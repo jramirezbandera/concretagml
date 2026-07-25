@@ -1,0 +1,38 @@
+{
+  "_fuente": "Calculadora Geodésica del IGN — ign.es/web/calculadora-geodesica, 'Transformación de Datum', ETRS89 geográficas (entrada manual) → UTM huso normal. Valores AUTORIZADOS leídos de la salida oficial el 2026-07-24.",
+  "_nota": "Resolución de la salida del IGN: X/Y a 3 decimales (mm); K a 8 decimales; W (convergencia de meridianos) al segundo de arco. Convención de W verificada: positiva al ESTE del meridiano central (coincide con geo/utm.js). Verificación en el momento de la captura: geo/utm.js concuerda a ≤0.46 mm en X/Y, ≤6e-9 en K y ≤0.31\" en W.",
+  "_criterio": "feature-00 criterio 1: 'Puntos de control de la Calculadora Geodésica del IGN como fixtures'. Cierra el TODO(IGN) de la auditoría (hallazgo A2).",
+  "sistemaReferencia": "ETRS89",
+  "puntos": [
+    {
+      "zona": 29,
+      "lat": 42,
+      "lon": -8,
+      "xUtm": 582818.069,
+      "yUtm": 4650259.847,
+      "k": 0.99968439,
+      "wDms": "0° 40' 9\"",
+      "wGrados": 0.6691666666666667
+    },
+    {
+      "zona": 30,
+      "lat": 40.4,
+      "lon": -3.7,
+      "xUtm": 440598.079,
+      "yUtm": 4472390.031,
+      "k": 0.99964343,
+      "wDms": "-0° 27' 13\"",
+      "wGrados": -0.4536111111111111
+    },
+    {
+      "zona": 31,
+      "lat": 41,
+      "lon": 2,
+      "xUtm": 415897.866,
+      "yUtm": 4539238.589,
+      "k": 0.99968705,
+      "wDms": "-0° 39' 22\"",
+      "wGrados": -0.6561111111111111
+    }
+  ]
+}

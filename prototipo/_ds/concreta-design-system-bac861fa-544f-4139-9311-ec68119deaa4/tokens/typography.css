@@ -1,0 +1,35 @@
+/* typography.css — Concreta type system.
+   Geist Sans for labels/titles/UI; Geist Mono for ALL numeric values, units,
+   and CE references (always with tabular-nums). The scale is pixel-literal —
+   this is a dense desk instrument, not a marketing type ramp. */
+
+:root {
+  --font-sans: "Geist Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* UI text scale — exact px values from the app */
+  --text-10: 10px;  /* section headers (CAPS), nav group labels */
+  --text-11: 11px;  /* CE notes, check-row values, app version */
+  --text-12: 12px;  /* input values (mono), check-row names */
+  --text-13: 13px;  /* field labels, nav items, topbar module title */
+  --text-14: 14px;  /* sidebar logo, module title */
+  --text-15: 15px;  /* topbar brand "Concreta" */
+
+  /* Marketing display scale (landing hero + section headings) */
+  --text-hero: clamp(40px, 5.6vw, 68px);
+  --text-h2: clamp(28px, 3.4vw, 42px);
+  --text-lead: 17px;
+
+  /* Weights */
+  --fw-regular: 400;   /* @kind font */
+  --fw-medium: 500;    /* @kind font */
+  --fw-semibold: 600;  /* @kind font */
+
+  /* Tracking */
+  --tracking-caps: 0.07em;   /* section headers */
+  --tracking-group: 0.11em;  /* sidebar nav group labels */
+  --tracking-tight: -0.035em;/* hero display */
+
+  /* Font features — stylistic sets used across the product */
+  --font-features: "ss01", "cv11";
+}

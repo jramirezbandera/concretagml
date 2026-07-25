@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/concreta-design-system-bac861fa-544f-4139-9311-ec68119deaa4/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/concreta-design-system-bac861fa-544f-4139-9311-ec68119deaa4/tokens/colors.css">
+<link rel="stylesheet" href="_ds/concreta-design-system-bac861fa-544f-4139-9311-ec68119deaa4/tokens/typography.css">
+<link rel="stylesheet" href="_ds/concreta-design-system-bac861fa-544f-4139-9311-ec68119deaa4/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/concreta-design-system-bac861fa-544f-4139-9311-ec68119deaa4/tokens/motion.css">
+<link rel="stylesheet" href="_ds/concreta-design-system-bac861fa-544f-4139-9311-ec68119deaa4/styles.css">
+<script src="_ds/concreta-design-system-bac861fa-544f-4139-9311-ec68119deaa4/_ds_bundle.js"></script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2032%2032'%3E%3Crect%20x%3D'1'%20y%3D'1'%20width%3D'30'%20height%3D'30'%20rx%3D'7'%20fill%3D'%23e0f2fe'%20stroke%3D'%237dd3fc'%2F%3E%3Cline%20x1%3D'16'%20y1%3D'4.5'%20x2%3D'16'%20y2%3D'27.5'%20stroke%3D'%230369a1'%20stroke-width%3D'1.6'%2F%3E%3Cline%20x1%3D'4.5'%20y1%3D'16'%20x2%3D'27.5'%20y2%3D'16'%20stroke%3D'%230369a1'%20stroke-width%3D'1.6'%2F%3E%3Ccircle%20cx%3D'16'%20cy%3D'16'%20r%3D'5'%20fill%3D'%23e0f2fe'%20stroke%3D'%230369a1'%20stroke-width%3D'1.8'%2F%3E%3Ccircle%20cx%3D'16'%20cy%3D'16'%20r%3D'1.9'%20fill%3D'%230369a1'%2F%3E%3C%2Fsvg%3E">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:#e2e8f0;font-family:'Geist Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#0369a1;text-decoration:none}
+a:hover{color:#0369a1}
+::selection{background:rgba(2,132,199,.16)}
+input,textarea,button,select{font-family:inherit}
+input:focus,textarea:focus,select:focus{outline:none;border-color:#0369a1!important}
+.mono{font-family:'Geist Mono',monospace;font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1}
+.lnk{color:#0369a1;cursor:pointer}
+.lnk:hover{text-decoration:underline}
+@keyframes mkdrop{0%{transform:translateY(-14px);opacity:0}100%{transform:translateY(0);opacity:1}}
+@keyframes scfade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+section[data-screen-label]{animation:scfade 220ms cubic-bezier(.22,1,.36,1)}
+button{font-family:inherit;letter-spacing:.005em;transition:background-color 150ms ease,border-color 150ms ease,color 150ms ease,filter 140ms ease,box-shadow 150ms ease,transform 110ms ease}
+button:not([disabled]){cursor:pointer}
+button:not([disabled]):hover{filter:brightness(.95)}
+button:not([disabled]):active{transform:translateY(1px);filter:brightness(.9)}
+input,select,textarea{transition:border-color 150ms ease,background-color 150ms ease,box-shadow 150ms ease}
+input:hover:not(:focus),select:hover,textarea:hover:not(:focus){border-color:#94a3b8!important}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#0369a1!important;box-shadow:0 0 0 3px rgba(3,105,161,.13)}
+:focus-visible{outline:2px solid #0369a1;outline-offset:2px}
+.hovv{transition:box-shadow 140ms ease,background-color 140ms ease}
+.hovv:hover{box-shadow:inset 0 0 0 1px #0369a1}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border:3px solid transparent;background-clip:content-box;border-radius:6px}
+</style>
+</helmet>
+<div style="width:1440px;height:900px;display:flex;background:#f1f5f9;color:#0f172a;font-size:13px;line-height:1.45;letter-spacing:.005em;overflow:hidden">
+
+  <!-- ============ PROGRESS RAIL ============ -->
+  <nav style="width:214px;flex:none;background:#f8fafc;border-right:1px solid #cbd5e1;display:flex;flex-direction:column;padding:18px 0">
+    <div style="padding:0 18px 14px;border-bottom:1px solid #e2e8f0;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div style="display:flex;align-items:center;gap:9px;min-width:0">
+          <span style="width:26px;height:26px;flex:none;display:flex;align-items:center;justify-content:center">
+            <svg width="26" height="26" viewBox="0 0 32 32" fill="none"><rect x="1" y="1" width="30" height="30" rx="7" fill="#e0f2fe" stroke="#7dd3fc"></rect><line x1="16" y1="4.5" x2="16" y2="27.5" stroke="#0369a1" stroke-width="1.4"></line><line x1="4.5" y1="16" x2="27.5" y2="16" stroke="#0369a1" stroke-width="1.4"></line><circle cx="16" cy="16" r="5" fill="#e0f2fe" stroke="#0369a1" stroke-width="1.6"></circle><circle cx="16" cy="16" r="1.7" fill="#0369a1"></circle></svg>
+          </span>
+          <div style="display:flex;align-items:center;gap:6px;min-width:0">
+            <span style="font-weight:600;font-size:15px;letter-spacing:-.01em;line-height:1;color:#0f172a">Concreta</span>
+            <span style="font-family:'Geist Mono',monospace;font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#64748b;line-height:1">GML</span>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#64748b;margin:4px 0 12px;letter-spacing:.03em">Contraste catastral · Escritorio</div>
+      <div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#94a3b8;font-weight:600;margin-bottom:6px">Tipo de expediente</div>
+      {{ docToggle }}
+    </div>
+    <div style="padding:0 12px;flex:1">{{ railSteps }}</div>
+    <div style="padding:14px 18px 0;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b">
+      <div style="display:flex;justify-content:space-between"><span>Documento</span><span class="mono" style="color:#475569">{{ docNum }}</span></div>
+      <div style="display:flex;justify-content:space-between;margin-top:3px"><span>RC</span><span class="mono" style="color:#475569">29041A00800099</span></div>
+      <div style="display:flex;justify-content:space-between;margin-top:3px"><span>SRS</span><span class="mono" style="color:#475569">UTM 30 ETRS89</span></div>
+    </div>
+  </nav>
+
+  <!-- ============ ENTRADA · PARCELA ============ -->
+  <sc-if value="{{ entryParcela }}" hint-placeholder-val="{{ true }}">
+  <section data-screen-label="Entrada · Parcela" style="flex:1;display:flex;min-width:0">
+    <div style="width:400px;flex:none;background:#fff;border-right:1px solid #cbd5e1;display:flex;flex-direction:column;overflow:auto">
+      <div style="padding:22px 24px 16px;border-bottom:1px solid #e2e8f0">
+        <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b;font-weight:600">Nuevo expediente · Parcela</div>
+        <h1 style="margin:6px 0 0;font-size:20px;font-weight:600;letter-spacing:-.01em">Empieza tu expediente</h1>
+      </div>
+      <div style="padding:18px 24px;display:flex;flex-direction:column;gap:16px">
+        <div style="border:1px solid #cbd5e1;border-left:2px solid #0369a1;border-radius:4px;background:#f8fafc;padding:15px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-size:12px;font-weight:600">Referencia catastral</span>
+            <span style="font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#0369a1;background:#e0f2fe;padding:1px 6px;border-radius:3px">Vía principal</span>
+          </div>
+          <div style="font-size:12px;color:#475569;margin-bottom:10px">Recupera el recinto oficial del Catastro para editarlo.</div>
+          <div style="display:flex;gap:8px">
+            <input class="mono" value="{{ rc }}" onInput="{{ setRc }}" maxlength="20" placeholder="29041A00800099" style="flex:1;height:36px;padding:0 10px;border:1px solid #cbd5e1;border-radius:4px;font-size:14px;letter-spacing:.06em;color:#0f172a;background:#fff"/>
+            <sc-if value="{{ rcValid }}" hint-placeholder-val="{{ true }}"><button onClick="{{ traer }}" style="height:36px;padding:0 18px;background:#0369a1;color:#fff;border:none;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer">Traer</button></sc-if>
+            <sc-if value="{{ rcInvalid }}"><button disabled style="height:36px;padding:0 18px;background:#e2e8f0;color:#94a3b8;border:none;border-radius:4px;font-weight:600;font-size:13px;cursor:not-allowed">Traer</button></sc-if>
+          </div>
+          <div style="margin-top:9px;font-size:11px;color:#64748b">Ejemplo: <span class="lnk mono" onClick="{{ fillExample }}">29041A00800099</span></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;color:#94a3b8;font-size:11px;letter-spacing:.1em;text-transform:uppercase">
+          <div style="flex:1;height:1px;background:#e2e8f0"></div><span>o bien</span><div style="flex:1;height:1px;background:#e2e8f0"></div>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:600;margin-bottom:7px">Medición propia</div>
+          <label style="font-size:11px;color:#64748b">Volcado del comando <span class="mono" style="color:#475569">LIST</span> de AutoCAD</label>
+          <textarea placeholder="Command: LIST&#10;LWPOLYLINE  Layer: PARCELA&#10;  at point, X=299381.53  Y=4028495.97 ..." style="width:100%;height:64px;margin-top:6px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:4px;font-family:'Geist Mono',monospace;font-size:11px;color:#475569;resize:none;background:#fff"></textarea>
+          <div style="margin-top:9px;border:1px dashed #cbd5e1;border-radius:4px;padding:11px;text-align:center;color:#64748b;font-size:12px;background:#f8fafc">Arrastra un fichero <span class="mono" style="color:#475569">DXF</span> o <span class="mono" style="color:#475569">TXT</span>, o haz clic para elegir</div>
+          <button onClick="{{ analizar }}" style="margin-top:10px;width:100%;height:36px;background:#fff;color:#0f172a;border:1px solid #cbd5e1;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer">Analizar parcela</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;color:#94a3b8;font-size:11px;letter-spacing:.1em;text-transform:uppercase">
+          <div style="flex:1;height:1px;background:#e2e8f0"></div><span>o bien</span><div style="flex:1;height:1px;background:#e2e8f0"></div>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:600;margin-bottom:4px">Comprobar un GML existente</div>
+          <div style="font-size:12px;color:#475569;margin-bottom:9px">Contrasta un GML ya hecho contra el parcelario, sin generar uno nuevo.</div>
+          <sc-if value="{{ noGml }}" hint-placeholder-val="{{ true }}">
+          <div onClick="{{ selectGml }}" style="border:1px dashed #cbd5e1;border-radius:4px;padding:14px;text-align:center;color:#64748b;font-size:12px;background:#f8fafc;cursor:pointer">Suelta un fichero <span class="mono" style="color:#475569">.gml</span>, o haz clic para elegir</div>
+          </sc-if>
+          <sc-if value="{{ hasGml }}">
+          <div style="border:1px solid #cbd5e1;border-radius:4px;padding:10px 12px;background:#f8fafc;display:flex;align-items:center;justify-content:space-between">
+            <span class="mono" style="font-size:12px;color:#0f172a">{{ gmlName }}</span>
+            <span class="lnk" style="font-size:11px" onClick="{{ clearGml }}">Quitar</span>
+          </div>
+          <button onClick="{{ comprobarGml }}" style="margin-top:10px;width:100%;height:36px;background:#0369a1;color:#fff;border:none;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer">Comprobar GML</button>
+          </sc-if>
+        </div>
+      </div>
+      <div style="margin-top:auto;padding:13px 24px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b">Sistema de referencia: <span class="mono" style="color:#475569">UTM huso 30 · ETRS89</span></div>
+    </div>
+    <div style="flex:1;position:relative;background:#f1f5f9;background-image:radial-gradient(#cfd8e3 1px,transparent 1px);background-size:22px 22px;min-width:0">
+      <div style="position:absolute;top:14px;left:14px;z-index:2;background:rgba(255,255,255,.92);border:1px solid #cbd5e1;border-radius:4px;padding:6px 10px;font-size:11px;color:#475569;letter-spacing:.02em">Cartografía catastral vigente · <span class="mono">UTM 30 ETRS89</span></div>
+      {{ mapEntry }}
+    </div>
+  </section>
+  </sc-if>
+
+  <!-- ============ ENTRADA · EDIFICIO ============ -->
+  <sc-if value="{{ entryEdificio }}">
+  <section data-screen-label="Entrada · Edificio" style="flex:1;display:flex;min-width:0">
+    <div style="width:400px;flex:none;background:#fff;border-right:1px solid #cbd5e1;display:flex;flex-direction:column;overflow:auto">
+      <div style="padding:22px 24px 16px;border-bottom:1px solid #e2e8f0">
+        <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b;font-weight:600">Nuevo expediente · Edificio</div>
+        <h1 style="margin:6px 0 0;font-size:20px;font-weight:600;letter-spacing:-.01em">Declara la construcción</h1>
+        <div style="font-size:12px;color:#475569;margin-top:5px">Genera el GML de edificio para la Sede Electrónica.</div>
+      </div>
+      <div style="padding:14px 24px 4px">
+        <div style="border:1px solid #e2e8f0;border-radius:4px;background:#f8fafc;padding:10px 12px;display:flex;align-items:center;gap:10px">
+          <span style="width:9px;height:9px;background:#15803d;border-radius:50%;flex:none"></span>
+          <div style="font-size:12px;color:#475569;line-height:1.35">Parcela de contexto ya cargada<br><span style="color:#0f172a;font-weight:600">Casares · Pol. 8, Parcela 99</span></div>
+        </div>
+      </div>
+      <div style="padding:14px 24px 4px">
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;font-weight:600;margin-bottom:8px">¿Qué necesitas generar?</div>
+        {{ edModelToggle }}
+        <div style="font-size:11px;color:#64748b;margin-top:8px;line-height:1.45">{{ edModelHint }}</div>
+      </div>
+      <div style="padding:10px 24px 6px">
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;font-weight:600;margin-bottom:8px">Referencia catastral</div>
+        <div style="display:flex;gap:8px">
+          <input class="mono" value="{{ edRc }}" onInput="{{ setEdRc }}" maxlength="20" style="flex:1;height:34px;padding:0 10px;border:1px solid #cbd5e1;border-radius:4px;font-size:14px;letter-spacing:.05em;color:#0f172a;background:#fff"/>
+          <button style="height:34px;padding:0 14px;background:#fff;color:#475569;border:1px solid #cbd5e1;border-radius:4px;font-weight:500;font-size:12px;cursor:pointer">Buscar</button>
+        </div>
+        <sc-if value="{{ edRcDeduced }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:8px;align-items:flex-start;margin-top:8px"><span style="width:6px;height:6px;border-radius:50%;background:#0369a1;margin-top:5px;flex:none"></span><span style="font-size:11px;color:#334155;line-height:1.4">Parcela deducida de la ubicación (centroide de la geometría) · puedes corregirla.</span></div></sc-if>
+        <sc-if value="{{ edRcAmbiguous }}"><div style="display:flex;gap:8px;align-items:flex-start;margin-top:8px"><span style="width:6px;height:6px;border-radius:50%;background:#d97706;margin-top:5px;flex:none"></span><span style="font-size:11px;color:#b45309;line-height:1.4">El centroide no cae en una parcela única. Elige o teclea la referencia catastral.</span></div></sc-if>
+        <sc-if value="{{ edRcContext }}"><div style="font-size:11px;color:#64748b;margin-top:8px">Traída con la parcela de contexto ya cargada.</div></sc-if>
+      </div>
+      <div style="padding:14px 24px 6px">
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;font-weight:600;margin-bottom:8px">Origen de la geometría</div>
+        <div style="border:1px solid #cbd5e1;border-left:2px solid #0369a1;border-radius:4px;background:#f8fafc;padding:13px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-size:12px;font-weight:600">Cargar DXF</span>
+            <span style="font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#0369a1;background:#e0f2fe;padding:1px 6px;border-radius:3px">Vía principal</span>
+          </div>
+          <div onClick="{{ pickDxf }}" style="border:1px dashed #7dd3fc;border-radius:4px;padding:14px;text-align:center;color:#0369a1;font-size:12px;background:#f1f5f9;cursor:pointer">Arrastra la planta <span class="mono">.dxf</span> del proyecto, o haz clic para elegir</div>
+          <div style="font-size:11px;color:#0369a1;margin-top:8px;line-height:1.4">Cada polilínea del dibujo se cargará como una parte; podrás nombrarlas y asignarles plantas en el paso siguiente.</div>
+        </div>
+        {{ edVias }}
+      </div>
+      <div style="padding:12px 24px 6px">
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;font-weight:600;margin-bottom:10px">{{ edAttrTitle }}</div>
+        <div style="font-size:11px;color:#64748b;margin:-4px 0 10px">Las plantas se asignan a cada parte en el paso siguiente.</div>
+        <div style="margin-bottom:12px">
+          <label style="font-size:11px;color:#64748b">Estado de conservación</label>
+          <select style="width:100%;height:34px;margin-top:5px;padding:0 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;color:#0f172a;background:#fff"><option>Funcional</option><option>Normal</option><option>Deficiente</option><option>Ruinoso</option></select>
+        </div>
+        <sc-if value="{{ edSimplificado }}" hint-placeholder-val="{{ true }}">
+          <div style="font-size:11px;color:#64748b;line-height:1.45;border-top:1px dashed #e2e8f0;padding-top:10px">Modelo simplificado: sólo se piden geometría, referencia catastral y estado. Los atributos semánticos (inmuebles, viviendas, superficie, uso y fechas) no son necesarios para el ICUC.</div>
+        </sc-if>
+        <sc-if value="{{ edCompleto }}">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="grid-column:1 / -1">
+              <label style="font-size:11px;color:#64748b">Uso dominante</label>
+              <select style="width:100%;height:34px;margin-top:5px;padding:0 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:13px;color:#0f172a;background:#fff"><option>Residencial</option><option>Industrial</option><option>Agrario</option><option>Almacén</option></select>
+              <div style="font-size:10px;color:#94a3b8;margin-top:4px;line-height:1.4">Uso con mayor superficie entre los inmuebles de la parcela.</div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:#64748b">Año de construcción</label>
+              <input class="mono" value="1998" style="width:100%;height:34px;margin-top:5px;padding:0 10px;border:1px solid #cbd5e1;border-radius:4px;font-size:14px;color:#0f172a"/>
+            </div>
+            <div>
+              <label style="font-size:11px;color:#64748b">Año de reforma</label>
+              <input class="mono" value="—" style="width:100%;height:34px;margin-top:5px;padding:0 10px;border:1px solid #cbd5e1;border-radius:4px;font-size:14px;color:#64748b"/>
+            </div>
+            <div style="grid-column:1 / -1;font-size:10px;color:#94a3b8;margin-top:-4px;line-height:1.4">El año de construcción se refiere al 1 de enero; si hay varias construcciones, es la del cuerpo más antiguo.</div>
+            <div>
+              <label style="font-size:11px;color:#64748b">Nº de inmuebles</label>
+              <input class="mono" value="3" style="width:100%;height:34px;margin-top:5px;padding:0 10px;border:1px solid #cbd5e1;border-radius:4px;font-size:14px;color:#0f172a"/>
+              <div style="font-size:10px;color:#94a3b8;margin-top:4px;line-height:1.4">Viviendas + locales + garajes.</div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:#64748b">Nº de viviendas</label>
+              <input class="mono" value="1" style="width:100%;height:34px;margin-top:5px;padding:0 10px;border:1px solid #cbd5e1;border-radius:4px;font-size:14px;color:#0f172a"/>
+            </div>
+            <div style="grid-column:1 / -1">
+              <label style="font-size:11px;color:#64748b">Superficie construida (grossFloorArea)</label>
+              <div style="display:flex;align-items:baseline;gap:6px"><input class="mono" value="112,40" style="flex:1;height:34px;margin-top:5px;padding:0 10px;border:1px solid #cbd5e1;border-radius:4px;font-size:14px;color:#0f172a"/><span style="font-size:12px;color:#64748b">m²</span></div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+      <div style="margin-top:auto;padding:16px 24px;border-top:1px solid #e2e8f0">
+        <button onClick="{{ toParts }}" style="width:100%;height:38px;background:#0369a1;color:#fff;border:none;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer">Continuar a partes y plantas</button>
+      </div>
+    </div>
+    <div style="flex:1;position:relative;background:#f1f5f9;background-image:radial-gradient(#cfd8e3 1px,transparent 1px);background-size:22px 22px;min-width:0">
+      <div style="position:absolute;top:14px;left:14px;z-index:2;background:rgba(255,255,255,.92);border:1px solid #cbd5e1;border-radius:4px;padding:6px 10px;font-size:11px;color:#475569;display:flex;gap:14px;align-items:center">
+        <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:11px;height:9px;background:rgba(124,58,237,.28);border:1px solid #7C3AED"></span>Construcción</span>
+        <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:11px;height:9px;border:1.4px solid #15803d"></span>Parcela</span>
+      </div>
+      {{ mapEntry }}
+    </div>
+  </section>
+  </sc-if>
+
+  <!-- ============ PARTES Y PLANTAS ============ -->
+  <sc-if value="{{ showParts }}">
+  <section data-screen-label="Partes y plantas" style="flex:1;display:flex;min-width:0">
+    <div style="width:412px;flex:none;background:#fff;border-right:1px solid #cbd5e1;display:flex;flex-direction:column;overflow:auto">
+      <div style="padding:20px 24px 14px;border-bottom:1px solid #e2e8f0">
+        <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b;font-weight:600">Partes de construcción</div>
+        <h1 style="margin:6px 0 0;font-size:19px;font-weight:600">Partes y plantas</h1>
+        <div style="font-size:12px;color:#475569;margin-top:4px;text-wrap:pretty">Cada parte es un recinto con su propio número de plantas. El edificio se deriva de ellas.</div>
+      </div>
+      <div style="padding:14px 24px 6px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;font-weight:600">Lista de partes</span>
+          <span class="lnk" style="font-size:12px;font-weight:600" onClick="{{ addPart }}">+ Añadir parte</span>
+        </div>
+        {{ partsList }}
+      </div>
+      <div style="padding:12px 24px">
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;font-weight:600;margin-bottom:10px">Geometría de la parte activa</div>
+        {{ partTools }}
+      </div>
+      <div style="margin:0 24px 6px;padding:12px 14px;border:1px solid #e2e8f0;border-radius:4px;background:#f8fafc;display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:#475569">Superficie de la parte activa</span><span class="mono" style="color:#0f172a">{{ activeArea }} m²</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:#475569">Huella sobre rasante (suma)</span><span class="mono" style="color:#0f172a">{{ huellaSobre }} m²</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;padding-top:6px;border-top:1px dashed #e2e8f0"><span style="color:#475569">Envolvente calculada</span><span class="mono" style="color:#7C3AED">{{ envParts }} parte(s)</span></div>
+      </div>
+      <div style="margin-top:auto;padding:16px 24px;border-top:1px solid #e2e8f0">
+        <button onClick="{{ toValidEd }}" style="width:100%;height:38px;background:#0369a1;color:#fff;border:none;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer">Comprobar y continuar</button>
+      </div>
+    </div>
+    <div style="flex:1;position:relative;background:#f1f5f9;background-image:radial-gradient(#cfd8e3 1px,transparent 1px);background-size:22px 22px;min-width:0">
+      <div style="position:absolute;top:14px;left:14px;z-index:2;background:rgba(255,255,255,.92);border:1px solid #cbd5e1;border-radius:4px;padding:6px 10px;font-size:11px;color:#475569;display:flex;gap:13px;align-items:center;flex-wrap:wrap;max-width:520px">
+        <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:11px;height:9px;background:rgba(124,58,237,.28);border:1.4px solid #7C3AED"></span>Parte principal</span>
+        <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:11px;height:9px;background:repeating-linear-gradient(45deg,#B79BEB,#B79BEB 2px,transparent 2px,transparent 4px);border:1.4px solid #7C3AED"></span>Otra construcción</span>
+        <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:14px;height:0;border-top:1.6px dashed #6D28D9"></span>Envolvente calculada</span>
+        <span style="display:inline-flex;align-items:center;gap:6px"><span style="font-family:'Geist Mono';font-weight:600;color:#6D28D9">II</span>plantas</span>
+      </div>
+      {{ mapParts }}
+    </div>
+  </section>
+  </sc-if>
+
+  <!-- ============ VALIDACIÓN ============ -->
+  <sc-if value="{{ showValid }}">
+  <section data-screen-label="Validación" style="flex:1;display:flex;min-width:0">
+    <div style="width:392px;flex:none;background:#fff;border-right:1px solid #cbd5e1;display:flex;flex-direction:column;overflow:auto">
+
+      <!-- ---- PARCELA validation ---- -->
+      <sc-if value="{{ isParcela }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:20px 24px 14px;border-bottom:1px solid #e2e8f0">
+        <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b;font-weight:600">Parcela cargada</div>
+        <h1 style="margin:6px 0 12px;font-size:19px;font-weight:600">Validación del recinto</h1>
+        <div style="display:flex;gap:8px">
+          <sc-if value="{{ hasError }}" hint-placeholder-val="{{ true }}"><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;padding:3px 9px;border-radius:3px"><span style="width:7px;height:7px;background:#dc2626;border-radius:50%"></span>{{ errCount }} error</span></sc-if>
+          <sc-if value="{{ noError }}"><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:3px 9px;border-radius:3px"><span style="width:7px;height:7px;background:#94a3b8;border-radius:50%"></span>0 errores</span></sc-if>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#b45309;background:#fffbeb;border:1px solid #fde68a;padding:3px 9px;border-radius:3px"><span style="width:7px;height:7px;background:#d97706;border-radius:50%"></span>1 aviso</span>
+        </div>
+      </div>
+      <div style="padding:16px 24px 6px">
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;font-weight:600;margin-bottom:8px">Incidencias</div>
+        <sc-if value="{{ hasError }}" hint-placeholder-val="{{ true }}">
+        <div onMouseEnter="{{ hoverErr }}" onMouseLeave="{{ hoverNone }}" style="border:1px solid #fecaca;border-left:3px solid #dc2626;border-radius:4px;background:#fef2f2;padding:12px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <span style="font-weight:600;color:#dc2626;font-size:13px">Vértice duplicado</span>
+            <span style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#dc2626">Bloqueante</span>
+          </div>
+          <div style="font-size:12px;color:#475569;margin:4px 0 10px">El vértice <span class="mono">4</span> coincide con el <span class="mono">1</span> (Δ &lt; 0,01 m). Impide cerrar el recinto.</div>
+          <button onClick="{{ fixDuplicate }}" style="height:32px;padding:0 12px;background:#fff;color:#dc2626;border:1px solid #fca5a5;border-radius:4px;font-weight:600;font-size:12px;cursor:pointer">Eliminar vértice duplicado</button>
+        </div>
+        </sc-if>
+        <sc-if value="{{ noError }}">
+        <div style="border:1px solid #e2e8f0;border-left:3px solid #94a3b8;border-radius:4px;background:#f8fafc;padding:12px;margin-bottom:8px">
+          <div style="font-weight:600;color:#475569;font-size:13px">Vértice duplicado · resuelto</div>
+          <div style="font-size:12px;color:#64748b;margin-top:4px">Se eliminó el vértice <span class="mono">4</span>. Recinto de 4 vértices.</div>
+        </div>
+        </sc-if>
+        <div onMouseEnter="{{ hoverAvi }}" onMouseLeave="{{ hoverNone }}" style="border:1px solid #fde68a;border-left:3px solid #d97706;border-radius:4px;background:#fffbeb;padding:12px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <span style="font-weight:600;color:#b45309;font-size:13px">Tramo casi colineal</span>
+            <span style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#b45309">Aviso</span>
+          </div>
+          <div style="font-size:12px;color:#475569;margin-top:4px">Vértices <span class="mono">2–3</span>: desviación de 0,4° respecto a la recta. No bloquea.</div>
+        </div>
+      </div>
+      <div style="padding:14px 24px 6px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;font-weight:600">Vértices</span>
+          <span style="font-size:11px;color:#64748b">X · Y (m)</span>
+        </div>
+        <div class="mono" style="font-size:12px;border:1px solid #e2e8f0;border-radius:4px;overflow:hidden">
+          <div style="display:grid;grid-template-columns:34px 1fr 1fr;background:#f1f5f9;color:#64748b;font-size:10px;letter-spacing:.04em;padding:5px 10px;text-transform:uppercase">
+            <span style="font-family:'Geist Sans'">Nº</span><span style="text-align:right">X</span><span style="text-align:right">Y</span></div>
+          <div style="display:grid;grid-template-columns:34px 1fr 1fr;padding:5px 10px"><span style="color:#7C3AED">0</span><span style="text-align:right">299 381,53</span><span style="text-align:right">4 028 495,97</span></div>
+          <div style="display:grid;grid-template-columns:34px 1fr 1fr;padding:5px 10px;background:#f8fafc"><span style="color:#7C3AED">1</span><span style="text-align:right">299 388,96</span><span style="text-align:right">4 028 493,14</span></div>
+          <div style="display:grid;grid-template-columns:34px 1fr 1fr;padding:5px 10px"><span style="color:#7C3AED">2</span><span style="text-align:right">299 386,01</span><span style="text-align:right">4 028 485,41</span></div>
+          <div style="display:grid;grid-template-columns:34px 1fr 1fr;padding:5px 10px;background:#f8fafc"><span style="color:#7C3AED">3</span><span style="text-align:right">299 378,47</span><span style="text-align:right">4 028 488,45</span></div>
+          <sc-if value="{{ hasError }}" hint-placeholder-val="{{ true }}"><div style="display:grid;grid-template-columns:34px 1fr 1fr;padding:5px 10px;background:#fef2f2;color:#dc2626"><span>4</span><span style="text-align:right">299 388,96</span><span style="text-align:right">4 028 493,14</span></div></sc-if>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:12px;color:#475569">
+          <span>Superficie <span class="mono" style="color:#0f172a">62,47 m²</span></span>
+          <span>Perímetro <span class="mono" style="color:#0f172a">31,86 m</span></span>
+        </div>
+      </div>
+      <div style="margin-top:auto;padding:16px 24px;border-top:1px solid #e2e8f0">
+        <sc-if value="{{ canDiagnose }}" hint-placeholder-val="{{ true }}"><button onClick="{{ toEdit }}" style="width:100%;height:38px;background:#0369a1;color:#fff;border:none;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer">Diagnosticar</button></sc-if>
+        <sc-if value="{{ cannotDiagnose }}"><button disabled style="width:100%;height:38px;background:#e2e8f0;color:#94a3b8;border:none;border-radius:4px;font-weight:600;font-size:13px;cursor:not-allowed">Diagnosticar</button></sc-if>
+        <sc-if value="{{ cannotDiagnose }}"><div style="font-size:11px;color:#64748b;margin-top:7px;text-align:center">Resuelve el error para continuar</div></sc-if>
+      </div>
+      </sc-if>
+
+      <!-- ---- EDIFICIO validation ---- -->
+      <sc-if value="{{ isEdificio }}">
+      <div style="padding:20px 24px 14px;border-bottom:1px solid #e2e8f0">
+        <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b;font-weight:600">Partes de construcción</div>
+        <h1 style="margin:6px 0 12px;font-size:19px;font-weight:600">Validación de partes</h1>
+        <div style="display:flex;gap:8px">
+          <sc-if value="{{ edHasError }}" hint-placeholder-val="{{ true }}"><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;padding:3px 9px;border-radius:3px"><span style="width:7px;height:7px;background:#dc2626;border-radius:50%"></span>{{ edErrCount }} error</span></sc-if>
+          <sc-if value="{{ edNoError }}"><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;padding:3px 9px;border-radius:3px"><span style="width:7px;height:7px;background:#94a3b8;border-radius:50%"></span>0 errores</span></sc-if>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#b45309;background:#fffbeb;border:1px solid #fde68a;padding:3px 9px;border-radius:3px"><span style="width:7px;height:7px;background:#d97706;border-radius:50%"></span>1 aviso</span>
+        </div>
+      </div>
+      <div style="padding:16px 24px 6px">
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;font-weight:600;margin-bottom:8px">Incidencias</div>
+        <sc-if value="{{ edHasError }}" hint-placeholder-val="{{ true }}">
+        <div style="border:1px solid #fecaca;border-left:3px solid #dc2626;border-radius:4px;background:#fef2f2;padding:12px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <span style="font-weight:600;color:#dc2626;font-size:13px">Vértice duplicado · Vivienda principal</span>
+            <span style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#dc2626">Bloqueante</span>
+          </div>
+          <div style="font-size:12px;color:#475569;margin:4px 0 10px">Dos vértices coinciden en la geometría de la parte (Δ &lt; 0,01 m).</div>
+          <button onClick="{{ fixEdError }}" style="height:32px;padding:0 12px;background:#fff;color:#dc2626;border:1px solid #fca5a5;border-radius:4px;font-weight:600;font-size:12px;cursor:pointer">Eliminar vértice duplicado</button>
+        </div>
+        </sc-if>
+        <sc-if value="{{ edNoError }}">
+        <div style="border:1px solid #e2e8f0;border-left:3px solid #94a3b8;border-radius:4px;background:#f8fafc;padding:12px;margin-bottom:8px">
+          <div style="font-weight:600;color:#475569;font-size:13px">Geometría de partes · resuelto</div>
+          <div style="font-size:12px;color:#64748b;margin-top:4px">Sin vértices duplicados ni autointersecciones.</div>
+        </div>
+        </sc-if>
+        <div style="border:1px solid #fde68a;border-left:3px solid #d97706;border-radius:4px;background:#fffbeb;padding:12px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <span style="font-weight:600;color:#b45309;font-size:13px">Parte fuera de la parcela</span>
+            <span style="font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#b45309">Aviso</span>
+          </div>
+          <div style="font-size:12px;color:#475569;margin-top:4px">La <b>Piscina</b> sobresale del recinto de la parcela. Puede ser legítimo; se avisa.</div>
+        </div>
+      </div>
+      <div style="padding:14px 24px 6px">
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;font-weight:600;margin-bottom:8px">Plantas asignadas</div>
+        {{ edPlantaCheck }}
+      </div>
+      <div style="margin-top:auto;padding:16px 24px;border-top:1px solid #e2e8f0">
+        <sc-if value="{{ edCanGen }}" hint-placeholder-val="{{ true }}"><button onClick="{{ toGml }}" style="width:100%;height:38px;background:#0369a1;color:#fff;border:none;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer">Continuar a generar GML</button></sc-if>
+        <sc-if value="{{ edCannotGen }}"><button disabled style="width:100%;height:38px;background:#e2e8f0;color:#94a3b8;border:none;border-radius:4px;font-weight:600;font-size:13px;cursor:not-allowed">Continuar a generar GML</button></sc-if>
+        <sc-if value="{{ edCannotGen }}"><div style="font-size:11px;color:#64748b;margin-top:7px;text-align:center">Resuelve el error para continuar</div></sc-if>
+      </div>
+      </sc-if>
+
+    </div>
+    <div style="flex:1;position:relative;background:#f1f5f9;background-image:radial-gradient(#cfd8e3 1px,transparent 1px);background-size:22px 22px;min-width:0">
+      <div style="position:absolute;top:14px;left:14px;z-index:2;background:rgba(255,255,255,.92);border:1px solid #cbd5e1;border-radius:4px;padding:6px 10px;font-size:11px;color:#475569">{{ validCaption }}</div>
+      {{ mapValid }}
+    </div>
+  </section>
+  </sc-if>
+
+  <!-- ============ EDICIÓN (parcela) ============ -->
+  <sc-if value="{{ showEdit }}">
+  <section data-screen-label="Edición" style="flex:1;display:flex;min-width:0">
+    <div style="width:392px;flex:none;background:#fff;border-right:1px solid #cbd5e1;display:flex;flex-direction:column;overflow:auto">
+      <div style="padding:20px 24px 14px;border-bottom:1px solid #e2e8f0">
+        <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b;font-weight:600">Edición de lindero</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+          <h1 style="margin:0;font-size:19px;font-weight:600">Lindero norte</h1>
+          <span class="mono" style="font-size:11px;color:#7C3AED;border:1px solid #C9B6F0;background:#F6F1FE;padding:2px 7px;border-radius:3px">v0 – v1</span>
+        </div>
+      </div>
+      <div style="padding:16px 24px;border-bottom:1px solid #e2e8f0">
+        <div style="font-size:12px;font-weight:600;margin-bottom:4px">Offset perpendicular</div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:10px">Desplaza el lindero en paralelo a sí mismo.</div>
+        <div style="display:flex;align-items:stretch;gap:8px">
+          <button onClick="{{ decOffset }}" style="width:38px;background:#fff;border:1px solid #cbd5e1;border-radius:4px;font-size:18px;color:#475569;cursor:pointer">−</button>
+          <div style="flex:1;display:flex;align-items:baseline;justify-content:center;gap:5px;border:1px solid #cbd5e1;border-radius:4px;background:#f8fafc">
+            <span class="mono" style="font-size:22px;font-weight:500">{{ offsetStr }}</span><span style="font-size:12px;color:#64748b">m</span>
+          </div>
+          <button onClick="{{ incOffset }}" style="width:38px;background:#fff;border:1px solid #cbd5e1;border-radius:4px;font-size:18px;color:#475569;cursor:pointer">+</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px dashed #e2e8f0">
+          <span style="font-size:12px;color:#475569">Δ superficie de esta edición</span>
+          <span class="mono" style="font-size:15px;color:#0f172a">{{ deltaArea }}</span>
+        </div>
+      </div>
+      <div style="padding:16px 24px">
+        <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#64748b;font-weight:600;margin-bottom:10px">Snap</div>
+        {{ snapControls }}
+      </div>
+      <div style="margin-top:auto;padding:16px 24px;border-top:1px solid #e2e8f0;display:flex;flex-direction:column;gap:8px">
+        <button onClick="{{ toDiagnosis }}" style="width:100%;height:38px;background:#0369a1;color:#fff;border:none;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer">Diagnosticar encaje</button>
+        <button onClick="{{ toDiagnosis }}" style="width:100%;height:34px;background:#fff;color:#475569;border:1px solid #cbd5e1;border-radius:4px;font-weight:500;font-size:12px;cursor:pointer">Omitir edición y diagnosticar</button>
+      </div>
+    </div>
+    <div style="flex:1;position:relative;background:#f1f5f9;background-image:radial-gradient(#cfd8e3 1px,transparent 1px);background-size:22px 22px;min-width:0">
+      <div style="position:absolute;top:14px;left:14px;z-index:2;background:rgba(255,255,255,.92);border:1px solid #cbd5e1;border-radius:4px;padding:6px 10px;font-size:11px;color:#475569;display:flex;gap:14px;align-items:center">
+        <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:9px;height:9px;background:#7C3AED;border-radius:2px"></span>Movido por ti</span>
+        <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border:1.5px solid #7C3AED;border-radius:50%;background:#fff"></span>Del Catastro</span>
+      </div>
+      {{ mapEdit }}
+    </div>
+  </section>
+  </sc-if>
+
+  <!-- ============ DIAGNÓSTICO (parcela) ============ -->
+  <sc-if value="{{ showDiag }}">
+  <section data-screen-label="Diagnóstico" style="flex:1;display:flex;min-width:0">
+    <div style="flex:1;position:relative;background:#f1f5f9;background-image:radial-gradient(#cfd8e3 1px,transparent 1px);background-size:22px 22px;min-width:0">
+      <div style="position:absolute;top:16px;left:16px;z-index:2;background:rgba(255,255,255,.92);border:1px solid #cbd5e1;border-radius:4px;padding:8px 12px;font-size:11px;color:#475569;display:flex;gap:16px;align-items:center">
+        <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:16px;height:0;border-top:2px solid #7C3AED"></span>Medición</span>
+        <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:16px;height:0;border-top:2px dashed #15803d"></span>Parcelario</span>
+        <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:12px;height:9px;background:repeating-linear-gradient(45deg,#B7A6E0,#B7A6E0 2px,transparent 2px,transparent 4px)"></span>Diferencia</span>
+      </div>
+      {{ mapDiag }}
+    </div>
+    <div style="width:420px;flex:none;background:#fff;border-left:1px solid #cbd5e1;display:flex;flex-direction:column;overflow:auto">
+      <div style="padding:22px 26px 18px;border-bottom:1px solid #e2e8f0">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+          <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b;font-weight:600">Contraste con el parcelario</div>
+          <span class="mono" style="font-size:11px;color:#64748b">{{ diagSource }}</span>
+        </div>
+        <p style="margin:0;font-size:14px;line-height:1.55;color:#334155;text-wrap:pretty">Medición de <span class="mono" style="color:#0f172a">62,47 m²</span> frente a los <span class="mono" style="color:#0f172a">61,80 m²</span> del parcelario vigente. Solape del <span class="mono" style="color:#0f172a">97,4 %</span>, sin invasión a colindantes.</p>
+      </div>
+      <div style="padding:22px 26px;border-bottom:1px solid #e2e8f0;display:flex;flex-direction:column;gap:18px">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;margin-bottom:2px"><span style="width:9px;height:9px;background:#7C3AED;border-radius:2px"></span>Superficie medida</div>
+          <div style="display:flex;align-items:baseline;gap:8px"><span class="mono" style="font-size:42px;font-weight:500;letter-spacing:-.02em;line-height:1">62,47</span><span style="font-size:15px;color:#64748b">m²</span></div>
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;margin-bottom:2px"><span style="width:9px;height:9px;border:1.5px solid #15803d;border-radius:50%"></span>Superficie catastral</div>
+          <div style="display:flex;align-items:baseline;gap:8px"><span class="mono" style="font-size:42px;font-weight:500;letter-spacing:-.02em;line-height:1;color:#334155">61,80</span><span style="font-size:15px;color:#64748b">m²</span></div>
+        </div>
+      </div>
+      <div style="padding:18px 26px">
+        <div style="display:flex;flex-direction:column">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #e2e8f0"><span style="font-size:13px;color:#475569">Diferencia</span><span class="mono" style="font-size:14px;color:#475569">+0,67 m² · +1,08 %</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #e2e8f0"><span style="font-size:13px;color:#475569">Solape</span><span class="mono" style="font-size:14px;color:#0f172a">97,4 %</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #e2e8f0"><span style="font-size:13px;color:#475569">Desplazamiento entre centroides</span><span class="mono" style="font-size:14px;color:#0f172a">0,31 m</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #e2e8f0"><span style="font-size:13px;color:#475569">Desviación máxima de lindero</span><span class="mono" style="font-size:14px;color:#0f172a">0,54 m</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0"><span style="font-size:13px;color:#475569">Invasión a colindantes</span><span class="mono" style="font-size:14px;color:#475569">Ninguna</span></div>
+        </div>
+      </div>
+      <div style="margin-top:auto;padding:18px 26px;border-top:1px solid #e2e8f0;display:flex;flex-direction:column;gap:9px">
+        <sc-if value="{{ diagGenerate }}" hint-placeholder-val="{{ true }}">
+          <button onClick="{{ genGml }}" style="width:100%;height:40px;background:#0369a1;color:#fff;border:none;border-radius:4px;font-weight:600;font-size:14px;cursor:pointer">Generar GML</button>
+          <button onClick="{{ verInforme }}" style="width:100%;height:38px;background:#fff;color:#0f172a;border:1px solid #cbd5e1;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer">Vista previa del informe</button>
+        </sc-if>
+        <sc-if value="{{ diagCheck }}">
+          <button onClick="{{ downloadInforme }}" style="width:100%;height:40px;background:#0369a1;color:#fff;border:none;border-radius:4px;font-weight:600;font-size:14px;cursor:pointer">Descargar informe de contraste</button>
+          <button onClick="{{ downloadGml }}" style="width:100%;height:38px;background:#fff;color:#0f172a;border:1px solid #cbd5e1;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer">Descargar GML de nuevo</button>
+          <sc-if value="{{ downloaded }}"><div style="font-size:12px;color:#475569;text-align:center;margin-top:2px">Informe descargado · <span class="mono">CG-2026-000099-contraste.pdf</span></div></sc-if>
+        </sc-if>
+      </div>
+    </div>
+  </section>
+  </sc-if>
+
+  <!-- ============ GENERAR GML (edificio) ============ -->
+  <sc-if value="{{ showGml }}">
+  <section data-screen-label="Generar GML" style="flex:1;display:flex;min-width:0">
+    <div style="flex:1;position:relative;background:#f1f5f9;background-image:radial-gradient(#cfd8e3 1px,transparent 1px);background-size:22px 22px;min-width:0">
+      <div style="position:absolute;top:14px;left:14px;z-index:2;background:rgba(255,255,255,.92);border:1px solid #cbd5e1;border-radius:4px;padding:6px 10px;font-size:11px;color:#475569;display:flex;gap:13px;align-items:center;flex-wrap:wrap;max-width:520px">
+        <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:11px;height:9px;background:rgba(124,58,237,.28);border:1.4px solid #7C3AED"></span>Parte principal</span>
+        <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:11px;height:9px;background:repeating-linear-gradient(45deg,#B79BEB,#B79BEB 2px,transparent 2px,transparent 4px);border:1.4px solid #7C3AED"></span>Otra construcción</span>
+        <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:14px;height:0;border-top:1.6px dashed #6D28D9"></span>Envolvente calculada</span>
+      </div>
+      {{ mapParts }}
+    </div>
+    <div style="width:420px;flex:none;background:#fff;border-left:1px solid #cbd5e1;display:flex;flex-direction:column;overflow:auto">
+      <div style="padding:22px 26px 16px;border-bottom:1px solid #e2e8f0">
+        <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b;font-weight:600">Salida del expediente</div>
+        <h1 style="margin:6px 0 0;font-size:20px;font-weight:600">Generar GML de edificio</h1>
+        <div style="font-size:12px;color:#475569;margin-top:5px;text-wrap:pretty">GML de edificio INSPIRE 2D extendido: las partes con sus plantas y el edificio-envolvente derivado.</div>
+      </div>
+      <div style="padding:20px 26px;display:flex;flex-direction:column;gap:16px">
+        <div>
+          <div style="font-size:12px;color:#475569;margin-bottom:2px">Huella sobre rasante</div>
+          <div style="display:flex;align-items:baseline;gap:8px"><span class="mono" style="font-size:40px;font-weight:500;letter-spacing:-.02em;line-height:1">{{ huellaSobre }}</span><span style="font-size:15px;color:#64748b">m²</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid #e2e8f0"><span style="font-size:13px;color:#475569">Partes de construcción</span><span class="mono" style="font-size:14px;color:#0f172a">{{ partCount }}</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid #e2e8f0"><span style="font-size:13px;color:#475569">Sobre rasante (envolvente)</span><span class="mono" style="font-size:14px;color:#0f172a">{{ envParts }}</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid #e2e8f0"><span style="font-size:13px;color:#475569">Modelo GML</span><span class="mono" style="font-size:13px;color:#0f172a">{{ edModelLabel }}</span></div>
+          <sc-if value="{{ edCompleto }}"><div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid #e2e8f0"><span style="font-size:13px;color:#475569">Uso · año · estado</span><span class="mono" style="font-size:13px;color:#0f172a">Resid. · 1998 · Func.</span></div></sc-if>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 0"><span style="font-size:13px;color:#475569">SRS</span><span class="mono" style="font-size:14px;color:#0f172a">EPSG:25830</span></div>
+        </div>
+        {{ edGmlFicha }}
+      </div>
+      <div style="margin-top:auto;padding:18px 26px;border-top:1px solid #e2e8f0;display:flex;flex-direction:column;gap:9px">
+        <sc-if value="{{ notGenerated }}" hint-placeholder-val="{{ true }}">
+          <button onClick="{{ generarGml }}" style="width:100%;height:42px;background:#0369a1;color:#fff;border:none;border-radius:4px;font-weight:600;font-size:14px;cursor:pointer">Generar GML</button>
+        </sc-if>
+        <sc-if value="{{ generated }}">
+          <div style="border:1px solid #bbf7d0;background:#f0fdf4;border-radius:4px;padding:11px 13px;display:flex;align-items:center;justify-content:space-between">
+            <span class="mono" style="font-size:12px;color:#166534">edificio_29041A00800099.gml</span>
+            <span class="lnk" style="font-size:12px;font-weight:600">Descargar</span>
+          </div>
+          <div style="height:1px;background:#e2e8f0;margin:4px 0"></div>
+          <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#94a3b8;font-weight:600">Opcional</div>
+          <button onClick="{{ toContrast }}" style="width:100%;height:38px;background:#fff;color:#0f172a;border:1px solid #cbd5e1;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer">Contrastar con la construcción catastral</button>
+          <button onClick="{{ toReportEd }}" style="width:100%;height:38px;background:#fff;color:#475569;border:1px solid #cbd5e1;border-radius:4px;font-weight:500;font-size:13px;cursor:pointer">Vista previa del informe</button>
+        </sc-if>
+      </div>
+    </div>
+  </section>
+  </sc-if>
+
+  <!-- ============ CONTRASTE (edificio · opcional) ============ -->
+  <sc-if value="{{ showContrast }}">
+  <section data-screen-label="Contraste" style="flex:1;display:flex;min-width:0">
+    <div style="flex:1;position:relative;background:#f1f5f9;background-image:radial-gradient(#cfd8e3 1px,transparent 1px);background-size:22px 22px;min-width:0">
+      <sc-if value="{{ contrastOn }}" hint-placeholder-val="{{ true }}">
+      <div style="position:absolute;top:16px;left:16px;z-index:2;background:rgba(255,255,255,.92);border:1px solid #cbd5e1;border-radius:4px;padding:8px 12px;font-size:11px;color:#475569;display:flex;gap:16px;align-items:center">
+        <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:12px;height:9px;background:rgba(124,58,237,.22);border:1.4px solid #7C3AED"></span>Huella medida</span>
+        <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:16px;height:0;border-top:2px dashed #15803d"></span>Constru. catastral</span>
+      </div>
+      </sc-if>
+      {{ mapContrast }}
+    </div>
+    <div style="width:420px;flex:none;background:#fff;border-left:1px solid #cbd5e1;display:flex;flex-direction:column;overflow:auto">
+      <sc-if value="{{ contrastOff }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:22px 26px 18px;border-bottom:1px solid #e2e8f0">
+        <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b;font-weight:600">Contraste · opcional</div>
+        <h1 style="margin:6px 0 0;font-size:19px;font-weight:600">Sin construcción registrada</h1>
+      </div>
+      <div style="padding:22px 26px;display:flex;flex-direction:column;gap:16px">
+        <div style="border:1px solid #e2e8f0;border-radius:4px;background:#f8fafc;padding:16px;font-size:13px;line-height:1.6;color:#334155;text-wrap:pretty">No consta construcción registrada en el Catastro para esta parcela. Se trata de una construcción que se declara por primera vez, así que no hay geometría de referencia contra la que contrastar.</div>
+        <div style="font-size:12px;color:#475569;line-height:1.55">El contraste sólo tiene sentido cuando ya hay algo registrado —una modificación o subsanación—. El GML generado es plenamente válido sin este paso.</div>
+        <button onClick="{{ enableContrast }}" style="width:100%;height:36px;background:#fff;color:#475569;border:1px dashed #cbd5e1;border-radius:4px;font-weight:500;font-size:12px;cursor:pointer">Ver el contraste sobre una parcela ya registrada</button>
+      </div>
+      <div style="margin-top:auto;padding:18px 26px;border-top:1px solid #e2e8f0;display:flex;flex-direction:column;gap:9px">
+        <button onClick="{{ toReportEd }}" style="width:100%;height:38px;background:#0369a1;color:#fff;border:none;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer">Vista previa del informe</button>
+      </div>
+      </sc-if>
+      <sc-if value="{{ contrastOn }}">
+      <div style="padding:22px 26px 18px;border-bottom:1px solid #e2e8f0">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+          <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#64748b;font-weight:600">Contraste con la construcción</div>
+          <span class="lnk" style="font-size:11px" onClick="{{ disableContrast }}">No aplica</span>
+        </div>
+        <p style="margin:0;font-size:14px;line-height:1.55;color:#334155;text-wrap:pretty">Huella medida de <span class="mono" style="color:#0f172a">{{ edMeasStr }} m²</span> frente a los <span class="mono" style="color:#0f172a">{{ edCatStr }} m²</span> de la construcción catastral. La edificación queda dentro de su parcela, sin invasión a colindantes.</p>
+      </div>
+      <div style="padding:22px 26px;border-bottom:1px solid #e2e8f0;display:flex;flex-direction:column;gap:18px">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;margin-bottom:2px"><span style="width:9px;height:9px;background:#7C3AED;border-radius:2px"></span>Huella medida</div>
+          <div style="display:flex;align-items:baseline;gap:8px"><span class="mono" style="font-size:42px;font-weight:500;letter-spacing:-.02em;line-height:1">{{ edMeasStr }}</span><span style="font-size:15px;color:#64748b">m²</span></div>
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;margin-bottom:2px"><span style="width:9px;height:9px;border:1.5px solid #15803d;border-radius:50%"></span>Construcción catastral</div>
+          <div style="display:flex;align-items:baseline;gap:8px"><span class="mono" style="font-size:42px;font-weight:500;letter-spacing:-.02em;line-height:1;color:#334155">{{ edCatStr }}</span><span style="font-size:15px;color:#64748b">m²</span></div>
+        </div>
+      </div>
+      <div style="padding:18px 26px">
+        <div style="display:flex;flex-direction:column">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #e2e8f0"><span style="font-size:13px;color:#475569">Diferencia de huella</span><span class="mono" style="font-size:14px;color:#475569">{{ edDiffStr }}</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #e2e8f0"><span style="font-size:13px;color:#475569">Solape con constru.</span><span class="mono" style="font-size:14px;color:#0f172a">96,1 %</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #e2e8f0"><span style="font-size:13px;color:#475569">Desviación máxima</span><span class="mono" style="font-size:14px;color:#0f172a">0,18 m</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid #e2e8f0"><span style="font-size:13px;color:#475569">Dentro de la parcela</span><span class="mono" style="font-size:14px;color:#0f172a">Sí</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 0"><span style="font-size:13px;color:#475569">Invasión a colindantes</span><span class="mono" style="font-size:14px;color:#475569">Ninguna</span></div>
+        </div>
+      </div>
+      <div style="margin-top:auto;padding:18px 26px;border-top:1px solid #e2e8f0">
+        <button onClick="{{ toReportEd }}" style="width:100%;height:38px;background:#0369a1;color:#fff;border:none;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer">Vista previa del informe</button>
+      </div>
+      </sc-if>
+    </div>
+  </section>
+  </sc-if>
+
+  <!-- ============ INFORME ============ -->
+  <sc-if value="{{ showReport }}">
+  <section data-screen-label="Informe" style="flex:1;display:flex;flex-direction:column;min-width:0;background:#e2e8f0">
+    <div style="flex:none;height:52px;background:#fff;border-bottom:1px solid #cbd5e1;display:flex;align-items:center;justify-content:space-between;padding:0 24px">
+      <div style="display:flex;align-items:baseline;gap:10px"><span style="font-weight:600;font-size:14px">{{ reportTitle }}</span><span class="mono" style="font-size:12px;color:#64748b">{{ docNum }}</span></div>
+      <div style="display:flex;gap:8px">
+        <button style="height:34px;padding:0 14px;background:#fff;color:#475569;border:1px solid #cbd5e1;border-radius:4px;font-weight:500;font-size:12px;cursor:pointer">Descargar GML</button>
+        <button style="height:34px;padding:0 16px;background:#0369a1;color:#fff;border:none;border-radius:4px;font-weight:600;font-size:13px;cursor:pointer">Descargar PDF</button>
+      </div>
+    </div>
+    <div style="flex:1;overflow:auto;padding:28px 0;display:flex;flex-direction:column;align-items:center;gap:24px">
+      {{ report }}
+    </div>
+  </section>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;userColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#7C3AED&quot;,&quot;options&quot;:[&quot;#7C3AED&quot;,&quot;#6D28D9&quot;,&quot;#DB2777&quot;,&quot;#0284c7&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Geometría del usuario&quot;},&quot;showWatermark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Cartografía&quot;},&quot;dimensionsOnPlan&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Cartografía&quot;}}">
+class Component extends DCLogic {
+  state = {
+    docType:'parcela', step:'entry', seen:{entry:true}, entryVia:null, rc:"", gmlName:"",
+    errorFixed:false, offset:0.20, hov:null, snaps:{v:true,l:true,i:false}, checkParcel:0, downloaded:false,
+    parts:[
+      {id:'viv', name:'Vivienda principal', type:'principal', fa:2, fb:0, geom:[[299381.6,4028494.4],[299387.8,4028492.0],[299385.6,4028486.6],[299379.4,4028489.0]]},
+      {id:'pisc', name:'Piscina', type:'otra', geom:[[299380.2,4028488.4],[299382.9,4028487.5],[299382.1,4028485.2],[299379.4,4028486.1]]}
+    ],
+    activePart:'viv', edErrorFixed:false, gmlGenerated:false, contrastRegistered:false, addedCount:0,
+    drawing:false, drawPts:[], edModel:'simplificado', edRc:'29041A00800099', edRcState:'context'
+  };
+
+  // ---- geometry constants (world coords, metres) ----
+  GEOM(){
+    return {
+      Vm:[[299381.53,4028495.97],[299388.96,4028493.14],[299386.01,4028485.41],[299378.47,4028488.45]],
+      Vdup:[299388.83,4028493.33],
+      Vc:[[299381.24,4028495.44],[299388.52,4028492.70],[299385.86,4028485.22],[299378.70,4028488.32]],
+      viv:[[299381.6,4028494.4],[299387.8,4028492.0],[299385.6,4028486.6],[299379.4,4028489.0]],
+      pisc:[[299380.2,4028488.4],[299382.9,4028487.5],[299382.1,4028485.2],[299379.4,4028486.1]],
+      vivCat:[[299381.35,4028494.05],[299387.5,4028491.75],[299385.4,4028486.8],[299379.55,4028489.15]]
+    };
+  }
+  partGeom(id){ const p=this.state.parts.find(x=>x.id===id); return (p&&p.geom)?p.geom:null; }
+  area(poly){ let s=0; for(let i=0;i<poly.length;i++){ const a=poly[i],b=poly[(i+1)%poly.length]; s+=a[0]*b[1]-b[0]*a[1]; } return Math.abs(s)/2; }
+  roman(n){ return ({0:'',1:'I',2:'II',3:'III',4:'IV',5:'V'})[n] || String(n); }
+  hull(pts){ const P=pts.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]); if(P.length<3)return P;
+    const cross=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);
+    const lo=[]; for(const p of P){ while(lo.length>=2&&cross(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop(); lo.push(p);} 
+    const up=[]; for(let i=P.length-1;i>=0;i--){ const p=P[i]; while(up.length>=2&&cross(up[up.length-2],up[up.length-1],p)<=0)up.pop(); up.push(p);} 
+    lo.pop(); up.pop(); return lo.concat(up); }
+  offsetPoly(poly,f){ const c=[poly.reduce((s,a)=>s+a[0],0)/poly.length, poly.reduce((s,a)=>s+a[1],0)/poly.length]; return poly.map(a=>[c[0]+(a[0]-c[0])*f, c[1]+(a[1]-c[1])*f]); }
+  sobreParts(){ return this.state.parts.filter(p=>p.type==='principal' && p.fa>0 && p.geom); }
+  envelope(){ let pts=[]; this.sobreParts().forEach(p=>{ pts=pts.concat(this.partGeom(p.id)); }); if(pts.length<3)return null; return this.offsetPoly(this.hull(pts),1.07); }
+
+  fmt(n,d){ return Number(n).toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+  routeOf(st){ return st.docType==='edificio' ? 'edificio' : (st.entryVia==='gml' ? 'check' : 'full'); }
+  stepsOf(st){ const r=this.routeOf(st); return r==='check' ? ['entry','check','diag'] : r==='edificio' ? ['entry','parts','valid','gml'] : ['entry','valid','edit','diag','report']; }
+  go(k){ this.setState(s=>({step:k, seen:{...s.seen,[k]:true}})); }
+  navTo(k){ const st=this.state;
+    if(this.stepsOf(st).includes(k) && st.seen[k]) return this.go(k);
+    if(st.docType==='edificio' && (k==='contrast'||k==='report') && (st.gmlGenerated||st.seen[k])) return this.go(k);
+  }
+  setDoc(t){ this.setState(s=>{ const ns={...s,docType:t}; const steps=this.stepsOf(ns); const step=steps.includes(s.step)?s.step:'entry'; return {docType:t, step, seen:{...s.seen, [step]:true}, downloaded:false}; }); }
+  setRc(e){ this.setState({rc:(e.target.value||'').toUpperCase()}); }
+  fillExample(){ this.setState({rc:'29041A00800099'}); }
+  selectGml(){ this.setState({gmlName:'entrega_topografia_08099.gml'}); }
+  clearGml(){ this.setState({gmlName:'', entryVia:null}); }
+  fixDuplicate(){ this.setState({errorFixed:true, hov:null}); }
+  incOffset(){ this.setState(s=>({offset:Math.min(2, Math.round((s.offset+0.05)*100)/100)})); }
+  decOffset(){ this.setState(s=>({offset:Math.max(-2, Math.round((s.offset-0.05)*100)/100)})); }
+  toggleSnap(k){ this.setState(s=>({snaps:{...s.snaps,[k]:!s.snaps[k]}})); }
+  // edificio parts
+  selectPart(id){ this.setState({activePart:id}); }
+  addPart(){ this.setState(s=>{ const n=s.addedCount+1; const id='ap'+n; return {addedCount:n, activePart:id, drawing:true, drawPts:[], parts:[...s.parts,{id,name:'Parte '+(s.parts.length+1),type:'principal',fa:1,fb:0,geom:null}]}; }); }
+  setPartName(id,v){ this.setState(s=>({parts:s.parts.map(p=>p.id===id?{...p,name:v}:p)})); }
+  startDraw(){ this.setState({drawing:true, drawPts:[]}); }
+  undoDraw(){ this.setState(s=>({drawPts:s.drawPts.slice(0,-1)})); }
+  cancelDraw(){ this.setState({drawing:false, drawPts:[]}); }
+  closeDraw(){ this.setState(s=>{ if(s.drawPts.length<3)return {}; return {drawing:false, drawPts:[], parts:s.parts.map(p=>p.id===s.activePart?{...p,geom:s.drawPts}:p)}; }); }
+  snapWorld(x,y){ const G=this.GEOM(); let cand=[...G.Vc]; this.state.parts.forEach(p=>{ if(p.geom)cand=cand.concat(p.geom); }); let best=null,bd=0.5; cand.forEach(c=>{ const d=Math.hypot(c[0]-x,c[1]-y); if(d<bd){bd=d;best=c;} }); return best?[best[0],best[1]]:[x,y]; }
+  handleDrawClick(e){ if(!this.state.drawing)return; const svg=e.currentTarget; const r=svg.getBoundingClientRect(); const VBw=1000,VBh=900; const scale=Math.min(r.width/VBw,r.height/VBh); const offx=(r.width-VBw*scale)/2, offy=(r.height-VBh*scale)/2; const vbx=(e.clientX-r.left-offx)/scale, vby=(e.clientY-r.top-offy)/scale; const S=40,cx=299383.715,cy=4028490.69,ox=VBw/2,oy=VBh/2; const wx=(vbx-ox)/S+cx, wy=cy-(vby-oy)/S; const sn=this.snapWorld(wx,wy); this.setState(s=>({drawPts:[...s.drawPts,sn]})); }
+  removePart(id){ this.setState(s=>{ if(s.parts.length<=1)return {}; const parts=s.parts.filter(p=>p.id!==id); const activePart=s.activePart===id?parts[0].id:s.activePart; return {parts,activePart}; }); }
+  chFloor(id,key,d){ this.setState(s=>({parts:s.parts.map(p=>p.id===id?{...p,[key]:Math.max(0,Math.min(9,(p[key]||0)+d))}:p)})); }
+  fixEdError(){ this.setState({edErrorFixed:true}); }
+  generarGml(){ this.setState({gmlGenerated:true}); }
+  enableContrast(){ this.setState({contrastRegistered:true}); }
+  disableContrast(){ this.setState({contrastRegistered:false}); }
+  setEdModel(m){ this.setState({edModel:m}); }
+  setEdRc(e){ this.setState({edRc:(e.target.value||'').toUpperCase(), edRcState:'manual'}); }
+  pickEdVia(k){ this.setState(k==='rc' ? {edRcState:'context', edRc:'29041A00800099'} : {edRcState:'deduced', edRc:'29041A00800099'}); }
+  buildEdModelToggle(){
+    const h=React.createElement;
+    const m=this.state.edModel;
+    const opt=(k,title,desc)=>{ const on=m===k; return h('div',{key:k,onClick:()=>this.setEdModel(k),className:on?undefined:'hovv',style:{display:'flex',gap:'10px',alignItems:'flex-start',padding:'11px 12px',border:'1px solid '+(on?'#B79BEB':'#e2e8f0'),background:on?'#F8F5FE':'#fff',borderRadius:'5px',cursor:'pointer',boxShadow:on?'inset 2px 0 0 #7C3AED':'none'}},[
+      h('div',{key:'r',style:{width:'16px',height:'16px',flex:'none',marginTop:'1px',borderRadius:'50%',border:'1.5px solid '+(on?'#7C3AED':'#cbd5e1'),background:'#fff',display:'flex',alignItems:'center',justifyContent:'center'}}, on?h('div',{style:{width:'8px',height:'8px',background:'#7C3AED',borderRadius:'50%'}}):null),
+      h('div',{key:'b',style:{flex:1}},[
+        h('div',{key:'t',style:{fontSize:'13px',fontWeight:600,color:'#0f172a'}},title),
+        h('div',{key:'d',style:{fontSize:'11px',color:'#475569',marginTop:'2px',lineHeight:1.35}},desc)
+      ])
+    ]); };
+    return h('div',{style:{display:'flex',flexDirection:'column',gap:'8px'}},[
+      opt('simplificado','Simplificado','Para el Informe de Ubicación de Construcciones (ICUC). El caso más frecuente.'),
+      opt('completo','Completo','Declaración con todos los atributos del edificio.')
+    ]);
+  }
+
+  buildMap(kind){
+    const h=React.createElement;
+    const P=this.props||{};
+    const uc=P.userColor||'#7C3AED';
+    const ucSoft='rgba(124,58,237,.10)';
+    const showWm=P.showWatermark!==false;
+    const dims=P.dimensionsOnPlan!==false;
+    const edif=this.state.docType==='edificio';
+    const CAD_G='#15803d', CAD_B='#0369a1', AMB='#d97706', RED='#dc2626';
+    const G=this.GEOM();
+    const Vm=G.Vm, Vdup=G.Vdup, Vc=G.Vc;
+    const SIDES=['7,95','8,27','8,13','8,12'];
+    const cx=299383.715, cy=4028490.69;
+    const isRep=kind==='report';
+    const VBw=isRep?560:1000, VBh=isRep?372:900;
+    const S=({entry:31,parts:40,validation:45,valparts:40,edition:47,check:34,diagnosis:52,contrast:48,report:27})[kind]||44;
+    const ox=VBw/2, oy=VBh/2 + (kind==='diagnosis'||kind==='contrast'?-6:0);
+    const p=(pt)=>[(pt[0]-cx)*S+ox,(cy-pt[1])*S+oy];
+    const str=(arr)=>(arr||[]).map(p).map(a=>a[0].toFixed(1)+','+a[1].toFixed(1)).join(' ');
+    const distW=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+    const centW=(arr)=>[arr.reduce((s,a)=>s+a[0],0)/arr.length, arr.reduce((s,a)=>s+a[1],0)/arr.length];
+    const Cm=p(centW(Vm));
+    const L=[];
+    const FM="Geist Mono, monospace";
+
+    L.push(h('rect',{key:'bg',x:0,y:0,width:VBw,height:VBh,fill:'#f1f5f9'}));
+    const gr=[];
+    for(let gx=0;gx<=VBw;gx+=S){ gr.push(h('line',{key:'gx'+gx,x1:gx,y1:0,x2:gx,y2:VBh,stroke:'#cbd5e1',strokeWidth:.5,opacity:gx%(S*5)<0.5?.55:.22})); }
+    for(let gy=0;gy<=VBh;gy+=S){ gr.push(h('line',{key:'gy'+gy,x1:0,y1:gy,x2:VBw,y2:gy,stroke:'#cbd5e1',strokeWidth:.5,opacity:gy%(S*5)<0.5?.55:.22})); }
+    L.push(h('g',{key:'grat'},gr));
+
+    if(showWm && !isRep){
+      const wm=[]; let i=0;
+      for(let wy=40;wy<VBh;wy+=150){ for(let wx=10;wx<VBw;wx+=230){ wm.push(h('text',{key:'wm'+(i++),x:wx,y:wy,fill:'#000',opacity:.045,fontSize:12,fontFamily:FM,transform:`rotate(-28 ${wx} ${wy})`},'© D. G. del Catastro')); } }
+      L.push(h('g',{key:'wm'},wm));
+    }
+
+    const canalW=[[299372.4,4028501],[299374.6,4028493],[299376.2,4028485.5],[299378.4,4028478]];
+    L.push(h('polyline',{key:'can',points:str(canalW),fill:'none',stroke:CAD_B,strokeWidth:isRep?2:3.5,opacity:.45,strokeLinecap:'round'}));
+    L.push(h('polyline',{key:'can2',points:str(canalW),fill:'none',stroke:'#fff',strokeWidth:isRep?.6:1,opacity:.5}));
+    if(!isRep){ const cp=p([299375,4028489]); L.push(h('text',{key:'canl',x:cp[0],y:cp[1],fill:CAD_B,fontSize:11,fontFamily:FM,opacity:.7,transform:`rotate(-74 ${cp[0]} ${cp[1]})`},'Acequia del Canal')); }
+
+    const tr=(arr,dx,dy)=>arr.map(a=>[a[0]+dx,a[1]+dy]);
+    const neigh=[{v:tr(Vm,1.6,9.6),l:'98'},{v:tr(Vm,10.0,-1.0),l:'100'},{v:tr(Vm,-0.8,-9.8),l:'12'},{v:tr(Vm,-9.8,1.4),l:'76'}];
+    neigh.forEach((n,i)=>{
+      L.push(h('polygon',{key:'nb'+i,points:str(n.v),fill:'#fff',fillOpacity:.35,stroke:CAD_G,strokeWidth:1,opacity:.6}));
+      const c=p(centW(n.v));
+      L.push(h('text',{key:'nl'+i,x:c[0],y:c[1]+4,fill:CAD_G,fontSize:isRep?9:12,fontWeight:600,fontFamily:FM,textAnchor:'middle',opacity:.75},n.l));
+    });
+
+    const numDot=(pt,label,color,filled)=>{
+      const sp=p(pt); const g=[];
+      g.push(h('circle',{key:'c',cx:sp[0],cy:sp[1],r:5,fill:filled?color:'#fff',stroke:color,strokeWidth:1.6}));
+      g.push(h('text',{key:'t',x:sp[0]+9,y:sp[1]-7,fill:color,fontSize:12,fontWeight:600,fontFamily:FM},label));
+      return h('g',{key:'nd'+label+sp[0].toFixed(0)},g);
+    };
+    const dim=(a,b,off,label,color,kk)=>{
+      const g=[]; const dx=b[0]-a[0],dy=b[1]-a[1]; const Ld=Math.hypot(dx,dy)||1;
+      let nx=-dy/Ld, ny=dx/Ld; const mid=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+      if((nx*(mid[0]-Cm[0])+ny*(mid[1]-Cm[1]))<0){nx=-nx;ny=-ny;}
+      const a2=[a[0]+nx*off,a[1]+ny*off], b2=[b[0]+nx*off,b[1]+ny*off];
+      g.push(h('line',{key:'e1',x1:a[0],y1:a[1],x2:a2[0],y2:a2[1],stroke:color,strokeWidth:.6,opacity:.55}));
+      g.push(h('line',{key:'e2',x1:b[0],y1:b[1],x2:b2[0],y2:b2[1],stroke:color,strokeWidth:.6,opacity:.55}));
+      g.push(h('line',{key:'m',x1:a2[0],y1:a2[1],x2:b2[0],y2:b2[1],stroke:color,strokeWidth:1}));
+      const lm=[(a2[0]+b2[0])/2+nx*10,(a2[1]+b2[1])/2+ny*10];
+      let ang=Math.atan2(dy,dx)*180/Math.PI; if(ang>90)ang-=180; if(ang<-90)ang+=180;
+      g.push(h('text',{key:'t',x:lm[0],y:lm[1],fill:color,fontSize:11.5,fontWeight:500,fontFamily:FM,textAnchor:'middle',dominantBaseline:'middle',transform:`rotate(${ang} ${lm[0]} ${lm[1]})`},label));
+      return h('g',{key:'dim'+kk,style:{paintOrder:'stroke'}},g);
+    };
+
+    const bm=Math.max(1,Math.round(120/S)); const bpx=bm*S; const bx=30, by=VBh-34;
+    const sb=[h('rect',{key:'sbg',x:bx-6,y:by-16,width:bpx+40,height:26,fill:'#fff',opacity:.72,rx:3})];
+    for(let k=0;k<bm;k++){ sb.push(h('rect',{key:'sk'+k,x:bx+k*S,y:by-4,width:S,height:5,fill:k%2?'#fff':'#334155',stroke:'#334155',strokeWidth:.7})); }
+    sb.push(h('text',{key:'s0',x:bx,y:by-8,fill:'#475569',fontSize:9,fontFamily:FM,textAnchor:'middle'},'0'));
+    sb.push(h('text',{key:'sm',x:bx+bpx,y:by-8,fill:'#475569',fontSize:9,fontFamily:FM,textAnchor:'middle'},bm+' m'));
+    L.push(h('g',{key:'sb'},sb));
+
+    const nax=VBw-34, nay=44;
+    L.push(h('g',{key:'na'},[
+      h('line',{key:'l',x1:nax,y1:nay+16,x2:nax,y2:nay-8,stroke:'#334155',strokeWidth:1.4}),
+      h('polygon',{key:'p',points:`${nax},${nay-14} ${nax-4},${nay-4} ${nax+4},${nay-4}`,fill:'#334155'}),
+      h('text',{key:'t',x:nax,y:nay+28,fill:'#334155',fontSize:11,fontWeight:600,fontFamily:FM,textAnchor:'middle'},'N')
+    ]));
+
+    const parcelBase = (kind==='entry'&&!edif)||kind==='validation'||kind==='edition';
+    if(parcelBase){ L.push(h('polygon',{key:'off',points:str(Vc),fill:'none',stroke:CAD_G,strokeWidth:1.6,opacity:.7})); }
+
+    // ===== helper: draw building parts =====
+    const drawParts=(opts)=>{
+      opts=opts||{};
+      L.push(h('polygon',{key:'pcx',points:str(Vc),fill:'none',stroke:CAD_G,strokeWidth:1.4,strokeDasharray:'5 3',opacity:.7}));
+      const env=this.envelope();
+      if(env){ L.push(h('polygon',{key:'env',points:str(env),fill:'none',stroke:'#6D28D9',strokeWidth:1.4,strokeDasharray:'6 4',opacity:.85}));
+        let topY=1e9,topX=0; env.map(p).forEach(a=>{ if(a[1]<topY){topY=a[1];topX=a[0];} });
+        L.push(h('text',{key:'envt',x:topX,y:topY-7,fill:'#6D28D9',fontSize:isRep?9:11,fontWeight:600,fontFamily:FM,textAnchor:'middle',opacity:.9},'envolvente calculada')); }
+      this.state.parts.forEach((pt)=>{
+        const gm=pt.geom; if(!gm)return;
+        const active=opts.editable && this.state.activePart===pt.id;
+        const otra=pt.type==='otra';
+        if(otra){ L.push(h('polygon',{key:'pf'+pt.id,points:str(gm),fill:uc,fillOpacity:active?.30:.16,stroke:uc,strokeWidth:active?2.6:1.7,strokeDasharray:'4 2'})); }
+        else { L.push(h('polygon',{key:'pf'+pt.id,points:str(gm),fill:uc,fillOpacity:active?.30:.20,stroke:uc,strokeWidth:active?2.8:2.1})); }
+        const c=p(centW(gm));
+        if(!otra && pt.fa>0){ L.push(h('text',{key:'rl'+pt.id,x:c[0],y:c[1]+5,fill:'#4C1D95',fontSize:isRep?12:16,fontWeight:700,fontFamily:FM,textAnchor:'middle'},this.roman(pt.fa))); }
+        if(active){ gm.forEach((v,i)=>{ const q=p(v); L.push(h('rect',{key:'hh'+pt.id+i,x:q[0]-4.5,y:q[1]-4.5,width:9,height:9,fill:uc,stroke:'#fff',strokeWidth:1.3,transform:`rotate(45 ${q[0]} ${q[1]})`})); }); }
+      });
+      if(opts.aviso){ const pz=this.state.parts.find(x=>x.type==='otra' && x.geom); if(pz){ const c=p(centW(pz.geom)); const rr=Math.max.apply(null,pz.geom.map(v=>Math.hypot(p(v)[0]-c[0],p(v)[1]-c[1])))+7; L.push(h('circle',{key:'avih',cx:c[0],cy:c[1],r:rr,fill:'none',stroke:AMB,strokeWidth:1.6,strokeDasharray:'4 3',opacity:.9})); } }
+      if(opts.errHighlight){ const v=this.state.parts.find(x=>x.id==='viv'); if(v&&v.geom){ const q=p(v.geom[1]); L.push(h('circle',{key:'errh',cx:q[0],cy:q[1],r:13,fill:'none',stroke:RED,strokeWidth:1.6,opacity:.9})); } }
+      if(opts.editable && this.state.drawing){
+        const dp=this.state.drawPts;
+        if(dp.length){ const pts=dp.map(p); if(dp.length>1) L.push(h('polyline',{key:'dprev',points:pts.map(a=>a[0].toFixed(1)+','+a[1].toFixed(1)).join(' '),fill:'none',stroke:uc,strokeWidth:2,strokeDasharray:'5 3'}));
+          pts.forEach((q,i)=>L.push(h('circle',{key:'dp'+i,cx:q[0],cy:q[1],r:4,fill:'#fff',stroke:uc,strokeWidth:1.8}))); }
+        L.push(h('text',{key:'dhint',x:VBw/2,y:30,fill:'#6D28D9',fontSize:12,fontWeight:600,fontFamily:FM,textAnchor:'middle'},'Haz clic para añadir vértices · con snap'));
+      }
+    };
+
+    // ================= ENTRY =================
+    if(kind==='entry'){
+      if(edif){
+        drawParts({});
+      } else if((this.state.rc||'').length>=14){
+        const mk=p(centW(Vm)); const w=132,hh=40;
+        L.push(h('g',{key:'marker',style:{animation:'mkdrop .45s cubic-bezier(.2,.8,.3,1)'}},[
+          h('line',{key:'ln',x1:mk[0],y1:mk[1],x2:mk[0],y2:mk[1]-30,stroke:'#0369a1',strokeWidth:1.5}),
+          h('circle',{key:'d',cx:mk[0],cy:mk[1],r:4,fill:'#0369a1'}),
+          h('rect',{key:'bx',x:mk[0]-w/2,y:mk[1]-30-hh,width:w,height:hh,rx:4,fill:'#fff',stroke:'#0369a1',strokeWidth:1}),
+          h('text',{key:'t1',x:mk[0],y:mk[1]-30-hh+16,fill:'#0f172a',fontSize:12,fontWeight:600,fontFamily:'Geist Sans',textAnchor:'middle'},'Casares (Málaga)'),
+          h('text',{key:'t2',x:mk[0],y:mk[1]-30-hh+31,fill:'#475569',fontSize:11,fontFamily:FM,textAnchor:'middle'},'Pol. 8 · Parcela 99')
+        ]));
+      }
+    }
+
+    if(kind==='parts'){ drawParts({editable:true}); }
+
+    // ================= VALIDATION =================
+    if(kind==='validation'){
+      if(edif){ drawParts({editable:false, errHighlight:!this.state.edErrorFixed, aviso:true}); }
+      else {
+        L.push(h('polygon',{key:'um',points:str(Vm),fill:ucSoft,stroke:uc,strokeWidth:2.4}));
+        L.push(h('line',{key:'coli',x1:p(Vm[2])[0],y1:p(Vm[2])[1],x2:p(Vm[3])[0],y2:p(Vm[3])[1],stroke:AMB,strokeWidth:this.state.hov==='avi'?4:2.6}));
+        Vm.forEach((v,i)=> L.push(numDot(v,String(i),uc,true)));
+        if(!this.state.errorFixed){
+          L.push(numDot(Vdup,'4',RED,true));
+          const r=this.state.hov==='err'?14:9;
+          [Vm[1],Vdup].forEach((v,i)=>{ const sp=p(v); L.push(h('circle',{key:'eh'+i,cx:sp[0],cy:sp[1],r:r,fill:'none',stroke:RED,strokeWidth:1.5,opacity:this.state.hov==='err'?.9:.35})); });
+        }
+        if(this.state.hov==='avi'){ [Vm[2],Vm[3]].forEach((v,i)=>{ const sp=p(v); L.push(h('circle',{key:'ah'+i,cx:sp[0],cy:sp[1],r:14,fill:'none',stroke:AMB,strokeWidth:1.5,opacity:.9})); }); }
+      }
+    }
+
+    // ================= CHECK (GML) =================
+    if(kind==='check'){
+      const other=tr(Vm,9.8,1.1);
+      const sel=this.state.checkParcel;
+      const draw=(V,on,label,k)=>{
+        L.push(h('polygon',{key:'cp'+k,points:str(V),fill:on?ucSoft:'none',stroke:on?uc:'#94a3b8',strokeWidth:on?2.6:1.6,strokeDasharray:on?'':'5 3'}));
+        const c=p(centW(V));
+        L.push(h('text',{key:'ct'+k,x:c[0],y:c[1]+4,fill:on?uc:'#64748b',fontSize:12,fontWeight:600,fontFamily:FM,textAnchor:'middle'},label));
+      };
+      draw(Vm,sel===0,'Recinto 1',0);
+      draw(other,sel===1,'Recinto 2',1);
+    }
+
+    // ================= EDITION (parcela) =================
+    if(kind==='edition'){
+      const off=this.state.offset;
+      const a=Vm[0],b=Vm[1]; const dx=b[0]-a[0],dy=b[1]-a[1]; const Lm=Math.hypot(dx,dy)||1;
+      let nx=-dy/Lm, ny=dx/Lm; const cW=centW(Vm);
+      if((nx*(((a[0]+b[0])/2)-cW[0])+ny*(((a[1]+b[1])/2)-cW[1]))<0){nx=-nx;ny=-ny;}
+      const a1=[a[0]+nx*off,a[1]+ny*off], b1=[b[0]+nx*off,b[1]+ny*off];
+      const Ve=[a1,b1,Vm[2],Vm[3]];
+      L.push(h('polygon',{key:'orig',points:str(Vm),fill:'none',stroke:uc,strokeWidth:1,opacity:.28,strokeDasharray:'4 3'}));
+      L.push(h('polygon',{key:'ed',points:str(Ve),fill:ucSoft,stroke:uc,strokeWidth:2.4}));
+      if(dims){ const sp=Ve.map(p);
+        L.push(dim(sp[0],sp[1],26,SIDES[0],uc,'e0'));
+        L.push(dim(sp[1],sp[2],26,SIDES[1],'#64748b','e1'));
+        L.push(dim(sp[2],sp[3],26,SIDES[2],'#64748b','e2'));
+        L.push(dim(sp[3],sp[0],26,SIDES[3],'#64748b','e3'));
+      }
+      [Ve[0],Ve[1]].forEach((v,i)=>{ const sp=p(v); L.push(h('rect',{key:'mv'+i,x:sp[0]-5,y:sp[1]-5,width:10,height:10,fill:uc,stroke:'#fff',strokeWidth:1.4,transform:`rotate(45 ${sp[0]} ${sp[1]})`})); });
+      [Vm[2],Vm[3]].forEach((v,i)=>{ const sp=p(v); L.push(h('circle',{key:'cv'+i,cx:sp[0],cy:sp[1],r:5,fill:'#fff',stroke:uc,strokeWidth:1.6})); });
+      const dc=p(cW); const dstr=(off>=0?'+':'−')+this.fmt(Math.abs(off*8.2),2);
+      L.push(h('g',{key:'dchip'},[
+        h('rect',{key:'r',x:dc[0]-52,y:dc[1]-13,width:104,height:26,rx:4,fill:'#fff',stroke:uc,strokeWidth:1,opacity:.95}),
+        h('text',{key:'t',x:dc[0],y:dc[1]+4,fill:uc,fontSize:12,fontWeight:600,fontFamily:FM,textAnchor:'middle'},'Δ '+dstr+' m²')
+      ]));
+    }
+
+    // ================= DIAGNOSIS (parcela) =================
+    if(kind==='diagnosis'){
+      L.push(h('polygon',{key:'cat',points:str(Vc),fill:'rgba(21,128,61,.09)',stroke:CAD_G,strokeWidth:2,strokeDasharray:'6 4'}));
+      L.push(h('polygon',{key:'meas',points:str(Vm),fill:ucSoft,stroke:uc,strokeWidth:2.6}));
+      L.push(h('line',{key:'maxl',x1:p(Vm[0])[0],y1:p(Vm[0])[1],x2:p(Vm[1])[0],y2:p(Vm[1])[1],stroke:uc,strokeWidth:5,opacity:.28}));
+      const mMid=p([(Vm[0][0]+Vm[1][0])/2,(Vm[0][1]+Vm[1][1])/2]);
+      const cMid=p([(Vc[0][0]+Vc[1][0])/2,(Vc[0][1]+Vc[1][1])/2]);
+      L.push(h('g',{key:'devd'},[
+        h('line',{key:'l',x1:mMid[0],y1:mMid[1],x2:cMid[0],y2:cMid[1],stroke:'#334155',strokeWidth:1}),
+        h('circle',{key:'c1',cx:mMid[0],cy:mMid[1],r:2.5,fill:uc}),
+        h('circle',{key:'c2',cx:cMid[0],cy:cMid[1],r:2.5,fill:CAD_G}),
+        h('rect',{key:'r',x:(mMid[0]+cMid[0])/2+8,y:(mMid[1]+cMid[1])/2-11,width:64,height:20,rx:3,fill:'#fff',stroke:'#cbd5e1',strokeWidth:.8}),
+        h('text',{key:'t',x:(mMid[0]+cMid[0])/2+40,y:(mMid[1]+cMid[1])/2+3,fill:'#0f172a',fontSize:11,fontWeight:600,fontFamily:FM,textAnchor:'middle'},'0,54 m')
+      ]));
+      if(dims){ const sp=Vm.map(p);
+        L.push(dim(sp[0],sp[1],30,SIDES[0],'#64748b','d0'));
+        L.push(dim(sp[1],sp[2],30,SIDES[1],'#64748b','d1'));
+        L.push(dim(sp[2],sp[3],30,SIDES[2],'#64748b','d2'));
+        L.push(dim(sp[3],sp[0],30,SIDES[3],'#64748b','d3'));
+      }
+      const cmS=p(centW(Vm)), ccS=p(centW(Vc));
+      const cross=(pt,col,k)=>h('g',{key:k},[h('line',{key:'a',x1:pt[0]-5,y1:pt[1],x2:pt[0]+5,y2:pt[1],stroke:col,strokeWidth:1.3}),h('line',{key:'b',x1:pt[0],y1:pt[1]-5,x2:pt[0],y2:pt[1]+5,stroke:col,strokeWidth:1.3})]);
+      L.push(cross(cmS,uc,'cm')); L.push(cross(ccS,CAD_G,'cc'));
+      L.push(h('line',{key:'cl',x1:cmS[0],y1:cmS[1],x2:ccS[0],y2:ccS[1],stroke:'#334155',strokeWidth:.9,strokeDasharray:'2 2'}));
+      const lmid=[(cmS[0]+ccS[0])/2,(cmS[1]+ccS[1])/2];
+      const lx=lmid[0]+34, ly=lmid[1]+30;
+      L.push(h('g',{key:'clbl'},[
+        h('line',{key:'ld',x1:lmid[0],y1:lmid[1],x2:lx-4,y2:ly-5,stroke:'#94a3b8',strokeWidth:.8}),
+        h('rect',{key:'r',x:lx-4,y:ly-14,width:52,height:19,rx:3,fill:'#fff',stroke:'#cbd5e1',strokeWidth:.8}),
+        h('text',{key:'t',x:lx+22,y:ly-1,fill:'#475569',fontSize:10.5,fontFamily:FM,textAnchor:'middle'},'0,31 m')
+      ]));
+    }
+
+    // ================= CONTRAST (edificio) =================
+    if(kind==='contrast'){
+      L.push(h('polygon',{key:'par',points:str(Vc),fill:'none',stroke:'#94a3b8',strokeWidth:1.4,strokeDasharray:'5 3'}));
+      const viv=this.partGeom('viv')||G.viv;
+      if(this.state.contrastRegistered){
+        L.push(h('polygon',{key:'bcat',points:str(G.vivCat),fill:'rgba(21,128,61,.08)',stroke:CAD_G,strokeWidth:2,strokeDasharray:'6 4'}));
+        L.push(h('polygon',{key:'bmeas',points:str(viv),fill:uc,fillOpacity:.20,stroke:uc,strokeWidth:2.6}));
+        const mMid=p([(viv[0][0]+viv[1][0])/2,(viv[0][1]+viv[1][1])/2]);
+        const cMid=p([(G.vivCat[0][0]+G.vivCat[1][0])/2,(G.vivCat[0][1]+G.vivCat[1][1])/2]);
+        L.push(h('g',{key:'devd'},[
+          h('line',{key:'l',x1:mMid[0],y1:mMid[1],x2:cMid[0],y2:cMid[1],stroke:'#334155',strokeWidth:1}),
+          h('circle',{key:'c1',cx:mMid[0],cy:mMid[1],r:2.5,fill:uc}),
+          h('circle',{key:'c2',cx:cMid[0],cy:cMid[1],r:2.5,fill:CAD_G}),
+          h('rect',{key:'r',x:mMid[0]+10,y:mMid[1]-30,width:58,height:20,rx:3,fill:'#fff',stroke:'#cbd5e1',strokeWidth:.8}),
+          h('line',{key:'ld',x1:mMid[0]+2,y1:mMid[1]-4,x2:mMid[0]+12,y2:mMid[1]-18,stroke:'#334155',strokeWidth:.7}),
+          h('text',{key:'t',x:mMid[0]+39,y:mMid[1]-17,fill:'#0f172a',fontSize:11,fontWeight:600,fontFamily:FM,textAnchor:'middle'},'0,18 m')
+        ]));
+      } else {
+        L.push(h('polygon',{key:'bmeas',points:str(viv),fill:uc,fillOpacity:.20,stroke:uc,strokeWidth:2.6}));
+        const c=p(centW(viv)); L.push(h('text',{key:'lbl',x:c[0],y:c[1]+4,fill:'#4C1D95',fontSize:16,fontWeight:700,fontFamily:FM,textAnchor:'middle'},this.roman(2)));
+      }
+    }
+
+    // ================= REPORT =================
+    if(kind==='report'){
+      if(edif){
+        L.push(h('polygon',{key:'par',points:str(Vc),fill:'none',stroke:'#94a3b8',strokeWidth:1.2,strokeDasharray:'4 3'}));
+        const env=this.envelope();
+        if(env) L.push(h('polygon',{key:'env',points:str(env),fill:'none',stroke:'#6D28D9',strokeWidth:1.1,strokeDasharray:'4 3',opacity:.85}));
+        this.state.parts.forEach(pt=>{ const gm=this.partGeom(pt.id); if(!gm)return; const otra=pt.type==='otra';
+          L.push(h('polygon',{key:'p'+pt.id,points:str(gm),fill:uc,fillOpacity:otra?.12:.18,stroke:uc,strokeWidth:otra?1.4:2,strokeDasharray:otra?'3 2':''}));
+          const c=p(centW(gm)); if(!otra&&pt.fa>0) L.push(h('text',{key:'l'+pt.id,x:c[0],y:c[1]+4,fill:'#4C1D95',fontSize:11,fontWeight:700,fontFamily:FM,textAnchor:'middle'},this.roman(pt.fa)));
+        });
+      } else {
+        L.push(h('polygon',{key:'cat',points:str(Vc),fill:'none',stroke:CAD_G,strokeWidth:1.4,strokeDasharray:'4 3',opacity:.8}));
+        L.push(h('polygon',{key:'meas',points:str(Vm),fill:ucSoft,stroke:uc,strokeWidth:2}));
+        Vm.forEach((v,i)=>{ const sp=p(v); L.push(h('circle',{key:'v'+i,cx:sp[0],cy:sp[1],r:3,fill:uc})); L.push(h('text',{key:'vt'+i,x:sp[0]+6,y:sp[1]-5,fill:uc,fontSize:9,fontWeight:600,fontFamily:FM},String(i))); });
+      }
+    }
+
+    const svgProps={viewBox:`0 0 ${VBw} ${VBh}`,width:'100%',height:'100%',preserveAspectRatio:'xMidYMid meet',style:{display:'block',fontFamily:'Geist Sans',cursor:(kind==='parts'&&this.state.drawing)?'crosshair':'default'}};
+    if(kind==='parts'&&this.state.drawing){ svgProps.onClick=(e)=>this.handleDrawClick(e); }
+    return h('svg',svgProps,L);
+  }
+
+  buildDocToggle(){
+    const h=React.createElement;
+    const t=this.state.docType;
+    const opt=(k,lbl,i)=>{ const on=t===k; return [
+      i>0 && h('span',{key:'d'+k,'aria-hidden':true,style:{width:'1px',alignSelf:'stretch',background:'#cbd5e1'}}),
+      h('button',{key:k,onClick:()=>this.setDoc(k),'aria-pressed':on,style:{flex:1,height:'32px',border:'none',cursor:'pointer',fontFamily:'Geist Sans',fontSize:'12px',fontWeight:on?600:500,letterSpacing:'.01em',background:on?'#e0f2fe':'transparent',color:on?'#0369a1':'#475569',transition:'background 150ms ease,color 150ms ease'}},lbl)
+    ]; };
+    return h('div',{role:'group',style:{display:'flex',alignItems:'stretch',border:'1px solid #cbd5e1',borderRadius:'4px',overflow:'hidden',background:'#fff'}}, [].concat(opt('parcela','Parcela',0),opt('edificio','Edificio',1)));
+  }
+
+  buildRail(){
+    const h=React.createElement;
+    const labels={entry:'Entrada',parts:'Partes y plantas',valid:'Validación',gml:'Generar GML',check:'Comprobación',edit:'Edición',diag:'Diagnóstico',report:'Informe',contrast:'Contraste'};
+    const edif=this.state.docType==='edificio';
+    const steps=this.stepsOf(this.state);
+    const cur=this.state.step, curIdx=steps.indexOf(cur);
+    const row=(k,label,idx,optional)=>{
+      const active=k===cur;
+      const reach=optional ? (this.state.gmlGenerated||this.state.seen[k]) : !!this.state.seen[k];
+      const done=reach && idx>=0 && idx<curIdx;
+      const isFirst=!optional && idx===0;
+      const isLast=optional || idx===steps.length-1;
+      const topOn=done||active, botOn=done;
+      const dot = active
+        ? {w:'10px',bg:'#0369a1',bd:'#0369a1',ring:'0 0 0 3px #e0f2fe'}
+        : done ? {w:'8px',bg:'#0369a1',bd:'#0369a1',ring:'none'}
+        : {w:'8px',bg:'#fff',bd:(reach?'#94a3b8':'#cbd5e1'),ring:'none'};
+      const marker = h('div',{key:'m',style:{width:dot.w,height:dot.w,borderRadius:'50%',zIndex:1,position:'relative',background:dot.bg,border:'1.5px solid '+dot.bd,boxShadow:dot.ring}});
+      const markerCol = h('div',{key:'mc',style:{position:'relative',width:'16px',flex:'none',alignSelf:'stretch',display:'flex',alignItems:'center',justifyContent:'center'}},[
+        (!optional&&!isFirst)&&h('div',{key:'lt',style:{position:'absolute',left:'50%',top:0,height:'50%',width:'1px',marginLeft:'-0.5px',background:topOn?'#7dd3fc':'#e2e8f0'}}),
+        (!optional&&!isLast)&&h('div',{key:'lb',style:{position:'absolute',left:'50%',bottom:0,height:'50%',width:'1px',marginLeft:'-0.5px',background:botOn?'#7dd3fc':'#e2e8f0'}}),
+        marker
+      ]);
+      return h('div',{key:k,onClick:()=>this.navTo(k),className:(reach&&!active)?'hovv':undefined,style:{
+        display:'flex',alignItems:'center',gap:'11px',padding:'4px 12px 4px 8px',borderRadius:'4px',minHeight:'40px',
+        cursor:reach?'pointer':'default',background:active?'#e0f2fe':undefined,opacity:reach?1:.55,
+        boxShadow:active?'inset 2px 0 0 #0369a1':'none'
+      }},[
+        markerCol,
+        h('span',{key:'l',style:{fontSize:'13px',fontWeight:active?600:500,color:active?'#0f172a':(reach?'#475569':'#94a3b8')}}, label)
+      ]);
+    };
+    const items=steps.map((k,idx)=>row(k,labels[k],idx,false));
+    if(edif){
+      items.push(h('div',{key:'opt',style:{margin:'10px 12px 6px',fontSize:'10px',letterSpacing:'.1em',textTransform:'uppercase',color:'#94a3b8',fontWeight:600,borderTop:'1px solid #e2e8f0',paddingTop:'10px'}},'Opcional'));
+      items.push(row('contrast',labels.contrast,-1,true));
+      items.push(row('report',labels.report,-1,true));
+    }
+    return h('div',{style:{display:'flex',flexDirection:'column',gap:'0'}}, items);
+  }
+
+  buildSnaps(){
+    const h=React.createElement;
+    const rows=[['v','A vértice','0,05 m'],['l','A lindero catastral','0,10 m'],['i','A intersección','0,05 m']];
+    return h('div',{style:{display:'flex',flexDirection:'column',gap:'8px'}}, rows.map(([k,lbl,tol])=>{
+      const on=this.state.snaps[k];
+      return h('div',{key:k,onClick:()=>this.toggleSnap(k),className:'hovv',style:{display:'flex',alignItems:'center',gap:'10px',padding:'8px 10px',border:'1px solid '+(on?'#7dd3fc':'#e2e8f0'),background:on?'#f1f5f9':'#fff',borderRadius:'4px',cursor:'pointer'}},[
+        h('div',{key:'c',style:{width:'16px',height:'16px',flex:'none',borderRadius:'3px',border:'1.5px solid '+(on?'#0369a1':'#cbd5e1'),background:on?'#0369a1':'#fff',display:'flex',alignItems:'center',justifyContent:'center'}}, on?h('div',{style:{width:'6px',height:'6px',background:'#fff',borderRadius:'1px'}}):null),
+        h('span',{key:'l',style:{flex:1,fontSize:'13px',color:'#334155'}}, lbl),
+        h('span',{key:'t',style:{fontFamily:'Geist Mono',fontSize:'12px',color:on?'#475569':'#94a3b8'}}, tol)
+      ]);
+    }));
+  }
+
+  buildPartsList(){
+    const h=React.createElement;
+    const btn={width:'24px',height:'24px',border:'1px solid #cbd5e1',background:'#fff',borderRadius:'3px',cursor:'pointer',color:'#475569',fontSize:'14px',lineHeight:'1'};
+    const stepper=(pt,key,label)=>h('div',{key:key,style:{display:'flex',alignItems:'center',gap:'8px'}},[
+      h('span',{key:'l',style:{fontSize:'12px',color:'#475569',flex:1}},label),
+      h('button',{key:'m',onClick:(e)=>{e.stopPropagation();this.chFloor(pt.id,key,-1);},style:btn},'−'),
+      h('span',{key:'v',style:{fontFamily:'Geist Mono',fontSize:'14px',fontWeight:600,minWidth:'18px',textAlign:'center',color:'#0f172a'}},String(pt[key]||0)),
+      h('button',{key:'p',onClick:(e)=>{e.stopPropagation();this.chFloor(pt.id,key,1);},style:btn},'+')
+    ]);
+    return h('div',{style:{display:'flex',flexDirection:'column',gap:'8px'}}, this.state.parts.map(pt=>{
+      const active=this.state.activePart===pt.id;
+      const otra=pt.type==='otra';
+      const pending=!pt.geom;
+      return h('div',{key:pt.id,onClick:()=>this.selectPart(pt.id),className:active?undefined:'hovv',style:{border:'1px solid '+(active?'#B79BEB':'#e2e8f0'),background:active?'#F8F5FE':'#fff',borderRadius:'5px',padding:'11px 12px',cursor:'pointer',boxShadow:active?'inset 2px 0 0 #7C3AED':'none'}},[
+        h('div',{key:'top',style:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px',marginBottom:otra?'0':'10px'}},[
+          h('div',{key:'nm',style:{display:'flex',alignItems:'center',gap:'8px',flex:1,minWidth:0}},[
+            h('span',{key:'sw',style:{width:'12px',height:'10px',flex:'none',background:otra?'repeating-linear-gradient(45deg,#B79BEB,#B79BEB 2px,transparent 2px,transparent 4px)':'rgba(124,58,237,.28)',border:'1.4px solid #7C3AED'}}),
+            h('input',{key:'t',value:pt.name,onClick:(e)=>e.stopPropagation(),onChange:(e)=>this.setPartName(pt.id,e.target.value),onFocus:(e)=>{e.target.style.border='1px solid #cbd5e1';e.target.style.background='#fff';},onBlur:(e)=>{e.target.style.border='1px solid transparent';e.target.style.background='transparent';},style:{flex:1,minWidth:0,fontSize:'13px',fontWeight:600,color:'#0f172a',border:'1px solid transparent',borderRadius:'3px',padding:'2px 5px',background:'transparent',fontFamily:'Geist Sans'}})
+          ]),
+          h('div',{key:'rt',style:{display:'flex',alignItems:'center',gap:'8px',flex:'none'}},[
+            h('span',{key:'ty',style:{fontSize:'10px',fontWeight:600,letterSpacing:'.04em',textTransform:'uppercase',color:otra?'#b45309':'#6D28D9',background:otra?'#fffbeb':'#F1E9FD',padding:'1px 6px',borderRadius:'3px'}},otra?'Otra':'Principal'),
+            this.state.parts.length>1?h('span',{key:'del',onClick:(e)=>{e.stopPropagation();this.removePart(pt.id);},style:{fontSize:'11px',color:'#dc2626',cursor:'pointer'}},'Eliminar'):null
+          ])
+        ]),
+        pending
+          ? h('div',{key:'pend',style:{display:'flex',alignItems:'center',gap:'7px',fontSize:'11px',color:'#b45309',background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'3px',padding:'6px 9px'}},[h('span',{key:'d',style:{width:'6px',height:'6px',borderRadius:'50%',background:'#d97706',flex:'none'}}),'Pendiente de dibujar el recinto'])
+          : (otra
+            ? h('div',{key:'no',style:{fontSize:'11px',color:'#64748b',marginTop:'8px'}},'Otra construcción · sin plantas')
+            : h('div',{key:'fl'},[
+                h('div',{key:'lbl',style:{fontSize:'11px',color:'#64748b',marginBottom:'7px'}},'Plantas de la parte'),
+                h('div',{key:'st',style:{display:'flex',flexDirection:'column',gap:'6px'}},[stepper(pt,'fa','Plantas sobre rasante'),stepper(pt,'fb','Plantas bajo rasante')]),
+                h('div',{key:'hlp',style:{fontSize:'10px',color:'#94a3b8',marginTop:'6px'}},'Bajo rasante = sótanos (bajo la línea del terreno).')
+              ]))
+      ]);
+    }));
+  }
+
+  buildPartTools(){
+    const h=React.createElement;
+    const ap=this.state.parts.find(p=>p.id===this.state.activePart)||{};
+    const otra=ap.type==='otra';
+    const pending=!ap.geom;
+    const primary={width:'100%',height:'36px',background:'#0369a1',color:'#fff',border:'none',borderRadius:'4px',fontWeight:600,fontSize:'13px',cursor:'pointer',fontFamily:'Geist Sans'};
+    const ghost={height:'34px',background:'#fff',color:'#475569',border:'1px solid #cbd5e1',borderRadius:'4px',fontWeight:500,fontSize:'12px',cursor:'pointer',fontFamily:'Geist Sans'};
+    const snaplbl=h('div',{key:'sl',style:{fontSize:'11px',letterSpacing:'.06em',textTransform:'uppercase',color:'#94a3b8',fontWeight:600,margin:'12px 0 8px'}},'Snap');
+    if(this.state.drawing){
+      const n=this.state.drawPts.length;
+      return h('div',{},[
+        h('div',{key:'nb',style:{border:'1px solid #bae6fd',background:'#f1f5f9',borderRadius:'4px',padding:'11px 12px',fontSize:'12px',color:'#334155',lineHeight:1.45,marginBottom:'10px'}},'Dibuja el recinto de «'+(ap.name||'la parte')+'» haciendo clic en el plano, vértice a vértice. El cursor engancha a vértices, linderos e intersecciones.'),
+        h('div',{key:'ct',style:{display:'flex',justifyContent:'space-between',fontSize:'12px',color:'#475569',marginBottom:'10px'}},[h('span',{key:'a'},'Vértices dibujados'),h('span',{key:'b',style:{fontFamily:'Geist Mono',color:'#0f172a'}},String(n))]),
+        n>=3?h('button',{key:'cl',onClick:()=>this.closeDraw(),style:primary},'Cerrar recinto'):h('button',{key:'cld',disabled:true,style:{...primary,background:'#e2e8f0',color:'#94a3b8',cursor:'not-allowed'}},'Cerrar recinto ('+n+'/3)'),
+        h('div',{key:'row',style:{display:'flex',gap:'8px',marginTop:'8px'}},[
+          h('button',{key:'u',onClick:()=>this.undoDraw(),style:{...ghost,flex:1}},'Deshacer vértice'),
+          h('button',{key:'c',onClick:()=>this.cancelDraw(),style:{...ghost,flex:1}},'Cancelar')
+        ]),
+        snaplbl, this.buildSnaps()
+      ]);
+    }
+    if(pending){
+      return h('div',{},[
+        h('div',{key:'e',style:{border:'1px dashed #cbd5e1',borderRadius:'4px',background:'#f8fafc',padding:'14px',fontSize:'12px',color:'#475569',lineHeight:1.5,marginBottom:'10px'}},'Esta parte todavía no tiene recinto. Dibújalo sobre el plano para poder asignarle plantas y validarla.'),
+        h('button',{key:'d',onClick:()=>this.startDraw(),style:primary},'Dibujar recinto'),
+        snaplbl, this.buildSnaps()
+      ]);
+    }
+    const tool=(lbl,dis)=>h('div',{key:lbl,style:{display:'flex',alignItems:'center',gap:'8px',padding:'7px 10px',border:'1px solid '+(dis?'#e2e8f0':'#e2e8f0'),borderRadius:'4px',background:dis?'#f8fafc':'#fff',opacity:dis?.6:1}},[
+      h('span',{key:'i',style:{width:'6px',height:'6px',borderRadius:'50%',background:dis?'#cbd5e1':'#7C3AED',flex:'none'}}),
+      h('span',{key:'l',style:{flex:1,fontSize:'12px',color:dis?'#64748b':'#334155'}},lbl),
+      dis?h('span',{key:'t',style:{fontSize:'10px',color:'#94a3b8'}},'No disp.'):null
+    ]);
+    return h('div',{},[
+      h('div',{key:'g',style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px',marginBottom:'8px'}},[tool('Arrastrar vértice',false),tool('Insertar vértice',false),tool('Eliminar vértice',false),tool('Offset lindero',false)]),
+      h('button',{key:'redraw',onClick:()=>this.startDraw(),style:{...ghost,width:'100%',marginBottom:'8px'}},'Volver a dibujar el recinto'),
+      tool('Hueco interior',true),
+      h('div',{key:'note',style:{margin:'8px 0 0',fontSize:'11px',color:'#64748b',lineHeight:1.4}}, otra ? 'Las otras construcciones (piscinas) son partes sin plantas sobre rasante; se excluyen de la envolvente.' : 'No se permiten huecos interiores en la geometría de una parte.'),
+      snaplbl, this.buildSnaps()
+    ]);
+  }
+
+  buildEdVias(){
+    const h=React.createElement;
+    const vias=[['list','Pegar volcado LIST de AutoCAD'],['txt','Cargar TXT de coordenadas'],['gml','Cargar GML de edificio existente'],['rc','Traer del Catastro por referencia catastral']];
+    return h('div',{style:{marginTop:'10px'}},[
+      h('div',{key:'div',style:{display:'flex',alignItems:'center',gap:'12px',color:'#94a3b8',fontSize:'11px',letterSpacing:'.1em',textTransform:'uppercase',margin:'2px 0 10px'}},[
+        h('div',{key:'a',style:{flex:1,height:'1px',background:'#e2e8f0'}}),h('span',{key:'b'},'o bien'),h('div',{key:'c',style:{flex:1,height:'1px',background:'#e2e8f0'}})
+      ]),
+      h('div',{key:'list',style:{display:'flex',flexDirection:'column',gap:'6px'}}, vias.map((v)=>
+        h('div',{key:v[0],onClick:()=>this.pickEdVia(v[0]),className:'hovv',style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'9px 11px',border:'1px solid #e2e8f0',borderRadius:'4px',background:'#fff',cursor:'pointer',fontSize:'12px',color:'#334155'}},[
+          h('span',{key:'l'},v[1]),
+          h('span',{key:'a',style:{color:'#94a3b8',fontSize:'15px',lineHeight:'1'}},'›')
+        ])
+      ))
+    ]);
+  }
+
+  buildPlantaCheck(){
+    const h=React.createElement;
+    return h('div',{style:{display:'flex',flexDirection:'column',gap:'7px'}}, this.state.parts.map(pt=>{
+      const otra=pt.type==='otra';
+      const ok = otra || (pt.geom && pt.fa>0);
+      return h('div',{key:pt.id,style:{display:'flex',alignItems:'center',gap:'9px',padding:'8px 11px',border:'1px solid #e2e8f0',borderRadius:'4px',background:'#f8fafc'}},[
+        h('span',{key:'c',style:{width:'16px',height:'16px',flex:'none',borderRadius:'50%',background:ok?'#dcfce7':'#fef2f2',color:ok?'#15803d':'#dc2626',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'11px',fontWeight:700}}, ok?'✓':'!'),
+        h('span',{key:'n',style:{flex:1,fontSize:'12px',color:'#334155'}},pt.name),
+        h('span',{key:'p',style:{fontFamily:'Geist Mono',fontSize:'12px',color:'#475569'}}, otra?'sin plantas':(pt.fa+' sobre rasante · '+pt.fb+' bajo rasante'))
+      ]);
+    }));
+  }
+
+  buildGmlFicha(){
+    const h=React.createElement;
+    return h('div',{style:{border:'1px solid #e2e8f0',borderRadius:'4px',overflow:'hidden'}},[
+      h('div',{key:'h',style:{display:'grid',gridTemplateColumns:'1fr 48px 46px 46px',background:'#f1f5f9',color:'#64748b',fontSize:'9px',letterSpacing:'.02em',textTransform:'uppercase',padding:'6px 10px'}},[
+        h('span',{key:'a'},'Parte'),h('span',{key:'b',style:{textAlign:'right'}},'m²'),h('span',{key:'c',style:{textAlign:'right'}},'S/ras.'),h('span',{key:'d',style:{textAlign:'right'}},'B/ras.')
+      ]),
+      ...this.state.parts.map((pt,i)=>h('div',{key:pt.id,style:{display:'grid',gridTemplateColumns:'1fr 48px 46px 46px',padding:'7px 10px',fontSize:'12px',background:i%2?'#f8fafc':'#fff',alignItems:'center'}},[
+        h('span',{key:'a',style:{color:'#0f172a',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},pt.name),
+        h('span',{key:'b',style:{textAlign:'right',fontFamily:'Geist Mono',color:'#475569'}},pt.geom?this.fmt(this.area(pt.geom),2):'—'),
+        h('span',{key:'c',style:{textAlign:'right',fontFamily:'Geist Mono',color:'#475569'}},pt.type==='otra'?'—':String(pt.fa)),
+        h('span',{key:'d',style:{textAlign:'right',fontFamily:'Geist Mono',color:'#475569'}},pt.type==='otra'?'—':String(pt.fb))
+      ])),
+      h('div',{key:'ft',style:{padding:'6px 10px',fontSize:'10px',color:'#94a3b8',borderTop:'1px solid #e2e8f0'}},'S/ras. = plantas sobre rasante · B/ras. = bajo rasante')
+    ]);
+  }
+
+  buildReport(){
+    const h=React.createElement;
+    const edif=this.state.docType==='edificio';
+    const docNum=edif?'CG-2026-000099/02':'CG-2026-000099/01';
+    const title=edif?'Informe de construcción para la Sede Electrónica':'Informe de contraste con el parcelario catastral';
+    const sheet=(children,pageNo,total)=>h('div',{style:{width:'760px',minHeight:'1010px',background:'#fff',boxShadow:'0 1px 0 #cbd5e1, 0 6px 20px rgba(15,23,42,.10)',border:'1px solid #cbd5e1',padding:'46px 54px 40px',position:'relative',display:'flex',flexDirection:'column',fontFamily:'Geist Sans',color:'#0f172a'}},[
+      ...children,
+      h('div',{key:'ft',style:{marginTop:'auto',paddingTop:'20px',borderTop:'1px solid #e2e8f0',display:'flex',justifyContent:'space-between',fontSize:'10px',color:'#64748b',fontFamily:'Geist Mono'}},[
+        h('span',{key:'a'},title+' · '+docNum),
+        h('span',{key:'b'},'Pág. '+pageNo+' / '+total)
+      ])
+    ]);
+    const lbl=()=>({fontSize:'9px',letterSpacing:'.1em',textTransform:'uppercase',color:'#64748b',fontWeight:600});
+    const field=(k,l,v)=>h('div',{key:k,style:{display:'flex',flexDirection:'column',gap:'2px'}},[h('span',{key:'l',style:lbl()},l),h('span',{key:'v',style:{fontSize:'12px',color:'#0f172a',fontFamily:'Geist Mono'}},v)]);
+    const sign=()=>h('div',{key:'sig',style:{marginTop:'40px',display:'flex',justifyContent:'flex-end'}},
+      h('div',{style:{width:'320px'}},[
+        h('div',{key:'ln',style:{borderTop:'1px solid #0f172a',paddingTop:'8px'}},[
+          h('div',{key:'n',style:{fontSize:'13px',fontWeight:600}},'María Ordóñez Vega'),
+          h('div',{key:'t',style:{fontSize:'11px',color:'#475569',marginTop:'2px'}},'Ingeniera Técnica en Topografía'),
+          h('div',{key:'c',style:{fontSize:'11px',color:'#475569',marginTop:'6px',fontFamily:'Geist Mono'}},'Colegiada nº 4 812 · COIT-TOP Andalucía'),
+          h('div',{key:'e',style:{fontSize:'11px',color:'#64748b',marginTop:'2px',fontFamily:'Geist Mono'}},'m.ordonez@topografia.es · +34 952 00 00 00')
+        ])
+      ])
+    );
+    const header=(sub)=>h('div',{key:'hd',style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',paddingBottom:'16px',borderBottom:'2px solid #0f172a'}},[
+      h('div',{key:'l'},[
+        h('div',{key:'t',style:{fontSize:'11px',letterSpacing:'.14em',textTransform:'uppercase',color:'#64748b',fontWeight:600}},title),
+        h('div',{key:'m',style:{fontSize:'20px',fontWeight:700,marginTop:'6px'}},sub)
+      ]),
+      h('div',{key:'r',style:{textAlign:'right'}},[
+        h('div',{key:'n',style:{fontSize:'13px',fontWeight:600,fontFamily:'Geist Mono'}},docNum),
+        h('div',{key:'d',style:{fontSize:'11px',color:'#64748b',marginTop:'3px'}},'23 de julio de 2026')
+      ])
+    ]);
+    const plano=(cap)=>h('div',{key:'plano',style:{border:'1px solid #cbd5e1',background:'#e2e8f0',height:'290px',position:'relative'}},[
+      this.buildMap('report'),
+      h('div',{key:'sc',style:{position:'absolute',right:'10px',bottom:'8px',fontFamily:'Geist Mono',fontSize:'10px',color:'#475569',background:'rgba(255,255,255,.85)',padding:'2px 6px',borderRadius:'3px'}},cap)
+    ]);
+    const table=(cols,rows)=>h('table',{style:{width:'100%',borderCollapse:'collapse',fontFamily:'Geist Mono',fontSize:'12px'}},[
+      h('thead',{key:'th'},h('tr',{style:{color:'#64748b',fontSize:'10px'}},cols.map((c,i)=>h('th',{key:i,style:{padding:'5px 8px',fontWeight:600,textAlign:i===0?'left':'right',borderBottom:'1px solid #0f172a'}},c)))),
+      h('tbody',{key:'tb'},rows.map((r,i)=>h('tr',{key:i,style:{background:i%2?'#f8fafc':'#fff'}},r.map((c,j)=>h('td',{key:j,style:{padding:'6px 8px',textAlign:j===0?'left':'right',fontWeight:j===0?600:400,fontFamily:j===0?'Geist Sans':'Geist Mono',color:j===0?'#0f172a':'#475569'}},c)))))
+    ]);
+
+    if(edif){
+      const reg=this.state.contrastRegistered;
+      const huella=this.fmt(this.sobreParts().reduce((s,pt)=>s+this.area(this.partGeom(pt.id)),0),2);
+      const p1=[];
+      p1.push(header('Casares · Edificio en Pol. 8, Parcela 99'));
+      p1.push(h('div',{key:'flds',style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'14px 20px',padding:'16px 0 22px'}},[
+        field('f1','Municipio','Casares (Málaga)'),
+        field('f2','Paraje','Huertas del Canal'),
+        field('f3','Polígono / Parcela','8 / 99'),
+        field('f4','Referencia catastral','29041A00800099'),
+        field('f5','Sistema de referencia','UTM huso 30 · ETRS89'),
+        field('f6','Huella sobre rasante',huella+' m²')
+      ]));
+      p1.push(h('div',{key:'atl',style:{...lbl(),marginBottom:'8px'}},'Atributos generales del edificio'));
+      p1.push(h('div',{key:'atg',style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'12px 20px',padding:'0 0 20px'}},[
+        field('a1','Uso dominante','Residencial'),
+        field('a2','Año de construcción','1998'),
+        field('a3','Año de reforma','—'),
+        field('a4','Estado de conservación','Funcional'),
+        field('a5','Nº de partes',String(this.state.parts.length)),
+        field('a6','Envolvente','derivada de partes')
+      ]));
+      p1.push(h('div',{key:'plt',style:{...lbl(),marginBottom:'6px'}},'Plano de situación de la construcción'));
+      p1.push(plano('Escala 1:100'));
+      p1.push(h('div',{key:'fl',style:{...lbl(),margin:'22px 0 6px'}},'Ficha de partes de construcción'));
+      p1.push(table(['Parte','Tipo','Superficie (m²)','Plantas sobre rasante','Plantas bajo rasante'], this.state.parts.map(pt=>[pt.name, pt.type==='otra'?'Otra constr.':'Principal', pt.geom?this.fmt(this.area(pt.geom),2):'—', pt.type==='otra'?'—':String(pt.fa), pt.type==='otra'?'—':String(pt.fb)])));
+      p1.push(h('div',{key:'note',style:{fontSize:'10px',color:'#64748b',marginTop:'6px'}},'El edificio-envolvente se deriva de las partes con volumen sobre rasante; no se dibuja. Sólo entran construcciones sobre rasante; se excluyen voladizos, terrazas y balcones.'));
+
+      const p2=[];
+      if(reg){
+        p2.push(h('div',{key:'clt',style:{...lbl(),marginBottom:'6px'}},'Contraste con la construcción catastral'));
+        const meas=this.area(this.partGeom('viv')||this.GEOM().viv), cat=this.area(this.GEOM().vivCat);
+        p2.push(table(['Concepto','Superficie (m²)','Δ','Δ %'],[['Huella medida',this.fmt(meas,2),'—','—'],['Constru. catastral',this.fmt(cat,2),this.fmt(cat-meas,2),this.fmt((cat-meas)/meas*100,2)],['Diferencia','+'+this.fmt(meas-cat,2),'+'+this.fmt(meas-cat,2),'+'+this.fmt((meas-cat)/cat*100,2)]]));
+        p2.push(h('div',{key:'cnote',style:{fontSize:'10px',color:'#64748b',margin:'6px 0 22px'}},'Solape del 96,1 %; desviación máxima de 0,18 m. La construcción queda dentro de su parcela, sin invasión a colindantes. El cuadro describe magnitudes; no emite valoración.'));
+      } else {
+        p2.push(h('div',{key:'clt',style:{...lbl(),marginBottom:'6px'}},'Contraste con la construcción catastral'));
+        p2.push(h('div',{key:'cempty',style:{border:'1px solid #e2e8f0',borderRadius:'4px',background:'#f8fafc',padding:'14px',fontSize:'12px',color:'#475569',lineHeight:1.6,margin:'0 0 22px'}},'No aplica: no consta construcción registrada en el Catastro para esta parcela. El presente informe es declarativo de la construcción que se aporta.'));
+      }
+      p2.push(h('div',{key:'dlt',style:{...lbl(),marginBottom:'8px'}},'Descripción'));
+      p2.push(h('p',{key:'desc',style:{fontSize:'13px',lineHeight:1.7,color:'#1e293b',margin:'0 0 22px',textWrap:'pretty'}},'Edificio de vivienda de dos plantas sobre rasante, sin plantas bajo rasante, en estado funcional, construido en 1998, de uso residencial. La huella se sitúa dentro de la parcela 99 del polígono 8. Como otra construcción figura una piscina descubierta, sin plantas, que se declara como parte independiente.'));
+      p2.push(sign());
+      return h('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:'24px'}},[sheet(p1,1,2),sheet(p2,2,2)]);
+    }
+
+    // ----- PARCELA REPORT -----
+    const p1=[];
+    p1.push(header('Casares · Polígono 8, Parcela 99'));
+    p1.push(h('div',{key:'flds',style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'14px 20px',padding:'16px 0 22px'}},[
+      field('f1','Municipio','Casares (Málaga)'),
+      field('f2','Paraje','Huertas del Canal'),
+      field('f3','Polígono / Parcela','8 / 99'),
+      field('f4','Referencia catastral','29041A00800099'),
+      field('f5','Sistema de referencia','UTM huso 30 · ETRS89'),
+      field('f6','Superficie medida','62,47 m²')
+    ]));
+    p1.push(h('div',{key:'plt',style:{...lbl(),marginBottom:'6px'}},'Plano de situación'));
+    p1.push(plano('Escala 1:100'));
+    p1.push(h('div',{key:'vlt',style:{...lbl(),margin:'22px 0 6px'}},'Relación de vértices'));
+    p1.push(table(['Nº','X (m)','Y (m)'],[['0','299 381,53','4 028 495,97'],['1','299 388,96','4 028 493,14'],['2','299 386,01','4 028 485,41'],['3','299 378,47','4 028 488,45']]));
+    p1.push(h('div',{key:'vsum',style:{display:'flex',gap:'28px',marginTop:'8px',fontSize:'12px',color:'#475569',fontFamily:'Geist Mono'}},[h('span',{key:'a'},'Superficie: 62,47 m²'),h('span',{key:'b'},'Perímetro: 31,86 m')]));
+    p1.push(h('div',{key:'clt',style:{...lbl(),margin:'22px 0 6px'}},'Cuadro de contraste de superficies'));
+    p1.push(table(['Banda','Superficie (m²)','Δ vs medida','Δ vs catastral','Δ vs registral'],[['Medida','62,47','—','+0,67','+0,47'],['Catastral','61,80','−0,67','—','−0,20'],['Registral','62,00','−0,47','+0,20','—']]));
+    p1.push(h('div',{key:'cnote',style:{fontSize:'10px',color:'#64748b',marginTop:'6px'}},'La superficie registral se introduce manualmente. El cuadro describe magnitudes; no emite valoración.'));
+    const p2=[];
+    p2.push(h('div',{key:'dlt',style:{...lbl(),marginBottom:'8px'}},'Descripción de linderos'));
+    p2.push(h('p',{key:'desc',style:{fontSize:'13px',lineHeight:1.7,color:'#1e293b',margin:'0 0 22px',textWrap:'pretty'}},'La parcela linda al norte, en línea recta de 12,45 m, con la parcela 98 del polígono 8; al este, en línea quebrada de 8,27 m, con la parcela 100 del mismo polígono; al sur, en línea de 8,13 m, con el camino de servicio de las Huertas del Canal; y al oeste, en línea de 8,12 m, con la Acequia del Canal, que discurre en dirección noroeste-sureste.'));
+    p2.push(h('div',{key:'olt',style:{...lbl(),marginBottom:'8px'}},'Observaciones'));
+    p2.push(h('p',{key:'obs',style:{fontSize:'12px',lineHeight:1.65,color:'#475569',margin:'0 0 30px'}},'Medición de 62,47 m² frente a los 61,80 m² del parcelario catastral vigente. Solape del 97,4 %, desplazamiento entre centroides de 0,31 m y desviación máxima de lindero de 0,54 m en el lindero norte. No se detecta invasión sobre parcelas colindantes.'));
+    p2.push(sign());
+    return h('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:'24px'}},[sheet(p1,1,2),sheet(p2,2,2)]);
+  }
+
+  renderVals(){
+    const s=this.state;
+    const route=this.routeOf(s);
+    const edif=s.docType==='edificio';
+    const rcValid=(s.rc||'').length>=14;
+    const meas=this.area(this.partGeom('viv')||this.GEOM().viv), cat=this.area(this.GEOM().vivCat);
+    return {
+      docToggle:this.buildDocToggle(),
+      railSteps:this.buildRail(),
+      docNum: edif?'CG-2026-000099/02':'CG-2026-000099/01',
+      isParcela:!edif, isEdificio:edif,
+      mapEntry:this.buildMap('entry'), mapValid:this.buildMap('validation'), mapCheck:this.buildMap('check'),
+      mapEdit:this.buildMap('edition'), mapDiag:this.buildMap('diagnosis'), mapParts:this.buildMap('parts'), mapContrast:this.buildMap('contrast'),
+      report:this.buildReport(),
+      // step visibility
+      entryParcela:s.step==='entry' && !edif, entryEdificio:s.step==='entry' && edif,
+      showParts:s.step==='parts', showValid:s.step==='valid', showCheck:s.step==='check', showEdit:s.step==='edit',
+      showDiag:s.step==='diag', showGml:s.step==='gml', showContrast:s.step==='contrast', showReport:s.step==='report',
+      // entry parcela
+      rc:s.rc, setRc:(e)=>this.setRc(e), fillExample:()=>this.fillExample(),
+      rcValid, rcInvalid:!rcValid,
+      traer:()=>{ if(rcValid){ this.setState({entryVia:'rc'}); this.go('valid'); } },
+      analizar:()=>{ this.setState({entryVia:'med'}); this.go('valid'); },
+      noGml:!s.gmlName, hasGml:!!s.gmlName, gmlName:s.gmlName,
+      selectGml:()=>this.selectGml(), clearGml:()=>this.clearGml(),
+      comprobarGml:()=>{ this.setState({entryVia:'gml'}); this.go('check'); },
+      // entry edificio
+      edVias:this.buildEdVias(), toParts:()=>this.go('parts'),
+      edModelToggle:this.buildEdModelToggle(),
+      edModelHint: s.edModel==='simplificado' ? 'Simplificado — sólo geometría y datos mínimos; es el válido para el Informe Catastral de Ubicación de Construcciones (ICUC).' : 'Completo — declaración con todos los atributos semánticos (inmuebles, viviendas, superficie construida, uso y fechas).',
+      edSimplificado: s.edModel==='simplificado', edCompleto: s.edModel==='completo',
+      edAttrTitle: s.edModel==='completo' ? 'Atributos del edificio' : 'Datos mínimos',
+      edModelLabel: s.edModel==='simplificado' ? 'Simplificado (ICUC)' : 'Completo',
+      edRc:s.edRc, setEdRc:(e)=>this.setEdRc(e),
+      edRcDeduced:s.edRcState==='deduced', edRcAmbiguous:s.edRcState==='ambiguous', edRcContext:s.edRcState==='context',
+      pickDxf:()=>this.pickEdVia('dxf'),
+      // parts
+      partsList:this.buildPartsList(), partTools:this.buildPartTools(),
+      activeArea:(this.partGeom(s.activePart)?this.fmt(this.area(this.partGeom(s.activePart)),2):'—'),
+      huellaSobre:this.fmt(this.sobreParts().reduce((a,pt)=>a+this.area(pt.geom),0),2),
+      envParts:String(this.sobreParts().length),
+      partCount:String(s.parts.length),
+      addPart:()=>this.addPart(), toValidEd:()=>this.go('valid'),
+      // validation parcela
+      hasError:!s.errorFixed, noError:s.errorFixed, errCount:s.errorFixed?0:1,
+      fixDuplicate:()=>this.fixDuplicate(),
+      canDiagnose:s.errorFixed, cannotDiagnose:!s.errorFixed, toEdit:()=>this.go('edit'),
+      hoverErr:()=>this.setState({hov:'err'}), hoverAvi:()=>this.setState({hov:'avi'}), hoverNone:()=>this.setState({hov:null}),
+      // validation edificio
+      edHasError:!s.edErrorFixed, edNoError:s.edErrorFixed, edErrCount:s.edErrorFixed?0:1,
+      fixEdError:()=>this.fixEdError(), edPlantaCheck:this.buildPlantaCheck(),
+      edCanGen:s.edErrorFixed, edCannotGen:!s.edErrorFixed, toGml:()=>this.go('gml'),
+      validCaption: edif?'Partes de construcción sobre la parcela':'Recinto medido sobre cartografía · Pol. 8 Parcela 99',
+      // check
+      checkParcels:this.buildCheckParcels(), toDiagFromCheck:()=>this.go('diag'),
+      // edit parcela
+      offsetStr:(s.offset>=0?'+':'−')+this.fmt(Math.abs(s.offset),2),
+      deltaArea:(s.offset>=0?'+':'−')+this.fmt(Math.abs(s.offset*8.2),2)+' m²',
+      incOffset:()=>this.incOffset(), decOffset:()=>this.decOffset(), snapControls:this.buildSnaps(),
+      toDiagnosis:()=>this.go('diag'),
+      // diagnosis parcela
+      diagSource: route==='check' ? ('GML · '+(s.gmlName||'')) : (s.rc||'29041A00800099'),
+      diagGenerate: route!=='check', diagCheck: route==='check',
+      genGml:()=>this.go('report'), verInforme:()=>this.go('report'),
+      downloadInforme:()=>this.setState({downloaded:true}), downloadGml:()=>this.setState({downloaded:true}), downloaded:s.downloaded,
+      // gml step
+      edGmlFicha:this.buildGmlFicha(),
+      notGenerated:!s.gmlGenerated, generated:s.gmlGenerated,
+      generarGml:()=>this.generarGml(), toContrast:()=>this.go('contrast'), toReportEd:()=>this.go('report'),
+      // contrast
+      contrastOn:s.contrastRegistered, contrastOff:!s.contrastRegistered,
+      enableContrast:()=>this.enableContrast(), disableContrast:()=>this.disableContrast(),
+      edMeasStr:this.fmt(meas,2), edCatStr:this.fmt(cat,2),
+      edDiffStr:'+'+this.fmt(meas-cat,2)+' m² · +'+this.fmt((meas-cat)/cat*100,2)+' %',
+      // report
+      reportTitle: edif?'Informe de construcción para la Sede Electrónica':'Informe de contraste con el parcelario catastral'
+    };
+  }
+
+  buildCheckParcels(){
+    const h=React.createElement;
+    const sel=this.state.checkParcel;
+    const rows=[
+      {i:0,rc:'29041A00800099',t:'62,47 m² · 4 vértices',note:'Coincide con el expediente'},
+      {i:1,rc:'29041A00800098',t:'54,10 m² · 5 vértices',note:'Parcela colindante 98'}
+    ];
+    return h('div',{style:{display:'flex',flexDirection:'column',gap:'8px'}}, rows.map(r=>{
+      const on=sel===r.i;
+      return h('div',{key:r.i,onClick:()=>this.setState({checkParcel:r.i}),className:on?undefined:'hovv',style:{display:'flex',gap:'11px',padding:'11px 12px',border:'1px solid '+(on?'#B79BEB':'#e2e8f0'),background:on?'#F8F5FE':'#fff',borderRadius:'4px',cursor:'pointer',alignItems:'flex-start'}},[
+        h('div',{key:'r',style:{width:'16px',height:'16px',flex:'none',marginTop:'1px',borderRadius:'50%',border:'1.5px solid '+(on?'#7C3AED':'#cbd5e1'),background:'#fff',display:'flex',alignItems:'center',justifyContent:'center'}}, on?h('div',{style:{width:'8px',height:'8px',background:'#7C3AED',borderRadius:'50%'}}):null),
+        h('div',{key:'b',style:{flex:1}},[
+          h('div',{key:'a',style:{display:'flex',justifyContent:'space-between',alignItems:'baseline'}},[
+            h('span',{key:'rc',style:{fontSize:'12px',fontWeight:600,color:'#0f172a',fontFamily:'Geist Mono'}},r.rc),
+            h('span',{key:'t',style:{fontSize:'11px',color:'#475569',fontFamily:'Geist Mono'}},r.t)
+          ]),
+          h('div',{key:'n',style:{fontSize:'11px',color:'#64748b',marginTop:'3px'}},r.note)
+        ])
+      ]);
+    }));
+  }
+}
+</script>
+</body>
+</html>

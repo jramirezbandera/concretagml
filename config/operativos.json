@@ -1,0 +1,9 @@
+{
+  "_nota": "Tolerancias OPERATIVAS de F02: decisiones de INGENIERÍA (regla de oro 9), no umbrales-veredicto. La app MIDE y SEÑALA, no juzga. `config/umbrales.json` está PROHIBIDO. Distancias/áreas en unidades SI (metros, m²); ángulos en grados.",
+  "duplicadoMetros": 0.001,
+  "segmentoCortoMetros": 0.05,
+  "colinealidadGrados": 179.9,
+  "superficieMinimaM2": 1,
+  "areaNulaM2": 0.000001,
+  "maxVertices": 500
+}

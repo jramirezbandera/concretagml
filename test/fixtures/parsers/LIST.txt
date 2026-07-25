@@ -1,0 +1,21 @@
+Comando: LISTA
+--------------------- LWPOLYLINE ----------------------------------
+                          Trazo:  D05
+                 Espacio actual:  Modelo
+                           Capa:  P
+                  Tipo de línea:  Continuo
+            Marcas de polilínea:  Cerrado
+                        Anchura:  0.0000
+                           Área:  61.0450
+                      Perímetro:  42.1753
+                      Ubicación:  X= 298755.5889  Y= 4090054.3788  Z= 0.0000
+                      Ubicación:  X= 298755.8939  Y= 4090054.3763  Z= 0.0000
+                      Ubicación:  X= 298755.8139  Y= 4090059.4292  Z= 0.0000
+                      Ubicación:  X= 298756.1654  Y= 4090063.3345  Z= 0.0000
+                      Ubicación:  X= 298756.1104  Y= 4090067.7861  Z= 0.0000
+                      Ubicación:  X= 298760.5239  Y= 4090067.5460  Z= 0.0000
+                      Ubicación:  X= 298759.6975  Y= 4090058.5242  Z= 0.0000
+                      Ubicación:  X= 298759.1598  Y= 4090058.5734  Z= 0.0000
+                      Ubicación:  X= 298758.4211  Y= 4090050.5088  Z= 0.0000
+                      Ubicación:  X= 298755.9492  Y= 4090050.8810  Z= 0.0000
+                      Ubicación:  X= 298755.6446  Y= 4090050.8585  Z= 0.0000

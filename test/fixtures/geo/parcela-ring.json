@@ -1,0 +1,32 @@
+{
+  "_fuente": "Extraído de test/fixtures/gml/cp_parcela_9398516VK3799G.gml (WFS GetParcel, Catastro).",
+  "_nota": "Anillo EXTERIOR abierto (sin repetir el vértice de cierre): 15 vértices. El GML lo trae cerrado (16, último = primero). Coordenadas UTM [X=Este, Y=Norte] en EPSG:25830 (huso 30, ETRS89).",
+  "refCatastral": "9398516VK3799G",
+  "srs": "EPSG:25830",
+  "huso": 30,
+  "areaValue": 1536,
+  "_verificado": {
+    "areaFirmada": -1535.865149996761,
+    "orientacion": -1,
+    "orientacionEtiqueta": "HORARIO (CW) — convención Catastro para el exterior (override O1)",
+    "areaAbsolutaRedondeada": 1536
+  },
+  "referencePoint": [439250.35, 4479664.55],
+  "anilloExterior": [
+    [439283.23, 4479671.27],
+    [439268.76, 4479658.01],
+    [439257.63, 4479647.8],
+    [439246.37, 4479637.48],
+    [439244.43, 4479640.02],
+    [439239.96, 4479646.73],
+    [439229.31, 4479665.26],
+    [439228.84, 4479666.09],
+    [439227.62, 4479668.26],
+    [439225.21, 4479672.54],
+    [439222.89, 4479677.12],
+    [439222.53, 4479678],
+    [439222.47, 4479678.13],
+    [439247.3, 4479687.38],
+    [439276.64, 4479673.63]
+  ]
+}

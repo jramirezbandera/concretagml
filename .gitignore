@@ -1,0 +1,46 @@
+# ── Dependencias y artefactos de build ───────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+build/
+
+# Caché de Vite / Vitest
+.vite/
+.vitest/
+*.local
+
+# Cobertura de tests
+coverage/
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+
+# ── Sistema operativo / editor ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# ── Herramientas locales (gstack, etc.) ───────────────────────────────────────
+.gstack/
+
+# ── AutoCAD (locks/temporales, no versionar) ──────────────────────────────────
+*.dwl
+*.dwl2
+
+# ── Documentos internos de I+D / estrategia (no se publican) ──────────────────
+PLAN_MODULO_GML.md
+MEJORES_PRACTICAS_GML.md
+HALLAZGOS_INVESTIGACION.md
+AUDITORIA_F00.md
+
+# ── Capturas de diseño y screenshots de desarrollo ────────────────────────────
+IMAGENES CLAUDEDESIGN/
+prototipo/screenshots/
