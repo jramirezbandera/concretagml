@@ -30,7 +30,7 @@ import { parseLIST } from './list.js'
 import { parseTXT } from './txt.js'
 import { parseDXF } from './dxf.js'
 import { crearDeteccion, TIPO_DETECCION, SEVERIDAD } from './_comun.js'
-import { detectarHuso, sanear } from '../geo/huso.js'
+import { detectarHuso, sanear, HUSOS_VALIDOS } from '../geo/huso.js'
 import { errorCierre, compensarCierre } from '../geo/cierre.js'
 import { superficie } from '../geo/area.js'
 import { crearParcela, crearRecinto, TIPO_RECINTO, ORIGEN_PARCELA } from '../model/parcela.js'
@@ -55,9 +55,6 @@ const TOL_CIERRE_MISCLOSURE = 0.5
 /** Umbral RELATIVO por defecto del cotejo de superficie (calculada vs reportada).
  *  Solo marca discrepancia; nunca emite juicio de valor (regla 9). */
 const UMBRAL_SUPERFICIE = 0.01
-
-/** Husos implementados (Península + Baleares; Canarias diferido, override O13). */
-const HUSOS_VALIDOS = [29, 30, 31]
 
 const FORMATOS = Object.freeze({ LIST: 'LIST', TXT: 'TXT', DXF: 'DXF' })
 
@@ -413,7 +410,10 @@ export function importar(texto, opts = {}) {
   }
   if (opts.huso !== undefined && !HUSOS_VALIDOS.includes(opts.huso)) {
     throw new RangeError(
-      `importar: 'opts.huso' inválido: ${JSON.stringify(opts.huso)}. Válidos: 29, 30, 31 (Canarias diferido).`,
+      // Los husos se DERIVAN de `HUSOS_VALIDOS` (la misma lista que valida arriba),
+      // nunca se escriben a mano: el mensaje no puede desincronizarse de la
+      // comprobación el día que entre Canarias. Igual que `geo/huso.js:142-143`.
+      `importar: 'opts.huso' inválido: ${JSON.stringify(opts.huso)}. Válidos: ${HUSOS_VALIDOS.join(', ')} (Canarias diferido).`,
     )
   }
 

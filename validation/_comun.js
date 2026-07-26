@@ -43,9 +43,16 @@ export const NIVEL = Object.freeze({ ERROR: 'ERROR', AVISO: 'AVISO' })
  * cruzan anillos (hueco fuera del exterior, huecos solapados) y la UI (F03) debe
  * saber qué recinto resaltar.
  *
+ * Este typedef es la ÚNICA definición del tipo en el proyecto: `viewer/_comun.js`
+ * lo ALIASA (`@typedef {import('../validation/_comun.js').RefVertice}`) en vez de
+ * re-declararlo, para que la tabla de vértices de F03 y el resaltado de F02 no
+ * puedan divergir (auditoría de coherencia 2C.2, hallazgo 2.10).
+ *
  * @typedef {Object} RefVertice
- * @property {number} recinto  Índice en `recintos` (0 = EXTERIOR).
- * @property {number} indice   Índice del vértice en `recintos[recinto].vertices`.
+ * @property {number} recinto  Índice en `recintos`: **0 = EXTERIOR; ≥1 = HUECO**
+ *   (invariante de `model/parcela.js`).
+ * @property {number} indice   Índice del vértice en `recintos[recinto].vertices`,
+ *   0-based y sobre el anillo **ABIERTO** (sin el vértice de cierre).
  */
 
 /**

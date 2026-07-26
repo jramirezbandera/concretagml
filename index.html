@@ -1,0 +1,126 @@
+<!doctype html>
+<!--
+  Concreta GML — index.html · F03 · Fase 4, Tarea 4B.1. LA CÁSCARA VIVA DE LA APP.
+
+  Sustituye la sonda de build de la tarea 4A.1. Aquí ya no hay andamiaje: este es
+  el esqueleto definitivo de la pantalla única de la app.
+
+  ── QUÉ ES ESTE FICHERO, EXACTAMENTE ────────────────────────────────────────
+  Un ESQUELETO DE CAJAS VACÍAS, y nada más. No pinta contenido dinámico: el
+  interior de `#avisos` es de `app/avisos.js`, el de `#tabla-vertices` y el de
+  `#mapa` es de `viewer/` (`sincronizar` y `crearVisor`), y los textos de la
+  ficha del pie los escribe `app/main.js` desde el store. Lo único que este HTML
+  aporta son los NODOS y sus clases.
+
+  ⚠️ EL MARCADO ES CONTRATO, NO SUGERENCIA. `estilos/app.css` está escrito
+  contra este esqueleto exacto (clases `gml-*`, anidamiento y orden incluidos).
+  Si se renombra una clase o se mueve un nodo de nivel, el CSS deja de aplicar
+  sin que nada avise. Antes de tocar la estructura, leer la cabecera de
+  `estilos/app.css`.
+
+  Dos trampas concretas, ya pisadas y documentadas:
+
+  · `#tabla-vertices` TIENE que ser un `<div>` y no un `<table>`. Ese `<div>` es
+    el contenedor con `overflow:auto` (`.gml-tabla-caja`) contra el que scrollea
+    la cabecera pegajosa de la tabla; si aquí hubiera un `<table>`,
+    `viewer/sincronizacion.js` lo usaría como tabla raíz (su contrato lo admite)
+    y desaparecerían el scroll y el `position:sticky` del `<thead>`.
+
+  · Los rótulos van SIEMPRE FUERA de las cajas vacías. `sincronizar` hace
+    `tablaEl.replaceChildren()` en cada repintado, así que cualquier cosa que se
+    meta dentro de `#tabla-vertices` se borra al primer `set` del store. Por eso
+    «Vértices · X · Y (m)» vive en un `.gml-rotulo-fila` HERMANO.
+
+  ── LOS CHIPS DEL CONTADOR ──────────────────────────────────────────────────
+  `.gml-chip` a secas ES el chip neutro (gris) de la maqueta; `--error` y
+  `--aviso` solo AÑADEN color. Los dos `<span>` nacen aquí SIN modificador y con
+  el texto de cuenta cero: un chip rojo diciendo «0 errores» sería peor que no
+  tener chip. Quien pone y quita el modificador es `app/avisos.js`, que los
+  recibe por `data-contador`. El punto de color lo pinta un `::before` del CSS,
+  así que aquí NO va ningún `<span>` de punto (saldrían dos), y por eso mismo
+  `chip.textContent = '3 errores'` no lo borra.
+
+  ── EL CSS: QUÉ SE CARGA AQUÍ Y QUÉ SE CARGA DESDE EL JS ────────────────────
+  · `estilos/app.css` (que hace `@import` de los cinco ficheros de tokens) va
+    como `<link>` EN LA CABECERA, no importado desde `app/main.js`. Motivo: así
+    la cáscara está vestida en el PRIMER pintado. Importándola desde el módulo
+    de entrada, en `npm run dev` la hoja llega después de evaluar el JS y se ve
+    un fogonazo de HTML sin estilo en cada recarga.
+  · `leaflet/dist/leaflet.css` lo importa `app/main.js`, que es el módulo que
+    depende de Leaflet (`viewer/` NO lo importa a propósito: es una librería, y
+    el CSS es responsabilidad de la entrada de la aplicación).
+  · El ORDEN entre las dos hojas es indiferente Y ESO ES DELIBERADO, no suerte:
+    todas las reglas de `estilos/app.css` que pisan cromo de Leaflet llevan
+    `.gml-app .gml-mapa` delante (0,3,0) precisamente para ganar la cascada
+    venga leaflet.css antes o después. Comprobado en pantalla en dev y sobre el
+    bundle de `vite preview`, que es donde el orden podría diferir.
+-->
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Concreta GML — validación del recinto</title>
+    <!-- Favicon SVG en línea (una línea, sin fichero ni petición): el recinto violeta
+         de `viewer/_comun.js#COLOR_USUARIO`. Sin él, la pestaña sale con el icono roto. -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%237C3AED'/><path d='M7.5 22.5 11.5 8.5 24.5 11.5 21 24.5Z' fill='none' stroke='%23fff' stroke-width='2.3' stroke-linejoin='round'/></svg>" />
+    <link rel="stylesheet" href="/estilos/app.css" />
+  </head>
+
+  <body class="gml-app">
+    <aside class="gml-panel">
+      <header class="gml-panel-cabecera">
+        <!-- `app/main.js` reescribe este texto cuando el dataset es sintético (?demo=hueco). -->
+        <p class="gml-eyebrow" data-eyebrow>Parcela cargada</p>
+        <h1 class="gml-titulo">Validación del recinto</h1>
+        <div class="gml-chips">
+          <span class="gml-chip" data-contador="ERROR">0 errores</span>
+          <span class="gml-chip" data-contador="AVISO">0 avisos</span>
+        </div>
+      </header>
+
+      <section class="gml-bloque">
+        <h2 class="gml-rotulo">Avisos</h2>
+        <!-- Caja VACÍA: su interior es de `app/avisos.js`. Tope de alto y scroll propio
+             los pone `.gml-avisos` (--gml-avisos-alto-max), para que una tanda larga de
+             hallazgos de F02 no empuje la tabla ni el pie fuera del panel. -->
+        <div id="avisos" class="gml-avisos"></div>
+      </section>
+
+      <section class="gml-bloque gml-bloque--vertices">
+        <!-- El rótulo va FUERA de la caja: `sincronizar` vacía `#tabla-vertices`.
+             El segundo hijo no necesita clase (hereda 11 px y gris de la fila). -->
+        <div class="gml-rotulo-fila">
+          <h2 class="gml-rotulo">Vértices</h2>
+          <span>X · Y (m)</span>
+        </div>
+        <!-- Caja VACÍA, y `<div>` a propósito (ver cabecera): su interior lo genera
+             `viewer/sincronizacion.js` y el scroll con cabecera pegajosa es de este div. -->
+        <div id="tabla-vertices" class="gml-tabla-caja"></div>
+      </section>
+
+      <!-- La ficha del expediente: SEGUNDO suscriptor del mismo store que el visor.
+           Los `<dd>` los rellena `app/main.js`; los `data-ficha` son su contrato. -->
+      <footer class="gml-panel-pie">
+        <dl class="gml-ficha">
+          <dt>Sistema de referencia</dt>
+          <dd class="gml-mono" data-ficha="srs">—</dd>
+
+          <dt>Referencia catastral</dt>
+          <dd class="gml-mono" data-ficha="refcat">—</dd>
+
+          <dt>Vértices</dt>
+          <dd class="gml-mono" data-ficha="vertices">—</dd>
+
+          <dt>Superficie</dt>
+          <dd class="gml-mono" data-ficha="superficie">—</dd>
+        </dl>
+      </footer>
+    </aside>
+
+    <!-- Caja VACÍA: `crearVisor` monta aquí el `L.Map`. `.gml-mapa` y
+         `.leaflet-container` acaban siendo EL MISMO nodo del DOM. -->
+    <main id="mapa" class="gml-mapa"></main>
+
+    <script type="module" src="/app/main.js"></script>
+  </body>
+</html>

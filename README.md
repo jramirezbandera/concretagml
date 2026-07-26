@@ -15,12 +15,20 @@ Herramienta web **frontend puro (sin backend)** para generar y diagnosticar fich
 ## Scripts
 
 ```bash
-npm install       # dependencias
-npm run dev       # servidor de desarrollo (Vite)
-npm run build     # empaquetado estático
-npm test          # tests (proyecto node)
-npm run test:all  # tests node + dom
+npm install        # dependencias
+npm run dev        # servidor de desarrollo (Vite)
+npm run build      # empaquetado estático
+npm test           # tests: AMBOS proyectos (node + dom) — el gate de "hecho"
+npm run test:node  # solo el proyecto node (bucle rápido: sin jsdom)
+npm run test:dom   # solo el proyecto dom (jsdom: visor, mapa, canvas)
+npm run test:all   # alias de `npm test` (node + dom)
+npm run test:watch # modo watch del proyecto node
 ```
+
+`npm test` corre los **dos** proyectos porque la definición de "hecho"
+(`spec/SPEC.md` §6) exige ambos: geometría y serializadores en `node`, canvas y
+mapa en `dom`. Cuando el proyecto `dom` estaba vacío (F00) bastaba con `node`;
+desde F03 no.
 
 ## Estado
 

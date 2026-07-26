@@ -1,0 +1,61 @@
+/* ── Procedencia ──────────────────────────────────────────────────────────
+   Copiado el 2026-07-26 desde:
+   prototipo/_ds/concreta-design-system-bac861fa-544f-4139-9311-ec68119deaa4/tokens/fonts.css
+
+   A partir de esta copia, `prototipo/` es referencia de diseño, NO
+   dependencia del producto: esta app no importa nada de `prototipo/` en
+   tiempo de build ni de ejecución. Si el design system evoluciona en
+   `prototipo/_ds/...`, el cambio hay que propagarlo aquí A MANO y de forma
+   deliberada — no hay ningún mecanismo de sincronización automática.
+
+   Único cambio respecto al original: las rutas `src: url(...)` apuntaban a
+   la subcarpeta de fuentes del design system original y ahora apuntan a
+   `../fuentes/X.woff2`, porque en `estilos/` las fuentes viven en
+   `estilos/fuentes/` (hermana de `estilos/tokens/`), con otro nombre y otro
+   nivel de anidamiento que en el original. Vite resuelve estas rutas
+   relativas al propio CSS (y las hashea en el build), así que tienen que
+   apuntar al sitio real o las fuentes darán 404 solo en producción. Ver
+   también `estilos/fuentes/LICENCIA-GEIST.txt` (Geist se distribuye bajo
+   SIL Open Font License 1.1).
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* fonts.css — Concreta webfonts.
+   Geist Sans (400/500/600) for all UI text; Geist Mono (400/500) for every
+   numeric value, unit, and normative reference. No system-ui fallback as
+   primary — Geist exclusively. */
+
+@font-face {
+  font-family: "Geist Sans";
+  src: url("../fuentes/Geist-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Sans";
+  src: url("../fuentes/Geist-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Sans";
+  src: url("../fuentes/Geist-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url("../fuentes/GeistMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url("../fuentes/GeistMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}

@@ -30,8 +30,10 @@ import { reglasGeometria } from './reglas-geometria.js'
 import { reglasTopologia } from './reglas-topologia.js'
 import { reglasHuso } from './reglas-huso.js'
 
-// Reexporta NIVEL en la superficie pública para que la UI (F03) lo consuma vía el
-// barrel: `validacion.NIVEL`.
+// Reexporta NIVEL en la superficie pública para que la UI lo consuma vía el
+// barrel: `validacion.NIVEL`. Y lo consume de verdad: el visor (F03) lo toma por
+// `viewer/_comun.js`, que re-exporta el MISMO objeto de `./_comun.js` (no una
+// copia), así que el vocabulario de niveles es único en todo el proyecto.
 export { NIVEL }
 
 /**

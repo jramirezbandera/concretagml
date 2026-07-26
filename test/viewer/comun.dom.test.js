@@ -8,10 +8,14 @@ import {
   recintoALatLng,
   latLngAUTM,
   crearEstadoVista,
+  NIVEL,
   PANES,
   PANE,
   COLOR_USUARIO,
+  avisoPorDefecto,
+  resolverAvisar,
 } from '../../viewer/_comun.js'
+import { NIVEL as NIVEL_VALIDACION } from '../../validation/_comun.js'
 
 describe('viewer/_comun · frontera de vista (proyección UTM ↔ lat/lon)', () => {
   // Coordenadas plausibles por huso (Península + Baleares). El round-trip es
@@ -68,6 +72,18 @@ describe('viewer/_comun · constantes de dominio', () => {
   it('la geometría del usuario es violeta #7C3AED', () => {
     expect(COLOR_USUARIO).toBe('#7C3AED')
   })
+
+  it('NIVEL es EL MISMO objeto que el de validation/_comun.js (re-exportado, no copiado)', () => {
+    // Hallazgo 2.4 de la auditoría de coherencia: F02 declaraba NIVEL "para que
+    // la UI (F03) lo consuma" y el visor no lo consumía (seis literales sueltos
+    // repartidos por services/ign.js, wms-catastro.js y sincronizacion.js). Aquí
+    // se comprueba la vía elegida: RE-EXPORTACIÓN directa, no una copia
+    // congelada — identidad (`toBe`), que es más fuerte que igualdad profunda:
+    // no hay dos objetos que puedan divergir.
+    expect(NIVEL).toBe(NIVEL_VALIDACION)
+    expect(NIVEL).toEqual({ ERROR: 'ERROR', AVISO: 'AVISO' })
+    expect(Object.isFrozen(NIVEL)).toBe(true)
+  })
 })
 
 describe('viewer/_comun · crearEstadoVista (store, sin feedback loop)', () => {
@@ -116,6 +132,62 @@ describe('viewer/_comun · crearEstadoVista (store, sin feedback loop)', () => {
   it('subscribe exige una función', () => {
     const estado = crearEstadoVista(null)
     expect(() => estado.subscribe(42)).toThrow(TypeError)
+  })
+})
+
+describe('viewer/_comun · canal de aviso (avisoPorDefecto / resolverAvisar)', () => {
+  it('avisoPorDefecto escribe el mensaje del usuario en console.warn, sin tragárselo', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      avisoPorDefecto('No se ha podido cargar la tesela del IGN.')
+      expect(spy).toHaveBeenCalledTimes(1)
+      const [primerArg] = spy.mock.calls[0]
+      expect(primerArg).toContain('No se ha podido cargar la tesela del IGN.')
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('avisoPorDefecto no lanza con detalle ausente, null o con causa Error', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      expect(() => avisoPorDefecto('mensaje sin detalle')).not.toThrow()
+      expect(() => avisoPorDefecto('mensaje con detalle null', null)).not.toThrow()
+      expect(() =>
+        avisoPorDefecto('mensaje con causa', { causa: new Error('fallo de red') }),
+      ).not.toThrow()
+      expect(spy).toHaveBeenCalledTimes(3)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('resolverAvisar devuelve exactamente la función recibida', () => {
+    const fn = () => {}
+    expect(resolverAvisar(fn)).toBe(fn)
+  })
+
+  it('resolverAvisar(null) y resolverAvisar(undefined) devuelven avisoPorDefecto', () => {
+    expect(resolverAvisar(null)).toBe(avisoPorDefecto)
+    expect(resolverAvisar(undefined)).toBe(avisoPorDefecto)
+  })
+
+  it('resolverAvisar lanza TypeError si le pasan basura donde iba una función', () => {
+    expect(() => resolverAvisar('texto')).toThrow(TypeError)
+    expect(() => resolverAvisar(42)).toThrow(TypeError)
+    expect(() => resolverAvisar({})).toThrow(TypeError)
+  })
+
+  it("el nivel por defecto es 'AVISO' y se puede forzar 'ERROR'", () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      avisoPorDefecto('sin nivel explícito')
+      avisoPorDefecto('nivel forzado a ERROR', { nivel: 'ERROR' })
+      expect(spy.mock.calls[0][0]).toContain('AVISO')
+      expect(spy.mock.calls[1][0]).toContain('ERROR')
+    } finally {
+      spy.mockRestore()
+    }
   })
 })
 

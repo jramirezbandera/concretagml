@@ -72,6 +72,13 @@ const SRS_POR_HUSO = Object.freeze({
   31: 'EPSG:25831',
 })
 
+// Husos UTM soportados por el proyecto (Península y Baleares). Es el mismo
+// dominio que `model/parcela.js#SRS_VALIDOS` visto desde la capa `geo/` (más
+// baja): NO se importan entre sí (evitar acoplo cruzado de capas); el test-
+// guarda que ambas listas no puedan divergir vive en `test/geo/huso.test.js`.
+// Canarias (28) queda DIFERIDA a propósito (override O13, gancho arriba).
+export const HUSOS_VALIDOS = Object.freeze([29, 30, 31])
+
 // ---------------------------------------------------------------------------
 // API
 // ---------------------------------------------------------------------------
@@ -97,6 +104,76 @@ export function srsPorHuso(zona) {
     )
   }
   return srs
+}
+
+// Inversa de `srsPorHuso` construida recorriendo `HUSOS_VALIDOS` y llamando a
+// `srsPorHuso` para cada zona: NO es una segunda tabla escrita a mano, así que
+// las dos direcciones no pueden divergir entre sí (ese es el objetivo entero
+// de esta consolidación). Se construye una única vez al cargar el módulo.
+const HUSO_POR_SRS = new Map(HUSOS_VALIDOS.map((zona) => [srsPorHuso(zona), zona]))
+
+/**
+ * Inversa de `srsPorHuso`: `'EPSG:25830' → 30`.
+ *
+ * Forma aceptada: ÚNICAMENTE la forma corta `'EPSG:258xx'`, que es la que
+ * circula por el campo `srs` del modelo y por todas las capas que lo
+ * consumen hoy (`model/parcela.js#SRS_VALIDOS`, `validation/reglas-huso.js`,
+ * `viewer/sincronizacion.js`). NO tolera las formas URI/URN del `srsName` del
+ * GML (dossier override O2/O10: la parcela serializa en URI
+ * `http://www.opengis.net/def/crs/EPSG/0/25830`, el edificio en URN
+ * `urn:ogc:def:crs:EPSG::25830`) — esa traducción es de F04, en el momento de
+ * serializar/leer el GML, y no se inventa aquí una tolerancia que hoy nadie
+ * pide; cuando F04 la necesite, deberá normalizar a la forma corta ANTES de
+ * llamar a `husoPorSrs`, no al revés.
+ *
+ * @param {string} srs  P.ej. `'EPSG:25830'`.
+ * @returns {number} El huso UTM correspondiente (29, 30 o 31).
+ * @throws {TypeError}  Si `srs` no es un string.
+ * @throws {RangeError} Si `srs` no corresponde a un huso soportado (incluye
+ *   Canarias `'EPSG:32628'`, DIFERIDA por decisión de alcance, override O13).
+ */
+export function husoPorSrs(srs) {
+  if (typeof srs !== 'string') {
+    throw new TypeError(`husoPorSrs: 'srs' debe ser un string; recibido ${JSON.stringify(srs)}.`)
+  }
+  const zona = HUSO_POR_SRS.get(srs)
+  if (zona === undefined) {
+    throw new RangeError(
+      `husoPorSrs: srs ${JSON.stringify(srs)} no corresponde a un huso soportado ` +
+        `(válidos: ${[...HUSO_POR_SRS.keys()].join(', ')}). ` +
+        `Canarias (EPSG:32628) está DIFERIDA (override O13).`,
+    )
+  }
+  return zona
+}
+
+/**
+ * Como {@link husoPorSrs} pero SIN LANZAR: `null` cuando el `srs` no es un
+ * string o no corresponde a un huso soportado. Existe para el único llamante
+ * que legítimamente NO tiene contrato sobre el `srs` — `validation/reglas-huso.js`,
+ * que debe poder decir "no puedo juzgar el rango" sin que eso sea un error.
+ * Quien SÍ tiene contrato (`viewer/index.js`, F04) usa `husoPorSrs`.
+ *
+ * Variante `number|null` y NO un predicado booleano `esSrsSoportado`: el booleano
+ * obligaría al llamante a consultar la tabla DOS veces (primero "¿vale?", después
+ * "dame el huso") y abriría una ventana para que la segunda consulta no case con
+ * la primera. Aquí se pregunta una sola vez, a la MISMA tabla que `husoPorSrs`
+ * ({@link HUSO_POR_SRS}, derivada de `srsPorHuso`), así que las dos funciones no
+ * pueden divergir.
+ *
+ * Sustituye al `try { husoPorSrs(srs) } catch { … }` que `reglas-huso.js`
+ * arrastraba de F02: aquel `catch` desnudo atrapaba CUALQUIER throw, así que el
+ * día que `husoPorSrs` crezca (la normalización URI/URN que su JSDoc anuncia
+ * para F04) un bug ahí degradaría la regla del huso a "no valida nada" en
+ * silencio. Aquí el "no sé juzgarlo" es un VALOR, no una excepción.
+ *
+ * @param {*} srs  P.ej. `'EPSG:25830'`. Cualquier valor: no hay contrato.
+ * @returns {number|null}  El huso UTM (29/30/31), o `null` si no es derivable.
+ */
+export function husoPorSrsOpcional(srs) {
+  if (typeof srs !== 'string') return null
+  const zona = HUSO_POR_SRS.get(srs)
+  return zona === undefined ? null : zona
 }
 
 /** ¿Este en rango UTM plausible de la Península? (dossier §3.2) */

@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node scripts/vitest.mjs run --project node",
+    "test": "node scripts/vitest.mjs run",
+    "test:node": "node scripts/vitest.mjs run --project node",
     "test:watch": "node scripts/vitest.mjs --project node",
     "test:all": "node scripts/vitest.mjs run",
     "test:dom": "node scripts/vitest.mjs run --project dom"

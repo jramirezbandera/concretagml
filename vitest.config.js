@@ -12,9 +12,11 @@ const root = fileURLToPath(new URL('.', import.meta.url)).replace(
   (_, d) => `${d.toUpperCase()}:`,
 )
 
-// F00 usa solo el proyecto `node` (geometría/modelo puros, sin DOM).
-// El proyecto `dom` queda preconfigurado y vacío; F03+ (visor/canvas) lo activará
-// con ficheros `*.dom.test.js`.
+// Dos proyectos, y el sufijo del fichero es lo que enruta: `*.dom.test.js` va a
+// `dom` (jsdom: visor, mapa, canvas) y todo lo demás a `node` (geometría, modelo,
+// parsers, serializadores). SPEC §6 exige AMBOS en verde para dar una feature por
+// hecha, así que desde F03 el script `npm test` corre los dos; `npm run test:node`
+// es el bucle rápido.
 export default defineConfig({
   root,
   test: {
@@ -32,7 +34,13 @@ export default defineConfig({
           name: 'dom',
           environment: 'jsdom',
           include: ['test/**/*.dom.test.js'],
-          // F00 no tiene tests dom; que el proyecto vacío no fuerce exit 1.
+          exclude: ['**/node_modules/**'],
+          // Se conserva para que un run FILTRADO por nombre (`npm test -- celda`,
+          // que solo casa en `node`) no falle por este proyecto. Contrapartida
+          // asumida: si el `include` de arriba se rompiera, los tests dom
+          // desaparecerían en verde. Cerrarlo es tarea de la guarda transversal
+          // de la Fase 4, que debe afirmar que se descubren los N ficheros dom
+          // esperados en vez de fiarse del glob.
           passWithNoTests: true,
         },
       },

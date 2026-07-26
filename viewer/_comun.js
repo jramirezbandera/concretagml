@@ -12,13 +12,24 @@
 //     vista (recinto/vértice UTM → [lat,lon] para Leaflet, y de vuelta).
 //   · Regla 4 — POJO plano. El estado del store ES el POJO de parcela que
 //     `edit/historial.js#commit` fotografía con `structuredClone` (decisión de
-//     review, hallazgo 1): así F06 enchufa undo/redo SIN reformar el estado.
+//     review, hallazgo 1). Reparto real (corregido en 2D.2): el `commit` ya lo
+//     hace F03 — `viewer/sincronizacion.js` commitea una instantánea por
+//     operación acabada (celda editada, `dragend`). Lo que F06 enchufa SIN
+//     reformar el estado son el UNDO y el REDO (los atajos, los botones y el
+//     `estado.set` del snapshot que devuelven), porque la pila ya se está
+//     llenando desde aquí.
 //   · Regla 1 — Ningún error silencioso: contrato roto por el programador
 //     (zona/estado inválidos) → throw; nunca se corrige callado.
+//   · Regla 1 (canal de aviso) — `resolverAvisar`/`avisoPorDefecto` (al final de
+//     este módulo) son el canal común con el que un módulo del visor cuenta al
+//     usuario un fallo de red o de entrada SIN abortar el flujo ni tragárselo.
 //
 // IMPORTANTE (decisión de review, Codex C1): este módulo NO importa Leaflet
 // (no usa `L.*`), por eso es seguro importarlo también bajo el proyecto Vitest
-// `node`. Los módulos que sí usan Leaflet (`services/ign`, `viewer/wms-catastro`,
+// `node`. Sus dos únicos imports son `geo/utm.js` y `validation/_comun.js` (de
+// donde re-exporta `NIVEL`), ambos Leaflet-free — el segundo carga
+// `config/operativos.json` con `with { type: 'json' }`, comprobado en verde en
+// los dos proyectos. Los módulos que sí usan Leaflet (`services/ign`, `viewer/wms-catastro`,
 // `viewer/mapa`, `viewer/sincronizacion`) son SOLO-navegador y jamás deben
 // entrar por el barrel raíz `index.js` (rompería la suite node: Leaflet exige
 // `window`).
@@ -28,24 +39,62 @@ import { forward, inverse } from '../geo/utm.js'
 // ── Vocabulario común ─────────────────────────────────────────────────────────
 
 /**
+ * Nivel de un aviso del visor. **Re-exportado de `validation/_comun.js`, no
+ * redefinido** (auditoría de coherencia 2C.2, hallazgo 2.4): F02 ya declaraba
+ * `NIVEL` "para que la UI (F03) lo consuma", y el visor lo consume por aquí en
+ * vez de escribir `'AVISO'`/`'ERROR'` como literales sueltos. Un solo objeto en
+ * memoria para todo el proyecto ⇒ imposible que los dos vocabularios divergan.
+ *
+ * Es seguro importarlo bajo el proyecto Vitest `node`: `validation/_comun.js`
+ * carga `config/operativos.json` con `with { type: 'json' }`, que Vite/Vitest y
+ * Node 22+ resuelven sin problema (comprobado: el proyecto `dom` y el `node`
+ * siguen en verde con esta re-exportación).
+ *
+ * @see {@link Avisar} para la REGLA de cuándo es AVISO y cuándo ERROR.
+ */
+export { NIVEL } from '../validation/_comun.js'
+
+/**
  * Descriptor de una capa del visor (base o superpuesta). POJO plano.
  *
  * @typedef {Object} DescriptorCapa
+ * @property {string} id           Clave ESTABLE de la capa (p. ej. `'pnoa-ma'`).
+ *   Es la clave con la que se indexa, se persiste "qué capa tenía activa el
+ *   usuario" y se referencia desde el control de capas. NUNCA se usa `nombre`
+ *   para eso: `nombre` es un rótulo de UI, traducible y retocable.
  * @property {string} nombre        Rótulo para el control de capas (español).
  * @property {'base'|'overlay'} rol Capa base (excluyente) o superpuesta.
- * @property {() => object} crear   Factory que devuelve la capa Leaflet, montada
- *                                  SIEMPRE con `crossOrigin:'anonymous'` (O7).
+ * @property {(opts?: object) => object} crear  Factory que devuelve la capa
+ *   Leaflet, montada SIEMPRE con `crossOrigin:'anonymous'` (O7). Acepta las
+ *   MISMAS opciones que la factory subyacente; en particular `alAvisar`, para
+ *   que los fallos de red de la capa lleguen a la UI de avisos y no se queden
+ *   en el `console.warn` por defecto (regla 1). Pasar `alAvisar` por el
+ *   descriptor es el caso NORMAL, no la excepción.
  * @property {string} atribucion    Texto legal de atribución (obligatorio).
+ *   Puede ser la CADENA VACÍA, y solo en un caso legítimo: una capa que no
+ *   muestra datos de terceros y por tanto no tiene titular al que citar (la
+ *   capa «Blanco» de `viewer/capas.js`, un lienzo generado en el cliente). Para
+ *   cualquier capa que pinte cartografía ajena, vacía = incumplimiento de
+ *   licencia.
+ * @property {number} [maxNativeZoom]  Zoom nativo máximo de la capa, si lo
+ *   tiene. OPCIONAL a propósito: hay capas SIN tope nativo —«Blanco» (no hay
+ *   tesela que reescalar) y el WMS del Catastro (una imagen por encuadre, a la
+ *   resolución del lienzo)— y `undefined` significa exactamente eso, no «cero».
+ *   Lo declara `viewer/capas.js` (único constructor de descriptores del
+ *   proyecto) leyéndolo de la config del módulo dueño (`WMTS_IGN`, `OSM`),
+ *   nunca a mano. Existe porque `crearVisor` (F03, tarea 3C) debe comprobar que
+ *   el `maxZoom` del mapa supera el tope nativo de las capas REALMENTE MONTADAS,
+ *   y `viewer/mapa.js` dejó deliberadamente de conocer ese dato (hallazgo 2.7 de
+ *   la auditoría de coherencia).
  */
 
 /**
- * Un vértice de la tabla/mapa, referido a su recinto. Coincide 1:1 con el
- * `RefVertice` de `validation/_comun.js` (`{recinto, indice}`) para que el
- * resaltado de F02 case sin traducción (decisión de review, hallazgo 8/C6).
+ * Un vértice de la tabla/mapa, referido a su recinto. Es EL MISMO tipo que el de
+ * `validation/_comun.js` (alias, no una copia: hallazgo 2.10 de la auditoría de
+ * coherencia), para que el resaltado de F02 case sin traducción (decisión de
+ * review, hallazgo 8/C6).
  *
- * @typedef {Object} RefVertice
- * @property {number} recinto  Índice del recinto (0 = EXTERIOR; ≥1 = HUECO).
- * @property {number} indice   Índice del vértice dentro del anillo ABIERTO.
+ * @typedef {import('../validation/_comun.js').RefVertice} RefVertice
  */
 
 /** Color de la geometría del usuario (violeta; el azul choca con la hidrografía). */
@@ -73,6 +122,59 @@ export const PANES = Object.freeze([
   { nombre: PANE.PARCELA_EDITADA, zIndex: 420 },
   { nombre: PANE.VERTICES, zIndex: 430 },
 ])
+
+// ── Contratos compartidos del visor ──────────────────────────────────────────
+
+/**
+ * Vista explícita de arranque del mapa: dónde mirar y con cuánto zoom.
+ *
+ * @typedef {Object} VistaInicial
+ * @property {[number, number]} centro  `[lat, lon]` en grados.
+ * @property {number} zoom              Nivel de zoom de Leaflet.
+ */
+
+/**
+ * Valida la forma de una `vistaInicial`. **ÚNICA definición del contrato**, la
+ * consumen `viewer/mapa.js#crearMapa` y `viewer/index.js#crearVisor`.
+ *
+ * Por qué vive aquí (auditoría de cierre de la fase 3, punto 4): los dos módulos
+ * tenían su propia copia y ya habían DIVERGIDO — `mapa.js` validaba las
+ * componentes del centro con `typeof === 'number'` y `index.js` con
+ * `Number.isFinite`, así que un `{centro:[NaN,NaN], zoom:10}` pasaba por
+ * `crearMapa` y reventaba dentro de `L.LatLng` con un error de Leaflet ilegible,
+ * mientras que el MISMO dato por `crearVisor` se rechazaba limpiamente. La razón
+ * por la que `crearVisor` no puede delegar la opción en `crearMapa` (el encuadre
+ * va DESPUÉS de montar las capas, y `crearMapa` la aplicaría de inmediato)
+ * justifica no delegar la APLICACIÓN, no duplicar la VALIDACIÓN. Es la misma
+ * solución que el proyecto ya aplicó a `PANES`/`crearPanes` en la fase 2.
+ *
+ * Contrato roto por el PROGRAMADOR (la `vistaInicial` la construye otro módulo,
+ * nunca teclea el usuario un objeto) → `throw`, igual que el resto del proyecto.
+ * `Number.isFinite` en las TRES componentes: un `NaN` no es una vista.
+ *
+ * @param {*} vistaInicial
+ * @param {string} [contexto='vistaInicial']  Prefijo del mensaje de error, para
+ *   que el `throw` nombre la función y la opción del llamante (p. ej.
+ *   `"crearVisor: 'opciones.vistaInicial'"`).
+ * @returns {void}
+ * @throws {TypeError}
+ */
+export function validarVistaInicial(vistaInicial, contexto = 'vistaInicial') {
+  const centro = vistaInicial && vistaInicial.centro
+  const zoom = vistaInicial && vistaInicial.zoom
+  const centroValido =
+    Array.isArray(centro) &&
+    centro.length === 2 &&
+    Number.isFinite(centro[0]) &&
+    Number.isFinite(centro[1])
+
+  if (!vistaInicial || typeof vistaInicial !== 'object' || !centroValido || !Number.isFinite(zoom)) {
+    throw new TypeError(
+      `${contexto} debe ser {centro:[lat,lon], zoom:number} con los tres valores ` +
+        `numéricos finitos; recibido ${JSON.stringify(vistaInicial)}.`,
+    )
+  }
+}
 
 // ── Frontera de vista: proyección UTM ↔ lat/lon (regla 3) ─────────────────────
 
@@ -130,7 +232,13 @@ export function latLngAUTM(latlng, zona) {
     lat = latlng.lat
     lng = latlng.lng
   }
-  if (typeof lat !== 'number' || typeof lng !== 'number') {
+  // `Number.isFinite` y NO `typeof === 'number'` (auditoría de cierre de la fase
+  // 3, punto 4): con `typeof`, un `{lat: NaN, lng: NaN}` pasaba el guardián y
+  // escribía `[NaN, NaN]` EN EL MODELO — un dato corrupto colado en silencio, que
+  // es exactamente lo que la regla de oro 1 prohíbe. Hoy el riesgo real es bajo
+  // (el único llamante es el `drag`, y `L.LatLng` ya rechaza NaN antes de llegar
+  // aquí), pero un guardián que no guarda no sirve de nada.
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     throw new TypeError(
       `latLngAUTM: 'latlng' debe ser {lat,lng} o [lat,lng] numérico; recibido ${JSON.stringify(latlng)}.`,
     )
@@ -200,4 +308,95 @@ export function crearEstadoVista(parcelaInicial = null) {
       return () => suscriptores.delete(fn)
     },
   }
+}
+
+// ── Canal de aviso del visor (regla 1: ningún error silencioso) ───────────────
+
+/**
+ * Canal de aviso del visor: cómo un módulo cuenta al usuario que algo ha ido mal
+ * SIN abortar el flujo. El vocabulario ES el `NIVEL` de `validation/_comun.js`
+ * (F02), re-exportado arriba: se usa `NIVEL.AVISO`/`NIVEL.ERROR`, nunca los
+ * literales sueltos y nunca `'warn'`/`'fatal'` ni ningún otro término.
+ *
+ * ── REGLA DE CLASIFICACIÓN (no la adivines: está fijada) ─────────────────────
+ * `validation/_comun.js#NIVEL` fija la semántica: **ERROR bloquea la generación
+ * del GML; AVISO no.** De ahí se deriva mecánicamente, para todo el visor:
+ *
+ *   · **Cartografía DE FONDO que no carga → `NIVEL.AVISO`, siempre.** Da igual
+ *     el proveedor: una tesela WMTS del IGN que falla y la imagen WMS del
+ *     Catastro que falla son EL MISMO suceso (un fallo de red en cartografía de
+ *     referencia) y ninguno impide generar el GML — la geometría del usuario
+ *     está en el modelo, no en la imagen de fondo. Antes de la auditoría de
+ *     coherencia 2C.2 (hallazgo 2.5) el IGN avisaba con AVISO y el Catastro con
+ *     ERROR: la misma cosa clasificada de dos maneras. Unificado a AVISO.
+ *   · **`NIVEL.ERROR` se reserva a lo que sí impide seguir**: el estado del
+ *     modelo no admite la operación que el usuario acaba de hacer (p. ej. mover
+ *     un vértice que ya no existe: el cambio NO se aplica).
+ *   · Un dato ilegible teclado por el usuario (celda de coordenada) es
+ *     `NIVEL.AVISO`: se revierte el input y el modelo sigue intacto y generable.
+ *
+ * Patrón de uso (cópialo tal cual en todo módulo del visor que pueda fallar por
+ * red o por entrada del usuario — `services/ign.js` (tileerror de las teselas),
+ * `viewer/wms-catastro.js` (fallo de carga de la imagen WMS),
+ * `viewer/sincronizacion.js` (celda de coordenada inválida), …):
+ *
+ * ```js
+ * import { NIVEL, resolverAvisar } from './_comun.js' // (o la ruta que toque)
+ *
+ * export function crearAlgo({ alAvisar, ...resto } = {}) {
+ *   const avisar = resolverAvisar(alAvisar)
+ *   // ...
+ *   avisar('No se ha podido cargar la tesela del IGN.', { nivel: NIVEL.AVISO, causa: error })
+ * }
+ * ```
+ *
+ * @callback Avisar
+ * @param {string} mensaje  Texto en español, mostrable tal cual.
+ * @param {{nivel?: 'AVISO'|'ERROR', causa?: *}} [detalle]
+ * @returns {void}
+ */
+
+/**
+ * Aviso por defecto cuando el llamante no proporciona uno (caso legítimo: la UI
+ * de avisos de Fase 3/4 aún no existe). Es el SUELO MÍNIMO de la regla 1: nunca
+ * silencioso. Escribe por `console.warn` con el prefijo `'[visor]'`, el nivel
+ * (`detalle.nivel`, por defecto `'AVISO'`) y, si viene, la `causa` como argumento
+ * adicional (para que la consola la expanda, en vez de aplanarla a texto). Nunca
+ * lanza y nunca se traga el mensaje.
+ *
+ * @type {Avisar}
+ * @param {string} mensaje
+ * @param {{nivel?: 'AVISO'|'ERROR', causa?: *}} [detalle]
+ * @returns {void}
+ */
+export function avisoPorDefecto(mensaje, detalle) {
+  const nivel = (detalle && detalle.nivel) || 'AVISO'
+  if (detalle && 'causa' in detalle) {
+    console.warn(`[visor] ${nivel}: ${mensaje}`, detalle.causa)
+  } else {
+    console.warn(`[visor] ${nivel}: ${mensaje}`)
+  }
+}
+
+/**
+ * Resuelve el avisador que un módulo del visor debe usar: el que le ha pasado el
+ * llamante, o {@link avisoPorDefecto} si no le han pasado ninguno.
+ *
+ * Asimetría deliberada entre "no me han pasado avisador" y "me han pasado basura
+ * donde iba una función": lo primero es un caso legítimo del llamante (aún no hay
+ * UI de avisos cableada) y se resuelve en silencio al valor por defecto; lo
+ * segundo es un contrato roto por el PROGRAMADOR (regla 1) y aquí la política del
+ * proyecto es `throw`, igual que en `crearEstadoVista#subscribe`.
+ *
+ * @param {Avisar|null|undefined} fn
+ * @returns {Avisar}
+ * @throws {TypeError}  Si `fn` no es función ni `null`/`undefined`.
+ */
+export function resolverAvisar(fn) {
+  if (typeof fn === 'function') return fn
+  if (fn === null || fn === undefined) return avisoPorDefecto
+  throw new TypeError(
+    `resolverAvisar: 'fn' debe ser una función, o null/undefined para el aviso ` +
+      `por defecto; recibido ${typeof fn} (${JSON.stringify(fn)}).`,
+  )
 }

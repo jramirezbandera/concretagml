@@ -16,11 +16,15 @@ import { describe, it, expect } from 'vitest'
 import {
   meridianoCentral,
   srsPorHuso,
+  husoPorSrs,
+  husoPorSrsOpcional,
   detectarHuso,
   sanear,
   CANDIDATOS_DEFECTO,
+  HUSOS_VALIDOS,
 } from '../../geo/huso.js'
 import { forward } from '../../geo/utm.js'
+import { SRS_VALIDOS } from '../../model/parcela.js'
 import fixtureRing from '../fixtures/geo/parcela-ring.json' with { type: 'json' }
 
 describe('geo/huso — meridianoCentral', () => {
@@ -44,6 +48,66 @@ describe('geo/huso — srsPorHuso', () => {
   it("huso string ('30') lanza TypeError — sin coerción de clave (auditoría A8)", () => {
     expect(() => srsPorHuso('30')).toThrow(TypeError)
     expect(() => srsPorHuso(30.5)).toThrow(TypeError)
+  })
+})
+
+describe('geo/huso — husoPorSrs (inversa de srsPorHuso)', () => {
+  it('mapea EPSG 25829/25830/25831 → 29/30/31', () => {
+    expect(husoPorSrs('EPSG:25829')).toBe(29)
+    expect(husoPorSrs('EPSG:25830')).toBe(30)
+    expect(husoPorSrs('EPSG:25831')).toBe(31)
+  })
+
+  it('ida y vuelta: husoPorSrs(srsPorHuso(z)) === z para los 3 husos', () => {
+    for (const z of HUSOS_VALIDOS) {
+      expect(husoPorSrs(srsPorHuso(z))).toBe(z)
+    }
+  })
+
+  it("srs no-string lanza TypeError (contrato roto por el llamante)", () => {
+    expect(() => husoPorSrs(42)).toThrow(TypeError)
+    expect(() => husoPorSrs(undefined)).toThrow(TypeError)
+    expect(() => husoPorSrs(null)).toThrow(TypeError)
+  })
+
+  it('Canarias (EPSG:32628, DIFERIDO) y un SRS geográfico ajeno lanzan RangeError', () => {
+    expect(() => husoPorSrs('EPSG:32628')).toThrow(RangeError)
+    expect(() => husoPorSrs('EPSG:4326')).toThrow(RangeError)
+  })
+})
+
+describe('geo/huso — husoPorSrsOpcional (la variante que NO lanza)', () => {
+  // Existe para el único llamante que legítimamente no tiene contrato sobre el
+  // `srs` — `validation/reglas-huso.js`, que debe poder decir "no puedo juzgar el
+  // rango" sin que eso sea un error. Sustituye al `try/catch` desnudo que esa
+  // regla arrastraba de F02.
+  it('devuelve el huso para los tres SRS soportados, igual que husoPorSrs', () => {
+    for (const z of HUSOS_VALIDOS) {
+      expect(husoPorSrsOpcional(srsPorHuso(z))).toBe(z)
+      expect(husoPorSrsOpcional(srsPorHuso(z))).toBe(husoPorSrs(srsPorHuso(z)))
+    }
+  })
+
+  it('devuelve null (NO lanza) donde husoPorSrs lanzaría', () => {
+    // Los mismos casos que los dos tests de `husoPorSrs` de arriba: no-string
+    // (TypeError allí) y SRS no soportado (RangeError allí).
+    for (const malo of [42, undefined, null, {}, 'EPSG:32628', 'EPSG:4326', '']) {
+      expect(husoPorSrsOpcional(malo), `srs ${JSON.stringify(malo)}`).toBeNull()
+    }
+  })
+})
+
+describe('geo/huso — HUSOS_VALIDOS no puede divergir de model/parcela.js#SRS_VALIDOS', () => {
+  // Mismo dominio visto desde dos capas (geo/ más baja que model/); no se
+  // acoplan con un import cruzado, así que este test-guarda es lo que
+  // garantiza que las dos listas no se desincronicen (mismo patrón de guarda
+  // transversal que test/contrato.test.js).
+  it('HUSOS_VALIDOS.map(srsPorHuso) coincide con SRS_VALIDOS', () => {
+    expect(HUSOS_VALIDOS.map(srsPorHuso)).toEqual(SRS_VALIDOS)
+  })
+
+  it('SRS_VALIDOS.map(husoPorSrs) coincide con HUSOS_VALIDOS', () => {
+    expect(SRS_VALIDOS.map(husoPorSrs)).toEqual([...HUSOS_VALIDOS])
   })
 })
 

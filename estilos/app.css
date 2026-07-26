@@ -1,0 +1,760 @@
+/* estilos/app.css — F03 · Fase 4, tarea 4A.3. LA CÁSCARA DE LA APP.
+ *
+ * Primera hoja de estilo propia del proyecto. Viste DOS cosas y nada más:
+ *   1. la cáscara «sin rail» — panel izquierdo de 392 px (avisos + tabla de
+ *      vértices + ficha del expediente) y mapa a la derecha ocupando el resto;
+ *   2. el cromo que ya generan `viewer/sincronizacion.js` (la tabla) y
+ *      `viewer/capas.js` (el control de opacidad), más los retoques mínimos
+ *      sobre las clases `.leaflet-*` que Leaflet crea por su cuenta.
+ *
+ * Es la mitad viva de la pantalla «Validación» de la maqueta de diseño, SIN su
+ * rail de progreso lateral: ese rail navegaría a pantallas que todavía no
+ * existen, así que no se copia (decisión de alcance del usuario).
+ *
+ * ── REGLAS DURAS DE ESTE FICHERO (léelas antes de tocar nada) ────────────────
+ *
+ * · **Ningún selector de elemento DESNUDO** fuera de `:root`, `*`, `html` y
+ *   `body`. Nada de `table {}`, `input {}`, `a {}`, `button {}`. Los selectores
+ *   de elemento SÍ se usan, pero siempre calificados y con raíz en una clase
+ *   `gml-*` (`.gml-ficha dt`, `.gml-tabla-vertices thead th`), porque hay HTML
+ *   generado por `viewer/sincronizacion.js` que no lleva clase en cada nodo.
+ *   El motivo de la regla es concreto: la maqueta trae un `input:focus` global
+ *   con marca de prioridad; copiado tal cual, pisaría el deslizador de opacidad
+ *   del visor, que vive DENTRO del contenedor del mapa. Aquí eso no puede pasar.
+ *
+ * · **Cero declaraciones con la palabra clave de prioridad de CSS.** Ninguna.
+ *   Cuando hace falta ganar una cascada se sube la especificidad (ver el mapa,
+ *   más abajo), nunca se fuerza el peso.
+ *
+ * · **No se pelea con `viewer/capas.js`.** Su control de opacidad trae estilos
+ *   EN LÍNEA a propósito (ese módulo no puede importar CSS): `background`,
+ *   `padding`, `border-radius` y `font` del contenedor son suyos y ganan
+ *   siempre. Aquí solo se COMPLETA lo que no fija (borde, sombra, el rótulo y
+ *   el deslizador, que son elementos hijos y sí se pueden estilar).
+ *
+ * · **La entrada (`app/main.js`) es quien importa `leaflet/dist/leaflet.css`.**
+ *   Aquí no se importa: solo se ajustan clases `.leaflet-*` que ya existen.
+ *
+ * ── LA ALTURA ES EL RIESGO Nº 1 DE LA FASE ──────────────────────────────────
+ * Si el contenedor del mapa acaba con altura 0, `viewer/wms-catastro.js` corta
+ * el cálculo del encuadre en su guarda `if (!(ancho > 0) || !(alto > 0)) return
+ * null`: ni petición, ni aviso, ni error en consola. Mapa en blanco y todo
+ * aparentemente correcto — el fallo silencioso perfecto. La cadena de altura
+ * que lo impide es, de arriba abajo:
+ *     html, body → 100 %  ·  .gml-app → 100vh  ·  .gml-mapa → estirado por el
+ *     flex de fila (align-items:stretch es el valor por defecto)
+ * y `min-height:0` en cada hijo flex que scrollea, porque un `flex:1` NO encoge
+ * por debajo del tamaño de su contenido mientras `min-height` valga `auto`: sin
+ * eso, una tabla de 200 vértices empuja el pie del panel fuera de la pantalla.
+ *
+ * @see viewer/sincronizacion.js  Contrato del HTML de la tabla (constante CLASE).
+ * @see viewer/capas.js           Control de opacidad y sus estilos en línea.
+ * @see viewer/_comun.js          COLOR_USUARIO (#7C3AED) y DENSIDAD_BASE_PX (13).
+ */
+
+@import './tokens/fonts.css';
+@import './tokens/colors.css';
+@import './tokens/typography.css';
+@import './tokens/spacing.css';
+@import './tokens/motion.css';
+
+/* ═══ Variables locales ══════════════════════════════════════════════════════
+ *
+ * NO son tokens del design system: son medidas de ESTA cáscara para las que el
+ * sistema no tiene token. Se declaran aquí, en un solo sitio, para que la
+ * verificación visual (tarea 4B.1) tenga una sola perilla que girar.
+ */
+:root {
+  /* Ancho del panel izquierdo. La maqueta usa 392 px en «Validación». */
+  --gml-panel-ancho: 392px;
+
+  /* Padding horizontal de las celdas de la tabla. La escala del sistema es de
+     base 8 (--space-2 = 8px, --space-3 = 12px) y no tiene el paso de 10 px que
+     usa la maqueta en la rejilla de vértices. */
+  --gml-celda-pad-x: 10px;
+
+  /* Tope de altura de la lista de avisos. F02 puede emitir MUCHOS hallazgos, y
+     sin tope la lista empujaría la tabla y el pie fuera del panel. Con tope, la
+     lista scrollea sola y el reparto de altura del panel es estable. */
+  --gml-avisos-alto-max: 34vh;
+
+  /* El título del panel (19px/600) cae entre --text-15 y la escala de display:
+     el sistema no tiene un token para ese tamaño. */
+  --gml-titulo-tam: 19px;
+}
+
+/* ═══ Base ═══════════════════════════════════════════════════════════════════ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  /* El primer eslabón de la cadena de altura (ver cabecera). */
+  height: 100%;
+  margin: 0;
+}
+
+/* ═══ Cáscara: panel izquierdo + mapa ════════════════════════════════════════ */
+
+.gml-app {
+  display: flex;
+  /* 100vh explícito (no `100%`) para que la cáscara no dependa de que nadie
+     rompa la cadena html/body. `100dvh` corrige la barra del navegador móvil;
+     en escritorio los dos valen lo mismo. */
+  height: 100vh;
+  height: 100dvh;
+  /* La app NO scrollea: scrollean la lista de avisos y la caja de la tabla. */
+  overflow: hidden;
+
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-13);
+  line-height: 1.45;
+  letter-spacing: 0.005em;
+  font-feature-settings: var(--font-features);
+  -webkit-font-smoothing: antialiased;
+
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-scrollbar) transparent;
+}
+
+/* `hidden` tiene que seguir ocultando aunque más abajo se declare `display` en
+   la misma clase (p. ej. `.gml-chip{display:inline-flex}` pisaría el
+   `display:none` de la hoja del navegador). Un chip de contador con valor 0 que
+   se oculte con el atributo `hidden` depende de esta línea. */
+.gml-app [hidden] {
+  display: none;
+}
+
+/* Anillo de foco de teclado para TODO lo que hay dentro de la app, controles de
+   Leaflet incluidos. Se excluye la celda de coordenada, que tiene el suyo
+   propio (más abajo): así el orden de las reglas deja de importar. */
+.gml-app :focus-visible:not(.gml-input-coordenada) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.gml-app ::selection {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.gml-app ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.gml-app ::-webkit-scrollbar-thumb {
+  background-color: var(--color-scrollbar);
+  background-clip: content-box;
+  border: 3px solid transparent;
+  border-radius: 6px;
+}
+
+.gml-app ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-scrollbar-hover);
+}
+
+.gml-panel {
+  width: var(--gml-panel-ancho);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  /* Sin esto, el panel crecería con su contenido en vez de repartirlo. */
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-bg-primary);
+  border-right: 1px solid var(--color-border-main);
+}
+
+/* ═══ Cabecera del panel ═════════════════════════════════════════════════════ */
+
+.gml-panel-cabecera {
+  flex: none;
+  padding: 20px var(--space-6) var(--space-3-5);
+  border-bottom: 1px solid var(--color-border-sub);
+}
+
+.gml-eyebrow {
+  margin: 0;
+  font-size: var(--text-11);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-disabled);
+}
+
+.gml-titulo {
+  margin: 6px 0 var(--space-3);
+  font-size: var(--gml-titulo-tam);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.gml-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* El estado BASE del chip es el NEUTRO de la maqueta («0 errores»): gris sobre
+   fondo elevado. Los modificadores solo añaden color. El punto lo pone un
+   ::before y no un elemento, para que `chip.textContent = '3 errores'` (que
+   reemplaza los HIJOS) no lo borre. */
+.gml-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--color-border-sub);
+  border-radius: 3px;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  font-size: var(--text-12);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.gml-chip::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.gml-chip--error {
+  color: var(--color-state-fail);
+  background: var(--color-tint-fail);
+  border-color: color-mix(in srgb, var(--color-state-fail) 30%, transparent);
+}
+
+.gml-chip--aviso {
+  color: var(--color-state-warn);
+  background: var(--color-tint-warn);
+  border-color: color-mix(in srgb, var(--color-state-warn) 32%, transparent);
+}
+
+/* ═══ Bloques y rótulos ══════════════════════════════════════════════════════ */
+
+.gml-bloque {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--space-4) var(--space-6) 0;
+}
+
+/* El bloque de vértices es el ÚNICO que se estira: absorbe la altura sobrante y
+   deja el pie pegado abajo. `min-height:0` (heredado de .gml-bloque) es lo que
+   permite que encoja por debajo del alto de la tabla — sin él, una tabla larga
+   empujaría el pie fuera de la pantalla. */
+.gml-bloque--vertices {
+  flex: 1 1 auto;
+  padding-bottom: var(--space-4);
+}
+
+.gml-rotulo {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-11);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-disabled);
+}
+
+/* «Vértices» a la izquierda, «X · Y (m)» a la derecha. El segundo hijo NO
+   necesita clase: hereda de aquí el 11 px y el gris de la maqueta. */
+.gml-rotulo-fila {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  font-size: var(--text-11);
+  color: var(--color-text-disabled);
+}
+
+.gml-rotulo-fila .gml-rotulo {
+  margin-bottom: 0;
+}
+
+/* ═══ Avisos ═════════════════════════════════════════════════════════════════ */
+
+.gml-avisos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: var(--gml-avisos-alto-max);
+  overflow-y: auto;
+  /* La rueda sobre la lista no debe acabar haciendo scroll en la página. */
+  overscroll-behavior: contain;
+}
+
+/* Tarjeta de incidencia: borde izquierdo de 3 px con el color del nivel, como
+   en la maqueta. El nivel llega en `data-nivel`, que es el contrato. El estado
+   sin `data-nivel` (o con uno desconocido) cae en el neutro y se ve igualmente:
+   una tarjeta invisible sería un fallo silencioso. */
+.gml-aviso {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-sub);
+  border-left-width: 3px;
+  border-left-color: var(--color-state-neutral);
+  border-radius: var(--radius);
+  background: var(--color-bg-surface);
+  transition: var(--transition-border);
+}
+
+.gml-aviso[data-nivel='ERROR'] {
+  border-color: color-mix(in srgb, var(--color-state-fail) 30%, transparent);
+  border-left-color: var(--color-state-fail);
+  background: var(--color-tint-fail);
+}
+
+.gml-aviso[data-nivel='AVISO'] {
+  border-color: color-mix(in srgb, var(--color-state-warn) 32%, transparent);
+  border-left-color: var(--color-state-warn);
+  background: var(--color-tint-warn);
+}
+
+.gml-aviso-cabecera {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.gml-aviso-etiqueta {
+  font-size: var(--text-10);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.gml-aviso[data-nivel='ERROR'] .gml-aviso-etiqueta {
+  color: var(--color-state-fail);
+}
+
+.gml-aviso[data-nivel='AVISO'] .gml-aviso-etiqueta {
+  color: var(--color-state-warn);
+}
+
+/* «×3». Ausente cuando el hallazgo ocurre una sola vez (lo decide app/avisos.js). */
+.gml-aviso-veces {
+  flex: none;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-11);
+  color: var(--color-text-disabled);
+}
+
+.gml-aviso-texto {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-12);
+  color: var(--color-text-secondary);
+}
+
+.gml-avisos-vacio {
+  margin: 0;
+  padding: 10px var(--space-3);
+  border: 1px dashed var(--color-border-sub);
+  border-radius: var(--radius);
+  background: var(--color-bg-surface);
+  font-size: var(--text-12);
+  color: var(--color-text-disabled);
+}
+
+/* Línea de desborde que emite `app/avisos.js` cuando hay más grupos de aviso
+   que su tope duro de 12 tarjetas («…y N avisos más.»). Es metainformación de
+   la lista, no un aviso: se viste como el estado vacío —discreta— y NO como una
+   tarjeta. Sin esta regla heredaba el 13 px y el color primario del panel, así
+   que salía más grande y más oscura que las tarjetas que resume, y su margen
+   por omisión del navegador peleaba con el `gap` de `.gml-avisos`. */
+.gml-avisos-resto {
+  margin: 0;
+  padding: var(--space-1) var(--space-3) 0;
+  font-size: var(--text-11);
+  color: var(--color-text-disabled);
+}
+
+/* ═══ Tabla de vértices ══════════════════════════════════════════════════════
+ *
+ * OJO: de aquí abajo el HTML NO lo escribe la cáscara, lo genera
+ * `viewer/sincronizacion.js#construirTabla`. Las clases son contrato estable de
+ * ese módulo (su constante `CLASE`): no se inventan ni se renombran aquí.
+ *
+ * Diferencia clave con la maqueta: la maqueta pinta una rejilla de SOLO
+ * LECTURA; F03 tiene una `<table>` con un `<input type="text">` por coordenada.
+ * Todo el trabajo de esta sección es que esos inputs parezcan celdas.
+ */
+
+.gml-tabla-caja {
+  flex: 1 1 auto;
+  /* Los dos, juntos, son lo que hace que la caja scrollee en vez de crecer. */
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--color-border-sub);
+  border-radius: var(--radius);
+  background: var(--color-bg-primary);
+}
+
+.gml-tabla-vertices {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: var(--text-12);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  line-height: 1.35;
+}
+
+/* Cabecera pegajosa: `position:sticky` va en las celdas, no en el <thead> ni en
+   el <tr> (ahí no funciona en todos los navegadores). Scrollea contra
+   `.gml-tabla-caja`, que es el contenedor con overflow. */
+.gml-tabla-vertices thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 5px var(--gml-celda-pad-x);
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border-sub);
+  font-family: var(--font-sans);
+  font-size: var(--text-10);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  /* SIN `text-transform: uppercase`, a propósito y no por descuido.
+     `viewer/sincronizacion.js` rotula las columnas «Nº», «X (m)» e «Y (m)», que
+     ya vienen en la caja que queremos: mayusculizar no añadía nada y convertía
+     la «m» del METRO en «M», que es el prefijo de MEGA. En una herramienta que
+     mide parcelas catastrales, una unidad mal escrita no es cosmética. Si algún
+     día hace falta el aspecto de versalitas, tendrá que ser sin tocar la unidad
+     (p. ej. `font-variant-caps`), nunca con `text-transform`. */
+  color: var(--color-text-disabled);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* La columna «Nº». Las tres clases de celda las comparten la cabecera y el
+   cuerpo (`construirCabecera` reusa CLASE.CELDA_*), así que hay que distinguir
+   por posición: aquí el <th> de <thead>, abajo el de `.gml-fila-vertice`. */
+.gml-tabla-vertices thead .gml-celda-indice {
+  width: 34px;
+  text-align: left;
+}
+
+/* Fila-rótulo de recinto: EXTERIOR / HUECO n. Es el PRIMER hijo de cada
+   <tbody class="gml-grupo-recinto">, y de ahí sale la trampa de la zebra (ver
+   la regla siguiente). */
+.gml-fila-recinto th {
+  padding: 6px var(--gml-celda-pad-x);
+  background: var(--color-bg-surface);
+  border-top: 1px solid var(--color-border-sub);
+  border-bottom: 1px solid var(--color-border-sub);
+  font-family: var(--font-sans);
+  font-size: var(--text-10);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  text-align: left;
+}
+
+/* El primer rótulo va pegado a la cabecera pegajosa: sobra su borde superior. */
+.gml-grupo-recinto:first-of-type .gml-fila-recinto th {
+  border-top: 0;
+}
+
+/* ── LA ZEBRA, Y POR QUÉ NO ES UN `nth-child(even)` ──────────────────────────
+ *
+ * Cada recinto es su propio <tbody>, y su primer hijo es la fila-rótulo. Un
+ * `tr:nth-child(even)` cuenta TODAS las filas hermanas, rótulo incluido, así
+ * que el sombreado sale desplazado un puesto y depende de que el rótulo esté
+ * ahí: el día que un recinto se pinte sin rótulo, la zebra se invierte solo en
+ * ese recinto y el panel se ve descosido.
+ *
+ * `:nth-child(even of .gml-fila-vertice)` cuenta SOLO filas de vértice. Y como
+ * `:nth-child` cuenta siempre entre hermanos, el conteo se reinicia en cada
+ * <tbody> sin escribir nada más: con exterior de 5 vértices + hueco de 3, el
+ * hueco vuelve a empezar por «vértice 1 sin sombra». Comprobado a mano:
+ *   tbody[0]: rótulo · v1 (limpia) · v2 (sombra) · v3 · v4 (sombra) · v5
+ *   tbody[1]: rótulo · h1 (limpia) · h2 (sombra) · h3
+ */
+.gml-fila-vertice:nth-child(even of .gml-fila-vertice) {
+  background: var(--color-bg-surface);
+}
+
+/* Va DESPUÉS de la zebra a propósito: misma especificidad (0,3,0), gana la
+   última. Si mueves esta regla arriba, el hover deja de verse en las filas
+   sombreadas. */
+.gml-tabla-vertices .gml-fila-vertice:hover {
+  background: var(--color-bg-elevated);
+}
+
+/* El nº de vértice, en el violeta reservado a la GEOMETRÍA DEL USUARIO
+   (`viewer/_comun.js#COLOR_USUARIO`, #7C3AED = --color-chart-envelope): el azul
+   del sistema chocaría con la hidrografía de la cartografía catastral.
+   La columna muestra `indice + 1` — el modelo cuenta desde 0 (`data-indice`) y
+   el humano desde 1. Manda el contrato de `sincronizacion.js`, no la maqueta
+   (que numeraba desde 0). */
+.gml-fila-vertice .gml-celda-indice {
+  width: 34px;
+  padding: var(--space-1) var(--gml-celda-pad-x);
+  font-family: var(--font-mono);
+  font-weight: var(--fw-medium);
+  font-size: var(--text-11);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-chart-envelope);
+  text-align: left;
+}
+
+/* El padding de la celda X/Y lo pone el <td>, NO el input: el input va a
+   `padding:0` y `width:100%` para que su caja coincida con la de la celda y no
+   se vea como un campo de formulario metido dentro de una tabla. */
+.gml-fila-vertice .gml-celda-x,
+.gml-fila-vertice .gml-celda-y {
+  padding: var(--space-1) var(--gml-celda-pad-x);
+  text-align: right;
+}
+
+.gml-input-coordenada {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--color-text-primary);
+  /* Hereda la mono/12px de la tabla: sin esto, el navegador impone su propia
+     tipografía de formulario y la columna deja de alinearse. */
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  transition:
+    outline-color var(--duration) ease-in-out,
+    box-shadow var(--duration) ease-in-out,
+    background-color var(--duration) ease-in-out;
+}
+
+/* El anillo de foco de la maqueta, y SOLO aquí. La maqueta lo consigue con
+   `border-color` + `box-shadow`, pero esta celda no tiene borde (sería una caja
+   de formulario), así que el borde se traduce a `outline`, que no ocupa sitio y
+   por tanto no mueve la tabla al enfocar. `:focus` y no `:focus-visible`: al
+   editar coordenadas con el ratón también hace falta ver qué celda está viva. */
+.gml-input-coordenada:focus {
+  outline: 1px solid var(--color-accent-hover);
+  outline-offset: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-hover) 13%, transparent);
+  background: var(--color-bg-primary);
+}
+
+.gml-fila-vacia td {
+  padding: var(--space-3) var(--gml-celda-pad-x);
+  font-family: var(--font-sans);
+  font-size: var(--text-12);
+  color: var(--color-text-disabled);
+  text-align: center;
+}
+
+/* ═══ Pie del panel: ficha del expediente ════════════════════════════════════ */
+
+.gml-panel-pie {
+  flex: none;
+  margin-top: auto;
+  padding: var(--space-3-5) var(--space-6) var(--space-4);
+  border-top: 1px solid var(--color-border-sub);
+  background: var(--color-bg-primary);
+}
+
+.gml-ficha {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px var(--space-3);
+  margin: 0;
+  font-size: var(--text-11);
+}
+
+.gml-ficha dt {
+  color: var(--color-text-disabled);
+}
+
+.gml-ficha dd {
+  margin: 0;
+  color: var(--color-text-secondary);
+  text-align: right;
+}
+
+/* Todo valor numérico o normativo va en mono con cifras tabulares: es la regla
+   tipográfica del sistema, no un adorno. */
+.gml-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* ═══ Mapa ═══════════════════════════════════════════════════════════════════
+ *
+ * ── DECISIÓN: EL DOT-GRID Y `.leaflet-container` ────────────────────────────
+ * La maqueta pone bajo el mapa el dot-grid de 22 px del sistema («la mesa de
+ * trabajo»). Leaflet, por su parte, da `background:#ddd` a `.leaflet-container`,
+ * y `crearMapa` hace `L.map(contenedor)` sobre ESTE MISMO elemento: `.gml-mapa`
+ * y `.leaflet-container` son el mismo nodo del DOM.
+ *
+ * Eso descarta la solución obvia. Escribir aparte
+ * `.leaflet-container{background:transparent}` no «destaparía» el dot-grid: al
+ * ser una propiedad ABREVIADA sobre el mismo elemento, borraría el
+ * `background-image` y dejaría el mapa liso. Y no se puede confiar en el orden
+ * de importación (`app/main.js` decide si leaflet.css va antes o después).
+ *
+ * Se resuelve con ESPECIFICIDAD y propiedades individuales: `.gml-app .gml-mapa`
+ * (0,2,0) gana siempre a `.leaflet-container` (0,1,0), venga cuando venga, sin
+ * forzar prioridades. El resultado es el que se quería: el dot-grid queda de
+ * TELÓN mientras cargan las teselas —que es justo para lo que sirve— y
+ * desaparece bajo ellas en cuanto llegan.
+ */
+.gml-app .gml-mapa {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  /* Lo estira `align-items:stretch` (el defecto del flex de fila); el 100 % es
+     cinturón y tirantes sobre el riesgo nº 1 de la fase (ver cabecera). */
+  height: 100%;
+  position: relative;
+
+  background-color: var(--color-bg-elevated);
+  /* El dot: `--color-dot-grid` (#e2e8f0) está calibrado para el lienzo BLANCO
+     del sistema y sobre este fondo (#f1f5f9) sería invisible. La maqueta usa
+     #cfd8e3, y el token del sistema que cae ahí es `--color-border-main`. */
+  background-image: radial-gradient(circle, var(--color-border-main) 1px, transparent 1px);
+  background-size: var(--dot-grid-size) var(--dot-grid-size);
+}
+
+/* ── Cromo de Leaflet ────────────────────────────────────────────────────────
+ * Retoques mínimos para que el cromo del mapa no desentone con el panel. Todos
+ * los selectores llevan `.gml-app .gml-mapa` delante (0,3,0) por una razón
+ * concreta: Leaflet duplica varias reglas bajo `.leaflet-touch` (0,2,0) —que se
+ * activa en cualquier portátil táctil— y con (0,2,0) propio habría empate y
+ * mandaría el orden de importación, que no controlamos.
+ */
+
+.gml-app .gml-mapa .leaflet-control-layers,
+.gml-app .gml-mapa .leaflet-bar {
+  border: 1px solid var(--color-border-main);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  background-clip: padding-box;
+}
+
+.gml-app .gml-mapa .leaflet-control-layers {
+  font-size: var(--text-12);
+  color: var(--color-text-secondary);
+}
+
+.gml-app .gml-mapa .leaflet-control-layers-separator {
+  border-top: 1px solid var(--color-border-sub);
+}
+
+.gml-app .gml-mapa .leaflet-bar a {
+  color: var(--color-text-secondary);
+  border-bottom-color: var(--color-border-sub);
+}
+
+.gml-app .gml-mapa .leaflet-bar a:hover {
+  background-color: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+}
+
+.gml-app .gml-mapa .leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--color-text-disabled);
+  font-family: var(--font-sans);
+  font-size: var(--text-10);
+}
+
+.gml-app .gml-mapa .leaflet-control-attribution a {
+  color: var(--color-accent-hover);
+}
+
+.gml-app .gml-mapa .leaflet-control-scale-line {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: var(--color-text-secondary);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-10);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── El vértice arrastrable (`L.divIcon`, clase `gml-vertice`) ───────────────
+ * El cuadradito violeta lo pinta un <span> con estilos EN LÍNEA dentro del
+ * icono (`sincronizacion.js` no puede importar CSS): su color, tamaño y sombra
+ * no se tocan desde aquí. Lo único que falta es el cursor.
+ *
+ * ⚠️ NUNCA declares `transform` en `.gml-vertice`: Leaflet posiciona cada
+ * marcador con un `transform: translate3d(...)` sobre ese mismo elemento, y
+ * cualquier transform propio lo pisaría y mandaría el vértice a otro sitio.
+ */
+.gml-app .gml-vertice {
+  cursor: grab;
+}
+
+.gml-app .gml-vertice:active {
+  cursor: grabbing;
+}
+
+/* ── Control de opacidad de la superpuesta (`viewer/capas.js`) ───────────────
+ * El módulo fija EN LÍNEA `background`, `padding`, `border-radius` y `font` del
+ * contenedor (a propósito: tiene que ser legible aunque nadie cargue esta hoja).
+ * Los estilos en línea ganan a cualquier regla sin marca de prioridad, así que
+ * aquí NO se intenta cambiarlos: se completa lo que falta. El rótulo y el
+ * deslizador sí son elementos hijos, y una regla que los apunte directamente
+ * gana a lo que HEREDAN del contenedor.
+ */
+.gml-app .gml-control-opacidad {
+  min-width: 172px;
+  border: 1px solid var(--color-border-main);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  color: var(--color-text-secondary);
+}
+
+.gml-app .gml-control-opacidad-etiqueta {
+  margin-bottom: var(--space-1);
+  font-family: var(--font-sans);
+  font-size: var(--text-10);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-text-disabled);
+}
+
+.gml-app .gml-control-opacidad-rango {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.gml-app .gml-control-opacidad-rango:disabled {
+  cursor: not-allowed;
+}
+
+/* ═══ Movimiento reducido ════════════════════════════════════════════════════
+ *
+ * Solo se apagan las transiciones PROPIAS. Deliberadamente NO se toca `*`: eso
+ * alcanzaría a las animaciones de zoom de Leaflet, que el mapa usa para su
+ * propia mecánica, y apagarlas desde aquí sería meterse donde no toca.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .gml-aviso,
+  .gml-input-coordenada {
+    transition: none;
+  }
+}

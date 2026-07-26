@@ -1,0 +1,33 @@
+/* ── Procedencia ──────────────────────────────────────────────────────────
+   Copiado el 2026-07-26 desde:
+   prototipo/_ds/concreta-design-system-bac861fa-544f-4139-9311-ec68119deaa4/tokens/motion.css
+
+   A partir de esta copia, `prototipo/` es referencia de diseño, NO
+   dependencia del producto: esta app no importa nada de `prototipo/` en
+   tiempo de build ni de ejecución. Si el design system evoluciona en
+   `prototipo/_ds/...`, el cambio hay que propagarlo aquí A MANO y de forma
+   deliberada — no hay ningún mecanismo de sincronización automática.
+
+   Copia fiel: ningún token modificado.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* motion.css — Concreta motion.
+   CSS transitions only. No animation library. 150ms ease-in-out is the house
+   transition for hover, focus, and state-color changes. Never animate layout
+   shifts, SVG content updates, or page transitions. */
+
+:root {
+  --transition: all 150ms ease-in-out;               /* @kind other */
+  --transition-color: color 150ms ease-in-out;       /* @kind other */
+  --transition-border: border-color 150ms ease-in-out; /* @kind other */
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);  /* @kind other */
+  --duration-fast: 120ms;   /* @kind other */
+  --duration: 150ms;        /* @kind other */
+  --duration-slow: 200ms;   /* @kind other */
+}
+
+/* dot-grid canvas surface — apply .canvas-dot-grid to any SVG work-area wrapper */
+.canvas-dot-grid {
+  background-image: radial-gradient(circle, var(--color-dot-grid) 1px, transparent 1px);
+  background-size: var(--dot-grid-size) var(--dot-grid-size);
+}

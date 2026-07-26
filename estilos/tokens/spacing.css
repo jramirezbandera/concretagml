@@ -1,0 +1,47 @@
+/* ── Procedencia ──────────────────────────────────────────────────────────
+   Copiado el 2026-07-26 desde:
+   prototipo/_ds/concreta-design-system-bac861fa-544f-4139-9311-ec68119deaa4/tokens/spacing.css
+
+   A partir de esta copia, `prototipo/` es referencia de diseño, NO
+   dependencia del producto: esta app no importa nada de `prototipo/` en
+   tiempo de build ni de ejecución. Si el design system evoluciona en
+   `prototipo/_ds/...`, el cambio hay que propagarlo aquí A MANO y de forma
+   deliberada — no hay ningún mecanismo de sincronización automática.
+
+   Copia fiel: ningún token modificado.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* spacing.css — Concreta spacing, radius, and layout dimensions.
+   Base unit is 8px. Radius has exactly three intentional levels; nothing larger
+   than rounded-md (6px) appears in the app. Layout dims are the real fixed
+   panel widths from the calculator shell. */
+
+:root {
+  /* ── Spacing scale (8px base) ── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-3-5: 14px;  /* inputs column padding */
+  --space-4: 16px;    /* results panel padding */
+  --space-6: 24px;    /* SVG canvas padding */
+
+  /* ── Border radius — three levels, hard cap at 6px ── */
+  --radius-none: 0px;   /* SVG canvas — the calc IS the content */
+  --radius: 4px;        /* inputs, unit chips, tags, badges, buttons */
+  --radius-md: 6px;     /* mockup wrappers, preview frames */
+
+  /* ── Layout dimensions (calculator shell) ── */
+  --topbar-h: 48px;
+  --sidebar-w: 204px;
+  --inputs-w: 240px;
+  --results-w: 280px;
+
+  /* ── Marketing layout ── */
+  --container-max: 1240px;
+  --nav-h: 56px;
+  --sec-pad: 84px;
+  --hero-pad: 112px;
+
+  /* ── Dot-grid ("mesa de trabajo del ingeniero") ── */
+  --dot-grid-size: 22px;
+}

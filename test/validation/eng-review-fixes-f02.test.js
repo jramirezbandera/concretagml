@@ -85,6 +85,19 @@ describe('F02 · robustez del contrato', () => {
     expect(r.errores).toEqual([])
     expect(r.puedeGenerar).toBe(true)
   })
+
+  it('con un srs VÁLIDO pero NO soportado (Canarias), la regla de huso también queda inerte', () => {
+    // La otra rama de `husoPorSrsOpcional`: `'EPSG:32628'` es un SRS perfectamente
+    // formado —y el de Canarias, DIFERIDA por el override O13—, pero este proyecto
+    // no tiene su huso. Sin huso no hay contra qué comparar el rango, así que la
+    // regla NO emite hallazgos (no es un error del usuario). Esta misma geometría
+    // en [0,0] con EPSG:25830 SÍ bloquea (ver reglas-error.test.js), o sea que el
+    // test no pasa por casualidad: mide justo el efecto del srs.
+    const ok = [crearRecinto([p(0, 0), p(10, 0), p(10, 10), p(0, 10)], 'EXTERIOR')]
+    const r = validarParcela(ok, { srs: 'EPSG:32628' })
+    expect(r.errores).toEqual([])
+    expect(r.puedeGenerar).toBe(true)
+  })
 })
 
 // ── OV-2/OV-3 · superficie NETA de la parcela ─────────────────────────────────
