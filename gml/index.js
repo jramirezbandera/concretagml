@@ -59,7 +59,7 @@
 //     necesite XML crudo (hoy nadie fuera de `gml/`) lo importa directamente.
 //   · `gml/descargar.js` ENTERO — decisión 1.
 //   · Las constantes de fontanería del resto de módulos (`NS`,
-//     `SCHEMA_LOCATION`, `ORDEN_CADASTRAL_PARCEL`, `PREFIJO_ID`,
+//     `SCHEMA_LOCATION_*`, `ORDEN_CADASTRAL_PARCEL`, `PREFIJO_ID`,
 //     `DECLARACION_XML`, `LIMITE_MAGNITUD_COORD`…): describen CÓMO se escribe el
 //     fichero, no cómo se lee el resultado. Publicarlas invita a componer GML a
 //     mano por fuera del serializador, que es justo lo que este módulo existe
@@ -111,7 +111,21 @@ export { SEVERIDAD, TIPO_GML } from './_comun.js'
 // o un GML de edificio. `SRS_SOPORTADOS` es la lista con la que se construye el
 // selector de sistema de referencia y con la que se explica un rechazo.
 
-export { DIALECTO, DIALECTOS, DIALECTO_DESCONOCIDO, SRS_SOPORTADOS } from './_comun.js'
+export { DIALECTO, DIALECTOS, DIALECTO_DESCONOCIDO, SRS_SOPORTADOS, esCp40 } from './_comun.js'
+
+// ── El SOBRE: entrega frente a descarga ──────────────────────────────────────
+// Sale por el barrel, y no es fontanería, porque es una decisión de PRODUCTO que
+// la capa de aplicación tiene que poder tomar y explicar: `PERFIL.ENTREGA` es el
+// fichero que se sube a la Sede y `PERFIL.WFS` el que devuelve el servicio del
+// Catastro — válido, legible y NO subible. Confundirlos es lo que provocó el
+// rechazo del IVG del 2026-07-27 (ver la cabecera de `gml/_comun.js`), así que la
+// distinción tiene que estar a la vista de quien construye la UI, no escondida.
+//
+// `PERFILES` acompaña a `PERFIL` porque lleva el `motivo` de cada campo y el
+// nombre del fixture del que sale, que es lo que permite explicar la diferencia
+// sin repetirla.
+
+export { PERFIL, PERFILES } from './_comun.js'
 
 // ── El reloj, que `gml/` no lee ──────────────────────────────────────────────
 // `serializarParcelaCp` exige `beginLifespanVersion` y NUNCA consulta la marca

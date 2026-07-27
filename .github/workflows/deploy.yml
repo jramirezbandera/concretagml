@@ -63,9 +63,57 @@ jobs:
       - name: npm test
         run: npm test
 
+  esquema:
+    name: Validar contra el XSD oficial de INSPIRE
+    needs: pruebas
+    runs-on: ubuntu-latest
+    # ⚠️ ESTE JOB EXISTE POR UN FALLO CONCRETO, y conviene que se lea aquí.
+    #
+    # El 2026-07-27 la Sede rechazó el GML que produce la app («El archivo no
+    # cumple el esquema Inspire GML») con la suite en verde y 1.784 pruebas. La
+    # validación de esquema existía —`npm run validar:xsd`— pero era OPCIONAL y
+    # dependía de tener `xmllint` instalado; en la máquina de desarrollo no lo
+    # estaba, así que salía SALTADO con código 0 y no se ejecutó NUNCA.
+    #
+    # La lección no es «había que instalar xmllint»: es que un guardián que puede
+    # saltarse a sí mismo en silencio no protege de nada. Aquí corre con
+    # `--estricto`, en una máquina donde las herramientas SÍ están, y no poder
+    # validar es un fallo en vez de un salto.
+    #
+    # Va DESPUÉS de `pruebas` porque necesita el snapshot que genera la suite, y
+    # ANTES de publicar (`construir` depende de él): un GML que no valida contra
+    # el esquema oficial no se pone en manos de nadie.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # `lxml` trae libxml2 dentro: el mismo motor que `xmllint`. Se instala en
+      # vez de usar `libxml2-utils` porque el script cachea en disco los XSD que
+      # descarga, y eso solo lo hace por la vía de Python.
+      - run: pip install lxml
+
+      - run: npm ci
+
+      # El snapshot del round-trip lo escribe la suite (`toMatchFileSnapshot`),
+      # así que hay que generarlo antes de validarlo. Solo el proyecto `node`:
+      # los tests de GML viven ahí y jsdom no pinta nada en esto.
+      - name: Generar los snapshots de GML
+        run: npm run test:node
+
+      - name: npm run validar:xsd -- --estricto
+        run: npm run validar:xsd -- --estricto
+
   construir:
     name: Construir el bundle
-    needs: pruebas
+    needs: esquema
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -24,7 +24,7 @@
  *   1. La serialización no produce ninguna detección de severidad ERROR.        *
  *   2. `canonico(salida)` toEqual `canonico(fixture)`: la igualdad de verdad.   *
  *   3. Los doce guardianes (abajo).                                             *
- *   4. `toMatchFileSnapshot('__snapshots__/parcela.gml')`.                      *
+ *   4. `toMatchFileSnapshot('__snapshots__/parcela-wfs.gml')`.                      *
  *                                                                               *
  * El snapshot va EL CUARTO, no el primero, y no es la aserción del AC1: un      *
  * snapshot solo está a un `-u` de no significar nada, así que no puede sostener *
@@ -105,8 +105,10 @@ import {
   DIALECTO,
   DIALECTOS,
   ELEMENTOS_PROSCRITOS_CP40,
+  PERFIL,
   SEVERIDAD,
   TIPO_GML,
+  esCp40,
 } from '../../gml/_comun.js'
 import { areaFirmada } from '../../geo/area.js'
 import { TIPO_RECINTO } from '../../model/parcela.js'
@@ -306,7 +308,7 @@ function unicoDeDialecto(id) {
 }
 
 /** El dato OFICIAL: la parcela 4.0 del WFS. Es la verdad-terreno de todo esto. */
-const CP40 = unicoDeDialecto(DIALECTO.CP_4_0)
+const CP40 = unicoDeDialecto(DIALECTO.CP_4_0_WFS)
 /** El CONTRAEJEMPLO: alta de particular en CP 3.0, de otro generador. */
 const UTM1 = unicoDeDialecto(DIALECTO.CP_3_0)
 /** Los GML de EDIFICIO: aportan el caso donde `boundedBy` SÍ existe de verdad. */
@@ -386,6 +388,7 @@ const COMENTARIO =
  */
 const SALIDA = serializarParcelaCp({
   recintos: PARCELA.recintos,
+  perfil: PERFIL.WFS,
   srs: PARCELA.srs,
   refcat: PARCELA.localId,
   namespaceInspire: PARCELA.namespaceInspire,
@@ -574,6 +577,7 @@ describe('F04 · guardián 3 · raíz WFS 2.0 con <member> (O3)', () => {
     const suya = UTM1.leido.parcelas[0]
     const { xml } = serializarParcelaCp({
       recintos: suya.recintos,
+      perfil: PERFIL.WFS,
       srs: suya.srs,
       refcat: suya.localId,
       namespaceInspire: suya.namespaceInspire,
@@ -629,6 +633,7 @@ describe('F04 · guardián 4 · gml:id por letra y sin repetir (AC5)', () => {
     // exactamente lo que debe hacer si alguien intentara publicar así.
     const { xml, detecciones } = serializarParcelaCp({
       recintos: PARCELA.recintos,
+      perfil: PERFIL.WFS,
       srs: PARCELA.srs,
       refcat: PARCELA.localId,
       namespaceInspire: '',
@@ -682,6 +687,7 @@ describe('F04 · guardián 5 · AC2 · orientación de los anillos (O1)', () => 
     const alReves = [...PARCELA.recintos[0].vertices].reverse()
     const resultado = serializarParcelaCp({
       recintos: [{ vertices: alReves, tipo: TIPO_RECINTO.EXTERIOR }],
+      perfil: PERFIL.WFS,
       srs: PARCELA.srs,
       refcat: PARCELA.localId,
       namespaceInspire: PARCELA.namespaceInspire,
@@ -946,11 +952,18 @@ describe('F04 · guardián 12 · tabla de dialectos frente a los GML del disco',
     }
   })
 
-  it('solo el CP 4.0 está soportado: los demás se leen para poder rechazarlos', () => {
+  it('lo soportado es el CP 4.0, EN CUALQUIERA DE SUS DOS SOBRES', () => {
+    // Hasta el 2026-07-27 esto decía «solo el CP 4.0» comparando con el único
+    // dialecto que entonces existía — el del WFS—, así que declaraba NO
+    // soportada la plantilla oficial del Catastro. El criterio real es el
+    // namespace del feature, que es lo que `esCp40` encapsula.
     for (const f of FIXTURES) {
-      expect(f.leido.soportado, `${f.nombre} (${f.leido.dialecto})`)
-        .toBe(f.leido.dialecto === DIALECTO.CP_4_0)
+      expect(f.leido.soportado, `${f.nombre} (${f.leido.dialecto})`).toBe(esCp40(f.leido.dialecto))
     }
+    // Anti-vacuidad por los dos lados: hay soportados y hay rechazados.
+    const soportados = FIXTURES.filter((f) => f.leido.soportado)
+    expect(soportados.length).toBe(2)
+    expect(FIXTURES.length - soportados.length).toBeGreaterThan(0)
   })
 
   it('DISPARA: un XML con una raíz inventada cae en DESCONOCIDO', () => {
@@ -988,6 +1001,7 @@ const RECINTOS_CON_HUECO = [
 
 const CON_HUECO = serializarParcelaCp({
   recintos: RECINTOS_CON_HUECO,
+  perfil: PERFIL.WFS,
   srs: PARCELA.srs,
   refcat: PARCELA.localId,
   namespaceInspire: PARCELA.namespaceInspire,
@@ -1043,7 +1057,177 @@ describe('F04 · los guardianes sobre una parcela con hueco derivada del fixture
 // ceros, y el `endLifespanVersion` autocerrado.
 
 describe('F04 · AC1 · 4ª · el documento completo, byte a byte', () => {
-  it('coincide con __snapshots__/parcela.gml', async () => {
-    await expect(XML).toMatchFileSnapshot('__snapshots__/parcela.gml')
+  it('coincide con __snapshots__/parcela-wfs.gml', async () => {
+    await expect(XML).toMatchFileSnapshot('__snapshots__/parcela-wfs.gml')
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 8 · EL FICHERO QUE SE SUBE — round-trip del perfil de ENTREGA
+//
+// ⚠️ ESTA SECCIÓN ES LA QUE FALTABA HASTA EL 2026-07-27, y su ausencia es la
+// historia entera del fallo. Todo lo de arriba comprueba, con mucho cuidado, que
+// sabemos reproducir la DESCARGA del WFS. Eso demuestra que los NÚMEROS son
+// correctos —y lo son—, pero no dice nada del fichero que el usuario sube: son
+// dos sobres distintos, y el de la descarga la Sede lo rechaza en la primera
+// línea porque su validador no carga el esquema de WFS.
+//
+// El oráculo de aquí NO es el GML del WFS: es `cp_ejemplo_explicativo.gml`, la
+// plantilla que publica el propio Catastro y que sus instrucciones mandan usar.
+// ═════════════════════════════════════════════════════════════════════════════
+
+const PLANTILLA = FIXTURES.find((f) => f.nombre === 'cp_ejemplo_explicativo.gml')
+if (PLANTILLA === undefined) {
+  throw new Error(
+    'falta test/fixtures/gml/cp_ejemplo_explicativo.gml, la plantilla OFICIAL del Catastro. ' +
+      'Sin ella esta suite vuelve a derivarlo todo de la descarga del WFS, que es el ' +
+      'fichero que la Sede rechaza. Ver test/fixtures/gml/PROCEDENCIA.md.',
+  )
+}
+const DOM_PLANTILLA = domDe(PLANTILLA.texto, `fixture ${PLANTILLA.nombre}`)
+
+/** La MISMA parcela del WFS, escrita en el sobre que se sube. */
+const ENTREGA = serializarParcelaCp({
+  recintos: PARCELA.recintos,
+  perfil: PERFIL.ENTREGA,
+  srs: PARCELA.srs,
+  refcat: PARCELA.localId,
+  namespaceInspire: PARCELA.namespaceInspire,
+  label: PARCELA.label,
+  nationalCadastralReference: PARCELA.refcat,
+  puntoReferencia: PARCELA.puntoReferencia,
+  comentario: COMENTARIO,
+})
+
+if (ENTREGA.xml === null) {
+  throw new Error(
+    `la entrega no emitió documento. Bloqueos: ${JSON.stringify(ENTREGA.resumen.bloqueos)}`,
+  )
+}
+
+const XML_ENTREGA = ENTREGA.xml
+const DOM_ENTREGA = domDe(XML_ENTREGA, 'salida de ENTREGA')
+
+/**
+ * ESQUELETO de un documento: el nombre CUALIFICADO de cada elemento, en orden de
+ * documento y con su profundidad. Es la forma del árbol sin ninguno de sus
+ * valores — que es exactamente lo que distingue un sobre de otro.
+ *
+ * Se compara el esqueleto y no el árbol canónico entero porque la plantilla
+ * describe OTRA parcela (otras coordenadas, otro identificador): lo que tiene
+ * que coincidir es la estructura, no el dato.
+ */
+const esqueleto = (nodo, profundidad = 0) => [
+  `${'  '.repeat(profundidad)}${nodo.nodeName}`,
+  ...[...nodo.children].flatMap((h) => esqueleto(h, profundidad + 1)),
+]
+
+describe('F04 · ENTREGA · el esqueleto es el de la plantilla oficial', () => {
+  it('el arnés no miente: la plantilla se ha leído y trae una parcela', () => {
+    expect(PLANTILLA.leido.dialecto).toBe(DIALECTO.CP_4_0_ENTREGA)
+    expect(PLANTILLA.leido.parcelas).toHaveLength(1)
+    expect(esqueleto(DOM_PLANTILLA).length).toBeGreaterThan(10)
+  })
+
+  it('mismo árbol de nombres cualificados, elemento por elemento', () => {
+    // Si alguien cambia la raíz, el contenedor, el prefijo del `inspireId` o
+    // añade un elemento que la plantilla no trae, esto lo dice señalando dónde.
+    expect(esqueleto(DOM_ENTREGA)).toEqual(esqueleto(DOM_PLANTILLA))
+  })
+
+  it('DISPARA: cambiar la raíz por la del WFS pone rojo el esqueleto', () => {
+    const mutado = domDe(
+      XML_ENTREGA.replace(/gml:FeatureCollection/g, 'wfs:FeatureCollection').replace(
+        'xmlns:gml=',
+        'xmlns:wfs="http://www.opengis.net/wfs/2.0" xmlns:gml=',
+      ),
+      'mutante con raíz WFS',
+    )
+    expect(esqueleto(mutado)).not.toEqual(esqueleto(DOM_PLANTILLA))
+  })
+
+  it('DISPARA: emitir el referencePoint también lo pone rojo', () => {
+    // La plantilla no lo trae, y añadirlo es justo la clase de «mejora» que nos
+    // devolvería al territorio donde el fichero no se parece a la referencia.
+    const conPunto = serializarParcelaCp({
+      recintos: PARCELA.recintos,
+      perfil: PERFIL.WFS,
+      srs: PARCELA.srs,
+      refcat: PARCELA.localId,
+      namespaceInspire: PARCELA.namespaceInspire,
+      label: PARCELA.label,
+      nationalCadastralReference: PARCELA.refcat,
+      beginLifespanVersion: PARCELA.beginLifespanVersion,
+    })
+    expect(esqueleto(domDe(conPunto.xml, 'wfs'))).not.toEqual(esqueleto(DOM_PLANTILLA))
+  })
+})
+
+describe('F04 · ENTREGA · los atributos del sobre, derivados de la plantilla', () => {
+  const atributos = (el) => [...el.attributes].map((a) => a.name)
+
+  it('la raíz declara los mismos atributos, en el mismo orden', () => {
+    expect(atributos(DOM_ENTREGA)).toEqual(atributos(DOM_PLANTILLA))
+  })
+
+  it('el `schemaLocation` apunta al MISMO esquema (y solo a ese)', () => {
+    const normal = (s) => s.replace(/\s+/g, ' ').trim()
+    const sl = (d) => normal(d.getAttribute('xsi:schemaLocation'))
+    expect(sl(DOM_ENTREGA)).toBe(sl(DOM_PLANTILLA))
+    expect(sl(DOM_ENTREGA)).not.toContain('wfs')
+  })
+
+  it('el `srsName` es la MISMA cadena que la de la plantilla, en todos los sitios', () => {
+    const suyo = unico(DOM_PLANTILLA, 'MultiSurface').getAttribute('srsName')
+    const nuestros = elementos(DOM_ENTREGA)
+      .filter((e) => e.hasAttribute('srsName'))
+      .map((e) => e.getAttribute('srsName'))
+    expect(nuestros.length).toBeGreaterThan(1)
+    for (const v of nuestros) expect(v).toBe(suyo)
+    // Y NO es la del WFS: el contraste hace que la afirmación separe de verdad.
+    expect(suyo).not.toBe(SRSNAME_URI)
+  })
+})
+
+describe('F04 · ENTREGA · los números NO cambian de sobre a sobre', () => {
+  // Todo el arsenal de guardianes de arriba mide la geometría sobre la salida
+  // WFS. Aquí se fija que la entrega lleva EXACTAMENTE los mismos números, para
+  // que aquellos guardianes sigan diciendo algo del fichero que de verdad se
+  // sube y no solo del que se usa para probar.
+  it('el `posList` y el `areaValue` son idénticos a los del perfil WFS', () => {
+    expect(unico(DOM_ENTREGA, 'posList').textContent).toBe(unico(domDe(XML, 'salida WFS'), 'posList').textContent)
+    expect(unico(DOM_ENTREGA, 'areaValue').textContent).toBe(
+      unico(domDe(XML, 'salida WFS'), 'areaValue').textContent,
+    )
+  })
+
+  it('y el `areaValue` sigue siendo el del fixture del Catastro', () => {
+    expect(unico(DOM_ENTREGA, 'areaValue').textContent).toBe(
+      unico(DOM_CP40, 'areaValue').textContent,
+    )
+  })
+
+  it('se relee como CP_4_0_ENTREGA, soportado y sin bloqueos', () => {
+    const releido = parsearGml(XML_ENTREGA)
+    expect(releido.dialecto).toBe(DIALECTO.CP_4_0_ENTREGA)
+    expect(releido.soportado).toBe(true)
+    expect(releido.resumen.bloqueos).toEqual([])
+    // Y los vértices vuelven tal cual salieron (regla de oro 4: abiertos).
+    expect(releido.parcelas[0].recintos[0].vertices).toEqual(PARCELA.recintos[0].vertices)
+    expect(releido.parcelas[0].areaValue).toBe(PARCELA.areaValue)
+  })
+
+  it('el encoding declarado es el de los bytes reales (guardián 11, aquí también)', () => {
+    expect(XML_ENTREGA).toContain('encoding="UTF-8"')
+    expect(Buffer.from(XML_ENTREGA, 'utf8').toString('utf8')).toBe(XML_ENTREGA)
+    // Anti-vacuidad: el comentario del prólogo lleva acentos, así que el
+    // documento tiene caracteres fuera de ASCII y la comprobación no es hueca.
+    expect([...XML_ENTREGA].some((c) => c.charCodeAt(0) > 127)).toBe(true)
+  })
+})
+
+describe('F04 · ENTREGA · 4ª aserción · el documento completo, byte a byte', () => {
+  it('coincide con __snapshots__/parcela-entrega.gml', async () => {
+    await expect(XML_ENTREGA).toMatchFileSnapshot('__snapshots__/parcela-entrega.gml')
   })
 })

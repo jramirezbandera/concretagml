@@ -4,17 +4,25 @@
  * Este es el test de UNIDAD del serializador; el de ida y vuelta (parse →       *
  * serialize contra snapshot) es otra tarea. Lo que aquí se comprueba es lo que  *
  * hace RECHAZAR un GML en la Sede, y por eso ninguna cifra ni ninguna cadena de *
- * las que se afirman está escrita a mano: TODAS se leen de                      *
- * `test/fixtures/gml/cp_parcela_9398516VK3799G.gml`, el GML real del WFS        *
- * (regla de oro 8). El namespace de la raíz, el orden de los ocho hijos, los    *
- * tres `srsName`, el `count`, el `areaValue`, los cuatro `gml:id`, el           *
- * `nilReason`, el `schemaLocation` y hasta el ORDEN de los atributos de la raíz  *
- * salen del fichero. Si el Catastro cambiara el fixture, este test cae y se     *
- * corrige el MÓDULO, nunca al revés.                                            *
+ * las que se afirman está escrita a mano: TODAS se leen de un fichero real      *
+ * (regla de oro 8).                                                             *
  *                                                                              *
- * `UTM_1.gml` entra como CONTRAEJEMPLO —CP 3.0 de otro generador— y aporta las  *
- * dos formas que la salida NO puede contener (la URN del `srsName` y el prefijo *
- * `base:` del `inspireId`) más el patrón del alta de particular: `label` y      *
+ * ⚠️ CUÁL fichero real, que es lo que se corrigió el 2026-07-27. Hay DOS, y     *
+ * cada uno manda sobre su perfil:                                               *
+ *   · `cp_ejemplo_explicativo.gml` — la PLANTILLA OFICIAL del Catastro. Manda   *
+ *     sobre `PERFIL.ENTREGA`: raíz, contenedor, schemaLocation y srsName del    *
+ *     fichero que se SUBE. Es el perfil por defecto y el que usa la app.        *
+ *   · `cp_parcela_9398516VK3799G.gml` — el GML del WFS. Manda sobre los NÚMEROS  *
+ *     (posList, count, areaValue, ids) y sobre `PERFIL.WFS`, el sobre de la     *
+ *     DESCARGA. La mayor parte de este fichero sigue apoyándose en él, porque   *
+ *     el interior del `cp:CadastralParcel` es idéntico en los dos perfiles.     *
+ *                                                                              *
+ * Hasta esa fecha TODO salía del segundo, incluida la parte del sobre, y por    *
+ * eso el fichero que producía la app era rechazado por el IVG con la suite en   *
+ * verde. Un test derivado del fichero equivocado no avisa: confirma.            *
+ *                                                                              *
+ * `UTM_1.gml` entra como CONTRAEJEMPLO de DIALECTO —CP 3.0 de otro generador—   *
+ * y aporta el patrón del alta de particular: `label` y                          *
  * `nationalCadastralReference` VACÍOS. Los dos GML de edificio sirven para que  *
  * la comprobación de elementos proscritos no sea vacua: ahí SÍ hay `boundedBy`. *
  *                                                                              *
@@ -42,6 +50,7 @@ import booleanClockwise from '@turf/boolean-clockwise'
 
 import {
   DECLARACION_XML,
+  NIL_REASON_BEGIN_LIFESPAN,
   NIL_REASON_END_LIFESPAN,
   RE_DATETIME_CATASTRO,
   SRS_DIMENSION,
@@ -53,6 +62,8 @@ import {
   NS,
   ORDEN_CADASTRAL_PARCEL,
   ELEMENTOS_PROSCRITOS_CP40,
+  PERFIL,
+  PERFILES,
   SEVERIDAD,
   TIPO_GML,
 } from '../../gml/_comun.js'
@@ -130,10 +141,13 @@ function pares(texto) {
 const tokens = (texto) => texto.trim().split(/\s+/)
 
 const NOMBRE_CP40 = 'cp_parcela_9398516VK3799G.gml'
+const NOMBRE_ENTREGA = 'cp_ejemplo_explicativo.gml'
 const NOMBRE_UTM1 = 'UTM_1.gml'
 const NOMBRE_BU = 'bu_building_9398516VK3799G.gml'
 
 const CP40 = docFixture(NOMBRE_CP40)
+/** La plantilla OFICIAL del Catastro: manda sobre el sobre de ENTREGA. */
+const PLANTILLA = docFixture(NOMBRE_ENTREGA)
 const UTM1 = docFixture(NOMBRE_UTM1)
 const BU = docFixture(NOMBRE_BU)
 
@@ -184,11 +198,19 @@ const NAMESPACE_LOCAL = unico(UTM1, 'namespace').textContent.trim()
 /** Recintos de entrada equivalentes al fixture (un solo exterior). */
 const RECINTOS = [{ vertices: ANILLO, tipo: TIPO_RECINTO.EXTERIOR }]
 
-/** Opciones que reproducen el fixture. Todo sale del fichero. */
+/**
+ * Opciones que reproducen el fixture del WFS. Todo sale del fichero.
+ *
+ * ⚠️ `perfil: PERFIL.WFS` es EXPLÍCITO y no es un detalle: lo que estas opciones
+ * reproducen es la DESCARGA, y el defecto del serializador es la ENTREGA. Antes
+ * del 2026-07-27 no había perfiles y estas mismas opciones describían «el»
+ * fichero, en singular — que era justo el error de concepto.
+ */
 const OPCIONES_FIXTURE = Object.freeze({
   recintos: RECINTOS,
   srs: SRS,
   refcat: REFCAT,
+  perfil: PERFIL.WFS,
   namespaceInspire: NAMESPACE_CATASTRO,
   beginLifespanVersion: BEGIN_CP40,
   timeStamp: TIMESTAMP_CP40,
@@ -945,5 +967,297 @@ describe('gml/serialize-cp · guardas', () => {
     // sumatorio, sería una segunda fuente de verdad para la superficie.
     expect(/from '\.\.\/geo\/area\.js'/.test(FUENTE)).toBe(false)
     expect(/booleanClockwise/.test(FUENTE)).toBe(false)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 9 · EL SOBRE DE ENTREGA — derivado de la plantilla OFICIAL del Catastro
+//
+// Esta sección es la que faltaba, y su ausencia costó un rechazo del IVG. Todo
+// lo que afirma sale de `cp_ejemplo_explicativo.gml` leído con jsdom: ni una
+// cadena escrita a mano. Cada guardián lleva su MITAD ANTI-VACUIDAD, porque un
+// guardián sin prueba de que dispara es una promesa.
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** Opciones mínimas de una ENTREGA. El perfil se deja al DEFECTO a propósito. */
+const OPCIONES_ENTREGA = Object.freeze({
+  recintos: RECINTOS,
+  srs: SRS,
+  refcat: REFCAT,
+  namespaceInspire: NAMESPACE_CATASTRO,
+})
+
+/** Serializa una entrega y devuelve `{...resultado, doc}`. */
+function entregar(extra = {}) {
+  const r = serializarParcelaCp({ ...OPCIONES_ENTREGA, ...extra })
+  expect(r.xml, `no se emitió XML: ${JSON.stringify(r.resumen.bloqueos)}`).not.toBeNull()
+  return { ...r, doc: parsear(r.xml, 'entrega') }
+}
+
+describe('gml/serialize-cp · el DEFECTO es la entrega, no la descarga', () => {
+  it('sin `perfil`, sale el sobre que la Sede admite', () => {
+    // Si alguien invirtiera el defecto, la app volvería a producir el fichero
+    // rechazado sin que ninguna otra prueba de este repo cambiase de color.
+    const { doc, resumen } = entregar()
+    expect(resumen.perfil).toBe(PERFIL.ENTREGA)
+    expect(resumen.subibleALaSede).toBe(true)
+    expect(doc.documentElement.namespaceURI).toBe(PLANTILLA.documentElement.namespaceURI)
+  })
+
+  it('el perfil WFS se declara NO subible, aunque su XML sea perfectamente válido', () => {
+    const r = serializarParcelaCp(OPCIONES_FIXTURE)
+    expect(r.xml).not.toBeNull()
+    expect(r.resumen.subibleALaSede).toBe(false)
+  })
+
+  it('un perfil inventado LANZA, no cae en un defecto silencioso', () => {
+    expect(() => serializarParcelaCp({ ...OPCIONES_ENTREGA, perfil: 'CP_5_0' })).toThrow(RangeError)
+  })
+})
+
+describe('gml/serialize-cp · ENTREGA · la raíz es la de la plantilla oficial', () => {
+  const { doc, xml } = entregar()
+  const raizNuestra = doc.documentElement
+  const raizPlantilla = PLANTILLA.documentElement
+
+  it('mismo namespace, mismo nombre local y mismo prefijo que la plantilla', () => {
+    expect(raizNuestra.namespaceURI).toBe(raizPlantilla.namespaceURI)
+    expect(raizNuestra.localName).toBe(raizPlantilla.localName)
+    expect(raizNuestra.prefix).toBe(raizPlantilla.prefix)
+  })
+
+  it('⚠️ NO es la raíz de WFS: ahí murió el fichero del 2026-07-27', () => {
+    // Anti-vacuidad por contraste: el otro perfil SÍ la lleva, así que esta
+    // afirmación distingue de verdad y no es un «no contiene» trivial.
+    expect(raizNuestra.namespaceURI).not.toBe(NS.wfs)
+    expect(xml).not.toContain(NS.wfs)
+    expect(serializarParcelaCp(OPCIONES_FIXTURE).xml).toContain(NS.wfs)
+  })
+
+  it('el contenedor es `gml:featureMember`, como en la plantilla', () => {
+    const nuestro = raizNuestra.firstElementChild
+    const suyo = raizPlantilla.firstElementChild
+    expect(nuestro.namespaceURI).toBe(suyo.namespaceURI)
+    expect(nuestro.localName).toBe(suyo.localName)
+  })
+
+  it('el `xsi:schemaLocation` cita SOLO cp/4.0, igual que la plantilla', () => {
+    const normal = (s) => s.replace(/\s+/g, ' ').trim()
+    expect(normal(raizNuestra.getAttributeNS(NS.xsi, 'schemaLocation'))).toBe(
+      normal(raizPlantilla.getAttributeNS(NS.xsi, 'schemaLocation')),
+    )
+    // Y el contraste con el otro perfil, que sí cita el esquema del servicio.
+    const wfs = parsear(serializarParcelaCp(OPCIONES_FIXTURE).xml, 'wfs')
+    expect(wfs.documentElement.getAttributeNS(NS.xsi, 'schemaLocation')).toContain(NS.wfs)
+  })
+
+  it('declara los MISMOS prefijos que la plantilla, y en su mismo orden', () => {
+    const prefijos = (el) =>
+      [...el.attributes].filter((a) => a.name.startsWith('xmlns:')).map((a) => a.name)
+    expect(prefijos(raizNuestra)).toEqual(prefijos(raizPlantilla))
+  })
+
+  it('no declara ningún `xmlns` por defecto: la raíz va prefijada', () => {
+    expect(raizNuestra.hasAttribute('xmlns')).toBe(false)
+    expect(raizPlantilla.hasAttribute('xmlns')).toBe(false)
+  })
+
+  it('no lleva timeStamp/numberMatched/numberReturned: no es respuesta de nadie', () => {
+    for (const attr of ['timeStamp', 'numberMatched', 'numberReturned']) {
+      expect(raizNuestra.hasAttribute(attr), attr).toBe(false)
+      expect(raizPlantilla.hasAttribute(attr), attr).toBe(false)
+    }
+  })
+
+  it('pasar `timeStamp` a una entrega LANZA, en vez de ignorarlo en silencio', () => {
+    // Quien lo pasa cree que va a salir en el fichero. Descubrir que no al
+    // subirlo a la Sede es el modo de fallo que este módulo persigue.
+    expect(() => serializarParcelaCp({ ...OPCIONES_ENTREGA, timeStamp: TIMESTAMP_CP40 })).toThrow(
+      TypeError,
+    )
+  })
+})
+
+describe('gml/serialize-cp · ENTREGA · el gml:id de la raíz (xs:ID es único)', () => {
+  it('es el namespace INSPIRE, como en la plantilla, y NO el de la parcela', () => {
+    const { doc } = entregar()
+    const raiz = doc.documentElement
+    expect(raiz.getAttributeNS(NS.gml, 'id')).toBe(NAMESPACE_CATASTRO)
+    expect(raiz.getAttributeNS(NS.gml, 'id')).toBe(
+      PLANTILLA.documentElement.getAttributeNS(NS.gml, 'id'),
+    )
+    expect(raiz.getAttributeNS(NS.gml, 'id')).not.toBe(idDe(doc, 'CadastralParcel'))
+  })
+
+  it('TODOS los gml:id del documento son distintos entre sí', () => {
+    // `xs:ID` es único en TODO el documento. Repetirlo invalida el fichero
+    // entero, y es exactamente lo que hace `UTM_1.gml` (ver PROCEDENCIA.md):
+    // por eso ese fichero no sirve de plantilla por mucho que sea un alta real.
+    const { doc } = entregar()
+    // `querySelectorAll('*')` YA incluye el elemento raíz: añadirlo aparte lo
+    // contaría dos veces y haría fallar esta comprobación por un duplicado que
+    // no existe (y, peor, haría pasar la mitad anti-vacuidad de abajo sin que el
+    // fichero repitiera nada).
+    const idsDe = (documento) =>
+      [...documento.querySelectorAll('*')]
+        .map((e) => e.getAttributeNS(NS.gml, 'id'))
+        .filter((v) => v !== null)
+
+    const ids = idsDe(doc)
+    expect(ids.length).toBeGreaterThan(3)
+    expect(new Set(ids).size).toBe(ids.length)
+    // La mitad anti-vacuidad, sobre el fichero real que SÍ los repite.
+    const idsUtm1 = idsDe(UTM1)
+    expect(new Set(idsUtm1).size).toBeLessThan(idsUtm1.length)
+  })
+
+  it('con namespace vacío la raíz sigue siendo única (y lo dice con ID_SANEADO)', () => {
+    const { doc, detecciones } = entregar({ namespaceInspire: '' })
+    const raiz = doc.documentElement.getAttributeNS(NS.gml, 'id')
+    expect(raiz).not.toBe(idDe(doc, 'CadastralParcel'))
+    expect(detecciones.some((d) => d.tipo === TIPO_GML.ID_SANEADO)).toBe(true)
+  })
+})
+
+describe('gml/serialize-cp · ENTREGA · srsName en URN (corrección de O2)', () => {
+  it('los tres srsName son la URN, y son la MISMA cadena que la de la plantilla', () => {
+    const { doc } = entregar()
+    const deLaPlantilla = srsNames(PLANTILLA)[0].srsName
+    const nuestros = srsNames(doc)
+    expect(nuestros.length).toBeGreaterThan(1)
+    for (const { local, srsName } of nuestros) {
+      expect(srsName, local).toBe(deLaPlantilla)
+    }
+  })
+
+  it('⚠️ NO es la URI de la descarga, y la diferencia está medida', () => {
+    const { xml } = entregar()
+    expect(xml).not.toContain(SRSNAME_CP40)
+    // Anti-vacuidad: el otro perfil sí la emite, luego la afirmación separa.
+    expect(serializarParcelaCp(OPCIONES_FIXTURE).xml).toContain(SRSNAME_CP40)
+  })
+})
+
+describe('gml/serialize-cp · ENTREGA · los hijos son los de la plantilla', () => {
+  it('mismo juego de hijos de cp:CadastralParcel, y en el mismo orden', () => {
+    const { doc } = entregar()
+    expect(hijosDe(unico(doc, 'CadastralParcel'))).toEqual(
+      hijosDe(unico(PLANTILLA, 'CadastralParcel')),
+    )
+  })
+
+  it('sin `endLifespanVersion` ni `referencePoint`: la plantilla no los trae', () => {
+    const { doc, resumen } = entregar()
+    const locales = hijosDe(unico(doc, 'CadastralParcel'))
+    expect(locales).not.toContain('endLifespanVersion')
+    expect(locales).not.toContain('referencePoint')
+    // …pero el punto SE CALCULA igual y sale en el resumen, que es donde la UI
+    // lo necesita. No emitirlo no es lo mismo que no saberlo.
+    expect(resumen.puntoReferencia.punto).not.toBeNull()
+    expect(resumen.referencePointEmitido).toBe(false)
+    // Anti-vacuidad: el perfil WFS sí los emite, así que la ausencia distingue.
+    const wfs = parsear(serializarParcelaCp(OPCIONES_FIXTURE).xml, 'wfs')
+    expect(hijosDe(unico(wfs, 'CadastralParcel'))).toContain('referencePoint')
+    expect(hijosDe(unico(wfs, 'CadastralParcel'))).toContain('endLifespanVersion')
+  })
+
+  it('el orden sigue siendo el del XSD, aunque haya menos hijos', () => {
+    const { doc } = entregar()
+    const locales = hijosDe(unico(doc, 'CadastralParcel'))
+    expect(locales).toEqual(ORDEN_CADASTRAL_PARCEL.filter((n) => locales.includes(n)))
+  })
+
+  it('el `inspireId` usa prefijo `base:` sobre base 3.3, como la plantilla', () => {
+    // ⚠️ Corrección de O4: el prefijo no es información en XML; lo que cuenta es
+    // el namespace. La plantilla oficial escribe `base:` y valida contra el XSD.
+    const { doc } = entregar()
+    const nuestro = unico(doc, 'Identifier')
+    const suyo = unico(PLANTILLA, 'Identifier')
+    expect(nuestro.namespaceURI).toBe(NS.base33)
+    expect(nuestro.prefix).toBe(suyo.prefix)
+    for (const local of ['localId', 'namespace']) {
+      expect(unico(doc, local).namespaceURI, local).toBe(NS.base33)
+      expect(unico(doc, local).prefix, local).toBe(unico(PLANTILLA, local).prefix)
+    }
+  })
+})
+
+describe('gml/serialize-cp · ENTREGA · beginLifespanVersion con xsi:nil', () => {
+  it('sin fecha sale con `xsi:nil` y el `nilReason` de la plantilla, LETRA a LETRA', () => {
+    const { doc } = entregar()
+    const nuestro = unico(doc, 'beginLifespanVersion')
+    const suyo = unico(PLANTILLA, 'beginLifespanVersion')
+    expect(nuestro.getAttributeNS(NS.xsi, 'nil')).toBe(suyo.getAttributeNS(NS.xsi, 'nil'))
+    expect(nuestro.getAttribute('nilReason')).toBe(suyo.getAttribute('nilReason'))
+    expect(nuestro.getAttribute('nilReason')).toBe(NIL_REASON_BEGIN_LIFESPAN)
+    expect(nuestro.textContent).toBe('')
+  })
+
+  it('es OPCIONAL en la entrega, pero OBLIGATORIA en la descarga del WFS', () => {
+    // La asimetría es deliberada y dice algo del mundo: el WFS reproduce un dato
+    // del Catastro, que sí sabe desde cuándo rige; un alta todavía no lo sabe.
+    expect(serializarParcelaCp(OPCIONES_ENTREGA).xml).not.toBeNull()
+    const sinFecha = { ...OPCIONES_FIXTURE }
+    delete sinFecha.beginLifespanVersion
+    expect(() => serializarParcelaCp(sinFecha)).toThrow(TypeError)
+  })
+
+  it('si SE aporta una fecha en la entrega, se emite y se sigue validando', () => {
+    const { doc } = entregar({ beginLifespanVersion: BEGIN_CP40 })
+    const el = unico(doc, 'beginLifespanVersion')
+    expect(el.textContent).toBe(BEGIN_CP40)
+    expect(el.hasAttributeNS(NS.xsi, 'nil')).toBe(false)
+    expect(() =>
+      serializarParcelaCp({ ...OPCIONES_ENTREGA, beginLifespanVersion: 'ayer' }),
+    ).toThrow(TypeError)
+  })
+
+  it('el resumen distingue «con fecha» de «nil», sin obligar a mirar el XML', () => {
+    expect(serializarParcelaCp(OPCIONES_ENTREGA).resumen.beginLifespanVersion).toBeNull()
+    expect(
+      serializarParcelaCp({ ...OPCIONES_ENTREGA, beginLifespanVersion: BEGIN_CP40 }).resumen
+        .beginLifespanVersion,
+    ).toBe(BEGIN_CP40)
+  })
+})
+
+describe('gml/serialize-cp · ENTREGA · el interior NO cambia entre perfiles', () => {
+  // El fallo del 2026-07-27 fue del SOBRE. Esta sección fija que lo de dentro
+  // —la geometría y los números, que es donde vive el riesgo de verdad— es
+  // idéntico en los dos, para que nadie «arregle» un perfil tocando el otro.
+  const entrega = entregar()
+  const wfs = parsear(serializarParcelaCp(OPCIONES_FIXTURE).xml, 'wfs')
+
+  it('el `posList` es el MISMO texto en los dos perfiles', () => {
+    expect(unico(entrega.doc, 'posList').textContent).toBe(unico(wfs, 'posList').textContent)
+  })
+
+  it('el `areaValue` y su `uom` son los mismos, y los del fixture', () => {
+    expect(unico(entrega.doc, 'areaValue').textContent).toBe(String(AREA_CP40))
+    expect(unico(entrega.doc, 'areaValue').textContent).toBe(unico(wfs, 'areaValue').textContent)
+    expect(unico(entrega.doc, 'areaValue').getAttribute('uom')).toBe(UOM_AREA)
+  })
+
+  it('los `gml:id` de parcela, MultiSurface y Surface son los mismos', () => {
+    for (const local of ['CadastralParcel', 'MultiSurface', 'Surface']) {
+      expect(idDe(entrega.doc, local), local).toBe(idDe(wfs, local))
+    }
+  })
+
+  it('el `count` del posList es el mismo, y son PARES', () => {
+    const c = unico(entrega.doc, 'posList').getAttribute('count')
+    expect(Number(c)).toBe(COUNT_CP40)
+    expect(Number(c)).toBe(pares(unico(entrega.doc, 'posList').textContent).length)
+    expect(unico(entrega.doc, 'posList').getAttribute('srsDimension')).toBe(SRS_DIMENSION)
+  })
+
+  it('ninguno de los elementos proscritos aparece en la entrega', () => {
+    const locales = new Set([...entrega.doc.querySelectorAll('*')].map((e) => e.localName))
+    for (const { local } of ELEMENTOS_PROSCRITOS_CP40) {
+      expect(locales.has(local), local).toBe(false)
+    }
+    // Anti-vacuidad, sobre el GML de edificio, que SÍ los trae.
+    const localesBu = new Set([...BU.querySelectorAll('*')].map((e) => e.localName))
+    expect(localesBu.has('boundedBy')).toBe(true)
   })
 })

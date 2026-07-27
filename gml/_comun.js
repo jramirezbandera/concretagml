@@ -7,27 +7,69 @@
 // GML, y `Date` → dateTime del Catastro). Es el análogo de `parsers/_comun.js`
 // para la rama de generación de GML.
 //
+// ═════════════════════════════════════════════════════════════════════════════
+// ⚠️ LA CORRECCIÓN DEL 2026-07-27: HAY DOS SOBRES, Y NO SON INTERCAMBIABLES
+// ═════════════════════════════════════════════════════════════════════════════
+// F04 se construyó copiando `cp_parcela_9398516VK3799G.gml`, la DESCARGA del WFS
+// del Catastro. La Sede rechazó el fichero resultante con «El archivo no cumple
+// el esquema Inspire GML». El motivo, MEDIDO después contra los XSD oficiales
+// (libxml2 resolviendo los imports de `inspire.ec.europa.eu`):
+//
+//   ┌───────────────────────────────────┬──────────────┬──────────────────────┐
+//   │ fichero                           │ vs cp/4.0    │ vs cp/4.0 + wfs/2.0  │
+//   ├───────────────────────────────────┼──────────────┼──────────────────────┤
+//   │ cp_ejemplo_explicativo.gml        │   VÁLIDO     │  válido              │
+//   │ cp_parcela_9398516VK3799G.gml     │   INVÁLIDO   │  válido              │
+//   └───────────────────────────────────┴──────────────┴──────────────────────┘
+//
+// El error exacto del inválido: «Element '{http://www.opengis.net/wfs/2.0}
+// FeatureCollection': No matching global declaration available for the
+// validation root». El validador del IVG carga el esquema de PARCELA; la raíz
+// `wfs:FeatureCollection` no está declarada ahí y el documento muere en la
+// primera línea. No era un problema de contenido: el contenido estaba bien.
+//
+// La lección, escrita para que no se repita: **la descarga y la entrega son dos
+// direcciones distintas del mismo formato**. El WFS responde envolviendo la
+// parcela en su propio protocolo; el técnico que SUBE un fichero no está
+// respondiendo a ninguna petición WFS y no debe traer ese envoltorio. De ahí
+// {@link PERFIL}, que hace la diferencia explícita en vez de dejarla implícita
+// en «de qué fichero copiamos».
+//
 // DE DÓNDE SALEN ESTAS CONSTANTES (regla de oro 8). De los ficheros reales de
-// `test/fixtures/gml/`, no de la documentación ni de la memoria de nadie:
-//   · `cp_parcela_9398516VK3799G.gml` — GML del WFS del Catastro, CP 4.0. Es LA
-//     fuente de verdad: cada namespace, el `xsi:schemaLocation`, el orden de los
-//     hijos de `cp:CadastralParcel` y el `srsName` se leyeron de ahí.
-//   · `UTM_1.gml` — CP 3.0 de otro generador. El CONTRAEJEMPLO: raíz
-//     `gml:FeatureCollection`, `srsName` en URN, `base:` en el `inspireId`.
+// `test/fixtures/gml/`, no de la documentación ni de la memoria de nadie (ver
+// `test/fixtures/gml/PROCEDENCIA.md`):
+//   · `cp_ejemplo_explicativo.gml` — la PLANTILLA OFICIAL del Catastro, la que
+//     sus propias instrucciones mandan usar para generar el fichero que se sube.
+//     Es la fuente de verdad del SOBRE DE ENTREGA (perfil `ENTREGA`).
+//   · `cp_parcela_9398516VK3799G.gml` — GML del WFS del Catastro, CP 4.0. Sigue
+//     siendo la fuente de verdad de los NÚMEROS y del sobre de la DESCARGA
+//     (perfil `WFS`), que es el que reproduce el round-trip.
+//   · `UTM_1.gml` — CP 3.0 de otro generador. CONTRAEJEMPLO por partida doble:
+//     dialecto viejo, y repite el `gml:id` entre raíz y parcela (`xs:ID` es
+//     único: eso invalida el documento). Ver `PROCEDENCIA.md`.
 //   · `bu_building_*.gml` / `bu_buildingpart_*.gml` — edificio (F13), otro
-//     dialecto todavía, con `boundedBy`/`Envelope` que en 4.0 están proscritos.
+//     dialecto todavía, con `boundedBy`/`Envelope` que en 4.0 no emitimos.
 // `test/gml/comun.test.js` ata cada constante de aquí a esos ficheros leyéndolos
 // del disco: si el Catastro cambiara el fixture, el test cae y este módulo se
 // corrige — nunca al revés.
 //
-// Overrides del dossier que VIVEN aquí (SPEC §3):
-//   · O2 — `srsName` de parcela = URI OGC `…/def/crs/EPSG/0/258xx`, NO la URN
-//     (que es del 3.0, rechazado) ni la forma corta `EPSG:25830`. Se repite en
-//     `MultiSurface`, `Surface` y en el `gml:Point` del `referencePoint`.
-//   · O3 — raíz `FeatureCollection` en el namespace WFS 2.0 + `member`. NUNCA
-//     `gml:FeatureCollection`/`gml:featureMember`.
-//   · O4 — `inspireId` con `Identifier` en base 3.3 y SIN prefijo `base:`.
+// Overrides del dossier que VIVEN aquí (SPEC §3), con lo que la medición del
+// 2026-07-27 corrigió de cada uno:
+//   · O2 — `srsName`. El dossier decía «URI OGC, NUNCA la URN». **Falso como
+//     regla general**: las dos formas son `xsd:anyURI` y las dos validan. Lo que
+//     hay es una forma por perfil — URI en la descarga del WFS, **URN en la
+//     entrega**, que es la que trae la plantilla oficial y la que emiten todos
+//     los generadores que el Catastro acepta. Ver {@link PERFILES}.
+//   · O3 — raíz. El dossier decía «WFS 2.0 + `member`, NUNCA
+//     `gml:FeatureCollection`». **Exactamente al revés para la entrega**: la
+//     plantilla oficial es `gml:FeatureCollection` + `gml:featureMember`, y la
+//     raíz WFS es justo lo que provocó el rechazo. Cada perfil tiene la suya.
+//   · O4 — `inspireId`. El dossier decía que el prefijo `base:` «produce rechazo
+//     en 4.0». **Falso**: un prefijo no es información en XML, lo que cuenta es
+//     la URI del namespace. La plantilla oficial usa `base:` sobre base **3.3** y
+//     valida. Lo que sí importa es la VERSIÓN: base 3.2 es del CP 3.0.
 //   · O5 — orden XSD de los hijos de `cp:CadastralParcel`: el validador lo exige.
+//     Este sigue en pie tal cual.
 //   · O13 — Canarias (huso 28 / EPSG:32628) DIFERIDA: gancho comentado abajo.
 //
 // Fronteras de responsabilidad (SPEC §2):
@@ -53,15 +95,15 @@
 // ── Namespaces ────────────────────────────────────────────────────────────────
 
 /**
- * Namespaces del GML que este proyecto EMITE (CP 4.0). Son exactamente los siete
- * declarados en `cp_parcela_9398516VK3799G.gml`: seis en la raíz (`xsi`, `gml`,
- * `xlink`, `cp`, `gmd` y el `xmlns` por defecto = WFS 2.0) y el séptimo como
- * `xmlns` por defecto del `<Identifier>` del `inspireId` (base 3.3, override O4:
- * sin prefijo `base:`; el `base:` de la 3.2 es del 3.0 y produce rechazo).
+ * Namespaces que este proyecto EMITE o RECONOCE en una parcela CP 4.0. La unión
+ * de los declarados por los dos fixtures 4.0: la plantilla de entrega (`gml`,
+ * `gmd`, `ogc`, `xlink`, `cp`, `xsi`, más `base` en el `inspireId`) y la descarga
+ * del WFS (los mismos menos `ogc`, más `wfs` como `xmlns` por defecto).
  *
- * `gmd` va declarado aunque el fixture no lo use en ningún elemento: se emite
- * igual, por fidelidad al fichero del WFS (regla de oro 8 — el GML real manda,
- * también en lo que a nosotros nos parezca superfluo).
+ * `gmd`, `ogc` y `xlink` van declarados aunque ningún elemento los use: se emiten
+ * igual, por fidelidad a los ficheros reales (regla de oro 8 — el GML real manda,
+ * también en lo que a nosotros nos parezca superfluo). Cuál se declara en cada
+ * caso lo dice {@link PERFILES}, no esta tabla.
  *
  * Los namespaces de los dialectos que solo se LEEN (CP 3.0, edificio) no están
  * aquí: viven en {@link DIALECTOS}, porque son de reconocimiento, no de emisión.
@@ -76,19 +118,188 @@ export const NS = Object.freeze({
   xsi: 'http://www.w3.org/2001/XMLSchema-instance',
   xlink: 'http://www.w3.org/1999/xlink',
   gmd: 'http://www.isotc211.org/2005/gmd',
+  ogc: 'http://www.opengis.net/ogc',
 })
 
 /**
- * Valor del atributo `xsi:schemaLocation` que se emite en la raíz, copiado del
- * fixture del WFS. Son PARES `namespace espacio xsd`: el del WFS 2.0 y el de
- * Cadastral Parcels 4.0, en ese orden.
+ * `xsi:schemaLocation` de la ENTREGA: UN solo par `namespace espacio xsd`, el de
+ * Cadastral Parcels 4.0. Copiado de la plantilla oficial.
+ *
+ * Que aquí NO aparezca el WFS es el corazón de la corrección del 2026-07-27: el
+ * fichero que se sube no es una respuesta WFS y no debe declarar ese esquema. Ver
+ * la cabecera del módulo.
  *
  * @readonly
  */
-export const SCHEMA_LOCATION =
+export const SCHEMA_LOCATION_ENTREGA =
+  'http://inspire.ec.europa.eu/schemas/cp/4.0 ' +
+  'http://inspire.ec.europa.eu/schemas/cp/4.0/CadastralParcels.xsd'
+
+/**
+ * `xsi:schemaLocation` de la DESCARGA del WFS: DOS pares, el del WFS 2.0 y el de
+ * Cadastral Parcels 4.0, en ese orden. Copiado del fixture del WFS.
+ *
+ * @readonly
+ */
+export const SCHEMA_LOCATION_WFS =
   'http://www.opengis.net/wfs/2.0 http://schemas.opengis.net/wfs/2.0/wfs.xsd ' +
   'http://inspire.ec.europa.eu/schemas/cp/4.0 ' +
   'http://inspire.ec.europa.eu/schemas/cp/4.0/CadastralParcels.xsd'
+
+// ── Formas del srsName ────────────────────────────────────────────────────────
+// Se declaran AQUÍ ARRIBA, y no junto a sus patrones (que están al final del
+// módulo), porque {@link PERFILES} y {@link DIALECTOS} las necesitan y en ESM un
+// `const` no se puede leer antes de su línea: hacerlo sería un ReferenceError en
+// tiempo de carga, no un aviso.
+
+/**
+ * Formas en las que un `srsName` puede venir escrito. Las tres primeras se han
+ * visto en ficheros reales de este repo (URI en la descarga del WFS, URN en la
+ * plantilla de entrega y en el 3.0 y el edificio, CORTA en el modelo interno);
+ * `GML_SRS` es la forma heredada de GML 2/3.0 (`…/gml/srs/epsg.xml#25830`), que
+ * se reconoce para poder nombrarla en el mensaje en vez de decir «desconocida».
+ *
+ * URI y URN son las DOS canónicas, cada una en su perfil: ninguna es «la mala».
+ * Ver la corrección de O2 en la cabecera del módulo.
+ *
+ * @readonly
+ */
+export const FORMA_SRSNAME = Object.freeze({
+  URI: 'URI',
+  URN: 'URN',
+  CORTA: 'CORTA',
+  GML_SRS: 'GML_SRS',
+  DESCONOCIDA: 'DESCONOCIDA',
+})
+
+/**
+ * Prefijo de la URI OGC del `srsName` (`…/def/crs/EPSG/0/25830`). Leído de la
+ * descarga del WFS, donde el valor completo aparece tres veces idénticas:
+ * `MultiSurface`, `Surface` y el `gml:Point` del `referencePoint`.
+ *
+ * El `/0/` es la versión del registro de CRS de OGC, no un relleno: la forma con
+ * otra versión sería una URI válida pero NO la que emite el Catastro.
+ *
+ * @readonly
+ */
+export const PREFIJO_SRSNAME_URI = 'http://www.opengis.net/def/crs/EPSG/0/'
+
+/**
+ * Prefijo de la URN OGC del `srsName` (`urn:ogc:def:crs:EPSG::25830`). Leído de
+ * `cp_ejemplo_explicativo.gml`, la plantilla oficial de entrega, y confirmado en
+ * `UTM_1.gml`, que es lo que genera una herramienta de terceros de uso real.
+ *
+ * Los DOS dos puntos seguidos no son una errata: el segmento intermedio es la
+ * versión del registro EPSG y va VACÍO, que es la forma «sin versión fijada».
+ *
+ * @readonly
+ */
+export const PREFIJO_SRSNAME_URN = 'urn:ogc:def:crs:EPSG::'
+
+// ── Perfiles de emisión: ENTREGA frente a DESCARGA ───────────────────────────
+
+/**
+ * Los dos sobres del mismo CP 4.0. Ver la cabecera del módulo: confundirlos es
+ * lo que provocó el rechazo del IVG del 2026-07-27.
+ *
+ * @readonly
+ */
+export const PERFIL = Object.freeze({
+  /** Lo que el técnico SUBE a la Sede. El que usa la app. */
+  ENTREGA: 'ENTREGA',
+  /** Lo que el WFS del Catastro DEVUELVE. Solo para reproducir su fichero. */
+  WFS: 'WFS',
+})
+
+/**
+ * Un perfil de emisión: todo lo que cambia entre la entrega y la descarga.
+ *
+ * @typedef {Object} PerfilEmision
+ * @property {'ENTREGA'|'WFS'} id
+ * @property {string} raiz      Nombre CUALIFICADO del elemento raíz tal como se
+ *   escribe (`'gml:FeatureCollection'` / `'FeatureCollection'`).
+ * @property {string} raizNs    URI del namespace de la raíz.
+ * @property {string} miembro   Nombre cualificado del contenedor de cada feature.
+ * @property {string} schemaLocation  Valor de `xsi:schemaLocation`.
+ * @property {'URI'|'URN'} formaSrsName  Forma canónica del `srsName` aquí.
+ * @property {boolean} raizLlevaGmlId  Si la raíz lleva `gml:id` propio. En la
+ *   entrega SÍ (`gml:FeatureCollection` hereda de `gml:AbstractGML`, donde
+ *   `gml:id` es obligatorio); en el WFS no (la raíz es de otro esquema).
+ * @property {boolean} atributosWfs  Si se emiten `timeStamp`/`numberMatched`/
+ *   `numberReturned`. Solo tienen sentido en una respuesta de servicio.
+ * @property {boolean} emiteEndLifespan   Si se emite `cp:endLifespanVersion`.
+ * @property {boolean} emiteReferencePoint  Si se emite `cp:referencePoint`.
+ * @property {readonly string[]} prefijosRaiz  Prefijos de `NS` que se declaran en
+ *   la raíz, en el orden en que los escribe el fichero real correspondiente.
+ * @property {string} fixture  Fichero de `test/fixtures/gml/` del que sale este
+ *   perfil. Lo lee el test para atar cada campo a su origen.
+ */
+
+/**
+ * Los dos perfiles, cada uno derivado de SU fichero real.
+ *
+ * ¿Por qué `emiteEndLifespan` y `emiteReferencePoint` son `false` en la entrega,
+ * si los dos VALIDAN contra el XSD (medido)? Porque la plantilla oficial no los
+ * trae, y acabamos de aprender —caro— que añadir al fichero de subida cosas que
+ * la plantilla no tiene es exactamente el riesgo que no hay motivo para correr.
+ * El punto de referencia se sigue CALCULANDO y verificando: sale en `resumen`,
+ * que es donde la UI lo necesita. Simplemente no se escribe.
+ *
+ * @readonly
+ * @type {Readonly<Record<'ENTREGA'|'WFS', PerfilEmision>>}
+ */
+export const PERFILES = Object.freeze({
+  [PERFIL.ENTREGA]: Object.freeze({
+    id: PERFIL.ENTREGA,
+    raiz: 'gml:FeatureCollection',
+    raizNs: NS.gml,
+    miembro: 'gml:featureMember',
+    schemaLocation: SCHEMA_LOCATION_ENTREGA,
+    formaSrsName: FORMA_SRSNAME.URN,
+    raizLlevaGmlId: true,
+    atributosWfs: false,
+    emiteEndLifespan: false,
+    emiteReferencePoint: false,
+    prefijosRaiz: Object.freeze(['gml', 'gmd', 'ogc', 'xlink', 'cp', 'xsi']),
+    fixture: 'cp_ejemplo_explicativo.gml',
+  }),
+  [PERFIL.WFS]: Object.freeze({
+    id: PERFIL.WFS,
+    raiz: 'FeatureCollection',
+    raizNs: NS.wfs,
+    miembro: 'member',
+    schemaLocation: SCHEMA_LOCATION_WFS,
+    formaSrsName: FORMA_SRSNAME.URI,
+    raizLlevaGmlId: false,
+    atributosWfs: true,
+    emiteEndLifespan: true,
+    emiteReferencePoint: true,
+    prefijosRaiz: Object.freeze(['xsi', 'gml', 'xlink', 'cp', 'gmd']),
+    fixture: 'cp_parcela_9398516VK3799G.gml',
+  }),
+})
+
+/**
+ * Resuelve un identificador de perfil a su {@link PerfilEmision}.
+ *
+ * @param {'ENTREGA'|'WFS'} id
+ * @returns {PerfilEmision}
+ * @throws {RangeError}  Si `id` no es un perfil conocido. No hay valor por
+ *   defecto silencioso: elegir sobre equivocado es el fallo que este módulo
+ *   existe para impedir.
+ */
+export function perfilPorId(id) {
+  const perfil = Object.prototype.hasOwnProperty.call(PERFILES, id) ? PERFILES[id] : undefined
+  if (perfil === undefined) {
+    throw new RangeError(
+      `perfilPorId: perfil ${JSON.stringify(id)} desconocido. ` +
+        `Válidos: ${Object.keys(PERFILES).join(', ')}. ` +
+        `${PERFIL.ENTREGA} es el fichero que se SUBE a la Sede; ${PERFIL.WFS} es el que ` +
+        `DEVUELVE el servicio del Catastro, y no se puede subir.`,
+    )
+  }
+  return perfil
+}
 
 // ── Orden XSD y elementos proscritos ─────────────────────────────────────────
 
@@ -211,25 +422,43 @@ export const ELEMENTOS_PROSCRITOS_CP40 = Object.freeze([
  * @readonly
  */
 export const DIALECTO = Object.freeze({
-  CP_4_0: 'CP_4_0',
+  /** CP 4.0 en sobre de ENTREGA: `gml:FeatureCollection` + `gml:featureMember`. */
+  CP_4_0_ENTREGA: 'CP_4_0_ENTREGA',
+  /** CP 4.0 en sobre de DESCARGA: `wfs:FeatureCollection` + `member`. */
+  CP_4_0_WFS: 'CP_4_0_WFS',
   CP_3_0: 'CP_3_0',
   BU: 'BU',
   DESCONOCIDO: 'DESCONOCIDO',
 })
 
 /**
+ * ¿Es un dialecto de parcela CP 4.0, venga en el sobre que venga? Los dos son
+ * soportados y comparten TODO el interior del `cp:CadastralParcel`: lo que
+ * cambia es el envoltorio. Existe como función para que nadie escriba
+ * `id === 'CP_4_0_ENTREGA' || id === 'CP_4_0_WFS'` en dos sitios y se le olvide
+ * uno el día que haya un tercero.
+ *
+ * @param {string} id  Clave de {@link DIALECTO}.
+ * @returns {boolean}
+ */
+export const esCp40 = (id) => id === DIALECTO.CP_4_0_ENTREGA || id === DIALECTO.CP_4_0_WFS
+
+/**
  * Un dialecto de GML reconocible. POJO plano y congelado.
  *
  * @typedef {Object} Dialecto
- * @property {'CP_4_0'|'CP_3_0'|'BU'|'DESCONOCIDO'} id  Clave de {@link DIALECTO}.
- * @property {boolean} soportado   `true` solo en CP 4.0: es el que se lee y se
- *   escribe. En los demás el llamante emite `DIALECTO_RECHAZADO` (parcela 3.0) o
- *   `DIALECTO_OTRO_TEMA` (edificio) y no sigue.
+ * @property {string} id  Clave de {@link DIALECTO}.
+ * @property {boolean} soportado   `true` en los dos CP 4.0: son los que se leen y
+ *   se escriben. En los demás el llamante emite `DIALECTO_RECHAZADO` (parcela
+ *   3.0) o `DIALECTO_OTRO_TEMA` (edificio) y no sigue.
  * @property {'PARCELA'|'EDIFICIO'|null} tema  De qué habla el fichero.
  * @property {{ns: string|null, local: string}} raiz     Elemento raíz.
  * @property {{ns: string|null, local: string}} miembro  Contenedor de cada feature.
  * @property {string|null} featureNs  Namespace del elemento de feature. Es el
  *   DISCRIMINANTE real (ver {@link DIALECTOS}).
+ * @property {'URI'|'URN'} formaSrsName  Forma en la que ESE dialecto escribe el
+ *   `srsName`. Se lee de su fichero de referencia; es lo que hace que leer una
+ *   URN en una entrega NO produzca un aviso y leerla en una descarga del WFS sí.
  * @property {string} motivo  Por qué está soportado o por qué no. Va al mensaje.
  */
 
@@ -237,32 +466,51 @@ export const DIALECTO = Object.freeze({
  * Tabla de dialectos, derivada de los cuatro fixtures del disco.
  *
  * ⚠️ HALLAZGO sobre los ficheros reales, y por qué esta tabla no se indexa solo
- * por la raíz: `UTM_1.gml` (parcela 3.0) y los dos `bu_*.gml` (edificio) tienen
- * EXACTAMENTE la misma raíz — `gml:FeatureCollection` en el namespace GML 3.2 —
- * y el mismo contenedor `gml:featureMember`. Lo único que los separa es el
- * namespace del elemento de feature: `urn:x-inspire:…:CadastralParcels:3.0` con
- * `CadastralParcel` frente a `…/bu-ext2d/2.0` con `Building`/`BuildingPart`. La
- * raíz sola, por tanto, NO clasifica; sirve para decir «esto no es 4.0» (que ya
- * es un rechazo, override O3) pero no para decir qué es. De ahí `featureNs`.
+ * por la raíz: `cp_ejemplo_explicativo.gml` (parcela 4.0 de ENTREGA), `UTM_1.gml`
+ * (parcela 3.0) y los dos `bu_*.gml` (edificio) tienen EXACTAMENTE la misma raíz
+ * — `gml:FeatureCollection` en el namespace GML 3.2 — y el mismo contenedor
+ * `gml:featureMember`. Lo único que los separa es el namespace del elemento de
+ * feature: `…/schemas/cp/4.0`, `urn:x-inspire:…:CadastralParcels:3.0` y
+ * `…/bu-ext2d/2.0`. La raíz sola, por tanto, NO clasifica. De ahí `featureNs`.
+ *
+ * Ese diseño es justo lo que ha permitido que reconocer el sobre de entrega —el
+ * fallo del 2026-07-27— sea una FILA MÁS en esta tabla y no una reescritura del
+ * lector: `gml/parse.js` no pregunta por ningún dialecto concreto, lee de aquí.
  *
  * Los namespaces ajenos (3.0 y edificio) están escritos aquí y no en {@link NS}
  * a propósito: son de RECONOCIMIENTO, jamás se emiten. Salen de los fixtures y
- * el test los ata a ellos clasificando los cuatro ficheros del disco.
+ * el test los ata a ellos clasificando los cinco ficheros del disco.
  *
  * @readonly
  * @type {ReadonlyArray<Dialecto>}
  */
 export const DIALECTOS = Object.freeze([
   Object.freeze({
-    id: DIALECTO.CP_4_0,
+    id: DIALECTO.CP_4_0_ENTREGA,
+    soportado: true,
+    tema: 'PARCELA',
+    raiz: Object.freeze({ ns: NS.gml, local: 'FeatureCollection' }),
+    miembro: Object.freeze({ ns: NS.gml, local: 'featureMember' }),
+    featureNs: NS.cp,
+    formaSrsName: FORMA_SRSNAME.URN,
+    motivo:
+      'INSPIRE Cadastral Parcels 4.0 en el sobre de ENTREGA (raíz ' +
+      '`gml:FeatureCollection`, `gml:featureMember`, srsName en URN): el fichero que ' +
+      'el técnico SUBE a la Sede, y el que produce la plantilla oficial del Catastro.',
+  }),
+  Object.freeze({
+    id: DIALECTO.CP_4_0_WFS,
     soportado: true,
     tema: 'PARCELA',
     raiz: Object.freeze({ ns: NS.wfs, local: 'FeatureCollection' }),
     miembro: Object.freeze({ ns: NS.wfs, local: 'member' }),
     featureNs: NS.cp,
+    formaSrsName: FORMA_SRSNAME.URI,
     motivo:
-      'INSPIRE Cadastral Parcels 4.0 sobre WFS 2.0: el dialecto que el Catastro ' +
-      'entrega hoy y el único que admite en la subida (override O3).',
+      'INSPIRE Cadastral Parcels 4.0 en el sobre de DESCARGA (raíz ' +
+      '`wfs:FeatureCollection`, `member`, srsName en URI): lo que DEVUELVE el servicio ' +
+      'del Catastro. Se lee perfectamente, pero NO se puede subir: el validador de la ' +
+      'Sede no carga el esquema de WFS y la raíz le resulta desconocida.',
   }),
   Object.freeze({
     id: DIALECTO.CP_3_0,
@@ -271,10 +519,11 @@ export const DIALECTOS = Object.freeze([
     raiz: Object.freeze({ ns: NS.gml, local: 'FeatureCollection' }),
     miembro: Object.freeze({ ns: NS.gml, local: 'featureMember' }),
     featureNs: 'urn:x-inspire:specification:gmlas:CadastralParcels:3.0',
+    formaSrsName: FORMA_SRSNAME.URN,
     motivo:
-      'Parcela en CP 3.0 (raíz `gml:FeatureCollection`, `gml:featureMember`, ' +
-      'srsName en URN y `base:` en el inspireId). La Sede lo RECHAZA desde 2025. ' +
-      'La conversión 3.0 → 4.0 está fuera de alcance (SPEC §1).',
+      'Parcela en CP 3.0 (namespaces `urn:x-inspire:…:CadastralParcels:3.0` y ' +
+      'BaseTypes 3.2). Es el dialecto de 2015; el esquema que la Sede valida hoy es ' +
+      'el 4.0. La conversión 3.0 → 4.0 está fuera de alcance (SPEC §1).',
   }),
   Object.freeze({
     id: DIALECTO.BU,
@@ -283,6 +532,7 @@ export const DIALECTOS = Object.freeze([
     raiz: Object.freeze({ ns: NS.gml, local: 'FeatureCollection' }),
     miembro: Object.freeze({ ns: NS.gml, local: 'featureMember' }),
     featureNs: 'http://inspire.jrc.ec.europa.eu/schemas/bu-ext2d/2.0',
+    formaSrsName: FORMA_SRSNAME.URN,
     motivo:
       'GML de EDIFICIO (Building/BuildingPart, namespaces draft de la JRC y ' +
       'srsName en URN, override O10). No es un fichero equivocado: es otro tema, ' +
@@ -305,6 +555,10 @@ export const DIALECTO_DESCONOCIDO = Object.freeze({
   raiz: Object.freeze({ ns: null, local: '' }),
   miembro: Object.freeze({ ns: null, local: '' }),
   featureNs: null,
+  // No se sabe qué forma esperaría este fichero; se pone la de la ENTREGA para
+  // que el campo exista siempre y el llamante no tenga que comprobar nada. Da
+  // igual: con dialecto DESCONOCIDO no se llega a leer ninguna geometría.
+  formaSrsName: FORMA_SRSNAME.URN,
   motivo:
     'El fichero es XML bien formado pero su raíz (o su primer elemento de feature) ' +
     'no corresponde a ningún GML de parcela ni de edificio conocido.',
@@ -412,7 +666,9 @@ export const TIPO_GML = Object.freeze({
   // ── Lectura: estructura del feature (lo que hace rechazar un GML ajeno, F08) ──
   ELEMENTO_PROSCRITO: 'ELEMENTO_PROSCRITO', // `boundedBy`/`zoning`/… en una parcela 4.0
   ORDEN_INESPERADO: 'ORDEN_INESPERADO', // hijos fuera del orden XSD (O5)
-  INSPIREID_CON_PREFIJO: 'INSPIREID_CON_PREFIJO', // `base:Identifier` (3.2) en vez de base 3.3 (O4)
+  // el `Identifier` del `inspireId` está en base 3.2 (del CP 3.0) y no en base 3.3.
+  // OJO: es el NAMESPACE lo que se juzga, nunca el prefijo — ver `gml/parse.js`.
+  INSPIREID_NS_INESPERADO: 'INSPIREID_NS_INESPERADO',
   // ── Escritura (gml/serialize-cp.js) ──
   ORIENTACION_NORMALIZADA: 'ORIENTACION_NORMALIZADA', // anillo invertido (O1: exterior horario)
   COLAPSO_POR_REDONDEO: 'COLAPSO_POR_REDONDEO', // dos vértices se funden al redondear a 2 decimales
@@ -506,35 +762,6 @@ export function crearDeteccionGml(tipo, mensaje, severidad, datos) {
 export const SRS_SOPORTADOS = Object.freeze(['EPSG:25829', 'EPSG:25830', 'EPSG:25831'])
 
 /**
- * Prefijo de la URI OGC del `srsName` de parcela 4.0 (override O2). Leído del
- * fixture del WFS, donde el valor completo aparece tres veces idénticas:
- * `MultiSurface`, `Surface` y el `gml:Point` del `referencePoint`.
- *
- * El `/0/` es la versión del registro de CRS de OGC, no un relleno: la forma con
- * otra versión sería una URI válida pero NO la que emite el Catastro.
- *
- * @readonly
- */
-export const PREFIJO_SRSNAME_URI = 'http://www.opengis.net/def/crs/EPSG/0/'
-
-/**
- * Formas en las que un `srsName` puede venir escrito. Las tres primeras se han
- * visto en ficheros reales de este repo (URI en la parcela 4.0, URN en el 3.0 y
- * en el edificio, CORTA en el modelo interno); `GML_SRS` es la forma heredada de
- * GML 2/3.0 (`…/gml/srs/epsg.xml#25830`), que se reconoce para poder nombrarla
- * en el mensaje de rechazo en vez de decir «formato desconocido».
- *
- * @readonly
- */
-export const FORMA_SRSNAME = Object.freeze({
-  URI: 'URI',
-  URN: 'URN',
-  CORTA: 'CORTA',
-  GML_SRS: 'GML_SRS',
-  DESCONOCIDA: 'DESCONOCIDA',
-})
-
-/**
  * Patrones de cada forma, en orden de comprobación. El grupo 1 es SIEMPRE el
  * código EPSG. Se admite el segmento de versión vacío o cualquiera (`/0/`,
  * `EPSG::`) porque el fixture 4.0 usa `/0/` y el 3.0 usa `EPSG::`, y clasificar
@@ -563,8 +790,36 @@ function codigoDeSrsCorto(srs) {
 }
 
 /**
- * Forma corta del modelo → `srsName` canónico de la parcela 4.0 (override O2).
+ * Código EPSG de una forma corta soportada, o el `RangeError` con el mensaje
+ * común a las dos traducciones. Existe para que `srsNameUri` y `srsNameUrn` no
+ * puedan divergir en qué aceptan.
+ *
+ * @param {string} srs
+ * @param {string} quien  Nombre de la función que llama, para el mensaje.
+ * @returns {number}
+ */
+function exigirCodigoSrs(srs, quien) {
+  if (typeof srs !== 'string') {
+    throw new TypeError(`${quien}: 'srs' debe ser un string; recibido ${JSON.stringify(srs)}.`)
+  }
+  const codigo = codigoDeSrsCorto(srs)
+  if (codigo === null) {
+    throw new RangeError(
+      `${quien}: srs ${JSON.stringify(srs)} no soportado ` +
+        `(válidos: ${SRS_SOPORTADOS.join(', ')}). ` +
+        `Canarias (EPSG:32628) está DIFERIDA (override O13).`,
+    )
+  }
+  return codigo
+}
+
+/**
+ * Forma corta del modelo → `srsName` en URI OGC.
  * `'EPSG:25830'` → `'http://www.opengis.net/def/crs/EPSG/0/25830'`.
+ *
+ * Es la forma canónica del perfil {@link PERFIL.WFS}. Para la ENTREGA se usa
+ * {@link srsNameUrn}; quien no quiera elegir a mano llama a
+ * {@link srsNamePorForma}, que despacha por perfil.
  *
  * Es la traducción que `geo/huso.js` se negó explícitamente a hacer («el
  * dialecto srsName del GML lo decide F04, NO aquí»): aquí está.
@@ -576,18 +831,45 @@ function codigoDeSrsCorto(srs) {
  *   está DIFERIDA, override O13; regla de oro 1: sin error silencioso).
  */
 export function srsNameUri(srs) {
-  if (typeof srs !== 'string') {
-    throw new TypeError(`srsNameUri: 'srs' debe ser un string; recibido ${JSON.stringify(srs)}.`)
-  }
-  const codigo = codigoDeSrsCorto(srs)
-  if (codigo === null) {
-    throw new RangeError(
-      `srsNameUri: srs ${JSON.stringify(srs)} no soportado ` +
-        `(válidos: ${SRS_SOPORTADOS.join(', ')}). ` +
-        `Canarias (EPSG:32628) está DIFERIDA (override O13).`,
-    )
-  }
-  return `${PREFIJO_SRSNAME_URI}${codigo}`
+  return `${PREFIJO_SRSNAME_URI}${exigirCodigoSrs(srs, 'srsNameUri')}`
+}
+
+/**
+ * Forma corta del modelo → `srsName` en URN OGC.
+ * `'EPSG:25830'` → `'urn:ogc:def:crs:EPSG::25830'`.
+ *
+ * Es la forma canónica del perfil {@link PERFIL.ENTREGA}: la que trae la
+ * plantilla oficial del Catastro y la que emiten los generadores de terceros
+ * cuyos ficheros la Sede acepta. Ver la corrección de O2 en la cabecera.
+ *
+ * @param {string} srs  Forma corta, una de {@link SRS_SOPORTADOS}.
+ * @returns {string}  El `srsName` completo en URN OGC.
+ * @throws {TypeError}   Si `srs` no es un string.
+ * @throws {RangeError}  Si no es uno de los SRS soportados.
+ */
+export function srsNameUrn(srs) {
+  return `${PREFIJO_SRSNAME_URN}${exigirCodigoSrs(srs, 'srsNameUrn')}`
+}
+
+/**
+ * Despachador: forma corta + forma canónica pedida → `srsName`. Es lo que llama
+ * el serializador, con el `formaSrsName` de su {@link PerfilEmision}, para que la
+ * elección URI/URN esté en UN sitio y no repartida por `if`s.
+ *
+ * @param {string} srs   Forma corta, una de {@link SRS_SOPORTADOS}.
+ * @param {'URI'|'URN'} forma  Una de {@link FORMA_SRSNAME} (solo URI o URN son
+ *   emitibles: CORTA y GML_SRS se reconocen al leer, no se escriben nunca).
+ * @returns {string}
+ * @throws {RangeError}  Si `forma` no es URI ni URN, o si el `srs` no se soporta.
+ */
+export function srsNamePorForma(srs, forma) {
+  if (forma === FORMA_SRSNAME.URI) return srsNameUri(srs)
+  if (forma === FORMA_SRSNAME.URN) return srsNameUrn(srs)
+  throw new RangeError(
+    `srsNamePorForma: forma ${JSON.stringify(forma)} no es emitible. ` +
+      `Solo ${FORMA_SRSNAME.URI} y ${FORMA_SRSNAME.URN} se escriben; ` +
+      `${FORMA_SRSNAME.CORTA} y ${FORMA_SRSNAME.GML_SRS} solo se reconocen al leer.`,
+  )
 }
 
 /**
@@ -625,12 +907,21 @@ export function srsCorto(codigo) {
  * @property {string} valor    El texto recibido, recortado de espacios.
  * @property {'URI'|'URN'|'CORTA'|'GML_SRS'|'DESCONOCIDA'} forma  Ver {@link FORMA_SRSNAME}.
  * @property {number|null} codigo  Código EPSG, o `null` si no se pudo extraer.
+ * @property {'URI'|'URN'} formaCanonica  Contra qué forma se ha juzgado
+ *   `coherente`. Va en el resultado para que el llamante pueda decir en el
+ *   mensaje QUÉ esperaba, en vez de dejar al usuario adivinándolo.
  * @property {boolean} coherente  `true` solo si `valor` es EXACTAMENTE el
- *   `srsName` que este proyecto emitiría para ese código, es decir la URI OGC
- *   canónica de un SRS soportado (override O2). Una URN, la forma corta, una URI
- *   con otra versión de registro o un EPSG fuera de los tres → `false`: el dato
- *   se puede aprovechar (el código es válido) pero el fichero NO está en la
- *   forma que la Sede admite, y eso hay que decirlo (`SRS_FORMA_INESPERADA`).
+ *   `srsName` que este proyecto emitiría para ese código EN LA FORMA CANÓNICA
+ *   PEDIDA. Una forma distinta, una URI con otra versión de registro o un EPSG
+ *   fuera de los tres → `false`: el dato se puede aprovechar (el código es
+ *   válido) pero el fichero no está en la forma de su perfil, y eso hay que
+ *   decirlo (`SRS_FORMA_INESPERADA`).
+ *
+ *   ⚠️ `coherente: false` NO significa «el esquema lo rechaza». Medido el
+ *   2026-07-27: URI y URN son las dos `xsd:anyURI` y las dos validan. Significa
+ *   «no es la forma que trae el fichero de referencia de este perfil», que es un
+ *   aviso, no un bloqueo.
+ *
  *   OJO: no confundir con `SRS_INCOHERENTE`, que es otra cosa —dos `srsName`
  *   del mismo documento que no coinciden entre sí— y la juzga `gml/parse.js`,
  *   porque aquí solo se ve una cadena cada vez.
@@ -638,7 +929,7 @@ export function srsCorto(codigo) {
 
 /**
  * Clasifica un `srsName` crudo sin juzgar nada más: qué forma tiene, qué código
- * EPSG lleva dentro y si es la forma canónica de la parcela 4.0.
+ * EPSG lleva dentro y si es la forma canónica del perfil que se le indique.
  *
  * NO lanza por un `srsName` raro (eso es dato del usuario: se devuelve
  * `DESCONOCIDA` y el llamante emite la detección). Sí lanza si no le dan un
@@ -647,14 +938,25 @@ export function srsCorto(codigo) {
  * desconocida».
  *
  * @param {string} crudo  El valor del atributo `srsName` tal cual venía.
+ * @param {object} [opciones]
+ * @param {'URI'|'URN'} [opciones.formaCanonica='URN']  Forma contra la que se
+ *   juzga `coherente`. Por defecto la de la ENTREGA, que es el caso principal;
+ *   el lector la pasa explícita según el dialecto que haya reconocido.
  * @returns {AnalisisSrs}
- * @throws {TypeError}  Si `crudo` no es un string (ver arriba: `null` NO vale).
+ * @throws {TypeError}   Si `crudo` no es un string (ver arriba: `null` NO vale).
+ * @throws {RangeError}  Si `formaCanonica` no es URI ni URN.
  */
-export function normalizarSrsName(crudo) {
+export function normalizarSrsName(crudo, { formaCanonica = FORMA_SRSNAME.URN } = {}) {
   if (typeof crudo !== 'string') {
     throw new TypeError(
       `normalizarSrsName: 'crudo' debe ser un string; recibido ${JSON.stringify(crudo)}. ` +
         `Un srsName AUSENTE es otro suceso: emite ${TIPO_GML.SRS_AUSENTE}.`,
+    )
+  }
+  if (formaCanonica !== FORMA_SRSNAME.URI && formaCanonica !== FORMA_SRSNAME.URN) {
+    throw new RangeError(
+      `normalizarSrsName: 'formaCanonica' debe ser ${FORMA_SRSNAME.URI} o ${FORMA_SRSNAME.URN}; ` +
+        `recibido ${JSON.stringify(formaCanonica)}.`,
     )
   }
   const valor = crudo.trim()
@@ -673,13 +975,13 @@ export function normalizarSrsName(crudo) {
   // «Coherente» se define por IGUALDAD con lo que emitiríamos, no por la forma:
   // así una URI con otra versión de registro (`…/EPSG/9.9.1/25830`) sale como
   // URI —que es lo que es— pero no como canónica, sin necesidad de una segunda
-  // regla que pudiera divergir de `srsNameUri`.
+  // regla que pudiera divergir de `srsNamePorForma`.
   let coherente = false
   if (codigo !== null && SRS_SOPORTADOS.includes(`EPSG:${codigo}`)) {
-    coherente = valor === srsNameUri(`EPSG:${codigo}`)
+    coherente = valor === srsNamePorForma(`EPSG:${codigo}`, formaCanonica)
   }
 
-  return { valor, forma, codigo, coherente }
+  return { valor, forma, codigo, formaCanonica, coherente }
 }
 
 // ── Fechas ────────────────────────────────────────────────────────────────────

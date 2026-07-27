@@ -34,14 +34,18 @@
 //      ±1 m². El guion no importa nada del proyecto —corre dentro de la página—,
 //      así que la fórmula es una segunda implementación independiente: si
 //      `gml/anillos.js` y esta cuenta discreparan, el smoke lo dice.
-//   5. **Estructura.** Raíz `FeatureCollection` en el namespace de WFS 2.0 con
-//      `<member>` (y NUNCA `gml:FeatureCollection`, que es el dialecto viejo),
-//      los `srsName` en URI OGC y ni una sola URN en todo el documento, y ningún
+//   5. **Estructura del SOBRE DE ENTREGA.** ⚠️ Corregido el 2026-07-27: este
+//      apartado comprobaba el sobre de la DESCARGA del WFS (raíz
+//      `wfs:FeatureCollection` + `<member>` + srsName en URI) y lo daba por
+//      bueno, que es justo el fichero que la Sede rechazó. Lo que se exige
+//      ahora es lo que trae la plantilla oficial del Catastro: raíz
+//      `gml:FeatureCollection` con `gml:featureMember`, los `srsName` en URN,
+//      ni rastro del namespace de WFS en todo el documento, y ningún
 //      `gml:boundedBy` ni `cp:zoning`.
 //   6. **El renglón de estado** dice que se ha descargado y NOMBRA el fichero, y
-//      ese nombre coincide con el `download` real del anchor y con la marca de
-//      tiempo del `cp:beginLifespanVersion` de dentro (`gml/descargar.js`
-//      promete que el nombre y el contenido no pueden discrepar).
+//      ese nombre coincide con el `download` real del anchor. La marca de tiempo
+//      del nombre YA NO se contrasta contra el `cp:beginLifespanVersion`: en el
+//      perfil de entrega ese elemento va con `xsi:nil`, como en la plantilla.
 //
 // Y dos comprobaciones cruzadas que solo existen porque aquí hay app entera:
 // la superficie que el usuario LEE en la ficha del pie contra la que se calcula
@@ -130,7 +134,11 @@ const SELECTOR_RENGLON = '[data-estado="generar-gml"]'
 /** Valor de `?demo=` que carga el dataset sintético con hueco (`app/main.js`). */
 const DEMO_HUECO = 'hueco'
 
-/** Namespace de WFS 2.0: el de la RAÍZ y el de `<member>` (override O3). */
+/**
+ * Namespace de WFS 2.0. NO debe aparecer en el fichero: es el sobre de la
+ * DESCARGA del servicio, y el validador del IVG no carga ese esquema. Se
+ * conserva aquí como la cadena que se BUSCA para poder afirmar su ausencia.
+ */
 const NS_WFS = 'http://www.opengis.net/wfs/2.0'
 
 /** Namespace de GML 3.2. */
@@ -140,13 +148,24 @@ const NS_GML = 'http://www.opengis.net/gml/3.2'
 const NS_CP = 'http://inspire.ec.europa.eu/schemas/cp/4.0'
 
 /**
- * `srsName` que debe llevar el documento: URI OGC, NUNCA la URN (override O2).
- * Los dos datasets de demostración están en EPSG:25830 (`app/demo-datos.js`).
+ * `srsName` que debe llevar el documento: la URN, que es la forma de la
+ * plantilla oficial y la del fichero que se sube. Los dos datasets de
+ * demostración están en EPSG:25830 (`app/demo-datos.js`).
+ *
+ * ⚠️ Aquí ponía la URI OGC hasta el 2026-07-27 «porque la URN es rechazo». Las
+ * dos formas son `xsd:anyURI` y las dos validan; lo que cambia es el perfil.
  */
-const SRS_NAME_ESPERADO = 'http://www.opengis.net/def/crs/EPSG/0/25830'
+const SRS_NAME_ESPERADO = 'urn:ogc:def:crs:EPSG::25830'
 
-/** Cuántas veces aparece el `srsName`: MultiSurface, Surface y Point. */
-const SRS_NAME_APARICIONES = 3
+/** La forma del OTRO perfil, que NO debe aparecer en una entrega. */
+const SRS_NAME_DESCARGA = 'http://www.opengis.net/def/crs/EPSG/0/25830'
+
+/**
+ * Cuántas veces aparece el `srsName`: MultiSurface y Surface. El
+ * `cp:referencePoint` NO se emite en el perfil de entrega (la plantilla oficial
+ * no lo trae), así que su `gml:Point` tampoco aporta un tercero.
+ */
+const SRS_NAME_APARICIONES = 2
 
 /** Un valor de `posList`: entero con signo opcional y EXACTAMENTE 2 decimales. */
 const RE_COORD = /^-?\d+\.\d{2}$/
@@ -531,7 +550,7 @@ if (errorDeParseo !== null) {
 }
 
 const raiz = doc.documentElement
-const miembros = doc.getElementsByTagNameNS(NS_WFS, 'member')
+const miembros = doc.getElementsByTagNameNS(NS_GML, 'featureMember')
 const srsNames = [...doc.querySelectorAll('[srsName]')].map((el) => el.getAttribute('srsName'))
 const boundedBy = doc.getElementsByTagNameNS(NS_GML, 'boundedBy')
 const zoning = doc.getElementsByTagNameNS(NS_CP, 'zoning')
@@ -541,25 +560,39 @@ const estructura = {
   raizNombreLocal: raiz.localName,
   raizNamespace: raiz.namespaceURI,
   raizPrefijo: raiz.prefix,
-  esFeatureCollectionWfs20: raiz.localName === 'FeatureCollection' && raiz.namespaceURI === NS_WFS,
-  // El dialecto viejo. Se busca en el TEXTO además de en el árbol: un
-  // `gml:FeatureCollection` con el prefijo mal declarado no aparecería como tal
-  // en el DOM y sí en el fichero que ve el validador.
-  sinGmlFeatureCollection: !texto.includes('<gml:FeatureCollection'),
+  esFeatureCollectionEntrega:
+    raiz.localName === 'FeatureCollection' && raiz.namespaceURI === NS_GML,
+  // El sobre equivocado. Se busca en el TEXTO además de en el árbol: el
+  // namespace de WFS declarado con otro prefijo no aparecería como `wfs:` en el
+  // DOM y sí estaría en el fichero que ve el validador.
+  sinNamespaceWfs: !texto.includes(NS_WFS),
+  // La raíz de la entrega hereda de `gml:AbstractGML`, donde `gml:id` es
+  // obligatorio; y es `xs:ID`, luego NO puede repetir el de la parcela.
+  gmlIdRaiz: raiz.getAttributeNS(NS_GML, 'id'),
   miembros: miembros.length,
+  // Atributos de la RESPUESTA de un servicio: en una entrega no existen.
   numberMatched: raiz.getAttribute('numberMatched'),
   numberReturned: raiz.getAttribute('numberReturned'),
+  timeStamp: raiz.getAttribute('timeStamp'),
   srsNames,
-  srsNamesEnUriOgc: srsNames.length > 0 && srsNames.every((s) => s === SRS_NAME_ESPERADO),
-  // Override O2: la URN (`urn:ogc:def:crs:EPSG::25830`) es rechazo. Se busca en
-  // TODO el documento, no solo en los `srsName`.
-  ningunaUrn: !/urn:/i.test(texto),
+  srsNamesEnUrn: srsNames.length > 0 && srsNames.every((s) => s === SRS_NAME_ESPERADO),
+  // La forma del otro perfil, buscada en TODO el documento y no solo en los
+  // `srsName`: si aparece, el fichero se ha construido con el sobre de descarga.
+  sinFormaDeDescarga: !texto.includes(SRS_NAME_DESCARGA),
   gmlBoundedBy: boundedBy.length,
   cpZoning: zoning.length,
   interiores: interiores.length,
-  beginLifespanVersion: (() => {
+  // En el perfil de ENTREGA va con `xsi:nil` y SIN texto, igual que en la
+  // plantilla oficial: la vigencia de la versión del objeto la fija el Catastro
+  // al inscribir, no el declarante al subir el fichero.
+  beginLifespanNil: (() => {
     const el = doc.getElementsByTagNameNS(NS_CP, 'beginLifespanVersion')[0]
-    return el === undefined ? null : el.textContent
+    if (el === undefined) return null
+    return el.getAttributeNS('http://www.w3.org/2001/XMLSchema-instance', 'nil')
+  })(),
+  beginLifespanTexto: (() => {
+    const el = doc.getElementsByTagNameNS(NS_CP, 'beginLifespanVersion')[0]
+    return el === undefined ? null : el.textContent.trim()
   })(),
   localId: (() => {
     const el = doc.getElementsByTagNameNS('http://inspire.ec.europa.eu/schemas/base/3.3', 'localId')[0]
@@ -575,22 +608,38 @@ const estructura = {
   })(),
 }
 
-if (!estructura.esFeatureCollectionWfs20) {
+if (!estructura.esFeatureCollectionEntrega) {
   problemas.push(
-    `La raíz no es {${NS_WFS}}FeatureCollection sino ` +
-      `{${raiz.namespaceURI}}${raiz.localName} (override O3).`,
+    `La raíz no es {${NS_GML}}FeatureCollection sino ` +
+      `{${raiz.namespaceURI}}${raiz.localName}. El fichero que se sube lleva la raíz de ` +
+      'GML 3.2, no la de WFS: el validador del IVG no carga el esquema de WFS.',
   )
 }
-if (!estructura.sinGmlFeatureCollection) {
+if (!estructura.sinNamespaceWfs) {
   problemas.push(
-    'El documento contiene `<gml:FeatureCollection`: es el dialecto viejo y el IVG lo ' +
-      'rechaza (override O3).',
+    `El documento cita el namespace de WFS 2.0 (${NS_WFS}). Ese es el sobre de la DESCARGA ` +
+      'del servicio, y es exactamente lo que la Sede rechazó el 2026-07-27.',
   )
 }
 if (estructura.miembros !== 1) {
   problemas.push(
-    `Se esperaba 1 <member> en el namespace de WFS 2.0 y hay ${estructura.miembros}.`,
+    `Se esperaba 1 <gml:featureMember> y hay ${estructura.miembros}.`,
   )
+}
+if (estructura.gmlIdRaiz === null || estructura.gmlIdRaiz === '') {
+  problemas.push('La raíz no lleva gml:id, y en GML 3.2 es obligatorio.')
+}
+for (const [nombre, valor] of [
+  ['numberMatched', estructura.numberMatched],
+  ['numberReturned', estructura.numberReturned],
+  ['timeStamp', estructura.timeStamp],
+]) {
+  if (valor !== null) {
+    problemas.push(
+      `La raíz lleva ${nombre}="${valor}". Esos atributos son de la respuesta de un ` +
+        'servicio WFS y no existen en el fichero que se sube.',
+    )
+  }
 }
 if (srsNames.length !== SRS_NAME_APARICIONES) {
   problemas.push(
@@ -598,16 +647,16 @@ if (srsNames.length !== SRS_NAME_APARICIONES) {
       `y hay ${srsNames.length}: ${JSON.stringify(srsNames)}.`,
   )
 }
-if (!estructura.srsNamesEnUriOgc) {
+if (!estructura.srsNamesEnUrn) {
   problemas.push(
-    `Algún srsName no es la URI OGC ${SRS_NAME_ESPERADO}: ${JSON.stringify(srsNames)} ` +
-      '(override O2).',
+    `Algún srsName no es la URN ${SRS_NAME_ESPERADO}: ${JSON.stringify(srsNames)}. Es la ` +
+      'forma que trae la plantilla oficial del Catastro.',
   )
 }
-if (!estructura.ningunaUrn) {
+if (!estructura.sinFormaDeDescarga) {
   problemas.push(
-    'El documento contiene una URN (`urn:…`). El override O2 exige URI OGC en los srsName ' +
-      'y la URN es rechazo del IVG.',
+    `El documento contiene ${SRS_NAME_DESCARGA}, que es la forma del srsName de la DESCARGA ` +
+      'del WFS. En una entrega no pinta nada: revisa el `perfil` con que se serializó.',
   )
 }
 if (estructura.gmlBoundedBy > 0) {
@@ -812,20 +861,21 @@ if (!geometriaIntacta) {
 const nombre = captura.nombreDelAncla
 const casaNombre = nombre === null ? null : RE_NOMBRE_FICHERO.exec(nombre)
 const marcaEnElNombre = casaNombre === null ? null : casaNombre[2]
-const marcaDelContenido =
-  estructura.beginLifespanVersion === null
-    ? null
-    : estructura.beginLifespanVersion.split(':').join('-')
-
+// ⚠️ Aquí se contrastaba la marca de tiempo del NOMBRE contra la del
+// `cp:beginLifespanVersion` del CONTENIDO. Ese cruce ya no existe: desde el
+// 2026-07-27 la entrega emite ese elemento con `xsi:nil`, así que dentro del
+// fichero no hay ninguna fecha con la que comparar. Lo que sí se comprueba es
+// que el elemento va nil DE VERDAD y vacío, que es lo que la plantilla oficial
+// hace — y que el renglón de estado nombra exactamente el fichero que baja, más
+// abajo, que es la promesa que de verdad importa para el usuario.
 const fichero = {
   nombre,
   formaValida: casaNombre !== null,
   segmentoReferencia: casaNombre === null ? null : casaNombre[1],
   segmentoReferenciaEsperado: esperado.segmentoNombre,
   marcaDeTiempoDelNombre: marcaEnElNombre,
-  beginLifespanVersionDelContenido: estructura.beginLifespanVersion,
-  // `gml/descargar.js` promete que el nombre y el contenido no pueden discrepar.
-  marcaCoincideConElContenido: marcaEnElNombre !== null && marcaEnElNombre === marcaDelContenido,
+  beginLifespanNil: estructura.beginLifespanNil,
+  beginLifespanTexto: estructura.beginLifespanTexto,
   tamanoBytes: buffer.byteLength,
 }
 
@@ -844,13 +894,17 @@ if (nombre === null) {
         `debería ser ${JSON.stringify(esperado.segmentoNombre)} en el ${esperado.descripcion}.`,
     )
   }
-  if (!fichero.marcaCoincideConElContenido) {
-    problemas.push(
-      `La marca de tiempo del NOMBRE (${marcaEnElNombre}) no es la del ` +
-        `cp:beginLifespanVersion del CONTENIDO (${estructura.beginLifespanVersion}): ` +
-        'emparejar el fichero con lo que lleva dentro deja de ser posible.',
-    )
+  if (marcaEnElNombre === null) {
+    problemas.push('El nombre del fichero no lleva marca de tiempo, y debería.')
   }
+}
+
+if (estructura.beginLifespanNil !== 'true' || estructura.beginLifespanTexto !== '') {
+  problemas.push(
+    `El cp:beginLifespanVersion debería ir con xsi:nil="true" y sin texto, como en la ` +
+      `plantilla oficial del Catastro; trae nil=${JSON.stringify(estructura.beginLifespanNil)} ` +
+      `y texto ${JSON.stringify(estructura.beginLifespanTexto)}.`,
+  )
 }
 
 const estadoRenglon = {

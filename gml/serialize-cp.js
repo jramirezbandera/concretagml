@@ -2,15 +2,44 @@
 //
 // Aquí se escribe el fichero que el usuario sube a la Sede Electrónica. Es la
 // pieza de MAYOR RIESGO del proyecto y el motivo es asimétrico: un GML mal
-// formado lo caza cualquiera, pero un GML *bien formado y mal hecho* —la URN en
-// vez de la URI, el anillo antihorario, el `gml:id` que empieza por dígito, dos
-// hijos permutados— sale sin una sola queja de ninguna herramienta local y muere
-// en el validador del IVG, semanas después, con un mensaje que no dice qué pasa.
-// De ahí que este módulo no invente NADA: cada namespace, cada atributo, cada
-// anidamiento y hasta el orden en que se escriben los atributos de la raíz salen
-// de `test/fixtures/gml/cp_parcela_9398516VK3799G.gml`, el GML real del WFS
-// (regla de oro 8). Donde el dossier y el fichero real discrepan, manda el
-// fichero real; los dos puntos donde eso ocurre están anotados abajo.
+// formado lo caza cualquiera, pero un GML *bien formado y mal hecho* sale sin una
+// sola queja de ninguna herramienta local y muere en el validador del IVG,
+// semanas después, con un mensaje que no dice qué pasa. De ahí que este módulo no
+// invente NADA: cada namespace, cada atributo, cada anidamiento y hasta el orden
+// en que se escriben los atributos de la raíz salen de un fichero real de
+// `test/fixtures/gml/` (regla de oro 8).
+//
+// ═════════════════════════════════════════════════════════════════════════════
+// ⚠️ EL FALLO DEL 2026-07-27, QUE ES EL MOTIVO DE QUE EXISTA `perfil`
+// ═════════════════════════════════════════════════════════════════════════════
+// La primera versión de este módulo copió `cp_parcela_9398516VK3799G.gml`. Ese
+// fichero es la RESPUESTA del WFS del Catastro, y la Sede rechazó lo que salió de
+// aquí: «El archivo no cumple el esquema Inspire GML».
+//
+// La causa, medida contra los XSD oficiales con libxml2, cabe en una línea:
+//
+//     Element '{http://www.opengis.net/wfs/2.0}FeatureCollection':
+//     No matching global declaration available for the validation root.
+//
+// El validador del IVG carga el esquema de PARCELA (`cp/4.0`), no el de WFS. La
+// raíz `wfs:FeatureCollection` no existe ahí y el documento muere en la primera
+// línea, sin llegar a mirar la geometría — que estaba bien.
+//
+// La descarga y la entrega son DOS DIRECCIONES del mismo formato, y el fichero
+// que las distingue es `cp_ejemplo_explicativo.gml`: la plantilla que el propio
+// Catastro publica y que sus instrucciones mandan usar para generar el fichero
+// que se sube. De ahí {@link PERFIL}:
+//
+//   · `PERFIL.ENTREGA` (POR DEFECTO) — `gml:FeatureCollection` +
+//     `gml:featureMember`, `srsName` en URN, `xsi:schemaLocation` solo de cp/4.0,
+//     sin atributos de WFS. Es lo que baja la app. Derivado de la plantilla.
+//   · `PERFIL.WFS` — el sobre de la descarga. Existe para reproducir el fichero
+//     del Catastro en el test de ida y vuelta, que es lo que demuestra que los
+//     NÚMEROS son correctos. No se puede subir, y el módulo lo dice.
+//
+// Lo que cambia entre perfiles es SOLO el sobre: el interior del
+// `cp:CadastralParcel` es idéntico. Toda la aritmética, los identificadores y el
+// orden XSD son comunes, y por eso el fallo no tocó ni una línea de `anillos.js`.
 //
 // ═════════════════════════════════════════════════════════════════════════════
 // LAS TRES DECISIONES DE DISEÑO, Y POR QUÉ
@@ -37,23 +66,29 @@
 // invitación a subirlo, y subir lo que sabemos que rechaza el IVG es peor que no
 // darle nada. Misma decisión que `importar()` toma con `parcela: null`.
 //
-// ── 3 · `beginLifespanVersion` es OBLIGATORIO; `timeStamp` es opcional ───────
+// ── 3 · La fecha ENTRA POR PARÁMETRO; el módulo no consulta el reloj ─────────
 // Ni este módulo ni ningún otro de `gml/` consultan la marca de tiempo del
 // sistema. El motivo es el test de ida y vuelta (T4.1): compara un GML ENTERO
 // contra un snapshot, y con el reloj metido dentro del serializador el fichero
-// cambiaría en cada ejecución y ese test no podría afirmar nada. Así que la fecha
-// entra por parámetro:
-//   · `beginLifespanVersion` es obligatorio y se valida con
-//     {@link RE_DATETIME_CATASTRO} (`TypeError` si falta o no casa). Es un
-//     elemento SIN `minOccurs` en el XSD: obligatorio de verdad, y no hay ningún
-//     valor por defecto honesto que este módulo pueda poner en su lugar.
-//   · `timeStamp` (atributo de la raíz WFS) solo se emite si se aporta. En el
-//     fixture está porque lo puso el servidor al responder la petición; un
-//     fichero que genera el técnico para SUBIRLO no tiene por qué llevarlo.
-// Quien necesite «ahora» lo obtiene en la capa de aplicación, formateándolo con
+// cambiaría en cada ejecución y ese test no podría afirmar nada. Quien necesite
+// «ahora» lo obtiene en la capa de aplicación, formateándolo con
 // `dateTimeCatastro(…)` de `gml/_comun.js`, y lo pasa hacia abajo. Hay un test
 // que vigila esta frontera con un grep sobre el TEXTO de este fichero, así que
 // las llamadas al reloj no deben aparecer ni siquiera dentro de un comentario.
+//
+// `cp:beginLifespanVersion` es un elemento SIN `minOccurs` en el XSD: hay que
+// emitirlo siempre. Pero QUÉ se emite depende del perfil, y la diferencia es una
+// afirmación sobre el mundo, no un detalle de formato:
+//   · `PERFIL.WFS` — dateTime OBLIGATORIO. El fichero reproduce un dato del
+//     Catastro, que sabe desde cuándo rige esa versión del objeto.
+//   · `PERFIL.ENTREGA` — dateTime OPCIONAL. Sin él sale
+//     `<cp:beginLifespanVersion xsi:nil="true" nilReason="other:unpopulated"/>`,
+//     que es EXACTAMENTE lo que trae la plantilla oficial. Y es lo honesto: en un
+//     alta, la versión del objeto todavía no ha empezado a regir — poner la fecha
+//     de hoy sería afirmar algo que decide el Catastro, no el declarante.
+// `timeStamp` (atributo de la raíz WFS) solo existe en `PERFIL.WFS`: es la marca
+// que pone el servidor al responder. Pasarlo en una entrega es un `TypeError`,
+// no un valor ignorado en silencio.
 //
 // ═════════════════════════════════════════════════════════════════════════════
 // LA IDENTIDAD DE LA PARCELA: `refcat` FRENTE A `nationalCadastralReference`
@@ -105,14 +140,23 @@
 // ═════════════════════════════════════════════════════════════════════════════
 // DONDE EL FICHERO REAL CORRIGE A LA DOCUMENTACIÓN
 // ═════════════════════════════════════════════════════════════════════════════
-// `numberMatched` / `numberReturned` SÍ se emiten. La plantilla anotada del
-// dossier los omite; el XSD de WFS 2.0 los declara `use="required"` en
-// `FeatureCollection` y el fichero real del WFS los trae. Manda el fichero
+// `numberMatched` / `numberReturned` se emiten en `PERFIL.WFS`. La plantilla
+// anotada del dossier los omite; el XSD de WFS 2.0 los declara `use="required"`
+// en `FeatureCollection` y el fichero real del WFS los trae. Manda el fichero
 // (regla de oro 8). Se derivan del nº de miembros, que hoy es siempre 1
-// (multiparcela está fuera de alcance, SPEC §1).
+// (multiparcela está fuera de alcance, SPEC §1). En `PERFIL.ENTREGA` no existen:
+// la raíz no es de WFS y esos atributos no están declarados en ningún sitio.
+//
+// El `gml:id` de la raíz (solo en `PERFIL.ENTREGA`, donde la raíz hereda de
+// `gml:AbstractGML` y lo exige) es el NAMESPACE INSPIRE —`ES.LOCAL.CP`— y no la
+// identidad de la parcela. No es cosmético: `gml:id` es de tipo `xs:ID`, único en
+// todo el documento, y `UTM_1.gml` repite el mismo valor en la raíz y en el
+// `cp:CadastralParcel`. Comprobado mutando nuestra salida: con el id repetido el
+// validador responde «'…' is not a valid value of the atomic type 'xs:ID'». La
+// plantilla oficial usa el namespace, y por eso lo usamos.
 //
 // ═════════════════════════════════════════════════════════════════════════════
-// TRES DIFERENCIAS DE TEXTO CON EL FIXTURE, TODAS DELIBERADAS
+// TRES DIFERENCIAS DE TEXTO CON EL FIXTURE DEL WFS, TODAS DELIBERADAS
 // ═════════════════════════════════════════════════════════════════════════════
 // Ninguna cambia el DATO; están escritas aquí para que nadie las «corrija»
 // copiando el fichero del WFS carácter a carácter.
@@ -155,10 +199,12 @@
 
 import {
   NS,
-  SCHEMA_LOCATION,
   ORDEN_CADASTRAL_PARCEL,
+  PERFIL,
+  PERFILES,
   SEVERIDAD,
-  srsNameUri,
+  perfilPorId,
+  srsNamePorForma,
 } from './_comun.js'
 import { elem, render } from './xml.js'
 import { DECIMALES_COORD, cerrarAnillo, prepararRecintos, puntoInterior } from './anillos.js'
@@ -176,14 +222,28 @@ import { NAMESPACE_INSPIRE_DEFECTO, idsDeParcela } from './ids.js'
 export const DECLARACION_XML = '<?xml version="1.0" encoding="UTF-8"?>'
 
 /**
- * `nilReason` de `cp:endLifespanVersion`, copiado del fixture 4.0. Es la URI del
- * code list de INSPIRE, no la forma corta `other:unpopulated` que usa el GML 3.0
- * de `UTM_1.gml`: el dialecto que este proyecto emite es el 4.0 del WFS.
+ * `nilReason` de `cp:endLifespanVersion`, copiado del fixture del WFS. Es la URI
+ * del code list de INSPIRE. Solo se usa en `PERFIL.WFS`, que es el único que
+ * emite ese elemento.
  *
  * @readonly
  */
 export const NIL_REASON_END_LIFESPAN =
   'http://inspire.ec.europa.eu/codelist/VoidReasonValue/Unpopulated'
+
+/**
+ * `nilReason` del `cp:beginLifespanVersion` vacío de una ENTREGA, copiado LETRA A
+ * LETRA de `cp_ejemplo_explicativo.gml`.
+ *
+ * Es la forma CORTA (`other:unpopulated`), no la URI larga del code list que usa
+ * el WFS para su `endLifespanVersion`. Que convivan las dos formas en el mismo
+ * proyecto no es un descuido: cada una está copiada del fichero que la usa, y
+ * unificarlas «por coherencia» sería preferir nuestro criterio al de los ficheros
+ * reales, que es justo lo que prohíbe la regla de oro 8.
+ *
+ * @readonly
+ */
+export const NIL_REASON_BEGIN_LIFESPAN = 'other:unpopulated'
 
 /**
  * Unidad del `cp:areaValue` (override O6: entero, `uom="m2"`).
@@ -229,24 +289,33 @@ const MIEMBROS = 1
  * @property {import('./anillos.js').Recinto[]} recintos  Anillos ABIERTOS en UTM
  *   (regla de oro 4), `recintos[0]` EXTERIOR y el resto HUECO. En float64
  *   completo: el redondeo a 2 decimales lo hace este módulo, no el llamante.
- * @property {string} srs  Forma corta del SRS (`'EPSG:25830'`…). Se traduce a la
- *   URI OGC con `srsNameUri` (override O2).
+ * @property {string} srs  Forma corta del SRS (`'EPSG:25830'`…). Se traduce a URN
+ *   o a URI según el perfil, con `srsNamePorForma`.
  * @property {string} refcat  IDENTIDAD de la parcela: referencia catastral si la
  *   hay, o el `idLocal` del modelo si es un alta que aún no la tiene. Ver la
  *   cabecera. NO es lo mismo que `nationalCadastralReference`.
- * @property {string} beginLifespanVersion  dateTime en el formato de
- *   {@link RE_DATETIME_CATASTRO}. OBLIGATORIO (ver la cabecera, decisión 3).
+ * @property {'ENTREGA'|'WFS'} [perfil='ENTREGA']  Qué SOBRE se escribe. Ver
+ *   {@link PERFILES} y la cabecera del módulo. El defecto es el fichero que se
+ *   sube a la Sede, porque es para lo que existe esta herramienta.
+ * @property {string|null} [beginLifespanVersion=null]  dateTime en el formato de
+ *   {@link RE_DATETIME_CATASTRO}. OBLIGATORIO en `PERFIL.WFS`; en
+ *   `PERFIL.ENTREGA` es opcional y su ausencia emite el elemento con
+ *   `xsi:nil="true"`, como la plantilla oficial (ver la cabecera, decisión 3).
  * @property {string} [namespaceInspire='ES.LOCAL.CP']  Namespace INSPIRE.
- *   `ES.LOCAL.CP` para el alta de un particular; `ES.SDGC.CP` para el dato
- *   oficial (round-trip).
+ *   `ES.LOCAL.CP` para el alta de un particular; `ES.SDGC.CP` cuando el `localId`
+ *   ES una referencia catastral real (así lo exige la FAQ del Catastro).
  * @property {string} [label='']  `cp:label`. Vacío en un alta: sale `<cp:label/>`.
  * @property {string} [nationalCadastralReference='']  Referencia catastral
  *   OFICIAL. Vacío por defecto a propósito (ver la cabecera).
  * @property {[number, number]|null} [puntoReferencia=null]  Punto propuesto para
- *   el `cp:referencePoint`. Se VERIFICA: si no cae dentro se descarta con una
- *   detección y se calcula otro.
- * @property {string|null} [timeStamp=null]  Atributo `timeStamp` de la raíz. Solo
- *   se emite si se aporta; mismo formato que `beginLifespanVersion`.
+ *   el `cp:referencePoint`. Se VERIFICA siempre: si no cae dentro se descarta con
+ *   una detección y se calcula otro. OJO: en `PERFIL.ENTREGA` el punto se calcula
+ *   y se devuelve en `resumen` pero NO se escribe en el fichero, porque la
+ *   plantilla oficial no lo trae (ver {@link PERFILES}).
+ * @property {string|null} [timeStamp=null]  Atributo `timeStamp` de la raíz.
+ *   EXCLUSIVO de `PERFIL.WFS`: en una entrega es un `TypeError`, porque esa raíz
+ *   no admite el atributo y aceptarlo en silencio sería emitir un fichero
+ *   distinto del que el llamante cree haber pedido.
  * @property {string|string[]|null} [comentario=null]  Comentario(s) del prólogo,
  *   como los dos que el WFS pone en su fichero. Sin `--` dentro y sin terminar
  *   en `-`, que es lo que XML prohíbe en un comentario.
@@ -271,8 +340,13 @@ const MIEMBROS = 1
  * @property {boolean} emitido  `true` si `xml` es un documento (sin bloqueos).
  * @property {string[]} bloqueos  Tipos de las detecciones de severidad ERROR, sin
  *   repetir y en orden de aparición. Vacío si se emitió.
+ * @property {'ENTREGA'|'WFS'} perfil  Sobre que se ha escrito.
+ * @property {boolean} subibleALaSede  `true` solo en `PERFIL.ENTREGA`. Existe
+ *   para que la UI no tenga que saberse la tabla de perfiles: un fichero del
+ *   perfil WFS es perfectamente válido y NO se puede subir, y eso hay que poder
+ *   decirlo sin razonarlo en cada llamante.
  * @property {string} srs         Forma corta recibida.
- * @property {string} srsName     URI OGC emitida (override O2).
+ * @property {string} srsName     `srsName` emitido, en la forma del perfil.
  * @property {string} namespaceInspire
  * @property {string} localId     Lo que va en `<localId>`: es `refcat`.
  * @property {import('./ids.js').IdsParcela} ids  Los cuatro `gml:id` emitidos.
@@ -287,10 +361,13 @@ const MIEMBROS = 1
  * @property {boolean[]} invertidos  Anillos cuyo sentido hubo que normalizar (O1).
  * @property {Array<-1|1>} orientacionOriginal  Orientación medida antes de normalizar.
  * @property {{punto: [number, number]|null, origen: string|null}} puntoReferencia
- * @property {string} beginLifespanVersion
+ *   Se rellena SIEMPRE, aunque el perfil no lo escriba: la UI lo necesita para
+ *   poder dibujarlo y para explicar que se recalculó.
+ * @property {boolean} referencePointEmitido  Si además fue AL FICHERO.
+ * @property {string|null} beginLifespanVersion  `null` si se emitió con `xsi:nil`.
  * @property {string|null} timeStamp  `null` si no se emitió.
- * @property {number} numberMatched
- * @property {number} numberReturned
+ * @property {number|null} numberMatched   `null` fuera de `PERFIL.WFS`.
+ * @property {number|null} numberReturned  `null` fuera de `PERFIL.WFS`.
  * @property {RecuentoDetecciones} detecciones
  */
 
@@ -513,18 +590,41 @@ function nodoGeometria(recintos, srsName, ids) {
 }
 
 /**
- * `cp:inspireId` (override O4): `<Identifier>` con el namespace de base 3.3 como
- * `xmlns` POR DEFECTO y SIN prefijo `base:`. El `base:` es de la 3.2, va con el
- * CP 3.0 (así lo escribe `UTM_1.gml`) y produce rechazo en 4.0.
+ * `cp:inspireId`. Los dos perfiles usan el MISMO namespace —INSPIRE base 3.3— y
+ * se diferencian solo en cómo lo declaran, porque así lo hace cada fichero real:
  *
- * `localId` y `namespace` no llevan prefijo: heredan el default del `Identifier`,
- * igual que en el fixture.
+ *   · `ENTREGA` — `xmlns:base` en el `cp:inspireId` y prefijo `base:` en los tres
+ *     elementos. Copiado de `cp_ejemplo_explicativo.gml`.
+ *   · `WFS` — `xmlns` POR DEFECTO en el `<Identifier>`, sin prefijo. Copiado de
+ *     `cp_parcela_9398516VK3799G.gml`.
+ *
+ * ⚠️ CORRECCIÓN DEL OVERRIDE O4. El dossier afirmaba que el prefijo `base:`
+ * «produce rechazo en 4.0». Es FALSO, y conviene entender por qué para no volver
+ * a escribirlo: en XML un prefijo no es información. `<base:Identifier
+ * xmlns:base="…/base/3.3">` y `<Identifier xmlns="…/base/3.3">` son el MISMO
+ * elemento para cualquier validador — el infoset solo guarda la URI del
+ * namespace. La plantilla oficial usa `base:` y valida (medido). Lo que sí
+ * importa es la VERSIÓN del namespace: base 3.2 (`urn:x-inspire:…:BaseTypes:3.2`)
+ * es del CP 3.0 y esa sí es otra cosa.
+ *
+ * Se conservan las dos formas, en vez de unificarlas, por la regla de oro 8: cada
+ * perfil escribe lo que escribe su fichero de referencia, y el round-trip lo
+ * comprueba byte a byte.
  *
  * @param {string} localId
  * @param {string} namespaceInspire
+ * @param {import('./_comun.js').PerfilEmision} perfil
  * @returns {import('./xml.js').NodoSalida}
  */
-function nodoInspireId(localId, namespaceInspire) {
+function nodoInspireId(localId, namespaceInspire, perfil) {
+  if (perfil.id === PERFIL.ENTREGA) {
+    return elem('cp:inspireId', [['xmlns:base', NS.base33]], [
+      elem('base:Identifier', [], [
+        elem('base:localId', [], localId),
+        elem('base:namespace', [], namespaceInspire),
+      ]),
+    ])
+  }
   return elem('cp:inspireId', [], [
     elem('Identifier', [['xmlns', NS.base33]], [
       elem('localId', [], localId),
@@ -562,29 +662,42 @@ function nodoReferencePoint(punto, srsName, ids) {
 }
 
 /**
- * Atributos de la raíz, EN EL ORDEN del fichero real (regla de oro 8): las cinco
- * declaraciones con prefijo, el `xsi:schemaLocation`, el `xmlns` por defecto —que
- * es el de WFS 2.0, override O3— y por último los tres atributos de la respuesta.
+ * Atributos de la raíz, EN EL ORDEN del fichero real de cada perfil (regla de oro
+ * 8). Los prefijos que se declaran y su orden salen de `perfil.prefijosRaiz`, no
+ * de una lista escrita aquí: así hay UN solo sitio donde mirar qué escribe cada
+ * perfil, y el test lo puede contrastar contra el fixture correspondiente.
  *
- * El namespace de base 3.3 NO se declara aquí: vive en el `<Identifier>`, que es
- * donde lo pone el Catastro. `xlink` y `gmd` se declaran aunque el documento no
- * los use en ningún elemento, también por fidelidad al fichero real.
+ * Diferencias entre los dos, todas leídas de sus ficheros:
+ *   · ENTREGA — `gml:id` PRIMERO (la raíz `gml:FeatureCollection` hereda de
+ *     `gml:AbstractGML`, donde `gml:id` es obligatorio) y ningún `xmlns` por
+ *     defecto: la raíz va prefijada. Sin atributos de respuesta.
+ *   · WFS — sin `gml:id`, con `xmlns` por defecto = WFS 2.0, y con
+ *     `timeStamp`/`numberMatched`/`numberReturned` al final.
  *
+ * El namespace de base 3.3 no se declara aquí en ninguno de los dos: vive en el
+ * `inspireId`, que es donde lo ponen los ficheros del Catastro. `xlink`, `gmd` y
+ * `ogc` se declaran aunque el documento no los use en ningún elemento, también
+ * por fidelidad.
+ *
+ * @param {import('./_comun.js').PerfilEmision} perfil
  * @param {string|null} timeStamp
+ * @param {string} gmlIdRaiz  Solo se usa si `perfil.raizLlevaGmlId`.
  * @returns {Array<[string, string]>}
  */
-function atributosRaiz(timeStamp) {
-  const atributos = [
-    ['xmlns:xsi', NS.xsi],
-    ['xmlns:gml', NS.gml],
-    ['xmlns:xlink', NS.xlink],
-    ['xmlns:cp', NS.cp],
-    ['xmlns:gmd', NS.gmd],
-    ['xsi:schemaLocation', SCHEMA_LOCATION],
-    ['xmlns', NS.wfs],
-  ]
-  if (timeStamp !== null) atributos.push(['timeStamp', timeStamp])
-  atributos.push(['numberMatched', String(MIEMBROS)], ['numberReturned', String(MIEMBROS)])
+function atributosRaiz(perfil, timeStamp, gmlIdRaiz) {
+  const atributos = []
+  if (perfil.raizLlevaGmlId) atributos.push(['gml:id', gmlIdRaiz])
+  for (const prefijo of perfil.prefijosRaiz) atributos.push([`xmlns:${prefijo}`, NS[prefijo]])
+  atributos.push(['xsi:schemaLocation', perfil.schemaLocation])
+  // El `xmlns` por defecto se declara si —y solo si— la raíz del perfil va SIN
+  // prefijo, que es lo que la obliga a estar en el namespace por defecto. Se
+  // deduce del propio nombre en vez de con una bandera aparte: así no puede
+  // quedar una bandera diciendo una cosa y el nombre del elemento otra.
+  if (!perfil.raiz.includes(':')) atributos.push(['xmlns', perfil.raizNs])
+  if (perfil.atributosWfs) {
+    if (timeStamp !== null) atributos.push(['timeStamp', timeStamp])
+    atributos.push(['numberMatched', String(MIEMBROS)], ['numberReturned', String(MIEMBROS)])
+  }
   return atributos
 }
 
@@ -644,7 +757,8 @@ export function serializarParcelaCp(opciones = {}) {
     recintos,
     srs,
     refcat,
-    beginLifespanVersion,
+    perfil: idPerfil = PERFIL.ENTREGA,
+    beginLifespanVersion = null,
     namespaceInspire = NAMESPACE_INSPIRE_DEFECTO,
     label = '',
     nationalCadastralReference = '',
@@ -655,15 +769,36 @@ export function serializarParcelaCp(opciones = {}) {
   } = opciones
 
   // ── 1 · Contrato ──────────────────────────────────────────────────────────
-  // `srsNameUri` valida el SRS y hace la traducción del override O2 de una vez:
-  // no hay una segunda tabla aquí que pudiera divergir de la suya.
-  const srsName = srsNameUri(srs)
+  // El perfil se resuelve LO PRIMERO: de él dependen la forma del `srsName`, qué
+  // fechas son obligatorias y qué elementos se emiten.
+  const perfil = perfilPorId(idPerfil)
 
-  exigirDateTime(beginLifespanVersion, 'beginLifespanVersion')
-  // `timeStamp` es lo ÚNICO opcional de las dos fechas: solo se valida —y solo se
-  // emite— si se aporta. El `null` del destructuring cubre también el
-  // `timeStamp: undefined` explícito, así que aquí basta comparar con `null`.
-  if (timeStamp !== null) exigirDateTime(timeStamp, 'timeStamp')
+  // `srsNamePorForma` valida el SRS y hace la traducción de una vez: no hay una
+  // segunda tabla aquí que pudiera divergir de la de `_comun.js`.
+  const srsName = srsNamePorForma(srs, perfil.formaSrsName)
+
+  // La fecha del `beginLifespanVersion`: obligatoria en la descarga, opcional en
+  // la entrega. Ver la decisión 3 de la cabecera — no es un capricho de formato,
+  // es que en un alta esa fecha todavía no existe.
+  if (perfil.id === PERFIL.WFS || beginLifespanVersion !== null) {
+    exigirDateTime(beginLifespanVersion, 'beginLifespanVersion')
+  }
+
+  // `timeStamp` es de la respuesta del servicio y no existe fuera de ella. Se
+  // LANZA en vez de ignorarlo: quien lo pasa cree que va a salir en el fichero, y
+  // descubrirlo al subirlo a la Sede es exactamente el modo de fallo que este
+  // módulo persigue (regla de oro 1).
+  if (timeStamp !== null) {
+    if (!perfil.atributosWfs) {
+      throw new TypeError(
+        `serializarParcelaCp: 'timeStamp' no existe en el perfil ${perfil.id}. Es un atributo ` +
+          `de la raíz «${PERFILES[PERFIL.WFS].raiz}», que marca cuándo respondió el servicio; ` +
+          `un fichero que se SUBE a la Sede no responde a ninguna petición y su raíz ` +
+          `(«${PERFILES[PERFIL.ENTREGA].raiz}») no admite el atributo.`,
+      )
+    }
+    exigirDateTime(timeStamp, 'timeStamp')
+  }
 
   exigirTexto(
     refcat,
@@ -717,6 +852,8 @@ export function serializarParcelaCp(opciones = {}) {
   const resumen = {
     emitido: bloqueos.length === 0,
     bloqueos,
+    perfil: perfil.id,
+    subibleALaSede: perfil.id === PERFIL.ENTREGA,
     srs,
     srsName,
     namespaceInspire,
@@ -730,10 +867,11 @@ export function serializarParcelaCp(opciones = {}) {
     invertidos: preparados.invertidos,
     orientacionOriginal: preparados.orientacionOriginal,
     puntoReferencia: { punto: referencia.punto, origen: referencia.origen },
+    referencePointEmitido: perfil.emiteReferencePoint,
     beginLifespanVersion,
     timeStamp,
-    numberMatched: MIEMBROS,
-    numberReturned: MIEMBROS,
+    numberMatched: perfil.atributosWfs ? MIEMBROS : null,
+    numberReturned: perfil.atributosWfs ? MIEMBROS : null,
     detecciones: contarDetecciones(detecciones),
   }
 
@@ -750,32 +888,51 @@ export function serializarParcelaCp(opciones = {}) {
   // deliberado: si coincidieran, el día que alguien reordenara estas líneas el
   // documento seguiría saliendo bien y nadie sabría que el orden estaba
   // sostenido por una casualidad.
+  // `cp:beginLifespanVersion` sale con valor o con `xsi:nil`; los otros dos
+  // opcionales sólo existen en el perfil que los tiene (ver {@link PERFILES}).
+  // `filter(Boolean)` NO puede tragarse nada por descuido: `elem` siempre
+  // devuelve objeto, así que lo único falsy de esta lista son los `null`
+  // escritos aquí a propósito.
   const hijos = ordenarSegunXsd(
     [
-      nodoInspireId(refcat, namespaceInspire),
+      nodoInspireId(refcat, namespaceInspire, perfil),
       elem('cp:label', [], label),
       elem('cp:nationalCadastralReference', [], nationalCadastralReference),
-      elem('cp:beginLifespanVersion', [], beginLifespanVersion),
-      elem(
-        'cp:endLifespanVersion',
-        [
-          ['xsi:nil', 'true'],
-          ['nilReason', NIL_REASON_END_LIFESPAN],
-        ],
-        null,
-      ),
+      beginLifespanVersion === null
+        ? elem(
+            'cp:beginLifespanVersion',
+            [
+              ['xsi:nil', 'true'],
+              ['nilReason', NIL_REASON_BEGIN_LIFESPAN],
+            ],
+            null,
+          )
+        : elem('cp:beginLifespanVersion', [], beginLifespanVersion),
+      perfil.emiteEndLifespan
+        ? elem(
+            'cp:endLifespanVersion',
+            [
+              ['xsi:nil', 'true'],
+              ['nilReason', NIL_REASON_END_LIFESPAN],
+            ],
+            null,
+          )
+        : null,
       nodoGeometria(preparados.recintos, srsName, ids),
-      nodoReferencePoint(referencia.punto, srsName, ids),
+      perfil.emiteReferencePoint ? nodoReferencePoint(referencia.punto, srsName, ids) : null,
       elem('cp:areaValue', [['uom', UOM_AREA]], String(preparados.areaValue)),
-    ],
+    ].filter(Boolean),
     ORDEN_CADASTRAL_PARCEL,
   )
 
-  const raiz = elem('FeatureCollection', atributosRaiz(timeStamp), [
-    elem('member', [], [
-      elem('cp:CadastralParcel', [['gml:id', ids.parcela]], hijos),
-    ]),
-  ])
+  const raiz = elem(
+    perfil.raiz,
+    // El `gml:id` de la RAÍZ es el namespace INSPIRE saneado, no la identidad de
+    // la parcela: `xs:ID` es único en el documento y repetirlo invalida el
+    // fichero entero (ver la cabecera). Lo compone `gml/ids.js` como los demás.
+    atributosRaiz(perfil, timeStamp, ids.coleccion),
+    [elem(perfil.miembro, [], [elem('cp:CadastralParcel', [['gml:id', ids.parcela]], hijos)])],
+  )
 
   // ── 7 · Texto ─────────────────────────────────────────────────────────────
   // El prólogo es lo único que no pasa por `render` (no son elementos). Los

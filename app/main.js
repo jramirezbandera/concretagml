@@ -56,27 +56,35 @@
 // el reloj. Eso deja cuatro decisiones huérfanas que sólo pueden tomarse aquí, y
 // las cuatro están tomadas en {@link cablearGeneracionGml}:
 //
-//   1. LA FECHA. `dateTimeCatastro(new Date())` se llama AQUÍ y baja como
-//      `beginLifespanVersion`. No es manía: es lo que permite que el test de ida
-//      y vuelta de F04 compare un GML entero contra un snapshot — con el reloj
-//      dentro del serializador, el fichero cambiaría en cada ejecución. El MISMO
-//      instante va a `descargarGml`, para que la marca de tiempo del nombre del
-//      fichero y la de su contenido no puedan discrepar.
+//   1. LA FECHA. El reloj se lee AQUÍ, en `ahora()`, y el MISMO instante va al
+//      nombre del fichero. Lo que NO baja es un `beginLifespanVersion`: en el
+//      perfil de entrega ese elemento sale con `xsi:nil`, como en la plantilla
+//      oficial del Catastro, porque la vigencia de la versión del objeto la fija
+//      el Catastro al inscribir, no el declarante al subir (ver
+//      `gml/serialize-cp.js`, decisión 3). Que `gml/` no consulte el reloj sigue
+//      siendo la regla, y es lo que permite que el test de ida y vuelta compare
+//      un GML entero contra un snapshot.
 //
 //   2. LA IDENTIDAD. `serializarParcelaCp` EXIGE `refcat` y no se la inventa;
 //      `model/parcela.js` tiene `refcat` (que puede ser `null`) y `idLocal` (que
 //      nunca lo es). Resolver `refcat ?? idLocal` es de esta capa, y por eso
 //      `gml/` no necesita importar `model/`.
 //
-//   3. EL NAMESPACE INSPIRE. Se deja el defecto `ES.LOCAL.CP` A PROPÓSITO, y no
-//      se pone `ES.SDGC.CP` aunque la parcela de demostración venga del Catastro:
-//      el fichero que genera el usuario es SU DECLARACIÓN de alta, no el dato
-//      oficial de la Sede. `ES.SDGC.CP` es del round-trip (leer el GML del WFS y
-//      volver a escribirlo), que es otro caso de uso y vive en los tests.
-//      Por lo mismo `nationalCadastralReference` se deja VACÍO: rellenarlo con la
-//      referencia convertiría un alta en una declaración falsa de inscripción.
+//   3. LA IDENTIDAD INSPIRE — `namespaceInspire` + `nationalCadastralReference`.
+//      ⚠️ CORREGIDO el 2026-07-27. Aquí se fijaba `ES.LOCAL.CP` SIEMPRE y
+//      `nationalCadastralReference` vacío, razonando que rellenarlo «convertiría
+//      un alta en una declaración falsa de inscripción». El razonamiento tenía
+//      buena intención y la conclusión era incoherente: con una referencia
+//      catastral real de `localId` bajo `ES.LOCAL.CP`, el fichero afirmaba a la
+//      vez «esta es su referencia catastral» y «esta parcela no está en el
+//      Catastro». La FAQ del Catastro empareja los dos campos y no los deja
+//      elegir por separado. Ver {@link identidadInspireDe}.
 //
-//   4. LA TRADUCCIÓN DE SEVERIDADES. `gml/` habla de tres (INFO/AVISO/ERROR) y
+//   4. EL PERFIL DEL FICHERO. `PERFIL.ENTREGA`, explícito. Es la decisión que
+//      hace que la Sede acepte el fichero en vez de rechazarlo, y no puede
+//      quedarse dependiendo del valor por omisión de otro módulo.
+//
+//   5. LA TRADUCCIÓN DE SEVERIDADES. `gml/` habla de tres (INFO/AVISO/ERROR) y
 //      el panel de dos (ver {@link NIVEL_POR_SEVERIDAD}).
 //
 // ⚠️ `gml/descargar.js` se importa DIRECTAMENTE, igual que `viewer/index.js` y
@@ -135,8 +143,9 @@
 import 'leaflet/dist/leaflet.css'
 
 import { superficie } from '../geo/area.js'
-import { SEVERIDAD, dateTimeCatastro } from '../gml/_comun.js'
+import { PERFIL, SEVERIDAD } from '../gml/_comun.js'
 import { descargarGml } from '../gml/descargar.js'
+import { NAMESPACE_INSPIRE_CATASTRO, NAMESPACE_INSPIRE_DEFECTO } from '../gml/ids.js'
 import { serializarParcelaCp } from '../gml/serialize-cp.js'
 import { validarParcela } from '../validation/parcela.js'
 import { crearEstadoVista, NIVEL } from '../viewer/_comun.js'
@@ -446,6 +455,51 @@ function identidadDe(parcelaActual) {
 }
 
 /**
+ * La pareja `localId` ↔ `namespace` del `inspireId`, que la FAQ del Catastro fija
+ * y que hasta el 2026-07-27 esta app incumplía.
+ *
+ * La regla, literal («¿Cómo nombrar las parcelas dentro de un GML de parcela
+ * catastral?»):
+ *
+ *   · «Si la parcela está inscrita en las bases de datos de catastro, o se desea
+ *     conservar la referencia catastral […], el valor del atributo identificativo
+ *     localId será la referencia catastral y el valor del atributo namespace
+ *     empleado será ES.SDGC.CP.»
+ *   · «Si la parcela no existe en la base de datos de catastro se deberá emplear
+ *     el valor del atributo namespace ES.LOCAL.CP y un identificador unívoco
+ *     dentro del negocio jurídico.»
+ *
+ * O sea: los dos campos son UNA sola afirmación, no dos ajustes independientes.
+ * La app venía poniendo la referencia catastral real como `localId` bajo
+ * `ES.LOCAL.CP`, que dice a la vez «esta es su referencia catastral» y «esta
+ * parcela no existe en el Catastro». Eso no era una preferencia discutible: era
+ * una contradicción dentro del mismo elemento.
+ *
+ * `nationalCadastralReference` acompaña al namespace y no se decide aparte,
+ * porque afirma exactamente lo mismo que `ES.SDGC.CP`: que la finca está inscrita
+ * con esa referencia. Dejarlo vacío junto a `ES.SDGC.CP` sería volver a partir en
+ * dos una única afirmación.
+ *
+ * El caso normal de esta herramienta es el segundo párrafo de arriba y a la vez
+ * el primero: una RGA **alternativa** sobre una parcela que SÍ existe —el técnico
+ * descarga su cartografía, corrige el lindero y vuelve a subirlo—, y ahí la
+ * referencia se conserva. Sin referencia, es un alta y va todo a `ES.LOCAL.CP`.
+ *
+ * `cp:label` se queda VACÍO en los dos casos: es el número de orden de la parcela
+ * dentro de un polígono y esta app no lo conoce. Vacío valida (su tipo no tiene
+ * `minLength`, comprobado contra el XSD).
+ *
+ * @param {object|null} parcelaActual  POJO de parcela del store (o `null`).
+ * @returns {{namespaceInspire: string, nationalCadastralReference: string}}
+ */
+function identidadInspireDe(parcelaActual) {
+  const refcat = referenciaCatastralDe(parcelaActual)
+  return refcat === null
+    ? { namespaceInspire: NAMESPACE_INSPIRE_DEFECTO, nationalCadastralReference: '' }
+    : { namespaceInspire: NAMESPACE_INSPIRE_CATASTRO, nationalCadastralReference: refcat }
+}
+
+/**
  * Texto del renglón cuando la VALIDACIÓN bloquea: cuántos errores son y cuáles.
  *
  * El recuento va delante y completo; lo que se recorta es la enumeración (ver
@@ -722,10 +776,23 @@ export function cablearGeneracionGml({
       recintos: parcelaActual.recintos,
       srs,
       refcat: identidadDe(parcelaActual),
-      beginLifespanVersion: dateTimeCatastro(fecha),
-      // `namespaceInspire` (ES.LOCAL.CP), `label`, `nationalCadastralReference`
-      // (vacío), `puntoReferencia` y `timeStamp` se dejan en su defecto A
-      // PROPÓSITO: ver la decisión 3 de la cabecera del módulo.
+      // El PERFIL va EXPLÍCITO aunque hoy sea el defecto del serializador: es la
+      // diferencia entre un fichero que la Sede admite y uno que rechaza, y no
+      // puede quedar colgando de un valor por omisión de otro módulo.
+      perfil: PERFIL.ENTREGA,
+      // `namespaceInspire` y `nationalCadastralReference` son UNA sola decisión y
+      // salen juntos de un solo sitio: ver {@link identidadInspireDe}.
+      ...identidadInspireDe(parcelaActual),
+      // `beginLifespanVersion` NO se pasa a propósito: en el perfil de entrega su
+      // ausencia emite `xsi:nil="true" nilReason="other:unpopulated"`, que es lo
+      // que trae la plantilla oficial y lo único honesto en un alta — desde
+      // cuándo rige esa versión del objeto lo fija el Catastro al inscribirla, no
+      // el declarante al subir el fichero. La `fecha` se sigue necesitando, pero
+      // para el NOMBRE del fichero, que es lo de abajo.
+      //
+      // `label`, `puntoReferencia` y `timeStamp` se dejan en su defecto: el
+      // primero porque esta app no conoce el número de orden de la parcela, y los
+      // otros dos porque el perfil de entrega no los escribe.
     })
 
     // ── 3 · Regla de oro 1: TODO lo que decidió el serializador, al panel ────

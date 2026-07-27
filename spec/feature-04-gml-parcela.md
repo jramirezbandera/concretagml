@@ -100,8 +100,11 @@ Del mismo XSD: `ORDEN_CADASTRAL_PARCEL` es un **prefijo** de la secuencia real d
 
 ## 3 · El caso «alta nueva» (parcela no inscrita)
 
-- `namespaceInspire` = **`ES.LOCAL.CP`** por defecto. `ES.SDGC.CP` es del round-trip (leer el dato oficial y reescribirlo), no de lo que genera el usuario: su fichero es **su declaración de alta**, no el dato de la Sede.
-- **`localId` e `identidad` van separados de la referencia catastral.** La app resuelve `refcat ?? idLocal` y lo pasa como identidad; `nationalCadastralReference` se deja **vacío**. Rellenarlo con la referencia convertiría un alta en una **declaración falsa de inscripción**, en silencio. `UTM_1.gml` lo confirma: `localId` lleno, `nationalCadastralReference` vacío.
+> ⚠️ **Corregido el 2026-07-27.** Los dos primeros puntos de esta lista estaban mal y se dejan tachados porque el razonamiento que los sostenía era razonable y hay que saber por qué no valía. Ver §8.
+
+- ~~`namespaceInspire` = **`ES.LOCAL.CP`** por defecto~~ → **depende de si hay referencia catastral, y no es una preferencia.** La FAQ del Catastro empareja los dos campos: `localId` = referencia catastral ⟺ namespace `ES.SDGC.CP`; sin referencia, `ES.LOCAL.CP` + identificador propio.
+- ~~`nationalCadastralReference` se deja **vacío** porque rellenarlo convertiría un alta en una declaración falsa de inscripción~~ → **se rellena cuando hay referencia real.** El error del razonamiento: emitir una referencia catastral verdadera como `localId` bajo `ES.LOCAL.CP` no evitaba la afirmación falsa, la duplicaba — el fichero decía a la vez «esta es su referencia catastral» y «esta parcela no está en el Catastro». `UTM_1.gml` es coherente porque su `localId` **no** es una referencia catastral: es un identificador de un particular.
+- El caso normal de esta herramienta no es un alta pura: es una **RGA alternativa** sobre una parcela que sí existe (se descarga su cartografía, se corrige el lindero y se vuelve a subir). Ahí la referencia se conserva y el namespace es `ES.SDGC.CP`.
 - **`cp:label` y `cp:nationalCadastralReference` son obligatorios** en el XSD (no llevan `minOccurs`) pero su tipo es `string` **sin `minLength`**: se emiten **vacíos** (`<cp:label/>`) y eso valida. El riesgo de producto que se temía **no existe**.
 
 ## 4 · Desviaciones conscientes del enunciado
@@ -124,6 +127,41 @@ Dialecto 4.0 canónico, **3.0 con su parcela dentro** (`soportado:false` pero `p
 
 ## 7 · Estado
 
-Hecho y en verde: **47 ficheros de test, 1.779 pruebas**. `gml/` = `_comun.js`, `xml.js`, `anillos.js`, `ids.js`, `parse.js`, `serialize-cp.js`, `descargar.js`, `index.js`. Cableado en la app con el gate `puedeGenerar` de F02.
+Hecho y en verde: **47 ficheros de test, 1.855 pruebas**. `gml/` = `_comun.js`, `xml.js`, `anillos.js`, `ids.js`, `parse.js`, `serialize-cp.js`, `descargar.js`, `index.js`. Cableado en la app con el gate `puedeGenerar` de F02.
 
-Pendiente y **no bloqueante** (SPEC §7): subir un GML generado a la Sede con certificado y confirmar que el IVG lo acepta. Eso cerraría de paso las dos verificaciones abiertas — orientación antihoraria y URI vs URN.
+---
+
+# ⛔ Rechazo del IVG y corrección (2026-07-27)
+
+**La verificación pendiente se hizo, y salió mal.** Se subió un GML generado por la app a la Sede Electrónica y el IVG lo rechazó: *«El archivo no cumple el esquema Inspire GML»*.
+
+El análisis completo, con las mediciones contra los XSD oficiales, está en **[`spec/SPEC.md` §3.1](SPEC.md)**, porque afecta a los overrides O1–O4 del dossier y no solo a este feature. Lo que hay que saber aquí:
+
+## 8 · Qué estaba mal y qué se ha cambiado
+
+**La causa en una línea:** el fichero se construía copiando la **descarga** del WFS (raíz `wfs:FeatureCollection`), y lo que se sube a la Sede es una **entrega** (raíz `gml:FeatureCollection`). El validador del IVG solo carga el esquema de parcela, así que la raíz de WFS le resulta desconocida y el documento muere en la primera línea. La geometría estaba bien.
+
+**Lo que se ha cambiado:**
+
+| Pieza | Cambio |
+|---|---|
+| `test/fixtures/gml/cp_ejemplo_explicativo.gml` | **NUEVO.** La plantilla oficial del Catastro. Es la fuente de verdad del sobre de entrega. Procedencia y SHA-256 en `PROCEDENCIA.md`. |
+| `gml/_comun.js` | `PERFIL` / `PERFILES` (ENTREGA y WFS), `SCHEMA_LOCATION_*`, `srsNameUrn`, `srsNamePorForma`, dialectos `CP_4_0_ENTREGA` y `CP_4_0_WFS`, `esCp40`. |
+| `gml/serialize-cp.js` | Opción `perfil`, **por defecto `ENTREGA`**. `beginLifespanVersion` pasa a opcional ahí (sale con `xsi:nil`, como la plantilla). `timeStamp` en una entrega **lanza**. |
+| `gml/ids.js` | `ids.coleccion`: el `gml:id` de la raíz, que es el namespace INSPIRE y **no** el de la parcela (`xs:ID` es único). |
+| `gml/parse.js` | Reconoce el dialecto de entrega. La forma canónica del `srsName` la dicta el dialecto. `INSPIREID_CON_PREFIJO` → `INSPIREID_NS_INESPERADO`: se juzga el namespace, nunca el prefijo. |
+| `app/main.js` | Perfil explícito, y la pareja `localId` ↔ `namespace` de la FAQ. |
+| `scripts/validar-xsd.mjs` + `.py` | Dos motores (`xmllint` o Python + `lxml`), modo `--estricto`, y valida contra **`cp/4.0` a secas**, como el IVG. |
+| `.github/workflows/deploy.yml` | Job `esquema` con `--estricto`, **entre las pruebas y la publicación**. |
+
+**Guardianes nuevos**, todos derivados de la plantilla oficial y todos con su mitad anti-vacuidad: el esqueleto del árbol coincide elemento a elemento con la plantilla; los atributos de la raíz y su orden; el `schemaLocation` sin WFS; los tres `srsName` en URN; todos los `gml:id` distintos entre sí (con `UTM_1.gml` como contraejemplo real de lo contrario); y el snapshot `__snapshots__/parcela-entrega.gml`, que es lo que valida el XSD en CI.
+
+## 9 · Lo que este episodio enseña, y no es sobre GML
+
+1. **La regla de oro 8 no dice «deriva de un fichero real»: dice «deriva del fichero real CORRECTO».** Todo estaba derivado, medido y probado contra `cp_parcela_9398516VK3799G.gml`. Ese fichero es auténtico y era la referencia equivocada, porque va en la dirección contraria. Un test derivado de la fuente equivocada no avisa: **confirma**.
+2. **Un guardián que puede saltarse a sí mismo en silencio no es un guardián.** `validar:xsd` existía desde el primer día de F04 y nunca se ejecutó, porque salía `SALTADO` con código 0 al no encontrar `xmllint`. La comprobación que habría cazado esto estaba escrita y era inerte.
+3. **«Verificado» sin ejecutar es una hipótesis.** Los overrides O2, O3 y O4 venían marcados como verdad verificada en el dossier. Dos eran falsos y el tercero estaba mal enunciado. Lo que los deshizo no fue leer mejor la documentación: fue **ejecutar el validador**.
+
+## 10 · Lo que sigue pendiente
+
+Subir a la Sede un GML generado con el perfil corregido y confirmar que el IVG lo acepta. Ahora se sabe que el fichero **valida contra el XSD oficial** (comprobado con libxml2, incluida la parcela con hueco), que es condición necesaria y no suficiente: el IVG comprueba además reglas de negocio —solape con parcelas colindantes, tolerancias de superficie— que ningún esquema expresa.

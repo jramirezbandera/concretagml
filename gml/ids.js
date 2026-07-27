@@ -96,6 +96,11 @@ export const PREFIJO_ID = Object.freeze({
   multiSurface: 'MultiSurface_',
   surface: 'Surface_',
   puntoReferencia: 'ReferencePoint_',
+  // Este NO sale de ningún fixture: la raíz de la plantilla oficial lleva el
+  // namespace pelado (`gml:id="ES.SDGC.CP"`) y ese es el caso normal. El prefijo
+  // solo entra en el caso degenerado de namespace vacío, donde hace falta un id
+  // único que además diga qué es. Ver `idsDeParcela`.
+  coleccion: 'FeatureCollection_',
 })
 
 /**
@@ -279,6 +284,16 @@ export function toXmlId(bruto) {
  * distintos entre sí, que es lo que `xsd:ID` exige (único en TODO el documento).
  *
  * @typedef {Object} IdsParcela
+ * @property {string} coleccion       Id de la RAÍZ (`gml:FeatureCollection`), que
+ *   solo existe en el perfil de ENTREGA. Es el NAMESPACE INSPIRE saneado —
+ *   `ES.LOCAL.CP`—, NO la identidad de la parcela.
+ *
+ *   ⚠️ Que sea distinto del de la parcela no es estética: `gml:id` es de tipo
+ *   `xs:ID` y debe ser único en TODO el documento. `UTM_1.gml`, generado por una
+ *   herramienta de terceros de uso real, repite el mismo valor en la raíz y en el
+ *   `cp:CadastralParcel`, y eso invalida el fichero entero contra cualquier
+ *   esquema GML 3.2 («is not a valid value of the atomic type 'xs:ID'»,
+ *   comprobado). Copiar ese patrón habría cambiado un rechazo por otro.
  * @property {string} parcela          Id de `cp:CadastralParcel`. Es la base.
  * @property {string} multiSurface     Id de `gml:MultiSurface`. SIN numerar.
  * @property {string[]} surfaces       Id de cada `gml:Surface`, en orden. CON
@@ -383,5 +398,21 @@ export function idsDeParcela({
   }
   const puntoReferencia = componer(`${PREFIJO_ID.puntoReferencia}${base}`)
 
-  return { ids: { parcela, multiSurface, surfaces, puntoReferencia }, detecciones }
+  // El id de la COLECCIÓN es el namespace a secas: así lo escribe la plantilla
+  // oficial (`gml:id="ES.SDGC.CP"`), y así queda garantizado que NO coincide con
+  // el de la parcela, que lleva el namespace MÁS la referencia.
+  //
+  // Sin namespace no hay nada con lo que nombrar la colección, y las dos salidas
+  // fáciles son malas: `toXmlId('')` da `_`, que es legal pero mudo, y usar la
+  // base repetiría el id de la parcela e invalidaría el documento entero. Se
+  // recurre entonces al mismo mecanismo que el resto del módulo —un prefijo de
+  // tipo— que resuelve las dos cosas a la vez: dice qué es y es único.
+  const coleccion = namespaceVacio
+    ? componer(`${PREFIJO_ID.coleccion}${base}`)
+    : componer(namespaceInspire)
+
+  return {
+    ids: { coleccion, parcela, multiSurface, surfaces, puntoReferencia },
+    detecciones,
+  }
 }

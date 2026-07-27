@@ -1,7 +1,7 @@
 # Smoke en navegador real — F03 · Fase 4
 
 Runbook de la **tarea 4D**: lo que `jsdom` no puede probar de F03. La suite
-(1.779 pruebas) ya cubre la lógica; aquí se comprueba lo otro: que **el servicio
+(1.855 pruebas) ya cubre la lógica; aquí se comprueba lo otro: que **el servicio
 responda con el tamaño pedido**, que **el canvas quede limpio**, que la
 atribución sea **visible** (jsdom no calcula layout) y que el arrastre funcione
 con la **maquinaria real de `L.Draggable`**.
@@ -629,17 +629,29 @@ mentira todo lo que se mida después de él.
   coordenadas EMITIDAS** dentro de ±1 m². El guion calcula el shoelace él mismo
   —no importa nada del proyecto, corre dentro de la página—, así que es una
   **segunda implementación independiente** de `gml/anillos.js`.
-- **Estructura**: raíz `FeatureCollection` en el namespace de WFS 2.0 con
-  `<member>` y NUNCA `<gml:FeatureCollection` (se busca también en el TEXTO: un
-  prefijo mal declarado no aparecería como tal en el DOM y sí en el fichero que ve
-  el validador); los tres `srsName` en URI OGC y **ni una `urn:` en todo el
-  documento** (override O2); cero `gml:boundedBy` y cero `cp:zoning`.
+- **Estructura del SOBRE DE ENTREGA** ⛔ *corregido el 2026-07-27*: raíz
+  `gml:FeatureCollection` (namespace de GML 3.2) **con su `gml:id`** y
+  `<gml:featureMember>`; los dos `srsName` en **URN**
+  (`urn:ogc:def:crs:EPSG::25830`); **ni rastro del namespace de WFS 2.0** en todo
+  el documento (se busca en el TEXTO: un prefijo mal declarado no aparecería como
+  tal en el DOM y sí en el fichero que ve el validador); sin
+  `timeStamp`/`numberMatched`/`numberReturned`; cero `gml:boundedBy` y cero
+  `cp:zoning`.
+
+  > Hasta esa fecha este apartado exigía **lo contrario** —raíz de WFS 2.0,
+  > `<member>`, `srsName` en URI y «ni una `urn:`»— y daba `ok:true` sobre el
+  > fichero que la Sede rechazó. Ver `spec/SPEC.md` §3.1. Un guion de humo
+  > derivado del fichero equivocado no avisa: firma el error.
+
 - **El nombre del fichero**: forma
   `parcela_<referencia>_<AAAA-MM-DDTHH-mm-ss>.gml`, segmento de referencia
-  correcto (`sin-referencia` cuando no hay `refcat`) y **marca de tiempo idéntica
-  a la del `cp:beginLifespanVersion` de dentro** — lo que `gml/descargar.js`
-  promete para que un fichero de la carpeta de descargas se pueda emparejar con su
-  contenido sin abrirlo.
+  correcto (`sin-referencia` cuando no hay `refcat`) y marca de tiempo presente.
+  ⚠️ **Ya no se contrasta contra el `cp:beginLifespanVersion`**: en el perfil de
+  entrega ese elemento va con `xsi:nil` y vacío, como en la plantilla oficial, así
+  que dentro del fichero no hay fecha con la que comparar. Lo que sí se comprueba
+  es que va nil de verdad, y que el renglón de estado nombra exactamente el
+  fichero que baja — que es la promesa que de verdad le importa a quien luego
+  busca ese fichero en su carpeta de descargas.
 - **El renglón de estado** (`[data-estado="generar-gml"]`) dice que se ha
   descargado y **nombra el fichero**, sin la clase de error.
 - **Dos cruces que solo existen porque aquí hay app entera**: la superficie que el
@@ -694,9 +706,11 @@ mismo renglón que con el click sintético.
 - en cada anillo: `countSonPares`, `dosDecimalesTodos` y `cerrado`, los tres
   `true`;
 - `area.cuadra: true` y `area.diferenciaConLaFicha: 0`;
-- `estructura.esFeatureCollectionWfs20: true`, `ningunaUrn: true`,
+- `estructura.esFeatureCollectionEntrega: true`, `sinNamespaceWfs: true`,
+  `srsNamesEnUrn: true`, `sinFormaDeDescarga: true`, `gmlIdRaiz` no vacío,
+  `numberMatched`/`numberReturned`/`timeStamp` los tres `null`,
   `gmlBoundedBy: 0`, `cpZoning: 0`, y `interiores: 1` **solo** con `?demo=hueco`;
-- `fichero.marcaCoincideConElContenido: true`;
+- `estructura.beginLifespanNil: 'true'` y `beginLifespanTexto: ''`;
 - `avisos.crecio: true` con `?demo=hueco` (dos detecciones) y `false` con la
   parcela real (ninguna).
 
@@ -722,10 +736,17 @@ advertencia desaparece sola y la comprobación pasa a ser real.
 
 ### Cifras de referencia (corrida del 2026-07-27, `npm run dev`, puerto 5175)
 
+> ⚠️ **Estas cifras son ANTERIORES a la corrección del sobre de entrega** (mismo
+> día, más tarde). Las geométricas —anillos, vértices, `count`, `areaValue`,
+> shoelace, superficie de la ficha— **no han cambiado**: la corrección tocó el
+> envoltorio, no los números. Lo que sí cambia es el **tamaño** del fichero (el
+> sobre de entrega es más corto: sin atributos de WFS, sin `endLifespanVersion` y
+> sin `referencePoint`). Hay que volver a correr el guion y actualizar esa fila.
+
 | Medida | Parcela real | `?demo=hueco` |
 |---|---|---|
 | Nombre del fichero | `parcela_9398516VK3799G_<marca>.gml` | `parcela_sin-referencia_<marca>.gml` |
-| Tamaño | **2.586 B** | **2.706 B** |
+| Tamaño | ~~2.586 B~~ *(pendiente de volver a medir)* | ~~2.706 B~~ *(pendiente)* |
 | Anillos (`exterior` + `interior`) | 1 + 0 | 1 + **1** |
 | Vértices abiertos / `count` | 15 / **16** | 4 / 5 y 4 / 5 |
 | `cp:areaValue` | **1536** m² | **348** m² |

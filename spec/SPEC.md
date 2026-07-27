@@ -64,10 +64,10 @@ Donde el plan y el dossier discrepan, **manda el dossier** (capa de verificació
 
 | # | Punto | Plan v4 dice | ✅ Verdad verificada (dossier) | Tier | Feature |
 |---|---|---|---|---|---|
-| O1 | **Orientación de anillos** | §8: "exterior antihorario, huecos horario ⚠️ verifica" | **Exterior HORARIO, huecos antihorario** (inverso a OGC/GeoJSON). Área firmada del GML real = −1536 = `areaValue`. | S1 (VERIFICADO) | F00, F04 |
-| O2 | **srsName parcela** | §9: `urn:ogc:def:crs:EPSG::25830` (URN) | Parcela 4.0 = **URI OGC** `http://www.opengis.net/def/crs/EPSG/0/25830`. La URN es del 3.0 (rechazado). **Edificio sí usa URN.** | S2/S3 | F04, F13 |
-| O3 | **Raíz parcela** | §9: `FeatureCollection` genérico | **wfs 2.0** `FeatureCollection` + `<member>` (ns `http://www.opengis.net/wfs/2.0`). **NO** `gml:FeatureCollection`/`gml:featureMember` (eso es 3.0 → rechazo). | S2, C2 | F04 |
-| O4 | **inspireId parcela** | (no detallado) | `Identifier` en `xmlns="http://inspire.ec.europa.eu/schemas/base/3.3"` **sin prefijo `base:`**. El `base:` (3.2) es del 3.0. | DOCUMENTADO | F04 |
+| O1 | **Orientación de anillos** | §8: "exterior antihorario, huecos horario ⚠️ verifica" | **Exterior HORARIO, huecos antihorario** en el GML real del WFS (área firmada = −1536 = `areaValue`). ⚠️ Matizado 2026-07-27: **no es un requisito, es una convención.** La plantilla oficial del Catastro tiene el exterior ANTIHORARIO (+236,05 m²) y es el fichero que ellos publican como válido. Se sigue emitiendo horario por fidelidad al dato del WFS, no porque lo otro se rechace. | S1 (VERIFICADO, alcance corregido) | F00, F04 |
+| O2 | **srsName parcela** | §9: `urn:ogc:def:crs:EPSG::25830` (URN) | ⛔ **CORREGIDO 2026-07-27 — ver §3.1.** Hay **una forma por perfil**: URN en la ENTREGA (lo que se sube), URI OGC en la DESCARGA del WFS. Las dos son `xsd:anyURI` y las dos validan. El plan v4 tenía razón para la entrega. | REFUTADO | F04, F13 |
+| O3 | **Raíz parcela** | §9: `FeatureCollection` genérico | ⛔ **CORREGIDO 2026-07-27 — ver §3.1.** La ENTREGA es **`gml:FeatureCollection` + `gml:featureMember`**; la raíz `wfs:FeatureCollection` es la de la DESCARGA y es lo que hizo que **la Sede rechazara el fichero**. | REFUTADO | F04 |
+| O4 | **inspireId parcela** | (no detallado) | ⛔ **CORREGIDO 2026-07-27 — ver §3.1.** Lo que cuenta es el **namespace** (INSPIRE base **3.3**), no el prefijo: un prefijo no es información en XML. La plantilla oficial usa `base:` sobre 3.3 y valida. | PARCIALMENTE REFUTADO | F04 |
 | O5 | **Orden XSD de `cp:CadastralParcel`** | (no fijado) | `areaValue → beginLifespanVersion → endLifespanVersion → geometry → inspireId → label → nationalCadastralReference → referencePoint`. El validador lo exige. | OBSERVADO | F04 |
 | O6 | **`areaValue`** | §9: "2 decimales en superficie" | **Entero** (`uom="m2"`), informativo (fixture 1535.87 → 1536). Coordenadas sí a 2 decimales. | S1/B1 | F00, F04 |
 | O7 | **CORS del WMS/servicios** | §11.3, §22: "⚠️ pendiente de verificar" | **RESUELTO: SÍ.** `ACAO:*` + HTTPS en WFS/WMS/OVC/IGN; tesela WMS con `crossOrigin='anonymous'` → canvas **CLEAN**. La Receta A es viable. | S5 (VERIFICADO) | F03, F05, F09 |
@@ -79,6 +79,76 @@ Donde el plan y el dossier discrepan, **manda el dossier** (capa de verificació
 | O13 | **Canarias** | (no cubierto) | EPSG **32628** (WGS84/UTM 28N) único para todo el archipiélago; forzar huso 28. **DIFERIDO** por decisión de alcance. | S11/C5 | F00 (gancho) |
 
 **Tolerancias oficiales de identidad** (dossier S6/C8, BOE-A-2020-12111), solo como capa informativa nunca como veredicto: perímetro **±0,50 m urbana / ±2,00 m rústica**, superficie **≤5%**, precisión de captura **<25 cm (85% ≤20 cm)**.
+
+### 3.1 · ⛔ El error del dossier que costó un rechazo del IVG (2026-07-27)
+
+**Qué pasó.** Se subió a la Sede Electrónica un GML generado por esta app y el
+IVG lo rechazó: *«El archivo no cumple el esquema Inspire GML»*. La suite tenía
+1.784 pruebas en verde, todas derivadas de ficheros reales.
+
+**La causa, medida** con libxml2 contra los XSD oficiales de INSPIRE:
+
+```
+Element '{http://www.opengis.net/wfs/2.0}FeatureCollection':
+No matching global declaration available for the validation root.
+```
+
+| Fichero | vs `cp/4.0` solo | vs `cp/4.0` + `wfs/2.0` |
+|---|---|---|
+| `cp_ejemplo_explicativo.gml` (plantilla oficial del Catastro) | **VÁLIDO** | válido |
+| `cp_parcela_9398516VK3799G.gml` (descarga del WFS) | **INVÁLIDO** | válido |
+
+El validador del IVG carga el esquema de **parcela**, no el de WFS. La raíz
+`wfs:FeatureCollection` no está declarada ahí y el documento muere en la primera
+línea, sin llegar a mirar la geometría — que era correcta.
+
+**El error de raíz, y es de método.** Los overrides O2, O3 y O4 se derivaron de
+`cp_parcela_9398516VK3799G.gml`, que es la **DESCARGA** del WFS: lo que el
+servicio *devuelve*. Pero esta herramienta produce una **ENTREGA**: lo que el
+técnico *sube*. Son dos direcciones del mismo formato y **el sobre es distinto**.
+La regla de oro 8 («manda el fichero real») se cumplió al pie de la letra sobre
+el fichero real **equivocado**, y todos los guardianes confirmaron el error en
+vez de detectarlo. Un test derivado de la fuente correcta es una garantía;
+derivado de la fuente equivocada es una garantía de estar mal.
+
+**La fuente de verdad de la entrega** es
+[`cp_ejemplo_explicativo.gml`](../test/fixtures/gml/cp_ejemplo_explicativo.gml),
+la plantilla que publica la propia D.G. del Catastro y que sus instrucciones
+mandan usar como punto de partida. Está versionada con su procedencia y su
+SHA-256 en [`PROCEDENCIA.md`](../test/fixtures/gml/PROCEDENCIA.md).
+
+**Los dos sobres, ahora explícitos** en `gml/_comun.js#PERFILES`:
+
+| | `PERFIL.ENTREGA` (defecto, lo que se sube) | `PERFIL.WFS` (lo que se descarga) |
+|---|---|---|
+| Raíz | `gml:FeatureCollection` **con `gml:id`** | `wfs:FeatureCollection` |
+| Miembro | `gml:featureMember` | `member` |
+| `schemaLocation` | solo `cp/4.0` | `wfs/2.0` **+** `cp/4.0` |
+| `srsName` | `urn:ogc:def:crs:EPSG::25830` | `http://www.opengis.net/def/crs/EPSG/0/25830` |
+| `timeStamp`/`numberMatched`/`numberReturned` | no existen | sí |
+| `endLifespanVersion`, `referencePoint` | no se emiten | sí |
+| `beginLifespanVersion` | `xsi:nil` (opcional) | dateTime obligatorio |
+
+**Dos trampas más que salieron al medir, y que conviene no repetir:**
+
+1. **`gml:id` es `xs:ID`: único en TODO el documento.** `UTM_1.gml` —un alta real
+   de un generador de terceros— repite el mismo valor en la raíz y en el
+   `cp:CadastralParcel`, y eso **invalida el fichero entero**. No sirve de
+   plantilla. Nuestra raíz lleva el **namespace INSPIRE** como `gml:id`, igual
+   que la plantilla oficial.
+2. **La pareja `localId` ↔ `namespace` es UNA afirmación, no dos ajustes.** La
+   FAQ del Catastro: si el `localId` es la referencia catastral, el namespace
+   **debe** ser `ES.SDGC.CP`; si la parcela no existe en el Catastro, va
+   `ES.LOCAL.CP` con un identificador propio. La app emitía la referencia real
+   bajo `ES.LOCAL.CP`, diciendo a la vez «esta es su referencia catastral» y
+   «esta parcela no está en el Catastro».
+
+**Y el guardián que no existía.** `npm run validar:xsd` estaba escrito desde F04,
+pero era **opcional** y dependía de `xmllint`, que no estaba instalado: salía
+`SALTADO` con código 0 y **no llegó a ejecutarse ni una vez**. Ahora acepta dos
+motores (`xmllint` o Python + `lxml`), tiene modo `--estricto` donde no poder
+validar es un fallo, y **corre en CI como gate previo a publicar**. Un guardián
+que puede saltarse a sí mismo en silencio no protege de nada.
 
 ---
 

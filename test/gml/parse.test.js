@@ -205,7 +205,7 @@ describe('gml/parse · contrato de entrada', () => {
 
 // ── Definición de hecho 1: los cuatro fixtures, cada uno en su dialecto ───────
 
-describe('gml/parse · clasifica los CUATRO fixtures del disco en su dialecto', () => {
+describe('gml/parse · clasifica los CINCO fixtures del disco en su dialecto', () => {
   it('coincide con el dialecto que `clasificarDialecto` asigna a cada fichero', () => {
     // El oráculo del dialecto es `gml/_comun.js` sobre el árbol de jsdom, que ya
     // está atado a los ficheros en `comun.test.js`: aquí se comprueba que el
@@ -230,13 +230,17 @@ describe('gml/parse · clasifica los CUATRO fixtures del disco en su dialecto', 
     }
   })
 
-  it('exactamente UNO es soportado, y es el único con `bloqueos` vacíos', () => {
+  it('los soportados son los DOS de CP 4.0, y son los únicos sin `bloqueos`', () => {
+    // Eran «exactamente UNO» hasta el 2026-07-27, cuando se descubrió que el
+    // fichero que la Sede ADMITE —la plantilla oficial— era uno de los que este
+    // lector rechazaba por no traer la raíz de WFS.
     const soportados = ANALISIS.filter((a) => parsear(a).soportado).map((a) => a.nombre)
     const sinBloqueos = ANALISIS.filter((a) => parsear(a).resumen.bloqueos.length === 0).map(
       (a) => a.nombre,
     )
-    expect(soportados).toHaveLength(1)
+    expect(soportados).toHaveLength(2)
     expect(sinBloqueos).toEqual(soportados)
+    expect(soportados).toContain('cp_ejemplo_explicativo.gml')
   })
 
   it('cuenta los miembros que el oráculo ve en la raíz', () => {
@@ -330,8 +334,8 @@ describe('gml/parse · cp_parcela_9398516VK3799G.gml (CP 4.0) — cotejado con j
   const resultado = parsearGml(CP40.texto)
   const parcela = resultado.parcelas[0]
 
-  it('es CP_4_0, soportado, con UNA parcela y sin bloqueos', () => {
-    expect(resultado.dialecto).toBe(DIALECTO.CP_4_0)
+  it('es CP_4_0_WFS, soportado, con UNA parcela y sin bloqueos', () => {
+    expect(resultado.dialecto).toBe(DIALECTO.CP_4_0_WFS)
     expect(resultado.soportado).toBe(true)
     expect(resultado.parcelas).toHaveLength(1)
     expect(resultado.resumen.bloqueos).toEqual([])
@@ -448,18 +452,80 @@ describe('gml/parse · cp_parcela_9398516VK3799G.gml (CP 4.0) — cotejado con j
     expect(typeof resultado.resumen.wfs.numberMatched).toBe('string')
   })
 
-  it('`nsDeclarados` son los siete namespaces del 4.0 (los mismos que `NS`)', () => {
-    // Oráculo independiente: `gml/_comun.js#NS`, que `comun.test.js` ata a las
-    // declaraciones REALES de este fichero.
-    expect(new Set(resultado.resumen.nsDeclarados)).toEqual(new Set(Object.values(NS)))
+  it('`nsDeclarados` son los que este fichero declara, todos dentro de `NS`', () => {
+    // Oráculo independiente: jsdom sobre el mismo fichero. Ya no se compara con
+    // `Object.values(NS)` entero, porque `NS` es ahora la UNIÓN de los dos
+    // perfiles de 4.0 y este fichero solo declara los suyos (le falta `ogc`).
+    const delOraculo = new Set(
+      [...CP40.texto.matchAll(/\bxmlns(?::[\w.-]+)?="([^"]+)"/g)].map((m) => m[1]),
+    )
+    expect(new Set(resultado.resumen.nsDeclarados)).toEqual(delOraculo)
+    for (const ns of resultado.resumen.nsDeclarados) {
+      expect(Object.values(NS), ns).toContain(ns)
+    }
   })
 
   it('no emite ni un ERROR: un GML del Catastro es un GML bueno', () => {
     expect(resultado.detecciones.filter((d) => d.severidad === SEVERIDAD.ERROR)).toEqual([])
     expect(tipos(resultado)).not.toContain(TIPO_GML.ELEMENTO_PROSCRITO)
     expect(tipos(resultado)).not.toContain(TIPO_GML.ORDEN_INESPERADO)
-    expect(tipos(resultado)).not.toContain(TIPO_GML.INSPIREID_CON_PREFIJO)
+    expect(tipos(resultado)).not.toContain(TIPO_GML.INSPIREID_NS_INESPERADO)
+    // Su `srsName` es URI, y URI es la forma canónica de SU perfil: sin aviso.
     expect(tipos(resultado)).not.toContain(TIPO_GML.SRS_FORMA_INESPERADA)
+  })
+})
+
+// ── Definición de hecho 2 bis: la PLANTILLA OFICIAL, que es lo que se sube ────
+
+describe('gml/parse · cp_ejemplo_explicativo.gml — la plantilla que la Sede admite', () => {
+  const ENTREGA = ANALISIS.find((a) => a.nombre === 'cp_ejemplo_explicativo.gml')
+  const resultado = parsearGml(ENTREGA.texto)
+
+  it('es CP_4_0_ENTREGA, soportado, con UNA parcela y sin bloqueos', () => {
+    expect(resultado.dialecto).toBe(DIALECTO.CP_4_0_ENTREGA)
+    expect(resultado.soportado).toBe(true)
+    expect(resultado.parcelas).toHaveLength(1)
+    expect(resultado.resumen.bloqueos).toEqual([])
+  })
+
+  it('no emite ni un AVISO estructural: es el fichero de referencia del Catastro', () => {
+    // ⚠️ Esta es LA prueba que faltaba. Antes del 2026-07-27 este mismo fichero
+    // producía DIALECTO_RECHAZADO/ERROR, SRS_FORMA_INESPERADA (por la URN) e
+    // INSPIREID_CON_PREFIJO (por el `base:`). Tres quejas sobre la plantilla
+    // oficial del organismo que valida. Que un lector proteste de su propia
+    // fuente de verdad es la señal de que la fuente de verdad era otra.
+    expect(resultado.detecciones.filter((d) => d.severidad === SEVERIDAD.ERROR)).toEqual([])
+    for (const tipo of [
+      TIPO_GML.DIALECTO_RECHAZADO,
+      TIPO_GML.SRS_FORMA_INESPERADA,
+      TIPO_GML.INSPIREID_NS_INESPERADO,
+      TIPO_GML.ELEMENTO_PROSCRITO,
+      TIPO_GML.ORDEN_INESPERADO,
+    ]) {
+      expect(tipos(resultado), tipo).not.toContain(tipo)
+    }
+  })
+
+  it('lee su geometría, su identidad y su superficie declarada', () => {
+    const p = resultado.parcelas[0]
+    const tokens = ENTREGA.texto
+      .match(/<gml:posList[^>]*>([^<]*)<\/gml:posList>/)[1]
+      .trim()
+      .split(/\s+/)
+    // Anillo ABIERTO: un vértice menos que pares trae el fichero (regla 4).
+    expect(p.recintos[0].vertices).toHaveLength(tokens.length / 2 - 1)
+    expect(p.srs).toBe('EPSG:25830')
+    expect(p.namespaceInspire).toBe(textoDe(ENTREGA, 'namespace'))
+    expect(p.localId).toBe(textoDe(ENTREGA, 'localId'))
+    expect(String(p.areaValue)).toBe(porLocal(ENTREGA, 'areaValue').textContent.trim())
+  })
+
+  it('su `beginLifespanVersion` viene con xsi:nil, y eso NO es un fallo', () => {
+    // Es el patrón del alta: la vigencia del objeto la fija el Catastro al
+    // inscribir. El lector no puede confundirlo con «falta un dato».
+    const elemento = porLocal(ENTREGA, 'beginLifespanVersion')
+    expect(elemento.getAttributeNS(NS.xsi, 'nil')).toBe('true')
+    expect(resultado.detecciones.filter((d) => d.severidad === SEVERIDAD.ERROR)).toEqual([])
   })
 })
 
@@ -494,10 +560,14 @@ describe('gml/parse · UTM_1.gml (CP 3.0) — rechazado, pero con su parcela den
     expect(deTipo(resultado, TIPO_GML.CIERRE_RETIRADO)).toHaveLength(1)
   })
 
-  it('emite INSPIREID_CON_PREFIJO: el `base:Identifier` es de base 3.2 (O4)', () => {
-    const avisos = deTipo(resultado, TIPO_GML.INSPIREID_CON_PREFIJO)
+  it('emite INSPIREID_NS_INESPERADO: su `Identifier` va en base 3.2, no en 3.3', () => {
+    // ⚠️ Lo que se juzga es el NAMESPACE, no el prefijo. La plantilla oficial
+    // del Catastro también escribe `base:Identifier` —con base 3.3— y no debe
+    // producir este aviso; la prueba de que no lo produce está en su describe.
+    const avisos = deTipo(resultado, TIPO_GML.INSPIREID_NS_INESPERADO)
     expect(avisos).toHaveLength(1)
-    expect(avisos[0].datos.prefijo).toBe(porLocal(CP30, 'Identifier').prefix)
+    expect(avisos[0].datos.ns).toBe(porLocal(CP30, 'Identifier').namespaceURI)
+    expect(avisos[0].datos.ns).not.toBe(NS.base33)
     expect(avisos[0].datos.esperado).toBe(NS.base33)
   })
 
@@ -506,12 +576,15 @@ describe('gml/parse · UTM_1.gml (CP 3.0) — rechazado, pero con su parcela den
     expect(resultado.parcelas[0].namespaceInspire).toBe(textoDe(CP30, 'namespace'))
   })
 
-  it('el `srsName` en URN se aprovecha (da huso) y NO se avisa de la forma: es su forma nativa', () => {
+  it('el `srsName` en URN se aprovecha (da huso) y NO se avisa de la forma', () => {
     expect(resultado.parcelas[0].srsName.valor).toBe(SRSNAME_URN)
-    expect(resultado.parcelas[0].srsName.coherente).toBe(false)
     expect(resultado.parcelas[0].srs).toBe(`EPSG:${resultado.parcelas[0].srsName.codigo}`)
-    // La URN es la forma del 3.0 y del edificio (O10): avisar aquí sería ruido
-    // sobre un fichero que ya se ha señalado entero con DIALECTO_RECHAZADO.
+    // No se avisa por DOS motivos independientes, y conviene no confundirlos:
+    // (a) el fichero ya se ha señalado entero con DIALECTO_RECHAZADO, así que
+    //     una queja más sobre él sería ruido; y
+    // (b) su URN es EXACTAMENTE la misma cadena que usa la plantilla oficial de
+    //     entrega — o sea que ni siquiera es una forma «mala». Lo que hace vieja
+    //     a UTM_1.gml es el namespace del feature, no esto.
     expect(tipos(resultado)).not.toContain(TIPO_GML.SRS_FORMA_INESPERADA)
   })
 
@@ -616,7 +689,7 @@ describe('gml/parse · un fichero malo produce DETECCIONES, jamás una excepció
   })
 
   it('basura que ni es XML tampoco lanza', () => {
-    for (const malo of ['no soy xml', '{"json":true}', '<<<', ' ']) {
+    for (const malo of ['no soy xml', '{"json":true}', '<<<', '\u0000']) {
       expect(() => parsearGml(malo), JSON.stringify(malo)).not.toThrow()
       expect(parsearGml(malo).parcelas, JSON.stringify(malo)).toEqual([])
     }
@@ -628,7 +701,7 @@ describe('gml/parse · un fichero malo produce DETECCIONES, jamás una excepció
 describe('gml/parse · miembros: cero, uno, varios', () => {
   it('una FeatureCollection sin miembros → SIN_MIEMBROS/ERROR', () => {
     const r = parsearGml(CP40.texto.replace(BLOQUE_MEMBER, ''))
-    expect(r.dialecto).toBe(DIALECTO.CP_4_0)
+    expect(r.dialecto).toBe(DIALECTO.CP_4_0_WFS)
     expect(r.parcelas).toEqual([])
     expect(r.resumen.nMiembros).toBe(0)
     expect(deTipo(r, TIPO_GML.SIN_MIEMBROS)).toHaveLength(1)

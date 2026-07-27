@@ -383,30 +383,58 @@ describe('app/main · generar el GML de la parcela demo (válida, con referencia
     await expect(entrega.blobs[0].text()).resolves.toBe(entrega.llamadas[0].xml)
   })
 
-  it('la fecha del CONTENIDO y la del NOMBRE salen del mismo instante', () => {
-    // Es la razón por la que la capa de aplicación lee el reloj UNA vez y lo
-    // pasa a las dos llamadas: un GML fechado a las 11:45:30 dentro de un
-    // fichero llamado …T11-45-31 es imposible de emparejar después.
+  it('el instante del NOMBRE es el único que lee la app, y va a la descarga', () => {
+    // La app lee el reloj UNA vez. Antes esa marca iba a DOS sitios (el nombre y
+    // el `beginLifespanVersion`); desde el 2026-07-27 solo al nombre, porque el
+    // perfil de entrega emite ese elemento con `xsi:nil` — desde cuándo rige la
+    // versión del objeto lo decide el Catastro al inscribir, no el declarante.
     const { boton, entrega } = cablear(parcelaDemo())
     boton.click()
 
     const marca = dateTimeCatastro(INSTANTE)
-    expect(entrega.llamadas[0].xml).toContain(`<cp:beginLifespanVersion>${marca}<`)
     expect(entrega.anclas[0].download).toContain(marca.split(':').join('-'))
     expect(entrega.llamadas[0].opciones.fecha).toBe(INSTANTE)
   })
 
-  it('el GML se emite como ALTA de particular, no como dato oficial del Catastro', () => {
-    // `ES.LOCAL.CP` (alta) y NO `ES.SDGC.CP` (dato de la Sede), y
-    // `nationalCadastralReference` VACÍO: rellenarlo con la referencia
-    // convertiría el alta en una declaración falsa de inscripción.
+  it('el `beginLifespanVersion` va NIL, como en la plantilla oficial del Catastro', () => {
     const { boton, entrega } = cablear(parcelaDemo())
     boton.click()
     const { xml } = entrega.llamadas[0]
-    expect(xml).toContain('<namespace>ES.LOCAL.CP</namespace>')
-    expect(xml).not.toContain('ES.SDGC.CP')
-    expect(xml).toContain('<cp:nationalCadastralReference/>')
-    expect(xml).toContain(`<localId>${REFCAT_DEMO}</localId>`)
+    expect(xml).toContain('<cp:beginLifespanVersion xsi:nil="true"')
+    // Y no se cuela una fecha de hoy disfrazada de vigencia.
+    expect(xml).not.toContain(`<cp:beginLifespanVersion>${dateTimeCatastro(INSTANTE)}<`)
+  })
+
+  it('⚠️ el sobre es el de ENTREGA: raíz gml:FeatureCollection y srsName en URN', () => {
+    // LA prueba de regresión del rechazo del 2026-07-27. La app producía un
+    // `wfs:FeatureCollection`, que el validador del IVG no reconoce porque no
+    // carga el esquema de WFS: el fichero moría en la primera línea.
+    const { boton, entrega } = cablear(parcelaDemo())
+    boton.click()
+    const { xml } = entrega.llamadas[0]
+    expect(xml).toContain('<gml:FeatureCollection')
+    expect(xml).toContain('<gml:featureMember>')
+    expect(xml).toContain('srsName="urn:ogc:def:crs:EPSG::25830"')
+    // Nada de WFS: ni la raíz, ni el namespace, ni sus atributos de respuesta.
+    expect(xml).not.toContain('opengis.net/wfs')
+    expect(xml).not.toContain('numberReturned')
+    expect(xml).not.toContain('timeStamp')
+  })
+
+  it('con referencia catastral REAL, la identidad INSPIRE es la del Catastro', () => {
+    // Regla de la FAQ del Catastro («¿Cómo nombrar las parcelas…?»): si el
+    // `localId` ES la referencia catastral, el namespace tiene que ser
+    // `ES.SDGC.CP`. Antes se emitía la referencia real bajo `ES.LOCAL.CP`, que
+    // afirmaba a la vez «esta es su referencia» y «no está en el Catastro».
+    const { boton, entrega } = cablear(parcelaDemo())
+    boton.click()
+    const { xml } = entrega.llamadas[0]
+    expect(xml).toContain(`<base:localId>${REFCAT_DEMO}</base:localId>`)
+    expect(xml).toContain('<base:namespace>ES.SDGC.CP</base:namespace>')
+    expect(xml).toContain(`<cp:nationalCadastralReference>${REFCAT_DEMO}<`)
+    expect(xml).not.toContain('ES.LOCAL.CP')
+    // `cp:label` sigue vacío: es el nº de orden de la parcela y la app no lo sabe.
+    expect(xml).toContain('<cp:label/>')
   })
 })
 
@@ -440,12 +468,23 @@ describe('app/main · parcela SINTÉTICA con hueco y sin referencia catastral', 
 
   it('la IDENTIDAD del GML sí cae al `idLocal`: el serializador la exige', () => {
     // Las dos caras de la misma decisión: sin referencia, el `<localId>` es el
-    // identificador local del modelo (patrón del alta real `UTM_1.gml`), pero el
-    // NOMBRE del fichero no puede presentarlo como si fuera una referencia.
+    // identificador local del modelo, pero el NOMBRE del fichero no puede
+    // presentarlo como si fuera una referencia catastral.
     const parcela = parcelaDemoConHueco()
     const { boton, entrega } = cablear(parcela)
     boton.click()
-    expect(entrega.llamadas[0].xml).toContain(`<localId>${parcela.idLocal}</localId>`)
+    expect(entrega.llamadas[0].xml).toContain(`<base:localId>${parcela.idLocal}</base:localId>`)
+  })
+
+  it('SIN referencia, la identidad INSPIRE es la LOCAL, y nada afirma inscripción', () => {
+    // La otra mitad de la regla de la FAQ, y la que hace que la pareja
+    // localId↔namespace no sea una constante disfrazada: aquí sale la otra.
+    const { boton, entrega } = cablear(parcelaDemoConHueco())
+    boton.click()
+    const { xml } = entrega.llamadas[0]
+    expect(xml).toContain('<base:namespace>ES.LOCAL.CP</base:namespace>')
+    expect(xml).not.toContain('ES.SDGC.CP')
+    expect(xml).toContain('<cp:nationalCadastralReference/>')
   })
 })
 

@@ -8,12 +8,21 @@
  * verdad del proyecto (regla de oro 8). Los ficheros se leen del disco aquí, en *
  * el test, que sí puede tocar `test/`.                                          *
  *                                                                              *
- * Los cuatro fixtures y para qué sirve cada uno:                                *
- *   · `cp_parcela_9398516VK3799G.gml` — CP 4.0 del WFS. De aquí salen NS,       *
- *     SCHEMA_LOCATION, ORDEN_CADASTRAL_PARCEL y el srsName canónico.            *
- *   · `UTM_1.gml` — CP 3.0 de otro generador: el CONTRAEJEMPLO (raíz            *
- *     `gml:FeatureCollection`, srsName en URN, `base:` en el inspireId).        *
- *   · `bu_building_*.gml` / `bu_buildingpart_*.gml` — edificio: tercer dialecto *
+ * ⚠️ ESTE FICHERO SE CORRIGIÓ EL 2026-07-27, y el motivo importa más que los    *
+ * cambios: sus afirmaciones estaban BIEN COMPROBADAS contra el fixture          *
+ * EQUIVOCADO. Ataban todo a `cp_parcela_9398516VK3799G.gml`, que es la DESCARGA *
+ * del WFS, cuando lo que la app produce es una ENTREGA. Todo salía verde y la   *
+ * Sede rechazaba el fichero. Un test derivado de la fuente correcta es una      *
+ * garantía; derivado de la fuente equivocada es una garantía de estar mal.      *
+ *                                                                              *
+ * Los cinco fixtures y para qué sirve cada uno:                                 *
+ *   · `cp_ejemplo_explicativo.gml` — LA PLANTILLA OFICIAL del Catastro. De aquí *
+ *     sale el perfil de ENTREGA: raíz, contenedor, schemaLocation y srsName en  *
+ *     URN. Es la fuente de verdad de lo que se SUBE.                            *
+ *   · `cp_parcela_9398516VK3799G.gml` — CP 4.0 del WFS. De aquí siguen saliendo *
+ *     ORDEN_CADASTRAL_PARCEL y el perfil de DESCARGA. NO el sobre de entrega.   *
+ *   · `UTM_1.gml` — CP 3.0 de otro generador: el CONTRAEJEMPLO de dialecto.     *
+ *   · `bu_building_*.gml` / `bu_buildingpart_*.gml` — edificio: cuarto dialecto *
  *     y única prueba de que la lista de elementos proscritos no es vacua.       *
  *                                                                              *
  * El XML se parsea con jsdom (ya es devDependency) y NO con `gml/xml.js`: ese   *
@@ -30,20 +39,28 @@ import { JSDOM } from 'jsdom'
 
 import {
   NS,
-  SCHEMA_LOCATION,
+  SCHEMA_LOCATION_ENTREGA,
+  SCHEMA_LOCATION_WFS,
   ORDEN_CADASTRAL_PARCEL,
   ELEMENTOS_PROSCRITOS_CP40,
   DIALECTO,
   DIALECTOS,
   DIALECTO_DESCONOCIDO,
+  PERFIL,
+  PERFILES,
   clasificarDialecto,
+  esCp40,
+  perfilPorId,
   SEVERIDAD,
   TIPO_GML,
   crearDeteccionGml,
   SRS_SOPORTADOS,
   PREFIJO_SRSNAME_URI,
+  PREFIJO_SRSNAME_URN,
   FORMA_SRSNAME,
   srsNameUri,
+  srsNameUrn,
+  srsNamePorForma,
   srsCorto,
   normalizarSrsName,
   dateTimeCatastro,
@@ -109,6 +126,20 @@ const ANALISIS = FIXTURES.map(analizar)
 // Sede rechaza). Se localizan por nombre y se comprueba que existen.
 const CP40 = ANALISIS.find((a) => a.nombre === 'cp_parcela_9398516VK3799G.gml')
 const CP30 = ANALISIS.find((a) => a.nombre === 'UTM_1.gml')
+/** La plantilla oficial: fuente de verdad del sobre que se SUBE a la Sede. */
+const ENTREGA = ANALISIS.find((a) => a.nombre === 'cp_ejemplo_explicativo.gml')
+
+/**
+ * Los dos fixtures de CP 4.0, emparejados con el perfil que cada uno define. Se
+ * recorre esta tabla en vez de escribir dos bloques gemelos: así, el día que
+ * entre un tercer perfil, la única forma de que sus pruebas no existan es que
+ * nadie añada su fixture — y eso lo caza la comprobación de que la tabla cubre
+ * TODOS los perfiles declarados, que está justo debajo.
+ */
+const PAREJAS_PERFIL = [
+  { perfil: PERFILES[PERFIL.ENTREGA], analisis: () => ENTREGA },
+  { perfil: PERFILES[PERFIL.WFS], analisis: () => CP40 },
+]
 
 /** Los `srsName` de un fixture, en orden de aparición. */
 const srsNamesDe = (a) =>
@@ -117,10 +148,26 @@ const srsNamesDe = (a) =>
     .map((e) => e.getAttribute('srsName'))
 
 describe('gml/_comun · el arnés de fixtures no miente', () => {
-  it('encuentra en el disco los cuatro GML reales, y los dos que se nombran', () => {
-    expect(FIXTURES.length).toBeGreaterThanOrEqual(4)
-    expect(CP40, 'falta el GML CP 4.0 del WFS: es LA fuente de verdad de F04').toBeDefined()
+  it('encuentra en el disco los cinco GML reales, y los tres que se nombran', () => {
+    expect(FIXTURES.length).toBeGreaterThanOrEqual(5)
+    expect(
+      ENTREGA,
+      'falta cp_ejemplo_explicativo.gml: es la plantilla OFICIAL y la fuente de verdad ' +
+        'del fichero que se sube a la Sede. Sin él, F04 vuelve a derivarlo todo de la ' +
+        'descarga del WFS, que es lo que provocó el rechazo del 2026-07-27.',
+    ).toBeDefined()
+    expect(CP40, 'falta el GML CP 4.0 del WFS: es la fuente de verdad de los números').toBeDefined()
     expect(CP30, 'falta UTM_1.gml: es el contraejemplo en CP 3.0').toBeDefined()
+  })
+
+  it('la tabla PAREJAS_PERFIL cubre TODOS los perfiles declarados', () => {
+    // Anti-vacuidad de la tabla de arriba: si mañana aparece un perfil nuevo sin
+    // su fixture, esto cae y nadie puede añadirlo sin atarlo a un fichero real.
+    expect(PAREJAS_PERFIL.map((p) => p.perfil.id).sort()).toEqual(Object.keys(PERFILES).sort())
+    for (const { perfil, analisis } of PAREJAS_PERFIL) {
+      expect(analisis(), `el perfil ${perfil.id} no tiene fixture en el disco`).toBeDefined()
+      expect(analisis().nombre, `el perfil ${perfil.id} apunta a otro fichero`).toBe(perfil.fixture)
+    }
   })
 
   it('los cuatro son XML bien formado y tienen raíz, contenedor y feature', () => {
@@ -141,32 +188,70 @@ describe('gml/_comun · el arnés de fixtures no miente', () => {
 
 // ── NS ────────────────────────────────────────────────────────────────────────
 
-describe('gml/_comun · NS — los namespaces salen del GML real', () => {
-  it('Object.values(NS) es EXACTAMENTE el juego de xmlns declarados en el fixture', () => {
-    // Se barre el TEXTO entero, no solo la raíz: base 3.3 se declara dentro, como
-    // `xmlns` por defecto del `<Identifier>` del inspireId (override O4).
-    const declarados = [
-      ...new Set([...CP40.texto.matchAll(/\bxmlns(?::[\w.-]+)?="([^"]+)"/g)].map((m) => m[1])),
-    ].sort()
+/** Todos los `xmlns` declarados en el TEXTO de un fixture, sin repetir. */
+const xmlnsDe = (a) => [
+  ...new Set([...a.texto.matchAll(/\bxmlns(?::[\w.-]+)?="([^"]+)"/g)].map((m) => m[1])),
+]
+
+describe('gml/_comun · NS — los namespaces salen de los GML reales', () => {
+  it('Object.values(NS) es EXACTAMENTE la UNIÓN de los xmlns de los dos fixtures 4.0', () => {
+    // Unión, no uno de los dos: cada perfil declara su juego y `NS` tiene que
+    // cubrir ambos. Se barre el TEXTO entero, no solo la raíz, porque base 3.3
+    // se declara dentro del `inspireId` en los dos ficheros.
+    const declarados = [...new Set([...xmlnsDe(CP40), ...xmlnsDe(ENTREGA)])].sort()
     expect(declarados).toEqual([...Object.values(NS)].sort())
   })
 
-  it('la raíz vive en el namespace WFS 2.0, no en el de GML (override O3)', () => {
+  it('cada fixture 4.0 declara EXACTAMENTE los prefijos de su perfil, y en su orden', () => {
+    // Deriva el orden del propio fichero. Es lo que impide que `prefijosRaiz` se
+    // «ordene alfabéticamente para que quede bonito» y deje de reproducirlo.
+    for (const { perfil, analisis } of PAREJAS_PERFIL) {
+      const a = analisis()
+      const enLaRaiz = [...a.raiz.attributes]
+        .filter((at) => at.name.startsWith('xmlns:'))
+        .map((at) => at.name.slice('xmlns:'.length))
+      expect(enLaRaiz, `${a.nombre}: prefijos de la raíz`).toEqual([...perfil.prefijosRaiz])
+    }
+  })
+
+  it('las DOS raíces 4.0 son distintas, y esa diferencia es el fallo del 2026-07-27', () => {
+    // La entrega va en GML 3.2 con `gml:featureMember`…
+    expect(ENTREGA.raiz.namespaceURI).toBe(NS.gml)
+    expect(ENTREGA.raiz.localName).toBe('FeatureCollection')
+    expect(ENTREGA.contenedor.localName).toBe('featureMember')
+    // …y la descarga del WFS en el namespace de WFS 2.0 con `member`.
     expect(CP40.raiz.namespaceURI).toBe(NS.wfs)
     expect(CP40.raiz.localName).toBe('FeatureCollection')
     expect(CP40.contenedor.localName).toBe('member')
-    // Y el contraejemplo: el 3.0 es justo lo prohibido.
-    expect(CP30.raiz.namespaceURI).toBe(NS.gml)
-    expect(CP30.contenedor.localName).toBe('featureMember')
+    // Anti-vacuidad: si alguien «unificase» los dos perfiles, esto cae.
+    expect(ENTREGA.raiz.namespaceURI).not.toBe(CP40.raiz.namespaceURI)
   })
 
-  it('el `Identifier` del inspireId va en base 3.3 y SIN prefijo (override O4)', () => {
-    const ident = todos(CP40).find((e) => e.localName === 'Identifier')
-    expect(ident.namespaceURI).toBe(NS.base33)
-    expect(ident.prefix).toBeNull()
-    // El contraejemplo, en el mismo sitio del 3.0: prefijo `base:` y otro ns.
+  it('la raíz de la ENTREGA lleva gml:id, y NO es el de la parcela (xs:ID es único)', () => {
+    const idRaiz = ENTREGA.raiz.getAttributeNS(NS.gml, 'id')
+    expect(idRaiz).toBeTruthy()
+    expect(idRaiz).toBe('ES.SDGC.CP')
+    expect(idRaiz).not.toBe(ENTREGA.feature.getAttributeNS(NS.gml, 'id'))
+    // El contraejemplo real: UTM_1.gml SÍ los repite, y por eso no vale de
+    // plantilla. Ver test/fixtures/gml/PROCEDENCIA.md.
+    expect(CP30.raiz.getAttributeNS(NS.gml, 'id')).toBe(
+      CP30.feature.getAttributeNS(NS.gml, 'id'),
+    )
+  })
+
+  it('el `Identifier` va en base 3.3 en los DOS fixtures 4.0, con prefijo o sin él', () => {
+    // ⚠️ Lo que se comprueba es el NAMESPACE, no el prefijo. El override O4 decía
+    // que `base:` «produce rechazo en 4.0»; la plantilla OFICIAL usa `base:` y
+    // valida contra el XSD. En XML el prefijo no es información.
+    for (const a of [CP40, ENTREGA]) {
+      const ident = todos(a).find((e) => e.localName === 'Identifier')
+      expect(ident.namespaceURI, `${a.nombre}: ns del Identifier`).toBe(NS.base33)
+    }
+    expect(todos(CP40).find((e) => e.localName === 'Identifier').prefix).toBeNull()
+    expect(todos(ENTREGA).find((e) => e.localName === 'Identifier').prefix).toBe('base')
+
+    // El contraejemplo de verdad es la VERSIÓN, y está en el 3.0: base 3.2.
     const ident30 = todos(CP30).find((e) => e.localName === 'Identifier')
-    expect(ident30.prefix).toBe('base')
     expect(ident30.namespaceURI).not.toBe(NS.base33)
   })
 
@@ -175,16 +260,98 @@ describe('gml/_comun · NS — los namespaces salen del GML real', () => {
   })
 })
 
-describe('gml/_comun · SCHEMA_LOCATION', () => {
-  it('es literalmente el xsi:schemaLocation de la raíz del fixture', () => {
-    expect(CP40.raiz.getAttributeNS(NS.xsi, 'schemaLocation')).toBe(SCHEMA_LOCATION)
+describe('gml/_comun · schemaLocation — uno por perfil', () => {
+  it('cada uno es literalmente el xsi:schemaLocation de la raíz de SU fixture', () => {
+    for (const { perfil, analisis } of PAREJAS_PERFIL) {
+      const enElFichero = analisis().raiz.getAttributeNS(NS.xsi, 'schemaLocation')
+      // El de la plantilla viene con espacios de sobra entre los dos trozos del
+      // par; se normalizan los runs de blancos, que es lo mismo que hace la
+      // canonicalización del round-trip y lo que XSD-list define.
+      expect(enElFichero.replace(/\s+/g, ' ').trim(), perfil.id).toBe(perfil.schemaLocation)
+    }
   })
 
-  it('son pares `namespace xsd` y los namespaces citados están en NS', () => {
-    const piezas = SCHEMA_LOCATION.split(/\s+/)
-    expect(piezas.length % 2).toBe(0)
-    const namespaces = piezas.filter((_, i) => i % 2 === 0)
-    expect(namespaces).toEqual([NS.wfs, NS.cp])
+  it('la ENTREGA cita SOLO cp/4.0; el WFS cita ADEMÁS su propio esquema', () => {
+    const namespacesDe = (sl) => sl.split(/\s+/).filter((_, i) => i % 2 === 0)
+    expect(namespacesDe(SCHEMA_LOCATION_ENTREGA)).toEqual([NS.cp])
+    expect(namespacesDe(SCHEMA_LOCATION_WFS)).toEqual([NS.wfs, NS.cp])
+  })
+
+  it('los dos son pares `namespace xsd` completos', () => {
+    for (const sl of [SCHEMA_LOCATION_ENTREGA, SCHEMA_LOCATION_WFS]) {
+      expect(sl.split(/\s+/).length % 2).toBe(0)
+    }
+  })
+
+  it('⚠️ el WFS declara el esquema que el IVG NO carga: ahí murió el fichero', () => {
+    // Esta es la afirmación que el proyecto no tenía escrita en ninguna parte, y
+    // por eso se pudo emitir el sobre equivocado durante toda F04.
+    expect(SCHEMA_LOCATION_WFS).toContain(NS.wfs)
+    expect(SCHEMA_LOCATION_ENTREGA).not.toContain(NS.wfs)
+  })
+})
+
+describe('gml/_comun · PERFILES — cada campo atado a su fichero real', () => {
+  it('perfilPorId devuelve el perfil, y LANZA con uno inventado', () => {
+    expect(perfilPorId(PERFIL.ENTREGA).id).toBe(PERFIL.ENTREGA)
+    expect(perfilPorId(PERFIL.WFS).id).toBe(PERFIL.WFS)
+    expect(() => perfilPorId('CP_5_0')).toThrow(RangeError)
+    // Sin valor por defecto silencioso: `undefined` no cae en ENTREGA.
+    expect(() => perfilPorId(undefined)).toThrow(RangeError)
+    // Y no se cuela por la cadena de prototipos.
+    expect(() => perfilPorId('toString')).toThrow(RangeError)
+  })
+
+  it('la raíz y el contenedor de cada perfil son los del fichero', () => {
+    for (const { perfil, analisis } of PAREJAS_PERFIL) {
+      const a = analisis()
+      expect(perfil.raiz.split(':').pop(), a.nombre).toBe(a.raiz.localName)
+      expect(perfil.raizNs, a.nombre).toBe(a.raiz.namespaceURI)
+      expect(perfil.miembro.split(':').pop(), a.nombre).toBe(a.contenedor.localName)
+    }
+  })
+
+  it('`raizLlevaGmlId` y `atributosWfs` describen lo que el fichero trae', () => {
+    for (const { perfil, analisis } of PAREJAS_PERFIL) {
+      const raiz = analisis().raiz
+      expect(perfil.raizLlevaGmlId, `${perfil.id}: gml:id en la raíz`).toBe(
+        raiz.hasAttributeNS(NS.gml, 'id'),
+      )
+      expect(perfil.atributosWfs, `${perfil.id}: numberReturned`).toBe(
+        raiz.hasAttribute('numberReturned'),
+      )
+    }
+  })
+
+  it('`emiteEndLifespan` y `emiteReferencePoint` describen lo que el fichero trae', () => {
+    for (const { perfil, analisis } of PAREJAS_PERFIL) {
+      const locales = [...analisis().feature.children].map((e) => e.localName)
+      expect(perfil.emiteEndLifespan, `${perfil.id}: endLifespanVersion`).toBe(
+        locales.includes('endLifespanVersion'),
+      )
+      expect(perfil.emiteReferencePoint, `${perfil.id}: referencePoint`).toBe(
+        locales.includes('referencePoint'),
+      )
+    }
+  })
+
+  it('`formaSrsName` es la forma que el fichero usa DE VERDAD, y son distintas', () => {
+    for (const { perfil, analisis } of PAREJAS_PERFIL) {
+      for (const valor of srsNamesDe(analisis())) {
+        expect(normalizarSrsName(valor).forma, `${perfil.id}: ${valor}`).toBe(perfil.formaSrsName)
+      }
+    }
+    // Anti-vacuidad: si las dos formas fueran la misma, el bucle de arriba
+    // pasaría sin comprobar nada interesante.
+    expect(PERFILES[PERFIL.ENTREGA].formaSrsName).not.toBe(PERFILES[PERFIL.WFS].formaSrsName)
+  })
+
+  it('PERFILES y todos sus campos de array están congelados', () => {
+    expect(Object.isFrozen(PERFILES)).toBe(true)
+    for (const perfil of Object.values(PERFILES)) {
+      expect(Object.isFrozen(perfil)).toBe(true)
+      expect(Object.isFrozen(perfil.prefijosRaiz)).toBe(true)
+    }
   })
 })
 
@@ -269,19 +436,40 @@ describe('gml/_comun · DIALECTOS — clasifica los cuatro fixtures del disco', 
     expect(vistos).toEqual(new Set(DIALECTOS.map((d) => d.id)))
   })
 
-  it('exactamente UN fixture es de dialecto soportado, y es el de raíz WFS 2.0', () => {
-    const soportados = ANALISIS.filter((a) => dialectoDe(a).soportado).map((a) => a.nombre)
-    const raizWfs = ANALISIS.filter((a) => a.raiz.namespaceURI === NS.wfs).map((a) => a.nombre)
-    expect(soportados).toEqual(raizWfs)
-    expect(soportados).toHaveLength(1)
+  it('los soportados son EXACTAMENTE los que traen el feature en cp/4.0', () => {
+    // El discriminante es el namespace del FEATURE, no la raíz. Hasta el
+    // 2026-07-27 esta prueba decía «y es el de raíz WFS 2.0», que ataba el
+    // soporte al sobre y dejaba fuera la plantilla oficial del propio Catastro.
+    const soportados = ANALISIS.filter((a) => dialectoDe(a).soportado).map((a) => a.nombre).sort()
+    const featureEnCp40 = ANALISIS.filter((a) => a.feature?.namespaceURI === NS.cp)
+      .map((a) => a.nombre)
+      .sort()
+    expect(soportados).toEqual(featureEnCp40)
+    expect(soportados).toHaveLength(2)
   })
 
-  it('el GML del WFS es CP_4_0 y soportado; UTM_1 es CP_3_0 y NO soportado', () => {
-    const d40 = dialectoDe(CP40)
-    expect(d40.id).toBe(DIALECTO.CP_4_0)
-    expect(d40.soportado).toBe(true)
-    expect(d40.tema).toBe('PARCELA')
+  it('los dos CP 4.0 son soportados y se distinguen por el SOBRE, no por el contenido', () => {
+    const dEntrega = dialectoDe(ENTREGA)
+    const dWfs = dialectoDe(CP40)
+    for (const [d, esperado] of [
+      [dEntrega, DIALECTO.CP_4_0_ENTREGA],
+      [dWfs, DIALECTO.CP_4_0_WFS],
+    ]) {
+      expect(d.id).toBe(esperado)
+      expect(d.soportado).toBe(true)
+      expect(d.tema).toBe('PARCELA')
+      expect(esCp40(d.id)).toBe(true)
+    }
+    // Mismo feature, distinta raíz: eso es exactamente la distinción.
+    expect(dEntrega.featureNs).toBe(dWfs.featureNs)
+    expect(dEntrega.raiz).not.toEqual(dWfs.raiz)
+    // Y `esCp40` no dice que sí a cualquier cosa.
+    expect(esCp40(DIALECTO.CP_3_0)).toBe(false)
+    expect(esCp40(DIALECTO.BU)).toBe(false)
+    expect(esCp40(DIALECTO.DESCONOCIDO)).toBe(false)
+  })
 
+  it('UTM_1 es CP_3_0 y NO soportado, y el motivo dice qué es', () => {
     const d30 = dialectoDe(CP30)
     expect(d30.id).toBe(DIALECTO.CP_3_0)
     expect(d30.soportado).toBe(false)
@@ -314,12 +502,25 @@ describe('gml/_comun · DIALECTOS — clasifica los cuatro fixtures del disco', 
   })
 
   it('sin `featureNs`: la raíz WFS 2.0 basta; la raíz gml:FeatureCollection no', () => {
-    expect(clasificarDialecto({ ns: NS.wfs, local: 'FeatureCollection' }).id).toBe(DIALECTO.CP_4_0)
-    // Aquí caben 3.0 y edificio: afirmar uno sería inventárselo (regla de oro 1).
-    // El llamante conserva lo que necesita: `soportado === false`.
+    expect(clasificarDialecto({ ns: NS.wfs, local: 'FeatureCollection' }).id).toBe(
+      DIALECTO.CP_4_0_WFS,
+    )
+    // Aquí caben tres (entrega 4.0, 3.0 y edificio): afirmar uno sería
+    // inventárselo (regla de oro 1). El llamante conserva lo que necesita:
+    // `soportado === false`, que es lo que le hace parar.
     const d = clasificarDialecto({ ns: NS.gml, local: 'FeatureCollection' })
     expect(d.id).toBe(DIALECTO.DESCONOCIDO)
     expect(d.soportado).toBe(false)
+  })
+
+  it('con `featureNs`, la raíz gml:FeatureCollection sí se resuelve, y en los tres casos', () => {
+    const conFeature = (featureNs) =>
+      clasificarDialecto({ ns: NS.gml, local: 'FeatureCollection', featureNs }).id
+    expect(conFeature(NS.cp)).toBe(DIALECTO.CP_4_0_ENTREGA)
+    expect(conFeature('urn:x-inspire:specification:gmlas:CadastralParcels:3.0')).toBe(
+      DIALECTO.CP_3_0,
+    )
+    expect(conFeature('http://inspire.jrc.ec.europa.eu/schemas/bu-ext2d/2.0')).toBe(DIALECTO.BU)
   })
 
   it('una raíz ajena (o sin namespace) cae en DESCONOCIDO, no lanza', () => {
@@ -449,11 +650,8 @@ describe('gml/_comun · srsNameUri — el srsName canónico (override O2)', () =
     }
   })
 
-  it('NO es la URN del 3.0 ni la forma corta del modelo', () => {
-    // Las tres formas conviven en este repo y confundirlas es un rechazo: el
-    // GML 3.0 del disco usa URN y el modelo usa la corta.
-    const urnDel30 = srsNamesDe(CP30)[0]
-    expect(srsNameUri('EPSG:25830')).not.toBe(urnDel30)
+  it('NO es la URN ni la forma corta del modelo: son tres cadenas distintas', () => {
+    expect(srsNameUri('EPSG:25830')).not.toBe(srsNameUrn('EPSG:25830'))
     expect(srsNameUri('EPSG:25830')).not.toBe('EPSG:25830')
   })
 
@@ -466,6 +664,62 @@ describe('gml/_comun · srsNameUri — el srsName canónico (override O2)', () =
   it('no-string → TypeError', () => {
     expect(() => srsNameUri(25830)).toThrow(TypeError)
     expect(() => srsNameUri(null)).toThrow(TypeError)
+  })
+})
+
+describe('gml/_comun · srsNameUrn — la forma de la ENTREGA (corrección de O2)', () => {
+  // ⚠️ El dossier decía «URI OGC, NUNCA la URN (que es del 3.0, rechazado)».
+  // Falso por partida doble: la URN también es 4.0 —la usa la plantilla oficial
+  // del Catastro— y es la que hay que emitir para SUBIR.
+  const URN_PLANTILLA = () => srsNamesDe(ENTREGA)[0]
+
+  it('para el huso 30 produce EXACTAMENTE el srsName de la plantilla OFICIAL', () => {
+    expect(srsNameUrn('EPSG:25830')).toBe(URN_PLANTILLA())
+    expect(URN_PLANTILLA().startsWith(PREFIJO_SRSNAME_URN)).toBe(true)
+  })
+
+  it('los tres husos siguen el patrón de la plantilla cambiando solo el código', () => {
+    for (const srs of SRS_SOPORTADOS) {
+      const codigo = srs.slice('EPSG:'.length)
+      expect(srsNameUrn(srs)).toBe(URN_PLANTILLA().replace(/\d+$/, codigo))
+    }
+  })
+
+  it('el `EPSG::` lleva DOS dos puntos (versión de registro vacía), y no es errata', () => {
+    // Se afirma sobre el fichero real, no sobre la constante: si alguien
+    // «arreglara» el doble dos puntos, la plantilla dejaría de reproducirse.
+    expect(URN_PLANTILLA()).toContain('EPSG::')
+    expect(URN_PLANTILLA()).not.toContain('EPSG:0:')
+  })
+
+  it('mismas guardas que srsNameUri: RangeError y TypeError', () => {
+    expect(() => srsNameUrn('EPSG:32628')).toThrow(RangeError)
+    expect(() => srsNameUrn('')).toThrow(RangeError)
+    expect(() => srsNameUrn(25830)).toThrow(TypeError)
+  })
+})
+
+describe('gml/_comun · srsNamePorForma — el despachador por perfil', () => {
+  it('URI y URN coinciden con sus dos funciones, para los tres husos', () => {
+    for (const srs of SRS_SOPORTADOS) {
+      expect(srsNamePorForma(srs, FORMA_SRSNAME.URI)).toBe(srsNameUri(srs))
+      expect(srsNamePorForma(srs, FORMA_SRSNAME.URN)).toBe(srsNameUrn(srs))
+    }
+  })
+
+  it('cada perfil, aplicado a su fixture, reproduce el srsName del fichero', () => {
+    // Cierra el círculo: perfil → forma → cadena → el fichero real. Si alguien
+    // cambiara `formaSrsName` de un perfil, esto cae señalando cuál.
+    for (const { perfil, analisis } of PAREJAS_PERFIL) {
+      const delFichero = srsNamesDe(analisis())[0]
+      expect(srsNamePorForma('EPSG:25830', perfil.formaSrsName), perfil.id).toBe(delFichero)
+    }
+  })
+
+  it('las formas que solo se LEEN no se pueden emitir → RangeError', () => {
+    expect(() => srsNamePorForma('EPSG:25830', FORMA_SRSNAME.CORTA)).toThrow(RangeError)
+    expect(() => srsNamePorForma('EPSG:25830', FORMA_SRSNAME.GML_SRS)).toThrow(RangeError)
+    expect(() => srsNamePorForma('EPSG:25830', FORMA_SRSNAME.DESCONOCIDA)).toThrow(RangeError)
   })
 })
 
@@ -494,40 +748,53 @@ describe('gml/_comun · srsCorto — la vuelta a la forma que consume geo/huso.j
 })
 
 describe('gml/_comun · normalizarSrsName — clasifica los srsName REALES del disco', () => {
-  it('URI del CP 4.0: forma URI, código 25830, COHERENTE', () => {
-    const r = normalizarSrsName(srsNamesDe(CP40)[0])
+  it('URI de la descarga del WFS: forma URI, código 25830, coherente CONTRA URI', () => {
+    const crudo = srsNamesDe(CP40)[0]
+    const r = normalizarSrsName(crudo, { formaCanonica: FORMA_SRSNAME.URI })
     expect(r.forma).toBe(FORMA_SRSNAME.URI)
     expect(r.codigo).toBe(25830)
     expect(r.coherente).toBe(true)
-    expect(r.valor).toBe(srsNamesDe(CP40)[0])
+    expect(r.formaCanonica).toBe(FORMA_SRSNAME.URI)
+    expect(r.valor).toBe(crudo)
+    // …y NO coherente contra la URN, que es la forma del otro perfil. Que
+    // `coherente` dependa de contra qué se pregunta es justo la corrección.
+    expect(normalizarSrsName(crudo, { formaCanonica: FORMA_SRSNAME.URN }).coherente).toBe(false)
   })
 
-  it('URN del CP 3.0 (`urn:ogc:def:crs:EPSG::25830`): forma URN, código sí, NO coherente', () => {
-    const crudo = srsNamesDe(CP30)[0]
-    expect(crudo).toMatch(/^urn:/) // el fichero del disco, no una cadena inventada
+  it('URN de la plantilla OFICIAL: coherente contra URN, que es el defecto', () => {
+    const crudo = srsNamesDe(ENTREGA)[0]
+    expect(crudo).toMatch(/^urn:/) // del fichero del disco, no una cadena inventada
     const r = normalizarSrsName(crudo)
     expect(r.forma).toBe(FORMA_SRSNAME.URN)
     expect(r.codigo).toBe(25830)
-    // El dato se aprovecha (el huso es legible) pero la forma es la del 3.0: el
-    // llamante emite SRS_FORMA_INESPERADA en vez de tragárselo.
-    expect(r.coherente).toBe(false)
+    expect(r.formaCanonica).toBe(FORMA_SRSNAME.URN)
+    expect(r.coherente).toBe(true)
   })
 
-  it('el GML de edificio usa la MISMA URN (override O10: asimetría deliberada)', () => {
+  it('la URN del CP 3.0 y la del edificio son la MISMA cadena que la de la entrega', () => {
+    // Hallazgo que hay que dejar escrito: la forma del srsName NO distingue
+    // dialectos. Quien quiera saber si un fichero es 4.0 mira el namespace del
+    // feature, no la forma de esta cadena. Suponer lo contrario fue parte de que
+    // el dossier llamara «del 3.0, rechazada» a una forma perfectamente 4.0.
+    const dePlantilla = srsNamesDe(ENTREGA)[0]
+    expect(srsNamesDe(CP30)[0]).toBe(dePlantilla)
     const bu = ANALISIS.filter((a) => dialectoDe(a).id === DIALECTO.BU)
     const urns = bu.flatMap(srsNamesDe)
     expect(urns.length).toBeGreaterThan(0)
-    for (const u of urns) {
-      expect(normalizarSrsName(u).forma, u).toBe(FORMA_SRSNAME.URN)
-      expect(normalizarSrsName(u).coherente, u).toBe(false)
-    }
+    for (const u of urns) expect(normalizarSrsName(u).forma, u).toBe(FORMA_SRSNAME.URN)
   })
 
-  it('forma CORTA `EPSG:25830` (la del modelo): se reconoce y no es coherente', () => {
+  it('forma CORTA `EPSG:25830` (la del modelo): se reconoce y no es coherente con ninguna', () => {
     const r = normalizarSrsName(SRS_SOPORTADOS[1])
     expect(r.forma).toBe(FORMA_SRSNAME.CORTA)
     expect(r.codigo).toBe(25830)
     expect(r.coherente).toBe(false)
+    expect(normalizarSrsName(SRS_SOPORTADOS[1], { formaCanonica: 'URI' }).coherente).toBe(false)
+  })
+
+  it('una `formaCanonica` que no es URI ni URN → RangeError', () => {
+    expect(() => normalizarSrsName('EPSG:25830', { formaCanonica: 'CORTA' })).toThrow(RangeError)
+    expect(() => normalizarSrsName('EPSG:25830', { formaCanonica: null })).toThrow(RangeError)
   })
 
   it('forma heredada de GML 2/3.0 (`epsg.xml#25830`): se reconoce para poder nombrarla', () => {
@@ -546,15 +813,22 @@ describe('gml/_comun · normalizarSrsName — clasifica los srsName REALES del d
     expect(r.coherente).toBe(false)
   })
 
-  it('un EPSG soportado en URI canónica es lo ÚNICO coherente, para los tres husos', () => {
+  it('un EPSG soportado en su forma canónica es coherente, para los tres husos', () => {
     for (const srs of SRS_SOPORTADOS) {
-      expect(normalizarSrsName(srsNameUri(srs)).coherente, srs).toBe(true)
+      expect(normalizarSrsName(srsNameUrn(srs)).coherente, srs).toBe(true)
+      expect(
+        normalizarSrsName(srsNameUri(srs), { formaCanonica: FORMA_SRSNAME.URI }).coherente,
+        srs,
+      ).toBe(true)
     }
-    // Canarias en URI canónica: forma buena, SRS diferido → no coherente (O13).
-    const canarias = normalizarSrsName(`${PREFIJO_SRSNAME_URI}32628`)
-    expect(canarias.forma).toBe(FORMA_SRSNAME.URI)
-    expect(canarias.codigo).toBe(32628)
-    expect(canarias.coherente).toBe(false)
+    // Canarias en forma canónica: forma buena, SRS diferido → no coherente (O13).
+    for (const prefijo of [PREFIJO_SRSNAME_URI, PREFIJO_SRSNAME_URN]) {
+      const canarias = normalizarSrsName(`${prefijo}32628`, {
+        formaCanonica: prefijo === PREFIJO_SRSNAME_URI ? FORMA_SRSNAME.URI : FORMA_SRSNAME.URN,
+      })
+      expect(canarias.codigo, prefijo).toBe(32628)
+      expect(canarias.coherente, prefijo).toBe(false)
+    }
   })
 
   it('basura → DESCONOCIDA con código null, sin lanzar (es dato del usuario)', () => {
@@ -566,10 +840,15 @@ describe('gml/_comun · normalizarSrsName — clasifica los srsName REALES del d
     }
   })
 
-  it('recorta espacios alrededor', () => {
-    const r = normalizarSrsName(`  ${srsNameUri('EPSG:25831')}\n`)
-    expect(r.valor).toBe(srsNameUri('EPSG:25831'))
-    expect(r.coherente).toBe(true)
+  it('recorta espacios alrededor, en las dos formas', () => {
+    for (const [forma, canonico] of [
+      [FORMA_SRSNAME.URN, srsNameUrn('EPSG:25831')],
+      [FORMA_SRSNAME.URI, srsNameUri('EPSG:25831')],
+    ]) {
+      const r = normalizarSrsName(`  ${canonico}\n`, { formaCanonica: forma })
+      expect(r.valor, forma).toBe(canonico)
+      expect(r.coherente, forma).toBe(true)
+    }
   })
 
   it('no-string → TypeError, y el mensaje manda a SRS_AUSENTE', () => {

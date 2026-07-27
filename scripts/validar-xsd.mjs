@@ -1,46 +1,48 @@
 #!/usr/bin/env node
-// scripts/validar-xsd.mjs — F04 · criterio de aceptación 6, la mitad OPCIONAL.
+// scripts/validar-xsd.mjs — F04 · validación contra el XSD oficial de INSPIRE.
 //
-// Valida un GML de parcela contra el XSD oficial de INSPIRE Cadastral Parcels
-// 4.0 usando `xmllint`, SIN subir nada a la Sede Electrónica del Catastro.
+// Valida uno o varios GML de parcela contra `CadastralParcels.xsd` 4.0 SIN subir
+// nada a la Sede Electrónica.
 //
-// POR QUÉ ESTE SCRIPT ESTÁ FUERA DE `npm test`
-// --------------------------------------------
-// El criterio 6 de F04 pedía «validación de esquema en CI con libxmljs/xmllint».
-// Cumplirlo dentro de la suite exigía una de dos cosas, y las dos son peores que
-// el problema que resuelven:
-//   · `libxmljs` — módulo NATIVO. En Windows arrastra toolchain de compilación y
-//     convierte `npm install` en una lotería. Este proyecto es frontend puro y su
-//     única dependencia de build es Vite: meter node-gyp para validar un XML es
-//     desproporcionado.
-//   · Vendorizar el árbol de XSD — `CadastralParcels.xsd` importa GML 3.2.1, que
-//     importa ISO 19139, que importa media docena más. Son decenas de ficheros de
-//     terceros, y sin un catálogo XML no resuelven offline.
-// La decisión (tomada con el usuario al planificar F04) fue partir el criterio en
-// dos: la parte que SIEMPRE corre es el guardián estructural de
-// `test/gml/aceptacion-f04.test.js`, que afirma punto por punto el checklist de
-// rechazos del IVG derivándolo del GML real del WFS; y la parte de esquema es
-// este script, opcional, que quien tenga `xmllint` puede ejecutar cuando quiera.
+// ═════════════════════════════════════════════════════════════════════════════
+// ⚠️ POR QUÉ ESTE SCRIPT SE REESCRIBIÓ EL 2026-07-27
+// ═════════════════════════════════════════════════════════════════════════════
+// La primera versión solo sabía usar `xmllint`. En la máquina donde se desarrolla
+// F04 `xmllint` no está instalado, así que el script salía SALTADO con código 0
+// —tal como estaba diseñado— y **nunca llegó a ejecutarse ni una vez**. Mientras
+// tanto la suite daba 1.784 pruebas en verde y el fichero que producía la app era
+// rechazado por el IVG: raíz `wfs:FeatureCollection`, que el validador de la Sede
+// no conoce porque solo carga el esquema de parcela.
 //
-// LO QUE EL XSD **NO** DETECTA (por eso el guardián estructural no es redundante)
-// -----------------------------------------------------------------------------
+// Un guardián que se salta solo no es un guardián: es una intención. De ahí tres
+// cambios:
+//
+//   1. DOS MOTORES. Si no hay `xmllint`, se usa Python con `lxml` (que trae
+//      libxml2, el mismo motor). Basta con que haya UNO de los dos.
+//   2. `--estricto`. Con esa bandera, no poder validar es un FALLO (código 2) en
+//      vez de un salto benigno. Es lo que usa CI, donde sí hay herramientas y
+//      donde saltarse la comprobación en silencio es justo lo que pasó.
+//   3. SE VALIDA CONTRA `cp/4.0` A SECAS. Sin `wfs/2.0`. Es lo que hace el IVG, y
+//      es la única forma de que el fallo real aparezca aquí: con los dos esquemas
+//      cargados, el fichero que la Sede rechazó valida perfectamente.
+//
+// LO QUE EL XSD **NO** DETECTA (por eso los guardianes de la suite no sobran)
+// -------------------------------------------------------------------------
 // Comprobado leyendo `CadastralParcelType` en el XSD oficial: `validFrom`,
 // `validTo` y `zoning` siguen en la secuencia con `minOccurs="0"`, y
-// `gml:boundedBy` se hereda de `gml:AbstractFeatureType`. Es decir: un GML con
-// cualquiera de esos elementos —que están en el checklist de rechazos del IVG—
-// **pasa esta validación en verde**. El esquema tampoco dice nada de la
-// orientación de los anillos (override O1), ni de que el `srsName` deba ser la
-// URI y no la URN (O2), ni de que `areaValue` cuadre con las coordenadas.
-// Traducción: que este script diga OK no significa que la Sede lo acepte, y que
-// falle sí significa que hay un problema. Es una red de seguridad asimétrica, y
-// así hay que leerla.
+// `gml:boundedBy` se hereda de `gml:AbstractFeatureType`. Un GML con cualquiera
+// de ellos —que están en el checklist de rechazos del IVG— pasa esta validación
+// en verde. El esquema tampoco dice nada de la orientación de los anillos, ni de
+// si el `srsName` va en URN o en URI (las dos son `xsd:anyURI` y las dos valen),
+// ni de que `areaValue` cuadre con las coordenadas.
+//
+// Traducción: que esto diga OK no garantiza que la Sede lo acepte; que falle sí
+// garantiza que hay un problema. Es una red asimétrica y así hay que leerla.
 //
 // CÓDIGOS DE SALIDA
-//   0 → validó correctamente, O se saltó por falta de herramienta/esquema
-//   1 → el fichero NO valida contra el esquema, o hubo un error de uso
-// El «saltado» sale con 0 A PROPÓSITO: este script no está en la ruta de nadie
-// que no lo haya invocado, y romper por no tener instalado un binario opcional
-// sería justo el tipo de fricción que se quería evitar.
+//   0 → todo validó (o se saltó sin `--estricto`)
+//   1 → algún fichero NO valida, o error de uso
+//   2 → no se pudo validar y se pidió `--estricto`
 
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
@@ -48,114 +50,150 @@ import { join, resolve } from 'node:path'
 
 const RAIZ = resolve(import.meta.dirname, '..')
 
-/** GML que se valida si no se pasa ninguno: el snapshot del round-trip de F04. */
-const GML_POR_DEFECTO = join(RAIZ, 'test', 'gml', '__snapshots__', 'parcela.gml')
+/**
+ * Los GML que se validan si no se pasa ninguno: los dos snapshots del round-trip.
+ * El de ENTREGA es el que importa —es la forma que produce la app— y el de WFS
+ * está a propósito para que se vea que SE COMPORTAN DISTINTO: contra `cp/4.0` a
+ * secas, el de entrega valida y el de WFS no. Esa asimetría es el hallazgo.
+ */
+const GML_POR_DEFECTO = [
+  join(RAIZ, 'test', 'gml', '__snapshots__', 'parcela-entrega.gml'),
+  join(RAIZ, 'test', 'fixtures', 'gml', 'cp_ejemplo_explicativo.gml'),
+]
 
-/** Árbol de esquemas local (opcional). Está en `.gitignore`: es de terceros. */
-const XSD_LOCAL = join(RAIZ, 'esquemas', 'cp', '4.0', 'CadastralParcels.xsd')
+/** Caché de los XSD descargados. Va en `.gitignore`: son de terceros. */
+const CACHE = join(RAIZ, 'esquemas', 'cache')
 
-/** El mismo esquema en su sitio oficial. Es de la Comisión Europea, NO del Catastro. */
+/** El esquema en su sitio oficial. Es de la Comisión Europea, NO del Catastro. */
 const XSD_REMOTO = 'https://inspire.ec.europa.eu/schemas/cp/4.0/CadastralParcels.xsd'
+
+const AYUDA_INSTALACION = [
+  'Hace falta UNA de estas dos cosas:',
+  '',
+  '  · xmllint (libxml2)',
+  '      Windows  →  winget install --id Gnome.Libxml2',
+  '      macOS    →  brew install libxml2   (y añade su bin al PATH)',
+  '      Debian   →  sudo apt install libxml2-utils',
+  '',
+  '  · Python con lxml  (lleva libxml2 dentro: el mismo motor)',
+  '      pip install lxml',
+]
 
 // ── Presentación ──────────────────────────────────────────────────────────────
 
 const linea = (s = '') => process.stdout.write(`${s}\n`)
 
-function saltado(motivo, comoArreglarlo) {
-  linea('')
-  linea('  SALTADO · validación de esquema XSD')
-  linea('  ─────────────────────────────────────────────────────────────────────')
-  linea(`  ${motivo}`)
-  linea('')
-  for (const paso of comoArreglarlo) linea(`  ${paso}`)
-  linea('')
-  linea('  Esto NO es un fallo: el guardián estructural de F04 corre siempre en')
-  linea('  `npm test` y cubre el checklist de rechazos del IVG. Esta validación')
-  linea('  de esquema es una comprobación adicional y opcional.')
-  linea('')
-  process.exit(0)
-}
+// ── Argumentos ────────────────────────────────────────────────────────────────
 
-// ── Comprobaciones ────────────────────────────────────────────────────────────
+const argv = process.argv.slice(2)
+const estricto = argv.includes('--estricto')
+const rutas = argv.filter((a) => !a.startsWith('-'))
+const ficheros = rutas.length > 0 ? rutas.map((r) => resolve(r)) : GML_POR_DEFECTO
 
-const argumentos = process.argv.slice(2).filter((a) => !a.startsWith('-'))
-if (argumentos.length > 1) {
+const faltan = ficheros.filter((f) => !existsSync(f))
+if (faltan.length > 0) {
   linea('')
-  linea('  Uso: npm run validar:xsd [-- ruta/al/fichero.gml]')
-  linea('')
-  linea(`  Sin argumento valida ${GML_POR_DEFECTO}`)
-  linea('')
-  process.exit(1)
-}
-
-const gml = argumentos.length === 1 ? resolve(argumentos[0]) : GML_POR_DEFECTO
-
-if (!existsSync(gml)) {
-  // Que falte el fichero A VALIDAR sí es un error de uso: lo has pedido tú.
-  // (Salvo el caso benigno de que aún no exista el snapshot, que se explica.)
-  const esElPorDefecto = gml === GML_POR_DEFECTO
-  linea('')
-  linea(`  ERROR · no existe el fichero a validar:\n    ${gml}`)
-  if (esElPorDefecto) {
+  linea('  ERROR · no existe(n) el/los fichero(s) a validar:')
+  for (const f of faltan) linea(`    ${f}`)
+  if (rutas.length === 0) {
     linea('')
-    linea('  Es el snapshot del round-trip de F04, y lo genera la suite de tests.')
+    linea('  Son los snapshots del round-trip de F04 y los genera la suite.')
     linea('  Ejecuta primero `npm test` y vuelve a intentarlo.')
   }
   linea('')
   process.exit(1)
 }
 
-const xmllint = spawnSync('xmllint', ['--version'], { stdio: 'ignore', shell: true })
-if (xmllint.error !== undefined || xmllint.status !== 0) {
-  saltado('`xmllint` no está disponible en el PATH.', [
-    'Para instalarlo:',
-    '  · Windows  →  winget install --id Gnome.Libxml2',
-    '                (o `choco install xsltproc`, que trae xmllint)',
-    '  · macOS    →  brew install libxml2  (y añade su bin al PATH)',
-    '  · Debian   →  sudo apt install libxml2-utils',
-  ])
+// ── Elección del motor ────────────────────────────────────────────────────────
+
+/**
+ * ¿Responde este ejecutable a los argumentos dados?
+ *
+ * ⚠️ SIN `shell: true`, y no es indiferente. Con shell en Windows, `spawnSync`
+ * pega los argumentos en una línea de `cmd.exe` sin entrecomillarlos, así que
+ * `['-c', 'import lxml.etree']` le llega a Python partido en dos y responde con
+ * un error de sintaxis. El síntoma es de los peores posibles: el script concluye
+ * «Python no tiene lxml» en una máquina donde sí lo tiene, se salta la validación
+ * y sale con 0. O sea, la misma clase de silencio que este script existe para
+ * romper. Sin shell, el array de argumentos se respeta y los rutas con espacios
+ * tampoco necesitan comillas.
+ */
+function disponible(cmd, args) {
+  const r = spawnSync(cmd, args, { stdio: 'ignore' })
+  return r.error === undefined && r.status === 0
 }
 
-// ── Validación ────────────────────────────────────────────────────────────────
-
-const hayEsquemaLocal = existsSync(XSD_LOCAL)
-const esquema = hayEsquemaLocal ? XSD_LOCAL : XSD_REMOTO
-
-if (!hayEsquemaLocal) {
-  linea('')
-  linea('  AVISO · no hay árbol de esquemas local, se usará el remoto.')
-  linea(`         ${XSD_REMOTO}`)
-  linea('         Requiere red, y xmllint tendrá que descargar también los XSD')
-  linea('         importados (GML 3.2.1, base 3.3, ISO 19139): puede tardar.')
-  linea('')
-  linea('  Para validar OFFLINE y de forma reproducible, coloca el árbol en')
-  linea(`         ${join(RAIZ, 'esquemas', 'cp', '4.0')}`)
-  linea('  (está en .gitignore: son ficheros de terceros, no código del proyecto).')
+/** Primer intérprete de Python que además tenga `lxml`. */
+function pythonConLxml() {
+  for (const cmd of ['python', 'python3', 'py']) {
+    if (disponible(cmd, ['-c', 'import lxml.etree'])) return cmd
+  }
+  return null
 }
 
-linea('')
-linea(`  Validando  ${gml}`)
-linea(`  Contra     ${esquema}`)
-linea('')
+const hayXmllint = disponible('xmllint', ['--version'])
+const python = hayXmllint ? null : pythonConLxml()
 
-const r = spawnSync('xmllint', ['--noout', '--schema', esquema, gml], {
-  stdio: 'inherit',
-  shell: true,
-})
-
-if (r.status === 0) {
+if (!hayXmllint && python === null) {
   linea('')
-  linea('  OK · el fichero valida contra el esquema.')
+  linea('  NO SE PUDO VALIDAR · no hay ningún motor de esquema disponible')
+  linea('  ─────────────────────────────────────────────────────────────────────')
+  for (const l of AYUDA_INSTALACION) linea(`  ${l}`)
   linea('')
-  linea('  Recordatorio: el XSD NO comprueba la orientación de los anillos (O1),')
-  linea('  ni que el srsName sea la URI y no la URN (O2), ni que areaValue cuadre')
-  linea('  con las coordenadas, ni la ausencia de boundedBy/validFrom/zoning (que')
-  linea('  el esquema ADMITE y el IVG rechaza). Eso lo cubre la suite de tests.')
+  if (estricto) {
+    linea('  Se pidió --estricto, así que esto es un FALLO.')
+    linea('')
+    process.exit(2)
+  }
+  linea('  Sin --estricto esto no rompe nada, pero que conste: la última vez que')
+  linea('  esta comprobación se saltó en silencio, la Sede rechazó el fichero.')
   linea('')
   process.exit(0)
 }
 
+// ── Validación ────────────────────────────────────────────────────────────────
+
 linea('')
-linea('  FALLO · el fichero NO valida contra el esquema (ver el detalle arriba).')
+linea(`  Motor      ${hayXmllint ? 'xmllint' : `${python} + lxml`}`)
+linea(`  Esquema    ${XSD_REMOTO}  (SOLO cp/4.0, como el IVG)`)
 linea('')
-process.exit(1)
+
+let codigo
+if (hayXmllint) {
+  // `xmllint` resuelve los imports por red él solo. No se le pasa `wfs.xsd` a
+  // propósito: ver la cabecera.
+  const r = spawnSync('xmllint', ['--noout', '--schema', XSD_REMOTO, ...ficheros], {
+    stdio: 'inherit',
+  })
+  codigo = r.status === 0 ? 0 : 1
+} else {
+  const r = spawnSync(python, [join(RAIZ, 'scripts', 'validar-xsd.py'), CACHE, ...ficheros], {
+    stdio: 'inherit',
+  })
+  if (r.status === 2) {
+    linea('')
+    linea('  NO SE PUDO CONSTRUIR EL ESQUEMA (¿sin red y sin caché?).')
+    linea('')
+    process.exit(estricto ? 2 : 0)
+  }
+  codigo = r.status === 0 ? 0 : 1
+}
+
+linea('')
+if (codigo === 0) {
+  linea('  OK · valida(n) contra el esquema oficial de parcela 4.0.')
+  linea('')
+  linea('  Recordatorio: el XSD NO comprueba la orientación de los anillos, ni que')
+  linea('  areaValue cuadre con las coordenadas, ni la ausencia de boundedBy /')
+  linea('  validFrom / zoning (que el esquema ADMITE y el IVG rechaza). Eso lo')
+  linea('  cubre la suite.')
+} else {
+  linea('  FALLO · NO valida contra el esquema (el detalle está arriba).')
+  linea('')
+  linea('  Si el error es «No matching global declaration available for the')
+  linea('  validation root», el fichero trae la raíz de la DESCARGA del WFS')
+  linea('  (`wfs:FeatureCollection`) y no la de ENTREGA (`gml:FeatureCollection`).')
+  linea('  Es el fallo del 2026-07-27: mira el `perfil` con que se serializó.')
+}
+linea('')
+process.exit(codigo)

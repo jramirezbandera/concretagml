@@ -101,6 +101,7 @@ import {
   crearDeteccionGml,
   normalizarSrsName,
   srsCorto,
+  srsNamePorForma,
 } from './_comun.js'
 import { SIN_NAMESPACE, atributo, hijo, hijoUnico, hijos, parsearXml, texto } from './xml.js'
 import { orientacion } from '../geo/area.js'
@@ -697,7 +698,12 @@ function resolverSrs(ctx, miembro, srsNames, dialecto) {
   }
 
   const distintos = [...new Set(srsNames.map((s) => s.valor))]
-  const analisis = normalizarSrsName(srsNames[0].valor)
+  // La forma canónica LA DICE EL DIALECTO, no una constante global: la URN es la
+  // correcta en una ENTREGA y la URI en una descarga del WFS, y hasta el
+  // 2026-07-27 este lector daba por buena solo la segunda. Ver `gml/_comun.js`.
+  const analisis = normalizarSrsName(srsNames[0].valor, {
+    formaCanonica: dialecto.formaSrsName,
+  })
   if (distintos.length > 1) {
     anotaEn(
       ctx,
@@ -744,18 +750,24 @@ function resolverSrs(ctx, miembro, srsNames, dialecto) {
     return { srs: null, srsName: analisis }
   }
 
-  // La forma solo se juzga en 4.0: la URN es la forma NATIVA del 3.0 y del GML de
-  // edificio (override O10), así que avisar allí sería ruido sobre un fichero que
-  // ya se ha señalado entero con DIALECTO_RECHAZADO.
-  if (dialecto.id === DIALECTO.CP_4_0 && !analisis.coherente) {
+  // La forma solo se juzga en los dialectos SOPORTADOS: en el 3.0 y en el de
+  // edificio avisar sería ruido sobre un fichero que ya se ha señalado entero.
+  //
+  // Y se juzga contra la forma DE SU DIALECTO, no contra una única forma buena.
+  // Hasta el 2026-07-27 aquí se exigía la URI siempre y se decía que «la Sede
+  // rechaza la otra forma»: era falso —las dos son `xsd:anyURI` y las dos
+  // validan— y además al revés, porque la que hay que emitir para SUBIR es la
+  // URN. Ahora es un aviso de coherencia con el perfil, no un veredicto.
+  if (dialecto.soportado && !analisis.coherente) {
     anotaEn(
       ctx,
       miembro,
       TIPO_GML.SRS_FORMA_INESPERADA,
-      `El «srsName» ${JSON.stringify(analisis.valor)} está en forma ${analisis.forma} y una ` +
-        'parcela 4.0 lo lleva en URI OGC (override O2): ' +
-        `«http://www.opengis.net/def/crs/EPSG/0/${analisis.codigo}». El código EPSG se ` +
-        'entiende igual, pero la Sede rechaza la otra forma.',
+      `El «srsName» ${JSON.stringify(analisis.valor)} está en forma ${analisis.forma}, y un ` +
+        `fichero de este tipo (${dialecto.id}) lo lleva en ${analisis.formaCanonica}: ` +
+        `«${srsNamePorForma(srsCorto(analisis.codigo), analisis.formaCanonica)}». El código ` +
+        'EPSG se entiende igual y el esquema admite las dos formas, así que la geometría se ' +
+        'lee sin problema; se avisa porque no es la forma del fichero de referencia.',
       SEVERIDAD.AVISO,
       { srsName: analisis.valor, forma: analisis.forma, codigo: analisis.codigo },
     )
@@ -826,11 +838,21 @@ function revisarOrden(ctx, miembro, feature) {
 }
 
 /**
- * `inspireId`: `localId` + `namespace`, y el aviso del `base:` de la 3.2.
+ * `inspireId`: `localId` + `namespace`, y el aviso de la VERSIÓN de base.
  *
- * La 4.0 lleva `<Identifier xmlns="…/base/3.3">` SIN prefijo (override O4); el
- * `base:Identifier` es de la 3.2, es decir del dialecto 3.0. Se leen los valores
- * igual —el dato es aprovechable y F08 quiere reescribirlo en 4.0—, pero se dice.
+ * ⚠️ Aquí se juzga el NAMESPACE, no el prefijo, y la distinción costó un rechazo.
+ * Hasta el 2026-07-27 esta función avisaba de `base:Identifier` porque el dossier
+ * (override O4) decía que el prefijo era del 3.0 y «produce rechazo en 4.0». Es
+ * falso: en XML el prefijo no es información —el infoset guarda la URI del
+ * namespace y nada más—, y la PLANTILLA OFICIAL del Catastro usa `base:` sobre
+ * base 3.3 y valida contra el XSD. Con aquella regla, el fichero de referencia
+ * del propio Catastro salía marcado.
+ *
+ * Lo que sí distingue los dialectos es la VERSIÓN: base 3.3
+ * (`http://inspire.ec.europa.eu/schemas/base/3.3`) es la del CP 4.0, y base 3.2
+ * (`urn:x-inspire:specification:gmlas:BaseTypes:3.2`) la del CP 3.0. Se leen los
+ * valores igual —el dato es aprovechable y F08 quiere reescribirlo en 4.0—, pero
+ * se dice.
  */
 function leerInspireId(ctx, miembro, feature, nsFeature) {
   const inspireId = hijo(feature, nsFeature, 'inspireId')
@@ -839,22 +861,22 @@ function leerInspireId(ctx, miembro, feature, nsFeature) {
   const identifier = inspireId.hijos.find((h) => h.local === 'Identifier') ?? null
   if (identifier === null) return { localId: null, namespaceInspire: null }
 
-  if (identifier.prefijo !== '' || identifier.ns !== NS.base33) {
+  if (identifier.ns !== NS.base33) {
     anotaEn(
       ctx,
       miembro,
-      TIPO_GML.INSPIREID_CON_PREFIJO,
-      `El «inspireId» trae «${identifier.prefijo === '' ? '' : `${identifier.prefijo}:`}` +
-        `Identifier» en el namespace ${JSON.stringify(identifier.ns)}. Una parcela 4.0 lo ` +
-        `lleva SIN prefijo y en base 3.3 (${NS.base33}); el prefijo «base:» es de base 3.2, ` +
-        'que es la del GML 3.0 (override O4).',
+      TIPO_GML.INSPIREID_NS_INESPERADO,
+      `El «Identifier» del «inspireId» está en el namespace ` +
+        `${JSON.stringify(identifier.ns)}. Una parcela 4.0 lo lleva en INSPIRE base 3.3 ` +
+        `(${NS.base33}); ese otro es de base 3.2, que va con el GML 3.0. El prefijo con que ` +
+        'se escriba (`base:` o ninguno) da igual: lo que cuenta es el namespace.',
       SEVERIDAD.AVISO,
       { prefijo: identifier.prefijo, ns: identifier.ns, esperado: NS.base33 },
     )
   }
 
-  // El `localId`/`namespace` se buscan por nombre LOCAL: en 4.0 van sin prefijo y
-  // en 3.0 con `base:`, y el dato es el mismo en los dos casos.
+  // El `localId`/`namespace` se buscan por nombre LOCAL: los ficheros reales los
+  // escriben con prefijo y sin él, y el dato es el mismo en los dos casos.
   const porLocal = (nombre) => identifier.hijos.find((h) => h.local === nombre) ?? null
   return {
     localId: valorTexto(porLocal('localId')),
@@ -1099,8 +1121,9 @@ export function parsearGml(xml, opciones = {}) {
       TIPO_GML.RAIZ_INESPERADA,
       `La raíz del documento es «${raiz.local}» en el namespace ` +
         `${raiz.ns === '' ? '(ninguno)' : JSON.stringify(raiz.ns)}, que no corresponde a ` +
-        'ningún GML conocido. Se esperaba una «FeatureCollection» de WFS 2.0 (parcela 4.0) ' +
-        'o de GML 3.2 (parcela 3.0 o edificio).',
+        'ningún GML conocido. Se esperaba una «FeatureCollection», o bien de GML 3.2 ' +
+        '(entrega de parcela 4.0, parcela 3.0 o edificio) o bien de WFS 2.0 (descarga del ' +
+        'servicio del Catastro).',
       SEVERIDAD.ERROR,
       { ...datosRaiz, featureNs: raiz.hijos[0]?.hijos[0]?.ns ?? null },
     )

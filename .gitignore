@@ -47,6 +47,15 @@ MEJORES_PRACTICAS_GML.md
 HALLAZGOS_INVESTIGACION.md
 AUDITORIA_F00.md
 
+# ── Documentación del Catastro descargada (de terceros, no se versiona) ───────
+# Se consulta en local pero no entra al repo: son publicaciones de la D.G. del
+# Catastro, no código de este proyecto. Lo que hacía falta de ellas está citado
+# —con su URL— en `spec/SPEC.md` §3.1 y en `test/fixtures/gml/PROCEDENCIA.md`,
+# que es lo que hay que leer para entender por qué el GML tiene la forma que
+# tiene sin depender de tener el PDF delante.
+FAQ catastro registro.pdf
+Formato GML parcela catastral.pdf
+
 # ── Capturas de diseño y screenshots de desarrollo ────────────────────────────
 IMAGENES CLAUDEDESIGN/
 prototipo/screenshots/

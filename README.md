@@ -26,7 +26,14 @@ npm run test:node  # solo el proyecto node (bucle rápido: sin jsdom)
 npm run test:dom   # solo el proyecto dom (jsdom: visor, mapa, canvas)
 npm run test:all   # alias de `npm test` (node + dom)
 npm run test:watch # modo watch del proyecto node
+npm run validar:xsd # valida el GML generado contra el XSD oficial de INSPIRE
 ```
+
+`validar:xsd` necesita **`xmllint` o Python con `lxml`** (cualquiera de los dos)
+y salida a Internet la primera vez, para traerse el árbol de esquemas —lo cachea
+en `esquemas/`, que está en `.gitignore`—. Sin motor disponible avisa y sale con
+0; con `--estricto` (lo que usa CI) eso pasa a ser un fallo. Valida contra
+`cp/4.0` **a secas**, sin `wfs/2.0`, que es lo que hace el validador del IVG.
 
 `npm test` corre los **dos** proyectos porque la definición de "hecho"
 (`spec/SPEC.md` §6) exige ambos: geometría y serializadores en `node`, canvas y
@@ -45,10 +52,17 @@ desde F03 no.
   parser, descarga y botón en la app; ida y vuelta contra el GML real del WFS.
   👉 **Cierra el corte de paridad**: la app ya produce el fichero que se sube a
   la Sede.
+  ⛔ **Corregido el 2026-07-27** tras un rechazo real del IVG: la app emitía el
+  sobre de la *descarga* del WFS (`wfs:FeatureCollection`) en vez del de la
+  *entrega* (`gml:FeatureCollection`), y el validador de la Sede no carga el
+  esquema de WFS. La historia completa, con las mediciones, está en
+  [`spec/SPEC.md` §3.1](spec/SPEC.md). Desde entonces la salida se valida contra
+  el **XSD oficial de INSPIRE** en CI, antes de publicar.
 
-La única verificación que ninguna máquina puede firmar sigue abierta y **no
-bloquea**: subir un GML generado a la Sede con certificado y comprobar que el
-IVG lo acepta (`spec/SPEC.md` §7).
+La verificación que ninguna máquina puede firmar sigue abierta: subir un GML
+generado a la Sede con certificado y comprobar que el IVG lo acepta
+(`spec/SPEC.md` §7). Lo que sí está comprobado por máquina es que **valida contra
+`CadastralParcels.xsd` 4.0**, que es condición necesaria y no suficiente.
 
 ## Despliegue
 
