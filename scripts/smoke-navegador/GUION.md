@@ -63,8 +63,15 @@ npm run dev            # dejarlo corriendo en segundo plano
 ```
 
 No des `5173` por hecho: **lee el puerto de la salida** (`➜ Local:
-http://localhost:PUERTO/`). Si el 5173 está ocupado, Vite coge otro sin avisar
-más que en esa línea.
+http://localhost:PUERTO/concretagml/`). Si el 5173 está ocupado, Vite coge otro
+sin avisar más que en esa línea.
+
+> ⚠️ **La app NO se sirve en la raíz**: `vite.config.js` fija
+> `base: '/concretagml/'` para GitHub Pages, y ese base se aplica **igual en dev,
+> build y preview** (a propósito: que dev y preview sirvieran rutas distintas es
+> la clase de diferencia que esconde un fallo hasta que está publicado). Abrir
+> `http://localhost:PUERTO/` **da 404**. La URL es
+> `http://localhost:PUERTO/concretagml/`.
 
 > Vite bindea **IPv6**: usa `http://localhost:PUERTO`. **`127.0.0.1` falla.**
 
@@ -90,7 +97,7 @@ En Windows el binario real es `browse.exe`; Git Bash resuelve `browse` →
 
 ```bash
 $B viewport 1440x900
-$B goto http://localhost:PUERTO/
+$B goto http://localhost:PUERTO/concretagml/    # ⚠️ el base, no la raíz
 $B wait ".gml-tabla-vertices"
 $B console --clear
 $B network --clear
@@ -162,6 +169,29 @@ $B screenshot .gstack/smoke-f03.png
 Regla general: **`ok: true` y `problemas: []`**. Cada guion acumula en
 `problemas` una frase por cada cosa que no cuadra, así que el `ok` nunca es un
 booleano huérfano. Y además, a ojo:
+
+### ⚠️ Antes de diagnosticar nada: el FALSO NEGATIVO por latencia
+
+`01` y `02` llevan **márgenes de tiempo fijos** (2.500 ms para que una base
+pinte; un margen por paso para contar los `GetMap`). Cuando el WMS del Catastro
+va lento —y va lento a ratos: se ha medido **2.062 ms** en una petición que
+normalmente tarda 250-300 ms, y la **primera en frío ronda los 3 s**— esos
+márgenes se quedan cortos y el veredicto sale rojo **sin que la app tenga nada
+mal**. La firma es inconfundible:
+
+- `01`: *«La base 'Catastro' no ha llegado a pintar en 2500 ms»* con
+  `wmsBaseCargadas: 0` — se pidió, pero no llegó a tiempo.
+- `02`: una petición **desplazada al paso siguiente** (`zoom: 0 esperadas 1` y
+  acto seguido `pan-nulo: 1 esperadas 0`). El total sigue cuadrando; lo que falla
+  es a qué paso se le atribuye.
+
+**Qué hacer:** recargar, esperar unos segundos a que la caché se caliente y
+repetir. Si a la segunda pasa, era latencia. Solo si falla de forma
+**reproducible** con el servicio respondiendo rápido hay defecto que buscar.
+
+Y no lo arregles subiendo los márgenes sin pensarlo: son también lo que
+detectaría una regresión de verdad en el número de peticiones, que es el mayor
+riesgo del proyecto.
 
 ### `02-wms-encuadre.js` (criterio 2)
 
@@ -382,11 +412,13 @@ Este smoke **no es de una sola vez**:
   cifras de §4. Lo que este smoke no puede cubrir (§0) quedó recogido en
   **`CHECKLIST-HUMANO.md`**, en esta misma carpeta: gestos de ratón reales,
   juicio visual y el 404 provocado cortando la red.
-- **F16**, cuando toque `base` para GitHub Pages: la app carga
-  `/estilos/app.css` y `/app/main.js` con rutas **absolutas** desde `index.html`,
-  y bajo una subruta de Pages eso se rompe. Hay que volver a pasar los cuatro
-  guiones sobre la URL desplegada (y `01` sobre `vite preview` con el `base`
-  nuevo).
+- **`base` para GitHub Pages — HECHO el 2026-07-27** (se adelantó de F16 a
+  petición del usuario). `vite.config.js` fija `base: '/concretagml/'` y Vite
+  reescribe solo las referencias del HTML **y las cinco fuentes del CSS**; se
+  verificó que no queda **ninguna** ruta absoluta fuera del base (hay una guarda
+  en el workflow que lo comprueba en cada despliegue). Los cuatro guiones
+  pasaron sobre `vite preview` con el base nuevo. **Sigue pendiente de repetirse
+  sobre la URL publicada** cada vez que cambie el despliegue.
 - **F06**, cuando cambie la maquinaria de arrastre (historial y undo/redo,
   insertar/eliminar vértices, snap): `03-arrastre.js` mide justo esa maquinaria y
   hay que revalidarlo — en especial `marcador.reutilizado`, `filaReutilizada` y

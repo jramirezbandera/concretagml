@@ -12,13 +12,20 @@ visual**.
 
 ## Cómo dejarlo listo
 
+Contra la versión publicada, que es lo que ve el usuario:
+
+**<https://jramirezbandera.github.io/concretagml/>**  ·  con hueco:
+[`?demo=hueco`](https://jramirezbandera.github.io/concretagml/?demo=hueco)
+
+O en local, sobre el bundle de verdad (no `npm run dev`):
+
 ```bash
-npm run build && npx vite preview     # el bundle de verdad, no `npm run dev`
+npm run build && npx vite preview
 ```
 
-Abrir `http://localhost:4173/` **en un navegador normal, a pantalla completa**
-(no en el navegador de `browse`). La vista de dos recintos, con hueco y patio,
-es `http://localhost:4173/?demo=hueco`.
+⚠️ La app se sirve bajo el `base` de Pages, así que la URL local es
+`http://localhost:4173/concretagml/` — **la raíz da 404**. Ábrela **en un
+navegador normal, a pantalla completa** (no en el de `browse`).
 
 Al terminar, parar el servidor **por PID verificado** — nunca por patrón
 `node …vite`: hay servidores de otros proyectos en esta máquina. El

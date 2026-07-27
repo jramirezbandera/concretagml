@@ -63,13 +63,38 @@ function gmlSinProj4() {
   }
 }
 
+/**
+ * Prefijo de TODAS las URL que el bundle genera. Vale el nombre del repositorio
+ * porque GitHub Pages de proyecto publica en `https://<usuario>.github.io/<repo>/`,
+ * no en la raíz del dominio.
+ *
+ * Sin esto, `dist/index.html` referencia `/assets/index-XXX.js` en absoluto y el
+ * navegador lo pide a `https://jramirezbandera.github.io/assets/…` — fuera del
+ * proyecto, 404, y la página queda en blanco. Es el modo de fallo clásico de
+ * Pages y por eso el runbook del smoke obliga a repetirlo sobre la URL
+ * desplegada (`scripts/smoke-navegador/GUION.md` §8).
+ *
+ * ⚠️ Se aplica IGUAL en dev, build y preview, a propósito y aunque en `npm run
+ * dev` obligue a abrir `http://localhost:5173/concretagml/`. La alternativa
+ * —`base` solo en producción— haría que dev y preview sirvieran rutas distintas,
+ * y la Fase 4 dejó escrito que cualquier discrepancia dev↔preview es
+ * bloqueante: es justo la clase de diferencia que esconde un fallo hasta que
+ * está publicado.
+ *
+ * Si el repositorio se renombra, este valor cambia con él. No hay forma de
+ * derivarlo sin leer el remoto de git durante el build, y acoplar el artefacto
+ * de producción a la configuración local de git sería peor que un literal con su
+ * motivo escrito al lado.
+ */
+const BASE_PAGES = '/concretagml/'
+
 // La entrada de la app es `index.html` en la raíz (F03, Fase 4).
 //
-// NO se configura `base`: el despliegue (y el `base` que un subdirectorio de
-// GitHub Pages necesitaría) es materia de F16, decisión ya tomada. Consecuencia
-// asumida y esperada: `dist/index.html` NO funciona abierto por `file://`; para
-// verlo hay que servirlo (`npx vite preview`).
+// Consecuencia asumida y esperada de empaquetar para Pages: `dist/index.html`
+// NO funciona abierto por `file://`; para verlo hay que servirlo
+// (`npx vite preview`, que respeta el `base` y sirve en la subruta).
 export default defineConfig({
   root,
+  base: BASE_PAGES,
   plugins: [gmlSinProj4()],
 })

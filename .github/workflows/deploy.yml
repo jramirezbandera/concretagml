@@ -1,0 +1,120 @@
+# Concreta GML — publicación en GitHub Pages.
+#
+# Qué hace: en cada push a `main`, corre la suite COMPLETA y, solo si pasa,
+# construye el bundle y lo publica en https://jramirezbandera.github.io/concretagml/
+#
+# ── POR QUÉ LOS TESTS SON UN GATE Y NO UN JOB APARTE ─────────────────────────
+# `spec/SPEC.md` §6 exige «tests en verde» para dar por hecho cualquier feature.
+# Si el despliegue no dependiera de ellos, la regla se cumpliría en la máquina
+# de quien programa y no en lo que ve el usuario — que es donde importa. Con
+# `needs:`, una suite roja deja publicada la versión anterior en vez de una rota.
+#
+# ── LO QUE ESTE WORKFLOW VIGILA Y NO ES OBVIO ───────────────────────────────
+# Corre en LINUX y el desarrollo es en Windows, así que de paso es el único
+# sitio donde se comprueba que el proyecto no depende del sistema de ficheros de
+# Windows: el envoltorio `scripts/vitest.mjs` (que existe por un bug de casing
+# de unidad, `e:` vs `E:`, que solo se da en Windows) y la guarda de partición de
+# `test/contrato.test.js` (que recorre `test/` con `node:fs` y traduce globs)
+# son los dos candidatos a comportarse distinto. Si algún día CI falla y local
+# no, mirar ahí primero.
+
+name: Desplegar en GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # Permite relanzar el despliegue a mano sin tener que empujar un commit vacío.
+  workflow_dispatch:
+
+# Los que exige `actions/deploy-pages`: `pages` para publicar y `id-token` para
+# que el despliegue se autentique sin secretos de larga vida.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un despliegue a la vez. `cancel-in-progress: false` a propósito: cancelar un
+# despliegue A MEDIAS puede dejar Pages en un estado intermedio. Se deja
+# terminar y el siguiente espera.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  pruebas:
+    name: Suite completa (node + dom)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # `npm ci`, no `npm install`: instala EXACTAMENTE el lockfile y falla si
+      # ha divergido de package.json, en vez de resolver versiones nuevas por su
+      # cuenta. Un despliegue no es el sitio donde descubrir una dependencia
+      # actualizada.
+      - run: npm ci
+
+      # Los DOS proyectos de Vitest (`node` y `dom`). El script `test` ya los
+      # corre ambos; `test:node` es solo el bucle rápido de desarrollo.
+      - name: npm test
+        run: npm test
+
+  construir:
+    name: Construir el bundle
+    needs: pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # El `base` de `vite.config.js` (`/concretagml/`) es lo que hace que las
+      # URL del bundle apunten dentro del proyecto de Pages. Sin él la página
+      # sale en blanco con 404 en los assets.
+      - name: npm run build
+        run: npm run build
+
+      # Guardia de humo del artefacto, antes de publicarlo. Comprueba las dos
+      # cosas que dejarían la página en blanco sin que nada más avisara:
+      # que el HTML referencia los assets BAJO el base, y que no queda ninguna
+      # ruta absoluta fuera de él.
+      - name: Comprobar que el bundle está preparado para la subruta
+        run: |
+          set -euo pipefail
+          if ! grep -q 'src="/concretagml/assets/' dist/index.html; then
+            echo "::error::dist/index.html no referencia los assets bajo /concretagml/. ¿Se ha perdido el 'base' de vite.config.js?"
+            exit 1
+          fi
+          sueltas=$(grep -oE '"/[^"]*"' dist/index.html | grep -v '^"/concretagml/' || true)
+          if [ -n "$sueltas" ]; then
+            echo "::error::Rutas absolutas fuera del base (darían 404 en Pages):"
+            echo "$sueltas"
+            exit 1
+          fi
+          echo "OK: el bundle apunta dentro de /concretagml/"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  desplegar:
+    name: Publicar
+    needs: construir
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+    steps:
+      - id: despliegue
+        uses: actions/deploy-pages@v4
