@@ -1,0 +1,30 @@
+# .gitattributes — estabilidad de bytes en los ficheros donde los bytes SON el dato
+#
+# Este repo se desarrolla en Windows con `core.autocrlf=true` y hasta F04 no tenía
+# ningún `.gitattributes`. Eso significa que git venía decidiendo por su cuenta los
+# finales de línea de cada fichero según la plataforma de quien hiciera el checkout.
+# Para el código da igual. Para dos familias de ficheros, no:
+#
+#   1. `test/gml/__snapshots__/*.gml` — el snapshot de `toMatchFileSnapshot` se
+#      compara BYTE A BYTE contra lo que emite el serializador, y el serializador
+#      emite `\n`. Sin esta regla, un clon limpio en Windows recibe el snapshot con
+#      CRLF y la prueba se pone roja sin que nadie haya tocado nada.
+#
+#   2. `test/fixtures/gml/*.gml` — son verdad numérica externa (regla de oro 8): GML
+#      reales descargados del WFS del Catastro, que mandan sobre la documentación y
+#      sobre nuestro criterio. Que git les reescriba los bytes según la máquina es
+#      justo lo contrario de lo que un fixture debe garantizar.
+#
+# Se usa `text eol=lf` (y no `-text`) a propósito: `-text` dejaría el árbol de
+# trabajo actual —que tiene CRLF por el checkout previo— divergiendo del blob, y
+# obligaría a un `git add --renormalize` que metería CRLF en el repositorio. Con
+# `eol=lf` el resultado es el mismo objetivo —todo el mundo ve LF, siempre— sin
+# reescribir nada de lo ya versionado.
+#
+# OJO: el fixture `cp_parcela_9398516VK3799G.gml` declara `encoding="ISO-8859-1"` y
+# sus bytes son UTF-8. Eso NO se corrige: el fichero es lo que el Catastro sirve, y
+# esa incoherencia es el caso real contra el que se prueba el guardián de encoding
+# de F04. Aquí solo se fijan los finales de línea.
+
+test/gml/__snapshots__/*.gml  text eol=lf
+test/fixtures/gml/*.gml       text eol=lf

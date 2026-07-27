@@ -31,6 +31,12 @@ Desktop.ini
 # ── Herramientas locales (gstack, etc.) ───────────────────────────────────────
 .gstack/
 
+# ── Esquemas XSD de terceros (F04, `npm run validar:xsd`) ─────────────────────
+# Árbol de INSPIRE/OGC/ISO que xmllint necesita para validar offline. Son decenas
+# de ficheros de la Comisión Europea: no son código de este proyecto y no se
+# versionan. El script funciona sin ellos (descargándolos) y lo explica.
+esquemas/
+
 # ── AutoCAD (locks/temporales, no versionar) ──────────────────────────────────
 *.dwl
 *.dwl2

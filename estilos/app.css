@@ -610,6 +610,82 @@ body {
   text-align: right;
 }
 
+/* ── La acción principal: «Generar GML» (F04) ───────────────────────────────
+ *
+ * Vive DENTRO de `.gml-panel-pie`, debajo de la ficha, porque es el final del
+ * recorrido: se mira el expediente y se genera. El pie ya es `flex:none` con
+ * `margin-top:auto`, así que el botón queda anclado abajo sin trucos.
+ *
+ * Se usan los tokens `--color-btn-primary-*` del sistema y NO `--color-accent`:
+ * el design system los separó a propósito (el comentario de `colors.css` lo dice
+ * — blanco sobre el accent de enlace no llega a AA en claro; sobre
+ * `--color-btn-primary-bg` da ≈5,7:1). Inventar aquí un color propio habría
+ * repetido ese error.
+ *
+ * El anillo de foco NO se declara aquí: lo pone la regla global
+ * `.gml-app :focus-visible` de más arriba, que ya cubre todo lo de la app.
+ *
+ * ── EL ESTADO DESHABILITADO ES EL QUE MÁS IMPORTA ──────────────────────────
+ * Es el estado en el que el usuario ve el botón cuando su parcela tiene errores
+ * bloqueantes, o sea justo cuando necesita entender por qué. Por eso NO se
+ * resuelve solo con opacidad: el botón se apaga a superficie neutra y el motivo
+ * se escribe al lado, en `.gml-accion-estado`, que es un `role="status"`. Un
+ * botón gris y mudo sería un error silencioso de manual (regla de oro 1).
+ * `cursor:not-allowed` completa la señal para quien usa ratón. */
+.gml-acciones {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3-5);
+}
+
+.gml-boton {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-12);
+  font-weight: var(--fw-medium);
+  line-height: 1.2;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.gml-boton--primario {
+  background: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-fg);
+}
+
+.gml-boton--primario:hover:not(:disabled) {
+  background: var(--color-btn-primary-bg-hover);
+}
+
+.gml-boton--primario:disabled {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-disabled);
+  border-color: var(--color-border-sub);
+  cursor: not-allowed;
+}
+
+/* El renglón que dice POR QUÉ. Vacío no ocupa alto (`:empty{display:none}`) para
+   que el pie no dé un salto de layout cada vez que aparece o desaparece.
+   `--error` lo pone `app/main.js` cuando la generación está bloqueada. */
+.gml-accion-estado {
+  margin: 0;
+  font-size: var(--text-11);
+  line-height: 1.35;
+  color: var(--color-text-secondary);
+}
+
+.gml-accion-estado:empty {
+  display: none;
+}
+
+.gml-accion-estado--error {
+  color: var(--color-state-fail);
+}
+
 /* Todo valor numérico o normativo va en mono con cifras tabulares: es la regla
    tipográfica del sistema, no un adorno. */
 .gml-mono {

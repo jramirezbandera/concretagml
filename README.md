@@ -38,7 +38,17 @@ desde F03 no.
 - **F00** Cimientos (modelo, motor UTM, área/orientación, undo/redo) — hecho.
 - **F01** Entrada de parcela (parsers LIST/TXT/DXF) — hecho.
 - **F02** Validación geométrica — hecho.
-- **F03** Visor y capas (Leaflet) — en curso.
+- **F03** Visor y capas (Leaflet) — código y pruebas hechos; **pendiente de la
+  firma humana** de `scripts/smoke-navegador/CHECKLIST-HUMANO.md` (gestos de
+  ratón, teclado, fallo de red y juicio visual, que no puede firmar una máquina).
+- **F04** Generación del GML de parcela (INSPIRE CP 4.0) — hecho. Serializador,
+  parser, descarga y botón en la app; ida y vuelta contra el GML real del WFS.
+  👉 **Cierra el corte de paridad**: la app ya produce el fichero que se sube a
+  la Sede.
+
+La única verificación que ninguna máquina puede firmar sigue abierta y **no
+bloquea**: subir un GML generado a la Sede con certificado y comprobar que el
+IVG lo acepta (`spec/SPEC.md` §7).
 
 ## Despliegue
 

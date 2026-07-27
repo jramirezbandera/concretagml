@@ -11,9 +11,11 @@
     "test:node": "node scripts/vitest.mjs run --project node",
     "test:watch": "node scripts/vitest.mjs --project node",
     "test:all": "node scripts/vitest.mjs run",
-    "test:dom": "node scripts/vitest.mjs run --project dom"
+    "test:dom": "node scripts/vitest.mjs run --project dom",
+    "validar:xsd": "node scripts/validar-xsd.mjs"
   },
   "devDependencies": {
+    "@turf/boolean-clockwise": "^7.3.5",
     "jsdom": "^29.1.1",
     "proj4": "^2.20.9",
     "vite": "^8.1.5",
@@ -21,9 +23,11 @@
   },
   "dependencies": {
     "@turf/boolean-contains": "^7.3.5",
+    "@turf/boolean-point-in-polygon": "^7.3.5",
     "@turf/helpers": "^7.3.5",
     "@turf/intersect": "^7.3.5",
     "@turf/kinks": "^7.3.5",
+    "@turf/point-on-feature": "^7.3.5",
     "leaflet": "^1.9.4"
   }
 }

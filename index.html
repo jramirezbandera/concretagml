@@ -118,6 +118,33 @@
           <dt>Superficie</dt>
           <dd class="gml-mono" data-ficha="superficie">—</dd>
         </dl>
+
+        <!-- ── La acción principal de la app (F04) ────────────────────────────
+             El botón NACE DESHABILITADO, y es deliberado: hasta que `app/main.js`
+             no ha validado la geometría no se sabe si se puede generar, y un
+             botón pulsable antes de esa comprobación ofrecería generar un GML
+             que quizá tenga errores bloqueantes. Es el mismo criterio por el que
+             los chips nacen en «0 errores» sin color: el estado inicial dice la
+             verdad, que es «todavía no se ha mirado». Quien lo habilita —y quien
+             escribe el motivo cuando NO lo habilita— es `app/main.js`, a partir
+             de `puedeGenerar` de `validation/parcela.js`.
+
+             `data-accion` y `data-estado` son el contrato con `app/main.js`, que
+             busca los nodos y LANZA si faltan. El `role="status"` hace que el
+             lector de pantalla anuncie el resultado de la generación sin robar
+             el foco: es la única superficie donde el usuario se entera de que se
+             le ha redondeado una coordenada o invertido un anillo. -->
+        <div class="gml-acciones">
+          <button
+            type="button"
+            class="gml-boton gml-boton--primario"
+            data-accion="generar-gml"
+            disabled
+          >
+            Generar GML
+          </button>
+          <p class="gml-accion-estado" data-estado="generar-gml" role="status"></p>
+        </div>
       </footer>
     </aside>
 

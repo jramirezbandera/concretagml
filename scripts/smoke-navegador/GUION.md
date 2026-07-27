@@ -1,7 +1,7 @@
 # Smoke en navegador real — F03 · Fase 4
 
 Runbook de la **tarea 4D**: lo que `jsdom` no puede probar de F03. La suite
-(1.114 pruebas) ya cubre la lógica; aquí se comprueba lo otro: que **el servicio
+(1.779 pruebas) ya cubre la lógica; aquí se comprueba lo otro: que **el servicio
 responda con el tamaño pedido**, que **el canvas quede limpio**, que la
 atribución sea **visible** (jsdom no calcula layout) y que el arrastre funcione
 con la **maquinaria real de `L.Draggable`**.
@@ -9,22 +9,26 @@ con la **maquinaria real de `L.Draggable`**.
 - **4D.1** (esta carpeta) escribió los guiones y los probó en seco.
 - **4D.2** es la ejecución oficial, con evidencia, siguiendo este documento.
 
-Cuatro guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
-para que el resultado no dependa de interpretar prosa:
+Cinco guiones de aceptación, un veredicto **serializable** cada uno
+(`{ok: boolean, …medidas}`), para que el resultado no dependa de interpretar prosa:
 
-| Guion | Criterio F03 | Mide | Veredicto pasa si |
+| Guion | Criterio | Mide | Veredicto pasa si |
 |---|---|---|---|
-| `01-capas.js` | 1 | las cinco bases conmutan y pintan; la superpuesta regula opacidad | `ok:true` |
-| `02-wms-encuadre.js` | 2 | 1 `GetMap` por instancia WMS visible y por encuadre, al tamaño del lienzo | `ok:true` |
-| `03-arrastre.js` | 3 | arrastrar un vértice mueve tabla + dibujo + ficha | `ok:true` |
-| `04-atribucion-consola.js` | 4 y 5 | atribución literal y visible; canvas limpio; el canal de avisos llega a la UI | `ok:true` |
+| `01-capas.js` | F03 · 1 | las cinco bases conmutan y pintan; la superpuesta regula opacidad | `ok:true` |
+| `02-wms-encuadre.js` | F03 · 2 | 1 `GetMap` por instancia WMS visible y por encuadre, al tamaño del lienzo | `ok:true` |
+| `03-arrastre.js` | F03 · 3 | arrastrar un vértice mueve tabla + dibujo + ficha | `ok:true` |
+| `04-atribucion-consola.js` | F03 · 4 y 5 | atribución literal y visible; canvas limpio; el canal de avisos llega a la UI | `ok:true` |
 | `05-salto-zoom.js` | — | **diagnóstico**, no aceptación: mide frame a frame la transición de la imagen WMS al hacer zoom | ver §11 |
+| `06-generar-gml.js` | F04 · T7.2 | la cadena Blob → descarga: bytes UTF-8, `posList`, `areaValue` y estructura del GML que baja | `ok:true` |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
 spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
 revisión humana de la Fase 5 («al hacer zoom la cartografía se mueve y luego
 vuelve a su sitio»), y se conserva porque la corrección —el fundido de
 `viewer/wms-catastro.js`— solo se puede comprobar midiendo frames. Ver §11.
+
+`06` es el primero que **no es de F03**: mide la generación del GML (F04) y va en
+su propia pasada, sobre página recién cargada. Ver §12.
 
 Cada guion lleva en su cabecera **qué mide y qué NO puede medir**. Léelas antes
 de citar un resultado.
@@ -152,6 +156,11 @@ $B eval scripts/smoke-navegador/04-atribucion-consola.js
 
 Para repetir un guion desde cero: `$B reload && $B wait ".gml-tabla-vertices"`
 antes de volver a lanzarlo (obligatorio para `02`, recomendable para `03`).
+
+`06` **no entra en esta secuencia**: va en su propia pasada, con la página recién
+cargada. `03` deja la geometría movida a propósito, y `06` contrasta el
+`areaValue` del fichero contra el del dataset de arranque — encadenarlo detrás de
+`03` lo haría fallar con razón. Ver §12.
 
 Y las lecturas transversales, al final:
 
@@ -423,6 +432,16 @@ Este smoke **no es de una sola vez**:
   insertar/eliminar vértices, snap): `03-arrastre.js` mide justo esa maquinaria y
   hay que revalidarlo — en especial `marcador.reutilizado`, `filaReutilizada` y
   `cambios.numeroDeVertices`.
+- **`06-generar-gml.js`, cuando cambie `gml/serialize-cp.js`, `gml/descargar.js` o
+  el cableado de `cablearGeneracionGml` en `app/main.js`.** Es lo único que prueba
+  la cadena Blob → descarga en un navegador de verdad: la suite de F04 corre en
+  jsdom, donde `Blob`, `URL` y el anchor son dobles del entorno de test y solo se
+  puede afirmar *qué se pidió*, no *qué bytes salieron*. También hay que repetirlo
+  si cambian los datasets de `app/demo-datos.js` (el guion lleva copiadas sus
+  cifras de arranque a propósito) o los dos selectores del contrato,
+  `[data-accion="generar-gml"]` y `[data-estado="generar-gml"]`.
+  HECHO el **2026-07-27**: `ok:true` y `problemas:[]` en los dos datasets sobre
+  `npm run dev`; cifras en §12.
 - Cuando cambie cualquiera de los **hooks semánticos** en los que se apoyan los
   guiones. Los guiones fallan a propósito si divergen, y ahí está su valor:
   - `title` del marcador (`'EXTERIOR · vértice 1'`) — `viewer/sincronizacion.js`;
@@ -567,3 +586,152 @@ ejercita y que sí cubre `test/viewer/wms-catastro.dom.test.js`: un encuadre
 deduplicado y un fallo de carga, los dos casos en que se atenúa y **no llega
 ninguna imagen** que devuelva la opacidad. Sin esa red, la capa se quedaría
 tenue para siempre.
+
+---
+
+## 12. `06-generar-gml.js` — la cadena Blob → descarga (F04 · T7.2)
+
+El primer guion de esta carpeta que **no cuelga de F03**. Cubre la tarea T7.2 de
+**F04** y es lo ÚNICO que prueba de extremo a extremo la cadena
+`Blob → URL.createObjectURL → anchor con download → click() → revokeObjectURL` en
+un navegador de verdad: la suite de F04 corre en jsdom, donde `Blob`, `URL` y el
+anchor son **dobles del entorno de test**, así que allí se puede afirmar *qué se
+pidió* pero no *qué bytes salieron*.
+
+### Cómo captura el fichero
+
+`/browse` no recoge con comodidad una descarga de blob del disco, así que el
+guion intercepta **en la página**, y solo durante el click:
+
+- envuelve `URL.createObjectURL` para quedarse con el `Blob` (llama a la original
+  y devuelve su URL: **la descarga real no se altera**) y lo lee con
+  `blob.arrayBuffer()`;
+- envuelve `URL.revokeObjectURL` para comprobar que `gml/descargar.js` cumple su
+  promesa de **revocar siempre**, y la misma URL que creó;
+- envuelve `document.createElement` para leer el `download` **real** del anchor
+  (el nodo se retira del DOM en el mismo turno; el objeto sobrevive).
+
+Las tres se restauran en un `finally` y el veredicto lo DECLARA
+(`captura.restaurado: true`). Un guion que deja la página parcheada convierte en
+mentira todo lo que se mida después de él.
+
+### Qué mide
+
+- **UTF-8 de verdad**: `TextDecoder('utf-8', {fatal:true})` sobre el
+  `ArrayBuffer` (lanza si los bytes no son UTF-8 válido) y declaración XML que
+  dice `UTF-8`. Ver la trampa de abajo.
+- **`posList`**: todos los valores casan `/^-?\d+\.\d{2}$/` (incluidos los ceros
+  no significativos: `4479678.00`), el nº de valores es par, `srsDimension="2"` y
+  el `count` declarado son **PARES** (`valores/2`), que es el rechazo más fácil de
+  cometer del proyecto.
+- **Anillo cerrado**: el primer par se repite al final, en cada anillo.
+- **`areaValue`**: entero, `uom="m2"`, y **cuadra con el shoelace de las
+  coordenadas EMITIDAS** dentro de ±1 m². El guion calcula el shoelace él mismo
+  —no importa nada del proyecto, corre dentro de la página—, así que es una
+  **segunda implementación independiente** de `gml/anillos.js`.
+- **Estructura**: raíz `FeatureCollection` en el namespace de WFS 2.0 con
+  `<member>` y NUNCA `<gml:FeatureCollection` (se busca también en el TEXTO: un
+  prefijo mal declarado no aparecería como tal en el DOM y sí en el fichero que ve
+  el validador); los tres `srsName` en URI OGC y **ni una `urn:` en todo el
+  documento** (override O2); cero `gml:boundedBy` y cero `cp:zoning`.
+- **El nombre del fichero**: forma
+  `parcela_<referencia>_<AAAA-MM-DDTHH-mm-ss>.gml`, segmento de referencia
+  correcto (`sin-referencia` cuando no hay `refcat`) y **marca de tiempo idéntica
+  a la del `cp:beginLifespanVersion` de dentro** — lo que `gml/descargar.js`
+  promete para que un fichero de la carpeta de descargas se pueda emparejar con su
+  contenido sin abrirlo.
+- **El renglón de estado** (`[data-estado="generar-gml"]`) dice que se ha
+  descargado y **nombra el fichero**, sin la clase de error.
+- **Dos cruces que solo existen porque aquí hay app entera**: la superficie que el
+  usuario LEE en la ficha del pie contra la que se deduce del GML descargado, y
+  las detecciones del serializador contra las tarjetas del panel de avisos (regla
+  de oro 1: si el fichero no es el dibujo, se dice).
+
+### Cómo se lanza
+
+**Dos pasadas, cada una con la página recién cargada** (el guion detecta él solo
+sobre qué dataset está: lee `?demo=`):
+
+```bash
+$B goto http://localhost:PUERTO/concretagml/             # parcela REAL
+$B wait ".gml-tabla-vertices"
+$B eval scripts/smoke-navegador/06-generar-gml.js
+
+$B goto "http://localhost:PUERTO/concretagml/?demo=hueco" # sintética con hueco
+$B wait ".gml-tabla-vertices"
+$B eval scripts/smoke-navegador/06-generar-gml.js
+
+$B console --errors                                       # → (no console errors)
+```
+
+⚠️ **Página recién cargada, y NO detrás de `03-arrastre.js`**: `03` deja la
+geometría movida a propósito y `06` contrasta el `areaValue` contra el del
+dataset de arranque (`geometriaIntacta`). Si sale `geometriaIntacta: false` con la
+página recién cargada, entonces sí hay regresión en `gml/` o en
+`app/demo-datos.js`.
+
+**Comprobación cruzada con evento *trusted***. El guion pulsa con
+`boton.click()` sintético porque hay que envolver `createObjectURL` **antes** y
+leer el Blob **después**, y `descargarGml` revoca en el mismo turno: partirlo en
+tres comandos costaría un global de página y tres veredictos en prosa. El
+selector es único, así que la versión con click real de Playwright es directa:
+
+```bash
+$B js "(()=>{const o=URL.createObjectURL;globalThis.__gmlBlob=null;URL.createObjectURL=function(b){globalThis.__gmlBlob=b;return o.call(URL,b)};globalThis.__gmlRestaurar=()=>{URL.createObjectURL=o};return 'envuelto'})()"
+$B click '[data-accion="generar-gml"]'
+$B js "globalThis.__gmlRestaurar(); const b=globalThis.__gmlBlob; return {bytes:(await b.arrayBuffer()).byteLength, tipo:b.type, renglon:document.querySelector('[data-estado=\"generar-gml\"]').textContent}"
+```
+
+Medido el 2026-07-27: `2586` bytes, `application/gml+xml;charset=utf-8` y el
+mismo renglón que con el click sintético.
+
+### Qué cuenta como «pasa»
+
+`ok: true` y `problemas: []` en **las dos** pasadas, y además:
+
+- `captura.blobsCapturados: 1`, `revocaLaQueCreo: true`, `restaurado: true`;
+- `utf8.decodificaFatalSinLanzar: true` y `declaracionDiceUtf8: true`;
+- en cada anillo: `countSonPares`, `dosDecimalesTodos` y `cerrado`, los tres
+  `true`;
+- `area.cuadra: true` y `area.diferenciaConLaFicha: 0`;
+- `estructura.esFeatureCollectionWfs20: true`, `ningunaUrn: true`,
+  `gmlBoundedBy: 0`, `cpZoning: 0`, y `interiores: 1` **solo** con `?demo=hueco`;
+- `fichero.marcaCoincideConElContenido: true`;
+- `avisos.crecio: true` con `?demo=hueco` (dos detecciones) y `false` con la
+  parcela real (ninguna).
+
+### ⚠️ La trampa que este guion documenta: la comprobación de UTF-8 es hoy VACUA
+
+`TextDecoder('utf-8', {fatal:true})` solo puede fallar si hay algún byte no ASCII
+que decodificar. **El GML que produce la app no tiene ninguno**: `app/main.js`
+llama a `serializarParcelaCp` **sin `comentario`**, y el resto del documento
+—namespaces, `gml:id`, coordenadas— es ASCII por construcción. Medido:
+`caracteresNoAscii: 0` de 2.586 y de 2.706.
+
+El guion **lo dice en el veredicto** (`utf8.comprobacionVacua: true` y una entrada
+en `advertencias`) en vez de fingir que ha comprobado algo, y sostiene la
+afirmación «este navegador escribe UTF-8» con un **CONTROL** explícito
+(`utf8.control`): la cadena `áéñ·²` por el MISMO camino
+(string → `Blob` → `ArrayBuffer`), contrastada contra `TextEncoder`. El control
+**no es salida de la app** y el propio veredicto lo rotula así.
+
+No es un defecto —un GML ASCII es perfectamente correcto—, es una **limitación de
+la medida**. El día que el prólogo lleve un comentario acentuado (como los dos que
+el WFS pone en su fichero, y que `serializarParcelaCp` ya sabe emitir), la
+advertencia desaparece sola y la comprobación pasa a ser real.
+
+### Cifras de referencia (corrida del 2026-07-27, `npm run dev`, puerto 5175)
+
+| Medida | Parcela real | `?demo=hueco` |
+|---|---|---|
+| Nombre del fichero | `parcela_9398516VK3799G_<marca>.gml` | `parcela_sin-referencia_<marca>.gml` |
+| Tamaño | **2.586 B** | **2.706 B** |
+| Anillos (`exterior` + `interior`) | 1 + 0 | 1 + **1** |
+| Vértices abiertos / `count` | 15 / **16** | 4 / 5 y 4 / 5 |
+| `cp:areaValue` | **1536** m² | **348** m² |
+| Shoelace de lo emitido | 1535,87 m² (Δ 0,13) | 348,00 m² (Δ 0) |
+| Superficie de la ficha del pie | 1535,87 m² (Δ **0**) | 348,00 m² (Δ **0**) |
+| Sentido del exterior | horario | horario (**invertido**) |
+| Detecciones → tarjetas del panel | 0 → 0 | 2 → **+2** |
+| Caracteres no ASCII | **0** | **0** |
+| Consola | limpia (solo `[vite] connecting…/connected.`) | ídem |

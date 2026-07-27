@@ -15,3 +15,7 @@ export * as parcela from './model/parcela.js'
 export * as edificio from './model/edificio.js'
 export * as historial from './edit/historial.js'
 export * as validacion from './validation/parcela.js'
+// gml: capa de dominio, sin Leaflet ni DOM, luego sí entra aquí. La ENTREGA del
+// fichero (`gml/descargar.js`) se queda fuera —necesita Blob/URL/document—,
+// igual que viewer/ y services/; el motivo, en la cabecera de `gml/index.js`.
+export * as gml from './gml/index.js'
