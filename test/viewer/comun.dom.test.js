@@ -69,8 +69,28 @@ describe('viewer/_comun · constantes de dominio', () => {
     }
   })
 
-  it('la geometría del usuario es violeta #7C3AED', () => {
-    expect(COLOR_USUARIO).toBe('#7C3AED')
+  it('la geometría del usuario es amarillo #FFD600 (revisión visual de la Fase 5)', () => {
+    // Guardián de identidad a propósito: este color NO es una preferencia
+    // suelta, es una decisión con tres restricciones detrás (no colisionar con
+    // el rojo catastral, el azul de la hidrografía ni el verde de la
+    // vegetación). Si alguien lo cambia, que sea leyendo el porqué en
+    // `viewer/_comun.js#COLOR_USUARIO` y actualizando también el spec.
+    expect(COLOR_USUARIO).toBe('#FFD600')
+  })
+
+  it('NO se usa sobre fondo blanco: la tabla tiene su propio ámbar legible', () => {
+    // El amarillo del mapa da ~1,4:1 sobre blanco (ilegible). El nº de vértice
+    // de la tabla usa `--gml-color-usuario-sobre-claro` en `estilos/app.css`, y
+    // esta prueba existe para que el día que alguien "unifique" ambos valores se
+    // encuentre con el motivo escrito en vez de con una columna ilegible.
+    const canal = (hex, i) => {
+      const v = parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255
+      return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+    }
+    const luminancia = (hex) =>
+      0.2126 * canal(hex, 0) + 0.7152 * canal(hex, 1) + 0.0722 * canal(hex, 2)
+    const contrasteSobreBlanco = 1.05 / (luminancia(COLOR_USUARIO) + 0.05)
+    expect(contrasteSobreBlanco).toBeLessThan(3)
   })
 
   it('NIVEL es EL MISMO objeto que el de validation/_comun.js (re-exportado, no copiado)', () => {

@@ -210,6 +210,59 @@ export const MAX_PIXELES_WMS = 4000
 export const OPACIDAD_SUPERPUESTA = 0.6
 
 /**
+ * Duración del fundido con el que entra cada imagen nueva, en ms.
+ *
+ * ── EL PROBLEMA QUE RESUELVE (medido, Fase 5) ───────────────────────────────
+ * Al hacer zoom, Leaflet ESCALA la imagen del encuadre anterior para mantenerla
+ * en su sitio geográfico (`ImageOverlay._animateZoom`/`_reset`): de 1048x900
+ * pasa a 2096x1800, correctamente centrada. Se queda así **entre 350 y 520 ms**
+ * —lo que tarda el WMS en responder— y entonces la nueva la sustituye **de
+ * golpe, en un solo frame**.
+ *
+ * Ese corte seco es lo que el ojo lee como «la cartografía se mueve y luego
+ * vuelve a su sitio». Lo que salta es el CONTENIDO — el WMS re-rasteriza rótulos
+ * y grosores a la escala nueva, así que los textos de la imagen ampliada no
+ * están donde el servidor los pone en la imagen nueva.
+ *
+ * Un matiz medido, para que nadie persiga la pista equivocada: el
+ * `setBounds`+`setUrl` de `_alCargar` SÍ deja un frame con la imagen vieja ya
+ * colocada en la geometría nueva —el navegador reposiciona antes de pintar el
+ * `src`—, pero es **UN solo frame** y no explica nada de un fenómeno que dura
+ * 350-520 ms. (El reflow forzado de `_fundirEntrada` lo elimina de paso.)
+ * `scripts/smoke-navegador/05-salto-zoom.js` lo sigue contando como regresión.
+ *
+ * ── POR QUÉ NO SE ARREGLA PIDIENDO ANTES ────────────────────────────────────
+ * La causa de fondo es la restricción central del proyecto: UNA imagen por
+ * encuadre, nunca teselas. Mientras no llega la nueva, lo único disponible es la
+ * anterior estirada. Adelantar la petición a `zoomanim` ganaría esos ms, pero
+ * pediría encuadres intermedios en cuanto alguien encadenara zooms — y el abuso
+ * de este WMS se castiga con denegación de servicio (ver la cabecera). No se
+ * hace: el criterio de aceptación 2 vale más que la suavidad.
+ *
+ * ── QUÉ SE HACE, ENTONCES ───────────────────────────────────────────────────
+ * Repartir la discontinuidad en dos mitades suaves, SIN tocar ni una petición:
+ * al empezar un zoom la imagen visible se ATENÚA (ya se sabe que es provisional,
+ * y atenuada lo parece), y la nueva ENTRA fundida hasta la opacidad de la capa.
+ * El cambio de escala sigue ocurriendo, pero ya no coincide con un frente de
+ * opacidad plena, que es lo que lo hacía leer como salto.
+ *
+ * Es puramente visual: no cambia `urlVisible()`, ni `estado()`, ni el momento en
+ * que la imagen se aplica. Un navegador que ignorase la transición CSS vería el
+ * comportamiento anterior, no uno roto.
+ */
+export const MS_FUNDIDO = 180
+
+/**
+ * Fracción de la opacidad de la capa a la que se atenúa la imagen mientras es
+ * PROVISIONAL (durante el zoom, y como punto de partida del fundido de entrada).
+ *
+ * No es 0 a propósito: a cero habría un instante SIN cartografía catastral
+ * ninguna, que es peor que verla provisional — el usuario está calcando sobre
+ * ella y perderla, aunque sea 180 ms, desorienta más que verla tenue.
+ */
+const FRACCION_PROVISIONAL = 0.35
+
+/**
  * Mensajes de usuario del módulo (español, mostrables tal cual). Exportados para
  * que la UI de avisos de Fase 3/4 y los tests los referencien en vez de
  * parafrasearlos. Distinguen las dos situaciones del punto 6 de la cabecera.
@@ -574,6 +627,8 @@ const CapaWMSCatastro = L.ImageOverlay.extend({
     this._urlVisible = null // última URL aplicada a la imagen visible
     this._precarga = null // <img> desprendido en vuelo (si hay)
     this._obsoleta = false
+    this._atenuada = false // la imagen visible se muestra como PROVISIONAL
+    this._temporizadorFundido = null
     this._cuenta = { peticiones: 0, aplicadas: 0, cargadas: 0, descartadas: 0, fallidas: 0 }
 
     // El overlay nace con el GIF 1×1 y unos bounds degenerados: `onAdd` pone los
@@ -611,6 +666,11 @@ const CapaWMSCatastro = L.ImageOverlay.extend({
     const eventos = L.ImageOverlay.prototype.getEvents.call(this)
     eventos.moveend = this._alCambiarEncuadre
     eventos.resize = this._alCambiarEncuadre
+    // `zoomstart` NO pide nada: solo marca la imagen visible como provisional
+    // (ver {@link MS_FUNDIDO}). El zoom es el único gesto que la DEFORMA —el pan
+    // la desplaza pero la deja a su escala—, y por eso es el único que atenúa:
+    // hacerlo también en cada pan sería un parpadeo constante.
+    eventos.zoomstart = this._alEmpezarZoom
     return eventos
   },
 
@@ -632,7 +692,26 @@ const CapaWMSCatastro = L.ImageOverlay.extend({
     // Al salir del mapa, la precarga en vuelo deja de interesar: se desconectan
     // sus handlers y se invalida su token (nada podrá tocar una capa retirada).
     this._cancelarPrecarga()
+    // Y el fundido tampoco: un temporizador vivo sobre una capa retirada es
+    // exactamente la fuga que `destruir()` existe para no dejar.
+    this._cancelarFundido()
+    this._atenuada = false
     L.ImageOverlay.prototype.onRemove.call(this, mapa)
+  },
+
+  /**
+   * El deslizador de opacidad MANDA sobre el fundido: cualquier transición en
+   * curso se corta y el valor pedido se aplica al instante. Con la transición
+   * puesta, arrastrar el deslizador se sentiría pegajoso — la imagen iría
+   * {@link MS_FUNDIDO} ms por detrás del control.
+   *
+   * @param {number} opacidad
+   * @returns {this}
+   */
+  setOpacity(opacidad) {
+    this._cancelarFundido()
+    this._atenuada = false
+    return L.ImageOverlay.prototype.setOpacity.call(this, opacidad)
   },
 
   /** @returns {string|null} URL de la imagen VISIBLE (null si no hay ninguna real). */
@@ -658,7 +737,78 @@ const CapaWMSCatastro = L.ImageOverlay.extend({
   // ── Interno ────────────────────────────────────────────────────────────────
 
   _alCambiarEncuadre() {
-    this._solicitar()
+    const emitida = this._solicitar()
+    // Red de seguridad del fundido: si el encuadre NO generó petición (URL
+    // deduplicada, o mapa sin superficie visible) no va a llegar ninguna imagen
+    // que devuelva la opacidad a su sitio, y la capa se quedaría atenuada para
+    // siempre. Pasa de verdad: un zoom que no cambia la URL —o un zoom sobre un
+    // mapa recién ocultado— atenúa en `zoomstart` y no pide nada.
+    if (!emitida && this._atenuada) this._fundirHasta(this._opacidadDeLaCapa())
+  },
+
+  _alEmpezarZoom() {
+    // La escala está a punto de cambiar: lo que se ve pasa a ser provisional.
+    this._fundirHasta(this._opacidadDeLaCapa() * FRACCION_PROVISIONAL)
+    this._atenuada = true
+  },
+
+  // ── Fundido (solo presentación; ver {@link MS_FUNDIDO}) ────────────────────
+
+  /** Opacidad que la capa debe tener cuando su imagen es la del encuadre actual. */
+  _opacidadDeLaCapa() {
+    const declarada = this.options.opacity
+    return typeof declarada === 'number' && Number.isFinite(declarada) ? declarada : 1
+  },
+
+  /** Corta cualquier transición en curso y deja el elemento sin `transition`. */
+  _cancelarFundido() {
+    if (this._temporizadorFundido !== null) {
+      clearTimeout(this._temporizadorFundido)
+      this._temporizadorFundido = null
+    }
+    if (this._image) this._image.style.transition = ''
+  },
+
+  /**
+   * Lleva la opacidad de la imagen visible a `destino` con una transición CSS.
+   * Es SOLO presentación: no toca el estado de la capa ni su `options.opacity`,
+   * así que `setOpacity` y `estado()` siguen diciendo la verdad durante el
+   * fundido.
+   *
+   * @param {number} destino
+   */
+  _fundirHasta(destino) {
+    if (!this._image) return
+    this._cancelarFundido()
+    this._image.style.transition = `opacity ${MS_FUNDIDO}ms linear`
+    this._image.style.opacity = String(destino)
+    // Se limpia la `transition` al acabar para no dejarla puesta: si se quedara,
+    // el siguiente `setOpacity` del deslizador se animaría (ver `setOpacity`).
+    this._temporizadorFundido = setTimeout(() => {
+      this._temporizadorFundido = null
+      if (this._image) this._image.style.transition = ''
+    }, MS_FUNDIDO + 20)
+  },
+
+  /**
+   * Fundido de ENTRADA de una imagen recién aplicada: arranca en la fracción
+   * provisional y sube a la opacidad de la capa.
+   *
+   * El punto de partida se fija con `transition:none` y se fuerza una lectura de
+   * layout entre los dos cambios de estilo. Sin esa lectura el navegador funde
+   * ambos en un solo recálculo y **la transición no arranca**: no habría estado
+   * inicial que animar y el cambio volvería a ser seco, que es justo el defecto
+   * que esto corrige.
+   */
+  _fundirEntrada() {
+    if (!this._image) return
+    const objetivo = this._opacidadDeLaCapa()
+    this._cancelarFundido()
+    this._image.style.transition = 'none'
+    this._image.style.opacity = String(objetivo * FRACCION_PROVISIONAL)
+    void this._image.offsetWidth
+    this._fundirHasta(objetivo)
+    this._atenuada = false
   },
 
   /**
@@ -697,11 +847,15 @@ const CapaWMSCatastro = L.ImageOverlay.extend({
   /**
    * UNA petición por encuadre: calcula la URL, deduplica y precarga. Nunca
    * lanza (corre dentro de handlers de eventos de Leaflet).
+   *
+   * @returns {boolean} `true` si se EMITIÓ una petición nueva. Lo consume la red
+   *   de seguridad del fundido en `_alCambiarEncuadre`: un encuadre que no pide
+   *   nada tampoco va a recibir nada que restaure la opacidad.
    */
   _solicitar() {
-    if (!this._map) return
+    if (!this._map) return false
     const encuadre = this._encuadre()
-    if (!encuadre) return
+    if (!encuadre) return false
 
     const url = getMapUrl(encuadre.bbox, encuadre.tamano, {
       crs: this._crs,
@@ -711,7 +865,7 @@ const CapaWMSCatastro = L.ImageOverlay.extend({
     })
 
     // Deduplicación (decisión 3): mismo encuadre ⇒ 0 peticiones.
-    if (url === this._urlPedida) return
+    if (url === this._urlPedida) return false
     this._urlPedida = url
 
     const secuencia = ++this._secuencia
@@ -725,6 +879,7 @@ const CapaWMSCatastro = L.ImageOverlay.extend({
     img.onerror = (evento) => this._alFallar(secuencia, evento)
     img.src = url
     this._precarga = img
+    return true
   },
 
   /**
@@ -748,6 +903,10 @@ const CapaWMSCatastro = L.ImageOverlay.extend({
     this._urlVisible = url
     this._obsoleta = false
     this._cuenta.aplicadas++
+    // El estado ya está aplicado ARRIBA, a propósito: el fundido es lo último y
+    // solo toca `style`. Así `urlVisible()` y `estado()` son ciertos desde el
+    // instante de la carga, pase lo que pase con la animación.
+    this._fundirEntrada()
   },
 
   /**
@@ -767,6 +926,12 @@ const CapaWMSCatastro = L.ImageOverlay.extend({
     // en el próximo `moveend`/`resize`: si no, una URL fallida quedaría vetada
     // para siempre y el usuario no podría recuperar la cartografía sin recargar.
     this._urlPedida = null
+    // Y la opacidad vuelve a su sitio: lo que se ve es la cartografía anterior,
+    // que se queda ahí. Dejarla atenuada indefinidamente sería un segundo
+    // síntoma del mismo fallo, y el aviso de «obsoleta» ya lo cuenta con
+    // palabras (decisión 6) en vez de con un color que hay que adivinar.
+    if (this._atenuada) this._fundirHasta(this._opacidadDeLaCapa())
+    this._atenuada = false
 
     // NIVEL.AVISO, no ERROR (hallazgo 2.5 de la auditoría de coherencia): esto es
     // cartografía DE FONDO que falla por red, exactamente el mismo suceso que un

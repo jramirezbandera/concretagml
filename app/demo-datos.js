@@ -22,10 +22,14 @@ import { crearParcela, crearRecinto, TIPO_RECINTO, ORIGEN_PARCELA } from '../mod
 // ── SRS / huso de todos los datasets de este módulo ─────────────────────────
 //
 // `crearParcela` NO porta `srs` (vive en el Expediente, no en la Parcela; ver
-// `model/parcela.js#crearExpediente`). Por eso se exporta aparte: quien
-// construya el Expediente de demo (`app/main.js`) lo pasa como
-// `crearExpediente({ srs: SRS_DEMO, parcela: parcelaDemo() })` o al visor como
-// `opciones.srs`.
+// `model/parcela.js#crearExpediente`). Por eso se exporta aparte.
+//
+// Hoy su ÚNICO consumidor es `app/main.js`, que lo pasa al visor como
+// `opciones.srs` y lo pinta en la ficha del pie: la app de F03 trabaja sobre una
+// Parcela suelta y todavía NO construye ningún Expediente. Cuando F10
+// (persistencia) lo construya, la llamada será
+// `crearExpediente({ srs: SRS_DEMO, parcela: parcelaDemo() })` y esta constante
+// seguirá siendo la fuente del `srs`.
 export const SRS_DEMO = 'EPSG:25830'
 
 // ── Parcela real: 9398516VK3799G ────────────────────────────────────────────

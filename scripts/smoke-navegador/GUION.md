@@ -18,6 +18,13 @@ para que el resultado no dependa de interpretar prosa:
 | `02-wms-encuadre.js` | 2 | 1 `GetMap` por instancia WMS visible y por encuadre, al tamaño del lienzo | `ok:true` |
 | `03-arrastre.js` | 3 | arrastrar un vértice mueve tabla + dibujo + ficha | `ok:true` |
 | `04-atribucion-consola.js` | 4 y 5 | atribución literal y visible; canvas limpio; el canal de avisos llega a la UI | `ok:true` |
+| `05-salto-zoom.js` | — | **diagnóstico**, no aceptación: mide frame a frame la transición de la imagen WMS al hacer zoom | ver §11 |
+
+`05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
+spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
+revisión humana de la Fase 5 («al hacer zoom la cartografía se mueve y luego
+vuelve a su sitio»), y se conserva porque la corrección —el fundido de
+`viewer/wms-catastro.js`— solo se puede comprobar midiendo frames. Ver §11.
 
 Cada guion lleva en su cabecera **qué mide y qué NO puede medir**. Léelas antes
 de citar un resultado.
@@ -322,7 +329,7 @@ Cómo se comprueba, sin ambigüedad, en el veredicto de `04`:
 
 No hay forma cómoda de **provocar** el 404 desde `/browse` (no tiene
 interceptación de red ni modo offline); provocarlo cortando la red un instante es
-parte del checklist humano de la fase 5.
+parte del checklist humano de la fase 5 (`CHECKLIST-HUMANO.md` §3).
 
 ⚠️ Y el aviso que invalida la lectura ingenua de `$B network`: el WMS del
 Catastro devuelve sus errores como `ServiceExceptionReport` en `text/xml` **con
@@ -369,8 +376,12 @@ barato). Para cerrarlo: `$B stop`.
 
 Este smoke **no es de una sola vez**:
 
-- **Fase 5**, junto al checklist humano: allí se hace el arrastre con ratón de
-  verdad, que es lo único que este smoke no puede cubrir (§0).
+- **Fase 5** — HECHO el 2026-07-26: los cuatro guiones se repitieron en las dos
+  pasadas (`npm run dev` y `npx vite preview`), `ok:true` y `problemas:[]` en los
+  ocho veredictos, **sin una sola discrepancia dev↔preview** y con las mismas
+  cifras de §4. Lo que este smoke no puede cubrir (§0) quedó recogido en
+  **`CHECKLIST-HUMANO.md`**, en esta misma carpeta: gestos de ratón reales,
+  juicio visual y el 404 provocado cortando la red.
 - **F16**, cuando toque `base` para GitHub Pages: la app carga
   `/estilos/app.css` y `/app/main.js` con rutas **absolutas** desde `index.html`,
   y bajo una subruta de Pages eso se rompe. Hay que volver a pasar los cuatro
@@ -460,3 +471,67 @@ volver a pisar (todas verificadas leyendo
 8. **El control de atribución une con `, `** y prefija el crédito de Leaflet con
    `<span aria-hidden="true">|</span>`: para comparar los literales legales por
    identidad hay que partir por ahí (lo hace `04`).
+
+---
+
+## 11. `05-salto-zoom.js` — el fundido de la imagen WMS
+
+Guion de **diagnóstico**, añadido en la Fase 5. No cuelga de ningún criterio del
+spec y **no tumba nada**: sirve para medir una cosa que solo se ve frame a frame.
+
+### El defecto, y lo que resultó NO ser
+
+La revisión humana reportó: «si haces pan y luego zoom in, la cartografía
+catastral se mueve y luego vuelve a su sitio». La hipótesis obvia era que
+`_alCargar` reposiciona la imagen (`setBounds`) antes de que el navegador pinte
+el `src` nuevo, dejando el contenido viejo en la geometría nueva. Medido: **ese
+frame existe, pero es UNO**, y no explica un fenómeno que dura 350–520 ms — tres
+órdenes de magnitud más. Perseguirlo habría sido perder la tarde.
+
+(Con el fundido puesto ese frame sale **0**: el reflow forzado de
+`_fundirEntrada` lo elimina de paso. El guion lo sigue contando como regresión.)
+
+Y el pan tampoco tenía nada que ver: **el zoom sin pan previo se comporta igual**
+(524 ms frente a 349 ms; la diferencia es latencia de red).
+
+### Lo que sí pasaba, medido
+
+Al hacer zoom, Leaflet escala la imagen del encuadre anterior para mantenerla en
+su sitio geográfico: `1048×900 → 2096×1800`, con el centro exactamente sobre el
+del lienzo. Se queda así **350–520 ms** —lo que tarda el WMS— y la nueva la
+sustituye **de golpe, en un frame y a opacidad plena**. Eso es lo que el ojo lee
+como salto, agravado porque el WMS **re-rasteriza rótulos y grosores** a la
+escala nueva: los textos de la imagen ampliada no están donde el servidor los
+pone en la nueva.
+
+La causa de fondo es la restricción central del proyecto (§ cabecera de
+`viewer/wms-catastro.js`): **una imagen por encuadre, nunca teselas**. Pedir en
+`zoomanim` en vez de en `moveend` quitaría el intervalo, pero pediría encuadres
+intermedios al encadenar zooms — y el criterio 2 vale más que la suavidad.
+
+### La corrección y cómo se comprueba
+
+`viewer/wms-catastro.js` reparte la discontinuidad: `zoomstart` **atenúa** la
+imagen visible al 35 % de la opacidad de la capa (es provisional, y lo parece), y
+la imagen nueva **entra fundida** hasta la opacidad plena en {@link MS_FUNDIDO}
+ms. **No toca ni una petición.**
+
+Medido en `vite preview` con la superpuesta al 60 %:
+
+| Medida | Antes | Después |
+|---|---|---|
+| Opacidad en el frame del cambio de escala | 0,60 (plena) | **0,21** |
+| Frames hasta recuperar la opacidad plena | 0 (corte seco) | 7 |
+| `GetMap` por encuadre | 1 | **1** (sin cambio) |
+
+Lo que hay que ver en el veredicto: `anchoTrasElCambio` la mitad de
+`anchoAntesDelCambio` (el cambio de escala sigue ahí, y debe seguir), pero
+`opacidadEnElFrameDelCambioDeContenido` **claramente por debajo** de la opacidad
+de la capa. Si ese número volviera a ser el de la capa, el fundido se habría
+perdido y el salto estaría de vuelta.
+
+⚠️ El fundido tiene **red de seguridad** en dos caminos que este guion no
+ejercita y que sí cubre `test/viewer/wms-catastro.dom.test.js`: un encuadre
+deduplicado y un fallo de carga, los dos casos en que se atenúa y **no llega
+ninguna imagen** que devuelva la opacidad. Sin esa red, la capa se quedaría
+tenue para siempre.

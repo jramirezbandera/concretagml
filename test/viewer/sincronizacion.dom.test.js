@@ -189,7 +189,7 @@ describe('viewer/sincronizacion · multi-recinto con huecos (C6/T6)', () => {
     ctx.limpiar()
   })
 
-  it('un marcador divIcon violeta por vértice de CADA recinto, en el pane vertices', () => {
+  it('un marcador divIcon amarillo por vértice de CADA recinto, en el pane vertices', () => {
     const ctx = montar()
     const marcadores = marcadoresDe(ctx.mapa)
     expect(marcadores).toHaveLength(8) // 4 del exterior + 4 del hueco

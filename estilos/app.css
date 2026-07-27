@@ -49,7 +49,7 @@
  *
  * @see viewer/sincronizacion.js  Contrato del HTML de la tabla (constante CLASE).
  * @see viewer/capas.js           Control de opacidad y sus estilos en línea.
- * @see viewer/_comun.js          COLOR_USUARIO (#7C3AED) y DENSIDAD_BASE_PX (13).
+ * @see viewer/_comun.js          COLOR_USUARIO (#FFD600) y DENSIDAD_BASE_PX (13).
  */
 
 @import './tokens/fonts.css';
@@ -81,6 +81,22 @@
   /* El título del panel (19px/600) cae entre --text-15 y la escala de display:
      el sistema no tiene un token para ese tamaño. */
   --gml-titulo-tam: 19px;
+
+  /* ── El color de la geometría del usuario, en sus DOS fondos ───────────────
+   *
+   * `viewer/_comun.js#COLOR_USUARIO` es amarillo `#FFD600` desde la revisión
+   * visual de la Fase 5, y ahí está escrito el porqué (no puede colisionar con
+   * el rojo catastral, el azul de la hidrografía ni el verde de la vegetación).
+   *
+   * Pero ese amarillo vive SOBRE LA ORTOFOTO. Sobre el blanco del panel da
+   * ~1,4:1 de contraste — ilegible. Por eso el nº de vértice de la tabla NO usa
+   * el mismo valor: usa un ámbar oscuro de la misma familia, que se lee como
+   * «el color de los vértices» pero pasa de sobra sobre fondo claro (~5,0:1).
+   *
+   * Son DOS variables a propósito y no una: unificarlas obliga a elegir entre
+   * un mapa donde el lindero no se ve o una columna que no se lee. */
+  --gml-color-usuario: #ffd600;
+  --gml-color-usuario-sobre-claro: #a16207;
 }
 
 /* ═══ Base ═══════════════════════════════════════════════════════════════════ */
@@ -499,9 +515,10 @@ body {
   background: var(--color-bg-elevated);
 }
 
-/* El nº de vértice, en el violeta reservado a la GEOMETRÍA DEL USUARIO
-   (`viewer/_comun.js#COLOR_USUARIO`, #7C3AED = --color-chart-envelope): el azul
-   del sistema chocaría con la hidrografía de la cartografía catastral.
+/* El nº de vértice, en el ámbar reservado a la GEOMETRÍA DEL USUARIO sobre
+   fondo CLARO (ver `--gml-color-usuario-sobre-claro` arriba): es la versión
+   legible sobre blanco del amarillo con el que el mapa dibuja esos mismos
+   vértices. NO se usa aquí `--gml-color-usuario` ni el token del design system.
    La columna muestra `indice + 1` — el modelo cuenta desde 0 (`data-indice`) y
    el humano desde 1. Manda el contrato de `sincronizacion.js`, no la maqueta
    (que numeraba desde 0). */
@@ -512,7 +529,7 @@ body {
   font-weight: var(--fw-medium);
   font-size: var(--text-11);
   font-variant-numeric: tabular-nums;
-  color: var(--color-chart-envelope);
+  color: var(--gml-color-usuario-sobre-claro);
   text-align: left;
 }
 

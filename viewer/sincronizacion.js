@@ -33,9 +33,13 @@
 // `L.Icon` depende de los PNG que Leaflet trae en `dist/images`; con Vite esas
 // URLs se rompen si no se configuran los assets a mano. Un `divIcon` con estilo
 // en línea no descarga nada, así que el vértice se ve igual en dev, en build y
-// en jsdom. El color es `COLOR_USUARIO` (violeta `#7C3AED`): la saturación se
-// reserva a la geometría del usuario, y el azul chocaría con la hidrografía de
-// la cartografía catastral (SPEC feature-03, Color).
+// en jsdom. El color es `COLOR_USUARIO` (amarillo `#FFD600` desde la revisión
+// visual de la Fase 5): la saturación se reserva a la geometría del usuario, y
+// es el único tono que no colisiona ni con el rojo de la cartografía catastral,
+// ni con el azul de la hidrografía, ni con el verde de la vegetación de la
+// ortofoto. La razón completa está en `viewer/_comun.js#COLOR_USUARIO`.
+// El borde blanco de 2 px del cuadradito no es adorno: es lo que sostiene el
+// contraste cuando el amarillo cae sobre asfalto o cubierta clara.
 //
 // ── Qué es de F06 y NO está aquí ────────────────────────────────────────────
 // Insertar o eliminar vértices, crear o borrar recintos, offset de lindero,

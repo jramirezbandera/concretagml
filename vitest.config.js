@@ -36,11 +36,17 @@ export default defineConfig({
           include: ['test/**/*.dom.test.js'],
           exclude: ['**/node_modules/**'],
           // Se conserva para que un run FILTRADO por nombre (`npm test -- celda`,
-          // que solo casa en `node`) no falle por este proyecto. Contrapartida
-          // asumida: si el `include` de arriba se rompiera, los tests dom
-          // desaparecerían en verde. Cerrarlo es tarea de la guarda transversal
-          // de la Fase 4, que debe afirmar que se descubren los N ficheros dom
-          // esperados en vez de fiarse del glob.
+          // que solo casa en `node`) no falle por este proyecto. Contrapartida:
+          // si el `include` de arriba se rompiera, los tests dom desaparecerían
+          // en verde. YA ESTÁ CERRADO por la guarda transversal de la Fase 4
+          // (`test/contrato.test.js`, describe «partición de tests derivada»),
+          // que corre en el proyecto `node` —si viviera en `dom`, romper el
+          // `include` la desactivaría a ella también— e importa ESTE fichero
+          // para afirmar sobre los `include`/`exclude` reales que la partición
+          // de `test/` es exacta: sin huérfanos y sin solapes. No cuenta
+          // ficheros a propósito: un `toBe(11)` sería una lista escrita a mano
+          // con otro nombre. Comprobado rompiendo el `include`: sale rojo
+          // NOMBRANDO los ficheros que nadie ejecutaría.
           passWithNoTests: true,
         },
       },

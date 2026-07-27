@@ -30,7 +30,13 @@ El mapa Leaflet con cartografía de fondo y la **tabla de vértices sincronizada
 
 ### Color (design system como referencia, no obligación)
 
-El mapa es el contenido; la interfaz, el instrumento. El cromo en neutros; la saturación se reserva para la geometría del usuario. **Geometría del usuario en violeta `#7C3AED`** (el azul colisiona con la hidrografía catastral). Densidad tipo base ~13 px.
+El mapa es el contenido; la interfaz, el instrumento. El cromo en neutros; la saturación se reserva para la geometría del usuario. Densidad tipo base ~13 px.
+
+**Geometría del usuario en amarillo intenso `#FFD600`** sobre el mapa. Es el único tono libre: no puede ser azul (choca con la hidrografía catastral), ni rojo/magenta (le resta contraste a las líneas de la cartografía catastral, que son sobre las que se calca), ni verde (el relleno se camufla con la vegetación de la ortofoto). El amarillo es además el que más contrasta sobre las sombras.
+
+> **Cambio de spec, decidido en la Fase 5 (2026-07-27)** tras comparar cuatro candidatos sobre la ortofoto real: la versión anterior fijaba violeta `#7C3AED` y **desaparecía sobre las sombras oscuras** (arbolado, cubiertas en sombra), justo donde más falta hace ver el lindero.
+
+El amarillo es para el mapa, **sobre imagen aérea**. Sobre el blanco del panel es ilegible (~1,4:1), así que el nº de vértice de la tabla usa un ámbar oscuro de la misma familia (`#A16207`, ~5,0:1). Son dos valores a propósito: unificarlos obliga a elegir entre un lindero que no se ve y una columna que no se lee.
 
 ## 🔻 OVERRIDE (dossier)
 

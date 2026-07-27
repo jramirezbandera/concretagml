@@ -8,8 +8,9 @@
    `prototipo/_ds/...`, el cambio hay que propagarlo aquí A MANO y de forma
    deliberada — no hay ningún mecanismo de sincronización automática.
 
-   Copia fiel: no se ha tocado ningún token salvo la anotación puntual junto
-   a `--color-chart-envelope` (ver más abajo, sobre el violeta de F03).
+   Copia fiel: **ningún VALOR se ha modificado**. Lo único propio son dos
+   anotaciones junto a `--color-chart-envelope` (:root y el bloque oscuro), que
+   dejan escrito que F03 dejó de reutilizar ese token en la Fase 5.
    ──────────────────────────────────────────────────────────────────────── */
 
 /* colors.css — Concreta color system.
@@ -64,15 +65,16 @@
   --color-chart-axis: #0284c7;
   --color-chart-dim: #64748b;
   --color-chart-dim-text: #475569;
-  /* Excepción deliberada a "No violet, no blue-to-purple" (readme.md de este
-     design system, sección "Color"): F03 reutiliza legítimamente este mismo
-     valor (#7c3aed) como COLOR_USUARIO en `viewer/_comun.js` para dibujar la
-     geometría aportada por el usuario en el visor, porque el azul de acento
-     del DS (--color-accent / --color-chart-axis) choca visualmente con la
-     hidrografía catastral (también azul) cuando ambas capas están activas a
-     la vez. El spec del proyecto trata este design system como referencia,
-     no como obligación. No cambiar este valor sin revisar antes
-     `viewer/_comun.js#COLOR_USUARIO` y los usos de F03 que dependen de él. */
+  /* Token del design system, conservado tal cual vino. HISTÓRICO, para que
+     nadie vuelva a atar cabos mal: hasta la Fase 5 de F03 este valor se
+     reutilizaba como COLOR_USUARIO (`viewer/_comun.js`) para dibujar la
+     geometría del usuario, como excepción declarada a "No violet, no
+     blue-to-purple" del readme del DS. **Ya NO.** La revisión visual sobre la
+     ortofoto real demostró que el violeta desaparece sobre las sombras
+     oscuras, y el visor pasó a amarillo `#FFD600`; el panel usa un ámbar
+     legible. Los dos valores viven ahora en `estilos/app.css`
+     (`--gml-color-usuario*`), NO aquí: este fichero es copia del DS y no debe
+     divergir de él. Ningún módulo del proyecto depende ya de este token. */
   --color-chart-envelope: #7c3aed;
   --color-chart-label: #0f172a;
   --color-chart-rebar-faint: #64748b;
@@ -175,8 +177,8 @@ html[data-theme="dark"] {
   --color-chart-axis: #38bdf8;
   --color-chart-dim: #94a3b8;
   --color-chart-dim-text: #94a3b8;
-  /* mismo token de excepción del violeta que en :root — ver el comentario
-     junto a --color-chart-envelope más arriba (F03 / COLOR_USUARIO). */
+  /* Variante oscura del mismo token del DS — ver la nota histórica junto a
+     --color-chart-envelope más arriba: F03 ya NO lo usa. */
   --color-chart-envelope: #a78bfa;
   --color-chart-label: #e2e8f0;
   --color-chart-rebar-faint: #64748b;

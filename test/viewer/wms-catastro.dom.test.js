@@ -26,6 +26,7 @@ import {
   FORMATO_DEFECTO,
   MAX_PIXELES_WMS,
   MENSAJES,
+  MS_FUNDIDO,
   OPACIDAD_SUPERPUESTA,
   VERSION_WMS,
   crearCapaWMSCatastro,
@@ -622,5 +623,186 @@ describe('crearCapaWMSCatastro · CORS, atribución y doble uso (base + superpue
     expect(() => crearCapaWMSCatastro({ rol: 'inventado' })).toThrow(RangeError)
     expect(() => crearCapaWMSCatastro({ opacidad: 2 })).toThrow(RangeError)
     expect(() => crearCapaWMSCatastro({ opacidad: 'mucha' })).toThrow(TypeError)
+  })
+})
+
+// ── Fundido de la imagen (Fase 5) ────────────────────────────────────────────
+//
+// Blinda la corrección del defecto que reportó la revisión humana: «al hacer
+// zoom la cartografía catastral se mueve y luego vuelve a su sitio». Medido
+// frame a frame en navegador real, NO era un error de posición —no existe ni un
+// instante con la imagen vieja colocada donde va la nueva—: era que la imagen
+// del encuadre anterior se muestra escalada 350-520 ms y la nueva la sustituía
+// de golpe, en un frame. La corrección reparte esa discontinuidad con un
+// fundido.
+//
+// Lo que estas pruebas vigilan por encima de todo es que el arreglo sea SOLO
+// presentación: si algún día tocara una petición, el criterio de aceptación 2
+// —el mayor riesgo de bloqueo del proyecto— se habría roto por un detalle
+// estético. Por eso el primer `it` del bloque cuenta peticiones.
+describe('crearCapaWMSCatastro · fundido de la imagen (Fase 5)', () => {
+  let arnes
+  let espia
+
+  /** Opacidad efectiva del `<img>` visible del overlay. */
+  const opacidadVisible = (capa) => Number(capa.getElement().style.opacity)
+
+  beforeEach(() => {
+    arnes = montarMapa({ ancho: 800, alto: 600 })
+    espia = espiarPeticiones()
+  })
+
+  afterEach(() => {
+    espia.restaurar()
+    arnes.destruir()
+  })
+
+  it('NO cambia el número de peticiones: el criterio 2 sigue intacto', () => {
+    const capa = crearCapaWMSCatastro().addTo(arnes.mapa)
+    dispararCarga(espia.ultima())
+    expect(espia.total).toBe(1)
+
+    // Un zoom completo: `zoomstart` (que atenúa) + `moveend` (que pide).
+    arnes.mapa.fire('zoomstart')
+    mover(arnes.mapa)
+    dispararCarga(espia.ultima())
+
+    // Dos encuadres ⇒ dos peticiones. Si el fundido hubiera introducido una
+    // recarga del `<img>`, un reintento o un clon, aquí saldrían más.
+    expect(espia.total).toBe(2)
+    expect(capa.estado().peticiones).toBe(2)
+    // Y ninguna del tamaño de una tesela (la firma de un mosaico).
+    for (const url of espia.urls()) expect(parametro(url, 'WIDTH')).toBe('800')
+  })
+
+  it('`zoomstart` ATENÚA la imagen visible: durante el zoom es provisional', () => {
+    const capa = crearCapaWMSCatastro({ opacidad: 0.6 }).addTo(arnes.mapa)
+    dispararCarga(espia.ultima())
+    expect(opacidadVisible(capa)).toBeCloseTo(0.6, 5)
+
+    arnes.mapa.fire('zoomstart')
+
+    // Atenuada, pero NUNCA a cero: quedarse sin cartografía mientras se calca
+    // desorienta más que verla tenue.
+    expect(opacidadVisible(capa)).toBeLessThan(0.6)
+    expect(opacidadVisible(capa)).toBeGreaterThan(0)
+  })
+
+  it('atenuar es SOLO presentación: `options.opacity` y `estado()` no mienten', () => {
+    const capa = crearCapaWMSCatastro({ opacidad: 0.6 }).addTo(arnes.mapa)
+    dispararCarga(espia.ultima())
+    const urlAntes = capa.urlVisible()
+
+    arnes.mapa.fire('zoomstart')
+
+    // El fundido toca `style`, no el estado de la capa. Si tocara
+    // `options.opacity`, el deslizador de `viewer/capas.js` leería un valor
+    // provisional y saltaría al siguiente encuadre.
+    expect(capa.options.opacity).toBe(0.6)
+    expect(capa.urlVisible()).toBe(urlAntes)
+    expect(capa.estado().hayCartografia).toBe(true)
+  })
+
+  it('la imagen nueva ENTRA fundida y acaba en la opacidad de la capa', () => {
+    const capa = crearCapaWMSCatastro({ opacidad: 0.6 }).addTo(arnes.mapa)
+    dispararCarga(espia.ultima())
+
+    arnes.mapa.fire('zoomstart')
+    mover(arnes.mapa)
+    dispararCarga(espia.ultima())
+
+    // El destino de la transición es la opacidad de la capa: el fundido sube
+    // hasta ella, no la deja a medias.
+    expect(opacidadVisible(capa)).toBeCloseTo(0.6, 5)
+    expect(capa.getElement().style.transition).toContain(`${MS_FUNDIDO}ms`)
+  })
+
+  it('el ESTADO se aplica de inmediato, sin esperar al fundido', () => {
+    // El fundido es lo último de `_alCargar` y solo toca `style`. Si el estado
+    // dependiera de la animación, un navegador con animaciones reducidas —o
+    // jsdom, que no anima— vería una capa que dice no tener cartografía.
+    const capa = crearCapaWMSCatastro().addTo(arnes.mapa)
+    dispararCarga(espia.ultima())
+
+    expect(capa.urlVisible()).toBe(espia.urls()[0])
+    expect(capa.estado().aplicadas).toBe(1)
+    expect(capa.estado().hayCartografia).toBe(true)
+  })
+
+  it('el deslizador MANDA: `setOpacity` corta el fundido y aplica el valor ya', () => {
+    const capa = crearCapaWMSCatastro({ opacidad: 0.6 }).addTo(arnes.mapa)
+    dispararCarga(espia.ultima())
+    arnes.mapa.fire('zoomstart') // deja un fundido en curso
+
+    capa.setOpacity(0.25)
+
+    // Sin transición pendiente y con el valor exacto: arrastrar el deslizador
+    // con una transición puesta se sentiría 180 ms pegajoso.
+    expect(capa.getElement().style.transition).toBe('')
+    expect(opacidadVisible(capa)).toBeCloseTo(0.25, 5)
+    expect(capa.options.opacity).toBe(0.25)
+  })
+
+  it('RED DE SEGURIDAD: un encuadre deduplicado tras atenuar restaura la opacidad', () => {
+    // El caso que dejaría la capa atenuada PARA SIEMPRE: se atenúa en
+    // `zoomstart` y el `moveend` siguiente no pide nada porque la URL no ha
+    // cambiado, así que no hay ninguna carga que devuelva la opacidad.
+    const capa = crearCapaWMSCatastro({ opacidad: 0.6 }).addTo(arnes.mapa)
+    dispararCarga(espia.ultima())
+    const peticionesAntes = espia.total
+
+    arnes.mapa.fire('zoomstart')
+    expect(opacidadVisible(capa)).toBeLessThan(0.6)
+
+    // `moveend` SIN mover: misma URL ⇒ deduplicada ⇒ 0 peticiones.
+    arnes.mapa.fire('moveend')
+
+    expect(espia.total).toBe(peticionesAntes)
+    expect(opacidadVisible(capa)).toBeCloseTo(0.6, 5)
+  })
+
+  it('RED DE SEGURIDAD: un fallo de carga tras atenuar también la restaura', () => {
+    // Lo visible es la cartografía anterior y ahí se queda. Dejarla atenuada
+    // sería un segundo síntoma del mismo fallo; el aviso de «obsoleta» ya lo
+    // cuenta con palabras.
+    const avisos = []
+    const capa = crearCapaWMSCatastro({
+      opacidad: 0.6,
+      alAvisar: (mensaje) => avisos.push(mensaje),
+    }).addTo(arnes.mapa)
+    dispararCarga(espia.ultima())
+
+    arnes.mapa.fire('zoomstart')
+    mover(arnes.mapa)
+    dispararCarga(espia.ultima(), { error: true })
+
+    expect(opacidadVisible(capa)).toBeCloseTo(0.6, 5)
+    expect(avisos).toContain(MENSAJES.OBSOLETA)
+    expect(capa.estado().obsoleta).toBe(true)
+  })
+
+  it('retirar la capa no deja temporizadores de fundido vivos', () => {
+    const capa = crearCapaWMSCatastro().addTo(arnes.mapa)
+    dispararCarga(espia.ultima())
+    arnes.mapa.fire('zoomstart')
+
+    // Si `onRemove` no cancelara, quedaría un `setTimeout` apuntando a una capa
+    // ya retirada: la fuga que `destruir()` existe para no dejar.
+    expect(() => arnes.mapa.removeLayer(capa)).not.toThrow()
+    expect(capa._temporizadorFundido).toBeNull()
+  })
+
+  it('la capa BASE (opacidad 1) también funde, y hasta 1', () => {
+    // El rol `base` es opaco; el fundido debe llevarlo a 1 exacto, no a la
+    // opacidad de la superpuesta.
+    const capa = crearCapaWMSCatastro({ rol: 'base' }).addTo(arnes.mapa)
+    dispararCarga(espia.ultima())
+
+    arnes.mapa.fire('zoomstart')
+    expect(opacidadVisible(capa)).toBeLessThan(1)
+
+    mover(arnes.mapa)
+    dispararCarga(espia.ultima())
+    expect(opacidadVisible(capa)).toBeCloseTo(1, 5)
   })
 })

@@ -97,8 +97,31 @@ export { NIVEL } from '../validation/_comun.js'
  * @typedef {import('../validation/_comun.js').RefVertice} RefVertice
  */
 
-/** Color de la geometría del usuario (violeta; el azul choca con la hidrografía). */
-export const COLOR_USUARIO = '#7C3AED'
+/**
+ * Color de la geometría del usuario **sobre el mapa**: amarillo intenso.
+ *
+ * Elegido en la revisión visual de la Fase 5 (2026-07-27) comparando cuatro
+ * candidatos sobre la ortofoto real, y sustituye al violeta `#7C3AED` que fijaba
+ * el spec: el violeta **desaparecía sobre las sombras oscuras** (arbolado,
+ * cubiertas en sombra), que es justo donde más falta hace ver el lindero.
+ *
+ * El criterio no es el gusto, son las tres cosas con las que este color NO puede
+ * colisionar, porque conviven en el mismo lienzo:
+ *   · el ROJO de la cartografía catastral superpuesta (descarta magenta/rosa:
+ *     le resta contraste a las líneas sobre las que se calca);
+ *   · el AZUL de la hidrografía catastral (descarta el azul de acento del DS —
+ *     era la razón original del violeta);
+ *   · el VERDE de la vegetación de la ortofoto (descarta el verde: el relleno
+ *     se camufla con césped y arbolado).
+ * El amarillo es el único que queda libre, y además es el que más contrasta
+ * sobre las sombras.
+ *
+ * ⚠️ Este valor es para el MAPA, sobre imagen aérea. **No sirve sobre fondo
+ * blanco**: amarillo sobre blanco da ~1,4:1 de contraste, ilegible. El nº de
+ * vértice de la tabla usa por eso un ámbar oscuro de la misma familia
+ * (`--gml-color-usuario-sobre-claro` en `estilos/app.css`), NO este valor.
+ */
+export const COLOR_USUARIO = '#FFD600'
 
 /** Densidad tipográfica base del cromo del visor, en px. */
 export const DENSIDAD_BASE_PX = 13
