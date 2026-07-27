@@ -233,6 +233,30 @@ Un feature está **hecho** cuando:
 
 ---
 
-## 7 · Verificaciones que siguen pendientes de certificado (no bloquean)
+## 7 · Verificaciones con certificado — ✅ HECHAS (2026-07-27)
 
-Del dossier §0.7 (Tier D, ya mitigado): (1) si el IVG rechaza o autocorrige un exterior antihorario → emitir **siempre horario**; (2) si la subida acepta srsName URI y URN → emitir la **forma canónica de cada tipo** (parcela=URI, edificio=URN). Ambas requieren subir un GML a la Sede con certificado/Cl@ve; se cierran cuando el usuario quiera, no antes de codificar.
+**Se subió un GML generado por la app a la Sede Electrónica y se cargó
+correctamente.** Es la única verificación que ninguna máquina podía firmar, y
+cerró de golpe el ciclo que empezó ese mismo día con el rechazo del IVG (§3.1).
+
+Qué queda confirmado, y qué no:
+
+| | |
+|---|---|
+| ✅ **El sobre de ENTREGA es el correcto** | La Sede acepta `gml:FeatureCollection` + `gml:featureMember` + `srsName` en URN + `schemaLocation` solo de cp/4.0. Confirmado **contra el sistema real**, no contra un XSD. |
+| ✅ **La lectura del rechazo era la buena** | El mismo día, el mismo fichero salvo el envoltorio, pasó de rechazado a admitido. La causa aislada en §3.1 era la causa. |
+| ✅ **`beginLifespanVersion` con `xsi:nil` vale** | Se temía que la Sede exigiera una fecha. No la exige, igual que su plantilla. |
+| ✅ **`cp:label` vacío vale** | El riesgo de producto que se temía (`minLength`) no existía, y ahora está confirmado también en producción. |
+| ⚠️ **La orientación sigue SIN discriminar** | Se subió con el exterior horario, así que esto no dice nada de qué pasa con el antihorario. La medición sobre la plantilla oficial (que es antihoraria) sigue siendo la mejor evidencia de que da igual. |
+| ⚠️ **URI vs URN: resuelto por la vía práctica** | La URN funciona. Que la URI también funcionara en la subida no se ha probado ni hace falta: la forma canónica de la entrega ya está fijada. |
+
+Las dos verificaciones del dossier §0.7 (Tier D) quedan cerradas en lo que
+importaba: **emitir horario y emitir URN en la parcela son formas que la Sede
+admite de hecho.** Lo que no se ha explorado es si las contrarias también, y ya
+no es una pregunta que este proyecto necesite responder.
+
+**Lo que sigue abierto no es de formato, es de contenido.** El IVG, además de
+leer el fichero, emite un informe de validación gráfica que juzga reglas de
+negocio —solape con parcelas colindantes, tolerancias de superficie y perímetro
+(§3, tolerancias oficiales)— que ningún esquema expresa y que dependen de la
+parcela concreta que se suba, no del generador. Eso es materia de F08 y F09.

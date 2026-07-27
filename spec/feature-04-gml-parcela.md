@@ -162,6 +162,14 @@ El análisis completo, con las mediciones contra los XSD oficiales, está en **[
 2. **Un guardián que puede saltarse a sí mismo en silencio no es un guardián.** `validar:xsd` existía desde el primer día de F04 y nunca se ejecutó, porque salía `SALTADO` con código 0 al no encontrar `xmllint`. La comprobación que habría cazado esto estaba escrita y era inerte.
 3. **«Verificado» sin ejecutar es una hipótesis.** Los overrides O2, O3 y O4 venían marcados como verdad verificada en el dossier. Dos eran falsos y el tercero estaba mal enunciado. Lo que los deshizo no fue leer mejor la documentación: fue **ejecutar el validador**.
 
-## 10 · Lo que sigue pendiente
+## 10 · ✅ Confirmado en la Sede (2026-07-27)
 
-Subir a la Sede un GML generado con el perfil corregido y confirmar que el IVG lo acepta. Ahora se sabe que el fichero **valida contra el XSD oficial** (comprobado con libxml2, incluida la parcela con hueco), que es condición necesaria y no suficiente: el IVG comprueba además reglas de negocio —solape con parcelas colindantes, tolerancias de superficie— que ningún esquema expresa.
+**Se subió un GML generado con el perfil corregido y la Sede Electrónica lo cargó correctamente.** F04 queda cerrado en lo que a formato se refiere.
+
+El detalle de qué queda probado y qué no —y lo que este resultado NO dice sobre la orientación de anillos— está en [`spec/SPEC.md` §7](SPEC.md).
+
+El día completo, en tres pasos: se subió el fichero → rechazado por esquema → se aisló la causa midiendo contra el XSD → se corrigió el sobre → aceptado. Lo que hizo la diferencia no fue leer mejor la documentación (la FAQ y el dossier decían cosas que resultaron falsas): fue **ejecutar el validador y mirar el mensaje de error**.
+
+## 11 · Lo que sigue abierto, y ya no es de F04
+
+El IVG emite además un **informe de validación gráfica** que juzga reglas de negocio: solape con parcelas colindantes y tolerancias de superficie y perímetro. Eso no depende del generador sino de la parcela concreta que se suba, y es materia de **F08** (comprobar un GML) y **F09**. Que el fichero se cargue no significa que el informe salga positivo para cualquier geometría.

@@ -59,10 +59,17 @@ desde F03 no.
   [`spec/SPEC.md` §3.1](spec/SPEC.md). Desde entonces la salida se valida contra
   el **XSD oficial de INSPIRE** en CI, antes de publicar.
 
-La verificación que ninguna máquina puede firmar sigue abierta: subir un GML
-generado a la Sede con certificado y comprobar que el IVG lo acepta
-(`spec/SPEC.md` §7). Lo que sí está comprobado por máquina es que **valida contra
-`CadastralParcels.xsd` 4.0**, que es condición necesaria y no suficiente.
+## ✅ Verificado en la Sede Electrónica
+
+El 2026-07-27 se subió un GML generado por esta app a la Sede Electrónica del
+Catastro y **se cargó correctamente**. Es la verificación que ninguna máquina
+puede firmar, y cierra el ciclo que empezó ese mismo día con un rechazo del IVG.
+
+Qué significa y qué no: confirma que **el formato del fichero es el que la Sede
+admite**. No dice nada del *informe de validación gráfica*, que juzga además
+solape con parcelas colindantes y tolerancias de superficie — reglas de negocio
+que dependen de la parcela concreta, no del generador. Ver
+[`spec/SPEC.md` §7](spec/SPEC.md).
 
 ## Despliegue
 
