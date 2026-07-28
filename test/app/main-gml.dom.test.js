@@ -72,8 +72,15 @@ import { NIVEL, crearEstadoVista } from '../../viewer/_comun.js'
 // `crearVisor` es lo ÚNICO que se dobla (decisión 3). El doble devuelve la
 // misma forma que el real —un objeto con `destruir`— para que `app/main.js` no
 // tenga que saber que está doblado.
+//
+// Desde F05 esa forma incluye `mapa`: el ensamblaje se lo pasa a
+// `cablearCatastro` para la deducción por clic, y ese cableado lo exige por duck
+// typing (`on`/`off`) o `null`. Un doble sin `mapa` le daría `undefined`, el
+// cableado lanzaría, y el `try` de arranque de `app/main.js` se lo tragaría: el
+// bloque del Catastro no se cablearía y esta suite seguiría en verde sin
+// enterarse. Es decir, exactamente un test que miente.
 vi.mock('../../viewer/index.js', () => ({
-  crearVisor: () => ({ destruir() {} }),
+  crearVisor: () => ({ mapa: { on() {}, off() {} }, destruir() {} }),
 }))
 
 // ── La cáscara REAL, leída de `index.html` ───────────────────────────────────

@@ -78,6 +78,15 @@
      lista scrollea sola y el reparto de altura del panel es estable. */
   --gml-avisos-alto-max: 34vh;
 
+  /* Tope de altura de la lista de candidatos de referencia catastral, por el
+     MISMO motivo que el de avisos: una deducción sobre un centroide ambiguo
+     puede devolver varias parcelas, y sin tope la lista empujaría la tabla y el
+     pie fuera del panel justo cuando el usuario tiene que elegir una. Es más
+     bajo que el de avisos a propósito: este bloque vive ARRIBA del panel y todo
+     lo que ocupe se lo quita a la tabla de vértices, que es lo que se está
+     validando. */
+  --gml-candidatos-alto-max: 20vh;
+
   /* El título del panel (19px/600) cae entre --text-15 y la escala de display:
      el sistema no tiene un token para ese tamaño. */
   --gml-titulo-tam: 19px;
@@ -303,7 +312,217 @@ body {
   margin-bottom: 0;
 }
 
+/* ═══ Origen de la parcela: la carga desde el Catastro (F05) ═════════════════
+ *
+ * Primer bloque del panel, y `flex:none` heredado de `.gml-bloque`. Eso último
+ * es deliberado: pase lo que pase con el reparto de altura, el campo por el que
+ * entra el dato sigue ahí. Quien absorbe y cede altura es el bloque de vértices,
+ * que es el único `flex:1 1 auto`.
+ *
+ * ⚠️ AQUÍ NO SE USA EL AMARILLO DE LA GEOMETRÍA, ni una sola vez.
+ * `--gml-color-usuario` (#FFD600) da ~1,4:1 sobre el blanco del panel: escrito
+ * ahí no se lee, se adivina. Si algún estado futuro de este bloque necesita el
+ * color del usuario, el valor es `--gml-color-usuario-sobre-claro` (~5,0:1), que
+ * existe exactamente por esto y está explicado arriba, junto a los dos. Hoy no
+ * lo necesita ninguno: el bloque se viste solo con tokens del sistema.
+ *
+ * ⚠️ NINGUNA regla de esta sección declara `outline` NI LO ANULA. El foco
+ * visible del campo y de los dos botones lo pone la regla global
+ * `.gml-app :focus-visible:not(.gml-input-coordenada)` de más arriba, que ya los
+ * alcanza. Es la misma solución que usa el botón «Generar GML» del pie, y por el
+ * mismo motivo: un anillo de foco declarado en dos sitios acaba divergiendo.
+ */
+.gml-bloque--catastro {
+  gap: var(--space-2);
+}
+
+/* Los márgenes NO se colapsan dentro de un contenedor flex: sin esto, el margen
+   inferior de `.gml-rotulo` se SUMARÍA al `gap` del bloque y el rótulo quedaría
+   al doble de distancia que el resto de las filas. Mismo arreglo, y por lo
+   mismo, que en `.gml-rotulo-fila .gml-rotulo`. */
+.gml-bloque--catastro .gml-rotulo {
+  margin-bottom: 0;
+}
+
+/* La etiqueta y su campo van más juntos entre sí (4 px) de lo que van las filas
+   del bloque entre ellas (8 px). Esa diferencia es lo único que los agrupa como
+   una sola cosa; con el mismo hueco, la etiqueta flotaría entre el rótulo de la
+   sección y el campo sin pertenecer a ninguno de los dos. */
+.gml-campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* NO es un `.gml-rotulo`: las versalitas están reservadas al título de la
+   SECCIÓN, y dos versalitas seguidas compiten en vez de jerarquizar. */
+.gml-campo-etiqueta {
+  font-size: var(--text-11);
+  color: var(--color-text-secondary);
+}
+
+/* `stretch` (el valor por defecto, escrito aquí porque es carga útil y no
+   inercia): el botón es más bajo que el campo, y sin estirarlo la fila queda
+   descuadrada por 4 px que nadie sabe de dónde salen. */
+.gml-campo-fila {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+/* `.gml-boton` nace a `width:100%` porque el del pie ocupa el panel entero.
+   Dentro de la fila del campo tiene que encoger a su texto. Se resuelve con
+   ESPECIFICIDAD (0,2,0 gana a 0,1,0) y no con el orden de las reglas, como en el
+   resto del fichero. `nowrap`: «Traer del Catastro» partido en dos líneas
+   estiraría la fila y descuadraría el campo. */
+.gml-campo-fila .gml-boton {
+  width: auto;
+  flex: none;
+  padding-left: var(--space-3);
+  padding-right: var(--space-3);
+  white-space: nowrap;
+}
+
+/* El campo de la referencia catastral.
+   · `min-width:0` es lo que le deja encoger dentro del flex. Sin él, el ancho
+     por omisión de un `<input>` (≈20 caracteres) actúa como suelo duro y la fila
+     desborda el panel de 392 px.
+   · NO se declara `font-family`: la mono la pone `.gml-mono` en el marcado y
+     aquí solo se pisaría. El `font-size` SÍ, porque la hoja del navegador impone
+     la suya a los controles de formulario y no se hereda del panel.
+   · 13 px y no los 12 px de la tabla: este es el único texto de la app que el
+     usuario compara carácter a carácter contra un papel. */
+.gml-entrada {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-main);
+  border-radius: var(--radius);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-size: var(--text-13);
+  letter-spacing: 0.06em;
+  transition: var(--transition-border);
+}
+
+/* El ejemplo enseña la FORMA del código —14 caracteres, letras y cifras—, que es
+   justo lo que no se sabe la primera vez. En el gris de texto inactivo para que
+   no se confunda con un valor ya escrito. */
+.gml-entrada::placeholder {
+  color: var(--color-text-disabled);
+  letter-spacing: inherit;
+}
+
+/* ── La lista de candidatos de la deducción ──────────────────────────────────
+ *
+ * Nace `hidden` y vacía en el marcado. Ese `hidden` sigue mandando sobre este
+ * `display:flex` porque `.gml-app [hidden]` es (0,2,0) y esto es (0,1,0): es
+ * exactamente el caso para el que existe aquella regla, anotado allí.
+ *
+ * Tope de alto y scroll PROPIO, igual que `.gml-avisos`: una deducción sobre un
+ * centroide ambiguo puede devolver varias parcelas, y la lista no puede empujar
+ * la tabla ni el pie fuera del panel justo en el momento en que hay que elegir
+ * una de ellas.
+ *
+ * El interior lo escribe `app/cableado-catastro.js`, que todavía no fija un
+ * contrato de clases. Por eso los hijos se apuntan por ELEMENTO con raíz en
+ * `.gml-candidatos` —lo mismo que se hace con la tabla de `viewer/`—: así el
+ * estilo aplica se llamen como se llamen los nodos. Y se da por hecho que cada
+ * candidato es PULSABLE (una lista de candidatos que no se puede elegir no sirve
+ * para nada), así que el padding de la fila lo pone el control y no el `<li>`:
+ * de ese modo el objetivo de clic es la fila entera y no un rectángulo más
+ * pequeño dentro de ella. */
+.gml-candidatos {
+  display: flex;
+  flex-direction: column;
+  max-height: var(--gml-candidatos-alto-max);
+  overflow-y: auto;
+  /* La rueda sobre la lista no debe acabar haciendo scroll en la página. */
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-border-sub);
+  border-radius: var(--radius);
+  background: var(--color-bg-surface);
+}
+
+.gml-candidatos li {
+  border-top: 1px solid var(--color-border-sub);
+}
+
+.gml-candidatos li:first-child {
+  border-top: 0;
+}
+
+.gml-candidatos button {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-12);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.gml-candidatos button:hover {
+  background: var(--color-bg-elevated);
+}
+
+/* ── La procedencia del dato ─────────────────────────────────────────────────
+ *
+ * «del Catastro · guardado hace 6 días». Es el renglón más discreto del bloque a
+ * propósito: no es una acción ni un error, es de dónde viene el dato, y solo se
+ * lee cuando se duda de él. Lo que impide es concreto: que una parcela sacada de
+ * la caché se presente como recién traída de la Sede.
+ *
+ * `:empty{display:none}` NO es cosmético. Este `<p>` nace vacío, y sin la regla
+ * dejaría un hueco fijo bajo el bloque desde el primer pintado — un hueco que
+ * nadie sabría explicar, porque en el inspector no hay nada que señalar. Mismo
+ * problema y misma solución que en `.gml-accion-estado`. */
+.gml-procedencia {
+  margin: 0;
+  font-size: var(--text-11);
+  line-height: 1.35;
+  color: var(--color-text-disabled);
+}
+
+.gml-procedencia:empty {
+  display: none;
+}
+
 /* ═══ Avisos ═════════════════════════════════════════════════════════════════ */
+
+/* El bloque de avisos CEDE ALTURA. Es el único `.gml-bloque` además del de
+   vértices que no es `flex:none`, y la diferencia entre los dos es deliberada:
+   vértices `1 1 auto` (crece Y encoge, absorbe lo que sobra), avisos `0 1 auto`
+   (NO crece, pero encoge cuando falta).
+
+   Por qué existe esta regla, medido durante F05: el panel reparte una altura
+   fija entre bloques fijos, y el bloque nuevo «Origen de la parcela» añadió
+   ~137 px a ese presupuesto. Con la lista de avisos llena (su tope es 34vh) y
+   un viewport de portátil, la suma se pasaba: la tabla encogía hasta cero y lo
+   siguiente que cedía era el PIE, que está `flex:none` — y el pie es donde vive
+   «Generar GML», la acción principal de la app. Medido antes del arreglo: a
+   768 px de alto se salían 5 px; a 720 px, 37 px; a 640 px, 90 px.
+
+   Ceder aquí es gratis porque `.gml-avisos` ya tiene su propio `overflow-y`:
+   la lista se hace más corta y scrollea, en vez de empujar. El `min-height:0`
+   de la caja interior es imprescindible: sin él un hijo flex no encoge por
+   debajo del alto de su contenido y la sección no podría ceder nada. */
+.gml-bloque--avisos {
+  flex: 0 1 auto;
+}
+
+.gml-bloque--avisos .gml-avisos {
+  min-height: 0;
+}
 
 .gml-avisos {
   display: flex;
@@ -668,6 +887,39 @@ body {
   cursor: not-allowed;
 }
 
+/* ── La variante SECUNDARIA: «Deducir del mapa» (F05) ────────────────────────
+ *
+ * Vive AQUÍ, junto a `--primario`, y no con el resto del bloque de Catastro. El
+ * motivo es mecánico, no de gusto: `.gml-boton` declara `border` en FORMA
+ * ABREVIADA, así que una regla de igual especificidad escrita ANTES vería su
+ * `border-color` pisado por el `transparent` de la base y el botón saldría sin
+ * borde. Junto a `--primario` el orden es correcto por construcción.
+ *
+ * Superficie blanca con borde, para que dentro de su bloque «Traer del Catastro»
+ * siga leyéndose como el camino normal y este como la salida de emergencia.
+ *
+ * El `:disabled` es CALCADO al de `--primario`, a propósito: los dos botones que
+ * nacen apagados en esta app tienen que apagarse igual, o el usuario acaba
+ * aprendiendo dos idiomas para el mismo estado. Y sigue valiendo lo que dice el
+ * bloque de arriba: apagado no basta: quien lo deja apagado escribe el motivo al
+ * lado, en un `role="status"`. */
+.gml-boton--secundario {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-main);
+}
+
+.gml-boton--secundario:hover:not(:disabled) {
+  background: var(--color-bg-elevated);
+}
+
+.gml-boton--secundario:disabled {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-disabled);
+  border-color: var(--color-border-sub);
+  cursor: not-allowed;
+}
+
 /* El renglón que dice POR QUÉ. Vacío no ocupa alto (`:empty{display:none}`) para
    que el pie no dé un salto de layout cada vez que aparece o desaparece.
    `--error` lo pone `app/main.js` cuando la generación está bloqueada. */
@@ -847,7 +1099,9 @@ body {
  */
 @media (prefers-reduced-motion: reduce) {
   .gml-aviso,
-  .gml-input-coordenada {
+  .gml-input-coordenada,
+  .gml-entrada,
+  .gml-candidatos button {
     transition: none;
   }
 }

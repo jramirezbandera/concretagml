@@ -16,9 +16,16 @@
 //                   `console.warn` por defecto y el usuario no vería nada.
 //   4. VISOR      — `crearVisor(...)` de `../viewer/index.js`. Monta mapa +
 //                   capas + tabla de vértices y encuadra sobre la geometría.
-//   5. FICHA      — `estado.subscribe(actualizarFicha)` y una primera llamada a
+//   5. CATASTRO   — `cablearCatastro(...)` de `./cableado-catastro.js` (F05,
+//                   tarea T4A), con las cuatro piezas que ese módulo exige ya
+//                   hechas: transporte, base, caché y cliente. Va DESPUÉS del
+//                   visor porque le pasa su `L.Map` (un clic en el mapa deduce
+//                   la referencia), y ANTES del GML porque traer una parcela
+//                   hace `estado.set` y de ese store sale el estado del botón
+//                   «Generar GML».
+//   6. FICHA      — `estado.subscribe(actualizarFicha)` y una primera llamada a
 //                   mano (`subscribe` NO notifica al suscribirse).
-//   6. GML        — `cablearGeneracionGml(...)` (F04, tarea T6.1). Va EL ÚLTIMO
+//   7. GML        — `cablearGeneracionGml(...)` (F04, tarea T6.1). Va EL ÚLTIMO
 //                   porque necesita las dos piezas anteriores: el store (de él
 //                   sale la geometría que se serializa, y de sus notificaciones
 //                   el estado del botón) y el panel (es donde se publican las
@@ -94,6 +101,75 @@
 // barrel: así el bundle no arrastra `gml/parse.js`, que hoy no usa nadie en la
 // app (lo usará F08).
 //
+// ── F05 · LO QUE ESTA CAPA DECIDE AL ENCHUFAR EL CATASTRO ───────────────────
+// `app/cableado-catastro.js` sabe hablar con el campo, los botones y el store,
+// pero EXIGE el cliente ya hecho y sin valor por defecto: crearlo dentro
+// decidiría por el llamante el transporte, la caché y el reloj (y en un test
+// tocaría la red de verdad). Esta es la capa que puede decidirlo, y decide:
+//
+//   1. EL CANAL DE AVISOS ES UNO SOLO. El MISMO `panel.avisar` va al transporte,
+//      a `abrirBd`, a la caché y al cliente. No se fabrica ningún avisador
+//      extra, y el reparto ya está pensado para que el usuario no lea lo mismo
+//      dos veces: `_red.js` avisa del fallo de RED, `services/catastro.js` NO
+//      avisa por sus resultados (los devuelve, y el cableado los publica), y la
+//      caché avisa de lo suyo, que es lo único que no cabe en ningún resultado.
+//      `abrirBd` MEMOIZA su promesa, así que su `alAvisar` lo fija la primera
+//      llamada: tiene que ser esta, la del arranque, o los fallos del almacén
+//      acabarían en el `console.warn` por defecto.
+//
+//   2. NO SE ESPERA A INDEXEDDB. `abrirBd()` devuelve una promesa y se le pasa
+//      SIN `await` a `crearCacheCatastro`, que la acepta tal cual a propósito y
+//      la resuelve sola en su primera operación. Es lo que hace que una base
+//      lenta —o un navegador con el almacenamiento denegado, o una pestaña
+//      vieja bloqueando la versión— no retrase ni impida que se vea el mapa. La
+//      caché es una OPTIMIZACIÓN: la app arranca y funciona aunque no haya base
+//      nunca (entonces se comporta como `CACHE_NULA` y lo dice por el panel).
+//
+//   3. EL CATASTRO NO PUEDE TUMBAR EL ARRANQUE. Todo el bloque va en un `try`
+//      cuyo `catch` NO relanza — la segunda excepción de este fichero, y por la
+//      misma razón que la primera (ver el `catch` de `refrescar`): F05 añade una
+//      VÍA DE ENTRADA, no sustituye la que hay, y si al preparar la conexión
+//      revienta algo (el entorno sin `fetch`, un nodo del contrato que ya no
+//      está en `index.html`), lo que no puede pasar es que se lleve por delante
+//      el mapa, la tabla, la ficha y el botón «Generar GML» — que se cablea
+//      DESPUÉS y con la geometría que ya está en el store. El defecto no se
+//      tapa: va al panel como ERROR y a la consola, y los dos botones del bloque
+//      se APAGAN, porque un botón vivo que no hace nada al pulsarlo es
+//      exactamente el error silencioso que este proyecto no admite.
+//      ⚠️ Ese `try` protege el CABLEADO, no el IMPORT: `cableado-catastro.js`
+//      tiene un guardián de carga que lanza si el catálogo de motivos del
+//      cliente crece y a él no le escriben el resumen. Es deliberadamente fatal
+//      (su comentario explica por qué) y ocurre antes de que aquí se ejecute
+//      nada; no se intenta neutralizar desde este fichero.
+//
+//   4. LA PROCEDENCIA DEL DATO NO SE MAQUILLA, y eso ahora incluye el eyebrow.
+//      `index.html` nace diciendo «Parcela cargada», que hasta F05 era vago y a
+//      partir de F05 sería FALSO: con un campo para traer parcelas del Catastro
+//      al lado, ese rótulo se lee como «esta viene del Catastro» cuando lo que
+//      hay en pantalla al abrir es el dataset de DEMOSTRACIÓN de
+//      `./demo-datos.js`. Así que el rótulo pasa a escribirlo SIEMPRE la ficha
+//      (ver {@link rotuloDelDato}), con los tres estados que de verdad existen.
+//      Es la misma regla por la que `demo-datos.js` no le añade un patio a la
+//      parcela real: un dato inventado no se presenta como uno del Catastro, y
+//      uno del Catastro tampoco se presenta como una demostración.
+//
+// ── LO QUE NO SE HA CABLEADO (F05), Y POR QUÉ ───────────────────────────────
+// `cablearCatastro` devuelve además `colindantes()`, y AQUÍ NO SE LLAMA. No es
+// un olvido:
+//   · la cáscara no tiene ningún gesto para pedirlos (`index.html` trae campo,
+//     «Traer del Catastro» y «Deducir del mapa», y nada más), y
+//   · dispararlos solos al cargar sería una SEGUNDA petición por cada parcela
+//     que nadie ha pedido — justo lo que castiga la política de uso del servicio
+//     (override O8) —, y además el store no distingue «parcela recién traída» de
+//     «parcela editada», así que cualquier disparo automático desde el
+//     suscriptor acabaría consultando el Catastro al mover un vértice.
+//   · `cargar()` usa `GetParcel` y no `GetNeighbourParcel`: que las vecinas sean
+//     una acción aparte es una decisión ya tomada en `cableado-catastro.js`, no
+//     algo que esta capa deba deshacer por su cuenta.
+// Consecuencia asumida: el `<dd data-ficha="colindantes">` dice la verdad —«Sin
+// consultar»— en vez de un «0» que sería mentira. Quien enchufe la acción (F07:
+// diagnóstico, invasión, snap) tiene el sitio marcado en {@link actualizarFicha}.
+//
 // ── POR QUÉ ESTE FICHERO EXPORTA UNA FUNCIÓN (y es la única que exporta) ────
 // Un módulo de entrada normalmente no exporta nada. `cablearGeneracionGml` es la
 // excepción, y la razón es que el resto de este fichero se comprueba SOLO (los
@@ -147,10 +223,20 @@ import { PERFIL, SEVERIDAD } from '../gml/_comun.js'
 import { descargarGml } from '../gml/descargar.js'
 import { NAMESPACE_INSPIRE_CATASTRO, NAMESPACE_INSPIRE_DEFECTO } from '../gml/ids.js'
 import { serializarParcelaCp } from '../gml/serialize-cp.js'
+import { crearTransporte } from '../services/_red.js'
+import { crearClienteCatastro } from '../services/catastro.js'
+import { abrirBd } from '../storage/bd.js'
+import { crearCacheCatastro } from '../storage/cache-catastro.js'
 import { validarParcela } from '../validation/parcela.js'
 import { crearEstadoVista, NIVEL } from '../viewer/_comun.js'
 import { crearVisor } from '../viewer/index.js'
 import { crearPanelAvisos } from './avisos.js'
+import {
+  SELECTOR_BOTON_CARGAR,
+  SELECTOR_BOTON_DEDUCIR,
+  SELECTOR_ESTADO_CATASTRO,
+  cablearCatastro,
+} from './cableado-catastro.js'
 import {
   AVISO_DEMO_HUECO_SINTETICO,
   SRS_DEMO,
@@ -167,11 +253,35 @@ import {
  */
 const DEMO_HUECO = 'hueco'
 
-/** Eyebrow de la cabecera cuando el dataset NO procede del Catastro. */
+/**
+ * Los TRES eyebrows de la cabecera, que son los tres estados de PROCEDENCIA que
+ * la app sabe distinguir de verdad (ver {@link rotuloDelDato}). `index.html`
+ * nace con «Parcela cargada» y a partir de F05 el rótulo lo escribe siempre la
+ * ficha: con un campo para traer parcelas del Catastro al lado, «cargada» se lee
+ * como «traída de la Sede», y al abrir la app lo que hay es una demostración.
+ */
 const EYEBROW_SINTETICA = 'Parcela sintética · demostración'
+const EYEBROW_DEMOSTRACION = 'Parcela de demostración'
+const EYEBROW_CATASTRO = 'Parcela del Catastro'
 
 /** Texto de la ficha cuando la parcela no tiene referencia catastral. */
 const SIN_REFCAT = 'Sin referencia'
+
+/**
+ * Ficha: el Catastro no ha declarado ninguna superficie para esta parcela. Es lo
+ * normal en todo lo que no viene del WFS (la demo, un DXF, un contorno dibujado)
+ * y se DICE, en vez de dejar el guion del HTML, que se lee como «esto no ha
+ * cargado», o un «0 m²», que sería afirmar una superficie que nadie declaró.
+ */
+const SIN_SUPERFICIE_CATASTRAL = 'No consta'
+
+/**
+ * Ficha: nadie ha pedido las parcelas colindantes. Ver la cabecera («LO QUE NO
+ * SE HA CABLEADO»): traerlas es una consulta aparte y hoy no hay ningún gesto
+ * que la dispare. El texto dice eso y no «0», que sería contar unas vecinas que
+ * no se han buscado.
+ */
+const SIN_COLINDANTES = 'Sin consultar'
 
 /**
  * Superficie con dos decimales y separadores españoles (1.019,17). Dos
@@ -182,6 +292,17 @@ const FORMATO_SUPERFICIE = new Intl.NumberFormat('es-ES', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 })
+
+/**
+ * La superficie que el Catastro DECLARA, escrita como él la declara: sin
+ * decimales forzados. Es toda la diferencia con {@link FORMATO_SUPERFICIE}, y no
+ * es un capricho de formato — el Catastro publica un ENTERO de metros cuadrados
+ * (`<cp:areaValue uom="m2">1536</cp:areaValue>`), así que pintar «1.536,00» le
+ * añadiría dos cifras de precisión que nadie ha afirmado. La superficie MEDIDA
+ * de la línea de arriba sí lleva sus dos decimales, porque esa la calcula la app
+ * y sabe hasta dónde llega. Que las dos cifras no coincidan ES el dato (F07).
+ */
+const FORMATO_DECLARADO = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 })
 
 /** Enteros con separador de millares español (para el recuento de vértices). */
 const FORMATO_ENTERO = new Intl.NumberFormat('es-ES')
@@ -281,6 +402,21 @@ const NIVEL_POR_SEVERIDAD = Object.freeze({
   [SEVERIDAD.ERROR]: NIVEL.ERROR,
 })
 
+// ── Constantes del cableado del Catastro (F05) ───────────────────────────────
+
+/**
+ * Lo que se le dice al usuario cuando el bloque «Origen de la parcela» no ha
+ * llegado a cablearse (ver la decisión 3 de la cabecera). Dice las tres cosas
+ * que le hacen falta: qué se ha perdido, qué SIGUE funcionando —que es casi
+ * todo, y es la diferencia entre una app rota y una app sin una vía de entrada—
+ * y dónde está el detalle para poder reportarlo.
+ */
+const MENSAJE_SIN_CATASTRO =
+  'No se ha podido preparar la conexión con el Catastro: el bloque «Origen de la parcela» queda ' +
+  'deshabilitado durante esta sesión. Todo lo demás sigue funcionando —el mapa, la tabla de ' +
+  'vértices, la validación y la generación del GML—. El detalle técnico está en la consola del ' +
+  'navegador.'
+
 // ── Nodos de la cáscara ──────────────────────────────────────────────────────
 
 /**
@@ -315,10 +451,31 @@ function nodo(selector) {
 const esSintetica = new URLSearchParams(window.location.search).get('demo') === DEMO_HUECO
 const parcela = esSintetica ? parcelaDemoConHueco() : parcelaDemo()
 
-// El eyebrow tiene que DECIR que el dato es inventado. Presentar una parcela
-// sintética bajo el rótulo «Parcela cargada» sería hacerla pasar por un dato del
-// Catastro, y eso el spec no lo permite (nada de maquillar la procedencia).
-if (esSintetica) nodo('[data-eyebrow]').textContent = EYEBROW_SINTETICA
+/**
+ * El `idLocal` del dataset de DEMOSTRACIÓN con el que arranca la app. Es lo que
+ * permite saber, más tarde y sin adivinar, si lo que hay en el store SIGUE
+ * siendo la demostración o si el usuario ya ha traído una parcela de verdad (ver
+ * {@link rotuloDelDato}).
+ *
+ * Se DERIVA del dataset en vez de escribir el literal `'demo-…'`, para que no
+ * puedan divergir. Y se usa `idLocal` y no `refcat`, `origen` ni la identidad
+ * del objeto, porque es el único de los cuatro que distingue de verdad:
+ *   · `refcat` NO sirve — la parcela de demostración es la REAL 9398516VK3799G,
+ *     así que traerla del Catastro deja la misma referencia en el store;
+ *   · `origen` NO sirve — la demo ya es `WFS` (ese anillo salió del WFS, y
+ *     `demo-datos.js` lo dice donde toca);
+ *   · la identidad del POJO NO sirve — editar una coordenada en la tabla
+ *     construye un objeto nuevo y la parcela seguiría siendo la de demostración.
+ * `idLocal` en cambio viaja con el dato: sobrevive a las ediciones y solo cambia
+ * cuando ENTRA otra parcela, que es exactamente la pregunta que se hace.
+ */
+const ID_LOCAL_DEMO = parcela.idLocal
+
+// El eyebrow ya no se escribe aquí. Lo escribe SIEMPRE la ficha (paso 6), que es
+// el único suscriptor que ve entrar y salir parcelas del store y por tanto el
+// único que puede decir la verdad sobre su procedencia también DESPUÉS del
+// arranque. Ver {@link rotuloDelDato} y la decisión 4 de la cabecera.
+const eyebrow = nodo('[data-eyebrow]')
 
 // ── 2 · Estado ───────────────────────────────────────────────────────────────
 
@@ -343,7 +500,10 @@ if (esSintetica) panel.avisar(AVISO_DEMO_HUECO_SINTETICO, { nivel: NIVEL.AVISO }
 
 // ── 4 · Visor ────────────────────────────────────────────────────────────────
 
-crearVisor(nodo('#mapa'), {
+// El retorno SÍ se recoge desde F05: de él sale el `L.Map` que el cableado del
+// Catastro necesita para la deducción por clic (paso 5). Del resto de la app
+// sigue sin depender nadie: el visor se comunica por el store, no por su asa.
+const visor = crearVisor(nodo('#mapa'), {
   estado,
   // `<div>`, no `<table>`: es la caja con `overflow:auto` contra la que scrollea
   // la cabecera pegajosa. `sincronizar` crea la `<table>` dentro.
@@ -371,12 +531,130 @@ crearVisor(nodo('#mapa'), {
   historial: null,
 })
 
-// ── 5 · Ficha del pie: el SEGUNDO suscriptor del mismo store ─────────────────
+// ── 5 · El Catastro en vivo (F05 · T4A) ──────────────────────────────────────
+
+try {
+  // El transporte es el único que toca la red: cola de 2, timeout, backoff con
+  // jitter. Su `alAvisar` es EL MISMO panel que todo lo demás (decisión 1).
+  const transporte = crearTransporte({ alAvisar: panel.avisar })
+
+  // ⚠️ SIN `await`, y es la decisión 2 de la cabecera: `abrirBd` devuelve una
+  // promesa y `crearCacheCatastro` la acepta tal cual a propósito, resolviéndola
+  // sola en su primera operación. Esperarla aquí ataría el primer pintado del
+  // mapa a IndexedDB —a una base lenta, a otra pestaña que bloquea la versión, a
+  // un navegador que niega el almacenamiento—, y la caché es una optimización:
+  // sin base, se comporta como `CACHE_NULA` y la app funciona igual.
+  const cache = crearCacheCatastro({
+    bd: abrirBd({ alAvisar: panel.avisar }),
+    alAvisar: panel.avisar,
+  })
+
+  const cliente = crearClienteCatastro({
+    transporte,
+    cache,
+    // EXPLÍCITO aunque hoy coincida con el `SRS_DEFAULT` del cliente: el sistema
+    // de referencia es del EXPEDIENTE (el mismo que se le da al visor y el mismo
+    // que se pinta en la ficha), no del servicio. El día que el expediente
+    // trabaje en otro huso, el cliente lo sigue sin que haya que acordarse.
+    srs: SRS_DEMO,
+    // El cliente NO avisa por sus resultados —los devuelve, y el cableado los
+    // publica—; este canal es solo para los fallos de la CACHÉ, que son lo único
+    // suyo que no cabe en ningún resultado. Ver la decisión 1 de la cabecera.
+    alAvisar: panel.avisar,
+  })
+
+  cablearCatastro({
+    // El MISMO store que el mapa, la tabla y la ficha. `viewer/index.js`
+    // documenta que recibe el store ya hecho para que F05 pudiera compartirlo;
+    // esta línea es esa promesa cobrada.
+    estado,
+    panel,
+    cliente,
+    srs: SRS_DEMO,
+    // El `L.Map` del visor, para la segunda vía de la deducción: clic en el mapa
+    // → geocodificación inversa (spec F05 §7.3). El cableado lo consume por duck
+    // typing (`on`/`off`) y solo actúa cuando tiene sentido deducir, así que un
+    // clic normal del mapa no consulta nada.
+    mapa: visor.mapa,
+    // Los seis nodos del bloque los localiza él con los selectores de su
+    // contrato, y LANZA nombrándolos si `index.html` ha dejado de traerlos.
+  })
+} catch (causa) {
+  // ── Aquí NO se relanza (decisión 3 de la cabecera) ─────────────────────────
+  // Relanzar mataría el arranque entero: sin `app/main.js` no habría ficha ni
+  // botón «Generar GML», que se cablea DESPUÉS, y el usuario perdería la app
+  // completa por no poder usar UNA de sus vías de entrada. El defecto no se
+  // tapa —panel como ERROR y consola— y el bloque muerto se apaga.
+  console.error('[catastro] no se ha podido cablear la entrada del Catastro:', causa)
+  panel.avisar(MENSAJE_SIN_CATASTRO, { nivel: NIVEL.ERROR, causa })
+
+  // `document.querySelector` a pelo y no `nodo()`: `nodo` LANZA cuando no
+  // encuentra, y lanzar DENTRO del catch de arranque volvería a tumbar la app
+  // por el mismo sitio que se acaba de proteger. Aquí un nodo que falta es,
+  // además, la causa más probable de haber llegado hasta este catch.
+  for (const selector of [SELECTOR_BOTON_CARGAR, SELECTOR_BOTON_DEDUCIR]) {
+    const boton = document.querySelector(selector)
+    if (boton !== null) boton.disabled = true
+  }
+  const renglonCatastro = document.querySelector(SELECTOR_ESTADO_CATASTRO)
+  if (renglonCatastro !== null) renglonCatastro.textContent = MENSAJE_SIN_CATASTRO
+}
+
+// ── 6 · Ficha del pie: el SEGUNDO suscriptor del mismo store ─────────────────
 
 const fichaSrs = nodo('[data-ficha="srs"]')
 const fichaRefcat = nodo('[data-ficha="refcat"]')
 const fichaVertices = nodo('[data-ficha="vertices"]')
 const fichaSuperficie = nodo('[data-ficha="superficie"]')
+const fichaSuperficieCatastral = nodo('[data-ficha="superficie-catastral"]')
+const fichaColindantes = nodo('[data-ficha="colindantes"]')
+
+/**
+ * El rótulo de PROCEDENCIA de la cabecera (`data-eyebrow`): qué es, exactamente,
+ * lo que hay en pantalla. Tres estados, que son los tres que la app distingue:
+ *
+ *   · **{@link EYEBROW_CATASTRO}** — la parcela ha ENTRADO en el store después
+ *     del arranque, o sea que la ha traído el cableado del Catastro. Vale
+ *     también cuando ha salido de la copia local: sigue siendo un dato del
+ *     Catastro, y de si se ha consultado el servicio o la caché —y de cuándo se
+ *     guardó— habla el renglón `data-procedencia`, que es su sitio.
+ *   · **{@link EYEBROW_SINTETICA}** — `?demo=hueco`: una parcela INVENTADA.
+ *   · **{@link EYEBROW_DEMOSTRACION}** — el dataset por defecto: la geometría
+ *     real de 9398516VK3799G, pero copiada dentro del código (ver la cabecera de
+ *     `./demo-datos.js`), no traída del Catastro ahora. Decirle «Parcela
+ *     cargada» —lo que trae `index.html`— sería, con el campo del Catastro al
+ *     lado, hacerla pasar por una consulta que no se ha hecho.
+ *
+ * Sin parcela (`null`, que el store admite) se cae al lado conservador: el de la
+ * demostración. Nunca se afirma «del Catastro» sin una parcela que lo respalde.
+ *
+ * @param {object|null} parcelaActual  POJO de parcela del store (o `null`).
+ * @returns {string}
+ */
+function rotuloDelDato(parcelaActual) {
+  const hayParcela = parcelaActual !== null && parcelaActual !== undefined
+  if (hayParcela && parcelaActual.idLocal !== ID_LOCAL_DEMO) return EYEBROW_CATASTRO
+  return esSintetica ? EYEBROW_SINTETICA : EYEBROW_DEMOSTRACION
+}
+
+/**
+ * La superficie que el Catastro DECLARA para esta parcela, o {@link
+ * SIN_SUPERFICIE_CATASTRAL}. No se calcula NADA aquí: se pinta lo que el
+ * servicio dijo, tal cual entró en el modelo (`cp:areaValue`). Si esta línea
+ * cayera alguna vez en `superficie(recintos)`, la ficha compararía la medición
+ * consigo misma y la discrepancia —que es media razón de ser de la app— saldría
+ * siempre en cero.
+ *
+ * @param {object|null} parcelaActual  POJO de parcela del store (o `null`).
+ * @returns {string}
+ */
+function superficieCatastralDe(parcelaActual) {
+  const declarada =
+    parcelaActual === null || parcelaActual === undefined ? null : parcelaActual.superficieCatastral
+  return Number.isFinite(declarada)
+    ? `${FORMATO_DECLARADO.format(declarada)} m²`
+    : SIN_SUPERFICIE_CATASTRAL
+}
 
 /**
  * Repinta la ficha del pie desde el POJO de parcela. Suscriptor del store: se
@@ -393,6 +671,10 @@ const fichaSuperficie = nodo('[data-ficha="superficie"]')
  * El SRS no sale de la parcela: `crearParcela` no porta `srs` (vive en el
  * Expediente), así que se pinta el del dataset, el mismo que se le da al visor.
  *
+ * Desde F05 escribe también el EYEBROW de la cabecera, que es una afirmación
+ * sobre la procedencia del dato y por tanto cambia cuando cambia el dato: ver
+ * {@link rotuloDelDato} y la decisión 4 de la cabecera del módulo.
+ *
  * @param {object|null} parcelaActual  POJO de parcela del store (o `null`).
  * @returns {void}
  */
@@ -400,12 +682,24 @@ function actualizarFicha(parcelaActual) {
   const recintos = (parcelaActual && parcelaActual.recintos) || []
   const nVertices = recintos.reduce((total, recinto) => total + recinto.vertices.length, 0)
 
+  eyebrow.textContent = rotuloDelDato(parcelaActual)
+
   fichaSrs.textContent = SRS_DEMO
   // `refcat` es `null` en el dataset sintético, y se DICE («Sin referencia») en
   // vez de dejar un guion: un guion se lee como «esto no ha cargado».
   fichaRefcat.textContent = (parcelaActual && parcelaActual.refcat) || SIN_REFCAT
   fichaVertices.textContent = FORMATO_ENTERO.format(nVertices)
   fichaSuperficie.textContent = `${FORMATO_SUPERFICIE.format(superficie(recintos))} m²`
+  // Las dos líneas de F05. La de arriba es la MEDIDA (la calcula la app); esta
+  // es la DECLARADA (la dice el Catastro), y van juntas para poder compararlas
+  // de un vistazo.
+  fichaSuperficieCatastral.textContent = superficieCatastralDe(parcelaActual)
+  // Constante HOY, y a propósito: nadie pide las colindantes (ver «LO QUE NO SE
+  // HA CABLEADO» en la cabecera), así que lo único cierto que se puede escribir
+  // es que no se han consultado. ESTE es el sitio donde poner su recuento el día
+  // que alguien —F07— llame a `colindantes()` del cableado; escribirlo desde
+  // aquí, y no desde el cableado, es lo que mantiene la ficha con un solo dueño.
+  fichaColindantes.textContent = SIN_COLINDANTES
 }
 
 estado.subscribe(actualizarFicha)
@@ -414,7 +708,7 @@ estado.subscribe(actualizarFicha)
 // la primera edición.
 actualizarFicha(estado.get())
 
-// ── 6 · Generación del GML (F04 · T6.1) ──────────────────────────────────────
+// ── 7 · Generación del GML (F04 · T6.1) ──────────────────────────────────────
 
 /**
  * Referencia catastral REAL de una parcela, o `null` si no tiene.

@@ -73,7 +73,11 @@
   <body class="gml-app">
     <aside class="gml-panel">
       <header class="gml-panel-cabecera">
-        <!-- `app/main.js` reescribe este texto cuando el dataset es sintético (?demo=hueco). -->
+        <!-- `app/main.js` reescribe este texto SIEMPRE, desde el suscriptor de la
+             ficha, con tres estados: «Parcela de demostración», «Parcela sintética ·
+             demostración» (?demo=hueco) y «Parcela del Catastro» (traída por F05).
+             Antes solo lo tocaba para el caso sintético; desde que se puede traer
+             una parcela real, callar la procedencia sería maquillarla. -->
         <p class="gml-eyebrow" data-eyebrow>Parcela cargada</p>
         <h1 class="gml-titulo">Validación del recinto</h1>
         <div class="gml-chips">
@@ -82,7 +86,102 @@
         </div>
       </header>
 
-      <section class="gml-bloque">
+      <!-- ── DE DÓNDE VIENE EL DATO: la parcela del Catastro (F05) ────────────
+           Es la PRIMERA sección del panel, y el orden es una decisión, no el
+           azar de haberla escrito la última: la primera acción de quien abre la
+           app es traer una parcela. Así el panel se lee de arriba abajo como el
+           trabajo real — de dónde viene el dato → qué problemas tiene → sus
+           vértices → qué se hace con ella.
+
+           `data-campo`, `data-accion`, `data-estado`, `data-procedencia` y
+           `data-candidatos` son el CONTRATO con `app/cableado-catastro.js`, que
+           busca estos nodos y LANZA si falta alguno (igual que `app/main.js`
+           con los del pie). Renombrar uno aquí rompe ese módulo, no esta página.
+
+           EL BOTÓN DE DEDUCIR NACE DESHABILITADO, por el mismo motivo que el de
+           «Generar GML» del pie: deducir la referencia solo tiene sentido
+           cuando ya hay geometría SIN referencia, y ofrecerlo antes prometería
+           algo que no se puede cumplir. Quien lo enciende —y quien escribe el
+           motivo cuando no lo enciende— es el cableado, no este fichero.
+
+           Los tres nodos de abajo son CAJAS VACÍAS y por eso no llevan texto
+           dentro (ver la segunda trampa de la cabecera): el JS los repinta, así
+           que cualquier rótulo metido ahí desaparecería al primer repintado. La
+           lista de candidatos nace además `hidden`: una lista visible y vacía
+           afirmaría que la deducción no encontró nada, que es otra cosa muy
+           distinta de que todavía no se haya deducido. -->
+      <section class="gml-bloque gml-bloque--catastro">
+        <h2 class="gml-rotulo">Origen de la parcela</h2>
+
+        <div class="gml-campo">
+          <label class="gml-campo-etiqueta" for="campo-refcat">Referencia catastral</label>
+          <div class="gml-campo-fila">
+            <!-- Monoespaciada (`gml-mono`) a propósito: son caracteres
+                 alfanuméricos que el usuario coteja UNO A UNO contra un papel, y
+                 en proporcional la O y el 0, o la I y el 1, se confunden. El
+                 autocompletado y el corrector ortográfico no tienen nada que
+                 aportar sobre un código y solo estorban.
+
+                 ⛔ SIN `maxlength`, y es deliberado (2026-07-28). Tenía
+                 `maxlength="14"` y era un FALLO SILENCIOSO: recortaba lo pegado
+                 antes de que nadie lo mirase. Quien pegaba `9398516 VK3799G`
+                 —con el espacio con el que la Sede imprime las referencias, que
+                 `normalizarRefcat` tolera a propósito— perdía el último
+                 carácter y recibía «no tiene forma de referencia catastral» por
+                 una referencia correcta. Y la de INMUEBLE (20 caracteres, la de
+                 los recibos del IBI) solo funcionaba por accidente, porque el
+                 truncado se quedaba justo con sus 14 primeros.
+                 Ahora el campo no altera nada y quien valida y explica es
+                 `normalizarRefcat`, que acepta las dos formas. Lo detectó el
+                 guion de humo `07`. -->
+            <input
+              id="campo-refcat"
+              class="gml-entrada gml-mono"
+              type="text"
+              data-campo="refcat"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="29041A00800099"
+            />
+            <button
+              type="button"
+              class="gml-boton gml-boton--primario"
+              data-accion="cargar-catastro"
+            >
+              Traer del Catastro
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          class="gml-boton gml-boton--secundario"
+          data-accion="deducir-refcat"
+          disabled
+        >
+          Deducir del mapa
+        </button>
+
+        <!-- El desenlace de la acción. `role="status"` para que el lector de
+             pantalla lo anuncie SIN robar el foco, igual que el renglón de
+             «Generar GML»: el usuario sigue con las manos en el campo. -->
+        <p class="gml-accion-estado" data-estado="cargar-catastro" role="status"></p>
+
+        <ul class="gml-candidatos" data-candidatos="refcat" hidden></ul>
+
+        <!-- De dónde salió el dato y su antigüedad («del Catastro · guardado
+             hace 6 días»). Es lo único que impide que un dato viejo sacado de la
+             caché se presente como recién traído de la Sede. -->
+        <p class="gml-procedencia" data-procedencia="parcela"></p>
+      </section>
+
+      <!-- El modificador `--avisos` NO es decorativo: es lo que permite que este
+           bloque CEDA altura. Lo añadió F05 al medir que su bloque nuevo de
+           «Origen de la parcela» sumaba ~137 px fijos a un presupuesto fijo, y
+           que con la lista de avisos llena por debajo de ~775 px de viewport el
+           pie del panel —y con él «Generar GML»— se salía por abajo. Ver la
+           regla en `estilos/app.css`. -->
+      <section class="gml-bloque gml-bloque--avisos">
         <h2 class="gml-rotulo">Avisos</h2>
         <!-- Caja VACÍA: su interior es de `app/avisos.js`. Tope de alto y scroll propio
              los pone `.gml-avisos` (--gml-avisos-alto-max), para que una tanda larga de
@@ -117,6 +216,16 @@
 
           <dt>Superficie</dt>
           <dd class="gml-mono" data-ficha="superficie">—</dd>
+
+          <!-- Los dos de F05 vienen del Catastro, no de la geometría del
+               usuario. «Superficie catastral» va JUSTO DEBAJO de «Superficie»
+               para que las dos cifras se comparen de un vistazo: la discrepancia
+               entre lo medido y lo inscrito es media razón de ser de la app. -->
+          <dt>Superficie catastral</dt>
+          <dd class="gml-mono" data-ficha="superficie-catastral">—</dd>
+
+          <dt>Colindantes</dt>
+          <dd class="gml-mono" data-ficha="colindantes">—</dd>
         </dl>
 
         <!-- ── La acción principal de la app (F04) ────────────────────────────

@@ -15,6 +15,13 @@
 #      sobre nuestro criterio. Que git les reescriba los bytes según la máquina es
 #      justo lo contrario de lo que un fixture debe garantizar.
 #
+#   3. `test/fixtures/catastro/*` (F05) — respuestas literales del WFS y del OVC,
+#      incluidos los cuerpos de error. Mismo motivo que (2): son la única prueba de
+#      cómo contesta de verdad el servicio, y su SHA-256 está publicado en
+#      `test/fixtures/catastro/PROCEDENCIA.md`. Los `.json` del OVC vienen en una
+#      sola línea, sin ningún salto: para ellos la regla es inocua y se declara solo
+#      para que nadie tenga que preguntárselo.
+#
 # Se usa `text eol=lf` (y no `-text`) a propósito: `-text` dejaría el árbol de
 # trabajo actual —que tiene CRLF por el checkout previo— divergiendo del blob, y
 # obligaría a un `git add --renormalize` que metería CRLF en el repositorio. Con
@@ -26,5 +33,7 @@
 # esa incoherencia es el caso real contra el que se prueba el guardián de encoding
 # de F04. Aquí solo se fijan los finales de línea.
 
-test/gml/__snapshots__/*.gml  text eol=lf
-test/fixtures/gml/*.gml       text eol=lf
+test/gml/__snapshots__/*.gml    text eol=lf
+test/fixtures/gml/*.gml         text eol=lf
+test/fixtures/catastro/*.xml    text eol=lf
+test/fixtures/catastro/*.json   text eol=lf

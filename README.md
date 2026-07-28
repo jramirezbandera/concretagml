@@ -27,6 +27,7 @@ npm run test:dom   # solo el proyecto dom (jsdom: visor, mapa, canvas)
 npm run test:all   # alias de `npm test` (node + dom)
 npm run test:watch # modo watch del proyecto node
 npm run validar:xsd # valida el GML generado contra el XSD oficial de INSPIRE
+npm run catastro:vivo # comprueba contra el servicio REAL que su contrato no ha cambiado
 ```
 
 `validar:xsd` necesita **`xmllint` o Python con `lxml`** (cualquiera de los dos)
@@ -58,6 +59,37 @@ desde F03 no.
   esquema de WFS. La historia completa, con las mediciones, está en
   [`spec/SPEC.md` §3.1](spec/SPEC.md). Desde entonces la salida se valida contra
   el **XSD oficial de INSPIRE** en CI, antes de publicar.
+- **F05** Catastro en vivo — hecho. Cliente del WFS, geocodificación inversa,
+  deducción de referencia, colindantes y caché en IndexedDB, con el control de
+  carga en la app. 👉 **La parcela ya no se copia a mano**: se teclea una
+  referencia catastral y llega la oficial, editable. Es también lo que habilita
+  el diagnóstico de encaje (F07) y la descripción de linderos (F09), que
+  necesitan las colindantes.
+  ⛔ **Ocho puntos de la spec resultaron falsos al medir el servicio real** antes
+  de escribir código, y están corregidos con su evidencia en
+  [`spec/feature-05-catastro-vivo.md`](spec/feature-05-catastro-vivo.md). Los dos
+  que más cambian el diseño: **todo error del Catastro llega con HTTP 200**
+  (`response.ok` no clasifica nada) y **`GetParcelsByBBox` no existe**.
+
+### El régimen de uso, que es el riesgo real de F05
+
+El Catastro **deniega el servicio ~10 días** por abuso y detecta la rotación de
+IP y de *user-agent*. La defensa no es un truco, son cuatro cosas aburridas:
+**caché antes que red** (una parcela ya traída no se vuelve a pedir), **cola de
+concurrencia**, **backoff con jitter** y **no pedir nunca lo que nadie ha
+pedido** — de ahí que la deducción de referencia sea un botón y no algo
+automático al arrancar.
+
+Y una decisión de honestidad: **no existe ningún motivo de error «bloqueado»**.
+Nadie ha medido —ni va a medir— qué contesta el servicio a un cliente denegado,
+porque provocarlo cuesta esos diez días. Hay un guardián (`G13`) que exige que
+**todo motivo del catálogo tenga un caso reproducible en la suite**, así que no
+se puede añadir sin medirlo antes.
+
+`npm run catastro:vivo` comprueba contra el servicio real que su contrato sigue
+siendo el que congelan los fixtures. **No está en CI a propósito**: dispararía
+desde las IP compartidas de GitHub, que es justo el patrón centralizado que la
+política del Catastro penaliza.
 
 ## ✅ Verificado en la Sede Electrónica
 

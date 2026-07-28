@@ -145,6 +145,24 @@ export function crearRecinto(vertices, tipo = TIPO_RECINTO.EXTERIOR) {
  * @param {Array} [args.recintos=[]] - `recintos[0]` debe ser el EXTERIOR.
  * @param {Array|null} [args.geometriaOficial=null] - La del WFS; se guarda intacta.
  * @param {number|null} [args.superficieRegistral=null]
+ * @param {number|null} [args.superficieCatastral=null] - La superficie que el
+ *        Catastro **DECLARA** (`cp:areaValue` del GML del WFS). NO es una
+ *        superficie medida por nosotros, y ahí está todo el valor del campo:
+ *          · Es un **entero** en m² (override O6, SPEC §3): el Catastro publica
+ *            `<cp:areaValue uom="m2">1536</cp:areaValue>`.
+ *          · La superficie **medida** se calcula aparte, con `geo/area.js`
+ *            (`area`/`superficie`, shoelace) sobre los vértices del modelo, y
+ *            las dos cifras **no tienen por qué coincidir**: en la parcela real
+ *            9398516VK3799G el Catastro declara 1536 mientras el shoelace de
+ *            las coordenadas que él mismo emite da 1535,87 m². La diferencia ES
+ *            el dato. Si aquí se guardara lo calculado, el diagnóstico de
+ *            encaje (F07) compararía una cifra consigo misma y lo llamaría
+ *            diagnóstico.
+ *          · `null` significa «no lo sabemos» (parcela que no viene del
+ *            Catastro: DXF, TXT, GML ajeno, dibujada…), NUNCA «cero».
+ *        Se valida como `superficieRegistral` —número finito o null—, sin
+ *        forzar el entero: aquí se guarda lo que el servicio declaró tal cual
+ *        (regla de oro 11: el modelo no redondea; el redondeo es de salida).
  * @param {string} args.origen - Uno de ORIGEN_PARCELA (obligatorio).
  * @returns {object} Parcela
  */
@@ -154,6 +172,7 @@ export function crearParcela({
   recintos = [],
   geometriaOficial = null,
   superficieRegistral = null,
+  superficieCatastral = null,
   origen,
 } = {}) {
   if (typeof idLocal !== 'string' || idLocal.length === 0) {
@@ -173,6 +192,11 @@ export function crearParcela({
   if (superficieRegistral !== null && !esNumeroFinito(superficieRegistral)) {
     throw new TypeError(
       `crearParcela: 'superficieRegistral' debe ser número finito o null; recibido ${JSON.stringify(superficieRegistral)}.`,
+    )
+  }
+  if (superficieCatastral !== null && !esNumeroFinito(superficieCatastral)) {
+    throw new TypeError(
+      `crearParcela: 'superficieCatastral' debe ser número finito o null; recibido ${JSON.stringify(superficieCatastral)}.`,
     )
   }
   if (!Array.isArray(recintos)) {
@@ -203,6 +227,7 @@ export function crearParcela({
     recintos: recintosCopia,
     geometriaOficial: geoOficial,
     superficieRegistral,
+    superficieCatastral,
     origen,
   }
 }

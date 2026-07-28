@@ -20,6 +20,7 @@ Cinco guiones de aceptación, un veredicto **serializable** cada uno
 | `04-atribucion-consola.js` | F03 · 4 y 5 | atribución literal y visible; canvas limpio; el canal de avisos llega a la UI | `ok:true` |
 | `05-salto-zoom.js` | — | **diagnóstico**, no aceptación: mide frame a frame la transición de la imagen WMS al hacer zoom | ver §11 |
 | `06-generar-gml.js` | F04 · T7.2 | la cadena Blob → descarga: bytes UTF-8, `posList`, `areaValue` y estructura del GML que baja | `ok:true` |
+| `07-catastro-vivo.js` | F05 · T5C | **contra el servicio REAL**: CORS, IndexedDB de verdad y el recorrido entero (traer parcela · 2.ª consulta sin red · deducir la referencia) | `ok:true` |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
 spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
@@ -29,6 +30,13 @@ vuelve a su sitio»), y se conserva porque la corrección —el fundido de
 
 `06` es el primero que **no es de F03**: mide la generación del GML (F04) y va en
 su propia pasada, sobre página recién cargada. Ver §12.
+
+`07` es de otra clase todavía: es el único guion de esta carpeta que **llama a un
+servicio de verdad**. Cubre F05 y existe porque hay tres cosas que ni Node ni
+jsdom pueden dar —**CORS**, **IndexedDB real** y el recorrido completo del
+Catastro en un navegador—, y la suite de aceptación de F05 las declara por escrito
+como no cubiertas y remite aquí. Tiene por eso un **régimen de uso** propio: una
+pasada, sin bucles, dos peticiones en total. Ver §13 **antes** de lanzarlo.
 
 Cada guion lleva en su cabecera **qué mide y qué NO puede medir**. Léelas antes
 de citar un resultado.
@@ -442,6 +450,21 @@ Este smoke **no es de una sola vez**:
   `[data-accion="generar-gml"]` y `[data-estado="generar-gml"]`.
   HECHO el **2026-07-27**: `ok:true` y `problemas:[]` en los dos datasets sobre
   `npm run dev`; cifras en §12.
+- **`07-catastro-vivo.js`, cuando cambie `services/catastro.js`,
+  `app/cableado-catastro.js` o el marcado del bloque de F05 en `index.html`.** Es
+  lo único que prueba F05 contra el servicio real y en un navegador: la suite
+  corre con el `fetch` doblado y con `fake-indexeddb`, así que allí no hay ni CORS
+  ni almacenamiento de verdad. Hay que repetirlo también si cambian
+  `services/_red.js` (cola, plazo, backoff: el guion cuenta las peticiones y una
+  petición de más es un reintento que el Catastro no debe recibir),
+  `storage/bd.js` o `storage/cache-catastro.js` (el guion abre la base por su
+  nombre, lee sus dos almacenes por su `keyPath` y deriva las expectativas del
+  TTL), o `app/demo-datos.js` (de ahí salen la referencia que se teclea y la
+  geometría contra la que se contrasta lo que llega).
+  ⚠️ **Antes de repetirlo, léete el régimen de uso de §13**: llama al servicio de
+  verdad y la denegación por abuso es de ~10 días.
+  HECHO el **2026-07-28**: `ok:true` y `problemas:[]` en los dos recorridos sobre
+  `vite preview`, con **2 peticiones en total**; cifras en §13.
 - Cuando cambie cualquiera de los **hooks semánticos** en los que se apoyan los
   guiones. Los guiones fallan a propósito si divergen, y ahí está su valor:
   - `title` del marcador (`'EXTERIOR · vértice 1'`) — `viewer/sincronizacion.js`;
@@ -453,6 +476,15 @@ Este smoke **no es de una sola vez**:
   - clases del panel de avisos (`.gml-aviso`, `.gml-aviso-texto`) — `app/avisos.js`;
   - `data-recinto` / `data-indice` / `data-eje` de la tabla y `data-ficha` del pie
     — contrato de `viewer/sincronizacion.js` e `index.html`.
+  - los SEIS selectores del bloque de F05 (`data-campo="refcat"`,
+    `data-accion="cargar-catastro"`, `data-accion="deducir-refcat"`,
+    `data-estado="cargar-catastro"`, `data-procedencia="parcela"`,
+    `data-candidatos="refcat"`) — los EXPORTA `app/cableado-catastro.js` y `07`
+    lleva copia deliberada;
+  - `ROTULO_DEDUCIDA` de `app/cableado-catastro.js` y el eyebrow «Parcela del
+    Catastro» de `app/main.js` — `07` los compara por identidad;
+  - `concreta-gml` / `catastroCache` / `revgeo` y los prefijos `parcela:` y
+    `revgeo:` — `storage/bd.js` y `storage/cache-catastro.js`.
 
 ---
 
@@ -734,19 +766,25 @@ la medida**. El día que el prólogo lleve un comentario acentuado (como los dos
 el WFS pone en su fichero, y que `serializarParcelaCp` ya sabe emitir), la
 advertencia desaparece sola y la comprobación pasa a ser real.
 
-### Cifras de referencia (corrida del 2026-07-27, `npm run dev`, puerto 5175)
+### Cifras de referencia (remedidas el 2026-07-28 sobre `vite preview`, puerto 4190)
 
-> ⚠️ **Estas cifras son ANTERIORES a la corrección del sobre de entrega** (mismo
-> día, más tarde). Las geométricas —anillos, vértices, `count`, `areaValue`,
-> shoelace, superficie de la ficha— **no han cambiado**: la corrección tocó el
-> envoltorio, no los números. Lo que sí cambia es el **tamaño** del fichero (el
-> sobre de entrega es más corto: sin atributos de WFS, sin `endLifespanVersion` y
-> sin `referencePoint`). Hay que volver a correr el guion y actualizar esa fila.
+> ✅ **Cifras del sobre de ENTREGA ya corregido.** Las anteriores (del 2026-07-27,
+> por la mañana) eran del sobre de la *descarga* del WFS, que es el que la Sede
+> rechazó. Las geométricas —anillos, vértices, `count`, `areaValue`, shoelace,
+> superficie de la ficha— **no cambiaron**: la corrección tocó el envoltorio, no
+> los números. Lo que sí cambió es el **tamaño**, y la medida lo confirma:
+> **−388 B** en la parcela real y **−434 B** en la sintética, que es lo que pesan
+> los atributos de WFS, el `endLifespanVersion` y el `referencePoint` que el
+> perfil de entrega no emite.
+>
+> Las dos pasadas: `ok:true`, `problemas: []`, consola sin un mensaje, sobre de
+> entrega confirmado (`esFeatureCollectionEntrega`, `sinNamespaceWfs`,
+> `srsNamesEnUrn`) y `area.diferenciaConLaFicha: 0`.
 
 | Medida | Parcela real | `?demo=hueco` |
 |---|---|---|
 | Nombre del fichero | `parcela_9398516VK3799G_<marca>.gml` | `parcela_sin-referencia_<marca>.gml` |
-| Tamaño | ~~2.586 B~~ *(pendiente de volver a medir)* | ~~2.706 B~~ *(pendiente)* |
+| Tamaño | **2.198 B** *(antes del sobre de entrega: 2.586)* | **2.272 B** *(antes: 2.706)* |
 | Anillos (`exterior` + `interior`) | 1 + 0 | 1 + **1** |
 | Vértices abiertos / `count` | 15 / **16** | 4 / 5 y 4 / 5 |
 | `cp:areaValue` | **1536** m² | **348** m² |
@@ -755,4 +793,204 @@ advertencia desaparece sola y la comprobación pasa a ser real.
 | Sentido del exterior | horario | horario (**invertido**) |
 | Detecciones → tarjetas del panel | 0 → 0 | 2 → **+2** |
 | Caracteres no ASCII | **0** | **0** |
-| Consola | limpia (solo `[vite] connecting…/connected.`) | ídem |
+| Consola | limpia | ídem |
+
+---
+
+## 13. `07-catastro-vivo.js` — el Catastro de verdad (F05 · T5C)
+
+El único guion de esta carpeta que **habla con un servicio real**. Lee esta
+sección entera antes de lanzarlo: tiene régimen de uso, y no es una formalidad.
+
+### ⚠️ Régimen de uso — lo primero, porque manda sobre todo lo demás
+
+La política del Catastro contempla la **denegación de servicio durante ~10 días**
+ante uso automático, con detección de rotación de IP/UA (override O8 de
+`spec/SPEC.md`; la cifra de «3.600 peticiones/h» que circula en el plan v4 **no
+tiene fuente oficial** y no se cita).
+
+- **Una pasada, sin bucles y sin reintentos propios.** El guion no reintenta
+  nada: el transporte (`services/_red.js`) ya trae cola de 2, plazo de 15 s y
+  backoff con jitter, y duplicar esa política desde arriba es exactamente cómo se
+  acaba pareciendo un raspador.
+- **Coste medido de una pasada completa: 2 peticiones.** Una al WFS
+  (`wfsCP.aspx`, pasada de carga) y una al OVC (`Consulta_RCCOOR`, pasada de
+  deducción). Las segundas pulsaciones de cada pasada valen **cero**, y ese cero
+  es justamente lo que se mide.
+- **Para depurar, la caché es la amiga.** Repetir el guion sin borrar la base
+  cuesta **0 peticiones**: el guion lo detecta solo (`cachePartiaCaliente: true`),
+  deriva `esperadasPrimeraConsulta: 0` y sigue saliendo `ok:true`. Lo único que se
+  pierde es la medida de CORS, y el veredicto lo dice
+  (`cors.medidoEnEstaPasada: false` + una entrada en `advertencias`). **Repite
+  cuantas veces quieras en ese modo; solo vuelve a frío cuando de verdad haga
+  falta.**
+
+### Las tres cosas que solo se pueden medir aquí
+
+1. **CORS.** Ni Node ni jsdom aplican la política de mismo origen: en los dos, un
+   `fetch` cross-origin sale sin que nadie mire `Access-Control-Allow-Origin`. La
+   suite de aceptación de F05 (`test/services/aceptacion-f05.test.js`) lo declara
+   con todas las letras como **no cubierto por ningún test offline** y remite
+   aquí.
+   ⚠️ **La cabecera no se puede leer desde script** —no está entre las expuestas;
+   el navegador la consume para decidir y luego la esconde—, así que el guion
+   **no finge leerla** (`cors.acaoLegibleDesdeScript: false`). Lo que mide es su
+   EFECTO, por dos caminos: que el CUERPO del servicio cruzó la frontera de
+   origen y es legible (se lee del registro que queda en IndexedDB, que guarda el
+   texto crudo), y que el desenlace en la UI es «Cargada la parcela …» y no el
+   mensaje de `SIN_RED` — que es como se manifiesta un CORS roto, porque el
+   navegador da el mismo `TypeError` que estando sin red.
+   Para **ver** la cabecera hace falta salir del navegador:
+   `npm run catastro:vivo` (`scripts/sonda-catastro.mjs`, en Node). Las dos
+   medidas son complementarias: la sonda ve la cabecera pero no prueba CORS
+   (Node no lo aplica), y el guion prueba CORS pero no ve la cabecera.
+2. **IndexedDB de verdad.** La suite usa `fake-indexeddb`. Aquí se abre la base
+   real (`concreta-gml`) **en solo lectura y solo si ya existe** —se consulta
+   antes `indexedDB.databases()`, porque `indexedDB.open()` sobre una base que no
+   está la CREA vacía y sin los almacenes de la escalera de `storage/bd.js`— y se
+   comprueba que la parcela quedó guardada, con qué bytes y con qué antigüedad.
+   La conexión se cierra siempre (`cache.conexionCerrada`).
+3. **El recorrido completo**: teclear → «Traer del Catastro» → parcela dibujada,
+   ficha rellena, eyebrow en «Parcela del Catastro» → segunda pulsación servida
+   desde la copia local **sin una sola petición** → y, en la otra pasada,
+   «Deducir del mapa» → el campo con la referencia deducida.
+
+### Cómo se lanza
+
+**Dos pasadas, cada una con la página recién cargada.** El guion **no lee
+`?demo=`**: elige el recorrido por el ESTADO —si la parcela de arranque trae
+referencia catastral no hay nada que deducir—, que es exactamente la condición
+con la que `cableado-catastro.js#puedeDeducirDe` habilita el botón. Así mide la
+regla, no el parámetro.
+
+```bash
+$B goto http://localhost:PUERTO/concretagml/              # recorrido «carga»
+$B wait ".gml-tabla-vertices"
+$B eval scripts/smoke-navegador/07-catastro-vivo.js
+
+$B goto "http://localhost:PUERTO/concretagml/?demo=hueco" # recorrido «deducción»
+$B wait ".gml-tabla-vertices"
+$B eval scripts/smoke-navegador/07-catastro-vivo.js
+
+$B console --errors                                       # → (no console errors)
+$B network | grep -E "wfsCP|Consulta_RCCOOR"              # → dos líneas, las dos 200
+```
+
+Para forzar una pasada **en frío** (la única que mide CORS), borrar la base y
+recargar. El `deleteDatabase` queda BLOQUEADO mientras la app tiene la conexión
+abierta, así que el orden importa:
+
+```bash
+$B js "await new Promise(r=>{const p=indexedDB.deleteDatabase('concreta-gml');p.onsuccess=r;p.onerror=r;p.onblocked=r}); return 'pedido'"
+$B reload && $B wait ".gml-tabla-vertices"
+```
+
+⚠️ **No lo encadenes detrás de `03-arrastre.js`** (deja la geometría movida) ni de
+`01-capas.js`. Con `06` sí convive: `06` no toca la geometría, pero **ponlo
+antes**, porque `07` sustituye la parcela de demostración por la que traiga el
+Catastro y `06` contrasta el `areaValue` contra el dataset de arranque.
+
+### Qué cuenta como «pasa»
+
+`ok: true` y `problemas: []` en **las dos** pasadas, y además:
+
+- `peticionesGastadas: 1` en cada pasada **en frío**, y **0** con la caché
+  caliente (en el recorrido «carga» eso se ve además en `cachePartiaCaliente:
+  true` y `esperadasPrimeraConsulta: 0`);
+- `consultas[0].peticiones.length === esperadasPrimeraConsulta` y
+  **`consultas[1].peticiones.length === 0`** — el cero es el criterio de
+  aceptación 1 de F05 medido donde vale;
+- `consultas[*].bloqueoDuranteLaConsulta: true` (los botones se apagan mientras
+  hay algo en vuelo: es cortesía, no la garantía, pero su ausencia es un defecto);
+- en la pasada de carga: `registroEnCache.esColeccionWfs: true` y
+  `esExcepcionWfs: false`; `pantallaTrasLa1.campo` en la forma **canónica**
+  (se teclea en minúsculas a propósito); `eyebrow: "Parcela del Catastro"`;
+  `pantallaTrasLa2.procedencia` diciendo «copia local»; `avisos.pesoTrasLa2 >
+  pesoTrasLa1`; y `botonDeducirDeshabilitado: true` (con referencia ya no hay
+  nada que deducir);
+- en la pasada de deducción: `punto.dentroDeLaParcela: true` (comprobado con un
+  lanzamiento de rayo escrito en el propio guion sobre los anillos leídos de la
+  tabla — segunda implementación de `gml/anillos.js#puntoInterior`),
+  `punto.srsConsultado === srs`, y la **rama** coherente con lo que el servicio
+  contestó de verdad (`respuestaDelServicio`, leído del almacén `revgeo`):
+  `UNICO` ⇒ campo relleno, lista oculta y `procedencia` con el rótulo de
+  deducida; `VARIOS` ⇒ campo INTACTO y lista visible con un botón por candidato;
+- `cors.medidoEnEstaPasada: true` al menos en una de las dos pasadas en frío;
+- `captura.fetchRestaurado: true` y `cache.conexionCerrada: true`;
+- `abortadoPorTiempo: false`.
+
+`advertencias` **no** tumba nada: recoge lo que limita la medida (caché ya
+caliente, geometría que ha cambiado respecto al fixture, el OVC diciendo que ahí
+no hay parcela).
+
+### ⚠️ La trampa que este guion NO se puede saltar: el error llega con HTTP 200
+
+Medido el 2026-07-27 en las 8 respuestas de
+`test/fixtures/catastro/PROCEDENCIA.md`: **las buenas y las malas, todas
+`HTTP/1.1 200 OK`.** Es el mismo hecho que §6 anota para el WMS, y aquí es
+central: `$B network` mostrará `→ 200` en las dos peticiones **también el día que
+el servicio conteste un `ExceptionReport`**. Por eso el guion cuenta las
+peticiones **y lo que traían**:
+
+- `responseStatus` de cada entrada de Resource Timing (es lo único que el
+  navegador expone de una respuesta cross-origin sin `Timing-Allow-Origin`;
+  `transferSize` y `encodedBodySize` **vienen a 0** y el veredicto lo dice para
+  que nadie los lea como «respuesta vacía»);
+- el **cuerpo**, leído del registro de IndexedDB: `FeatureCollection` sí,
+  `ExceptionReport` no;
+- y el desenlace en la UI: renglón sin la clase de error, ficha rellena, panel de
+  avisos sin crecer.
+
+### Por qué NO envuelve `fetch` (y por qué eso está MEDIDO, no afirmado)
+
+Lo obvio, viniendo de `06`, sería envolver `URL.createObjectURL`… o aquí
+`window.fetch`. **No funciona**: `app/main.js` crea el transporte al arrancar y
+`services/_red.js#crearTransporte` captura `globalThis.fetch` en ese momento
+(`const { fetch: fetchDe = globalThis.fetch } = opciones`), así que envolverlo
+después es invisible para él. El guion pone igualmente un envoltorio-**contador**
+que llama a la original y no cambia nada, y publica
+`captura.llamadasVistasPorElEnvoltorio: 0` para que el siguiente no pierda la
+tarde en ese callejón. Se restaura en un `finally`, como todo lo que este guion
+toca (que son dos cosas: ese contador y su conexión a IndexedDB).
+
+### Cifras de referencia (corrida del 2026-07-28, `vite preview`, puerto 4183)
+
+Dos pasadas en frío (base borrada) y dos con la caché caliente. **Cuatro
+peticiones al servicio en toda la sesión.**
+
+| Medida | Recorrido «carga» | Recorrido «deducción» (`?demo=hueco`) |
+|---|---|---|
+| Peticiones a servicios de datos | **1** (WFS `GetParcel`) | **1** (OVC `Consulta_RCCOOR`) |
+| Estado HTTP | 200 | 200 |
+| Latencia de la petición | **49 – 2.393 ms** | **223 – 764 ms** |
+| Duración del guion | 484 – 2.845 ms | 667 – 1.215 ms |
+| 2.ª pulsación | **0 peticiones**, 241 ms | **0 peticiones**, 241 ms |
+| Bytes guardados en IndexedDB | 2.876 (cuerpo GML crudo) | POJO `{cuantos:1, unico:true}` |
+| Clave de caché | `parcela:EPSG:25830:9398516VK3799G` | `revgeo:EPSG:25830:439305:4479658` |
+| Punto consultado | — | `[439304.5, 4479658]`, **dentro** |
+| Respuesta del servicio | `FeatureCollection`, 15 vértices | `9398515VK3799G` · CL SAN RESTITUTO 72(A) MADRID |
+| Geometría vs. el dataset de demostración | **idéntica** (desviación 0,000 m) | — |
+| Con la caché caliente | 0 peticiones, `ok:true` | 0 peticiones, `ok:true` |
+| Consola | limpia | limpia |
+
+⚠️ La horquilla de latencia no es ruido de medida: **la primera petición de la
+sesión pagó el saludo TLS** (2.393 ms el WFS, 764 ms el OVC) y las siguientes,
+sobre la conexión ya abierta, bajaron a 49 y 223 ms. Es el mismo fenómeno que
+`test/fixtures/catastro/PROCEDENCIA.md` anota para el OVC («cada llamada abre
+sesión ASP.NET nueva»). Si alguien viene a apretar el `TOPE_RED_MS` del guion,
+que lo haga contra los 2,4 s, no contra los 50 ms.
+
+La fila de la geometría merece una nota: el dataset de `app/demo-datos.js` se
+derivó del fixture de **esa misma parcela**, así que una desviación de 0 m
+significa que lo que el Catastro está sirviendo hoy coincide vértice a vértice
+con lo que sirvió el día de la captura. Si algún día difiere, el guion lo dice
+como **advertencia** y no como fallo: la verdad externa puede cambiar, y quien
+tiene que decidir qué hacer con eso es una persona.
+
+Y una observación que salió de correrlo con la caché caliente, y que el guion
+publica: con el punto ya cacheado no hay URL de la que leer las coordenadas
+consultadas, así que la comprobación de «el punto cae dentro de la parcela» se
+vuelve **circular** (el registro se localiza precisamente por caer dentro). El
+guion lo marca con `punto.comprobacionVacua: true` y una advertencia, en vez de
+apuntarse una comprobación que no ha hecho — mismo criterio que
+`06.utf8.comprobacionVacua`.

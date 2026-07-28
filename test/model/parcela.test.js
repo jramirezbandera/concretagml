@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import ring from '../fixtures/geo/parcela-ring.json' with { type: 'json' }
 import {
   crearRecinto,
@@ -115,6 +117,7 @@ describe('crearParcela', () => {
       recintos: [],
       geometriaOficial: null,
       superficieRegistral: null,
+      superficieCatastral: null,
       origen: 'WFS',
     })
     expect(Object.getPrototypeOf(p)).toBe(Object.prototype)
@@ -205,6 +208,123 @@ describe('crearParcela', () => {
     expect(() => {
       p.geometriaOficial[0].vertices[0][0] = 5
     }).toThrow(TypeError)
+  })
+})
+
+// ── superficieCatastral (F05 · T0C) ──────────────────────────────────────────
+// El `cp:areaValue` que el Catastro DECLARA en el GML del WFS, hermano de
+// `superficieRegistral`. No es una superficie medida por nosotros: la medida se
+// calcula con geo/area.js sobre los vértices y NO tiene por qué coincidir. Si
+// esa distinción se pierde, F07 comparará una cifra consigo misma.
+
+const CLAVE_NUEVA = 'superficieCatastral'
+const RUTA_MODELO = fileURLToPath(new URL('../../model/parcela.js', import.meta.url))
+
+/**
+ * Claves que la factory DOCUMENTA en el JSDoc de `crearParcela`
+ * (`@param {...} args.X` / `[args.X=...]`). Es una fuente INDEPENDIENTE del POJO
+ * que devuelve: sirve para comparar conjuntos de claves derivados en vez de una
+ * lista escrita a mano, y salta tanto si se añade un campo sin documentarlo como
+ * si se documenta uno que no existe.
+ */
+function clavesDocumentadasDeCrearParcela() {
+  const fuente = readFileSync(RUTA_MODELO, 'utf8')
+  const desde = fuente.indexOf('Crea una Parcela')
+  const hasta = fuente.indexOf('export function crearParcela')
+  const jsdoc = fuente.slice(desde, hasta)
+  return [...jsdoc.matchAll(/@param \{[^}]*\}\s+\[?args\.(\w+)/g)].map((m) => m[1])
+}
+
+describe('crearParcela · superficieCatastral (el cp:areaValue DECLARADO)', () => {
+  const base = { idLocal: 'P1', origen: ORIGEN_PARCELA.WFS }
+
+  it('no-regresión del shape: mismas claves se pase o no el campo, y son las documentadas', () => {
+    const sin = crearParcela({ ...base })
+    const con = crearParcela({ ...base, superficieCatastral: ring.areaValue })
+    const clavesSin = Object.keys(sin).sort()
+    const clavesCon = Object.keys(con).sort()
+
+    // Pasar el campo no crea ni quita claves: nada de shape condicional.
+    expect(clavesSin).toEqual(clavesCon)
+    expect(clavesSin).toContain(CLAVE_NUEVA)
+    // Conjuntos DERIVADOS: el POJO es exactamente lo que la factory documenta.
+    expect(clavesSin).toEqual([...clavesDocumentadasDeCrearParcela()].sort())
+    // Y lo heredado sigue ahí: `superficieRegistral` no se ha sustituido.
+    expect(clavesSin.filter((k) => k !== CLAVE_NUEVA)).toContain('superficieRegistral')
+    // El expediente reconstruye la parcela con la misma factory: mismo shape.
+    expect(Object.keys(crearExpediente({ parcela: sin }).parcela).sort()).toEqual(clavesSin)
+  })
+
+  it('por defecto es null, y el null SOBREVIVE a structuredClone (undo/redo real)', () => {
+    const p = crearParcela({ ...base })
+    expect(p.superficieCatastral).toBe(null)
+
+    const clon = structuredClone(p)
+    expect(CLAVE_NUEVA in clon).toBe(true) // null, no "clave ausente"
+    expect(clon.superficieCatastral).toBe(null)
+    expect(clon).toEqual(p)
+
+    // También dentro de un expediente completo, con valor y sin él.
+    const e = crearExpediente({
+      parcela: crearParcela({ ...base, superficieCatastral: ring.areaValue }),
+    })
+    const clonE = structuredClone(e)
+    expect(clonE.parcela.superficieCatastral).toBe(ring.areaValue)
+    expect(structuredClone(crearExpediente({ parcela: p })).parcela.superficieCatastral).toBe(null)
+  })
+
+  it('conserva un valor válido tal cual (sin redondear: regla de oro 11)', () => {
+    expect(crearParcela({ ...base, superficieCatastral: 1536 }).superficieCatastral).toBe(1536)
+    expect(crearParcela({ ...base, superficieCatastral: 1535.87 }).superficieCatastral).toBe(1535.87)
+    expect(crearParcela({ ...base, superficieCatastral: 0 }).superficieCatastral).toBe(0)
+  })
+
+  it('con los inválidos hace EXACTAMENTE lo que hace hoy superficieRegistral', () => {
+    // La política no se reinventa: se compara campo contra campo con los mismos
+    // valores, así que si mañana cambia la de superficieRegistral, esto salta.
+    const invalidos = ['1536', NaN, Infinity, -Infinity, {}, [], true, false]
+    for (const v of invalidos) {
+      expect(() => crearParcela({ ...base, superficieRegistral: v })).toThrow(TypeError)
+      expect(() => crearParcela({ ...base, superficieCatastral: v })).toThrow(TypeError)
+      expect(() => crearParcela({ ...base, superficieCatastral: v })).toThrow(
+        /'superficieCatastral' debe ser número finito o null/,
+      )
+    }
+    // Y con los que hoy SÍ admite superficieRegistral (incluido un negativo, que
+    // no se valida aquí), los dos campos aceptan y guardan lo mismo.
+    for (const v of [0, -12.5, 1536, 1535.87, null, undefined]) {
+      const p = crearParcela({ ...base, superficieRegistral: v, superficieCatastral: v })
+      expect(p.superficieCatastral).toBe(p.superficieRegistral)
+      expect(p.superficieCatastral).toBe(v === undefined ? null : v)
+    }
+  })
+
+  it('guarda el DECLARADO por el Catastro, NO la superficie medida por shoelace', () => {
+    // Los dos números salen del fixture real (parcela 9398516VK3799G): el
+    // `cp:areaValue` declarado y el área firmada de las coordenadas emitidas.
+    const declarado = ring.areaValue // 1536, entero, uom="m2" (override O6)
+    const medida = Math.abs(ring._verificado.areaFirmada) // 1535,865… m²
+
+    const p = crearParcela({
+      idLocal: ring.refCatastral,
+      refcat: ring.refCatastral,
+      origen: ORIGEN_PARCELA.WFS,
+      recintos: [{ vertices: ring.anilloExterior, tipo: 'EXTERIOR' }],
+      geometriaOficial: [{ vertices: ring.anilloExterior, tipo: 'EXTERIOR' }],
+      superficieCatastral: declarado,
+    })
+
+    expect(p.superficieCatastral).toBe(declarado)
+    expect(Number.isInteger(p.superficieCatastral)).toBe(true)
+    // La trampa: NO es la superficie de sus propias coordenadas.
+    expect(p.superficieCatastral).not.toBe(medida)
+    expect(Number.isInteger(medida)).toBe(false)
+    // Difieren de verdad (más de un cm²) y a la vez son la misma parcela
+    // (menos de 1 m²: el declarado es el redondeo entero de lo medido).
+    const diferencia = Math.abs(p.superficieCatastral - medida)
+    expect(diferencia).toBeGreaterThan(0.01)
+    expect(diferencia).toBeLessThan(1)
+    expect(Math.round(medida)).toBe(declarado)
   })
 })
 

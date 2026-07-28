@@ -12,10 +12,12 @@
     "test:watch": "node scripts/vitest.mjs --project node",
     "test:all": "node scripts/vitest.mjs run",
     "test:dom": "node scripts/vitest.mjs run --project dom",
-    "validar:xsd": "node scripts/validar-xsd.mjs"
+    "validar:xsd": "node scripts/validar-xsd.mjs",
+    "catastro:vivo": "node scripts/sonda-catastro.mjs"
   },
   "devDependencies": {
     "@turf/boolean-clockwise": "^7.3.5",
+    "fake-indexeddb": "^6.2.5",
     "jsdom": "^29.1.1",
     "proj4": "^2.20.9",
     "vite": "^8.1.5",
@@ -28,6 +30,7 @@
     "@turf/intersect": "^7.3.5",
     "@turf/kinks": "^7.3.5",
     "@turf/point-on-feature": "^7.3.5",
+    "idb": "^8.0.3",
     "leaflet": "^1.9.4"
   }
 }
