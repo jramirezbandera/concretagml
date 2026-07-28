@@ -276,13 +276,27 @@ const INVOCACION = {
 // ── El arnés es el que decimos (no vacuidad) ─────────────────────────────────
 
 describe('cache-catastro · el arnés y los fixtures no mienten', () => {
-  it('el GML del fixture SIRVE para detectar corrupción: trae acentos y CRLF', () => {
+  it('el GML del fixture SIRVE para detectar corrupción: trae acentos y varias líneas', () => {
     // Un fixture puramente ASCII y de una sola línea no podría distinguir un
     // viaje limpio por IndexedDB de uno que estropea la codificación o los
     // saltos de línea. Se afirma que este sí puede.
     expect(GML_PARCELA.length).toBeGreaterThan(1000)
     expect([...GML_PARCELA].some((c) => c.codePointAt(0) > 127)).toBe(true)
-    expect(GML_PARCELA).toContain('\r\n')
+
+    // ⚠️ Aquí había un `toContain('\r\n')` y **lo puso rojo la CI del primer push
+    // de F05** (2026-07-28). El salto de línea concreto NO ES UNA PROPIEDAD DEL
+    // FIXTURE, es del sistema de ficheros: `.gitattributes` guarda estos ficheros
+    // con LF, y el checkout de Windows los deja con CRLF. Afirmar `\r\n` era
+    // afirmar «estoy en Windows», y en Linux —que es donde corre CI, y el único
+    // sitio donde se comprueba que el proyecto no depende del sistema de ficheros
+    // de Windows— fallaba con razón.
+    //
+    // Lo invariante, y lo que de verdad sostiene la no-vacuidad, es que el fixture
+    // tiene VARIAS LÍNEAS: eso basta para que un viaje que estropee los saltos se
+    // note. Cuál sea el salto da igual, porque la prueba de ida y vuelta exige
+    // igualdad carácter a carácter y por tanto lo conserva sea el que sea.
+    const salto = GML_PARCELA.includes('\r\n') ? '\r\n' : '\n'
+    expect(GML_PARCELA.split(salto).length).toBeGreaterThan(5)
   })
 
   it('el GML se ha leído como UTF-8 pese a que declara ISO-8859-1 (mandan los bytes)', () => {
