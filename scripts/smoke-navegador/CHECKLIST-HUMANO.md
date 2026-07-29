@@ -17,6 +17,12 @@ visual**.
 > entonces esta lista sigue bloqueando el cierre de F03 → F05 → F06.
 > **Sigue SIN FIRMAR** — el traslado de las herramientas a la barra
 > (2026-07-29) reescribió 7.4 y 7.6 y añadió 7.6 bis.
+>
+> Y desde F07 tiene un punto **8**, el del DIAGNÓSTICO: lo que `09-diagnostico.js`
+> no alcanza porque es juicio y no medida — si el cajón estorba, si la sombra de
+> la diferencia se ENTIENDE sin leyenda, y el punto BLOQUEANTE de la fase: si
+> alguna cifra o algún color **se lee como un veredicto**. **El punto 8 se firma
+> junto con el 6 y el 7**; la cadena bloqueada es F03 → F05 → F06 → F07.
 
 > Regla de lectura: aquí NO se repite nada que ya esté medido. Cada punto existe
 > porque el smoke **no puede** cubrirlo, y dice por qué. Si alguna vez un punto
@@ -578,6 +584,79 @@ haciendo la consulta.
 
 ---
 
+## 8 · El diagnóstico de encaje ⟨F07⟩ — lo que ni `09-diagnostico.js` firma
+
+**Por qué está aquí.** `09-diagnostico.js` mide el mecanismo entero en un
+navegador de verdad: el `<path>` de la diferencia con su `fill-rule="evenodd"` y
+sus dos anillos, el cajón que flota sin cambiar el tamaño del mapa **y sin
+quitarle un píxel a la caja de vértices al abrirse** (lo único que F07 le cuesta
+al panel son los ~36 px del CTA del pie, medidos y deliberados), la banda del
+margen que conserva sus metros al hacer zoom y el tiempo del recálculo (~7 ms).
+Lo que NO puede firmar es de otra naturaleza: F07
+es la fase cuyo riesgo de producto no es técnico, es que **una pantalla llena de
+cifras se lea como un dictamen** — y «cómo se lee» no lo mide ninguna máquina.
+
+Para recorrerla: trae `9398516VK3799G` con «Traer del Catastro» y pulsa
+**«Diagnosticar encaje»** (una petición de colindantes al abrir — régimen del
+§13). Mueve un vértice medio metro hacia una vecina para que haya algo que ver.
+
+### 8.1 · El punto BLOQUEANTE: ¿algo se lee como un veredicto? ⟨regla de oro 9⟩
+
+El guardián mecánico ya exige que no haya palabra, clase CSS ni color de mérito
+(la suite de aceptación y el guion lo comprueban). Esto es lo que queda: la
+LECTURA. Enséñale el cajón abierto a alguien que no haya visto la app —o míralo
+tú con ojos de cliente— y pregunta:
+
+- [ ] ¿Alguna cifra **parece un aprobado o un suspenso**? El % de solape es el
+      candidato obvio: «99,80 % de la mayor» ¿se lee como una nota de examen?
+      Si sí, el problema es de rotulación, no del número.
+- [ ] La **banda del margen de identidad**: ¿se entiende como referencia
+      informativa (eso es, y su etiqueta lo dice), o el trazo discontinuo
+      alrededor del lindero oficial se lee como «carril bueno / zona permitida»?
+- [ ] El **ámbar de la invasión**: ¿queda claro que ese color afirma un HECHO
+      (hay superficie dentro de la vecina) y no una opinión? ¿Y queda claro que
+      es el ÚNICO color que afirma algo?
+- [ ] El titular «Contraste con el parcelario — Medición de X m² frente a los
+      Y m² del parcelario vigente»: ¿alguien lo parafrasea como «está bien» o
+      «está mal»? Si la paráfrasis natural es un dictamen, el texto no está
+      haciendo su trabajo.
+
+### 8.2 · La sombra de la diferencia ⟨§10.5⟩
+
+- [ ] Con un vértice movido medio metro, ¿la mancha gris **se entiende sin
+      leyenda** como «lo que no coincide»? ¿O parece un error de pintado?
+- [ ] Muévelo dos metros: ¿la sombra sigue leyéndose, o a ese tamaño se confunde
+      con el relleno de la propia parcela?
+- [ ] Sobre la **ortofoto** (no sobre el fondo blanco): ¿el gris al 22 % se ve, o
+      desaparece sobre asfalto?
+- [ ] El lindero de máxima desviación va resaltado con su cota y su línea guía:
+      ¿se encuentra de un vistazo, o hay que buscarlo?
+
+### 8.3 · El cajón sobre el mapa
+
+- [ ] En `bottomleft`, con la parcela encuadrada: ¿tapa la parcela o la esquina
+      que estorba menos? Muévele el zoom: ¿sigue sin estorbar?
+- [ ] Ábrelo y edita: arrastra un vértice, selecciona un lindero, desplázalo.
+      **Todo F06 tiene que seguir vivo con el cajón abierto** — el guion lo
+      garantiza para el mecanismo; lo que aquí se mira es si el FLUJO se siente
+      natural (diagnosticar → corregir → volver a mirar las cifras).
+- [ ] Pincha fuera: se cierra Y el clic hace lo suyo (seleccionar lindero). ¿Se
+      siente bien o sorprende? `Escape` también cierra.
+- [ ] La tabla a tres bandas con la registral tecleada: ¿los signos se entienden
+      («−» = medimos menos)? ¿La fila «Catastro − Registro» aporta o confunde?
+- [ ] «No se ha consultado» frente a «ninguna» en la invasión: ¿la diferencia se
+      percibe leyendo rápido, o las dos se leen como «no pasa nada»?
+
+### 8.4 · La clase de suelo propuesta
+
+- [ ] Con la parcela urbana cargada, el margen dice «Clase propuesta por la
+      aplicación». ¿Se entiende que es una PROPUESTA que se puede cambiar en el
+      `<select>`, o se lee como un dato oficial más?
+- [ ] Cambia a «Rústica»: la banda pasa de ±0,50 m a ±2,00 m. ¿El cambio se ve en
+      el mapa sin tener que releer el texto?
+
+---
+
 ## Qué hacer con el resultado
 
 - **Todo conforme** → F03 se marca hecha (`README.md` §Estado y `spec/SPEC.md`).
@@ -610,6 +689,17 @@ haciendo la consulta.
   no es presentación: si no se sabe si el enganche está activo, no se sabe si el
   vértice que se acaba de soltar cayó donde se ve o donde enganchó. Es la regla de
   oro 1. Se arregla en `estilos/app.css`, sobre `.gml-barra-conmutador`.
+- **Algo se lee como un veredicto (8.1)** → **bloquea F07**, y es EL punto de la
+  fase: la regla de oro 9 no se cumple con no escribir «apta» — se cumple cuando
+  nadie LEE un apta donde no lo hay. La salida no es quitar la cifra: es rotularla
+  mejor (los textos viven en `viewer/cajon-diagnostico.js` y
+  `viewer/contraste.js`; la etiqueta del margen, en `diagnostico/margen.js` y es
+  literal de la spec).
+- **Algo del 8.2, 8.3 o 8.4 no convence** → es presentación o producto. Se anota
+  y se decide; **no bloquea F07**: el mecanismo ya está medido por
+  `09-diagnostico.js`. Los tonos y opacidades viven en `viewer/contraste.js`
+  (constantes con su porqué) y el cromo del cajón en `estilos/app.css`; la esquina
+  es la opción `diagnostico.posicion` de `crearVisor`.
 
 ## Cuándo repetir esta lista
 
@@ -622,6 +712,12 @@ El punto **6** se repite cuando cambien `services/catastro.js`,
 de `index.html` — los mismos disparadores que `07-catastro-vivo.js` (`GUION.md`
 §8), porque los dos cubren mitades de lo mismo. Y el **6.7**, cada vez que se
 publique: el CORS que importa es el del origen desde el que trabaja la gente.
+
+El punto **8** se repite cuando cambien los textos o los colores del diagnóstico
+(`viewer/cajon-diagnostico.js`, `viewer/contraste.js`, la etiqueta de
+`diagnostico/margen.js`) — el 8.1 es sobre la LECTURA, y la lectura cambia con
+cada palabra. Los disparadores del mecanismo son los de `09-diagnostico.js`
+(`GUION.md` §15).
 
 El punto **7** se repite con los mismos disparadores que `08-edicion.js`
 (`GUION.md` §8 y §14): `viewer/edicion.js`, `viewer/acotaciones.js`,

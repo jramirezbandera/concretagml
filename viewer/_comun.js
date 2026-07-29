@@ -132,6 +132,7 @@ export const PANE = Object.freeze({
   PARCELA_OFICIAL: 'parcelaOficial',
   PARCELA_EDITADA: 'parcelaEditada',
   ACOTACIONES: 'acotaciones',
+  DIAGNOSTICO: 'diagnostico',
   VERTICES: 'vertices',
 })
 
@@ -149,6 +150,26 @@ export const PANE = Object.freeze({
  *     ni siquiera intercepta el puntero: el zIndex es la segunda línea de
  *     defensa, no la única.)
  *
+ * `diagnostico` (F07, T1.3) se intercala en **428**, entre `acotaciones` (425) y
+ * `vertices` (430), con el mismo razonamiento que `acotaciones` un peldaño más
+ * arriba:
+ *   · por ENCIMA de `parcelaEditada` (420) Y de `acotaciones` (425): todo lo que
+ *     F07 dibuja —la diferencia sombreada entre la parcela medida y la oficial,
+ *     las piezas de invasión con colindantes, la cota de la desviación máxima
+ *     con su línea guía, la banda del margen de identidad (§10.5,
+ *     `diagnostico/margen.js`)— es una ANOTACIÓN que EXPLICA esas dos
+ *     geometrías. Debajo del relleno del polígono que pretende explicar no se
+ *     vería, exactamente el motivo por el que `acotaciones` va sobre
+ *     `parcelaEditada`.
+ *   · por DEBAJO de `vertices` (430): el vértice sigue siendo lo que se agarra,
+ *     y F06 SIGUE ACTIVO con el diagnóstico abierto — el flujo real es
+ *     diagnosticar, corregir el lindero señalado, volver a diagnosticar. Si la
+ *     sombra de la diferencia o una pieza de invasión taparan al vértice, el
+ *     usuario apuntaría a la explicación en vez de a la esquina que quiere
+ *     mover. Como en `acotaciones`, la capa de diagnóstico va además
+ *     `interactive:false`: el zIndex es la SEGUNDA línea de defensa, no la
+ *     única.
+ *
  * `viewer/mapa.js#crearMapa` ITERA esta lista para crear los panes, así que
  * añadir una entrada aquí es todo lo que hace falta: ni ese módulo ni el arnés
  * de test (`test/viewer/_ayuda-jsdom.js#crearPanes`) llevan nombres a mano.
@@ -159,6 +180,7 @@ export const PANES = Object.freeze([
   { nombre: PANE.PARCELA_OFICIAL, zIndex: 410 },
   { nombre: PANE.PARCELA_EDITADA, zIndex: 420 },
   { nombre: PANE.ACOTACIONES, zIndex: 425 },
+  { nombre: PANE.DIAGNOSTICO, zIndex: 428 },
   { nombre: PANE.VERTICES, zIndex: 430 },
 ])
 

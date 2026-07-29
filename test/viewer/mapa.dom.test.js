@@ -18,7 +18,13 @@ import { crearMapa } from '../../viewer/mapa.js'
 import { MAX_ZOOM_NATIVO_IGN } from '../../services/ign.js'
 
 describe('crearMapa · panes', () => {
-  it('crea los tres panes de PANES, cada uno con su zIndex exacto', () => {
+  // El rótulo NO lleva la cuenta, y es por lo mismo que este fichero no copia el
+  // tope nativo del IGN (ver la cabecera): un número aquí es una copia a mano de
+  // un dato que vive en `PANES`. Decía «los tres» desde F03 y F06 lo dejó en
+  // cuatro sin que nada avisara —el cuerpo itera `PANES`, así que seguía verde—;
+  // F07 lo habría dejado en cinco. Un test que pasa contando mal lo que hace es
+  // el tipo de mentira en verde que este proyecto persigue.
+  it('crea TODOS los panes de PANES, cada uno con su zIndex exacto', () => {
     const contenedor = crearContenedor()
     const { mapa, panes, destruir } = crearMapa(contenedor)
 

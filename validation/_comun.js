@@ -5,14 +5,15 @@
 // de adaptación a Turf que comparten reglas-geometria/reglas-topologia/reglas-huso.
 // Es el análogo de parsers/_comun.js para la rama de validación.
 //
-// Dos de esos «helpers» ya no se definen aquí, se RE-EXPORTAN (F06, T1.2):
-// `OPERATIVOS` viene de `config/operativos.js` y `distancia` de `geo/metrica.js`.
-// Vivían en este fichero solo porque F02 fue quien primero los necesitó, y eso
-// obligaba a la capa de edición a depender de la de validación para leer una
-// constante o medir una hipotenusa. La API pública de este módulo no cambia: sus
-// consumidores siguen importando ambos de aquí. Es el mismo movimiento que hizo
-// `viewer/_comun.js` con `NIVEL`, y por el mismo motivo — una sola definición en
-// todo el proyecto ⇒ nada puede divergir.
+// Varios de esos «helpers» ya no se definen aquí, se RE-EXPORTAN: `OPERATIVOS`
+// viene de `config/operativos.js` y `distancia` de `geo/metrica.js` (F06, T1.2);
+// `anilloCerrado` y `coordsPoligono`, de `geo/poligono.js` (F07, T1.1). Vivían en
+// este fichero solo porque F02 fue quien primero los necesitó, y eso obligaba a
+// las capas de edición y de diagnóstico a depender de la de VALIDACIÓN para leer
+// una constante, medir una hipotenusa o cerrar un anillo. La API pública de este
+// módulo no cambia: sus consumidores siguen importándolos de aquí. Es el mismo
+// movimiento que hizo `viewer/_comun.js` con `NIVEL`, y por el mismo motivo — una
+// sola definición en todo el proyecto ⇒ nada puede divergir.
 //
 // Fronteras de responsabilidad (SPEC §2):
 //   · Regla 1 — NADA silencioso. Cada regla materializa un {@link Hallazgo}; un
@@ -20,7 +21,9 @@
 //     reserva para errores del PROGRAMADOR (contrato roto por el llamante).
 //   · Regla 6 — Turf SOLO para topología (kinks/booleanContains/intersect), y en
 //     otra tarea (reglas-topologia.js). Este módulo es aritmética PROPIA: no
-//     importa turf. Solo prepara coordenadas (anillo abierto → cerrado GeoJSON).
+//     importa turf, ni directa ni indirectamente. Lo único que hace por Turf es
+//     preparar coordenadas (anillo abierto → cerrado GeoJSON), y eso ya vive en
+//     `geo/poligono.js` — que tampoco importa turf — y se re-exporta al final.
 //   · Regla 9 — las tolerancias viven en config/operativos.json (decisiones de
 //     ingeniería), NO en un `umbrales.json` (prohibido). Las carga UNA sola vez
 //     `config/operativos.js`, que es de donde este módulo las re-exporta.
@@ -201,30 +204,25 @@ export function anguloVertice(prev, v, next) {
 // ── Adaptación a Turf (SOLO preparación de coordenadas; sin importar turf) ────
 
 /**
- * Cierra un anillo ABIERTO del modelo repitiendo el primer vértice al final, como
- * exige GeoJSON/Turf. Devuelve una COPIA (no muta la entrada). Si ya viniera
- * cerrado, se copia tal cual.
+ * Cierre de anillo (`anilloCerrado`: anillo ABIERTO del modelo → anillo cerrado
+ * GeoJSON, en una copia) y coordenadas de polígono de un recinto
+ * (`coordsPoligono`: `[ anilloCerrado(recinto.vertices) ]`, listo para
+ * `polygon(...)` de @turf/helpers en `reglas-topologia.js`). Turf corre
+ * directamente sobre UTM.
  *
- * @param {Array<[number,number]>} anillo  Anillo abierto en UTM.
- * @returns {Array<[number,number]>}  Anillo cerrado (primer=último).
- */
-export function anilloCerrado(anillo) {
-  const n = anillo.length
-  if (n === 0) return []
-  const copia = anillo.map((p) => [p[0], p[1]])
-  const [fx, fy] = copia[0]
-  const [lx, ly] = copia[n - 1]
-  if (fx === lx && fy === ly) return copia
-  copia.push([fx, fy])
-  return copia
-}
-
-/**
- * Coordenadas GeoJSON de un recinto como polígono de un solo anillo:
- * `[ anilloCerrado(recinto.vertices) ]`. Listo para `polygon(coordsPoligono(r))`
- * de @turf/helpers en reglas-topologia.js. Turf corre directamente sobre UTM.
+ * **Re-exportadas de `geo/poligono.js`, no redefinidas aquí** (F07, T1.1), por el
+ * mismo motivo que {@link OPERATIVOS} y {@link distancia} arriba: el diagnóstico
+ * de encaje (`diagnostico/`, F07) también tiene que cerrar anillos para hablar con
+ * Turf —el solape con la geometría oficial y la invasión a colindantes son
+ * `intersect`— y no puede depender de la capa de VALIDACIÓN para eso. La
+ * adaptación vive en `geo/`, junto a `geo/area.js` y `geo/metrica.js`, y este
+ * re-export mantiene intacta la API de F02: `reglas-topologia.js` sigue
+ * importándolas de aquí sin cambios. Una sola definición en todo el proyecto.
  *
- * @param {{vertices: Array<[number,number]>}} recinto
- * @returns {Array<Array<[number,number]>>}
+ * `geo/poligono.js` añade además la dirección INVERSA
+ * (`recintosDeGeometriaTurf`: la geometría que devuelve una booleana de Turf →
+ * `recintos` del modelo, en LISTA porque la intersección puede salir en varias
+ * piezas disjuntas). No se re-exporta aquí: F02 no la necesita y este módulo es
+ * el contrato de la validación, no un barrel.
  */
-export const coordsPoligono = (recinto) => [anilloCerrado(recinto.vertices)]
+export { anilloCerrado, coordsPoligono } from '../geo/poligono.js'

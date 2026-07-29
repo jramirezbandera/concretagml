@@ -69,6 +69,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 import { crearPanelAvisos } from '../../app/avisos.js'
 import { REFCAT_DEMO, SRS_DEMO, parcelaDemo, parcelaDemoConHueco } from '../../app/demo-datos.js'
+import { husoPorSrs } from '../../geo/huso.js'
 import { SEVERIDAD, dateTimeCatastro } from '../../gml/_comun.js'
 import { MARCA_SIN_REFCAT, descargarGml } from '../../gml/descargar.js'
 import { serializarParcelaCp } from '../../gml/serialize-cp.js'
@@ -76,26 +77,39 @@ import { crearParcela, crearRecinto, ORIGEN_PARCELA, TIPO_RECINTO } from '../../
 import { validarParcela } from '../../validation/parcela.js'
 import { NIVEL, crearEstadoVista } from '../../viewer/_comun.js'
 import { crearBarraEdicion } from '../../viewer/barra-edicion.js'
-import { montarMapa } from '../viewer/_ayuda-jsdom.js'
+import { crearCajonDiagnostico } from '../../viewer/cajon-diagnostico.js'
+import { crearContraste } from '../../viewer/contraste.js'
+import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
 
 /**
- * El OTRO efecto de `crearVisor` sobre el documento, desde el traslado de F06:
- * la barra flotante de herramientas de edición. Sus siete nodos ya no están en
- * `index.html` —el bloque «Edición» del panel dejó de existir—, así que si el
- * doble no los pusiera, `cablearEdicion` lanzaría al buscar
- * `[data-accion="deshacer"]` y este fichero no recolectaría NI UN test.
+ * El OTRO efecto de `crearVisor` sobre el documento: el cromo que monta SOBRE EL
+ * MAPA. Desde el traslado de F06, la barra flotante de herramientas de edición
+ * —sus siete nodos ya no están en `index.html`, porque el bloque «Edición» del
+ * panel dejó de existir—; y desde F07, el CAJÓN del diagnóstico y su capa de
+ * CONTRASTE. Si el doble no lo pusiera, `cablearEdicion` lanzaría al buscar
+ * `[data-accion="deshacer"]` —y `cablearDiagnostico` al comprobar la forma del
+ * cajón— y este fichero no recolectaría NI UN test.
  *
- * Se llama al módulo de verdad sobre un `L.Map` del arnés compartido en vez de
- * inyectar una copia del marcado, por lo mismo que en `main-edicion.dom.test.js`
- * (decisión 3 de aquella cabecera): una copia se desincroniza en silencio de la
- * barra real y estas pruebas se quedarían ciegas a un cambio de contrato.
+ * Se llama a los módulos de verdad sobre un `L.Map` del arnés compartido en vez de
+ * inyectar copias, por lo mismo que en `main-edicion.dom.test.js` (decisión 3 de
+ * aquella cabecera): una copia se desincroniza en silencio del original y estas
+ * pruebas se quedarían ciegas a un cambio de contrato.
  *
- * Aquí basta con montarla UNA vez, al arrancar: ningún test de este fichero
- * toca los siete nodos ni vuelve a cablear la edición.
+ * Aquí basta con montarlo UNA vez, al arrancar: ningún test de este fichero toca
+ * esos nodos ni vuelve a cablear la edición ni el diagnóstico.
+ *
+ * @returns {{cajon: object, contraste: object}}  Lo que el doble devuelve como
+ *   `visor.diagnostico`.
  */
-function montarBarra() {
+function montarCromoDelMapa() {
   const { mapa } = montarMapa()
+  crearPanes(mapa)
   crearBarraEdicion({ mapa })
+  return {
+    cajon: crearCajonDiagnostico({ mapa }),
+    // El huso se DERIVA del SRS del expediente con la misma función que la app.
+    contraste: crearContraste({ mapa, zona: husoPorSrs(SRS_DEMO) }),
+  }
 }
 
 // `crearVisor` es lo ÚNICO que se dobla (decisión 3). El doble devuelve la
@@ -117,25 +131,29 @@ function montarBarra() {
 //
 // Y desde el TRASLADO de las herramientas al mapa, el doble tiene además que
 // reproducir el segundo efecto del original sobre el DOCUMENTO: los siete nodos
-// de la barra (ver {@link montarBarra}). Sin ellos el fallo es el mismo de
-// siempre —el import de `app/main.js` se cae y la suite entera desaparece—, solo
-// que por el otro extremo del cable.
+// de la barra y, desde F07, el cajón del diagnóstico (ver
+// {@link montarCromoDelMapa}). Sin ellos el fallo es el mismo de siempre —el
+// import de `app/main.js` se cae y la suite entera desaparece—, solo que por el
+// otro extremo del cable.
+//
+// Desde F07 la forma incluye `diagnostico`, con las DOS piezas de verdad:
+// `cablearDiagnostico` comprueba por duck typing los diez métodos del cajón y los
+// dos de la capa, y va FUERA del `try` del Catastro — así que un doble escrito a
+// mano no dejaría un bloque muerto, tumbaría esta suite entera.
 vi.mock('../../viewer/index.js', () => ({
-  crearVisor: () => {
-    montarBarra()
-    return {
-      mapa: { on() {}, off() {} },
-      edicion: {
-        snapActivo: () => true,
-        tolerancia: () => 0.2,
-        ladoSeleccionado: () => null,
-        alCambiarSeleccion: () => () => {},
-        fijarColindantes() {},
-        desplazarSeleccion: () => ({ aplicado: false, modo: null, detecciones: [] }),
-      },
-      destruir() {},
-    }
-  },
+  crearVisor: () => ({
+    mapa: { on() {}, off() {} },
+    edicion: {
+      snapActivo: () => true,
+      tolerancia: () => 0.2,
+      ladoSeleccionado: () => null,
+      alCambiarSeleccion: () => () => {},
+      fijarColindantes() {},
+      desplazarSeleccion: () => ({ aplicado: false, modo: null, detecciones: [] }),
+    },
+    diagnostico: montarCromoDelMapa(),
+    destruir() {},
+  }),
 }))
 
 // ── La cáscara REAL, leída de `index.html` ───────────────────────────────────

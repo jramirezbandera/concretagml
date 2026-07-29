@@ -17,6 +17,14 @@
  * ficha se repinte por el canal en vivo y por el del store con la MISMA         *
  * función, y que las colindantes lleguen APLANADAS a las dianas del enganche.   *
  *                                                                              *
+ * ── Y DESDE F07 · T5.1, TRES HECHOS DEL ARRANQUE QUE SOLO SE VEN AQUÍ ──       *
+ * El diagnóstico tiene su propia suite completa (`diagnostico.dom.test.js`),    *
+ * pero hay cosas que no son de ninguna función sino del ORDEN del arranque: con *
+ * qué opciones se monta el visor y cómo nace el CTA del pie. El único sitio que *
+ * las tiene capturadas es este fichero, por el doble de la decisión 3 y su      *
+ * `arranque.opciones`. Un fichero nuevo duplicaría todo este arnés para tres    *
+ * afirmaciones.                                                                *
+ *                                                                              *
  * ── DECISIÓN 1 · DOS NIVELES, Y LOS DOS HACEN FALTA ──                         *
  *   · **El ENSAMBLAJE real** — se importa `app/main.js` una vez, con la cáscara *
  *     de `index.html` ya montada, y se afirma sobre lo que quedó cableado. Es   *
@@ -65,6 +73,13 @@
  * cambio de contrato de la barra. Con la barra de verdad, si cambia, se         *
  * enteran aquí. Lo que la decisión 3 se sigue ahorrando es todo lo demás del    *
  * visor: capas, WMS, tabla, sincronización y encuadre.                          *
+ *                                                                              *
+ * ⚠️ Desde F07 ese segundo efecto son TRES piezas: la barra, el CAJÓN del       *
+ * diagnóstico y su CAPA DE CONTRASTE. Las tres se montan de verdad, y por el    *
+ * mismo argumento: `cablearDiagnostico` comprueba por duck typing los diez      *
+ * métodos del cajón y los dos de la capa antes de cablear nada, así que un      *
+ * doble escrito a mano sería otra segunda redacción — y este fichero no         *
+ * recolectaría ni un test el día que a esas dos APIs les cambie una firma.      *
  * -------------------------------------------------------------------------- */
 
 import { readFileSync } from 'node:fs'
@@ -77,44 +92,68 @@ import { SRS_DEMO, parcelaDemo } from '../../app/demo-datos.js'
 import { OPERATIVOS } from '../../config/operativos.js'
 import { commit, crearHistorial, puedeDeshacer, puedeRehacer } from '../../edit/historial.js'
 import { metricas } from '../../edit/metricas.js'
+import { husoPorSrs } from '../../geo/huso.js'
 import { crearParcela, crearRecinto, ORIGEN_PARCELA, TIPO_RECINTO } from '../../model/parcela.js'
 import { NIVEL, crearEstadoVista } from '../../viewer/_comun.js'
 import { crearBarraEdicion } from '../../viewer/barra-edicion.js'
-import { montarMapa } from '../viewer/_ayuda-jsdom.js'
+import { crearCajonDiagnostico } from '../../viewer/cajon-diagnostico.js'
+import { crearContraste } from '../../viewer/contraste.js'
+import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
 
-// ── La BARRA: el segundo efecto de `crearVisor` sobre el documento ───────────
+// ── EL CROMO DEL MAPA: el segundo efecto de `crearVisor` sobre el documento ──
 
-/** Cómo desmontar la barra viva ahora mismo (y su mapa), o `null` si no hay. */
-let desmontarBarraViva = null
+/** Cómo desmontar el cromo vivo ahora mismo (y su mapa), o `null` si no hay. */
+let desmontarCromoVivo = null
+
+/** El cajón y la capa de F07 vivos, para que el doble los entregue. */
+let diagnosticoVivo = null
 
 /**
- * Pone en el documento los SIETE nodos de las herramientas de edición, con el
- * módulo que los fabrica en producción y no con una copia (decisión 3). Es lo
- * que `crearVisor` hace de verdad cuando la edición está activa, así que lo hace
- * también su doble; y hay que repetirlo en cada `beforeEach`, porque
- * {@link montarCascara} vacía el `<body>` y se lleva por delante el contenedor
- * del mapa, que es donde vive la barra.
+ * Pone en el documento lo que `crearVisor` monta SOBRE EL MAPA cuando la edición y
+ * el diagnóstico están activos, **con los módulos que lo fabrican en producción y
+ * no con copias** (decisión 3):
  *
- * IDEMPOTENTE en el sentido que hace falta: desmonta la anterior antes de montar
- * la siguiente. Sin eso quedarían dos barras (o sea, los siete nodos por
- * duplicado, que es justo el fallo que G16 vigila en `index.html`) y una pila de
- * oyentes de `document` sobre barras ya muertas.
+ *   · los SIETE nodos de las herramientas de edición (`crearBarraEdicion`). Sin
+ *     ellos `cablearEdicion` lanza al buscar `[data-accion="deshacer"]`.
+ *   · el CAJÓN y la CAPA DE CONTRASTE de F07 (`crearCajonDiagnostico` +
+ *     `crearContraste`). Sin ellos `cablearDiagnostico` lanza: comprueba por duck
+ *     typing los diez métodos del cajón y los dos de la capa, así que un doble
+ *     escrito a mano sería una segunda redacción de esas dos APIs que se
+ *     desincroniza en silencio.
+ *
+ * Hay que repetirlo en cada `beforeEach`, porque {@link montarCascara} vacía el
+ * `<body>` y se lleva por delante el contenedor del mapa, que es donde vive todo
+ * esto.
+ *
+ * IDEMPOTENTE en el sentido que hace falta: desmonta lo anterior antes de montar lo
+ * siguiente. Sin eso quedarían dos barras (o sea, los siete nodos por duplicado,
+ * que es justo el fallo que G16 vigila en `index.html`), dos cajones y una pila de
+ * oyentes de `document` sobre controles ya muertos.
  */
-function montarBarra() {
-  desmontarBarra()
+function montarCromoDelMapa() {
+  desmontarCromoDelMapa()
   const { mapa, destruir: destruirMapa } = montarMapa()
+  crearPanes(mapa)
   const barra = crearBarraEdicion({ mapa })
-  desmontarBarraViva = () => {
+  const cajon = crearCajonDiagnostico({ mapa })
+  // El huso se DERIVA del SRS del expediente con la misma función que usa la app;
+  // escribir «30» aquí sería una tercera copia de ese dato.
+  const contraste = crearContraste({ mapa, zona: husoPorSrs(SRS_DEMO) })
+  diagnosticoVivo = { cajon, contraste }
+  desmontarCromoVivo = () => {
+    contraste.destruir()
+    cajon.destruir()
     barra.destruir()
     destruirMapa()
+    diagnosticoVivo = null
   }
 }
 
-/** Quita la barra viva y su mapa. No hace nada si no hay ninguna. */
-function desmontarBarra() {
-  if (desmontarBarraViva === null) return
-  const desmontar = desmontarBarraViva
-  desmontarBarraViva = null
+/** Quita el cromo vivo y su mapa. No hace nada si no hay ninguno. */
+function desmontarCromoDelMapa() {
+  if (desmontarCromoVivo === null) return
+  const desmontar = desmontarCromoVivo
+  desmontarCromoVivo = null
   desmontar()
 }
 
@@ -130,8 +169,11 @@ const arranque = vi.hoisted(() => ({
   opciones: null,
   /** Opciones con las que `app/main.js` cableó el Catastro. */
   catastro: null,
-  /** El oyente de colindantes que `app/main.js` registró en el cableado. */
-  alColindantes: null,
+  /**
+   * Los oyentes de colindantes que `app/main.js` ha registrado en el cableado.
+   * Desde F07 son DOS: el del snap de F06 y el del diagnóstico. Ver el doble.
+   */
+  oyentesColindantes: new Set(),
   /** Lo que se le ha pedido al doble de `visor.edicion`. */
   registro: {
     snapActivo: [],
@@ -146,8 +188,9 @@ vi.mock('../../viewer/index.js', () => ({
     arranque.opciones = opciones
     // El segundo efecto del original sobre el documento: si el doble no lo
     // reprodujera, `cablearEdicion` lanzaría al buscar `[data-accion="deshacer"]`
-    // y este fichero no recolectaría ni un test. Ver la decisión 3.
-    montarBarra()
+    // y este fichero no recolectaría ni un test. Ver la decisión 3. Desde F07 monta
+    // además el cajón y la capa del diagnóstico, por lo mismo.
+    montarCromoDelMapa()
     let tau = opciones.edicion && opciones.edicion.tolerancia
     return {
       mapa: { on() {}, off() {} },
@@ -176,6 +219,11 @@ vi.mock('../../viewer/index.js', () => ({
           return { aplicado: false, modo: null, detecciones: [] }
         },
       },
+      // Las dos piezas de F07, LAS DE VERDAD (las ha montado `montarCromoDelMapa`
+      // sobre un `L.Map` real). No se doblan por lo mismo que la barra: el cableado
+      // del diagnóstico comprueba los diez métodos del cajón por duck typing, así
+      // que un doble escrito a mano sería una segunda redacción de esa API.
+      diagnostico: diagnosticoVivo,
       destruir() {},
     }
   },
@@ -192,6 +240,14 @@ vi.mock('../../viewer/index.js', () => ({
 //     'function')`— con un cableado que sí lo publica.
 // El cableado de verdad tiene su propia suite (`test/app/catastro.dom.test.js`)
 // y además se ejercita entero en `main-gml.dom.test.js`, que no lo dobla.
+//
+// ⚠️ `alColindantes` guarda los oyentes en un SET, como el módulo real, y no en una
+// variable suelta. Lo hacía —`arranque.alColindantes = fn`— y desde F07 dejó de
+// valer: hay DOS suscriptores (el snap de F06 y el diagnóstico), así que la
+// variable se quedaba con el segundo y `arranque.alColindantes(...)` publicaba a
+// uno solo. Es exactamente el fallo contra el que avisa el JSDoc del módulo real
+// («un `alColindantes = fn` desengancharía al primero en silencio»), cometido en su
+// propio doble. Se publica con {@link publicarColindantes}, que avisa a los dos.
 vi.mock('../../app/cableado-catastro.js', async (importOriginal) => {
   const original = await importOriginal()
   return {
@@ -203,16 +259,23 @@ vi.mock('../../app/cableado-catastro.js', async (importOriginal) => {
         deducir: async () => null,
         colindantes: async () => null,
         alColindantes(fn) {
-          arranque.alColindantes = fn
-          return () => {
-            arranque.alColindantes = null
-          }
+          arranque.oyentesColindantes.add(fn)
+          return () => arranque.oyentesColindantes.delete(fn)
         },
         destruir() {},
       }
     },
   }
 })
+
+/** Publica un resultado de colindantes a TODOS los suscriptores, como el real. */
+const publicarColindantes = (resultado) => {
+  expect(
+    arranque.oyentesColindantes.size,
+    'nadie se ha suscrito a alColindantes: el puente del arranque no se ha montado',
+  ).toBeGreaterThan(0)
+  for (const fn of arranque.oyentesColindantes) fn(resultado)
+}
 
 // ── La cáscara REAL, leída de `index.html` ───────────────────────────────────
 
@@ -235,7 +298,7 @@ const CUERPO_INDEX = (() => {
  *
  * ⚠️ Se lleva por delante TODO lo que hubiera en el `<body>`, incluida la barra
  * de edición (que vive dentro del contenedor del mapa). Quien la use en un
- * `beforeEach` tiene que volver a montarla: ver {@link montarBarra}.
+ * `beforeEach` tiene que volver a montarla: ver {@link montarCromoDelMapa}.
  */
 function montarCascara() {
   document.body.innerHTML = CUERPO_INDEX
@@ -274,6 +337,9 @@ const DEL_ARRANQUE = Object.freeze({
   colindantes: document.querySelector('[data-ficha="colindantes"]'),
   tolerancia: document.querySelector(SELECTOR_CAMPO_TOLERANCIA),
   snap: document.querySelector(SELECTOR_CAMPO_SNAP),
+  // F07 · el CTA del pie y su renglón. Se capturan aquí por lo mismo que el resto.
+  botonDiagnosticar: document.querySelector('[data-accion="diagnosticar"]'),
+  estadoDiagnosticar: document.querySelector('[data-estado="diagnosticar"]'),
 })
 
 /** El store REAL del ensamblaje (el mismo objeto que comparten las tres vistas). */
@@ -504,9 +570,9 @@ const renglonEnError = (renglon) => renglon.classList.contains('gml-accion-estad
 // por `crearVisor`). Sin la segunda, los siete nodos que `cablearEdicion` busca
 // no existirían a partir del primer test.
 beforeEach(() => {
-  desmontarBarra()
+  desmontarCromoDelMapa()
   montarCascara()
-  montarBarra()
+  montarCromoDelMapa()
 })
 afterEach(() => {
   // Los atajos viven en `document`: sin esta baja, el cableado de una prueba
@@ -1123,7 +1189,10 @@ describe('app/main · los dos ganchos que el arranque le entrega al Catastro', (
 
   it('el arranque le pasa `alCargarParcela` y le registra el oyente de colindantes', () => {
     expect(typeof arranque.catastro.alCargarParcela).toBe('function')
-    expect(typeof arranque.alColindantes, 'el puente del arranque').toBe('function')
+    // DOS suscriptores: el snap de F06 y el diagnóstico de F07. Que sean dos es
+    // parte del contrato del cableado del Catastro (un `Set`, no un callback), y
+    // este número es lo que lo afirma desde el arranque real.
+    expect(arranque.oyentesColindantes.size, 'el puente del arranque').toBe(2)
   })
 
   it('traer una parcela REINICIA la pila del arranque (deshacer no la devuelve)', () => {
@@ -1142,7 +1211,7 @@ describe('app/main · los dos ganchos que el arranque le entrega al Catastro', (
     // `visor.edicion.fijarColindantes` → callback → `<dd data-ficha>`.
     expect(DEL_ARRANQUE.colindantes.textContent).toBe('Sin consultar')
 
-    arranque.alColindantes({
+    publicarColindantes({
       ok: true,
       datos: { colindantes: [parcelaCuadrada(), parcelaConHueco()] },
     })
@@ -1155,7 +1224,7 @@ describe('app/main · los dos ganchos que el arranque le entrega al Catastro', (
   })
 
   it('cargar otra parcela suelta el recuento: esas vecinas ya no lindan con nada', () => {
-    arranque.alColindantes({ ok: true, datos: { colindantes: [parcelaCuadrada()] } })
+    publicarColindantes({ ok: true, datos: { colindantes: [parcelaCuadrada()] } })
     expect(DEL_ARRANQUE.colindantes.textContent).toBe('1')
 
     const traida = parcelaCuadrada({ lado: 30 })
@@ -1263,4 +1332,55 @@ describe('app/main · el marcado de las herramientas de edición es CONTRATO', (
       cablearEdicion({ estado, historial: { deshacer() {} }, edicion: crearEdicionFalsa() }),
     ).toThrow(/historial/i)
   })
+})
+
+// ── F07 · T5.1 — el DIAGNÓSTICO en el ensamblaje ─────────────────────────────
+//
+// Vive en este fichero y no en uno propio por una razón concreta: lo que hay que
+// afirmar son hechos del ARRANQUE (con qué opciones se montó el visor, cómo nace el
+// CTA), y el único sitio del proyecto que los tiene capturados es este —el doble de
+// `crearVisor` de la decisión 3 y su `arranque.opciones`—. Un fichero nuevo
+// duplicaría ese arnés entero (cáscara real, dos dobles, el cromo del mapa) para
+// tres afirmaciones. El CABLEADO en sí tiene su propia suite completa, con su propio
+// arnés y sin doblar nada del visor: `test/app/diagnostico.dom.test.js`.
+
+describe('app/main · F07 · el diagnóstico, montado y cableado en el arranque', () => {
+  it('el visor se monta con `diagnostico: true`', () => {
+    // `true` y no un objeto: las dos claves que admite valen aquí lo que sus
+    // defectos, y escribirlas fingiría una decisión que no se ha tomado.
+    expect(arranque.opciones.diagnostico).toBe(true)
+  })
+
+  it('el cajón del arranque existe y nace CERRADO', () => {
+    // Montar el diagnóstico no es abrirlo: un cajón que se abriera solo taparía el
+    // mapa con algo que nadie ha pedido.
+    expect(diagnosticoVivo).not.toBeNull()
+    expect(diagnosticoVivo.cajon.abierto()).toBe(false)
+  })
+
+  it('con la parcela de demo, el CTA nace ENCENDIDO', () => {
+    // `parcelaDemo()` trae `geometriaOficial` —es la parcela REAL del Catastro, y su
+    // contorno medido nace igual al oficial—, así que hay contra qué contrastar. Es
+    // lo que se ve al abrir la app, y el `disabled` del HTML tiene que haberse
+    // levantado ya: `subscribe` no notifica al suscribirse, así que esto solo pasa
+    // si el cableado calcula el primer estado a mano.
+    expect(parcelaDemo().geometriaOficial).not.toBeNull()
+    expect(DEL_ARRANQUE.botonDiagnosticar.disabled).toBe(false)
+  })
+
+  it('el renglón del CTA se anuncia sin robar el foco', () => {
+    expect(DEL_ARRANQUE.estadoDiagnosticar.getAttribute('role')).toBe('status')
+  })
+
+  // ⚠️ LO QUE **NO** SE PUEDE PROBAR AQUÍ, y por qué está escrito:
+  // «la superficie de la ficha y la del cajón coinciden» —el invariante de los dos
+  // suscriptores— no cabe en este fichero. El cajón del ARRANQUE lo destruye el
+  // primer `beforeEach` (`desmontarCromoDelMapa`), así que a partir del primer test
+  // el cajón que hay en `diagnosticoVivo` es otro, y NO está cableado: `pintar`
+  // sobre él no lo llama nadie. Capturarlo antes tampoco vale, porque `destruir()`
+  // lo deja inerte a propósito.
+  //
+  // Ese invariante es de la ACEPTACIÓN de F07 y se afirma en
+  // `test/diagnostico/aceptacion-f07.dom.test.js`, que monta la app entera sin
+  // doblar el visor — que es la única forma de tener las dos vistas vivas a la vez.
 })

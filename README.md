@@ -96,6 +96,31 @@ desde F03 no.
   bloque ya no existe en `index.html`, y hay un guardián (`G16`) que exige que sus
   siete controles **no vuelvan** al marcado: duplicarlos dejaría la barra muerta
   con el mismo aspecto que la viva.
+- **F07** Diagnóstico de encaje — código y pruebas hechos; **pendiente de la firma
+  humana** del mismo checklist (su sección 8 trae el punto bloqueante: que ninguna
+  cifra ni color se lea como un veredicto).
+  👉 **La pregunta por la que se hace todo lo anterior**: *¿mi medición cuadra con
+  Catastro?* Un botón «Diagnosticar encaje» abre un cajón sobre el mapa con el
+  contraste completo — superficies a tres bandas (medida / catastral / registral,
+  con las tres diferencias cruzadas), solape, desplazamiento de centroides,
+  desviación por lindero con el peor resaltado y acotado sobre el dibujo, invasión
+  a colindantes con la parcela afectada en ámbar, y la diferencia entre contornos
+  sombreada. **Sin una sola cifra con juicio de valor**: la app mide, el colegiado
+  interpreta y firma (regla de oro 9); la única excepción es la invasión, que es un
+  hecho binario. El margen oficial de identidad (±0,50 m urbana / ±2,00 m rústica,
+  ≤5 %; BOE-A-2020-12111) se dibuja como **capa informativa etiquetada**, jamás
+  como semáforo.
+  ⛔ **Correcciones a su propia spec, con su evidencia** en
+  [`spec/feature-07-diagnostico-parcela.md`](spec/feature-07-diagnostico-parcela.md):
+  la «desviación entre linderos homólogos» se redefinió **por lado contra el
+  contorno oficial entero** (el emparejamiento 1 a 1 muere en cuanto F06 inserta o
+  borra un vértice), y el filtro de astillas de invasión pasó de **área a grosor**
+  — con el umbral de área, la parcela oficial «invadía» a dos de sus colindantes
+  sin que nadie hubiera tocado un vértice.
+  ⚙️ **Ni una dependencia nueva**: la diferencia sombreada sale del
+  `fillRule: 'evenodd'` que Leaflet trae por defecto (un solo polígono con los
+  anillos de las dos geometrías rellena exactamente la diferencia simétrica), y la
+  banda del margen es un trazo con el ancho recalculado por zoom, no un buffer.
 
 ### El régimen de uso, que es el riesgo real de F05
 

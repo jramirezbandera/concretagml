@@ -253,7 +253,17 @@
            `nodo()` de `app/main.js` usa `querySelector`, que se queda con el
            PRIMERO del documento — y este `<aside>` va antes que el `<main>`. La
            barra quedaría muerta y nada avisaría. (Pasó: es el estado intermedio
-           que cerró esta tarea.) -->
+           que cerró esta tarea.)
+
+           Y TAMPOCO HAY BLOQUE «DIAGNÓSTICO» (F07), por lo mismo y por algo más:
+           las cifras del diagnóstico van en un CAJÓN sobre el mapa
+           (`viewer/cajon-diagnostico.js`, esquina inferior izquierda), no en el
+           panel. Además de la altura —el presupuesto que este panel reparte no da
+           para otro bloque fijo; lo dice la nota de `estilos/app.css`—, un
+           diagnóstico se lee MIRANDO el mapa: el cajón señala en el dibujo lo que
+           dice en la tabla, y a 40 cm de distancia eso no se sigue. Lo único que
+           F07 pone en este fichero es el CTA del pie, que es una ACCIÓN y va donde
+           van las acciones. -->
 
       <!-- La ficha del expediente: SEGUNDO suscriptor del mismo store que el visor.
            Los `<dd>` los rellena `app/main.js`; los `data-ficha` son su contrato. -->
@@ -303,7 +313,7 @@
           <dd class="gml-mono" data-ficha="colindantes">—</dd>
         </dl>
 
-        <!-- ── La acción principal de la app (F04) ────────────────────────────
+        <!-- ── Las acciones del pie: «Generar GML» (F04) y «Diagnosticar» (F07)
              El botón NACE DESHABILITADO, y es deliberado: hasta que `app/main.js`
              no ha validado la geometría no se sabe si se puede generar, y un
              botón pulsable antes de esa comprobación ofrecería generar un GML
@@ -328,6 +338,36 @@
             Generar GML
           </button>
           <p class="gml-accion-estado" data-estado="generar-gml" role="status"></p>
+
+          <!-- ── F07 · «Diagnosticar» ──────────────────────────────────────
+               SECUNDARIO y DEBAJO del primario, no al lado: son dos acciones de
+               momentos distintos del recorrido —se diagnostica para decidir si
+               hay algo que corregir, y se genera al final— y ponerlas a la par
+               diría que da igual cuál se pulsa. La variante `--secundario` es la
+               misma que «Deducir del mapa» de F05, por el mismo motivo: es una
+               salida lateral del camino principal, no el camino.
+
+               NACE DESHABILITADO igual que el primario, y por una razón todavía
+               más simple: sin parcela del Catastro no hay CONTRA QUÉ contrastar,
+               y siete de las nueve métricas de §10 comparan con el contorno
+               oficial. Quien lo habilita —y quien escribe el motivo mientras no
+               lo habilita— es `app/cableado-diagnostico.js`.
+
+               ⚠️ El renglón es `data-estado="diagnosticar"`, con la misma cadena
+               que su `data-accion` (la convención de esta app: `generar-gml`/
+               `generar-gml`, `cargar-catastro`/`cargar-catastro`). El cajón del
+               mapa tiene ADEMÁS el suyo propio, y se llama `cajon-diagnostico`
+               justamente para que no se confundan: `querySelector` se quedaría
+               con el de este `<aside>`, que va antes en el documento. -->
+          <button
+            type="button"
+            class="gml-boton gml-boton--secundario"
+            data-accion="diagnosticar"
+            disabled
+          >
+            Diagnosticar encaje
+          </button>
+          <p class="gml-accion-estado" data-estado="diagnosticar" role="status"></p>
         </div>
       </footer>
     </aside>
@@ -339,7 +379,14 @@
          (`viewer/barra-edicion.js`), como un control más de Leaflet: los nodos
          `[data-accion]`, `[data-campo]` y `[data-estado]` de la edición NO están
          en este fichero, están ahí. Su cromo lo viste la sección «La barra
-         flotante de edición» de `estilos/app.css`. -->
+         flotante de edición» de `estilos/app.css`.
+
+         Y desde F07, el CAJÓN DEL DIAGNÓSTICO (`viewer/cajon-diagnostico.js`),
+         otro control de Leaflet, en la esquina inferior IZQUIERDA — la única
+         libre: arriba a la izquierda está la barra, arriba a la derecha el
+         control de capas, y abajo a la derecha la opacidad y la atribución. Nace
+         oculto (`display:none` en línea) y lo abre el CTA del pie. Su cromo, en
+         la sección «El cajón del diagnóstico» de `estilos/app.css`. -->
     <main id="mapa" class="gml-mapa"></main>
 
     <script type="module" src="/app/main.js"></script>

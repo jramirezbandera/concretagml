@@ -9,8 +9,8 @@ con la **maquinaria real de `L.Draggable`**.
 - **4D.1** (esta carpeta) escribió los guiones y los probó en seco.
 - **4D.2** es la ejecución oficial, con evidencia, siguiendo este documento.
 
-Ocho guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
-para que el resultado no dependa de interpretar prosa. Siete son de aceptación;
+Nueve guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
+para que el resultado no dependa de interpretar prosa. Ocho son de aceptación;
 `05` es de diagnóstico (§11):
 
 | Guion | Criterio | Mide | Veredicto pasa si |
@@ -23,6 +23,7 @@ para que el resultado no dependa de interpretar prosa. Siete son de aceptación;
 | `06-generar-gml.js` | F04 · T7.2 | la cadena Blob → descarga: bytes UTF-8, `posList`, `areaValue` y estructura del GML que baja | `ok:true` |
 | `07-catastro-vivo.js` | F05 · T5C | **contra el servicio REAL**: CORS, IndexedDB de verdad y el recorrido entero (traer parcela · 2.ª consulta sin red · deducir la referencia) | `ok:true` |
 | `08-edicion.js` | F06 · 1 a 5 | la edición con `L.Draggable` real: snap a vértice y a lindero, `Alt`, cotas contra el zoom, offset, insertar/eliminar, undo/redo y su inhibición | `ok:true` |
+| `09-diagnostico.js` | F07 · 1 a 4 | el diagnóstico con SVG y layout reales: la diferencia sombreada por `fill-rule: evenodd`, el cajón que flota sin quitarle NI UN PÍXEL a la caja de vértices al abrirse, la banda del margen que conserva sus metros con el zoom y el tiempo del recálculo completo | `ok:true` |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
 spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
@@ -1249,11 +1250,149 @@ Esas filas no son cosméticas y por eso están medidas. Antes decían lo que el 
 «Edición» le quitaba a la tabla: 270 px fijos de un panel que reparte alto fijo.
 Desde el 2026-07-29 ese bloque no existe —las herramientas están en la barra— y lo
 que se vigila es lo contrario: que la caja siga grande cuando entre el próximo
-bloque (F07 mete el suyo). El guion las publica en `panel` **sin juzgarlas** (regla
-de oro 9); quien decide si once filas bastan, y si la barra estorba sobre la
+bloque. ~~(F07 mete el suyo)~~ **F07 decidió NO meterlo** (su diagnóstico vive en
+un cajón flotante sobre el mapa, ver §15), y `09-diagnostico.js` HEREDA esta medida
+y la repite con ese cajón abierto. El guion las publica en `panel` **sin juzgarlas**
+(regla de oro 9); quien decide si once filas bastan, y si la barra estorba sobre la
 ortofoto, es el checklist humano (§7.6 y §7.6 bis).
 
 ⚠️ El alto de la barra **crece con el renglón de estado**: vacío no ocupa
 (`:empty{display:none}`), así que 36 px al arrancar y 55 px en cuanto hay algo que
 anunciar. Es por diseño; si el guion la mide en 36 px al final, es que el renglón se
 quedó mudo donde debería haber hablado.
+
+---
+
+## 15. `09-diagnostico.js` — el diagnóstico de encaje (F07 · T6.2)
+
+El guion de F07: abre el contraste con el parcelario sobre la parcela REAL y mide
+lo que la suite —2.900 y pico pruebas, incluida la aceptación de los cuatro
+criterios— no puede tocar porque exige un motor de layout, un renderizador SVG y
+una proyección de verdad.
+
+### Qué mide, y por qué NO lo mide la suite
+
+1. **Que la diferencia simétrica SE VEA.** Es lo primero que hay que confirmar
+   fuera de jsdom: toda la representación de §10.5 descansa en que el
+   `fillRule: 'evenodd'` por defecto de Leaflet rellene la diferencia al pintar UN
+   solo polígono con los anillos de las dos geometrías. El guion lo comprueba
+   sobre el SVG real (el `<path>` existe, lleva `fill-rule="evenodd"` aplicado,
+   contiene DOS subtrazados y tiene relleno) y deja la pantalla lista para la
+   captura. **No muestrea píxeles** — es SVG y las capas van `interactive: false`
+   a propósito—, así que «se entiende sin leyenda» queda para el checklist §8.
+2. **Que el cajón FLOTA**: `getBoundingClientRect` del cajón dentro del lienzo del
+   mapa, el mapa con el MISMO tamaño antes y después de abrir, y el porcentaje de
+   lienzo tapado como número sin juicio.
+3. **La banda del margen conserva su anchura en METROS al cambiar el zoom**: el
+   `stroke-width` a dos escalas MEDIDAS (Z y UN nivel alejando: al acercar actúa
+   el tope de 40 px de la capa y la linealidad se corta a propósito; y un segundo
+   clic de zoom durante la animación del primero se pierde sin síntoma — medido)
+   dividido por la escala tiene que dar los mismos metros.
+4. **El tiempo del recálculo completo por operación** (intersección contra el
+   oficial y contra cada vecina + el muestreo de la desviación): el suscriptor del
+   store corre síncrono dentro del `set`, así que se mide alrededor del gesto que
+   lo dispara. Se publica en `contraste.recalculoCompletoMs`, sin umbral.
+5. **El presupuesto de altura, HEREDADO de `08` §10**, en DOS medidas. La caja de
+   vértices arranca en **~267 px** con los avisos vacíos: los ~36 px que faltan
+   hasta los 303 de F06 son el **CTA del pie** —el único coste de F07 en el panel,
+   deliberado y razonado en `index.html`—, y el guardián solo salta por debajo de
+   220 px (un BLOQUE de los de verdad). Y **abrir el cajón no quita nada**: la
+   caja se mide en el mismo tick del clic, descontando lo que crezca el renglón
+   de estado del CTA si habla (regla de oro 1). Medido: 172 → 172 px. Si
+   `.gml-bloque--diagnostico` apareciera en el panel, el guion falla por eso,
+   con ese nombre.
+
+Y dos comprobaciones de la regla de oro 9 sobre lo que el navegador realmente
+muestra: ni una palabra de veredicto en el texto del cajón, y el ámbar
+(`#92400E`) SOLO dentro de la sección de invasión.
+
+### Régimen de red — léete el §13 antes de lanzarlo
+
+Como `07`, toca el servicio REAL: una pasada, sin bucles, **como mucho dos
+peticiones de datos**. «Traer del Catastro» (GetParcel: 0 si la caché de
+IndexedDB sigue dentro del TTL, 1 si no) y la apertura del cajón (GetNeighbourParcel:
+una pulsación, una petición — override O8; 0 si otro gesto ya las trajo). Las dos
+se cuentan por Resource Timing y salen en `red`. Si el servicio no contesta, el
+guion lo dice (`red.servicioRespondio: false`), no reintenta, y mide igual todo lo
+que no depende de la red — con la sección de invasión diciendo «no se ha
+consultado», que es lo que tiene que decir (nunca «ninguna»).
+
+### Cómo se lanza
+
+Página recién cargada, desde la raíz del repo:
+
+```bash
+$B viewport 1440x900
+$B goto http://localhost:PUERTO/concretagml/
+$B wait ".gml-tabla-vertices"
+$B console --clear
+$B eval scripts/smoke-navegador/09-diagnostico.js
+
+$B console --errors                              # → (no console errors)
+$B network | grep -E "wfsCP"                     # → ≤ 2 peticiones de datos
+$B screenshot .gstack/smoke-f07.png              # la evidencia para el §8
+```
+
+⚠️ **Orden.** Deja la geometría **modificada** (el vértice 1 del exterior, 0,40 m
+al Este — el caso medido de la suite, que barre un triángulo de 3,124 m² e invade
+a tres colindantes), la registral tecleada (1.500) y el **cajón abierto**, todo a
+propósito: la captura tiene que enseñar la sombra, el ámbar y la cota. No lo
+encadenes antes de `02` (le contamina la cuenta de `GetMap` con el zoom de la
+banda) ni de `06` (contrasta el `areaValue` contra el dataset de arranque). Para
+repetirlo: `$B reload && $B wait ".gml-tabla-vertices"`.
+
+### Qué cuenta como «pasa»
+
+`ok: true` y `problemas: []`, y además:
+
+- `arranque.ctaHabilitado: true` con el renglón vacío (la parcela de demostración
+  trae contorno oficial) y `cajonCerrado: true`.
+- `red.peticionesGetNeighbour ≤ 1`, y en la reapertura final **cero** peticiones
+  nuevas (las vecinas se adoptan, no se repiden).
+- `cajon.dentroDelMapa: true`, `mapaIntacto: true` y el titular descriptivo
+  (`Contraste con el parcelario — …`).
+- `bandas.filas: 3` con signo en los dos sentidos, y al borrar la registral los
+  dos pares que la usan vuelven a «No consta», no a 0.
+- `contraste.desviacionAtribuida: true` — «0,40 m · lindero 1»: la cifra Y el
+  culpable, que es lo que §10.5 resalta.
+- `invasion.parcelas` con ≥ 1 entrada `refcat: X m²` y
+  `ambarSoloEnLaInvasion: true`.
+- `diferencia.encontrada: true` con `fillRule: "evenodd"`, `subtrazados ≥ 2`,
+  `conRelleno: true` e `interactivas: 0`.
+- `banda.anchuraConstanteEnMetros: true`.
+- `panel.bloqueDiagnosticoEnElPanel: false`, `panel.abrirNoRoboAltura: true`
+  (`altoAntesDeAbrirPx` = `altoTrasAbrirPx`, con el renglón del CTA descontado si
+  habló) y `arranque.altoCajaVerticesPx` ≥ 220 con los avisos vacíos (referencia
+  medida: ~267 px; el guardián caza un BLOQUE, no el CTA).
+- `cierre.cajonOculto: true` y `paneLimpio: true` (cerrar limpia el mapa).
+- `regla9.palabraDeVeredicto: false`.
+
+### Cifras de referencia (corrida de T6.2, **2026-07-29**, `npm run dev`)
+
+Sirven para detectar una desviación, no como valores canónicos. Viewport
+1440×900, lienzo 1048×900, duración **1,3 s**, consola limpia, **2 peticiones de
+datos EN TODA LA SESIÓN** (GetParcel 2,9 kB + GetNeighbourParcel 12,0 kB, ambas
+200; las corridas siguientes salieron de la caché de IndexedDB: 0 peticiones).
+
+| Medida | Valor |
+|---|---|
+| Escala en el encuadre de arranque | **16,18 px/m** (la misma que midió `08`) |
+| Caja de vértices al arrancar (avisos vacíos) | **267 px** (F06 dejó 303; los ~36 px son el CTA del pie) |
+| Caja al abrir el cajón (mismo tick, mismos avisos) | **172 → 172 px** (el cajón no roba nada) |
+| El cajón abierto | **420 × 468 px**, el **20,8 %** del lienzo, dentro del mapa, mapa intacto |
+| Titular | «Contraste con el parcelario — Medición de 1535,87 m² frente a los 1536 m² …» |
+| Cruces con la registral en 1.500 | −0,13 m² / +35,87 m² / +36,00 m², con signo |
+| Recálculo completo por operación (con 4 vecinas) | **7–8 ms** |
+| Invasiones tras +0,40 m al Este | 0,23 / 0,25 / 2,64 m² — las mismas que la suite sobre fixtures |
+| La diferencia sombreada | 1 `<path>` con `fill-rule="evenodd"`, **2 subtrazados**, con relleno, 0 interactivos |
+| La banda del margen (urbana, ±0,50 m) | 16 px a 16,17 px/m → 9 px a 8,10 px/m: **0,99 → 1,11 m** (constante en metros) |
+
+`advertencias` **no** tumba nada: recoge lo que limita la medida (sin red, sin
+banda que medir, plazo agotado).
+
+### Lo que este guion deja al checklist humano (§8)
+
+Si el cajón **estorba** sobre la ortofoto aunque quepa; si la sombra de la
+diferencia **se entiende** sin leyenda; si la banda discontinua se lee como
+referencia y no como «carril bueno»; y el punto BLOQUEANTE: si alguna cifra o
+algún color **se lee como un veredicto** sin que el texto lo diga.

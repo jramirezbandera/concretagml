@@ -58,23 +58,49 @@ describe('viewer/_comun · frontera de vista (proyección UTM ↔ lat/lon)', () 
 })
 
 describe('viewer/_comun · constantes de dominio', () => {
-  it('PANES tiene zIndex creciente oficial < editada < acotaciones < vertices', () => {
+  it('PANES tiene zIndex creciente oficial < editada < acotaciones < diagnostico < vertices', () => {
     const z = Object.fromEntries(PANES.map((p) => [p.nombre, p.zIndex]))
     expect(z[PANE.PARCELA_OFICIAL]).toBeLessThan(z[PANE.PARCELA_EDITADA])
     // Las acotaciones (F06, T3.2) van SOBRE la geometría editada —un rótulo
     // debajo del relleno no se lee— y BAJO los vértices —el vértice es lo que se
     // agarra, y una etiqueta encima invitaría a apuntar al sitio equivocado—.
     expect(z[PANE.PARCELA_EDITADA]).toBeLessThan(z[PANE.ACOTACIONES])
-    expect(z[PANE.ACOTACIONES]).toBeLessThan(z[PANE.VERTICES])
+    // El diagnóstico (F07, T1.3) va SOBRE las acotaciones —también es una
+    // anotación que EXPLICA la geometría, no la geometría en sí— y sigue BAJO
+    // los vértices por el mismo motivo que las acotaciones: F06 sigue activo
+    // con el diagnóstico abierto (diagnosticar → corregir el lindero → volver a
+    // diagnosticar) y el vértice tiene que seguir siendo lo que se agarra.
+    expect(z[PANE.ACOTACIONES]).toBeLessThan(z[PANE.DIAGNOSTICO])
+    expect(z[PANE.DIAGNOSTICO]).toBeLessThan(z[PANE.VERTICES])
     // Entre overlayPane (400) y markerPane (600) de Leaflet.
     for (const p of PANES) {
       expect(p.zIndex).toBeGreaterThan(400)
       expect(p.zIndex).toBeLessThan(600)
     }
     // El orden del array ES el zIndex creciente: `viewer/mapa.js` lo itera tal
-    // cual, así que una entrada nueva mal colocada rompería el apilado.
+    // cual, así que una entrada nueva mal colocada rompería el apilado. Se exige
+    // ESTRICTAMENTE creciente (no solo no-decreciente): dos panes con el mismo
+    // zIndex dejarían el apilado entre ellos a merced del orden de inserción en
+    // el DOM, no de una decisión explícita.
     const zIndices = PANES.map((p) => p.zIndex)
-    expect([...zIndices].sort((a, b) => a - b)).toEqual(zIndices)
+    const estrictamenteCreciente = zIndices.every(
+      (v, i) => i === 0 || v > zIndices[i - 1],
+    )
+    expect(estrictamenteCreciente).toBe(true)
+  })
+
+  it('PANE.DIAGNOSTICO existe y su zIndex (428) cae entre acotaciones (425) y vertices (430)', () => {
+    // F07, T1.3: el pane nuevo del diagnóstico de encaje. 428 y no, por ejemplo,
+    // 426 o 429: cualquier valor estrictamente entre 425 y 430 cumple el
+    // contrato de apilado; lo que este test fija es el HUECO, no el dígito
+    // exacto — pero comprueba también la cifra real para que un cambio
+    // accidental (p. ej. escribir 425 dos veces) no pase desapercibido.
+    expect(PANE.DIAGNOSTICO).toBe('diagnostico')
+    const entrada = PANES.find((p) => p.nombre === PANE.DIAGNOSTICO)
+    expect(entrada).toBeDefined()
+    expect(entrada.zIndex).toBe(428)
+    expect(entrada.zIndex).toBeGreaterThan(425)
+    expect(entrada.zIndex).toBeLessThan(430)
   })
 
   it('la geometría del usuario es amarillo #FFD600 (revisión visual de la Fase 5)', () => {

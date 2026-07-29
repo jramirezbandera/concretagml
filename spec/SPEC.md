@@ -178,7 +178,7 @@ Orden de construcción (= orden de fases del plan §18, decisión de la entrevis
 |---|---|---|---|---|---|
 | P5 | [F05 · Catastro en vivo](feature-05-catastro-vivo.md) | Cliente WFS, carga por RC editable, geocodificación, deducción de RC, colindantes, caché. | F00, F03 | Medio (anti-bloqueo) | ✅ hecho · ⏳ arrastra la firma humana de F03 |
 | P6 | [F06 · Edición parcela](feature-06-edicion-parcela.md) | Arrastrar/insertar/eliminar, edición numérica, offset de lindero, snap, acotaciones en vivo. | F03, F05 | Medio (offset/snap) | ✅ código y pruebas (2.894/69) · ⏳ **firma humana** · ⚠️ `edit/dibujo.js` **diferido a F12**; el presupuesto de altura del panel **se cerró el 2026-07-29** llevando las herramientas a una barra sobre el mapa (tabla de vértices: 64 → 303 px) |
-| P7 | [F07 · Diagnóstico parcela](feature-07-diagnostico-parcela.md) | Métricas de encaje, comparación a tres bandas, representación. **Sin umbrales.** | F05, F06 | Medio | — el siguiente |
+| P7 | [F07 · Diagnóstico parcela](feature-07-diagnostico-parcela.md) | Métricas de encaje, comparación a tres bandas, representación. **Sin umbrales.** | F05, F06 | Medio | ✅ código y pruebas (3.312/80) · ⏳ **firma humana** (checklist §8) · cajón flotante sobre el mapa: abrirlo no le quita ni un píxel al panel (el único coste de F07 son los ~36 px del CTA del pie, medidos); ni una dependencia nueva (la diferencia sombreada es el `fillRule:'evenodd'` de Leaflet); la desviación se redefinió POR LADO contra el contorno oficial entero (spec M2) y el filtro de astillas es de GROSOR, no de área (spec M4) |
 | P8 | [F08 · Comprobar GML existente](feature-08-comprobar-gml.md) | Recorrido corto: cargar GML ajeno → validar fichero → diagnóstico. | F04, F07 | Bajo | — |
 | P9 | [F09 · Informe parcela](feature-09-informe-parcela.md) | Canvas propio a 300 ppp (Receta A), jsPDF, descripción literaria, firma. | F07 | **Alto** (plano 300 ppp) | — |
 | P10 | [F10 · Persistencia y exportación](feature-10-persistencia-export.md) | IndexedDB (expedientes), autoguardado, exportación DXF. | F04 | Bajo | — |
@@ -187,8 +187,9 @@ Orden de construcción (= orden de fases del plan §18, decisión de la entrevis
 > `scripts/smoke-navegador/CHECKLIST-HUMANO.md` recoge lo que **ninguna máquina de
 > este proyecto puede firmar**: gestos con un ratón de verdad, teclado, el fallo de
 > red provocado a mano y el juicio visual. Bloquea el cierre formal de **F03 → F05 →
-> F06** en cadena. Que la suite esté verde y el build limpio **no cierra una fase**
-> por sí solo (§6.2 y §6.3 son necesarios, no suficientes).
+> F06 → F07** en cadena (la §8, de F07, añade el punto BLOQUEANTE de si alguna cifra
+> o color se lee como un veredicto). Que la suite esté verde y el build limpio **no
+> cierra una fase** por sí solo (§6.2 y §6.3 son necesarios, no suficientes).
 
 ### Bloque C — Edificio (baja prioridad, capítulo posterior)
 
@@ -223,7 +224,7 @@ Orden de construcción (= orden de fases del plan §18, decisión de la entrevis
 | F04 | `gml/serialize-cp.js`, `gml/parse.js`, `test/fixtures/gml/` |
 | F05 | `services/catastro.js`, `storage/cache-catastro.js` |
 | F06 | ⛔ *Actualizado 2026-07-28 al terminar la fase, y 2026-07-29 al cerrar la deuda del panel; eran tres y son bastantes más.* `edit/snap.js`, `edit/offset.js`, `edit/vertices.js`, `edit/metricas.js`, `edit/_comun.js`, `geo/segmento.js`, `geo/metrica.js`, `config/operativos.js`, `viewer/edicion.js`, `viewer/acotaciones.js`, `viewer/barra-edicion.js` (+ `edit/historial.js#reiniciar`, `viewer/index.js`, `viewer/sincronizacion.js`, `app/main.js#cablearEdicion`, `app/cableado-catastro.js`). ~~`edit/dibujo.js` (base)~~ **NO se hizo: diferido entero a F12** |
-| F07 | `diagnostico/parcela.js` |
+| F07 | ⛔ *Actualizado 2026-07-29 al terminar la fase; era uno y son once.* `diagnostico/parcela.js` (orquestador), `diagnostico/topologia.js` (único con Turf), `diagnostico/desviacion.js`, `diagnostico/bandas.js`, `diagnostico/margen.js` (BOE, enuncia y no compara), `diagnostico/_comun.js`, `geo/poligono.js`, `geo/centroide.js`, `viewer/contraste.js`, `viewer/cajon-diagnostico.js`, `app/cableado-diagnostico.js` (+ `viewer/index.js#diagnostico`, `viewer/_comun.js#PANE.DIAGNOSTICO`, `validation/_comun.js` re-exporta, `config/operativos.*` 3 claves, `index.html` CTA, `app/main.js` paso 8) |
 | F08 | `gml/parse.js` (entrada ajena), recorrido corto en `viewer/` |
 | F09 | `report/canvas.js`, `report/literal.js`, `report/pdf-parcela.js` |
 | F10 | `storage/` (expedientes), `export/dxf.js` |

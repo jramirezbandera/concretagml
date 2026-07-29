@@ -30,6 +30,15 @@
 //     mientras el mapa sigue en pie.
 //   · la ATOMICIDAD cuando la edición falla a mitad del ensamblaje.
 //
+// Y desde F07 · T4.1, la OPCIÓN `diagnostico`, por el mismo motivo:
+//   · `diagnostico:false` (el defecto) ⇒ el visor de antes de F07 EXACTO: ni un
+//     control, ni una capa, ni un listener de más, y `visor.diagnostico` a `null`.
+//   · `diagnostico:true|{…}` ⇒ el cajón (CERRADO) y la capa (VACÍA) montados, con
+//     sus dos opciones llegando a su destinatario.
+//   · que las dos opciones son INDEPENDIENTES: diagnosticar sobre una parcela que
+//     se está editando es el caso normal, no una combinación exótica.
+//   · el desmontaje —el diagnóstico es el PRIMERO en caer— y la atomicidad.
+//
 // Proyecto Vitest `dom` (jsdom): el sufijo `.dom.test.js` lo enruta ahí, porque
 // `viewer/index.js` arrastra Leaflet. NINGUNA petición real de red: jsdom no
 // descarga imágenes, y `load`/`error` se emiten a mano con `dispararCarga`.
@@ -42,6 +51,7 @@ import { NIVEL, PANE, crearEstadoVista, vertUTMaLatLng } from '../../viewer/_com
 import { BASE_POR_DEFECTO, ID_CAPA, maxZoomNativo, CAPAS } from '../../viewer/capas.js'
 import { ATRIBUCION } from '../../viewer/atribucion.js'
 import { CLASE_ACOTACION, textoDeLongitud } from '../../viewer/acotaciones.js'
+import { CLASE as CLASE_CAJON, SELECTOR as SELECTOR_CAJON } from '../../viewer/cajon-diagnostico.js'
 import { MENSAJES } from '../../viewer/wms-catastro.js'
 import { sincronizar } from '../../viewer/sincronizacion.js'
 import { OPERATIVOS } from '../../config/operativos.js'
@@ -217,6 +227,66 @@ function anotarDestruccion(obj, nombre, orden, antes) {
     if (antes) antes()
     real()
   }
+}
+
+/** El nodo del cajón del diagnóstico dentro del contenedor del mapa, o `null`. */
+const cajonDe = (contenedor) => contenedor.querySelector(`.${CLASE_CAJON.CONTENEDOR}`)
+
+/**
+ * Las capas que el contraste ha puesto en el mapa. Se filtran POR PANE y no por
+ * clase de Leaflet: el contraste dibuja polígonos y polilíneas —y la capa de
+ * edición también—, así que `instanceof L.Polygon` mezclaría las dos. El pane es
+ * lo que las distingue de verdad, y además es lo que gobierna el apilado.
+ *
+ * ⚠️ Y se excluye el RENDERIZADOR: al dibujar el primer trazo en un pane, Leaflet
+ * crea un `L.SVG` **para ese pane** y lo añade al mapa como una capa más, así que
+ * el filtro por pane lo recogería. No lo pone el contraste y no lo quita
+ * `limpiar()`. Ver `test/viewer/contraste.dom.test.js`, donde esto costó siete
+ * pruebas en rojo.
+ */
+function capasDeDiagnostico(mapa) {
+  const out = []
+  mapa.eachLayer((capa) => {
+    if (capa instanceof L.Renderer) return
+    if (capa.options && capa.options.pane === PANE.DIAGNOSTICO) out.push(capa)
+  })
+  return out
+}
+
+/**
+ * Un diagnóstico MÍNIMO con la forma que consumen el cajón y la capa. No sale de
+ * `diagnosticar()` a propósito: aquí se prueba el ENSAMBLAJE, y hacer pasar los
+ * tests del visor por el orquestador los ataría a sus cifras. Lo que se afirma es
+ * que lo que entra por `visor.diagnostico` llega a las dos piezas.
+ */
+function diagnosticoMinimo() {
+  return {
+    superficie: { medida: 300, catastral: 298, registral: null, oficial: 298 },
+    perimetro: { medido: 70, oficial: 70 },
+    bandas: { valores: {}, cruces: [] },
+    solape: null,
+    diferencia: null,
+    centroides: null,
+    desviacion: null,
+    invasion: { consultado: false, invasiones: [], descartadas: [] },
+    margen: null,
+    omisiones: [],
+    saltados: [],
+  }
+}
+
+/**
+ * Un `desviacion` cuyo segmento medido→oficial mide 4 m, DERIVADO del primer
+ * vértice de la parcela que se le pase. Cuatro metros y no los 40 cm del caso real
+ * porque aquí lo que se prueba es el umbral en píxeles: hace falta un segmento que
+ * lo supere holgadamente a cualquier encuadre razonable.
+ */
+function desviacionDeCuatroMetros(parcela) {
+  const [x, y] = parcela.recintos[0].vertices[0]
+  const maxima = { recinto: 0, indice: 0, maxima: 4, en: [x, y], enOficial: [x, y + 4] }
+  // `maxima` es LA MISMA entrada de `porLado` (identidad, no copia): es el contrato
+  // de `diagnostico/desviacion.js` y el fixture no puede contradecirlo.
+  return { porLado: [maxima], maxima, nMuestras: 1 }
 }
 
 /**
@@ -1093,5 +1163,325 @@ describe('crearVisor · destruir con edición: orden inverso e idempotencia', ()
     expect(cotasDe(contenedor)).toHaveLength(0)
     expect(() => visor.edicion.insertarEn({ lat: 40, lng: -3 })).not.toThrow()
     expect(visor.edicion.insertarEn({ lat: 40, lng: -3 }).aplicado).toBe(false)
+  })
+})
+
+// ── F07 · T4.1 — la opción `diagnostico` ─────────────────────────────────────
+
+describe('crearVisor · diagnostico:false (el DEFECTO) es el visor de antes de F07', () => {
+  it('no monta nada: visor.diagnostico vale null, NO undefined', () => {
+    const { visor, contenedor } = abrirVisor()
+
+    expect(visor.diagnostico).toBeNull()
+    // Misma distinción que con `edicion`: la propiedad EXISTE y vale null, así que
+    // «no montado» y «se me ha olvidado devolverlo» no se confunden.
+    expect('diagnostico' in visor).toBe(true)
+
+    expect(cajonDe(contenedor)).toBeNull()
+    expect(capasDeDiagnostico(visor.mapa)).toHaveLength(0)
+  })
+
+  it('`diagnostico: false` explícito se comporta igual que no pasarlo', () => {
+    const { visor, contenedor } = abrirVisor({ diagnostico: false })
+    expect(visor.diagnostico).toBeNull()
+    expect(cajonDe(contenedor)).toBeNull()
+  })
+
+  it('el pane del diagnóstico EXISTE igualmente: lo crea el mapa, no la opción', () => {
+    // Un pane vacío no cuesta nada y `crearMapa` los crea todos iterando `PANES`.
+    // Se afirma para que quede claro que «hay pane» no significa «hay diagnóstico»
+    // — el discriminante de `capasDeDiagnostico` no valdría nada si lo fuera.
+    const { visor } = abrirVisor()
+    expect(visor.mapa.getPane(PANE.DIAGNOSTICO)).toBeTruthy()
+    expect(capasDeDiagnostico(visor.mapa)).toHaveLength(0)
+  })
+})
+
+describe('crearVisor · diagnostico:true monta las dos piezas, INERTES', () => {
+  it('devuelve las dos juntas, con su API completa', () => {
+    const { visor } = abrirVisor({ diagnostico: true })
+
+    expect(visor.diagnostico).not.toBeNull()
+    for (const metodo of [
+      'pintar',
+      'abrir',
+      'cerrar',
+      'abierto',
+      'registral',
+      'clase',
+      'estado',
+      'alCambiar',
+      'alCerrar',
+      'destruir',
+    ]) {
+      expect(typeof visor.diagnostico.cajon[metodo], `falta cajon.${metodo}`).toBe('function')
+    }
+    for (const metodo of ['pintar', 'limpiar', 'destruir']) {
+      expect(typeof visor.diagnostico.contraste[metodo], `falta contraste.${metodo}`).toBe(
+        'function',
+      )
+    }
+  })
+
+  it('el cajón está en el DOM pero CERRADO, y la capa vacía: montar no es diagnosticar', () => {
+    const { visor, contenedor } = abrirVisor({ diagnostico: true })
+
+    const cajon = cajonDe(contenedor)
+    expect(cajon).not.toBeNull()
+    // Los nodos del CONTRATO con `app/cableado-diagnostico.js` ya están, que es la
+    // razón de montarlo aquí y no en la app: cuando `crearVisor` devuelve, el
+    // cableado puede resolverlos por selector.
+    for (const selector of Object.values(SELECTOR_CAJON)) {
+      expect(cajon.querySelector(selector), `falta ${selector}`).not.toBeNull()
+    }
+
+    // Y sin embargo NO se ve, ni hay nada pintado sobre el mapa. Un visor que se
+    // abriera solo taparía el mapa con un cajón que nadie ha pedido.
+    expect(visor.diagnostico.cajon.abierto()).toBe(false)
+    expect(cajon.style.display).toBe('none')
+    expect(capasDeDiagnostico(visor.mapa)).toHaveLength(0)
+  })
+
+  it('el arranque con diagnóstico NO deja ni un aviso espurio', () => {
+    // Regresión del paso 5: el contraste se suscribe a `zoomend moveend` con el
+    // mapa AÚN SIN VISTA, y el encuadre del paso 6 dispara los dos. Si su repintado
+    // no saliera por la puerta de atrás mientras no le han pintado nada, mediría en
+    // píxeles sobre un mapa sin vista y avisaría en CADA arranque.
+    const alAvisar = vi.fn()
+    abrirVisor({ diagnostico: true, alAvisar })
+    expect(alAvisar).not.toHaveBeenCalled()
+  })
+
+  it('CON DIAGNÓSTICO, el ENCUADRE sigue siendo el último paso: UNA sola petición al WMS', () => {
+    const espia = espiarPeticionesDeEsteTest()
+    abrirVisor({ diagnostico: true, baseInicial: ID_CAPA.CATASTRO })
+    expect(espia.total).toBe(1)
+  })
+
+  it('lo que se pinta por `visor.diagnostico` llega a las DOS piezas', () => {
+    const { visor, contenedor, parcela } = abrirVisor({ diagnostico: true })
+    const { cajon, contraste } = visor.diagnostico
+
+    cajon.abrir()
+    cajon.pintar(diagnosticoMinimo())
+    contraste.pintar(diagnosticoMinimo(), {
+      recintos: parcela.recintos,
+      geometriaOficial: parcela.recintos,
+    })
+
+    expect(cajonDe(contenedor).style.display).not.toBe('none')
+    expect(cajonDe(contenedor).querySelector(SELECTOR_CAJON.TITULAR).textContent).toContain('300')
+    // La diferencia simétrica es UN polígono con los anillos de las dos geometrías
+    // (`fillRule:'evenodd'`), así que aquí hay capa aunque las dos coincidan.
+    expect(capasDeDiagnostico(visor.mapa).length).toBeGreaterThan(0)
+  })
+})
+
+describe('crearVisor · las opciones de `diagnostico` llegan a su destinatario', () => {
+  it('sin opciones, el cajón va a la ÚNICA esquina libre (bottomleft)', () => {
+    const { visor, contenedor } = abrirVisor({ diagnostico: true })
+    expect(visor.diagnostico.cajon.control.getPosition()).toBe('bottomleft')
+    // Y de verdad cuelga de esa esquina del mapa, no de cualquier sitio del DOM.
+    expect(
+      contenedor
+        .querySelector('.leaflet-bottom.leaflet-left')
+        .querySelector(`.${CLASE_CAJON.CONTENEDOR}`),
+    ).not.toBeNull()
+  })
+
+  it('`posicion` llega a crearCajonDiagnostico', () => {
+    const { visor, contenedor } = abrirVisor({ diagnostico: { posicion: 'topright' } })
+    expect(visor.diagnostico.cajon.control.getPosition()).toBe('topright')
+    expect(
+      contenedor
+        .querySelector('.leaflet-top.leaflet-right')
+        .querySelector(`.${CLASE_CAJON.CONTENEDOR}`),
+    ).not.toBeNull()
+  })
+
+  it('`minimoPx` llega a crearContraste (se mide en si la cota se rotula o no)', () => {
+    // Mismo criterio que con `edicion.minimoPx`: el umbral no se puede leer de la
+    // API, así que se mide por su efecto. Con 0 se rotula la cota de la desviación
+    // máxima; con un umbral enorme, no. En los dos casos el resalte del lado SÍ se
+    // dibuja: lo que el umbral filtra es el RÓTULO, no el hallazgo.
+    // El rótulo es un `L.divIcon` sobre un marcador (mismo recurso que las cotas
+    // de F06); la línea guía y el resalte son polilíneas.
+    const rotulosDe = (mapa) => capasDeDiagnostico(mapa).filter((capa) => capa instanceof L.Marker)
+
+    const conRotulo = abrirVisor({ diagnostico: { minimoPx: 0 } })
+    conRotulo.visor.diagnostico.contraste.pintar(
+      { ...diagnosticoMinimo(), desviacion: desviacionDeCuatroMetros(conRotulo.parcela) },
+      { recintos: conRotulo.parcela.recintos, geometriaOficial: null },
+    )
+
+    const sinRotulo = abrirVisor({ diagnostico: { minimoPx: 1e6 } })
+    sinRotulo.visor.diagnostico.contraste.pintar(
+      { ...diagnosticoMinimo(), desviacion: desviacionDeCuatroMetros(sinRotulo.parcela) },
+      { recintos: sinRotulo.parcela.recintos, geometriaOficial: null },
+    )
+
+    expect(rotulosDe(conRotulo.visor.mapa)).toHaveLength(1)
+    expect(rotulosDe(sinRotulo.visor.mapa)).toHaveLength(0)
+    // El hallazgo se sigue señalando en el mapa en los dos casos.
+    expect(capasDeDiagnostico(sinRotulo.visor.mapa).length).toBeGreaterThan(0)
+  })
+
+  it('una clave DESCONOCIDA en `diagnostico` es TypeError y no monta nada', () => {
+    const { contenedor, tablaEl } = prepararDOM()
+    const base = { estado: crearEstadoVista(parcelaConHueco()), tablaEl, srs: SRS_DEMO }
+
+    let error = null
+    try {
+      crearVisor(contenedor, { ...base, diagnostico: { posicón: 'topright' } })
+    } catch (e) {
+      error = e
+    }
+
+    expect(error).toBeInstanceOf(TypeError)
+    expect(error.message).toContain('posicón')
+    expect(error.message).toContain('posicion')
+    // Y el mensaje nombra la vía correcta para lo que la lista cerrada excluye.
+    expect(error.message).toContain('colindantes')
+    expect(contenedor.children).toHaveLength(0)
+  })
+
+  it('`diagnostico` que no es booleano ni objeto es TypeError, sin montar nada', () => {
+    const { contenedor, tablaEl } = prepararDOM()
+    const base = { estado: crearEstadoVista(parcelaConHueco()), tablaEl, srs: SRS_DEMO }
+
+    for (const diagnostico of ['si', 1, null, [], () => {}]) {
+      expect(() => crearVisor(contenedor, { ...base, diagnostico })).toThrow(TypeError)
+    }
+    expect(contenedor.children).toHaveLength(0)
+  })
+
+  it('una `posicion` que no es esquina de Leaflet lanza, y no deja el cajón montado', () => {
+    const { contenedor, tablaEl } = prepararDOM()
+
+    expect(() =>
+      crearVisor(contenedor, {
+        estado: crearEstadoVista(parcelaConHueco()),
+        tablaEl,
+        srs: SRS_DEMO,
+        diagnostico: { posicion: 'centro' },
+      }),
+    ).toThrow(RangeError)
+
+    expect(contenedor.children).toHaveLength(0)
+    expect(document.querySelector(`.${CLASE_CAJON.CONTENEDOR}`)).toBeNull()
+  })
+
+  it('un fallo del contraste (minimoPx negativo) arrastra al cajón YA montado', () => {
+    // El punto medio que este test vigila: el cajón se monta primero, así que
+    // cuando `crearContraste` lanza hay un control vivo en el mapa. O cae todo, o
+    // queda un cajón huérfano en un contenedor que el llamante cree vacío.
+    const { contenedor, tablaEl } = prepararDOM()
+
+    expect(() =>
+      crearVisor(contenedor, {
+        estado: crearEstadoVista(parcelaConHueco()),
+        tablaEl,
+        srs: SRS_DEMO,
+        diagnostico: { minimoPx: -1 },
+      }),
+    ).toThrow(TypeError)
+
+    expect(contenedor.children).toHaveLength(0)
+    expect(document.querySelector(`.${CLASE_CAJON.CONTENEDOR}`)).toBeNull()
+  })
+})
+
+describe('crearVisor · `edicion` y `diagnostico` son INDEPENDIENTES', () => {
+  it('las dos a la vez: es el caso NORMAL de F07, no una combinación exótica', () => {
+    // El JSDoc de `edicion` llegó a decir que «el diagnóstico de F07» era un visor
+    // de solo lectura. Era falso, y este test es lo que impide que vuelva a serlo:
+    // se diagnostica SOBRE la parcela que se está editando.
+    const { visor, contenedor } = abrirVisor({ edicion: true, diagnostico: true })
+
+    expect(visor.edicion).not.toBeNull()
+    expect(visor.diagnostico).not.toBeNull()
+    expect(cajonDe(contenedor)).not.toBeNull()
+    expect(cotasDe(contenedor).length).toBeGreaterThan(0)
+    // La barra de edición (topleft) y el cajón (bottomleft) no se pelean por la
+    // esquina: es exactamente por lo que el cajón va abajo.
+    expect(contenedor.querySelector('.leaflet-top.leaflet-left').children.length).toBeGreaterThan(0)
+  })
+
+  it('diagnóstico SIN edición: un visor de solo lectura que sí diagnostica', () => {
+    const { visor } = abrirVisor({ diagnostico: true })
+    expect(visor.edicion).toBeNull()
+    expect(visor.diagnostico).not.toBeNull()
+    // Y conserva el zoom por doble clic, que es lo que `crearEdicion` apaga.
+    expect(visor.mapa.doubleClickZoom.enabled()).toBe(true)
+  })
+
+  it('el diagnóstico NO le pone ganchos a sincronizar (por eso va DESPUÉS)', () => {
+    // Es la justificación del orden del paso 5, afirmada: si algún día el
+    // diagnóstico necesitara medir durante el arrastre, este test caería y con él
+    // el motivo escrito en la cabecera.
+    abrirVisor({ diagnostico: true })
+    const args = argumentosDeSincronizar()
+
+    expect(args.ajustar).toBeNull()
+    expect(args.alPrevisualizar).toBeNull()
+    expect(args.alCrearMarcador).toBeNull()
+  })
+})
+
+describe('crearVisor · destruir con diagnóstico', () => {
+  it('el diagnóstico es el PRIMERO en caer, con el mapa todavía en pie', () => {
+    const { contenedor, visor } = abrirVisor({ edicion: true, diagnostico: true })
+
+    const orden = []
+    let alTocarleAlContraste = null
+
+    anotarDestruccion(visor.diagnostico.contraste, 'contraste', orden, () => {
+      alTocarleAlContraste = {
+        mapaAunEnPie: contenedor.querySelector('.leaflet-map-pane') !== null,
+        cajonAunPuesto: cajonDe(contenedor) !== null,
+      }
+    })
+    anotarDestruccion(visor.diagnostico.cajon, 'cajon', orden)
+    anotarDestruccion(visor.edicion, 'edicion', orden)
+    anotarDestruccion(visor.acotaciones, 'acotaciones', orden)
+    anotarDestruccion(visor.capas, 'capas', orden)
+
+    visor.destruir()
+
+    // Dentro del bloque de F07 el orden también es el inverso del montaje: primero
+    // el contraste (el último apilado), luego el cajón.
+    expect(orden).toEqual(['contraste', 'cajon', 'edicion', 'acotaciones', 'capas'])
+    expect(alTocarleAlContraste).toEqual({ mapaAunEnPie: true, cajonAunPuesto: true })
+    expect(cajonDe(contenedor)).toBeNull()
+    expect(contenedor.children).toHaveLength(0)
+  })
+
+  it('tras destruir no queda ni el cajón ni una capa del contraste', () => {
+    const { visor, contenedor, parcela } = abrirVisor({ diagnostico: true })
+    visor.diagnostico.cajon.abrir()
+    visor.diagnostico.contraste.pintar(diagnosticoMinimo(), {
+      recintos: parcela.recintos,
+      geometriaOficial: parcela.recintos,
+    })
+    expect(capasDeDiagnostico(visor.mapa).length).toBeGreaterThan(0)
+
+    visor.destruir()
+
+    expect(cajonDe(contenedor)).toBeNull()
+    expect(document.querySelector(`.${CLASE_CAJON.CONTENEDOR}`)).toBeNull()
+  })
+
+  it('es IDEMPOTENTE: cada pieza del diagnóstico se desmonta UNA sola vez', () => {
+    const { visor } = abrirVisor({ diagnostico: true })
+
+    const orden = []
+    anotarDestruccion(visor.diagnostico.contraste, 'contraste', orden)
+    anotarDestruccion(visor.diagnostico.cajon, 'cajon', orden)
+
+    visor.destruir()
+    expect(() => visor.destruir()).not.toThrow()
+    expect(() => visor.destruir()).not.toThrow()
+
+    expect(orden).toEqual(['contraste', 'cajon'])
   })
 })

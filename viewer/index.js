@@ -10,7 +10,7 @@
 //   1. `crearMapa`     — el `L.Map` con `zoomSnap:0`, `maxZoom` alto, los panes
 //                        del visor, la barra de escala métrica y el control de
 //                        atribución blindado. El mapa nace SIN VISTA a propósito
-//                        (ver punto 5).
+//                        (ver punto 6).
 //   2. `montarCapas`   — las cinco bases + la superpuesta, el control de capas y
 //                        el de opacidad. Va DESPUÉS del mapa porque necesita el
 //                        `maxZoom` del mapa para subir el tope de las teseladas.
@@ -35,7 +35,24 @@
 //                        recibe los ganchos del paso 3 — o los TRES en `null`,
 //                        que es el visor de F03 EXACTO (`edicion:false`, el
 //                        defecto).
-//   5. ENCUADRE        — el ÚLTIMO paso, y no por casualidad. Leaflet difiere el
+//   5. DIAGNÓSTICO (F07) — `crearCajonDiagnostico` + `crearContraste`, y SOLO si
+//                        el llamante ha pedido `opciones.diagnostico`. Va DESPUÉS
+//                        de `sincronizar` y no antes, al revés que la edición, y
+//                        la asimetría tiene una razón concreta: el diagnóstico NO
+//                        entrega ningún gancho a `sincronizar` — no dibuja durante
+//                        el arrastre ni mide en cada frame. Lo pinta el cableado
+//                        de la app cuando el store cierra una operación, que es
+//                        una vez por gesto acabado y no sesenta veces por segundo.
+//                        Al no haber dependencia, manda el orden natural: primero
+//                        la geometría, después la anotación que la comenta. Lo que
+//                        sí es obligatorio es que vaya ANTES del encuadre, y por
+//                        partida doble: para que el ensamblaje siga siendo atómico
+//                        (el `throw` del encuadre mudo tiene que llevarse por
+//                        delante también el cajón) y porque el cajón es un control
+//                        del mapa que `app/cableado-diagnostico.js` resuelve por
+//                        selector — cuando `crearVisor` devuelve, sus nodos ya
+//                        tienen que estar en el documento.
+//   6. ENCUADRE        — el ÚLTIMO paso, y no por casualidad. Leaflet difiere el
 //                        `onAdd` de toda capa hasta que el mapa tiene vista
 //                        (`Map#addLayer` → `whenReady`), así que encuadrar al
 //                        final significa que la capa WMS del Catastro emite su
@@ -43,9 +60,9 @@
 //                        petición, no una para un encuadre intermedio y otra
 //                        para el bueno (criterio de aceptación 2).
 //
-// `destruir()` deshace exactamente eso EN ORDEN INVERSO (sincronización →
-// edición → acotaciones → capas → mapa) y es IDEMPOTENTE. Ese orden tampoco es
-// decorativo: `crearEdicion` APAGA el `doubleClickZoom` del mapa mientras vive
+// `destruir()` deshace exactamente eso EN ORDEN INVERSO (diagnóstico →
+// sincronización → edición → acotaciones → capas → mapa) y es IDEMPOTENTE. Ese
+// orden tampoco es decorativo: `crearEdicion` APAGA el `doubleClickZoom` mientras vive
 // —el doble clic inserta un vértice— y lo restaura al destruirse, así que tiene
 // que desmontarse con el mapa todavía en pie. Y si algo falla A MITAD del
 // ensamblaje —el `throw` del encuadre mudo, el del tope de zoom y el de una
@@ -132,6 +149,8 @@ import { husoPorSrs } from '../geo/huso.js'
 import { resolverAvisar, validarVistaInicial, vertUTMaLatLng, NIVEL } from './_comun.js'
 import { crearAcotaciones } from './acotaciones.js'
 import { crearBarraEdicion } from './barra-edicion.js'
+import { crearCajonDiagnostico } from './cajon-diagnostico.js'
+import { crearContraste } from './contraste.js'
 import { crearEdicion } from './edicion.js'
 import { crearMapa } from './mapa.js'
 import { montarCapas } from './capas.js'
@@ -264,6 +283,63 @@ function normalizarEdicion(edicion) {
   }
   // La barra se monta salvo que la quiten a mano (ver {@link BARRA_POR_DEFECTO}).
   return { barra: BARRA_POR_DEFECTO, ...edicion }
+}
+
+/**
+ * Claves que admite `opciones.diagnostico` cuando viene como objeto. **Lista
+ * cerrada**, por el mismo motivo que {@link CLAVES_EDICION}: aquí no hay ningún
+ * destinatario al que reenviar lo desconocido, así que `diagnostico:{posicón:…}`
+ * —con la errata— montaría el cajón en la esquina por defecto y nadie sabría por
+ * qué. Son las dos únicas opciones que las dos piezas de F07 aceptan.
+ *
+ * Lo que deliberadamente NO está: las COLINDANTES, la superficie registral y la
+ * clase de suelo. Las tres son DATOS del expediente, no configuración del visor,
+ * y ninguna existe cuando el visor se monta: las colindantes llegan del WFS y las
+ * otras dos las teclea el usuario en el propio cajón. Su camino es
+ * `visor.diagnostico.cajon.pintar(diagnosticar(...))`, y solo ese.
+ */
+const CLAVES_DIAGNOSTICO = Object.freeze(['posicion', 'minimoPx'])
+
+/**
+ * Normaliza `opciones.diagnostico` a «no montar» (`null`) o al objeto de opciones
+ * con el que se montan las dos piezas de F07.
+ *
+ * Es un gemelo de {@link normalizarEdicion} y NO se ha factorizado con él a un
+ * `normalizarOpcionCompuesta(valor, claves, nombre)`: los dos mensajes de error
+ * dicen cosas distintas —cada uno nombra la vía correcta para lo que su lista
+ * cerrada excluye, que es la mitad de su valor— y el defecto de `edicion` es un
+ * objeto (`{barra:true}`) mientras que el de aquí es el vacío. Lo común serían
+ * cuatro líneas de forma; lo distinto es todo lo que se lee.
+ *
+ * @param {*} diagnostico
+ * @returns {{posicion?: string, minimoPx?: number}|null}
+ * @throws {TypeError}  Contrato del programador.
+ */
+function normalizarDiagnostico(diagnostico) {
+  if (diagnostico === undefined || diagnostico === false) return null
+  if (diagnostico === true) return {}
+
+  if (diagnostico === null || typeof diagnostico !== 'object' || Array.isArray(diagnostico)) {
+    throw new TypeError(
+      `crearVisor: 'opciones.diagnostico' debe ser un booleano, un objeto de opciones ` +
+        `{${CLAVES_DIAGNOSTICO.join(', ')}} o undefined; recibido ` +
+        `${Array.isArray(diagnostico) ? 'un array' : JSON.stringify(diagnostico) || typeof diagnostico}.`,
+    )
+  }
+
+  const desconocidas = Object.keys(diagnostico).filter(
+    (clave) => !CLAVES_DIAGNOSTICO.includes(clave),
+  )
+  if (desconocidas.length > 0) {
+    throw new TypeError(
+      `crearVisor: 'opciones.diagnostico' no conoce ${desconocidas.map((c) => `'${c}'`).join(', ')}. ` +
+        `Las únicas claves admitidas son: ${CLAVES_DIAGNOSTICO.join(', ')}. Los datos del ` +
+        `expediente (colindantes, superficie registral, clase de suelo) no se pasan aquí: no ` +
+        `existen cuando se monta el visor. Se pintan con ` +
+        `visor.diagnostico.cajon.pintar(diagnosticar({...})).`,
+    )
+  }
+  return { ...diagnostico }
 }
 
 /**
@@ -458,9 +534,16 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  * @property {import('./acotaciones.js').Acotaciones|null} acotaciones  La capa de
  *   cotas de F06, o **`null`** por el mismo motivo. Se monta y se desmonta con la
  *   edición: son las dos mitades de la misma opción.
+ * @property {{cajon: ReturnType<typeof crearCajonDiagnostico>,
+ *   contraste: ReturnType<typeof crearContraste>}|null} diagnostico  Las dos
+ *   piezas de F07, o **`null`** si el visor se montó sin ellas (mismo criterio que
+ *   `edicion`: `null` es una respuesta, `undefined` sería un olvido). Van juntas en
+ *   un objeto y no como dos propiedades hermanas porque son inseparables —el cajón
+ *   dice las cifras y la capa señala DÓNDE están en el mapa; una sin la otra es
+ *   media función— y porque así `if (visor.diagnostico)` es una sola pregunta.
  * @property {() => void} destruir  Deshace TODO el ensamblaje en orden inverso
- *   (sincronización → edición → acotaciones → capas → mapa). IDEMPOTENTE:
- *   llamarlo dos veces no lanza.
+ *   (diagnóstico → sincronización → edición → acotaciones → capas → mapa).
+ *   IDEMPOTENTE: llamarlo dos veces no lanza.
  */
 
 /**
@@ -546,9 +629,16 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  *
  *   · **`false` (el DEFECTO) ⇒ el visor de F03 EXACTO.** No se monta nada, los
  *     tres ganchos de `sincronizar` van en `null` y `visor.edicion` /
- *     `visor.acotaciones` valen `null`. Un visor de solo lectura (el diagnóstico
- *     de F07, el plano de F09) no debe pagar ni un marcador de más ni, sobre
- *     todo, quedarse sin el zoom por doble clic, que `crearEdicion` apaga.
+ *     `visor.acotaciones` valen `null`. Un visor de solo lectura (el plano de F09)
+ *     no debe pagar ni un marcador de más ni, sobre todo, quedarse sin el zoom por
+ *     doble clic, que `crearEdicion` apaga.
+ *
+ *     (Aquí decía «el diagnóstico de F07» como segundo ejemplo de visor de solo
+ *     lectura, y **era falso**: F07 se monta ENCIMA de la edición, con la parcela
+ *     viva y el cajón recalculando en cada operación del store. Se corrige en vez
+ *     de borrarse porque la suposición es fácil de volver a hacer: `diagnostico` y
+ *     `edicion` son opciones INDEPENDIENTES y su combinación normal es las dos a la
+ *     vez, no una u otra.)
  *   · **`true`** ⇒ se montan con todos sus valores por defecto.
  *   · **objeto** ⇒ igual, con estas TRES claves y ninguna más (una clave
  *     desconocida es `TypeError`, ver {@link CLAVES_EDICION}):
@@ -579,16 +669,36 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  *   NO garantiza es que el otro consumidor llegue a ejecutarse, y eso se resuelve
  *   pintando las cotas ANTES. Un `alPrevisualizar` que revienta no se lleva por
  *   delante ni el repintado de las cotas ni el gesto.
+ * @param {boolean|{posicion?: string, minimoPx?: number}} [opciones.diagnostico=false]
+ *   Monta las dos piezas de F07: el CAJÓN de cifras (`viewer/cajon-diagnostico.js`)
+ *   y la capa de CONTRASTE sobre el mapa (`viewer/contraste.js`).
+ *
+ *   · **`false` (el DEFECTO) ⇒ el visor de antes de F07, sin un control ni un
+ *     listener de más.** `visor.diagnostico` vale `null`.
+ *   · **`true`** ⇒ las dos, con sus defectos.
+ *   · **objeto** ⇒ igual, con estas DOS claves y ninguna más (una desconocida es
+ *     `TypeError`, ver {@link CLAVES_DIAGNOSTICO}):
+ *       - `posicion` → esquina del cajón (defecto `'bottomleft'`, **la única libre**:
+ *         ver el JSDoc de `crearCajonDiagnostico`).
+ *       - `minimoPx` → longitud mínima en PANTALLA para rotular la cota de la
+ *         desviación máxima (defecto `OPERATIVOS.cotaDiagnosticoMinimaPx`).
+ *
+ *   El cajón nace CERRADO y la capa VACÍA: montar el diagnóstico no diagnostica
+ *   nada. Quien lo abre y le da las cifras es `app/cableado-diagnostico.js`, cuando
+ *   el usuario pulsa «Diagnosticar». Un visor que se abriera solo taparía el mapa
+ *   con un cajón que nadie ha pedido.
  * @returns {Visor}
  * @throws {TypeError}  Contrato del programador: `opciones` no es un objeto,
  *   `estado` no es el store, `vistaInicial` malformada, `srs` no es un string
  *   (desde `husoPorSrs`), `contenedor`/`tablaEl` no son elementos del DOM (desde
- *   `crearMapa`/`sincronizar`), `edicion` que no es booleano ni objeto,
- *   `alPrevisualizar` que no es función, o **no hay ni geometría ni
+ *   `crearMapa`/`sincronizar`), `edicion` o `diagnostico` que no son booleano ni
+ *   objeto, `alPrevisualizar` que no es función, o **no hay ni geometría ni
  *   `vistaInicial`**.
  * @throws {RangeError}  `srs` no soportado (desde `husoPorSrs`), `baseInicial`
  *   inexistente (desde `montarCapas`), `maxZoom` que no supera el zoom nativo
- *   de las capas montadas, o `edicion.tolerancia` negativa (desde `crearEdicion`).
+ *   de las capas montadas, `edicion.tolerancia` negativa (desde `crearEdicion`) o
+ *   `diagnostico.posicion` que no es una esquina de Leaflet (desde
+ *   `crearCajonDiagnostico`).
  */
 export function crearVisor(contenedor, opciones = {}) {
   if (opciones === null || typeof opciones !== 'object') {
@@ -609,6 +719,7 @@ export function crearVisor(contenedor, opciones = {}) {
     posicionOpacidad,
     maxZoom,
     edicion: opcionEdicion = false,
+    diagnostico: opcionDiagnostico = false,
     alPrevisualizar,
     ...opcionesMapa
   } = opciones
@@ -632,6 +743,7 @@ export function crearVisor(contenedor, opciones = {}) {
   // `null` = no montar edición. Lanza ANTES de montar nada si la opción no tiene
   // forma: una opción malformada es un bug del llamante lo montemos o no.
   const opcionesEdicion = normalizarEdicion(opcionEdicion)
+  const opcionesDiagnostico = normalizarDiagnostico(opcionDiagnostico)
   // Misma política que `resolverAvisar` y que los tres ganchos de `sincronizar`:
   // "no me han pasado nada" es legítimo (cae a `null`); "me han pasado basura
   // donde iba una función" es contrato roto, y eso aquí es `throw`.
@@ -757,7 +869,35 @@ export function crearVisor(contenedor, opciones = {}) {
     })
     deshacer.push(() => sincronizacion.destruir())
 
-    // 5 · El encuadre, lo ÚLTIMO del MONTAJE (ver cabecera: así la capa WMS del
+    // 5 · Las dos piezas de F07. Nacen INERTES —el cajón cerrado y la capa sin
+    // nada puesto— y eso es lo que las hace seguras aquí, con el mapa todavía sin
+    // vista: `crearContraste` solo se suscribe a `zoomend moveend`, y su repintado
+    // sale por la puerta de atrás mientras no le hayan pintado nada. El encuadre
+    // del paso 6 dispara esos dos eventos y no pasa nada, que es justo lo que las
+    // acotaciones de F06 NO podían garantizar (por eso ellas necesitan el puente
+    // mudo y estas no).
+    /** @type {{cajon: object, contraste: object}|null} */
+    let diagnostico = null
+    if (opcionesDiagnostico !== null) {
+      const cajon = crearCajonDiagnostico({
+        mapa,
+        posicion: opcionesDiagnostico.posicion,
+        alAvisar: avisar,
+      })
+      deshacer.push(() => cajon.destruir())
+
+      const contraste = crearContraste({
+        mapa,
+        zona,
+        minimoPx: opcionesDiagnostico.minimoPx,
+        alAvisar: avisar,
+      })
+      deshacer.push(() => contraste.destruir())
+
+      diagnostico = { cajon, contraste }
+    }
+
+    // 6 · El encuadre, lo ÚLTIMO del MONTAJE (ver cabecera: así la capa WMS del
     // Catastro pide UNA sola imagen, y del encuadre bueno).
     encuadrar({ mapa, estado, zona, vistaInicial, avisar })
 
@@ -778,6 +918,7 @@ export function crearVisor(contenedor, opciones = {}) {
       capas,
       edicion,
       acotaciones,
+      diagnostico,
       destruir() {
         if (destruido) return
         destruido = true

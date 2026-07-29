@@ -1,5 +1,5 @@
 {
-  "_nota": "Tolerancias OPERATIVAS de F02 (validación) y F06 (edición): decisiones de INGENIERÍA (regla de oro 9), no umbrales-veredicto. La app MIDE y SEÑALA, no juzga. `config/umbrales.json` está PROHIBIDO. Distancias/áreas en unidades SI (metros, m²); ángulos en grados; las claves con sufijo `Px` van en píxeles de pantalla y se documentan como tales. El porqué de cada cifra está en el JSDoc de `config/operativos.js` (el JSON no admite comentarios).",
+  "_nota": "Tolerancias OPERATIVAS de F02 (validación), F06 (edición) y F07 (diagnóstico de encaje): decisiones de INGENIERÍA (regla de oro 9), no umbrales-veredicto. La app MIDE y SEÑALA, no juzga. `config/umbrales.json` está PROHIBIDO. Distancias/áreas en unidades SI (metros, m²); ángulos en grados; las claves con sufijo `Px` van en píxeles de pantalla y se documentan como tales. El margen oficial de identidad (±0,50 m urbana / ±2,00 m rústica, ≤5%, BOE-A-2020-12111) NO vive aquí: es una cifra de una norma publicada, no una tolerancia de ingeniería nuestra — vive en `diagnostico/margen.js` con su cita al lado. El porqué de cada cifra está en el JSDoc de `config/operativos.js` (el JSON no admite comentarios).",
   "duplicadoMetros": 0.001,
   "segmentoCortoMetros": 0.05,
   "colinealidadGrados": 179.9,
@@ -9,5 +9,8 @@
   "snapMetros": 0.2,
   "senoMinimoOffset": 0.01,
   "miterLimiteFactor": 4,
-  "acotacionMinimaPx": 44
+  "acotacionMinimaPx": 44,
+  "pasoDesviacionMetros": 0.3,
+  "grosorInvasionMinimoM": 0.001,
+  "cotaDiagnosticoMinimaPx": 12
 }

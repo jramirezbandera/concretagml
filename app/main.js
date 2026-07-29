@@ -30,7 +30,9 @@
 //                   arranque. Hasta F05 daba igual y estaba la sexta.
 //   5. VISOR      — `crearVisor(...)` de `../viewer/index.js`. Monta mapa +
 //                   capas + tabla de vértices, la EDICIÓN de F06 (`edicion:` y su
-//                   capa de acotaciones) y encuadra sobre la geometría.
+//                   capa de acotaciones), el DIAGNÓSTICO de F07 (`diagnostico:`,
+//                   el cajón y la capa de contraste, los dos inertes hasta que
+//                   los cablee el paso 8) y encuadra sobre la geometría.
 //   6. EDICIÓN    — `cablearEdicion(...)` (F06, tarea T5.1): deshacer/rehacer con
 //                   sus atajos, la casilla y la tolerancia del snap, el offset y
 //                   el renglón `[data-estado="edicion"]`. Va DESPUÉS del visor
@@ -44,7 +46,20 @@
 //                   la referencia), y ANTES del GML porque traer una parcela
 //                   hace `estado.set` y de ese store sale el estado del botón
 //                   «Generar GML».
-//   8. GML        — `cablearGeneracionGml(...)` (F04, tarea T6.1). Va EL ÚLTIMO
+//   8. DIAGNÓSTICO— `cablearDiagnostico(...)` de `./cableado-diagnostico.js`
+//                   (F07, tarea T5.1): el CTA «Diagnosticar encaje», el cajón
+//                   sobre el mapa y la capa de contraste. Va DESPUÉS del visor
+//                   (le consume `visor.diagnostico`) y DESPUÉS del Catastro
+//                   (para pedirle las colindantes de la invasión), que son sus
+//                   dos dependencias. Y va ANTES del GML por lo mismo que la
+//                   ficha: es una vista más del expediente, y el paso 9 es el
+//                   que cierra el recorrido.
+//                   ⚠️ Fuera del `try` del Catastro y sin `try` propio, como la
+//                   edición: si el cliente del Catastro no se ha podido montar
+//                   se diagnostica IGUAL —ocho de las nueve medidas no dependen
+//                   de la red— y lo único que se pierde es la invasión, que el
+//                   cajón dice en voz alta que no ha consultado.
+//   9. GML        — `cablearGeneracionGml(...)` (F04, tarea T6.1). Va EL ÚLTIMO
 //                   porque necesita las dos piezas anteriores: el store (de él
 //                   sale la geometría que se serializa, y de sus notificaciones
 //                   el estado del botón) y el panel (es donde se publican las
@@ -294,11 +309,13 @@
 // contenedor), así que se comprueba con
 // `const e = document.getElementById('mapa'); [e.clientWidth, e.clientHeight]`.
 //
-// ── POR QUÉ NO HAY BOTÓN «DIAGNOSTICAR» ────────────────────────────────────
-// La maqueta de diseño lleva un CTA que abre el diagnóstico de F07. F07 no
-// existe todavía, y un botón deshabilitado es UI muerta: promete una función que
-// nadie puede usar y hay que acordarse de encenderla. Cuando F07 exista, se
-// añade entonces.
+// ── EL BOTÓN «DIAGNOSTICAR» YA EXISTE (F07, 2026-07-29) ─────────────────────
+// Aquí había un párrafo explicando por qué NO estaba: la maqueta lo llevaba, F07
+// no existía, y un botón deshabilitado era UI muerta. Ya no aplica — el CTA está
+// en el pie de `index.html` y lo cablea el paso 8—, pero la regla que lo escribió
+// sigue en pie y por eso queda anotada: el botón nace `disabled` **y con el motivo
+// escrito al lado**, que es la diferencia entre un botón apagado y un botón muerto.
+// Ver `app/cableado-diagnostico.js#MOTIVO_SIN_OFICIAL`.
 
 import 'leaflet/dist/leaflet.css'
 
@@ -332,6 +349,7 @@ import {
   SELECTOR_ESTADO_CATASTRO,
   cablearCatastro,
 } from './cableado-catastro.js'
+import { cablearDiagnostico } from './cableado-diagnostico.js'
 import {
   AVISO_DEMO_HUECO_SINTETICO,
   SRS_DEMO,
@@ -1053,6 +1071,16 @@ const visor = crearVisor(nodo('#mapa'), {
   // que es lo que ata los 20 cm del campo a estos 0,2 m POR CONSTRUCCIÓN y no
   // por casualidad.
   edicion: { tolerancia: OPERATIVOS.snapMetros },
+  // ── F07 · el diagnóstico, montado (que no es lo mismo que abierto) ───────
+  // `true` y no un objeto: las dos claves que admite —`posicion` y `minimoPx`—
+  // valen aquí exactamente lo que sus defectos, y escribirlas sería fingir una
+  // decisión que no se ha tomado. El cajón nace CERRADO y la capa VACÍA; quien
+  // los abre y les da cifras es el paso 8, cuando el usuario pulsa el CTA.
+  //
+  // Ojo a la combinación: `edicion` y `diagnostico` a la vez es el caso NORMAL de
+  // F07, no una rareza. Se diagnostica SOBRE la parcela que se está editando, y
+  // por eso el cajón recalcula en cada operación del store.
+  diagnostico: true,
   // El canal EN VIVO de la ficha (criterio de aceptación 4). Es opción de PRIMER
   // NIVEL y no una clave de `edicion` porque medir mientras se arrastra no exige
   // poder insertar vértices ni enganchar al parcelario: son dos cosas distintas.
@@ -1572,6 +1600,20 @@ const edicionCableada = cablearEdicion({
 
 // ── 7 · El Catastro en vivo (F05 · T4A) ──────────────────────────────────────
 
+/**
+ * El cableado del Catastro, o `null` si no se ha podido montar. Vive FUERA del
+ * `try` —donde se le asigna— porque el paso 8 lo necesita y el `const` de dentro
+ * es de bloque.
+ *
+ * `null` no es un caso de excepción que haya que tapar: es lo que
+ * `cablearDiagnostico` entiende como «no hay a quién pedirle las vecinas», y lo
+ * dice en el renglón. Ocho de las nueve medidas del diagnóstico no dependen de la
+ * red, así que perder la novena no puede llevarse por delante las otras ocho.
+ *
+ * @type {ReturnType<typeof cablearCatastro>|null}
+ */
+let catastroCableado = null
+
 try {
   // El transporte es el único que toca la red: cola de 2, timeout, backoff con
   // jitter. Su `alAvisar` es EL MISMO panel que todo lo demás (decisión 1).
@@ -1624,6 +1666,7 @@ try {
     // Los seis nodos del bloque los localiza él con los selectores de su
     // contrato, y LANZA nombrándolos si `index.html` ha dejado de traerlos.
   })
+  catastroCableado = catastro
 
   // ── F06 · las vecinas, cuando el usuario las pide ───────────────────────
   // El botón «Traer colindantes» lo cablea `cableado-catastro.js`; lo que hace
@@ -1674,7 +1717,48 @@ try {
   if (renglonCatastro !== null) renglonCatastro.textContent = MENSAJE_SIN_CATASTRO
 }
 
-// ── 8 · Generación del GML (F04 · T6.1) ──────────────────────────────────────
+// ── 8 · Diagnóstico de encaje (F07 · T5.1) ───────────────────────────────────
+
+// Es el TERCER suscriptor del store, y no recalcula nada de lo que ya calculan los
+// otros dos: la ficha del pie sigue con `edit/metricas.js` por el canal EN VIVO del
+// arrastre, y el cajón con `diagnostico/parcela.js` por el del store —una vez por
+// operación acabada—. Que las dos superficies coincidan es invariante, no
+// casualidad: las dos miden el mismo contorno con la misma fórmula de `geo/area.js`.
+//
+// ⚠️ El diagnóstico NO se engancha a `alPrevisualizar`. Ese canal se dispara en cada
+// FRAME del arrastre y detrás de `diagnosticar()` hay intersección topológica contra
+// el contorno oficial y contra cada vecina (~67 ms medidos sobre la parcela real):
+// colgarlo del frame convertiría un arrastre fluido en una presentación de
+// diapositivas, y para nada, porque el diagnóstico se lee al soltar. El razonamiento
+// entero está en la cabecera de `./cableado-diagnostico.js`.
+//
+// SIN `try`, igual que la edición del paso 6 y por lo mismo: lo único que puede
+// lanzar aquí es un contrato del programador (un nodo que `index.html` ya no trae, o
+// un visor montado sin `diagnostico: true`), y eso tiene que ser ruidoso en
+// desarrollo, no degradarse en silencio en producción. Lo que sí está previsto —que
+// el Catastro no se haya podido montar— no es una excepción: entra como `null`.
+cablearDiagnostico({
+  estado,
+  cajon: visor.diagnostico.cajon,
+  contraste: visor.diagnostico.contraste,
+  panel,
+  // Se comprueba la FORMA en vez de pasarlo a ciegas, por el mismo criterio que el
+  // puente de colindantes de F06 unas líneas más arriba: un cableado del Catastro
+  // incompleto no puede tumbar el diagnóstico entero, que es lo que haría el
+  // `throw` del contrato de `cablearDiagnostico`. Sin cliente se diagnostica igual
+  // y el renglón dice que las vecinas no se han consultado — que es exactamente lo
+  // que ha pasado.
+  catastro:
+    catastroCableado !== null &&
+    typeof catastroCableado.colindantes === 'function' &&
+    typeof catastroCableado.alColindantes === 'function'
+      ? catastroCableado
+      : null,
+  // Los dos nodos del CTA los localiza él con los selectores de su contrato, y
+  // LANZA nombrándolos si `index.html` ha dejado de traerlos.
+})
+
+// ── 9 · Generación del GML (F04 · T6.1) ──────────────────────────────────────
 
 /**
  * Referencia catastral REAL de una parcela, o `null` si no tiene.

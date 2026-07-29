@@ -532,8 +532,20 @@ body {
    fijos, así que esta cesión sigue haciendo falta y el problema de fondo sigue
    abierto (`spec/feature-06-edicion-parcela.md` §2: la solución de verdad es
    que la región de bloques entera ceda o scrollee). Lo que hay ahora es aire,
-   no una arquitectura nueva: el siguiente bloque que entre en el panel —F07
-   trae uno de diagnóstico— se lo vuelve a comer. */
+   no una arquitectura nueva: el siguiente bloque que entre en el panel se lo
+   vuelve a comer.
+
+   ── F07 NO SE LO COMIÓ (2026-07-29) ───────────────────────────────────────
+   Aquí decía que F07 «trae un bloque de diagnóstico» y que se comería este
+   aire. No lo hace: el diagnóstico se fue a un CAJÓN sobre el mapa
+   (`viewer/cajon-diagnostico.js`), por la misma puerta por la que se había ido
+   la edición y por dos motivos —el presupuesto de altura, y que un diagnóstico
+   se lee mirando el dibujo que comenta—. Lo único que F07 añade al panel son
+   los dos nodos del CTA en el pie, que es `flex:none` y ya tenía sitio.
+
+   Así que el aire de arriba SIGUE ahí, y la advertencia también: sigue siendo
+   verdad que el próximo bloque fijo se lo come. Esta nota no se borra porque
+   una predicción que no se cumplió es justo lo que hay que dejar escrito. */
 .gml-bloque--avisos {
   flex: 0 1 auto;
 }
@@ -1737,6 +1749,151 @@ body {
   margin-top: var(--space-1);
   padding: 0 2px;
   font-family: var(--font-sans);
+}
+
+/* ═══ El cajón del diagnóstico (F07) ═════════════════════════════════════════
+ *
+ * El cromo de `viewer/cajon-diagnostico.js`, un `L.Control` en la esquina inferior
+ * IZQUIERDA del mapa — la única libre (arriba a la izquierda, la barra de edición;
+ * arriba a la derecha, el control de capas; abajo a la derecha, la opacidad y la
+ * atribución).
+ *
+ * Vale palabra por palabra lo escrito para la barra de edición ahí arriba: el
+ * módulo fija EN LÍNEA fondo, padding, radio, `font`, `max-width`, `max-height` y
+ * `overflow-y` del contenedor porque tiene que ser legible sobre cualquier
+ * ortofoto aunque esta hoja no llegue; aquí NO se pelea con eso —este fichero
+ * tiene prohibida la marca de prioridad—, se COMPLETA lo que falta y se viste a
+ * los HIJOS, que sí se pueden apuntar. Y la tipografía se declara en cada hijo
+ * porque lo que heredan del `font` en línea lo pisa cualquier regla que los
+ * apunte a ellos.
+ *
+ * ── ⚠️ NINGÚN `display` EN `.gml-cajon-diagnostico` ─────────────────────────
+ * Es la MISMA trampa que los desplegables de la barra, con otro mecanismo. El
+ * cajón se abre y se cierra conmutando su `style.display` EN LÍNEA entre `'none'`
+ * y `''` — y `''` significa «que decida la hoja». Un `display` aquí funcionaría
+ * hoy y sería una bomba de relojería: la primera regla responsive que quisiera
+ * ocultarlo pondría `display:none` sobre el mismo selector, el módulo lo
+ * «abriría» dejando el inline en `''`, y el cajón no aparecería nunca sin que
+ * nada avisara. El `<section>` es un bloque y su contenido se maqueta con
+ * márgenes; no hace falta más.
+ *
+ * ── EL ANCHO SE FIJA POR ABAJO, NO POR ARRIBA ───────────────────────────────
+ * El `max-width: min(420px, 42vw)` es del módulo y no se toca. Lo que falta es el
+ * suelo: la tabla de cruces tiene tres columnas de cifras y por debajo de ~300 px
+ * los encabezados se parten en dos líneas cada uno. `min-width` no está declarado
+ * en línea, así que se puede poner desde aquí sin pelear con nada. En pantallas
+ * estrechas manda el `42vw` del módulo (min-width por debajo de max-width en el
+ * algoritmo de CSS solo gana si el max es menor, y aquí lo acotamos con el mismo
+ * `min()` para no forzar scroll horizontal en el mapa).
+ *
+ * @see viewer/cajon-diagnostico.js  CLASE y SELECTOR: los nombres son contrato.
+ * @see index.html                    Por qué el diagnóstico NO es un bloque del panel.
+ */
+
+/* El contenedor. Solo lo que el módulo NO fija en línea — las mismas dos
+   propiedades que `.gml-barra-edicion` y `.leaflet-control-layers`, para que el
+   cajón se lea como cromo del mapa y no como una ventana ajena. */
+.gml-app .gml-cajon-diagnostico {
+  min-width: min(300px, 42vw);
+  border: 1px solid var(--color-border-main);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
+  background-clip: padding-box;
+}
+
+/* El titular. El módulo le fija tamaño, peso y color; lo que falta es la familia
+   y que no se pegue al botón de cerrar cuando ocupa dos líneas. */
+.gml-app .gml-cajon-titular {
+  font-family: var(--font-sans);
+  text-wrap: balance;
+}
+
+/* Los rótulos de las dos rejillas (`<dt>`): el gris secundario del sistema, para
+   que la vista salte a la cifra y no al nombre de la cifra.
+
+   UN solo selector, y alcanza a las dos: la rejilla de las bandas es un `<dl>`
+   DENTRO de un `.gml-cajon-seccion`, y la de las métricas es ella misma un
+   `dl.gml-cajon-seccion`. El descendiente cubre los dos casos. */
+.gml-app .gml-cajon-seccion dt {
+  font-family: var(--font-sans);
+  color: var(--color-text-secondary);
+}
+
+/* ── TODA cifra en mono con cifras tabulares ─────────────────────────────────
+ * No es adorno: es la regla tipográfica del sistema (la misma `.gml-mono` del
+ * panel), y aquí carga más que en ningún otro sitio. Las tres bandas se leen en
+ * COLUMNA y se comparan entre sí; con cifras proporcionales, «1.538,99» y
+ * «1.601,00» no alinean la coma y la comparación hay que hacerla leyendo en vez
+ * de mirando. `.gml-mono` no se puede reutilizar tal cual porque estos nodos los
+ * fabrica el módulo, que no conoce las clases de esta hoja. */
+.gml-app .gml-cajon-cifra,
+.gml-app .gml-cajon-tabla td {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  color: var(--color-text-primary);
+}
+
+/* La tabla de los tres cruces. El módulo fija `border-collapse`, ancho y tamaño;
+   aquí, la separación entre filas y la familia de los encabezados. */
+.gml-app .gml-cajon-tabla th {
+  font-family: var(--font-sans);
+  font-weight: var(--fw-medium);
+}
+
+.gml-app .gml-cajon-tabla tbody tr + tr td,
+.gml-app .gml-cajon-tabla tbody tr + tr th {
+  border-top: 1px solid var(--color-border-sub);
+}
+
+/* ── La sección de invasión ──────────────────────────────────────────────────
+ * ⚠️ AQUÍ NO SE DECLARA NINGÚN `color`. El ámbar (#92400E) lo pone el módulo EN
+ * LÍNEA, y solo sobre los nodos que de verdad reportan una invasión — es la
+ * ÚNICA excepción que la regla de oro 9 admite (spec §10.4: la app mide, no
+ * dictamina, salvo cuando lo medido es que se está pisando a un vecino). Un
+ * `color` sobre `.gml-cajon-invasion` alcanzaría también al «no se ha
+ * consultado» y al «ninguna», y teñir de alarma un «no lo sé» sería justo el
+ * juicio de valor que la regla prohíbe.
+ *
+ * Lo que sí se hace es separarla del bloque de arriba con una línea: es la
+ * sección que hay que encontrar de un vistazo. */
+.gml-app .gml-cajon-invasion {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border-sub);
+  font-family: var(--font-sans);
+}
+
+.gml-app .gml-cajon-invasion li {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* El renglón del margen de identidad. El módulo le fija tamaño y gris; falta la
+   familia y que no se estire más de lo legible. */
+.gml-app .gml-cajon-margen {
+  font-family: var(--font-sans);
+  max-width: 46ch;
+}
+
+/* Los dos campos que el usuario rellena (registral y clase de suelo). El módulo
+   les fija borde y padding para que sean usables sin esta hoja; lo que falta es
+   que la tipografía sea la de la app y no la que el navegador da a los controles
+   de formulario, que en Windows es otra familia y otro tamaño. */
+.gml-app .gml-cajon-diagnostico label {
+  font-family: var(--font-sans);
+  color: var(--color-text-secondary);
+}
+
+.gml-app .gml-cajon-diagnostico input,
+.gml-app .gml-cajon-diagnostico select {
+  font-family: var(--font-sans);
+  font-size: var(--text-12);
+  color: var(--color-text-primary);
+  background: var(--color-bg-primary);
+}
+
+.gml-app .gml-cajon-diagnostico input {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ═══ Movimiento reducido ════════════════════════════════════════════════════

@@ -87,6 +87,11 @@ describe('config/operativos.json · contenido y regla de oro 9', () => {
     'maxVertices',
   ]
   const CLAVES_F06 = ['snapMetros', 'senoMinimoOffset', 'miterLimiteFactor', 'acotacionMinimaPx']
+  const CLAVES_F07 = [
+    'pasoDesviacionMetros',
+    'grosorInvasionMinimoM',
+    'cotaDiagnosticoMinimaPx',
+  ]
 
   it('conserva intactas las tolerancias de F02 (la extracción no cambió ninguna cifra)', () => {
     expect(OPERATIVOS.duplicadoMetros).toBe(0.001)
@@ -123,6 +128,66 @@ describe('config/operativos.json · contenido y regla de oro 9', () => {
     expect(theta).toBeCloseTo(28.96, 1)
   })
 
+  it('añade las tres tolerancias de F07 con sus valores especificados', () => {
+    expect(OPERATIVOS.pasoDesviacionMetros).toBe(0.3)
+    expect(OPERATIVOS.grosorInvasionMinimoM).toBe(0.001)
+    expect(OPERATIVOS.cotaDiagnosticoMinimaPx).toBe(12)
+  })
+
+  it('`pasoDesviacionMetros` da del orden de 100 muestras en un lado de ~30 m', () => {
+    // El criterio explícito de la tarea: ni 3 muestras (se saltaría el punto de
+    // desviación máxima) ni un paso tan fino que dispare el coste del muestreo
+    // sobre ≤500 vértices contra el contorno oficial completo.
+    const muestrasLado30m = 30 / OPERATIVOS.pasoDesviacionMetros
+    expect(muestrasLado30m).toBeGreaterThanOrEqual(50)
+    expect(muestrasLado30m).toBeLessThanOrEqual(200)
+  })
+
+  it('el patrón `duplicadoMetros² = areaNulaM2` sigue en pie (era casualidad implícita)', () => {
+    // `duplicadoMetros` (10⁻³ m, «dos puntos más juntos que esto son el mismo
+    // punto») elevado al cuadrado da EXACTAMENTE `areaNulaM2`, el suelo de ruido de
+    // float64. Estaba así desde F02 sin que nada lo dijera; este test lo convierte
+    // en patrón vigilado, para que nadie cambie una cifra sin la otra.
+    expect(OPERATIVOS.duplicadoMetros ** 2).toBeCloseTo(OPERATIVOS.areaNulaM2, 12)
+  })
+
+  it('`grosorInvasionMinimoM` ES `duplicadoMetros`, y no por casualidad', () => {
+    // ⛔ ESTA CLAVE SUSTITUYE A `areaInvasionMinimaM2` (10⁻⁴ m²), que vivió medio
+    // día y la medición refutó (2026-07-29). Aquella se calibró elevando al cuadrado
+    // el paso de cuantización del WFS —(10⁻² m)² = 10⁻⁴ m²—, lo que supone la
+    // astilla CUADRADA. Medida sobre el fixture real, la astilla es una AGUJA: área
+    // ≈ ½·L·δ, que crece con la LONGITUD del lindero compartido. Resultado: las dos
+    // astillas reales (1,23 y 3,77 cm²) SUPERABAN el umbral y la parcela oficial
+    // «invadía» a dos colindantes oficiales sin que nadie tocara un vértice.
+    //
+    // El grosor no depende de L, y su valor no se inventa: una pieza más delgada que
+    // la distancia a la que consideramos dos puntos el mismo punto está entre dos
+    // linderos que consideramos el mismo lindero.
+    expect(OPERATIVOS.grosorInvasionMinimoM).toBe(OPERATIVOS.duplicadoMetros)
+
+    // Y queda muy por debajo de cualquier invasión que un técnico revisaría: una
+    // franja de 5 cm de fondo tiene mil veces este grosor.
+    expect(OPERATIVOS.grosorInvasionMinimoM).toBeLessThan(0.05)
+  })
+
+  it('no queda ni rastro de `areaInvasionMinimaM2`: una cifra refutada no se deja de adorno', () => {
+    // Config muerta es peor que config ausente: quien la encuentre supondrá que
+    // alguien la usa. Su historia está escrita en el JSDoc de la clave que la
+    // sustituyó, que es donde sirve de algo.
+    expect(OPERATIVOS.areaInvasionMinimaM2).toBeUndefined()
+    expect(Object.keys(OPERATIVOS)).not.toContain('areaInvasionMinimaM2')
+  })
+
+  it('`cotaDiagnosticoMinimaPx` es MENOR que `acotacionMinimaPx`: no necesita que quepa el texto', () => {
+    // La cota de diagnóstico lleva línea guía (SPEC feature-07, «Representación»):
+    // el rótulo puede ir donde haya hueco, así que el suelo de 44 px —pensado
+    // para que el NÚMERO quepa EN LÍNEA entre los extremos del lado— no aplica.
+    // Lo que queda es un suelo puramente perceptivo: que el segmento señalado
+    // sea un hueco real, no un punto.
+    expect(OPERATIVOS.cotaDiagnosticoMinimaPx).toBeLessThan(OPERATIVOS.acotacionMinimaPx)
+    expect(OPERATIVOS.cotaDiagnosticoMinimaPx).toBeGreaterThan(0)
+  })
+
   it('todas las claves son números finitos y positivos (salvo `_nota`)', () => {
     for (const [k, v] of Object.entries(OPERATIVOS)) {
       if (k === '_nota') {
@@ -134,16 +199,27 @@ describe('config/operativos.json · contenido y regla de oro 9', () => {
     }
   })
 
-  it('no hay claves de más ni de menos: solo F02 + F06 + `_nota`', () => {
+  it('no hay claves de más ni de menos: solo F02 + F06 + F07 + `_nota`', () => {
     expect(Object.keys(OPERATIVOS).sort()).toEqual(
-      ['_nota', ...CLAVES_F02, ...CLAVES_F06].sort(),
+      ['_nota', ...CLAVES_F02, ...CLAVES_F06, ...CLAVES_F07].sort(),
     )
   })
 
-  it('la `_nota` dice de qué fases son las tolerancias, y ya son dos', () => {
+  it('la `_nota` dice de qué fases son las tolerancias, y ya son tres', () => {
     expect(OPERATIVOS._nota).toMatch(/F02/)
     expect(OPERATIVOS._nota).toMatch(/F06/)
+    expect(OPERATIVOS._nota).toMatch(/F07/)
     expect(OPERATIVOS._nota).toMatch(/INGENIER[IÍ]A/i)
+  })
+
+  it('la `_nota` deja escrito que el margen oficial de identidad NO vive aquí', () => {
+    // Regla de oro 9 + el override de F07: el margen ±0,5 m urbana / ±2 m
+    // rústica (BOE-A-2020-12111) es una cifra de una norma publicada, no una
+    // tolerancia de ingeniería de este proyecto. Que quede escrito en la
+    // `_nota` es lo que evita que alguien la añada aquí «para tenerlas todas
+    // juntas» y la convierta, sin querer, en un umbral configurable.
+    expect(OPERATIVOS._nota).toMatch(/margen/i)
+    expect(OPERATIVOS._nota).toMatch(/diagnostico\/margen\.js/)
   })
 
   it('`config/umbrales.json` NO existe y sigue PROHIBIDO (regla de oro 9)', () => {
