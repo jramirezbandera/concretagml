@@ -27,7 +27,8 @@
 // IMPORTANTE (decisión de review, Codex C1): este módulo NO importa Leaflet
 // (no usa `L.*`), por eso es seguro importarlo también bajo el proyecto Vitest
 // `node`. Sus dos únicos imports son `geo/utm.js` y `validation/_comun.js` (de
-// donde re-exporta `NIVEL`), ambos Leaflet-free — el segundo carga
+// donde re-exporta `NIVEL`), ambos Leaflet-free — el segundo arrastra, a través
+// de `config/operativos.js` (F06 extrajo ahí el cargador), un import de
 // `config/operativos.json` con `with { type: 'json' }`, comprobado en verde en
 // los dos proyectos. Los módulos que sí usan Leaflet (`services/ign`, `viewer/wms-catastro`,
 // `viewer/mapa`, `viewer/sincronizacion`) son SOLO-navegador y jamás deben
@@ -130,6 +131,7 @@ export const DENSIDAD_BASE_PX = 13
 export const PANE = Object.freeze({
   PARCELA_OFICIAL: 'parcelaOficial',
   PARCELA_EDITADA: 'parcelaEditada',
+  ACOTACIONES: 'acotaciones',
   VERTICES: 'vertices',
 })
 
@@ -138,11 +140,25 @@ export const PANE = Object.freeze({
  * geometría editada va sobre la oficial y los vértices SIEMPRE encima. Los
  * valores caen entre `overlayPane` (400) y `markerPane` (600) de Leaflet.
  *
+ * `acotaciones` (F06, T3.2) se intercala en **425**, y el sitio no es arbitrario:
+ *   · por ENCIMA de `parcelaEditada` (420) porque una cota es un rótulo SOBRE el
+ *     dibujo — debajo del relleno del polígono no se leería;
+ *   · por DEBAJO de `vertices` (430) porque el vértice es lo que se agarra. Si la
+ *     cota tapara al vértice, el usuario apuntaría a una etiqueta en vez de a la
+ *     esquina que quiere mover. (La cota además va `interactive:false`, así que
+ *     ni siquiera intercepta el puntero: el zIndex es la segunda línea de
+ *     defensa, no la única.)
+ *
+ * `viewer/mapa.js#crearMapa` ITERA esta lista para crear los panes, así que
+ * añadir una entrada aquí es todo lo que hace falta: ni ese módulo ni el arnés
+ * de test (`test/viewer/_ayuda-jsdom.js#crearPanes`) llevan nombres a mano.
+ *
  * @type {ReadonlyArray<{nombre:string, zIndex:number}>}
  */
 export const PANES = Object.freeze([
   { nombre: PANE.PARCELA_OFICIAL, zIndex: 410 },
   { nombre: PANE.PARCELA_EDITADA, zIndex: 420 },
+  { nombre: PANE.ACOTACIONES, zIndex: 425 },
   { nombre: PANE.VERTICES, zIndex: 430 },
 ])
 

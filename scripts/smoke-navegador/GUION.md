@@ -9,8 +9,9 @@ con la **maquinaria real de `L.Draggable`**.
 - **4D.1** (esta carpeta) escribió los guiones y los probó en seco.
 - **4D.2** es la ejecución oficial, con evidencia, siguiendo este documento.
 
-Cinco guiones de aceptación, un veredicto **serializable** cada uno
-(`{ok: boolean, …medidas}`), para que el resultado no dependa de interpretar prosa:
+Ocho guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
+para que el resultado no dependa de interpretar prosa. Siete son de aceptación;
+`05` es de diagnóstico (§11):
 
 | Guion | Criterio | Mide | Veredicto pasa si |
 |---|---|---|---|
@@ -21,6 +22,7 @@ Cinco guiones de aceptación, un veredicto **serializable** cada uno
 | `05-salto-zoom.js` | — | **diagnóstico**, no aceptación: mide frame a frame la transición de la imagen WMS al hacer zoom | ver §11 |
 | `06-generar-gml.js` | F04 · T7.2 | la cadena Blob → descarga: bytes UTF-8, `posList`, `areaValue` y estructura del GML que baja | `ok:true` |
 | `07-catastro-vivo.js` | F05 · T5C | **contra el servicio REAL**: CORS, IndexedDB de verdad y el recorrido entero (traer parcela · 2.ª consulta sin red · deducir la referencia) | `ok:true` |
+| `08-edicion.js` | F06 · 1 a 5 | la edición con `L.Draggable` real: snap a vértice y a lindero, `Alt`, cotas contra el zoom, offset, insertar/eliminar, undo/redo y su inhibición | `ok:true` |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
 spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
@@ -30,6 +32,13 @@ vuelve a su sitio»), y se conserva porque la corrección —el fundido de
 
 `06` es el primero que **no es de F03**: mide la generación del GML (F04) y va en
 su propia pasada, sobre página recién cargada. Ver §12.
+
+`08` es el de F06 y el más largo: conduce la EDICIÓN entera con gestos sintéticos
+—arrastrar con y sin enganche, seleccionar un lindero, desplazarlo, insertar,
+eliminar, deshacer y rehacer— y mide lo que solo existe con layout: píxeles,
+`getBoundingClientRect`, `L.Draggable`, hit-testing y el zoom de verdad. **No toca
+ningún servicio de datos.** Ver §14 **antes** de tocarlo: su medida del enganche
+depende de una decisión (teclear τ) que hay que entender para no leerla mal.
 
 `07` es de otra clase todavía: es el único guion de esta carpeta que **llama a un
 servicio de verdad**. Cubre F05 y existe porque hay tres cosas que ni Node ni
@@ -440,6 +449,19 @@ Este smoke **no es de una sola vez**:
   insertar/eliminar vértices, snap): `03-arrastre.js` mide justo esa maquinaria y
   hay que revalidarlo — en especial `marcador.reutilizado`, `filaReutilizada` y
   `cambios.numeroDeVertices`.
+  HECHO el **2026-07-28**: `03` sigue en `ok:true` con la edición montada.
+- **`08-edicion.js`, cuando cambie `viewer/edicion.js`, `viewer/acotaciones.js`,
+  `viewer/barra-edicion.js` o `cablearEdicion` (`app/main.js`).** ~~O el bloque
+  «Edición» de `index.html`~~: ese bloque ya no existe desde el 2026-07-29 — los
+  siete nodos los fabrica la barra, y G16 exige que no vuelvan al marcado. Es lo
+  único que prueba F06 con `L.Draggable`, layout y proyección reales: la suite
+  corre en jsdom, donde no hay píxeles y por tanto ni el filtro de las cotas ni el
+  hit-testing significan nada. Hay que repetirlo también si cambian `edit/snap.js`
+  (el guion deriva el desenlace del enganche de la política de `dianasDe`),
+  `edit/offset.js` (mide el desplazamiento real sobre la tabla y espera la
+  detección del guard de paralelismo en el panel), `OPERATIVOS.acotacionMinimaPx`
+  o `snapMetros`, o `app/demo-datos.js` (de ahí salen los 15 vértices y los
+  1.535,87 m² con los que comprueba que la página está recién cargada). Ver §14.
 - **`06-generar-gml.js`, cuando cambie `gml/serialize-cp.js`, `gml/descargar.js` o
   el cableado de `cablearGeneracionGml` en `app/main.js`.** Es lo único que prueba
   la cadena Blob → descarga en un navegador de verdad: la suite de F04 corre en
@@ -994,3 +1016,244 @@ vuelve **circular** (el registro se localiza precisamente por caer dentro). El
 guion lo marca con `punto.comprobacionVacua: true` y una advertencia, en vez de
 apuntarse una comprobación que no ha hecho — mismo criterio que
 `06.utf8.comprobacionVacua`.
+
+---
+
+## 14. `08-edicion.js` — la edición con `L.Draggable` real (F06 · T6.2)
+
+El guion de F06, y el más largo de la carpeta: conduce las cinco operaciones de la
+fase de punta a punta. Lee esta sección antes de tocarlo o de citarlo — la medida
+del enganche descansa en dos decisiones que hay que entender para no leerla mal.
+
+> ⚠️ **2026-07-29 · los controles se mudaron del panel al mapa.** Los siete nodos
+> que este guion conduce (`[data-campo="snap-tolerancia"]` y compañía) ya no salen
+> de `index.html`: los fabrica `viewer/barra-edicion.js`, la barra flotante que
+> `crearVisor` monta cuando `edicion.barra` (cierta por defecto). **Los selectores
+> NO han cambiado** —ese era el objetivo del traslado—, así que el guion sigue
+> valiendo tal cual y no hace falta abrir ningún desplegable para escribir en los
+> campos: existen siempre en el DOM y solo se ocultan con `hidden`. Lo que sí
+> cambió son dos cifras de referencia (abajo) y lo que mide el apartado 10.
+
+### Qué mide, y por qué NO lo mide la suite
+
+La suite (2.894 pruebas) ya cubre la geometría: que `desplazarLado` recalcule los
+contiguos, que `ajustar` priorice el vértice, que `insertarVertice` proyecte sobre
+el lado. **Aquí no se vuelve a medir nada de eso.** Lo que este guion añade es lo
+que solo existe con un navegador delante:
+
+1. **El snap con `L.Draggable` de verdad.** Tres arrastres sobre el vértice 1 del
+   EXTERIOR: enganche a **VÉRTICE** (la coordenada que acaba en la tabla es la del
+   vértice oficial, no la del puntero, y el marcador VUELVE a su píxel de partida),
+   enganche a **LINDERO** (la coordenada commiteada cae *sobre* la recta del
+   lindero oficial: producto vectorial ≈ 0) y **con `Alt`** (ni engancha ni pinta
+   indicador). El indicador `.gml-snap--vertice` / `.gml-snap--lindero` se cuenta
+   **fotograma a fotograma**.
+2. **Las cotas contra el zoom real.** El filtro de `viewer/acotaciones.js` es por
+   PÍXELES (`OPERATIVOS.acotacionMinimaPx` = 44), o sea que en jsdom no significa
+   nada. Se cuentan los rótulos visibles a tres escalas MEDIDAS y se exige que
+   suban al acercar, bajen al alejar y **vuelvan al mismo número** al deshacer el
+   zoom.
+3. **El offset sobre la pantalla**: se selecciona el lindero con un clic en el
+   punto medio real entre dos marcadores, se teclea la distancia, se pulsa, y se
+   mide sobre las coordenadas de la tabla **cuánto se ha movido de verdad**.
+4. **Insertar y eliminar** con doble clic y clic derecho, con sus dos
+   `preventDefault` (ni menú del navegador ni zoom) y con la escala del mapa
+   inalterada.
+5. **Undo/redo y su INHIBICIÓN**, que es lo que más fácil se rompe: `Ctrl+Z` con el
+   foco en el mapa deshace **y consume la tecla**; con el foco en una celda de
+   coordenada **no deshace y no la consume**. `defaultPrevented` es la única señal
+   observable de esa diferencia.
+6. **Las métricas en vivo**: superficie y perímetro leídos de la ficha en cada
+   fotograma de `drag`, **antes** del `mouseup`. Y al soltar, las dos cifras se
+   contrastan contra un shoelace y una suma de lados calculados dentro de la
+   página — segunda implementación independiente de `geo/area.js` y
+   `geo/metrica.js`, igual que hace `06` con el `areaValue`.
+
+Y dos **hit-tests reales** con `document.elementFromPoint`, que es lo más cerca que
+se puede estar de un puntero sin tenerlo: sobre el centro de un vértice responde su
+marcador (se comprueba por el `title`, y ojo: el icono es un `divIcon` y el nodo
+que devuelve el navegador es el `<span>` de dentro, así que se resuelve con
+`closest`), y sobre el punto medio de un lado responde el `<path>` **y no la
+cota** — que va `interactive:false` justo para eso.
+
+### ⚠️ Las dos decisiones que hay que entender antes de leer el veredicto
+
+**1 · El enganche se mide con τ tecleada a 300 cm, no con los 20 cm de
+producción.** A la escala de arranque (16,19 px/m, medida) 20 cm son **3,24 px**, y
+`MouseEvent.clientX` es un entero: la resolución del gesto (1 px ≈ 6 cm) es un
+tercio de la tolerancia, así que «enganchó» y «no enganchó» no se distinguirían de
+un redondeo. El guion escribe 300 en `[data-campo="snap-tolerancia"]` —lo que de
+paso ejercita en un navegador la conversión cm→m del campo, que es contrato de
+F06— y **restaura los 20 al terminar** (`restaurado.toleranciaEsLaDeArranque`). τ
+es un parámetro del MISMO camino de código: lo que aporta el navegador
+—`L.Draggable`, el re-ajuste del `dragend`, el indicador, la tecla— no depende de
+su valor, y el ajuste fino de τ es de `test/edit/snap.test.js`.
+
+**2 · La diana del enganche es la `geometriaOficial` de la parcela de
+demostración.** `app/demo-datos.js#parcelaDemo` carga el mismo anillo en `recintos`
+y en `geometriaOficial` —que es el estado real de una parcela recién traída del
+Catastro— y `edit/snap.js#dianasDe` documenta que **`excluir` no se aplica a
+`geometriaOficial`**: el vértice oficial sigue siendo diana legítima aunque se esté
+arrastrando su gemelo editable. La consecuencia («un desplazamiento menor que τ
+vuelve al sitio») la declara el propio módulo como lo que el snap SIGNIFICA. Eso da
+un desenlace binario y sin ambigüedad sin traer ni una parcela vecina — y por tanto
+**sin gastar ni una petición**.
+
+### Régimen de red: NINGUNA petición a los servicios de datos
+
+A diferencia de `07`, este guion **no habla con el WFS ni con el OVC**. El **snap a
+colindantes queda declarado como NO CUBIERTO** en el propio veredicto
+(`noCubierto`), porque traerlas cuesta una petición y manda el override O8 (§13).
+Lo único que sale a la red es la cartografía de fondo, que se repide sola al hacer
+zoom igual que en `01`, `02` y `05`. Se comprueba así:
+
+```bash
+$B network | grep -E "wfsCP|Consulta_RCCOOR"     # → sin resultados
+```
+
+### Cómo se lanza
+
+**Página recién cargada y sobre la parcela REAL** (sin `?demo=`). El guion lo
+comprueba él mismo (`paginaRecienCargada`, contra los 15 vértices y los 1.535,87 m²
+de arranque) y lo dice antes que nada si no se cumple:
+
+```bash
+$B viewport 1440x900
+$B goto http://localhost:PUERTO/concretagml/
+$B wait ".gml-tabla-vertices"
+$B console --clear
+$B eval scripts/smoke-navegador/08-edicion.js
+
+$B console --errors                              # → (no console errors)
+```
+
+Con `?demo=hueco` sale `ok:false` diciendo por qué: ese dataset es sintético, no
+trae `geometriaOficial` y el criterio 2 no se podría medir.
+
+⚠️ **Orden.** El guion deja la geometría **modificada a propósito** (un lindero
+desplazado 0,50 m), como `03`, para que la evidencia se vea en una captura. Lo que
+sí restaura —y lo declara en `restaurado`— es la **tolerancia**, el **zoom** y la
+bandera de **`Alt`**. No lo encadenes antes de `06-generar-gml.js` (contrasta el
+`areaValue` contra el dataset de arranque) ni de `02-wms-encuadre.js` (el zoom le
+contamina la cuenta de `GetMap`). Para repetirlo:
+`$B reload && $B wait ".gml-tabla-vertices"`.
+
+**Comprobación cruzada con eventos *trusted***. El guion navega el historial con el
+atajo de teclado, que es el camino que puede romper la inhibición del foco. Los dos
+botones se comprueban aparte, con clicks de verdad de Playwright:
+
+```bash
+$B is enabled '[data-accion="deshacer"]'         # → true (hay historial)
+$B click '[data-accion="deshacer"]'
+$B js "document.querySelector('[data-estado=\"edicion\"]').textContent"
+$B click '[data-accion="rehacer"]'
+```
+
+Medido el 2026-07-28: «Deshecha la última operación.» / «Rehecha la operación
+siguiente.», con la tabla pasando de 15 a 16 filas y de vuelta — o sea que los
+botones navegan las mismas operaciones que los atajos.
+
+### Qué cuenta como «pasa»
+
+`ok: true` y `problemas: []`, y además:
+
+- `paginaRecienCargada: true` y `arranque.escalaCoherente: true` (la escala medida
+  entre dos pares de marcadores distintos coincide; sin eso ninguna medida vale).
+- `hitTest.respondeElMarcador: true` con el `title` esperado, y
+  `hitTest.ladoAtrapadoPorLaCota: false`.
+- `acotaciones`: `bajanAlAlejar`, `subenAlAcercar`, `reversible` y `domEstable`,
+  los cuatro `true`.
+- `engancheVertice.desviacionDelOficialM: 0`, `marcadorVuelveAlOrigen: true`,
+  `indicadorTrasSoltar: null` y `VERTICE` en los cuatro fotogramas.
+- `engancheLindero.fueraDeLaRectaM: 0` con `LINDERO` en los últimos fotogramas.
+- `sinEnganche.indicadoresPorFotograma` todo `null` y `desviacionM` ≈ 0 (la
+  coordenada final ES la del puntero, traducida con la escala medida).
+- `historial`: las tres desviaciones a 0 y `prevenido: true` en las tres teclas;
+  `inhibicion.prevenido: `**`false`** (esa es al revés a propósito).
+- `enVivo.superficieSeMuevePorFotograma` y `perimetroSeMuevePorFotograma` los dos
+  `true`, y `cambioAntesDeSoltar: true`.
+- `offset.desplazamientoMedidoM` = lo tecleado, `filasAntes === filasDespues` y
+  `offset.avisos.crecio: true` (ver la nota de abajo).
+- `insertar.dobleClicPrevenido`, `insertar.zoomIntacto`,
+  `eliminar.menuDelNavegadorPrevenido` y `eliminar.anilloVuelveAlDeAntes`.
+- `restaurado.toleranciaEsLaDeArranque` y `restaurado.zoomComoAlArrancar`.
+- `panel.barra` con sus dos medidas, y `panel.altoBloqueEdicionPx: `**`null`** — ese
+  `null` es el desenlace bueno: significa que el bloque «Edición» sigue fuera de
+  `index.html`. Si volviera a dar un número, la barra estaría duplicada y muerta
+  (G16 se pondría rojo antes, en la suite).
+
+`advertencias` **no** tumba nada: recoge lo que limita la medida.
+
+### Dos cosas que este guion dejó a la vista, y que no son fallos
+
+**El renglón no anuncia insertar ni eliminar.** El comentario de quien lo fabrica
+—`viewer/barra-edicion.js` desde el 2026-07-29; antes, `index.html`—
+describe `[data-estado="edicion"]` como «el desenlace de deshacer, rehacer,
+insertar, eliminar y desplazar», y de esos cinco solo tres lo escriben: los dos
+gestos del mapa viven en `viewer/edicion.js`, que solo habla cuando la operación
+**no** se aplica (nadie en `app/` llama a `insertarEn` ni a `eliminar`). La
+operación sí es visible —aparece el vértice, crece la tabla, cambia el recuento de
+la ficha—, así que **no es un error silencioso**; es una promesa del marcado que el
+cableado no ata. El guion lo MIDE (`anuncios.anunciaLaInsercion: false`) y lo deja
+en `advertencias`: decidirlo es del checklist humano (§7.5), no de un smoke.
+
+**Desplazar el lindero 1 de este dataset SIEMPRE degrada, y eso se comprueba.**
+Sus dos lados contiguos son casi su prolongación (**0,03°**, medido por el propio
+`edit/offset.js`), así que no hay punto de corte donde apoyar la intersección y
+salta el guard de paralelismo. La operación se aplica igual —el lindero se mueve
+los 0,50 m pedidos, y el guion lo verifica sobre las coordenadas— pero
+**degradada**, y el panel de avisos tiene que decirlo: por eso
+`offset.avisos.crecio: true` es condición de paso. Es la regla de oro 1 aplicada al
+gesto más usado de la fase. Si alguna vez ese aviso desaparece, o el offset empieza
+a **añadir** un vértice (el fallback de bisel), el guion falla y explica las dos
+lecturas posibles.
+
+### Cifras de referencia (corrida en seco de T6.2, **2026-07-28**, revisada el **2026-07-29** tras el traslado a la barra, `npm run dev`)
+
+Sirven para detectar una desviación, no como valores canónicos. Viewport 1440×900,
+lienzo 1048×900, duración del guion **6,2 s**, consola limpia, **5 `GetMap`** al
+WMS (1 de carga + 4 encuadres del zoom) y **cero** peticiones a servicios de datos.
+Todas las cifras de abajo se han vuelto a medir el 2026-07-29 y **solo cambian las
+dos últimas filas**: el traslado fue un cambio de vista, no de mecánica.
+
+| Medida | Valor |
+|---|---|
+| Escala en el encuadre de arranque | **16,19 px/m** (`escalaCoherente: true`) |
+| τ de producción (20 cm) a esa escala | **3,24 px** ← por eso se mide con 300 cm |
+| Cotas: en el DOM / visibles a Z | 15 / **11** (umbral 44 px = 2,72 m) |
+| Cotas visibles a Z−2 (4,05 px/m) | **6** (umbral = 10,87 m) |
+| Cotas visibles a Z+2 (64,72 px/m) | **14** (umbral = 0,68 m) |
+| Al volver a Z | **11** otra vez |
+| Enganche a VÉRTICE: desviación del oficial | **0,0000 m** (con el puntero a 23 px) |
+| Enganche a LINDERO: fuera de la recta / avance | **0,0000 m** / 5,013 m |
+| Con `Alt`: coordenada vs. puntero previsto | **0,008 m** (y 3,33 m del oficial) |
+| Undo · redo · undo: desviación | **0 · 0 · 0 m** |
+| `Ctrl+Z` en el mapa / en una celda | `prevenido: true` / **`false`** |
+| Superficie por fotograma (arrastre con `Alt`) | 1.539,29 → 1.547,25 → 1.557,88 → **1.564,88** m² |
+| Perímetro por fotograma | 163,72 → 164,81 → 166,46 → **167,57** m |
+| Ficha vs. shoelace/suma de lados propios | **coinciden** (0,00) |
+| Offset de 0,50 m: superficie | 1.535,87 → **1.549,52** m², 15 → 15 vértices |
+| Offset: desplazamiento medido sobre la tabla | **0,500 m**, +1 tarjeta en el panel |
+| Insertar: filas / desviación de la recta | 15 → **16** / 0,0001 m |
+| Eliminar: filas / anillo | 16 → **15** / **idéntico al de antes** |
+| Zoom tras el doble clic | 16,177 → 16,184 px/m (**+0,04 %**) |
+| Caja de vértices al terminar el guion (1 aviso) | ~~69 px ≈ 2,8 filas~~ → **237 px** ≈ **9,6 filas** de 15 |
+| La barra sobre el mapa | **285 × 55 px** (36 px de alto con el renglón de estado vacío) |
+
+Y la caja de vértices **con la lista de avisos vacía**, o sea con la página recién
+cargada y antes de que el guion desplace nada: ~~64 px ≈ 1,6 renglones~~ →
+**303 px ≈ 11,3 renglones** bajo la cabecera fija. Medido en dev y en el build, que
+dan lo mismo (302,73 px).
+
+Esas filas no son cosméticas y por eso están medidas. Antes decían lo que el bloque
+«Edición» le quitaba a la tabla: 270 px fijos de un panel que reparte alto fijo.
+Desde el 2026-07-29 ese bloque no existe —las herramientas están en la barra— y lo
+que se vigila es lo contrario: que la caja siga grande cuando entre el próximo
+bloque (F07 mete el suyo). El guion las publica en `panel` **sin juzgarlas** (regla
+de oro 9); quien decide si once filas bastan, y si la barra estorba sobre la
+ortofoto, es el checklist humano (§7.6 y §7.6 bis).
+
+⚠️ El alto de la barra **crece con el renglón de estado**: vacío no ocupa
+(`:empty{display:none}`), así que 36 px al arrancar y 55 px en cuanto hay algo que
+anunciar. Es por diseño; si el guion la mide en 36 px al final, es que el renglón se
+quedó mudo donde debería haber hablado.

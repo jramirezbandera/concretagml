@@ -5,6 +5,15 @@
 // de adaptación a Turf que comparten reglas-geometria/reglas-topologia/reglas-huso.
 // Es el análogo de parsers/_comun.js para la rama de validación.
 //
+// Dos de esos «helpers» ya no se definen aquí, se RE-EXPORTAN (F06, T1.2):
+// `OPERATIVOS` viene de `config/operativos.js` y `distancia` de `geo/metrica.js`.
+// Vivían en este fichero solo porque F02 fue quien primero los necesitó, y eso
+// obligaba a la capa de edición a depender de la de validación para leer una
+// constante o medir una hipotenusa. La API pública de este módulo no cambia: sus
+// consumidores siguen importando ambos de aquí. Es el mismo movimiento que hizo
+// `viewer/_comun.js` con `NIVEL`, y por el mismo motivo — una sola definición en
+// todo el proyecto ⇒ nada puede divergir.
+//
 // Fronteras de responsabilidad (SPEC §2):
 //   · Regla 1 — NADA silencioso. Cada regla materializa un {@link Hallazgo}; un
 //     dato malo del USUARIO produce Hallazgos, nunca una excepción. El `throw` se
@@ -13,7 +22,8 @@
 //     otra tarea (reglas-topologia.js). Este módulo es aritmética PROPIA: no
 //     importa turf. Solo prepara coordenadas (anillo abierto → cerrado GeoJSON).
 //   · Regla 9 — las tolerancias viven en config/operativos.json (decisiones de
-//     ingeniería), NO en un `umbrales.json` (prohibido). Se cargan aquí una vez.
+//     ingeniería), NO en un `umbrales.json` (prohibido). Las carga UNA sola vez
+//     `config/operativos.js`, que es de donde este módulo las re-exporta.
 //   · Override O1 — exterior HORARIO (A_signed<0), huecos antihorario. La
 //     validación NO falla por orientación (se normaliza en F04); la convención se
 //     usa solo si alguna regla emite un mensaje sobre orientación.
@@ -21,10 +31,22 @@
 // Modelo que se valida (model/parcela.js): `recintos` = [{ vertices:[[x,y],…],
 // tipo }] en UTM, ANILLOS ABIERTOS (sin repetir el cierre); recintos[0]=EXTERIOR.
 
-import OPERATIVOS_RAW from '../config/operativos.json' with { type: 'json' }
-
-/** Tolerancias operativas (config/operativos.json). Congeladas (regla 9). */
-export const OPERATIVOS = Object.freeze({ ...OPERATIVOS_RAW })
+/**
+ * Tolerancias operativas (`config/operativos.json`), congeladas (regla 9).
+ * **Re-exportadas de `config/operativos.js`, no redefinidas aquí** (F06, T1.2):
+ * el cargador vivía en este módulo porque F02 fue quien primero lo necesitó,
+ * pero la edición (F06) también lee tolerancias —`snapMetros`— y tenerlo aquí
+ * obligaba a `edit/` a importar de `validation/` para leer una constante: una
+ * dependencia al revés. El cargador está ahora en un módulo NEUTRO que no
+ * depende de nadie, y este re-export mantiene intacta la API de F02: quien
+ * importaba `OPERATIVOS` de aquí sigue haciéndolo. Un solo objeto congelado en
+ * memoria para todo el proyecto ⇒ imposible que dos capas midan con reglas
+ * distintas. El porqué de cada cifra está en el JSDoc de `config/operativos.js`.
+ *
+ * Sigue siendo seguro importar este módulo bajo el proyecto Vitest `node`: el
+ * `with { type: 'json' }` no ha desaparecido, se ha mudado un fichero más allá.
+ */
+export { OPERATIVOS } from '../config/operativos.js'
 
 // ── Vocabulario ───────────────────────────────────────────────────────────────
 
@@ -142,11 +164,20 @@ export const refsAnillo = (recinto, n) => Array.from({ length: n }, (_, i) => re
 /**
  * Distancia euclídea entre dos vértices UTM (metros). La métrica es plana sobre la
  * proyección, coherente con el resto del motor (geo/area.js).
- * @param {[number,number]} a
- * @param {[number,number]} b
- * @returns {number}
+ *
+ * **Re-exportada de `geo/metrica.js`, no redefinida aquí** (F06, T1.2), por el
+ * mismo motivo que {@link OPERATIVOS} arriba: la edición (F06) y las acotaciones
+ * (F09) también miden distancias, y no pueden depender de la capa de validación
+ * para calcular una hipotenusa. La aritmética vive en `geo/`, junto a
+ * `geo/area.js`; este módulo la re-exporta para que las reglas de F02
+ * (`reglas-geometria.js`, `reglas-topologia.js`) sigan importándola de aquí sin
+ * cambios. Una sola definición en todo el proyecto.
+ *
+ * `geo/metrica.js` añade además `longitudesDeLados`, `perimetroAnillo` y
+ * `perimetro`: si una regla nueva necesita medir un anillo entero, se importan
+ * de allí y no se re-exportan aquí (esto es el contrato de F02, no un barrel).
  */
-export const distancia = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1])
+export { distancia } from '../geo/metrica.js'
 
 /**
  * Ángulo interior en el vértice `v` formado por los segmentos v→prev y v→next, en

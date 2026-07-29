@@ -9,6 +9,14 @@ visual**.
 > Desde F05 esta lista tiene un punto **6**, que no es de F03 y no es de la misma
 > naturaleza que los cinco primeros: recoge lo que ni siquiera
 > `07-catastro-vivo.js` —que llama al Catastro de verdad— puede firmar.
+>
+> Y desde F06 tiene un punto **7**, el de la EDICIÓN: lo que `08-edicion.js` no
+> alcanza porque sus gestos son sintéticos (la mano), más lo que es juicio y no
+> medida (si un gesto se descubre, si la barra estorba sobre la parcela, si once
+> filas de vértices bastan). **El punto 7 se firma junto con el 6**, y hasta
+> entonces esta lista sigue bloqueando el cierre de F03 → F05 → F06.
+> **Sigue SIN FIRMAR** — el traslado de las herramientas a la barra
+> (2026-07-29) reescribió 7.4 y 7.6 y añadió 7.6 bis.
 
 > Regla de lectura: aquí NO se repite nada que ya esté medido. Cada punto existe
 > porque el smoke **no puede** cubrirlo, y dice por qué. Si alguna vez un punto
@@ -284,6 +292,292 @@ los dos, pero eso hay que verlo, no suponerlo.
 
 ---
 
+## 7 · La edición de la parcela ⟨F06⟩ — lo que ni `08-edicion.js` firma
+
+**Por qué está aquí.** `08-edicion.js` conduce las cinco operaciones de F06 en un
+navegador de verdad y mide lo que jsdom no puede: `L.Draggable` real, píxeles
+reales, hit-testing real, el zoom real. Pero **sus gestos son sintéticos** —
+`/browse` no tiene comando `drag` y su allowlist CDP no incluye el dominio `Input`
+(§0)—, así que lo que no toca es exactamente la capa donde vive esta fase: **la
+mano**. Y hay una segunda clase de cosas aquí, que no es de medida sino de
+**juicio**: si un gesto se descubre, si un rótulo estorba, si un número cabe.
+
+⚠️ De esta lista, **solo el punto 7.7 consulta al Catastro** (una petición). Todo
+lo demás se recorre con la parcela de demostración y no cuesta nada. Antes de 7.7,
+léete el régimen de uso de `GUION.md` §13.
+
+Recuerda el mapa de gestos, que es lo que se está poniendo a prueba: **clic** =
+selecciona lindero · **doble clic** = inserta vértice · **clic derecho sobre un
+vértice** = lo elimina · **`Alt`** = arrastra sin ajustar.
+
+⚠️ **Desde el 2026-07-29 las herramientas NO están en el panel: están en una barra
+flotante sobre el mapa** (arriba a la izquierda, 285 × 36 px). Cinco: deshacer,
+rehacer, ajuste al parcelario (botón partido — el imán conmuta, la flecha abre la
+tolerancia), desplazar lindero (desplegable con la distancia) y **«?»**, que abre el
+panel de ayuda con los ocho gestos. El bloque «Edición» del panel ya no existe, y la
+caja de vértices ha pasado de **64 px a 303 px**. Eso mueve cuatro puntos de esta
+sección (7.4 y 7.6 se han reescrito, 7.8 es nuevo): si vienes de una corrida
+anterior, **no la copies**.
+
+### 7.1 · El agarre, con un ratón de verdad ⟨criterios 1 y 2⟩
+
+`08` demuestra que el punto exacto del centro del vértice le corresponde al
+marcador (`document.elementFromPoint` devuelve su icono, con el `title` correcto) y
+que la cota **no** roba el punto medio del lado. Lo que no dice es si una persona
+acierta.
+
+- [ ] **Agarrar un vértice a la primera**, con el ratón, sin apuntar con precisión
+      molesta. El cuadradito son **10 × 10 px** y F06 convierte esto en la
+      operación central del producto: si cuesta, hay que anotarlo con el número de
+      intentos, no con un «va justito».
+- [ ] **El cursor** cambia al pasar por encima del vértice, y **no** cambia sobre
+      la cota (que no es agarrable) ni sobre el resalte del lindero.
+- [ ] ⚠️ **¿Se puede enganchar con los 20 cm de verdad?** Medido por `08`: al
+      encuadre de arranque la escala es **16,19 px/m**, o sea que τ = 20 cm son
+      **3,24 px** — menos de un tercio del lado del vértice. Arrastra un vértice
+      hacia el lindero rojo del Catastro **sin tocar el zoom** y mira si engancha o
+      si hay que acercarse primero. Si hay que acercarse siempre, la tolerancia por
+      defecto está bien elegida pero la app no lo está contando: es decisión de
+      producto, no defecto.
+- [ ] **El indicador de enganche se ve y se entiende**: ~~marca maciza / anillo
+      hueco~~ **cuadrado** cuando captura un VÉRTICE, **reloj de arena** cuando
+      desliza sobre un LINDERO (la convención OSNAP; se corrigió el 2026-07-28
+      porque relleno y tamaño no se distinguen a mitad de arrastre — ver 7.3 bis).
+      ¿Se distinguen de un vistazo sobre la ortofoto, o parecen lo mismo?
+- [ ] **Soltar fuera del mapa** (sobre el panel, o fuera de la ventana) no deja el
+      vértice pegado al puntero ni bloquea el arrastre siguiente
+      (`Draggable._dragging` es global).
+
+### 7.2 · La tecla `Alt` ⟨decisión de la fase — si falla, hay que saberlo⟩
+
+**Este es el punto que más importa de la lista.** `08` mete `altKey: true` en el
+evento sintético, y así el módulo la lee sin que el sistema operativo intervenga.
+Con un teclado de verdad **puede no llegar nunca**: en Windows, `Alt` activa la
+barra de menús del navegador y roba el foco; en algunos entornos abre el menú de la
+ventana. `viewer/edicion.js` la eligió porque `Ctrl` colisiona con el zoom de rueda
+y `Shift` con el `boxZoom` de Leaflet — o sea que si `Alt` no sirve, **no hay una
+cuarta tecla obvia** y habría que decidir otra cosa (un botón, un cambio de
+modificador). No es cosmético.
+
+- [ ] Mantén `Alt` y arrastra un vértice **hacia el lindero oficial**. ¿Se salta el
+      ajuste? Pruébalo en **los navegadores en los que trabajas**, no en uno.
+- [ ] Al soltar `Alt`, ¿el arrastre siguiente vuelve a enganchar? (Hay una guarda en
+      el `blur` de la ventana justo para que soltar `Alt` en otra aplicación no deje
+      el ajuste apagado para siempre y en silencio: pruébalo cambiando de ventana
+      con la tecla pulsada.)
+- [ ] Con `Alt` pulsada, ¿el navegador hace algo más — abre menús, pone el foco en
+      la barra, pinta un subrayado de acceso rápido? Anótalo aunque el arrastre
+      funcione: es lo que hará dudar al usuario.
+- [ ] Si `Alt` no sirve: la **casilla «Ajustar al parcelario»** hace lo mismo de
+      forma permanente. ¿Basta como salida, o el gesto momentáneo es imprescindible?
+
+### 7.3 · Las cotas sobre la ortofoto real ⟨criterio 4⟩
+
+`08` mide que el número de rótulos visibles **cambia con el zoom en el sentido
+correcto** (11 visibles de 15 al encuadre de arranque, 6 al alejar dos niveles, 14
+al acercar dos). Que 44 px sea el umbral **correcto** no lo puede medir nadie: es
+legibilidad.
+
+- [ ] Mira las cotas sobre la ortofoto a tamaño real, con la cartografía catastral
+      encendida al 60 %. ¿La píldora oscura las sostiene sobre asfalto claro **y**
+      sobre arbolado en sombra?
+- [ ] **¿Estorban?** En la parcela de demostración hay 11 rótulos a la vez. ¿Tapan
+      el dibujo, los vértices o los rótulos del Catastro? Si tapan, la salida no es
+      apagarlas: es subir el umbral.
+- [ ] **El umbral de 44 px**: aleja el zoom despacio y mira **cuándo** desaparece
+      cada cota. ¿Se van justo cuando dejan de leerse, antes, o demasiado tarde
+      (cuando ya se pisan unas a otras)? El número vive en
+      `config/operativos.json#acotacionMinimaPx` y cambiarlo no toca código.
+- [ ] Con el zoom muy acercado aparecen las cotas de los lados diminutos (0,95 m,
+      0,14 m). ¿Aportan o son ruido?
+- [ ] **Al imprimir o al hacer captura**: ¿se leen? F09 va a acotar también sobre el
+      informe, y este es el primer sitio donde se ve el aspecto que tendrán.
+
+### 7.3 bis · El indicador de enganche ⟨criterio 2⟩
+
+Sigue la **convención OSNAP de AutoCAD**: **cuadrado** = enganche a VÉRTICE (su
+*Punto final*), **reloj de arena** = enganche a un punto cualquiera del LINDERO (su
+*Cercano*). La distinción es por **silueta** y no por relleno, porque relleno y
+tamaño es justo lo que se pierde a mitad de arrastre sobre una ortofoto.
+
+Dos defectos ya corregidos mirándolo en el navegador el 2026-07-28 —los dos están
+fijados por test, pero conviene volver a verlos con ojos—:
+
+- [ ] **El enganche a lindero cae casi siempre en el punto medio del lado, que es
+      donde vive su acotación.** Estaba tapado; ahora el indicador va por encima de
+      la cota. Míralo: ¿se ve la pajarita, o el amontonamiento de silueta + número +
+      píldora es ilegible? Si estorba, la salida no es bajar el indicador: es que la
+      cota se aparte durante el gesto.
+- [ ] **El cuadrado rodea al vértice con 4 px de aire por lado.** ¿Se distingue del
+      cuadradito amarillo del vértice, o vuelve a leerse como «un cuadrado dentro de
+      otro»?
+- [ ] ¿Alguien que use AutoCAD **reconoce** las dos siluetas sin que se las
+      expliquen? Es la única pregunta que decide si copiar la convención valió la
+      pena.
+- [ ] Con la **cartografía catastral encendida al 60 %** y sobre arbolado en sombra:
+      ¿el trazo doble (halo oscuro + amarillo) aguanta?
+
+### 7.4 · Descubrir los gestos ⟨criterio 1⟩ — **reescrito el 2026-07-29**
+
+Un gesto que nadie descubre no existe. ~~El panel los cuenta en dos renglones de
+ayuda de 11 px.~~ **Ya no.** Los ocho gestos viven ahora en el **panel de ayuda** del
+botón «?» de la barra, en una tabla de tres columnas (gesto · dónde · qué hace) que
+se genera del código y no de un texto escrito a mano. Eso cambia la pregunta: antes
+era «¿se leen?», y ahora es **«¿alguien lo abre?»**.
+
+- [ ] **Siéntate detrás de alguien que abre la app por primera vez y no digas
+      nada.** ¿Pulsa el «?» por su cuenta, o se pone a probar gestos a ciegas? Si no
+      lo pulsa, la ayuda no existe aunque esté escrita — y esa es la respuesta que
+      importa, no si el texto es bueno.
+- [ ] Si lo abre: ¿encuentra lo que buscaba en la tabla, o se pierde entre ocho
+      filas? Ocho es más de lo que cabía en el panel, y ese es justo el motivo de que
+      la ayuda tenga ahora sitio propio.
+- [ ] **El icono «?» compite con cuatro herramientas más.** ¿Se lee como «ayuda», o
+      como un botón más de la barra? Míralo sin pasar el ratón por encima: el `title`
+      solo aparece al detenerse.
+- [ ] **El clic derecho para eliminar**: ¿es descubrible, o la gente esperaba una
+      tecla `Supr` con el vértice seleccionado? Hoy `Supr` no hace nada. Pruébalo
+      con alguien que no haya visto la app.
+- [ ] **El doble clic para insertar**: ¿se intenta primero sobre el *vértice* (para
+      editarlo) en vez de sobre el *lindero*? Sobre un vértice no pasa nada.
+- [ ] **El clic simple que selecciona**: al pinchar en el mapa lejos de todo lindero
+      se DESELECCIONA (y el botón «Desplazar lindero» se apaga). ¿Se lee como «he
+      soltado la selección» o como «se ha roto algo»?
+- [ ] ¿Alguien intenta arrastrar **el lindero entero** para desplazarlo, en vez de
+      teclear una distancia? Es el gesto que un CAD tendría, y aquí no existe.
+
+### 7.5 · Lo que la app dice —y lo que se calla— al editar ⟨regla de oro 1⟩
+
+Dos hallazgos MEDIDOS por `08` que no son fallos y que hay que decidir:
+
+- [ ] **Insertar y eliminar no escriben nada en el renglón** `[data-estado="edicion"]`,
+      aunque el comentario que lo fabrica (`viewer/barra-edicion.js`, antes
+      `index.html`) lo describa como «el desenlace de
+      deshacer, rehacer, insertar, eliminar y desplazar». La operación sí se ve
+      (aparece el vértice, crece la tabla, cambia el recuento de la ficha) y el
+      renglón es `role="status"`, o sea que lo **anuncia el lector de pantalla**:
+      escribir en él en cada inserción se oiría en cada gesto. ¿Falta, o está bien
+      callado? Es la misma decisión que F05 dejó abierta con «consultando…».
+- [ ] **Desplazar el lindero 1 de la parcela de demostración siempre deja un
+      aviso**: sus lados contiguos son casi su prolongación (0,03°), así que no hay
+      esquina donde apoyar la intersección y `edit/offset.js` aplica su fallback. El
+      lindero se mueve los 0,50 m pedidos, pero **degradado**. Lee la tarjeta del
+      panel en voz alta: ¿un técnico entiende qué le ha pasado a su lindero y qué
+      puede hacer? Es el texto que más veces se va a leer de toda la fase.
+- [ ] **La distancia del offset admite negativos, y el signo no está escrito en
+      ninguna parte de la pantalla.** La regla de `edit/offset.js` es inequívoca —
+      `distancia > 0` aleja el lindero del interior de su propio anillo, o sea que
+      el área de ese anillo crece— pero el campo solo dice «Distancia (m)». Prueba
+      `0,5` y `−0,5` sobre el mismo lindero: ¿se adivina cuál va a ser antes de
+      pulsar, o hay que probar y deshacer? (Con un HUECO la respuesta desconcierta
+      más: el hueco se agranda y la superficie NETA baja.)
+- [ ] Teclea una tolerancia ilegible (`abc`, vacío) y una distancia ilegible: el
+      panel avisa, el renglón lo dice y **la tolerancia se revierte sola** (la
+      distancia no, a propósito). ¿Se entiende la diferencia?
+
+### 7.6 · ¿Bastan once filas de vértices? ⟨comprobación — reescrito el 2026-07-29⟩
+
+Este punto **era una queja y ahora es una comprobación**. Lo que decía antes: «el
+bloque «Edición» ocupa 241 px y la caja de vértices queda en **69 px**, o sea 2,8
+filas a la vista de las 15». Eso se arregló sacando las herramientas del panel.
+Medido en navegador a **1440 × 900**, en dev y en el build, con la lista de avisos
+vacía:
+
+| | Antes | Ahora |
+|---|---|---|
+| Caja `#tabla-vertices` | 64 px | **303 px** |
+| Renglones bajo la cabecera fija (24 px) | 1,6 | **11,3** |
+| Con una tarjeta de aviso (lo que deja `08`) | 69 px · 2,8 filas | **237 px · 9,6 filas** |
+
+Los números están en el veredicto de `08` (`panel`), **sin juicio**: el umbral de
+«bastan» sigue siendo humano (regla de oro 9). Lo que hay que confirmar es que el
+arreglo sirve de verdad, no que exista.
+
+- [ ] Con la app a pantalla completa en **la pantalla en la que trabajas**: ¿once
+      filas bastan para trabajar una parcela de 15 vértices sin hacer scroll
+      continuamente? Prueba también en un portátil de 900 px de alto y con dos
+      recintos (`?demo=hueco`), que gasta un renglón más en su separador.
+- [ ] **Con el panel de avisos lleno.** Provoca dos o tres avisos (desplaza el
+      lindero 1 varias veces) y vuelve a mirar: la lista de avisos tiene su propio
+      tope de 34vh y también come alto. ¿Aguanta la tabla, o vuelve el problema por
+      otra puerta?
+- [ ] La **cabecera de la tabla se queda pegada** al hacer scroll dentro de la caja
+      (verificado en F03). Con 303 px ya no se come el espacio útil — confírmalo.
+- [ ] ¿Se nota la diferencia **trabajando**, o solo en la captura? Es la pregunta
+      que decide si el traslado valió el sitio que la barra ocupa sobre el mapa (ver
+      7.8).
+
+### 7.6 bis · La barra sobre el mapa ⟨juicio — nuevo el 2026-07-29⟩
+
+Lo que ganó la tabla de vértices lo paga el mapa: la barra flota **encima de la
+ortofoto**, y eso no lo puede juzgar ningún guion. Mide 285 × 36 px arriba a la
+izquierda; el panel de ayuda abierto mide 460 × 558 px, o sea el **27 % del lienzo**
+(1048 × 900 al viewport de referencia). Nada de esto es un defecto por sí solo — la
+pregunta es si molesta cuando se está trabajando.
+
+- [ ] **¿Estorba sobre la parcela?** La geometría se encuadra centrada y la barra
+      vive en la esquina superior izquierda, que es donde debería tapar menos. Trae
+      dos o tres parcelas distintas (una alargada, una en esquina) y mira si en
+      alguna se come vértices que hay que agarrar. Si estorba, la salida es
+      `posicionBarra` —admite las cuatro esquinas de Leaflet—, no quitar la barra.
+- [ ] **¿Convive con los controles de Leaflet?** El zoom, el selector de capas y el
+      control de opacidad están en el mismo mapa. ¿Se lee como una barra de
+      herramientas de la app, o como cuatro cajas sueltas amontonadas?
+- [ ] ⚠️ **El conmutador del ajuste: ¿se ve encendido de un vistazo?** Nace
+      **marcado** (el estado que protege del error más caro de esta app: dejar
+      milímetros de hueco entre dos parcelas que en el terreno son la misma línea).
+      Es un `<input type="checkbox">` estilado como botón, así que su «encendido» es
+      solo un cambio de fondo. Apágalo y enciéndelo mirando a otra parte entre medias:
+      ¿sabrías decir en qué estado está **sin** pulsarlo? Si no, es un error
+      silencioso de manual y **bloquea**, porque el usuario no puede saber si lo que
+      acaba de arrastrar enganchó o no.
+- [ ] **¿Se descubren los desplegables?** La tolerancia y la distancia del offset ya
+      no están a la vista: se abren desde su herramienta. El ajuste es un **botón
+      partido** (imán + flecha) y «Desplazar lindero» abre siempre. ¿Se entiende que
+      la flecha abre algo, o parece parte del icono? ¿Alguien encuentra la tolerancia
+      sin que se la enseñen?
+- [ ] **«Desplazar lindero» no se apaga nunca** — el que se apaga es el botón de
+      dentro, y su motivo («Elige antes un lindero en el mapa: basta un clic sobre
+      él.») está en el desplegable. Ábrelo sin haber elegido lindero: ¿se lee el
+      motivo, o parece que la herramienta está rota?
+- [ ] **El panel de ayuda tapa el 27 % del mapa mientras está abierto.** ¿Es
+      aceptable para leer una tabla, o hay que cerrarlo para consultar y volver a
+      abrirlo? Comprueba las tres salidas: `Escape`, el botón «Cerrar» y **pinchar
+      fuera** — y que ese clic de fuera **además** seleccione el lindero que hay
+      debajo, en un solo gesto, que es como se diseñó a propósito.
+- [ ] **Por teclado.** Tabula hasta la barra y muévete con las flechas: saltan las
+      herramientas apagadas. Con un desplegable abierto, las flechas son del campo
+      numérico y no de la barra. ¿Se puede deshacer, ajustar la tolerancia y
+      desplazar un lindero **sin ratón**?
+- [ ] **El renglón de estado arranca vacío**, a propósito: el texto que explicaba
+      por qué los botones nacen apagados se fue al panel de ayuda porque sobre la
+      ortofoto era un cartel de tres líneas. ¿Se echa de menos, o el motivo se
+      encuentra donde ahora vive (el desplegable del offset y la primera línea de la
+      ayuda)?
+
+### 7.7 · El enganche a las COLINDANTES ⟨cuesta 1 petición al Catastro⟩
+
+**Por qué está aquí.** Ningún guion lo cubre: `08` no toca servicios de datos a
+propósito (override O8), así que mide el ajuste contra la `geometriaOficial` de la
+parcela y **declara las colindantes como no cubiertas**. La suite lo prueba con
+recintos de fixture. Que enganche a la parcela del vecino **de verdad** solo se ve
+haciendo la consulta.
+
+- [ ] Pulsa **«Traer colindantes»** (una petición) y mira que el renglón diga
+      cuántas han llegado y que la ficha las cuente.
+- [ ] Arrastra un vértice hacia el **lindero de una vecina** y comprueba que
+      engancha. Es el caso de uso que da sentido a la fase: cerrar la hendidura
+      entre dos parcelas que en el terreno son la misma línea.
+- [ ] Trae una parcela **nueva** con «Traer del Catastro» y comprueba que las
+      colindantes de la anterior **se sueltan** (deja de engancharse a linderos que
+      ya no lindan con nada) y que «Deshacer» se apaga con su explicación.
+- [ ] Con una parcela del Catastro cargada, la ficha ya tiene superficie declarada:
+      **mira el Δ catastral moverse durante el arrastre**. Es la única parte del
+      criterio 4 que `08` no puede medir, porque la parcela de demostración no trae
+      superficie inscrita.
+
+---
+
 ## Qué hacer con el resultado
 
 - **Todo conforme** → F03 se marca hecha (`README.md` §Estado y `spec/SPEC.md`).
@@ -298,6 +592,24 @@ los dos, pero eso hay que verlo, no suponerlo.
 - **Algo del 6.1, 6.3, 6.4 o 6.5 no convence** → es redacción o producto. Se
   anota, se decide, y no bloquea F05: la mecánica ya está medida por
   `07-catastro-vivo.js`.
+- **`Alt` no llega (7.2)** → **bloquea F06**, y no es cosmético: es la tecla
+  modificadora que pide el criterio 2 y `viewer/edicion.js` ya descartó `Ctrl` y
+  `Shift` por colisión con Leaflet. Si el navegador o Windows se la quedan, hay
+  que decidir otro modificador o dar por buena la casilla como única vía — y eso
+  se decide con el dato delante, no antes.
+- **Algo del 7.1 o del 7.7 falla** → es un defecto real de la edición. Mismo
+  protocolo que el punto 1: se abre tarea con propiedad exclusiva del módulo de
+  `edit/` o de `viewer/` y de su test, nunca un parche desde la app.
+- **Algo del 7.3, 7.4, 7.5, 7.6 o 7.6 bis no convence** → es presentación,
+  redacción o producto. Se anota y se decide; **no bloquea F06**, porque la mecánica
+  ya está medida por `08-edicion.js`. El 7.3 se corrige sin tocar código
+  (`config/operativos.json#acotacionMinimaPx`); el 7.6 y casi todo el 7.6 bis, en
+  `estilos/app.css`, y la esquina de la barra es la opción `edicion.posicionBarra`
+  de `crearVisor`.
+- **El conmutador del ajuste no se lee encendido (7.6 bis)** → eso sí **bloquea**, y
+  no es presentación: si no se sabe si el enganche está activo, no se sabe si el
+  vértice que se acaba de soltar cayó donde se ve o donde enganchó. Es la regla de
+  oro 1. Se arregla en `estilos/app.css`, sobre `.gml-barra-conmutador`.
 
 ## Cuándo repetir esta lista
 
@@ -310,3 +622,12 @@ El punto **6** se repite cuando cambien `services/catastro.js`,
 de `index.html` — los mismos disparadores que `07-catastro-vivo.js` (`GUION.md`
 §8), porque los dos cubren mitades de lo mismo. Y el **6.7**, cada vez que se
 publique: el CORS que importa es el del origen desde el que trabaja la gente.
+
+El punto **7** se repite con los mismos disparadores que `08-edicion.js`
+(`GUION.md` §8 y §14): `viewer/edicion.js`, `viewer/acotaciones.js`,
+**`viewer/barra-edicion.js`**, `cablearEdicion`, `edit/snap.js`, `edit/offset.js` y
+los operativos `snapMetros` / `acotacionMinimaPx`. ~~El bloque «Edición» de
+`index.html`~~ ya no existe: desde el 2026-07-29 los siete nodos los fabrica la
+barra, y G16 exige que no vuelvan al marcado. Y el **7.2** además cada vez que se
+pruebe en un navegador o un sistema operativo nuevos: la tecla no es de la app, es
+del entorno.

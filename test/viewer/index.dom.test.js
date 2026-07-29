@@ -17,6 +17,19 @@
 //   · Que `alAvisar` llega a las DOS mitades (capas y sincronización).
 //   · `destruir()`: idempotente y sin dejar nada vivo detrás.
 //
+// Y desde F06 · T4.1, la OPCIÓN `edicion` — que es ensamblaje puro y por tanto
+// vive aquí y no en `edicion.dom.test.js` ni en `acotaciones.dom.test.js`:
+//   · `edicion:false` (el defecto) ⇒ el visor de F03 EXACTO, con los TRES
+//     ganchos de `sincronizar` en `null` y `visor.edicion`/`visor.acotaciones` a
+//     `null` (no `undefined`).
+//   · `edicion:true|{…}` ⇒ las dos piezas montadas y ENCHUFADAS: los ganchos que
+//     recibe `sincronizar` son los de la edición, y su `alPrevisualizar` repinta
+//     las cotas.
+//   · el DOBLE CANAL de `alPrevisualizar` (cotas + llamante) y su orden.
+//   · el desmontaje en orden INVERSO, con el `doubleClickZoom` restaurado
+//     mientras el mapa sigue en pie.
+//   · la ATOMICIDAD cuando la edición falla a mitad del ensamblaje.
+//
 // Proyecto Vitest `dom` (jsdom): el sufijo `.dom.test.js` lo enruta ahí, porque
 // `viewer/index.js` arrastra Leaflet. NINGUNA petición real de red: jsdom no
 // descarga imágenes, y `load`/`error` se emiten a mano con `dispararCarga`.
@@ -28,7 +41,10 @@ import { crearVisor } from '../../viewer/index.js'
 import { NIVEL, PANE, crearEstadoVista, vertUTMaLatLng } from '../../viewer/_comun.js'
 import { BASE_POR_DEFECTO, ID_CAPA, maxZoomNativo, CAPAS } from '../../viewer/capas.js'
 import { ATRIBUCION } from '../../viewer/atribucion.js'
+import { CLASE_ACOTACION, textoDeLongitud } from '../../viewer/acotaciones.js'
 import { MENSAJES } from '../../viewer/wms-catastro.js'
+import { sincronizar } from '../../viewer/sincronizacion.js'
+import { OPERATIVOS } from '../../config/operativos.js'
 import { crearHistorial } from '../../edit/historial.js'
 import {
   crearContenedor,
@@ -36,6 +52,18 @@ import {
   espiarPeticiones,
   parcelaConHueco,
 } from './_ayuda-jsdom.js'
+
+// `sincronizar` se envuelve en un espía que llama al ORIGINAL: el comportamiento
+// del visor es idéntico —y por eso las 28 pruebas de F03 de este fichero siguen
+// verdes sin tocar ni una línea— y a cambio se puede LEER con qué ganchos se ha
+// construido. Es la única forma de demostrar «los tres en `null`»: un gancho que
+// no se enchufa no deja ninguna huella observable, que es justo lo que hay que
+// probar. Mismo patrón —y por el mismo motivo— que el espía sobre `dianasDe` de
+// `test/viewer/edicion.dom.test.js`.
+vi.mock('../../viewer/sincronizacion.js', async (importarOriginal) => {
+  const real = await importarOriginal()
+  return { ...real, sincronizar: vi.fn(real.sincronizar) }
+})
 
 // ── Utilidades del test ──────────────────────────────────────────────────────
 
@@ -147,6 +175,48 @@ function espiarPeticionesDeEsteTest() {
   const espia = espiarPeticiones()
   pendientes.push(() => espia.restaurar())
   return espia
+}
+
+/**
+ * Los argumentos con los que se construyó la ÚLTIMA sincronización. Se lee la
+ * última llamada (y no se limpia el espía entre tests) porque cada test abre su
+ * propio visor: la última llamada es siempre la suya.
+ *
+ * @returns {object}
+ */
+function argumentosDeSincronizar() {
+  const llamadas = vi.mocked(sincronizar).mock.calls
+  expect(llamadas.length, 'nadie ha llamado a sincronizar').toBeGreaterThan(0)
+  return llamadas[llamadas.length - 1][0]
+}
+
+/** Los rótulos de acotación que hay pintados DENTRO del contenedor del mapa. */
+const cotasDe = (contenedor) => [...contenedor.querySelectorAll(`.${CLASE_ACOTACION}`)]
+
+/** El texto de cada cota, en un Set (el orden de los lados no importa aquí). */
+const textosDeCotas = (contenedor) => new Set(cotasDe(contenedor).map((el) => el.textContent))
+
+/**
+ * Anillos UTM de una parcela, en la forma en la que viajan por `alPrevisualizar`
+ * (un array por recinto). Se DERIVA de la parcela, nunca se copia a mano.
+ */
+const anillosDe = (parcela) => parcela.recintos.map((recinto) => recinto.vertices)
+
+/**
+ * Sustituye `obj.destruir` por una versión que apunta su nombre en `orden` (y
+ * ejecuta `antes` justo antes de desmontar de verdad).
+ *
+ * Funciona porque la pila `deshacer` de `crearVisor` guarda `() => pieza.destruir()`
+ * —la propiedad se resuelve EN LA LLAMADA—, y `visor.edicion`/`visor.acotaciones`/
+ * `visor.capas` son exactamente esos mismos objetos.
+ */
+function anotarDestruccion(obj, nombre, orden, antes) {
+  const real = obj.destruir.bind(obj)
+  obj.destruir = () => {
+    orden.push(nombre)
+    if (antes) antes()
+    real()
+  }
 }
 
 /**
@@ -575,5 +645,453 @@ describe('crearVisor · destruir', () => {
     // Ni una fila repintada: la tabla sigue vacía y el store guarda el valor.
     expect(tablaEl.children).toHaveLength(0)
     expect(store.get()).toBe(otra)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// F06 · T4.1 — la opción `edicion`
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── El DEFECTO: el visor de F03, exacto ──────────────────────────────────────
+
+describe('crearVisor · edicion:false (el DEFECTO) es el visor de F03 EXACTO', () => {
+  it('no monta nada: visor.edicion y visor.acotaciones valen null, NO undefined', () => {
+    const { visor, contenedor } = abrirVisor()
+
+    expect(visor.edicion).toBeNull()
+    expect(visor.acotaciones).toBeNull()
+    // La diferencia entre «no montado» y «me he olvidado de devolverlo»: las
+    // propiedades EXISTEN y valen null. Sin esto, `null` y `undefined` serían
+    // indistinguibles para el llamante.
+    expect('edicion' in visor).toBe(true)
+    expect('acotaciones' in visor).toBe(true)
+
+    // Ni una cota pintada, y el zoom por doble clic INTACTO (lo apaga
+    // `crearEdicion`, y un visor de solo lectura no puede perderlo).
+    expect(cotasDe(contenedor)).toHaveLength(0)
+    expect(visor.mapa.doubleClickZoom.enabled()).toBe(true)
+  })
+
+  it('sincronizar recibe los TRES ganchos de F06 en null', () => {
+    abrirVisor()
+    const args = argumentosDeSincronizar()
+
+    expect(args.ajustar).toBeNull()
+    expect(args.alPrevisualizar).toBeNull()
+    expect(args.alCrearMarcador).toBeNull()
+  })
+
+  it('`edicion: false` explícito se comporta igual que no pasarlo', () => {
+    const { visor } = abrirVisor({ edicion: false })
+    expect(visor.edicion).toBeNull()
+    expect(visor.acotaciones).toBeNull()
+    expect(argumentosDeSincronizar().alPrevisualizar).toBeNull()
+  })
+})
+
+// ── `edicion: true` — las dos piezas montadas y ENCHUFADAS ───────────────────
+
+describe('crearVisor · edicion:true monta las dos piezas y las enchufa', () => {
+  it('devuelve las dos piezas, con su API completa', () => {
+    const { visor } = abrirVisor({ edicion: true })
+
+    expect(visor.edicion).not.toBeNull()
+    expect(visor.acotaciones).not.toBeNull()
+    for (const metodo of [
+      'ajustar',
+      'alCrearMarcador',
+      'snapActivo',
+      'tolerancia',
+      'seleccionarLado',
+      'ladoSeleccionado',
+      'desplazarSeleccion',
+      'insertarEn',
+      'eliminar',
+      'fijarColindantes',
+      'alCambiarSeleccion',
+      'destruir',
+    ]) {
+      expect(typeof visor.edicion[metodo], `falta edicion.${metodo}`).toBe('function')
+    }
+    expect(typeof visor.acotaciones.pintar).toBe('function')
+  })
+
+  it('sincronizar recibe `ajustar` y `alCrearMarcador` DE LA EDICIÓN (las mismas funciones)', () => {
+    const { visor } = abrirVisor({ edicion: true })
+    const args = argumentosDeSincronizar()
+
+    // Identidad, no "una función cualquiera": si el visor fabricara un envoltorio
+    // propio, el snap y el menú de vértice podrían no ser los de esta edición.
+    expect(args.ajustar).toBe(visor.edicion.ajustar)
+    expect(args.alCrearMarcador).toBe(visor.edicion.alCrearMarcador)
+    expect(typeof args.alPrevisualizar).toBe('function')
+  })
+
+  it('el alPrevisualizar que recibe sincronizar REPINTA LAS COTAS, con el soloRef del gesto', () => {
+    const { visor } = abrirVisor({ edicion: true })
+    const pintar = vi.spyOn(visor.acotaciones, 'pintar')
+
+    const anillos = [
+      [
+        [439240, 4479655],
+        [439260, 4479655],
+        [439260, 4479670],
+      ],
+    ]
+    const ref = { recinto: 0, indice: 1 }
+    argumentosDeSincronizar().alPrevisualizar(anillos, ref)
+
+    // `soloRef` es lo que hace que un arrastre repinte DOS lados y no 500.
+    expect(pintar).toHaveBeenCalledTimes(1)
+    expect(pintar).toHaveBeenCalledWith(anillos, { soloRef: ref })
+  })
+
+  it('las cotas están pintadas de ARRANQUE, con la longitud real de cada lado', () => {
+    const { contenedor, parcela } = abrirVisor({ edicion: true })
+
+    // 4 lados del exterior + 4 del hueco (el último de cada anillo es el cierre).
+    const lados = parcela.recintos.reduce((n, r) => n + r.vertices.length, 0)
+    expect(cotasDe(contenedor)).toHaveLength(lados)
+
+    // El exterior mide 20 × 15 m y el hueco 4 × 4: los textos se DERIVAN de la
+    // misma función que los escribe, nunca se copia el formato español a mano.
+    const textos = textosDeCotas(contenedor)
+    for (const metros of [20, 15, 4]) {
+      expect(textos.has(textoDeLongitud(metros)), `falta la cota de ${metros} m`).toBe(true)
+    }
+    // Y se ven: a este encuadre (parcela de 20 m en 800 px) ningún lado baja del
+    // umbral por defecto.
+    for (const cota of cotasDe(contenedor)) expect(cota.style.display).not.toBe('none')
+  })
+
+  it('el arranque con edición NO deja ni un aviso espurio', () => {
+    // Regresión de la coda del ensamblaje: el primer render de `sincronizar`
+    // ocurre con el mapa AÚN SIN VISTA, y las cotas miden en píxeles
+    // (`latLngToLayerPoint` LANZA sin vista). Si el puente no naciera mudo, cada
+    // arranque con edición dejaría el aviso «las medidas en vivo han fallado»,
+    // que es ruido indistinguible de un fallo de verdad.
+    const alAvisar = vi.fn()
+    const { contenedor } = abrirVisor({ edicion: true, alAvisar })
+
+    expect(alAvisar).not.toHaveBeenCalled()
+    // Y no es que no haya pintado nada: las cotas están.
+    expect(cotasDe(contenedor).length).toBeGreaterThan(0)
+  })
+
+  it('arranca SIN geometría (vistaInicial) y las cotas aparecen cuando llega la parcela', () => {
+    // El camino real de F05 → F06: el visor se abre vacío sobre una vista
+    // explícita y la parcela entra después por el store. El puente tiene que
+    // seguir vivo, sin que nadie lo vuelva a enchufar.
+    const store = crearEstadoVista(null)
+    const { contenedor } = abrirVisor({
+      estado: store,
+      vistaInicial: VISTA_MADRID,
+      edicion: true,
+    })
+    expect(cotasDe(contenedor)).toHaveLength(0)
+
+    store.set(parcelaConHueco())
+
+    expect(cotasDe(contenedor).length).toBeGreaterThan(0)
+    expect(textosDeCotas(contenedor).has(textoDeLongitud(20))).toBe(true)
+  })
+
+  it('CON EDICIÓN, el ENCUADRE sigue siendo el último paso: UNA sola petición al WMS', () => {
+    // Criterio de aceptación 2 de F03. Montar dos piezas más entre las capas y el
+    // encuadre no puede colar una petición del encuadre intermedio, y el
+    // repintado posterior de las cotas no mueve el mapa, así que tampoco añade
+    // una segunda.
+    const espia = espiarPeticionesDeEsteTest()
+    abrirVisor({ edicion: true, baseInicial: ID_CAPA.CATASTRO })
+
+    expect(espia.total).toBe(1)
+  })
+})
+
+// ── Las opciones llegan a quien deben ────────────────────────────────────────
+
+describe('crearVisor · las opciones de `edicion` llegan a su destinatario', () => {
+  it('sin opciones, cada pieza usa SU defecto de config/operativos.json', () => {
+    const { visor } = abrirVisor({ edicion: true })
+    expect(visor.edicion.tolerancia()).toBe(OPERATIVOS.snapMetros)
+    expect(visor.edicion.snapActivo()).toBe(true)
+  })
+
+  it('`tolerancia` y `snapActivo` llegan a crearEdicion', () => {
+    const { visor } = abrirVisor({ edicion: { tolerancia: 1.25, snapActivo: false } })
+    expect(visor.edicion.tolerancia()).toBe(1.25)
+    expect(visor.edicion.snapActivo()).toBe(false)
+  })
+
+  it('`minimoPx` llega a crearAcotaciones (se mide en QUÉ cotas se ven)', () => {
+    // El umbral no se puede leer de la API de acotaciones, así que se mide por su
+    // efecto, que es lo que importa: con 0 se rotula todo, con un umbral enorme
+    // no se rotula nada. Los rótulos siguen existiendo en los dos casos (se
+    // ocultan con `display`, no se destruyen).
+    const todas = abrirVisor({ edicion: { minimoPx: 0 } })
+    expect(cotasDe(todas.contenedor).length).toBeGreaterThan(0)
+    for (const cota of cotasDe(todas.contenedor)) expect(cota.style.display).not.toBe('none')
+
+    const ninguna = abrirVisor({ edicion: { minimoPx: 1e6 } })
+    expect(cotasDe(ninguna.contenedor).length).toBeGreaterThan(0)
+    for (const cota of cotasDe(ninguna.contenedor)) expect(cota.style.display).toBe('none')
+  })
+
+  it('una clave DESCONOCIDA en `edicion` es TypeError y no monta nada', () => {
+    const { contenedor, tablaEl } = prepararDOM()
+    const base = { estado: crearEstadoVista(parcelaConHueco()), tablaEl, srs: SRS_DEMO }
+
+    let error = null
+    try {
+      // La errata clásica. Sin esta guarda, el snap usaría los 20 cm por defecto
+      // y el usuario vería «engancha mal» sin que nada lo explicara.
+      crearVisor(contenedor, { ...base, edicion: { toleracia: 1.25 } })
+    } catch (e) {
+      error = e
+    }
+
+    expect(error).toBeInstanceOf(TypeError)
+    expect(error.message).toContain('toleracia')
+    expect(error.message).toContain('tolerancia')
+    expect(contenedor.children).toHaveLength(0)
+  })
+
+  it('`edicion` que no es booleano ni objeto es TypeError, sin montar nada', () => {
+    const { contenedor, tablaEl } = prepararDOM()
+    const base = { estado: crearEstadoVista(parcelaConHueco()), tablaEl, srs: SRS_DEMO }
+
+    // `null` se rechaza a propósito: sería una cuarta forma de decir "no", y casi
+    // siempre es un `?? false` que falta.
+    for (const edicion of ['si', 1, null, [], () => {}]) {
+      expect(() => crearVisor(contenedor, { ...base, edicion })).toThrow(TypeError)
+    }
+    expect(contenedor.children).toHaveLength(0)
+  })
+
+  it('un `snapActivo` que no es booleano lanza, y no deja la edición montada', () => {
+    const { contenedor, tablaEl } = prepararDOM()
+
+    expect(() =>
+      crearVisor(contenedor, {
+        estado: crearEstadoVista(parcelaConHueco()),
+        tablaEl,
+        srs: SRS_DEMO,
+        edicion: { snapActivo: 'sí' },
+      }),
+    ).toThrow(TypeError)
+
+    // Se aplica DESPUÉS de apilar el deshacer de la edición, así que el fallo
+    // arrastra también a la pieza ya construida.
+    expect(contenedor.children).toHaveLength(0)
+    expect(document.querySelector(`.${CLASE_ACOTACION}`)).toBeNull()
+  })
+})
+
+// ── El DOBLE CANAL de alPrevisualizar ────────────────────────────────────────
+
+describe('crearVisor · alPrevisualizar del llamante (canal propio, no una clave de edicion)', () => {
+  it('se llama TAMBIÉN con edición montada, y DESPUÉS de repintar las cotas', () => {
+    const orden = []
+    const alPrevisualizar = vi.fn(() => orden.push('llamante'))
+    const { visor } = abrirVisor({ edicion: true, alPrevisualizar })
+
+    // Arranque: exactamente UNA llamada (la del render posterior al encuadre; la
+    // del render mudo previo no cuenta), con los anillos del estado y ref null.
+    expect(alPrevisualizar).toHaveBeenCalledTimes(1)
+
+    vi.spyOn(visor.acotaciones, 'pintar').mockImplementation(() => orden.push('cotas'))
+    orden.length = 0
+    argumentosDeSincronizar().alPrevisualizar([[[1, 2]]], null)
+
+    // Las cotas PRIMERO: es el orden que garantiza que un llamante que revienta no
+    // se lleve por delante el repintado.
+    expect(orden).toEqual(['cotas', 'llamante'])
+  })
+
+  it('recibe los anillos UTM del estado y refVertice null en el arranque', () => {
+    const alPrevisualizar = vi.fn()
+    const { parcela } = abrirVisor({ edicion: true, alPrevisualizar })
+
+    const [anillos, ref] = alPrevisualizar.mock.calls[0]
+    expect(anillos).toEqual(anillosDe(parcela))
+    expect(ref).toBeNull()
+    // COPIA, nunca los arrays del estado (contrato de `sincronizacion.js`).
+    expect(anillos[0]).not.toBe(parcela.recintos[0].vertices)
+  })
+
+  it('funciona SIN edición montada: son dos cosas distintas', () => {
+    const alPrevisualizar = vi.fn()
+    const { visor, parcela } = abrirVisor({ alPrevisualizar })
+
+    expect(visor.edicion).toBeNull()
+    expect(visor.acotaciones).toBeNull()
+    // El gancho que llega a `sincronizar` ya no es `null`: hay un consumidor.
+    expect(typeof argumentosDeSincronizar().alPrevisualizar).toBe('function')
+    expect(alPrevisualizar).toHaveBeenCalledTimes(1)
+    expect(alPrevisualizar.mock.calls[0][0]).toEqual(anillosDe(parcela))
+  })
+
+  it('un alPrevisualizar que REVIENTA no tumba el visor ni el repintado de las cotas', () => {
+    const alAvisar = vi.fn()
+    const alPrevisualizar = vi.fn(() => {
+      throw new Error('la ficha del pie ha explotado')
+    })
+    const { contenedor } = abrirVisor({ edicion: true, alPrevisualizar, alAvisar })
+
+    // Las cotas se han pintado igual (van primero) …
+    expect(cotasDe(contenedor).length).toBeGreaterThan(0)
+    // … y el fallo NO se ha tragado: lo cuenta la red que `sincronizacion.js` ya
+    // pone, UNA vez (aquí no se duplica esa protección).
+    expect(alAvisar).toHaveBeenCalledTimes(1)
+    expect(alAvisar.mock.calls[0][1].nivel).toBe(NIVEL.AVISO)
+  })
+
+  it('un alPrevisualizar que no es función es contrato roto → TypeError, sin montar nada', () => {
+    const { contenedor, tablaEl } = prepararDOM()
+    expect(() =>
+      crearVisor(contenedor, {
+        estado: crearEstadoVista(parcelaConHueco()),
+        tablaEl,
+        srs: SRS_DEMO,
+        alPrevisualizar: 'no soy una función',
+      }),
+    ).toThrow(TypeError)
+    expect(contenedor.children).toHaveLength(0)
+  })
+})
+
+// ── ATOMICIDAD del ensamblaje con edición ────────────────────────────────────
+
+describe('crearVisor · si la edición falla a mitad, no queda NADA montado', () => {
+  it('un fallo de crearEdicion (tolerancia negativa) deja el contenedor limpio', () => {
+    const { contenedor, tablaEl } = prepararDOM()
+
+    let error = null
+    try {
+      crearVisor(contenedor, {
+        estado: crearEstadoVista(parcelaConHueco()),
+        tablaEl,
+        srs: SRS_DEMO,
+        // Una tolerancia negativa no es una tolerancia: `crearEdicion` lanza. Y lo
+        // hace con el mapa, las capas y las acotaciones YA montadas, que es
+        // exactamente el punto medio que este test vigila.
+        edicion: { tolerancia: -1 },
+      })
+    } catch (e) {
+      error = e
+    }
+
+    expect(error).toBeInstanceOf(RangeError)
+    expect(contenedor.querySelector('.leaflet-map-pane')).toBeNull()
+    expect(contenedor.querySelector('.leaflet-control-layers')).toBeNull()
+    expect(contenedor.querySelector('.leaflet-control-attribution')).toBeNull()
+    expect(contenedor.children).toHaveLength(0)
+    // Y las acotaciones, que sí llegaron a montarse, se han desmontado con todo
+    // lo demás (si no, quedarían rótulos huérfanos en el documento).
+    expect(document.querySelector(`.${CLASE_ACOTACION}`)).toBeNull()
+    // La tabla ni siquiera llegó a construirse: `sincronizar` es el paso 4.
+    expect(tablaEl.children).toHaveLength(0)
+  })
+
+  it('un fallo de crearAcotaciones (minimoPx inválido) deja el contenedor limpio', () => {
+    const { contenedor, tablaEl } = prepararDOM()
+
+    expect(() =>
+      crearVisor(contenedor, {
+        estado: crearEstadoVista(parcelaConHueco()),
+        tablaEl,
+        srs: SRS_DEMO,
+        edicion: { minimoPx: -1 },
+      }),
+    ).toThrow(TypeError)
+
+    expect(contenedor.querySelector('.leaflet-map-pane')).toBeNull()
+    expect(contenedor.children).toHaveLength(0)
+  })
+})
+
+// ── destruir() con edición montada ───────────────────────────────────────────
+
+describe('crearVisor · destruir con edición: orden inverso e idempotencia', () => {
+  it('desmonta en ORDEN INVERSO: sincronización → edición → acotaciones → capas → mapa', () => {
+    const { contenedor, tablaEl, visor } = abrirVisor({ edicion: true })
+    expect(tablaEl.children.length).toBeGreaterThan(0)
+
+    const orden = []
+    /** Lo observado en el instante en el que le toca a la EDICIÓN. */
+    let alTocarleALaEdicion = null
+
+    anotarDestruccion(visor.edicion, 'edicion', orden, () => {
+      alTocarleALaEdicion = {
+        // La sincronización ya se ha ido: es la primera de la pila, y lo único
+        // que deja como huella es la tabla vaciada.
+        tablaYaVacia: tablaEl.children.length === 0,
+        // Y el mapa SIGUE EN PIE: `crearEdicion` tiene que poder restaurarle el
+        // `doubleClickZoom` y darse de baja de sus eventos.
+        mapaAunEnPie: contenedor.querySelector('.leaflet-map-pane') !== null,
+      }
+    })
+    anotarDestruccion(visor.acotaciones, 'acotaciones', orden)
+    anotarDestruccion(visor.capas, 'capas', orden)
+    const quitarMapa = visor.mapa.remove.bind(visor.mapa)
+    visor.mapa.remove = () => {
+      orden.push('mapa')
+      return quitarMapa()
+    }
+
+    visor.destruir()
+
+    expect(orden).toEqual(['edicion', 'acotaciones', 'capas', 'mapa'])
+    expect(alTocarleALaEdicion).toEqual({ tablaYaVacia: true, mapaAunEnPie: true })
+    expect(contenedor.querySelector('.leaflet-map-pane')).toBeNull()
+    expect(cotasDe(contenedor)).toHaveLength(0)
+  })
+
+  it('restaura el doubleClickZoom que crearEdicion había apagado', () => {
+    const { visor } = abrirVisor({ edicion: true })
+
+    // Mientras la edición vive, el doble clic INSERTA un vértice: ampliar además
+    // el mapa con el mismo gesto sería un efecto sorpresa.
+    expect(visor.mapa.doubleClickZoom.enabled()).toBe(false)
+
+    // Se mide EN EL INSTANTE del desmontaje del mapa y no después: `Map#remove`
+    // deshabilita todos sus handlers, así que preguntarlo al final daría `false`
+    // pasara lo que pasara — el test parecería pasar sin probar nada.
+    let alQuitarElMapa = null
+    const quitarMapa = visor.mapa.remove.bind(visor.mapa)
+    visor.mapa.remove = () => {
+      alQuitarElMapa = visor.mapa.doubleClickZoom.enabled()
+      return quitarMapa()
+    }
+
+    visor.destruir()
+    expect(alQuitarElMapa).toBe(true)
+  })
+
+  it('es IDEMPOTENTE: cada pieza se desmonta UNA sola vez aunque se llame tres', () => {
+    const { visor } = abrirVisor({ edicion: true })
+
+    const orden = []
+    anotarDestruccion(visor.edicion, 'edicion', orden)
+    anotarDestruccion(visor.acotaciones, 'acotaciones', orden)
+
+    visor.destruir()
+    expect(() => visor.destruir()).not.toThrow()
+    expect(() => visor.destruir()).not.toThrow()
+
+    expect(orden).toEqual(['edicion', 'acotaciones'])
+  })
+
+  it('tras destruir, un estado.set no revive ni las cotas ni la edición', () => {
+    const { contenedor, store, visor } = abrirVisor({ edicion: true })
+    visor.destruir()
+
+    const otra = parcelaConHueco()
+    otra.recintos[0].vertices[0] = [439200, 4479600]
+    expect(() => store.set(otra)).not.toThrow()
+
+    expect(cotasDe(contenedor)).toHaveLength(0)
+    expect(() => visor.edicion.insertarEn({ lat: 40, lng: -3 })).not.toThrow()
+    expect(visor.edicion.insertarEn({ lat: 40, lng: -3 }).aplicado).toBe(false)
   })
 })

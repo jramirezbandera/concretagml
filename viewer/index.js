@@ -7,17 +7,35 @@
 //   import { crearVisor } from './viewer/index.js'
 //
 // ── QUÉ ENSAMBLA, EN QUÉ ORDEN Y POR QUÉ ────────────────────────────────────
-//   1. `crearMapa`     — el `L.Map` con `zoomSnap:0`, `maxZoom` alto, los TRES
-//                        panes del visor, la barra de escala métrica y el
-//                        control de atribución blindado. El mapa nace SIN VISTA
-//                        a propósito (ver punto 4).
+//   1. `crearMapa`     — el `L.Map` con `zoomSnap:0`, `maxZoom` alto, los panes
+//                        del visor, la barra de escala métrica y el control de
+//                        atribución blindado. El mapa nace SIN VISTA a propósito
+//                        (ver punto 5).
 //   2. `montarCapas`   — las cinco bases + la superpuesta, el control de capas y
 //                        el de opacidad. Va DESPUÉS del mapa porque necesita el
 //                        `maxZoom` del mapa para subir el tope de las teseladas.
-//   3. `sincronizar`   — tabla de vértices ↔ dibujo, ambos vistas del mismo
+//   3. EDICIÓN (F06)   — `crearAcotaciones` + `crearEdicion`, y SOLO si el
+//                        llamante ha pedido `opciones.edicion`. Va ANTES de
+//                        `sincronizar`, que es justo lo contrario de lo que
+//                        sugiere el orden visual —primero el dibujo, luego lo que
+//                        se cuelga de él—, y por eso está escrito aquí en vez de
+//                        confiarlo a la intuición del que venga a "ordenarlo":
+//                        `sincronizar` CONSUME los tres ganchos de F06
+//                        (`ajustar`, `alCrearMarcador`, `alPrevisualizar`) y los
+//                        recibe UNA SOLA VEZ, al construirse. No existe ninguna
+//                        vía para enchufarlos después. Montar la edición detrás
+//                        dejaría un visor con la capa de edición viva y los
+//                        marcadores SIN cablear: parecería que edita y no
+//                        editaría, en silencio — el fallo que la regla de oro 1
+//                        prohíbe. Si algún día hay que mover este paso, lo que
+//                        hay que cambiar antes es el contrato de `sincronizar`.
+//   4. `sincronizar`   — tabla de vértices ↔ dibujo, ambos vistas del mismo
 //                        `estado`. Va DESPUÉS de las capas para que la geometría
-//                        del usuario se cablee sobre un mapa ya completo.
-//   4. ENCUADRE        — el ÚLTIMO paso, y no por casualidad. Leaflet difiere el
+//                        del usuario se cablee sobre un mapa ya completo, y
+//                        recibe los ganchos del paso 3 — o los TRES en `null`,
+//                        que es el visor de F03 EXACTO (`edicion:false`, el
+//                        defecto).
+//   5. ENCUADRE        — el ÚLTIMO paso, y no por casualidad. Leaflet difiere el
 //                        `onAdd` de toda capa hasta que el mapa tiene vista
 //                        (`Map#addLayer` → `whenReady`), así que encuadrar al
 //                        final significa que la capa WMS del Catastro emite su
@@ -26,12 +44,29 @@
 //                        para el bueno (criterio de aceptación 2).
 //
 // `destruir()` deshace exactamente eso EN ORDEN INVERSO (sincronización →
-// capas → mapa) y es IDEMPOTENTE. Y si algo falla A MITAD del ensamblaje —el
-// `throw` del encuadre mudo y el del tope de zoom son caminos DOCUMENTADOS que
-// un programador va a pisar en desarrollo— se deshace lo ya montado antes de
-// propagar el error: `crearVisor` es atómica, o devuelve un visor entero o no
-// deja nada en el contenedor. Un mapa Leaflet a medio montar en el DOM es una
-// fuga silenciosa (listeners de `window`, controles, imágenes en vuelo).
+// edición → acotaciones → capas → mapa) y es IDEMPOTENTE. Ese orden tampoco es
+// decorativo: `crearEdicion` APAGA el `doubleClickZoom` del mapa mientras vive
+// —el doble clic inserta un vértice— y lo restaura al destruirse, así que tiene
+// que desmontarse con el mapa todavía en pie. Y si algo falla A MITAD del
+// ensamblaje —el `throw` del encuadre mudo, el del tope de zoom y el de una
+// opción de edición malformada son caminos DOCUMENTADOS que un programador va a
+// pisar en desarrollo— se deshace lo ya montado antes de propagar el error:
+// `crearVisor` es atómica, o devuelve un visor entero o no deja nada en el
+// contenedor. Un mapa Leaflet a medio montar en el DOM es una fuga silenciosa
+// (listeners de `window`, controles, imágenes en vuelo).
+//
+// ── LAS VISTAS EN VIVO NO PINTAN HASTA DESPUÉS DEL ENCUADRE ────────────────
+// `sincronizar` avisa a `alPrevisualizar` al cerrar CADA render, y su primer
+// render ocurre en el paso 4 — o sea, con el mapa aún sin vista. Las acotaciones
+// miden en PÍXELES DE PANTALLA (`Map#latLngToLayerPoint`), y sobre un mapa sin
+// vista eso no da un número malo: LANZA (`_checkIfLoaded`: «Set map center and
+// zoom first»). Ese `throw` no tumbaría nada —`sincronizacion.js` protege el
+// gancho— pero sí dejaría un aviso espurio en la UI en CADA arranque con
+// edición, que es ruido indistinguible de un fallo real. Así que el puente de
+// previsualización nace MUDO y se abre justo después del encuadre, con un
+// `refrescar()` que reproduce el mismo camino de datos (una copia de los anillos
+// del estado, `refVertice:null`). El encuadre sigue siendo el último paso del
+// MONTAJE; esto es un repintado, no una pieza más: no apila nada en `deshacer`.
 //
 // ── EL CONTRATO DE VIEWPORT — NUNCA UN ENCUADRE MUDO (hallazgo C5) ───────────
 // Un visor que arranca mirando a un sitio arbitrario porque nadie decidió dónde
@@ -95,6 +130,9 @@
 
 import { husoPorSrs } from '../geo/huso.js'
 import { resolverAvisar, validarVistaInicial, vertUTMaLatLng, NIVEL } from './_comun.js'
+import { crearAcotaciones } from './acotaciones.js'
+import { crearBarraEdicion } from './barra-edicion.js'
+import { crearEdicion } from './edicion.js'
 import { crearMapa } from './mapa.js'
 import { montarCapas } from './capas.js'
 import { sincronizar } from './sincronizacion.js'
@@ -154,6 +192,78 @@ function esStore(estado) {
     typeof estado.set === 'function' &&
     typeof estado.subscribe === 'function'
   )
+}
+
+/**
+ * Claves que admite `opciones.edicion` cuando viene como objeto. **Es la lista
+ * cerrada**: una clave que no esté aquí es un `throw`, no un silencio.
+ *
+ * Por qué cerrada y no abierta (el resto de `opciones` sí se reenvía tal cual a
+ * `L.map`): ahí el rest TIENE un destinatario documentado —Leaflet— y una clave
+ * desconocida acaba en él. Aquí no hay destinatario: `edicion: {toleracia: 0.5}`
+ * —con la errata— montaría la edición con la tolerancia por defecto y el usuario
+ * vería el snap enganchar "mal" sin que nada lo explicara. Es exactamente el
+ * fallo silencioso de la regla de oro 1, y cuesta tres líneas impedirlo.
+ *
+ * Lo que deliberadamente NO está: las COLINDANTES del snap. Llegan del WFS de
+ * F05, o sea después y de forma asíncrona, así que su camino es
+ * `visor.edicion.fijarColindantes(...)` y solo ese. Admitirlas también aquí sería
+ * un segundo camino para lo mismo que además estaría vacío casi siempre.
+ */
+const CLAVES_EDICION = Object.freeze([
+  'tolerancia',
+  'minimoPx',
+  'snapActivo',
+  'barra',
+  'posicionBarra',
+])
+
+/**
+ * ¿Se monta la barra de herramientas sobre el mapa? **Sí por defecto**, y es una
+ * decisión, no una comodidad: la barra es la ÚNICA superficie desde la que el
+ * usuario puede deshacer, conmutar el enganche o desplazar un lindero, porque el
+ * bloque «Edición» del panel dejó de existir. Un visor con edición y sin barra es
+ * un visor con la mitad de la función inalcanzable, así que hay que pedirlo
+ * explícitamente (`barra: false`) y solo tiene sentido para quien fabrique su
+ * propia UI — o para un test que quiera el mapa pelado.
+ */
+const BARRA_POR_DEFECTO = true
+
+/**
+ * Normaliza `opciones.edicion` a «no montar» (`null`) o al objeto de opciones con
+ * el que se montan las dos piezas de F06.
+ *
+ * @param {*} edicion
+ * @returns {{tolerancia?: number, minimoPx?: number, snapActivo?: boolean}|null}
+ * @throws {TypeError}  Contrato del programador.
+ */
+function normalizarEdicion(edicion) {
+  if (edicion === undefined || edicion === false) return null
+  if (edicion === true) return { barra: BARRA_POR_DEFECTO }
+
+  // `null` se rechaza EN VEZ de tratarlo como `false`, aunque `typeof null` sea
+  // 'object' y colarlo fuera trivial: sería una cuarta forma de decir "no", y las
+  // formas de decir "no" ya son dos de más. Un `edicion: null` es casi siempre un
+  // `?? false` que falta o un valor que se esperaba haber calculado.
+  if (edicion === null || typeof edicion !== 'object' || Array.isArray(edicion)) {
+    throw new TypeError(
+      `crearVisor: 'opciones.edicion' debe ser un booleano, un objeto de opciones ` +
+        `{${CLAVES_EDICION.join(', ')}} o undefined; recibido ` +
+        `${Array.isArray(edicion) ? 'un array' : JSON.stringify(edicion) || typeof edicion}.`,
+    )
+  }
+
+  const desconocidas = Object.keys(edicion).filter((clave) => !CLAVES_EDICION.includes(clave))
+  if (desconocidas.length > 0) {
+    throw new TypeError(
+      `crearVisor: 'opciones.edicion' no conoce ${desconocidas.map((c) => `'${c}'`).join(', ')}. ` +
+        `Las únicas claves admitidas son: ${CLAVES_EDICION.join(', ')}. Las colindantes del snap ` +
+        `no se pasan aquí: llegan del WFS después de montar el visor y se fijan con ` +
+        `visor.edicion.fijarColindantes(recintos).`,
+    )
+  }
+  // La barra se monta salvo que la quiten a mano (ver {@link BARRA_POR_DEFECTO}).
+  return { barra: BARRA_POR_DEFECTO, ...edicion }
 }
 
 /**
@@ -339,13 +449,24 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  *   pasó en las opciones, devuelto por comodidad (ver el JSDoc de `crearVisor`).
  * @property {import('./capas.js').CapasMontadas} capas  Lo que devuelve
  *   `montarCapas`: conmutar base, activar la superpuesta, regular la opacidad…
+ * @property {ReturnType<typeof crearEdicion>|null} edicion  La interacción de
+ *   edición de F06 (`viewer/edicion.js`), o **`null`** si el visor se montó sin
+ *   ella. `null` y NO `undefined`, a propósito: `undefined` es lo que devuelve un
+ *   objeto al que se le ha olvidado una propiedad, y aquí «no montado» es una
+ *   respuesta, no un olvido. `if (visor.edicion)` distingue las dos situaciones
+ *   sin que el llamante tenga que acordarse de con qué opciones lo creó.
+ * @property {import('./acotaciones.js').Acotaciones|null} acotaciones  La capa de
+ *   cotas de F06, o **`null`** por el mismo motivo. Se monta y se desmonta con la
+ *   edición: son las dos mitades de la misma opción.
  * @property {() => void} destruir  Deshace TODO el ensamblaje en orden inverso
- *   (sincronización → capas → mapa). IDEMPOTENTE: llamarlo dos veces no lanza.
+ *   (sincronización → edición → acotaciones → capas → mapa). IDEMPOTENTE:
+ *   llamarlo dos veces no lanza.
  */
 
 /**
- * Crea el visor completo de F03: mapa + capas + tabla de vértices sincronizada,
- * encuadrado según el contrato de viewport (ver la cabecera del módulo).
+ * Crea el visor completo: mapa + capas + tabla de vértices sincronizada —y, si se
+ * pide, la EDICIÓN de F06 con sus acotaciones—, encuadrado según el contrato de
+ * viewport (ver la cabecera del módulo).
  *
  * ── RECIBE EL STORE, NO UNA PARCELA (decisión, una sola forma) ───────────────
  * `opciones.estado` es el store YA CREADO con
@@ -365,6 +486,19 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  * // … más tarde:
  * estado.set(otraParcela)   // mapa y tabla se repintan solos
  * visor.destruir()
+ * ```
+ *
+ * Con edición (F06), y con la ficha de medidas del pie enchufada al MISMO canal
+ * en vivo que las cotas:
+ *
+ * ```js
+ * const visor = crearVisor(el, {
+ *   estado, tablaEl, srs: 'EPSG:25830', historial,
+ *   edicion: { tolerancia: 0.2 },
+ *   alPrevisualizar: (anillosUTM) => ficha.medir(anillosUTM),
+ * })
+ * visor.edicion.fijarColindantes(vecinas.flatMap((p) => p.recintos))
+ * visor.edicion.desplazarSeleccion(0.5)
  * ```
  *
  * @param {HTMLElement} contenedor  Elemento del DOM donde montar el mapa.
@@ -405,14 +539,56 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  *   de opacidad.
  * @param {number} [opciones.maxZoom=24]  Tope de zoom del mapa. DEBE superar el
  *   `maxNativeZoom` de las capas montadas o se lanza `RangeError` (ver cabecera).
+ * @param {boolean|{tolerancia?: number, minimoPx?: number, snapActivo?: boolean}}
+ *   [opciones.edicion=false]  Monta las dos piezas de F06: la INTERACCIÓN de
+ *   edición (`viewer/edicion.js`) y la capa de ACOTACIONES
+ *   (`viewer/acotaciones.js`).
+ *
+ *   · **`false` (el DEFECTO) ⇒ el visor de F03 EXACTO.** No se monta nada, los
+ *     tres ganchos de `sincronizar` van en `null` y `visor.edicion` /
+ *     `visor.acotaciones` valen `null`. Un visor de solo lectura (el diagnóstico
+ *     de F07, el plano de F09) no debe pagar ni un marcador de más ni, sobre
+ *     todo, quedarse sin el zoom por doble clic, que `crearEdicion` apaga.
+ *   · **`true`** ⇒ se montan con todos sus valores por defecto.
+ *   · **objeto** ⇒ igual, con estas TRES claves y ninguna más (una clave
+ *     desconocida es `TypeError`, ver {@link CLAVES_EDICION}):
+ *       - `tolerancia` (metros) → τ del snap, a `crearEdicion`
+ *         (defecto `OPERATIVOS.snapMetros`, 20 cm). `0` = snap apagado.
+ *       - `minimoPx` (píxeles) → longitud mínima en PANTALLA para rotular un
+ *         lado, a `crearAcotaciones` (defecto `OPERATIVOS.acotacionMinimaPx`).
+ *       - `snapActivo` (booleano) → estado inicial del enganche; se aplica con
+ *         `edicion.snapActivo(valor)` en cuanto la pieza existe.
+ * @param {import('./sincronizacion.js').AlPrevisualizar|null}
+ *   [opciones.alPrevisualizar=null]  Vistas en vivo **DEL LLAMANTE**: la ficha de
+ *   superficie / perímetro / Δcatastral de F06, o cualquier otra cosa que quiera
+ *   los anillos EN VUELO durante el arrastre. Recibe UTM y `refVertice` tal como
+ *   los define {@link import('./sincronizacion.js').AlPrevisualizar}.
+ *
+ *   Es una opción **de primer nivel y no una clave de `edicion`**, y es
+ *   deliberado: medir la parcela mientras se mueve un vértice no exige poder
+ *   insertar vértices ni enganchar al parcelario. Son dos cosas distintas, así
+ *   que se piden por separado — este gancho funciona igual **monte o no monte
+ *   edición**.
+ *
+ *   Cuando SÍ hay edición, el canal tiene dos consumidores y se llama a los DOS,
+ *   en este orden: primero se repintan las cotas
+ *   (`acotaciones.pintar(anillos, {soloRef: ref})`) y después este gancho. El
+ *   orden es la protección: `sincronizacion.js` ya envuelve el gancho entero en
+ *   `try/catch` —avisa una vez por gesto y el arrastre sigue—, así que envolverlo
+ *   aquí otra vez sería duplicar una red que ya está puesta; lo único que esa red
+ *   NO garantiza es que el otro consumidor llegue a ejecutarse, y eso se resuelve
+ *   pintando las cotas ANTES. Un `alPrevisualizar` que revienta no se lleva por
+ *   delante ni el repintado de las cotas ni el gesto.
  * @returns {Visor}
  * @throws {TypeError}  Contrato del programador: `opciones` no es un objeto,
  *   `estado` no es el store, `vistaInicial` malformada, `srs` no es un string
  *   (desde `husoPorSrs`), `contenedor`/`tablaEl` no son elementos del DOM (desde
- *   `crearMapa`/`sincronizar`), o **no hay ni geometría ni `vistaInicial`**.
+ *   `crearMapa`/`sincronizar`), `edicion` que no es booleano ni objeto,
+ *   `alPrevisualizar` que no es función, o **no hay ni geometría ni
+ *   `vistaInicial`**.
  * @throws {RangeError}  `srs` no soportado (desde `husoPorSrs`), `baseInicial`
- *   inexistente (desde `montarCapas`), o `maxZoom` que no supera el zoom nativo
- *   de las capas montadas.
+ *   inexistente (desde `montarCapas`), `maxZoom` que no supera el zoom nativo
+ *   de las capas montadas, o `edicion.tolerancia` negativa (desde `crearEdicion`).
  */
 export function crearVisor(contenedor, opciones = {}) {
   if (opciones === null || typeof opciones !== 'object') {
@@ -432,6 +608,8 @@ export function crearVisor(contenedor, opciones = {}) {
     posicion,
     posicionOpacidad,
     maxZoom,
+    edicion: opcionEdicion = false,
+    alPrevisualizar,
     ...opcionesMapa
   } = opciones
 
@@ -451,6 +629,23 @@ export function crearVisor(contenedor, opciones = {}) {
   // Un solo avisador para todo el visor (y su forma queda validada ya aquí).
   const avisar = resolverAvisar(alAvisar)
   if (vistaInicial !== undefined) validarVistaInicial(vistaInicial, CONTEXTO_VISTA_INICIAL)
+  // `null` = no montar edición. Lanza ANTES de montar nada si la opción no tiene
+  // forma: una opción malformada es un bug del llamante lo montemos o no.
+  const opcionesEdicion = normalizarEdicion(opcionEdicion)
+  // Misma política que `resolverAvisar` y que los tres ganchos de `sincronizar`:
+  // "no me han pasado nada" es legítimo (cae a `null`); "me han pasado basura
+  // donde iba una función" es contrato roto, y eso aquí es `throw`.
+  if (
+    alPrevisualizar !== undefined &&
+    alPrevisualizar !== null &&
+    typeof alPrevisualizar !== 'function'
+  ) {
+    throw new TypeError(
+      `crearVisor: 'opciones.alPrevisualizar' debe ser una función (anillosUTM, refVertice), o ` +
+        `null/undefined para no enchufar ninguna vista en vivo; recibido ${typeof alPrevisualizar}.`,
+    )
+  }
+  const previsualizarDelLlamante = typeof alPrevisualizar === 'function' ? alPrevisualizar : null
 
   // Pila de deshacer: se apila cada pieza montada y se desapila en orden inverso,
   // tanto en `destruir()` como si el ensamblaje falla a mitad (ver cabecera).
@@ -458,7 +653,7 @@ export function crearVisor(contenedor, opciones = {}) {
   const deshacer = []
 
   try {
-    // 1 · El mapa (sin vista: el encuadre es el paso 4).
+    // 1 · El mapa (sin vista: el encuadre es el paso 5).
     const { mapa, panes, destruir: destruirMapa } = crearMapa(contenedor, {
       ...opcionesMapa,
       maxZoom,
@@ -480,7 +675,74 @@ export function crearVisor(contenedor, opciones = {}) {
     // La comprobación del tope, en cuanto se sabe qué capas hay de verdad.
     comprobarTopeDeZoom(mapa, capas.maxNativeZoom)
 
-    // 3 · Tabla ↔ dibujo, ambos vistas del mismo estado.
+    // 3 · Las dos piezas de F06, ANTES de sincronizar porque `sincronizar`
+    // CONSUME sus ganchos y solo los acepta al construirse (ver cabecera).
+    /** @type {import('./acotaciones.js').Acotaciones|null} */
+    let acotaciones = null
+    /** @type {ReturnType<typeof crearEdicion>|null} */
+    let edicion = null
+    if (opcionesEdicion !== null) {
+      acotaciones = crearAcotaciones({
+        mapa,
+        zona,
+        minimoPx: opcionesEdicion.minimoPx,
+        alAvisar: avisar,
+      })
+      deshacer.push(() => acotaciones.destruir())
+
+      edicion = crearEdicion({
+        mapa,
+        estado,
+        zona,
+        historial,
+        tolerancia: opcionesEdicion.tolerancia,
+        alAvisar: avisar,
+      })
+      deshacer.push(() => edicion.destruir())
+
+      // Después de apilar su deshacer: `snapActivo` valida su argumento y lanza,
+      // y esa `edicion` ya montada tiene que caer con el resto en el desmontaje.
+      if (opcionesEdicion.snapActivo !== undefined) edicion.snapActivo(opcionesEdicion.snapActivo)
+
+      // La BARRA de herramientas, sobre el mapa. Es una VISTA: no conoce el
+      // modelo ni el historial, solo fabrica los nodos del contrato
+      // (`[data-accion]`, `[data-campo]`, `[data-estado]`) que `app/main.js`
+      // localiza por selector y cablea. Por eso se monta AQUÍ y no allí: cuando
+      // `crearVisor` devuelve, los nodos ya están en el documento, que es
+      // exactamente lo que `cablearEdicion` necesita para resolverlos.
+      //
+      // Vive sobre el mapa y no en el panel porque el bloque «Edición» del panel
+      // se comía 270 px fijos y dejaba la tabla de vértices en 1,6 renglones de
+      // los 15 de la parcela (medido en navegador, ver `spec/feature-06`).
+      if (opcionesEdicion.barra) {
+        const barra = crearBarraEdicion({ mapa, posicion: opcionesEdicion.posicionBarra })
+        deshacer.push(() => barra.destruir())
+      }
+    }
+
+    // El PUENTE de previsualización: un solo gancho para `sincronizar`, dos
+    // consumidores (ver el JSDoc de `opciones.alPrevisualizar`). Nace mudo —el
+    // mapa aún no tiene vista y las cotas miden en píxeles— y se abre justo tras
+    // el encuadre (ver la cabecera del módulo).
+    //
+    // Sin ninguno de los dos consumidores, el gancho es `null` y no una función
+    // vacía: `sincronizar` con `alPrevisualizar:null` no copia los anillos en cada
+    // frame, y eso es parte de "el visor de F03 EXACTO".
+    let vistasEnVivoAbiertas = false
+    const puentePrevisualizacion =
+      acotaciones === null && previsualizarDelLlamante === null
+        ? null
+        : (anillosUTM, refVertice) => {
+            if (!vistasEnVivoAbiertas) return
+            // Las cotas PRIMERO: es lo que garantiza que se repinten aunque el
+            // gancho del llamante reviente (`sincronizacion.js` ya atrapa eso y
+            // avisa una vez por gesto; aquí no se duplica esa red).
+            if (acotaciones !== null) acotaciones.pintar(anillosUTM, { soloRef: refVertice })
+            if (previsualizarDelLlamante !== null) previsualizarDelLlamante(anillosUTM, refVertice)
+          }
+
+    // 4 · Tabla ↔ dibujo, ambos vistas del mismo estado. Con los ganchos del
+    // paso 3, o con los TRES en `null` (el visor de F03, byte a byte).
     const sincronizacion = sincronizar({
       mapa,
       panes,
@@ -489,18 +751,33 @@ export function crearVisor(contenedor, opciones = {}) {
       zona,
       historial,
       alAvisar: avisar,
+      ajustar: edicion === null ? null : edicion.ajustar,
+      alPrevisualizar: puentePrevisualizacion,
+      alCrearMarcador: edicion === null ? null : edicion.alCrearMarcador,
     })
     deshacer.push(() => sincronizacion.destruir())
 
-    // 4 · El encuadre, lo ÚLTIMO (ver cabecera: así la capa WMS del Catastro
-    // pide UNA sola imagen, y del encuadre bueno).
+    // 5 · El encuadre, lo ÚLTIMO del MONTAJE (ver cabecera: así la capa WMS del
+    // Catastro pide UNA sola imagen, y del encuadre bueno).
     encuadrar({ mapa, estado, zona, vistaInicial, avisar })
+
+    // Coda (no es un paso del montaje: no apila nada en `deshacer`): con el mapa
+    // ya encuadrado, las vistas en vivo pueden medir. Se abre el puente y se
+    // fuerza UN render, que es lo que las deja pintadas de arranque sin que el
+    // llamante tenga que acordarse de refrescarlas. No mueve el mapa, así que no
+    // provoca una segunda petición al WMS.
+    if (puentePrevisualizacion !== null) {
+      vistasEnVivoAbiertas = true
+      sincronizacion.refrescar()
+    }
 
     let destruido = false
     return {
       mapa,
       estado,
       capas,
+      edicion,
+      acotaciones,
       destruir() {
         if (destruido) return
         destruido = true

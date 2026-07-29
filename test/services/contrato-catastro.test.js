@@ -849,8 +849,8 @@ describe('G15 · fronteras de capa entre services/, storage/, model/ y app/', ()
 // ─────────────────────────────────────────────────────────────────────────────
 // `app/` exporta sus selectores (`SELECTOR_*`) para que los tests y los guiones
 // de humo apunten al MISMO literal que el módulo, en vez de a una copia que
-// puede divergir. Este guardián cierra el otro extremo del cable: que el
-// `index.html` REAL tenga **exactamente un** nodo por selector.
+// puede divergir. Este guardián cierra el otro extremo del cable: que cada
+// selector tenga **exactamente un** nodo vivo, y en UNA sola fuente.
 //
 // Ni cero ni dos, y las dos mitades importan:
 //   · **Cero** es un botón que no existe: el módulo lanza al cablearse, o —peor—
@@ -864,11 +864,45 @@ describe('G15 · fronteras de capa entre services/, storage/, model/ y app/', ()
 // solo. Y retro-cubre de paso el `SELECTOR_BOTON_GML` de F04, que hasta ahora no
 // tenía quien comprobara que su `data-accion` seguía en el HTML.
 //
+// ── EL CONTRATO SE PARTIÓ EN DOS FUENTES (F06) ──────────────────────────────
+// Las herramientas de edición se mudaron del panel lateral a una BARRA FLOTANTE
+// sobre el mapa: el bloque `<section class="gml-bloque--edicion">` ya no existe
+// en `index.html` y sus siete nodos los fabrica ahora `viewer/barra-edicion.js`,
+// que monta `viewer/index.js#crearVisor`. El contrato no ha desaparecido: tiene
+// dos extremos, y un `SELECTOR_*` de `app/` casa exactamente un nodo **de la
+// cáscara** *o* viene **de la barra**. Lo que se sigue garantizando aquí:
+//
+//   1. Un selector que no case en `index.html` **y** no esté declarado «de la
+//      barra» sigue siendo un fallo: el cableado a la nada de siempre.
+//   2. Un selector declarado «de la barra» que SÍ aparezca en `index.html` es un
+//      fallo NUEVO y peor, y se exige a CERO. Es el duplicado que el traslado
+//      acaba de quitar —el bloque viejo y la barra fabricando los mismos siete
+//      `data-*` a la vez—, y **este guardián es quien lo cazó**: volver a
+//      declararlos ahí los resucitaría en silencio, con el segundo nodo muerto en
+//      pantalla y con el mismo aspecto que el vivo.
+//   3. La partición es EXHAUSTIVA y SIN SOLAPES, y no es una lista escrita a mano
+//      en este fichero —que es justo lo que se pudre—: se DERIVA de la tabla
+//      `CONTRATO` de `test/viewer/barra-edicion.dom.test.js`, el test hermano que
+//      prueba la otra mitad (monta la barra y afirma que cada uno de esos siete
+//      casa EXACTAMENTE un nodo, leyendo los valores de la fuente de
+//      `app/main.js` en vez de copiarlos). De ahí salen tres consecuencias, que
+//      son el punto entero:
+//        · un `SELECTOR_*` nuevo cae POR DEFECTO del lado de la cáscara, así que
+//          si nadie lo pone en `index.html` sale rojo aquí, nombrándolo;
+//        · para pasarlo al lado de la barra hay que declararlo en ese fichero, y
+//          declararlo ahí **es** someterlo a la prueba de que la barra lo produce
+//          exactamente una vez. No queda rendija por la que colarse sin que
+//          alguno de los dos guardianes lo mire;
+//        · y si la lectura de esa tabla se rompiera, la partición no se afloja:
+//          todo caería del lado de la cáscara y este guardián se volvería MÁS
+//          estricto, no menos. El modo de fallo del instrumento es hacia el rojo.
+//
 // jsdom se usa aquí COMO LIBRERÍA, no como entorno: este fichero corre en el
-// proyecto `node` y no puede importar `app/main.js` (arrastra Leaflet, que exige
-// `window`). Los selectores se leen del TEXTO y el HTML se parsea aparte.
+// proyecto `node` y no puede importar `app/main.js` ni `viewer/barra-edicion.js`
+// (los dos arrastran Leaflet, que exige `window`). Los selectores se leen del
+// TEXTO y el HTML se parsea aparte.
 
-describe('G16 · todo `SELECTOR_*` de app/ casa exactamente un nodo de index.html', () => {
+describe('G16 · todo `SELECTOR_*` de app/ casa exactamente un nodo, y de UNA sola fuente', () => {
   const MODULOS_APP = readdirSync(join(RAIZ, 'app'), { withFileTypes: true })
     .filter((e) => e.isFile() && e.name.endsWith('.js'))
     .map((e) => `app/${e.name}`)
@@ -886,6 +920,68 @@ describe('G16 · todo `SELECTOR_*` de app/ casa exactamente un nodo de index.htm
 
   /** Cuántos nodos casan. Aparte para poder probarla contra HTML sintético. */
   const cuantosCasan = (doc, selector) => doc.querySelectorAll(selector).length
+
+  // ── La otra mitad del contrato: los selectores que fabrica la BARRA ────────
+
+  /**
+   * El test hermano que prueba la mitad «de la barra». Se nombra UNA vez y se
+   * usa para las dos cosas: para derivar la partición y para remitir a él en los
+   * mensajes de fallo, que es donde hace falta saber dónde vive la otra mitad.
+   */
+  const TEST_BARRA = 'test/viewer/barra-edicion.dom.test.js'
+
+  const FUENTE_BARRA = (() => {
+    try {
+      return fuenteDe(TEST_BARRA)
+    } catch (causa) {
+      throw new Error(
+        `contrato-catastro.test.js (G16): ${TEST_BARRA} ha desaparecido. De su tabla CONTRATO ` +
+          `sale la partición de los SELECTOR_* de app/ entre «los que trae index.html» y «los ` +
+          `que fabrica viewer/barra-edicion.js», y es además el test que prueba esa segunda ` +
+          `mitad. Si la barra ya no existe, los siete selectores tienen que volver a index.html ` +
+          `y este bloque sobra; si solo se ha movido el fichero, actualiza esta ruta.`,
+        { cause: causa },
+      )
+    }
+  })()
+
+  /**
+   * Los nombres de constante `SELECTOR_*` que {@link TEST_BARRA} declara en su
+   * tabla `CONTRATO` (`{ constante: 'SELECTOR_…', etiqueta: 'BUTTON' }`).
+   *
+   * Se leen del TEXTO, como todo en este fichero: ese test importa Leaflet.
+   * Función aparte —y no una constante— para poder probarla contra fuente
+   * sintética más abajo: es el instrumento del que depende toda la partición.
+   *
+   * @param {string} fuente
+   * @returns {string[]}
+   */
+  const declaradosEnLaBarra = (fuente) =>
+    [...codigoDe(fuente).matchAll(/\bconstante:\s*'(SELECTOR_[\w$]+)'/g)].map((m) => m[1])
+
+  const NOMBRES_BARRA = new Set(declaradosEnLaBarra(FUENTE_BARRA))
+
+  /** Los que fabrica la barra… */
+  const DE_LA_BARRA = SELECTORES.filter(({ nombre }) => NOMBRES_BARRA.has(nombre))
+  /** …y todos los demás, que tienen que estar en la cáscara. */
+  const DE_LA_CASCARA = SELECTORES.filter(({ nombre }) => !NOMBRES_BARRA.has(nombre))
+
+  /**
+   * Los selectores de `lista` cuyo recuento en `doc` NO es el esperado, ya
+   * formateados para que el fallo diga QUIÉN y CUÁNTOS. Una sola función para las
+   * dos mitades: la de la cáscara espera 1 y la de la barra espera 0.
+   *
+   * @param {Document} doc
+   * @param {{modulo: string, nombre: string, selector: string}[]} lista
+   * @param {number} esperado
+   */
+  const desviados = (doc, lista, esperado) =>
+    lista
+      .map(({ modulo, nombre, selector }) => ({
+        quien: `${modulo}#${nombre} (${selector})`,
+        casan: cuantosCasan(doc, selector),
+      }))
+      .filter((s) => s.casan !== esperado)
 
   it('el recorrido de selectores no es vacuo y cubre los dos módulos con contrato', () => {
     expect(SELECTORES.length, 'no se ha leído ni un SELECTOR_* de app/').toBeGreaterThan(0)
@@ -910,25 +1006,104 @@ describe('G16 · todo `SELECTOR_*` de app/ casa exactamente un nodo de index.htm
     expect(documento.querySelectorAll('[data-accion]').length).toBeGreaterThan(0)
   })
 
-  it('cada selector casa EXACTAMENTE un nodo', () => {
-    const rotos = SELECTORES.map(({ modulo, nombre, selector }) => ({
-      quien: `${modulo}#${nombre} (${selector})`,
-      casan: cuantosCasan(documento, selector),
-    })).filter((s) => s.casan !== 1)
+  it('la partición es EXHAUSTIVA y SIN SOLAPES: ningún selector se cuela por la rendija', () => {
+    // Las dos mitades cubren el todo y no se pisan. No se afirma NINGÚN número:
+    // eso sería la lista escrita a mano otra vez, con otro nombre.
+    expect([...DE_LA_CASCARA, ...DE_LA_BARRA].map((s) => s.nombre).sort()).toEqual(
+      SELECTORES.map((s) => s.nombre).sort(),
+    )
+    expect(DE_LA_CASCARA.filter((s) => NOMBRES_BARRA.has(s.nombre))).toEqual([])
+    // Y ninguna de las dos está vacía: con una vacía, la mitad correspondiente de
+    // este guardián no estaría mirando nada.
+    expect(DE_LA_CASCARA.length, 'ningún selector viene ya de index.html').toBeGreaterThan(0)
     expect(
-      rotos,
+      DE_LA_BARRA.length,
+      `${TEST_BARRA} ya no declara ningún SELECTOR_* de app/ en su tabla CONTRATO: o la barra ` +
+        `dejó de fabricarlos (y entonces vuelven a index.html) o el lector de esa tabla se ha ` +
+        `roto y la partición ha dejado de existir`,
+    ).toBeGreaterThan(0)
+    // Un nombre declarado «de la barra» que app/ no exporta es una entrada podrida
+    // en esa tabla: no rompe nada, y por eso hay que verlo.
+    const nombresDeApp = new Set(SELECTORES.map((s) => s.nombre))
+    expect(
+      [...NOMBRES_BARRA].filter((nombre) => !nombresDeApp.has(nombre)),
+      `constantes declaradas en el CONTRATO de ${TEST_BARRA} que app/ ya no exporta`,
+    ).toEqual([])
+  })
+
+  it('cada selector DE LA CÁSCARA casa EXACTAMENTE un nodo de index.html', () => {
+    expect(
+      desviados(documento, DE_LA_CASCARA, 1),
       'selectores exportados por app/ que NO casan exactamente un nodo de index.html. Cero es ' +
         'un cableado a la nada; dos es peor, porque el módulo agarra el primero y el segundo ' +
         'queda muerto en pantalla con el mismo aspecto que el vivo. Los tests de app/ no lo ' +
-        'ven: montan su propio DOM y ahí el nodo siempre está',
+        'ven: montan su propio DOM y ahí el nodo siempre está. Si el selector es de los que ' +
+        `fabrica viewer/barra-edicion.js, su sitio es la tabla CONTRATO de ${TEST_BARRA}`,
     ).toEqual([])
+  })
+
+  it('⚠️ ningún selector DE LA BARRA vuelve a estar declarado en index.html', () => {
+    expect(
+      desviados(documento, DE_LA_BARRA, 0),
+      'selectores que fabrica viewer/barra-edicion.js y que ADEMÁS aparecen en index.html. Es ' +
+        'el duplicado que el traslado del bloque «Edición» al mapa acabó de quitar, y es peor ' +
+        'que la ausencia: `cablearEdicion` agarraría el de la cáscara —el primero del ' +
+        'documento— y el de la barra quedaría muerto sobre el mapa, con el mismo aspecto que ' +
+        `el vivo. Estos siete nodos tienen un solo dueño; quien los prueba es ${TEST_BARRA}`,
+    ).toEqual([])
+  })
+
+  it(`la otra mitad la prueba ${TEST_BARRA}, y sigue haciéndolo`, () => {
+    // Este fichero corre en el proyecto `node` y NO puede montar la barra (Leaflet
+    // exige `window`), así que la mitad de arriba se apoya en el test hermano. Lo
+    // que se puede comprobar desde aquí es que ese apoyo sigue existiendo, y es lo
+    // que se comprueba: si algo de esto cambia, sale rojo pidiendo que se mire a
+    // mano si la otra mitad sigue afirmando lo que este guardián da por hecho.
+    //
+    // 1 · Corre de verdad: el sufijo `.dom.test.js` lo enruta al proyecto `dom`
+    //     (ver `vitest.config.js`), y SPEC §6 exige los DOS proyectos en verde.
+    expect(TEST_BARRA.endsWith('.dom.test.js')).toBe(true)
+    // 2 · No copia los literales: lee los valores de la fuente de `app/main.js`.
+    //     Si los copiara, sus siete selectores podrían divergir de los de verdad y
+    //     estaría probando otra cosa.
+    //     ⚠️ Sobre el CÓDIGO, no sobre el texto, y por quinta vez en este fichero:
+    //     ese test NOMBRA `[data-accion="offset"]` en un comentario, para explicar
+    //     de qué regla de `estilos/app.css` depende el orden de dos hermanos. Un
+    //     `includes` sobre el fichero entero confundiría la explicación con la
+    //     copia. Se comprueba abajo que la distinción sigue haciendo falta.
+    expect(
+      FUENTE_BARRA,
+      `${TEST_BARRA} ya no lee los selectores de app/main.js`,
+    ).toMatch(/readFileSync\([^\n]{0,80}'main\.js'/)
+    const codigoBarra = codigoDe(FUENTE_BARRA)
+    for (const { nombre, selector } of DE_LA_BARRA) {
+      expect(
+        codigoBarra,
+        `${TEST_BARRA} ha copiado a mano el literal de ${nombre}: tiene que leerlo de app/main.js`,
+      ).not.toContain(selector)
+    }
+    // La trampa, anclada: si ese comentario desapareciera, mirar el CÓDIGO y no el
+    // texto dejaría de estar distinguiendo nada y esta cautela sobraría.
+    const mencionados = DE_LA_BARRA.filter(({ selector }) => FUENTE_BARRA.includes(selector))
+    expect(
+      mencionados.length,
+      `${TEST_BARRA} ya no nombra ningún selector en un comentario: el filtro de comentarios de ` +
+        `esta comprobación deja de distinguir MENCIÓN de COPIA`,
+    ).toBeGreaterThan(0)
+    // 3 · Y afirma que cada uno casa EXACTAMENTE un nodo, que es la mitad del
+    //     contrato que aquí se exige a CERO en `index.html`.
+    expect(
+      FUENTE_BARRA,
+      `${TEST_BARRA} ya no afirma que cada selector case exactamente un nodo: sin eso, exigir ` +
+        `aquí que valgan CERO en index.html dejaría a esos siete sin nadie que los cuente`,
+    ).toMatch(/querySelectorAll\(selector\)\.length[\s\S]{0,400}?\)\.toBe\(1\)/)
   })
 
   it('el detector NO es vacuo: cuenta cero y cuenta dos sobre HTML sintético', () => {
     // Se ha VISTO fallar. Las dos formas de romper el contrato, escritas a
-    // propósito, con el PRIMER selector real del recorrido para que la prueba no
+    // propósito, con el PRIMER selector real de la cáscara para que la prueba no
     // dependa de ningún literal escrito aquí.
-    const { selector } = SELECTORES[0]
+    const { selector } = DE_LA_CASCARA[0]
     const atributo = selector.slice(1, -1) // `data-x="y"`
     const vacio = new JSDOM('<main></main>').window.document
     expect(cuantosCasan(vacio, selector), 'un documento sin el nodo debe dar 0').toBe(0)
@@ -939,6 +1114,49 @@ describe('G16 · todo `SELECTOR_*` de app/ casa exactamente un nodo de index.htm
     // Y el HTML real da 1 para ese mismo selector: si diera otra cosa, el test de
     // arriba ya habría caído, pero aquí queda dicho que la herramienta MIDE.
     expect(cuantosCasan(documento, selector)).toBe(1)
+  })
+
+  it('la mitad NUEVA tampoco es vacua: un `data-*` de la barra en el HTML se caza', () => {
+    // La prueba negativa del guardián que acaba de cazar el duplicado de verdad.
+    // Se reconstruye el estado intermedio del traslado —una cáscara que todavía
+    // declara uno de los nodos que ahora fabrica la barra— y se comprueba que la
+    // comparación de arriba lo detecta y lo NOMBRA, uno por uno. Sin esto, «vale
+    // cero» podría ser cierto por casualidad para siempre.
+    //
+    // Sobre HTML SINTÉTICO y no sobre `index.html`: un instrumento que se mide a
+    // sí mismo contra el sujeto vigilado deja de decir nada el día que el sujeto
+    // está roto —fallaría por el mismo motivo que el guardián, tapándolo—.
+    for (const { nombre, selector } of DE_LA_BARRA) {
+      const atributo = selector.slice(1, -1) // `data-x="y"`
+      const resucitado = new JSDOM(`<main><p ${atributo}></p></main>`).window.document
+      const cazados = desviados(resucitado, DE_LA_BARRA, 0)
+      expect(cazados.map((c) => c.casan), `${nombre} resucitado en la cáscara`).toEqual([1])
+      expect(cazados[0].quien).toContain(nombre)
+    }
+    // Y sobre el HTML real la misma llamada no caza nada, que es justo lo que
+    // afirma el guardián: aquí queda dicho que la herramienta MIDE.
+    expect(desviados(documento, DE_LA_BARRA, 0)).toEqual([])
+  })
+
+  it('el lector de la tabla CONTRATO no es vacuo, y falla hacia el ROJO', () => {
+    // El instrumento del que depende la partición entera, probado contra fuente
+    // sintética. Lee la forma real de la tabla…
+    expect(declaradosEnLaBarra("{ constante: 'SELECTOR_X', etiqueta: 'BUTTON' },\n")).toEqual([
+      'SELECTOR_X',
+    ])
+    // …no se inventa nada donde no hay tabla…
+    expect(declaradosEnLaBarra('const CONTRATO = []\n')).toEqual([])
+    // …y no cuenta lo que solo está NOMBRADO en un comentario, que es como está
+    // escrita media cabecera de ese fichero.
+    expect(declaradosEnLaBarra("// { constante: 'SELECTOR_FANTASMA' }\n")).toEqual([])
+    // La consecuencia, que es lo que hace segura la partición: con la tabla
+    // ilegible, la mitad «de la barra» queda VACÍA, todos los selectores caen del
+    // lado de la cáscara y a los siete de la barra se les exige un nodo que
+    // `index.html` ya no tiene. O sea, el fallo del instrumento pone la suite en
+    // rojo en vez de aflojarla, que es la única dirección admisible.
+    const conTablaIlegible = new Set(declaradosEnLaBarra(''))
+    expect(SELECTORES.filter(({ nombre }) => conTablaIlegible.has(nombre))).toEqual([])
+    expect(desviados(documento, SELECTORES, 1).length).toBeGreaterThan(0)
   })
 
   it('los `data-*` del HTML no se cuelan desde un COMENTARIO', () => {

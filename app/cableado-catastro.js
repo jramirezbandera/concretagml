@@ -26,8 +26,48 @@
 //     recarga de la página, es exactamente lo que la política de uso del servicio
 //     castiga (override O8). Todo sale de un gesto explícito del usuario.
 //   · **No toca la ficha del pie** (`data-ficha="…"`). Esos nodos son de
-//     `app/main.js`; `colindantes()` DEVUELVE su resultado para que quien cablee
-//     decida qué hacer con él.
+//     `app/main.js`; `colindantes()` DEVUELVE su resultado —y desde F06 lo
+//     PUBLICA además a quien se haya suscrito con `alColindantes`— para que quien
+//     cablee decida qué hacer con él. Ni una vecina entra en el modelo.
+//
+// ── F06 · LOS DOS GANCHOS HACIA AFUERA, Y POR QUÉ SON DOS Y NO UNO ──────────
+// Hasta F05 este módulo no llamaba a nadie: escribía en el store, en la cáscara y
+// devolvía resultados. F06 necesita dos avisos que el store NO puede dar, y por eso
+// son dos ganchos y no un suscriptor más de `estado.subscribe`:
+//
+//   · **`alCargarParcela(parcela)`** — se dispara tras el `estado.set` de una
+//     parcela **TRAÍDA del Catastro**, y sólo ahí. El store notifica TODOS los
+//     `set`, y desde fuera «parcela recién traída» y «parcela con un vértice
+//     movido» son indistinguibles: quien reinicia el historial de edición
+//     (`edit/historial.js`) necesita justo esa diferencia, porque reiniciarlo en
+//     cada arrastre borraría el «deshacer» del usuario. `deducir()` **no** lo
+//     dispara: rellena el campo, no mete geometría.
+//   · **`alColindantes(resultado)`** — SUSCRIPCIÓN (varios oyentes, con baja), no
+//     un callback único, calcada de `crearEstadoVista#subscribe`. Recibe el
+//     {@link ResultadoCatastro} de una consulta de vecinas que ha ido BIEN: los
+//     `ok:false` se cuentan por el renglón y el panel y no se publican, porque
+//     quien se suscribe espera datos utilizables (las vecinas son dianas del snap
+//     de F06), no un objeto que tenga que volver a clasificar.
+//
+// Un oyente que revienta **no tumba el cableado ni impide que se notifique a los
+// demás**: se envuelve, se cuenta por el panel y por la consola
+// ({@link MENSAJE_SUSCRIPTOR_ROTO}) y se sigue. Lo contrario haría que un bug en el
+// snap convirtiera una consulta correcta en una excepción del Catastro, que es
+// mentir sobre de quién es el fallo.
+//
+// ⚠️ Los dos son **opcionales**. Sin ellos el módulo se comporta exactamente como
+// en F05, y eso no es cortesía: `app/main.js` los enchufa cuando existe quien los
+// consume, y ningún test de F05 tuvo que cambiar para que existieran.
+//
+// ── POR QUÉ «TRAER COLINDANTES» ES UN BOTÓN Y NO UN EFECTO DE `cargar()` ────
+// Las vecinas hacen falta desde F06 (snap «al parcelario oficial y a las
+// colindantes»), y la tentación es traerlas solas al cargar la parcela. No se hace:
+// sería una SEGUNDA petición por cada parcela que nadie ha pedido, que es
+// exactamente lo que castiga la política de uso del servicio (override O8), y
+// dispararlas desde el suscriptor del store acabaría consultando al Catastro **al
+// mover un vértice**. Una pulsación, una petición. La segunda pulsación sobre la
+// misma parcela **no vuelve a la red**, y eso tampoco se resuelve aquí: lo da la
+// caché de `services/catastro.js` (clave `parcela:<srs>:<refcat>:vecindad`).
 //
 // ── LAS DOS DEFENSAS CONTRA LA CARRERA, Y HACEN FALTA LAS DOS ───────────────
 // Dos consultas encabalgadas (dos clics seguidos, un clic mientras F07 pide los
@@ -137,6 +177,17 @@ export const SELECTOR_BOTON_CARGAR = '[data-accion="cargar-catastro"]'
  */
 export const SELECTOR_BOTON_DEDUCIR = '[data-accion="deducir-refcat"]'
 
+/**
+ * «Traer colindantes». **Nace `disabled` en `index.html`** y lo habilita el
+ * ESTADO: ver {@link puedePedirColindantesDe}.
+ *
+ * No tiene renglón propio y usa el del bloque ({@link SELECTOR_ESTADO_CATASTRO}),
+ * que es lo correcto: es una consulta al Catastro más, y darle un `role="status"`
+ * aparte haría que dos renglones vecinos se contradijeran sobre cuál fue la última
+ * acción.
+ */
+export const SELECTOR_BOTON_COLINDANTES = '[data-accion="traer-colindantes"]'
+
 /** Renglón `role="status"` del bloque: el desenlace de la última acción. */
 export const SELECTOR_ESTADO_CATASTRO = '[data-estado="cargar-catastro"]'
 
@@ -170,6 +221,37 @@ export const ROTULO_DEDUCIDA = 'Parcela deducida de la ubicación · puedes corr
 export const MENSAJE_FALLO_INESPERADO =
   'La consulta al Catastro se ha interrumpido por un fallo interno de la aplicación; no se ha ' +
   'cambiado nada. El detalle técnico está en la consola del navegador.'
+
+/**
+ * Lo que se le dice al usuario cuando revienta algo que estaba PENDIENTE del
+ * resultado (el callback `alCargarParcela` o un suscriptor de `alColindantes`), no
+ * la consulta.
+ *
+ * Es distinto de {@link MENSAJE_FALLO_INESPERADO} a propósito, y la diferencia
+ * importa: ahí falló la consulta y no se cambió nada; aquí la consulta ha ido bien,
+ * el dato del Catastro es correcto y lo que puede haberse quedado a medias es lo
+ * que dependía de él. Decir «la consulta se ha interrumpido» sería culpar al
+ * Catastro de un bug de esta casa.
+ *
+ * **No toca el renglón**: el renglón cuenta el desenlace de lo que el usuario
+ * pidió, y lo que pidió salió bien. Va por panel y consola, que son dos canales.
+ */
+export const MENSAJE_SUSCRIPTOR_ROTO =
+  'La consulta al Catastro ha terminado bien, pero algo que estaba pendiente de su resultado ha ' +
+  'fallado por un defecto interno de la aplicación. El dato del Catastro es correcto; lo que ' +
+  'puede no haberse actualizado es lo que dependía de él. El detalle técnico está en la consola ' +
+  'del navegador.'
+
+/**
+ * Por qué «Traer colindantes» está apagado. **Un botón gris y mudo es un error
+ * silencioso** (regla de oro 1, y está escrito en `index.html`: «quien las
+ * enciende —y quien escribe el motivo cuando NO las enciende— es el cableado»).
+ *
+ * Se exporta para que su test lo afirme sin copiar el literal.
+ */
+export const MOTIVO_COLINDANTES_APAGADO =
+  '«Traer colindantes» está apagado: las vecinas lo son de una parcela concreta, y todavía no ' +
+  'hay ninguna cargada con referencia catastral. Trae una parcela del Catastro y se enciende.'
 
 /** Cola del renglón cuando el mensaje ÍNTEGRO acaba de entrar en el panel. */
 const COLA_DETALLE = 'El detalle está en el panel de avisos.'
@@ -358,6 +440,32 @@ function puedeDeducirDe(parcelaActual) {
   return recintosDe(parcelaActual).length > 0 && referenciaDe(parcelaActual) === null
 }
 
+/**
+ * ¿Tiene sentido ofrecer «Traer colindantes»? **Hay una parcela con referencia
+ * catastral en el MODELO.** Es la condición exacta y ninguna otra:
+ *   · sin referencia no hay a quién pedirle vecinas — `GetNeighbourParcel` se
+ *     pregunta por una referencia, no por una geometría;
+ *   · se mira el MODELO y no el campo, y esa es la mitad que se olvida: el campo
+ *     puede tener una referencia a medio teclear o una que el usuario acaba de
+ *     pegar y aún no ha traído, y encender el botón entonces prometería las
+ *     vecinas de una parcela que no está en el expediente.
+ *
+ * ⚠️ **No se exige que la referencia sea normalizable.** Una referencia rara en el
+ * modelo enciende el botón igual, y el cliente contesta `ENTRADA_INVALIDA` sin
+ * tocar la red — mismo criterio que «Traer del Catastro», que está siempre
+ * disponible por eso mismo. Apagar el botón por algo que el usuario no puede ver ni
+ * corregir sería la peor versión del botón mudo.
+ *
+ * No se exporta, por el mismo motivo que {@link puedeDeducirDe}: es una regla
+ * INTERNA de esta pantalla. Se comprueba desde fuera por su efecto (el `disabled`).
+ *
+ * @param {object|null} parcelaActual
+ * @returns {boolean}
+ */
+function puedePedirColindantesDe(parcelaActual) {
+  return referenciaDe(parcelaActual) !== null
+}
+
 // ── Procedencia ──────────────────────────────────────────────────────────────
 
 /**
@@ -440,31 +548,41 @@ function esEmisor(m) {
 
 /**
  * Cablea el bloque «Origen de la parcela»: el campo de la referencia, «Traer del
- * Catastro», «Deducir del mapa», la lista de candidatos y el renglón de
- * procedencia. Es el último metro de F05 y lo único de toda la feature que el
- * usuario llega a ver.
+ * Catastro», «Deducir del mapa», «Traer colindantes», la lista de candidatos y el
+ * renglón de procedencia. Es el último metro de F05 y lo único de toda la feature
+ * que el usuario llega a ver.
  *
  * ── LAS TRES ACCIONES ──
  *   · **`cargar()`** — `cliente.parcelaPorRefcat(lo que hay en el campo)` y, si trae
  *     dato, `estado.set(crearParcela(...))`. Es la ÚNICA de las tres que escribe en
- *     el modelo, y hace **un solo `set`**.
+ *     el modelo, y hace **un solo `set`**. Es también la única que dispara
+ *     `alCargarParcela`, y siempre DESPUÉS del `set`.
  *   · **`deducir()`** — punto interior de la geometría del store →
  *     `cliente.refcatPorCoordenada` → rellena el CAMPO (nunca el modelo). Con
  *     varios candidatos no rellena nada: los lista con su domicilio y deja elegir.
+ *     **No dispara `alCargarParcela`**: no mete geometría en ninguna parte.
  *   · **`colindantes()`** — `cliente.parcelaYColindantes` de la parcela cargada.
- *     **No escribe en el modelo**: `model/parcela.js` no tiene dónde guardar unas
- *     vecinas, y meterlas donde no van sería peor que devolverlas. Se devuelve el
- *     {@link ResultadoCatastro} para que F07 (diagnóstico, invasión, snap) haga con
- *     él lo que le toque.
+ *     Desde F06 tiene su BOTÓN («Traer colindantes»), y sigue sin escribir en el
+ *     modelo: `model/parcela.js` no tiene dónde guardar unas vecinas, y meterlas
+ *     donde no van sería peor que devolverlas. Se devuelve el
+ *     {@link ResultadoCatastro} **y se publica** a los suscriptores de
+ *     `alColindantes`, para que F06 (snap) y F07 (diagnóstico, invasión) hagan con
+ *     él lo que les toque.
  *
  * Las tres devuelven una promesa del {@link ResultadoCatastro} (o `null` si no se
  * llegó a consultar nada), y las tres comparten el mismo esqueleto de defensas: ver
  * la cabecera del módulo.
  *
  * ```js
- * const catastro = cablearCatastro({ estado, panel, cliente, srs: 'EPSG:25830', mapa })
+ * const catastro = cablearCatastro({
+ *   estado, panel, cliente, srs: 'EPSG:25830', mapa,
+ *   alCargarParcela: (parcela) => reiniciar(historial, parcela),
+ * })
+ * const baja = catastro.alColindantes((r) => {
+ *   snap.dianas(r.datos.colindantes.flatMap((p) => p.recintos))
+ * })
  * // … al cerrar la pantalla:
- * catastro.destruir()
+ * catastro.destruir()   // retira los oyentes Y suelta los suscriptores
  * ```
  *
  * @param {object} opciones
@@ -484,9 +602,17 @@ function esEmisor(m) {
  *   la pantalla, no media hora después.
  * @param {{on: Function, off: Function}|null} [opciones.mapa=null]  Emisor de clics
  *   del mapa (el `L.Map`). Por DUCK TYPING; ver {@link esEmisor}.
+ * @param {((parcela: object) => void)|null} [opciones.alCargarParcela=null]  Se
+ *   llama DESPUÉS de cada `estado.set` de una parcela **traída del Catastro**, con
+ *   el POJO que ha entrado en el store. **OPCIONAL**: sin él, el módulo se comporta
+ *   igual que en F05. No se llama en `deducir()` (que no mete geometría), ni cuando
+ *   la respuesta llega superada por otra más nueva, ni después de `destruir()`. Ver
+ *   la sección de los dos ganchos en la cabecera.
  * @param {HTMLElement} [opciones.campo]  Por defecto {@link SELECTOR_CAMPO_REFCAT}.
  * @param {HTMLElement} [opciones.botonCargar]  Ídem {@link SELECTOR_BOTON_CARGAR}.
  * @param {HTMLElement} [opciones.botonDeducir]  Ídem {@link SELECTOR_BOTON_DEDUCIR}.
+ * @param {HTMLElement} [opciones.botonColindantes]  Ídem
+ *   {@link SELECTOR_BOTON_COLINDANTES}.
  * @param {HTMLElement} [opciones.renglon]  Ídem {@link SELECTOR_ESTADO_CATASTRO}.
  * @param {HTMLElement} [opciones.procedencia]  Ídem {@link SELECTOR_PROCEDENCIA}.
  * @param {HTMLElement} [opciones.candidatos]  Ídem {@link SELECTOR_CANDIDATOS}.
@@ -496,10 +622,12 @@ function esEmisor(m) {
  * @returns {{cargar: () => Promise<ResultadoCatastro|null>,
  *            deducir: () => Promise<ResultadoCatastro|null>,
  *            colindantes: () => Promise<ResultadoCatastro|null>,
+ *            alColindantes: (fn: (resultado: ResultadoCatastro) => void) => (() => void),
  *            destruir: () => void}}
  * @throws {Error|TypeError|RangeError}  Si falta un nodo del contrato (vía
  *   {@link nodo}, nombrando el selector), si el `cliente` no lo es, si el `mapa` no
- *   emite, o si el `srs` no es un huso soportado.
+ *   emite, si `alCargarParcela` no es función, o si el `srs` no es un huso
+ *   soportado.
  */
 export function cablearCatastro({
   estado,
@@ -507,9 +635,11 @@ export function cablearCatastro({
   cliente,
   srs,
   mapa = null,
+  alCargarParcela = null,
   campo = nodo(SELECTOR_CAMPO_REFCAT),
   botonCargar = nodo(SELECTOR_BOTON_CARGAR),
   botonDeducir = nodo(SELECTOR_BOTON_DEDUCIR),
+  botonColindantes = nodo(SELECTOR_BOTON_COLINDANTES),
   renglon = nodo(SELECTOR_ESTADO_CATASTRO),
   procedencia = nodo(SELECTOR_PROCEDENCIA),
   candidatos = nodo(SELECTOR_CANDIDATOS),
@@ -527,6 +657,14 @@ export function cablearCatastro({
     throw new TypeError(
       `cablearCatastro: 'mapa' debe ser un emisor con 'on' y 'off' (el L.Map del visor), o null ` +
         `si no se quiere deducir con un clic; recibido ${typeof mapa}.`,
+    )
+  }
+  if (alCargarParcela !== null && typeof alCargarParcela !== 'function') {
+    throw new TypeError(
+      `cablearCatastro: 'alCargarParcela' debe ser una función (se le pasa el POJO de la parcela ` +
+        `que acaba de entrar en el store) o null si no hace falta; recibido ` +
+        `${typeof alCargarParcela}. Se rechaza al cablear y no en la primera carga: un gancho ` +
+        `mal pasado tiene que descubrirse al montar la pantalla, no media hora después.`,
     )
   }
   // Delegado: `husoPorSrs` es el único sitio del proyecto que sabe qué husos están
@@ -547,6 +685,14 @@ export function cablearCatastro({
   let enVuelo = null
 
   let destruido = false
+
+  /**
+   * Los suscriptores de `alColindantes`. Un `Set` y no un solo callback, calcado de
+   * `crearEstadoVista#subscribe`: F06 quiere las vecinas para el snap y F07 las
+   * querrá para el diagnóstico, y el segundo en llegar no puede desalojar al
+   * primero en silencio — que es exactamente lo que hace un `alColindantes = fn`.
+   */
+  const suscriptoresColindantes = new Set()
 
   // ── Escritura en la cáscara ────────────────────────────────────────────────
 
@@ -570,14 +716,27 @@ export function cablearCatastro({
   }
 
   /**
-   * Estado de los dos botones. Es a la vez el suscriptor del store y lo que se
+   * Estado de los TRES botones. Es a la vez el suscriptor del store y lo que se
    * llama al acabar cada consulta, así que la regla vive en UN solo sitio:
    *
-   *   · mientras hay algo EN VUELO, los dos apagados (cortesía, no garantía);
+   *   · mientras hay algo EN VUELO, los tres apagados (cortesía, no garantía; y
+   *     además es lo que impide que una doble pulsación dispare dos peticiones);
    *   · «Traer del Catastro», siempre disponible en reposo: el campo vacío o mal
    *     escrito lo resuelve el cliente con `ENTRADA_INVALIDA` y sin tocar la red,
    *     y un botón apagado sin motivo al lado es lo que no se admite;
-   *   · «Deducir del mapa», sólo si {@link puedeDeducirDe}.
+   *   · «Deducir del mapa», sólo si {@link puedeDeducirDe};
+   *   · «Traer colindantes», sólo si {@link puedePedirColindantesDe}, y cuando
+   *     queda apagado **se escribe el motivo**: ver {@link MOTIVO_COLINDANTES_APAGADO}.
+   *
+   * ── POR QUÉ EL MOTIVO SÓLO SE ESCRIBE CON EL RENGLÓN VACÍO ──
+   * El renglón es del DESENLACE de la última acción (reparto de superficies de la
+   * cabecera), y `refrescar` corre en cada `set` del store —o sea, en cada vértice
+   * que F06 mueva— y al final de cada consulta. Escribir ahí sin condición borraría
+   * «Cargada la parcela X: 12 vértices» un instante después de haberlo puesto. El
+   * renglón VACÍO es el único estado que no es de nadie («no ha pasado nada
+   * todavía»), y es justo el que se ve al abrir la app con el botón ya gris: ese
+   * hueco es el que se llena. En cuanto una acción habla, el motivo del botón
+   * apagado ES lo que esa acción acaba de contar.
    *
    * @param {object|null} parcelaActual
    */
@@ -585,6 +744,67 @@ export function cablearCatastro({
     const ocupado = enVuelo !== null
     botonCargar.disabled = ocupado
     botonDeducir.disabled = ocupado || !puedeDeducirDe(parcelaActual)
+    const sinReferencia = !puedePedirColindantesDe(parcelaActual)
+    botonColindantes.disabled = ocupado || sinReferencia
+    // `ocupado` fuera: mientras hay algo en vuelo el motivo de estar apagado es la
+    // consulta en curso, no la falta de referencia, y contarlo sería mentir.
+    if (!ocupado && sinReferencia && renglon.textContent === '') {
+      // `false`: no es un fallo. Nadie ha pedido nada todavía; se explica un botón.
+      decir(MOTIVO_COLINDANTES_APAGADO, false)
+    }
+  }
+
+  // ── Los dos ganchos hacia afuera ───────────────────────────────────────────
+
+  /**
+   * Cuenta que un oyente de fuera ha reventado. **Panel y consola, nunca el
+   * renglón**: la consulta ha ido bien y el renglón cuenta lo que el usuario pidió.
+   *
+   * Nivel `ERROR` por la misma razón que {@link reventar}: no es un motivo del
+   * catálogo del Catastro sino un defecto de programación, y esos no se degradan a
+   * aviso para que no molesten.
+   *
+   * @param {string} quien  El gancho que ha fallado, para la consola.
+   * @param {*} causa
+   */
+  function contarOyenteRoto(quien, causa) {
+    panel.avisar(MENSAJE_SUSCRIPTOR_ROTO, { nivel: NIVEL.ERROR, causa })
+    console.error(`[catastro] ${quien} ha fallado tras una consulta correcta:`, causa)
+  }
+
+  /**
+   * Avisa de que ha entrado en el store una parcela TRAÍDA del Catastro. Se llama
+   * desde {@link aplicar} y desde ningún otro sitio.
+   *
+   * @param {object} parcela  El POJO que acaba de entrar en el store.
+   */
+  function notificarCarga(parcela) {
+    if (alCargarParcela === null || destruido) return
+    try {
+      alCargarParcela(parcela)
+    } catch (causa) {
+      contarOyenteRoto('el aviso de parcela cargada (alCargarParcela)', causa)
+    }
+  }
+
+  /**
+   * Publica un resultado de vecinas que ha ido BIEN a todos los suscriptores.
+   *
+   * Se itera sobre una COPIA: un suscriptor que se da de baja a sí mismo dentro de
+   * la notificación (o que registra otro) no puede alterar el recorrido en curso.
+   * Y cada uno va en su propio `try`: **uno que revienta no puede impedir que se
+   * notifique a los demás**, que es la diferencia entre un canal y una cadena.
+   *
+   * @param {ResultadoCatastro} resultado
+   */
+  function publicarColindantes(resultado) {
+    for (const fn of [...suscriptoresColindantes]) {
+      try {
+        fn(resultado)
+      } catch (causa) {
+        contarOyenteRoto('un suscriptor de colindantes (alColindantes)', causa)
+      }
+    }
   }
 
   /**
@@ -769,6 +989,12 @@ export function cablearCatastro({
         `${parcela.recintos.reduce((n, r) => n + r.vertices.length, 0)} vértices.`,
       false,
     )
+
+    // EL ÚLTIMO, y a propósito: quien escuche esto (F06 reinicia el historial de
+    // edición) se encuentra la pantalla ya coherente —store, campo, procedencia y
+    // renglón—, en vez de a mitad de escribirse. Y si revienta, lo de arriba ya
+    // está hecho: una parcela cargada no se deshace porque falle un oyente.
+    notificarCarga(parcela)
   }
 
   /**
@@ -936,11 +1162,23 @@ export function cablearCatastro({
   /**
    * Trae la parcela y sus COLINDANTES. No escribe en el modelo (ver el JSDoc de
    * {@link cablearCatastro}); devuelve el resultado para quien sepa qué hacer con
-   * él.
+   * él, y **lo publica** a los suscriptores de `alColindantes`.
    *
    * La referencia sale del MODELO —los colindantes lo son de la parcela cargada, no
    * de lo que haya a medio teclear— y sólo cae al campo si el modelo aún no tiene
    * ninguna, que es el caso de quien pide vecinas antes de cargar nada.
+   *
+   * ── «CERO COLINDANTES» NO ES UN FALLO, Y AQUÍ SE DICE DISTINTO ──
+   * Una parcela aislada existe (rodeada de viales, de dominio público o de suelo
+   * sin parcelar), y contarla como un error mandaría al usuario a buscar una avería
+   * que no hay. Se distingue **por el número**, que es un dato que esta casa ha
+   * calculado —`services/catastro.js` separa la propia por referencia catastral
+   * normalizada (override O15: `GetNeighbourParcel` la devuelve dentro, en 2.ª
+   * posición)—, **nunca leyendo el texto del servicio**: el override O14 dice que
+   * «vacío» y «no existe» llegan con el mismo `exceptionCode` y sólo se
+   * distinguirían por texto libre, bilingüe y con errata, sobre el que está
+   * PROHIBIDO ramificar. Ese caso ni llega aquí: sale como `NO_ENCONTRADO` y lo
+   * cuenta {@link contarFallo}.
    *
    * @returns {Promise<ResultadoCatastro|null>}
    */
@@ -953,15 +1191,24 @@ export function cablearCatastro({
       )
       if (!vigente) return superada(resultado)
       if (!resultado.ok) {
+        // Un resultado sin dato NO se publica: quien se suscribe espera vecinas
+        // utilizables (dianas del snap), no un objeto que tenga que reclasificar.
         contarFallo(resultado)
         return resultado
       }
       const cuantos = resultado.datos.colindantes.length
       decir(
-        `El Catastro ha devuelto ${cuantos} colindante${cuantos === 1 ? '' : 's'} de la parcela ` +
-          `${pedida}.`,
+        cuantos === 0
+          ? `El Catastro ha contestado con la parcela ${pedida} y NINGUNA colindante. No es un ` +
+              `fallo: es el dato — hay parcelas aisladas, rodeadas de viales o de suelo sin ` +
+              `parcelar.`
+          : `El Catastro ha devuelto ${cuantos} colindante${cuantos === 1 ? '' : 's'} de la ` +
+              `parcela ${pedida}.`,
         false,
       )
+      // También con CERO: una lista vacía es una respuesta, y quien espere dianas
+      // de snap necesita saber que no las hay tanto como necesita saber cuáles son.
+      publicarColindantes(resultado)
       return resultado
     } catch (causa) {
       reventar(causa)
@@ -972,7 +1219,7 @@ export function cablearCatastro({
   // ── Oyentes ────────────────────────────────────────────────────────────────
 
   /**
-   * Los tres manejadores de `click` sueltan la promesa a propósito. Lo que puede
+   * Los cuatro manejadores de `click` sueltan la promesa a propósito. Lo que puede
    * fallar dentro ya se ha contado por TRES canales (renglón, panel y
    * `console.error`) antes de rechazar, así que dejar además una promesa sin
    * manejar sólo añadiría un mensaje del motor encima de los tres que sí explican
@@ -986,6 +1233,17 @@ export function cablearCatastro({
 
   const alPulsarDeducir = () => {
     deducir().catch(yaContado)
+  }
+
+  /**
+   * «Traer colindantes». **Una pulsación, una petición**: `refrescar` deja el botón
+   * `disabled` en este mismo tick (dentro de `operar`, antes del primer `await`),
+   * así que una doble pulsación no llega a disparar la segunda. Y si alguien
+   * quitara el `disabled` desde el inspector, la protección de verdad sigue siendo
+   * la de siempre —abortador + token—, no el atributo.
+   */
+  const alPulsarColindantes = () => {
+    colindantes().catch(yaContado)
   }
 
   /**
@@ -1029,6 +1287,7 @@ export function cablearCatastro({
 
   botonCargar.addEventListener('click', alPulsarCargar)
   botonDeducir.addEventListener('click', alPulsarDeducir)
+  botonColindantes.addEventListener('click', alPulsarColindantes)
   candidatos.addEventListener('click', alElegirCandidato)
   if (mapa !== null) mapa.on('click', alPulsarMapa)
 
@@ -1046,8 +1305,40 @@ export function cablearCatastro({
     colindantes,
 
     /**
-     * Deja el cableado inerte: retira los cuatro oyentes y la suscripción, y
-     * **aborta lo que esté en vuelo**. IDEMPOTENTE.
+     * Se suscribe a los resultados de {@link colindantes} que traen dato. Devuelve
+     * la función de BAJA, como `crearEstadoVista#subscribe`: quien se suscribe se
+     * puede ir sin tener que destruir el cableado entero.
+     *
+     * Sólo se notifican las consultas con `ok: true` —los fallos ya se cuentan por
+     * el renglón y el panel—, y **cero colindantes SÍ se notifica**: una lista
+     * vacía es una respuesta.
+     *
+     * Después de {@link destruir} no registra nada y devuelve una baja inerte: la
+     * misma doctrina que las tres acciones, que devuelven `null` en vez de lanzar.
+     * Un `fn` que no es función sí lanza, porque eso lo escribe un programador.
+     *
+     * @param {(resultado: ResultadoCatastro) => void} fn
+     * @returns {() => void}  La baja. Idempotente.
+     * @throws {TypeError}  Si `fn` no es una función.
+     */
+    alColindantes(fn) {
+      if (typeof fn !== 'function') {
+        throw new TypeError(
+          `alColindantes: 'fn' debe ser una función (recibe el ResultadoCatastro de una consulta ` +
+            `de vecinas que ha ido bien); recibido ${typeof fn}.`,
+        )
+      }
+      if (destruido) return () => {}
+      suscriptoresColindantes.add(fn)
+      return () => {
+        suscriptoresColindantes.delete(fn)
+      }
+    },
+
+    /**
+     * Deja el cableado inerte: retira los cinco oyentes, la suscripción al store y
+     * **los suscriptores de `alColindantes`**, y **aborta lo que esté en vuelo**.
+     * IDEMPOTENTE.
      *
      * El orden importa: primero se invalida la secuencia y luego se aborta, para
      * que la respuesta que llegue después de esto no encuentre ningún camino por el
@@ -1063,9 +1354,14 @@ export function cablearCatastro({
       }
       botonCargar.removeEventListener('click', alPulsarCargar)
       botonDeducir.removeEventListener('click', alPulsarDeducir)
+      botonColindantes.removeEventListener('click', alPulsarColindantes)
       candidatos.removeEventListener('click', alElegirCandidato)
       if (mapa !== null) mapa.off('click', alPulsarMapa)
       desuscribir()
+      // Se sueltan los suscriptores: si no, una consulta que ya no puede llegar a
+      // publicarse mantendría vivas —por el cierre— las cerraduras de F06 (el snap,
+      // sus capas de Leaflet) mucho después de que su pantalla se haya ido.
+      suscriptoresColindantes.clear()
     },
   }
 }

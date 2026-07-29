@@ -1,9 +1,13 @@
 {
-  "_nota": "Tolerancias OPERATIVAS de F02: decisiones de INGENIERÍA (regla de oro 9), no umbrales-veredicto. La app MIDE y SEÑALA, no juzga. `config/umbrales.json` está PROHIBIDO. Distancias/áreas en unidades SI (metros, m²); ángulos en grados.",
+  "_nota": "Tolerancias OPERATIVAS de F02 (validación) y F06 (edición): decisiones de INGENIERÍA (regla de oro 9), no umbrales-veredicto. La app MIDE y SEÑALA, no juzga. `config/umbrales.json` está PROHIBIDO. Distancias/áreas en unidades SI (metros, m²); ángulos en grados; las claves con sufijo `Px` van en píxeles de pantalla y se documentan como tales. El porqué de cada cifra está en el JSDoc de `config/operativos.js` (el JSON no admite comentarios).",
   "duplicadoMetros": 0.001,
   "segmentoCortoMetros": 0.05,
   "colinealidadGrados": 179.9,
   "superficieMinimaM2": 1,
   "areaNulaM2": 0.000001,
-  "maxVertices": 500
+  "maxVertices": 500,
+  "snapMetros": 0.2,
+  "senoMinimoOffset": 0.01,
+  "miterLimiteFactor": 4,
+  "acotacionMinimaPx": 44
 }

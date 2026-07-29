@@ -21,6 +21,7 @@
 // propia pila del historial):
 //   crearHistorial({ limite })                -> historial
 //   commit(historial, estado)                 -> void
+//   reiniciar(historial, estado)              -> void
 //   undo(historial, estadoActual?)            -> estado | null
 //   redo(historial, estadoActual?)            -> estado | null
 //   puedeDeshacer(historial)                  -> boolean
@@ -78,6 +79,38 @@ export function commit(historial, estado) {
     historial.pila.shift()
     historial.indice--
   }
+}
+
+/**
+ * Reinicia el historial: descarta TODA la historia y siembra `estado` como único
+ * presente (`pila = [clon]`, `indice = 0`). Tras llamarla no se puede deshacer ni
+ * rehacer nada.
+ *
+ * Es la operación de "documento nuevo": cargar una parcela del WFS, abrir un
+ * fichero, empezar de cero. Sin ella la única forma de arrancar limpio sería
+ * `commit` sobre el historial viejo, y entonces el primer undo del usuario le
+ * devolvería la parcela ANTERIOR — un documento que ya no está abierto.
+ *
+ * Se siembra en vez de dejar la pila vacía porque el presente vive DENTRO de la
+ * pila (ver el modelo interno de la cabecera): una pila vacía con `indice = -1`
+ * dejaría el primer `undo` sin punto de retorno. Con la semilla, el estado
+ * inicial es un destino legítimo al que volver en cuanto haya un `commit`.
+ *
+ * Notas de contrato:
+ *   · El estado se guarda CLONADO (`structuredClone`), como en `commit`: mutar
+ *     fuera el objeto sembrado no toca la pila.
+ *   · `limite` NO se toca — es configuración del historial, no historia.
+ *   · Se vacía la pila EN SITIO (`length = 0`) en vez de reasignar el array, para
+ *     que quien tenga una referencia a `historial.pila` no se quede con la vieja.
+ *
+ * @param {Historial} historial
+ * @param {any} estado  Estado POJO plano que pasa a ser el único presente.
+ * @returns {void}
+ */
+export function reiniciar(historial, estado) {
+  historial.pila.length = 0
+  historial.pila.push(structuredClone(estado))
+  historial.indice = 0
 }
 
 /**

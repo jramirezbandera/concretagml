@@ -75,6 +75,7 @@ Donde el plan y el dossier discrepan, **manda el dossier** (capa de verificació
 | O14 | **Errores del WFS** | (no cubierto) | ⛔ **Todo error llega con HTTP 200** y `ows:ExceptionReport` **sin prefijo**. `response.ok` no clasifica nada. Y **no existe la «colección vacía»**: un BBOX sin parcelas da el **mismo `exceptionCode`** que una RC inexistente, así que «vacío» y «no existe» **no se distinguen** salvo por texto libre bilingüe y con errata — sobre el que está **prohibido ramificar**. | MEDIDO 2026-07-28 | F05, F08 |
 | O15 | **`GetParcelsByBBox`** | (spec F05 lo nombra) | **No existe.** El catálogo real publica `GetParcel`, `GetNeighbourParcel`, `GetZoning`, `GetParcelByZoning` y `GetFeatureById`. El BBOX se hace con `GetFeature` estándar. Y **`GetNeighbourParcel` incluye a la propia parcela**, en 2.ª posición. | MEDIDO 2026-07-28 | F05 |
 | O16 | **Conteo del WFS** | (no cubierto) | **`numberMatched` y `numberReturned` MIENTEN** cuando se usa `count`: declaran el total sin truncar. Contar `<member>`, nunca leer los atributos. | MEDIDO 2026-07-28 | F05, F08 |
+| O17 | **Signo del offset de lindero** | Esta vez el que se corrige es **el dossier**: §3.6 (línea 569) da `nrm = (u.y, −u.x)` sin decir respecto a qué anillo, y la spec de F06 lo leyó como «en un anillo horario la derecha del recorrido apunta hacia fuera» | ⛔ **La fórmula, aplicada literalmente, mueve el lindero al REVÉS en la mitad de los casos.** `(u.y, −u.x)` es la normal a la DERECHA del recorrido: apunta afuera en un anillo ANTIHORARIO y **adentro** en uno horario. Y este proyecto se encuentra **los dos** sentidos: el WFS emite el exterior horario (O1), la plantilla oficial del Catastro lo trae antihorario y el usuario dibuja como quiere. El signo **no puede venir de una convención: se MIDE** con `geo/area.js#orientacion` → **`nrm_fuera = orientacion(anillo) · (u.y, −u.x)`**. Fijado por el test del anillo invertido: un cuadrado de 100 m² **y su `reverse()`** dan los dos **110 m²** con `d = +1`, y lo mismo sobre los 15 lados de la parcela real. | MEDIDO 2026-07-28 | F06 |
 | O9 | **Licencia Leaflet** | §21: "Leaflet MIT" | **Leaflet = BSD-2-Clause.** (Turf/jsPDF/html2canvas/proj4js sí MIT.) Corregir créditos. | S7 | F03, F16 |
 | O10 | **Edificio: raíz y srsName** | §16.2 (genérico) | Raíz **`gml:FeatureCollection` + `gml:featureMember`**, namespaces `inspire.jrc.ec.europa.eu` *draft* + base 3.2, **srsName URN**. Asimetría deliberada con parcela. | S3 | F13 |
 | O11 | **BuildingPart** | §4.2 (modelo) | Confirmado: **una `BuildingPart` por volumen de altura homogénea**, cada una con huella propia + plantas sobre/bajo rasante independientes (fixture real: 13 partes). Valida el modelo del plan. | S4 (VERIFICADO) | F12, F13 |
@@ -161,28 +162,37 @@ Orden de construcción (= orden de fases del plan §18, decisión de la entrevis
 
 ### Bloque A — Núcleo de parcela (producto publicable pronto)
 
-| Prio | Feature | Objetivo (una línea) | Depende de | Riesgo |
-|---|---|---|---|---|
-| P0 | [F00 · Cimientos](feature-00-cimientos.md) | Modelo de datos, motor UTM, área/orientación, undo/redo. Sin UI. | — | **Alto** (motor UTM, precisión) |
-| P1 | [F01 · Entrada parcela](feature-01-entrada-parcela.md) | Parsers LIST/TXT/DXF (bulge) + detecciones defensivas. | F00 | Medio (bulge DXF) |
-| P2 | [F02 · Validación parcela](feature-02-validacion-parcela.md) | Reglas geométricas en vivo; errores vs avisos con vértices señalados. | F00 | Bajo |
-| P3 | [F03 · Visor](feature-03-visor.md) | Leaflet, capas base + WMS por encuadre, tabla sincronizada. | F00 | Medio (WMS no teselado) |
-| P4 | [F04 · GML parcela](feature-04-gml-parcela.md) | Serializador CP 4.0 + test de ida y vuelta contra fixtures. | F00, F01 | **Alto** (fidelidad IVG) |
+| Prio | Feature | Objetivo (una línea) | Depende de | Riesgo | Estado (2026-07-28) |
+|---|---|---|---|---|---|
+| P0 | [F00 · Cimientos](feature-00-cimientos.md) | Modelo de datos, motor UTM, área/orientación, undo/redo. Sin UI. | — | **Alto** (motor UTM, precisión) | ✅ hecho |
+| P1 | [F01 · Entrada parcela](feature-01-entrada-parcela.md) | Parsers LIST/TXT/DXF (bulge) + detecciones defensivas. | F00 | Medio (bulge DXF) | ✅ hecho |
+| P2 | [F02 · Validación parcela](feature-02-validacion-parcela.md) | Reglas geométricas en vivo; errores vs avisos con vértices señalados. | F00 | Bajo | ✅ hecho |
+| P3 | [F03 · Visor](feature-03-visor.md) | Leaflet, capas base + WMS por encuadre, tabla sincronizada. | F00 | Medio (WMS no teselado) | ✅ código y pruebas · ⏳ **firma humana** |
+| P4 | [F04 · GML parcela](feature-04-gml-parcela.md) | Serializador CP 4.0 + test de ida y vuelta contra fixtures. | F00, F01 | **Alto** (fidelidad IVG) | ✅ hecho · **aceptado en la Sede** (§7) |
 
 > 👉 **Corte de paridad funcional con la competencia en parcela.** A partir de aquí, el diferencial.
 
 ### Bloque B — Diferencial de parcela (el foso comercial)
 
-| Prio | Feature | Objetivo | Depende de | Riesgo |
-|---|---|---|---|---|
-| P5 | [F05 · Catastro en vivo](feature-05-catastro-vivo.md) | Cliente WFS, carga por RC editable, geocodificación, deducción de RC, colindantes, caché. | F00, F03 | Medio (anti-bloqueo) |
-| P6 | [F06 · Edición parcela](feature-06-edicion-parcela.md) | Arrastrar/insertar/eliminar, edición numérica, offset de lindero, snap, acotaciones en vivo. | F03, F05 | Medio (offset/snap) |
-| P7 | [F07 · Diagnóstico parcela](feature-07-diagnostico-parcela.md) | Métricas de encaje, comparación a tres bandas, representación. **Sin umbrales.** | F05, F06 | Medio |
-| P8 | [F08 · Comprobar GML existente](feature-08-comprobar-gml.md) | Recorrido corto: cargar GML ajeno → validar fichero → diagnóstico. | F04, F07 | Bajo |
-| P9 | [F09 · Informe parcela](feature-09-informe-parcela.md) | Canvas propio a 300 ppp (Receta A), jsPDF, descripción literaria, firma. | F07 | **Alto** (plano 300 ppp) |
-| P10 | [F10 · Persistencia y exportación](feature-10-persistencia-export.md) | IndexedDB (expedientes), autoguardado, exportación DXF. | F04 | Bajo |
+| Prio | Feature | Objetivo | Depende de | Riesgo | Estado (2026-07-29) |
+|---|---|---|---|---|---|
+| P5 | [F05 · Catastro en vivo](feature-05-catastro-vivo.md) | Cliente WFS, carga por RC editable, geocodificación, deducción de RC, colindantes, caché. | F00, F03 | Medio (anti-bloqueo) | ✅ hecho · ⏳ arrastra la firma humana de F03 |
+| P6 | [F06 · Edición parcela](feature-06-edicion-parcela.md) | Arrastrar/insertar/eliminar, edición numérica, offset de lindero, snap, acotaciones en vivo. | F03, F05 | Medio (offset/snap) | ✅ código y pruebas (2.894/69) · ⏳ **firma humana** · ⚠️ `edit/dibujo.js` **diferido a F12**; el presupuesto de altura del panel **se cerró el 2026-07-29** llevando las herramientas a una barra sobre el mapa (tabla de vértices: 64 → 303 px) |
+| P7 | [F07 · Diagnóstico parcela](feature-07-diagnostico-parcela.md) | Métricas de encaje, comparación a tres bandas, representación. **Sin umbrales.** | F05, F06 | Medio | — el siguiente |
+| P8 | [F08 · Comprobar GML existente](feature-08-comprobar-gml.md) | Recorrido corto: cargar GML ajeno → validar fichero → diagnóstico. | F04, F07 | Bajo | — |
+| P9 | [F09 · Informe parcela](feature-09-informe-parcela.md) | Canvas propio a 300 ppp (Receta A), jsPDF, descripción literaria, firma. | F07 | **Alto** (plano 300 ppp) | — |
+| P10 | [F10 · Persistencia y exportación](feature-10-persistencia-export.md) | IndexedDB (expedientes), autoguardado, exportación DXF. | F04 | Bajo | — |
+
+> ⏳ **La «firma humana» es un gate de verdad, no un trámite.**
+> `scripts/smoke-navegador/CHECKLIST-HUMANO.md` recoge lo que **ninguna máquina de
+> este proyecto puede firmar**: gestos con un ratón de verdad, teclado, el fallo de
+> red provocado a mano y el juicio visual. Bloquea el cierre formal de **F03 → F05 →
+> F06** en cadena. Que la suite esté verde y el build limpio **no cierra una fase**
+> por sí solo (§6.2 y §6.3 son necesarios, no suficientes).
 
 ### Bloque C — Edificio (baja prioridad, capítulo posterior)
+
+*No empezado, ninguno. Sin columna de estado por eso.*
 
 | Prio | Feature | Objetivo | Depende de | Riesgo |
 |---|---|---|---|---|
@@ -192,6 +202,8 @@ Orden de construcción (= orden de fases del plan §18, decisión de la entrevis
 | P14 | [F14 · Edificio: contraste e informe](feature-14-edificio-contraste-informe.md) | Contraste opcional + pantalla "sin construcción registrada", informe con ficha de partes. | F13, F09 | Bajo |
 
 ### Bloque D — Cierre
+
+*No empezado, ninguno.*
 
 | Prio | Feature | Objetivo | Depende de | Riesgo |
 |---|---|---|---|---|
@@ -210,13 +222,13 @@ Orden de construcción (= orden de fases del plan §18, decisión de la entrevis
 | F03 | `viewer/`, `services/ign.js` |
 | F04 | `gml/serialize-cp.js`, `gml/parse.js`, `test/fixtures/gml/` |
 | F05 | `services/catastro.js`, `storage/cache-catastro.js` |
-| F06 | `edit/snap.js`, `edit/offset.js`, `edit/dibujo.js` (base) |
+| F06 | ⛔ *Actualizado 2026-07-28 al terminar la fase, y 2026-07-29 al cerrar la deuda del panel; eran tres y son bastantes más.* `edit/snap.js`, `edit/offset.js`, `edit/vertices.js`, `edit/metricas.js`, `edit/_comun.js`, `geo/segmento.js`, `geo/metrica.js`, `config/operativos.js`, `viewer/edicion.js`, `viewer/acotaciones.js`, `viewer/barra-edicion.js` (+ `edit/historial.js#reiniciar`, `viewer/index.js`, `viewer/sincronizacion.js`, `app/main.js#cablearEdicion`, `app/cableado-catastro.js`). ~~`edit/dibujo.js` (base)~~ **NO se hizo: diferido entero a F12** |
 | F07 | `diagnostico/parcela.js` |
 | F08 | `gml/parse.js` (entrada ajena), recorrido corto en `viewer/` |
 | F09 | `report/canvas.js`, `report/literal.js`, `report/pdf-parcela.js` |
 | F10 | `storage/` (expedientes), `export/dxf.js` |
 | F11 | `model/edificio.js`, entrada edificio |
-| F12 | `edit/dibujo.js`, envolvente derivada en `model/edificio.js` |
+| F12 | `edit/dibujo.js` (**entero**: F06 no llegó a estrenarlo), envolvente derivada en `model/edificio.js` |
 | F13 | `validation/edificio.js`, `gml/serialize-bu.js` |
 | F14 | `diagnostico/edificio.js`, `report/pdf-edificio.js` |
 | F15 | `config/errores-ivg.json` |

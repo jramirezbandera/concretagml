@@ -41,12 +41,27 @@
 // El borde blanco de 2 px del cuadradito no es adorno: es lo que sostiene el
 // contraste cuando el amarillo cae sobre asfalto o cubierta clara.
 //
-// ── Qué es de F06 y NO está aquí ────────────────────────────────────────────
+// ── Qué es de F06, qué sigue sin estar aquí, y por dónde se enchufa ─────────
 // Insertar o eliminar vértices, crear o borrar recintos, offset de lindero,
-// snap y acotaciones en vivo son EDICIÓN (F06). Aquí solo hay: render de lo que
-// el estado ya contiene, arrastre de un vértice EXISTENTE y edición de su
-// valor. Deliberadamente no hay ningún botón de "añadir vértice": añadirlo aquí
-// sería colar media feature ajena en el visor.
+// CALCULAR el snap y MEDIR las acotaciones son EDICIÓN (F06) y siguen sin estar
+// aquí: este módulo no sabe qué es una diana, ni una tolerancia, ni un metro
+// cuadrado, y sigue sin tener ningún botón de "añadir vértice" (sería colar
+// media feature ajena en el visor). Lo que sí hay desde F06 · T3.1 son TRES
+// ENCHUFES OPCIONALES por los que la edición se cuelga encima sin que esta
+// función cambie de responsabilidad:
+//   · `ajustar` .......... se le da el UTM CRUDO de cada frame y devuelve el
+//     punto que debe escribirse. Aquí no vive el snap; vive el sitio exacto
+//     donde hay que llamarlo (cada `drag` y también el `dragend`).
+//   · `alPrevisualizar` .. se le dan los anillos EN VUELO para que las vistas en
+//     vivo (acotaciones, superficie/perímetro/Δcatastral) se pinten durante el
+//     gesto sin que nadie tenga que tocar el store.
+//   · `alCrearMarcador` .. se le entrega cada `L.Marker` recién creado para que
+//     la interacción de edición le cuelgue sus propios manejadores.
+// Los tres valen `null` por defecto, y con los tres a `null` el comportamiento
+// es EXACTAMENTE el de F03. Lo que ninguno de ellos cambia es la regla que
+// sostiene el criterio 5 de F06 («undo/redo revierten operaciones completas, no
+// fotogramas del arrastre»): se llaman POR FRAME, pero ninguno escribe en el
+// store ni commitea. El gesto sigue dejando UN `set` y UN `commit`, en `dragend`.
 //
 // ── Frontera de vista (regla 3) ─────────────────────────────────────────────
 // El modelo va SIEMPRE en UTM. lat/lon aparece solo para pintar, y solo a
@@ -162,6 +177,49 @@ function anillosDe(parcela) {
   return recintos.map((r) => (r && Array.isArray(r.vertices) ? r.vertices : []))
 }
 
+/**
+ * Copia PROPIA de unos anillos UTM: array nuevo por recinto y par `[x,y]` nuevo
+ * por vértice. Existe por dos motivos distintos, y los dos importan:
+ *
+ *   · **El espejo interno.** `anillosDe` devuelve los MISMOS arrays `vertices`
+ *     del estado (solo el array exterior es nuevo). El espejo UTM que este módulo
+ *     muta punto a punto durante el `drag` no puede ser eso: mutarlo escribiría en
+ *     el POJO del store a espaldas de `set`, y el arrastre dejaría de ser "sin
+ *     tocar el modelo hasta soltar" sin que ningún `set` lo delatara.
+ *   · **Lo que se entrega a `alPrevisualizar`.** Tampoco puede ser el espejo vivo:
+ *     un consumidor que lo mutara (o que se lo guardara) movería el polígono que
+ *     se está pintando, desde fuera y sin pasar por aquí.
+ *
+ * El coste asumido es una copia POR FRAME de decenas de pares —una parcela son
+ * decenas de vértices, no millones—, despreciable al lado de la reproyección y
+ * del repintado de Leaflet que ya ocurren en ese mismo frame. La alternativa
+ * (entregar la referencia interna y confiar) cambia un coste medible por un fallo
+ * imposible de depurar.
+ *
+ * @param {Array<Array<[number, number]>>} anillos
+ * @returns {Array<Array<[number, number]>>}
+ */
+function copiaAnillos(anillos) {
+  return anillos.map((anillo) => anillo.map((v) => [v[0], v[1]]))
+}
+
+/**
+ * El `originalEvent` de un evento de Leaflet, o `null`.
+ *
+ * Leaflet lo trae en `drag` (sale del `mousemove`/`touchmove` real), pero NO en
+ * `dragend`, y tampoco cuando el gesto se simula por API (`marcador.fire('drag')`,
+ * que es como lo prueban los tests: jsdom no tiene hit-testing). El consumidor
+ * lee de ahí la tecla que desactiva el snap, así que `null` significa exactamente
+ * «no hay teclado que consultar», y nunca debe confundirse con «sin modificador
+ * pulsado»: por eso se normaliza aquí a `null` en vez de dejar pasar `undefined`.
+ *
+ * @param {object} [evento]  Evento de Leaflet.
+ * @returns {Event|null}
+ */
+function eventoOriginalDe(evento) {
+  return (evento && evento.originalEvent) || null
+}
+
 /** Forma del estado: nº de vértices por recinto. `[4, 4]` para exterior + 1 hueco. */
 function formaDe(parcela) {
   return anillosDe(parcela).map((a) => a.length)
@@ -204,6 +262,72 @@ function esHistorialUsable(h) {
 }
 
 // ── API ──────────────────────────────────────────────────────────────────────
+
+/** @typedef {import('./_comun.js').RefVertice} RefVertice */
+
+/**
+ * Gancho de AJUSTE (el snap de F06, visto desde aquí).
+ *
+ * Se llama en CADA `drag` y también en `dragend`, SIEMPRE antes de escribir nada
+ * —ni en el dibujo, ni en la tabla, ni en el modelo—, con el par UTM crudo que
+ * sale del cursor. Devuelve el punto que debe usarse en su lugar.
+ *
+ * Que se llame **también en `dragend`** no es simetría decorativa: `dragend`
+ * recalcula el UTM desde `marcador.getLatLng()`, así que si solo se ajustara en
+ * `drag`, lo que acabaría en el modelo sería el punto CRUDO del último
+ * movimiento y el vértice **se despegaría justo al soltar** — el enganche se
+ * vería durante todo el gesto y se perdería en el instante de confirmarlo.
+ *
+ * Si lanza, el arrastre NO se cae: se avisa (una vez por gesto) y se sigue con
+ * el punto crudo. Si devuelve un `punto` que no es un par UTM finito, se ignora
+ * con aviso: un `NaN` colado por aquí acabaría en el modelo en el `dragend`.
+ *
+ * @callback Ajustar
+ * @param {[number, number]} utm  Punto crudo del cursor, en UTM.
+ * @param {RefVertice} refVertice  Vértice que se está moviendo.
+ * @param {Event|null} eventoOriginal  `e.originalEvent` de Leaflet cuando lo hay
+ *   (de ahí lee el consumidor `altKey`, la tecla que desactiva el snap), o `null`
+ *   cuando el gesto se simula por API y Leaflet no lo trae (ver
+ *   {@link eventoOriginalDe}).
+ * @returns {{punto: [number, number], enganchado: boolean, tipo?: string|null}|null}
+ *   `null`, o `enganchado:false`, ⇒ se usa el `utm` CRUDO.
+ */
+
+/**
+ * Gancho de PREVISUALIZACIÓN: las vistas en vivo de F06 (acotación de cada lado,
+ * superficie, perímetro, Δ respecto a la catastral).
+ *
+ * Se llama en dos momentos, y la diferencia la marca `refVertice`:
+ *   · en cada `drag`, con los anillos EN VUELO —los que aún no han pasado por el
+ *     store— y el vértice que se está moviendo;
+ *   · al final de cada `render()`, con los anillos DEL ESTADO y `refVertice:null`,
+ *     para que las vistas arranquen pintadas y se re-sincronicen tras un `set`
+ *     venga de donde venga.
+ *
+ * Recibe UTM (`[[ [x,y], … ], … ]`, un array por recinto), no lat/lng: la
+ * frontera de vista no se mueve (regla 3). Los anillos son una COPIA (ver
+ * {@link copiaAnillos}); mutarlos no afecta a nada.
+ *
+ * @callback AlPrevisualizar
+ * @param {Array<Array<[number, number]>>} anillosUTM
+ * @param {RefVertice|null} refVertice
+ * @returns {void}
+ */
+
+/**
+ * Gancho de CREACIÓN DE MARCADOR: la interacción de edición de F06 (menú de
+ * vértice, insertar/eliminar, selección de lado) le cuelga sus manejadores.
+ *
+ * Se llama una vez por `L.Marker`, dentro de `crearMarcador` y por tanto solo
+ * cuando se RECONSTRUYE (el render en sitio reutiliza las instancias a
+ * propósito: hallazgo C8). El `refVertice` que recibe es el mismo objeto que
+ * cuelga del marcador.
+ *
+ * @callback AlCrearMarcador
+ * @param {import('leaflet').Marker} marcador
+ * @param {RefVertice} refVertice
+ * @returns {void}
+ */
 
 /**
  * Cablea la tabla de vértices con el dibujo del mapa: ambos como vistas del
@@ -275,6 +399,12 @@ function esHistorialUsable(h) {
  *   por OPERACIÓN ACABADA, nunca por frame de arrastre.
  * @param {import('./_comun.js').Avisar} [args.alAvisar]  Canal de aviso (ver
  *   `resolverAvisar`).
+ * @param {Ajustar|null} [args.ajustar=null]  Gancho de ajuste/snap (F06). Ver
+ *   {@link Ajustar}. `null` = el punto del cursor entra crudo, como en F03.
+ * @param {AlPrevisualizar|null} [args.alPrevisualizar=null]  Gancho de vistas en
+ *   vivo (F06). Ver {@link AlPrevisualizar}.
+ * @param {AlCrearMarcador|null} [args.alCrearMarcador=null]  Gancho de creación
+ *   de marcador (F06). Ver {@link AlCrearMarcador}.
  * @returns {{ destruir: () => void, refrescar: () => void }}
  */
 export function sincronizar({
@@ -285,6 +415,9 @@ export function sincronizar({
   zona,
   historial = null,
   alAvisar,
+  ajustar = null,
+  alPrevisualizar = null,
+  alCrearMarcador = null,
 } = {}) {
   // ── Contratos del programador: throw, nunca corrección callada ────────────
   if (!mapa || typeof mapa.addLayer !== 'function' || typeof mapa.removeLayer !== 'function') {
@@ -339,6 +472,23 @@ export function sincronizar({
       `sincronizar: 'historial' debe ser el POJO de crearHistorial ` +
         `({pila, indice, limite}) o null; recibido ${describir(historial)}.`,
     )
+  }
+  // Los ganchos de F06: misma política que `resolverAvisar`. "No me han pasado
+  // gancho" es un caso legítimo (F03 no tiene ninguno) y cae al `null` por
+  // defecto; "me han pasado basura donde iba una función" es un contrato roto
+  // por el PROGRAMADOR, y eso en este proyecto es `throw`, nunca corrección
+  // callada (regla de oro 1).
+  for (const [nombre, gancho] of [
+    ['ajustar', ajustar],
+    ['alPrevisualizar', alPrevisualizar],
+    ['alCrearMarcador', alCrearMarcador],
+  ]) {
+    if (gancho !== null && typeof gancho !== 'function') {
+      throw new TypeError(
+        `sincronizar: '${nombre}' debe ser una función, o null/undefined para no ` +
+          `enchufar nada; recibido ${describir(gancho)}.`,
+      )
+    }
   }
 
   const avisar = resolverAvisar(alAvisar)
@@ -395,12 +545,173 @@ export function sincronizar({
   let forma = null
   /** Anillos en `[lat,lng]`, espejo de lo que hay pintado. Se muta punto a punto en `drag`. */
   let anillosLatLng = []
+  /**
+   * Anillos en UTM `[x,y]`, el MISMO espejo que `anillosLatLng` pero del lado del
+   * modelo. Se muta punto a punto en `drag`, en paralelo con él.
+   *
+   * Por qué un segundo espejo y no reproyectar los anillos en cada frame para
+   * `alPrevisualizar`: reproyectar el anillo entero por frame es caro (una serie
+   * de Krüger por vértice y por frame, con decenas de vértices) y además IMPRECISO
+   * —el viaje UTM→lat/lon→UTM de los vértices quietos les mete ruido en los
+   * últimos decimales, y las acotaciones en vivo son justo lo que lo notaría—.
+   * La otra alternativa, partir de los anillos del estado y sustituir solo el
+   * vértice en vuelo, es exacta pero copia el estado entero por frame y obliga a
+   * recordar que el estado va con un frame de retraso durante el gesto. Un espejo
+   * mantenido en O(1) por frame, hermano del que ya existía para lat/lng, es lo
+   * barato y lo exacto a la vez. Es COPIA PROPIA, nunca los arrays del estado
+   * (ver {@link copiaAnillos}).
+   */
+  let anillosUTM = []
   /** `marcadores[recinto][indice]` → L.Marker. */
   let marcadores = []
   /** `filas[recinto][indice]` → `{fila, inputX, inputY}`. */
   let filas = []
   let poligonoEditado = null
   let poligonoOficial = null
+
+  // ── Ganchos opcionales de F06 (ver cabecera del módulo) ───────────────────
+  //
+  // Los tres son CONSEJOS o VISTAS colgadas del gesto, nunca el gesto: ninguno
+  // escribe en el store ni commitea, así que ninguno puede añadir un snapshot al
+  // historial (criterio 5 de F06). Y ninguno puede tumbar un arrastre a medias:
+  // las tres llamadas van envueltas en `try/catch`, se AVISA (regla de oro 1:
+  // nada en silencio) y el gesto continúa con el dato crudo.
+  //
+  // El aviso es UNA VEZ POR EPISODIO, no por frame: un `ajustar` roto se llama
+  // decenas de veces en un solo arrastre, y cien mensajes idénticos dejarían el
+  // panel de avisos inservible — que es otra forma de silencio. Episodio =
+  //   · el GESTO de arrastre, para `ajustar` y `alPrevisualizar` (se reinicia al
+  //     arrancar el gesto siguiente, así que un fallo que persiste se vuelve a
+  //     contar: no se enmudece para siempre);
+  //   · la RECONSTRUCCIÓN completa, para `alCrearMarcador` (su bucle es por
+  //     vértice: ocho marcadores no pueden dar ocho avisos idénticos).
+
+  /** Ganchos que ya han avisado dentro del episodio en curso. */
+  const yaAvisado = { ajustar: false, previsualizar: false, crearMarcador: false }
+
+  /**
+   * Avisa por el canal del visor SOLO la primera vez del episodio.
+   *
+   * Siempre `NIVEL.AVISO` y nunca `NIVEL.ERROR`: la regla junto al typedef
+   * `Avisar` de `_comun.js` reserva ERROR a lo que impide seguir, y aquí se sigue
+   * —con el punto crudo, o sin la vista en vivo—; el modelo queda intacto y el
+   * GML se puede generar igual.
+   *
+   * @param {'ajustar'|'previsualizar'|'crearMarcador'} clave
+   * @param {string} mensaje
+   * @param {*} [causa]
+   */
+  function avisarUnaVez(clave, mensaje, causa) {
+    if (yaAvisado[clave]) return
+    yaAvisado[clave] = true
+    if (causa === undefined) avisar(mensaje, { nivel: NIVEL.AVISO })
+    else avisar(mensaje, { nivel: NIVEL.AVISO, causa })
+  }
+
+  /** Abre un episodio de avisos de gancho nuevo (uno por gesto de arrastre). */
+  function abrirEpisodioDeGesto() {
+    yaAvisado.ajustar = false
+    yaAvisado.previsualizar = false
+  }
+
+  /**
+   * Levanta la bandera de gesto y, si el gesto es NUEVO, le abre su episodio de
+   * avisos.
+   *
+   * Se llama desde el primer `drag` además de desde `dragstart`, porque
+   * `dragstart` no llega cuando el arrastre se simula por API (los tests) y sin
+   * esto los contadores de aviso se quedarían con los del gesto anterior.
+   */
+  function iniciarGesto() {
+    if (!arrastrando) abrirEpisodioDeGesto()
+    arrastrando = true
+  }
+
+  /**
+   * El punto que debe acabar en el dibujo y en el modelo para este frame: el que
+   * devuelva `ajustar` si ha enganchado, o el CRUDO en todos los demás casos
+   * (sin gancho, `null`, `enganchado:false`, excepción, o punto no finito).
+   *
+   * @param {[number, number]} utm  Par UTM crudo, recién salido de `latLngAUTM`.
+   * @param {RefVertice} refVertice
+   * @param {Event|null} eventoOriginal
+   * @returns {{punto: [number, number], enganchado: boolean}}
+   */
+  function ajustarPunto(utm, refVertice, eventoOriginal) {
+    if (!ajustar) return { punto: utm, enganchado: false }
+
+    let resultado = null
+    try {
+      resultado = ajustar(utm, refVertice, eventoOriginal)
+    } catch (causa) {
+      avisarUnaVez(
+        'ajustar',
+        'El ajuste automático (snap) ha fallado: el vértice se está moviendo a la ' +
+          'posición exacta del cursor, sin engancharse a nada.',
+        causa,
+      )
+      return { punto: utm, enganchado: false }
+    }
+
+    if (!resultado || resultado.enganchado !== true) return { punto: utm, enganchado: false }
+
+    const punto = resultado.punto
+    if (!Array.isArray(punto) || !Number.isFinite(punto[0]) || !Number.isFinite(punto[1])) {
+      // Un guardián que no guarda no sirve de nada (misma razón, y mismo estilo,
+      // que en `_comun.js#latLngAUTM`): sin esta comprobación un
+      // `{enganchado:true, punto:[NaN,NaN]}` entraría TAL CUAL en el modelo en el
+      // `dragend`, que es exactamente lo que la regla de oro 1 prohíbe.
+      avisarUnaVez(
+        'ajustar',
+        'El ajuste automático (snap) ha devuelto un punto que no es un par UTM ' +
+          `finito (${JSON.stringify(punto)}): se usa la posición del cursor.`,
+      )
+      return { punto: utm, enganchado: false }
+    }
+    return { punto: [punto[0], punto[1]], enganchado: true }
+  }
+
+  /**
+   * Ofrece unos anillos a las vistas en vivo. Siempre una COPIA (ver
+   * {@link copiaAnillos}); el `refVertice` va tal cual, porque es el mismo objeto
+   * que ya cuelga públicamente del marcador.
+   *
+   * @param {Array<Array<[number, number]>>} anillos
+   * @param {RefVertice|null} refVertice
+   */
+  function previsualizar(anillos, refVertice) {
+    if (!alPrevisualizar) return
+    try {
+      alPrevisualizar(copiaAnillos(anillos), refVertice)
+    } catch (causa) {
+      avisarUnaVez(
+        'previsualizar',
+        'Las medidas en vivo del dibujo (acotaciones, superficie, perímetro) han ' +
+          'fallado: la geometría es correcta, pero lo que se muestra sobre el mapa ' +
+          'puede estar desactualizado.',
+        causa,
+      )
+    }
+  }
+
+  /**
+   * Entrega un marcador recién creado a la interacción de edición.
+   * @param {import('leaflet').Marker} marcador
+   */
+  function notificarMarcador(marcador) {
+    if (!alCrearMarcador) return
+    try {
+      alCrearMarcador(marcador, marcador.refVertice)
+    } catch (causa) {
+      avisarUnaVez(
+        'crearMarcador',
+        'No se ha podido activar la edición sobre los vértices: se pueden arrastrar ' +
+          'y se puede teclear su coordenada en la tabla, pero pueden faltarles ' +
+          'acciones de edición.',
+        causa,
+      )
+    }
+  }
 
   // ── Historial: un commit por operación acabada ────────────────────────────
   /**
@@ -658,29 +969,79 @@ export function sincronizar({
     // F06 puedan localizarlo sin depender del orden de `mapa.eachLayer`.
     marcador.refVertice = { recinto: r, indice: i }
 
-    const alMover = () => {
+    /**
+     * Coloca el vértice en `punto` (UTM) en TODO lo que no es el modelo: el
+     * espejo UTM, el espejo lat/lng, el polígono, la fila y —solo si el punto
+     * viene de un enganche— el propio marcador.
+     *
+     * Reposicionar el marcador SOLO cuando `enganchado` no es una optimización:
+     * durante un arrastre real `L.Draggable` está moviendo el icono por CSS
+     * frame a frame, y llamarle `setLatLng` con la posición que él mismo acaba
+     * de fijar es pelearse con él para nada. Cuando el snap SÍ ha movido el
+     * punto hay que hacerlo, porque si no el vértice se dibujaría donde está el
+     * ratón en vez de donde ha enganchado.
+     *
+     * @param {[number, number]} punto  UTM ya definitivo para este frame.
+     * @param {{lat:number, lng:number}} pos  Posición cruda del marcador.
+     * @param {boolean} enganchado
+     * @returns {void}
+     */
+    function colocar(punto, pos, enganchado) {
+      // Reproyectar el punto ajustado es OBLIGATORIO: `ajustar` habla UTM (la
+      // frontera de vista no se mueve, regla 3) y Leaflet habla lat/lng.
+      const latlng = enganchado ? vertUTMaLatLng(punto, zona) : [pos.lat, pos.lng]
+      if (enganchado) marcador.setLatLng(latlng)
+      if (anillosUTM[r]) anillosUTM[r][i] = [punto[0], punto[1]]
+      if (anillosLatLng[r]) anillosLatLng[r][i] = latlng
+      if (poligonoEditado) poligonoEditado.setLatLngs(anillosLatLng)
+      escribirFila(r, i, punto)
+    }
+
+    const alMover = (evento) => {
       // `dragstart` no llega cuando el gesto se simula por API (tests), así que
       // la bandera se levanta también aquí: es la que impide que el suscriptor
       // re-renderice —y por tanto recree filas— en medio del gesto.
-      arrastrando = true
+      iniciarGesto()
       const pos = marcador.getLatLng()
-      const utm = latLngAUTM(pos, zona)
-      if (anillosLatLng[r]) anillosLatLng[r][i] = [pos.lat, pos.lng]
-      if (poligonoEditado) poligonoEditado.setLatLngs(anillosLatLng)
-      escribirFila(r, i, utm)
+      const crudo = latLngAUTM(pos, zona)
+      // `ajustar` por frame, pero SIN tocar el store: el snap es un consejo sobre
+      // dónde dibujar, no una operación acabada. Un `set` aquí metería un
+      // snapshot por fotograma y rompería el criterio 5 de F06.
+      const { punto, enganchado } = ajustarPunto(
+        crudo,
+        marcador.refVertice,
+        eventoOriginalDe(evento),
+      )
+      colocar(punto, pos, enganchado)
+      previsualizar(anillosUTM, marcador.refVertice)
     }
 
     marcador.on('dragstart', () => {
+      // `dragstart` es inequívoco: empieza un gesto NUEVO. Por eso reabre el
+      // episodio de avisos SIN condiciones, incluso si la bandera hubiera quedado
+      // alta de un gesto que nunca recibió su `dragend` (el mismo escenario del
+      // hallazgo 2.11: el puntero sale de la ventana). Si no, un gancho roto se
+      // quedaría mudo para siempre a partir de ese gesto huérfano.
+      abrirEpisodioDeGesto()
       arrastrando = true
     })
     marcador.on('drag', alMover)
-    marcador.on('dragend', () => {
+    marcador.on('dragend', (evento) => {
       arrastrando = false
       const pos = marcador.getLatLng()
-      const utm = latLngAUTM(pos, zona)
-      if (anillosLatLng[r]) anillosLatLng[r][i] = [pos.lat, pos.lng]
+      const crudo = latLngAUTM(pos, zona)
+      // Se ajusta TAMBIÉN aquí, y no por simetría: `dragend` recalcula el UTM
+      // desde `marcador.getLatLng()`, así que sin esta llamada lo que entraría en
+      // el modelo sería el punto crudo del último movimiento y el vértice se
+      // despegaría del enganche justo al soltarlo (ver el typedef `Ajustar`).
+      const { punto, enganchado } = ajustarPunto(
+        crudo,
+        marcador.refVertice,
+        eventoOriginalDe(evento),
+      )
+      colocar(punto, pos, enganchado)
       // Único punto del gesto que toca el store y el historial.
-      if (!aplicarVertice(r, i, utm)) {
+      if (!aplicarVertice(r, i, punto)) {
         // El modelo ya no admite el cambio: se re-renderiza desde el estado
         // para que el dibujo no quede mintiendo (regla 1: nada silencioso).
         render()
@@ -694,6 +1055,12 @@ export function sincronizar({
       // no commiteo"— y para que la notificación ignorada no se pierda jamás.
       if (renderPendiente) render()
     })
+
+    // Al FINAL, no nada más construirlo: así la edición de F06 recibe un marcador
+    // ya cableado, y sus manejadores quedan registrados DESPUÉS de los de aquí
+    // (Leaflet los dispara en orden de registro), que es el orden correcto —
+    // primero se actualiza el dibujo, luego reacciona quien lo observa.
+    notificarMarcador(marcador)
 
     return marcador
   }
@@ -715,7 +1082,12 @@ export function sincronizar({
   /** Reconstruye polígono editado, marcadores y tabla desde cero. */
   function reconstruir(parcela) {
     quitarMarcadores()
-    const anillosUTM = anillosDe(parcela)
+    // Episodio de avisos nuevo para `alCrearMarcador`: el bucle de abajo lo llama
+    // una vez por vértice, y un gancho roto daría un aviso por vértice.
+    yaAvisado.crearMarcador = false
+    // COPIA propia: `anillosDe` devuelve los arrays `vertices` DEL ESTADO, y este
+    // espejo se muta punto a punto en `drag` (ver `copiaAnillos`).
+    anillosUTM = copiaAnillos(anillosDe(parcela))
     anillosLatLng = anillosUTM.map((anillo) => anillo.map((v) => vertUTMaLatLng(v, zona)))
 
     const hayGeometria = anillosLatLng.some((a) => a.length > 0)
@@ -741,10 +1113,13 @@ export function sincronizar({
    * fila se destruyen (requisito del arrastre, hallazgo C8).
    */
   function actualizarEnSitio(parcela) {
-    const anillosUTM = anillosDe(parcela)
-    anillosUTM.forEach((anillo, r) => {
+    anillosDe(parcela).forEach((anillo, r) => {
       anillo.forEach((vertice, i) => {
         const latlng = vertUTMaLatLng(vertice, zona)
+        // Los dos espejos vuelven a la verdad del estado a la vez. El UTM no se
+        // reproyecta de vuelta desde lat/lng: se copia del modelo, que es el que
+        // manda (y así el viaje de ida y vuelta no le mete ruido).
+        anillosUTM[r][i] = [vertice[0], vertice[1]]
         anillosLatLng[r][i] = latlng
         const m = marcadores[r] && marcadores[r][i]
         if (m) m.setLatLng(latlng)
@@ -792,6 +1167,12 @@ export function sincronizar({
     else reconstruir(parcela)
     forma = nuevaForma
     sincronizarOficial(parcela)
+    // Las vistas en vivo se re-sincronizan con el ESTADO al cerrar cada ciclo
+    // (`refVertice:null` = "esto no es un frame de arrastre, es la verdad"): así
+    // arrancan pintadas en el primer render y vuelven a cuadrar tras cualquier
+    // `set`, venga de la tabla, de otra vista o de un undo, sin que nadie tenga
+    // que acordarse de refrescarlas.
+    previsualizar(anillosUTM, null)
   }
 
   // ── Edición de celda (hallazgo C7/T8) ────────────────────────────────────
@@ -905,6 +1286,7 @@ export function sincronizar({
       }
       filas = []
       anillosLatLng = []
+      anillosUTM = []
       forma = null
       arrastrando = false
       renderPendiente = false

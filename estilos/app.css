@@ -515,7 +515,25 @@ body {
    Ceder aquí es gratis porque `.gml-avisos` ya tiene su propio `overflow-y`:
    la lista se hace más corta y scrollea, en vez de empujar. El `min-height:0`
    de la caja interior es imprescindible: sin él un hijo flex no encoge por
-   debajo del alto de su contenido y la sección no podría ceder nada. */
+   debajo del alto de su contenido y la sección no podría ceder nada.
+
+   ── AL DÍA (2026-07-29): EL PRESUPUESTO SE HA DESAHOGADO ──────────────────
+   Esta regla se escribió cuando F06 iba a meter ABAJO un bloque «Edición» de
+   270 px. Ese bloque ya no está en el panel: se fue a la barra flotante sobre
+   el mapa (ver `index.html`, donde estaba). Vuelto a medir en navegador, mismo
+   viewport 1440×900 y misma lista de avisos vacía:
+
+       caja de vértices ANTES (con el bloque) ....... 64 px → 1,6 renglones
+       caja de vértices AHORA (sin él) ............. 303 px → 11,3 renglones
+       cabecera 24 px + renglón de vértice 24,69 px; se ven ENTERAS 11 filas
+       —el rótulo EXTERIOR y 10 de los 15 vértices— frente a ninguna antes.
+
+   Lo que NO cambia: el panel sigue repartiendo una altura FIJA entre bloques
+   fijos, así que esta cesión sigue haciendo falta y el problema de fondo sigue
+   abierto (`spec/feature-06-edicion-parcela.md` §2: la solución de verdad es
+   que la región de bloques entera ceda o scrollee). Lo que hay ahora es aire,
+   no una arquitectura nueva: el siguiente bloque que entre en el panel —F07
+   trae uno de diagnóstico— se lo vuelve a comer. */
 .gml-bloque--avisos {
   flex: 0 1 auto;
 }
@@ -801,6 +819,106 @@ body {
   text-align: center;
 }
 
+/* ═══ Piezas que estrenó la edición y siguen vivas (F06) ═════════════════════
+ *
+ * ── QUÉ HABÍA AQUÍ, Y POR QUÉ YA NO ────────────────────────────────────────
+ * Hasta el 2026-07-29 esta sección vestía el bloque «Edición» del PANEL: la fila
+ * de deshacer/rehacer, la casilla del ajuste con su tolerancia, el campo del
+ * offset y sus renglones de ayuda. Ese bloque ya no existe — se fue entero a la
+ * barra flotante sobre el mapa (ver `index.html`, donde estaba, y la sección «La
+ * barra flotante de edición» al final de este fichero).
+ *
+ * Con él se fueron sus reglas: `.gml-campo-linea`, `.gml-campo-linea--fin`,
+ * `.gml-casilla`, `.gml-entrada--numero` y `.gml-ayuda` se BORRARON porque ya no
+ * las lleva ningún nodo del documento (comprobado en `index.html` y en todo
+ * `app/`; la barra trae sus propias `.gml-barra-*`). CSS que apunta a marcado que
+ * no existe no avisa de nada: solo se queda ahí hasta que alguien lo copia
+ * creyendo que está en uso.
+ *
+ * Sobreviven DOS, y las dos porque las usa otro sitio:
+ *   · `.gml-boton-par` ..... empareja «Deducir del mapa» con «Traer colindantes»
+ *     en el bloque «Origen de la parcela» (F05).
+ *   · `.gml-tecla` ......... la píldora de una tecla. Hoy la usa la BARRA, en los
+ *     botones de historial y en la tabla de gestos del panel de ayuda
+ *     (`viewer/barra-edicion.js#CLASE_BARRA.TECLA`, que la nombra a propósito
+ *     para no inventar una equivalente). Es su único consumidor: si algún día
+ *     desaparece de ahí, esta regla se va con ella.
+ *
+ * Que `.gml-boton-par` esté declarada DESPUÉS de su uso en el DOM no importa:
+ * `.gml-boton-par .gml-boton` es (0,2,0) y `.gml-boton` (0,1,0), así que gana por
+ * ESPECIFICIDAD y no por orden — el mismo criterio que usa todo este fichero.
+ *
+ * ⚠️ AQUÍ TAMPOCO SE USA EL AMARILLO DE LA GEOMETRÍA. Vale palabra por palabra lo
+ * anotado en `.gml-bloque--catastro`: `--gml-color-usuario` (#FFD600) da ~1,4:1
+ * sobre el blanco del panel. Si algún estado futuro necesitara el color del
+ * usuario, el valor es `--gml-color-usuario-sobre-claro`.
+ *
+ * ⚠️ Y NINGUNA CIFRA DE LA FICHA LLEVA COLOR DE MÉRITO. La regla de oro 9
+ * (SPEC §2) prohíbe los semáforos: el Δ catastral del pie se viste como cualquier
+ * otra línea de la ficha. No añadir un `--ok`/`--fail` para la diferencia de
+ * superficie, por tentador que resulte.
+ *
+ * @see index.html                Dónde estaba el bloque y a dónde se fue.
+ * @see viewer/barra-edicion.js   CLASE_BARRA: las clases que lo sustituyen.
+ * @see viewer/edicion.js         CLASE_EDICION (`gml-snap*`, `gml-lado-seleccionado`).
+ * @see viewer/acotaciones.js     CLASE_ACOTACION (`gml-acotacion`).
+ */
+
+/* ── Dos botones hermanos en una fila ────────────────────────────────────────
+ * Reparto a partes IGUALES (`flex:1 1 0`, no `1 1 auto`): con `auto` la base
+ * sería el ancho del texto y «Deshacer» saldría más estrecho que «Rehacer Ctrl+Y»
+ * por dos caracteres de diferencia. Dos botones simétricos se leen como un par;
+ * dos botones casi iguales, como un descuadre.
+ *
+ * `inline-flex` en el botón —y no el `block` implícito— es lo que permite meter
+ * el `<kbd>` del atajo al lado del rótulo con un hueco propio, centrado en la
+ * misma línea base óptica. */
+.gml-boton-par {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.gml-boton-par .gml-boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  /* 1 1 0 y no `auto`: ver arriba. `min-width:0` deja que encojan por debajo de
+     su texto antes que desbordar el panel. */
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+  white-space: nowrap;
+}
+
+/* ── La tecla de un atajo o de un modificador (`<kbd>`) ──────────────────────
+ * UN SOLO aspecto en toda la app, y esa es la decisión: la misma píldora sirve
+ * dentro de un botón encendido (superficie blanca), dentro de uno apagado
+ * (superficie `--color-bg-elevated`), suelta en un renglón de ayuda y —desde el
+ * traslado— sobre el fondo casi blanco de la barra flotante. Se consigue dándole
+ * fondo BLANCO y borde `--color-border-main`: sobre el botón apagado se recorta
+ * por el fondo, y sobre el blanco del panel se recorta por el borde. Dos aspectos
+ * distintos para «esto es una tecla» habrían obligado al usuario a aprenderlo dos
+ * veces, y por eso `viewer/barra-edicion.js` REUTILIZA esta clase en vez de
+ * declarar una `gml-barra-tecla` paralela.
+ *
+ * El tamaño es --text-10 (el más pequeño del sistema) porque un atajo es una
+ * anotación sobre el rótulo, no compite con él. */
+.gml-tecla {
+  padding: 0 4px;
+  border: 1px solid var(--color-border-main);
+  border-radius: 3px;
+  background: var(--color-bg-primary);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-10);
+  font-weight: var(--fw-medium);
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
 /* ═══ Pie del panel: ficha del expediente ════════════════════════════════════ */
 
 .gml-panel-pie {
@@ -1055,6 +1173,42 @@ body {
   cursor: grabbing;
 }
 
+/* ── Las capas de F06 sobre el mapa, y por qué AQUÍ NO HAY NINGUNA REGLA ─────
+ *
+ * `viewer/acotaciones.js` y `viewer/edicion.js` publican sus clases como CONTRATO
+ * ESTABLE precisamente para que esta hoja pueda afinarlas sin que ellos importen
+ * CSS (no pueden: son librería):
+ *
+ *   · `gml-acotacion` .............. rótulo con la longitud de un lado.
+ *   · `gml-snap` ................... indicador de enganche, con sus dos
+ *     `gml-snap--vertice` / `gml-snap--lindero`   modificadores por tipo.
+ *   · `gml-lado-seleccionado` ...... halo del lindero elegido para el offset.
+ *
+ * Se revisaron las tres y hoy NO necesitan nada de aquí. Queda escrito para que
+ * nadie lo lea como un olvido y para que quien venga sepa dónde tocar:
+ *
+ *   1. **El aspecto ya está resuelto EN LÍNEA, y bien.** La cota se pinta sobre
+ *      una píldora oscura (~12:1 contra el amarillo del usuario, y el mismo 12:1
+ *      sobre asfalto que sobre arbolado) y los indicadores llevan trazo blanco por
+ *      el mismo motivo. Repetirlo aquí crearía dos fuentes de verdad para un
+ *      contraste que ya está medido, y la que se quedaría vieja sería esta.
+ *   2. **La tipografía de la cota NO se puede pisar sin forzar la cascada.** El
+ *      módulo la fija con la propiedad abreviada `font:` EN LÍNEA, y un estilo en
+ *      línea gana a cualquier regla sin marca de prioridad — que este fichero
+ *      tiene prohibida (ver la cabecera). Cambiarla a Geist exige tocar
+ *      `ESTILO_ROTULO` en `viewer/acotaciones.js`, no esta hoja.
+ *   3. **El puntero y la selección ya los cubre `leaflet.css`**, que en la app SÍ
+ *      está cargada (la importa `app/main.js`): `.leaflet-pane > svg path` sin
+ *      `.leaflet-interactive` va a `pointer-events:none`, y `.leaflet-marker-icon`
+ *      a `user-select:none`. Las tres capas nacen `interactive:false`, así que
+ *      caen ahí solas. Y la cota, que es la que se monta justo encima del punto
+ *      donde más se pincha, repite además su `pointer-events:none` en línea para
+ *      no depender de esa hoja.
+ *
+ * @see viewer/acotaciones.js  CLASE_ACOTACION y ESTILO_ROTULO.
+ * @see viewer/edicion.js      CLASE_EDICION, ESTILO_RESALTE y ESTILO_INDICADOR.
+ */
+
 /* ── Control de opacidad de la superpuesta (`viewer/capas.js`) ───────────────
  * El módulo fija EN LÍNEA `background`, `padding`, `border-radius` y `font` del
  * contenedor (a propósito: tiene que ser legible aunque nadie cargue esta hoja).
@@ -1091,6 +1245,500 @@ body {
   cursor: not-allowed;
 }
 
+/* ═══ La barra flotante de edición (F06) ═════════════════════════════════════
+ *
+ * El cromo de `viewer/barra-edicion.js`, que monta un `L.Control` propio en la
+ * esquina superior izquierda del mapa. Aquí estaba antes el bloque «Edición» del
+ * panel; el porqué del traslado está escrito en `index.html`, donde estaba, y en
+ * la cabecera de aquel módulo.
+ *
+ * Es el MISMO caso que `.gml-control-opacidad`, justo arriba, y se resuelve igual:
+ *
+ *   · El módulo fija EN LÍNEA `background`, `padding`, `border-radius` y `font`
+ *     del CONTENEDOR, a propósito: la barra tiene que ser legible sobre cualquier
+ *     ortofoto aunque esta hoja no llegue. Un estilo en línea gana a cualquier
+ *     regla sin marca de prioridad —que este fichero tiene prohibida—, así que
+ *     aquí NO se pelea con ellos: se COMPLETA lo que no fijan (borde y sombra) y
+ *     se viste a los HIJOS, que sí se pueden apuntar directamente.
+ *   · Por eso la tipografía se declara en CADA hijo y no en el contenedor: el
+ *     `font: 13px system-ui` en línea manda en el contenedor, pero lo que los
+ *     hijos HEREDAN de él lo pisa cualquier regla que los apunte a ellos.
+ *   · Especificidad `.gml-app .gml-barra-*` (0,2,0), como `.gml-control-opacidad`
+ *     y por lo mismo: ganar la cascada subiendo la especificidad, nunca el peso.
+ *
+ * ── EL FONDO ES LA SOLUCIÓN AL CONTRASTE, NO EL COLOR DEL TEXTO ─────────────
+ * La barra flota sobre imagen aérea que pasa de hormigón casi blanco a arbolado
+ * en sombra dentro del mismo encuadre. Ningún color de texto aguanta los dos
+ * extremos, así que la barra trae fondo PROPIO (el `rgba(255,255,255,0.94)` en
+ * línea del módulo) y todo lo demás se viste como si estuviera sobre el blanco del
+ * panel — mismo recurso que la píldora oscura de `viewer/acotaciones.js`.
+ * ⚠️ Y por lo mismo, aquí NO se usa `--gml-color-usuario` (#FFD600): es el amarillo
+ * del MAPA, sobre este fondo claro daría ~1,4:1. Vale lo anotado junto a los dos
+ * `--gml-color-usuario*` de arriba.
+ *
+ * ── ⚠️ TRES DECLARACIONES QUE NO SE PUEDEN ESCRIBIR AQUÍ ────────────────────
+ * Las tres son la misma trampa: una regla (0,2,0) escrita MÁS ABAJO en el fichero
+ * pisa a otra (0,2,0) de más arriba, y las de arriba son las que hacen funcionar
+ * la barra.
+ *
+ *   1. **Ningún `display` en `.gml-barra-desplegable` ni en `.gml-barra-ayuda`.**
+ *      Los tres paneles se abren y se cierran con el atributo `hidden`, y quien
+ *      los oculta es `.gml-app [hidden]{display:none}` — (0,2,0), declarada al
+ *      principio del fichero. Un `display` propio la pisaría y los tres paneles
+ *      quedarían abiertos para siempre, tapando la parcela. Por eso son `<div>` y
+ *      se maquetan con el flujo normal y márgenes, sin flex: no hace falta.
+ *   2. **Ningún `display` en `.gml-barra-estado`.** Ese `<p>` lleva ADEMÁS la
+ *      clase `.gml-accion-estado`, y de ahí saca gratis su `:empty{display:none}`
+ *      —(0,2,0) también—. Sin él, el renglón vacío ocuparía alto desde el primer
+ *      pintado y la barra daría un salto en cada operación.
+ *   3. **Ningún `color` en `.gml-barra-estado`.** `app/main.js` conmuta sobre ese
+ *      mismo nodo el modificador `.gml-accion-estado--error`, que es (0,1,0): un
+ *      `color` (0,2,0) aquí dejaría el rojo del error sin efecto, en silencio.
+ *
+ * ── LOS DESPLEGABLES VAN EN EL FLUJO, NO FLOTANDO ───────────────────────────
+ * Están dentro del contenedor del control, uno debajo de otro, y solo ocupan
+ * cuando están abiertos (los tres nacen `hidden` y solo hay uno abierto a la vez;
+ * lo garantiza el módulo). Posicionarlos en absoluto no habría ganado nada y sí
+ * habría abierto el riesgo clásico de que un panel se salga del mapa por abajo o
+ * por la derecha.
+ *
+ * @see viewer/barra-edicion.js  CLASE_BARRA: los 21 nombres son contrato estable.
+ * @see index.html               Dónde estuvo este bloque hasta el 2026-07-29.
+ */
+
+/* El contenedor. Solo lo que el módulo NO fija en línea. Mismas dos propiedades
+   —y los mismos valores— que `.leaflet-control-layers` y `.leaflet-bar` unas
+   líneas más arriba: la barra es cromo del mapa y tiene que leerse como tal. */
+.gml-app .gml-barra-edicion {
+  border: 1px solid var(--color-border-main);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  background-clip: padding-box;
+  color: var(--color-text-secondary);
+}
+
+/* La fila `role="toolbar"`. `nowrap` es carga útil: si las herramientas se
+   partieran en dos líneas, la barra ganaría alto sobre la parcela justo cuando
+   menos sitio hay. Son seis y caben de sobra. */
+.gml-app .gml-barra-edicion-fila {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--font-sans);
+}
+
+/* ── Cada herramienta de la fila ─────────────────────────────────────────────
+ * Botón cuadrado de 26 px, transparente sobre el fondo de la barra: lo que se ve
+ * es el icono, y el relleno aparece al señalar. Los de historial llevan además su
+ * `<kbd>`, así que la caja crece a lo ancho — de ahí `min-width` y no `width`.
+ *
+ * El estado APAGADO importa tanto como el encendido: deshacer y rehacer nacen así
+ * (con la pila vacía no hay nada que deshacer) y es como el usuario los ve al
+ * abrir la app. Se apagan bajando el color Y la opacidad, que es lo que apaga
+ * también el `<kbd>` de dentro sin escribir una regla para él. */
+.gml-app .gml-barra-herramienta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-width: 26px;
+  height: 26px;
+  padding: 0 5px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-11);
+  line-height: 1;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.gml-app .gml-barra-herramienta:hover:not(:disabled) {
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border-sub);
+  color: var(--color-text-primary);
+}
+
+/* El «hundido» de la herramienta cuyo desplegable está abierto. Sale del
+   `aria-expanded` que el módulo ya mantiene: el DOM lo dice, nadie lo observa,
+   y así no hay una clase de estado que pudiera desincronizarse del ARIA. */
+.gml-app .gml-barra-herramienta[aria-expanded='true'] {
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border-main);
+  color: var(--color-text-primary);
+}
+
+.gml-app .gml-barra-herramienta:disabled {
+  color: var(--color-text-disabled);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* La punta de flecha del botón partido: es un apéndice de la herramienta que
+   tiene al lado, no una herramienta más, y su tamaño lo dice. */
+.gml-app .gml-barra-herramienta--flecha {
+  min-width: 16px;
+  padding: 0;
+  border-radius: 0 2px 2px 0;
+}
+
+.gml-app .gml-barra-herramienta--flecha .gml-barra-icono {
+  width: 14px;
+  height: 14px;
+}
+
+/* ── El botón partido del ajuste al parcelario ───────────────────────────────
+ * Una rejilla de dos columnas con la casilla y su rótulo SUPERPUESTOS en la
+ * primera (`grid-area: 1 / 1`) y la flecha del desplegable en la segunda.
+ *
+ * Por qué superpuestos, que es lo único no obvio de esta sección: el módulo tiene
+ * que producir un `<input type="checkbox">` de verdad —`app/main.js` lee su
+ * `.checked` y escucha su `change`—, pero quien lleva el icono es su `<label for>`
+ * hermano. Apilándolos en la MISMA celda, el `<label>` pinta la piel del botón y
+ * la casilla queda debajo, invisible pero con la caja EXACTA del botón: así el
+ * anillo de foco global (`.gml-app :focus-visible`) se dibuja donde el usuario ve
+ * el control, y no alrededor de una casilla suelta a un lado. El `<label>` queda
+ * encima y recibe el clic, que su `for` reenvía a la casilla — y de paso conserva
+ * su `title`, que se perdería con `pointer-events:none`.
+ *
+ * ⚠️ NADA de `overflow:hidden` en este contenedor: recortaría ese anillo de foco.
+ * El redondeo se hace con el `border-radius` de cada mitad. */
+.gml-app .gml-barra-partido {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: stretch;
+  height: 26px;
+  border: 1px solid var(--color-border-main);
+  border-radius: 3px;
+  background: var(--color-bg-primary);
+}
+
+/* Dentro del partido la flecha no lleva alto propio (la estira la fila de la
+   rejilla) y CONSERVA su borde transparente heredado: sin él, la regla de
+   `[aria-expanded="true"]` no tendría dónde pintar el marco del estado abierto y
+   el único aviso de que el desplegable está desplegado sería el desplegable. */
+.gml-app .gml-barra-partido .gml-barra-herramienta--flecha {
+  grid-area: 1 / 2;
+  height: auto;
+}
+
+/* La casilla: invisible, pero ocupa la celda entera. `appearance:none` le quita
+   el dibujo nativo; no se le da fondo ni borde porque su piel es el `<label>`
+   de la regla siguiente. Lo que sí conserva es su caja, su foco y su semántica. */
+.gml-app .gml-barra-conmutador {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  border: 0;
+  border-radius: 2px 0 0 2px;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* La piel del conmutador. **Este es el estado más consultado de la barra**, así
+   que la diferencia entre encendido y apagado no puede ser un matiz: apagado es
+   una superficie clara con el imán en gris; encendido es un bloque macizo en el
+   azul de acción del sistema con el imán en blanco (≈5,7:1, los mismos tokens
+   que «Generar GML» — no un color inventado aquí). Se distingue de un vistazo y
+   sin leer nada, que es el requisito. */
+.gml-app .gml-barra-conmutador-rotulo {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  border-right: 1px solid var(--color-border-main);
+  border-radius: 2px 0 0 2px;
+  color: var(--color-text-disabled);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.gml-app .gml-barra-conmutador-rotulo:hover {
+  background: var(--color-bg-elevated);
+}
+
+/* (0,4,0): gana a la regla de `:hover` de arriba (0,3,0) por especificidad, así
+   que señalar el conmutador ENCENDIDO nunca lo hace parecer apagado. */
+.gml-app .gml-barra-conmutador:checked + .gml-barra-conmutador-rotulo {
+  background: var(--color-btn-primary-bg);
+  border-right-color: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-fg);
+}
+
+.gml-app .gml-barra-conmutador:checked + .gml-barra-conmutador-rotulo:hover {
+  background: var(--color-btn-primary-bg-hover);
+  border-right-color: var(--color-btn-primary-bg-hover);
+}
+
+/* `block` mata el hueco de línea base que deja un `<svg>` en línea y que, en un
+   botón de 26 px, se nota como un icono descentrado hacia arriba. */
+.gml-app .gml-barra-icono {
+  display: block;
+  flex: none;
+}
+
+/* El nombre accesible de cada icono. El módulo ya lo oculta con estilo EN LÍNEA
+   —tiene que ser correcto aunque esta hoja no cargue— y esto es la misma receta
+   escrita donde le corresponde. Es la técnica de 1×1 px, NUNCA `display:none`:
+   eso lo escondería también del lector de pantalla, que es a quien va dirigido. */
+.gml-app .gml-barra-rotulo {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Los desplegables ────────────────────────────────────────────────────────
+ * Ver el punto 1 de la cabecera: SIN `display`. Caja blanca sobre el fondo casi
+ * blanco de la barra, separada por su borde: el desplegable es una superficie
+ * distinta de la fila, no una continuación de ella. */
+.gml-app .gml-barra-desplegable {
+  min-width: 250px;
+  margin-top: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border-sub);
+  border-radius: var(--radius);
+  background: var(--color-bg-primary);
+}
+
+.gml-app .gml-barra-desplegable-linea {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.gml-app .gml-barra-etiqueta {
+  flex: none;
+  font-family: var(--font-sans);
+  font-size: var(--text-11);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Cifra: mono y tabular y alineada a la DERECHA, como toda cifra de esta app
+   (misma regla que las columnas X/Y de la tabla de vértices). Los incrementadores
+   se ocultan por lo mismo que se ocultaban en el panel: en un campo estrecho el
+   de Chrome se monta sobre la cifra al pasar el ratón y mueve el contenido. Las
+   flechas del teclado y el `step` siguen funcionando igual. */
+.gml-app .gml-barra-entrada {
+  flex: none;
+  width: 76px;
+  margin: 0;
+  padding: 3px var(--space-2);
+  border: 1px solid var(--color-border-main);
+  border-radius: var(--radius);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-12);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  appearance: textfield;
+  transition: var(--transition-border);
+}
+
+.gml-app .gml-barra-entrada::-webkit-outer-spin-button,
+.gml-app .gml-barra-entrada::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.gml-app .gml-barra-entrada::placeholder {
+  color: var(--color-text-disabled);
+}
+
+/* La acción del desplegable. Calcada a `.gml-boton--secundario` —incluido su
+   estado apagado— porque es la misma clase de cosa y el usuario no tiene por qué
+   aprender dos idiomas para el mismo botón. No se REUTILIZA aquella clase porque
+   el módulo no la pone: pone la suya, que es lo que le deja ser una vista sin
+   conocer el panel. */
+.gml-app .gml-barra-accion {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-2);
+  padding: 5px var(--space-3);
+  border: 1px solid var(--color-border-main);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-12);
+  font-weight: var(--fw-medium);
+  line-height: 1.2;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.gml-app .gml-barra-accion:hover:not(:disabled) {
+  background: var(--color-bg-elevated);
+}
+
+.gml-app .gml-barra-accion:disabled {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-disabled);
+  border-color: var(--color-border-sub);
+  cursor: not-allowed;
+}
+
+/* ── El texto que dice POR QUÉ ───────────────────────────────────────────────
+ * Dos usos, y la diferencia entre ellos está en el marcado: el del desplegable
+ * del ajuste no lleva `data-motivo` y se ve SIEMPRE (explica qué hace un 0); el
+ * del offset lleva `data-motivo="offset"` y solo se ve mientras su botón está
+ * apagado — cuando el botón se enciende, sobra.
+ *
+ * ⚠️ Y ese segundo caso lo resuelve el CSS SOLO, con el combinador de hermano
+ * siguiente: `viewer/barra-edicion.js` coloca el `<p>` justo detrás del botón
+ * exactamente para esto, y lo tiene declarado como INVARIANTE con test
+ * (`test/viewer/barra-edicion.dom.test.js` §6). Nadie observa ese `disabled`:
+ * `app/main.js` sigue siendo el único que lo toca, y el DOM ya dice el resto.
+ * (0,3,0) la de ocultar y (0,4,0) la de enseñar: gana por especificidad, no por
+ * orden. */
+.gml-app .gml-barra-motivo {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-11);
+  line-height: 1.35;
+  color: var(--color-text-disabled);
+}
+
+.gml-app .gml-barra-motivo[data-motivo] {
+  display: none;
+}
+
+.gml-app [data-accion='offset']:disabled ~ .gml-barra-motivo {
+  display: block;
+}
+
+/* ── El panel de ayuda ───────────────────────────────────────────────────────
+ * Ocho gestos en tres columnas. Ancho FIJO y no elástico: con la barra a ~300 px
+ * la tabla saldría en cuatro renglones por fila y sería ilegible; con 460 px cada
+ * gesto ocupa una o dos líneas. Es la caja más grande de toda la barra y por eso
+ * es la única detrás de un botón, en vez de estar siempre a la vista.
+ *
+ * `max-height` + scroll propio es la red de seguridad contra la pantalla baja: el
+ * diálogo se hace más corto y scrollea en vez de salirse por abajo. Y sin
+ * `display` (punto 1 de la cabecera): es un `<div hidden>`.
+ * `overscroll-behavior` para que la rueda dentro de la tabla no acabe moviendo
+ * nada de fuera. */
+.gml-app .gml-barra-ayuda {
+  width: 460px;
+  max-height: 62vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-top: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-sub);
+  border-radius: var(--radius);
+  background: var(--color-bg-primary);
+}
+
+/* El mismo aspecto que un `.gml-rotulo` del panel: es un título de sección. */
+.gml-app .gml-barra-ayuda-titulo {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-11);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-disabled);
+}
+
+/* Las celdas se apuntan POR ELEMENTO con raíz en la clase, igual que la tabla de
+   vértices y por lo mismo: el HTML lo genera un módulo y sus `<th>`/`<td>` no
+   llevan clase. `vertical-align: top` porque la tercera columna envuelve a dos
+   líneas y las otras dos no: centradas, cada fila se leería descosida. */
+.gml-app .gml-barra-ayuda-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+  font-size: var(--text-11);
+  line-height: 1.4;
+}
+
+.gml-app .gml-barra-ayuda-tabla thead th {
+  padding: 0 var(--space-2) var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border-sub);
+  font-size: var(--text-10);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  color: var(--color-text-disabled);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.gml-app .gml-barra-ayuda-tabla tbody th {
+  /* `width:1%` + `nowrap` es el modo estándar de decirle a una tabla «esta
+     columna, lo justo»: el reparto sobrante se lo lleva la de «Qué hace». */
+  width: 1%;
+  padding: var(--space-1) var(--space-2) var(--space-1) 0;
+  border-top: 1px solid var(--color-border-sub);
+  font-weight: var(--fw-medium);
+  color: var(--color-text-primary);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.gml-app .gml-barra-ayuda-tabla tbody td {
+  padding: var(--space-1) var(--space-2) var(--space-1) 0;
+  border-top: 1px solid var(--color-border-sub);
+  color: var(--color-text-secondary);
+  vertical-align: top;
+}
+
+/* La columna «Dónde»: es una localización, no una explicación, y va en el gris
+   más apagado para que la vista salte del gesto a lo que hace. */
+.gml-app .gml-barra-ayuda-tabla tbody td:first-of-type {
+  color: var(--color-text-disabled);
+  white-space: nowrap;
+}
+
+/* La salida visible del diálogo, para quien no va a probar con `Escape`. A la
+   derecha del todo, que es donde se busca el cierre de un cuadro. */
+.gml-app .gml-barra-ayuda-cerrar {
+  display: block;
+  margin: var(--space-3) 0 0 auto;
+  padding: 4px var(--space-3);
+  border: 1px solid var(--color-border-main);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-12);
+  font-weight: var(--fw-medium);
+  line-height: 1.2;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.gml-app .gml-barra-ayuda-cerrar:hover {
+  background: var(--color-bg-elevated);
+}
+
+/* El renglón `role="status"`. Ver los puntos 2 y 3 de la cabecera: NI `display`
+   NI `color`. El tope de ancho evita que un desenlace largo estire la barra a lo
+   ancho del mapa; el resto —tamaño, color y el `:empty{display:none}`— lo pone
+   `.gml-accion-estado`, que este nodo lleva a propósito. */
+.gml-app .gml-barra-estado {
+  max-width: 300px;
+  margin-top: var(--space-1);
+  padding: 0 2px;
+  font-family: var(--font-sans);
+}
+
 /* ═══ Movimiento reducido ════════════════════════════════════════════════════
  *
  * Solo se apagan las transiciones PROPIAS. Deliberadamente NO se toca `*`: eso
@@ -1101,7 +1749,12 @@ body {
   .gml-aviso,
   .gml-input-coordenada,
   .gml-entrada,
-  .gml-candidatos button {
+  .gml-candidatos button,
+  .gml-barra-herramienta,
+  .gml-barra-conmutador-rotulo,
+  .gml-barra-entrada,
+  .gml-barra-accion,
+  .gml-barra-ayuda-cerrar {
     transition: none;
   }
 }

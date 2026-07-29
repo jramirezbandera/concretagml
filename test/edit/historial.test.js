@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   crearHistorial,
   commit,
+  reiniciar,
   undo,
   redo,
   puedeDeshacer,
@@ -197,5 +198,97 @@ describe('edit/historial.js — undo/redo por snapshots', () => {
     const h = crearHistorial({ limite: NaN })
     for (let i = 0; i < 105; i++) commit(h, estadoRecintos('EXTERIOR', [i, i]))
     expect(h.pila.length).toBe(100)
+  })
+})
+
+describe('edit/historial.js — reiniciar (documento nuevo)', () => {
+  it('tras varios commit y algún undo, deja la pila con un único presente', () => {
+    const h = crearHistorial()
+    commit(h, estadoRecintos('EXTERIOR', [1, 1]))
+    commit(h, estadoRecintos('EXTERIOR', [2, 2]))
+    commit(h, estadoRecintos('EXTERIOR', [3, 3]))
+    undo(h) // el presente queda en medio, con rama de redo por delante
+    expect(puedeDeshacer(h)).toBe(true)
+    expect(puedeRehacer(h)).toBe(true)
+
+    const nuevo = estadoRecintos('EXTERIOR', [9, 9])
+    expect(reiniciar(h, nuevo)).toBe(undefined) // devuelve void
+
+    expect(h.pila.length).toBe(1)
+    expect(h.indice).toBe(0)
+    expect(puedeDeshacer(h)).toBe(false)
+    expect(puedeRehacer(h)).toBe(false)
+    // Ni el pasado ni la rama de redo sobreviven.
+    expect(undo(h)).toBe(null)
+    expect(redo(h)).toBe(null)
+    expect(h.pila[0]).toEqual(nuevo)
+  })
+
+  it('el estado sembrado es un CLON independiente: mutarlo fuera no cambia la pila', () => {
+    const h = crearHistorial()
+    const semilla = estadoRecintos('EXTERIOR', [1, 2])
+    reiniciar(h, semilla)
+
+    // Mutación en profundidad del objeto que se pasó.
+    semilla.recintos[0].vertices[0][0] = 999
+    semilla.recintos[0].tipo = 'MUTADO'
+    semilla.recintos.push({ vertices: [[7, 8]], tipo: 'HUECO' })
+
+    expect(h.pila[0]).toEqual(estadoRecintos('EXTERIOR', [1, 2]))
+    expect(h.pila[0].recintos).toHaveLength(1)
+    expect(h.pila[0]).not.toBe(semilla)
+    expect(h.pila[0].recintos[0].vertices[0]).not.toBe(semilla.recintos[0].vertices[0])
+
+    // Y se puede volver a él: commit + undo devuelve la semilla ORIGINAL.
+    commit(h, estadoRecintos('HUECO', [5, 6]))
+    expect(puedeDeshacer(h)).toBe(true)
+    expect(undo(h)).toEqual(estadoRecintos('EXTERIOR', [1, 2]))
+  })
+
+  it('conserva `limite` (es configuración, no historia)', () => {
+    const h = crearHistorial({ limite: 3 })
+    for (let i = 0; i < 5; i++) commit(h, estadoRecintos('EXTERIOR', [i, i]))
+    expect(h.limite).toBe(3)
+
+    reiniciar(h, estadoRecintos('EXTERIOR', [0, 0]))
+    expect(h.limite).toBe(3)
+
+    // Y el límite sigue OPERATIVO tras el reinicio: la pila se vuelve a acotar.
+    for (let i = 1; i <= 5; i++) commit(h, estadoRecintos('EXTERIOR', [i, i]))
+    expect(h.pila.length).toBe(3)
+  })
+
+  it('sobre un historial recién creado (pila vacía, indice -1) siembra igual', () => {
+    const h = crearHistorial()
+    expect(h.indice).toBe(-1)
+    reiniciar(h, estadoRecintos('EXTERIOR', [4, 4]))
+    expect(h.pila.length).toBe(1)
+    expect(h.indice).toBe(0)
+    expect(undo(h)).toBe(null)
+    expect(redo(h)).toBe(null)
+  })
+
+  it('vacía la pila EN SITIO: quien tenga la referencia al array ve el reinicio', () => {
+    const h = crearHistorial()
+    commit(h, estadoRecintos('EXTERIOR', [1, 1]))
+    commit(h, estadoRecintos('EXTERIOR', [2, 2]))
+    const pilaAntes = h.pila
+
+    reiniciar(h, estadoRecintos('EXTERIOR', [3, 3]))
+
+    expect(h.pila).toBe(pilaAntes) // mismo array, no uno nuevo
+    expect(pilaAntes.length).toBe(1)
+  })
+
+  it('reiniciar dos veces seguidas deja siempre un único presente', () => {
+    const h = crearHistorial()
+    reiniciar(h, estadoRecintos('EXTERIOR', [1, 1]))
+    commit(h, estadoRecintos('EXTERIOR', [2, 2]))
+    reiniciar(h, estadoRecintos('HUECO', [3, 3]))
+    expect(h.pila.length).toBe(1)
+    expect(h.indice).toBe(0)
+    expect(h.pila[0]).toEqual(estadoRecintos('HUECO', [3, 3]))
+    expect(puedeDeshacer(h)).toBe(false)
+    expect(puedeRehacer(h)).toBe(false)
   })
 })

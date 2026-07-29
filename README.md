@@ -70,6 +70,32 @@ desde F03 no.
   [`spec/feature-05-catastro-vivo.md`](spec/feature-05-catastro-vivo.md). Los dos
   que más cambian el diseño: **todo error del Catastro llega con HTTP 200**
   (`response.ok` no clasifica nada) y **`GetParcelsByBBox` no existe**.
+- **F06** Edición de parcela — código y pruebas hechos; **pendiente de la firma
+  humana** del mismo checklist que F03 (gestos de ratón y juicio visual).
+  👉 **La parcela deja de ser un dato que se mira y pasa a ser un dato que se
+  trabaja**: se arrastran, insertan y eliminan vértices sobre el mapa, se teclean
+  coordenadas en la tabla, se desplaza un lindero en paralelo por una distancia, y
+  todo engancha (*snap*) al parcelario oficial y a las colindantes con 20 cm de
+  tolerancia. Con deshacer/rehacer, la longitud de cada lado acotada sobre el
+  dibujo, y superficie, perímetro y diferencia con la superficie catastral
+  actualizándose **durante** el arrastre.
+  ⛔ **Dos correcciones a su propia spec, con su evidencia** en
+  [`spec/feature-06-edicion-parcela.md`](spec/feature-06-edicion-parcela.md):
+  la fórmula del offset del dossier (`nrm = (u.y, −u.x)`) **mueve el lindero al
+  revés en la mitad de los casos** —el sentido depende de cómo esté girado el
+  anillo, así que se mide en vez de suponerse—, y el «fallback para el ángulo
+  agudo» **no es la excepción sino la regla**: sobre la parcela real
+  9398516VK3799G, de sus 15 lados **solo uno** se resuelve por el camino nominal.
+  ⚠️ **Deuda anotada, no escondida**: `edit/dibujo.js` (dibujar un recinto desde
+  cero) **no se ha hecho** y queda entero para F12.
+  ✅ **La otra deuda se cerró el 2026-07-28…29**: el bloque «Edición» del panel
+  consumía **270 px** de un presupuesto de altura fijo y dejaba la tabla de
+  vértices en **64 px** sobre un portátil de 1440×900 — 1,6 renglones para 15
+  vértices. Las herramientas se han llevado a una **barra sobre el mapa** y los
+  gestos a un panel de ayuda; la tabla pasa a **303 px**, unas **once filas**. El
+  bloque ya no existe en `index.html`, y hay un guardián (`G16`) que exige que sus
+  siete controles **no vuelvan** al marcado: duplicarlos dejaría la barra muerta
+  con el mismo aspecto que la viva.
 
 ### El régimen de uso, que es el riesgo real de F05
 
@@ -90,6 +116,33 @@ se puede añadir sin medirlo antes.
 siendo el que congelan los fixtures. **No está en CI a propósito**: dispararía
 desde las IP compartidas de GitHub, que es justo el patrón centralizado que la
 política del Catastro penaliza.
+
+### Cómo se edita una parcela (F06)
+
+Las herramientas están en una **barra flotante sobre el mapa**, arriba a la
+izquierda: deshacer, rehacer, **ajuste al parcelario** (botón partido — el imán lo
+conmuta y la flecha abre la tolerancia, en centímetros), **desplazar lindero** (con
+la distancia en metros) y **«?»**, que abre la ayuda. No están en el panel lateral a
+propósito: ahí se comían 270 px de una altura fija y dejaban la lista de vértices en
+1,6 renglones.
+
+Los gestos del mapa, que es lo que no se descubre solo. En la app los cuenta el
+panel de ayuda del «?»; aquí están todos juntos:
+
+| Gesto | Qué hace |
+|---|---|
+| **Clic** en un lindero | Lo selecciona (es el que se desplaza), si cae a 12 px o menos. **Un clic nunca cambia la geometría** |
+| **Doble clic** en un lindero | Inserta un vértice ahí, proyectado sobre el lado |
+| **Clic derecho** sobre un vértice | Lo elimina |
+| **Arrastrar** un vértice | Lo mueve, enganchando al parcelario si el ajuste está activo |
+| **`Alt`** pulsada | Desactiva el enganche mientras dura el gesto |
+| **Teclear** una coordenada en la tabla | Mueve el vértice a lo tecleado |
+| **«Desplazar lindero»** + distancia | Desplaza en paralelo el lado seleccionado |
+| **`Ctrl+Z` / `Ctrl+Y`** | Deshacer / rehacer. Dentro de un campo de texto se los queda el navegador, a propósito |
+
+El enganche (*snap*) tira del **parcelario oficial**, de la **propia geometría** y
+de las **colindantes** — estas últimas solo si se han traído con su botón: una
+pulsación, una petición al Catastro, nunca a espaldas del usuario.
 
 ## ✅ Verificado en la Sede Electrónica
 

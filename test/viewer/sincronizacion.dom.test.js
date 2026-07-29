@@ -90,8 +90,18 @@ function exigirSinNaN(parcela) {
 /**
  * Monta mapa + panes + tabla + store + `sincronizar`. Devuelve todo lo que los
  * tests necesitan, más `limpiar()`.
+ *
+ * El resto de opciones (`...ganchos`) se reenvía tal cual a `sincronizar`: es
+ * como los tests de F06 · T3.1 enchufan `ajustar`/`alPrevisualizar`/
+ * `alCrearMarcador` sin que ninguna de las pruebas anteriores cambie —omitirlos
+ * es exactamente el caso "sin ganchos", que debe comportarse igual que F03.
  */
-function montar({ parcela = parcelaConHueco(), historial = null, alAvisar = vi.fn() } = {}) {
+function montar({
+  parcela = parcelaConHueco(),
+  historial = null,
+  alAvisar = vi.fn(),
+  ...ganchos
+} = {}) {
   const { mapa, destruir: destruirMapa } = montarMapa()
   const panes = crearPanes(mapa)
   const tablaEl = document.createElement('table')
@@ -105,6 +115,7 @@ function montar({ parcela = parcelaConHueco(), historial = null, alAvisar = vi.f
     zona: parcela && parcela.huso ? parcela.huso : 30,
     historial,
     alAvisar,
+    ...ganchos,
   })
   return {
     mapa,
@@ -778,6 +789,468 @@ describe('viewer/sincronizacion · dos vistas de un estado, sin bucle', () => {
     const { x, y: y2 } = inputsDe(filaDe(ctx.tablaEl, 0, 0))
     expect(Number(x.value)).toBeCloseTo(ctx.store.get().recintos[0].vertices[0][0], 3)
     expect(Number(y2.value)).toBeCloseTo(ctx.store.get().recintos[0].vertices[0][1], 3)
+
+    ctx.limpiar()
+  })
+})
+
+// ── F06 · T3.1 · Los tres ganchos ────────────────────────────────────────────
+//
+// Lo que se blinda aquí:
+//   · Sin ganchos, comportamiento IDÉNTICO (lo prueba, sobre todo, que ni una de
+//     las pruebas de arriba haya tenido que tocarse).
+//   · `ajustar` se llama por frame Y en `dragend` — sin lo segundo, el vértice se
+//     despegaría del enganche justo al soltarlo.
+//   · UN solo `set` y UN solo `commit` por gesto AUNQUE haya ganchos: es donde
+//     vive el criterio de aceptación 5 de F06 ("undo/redo revierten operaciones
+//     completas, no fotogramas del arrastre").
+//   · Un gancho que revienta no tumba el arrastre, avisa UNA vez por episodio (no
+//     una por frame) y el gesto termina con el modelo sano.
+
+describe('viewer/sincronizacion · ganchos de F06 (T3.1)', () => {
+  /** Posición destino: el vértice desplazado `d` metros en X e Y. */
+  function destinoDe(parcela, recinto, indice, d = 1) {
+    const [x, y] = parcela.recintos[recinto].vertices[indice]
+    const [lat, lng] = vertUTMaLatLng([x + d, y + d], 30)
+    return { latlng: { lat, lng }, utm: [x + d, y + d] }
+  }
+
+  /** Punto de enganche de mentira: no coincide con NINGÚN vértice de la parcela. */
+  const ENGANCHE = [439246.5, 4479658.25]
+
+  /** Un `ajustar` que engancha SIEMPRE al mismo punto (el snap real ya es de `edit/snap.js`). */
+  const engancharSiempre = () => ({ punto: [...ENGANCHE], enganchado: true, tipo: 'VERTICE' })
+
+  // ── Contrato ──────────────────────────────────────────────────────────────
+
+  it('un gancho que no es función ni null/undefined es contrato roto: TypeError', () => {
+    const { mapa, destruir } = montarMapa()
+    const panes = crearPanes(mapa)
+    const tablaEl = document.createElement('table')
+    const estado = crearEstadoVista(parcelaConHueco())
+    const base = { mapa, panes, estado, tablaEl, zona: 30 }
+
+    expect(() => sincronizar({ ...base, ajustar: 'snap' })).toThrow(TypeError)
+    expect(() => sincronizar({ ...base, alPrevisualizar: 42 })).toThrow(TypeError)
+    expect(() => sincronizar({ ...base, alCrearMarcador: {} })).toThrow(TypeError)
+
+    // `null` y la ausencia son legítimos (y la ausencia ES el defecto).
+    const conNulls = sincronizar({
+      ...base,
+      ajustar: null,
+      alPrevisualizar: null,
+      alCrearMarcador: null,
+    })
+    conNulls.destruir()
+    const sinNada = sincronizar(base)
+    sinNada.destruir()
+
+    destruir()
+  })
+
+  it('los tres son opcionales: sin ellos, el arrastre es el de F03 y no avisa de nada', () => {
+    const historial = historialReal()
+    const ctx = montar({ historial })
+    const antes = structuredClone(ctx.store.get())
+    const marcador = marcadorDe(ctx.mapa, 0, 0)
+
+    marcador.setLatLng(destinoDe(antes, 0, 0, 1).latlng)
+    marcador.fire('drag')
+    marcador.fire('dragend')
+
+    expect(ctx.alAvisar).not.toHaveBeenCalled()
+    expect(commitsDe(historial)).toBe(1)
+    expect(ctx.store.get().recintos[0].vertices[0][0]).toBeCloseTo(
+      destinoDe(antes, 0, 0, 1).utm[0],
+      2,
+    )
+    ctx.limpiar()
+  })
+
+  // ── ajustar ───────────────────────────────────────────────────────────────
+
+  it('ajustar se llama en CADA drag con el UTM crudo, la refVertice y el eventoOriginal', () => {
+    const ajustar = vi.fn(() => null)
+    const ctx = montar({ ajustar })
+    const antes = structuredClone(ctx.store.get())
+
+    const marcador = marcadorDe(ctx.mapa, 0, 1)
+    const { latlng, utm } = destinoDe(antes, 0, 1, 2)
+    marcador.setLatLng(latlng)
+    marcador.fire('drag')
+
+    expect(ajustar).toHaveBeenCalledTimes(1)
+    const [crudo, ref, evento] = ajustar.mock.calls[0]
+    expect(crudo[0]).toBeCloseTo(utm[0], 2)
+    expect(crudo[1]).toBeCloseTo(utm[1], 2)
+    expect(ref).toEqual({ recinto: 0, indice: 1 })
+    // Gesto simulado por API: Leaflet no trae `originalEvent` → null, no undefined.
+    expect(evento).toBeNull()
+
+    // Con un evento de Leaflet de verdad, llega su `originalEvent` TAL CUAL: es de
+    // donde el consumidor saca `altKey` (la tecla que desactiva el snap).
+    const teclado = { altKey: true }
+    marcador.fire('drag', { originalEvent: teclado })
+    expect(ajustar.mock.calls[1][2]).toBe(teclado)
+
+    ctx.limpiar()
+  })
+
+  it('un enganche lleva marcador, polígono y fila al punto ENGANCHADO (reproyectado)', () => {
+    const ctx = montar({ ajustar: engancharSiempre })
+    const antes = structuredClone(ctx.store.get())
+    const espiaSet = vi.spyOn(ctx.store, 'set')
+
+    const marcador = marcadorDe(ctx.mapa, 0, 0)
+    marcador.setLatLng(destinoDe(antes, 0, 0, 3).latlng)
+    marcador.fire('drag')
+
+    const [lat, lon] = vertUTMaLatLng(ENGANCHE, 30)
+    // El marcador se despega del cursor y salta al enganche…
+    expect(marcador.getLatLng().lat).toBeCloseTo(lat, 9)
+    expect(marcador.getLatLng().lng).toBeCloseTo(lon, 9)
+    // …el polígono, igual (si no, el vértice se dibujaría donde el ratón)…
+    const anillo = poligonoEnPane(ctx.mapa, PANE.PARCELA_EDITADA).getLatLngs()[0]
+    expect(anillo[0].lat).toBeCloseTo(lat, 9)
+    expect(anillo[0].lng).toBeCloseTo(lon, 9)
+    // …y la fila muestra el UTM enganchado, no el del cursor.
+    const { x, y } = inputsDe(filaDe(ctx.tablaEl, 0, 0))
+    expect(Number(x.value)).toBeCloseTo(ENGANCHE[0], 3)
+    expect(Number(y.value)).toBeCloseTo(ENGANCHE[1], 3)
+
+    // Y nada de esto ha pasado por el store: el snap es un consejo, no un `set`.
+    expect(espiaSet).not.toHaveBeenCalled()
+    expect(ctx.store.get().recintos).toEqual(antes.recintos)
+
+    ctx.limpiar()
+  })
+
+  it('ajustar se llama TAMBIÉN en dragend: lo que entra en el modelo es el enganche, no el cursor', () => {
+    // El fallo que este test impide: si solo se ajustara en `drag`, `dragend`
+    // recalcularía el UTM desde `marcador.getLatLng()` y escribiría el punto CRUDO
+    // del último movimiento — el enganche se vería durante todo el gesto y se
+    // perdería justo al soltar. Por eso el último movimiento va DESPUÉS del último
+    // `drag`, que es lo que hace Leaflet de verdad antes de emitir `dragend`.
+    const ajustar = vi.fn(engancharSiempre)
+    const historial = historialReal()
+    const ctx = montar({ ajustar, historial })
+    const antes = structuredClone(ctx.store.get())
+
+    const marcador = marcadorDe(ctx.mapa, 0, 0)
+    marcador.setLatLng(destinoDe(antes, 0, 0, 3).latlng)
+    marcador.fire('drag')
+
+    const ultimo = destinoDe(antes, 0, 0, 5) // el ratón se mueve una vez más…
+    marcador.setLatLng(ultimo.latlng)
+    marcador.fire('dragend') // …y se suelta ahí
+
+    expect(ajustar).toHaveBeenCalledTimes(2) // el `drag` y el `dragend`
+    expect(ajustar.mock.calls[1][0][0]).toBeCloseTo(ultimo.utm[0], 2) // con el crudo final
+    expect(ajustar.mock.calls[1][1]).toEqual({ recinto: 0, indice: 0 })
+
+    // En el modelo está el ENGANCHE exacto, no el punto donde se soltó el ratón.
+    expect(ctx.store.get().recintos[0].vertices[0]).toEqual(ENGANCHE)
+    expect(ctx.store.get().recintos[0].vertices[0][0]).not.toBeCloseTo(ultimo.utm[0], 2)
+    exigirSinNaN(ctx.store.get())
+    expect(commitsDe(historial)).toBe(1)
+
+    ctx.limpiar()
+  })
+
+  it('null o enganchado:false dejan el punto CRUDO (el snap desactivado no estorba)', () => {
+    for (const respuesta of [null, { punto: [...ENGANCHE], enganchado: false, tipo: null }]) {
+      const ctx = montar({ ajustar: () => respuesta })
+      const antes = structuredClone(ctx.store.get())
+      const marcador = marcadorDe(ctx.mapa, 1, 1)
+      const destino = destinoDe(antes, 1, 1, 1.25)
+
+      marcador.setLatLng(destino.latlng)
+      marcador.fire('drag')
+      marcador.fire('dragend')
+
+      const v = ctx.store.get().recintos[1].vertices[1]
+      expect(v[0]).toBeCloseTo(destino.utm[0], 2)
+      expect(v[1]).toBeCloseTo(destino.utm[1], 2)
+      expect(v[0]).not.toBeCloseTo(ENGANCHE[0], 2)
+      ctx.limpiar()
+    }
+  })
+
+  it('CRITERIO 5 · un arrastre entero con los tres ganchos deja EXACTAMENTE un snapshot', () => {
+    // Si un solo frame escribiera en el store, el undo pasaría a revertir
+    // fotogramas del arrastre en vez de la operación completa.
+    const historial = historialReal()
+    const ctx = montar({
+      historial,
+      ajustar: engancharSiempre,
+      alPrevisualizar: vi.fn(),
+      alCrearMarcador: vi.fn(),
+    })
+    const antes = structuredClone(ctx.store.get())
+    const espiaSet = vi.spyOn(ctx.store, 'set')
+    const pilaAntes = historial.pila.length
+
+    const marcador = marcadorDe(ctx.mapa, 0, 2)
+    for (const d of [0.2, 0.4, 0.6, 0.8, 1]) {
+      marcador.setLatLng(destinoDe(antes, 0, 2, d).latlng)
+      marcador.fire('drag')
+    }
+    expect(espiaSet).not.toHaveBeenCalled()
+    expect(historial.pila.length).toBe(pilaAntes)
+
+    marcador.fire('dragend')
+
+    expect(espiaSet).toHaveBeenCalledTimes(1)
+    expect(historial.pila.length - pilaAntes).toBe(1)
+    expect(ctx.store.get().recintos[0].vertices[2]).toEqual(ENGANCHE)
+
+    ctx.limpiar()
+  })
+
+  it('un ajustar que revienta no tumba el arrastre: avisa UNA vez por gesto y sigue con el crudo', () => {
+    const ajustar = vi.fn(() => {
+      throw new Error('snap roto')
+    })
+    const historial = historialReal()
+    const ctx = montar({ ajustar, historial })
+    const antes = structuredClone(ctx.store.get())
+
+    const marcador = marcadorDe(ctx.mapa, 0, 0)
+    for (const d of [1, 2, 3, 4, 5]) {
+      marcador.setLatLng(destinoDe(antes, 0, 0, d).latlng)
+      marcador.fire('drag')
+    }
+    marcador.fire('dragend')
+
+    expect(ajustar).toHaveBeenCalledTimes(6) // 5 frames + el dragend
+    // …y UN SOLO aviso: cien mensajes idénticos serían otra forma de silencio.
+    expect(ctx.alAvisar).toHaveBeenCalledTimes(1)
+    const [mensaje, detalle] = ctx.alAvisar.mock.calls[0]
+    expect(typeof mensaje).toBe('string')
+    expect(mensaje.length).toBeGreaterThan(0)
+    // AVISO y no ERROR: el gesto sigue, el modelo queda generable.
+    expect(detalle.nivel).toBe(NIVEL.AVISO)
+    expect(detalle.causa).toBeInstanceOf(Error)
+
+    // El gesto ha llegado a su fin con el punto CRUDO y su único commit.
+    const v = ctx.store.get().recintos[0].vertices[0]
+    expect(v[0]).toBeCloseTo(destinoDe(antes, 0, 0, 5).utm[0], 2)
+    exigirSinNaN(ctx.store.get())
+    expect(commitsDe(historial)).toBe(1)
+
+    // Un SEGUNDO gesto vuelve a avisar: el episodio es el gesto, no la vida del
+    // módulo (un fallo que persiste no puede enmudecer para siempre).
+    marcador.setLatLng(destinoDe(antes, 0, 0, 6).latlng)
+    marcador.fire('drag')
+    expect(ctx.alAvisar).toHaveBeenCalledTimes(2)
+
+    ctx.limpiar()
+  })
+
+  it('un ajustar que devuelve un punto no finito se ignora con aviso: CERO NaN en el modelo', () => {
+    const ctx = montar({
+      ajustar: () => ({ punto: [Number.NaN, 4479660], enganchado: true, tipo: 'VERTICE' }),
+    })
+    const antes = structuredClone(ctx.store.get())
+
+    const marcador = marcadorDe(ctx.mapa, 1, 0)
+    const destino = destinoDe(antes, 1, 0, 0.75)
+    marcador.setLatLng(destino.latlng)
+    marcador.fire('drag')
+    marcador.fire('dragend')
+
+    expect(ctx.alAvisar).toHaveBeenCalledTimes(1)
+    expect(ctx.alAvisar.mock.calls[0][1].nivel).toBe(NIVEL.AVISO)
+    exigirSinNaN(ctx.store.get())
+    expect(ctx.store.get().recintos[1].vertices[0][0]).toBeCloseTo(destino.utm[0], 2)
+
+    ctx.limpiar()
+  })
+
+  // ── alPrevisualizar ───────────────────────────────────────────────────────
+
+  it('alPrevisualizar cierra cada render con los anillos DEL ESTADO y refVertice null', () => {
+    const alPrevisualizar = vi.fn()
+    const ctx = montar({ alPrevisualizar })
+
+    expect(alPrevisualizar).toHaveBeenCalledTimes(1) // el render de arranque
+    const [anillos, ref] = alPrevisualizar.mock.calls[0]
+    expect(ref).toBeNull()
+    expect(anillos).toHaveLength(2)
+    expect(anillos[0]).toEqual(ctx.parcela.recintos[0].vertices)
+    expect(anillos[1]).toEqual(ctx.parcela.recintos[1].vertices)
+
+    // Son UTM, no lat/lng (la frontera de vista no se mueve: regla de oro 3).
+    expect(anillos[0][0][0]).toBeGreaterThan(1000)
+
+    // Y son una COPIA: un consumidor que los mutara no puede tocar ni el modelo…
+    expect(anillos[0]).not.toBe(ctx.store.get().recintos[0].vertices)
+    anillos[0][0][0] = 999999
+    expect(ctx.store.get().recintos[0].vertices[0][0]).toBeCloseTo(439240, 6)
+    // …ni el polígono que se está pintando.
+    ctx.sinc.refrescar()
+    const anillo = poligonoEnPane(ctx.mapa, PANE.PARCELA_EDITADA).getLatLngs()[0]
+    expect(anillo[0].lat).toBeCloseTo(vertUTMaLatLng([439240, 4479655], 30)[0], 9)
+
+    ctx.limpiar()
+  })
+
+  it('en cada drag recibe los anillos EN VUELO y la refVertice del vértice movido', () => {
+    const alPrevisualizar = vi.fn()
+    const ctx = montar({ alPrevisualizar })
+    const antes = structuredClone(ctx.store.get())
+    alPrevisualizar.mockClear()
+
+    const marcador = marcadorDe(ctx.mapa, 1, 2)
+    const destino = destinoDe(antes, 1, 2, 1.5)
+    marcador.setLatLng(destino.latlng)
+    marcador.fire('drag')
+
+    expect(alPrevisualizar).toHaveBeenCalledTimes(1)
+    const [anillos, ref] = alPrevisualizar.mock.calls[0]
+    expect(ref).toEqual({ recinto: 1, indice: 2 })
+    // El vértice en vuelo ya lleva el valor nuevo…
+    expect(anillos[1][2][0]).toBeCloseTo(destino.utm[0], 2)
+    expect(anillos[1][2][1]).toBeCloseTo(destino.utm[1], 2)
+    // …los demás siguen quietos…
+    expect(anillos[1][0]).toEqual(antes.recintos[1].vertices[0])
+    expect(anillos[0]).toEqual(antes.recintos[0].vertices)
+    // …y el ESTADO todavía no sabe nada: por eso son "en vuelo".
+    expect(ctx.store.get().recintos).toEqual(antes.recintos)
+
+    // Al soltar, una llamada más: la del render, ya con el estado y sin refVertice.
+    marcador.fire('dragend')
+    const [anillosFin, refFin] = alPrevisualizar.mock.calls.at(-1)
+    expect(refFin).toBeNull()
+    expect(anillosFin[1][2][0]).toBeCloseTo(destino.utm[0], 2)
+    expect(anillosFin[1][2]).toEqual(ctx.store.get().recintos[1].vertices[2])
+
+    ctx.limpiar()
+  })
+
+  it('un set ajeno re-sincroniza la vista en vivo con el estado', () => {
+    const alPrevisualizar = vi.fn()
+    const ctx = montar({ alPrevisualizar })
+    alPrevisualizar.mockClear()
+
+    const siguiente = structuredClone(ctx.store.get())
+    siguiente.recintos[1].vertices[0] = [439249.5, 4479661.5]
+    ctx.store.set(siguiente)
+
+    expect(alPrevisualizar).toHaveBeenCalledTimes(1)
+    const [anillos, ref] = alPrevisualizar.mock.calls[0]
+    expect(ref).toBeNull()
+    expect(anillos[1][0]).toEqual([439249.5, 4479661.5])
+
+    ctx.limpiar()
+  })
+
+  it('una vista en vivo que revienta no se lleva por delante el modelo', () => {
+    const alPrevisualizar = vi.fn(() => {
+      throw new Error('acotaciones rotas')
+    })
+    const historial = historialReal()
+    // El render de arranque ya llama al gancho: el primer aviso llega al montar.
+    const ctx = montar({ alPrevisualizar, historial })
+    expect(ctx.alAvisar).toHaveBeenCalledTimes(1)
+    expect(ctx.alAvisar.mock.calls[0][1].nivel).toBe(NIVEL.AVISO)
+
+    const antes = structuredClone(ctx.store.get())
+    const marcador = marcadorDe(ctx.mapa, 0, 3)
+    expect(() => {
+      for (const d of [1, 2, 3, 4]) {
+        marcador.setLatLng(destinoDe(antes, 0, 3, d).latlng)
+        marcador.fire('drag')
+      }
+      marcador.fire('dragend')
+    }).not.toThrow()
+
+    expect(alPrevisualizar).toHaveBeenCalledTimes(1 + 4 + 1) // montaje + frames + render final
+    // Un aviso por el montaje y UNO por el gesto entero, no cuatro.
+    expect(ctx.alAvisar).toHaveBeenCalledTimes(2)
+
+    // El modelo, intacto en su corrección: el gesto ha acabado y ha commiteado.
+    expect(ctx.store.get().recintos[0].vertices[3][0]).toBeCloseTo(
+      destinoDe(antes, 0, 3, 4).utm[0],
+      2,
+    )
+    exigirSinNaN(ctx.store.get())
+    expect(commitsDe(historial)).toBe(1)
+
+    ctx.limpiar()
+  })
+
+  // ── alCrearMarcador ───────────────────────────────────────────────────────
+
+  it('alCrearMarcador recibe cada L.Marker recién creado con su refVertice', () => {
+    const vistos = []
+    const alCrearMarcador = vi.fn((marcador, ref) => vistos.push({ marcador, ref }))
+    const ctx = montar({ alCrearMarcador })
+
+    expect(alCrearMarcador).toHaveBeenCalledTimes(8) // uno por vértice de los 2 recintos
+    for (const { marcador, ref } of vistos) {
+      expect(marcador instanceof L.Marker).toBe(true)
+      // El MISMO objeto que cuelga del marcador, no una copia.
+      expect(ref).toBe(marcador.refVertice)
+      // Ya está en el mapa y ya es localizable por su RefVertice.
+      expect(marcadorDe(ctx.mapa, ref.recinto, ref.indice)).toBe(marcador)
+    }
+    const claves = new Set(vistos.map(({ ref }) => `${ref.recinto}:${ref.indice}`))
+    expect(claves.size).toBe(8) // uno por RefVertice, sin repetir
+
+    ctx.limpiar()
+  })
+
+  it('se llama al RECONSTRUIR y NO cuando el render actualiza en sitio', () => {
+    const alCrearMarcador = vi.fn()
+    const ctx = montar({ alCrearMarcador })
+    alCrearMarcador.mockClear()
+
+    // Misma forma → render en sitio: las instancias se reutilizan (hallazgo C8),
+    // así que no hay ningún marcador nuevo que entregar.
+    const igual = structuredClone(ctx.store.get())
+    igual.recintos[0].vertices[0] = [439241, 4479656]
+    ctx.store.set(igual)
+    expect(alCrearMarcador).not.toHaveBeenCalled()
+
+    // Cambia la forma → reconstrucción: se entregan todos otra vez.
+    const otra = structuredClone(ctx.store.get())
+    otra.recintos[0].vertices.push([439250, 4479675])
+    ctx.store.set(otra)
+    expect(alCrearMarcador).toHaveBeenCalledTimes(9)
+
+    ctx.limpiar()
+  })
+
+  it('un alCrearMarcador que revienta avisa UNA vez (no ocho) y deja los vértices usables', () => {
+    const alCrearMarcador = vi.fn(() => {
+      throw new Error('edición rota')
+    })
+    const historial = historialReal()
+    const ctx = montar({ alCrearMarcador, historial })
+
+    expect(alCrearMarcador).toHaveBeenCalledTimes(8)
+    expect(ctx.alAvisar).toHaveBeenCalledTimes(1) // un aviso por reconstrucción, no por vértice
+    expect(ctx.alAvisar.mock.calls[0][1].nivel).toBe(NIVEL.AVISO)
+    expect(marcadoresDe(ctx.mapa)).toHaveLength(8)
+
+    // Y el arrastre sigue funcionando: la vista rota no se lleva el modelo.
+    const antes = structuredClone(ctx.store.get())
+    const marcador = marcadorDe(ctx.mapa, 0, 1)
+    marcador.setLatLng(destinoDe(antes, 0, 1, 1).latlng)
+    marcador.fire('drag')
+    marcador.fire('dragend')
+    expect(ctx.store.get().recintos[0].vertices[1][0]).toBeCloseTo(
+      destinoDe(antes, 0, 1, 1).utm[0],
+      2,
+    )
+    expect(commitsDe(historial)).toBe(1)
+
+    // Una reconstrucción nueva es un episodio nuevo: vuelve a avisar.
+    const otra = structuredClone(ctx.store.get())
+    otra.recintos[0].vertices.push([439250, 4479675])
+    ctx.store.set(otra)
+    expect(ctx.alAvisar).toHaveBeenCalledTimes(2)
 
     ctx.limpiar()
   })

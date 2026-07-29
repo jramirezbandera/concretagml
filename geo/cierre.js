@@ -15,15 +15,15 @@
 // vértice de cierre casi-duplicado— y devuelve el anillo ABIERTO ya compensado.
 //
 // Distancias euclídeas propias con `Math.hypot` (UTM en metros); NUNCA
-// `turf.distance` / `turf.length` (regla de oro 6).
+// `turf.distance` / `turf.length` (regla de oro 6). La fórmula NO se reescribe
+// aquí: se importa de `geo/metrica.js`, que es su única definición en el
+// proyecto desde F06 (antes vivía duplicada en este módulo y en
+// `validation/_comun.js`, que ahora también la re-exporta de allí).
+
+import { distancia } from './metrica.js'
 
 // Misclosure por debajo del cual no hay nada que repartir (1 nm; despreciable).
 const TOL_CIERRE_POR_DEFECTO = 1e-9
-
-/** Distancia euclídea entre dos vértices [x,y] (metros UTM). */
-function distancia(a, b) {
-  return Math.hypot(a[0] - b[0], a[1] - b[1])
-}
 
 /** Valida que `anillo` sea un array de vértices [x,y] numéricos y finitos. */
 function validarAnillo(anillo) {

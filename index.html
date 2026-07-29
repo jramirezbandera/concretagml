@@ -153,14 +153,42 @@
           </div>
         </div>
 
-        <button
-          type="button"
-          class="gml-boton gml-boton--secundario"
-          data-accion="deducir-refcat"
-          disabled
-        >
-          Deducir del mapa
-        </button>
+        <!-- LAS DOS CONSULTAS DERIVADAS, EN PAREJA. Las dos parten de algo que
+             ya tiene que estar cargado, y por eso las dos NACEN `disabled`:
+             «Deducir del mapa» va de la geometría a la referencia, y «Traer
+             colindantes» va de la referencia a las parcelas vecinas (que F06
+             necesita como dianas de enganche). Quien las enciende —y quien
+             escribe el motivo cuando NO las enciende— es el cableado.
+
+             Van en UNA fila y no una debajo de la otra por una razón medida, no
+             por gusto: el panel reparte una altura fija entre bloques fijos (ver
+             la nota de `.gml-bloque--avisos` en `estilos/app.css`). Una tercera
+             fila de botón a lo ancho habría costado ~36 px que se los quita la
+             tabla de vértices. Emparejarlas cuesta cero y además dice la verdad:
+             son la misma clase de cosa.
+
+             ⚠️ `traer-colindantes` vive AQUÍ y no en la barra de edición del mapa
+             aunque sean las colindantes lo que F06 usa para enganchar: esto es
+             una CONSULTA al Catastro, no una edición, y la barra no habla con la
+             red. -->
+        <div class="gml-boton-par">
+          <button
+            type="button"
+            class="gml-boton gml-boton--secundario"
+            data-accion="deducir-refcat"
+            disabled
+          >
+            Deducir del mapa
+          </button>
+          <button
+            type="button"
+            class="gml-boton gml-boton--secundario"
+            data-accion="traer-colindantes"
+            disabled
+          >
+            Traer colindantes
+          </button>
+        </div>
 
         <!-- El desenlace de la acción. `role="status"` para que el lector de
              pantalla lo anuncie SIN robar el foco, igual que el renglón de
@@ -201,6 +229,32 @@
         <div id="tabla-vertices" class="gml-tabla-caja"></div>
       </section>
 
+      <!-- ── AQUÍ ESTUVO EL BLOQUE «EDICIÓN» (F06) HASTA EL 2026-07-29 ────────
+           Si buscas «Deshacer», «Ajustar al parcelario», la tolerancia, el
+           «Desplazar lindero», el renglón `[data-estado="edicion"]` o la ayuda de
+           gestos: ya no están en el panel. Se fueron ENTEROS a la BARRA FLOTANTE
+           sobre el mapa, que fabrica `viewer/barra-edicion.js` y monta
+           `viewer/index.js` como control de Leaflet en la esquina superior
+           izquierda del `<main id="mapa">` de más abajo.
+
+           POR QUÉ SE FUERON: el bloque se comía 270 px de un panel que reparte
+           una altura FIJA entre bloques fijos, y dejaba la caja de vértices en
+           64 px a 1440×900 — su cabecera y 1,6 renglones, o sea UN vértice a
+           medias de los 15 de la parcela. Medido en navegador y anotado en
+           `spec/feature-06-edicion-parcela.md` §2. Sobre el mapa esas
+           herramientas no le quitan altura a nada.
+
+           QUÉ NO CAMBIÓ: la barra produce los MISMOS siete nodos, con los mismos
+           `data-accion`/`data-campo`/`data-estado` y los mismos tipos de
+           elemento, porque `app/main.js#cablearEdicion` los localiza POR
+           SELECTOR. Por eso el traslado no tocó ni una línea de JS de la app.
+
+           ⚠️ NO VOLVER A DECLARAR ESOS NODOS AQUÍ. Existirían DOS veces, y el
+           `nodo()` de `app/main.js` usa `querySelector`, que se queda con el
+           PRIMERO del documento — y este `<aside>` va antes que el `<main>`. La
+           barra quedaría muerta y nada avisaría. (Pasó: es el estado intermedio
+           que cerró esta tarea.) -->
+
       <!-- La ficha del expediente: SEGUNDO suscriptor del mismo store que el visor.
            Los `<dd>` los rellena `app/main.js`; los `data-ficha` son su contrato. -->
       <footer class="gml-panel-pie">
@@ -217,12 +271,33 @@
           <dt>Superficie</dt>
           <dd class="gml-mono" data-ficha="superficie">—</dd>
 
+          <!-- F06. El perímetro va JUSTO DEBAJO de la superficie porque las dos
+               son la MISMA medición del MISMO contorno, y durante un arrastre se
+               mueven a la vez: separarlas obligaría a mirar a dos sitios para
+               entender un solo gesto. -->
+          <dt>Perímetro</dt>
+          <dd class="gml-mono" data-ficha="perimetro">—</dd>
+
           <!-- Los dos de F05 vienen del Catastro, no de la geometría del
                usuario. «Superficie catastral» va JUSTO DEBAJO de «Superficie»
                para que las dos cifras se comparen de un vistazo: la discrepancia
                entre lo medido y lo inscrito es media razón de ser de la app. -->
           <dt>Superficie catastral</dt>
           <dd class="gml-mono" data-ficha="superficie-catastral">—</dd>
+
+          <!-- F06. Esa discrepancia, ya restada, y JUSTO DEBAJO de la cifra que
+               la produce.
+
+               ⚠️ SIN COLOR DE MÉRITO, y esto no es una omisión: la regla de oro 9
+               dice que la aplicación MIDE y el colegiado interpreta y firma —
+               «ninguna cifra lleva juicio de valor: sin semáforos, sin válido/no
+               válido». Un Δ en verde cuando es pequeño y en rojo cuando es grande
+               estaría dictaminando si la discrepancia es tolerable, que es
+               exactamente la decisión que no nos toca: el umbral depende del
+               expediente, del municipio y del criterio del técnico que firma.
+               Va en el mismo gris de texto que el resto de la ficha. -->
+          <dt>Δ catastral</dt>
+          <dd class="gml-mono" data-ficha="delta-catastral">—</dd>
 
           <dt>Colindantes</dt>
           <dd class="gml-mono" data-ficha="colindantes">—</dd>
@@ -258,7 +333,13 @@
     </aside>
 
     <!-- Caja VACÍA: `crearVisor` monta aquí el `L.Map`. `.gml-mapa` y
-         `.leaflet-container` acaban siendo EL MISMO nodo del DOM. -->
+         `.leaflet-container` acaban siendo EL MISMO nodo del DOM.
+
+         Y aquí dentro monta también la BARRA DE EDICIÓN
+         (`viewer/barra-edicion.js`), como un control más de Leaflet: los nodos
+         `[data-accion]`, `[data-campo]` y `[data-estado]` de la edición NO están
+         en este fichero, están ahí. Su cromo lo viste la sección «La barra
+         flotante de edición» de `estilos/app.css`. -->
     <main id="mapa" class="gml-mapa"></main>
 
     <script type="module" src="/app/main.js"></script>

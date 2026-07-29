@@ -45,8 +45,15 @@
  * contenedor con dimensiones falsificadas (`test/viewer/_ayuda-jsdom.js`) y una *
  * ristra de animaciones desactivadas. Nada de eso tiene que ver con generar un  *
  * GML, y `crearVisor` tiene su propia suite. Se dobla ese módulo —uno solo— y   *
- * se dejan REALES el store, el panel, la validación, el serializador y la       *
- * entrega: el cable que se prueba es de punta a punta salvo por el mapa.        *
+ * se dejan REALES el store, el panel, la validación, el serializador, la entrega*
+ * y la BARRA de edición: el cable que se prueba es de punta a punta salvo por el*
+ * mapa.                                                                         *
+ *                                                                              *
+ * ⚠️ La barra está en esa lista desde el traslado de F06, y no por gusto: los   *
+ * siete nodos de las herramientas de edición ya no los trae `index.html`, los   *
+ * fabrica `viewer/barra-edicion.js` y quien lo llama es el `crearVisor` que aquí*
+ * se dobla. El doble tiene que reproducir ese efecto sobre el documento o       *
+ * `cablearEdicion` lanza y este fichero se queda sin recolectar ni un test.     *
  *                                                                              *
  * ── DECISIÓN 4 · LA ENTREGA PASA POR `descargarGml` DE VERDAD ──               *
  * El espía no sustituye la descarga: la registra y la DELEGA en `descargarGml`  *
@@ -68,6 +75,28 @@ import { serializarParcelaCp } from '../../gml/serialize-cp.js'
 import { crearParcela, crearRecinto, ORIGEN_PARCELA, TIPO_RECINTO } from '../../model/parcela.js'
 import { validarParcela } from '../../validation/parcela.js'
 import { NIVEL, crearEstadoVista } from '../../viewer/_comun.js'
+import { crearBarraEdicion } from '../../viewer/barra-edicion.js'
+import { montarMapa } from '../viewer/_ayuda-jsdom.js'
+
+/**
+ * El OTRO efecto de `crearVisor` sobre el documento, desde el traslado de F06:
+ * la barra flotante de herramientas de edición. Sus siete nodos ya no están en
+ * `index.html` —el bloque «Edición» del panel dejó de existir—, así que si el
+ * doble no los pusiera, `cablearEdicion` lanzaría al buscar
+ * `[data-accion="deshacer"]` y este fichero no recolectaría NI UN test.
+ *
+ * Se llama al módulo de verdad sobre un `L.Map` del arnés compartido en vez de
+ * inyectar una copia del marcado, por lo mismo que en `main-edicion.dom.test.js`
+ * (decisión 3 de aquella cabecera): una copia se desincroniza en silencio de la
+ * barra real y estas pruebas se quedarían ciegas a un cambio de contrato.
+ *
+ * Aquí basta con montarla UNA vez, al arrancar: ningún test de este fichero
+ * toca los siete nodos ni vuelve a cablear la edición.
+ */
+function montarBarra() {
+  const { mapa } = montarMapa()
+  crearBarraEdicion({ mapa })
+}
 
 // `crearVisor` es lo ÚNICO que se dobla (decisión 3). El doble devuelve la
 // misma forma que el real —un objeto con `destruir`— para que `app/main.js` no
@@ -79,8 +108,34 @@ import { NIVEL, crearEstadoVista } from '../../viewer/_comun.js'
 // cableado lanzaría, y el `try` de arranque de `app/main.js` se lo tragaría: el
 // bloque del Catastro no se cablearía y esta suite seguiría en verde sin
 // enterarse. Es decir, exactamente un test que miente.
+//
+// Desde F06 incluye además `edicion`, por la MISMA razón y con un agravante: el
+// cableado de la edición va FUERA del `try` del Catastro, así que un doble sin
+// `edicion` no dejaría un bloque muerto sino que tumbaría el import entero de
+// `app/main.js` y con él esta suite. Se implementa lo justo que consume
+// `cablearEdicion`; su comportamiento se prueba en `main-edicion.dom.test.js`.
+//
+// Y desde el TRASLADO de las herramientas al mapa, el doble tiene además que
+// reproducir el segundo efecto del original sobre el DOCUMENTO: los siete nodos
+// de la barra (ver {@link montarBarra}). Sin ellos el fallo es el mismo de
+// siempre —el import de `app/main.js` se cae y la suite entera desaparece—, solo
+// que por el otro extremo del cable.
 vi.mock('../../viewer/index.js', () => ({
-  crearVisor: () => ({ mapa: { on() {}, off() {} }, destruir() {} }),
+  crearVisor: () => {
+    montarBarra()
+    return {
+      mapa: { on() {}, off() {} },
+      edicion: {
+        snapActivo: () => true,
+        tolerancia: () => 0.2,
+        ladoSeleccionado: () => null,
+        alCambiarSeleccion: () => () => {},
+        fijarColindantes() {},
+        desplazarSeleccion: () => ({ aplicado: false, modo: null, detecciones: [] }),
+      },
+      destruir() {},
+    }
+  },
 }))
 
 // ── La cáscara REAL, leída de `index.html` ───────────────────────────────────

@@ -68,6 +68,24 @@
  *        rojo, «NO rellena nada».                                                *
  *   M9 · `geometriaOficial: null` en `crearParcela` → 1 rojo, «la parcela       *
  *        cargada lleva su GEOMETRÍA OFICIAL».                                    *
+ *                                                                              *
+ * ── F06 · T5.2 · MUTACIONES DEL BOTÓN Y DE LOS DOS GANCHOS ──                   *
+ * Mismo método: aplicada, `npm test -- catastro`, revertida con el editor.       *
+ *  M10 · `botonColindantes.disabled = ocupado` (sin la condición de referencia) → *
+ *        4 rojos: los tres del «apagado» y el del motivo que no pisa el          *
+ *        desenlace. Es la prueba de que el criterio de encendido no es vacuo.    *
+ *  M11 · `botonColindantes.disabled = sinReferencia` (sin `ocupado`) → 2 rojos:  *
+ *        «mientras hay algo EN VUELO está apagado» y «una pulsación, UNA         *
+ *        petición». O sea: sin eso, la doble pulsación SÍ dispara dos consultas. *
+ *  M12 · publicar también los `ok:false` → 1 rojo, «un resultado SIN dato no se  *
+ *        publica».                                                               *
+ *  M13 · quitar el `try` de `publicarColindantes` → 1 rojo, «un suscriptor que   *
+ *        revienta no tumba el cableado ni tapa a los demás».                     *
+ *  M14 · `vigente: true` fijo en `operar` (la M1, repetida ahora) → 5 rojos, y   *
+ *        DOS son nuevos: los caminos 3 y 4 de `alCargarParcela` (respuesta       *
+ *        superada y respuesta posterior a `destruir()`).                         *
+ *  M15 · quitar la rama de CERO colindantes → 1 rojo, «NO se cuenta como fallo,  *
+ *        y se dice DISTINTO».                                                    *
  * -------------------------------------------------------------------------- */
 
 import { readFileSync } from 'node:fs'
@@ -77,8 +95,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 import {
   MENSAJE_FALLO_INESPERADO,
+  MENSAJE_SUSCRIPTOR_ROTO,
+  MOTIVO_COLINDANTES_APAGADO,
   ROTULO_DEDUCIDA,
   SELECTOR_BOTON_CARGAR,
+  SELECTOR_BOTON_COLINDANTES,
   SELECTOR_BOTON_DEDUCIR,
   SELECTOR_CAMPO_REFCAT,
   SELECTOR_CANDIDATOS,
@@ -274,14 +295,25 @@ const httpCancelada = (url) => ({
  * @param {string} [opciones.rccoor]  Qué contesta el OVC.
  * @param {string|null} [opciones.parcela=null]  Qué contesta `GetParcel` (por
  *   defecto, el fixture que corresponda a la referencia pedida).
+ * @param {string} [opciones.vecindad]  Qué contesta `GetNeighbourParcel`. Se puede
+ *   cambiar para montar el caso de CERO colindantes, que ningún fixture tiene: se
+ *   le sirve la colección de UN miembro de `GetParcel` (la propia parcela y nadie
+ *   más), que es exactamente lo que el servicio devolvería para una parcela
+ *   aislada. El cliente separa la propia por referencia, así que `colindantes`
+ *   queda vacío sin inventarse ningún XML.
  */
-function crearTransporteDoble({ manual = false, rccoor = TEXTO_RCCOOR_OK, parcela = null } = {}) {
+function crearTransporteDoble({
+  manual = false,
+  rccoor = TEXTO_RCCOOR_OK,
+  parcela = null,
+  vecindad = TEXTO_VECINDAD,
+} = {}) {
   const peticiones = []
   let emitidas = 0
 
   function cuerpoDe(url) {
     if (url.includes('Consulta_RCCOOR')) return rccoor
-    if (url.includes('GetNeighbourParcel')) return TEXTO_VECINDAD
+    if (url.includes('GetNeighbourParcel')) return vecindad
     if (parcela !== null) return parcela
     const pedida = /[?&]refcat=([^&]*)/.exec(url)[1]
     if (pedida === REFCAT) return TEXTO_PARCELA
@@ -336,6 +368,24 @@ function crearCacheDoble({ valor = null, guardadoEn = null } = {}) {
     leer: async () => (valor === null ? null : { valor, guardadoEn }),
     guardar: async (clave, dato, meta) => {
       guardados.push({ clave, dato, meta })
+    },
+  }
+}
+
+/**
+ * Caché de VERDAD, en memoria: lo que se guarda se puede volver a leer por su
+ * clave. {@link crearCacheDoble} no sirve para esto —devuelve siempre la misma
+ * entrada, venga la clave que venga—, y aquí hace falta el comportamiento real
+ * para poder afirmar que la SEGUNDA pulsación de «Traer colindantes» no vuelve a
+ * la red. Cumple el puerto `CacheCatastro` y nada más.
+ */
+function crearCacheEnMemoria() {
+  const almacen = new Map()
+  return {
+    almacen,
+    leer: async (clave) => almacen.get(clave) ?? null,
+    guardar: async (clave, valor, meta) => {
+      almacen.set(clave, { valor, guardadoEn: meta.guardadoEn })
     },
   }
 }
@@ -396,6 +446,7 @@ function cablear(opciones = {}) {
     campo: document.querySelector(SELECTOR_CAMPO_REFCAT),
     botonCargar: document.querySelector(SELECTOR_BOTON_CARGAR),
     botonDeducir: document.querySelector(SELECTOR_BOTON_DEDUCIR),
+    botonColindantes: document.querySelector(SELECTOR_BOTON_COLINDANTES),
     renglon: document.querySelector(SELECTOR_ESTADO_CATASTRO),
     procedencia: document.querySelector(SELECTOR_PROCEDENCIA),
     lista: document.querySelector(SELECTOR_CANDIDATOS),
@@ -1243,5 +1294,485 @@ describe('cableado-catastro · colindantes()', () => {
     const resultado = await montado.cableado.colindantes()
     expect(resultado.ok).toBe(true)
     expect(montado.transporte.peticiones[0].url).toContain('GetNeighbourParcel')
+  })
+})
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * F06 · T5.2 — el BOTÓN de las colindantes y los dos ganchos hacia afuera
+ *
+ * `colindantes()` existía desde F05 y no lo llamaba nadie: era una decisión
+ * escrita (la cáscara no tenía gesto para pedirlas, y dispararlas solas al cargar
+ * sería una segunda petición por parcela que nadie ha pedido — override O8). F06
+ * le da un llamante, y sigue siendo BAJO ACCIÓN EXPLÍCITA del usuario.
+ *
+ * Lo que se prueba aquí, y en este orden: que el botón se enciende y se apaga con
+ * criterio Y dice por qué cuando lo deja apagado; que una pulsación es UNA
+ * petición y la segunda sobre la misma parcela no vuelve a la red; que
+ * `alCargarParcela` se dispara donde toca y sólo ahí; y que `alColindantes` es una
+ * suscripción de verdad, con baja, con varios oyentes y a prueba de uno que
+ * revienta.
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
+// ── 13 · El contrato de `index.html` para el botón nuevo ─────────────────────
+
+describe('cableado-catastro · «Traer colindantes» es contrato de index.html', () => {
+  it('si falta el botón, lanza NOMBRANDO el selector', () => {
+    document.querySelector(SELECTOR_BOTON_COLINDANTES).remove()
+    expect(() => cablear()).toThrow(SELECTOR_BOTON_COLINDANTES)
+  })
+
+  it('la guarda NO es vacua: index.html lo trae, y NACE apagado', () => {
+    const boton = document.querySelector(SELECTOR_BOTON_COLINDANTES)
+    expect(boton).not.toBeNull()
+    // Pedir las vecinas de nada no tiene sentido: hace falta una parcela con
+    // referencia catastral en el modelo, y al abrir la app no la hay.
+    expect(boton.disabled).toBe(true)
+  })
+
+  it('comparte el renglón del bloque: no se le ha inventado un `role="status"` propio', () => {
+    // Es una consulta al Catastro más. Dos renglones vecinos acabarían
+    // contradiciéndose sobre cuál fue la última acción.
+    expect(document.querySelectorAll('[role="status"][data-estado="cargar-catastro"]')).toHaveLength(
+      1,
+    )
+  })
+
+  it('un `alCargarParcela` que no es función se rechaza al cablear, no en la primera carga', () => {
+    expect(() => cablear({ alCargarParcela: 'reiniciar' })).toThrow(/alCargarParcela/)
+  })
+})
+
+// ── 14 · Cuándo se enciende, cuándo se apaga y qué se dice al apagarlo ───────
+
+describe('cableado-catastro · «Traer colindantes» lo enciende el ESTADO', () => {
+  it('⚠️ encendido con una parcela que YA tiene referencia catastral', () => {
+    const montado = cablear({ parcelaInicial: parcelaConReferencia() })
+    expect(montado.botonColindantes.disabled).toBe(false)
+  })
+
+  it('⚠️ apagado sin nada en el store, y el renglón DICE por qué', () => {
+    const montado = cablear({ parcelaInicial: null })
+    expect(montado.botonColindantes.disabled).toBe(true)
+    // Un botón gris y mudo es un error silencioso (regla de oro 1). El literal se
+    // importa del módulo: una copia aquí podría divergir sin que nadie se entere.
+    expect(montado.renglon.textContent).toBe(MOTIVO_COLINDANTES_APAGADO)
+    // Y no es un fallo: nadie ha pedido nada todavía, sólo se explica un botón.
+    expect(renglonEnFallo(montado.renglon)).toBe(false)
+    expect(montado.panel.resumen()).toEqual({ [NIVEL.ERROR]: 0, [NIVEL.AVISO]: 0 })
+  })
+
+  it('⚠️ apagado con geometría SIN referencia (el caso del DXF), y también lo dice', () => {
+    // Es el estado en el que sí se puede deducir: los dos botones del par dicen
+    // cosas distintas a la vez, y cada uno la suya.
+    const montado = cablear({ parcelaInicial: parcelaSinReferencia() })
+    expect(montado.botonColindantes.disabled).toBe(true)
+    expect(montado.botonDeducir.disabled).toBe(false)
+    expect(montado.renglon.textContent).toBe(MOTIVO_COLINDANTES_APAGADO)
+  })
+
+  it('se re-evalúa con el store, no sólo al cablear', () => {
+    const montado = cablear({ parcelaInicial: parcelaSinReferencia() })
+    expect(montado.botonColindantes.disabled).toBe(true)
+    montado.estado.set(parcelaConReferencia())
+    expect(montado.botonColindantes.disabled).toBe(false)
+    montado.estado.set(parcelaSinReferencia())
+    expect(montado.botonColindantes.disabled).toBe(true)
+  })
+
+  it('⚠️ el motivo NO pisa el desenlace de una acción anterior', async () => {
+    // El renglón es del DESENLACE de lo último que el usuario pidió. Si `refrescar`
+    // escribiera sin condición, cada `set` del store —cada vértice que F06 mueva—
+    // borraría lo que la última consulta acaba de contar.
+    const montado = cablear({ parcelaInicial: parcelaConReferencia() })
+    // Con el botón encendido no hay nada que explicar: el renglón sigue libre.
+    expect(montado.renglon.textContent).toBe('')
+
+    await montado.cableado.colindantes()
+    const desenlace = montado.renglon.textContent
+    expect(desenlace).not.toBe(MOTIVO_COLINDANTES_APAGADO)
+
+    // Ahora la parcela se queda sin referencia (el usuario abre un DXF encima): el
+    // botón se apaga…
+    montado.estado.set(parcelaSinReferencia())
+    expect(montado.botonColindantes.disabled).toBe(true)
+    // …y el renglón sigue contando lo que pasó, que es lo que el usuario pidió.
+    expect(montado.renglon.textContent).toBe(desenlace)
+  })
+
+  it('mientras hay algo EN VUELO está apagado, y luego vuelve', async () => {
+    const transporte = crearTransporteDoble({ manual: true })
+    const montado = cablear({ transporte, parcelaInicial: parcelaConReferencia() })
+    expect(montado.botonColindantes.disabled).toBe(false)
+
+    montado.campo.value = REFCAT
+    const enCurso = montado.cableado.cargar()
+    // Síncrono, en el mismo tick: no hay ventana en la que siga pulsable.
+    expect(montado.botonColindantes.disabled).toBe(true)
+
+    await hastaPeticion(transporte, 1)
+    transporte.peticiones[0].responder()
+    await enCurso
+    expect(montado.botonColindantes.disabled).toBe(false)
+  })
+})
+
+// ── 15 · UNA petición por pulsación. Ni una más (override O8) ────────────────
+
+describe('cableado-catastro · el régimen de uso del servicio', () => {
+  it('⚠️ NADA automático: ni al cablear, ni al cargar, ni al mover un vértice', async () => {
+    const montado = cablear({ parcelaInicial: parcelaConReferencia() })
+    // Suscribirse tampoco consulta: `alColindantes` es un canal, no un disparador.
+    montado.cableado.alColindantes(() => {})
+    expect(montado.transporte.emitidas).toBe(0)
+
+    // Una carga con éxito trae la parcela y NADA más: `GetParcel`, no
+    // `GetNeighbourParcel`. Dispararlas al cargar sería una segunda petición por
+    // parcela que nadie ha pedido.
+    montado.campo.value = REFCAT
+    await montado.cableado.cargar()
+    expect(montado.transporte.peticiones).toHaveLength(1)
+    expect(montado.transporte.peticiones[0].url).not.toContain('GetNeighbourParcel')
+
+    // Y un `set` del store (lo que F06 hace en cada arrastre) tampoco.
+    montado.estado.set(parcelaConReferencia())
+    await cederTurno()
+    expect(montado.transporte.emitidas).toBe(1)
+  })
+
+  it('⚠️ una pulsación, UNA petición: la doble pulsación no dispara la segunda', async () => {
+    const transporte = crearTransporteDoble({ manual: true })
+    const montado = cablear({ transporte, parcelaInicial: parcelaConReferencia() })
+
+    montado.botonColindantes.click()
+    // El `disabled` se pone en el mismo tick del clic, así que el segundo `click()`
+    // ni siquiera despacha el evento.
+    expect(montado.botonColindantes.disabled).toBe(true)
+    montado.botonColindantes.click()
+    montado.botonColindantes.click()
+
+    await hastaPeticion(transporte, 1)
+    expect(transporte.emitidas).toBe(1)
+    expect(transporte.peticiones[0].url).toContain('GetNeighbourParcel')
+
+    transporte.peticiones[0].responder()
+    await cederTurno()
+    expect(transporte.emitidas).toBe(1)
+    expect(montado.botonColindantes.disabled).toBe(false)
+  })
+
+  it('⚠️ la SEGUNDA pulsación sobre la misma parcela NO vuelve a la red', async () => {
+    // Lo garantiza `services/catastro.js` con su clave de vecindad propia; esto lo
+    // AFIRMA de punta a punta, contando las peticiones del transporte doble. Sin
+    // caché de verdad, cada pulsación sería una consulta más al servicio.
+    const montado = cablear({
+      parcelaInicial: parcelaConReferencia(),
+      cache: crearCacheEnMemoria(),
+    })
+
+    const primera = await montado.cableado.colindantes()
+    expect(primera.procedencia.origen).toBe(ORIGEN.RED)
+    expect(montado.transporte.emitidas).toBe(1)
+
+    const segunda = await montado.cableado.colindantes()
+    expect(segunda.procedencia.origen).toBe(ORIGEN.CACHE)
+    expect(montado.transporte.emitidas).toBe(1)
+    // Y sirve el MISMO dato, no uno recortado por venir de la copia local.
+    expect(segunda.datos.colindantes).toHaveLength(primera.datos.colindantes.length)
+  })
+})
+
+// ── 16 · `alColindantes` es una SUSCRIPCIÓN, no un callback único ────────────
+
+describe('cableado-catastro · alColindantes()', () => {
+  it('publica el resultado a TODOS los suscriptores, no sólo al último', async () => {
+    const montado = cablear({ parcelaInicial: parcelaConReferencia() })
+    const unos = []
+    const otros = []
+    montado.cableado.alColindantes((r) => unos.push(r))
+    montado.cableado.alColindantes((r) => otros.push(r))
+
+    const resultado = await montado.cableado.colindantes()
+
+    expect(unos).toEqual([resultado])
+    expect(otros).toEqual([resultado])
+    // Y lo que llega es lo que F06 va a aplanar para el snap.
+    expect(unos[0].datos.colindantes.flatMap((p) => p.recintos).length).toBeGreaterThan(0)
+  })
+
+  it('devuelve la BAJA, y la baja funciona', async () => {
+    const montado = cablear({ parcelaInicial: parcelaConReferencia() })
+    const vistos = []
+    const baja = montado.cableado.alColindantes((r) => vistos.push(r))
+    baja()
+
+    await montado.cableado.colindantes()
+    expect(vistos).toHaveLength(0)
+    // Idempotente: darse de baja dos veces no revienta.
+    expect(() => baja()).not.toThrow()
+  })
+
+  it('⚠️ un resultado SIN dato no se publica: quien escucha espera vecinas usables', async () => {
+    const montado = cablear({ parcelaInicial: null })
+    montado.campo.value = '0000000XX0000X'
+    const vistos = []
+    montado.cableado.alColindantes((r) => vistos.push(r))
+
+    const resultado = await montado.cableado.colindantes()
+
+    expect(resultado.ok).toBe(false)
+    expect(vistos).toHaveLength(0)
+    // Pero no se calla: se cuenta por los dos canales de siempre.
+    expect(textosDelPanel()).toContain(resultado.mensaje)
+    expect(renglonEnFallo(montado.renglon)).toBe(true)
+  })
+
+  it('⚠️ un suscriptor que revienta no tumba el cableado ni tapa a los demás', async () => {
+    const consola = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const montado = cablear({ parcelaInicial: parcelaConReferencia() })
+    const despues = []
+    montado.cableado.alColindantes(() => {
+      throw new Error('el snap de F06 se ha roto')
+    })
+    montado.cableado.alColindantes((r) => despues.push(r))
+
+    // La consulta NO se convierte en un rechazo: lo que ha fallado es un oyente.
+    const resultado = await montado.cableado.colindantes()
+    expect(resultado.ok).toBe(true)
+    expect(despues).toEqual([resultado])
+
+    // Y no es silencioso: panel (como defecto de programación) y consola.
+    expect(textosDelPanel()).toContain(MENSAJE_SUSCRIPTOR_ROTO)
+    expect(tarjetaDe(MENSAJE_SUSCRIPTOR_ROTO).dataset.nivel).toBe(NIVEL.ERROR)
+    expect(consola).toHaveBeenCalled()
+    // El renglón NO se toca: lo que el usuario pidió salió bien, y decirle que la
+    // consulta al Catastro ha fallado sería culpar al Catastro de un bug de casa.
+    expect(montado.renglon.textContent).not.toBe(MENSAJE_SUSCRIPTOR_ROTO)
+    expect(renglonEnFallo(montado.renglon)).toBe(false)
+    // Y el texto técnico no se le enseña a quien no programa.
+    expect(textosDelPanel().join(' ')).not.toMatch(/el snap de F06/)
+    consola.mockRestore()
+  })
+
+  it('tras `destruir()` no le llega nada a nadie, y la baja sigue siendo llamable', async () => {
+    // ⚠️ Honestidad sobre el alcance: que `destruir()` haga además `clear()` del
+    // conjunto NO es observable desde el DOM (después de destruir, `colindantes()`
+    // devuelve `null` antes de publicar nada). Ese `clear()` está por las
+    // cerraduras: sin él, el cableado retendría las capas de Leaflet del snap de
+    // F06 mucho después de que su pantalla se haya ido. Lo que sí se afirma aquí es
+    // lo que se ve: que nada llega, y que quien se suscriba tarde recibe una baja
+    // llamable en vez de un `undefined` que reventaría al invocarlo.
+    const montado = cablear({ parcelaInicial: parcelaConReferencia() })
+    const vistos = []
+    montado.cableado.alColindantes((r) => vistos.push(r))
+
+    montado.cableado.destruir()
+    expect(() => montado.cableado.alColindantes(() => vistos.push('tarde'))()).not.toThrow()
+    await expect(montado.cableado.colindantes()).resolves.toBeNull()
+
+    // Y los suscriptores NO se comparten entre cableados: el conjunto vive en el
+    // cierre de cada uno, no en el módulo.
+    const otro = cablear({ parcelaInicial: parcelaConReferencia() })
+    await otro.cableado.colindantes()
+    expect(vistos).toHaveLength(0)
+  })
+
+  it('un `fn` que no es función lanza: eso lo escribe un programador', () => {
+    const montado = cablear({ parcelaInicial: parcelaConReferencia() })
+    expect(() => montado.cableado.alColindantes(null)).toThrow(/alColindantes/)
+  })
+})
+
+// ── 17 · CERO colindantes es un DATO, no un fallo ────────────────────────────
+
+describe('cableado-catastro · una parcela aislada', () => {
+  /**
+   * Cero colindantes se monta sirviendo al `GetNeighbourParcel` la colección de UN
+   * miembro del `GetParcel`: la propia parcela y nadie más. Es lo que el servicio
+   * devolvería para una parcela rodeada de viales, y el cliente —que separa la
+   * propia por referencia normalizada (override O15)— deja `colindantes` vacío.
+   */
+  const aislada = () =>
+    cablear({
+      parcelaInicial: parcelaConReferencia(),
+      transporte: crearTransporteDoble({ vecindad: TEXTO_PARCELA }),
+    })
+
+  it('⚠️ NO se cuenta como fallo, y se dice DISTINTO', async () => {
+    const montado = aislada()
+    const resultado = await montado.cableado.colindantes()
+
+    expect(resultado.ok).toBe(true)
+    expect(resultado.datos.propia.refcat).toBe(REFCAT)
+    expect(resultado.datos.colindantes).toHaveLength(0)
+
+    // Ni renglón rojo, ni tarjeta de aviso: no ha fallado nada.
+    expect(renglonEnFallo(montado.renglon)).toBe(false)
+    expect(montado.panel.resumen()).toEqual({ [NIVEL.ERROR]: 0, [NIVEL.AVISO]: 0 })
+    // Y el renglón lo dice con sus palabras, no con las de «4 colindantes».
+    expect(montado.renglon.textContent).toMatch(/ninguna colindante/i)
+    expect(montado.renglon.textContent).toMatch(/no es un fallo/i)
+  })
+
+  it('⚠️ se distingue por el NÚMERO, nunca por el texto del servicio', async () => {
+    // Override O14: «vacío» y «no existe» llegan con el mismo `exceptionCode` y sólo
+    // se diferenciarían por texto libre, bilingüe y con errata («No records
+    // founded»). Ramificar sobre él está prohibido. Esta prueba fija que los dos
+    // casos salen por caminos DISTINTOS del cableado sin leer una sola letra del
+    // servicio: uno es `ok:true` con lista vacía; el otro, `ok:false`.
+    const conCero = aislada()
+    const cero = await conCero.cableado.colindantes()
+    expect(cero.ok).toBe(true)
+    expect(cero.motivo).toBeNull()
+    conCero.cableado.destruir()
+
+    // El `ExceptionReport` real de una referencia que el Catastro no conoce: es el
+    // MISMO código que devolvería una caja sin parcelas, y por eso no se distinguen.
+    const sinNada = cablear({
+      parcelaInicial: null,
+      transporte: crearTransporteDoble({ vecindad: TEXTO_INEXISTENTE }),
+    })
+    sinNada.campo.value = '0000000XX0000X'
+    const inexistente = await sinNada.cableado.colindantes()
+    expect(inexistente.ok).toBe(false)
+    expect(inexistente.motivo).toBe(MOTIVO_CATASTRO.NO_ENCONTRADO)
+    expect(renglonEnFallo(sinNada.renglon)).toBe(true)
+  })
+
+  it('se publica igual: no tener dianas de snap es una respuesta', async () => {
+    const montado = aislada()
+    const vistos = []
+    montado.cableado.alColindantes((r) => vistos.push(r))
+
+    await montado.cableado.colindantes()
+
+    expect(vistos).toHaveLength(1)
+    expect(vistos[0].datos.colindantes).toEqual([])
+  })
+})
+
+// ── 18 · `alCargarParcela`: los cuatro caminos ──────────────────────────────
+
+describe('cableado-catastro · alCargarParcela', () => {
+  /** Cablea apuntando cada aviso Y el estado de la pantalla en ese instante. */
+  function conGancho(opciones = {}) {
+    const avisos = []
+    let montado = null
+    montado = cablear({
+      ...opciones,
+      alCargarParcela: (parcela) => {
+        avisos.push({
+          parcela,
+          // Se llama DESPUÉS del `set`: quien escuche se encuentra la pantalla ya
+          // coherente, no a mitad de escribirse.
+          enStore: montado.estado.get(),
+          campo: montado.campo.value,
+          procedencia: montado.procedencia.textContent,
+        })
+      },
+    })
+    return { ...montado, avisos }
+  }
+
+  it('⚠️ 1 · se dispara tras `cargar()` con éxito, DESPUÉS del `estado.set`', async () => {
+    const montado = conGancho()
+    montado.campo.value = REFCAT
+    await montado.cableado.cargar()
+
+    expect(montado.avisos).toHaveLength(1)
+    const aviso = montado.avisos[0]
+    expect(aviso.parcela.refcat).toBe(REFCAT)
+    // El POJO que llega ES el que está en el store, no una copia paralela: F06 hace
+    // `reiniciar(historial, parcela)` con él y tiene que ser el mismo objeto.
+    expect(aviso.enStore).toBe(aviso.parcela)
+    expect(aviso.parcela).toBe(montado.sets[0])
+    // Y la cáscara ya estaba escrita cuando se le avisó.
+    expect(aviso.campo).toBe(REFCAT)
+    expect(aviso.procedencia.length).toBeGreaterThan(0)
+  })
+
+  it('⚠️ 2 · NO se dispara en `deducir()`: deducir no mete geometría en el modelo', async () => {
+    const montado = conGancho({ parcelaInicial: parcelaSinReferencia() })
+    await montado.cableado.deducir()
+
+    expect(montado.campo.value.length).toBeGreaterThan(0) // la deducción SÍ ha ido
+    expect(montado.avisos).toHaveLength(0)
+    expect(montado.sets).toHaveLength(0)
+  })
+
+  it('⚠️ 3 · NO se dispara con la respuesta SUPERADA por otra más nueva', async () => {
+    const transporte = crearTransporteDoble({ manual: true })
+    const montado = conGancho({ transporte })
+
+    montado.campo.value = REFCAT
+    const primera = montado.cableado.cargar()
+    montado.campo.value = VECINA.refcat
+    const segunda = montado.cableado.cargar()
+
+    await hastaPeticion(transporte, 2)
+    transporte.peticiones[1].responder()
+    await segunda
+    // La primera contesta BIEN y TARDE (ya venía por el cable cuando se abortó).
+    transporte.peticiones[0].responderPeseAlAborto()
+    await primera
+
+    // UNA vez, y la de la parcela que de verdad está en el store. Sin esto, F06
+    // reiniciaría el historial con una parcela que el usuario ya había sustituido.
+    expect(montado.avisos).toHaveLength(1)
+    expect(montado.avisos[0].parcela.refcat).toBe(VECINA.refcat)
+  })
+
+  it('⚠️ 4 · NO se dispara después de `destruir()`', async () => {
+    const transporte = crearTransporteDoble({ manual: true })
+    const montado = conGancho({ transporte })
+    montado.campo.value = REFCAT
+    const enCurso = montado.cableado.cargar()
+    await hastaPeticion(transporte, 1)
+
+    montado.cableado.destruir()
+    transporte.peticiones[0].responderPeseAlAborto()
+    await enCurso
+
+    expect(montado.avisos).toHaveLength(0)
+    expect(montado.sets).toHaveLength(0)
+  })
+
+  it('tampoco cuando la consulta no trae parcela: no ha entrado nada en el store', async () => {
+    const montado = conGancho()
+    montado.campo.value = '0000000XX0000X'
+    await montado.cableado.cargar()
+    expect(montado.avisos).toHaveLength(0)
+  })
+
+  it('un gancho que revienta no deshace la carga ni tumba la consulta', async () => {
+    const consola = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const montado = cablear({
+      alCargarParcela: () => {
+        throw new Error('el historial de F06 se ha roto')
+      },
+    })
+    montado.campo.value = REFCAT
+
+    const resultado = await montado.cableado.cargar()
+
+    expect(resultado.ok).toBe(true)
+    // La parcela ESTÁ cargada: lo que ha fallado es lo de después.
+    expect(montado.estado.get().refcat).toBe(REFCAT)
+    expect(montado.renglon.textContent).toContain(REFCAT)
+    expect(renglonEnFallo(montado.renglon)).toBe(false)
+    // Y se cuenta por panel y consola, que son dos canales.
+    expect(textosDelPanel()).toContain(MENSAJE_SUSCRIPTOR_ROTO)
+    expect(consola).toHaveBeenCalled()
+    consola.mockRestore()
+  })
+
+  it('sin gancho, el módulo se comporta exactamente como en F05', async () => {
+    // `alCargarParcela` y `alColindantes` son OPCIONALES: esta es la prueba de que
+    // no hay ningún camino que los dé por hechos.
+    const montado = cablear()
+    montado.campo.value = REFCAT
+    const resultado = await montado.cableado.cargar()
+    expect(resultado.ok).toBe(true)
+    expect(montado.sets).toHaveLength(1)
+    await expect(montado.cableado.colindantes()).resolves.toMatchObject({ ok: true })
   })
 })
