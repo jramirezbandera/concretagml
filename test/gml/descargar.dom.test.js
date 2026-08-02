@@ -60,6 +60,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   EXTENSION_GML,
   TIPO_MIME_GML,
+  TIPO_MIME_TEXTO,
   SUSTITUTO_NOMBRE,
   SEPARADOR_NOMBRE,
   PREFIJO_NOMBRE,
@@ -71,6 +72,7 @@ import {
   MOTIVO_NO_DESCARGADO,
   nombreFicheroGml,
   descargarGml,
+  descargarTexto,
 } from '../../gml/descargar.js'
 import { dateTimeCatastro } from '../../gml/_comun.js'
 
@@ -703,6 +705,492 @@ describe('gml/descargar · descargarGml, guardas de contrato', () => {
   })
 })
 
+/* -------------------------------------------------------------------------- *
+ * F08 · T1.3 · `descargarTexto`, el primitivo de la entrega                    *
+ *                                                                              *
+ * Todo lo de arriba se escribió para `descargarGml` en F04 y NO SE HA TOCADO   *
+ * ni una línea: eso es exactamente lo que se está afirmando aquí abajo. F08    *
+ * necesita bajar un informe de contraste en TEXTO, y la mecánica —Blob →       *
+ * createObjectURL → <a download> → click → revoke, con su comprobación de      *
+ * capacidad y su limpieza en `finally` anidados— se EXTRAJO a `descargarTexto` *
+ * en vez de copiarse. Si hubiera hecho falta reescribir una prueba de las de   *
+ * arriba, no habría sido una extracción sino un rediseño.                      *
+ *                                                                              *
+ * Cuatro cosas se comprueban, y las cuatro tienen su motivo:                   *
+ *                                                                              *
+ * 1. LOS BYTES, otra vez y sobre el texto. El informe lleva `ñ`, acentos y     *
+ *    `²`; se afirma que la `ñ` viaja como `0xC3 0xB1` y que el `0xF1` de       *
+ *    latin-1 NO aparece en ningún sitio del buffer. Mirar la cadena de vuelta  *
+ *    no valdría: `blob.text()` vuelve a decodificar y taparía un round-trip    *
+ *    simétricamente roto.                                                      *
+ * 2. EL MIME Y EL NOMBRE LOS PONE QUIEN LLAMA. El primitivo no inventa         *
+ *    ninguno de los dos, así que se comprueba que llegan tal cual al Blob y al *
+ *    atributo `download` — y que el MIME de texto NO es el del GML, porque si  *
+ *    lo fuera la prueba pasaría sin comprobar nada.                            *
+ * 3. LA REVOCACIÓN, también cuando el click lanza. La fuga de memoria no       *
+ *    distingue de qué llamante viene el Blob.                                  *
+ * 4. AUSENTE ≠ EQUIVOCADO. Sin `document` en el entorno sale un MOTIVO, no una *
+ *    excepción: es una limitación del entorno, como un `Blob` que no está. Un  *
+ *    `documento: null` explícito sigue LANZANDO, que es un contrato roto por   *
+ *    el programador. Las dos mitades se prueban juntas o la línea no existe.   *
+ *                                                                              *
+ * Y hay un guardián mecánico de la NO DUPLICACIÓN al final: la mecánica        *
+ * aparece UNA sola vez en el código del módulo. Es la única forma de que       *
+ * «extraer, no copiar» siga siendo cierto dentro de seis meses.                *
+ * -------------------------------------------------------------------------- */
+
+/**
+ * El informe de contraste de F08, en pequeño: acentos, `ñ`, superíndice y una
+ * raya. Si la codificación se estropeara en el camino, se vería aquí.
+ */
+const INFORME_ACENTUADO =
+  'Informe de contraste con el parcelario catastral\n' +
+  'Parcela: Peña del Cañón — Añón de Moncayo\n' +
+  'Superficie medida: 1.535,87 m²\n' +
+  'Desviación máxima por lado: 0,12 m\n' +
+  'Versión provisional en texto; sin plano y sin pie de firma.\n'
+
+/**
+ * Nombre del fichero del informe. Se DERIVA de las mismas piezas que el nombre
+ * del GML (la RC leída del fixture y la marca de tiempo de `dateTimeCatastro`)
+ * en vez de escribirse a mano, para que no pueda quedarse desincronizado.
+ */
+const NOMBRE_INFORME = ['contraste', REFCAT, MARCA_TIEMPO].join(SEPARADOR_NOMBRE) + '.txt'
+
+/** ¿Aparece esta secuencia de bytes dentro del buffer? Búsqueda literal. */
+function contieneBytes(bytes, secuencia) {
+  return [...bytes].some((_b, i) => secuencia.every((s, j) => bytes[i + j] === s))
+}
+
+/**
+ * Gemela de {@link prepararDescarga} para el primitivo: mismos dos dobles, misma
+ * forma de devolver `ejecutar` sin llamarla.
+ */
+function prepararDescargaTexto(
+  texto,
+  { nombreFichero = NOMBRE_INFORME, mime = TIPO_MIME_TEXTO, alHacerClick } = {},
+) {
+  const espiaUrl = crearUrlEspia()
+  const espiaDoc = crearDocumentoEspia(alHacerClick)
+  return {
+    creados: espiaUrl.creados,
+    revocados: espiaUrl.revocados,
+    anclas: espiaDoc.anclas,
+    ejecutar: () =>
+      descargarTexto(texto, {
+        nombreFichero,
+        mime,
+        documento: espiaDoc.documento,
+        url: espiaUrl.url,
+      }),
+  }
+}
+
+describe('gml/descargar · descargarTexto entrega un texto cualquiera', () => {
+  it('crea el objeto-URL, pincha el anchor, revoca y devuelve el nombre que le dieron', () => {
+    const { ejecutar, creados, revocados, anclas } = prepararDescargaTexto(INFORME_ACENTUADO)
+    const resultado = ejecutar()
+
+    expect(resultado).toEqual({
+      descargado: true,
+      nombre: NOMBRE_INFORME,
+      motivo: null,
+      mensaje: null,
+    })
+    expect(creados).toHaveLength(1)
+    expect(anclas).toHaveLength(1)
+    expect(revocados, 'el objeto-URL se ha quedado vivo: fuga por cada informe').toEqual([
+      creados[0].href,
+    ])
+    expect(anclas[0].isConnected).toBe(false)
+    expect(document.body.childNodes).toHaveLength(0)
+  })
+
+  it('el Blob lleva los BYTES UTF-8 exactos del texto (la ñ es 0xC3 0xB1, no 0xF1)', async () => {
+    const { ejecutar, creados } = prepararDescargaTexto(INFORME_ACENTUADO)
+    ejecutar()
+
+    const buffer = await creados[0].blob.arrayBuffer()
+    const bytes = new Uint8Array(buffer)
+    const esperados = new TextEncoder().encode(INFORME_ACENTUADO)
+
+    // Vistas tipadas de realms distintos: se comparan como arrays normales (el
+    // mismo hallazgo que la prueba hermana del GML).
+    expect(Array.from(bytes)).toEqual(Array.from(esperados))
+    expect(creados[0].blob.size).toBe(esperados.length)
+
+    // La afirmación sobre los BYTES, que es la que pide la tarea: la `ñ` de
+    // «Cañón» viaja como la pareja UTF-8, y el byte suelto de latin-1 no está en
+    // ningún sitio del fichero. Con un texto sin caracteres de 4 bytes, 0xF1 solo
+    // puede aparecer si alguien codificó en latin-1.
+    expect(INFORME_ACENTUADO, 'el texto de prueba ya no lleva ñ: la prueba sería vacua').toContain(
+      'ñ',
+    )
+    expect(contieneBytes(bytes, [0xc3, 0xb1]), 'la ñ no está codificada en UTF-8').toBe(true)
+    expect(contieneBytes(bytes, [0xf1]), 'hay un 0xF1: el texto se codificó en latin-1').toBe(false)
+
+    // `fatal: true`: una secuencia que no sea UTF-8 válido lanza en vez de colar
+    // un U+FFFD que después se compararía como diferencia de texto.
+    expect(new TextDecoder('utf-8', { fatal: true }).decode(buffer)).toBe(INFORME_ACENTUADO)
+  })
+
+  it('la comprobación de bytes NO es vacua: hay multibyte y latin-1 no lo lee igual', async () => {
+    const { ejecutar, creados } = prepararDescargaTexto(INFORME_ACENTUADO)
+    ejecutar()
+
+    const buffer = await creados[0].blob.arrayBuffer()
+    expect(buffer.byteLength).toBeGreaterThan(INFORME_ACENTUADO.length)
+    expect(new TextDecoder('iso-8859-1').decode(buffer)).not.toBe(INFORME_ACENTUADO)
+    // Y el detector de bytes distingue algo: sobre el buffer real encuentra la
+    // pareja de la ñ y no encuentra una secuencia que no está.
+    const bytes = new Uint8Array(buffer)
+    expect(contieneBytes(bytes, [0x00, 0x00])).toBe(false)
+  })
+
+  it('no se antepone BOM: el fichero empieza donde empieza el texto', async () => {
+    const { ejecutar, creados } = prepararDescargaTexto(INFORME_ACENTUADO)
+    ejecutar()
+    const bytes = new Uint8Array(await creados[0].blob.arrayBuffer())
+    expect([...bytes.slice(0, 3)]).not.toEqual([0xef, 0xbb, 0xbf])
+    expect(String.fromCharCode(bytes[0])).toBe(INFORME_ACENTUADO[0])
+  })
+
+  it('el MIME y el nombre son los que le pasan: el primitivo no inventa ninguno', () => {
+    const durante = {}
+    const { ejecutar, creados } = prepararDescargaTexto(INFORME_ACENTUADO, {
+      alHacerClick: (anchor) => {
+        durante.download = anchor.getAttribute('download')
+        durante.href = anchor.getAttribute('href')
+        durante.conectado = anchor.isConnected
+      },
+    })
+    const resultado = ejecutar()
+
+    expect(creados[0].blob.type).toBe(TIPO_MIME_TEXTO)
+    expect(durante.download).toBe(NOMBRE_INFORME)
+    expect(durante.href).toBe(creados[0].href)
+    expect(durante.conectado, 'el anchor tiene que estar montado DURANTE el click').toBe(true)
+    expect(resultado.nombre).toBe(NOMBRE_INFORME)
+
+    // No vacuo: si el módulo se hubiera quedado con el MIME del GML —o si las dos
+    // constantes fueran la misma cadena— esta prueba pasaría sin mirar nada.
+    expect(TIPO_MIME_TEXTO).not.toBe(TIPO_MIME_GML)
+    expect(TIPO_MIME_TEXTO).toContain('charset=utf-8')
+    expect(NOMBRE_INFORME.endsWith(EXTENSION_GML)).toBe(false)
+  })
+
+  it('un MIME cualquiera del llamante llega intacto al Blob', () => {
+    // El primitivo sirve a F08 hoy y a lo que venga después: el MIME es un
+    // parámetro de verdad, no una elección entre dos constantes conocidas.
+    const inventado = 'text/markdown;charset=utf-8'
+    const { ejecutar, creados } = prepararDescargaTexto(INFORME_ACENTUADO, { mime: inventado })
+    ejecutar()
+    expect(creados[0].blob.type).toBe(inventado)
+  })
+
+  it('revoca aunque el click LANCE, deja el DOM limpio y propaga la excepción', () => {
+    const fallo = new Error('una extensión ha roto el click')
+    const { ejecutar, creados, revocados, anclas } = prepararDescargaTexto(INFORME_ACENTUADO, {
+      alHacerClick: () => {
+        throw fallo
+      },
+    })
+
+    expect(ejecutar).toThrow(fallo)
+    expect(creados).toHaveLength(1)
+    expect(revocados, 'el objeto-URL se ha quedado vivo: fuga por cada informe').toEqual([
+      creados[0].href,
+    ])
+    expect(anclas[0].isConnected).toBe(false)
+    expect(document.body.childNodes).toHaveLength(0)
+  })
+
+  it('dos informes seguidos: dos objetos-URL, dos revocaciones y cero anchors residuales', () => {
+    const primero = prepararDescargaTexto(INFORME_ACENTUADO)
+    const segundo = prepararDescargaTexto(INFORME_ACENTUADO)
+    primero.ejecutar()
+    segundo.ejecutar()
+
+    for (const { creados, revocados, anclas } of [primero, segundo]) {
+      expect(revocados).toEqual([creados[0].href])
+      expect(anclas[0].isConnected).toBe(false)
+    }
+    expect(document.body.childNodes).toHaveLength(0)
+  })
+})
+
+describe('gml/descargar · descargarTexto sin texto y sin entorno: motivo, nunca silencio', () => {
+  it.each([
+    ['null (no se generó informe)', null],
+    ['la cadena vacía', ''],
+  ])('texto = %s ⇒ no descarga NADA y devuelve el motivo', (_caso, texto) => {
+    const { ejecutar, creados, revocados, anclas } = prepararDescargaTexto(texto)
+    const resultado = ejecutar()
+
+    expect(resultado.descargado).toBe(false)
+    expect(resultado.motivo).toBe(MOTIVO_NO_DESCARGADO.SIN_CONTENIDO)
+    expect(resultado.nombre).toBeNull()
+    expect(typeof resultado.mensaje).toBe('string')
+    expect(resultado.mensaje.length).toBeGreaterThan(0)
+
+    // Ni Blob, ni URL, ni anchor: no se ha rozado el DOM.
+    expect(creados).toEqual([])
+    expect(revocados).toEqual([])
+    expect(anclas).toEqual([])
+    expect(document.body.childNodes).toHaveLength(0)
+  })
+
+  it('SIN `document` en el ENTORNO: motivo presentable, NO una excepción', () => {
+    // El caso de la tarea. `descargarTexto` puede acabar llamándose desde código
+    // que no siempre corre en un navegador; reventar con «cannot read properties
+    // of undefined» no le diría nada a nadie, y devolver `false` a secas sería un
+    // fallo silencioso (regla de oro 1). Sale el motivo, con el nombre de lo que
+    // falta escrito en el mensaje.
+    const { url } = crearUrlEspia()
+    vi.stubGlobal('document', undefined)
+
+    let resultado
+    expect(() => {
+      resultado = descargarTexto(INFORME_ACENTUADO, {
+        nombreFichero: NOMBRE_INFORME,
+        mime: TIPO_MIME_TEXTO,
+        url,
+        // `documento` sin inyectar: cae al global, que aquí no existe.
+      })
+    }, 'sin document el primitivo ha LANZADO en vez de degradar').not.toThrow()
+
+    expect(resultado.descargado).toBe(false)
+    expect(resultado.motivo).toBe(MOTIVO_NO_DESCARGADO.SIN_SOPORTE_NAVEGADOR)
+    expect(resultado.nombre).toBeNull()
+    expect(resultado.mensaje, 'el mensaje no NOMBRA lo que falta').toContain('document')
+  })
+
+  it('el caso anterior NO es vacuo: con el `document` del entorno la descarga ocurre', () => {
+    // Contrapartida obligada: sin esto, un módulo que degradara SIEMPRE pasaría.
+    expect(typeof globalThis.document, 'el entorno de este test debe tener DOM').toBe('object')
+    const { ejecutar } = prepararDescargaTexto(INFORME_ACENTUADO)
+    expect(ejecutar().descargado).toBe(true)
+  })
+
+  it('AUSENTE ≠ EQUIVOCADO: un `documento` presente pero inservible LANZA', () => {
+    // La otra mitad de la línea. Que el global no exista es el entorno hablando;
+    // pasar `null` o un número es haberse equivocado de argumento, y eso no se
+    // convierte en un `motivo` porque aplanaría un error de programación a una
+    // etiqueta de texto.
+    for (const documento of [null, 7, 'document', { body: {} }]) {
+      expect(() =>
+        descargarTexto(INFORME_ACENTUADO, {
+          nombreFichero: NOMBRE_INFORME,
+          mime: TIPO_MIME_TEXTO,
+          documento,
+          url: crearUrlEspia().url,
+        }),
+      ).toThrow(/'documento'/)
+    }
+  })
+
+  it.each([
+    ['sin ninguna de las dos', {}, 'createObjectURL'],
+    ['sin revokeObjectURL', { createObjectURL: () => 'blob:x' }, 'revokeObjectURL'],
+    ['sin createObjectURL', { revokeObjectURL: () => {} }, 'createObjectURL'],
+  ])('un `url` con forma pero %s degrada con motivo, no lanza', (_caso, url, ausente) => {
+    const espiaDoc = crearDocumentoEspia()
+    const resultado = descargarTexto(INFORME_ACENTUADO, {
+      nombreFichero: NOMBRE_INFORME,
+      mime: TIPO_MIME_TEXTO,
+      documento: espiaDoc.documento,
+      url,
+    })
+
+    expect(resultado.descargado).toBe(false)
+    expect(resultado.motivo).toBe(MOTIVO_NO_DESCARGADO.SIN_SOPORTE_NAVEGADOR)
+    expect(resultado.mensaje).toContain(ausente)
+    // Degrada ANTES de tocar el DOM: ni un anchor huérfano.
+    expect(espiaDoc.anclas).toEqual([])
+    expect(document.body.childNodes).toHaveLength(0)
+  })
+
+  it('sin `Blob` en el entorno tampoco se inventa nada', () => {
+    vi.stubGlobal('Blob', undefined)
+    const { ejecutar, creados } = prepararDescargaTexto(INFORME_ACENTUADO)
+    const resultado = ejecutar()
+    expect(resultado.motivo).toBe(MOTIVO_NO_DESCARGADO.SIN_SOPORTE_NAVEGADOR)
+    expect(resultado.mensaje).toContain('Blob')
+    expect(creados).toEqual([])
+  })
+
+  it('los dos desenlaces de «no ha bajado nada» siguen usando motivos DISTINTOS', () => {
+    const sinContenido = prepararDescargaTexto(null).ejecutar()
+    const sinSoporte = descargarTexto(INFORME_ACENTUADO, {
+      nombreFichero: NOMBRE_INFORME,
+      mime: TIPO_MIME_TEXTO,
+      documento: crearDocumentoEspia().documento,
+      url: {},
+    })
+    const motivos = [sinContenido.motivo, sinSoporte.motivo]
+    for (const motivo of motivos) {
+      expect(Object.values(MOTIVO_NO_DESCARGADO)).toContain(motivo)
+    }
+    expect(new Set(motivos).size).toBe(motivos.length)
+  })
+})
+
+describe('gml/descargar · descargarTexto, guardas de contrato', () => {
+  const entorno = () => ({
+    documento: crearDocumentoEspia().documento,
+    url: crearUrlEspia().url,
+  })
+
+  it.each([
+    ['ausente', undefined],
+    ['null', null],
+    ['la cadena vacía', ''],
+    ['solo espacios', '   '],
+    ['un número', 42],
+  ])("nombreFichero = %s ⇒ TypeError que NOMBRA 'nombreFichero'", (_caso, nombreFichero) => {
+    // Un fichero sin nombre no es un fichero: el navegador le pondría uno suyo
+    // («download») y el usuario acabaría con un informe que no sabe de qué es.
+    const opciones = { nombreFichero, mime: TIPO_MIME_TEXTO, ...entorno() }
+    expect(() => descargarTexto(INFORME_ACENTUADO, opciones)).toThrow(TypeError)
+    expect(() => descargarTexto(INFORME_ACENTUADO, opciones)).toThrow(/'nombreFichero'/)
+  })
+
+  it.each([
+    ['ausente', undefined],
+    ['null', null],
+    ['la cadena vacía', ''],
+    ['un objeto', {}],
+  ])("mime = %s ⇒ TypeError que NOMBRA 'mime'", (_caso, mime) => {
+    // Sin valor por defecto a propósito: un `text/plain` supuesto deja al
+    // navegador ADIVINAR la codificación, y el informe lleva acentos.
+    const opciones = { nombreFichero: NOMBRE_INFORME, mime, ...entorno() }
+    expect(() => descargarTexto(INFORME_ACENTUADO, opciones)).toThrow(TypeError)
+    expect(() => descargarTexto(INFORME_ACENTUADO, opciones)).toThrow(/'mime'/)
+  })
+
+  it.each([
+    ['undefined (argumento olvidado)', undefined],
+    ['un número', 42],
+    ['un objeto', {}],
+    ['un array', []],
+  ])("texto = %s ⇒ TypeError que NOMBRA 'texto'", (_caso, texto) => {
+    const opciones = { nombreFichero: NOMBRE_INFORME, mime: TIPO_MIME_TEXTO, ...entorno() }
+    expect(() => descargarTexto(texto, opciones)).toThrow(TypeError)
+    expect(() => descargarTexto(texto, opciones)).toThrow(/'texto'/)
+  })
+
+  it.each([
+    ['null', null],
+    ['un número', 7],
+    ['una cadena', 'URL'],
+  ])("url = %s ⇒ TypeError que NOMBRA 'url'", (_caso, url) => {
+    const opciones = {
+      nombreFichero: NOMBRE_INFORME,
+      mime: TIPO_MIME_TEXTO,
+      documento: crearDocumentoEspia().documento,
+      url,
+    }
+    expect(() => descargarTexto(INFORME_ACENTUADO, opciones)).toThrow(TypeError)
+    expect(() => descargarTexto(INFORME_ACENTUADO, opciones)).toThrow(/'url'/)
+  })
+
+  it('sin opciones ⇒ TypeError por el nombre, no un «cannot destructure»', () => {
+    expect(() => descargarTexto(INFORME_ACENTUADO)).toThrow(TypeError)
+    expect(() => descargarTexto(INFORME_ACENTUADO)).toThrow(/'nombreFichero'/)
+  })
+})
+
+// ── La extracción: la mecánica está COMPARTIDA, no copiada ───────────────────
+
+describe('gml/descargar · descargarGml es un LLAMANTE de descargarTexto', () => {
+  it('con los mismos argumentos, las dos vías dan el MISMO resultado y los MISMOS bytes', async () => {
+    // Prueba de COMPORTAMIENTO de la extracción: si `descargarGml` conservara su
+    // propia copia de la mecánica, bastaría con que una de las dos divergiera
+    // —el tipo del Blob, el nombre, la forma del POJO— para que esto cayera.
+    const nombre = nombreFicheroGml({ refcat: REFCAT, fecha: FECHA })
+
+    const porGml = prepararDescarga(XML_ACENTUADO, { refcat: REFCAT })
+    const resultadoGml = porGml.ejecutar()
+    const porTexto = prepararDescargaTexto(XML_ACENTUADO, {
+      nombreFichero: nombre,
+      mime: TIPO_MIME_GML,
+    })
+    const resultadoTexto = porTexto.ejecutar()
+
+    expect(resultadoGml).toEqual(resultadoTexto)
+    expect(resultadoGml.nombre).toBe(nombre)
+    expect(porGml.creados[0].blob.type).toBe(porTexto.creados[0].blob.type)
+    expect(await porGml.creados[0].blob.text()).toBe(await porTexto.creados[0].blob.text())
+  })
+
+  it('la degradación por entorno sale del MISMO sitio: mensaje idéntico por las dos vías', () => {
+    // Un mensaje distinto querría decir que hay dos textos que mantener, que es
+    // el primer síntoma del duplicado.
+    const nombre = nombreFicheroGml({ refcat: REFCAT, fecha: FECHA })
+    const porGml = descargarGml(XML_ACENTUADO, {
+      refcat: REFCAT,
+      fecha: FECHA,
+      documento: crearDocumentoEspia().documento,
+      url: {},
+    })
+    const porTexto = descargarTexto(XML_ACENTUADO, {
+      nombreFichero: nombre,
+      mime: TIPO_MIME_GML,
+      documento: crearDocumentoEspia().documento,
+      url: {},
+    })
+    expect(porGml).toEqual(porTexto)
+    expect(porGml.motivo).toBe(MOTIVO_NO_DESCARGADO.SIN_SOPORTE_NAVEGADOR)
+  })
+
+  it('«sin contenido» SÍ habla distinto en cada capa, y es a propósito', () => {
+    // Lo único que `descargarGml` no delega. El motivo es el mismo código estable
+    // —la UI decide con él—, pero el mensaje del GML nombra la causa real («no se
+    // ha generado GML, revisa los errores del expediente»), que es lo que hace
+    // útil a la regla de oro 1. Un texto genérico ahí sería una degradación.
+    const porGml = prepararDescarga(null, { refcat: REFCAT }).ejecutar()
+    const porTexto = prepararDescargaTexto(null).ejecutar()
+    expect(porGml.motivo).toBe(porTexto.motivo)
+    expect(porGml.mensaje).not.toBe(porTexto.mensaje)
+    expect(porGml.mensaje).toContain('GML')
+  })
+
+  it('GUARDIÁN: la mecánica del navegador aparece UNA sola vez en el código', () => {
+    // Un guardián mecánico, no una convención: el día que alguien «arregle» algo
+    // pegando otra vez las veinte líneas, esto se pone rojo. Este repo ya arrastra
+    // la deuda declarada de cuatro copias de `describir` (edit/_comun.js:42-46) y
+    // no necesita una segunda familia.
+    const fuente = readFileSync(join(RAIZ, 'gml', 'descargar.js'), 'utf8')
+    // Solo CÓDIGO: la cabecera nombra `createObjectURL` y `click()` varias veces
+    // justamente para explicar por qué se hacen así.
+    const codigo = fuente
+      .split('\n')
+      .filter((linea) => !/^\s*(?:\/\/|\/\*|\*)/.test(linea))
+      .join('\n')
+    const cuantas = (re) => (codigo.match(re) ?? []).length
+
+    const PASOS = [
+      ['creación del objeto-URL', /\.createObjectURL\s*\(/g],
+      ['revocación del objeto-URL', /\.revokeObjectURL\s*\(/g],
+      ['construcción del Blob', /new\s+ConstructorBlob\s*\(/g],
+      ['click sobre el anchor', /\.click\s*\(\s*\)/g],
+      ['atributo download', /\.download\s*=/g],
+      ['montaje del anchor', /appendChild\s*\(/g],
+    ]
+    for (const [paso, re] of PASOS) {
+      expect(cuantas(re), `«${paso}» aparece más de una vez: la mecánica se ha duplicado`).toBe(1)
+    }
+
+    // Mitad anti-vacuidad: el contador cuenta de verdad y el filtro de comentarios
+    // no se ha comido el código.
+    const control = 'a.click()\nb.click()\n'.match(/\.click\s*\(\s*\)/g) ?? []
+    expect(control.length, 'el contador no cuenta: los seis pasos de arriba serían vacuos').toBe(2)
+    expect(codigo).toContain('export function descargarTexto')
+    expect(codigo).toContain('export function descargarGml')
+    expect(codigo, 'descargarGml ya no llama a descargarTexto').toContain('return descargarTexto(')
+  })
+})
+
 // ── El reloj ─────────────────────────────────────────────────────────────────
 
 describe('gml/descargar · el módulo no lee el reloj', () => {
@@ -718,5 +1206,72 @@ describe('gml/descargar · el módulo no lee el reloj', () => {
     // …y los detectores no son vacuos: reconocen las dos formas prohibidas.
     expect(INSTANCIA_FECHA.test('const x = new Date()')).toBe(true)
     expect(RELOJ.test('const t = Date.now()')).toBe(true)
+  })
+})
+
+// ── El clic del enlace no puede salir del módulo ─────────────────────────────
+//
+// Defecto REAL, medido en navegador por `scripts/smoke-navegador/10-comprobar-gml.js`
+// el 2026-07-30: `anchor.click()` burbujeaba hasta `document`, el guardián de
+// clic-fuera de `viewer/cajon-diagnostico.js` lo recogía, hacía `contains()` sobre
+// un `<a>` que cuelga del `<body>` —así que no está en el cajón— y CERRABA el cajón
+// justo al descargar. El acuse de recibo se escribía entonces en un `role="status"`
+// ya en `display:none`: invisible y fuera del árbol de accesibilidad. Regla de oro 1
+// rota en el último gesto del recorrido de F08.
+//
+// El arreglo vive en `gml/descargar.js` y no en el cajón: este clic no es un gesto
+// del usuario, es fontanería de la descarga, y que un detalle de implementación sea
+// observable por el resto de la aplicación es el defecto. Parchear a cada oyente
+// para que aprendiera a ignorarlo repartiría el arreglo entre todos los que algún
+// día escuchen en `document`.
+
+describe('gml/descargar · el clic sintético no se escapa a `document`', () => {
+  /** Cuenta los clics que llegan a `document` mientras corre `accion()`. */
+  function clicsQueLlegan(accion) {
+    let vistos = 0
+    const espia = () => { vistos += 1 }
+    document.addEventListener('click', espia)
+    try {
+      accion()
+    } finally {
+      document.removeEventListener('click', espia)
+    }
+    return vistos
+  }
+
+  it('descargarTexto entrega el fichero sin que `document` vea ni un clic', () => {
+    let devuelto = null
+    const vistos = clicsQueLlegan(() => {
+      devuelto = descargarTexto('contenido del informe', {
+        nombreFichero: 'contraste_prueba.txt',
+        mime: TIPO_MIME_TEXTO,
+      })
+    })
+
+    expect(devuelto?.descargado, 'la descarga tiene que seguir ocurriendo').toBe(true)
+    expect(vistos, 'el clic del <a download> ha burbujeado hasta document').toBe(0)
+  })
+
+  it('descargarGml tampoco lo deja escapar: es el mismo camino de código', () => {
+    let devuelto = null
+    const vistos = clicsQueLlegan(() => {
+      devuelto = descargarGml('<gml/>', { refcat: '9398516VK3799G', fecha: new Date(0) })
+    })
+
+    expect(devuelto?.descargado).toBe(true)
+    expect(vistos).toBe(0)
+  })
+
+  it('el espía SÍ ve un clic normal — sin esto las dos pruebas de arriba serían vacuas', () => {
+    // La mitad anti-vacuidad. Un `document.addEventListener('click')` que no
+    // funcionara daría cero en los tres casos y las dos pruebas anteriores pasarían
+    // sin significar nada.
+    const boton = document.createElement('button')
+    document.body.appendChild(boton)
+    try {
+      expect(clicsQueLlegan(() => boton.click())).toBe(1)
+    } finally {
+      boton.remove()
+    }
   })
 })

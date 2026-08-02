@@ -14,6 +14,14 @@
 //   2. `montarCapas`   — las cinco bases + la superpuesta, el control de capas y
 //                        el de opacidad. Va DESPUÉS del mapa porque necesita el
 //                        `maxZoom` del mapa para subir el tope de las teseladas.
+//   2 bis. COLINDANTES — `crearCapaColindantes`, y SOLO si el llamante ha pedido
+//                        `opciones.colindantes`. Va aquí, pegada a las capas de
+//                        fondo, porque es lo que es: CONTEXTO cartográfico. Su
+//                        pane (405) es el más bajo del visor, así que se monta
+//                        antes que la geometría y se desmonta después que ella —
+//                        el orden del montaje ES el orden de apilado dentro de
+//                        cada pane, pero entre panes manda el zIndex, y este va
+//                        debajo de todo. Nace VACÍA: montarla no trae vecinas.
 //   3. EDICIÓN (F06)   — `crearAcotaciones` + `crearEdicion`, y SOLO si el
 //                        llamante ha pedido `opciones.edicion`. Va ANTES de
 //                        `sincronizar`, que es justo lo contrario de lo que
@@ -52,6 +60,13 @@
 //                        del mapa que `app/cableado-diagnostico.js` resuelve por
 //                        selector — cuando `crearVisor` devuelve, sus nodos ya
 //                        tienen que estar en el documento.
+//   5 bis. COMPROBACIÓN (F08) — `crearCajonComprobacion`, y SOLO si el llamante ha
+//                        pedido `opciones.comprobacion`. Comparte `bottomleft` con
+//                        el cajón de F07 —las cuatro esquinas del mapa ya estaban
+//                        ocupadas— y los dos son MUTUAMENTE EXCLUYENTES por diseño:
+//                        la comprobación precede al diagnóstico y no coexiste con
+//                        él. Va después del diagnóstico y antes del encuadre, por
+//                        las mismas dos razones que él.
 //   6. ENCUADRE        — el ÚLTIMO paso, y no por casualidad. Leaflet difiere el
 //                        `onAdd` de toda capa hasta que el mapa tiene vista
 //                        (`Map#addLayer` → `whenReady`), así que encuadrar al
@@ -59,9 +74,16 @@
 //                        PRIMERA petición ya sobre el encuadre definitivo: UNA
 //                        petición, no una para un encuadre intermedio y otra
 //                        para el bueno (criterio de aceptación 2).
+//   7. REENCUADRE VIVO — la suscripción al store que vuelve a encuadrar cuando
+//                        entra una parcela DISTINTA —y que de paso SUELTA las
+//                        colindantes de la anterior, que ya no son de nadie—. Va
+//                        necesariamente después del paso 6 (ver el bloque «EL MAPA
+//                        SIGUE A LA PARCELA»).
 //
-// `destruir()` deshace exactamente eso EN ORDEN INVERSO (diagnóstico →
-// sincronización → edición → acotaciones → capas → mapa) y es IDEMPOTENTE. Ese
+// `destruir()` deshace exactamente eso EN ORDEN INVERSO (reencuadre →
+// comprobación → diagnóstico → sincronización → edición → acotaciones →
+// colindantes → capas → mapa) y es
+// IDEMPOTENTE. Ese
 // orden tampoco es decorativo: `crearEdicion` APAGA el `doubleClickZoom` mientras vive
 // —el doble clic inserta un vértice— y lo restaura al destruirse, así que tiene
 // que desmontarse con el mapa todavía en pie. Y si algo falla A MITAD del
@@ -112,6 +134,51 @@
 // visor sin parcela" ya está, se llama `vistaInicial`, y obliga a que alguien
 // escriba conscientemente el centro y el zoom.
 //
+// ── EL MAPA SIGUE A LA PARCELA, PERO NO PERSIGUE AL EDITOR ──────────────────
+// El encuadre del paso 6 ocurría UNA sola vez, al construir el visor, y el visor
+// no exponía ninguna forma de repetirlo. Consecuencia medida en la revisión visual
+// de F08: se traía una parcela de Sevilla por referencia catastral, o se soltaba
+// un GML de Cádiz, y **el mapa seguía mirando la parcela de demostración**. Otro
+// fallo silencioso: la app había cargado lo que se le pedía y no lo enseñaba.
+//
+// Se arregla con UNA suscripción al store (paso 7) y una regla de una línea:
+// **se reencuadra cuando entra una parcela DISTINTA, y solo entonces.**
+//
+//   · **La identidad es `refcat ?? idLocal`, NUNCA la del objeto.** `edit/`
+//     reconstruye el POJO en cada operación (regla de oro 4: modelo plano +
+//     `structuredClone`), así que comparar referencias diría «otra parcela» en
+//     CADA frame de un arrastre. Los dos campos sobreviven a las ediciones porque
+//     `edit/` no reetiqueta el expediente, que es exactamente la propiedad que
+//     hace falta. Es la MISMA clave y el MISMO motivo que
+//     `app/cableado-diagnostico.js#claveDeExpediente` — dos copias de seis líneas
+//     en dos capas que no pueden importarse entre sí (`viewer/` no conoce `app/`);
+//     lo que no puede haber son dos criterios distintos de «es otra parcela».
+//   · **JAMÁS al editar.** Si la identidad no cambia, la vista no se toca. Un mapa
+//     que se recentra mientras se arrastra un vértice es peor que un mapa quieto:
+//     el vértice se escapa del puntero. Esto rompería F06 entero, y es el test más
+//     importante de los dos que protegen este bloque.
+//   · **Nunca dos veces al arrancar.** `crearVisor` ya encuadra en el paso 6, y
+//     `crearEstadoVista#subscribe` **no notifica al suscribirse** (solo `set`
+//     notifica: ver `viewer/_comun.js`). Además la clave se inicializa DESPUÉS del
+//     encuadre con la parcela que se acaba de encuadrar, así que el primer `set`
+//     que llegue con esa misma parcela tampoco mueve nada.
+//   · **Del mismo cambio de identidad cuelga la LIMPIEZA DE LAS COLINDANTES**, y
+//     no de los cableados de `app/`: las vecinas son de UNA parcela, así que
+//     «ha entrado otra» es exactamente el suceso que las jubila. Hay tres vías de
+//     entrada de parcela (Catastro, fichero GML, `estado.set` a pelo) y todas
+//     pasan por aquí; una llamada por cableado sería un cable que se rompe en
+//     silencio con la cuarta. El razonamiento completo está en el paso 7.
+//   · **El reencuadre automático NO usa la cascada entera**, solo su rama de
+//     geometría. Dos razones: (1) esto corre dentro de una notificación del store,
+//     y el `throw` del encuadre mudo saldría por el `set()` de quien cargó la
+//     parcela, en un sitio donde ya no significa lo que dice; (2) vaciar el store
+//     (`set(null)`) no es motivo para viajar a `vistaInicial` — no hay nada que
+//     mirar, y quedarse donde se está es lo único que no sorprende.
+//
+// Y para el uso EXPLÍCITO está `visor.encuadrar()`, que sí ejecuta la cascada
+// completa (geometría → `vistaInicial` → `throw`) reutilizando la misma función
+// que el paso 6.
+//
 // ── EL TOPE DE ZOOM VIVE AQUÍ, NO EN `viewer/mapa.js` ───────────────────────
 // `montarCapas` devuelve el `maxNativeZoom` DERIVADO de las capas realmente
 // montadas. **Hoy vale SIEMPRE 20**: `montarCapas` monta las seis capas y no
@@ -149,7 +216,9 @@ import { husoPorSrs } from '../geo/huso.js'
 import { resolverAvisar, validarVistaInicial, vertUTMaLatLng, NIVEL } from './_comun.js'
 import { crearAcotaciones } from './acotaciones.js'
 import { crearBarraEdicion } from './barra-edicion.js'
+import { crearCajonComprobacion } from './cajon-comprobacion.js'
 import { crearCajonDiagnostico } from './cajon-diagnostico.js'
+import { crearCapaColindantes } from './colindantes.js'
 import { crearContraste } from './contraste.js'
 import { crearEdicion } from './edicion.js'
 import { crearMapa } from './mapa.js'
@@ -343,6 +412,122 @@ function normalizarDiagnostico(diagnostico) {
 }
 
 /**
+ * Claves que admite `opciones.comprobacion` cuando viene como objeto. **Lista
+ * cerrada**, por el mismo motivo que {@link CLAVES_EDICION} y
+ * {@link CLAVES_DIAGNOSTICO}.
+ *
+ * Solo hay una, y no es un descuido: el cajón de comprobación no tiene ningún otro
+ * parámetro de MONTAJE. Todo lo demás que necesita —qué fichero, qué parcela, qué
+ * detecciones— es un DATO que no existe cuando el visor se monta: llega cuando el
+ * usuario suelta un `.gml`, y su camino es
+ * `visor.comprobacion.pintar(comprobarGml({...}))`, y solo ese.
+ */
+const CLAVES_COMPROBACION = Object.freeze(['posicion'])
+
+/**
+ * Normaliza `opciones.comprobacion` a «no montar» (`null`) o al objeto de opciones
+ * con el que se monta el cajón de F08.
+ *
+ * Tercer gemelo de {@link normalizarEdicion} y {@link normalizarDiagnostico}, y
+ * tampoco se factoriza con ellos: la razón está escrita en el JSDoc del segundo
+ * —los mensajes de error dicen cosas distintas y esa mitad es lo que vale— y con
+ * tres copias sigue siendo cierta. Lo común serían cuatro líneas de forma.
+ *
+ * @param {*} comprobacion
+ * @returns {{posicion?: string}|null}
+ * @throws {TypeError}  Contrato del programador.
+ */
+function normalizarComprobacion(comprobacion) {
+  if (comprobacion === undefined || comprobacion === false) return null
+  if (comprobacion === true) return {}
+
+  if (comprobacion === null || typeof comprobacion !== 'object' || Array.isArray(comprobacion)) {
+    throw new TypeError(
+      `crearVisor: 'opciones.comprobacion' debe ser un booleano, un objeto de opciones ` +
+        `{${CLAVES_COMPROBACION.join(', ')}} o undefined; recibido ` +
+        `${Array.isArray(comprobacion) ? 'un array' : JSON.stringify(comprobacion) || typeof comprobacion}.`,
+    )
+  }
+
+  const desconocidas = Object.keys(comprobacion).filter(
+    (clave) => !CLAVES_COMPROBACION.includes(clave),
+  )
+  if (desconocidas.length > 0) {
+    throw new TypeError(
+      `crearVisor: 'opciones.comprobacion' no conoce ${desconocidas.map((c) => `'${c}'`).join(', ')}. ` +
+        `La única clave admitida es: ${CLAVES_COMPROBACION.join(', ')}. El fichero cargado, la ` +
+        `parcela elegida y sus detecciones no se pasan aquí: no existen cuando se monta el ` +
+        `visor. Se pintan con visor.comprobacion.pintar(comprobarGml({...})).`,
+    )
+  }
+  return { ...comprobacion }
+}
+
+/**
+ * Normaliza `opciones.colindantes` a un booleano: montar la capa de vecinas o no.
+ *
+ * **Cuarto hermano de los tres de arriba, y el único que NO admite forma de
+ * objeto**, que es una decisión y no un olvido: la capa de colindantes no tiene
+ * ninguna opción de MONTAJE. No hay esquina que elegir (no es un control), ni
+ * umbral en píxeles que ajustar (no rotula nada que dependa del zoom). Lo único
+ * que necesita —QUÉ vecinas— es un dato que llega del WFS después de montar el
+ * visor, y su camino es `visor.colindantes.pintar(vecinas)`, y solo ese. Una
+ * lista cerrada VACÍA sería peor que no tenerla: prometería una configuración
+ * que no existe.
+ *
+ * @param {*} colindantes
+ * @returns {boolean}
+ * @throws {TypeError}  Contrato del programador.
+ */
+function normalizarColindantes(colindantes) {
+  if (colindantes === undefined || colindantes === false) return false
+  if (colindantes === true) return true
+
+  throw new TypeError(
+    `crearVisor: 'opciones.colindantes' es un BOOLEANO (o undefined); recibido ` +
+      `${describir(colindantes)}. No admite objeto de opciones porque la capa de vecinas ` +
+      `no tiene ninguna: las parcelas colindantes llegan del WFS DESPUÉS de montar el ` +
+      `visor y se pintan con visor.colindantes.pintar([{refcat, recintos}]).`,
+  )
+}
+
+/** Describe un valor para un mensaje de contrato roto. */
+function describir(valor) {
+  if (valor === null) return 'null'
+  if (Array.isArray(valor)) return 'un array'
+  return typeof valor
+}
+
+/**
+ * QUÉ PARCELA es esta, a efectos de «¿ha entrado una distinta?». La referencia
+ * catastral primero y el `idLocal` como respaldo. Ver el bloque «EL MAPA SIGUE A
+ * LA PARCELA» de la cabecera para el porqué de cada pieza; en corto: los dos
+ * sobreviven a las ediciones y la identidad del OBJETO no, porque `edit/`
+ * reconstruye el POJO en cada operación.
+ *
+ * ⚠️ **Gemela de `app/cableado-diagnostico.js#claveDeExpediente`**, a propósito y
+ * declarado: `viewer/` no puede importar de `app/` (la capa de vista no conoce a
+ * la aplicación que la usa) y `app/` no es un sitio del que un módulo del visor
+ * pueda depender. Lo que sí es intolerable es que las dos capas tengan criterios
+ * DISTINTOS de «es otra parcela»: si alguien cambia uno, tiene que cambiar el
+ * otro, y por eso cada copia nombra a la otra.
+ *
+ * `null` = la parcela no dice quién es (o no hay parcela). Ver el aviso de
+ * {@link crearVisor}: con dos parcelas anónimas seguidas, el reencuadre no puede
+ * distinguirlas de una edición y no se mueve — y lo dice.
+ *
+ * @param {object|null} parcela
+ * @returns {string|null}
+ */
+function claveDeParcela(parcela) {
+  if (parcela === null || parcela === undefined) return null
+  const refcat = typeof parcela.refcat === 'string' ? parcela.refcat.trim() : ''
+  if (refcat !== '') return `refcat:${refcat}`
+  const idLocal = typeof parcela.idLocal === 'string' ? parcela.idLocal : ''
+  return idLocal === '' ? null : `idLocal:${idLocal}`
+}
+
+/**
  * Prefijo del mensaje de error de `viewer/_comun.js#validarVistaInicial` para
  * este módulo.
  *
@@ -404,6 +589,31 @@ function verticesFinitos(parcela, avisar) {
 }
 
 /**
+ * ¿Trae esta parcela algún vértice utilizable?
+ *
+ * Pregunta BARATA y **sin efectos secundarios**, al revés que
+ * {@link verticesFinitos}, que además AVISA de los vértices no numéricos. La usa
+ * el reencuadre vivo (paso 7) para decidir si merece la pena hablar de una parcela
+ * sin identidad: si no hay geometría, tampoco habría nada que encuadrar, y avisar
+ * dos veces de los mismos vértices rotos es ruido.
+ *
+ * @param {object|null} parcela
+ * @returns {boolean}
+ */
+function tieneGeometria(parcela) {
+  const recintos = parcela && Array.isArray(parcela.recintos) ? parcela.recintos : []
+  for (const recinto of recintos) {
+    if (!recinto || !Array.isArray(recinto.vertices)) continue
+    for (const vertice of recinto.vertices) {
+      if (Array.isArray(vertice) && Number.isFinite(vertice[0]) && Number.isFinite(vertice[1])) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+/**
  * Extensión (m) y centro (UTM) de una nube de vértices UTM no vacía.
  *
  * Se calcula en UTM —no en lat/lon— porque el modelo va en metros (regla de oro
@@ -432,8 +642,51 @@ function extensionUTM(vertices) {
 }
 
 /**
+ * RAMA 1 de la cascada, aislada: encuadrar sobre la geometría del estado, si la
+ * hay. Es la ÚNICA rama que usa el reencuadre automático del paso 7 (el porqué
+ * está en la cabecera: dentro de una notificación del store no puede haber ni un
+ * `throw` de contrato ni un salto a `vistaInicial`).
+ *
+ * @param {object} args
+ * @param {import('leaflet').Map} args.mapa
+ * @param {import('./_comun.js').EstadoVista} args.estado
+ * @param {number} args.zona
+ * @param {import('./_comun.js').Avisar} args.avisar
+ * @returns {boolean}  `true` si ha encuadrado; `false` si no había geometría (y
+ *   entonces NO ha tocado la vista).
+ */
+function encuadrarGeometria({ mapa, estado, zona, avisar }) {
+  const vertices = verticesFinitos(estado.get(), avisar)
+  if (vertices.length === 0) return false
+
+  const { ancho, alto, centro } = extensionUTM(vertices)
+
+  // Caso degenerado (un vértice, o todos coincidentes): `fitBounds` sobre
+  // bounds sin extensión daría el maxZoom del mapa. Se encuadra el punto a un
+  // zoom de parcela, explícitamente.
+  if (Math.max(ancho, alto) < EXTENSION_MINIMA_M) {
+    mapa.setView(vertUTMaLatLng(centro, zona), ZOOM_PUNTO)
+    return true
+  }
+
+  // `fitBounds` acepta directamente el array de [lat,lon] como bounds. Se
+  // proyecta VÉRTICE A VÉRTICE (no las dos esquinas del bbox UTM): la
+  // desproyección UTM→lat/lon no conserva los ejes —la convergencia de
+  // meridianos es una rotación— y el bbox de las esquinas dejaría fuera parte
+  // de la parcela.
+  mapa.fitBounds(
+    vertices.map((vertice) => vertUTMaLatLng(vertice, zona)),
+    { padding: [MARGEN_ENCUADRE_PX, MARGEN_ENCUADRE_PX] },
+  )
+  return true
+}
+
+/**
  * La CASCADA DEL VIEWPORT (hallazgo C5). Ver la cabecera del módulo: geometría →
  * `vistaInicial` → `throw`. Nunca hay una cuarta rama que "mire a algún sitio".
+ *
+ * La usan DOS llamantes y ninguno más: el paso 6 del montaje y `visor.encuadrar()`
+ * (el encuadre explícito, que es la misma decisión tomada más tarde).
  *
  * @param {object} args
  * @param {import('leaflet').Map} args.mapa
@@ -446,31 +699,8 @@ function extensionUTM(vertices) {
  * @throws {TypeError} Si no hay ni geometría ni `vistaInicial`.
  */
 function encuadrar({ mapa, estado, zona, vistaInicial, avisar }) {
-  const vertices = verticesFinitos(estado.get(), avisar)
-
   // 1 · Geometría: manda siempre que la haya, aunque venga también vistaInicial.
-  if (vertices.length > 0) {
-    const { ancho, alto, centro } = extensionUTM(vertices)
-
-    // Caso degenerado (un vértice, o todos coincidentes): `fitBounds` sobre
-    // bounds sin extensión daría el maxZoom del mapa. Se encuadra el punto a un
-    // zoom de parcela, explícitamente.
-    if (Math.max(ancho, alto) < EXTENSION_MINIMA_M) {
-      mapa.setView(vertUTMaLatLng(centro, zona), ZOOM_PUNTO)
-      return 'geometria'
-    }
-
-    // `fitBounds` acepta directamente el array de [lat,lon] como bounds. Se
-    // proyecta VÉRTICE A VÉRTICE (no las dos esquinas del bbox UTM): la
-    // desproyección UTM→lat/lon no conserva los ejes —la convergencia de
-    // meridianos es una rotación— y el bbox de las esquinas dejaría fuera parte
-    // de la parcela.
-    mapa.fitBounds(
-      vertices.map((vertice) => vertUTMaLatLng(vertice, zona)),
-      { padding: [MARGEN_ENCUADRE_PX, MARGEN_ENCUADRE_PX] },
-    )
-    return 'geometria'
-  }
+  if (encuadrarGeometria({ mapa, estado, zona, avisar })) return 'geometria'
 
   // 2 · La vía explícita.
   if (vistaInicial !== undefined) {
@@ -541,9 +771,46 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  *   un objeto y no como dos propiedades hermanas porque son inseparables —el cajón
  *   dice las cifras y la capa señala DÓNDE están en el mapa; una sin la otra es
  *   media función— y porque así `if (visor.diagnostico)` es una sola pregunta.
+ * @property {ReturnType<typeof crearCajonComprobacion>|null} comprobacion  El
+ *   cajón de F08 (`viewer/cajon-comprobacion.js`), o **`null`** si el visor se
+ *   montó sin él (mismo criterio que `edicion` y `diagnostico`: `null` es una
+ *   respuesta, `undefined` sería un olvido).
+ *
+ *   Va SUELTO y no dentro de un objeto como `diagnostico`, y la asimetría es
+ *   deliberada: F07 son DOS piezas inseparables (el cajón dice las cifras y la
+ *   capa las señala en el mapa), mientras que F08 es UNA. Envolverla en
+ *   `{cajon}` para que se pareciera obligaría a todos sus llamantes a escribir
+ *   `visor.comprobacion.cajon` por una simetría que no existe.
+ * @property {import('./colindantes.js').CapaColindantes|null} colindantes  La capa
+ *   de PARCELAS VECINAS (`viewer/colindantes.js`), o **`null`** si el visor se
+ *   montó sin ella (mismo criterio que las anteriores: `null` es una respuesta,
+ *   `undefined` sería un olvido). Nace VACÍA: se le dan las vecinas con
+ *   `visor.colindantes.pintar([{refcat, recintos}])` cuando llegan del WFS.
+ *
+ *   Lo ÚNICO que el visor le hace por su cuenta es LIMPIARLA cuando entra en el
+ *   store una parcela con otra identidad (paso 7): las vecinas son de una parcela
+ *   concreta y dejarlas junto a otra sería mentir sobre el mapa. Quien las pinta
+ *   sigue siendo el llamante, siempre.
+ * @property {() => ('geometria'|'vistaInicial'|null)} encuadrar  Vuelve a encuadrar
+ *   el mapa AHORA, ejecutando la cascada completa del viewport (geometría →
+ *   `vistaInicial` → `throw`) sobre el estado actual del store. Es la MISMA función
+ *   del paso 6 del montaje, así que respeta también el caso degenerado (un vértice,
+ *   o todos coincidentes → `setView` a {@link ZOOM_PUNTO}, nunca `fitBounds` sobre
+ *   unos bounds sin extensión).
+ *
+ *   Devuelve qué rama se aplicó, o **`null` si el visor ya está destruido** — un
+ *   no-op, no un `throw`, por lo mismo que `acotaciones.pintar` y
+ *   `contraste.pintar`: el desmontaje va en orden inverso y una respuesta de red en
+ *   vuelo puede llegar después.
+ *
+ *   Casi nunca hace falta: el visor **se reencuadra solo** cuando entra una parcela
+ *   distinta (ver la cabecera). Esto es para el gesto EXPLÍCITO —un botón «centrar
+ *   en la parcela» después de que el usuario se haya ido navegando— y para
+ *   recolocar la vista tras un cambio de tamaño del contenedor.
  * @property {() => void} destruir  Deshace TODO el ensamblaje en orden inverso
- *   (diagnóstico → sincronización → edición → acotaciones → capas → mapa).
- *   IDEMPOTENTE: llamarlo dos veces no lanza.
+ *   (reencuadre → comprobación → diagnóstico → sincronización → edición →
+ *   acotaciones → colindantes → capas → mapa). IDEMPOTENTE: llamarlo dos veces no
+ *   lanza.
  */
 
 /**
@@ -687,18 +954,57 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  *   nada. Quien lo abre y le da las cifras es `app/cableado-diagnostico.js`, cuando
  *   el usuario pulsa «Diagnosticar». Un visor que se abriera solo taparía el mapa
  *   con un cajón que nadie ha pedido.
+ * @param {boolean|{posicion?: string}} [opciones.comprobacion=false]  Monta el
+ *   CAJÓN de comprobación de F08 (`viewer/cajon-comprobacion.js`): qué es el `.gml`
+ *   que se acaba de soltar en la ventana, qué trae y qué le pasa.
+ *
+ *   · **`false` (el DEFECTO) ⇒ el visor de antes de F08, sin un control ni un
+ *     listener de más.** `visor.comprobacion` vale `null`. El defecto es `false`
+ *     para que el visor de F03/F06/F07 quede **idéntico** y sus pruebas sigan
+ *     intactas: F08 no le cobra un solo nodo a quien no lo ha pedido.
+ *   · **`true`** ⇒ el cajón, con sus defectos.
+ *   · **objeto** ⇒ igual, con esta ÚNICA clave (una desconocida es `TypeError`,
+ *     ver {@link CLAVES_COMPROBACION}):
+ *       - `posicion` → esquina del cajón (defecto `'bottomleft'`).
+ *
+ *   ⚠️ **`bottomleft` es la MISMA esquina que el cajón de diagnóstico**, y es una
+ *   decisión, no un descuido: las cuatro esquinas del mapa ya estaban ocupadas
+ *   cuando llegó F08, y los dos cajones son **mutuamente excluyentes por diseño**
+ *   —la comprobación precede al diagnóstico y no coexiste con él—. Montar los dos
+ *   a la vez es legítimo y es lo normal; abrirlos a la vez no, y de eso responde
+ *   el cableado de la aplicación, que es quien sabe en qué punto del recorrido
+ *   está. Ver la cabecera de `viewer/cajon-comprobacion.js`.
+ *
+ *   El cajón nace CERRADO y en blanco: montarlo no comprueba nada. Quien lo abre y
+ *   le da el contenido es el cableado de F08, cuando el usuario suelta un fichero.
+ * @param {boolean} [opciones.colindantes=false]  Monta la capa de PARCELAS VECINAS
+ *   (`viewer/colindantes.js`): un contorno gris fino por colindante, con su
+ *   referencia catastral en un título emergente.
+ *
+ *   · **`false` (el DEFECTO) ⇒ el visor de antes, sin una capa ni un pane ocupado
+ *     de más.** `visor.colindantes` vale `null`. El defecto es `false` para que el
+ *     visor de F03/F06/F07 quede **idéntico** y sus pruebas sigan intactas.
+ *   · **`true`** ⇒ la capa, VACÍA. Montarla no trae vecinas: eso es una consulta al
+ *     WFS que hace la aplicación. Se pintan con
+ *     `visor.colindantes.pintar([{refcat, recintos}])`, y se van SOLAS cuando entra
+ *     otra parcela en el store (paso 7): el llamante no tiene que acordarse de
+ *     limpiarlas en cada vía de entrada, que es donde se olvidaría.
+ *
+ *   **Es booleano y no admite objeto**, al revés que las tres opciones de arriba:
+ *   la capa no tiene ni una opción de montaje (ver {@link normalizarColindantes}).
  * @returns {Visor}
  * @throws {TypeError}  Contrato del programador: `opciones` no es un objeto,
  *   `estado` no es el store, `vistaInicial` malformada, `srs` no es un string
  *   (desde `husoPorSrs`), `contenedor`/`tablaEl` no son elementos del DOM (desde
- *   `crearMapa`/`sincronizar`), `edicion` o `diagnostico` que no son booleano ni
- *   objeto, `alPrevisualizar` que no es función, o **no hay ni geometría ni
- *   `vistaInicial`**.
+ *   `crearMapa`/`sincronizar`), `edicion`, `diagnostico` o `comprobacion` que no
+ *   son booleano ni objeto, `colindantes` que no es booleano, `alPrevisualizar`
+ *   que no es función, o **no hay ni geometría ni `vistaInicial`**.
  * @throws {RangeError}  `srs` no soportado (desde `husoPorSrs`), `baseInicial`
  *   inexistente (desde `montarCapas`), `maxZoom` que no supera el zoom nativo
- *   de las capas montadas, `edicion.tolerancia` negativa (desde `crearEdicion`) o
+ *   de las capas montadas, `edicion.tolerancia` negativa (desde `crearEdicion`),
  *   `diagnostico.posicion` que no es una esquina de Leaflet (desde
- *   `crearCajonDiagnostico`).
+ *   `crearCajonDiagnostico`) o `comprobacion.posicion` ídem (desde
+ *   `crearCajonComprobacion`).
  */
 export function crearVisor(contenedor, opciones = {}) {
   if (opciones === null || typeof opciones !== 'object') {
@@ -720,6 +1026,8 @@ export function crearVisor(contenedor, opciones = {}) {
     maxZoom,
     edicion: opcionEdicion = false,
     diagnostico: opcionDiagnostico = false,
+    comprobacion: opcionComprobacion = false,
+    colindantes: opcionColindantes = false,
     alPrevisualizar,
     ...opcionesMapa
   } = opciones
@@ -744,6 +1052,8 @@ export function crearVisor(contenedor, opciones = {}) {
   // forma: una opción malformada es un bug del llamante lo montemos o no.
   const opcionesEdicion = normalizarEdicion(opcionEdicion)
   const opcionesDiagnostico = normalizarDiagnostico(opcionDiagnostico)
+  const opcionesComprobacion = normalizarComprobacion(opcionComprobacion)
+  const montarColindantes = normalizarColindantes(opcionColindantes)
   // Misma política que `resolverAvisar` y que los tres ganchos de `sincronizar`:
   // "no me han pasado nada" es legítimo (cae a `null`); "me han pasado basura
   // donde iba una función" es contrato roto, y eso aquí es `throw`.
@@ -786,6 +1096,18 @@ export function crearVisor(contenedor, opciones = {}) {
 
     // La comprobación del tope, en cuanto se sabe qué capas hay de verdad.
     comprobarTopeDeZoom(mapa, capas.maxNativeZoom)
+
+    // 2 bis · Las PARCELAS VECINAS. Va pegada a las capas de fondo porque es lo
+    // que es —contexto cartográfico, en el pane más bajo del visor (405)— y nace
+    // VACÍA: no pone ni una capa en el mapa hasta que alguien le pase vecinas, así
+    // que aquí es tan inerte como el cajón cerrado de F08. No necesita que el mapa
+    // tenga vista (Leaflet difiere el `onAdd` de toda capa hasta que la tiene).
+    /** @type {ReturnType<typeof crearCapaColindantes>|null} */
+    let colindantes = null
+    if (montarColindantes) {
+      colindantes = crearCapaColindantes({ mapa, zona, alAvisar: avisar })
+      deshacer.push(() => colindantes.destruir())
+    }
 
     // 3 · Las dos piezas de F06, ANTES de sincronizar porque `sincronizar`
     // CONSUME sus ganchos y solo los acepta al construirse (ver cabecera).
@@ -897,9 +1219,100 @@ export function crearVisor(contenedor, opciones = {}) {
       diagnostico = { cajon, contraste }
     }
 
+    // 5 bis · El cajón de F08. Nace CERRADO y en blanco, así que es tan inerte
+    // aquí como las dos piezas de F07 y por el mismo motivo: no se suscribe a
+    // ningún evento del mapa, no mide en píxeles y no toca el store. Va DESPUÉS
+    // del diagnóstico porque comparte esquina con su cajón —Leaflet apila por
+    // orden de alta dentro de una esquina, y con los dos abiertos (que no debería
+    // pasar nunca) el de la comprobación queda debajo, que es lo coherente con el
+    // recorrido—, y ANTES del encuadre por lo mismo que el diagnóstico: para que
+    // el ensamblaje siga siendo atómico y para que sus nodos ya estén en el
+    // documento cuando `crearVisor` devuelva, que es lo que el cableado necesita
+    // para resolverlos por selector.
+    /** @type {ReturnType<typeof crearCajonComprobacion>|null} */
+    let comprobacion = null
+    if (opcionesComprobacion !== null) {
+      comprobacion = crearCajonComprobacion({
+        mapa,
+        posicion: opcionesComprobacion.posicion,
+        alAvisar: avisar,
+      })
+      deshacer.push(() => comprobacion.destruir())
+    }
+
     // 6 · El encuadre, lo ÚLTIMO del MONTAJE (ver cabecera: así la capa WMS del
     // Catastro pide UNA sola imagen, y del encuadre bueno).
     encuadrar({ mapa, estado, zona, vistaInicial, avisar })
+
+    // 7 · EL REENCUADRE VIVO: el mapa sigue a la parcela, pero no persigue al
+    // editor (ver el bloque homónimo de la cabecera).
+    //
+    // La clave se inicializa AQUÍ, después del paso 6, con la parcela que se acaba
+    // de encuadrar: eso —y que `crearEstadoVista#subscribe` no notifica al
+    // suscribirse— es lo que garantiza que el arranque encuadre UNA sola vez.
+    let claveEncuadrada = claveDeParcela(estado.get())
+    /** Un solo aviso de «parcela sin identidad» por visor, no uno por `set`. */
+    let avisadoSinIdentidad = false
+
+    const bajaReencuadre = estado.subscribe((parcela) => {
+      const clave = claveDeParcela(parcela)
+
+      if (clave === claveEncuadrada) {
+        // Caso normal y masivo: la MISMA parcela, editada. No se toca la vista.
+        // Pero si la parcela no dice quién es, «la misma» es una suposición y no
+        // un hecho: se avisa UNA vez y se sigue sin mover el mapa, que es la
+        // opción que nunca estropea un arrastre en curso. Con `crearParcela` esto
+        // no ocurre (`idLocal` es obligatorio); un POJO a mano sí puede.
+        if (clave === null && !avisadoSinIdentidad && tieneGeometria(parcela)) {
+          avisadoSinIdentidad = true
+          avisar(
+            `La parcela no trae ni referencia catastral ni identificador local, así que el ` +
+              `visor no puede distinguir «ha entrado otra parcela» de «se ha editado esta»: ` +
+              `no reencuadra solo. Usa visor.encuadrar() para encuadrarla a mano.` +
+              // La coda solo aparece si HAY capa de vecinas: nombrar una pieza que
+              // este visor no monta sería mandar al usuario a un `null`.
+              (colindantes === null
+                ? ''
+                : ` Por lo mismo tampoco suelta las parcelas colindantes que hubiera ` +
+                  `pintadas: si ya no son suyas, visor.colindantes.limpiar().`),
+            { nivel: NIVEL.AVISO },
+          )
+        }
+        return
+      }
+
+      claveEncuadrada = clave
+
+      // ── PARCELA NUEVA ⇒ LAS VECINAS DE LA ANTERIOR SE VAN ────────────────────
+      // Unas colindantes dibujadas junto a una parcela que ya no está en pantalla
+      // son una MENTIRA sobre el mapa: el contorno gris sigue diciendo «esto linda
+      // con lo tuyo» cuando lo tuyo es otra cosa, y a 500 m de distancia ni siquiera
+      // se ve que se ha quedado atrás.
+      //
+      // Va AQUÍ, colgado del MISMO cambio de identidad que dispara el reencuadre, y
+      // no en los cableados de `app/`, por tres razones:
+      //   · Es UN solo sitio. Hoy hay tres vías de entrada de parcela (el Catastro
+      //     de F05, el fichero GML de F08 y cualquier `estado.set` directo) y todas
+      //     pasan por el store; una llamada por cableado sería un cable que se rompe
+      //     EN SILENCIO el día que alguien añada la cuarta y no se acuerde de ella.
+      //   · Dice exactamente lo que significa: parcela nueva, vecinas que ya no son
+      //     suyas. Es el mismo hecho que el reencuadre, no una coincidencia.
+      //   · `viewer/` es quien tiene la capa. `app/` tendría que ir a buscarla.
+      //
+      // ANTES del encuadre a propósito: la vista se mueve a la parcela nueva con el
+      // mapa YA limpio, así que ningún repintado intermedio puede enseñar los
+      // contornos viejos sobre ella. Y se limpia también cuando la parcela nueva no
+      // trae geometría (o cuando el store se VACÍA con `set(null)`, que aquí es un
+      // cambio de identidad como otro cualquiera): entonces no hay encuadre que
+      // hacer, y unas vecinas huérfanas serían todavía menos explicables.
+      if (colindantes !== null) colindantes.limpiar()
+
+      // Solo la rama de geometría: ni `throw` ni salto a `vistaInicial` dentro de
+      // una notificación del store (ver la cabecera). Sin geometría, la vista se
+      // queda donde está.
+      encuadrarGeometria({ mapa, estado, zona, avisar })
+    })
+    deshacer.push(() => bajaReencuadre())
 
     // Coda (no es un paso del montaje: no apila nada en `deshacer`): con el mapa
     // ya encuadrado, las vistas en vivo pueden medir. Se abre el puente y se
@@ -919,6 +1332,22 @@ export function crearVisor(contenedor, opciones = {}) {
       edicion,
       acotaciones,
       diagnostico,
+      comprobacion,
+      colindantes,
+
+      /**
+       * El encuadre EXPLÍCITO. Misma función que el paso 6 —cascada completa— y
+       * misma clave de identidad: encuadrar a mano cuenta como «esta es la vista de
+       * esta parcela», así que se actualiza `claveEncuadrada` y el reencuadre
+       * automático no vuelve a dispararse por lo mismo.
+       */
+      encuadrar() {
+        if (destruido) return null
+        const rama = encuadrar({ mapa, estado, zona, vistaInicial, avisar })
+        claveEncuadrada = claveDeParcela(estado.get())
+        return rama
+      },
+
       destruir() {
         if (destruido) return
         destruido = true

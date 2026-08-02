@@ -129,6 +129,7 @@ export const DENSIDAD_BASE_PX = 13
 
 /** Nombres canónicos de los panes del visor. */
 export const PANE = Object.freeze({
+  COLINDANTES: 'colindantes',
   PARCELA_OFICIAL: 'parcelaOficial',
   PARCELA_EDITADA: 'parcelaEditada',
   ACOTACIONES: 'acotaciones',
@@ -170,6 +171,31 @@ export const PANE = Object.freeze({
  *     `interactive:false`: el zIndex es la SEGUNDA línea de defensa, no la
  *     única.
  *
+ * `colindantes` (`viewer/colindantes.js`) se intercala en **405**, y es el ÚNICO
+ * pane del visor que va por DEBAJO de la geometría de la parcela. Los tres
+ * porqués, con el mismo detalle que los dos de arriba:
+ *   · por DEBAJO de `parcelaOficial` (410) y de `parcelaEditada` (420) porque una
+ *     vecina es **contexto de la parcela que se está mirando**, y el contexto
+ *     jamás debe tapar a su asunto. El caso que lo decide no es raro, es el
+ *     normal: una colindante COMPARTE lindero con la propia. Si el contorno gris
+ *     de la vecina se dibujara encima, el lado compartido se vería con el gris de
+ *     la vecina y no con el amarillo del usuario, y el técnico creería estar
+ *     mirando su lindero mientras mira el de al lado. Con el pane debajo, el
+ *     amarillo gana siempre.
+ *   · por ENCIMA del `overlayPane` de Leaflet (400), donde viven la ortofoto y la
+ *     cartografía catastral superpuesta: el contorno de la vecina tiene que
+ *     leerse SOBRE la imagen, que es exactamente para lo que sirve.
+ *   · y aquí el zIndex es la PRIMERA línea de defensa del puntero, no la segunda.
+ *     `acotaciones` y `diagnostico` van además `interactive:false`; esta capa NO
+ *     puede —el título emergente con la referencia catastral exige interacción—,
+ *     así que lo único que la separa del arrastre de un vértice o del clic sobre
+ *     el polígono editado es el apilado. Estando debajo de todo, el navegador
+ *     entrega el puntero a lo de arriba y la vecina solo recoge lo que cae fuera
+ *     de la parcela propia. Y lo que recoge lo BURBUJEA al mapa
+ *     (`bubblingMouseEvents:true`, el defecto de `L.Path`), que es lo que
+ *     mantiene vivo el clic de «Deducir del mapa» de F05: medido en
+ *     `test/viewer/colindantes.dom.test.js`, no supuesto.
+ *
  * `viewer/mapa.js#crearMapa` ITERA esta lista para crear los panes, así que
  * añadir una entrada aquí es todo lo que hace falta: ni ese módulo ni el arnés
  * de test (`test/viewer/_ayuda-jsdom.js#crearPanes`) llevan nombres a mano.
@@ -177,6 +203,7 @@ export const PANE = Object.freeze({
  * @type {ReadonlyArray<{nombre:string, zIndex:number}>}
  */
 export const PANES = Object.freeze([
+  { nombre: PANE.COLINDANTES, zIndex: 405 },
   { nombre: PANE.PARCELA_OFICIAL, zIndex: 410 },
   { nombre: PANE.PARCELA_EDITADA, zIndex: 420 },
   { nombre: PANE.ACOTACIONES, zIndex: 425 },

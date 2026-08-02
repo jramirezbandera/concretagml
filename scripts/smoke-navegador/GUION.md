@@ -9,8 +9,8 @@ con la **maquinaria real de `L.Draggable`**.
 - **4D.1** (esta carpeta) escribió los guiones y los probó en seco.
 - **4D.2** es la ejecución oficial, con evidencia, siguiendo este documento.
 
-Nueve guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
-para que el resultado no dependa de interpretar prosa. Ocho son de aceptación;
+Diez guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
+para que el resultado no dependa de interpretar prosa. Nueve son de aceptación;
 `05` es de diagnóstico (§11):
 
 | Guion | Criterio | Mide | Veredicto pasa si |
@@ -24,6 +24,7 @@ para que el resultado no dependa de interpretar prosa. Ocho son de aceptación;
 | `07-catastro-vivo.js` | F05 · T5C | **contra el servicio REAL**: CORS, IndexedDB de verdad y el recorrido entero (traer parcela · 2.ª consulta sin red · deducir la referencia) | `ok:true` |
 | `08-edicion.js` | F06 · 1 a 5 | la edición con `L.Draggable` real: snap a vértice y a lindero, `Alt`, cotas contra el zoom, offset, insertar/eliminar, undo/redo y su inhibición | `ok:true` |
 | `09-diagnostico.js` | F07 · 1 a 4 | el diagnóstico con SVG y layout reales: la diferencia sombreada por `fill-rule: evenodd`, el cajón que flota sin quitarle NI UN PÍXEL a la caja de vértices al abrirse, la banda del margen que conserva sus metros con el zoom y el tiempo del recálculo completo | `ok:true` |
+| `10-comprobar-gml.js` | F08 · 1 a 4 · **+ los tres arreglos del check visual** | **soltar un fichero de verdad** de punta a punta (bytes reales, velo con `opacity` calculada, `File.arrayBuffer()`), el cajón que no tapa ninguno de los cinco controles del mapa, los dos cajones que no coinciden, el informe que baja con BYTES, el invariante de los ~267 px, la tipografía real de los botones de los dos cajones y —desde el 2026-08-02— **el REENCUADRE** (viaja con otra parcela, no se mueve al editar), **las COLINDANTES dibujadas** y **el CAMPO de la referencia** | `ok:true` — ver §16 |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
 spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
@@ -47,6 +48,26 @@ jsdom pueden dar —**CORS**, **IndexedDB real** y el recorrido completo del
 Catastro en un navegador—, y la suite de aceptación de F05 las declara por escrito
 como no cubiertas y remite aquí. Tiene por eso un **régimen de uso** propio: una
 pasada, sin bucles, dos peticiones en total. Ver §13 **antes** de lanzarlo.
+
+`10` es el de F08 y el único que **mete un fichero en la aplicación**. Fabrica un
+`File` con los bytes reales de un fixture —traídos por `fetch` del propio
+servidor, así que **exige `npm run dev`**: `vite preview` sirve `dist/`, donde
+los fixtures no están— y lo suelta sobre la ventana con un `DataTransfer`. Es
+también **el único de esta carpeta que ha encontrado defectos de producción**:
+en su primera corrida salió `ok:false` por **dos defectos reales**, los dos se
+corrigieron con guardián, y en la segunda corrida sale `ok:true`. Las dos
+corridas están en §16, y la primera no se borra: encontrarlos es su mérito.
+Léete §16 **antes** de citarlo, y §0 antes que nada: el arrastre sigue sin ser
+un gesto de ratón.
+
+Y desde el **2026-08-02** `10` mide tres cosas más que **no encontró ninguna
+máquina: las encontró la FIRMA HUMANA de F08** (`CHECKLIST-HUMANO.md` §9). Dos de
+ellas **ni siquiera son de F08 — vienen de F03/F05** —, y las tres estaban fuera
+del alcance de la suite por construcción: el reencuadre del mapa cuando entra otra
+parcela, las parcelas colindantes dibujadas y el campo de la referencia catastral.
+Ver §16, apartado «Los TRES defectos que encontró la firma humana». **Esto es lo
+que vale el gate humano, y así hay que contarlo:** el guion encontró dos defectos
+que la suite no veía, y la persona encontró otros tres que no veía ni el guion.
 
 Cada guion lleva en su cabecera **qué mide y qué NO puede medir**. Léelas antes
 de citar un resultado.
@@ -488,6 +509,71 @@ Este smoke **no es de una sola vez**:
   verdad y la denegación por abuso es de ~10 días.
   HECHO el **2026-07-28**: `ok:true` y `problemas:[]` en los dos recorridos sobre
   `vite preview`, con **2 peticiones en total**; cifras en §13.
+- **`10-comprobar-gml.js`, cuando cambie cualquier pieza del recorrido de F08.**
+  Es lo único que prueba la entrada por fichero de punta a punta en un navegador
+  de verdad: la suite corre en jsdom, donde no hay `DataTransfer`, ni bytes de
+  fichero, ni `opacity` calculada, ni áreas de solape entre controles de Leaflet.
+  Los disparadores, por lo que cada uno rompería:
+  - `app/zona-fichero.js` (el `preventDefault` del `dragover`, el contador de
+    profundidad, el velo, el reseteo del `value`) y `app/cableado-comprobacion.js`
+    (el recorrido entero, la procedencia doble y el cierre de los dos cajones);
+  - `viewer/cajon-comprobacion.js` y `viewer/cajon-diagnostico.js` — **los dos**:
+    comparten la esquina `bottomleft` y el guion mide que no coincidan y que
+    ninguno tape los cinco controles del mapa. También su tipografía;
+  - `gml/decodificar.js` (el rótulo «declara «ISO-8859-1», leído como «utf-8»» es
+    salida suya) y `comprobacion/gml.js` (las notas, los hallazgos y
+    `puedeContinuar`);
+  - `report/contraste-texto.js` y `gml/descargar.js#descargarTexto` — el guion
+    afirma el TÍTULO LEGAL del informe, que desmienta ser la VGA/IVG, que diga
+    que es provisional, y que los bytes bajen y la URL de blob se revoque;
+  - `estilos/app.css`, tramo de F08: el cromo del cajón, el velo de arrastre y la
+    regla de tipografía de los botones de los dos cajones;
+  - `index.html` (la fila del rótulo con `[data-accion="abrir-gml"]`: la Decisión
+    5 es que ese botón cueste 0 px a la tabla de vértices) y `app/main.js` paso 9;
+  - los **fixtures** `test/fixtures/gml/cp_parcela_9398516VK3799G.gml` y
+    `test/fixtures/gml/derivados/cp_huso_incoherente.gml`, que el guion trae por
+    `fetch` del propio servidor y de los que deriva sus expectativas (2.878 y
+    3.167 bytes, 15 vértices, 1536 m² declarados, EPSG:25830 y EPSG:25829);
+  - y los **selectores del contrato**, que el guion lleva copiados a propósito:
+    `[data-accion="abrir-gml"]`, `[data-accion="contrastar-parcelario"]`,
+    `[data-accion="descartar-comprobacion"]`, `[data-estado="cajon-comprobacion"]`
+    y los `[data-comp="…"]` que EXPORTA `viewer/cajon-comprobacion.js#SELECTOR`,
+    más `[data-accion="descargar-informe"]` y `[data-estado="informe-contraste"]`
+    de `viewer/cajon-diagnostico.js#SELECTOR`, `.gml-soltar-superposicion` y
+    `.gml-zona-fichero-input` de `app/zona-fichero.js`, y `[data-procedencia="parcela"]`.
+  - **Desde el 2026-08-02 mide además los tres arreglos de la firma humana**, y
+    con ellos entran cuatro disparadores más — dos de los cuales **no son de F08**:
+    - **`viewer/index.js`, paso 7 (el REENCUADRE VIVO) y `claveDeParcela`.** Es lo
+      único que prueba en un navegador que el mapa **viaja** cuando entra otra
+      parcela y que **no se mueve al editar**. Ojo con la gemela declarada:
+      `app/cableado-diagnostico.js#claveDeExpediente` usa la MISMA clave
+      (`refcat ?? idLocal`) y las dos copias se nombran entre sí; si cambia una,
+      cambia la otra y hay que repetir esto.
+    - **`viewer/colindantes.js`, `PANE.COLINDANTES`/`PANES` de `viewer/_comun.js`
+      y el tercer suscriptor de `alColindantes` en `app/main.js`.** El guion afirma
+      el pane **405**, que está **por debajo** de `parcelaOficial` (410), el color y
+      el grosor del contorno, el emergente y —lo que de verdad importa— que la capa
+      interactiva **no le roba el clic al mapa**.
+    - **`app/cableado-catastro.js#puedeDeducirDe` y `puedePedirColindantesDe`.** De
+      ahí sale la coherencia campo ↔ botones que mide `campoRefcat`: si cambia
+      cuándo se enciende «Deducir del mapa» o «Traer colindantes», el guion se pone
+      rojo con razón.
+    - **el fixture `test/fixtures/gml/UTM_1.gml`**, que el guion trae por `fetch` y
+      del que deriva sus expectativas (3.450 B, 11 vértices, **sin** referencia
+      catastral, otra parcela a ~414 km). Es el único fichero de la carpeta con una
+      parcela **distinta** de la de arranque, y sin él el reencuadre no se puede
+      medir.
+  ⚠️ Antes de repetirlo, léete el régimen de uso de §13 (llama al servicio real)
+  y el §16 entero.
+  HECHO **dos veces el 2026-07-30**: la primera dio `ok:`**`false`** con **2
+  defectos reales destapados** y todo lo demás como se esperaba; corregidos los
+  dos en producción y con guardián en la suite, la **segunda** dio
+  `ok:`**`true`** con `problemas: []` **y `advertencias: []`**, en pasada en
+  FRÍO. Cifras de las dos y los defectos, en §16.
+  HECHO **una tercera vez el 2026-08-02**, ya con las tres medidas de la firma
+  humana dentro: `ok:`**`true`**, `problemas: []` y `advertencias: []`, en frío,
+  con 2 peticiones y consola limpia. **Ninguna de las cifras anteriores se movió.**
+  Cifras nuevas en §16.
 - Cuando cambie cualquiera de los **hooks semánticos** en los que se apoyan los
   guiones. Los guiones fallan a propósito si divergen, y ahí está su valor:
   - `title` del marcador (`'EXTERIOR · vértice 1'`) — `viewer/sincronizacion.js`;
@@ -1396,3 +1482,543 @@ Si el cajón **estorba** sobre la ortofoto aunque quepa; si la sombra de la
 diferencia **se entiende** sin leyenda; si la banda discontinua se lee como
 referencia y no como «carril bueno»; y el punto BLOQUEANTE: si alguna cifra o
 algún color **se lee como un veredicto** sin que el texto lo diga.
+
+---
+
+## 16. `10-comprobar-gml.js` — comprobar un GML existente (F08 · T6.2)
+
+El guion de F08, y el **único de esta carpeta que mete un fichero en la
+aplicación**. Recorre lo que la fase estrena —la primera entrada por fichero que
+esta app ha tenido nunca— hasta el final: velo de arrastre → cajón de
+comprobación → «Contrastar» → parcela en el mapa con procedencia doble → el CTA
+de F07 encendiéndose solo → informe de contraste descargado.
+
+> ✅ **HOY SALE `ok:true`, `problemas: []` y `advertencias: []`** (tercera
+> corrida, **2026-08-02**, pasada en frío, con las tres medidas nuevas dentro).
+> ⛔ **La PRIMERA corrida salió `ok:false`, y no era la medida: eran DOS DEFECTOS
+> REALES DE PRODUCCIÓN** que este guion destapó y que ningún test de la suite
+> podía ver. Los dos están **corregidos y con guardián**; su causa medida, la
+> corrección y el guardián están abajo, en «Los dos defectos que este guion
+> destapó». **No se arreglaron desde el guion**: arreglarlos ahí habría escondido
+> el hallazgo. Encontrarlos es el mérito del guion y por eso la primera corrida no
+> se borra.
+>
+> ⛔ **Y después vinieron TRES MÁS, que este guion tampoco veía: los encontró una
+> PERSONA** haciendo la firma humana del §9 del checklist (2026-07-31/08-01). **Dos
+> de los tres no son de F08: vienen de F03 y de F05.** Están corregidos, con
+> guardián en la suite, y **desde el 2026-08-02 los mide este guion** — que es
+> justo la regla del checklist: lo que se vuelve automatizable baja aquí. Ver «Los
+> TRES defectos que encontró la firma humana».
+
+### Qué mide, y por qué NO lo mide la suite
+
+La suite (**3.925 pruebas en 90 ficheros**) ya cubre la comprobación pura
+(`test/comprobacion/`), el decodificador, el informe, el cajón, la zona de
+fichero, el cableado y los cuatro criterios de aceptación. **Aquí no se vuelve a
+medir nada de eso.** Lo que se añade es lo que solo existe con un navegador
+delante:
+
+1. **Que soltar un fichero funcione DE VERDAD.** En jsdom no hay `DataTransfer`
+   real, ni `File.arrayBuffer()` sobre bytes de verdad, ni una `opacity`
+   calculada. Aquí el `File` se fabrica con los **bytes reales** del fixture
+   —`arrayBuffer()` y no `text()`, porque la mitad de F08 que importa es de
+   nivel de byte: el fichero del WFS **declara `ISO-8859-1` y sus bytes son
+   UTF-8**, y el cajón lo dice— y el recorrido va entero.
+2. **Que el cajón no tape NADA.** Comparte `bottomleft` con el de diagnóstico y
+   las otras tres esquinas estaban ocupadas desde F03/F06. Se mide el **área de
+   solape en px²** contra los cinco controles del mapa (barra de edición,
+   control de capas, atribución, control de opacidad y el zoom), más que la
+   atribución siga **visible**, que es obligación de licencia.
+3. **Que los dos cajones nunca coincidan.** Dos de los tres caminos están
+   blindados por `app/cableado-comprobacion.js` y se comprueban sobre controles
+   de Leaflet reales; **el tercero se MIDE y no se juzga** (ver `terceraVia`),
+   porque T4.1 lo dejó declarado y sin resolver.
+4. **Que el informe produzca BYTES.** Misma cadena
+   `Blob → createObjectURL → <a download> → click() → revoke` que mide `06` para
+   el GML, con el mismo patrón de captura (§12) y la misma promesa: los tres
+   envoltorios se restauran en un `finally` y el veredicto lo DECLARA
+   (`informe.restaurado`).
+5. **El invariante heredado de `08` §10 y `09` §5: la caja de vértices.** Se
+   mide tres veces —al arrancar, **en el tick en que el cajón se abre** y tras
+   contrastar— y cada pérdida se **atribuye**. La lección es de la primera
+   corrida del guardián de F07, que acusó al cajón de 11 px que eran de otros
+   renglones hablando después.
+6. **La tipografía real de los botones de los dos cajones.** Que una regla CSS
+   exista no significa que se aplique, y eso solo lo dice `getComputedStyle` con
+   la hoja cargada. La expectativa se **deriva** del token `--font-sans` leído
+   del `:root`, no de un literal copiado: si el token cambia, el guion sigue
+   midiendo lo que hay que medir. **Esta medida es la que destapó el defecto 1**
+   —una regla escrita, puesta y muerta— y sigue siendo la única que lo vería
+   volver: en jsdom no hay cascada que resolver.
+
+Y desde el **2026-08-02**, tres más. No salieron de este guion ni de la suite:
+**salieron de la firma humana del §9 del checklist**, y dos de ellas ni siquiera
+son de F08.
+
+7. **EL REENCUADRE** (`reencuadre`; defecto heredado de F03/F05). `encuadrar()`
+   se llamaba **una sola vez, al construir el visor**: se soltaba un GML de otra
+   provincia y el mapa seguía mirando la parcela de demostración. **La suite no
+   podía verlo por construcción** — todas sus pruebas traen su geometría a mano y
+   la app arranca ya encuadrada sobre ella, así que la pregunta «¿y cuando entra
+   OTRA?» no se hacía en ninguna parte. Aquí se sueltan **tres** ficheros y dos de
+   ellos son la misma parcela que la de arranque, así que se miden **las dos
+   mitades**: con `UTM_1.gml` (otra parcela, a 414,74 km medidos) la vista
+   **viaja** y sus once vértices caben en el lienzo; con el fichero del WFS y con
+   un **arrastre de vértice** el mapa **no se mueve ni un píxel**. Esa segunda
+   mitad es la que importa: un mapa que se recentra mientras se arrastra le escapa
+   el vértice al puntero.
+8. **LAS PARCELAS VECINAS, DIBUJADAS** (`colindantes`; deuda de F05). Se traían,
+   se publicaban por `alColindantes` y las usaban el snap de F06 y la invasión de
+   F07 — **y no las pintaba nadie**: pulsar «Traer colindantes» dejaba el mapa
+   exactamente igual mientras la ficha decía el número. **La suite no lo veía
+   porque nadie afirmaba que se dibujaran.** Se miden los contornos, que estén en
+   el pane **405** y **por debajo** de la parcela propia (405 < 410: una vecina
+   comparte lindero con la propia y encima pondría gris el lado compartido), que
+   el emergente traiga la referencia catastral, y **el riesgo que el emergente
+   abría** — que la capa interactiva le robe el clic al mapa.
+9. **EL CAMPO DE LA REFERENCIA** (`campoRefcat`; éste sí es defecto propio de
+   F08). Con un fichero que trae referencia, el campo la enseña en forma
+   **canónica**; con `UTM_1.gml`, que no la trae, el campo se **vacía** — decisión
+   contraria a la de la vía del Catastro y razonada: allí el campo es lo que el
+   usuario **tecleó** y no se le quita; aquí manda el fichero. Y en los dos casos
+   se comprueba que **ningún botón derivado se queda encendido contradiciéndolo**,
+   porque «Deducir del mapa» y «Traer colindantes» se encienden mirando el
+   **MODELO** y no el campo.
+
+Y de propina: un **GML ajeno con una tanda larga de notas** (el riesgo que el
+plan de F08 mandó expresamente aquí: *«hay que mirarlo con un fichero malo de
+verdad: va al guion 10»*) y un contador de **excepciones no capturadas** durante
+el recorrido, que es más de lo que hace `09`.
+
+### Cómo lee el encuadre un guion que no tiene el `L.Map`
+
+Merece una nota porque es la parte no obvia de la medida 7. `crearVisor` **no
+publica el mapa en ningún global** (a propósito: `app/main.js` razona que
+`mapa.getSize()` **ES** `#mapa.clientWidth/clientHeight` y que por eso no hace
+falta ningún `window.__gml`). Así que el encuadre se lee de donde **sí** es
+observable: **el `src` de la imagen del WMS del Catastro**, que lleva su `BBOX` en
+`EPSG:3857` y que `viewer/wms-catastro.js` reescribe **una vez por encuadre**
+(criterio 2 de F03). El `src` se fija al **pedir** la imagen, así que está
+disponible en cuanto hay `moveend`, sin esperar a que el servicio conteste. El
+guion lo convierte a `[lon, lat]` con la fórmula cerrada de Mercator y calcula la
+distancia con haversine. La segunda medida, la de píxeles, no necesita nada de
+eso: es la posición en pantalla de un vértice **que no se ha tocado**.
+
+### ⚠️ Este guion necesita `npm run dev`, NO `vite preview`
+
+Los ficheros de prueba se traen con `fetch` del propio servidor
+(`test/fixtures/gml/…`), y eso **solo funciona en dev**: `vite preview` sirve
+`dist/`, donde los fixtures no están. Se hace así a propósito, y no empotrando
+una copia del GML dentro del guion, porque **un fixture copiado es un fixture
+que diverge** y este proyecto ya pagó un rechazo del IVG por derivar del fichero
+equivocado (`spec/SPEC.md` §3.1). Si el `fetch` falla, el guion **para y lo
+dice**; no inventa un GML de repuesto.
+
+### Régimen de red — léete el §13 antes de lanzarlo
+
+Como `07` y `09`: una pasada, sin bucles, **como mucho dos peticiones de datos**
+(override O8).
+
+- «Contrastar con el parcelario» → **GetParcel** con la referencia leída **del
+  fichero**: 1 en frío, **0** si la caché de IndexedDB sigue dentro del TTL (y
+  entonces el veredicto lo dice en `advertencias`, porque esa pasada no mide ni
+  el servicio ni CORS).
+- Abrir el cajón de diagnóstico → **GetNeighbourParcel**: una pulsación, una
+  petición; 0 si ya las trajo otro gesto en esta página.
+- **El segundo fichero no gasta nada.** `cp_huso_incoherente.gml` declara
+  EPSG:25829 y el cableado se niega a pedir el parcelario en un huso distinto
+  del expediente (`motivoSrsAjeno`), que es justo lo que hay que ver. El guion
+  lo comprueba (`ficheroLargo.peticionesGastadas: 0`).
+- **El tercero tampoco.** `UTM_1.gml` **no trae referencia catastral** (el
+  elemento está y viene vacío), así que no hay parcelario que pedir y el cableado
+  lo dice sin salir a la red. El guion lo comprueba
+  (`reencuadre.otraParcela.peticionesGastadas: 0`), y de paso **es lo que hace
+  medible el reencuadre**: es el único fichero de la carpeta que trae una parcela
+  DISTINTA de la de arranque.
+- **Reabrir el cajón de diagnóstico no gasta nada**, y también se comprueba
+  (`colindantes.peticionesAlReabrir: 0`): las vecinas ya están adoptadas.
+
+### Cómo se lanza
+
+Página recién cargada, desde la raíz del repo:
+
+```bash
+$B viewport 1440x900
+$B goto http://localhost:PUERTO/concretagml/
+$B wait ".gml-tabla-vertices"
+$B console --clear
+$B network --clear
+$B eval scripts/smoke-navegador/10-comprobar-gml.js
+
+$B console --errors                              # → (no console errors)
+$B network | grep -E "wfsCP"                     # → ≤ 2 peticiones de datos
+$B screenshot .gstack/smoke-f08.png              # la evidencia para el §9
+```
+
+Para forzar la pasada **en frío** (la única que mide el servicio de verdad),
+borrar la base antes de recargar — el `deleteDatabase` queda BLOQUEADO mientras
+la app tiene la conexión abierta, así que el orden importa:
+
+```bash
+$B js "await new Promise(r=>{const p=indexedDB.deleteDatabase('concreta-gml');p.onsuccess=r;p.onerror=r;p.onblocked=r}); return 'pedido'"
+$B reload && $B wait ".gml-tabla-vertices"
+```
+
+⚠️ **Orden.** El guion deja **el cajón de comprobación abierto con el fichero
+del huso incoherente**, a propósito: la captura tiene que enseñar la tanda larga
+de notas sobre un GML ajeno, que es lo que el §9 del checklist manda leer en voz
+alta. Lo restaura el paso 17.4 y lo **declara** en `estadoFinal`. No lo encadenes
+antes de `02` (le contamina la cuenta de `GetMap`) ni de `06` (contrasta el
+`areaValue` contra el dataset de arranque, y este guion lo sustituye por la
+parcela del fichero). Para repetirlo:
+`$B reload && $B wait ".gml-tabla-vertices"`.
+
+> ⛔ **Lo que cambió el 2026-08-02**: ~~«y la parcela del primer fichero
+> cargada»~~. La parcela que queda en pantalla es la de **`UTM_1.gml`** —a 414 km
+> de la anterior— y con **un vértice movido**: es el precio de medir el
+> reencuadre y el arrastre, y se paga a sabiendas, porque el §9 del checklist mira
+> **el cajón**, no el dataset. El guion lo dice en
+> `estadoFinal.parcelaEnPantalla`.
+
+### Qué cuenta como «pasa»
+
+`ok: true` y `problemas: []` —✅ **se cumple desde la segunda corrida del
+2026-07-30**; ~~«hoy no se cumple, ver el aviso de arriba»~~— y además:
+
+- `arranque.altoCajaVerticesPx` ≥ 220 con los avisos vacíos (referencia medida:
+  **267 px**, los mismos que dejó F07: el botón del rótulo costó 0 px) y
+  `arranque.boton.enLaFilaDelRotulo: true`.
+- `arranque.input.seRenderiza: true` — el `<input type="file">` va con el patrón
+  «visually hidden», **nunca** `display:none` ni `hidden`: hay navegadores que se
+  niegan a abrir el selector de un input que no se renderiza.
+- `arrastre.sobrevueloCancelado: true` — es la línea más cara del módulo: sin ese
+  `preventDefault` el navegador abre el fichero en la pestaña y la aplicación
+  entera desaparece.
+- `arrastre.veloDurante`: `opacidad > 0`, `visibilidad: "visible"`,
+  `punteroAtraviesa: true` y `cubreLaVentana: true`; y `veloDespues` con la marca
+  del `<body>` retirada.
+- `cajon.dentroDelMapa: true`, `mapaIntacto: true` y el rótulo del fichero
+  **nombrando el fichero soltado**.
+- `solapes.*.areaPx2: 0` en los CINCO, y `atribucionVisible: true`.
+- `tipografia.todosConLaFamiliaDeLaApp: true` ← ~~hoy `false`~~ ✅ **`true`
+  desde la corrección del defecto 1**: los tres botones se pintan en
+  `"Geist Sans", system-ui, -apple-system, sans-serif`.
+- `contraste.cerroSolo: true`, `nombraElFichero`, `diceQueNoEsDelCatastro` y
+  `nombraElParcelario` los tres `true` (la procedencia es DOBLE: decir solo «Del
+  Catastro» convertiría el fichero de un tercero en un dato oficial, y ése es EL
+  error de producto de la fase), y `ctaDiagnosticoHabilitado: true` — F07 se
+  enciende **sola**, sin una línea de código nuevo.
+- `red.peticionesGetParcel` ≤ 1 y `red.peticionesGetNeighbour` ≤ 1.
+- `panel.soltarNoRoboAltura: true` y
+  `panel.contrastarNoRoboMasQueLaProcedencia: true`.
+- `informe`: `blobsCapturados: 1`, `bytes > 0`, `revocaLaQueCreo: true`,
+  `restaurado: true`, `titulaComoTocaLegalmente: true`,
+  `desmienteSerLaValidacionGrafica: true`,
+  `seLlamaValidacionGraficaEnElTitulo: false`,
+  `diceQueEsProvisionalYSinFirma: true`, `nombraElFicheroDeOrigen: true` y
+  `diagnosticoSigueAbierto: true` ← ~~hoy `false`~~ ✅ **`true` desde la
+  corrección del defecto 2**.
+- `ficheroLargo`: `diagnosticoSeCerroAlAbrirLaComprobacion: true`,
+  `dentroDelMapa: true`, `botonesAlcanzables: true`,
+  `contrastarSigueHabilitado: true` (fuera de huso es NOTA, no fallo) y
+  `peticionesGastadas: 0`.
+- `consola.excepcionesNoCapturadas: 0`.
+
+Y desde el **2026-08-02**, las tres medidas de la firma humana:
+
+- `campoRefcat.arranqueVacio: true` (el campo nace sin `value`: si no lo
+  estuviera, medir que la referencia «llega» no afirmaría nada),
+  `campoRefcat.conReferencia.canonica: true` con valor `"9398516VK3799G"`, y
+  `campoRefcat.sinReferencia.vacio: true` con `UTM_1.gml`.
+- `campoRefcat.*.coherente: true` en las DOS: con referencia, «Deducir del mapa»
+  **apagado** y «Traer colindantes» **encendido**; sin referencia, al revés. Los
+  botones miran el MODELO, así que una referencia huérfana en el campo los deja
+  contradiciéndolo — que es exactamente el defecto que se arregló.
+- `colindantes.contornos > 0` y **cuadrando con la ficha**,
+  `colindantes.enSuPane === colindantes.contornos`,
+  `colindantes.porDebajoDeLaParcela: true` (405 < 410),
+  `colindantes.emergente.traeReferencia: true` y
+  `colindantes.clicAlMapa.elClicLlegaAlMapa: true`.
+- `reencuadre.mismaParcela.desplazamientoKm: 0` (la misma parcela **no** mueve la
+  vista), `reencuadre.editar.elMapaSeQuedoQuieto: true` con
+  `laGeometriaCambio: true` (la mitad anti-vacuidad: sin edición efectiva, «no se
+  movió» no afirma nada) y `reencuadre.otraParcela` con `laVistaViajoKm` de
+  cientos de km, `marcadores.todos: true` y `contornosDeVecinasDespues: 0`.
+- `estadoFinal.restaurado: true` — el guion deja la pantalla como el §9 del
+  checklist la necesita, y lo dice en vez de darlo por hecho.
+
+`advertencias` **no** tumba nada: recoge lo que limita la medida (la caché ya
+caliente, un fixture que no se ha podido traer, un control que no está en el
+mapa, un arrastre sintético que no enganchó).
+
+### ✅ Los DOS defectos que este guion destapó (2026-07-30, primera corrida) — CORREGIDOS
+
+Los dos eran de PRODUCCIÓN, y **ninguno se tocó desde el guion**: el guion existe
+para encontrarlos, no para taparlos. Se corrigieron **en producción**, cada uno en
+el módulo que era su dueño, y cada uno con un **guardián nuevo en la suite
+verificado por reintroducción del defecto** (se vuelve a meter, el test se pone
+rojo con su mensaje, se quita). La descripción de abajo se conserva **en presente**
+tal como se midió el día del hallazgo; debajo de cada una va la corrección.
+
+> Esto es lo que este guion vale. Los dos defectos estaban **fuera del alcance de
+> jsdom por construcción**: el primero necesita una cascada de CSS resuelta con la
+> hoja cargada, y el segundo, un `click()` que burbujee por un árbol con
+> `display` calculado. La suite estaba verde con los dos vivos, y lo habría
+> seguido estando.
+
+**1 · Los tres botones de los dos cajones siguen en `system-ui`, y la regla que
+lo arreglaba es código muerto.** Medido:
+`getComputedStyle(boton).fontFamily === "system-ui, sans-serif"` en
+«Contrastar con el parcelario», «Descartar» y «Descargar informe de contraste»,
+frente al `"Geist Sans", system-ui, -apple-system, sans-serif` de `--font-sans`.
+La causa está medida y es de cascada: `estilos/app.css` (regla
+`.gml-app .gml-cajon-diagnostico button, .gml-app .gml-cajon-comprobacion button`)
+declara `font-family: var(--font-sans)`, pero los dos módulos fijan
+**`font: inherit` EN LÍNEA** sobre cada botón, y **el estilo en línea gana a la
+hoja**. Así que el botón hereda el `font: 13px/1.45 system-ui,sans-serif` que el
+propio módulo pone en el contenedor. El comentario de esa regla ya avisaba de
+que «el inline gana a esta regla» **para el estado apagado**, y no cayó en que
+la propia `font-family` también va en línea. Se corrige en
+`viewer/cajon-comprobacion.js` y `viewer/cajon-diagnostico.js` (quitando
+`font: 'inherit'` de los botones o dejando solo lo que no sea la familia), **no
+en la hoja**: mientras el inline esté, cualquier regla que se escriba allí es
+decorativa.
+
+> ✅ **CORREGIDO (2026-07-30).** Los tres botones de los DOS módulos ya **no
+> fijan la familia**: ponen `fontSize: 'inherit'`, `lineHeight: 'inherit'` y su
+> grosor, y **la familia la pone la hoja**. El reparto está escrito en los tres
+> ficheros: *el módulo pone lo que hace el botón legible sin ninguna hoja —tamaño,
+> grosor, espaciado—; la hoja pone la familia, que es lo único que el módulo no
+> puede saber.* La regla de `estilos/app.css` se **redujo a `font-family` sola**,
+> porque `font-size` y `font-weight` también eran código muerto (los pone el
+> inline) y declararlos era volver a escribir algo que no se aplica.
+> **Guardianes nuevos** en `test/viewer/cajon-comprobacion.dom.test.js` y
+> `test/viewer/cajon-diagnostico.dom.test.js`: ningún botón lleva `fontFamily` en
+> su atributo `style`, y sí conserva tamaño y relleno —la mitad anti-vacuidad,
+> para que el guardián no se pueda cumplir borrándolo todo—. Se mira la propiedad
+> suelta `style.fontFamily` y **no** el atajo `style.font`, y eso está medido:
+> jsdom **serializa** el atajo desde las propiedades sueltas, así que `style.font`
+> nunca sale `''` y el guardián sería vacuo.
+> **Medido en la segunda corrida:**
+> `tipografia.todosConLaFamiliaDeLaApp: true`, con
+> `"Geist Sans", system-ui, -apple-system, sans-serif` en los tres.
+> **La lección, que es la de `SPEC.md` §3.1 repetida en una hoja de estilos:** una
+> protección que no llega a ejecutarse no protege, y esta *parecía* escrita, puesta
+> y revisada. Su propio comentario ya avisaba de que «el inline gana a esta regla»
+> —para el estado apagado— y no cayó en que la familia iba por el mismo sitio.
+
+**2 · Pulsar «Descargar informe de contraste» CIERRA el cajón de diagnóstico, y
+el desenlace se escribe donde nadie lo lee.** Medido: `diagnosticoSigueAbierto:
+false` justo después del click, con el renglón
+`[data-estado="informe-contraste"]` diciendo «Descargado «contraste_….txt».» en
+un cajón que ya está en `display:none`. La cadena, entera y verificada:
+`gml/descargar.js` cuelga el `<a download>` del `<body>` (línea 713) y lo pulsa
+(línea 716); ese `click()` sintético **burbujea hasta `document`**; ahí está el
+guardián de clic-fuera de `viewer/cajon-diagnostico.js`, que hace
+`if (this._contenedor.contains(evento.target)) return` — y el `target` es el
+anchor, que cuelga del `<body>` y **no** del cajón. `disableClickPropagation` no
+ayuda: no detiene el `click`, y su propia cabecera lo dice.
+Consecuencia real, no cosmética: el usuario pulsa, el cajón desaparece y **la
+confirmación de que su fichero ha bajado —o el motivo de que no— no llega a
+leerse ni a anunciarse** (un `role="status"` en `display:none` sale del árbol de
+accesibilidad). Es la regla de oro 1 rota en el último gesto del recorrido de
+F08. Se corrige en `viewer/cajon-diagnostico.js` (el guardián tiene que ignorar
+un clic cuyo `target` no esté en el documento visible, o el anchor tiene que
+dejar de burbujear) o en `gml/descargar.js` (que el anchor no cuelgue del
+`<body>`); **no en el guion**.
+
+> ✅ **CORREGIDO (2026-07-30), y en `gml/descargar.js`, no en el cajón.** Un
+> oyente **en fase de captura sobre el propio anchor** que hace
+> `evento.stopPropagation()`. `stopPropagation` **no** impide la acción por
+> defecto, así que **la descarga se dispara igual**; y va en captura y sobre el
+> nodo para que ni un oyente puesto antes en el mismo elemento pueda reenviarlo.
+> **El razonamiento de por qué ahí y no en el cajón está escrito en el fichero**,
+> y es de fondo: *este clic no es un gesto del usuario, es fontanería de la
+> descarga.* Que un detalle de implementación de `descargarTexto` sea observable
+> por el resto de la aplicación **es el defecto**; parchear a cada oyente para que
+> aprenda a ignorarlo habría repartido el arreglo entre todos los que algún día
+> escuchen en `document` — y el siguiente no se acordaría.
+> **Guardián nuevo** en `test/gml/descargar.dom.test.js`, con su mitad
+> anti-vacuidad: un oyente en `document` **no** ve el clic del anchor de la
+> descarga, y **sí** ve el de un botón normal (sin esa segunda mitad, el guardián
+> pasaría también con un DOM en el que nadie oye nada).
+> **Medido en la segunda corrida:** `informe.diagnosticoSigueAbierto: true`, con
+> el renglón `[data-estado="informe-contraste"]` diciendo
+> «Descargado «contraste_9398516VK3799G_2026-07-30T11-09-02.txt».» **en un cajón
+> que sigue visible**, y los **12.869 B** bajando igual.
+
+### ✅ Los TRES defectos que encontró la FIRMA HUMANA (2026-07-31/08-01) — CORREGIDOS
+
+Este apartado es el argumento de que el gate humano existe. **Ninguno de los tres
+lo veía la suite. Ninguno lo veía este guion. Y dos de los tres ni siquiera son de
+F08: vienen de F03 y de F05**, y llevaban ahí desde entonces sin que nadie los
+notara, porque cada uno estaba justo en el punto ciego de su gate.
+
+**1 · El mapa no reencuadraba NUNCA.** ⟨heredado de F03 · encuadre⟩
+`encuadrar()` se llamaba una sola vez, al construir el visor, y el visor no
+exponía ninguna forma de repetirlo. Se traía una parcela de Sevilla por referencia
+catastral, o se soltaba un GML de Cádiz, y **el mapa seguía mirando la parcela de
+demostración**. Y de rebote: «traer geometría del Catastro» **parecía no tener
+feedback visual**, cuando el dibujo estaba hecho — a cientos de kilómetros de la
+vista.
+
+> ✅ **CORREGIDO en `viewer/index.js` (paso 7 del montaje).** Una suscripción al
+> store y una regla de una línea: **se reencuadra cuando entra una parcela con
+> OTRA identidad, y solo entonces**. La identidad es **`refcat ?? idLocal`**, la
+> misma clave y por el mismo motivo que `app/cableado-diagnostico.js` —`edit/`
+> reconstruye el POJO en cada operación (regla de oro 4), así que comparar
+> referencias de objeto diría «otra parcela» en CADA frame de un arrastre—. Se
+> expone además `visor.encuadrar()` para el gesto explícito. Una parcela **anónima**
+> (sin refcat ni idLocal) no mueve el mapa —«otra» y «esta, editada» son
+> indistinguibles— y **se avisa una vez**.
+> **Por qué la suite no podía verlo:** todas sus pruebas **traen su geometría a
+> mano y la app arranca ya encuadrada sobre ella**, así que la única pregunta que
+> importaba —«¿y cuando entra otra?»— no se hacía en ninguna parte.
+> **Medido el 2026-08-02:** con `UTM_1.gml` la vista viaja **414,74 km** y sus 11
+> vértices caben en el lienzo; con el fichero del WFS (la misma parcela) **0 km**;
+> y arrastrando un vértice, un vértice que no se ha tocado se queda en **el mismo
+> píxel** (`desplazamientoPx: 0`, `transform` del `map-pane` idéntico).
+
+**2 · Las colindantes no se dibujaban en ningún sitio.** ⟨deuda de F05⟩
+Se traían del Catastro, se publicaban por `alColindantes` y las consumían el
+**snap** de F06 y la **invasión** de F07 — pero no había ni una capa que las
+pintara. Pulsar «Traer colindantes» no daba **ningún** acuse de recibo visual: el
+usuario leía «4 parcelas colindantes» en la ficha y el mapa seguía exactamente
+igual. Que el dato se usara por dentro no lo arregla: **es la regla de oro 1 rota
+en el último tramo**, que es el peor sitio, porque el trabajo estaba hecho.
+
+> ✅ **CORREGIDO con `viewer/colindantes.js`** y `PANE.COLINDANTES` en zIndex
+> **405** — el único pane del visor **por debajo** de la geometría propia, y no por
+> gusto: **una vecina COMPARTE lindero con la propia**, y dibujada encima pondría
+> gris el lado compartido; el técnico creería estar mirando su lindero mientras
+> mira el de al lado. Contorno gris claro `#CBD5E1` de 1,5 px **sin relleno
+> visible** (`fillOpacity: 0`, que no pinta un píxel y sin embargo hace que el
+> interior entero responda al emergente), y la referencia catastral en un
+> emergente. Lo enchufa `app/main.js` como **tercer suscriptor** de
+> `alColindantes`, y se **limpian** en `viewer/index.js` con el **mismo cambio de
+> identidad** que dispara el reencuadre — unas vecinas junto a otra parcela son
+> una mentira sobre el mapa.
+> **Por qué la suite no podía verlo: nadie afirmaba que se dibujaran.** No es que
+> un test fallara: es que la afirmación no existía.
+> **El riesgo que esto abría, medido y despejado:** el emergente exige
+> `interactive: true`, y una capa interactiva puede **robarle el clic al mapa** —
+> que es «Deducir del mapa» de F05. No pasa: `L.Path` trae
+> `bubblingMouseEvents: true`, y aquí se comprueba **con la app viva y con el motor
+> de layout eligiendo el destinatario** (`elementFromPoint` devuelve el `<path>` de
+> la vecina): pinchando sobre una vecina a menos de 12 px de un lindero propio, el
+> mapa **selecciona ese lindero**; pinchando lejos, **deselecciona**. O sea que el
+> clic llega **con la coordenada del puntero**.
+> ⚠️ **Y una cosa que solo se ve con la app entera delante:** la deducción por
+> clic y unas colindantes dibujadas **no pueden coexistir en esta aplicación**. La
+> deducción se arma solo con una parcela **sin** referencia catastral
+> (`puedeDeducirDe`), y las vecinas se piden **por** referencia y se sueltan en
+> cuanto entra otra parcela. No es un defecto —es coherente: sin referencia no hay
+> a quién pedir vecinas— pero conviene saberlo antes de intentar medirlo a la vez.
+
+**3 · La referencia del GML no llegaba al campo del panel.** ⟨defecto propio de
+F08⟩ Y los botones derivados se quedaban encendidos contradiciéndolo.
+
+> ✅ **CORREGIDO en `app/cableado-comprobacion.js`**: se escribe la forma
+> **canónica** —la que ha entrado en el modelo, nunca la cadena cruda del fichero—
+> y **se VACÍA el campo** cuando el fichero no trae referencia utilizable. Esto
+> último es la **decisión contraria** a la de la vía del Catastro, y es deliberada:
+> allí `null` significa «el servicio no ha confirmado lo que TECLEASTE», y lo
+> tecleado es del usuario; **aquí manda el fichero**, que afirma que esta parcela no
+> tiene referencia. Dejar la anterior sería peor que el hueco: el campo hablaría de
+> una parcela que ya no está en pantalla, y **«Deducir del mapa» —que mira el
+> MODELO— se encendería al lado de una referencia perfectamente escrita**, que es
+> lo único que ese botón promete que no hace falta.
+> **Medido el 2026-08-02:** `"9398516VK3799G"` con el fichero del WFS (deducir
+> apagado, colindantes encendido) y `""` con `UTM_1.gml` (deducir encendido,
+> colindantes apagado). Coherente en los dos.
+
+> **La lección, y es de las que no se pueden automatizar:** este guion encontró dos
+> defectos que la suite no veía **porque jsdom no tiene cascada ni burbujeo real**.
+> La firma humana encontró otros tres que el guion no veía **porque nadie había
+> escrito la pregunta**. Un gate no encuentra lo que no se le ocurre preguntar, y
+> por eso el último es una persona mirando la pantalla.
+
+### Cifras de referencia (corrida de cierre, **2026-07-30**, `npm run dev`, puerto 5175, pasada en FRÍO)
+
+⛔ **Son las de la SEGUNDA corrida, la de después de las dos correcciones**:
+`ok: true`, `problemas: []` y `advertencias: []`. Sirven para detectar una
+desviación, no como valores canónicos. Viewport 1440×900, lienzo 1048×900,
+duración **1,18 s**, consola **limpia** (`$B console --errors` →
+*(no console errors)*, y `consola.excepcionesNoCapturadas: 0`), **2 peticiones de
+datos** (GetParcel 2.878 B en 71 ms + GetNeighbourParcel 11.969 B en 127 ms, las
+dos 200). Suite en ese commit: **3.845 pruebas en 89 ficheros**.
+
+| Medida | Valor |
+|---|---|
+| Caja de vértices al arrancar (avisos vacíos) | **267 px** — los mismos que dejó F07: «Abrir un GML…» costó **0 px** |
+| Caja al abrirse el cajón (mismo tick del `drop`) | **267 → 267 px** (el cajón flota y el panel no se entera) |
+| Caja tras «Contrastar» | 267 → **222 px**, y los **45 px** son exactamente lo que crece el renglón de procedencia al pasar de vacío a 3 líneas |
+| Alto de la fila del rótulo con el botón dentro | **16 px** |
+| Fichero soltado | `cp_parcela_9398516VK3799G.gml`, **2.878 bytes** |
+| Rótulo del cajón | «… · 2,8 kB · declara «ISO-8859-1», leído como «utf-8»» |
+| El cajón abierto | **420 × 468 px**, el **20,8 %** del lienzo, dentro del mapa, mapa intacto |
+| Solape con los 5 controles del mapa | **0 px²** en los cinco; atribución visible |
+| Superficie declarada / medida en el cajón | 1536 m² / 1535,87 m² · 15 vértices · EPSG:25830 |
+| Notas del fichero limpio (el del WFS) | **8** · 0 bloqueos |
+| Peticiones: GetParcel · GetNeighbourParcel | **1 · 1** (en caliente: 0 y 0, con su advertencia) |
+| Informe descargado | **12.869 B**, 275 líneas, `text/plain;charset=utf-8`, `contraste_9398516VK3799G_<marca>.txt` |
+| GML ajeno (`cp_huso_incoherente.gml`, 3.167 B) | **8 notas · 4 hallazgos · 0 bloqueos**, EPSG:25829, el recorrido CONTINÚA |
+| El cajón con ese fichero | mismos 420 × 468 px, hace scroll propio, los dos botones **alcanzables**, **0 peticiones** |
+| La tercera vía (los dos cajones apilados) | **946 px** de alto; el de comprobación sube a `y = −77` y **se sale del mapa por arriba**; solape entre ellos: 0 px² |
+| Tipografía de los 3 botones | ~~`system-ui, sans-serif` ← defecto 1~~ → ✅ **`"Geist Sans", system-ui, -apple-system, sans-serif`**, derivada de `--font-sans` |
+| Cajón de diagnóstico tras pulsar «Descargar informe» | ~~cerrado ← defecto 2~~ → ✅ **sigue abierto**, con el acuse de recibo legible |
+
+⚠️ La fila de la tercera vía es la única de esta tabla que **no** es un
+veredicto: está declarada y no resuelta (T4.1), y se publica para que el
+checklist §9.5 tenga la cifra delante. Que los 946 px no quepan en los 900 del
+lienzo es exactamente lo que el plan preveía al decir «legible, pero feo».
+
+**Lo que cambió entre las dos corridas, y lo que NO.** Solo las dos filas
+tachadas. Todas las demás medidas —los 267 px, el 20,8 % del lienzo, los 0 px² de
+solape en los cinco controles, los 12.869 B del informe, las 8 notas, los 946 px
+de la tercera vía— salieron **idénticas** en las dos pasadas, las dos en frío y
+con 2 peticiones. Eso es lo que permite afirmar que las correcciones arreglaron
+**lo que se dijo y nada más**: si hubieran movido algo por el camino, esta tabla
+lo diría.
+
+### Cifras de las TRES medidas nuevas (corrida del **2026-08-02**, `npm run dev`, puerto 5173, pasada en FRÍO)
+
+`ok: true`, `problemas: []`, `advertencias: []`. Duración **2,20 s** (eran 1,18 s:
+las tres medidas nuevas cuestan ~1 s, casi todo el arrastre y la espera del
+encuadre nuevo). Consola **limpia** (`$B console --errors` → *(no console
+errors)*, `consola.excepcionesNoCapturadas: 0`) y **2 peticiones de datos**
+(GetParcel 2.878 B en 44 ms + GetNeighbourParcel 11.969 B en 129 ms, las dos 200).
+Suite en ese commit: **3.925 pruebas en 90 ficheros**.
+
+⚠️ **Toda la tabla anterior salió IGUAL**: 267 px de caja de vértices, 267 → 267
+al abrirse el cajón, 222 tras contrastar con los mismos 45 px de procedencia, 420
+× 468 px de cajón (20,8 % del lienzo), 0 px² de solape en los cinco controles,
+12.869 B y 275 líneas de informe, 8 notas, 946 px de la tercera vía. **Los tres
+arreglos no movieron nada de lo que ya estaba medido**, y eso es la mitad del
+valor de tener la tabla.
+
+| Medida nueva | Valor |
+|---|---|
+| **Campo con el fichero del WFS** | `"9398516VK3799G"` — forma canónica, la misma que la ficha. «Deducir del mapa» **apagado**, «Traer colindantes» **encendido** |
+| **Campo con `UTM_1.gml`** (3.450 B, sin referencia) | `""` — **vaciado**. «Deducir del mapa» **encendido**, «Traer colindantes» **apagado**. Ficha: «Sin referencia» |
+| **Colindantes dibujadas** | **4** contornos, y la ficha dice **4**. Las 4 en el pane `colindantes` |
+| Pane de las colindantes · pane de la parcela oficial | **405** · **410** ⇒ por debajo, como manda el lindero compartido |
+| Estilo del contorno | `stroke #CBD5E1`, `stroke-width 1.5`, `fill-opacity 0`, `leaflet-interactive` |
+| Emergente de una vecina | **`9398501VK3799G`** (la referencia catastral, no un rótulo) |
+| El clic sobre una vecina | `elementFromPoint` → `gml-colindante leaflet-interactive`; a 3–9 px de un lindero **selecciona** ese lindero, a > 40 px **deselecciona** ⇒ **el clic llega al mapa con la coordenada del puntero** |
+| Reabrir el cajón de diagnóstico tras esos clics | **0 peticiones** |
+| **Reencuadre con la MISMA parcela** (fichero del WFS) | centro `−3,716547 / 40,465415` antes y después ⇒ **0,00 km** |
+| **Reencuadre al EDITAR** (arrastre sintético de 40 × −28 px) | vértice de referencia en `(528, 392)` antes y después ⇒ **0 px**; `transform` del `map-pane` y BBOX del WMS **idénticos**; y la geometría **sí** cambió (mitad anti-vacuidad) |
+| **Reencuadre con OTRA parcela** (`UTM_1.gml`) | `−3,716547 / 40,465415` → `−5,259671 / 36,935108` ⇒ **414,74 km**. Los **11 de 11** vértices dentro del lienzo. Vecinas: **4 → 0** |
+| Peticiones que gasta `UTM_1.gml` | **0** (sin referencia no hay parcelario que pedir) |
+| Estado en que queda la pantalla | cajón abierto con `cp_huso_incoherente.gml` (8 notas) sobre la parcela de `UTM_1.gml`, **con un vértice movido** — `estadoFinal.restaurado: true` |
+
+Evidencia: `.gstack/smoke-f08.png` (el estado final) y
+`.gstack/smoke-f08-colindantes.png` / `.gstack/smoke-f08-colindantes-alejado.png`
+—**la vía de F05, la que destapó el defecto**: «Traer del Catastro» +  «Traer
+colindantes» con la caché caliente (**0 peticiones**) dejan el renglón diciendo
+«El Catastro ha devuelto 4 colindantes…» **y cuatro contornos grises en el mapa**.
+Al encuadre de arranque solo se ven fragmentos (las vecinas son grandes y el lado
+que comparten con la propia queda debajo del amarillo, que es la decisión del
+pane); alejando dos niveles se leen enteras. Que eso **baste como acuse de
+recibo** es juicio, y es del checklist §7.7 — la mecánica ya está medida aquí.

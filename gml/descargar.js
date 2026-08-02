@@ -6,6 +6,32 @@
 // cuatro formas distintas de arruinar el trabajo de toda la feature. Esta
 // cabecera existe para que ninguna de las cuatro se «simplifique» más adelante.
 //
+// ── F08 · T1.3 · LA MECÁNICA SE COMPARTE, NO SE COPIA ────────────────────────
+// F08 baja un INFORME DE CONTRASTE EN TEXTO, no un GML. La mecánica —`Blob` →
+// `createObjectURL` → `<a download>` → `click()` → `revokeObjectURL`, con su
+// comprobación de capacidad y su limpieza innegociable— es exactamente la misma,
+// y las cuatro trampas de esta cabecera también lo son. Por eso vive ahora en
+// {@link descargarTexto}, que es el PRIMITIVO, y {@link descargarGml} pasa a ser
+// un LLAMANTE que solo aporta lo que sabe de su dominio: el tipo MIME
+// ({@link TIPO_MIME_GML}), el nombre saneado ({@link nombreFicheroGml}) y el
+// mensaje concreto de «el serializador no emitió nada».
+//
+// No se ha copiado, y el motivo no es estético: este repo ya arrastra la deuda
+// declarada de cuatro copias de `describir` repartidas por las capas (escrita en
+// `edit/_comun.js:42-46`). Una segunda familia de duplicados querría decir que la
+// próxima corrección de la fuga de memoria —o del `finally` anidado, o del caveat
+// de Safari de más abajo— habría que acordarse de hacerla dos veces, y la que se
+// olvide fallará en verde. La prueba de que la extracción fue una EXTRACCIÓN y no
+// un rediseño es que ni una línea de `test/gml/descargar.dom.test.js` sobre
+// `descargarGml` tuvo que cambiar.
+//
+// Un único desenlace observable cambió, y se anota aquí para que no se descubra
+// por sorpresa: cuando `documento` o `url` son inválidos A LA VEZ que `refcat` o
+// `fecha`, el `TypeError` que sale ahora es el del nombre y antes era el del
+// entorno. Los dos son contratos rotos por el programador, ninguna prueba los
+// pinta juntos, y el orden entre dos errores de programación no es una garantía
+// que merezca código para conservarse.
+//
 // ── 1 · CODIFICACIÓN: el fichero no puede mentir sobre sí mismo ──────────────
 // La spec de F04 lo pide con todas las letras: «Fichero UTF-8 (encoding
 // declarado == bytes reales)». El GML lleva escrito en su prólogo
@@ -111,6 +137,19 @@
 // mitad del proceso con un «url.createObjectURL is not a function» que no le
 // dice nada a nadie. Lo que NO hace es debilitarse para que el test pase.
 //
+// ── AUSENTE ≠ EQUIVOCADO: dónde está la línea entre el TypeError y el motivo ─
+// `documento: null`, `documento: 7`, `url: 'URL'` son CONTRATOS ROTOS por el
+// programador y LANZAN: te has equivocado de argumento, y aplanarlo a una
+// etiqueta de texto solo retrasaría el momento de enterarte. Que el global NO
+// EXISTA —`globalThis.document` en un proceso de Node, un `URL` que no está— es
+// una limitación del ENTORNO, exactamente igual que un `Blob` ausente, y se
+// degrada con `SIN_SOPORTE_NAVEGADOR` nombrando lo que falta. Es la misma línea
+// que este módulo ya trazaba para `url` (forma frente a capacidad), aplicada
+// ahora también a la ausencia: la FORMA la pone quien llama, la CAPACIDAD la
+// pone el entorno. Consecuencia práctica: `descargarTexto` se puede invocar
+// desde código que quizá corra sin DOM y responde con un motivo presentable en
+// vez de con una excepción que nadie esperaba.
+//
 // ── INYECCIÓN DE `documento` Y `url` ─────────────────────────────────────────
 // Ambos se pueden inyectar y ambos caen por defecto al global correspondiente,
 // así que en la app se llama sin ceremonia: `descargarGml(xml, {refcat, fecha})`.
@@ -148,6 +187,22 @@ export const EXTENSION_GML = '.gml'
  * @readonly
  */
 export const TIPO_MIME_GML = 'application/gml+xml;charset=utf-8'
+
+/**
+ * Tipo MIME del informe de contraste en texto plano de F08. Vive aquí, junto a
+ * {@link TIPO_MIME_GML}, porque el vocabulario de la ENTREGA es de este módulo.
+ *
+ * El `charset=utf-8` no es decorativo y por eso hay constante en vez de una
+ * cadena escrita en el llamante: un `text/plain` a secas deja al navegador
+ * ADIVINAR la codificación al abrir el fichero, y el informe lleva `ñ`, acentos
+ * y el símbolo `²` de las superficies. Adivinando mal, el técnico ve mojibake en
+ * un documento que va a leer un tercero. El Blob ya codifica en UTF-8 por
+ * especificación; esto lo DECLARA, que es la misma verdad dicha dos veces —igual
+ * que en el GML.
+ *
+ * @readonly
+ */
+export const TIPO_MIME_TEXTO = 'text/plain;charset=utf-8'
 
 // ── Repertorio de caracteres del nombre de fichero ───────────────────────────
 
@@ -510,8 +565,10 @@ function esObjetoUrl(u) {
 }
 
 /**
- * Resultado de {@link descargarGml}. POJO plano, mismas cuatro claves siempre
- * presentes: quien lo reciba puede leerlas sin comprobar antes si existen.
+ * Resultado de {@link descargarTexto} y de {@link descargarGml} — el mismo tipo
+ * para las dos, porque el desenlace de una entrega no depende de qué se entregue.
+ * POJO plano, mismas cuatro claves siempre presentes: quien lo reciba puede
+ * leerlas sin comprobar antes si existen.
  *
  * @typedef {Object} ResultadoDescarga
  * @property {boolean} descargado  `true` solo si el fichero llegó a entregarse.
@@ -524,85 +581,113 @@ function esObjetoUrl(u) {
  */
 
 /**
- * Entrega el GML como fichero descargado por el navegador.
+ * Entrega un TEXTO como fichero descargado por el navegador. Es el primitivo de
+ * la entrega: no sabe qué le están dando —un GML (F04), un informe de contraste
+ * (F08), lo que venga— y por eso no compone nombres, no elige tipos MIME y no
+ * rediagnostica nada. Pide las dos cosas que no puede saber (el nombre y el
+ * MIME) y hace la única cosa que sí es suya: convertir una cadena en un fichero
+ * sin perder un byte y sin dejar basura detrás.
  *
  * El recorrido completo, en orden, es: `Blob` con los bytes UTF-8 exactos →
  * `URL.createObjectURL` → anchor sintético con `download` → `click()` → retirada
  * del anchor → `URL.revokeObjectURL`. Los dos últimos pasos van en `finally`
  * anidados para que ocurran también si el `click()` lanza (ver la cabecera).
  *
- * @param {string|null} xml  El GML ya serializado, o `null` si el serializador no
- *   produjo nada por errores bloqueantes. La cadena VACÍA se trata igual que
- *   `null`: descargar un fichero de 0 bytes es peor que no descargar nada, porque
- *   aparenta que la operación salió bien.
- * @param {object} [opciones]
- * @param {string|null} [opciones.refcat=null]  Ver {@link nombreFicheroGml}.
- * @param {Date} opciones.fecha  Ver {@link nombreFicheroGml}. Obligatorio, y se
- *   valida SIEMPRE —incluso cuando `xml` es `null` y no va a bajar nada—, para
- *   que un cableado mal hecho no se descubra el día en que el serializador acierta.
+ * ── EL NOMBRE LLEGA HECHO, Y ESO ES UNA RESPONSABILIDAD DE QUIEN LLAMA ──
+ * Aquí NO se sanea: sanear el nombre COMPLETO se llevaría por delante el punto
+ * de la extensión, y esta función no puede saber qué parte del nombre es
+ * extensión y qué parte no. Quien construya el nombre tiene el precedente
+ * entero en {@link nombreFicheroGml}: lista blanca, nombres reservados de
+ * Windows y tope de longitud, con el porqué de cada cosa escrito al lado.
+ *
+ * @param {string|null} texto  El contenido ya compuesto, o `null` si quien lo
+ *   genera no produjo nada. La cadena VACÍA se trata igual que `null`: un fichero
+ *   de 0 bytes en la carpeta de descargas es peor que ninguno, porque aparenta
+ *   que la operación salió bien.
+ * @param {object} opciones
+ * @param {string} opciones.nombreFichero  Nombre con el que baja el fichero,
+ *   extensión incluida y YA SANEADO. Obligatorio.
+ * @param {string} opciones.mime  Tipo MIME del Blob, con su `charset`.
+ *   Obligatorio y sin valor por defecto: ver {@link TIPO_MIME_TEXTO}.
  * @param {Document} [opciones.documento=globalThis.document]  Documento donde se
  *   crea el anchor.
  * @param {typeof URL} [opciones.url=globalThis.URL]  Objeto con
  *   `createObjectURL`/`revokeObjectURL`.
  * @returns {ResultadoDescarga}
- * @throws {TypeError}  Si `xml` no es un string ni `null`, si `documento` no
- *   sirve como documento, si `url` no es un objeto, o si `refcat`/`fecha`
- *   incumplen el contrato de {@link nombreFicheroGml}.
- * @throws {RangeError}  Si `fecha` es una fecha inválida.
+ * @throws {TypeError}  Si `nombreFichero` o `mime` no son cadenas con contenido,
+ *   si `texto` no es un string ni `null`, si `documento` está PRESENTE y no sirve
+ *   como documento, o si `url` está PRESENTE y no es un objeto. Que falten del
+ *   entorno no lanza: degrada con motivo (ver la cabecera, «ausente ≠ equivocado»).
  * @throws {*}  Lo que lance `click()`, DESPUÉS de haber revocado la URL y
  *   retirado el anchor. Ver la cabecera: no se convierte en un `motivo`.
  */
-export function descargarGml(xml, opciones = {}) {
+export function descargarTexto(texto, opciones = {}) {
   const {
-    refcat = null,
-    fecha,
+    nombreFichero,
+    mime,
     documento = globalThis.document,
     url = globalThis.URL,
   } = opciones ?? {}
 
-  if (xml !== null && typeof xml !== 'string') {
+  if (typeof nombreFichero !== 'string' || nombreFichero.trim().length === 0) {
     throw new TypeError(
-      `descargarGml: 'xml' debe ser un string o null; recibido ${JSON.stringify(xml)}. ` +
-        'null significa «el serializador no produjo GML»; undefined significa que ' +
+      `descargarTexto: 'nombreFichero' debe ser un nombre de fichero no vacío; ` +
+        `recibido ${describir(nombreFichero)}. El nombre lo pone quien llama, ya ` +
+        'saneado y con su extensión: este primitivo no lo inventa (ver nombreFicheroGml).',
+    )
+  }
+  if (typeof mime !== 'string' || mime.trim().length === 0) {
+    throw new TypeError(
+      `descargarTexto: 'mime' debe ser un tipo MIME no vacío; recibido ${describir(mime)}. ` +
+        'No hay valor por defecto a propósito: un MIME supuesto es un fichero que se ' +
+        'abre con el programa equivocado o con la codificación adivinada.',
+    )
+  }
+  if (texto !== null && typeof texto !== 'string') {
+    throw new TypeError(
+      `descargarTexto: 'texto' debe ser un string o null; recibido ${describir(texto)}. ` +
+        'null significa «quien lo genera no produjo nada»; undefined significa que ' +
         'alguien se ha dejado el argumento, y eso no es lo mismo.',
     )
   }
-  if (!esDocumentoUtil(documento)) {
+  // `!== undefined`: ausente es el entorno hablando y se degrada más abajo;
+  // presente-y-raro es el programador equivocándose y lanza aquí.
+  if (documento !== undefined && !esDocumentoUtil(documento)) {
     throw new TypeError(
-      `descargarGml: 'documento' debe ser un documento del DOM con 'createElement' y ` +
+      `descargarTexto: 'documento' debe ser un documento del DOM con 'createElement' y ` +
         `'body'; recibido ${describir(documento)}. Sin DOM no hay descarga: ` +
         'esta función es del navegador.',
     )
   }
-  if (!esObjetoUrl(url)) {
+  if (url !== undefined && !esObjetoUrl(url)) {
     throw new TypeError(
-      `descargarGml: 'url' debe ser un objeto con 'createObjectURL' y ` +
+      `descargarTexto: 'url' debe ser un objeto con 'createObjectURL' y ` +
         `'revokeObjectURL'; recibido ${describir(url)}.`,
     )
   }
 
-  // Se calcula ANTES de mirar `xml`: el contrato de `refcat`/`fecha` se cumple o
-  // no se cumple, y no depende de que haya algo que descargar.
-  const nombre = nombreFicheroGml({ refcat, fecha })
-
-  if (xml === null || xml.length === 0) {
+  if (texto === null || texto.length === 0) {
     return {
       descargado: false,
       nombre: null,
       motivo: MOTIVO_NO_DESCARGADO.SIN_CONTENIDO,
       mensaje:
-        'No se ha descargado ningún fichero porque no se ha generado GML. ' +
-        'Revisa los errores del expediente: mientras haya alguno bloqueante, el ' +
-        'serializador no emite nada, y un GML vacío sería peor que ninguno.',
+        'No se ha descargado ningún fichero porque no había contenido que entregar. ' +
+        'Un fichero de 0 bytes en la carpeta de descargas es peor que ninguno: ' +
+        'aparenta que la operación salió bien.',
     }
   }
 
   const ConstructorBlob = globalThis.Blob
-  const faltan = [
-    typeof ConstructorBlob === 'function' ? null : 'Blob',
-    typeof url.createObjectURL === 'function' ? null : 'URL.createObjectURL',
-    typeof url.revokeObjectURL === 'function' ? null : 'URL.revokeObjectURL',
-  ].filter((x) => x !== null)
+  const faltan = []
+  if (documento === undefined) faltan.push('document')
+  if (typeof ConstructorBlob !== 'function') faltan.push('Blob')
+  if (url === undefined) {
+    faltan.push('URL')
+  } else {
+    if (typeof url.createObjectURL !== 'function') faltan.push('URL.createObjectURL')
+    if (typeof url.revokeObjectURL !== 'function') faltan.push('URL.revokeObjectURL')
+  }
   if (faltan.length > 0) {
     return {
       descargado: false,
@@ -610,21 +695,43 @@ export function descargarGml(xml, opciones = {}) {
       motivo: MOTIVO_NO_DESCARGADO.SIN_SOPORTE_NAVEGADOR,
       mensaje:
         `No se ha descargado ningún fichero: este entorno no implementa ${faltan.join(', ')}. ` +
-        'El GML se ha generado correctamente, pero no hay forma de entregarlo desde aquí.',
+        'El contenido se ha generado correctamente, pero no hay forma de entregarlo desde aquí.',
     }
   }
 
   // Los bytes. `Blob` codifica en UTF-8 por especificación cuando la entrada es
   // un string: no hay conversión manual que pueda estropearlo, y tampoco BOM.
-  const blob = new ConstructorBlob([xml], { type: TIPO_MIME_GML })
+  const blob = new ConstructorBlob([texto], { type: mime })
 
   const href = url.createObjectURL(blob)
   const anchor = documento.createElement('a')
   anchor.href = href
-  anchor.download = nombre
+  anchor.download = nombreFichero
   // Sin texto dentro no ocuparía nada igualmente, pero `hidden` lo deja fuera del
   // flujo sin depender de qué layout tenga el `body` de turno.
   anchor.hidden = true
+  // ⚠️ EL CLIC DE ESTE ENLACE NO PUEDE SALIR DE AQUÍ (2026-07-30).
+  //
+  // `anchor.click()` despacha un evento que BURBUJEA hasta `document`, y ahí lo
+  // recoge cualquiera que esté escuchando. Medido en navegador real por el guion
+  // `10-comprobar-gml.js`: al pulsar «Descargar informe de contraste», el
+  // guardián de clic-fuera de `viewer/cajon-diagnostico.js` veía este clic, hacía
+  // `contains(evento.target)` sobre un `<a>` que cuelga del `<body>` —así que no
+  // está en el cajón— y CERRABA el cajón. El informe bajaba bien, pero el acuse
+  // de recibo se escribía en un `role="status"` que acababa de quedar en
+  // `display:none`: invisible y además fuera del árbol de accesibilidad. La regla
+  // de oro 1 rota justo en el último gesto del recorrido de F08.
+  //
+  // La corrección va AQUÍ y no en el cajón, y el motivo es de fondo: este clic no
+  // es un gesto del usuario, es **fontanería de la descarga**. Que un detalle de
+  // implementación de este módulo sea observable por el resto de la aplicación es
+  // el defecto; parchear a cada oyente para que aprenda a ignorarlo sería repartir
+  // el arreglo entre todos los que algún día escuchen en `document`.
+  //
+  // `stopPropagation` **no** impide la acción por defecto: la descarga se dispara
+  // igual. Y va en fase de captura sobre el propio nodo para que ni un oyente
+  // puesto antes en el mismo elemento pueda reenviarlo.
+  anchor.addEventListener('click', (evento) => evento.stopPropagation(), { capture: true })
   documento.body.appendChild(anchor)
 
   try {
@@ -642,5 +749,78 @@ export function descargarGml(xml, opciones = {}) {
     }
   }
 
-  return { descargado: true, nombre, motivo: null, mensaje: null }
+  return { descargado: true, nombre: nombreFichero, motivo: null, mensaje: null }
+}
+
+/**
+ * Entrega el GML como fichero descargado por el navegador.
+ *
+ * Es un LLAMANTE de {@link descargarTexto}: aporta las tres cosas que sabe de su
+ * dominio —el nombre saneado ({@link nombreFicheroGml}), el tipo MIME
+ * ({@link TIPO_MIME_GML}) y el mensaje concreto de cuando el serializador no
+ * emitió nada— y delega toda la mecánica del navegador. Ver la cabecera del
+ * módulo: la mecánica se comparte, no se copia.
+ *
+ * @param {string|null} xml  El GML ya serializado, o `null` si el serializador no
+ *   produjo nada por errores bloqueantes. La cadena VACÍA se trata igual que
+ *   `null`: descargar un fichero de 0 bytes es peor que no descargar nada, porque
+ *   aparenta que la operación salió bien.
+ * @param {object} [opciones]
+ * @param {string|null} [opciones.refcat=null]  Ver {@link nombreFicheroGml}.
+ * @param {Date} opciones.fecha  Ver {@link nombreFicheroGml}. Obligatorio, y se
+ *   valida SIEMPRE —incluso cuando `xml` es `null` y no va a bajar nada—, para
+ *   que un cableado mal hecho no se descubra el día en que el serializador acierta.
+ * @param {Document} [opciones.documento=globalThis.document]  Documento donde se
+ *   crea el anchor. El valor por defecto lo aplica {@link descargarTexto}, que es
+ *   quien lo usa: un solo sitio donde caer al global.
+ * @param {typeof URL} [opciones.url=globalThis.URL]  Objeto con
+ *   `createObjectURL`/`revokeObjectURL`. Ídem.
+ * @returns {ResultadoDescarga}
+ * @throws {TypeError}  Si `xml` no es un string ni `null`, si `refcat`/`fecha`
+ *   incumplen el contrato de {@link nombreFicheroGml}, o si `documento`/`url`
+ *   incumplen el de {@link descargarTexto}.
+ * @throws {RangeError}  Si `fecha` es una fecha inválida.
+ * @throws {*}  Lo que lance `click()`, DESPUÉS de haber revocado la URL y
+ *   retirado el anchor. Ver la cabecera: no se convierte en un `motivo`.
+ */
+export function descargarGml(xml, opciones = {}) {
+  // `documento` y `url` se reenvían SIN resolver el global: el defecto vive en
+  // `descargarTexto` y tenerlo en dos sitios sería la primera grieta por la que
+  // se cuela un duplicado.
+  const { refcat = null, fecha, documento, url } = opciones ?? {}
+
+  if (xml !== null && typeof xml !== 'string') {
+    throw new TypeError(
+      `descargarGml: 'xml' debe ser un string o null; recibido ${JSON.stringify(xml)}. ` +
+        'null significa «el serializador no produjo GML»; undefined significa que ' +
+        'alguien se ha dejado el argumento, y eso no es lo mismo.',
+    )
+  }
+
+  // Se calcula ANTES de mirar `xml`: el contrato de `refcat`/`fecha` se cumple o
+  // no se cumple, y no depende de que haya algo que descargar.
+  const nombre = nombreFicheroGml({ refcat, fecha })
+
+  // Este caso NO se delega, y no es un descuido: `descargarTexto` también se
+  // niega a bajar 0 bytes, pero con un mensaje genérico. El de aquí nombra la
+  // causa REAL y le dice al usuario qué mirar —los errores del expediente—, que
+  // es la única forma de que la regla de oro 1 sirva para algo.
+  if (xml === null || xml.length === 0) {
+    return {
+      descargado: false,
+      nombre: null,
+      motivo: MOTIVO_NO_DESCARGADO.SIN_CONTENIDO,
+      mensaje:
+        'No se ha descargado ningún fichero porque no se ha generado GML. ' +
+        'Revisa los errores del expediente: mientras haya alguno bloqueante, el ' +
+        'serializador no emite nada, y un GML vacío sería peor que ninguno.',
+    }
+  }
+
+  return descargarTexto(xml, {
+    nombreFichero: nombre,
+    mime: TIPO_MIME_GML,
+    documento,
+    url,
+  })
 }

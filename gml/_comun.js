@@ -642,6 +642,13 @@ export const SEVERIDAD = Object.freeze({
  * @readonly
  */
 export const TIPO_GML = Object.freeze({
+  // ── Bytes: con qué se decodificó el fichero (gml/decodificar.js, F08) ──
+  // Van los primeros porque ocurren los primeros: cuando `parse.js` empieza a
+  // trabajar, el texto que recibe YA es el resultado de estas tres decisiones.
+  // `ENCODING_DECLARADO` —el de abajo, que ya existía— lo emiten los dos.
+  BOM_PRESENTE: 'BOM_PRESENTE', // marca de orden de bytes: manda, se consume y no queda en el texto
+  ENCODING_DESMENTIDO: 'ENCODING_DESMENTIDO', // el prólogo declara uno y los bytes son otro (mandan los bytes)
+  ENCODING_SUPUESTO: 'ENCODING_SUPUESTO', // ni BOM ni prólogo utilizable: se decodificó con el de reserva
   // ── Lectura: qué es este fichero (gml/parse.js) ──
   XML_MAL_FORMADO: 'XML_MAL_FORMADO', // ni siquiera es XML: el parser se plantó
   ENCODING_DECLARADO: 'ENCODING_DECLARADO', // el `encoding=` del prólogo y con qué se decodificó

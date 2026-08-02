@@ -25,7 +25,12 @@ import L from 'leaflet'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ETIQUETA } from '../../diagnostico/margen.js'
-import { CLASE, SELECTOR, crearCajonDiagnostico } from '../../viewer/cajon-diagnostico.js'
+import {
+  CLASE,
+  MOTIVO_INFORME_SIN_DIAGNOSTICO,
+  SELECTOR,
+  crearCajonDiagnostico,
+} from '../../viewer/cajon-diagnostico.js'
 import { montarMapa } from './_ayuda-jsdom.js'
 
 /**
@@ -761,5 +766,265 @@ describe('viewer/cajon-diagnostico.js · `pintar(null)` y desmontaje', () => {
   it('es un `L.Control` de verdad, no un div suelto sobre el mapa', () => {
     const { cajon } = conCajon()
     expect(cajon.control).toBeInstanceOf(L.Control)
+  })
+})
+
+/* ────────────────────────────────────────────────────────────────────────── *
+ * F08 · T4.2 · EL PIE DEL INFORME                                            *
+ *                                                                            *
+ * El botón «Descargar informe de contraste» vive DENTRO del cajón y no en el *
+ * pie de la app — las tres razones están escritas en la cabecera del módulo. *
+ * Lo que este bloque vigila es lo que puede fallar en silencio:              *
+ *                                                                            *
+ *   · Que NUNCA esté gris y mudo (regla de oro 1).                           *
+ *   · Que su `data-estado` no pueda colisionar con nada (lección M8 de F07). *
+ *   · Que el cajón AVISE y no descargue: componer y entregar son del cable.  *
+ * ────────────────────────────────────────────────────────────────────────── */
+
+describe('viewer/cajon-diagnostico.js · el pie del informe (F08)', () => {
+  it('el botón NACE apagado Y con el motivo escrito: nunca gris y mudo', () => {
+    // Un botón apagado sin su porqué a la vista no se distingue de uno roto. El
+    // motivo se escribe al NACER, no al primer repintado: el cajón se puede abrir
+    // sin que nadie haya llamado a `pintar`, y ese es justo el instante en que el
+    // botón está gris.
+    const { raiz } = conCajon()
+    const boton = nodo(raiz, SELECTOR.DESCARGAR)
+    expect(boton).not.toBeNull()
+    expect(boton.tagName).toBe('BUTTON')
+    expect(boton.type).toBe('button')
+    expect(boton.disabled).toBe(true)
+    expect(nodo(raiz, SELECTOR.ESTADO_INFORME).textContent).toBe(MOTIVO_INFORME_SIN_DIAGNOSTICO)
+  })
+
+  it('el renglón del informe es `role="status"` y está ENLAZADO al botón', () => {
+    // `aria-describedby`: quien oiga el botón oye también por qué está apagado, sin
+    // tener que ir a buscarlo. Y `role="status"` lo anuncia sin robar el foco.
+    const { raiz } = conCajon()
+    const boton = nodo(raiz, SELECTOR.DESCARGAR)
+    const renglon = nodo(raiz, SELECTOR.ESTADO_INFORME)
+    expect(renglon.getAttribute('role')).toBe('status')
+    expect(renglon.id).not.toBe('')
+    expect(boton.getAttribute('aria-describedby')).toBe(renglon.id)
+  })
+
+  it('⚠️ M8 · el `data-estado` del informe NO colisiona con ningún otro del cajón', () => {
+    // La lección M8 de F07, aplicada por segunda vez: `[data-estado="diagnostico"]`
+    // iba a chocar con el `[data-estado="diagnosticar"]` del pie de la app, y
+    // `querySelector` se queda con el PRIMERO del documento — el renglón habría
+    // quedado mudo y SIN SÍNTOMA. Por eso el del informe se llama por el COMPONENTE
+    // (`informe-contraste`) y no por la acción (`descargar-informe`).
+    const { raiz } = conCajon()
+    const valores = [...raiz.querySelectorAll('[data-estado]')].map((el) => el.dataset.estado)
+    // Exactamente dos renglones, y los dos con nombre propio.
+    expect(valores.sort()).toEqual(['cajon-diagnostico', 'informe-contraste'])
+    expect(new Set(valores).size).toBe(valores.length)
+    // Y el valor del estado NO es el de ninguna acción del cajón: son dos espacios
+    // de nombres distintos y cruzarlos es exactamente lo que costó M8.
+    const acciones = [...raiz.querySelectorAll('[data-accion]')].map((el) => el.dataset.accion)
+    expect(acciones.sort()).toEqual(['cerrar-diagnostico', 'descargar-informe'])
+    for (const valor of valores) expect(acciones).not.toContain(valor)
+  })
+
+  it('los selectores exportados apuntan a UN nodo cada uno', () => {
+    const { raiz } = conCajon()
+    expect(raiz.querySelectorAll(SELECTOR.DESCARGAR)).toHaveLength(1)
+    expect(raiz.querySelectorAll(SELECTOR.ESTADO_INFORME)).toHaveLength(1)
+  })
+
+  it('`pintar(d)` lo ENCIENDE y borra el motivo', () => {
+    const { cajon, raiz } = conCajon()
+    cajon.pintar(COMPLETO())
+    expect(nodo(raiz, SELECTOR.DESCARGAR).disabled).toBe(false)
+    expect(nodo(raiz, SELECTOR.ESTADO_INFORME).textContent).toBe('')
+  })
+
+  it('se enciende también con el diagnóstico a medias: hay cifras que llevarse', () => {
+    // Sin geometría oficial faltan cuatro secciones, pero la medición, el perímetro
+    // y la relación de vértices están: negarle el informe a quien llegó con un DXF
+    // sería apagar el botón por un motivo que no es el suyo.
+    const { cajon, raiz } = conCajon()
+    cajon.pintar(SIN_OFICIAL())
+    expect(nodo(raiz, SELECTOR.DESCARGAR).disabled).toBe(false)
+  })
+
+  it('`pintar(null)` lo vuelve a APAGAR y reescribe el motivo', () => {
+    const { cajon, raiz } = conCajon()
+    cajon.pintar(COMPLETO())
+    cajon.estadoInforme('Descargado «contraste_X_2026-07-30T10-00-00.txt».')
+
+    cajon.pintar(null)
+
+    expect(nodo(raiz, SELECTOR.DESCARGAR).disabled).toBe(true)
+    // Al apagar SÍ se pisa el desenlace anterior: habla de un diagnóstico que ya no
+    // está, y dejarlo junto a un botón gris haría creer que basta con volver a
+    // pulsarlo.
+    expect(nodo(raiz, SELECTOR.ESTADO_INFORME).textContent).toBe(MOTIVO_INFORME_SIN_DIAGNOSTICO)
+  })
+
+  it('repintar NO pisa el desenlace que escribió el cableado (solo borra el motivo)', () => {
+    // `pintar` corre en CADA operación acabada —cada vértice que F06 mueva con el
+    // cajón abierto—. Vaciar el renglón sin condición se llevaría por delante el
+    // «Descargado «…».» un instante después de haberlo puesto. Es la misma regla que
+    // `app/cableado-diagnostico.js#refrescarBoton` defiende para el renglón del CTA.
+    const { cajon, raiz } = conCajon()
+    cajon.pintar(COMPLETO())
+    cajon.estadoInforme('Descargado «contraste_X_2026-07-30T10-00-00.txt».')
+
+    cajon.pintar(COMPLETO())
+
+    expect(nodo(raiz, SELECTOR.ESTADO_INFORME).textContent).toBe(
+      'Descargado «contraste_X_2026-07-30T10-00-00.txt».',
+    )
+  })
+
+  it('`alDescargar` avisa al pulsar, admite VARIOS oyentes y devuelve la BAJA', () => {
+    const { cajon, raiz } = conCajon()
+    const a = vi.fn()
+    const b = vi.fn()
+    const baja = cajon.alDescargar(a)
+    cajon.alDescargar(b)
+    cajon.pintar(COMPLETO())
+
+    nodo(raiz, SELECTOR.DESCARGAR).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(a).toHaveBeenCalledTimes(1)
+    expect(b).toHaveBeenCalledTimes(1)
+
+    baja()
+    nodo(raiz, SELECTOR.DESCARGAR).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(a).toHaveBeenCalledTimes(1)
+    expect(b).toHaveBeenCalledTimes(2)
+  })
+
+  it('`alDescargar` LANZA si no recibe una función', () => {
+    const { cajon } = conCajon()
+    expect(() => cajon.alDescargar('no')).toThrow(TypeError)
+  })
+
+  it('el cajón NO descarga nada: solo avisa', () => {
+    // Es una VISTA. Componer el texto es de `report/contraste-texto.js` y entregarlo
+    // de `gml/descargar.js#descargarTexto`; a los dos los llama el cableado. Si el
+    // cajón supiera de Blobs, el visor dejaría de ser consumible como librería.
+    const { cajon, raiz } = conCajon()
+    const crear = vi.spyOn(URL, 'createObjectURL')
+    cajon.pintar(COMPLETO())
+    nodo(raiz, SELECTOR.DESCARGAR).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(crear).not.toHaveBeenCalled()
+    crear.mockRestore()
+  })
+
+  it('pulsar el botón NO cierra el cajón', () => {
+    // `disableClickPropagation` no detiene el `click`, así que el clic llega al
+    // `document`; lo que lo salva es la comprobación `contains` del guardián. Y a
+    // propósito NO se para la propagación: eso dejaría sordo al panel de ayuda de la
+    // barra de edición, que también escucha en el documento.
+    const { cajon, raiz } = conCajon()
+    cajon.pintar(COMPLETO())
+    cajon.abrir()
+
+    const evento = new MouseEvent('click', { bubbles: true, cancelable: true })
+    const stop = vi.spyOn(evento, 'stopPropagation')
+    nodo(raiz, SELECTOR.DESCARGAR).dispatchEvent(evento)
+
+    expect(cajon.abierto()).toBe(true)
+    expect(stop).not.toHaveBeenCalled()
+    expect(evento.defaultPrevented).toBe(false)
+  })
+
+  it('`estadoInforme` y el renglón de arriba son DOS nodos distintos', () => {
+    // Aquel cuenta lo que le pasa a lo que se está enseñando (las vecinas que no
+    // llegaron); este, el desenlace de pulsar el botón. Escribir en uno no puede
+    // borrar el otro.
+    const { cajon, raiz } = conCajon()
+    cajon.estado('Invasión a colindantes: no se ha podido consultar.')
+    cajon.estadoInforme('Descargado «contraste_X.txt».')
+
+    expect(nodo(raiz, SELECTOR.ESTADO).textContent).toBe(
+      'Invasión a colindantes: no se ha podido consultar.',
+    )
+    expect(nodo(raiz, SELECTOR.ESTADO_INFORME).textContent).toBe('Descargado «contraste_X.txt».')
+    expect(nodo(raiz, SELECTOR.ESTADO)).not.toBe(nodo(raiz, SELECTOR.ESTADO_INFORME))
+  })
+
+  it('el botón NO es un `input` ni un `select`: el cajón sigue con DOS mandos', () => {
+    // El test de aceptación de F07 afirma que los únicos controles del cajón son los
+    // dos datos del expediente («ni umbral configurable, ni siquiera uno que elija el
+    // usuario»). Un tercer control numérico sería el umbral entrando por la puerta de
+    // atrás; un `<button>` de descarga no lo es, y esto lo deja escrito.
+    const { raiz } = conCajon()
+    const controles = [...raiz.querySelectorAll('input, select')]
+    expect(controles.map((el) => el.dataset.campo).sort()).toEqual([
+      'clase-parcela',
+      'superficie-registral',
+    ])
+  })
+
+  it('ni el botón ni su motivo llevan palabra ni color de MÉRITO (regla de oro 9)', () => {
+    const VEREDICTOS =
+      /\b(apta|apto|válida|valida|válido|correcta|correcto|conforme|aprobad|suspend|admisible|aceptable|dentro de tolerancia|fuera de tolerancia|no válid)/i
+    const { raiz } = conCajon()
+    const boton = nodo(raiz, SELECTOR.DESCARGAR)
+    expect(boton.textContent).toBe('Descargar informe de contraste')
+    expect(boton.textContent).not.toMatch(VEREDICTOS)
+    expect(MOTIVO_INFORME_SIN_DIAGNOSTICO).not.toMatch(VEREDICTOS)
+    // El apagado va en el GRIS del cromo, nunca en rojo: lo que se comunica es «no
+    // se puede pulsar ahora», no «esto está mal».
+    const PROHIBIDOS = /#(16a34a|22c55e|dc2626|ef4444|15803d|b91c1c)/i
+    expect(boton.getAttribute('style') || '').not.toMatch(PROHIBIDOS)
+    expect(boton.style.background).not.toBe('')
+  })
+
+  it('`destruir()` desengancha el botón y deja `estadoInforme` inerte', () => {
+    const { cajon, raiz } = conCajon()
+    const fn = vi.fn()
+    cajon.alDescargar(fn)
+    cajon.pintar(COMPLETO())
+    const boton = nodo(raiz, SELECTOR.DESCARGAR)
+
+    cajon.destruir()
+
+    // El nodo sigue existiendo (el control ya no está en el mapa, pero el elemento
+    // es el mismo objeto) y pulsarlo no llama a nadie ni revienta.
+    expect(() =>
+      boton.dispatchEvent(new MouseEvent('click', { bubbles: true })),
+    ).not.toThrow()
+    expect(fn).not.toHaveBeenCalled()
+    expect(() => cajon.estadoInforme('x')).not.toThrow()
+    expect(() => cajon.destruir()).not.toThrow()
+  })
+})
+
+// ── La familia tipográfica la pone la HOJA, no el módulo ─────────────────────
+//
+// Gemelo del guardián de `test/viewer/cajon-comprobacion.dom.test.js`, y existe
+// por el mismo defecto REAL medido en navegador el 2026-07-30 por
+// `scripts/smoke-navegador/10-comprobar-gml.js`: «Descargar informe de contraste»
+// salía en `system-ui` porque llevaba `font: 'inherit'` EN LÍNEA, y el inline gana
+// a la hoja — la regla `.gml-cajon-diagnostico button` de `estilos/app.css` era
+// código muerto. Los dos cajones se arreglaron juntos porque sus cabeceras dicen
+// que tienen que leerse como el mismo cromo; se vigilan juntos por lo mismo.
+
+describe('viewer/cajon-diagnostico · el botón del informe no fija la tipografía en línea', () => {
+  it('«Descargar informe de contraste» no lleva font-family en su atributo style', () => {
+    const { mapa, destruir } = montarMapa({ centro: [36.7, -4.5], zoom: 19 })
+    const cajon = crearCajonDiagnostico({ mapa })
+    try {
+      const raiz = mapa.getContainer().querySelector('.gml-cajon-diagnostico')
+      const boton = raiz.querySelector('[data-accion="descargar-informe"]')
+      expect(boton, 'el pie del cajón tiene que traer el botón del informe').toBeTruthy()
+
+      // Ver el porqué de mirar `fontFamily` y no el atajo `font` en el guardián
+      // gemelo: jsdom serializa el atajo desde las propiedades sueltas.
+      expect(
+        boton.style.fontFamily,
+        'el botón fija la familia en línea: la regla de estilos/app.css queda muerta',
+      ).toBe('')
+      // Lo que el módulo SÍ tiene que seguir poniendo, para que sea legible sin
+      // hoja. Sin esto, el guardián se cumpliría borrándolo todo.
+      expect(boton.style.fontSize, 'el botón ha perdido el tamaño en línea').toBe('inherit')
+      expect(boton.style.fontWeight, 'el botón ha perdido el grosor en línea').toBe('600')
+    } finally {
+      cajon.destruir()
+      destruir()
+    }
   })
 })

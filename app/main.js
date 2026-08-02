@@ -32,7 +32,11 @@
 //                   capas + tabla de vértices, la EDICIÓN de F06 (`edicion:` y su
 //                   capa de acotaciones), el DIAGNÓSTICO de F07 (`diagnostico:`,
 //                   el cajón y la capa de contraste, los dos inertes hasta que
-//                   los cablee el paso 8) y encuadra sobre la geometría.
+//                   los cablee el paso 8), el cajón de COMPROBACIÓN de F08
+//                   (`comprobacion:`, inerte hasta el paso 9), la capa de
+//                   PARCELAS VECINAS (`colindantes:`, vacía hasta que el paso 7
+//                   le pase las que traiga el Catastro) y encuadra sobre la
+//                   geometría.
 //   6. EDICIÓN    — `cablearEdicion(...)` (F06, tarea T5.1): deshacer/rehacer con
 //                   sus atajos, la casilla y la tolerancia del snap, el offset y
 //                   el renglón `[data-estado="edicion"]`. Va DESPUÉS del visor
@@ -52,14 +56,49 @@
 //                   (le consume `visor.diagnostico`) y DESPUÉS del Catastro
 //                   (para pedirle las colindantes de la invasión), que son sus
 //                   dos dependencias. Y va ANTES del GML por lo mismo que la
-//                   ficha: es una vista más del expediente, y el paso 9 es el
+//                   ficha: es una vista más del expediente, y el paso 10 es el
 //                   que cierra el recorrido.
 //                   ⚠️ Fuera del `try` del Catastro y sin `try` propio, como la
 //                   edición: si el cliente del Catastro no se ha podido montar
 //                   se diagnostica IGUAL —ocho de las nueve medidas no dependen
 //                   de la red— y lo único que se pierde es la invasión, que el
 //                   cajón dice en voz alta que no ha consultado.
-//   9. GML        — `cablearGeneracionGml(...)` (F04, tarea T6.1). Va EL ÚLTIMO
+//   9. COMPROBACIÓN—`cablearComprobacion(...)` de `./cableado-comprobacion.js`
+//                   (F08, tarea T5.1): la entrada por fichero —el botón «Abrir
+//                   un GML…» de la fila del rótulo y el arrastre sobre la
+//                   VENTANA ENTERA—, el cajón que dice qué es ese `.gml` y qué
+//                   le pasa, y el único `estado.set` que mete su parcela en el
+//                   expediente. Tiene TRES dependencias y por eso va aquí:
+//                     · DESPUÉS del visor, porque le consume `visor.comprobacion`
+//                       (el cajón de F08, que es la pieza SUELTA del visor y no
+//                       va envuelta como `diagnostico`);
+//                     · DESPUÉS del Catastro, porque le pide el `cliente` para
+//                       traer el parcelario con el que contrastar — el cliente,
+//                       no el cableado: llamar a `cablearCatastro().cargar()`
+//                       haría un `estado.set` con la geometría del WFS y
+//                       BORRARÍA la del fichero, que es justo lo que hay que
+//                       contrastar (ver la cabecera de aquel módulo);
+//                     · DESPUÉS del diagnóstico, por dos motivos distintos: para
+//                       que el CTA «Diagnosticar encaje» YA EXISTA cuando llegue
+//                       la parcela del fichero —el recorrido de F08 termina
+//                       encendiendo F07, y el destino no puede cablearse después
+//                       que su origen—, y para poder pasarle
+//                       `visor.diagnostico.cajon`: los dos cajones comparten la
+//                       esquina `bottomleft` y son MUTUAMENTE EXCLUYENTES, así
+//                       que abrir el de comprobación cierra el de F07.
+//                   ⚠️ Fuera del `try` del Catastro y sin `try` propio, igual
+//                   que la edición y el diagnóstico: si el cliente no se pudo
+//                   montar, **se comprueba el fichero igual** —leer bytes,
+//                   decodificar, parsear, validar y cargar la geometría no
+//                   necesitan la red— y lo único que se pierde es el parcelario,
+//                   que el cableado dice en voz alta que no ha pedido
+//                   (`MOTIVO_SIN_CLIENTE`). Por eso lo que se le pasa es
+//                   {@link clienteCatastro}, que vale `null` cuando el bloque
+//                   del paso 7 se cayó, y `null` ahí es una respuesta prevista.
+//                   El enlace con F07 —que el informe de contraste cuente lo que
+//                   se leyó del fichero— está en el paso 8: ver
+//                   {@link comprobacionCableada}.
+//  10. GML        — `cablearGeneracionGml(...)` (F04, tarea T6.1). Va EL ÚLTIMO
 //                   porque necesita las dos piezas anteriores: el store (de él
 //                   sale la geometría que se serializa, y de sus notificaciones
 //                   el estado del botón) y el panel (es donde se publican las
@@ -130,10 +169,36 @@
 //
 // ⚠️ `gml/descargar.js` se importa DIRECTAMENTE, igual que `viewer/index.js` y
 // por el mismo motivo: necesita `Blob`/`URL`/`document`, así que está fuera del
-// barrel `gml/index.js` (que sí carga el proyecto Vitest `node`, sin DOM). Los
-// otros dos módulos de `gml/` también se importan uno a uno en vez de por el
-// barrel: así el bundle no arrastra `gml/parse.js`, que hoy no usa nadie en la
-// app (lo usará F08).
+// barrel `gml/index.js` (que sí carga el proyecto Vitest `node`, sin DOM). Ese
+// motivo sigue intacto. Los otros módulos de `gml/` se siguen importando uno a
+// uno, y aquí había escrito que así «el bundle no arrastra `gml/parse.js`, que
+// hoy no usa nadie en la app (lo usará F08)».
+//
+// ⛔ ESA MITAD ERA FALSA YA CUANDO SE ESCRIBIÓ, y se corrige en vez de borrarse
+// porque el error de razonamiento es más instructivo que el dato.
+// **`gml/parse.js` está en el bundle DESDE F05**: lo importa
+// `services/_catastro-wfs.js` para leer la respuesta del WFS. Lo que era cierto
+// es que no lo usaba nadie en la CAPA DE APLICACIÓN — y de ahí se saltó, sin
+// medirlo, a «el bundle no lo arrastra», que es otra afirmación. Al cerrar F08 se
+// midió de verdad, atribuyendo los dos paquetes por sourcemap contra el de F07
+// reconstruido desde `a0e2a9d`: **15,78 kB en los dos, delta 0,00 kB.** Un módulo
+// que ya estaba no puede volver a entrar.
+//
+// Lo que F08 sí cuesta, medido igual: el bundle pasa de 481,93 kB (F07) a
+// 550,31 kB de JS (**+68,38 kB**; 177,93 kB en gzip), y son los SIETE módulos
+// nuevos —encabezados por `report/contraste-texto.js` (+17,54) y
+// `viewer/cajon-comprobacion.js` (+13,29)—, más `gml/decodificar.js`,
+// `comprobacion/`, `app/zona-fichero.js` y el cableado. El CSS (45,95 kB) y el
+// HTML (25,44 kB) también se mueven, y son de la cáscara y del cromo del cajón.
+//
+// La lección, que no es sobre bundles: «no lo usa nadie **aquí**» y «no está en
+// el paquete» son dos afirmaciones distintas, y la segunda solo se sabe midiendo.
+// Es la regla de oro 8 en pequeño, y el mismo salto de razonamiento que costó el
+// rechazo del IVG (SPEC §3.1).
+//
+// Importar uno a uno en vez de por el barrel se conserva, pero por lo único que
+// queda en pie: `gml/index.js` publica además `serialize-cp`, `anillos`, `ids` y
+// el vocabulario entero, y esta capa solo usa cuatro cosas.
 //
 // ── F05 · LO QUE ESTA CAPA DECIDE AL ENCHUFAR EL CATASTRO ───────────────────
 // `app/cableado-catastro.js` sabe hablar con el campo, los botones y el store,
@@ -240,7 +305,7 @@
 // aquí no se llamaba, porque la cáscara no tenía ningún gesto para pedirlas. Ya
 // lo tiene: `index.html` trae «Traer colindantes» y lo cablea
 // `cableado-catastro.js`, que publica cada resultado por `alColindantes(fn)`.
-// Esta capa hace DOS cosas con él, y ninguna es automática:
+// Esta capa hace TRES cosas con él, y ninguna es automática:
 //   · **dianas de enganche** — `visor.edicion.fijarColindantes(recintos)`. Ojo:
 //     ese método recibe RECINTOS y F05 devuelve PARCELAS, así que hay que aplanar
 //     (`colindantes.flatMap((p) => p.recintos)`); pasarle parcelas LANZA a
@@ -250,6 +315,14 @@
 //     «Sin consultar» y dice cuántas hay (incluido «0», que después de preguntar
 //     sí es una respuesta). Lo escribe {@link actualizarFicha} y no el cableado
 //     del Catastro: la ficha sigue teniendo un solo dueño.
+//   · **DIBUJARLAS** — `visor.colindantes.pintar(vecinas)`, con las parcelas SIN
+//     APLANAR (la capa necesita la referencia catastral de cada una para su
+//     emergente: es la MISMA forma que consume `diagnosticar()`). Faltaba, y era
+//     un defecto de verdad: hasta el arreglo del check visual, pulsar «Traer
+//     colindantes» dejaba el mapa EXACTAMENTE IGUAL mientras la ficha decía «12».
+//     El dato se usaba por dentro; que no se viera es la regla de oro 1 rota.
+//     Las tres cuelgan del mismo `alColindantes`, que es un `Set` de suscriptores
+//     justo para esto (ver el paso 7).
 // Lo que NO ha cambiado es por qué no se piden solas: sería una SEGUNDA petición
 // por cada parcela que nadie ha pedido —lo que castiga la política de uso del
 // servicio (override O8)— y el store no distingue «parcela recién traída» de
@@ -349,6 +422,7 @@ import {
   SELECTOR_ESTADO_CATASTRO,
   cablearCatastro,
 } from './cableado-catastro.js'
+import { cablearComprobacion } from './cableado-comprobacion.js'
 import { cablearDiagnostico } from './cableado-diagnostico.js'
 import {
   AVISO_DEMO_HUECO_SINTETICO,
@@ -1081,6 +1155,36 @@ const visor = crearVisor(nodo('#mapa'), {
   // F07, no una rareza. Se diagnostica SOBRE la parcela que se está editando, y
   // por eso el cajón recalcula en cada operación del store.
   diagnostico: true,
+  // ── F08 · el cajón de comprobación, montado (que tampoco es abierto) ─────
+  // `true` y no un objeto por lo mismo que arriba: su única clave de montaje
+  // —`posicion`— vale aquí exactamente lo que su defecto, `bottomleft`.
+  //
+  // ⚠️ Y `bottomleft` es LA MISMA esquina que el cajón de F07, a sabiendas: las
+  // cuatro esquinas del mapa estaban ocupadas antes de F08 (`topleft` la barra
+  // de edición, `topright` el control de capas, `bottomright` la opacidad y la
+  // atribución). Los dos cajones son mutuamente excluyentes por diseño —la
+  // comprobación PRECEDE al diagnóstico y no coexiste con él—, así que montarlos
+  // los dos es lo normal y abrirlos a la vez no; de esa exclusión responde el
+  // paso 9, que es quien sabe en qué punto del recorrido está el usuario.
+  //
+  // El cajón nace CERRADO y en blanco: montarlo no comprueba nada. Quien lo abre
+  // y le da contenido es el paso 9, cuando el usuario suelta un `.gml`.
+  comprobacion: true,
+  // ── Las PARCELAS VECINAS, dibujadas (deuda de F05) ───────────────────────
+  // `true` y no un objeto porque esta opción es BOOLEANA por contrato: la capa no
+  // tiene ni una opción de montaje (`crearVisor` LANZA si se le pasa un objeto, y
+  // el mensaje nombra la vía buena). Va aquí, en el paso 5, porque la capa es del
+  // VISOR: quien la llena es el paso 7, con lo que devuelve «Traer colindantes».
+  //
+  // ⚠️ Esto es el arreglo de un defecto REAL encontrado en el check visual: las
+  // vecinas se traían del Catastro desde F05, las usaban por dentro el SNAP de F06
+  // y la INVASIÓN de F07, y NO LAS PINTABA NADIE. El usuario leía «12 parcelas
+  // colindantes» en la ficha y el mapa seguía exactamente igual — la regla de oro 1
+  // rota en el último tramo, que es el peor sitio: el trabajo estaba hecho.
+  //
+  // Sin `colindantes: true` aquí, `visor.colindantes` vale `null` y el suscriptor
+  // que las pinta (paso 7) no tendría dónde pintarlas.
+  colindantes: true,
   // El canal EN VIVO de la ficha (criterio de aceptación 4). Es opción de PRIMER
   // NIVEL y no una clave de `edicion` porque medir mientras se arrastra no exige
   // poder insertar vértices ni enganchar al parcelario: son dos cosas distintas.
@@ -1614,6 +1718,29 @@ const edicionCableada = cablearEdicion({
  */
 let catastroCableado = null
 
+/**
+ * El CLIENTE del Catastro, o `null` si no se ha llegado a construir. Vive fuera
+ * del `try` por la misma razón que {@link catastroCableado} —el `const` de dentro
+ * es de bloque y el paso 9 lo necesita—, pero **no es el mismo dato y por eso son
+ * dos variables**:
+ *
+ *   · `catastroCableado` es la UI del bloque «Origen de la parcela» (los tres
+ *     botones, el campo y el renglón). Lo consume el paso 8 para pedir vecinas.
+ *   · `clienteCatastro` es el acceso al servicio, a secas. Lo consume el paso 9,
+ *     que **no puede usar el cableado**: `cargar()` hace `estado.set` con la
+ *     geometría del WFS y borraría la del fichero (ver la cabecera de
+ *     `./cableado-comprobacion.js`). F08 pide el parcelario y COMPONE.
+ *
+ * Se asigna en cuanto el cliente existe y ANTES de `cablearCatastro`, a propósito:
+ * si lo que revienta es el CABLEADO —un nodo que `index.html` ya no trae—, el
+ * cliente está perfectamente construido y la comprobación de un fichero puede
+ * seguir trayendo su parcelario. Perder la vía de entrada del Catastro no tiene
+ * por qué llevarse por delante también el contraste de F08.
+ *
+ * @type {ReturnType<typeof crearClienteCatastro>|null}
+ */
+let clienteCatastro = null
+
 try {
   // El transporte es el único que toca la red: cola de 2, timeout, backoff con
   // jitter. Su `alAvisar` es EL MISMO panel que todo lo demás (decisión 1).
@@ -1643,6 +1770,10 @@ try {
     // suyo que no cabe en ningún resultado. Ver la decisión 1 de la cabecera.
     alAvisar: panel.avisar,
   })
+  // Antes de cablear nada: ver el JSDoc de {@link clienteCatastro}. Un cableado
+  // que reviente después de esta línea deja el bloque del Catastro apagado, pero
+  // NO deja al paso 9 sin parcelario.
+  clienteCatastro = cliente
 
   const catastro = cablearCatastro({
     // El MISMO store que el mapa, la tabla y la ficha. `viewer/index.js`
@@ -1670,9 +1801,45 @@ try {
 
   // ── F06 · las vecinas, cuando el usuario las pide ───────────────────────
   // El botón «Traer colindantes» lo cablea `cableado-catastro.js`; lo que hace
-  // ESTA capa con el resultado —dianas de enganche y recuento en la ficha— está
-  // en {@link cablearEdicion}#alColindantes.
-  //
+  // ESTA capa con el resultado —dianas de enganche, recuento en la ficha y, desde
+  // el arreglo del check visual, CONTORNOS EN EL MAPA— está repartido entre
+  // {@link cablearEdicion}#alColindantes y {@link pintarColindantes}.
+
+  /**
+   * Dibuja en el mapa las parcelas vecinas que acaba de devolver el Catastro.
+   *
+   * ⚠️ **LAS DOS FORMAS DEL MISMO DATO, y no se unifican.** Es la trampa que ya
+   * avisa {@link cablearEdicion}#alColindantes unas cuantas líneas más arriba:
+   *   · `edicion.fijarColindantes` (F06) quiere **RECINTOS APLANADOS** —le da igual
+   *     de qué parcela sea cada anillo: solo busca dianas de enganche— y LANZA si
+   *     se le pasan parcelas.
+   *   · `visor.colindantes.pintar` quiere **PARCELAS SIN APLANAR**, `[{refcat,
+   *     recintos}]`, que es la misma forma que consume `diagnosticar()`: necesita
+   *     la referencia catastral de CADA vecina para su título emergente, que es
+   *     justo lo que el aplanado pierde.
+   * Dos consumidores con dos formas distintas del mismo resultado. Aplanar aquí
+   * dejaría los emergentes mudos; no aplanar allí rompería el snap.
+   *
+   * Un resultado sin dato (`ok:false`) no borra lo pintado, por el mismo criterio
+   * que las dianas: una consulta que falla no es una consulta que devuelve cero
+   * vecinas, y `cableado-catastro.js` ya la ha contado en su renglón y en el panel.
+   * Un `ok:true` con cero vecinas SÍ limpia, porque eso sí es una respuesta.
+   *
+   * @param {{ok: boolean, datos: {colindantes?: Array<object>}|null}} resultado
+   *   El `ResultadoCatastro` de `services/catastro.js#parcelaYColindantes`.
+   * @returns {void}
+   */
+  function pintarColindantes(resultado) {
+    if (!resultado || resultado.ok !== true || !resultado.datos) return
+    const vecinas = Array.isArray(resultado.datos.colindantes) ? resultado.datos.colindantes : []
+    // SIN aplanar y sin traducir: la capa consume exactamente lo que el servicio
+    // devuelve. Y `visor.colindantes` no puede ser `null` aquí — el paso 5 monta el
+    // visor con `colindantes: true`—, así que no se comprueba: un `null` ahí sería
+    // un defecto de esta casa y tiene que reventar en desarrollo, no degradarse en
+    // silencio hasta el navegador del usuario.
+    visor.colindantes.pintar(vecinas)
+  }
+
   // Se comprueba la FORMA en vez de llamar a ciegas, y no es adorno defensivo:
   // sin el puente, «Traer del Catastro» y «Deducir del mapa» siguen siendo
   // perfectamente útiles, así que un cableado que no publique colindantes no
@@ -1680,12 +1847,26 @@ try {
   // de abajo). Lo que no se hace es callarlo: va a la consola nombrando el
   // contrato, porque un botón que consulta al Catastro y cuyo resultado nadie
   // recoge sí sería un error silencioso.
+  //
+  // ── AQUÍ SE ENCHUFAN DOS OYENTES, Y EN TOTAL SON TRES ───────────────────
+  // `alColindantes` es una SUSCRIPCIÓN (un `Set`, con baja) y no un callback
+  // único, y su JSDoc dice para qué: «F06 quiere las vecinas para el snap y F07
+  // las querrá para el diagnóstico, y el segundo en llegar no puede desalojar al
+  // primero en silencio». El que las DIBUJA es el TERCERO —el paso 8 registra el
+  // suyo por su cuenta, al cablear el diagnóstico— y por eso puede enchufarse aquí
+  // sin quitarle nada a nadie. Que sigan siendo tres lo afirma
+  // `test/app/main-edicion.dom.test.js` sobre el arranque real: si algún día baja,
+  // alguien ha desenchufado a uno.
   if (typeof catastro.alColindantes === 'function') {
+    // 1 · Las dianas del enganche (F06) y el recuento de la ficha.
     catastro.alColindantes(edicionCableada.alColindantes)
+    // 2 · Y el mapa, que era el único que no se enteraba.
+    catastro.alColindantes(pintarColindantes)
   } else {
     console.warn(
       '[catastro] el cableado no publica `alColindantes(fn)`: las parcelas vecinas que se traigan ' +
-        'no se usarán como dianas de enganche ni se contarán en la ficha.',
+        'no se dibujarán en el mapa, no se usarán como dianas de enganche y no se contarán en la ' +
+        'ficha.',
     )
   }
 } catch (causa) {
@@ -1737,11 +1918,50 @@ try {
 // un visor montado sin `diagnostico: true`), y eso tiene que ser ruidoso en
 // desarrollo, no degradarse en silencio en producción. Lo que sí está previsto —que
 // el Catastro no se haya podido montar— no es una excepción: entra como `null`.
+
+/**
+ * El cableado de comprobación del paso 9, o `null` mientras no exista. **Es una
+ * referencia ADELANTADA y ese es todo su motivo**: la lee el envoltorio
+ * `comprobacion` de aquí abajo, que se ejecuta mucho después del arranque.
+ *
+ * @type {ReturnType<typeof cablearComprobacion>|null}
+ */
+let comprobacionCableada = null
+
 cablearDiagnostico({
   estado,
   cajon: visor.diagnostico.cajon,
   contraste: visor.diagnostico.contraste,
   panel,
+  // ── F08 · las dos features, enlazadas ────────────────────────────────────
+  // El informe de contraste que se descarga desde el cajón de F07 lleva una
+  // sección con lo que se leyó del fichero, y esa sección solo existe si la
+  // parcela vino de uno. Aquí es donde se le dice de dónde sacarla.
+  //
+  // ⚠️ ES UN ENVOLTORIO Y NO `comprobacionCableada.comprobacion` A SECAS, porque
+  // el paso 9 todavía no ha corrido: en esta línea `comprobacionCableada` vale
+  // `null`, y pasar su método sería un `TypeError` en el arranque.
+  //
+  // Y lo que NO se hace es reordenar los pasos, que sería lo primero que se
+  // ocurre. Tres razones, en orden de peso:
+  //   1. La opción `comprobacion` de `cablearDiagnostico` YA ES una función por
+  //      contrato, y su JSDoc dice por qué: la comprobación CAMBIA con el tiempo
+  //      —entra al soltar un GML y se va al descartarlo—, así que un valor
+  //      congelado en el montaje mentiría a la segunda carga. Resolverla tarde
+  //      no es un apaño alrededor del orden: es exactamente la forma que ese
+  //      parámetro pide. El envoltorio no añade ni una indirección nueva.
+  //   2. El orden 8 → 9 es el del RECORRIDO: F08 termina entregando una parcela
+  //      a F07, y el destino no puede cablearse después que su origen (ver el
+  //      paso 9 de la cabecera). Invertirlos solo movería la referencia
+  //      adelantada al otro lado —`cablearComprobacion` necesita el cajón de
+  //      F07 para la exclusión mutua de `bottomleft`—, y encima al lado que NO
+  //      la tiene prevista en su contrato.
+  //   3. El defecto de esta opción es `() => null`, que es LA VÍA DE F05: quien
+  //      llegó por referencia catastral descarga su informe igual, sin sección
+  //      de fichero. Este envoltorio devuelve exactamente eso mientras no haya
+  //      comprobación, así que la interfaz no se ramifica por procedencia.
+  comprobacion: () =>
+    comprobacionCableada === null ? null : comprobacionCableada.comprobacion(),
   // Se comprueba la FORMA en vez de pasarlo a ciegas, por el mismo criterio que el
   // puente de colindantes de F06 unas líneas más arriba: un cableado del Catastro
   // incompleto no puede tumbar el diagnóstico entero, que es lo que haría el
@@ -1758,7 +1978,58 @@ cablearDiagnostico({
   // LANZA nombrándolos si `index.html` ha dejado de traerlos.
 })
 
-// ── 9 · Generación del GML (F04 · T6.1) ──────────────────────────────────────
+// ── 9 · Comprobar un GML existente (F08 · T5.1) ──────────────────────────────
+
+// La PRIMERA vía de entrada por fichero que tiene esta aplicación. Hasta aquí solo
+// se podía hablar de una parcela que la app misma hubiera traído del Catastro; el
+// técnico que llega con un `.gml` en la mano —el de otro despacho, el que le
+// rechazaron hace dos años— no tenía dónde meterlo.
+//
+// SIN `try`, igual que la edición del paso 6 y el diagnóstico del paso 8, y por lo
+// mismo: lo único que puede lanzar aquí es un contrato del programador (el botón
+// «Abrir un GML…» que `index.html` ya no trae, un visor montado sin
+// `comprobacion: true`, un `srs` que no es un huso implementado), y eso tiene que
+// ser ruidoso en desarrollo en vez de degradarse en silencio en producción.
+//
+// Lo que SÍ está previsto —que el bloque del Catastro se haya caído— no es una
+// excepción y entra como `null`: se comprueba el fichero igual, se carga su
+// geometría igual, y lo único que no se puede hacer es traer el parcelario con el
+// que contrastarla. Es la misma degradación honrada que el diagnóstico sin vecinas.
+comprobacionCableada = cablearComprobacion({
+  // El MISMO store que el mapa, la tabla, la ficha y el diagnóstico. Es el quinto
+  // suscriptor, y escribe en él UNA sola vez por recorrido.
+  estado,
+  // La pieza SUELTA del visor (no `visor.comprobacion.cajon`): F07 son dos piezas
+  // inseparables —el cajón dice las cifras y la capa las señala— y F08 es una.
+  cajon: visor.comprobacion,
+  panel,
+  // El cliente, NO el cableado del paso 7. Ver el JSDoc de {@link clienteCatastro}:
+  // `cargar()` haría `estado.set` con la geometría del WFS y borraría la del
+  // fichero, que es justo lo que hay que contrastar.
+  cliente: clienteCatastro,
+  // El mismo SRS del expediente que reciben el visor y el cliente. El cableado lo
+  // valida AL MONTAR con `husoPorSrs` —no en el primer fichero—, y además lo usa
+  // para negarse a pedir el parcelario cuando el fichero declara otro: el contraste
+  // entre dos husos daría cientos de kilómetros con pinta de medida.
+  srs: SRS_DEMO,
+  // La exclusión mutua de `bottomleft`. Soltar un fichero no es un clic, así que el
+  // guardián de clic-fuera de F07 no se entera y su cajón se quedaría abierto
+  // debajo; se le pasa el de F07 para que este cableado lo cierre al abrir el suyo.
+  cajonDiagnostico: visor.diagnostico.cajon,
+  // ── F06 · abrir un documento nuevo ────────────────────────────────────────
+  // El MISMO gancho que recibe el Catastro en el paso 7, y por la MISMA razón:
+  // cargar la parcela de un fichero es abrir un documento nuevo, así que el
+  // historial se REINICIA en vez de commitear encima. Un `Ctrl+Z` que devolviera la
+  // parcela anterior —cambiando la geometría que hay en pantalla y la que se
+  // generaría— sería un error silencioso disfrazado de función (decisión 2 de F06).
+  alCargarParcela: edicionCableada.alCargarParcela,
+  // El botón del rótulo y el renglón de procedencia los localiza él con los
+  // selectores de su contrato, y LANZA nombrándolos si `index.html` no los trae.
+  // El `<input type="file">` y la superposición de arrastre NO están en la cáscara:
+  // los fabrica `app/zona-fichero.js`, y `index.html` lo dice por escrito.
+})
+
+// ── 10 · Generación del GML (F04 · T6.1) ─────────────────────────────────────
 
 /**
  * Referencia catastral REAL de una parcela, o `null` si no tiene.

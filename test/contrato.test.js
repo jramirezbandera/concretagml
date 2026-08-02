@@ -9,6 +9,10 @@ import {
   crearRecinto,
 } from '../model/parcela.js'
 import { crearEdificio, crearParteConstruccion } from '../model/edificio.js'
+// `diagnosticar` NO sale por el barrel (es de F07 y nadie lo ha pedido ahí): se
+// importa directamente porque la cadena de F08 lo necesita en medio, y lo que este
+// fichero afirma es la frontera del barrel, no su superficie completa.
+import { diagnosticar } from '../diagnostico/parcela.js'
 import * as area from '../geo/area.js'
 import * as cierre from '../geo/cierre.js'
 import * as utm from '../geo/utm.js'
@@ -149,6 +153,106 @@ describe('contrato F03 · el visor NO sale por el barrel raíz (Leaflet exige wi
   it('el barrel raíz NO expone viewer ni services (Leaflet exige window)', () => {
     expect(Object.keys(barrel)).not.toContain('viewer')
     expect(Object.keys(barrel)).not.toContain('services')
+  })
+})
+
+// ── Test-guardián del barrel raíz tras F08 (T5.1) ────────────────────────────
+// F08 mete DOS capas nuevas en el barrel —`comprobacion/` y `report/`— y las dos
+// pueden entrar por la misma razón por la que `viewer/` no puede: son puras. Este
+// bloque afirma las dos mitades de esa frontera, y vive aquí (proyecto `node`, sin
+// DOM) porque es donde el error se manifestaría: un import prohibido revienta al
+// CARGAR el barrel, no al usarlo, y se llevaría por delante la suite entera.
+//
+// Momento de riesgo previsto: el día que alguien quiera «cerrar el círculo»
+// exportando también `gml/descargar.js#descargarTexto`, que es literalmente lo que
+// consume el texto que produce `report/`. Está a un import de distancia y es la
+// tentación más razonable de todo el fichero — por eso se nombra.
+describe('contrato F08 · comprobación e informe salen por el barrel; la ENTREGA no', () => {
+  it('el barrel expone las tres funciones puras de F08', () => {
+    // Los tres nombres, por su nombre. `comprobarGml` compone la lectura del
+    // fichero con las validaciones de F02; `informeContrasteTexto` la convierte en
+    // el informe de texto; y `decodificarGml` es el escalón de debajo de
+    // `parsearGml` (bytes → texto), que entra por el espacio `gml` porque ya sale
+    // de `gml/index.js`: un segundo camino hasta la misma función acabaría
+    // prometiendo otra cosa que el primero.
+    expect(typeof barrel.comprobacion.comprobarGml).toBe('function')
+    expect(typeof barrel.report.informeContrasteTexto).toBe('function')
+    expect(typeof barrel.gml.decodificarGml).toBe('function')
+  })
+
+  it('y las tres FUNCIONAN sin DOM, encadenadas sobre el fichero real', () => {
+    // La mitad anti-vacuidad: `typeof x === 'function'` seguiría en verde con un
+    // módulo cuyo grafo de imports tocara `window` en la primera llamada. Aquí se
+    // recorre la cadena entera —bytes → texto → comprobación → informe— dentro del
+    // proyecto `node`, que corre sin `window`, sin `document` y sin `Blob`.
+    const bytes = readFileSync(
+      join(fileURLToPath(new URL('..', import.meta.url)), 'test/fixtures/gml/cp_parcela_9398516VK3799G.gml'),
+    )
+    const { texto, encodingUsado } = barrel.gml.decodificarGml(Uint8Array.from(bytes))
+    // El fichero declara ISO-8859-1 y sus bytes son UTF-8: mandan los bytes.
+    expect(encodingUsado).toBe('utf-8')
+
+    const comprobacion = barrel.comprobacion.comprobarGml({
+      texto,
+      nombreFichero: 'cp_parcela_9398516VK3799G.gml',
+    })
+    expect(comprobacion.puedeContinuar).toBe(true)
+    expect(comprobacion.geometria.recintos.length).toBeGreaterThan(0)
+
+    const informe = barrel.report.informeContrasteTexto({
+      comprobacion,
+      diagnostico: diagnosticar({ recintos: comprobacion.geometria.recintos }),
+      fecha: new Date(Date.UTC(2026, 6, 30, 10, 0, 0)),
+    })
+    expect(informe).toContain('INFORME DE CONTRASTE CON EL PARCELARIO CATASTRAL')
+    // Y la sección del fichero, que es la que solo existe cuando hubo comprobación.
+    expect(informe).toContain('QUÉ SE LEYÓ DEL FICHERO')
+  })
+
+  it('el barrel NO expone viewer, services ni app (window/document/File)', () => {
+    // `app/` es el tercero de la lista desde F08: `app/cableado-comprobacion.js` y
+    // `app/zona-fichero.js` nombran `document`, `File` y los oyentes de la ventana.
+    for (const prohibido of ['viewer', 'services', 'app']) {
+      expect(Object.keys(barrel), `el barrel no puede exponer '${prohibido}'`).not.toContain(
+        prohibido,
+      )
+    }
+  })
+
+  it('la ENTREGA del fichero no sale por ningún espacio del barrel', () => {
+    // `gml/descargar.js` necesita `Blob`, `URL.createObjectURL` y `<a download>`.
+    // Se comprueba sobre TODOS los espacios y no solo sobre `gml`, porque el sitio
+    // por el que se colaría hoy es `report/` — que produce el texto que ese módulo
+    // entrega— y no la rama en la que vive el fichero.
+    const entrega = ['descargarTexto', 'descargarGml', 'nombreFicheroGml', 'MOTIVO_NO_DESCARGADO']
+    for (const [espacio, contenido] of Object.entries(barrel)) {
+      for (const nombre of entrega) {
+        expect(
+          Object.keys(contenido),
+          `el espacio '${espacio}' expone '${nombre}': la entrega del fichero es código de ` +
+            `NAVEGADOR y el barrel lo carga el proyecto Vitest 'node', sin DOM`,
+        ).not.toContain(nombre)
+      }
+    }
+  })
+
+  it('el FUENTE del barrel no importa ninguna de las cuatro fronteras', () => {
+    // Mitad ESTÁTICA, y no es redundante con las de arriba: un módulo de `app/` que
+    // solo nombrara `document` DENTRO de una función se importaría sin lanzar, y el
+    // barrel quedaría roto en producción y verde aquí. El mismo criterio que la
+    // guarda de proj4 de más abajo.
+    const fuente = readFileSync(fileURLToPath(new URL('../index.js', import.meta.url)), 'utf8')
+    const imports = [...fuente.matchAll(/(?:^|\n)[ \t]*export\s+\*[^\n]*from\s+['"]([^'"]+)['"]/g)].map(
+      (m) => m[1],
+    )
+    expect(imports.length, 'no se ha leído ni un `export * as … from` del barrel').toBeGreaterThan(0)
+    const infractores = imports.filter((ruta) =>
+      /^\.\/(?:viewer|services|app)\//.test(ruta) || ruta === './gml/descargar.js',
+    )
+    expect(
+      infractores,
+      'el barrel raíz no puede reexportar viewer/, services/, app/ ni gml/descargar.js',
+    ).toEqual([])
   })
 })
 

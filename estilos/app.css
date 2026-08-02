@@ -87,6 +87,17 @@
      validando. */
   --gml-candidatos-alto-max: 20vh;
 
+  /* Tope de altura de las relaciones de notas y bloqueos del cajón de
+     comprobación (F08), por el MISMO motivo que los dos de arriba y con un dueño
+     distinto: ese cajón vive sobre el mapa, no en el panel, así que aquí lo que
+     hay que proteger no es el reparto de altura sino la NAVEGABILIDAD del propio
+     cajón. Un GML ajeno puede traer una tanda larga de notas, y sin tope la
+     relación empujaría los dos botones del pie —«Contrastar con el parcelario» y
+     «Descartar»— fuera del alto del cajón: el usuario vería el problema y no la
+     salida. Con tope, la relación scrollea sola y las acciones siguen a la vista.
+     (La lista de PARCELAS no se acota, y el porqué está donde se aplica.) */
+  --gml-cajon-lista-alto-max: 22vh;
+
   /* El título del panel (19px/600) cae entre --text-15 y la escala de display:
      el sistema no tiene un token para ese tamaño. */
   --gml-titulo-tam: 19px;
@@ -339,8 +350,18 @@ body {
 /* Los márgenes NO se colapsan dentro de un contenedor flex: sin esto, el margen
    inferior de `.gml-rotulo` se SUMARÍA al `gap` del bloque y el rótulo quedaría
    al doble de distancia que el resto de las filas. Mismo arreglo, y por lo
-   mismo, que en `.gml-rotulo-fila .gml-rotulo`. */
-.gml-bloque--catastro .gml-rotulo {
+   mismo, que en `.gml-rotulo-fila .gml-rotulo`.
+
+   Desde F08 el rótulo de ESTE bloque va envuelto en un `.gml-rotulo-fila` (para
+   colgarle «Abrir un GML…» a la derecha), y esa fila trae su PROPIO
+   `margin-bottom: var(--space-2)` — exactamente los mismos 8 px que volverían a
+   sumarse al `gap`. Por eso el selector es doble: se anulan los dos márgenes, el
+   del rótulo y el de su fila. El primero sigue escrito aunque hoy lo cubra
+   también `.gml-rotulo-fila .gml-rotulo`, porque describe una propiedad del
+   BLOQUE y tiene que seguir valiendo si algún día el `<h2>` vuelve a colgar
+   suelto de la sección. */
+.gml-bloque--catastro .gml-rotulo,
+.gml-bloque--catastro .gml-rotulo-fila {
   margin-bottom: 0;
 }
 
@@ -545,7 +566,31 @@ body {
 
    Así que el aire de arriba SIGUE ahí, y la advertencia también: sigue siendo
    verdad que el próximo bloque fijo se lo come. Esta nota no se borra porque
-   una predicción que no se cumplió es justo lo que hay que dejar escrito. */
+   una predicción que no se cumplió es justo lo que hay que dejar escrito.
+
+   ── F08 TAMPOCO (2026-07-30): TERCERA FASE SEGUIDA SIN TOCAR EL PANEL ──────
+   F08 estrena la primera entrada por FICHERO de la app y trae dos piezas de
+   interfaz nuevas. Ninguna de las dos le quita un píxel a este presupuesto, y
+   las dos por la misma puerta que ya usaron F06 y F07:
+
+     · El cajón de comprobación se fue AL MAPA (`viewer/cajon-comprobacion.js`),
+       y además comparte la esquina `bottomleft` con el de diagnóstico —son
+       mutuamente excluyentes por diseño: la comprobación precede al
+       diagnóstico y sus dos salidas la cierran—, así que tampoco añade cromo
+       nuevo al mapa.
+     · El botón «Abrir un GML…» se metió DENTRO de una fila que ya existía, la
+       del rótulo «Origen de la parcela», en vez de estrenar una propia. Una
+       fila de botón a lo ancho habría costado ~36 px; el hueco a la derecha de
+       un `<h2>` de 11 px costaba 0. Y es 0 MEDIDO, no 0 redondeado: el botón
+       mide 15,2 px de alto contra los 15,95 px del renglón del rótulo, así que
+       la fila no crece (las cuentas, en `.gml-boton--menudo`).
+
+   Tres fases seguidas sin tocar el panel NO significan que el problema de
+   fondo se haya arreglado: significan que no ha entrado ningún bloque fijo
+   nuevo. La arquitectura sigue siendo la misma —altura fija repartida entre
+   bloques fijos— y la solución de verdad sigue pendiente en
+   `spec/feature-06-edicion-parcela.md` §2. El aire de arriba es aire prestado:
+   el primer bloque fijo que entre en el panel se lo sigue comiendo entero. */
 .gml-bloque--avisos {
   flex: 0 1 auto;
 }
@@ -1044,6 +1089,88 @@ body {
 }
 
 .gml-boton--secundario:disabled {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-disabled);
+  border-color: var(--color-border-sub);
+  cursor: not-allowed;
+}
+
+/* ── La variante MENUDA: «Abrir un GML…» en la fila del rótulo (F08) ─────────
+ *
+ * Vive AQUÍ, con sus dos hermanas, por el mismo motivo mecánico que `--secundario`
+ * explica arriba: `.gml-boton` declara `border` en FORMA ABREVIADA, así que una
+ * regla de igual especificidad escrita ANTES vería su `border-color` pisado por el
+ * `transparent` de la base y el botón saldría sin borde.
+ *
+ * ── POR QUÉ ES MENUDA: EL PRESUPUESTO DE ALTURA, OTRA VEZ ───────────────────
+ * Este botón NO tiene fila propia: cuelga a la derecha del `<h2>Origen de la
+ * parcela</h2>`, dentro de un `.gml-rotulo-fila` (ver `index.html`). Una fila de
+ * botón a lo ancho habría costado ~36 px de un panel que reparte altura FIJA entre
+ * bloques fijos, y esos 36 px salen siempre del mismo sitio: la caja de vértices.
+ *
+ * Y «coste cero» aquí es LITERAL, no una manera de hablar. La fila la gobierna el
+ * más alto de sus dos hijos, así que el botón tiene que caber DENTRO del renglón
+ * del rótulo. Las cuentas, con los tokens de este fichero:
+ *
+ *     renglón del `<h2>` .... 11 px × 1,45 (`line-height` de `.gml-app`) = 15,95 px
+ *     este botón ............ 11 px × 1,2 + 0 de padding + 2 × 1 px de borde = 15,2 px
+ *
+ * Por eso `padding` vertical CERO y `line-height: 1.2` (el de `.gml-boton`, que se
+ * respeta a propósito): con el padding de la base —`var(--space-2)`, 8 px arriba y
+ * 8 abajo— el botón mediría 31,2 px y la fila crecería 15 px. Serían 15 px robados
+ * a la tabla de vértices por un botón secundario, que es justo lo que la decisión
+ * de F08 quería evitar. Si alguien toca `padding`, `font-size` o `line-height`
+ * aquí, que vuelva a hacer la resta: el guion `10-comprobar-gml.js` mide en
+ * navegador que la caja de vértices sigue en 267 px y saldrá rojo.
+ *
+ * ── LO QUE HAY QUE DESHACER DE LA BASE ──────────────────────────────────────
+ * `.gml-boton` está escrita para el PIE del panel, donde los botones son barras a
+ * lo ancho: trae `width: 100%`. Dentro de un contenedor flex eso convierte al botón
+ * en un hijo que reclama todo el ancho y aplasta el `<h2>` a la izquierda. `width:
+ * auto` + `flex: none` lo devuelven a su tamaño de contenido; `white-space: nowrap`
+ * impide que «Abrir un GML…» se parta en dos líneas y vuelva a subir el alto.
+ *
+ * ── EL ÁREA DE PULSACIÓN NO ES LA CAJA ──────────────────────────────────────
+ * 15,2 px de alto es un objetivo pequeño para el ratón y muy pequeño para el dedo
+ * (WCAG 2.5.8 pide 24 px). El `::after` absoluto lo agranda a ~27 px SIN ocupar
+ * layout —no pinta nada y no participa del flujo—, así que el área de pulsación
+ * crece y el presupuesto de altura no se entera. Es la única forma de tener las dos
+ * cosas; encoger el objetivo en silencio habría sido pagar accesibilidad con
+ * píxeles ajenos sin decirlo.
+ *
+ * El anillo de foco NO se declara aquí: lo pone la regla global
+ * `.gml-app :focus-visible`, igual que en las otras dos variantes.
+ *
+ * @see index.html  El razonamiento completo de por qué va en la fila del rótulo. */
+.gml-boton--menudo {
+  position: relative;
+  flex: none;
+  width: auto;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-main);
+  font-size: var(--text-11);
+  white-space: nowrap;
+}
+
+.gml-boton--menudo::after {
+  content: '';
+  position: absolute;
+  /* 6 px por cada lado: 15,2 + 12 ≈ 27 px de objetivo. No pinta ni ocupa. */
+  inset: -6px;
+}
+
+.gml-boton--menudo:hover:not(:disabled) {
+  background: var(--color-bg-elevated);
+}
+
+/* CALCADO al de las otras dos variantes, y a propósito: los botones que se apagan
+   en esta app tienen que apagarse igual, o el usuario acaba aprendiendo tres
+   idiomas para el mismo estado. Y sigue valiendo lo de arriba: apagado no basta,
+   quien lo apaga escribe el motivo al lado. */
+.gml-boton--menudo:disabled {
   background: var(--color-bg-elevated);
   color: var(--color-text-disabled);
   border-color: var(--color-border-sub);
@@ -1896,6 +2023,268 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Los BOTONES de los dos cajones, en UNA regla — y que sea una sola no es aseo,
+   es el requisito.
+   Hasta F08 ningún cajón tenía botones: el de diagnóstico solo traía `label`,
+   `input` y `select`, que son los que cubre la regla de aquí arriba. F08 añadió
+   tres de golpe —«Contrastar con el parcelario» y «Descartar» en el cajón de
+   comprobación, «Descargar informe de contraste» en el de diagnóstico— y los tres
+   se pintaban en `system-ui`, porque los módulos los crean SIN clase (no usan
+   `.gml-boton`: no son botones del panel) y `font-family` no se hereda en los
+   controles de formulario. Es exactamente el defecto que el comentario de arriba
+   describe para `label`/`input`/`select`, repetido en un elemento que entonces no
+   existía.
+   Se arreglan JUNTOS a propósito. Las cabeceras de los dos cajones dicen que
+   tienen que leerse como el mismo cromo, y vestir solo el que se acaba de tocar
+   los habría separado un poco más cada vez. Selector acotado al cajón, nunca
+   `button {}` a secas: la cabecera de este fichero lo prohíbe, y el precedente es
+   `.gml-candidatos button`.
+   ── SOLO LA FAMILIA, Y ESO ES UNA CORRECCIÓN, NO UNA ELECCIÓN ──────────────
+   La primera versión de esta regla (2026-07-30) declaraba también `font-size` y
+   `font-weight` y era CÓDIGO MUERTO ENTERO: los tres botones se crean con
+   `font: 'inherit'` EN LÍNEA, y el inline gana a la hoja, así que heredaban el
+   `13px/1.45 system-ui` del contenedor y seguían saliendo en `system-ui`. Lo
+   destapó el guion de humo `10-comprobar-gml.js` midiendo `getComputedStyle` en
+   un navegador de verdad; en jsdom no se ve, y la regla parecía escrita y puesta.
+   Es la misma lección de SPEC §3.1 —una protección que no llega a ejecutarse no
+   protege— aplicada a una hoja de estilos.
+   La corrección está EN LOS MÓDULOS, que ya no fijan la familia: reparto
+   explícito y escrito en los dos, `viewer/cajon-comprobacion.js` y
+   `viewer/cajon-diagnostico.js`. El módulo pone tamaño, grosor y espaciado —lo
+   que hace el botón legible sin ninguna hoja, que es la doctrina de esos
+   ficheros—; la hoja pone **la familia**, que es lo único que el módulo no puede
+   saber. Por eso aquí no hay `font-size` ni `font-weight`: los pone el inline y
+   declararlos sería volver a escribir algo que no se aplica.
+   Tampoco color ni fondo: el estado apagado lo viste cada módulo en línea (gris y
+   `cursor:default`, porque un estilo en línea no puede expresar `:disabled`). */
+.gml-app .gml-cajon-diagnostico button,
+.gml-app .gml-cajon-comprobacion button {
+  font-family: var(--font-sans);
+}
+
+/* ═══ Comprobar un GML existente (F08) ═══════════════════════════════════════
+ *
+ * Dos piezas, y ninguna de las dos vive en el panel (ver la nota del presupuesto
+ * de altura en `.gml-bloque--avisos`, tramo de F08):
+ *
+ *   1. EL CAJÓN DE COMPROBACIÓN — `viewer/cajon-comprobacion.js`, otro `L.Control`
+ *      en la esquina inferior IZQUIERDA del mapa. COMPARTE esquina con el cajón de
+ *      diagnóstico y son mutuamente excluyentes por diseño: la comprobación
+ *      PRECEDE al diagnóstico y sus dos únicas salidas —«Contrastar con el
+ *      parcelario» y «Descartar»— lo cierran. Las cuatro esquinas del mapa estaban
+ *      ocupadas (arriba a la izquierda la barra de edición, arriba a la derecha el
+ *      control de capas, abajo a la derecha la opacidad y la atribución), así que
+ *      compartir no es un apaño: es lo que el recorrido ya decía.
+ *   2. LA SUPERPOSICIÓN DE SOLTAR — el velo que cubre la ventana mientras se
+ *      arrastra un fichero por encima.
+ *
+ * ── VALE PALABRA POR PALABRA LA CABECERA DEL CAJÓN DE DIAGNÓSTICO ───────────
+ * El módulo fija EN LÍNEA lo que hace el cajón legible sin ninguna hoja (fondo,
+ * padding, radio, `font`, `max-width`, `max-height`, `overflow-y`), porque no
+ * importa CSS. Aquí NO se pelea con eso —este fichero tiene prohibida la marca de
+ * prioridad—: se COMPLETA lo que falta y se viste a los HIJOS. Y la tipografía se
+ * declara en cada hijo porque lo que heredan del `font` en línea lo pisa cualquier
+ * regla que los apunte a ellos.
+ *
+ * ── ⚠️ NINGÚN `display` EN `.gml-cajon-comprobacion` ────────────────────────
+ * La MISMA bomba de relojería que documenta el cajón de diagnóstico, y por lo
+ * mismo: el cajón se abre y se cierra conmutando su `style.display` EN LÍNEA entre
+ * `'none'` y `''`, y `''` significa «que decida la hoja». Un `display` aquí
+ * funcionaría hoy y el día que una regla responsive lo ocultara, el módulo lo
+ * «abriría» dejando el inline en `''` y el cajón no aparecería nunca sin que nada
+ * avisara.
+ *
+ * ── ⚠️ TAMPOCO SE DECLARA `max-height` EN EL CONTENEDOR ─────────────────────
+ * Es del módulo, en línea, igual que en el de diagnóstico. Lo que sí se declara es
+ * el tope de las LISTAS de dentro, que el módulo no acota y que son las únicas
+ * piezas de largo imprevisible: `--gml-cajon-lista-alto-max` (ver `:root`).
+ *
+ * ── ⚠️ NI UN COLOR DE MÉRITO (regla de oro 9, SPEC §2) ──────────────────────
+ * Ni aquí ni en la superposición. Nada de verde de «bien» ni de rojo de «mal»: la
+ * comprobación de un GML ajeno es una MEDIDA sobre el trabajo de otro técnico, y
+ * teñirla de aprobado/suspenso sería justo el juicio de valor que la regla prohíbe
+ * («la aplicación mide; el colegiado interpreta y firma»). Las SEVERIDADES sí
+ * llevan su color —un ERROR se pinta como un error— porque una severidad es un
+ * hecho declarado, no una nota; y para eso ya están los tokens `--color-state-*`
+ * que usa `.gml-aviso`, que no se duplican aquí. La superposición se viste con el
+ * acento del sistema (`--color-accent`, el mismo del anillo de foco), que no dice
+ * nada del fichero: dice «suéltalo aquí».
+ *
+ * @see viewer/cajon-comprobacion.js  CLASE y SELECTOR: los nombres son contrato.
+ * @see app/zona-fichero.js           Quien pone y quita `data-arrastrando` en el <body>.
+ * @see index.html                    Por qué el botón va en la fila del rótulo.
+ */
+
+/* El contenedor. Solo lo que el módulo NO fija en línea — las mismas cuatro
+   propiedades que `.gml-cajon-diagnostico`, para que los dos cajones se lean como
+   el MISMO cromo: comparten esquina y se turnan, y dos aspectos distintos harían
+   creer que son dos cosas distintas. El suelo de ancho existe por el mismo motivo
+   que allí: la lista de parcelas trae referencia catastral (14 caracteres en mono)
+   y superficie en la misma línea, y por debajo de ~300 px se parte. */
+.gml-app .gml-cajon-comprobacion {
+  min-width: min(300px, 42vw);
+  border: 1px solid var(--color-border-main);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
+  background-clip: padding-box;
+}
+
+/* El rótulo del fichero: nombre, tamaño y con qué se leyó. MONO, y no es adorno —
+   es la misma regla que el campo de la referencia catastral en el panel: un nombre
+   de fichero es una cadena que el usuario coteja carácter a carácter contra lo que
+   tiene en el escritorio, y en proporcional la O y el 0 se confunden.
+
+   `overflow-wrap: anywhere` porque un nombre de fichero puede no traer un solo
+   espacio en 60 caracteres (`cp_parcela_9398516VK3799G_v2_final.gml`) y sin esto
+   desbordaría el `max-width` del cajón en horizontal, que sobre un mapa es un
+   desbordamiento que nadie ve venir.
+
+   NI tamaño NI color: los dos los fija el módulo EN LÍNEA (12 px y el gris
+   `#64748B`). Declararlos aquí sería escribir dos reglas que no se aplican y que
+   el siguiente lector creería vivas. */
+.gml-app .gml-cajon-fichero {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+/* ── Las tres relaciones: parcelas, notas y bloqueos ─────────────────────────
+ * Lo único que comparten desde esta hoja es la FAMILIA, y hace falta declararla en
+ * cada una: el `font` que el módulo fija en línea sobre el contenedor es
+ * `system-ui, sans-serif` (para ser legible sin ninguna hoja), y sin esto las tres
+ * saldrían en la tipografía del sistema operativo en medio de una app que usa
+ * Geist. Es la misma razón por la que el cajón de diagnóstico repite
+ * `font-family` en cada hijo. */
+.gml-app .gml-cajon-miembros,
+.gml-app .gml-cajon-notas,
+.gml-app .gml-cajon-bloqueos {
+  font-family: var(--font-sans);
+}
+
+/* ── Tope y scroll propio: SOLO notas y bloqueos ─────────────────────────────
+ * Son las dos piezas de largo imprevisible —una entrada por detección, y un GML
+ * ajeno puede traer una tanda larga— y son las dos que, sin tope, empujarían los
+ * botones «Contrastar con el parcelario» y «Descartar» fuera del alto del cajón:
+ * el usuario vería el problema y no la salida.
+ *
+ * `overscroll-behavior: contain` importa AQUÍ más que en ninguna otra lista de la
+ * app: debajo hay un mapa de Leaflet, y una rueda que se escapase del final de la
+ * lista haría ZOOM sobre la parcela que se está mirando.
+ *
+ * ⚠️ LA LISTA DE PARCELAS NO SE ACOTA, y es deliberado. Lleva radios dentro, y un
+ * contenedor con `overflow:auto` RECORTA el anillo de foco de lo que hay pegado a
+ * sus bordes: quien elija parcela con el teclado dejaría de ver dónde está. Y el
+ * cajón entero ya scrollea (`max-height: 52vh` en línea, del módulo), así que la
+ * lista larga tiene salida igualmente. Esconder las opciones de una ELECCIÓN
+ * detrás de un segundo scroll, dentro de algo que ya scrollea, sería peor que el
+ * problema que resuelve. */
+.gml-app .gml-cajon-notas,
+.gml-app .gml-cajon-bloqueos {
+  max-height: var(--gml-cajon-lista-alto-max);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* El rótulo de cada parcela del fichero, en el color de un DATO y no en el gris
+   del cromo: es lo que el usuario está leyendo para elegir. El radio y su rótulo
+   ya van en una fila con las líneas base alineadas, que la pone el módulo en línea
+   sobre el `<div>` que los envuelve; aquí no se repite.
+
+   Las cifras de cada renglón tampoco se visten aquí: son `.gml-cajon-cifra`, que
+   ya existe desde F07 y da mono con cifras tabulares a los DOS cajones. */
+.gml-app .gml-cajon-miembros label {
+  color: var(--color-text-primary);
+}
+
+/* Los bloqueos se separan con una línea, igual que la sección de invasión del
+   cajón de diagnóstico y por el mismo motivo: es la sección que hay que encontrar
+   de un vistazo, porque es la que explica por qué el botón de continuar está
+   apagado. La línea es del sistema (`--color-border-sub`), NO roja: separar no es
+   dictaminar. */
+.gml-app .gml-cajon-bloqueos {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border-sub);
+}
+
+/* ── La superposición de soltar un fichero ───────────────────────────────────
+ *
+ * ⚠️ `pointer-events: none`, Y NO ES UNA OPTIMIZACIÓN. Es el requisito del que
+ * depende que la función exista. Si esta capa captura el ratón, el evento `drop`
+ * lo recibe ELLA y no la ventana: el usuario suelta el fichero, la superposición
+ * desaparece y no pasa absolutamente nada. Sin excepción en consola, sin aviso,
+ * sin síntoma — el fallo silencioso perfecto, y encima intermitente, porque con el
+ * fichero soltado justo sobre un borde a veces funciona. Quien la retire, que
+ * pruebe a soltar un `.gml` de verdad antes de dar nada por bueno.
+ *
+ * `app/zona-fichero.js` la declara ADEMÁS en línea, y las dos declaraciones son a
+ * propósito: la de allí es un suelo de seguridad para que la propiedad no pueda
+ * faltar aunque esta hoja no llegue (un velo a pantalla completa que capturase el
+ * ratón dejaría la app inservible), y la de aquí es la que dice, donde se lee el
+ * cromo, que este velo NO es interactivo. Las dos dicen lo mismo; ninguna sobra.
+ *
+ * ── AQUÍ SÍ SE DECLARA `display`, y la diferencia con el cajón es real ──────
+ * El cajón lo abre el módulo conmutando su `style.display` en línea, y por eso
+ * arriba está prohibido declararlo. Esta capa NO: la gobierna un atributo en el
+ * `<body>` (`data-arrastrando`), o sea que quien decide si se ve es ESTA HOJA. Lo
+ * que se conmuta es la visibilidad, no el `display`, para que el velo pueda fundir
+ * en vez de aparecer de golpe encima del mapa — y `visibility` (a diferencia de
+ * `opacity` a secas) la saca además del árbol de accesibilidad mientras no está.
+ *
+ * `z-index` por encima de 1000: los controles de Leaflet (`.leaflet-top` y
+ * `.leaflet-bottom`) están en 1000, y una superposición que quede POR DEBAJO de la
+ * barra de edición o del control de capas se lee como un fallo de pintado.
+ *
+ * El velo es un lavado del blanco del sistema y el trazo discontinuo es
+ * `--color-accent`, el mismo del anillo de foco. Ningún color de mérito: esta capa
+ * aparece ANTES de leer el fichero, así que no sabe nada de él y no puede opinar. */
+.gml-soltar-superposicion {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  background: color-mix(in srgb, var(--color-bg-primary) 78%, transparent);
+  /* El trazo va POR DENTRO (`inset`) y no como `border`: un borde sobre un
+     elemento anclado a los cuatro lados del viewport queda medio tapado por el
+     recorte de la ventana en algunos navegadores. */
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+  font-family: var(--font-sans);
+  font-size: var(--text-14);
+  font-weight: var(--fw-medium);
+  color: var(--color-text-primary);
+  text-align: center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--duration) ease-in-out,
+    visibility var(--duration) ease-in-out;
+}
+
+/* El renglón de dentro («Suelta aquí el fichero (.gml, .xml).», que arma
+   `app/zona-fichero.js` porque el texto DEPENDE de las extensiones aceptadas y eso
+   es un dato que el CSS no tiene). Una tarjeta y no texto suelto: el velo es
+   translúcido y debajo hay una ortofoto, así que una frase a pelo se lee sobre lo
+   que le toque. La tarjeta le pone un fondo propio y garantiza el contraste pase
+   lo que pase por debajo. `margin: 0` para deshacer el del `<p>` del navegador,
+   que descentraría la tarjeta en vertical. */
+.gml-soltar-superposicion-texto {
+  margin: 0;
+  max-width: 40ch;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-primary);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
+}
+
+/* El `<body>` es `.gml-app`, así que esto es (0,2,0) y gana a la regla de arriba
+   por especificidad, no por orden — el criterio de todo este fichero. */
+.gml-app[data-arrastrando='si'] .gml-soltar-superposicion {
+  opacity: 1;
+  visibility: visible;
+}
+
 /* ═══ Movimiento reducido ════════════════════════════════════════════════════
  *
  * Solo se apagan las transiciones PROPIAS. Deliberadamente NO se toca `*`: eso
@@ -1911,7 +2300,10 @@ body {
   .gml-barra-conmutador-rotulo,
   .gml-barra-entrada,
   .gml-barra-accion,
-  .gml-barra-ayuda-cerrar {
+  .gml-barra-ayuda-cerrar,
+  /* El velo de arrastre aparece y desaparece de golpe: sigue APARECIENDO, que es
+     lo que informa; lo que se apaga es el fundido, que es lo que molesta. */
+  .gml-soltar-superposicion {
     transition: none;
   }
 }

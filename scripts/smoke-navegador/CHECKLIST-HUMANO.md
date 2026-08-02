@@ -23,10 +23,28 @@ visual**.
 > la diferencia se ENTIENDE sin leyenda, y el punto BLOQUEANTE de la fase: si
 > alguna cifra o algún color **se lee como un veredicto**. **El punto 8 se firma
 > junto con el 6 y el 7**; la cadena bloqueada es F03 → F05 → F06 → F07.
+>
+> Y desde F08 tiene un punto **9**, el de COMPROBAR UN GML EXISTENTE: el
+> **arrastre con la mano** (que `10-comprobar-gml.js` solo puede sintetizar, igual
+> que el punto 1 con el ratón), si el cajón de comprobación se entiende sin que
+> nadie lo explique, y el punto BLOQUEANTE que HEREDA el carácter del 8.1: si
+> alguna nota **se lee como un veredicto sobre el trabajo de otro técnico**. La
+> app mide; el colegiado firma. **El punto 9 se firma junto con el 6, el 7 y el
+> 8**; la cadena bloqueada es F03 → F05 → F06 → F07 → F08.
+>
+> ⛔ **Y el punto 9 ya se ha recorrido una vez, el 2026-08-02, y encontró TRES
+> DEFECTOS REALES — dos de los cuales ni siquiera eran de F08: venían de F03 y de
+> F05.** Están corregidos, con guardián en la suite y **medidos desde entonces por
+> el guion 10** (`GUION.md` §16). El detalle está al principio del punto 9. **La
+> lista sigue SIN FIRMAR**: hay que volver a recorrerla con las correcciones
+> puestas, que es exactamente lo que manda «Cuándo repetir esta lista».
 
 > Regla de lectura: aquí NO se repite nada que ya esté medido. Cada punto existe
 > porque el smoke **no puede** cubrirlo, y dice por qué. Si alguna vez un punto
 > de esta lista se vuelve automatizable, se baja al guion y se borra de aquí.
+> **Aplicada el 2026-08-02** sobre los tres hallazgos de arriba: no se han añadido
+> como puntos manuales —los mide el guion— y se ha podado del 7.7 lo que el guion
+> pasó a medir. Lo que queda de ellos aquí es el JUICIO, que no se automatiza.
 
 ## Cómo dejarlo listo
 
@@ -569,14 +587,38 @@ parcela y **declara las colindantes como no cubiertas**. La suite lo prueba con
 recintos de fixture. Que enganche a la parcela del vecino **de verdad** solo se ve
 haciendo la consulta.
 
-- [ ] Pulsa **«Traer colindantes»** (una petición) y mira que el renglón diga
-      cuántas han llegado y que la ficha las cuente.
+> ⛔ **Podado el 2026-08-02.** Dos medias frases de este apartado se han BAJADO AL
+> GUION, que es la regla de esta lista: *«mira que el renglón diga cuántas han
+> llegado y que la ficha las cuente»* y *«comprueba que las colindantes de la
+> anterior se sueltan»* las mide ahora `10-comprobar-gml.js` (`colindantes.*` y
+> `reencuadre.otraParcela.contornosDeVecinasDespues`, `GUION.md` §16). Lo que
+> queda aquí es lo que sigue siendo de la mano y del ojo. **Y no es un detalle de
+> mantenimiento: fue recorriendo esto cuando se vio que las vecinas no se
+> dibujaban en ninguna parte** — ver el encabezado del punto 9.
+
+- [ ] Pulsa **«Traer colindantes»** (una petición). El guion ya afirma que
+      aparecen los contornos y que cuadran con la ficha; lo que se mira aquí es
+      **si eso basta como acuse de recibo**: al encuadre de arranque las vecinas
+      son grandes y el lado que comparten con la propia queda **debajo** del
+      amarillo (decisión del pane 405), así que a primera vista solo se ven
+      fragmentos por los bordes. ¿Se entiende que «han llegado», o hay que alejar
+      dos niveles para creérselo?
+- [ ] El **gris `#CBD5E1` a 1,5 px** sobre las cinco bases, y sobre todo con la
+      **cartografía catastral encendida**, que dibuja EXACTAMENTE los mismos
+      linderos en rojo: ¿se lee el contorno de la vecina, o produce un lindero
+      doble y sucio? Y al revés: ¿desaparece sobre asfalto claro?
+- [ ] El **emergente** con la referencia catastral: apunta a una vecina y mira si
+      aparece donde el ojo lo busca. Es `sticky` a propósito (sigue al puntero en
+      vez de plantarse en el centro geométrico, que en una parcela grande puede
+      caer fuera de la pantalla).
 - [ ] Arrastra un vértice hacia el **lindero de una vecina** y comprueba que
       engancha. Es el caso de uso que da sentido a la fase: cerrar la hendidura
-      entre dos parcelas que en el terreno son la misma línea.
-- [ ] Trae una parcela **nueva** con «Traer del Catastro» y comprueba que las
-      colindantes de la anterior **se sueltan** (deja de engancharse a linderos que
-      ya no lindan con nada) y que «Deshacer» se apaga con su explicación.
+      entre dos parcelas que en el terreno son la misma línea. **Y ahora se ve
+      contra qué se engancha**, que antes de este arreglo era invisible.
+- [ ] Trae una parcela **nueva** con «Traer del Catastro»: el mapa **viaja** a
+      ella y las vecinas de la anterior desaparecen (las dos cosas las mide el
+      guion). Lo que se juzga aquí es **el salto**: ¿se entiende que la vista se ha
+      mudado, o desorienta? ¿Y «Deshacer» se apaga con su explicación?
 - [ ] Con una parcela del Catastro cargada, la ficha ya tiene superficie declarada:
       **mira el Δ catastral moverse durante el arrastre**. Es la única parte del
       criterio 4 que `08` no puede medir, porque la parcela de demostración no trae
@@ -657,6 +699,254 @@ tú con ojos de cliente— y pregunta:
 
 ---
 
+## 9 · Comprobar un GML existente ⟨F08⟩ — lo que ni `10-comprobar-gml.js` firma
+
+**Por qué está aquí.** `10-comprobar-gml.js` recorre F08 entera en un navegador
+de verdad y mide lo que jsdom no puede: los bytes reales del fichero, el velo con
+su `opacity` calculada, el cajón que no tapa ninguno de los cinco controles del
+mapa (0 px² de solape en los cinco), los dos cajones que no coinciden, el informe
+que baja con **12.869 bytes** y el invariante de los **267 px** de la caja de
+vértices. Lo que NO puede firmar son dos cosas de otra naturaleza: **la mano**
+—`/browse` no tiene comando `drag` (§0), así que el arrastre es sintético— y **la
+lectura**, que es donde vive el riesgo de producto de esta fase: F08 pone en
+pantalla una medición sobre el trabajo de otro técnico, y «cómo se lee eso» no lo
+mide ninguna máquina.
+
+### ⛔ Lo que esta lista encontró la PRIMERA vez que se recorrió (2026-08-02)
+
+**Tres defectos reales. Ninguno lo veía la suite. Ninguno lo veía el guion. Y dos
+de los tres ni siquiera eran de F08.** Esto se deja escrito porque **es el
+argumento entero de que este gate exista**: no es una formalidad de cierre, es el
+único sitio donde alguien mira la pantalla sin una expectativa escrita de
+antemano.
+
+1. **El mapa no reencuadraba nunca** ⟨de F03⟩. `encuadrar()` se llamaba una sola
+   vez, al construir el visor: se traía una parcela de Sevilla o se soltaba un GML
+   de Cádiz y **el mapa seguía mirando la de demostración**. De rebote, «traer
+   geometría del Catastro» **parecía no tener feedback visual**: el dibujo estaba
+   hecho, a cientos de kilómetros de la vista.
+   → Arreglado en `viewer/index.js` (paso 7): se reencuadra cuando entra una
+   parcela con **otra identidad** (`refcat ?? idLocal`), **nunca al editar**.
+   **La suite no podía verlo por construcción:** todas sus pruebas traen su
+   geometría a mano y la app arranca ya encuadrada sobre ella.
+2. **Las colindantes no se dibujaban en ningún sitio** ⟨de F05⟩. Se traían, se
+   publicaban, las usaban el snap de F06 y la invasión de F07 — y **nadie las
+   pintaba**: pulsar «Traer colindantes» dejaba el mapa exactamente igual mientras
+   la ficha decía el número.
+   → Arreglado con `viewer/colindantes.js` y el pane **405** (por debajo de la
+   parcela propia: comparten lindero). **La suite no lo veía porque nadie
+   afirmaba que se dibujaran** — no es que un test fallara: la afirmación no
+   existía.
+3. **La referencia del GML no llegaba al campo del panel** ⟨sí, de F08⟩, y los
+   botones derivados se quedaban encendidos contradiciéndolo.
+   → Arreglado en `app/cableado-comprobacion.js`: forma canónica, y el campo se
+   **vacía** cuando el fichero no trae referencia utilizable.
+
+**Los tres los mide desde el 2026-08-02 el guion 10** (`GUION.md` §16), así que
+**no se han añadido como puntos manuales de esta lista**: la regla del fichero es
+que lo automatizable baja al guion. Lo que sí se ha podado es el **7.7**, donde
+había dos medias frases que el guion pasó a cubrir.
+
+⚠️ **Antes de nada, lee el §16 del `GUION.md`.** El guion sale hoy en `ok:true`,
+pero su **primera** corrida salió `ok:false` por **dos defectos reales** que él
+mismo destapó (los botones de los dos cajones en `system-ui`, y la descarga del
+informe cerrando el cajón de diagnóstico). **Ya están corregidos y con guardián**,
+y su causa está descrita allí. Si al recorrer esta lista ves reaparecer cualquiera
+de los dos —o cualquiera de los tres de arriba—, **es una regresión**: anótala como
+bloqueante y mira `M17`–`M22` de `spec/feature-08-comprobar-gml.md`, que dicen
+dónde vive cada arreglo y por qué está ahí y no donde se notaba.
+
+Para recorrerla, con la app viva: suelta
+`test/fixtures/gml/cp_parcela_9398516VK3799G.gml` sobre la ventana, pulsa
+«Contrastar con el parcelario», y de ahí a «Diagnosticar encaje». Después repite
+con `test/fixtures/gml/derivados/cp_huso_incoherente.gml` (8 notas y 4 hallazgos:
+es el fichero «que va mal») y con `test/fixtures/gml/UTM_1.gml` (el 3.0 sin
+referencia). **Solo el primero consulta al Catastro** (una petición; los otros dos
+no gastan nada). Régimen de uso en `GUION.md` §13.
+
+### 9.1 · El arrastre con un ratón de verdad ⟨criterio 1⟩
+
+**Por qué está aquí.** El guion fabrica un `DataTransfer` y despacha
+`dragenter`/`dragover`/`dragleave`/`drop` a mano, porque `/browse` no tiene
+comando `drag` y su allowlist CDP no incluye el dominio `Input` (§0). Eso prueba
+el módulo entero —el `preventDefault` que evita que el navegador abra el fichero,
+el contador de profundidad, el velo— pero **no toca la capa que sí toca un
+usuario**: el explorador de archivos, el cursor del sistema, la ventana perdiendo
+el foco. El propio veredicto lo dice en `esGestoDeRatonReal: false`.
+
+- [ ] **Arrastra un `.gml` desde el explorador de Windows** y suéltalo sobre la
+      ventana. ¿Se abre el cajón? Prueba a soltarlo **sobre el panel izquierdo**,
+      **sobre el mapa** y **sobre la tabla de vértices**: la zona es la ventana
+      ENTERA a propósito, y las tres tienen que valer igual.
+- [ ] **El cursor**: mientras arrastras, ¿dice «copiar» y no «mover»? Es lo que
+      promete que no se va a tocar el fichero de origen.
+- [ ] ⚠️ **Suéltalo FUERA de la ventana** (en el escritorio, en otra pestaña) y
+      vuelve. ¿El velo se ha quitado? Un velo que se queda puesto deja la
+      aplicación con una capa encima; el módulo tiene una red (el contador nunca
+      baja de cero y el velo va con `pointer-events: none`), pero eso se ve al
+      primer intento y no en un guion.
+- [ ] **Entra y sal cruzando el panel** (que está lleno de celdas): el velo no
+      puede **parpadear** al cruzar de un elemento a su hijo. Es el contador de
+      `dragenter`/`dragleave`, y en sintético no se nota.
+- [ ] **Suelta un `.dwg` o un `.pdf`.** Tiene que aparecer un aviso que nombre las
+      extensiones que sí se aceptan, y NO puede pasar nada más. Y luego suelta
+      **tres ficheros a la vez**: se abre el primero **y se dice cuál** y cuáles
+      no.
+- [ ] **El mismo fichero dos veces seguidas** por el botón «Abrir un GML…»: la
+      segunda tiene que volver a abrirlo. (El módulo vacía el `value` del input
+      justo para esto, y es el reintento más probable que hay: abrir un GML, ver
+      que le falta algo, corregirlo fuera y volver.)
+- [ ] **Con el teclado.** Tabula hasta «Abrir un GML…» y pulsa **Enter** y
+      **Espacio**: los dos tienen que abrir el selector de ficheros del sistema.
+      Ningún guion ve ese diálogo. Y el `<input type="file">` que el módulo
+      fabrica **no** puede aparecer como una segunda parada muda en el tabulador.
+
+### 9.2 · ¿Se entiende el cajón de comprobación, sin que nadie lo explique?
+
+**Por qué está aquí.** El guion mide que el cajón cabe, que no tapa nada y que
+dice lo que tiene que decir. Que se ENTIENDA es otra cosa. Enséñaselo a alguien
+que no haya visto la app —o míralo tú con ojos de cliente— con el fichero del WFS
+soltado:
+
+- [ ] El titular es «Comprobación del fichero — Parcela catastral · formato 4.0,
+      descarga del servicio». ¿Se entiende **qué le está diciendo la app**: que ha
+      leído el fichero, o que lo está juzgando?
+- [ ] El rótulo dice «declara «ISO-8859-1», leído como «utf-8»». Es un hecho real
+      y bien medido (el fichero **miente sobre sí mismo**). ¿Le sirve a un
+      arquitecto, o es ruido de programador? Si es ruido, la salida no es borrarlo
+      —regla de oro 1— sino contarlo de otra manera.
+- [ ] Las dos superficies, «que declara el fichero» (1536 m²) y «medida sobre sus
+      coordenadas» (1535,87 m²): ¿queda claro que son **dos números del mismo
+      fichero** y no el Catastro contra la medición? Es la confusión más cara de
+      esta fase.
+- [ ] **Los dos botones están abajo del todo y con el fichero malo hay que hacer
+      scroll dentro del cajón para llegar a ellos** (medido: el cajón mide 420 ×
+      468 px y su contenido, 937). ¿Se descubre que el cajón hace scroll, o parece
+      que no hay salida? Si no se descubre, la salida no es acortar las notas.
+- [ ] «Descartar»: ¿queda claro que **no cambia nada** y que el fichero
+      simplemente se suelta?
+- [ ] Con `cp_ejemplo_explicativo.gml` (la plantilla oficial, sin referencia
+      catastral): el cajón dice que no hay nada que pedirle al Catastro y el CTA
+      de F07 se queda apagado **con su motivo**. ¿Se lee como una explicación o
+      como un fallo de la app?
+
+### 9.3 · Las notas sobre el GML de otro técnico: ¿informan o regañan?
+
+**Por qué está aquí.** El guion cuenta las notas (8 con el fichero del WFS, 8
+notas y 4 hallazgos con el del huso incoherente) y comprueba que el recorrido
+CONTINÚA. No puede leerlas. Y esa tanda es larga: es lo que un GML ajeno produce
+en cuanto se le pasa la validación completa de F02.
+
+- [ ] Suelta `cp_huso_incoherente.gml` y **lee las notas en voz alta**, en el
+      papel del técnico que hizo ese fichero. ¿Suenan a «esto es lo que he
+      medido» o a «lo has hecho mal»?
+- [ ] La nota de los **15 vértices fuera del huso declarado** es la más dura que
+      la app puede escribir. ¿Dice qué ha pasado sin decidir de quién es la culpa?
+      ¿Y se entiende que el recorrido **sigue** —que el fichero se puede cargar
+      igual— o parece que ahí se acabó?
+- [ ] La orientación del contorno exterior sale como **informativa** («Horario»).
+      Override O1: es convención, no requisito, y la plantilla del propio Catastro
+      va antihoraria. ¿Se lee así, o parece un requisito incumplido?
+- [ ] El bloque «Es lo que devuelve el servicio de descarga del Catastro […] tal
+      cual NO se puede presentar en la Sede» es un hecho que costó un rechazo real.
+      ¿Se entiende que el problema es la **envoltura** y no la geometría?
+- [ ] Con `UTM_1.gml` (formato 3.0): dice que es de una versión que la Sede ya no
+      admite **y enseña la parcela igualmente**. ¿Se percibe esa doble cosa, o el
+      usuario cree que no puede hacer nada?
+
+### 9.4 · ⛔ EL PUNTO BLOQUEANTE: ¿alguna nota se lee como un veredicto sobre el trabajo de otro técnico? ⟨regla de oro 9⟩
+
+**Hereda el carácter bloqueante del 8.1, y por el mismo motivo.** El guardián
+mecánico ya exige que en `comprobacion/` no haya ni una clave, ni una palabra, ni
+una clase CSS de mérito (`test/comprobacion/aceptacion-f08.dom.test.js`), y el
+guion lo comprueba sobre el DOM pintado. Esto es lo que queda: **la lectura**. Y
+en F08 el sujeto no es una parcela: es el trabajo de una persona con nombre.
+
+- [ ] Enséñale el cajón a alguien y pregúntale, sin darle pistas: **«¿qué te está
+      diciendo esto del fichero?»** Si la respuesta natural es «que está mal» o
+      «que está bien», el texto no está haciendo su trabajo, aunque no contenga
+      ninguna palabra prohibida.
+- [ ] **`puedeContinuar` es la única excepción autorizada de la regla 9, y es
+      CAPACIDAD, no mérito**: vale `false` solo cuando no hay geometría legible,
+      nunca porque la parcela «esté mal». Cuando el botón «Contrastar» está
+      apagado, ¿el motivo escrito se lee como «la app no puede» o como «tu fichero
+      no vale»?
+- [ ] La palabra **ERROR** delante de un hallazgo de geometría. Es una
+      **severidad**, no una nota de examen — y por eso lleva color, que es la otra
+      excepción autorizada. ¿Se lee como el hecho que es?
+- [ ] Con el fichero de edificio (`bu_building_9398516VK3799G.gml`): la app dice
+      que es un GML de edificio, que el contraste de construcción **todavía no
+      existe** (es F14) y no deja contrastar contra el lindero. ¿Suena a «tu
+      fichero no sirve» o a «esto todavía no lo sé hacer»? La diferencia lo es
+      todo: lo segundo es la verdad.
+- [ ] Y el informe descargado, que es lo que puede acabar en manos de un tercero:
+      léelo entero una vez. ¿Alguna línea **dictamina** algo? El documento dice por
+      escrito que es provisional, sin pie de firma, y que **no** es la validación
+      gráfica alternativa (VGA) ni el informe de validación gráfica (IVG) del
+      Catastro. ¿Ese desmentido se ve, o hay que buscarlo?
+
+### 9.5 · La tercera vía: pulsar «Diagnosticar encaje» con el cajón de comprobación abierto
+
+**Por qué está aquí.** Los dos cajones comparten la esquina `bottomleft` y son
+mutuamente excluyentes por diseño. T4.1 blindó **dos** de los tres caminos
+(cualquier `estado.set` cierra el de comprobación; abrir el de comprobación
+cierra el de diagnóstico) y **declaró por escrito el tercero**: pulsar el CTA del
+pie con el cajón de comprobación abierto abre el de F07 sin tocar el store, así
+que Leaflet los apila en vertical. No se resolvió porque la única forma sería
+escuchar el clic del CTA de otra feature, y ese cable **se rompe en silencio** el
+día que ese botón cambie de nombre.
+
+Medido por el guion, para que lo juzgues con la cifra delante: los dos apilados
+ocupan **946 px** de alto en un lienzo de **900**, así que **el de comprobación se
+sale del mapa por arriba** (`y = −77`). No se solapan entre sí.
+
+- [ ] Suelta un fichero y, **sin pulsar «Contrastar» ni «Descartar»**, pulsa
+      «Diagnosticar encaje» en el pie. Míralo: ¿se lee como «dos cosas a la vez» o
+      como que algo se ha roto? ¿Se puede seguir trabajando —cerrar uno, usar el
+      otro— sin recargar?
+- [ ] ¿Cuánto molesta de verdad, o es un camino que nadie recorre? Si molesta, la
+      solución limpia está escrita: **que el cajón de F07 pregunte al de F08 al
+      abrirse**, no un oyente cruzado sobre el clic del CTA.
+
+### 9.6 · El sitio del cajón sobre el mapa ⟨juicio⟩
+
+Lo que el guion mide (0 px² de solape con los cinco controles, el 20,8 % del
+lienzo) dice que **cabe**. Si **estorba** es otra pregunta, y es la misma que el
+7.6 bis le hace a la barra de edición.
+
+- [ ] Con la parcela encuadrada: ¿el cajón tapa la geometría que hay que mirar
+      mientras se decide si contrastar? Trae dos o tres parcelas distintas.
+- [ ] Los dos cajones **se turnan en la misma esquina**. Con el recorrido
+      completo (soltar → contrastar → diagnosticar), ¿se percibe que es el mismo
+      sitio contando dos cosas distintas, o parece que uno «ha desaparecido»?
+- [ ] El velo de arrastre cubre la ventana entera con el acento del sistema.
+      ¿Ayuda, o tapa justo lo que se estaba mirando? Míralo también con el panel
+      de avisos lleno.
+- [ ] **Pantalla pequeña.** El cajón declara `min-width: min(300px, 42vw)` y a
+      1440 × 900 mide 420 px. Ábrelo en un portátil de 900 px de alto y con la
+      ventana estrecha: ¿sigue cabiendo, o se come el mapa entero?
+
+### 9.7 · El presupuesto de altura, cuarta fase seguida ⟨comprobación⟩
+
+El guion publica las cifras **sin juzgarlas** (regla de oro 9): la caja de
+vértices arranca en **267 px** —los mismos que dejó F07, o sea que el botón
+«Abrir un GML…» costó **0 px**, que era la Decisión 5—, **abrir el cajón no le
+quita nada** (267 → 267 en el tick del `drop`) y tras contrastar baja a **222 px**
+porque el renglón de procedencia pasa de vacío a **45 px** (tres líneas: ahora
+cuenta dos procedencias, no una). Quien decide si eso basta es una persona.
+
+- [ ] Con la parcela de un fichero cargada, ¿las ~9 filas que quedan bastan para
+      trabajar una parcela de 15 vértices? Compáralo con lo que había antes de
+      contrastar.
+- [ ] **El renglón de procedencia doble ocupa tres líneas de 11 px.** ¿Se lee, o
+      es un párrafo gris que nadie mira? Es el único sitio de la pantalla que dice
+      que **la geometría no es del Catastro**, así que si no se lee, el error de
+      producto de la fase sigue vivo aunque el texto sea correcto.
+- [ ] Con el fichero del huso incoherente cargado y el panel de avisos con
+      tarjetas: ¿aguanta la tabla?
+
+---
+
 ## Qué hacer con el resultado
 
 - **Todo conforme** → F03 se marca hecha (`README.md` §Estado y `spec/SPEC.md`).
@@ -700,6 +990,49 @@ tú con ojos de cliente— y pregunta:
   `09-diagnostico.js`. Los tonos y opacidades viven en `viewer/contraste.js`
   (constantes con su porqué) y el cromo del cajón en `estilos/app.css`; la esquina
   es la opción `diagnostico.posicion` de `crearVisor`.
+- **Algo del 9.1 falla** → **bloquea F08**, y es un defecto real de la entrada por
+  fichero: es la única vía de entrada que la fase estrena, y el guion solo puede
+  sintetizarla. Mismo protocolo que el punto 1: se arregla en
+  **`app/zona-fichero.js`** (y su test `.dom`), con propiedad exclusiva del
+  módulo — nunca un parche desde `app/cableado-comprobacion.js`. Si lo que falla
+  es el teclado sobre «Abrir un GML…», el dueño es el mismo módulo (el `<button>`
+  vive en `index.html`, pero quien lo cablea al input es él).
+- **Algo del 9.2, 9.3, 9.6 o 9.7 no convence** → es redacción, presentación o
+  producto. Se anota y se decide; **no bloquea F08**, porque la mecánica ya está
+  medida por `10-comprobar-gml.js`. Los textos del cajón viven en
+  **`viewer/cajon-comprobacion.js`**; los de las notas y los hallazgos, en
+  **`comprobacion/_comun.js`** (el catálogo `TIPO_COMPROBACION`) y en
+  `gml/_comun.js#TIPO_GML`; el cromo del cajón y el velo, en **`estilos/app.css`**
+  (tramo de F08); el renglón de procedencia doble, en
+  **`app/cableado-comprobacion.js#textoProcedenciaDoble`**; y la esquina del
+  cajón, en la opción `comprobacion` de `crearVisor`.
+- **Algo del 9.4 se lee como un veredicto** → **BLOQUEA F08**, y es EL punto de la
+  fase, igual que el 8.1 lo era de F07. Aquí el sujeto no es una parcela: es el
+  trabajo de otro técnico con nombre. La regla de oro 9 no se cumple con no
+  escribir «apta» — se cumple cuando nadie LEE un apta donde no lo hay. La salida
+  no es quitar la nota (regla de oro 1: se dice todo): es **rotularla mejor**. Los
+  textos están en **`comprobacion/_comun.js`**, **`viewer/cajon-comprobacion.js`**
+  y **`report/contraste-texto.js`**; los mensajes del recorrido, en
+  **`app/cableado-comprobacion.js`**.
+- **El 9.5 (la tercera vía) molesta de verdad** → **no bloquea**: está declarado
+  por escrito desde T4.1 y los otros dos caminos sí están blindados. Si se decide
+  arreglar, la solución limpia está escrita y es **que el cajón de F07 pregunte al
+  de F08 al abrirse** (`viewer/cajon-diagnostico.js`), NO un oyente cruzado sobre
+  el clic del CTA: ese cable se rompe en silencio.
+- **Los dos defectos que `10-comprobar-gml.js` ya destapó** (`GUION.md` §16) no se
+  vuelven a levantar aquí: están medidos. El de la tipografía es presentación y
+  **no bloquea**; el de la descarga cerrando el cajón de diagnóstico **sí**, porque
+  la confirmación de que el fichero ha bajado se escribe donde nadie puede leerla
+  —regla de oro 1— y se corrige en `viewer/cajon-diagnostico.js` o en
+  `gml/descargar.js`.
+- **Los TRES que encontró esta lista** (encabezado del punto 9) tampoco se vuelven
+  a levantar: los mide el guion desde el 2026-08-02. Si alguno **reaparece**, es
+  regresión y **bloquea**, porque los tres son la regla de oro 1 —«la app hizo el
+  trabajo y no lo enseñó»— en tres sitios distintos. Dueños: el reencuadre,
+  `viewer/index.js` (paso 7); las vecinas, `viewer/colindantes.js` más su pane en
+  `viewer/_comun.js#PANES` y el suscriptor de `app/main.js`; el campo,
+  `app/cableado-comprobacion.js`. **Nunca un parche desde otra capa**: es el mismo
+  protocolo del punto 1.
 
 ## Cuándo repetir esta lista
 
@@ -719,6 +1052,16 @@ El punto **8** se repite cuando cambien los textos o los colores del diagnóstic
 cada palabra. Los disparadores del mecanismo son los de `09-diagnostico.js`
 (`GUION.md` §15).
 
+El punto **9** se repite cuando cambien los textos del cajón de comprobación
+(`viewer/cajon-comprobacion.js`), el catálogo de notas y hallazgos
+(`comprobacion/_comun.js`, `gml/_comun.js#TIPO_GML`), el renglón de procedencia
+doble (`app/cableado-comprobacion.js`) o el informe
+(`report/contraste-texto.js`) — el 9.3 y el 9.4 son sobre la LECTURA, y la
+lectura cambia con cada palabra. El **9.1** se repite además con cada
+`app/zona-fichero.js` y **cada navegador o sistema operativo nuevos**: el
+arrastre de ficheros no es de la app, es del entorno. Los disparadores del
+mecanismo son los de `10-comprobar-gml.js` (`GUION.md` §8 y §16).
+
 El punto **7** se repite con los mismos disparadores que `08-edicion.js`
 (`GUION.md` §8 y §14): `viewer/edicion.js`, `viewer/acotaciones.js`,
 **`viewer/barra-edicion.js`**, `cablearEdicion`, `edit/snap.js`, `edit/offset.js` y
@@ -726,4 +1069,12 @@ los operativos `snapMetros` / `acotacionMinimaPx`. ~~El bloque «Edición» de
 `index.html`~~ ya no existe: desde el 2026-07-29 los siete nodos los fabrica la
 barra, y G16 exige que no vuelvan al marcado. Y el **7.2** además cada vez que se
 pruebe en un navegador o un sistema operativo nuevos: la tecla no es de la app, es
-del entorno.
+del entorno. El **7.7** se repite además cuando cambie **`viewer/colindantes.js`**
+o su pane (`viewer/_comun.js#PANES`): el color, el grosor y el emergente de las
+vecinas son juicio visual, y la mecánica la mide el guion 10.
+
+⛔ **Y toda la lista, ahora.** Se recorrió el 2026-08-02, salieron **tres defectos
+reales** (encabezado del punto 9), se corrigieron los tres y **la lista no llegó a
+firmarse**. Hay que volver a recorrerla entera con las correcciones puestas: es la
+propia regla de esta sección, y esta vez con el motivo delante. La cadena
+bloqueada sigue siendo F03 → F05 → F06 → F07 → F08.

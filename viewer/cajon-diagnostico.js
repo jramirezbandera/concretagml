@@ -23,6 +23,34 @@
 // del margen— y ni una línea de `model/` o `edit/`. Es la misma doctrina, y por las
 // mismas razones, que `viewer/barra-edicion.js`.
 //
+// ── F08 · POR QUÉ «DESCARGAR INFORME DE CONTRASTE» VIVE AQUÍ Y NO EN EL PIE ──
+// El pie de `index.html` ya tiene dos CTA —«Generar GML» (F04) y «Diagnosticar
+// encaje» (F07)— y el sitio natural de un tercero parecería ser ese. No lo es, y
+// las tres razones son las que el plan de F08 fijó, en este orden:
+//
+//   1. **Es la acción que CONSUME el diagnóstico, y el diagnóstico se lee AQUÍ.**
+//      El informe no es otra cosa que las cifras de este cajón puestas en un
+//      fichero. Poner el botón en el panel, a un palmo de distancia de las cifras
+//      que descarga, obligaría a recordar qué se estaba mirando para saber qué se
+//      está bajando.
+//   2. **El cajón tiene ANCHURA y el pie no.** Los CTA del pie van a lo ancho y
+//      uno DEBAJO de otro —el razonamiento está escrito en `index.html`, junto al
+//      de F07: «secundario y debajo del primario, no al lado»—, así que un tercero
+//      cuesta ~36 px MEDIDOS de altura del panel, y esos píxeles salen de la caja
+//      de vértices, que es justo la que lleva sin sitio desde F06. Aquí cuesta
+//      **0 px de panel**, igual que costó traerse el diagnóstico al mapa.
+//   3. **Sirve igual de bien a las DOS vías de entrada.** Quien llegó por
+//      referencia catastral (F05) y quien llegó soltando un GML ajeno (F08)
+//      quieren el mismo informe. El cajón es común a las dos, así que no hay que
+//      ramificar la interfaz por procedencia — y `report/contraste-texto.js` acepta
+//      `comprobacion: null` precisamente para eso.
+//
+// Lo que este módulo NO sabe es qué se escribe dentro del informe ni cómo baja:
+// solo enciende el botón, lo apaga y avisa de que lo han pulsado. Componer el
+// texto es de `report/contraste-texto.js` y entregarlo de
+// `gml/descargar.js#descargarTexto`; a los dos los llama
+// `app/cableado-diagnostico.js`, que es quien conoce el store y el reloj.
+//
 // ── LA REGLA DE ORO 9 ES EL REQUISITO PRINCIPAL DE ESTE FICHERO ─────────────
 // «La aplicación mide; el colegiado interpreta y firma.» En un cajón lleno de cifras
 // eso se traduce en tres prohibiciones concretas, y las tres tienen guardián:
@@ -115,12 +143,26 @@ export const CLASE = Object.freeze({
  * y mudo sin que nada lo dijera. Es exactamente la trampa que `index.html` ya
  * documenta con la barra de edición. Aquí se nombra por el componente, que además
  * es lo que este renglón es.
+ *
+ * ⚠️ Y lo mismo, otra vez, con el pie de F08: el renglón del informe vale
+ * `informe-contraste` y **no** `descargar-informe`, que es el valor de su
+ * `data-accion`. La convención del PIE de la app (`generar-gml`/`generar-gml`)
+ * empareja acción y estado porque allí solo hay un nodo de cada; dentro del mapa
+ * ya se ha visto lo que cuesta —M8 de F07—, así que aquí se nombra por el
+ * COMPONENTE («el renglón del informe de contraste») y no por la acción. Que hoy
+ * las dos cadenas no colisionen no basta: `descargar-informe` es exactamente el
+ * nombre que le pondría el siguiente que añada un botón «Descargar informe» en
+ * el pie, y `querySelector` se quedaría con el PRIMERO del documento —el
+ * `<aside>` va antes que el `<main>`— dejando uno de los dos mudo y sin síntoma.
+ * Hay un test que afirma que ningún otro nodo del documento lleva este valor.
  */
 export const SELECTOR = Object.freeze({
   CERRAR: '[data-accion="cerrar-diagnostico"]',
   REGISTRAL: '[data-campo="superficie-registral"]',
   CLASE_PARCELA: '[data-campo="clase-parcela"]',
   ESTADO: '[data-estado="cajon-diagnostico"]',
+  DESCARGAR: '[data-accion="descargar-informe"]',
+  ESTADO_INFORME: '[data-estado="informe-contraste"]',
   TITULAR: '[data-diag="titular"]',
   MEDIDA: '[data-diag="superficie-medida"]',
   CATASTRAL: '[data-diag="superficie-catastral"]',
@@ -146,6 +188,39 @@ const ROTULO_BANDA = Object.freeze({
  * del pie.
  */
 const NO_CONSTA = 'No consta'
+
+/**
+ * Por qué «Descargar informe de contraste» está apagado. Se escribe en el renglón
+ * del pie **en el mismo instante** en que el botón se apaga —al nacer y en cada
+ * `pintar(null)`—, porque un botón gris y mudo es un error silencioso (regla de
+ * oro 1): desde fuera no se distingue de uno roto.
+ *
+ * Dice las dos cosas que hacen falta: qué falta y qué hay que hacer para tenerlo.
+ * Se exporta para que el cableado y los tests lo afirmen sin copiar el literal,
+ * igual que {@link MOTIVO_SIN_OFICIAL} de `app/cableado-diagnostico.js`.
+ *
+ * @readonly
+ */
+export const MOTIVO_INFORME_SIN_DIAGNOSTICO =
+  '«Descargar informe de contraste» está apagado: el informe recoge las medidas de este ' +
+  'diagnóstico y todavía no hay ninguna calculada. Se enciende en cuanto el cajón muestra ' +
+  'un diagnóstico.'
+
+/**
+ * Las dos vestimentas del botón del informe, que viajan SIEMPRE con su `disabled`
+ * (ver `gateInforme`). Un botón que parece pulsable y no lo es no se distingue de
+ * uno roto; uno apagado que parece encendido, tampoco.
+ *
+ * El apagado va en el GRIS del cromo y **nunca en rojo**: lo que se comunica es
+ * «esto no se puede pulsar ahora», no «esto está mal» (regla de oro 9). El porqué
+ * se escribe con palabras en el renglón de al lado, que es donde se lee. Son los
+ * mismos dos pares que usa el primario de `viewer/cajon-comprobacion.js`, para que
+ * los dos cajones —que comparten esquina y se turnan— no parezcan dos apps.
+ */
+const BOTON_INFORME = Object.freeze({
+  ENCENDIDO: Object.freeze({ background: '#0F172A', color: '#fff', cursor: 'pointer' }),
+  APAGADO: Object.freeze({ background: '#E2E8F0', color: '#64748B', cursor: 'default' }),
+})
 
 const nf = (decimales) =>
   new Intl.NumberFormat('es-ES', {
@@ -237,7 +312,7 @@ const CajonDiagnostico = L.Control.extend({
     this._alEscape = (evento) => this._cerrarPorEscape(evento)
     this._abierto = false
     this._eventoApertura = null
-    this._oyentes = { cerrar: new Set(), cambiar: new Set() }
+    this._oyentes = { cerrar: new Set(), cambiar: new Set(), descargar: new Set() }
   },
 
   onAdd(mapa) {
@@ -307,6 +382,7 @@ const CajonDiagnostico = L.Control.extend({
     const bandas = crear(doc, 'div', CLASE.SECCION)
     const idRegistral = `gml-diag-registral-${sello}`
     const idClase = `gml-diag-clase-${sello}`
+    const idInforme = `gml-diag-informe-${sello}`
 
     const medida = crear(doc, 'dd', CLASE.CIFRA)
     medida.dataset.diag = 'superficie-medida'
@@ -459,7 +535,65 @@ const CajonDiagnostico = L.Control.extend({
     })
     this._estado = estado
 
-    contenedor.append(cabecera, bandas, metricas, invasion, bloqueMargen, estado)
+    // ── El PIE: la acción que consume el diagnóstico (F08) ─────────────────
+    // Por qué vive aquí y no en el pie de la app: ver la cabecera del módulo.
+    // `<footer>` de verdad, hermano del `<header>` de la cabecera; no lleva clase
+    // porque `estilos/app.css` no necesita engancharse a él, y una clase que nadie
+    // viste es un gancho que invita a escribir la regla y a creer que se aplica
+    // (ver la nota de `OMISION` en {@link CLASE}).
+    const pie = crear(doc, 'footer')
+    estilar(pie, { marginTop: '12px' })
+
+    const descargar = crear(doc, 'button', null, 'Descargar informe de contraste')
+    descargar.type = 'button'
+    descargar.dataset.accion = 'descargar-informe'
+    // El renglón de debajo es donde se escribe POR QUÉ está apagado, así que se
+    // ENLAZA: un lector de pantalla que anuncie el botón anuncia también el
+    // motivo, sin que el usuario tenga que ir a buscarlo. Mismo recurso que el
+    // primario de `viewer/cajon-comprobacion.js`.
+    descargar.setAttribute('aria-describedby', idInforme)
+    // NACE APAGADO: sin diagnóstico calculado no hay cifras que llevarse. A partir
+    // de aquí lo gobierna `pintar`, y NUNCA sin escribir el motivo (regla 1).
+    descargar.disabled = true
+    // ⚠️ NI `font: 'inherit'` NI NINGUNA `fontFamily` AQUÍ, y es deliberado
+    // (2026-07-30, corregido tras medirlo en el guion 10). El atajo
+    // `font: 'inherit'` hereda el `font` EN LÍNEA del contenedor —`system-ui`— y,
+    // por ser inline, **gana a la hoja**: la regla `.gml-cajon-diagnostico button`
+    // de `estilos/app.css` quedaba muerta y el botón salía en `system-ui` mientras
+    // el resto del cajón iba en Geist. El módulo fija tamaño y grosor (legible sin
+    // hoja); **la FAMILIA la pone la hoja**. Mismo reparto que en
+    // `viewer/cajon-comprobacion.js`, y por eso los dos cajones se arreglan juntos.
+    estilar(descargar, {
+      border: '0',
+      borderRadius: '4px',
+      padding: '6px 12px',
+      fontSize: 'inherit',
+      lineHeight: 'inherit',
+      fontWeight: '600',
+      ...BOTON_INFORME.APAGADO,
+    })
+    this._descargar = descargar
+
+    const estadoInforme = crear(doc, 'p')
+    estadoInforme.id = idInforme
+    // `informe-contraste`, no `descargar-informe`: ver el aviso de {@link SELECTOR}.
+    estadoInforme.dataset.estado = 'informe-contraste'
+    estadoInforme.setAttribute('role', 'status')
+    estilar(estadoInforme, {
+      margin: '6px 0 0',
+      fontSize: '12px',
+      color: '#64748B',
+      minHeight: '1em',
+    })
+    // El motivo se escribe YA, no al primer repintado: el cajón puede abrirse sin
+    // que nadie haya llamado a `pintar` todavía, y ese es justo el instante en que
+    // el botón está gris.
+    estadoInforme.textContent = MOTIVO_INFORME_SIN_DIAGNOSTICO
+    this._estadoInforme = estadoInforme
+
+    pie.append(descargar, estadoInforme)
+
+    contenedor.append(cabecera, bandas, metricas, invasion, bloqueMargen, estado, pie)
 
     // OBLIGATORIOS: sin ellos, pulsar dentro seleccionaría un lindero por debajo y
     // la rueda sobre la tabla haría zoom al mapa.
@@ -467,6 +601,7 @@ const CajonDiagnostico = L.Control.extend({
     L.DomEvent.disableScrollPropagation(contenedor)
 
     L.DomEvent.on(cerrar, 'click', this._alPulsarCerrar, this)
+    L.DomEvent.on(descargar, 'click', this._alPulsarDescargar, this)
     L.DomEvent.on(registral, 'change', this._alCambiar, this)
     L.DomEvent.on(registral, 'input', this._alCambiar, this)
     L.DomEvent.on(selectorClase, 'change', this._alCambiar, this)
@@ -478,6 +613,7 @@ const CajonDiagnostico = L.Control.extend({
 
   onRemove() {
     L.DomEvent.off(this._botonCerrar, 'click', this._alPulsarCerrar, this)
+    L.DomEvent.off(this._descargar, 'click', this._alPulsarDescargar, this)
     L.DomEvent.off(this._registral, 'change', this._alCambiar, this)
     L.DomEvent.off(this._registral, 'input', this._alCambiar, this)
     L.DomEvent.off(this._clase, 'change', this._alCambiar, this)
@@ -545,6 +681,22 @@ const CajonDiagnostico = L.Control.extend({
   _alCambiar() {
     for (const fn of this._oyentes.cambiar) fn()
   },
+
+  /**
+   * Pulsación de «Descargar informe de contraste».
+   *
+   * ⚠️ **No se llama a `L.DomEvent.stop`**, a diferencia del botón de cerrar, y es
+   * la misma decisión que tomó `viewer/cajon-comprobacion.js`: parar la propagación
+   * de este clic dejaría sordo a cualquier otro oyente del `document` —hoy, el
+   * panel de ayuda de la barra de edición— por un problema que ni siquiera existe.
+   * No existe porque el clic pasa igualmente por {@link
+   * CajonDiagnostico._cerrarPorClicFuera}, que lo ve DENTRO del contenedor y no
+   * cierra nada: `disableClickPropagation` no detiene el `click`, pero la
+   * comprobación `contains` sí lo distingue.
+   */
+  _alPulsarDescargar(evento) {
+    for (const fn of this._oyentes.descargar) fn(evento)
+  },
 })
 
 /**
@@ -555,6 +707,7 @@ const CajonDiagnostico = L.Control.extend({
  * cajon.abrir()
  * cajon.pintar(diagnostico)
  * cajon.alCambiar(() => recalcular(cajon.registral(), cajon.clase()))
+ * cajon.alDescargar(() => bajarInforme())   // el pie de F08
  * ```
  *
  * @param {Object} opciones
@@ -568,8 +721,9 @@ const CajonDiagnostico = L.Control.extend({
  *   el patrón obligatorio del visor.
  * @returns {{control: object, pintar: Function, abrir: Function, cerrar: Function,
  *   abierto: Function, registral: Function, clase: Function,
- *   reiniciarExpediente: Function, estado: Function, alCambiar: Function,
- *   alCerrar: Function, destruir: Function}}
+ *   reiniciarExpediente: Function, estado: Function, estadoInforme: Function,
+ *   alCambiar: Function, alDescargar: Function, alCerrar: Function,
+ *   destruir: Function}}
  * @throws {TypeError|RangeError} Contrato del programador.
  */
 export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar } = {}) {
@@ -816,6 +970,43 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       : cifras
   }
 
+  /**
+   * El `disabled` del botón del informe, su vestimenta y su renglón: las TRES
+   * cosas en una sola función, para que no puedan divergir. Es el mismo recurso
+   * —y por lo mismo— que `apagarPrimario` en `viewer/cajon-comprobacion.js`.
+   *
+   * La regla es una sola línea: **el informe se puede descargar ⟺ el cajón está
+   * enseñando un diagnóstico**. No hace falta que nadie se la cuente al cajón
+   * desde fuera; la sabe él, porque es quien recibe el POJO en `pintar`.
+   *
+   * ── POR QUÉ AL ENCENDER SOLO SE BORRA EL MOTIVO, Y NO EL RENGLÓN ────────────
+   * `pintar` corre en CADA operación acabada —o sea, en cada vértice que F06 mueva
+   * con el cajón abierto—. Vaciar el renglón sin condición se llevaría por delante
+   * el «Descargado «contraste_….txt».» que el cableado acaba de escribir, un
+   * instante después de haberlo puesto. Es exactamente la regla que
+   * `app/cableado-diagnostico.js#refrescarBoton` ya defiende para el renglón del
+   * CTA, y aquí se aplica al revés: se reconoce el motivo por su texto y se borra
+   * solo él.
+   *
+   * Al APAGAR sí se pisa lo que hubiera: un desenlace anterior habla de un
+   * diagnóstico que ya no está, y dejarlo escrito junto a un botón gris haría creer
+   * que basta con volver a pulsarlo.
+   *
+   * @param {boolean} hayDiagnostico
+   */
+  function gateInforme(hayDiagnostico) {
+    if (!control._descargar || !control._estadoInforme) return
+    control._descargar.disabled = !hayDiagnostico
+    estilar(control._descargar, hayDiagnostico ? BOTON_INFORME.ENCENDIDO : BOTON_INFORME.APAGADO)
+    if (!hayDiagnostico) {
+      control._estadoInforme.textContent = MOTIVO_INFORME_SIN_DIAGNOSTICO
+      return
+    }
+    if (control._estadoInforme.textContent === MOTIVO_INFORME_SIN_DIAGNOSTICO) {
+      control._estadoInforme.textContent = ''
+    }
+  }
+
   return {
     control,
 
@@ -835,6 +1026,8 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
         control._cruces.replaceChildren()
         control._invasion.replaceChildren()
         control._margen.textContent = ''
+        // Sin cifras no hay informe que componer, y el botón lo dice.
+        gateInforme(false)
         return
       }
 
@@ -851,6 +1044,8 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       pintarMetricas(d)
       pintarInvasion(d)
       pintarMargen(d)
+      // Hay diagnóstico enseñándose: el informe ya se puede llevar.
+      gateInforme(true)
     },
 
     /**
@@ -920,6 +1115,20 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
     },
 
     /**
+     * Escribe el renglón del PIE del informe (`role="status"`), que es un nodo
+     * DISTINTO del de arriba: aquel cuenta lo que le pasa a lo que se está
+     * enseñando (las vecinas que no llegaron, un fallo del cálculo) y este, el
+     * desenlace de pulsar «Descargar informe de contraste». Se llaman distinto
+     * (`cajon-diagnostico` / `informe-contraste`) por la misma razón por la que
+     * ninguno se llama `diagnostico`: ver el aviso de {@link SELECTOR}.
+     *
+     * @param {string} texto
+     */
+    estadoInforme(texto) {
+      if (!destruido && control._estadoInforme) control._estadoInforme.textContent = texto
+    },
+
+    /**
      * Se suscribe a los cambios del usuario en la registral o en la clase. Devuelve
      * la BAJA. Varios oyentes, como `alColindantes` de F05: un `= fn` desengancharía
      * al primero en silencio.
@@ -930,6 +1139,23 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       }
       control._oyentes.cambiar.add(fn)
       return () => control._oyentes.cambiar.delete(fn)
+    },
+
+    /**
+     * Se suscribe a la pulsación de «Descargar informe de contraste». Devuelve la
+     * BAJA. Varios oyentes, igual que {@link alCambiar}: un `= fn` desengancharía
+     * al primero en silencio.
+     *
+     * El cajón **no compone ni entrega nada**: solo avisa. Quien escucha es
+     * `app/cableado-diagnostico.js`, que sabe qué diagnóstico se está enseñando,
+     * qué parcela hay en el store, qué hora es y cómo se baja un fichero.
+     */
+    alDescargar(fn) {
+      if (typeof fn !== 'function') {
+        throw new TypeError(`alDescargar: 'fn' debe ser una función; recibido ${typeof fn}.`)
+      }
+      control._oyentes.descargar.add(fn)
+      return () => control._oyentes.descargar.delete(fn)
     },
 
     /** Se suscribe al cierre (botón, clic fuera o Escape). Devuelve la BAJA. */
@@ -950,6 +1176,7 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       destruido = true
       control._oyentes.cerrar.clear()
       control._oyentes.cambiar.clear()
+      control._oyentes.descargar.clear()
       control.remove()
     },
   }

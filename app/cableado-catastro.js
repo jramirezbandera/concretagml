@@ -495,11 +495,20 @@ function describirEdad(edadMs) {
  * dato acaba de llegar, que es exactamente la mentira que este renglón existe para
  * evitar. Una hora sigue siendo verdad siempre.
  *
+ * ⛔ **EXPORTADA desde F08 · T4.1, y solo por eso.** `app/cableado-comprobacion.js`
+ * escribe el MISMO renglón `[data-procedencia="parcela"]` cuando la parcela entra
+ * desde un fichero, y su procedencia es DOBLE: la geometría es del fichero y el
+ * parcelario del Catastro. La mitad que habla del Catastro tiene que decir
+ * exactamente lo que dice aquí —incluida la edad de la copia local—, así que se
+ * reutiliza esta función en vez de redactar una segunda versión: dos redacciones
+ * del mismo hecho divergen, y la que se queda vieja siempre es la nueva. Este
+ * módulo no cambia por ello ni una línea de comportamiento.
+ *
  * @param {import('../services/catastro.js').ProcedenciaCatastro} procedencia
  * @param {Date} instante  El «ahora» del cableado (inyectable: ver `cablearCatastro`).
  * @returns {string}
  */
-function textoProcedencia(procedencia, instante) {
+export function textoProcedencia(procedencia, instante) {
   if (procedencia.origen === ORIGEN.CACHE) {
     const edad = describirEdad(procedencia.edadMs)
     return edad === null

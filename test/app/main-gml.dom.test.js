@@ -77,6 +77,7 @@ import { crearParcela, crearRecinto, ORIGEN_PARCELA, TIPO_RECINTO } from '../../
 import { validarParcela } from '../../validation/parcela.js'
 import { NIVEL, crearEstadoVista } from '../../viewer/_comun.js'
 import { crearBarraEdicion } from '../../viewer/barra-edicion.js'
+import { crearCajonComprobacion } from '../../viewer/cajon-comprobacion.js'
 import { crearCajonDiagnostico } from '../../viewer/cajon-diagnostico.js'
 import { crearContraste } from '../../viewer/contraste.js'
 import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
@@ -95,20 +96,31 @@ import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
  * aquella cabecera): una copia se desincroniza en silencio del original y estas
  * pruebas se quedarían ciegas a un cambio de contrato.
  *
- * Aquí basta con montarlo UNA vez, al arrancar: ningún test de este fichero toca
- * esos nodos ni vuelve a cablear la edición ni el diagnóstico.
+ * Y desde F08, el CAJÓN DE COMPROBACIÓN, por la misma razón que los otros tres:
+ * `cablearComprobacion` va también FUERA del `try` del Catastro y comprueba por
+ * duck typing los siete métodos del cajón antes de cablear nada, así que un doble
+ * escrito a mano sería una segunda redacción de esa API —y sin él el import de
+ * `app/main.js` se cae y esta suite entera desaparece—.
  *
- * @returns {{cajon: object, contraste: object}}  Lo que el doble devuelve como
- *   `visor.diagnostico`.
+ * Aquí basta con montarlo UNA vez, al arrancar: ningún test de este fichero toca
+ * esos nodos ni vuelve a cablear la edición, el diagnóstico ni la comprobación.
+ *
+ * @returns {{diagnostico: {cajon: object, contraste: object}, comprobacion: object}}
+ *   Lo que el doble devuelve como `visor.diagnostico` y `visor.comprobacion`.
  */
 function montarCromoDelMapa() {
   const { mapa } = montarMapa()
   crearPanes(mapa)
   crearBarraEdicion({ mapa })
   return {
-    cajon: crearCajonDiagnostico({ mapa }),
-    // El huso se DERIVA del SRS del expediente con la misma función que la app.
-    contraste: crearContraste({ mapa, zona: husoPorSrs(SRS_DEMO) }),
+    diagnostico: {
+      cajon: crearCajonDiagnostico({ mapa }),
+      // El huso se DERIVA del SRS del expediente con la misma función que la app.
+      contraste: crearContraste({ mapa, zona: husoPorSrs(SRS_DEMO) }),
+    },
+    // SUELTO y no dentro de un objeto, igual que en el visor real: F07 son dos
+    // piezas inseparables y F08 es una sola.
+    comprobacion: crearCajonComprobacion({ mapa }),
   }
 }
 
@@ -140,20 +152,33 @@ function montarCromoDelMapa() {
 // `cablearDiagnostico` comprueba por duck typing los diez métodos del cajón y los
 // dos de la capa, y va FUERA del `try` del Catastro — así que un doble escrito a
 // mano no dejaría un bloque muerto, tumbaría esta suite entera.
+//
+// Y desde F08 incluye `comprobacion`, la pieza SUELTA del visor: el paso 9 del
+// ensamblaje también vive fuera del `try`, así que vale lo mismo que el párrafo
+// anterior — sin ella no hay bloque muerto, hay suite entera caída.
 vi.mock('../../viewer/index.js', () => ({
-  crearVisor: () => ({
-    mapa: { on() {}, off() {} },
-    edicion: {
-      snapActivo: () => true,
-      tolerancia: () => 0.2,
-      ladoSeleccionado: () => null,
-      alCambiarSeleccion: () => () => {},
-      fijarColindantes() {},
-      desplazarSeleccion: () => ({ aplicado: false, modo: null, detecciones: [] }),
-    },
-    diagnostico: montarCromoDelMapa(),
-    destruir() {},
-  }),
+  crearVisor: () => {
+    const cromo = montarCromoDelMapa()
+    return {
+      mapa: { on() {}, off() {} },
+      edicion: {
+        snapActivo: () => true,
+        tolerancia: () => 0.2,
+        ladoSeleccionado: () => null,
+        alCambiarSeleccion: () => () => {},
+        fijarColindantes() {},
+        desplazarSeleccion: () => ({ aplicado: false, modo: null, detecciones: [] }),
+      },
+      // La capa de vecinas: doblada y muda. Aquí no se prueba nada suyo (eso está
+      // en `main-edicion.dom.test.js` y en `test/viewer/`), pero tiene que EXISTIR:
+      // `app/main.js` monta el visor con `colindantes: true` y el suscriptor que
+      // las dibuja llama a `visor.colindantes.pintar(...)` sin comprobar nada.
+      colindantes: { pintar() {}, limpiar() {}, destruir() {} },
+      diagnostico: cromo.diagnostico,
+      comprobacion: cromo.comprobacion,
+      destruir() {},
+    }
+  },
 }))
 
 // ── La cáscara REAL, leída de `index.html` ───────────────────────────────────

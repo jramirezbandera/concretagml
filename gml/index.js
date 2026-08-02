@@ -52,7 +52,7 @@
 // exporta `texto`, `hijo`, `hijos`, `atributo`, `elem`, `render` y `ruta`:
 // fontanería XML con nombres genéricos que no significan nada fuera de su módulo
 // y que colisionarían con lo primero que se llame igual. La API pública del
-// proyecto son dos funciones y el vocabulario para interpretar lo que devuelven.
+// proyecto son TRES funciones y el vocabulario para interpretar lo que devuelven.
 //
 // ── QUÉ NO SALE, Y POR QUÉ ───────────────────────────────────────────────────
 //   · `gml/xml.js` ENTERO — lector/escritor XML genérico, sin dominio. Quien
@@ -65,7 +65,7 @@
 //     mano por fuera del serializador, que es justo lo que este módulo existe
 //     para impedir. Si alguna hace falta de verdad, se añade aquí con su motivo.
 //
-// Lo que SÍ sale es, en una frase: las dos funciones de entrada y salida, más el
+// Lo que SÍ sale es, en una frase: las tres funciones de entrada y salida, más el
 // vocabulario CERRADO con el que se leen sus `detecciones` y su `resumen`
 // (severidades, tipos, dialectos, orientaciones, orígenes del punto, motivos de
 // saneado) y la única función que la capa de aplicación necesita para meter el
@@ -91,14 +91,28 @@
  */
 
 // ── Entrada y salida ─────────────────────────────────────────────────────────
-// Las dos únicas funciones que hacen trabajo. Todo lo demás de este fichero
-// existe para poder leer lo que estas dos devuelven.
+// Las únicas funciones que hacen trabajo: leer un GML, escribirlo, y —desde
+// F08— convertir los bytes de un fichero ajeno en el texto que lee la primera.
+// Todo lo demás de este fichero existe para poder leer lo que devuelven.
 
 export { parsearGml } from './parse.js'
 export { serializarParcelaCp } from './serialize-cp.js'
 
+// ── El escalón de debajo: bytes → texto (F08) ────────────────────────────────
+// `parsearGml` recibe un `string` y nunca ha sabido de dónde salía. Cuando el
+// fichero lo trae el usuario —que es F08— alguien tiene que decidir con qué
+// codificación se leen sus bytes, y esa decisión NO puede ser «lo que diga el
+// prólogo»: el GML real del WFS declara `ISO-8859-1` y sus bytes son UTF-8.
+// `decodificarGml` lo decide por prueba y lo cuenta. Sale por el barrel porque
+// es puro —`TextDecoder` es WHATWG Encoding, no DOM: existe igual en Node y en
+// el navegador— y porque su salida es la ENTRADA de `parsearGml`: publicar una
+// sin la otra dejaría al consumidor obligado a improvisar el paso que este
+// módulo existe para hacer bien.
+
+export { decodificarGml } from './decodificar.js'
+
 // ── Vocabulario de las detecciones ───────────────────────────────────────────
-// Las dos funciones devuelven `detecciones` (regla de oro 1: ningún error
+// Las tres funciones devuelven `detecciones` (regla de oro 1: ningún error
 // silencioso). Sin estas dos tablas, la UI tendría que decidir mirando el TEXTO
 // del mensaje, que es lo único que sí puede cambiar.
 

@@ -15,7 +15,9 @@
  * nazca SEMBRADA, que los botones y los atajos la sigan, que los atajos se      *
  * callen dentro de un campo de texto, que undo/redo NO ensucien la pila, que la *
  * ficha se repinte por el canal en vivo y por el del store con la MISMA         *
- * función, y que las colindantes lleguen APLANADAS a las dianas del enganche.   *
+ * función, y que las colindantes lleguen APLANADAS a las dianas del enganche    *
+ * y SIN APLANAR a la capa que las dibuja — dos formas del mismo resultado, dos  *
+ * consumidores, y un reparto que no se puede unificar sin romper una de las dos.*
  *                                                                              *
  * ── Y DESDE F07 · T5.1, TRES HECHOS DEL ARRANQUE QUE SOLO SE VEN AQUÍ ──       *
  * El diagnóstico tiene su propia suite completa (`diagnostico.dom.test.js`),    *
@@ -96,6 +98,7 @@ import { husoPorSrs } from '../../geo/huso.js'
 import { crearParcela, crearRecinto, ORIGEN_PARCELA, TIPO_RECINTO } from '../../model/parcela.js'
 import { NIVEL, crearEstadoVista } from '../../viewer/_comun.js'
 import { crearBarraEdicion } from '../../viewer/barra-edicion.js'
+import { crearCajonComprobacion } from '../../viewer/cajon-comprobacion.js'
 import { crearCajonDiagnostico } from '../../viewer/cajon-diagnostico.js'
 import { crearContraste } from '../../viewer/contraste.js'
 import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
@@ -107,6 +110,9 @@ let desmontarCromoVivo = null
 
 /** El cajón y la capa de F07 vivos, para que el doble los entregue. */
 let diagnosticoVivo = null
+
+/** El cajón de F08 vivo, ídem. Va SUELTO, como en el visor real. */
+let comprobacionViva = null
 
 /**
  * Pone en el documento lo que `crearVisor` monta SOBRE EL MAPA cuando la edición y
@@ -120,6 +126,9 @@ let diagnosticoVivo = null
  *     typing los diez métodos del cajón y los dos de la capa, así que un doble
  *     escrito a mano sería una segunda redacción de esas dos APIs que se
  *     desincroniza en silencio.
+ *   · el CAJÓN DE COMPROBACIÓN de F08 (`crearCajonComprobacion`), por lo mismo:
+ *     `cablearComprobacion` —paso 9 del ensamblaje, también fuera del `try` del
+ *     Catastro— comprueba por duck typing los siete métodos que le pide.
  *
  * Hay que repetirlo en cada `beforeEach`, porque {@link montarCascara} vacía el
  * `<body>` y se lleva por delante el contenedor del mapa, que es donde vive todo
@@ -139,13 +148,17 @@ function montarCromoDelMapa() {
   // El huso se DERIVA del SRS del expediente con la misma función que usa la app;
   // escribir «30» aquí sería una tercera copia de ese dato.
   const contraste = crearContraste({ mapa, zona: husoPorSrs(SRS_DEMO) })
+  const cajonComprobacion = crearCajonComprobacion({ mapa })
   diagnosticoVivo = { cajon, contraste }
+  comprobacionViva = cajonComprobacion
   desmontarCromoVivo = () => {
+    cajonComprobacion.destruir()
     contraste.destruir()
     cajon.destruir()
     barra.destruir()
     destruirMapa()
     diagnosticoVivo = null
+    comprobacionViva = null
   }
 }
 
@@ -171,15 +184,20 @@ const arranque = vi.hoisted(() => ({
   catastro: null,
   /**
    * Los oyentes de colindantes que `app/main.js` ha registrado en el cableado.
-   * Desde F07 son DOS: el del snap de F06 y el del diagnóstico. Ver el doble.
+   * Desde F07 eran DOS —el del snap de F06 y el del diagnóstico— y desde que las
+   * vecinas por fin se DIBUJAN son TRES. Ver el doble.
    */
   oyentesColindantes: new Set(),
-  /** Lo que se le ha pedido al doble de `visor.edicion`. */
+  /** Lo que se le ha pedido a los dobles de `visor.edicion` y `visor.colindantes`. */
   registro: {
     snapActivo: [],
     tolerancia: [],
     colindantes: [],
     desplazamientos: [],
+    /** Cada llamada a `visor.colindantes.pintar`, con su argumento tal cual. */
+    pintadas: [],
+    /** Cuántas veces se ha llamado a `visor.colindantes.limpiar`. */
+    limpiezas: 0,
   },
 }))
 
@@ -219,11 +237,29 @@ vi.mock('../../viewer/index.js', () => ({
           return { aplicado: false, modo: null, detecciones: [] }
         },
       },
+      // La capa de PARCELAS VECINAS. Se DOBLA —al revés que el cajón de F07— por
+      // el mismo criterio que `edicion`: `app/main.js` no le hace duck typing, solo
+      // la LLAMA, y lo que aquí se prueba es CON QUÉ la llama (parcelas sin
+      // aplanar, no los recintos que recibe el snap). Lo que la capa hace con eso
+      // —contornos, emergentes, panes— vive en `test/viewer/colindantes.dom.test.js`
+      // y su montaje, en `test/viewer/index.dom.test.js`.
+      colindantes: {
+        pintar(vecinas) {
+          arranque.registro.pintadas.push(vecinas)
+        },
+        limpiar() {
+          arranque.registro.limpiezas++
+        },
+        destruir() {},
+      },
       // Las dos piezas de F07, LAS DE VERDAD (las ha montado `montarCromoDelMapa`
       // sobre un `L.Map` real). No se doblan por lo mismo que la barra: el cableado
       // del diagnóstico comprueba los diez métodos del cajón por duck typing, así
       // que un doble escrito a mano sería una segunda redacción de esa API.
       diagnostico: diagnosticoVivo,
+      // La de F08, ídem, y SUELTA como en el visor real (`visor.comprobacion`, no
+      // `visor.comprobacion.cajon`): F07 son dos piezas inseparables y F08 es una.
+      comprobacion: comprobacionViva,
       destruir() {},
     }
   },
@@ -1187,12 +1223,15 @@ describe('app/main · los dos ganchos que el arranque le entrega al Catastro', (
     estadoDelArranque.set(original)
   })
 
-  it('el arranque le pasa `alCargarParcela` y le registra el oyente de colindantes', () => {
+  it('el arranque le pasa `alCargarParcela` y le registra los oyentes de colindantes', () => {
     expect(typeof arranque.catastro.alCargarParcela).toBe('function')
-    // DOS suscriptores: el snap de F06 y el diagnóstico de F07. Que sean dos es
-    // parte del contrato del cableado del Catastro (un `Set`, no un callback), y
-    // este número es lo que lo afirma desde el arranque real.
-    expect(arranque.oyentesColindantes.size, 'el puente del arranque').toBe(2)
+    // TRES suscriptores: el snap de F06, el diagnóstico de F07 y —desde el arreglo
+    // del check visual— la CAPA que las dibuja. Que sean tres y no uno es
+    // exactamente el contrato del cableado del Catastro (un `Set`, no un callback:
+    // «el segundo en llegar no puede desalojar al primero»), y este número es lo
+    // que lo afirma desde el arranque real. Eran dos hasta que las vecinas se
+    // pintaron; si alguna vez vuelve a bajar, alguien ha desenchufado a uno.
+    expect(arranque.oyentesColindantes.size, 'el puente del arranque').toBe(3)
   })
 
   it('traer una parcela REINICIA la pila del arranque (deshacer no la devuelve)', () => {
@@ -1233,6 +1272,67 @@ describe('app/main · los dos ganchos que el arranque le entrega al Catastro', (
 
     expect(DEL_ARRANQUE.colindantes.textContent).toBe('Sin consultar')
     expect(arranque.registro.colindantes.at(-1)).toEqual([])
+  })
+
+  // ── Las vecinas, DIBUJADAS (el defecto del check visual) ──────────────────
+  //
+  // Se traían del Catastro desde F05, las usaban por dentro el snap de F06 y la
+  // invasión de F07, y no las pintaba NADIE: la ficha decía «12 parcelas
+  // colindantes» y el mapa seguía exactamente igual.
+
+  it('el visor se monta CON la capa de parcelas vecinas', () => {
+    // Sin esto `visor.colindantes` vale `null` y el suscriptor que las pinta no
+    // tendría dónde pintarlas (reventaría en el primer «Traer colindantes»).
+    expect(arranque.opciones.colindantes).toBe(true)
+  })
+
+  it('al llegar las colindantes SE PINTAN, y a la capa llegan SIN APLANAR', () => {
+    const antes = arranque.registro.pintadas.length
+    const vecinas = [parcelaCuadrada(), parcelaConHueco()]
+
+    publicarColindantes({ ok: true, datos: { colindantes: vecinas } })
+
+    expect(
+      arranque.registro.pintadas.length,
+      'nadie ha pintado las vecinas: falta el suscriptor que las dibuja',
+    ).toBe(antes + 1)
+    const pintadas = arranque.registro.pintadas.at(-1)
+    // DOS parcelas, no TRES recintos: la capa necesita la referencia catastral de
+    // cada vecina para su emergente, y eso es justo lo que el aplanado pierde.
+    expect(pintadas).toHaveLength(2)
+    for (const vecina of pintadas) {
+      expect(Array.isArray(vecina.recintos), 'una vecina sin `recintos`: viene aplanada').toBe(true)
+      expect('refcat' in vecina, 'una vecina sin `refcat`: viene aplanada').toBe(true)
+    }
+  })
+
+  it('EL REPARTO NO SE HA ROTO: el snap sigue recibiendo los recintos aplanados', () => {
+    // La misma publicación alimenta a los dos consumidores con formas DISTINTAS
+    // del mismo resultado. Unificarlas dejaría los emergentes mudos (si se aplana
+    // para todos) o el snap sin dianas (si no se aplana para nadie).
+    publicarColindantes({
+      ok: true,
+      datos: { colindantes: [parcelaCuadrada(), parcelaConHueco()] },
+    })
+
+    const dianas = arranque.registro.colindantes.at(-1)
+    expect(dianas).toHaveLength(3) // 1 exterior + (1 exterior + 1 hueco)
+    for (const recinto of dianas) expect(Array.isArray(recinto.vertices)).toBe(true)
+    expect(arranque.registro.pintadas.at(-1)).toHaveLength(2)
+    // Y la ficha, que es el tercer consumidor, sigue contando PARCELAS.
+    expect(DEL_ARRANQUE.colindantes.textContent).toBe('2')
+  })
+
+  it('una consulta que FALLA no borra los contornos que hubiera', () => {
+    // Mismo criterio que las dianas del enganche: una consulta que falla no es una
+    // consulta que devuelve cero vecinas, y `cableado-catastro.js` ya la ha contado
+    // en su renglón y en el panel.
+    publicarColindantes({ ok: true, datos: { colindantes: [parcelaCuadrada()] } })
+    const pintadas = arranque.registro.pintadas.length
+
+    publicarColindantes({ ok: false, datos: null })
+
+    expect(arranque.registro.pintadas).toHaveLength(pintadas)
   })
 })
 

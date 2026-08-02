@@ -55,6 +55,37 @@ PNOA: *"PNOA cedido por © Instituto Geográfico Nacional de España"*; base/MTN
 4. Todas las capas cargan con `crossOrigin='anonymous'`.
 5. La atribución aparece en el visor.
 
+## ⛔ Un defecto de ESTA fase que destapó la firma humana de F08 (2026-08-02)
+
+**El mapa no reencuadraba nunca.** El encuadre era el **último paso del MONTAJE** de
+`crearVisor` —y esa decisión sigue siendo correcta: así la capa WMS del Catastro pide
+UNA sola imagen y del encuadre bueno, que es el criterio 2— pero **no había forma de
+repetirlo**, y ni esta spec ni las de F05 y F08 se preguntaron qué pasa **después**.
+Consecuencia: se traía una parcela de Sevilla por referencia catastral, o se soltaba
+un GML de Cádiz, y **el mapa seguía mirando la parcela de demostración**. De rebote,
+«traer geometría del Catastro» **parecía no tener feedback visual**, cuando el dibujo
+estaba perfectamente hecho — a cientos de kilómetros de la vista.
+
+Ni la suite ni ningún guion de humo lo veían, y el motivo es instructivo: **todas las
+pruebas del visor traen su geometría a mano y la app arranca ya encuadrada sobre
+ella**, así que la única pregunta que importaba —«¿y cuando entra OTRA?»— no se hacía
+en ninguna parte.
+
+**El arreglo es el paso 7 de `viewer/index.js`**: una suscripción al store que
+reencuadra **cuando entra una parcela con OTRA identidad, y solo entonces**. La
+identidad es **`refcat ?? idLocal`** y nunca la del objeto —`edit/` reconstruye el
+POJO en cada operación, así que comparar referencias diría «otra parcela» en cada
+frame de un arrastre—, y **jamás se reencuadra al editar**: un mapa que se recentra
+mientras se arrastra un vértice le escapa el vértice al puntero. Se expone además
+`visor.encuadrar()` para el gesto explícito. Una parcela **anónima** (sin refcat ni
+idLocal) no mueve la vista y **se avisa una vez**.
+
+**Esta spec no se reescribe por ello**: sus cinco criterios siguen intactos y
+medidos. Lo que le faltaba está contado con su medida en
+[`feature-08-comprobar-gml.md`](feature-08-comprobar-gml.md) **M20**, y medido en
+navegador en `scripts/smoke-navegador/GUION.md` §16 (con otra parcela la vista viaja
+414,74 km; editando, un vértice que no se ha tocado se queda en el mismo píxel).
+
 ## Referencias
 
 Plan §12, §18 Fase 3, §21. Dossier §4.3 (Leaflet), §2.1 (endpoints), §0.6 (CORS verificado), §5.5 (atribución/licencias).

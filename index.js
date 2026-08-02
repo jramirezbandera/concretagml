@@ -24,4 +24,40 @@ export * as validacion from './validation/parcela.js'
 // gml: capa de dominio, sin Leaflet ni DOM, luego sí entra aquí. La ENTREGA del
 // fichero (`gml/descargar.js`) se queda fuera —necesita Blob/URL/document—,
 // igual que viewer/ y services/; el motivo, en la cabecera de `gml/index.js`.
+//
+// ⚠️ `decodificarGml` (F08 · T1.1) —bytes → texto, el escalón de debajo de
+// `parsearGml`— entra por AQUÍ, porque ya sale por `gml/index.js`. No se
+// reexporta además por su nombre en la raíz: serían dos caminos hasta la misma
+// función, y el día que uno de los dos cambie de promesa el otro seguirá
+// diciendo la de antes. `TextDecoder` es WHATWG Encoding, no DOM: existe igual
+// en Node y en el navegador, así que el proyecto Vitest `node` lo carga sin
+// problema.
 export * as gml from './gml/index.js'
+
+// ── F08 · las dos capas puras que estrena «Comprobar un GML existente» ───────
+// Las dos son ESPEJO de `diagnostico/`: componen piezas puras de las capas de
+// abajo, no tocan el DOM, no consultan la red y no leen el reloj. Por eso —y
+// solo por eso— entran en el barrel, que lo carga el proyecto Vitest `node` sin
+// `window`. Lo vigila `test/contrato.test.js`.
+//
+//   · comprobacion — `comprobarGml(...)`: cruza lo que lee `gml/parse.js` con
+//     `validation/parcela.js` (autointersecciones, duplicados),
+//     `validation/reglas-huso.js` (fuera del huso DECLARADO) y `geo/area.js`
+//     (superficie declarada frente a medida). Vive POR ENCIMA de `validation/`
+//     y no dentro de `gml/` justamente por eso: `gml/` es capa de dominio y no
+//     conoce a nadie por encima suyo.
+//   · report — `informeContrasteTexto(...)`: comprobación + diagnóstico → el
+//     texto del informe de contraste. **No lee el reloj**: la fecha se INYECTA,
+//     misma regla que `gml/` y por lo mismo (un snapshot tiene que valer igual
+//     dentro de un año).
+//
+// Lo que NO entra, y hay que dejarlo escrito porque es la frontera que este
+// fichero existe para defender: nada de `viewer/` (Leaflet exige `window`),
+// nada de `app/` (`document`, `File`, oyentes de la ventana) y **tampoco
+// `gml/descargar.js`** (`Blob`, `URL.createObjectURL`, `<a download>`), aunque
+// sea de `gml/` y aunque `report/` produzca justo el texto que ese módulo
+// entrega. Cualquiera de los tres rompería la suite `node` entera en el import,
+// no en el uso. El mismo razonamiento está escrito en `gml/index.js`
+// (decisión 1) y en la cabecera de `app/main.js`.
+export * as comprobacion from './comprobacion/gml.js'
+export * as report from './report/contraste-texto.js'

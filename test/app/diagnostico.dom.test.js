@@ -43,20 +43,37 @@ import L from 'leaflet'
 import { crearPanelAvisos } from '../../app/avisos.js'
 import {
   COLA_SIN_VECINAS,
+  EXTENSION_INFORME,
   MENSAJE_FALLO_INESPERADO,
+  MENSAJE_INFORME_NO_COMPUESTO,
+  MENSAJE_INFORME_NO_ENTREGADO,
   MOTIVO_SIN_CATASTRO,
   MOTIVO_SIN_OFICIAL,
+  PREFIJO_INFORME,
   SELECTOR_BOTON_DIAGNOSTICAR,
   SELECTOR_ESTADO_DIAGNOSTICO,
   cablearDiagnostico,
+  nombreFicheroInforme,
 } from '../../app/cableado-diagnostico.js'
 import { cablearCatastro } from '../../app/cableado-catastro.js'
+import { comprobarGml } from '../../comprobacion/gml.js'
 import { diagnosticar } from '../../diagnostico/parcela.js'
+import {
+  EXTENSION_GML,
+  PREFIJO_NOMBRE,
+  TIPO_MIME_TEXTO,
+  descargarTexto,
+  nombreFicheroGml,
+} from '../../gml/descargar.js'
 import { parsearGml } from '../../gml/parse.js'
 import { ORIGEN_PARCELA, crearParcela } from '../../model/parcela.js'
 import { crearClienteCatastro } from '../../services/catastro.js'
 import { PANE, crearEstadoVista } from '../../viewer/_comun.js'
-import { SELECTOR as SELECTOR_CAJON, crearCajonDiagnostico } from '../../viewer/cajon-diagnostico.js'
+import {
+  MOTIVO_INFORME_SIN_DIAGNOSTICO,
+  SELECTOR as SELECTOR_CAJON,
+  crearCajonDiagnostico,
+} from '../../viewer/cajon-diagnostico.js'
 import { crearContraste } from '../../viewer/contraste.js'
 import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
 
@@ -231,6 +248,67 @@ function crearTransporteDoble() {
   }
 }
 
+/**
+ * El instante que se le inyecta al cableado para el informe. Fijo a propósito: la
+ * fecha entra en la CABECERA del informe **y** en el nombre del fichero, y poder
+ * fijarla es lo único que permite afirmar algo exacto sobre los dos.
+ * `report/contraste-texto.js` no consulta el reloj por contrato.
+ */
+const FECHA_INFORME = new Date(Date.UTC(2026, 6, 30, 11, 45, 30))
+
+/**
+ * El entorno de la ENTREGA, espiado — mismo par de dobles que
+ * `test/gml/descargar.dom.test.js`, y por lo mismo:
+ *
+ *   · `url` es lo único desde donde se puede AGARRAR el Blob que se entrega, que es
+ *     donde están los bytes de verdad. Inyectarlo (en vez de parchear el global)
+ *     evita contaminar a los demás ficheros de test.
+ *   · el `click()` heredado de jsdom sobre un `<a href="blob:…">` intenta NAVEGAR y
+ *     escupe un «Not implemented: navigation». Se sustituye solo él; el resto del
+ *     anchor —`href`, `download`, `isConnected`— es de verdad.
+ *
+ * La descarga que se prueba es la REAL (`gml/descargar.js#descargarTexto`): un doble
+ * de la entrega dejaría sin comprobar justo lo que hay que comprobar, que del botón
+ * salen bytes y no un fichero vacío.
+ */
+function crearEntregaEspia({ alHacerClick = () => {} } = {}) {
+  const creados = []
+  const revocados = []
+  const anclas = []
+  const url = {
+    createObjectURL(blob) {
+      const href = `blob:https://concreta.test/${creados.length}`
+      creados.push({ blob, href })
+      return href
+    },
+    revokeObjectURL(href) {
+      revocados.push(href)
+    },
+  }
+  const documento = {
+    body: document.body,
+    createElement(etiqueta) {
+      const el = document.createElement(etiqueta)
+      if (etiqueta === 'a') {
+        anclas.push(el)
+        el.click = () => alHacerClick(el)
+      }
+      return el
+    },
+  }
+  return {
+    creados,
+    revocados,
+    anclas,
+    descargar: (texto, opciones) => descargarTexto(texto, { ...opciones, documento, url }),
+    /** El último Blob entregado, decodificado. */
+    async ultimoTexto() {
+      if (creados.length === 0) return null
+      return creados[creados.length - 1].blob.text()
+    },
+  }
+}
+
 /** Caché de verdad, en memoria: cumple el puerto `CacheCatastro` y nada más. */
 function crearCacheEnMemoria() {
   const almacen = new Map()
@@ -270,8 +348,18 @@ afterEach(() => {
  * @param {object|null} [opciones.parcelaInicial=null]
  * @param {object|null|undefined} [opciones.catastro]  `undefined` ⇒ doble ligero;
  *   `null` ⇒ sin cliente (el caso legítimo de un visor suelto).
+ * @param {() => (object|null)} [opciones.comprobacion]  De dónde sale la
+ *   `Comprobacion` del informe. El defecto —`() => null`— es LA VÍA DE F05: quien
+ *   llegó por referencia catastral no tiene fichero que comprobar.
+ * @param {() => Date} [opciones.ahora]  El reloj del informe, fijo por defecto.
  */
-function montar({ parcelaInicial = null, catastro = crearCatastroDoble() } = {}) {
+function montar({
+  parcelaInicial = null,
+  catastro = crearCatastroDoble(),
+  comprobacion = () => null,
+  ahora = () => FECHA_INFORME,
+  entrega = crearEntregaEspia(),
+} = {}) {
   const { mapa, destruir: destruirMapa } = montarMapa({ zoom: 19 })
   crearPanes(mapa)
 
@@ -283,7 +371,16 @@ function montar({ parcelaInicial = null, catastro = crearCatastroDoble() } = {})
   })
   const cajon = crearCajonDiagnostico({ mapa })
   const contraste = crearContraste({ mapa, zona: HUSO })
-  const cableado = cablearDiagnostico({ estado, cajon, contraste, panel, catastro })
+  const cableado = cablearDiagnostico({
+    estado,
+    cajon,
+    contraste,
+    panel,
+    catastro,
+    comprobacion,
+    ahora,
+    descargar: entrega.descargar,
+  })
 
   pendientes.push(() => {
     cableado.destruir()
@@ -292,6 +389,7 @@ function montar({ parcelaInicial = null, catastro = crearCatastroDoble() } = {})
     destruirMapa()
   })
 
+  const raizCajon = cajon.control.getContainer()
   return {
     mapa,
     estado,
@@ -300,9 +398,12 @@ function montar({ parcelaInicial = null, catastro = crearCatastroDoble() } = {})
     contraste,
     cableado,
     catastro,
-    raizCajon: cajon.control.getContainer(),
+    entrega,
+    raizCajon,
     boton: document.querySelector(SELECTOR_BOTON_DIAGNOSTICAR),
     renglon: document.querySelector(SELECTOR_ESTADO_DIAGNOSTICO),
+    botonInforme: raizCajon.querySelector(SELECTOR_CAJON.DESCARGAR),
+    renglonInforme: raizCajon.querySelector(SELECTOR_CAJON.ESTADO_INFORME),
   }
 }
 
@@ -768,6 +869,368 @@ describe('cableado-diagnostico · destruir', () => {
   })
 })
 
+// ── 9 · El informe de contraste (F08 · T4.2) ─────────────────────────────────
+//
+// El botón vive DENTRO del cajón —razonado en `viewer/cajon-diagnostico.js`— y este
+// cableado es quien compone el texto (`report/contraste-texto.js`) y lo entrega
+// (`gml/descargar.js#descargarTexto`). Lo que se prueba aquí es el CABLE: que el
+// botón nunca esté gris y mudo, que de él salgan BYTES y no un fichero vacío, que el
+// nombre no pise al del GML, y que la vía de la referencia catastral —`comprobacion:
+// null`— funcione exactamente igual que la del fichero.
+
+const pulsar = (el) => el.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+describe('cableado-diagnostico · el informe de contraste: el gate del botón', () => {
+  it('nace APAGADO y con el motivo escrito: nunca gris y mudo (regla de oro 1)', () => {
+    const { botonInforme, renglonInforme } = montar({ parcelaInicial: parcelaDelCatastro() })
+    expect(botonInforme.disabled).toBe(true)
+    expect(renglonInforme.textContent).toBe(MOTIVO_INFORME_SIN_DIAGNOSTICO)
+  })
+
+  it('se enciende cuando hay diagnóstico calculado, y el motivo se va', async () => {
+    const { boton, botonInforme, renglonInforme } = montar({
+      parcelaInicial: parcelaDelCatastro(),
+    })
+    boton.click()
+    await cederTurno()
+
+    expect(botonInforme.disabled).toBe(false)
+    expect(renglonInforme.textContent).toBe('')
+  })
+
+  it('con el botón apagado, pulsar NO descarga nada (y el motivo sigue a la vista)', () => {
+    // El `disabled` es cortesía; la garantía es la comprobación de dentro. Se llama
+    // al manejador saltándose el atributo, que es lo que haría un atajo de teclado o
+    // el inspector. Mismo criterio que el CTA del pie.
+    const { botonInforme, renglonInforme, entrega } = montar({
+      parcelaInicial: parcelaDelCatastro(),
+    })
+    botonInforme.disabled = false
+    pulsar(botonInforme)
+
+    expect(entrega.creados).toHaveLength(0)
+    expect(renglonInforme.textContent).toBe(MOTIVO_INFORME_SIN_DIAGNOSTICO)
+  })
+
+  it('una parcela DISTINTA lo apaga: no se baja el informe de la que ya no está', async () => {
+    // El fallo más caro que este pie podría cometer, y sería silencioso: el cajón se
+    // cierra al entrar otra parcela, así que `recalcular()` sale por arriba y no
+    // repinta. Sin olvidar el diagnóstico anterior, el botón se quedaría encendido y
+    // el fichero que bajara hablaría de la parcela anterior — con SU referencia
+    // catastral en el nombre.
+    const { boton, estado, botonInforme, renglonInforme, entrega } = montar({
+      parcelaInicial: parcelaDelCatastro(),
+    })
+    boton.click()
+    await cederTurno()
+    expect(botonInforme.disabled).toBe(false)
+
+    estado.set(otraParcela())
+
+    expect(botonInforme.disabled).toBe(true)
+    expect(renglonInforme.textContent).toBe(MOTIVO_INFORME_SIN_DIAGNOSTICO)
+    botonInforme.disabled = false
+    pulsar(botonInforme)
+    expect(entrega.creados).toHaveLength(0)
+  })
+
+  it('un fallo del CÁLCULO también lo apaga: no se ofrece un informe de cifras muertas', async () => {
+    const { boton, estado, botonInforme } = montar({ parcelaInicial: parcelaDelCatastro() })
+    boton.click()
+    await cederTurno()
+    expect(botonInforme.disabled).toBe(false)
+
+    vi.mocked(diagnosticar).mockImplementationOnce(() => {
+      throw new Error('un contrato roto de una capa de abajo')
+    })
+    const enConsola = vi.spyOn(console, 'error').mockImplementation(() => {})
+    estado.set(parcelaEditada())
+    enConsola.mockRestore()
+
+    expect(botonInforme.disabled).toBe(true)
+  })
+
+  it('⚠️ M8 · `informe-contraste` es ÚNICO en TODO el documento (cáscara incluida)', () => {
+    // La lección M8 de F07: `querySelector` se queda con el PRIMERO del documento y
+    // el `<aside>` de `index.html` va antes que el `<main>` donde vive el mapa. Dos
+    // nodos con el mismo `data-estado` dejarían a uno mudo y SIN SÍNTOMA. Aquí se
+    // mide sobre el documento entero —la cáscara real más el cajón montado—, que es
+    // el único sitio donde la colisión podría existir de verdad.
+    montar({ parcelaInicial: parcelaDelCatastro() })
+
+    expect(document.querySelectorAll(SELECTOR_CAJON.ESTADO_INFORME)).toHaveLength(1)
+    expect(document.querySelectorAll(SELECTOR_CAJON.DESCARGAR)).toHaveLength(1)
+    // Anti-vacuidad: la cáscara SÍ trae otros `data-estado`, así que el recuento no
+    // está saliendo de un documento vacío.
+    const estados = [...document.querySelectorAll('[data-estado]')].map((el) => el.dataset.estado)
+    expect(estados.length).toBeGreaterThan(3)
+    expect(estados.filter((v) => v === 'informe-contraste')).toHaveLength(1)
+    // Y el valor del renglón no es el de NINGUNA acción del documento: cruzar los dos
+    // espacios de nombres es exactamente lo que costó M8.
+    const acciones = [...document.querySelectorAll('[data-accion]')].map((el) => el.dataset.accion)
+    expect(acciones).toContain('descargar-informe')
+    expect(acciones).not.toContain('informe-contraste')
+    expect(estados).not.toContain('descargar-informe')
+    // ⚠️ Y NO se exige que estado y acción sean disjuntos en todo el documento: en el
+    // PIE de la app la convención es justo la contraria (`cargar-catastro`/
+    // `cargar-catastro`, `generar-gml`/`generar-gml`) y ahí es correcta, porque hay
+    // un nodo de cada. La regla que aquí se afirma es la de DENTRO DEL MAPA, donde
+    // los renglones conviven con los del `<aside>`: se nombran por el componente.
+    expect(estados).toContain('cargar-catastro')
+    expect(acciones).toContain('cargar-catastro')
+  })
+})
+
+describe('cableado-diagnostico · el informe de contraste: bytes de verdad', () => {
+  it('pulsar produce BYTES (no un fichero vacío) con el nombre y el MIME esperados', async () => {
+    const { boton, botonInforme, renglonInforme, entrega } = montar({
+      parcelaInicial: parcelaDelCatastro(),
+    })
+    boton.click()
+    await cederTurno()
+
+    pulsar(botonInforme)
+
+    // (a) Se entregó UN fichero, y sus bytes son los del texto en UTF-8. Comprobar el
+    // `charset` del MIME sería comprobar la ETIQUETA; aquí se decodifica el Blob.
+    expect(entrega.creados).toHaveLength(1)
+    const { blob } = entrega.creados[0]
+    const texto = await blob.text()
+    const buffer = await blob.arrayBuffer()
+    // Como arrays normales y no como vistas tipadas: el buffer sale del Blob del
+    // entorno jsdom y el esperado del `TextEncoder` de Node, y `toEqual` sobre dos
+    // vistas de REALMS distintos falla aunque los bytes coincidan (medido en
+    // `test/gml/descargar.dom.test.js`).
+    expect(buffer.byteLength).toBeGreaterThan(0)
+    expect(Array.from(new Uint8Array(buffer))).toEqual(
+      Array.from(new TextEncoder().encode(texto)),
+    )
+    // El informe lleva `m²`, acentos y `ñ`: hay carga multibyte de verdad, así que
+    // la comprobación de bytes no es vacua.
+    expect(buffer.byteLength).toBeGreaterThan(texto.length)
+    expect(blob.type).toBe(TIPO_MIME_TEXTO)
+
+    // (b) Y no es un fichero vacío disfrazado: trae el informe entero, con el nombre
+    // LEGAL (jamás «validación gráfica») y las cifras de la parcela real.
+    expect(texto.length).toBeGreaterThan(1000)
+    expect(texto).toContain('INFORME DE CONTRASTE CON EL PARCELARIO CATASTRAL')
+    expect(texto).toContain(REFCAT)
+    expect(texto).toContain('30/07/2026 11:45 (UTC)')
+
+    // (c) El nombre del fichero, derivado del de `nombreFicheroGml`.
+    expect(entrega.anclas).toHaveLength(1)
+    expect(entrega.anclas[0].download).toBe(
+      nombreFicheroInforme({ refcat: REFCAT, fecha: FECHA_INFORME }),
+    )
+    expect(entrega.anclas[0].download).toBe(`contraste_${REFCAT}_2026-07-30T11-45-30.txt`)
+
+    // (d) El desenlace se DICE, y no queda basura: el objeto-URL se revoca.
+    expect(renglonInforme.textContent).toBe(`Descargado «${entrega.anclas[0].download}».`)
+    expect(entrega.revocados).toEqual([entrega.creados[0].href])
+  })
+
+  it('con `comprobacion: null` —la vía de la REFERENCIA CATASTRAL— baja igual', async () => {
+    // Es la razón de que el botón viva en el cajón y no en el pie de la comprobación:
+    // sirve a las DOS vías sin ramificar la interfaz. Quien llegó por RC no tiene
+    // fichero, y su informe se emite sin la sección «Qué se leyó del fichero».
+    const { boton, botonInforme, entrega } = montar({ parcelaInicial: parcelaDelCatastro() })
+    boton.click()
+    await cederTurno()
+
+    pulsar(botonInforme)
+
+    const texto = await entrega.ultimoTexto()
+    expect(texto).toContain('INFORME DE CONTRASTE CON EL PARCELARIO CATASTRAL')
+    expect(texto).not.toContain('QUÉ SE LEYÓ DEL FICHERO')
+  })
+
+  it('con la comprobación de un GML aportado, el informe añade la sección del fichero', async () => {
+    // La MISMA interfaz, con la comprobación REAL de `comprobacion/gml.js` sobre el
+    // fichero real. Un doble aquí no demostraría nada: lo que se afirma es que el
+    // cableado pasa lo que hay cuando lo hay.
+    const NOMBRE = 'cp_parcela_9398516VK3799G.gml'
+    const { boton, botonInforme, entrega } = montar({
+      parcelaInicial: parcelaDelCatastro(),
+      comprobacion: () => comprobarGml({ texto: TEXTO_PARCELA, nombreFichero: NOMBRE }),
+    })
+    boton.click()
+    await cederTurno()
+
+    pulsar(botonInforme)
+
+    const texto = await entrega.ultimoTexto()
+    expect(texto).toContain('QUÉ SE LEYÓ DEL FICHERO')
+    expect(texto).toContain(NOMBRE)
+  })
+
+  it('la fecha se INYECTA: el informe no consulta el reloj del sistema', async () => {
+    // `report/contraste-texto.js` no lo consulta por contrato (hay un guardián con
+    // grep sobre su fuente), y el nombre del fichero tampoco. El instante entra por
+    // `ahora()`, igual que en `cablearCatastro` y en `cablearGeneracionGml`.
+    const OTRO = new Date(Date.UTC(2019, 0, 2, 3, 4, 5))
+    const { boton, botonInforme, entrega } = montar({
+      parcelaInicial: parcelaDelCatastro(),
+      ahora: () => OTRO,
+    })
+    boton.click()
+    await cederTurno()
+
+    pulsar(botonInforme)
+
+    expect(entrega.anclas[0].download).toBe(`contraste_${REFCAT}_2019-01-02T03-04-05.txt`)
+    expect(await entrega.ultimoTexto()).toContain('02/01/2019 03:04 (UTC)')
+  })
+
+  it('descargar dos veces produce dos ficheros y no duplica anclas colgadas del DOM', async () => {
+    const { boton, botonInforme, entrega } = montar({ parcelaInicial: parcelaDelCatastro() })
+    boton.click()
+    await cederTurno()
+
+    pulsar(botonInforme)
+    pulsar(botonInforme)
+
+    expect(entrega.creados).toHaveLength(2)
+    expect(entrega.revocados).toHaveLength(2)
+    for (const ancla of entrega.anclas) expect(ancla.isConnected).toBe(false)
+  })
+})
+
+describe('cableado-diagnostico · el nombre del informe', () => {
+  it('NO colisiona con el del GML de la misma parcela y el mismo instante', () => {
+    const gml = nombreFicheroGml({ refcat: REFCAT, fecha: FECHA_INFORME })
+    const informe = nombreFicheroInforme({ refcat: REFCAT, fecha: FECHA_INFORME })
+
+    expect(informe).not.toBe(gml)
+    expect(gml.endsWith(EXTENSION_GML)).toBe(true)
+    expect(informe.endsWith(EXTENSION_INFORME)).toBe(true)
+    expect(informe.startsWith(`${PREFIJO_INFORME}_`)).toBe(true)
+    // Y la parte de en medio es la MISMA: es lo que permite emparejar el informe con
+    // su GML de un vistazo en la carpeta de descargas, sin abrir ninguno.
+    expect(informe.slice(PREFIJO_INFORME.length, -EXTENSION_INFORME.length)).toBe(
+      gml.slice(PREFIJO_NOMBRE.length, -EXTENSION_GML.length),
+    )
+  })
+
+  it('hereda el SANEADO de `nombreFicheroGml`: no hay una segunda lista blanca', () => {
+    // La referencia la teclea o la pega el usuario. El saneador de `gml/descargar.js`
+    // no está exportado, así que el nombre se DERIVA del suyo en vez de copiar
+    // cuarenta líneas de lista blanca que se quedarían desincronizadas en verde.
+    const SUCIA = '../CON:9398516VK3799G'
+    const nombre = nombreFicheroInforme({ refcat: SUCIA, fecha: FECHA_INFORME })
+
+    // Anti-vacuidad: la entrada SÍ traía todo lo que no puede sobrevivir.
+    expect(SUCIA).toContain('..')
+    expect(SUCIA).toMatch(/[/:]/)
+    expect(nombre).not.toContain('..')
+    expect(nombre).not.toMatch(/[/\\:*?"<>|]/)
+    expect(nombre.endsWith(EXTENSION_INFORME)).toBe(true)
+  })
+
+  it('sin referencia sale la MISMA marca honesta que en el GML', () => {
+    // No se inventa una referencia: es el caso real de un alta nueva y del `UTM_1.gml`
+    // (donde la refcat medida es `''`, no `null` — F08 · T2.1).
+    for (const refcat of [null, '', '   ']) {
+      expect(nombreFicheroInforme({ refcat, fecha: FECHA_INFORME })).toBe(
+        `contraste_sin-referencia_2026-07-30T11-45-30.txt`,
+      )
+    }
+  })
+
+  it('una parcela SIN refcat baja su informe con la marca, no con el `idLocal`', async () => {
+    // `claveDeExpediente` mezcla `refcat` con `idLocal` y les pone prefijo: si el
+    // nombre saliera de ahí, el fichero se llamaría `idLocal-de-un-dxf`.
+    const { boton, botonInforme, entrega, estado } = montar()
+    estado.set(
+      crearParcela({
+        idLocal: 'de-un-dxf',
+        recintos: PARCELA_FIXTURE.recintos,
+        geometriaOficial: PARCELA_FIXTURE.recintos,
+        origen: ORIGEN_PARCELA.DXF,
+      }),
+    )
+    boton.click()
+    await cederTurno()
+
+    pulsar(botonInforme)
+
+    expect(entrega.anclas[0].download).toBe('contraste_sin-referencia_2026-07-30T11-45-30.txt')
+    expect(entrega.anclas[0].download).not.toContain('de-un-dxf')
+  })
+})
+
+describe('cableado-diagnostico · el informe cuando algo falla', () => {
+  it('si el informe no se puede COMPONER se cuenta por el panel y por el renglón', async () => {
+    // Una `comprobacion()` que devuelve algo que no es una Comprobacion ni `null` es
+    // un contrato roto: `informeContrasteTexto` lanza. La excepción NO puede subir —
+    // esto corre dentro de un oyente del DOM y una excepción lanzada ahí no sale por
+    // `dispatchEvent` (medido en F08 · T3.2): el usuario vería que no pasa nada.
+    const { boton, botonInforme, renglonInforme, entrega } = montar({
+      parcelaInicial: parcelaDelCatastro(),
+      comprobacion: () => 42,
+    })
+    boton.click()
+    await cederTurno()
+    const enConsola = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    expect(() => pulsar(botonInforme)).not.toThrow()
+
+    expect(entrega.creados).toHaveLength(0)
+    expect(renglonInforme.textContent).toContain('no se ha podido componer')
+    expect(
+      [...document.querySelectorAll('#avisos .gml-aviso-texto')].map((t) => t.textContent),
+    ).toContain(MENSAJE_INFORME_NO_COMPUESTO)
+    expect(enConsola).toHaveBeenCalled()
+    enConsola.mockRestore()
+  })
+
+  it('si el navegador no puede ENTREGARLO se dice con OTRO mensaje, y tampoco sube', async () => {
+    // «Tu informe no se puede escribir» y «el informe está hecho pero no ha bajado»
+    // llevan a acciones distintas. `descargarTexto` propaga lo que lance el `click()`
+    // (una extensión que ha manipulado el DOM) DESPUÉS de limpiar.
+    const fallo = new Error('una extensión ha roto el click')
+    const entrega = crearEntregaEspia({
+      alHacerClick: () => {
+        throw fallo
+      },
+    })
+    const { boton, botonInforme, renglonInforme } = montar({
+      parcelaInicial: parcelaDelCatastro(),
+      entrega,
+    })
+    boton.click()
+    await cederTurno()
+    const enConsola = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    expect(() => pulsar(botonInforme)).not.toThrow()
+
+    // La limpieza de `descargarTexto` se hizo IGUAL, antes de propagar: el anchor no
+    // se ha quedado colgado del DOM y el objeto-URL está revocado.
+    expect(entrega.anclas[0].isConnected).toBe(false)
+    expect(entrega.revocados).toEqual([entrega.creados[0].href])
+    expect(renglonInforme.textContent).toContain('no ha bajado')
+    expect(
+      [...document.querySelectorAll('#avisos .gml-aviso-texto')].map((t) => t.textContent),
+    ).toContain(MENSAJE_INFORME_NO_ENTREGADO)
+    expect(enConsola).toHaveBeenCalled()
+    enConsola.mockRestore()
+  })
+
+  it('`destruir()` deja el botón del informe INERTE', async () => {
+    const { boton, botonInforme, cableado, entrega } = montar({
+      parcelaInicial: parcelaDelCatastro(),
+    })
+    boton.click()
+    await cederTurno()
+
+    cableado.destruir()
+    pulsar(botonInforme)
+
+    expect(entrega.creados).toHaveLength(0)
+    // Y por la API tampoco: el cableado está muerto.
+    expect(cableado.descargarInforme()).toBeNull()
+  })
+})
+
 describe('cableado-diagnostico · contratos del programador', () => {
   it('rechaza lo que no es el store, el cajón, el contraste o el panel', () => {
     const { mapa } = montarMapa({ zoom: 19 })
@@ -789,6 +1252,54 @@ describe('cableado-diagnostico · contratos del programador', () => {
     expect(() => cablearDiagnostico({ ...base, contraste: null })).toThrow(TypeError)
     expect(() => cablearDiagnostico({ ...base, panel: null })).toThrow(TypeError)
     expect(() => cablearDiagnostico({ ...base, catastro: 'sí' })).toThrow(TypeError)
+
+    cajon.destruir()
+    contraste.destruir()
+  })
+
+  it('rechaza `comprobacion`, `ahora` y `descargar` que no sean FUNCIONES', () => {
+    // El error fácil aquí es pasar `comprobacion` como el OBJETO en vez de la función
+    // que lo devuelve. Sin guarda se descubriría el día que alguien pulse el botón,
+    // con un TypeError de dentro de este módulo y no del llamante que se equivocó.
+    const { mapa } = montarMapa({ zoom: 19 })
+    crearPanes(mapa)
+    const cajon = crearCajonDiagnostico({ mapa })
+    const contraste = crearContraste({ mapa, zona: HUSO })
+    const panel = crearPanelAvisos({
+      contenedor: document.getElementById('avisos'),
+      chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
+      chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
+    })
+    const base = { estado: crearEstadoVista(null), cajon, contraste, panel }
+
+    expect(() => cablearDiagnostico({ ...base, comprobacion: {} })).toThrow(/comprobacion/)
+    expect(() => cablearDiagnostico({ ...base, ahora: FECHA_INFORME })).toThrow(/ahora/)
+    expect(() => cablearDiagnostico({ ...base, descargar: null })).toThrow(/descargar/)
+
+    cajon.destruir()
+    contraste.destruir()
+  })
+
+  it('exige del cajón las DOS piezas del pie del informe', () => {
+    // Se comprueba lo que se USA. Un cajón sin `alDescargar`/`estadoInforme` dejaría
+    // el botón montado y mudo, que es exactamente el fallo que este pie no admite.
+    const { mapa } = montarMapa({ zoom: 19 })
+    crearPanes(mapa)
+    const cajon = crearCajonDiagnostico({ mapa })
+    const contraste = crearContraste({ mapa, zona: HUSO })
+    const panel = crearPanelAvisos({
+      contenedor: document.getElementById('avisos'),
+      chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
+      chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
+    })
+    const base = { estado: crearEstadoVista(null), contraste, panel }
+
+    for (const que of ['alDescargar', 'estadoInforme']) {
+      const mutilado = { ...cajon, [que]: undefined }
+      expect(() => cablearDiagnostico({ ...base, cajon: mutilado }), que).toThrow(TypeError)
+    }
+    // Anti-vacuidad: el cajón ENTERO sí se acepta.
+    expect(() => cablearDiagnostico({ ...base, cajon }).destruir()).not.toThrow()
 
     cajon.destruir()
     contraste.destruir()

@@ -114,6 +114,33 @@ humo `07-catastro-vivo.js` (navegador real) y en `npm run catastro:vivo` (servic
 real). Un test que dijera «CORS comprobado» sería mentira. Los demás huecos están
 declarados en `PROCEDENCIA.md` y en las cabeceras de los tests de aceptación.
 
+## ⛔ Un defecto de ESTA fase que destapó la firma humana de F08 (2026-08-02)
+
+**Las parcelas colindantes no se dibujaban en ningún sitio.** Se traían del servicio
+(`parcelaYColindantes`), se publicaban por `alColindantes` y las consumían el **snap**
+de F06 y la **invasión** de F07 — pero **no había ni una capa que las pintara**.
+Pulsar «Traer colindantes» no daba **ningún** acuse de recibo visual: el usuario leía
+«4 parcelas colindantes» en la ficha y el mapa seguía exactamente igual. Que el dato
+se usara por dentro no lo arregla; **que no se vea es la regla de oro 1 rota en el
+último tramo**, que es el peor sitio, porque el trabajo ya estaba hecho.
+
+Ni la suite ni ningún guion de humo lo veían, y por un motivo que conviene tener
+escrito: **nadie afirmaba que se dibujaran**. No es que un test fallara — la
+afirmación no existía.
+
+**El arreglo vive en `viewer/colindantes.js`** (contorno gris `#CBD5E1` de 1,5 px sin
+relleno visible, emergente con la referencia catastral) sobre `PANE.COLINDANTES` en
+zIndex **405**, el único pane del visor **por debajo** de la geometría propia — una
+vecina **comparte lindero** con ella y dibujada encima pondría gris el lado
+compartido—, y lo enchufa `app/main.js` como **tercer suscriptor** de
+`alColindantes`. Las vecinas se **sueltan solas** cuando entra en el store una parcela
+con otra identidad (`viewer/index.js`, paso 7).
+
+**Esta spec no se reescribe por ello**: lo que decía sigue siendo verdad, y lo que le
+faltaba —dónde se ven— está contado con su medida en
+[`feature-08-comprobar-gml.md`](feature-08-comprobar-gml.md) **M21**, y medido en
+navegador en `scripts/smoke-navegador/GUION.md` §16.
+
 ## Referencias
 
 Plan §5.4, §7.3, §18 Fase 5, §21. Dossier §2.1–§2.5 (endpoints, régimen de acceso, trampas), §2.4 (`services/catastro.js`), §4.2 (IndexedDB/`idb`), §0.6 (CORS).

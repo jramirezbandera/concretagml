@@ -39,6 +39,36 @@
 //     se está editando es el caso normal, no una combinación exótica.
 //   · el desmontaje —el diagnóstico es el PRIMERO en caer— y la atomicidad.
 //
+// Y desde F08 · T3.1, la OPCIÓN `comprobacion`, por el mismo motivo:
+//   · `comprobacion:false` (el defecto) ⇒ el visor de antes de F08 EXACTO: ni un
+//     control ni un listener de más, y `visor.comprobacion` a `null`.
+//   · `comprobacion:true|{…}` ⇒ el cajón montado, CERRADO y en blanco, con su
+//     única opción llegando a su destinatario.
+//   · que su cajón COMPARTE la esquina `bottomleft` con el de F07 —las cuatro del
+//     mapa ya estaban ocupadas— y que ahí caben los dos sin pelearse: la exclusión
+//     mutua es del CABLEADO, no del ensamblador, y hay un test que lo fija.
+//   · el desmontaje —la comprobación es lo último que se monta y lo primero que
+//     cae— y la atomicidad.
+//
+// Y desde el arreglo del REENCUADRE VIVO (defecto de F05 encontrado en la
+// revisión visual de F08: el mapa solo se encuadraba al construir el visor, así
+// que traer una parcela de Sevilla dejaba el mapa mirando la de demostración):
+//   · una parcela con OTRA identidad (`refcat ?? idLocal`) mueve la vista;
+//   · **la MISMA identidad con los vértices movidos NO la mueve** — es la prueba
+//     de que editar no hace que el mapa persiga al vértice, y la más importante
+//     de las dos: sin ella, F06 sería inusable;
+//   · el arranque encuadra UNA sola vez, no dos;
+//   · `visor.encuadrar()`, el encuadre explícito, con su cascada completa;
+//   · que del MISMO cambio de identidad cuelga la limpieza de las COLINDANTES
+//     (parcela nueva ⇒ vecinas que ya no son suyas), con su gemela: editar la
+//     misma parcela NO las borra;
+//   · y que la suscripción se da de baja en `destruir()`.
+//
+// Y la OPCIÓN `colindantes` (la capa de parcelas vecinas, que tampoco existía:
+// se traían del Catastro y no las pintaba nadie), con el mismo reparto de
+// siempre — lo que la PIEZA hace vive en `colindantes.dom.test.js`; aquí solo el
+// ensamblaje.
+//
 // Proyecto Vitest `dom` (jsdom): el sufijo `.dom.test.js` lo enruta ahí, porque
 // `viewer/index.js` arrastra Leaflet. NINGUNA petición real de red: jsdom no
 // descarga imágenes, y `load`/`error` se emiten a mano con `dispararCarga`.
@@ -51,7 +81,12 @@ import { NIVEL, PANE, crearEstadoVista, vertUTMaLatLng } from '../../viewer/_com
 import { BASE_POR_DEFECTO, ID_CAPA, maxZoomNativo, CAPAS } from '../../viewer/capas.js'
 import { ATRIBUCION } from '../../viewer/atribucion.js'
 import { CLASE_ACOTACION, textoDeLongitud } from '../../viewer/acotaciones.js'
+import { CLASE_COLINDANTE } from '../../viewer/colindantes.js'
 import { CLASE as CLASE_CAJON, SELECTOR as SELECTOR_CAJON } from '../../viewer/cajon-diagnostico.js'
+import {
+  CLASE as CLASE_COMPROBACION,
+  SELECTOR as SELECTOR_COMPROBACION,
+} from '../../viewer/cajon-comprobacion.js'
 import { MENSAJES } from '../../viewer/wms-catastro.js'
 import { sincronizar } from '../../viewer/sincronizacion.js'
 import { OPERATIVOS } from '../../config/operativos.js'
@@ -1483,5 +1518,916 @@ describe('crearVisor · destruir con diagnóstico', () => {
     expect(() => visor.destruir()).not.toThrow()
 
     expect(orden).toEqual(['contraste', 'cajon'])
+  })
+})
+
+// ── F08 · T3.1 — la opción `comprobacion` ────────────────────────────────────
+//
+// Mismo reparto que con `edicion` y `diagnostico`: lo que la PIEZA hace vive en
+// `test/viewer/cajon-comprobacion.dom.test.js`; aquí solo lo que existe cuando
+// está ENSAMBLADA — que el defecto no cuesta nada, que la opción llega a su
+// destinatario, que comparte esquina con el cajón de F07 sin pelearse, y que el
+// desmontaje sigue siendo atómico y en orden inverso.
+
+/** El nodo del cajón de COMPROBACIÓN dentro del contenedor del mapa, o `null`. */
+const cajonComprobacionDe = (contenedor) =>
+  contenedor.querySelector(`.${CLASE_COMPROBACION.CONTENEDOR}`)
+
+describe('crearVisor · comprobacion:false (el DEFECTO) es el visor de antes de F08', () => {
+  it('no monta nada: visor.comprobacion vale null, NO undefined', () => {
+    const { visor, contenedor } = abrirVisor()
+
+    expect(visor.comprobacion).toBeNull()
+    // Misma distinción que con `edicion` y `diagnostico`: la propiedad EXISTE y
+    // vale null, así que «no montado» y «se me ha olvidado devolverlo» no se
+    // confunden.
+    expect('comprobacion' in visor).toBe(true)
+    expect(cajonComprobacionDe(contenedor)).toBeNull()
+  })
+
+  it('`comprobacion: false` explícito se comporta igual que no pasarlo', () => {
+    const { visor, contenedor } = abrirVisor({ comprobacion: false })
+    expect(visor.comprobacion).toBeNull()
+    expect(cajonComprobacionDe(contenedor)).toBeNull()
+  })
+
+  it('con diagnóstico y SIN comprobación, la esquina compartida solo lleva un cajón', () => {
+    // Es la mitad que garantiza que F08 no le cobra un solo nodo al visor de F07:
+    // sus pruebas siguen intactas porque el DOM que ven es el mismo.
+    const { contenedor } = abrirVisor({ diagnostico: true })
+    const esquina = contenedor.querySelector('.leaflet-bottom.leaflet-left')
+    expect(esquina.querySelectorAll(`.${CLASE_CAJON.CONTENEDOR}`)).toHaveLength(1)
+    expect(esquina.querySelectorAll(`.${CLASE_COMPROBACION.CONTENEDOR}`)).toHaveLength(0)
+  })
+})
+
+describe('crearVisor · comprobacion:true monta el cajón, INERTE', () => {
+  it('devuelve la pieza SUELTA (no envuelta), con su API completa', () => {
+    // Va suelta y no en `{cajon}` como `diagnostico`: F07 son DOS piezas
+    // inseparables, F08 es UNA. Envolverla por simetría obligaría a todos sus
+    // llamantes a escribir `.cajon` por una hermandad que no existe.
+    const { visor } = abrirVisor({ comprobacion: true })
+
+    expect(visor.comprobacion).not.toBeNull()
+    for (const metodo of [
+      'pintar',
+      'abrir',
+      'cerrar',
+      'abierto',
+      'elegido',
+      'puedeContrastar',
+      'estado',
+      'alElegir',
+      'alContrastar',
+      'alDescartar',
+      'destruir',
+    ]) {
+      expect(typeof visor.comprobacion[metodo], `falta comprobacion.${metodo}`).toBe('function')
+    }
+  })
+
+  it('el cajón está en el DOM pero CERRADO y en blanco: montar no es comprobar', () => {
+    const { visor, contenedor } = abrirVisor({ comprobacion: true })
+
+    const cajon = cajonComprobacionDe(contenedor)
+    expect(cajon).not.toBeNull()
+    // Los nodos del CONTRATO con el cableado ya están, que es la razón de montarlo
+    // aquí y no en la app: cuando `crearVisor` devuelve, se pueden resolver por
+    // selector.
+    for (const selector of Object.values(SELECTOR_COMPROBACION)) {
+      expect(cajon.querySelector(selector), `falta ${selector}`).not.toBeNull()
+    }
+
+    expect(visor.comprobacion.abierto()).toBe(false)
+    expect(cajon.style.display).toBe('none')
+    // Y sin fichero no hay nada que contrastar: el botón primario nace apagado.
+    expect(visor.comprobacion.puedeContrastar()).toBe(false)
+  })
+
+  it('el arranque con comprobación NO deja ni un aviso espurio', () => {
+    const alAvisar = vi.fn()
+    abrirVisor({ comprobacion: true, alAvisar })
+    expect(alAvisar).not.toHaveBeenCalled()
+  })
+
+  it('CON COMPROBACIÓN, el ENCUADRE sigue siendo el último paso: UNA sola petición al WMS', () => {
+    const espia = espiarPeticionesDeEsteTest()
+    abrirVisor({ comprobacion: true, baseInicial: ID_CAPA.CATASTRO })
+    expect(espia.total).toBe(1)
+  })
+
+  it('no le pone ganchos a sincronizar (por eso puede ir al final del montaje)', () => {
+    abrirVisor({ comprobacion: true })
+    const args = argumentosDeSincronizar()
+
+    expect(args.ajustar).toBeNull()
+    expect(args.alPrevisualizar).toBeNull()
+    expect(args.alCrearMarcador).toBeNull()
+  })
+})
+
+describe('crearVisor · las opciones de `comprobacion` llegan a su destinatario', () => {
+  it('sin opciones, el cajón va a `bottomleft` — la esquina que comparte con F07', () => {
+    const { visor, contenedor } = abrirVisor({ comprobacion: true })
+    expect(visor.comprobacion.control.getPosition()).toBe('bottomleft')
+    expect(
+      contenedor
+        .querySelector('.leaflet-bottom.leaflet-left')
+        .querySelector(`.${CLASE_COMPROBACION.CONTENEDOR}`),
+    ).not.toBeNull()
+  })
+
+  it('`posicion` llega a crearCajonComprobacion', () => {
+    const { visor, contenedor } = abrirVisor({ comprobacion: { posicion: 'topright' } })
+    expect(visor.comprobacion.control.getPosition()).toBe('topright')
+    expect(
+      contenedor
+        .querySelector('.leaflet-top.leaflet-right')
+        .querySelector(`.${CLASE_COMPROBACION.CONTENEDOR}`),
+    ).not.toBeNull()
+  })
+
+  it('una clave DESCONOCIDA es TypeError, y el mensaje nombra la vía correcta', () => {
+    const { contenedor, tablaEl } = prepararDOM()
+    const base = { estado: crearEstadoVista(parcelaConHueco()), tablaEl, srs: SRS_DEMO }
+
+    let error = null
+    try {
+      crearVisor(contenedor, { ...base, comprobacion: { posicón: 'topright' } })
+    } catch (e) {
+      error = e
+    }
+
+    expect(error).toBeInstanceOf(TypeError)
+    expect(error.message).toContain('posicón')
+    expect(error.message).toContain('posicion')
+    expect(error.message).toContain('comprobarGml')
+    expect(contenedor.children).toHaveLength(0)
+  })
+
+  it('`comprobacion` que no es booleano ni objeto es TypeError, sin montar nada', () => {
+    const { contenedor, tablaEl } = prepararDOM()
+    const base = { estado: crearEstadoVista(parcelaConHueco()), tablaEl, srs: SRS_DEMO }
+
+    for (const comprobacion of ['si', 1, null, [], () => {}]) {
+      expect(() => crearVisor(contenedor, { ...base, comprobacion })).toThrow(TypeError)
+    }
+    expect(contenedor.children).toHaveLength(0)
+  })
+
+  it('una `posicion` que no es esquina de Leaflet lanza y NO deja nada montado', () => {
+    // El cajón de comprobación es el ÚLTIMO en montarse, así que cuando lanza hay un
+    // visor entero vivo detrás. O cae todo, o el llamante se queda con un mapa que
+    // cree que no existe.
+    const { contenedor, tablaEl } = prepararDOM()
+
+    expect(() =>
+      crearVisor(contenedor, {
+        estado: crearEstadoVista(parcelaConHueco()),
+        tablaEl,
+        srs: SRS_DEMO,
+        diagnostico: true,
+        comprobacion: { posicion: 'centro' },
+      }),
+    ).toThrow(RangeError)
+
+    expect(contenedor.children).toHaveLength(0)
+    expect(document.querySelector(`.${CLASE_COMPROBACION.CONTENEDOR}`)).toBeNull()
+    expect(document.querySelector(`.${CLASE_CAJON.CONTENEDOR}`)).toBeNull()
+  })
+})
+
+describe('crearVisor · las TRES opciones conviven', () => {
+  it('edición, diagnóstico y comprobación a la vez: es el visor de F08 completo', () => {
+    const { visor, contenedor } = abrirVisor({
+      edicion: true,
+      diagnostico: true,
+      comprobacion: true,
+    })
+
+    expect(visor.edicion).not.toBeNull()
+    expect(visor.diagnostico).not.toBeNull()
+    expect(visor.comprobacion).not.toBeNull()
+
+    // Los dos cajones caben en la MISMA esquina: Leaflet los apila y ninguno pisa al
+    // otro. Que no se abran a la vez es del cableado, no del visor.
+    const esquina = contenedor.querySelector('.leaflet-bottom.leaflet-left')
+    expect(esquina.querySelectorAll(`.${CLASE_CAJON.CONTENEDOR}`)).toHaveLength(1)
+    expect(esquina.querySelectorAll(`.${CLASE_COMPROBACION.CONTENEDOR}`)).toHaveLength(1)
+    // Y la barra de edición sigue arriba a la izquierda, sin pelearse con nadie.
+    expect(contenedor.querySelector('.leaflet-top.leaflet-left').children.length).toBeGreaterThan(0)
+  })
+
+  it('comprobación SIN diagnóstico: la esquina es suya sola', () => {
+    const { visor, contenedor } = abrirVisor({ comprobacion: true })
+    expect(visor.diagnostico).toBeNull()
+    const esquina = contenedor.querySelector('.leaflet-bottom.leaflet-left')
+    expect(esquina.querySelectorAll(`.${CLASE_CAJON.CONTENEDOR}`)).toHaveLength(0)
+    expect(esquina.querySelectorAll(`.${CLASE_COMPROBACION.CONTENEDOR}`)).toHaveLength(1)
+  })
+
+  it('los dos cajones son independientes: abrir uno no toca al otro', () => {
+    // El visor NO coordina la exclusión mutua, y este test lo fija: si algún día
+    // alguien la implementa aquí, cae — y tiene que caer, porque quien sabe en qué
+    // punto del recorrido está la aplicación es el cableado, no el ensamblador.
+    const { visor } = abrirVisor({ diagnostico: true, comprobacion: true })
+
+    visor.comprobacion.abrir()
+    expect(visor.comprobacion.abierto()).toBe(true)
+    expect(visor.diagnostico.cajon.abierto()).toBe(false)
+
+    visor.diagnostico.cajon.abrir()
+    expect(visor.diagnostico.cajon.abierto()).toBe(true)
+    expect(visor.comprobacion.abierto()).toBe(true)
+  })
+})
+
+describe('crearVisor · destruir con comprobación', () => {
+  it('la comprobación es la PRIMERA en caer, con el mapa todavía en pie', () => {
+    const { contenedor, visor } = abrirVisor({
+      edicion: true,
+      diagnostico: true,
+      comprobacion: true,
+    })
+
+    const orden = []
+    let alTocarleALaComprobacion = null
+
+    anotarDestruccion(visor.comprobacion, 'comprobacion', orden, () => {
+      alTocarleALaComprobacion = {
+        mapaAunEnPie: contenedor.querySelector('.leaflet-map-pane') !== null,
+        cajonDeF07AunPuesto: cajonDe(contenedor) !== null,
+      }
+    })
+    anotarDestruccion(visor.diagnostico.contraste, 'contraste', orden)
+    anotarDestruccion(visor.diagnostico.cajon, 'cajon', orden)
+    anotarDestruccion(visor.edicion, 'edicion', orden)
+    anotarDestruccion(visor.capas, 'capas', orden)
+
+    visor.destruir()
+
+    // Orden inverso EXACTO al del montaje: la comprobación es lo último que se
+    // apila, así que es lo primero que se desapila.
+    expect(orden).toEqual(['comprobacion', 'contraste', 'cajon', 'edicion', 'capas'])
+    expect(alTocarleALaComprobacion).toEqual({ mapaAunEnPie: true, cajonDeF07AunPuesto: true })
+    expect(cajonComprobacionDe(contenedor)).toBeNull()
+    expect(contenedor.children).toHaveLength(0)
+  })
+
+  it('tras destruir no queda el cajón, ni aunque estuviera abierto', () => {
+    const { visor, contenedor } = abrirVisor({ comprobacion: true })
+    visor.comprobacion.abrir()
+
+    visor.destruir()
+
+    expect(cajonComprobacionDe(contenedor)).toBeNull()
+    expect(document.querySelector(`.${CLASE_COMPROBACION.CONTENEDOR}`)).toBeNull()
+  })
+
+  it('es IDEMPOTENTE: el cajón se desmonta UNA sola vez', () => {
+    const { visor } = abrirVisor({ comprobacion: true })
+
+    const orden = []
+    anotarDestruccion(visor.comprobacion, 'comprobacion', orden)
+
+    visor.destruir()
+    expect(() => visor.destruir()).not.toThrow()
+    expect(() => visor.destruir()).not.toThrow()
+
+    expect(orden).toEqual(['comprobacion'])
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EL REENCUADRE VIVO — el mapa sigue a la parcela, pero no persigue al editor
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Defecto REAL de F05, encontrado en la revisión visual de F08: `encuadrar()` se
+// llamaba UNA sola vez, al construir el visor, y no había ninguna forma de volver
+// a encuadrar. Se traía una parcela de Sevilla por referencia catastral —o se
+// soltaba un GML de Cádiz— y el mapa seguía mirando la parcela de demostración.
+
+/** Dos referencias catastrales reales distintas (mismo polígono, otra parcela). */
+const REF_A = '9398516VK3799G'
+const REF_B = '9398501VK3799G'
+
+/**
+ * `parcelaConHueco()` con la identidad y el desplazamiento que se le pidan. Se
+ * DERIVA del arnés (nunca se copian vértices a mano) para que un cambio en la
+ * parcela de demo no deje estos tests midiendo otra geometría.
+ *
+ * @param {object} [opciones]
+ * @param {string|null} [opciones.refcat]   Referencia catastral (`null` = ninguna).
+ * @param {string} [opciones.idLocal]        Identificador local.
+ * @param {number} [opciones.dx]             Desplazamiento Este, en metros.
+ * @param {number} [opciones.dy]             Desplazamiento Norte, en metros.
+ */
+function parcelaComo({ refcat = null, idLocal, dx = 0, dy = 0 } = {}) {
+  const base = parcelaConHueco()
+  return {
+    ...base,
+    refcat,
+    idLocal: idLocal ?? base.idLocal,
+    recintos: base.recintos.map((recinto) => ({
+      ...recinto,
+      vertices: recinto.vertices.map(([x, y]) => [x + dx, y + dy]),
+    })),
+  }
+}
+
+/** La vista actual, en una forma comparable con `toEqual` (sin objetos LatLng). */
+const vistaDe = (mapa) => ({
+  lat: mapa.getCenter().lat,
+  lng: mapa.getCenter().lng,
+  zoom: mapa.getZoom(),
+})
+
+/** ¿El encuadre contiene TODOS los vértices de la parcela? */
+function encuadraA(mapa, parcela) {
+  const bounds = mapa.getBounds()
+  return verticesDe(parcela).every((v) => bounds.contains(L.latLng(vertUTMaLatLng(v, HUSO_DEMO))))
+}
+
+describe('crearVisor · reencuadre automático: solo cuando entra una parcela DISTINTA', () => {
+  it('LA PRUEBA QUE MANDA: la MISMA parcela con los vértices movidos NO mueve la vista', () => {
+    // Es lo que hace usable F06. `edit/` reconstruye el POJO en cada operación, así
+    // que comparar la identidad del OBJETO diría «otra parcela» en cada frame de un
+    // arrastre y el mapa se recentraría bajo el puntero: el vértice se escaparía de
+    // la mano. Por eso la identidad es `refcat ?? idLocal`, no la referencia.
+    const parcela = parcelaComo({ refcat: REF_A })
+    const { visor, store } = abrirVisor({ parcela })
+    const antes = vistaDe(visor.mapa)
+
+    // Un arrastre de 40 m —enorme para una parcela de 20— sobre la MISMA parcela.
+    store.set(parcelaComo({ refcat: REF_A, dx: 40, dy: 40 }))
+
+    expect(vistaDe(visor.mapa)).toEqual(antes)
+  })
+
+  it('ni siquiera con veinte ediciones seguidas: la vista no se mueve NI UN PÍXEL', () => {
+    const { visor, store } = abrirVisor({ parcela: parcelaComo({ refcat: REF_A }) })
+    const antes = vistaDe(visor.mapa)
+
+    for (let i = 1; i <= 20; i++) store.set(parcelaComo({ refcat: REF_A, dx: i, dy: i }))
+
+    expect(vistaDe(visor.mapa)).toEqual(antes)
+  })
+
+  it('una parcela con OTRA refcat SÍ mueve la vista, y encuadra sobre ella', () => {
+    const { visor, store } = abrirVisor({ parcela: parcelaComo({ refcat: REF_A }) })
+    const antes = vistaDe(visor.mapa)
+
+    // 500 m: lo bastante lejos como para que el encuadre viejo no la contenga.
+    const otra = parcelaComo({ refcat: REF_B, dx: 500, dy: 500 })
+    store.set(otra)
+
+    expect(vistaDe(visor.mapa)).not.toEqual(antes)
+    expect(encuadraA(visor.mapa, otra), 'la parcela nueva no ha quedado encuadrada').toBe(true)
+    // Y ajustado, no «Andalucía entera»: sigue siendo un encuadre de parcela.
+    const bounds = visor.mapa.getBounds()
+    expect(visor.mapa.distance(bounds.getNorthWest(), bounds.getNorthEast())).toBeLessThan(200)
+  })
+
+  it('sin refcat, manda el `idLocal`: otro idLocal mueve, el mismo no', () => {
+    // Es el caso de un DXF, un TXT o un GML ajeno sin referencia: la parcela no
+    // deja de tener identidad por no venir del Catastro.
+    const { visor, store } = abrirVisor({ parcela: parcelaComo({ idLocal: 'expediente-1' }) })
+    const antes = vistaDe(visor.mapa)
+
+    store.set(parcelaComo({ idLocal: 'expediente-1', dx: 40, dy: 40 }))
+    expect(vistaDe(visor.mapa)).toEqual(antes)
+
+    store.set(parcelaComo({ idLocal: 'expediente-2', dx: 500, dy: 500 }))
+    expect(vistaDe(visor.mapa)).not.toEqual(antes)
+  })
+
+  it('la refcat MANDA sobre el idLocal: misma refcat con otro idLocal no mueve nada', () => {
+    // Mismo orden de precedencia que `app/cableado-diagnostico.js#claveDeExpediente`.
+    // La referencia catastral identifica la parcela; el `idLocal` es el respaldo.
+    const { visor, store } = abrirVisor({
+      parcela: parcelaComo({ refcat: REF_A, idLocal: 'expediente-1' }),
+    })
+    const antes = vistaDe(visor.mapa)
+
+    store.set(parcelaComo({ refcat: REF_A, idLocal: 'expediente-2', dx: 40, dy: 40 }))
+
+    expect(vistaDe(visor.mapa)).toEqual(antes)
+  })
+
+  it('el CASO DEGENERADO también al reencuadrar: un vértice no da un zoom absurdo', () => {
+    const { visor, store } = abrirVisor({ parcela: parcelaComo({ refcat: REF_A }) })
+
+    const punto = [439900, 4480200]
+    store.set({ ...parcelaDegenerada([punto]), refcat: REF_B })
+
+    const zoom = visor.mapa.getZoom()
+    expect(Number.isFinite(zoom)).toBe(true)
+    // Sin tratar el caso, `fitBounds` sobre bounds de extensión cero pegaría el
+    // zoom al maxZoom del mapa (24) sobre un único vértice.
+    expect(zoom).toBeLessThan(visor.mapa.getMaxZoom())
+    expect(zoom).toBeGreaterThanOrEqual(15)
+    expect(zoom).toBeLessThanOrEqual(MAX_NATIVO)
+    const [lat, lon] = vertUTMaLatLng(punto, HUSO_DEMO)
+    expect(visor.mapa.getCenter().lat).toBeCloseTo(lat, 9)
+    expect(visor.mapa.getCenter().lng).toBeCloseTo(lon, 9)
+  })
+
+  it('la parcela que ENTRA en un visor arrancado vacío se encuadra (el camino de F05)', () => {
+    const store = crearEstadoVista(null)
+    const { visor } = abrirVisor({ estado: store, vistaInicial: VISTA_MADRID })
+    expect(visor.mapa.getCenter().lat).toBeCloseTo(VISTA_MADRID.centro[0], 9)
+
+    const parcela = parcelaComo({ refcat: REF_A })
+    store.set(parcela)
+
+    expect(encuadraA(visor.mapa, parcela)).toBe(true)
+  })
+
+  it('VACIAR el store no lanza y NO viaja a vistaInicial: se queda donde está', () => {
+    // Dentro de una notificación del store no puede haber ni el `throw` del
+    // encuadre mudo ni un salto a Madrid: no hay nada que mirar, y quedarse quieto
+    // es lo único que no sorprende.
+    const alAvisar = vi.fn()
+    const { visor, store } = abrirVisor({
+      parcela: parcelaComo({ refcat: REF_A }),
+      vistaInicial: VISTA_MADRID,
+      alAvisar,
+    })
+    const antes = vistaDe(visor.mapa)
+
+    expect(() => store.set(null)).not.toThrow()
+
+    expect(vistaDe(visor.mapa)).toEqual(antes)
+    expect(alAvisar).not.toHaveBeenCalled()
+  })
+
+  it('una parcela SIN identidad no mueve el mapa, pero lo DICE (regla de oro 1)', () => {
+    // `crearParcela` exige `idLocal`, así que esto solo llega de un POJO hecho a
+    // mano. Y aun así: no poder distinguir «otra parcela» de «esta, editada» es un
+    // motivo para NO mover el mapa —nunca se estropea un arrastre— y para contarlo.
+    //
+    // El visor arranca YA con la parcela anónima, y es a propósito: pasar de una
+    // parcela identificada a una anónima sí es un cambio de identidad observable
+    // («la que había decía llamarse X y esta no lo dice») y sí reencuadra. Lo que
+    // no se puede distinguir es una anónima de OTRA anónima, que es esto.
+    const alAvisar = vi.fn()
+    const anonima = (dx = 0, dy = 0) => ({ recintos: parcelaComo({ dx, dy }).recintos })
+    const { visor, store } = abrirVisor({ parcela: anonima(), alAvisar })
+    const antes = vistaDe(visor.mapa)
+
+    store.set(anonima(500, 500))
+    store.set(anonima(900, 900))
+
+    expect(vistaDe(visor.mapa)).toEqual(antes)
+    // UNA vez por visor, no una por `set`: si no, editar una parcela anónima
+    // llenaría el panel de avisos idénticos.
+    expect(alAvisar).toHaveBeenCalledTimes(1)
+    expect(alAvisar.mock.calls[0][0]).toContain('encuadrar()')
+    expect(alAvisar.mock.calls[0][1].nivel).toBe(NIVEL.AVISO)
+  })
+
+  it('de una parcela IDENTIFICADA a una anónima sí es un cambio: reencuadra', () => {
+    // La otra mitad del caso de arriba, afirmada para que no se lea como un
+    // descuido: la clave pasa de `refcat:…` a `null`, y eso es una identidad
+    // distinta. Se reencuadra y NO se avisa (no hay ninguna ambigüedad que contar).
+    const alAvisar = vi.fn()
+    const { visor, store } = abrirVisor({ parcela: parcelaComo({ refcat: REF_A }), alAvisar })
+    const antes = vistaDe(visor.mapa)
+
+    const anonima = { recintos: parcelaComo({ dx: 500, dy: 500 }).recintos }
+    store.set(anonima)
+
+    expect(vistaDe(visor.mapa)).not.toEqual(antes)
+    expect(encuadraA(visor.mapa, anonima)).toBe(true)
+    expect(alAvisar).not.toHaveBeenCalled()
+  })
+
+  it('el ARRANQUE encuadra UNA sola vez: `subscribe` no notifica al suscribirse', () => {
+    // Doble encuadre = doble petición al WMS del Catastro (criterio de aceptación
+    // 2 de F03) y un salto visible. Se mide sobre `fitBounds`, que es la llamada
+    // que ejecuta el encuadre de una parcela normal.
+    const espiaFit = vi.spyOn(L.Map.prototype, 'fitBounds')
+    pendientes.push(() => espiaFit.mockRestore())
+
+    abrirVisor({ parcela: parcelaComo({ refcat: REF_A }) })
+
+    expect(espiaFit).toHaveBeenCalledTimes(1)
+  })
+
+  it('traer otra parcela pide UNA imagen más al WMS, no dos', () => {
+    const espia = espiarPeticionesDeEsteTest()
+    const { store } = abrirVisor({
+      parcela: parcelaComo({ refcat: REF_A }),
+      baseInicial: ID_CAPA.CATASTRO,
+    })
+    expect(espia.total).toBe(1)
+
+    store.set(parcelaComo({ refcat: REF_B, dx: 500, dy: 500 }))
+
+    expect(espia.total).toBe(2)
+  })
+
+  // ── Y del MISMO cambio de identidad cuelga la limpieza de las vecinas ──────
+  //
+  // Gemelas de las dos de arriba y por el mismo motivo: unas colindantes dibujadas
+  // junto a una parcela que ya no está en pantalla son una MENTIRA sobre el mapa,
+  // igual que un encuadre que se quedó en la parcela anterior. Va en el visor —y no
+  // en los cableados de `app/`— porque hay tres vías de entrada de parcela y todas
+  // pasan por el store: una llamada por cableado se rompería en silencio con la
+  // cuarta. Ver el paso 7 de `viewer/index.js`.
+
+  it('LA GEMELA: editar la MISMA parcela NO borra las vecinas', () => {
+    // La mitad que hace usable F06. Si esto cayera, cada arrastre borraría unos
+    // contornos que siguen siendo perfectamente válidos y habría que volver a
+    // pedírselos al Catastro — una consulta de red por vértice movido.
+    const { visor, store, parcela } = abrirVisor({
+      parcela: parcelaComo({ refcat: REF_A }),
+      colindantes: true,
+    })
+    visor.colindantes.pintar([vecinaJuntoA(parcela, REF_B)])
+    expect(capasDeColindantes(visor.mapa)).toHaveLength(1)
+
+    for (let i = 1; i <= 5; i++) store.set(parcelaComo({ refcat: REF_A, dx: i, dy: i }))
+
+    expect(capasDeColindantes(visor.mapa)).toHaveLength(1)
+  })
+
+  it('una parcela con OTRA identidad SÍ las borra: ya no son sus vecinas', () => {
+    const { visor, store, parcela } = abrirVisor({
+      parcela: parcelaComo({ refcat: REF_A }),
+      colindantes: true,
+    })
+    visor.colindantes.pintar([
+      vecinaJuntoA(parcela, REF_B),
+      vecinaJuntoA(parcela, '9398502VK3799G'),
+    ])
+    expect(capasDeColindantes(visor.mapa)).toHaveLength(2)
+
+    store.set(parcelaComo({ refcat: REF_B, dx: 500, dy: 500 }))
+
+    expect(capasDeColindantes(visor.mapa)).toHaveLength(0)
+    // Y no queda ni un `<path>` colgando en el documento.
+    expect(document.querySelector(`.${CLASE_COLINDANTE}`)).toBeNull()
+  })
+
+  it('VACIAR el store también las borra: sin parcela no hay vecinas de nadie', () => {
+    const { visor, store, parcela } = abrirVisor({
+      parcela: parcelaComo({ refcat: REF_A }),
+      colindantes: true,
+    })
+    visor.colindantes.pintar([vecinaJuntoA(parcela, REF_B)])
+
+    store.set(null)
+
+    expect(capasDeColindantes(visor.mapa)).toHaveLength(0)
+  })
+
+  it('la limpieza va ANTES del encuadre: el mapa se mueve ya sin los contornos viejos', () => {
+    // El orden importa para que ningún repintado intermedio pueda enseñar las
+    // vecinas de la parcela anterior sobre la nueva. Se mide con un espía en
+    // `fitBounds` que fotografía cuántos contornos quedaban al encuadrar.
+    const { visor, store, parcela } = abrirVisor({
+      parcela: parcelaComo({ refcat: REF_A }),
+      colindantes: true,
+    })
+    visor.colindantes.pintar([vecinaJuntoA(parcela, REF_B)])
+
+    let contornosAlEncuadrar = null
+    const fitBoundsReal = L.Map.prototype.fitBounds
+    const espia = vi.spyOn(L.Map.prototype, 'fitBounds').mockImplementation(function (...args) {
+      contornosAlEncuadrar = capasDeColindantes(visor.mapa).length
+      return fitBoundsReal.apply(this, args)
+    })
+    pendientes.push(() => espia.mockRestore())
+
+    store.set(parcelaComo({ refcat: REF_B, dx: 500, dy: 500 }))
+
+    expect(contornosAlEncuadrar, 'no se ha llegado a encuadrar').toBe(0)
+  })
+
+  it('un visor SIN la capa no revienta al cambiar de parcela', () => {
+    // `colindantes: false` es el defecto y `visor.colindantes` vale `null`: la
+    // limpieza tiene que preguntar antes de llamar.
+    const { visor, store } = abrirVisor({ parcela: parcelaComo({ refcat: REF_A }) })
+    expect(visor.colindantes).toBeNull()
+
+    expect(() => store.set(parcelaComo({ refcat: REF_B, dx: 500, dy: 500 }))).not.toThrow()
+  })
+
+  it('la parcela ANÓNIMA no las borra —no puede saber si son suyas— y lo DICE', () => {
+    // Misma decisión que con el encuadre, y por el mismo motivo: sin identidad, «ha
+    // entrado otra parcela» y «se ha editado esta» son indistinguibles, y entre
+    // borrar unas vecinas que siguen valiendo (en CADA edición) y dejar unas que
+    // quizá ya no valen, se elige lo que no destruye trabajo. Y no se calla.
+    const alAvisar = vi.fn()
+    const anonima = (dx = 0, dy = 0) => ({ recintos: parcelaComo({ dx, dy }).recintos })
+    const { visor, store, parcela } = abrirVisor({
+      parcela: anonima(),
+      colindantes: true,
+      alAvisar,
+    })
+    visor.colindantes.pintar([vecinaJuntoA(parcela, REF_B)])
+
+    store.set(anonima(500, 500))
+
+    expect(capasDeColindantes(visor.mapa)).toHaveLength(1)
+    expect(alAvisar).toHaveBeenCalledTimes(1)
+    // El aviso nombra las DOS consecuencias, no solo el encuadre.
+    expect(alAvisar.mock.calls[0][0]).toContain('encuadrar()')
+    expect(alAvisar.mock.calls[0][0]).toContain('colindantes.limpiar()')
+    expect(alAvisar.mock.calls[0][1].nivel).toBe(NIVEL.AVISO)
+  })
+
+  it('sin capa montada, el aviso de la parcela anónima NO habla de vecinas', () => {
+    // Mandar al usuario a `visor.colindantes.limpiar()` en un visor que no monta la
+    // capa sería mandarlo a un `null`.
+    const alAvisar = vi.fn()
+    const anonima = (dx = 0, dy = 0) => ({ recintos: parcelaComo({ dx, dy }).recintos })
+    const { store } = abrirVisor({ parcela: anonima(), alAvisar })
+
+    store.set(anonima(500, 500))
+
+    expect(alAvisar).toHaveBeenCalledTimes(1)
+    expect(alAvisar.mock.calls[0][0]).not.toContain('colindantes')
+  })
+
+  it('tras destruir(), una parcela NUEVA en el store no lanza ni toca nada', () => {
+    // La suscripción se da de baja con el resto del visor: sin eso, `fitBounds`
+    // correría sobre un mapa ya retirado del DOM y reventaría dentro de Leaflet.
+    const { store, visor } = abrirVisor({ parcela: parcelaComo({ refcat: REF_A }) })
+    visor.destruir()
+
+    expect(() => store.set(parcelaComo({ refcat: REF_B, dx: 500, dy: 500 }))).not.toThrow()
+  })
+})
+
+// ── visor.encuadrar() — el encuadre EXPLÍCITO ────────────────────────────────
+
+describe('crearVisor · visor.encuadrar(): la misma cascada, a petición', () => {
+  it('devuelve la vista a la parcela después de que el usuario se haya ido navegando', () => {
+    const parcela = parcelaComo({ refcat: REF_A })
+    const { visor } = abrirVisor({ parcela })
+
+    visor.mapa.setView(VISTA_MADRID.centro, VISTA_MADRID.zoom)
+    expect(encuadraA(visor.mapa, parcela)).toBe(false)
+
+    expect(visor.encuadrar()).toBe('geometria')
+    expect(encuadraA(visor.mapa, parcela)).toBe(true)
+  })
+
+  it('respeta el caso DEGENERADO igual que el encuadre del montaje', () => {
+    // Reutiliza la misma función, así que no puede divergir; el test lo fija.
+    const punto = [439250, 4479662.5]
+    const { visor } = abrirVisor({ parcela: parcelaDegenerada([punto]) })
+
+    visor.mapa.setView(VISTA_MADRID.centro, VISTA_MADRID.zoom)
+    visor.encuadrar()
+
+    expect(visor.mapa.getZoom()).toBeLessThan(visor.mapa.getMaxZoom())
+    expect(visor.mapa.getCenter().lat).toBeCloseTo(vertUTMaLatLng(punto, HUSO_DEMO)[0], 9)
+  })
+
+  it('SIN geometría cae a vistaInicial, y lo dice', () => {
+    const store = crearEstadoVista(null)
+    const { visor } = abrirVisor({ estado: store, vistaInicial: VISTA_MADRID })
+
+    visor.mapa.setView([41.65, -0.88], 12) // Zaragoza, a mano
+    expect(visor.encuadrar()).toBe('vistaInicial')
+    expect(visor.mapa.getCenter().lat).toBeCloseTo(VISTA_MADRID.centro[0], 9)
+    expect(visor.mapa.getZoom()).toBe(VISTA_MADRID.zoom)
+  })
+
+  it('SIN geometría y SIN vistaInicial LANZA: es la misma cascada, no una versión blanda', () => {
+    const { visor, store } = abrirVisor({ parcela: parcelaComo({ refcat: REF_A }) })
+    store.set(null)
+
+    let error = null
+    try {
+      visor.encuadrar()
+    } catch (e) {
+      error = e
+    }
+    expect(error).toBeInstanceOf(TypeError)
+    expect(error.message).toMatch(/vistaInicial/)
+    expect(error.message).toMatch(/geometr/i)
+  })
+
+  it('encuadrar a mano CUENTA como «esta es la vista de esta parcela»', () => {
+    // Si no actualizara la clave, un `set` posterior de la MISMA parcela editada
+    // volvería a encuadrar y desharía lo que el usuario acaba de pedir.
+    const { visor, store } = abrirVisor({ parcela: parcelaComo({ refcat: REF_A }) })
+    store.set(null)
+    store.set(parcelaComo({ refcat: REF_B, dx: 500, dy: 500 }))
+
+    visor.encuadrar()
+    const despues = vistaDe(visor.mapa)
+
+    store.set(parcelaComo({ refcat: REF_B, dx: 540, dy: 540 }))
+    expect(vistaDe(visor.mapa)).toEqual(despues)
+  })
+
+  it('tras destruir() es un NO-OP que devuelve null, no un throw', () => {
+    // Mismo criterio que `acotaciones.pintar` y `contraste.pintar`: el desmontaje
+    // va en orden inverso y una respuesta de red en vuelo puede llegar después.
+    const { visor } = abrirVisor({ parcela: parcelaComo({ refcat: REF_A }) })
+    visor.destruir()
+
+    expect(visor.encuadrar()).toBeNull()
+  })
+})
+
+// ── La opción `colindantes` — la capa de parcelas vecinas ────────────────────
+//
+// Mismo reparto que con `edicion`, `diagnostico` y `comprobacion`: lo que la PIEZA
+// hace vive en `test/viewer/colindantes.dom.test.js` (incluido el riesgo estrella:
+// que el clic del mapa sobreviva a una capa interactiva); aquí solo el ENSAMBLAJE.
+
+/** Las capas que la capa de colindantes ha puesto, filtradas POR PANE. */
+function capasDeColindantes(mapa) {
+  const out = []
+  mapa.eachLayer((capa) => {
+    if (capa instanceof L.Renderer) return
+    if (capa.options && capa.options.pane === PANE.COLINDANTES) out.push(capa)
+  })
+  return out
+}
+
+/** Una vecina con la forma que consume la capa (y `diagnostico/parcela.js`). */
+function vecinaJuntoA(parcela, refcat) {
+  const vertices = parcela.recintos[0].vertices.map(([x, y]) => [x + 25, y])
+  return { refcat, recintos: [{ vertices, tipo: 'EXTERIOR' }] }
+}
+
+describe('crearVisor · colindantes:false (el DEFECTO) no cuesta ni una capa', () => {
+  it('no monta nada: visor.colindantes vale null, NO undefined', () => {
+    const { visor } = abrirVisor()
+
+    expect(visor.colindantes).toBeNull()
+    expect('colindantes' in visor).toBe(true)
+    expect(capasDeColindantes(visor.mapa)).toHaveLength(0)
+  })
+
+  it('`colindantes: false` explícito se comporta igual que no pasarlo', () => {
+    const { visor } = abrirVisor({ colindantes: false })
+    expect(visor.colindantes).toBeNull()
+  })
+
+  it('el pane EXISTE igualmente: lo crea el mapa, no la opción', () => {
+    const { visor } = abrirVisor()
+    expect(visor.mapa.getPane(PANE.COLINDANTES)).toBeTruthy()
+    expect(capasDeColindantes(visor.mapa)).toHaveLength(0)
+  })
+})
+
+describe('crearVisor · colindantes:true monta la capa, VACÍA', () => {
+  it('devuelve la pieza con su API completa, y sin nada puesto', () => {
+    const { visor } = abrirVisor({ colindantes: true })
+
+    expect(visor.colindantes).not.toBeNull()
+    for (const metodo of ['pintar', 'limpiar', 'destruir']) {
+      expect(typeof visor.colindantes[metodo], `falta colindantes.${metodo}`).toBe('function')
+    }
+    // Montar la capa NO trae vecinas: eso es una consulta al WFS que hace la app.
+    expect(capasDeColindantes(visor.mapa)).toHaveLength(0)
+  })
+
+  it('lo que se pinta por `visor.colindantes` aparece en su pane', () => {
+    const { visor, parcela } = abrirVisor({ colindantes: true })
+
+    visor.colindantes.pintar([
+      vecinaJuntoA(parcela, '9398501VK3799G'),
+      vecinaJuntoA(parcela, '9398502VK3799G'),
+    ])
+
+    expect(capasDeColindantes(visor.mapa)).toHaveLength(2)
+    visor.colindantes.limpiar()
+    expect(capasDeColindantes(visor.mapa)).toHaveLength(0)
+  })
+
+  it('recibe el `zona` del `srs` del visor (no un huso fijo)', () => {
+    const { visor, parcela } = abrirVisor({ colindantes: true, srs: 'EPSG:25829' })
+    const vecina = vecinaJuntoA(parcela, '9398501VK3799G')
+    visor.colindantes.pintar([vecina])
+
+    const anillo = capasDeColindantes(visor.mapa)[0].getLatLngs()[0]
+    const [lat29, lon29] = vertUTMaLatLng(vecina.recintos[0].vertices[0], 29)
+    expect(anillo[0].lat).toBeCloseTo(lat29, 9)
+    expect(anillo[0].lng).toBeCloseTo(lon29, 9)
+  })
+
+  it('el alAvisar del VISOR llega a la capa', () => {
+    const alAvisar = vi.fn()
+    const { visor } = abrirVisor({ colindantes: true, alAvisar })
+
+    visor.colindantes.pintar([{ refcat: 'sin-geometria', recintos: [] }])
+
+    expect(alAvisar).toHaveBeenCalledTimes(1)
+    expect(alAvisar.mock.calls[0][1].nivel).toBe(NIVEL.AVISO)
+  })
+
+  it('el arranque con colindantes NO deja ni un aviso espurio, y sigue habiendo UNA petición', () => {
+    const espia = espiarPeticionesDeEsteTest()
+    const alAvisar = vi.fn()
+    abrirVisor({ colindantes: true, alAvisar, baseInicial: ID_CAPA.CATASTRO })
+
+    expect(alAvisar).not.toHaveBeenCalled()
+    expect(espia.total).toBe(1)
+  })
+
+  it('no le pone ganchos a sincronizar (por eso puede ir pegada a las capas de fondo)', () => {
+    abrirVisor({ colindantes: true })
+    const args = argumentosDeSincronizar()
+
+    expect(args.ajustar).toBeNull()
+    expect(args.alPrevisualizar).toBeNull()
+    expect(args.alCrearMarcador).toBeNull()
+  })
+
+  it('`colindantes` que no es booleano es TypeError, y el mensaje nombra la vía correcta', () => {
+    const { contenedor, tablaEl } = prepararDOM()
+    const base = { estado: crearEstadoVista(parcelaConHueco()), tablaEl, srs: SRS_DEMO }
+
+    let error = null
+    try {
+      // La tentación es pasarle un objeto de opciones, como a las otras tres.
+      crearVisor(contenedor, { ...base, colindantes: { color: 'gris' } })
+    } catch (e) {
+      error = e
+    }
+    expect(error).toBeInstanceOf(TypeError)
+    expect(error.message).toContain('BOOLEANO')
+    expect(error.message).toContain('pintar')
+
+    for (const colindantes of ['si', 1, null, [], () => {}]) {
+      expect(() => crearVisor(contenedor, { ...base, colindantes })).toThrow(TypeError)
+    }
+    expect(contenedor.children).toHaveLength(0)
+  })
+})
+
+describe('crearVisor · destruir con colindantes', () => {
+  it('cae DESPUÉS de la edición y ANTES de las capas, con el mapa todavía en pie', () => {
+    const { contenedor, visor } = abrirVisor({ edicion: true, colindantes: true })
+
+    const orden = []
+    let alTocarleALasColindantes = null
+
+    anotarDestruccion(visor.edicion, 'edicion', orden)
+    anotarDestruccion(visor.acotaciones, 'acotaciones', orden)
+    anotarDestruccion(visor.colindantes, 'colindantes', orden, () => {
+      alTocarleALasColindantes = {
+        mapaAunEnPie: contenedor.querySelector('.leaflet-map-pane') !== null,
+      }
+    })
+    anotarDestruccion(visor.capas, 'capas', orden)
+
+    visor.destruir()
+
+    // Es lo primero que se monta después de las capas, así que es lo último que se
+    // desmonta antes de ellas: orden inverso EXACTO.
+    expect(orden).toEqual(['edicion', 'acotaciones', 'colindantes', 'capas'])
+    expect(alTocarleALasColindantes).toEqual({ mapaAunEnPie: true })
+    expect(contenedor.children).toHaveLength(0)
+  })
+
+  it('tras destruir no queda ni un contorno de vecina', () => {
+    const { visor, parcela } = abrirVisor({ colindantes: true })
+    visor.colindantes.pintar([vecinaJuntoA(parcela, '9398501VK3799G')])
+    expect(capasDeColindantes(visor.mapa).length).toBeGreaterThan(0)
+
+    visor.destruir()
+
+    expect(document.querySelector(`.${CLASE_COLINDANTE}`)).toBeNull()
+  })
+
+  it('es IDEMPOTENTE: la capa se desmonta UNA sola vez', () => {
+    const { visor } = abrirVisor({ colindantes: true })
+
+    const orden = []
+    anotarDestruccion(visor.colindantes, 'colindantes', orden)
+
+    visor.destruir()
+    expect(() => visor.destruir()).not.toThrow()
+    expect(() => visor.destruir()).not.toThrow()
+
+    expect(orden).toEqual(['colindantes'])
+  })
+
+  it('un fallo posterior del ensamblaje arrastra a la capa YA montada (atomicidad)', () => {
+    const { contenedor, tablaEl } = prepararDOM()
+
+    expect(() =>
+      crearVisor(contenedor, {
+        estado: crearEstadoVista(parcelaConHueco()),
+        tablaEl,
+        srs: SRS_DEMO,
+        colindantes: true,
+        // Lanza en `crearEdicion`, con la capa de colindantes ya montada.
+        edicion: { tolerancia: -1 },
+      }),
+    ).toThrow(RangeError)
+
+    expect(contenedor.children).toHaveLength(0)
+    expect(document.querySelector(`.${CLASE_COLINDANTE}`)).toBeNull()
   })
 })

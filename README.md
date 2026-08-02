@@ -49,6 +49,12 @@ desde F03 no.
 - **F03** Visor y capas (Leaflet) — código y pruebas hechos; **pendiente de la
   firma humana** de `scripts/smoke-navegador/CHECKLIST-HUMANO.md` (gestos de
   ratón, teclado, fallo de red y juicio visual, que no puede firmar una máquina).
+  ⛔ **Corregido el 2026-08-02, y lo encontró esa misma firma humana** (haciendo la
+  de F08): **el mapa no reencuadraba nunca.** El encuadre era el último paso del
+  *montaje* del visor y no se repetía, así que se traía una parcela de Sevilla o se
+  soltaba un GML de Cádiz y **el mapa seguía mirando la de demostración** — el
+  dibujo estaba hecho, a cientos de kilómetros de la vista. Ahora el visor se
+  reencuadra solo cuando entra una parcela **distinta**, y **nunca al editar**.
 - **F04** Generación del GML de parcela (INSPIRE CP 4.0) — hecho. Serializador,
   parser, descarga y botón en la app; ida y vuelta contra el GML real del WFS.
   👉 **Cierra el corte de paridad**: la app ya produce el fichero que se sube a
@@ -70,6 +76,13 @@ desde F03 no.
   [`spec/feature-05-catastro-vivo.md`](spec/feature-05-catastro-vivo.md). Los dos
   que más cambian el diseño: **todo error del Catastro llega con HTTP 200**
   (`response.ok` no clasifica nada) y **`GetParcelsByBBox` no existe**.
+  ⛔ **Y una deuda suya saldada el 2026-08-02, también por la firma humana de F08:
+  las colindantes se traían y no las dibujaba nadie.** Se usaban por dentro —para
+  el enganche de F06 y la invasión de F07— pero pulsar «Traer colindantes» dejaba
+  el mapa exactamente igual mientras la ficha decía el número. Ahora se pintan como
+  contornos grises finos con su referencia catastral al pasar por encima, **por
+  debajo** de la parcela propia: una vecina comparte lindero con ella, y dibujada
+  encima pondría gris el lado compartido.
 - **F06** Edición de parcela — código y pruebas hechos; **pendiente de la firma
   humana** del mismo checklist que F03 (gestos de ratón y juicio visual).
   👉 **La parcela deja de ser un dato que se mira y pasa a ser un dato que se
@@ -121,6 +134,49 @@ desde F03 no.
   `fillRule: 'evenodd'` que Leaflet trae por defecto (un solo polígono con los
   anillos de las dos geometrías rellena exactamente la diferencia simétrica), y la
   banda del margen es un trazo con el ancho recalculado por zoom, no un buffer.
+- **F08** Comprobar un GML existente — código y pruebas hechos, guion de navegador en
+  `ok: true`; **pendiente solo de la firma humana** del mismo checklist (su sección 9
+  trae el punto bloqueante: que ninguna nota se lea como un juicio sobre el trabajo de
+  otro técnico).
+  🔎 **La primera corrida del guion salió `ok: false`, y encontró dos defectos reales
+  que la suite no podía ver** (`scripts/smoke-navegador/GUION.md` §16): los botones de
+  los cajones se pintaban en `system-ui` porque un `font: inherit` en línea dejaba
+  muerta la regla CSS, y pulsar «Descargar informe de contraste» **cerraba el cajón de
+  diagnóstico**, así que el acuse de recibo acababa en un renglón invisible — la regla
+  de oro 1 rota en el último gesto del recorrido. Los dos están corregidos y con
+  guardián. Uno es de cascada CSS, que en jsdom no existe; el otro, de burbujeo real
+  hasta `document`: **3.845 pruebas en verde no los veían, y es la justificación
+  entera de que este guion exista.**
+  🔎 **Y después la firma humana encontró TRES defectos más que el guion tampoco
+  veía — y dos ni siquiera eran de F08** (2026-08-02): el mapa que no reencuadraba
+  (F03), las colindantes que no se dibujaban (F05) y la referencia del GML que no
+  llegaba al campo del panel (ésta sí, de F08). Los tres son la misma cosa: **la
+  aplicación hacía el trabajo y no lo enseñaba.** Están corregidos, con guardián en
+  la suite, y **medidos por el guion desde entonces**. La diferencia con los dos de
+  arriba es la que importa: aquéllos fallaban una afirmación que existía; **éstos no
+  fallaban nada, porque la afirmación no estaba escrita.** Un gate no encuentra lo
+  que no se le ocurre preguntar, y por eso el último es una persona mirando la
+  pantalla. Detalle en
+  [`spec/feature-08-comprobar-gml.md`](spec/feature-08-comprobar-gml.md) M20–M22.
+  👉 **Se suelta un `.gml` en la ventana y la app dice qué es y qué le pasa**: el
+  que le pasó otro despacho, el que generó con otro programa, el que subió hace dos
+  años y le rechazaron. Y lo contrasta contra el parcelario oficial **antes** de
+  presentar nada, que es la pregunta que la Sede dejó abierta (`spec/SPEC.md` §7).
+  ⛔ **La spec la llamaba «la tercera vía de entrada» y es la PRIMERA**: hasta esta
+  fase la aplicación **no tenía ninguna entrada por fichero** —ni un
+  `<input type="file">`, ni un `FileReader`, ni un `drop`— y los parsers de F01
+  llevaban desde la fase 1 en verde **sin que nadie los llamara**. Por eso la zona
+  de fichero se hizo **genérica**: F01 se enchufa después sin rehacer la interfaz.
+  ⚠️ **Y el criterio 4 se cumple a medias, dicho por escrito**: un GML de edificio
+  se detiene con honradez y explica por qué, pero encaminarlo al contraste de
+  construcción exige **F14**, que no existe. Fingir un destino sería peor que decir
+  que no. Las demás correcciones, con su evidencia, en
+  [`spec/feature-08-comprobar-gml.md`](spec/feature-08-comprobar-gml.md).
+  ⚙️ **Ni una dependencia nueva, y el riesgo estrella de la fase no existía**: se
+  temía que meter el lector de GML en el paquete lo engordara de golpe, y medido con
+  atribución por *sourcemap* resulta que **`gml/parse.js` ya estaba dentro desde
+  F05**, porque el cliente del WFS lo importa. Los 68 kB que crece el paquete son
+  código nuevo de la fase, todo él.
 
 ### El régimen de uso, que es el riesgo real de F05
 
@@ -167,7 +223,57 @@ panel de ayuda del «?»; aquí están todos juntos:
 
 El enganche (*snap*) tira del **parcelario oficial**, de la **propia geometría** y
 de las **colindantes** — estas últimas solo si se han traído con su botón: una
-pulsación, una petición al Catastro, nunca a espaldas del usuario.
+pulsación, una petición al Catastro, nunca a espaldas del usuario. Y desde el
+2026-08-02 **se ven**: las vecinas se dibujan como contornos grises finos, con su
+referencia catastral al pasar por encima, así que se sabe **contra qué** se está
+enganchando.
+
+### Cómo se comprueba un GML que ya existe (F08)
+
+Dos gestos, y ninguno tecleado:
+
+1. **Suelta el `.gml` en cualquier sitio de la ventana** —o pulsa «Abrir un GML…»,
+   a la derecha del rótulo «Origen de la parcela»—. Se abre un **cajón sobre el
+   mapa** que dice qué es ese fichero: qué dialecto (CP 4.0 de entrega, la descarga
+   del WFS, un 3.0 que la Sede ya no admite, un GML de edificio), cuántas parcelas
+   trae, qué superficie **declara** y cuál **mide** de verdad, y las notas de lo que
+   no cuadra: coordenadas fuera del huso que el propio fichero declara, vértices
+   duplicados, un contorno que se cruza consigo mismo, un `encoding` que el fichero
+   dice mal sobre sí mismo. Si trae varias parcelas, se elige una.
+2. **«Contrastar con el parcelario»**. La geometría del fichero entra en el mapa,
+   la app pide al Catastro la parcela oficial con la referencia leída **del propio
+   fichero**, y el botón «Diagnosticar encaje» de F07 se enciende solo. Desde el
+   cajón de diagnóstico se descarga el **informe de contraste** en texto.
+
+Al contrastar, **el mapa viaja a la parcela del fichero** —si el GML es de otra
+provincia, la vista se muda— y **el campo «Referencia catastral» pasa a decir lo
+mismo que el modelo**. Las dos cosas parecen obvias, y **las dos faltaban** hasta el
+2026-08-02: ver «Estado», F03 y F08.
+
+Cuatro cosas que conviene saber, porque son decisiones y no accidentes:
+
+- **El campo se vacía si el fichero no trae referencia**, al revés que en la vía del
+  Catastro, donde lo tecleado no se toca. Aquí no hay nada tecleado que respetar:
+  manda el fichero. Dejar la referencia anterior sería peor que el hueco — el campo
+  estaría hablando de una parcela que ya no está en pantalla, y dejaría «Deducir del
+  mapa» encendido al lado de una referencia perfectamente escrita.
+- **Las notas no son un suspenso.** Un GML ajeno con el exterior antihorario, o con
+  un SRS distinto del esperado, o con una superficie declarada que no cuadra con sus
+  propias coordenadas, **sigue adelante**: la app lo dice y te deja contrastarlo. Solo
+  se para cuando no hay geometría legible (no es XML, es un edificio, no trae ninguna
+  parcela, o el sistema de coordenadas no está soportado) — y entonces escribe el
+  motivo, nunca un botón gris y mudo.
+- **La procedencia dice las dos cosas**: la geometría es del fichero, el parcelario
+  es del Catastro. Decir «del Catastro» a secas convertiría el fichero de un tercero
+  en un dato oficial.
+- **El informe es provisional y lo dice de sí mismo.** Se llama «Informe de
+  contraste con el parcelario catastral» y **nunca** «informe de validación
+  gráfica»: VGA e IVG son documentos oficiales con CSV, y un nombre casi homónimo
+  haría creer que ya se presentó algo. El documento con plano y pie de firma es F09.
+
+Y **«Generar GML» sigue encendido** por esta vía, contra la letra de la spec y a
+propósito: si el fichero que has soltado es un 3.0 antiguo, el recorrido natural es
+que la app te lo reescriba en 4.0.
 
 ## ✅ Verificado en la Sede Electrónica
 

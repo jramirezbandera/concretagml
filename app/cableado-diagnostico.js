@@ -9,7 +9,7 @@
 // con `throw` si faltan, dependencias inyectables, `destruir()` idempotente—: quien
 // llegue después reconoce el patrón sin leerlo entero.
 //
-// ── LAS CINCO COSAS DE LAS QUE ES DUEÑO ─────────────────────────────────────
+// ── LAS SEIS COSAS DE LAS QUE ES DUEÑO ──────────────────────────────────────
 //
 //   1. **EL CTA.** Encendido ⟺ hay `geometriaOficial` en el store. Y cuando queda
 //      apagado se ESCRIBE EL MOTIVO: un botón gris y mudo es un error silencioso
@@ -22,6 +22,38 @@
 //      sobreviven a las ediciones y se REINICIAN con cada parcela distinta.
 //   5. **EL RECÁLCULO**: por el store (una vez por operación acabada) y por los dos
 //      campos del cajón. **Nunca por `alPrevisualizar`.**
+//   6. **EL INFORME DE CONTRASTE** (F08 · T4.2): compone el texto con
+//      `report/contraste-texto.js` y lo entrega con `gml/descargar.js#descargarTexto`
+//      cuando se pulsa el botón del PIE del cajón. Ver el bloque de abajo.
+//
+// ── F08 · EL INFORME: QUIÉN PONE CADA PIEZA ─────────────────────────────────
+// El botón vive DENTRO del cajón —las tres razones están escritas en
+// `viewer/cajon-diagnostico.js`, que es donde se toma la decisión de UI— y ese
+// módulo solo enciende, apaga y avisa. Aquí se pone todo lo que él no puede saber:
+//
+//   · **El diagnóstico.** Se guarda el ÚLTIMO que se pintó ({@link
+//     cablearDiagnostico} → `ultimoDiagnostico`) en vez de recalcularlo al pulsar:
+//     recalcular daría cifras que podrían no ser las que el usuario está mirando
+//     —cuesta ~67 ms y el store puede haber cambiado— y el informe tiene que decir
+//     exactamente lo que dice el cajón. Cuando no hay ninguno, el botón está
+//     apagado Y la comprobación de dentro lo vuelve a mirar (el `disabled` es
+//     cortesía, la garantía es la guarda).
+//   · **La FECHA.** `report/contraste-texto.js` **no consulta el reloj** —hay un
+//     guardián que lo comprueba con un grep sobre su fuente— por la misma razón que
+//     `gml/`: un informe descargado es un snapshot y tiene que valer lo mismo dentro
+//     de un año. Quien sí puede leerlo es este cableado, y lo hace por `ahora()`,
+//     inyectable igual que en `cablearCatastro` y en `cablearGeneracionGml`.
+//   · **La COMPROBACIÓN, que puede ser `null`.** Quien llegó por referencia
+//     catastral (F05) no tiene fichero que comprobar y descarga su informe igual;
+//     `informeContrasteTexto` admite `null` y se salta la sección del fichero. Por
+//     eso la opción es una FUNCIÓN (`comprobacion()`) y no un valor: la
+//     comprobación cambia con el tiempo —entra al soltar un GML y se va al
+//     descartarlo— y un valor congelado en el montaje mentiría a la segunda carga.
+//     Su defecto es `() => null`, que es exactamente la vía de F05, así que la
+//     interfaz **no se ramifica por procedencia**. Quien la enchufa es `app/main.js`
+//     (T5.1), y no hay que fabricar nada: `app/cableado-comprobacion.js` ya expone
+//     `comprobacion: () => comprobacion` con esa misma forma.
+//   · **El NOMBRE del fichero.** Ver {@link nombreFicheroInforme}.
 //
 // ── POR QUÉ EL RECÁLCULO NO SE ENGANCHA A `alPrevisualizar` ─────────────────
 // Es la decisión de rendimiento de F07 y conviene que esté escrita donde se toma.
@@ -70,6 +102,20 @@
 // Su test es `test/app/diagnostico.dom.test.js`, con sufijo `.dom`: toca el DOM.
 
 import { diagnosticar } from '../diagnostico/parcela.js'
+import {
+  EXTENSION_GML,
+  PREFIJO_NOMBRE,
+  TIPO_MIME_TEXTO,
+  descargarTexto,
+  nombreFicheroGml,
+} from '../gml/descargar.js'
+import { informeContrasteTexto } from '../report/contraste-texto.js'
+// ⚠️ De `viewer/` solo se importa `_comun.js`, que NO trae Leaflet. El motivo de
+// «Descargar informe de contraste» vive en `viewer/cajon-diagnostico.js` y **no se
+// importa desde aquí a propósito**: ese módulo sí importa Leaflet, y este fichero
+// tiene escrito —y cumple— que no lo hace. Tampoco se copia el literal: quien
+// escribe ese renglón cuando el botón está apagado es el propio cajón, en el mismo
+// instante en que lo apaga. Ver la guarda de `descargarInforme`.
 import { NIVEL } from '../viewer/_comun.js'
 
 // ── Los selectores del contrato con `index.html` ─────────────────────────────
@@ -140,6 +186,94 @@ export const COLA_SIN_VECINAS =
 export const MENSAJE_FALLO_INESPERADO =
   'El diagnóstico se ha interrumpido por un fallo interno de la aplicación; no se ha cambiado ' +
   'nada de la parcela. El detalle técnico está en la consola del navegador.'
+
+/**
+ * Fallo COMPONIENDO el informe. Se distingue del de la entrega porque llevan a
+ * acciones distintas: aquí el fichero no llegó a existir, allí existe y no bajó.
+ * Mismo criterio —y mismas tres piezas— que {@link MENSAJE_FALLO_INESPERADO}.
+ */
+export const MENSAJE_INFORME_NO_COMPUESTO =
+  'El informe de contraste no se ha podido componer por un fallo interno de la aplicación; ' +
+  'no se ha descargado nada y no se ha cambiado nada de la parcela. El detalle técnico está ' +
+  'en la consola del navegador.'
+
+/**
+ * Fallo ENTREGANDO el informe: el texto se compuso entero y lo que falló fue el
+ * navegador (una extensión que ha roto el `click`, la pestaña cerrándose). Se dice
+ * aparte porque para el usuario «tu informe no se puede escribir» y «el informe
+ * está hecho pero no ha bajado» son cosas distintas, y un solo mensaje para las dos
+ * le haría buscar el problema donde no está. Es la misma distinción que hace
+ * `app/main.js` con el GML.
+ */
+export const MENSAJE_INFORME_NO_ENTREGADO =
+  'El informe de contraste se ha compuesto, pero el navegador no ha podido entregarlo. ' +
+  'Vuelve a intentarlo; el detalle técnico está en la consola del navegador.'
+
+// ── El nombre del fichero del informe ────────────────────────────────────────
+
+/**
+ * Primera parte del nombre del informe, en el lugar que el GML ocupa con
+ * `PREFIJO_NOMBRE` (`'parcela'`) y por el mismo motivo: dice QUÉ es el fichero
+ * antes de decir de qué parcela es, y agrupa todo lo que sale de esta aplicación
+ * en la misma carpeta de descargas.
+ *
+ * @readonly
+ */
+export const PREFIJO_INFORME = 'contraste'
+
+/**
+ * Extensión del informe. Es texto plano de verdad —lo dice {@link TIPO_MIME_TEXTO}—
+ * y `.txt` es lo que hace que se abra con un editor en los tres sistemas.
+ *
+ * @readonly
+ */
+export const EXTENSION_INFORME = '.txt'
+
+/**
+ * Compone el nombre con el que baja el informe:
+ * `contraste_<referencia>_<AAAA-MM-DDTHH-mm-ss>.txt`.
+ *
+ *     contraste_9398516VK3799G_2026-07-30T11-45-30.txt   ← con referencia
+ *     contraste_sin-referencia_2026-07-30T11-45-30.txt   ← sin RC (un alta, un 3.0)
+ *
+ * ── POR QUÉ SE DERIVA DE `nombreFicheroGml` Y NO SE ESCRIBE OTRA VEZ ────────
+ * El nombre de un fichero no es texto libre: la referencia catastral la teclea o
+ * la pega el usuario, y de ahí salen rutas (`/`, `\`, `..`), caracteres ilegales
+ * en Windows, nombres de DISPOSITIVO reservados (`CON.txt` no se puede crear) y
+ * longitudes que revientan con `ENAMETOOLONG`. Todo eso ya está resuelto —por
+ * lista BLANCA, con el porqué de cada decisión escrito al lado— dentro de
+ * `gml/descargar.js#nombreFicheroGml`, y su saneador **no está exportado**. Copiar
+ * cuarenta líneas de lista blanca aquí sería abrir la segunda familia de
+ * duplicados que la cabecera de aquel módulo se niega expresamente a abrir; la
+ * copia que se olvidara de una corrección fallaría en verde.
+ *
+ * Así que se le pide el nombre HECHO y se le cambian las dos piezas que son de
+ * este dominio: el prefijo y la extensión. La marca de tiempo, el saneado de la
+ * referencia y las dos marcas honestas (`sin-referencia`, `referencia-ilegible`)
+ * vienen intactas del original — que es justamente lo que se quiere, porque el
+ * informe y el GML de la misma parcela y el mismo instante tienen que emparejarse
+ * de un vistazo en la carpeta de descargas.
+ *
+ * **Y no colisiona con el del GML** por partida doble: distinto prefijo y distinta
+ * extensión. Hay un test que lo afirma en vez de darlo por hecho.
+ *
+ * FUNCIÓN PURA: la fecha entra por parámetro, igual que en `gml/`.
+ *
+ * @param {object} args
+ * @param {string|null} [args.refcat=null]  La referencia tal cual la tenga el
+ *   expediente, sin sanear. `null`, vacía o en blanco = no hay referencia.
+ * @param {Date} args.fecha  Instante que se estampa en el nombre. OBLIGATORIO.
+ * @returns {string}  Nombre de fichero seguro, terminado en {@link EXTENSION_INFORME}.
+ * @throws {TypeError|RangeError}  Los de `nombreFicheroGml`, sin traducir: son
+ *   contratos del programador y el mensaje original nombra el problema mejor.
+ */
+export function nombreFicheroInforme({ refcat = null, fecha } = {}) {
+  const delGml = nombreFicheroGml({ refcat, fecha })
+  // Se recorta por longitud y no por `replace`, porque un `replace` de la cadena
+  // «parcela» acertaría también dentro de una referencia que la contuviera.
+  const cuerpo = delGml.slice(PREFIJO_NOMBRE.length, delGml.length - EXTENSION_GML.length)
+  return `${PREFIJO_INFORME}${cuerpo}${EXTENSION_INFORME}`
+}
 
 // ── Nodos de la cáscara ──────────────────────────────────────────────────────
 
@@ -232,6 +366,25 @@ function claveDeExpediente(parcelaActual) {
 }
 
 /**
+ * La referencia catastral del POJO, o `null`, **para el NOMBRE del fichero**. La
+ * cadena vacía y la cadena en blanco valen `null`: es el caso REAL de `UTM_1.gml`
+ * y de la plantilla oficial del Catastro, donde el elemento está y viene VACÍO
+ * (medido en F08 · T2.1, donde `refcat` resultó ser `''` y no `null`).
+ *
+ * No se reutiliza {@link claveDeExpediente}: aquella es una clave de IDENTIDAD
+ * —mezcla `refcat` con `idLocal` y les pone prefijo— y meterla en el nombre de un
+ * fichero escribiría `idLocal-de-un-dxf` donde el usuario espera una referencia.
+ *
+ * @param {object|null} parcelaActual
+ * @returns {string|null}
+ */
+function referenciaDe(parcelaActual) {
+  if (parcelaActual === null || parcelaActual === undefined) return null
+  const refcat = typeof parcelaActual.refcat === 'string' ? parcelaActual.refcat : ''
+  return refcat.trim() === '' ? null : refcat
+}
+
+/**
  * `ParcelaGml[]` → `[{refcat, recintos}]`, que es lo que come
  * `diagnostico/parcela.js`. La traducción es de tres campos y aun así vive en una
  * función con nombre: es la costura entre el vocabulario de `gml/parse.js` y el de
@@ -271,6 +424,10 @@ const esCajon = (v) =>
   typeof v.clase === 'function' &&
   typeof v.reiniciarExpediente === 'function' &&
   typeof v.estado === 'function' &&
+  // Las dos del pie del informe (F08 · T4.2). Se comprueba lo que se USA, así que
+  // entran en la misma lista: sin ellas el botón quedaría montado y mudo.
+  typeof v.estadoInforme === 'function' &&
+  typeof v.alDescargar === 'function' &&
   typeof v.alCambiar === 'function' &&
   typeof v.alCerrar === 'function'
 
@@ -296,6 +453,10 @@ const esCatastro = (v) =>
  *   contraste: visor.diagnostico.contraste,
  *   catastro,
  *   panel,
+ *   // Opcional (F08): de dónde sale la comprobación del fichero, si la hay. Es la
+ *   // MISMA función que `cablearComprobacion` ya expone. Sin esto el informe se
+ *   // descarga igual, con la sección del fichero omitida.
+ *   comprobacion: comprobacionCableada.comprobacion,
  * })
  * // … al cerrar la pantalla:
  * diag.destruir()
@@ -313,8 +474,21 @@ const esCatastro = (v) =>
  *   ({@link MOTIVO_SIN_CATASTRO}): es un uso legítimo, no una degradación callada.
  * @param {HTMLElement} [opciones.boton]  El CTA. Por defecto, el de la cáscara.
  * @param {HTMLElement} [opciones.renglon]  Su `role="status"`.
+ * @param {() => (object|null)} [opciones.comprobacion]  De dónde sale la
+ *   `Comprobacion` de `comprobacion/gml.js` que va en la cabecera del informe.
+ *   **Es una función y su defecto devuelve `null`**, que es la vía de F05: quien
+ *   llegó por referencia catastral no tiene fichero que comprobar y descarga su
+ *   informe igual. Ver el bloque «EL INFORME» de la cabecera.
+ * @param {() => Date} [opciones.ahora]  De dónde sale «ahora» para la cabecera del
+ *   informe y para el nombre del fichero. Por defecto el reloj del sistema. Es un
+ *   parámetro y no una llamada directa porque `report/contraste-texto.js` **no
+ *   consulta el reloj por contrato** —hay un guardián que lo comprueba—, así que
+ *   poder fijarlo desde fuera es lo único que permite afirmar algo exacto sobre el
+ *   texto y sobre el nombre en una prueba. Mismo criterio que `cablearCatastro` y
+ *   que `cablearGeneracionGml`.
+ * @param {typeof descargarTexto} [opciones.descargar]  La entrega del fichero.
  * @returns {{abrir: (evento?: Event|null) => Promise<void>, recalcular: () => void,
- *   destruir: () => void}}
+ *   descargarInforme: () => (object|null), destruir: () => void}}
  * @throws {TypeError}  Contrato del programador.
  * @throws {Error}  Si la cáscara no trae los dos nodos del contrato.
  */
@@ -326,6 +500,9 @@ export function cablearDiagnostico({
   catastro = null,
   boton = nodo(SELECTOR_BOTON_DIAGNOSTICAR),
   renglon = nodo(SELECTOR_ESTADO_DIAGNOSTICO),
+  comprobacion = () => null,
+  ahora = () => new Date(),
+  descargar = descargarTexto,
 } = {}) {
   if (!esStore(estado)) {
     throw new TypeError(
@@ -359,6 +536,24 @@ export function cablearDiagnostico({
         `${typeof catastro}.`,
     )
   }
+  // Las tres del informe. Se validan aunque tengan defecto: un `comprobacion` que
+  // fuera el OBJETO en vez de la función que lo devuelve es el error fácil de
+  // cometer aquí, y sin guarda se descubriría el día que alguien pulse el botón —
+  // con un `TypeError` de dentro de este módulo, no del llamante que se equivocó.
+  for (const [nombre, valor] of [
+    ['comprobacion', comprobacion],
+    ['ahora', ahora],
+    ['descargar', descargar],
+  ]) {
+    if (typeof valor !== 'function') {
+      throw new TypeError(
+        `cablearDiagnostico: '${nombre}' debe ser una función; recibido ${typeof valor}. ` +
+          `'comprobacion' se pasa como función (y no como valor) porque la comprobación ` +
+          `cambia con el tiempo; 'ahora' porque report/contraste-texto.js no consulta el ` +
+          `reloj por contrato.`,
+      )
+    }
+  }
 
   let destruido = false
 
@@ -376,6 +571,26 @@ export function cablearDiagnostico({
 
   /** Una consulta de vecinas en vuelo, para no encabalgar dos aperturas. */
   let pidiendo = false
+
+  /**
+   * El ÚLTIMO diagnóstico que se pintó en el cajón, que es el que el informe
+   * recoge. `null` = no hay ninguno, y entonces el botón del pie está apagado con
+   * su motivo escrito.
+   *
+   * Se guarda en vez de recalcularse al pulsar, y no es por ahorrar los ~67 ms:
+   * recalcular podría dar cifras DISTINTAS de las que el usuario tiene delante —el
+   * store puede haber cambiado entre el repintado y el clic— y un informe que no
+   * dice lo mismo que la pantalla de la que salió es peor que no tener informe.
+   *
+   * Su invariante, que sostiene toda la guarda del botón: **`ultimoDiagnostico` es
+   * `null` exactamente cuando el cajón ha recibido `pintar(null)`**, que es lo que
+   * apaga el botón y escribe su motivo. Por eso hay UN solo sitio que lo devuelve a
+   * `null` —{@link olvidarDiagnostico}, que hace las dos cosas juntas— y no tres
+   * asignaciones sueltas de las que haya que acordarse.
+   *
+   * @type {object|null}
+   */
+  let ultimoDiagnostico = null
 
   // ── Escritura en la cáscara ────────────────────────────────────────────────
 
@@ -429,7 +644,7 @@ export function cablearDiagnostico({
     const geometriaOficial = oficialDe(parcelaActual)
 
     if (recintos.length === 0) {
-      cajon.pintar(null)
+      olvidarDiagnostico()
       contraste.pintar(null)
       cajon.estado('No hay geometría que diagnosticar.')
       return
@@ -451,13 +666,113 @@ export function cablearDiagnostico({
         // `diagnostico/margen.js` reconoce las dos formas.
         refcat: typeof parcelaActual.refcat === 'string' ? parcelaActual.refcat : null,
       })
+      ultimoDiagnostico = d
       cajon.pintar(d)
       contraste.pintar(d, { recintos, geometriaOficial })
     } catch (causa) {
+      // Se OLVIDA el anterior, y no es celo: el informe se compone del último
+      // diagnóstico, y dejar en pie el de hace dos ediciones ofrecería descargar
+      // unas cifras que ya no describen la parcela que hay en el store. `pintar(null)`
+      // vacía el cajón Y apaga el botón del informe con su motivo, las dos cosas de
+      // una vez. El renglón de estado se escribe DESPUÉS: `pintar` no lo toca.
+      olvidarDiagnostico()
       cajon.estado('El diagnóstico ha fallado. Mira el panel de avisos.')
       panel.avisar(MENSAJE_FALLO_INESPERADO, { nivel: NIVEL.ERROR, causa })
       console.error('cablearDiagnostico: fallo al diagnosticar', causa)
     }
+  }
+
+  // ── El informe de contraste (F08 · T4.2) ───────────────────────────────────
+
+  /**
+   * Tira el último diagnóstico y deja el cajón coherente con esa verdad: en blanco
+   * y con el botón del informe apagado —el cajón escribe su propio motivo—. Es el
+   * ÚNICO camino por el que `ultimoDiagnostico` vuelve a `null`, para que el
+   * invariante que sostiene la guarda del botón no dependa de acordarse.
+   */
+  function olvidarDiagnostico() {
+    ultimoDiagnostico = null
+    cajon.pintar(null)
+  }
+
+  /**
+   * Compone el informe de contraste y lo entrega. Es lo que se llama al pulsar el
+   * botón del pie del cajón, y también está en la API por si alguna vez hace falta
+   * dispararlo desde fuera (un guion de humo, un atajo).
+   *
+   * Los dos fallos posibles se cuentan por SEPARADO y con mensajes distintos —ver
+   * {@link MENSAJE_INFORME_NO_COMPUESTO} y {@link MENSAJE_INFORME_NO_ENTREGADO}—,
+   * y ninguno se deja subir: esto corre dentro de un oyente del DOM, y una
+   * excepción lanzada ahí **no sale por `dispatchEvent`** (medido en F08 · T3.2).
+   * Se reportaría como error no capturado en `window`, el usuario vería que no pasa
+   * nada y el único rastro quedaría en una consola que un técnico del Catastro no
+   * abre nunca.
+   *
+   * @returns {object|null}  El `ResultadoDescarga` de `gml/descargar.js`, o `null`
+   *   si no se llegó a intentar la entrega.
+   */
+  function descargarInforme() {
+    if (destruido) return null
+
+    if (ultimoDiagnostico === null) {
+      // El `disabled` del botón es cortesía; la garantía es esta comprobación —la
+      // misma doctrina que el CTA de arriba—. Y el POR QUÉ no se reescribe aquí:
+      // lo escribe el cajón en su propio renglón en el mismo instante en que apaga
+      // el botón, así que basta con asegurarse de que el gate está bajado. Dos
+      // redacciones del mismo motivo, en dos módulos, divergirían.
+      cajon.pintar(null)
+      return null
+    }
+
+    // Un solo instante para el texto y para el nombre del fichero, igual que hace
+    // `app/main.js` con el GML: si se leyeran dos veces el reloj, la cabecera y el
+    // nombre podrían discrepar en el cambio de segundo y el fichero de la carpeta
+    // dejaría de emparejarse con su contenido.
+    const fecha = ahora()
+    const parcelaActual = estado.get()
+
+    let texto
+    try {
+      texto = informeContrasteTexto({
+        // `null` es un caso legítimo y frecuente, no una degradación: la parcela
+        // llegó por referencia catastral y no hubo fichero que comprobar.
+        comprobacion: comprobacion(),
+        diagnostico: ultimoDiagnostico,
+        parcela: parcelaActual,
+        fecha,
+      })
+    } catch (causa) {
+      cajon.estadoInforme('El informe no se ha podido componer. Mira el panel de avisos.')
+      panel.avisar(MENSAJE_INFORME_NO_COMPUESTO, { nivel: NIVEL.ERROR, causa })
+      console.error('cablearDiagnostico: fallo al componer el informe de contraste', causa)
+      return null
+    }
+
+    let entrega
+    try {
+      entrega = descargar(texto, {
+        nombreFichero: nombreFicheroInforme({ refcat: referenciaDe(parcelaActual), fecha }),
+        mime: TIPO_MIME_TEXTO,
+      })
+    } catch (causa) {
+      // `descargarTexto` PROPAGA lo que lance el `click()` (una extensión que ha
+      // manipulado el DOM), después de haber limpiado. Aquí se cierra el renglón
+      // para que el usuario no se quede mirando un botón que aparentemente no hizo
+      // nada.
+      cajon.estadoInforme('El informe no ha bajado. Mira el panel de avisos.')
+      panel.avisar(MENSAJE_INFORME_NO_ENTREGADO, { nivel: NIVEL.ERROR, causa })
+      console.error('cablearDiagnostico: fallo al entregar el informe de contraste', causa)
+      return null
+    }
+
+    // El desenlace se dice SIEMPRE, salga bien o mal. Cuando no baja, `descargarTexto`
+    // trae un `mensaje` en castellano ya presentable: se enseña tal cual y no se
+    // duplica en el panel, porque el panel es para lo que le pasa al DATO y esto es
+    // lo que le ha pasado a la ENTREGA.
+    cajon.estadoInforme(
+      entrega.descargado ? `Descargado «${entrega.nombre}».` : entrega.mensaje,
+    )
+    return entrega
   }
 
   // ── Las colindantes ────────────────────────────────────────────────────────
@@ -573,6 +888,12 @@ export function cablearDiagnostico({
       vecinas = null
       cajon.reiniciarExpediente()
       cajon.cerrar()
+      // Y el diagnóstico de la anterior se OLVIDA. El cajón está cerrado, así que
+      // `recalcular()` sale por arriba y no lo repintaría: sin esta línea el botón
+      // del informe se quedaría encendido, y el fichero que bajara hablaría de la
+      // parcela que ya no está — con su referencia catastral en el nombre. Es el
+      // fallo más caro que este pie podría cometer, y es silencioso.
+      olvidarDiagnostico()
       contraste.pintar(null)
       decir('', false)
     }
@@ -587,6 +908,7 @@ export function cablearDiagnostico({
   // diagnóstico, y dejarlas pintadas sobre un cajón cerrado sería dejar una
   // anotación sin su explicación.
   const bajaCierre = cajon.alCerrar(() => contraste.pintar(null))
+  const bajaDescargar = cajon.alDescargar(descargarInforme)
   const bajaColindantes = catastro === null ? () => {} : catastro.alColindantes(adoptar)
 
   // `subscribe` NO notifica al suscribirse (ver `crearEstadoVista`): el primer
@@ -599,14 +921,18 @@ export function cablearDiagnostico({
   return {
     abrir,
     recalcular,
+    descargarInforme,
 
     /**
      * Deja el cableado inerte: retira el oyente del CTA, la suscripción al store,
-     * las dos del cajón y la de las colindantes, y **limpia el mapa**. IDEMPOTENTE.
+     * las TRES del cajón (cambio, cierre y descarga) y la de las colindantes, y
+     * **limpia el mapa**. IDEMPOTENTE.
      *
      * No destruye el cajón ni el contraste: son del VISOR y los desmonta
      * `visor.destruir()`. Este módulo desmonta lo que ha montado él, ni más ni
-     * menos — la misma regla que hace que `crearVisor` sea atómico.
+     * menos — la misma regla que hace que `crearVisor` sea atómico. Consecuencia
+     * buscada: tras destruir, el botón del informe sigue en el DOM y sigue
+     * pulsable, pero ya no llama a nadie.
      */
     destruir() {
       if (destruido) return
@@ -615,6 +941,7 @@ export function cablearDiagnostico({
       desuscribirStore()
       bajaCambio()
       bajaCierre()
+      bajaDescargar()
       bajaColindantes()
       contraste.pintar(null)
     },

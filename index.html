@@ -111,7 +111,46 @@
            afirmaría que la deducción no encontró nada, que es otra cosa muy
            distinta de que todavía no se haya deducido. -->
       <section class="gml-bloque gml-bloque--catastro">
-        <h2 class="gml-rotulo">Origen de la parcela</h2>
+        <!-- ── F08 · «Abrir un GML…» VA EN LA FILA DEL RÓTULO ────────────────
+             Con este botón la app estrena su PRIMERA entrada por fichero: hasta
+             F08 no había ni un `<input type="file">`, ni un `FileReader`, ni un
+             `drop` en todo el proyecto. Y va aquí, a la derecha del `<h2>`, y NO
+             en una fila propia debajo.
+
+             LA RAZÓN ES MEDIDA, NO ESTÉTICA, y es LA MISMA que ya razona el
+             `.gml-boton-par` de unas líneas más abajo (el que empareja «Deducir
+             del mapa» con «Traer colindantes»): el panel reparte una altura FIJA
+             entre bloques fijos, así que una fila de botón a lo ancho cuesta
+             ~36 px y esos 36 px se los quita la CAJA DE VÉRTICES — que costó
+             recuperar hasta 303 px sacando el bloque «Edición» al mapa (F06) y
+             que F07 dejó en 267. La fila del rótulo, en cambio, YA EXISTE y le
+             sobra ancho: el botón cabe en el hueco vacío de su derecha.
+
+             COSTE CERO, y es literal: `.gml-boton--menudo` está dimensionado en
+             `estilos/app.css` para caber DENTRO del alto de línea del `<h2>`
+             (15,2 px de botón contra 15,95 px de renglón), así que el bloque no
+             crece ni un píxel y los 267 px de la tabla siguen siendo 267.
+
+             Es el MISMO patrón `.gml-rotulo-fila` del bloque «Vértices» de más
+             abajo, donde el segundo hijo de la fila es el rótulo «X · Y (m)».
+
+             ⚠️ AQUÍ NO VA NINGÚN `<input type="file">`, y es deliberado: lo
+             fabrica `app/zona-fichero.js`, que es además quien engancha el
+             arrastre sobre la VENTANA ENTERA. Un input escrito también aquí daría
+             dos dueños al mismo control, y el módulo tendría que adivinar cuál de
+             los dos es el suyo. Quien abre el selector al pulsar este botón —y
+             quien vacía su `value` para que soltar dos veces el mismo fichero
+             vuelva a disparar— es ese módulo.
+
+             Tampoco está aquí la superposición que se ve mientras se arrastra:
+             la fabrica el mismo módulo y la gobierna `body[data-arrastrando="si"]`
+             desde `estilos/app.css`. -->
+        <div class="gml-rotulo-fila">
+          <h2 class="gml-rotulo">Origen de la parcela</h2>
+          <button type="button" class="gml-boton gml-boton--menudo" data-accion="abrir-gml">
+            Abrir un GML…
+          </button>
+        </div>
 
         <div class="gml-campo">
           <label class="gml-campo-etiqueta" for="campo-refcat">Referencia catastral</label>
