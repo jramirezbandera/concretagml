@@ -356,9 +356,14 @@ describe('services/catastro · el arnés lee ficheros de verdad (anti-vacuidad)'
 })
 
 describe('services/catastro · contrato del módulo', () => {
-  it('el cliente expone exactamente las seis funciones de la puerta pública', () => {
+  it('el cliente expone exactamente las siete funciones de la puerta pública', () => {
+    // Siete desde F09: `descriptivosPorRefcat` (contrato E) trae los datos
+    // alfanuméricos que el encabezado del informe imprime y que la geometría del
+    // WFS no tiene. Su suite propia es `test/services/catastro-dnp.test.js`; aquí
+    // solo se ancla la superficie pública, que es lo que este bloque vigila.
     const { crudo } = montar()
     expect(Object.keys(crudo).sort()).toEqual([
+      'descriptivosPorRefcat',
       'destruir',
       'estado',
       'parcelaPorRefcat',

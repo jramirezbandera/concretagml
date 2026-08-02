@@ -1,7 +1,9 @@
 # Concreta GML
 
 Herramienta web **frontend puro (sin backend)** para generar y diagnosticar ficheros
-**GML INSPIRE** de la Sede Electrónica del Catastro español (parcela y edificio).
+**GML INSPIRE** de la Sede Electrónica del Catastro español (parcela y edificio), y
+para producir con ellos el **informe de contraste firmable**: plano a 300 ppp,
+descripción literaria del lindero y pie de firma colegiada.
 
 **En vivo: <https://jramirezbandera.github.io/concretagml/>** — se publica sola en
 cada push a `main`, y solo si la suite completa pasa (ver «Despliegue»).
@@ -12,6 +14,10 @@ cada push a `main`, y solo si la suite completa pasa (ver «Despliegue»).
 - Motor UTM (serie de Krüger/Karney) propio — sin `proj4js`.
 - [Leaflet](https://leafletjs.com/) (BSD-2-Clause) para el visor.
 - [Turf](https://turfjs.org/) (solo operaciones topológicas) para validación.
+- Escritor de **PDF propio** — sin jsPDF. Sabe texto en Helvetica, líneas,
+  rectángulos y un JPEG pegado sin recodificar, que es lo que el informe necesita.
+- Plano compuesto **a mano en canvas** — sin html2canvas, que sobre el div de
+  Leaflet produce el polígono flotando en un rectángulo gris.
 - [Vite](https://vitejs.dev/) como servidor de desarrollo y empaquetador.
 - [Vitest](https://vitest.dev/) (proyectos `node` y `dom`) para los tests.
 
@@ -177,6 +183,45 @@ desde F03 no.
   atribución por *sourcemap* resulta que **`gml/parse.js` ya estaba dentro desde
   F05**, porque el cliente del WFS lo importa. Los 68 kB que crece el paquete son
   código nuevo de la fase, todo él.
+- **F09** Informe de contraste firmable — código y pruebas hechos, guion de navegador
+  en `ok: true`; **pendiente solo de la firma humana** del mismo checklist (su sección
+  10 hereda el punto bloqueante sobre un papel que se firma, y añade lo que solo se
+  comprueba con el fichero delante: que el PDF **abra en tres lectores distintos**,
+  que el plano se lea y que salga bien **en papel**).
+  👉 **El documento que se entrega y se firma**: plano de situación a **300 ppp**
+  sobre la cartografía del Catastro, con norte, escala gráfica y numérica; relación
+  de vértices; el diagnóstico de F07 a tres bandas; la **descripción literaria del
+  lindero**, editable antes de exportar; y el **pie de firma**, neutral y recordado
+  entre sesiones. Sin una sola conclusión, y con la frase que lo explica impresa en la
+  portada antes de la primera cifra.
+  ⚙️ **Ni una dependencia nueva, otra vez** — `package.json` no cambió en toda la
+  fase. El PDF lo escribe un módulo propio de 13,5 kB en vez de jsPDF, por el mismo
+  motivo por el que el motor UTM es propio en vez de proj4; y como es puro, **su
+  salida se fija con un snapshot de bytes**.
+  ⛔ **El riesgo estrella del proyecto murió medido el primer día**: el WMS del
+  Catastro sirve `EPSG:25830` a `2126×1535` px con el tamaño exacto pedido, así que
+  el plano sale con **una sola petición**. Lo que sí apareció al medir es peor y no
+  estaba previsto: **pasarse de 4000 px no recorta, SUSTITUYE** — pedidos `4200×100`
+  y `5000×100`, devolvió las dos veces `4000×2000`, con HTTP 200 y sin aviso. La
+  imagen carga, se dibuja, y la geometría queda descolocada **con la escala
+  correctamente rotulada al pie**. Por eso el plano se niega a dibujarse si lo servido
+  no coincide con lo pedido.
+  🔎 **Y los tres defectos que hay que recordar no los vio ningún test: los vio abrir
+  el PDF y mirarlo.** Un epígrafe «FIRMA» huérfano al pie de página, las columnas de
+  la tabla de tramos tocándose —dos cifras contiguas se leían como una tercera que no
+  existe— y un `129.9624` con punto inglés en un documento que escribe el resto en
+  español. La suite afirmaba cabecera, `%%EOF`, árbol de páginas, tabla `xref` y hasta
+  un snapshot de bytes, y **los bytes eran los que el código pedía**: el defecto era lo
+  que pedía el código. Detalle en
+  [`spec/feature-09-informe-parcela.md`](spec/feature-09-informe-parcela.md) M11–M13.
+  ⚠️ **El único sitio de toda la aplicación donde propone en vez de medir**, y está
+  acotado con tres candados: en parcela **urbana**, con colindantes consultadas, un
+  frente que ninguna parcela alcanza se describe «presumiblemente con vía pública …
+  **dato NO verificado**, confirme antes de firmar». La marca viaja **en el dato**, no
+  solo en el texto, precisamente porque el texto se puede reescribir.
+  ⚠️ **Deuda anotada**: el paquete queda en **675,5 kB** y Vite avisa por encima de
+  500 — el aviso ya estaba en F08 y F09 lo empeora un 21,8 %. No hay dependencia que
+  podar; el remedio es partir el paquete, y es materia de F16.
 
 ### El régimen de uso, que es el riesgo real de F05
 
@@ -266,14 +311,66 @@ Cuatro cosas que conviene saber, porque son decisiones y no accidentes:
 - **La procedencia dice las dos cosas**: la geometría es del fichero, el parcelario
   es del Catastro. Decir «del Catastro» a secas convertiría el fichero de un tercero
   en un dato oficial.
-- **El informe es provisional y lo dice de sí mismo.** Se llama «Informe de
-  contraste con el parcelario catastral» y **nunca** «informe de validación
-  gráfica»: VGA e IVG son documentos oficiales con CSV, y un nombre casi homónimo
-  haría creer que ya se presentó algo. El documento con plano y pie de firma es F09.
+- **El informe de texto lo dice de sí mismo.** Se llama «Informe de contraste con el
+  parcelario catastral» y **nunca** «informe de validación gráfica»: VGA e IVG son
+  documentos oficiales con CSV, y un nombre casi homónimo haría creer que ya se
+  presentó algo. Del mismo cajón baja también el documento con plano y pie de firma
+  («Preparar informe (PDF)», abajo).
 
 Y **«Generar GML» sigue encendido** por esta vía, contra la letra de la spec y a
 propósito: si el fichero que has soltado es un 3.0 antiguo, el recorrido natural es
 que la app te lo reescriba en 4.0.
+
+### Cómo se saca el informe firmable (F09)
+
+En el pie del cajón de diagnóstico hay **dos** botones, y el orden dice cuál es el
+entregable:
+
+| | **«Preparar informe (PDF)»** | «Descargar informe de contraste» |
+|---|---|---|
+| Qué lleva | Plano de situación a **300 ppp**, relación de vértices, diagnóstico a tres bandas, **descripción del lindero** y **pie de firma** | Las mismas cifras, en texto plano |
+| Red | Una petición de cartografía | **Ninguna** |
+| Para qué | Se firma, se presenta, se archiva | Se pega en un correo o en una instancia |
+
+El PDF abre un diálogo antes de componerse. Ahí es donde se corrige lo que la
+aplicación no puede saber: **el texto del lindero se edita** —es un borrador, no un
+resultado— y **el pie de firma se teclea una vez y se recuerda**. Después, «Componer
+PDF».
+
+Cinco cosas que conviene saber, porque son decisiones:
+
+- **El texto del lindero se recorre en sentido horario desde el vértice más al
+  noroeste**, agrupando lados consecutivos con el mismo colindante y rumbo parecido.
+  Un tramo de un solo lado se escribe «en línea recta de X m»; uno agrupado, «en línea
+  quebrada de N lados que suman X m» — llamar «línea recta» de 47 m a una quebrada de
+  nueve lados sería una medida que no se puede replantear sobre el terreno. Lo
+  metodológico (sentido, arranque, norte de cuadrícula, qué significa un tramo sin
+  referencia) **va al pie como nota técnica**: delante, se colaría en el portapapeles
+  de quien solo quería los linderos.
+- **En urbana, un frente que ninguna parcela alcanza se propone como vía pública** —y
+  es lo único que esta aplicación propone en vez de medir—. Va marcado tres veces en
+  la misma frase («presumiblemente», «dato NO verificado», «confirme antes de firmar»),
+  aparece en un bloque propio encima del cuadro de edición y **«Componer PDF» nace
+  apagado** hasta que se marca el acuse. En rústica no se propone nada: un lindero sin
+  parcela catastral puede ser un camino, un cauce o un monte público.
+- **El pie de firma no presupone titulación.** Ningún desplegable de profesiones,
+  ninguno; «colegio» es texto libre. Quién puede firmar qué está en disputa, y esa
+  decisión no le toca a un programa.
+- **Lo que se guarda son cuatro campos y nada más** —nombre, número de colegiado,
+  colegio y contacto—, en el navegador y en el equipo de quien los escribe. **No se
+  guarda qué fincas has consultado ni qué informes has emitido**, y desmarcar
+  «Recordar» **borra** el registro, no lo desactiva.
+- **Si el plano no se puede componer, el informe baja igual y lo dice en el propio
+  papel.** Las otras secciones no dependen de la red, y negarlas porque un servicio
+  externo no contesta sería castigar al usuario por algo que no ha hecho. Lo único
+  inaceptable sería componerlo mudo.
+
+El documento **no lleva ninguna conclusión**, y lo dice de sí mismo en la portada:
+«la aplicación mide; el colegiado interpreta y firma». No hay semáforos, no hay
+colores de mérito —el escritor solo sabe grises, y el gris se usa para jerarquía, no
+para puntuar una cifra— y **no aparece ni una sigla de los documentos oficiales del
+Catastro**, ni siquiera para negar ser uno: en un papel que se firma, la sigla se lee
+y la negación no.
 
 ## ✅ Verificado en la Sede Electrónica
 

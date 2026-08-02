@@ -295,13 +295,33 @@ describe('report/contraste-texto · el informe completo sobre la parcela real', 
     }
   })
 
-  it('dice que es PROVISIONAL, que no lleva pie de firma y que el documento es F09', () => {
-    expect(texto).toContain('VERSIÓN PROVISIONAL EN TEXTO, SIN PIE DE FIRMA')
-    expect(texto).toContain('F09')
-    expect(texto).toContain('NO LLEVA PIE DE FIRMA')
-    // Y lo dice DOS veces: arriba, antes de que se lea una sola cifra, y abajo, en
-    // el sitio donde alguien iría a buscar la firma que no está.
+  it('dice que no lleva pie de firma, y REMITE al documento que sí lo lleva', () => {
+    // ⚠️ REESCRITO EN F09 (T4.2). Este párrafo decía que el documento firmable «es el
+    // de la fase F09 de esta herramienta y todavía no existe». Ya existe, así que esa
+    // frase pasó de aviso a error: un desmentido caducado se sigue leyendo con la
+    // misma cara de cierto. Lo que este test exige hoy son las dos mitades que
+    // importan —lo que este documento NO lleva, y a DÓNDE hay que ir por el que sí—,
+    // y que la caducada no haya vuelto.
+    expect(texto).toContain('VERSIÓN EN TEXTO, SIN PIE DE FIRMA')
+    // Con `\s+`: el párrafo del pie va justificado y la frase se parte por un salto
+    // de línea. Buscar el literal ataba la afirmación al ancho de columna, que es un
+    // detalle de maquetación y no lo que aquí se defiende.
+    expect(texto).toMatch(/NO\s+LLEVA\s+PIE\s+DE\s+FIRMA/)
+    expect(texto).not.toContain('todavía no existe')
+    // Las tres cosas que no lleva, enumeradas: sin la lista, «sin pie de firma» se
+    // lee como si solo faltara una rúbrica.
+    expect(texto).toMatch(/plano\s+de\s+situación/)
+    expect(texto).toMatch(/descripción\s+literaria\s+del\s+lindero/)
+    // Y el destino, por el NOMBRE DEL BOTÓN que lo compone: remitir a «la fase F09»
+    // no le sirve de nada a quien tiene el fichero abierto. Se busca con `\s+` porque
+    // el párrafo va JUSTIFICADO a lo ancho y el rótulo puede partirse por un salto de
+    // línea — buscar el literal ataría el test al ancho de columna.
+    const REMITE = /«Preparar\s+informe\s+\(PDF\)»/g
+    expect(texto).toMatch(REMITE)
+    // Lo dice DOS veces: arriba, antes de que se lea una sola cifra, y abajo, en el
+    // sitio donde alguien iría a buscar la firma que no está.
     expect(texto.split('SIN PIE DE FIRMA').length - 1).toBeGreaterThanOrEqual(1)
+    expect(texto.match(REMITE)).toHaveLength(2)
     expect(texto).toContain('validación gráfica alternativa (VGA)')
   })
 
@@ -647,9 +667,10 @@ describe('report/contraste-texto · fichero sin parcela que contrastar', () => {
 
   it('sin geometría, la relación de vértices lo dice en vez de salir vacía', () => {
     expect(texto).toContain('No consta la geometría de la parcela.')
-    // Y el informe sigue siendo un informe: cabecera, provisionalidad y pie.
+    // Y el informe sigue siendo un informe: cabecera, desmentido y pie. (`\s+`: la
+    // frase se parte por el salto de línea del párrafo justificado.)
     expect(texto).toContain('INFORME DE CONTRASTE CON EL PARCELARIO CATASTRAL')
-    expect(texto).toContain('NO LLEVA PIE DE FIRMA')
+    expect(texto).toMatch(/NO\s+LLEVA\s+PIE\s+DE\s+FIRMA/)
   })
 
   it('un hallazgo de F02 sale con SUS vértices y con el verbo de la corrección', () => {
@@ -917,7 +938,7 @@ describe('report/contraste-texto · sin fichero de origen', () => {
     expect(texto).toContain('CONTRASTE CON EL PARCELARIO')
     expect(apartadosDe(texto).filter((a) => a.seccion === 2)).toHaveLength(11)
     expect(texto).toContain('Exterior — 15 vértices')
-    expect(texto).toContain('NO LLEVA PIE DE FIRMA')
+    expect(texto).toMatch(/NO\s+LLEVA\s+PIE\s+DE\s+FIRMA/)
     expect(veredictosEn(sinInvasion(texto))).toEqual([])
   })
 

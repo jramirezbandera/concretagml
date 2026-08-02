@@ -424,10 +424,21 @@ const esCajon = (v) =>
   typeof v.clase === 'function' &&
   typeof v.reiniciarExpediente === 'function' &&
   typeof v.estado === 'function' &&
-  // Las dos del pie del informe (F08 · T4.2). Se comprueba lo que se USA, así que
-  // entran en la misma lista: sin ellas el botón quedaría montado y mudo.
+  // Las TRES del pie del informe (F08 · T4.2 y F09 · T4.2). Se comprueba lo que se
+  // USA, así que entran en la misma lista: sin ellas el botón quedaría montado y
+  // mudo.
+  //
+  // ⚠️ `alPreparar` lo consume `app/cableado-informe.js` (F09) y NO este módulo, y
+  // aun así se exige aquí. No es celo: el pie del cajón tiene DOS botones que el
+  // mismo `gateInforme` enciende y apaga a la vez, y este cableado es el primero de
+  // los dos que monta sobre él. Un cajón sin ese canal pasaría esta guarda,
+  // `cablearDiagnostico` seguiría funcionando entero, y el botón PRIMARIO —el del
+  // documento firmable, el que el usuario viene a pulsar— se quedaría montado y
+  // mudo, sin un solo síntoma. Un contrato que solo se comprueba cuando alguien lo
+  // usa es un contrato que se descubre roto en producción.
   typeof v.estadoInforme === 'function' &&
   typeof v.alDescargar === 'function' &&
+  typeof v.alPreparar === 'function' &&
   typeof v.alCambiar === 'function' &&
   typeof v.alCerrar === 'function'
 
@@ -488,7 +499,8 @@ const esCatastro = (v) =>
  *   que `cablearGeneracionGml`.
  * @param {typeof descargarTexto} [opciones.descargar]  La entrega del fichero.
  * @returns {{abrir: (evento?: Event|null) => Promise<void>, recalcular: () => void,
- *   descargarInforme: () => (object|null), destruir: () => void}}
+ *   descargarInforme: () => (object|null), ultimoDiagnostico: () => (object|null),
+ *   destruir: () => void}}
  * @throws {TypeError}  Contrato del programador.
  * @throws {Error}  Si la cáscara no trae los dos nodos del contrato.
  */
@@ -922,6 +934,32 @@ export function cablearDiagnostico({
     abrir,
     recalcular,
     descargarInforme,
+
+    /**
+     * El ÚLTIMO diagnóstico que se PINTÓ en el cajón, o `null` si no hay ninguno.
+     *
+     * ── POR QUÉ SE EXPONE (F09 · T5.1) ─────────────────────────────────────
+     * El informe firmable en PDF lo compone `app/cableado-informe.js`, que
+     * escucha el OTRO botón del mismo pie (`alPreparar`) y necesita exactamente
+     * las mismas cifras. Las alternativas eran las dos peores:
+     *
+     *   · **Recalcular allí** con `diagnosticar()`: ~67 ms de bloqueo mientras el
+     *     usuario espera, y —lo que decide— una SEGUNDA verdad sobre el mismo
+     *     expediente. Habría que reproducir la registral, la clase, las vecinas y
+     *     la traducción `ParcelaGml → Vecina`; el día que una de las cuatro
+     *     divergiera, el PDF diría una cosa y el cajón del que salió, otra. La
+     *     invariante que este módulo defiende desde F08 es justo esa: **el
+     *     informe dice EXACTAMENTE lo que dice el cajón**.
+     *   · **Duplicar el estado** guardando otra copia en el otro cableado, con
+     *     dos sitios que acordarse de poner a `null` cuando entra otra parcela.
+     *
+     * Es una lectura, no una puerta: devuelve la referencia tal cual y no admite
+     * escritura. `null` significa lo mismo que dentro —no hay diagnóstico que
+     * enseñar— y es exactamente cuando los dos botones del pie están apagados.
+     *
+     * @returns {object|null}
+     */
+    ultimoDiagnostico: () => ultimoDiagnostico,
 
     /**
      * Deja el cableado inerte: retira el oyente del CTA, la suscripción al store,

@@ -36,7 +36,7 @@
 // —ni va a medir— qué contesta a un cliente denegado**: provocarlo es exactamente
 // la conducta que se sanciona (hueco declarado en `PROCEDENCIA.md`). Por tanto:
 //
-//   · Ocho peticiones fallidas con `SIN_RED` son compatibles con estar
+//   · Nueve peticiones fallidas con `SIN_RED` son compatibles con estar
 //     bloqueados, con estar sin internet, con un DNS caído y con que el servicio
 //     esté apagado. **Esta sonda no los distingue, y no finge distinguirlos.**
 //   · Por eso «no he podido comprobarlo» es un desenlace de primera clase, con su
@@ -60,7 +60,7 @@
 //     `push`. Esto se mira cada varias semanas, o cuando algo huele raro.
 //
 // La regla es corta: **la lanza una persona, desde su máquina, cuando quiere
-// saber.** Ocho operaciones, una vez.
+// saber.** Nueve operaciones, una vez.
 //
 // ── QUÉ COMPRUEBA: EL CONTRATO, NO LOS BYTES ─────────────────────────────────
 //
@@ -87,10 +87,24 @@
 //   9. `Access-Control-Allow-Origin: *` y el `content-type` siguen ahí.
 //  10. El byte acentuado sobrevive: la respuesta sigue declarando `ISO-8859-1`
 //      con bytes UTF-8, o ha dejado de hacerlo. **Las dos cosas son información.**
+//  11. (F09) `Consulta_DNPRC` sigue contestando a `RefCat` —y no a `RC`—, su
+//      envoltorio sigue llamándose `consulta_dnprcResult` EN MINÚSCULAS, la
+//      parcela de referencia del proyecto sigue cayendo en la rama `lrcdnp` (no
+//      en `bico`) y su municipio y su provincia siguen siendo los mismos en
+//      TODOS sus inmuebles.
 //
 // Y la número 6 merece un aviso: **si algún día el servicio dejara de mentir en
 // sus contadores, esta sonda saldría roja — y sería una BUENA noticia**, no un
 // fallo. «Rojo» aquí quiere decir «el contrato ha cambiado», nunca «algo va mal».
+//
+// Sobre la 11 hay que decir por qué es UNA petición y no dos. El caso simétrico
+// —mandar `RC=` y comprobar que sigue contestando `cod:17`, como se hace con los
+// parámetros del `.asmx` en la número 8— **no se sondea**: costaría otra llamada
+// a un servicio que sanciona el uso abusivo con ~10 días de denegación (override
+// O8) para medir algo que la propia comprobación 11 ya cubre por el otro lado. Si
+// el servicio dejara de entender `RefCat`, contestaría un `cod` y la 11 saldría
+// roja igual. La respuesta del `RC=` está congelada en su fixture y no hace falta
+// repetirla cada vez que alguien quiere saber si el contrato sigue en pie.
 //
 // ── CÓMO ESTÁ CONSTRUIDA, Y POR QUÉ ASÍ ──────────────────────────────────────
 //
@@ -103,13 +117,13 @@
 //     incumpliera esta regla, la sonda envejecería igual que los fixtures y no
 //     serviría para nada — que es el problema que viene a resolver.
 //   · **Mismo transporte que la app** (`services/_red.js`), cola incluida. Son
-//     ~8 peticiones; que salgan con la misma disciplina que las de producción, y
+//     ~9 peticiones; que salgan con la misma disciplina que las de producción, y
 //     de paso el transporte queda ejercitado contra el servicio real una vez.
-//   · **Sin bucles ni reintentos propios.** Ocho operaciones, una vez, y ninguna
+//   · **Sin bucles ni reintentos propios.** Nueve operaciones, una vez, y ninguna
 //     se repite desde aquí. Lo que sí puede repetirse es lo que repetiría la app:
 //     `services/_red.js` reintenta hasta 3 veces con backoff **solo** cuando el
 //     `fetch` rechaza o el estado es 5xx —nunca un 2xx, nunca un 4xx—, así que
-//     con el servicio caído la tanda puede llegar a 24 peticiones. Es la
+//     con el servicio caído la tanda puede llegar a 27 peticiones. Es la
 //     disciplina de producción, no una decisión de este guion; y cuando ocurre,
 //     el veredicto lo dice en `advertencias` y en `transporte.reintentos`.
 //   · **Nunca se ramifica sobre el texto libre del `CDATA` de los errores.** Es
@@ -154,6 +168,15 @@ import { join, resolve } from 'node:path'
 
 import { NS } from '../gml/_comun.js'
 import { SIN_NAMESPACE, atributo, hijos, parsearXml } from '../gml/xml.js'
+import {
+  CAMPOS_DESCRIPTIVOS,
+  CLAVE_ENVOLTORIO_DNPRC,
+  PARAM_DNPRC,
+  RAMA_DNPRC,
+  TIPO_DNPRC,
+  leerDnprc,
+  urlDnprc,
+} from '../services/_catastro-dnp.js'
 import {
   CATASTRO_OVC_RCCOOR_JSON,
   CLAVE_ENVOLTORIO_RCCOOR,
@@ -202,6 +225,14 @@ const FIXTURES = Object.freeze({
   rcInexistente: 'wfs-exceptionreport-rc-inexistente.xml',
   rccoor: 'ovc-rccoor-ok.json',
   rccoorAsmx: 'ovc-rccoor-cod76.json',
+  /**
+   * F09. Es la URBANA a propósito: es la parcela de referencia del proyecto y la
+   * que cae en la rama `lrcdnp` con 18 inmuebles, o sea la que hace falta para
+   * vigilar la forma que el código tiene que saber leer. La rústica congela las
+   * rutas de paraje y polígono/parcela y **no se sondea**: sería una petición más
+   * (override O8) sobre una parcela ajena al proyecto.
+   */
+  dnprc: 'ovc-dnprc-urbana-9398516VK3799G.json',
   parcela: 'cp_parcela_9398516VK3799G.gml',
 })
 
@@ -430,7 +461,7 @@ function jsonONulo(texto) {
 }
 
 /**
- * Prepara la sonda: lee la verdad externa, deriva las 8 peticiones con el código
+ * Prepara la sonda: lee la verdad externa, deriva las 9 peticiones con el código
  * de PRODUCCIÓN y deja calculadas las expectativas que salen de los fixtures.
  *
  * @returns {{peticiones: Array<{nombre: string, familia: 'xml'|'json', url: string,
@@ -472,6 +503,35 @@ function prepararse() {
   const rccoorFixture = jsonONulo(leerFixture(DIR_CATASTRO, FIXTURES.rccoor))
   const asmxFixture = leerRccoor(leerFixture(DIR_CATASTRO, FIXTURES.rccoorAsmx))
 
+  // F09. Las expectativas del DNPRC salen del fixture leído con el lector de
+  // PRODUCCIÓN, igual que las del WFS: si mañana cambia la forma que el código
+  // sabe leer, cambian solas.
+  const dnprcTexto = leerFixture(DIR_CATASTRO, FIXTURES.dnprc)
+  const dnprcFixture = leerDnprc(dnprcTexto)
+  if (dnprcFixture.tipo !== TIPO_DNPRC.DESCRIPTIVOS) {
+    throw errorDePreparacion(
+      `El fixture «${FIXTURES.dnprc}» no se lee como datos alfanuméricos (salió ` +
+        `${dnprcFixture.tipo}). Es la referencia contra la que se compara la respuesta viva.`,
+    )
+  }
+  if (dnprcFixture.rama !== RAMA_DNPRC.VARIOS) {
+    // Anti-vacuidad: la gracia de este caso es que la parcela de referencia del
+    // proyecto cae en la rama LISTA, que es la que no trae `ldt` ni `cn`. Con la
+    // otra rama, la comprobación seguiría en verde midiendo otra cosa.
+    throw errorDePreparacion(
+      `El fixture «${FIXTURES.dnprc}» ya no viene por la rama «${RAMA_DNPRC.VARIOS}» sino por ` +
+        `«${dnprcFixture.rama}». Ese fixture existe justamente porque la parcela de referencia ` +
+        'del proyecto cae en la rama de VARIOS inmuebles, que es la que tiene menos campos.',
+    )
+  }
+  if (!dnprcTexto.includes(`{"${CLAVE_ENVOLTORIO_DNPRC}"`)) {
+    throw errorDePreparacion(
+      `El fixture «${FIXTURES.dnprc}» ya no empieza por el envoltorio ` +
+        `«${CLAVE_ENVOLTORIO_DNPRC}» en minúsculas, que es lo que la sonda va a buscar en la ` +
+        'respuesta viva.',
+    )
+  }
+
   const pcFixture = pcDelPrimerCandidato(rccoorFixture)
   if (pcFixture === null) {
     throw errorDePreparacion(
@@ -496,7 +556,7 @@ function prepararse() {
   })
   const encodingEsperado = [...new Set(encodingsFixtures)]
 
-  // ── Las 8 peticiones, construidas con el código de PRODUCCIÓN ───────────────
+  // ── Las 9 peticiones, construidas con el código de PRODUCCIÓN ───────────────
   //
   // Cada una: parámetros de la URL MEDIDA + constructor de `services/`. Lo que
   // sale es lo que la app emitiría hoy para ese caso.
@@ -681,6 +741,34 @@ function prepararse() {
     })
   }
 
+  // 9 · (F09) `Consulta_DNPRC`: los datos alfanuméricos de la parcela. Es OTRO
+  //     `.svc` —el del callejero, no el de coordenadas— y otra convención de
+  //     envoltorio. La referencia sale de la URL medida y la petición la construye
+  //     `urlDnprc`, que es el código de producción.
+  {
+    const medida = urlMedida(medidas, FIXTURES.dnprc)
+    const p = parametros(medida)
+    const nombres = [...p.keys()]
+    // Anti-vacuidad del NOMBRE del parámetro: si la URL medida llevara `RC` —el
+    // nombre que no es—, esta petición estaría sondeando el camino del error y la
+    // comprobación saldría roja por el motivo equivocado.
+    if (!nombres.includes(PARAM_DNPRC.refcat)) {
+      throw errorDePreparacion(
+        `La URL medida de «${FIXTURES.dnprc}» no lleva «${PARAM_DNPRC.refcat}» (lleva ` +
+          `${JSON.stringify(nombres)}). Ese es el nombre bueno del parámetro y el que la sonda ` +
+          'tiene que ejercitar: con `RC` el servicio contesta HTTP 200 y un código de error.',
+      )
+    }
+    const refcat = exigirParametro(p, PARAM_DNPRC.refcat, 'Consulta_DNPRC')
+    registrar({
+      nombre: 'dnprc',
+      titulo: `Consulta_DNPRC · los datos alfanuméricos de ${refcat} (con ${PARAM_DNPRC.refcat})`,
+      familia: 'json',
+      url: urlDnprc(refcat),
+      medida,
+    })
+  }
+
   return {
     peticiones,
     esperado: {
@@ -694,6 +782,9 @@ function prepararse() {
       refcatRccoorFixture: `${pcFixture.pc1}${pcFixture.pc2}`,
       codAsmxFixture: asmxFixture.cod,
       tipoRccoorAsmxFixture: asmxFixture.tipo,
+      ramaDnprcFixture: dnprcFixture.rama,
+      inmueblesDnprcFixture: dnprcFixture.inmuebles,
+      datosDnprcFixture: dnprcFixture.datos,
       encodingEsperado,
     },
     advertencias,
@@ -730,7 +821,7 @@ function fetchQueApunta(registro) {
 }
 
 /**
- * Emite las 8 peticiones por el transporte de la app.
+ * Emite las 9 peticiones por el transporte de la app.
  *
  * Se lanzan TODAS a la vez a propósito: la cola de `services/_red.js` las va a
  * serializar de dos en dos (`MAX_CONCURRENCIA`), que es justo la disciplina que
@@ -1390,6 +1481,181 @@ function juzgar(esperado, respuestas) {
     }
   }
 
+  // ── (F09) `Consulta_DNPRC`: el otro `.svc`, la otra convención ──────────────
+  {
+    const p = con('dnprc')
+    const cuerpo = cuerpoDe(p)
+
+    if (cuerpo === null) {
+      comprobaciones.push(
+        sinMedir(
+          `Consulta_DNPRC · sigue respondiendo a ${PARAM_DNPRC.refcat} (y no a «RC»)`,
+          TIPO_DNPRC.DESCRIPTIVOS,
+          p,
+        ),
+        sinMedir(
+          `Consulta_DNPRC · el envoltorio sigue siendo «${CLAVE_ENVOLTORIO_DNPRC}» en minúsculas`,
+          CLAVE_ENVOLTORIO_DNPRC,
+          p,
+        ),
+        sinMedir(
+          `Consulta_DNPRC · la parcela de referencia sigue cayendo en la rama «${RAMA_DNPRC.VARIOS}»`,
+          { rama: esperado.ramaDnprcFixture, inmuebles: esperado.inmueblesDnprcFixture },
+          p,
+        ),
+        sinMedir(
+          'Consulta_DNPRC · municipio y provincia siguen coincidiendo en TODOS los inmuebles',
+          esperado.datosDnprcFixture,
+          p,
+        ),
+      )
+    } else {
+      const leido = leerDnprc(cuerpo)
+      const responde = leido.tipo === TIPO_DNPRC.DESCRIPTIVOS
+
+      // El envoltorio se mira sobre el TEXTO CRUDO y no sobre el árbol ya leído:
+      // `leerDnprc` ya lo exige, así que preguntárselo a él sería preguntarle si
+      // hizo lo que hizo. Lo que interesa saber es si la clave que viene del
+      // servidor sigue escrita como se midió.
+      const claves = Object.keys(jsonONulo(cuerpo) ?? {})
+      const envoltorioBien = claves.includes(CLAVE_ENVOLTORIO_DNPRC)
+
+      comprobaciones.push(
+        comprobacion(`Consulta_DNPRC · sigue respondiendo a ${PARAM_DNPRC.refcat} (y no a «RC»)`, {
+          esperado: TIPO_DNPRC.DESCRIPTIVOS,
+          observado: { tipo: leido.tipo, cod: leido.cod, des: leido.des },
+          ok: responde,
+          nota: responde
+            ? 'El parámetro sigue llamándose `RefCat`. Es la única comprobación de esa trampa ' +
+              'que se hace en vivo: la simétrica —mandar `RC` y ver que contesta `cod:17`— ' +
+              'costaría otra petición y su respuesta ya está congelada en ' +
+              '`ovc-dnprc-cod17.json`. Si el servicio dejara de entender `RefCat`, esto saldría ' +
+              'rojo igual.'
+            : 'El endpoint ha dejado de devolver datos para la referencia medida. Si contesta un ' +
+              '`cod`, mira CUÁL antes de tocar nada: `"17"` («LA REFERENCIA CATASTRAL ES ' +
+              'OBLIGATORIA») significa que la petición va sin referencia utilizable, o sea que ' +
+              'el fallo es NUESTRO. En ningún caso se traduce un código a «esa parcela no ' +
+              'existe»: nadie ha medido cómo se dice eso en este endpoint.',
+        }),
+        comprobacion(
+          `Consulta_DNPRC · el envoltorio sigue siendo «${CLAVE_ENVOLTORIO_DNPRC}» en minúsculas`,
+          {
+            esperado: CLAVE_ENVOLTORIO_DNPRC,
+            observado: claves,
+            ok: envoltorioBien,
+            nota: envoltorioBien
+              ? 'Sigue en minúsculas, al revés que el `Consulta_RCCOORResult` del servicio ' +
+                'hermano. Misma casa y dos convenciones: derivar la clave del nombre de la ' +
+                'operación funciona con uno y falla con este.'
+              : 'La clave del envoltorio ha cambiado. Si ahora es `Consulta_DNPRCResult`, el ' +
+                'servicio se ha vuelto coherente con su hermano —buena noticia— y hay que ' +
+                'actualizar `CLAVE_ENVOLTORIO_DNPRC` y su ficha en PROCEDENCIA.md. Hasta ' +
+                'entonces, el lector no encuentra nada donde miraba.',
+          },
+        ),
+      )
+
+      if (!responde) {
+        // El cuerpo llegó, pero no se ha podido leer. Las dos comprobaciones que
+        // dependen de haberlo leído salen «no lo sé» y NO en rojo: en rojo estarían
+        // diciendo que la rama y los campos han cambiado, y lo único que se sabe es
+        // que no se han podido observar. El rojo ya lo ha puesto la comprobación de
+        // arriba, que es la que sí ha medido algo.
+        const noObservable = (nombre, esperadoDe) =>
+          comprobacion(nombre, {
+            esperado: esperadoDe,
+            observado: null,
+            ok: null,
+            nota:
+              'NO SE HA PODIDO COMPROBAR: la respuesta ha llegado pero no se ha podido leer ' +
+              '(ver la comprobación anterior, que dice con qué ha contestado el servicio). Esto ' +
+              'NO dice que esta parte del contrato haya cambiado; dice que hoy no se sabe.',
+          })
+        comprobaciones.push(
+          noObservable(
+            `Consulta_DNPRC · la parcela de referencia sigue cayendo en la rama «${RAMA_DNPRC.VARIOS}»`,
+            { rama: esperado.ramaDnprcFixture, inmuebles: esperado.inmueblesDnprcFixture },
+          ),
+          noObservable(
+            'Consulta_DNPRC · municipio y provincia siguen coincidiendo en TODOS los inmuebles',
+            esperado.datosDnprcFixture,
+          ),
+        )
+      } else {
+        comprobaciones.push(
+          comprobacion(
+            `Consulta_DNPRC · la parcela de referencia sigue cayendo en la rama «${RAMA_DNPRC.VARIOS}»`,
+            {
+              esperado: {
+                rama: esperado.ramaDnprcFixture,
+                inmuebles: esperado.inmueblesDnprcFixture,
+              },
+              observado: {
+                rama: leido.rama,
+                inmuebles: leido.inmuebles,
+                declarados: leido.declarados,
+              },
+              ok:
+                leido.rama === esperado.ramaDnprcFixture &&
+                leido.inmuebles === esperado.inmueblesDnprcFixture,
+              nota:
+                leido.rama === esperado.ramaDnprcFixture &&
+                leido.inmuebles === esperado.inmueblesDnprcFixture
+                  ? 'Sigue viniendo por la rama de VARIOS inmuebles y con los mismos que el día ' +
+                    'de la captura. Es la rama que NO trae `ldt` ni `cn`, y por eso el domicilio ' +
+                    'y la clase de esta parcela se resuelven como se resuelven.'
+                  : leido.rama === RAMA_DNPRC.UNO
+                    ? 'La parcela ha pasado a devolver `bico` (UN inmueble). Sería un cambio del ' +
+                      'dato, no una avería: alguien ha agrupado o dado de baja inmuebles. Con ' +
+                      'esa rama aparecen `ldt` y `cn`, así que el domicilio y la clase pasarían ' +
+                      'a salir por otro camino. Recapturar el fixture y anotarlo.'
+                    : 'El número de inmuebles de la parcela ha cambiado. Puede ser una división ' +
+                      'horizontal real en el Catastro —dato de la realidad— y entonces lo que ' +
+                      'toca es recapturar el fixture y actualizar PROCEDENCIA.md.',
+            },
+          ),
+        )
+
+        // Los SIETE campos se comparan de una vez, y la comparación incluye los
+        // `null`: que un campo DEJE de venir es tan noticiable como que cambie de
+        // valor. La expectativa sale del fixture leído con el mismo lector.
+        const iguales = CAMPOS_DESCRIPTIVOS.filter(
+          (c) => leido.datos[c] === esperado.datosDnprcFixture[c],
+        )
+        const bien = iguales.length === CAMPOS_DESCRIPTIVOS.length && leido.discrepancias.length === 0
+        comprobaciones.push(
+          comprobacion(
+            'Consulta_DNPRC · municipio y provincia siguen coincidiendo en TODOS los inmuebles',
+            {
+              esperado: esperado.datosDnprcFixture,
+              observado: {
+                datos: leido.datos,
+                discrepancias: leido.discrepancias,
+                avisosNoComparados: leido.avisos,
+              },
+              ok: bien,
+              nota: bien
+                ? 'Los siete campos del contrato E salen igual que el día de la captura, y los ' +
+                  'inmuebles siguen sin contradecirse entre sí. Los `null` cuentan: que un campo ' +
+                  'DEJE de venir sería tan noticiable como que cambiara de valor.'
+                : leido.discrepancias.length > 0
+                  ? 'Los inmuebles de la parcela YA NO dicen lo mismo: ' +
+                    leido.discrepancias.map((d) => d.campo).join(', ') +
+                    '. El cliente hace lo correcto —deja esos campos sin determinar y lo dice—, ' +
+                    'pero es un hecho nuevo del dato y hay que mirarlo antes de fiarse del ' +
+                    'encabezado de un informe.'
+                  : 'Han cambiado campos del contrato E: ' +
+                    CAMPOS_DESCRIPTIVOS.filter((c) => !iguales.includes(c)).join(', ') +
+                    '. Si el que cambia es el municipio o la provincia, el encabezado del ' +
+                    'informe llevaba mal ese dato o lo lleva mal ahora: recapturar el fixture ' +
+                    'ANTES de tocar `services/_catastro-dnp.js`.',
+            },
+          ),
+        )
+      }
+    }
+  }
+
   // ── Cabeceras: CORS y tipo de contenido ─────────────────────────────────────
   {
     const conCabeceras = [...respuestas.values()].filter((p) => p.cabeceras !== null)
@@ -1592,6 +1858,21 @@ const NO_SE_PUEDE_SABER = Object.freeze([
   'CUÁNTAS PARCELAS TRAE UNA CAJA SIN `count`. Se midieron 539 y ~1,15 MB una vez, y no se ' +
     'repite: es precisamente la descarga masiva accidental contra la que existe ' +
     '`COUNT_BBOX_DEFECTO`.',
+  'QUÉ CONTESTA `Consulta_DNPRC` A UNA REFERENCIA QUE NO EXISTE. Nunca se ha medido (hueco ' +
+    'declarado en PROCEDENCIA.md) y no se sondea, porque para saberlo habría que inventarse una ' +
+    'referencia y gastar una petición en un caso que la app no provoca: `services/catastro.js` ' +
+    'comprueba la FORMA de la referencia antes de pedir. Consecuencia viva: `_catastro-dnp.js` ' +
+    'no tiene ninguna tabla de códigos que signifiquen «no hay datos», y por eso ' +
+    '`descriptivosPorRefcat` NO puede devolver NO_ENCONTRADO.',
+  'SI EN UNA RÚSTICA CON VARIOS INMUEBLES APARECE EL SUBÁRBOL `lors`. Es la diagonal que falta ' +
+    '—las dos capturas dan `lrcdnp`+urbana y `bico`+rústica— y es la única vía que quedaría ' +
+    'para saber que una parcela es rústica sin el `cn`, que en la rama de varios no existe. ' +
+    'Sondearlo exigiría encontrar primero una parcela así, o sea más peticiones. Mientras ' +
+    'tanto, el cliente deja `clase` en `null` cuando no es concluyente, que es lo honesto.',
+  'SI EL `cod:17` SIGUE SIENDO LO QUE CONTESTA `RC=`. Está congelado en su fixture y no se ' +
+    'repite: mandar a propósito una petición mal construida cada vez que alguien quiere saber ' +
+    'si el contrato sigue en pie gastaría llamadas para medir un camino que la app no emite. La ' +
+    'comprobación 11 cubre el mismo hecho por el lado bueno.',
 ])
 
 // ── Salida legible ────────────────────────────────────────────────────────────

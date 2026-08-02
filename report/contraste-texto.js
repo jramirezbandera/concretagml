@@ -1,11 +1,27 @@
 // report/contraste-texto.js — F08 · El informe de contraste, en TEXTO PLANO.
 //
-// Estrena el directorio `report/`, que SPEC §5 reserva para F09. F09 traerá el
-// documento firmable —plano compuesto a 300 ppp, descripción literaria del lindero
-// y pie de firma colegiada—; F08 escribe la **versión en texto de ese mismo índice**
+// Estrena el directorio `report/`, que SPEC §5 reserva para F09. F08 escribió la
+// **versión en texto del índice del informe firmable**
 // (`spec/feature-09-informe-parcela.md`, §Contenido) para que el recorrido «soltar
-// un GML → ver el contraste → llevarse el resultado» quede cerrado desde el primer
-// día y para que F09 no tenga que reinventar qué va dentro ni en qué orden.
+// un GML → ver el contraste → llevarse el resultado» quedara cerrado desde el primer
+// día y para que F09 no tuviera que reinventar qué va dentro ni en qué orden.
+//
+// ── QUÉ CAMBIÓ CUANDO F09 LLEGÓ (2026-08-02) ────────────────────────────────
+// El documento firmable —plano compuesto a 300 ppp, descripción literaria del
+// lindero y pie de firma colegiada— **ya existe**: lo componen `report/pdf-parcela.js`
+// y sus contratos, y se pide con «Preparar informe (PDF)» en el cajón del
+// diagnóstico. Este módulo NO se jubila por eso, y sigue enganchado al botón de al
+// lado por dos motivos que no ha caducado ninguno: se compone **sin red** —no pide
+// una sola tesela al WMS— y baja igual el día que el plano no se pueda armar.
+//
+// Lo que sí cambió es **el desmentido de la cabecera**. Decía que el firmable «es el
+// de la fase F09 de esta herramienta y todavía no existe», y eso dejó de ser verdad;
+// un aviso que se queda viejo es peor que ninguno, porque se sigue leyendo con la
+// misma cara de cierto. Hoy dice lo que sigue siendo verdad —que este documento no
+// lleva plano, ni descripción del lindero, ni pie de firma— y **remite al que sí los
+// lleva**, por el nombre del botón que lo compone. Está anclado en `pie()` además de
+// en `cabecera()`, a propósito: arriba, antes de leer una cifra, y abajo, en el sitio
+// donde alguien iría a buscar la firma que no está.
 //
 // ── EL NOMBRE ES LEGAL, NO DECORATIVO ───────────────────────────────────────
 // **«Informe de contraste con el parcelario catastral»**, y jamás «informe de
@@ -362,10 +378,11 @@ function cabecera() {
     regla('='),
     '',
     ...parrafo(
-      'VERSIÓN PROVISIONAL EN TEXTO, SIN PIE DE FIRMA. No lleva plano de situación, ' +
-        'ni descripción literaria del lindero, ni firma colegiada. El documento ' +
-        'firmable —plano a 300 ppp, descripción del lindero y pie de firma— es el de ' +
-        'la fase F09 de esta herramienta y todavía no existe: esto no lo sustituye.',
+      'VERSIÓN EN TEXTO, SIN PIE DE FIRMA. No lleva plano de situación, ni ' +
+        'descripción literaria del lindero, ni firma colegiada. El documento ' +
+        'firmable —plano de situación a 300 ppp, descripción literaria del lindero y ' +
+        'pie de firma— se compone en esta misma herramienta con «Preparar informe ' +
+        '(PDF)», en el cajón del diagnóstico: este texto no lo sustituye.',
     ),
     '',
     ...parrafo(
@@ -1091,16 +1108,18 @@ function recintosDe(parcela, comprobacion) {
   return lista(comprobacion?.geometria?.recintos)
 }
 
-/** Sección final · la nota de provisionalidad, otra vez y en el sitio donde se firma. */
+/** Sección final · el desmentido, otra vez y en el sitio donde se firma. */
 function pie({ num }) {
   return [
     ...num.seccion('Nota final'),
     ...parrafo(
-      'Este documento es la VERSIÓN PROVISIONAL EN TEXTO del informe de contraste y ' +
-        'NO LLEVA PIE DE FIRMA. No tiene plano de situación, ni descripción literaria ' +
-        'del lindero, ni número de colegiado, ni código de verificación. No es la ' +
-        'validación gráfica alternativa (VGA) ni el informe de validación gráfica ' +
-        '(IVG) del Catastro, que emite su Sede Electrónica.',
+      'Este documento es la VERSIÓN EN TEXTO del informe de contraste y NO LLEVA PIE ' +
+        'DE FIRMA. No tiene plano de situación, ni descripción literaria del lindero, ' +
+        'ni número de colegiado, ni código de verificación. El documento firmable que ' +
+        'sí los lleva se compone con «Preparar informe (PDF)», en el cajón del ' +
+        'diagnóstico. Ninguno de los dos es la validación gráfica alternativa (VGA) ni ' +
+        'el informe de validación gráfica (IVG) del Catastro, que emite su Sede ' +
+        'Electrónica.',
     ),
     '',
     ...parrafo(
@@ -1135,8 +1154,9 @@ function pie({ num }) {
  *
  *   · **Nombre legal.** «Informe de contraste con el parcelario catastral», y dice
  *     de sí mismo que no es el VGA/IVG del Catastro.
- *   · **Provisionalidad.** Dice, arriba y abajo, que es la versión en texto y que no
- *     lleva pie de firma; el documento firmable es F09.
+ *   · **Qué NO es.** Dice, arriba y abajo, que es la versión en texto, que no lleva
+ *     plano, ni descripción del lindero, ni pie de firma, y **remite** al documento
+ *     firmable por el nombre del botón que lo compone: «Preparar informe (PDF)».
  *   · **Ninguna cifra con juicio de valor** (SPEC §2, regla 9). El margen del BOE se
  *     enuncia y no se compara. La única excepción es la invasión a colindante.
  *   · **`null` es «No consta», nunca 0**, y «no se ha consultado» nunca es «ninguna».

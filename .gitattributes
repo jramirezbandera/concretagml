@@ -31,6 +31,12 @@
 #      sola línea, sin ningún salto: para ellos la regla es inocua y se declara solo
 #      para que nadie tenga que preguntárselo.
 #
+#   3bis. `test/fixtures/catastro/derivados/*.json` (F09) — fixtures SINTÉTICOS del
+#      servicio, derivados de los reales por una mutación escrita y reproducible en
+#      su `PROCEDENCIA.md`, que publica su SHA-256. Necesitan línea PROPIA por lo
+#      mismo que (2bis): en `.gitattributes` el `*` de `test/fixtures/catastro/*`
+#      NO cruza la barra, así que el subdirectorio no hereda nada.
+#
 # Se usa `text eol=lf` (y no `-text`) a propósito: `-text` dejaría el árbol de
 # trabajo actual —que tiene CRLF por el checkout previo— divergiendo del blob, y
 # obligaría a un `git add --renormalize` que metería CRLF en el repositorio. Con
@@ -47,3 +53,4 @@ test/fixtures/gml/*.gml         text eol=lf
 test/fixtures/gml/derivados/*.gml  text eol=lf
 test/fixtures/catastro/*.xml    text eol=lf
 test/fixtures/catastro/*.json   text eol=lf
+test/fixtures/catastro/derivados/*.json  text eol=lf

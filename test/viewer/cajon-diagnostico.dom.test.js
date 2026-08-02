@@ -821,13 +821,18 @@ describe('viewer/cajon-diagnostico.js · el pie del informe (F08)', () => {
     // Y el valor del estado NO es el de ninguna acción del cajón: son dos espacios
     // de nombres distintos y cruzarlos es exactamente lo que costó M8.
     const acciones = [...raiz.querySelectorAll('[data-accion]')].map((el) => el.dataset.accion)
-    expect(acciones.sort()).toEqual(['cerrar-diagnostico', 'descargar-informe'])
+    expect(acciones.sort()).toEqual([
+      'cerrar-diagnostico',
+      'descargar-informe',
+      'preparar-informe',
+    ])
     for (const valor of valores) expect(acciones).not.toContain(valor)
   })
 
   it('los selectores exportados apuntan a UN nodo cada uno', () => {
     const { raiz } = conCajon()
     expect(raiz.querySelectorAll(SELECTOR.DESCARGAR)).toHaveLength(1)
+    expect(raiz.querySelectorAll(SELECTOR.PREPARAR)).toHaveLength(1)
     expect(raiz.querySelectorAll(SELECTOR.ESTADO_INFORME)).toHaveLength(1)
   })
 
@@ -993,6 +998,222 @@ describe('viewer/cajon-diagnostico.js · el pie del informe (F08)', () => {
   })
 })
 
+/* ────────────────────────────────────────────────────────────────────────── *
+ * F09 · T4.2 · «PREPARAR INFORME (PDF)», EL PRIMARIO DEL PIE                 *
+ *                                                                            *
+ * El botón del documento FIRMABLE de F09. Comparte pie, gate y renglón con   *
+ * el de texto, y esa es justo la parte que puede romperse en silencio:       *
+ *                                                                            *
+ *   · Que NUNCA esté gris y mudo (regla de oro 1), ni al nacer ni al         *
+ *     apagarse: un botón apagado sin su porqué no se distingue de uno roto.  *
+ *   · Que los DOS se enciendan y se apaguen a la vez. Un gate paralelo que   *
+ *     se desincronizara dejaría un botón encendido componiendo un informe de *
+ *     cifras que ya no están.                                                *
+ *   · Que se vea que es el PRIMARIO: el orden y la vestimenta son lo único   *
+ *     que dice cuál de los dos documentos es el entregable.                  *
+ *   · Que el cajón AVISE y no componga nada: sigue siendo una vista.         *
+ * ────────────────────────────────────────────────────────────────────────── */
+
+describe('viewer/cajon-diagnostico.js · «Preparar informe (PDF)» (F09)', () => {
+  it('el botón NACE apagado Y con el motivo escrito: nunca gris y mudo', () => {
+    const { raiz } = conCajon()
+    const boton = nodo(raiz, SELECTOR.PREPARAR)
+    expect(boton).not.toBeNull()
+    expect(boton.tagName).toBe('BUTTON')
+    expect(boton.type).toBe('button')
+    expect(boton.textContent).toBe('Preparar informe (PDF)')
+    expect(boton.disabled).toBe(true)
+    // El motivo se escribe al NACER, no al primer repintado: el cajón se puede abrir
+    // sin que nadie haya llamado a `pintar`, y ese es el instante en que está gris.
+    expect(nodo(raiz, SELECTOR.ESTADO_INFORME).textContent).toBe(MOTIVO_INFORME_SIN_DIAGNOSTICO)
+    // Y el motivo lo NOMBRA, que es lo que hace que un renglón compartido sirva:
+    // quien lo oiga por `aria-describedby` tiene que saber de qué botón le hablan.
+    expect(MOTIVO_INFORME_SIN_DIAGNOSTICO).toContain('Preparar informe (PDF)')
+    expect(MOTIVO_INFORME_SIN_DIAGNOSTICO).toContain('Descargar informe de contraste')
+  })
+
+  it('comparte el renglón con el de texto, y los dos lo tienen ENLAZADO', () => {
+    // Un solo renglón porque es un solo hecho el que apaga a los dos. Dos renglones
+    // diciendo lo mismo se desincronizan solos — y el segundo tendría además que ser
+    // único en todo el documento (M8).
+    const { raiz } = conCajon()
+    const renglon = nodo(raiz, SELECTOR.ESTADO_INFORME)
+    expect(renglon.id).not.toBe('')
+    expect(nodo(raiz, SELECTOR.PREPARAR).getAttribute('aria-describedby')).toBe(renglon.id)
+    expect(nodo(raiz, SELECTOR.DESCARGAR).getAttribute('aria-describedby')).toBe(renglon.id)
+    expect(raiz.querySelectorAll('[data-estado="informe-contraste"]')).toHaveLength(1)
+  })
+
+  it('`pintar(d)` ENCIENDE los dos botones a la vez y borra el motivo', () => {
+    const { cajon, raiz } = conCajon()
+    cajon.pintar(COMPLETO())
+    expect(nodo(raiz, SELECTOR.PREPARAR).disabled).toBe(false)
+    expect(nodo(raiz, SELECTOR.DESCARGAR).disabled).toBe(false)
+    expect(nodo(raiz, SELECTOR.ESTADO_INFORME).textContent).toBe('')
+  })
+
+  it('se enciende también con el diagnóstico a medias: hay medidas que maquetar', () => {
+    // Sin geometría oficial faltan cuatro secciones, pero la medición, el perímetro y
+    // la relación de vértices están. El PDF lleva ADEMÁS plano y pie de firma, y eso
+    // no cambia la condición: lo que se exige es que haya medidas.
+    const { cajon, raiz } = conCajon()
+    cajon.pintar(SIN_OFICIAL())
+    expect(nodo(raiz, SELECTOR.PREPARAR).disabled).toBe(false)
+  })
+
+  it('`pintar(null)` APAGA los dos y reescribe el motivo', () => {
+    const { cajon, raiz } = conCajon()
+    cajon.pintar(COMPLETO())
+    cajon.estadoInforme('Informe preparado.')
+
+    cajon.pintar(null)
+
+    expect(nodo(raiz, SELECTOR.PREPARAR).disabled).toBe(true)
+    expect(nodo(raiz, SELECTOR.DESCARGAR).disabled).toBe(true)
+    // Al apagar SÍ se pisa el desenlace anterior: habla de un diagnóstico que ya no
+    // está, y dejarlo junto a dos botones grises haría creer que basta con volver a
+    // pulsar.
+    expect(nodo(raiz, SELECTOR.ESTADO_INFORME).textContent).toBe(MOTIVO_INFORME_SIN_DIAGNOSTICO)
+  })
+
+  it('la VESTIMENTA viaja con el `disabled`, y el primario se distingue del secundario', () => {
+    // Un botón que parece pulsable y no lo es no se distingue de uno roto; y dos
+    // fondos oscuros lado a lado no dirían cuál es el entregable. El apagado va en el
+    // GRIS del cromo, nunca en rojo (regla de oro 9).
+    const { cajon, raiz } = conCajon()
+    const primario = nodo(raiz, SELECTOR.PREPARAR)
+    const secundario = nodo(raiz, SELECTOR.DESCARGAR)
+
+    expect(primario.style.cursor).toBe('default')
+    expect(secundario.style.cursor).toBe('default')
+
+    cajon.pintar(COMPLETO())
+    expect(primario.style.cursor).toBe('pointer')
+    expect(secundario.style.cursor).toBe('pointer')
+    // El fondo oscuro del cromo es del primario, y solo suyo.
+    expect(primario.style.background).not.toBe('')
+    expect(primario.style.background).not.toBe(secundario.style.background)
+
+    cajon.pintar(null)
+    expect(primario.style.cursor).toBe('default')
+    expect(secundario.style.cursor).toBe('default')
+    const PROHIBIDOS = /#(16a34a|22c55e|dc2626|ef4444|15803d|b91c1c)/i
+    expect(primario.getAttribute('style') || '').not.toMatch(PROHIBIDOS)
+  })
+
+  it('el primario va PRIMERO en el pie: el orden es lo que dice cuál es el entregable', () => {
+    const { raiz } = conCajon()
+    const acciones = [...raiz.querySelectorAll('footer [data-accion]')].map(
+      (el) => el.dataset.accion,
+    )
+    expect(acciones).toEqual(['preparar-informe', 'descargar-informe'])
+  })
+
+  it('los dos botones comparten FILA: el segundo cuesta 0 px de alto', () => {
+    // La razón 2 de F08 —el panel no pierde ni un píxel— sigue en pie porque el
+    // cajón no crece. `getBoundingClientRect` no mide nada en jsdom, así que lo que
+    // se afirma es la ESTRUCTURA que lo garantiza: un solo contenedor flex.
+    const { raiz } = conCajon()
+    const primario = nodo(raiz, SELECTOR.PREPARAR)
+    const secundario = nodo(raiz, SELECTOR.DESCARGAR)
+    expect(primario.parentElement).toBe(secundario.parentElement)
+    expect(primario.parentElement.style.display).toBe('flex')
+  })
+
+  it('`alPreparar` avisa al pulsar, admite VARIOS oyentes y devuelve la BAJA', () => {
+    const { cajon, raiz } = conCajon()
+    const a = vi.fn()
+    const b = vi.fn()
+    const baja = cajon.alPreparar(a)
+    cajon.alPreparar(b)
+    cajon.pintar(COMPLETO())
+
+    nodo(raiz, SELECTOR.PREPARAR).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(a).toHaveBeenCalledTimes(1)
+    expect(b).toHaveBeenCalledTimes(1)
+
+    baja()
+    nodo(raiz, SELECTOR.PREPARAR).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(a).toHaveBeenCalledTimes(1)
+    expect(b).toHaveBeenCalledTimes(2)
+  })
+
+  it('`alPreparar` LANZA si no recibe una función', () => {
+    const { cajon } = conCajon()
+    expect(() => cajon.alPreparar('no')).toThrow(TypeError)
+  })
+
+  it('los dos canales son INDEPENDIENTES: preparar no descarga y descargar no prepara', () => {
+    const { cajon, raiz } = conCajon()
+    const preparar = vi.fn()
+    const descargar = vi.fn()
+    cajon.alPreparar(preparar)
+    cajon.alDescargar(descargar)
+    cajon.pintar(COMPLETO())
+
+    nodo(raiz, SELECTOR.PREPARAR).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(preparar).toHaveBeenCalledTimes(1)
+    expect(descargar).not.toHaveBeenCalled()
+
+    nodo(raiz, SELECTOR.DESCARGAR).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(descargar).toHaveBeenCalledTimes(1)
+    expect(preparar).toHaveBeenCalledTimes(1)
+  })
+
+  it('pulsarlo NO cierra el cajón ni para la propagación', () => {
+    // Mismo caso que el de texto: `disableClickPropagation` no detiene el `click`, y
+    // lo que salva al cajón es la comprobación `contains` del guardián. Parar la
+    // propagación dejaría sordo al panel de ayuda de la barra de edición.
+    const { cajon, raiz } = conCajon()
+    cajon.pintar(COMPLETO())
+    cajon.abrir()
+
+    const evento = new MouseEvent('click', { bubbles: true, cancelable: true })
+    const stop = vi.spyOn(evento, 'stopPropagation')
+    nodo(raiz, SELECTOR.PREPARAR).dispatchEvent(evento)
+
+    expect(cajon.abierto()).toBe(true)
+    expect(stop).not.toHaveBeenCalled()
+    expect(evento.defaultPrevented).toBe(false)
+  })
+
+  it('el cajón NO compone ni baja nada: solo avisa', () => {
+    // Sigue siendo una VISTA. Maquetar el PDF es de `report/pdf-parcela.js` y pedir
+    // el pie de firma, del diálogo; los llama el cableado. Si el cajón supiera de
+    // Blobs, el visor dejaría de ser consumible como librería.
+    const { cajon, raiz } = conCajon()
+    const crear = vi.spyOn(URL, 'createObjectURL')
+    cajon.pintar(COMPLETO())
+    nodo(raiz, SELECTOR.PREPARAR).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(crear).not.toHaveBeenCalled()
+    crear.mockRestore()
+  })
+
+  it('ni el rótulo ni el motivo llevan palabra de MÉRITO (regla de oro 9)', () => {
+    const VEREDICTOS =
+      /\b(apta|apto|válida|valida|válido|correcta|correcto|conforme|aprobad|suspend|admisible|aceptable|dentro de tolerancia|fuera de tolerancia|no válid)/i
+    const { raiz } = conCajon()
+    const boton = nodo(raiz, SELECTOR.PREPARAR)
+    expect(boton.textContent).not.toMatch(VEREDICTOS)
+    expect(MOTIVO_INFORME_SIN_DIAGNOSTICO).not.toMatch(VEREDICTOS)
+  })
+
+  it('`destruir()` lo desengancha', () => {
+    const { cajon, raiz } = conCajon()
+    const fn = vi.fn()
+    cajon.alPreparar(fn)
+    cajon.pintar(COMPLETO())
+    const boton = nodo(raiz, SELECTOR.PREPARAR)
+
+    cajon.destruir()
+
+    expect(() =>
+      boton.dispatchEvent(new MouseEvent('click', { bubbles: true })),
+    ).not.toThrow()
+    expect(fn).not.toHaveBeenCalled()
+  })
+})
+
 // ── La familia tipográfica la pone la HOJA, no el módulo ─────────────────────
 //
 // Gemelo del guardián de `test/viewer/cajon-comprobacion.dom.test.js`, y existe
@@ -1003,28 +1224,36 @@ describe('viewer/cajon-diagnostico.js · el pie del informe (F08)', () => {
 // código muerto. Los dos cajones se arreglaron juntos porque sus cabeceras dicen
 // que tienen que leerse como el mismo cromo; se vigilan juntos por lo mismo.
 
-describe('viewer/cajon-diagnostico · el botón del informe no fija la tipografía en línea', () => {
-  it('«Descargar informe de contraste» no lleva font-family en su atributo style', () => {
-    const { mapa, destruir } = montarMapa({ centro: [36.7, -4.5], zoom: 19 })
-    const cajon = crearCajonDiagnostico({ mapa })
-    try {
-      const raiz = mapa.getContainer().querySelector('.gml-cajon-diagnostico')
-      const boton = raiz.querySelector('[data-accion="descargar-informe"]')
-      expect(boton, 'el pie del cajón tiene que traer el botón del informe').toBeTruthy()
+describe('viewer/cajon-diagnostico · los botones del informe no fijan la tipografía en línea', () => {
+  // Los DOS del pie, no solo el que tuvo el defecto: el de F09 nació con el mismo
+  // reparto y se rompería de la misma forma, en silencio y solo en navegador.
+  for (const [rotulo, accion] of [
+    ['Descargar informe de contraste', 'descargar-informe'],
+    ['Preparar informe (PDF)', 'preparar-informe'],
+  ]) {
+    it(`«${rotulo}» no lleva font-family en su atributo style`, () => {
+      const { mapa, destruir } = montarMapa({ centro: [36.7, -4.5], zoom: 19 })
+      const cajon = crearCajonDiagnostico({ mapa })
+      try {
+        const raiz = mapa.getContainer().querySelector('.gml-cajon-diagnostico')
+        const boton = raiz.querySelector(`[data-accion="${accion}"]`)
+        expect(boton, 'el pie del cajón tiene que traer el botón del informe').toBeTruthy()
+        expect(boton.textContent).toBe(rotulo)
 
-      // Ver el porqué de mirar `fontFamily` y no el atajo `font` en el guardián
-      // gemelo: jsdom serializa el atajo desde las propiedades sueltas.
-      expect(
-        boton.style.fontFamily,
-        'el botón fija la familia en línea: la regla de estilos/app.css queda muerta',
-      ).toBe('')
-      // Lo que el módulo SÍ tiene que seguir poniendo, para que sea legible sin
-      // hoja. Sin esto, el guardián se cumpliría borrándolo todo.
-      expect(boton.style.fontSize, 'el botón ha perdido el tamaño en línea').toBe('inherit')
-      expect(boton.style.fontWeight, 'el botón ha perdido el grosor en línea').toBe('600')
-    } finally {
-      cajon.destruir()
-      destruir()
-    }
-  })
+        // Ver el porqué de mirar `fontFamily` y no el atajo `font` en el guardián
+        // gemelo: jsdom serializa el atajo desde las propiedades sueltas.
+        expect(
+          boton.style.fontFamily,
+          'el botón fija la familia en línea: la regla de estilos/app.css queda muerta',
+        ).toBe('')
+        // Lo que el módulo SÍ tiene que seguir poniendo, para que sea legible sin
+        // hoja. Sin esto, el guardián se cumpliría borrándolo todo.
+        expect(boton.style.fontSize, 'el botón ha perdido el tamaño en línea').toBe('inherit')
+        expect(boton.style.fontWeight, 'el botón ha perdido el grosor en línea').toBe('600')
+      } finally {
+        cajon.destruir()
+        destruir()
+      }
+    })
+  }
 })

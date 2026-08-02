@@ -51,6 +51,33 @@
 // `gml/descargar.js#descargarTexto`; a los dos los llama
 // `app/cableado-diagnostico.js`, que es quien conoce el store y el reloj.
 //
+// ── F09 · «PREPARAR INFORME (PDF)», Y POR QUÉ ES EL PRIMARIO DE LOS DOS ─────
+// El pie tiene desde F09 DOS botones, y cuál va primero no es aseo: es lo único
+// que dice cuál de los dos documentos es el entregable.
+//
+//   · **«Preparar informe (PDF)»** — el PRIMARIO. Es el documento firmable de
+//     F09: plano de situación a 300 ppp, descripción literaria del lindero y pie
+//     de firma. Es a lo que se viene.
+//   · **«Descargar informe de contraste»** — el secundario, y no se jubila
+//     porque sigue sirviendo para lo que el otro no puede: es texto plano, se
+//     compone SIN RED —no pide una sola tesela al WMS— y baja igual el día que
+//     el plano no se pueda armar. Degradar no es quitar.
+//
+// Los dos se encienden y se apagan JUNTOS, con el MISMO gate y contra la misma
+// condición —«el cajón está enseñando un diagnóstico»—, y comparten el renglón
+// del motivo: es un solo hecho el que los apaga, y dos renglones diciendo lo
+// mismo se desincronizan solos (y el segundo, además, tendría que ser único en
+// todo el documento — ver M8 en {@link SELECTOR}).
+//
+// Y sigue costando **0 px del panel izquierdo**, que era la razón 2 de F08: el
+// segundo botón va en la MISMA fila que el primero, así que el cajón no crece ni
+// un píxel y la caja de vértices conserva los 267,4 px medidos desde F07.
+//
+// Lo que este módulo tampoco sabe, otra vez, es qué lleva el PDF ni cómo se
+// compone: solo enciende, apaga y avisa. Armarlo es de `report/pdf-parcela.js` y
+// pedir el pie de firma, del diálogo de `app/dialogo-informe.js`; a los dos los
+// llama el cableado.
+//
 // ── LA REGLA DE ORO 9 ES EL REQUISITO PRINCIPAL DE ESTE FICHERO ─────────────
 // «La aplicación mide; el colegiado interpreta y firma.» En un cajón lleno de cifras
 // eso se traduce en tres prohibiciones concretas, y las tres tienen guardián:
@@ -161,6 +188,7 @@ export const SELECTOR = Object.freeze({
   REGISTRAL: '[data-campo="superficie-registral"]',
   CLASE_PARCELA: '[data-campo="clase-parcela"]',
   ESTADO: '[data-estado="cajon-diagnostico"]',
+  PREPARAR: '[data-accion="preparar-informe"]',
   DESCARGAR: '[data-accion="descargar-informe"]',
   ESTADO_INFORME: '[data-estado="informe-contraste"]',
   TITULAR: '[data-diag="titular"]',
@@ -190,10 +218,15 @@ const ROTULO_BANDA = Object.freeze({
 const NO_CONSTA = 'No consta'
 
 /**
- * Por qué «Descargar informe de contraste» está apagado. Se escribe en el renglón
- * del pie **en el mismo instante** en que el botón se apaga —al nacer y en cada
+ * Por qué están apagados **los dos botones del informe**. Se escribe en el renglón
+ * del pie **en el mismo instante** en que se apagan —al nacer y en cada
  * `pintar(null)`—, porque un botón gris y mudo es un error silencioso (regla de
  * oro 1): desde fuera no se distingue de uno roto.
+ *
+ * Es UNO para los dos, y no dos constantes, porque el hecho que los apaga es uno
+ * solo: no hay diagnóstico. Los NOMBRA a los dos con todas las letras para que
+ * quien lo oiga por `aria-describedby` —los dos botones apuntan al mismo renglón—
+ * sepa de cuál le están hablando.
  *
  * Dice las dos cosas que hacen falta: qué falta y qué hay que hacer para tenerlo.
  * Se exporta para que el cableado y los tests lo afirmen sin copiar el literal,
@@ -202,24 +235,47 @@ const NO_CONSTA = 'No consta'
  * @readonly
  */
 export const MOTIVO_INFORME_SIN_DIAGNOSTICO =
-  '«Descargar informe de contraste» está apagado: el informe recoge las medidas de este ' +
-  'diagnóstico y todavía no hay ninguna calculada. Se enciende en cuanto el cajón muestra ' +
-  'un diagnóstico.'
+  '«Preparar informe (PDF)» y «Descargar informe de contraste» están apagados: los dos ' +
+  'recogen las medidas de este diagnóstico y todavía no hay ninguna calculada. Se encienden ' +
+  'en cuanto el cajón muestra un diagnóstico.'
 
 /**
- * Las dos vestimentas del botón del informe, que viajan SIEMPRE con su `disabled`
- * (ver `gateInforme`). Un botón que parece pulsable y no lo es no se distingue de
- * uno roto; uno apagado que parece encendido, tampoco.
+ * Las vestimentas de los dos botones del informe, que viajan SIEMPRE con su
+ * `disabled` (ver `gateInforme`). Un botón que parece pulsable y no lo es no se
+ * distingue de uno roto; uno apagado que parece encendido, tampoco. Existen porque
+ * un estilo EN LÍNEA no puede expresar `:disabled` y este módulo no escribe reglas.
+ *
+ * Son DOS pares porque los botones no son iguales: el PRIMARIO —«Preparar informe
+ * (PDF)», el documento firmable de F09— va en el fondo oscuro del cromo, y el
+ * SECUNDARIO —el de texto— en contorno. La jerarquía es lo único que dice cuál de
+ * los dos es el entregable, y dos fondos oscuros lado a lado no dicen nada.
  *
  * El apagado va en el GRIS del cromo y **nunca en rojo**: lo que se comunica es
  * «esto no se puede pulsar ahora», no «esto está mal» (regla de oro 9). El porqué
- * se escribe con palabras en el renglón de al lado, que es donde se lee. Son los
- * mismos dos pares que usa el primario de `viewer/cajon-comprobacion.js`, para que
- * los dos cajones —que comparten esquina y se turnan— no parezcan dos apps.
+ * se escribe con palabras en el renglón de al lado, que es donde se lee. El par
+ * primario es el MISMO que usa `viewer/cajon-comprobacion.js`, y el secundario
+ * viste como su «Descartar», para que los dos cajones —que comparten esquina y se
+ * turnan— no parezcan dos apps.
  */
 const BOTON_INFORME = Object.freeze({
-  ENCENDIDO: Object.freeze({ background: '#0F172A', color: '#fff', cursor: 'pointer' }),
-  APAGADO: Object.freeze({ background: '#E2E8F0', color: '#64748B', cursor: 'default' }),
+  PRIMARIO: Object.freeze({
+    ENCENDIDO: Object.freeze({ background: '#0F172A', color: '#fff', cursor: 'pointer' }),
+    APAGADO: Object.freeze({ background: '#E2E8F0', color: '#64748B', cursor: 'default' }),
+  }),
+  SECUNDARIO: Object.freeze({
+    ENCENDIDO: Object.freeze({
+      background: 'transparent',
+      color: '#334155',
+      border: '1px solid #CBD5E1',
+      cursor: 'pointer',
+    }),
+    APAGADO: Object.freeze({
+      background: 'transparent',
+      color: '#94A3B8',
+      border: '1px solid #E2E8F0',
+      cursor: 'default',
+    }),
+  }),
 })
 
 const nf = (decimales) =>
@@ -289,6 +345,27 @@ const esMapa = (m) =>
   typeof m.removeControl === 'function' &&
   typeof m.getContainer === 'function'
 
+/**
+ * ¿El gesto ha ocurrido dentro de un `<dialog>`?
+ *
+ * Se pregunta por el ELEMENTO y no por el atributo `open`, y es deliberado: en un
+ * `keydown` de `Escape` el propio diálogo ya se ha cerrado —su oyente está más
+ * adentro y corre primero— cuando el evento llega burbujeando hasta el
+ * `document`, así que un `dialog[open]` daría `null` justo en el caso que hay que
+ * atrapar. Un gesto cuyo destino cuelga de un `<dialog>` es un gesto dirigido al
+ * diálogo, esté abierto o cerrado, y en ningún caso un gesto sobre el mapa.
+ *
+ * `closest` se comprueba antes de llamarlo: el destino de un evento puede ser un
+ * nodo de texto o el propio `document`, que no lo tienen.
+ *
+ * @param {EventTarget|null} objetivo
+ * @returns {boolean}
+ */
+const enDialogo = (objetivo) =>
+  !!objetivo &&
+  typeof objetivo.closest === 'function' &&
+  objetivo.closest('dialog') !== null
+
 // ── El control ───────────────────────────────────────────────────────────────
 
 const CajonDiagnostico = L.Control.extend({
@@ -312,7 +389,12 @@ const CajonDiagnostico = L.Control.extend({
     this._alEscape = (evento) => this._cerrarPorEscape(evento)
     this._abierto = false
     this._eventoApertura = null
-    this._oyentes = { cerrar: new Set(), cambiar: new Set(), descargar: new Set() }
+    this._oyentes = {
+      cerrar: new Set(),
+      cambiar: new Set(),
+      descargar: new Set(),
+      preparar: new Set(),
+    }
   },
 
   onAdd(mapa) {
@@ -535,14 +617,52 @@ const CajonDiagnostico = L.Control.extend({
     })
     this._estado = estado
 
-    // ── El PIE: la acción que consume el diagnóstico (F08) ─────────────────
-    // Por qué vive aquí y no en el pie de la app: ver la cabecera del módulo.
+    // ── El PIE: las acciones que consumen el diagnóstico (F08 y F09) ───────
+    // Por qué viven aquí y no en el pie de la app: ver la cabecera del módulo.
     // `<footer>` de verdad, hermano del `<header>` de la cabecera; no lleva clase
     // porque `estilos/app.css` no necesita engancharse a él, y una clase que nadie
     // viste es un gancho que invita a escribir la regla y a creer que se aplica
     // (ver la nota de `OMISION` en {@link CLASE}).
     const pie = crear(doc, 'footer')
     estilar(pie, { marginTop: '12px' })
+
+    // Los dos botones en UNA fila, y el primario primero. Que compartan fila es lo
+    // que hace que el segundo cueste **0 px** de alto: el cajón no crece, y por lo
+    // tanto tampoco empuja nada del panel (ver la cabecera). `flexWrap` para que en
+    // un cajón estrecho el segundo caiga debajo en vez de desbordarse.
+    const acciones = crear(doc, 'div')
+    estilar(acciones, {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '8px',
+      alignItems: 'center',
+    })
+
+    // El PRIMARIO de F09: el documento firmable. Va antes que el de texto porque el
+    // orden es lo único que dice cuál de los dos es el entregable.
+    const preparar = crear(doc, 'button', null, 'Preparar informe (PDF)')
+    preparar.type = 'button'
+    preparar.dataset.accion = 'preparar-informe'
+    // El MISMO renglón que el secundario: los dos se apagan por el mismo hecho y el
+    // motivo es uno solo. Ver {@link MOTIVO_INFORME_SIN_DIAGNOSTICO}.
+    preparar.setAttribute('aria-describedby', idInforme)
+    // NACE APAGADO, igual que el de texto y por lo mismo: sin diagnóstico calculado
+    // no hay medidas que llevar al documento. A partir de aquí lo gobierna `pintar`.
+    preparar.disabled = true
+    // ⚠️ NI `font: 'inherit'` NI NINGUNA `fontFamily`, exactamente por lo que se
+    // explica un poco más abajo para el secundario (defecto REAL medido en el
+    // guion 10 el 2026-07-30): el estilo en línea gana a la hoja y dejaría muerta
+    // la regla `.gml-cajon-diagnostico button` de `estilos/app.css`.
+    estilar(preparar, {
+      border: '0',
+      borderRadius: '4px',
+      padding: '6px 12px',
+      fontSize: 'inherit',
+      lineHeight: 'inherit',
+      fontWeight: '600',
+      ...BOTON_INFORME.PRIMARIO.APAGADO,
+    })
+    this._preparar = preparar
 
     const descargar = crear(doc, 'button', null, 'Descargar informe de contraste')
     descargar.type = 'button'
@@ -564,13 +684,12 @@ const CajonDiagnostico = L.Control.extend({
     // hoja); **la FAMILIA la pone la hoja**. Mismo reparto que en
     // `viewer/cajon-comprobacion.js`, y por eso los dos cajones se arreglan juntos.
     estilar(descargar, {
-      border: '0',
       borderRadius: '4px',
       padding: '6px 12px',
       fontSize: 'inherit',
       lineHeight: 'inherit',
       fontWeight: '600',
-      ...BOTON_INFORME.APAGADO,
+      ...BOTON_INFORME.SECUNDARIO.APAGADO,
     })
     this._descargar = descargar
 
@@ -587,11 +706,12 @@ const CajonDiagnostico = L.Control.extend({
     })
     // El motivo se escribe YA, no al primer repintado: el cajón puede abrirse sin
     // que nadie haya llamado a `pintar` todavía, y ese es justo el instante en que
-    // el botón está gris.
+    // los dos botones están grises.
     estadoInforme.textContent = MOTIVO_INFORME_SIN_DIAGNOSTICO
     this._estadoInforme = estadoInforme
 
-    pie.append(descargar, estadoInforme)
+    acciones.append(preparar, descargar)
+    pie.append(acciones, estadoInforme)
 
     contenedor.append(cabecera, bandas, metricas, invasion, bloqueMargen, estado, pie)
 
@@ -601,6 +721,7 @@ const CajonDiagnostico = L.Control.extend({
     L.DomEvent.disableScrollPropagation(contenedor)
 
     L.DomEvent.on(cerrar, 'click', this._alPulsarCerrar, this)
+    L.DomEvent.on(preparar, 'click', this._alPulsarPreparar, this)
     L.DomEvent.on(descargar, 'click', this._alPulsarDescargar, this)
     L.DomEvent.on(registral, 'change', this._alCambiar, this)
     L.DomEvent.on(registral, 'input', this._alCambiar, this)
@@ -613,6 +734,7 @@ const CajonDiagnostico = L.Control.extend({
 
   onRemove() {
     L.DomEvent.off(this._botonCerrar, 'click', this._alPulsarCerrar, this)
+    L.DomEvent.off(this._preparar, 'click', this._alPulsarPreparar, this)
     L.DomEvent.off(this._descargar, 'click', this._alPulsarDescargar, this)
     L.DomEvent.off(this._registral, 'change', this._alCambiar, this)
     L.DomEvent.off(this._registral, 'input', this._alCambiar, this)
@@ -660,6 +782,16 @@ const CajonDiagnostico = L.Control.extend({
    * Lo que NO se hace es que el llamante pare la propagación de su clic: eso
    * dejaría sordo a cualquier otro oyente del documento —hoy, el panel de ayuda de
    * la barra de edición— por un problema que es de este componente.
+   *
+   * ── ⚠️ UN GESTO DENTRO DE UN `<dialog>` NO ES UN GESTO EN EL MAPA (F09) ─────
+   * Ver {@link enDialogo}. Apareció al cablear F09 y es el mismo modo de fallo que
+   * la mina del `<a download>` de F08: el clic sobre «Componer PDF» —que vive
+   * dentro del diálogo «Preparar informe», o sea colgando del `<body>` y fuera de
+   * este contenedor— burbujeaba hasta aquí, este guardián lo contaba como un clic
+   * FUERA y cerraba el cajón **por debajo del modal**. El usuario no veía nada
+   * raro hasta cerrar el diálogo: para entonces el cajón había desaparecido, el
+   * contraste del mapa estaba borrado y el acuse de recibo del PDF se había
+   * escrito en un `role="status"` que acababa de quedar en `display:none`.
    */
   _cerrarPorClicFuera(evento) {
     if (!this._abierto || !this._contenedor) return
@@ -669,12 +801,22 @@ const CajonDiagnostico = L.Control.extend({
       return
     }
     if (this._contenedor.contains(evento.target)) return
+    if (enDialogo(evento.target)) return
     this._fijarAbierto(false)
   },
 
+  /**
+   * Cierra con `Escape`.
+   *
+   * La misma excepción del diálogo, y aquí es todavía más necesaria: `Escape` es
+   * LA tecla de cerrar un modal, así que sin esta guarda cancelar el diálogo
+   * «Preparar informe» cerraría además el cajón de debajo — dos cierres por una
+   * tecla, y el segundo sin que nadie lo hubiera pedido.
+   */
   _cerrarPorEscape(evento) {
     if (!this._abierto) return
     if (evento.key !== 'Escape') return
+    if (enDialogo(evento.target)) return
     this._fijarAbierto(false)
   },
 
@@ -697,6 +839,19 @@ const CajonDiagnostico = L.Control.extend({
   _alPulsarDescargar(evento) {
     for (const fn of this._oyentes.descargar) fn(evento)
   },
+
+  /**
+   * Pulsación de «Preparar informe (PDF)». **Tampoco se llama a `L.DomEvent.stop`**,
+   * y por lo mismo que en {@link CajonDiagnostico._alPulsarDescargar}: parar la
+   * propagación dejaría sordo a cualquier otro oyente del `document` por un problema
+   * que no existe, porque el guardián de clic-fuera ve el clic DENTRO del contenedor.
+   *
+   * El evento se pasa al oyente porque quien escucha va a abrir un diálogo con él, y
+   * un diálogo abierto por un clic quiere saber cuál fue.
+   */
+  _alPulsarPreparar(evento) {
+    for (const fn of this._oyentes.preparar) fn(evento)
+  },
 })
 
 /**
@@ -707,7 +862,8 @@ const CajonDiagnostico = L.Control.extend({
  * cajon.abrir()
  * cajon.pintar(diagnostico)
  * cajon.alCambiar(() => recalcular(cajon.registral(), cajon.clase()))
- * cajon.alDescargar(() => bajarInforme())   // el pie de F08
+ * cajon.alDescargar(() => bajarInforme())    // el secundario del pie (F08)
+ * cajon.alPreparar(() => abrirDialogo())     // el primario del pie (F09)
  * ```
  *
  * @param {Object} opciones
@@ -722,8 +878,8 @@ const CajonDiagnostico = L.Control.extend({
  * @returns {{control: object, pintar: Function, abrir: Function, cerrar: Function,
  *   abierto: Function, registral: Function, clase: Function,
  *   reiniciarExpediente: Function, estado: Function, estadoInforme: Function,
- *   alCambiar: Function, alDescargar: Function, alCerrar: Function,
- *   destruir: Function}}
+ *   alCambiar: Function, alDescargar: Function, alPreparar: Function,
+ *   alCerrar: Function, destruir: Function}}
  * @throws {TypeError|RangeError} Contrato del programador.
  */
 export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar } = {}) {
@@ -971,13 +1127,21 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
   }
 
   /**
-   * El `disabled` del botón del informe, su vestimenta y su renglón: las TRES
-   * cosas en una sola función, para que no puedan divergir. Es el mismo recurso
+   * El `disabled` de LOS DOS botones del informe, sus vestimentas y su renglón: las
+   * tres cosas en una sola función, para que no puedan divergir. Es el mismo recurso
    * —y por lo mismo— que `apagarPrimario` en `viewer/cajon-comprobacion.js`.
    *
-   * La regla es una sola línea: **el informe se puede descargar ⟺ el cajón está
+   * La regla es una sola línea: **el informe se puede componer ⟺ el cajón está
    * enseñando un diagnóstico**. No hace falta que nadie se la cuente al cajón
    * desde fuera; la sabe él, porque es quien recibe el POJO en `pintar`.
+   *
+   * ── POR QUÉ LOS DOS BOTONES PASAN POR AQUÍ Y NO POR DOS GATES ───────────────
+   * Porque la condición es LA MISMA —y el motivo también—, y dos gates paralelos
+   * son dos oportunidades de que uno se quede encendido con el otro apagado, sin
+   * síntoma: un botón encendido que compone un informe de cifras que ya no están
+   * es exactamente el error silencioso que este gate existe para impedir. El PDF
+   * lleva ADEMÁS un plano y un pie de firma, pero eso no cambia la condición: sin
+   * medidas no hay nada que maquetar.
    *
    * ── POR QUÉ AL ENCENDER SOLO SE BORRA EL MOTIVO, Y NO EL RENGLÓN ────────────
    * `pintar` corre en CADA operación acabada —o sea, en cada vértice que F06 mueva
@@ -995,9 +1159,17 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
    * @param {boolean} hayDiagnostico
    */
   function gateInforme(hayDiagnostico) {
-    if (!control._descargar || !control._estadoInforme) return
+    if (!control._descargar || !control._preparar || !control._estadoInforme) return
+    control._preparar.disabled = !hayDiagnostico
     control._descargar.disabled = !hayDiagnostico
-    estilar(control._descargar, hayDiagnostico ? BOTON_INFORME.ENCENDIDO : BOTON_INFORME.APAGADO)
+    estilar(
+      control._preparar,
+      hayDiagnostico ? BOTON_INFORME.PRIMARIO.ENCENDIDO : BOTON_INFORME.PRIMARIO.APAGADO,
+    )
+    estilar(
+      control._descargar,
+      hayDiagnostico ? BOTON_INFORME.SECUNDARIO.ENCENDIDO : BOTON_INFORME.SECUNDARIO.APAGADO,
+    )
     if (!hayDiagnostico) {
       control._estadoInforme.textContent = MOTIVO_INFORME_SIN_DIAGNOSTICO
       return
@@ -1118,7 +1290,9 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
      * Escribe el renglón del PIE del informe (`role="status"`), que es un nodo
      * DISTINTO del de arriba: aquel cuenta lo que le pasa a lo que se está
      * enseñando (las vecinas que no llegaron, un fallo del cálculo) y este, el
-     * desenlace de pulsar «Descargar informe de contraste». Se llaman distinto
+     * desenlace de pulsar cualquiera de los dos botones del informe —el de texto o
+     * el del PDF—, que comparten renglón por lo mismo que comparten gate: los apaga
+     * y los enciende el mismo hecho. Se llaman distinto
      * (`cajon-diagnostico` / `informe-contraste`) por la misma razón por la que
      * ninguno se llama `diagnostico`: ver el aviso de {@link SELECTOR}.
      *
@@ -1158,6 +1332,24 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       return () => control._oyentes.descargar.delete(fn)
     },
 
+    /**
+     * Se suscribe a la pulsación de «Preparar informe (PDF)» —el primario del pie—.
+     * Devuelve la BAJA. Varios oyentes, igual que {@link alDescargar}.
+     *
+     * El cajón **no compone, no maqueta y no baja nada**: solo avisa, exactamente
+     * igual que con el de texto. El PDF lo arma `report/pdf-parcela.js` con el plano
+     * de `report/canvas.js` y el pie de firma que recoge el diálogo de
+     * `app/dialogo-informe.js`; quien los orquesta es el cableado, que sabe qué
+     * diagnóstico se está enseñando, qué parcela hay en el store y qué hora es.
+     */
+    alPreparar(fn) {
+      if (typeof fn !== 'function') {
+        throw new TypeError(`alPreparar: 'fn' debe ser una función; recibido ${typeof fn}.`)
+      }
+      control._oyentes.preparar.add(fn)
+      return () => control._oyentes.preparar.delete(fn)
+    },
+
     /** Se suscribe al cierre (botón, clic fuera o Escape). Devuelve la BAJA. */
     alCerrar(fn) {
       if (typeof fn !== 'function') {
@@ -1177,6 +1369,7 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       control._oyentes.cerrar.clear()
       control._oyentes.cambiar.clear()
       control._oyentes.descargar.clear()
+      control._oyentes.preparar.clear()
       control.remove()
     },
   }

@@ -7,8 +7,8 @@
 // meses alguien viene a añadir un almacén.
 //
 // Este módulo NO guarda nada ni lee nada. Solo abre la base y deja los almacenes
-// creados. Quien guarda es la capa de encima: `storage/cache-catastro.js` (F05) y
-// los expedientes de F10.
+// creados. Quien guarda es la capa de encima: `storage/cache-catastro.js` (F05),
+// `storage/pie-firma.js` (F09) y los expedientes de F10.
 //
 // ── POR QUÉ LA APERTURA VA SEPARADA DE LA CACHÉ ──────────────────────────────
 // **IndexedDB tiene UN SOLO número de versión por base**, y el `upgrade` que se
@@ -30,10 +30,16 @@
 //
 // De ahí el diseño: **UNA puerta de apertura** ({@link abrirBd}, memoizada: una
 // sola conexión por proceso) y **UNA escalera de migraciones**
-// ({@link MIGRACIONES}). F10 no tendrá que tocar nada de aquí; le bastará con
-// añadir su almacén a {@link ALMACENES} + {@link ESQUEMA_ALMACENES} y un
-// `{version: 2, aplicar}` al final del array. Los tres pasos van juntos o el
-// módulo no carga (ver «invariantes» más abajo).
+// ({@link MIGRACIONES}). Quien necesite un almacén nuevo no tiene que tocar nada
+// más de aquí: le basta con añadirlo a {@link ALMACENES} + {@link ESQUEMA_ALMACENES}
+// y poner un `{version: N, aplicar}` al final del array. Los tres pasos van juntos
+// o el módulo no carga (ver «invariantes» más abajo).
+//
+// ✅ **Comprobado en F09** (2026-08-02), que estrenó el peldaño 2 con el almacén
+// del pie de firma: tres líneas en tres sitios de este fichero y ni una línea de
+// `abrirBd`, ni de `cache-catastro.js`, ni del test de F05 tuvo que cambiar. La
+// versión subió sola. Se deja escrito porque un diseño que dice «el día de mañana
+// esto será fácil» solo vale cuando llega ese día y se puede contar cómo fue.
 //
 // ── LA ESCALERA SE APLICA CON `<`, NUNCA CON `===` ───────────────────────────
 // `aplicarMigraciones` ejecuta TODA migración cuya `version` sea mayor que la
@@ -45,8 +51,11 @@
 // aplicaría una migración o ninguna, la base quedaría A MEDIAS y —de nuevo— sin
 // un solo error: los almacenes que faltan no se notan hasta la primera escritura.
 // Por eso `aplicarMigraciones` se exporta y se prueba con una escalera SINTÉTICA
-// de varios peldaños: con la escalera real, que hoy tiene uno solo, ninguna
-// prueba podría distinguir `<` de `===`.
+// de varios peldaños. Cuando se escribió, la escalera real tenía UN peldaño y
+// ninguna prueba podía distinguir `<` de `===`; desde F09 tiene dos y el salto
+// 0 → 2 ya es observable con la real, pero la sintética se conserva: es la única
+// forma de ejercitar saltos que la escalera de hoy todavía no permite (1 → 3,
+// 2 → 4) sin esperar a que existan.
 //
 // ── `VERSION_BD` ES DERIVADA, NUNCA ESCRITA A MANO ───────────────────────────
 // `VERSION_BD = MIGRACIONES.length`. Así nadie puede subir la versión sin
@@ -83,7 +92,9 @@
 // en `viewer/_comun.js`: **ERROR es lo que impide generar el GML; AVISO lo que
 // no.** El almacén local es caché y comodidad — la geometría del usuario está en
 // el modelo, en memoria, y el GML se genera igual con la base cerrada. Mismo
-// criterio con el que la cartografía de fondo que no carga es AVISO.
+// criterio con el que la cartografía de fondo que no carga es AVISO. Sigue siendo
+// cierto con el pie de firma de F09: sin base hay que volver a teclearlo, que es
+// una molestia, no un impedimento.
 //
 // ── UN ENTORNO SIN IndexedDB NO PUEDE REVENTAR LA APP ────────────────────────
 // Node no tiene `indexedDB` (medido: `typeof indexedDB === 'undefined'` en la
@@ -178,6 +189,18 @@ export const ALMACENES = Object.freeze({
   PARCELAS: 'catastroCache',
   /** Geocodificación inversa: punto redondeado → referencia catastral. */
   REVGEO: 'revgeo',
+  /**
+   * F09 · El pie de firma del informe, para recordarlo entre sesiones (la casilla
+   * «Recordar» del diálogo de informe). **Un solo registro, siempre el mismo**:
+   * no es un historial. Quién escribe aquí, qué guarda exactamente y cómo se
+   * borra está en `storage/pie-firma.js`, que es su único dueño.
+   *
+   * ⚠️ Es el PRIMER almacén de la base con datos personales de quien usa la
+   * aplicación (los dos de arriba son cartografía pública). Esa diferencia manda
+   * en su política y por eso vive en un almacén aparte y no colgado de la caché:
+   * un almacén propio se borra entero de una vez.
+   */
+  PIE_FIRMA: 'pieFirma',
 })
 
 /**
@@ -222,6 +245,19 @@ export const ESQUEMA_ALMACENES = Object.freeze({
    * denuncie. Con una cadena canónica, la clave ES la política.
    */
   [ALMACENES.REVGEO]: Object.freeze({ keyPath: 'clave' }),
+  /**
+   * `keyPath: 'id'` — y la clave la escribe el llamante, que siempre pone LA
+   * MISMA (`storage/pie-firma.js#CLAVE_PIE_FIRMA`). Es deliberado: con una clave
+   * fija, `put` PISA, así que en este almacén no puede haber más de un registro
+   * ni, por tanto, un historial de firmas que nadie pidió guardar. La alternativa
+   * —una clave por fecha, o autoincremental— acumularía versiones antiguas del
+   * nombre y el contacto de una persona sin que nada las borrara.
+   *
+   * El campo se llama `id` y no `clave` para no darle a entender a nadie que este
+   * almacén se enruta por la tabla de prefijos de la caché: no es caché, no tiene
+   * TTL y no se purga.
+   */
+  [ALMACENES.PIE_FIRMA]: Object.freeze({ keyPath: 'id' }),
 })
 
 // ── Escalera de migraciones ──────────────────────────────────────────────────
@@ -244,13 +280,14 @@ export const ESQUEMA_ALMACENES = Object.freeze({
  * ya está aplicado en la base de alguien y por eso **no se edita nunca hacia
  * atrás** — se añade uno nuevo al final.
  *
- * De ahí que la migración 1 escriba los nombres y los `keyPath` LITERALES en vez
- * de recorrer {@link ESQUEMA_ALMACENES}: derivarla del esquema de hoy la
- * convertiría en una migración que cambia con el tiempo. El día que F10 añada
- * `expedientes`, una migración 1 «derivada» crearía TAMBIÉN ese almacén en las
- * bases nuevas y luego la migración 2 volvería a crearlo → `ConstraintError` en
- * cada usuario nuevo, mientras que a los usuarios antiguos les llegaría por la
- * vía correcta. La historia se escribe literal; la coincidencia entre lo que la
+ * De ahí que cada peldaño escriba los nombres y los `keyPath` LITERALES en vez de
+ * recorrer {@link ESQUEMA_ALMACENES}: derivarlos del esquema de hoy los
+ * convertiría en migraciones que cambian con el tiempo. **Y ya no es hipotético:**
+ * con `pieFirma` en el esquema (F09), una migración 1 «derivada» lo crearía
+ * TAMBIÉN en las bases nuevas y luego la migración 2 volvería a crearlo →
+ * `ConstraintError` en cada usuario nuevo, mientras que a los usuarios antiguos
+ * les llegaría por la vía correcta y no se enteraría nadie hasta leer los informes
+ * de error. La historia se escribe literal; la coincidencia entre lo que la
  * escalera produce y lo que {@link ESQUEMA_ALMACENES} declara la vigila el test.
  *
  * Tampoco se comprueba `if (!bd.objectStoreNames.contains(…))` antes de crear:
@@ -268,6 +305,20 @@ export const MIGRACIONES = Object.freeze([
     aplicar(bd) {
       bd.createObjectStore('catastroCache', { keyPath: 'refcat' })
       bd.createObjectStore('revgeo', { keyPath: 'clave' })
+    },
+  }),
+  Object.freeze({
+    version: 2,
+    // F09 · el pie de firma del informe, recordado entre sesiones.
+    //
+    // Primer peldaño que se sube de verdad: hasta aquí `VERSION_BD` valía 1 y
+    // ninguna base había necesitado nunca un ascenso. A partir de este commit, un
+    // usuario que ya tenía la base entra por `oldVersion === 1` y ejecuta SOLO
+    // esta migración, mientras que uno nuevo entra por `oldVersion === 0` y
+    // ejecuta las dos — que es exactamente lo que la condición `<` de
+    // `aplicarMigraciones` sostiene y lo que un `===` habría roto en silencio.
+    aplicar(bd) {
+      bd.createObjectStore('pieFirma', { keyPath: 'id' })
     },
   }),
 ])

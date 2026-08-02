@@ -2056,7 +2056,11 @@ body {
    saber. Por eso aquí no hay `font-size` ni `font-weight`: los pone el inline y
    declararlos sería volver a escribir algo que no se aplica.
    Tampoco color ni fondo: el estado apagado lo viste cada módulo en línea (gris y
-   `cursor:default`, porque un estilo en línea no puede expresar `:disabled`). */
+   `cursor:default`, porque un estilo en línea no puede expresar `:disabled`).
+   Desde F09 (T4.2) son CUATRO: entra «Preparar informe (PDF)», el primario del pie
+   del cajón de diagnóstico. No hace falta tocar nada aquí —el selector es por
+   elemento y lo cubre solo—, y ése es justo el motivo de que la regla no enumere
+   botones: una lista de nombres se habría quedado corta en silencio. */
 .gml-app .gml-cajon-diagnostico button,
 .gml-app .gml-cajon-comprobacion button {
   font-family: var(--font-sans);
@@ -2283,6 +2287,327 @@ body {
 .gml-app[data-arrastrando='si'] .gml-soltar-superposicion {
   opacity: 1;
   visibility: visible;
+}
+
+/* ═══ El diálogo «Preparar informe» (F09 · T4.1) ═════════════════════════════
+ *
+ * Viste el `<dialog>` que fabrica `app/dialogo-informe.js`. **`index.html` no lo
+ * trae**: el módulo lo crea y lo retira, igual que `app/zona-fichero.js` con su
+ * `<input type="file">` y que los dos cajones con su marcado.
+ *
+ * ── AQUÍ SÍ HAY UN MODAL, Y NO CONTRADICE A F08 ─────────────────────────────
+ * Los dos cajones ANOTAN el mapa: viven sobre la cartografía porque hablan de
+ * ella. Esto PREPARA un documento, donde el mapa no aporta nada mientras se teclea
+ * un número de colegiado. Y las cuatro esquinas de Leaflet están ocupadas desde
+ * F08: un formulario de diez campos ahí dentro empeoraría una deuda ya declarada
+ * (946 px de cajones sobre 900 de lienzo).
+ *
+ * ── ⛔ NI UN `display` EN `.gml-dialogo-informe`. NUNCA. ────────────────────
+ * Es LA trampa de este bloque, y es peor que la de los dos cajones. Lo que oculta
+ * un `<dialog>` cerrado es la regla `dialog:not([open]){display:none}` de la hoja
+ * del NAVEGADOR, y las reglas de autor ganan a las del navegador **siempre, sin
+ * mirar la especificidad**. O sea que un inocente `display:flex` aquí dejaría el
+ * diálogo permanentemente visible, plantado sobre la aplicación, sin que ninguna
+ * de las dos hojas pareciera decir nada raro. Por eso la caja no maqueta nada:
+ * quien reparte el interior es `.gml-dialogo-informe-cuerpo`, que es un `<div>` de
+ * dentro y no puede hacer daño.
+ *
+ * ── ⛔ TAMPOCO EN `.gml-dialogo-informe-presuncion` ────────────────────────
+ * Ese bloque se enseña y se esconde con el atributo `hidden`, y quien lo oculta es
+ * `.gml-app [hidden]{display:none}` — (0,2,0), declarada arriba del todo. Una
+ * regla `.gml-app .gml-dialogo-informe-presuncion{display:…}` tiene ESA MISMA
+ * especificidad y está escrita DESPUÉS, así que ganaría por orden y el bloque de
+ * la presunción se vería siempre: una advertencia de «esto no lo hemos medido»
+ * sobre linderos que sí se midieron. Se maqueta con márgenes y borde, sin `display`.
+ *
+ * ── POR QUÉ EL BLOQUE DE LA PRESUNCIÓN LLEVA COLOR, Y NO ROMPE LA REGLA 9 ───
+ * Va en `--color-state-warn`, que el sistema documenta literalmente como el color
+ * de las «advisory notes». No es un color de MÉRITO y la diferencia no es sutil:
+ * no califica la parcela, ni el trabajo de nadie — califica **una afirmación de
+ * esta aplicación**, diciendo que no la ha medido. Es la misma doctrina que ya
+ * está escrita en el bloque del cajón de comprobación: «las severidades sí llevan
+ * su color porque una severidad es un hecho declarado, no una nota». Aquí el hecho
+ * declarado es «esto es una propuesta». Lo que sigue prohibido, y no aparece, es
+ * verde de aprobado o rojo de suspenso sobre ninguna cifra.
+ *
+ * ── SE REUTILIZA EL CROMO DE LA APP, NO SE INVENTA OTRO ─────────────────────
+ * Los tres botones llevan `.gml-boton` con sus variantes, y los campos de texto
+ * `.gml-entrada`. No es pereza: el `:disabled` de esta aplicación está escrito UNA
+ * vez y su cabecera lo dice sin rodeos —«los dos botones que nacen apagados en
+ * esta app tienen que apagarse igual, o el usuario acaba aprendiendo dos idiomas
+ * para el mismo estado»—. Este diálogo tiene un tercero. Lo único que hay que
+ * deshacer de la base es lo que sea propio del panel (`width:100%`) o esté
+ * calibrado para otro dato (el `letter-spacing` de la referencia catastral).
+ *
+ * ── NADA DE ESTO SE DECLARA EN LÍNEA ────────────────────────────────────────
+ * A diferencia de `viewer/*`, este módulo no tiene que ser legible sin hoja: la
+ * hoja entra por `<link>` en `index.html` y es contrato de la cáscara. Así que
+ * `app/dialogo-informe.js` no escribe ni un `style`, y en particular **ni un
+ * `font`** — el defecto que destapó el guion 10 de F08 fue exactamente ése: un
+ * `font:'inherit'` en línea que dejaba muerta una regla de este fichero sin que
+ * nada se quejara.
+ *
+ * @see app/dialogo-informe.js  CLASE, CLASE_REUTILIZADA y SELECTOR: son contrato.
+ * @see report/firma.js         De dónde salen los rótulos del pie de firma.
+ */
+
+/* La caja. `position: fixed` y centrado por `transform` en vez del `inset:0` +
+   `margin:auto` de manual: con la altura en `auto` —que es lo que se quiere, para
+   que el diálogo mida lo que mide su contenido hasta el tope— aquella receta no
+   centra en vertical. Y `fixed` importa aunque `showModal()` ponga el diálogo en
+   la capa superior: es lo que sostiene la vía de respaldo (el atributo `open` a
+   secas), donde el diálogo sí queda sujeto al `overflow:hidden` de la cáscara.
+
+   `z-index` por encima de 1100, que es donde vive el velo de soltar un fichero;
+   los controles de Leaflet están en 1000.
+
+   `overscroll-behavior: contain` NO es adorno: debajo hay un mapa, y una rueda que
+   se escapara del final de este formulario haría zoom sobre la parcela. */
+.gml-app .gml-dialogo-informe {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1200;
+  width: min(760px, calc(100vw - 2 * var(--space-4)));
+  max-height: min(88vh, 900px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-main);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.28);
+}
+
+/* El velo de detrás. Solo lo pinta el navegador cuando el diálogo se ha abierto
+   con `showModal()`; con la vía de respaldo no hay velo, y no pasa nada.
+
+   Los tokens funcionan aquí porque `::backdrop` hereda de su elemento de origen
+   desde 2023 en los tres motores. En un navegador anterior el `var()` no
+   resolvería y el velo saldría transparente: se pierde el oscurecido, no la
+   función. */
+.gml-app .gml-dialogo-informe::backdrop {
+  background: color-mix(in srgb, var(--color-text-primary) 45%, transparent);
+}
+
+/* Quien reparte el interior. Ver arriba por qué esto NO está en el `<dialog>`. */
+.gml-dialogo-informe-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.gml-dialogo-informe-titulo {
+  margin: 0;
+  font-size: var(--gml-titulo-tam);
+  font-weight: var(--fw-semibold);
+  line-height: 1.25;
+  color: var(--color-text-primary);
+}
+
+/* El desmentido (esto NO es el IVG). En el cuerpo de texto normal y no en el
+   apunte menudo: es lo que hay que haber leído ANTES de teclear un número de
+   colegiado, no la letra pequeña. */
+.gml-dialogo-informe-intro {
+  margin: 0;
+  max-width: 68ch;
+  font-size: var(--text-12);
+  color: var(--color-text-secondary);
+}
+
+/* Los tres grupos son `<fieldset>`. Se les deshace el marco del navegador y se
+   dejan en flujo de bloque a propósito: un `display:flex` sobre un `<fieldset>`
+   descoloca la `<legend>`, que el navegador maqueta como caja especial. Los
+   huecos, por tanto, con márgenes. */
+.gml-app .gml-dialogo-informe-grupo {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.gml-app .gml-dialogo-informe-leyenda {
+  padding: 0;
+  font-size: var(--text-10);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+/* El apunte que va justo debajo de una `<legend>` separa del primer campo; los
+   demás apuntes (los de un campo vacío) van pegados a su control. */
+.gml-app .gml-dialogo-informe-grupo > .gml-dialogo-informe-apunte {
+  margin-top: var(--space-1);
+  margin-bottom: var(--space-3);
+  max-width: 68ch;
+}
+
+/* Dos columnas donde quepan y una donde no, sin consulta de medios: el diálogo
+   puede quedarse en 320 px de ancho en un portátil pequeño y los rótulos
+   («Parcela (nº en el polígono)») no admiten columnas estrechas. */
+.gml-dialogo-informe-rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3) var(--space-4);
+}
+
+.gml-dialogo-informe-campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.gml-dialogo-informe-rotulo {
+  font-size: var(--text-12);
+  color: var(--color-text-secondary);
+}
+
+/* Lo que hay que deshacer de `.gml-entrada`, que está escrita para el campo de la
+   referencia catastral:
+   · `letter-spacing` — 0,06 em separa las 14 letras de un código para que se
+     coteje carácter a carácter. Sobre «Alhaurín de la Torre» eso mismo se lee como
+     un texto mal compuesto.
+   · `flex` — allí el campo comparte fila con un botón; aquí es el único hijo de
+     una columna y no tiene que crecer.
+   · la familia — la hoja del navegador impone la suya a los controles de
+     formulario y no se hereda del panel, así que hay que decirla. */
+.gml-app .gml-dialogo-informe .gml-dialogo-informe-entrada {
+  width: 100%;
+  flex: none;
+  font-family: var(--font-sans);
+  letter-spacing: normal;
+}
+
+/* Los cuatro datos que pone la aplicación y no se editan. Se enseñan como TEXTO y
+   no como un `<input readonly>`: un campo de formulario que no se puede escribir
+   invita a intentarlo y no dice por qué no. El `padding` vertical es el mismo que
+   el de `.gml-entrada`, para que la fila de un dato fijo y la de uno editable no
+   bailen dentro de la misma rejilla. */
+.gml-dialogo-informe-fijo {
+  margin: 0;
+  padding: var(--space-2) 0;
+  font-size: var(--text-13);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.gml-dialogo-informe-apunte {
+  margin: 0;
+  font-size: var(--text-11);
+  color: var(--color-text-disabled);
+}
+
+/* El cuadro donde se reescribe el lindero.
+
+   `font-family` es OBLIGATORIA aquí, no una preferencia: la hoja del navegador le
+   da monoespaciada a todo `<textarea>`, así que sin esta línea el borrador saldría
+   en mono en medio de una app que usa Geist. Y `display:block` mata el hueco de
+   línea base que arrastra un elemento en línea.
+
+   `resize: vertical` y no `both`: a lo ancho no hay nada que ganar —el cuadro ya
+   ocupa el diálogo entero— y sí que perder, porque un `<textarea>` estirado a mano
+   se sale de la caja y tapa lo de al lado. */
+.gml-app .gml-dialogo-informe .gml-dialogo-informe-literal {
+  display: block;
+  width: 100%;
+  flex: none;
+  min-height: 16em;
+  resize: vertical;
+  font-family: var(--font-sans);
+  font-size: var(--text-13);
+  line-height: 1.55;
+  letter-spacing: normal;
+}
+
+/* ── El bloque de la presunción ──────────────────────────────────────────────
+ *
+ * Es la única marca posible de que un renglón del borrador está PROPUESTO y no
+ * medido: dentro de un `<textarea>` no hay formato, así que la advertencia tiene
+ * que vivir fuera del cuadro. Va encima y no debajo, porque debajo estaría
+ * después de 16 em de texto y la mitad de las veces fuera de la pantalla.
+ *
+ * ⛔ SIN `display` — ver la cabecera de esta sección: rompería el `hidden` con el
+ * que el módulo lo enseña y lo esconde. */
+.gml-dialogo-informe-presuncion {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3);
+  border-left: 3px solid var(--color-state-warn);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--color-state-warn) 7%, var(--color-bg-primary));
+}
+
+.gml-dialogo-informe-presuncion-titulo {
+  margin: 0;
+  font-size: var(--text-12);
+  font-weight: var(--fw-semibold);
+  color: var(--color-state-warn);
+}
+
+.gml-dialogo-informe-lista {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-4);
+  font-size: var(--text-12);
+  color: var(--color-text-primary);
+}
+
+.gml-app .gml-dialogo-informe-lista li {
+  margin-bottom: var(--space-1);
+}
+
+/* Las dos casillas —el acuse de la presunción y «Recordar»— son `<label>` con el
+   control dentro. `align-items: flex-start` y no `center` porque los dos textos
+   pueden partirse en dos líneas y una casilla centrada respecto de un párrafo de
+   dos renglones queda flotando en medio de la nada. */
+.gml-dialogo-informe-casilla-fila {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  font-size: var(--text-12);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+/* El `margin-top` alinea el cuadradito con la primera línea de su texto, que es
+   lo que el `flex-start` de arriba deja sin resolver. */
+.gml-dialogo-informe-casilla {
+  flex: none;
+  margin: 0.2em 0 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+/* El pie de acciones, y también la fila del botón «Regenerar». A la derecha, que
+   es donde el ojo termina de leer un formulario. */
+.gml-dialogo-informe-pie {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+/* `.gml-boton` está escrita para el PIE del panel, donde los botones son barras a
+   lo ancho, y trae `width:100%`. Aquí van en fila y a su tamaño. Es (0,3,0)
+   contra la (0,1,0) de la base: se gana por especificidad, que es el criterio de
+   todo este fichero, nunca forzando el peso. */
+.gml-app .gml-dialogo-informe-pie .gml-boton {
+  width: auto;
+  flex: none;
+}
+
+/* El renglón donde se escribe POR QUÉ está apagado «Componer PDF» (regla de oro
+   1). `min-height` reservado para que encender el botón —y vaciar el renglón— no
+   dé un salto de maquetación justo debajo de la mano que va a pulsar. */
+.gml-dialogo-informe-estado {
+  margin: 0;
+  min-height: 1.45em;
+  font-size: var(--text-12);
+  color: var(--color-text-secondary);
 }
 
 /* ═══ Movimiento reducido ════════════════════════════════════════════════════

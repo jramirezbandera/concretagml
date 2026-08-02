@@ -835,6 +835,10 @@ const botonesDeCajon = [
   ['contrastar', cajonComp.querySelector('[data-accion="contrastar-parcelario"]')],
   ['descartar', cajonComp.querySelector('[data-accion="descartar-comprobacion"]')],
   ['descargar-informe', cajonDiag.querySelector('[data-accion="descargar-informe"]')],
+  // El primario del pie de F09. Entra en la misma lista porque nació con el mismo
+  // reparto —el módulo pone tamaño y grosor, la hoja pone la familia— y se rompería
+  // igual: en silencio, y solo en navegador (en jsdom no hay cascada).
+  ['preparar-informe', cajonDiag.querySelector('[data-accion="preparar-informe"]')],
 ]
 const tipografia = {
   tokenFontSans: fontSans,
@@ -1442,7 +1446,18 @@ const informe = {
   desmienteSerLaValidacionGrafica:
     /NO es la validaci[oó]n gr[aá]fica alternativa \(VGA\)/i.test(contenido || ''),
   seLlamaValidacionGraficaEnElTitulo: /validaci[oó]n\s+gr[aá]fica/i.test(tituloInforme || ''),
-  diceQueEsProvisionalYSinFirma: /provisional/i.test(contenido || '') && /sin\s+pie\s+de\s+firma/i.test(contenido || ''),
+  // ⚠️ REESCRITO EN F09 (T4.2). Hasta el 2026-08-02 aquí se buscaba «provisional»,
+  // porque el informe se llamaba a sí mismo «VERSIÓN PROVISIONAL EN TEXTO» y decía
+  // que el firmable «todavía no existe». F09 lo trajo, así que el desmentido se
+  // reescribió: lo que hay que medir ahora son las DOS mitades que siguen siendo
+  // verdad —que este documento no lleva pie de firma, y que REMITE al que sí lo
+  // lleva por el nombre de su botón—. El `\s+` no es aseo: el párrafo va justificado
+  // a lo ancho y el rótulo se puede partir por un salto de línea.
+  diceQueNoLlevaPieDeFirma: /sin\s+pie\s+de\s+firma/i.test(contenido || ''),
+  remiteAlInformeFirmable: /«Preparar\s+informe\s+\(PDF\)»/i.test(contenido || ''),
+  // Y que la frase caducada no haya vuelto: un desmentido viejo se sigue leyendo con
+  // la misma cara de cierto que uno vigente.
+  siguePresumiendoDeQueElFirmableNoExiste: /todav[ií]a\s+no\s+existe/i.test(contenido || ''),
   nombraElFicheroDeOrigen: (contenido || '').includes('cp_parcela_9398516VK3799G.gml'),
   lineas: contenido === null ? null : contenido.split('\n').length,
   // Y la mitad que solo se ve aquí: ¿sigue el cajón donde se acaba de escribir el
@@ -1494,8 +1509,23 @@ if (informe.seLlamaValidacionGraficaEnElTitulo) {
       'de un documento oficial del Catastro y este no lo es.',
   )
 }
-if (!informe.diceQueEsProvisionalYSinFirma) {
-  problemas.push('El informe descargado no dice que es provisional y sin pie de firma (eso llega en F09).')
+if (!informe.diceQueNoLlevaPieDeFirma) {
+  problemas.push(
+    'El informe descargado no dice que NO lleva pie de firma: sin eso, un texto con el nombre legal ' +
+      'del documento y todas las cifras dentro se puede presentar como si estuviera firmado.',
+  )
+}
+if (!informe.remiteAlInformeFirmable) {
+  problemas.push(
+    'El informe descargado no remite al documento firmable por el nombre de su botón («Preparar ' +
+      'informe (PDF)»): decir lo que falta sin decir dónde está es media regla de oro 1.',
+  )
+}
+if (informe.siguePresumiendoDeQueElFirmableNoExiste) {
+  problemas.push(
+    'El informe descargado sigue diciendo que el documento firmable «todavía no existe». Lo trajo ' +
+      'F09 el 2026-08-02: el aviso caducó y ahora es falso, pero se lee con la misma cara de cierto.',
+  )
 }
 if (!informe.nombraElFicheroDeOrigen) {
   problemas.push(

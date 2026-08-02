@@ -1,0 +1,75 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`report/pdf · snapshot de bytes de un documento mínimo > el documento mínimo, byte a byte 1`] = `
+"%PDF-1.4
+%«e2»«e3»«cf»«d3»
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 1 /Kids [6 0 R] >>
+endobj
+3 0 obj
+<< /ProcSet [/PDF /Text /ImageC] /Font << /F1 4 0 R /F2 5 0 R >> >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.276 841.89] /Resources 3 0 R /Contents 7 0 R >>
+endobj
+7 0 obj
+<< /Length 231 >>
+stream
+q
+0 g
+BT
+/F2 11.339 Tf
+1 0 0 1 56.693 771.024 Tm
+(Parcela 9398516VK3799G) Tj
+ET
+Q
+q
+0.25 g
+BT
+/F1 8.504 Tf
+1 0 0 1 56.693 751.181 Tm
+(Se«f1»alizaci«f3»n de linderos «b7» «b1»0,50 m) Tj
+ET
+Q
+q
+0 G
+1.134 w
+56.693 742.677 m
+538.583 742.677 l
+S
+Q
+
+endstream
+endobj
+8 0 obj
+<< /Title (Informe de contraste con el parcelario catastral) /Producer (Concreta GML) /CreationDate (D:20260802123015Z00'00') >>
+endobj
+xref
+0 9
+0000000000 65535 f«0d»
+0000000015 00000 n«0d»
+0000000064 00000 n«0d»
+0000000121 00000 n«0d»
+0000000204 00000 n«0d»
+0000000301 00000 n«0d»
+0000000403 00000 n«0d»
+0000000514 00000 n«0d»
+0000000796 00000 n«0d»
+trailer
+<< /Size 9 /Root 1 0 R /Info 8 0 R >>
+startxref
+940
+%%EOF
+"
+`;
+
+exports[`report/pdf · snapshot de bytes de un documento mínimo > y su tamaño, que es el argumento de todo esto 1`] = `1195`;

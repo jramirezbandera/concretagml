@@ -32,6 +32,22 @@
 // pinta juntos, y el orden entre dos errores de programación no es una garantía
 // que merezca código para conservarse.
 //
+// ── F09 · T5.1 · EL TERCER LLAMANTE, Y POR QUÉ ES BINARIO ────────────────────
+// F09 baja un INFORME FIRMABLE EN PDF. Un PDF **son bytes**: lleva un JPEG
+// pegado sin recodificar (`/DCTDecode`) y una tabla `xref` con desplazamientos
+// de byte exactos, así que pasarlo por {@link descargarTexto} —que codifica en
+// UTF-8 por especificación— lo corrompería en silencio, con el `%PDF` intacto en
+// la cabecera y el defecto invisible hasta abrirlo. De ahí
+// {@link descargarBinario}.
+//
+// Y como eran ya TRES, la cadena que los tres comparten —capacidad → `Blob` →
+// `createObjectURL` → `<a download>` con su `stopPropagation` en CAPTURA →
+// `click()` → limpieza en `finally` anidados— se ha extraído a {@link entregar}.
+// Lo que se valida sigue en cada función pública, con SU nombre en el mensaje;
+// lo que se comparte es la mecánica, que es la que concentra las cuatro trampas
+// de esta cabecera. Ni una línea de `test/gml/descargar.dom.test.js` cambió, que
+// es la prueba de que fue una extracción y no un rediseño.
+//
 // ── 1 · CODIFICACIÓN: el fichero no puede mentir sobre sí mismo ──────────────
 // La spec de F04 lo pide con todas las letras: «Fichero UTF-8 (encoding
 // declarado == bytes reales)». El GML lleva escrito en su prólogo
@@ -203,6 +219,19 @@ export const TIPO_MIME_GML = 'application/gml+xml;charset=utf-8'
  * @readonly
  */
 export const TIPO_MIME_TEXTO = 'text/plain;charset=utf-8'
+
+/**
+ * Tipo MIME del informe firmable en PDF de F09. Vive aquí por lo mismo que los
+ * otros dos: el vocabulario de la ENTREGA es de este módulo.
+ *
+ * **Sin `charset`, y no es un olvido.** Un PDF no es texto: es un contenedor
+ * binario que declara sus propias codificaciones dentro (`/WinAnsiEncoding` en
+ * las fuentes, `/DCTDecode` en la imagen). Añadirle un `charset=utf-8` sería
+ * afirmar sobre los bytes algo que no es cierto y que ningún lector consulta.
+ *
+ * @readonly
+ */
+export const TIPO_MIME_PDF = 'application/pdf'
 
 // ── Repertorio de caracteres del nombre de fichero ───────────────────────────
 
@@ -678,6 +707,41 @@ export function descargarTexto(texto, opciones = {}) {
     }
   }
 
+  // Los bytes. `Blob` codifica en UTF-8 por especificación cuando la entrada es
+  // un string: no hay conversión manual que pueda estropearlo, y tampoco BOM.
+  return entregar([texto], { nombreFichero, mime, documento, url })
+}
+
+/**
+ * **LA CADENA DE LA ENTREGA, EN UN SOLO SITIO.** Comprobación de capacidad →
+ * `Blob` → `createObjectURL` → `<a download>` con su `stopPropagation` en
+ * CAPTURA → `click()` → retirada → `revokeObjectURL`.
+ *
+ * Se extrajo en F09 (T5.1) al aparecer el TERCER llamante —un PDF son bytes, no
+ * texto—, y por la misma razón por la que F08 extrajo {@link descargarTexto} de
+ * {@link descargarGml}: la cabecera de este módulo se niega expresamente a abrir
+ * una segunda familia de duplicados. Las cuatro trampas de arriba (codificación,
+ * fuga de memoria, nombre de fichero, propagación del clic) son idénticas para
+ * un GML, un informe de texto y un PDF; una copia que se olvidara de una
+ * corrección fallaría en verde.
+ *
+ * **Aquí NO se valida nada del llamante.** Los `TypeError` de contrato los lanza
+ * cada función pública con SU nombre dentro del mensaje, que es la mitad de lo
+ * que sirve; esta se ocupa solo de lo que el ENTORNO sabe o no sabe hacer.
+ *
+ * @param {Array<string|ArrayBufferView|ArrayBuffer|Blob>} partes  Lo que va
+ *   dentro del `Blob`, tal cual se le pasa al constructor.
+ * @param {object} opciones
+ * @param {string} opciones.nombreFichero  Ya saneado y con extensión.
+ * @param {string} opciones.mime
+ * @param {Document|undefined} opciones.documento  `undefined` ⇒ el entorno no
+ *   tiene `document`, y se degrada con motivo (no lanza).
+ * @param {typeof URL|undefined} opciones.url  Ídem.
+ * @returns {ResultadoDescarga}
+ * @throws {*}  Lo que lance `click()`, DESPUÉS de haber revocado la URL y
+ *   retirado el anchor.
+ */
+function entregar(partes, { nombreFichero, mime, documento, url }) {
   const ConstructorBlob = globalThis.Blob
   const faltan = []
   if (documento === undefined) faltan.push('document')
@@ -699,9 +763,7 @@ export function descargarTexto(texto, opciones = {}) {
     }
   }
 
-  // Los bytes. `Blob` codifica en UTF-8 por especificación cuando la entrada es
-  // un string: no hay conversión manual que pueda estropearlo, y tampoco BOM.
-  const blob = new ConstructorBlob([texto], { type: mime })
+  const blob = new ConstructorBlob(partes, { type: mime })
 
   const href = url.createObjectURL(blob)
   const anchor = documento.createElement('a')
@@ -750,6 +812,134 @@ export function descargarTexto(texto, opciones = {}) {
   }
 
   return { descargado: true, nombre: nombreFichero, motivo: null, mensaje: null }
+}
+
+/**
+ * ¿Son BYTES entregables? Se admite `Uint8Array` —lo que devuelve
+ * `report/pdf.js#bytes()`— y, en general, cualquier vista de `ArrayBuffer` o el
+ * propio `ArrayBuffer`, que es exactamente lo que el constructor de `Blob`
+ * acepta. Duck typing, no `instanceof`: un `Uint8Array` de otro realm (un
+ * `<iframe>`, un worker) no pasa el `instanceof` y sí es perfectamente
+ * entregable, y es la misma línea que este módulo ya traza con `documento`.
+ *
+ * @param {*} v
+ * @returns {boolean}
+ */
+function esBytes(v) {
+  if (ArrayBuffer.isView(v)) return true
+  // `instanceof` primero (barato) y la marca interna después, que es la que
+  // reconoce un `ArrayBuffer` fabricado en otro realm.
+  return v instanceof ArrayBuffer || Object.prototype.toString.call(v) === '[object ArrayBuffer]'
+}
+
+/**
+ * Cuántos bytes hay. `ArrayBuffer` mide por `byteLength` y las vistas también,
+ * así que la misma propiedad sirve para las dos formas.
+ *
+ * @param {ArrayBufferView|ArrayBuffer} v
+ * @returns {number}
+ */
+const cuantosBytes = (v) => (typeof v.byteLength === 'number' ? v.byteLength : 0)
+
+/**
+ * Entrega unos BYTES como fichero descargado por el navegador. Es el gemelo
+ * binario de {@link descargarTexto} y **comparte con él la cadena entera** (ver
+ * {@link entregar}): la misma comprobación de capacidad, el mismo `<a download>`
+ * con su `stopPropagation` en fase de CAPTURA, la misma limpieza en `finally`
+ * anidados y el mismo {@link ResultadoDescarga} de cuatro claves.
+ *
+ * ── POR QUÉ HACE FALTA, HABIENDO `descargarTexto` ──
+ * Un PDF **son bytes, no texto**. Pasar un `Uint8Array` por `descargarTexto`
+ * lanzaría (su guarda exige `string|null`), y convertirlo a cadena antes sería
+ * peor que lanzar: el `Blob` recodificaría en UTF-8 cada byte ≥ 0x80 y el
+ * fichero saldría corrupto —con el `%PDF` intacto en la cabecera, así que el
+ * defecto no se vería hasta abrirlo—. El JPEG del plano y la tabla `xref`
+ * (desplazamientos de byte EXACTOS) no sobreviven a ninguna reinterpretación.
+ *
+ * ── EL `stopPropagation` NO ES OPCIONAL ──
+ * Está medido en navegador real (F08, guion 10): sin él, el `click()` de este
+ * anchor burbujea hasta `document`, el guardián de clic-fuera de
+ * `viewer/cajon-diagnostico.js` lo cuenta como un clic FUERA del cajón y lo
+ * cierra — dejando el acuse de recibo escrito en un `role="status"` que acaba de
+ * quedar en `display:none`. Aquí se hereda de {@link entregar} por construcción,
+ * que es justo el motivo de haber extraído la cadena en vez de copiarla.
+ *
+ * @param {ArrayBufferView|ArrayBuffer|null} bytes  El documento ya compuesto, o
+ *   `null` si quien lo genera no produjo nada. **Cero bytes se trata igual que
+ *   `null`**: un fichero vacío en la carpeta de descargas aparenta que la
+ *   operación salió bien.
+ * @param {object} opciones
+ * @param {string} opciones.nombreFichero  Nombre con el que baja el fichero,
+ *   extensión incluida y YA SANEADO. Obligatorio: este primitivo no lo inventa.
+ * @param {string} opciones.mime  Tipo MIME del Blob. Obligatorio y sin defecto,
+ *   por lo mismo que en {@link descargarTexto}. Ver {@link TIPO_MIME_PDF}.
+ * @param {Document} [opciones.documento=globalThis.document]
+ * @param {typeof URL} [opciones.url=globalThis.URL]
+ * @returns {ResultadoDescarga}
+ * @throws {TypeError}  Si `nombreFichero` o `mime` no son cadenas con contenido,
+ *   si `bytes` no es un búfer ni `null`, o si `documento`/`url` están PRESENTES y
+ *   no sirven. Que falten del entorno NO lanza: degrada con motivo.
+ * @throws {*}  Lo que lance `click()`, DESPUÉS de haber limpiado.
+ */
+export function descargarBinario(bytes, opciones = {}) {
+  const {
+    nombreFichero,
+    mime,
+    documento = globalThis.document,
+    url = globalThis.URL,
+  } = opciones ?? {}
+
+  if (typeof nombreFichero !== 'string' || nombreFichero.trim().length === 0) {
+    throw new TypeError(
+      `descargarBinario: 'nombreFichero' debe ser un nombre de fichero no vacío; ` +
+        `recibido ${describir(nombreFichero)}. El nombre lo pone quien llama, ya ` +
+        'saneado y con su extensión: este primitivo no lo inventa (ver nombreFicheroGml).',
+    )
+  }
+  if (typeof mime !== 'string' || mime.trim().length === 0) {
+    throw new TypeError(
+      `descargarBinario: 'mime' debe ser un tipo MIME no vacío; recibido ${describir(mime)}. ` +
+        'No hay valor por defecto a propósito: un MIME supuesto es un fichero que se ' +
+        'abre con el programa equivocado.',
+    )
+  }
+  if (bytes !== null && !esBytes(bytes)) {
+    throw new TypeError(
+      `descargarBinario: 'bytes' debe ser un Uint8Array (u otra vista de ArrayBuffer), un ` +
+        `ArrayBuffer, o null; recibido ${describir(bytes)}. null significa «quien lo genera no ` +
+        'produjo nada»; undefined significa que alguien se ha dejado el argumento, y eso no es ' +
+        'lo mismo. Un string tampoco vale: para texto está descargarTexto, que codifica en UTF-8.',
+    )
+  }
+  // `!== undefined`: ausente es el entorno hablando y se degrada más abajo;
+  // presente-y-raro es el programador equivocándose y lanza aquí.
+  if (documento !== undefined && !esDocumentoUtil(documento)) {
+    throw new TypeError(
+      `descargarBinario: 'documento' debe ser un documento del DOM con 'createElement' y ` +
+        `'body'; recibido ${describir(documento)}. Sin DOM no hay descarga: ` +
+        'esta función es del navegador.',
+    )
+  }
+  if (url !== undefined && !esObjetoUrl(url)) {
+    throw new TypeError(
+      `descargarBinario: 'url' debe ser un objeto con 'createObjectURL' y ` +
+        `'revokeObjectURL'; recibido ${describir(url)}.`,
+    )
+  }
+
+  if (bytes === null || cuantosBytes(bytes) === 0) {
+    return {
+      descargado: false,
+      nombre: null,
+      motivo: MOTIVO_NO_DESCARGADO.SIN_CONTENIDO,
+      mensaje:
+        'No se ha descargado ningún fichero porque no había contenido que entregar. ' +
+        'Un fichero de 0 bytes en la carpeta de descargas es peor que ninguno: ' +
+        'aparenta que la operación salió bien.',
+    }
+  }
+
+  return entregar([bytes], { nombreFichero, mime, documento, url })
 }
 
 /**

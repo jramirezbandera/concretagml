@@ -2,10 +2,11 @@
 INFORME DE CONTRASTE CON EL PARCELARIO CATASTRAL
 ==============================================================================
 
-  VERSIÓN PROVISIONAL EN TEXTO, SIN PIE DE FIRMA. No lleva plano de situación,
-  ni descripción literaria del lindero, ni firma colegiada. El documento
-  firmable —plano a 300 ppp, descripción del lindero y pie de firma— es el de
-  la fase F09 de esta herramienta y todavía no existe: esto no lo sustituye.
+  VERSIÓN EN TEXTO, SIN PIE DE FIRMA. No lleva plano de situación, ni
+  descripción literaria del lindero, ni firma colegiada. El documento firmable
+  —plano de situación a 300 ppp, descripción literaria del lindero y pie de
+  firma— se compone en esta misma herramienta con «Preparar informe (PDF)», en
+  el cajón del diagnóstico: este texto no lo sustituye.
 
   Este documento NO es la validación gráfica alternativa (VGA) ni el informe
   de validación gráfica (IVG) del Catastro. Esos son un procedimiento y un
@@ -26,7 +27,7 @@ INFORME DE CONTRASTE CON EL PARCELARIO CATASTRAL
   Procedencia de la geometría .... Fichero GML aportado por el usuario
   Procedencia del parcelario ..... Contorno oficial descargado del Catastro,
                                    conservado intacto
-  Fichero de origen .............. cp_parcela_9398516VK3799G.gml (2.878 bytes)
+  Fichero de origen .............. cp_parcela_9398516VK3799G.gml (2.837 bytes)
 
 2. QUÉ SE LEYÓ DEL FICHERO
 ------------------------------------------------------------------------------
@@ -215,11 +216,13 @@ INFORME DE CONTRASTE CON EL PARCELARIO CATASTRAL
 5. NOTA FINAL
 ------------------------------------------------------------------------------
 
-  Este documento es la VERSIÓN PROVISIONAL EN TEXTO del informe de contraste y
-  NO LLEVA PIE DE FIRMA. No tiene plano de situación, ni descripción literaria
-  del lindero, ni número de colegiado, ni código de verificación. No es la
-  validación gráfica alternativa (VGA) ni el informe de validación gráfica
-  (IVG) del Catastro, que emite su Sede Electrónica.
+  Este documento es la VERSIÓN EN TEXTO del informe de contraste y NO LLEVA
+  PIE DE FIRMA. No tiene plano de situación, ni descripción literaria del
+  lindero, ni número de colegiado, ni código de verificación. El documento
+  firmable que sí los lleva se compone con «Preparar informe (PDF)», en el
+  cajón del diagnóstico. Ninguno de los dos es la validación gráfica
+  alternativa (VGA) ni el informe de validación gráfica (IVG) del Catastro,
+  que emite su Sede Electrónica.
 
   La aplicación mide; el colegiado interpreta y firma. Aquí no hay una sola
   conclusión sobre las cifras, y no la hay a propósito.

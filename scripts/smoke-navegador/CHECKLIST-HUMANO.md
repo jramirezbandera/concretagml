@@ -32,6 +32,19 @@ visual**.
 > app mide; el colegiado firma. **El punto 9 se firma junto con el 6, el 7 y el
 > 8**; la cadena bloqueada es F03 → F05 → F06 → F07 → F08.
 >
+> Y desde F09 tiene un punto **10**, el del INFORME FIRMABLE EN PDF, y es de los
+> que no se pueden delegar en ninguna máquina por dos motivos distintos. Uno es
+> mecánico: el PDF está escrito **a mano, byte a byte, sin librería**, y
+> `11-informe-pdf.js` solo puede mirar sus bytes — **que ABRA, y en tres lectores
+> distintos, hay que verlo** (§10.1, y BLOQUEA: uno que abre en un solo lector no
+> está escrito, está de suerte). El otro es de lectura, y HEREDA el carácter del
+> 8.1 y del 9.4 subiendo la apuesta: en F07 el sujeto era una parcela, en F08 el
+> trabajo de otro técnico, y **aquí es un papel que alguien firma y entrega**. Con
+> mención expresa a la **presunción de vía pública**, que es el único sitio de toda
+> la aplicación donde se PROPONE en vez de medir (§10.5, BLOQUEANTE). **El punto 10
+> se firma junto con el 6, el 7, el 8 y el 9**; la cadena bloqueada pasa a ser
+> **F03 → F05 → F06 → F07 → F08 → F09**.
+>
 > ⛔ **Y el punto 9 ya se ha recorrido una vez, el 2026-08-02, y encontró TRES
 > DEFECTOS REALES — dos de los cuales ni siquiera eran de F08: venían de F03 y de
 > F05.** Están corregidos, con guardián en la suite y **medidos desde entonces por
@@ -663,7 +676,7 @@ tú con ojos de cliente— y pregunta:
       «está mal»? Si la paráfrasis natural es un dictamen, el texto no está
       haciendo su trabajo.
 
-### 8.2 · La sombra de la diferencia ⟨§10.5⟩
+### 8.2 · La sombra de la diferencia ⟨`spec/SPEC.md` §10.5⟩
 
 - [ ] Con un vértice movido medio metro, ¿la mancha gris **se entiende sin
       leyenda** como «lo que no coincide»? ¿O parece un error de pintado?
@@ -947,6 +960,235 @@ cuenta dos procedencias, no una). Quien decide si eso basta es una persona.
 
 ---
 
+## 10 · El informe firmable en PDF ⟨F09⟩ — lo que ni `11-informe-pdf.js` firma
+
+**Por qué está aquí.** `11-informe-pdf.js` es el guion que más lejos llega de toda
+la carpeta: es el **único** que mide un criterio de aceptación que la suite no
+puede medir en absoluto (en jsdom no hay contexto 2D, así que el criterio 1 no
+tiene dónde ejecutarse), y lo mide **con control negativo** —sin `crossOrigin` el
+lienzo tiene que contaminarse y `toDataURL` tiene que lanzar—. Además afirma que
+los bytes que bajan empiezan por `%PDF`, terminan en `%%EOF`, declaran 4 páginas y
+llevan el plano dentro como imagen `/DCTDecode`; que componer no cierra el cajón
+por debajo del modal; que el `<dialog>` está en la capa superior con el fondo
+inerte; y el invariante de los 267 px. Cifras en `GUION.md` §17.
+
+**Y aun así no puede firmar dos cosas, y las dos son de esta fase.** La primera es
+que **el PDF ABRA**: este documento está escrito **a mano, byte a byte, sin
+librería** (`report/pdf.js`, ~15 kB frente a los ~350 de jsPDF; fue la Decisión 1
+de F09), y un guion solo puede mirar sus bytes. La segunda es **cómo se lee**: F09
+pone en un papel que alguien va a firmar unas cifras sobre una finca y una
+descripción de sus linderos, y «cómo se lee eso» no lo mide ninguna máquina.
+
+⚠️ **Antes de nada, lee el §17 del `GUION.md`.** El guion sale hoy en `ok:true`,
+pero su **primera** corrida salió `ok:false` — y esta vez **no era un defecto de
+producción: era la MEDIDA**, y está contado allí porque la lección importa (medir
+demasiado pronto es tan malo como medir demasiado tarde).
+
+Para recorrerla, con la app viva: pulsa **«Diagnosticar encaje»** sobre la parcela
+de demostración, mueve un vértice medio metro para que haya algo que ver, y de ahí
+a **«Preparar informe (PDF)»** y **«Componer PDF»**. Cuesta **dos peticiones** al
+Catastro (colindantes + descriptivos) y **una** al WMS por cada PDF que compongas
+—~200 kB de plano a 300 ppp—, así que no compongas quince: régimen de uso en
+`GUION.md` §13.
+
+### 10.1 · ⛔ Abrir el PDF en TRES lectores distintos ⟨obligatorio⟩
+
+**Por qué está aquí, y por qué no es una formalidad.** El escritor de PDF es
+propio: `report/pdf.js` monta el `xref`, el `trailer`, los objetos, las fuentes
+estándar, la codificación WinAnsi y el `/DCTDecode` **a mano**. Los visores son
+notoriamente desiguales en lo que perdonan: Chrome reconstruye tablas de
+referencias cruzadas rotas sin decir nada, Acrobat es el más estricto con el
+`xref` y con los diccionarios de fuente, y los lectores ligeros son los que menos
+heurísticas tienen. **Un PDF que abre en un solo lector no está escrito: está de
+suerte.** La suite tiene snapshot de bytes, que garantiza que no cambian sin que
+nadie se entere — no que sean correctos para un tercero.
+
+- [ ] **Acrobat Reader** (el estricto). Que abra **sin diálogo de reparación** y
+      sin advertencia de fichero dañado. Si repara, anótalo: reparar es abrir, pero
+      no es estar bien.
+- [ ] **El visor de PDF de Chrome** (el que va a usar la mayoría, porque es el que
+      se abre solo al descargar).
+- [ ] **Un lector ligero** (SumatraPDF, o el visor del sistema). Es el que menos
+      perdona por tener menos código que adivine.
+- [ ] En los tres: **las 4 páginas están**, la numeración corre, y **los acentos y
+      la ñ se ven** («Diagnóstico», «Sudoeste», «línea quebrada», «número de
+      colegiado»). La codificación es WinAnsi con las fuentes estándar, y ahí es
+      donde se rompen los caracteres si algo va mal.
+- [ ] **Buscar texto dentro del PDF** (`Ctrl+F`) y encontrar la referencia
+      catastral. Si el texto no es buscable, el documento es una imagen con letras
+      y no un documento.
+- [ ] **Copiar y pegar** un párrafo del lindero a un editor: tiene que salir el
+      texto, con sus acentos. Es lo que hará quien lo lleve a una escritura o a una
+      instancia — y es, literalmente, el diferenciador que sostiene la fase.
+- [ ] **Las propiedades del documento** (título, fecha de creación): que digan lo
+      que tienen que decir y no «Untitled».
+
+### 10.2 · El plano: ¿se lee? ⟨juicio⟩
+
+El guion sabe que el plano entró (una imagen `/DCTDecode`, 194 kB de cartografía a
+2126 × 1535 px) y que el `toDataURL` no lanzó. **No sabe si se ve nada.**
+
+- [ ] **La parcela se reconoce sobre la cartografía catastral**: el contorno
+      medido, el oficial y la diferencia entre los dos se distinguen a tamaño de
+      papel, no ampliando al 400 %.
+- [ ] **La escala gráfica**: ¿se lee su rótulo? ¿La barra tiene una longitud
+      redonda (10 m, 20 m) o una cifra rara? El reparto lo decide
+      `metrosDeBarra` y se puede ajustar sin tocar nada más.
+- [ ] **El norte**: en UTM el norte de cuadrícula es +Y, o sea una flecha vertical.
+      ¿Se entiende que es «norte de cuadrícula» y no norte geográfico? El rótulo lo
+      dice; la pregunta es si alguien lo lee.
+- [ ] **Las cotas de los lados**: ¿se pisan entre ellas en los lados cortos? En
+      pantalla hay un umbral de píxeles que las esconde (F06); **en el plano del
+      PDF no hay zoom que valga**, así que este es el único sitio donde se ve el
+      resultado final.
+- [ ] **Los números de vértice**: ¿se leen sobre la ortofoto oscura y sobre el
+      asfalto claro? El halo es lo único que los sostiene.
+- [ ] **El pie de atribución** del plano: está por obligación de licencia. ¿Está, y
+      se lee?
+- [ ] Con la parcela de **`?demo=hueco`** (dos recintos): ¿el hueco se entiende
+      como hueco, o parece un error de dibujo?
+
+### 10.3 · En papel ⟨juicio — no hay forma de automatizarlo⟩
+
+- [ ] **Imprímelo en A4.** ¿Los márgenes de la impresora se comen algo? El
+      documento se maqueta a 15 mm por lado y el plano ocupa los 180 mm útiles: es
+      justo el ancho donde una impresora con márgenes generosos recorta.
+- [ ] **En blanco y negro.** El gris de la diferencia y el ámbar de la invasión
+      salen los dos grises. ¿Se sigue distinguiendo lo que dice el texto, o el
+      plano se vuelve ilegible sin color? Si se vuelve ilegible, la salida no es
+      quitar el color: es que el texto no dependa de él.
+- [ ] **Firmado a mano encima del pie de firma**: ¿queda sitio? El pie imprime
+      cuatro campos y «No consta» donde falte alguno; lo que no imprime es un
+      espacio para la rúbrica.
+
+### 10.4 · Lo que no se puede provocar desde el guion ⟨regla de oro 1⟩
+
+**Por qué está aquí.** `/browse` no tiene modo offline ni interceptación de red
+(§9 del GUION), así que la degradación del plano **no se puede provocar** desde el
+guion. Y es la decisión de producto más delicada de la fase: si el WMS no
+contesta, **el informe se compone igual, sin plano**, y se dice por **tres
+canales** —el renglón del diálogo, el panel de avisos y **el propio PDF**—. El
+tercero es el que importa: es el único que sobrevive a que alguien reenvíe el
+fichero.
+
+- [ ] **Modo avión** (o «Offline» en la pestaña Network de las DevTools) y
+      «Componer PDF». Tiene que bajar un PDF **sin plano**, y el PDF tiene que
+      **decirlo en su sitio**, no en una nota al pie que nadie lee. Ábrelo: ¿alguien
+      que reciba ese fichero por correo se entera de que le falta el plano?
+- [ ] ¿El renglón del diálogo y la tarjeta del panel dicen lo mismo, o se
+      contradicen?
+- [ ] Con la red cortada **a mitad de la composición**: el diálogo no se queda
+      colgado, el botón se vuelve a encender y se puede reintentar.
+- [ ] **Una sola capa caída** no es lo mismo que el plano caído: `componerPlano`
+      apaga la capa que no sirva y lo anota bajo el plano. No hay forma cómoda de
+      provocarlo; si alguna vez sale, mira que el aviso **nombre la capa**.
+
+### 10.5 · ⛔ EL PUNTO BLOQUEANTE: ¿alguna frase se lee como un VEREDICTO? ⟨regla de oro 9⟩
+
+**Hereda el carácter del 8.1 y del 9.4, y sube la apuesta.** En F07 el sujeto era
+una parcela; en F08, el trabajo de otro técnico; **aquí es un papel que alguien
+firma y entrega**. El guardián mecánico ya existe —hay un vocabulario prohibido en
+`report/contraste-texto.js` y otro en `test/app/dialogo-informe.dom.test.js`, y el
+guion publica el borrador del lindero entero para que se pueda leer—. Esto es lo
+que queda, y no lo automatiza nadie: **la LECTURA**.
+
+Léelo en voz alta, con el PDF impreso delante y en el papel de quien lo va a
+firmar:
+
+- [ ] El **titular** y el nombre legal: «Informe de contraste con el parcelario
+      catastral». ¿Alguien lo parafrasea como «el informe de que la parcela está
+      bien»? Si la paráfrasis natural es un dictamen, el texto no está haciendo su
+      trabajo.
+- [ ] ¿Se entiende que **esto no es la VGA ni el IVG**? Son un procedimiento y un
+      documento **oficiales del Catastro, con código seguro de verificación**, y el
+      desmentido está escrito arriba del todo — en el diálogo y en el PDF. La
+      pregunta no es si está: es si **se lee antes** de teclear el número de
+      colegiado, o después.
+- [ ] La **tabla a tres bandas**: ¿los signos se entienden («−» = medimos menos)?
+      ¿Alguna cifra parece un aprobado o un suspenso?
+- [ ] ⛔ **LA PRESUNCIÓN DE VÍA PÚBLICA.** Es **el único sitio de toda la
+      aplicación donde se PROPONE en vez de medir**, y está en el párrafo más
+      copiable del documento: *«Linda al Noroeste, en línea quebrada de 9 lados que
+      suman 47,21 m, presumiblemente con vía pública (ninguna parcela catastral
+      colindante alcanza este lindero; dato NO verificado, confirme antes de
+      firmar)»*. Preguntas, y las tres tienen que salir bien:
+      - Con el PDF impreso y **sin haber visto el diálogo**, ¿se entiende que ese
+        tramo **no está medido** y los otros tres sí? ¿O los cuatro se leen igual?
+      - El paréntesis con el desmentido es lo único que lo distingue. **¿Qué pasa
+        si alguien lo borra al maquetar?** El cuadro de edición está para
+        reescribir el texto, así que va a pasar. La aplicación lo previó —la
+        advertencia vive en el DATO (`tramos[].presuncionNoVerificada`) y no en la
+        cadena—, pero **lo que se imprime es lo que quede escrito**. ¿Basta con
+        eso, o el PDF debería marcar el tramo también fuera del párrafo?
+      - La **nota técnica** final lo explica otra vez, y con todas las letras
+        («Esta aplicación no ha consultado el callejero ni el inventario de bienes
+        de dominio público: quien firma tiene que comprobarlo»). ¿Se lee, o es el
+        párrafo gris del final que nadie mira?
+- [ ] El **acuse** del diálogo dice «He repasado los tramos de arriba», no «He
+      verificado». ¿Se entiende la diferencia? La aplicación mide y el colegiado
+      firma; pedirle que jure algo sería invertir esa frase.
+- [ ] El **pie de firma**: los rótulos no presuponen titulación y **no hay ningún
+      desplegable de profesiones**, a propósito (quién puede firmar qué está en
+      disputa jurídica). Léelos: ¿alguno insinúa una profesión? ¿«Colegio» como
+      campo libre desconcierta, o se agradece?
+- [ ] Y la pregunta de cierre, la misma de F07 y F08: **enséñaselo a alguien que no
+      haya visto la app** y pregúntale qué dice el documento. Si la respuesta
+      empieza por «que está bien» o «que está mal», **la fase no se cierra**.
+
+### 10.6 · El diálogo, con teclado y con ojos ⟨juicio⟩
+
+El guion mide que es un modal de verdad (capa superior, fondo inerte, `Escape`,
+foco dentro) y que **tapa el 59,5 % del lienzo** —a propósito: esto no anota la
+cartografía, prepara un documento (Decisión 3 de F09, que rompe la norma «nada de
+modales» de F08 conscientemente)—. Lo que no puede decir es si se trabaja bien
+dentro.
+
+- [ ] **Tabula el formulario entero** con un teclado de verdad, de arriba abajo:
+      encabezado → cuadro del lindero → «Regenerar» → firma → «Componer PDF». ¿El
+      anillo de foco se ve en los tres tipos de control (`input`, `textarea`,
+      `checkbox`)? ¿Se puede componer el PDF **sin ratón**?
+      ⚠️ El guion **no** mide el ciclo de tabulación: mide su consecuencia (el
+      fondo queda inerte). `app/dialogo-informe.js` declara por escrito que **no
+      reimplementa el atrape de foco** porque cuenta con la capa superior. Este es
+      el sitio donde se comprueba que esa apuesta era buena.
+- [ ] **`Escape`** cierra el diálogo y **no** cierra el cajón de debajo — eso lo
+      mide el guion. Lo que aquí se mira es si **sorprende**: cerrar **no borra
+      nada** y volver a abrir devuelve lo tecleado, pero desde fuera un modal que
+      desaparece se lee como «he perdido lo que había escrito». ¿Se nota que no?
+- [ ] **El formulario no cabe entero** (1.336 px de contenido en 790 de caja): hay
+      que hacer scroll. ¿Se ve que hay más abajo, o «Componer PDF» parece no
+      existir hasta que alguien rueda? Es el botón primario de la fase.
+- [ ] **Reescribe el lindero entero** y pulsa «Regenerar el borrador»: se pierde lo
+      escrito, y lo avisa después de hacerlo. ¿Es el orden correcto, o hacía falta
+      preguntar antes?
+- [ ] **Deja campos del pie de firma en blanco.** Se imprimen como «No consta».
+      ¿Se entiende antes de componer, o sorprende al abrir el PDF?
+- [ ] **La casilla «Recordar»**: márcala, compón, cierra el navegador, vuelve.
+      ¿Están los datos? Desmárcala y compón: **tienen que borrarse**.
+- [ ] **En un portátil de 900 px de alto y con la ventana estrecha**: el diálogo
+      declara `min(760px, 100vw − 2·space)` y `max-height: min(88vh, 900px)`.
+      ¿Sigue siendo usable, o hay que rodar por todo?
+
+### 10.7 · El presupuesto de altura, cuarta fase seguida ⟨comprobación⟩
+
+F09 prometió **coste 0 px en el panel** porque su interfaz es un modal y dos
+botones dentro del cajón, y el guion lo confirma: `perdidaImputableAlDialogoPx: 0`.
+
+Pero la primera corrida sacó a la luz una cifra que **no estaba medida y que sí es
+de mirar**: pedir el diagnóstico deja la caja de vértices en **234 px**, porque el
+renglón de colindantes **de F05** crece a dos líneas y se lleva **33 px**. No es un
+defecto —es la regla de oro 1 funcionando— pero es alto real que desaparece.
+
+- [ ] Con el diagnóstico pedido y las 4 colindantes traídas, ¿las **~9 filas** que
+      quedan bastan para trabajar una parcela de 15 vértices? Compáralo con las
+      ~11 de antes de pedirlo.
+- [ ] El renglón «El Catastro ha devuelto 4 colindantes de la parcela …» se queda
+      puesto para siempre. **¿Sigue aportando algo diez minutos después**, o es un
+      acuse de recibo caducado ocupando dos líneas del sitio más caro del panel?
+      Si es lo segundo, la salida no es quitarlo: es que caduque.
+
+---
+
 ## Qué hacer con el resultado
 
 - **Todo conforme** → F03 se marca hecha (`README.md` §Estado y `spec/SPEC.md`).
@@ -1033,6 +1275,40 @@ cuenta dos procedencias, no una). Quien decide si eso basta es una persona.
   `viewer/_comun.js#PANES` y el suscriptor de `app/main.js`; el campo,
   `app/cableado-comprobacion.js`. **Nunca un parche desde otra capa**: es el mismo
   protocolo del punto 1.
+- **El PDF no abre en alguno de los tres lectores (10.1)** → **BLOQUEA F09**, sin
+  matices y sin «pero en Chrome se ve». El escritor es propio y a mano; un
+  documento que depende de las heurísticas de reparación de un visor concreto no
+  es entregable a un cliente ni a una administración. Se arregla en
+  **`report/pdf.js`** (el `xref`, el `trailer`, los diccionarios de fuente, el
+  `/DCTDecode`) con propiedad exclusiva del módulo y **con un caso nuevo en
+  `test/report/pdf.test.js`**, que tiene snapshot de bytes: si el arreglo cambia el
+  fichero, el snapshot lo dirá.
+- **Algo del 10.2, 10.3 o 10.6 no convence** → es presentación o producto. Se anota
+  y se decide; **no bloquea F09**, porque el mecanismo ya está medido por
+  `11-informe-pdf.js`. El cromo del plano vive en `report/canvas.js`
+  (`COLORES_PLANO`, `MEDIDAS_MM`, `metrosDeBarra`), la maqueta y sus márgenes en
+  `report/pdf-parcela.js`, y el diálogo en `estilos/app.css` (tramo de F09) — el
+  tamaño del plano son `ANCHO_PLANO_MM` / `ALTO_PLANO_MM` de
+  `app/cableado-informe.js` y cambiarlos no toca ni una línea de dibujo.
+- **Algo del 10.4 falla** → **bloquea**, y es la regla de oro 1 en su versión más
+  cara: un informe **sin plano que no diga que le falta** es un documento que
+  miente sobre sí mismo, y sobrevive a que alguien lo reenvíe. Se arregla en
+  **`app/cableado-informe.js`** (los tres canales) o en
+  **`report/pdf-parcela.js`** (lo que el PDF declara de sí mismo), nunca
+  cancelando la composición: degradar no es quitar.
+- **Algo del 10.5 se lee como un veredicto** → **BLOQUEA F09**, y es EL punto de la
+  fase, igual que el 8.1 lo era de F07 y el 9.4 de F08. Aquí el sujeto es un papel
+  que alguien firma y entrega a un tercero. **Y con mención expresa a la presunción
+  de vía pública**: es el único sitio de toda la aplicación donde se PROPONE en vez
+  de medir, así que es el único sitio donde una lectura descuidada convierte una
+  hipótesis en un hecho firmado. La salida no es quitar la presunción —es útil y
+  está razonada— ni quitar la cifra: es **rotularla mejor**. Los textos viven en
+  **`report/literal.js`** (el párrafo y su `PRESUNCION`),
+  **`app/dialogo-informe.js`** (el bloque de advertencia y el acuse) y
+  **`report/pdf-parcela.js`** / **`report/firma.js`** (lo que se imprime).
+- **El 10.7 (los 33 px del renglón de colindantes)** → **no bloquea**: es de F05,
+  está medido y la caja sigue en 234 px, muy por encima del umbral de 220. Si se
+  decide que el acuse caduque, el dueño es `app/cableado-catastro.js`.
 
 ## Cuándo repetir esta lista
 
@@ -1073,8 +1349,18 @@ del entorno. El **7.7** se repite además cuando cambie **`viewer/colindantes.js
 o su pane (`viewer/_comun.js#PANES`): el color, el grosor y el emergente de las
 vecinas son juicio visual, y la mecánica la mide el guion 10.
 
+El punto **10** se repite cuando cambie cualquier texto que acabe **impreso**:
+`report/literal.js` (el lindero y su presunción), `report/firma.js` (los rótulos
+del encabezado y del pie), `report/pdf-parcela.js` (lo que el documento declara de
+sí mismo) y `app/dialogo-informe.js` (lo que se lee antes de firmar) — el 10.5 es
+sobre la LECTURA, y la lectura cambia con cada palabra. El **10.1** se repite
+además **con cada cambio de `report/pdf.js`** y **con cada versión nueva de
+cualquiera de los tres lectores**: la compatibilidad de un PDF escrito a mano no es
+de la app, es del entorno. El **10.3**, con cada impresora distinta. Los
+disparadores del mecanismo son los de `11-informe-pdf.js` (`GUION.md` §8 y §17).
+
 ⛔ **Y toda la lista, ahora.** Se recorrió el 2026-08-02, salieron **tres defectos
 reales** (encabezado del punto 9), se corrigieron los tres y **la lista no llegó a
 firmarse**. Hay que volver a recorrerla entera con las correcciones puestas: es la
 propia regla de esta sección, y esta vez con el motivo delante. La cadena
-bloqueada sigue siendo F03 → F05 → F06 → F07 → F08.
+bloqueada es **F03 → F05 → F06 → F07 → F08 → F09**.

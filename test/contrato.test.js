@@ -209,10 +209,24 @@ describe('contrato F08 · comprobación e informe salen por el barrel; la ENTREG
     expect(informe).toContain('QUÉ SE LEYÓ DEL FICHERO')
   })
 
-  it('el barrel NO expone viewer, services ni app (window/document/File)', () => {
+  it('el barrel NO expone viewer, services, app ni storage', () => {
     // `app/` es el tercero de la lista desde F08: `app/cableado-comprobacion.js` y
     // `app/zona-fichero.js` nombran `document`, `File` y los oyentes de la ventana.
-    for (const prohibido of ['viewer', 'services', 'app']) {
+    //
+    // `storage/` es el cuarto, y entra en la lista en F09 (T5.2) por un motivo
+    // DISTINTO que merece decirse: no es que explote, es que no explotaría. Los
+    // tres primeros se autoprotegen —importarlos aquí revienta el fichero entero
+    // por falta de `window`—, mientras que `storage/bd.js`, `storage/pie-firma.js`
+    // y `storage/cache-catastro.js` se importan tan ricamente bajo el proyecto
+    // `node`: leen `globalThis.indexedDB` al LLAMAR, como valor por defecto de un
+    // parámetro, no al cargar (lo declara la cabecera de `storage/bd.js` y lo
+    // demuestra `test/storage/bd.test.js`, que corre sin jsdom). Meter `storage/`
+    // en el barrel dejaría la suite en VERDE. Es un error de capas —el barrel raíz
+    // es superficie de DOMINIO y `storage/` es un adaptador de entorno—, la
+    // decisión ya estaba escrita en esa cabecera («QUÉ NO ENTRA EN EL BARREL
+    // RAÍZ»), y esta línea es lo único que la vuelve comprobable. Una regla que
+    // solo se sostiene cuando romperla revienta no es una regla.
+    for (const prohibido of ['viewer', 'services', 'app', 'storage']) {
       expect(Object.keys(barrel), `el barrel no puede exponer '${prohibido}'`).not.toContain(
         prohibido,
       )
@@ -224,7 +238,21 @@ describe('contrato F08 · comprobación e informe salen por el barrel; la ENTREG
     // Se comprueba sobre TODOS los espacios y no solo sobre `gml`, porque el sitio
     // por el que se colaría hoy es `report/` — que produce el texto que ese módulo
     // entrega— y no la rama en la que vive el fichero.
-    const entrega = ['descargarTexto', 'descargarGml', 'nombreFicheroGml', 'MOTIVO_NO_DESCARGADO']
+    //
+    // `descargarBinario` (F09 · T5.1) es el que entrega los BYTES del PDF, así que
+    // es el que cierra el círculo del que habla la cabecera de este bloque: quien
+    // acaba de exportar `informePdfParcela` por el barrel tiene la mano puesta
+    // sobre él. Está en la lista aunque **puede que todavía no exista**: esto es
+    // una lista de nombres PROHIBIDOS, no de nombres que deban existir, y
+    // prohibirlo antes de que exista es la única forma de que el guardián llegue
+    // antes que el error en vez de después.
+    const entrega = [
+      'descargarTexto',
+      'descargarGml',
+      'descargarBinario',
+      'nombreFicheroGml',
+      'MOTIVO_NO_DESCARGADO',
+    ]
     for (const [espacio, contenido] of Object.entries(barrel)) {
       for (const nombre of entrega) {
         expect(
@@ -236,23 +264,209 @@ describe('contrato F08 · comprobación e informe salen por el barrel; la ENTREG
     }
   })
 
-  it('el FUENTE del barrel no importa ninguna de las cuatro fronteras', () => {
+  it('el FUENTE del barrel no importa ninguna de las fronteras', () => {
     // Mitad ESTÁTICA, y no es redundante con las de arriba: un módulo de `app/` que
     // solo nombrara `document` DENTRO de una función se importaría sin lanzar, y el
     // barrel quedaría roto en producción y verde aquí. El mismo criterio que la
     // guarda de proj4 de más abajo.
+    //
+    // F09 añade `storage/` a las capas vetadas (ver el test de arriba: esa es la
+    // que NO se autoprotege) y DOS FICHEROS POR SU NOMBRE, que son los dos módulos
+    // impuros que estrena la feature y los únicos de sus capas que caerían dentro
+    // de una regla por directorio:
+    //   · `report/canvas.js` — `document.createElement('canvas')`, `Image` y
+    //     `toBlob`, más las descargas al WMS. Es el `gml/descargar.js` de `report/`,
+    //     y su capa entera SÍ sale por el barrel, así que la regla por directorio
+    //     no lo cubre: hay que nombrarlo.
+    //   · `app/dialogo-informe.js` — lo cubre `^\./app/`, y se nombra igual porque
+    //     es el fichero concreto que alguien intentaría exportar «para que el
+    //     cableado lo importe bonito», que es la tentación que el resto de la
+    //     cabecera de este bloque describe.
     const fuente = readFileSync(fileURLToPath(new URL('../index.js', import.meta.url)), 'utf8')
     const imports = [...fuente.matchAll(/(?:^|\n)[ \t]*export\s+\*[^\n]*from\s+['"]([^'"]+)['"]/g)].map(
       (m) => m[1],
     )
     expect(imports.length, 'no se ha leído ni un `export * as … from` del barrel').toBeGreaterThan(0)
-    const infractores = imports.filter((ruta) =>
-      /^\.\/(?:viewer|services|app)\//.test(ruta) || ruta === './gml/descargar.js',
+    const VETADOS = ['./gml/descargar.js', './report/canvas.js', './app/dialogo-informe.js']
+    const infractores = imports.filter(
+      (ruta) => /^\.\/(?:viewer|services|app|storage)\//.test(ruta) || VETADOS.includes(ruta),
     )
     expect(
       infractores,
-      'el barrel raíz no puede reexportar viewer/, services/, app/ ni gml/descargar.js',
+      'el barrel raíz no puede reexportar viewer/, services/, app/, storage/, ' +
+        'gml/descargar.js, report/canvas.js ni app/dialogo-informe.js',
     ).toEqual([])
+  })
+})
+
+// ── Test-guardián del barrel raíz tras F09 (T5.2) ────────────────────────────
+// F09 convierte `report/` de UN FICHERO en UNA CAPA: siete módulos, de los que
+// SEIS son puros y entran (`encuadre`, `literal`, `firma`, `pdf`, `pdf-parcela` y
+// el `contraste-texto` de F08) y UNO no —`report/canvas.js`, que crea un
+// `<canvas>`, descarga teselas del WMS y saca el JPEG con `toBlob`—. El octavo
+// módulo de la feature, `app/dialogo-informe.js`, es una vista y ya lo cubre la
+// prohibición de `app/`, pero se nombra igual porque es el que más cerca está de
+// colarse. El espacio `report` deja de apuntar a un fichero y pasa a apuntar a
+// `report/index.js`, con el precedente y las decisiones de `gml/index.js`. De
+// `geo/` entran además `bbox` y `rumbo`, que son de donde `report/` saca la caja
+// envolvente y los cardinales.
+//
+// Las tres reglas transversales —capas prohibidas, la ENTREGA, y la mitad
+// ESTÁTICA sobre el fuente— NO se reescriben aquí: viven AMPLIADAS en el bloque de
+// F08 de arriba, con `storage`, con `descargarBinario` y con los dos ficheros
+// impuros de esta feature. Dos listas de prohibiciones en el mismo fichero acaban
+// discrepando, y la que se olvide de actualizar es justo la que protege.
+//
+// Momento de riesgo previsto: el mismo que en F08, un piso más arriba. Ahora el
+// barrel expone `informePdfParcela`, que devuelve BYTES; el paso «natural» que
+// alguien querrá dar es exportar también quien los entrega (`descargarBinario`, de
+// `gml/descargar.js`) o quien compone el plano que va dentro (`componerPlano`, de
+// `report/canvas.js`). Los dos están prohibidos por su nombre, y el segundo aquí.
+describe('contrato F09 · la capa del informe sale por el barrel; el plano y el diálogo no', () => {
+  const RAIZ_REPO = fileURLToPath(new URL('..', import.meta.url))
+
+  /**
+   * El instante del documento, INYECTADO. Ni un módulo de `report/` consulta el
+   * reloj —lo declaran las cinco cabeceras—, así que esta fecha tiene que
+   * reaparecer literalmente en el identificador del informe. Es lo que convierte
+   * «no lee el reloj» en algo comprobable en vez de en una promesa de comentario.
+   */
+  const FECHA = new Date(Date.UTC(2026, 7, 2, 10, 0, 0))
+
+  it('el barrel expone las cinco funciones puras de la capa del informe', () => {
+    // Una por contrato del plan de F09: A el encuadre, C el lindero, D el
+    // encabezado, y `informePdfParcela` el documento. `informeContrasteTexto` sigue
+    // saliendo por el mismo nombre que en F08 —el espacio `report` cambió de fichero
+    // a capa y esa mudanza no se puede notar desde fuera—, y se comprueba aquí
+    // además de en el bloque de arriba precisamente por eso.
+    expect(typeof barrel.report.encuadrar).toBe('function')
+    expect(typeof barrel.report.describirLindero).toBe('function')
+    expect(typeof barrel.report.componerEncabezado).toBe('function')
+    expect(typeof barrel.report.informePdfParcela).toBe('function')
+    expect(typeof barrel.report.informeContrasteTexto).toBe('function')
+    // Y las dos de `geo/` que entran con ellas: `report/encuadre.js` encuadra con
+    // la primera y `report/literal.js` nombra los cardinales con la segunda.
+    expect(typeof barrel.bbox.bbox).toBe('function')
+    expect(typeof barrel.rumbo.azimut).toBe('function')
+  })
+
+  it('y la cadena entera FUNCIONA sin DOM sobre el fichero real, con la fecha inyectada', () => {
+    // La mitad anti-vacuidad, que es la que de verdad protege: `typeof x ===
+    // 'function'` seguiría en verde con un módulo cuyo grafo de imports tocara
+    // `window` en la primera llamada, y un guardián que solo comprueba que las
+    // claves existen está a un import de volverse mentira. Aquí se recorre la
+    // cadena natural de F09 —fichero → geometría → encuadre → lindero → encabezado
+    // → PDF— dentro del proyecto `node`, que corre sin `window`, sin `document` y
+    // sin `Blob`, y se termina en unos bytes que empiezan por `%PDF`.
+    const texto = readFileSync(
+      join(RAIZ_REPO, 'test/fixtures/gml/cp_parcela_9398516VK3799G.gml'),
+      'utf8',
+    )
+    const { parcelas } = barrel.gml.parsearGml(texto)
+    const parcela = parcelas[0]
+    expect(parcela.recintos.length).toBeGreaterThan(0)
+
+    // Contrato A. Se afirma sobre él y no solo se pasa adelante: el encuadre es la
+    // única pieza de la cadena cuyo consumidor natural —`report/canvas.js`— es
+    // justamente el módulo impuro que NO puede correr aquí, así que sin estas dos
+    // líneas entraría de adorno. La escala es la que se rotula en el papel y `toPx`
+    // el mapeo con el que se dibuja el vector sobre la cartografía.
+    const encuadre = barrel.report.encuadrar({
+      recintos: parcela.recintos,
+      anchoMm: 180,
+      altoMm: 130,
+    })
+    expect(Number.isInteger(encuadre.escalaDenominador)).toBe(true)
+    expect(encuadre.escalaDenominador).toBeGreaterThan(0)
+    const [px, py] = encuadre.toPx(parcela.recintos[0].vertices[0])
+    expect(px).toBeGreaterThanOrEqual(0)
+    expect(px).toBeLessThanOrEqual(encuadre.anchoPx)
+    expect(py).toBeGreaterThanOrEqual(0)
+    expect(py).toBeLessThanOrEqual(encuadre.altoPx)
+
+    // Contrato C. Sin vecinas: `null` significa «no se han consultado», que es la
+    // verdad aquí —este bloque no habla por la red— y no es lo mismo que `[]`.
+    const literal = barrel.report.describirLindero({ recintos: parcela.recintos })
+    expect(literal.tramos.length).toBeGreaterThan(0)
+    expect(literal.texto).toContain('Linda al ')
+    expect(literal.vecinasConsultadas).toBe(false)
+
+    // Contrato D. Sin descriptivos, que tampoco se pueden consultar sin red.
+    const encabezado = barrel.report.componerEncabezado({
+      refcat: parcela.refcat,
+      srs: parcela.srs,
+      fecha: FECHA,
+      idDocumento: null,
+    })
+    // El identificador se compone con la fecha RECIBIDA. Que lleve dentro el
+    // 2026-08-02T10:00:00Z y no el instante de la ejecución es la prueba de que
+    // ningún eslabón ha ido a buscar el reloj por su cuenta: si alguno lo hiciera,
+    // esta línea se pondría roja al día siguiente y no dentro de un año.
+    expect(encabezado.idDocumento).toContain('20260802')
+    expect(encabezado.idDocumento).toContain('100000Z')
+    expect(barrel.report.esIdDocumento(encabezado.idDocumento)).toBe(true)
+
+    // Y el documento. `plano: null` es legítimo y es lo único posible aquí: el
+    // plano lo compone `report/canvas.js`, que es la mitad de `report/` que se
+    // queda fuera del barrel — el informe sale diciendo que no lo lleva, que es
+    // exactamente lo que tiene que hacer.
+    const informe = barrel.report.informePdfParcela({
+      diagnostico: diagnosticar({ recintos: parcela.recintos }),
+      encabezado,
+      parcela,
+      literal,
+      encuadre,
+      plano: null,
+    })
+    expect(informe.bytes).toBeInstanceOf(Uint8Array)
+    expect(informe.bytes.length).toBeGreaterThan(0)
+    expect(String.fromCharCode(...informe.bytes.slice(0, 4))).toBe('%PDF')
+    expect(informe.nPaginas).toBeGreaterThan(0)
+    // El identificador del encabezado viaja hasta el papel y hasta el nombre del
+    // fichero: un documento firmable con dos identidades no serviría de nada.
+    expect(informe.idDocumento).toBe(encabezado.idDocumento)
+    expect(informe.nombreFichero).toContain(encabezado.idDocumento)
+  })
+
+  it('el PLANO y el DIÁLOGO no salen por ningún espacio del barrel', () => {
+    // Espejo exacto de la regla de la ENTREGA del bloque de F08, para las dos
+    // piezas impuras que estrena F09. Se comprueba sobre TODOS los espacios y no
+    // solo sobre `report`, por el mismo motivo que allí: el sitio por el que se
+    // colaría no tiene por qué ser la rama en la que vive el fichero.
+    //   · `componerPlano` (`report/canvas.js`) necesita `document.createElement`,
+    //     `Image` y `toBlob`, y además descarga teselas del WMS. Es la única
+    //     función de toda la capa `report/` que hace las dos cosas prohibidas.
+    //   · `crearDialogoInforme` (`app/dialogo-informe.js`) fabrica nodos: es una
+    //     vista, y las vistas no son superficie del motor.
+    const impuros = ['componerPlano', 'crearDialogoInforme']
+    for (const [espacio, contenido] of Object.entries(barrel)) {
+      for (const nombre of impuros) {
+        expect(
+          Object.keys(contenido),
+          `el espacio '${espacio}' expone '${nombre}': toca el DOM (y el plano, además, ` +
+            `la red) y el barrel lo carga el proyecto Vitest 'node', sin document ni Image`,
+        ).not.toContain(nombre)
+      }
+    }
+  })
+
+  it('el escritor de PDF genérico tampoco sale: la capa publica el INFORME, no la imprenta', () => {
+    // Decisión 3 de `report/index.js`, y es el calco de por qué `gml/index.js` deja
+    // fuera `gml/xml.js`. `crearDocumentoPdf` es puro y podría salir sin romper
+    // nada: no está fuera por miedo, está fuera porque publicarlo invita a componer
+    // informes A MANO por fuera de `informePdfParcela` —donde viven el nombre legal
+    // del documento, la ausencia de siglas oficiales, la numeración de páginas y la
+    // regla de oro 9—, que es justo lo que ese módulo existe para impedir. Quien
+    // necesite la imprenta importa `report/pdf.js` directamente.
+    expect(Object.keys(barrel.report)).not.toContain('crearDocumentoPdf')
+    // Y el espacio `report` es la CAPA, no un fichero: si alguien deshiciera la
+    // unificación volviendo a apuntar a `contraste-texto.js`, esto lo diría.
+    for (const nombre of ['encuadrar', 'describirLindero', 'componerEncabezado']) {
+      expect(
+        Object.keys(barrel.report),
+        `el espacio 'report' ya no puede ser UN fichero: le falta '${nombre}'`,
+      ).toContain(nombre)
+    }
   })
 })
 

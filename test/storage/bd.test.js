@@ -32,11 +32,13 @@
  *    la versión honesta de «otro proceso». Nada de exportar un `reiniciarBd()`  *
  *    que solo existiría para los tests.                                         *
  *                                                                              *
- * 3. LA ESCALERA SE PRUEBA CON PELDAÑOS SINTÉTICOS. Hoy `MIGRACIONES` tiene un  *
- *    solo peldaño, y con uno solo NINGUNA prueba puede distinguir `<` de `===`. *
- *    Por eso `aplicarMigraciones` recibe la escalera por parámetro y aquí se le *
- *    pasa una de tres peldaños: es la única forma de que cambiar el operador    *
- *    ponga algo rojo HOY, y no dentro de un año, cuando F10 añada la versión 2. *
+ * 3. LA ESCALERA SE PRUEBA CON PELDAÑOS SINTÉTICOS. Cuando se escribió esto,    *
+ *    `MIGRACIONES` tenía un solo peldaño, y con uno solo NINGUNA prueba puede   *
+ *    distinguir `<` de `===`. Por eso `aplicarMigraciones` recibe la escalera   *
+ *    por parámetro y aquí se le pasa una de tres peldaños. Desde F09 la real    *
+ *    tiene dos —el almacén del pie de firma— y el salto 0 → 2 ya distingue los  *
+ *    operadores por sí solo; la sintética se conserva porque sigue siendo la    *
+ *    única forma de ejercitar los saltos que la escalera de hoy no permite.     *
  *                                                                              *
  * 4. SE DICE LO QUE `fake-indexeddb` NO PUEDE. Ver el bloque de límites justo   *
  *    debajo: hay una parte del ciclo multipestaña que esta implementación no    *
@@ -44,16 +46,19 @@
  *                                                                              *
  * ── LÍMITES MEDIDOS DE `fake-indexeddb` FRENTE AL NAVEGADOR REAL ──            *
  *                                                                              *
- * · `blocked` REAL es HOY INALCANZABLE, y no por culpa de `fake-indexeddb`:     *
+ * · `blocked` REAL es INALCANZABLE AQUÍ, y no por culpa de `fake-indexeddb`:    *
  *   ese evento solo se dispara cuando una apertura pide una versión MAYOR que   *
- *   la instalada y hay otra conexión abierta. Como `VERSION_BD` vale 1 (hay una *
- *   sola migración), `abrirBd` nunca pide un ascenso y nunca puede ser          *
- *   bloqueada. Lo que se prueba aquí es EL CABLEADO —que el módulo escucha      *
- *   `blocked` y lo lleva al canal `Avisar` con `NIVEL.AVISO`—, despachando un   *
- *   `IDBVersionChangeEvent('blocked')` sobre la petición real. El día que F10   *
- *   añada la versión 2 el ciclo entero pasa a ser reproducible y esta prueba    *
- *   seguirá valiendo sin tocarla. El ciclo REAL de dos pestañas —dos contextos  *
- *   de navegación distintos compartiendo origen— no lo reproduce ningún proceso *
+ *   la instalada Y hay otra conexión abierta con la vieja. En este fichero cada *
+ *   prueba estrena su propia `IDBFactory`, así que siempre se entra por         *
+ *   `oldVersion === 0` y no hay nadie a quien bloquear. (Cuando se escribió     *
+ *   esto había una razón adicional —`VERSION_BD` valía 1 y `abrirBd` no pedía   *
+ *   ascenso nunca—; desde F09 la escalera tiene dos peldaños y el ascenso 1 → 2 *
+ *   SÍ existe: lo ejercita `test/storage/pie-firma.test.js`, que fabrica a mano *
+ *   una base de la versión 1 y la abre con la de hoy.) Lo que se prueba aquí es *
+ *   EL CABLEADO —que el módulo escucha `blocked` y lo lleva al canal `Avisar`   *
+ *   con `NIVEL.AVISO`—, despachando un `IDBVersionChangeEvent('blocked')` sobre *
+ *   la petición real. El ciclo REAL de dos pestañas —dos contextos de           *
+ *   navegación distintos compartiendo origen— no lo reproduce ningún proceso    *
  *   de Node: eso es materia del guion de humo en navegador.                     *
  * · `blocking` (nuestro `versionchange`) y la terminación anormal (`close`, vía *
  *   `forceCloseDatabase`) SÍ son reproducibles y aquí se ejercitan DE VERDAD,   *
@@ -440,9 +445,10 @@ describe('storage/bd · una sola conexión por proceso (criterio 5)', () => {
 describe('storage/bd · blocked/blocking/terminated van al canal Avisar (criterio 6)', () => {
   it('`blocked` llega al avisador con NIVEL.AVISO y un mensaje presentable', async () => {
     // Ver el bloque de límites de la cabecera: el evento se despacha a mano sobre
-    // la petición REAL porque con `VERSION_BD === 1` una apertura nuestra no
-    // puede ser bloqueada por nadie. Lo que se comprueba es el CABLEADO: que el
-    // módulo escucha `blocked` y lo cuenta, en vez de esperar en silencio.
+    // la petición REAL porque aquí la fábrica se estrena en cada prueba, así que
+    // se entra por `oldVersion === 0` y no hay ninguna conexión vieja que nos
+    // pueda bloquear. Lo que se comprueba es el CABLEADO: que el módulo escucha
+    // `blocked` y lo cuenta, en vez de esperar en silencio.
     const modulo = await moduloFresco()
     const fabrica = fabricaEspia(new IDBFactory())
     const avisos = vi.fn()

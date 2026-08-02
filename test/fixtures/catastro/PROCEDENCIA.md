@@ -20,6 +20,19 @@ la cifra de «3.600/h» que circula en el plan v4 **no está respaldada** por ni
 oficial y no se cita). Fueron 8 peticiones en total. Si alguien necesita rehacer una captura,
 que rehaga **esa**, no la tanda.
 
+**Segunda tanda, el 2026-08-02 (F09), 5 peticiones.** Mismo método: `curl`, secuenciales, una
+sola petición por caso, sin bucles ni reintentos, con el `User-Agent` por defecto de `curl` y
+sin ninguna cabecera añadida. Son las **tres** fichas `ovc-dnprc-*` de más abajo (3 peticiones:
+la urbana, la rústica y la fallida que destapó la trampa del nombre del parámetro), la
+`Consulta_RCCOOR` con la que se **encontró** la parcela rústica (1, no versionada: ver «Huecos
+declarados») y una lectura de metadata `?singleWsdl` (1, tampoco versionada). Cinco, contadas.
+
+> La tercera ficha `ovc-dnprc-*` —la del `cod:"17"`— **se versionó como fichero el 2026-08-02,
+> en la tarea T2.3**, sin volver a pedir nada: su cuerpo entero ya estaba transcrito literal en
+> este documento, y el fichero se escribió **desde esa transcripción**. Que su SHA-256 coincida
+> con el publicado (`76059b09…`) es la prueba de que la transcripción era fiel byte a byte. No es
+> una petición más: es la misma, guardada.
+
 La URL exacta de cada fichero está en su sección. Reproducibles tal cual.
 
 ## Cinco hechos transversales, medidos en las 8 respuestas
@@ -87,6 +100,24 @@ No convierte la frase de la spec en falsa —puede haber sido cierta antes, o se
 endpoint—, pero sí la deja **sin respaldo medido**, y ese es el estándar de esta carpeta. Lo
 que **no** cambia es el override O8: *no rotar* `User-Agent`. Son dos cosas distintas —mandar
 uno fijo y creíble frente a ir cambiándolo— y la segunda es la que el Catastro sanciona.
+
+**Corroborados el 2026-08-02** por las 5 peticiones de la tanda de F09, todas contra
+`COVCCallejero.svc` (servicio hermano del ya medido, misma máquina): las 5 dieron **HTTP 200**
+—incluida la que llevaba mal el nombre de un parámetro— con `Content-Type: application/json;
+charset=utf-8` y `Access-Control-Allow-Origin: *`. Los hechos 1 y 2 valen, pues, también para
+`Consulta_DNPRC`. Latencias: 0,136 s (la fallida), 0,357 s (`Consulta_RCCOOR` rural), 0,466 s
+(`?singleWsdl`), **0,966 s** (DNPRC urbana, 18 inmuebles) y 0,339 s (DNPRC rústica). Ninguna
+llegó a los 2,9 s del peor caso de julio, pero el hecho 3 sigue en pie: el rango de este
+endpoint no está acotado en décimas.
+
+⚠️ **Matiz honesto sobre el CORS, que hay que leer antes de dar F09 por seguro.** Ninguna de
+estas 5 peticiones llevó cabecera `Origin` — igual que las 8 de julio. Lo que sí se puede
+afirmar, y es más de lo que decía la nota anterior: el servidor emitió
+`Access-Control-Allow-Origin: *` **aun sin `Origin` en la petición**, lo cual descarta que esté
+*reflejando* el origen del cliente y apunta a una cabecera fija de configuración. Sigue sin
+haber `Access-Control-Allow-Headers` ni `-Methods`: solo la petición **simple** está respaldada
+por medición, y las dos consecuencias del hecho 2 (no añadir cabeceras propias, no usar
+`credentials: 'include'`) se aplican igual a `Consulta_DNPRC`.
 
 ---
 
@@ -390,6 +421,278 @@ Y, otra vez: **HTTP 200**. La URL está mal construida, el servicio lo sabe, lo 
 
 ---
 
+# `Consulta_DNPRC` — los datos alfanuméricos de la parcela (F09)
+
+Las dos fichas siguientes son de **otro servicio**: `COVCCallejero.svc`, no `COVCCoordenadas.svc`.
+Es el que da lo que el informe de F09 necesita en su encabezado —municipio, paraje,
+polígono/parcela— y que la geometría del WFS **no trae**.
+
+> ⚠️ **El envoltorio de este servicio se llama `consulta_dnprcResult`, TODO EN MINÚSCULAS.**
+> El del servicio hermano se llama `Consulta_RCCOORResult`, con la caja del nombre de la
+> operación. Son la misma casa, la misma máquina y la misma tanda de medición, y **no siguen la
+> misma convención**. La operación se pide como `Consulta_DNPRC` (así, en la URL) y contesta en
+> minúsculas. Cualquier código que derive la clave del envoltorio a partir del nombre de la
+> operación —`` `${op}Result` ``— funciona con RCCOOR y falla con DNPRC. Medido en las dos
+> fichas de abajo y también en la respuesta de error.
+
+## `ovc-dnprc-urbana-9398516VK3799G.json` — LA PARCELA DE REFERENCIA NO DEVUELVE `bico`
+
+| | |
+|---|---|
+| Origen | OVC Callejero, `Consulta_DNPRC` (endpoint WCF/JSON) |
+| URL | `https://ovc.catastro.meh.es/OVCServWeb/OVCWcfCallejero/COVCCallejero.svc/json/Consulta_DNPRC?Provincia=&Municipio=&RefCat=9398516VK3799G` |
+| Descargado | 2026-08-02 |
+| HTTP | 200 OK · `application/json; charset=utf-8` · `Access-Control-Allow-Origin: *` · 0,966 s |
+| SHA-256 | `9dd04f1ec1a4434b787f04ba79d8d39fd24b05986f9c3d60c2d515a8008bc294` (6.817 B) |
+| Finales de línea | ninguno: el cuerpo viene en una sola línea, sin `\n` final |
+
+Es la parcela `9398516VK3799G`, la misma que recorre toda la suite y la misma de `../gml/`.
+
+### La trampa de entrada: el parámetro se llama `RefCat`, no `RC`
+
+**Primero se pidió con `…&RC=9398516VK3799G`.** El servicio contestó **HTTP 200** con:
+
+```json
+{"consulta_dnprcResult":{"control":{"cuerr":1},"lerr":[{"cod":"17","des":"LA REFERENCIA CATASTRAL ES OBLIGATORIA"}]}}
+```
+
+(117 B, SHA-256 `76059b090fce8a53c3c8b071a44cf477a998d0d36931b17e087e6e1463c52a3f`. **Desde el
+2026-08-02 tiene fichero propio**: [`ovc-dnprc-cod17.json`](ovc-dnprc-cod17.json), con su ficha
+más abajo. El cuerpo se queda aquí igualmente, literal, porque es el que explica esta trampa.)
+
+**«ES OBLIGATORIA» — de una referencia catastral que iba en la petición.** Es el tercer caso del
+mismo patrón que ya documentan `ovc-rccoor-cod16.json` y `ovc-rccoor-cod76.json`: *el servicio
+informa de un fallo NUESTRO con el vocabulario de un dato que falta*. Un lector ingenuo lo
+traduce a «esa referencia no existe» o «el usuario no ha escrito nada», y lo que pasa de verdad
+es que **el parámetro está mal escrito y falla el 100% de las peticiones**.
+
+El nombre bueno no se adivinó: se leyó del **esquema del propio servicio**
+(`COVCCallejero.svc?singleWsdl`), donde el mensaje `Consulta_DNPRC_In` declara exactamente tres
+partes:
+
+| Parte | Tipo |
+|---|---|
+| `Municipio` | `xs:string` |
+| `Provincia` | `xs:string` |
+| **`RefCat`** | `xs:string` |
+
+`Provincia` y `Municipio` van **vacíos** y la consulta funciona igual: con la referencia
+completa de 14 caracteres el servicio no los necesita. Los tres son `minOccurs="0"`.
+
+### Qué congela: **con varios inmuebles NO hay `bico`, hay `lrcdnp`** — y no es el caso raro
+
+Claves de primer nivel medidas: **`control` y `lrcdnp`. No hay `bico`.** La parcela de
+referencia del proyecto es un edificio con **18 inmuebles** (`control.cudnp` = 18, y el array
+`lrcdnp.rcdnp` tiene 18 elementos: contados, coinciden).
+
+> Esto invierte la intuición. `bico` («bien inmueble con construcciones») parece el caso normal
+> y `lrcdnp` la lista excepcional. En la parcela que este proyecto usa **de referencia para
+> todo**, el caso es `lrcdnp`. Cualquier cliente que lea `…Result.bico.bi.dt.nm` para sacar el
+> municipio obtiene `undefined` justo en la parcela de la suite.
+
+Las dos ramas son **excluyentes** y se distinguen por qué clave existe:
+
+| Rama | Cuándo | Dónde está cada inmueble |
+|---|---|---|
+| `bico` | **un** inmueble | `consulta_dnprcResult.bico.bi` (objeto) |
+| `lrcdnp` | **varios** inmuebles | `consulta_dnprcResult.lrcdnp.rcdnp[i]` (array) |
+
+Y no son la misma forma con distinta cardinalidad — **traen campos distintos**:
+
+| | `bico.bi` | `lrcdnp.rcdnp[i]` |
+|---|---|---|
+| Claves | `idbi`, `dt`, `ldt`, `debi` | `rc`, `dt`, `debi` |
+| La RC cuelga de | `bi.idbi.rc` | `rcdnp.rc` (**un nivel menos**) |
+| `cn` (`'UR'`/`'RU'`) | **sí**, en `bi.idbi.cn` | **NO EXISTE** |
+| `ldt` (domicilio compuesto) | **sí** | **NO EXISTE** |
+| Hermanos (`finca`, `lcons`, `lspr`) | sí, en `bico` | **NO EXISTEN** |
+
+Dos consecuencias que hay que tener escritas antes de programar nada:
+
+1. **En la rama `lrcdnp` no se puede saber si la parcela es urbana o rústica**: el discriminante
+   `cn` solo existe en `bico`. Quien lo necesite, lo deduce de la propia referencia catastral o
+   de qué subárbol de `locs` viene (`lous` vs `lors`, ver la ficha siguiente).
+2. **En la rama `lrcdnp` no hay ningún domicilio ya montado.** `ldt` —el campo que
+   `Consulta_RCCOOR` sí da y del que depende `services/_catastro-ovc.js` para que el usuario
+   elija— **no aparece ni una vez** en este fichero de 6,8 kB. Hay que componerlo desde `dt`.
+
+Excerpt del primer inmueble (el fichero trae 18 así):
+
+```json
+{"rc":{"pc1":"9398516","pc2":"VK3799G","car":"0001","cc1":"A","cc2":"Y"},"dt":{"loine":{"cp":"28","cm":"79"},"cmc":"900","np":"MADRID","nm":"MADRID","locs":{"lous":{"lourb":{"dir":{"cv":"8822","tv":"CL","nv":"SAN RESTITUTO","pnp":"72","plp":"C"},"loint":{"pt":"-1"},"dp":"28039","dm":"9"}}}},"debi":{"luso":"Almacen-Estacionamiento","sfc":"505","cpt":"8,200000","ant":"1997"}}
+```
+
+Lo que hay que saber de ahí:
+
+1. **La RC de este servicio tiene CINCO trozos, no dos.** `pc1`(7) + `pc2`(7) + `car`(4) +
+   `cc1`(1) + `cc2`(1) = **20 caracteres**: es la referencia del **inmueble**, no la de la
+   parcela. `Consulta_RCCOOR` solo daba `pc1`+`pc2` = 14. Los 14 de parcela son idénticos en
+   los 18 inmuebles (comprobado: `pc1+pc2` toma un solo valor); lo que cambia es `car`.
+2. **`cc1`+`cc2` NO es un identificador único.** Son dígitos de control y se repiten dentro de
+   la misma parcela: medido, `JS`, `KD` y `LF` salen **dos veces cada uno** entre los 18. El
+   único discriminante es `car` (`0001`…`0018`).
+3. **Hay DOS códigos de municipio y no valen lo mismo.** `dt.loine.cm` = `"79"` (código INE) y
+   `dt.cmc` = `"900"` (código DGC del Catastro). Para Madrid son **79 y 900**. Confundirlos da
+   un municipio que no existe.
+4. **Los códigos vienen SIN CEROS A LA IZQUIERDA.** `loine.cm` es `"79"`, no `"079"`: el código
+   INE de Madrid es `28079`, y para reconstruirlo hay que rellenar a 3 (`cp` a 2). En la ficha
+   siguiente el mismo campo vale `"5"` para el municipio INE `005`.
+5. **`debi.cpt` lleva COMA decimal dentro de la cadena**: `"8,200000"`. `Number("8,200000")` es
+   `NaN`. El servicio hermano daba `"439242.88"` con **punto**. Misma familia de servicios, dos
+   separadores decimales distintos, y ninguno de los dos avisa.
+6. **Todo son cadenas menos los contadores de `control`**, que son números (`cudnp: 18`, sin
+   comillas). El resto —superficies, años, códigos— es texto.
+
+## `ovc-dnprc-rustica-13005A10900005.json` — DONDE VIVEN EL POLÍGONO, LA PARCELA Y EL PARAJE
+
+| | |
+|---|---|
+| Origen | OVC Callejero, `Consulta_DNPRC` sobre una parcela **rústica** |
+| URL | `https://ovc.catastro.meh.es/OVCServWeb/OVCWcfCallejero/COVCCallejero.svc/json/Consulta_DNPRC?Provincia=&Municipio=&RefCat=13005A10900005` |
+| Descargado | 2026-08-02 |
+| HTTP | 200 OK · `application/json; charset=utf-8` · `Access-Control-Allow-Origin: *` · 0,339 s |
+| SHA-256 | `6632d9d816b4f3796b6cd7e5c061291aceaba3457454d41a47979bc6da6ba716` (1.399 B) |
+| Finales de línea | ninguno: el cuerpo viene en una sola línea, sin `\n` final |
+
+**De dónde sale esta parcela, que no se eligió de una lista.** No hay ninguna rústica de
+referencia en el proyecto, así que se buscó **midiendo**, no adivinando: se tomó un punto en
+mitad de La Mancha —`[474132.51, 4350111.66]` en `EPSG:25830`, o sea lon −3,30 / lat 39,30,
+labrantío entre Herencia y Alcázar de San Juan— y se le preguntó a `Consulta_RCCOOR` qué parcela
+lo contiene. Contestó a la primera (0,357 s, `control.cucoor` = 1):
+
+```json
+{"Consulta_RCCOORResult":{"control":{"cucoor":1},"coordenadas":{"coord":[{"pc":{"pc1":"13005A1","pc2":"0900005"},"geo":{"xcen":"474132.51","ycen":"4350111.66","srs":"EPSG:25830"},"ldt":"ER EXTRARRADIO  Polígono 109 Parcela 5 C.BOLSA. ALCAZAR DE SAN JUAN (CIUDAD REAL)"}]}}}
+```
+
+`pc1`+`pc2` = **`13005A10900005`**, que es la referencia con la que se pidió el DNPRC. Esa
+respuesta intermedia **no se versiona** (ver «Huecos declarados»); va aquí entera porque es la
+procedencia del fixture y sin ella la elección de la parcela sería un dedo en el mapa.
+
+De paso deja medido algo útil: **`Consulta_RCCOOR` funciona igual en rústica**, y su `ldt` ya
+trae el polígono y la parcela **en texto libre castellano** («Polígono 109 Parcela 5»). Es texto
+para leer, no para parsear: los números de verdad están donde dice la tabla de abajo.
+
+### Qué congela: el subárbol rústico es `locs.lors`, y **no** `locs.lous`
+
+Esta es la diferencia estructural que la ficha existe para dejar por escrito:
+
+| | urbana | rústica |
+|---|---|---|
+| Subárbol de `dt.locs` | **`lous`** | **`lors`** |
+| Dentro | `lous.lourb` | `lors.lorus` **y `lors.lourb`** |
+
+Es decir: **`lors` contiene los dos**. Una parcela rústica trae su bloque rústico (`lorus`:
+polígono, parcela, paraje) *y además* un bloque de dirección con forma urbana (`lourb`:
+`ER EXTRARRADIO`, código postal `13600`). Quien busque la dirección en
+`locs.lous.lourb` —la ruta que funciona en la urbana— no la encuentra en la rústica, aunque
+`lourb` exista: **cuelga de `lors`, no de `lous`**.
+
+Rutas completas medidas de lo que F09 necesita:
+
+| Dato | Ruta completa | Valor medido |
+|---|---|---|
+| Urbana o rústica | `consulta_dnprcResult.bico.bi.idbi.cn` | `"RU"` (la urbana da `"UR"`, pero ver el aviso de la ficha anterior: en la rama `lrcdnp` **no existe**) |
+| Provincia (nombre) | `consulta_dnprcResult.bico.bi.dt.np` | `"CIUDAD REAL"` |
+| Municipio (nombre) | `consulta_dnprcResult.bico.bi.dt.nm` | `"ALCAZAR DE SAN JUAN"` |
+| Provincia (cód. INE) | `consulta_dnprcResult.bico.bi.dt.loine.cp` | `"13"` |
+| Municipio (cód. INE) | `consulta_dnprcResult.bico.bi.dt.loine.cm` | `"5"` (¡no `"005"`!) |
+| Municipio (cód. DGC) | `consulta_dnprcResult.bico.bi.dt.cmc` | `"5"` |
+| **Polígono** | `consulta_dnprcResult.bico.bi.dt.locs.lors.lorus.cpp.cpo` | `"109"` |
+| **Parcela** | `consulta_dnprcResult.bico.bi.dt.locs.lors.lorus.cpp.cpa` | `"5"` (¡no `"00005"`!) |
+| **Paraje (nombre)** | `consulta_dnprcResult.bico.bi.dt.locs.lors.lorus.npa` | `"C.BOLSA"` |
+| Paraje (código) | `consulta_dnprcResult.bico.bi.dt.locs.lors.lorus.cpaj` | `"96"` |
+| Zona de concentración | `consulta_dnprcResult.bico.bi.dt.locs.lors.lorus.czc` | `"0"` |
+| Código postal | `consulta_dnprcResult.bico.bi.dt.locs.lors.lourb.dp` | `"13600"` |
+| Superficie de la finca | `consulta_dnprcResult.bico.finca.dff.ss` | `"395764"` (m²) |
+| Tipo de finca | `consulta_dnprcResult.bico.finca.ltp` | `"Parcela construida sin división horizontal"` |
+| Uso | `consulta_dnprcResult.bico.bi.debi.luso` | `"Agrario"` |
+| Superficie construida | `consulta_dnprcResult.bico.bi.debi.sfc` | `"25"` (m²) |
+| Antigüedad | `consulta_dnprcResult.bico.bi.debi.ant` | `"1997"` |
+| Subparcelas (cultivos) | `consulta_dnprcResult.bico.lspr[i].dspr.{ccc,dcc,ip,ssp}` | 4 elementos; `[0]` = `CR` / `"LABOR O LABRADÍO REGADÍO"` / `"02"` / `"358255"` |
+
+Y siete detalles más que muerden:
+
+1. **`npa` es el paraje y NO tiene por qué ser un topónimo legible.** Aquí vale `"C.BOLSA"`
+   —abreviado, con punto, sin espacio—. En el informe se imprime tal cual o no se imprime; no
+   se «arregla».
+2. **`cpa` («parcela») viene sin ceros: `"5"`, no `"00005"`.** La referencia catastral
+   `13005A109`**`00005`** sí los lleva. Si alguien compone el texto «Polígono 109 Parcela 5» a
+   partir de la RC y otro lo compone desde `cpp`, salen dos cadenas distintas para el mismo
+   dato. Lo mismo con `cpo` (`"109"`), que en la RC ocupa 3 y coincide por casualidad.
+3. **Hay DOS `ldt` y son distintos.** `bico.bi.ldt` lleva el código postal y un espacio;
+   `bico.finca.ldt` no lleva código postal y tiene **dos** espacios antes de `C.BOLSA`:
+   - `bi.ldt` → `ER EXTRARRADIO  Polígono 109 Parcela 5 C.BOLSA. 13600 ALCAZAR DE SAN JUAN (CIUDAD REAL)`
+   - `finca.ldt` → `ER EXTRARRADIO  Polígono 109 Parcela 5  C.BOLSA. ALCAZAR DE SAN JUAN (CIUDAD REAL)`
+
+   No son el mismo campo repetido: hay que elegir uno **a sabiendas**. (Los dos traen además
+   doble espacio tras `EXTRARRADIO`.)
+4. **`nm` viene SIN TILDE: `"ALCAZAR DE SAN JUAN"`**, cuando el municipio se escribe *Alcázar*.
+   Y **no es un problema de codificación**: en el mismo fichero, y en UTF-8 correcto, hay
+   `Polígono` (U+00ED), `división` (U+00F3) y `LABRADÍO REGADÍO` (U+00CD). Los nombres de
+   municipio y provincia van en mayúsculas y sin acentuar **por decisión del dato**, no por el
+   transporte. Un informe que imprima `nm` tal cual escribirá «ALCAZAR».
+5. **`loint` puede ser un objeto VACÍO `{}`**, no ausente y no `null`
+   (`…lors.lourb.loint` aquí). Un `if (loint)` da `true` sobre nada.
+6. **Los contadores de `control` sí cuadran, esta vez.** `cudnp`=1, `cucons`=1 (`lcons` tiene 1)
+   y `cucul`=4 (`lspr` tiene 4): contados, coinciden los tres. No es excusa para fiarse —el WFS
+   miente en `numberReturned` y está documentado arriba—, pero queda medido que aquí no mintió.
+7. **La aritmética de superficies cierra, y conviene saberlo:** la suma de los cuatro `ssp` es
+   **395.739** m² y `finca.dff.ss` declara **395.764** m². La diferencia es **25** m², que es
+   exactamente `debi.sfc`, la superficie construida. O sea: `ss` incluye lo construido y las
+   subparcelas de cultivo no.
+
+Un apunte de bytes: `bico.finca.infgraf.igraf` trae una URL a la Sede con las **barras
+escapadas** en el JSON crudo (`https:\/\/www1.sedecatastro.gob.es\/…`). `JSON.parse` lo
+deshace solo; cualquier búsqueda por texto sobre el fichero en bruto, no. Y su cadena de
+consulta usa otra vez los códigos sin rellenar: `?del=13&mun=5&refcat=13005A10900005`.
+
+## `ovc-dnprc-cod17.json` — EL FALLO NUESTRO CONTADO COMO DATO QUE FALTA
+
+| | |
+|---|---|
+| Origen | OVC Callejero, `Consulta_DNPRC` con el nombre de parámetro que **no** es |
+| URL | `https://ovc.catastro.meh.es/OVCServWeb/OVCWcfCallejero/COVCCallejero.svc/json/Consulta_DNPRC?Provincia=&Municipio=&RC=9398516VK3799G` |
+| Descargado | 2026-08-02 · **versionado como fichero el 2026-08-02 (T2.3), sin repetir la petición** |
+| HTTP | **200 OK** · `application/json; charset=utf-8` · `Access-Control-Allow-Origin: *` · 0,136 s |
+| SHA-256 | `76059b090fce8a53c3c8b071a44cf477a998d0d36931b17e087e6e1463c52a3f` (117 B) |
+| Finales de línea | ninguno: el cuerpo viene en una sola línea, sin `\n` final |
+
+```json
+{"consulta_dnprcResult":{"control":{"cuerr":1},"lerr":[{"cod":"17","des":"LA REFERENCIA CATASTRAL ES OBLIGATORIA"}]}}
+```
+
+**Qué congela: el TERCER caso del patrón «fallo nuestro con vocabulario de dato ausente».** Es el
+hermano exacto de [`ovc-rccoor-cod76.json`](ovc-rccoor-cod76.json) —de ahí que se versione, por
+simetría— y de [`ovc-rccoor-cod16.json`](ovc-rccoor-cod16.json). La diferencia entre lo que el
+servicio dice y lo que pasa de verdad:
+
+| | |
+|---|---|
+| El servicio dice | «LA REFERENCIA CATASTRAL ES OBLIGATORIA» |
+| La petición llevaba | `…&RC=9398516VK3799G`, o sea **la referencia catastral, delante** |
+| Lo que pasa de verdad | el parámetro se llama **`RefCat`**, y con `RC` **falla el 100 % de las peticiones** |
+
+Un lector ingenuo lo traduce a «esa referencia no existe» o «el usuario no ha escrito nada»; las
+dos lecturas son falsas y las dos mandan a arreglar lo que no es. Y, otra vez, **HTTP 200**: la
+petición está mal construida, el servicio lo sabe, lo dice, y contesta 200 igual.
+
+**Sobre su procedencia, que aquí importa más que en ninguna otra ficha.** Este fichero **no se
+descargó dos veces**. La petición se hizo el 2026-08-02, en la tanda de T0.2, y su cuerpo quedó
+transcrito literal en la ficha de la urbana con su tamaño y su SHA-256. El 2026-08-02, en T2.3,
+se escribió el fichero **a partir de esa transcripción** y se comprobó que da **117 bytes** y el
+**mismo SHA-256 publicado**. Esa coincidencia es lo que convierte la transcripción en verdad
+externa: si un solo byte se hubiera perdido al copiarla, el hash no cuadraría. No hay una
+petición más en la cuenta del override O8, y no la habrá: recapturarlo «para estar seguros»
+gastaría una llamada para obtener un fichero que ya está comprobado.
+
+**Consecuencia para el cliente**, escrita aquí porque es donde se busca: `'17'` **no entra en
+ninguna tabla de «no hay datos»**. `services/_catastro-dnp.js` no tiene ninguna —ver «Huecos
+declarados»— y este código sale como `RESPUESTA_ILEGIBLE`, o sea como problema técnico con el
+`cod` y el `des` literales delante. Meterlo en un camino de «no encontrado» convertiría un bug
+reproducible en el 100 % de las peticiones en un mensaje tranquilizador y falso.
+
+---
+
 ## El `GetParcel` bueno no se duplica aquí
 
 El camino de éxito de la *stored query* `GetParcel` ya está versionado, y **no se copia a esta
@@ -429,8 +732,13 @@ Es lícito y no cambia nada del contenido: **XML 1.0 §2.11 obliga a todo proces
 idéntico. Comprobado además que no había ningún `\r` suelto (CR = CRLF en los cinco ficheros),
 así que la sustitución `\r\n → \n` es reversible sin pérdida.
 
-Los tres `.json` **no tienen ni un salto de línea** —ni siquiera final—, así que la regla es
-inocua para ellos y su SHA-256 es uno solo.
+Los **seis** `.json` **no tienen ni un salto de línea** —ni siquiera final—, así que la regla es
+inocua para ellos y su SHA-256 es uno solo. Comprobado también en los tres de F09
+(`ovc-dnprc-*`): cero `\r` y cero `\n` en los 6.817, 1.399 y 117 bytes, y los tres decodifican
+como UTF-8 válido. Los dos `ovc-dnprc-*` de datos **sí llevan caracteres no ASCII** (`í`, `ó`,
+`Í`), al contrario que los tres `ovc-rccoor-*` y que `ovc-dnprc-cod17.json`, que son ASCII puro;
+y a diferencia de los `.xml` de esta carpeta, aquí no hay ninguna declaración de encoding que
+pueda mentir: el JSON es UTF-8 por definición (RFC 8259 §8.1) y la cabecera HTTP lo confirma.
 
 ## Huecos declarados
 
@@ -446,3 +754,52 @@ Ninguno de estos casos se ha fabricado a mano, y ninguno se fabricará. Lo que f
   ~10 días de denegación. El camino de fallo de red se prueba con el `fetch` doblado, y eso
   queda dicho aquí para que nadie lo confunda con verdad externa: **no lo es**.
 - **No hay fixture de bloqueo por abuso.** Mismo motivo, con más razón.
+
+Y los que deja abiertos la tanda de F09 (2026-08-02):
+
+- ~~La respuesta `cod:"17"` de `Consulta_DNPRC` no está versionada como fixture.~~ **CERRADO el
+  2026-08-02 (T2.3)**, y sin gastar una petición: ver la ficha de
+  [`ovc-dnprc-cod17.json`](#ovc-dnprc-cod17json--el-fallo-nuestro-contado-como-dato-que-falta). El
+  fichero se escribió desde la transcripción literal que ya había en este documento y su SHA-256
+  coincide con el publicado, que es la prueba de que la copia era fiel.
+- **La `Consulta_RCCOOR` con la que se encontró la parcela rústica no está versionada.** Fue un
+  medio para elegir el caso, no un caso; su cuerpo va literal en la ficha de la rústica.
+- **No se ha medido `Consulta_DNPRC` sobre una rústica con VARIOS inmuebles**, o sea la
+  combinación `lrcdnp` + rústica. Las dos capturas dan `lrcdnp`+urbana y `bico`+rústica, que son
+  las dos diagonales: **queda sin comprobar si en la rama `lrcdnp` de una rústica aparece el
+  subárbol `lors`**, que es la única vía que quedaría para saber que es rústica sin el `cn`.
+  Habría sido otra petición y el override O8 manda.
+
+  > **Lo que el cliente hace con este hueco**, escrito aquí porque es donde se busca:
+  > `services/_catastro-dnp.js` deduce `datos.clase` **del subárbol presente** (`lors` → rústica,
+  > `lous` → urbana) y, cuando no es concluyente, la deja en **`null`** — que el informe imprime
+  > como “No consta”. No se adivina por la referencia catastral, no se hereda del `cn` (que en la
+  > rama lista **no existe**) y no se rellena «porque casi siempre es urbana». El día que alguien
+  > mida esta diagonal, se recaptura, se anota aquí y **entonces** se toca el código.
+- **No se ha medido `Consulta_DNPRC` con una referencia inexistente**, ni con `Provincia`/
+  `Municipio` rellenos, ni la variante `Consulta_DNPRC_Codigos`. Tampoco `Consulta_DNPPP`
+  (consulta por polígono/parcela), que el WSDL declara y que sería el camino inverso al de la
+  ficha rústica.
+
+  > **Consecuencia MEDIBLE en el código, y es la más importante de esta lista:**
+  > `services/_catastro-dnp.js` **no tiene ninguna tabla de códigos que signifiquen «no hay
+  > datos»**, al contrario que su hermano `_catastro-ovc.js`, que sí tiene `COD_OVC_SIN_REFERENCIA`
+  > porque midió el `cod:16`. Aquí no hay nada que medir todavía, así que no hay tabla, no hay un
+  > tipo `SIN_DATOS`, y **`services/catastro.js#descriptivosPorRefcat` no puede devolver
+  > `NO_ENCONTRADO`**: cualquier `cod` de error sale como `RESPUESTA_ILEGIBLE`, con el código y la
+  > descripción literales del servicio dentro del mensaje. Escribir la tabla vacía «para tenerla»
+  > sería un detector de una señal que nadie ha visto: o código muerto que tranquiliza, o un
+  > disparo en falso. Hay tests que afirman las dos mitades.
+- **No hay ninguna captura de `Consulta_DNPRC` con inmuebles que discrepen entre sí** (dos
+  municipios en la misma parcela). No es provocable: depende de que exista una parcela así y de
+  encontrarla. El caso se cubre con un fixture **sintético**, en
+  [`derivados/`](derivados/PROCEDENCIA.md), que es un directorio aparte precisamente para que
+  nadie lo confunda con esto y para que su URL —que no existe— no entre en el mapa de URL medidas
+  que lee `scripts/sonda-catastro.mjs`.
+- **Ninguna petición de esta carpeta ha llevado nunca cabecera `Origin`.** Ver el matiz sobre el
+  CORS en los hechos transversales: lo medido respalda la petición **simple**, no un
+  *preflight*.
+- **La metadata `?singleWsdl` no se versiona.** Se leyó para averiguar el nombre real del
+  parámetro (`RefCat`) y para nada más; son ~100 kB de WSDL que no describen ningún
+  comportamiento que estos fixtures no congelen ya. Reproducible en
+  `https://ovc.catastro.meh.es/OVCServWeb/OVCWcfCallejero/COVCCallejero.svc?singleWsdl`.

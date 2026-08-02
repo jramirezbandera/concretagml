@@ -1225,13 +1225,19 @@ describe('app/main · los dos ganchos que el arranque le entrega al Catastro', (
 
   it('el arranque le pasa `alCargarParcela` y le registra los oyentes de colindantes', () => {
     expect(typeof arranque.catastro.alCargarParcela).toBe('function')
-    // TRES suscriptores: el snap de F06, el diagnóstico de F07 y —desde el arreglo
-    // del check visual— la CAPA que las dibuja. Que sean tres y no uno es
-    // exactamente el contrato del cableado del Catastro (un `Set`, no un callback:
-    // «el segundo en llegar no puede desalojar al primero»), y este número es lo
-    // que lo afirma desde el arranque real. Eran dos hasta que las vecinas se
-    // pintaron; si alguna vez vuelve a bajar, alguien ha desenchufado a uno.
-    expect(arranque.oyentesColindantes.size, 'el puente del arranque').toBe(3)
+    // CUATRO suscriptores: el snap de F06, el diagnóstico de F07, la CAPA que las
+    // dibuja (desde el arreglo del check visual) y —desde F09— el INFORME, que
+    // necesita las vecinas para atribuir cada lindero en la descripción literaria
+    // y que **no dispara ninguna consulta propia**: se cuelga de la que hace el
+    // cajón del diagnóstico al abrirse (el presupuesto de red de F09 es +1
+    // petición, y se la gasta en el servicio descriptivo).
+    //
+    // Que sean cuatro y no uno es exactamente el contrato del cableado del Catastro
+    // (un `Set`, no un callback: «el segundo en llegar no puede desalojar al
+    // primero»), y este número es lo que lo afirma desde el arranque real. Eran dos
+    // hasta que las vecinas se pintaron y tres hasta F09; si alguna vez BAJA,
+    // alguien ha desenchufado a uno.
+    expect(arranque.oyentesColindantes.size, 'el puente del arranque').toBe(4)
   })
 
   it('traer una parcela REINICIA la pila del arranque (deshacer no la devuelve)', () => {

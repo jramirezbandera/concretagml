@@ -864,17 +864,28 @@ async function conDiagnosticoDeFichero(banco, nombre = WFS) {
 }
 
 describe('F08 · AC3 · la acción principal del diagnóstico por esta vía es «Descargar informe de contraste»', () => {
-  it('el botón se llama EXACTAMENTE así, y es el primario del pie del cajón', () => {
+  it('el botón se llama EXACTAMENTE así, y está en el pie del cajón', () => {
     const banco = montar()
 
     expect(banco.botonInforme.textContent).toBe('Descargar informe de contraste')
-    // Los únicos dos botones del cajón son «cerrar» y éste: no hay un tercer CTA
-    // compitiendo, y el primario —fondo oscuro del cromo— es el informe.
+    // ⚠️ ACTUALIZADO EN F09 (T4.2). Cuando se escribió este criterio, el informe de
+    // contraste era el ÚNICO documento que la herramienta sabía emitir, así que era
+    // el primario del pie. F09 trae el documento FIRMABLE —«Preparar informe
+    // (PDF)»: plano a 300 ppp, descripción del lindero y pie de firma— y ése pasa a
+    // ser el primario; el de texto se queda como la alternativa que se compone SIN
+    // RED y sin plano. Lo que AC3 pedía de verdad —que la acción que consume el
+    // diagnóstico esté en el cajón y no en el pie de la app, que no cueste píxeles
+    // del panel y que sirva a las dos vías de entrada— sigue cumpliéndose entero.
     const botones = [...banco.raizDiag.querySelectorAll('button')]
     expect(botones.map((b) => b.dataset.accion).sort()).toEqual([
       'cerrar-diagnostico',
       'descargar-informe',
+      'preparar-informe',
     ])
+    // Y los dos del informe comparten fila, así que el cajón no ha crecido de alto:
+    // la razón 2 (un CTA más cuesta ~36 px del panel) sigue en pie.
+    const preparar = banco.raizDiag.querySelector('[data-accion="preparar-informe"]')
+    expect(preparar.parentElement).toBe(banco.botonInforme.parentElement)
   })
 
   it('nace APAGADO y con el motivo escrito: un botón gris y mudo es un error silencioso', () => {
@@ -909,8 +920,11 @@ describe('F08 · AC3 · la acción principal del diagnóstico por esta vía es �
 
     // El nombre LEGAL, que no es el del documento oficial del Catastro.
     expect(contenido).toContain('INFORME DE CONTRASTE CON EL PARCELARIO CATASTRAL')
-    // Dice que es provisional y sin firma: F09 es quien trae el documento firmable.
-    expect(contenido).toContain('VERSIÓN PROVISIONAL EN TEXTO, SIN PIE DE FIRMA')
+    // Dice que no lleva pie de firma y REMITE al documento que sí lo lleva. (Decía
+    // que el firmable «todavía no existe»; F09 lo trajo y la frase se reescribió.)
+    expect(contenido).toContain('VERSIÓN EN TEXTO, SIN PIE DE FIRMA')
+    expect(contenido).not.toContain('todavía no existe')
+    expect(contenido).toMatch(/«Preparar\s+informe\s+\(PDF\)»/)
     // Y niega expresamente ser el IVG/VGA, que es lo que un cliente confundiría.
     expect(contenido).toContain('NO es la validación gráfica alternativa (VGA)')
     // La sección que SOLO existe por esta vía: qué se leyó del fichero.

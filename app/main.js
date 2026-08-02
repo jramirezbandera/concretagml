@@ -98,12 +98,37 @@
 //                   El enlace con F07 —que el informe de contraste cuente lo que
 //                   se leyó del fichero— está en el paso 8: ver
 //                   {@link comprobacionCableada}.
-//  10. GML        — `cablearGeneracionGml(...)` (F04, tarea T6.1). Va EL ÚLTIMO
-//                   porque necesita las dos piezas anteriores: el store (de él
-//                   sale la geometría que se serializa, y de sus notificaciones
-//                   el estado del botón) y el panel (es donde se publican las
-//                   detecciones del serializador). Como la ficha, se suscribe y
-//                   además se llama a mano una primera vez.
+//  10. GML        — `cablearGeneracionGml(...)` (F04, tarea T6.1). Necesita las
+//                   dos piezas anteriores: el store (de él sale la geometría que
+//                   se serializa, y de sus notificaciones el estado del botón) y
+//                   el panel (es donde se publican las detecciones del
+//                   serializador). Como la ficha, se suscribe y además se llama a
+//                   mano una primera vez.
+//  11. INFORME    — `cablearInforme(...)` de `./cableado-informe.js` (F09, tarea
+//                   T5.1): el botón PRIMARIO del pie del cajón de diagnóstico
+//                   («Preparar informe (PDF)»), el diálogo que recoge el
+//                   encabezado, el lindero y el pie de firma, y el recorrido que
+//                   termina con los bytes del PDF en la carpeta de descargas.
+//                   Va EL ÚLTIMO porque es el que más dependencias tiene, y las
+//                   tiene TODAS de pasos anteriores:
+//                     · el store (paso 2) — es su SEXTO suscriptor;
+//                     · el cajón de F07 (paso 5), de donde sale el botón;
+//                     · el DIAGNÓSTICO del paso 8, que le presta su
+//                       `ultimoDiagnostico()`: el informe imprime exactamente las
+//                       cifras que el cajón está enseñando, no unas recalculadas;
+//                     · el CLIENTE del Catastro (paso 7) para el servicio
+//                       descriptivo (`Consulta_DNPRC`), que es el +1 de petición
+//                       que cuesta toda F09;
+//                     · el cableado del Catastro (paso 7) solo para SUSCRIBIRSE a
+//                       las colindantes: con ellas `report/literal.js` atribuye
+//                       cada lindero, y sin ellas lo dice;
+//                     · la COMPROBACIÓN del paso 9, si la parcela vino de un
+//                       fichero, por el mismo envoltorio que usa el paso 8.
+//                   ⚠️ Sin `try` propio, igual que los pasos 6, 8 y 9: lo único
+//                   que puede lanzar aquí es un contrato del programador. Lo que
+//                   sí está previsto —que el Catastro o el almacén local no se
+//                   hayan podido montar— entra como `null` y el informe se prepara
+//                   igual, diciendo qué no se ha consultado.
 //
 // ── POR QUÉ EL STORE LO CREA ESTA FUNCIÓN Y NO `crearVisor` ─────────────────
 // `viewer/index.js` documenta que recibe el store ya hecho y NO lo fabrica, para
@@ -411,6 +436,7 @@ import { crearTransporte } from '../services/_red.js'
 import { crearClienteCatastro } from '../services/catastro.js'
 import { abrirBd } from '../storage/bd.js'
 import { crearCacheCatastro } from '../storage/cache-catastro.js'
+import { crearPieDeFirmaGuardado } from '../storage/pie-firma.js'
 import { validarParcela } from '../validation/parcela.js'
 import { crearEstadoVista, NIVEL } from '../viewer/_comun.js'
 import { crearVisor } from '../viewer/index.js'
@@ -424,6 +450,7 @@ import {
 } from './cableado-catastro.js'
 import { cablearComprobacion } from './cableado-comprobacion.js'
 import { cablearDiagnostico } from './cableado-diagnostico.js'
+import { cablearInforme } from './cableado-informe.js'
 import {
   AVISO_DEMO_HUECO_SINTETICO,
   SRS_DEMO,
@@ -1928,7 +1955,16 @@ try {
  */
 let comprobacionCableada = null
 
-cablearDiagnostico({
+/**
+ * El cableado del diagnóstico. **Se guarda la referencia desde F09** y no por
+ * gusto: el paso 11 le pide `ultimoDiagnostico()`, que es el ÚNICO sitio donde
+ * vive el diagnóstico que el cajón está enseñando ahora mismo. El informe firmable
+ * tiene que imprimir esas cifras y no unas recalculadas — ver el JSDoc de aquel
+ * accesor, que es donde está el porqué.
+ *
+ * @type {ReturnType<typeof cablearDiagnostico>}
+ */
+const diagnosticoCableado = cablearDiagnostico({
   estado,
   cajon: visor.diagnostico.cajon,
   contraste: visor.diagnostico.contraste,
@@ -2479,3 +2515,76 @@ export function cablearGeneracionGml({
 // Sin nodos explícitos: los localiza `cablearGeneracionGml` con los selectores
 // del contrato, y LANZA nombrándolos si `index.html` ha dejado de traerlos.
 cablearGeneracionGml({ estado, panel, srs: SRS_DEMO })
+
+// ── 11 · Informe de contraste firmable en PDF (F09 · T5.1) ───────────────────
+
+// El último metro de F09 y lo único de toda la fase que el usuario llega a tocar:
+// «Preparar informe (PDF)» → datos descriptivos del Catastro → diálogo con el
+// lindero redactado y la firma recordada → «Componer PDF» → plano a 300 ppp →
+// maqueta → los bytes en la carpeta de descargas.
+//
+// Es el SEXTO suscriptor del mismo store, y como los otros cinco no recalcula nada
+// de lo que ya calcula otro: el diagnóstico se lo presta el paso 8 y las vecinas se
+// las presta el paso 7. Lo único que este cableado consulta por su cuenta es el
+// servicio DESCRIPTIVO (`Consulta_DNPRC`), que es una petición por expediente y el
+// presupuesto de red entero de la fase.
+//
+// SIN `try`, igual que los pasos 6, 8 y 9 y por lo mismo: lo único que puede lanzar
+// aquí es un contrato del programador (un visor montado sin `diagnostico: true`, un
+// `srs` que no es un huso). Lo que sí está previsto entra como `null` y se dice.
+//
+// **`index.html` no se toca en F09**: el `<dialog>` lo fabrica
+// `app/dialogo-informe.js` —igual que `app/zona-fichero.js` fabrica su
+// `<input type="file">`— y los dos botones del pie los fabrica
+// `viewer/cajon-diagnostico.js`.
+cablearInforme({
+  // El MISMO store que el mapa, la tabla, la ficha, el diagnóstico, la comprobación
+  // y el botón del GML. No escribe en él: un informe mide y maqueta, no edita.
+  estado,
+  // La misma pieza que consume el paso 8. Los dos botones del pie del cajón viven
+  // en la misma fila y los enciende el mismo gate, así que los dos cableados montan
+  // sobre el mismo cajón — cada uno por su canal (`alDescargar` / `alPreparar`).
+  cajon: visor.diagnostico.cajon,
+  panel,
+  // El SRS del expediente: el mismo que reciben el visor, el cliente y F08. Se
+  // imprime en el encabezado, se rotula bajo el plano y es con el que se le pide la
+  // cartografía al WMS.
+  srs: SRS_DEMO,
+  // ⚠️ EL DIAGNÓSTICO NO SE RECALCULA: se lee el que el cajón está enseñando. Ver
+  // `cablearDiagnostico#ultimoDiagnostico`. Se pasa el método SIN invocar —es una
+  // función por contrato— porque el diagnóstico cambia con cada edición y un valor
+  // congelado en el montaje sería siempre `null`.
+  diagnostico: diagnosticoCableado.ultimoDiagnostico,
+  // El CLIENTE, no el cableado del paso 7: de él solo se usa
+  // `descriptivosPorRefcat`, y `null` (el bloque del Catastro se cayó) es una
+  // respuesta prevista — el informe se prepara igual y el encabezado dice que no se
+  // ha consultado.
+  cliente: clienteCatastro,
+  // Y el CABLEADO, esta vez, solo para SUSCRIBIRSE a las colindantes: de ellas sale
+  // la atribución de cada lindero en la descripción literaria. Es el CUARTO oyente
+  // de `alColindantes` —un `Set` con baja, precisamente para que el que llega no
+  // desaloje al que estaba— y **no dispara ninguna consulta**: se cuelga de la que
+  // el cajón del diagnóstico ya hace al abrirse. Se comprueba la FORMA en vez de
+  // pasarlo a ciegas, por el mismo criterio que el puente de colindantes de F06 y
+  // que el `catastro:` del paso 8.
+  catastro:
+    catastroCableado !== null && typeof catastroCableado.alColindantes === 'function'
+      ? catastroCableado
+      : null,
+  // El pie de firma recordado. `abrirBd` MEMOIZA su conexión, así que esta llamada
+  // reutiliza la que abrió la caché del Catastro en el paso 7 en vez de abrir una
+  // segunda; y va sin `await` por lo mismo que allí: preparar un informe no puede
+  // quedarse esperando a IndexedDB, y sin base el almacén se comporta como si no
+  // hubiera nada recordado (y lo dice por el panel).
+  pieFirma: crearPieDeFirmaGuardado({
+    bd: abrirBd({ alAvisar: panel.avisar }),
+    alAvisar: panel.avisar,
+  }),
+  // El MISMO envoltorio que el paso 8, y por la misma razón escrita allí: la
+  // comprobación cambia con el tiempo —entra al soltar un GML y se va al
+  // descartarlo—, así que se resuelve tarde. Aquí, además, `comprobacionCableada`
+  // YA está asignado (el paso 9 corrió antes), pero el envoltorio se conserva
+  // porque lo que hace falta no es esquivar el orden: es no congelar el valor.
+  comprobacion: () =>
+    comprobacionCableada === null ? null : comprobacionCableada.comprobacion(),
+})

@@ -193,12 +193,55 @@ import OPERATIVOS_RAW from './operativos.json' with { type: 'json' }
  *   (`viewer/edicion.js#UMBRAL_PUNTERIA_PX`, también 12 px): es el suelo de
  *   resolución PERCEPTIVA de este mapa, no el suelo de caber-un-texto.
  *
+ * ── F09 · informe (descripción literaria del lindero) ───────────────────────
+ * Las dos las consume `report/literal.js`, y las dos son de INGENIERÍA: una dice
+ * dónde se pincha para preguntar quién hay al otro lado, y la otra cuándo dos
+ * lados se cuentan como un solo tramo de la redacción. Ninguna decide si un
+ * lindero está bien o mal — de hecho ese texto no lleva ni una conclusión.
+ *
+ * @property {number} epsilonColindanteMetros  **0,30 m.** Cuánto se aleja del
+ *   lindero, PERPENDICULARMENTE Y HACIA FUERA, el punto con el que se pregunta
+ *   `booleanPointInPolygon` a cada parcela colindante para atribuirle el lado.
+ *   La cifra tiene que estar por encima de lo que separa a las DOS versiones de
+ *   un mismo lindero: dos parcelas vecinas declaran cada una por su lado la misma
+ *   línea, y esas dos líneas no coinciden al milímetro. Las separan dos cosas
+ *   medidas y acumulables — el paso de cuantización del WFS, que serializa a 2
+ *   decimales (0,01 m; ver `grosorInvasionMinimoM`), y la precisión de captura
+ *   del propio Catastro, **<25 cm** con el 85 % ≤20 cm (SPEC §3, la misma cifra
+ *   que sostiene `snapMetros`). Una sonda a menos de esa distancia puede caer en
+ *   la tira de tierra de nadie que queda entre las dos versiones del lindero y
+ *   volver «sin colindante» teniéndolo pegado. 0,30 m queda por encima del techo
+ *   de 0,25 m y muy por debajo del fondo de cualquier parcela real, así que la
+ *   sonda entra en la vecina y no la atraviesa. **Coincide en valor con
+ *   `pasoDesviacionMetros` y no tiene nada que ver con él** (uno es un paso de
+ *   muestreo a lo largo de un lado; éste, un desplazamiento perpendicular): son
+ *   dos decisiones distintas que hoy dan el mismo número, y el día que una cambie
+ *   no debe arrastrar a la otra — mismo criterio que separó
+ *   `grosorInvasionMinimoM` de `duplicadoMetros`.
+ * @property {number} rumboSimilarGrados  **22,5°.** Cuánto puede separarse el
+ *   rumbo de un lado del rumbo del PRIMER lado de su tramo para fundirse con él
+ *   en la descripción literaria (además de compartir colindante). Es el
+ *   SEMISECTOR cardinal: los ocho cuadrantes de `geo/rumbo.js#cuadrante` miden 45°
+ *   y están centrados en el rumbo que nombran, así que 22,5° es exactamente la
+ *   distancia del centro de un sector a su borde. Dos lados separados por menos
+ *   caen, como mucho, en sectores CONTIGUOS y el tramo agrupado puede llevar un
+ *   cardinal que los describa a los dos; por encima, el tramo llevaría el nombre
+ *   de un cuadrante que uno de sus lados no toca ni de lejos. Se compara contra el
+ *   PRIMER lado del tramo y no contra el anterior, para que la apertura total
+ *   quede acotada por esta cifra en vez de acumularse en cadena. Medido sobre la
+ *   parcela real del repo (`test/fixtures/gml/cp_parcela_9398516VK3799G.gml`, 15
+ *   lados), con este valor salen los CUATRO tramos que un técnico escribiría a
+ *   mano: uno por colindante y el frente que da a la calle entero. Y no se lee de
+ *   `geo/rumbo.js` —que no lo exporta— porque son dos decisiones distintas: allí
+ *   define dónde parte un sector, aquí cuándo dos lados se cuentan como uno.
+ *
  * @type {Readonly<{
  *   duplicadoMetros: number, segmentoCortoMetros: number, colinealidadGrados: number,
  *   superficieMinimaM2: number, areaNulaM2: number, maxVertices: number,
  *   snapMetros: number, senoMinimoOffset: number, miterLimiteFactor: number,
  *   acotacionMinimaPx: number, pasoDesviacionMetros: number,
  *   grosorInvasionMinimoM: number, cotaDiagnosticoMinimaPx: number,
+ *   epsilonColindanteMetros: number, rumboSimilarGrados: number,
  * }>}
  */
 export const OPERATIVOS = Object.freeze({ ...OPERATIVOS_RAW })

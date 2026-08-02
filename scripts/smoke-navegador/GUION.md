@@ -9,8 +9,8 @@ con la **maquinaria real de `L.Draggable`**.
 - **4D.1** (esta carpeta) escribió los guiones y los probó en seco.
 - **4D.2** es la ejecución oficial, con evidencia, siguiendo este documento.
 
-Diez guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
-para que el resultado no dependa de interpretar prosa. Nueve son de aceptación;
+Once guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
+para que el resultado no dependa de interpretar prosa. Diez son de aceptación;
 `05` es de diagnóstico (§11):
 
 | Guion | Criterio | Mide | Veredicto pasa si |
@@ -25,6 +25,7 @@ para que el resultado no dependa de interpretar prosa. Nueve son de aceptación;
 | `08-edicion.js` | F06 · 1 a 5 | la edición con `L.Draggable` real: snap a vértice y a lindero, `Alt`, cotas contra el zoom, offset, insertar/eliminar, undo/redo y su inhibición | `ok:true` |
 | `09-diagnostico.js` | F07 · 1 a 4 | el diagnóstico con SVG y layout reales: la diferencia sombreada por `fill-rule: evenodd`, el cajón que flota sin quitarle NI UN PÍXEL a la caja de vértices al abrirse, la banda del margen que conserva sus metros con el zoom y el tiempo del recálculo completo | `ok:true` |
 | `10-comprobar-gml.js` | F08 · 1 a 4 · **+ los tres arreglos del check visual** | **soltar un fichero de verdad** de punta a punta (bytes reales, velo con `opacity` calculada, `File.arrayBuffer()`), el cajón que no tapa ninguno de los cinco controles del mapa, los dos cajones que no coinciden, el informe que baja con BYTES, el invariante de los ~267 px, la tipografía real de los botones de los dos cajones y —desde el 2026-08-02— **el REENCUADRE** (viaja con otra parcela, no se mueve al editar), **las COLINDANTES dibujadas** y **el CAMPO de la referencia** | `ok:true` — ver §16 |
+| `11-informe-pdf.js` | F09 · **1** a 5 | ⭐ **el CRITERIO 1, que solo se puede medir aquí**: `toDataURL` sobre un lienzo con una tesela REAL del WMS, **con control negativo** (sin `crossOrigin` tiene que lanzar); el PDF que baja con BYTES de verdad (`%PDF`, páginas declaradas, el plano `/DCTDecode` dentro); que componer **no cierre nada por debajo** (tercera aparición del mismo defecto); el `<dialog>` como modal DE VERDAD (capa superior, fondo inerte, `Escape`), el encaje del modal en la ventana, el invariante de la caja de vértices y la tipografía de los cuatro botones nuevos | `ok:true` — ver §17 |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
 spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
@@ -68,6 +69,16 @@ parcela, las parcelas colindantes dibujadas y el campo de la referencia catastra
 Ver §16, apartado «Los TRES defectos que encontró la firma humana». **Esto es lo
 que vale el gate humano, y así hay que contarlo:** el guion encontró dos defectos
 que la suite no veía, y la persona encontró otros tres que no veía ni el guion.
+
+`11` es el de F09 y **el único de esta carpeta que mide un criterio de aceptación
+que la suite NO puede medir en absoluto**. Los demás miden lo que jsdom hace mal
+o a medias; éste mide lo que allí **no existe**: en jsdom no hay contexto 2D —el
+paquete `canvas` no está instalado ni se va a instalar—, así que el criterio 1 de
+F09 («el canvas compuesto exporta con `toDataURL` sin `SecurityError`») no tiene
+dónde ejecutarse. El plan de F09 lo declaró por escrito como desviación 1 y lo
+trasladó aquí. Y como una comprobación que solo puede salir bien no prueba nada,
+lleva **control negativo**: la misma cartografía cargada sin `crossOrigin`, que
+tiene que contaminar el lienzo y hacer que `toDataURL` **lance**. Ver §17.
 
 Cada guion lleva en su cabecera **qué mide y qué NO puede medir**. Léelas antes
 de citar un resultado.
@@ -574,6 +585,45 @@ Este smoke **no es de una sola vez**:
   humana dentro: `ok:`**`true`**, `problemas: []` y `advertencias: []`, en frío,
   con 2 peticiones y consola limpia. **Ninguna de las cifras anteriores se movió.**
   Cifras nuevas en §16.
+- **`11-informe-pdf.js`, cuando cambie cualquier pieza del informe de F09.** Es lo
+  único que mide **el criterio de aceptación 1** —y no «lo mide mejor»: es que en
+  jsdom **no hay contexto 2D** y allí no se puede medir en absoluto—, más la cadena
+  entera hasta los bytes del PDF en un navegador de verdad. Los disparadores, por
+  lo que cada uno rompería:
+  - **`report/canvas.js`** (el orden `crossOrigin` → `src`, la comparación de
+    `naturalWidth`/`naturalHeight` contra lo pedido, la caída silenciosa de
+    `toDataURL` a PNG) y **`viewer/wms-catastro.js#getMapUrl`** — el guion lleva
+    una **copia deliberada** de la forma de esa URL, como `04` con los literales
+    legales: si divergen, el guion debe fallar. Si el WMS dejara de emitir
+    `Access-Control-Allow-Origin: *`, esto es lo único que lo vería.
+  - **`report/pdf.js`** y **`report/pdf-parcela.js`** — el guion afirma `%PDF-1.4`,
+    `%%EOF`, el nodo `/Type /Pages /Count N` y la imagen `/DCTDecode`. Cambiar la
+    versión del PDF o cómo se empotra el JPEG mueve esas afirmaciones.
+  - **`app/dialogo-informe.js`** (el `<dialog>`, sus cuatro selectores de acción,
+    el gate del acuse) y **`app/cableado-informe.js`** (el DNPRC, su caché por
+    expediente, el cierre programático al bajar el PDF).
+  - **`viewer/cajon-diagnostico.js#enDialogo`** y **`gml/descargar.js`** — las dos
+    correcciones de «no cerrar nada por debajo». El guion es lo único que las ve
+    volver.
+  - **`report/literal.js`** y su `PRESUNCION`: de ahí sale el bloque de advertencia
+    y el gate de «Componer PDF».
+  - `estilos/app.css`, tramo de F09 (el modal, su `::backdrop`, su
+    `overscroll-behavior` y la familia tipográfica de los botones).
+  - y los **selectores del contrato**, que el guion lleva copiados a propósito:
+    `[data-accion="preparar-informe"]`, `[data-estado="informe-contraste"]`,
+    `[data-accion="componer-pdf"]`, `[data-accion="cancelar-informe"]`,
+    `[data-accion="regenerar-lindero"]`, `[data-estado="dialogo-informe"]`,
+    `[data-informe="presuncion"]`, `[data-informe="presuncion-tramos"]`,
+    `[data-informe="acuse-presuncion"]`, `[data-informe="literal"]` y
+    `.gml-dialogo-informe`.
+  ⚠️ Antes de repetirlo, léete el régimen de uso de §13 (llama a dos servicios
+  reales) y el §17 entero.
+  HECHO **dos veces el 2026-08-02**: la primera dio `ok:`**`false`** por **un falso
+  positivo de la MEDIDA, no un defecto de producción** —33 px que eran del renglón
+  de colindantes de F05—; corregida la ventana de medida y añadida la atribución de
+  la pérdida, la segunda dio `ok:`**`true`** con `problemas: []` y
+  `advertencias: []`, en pasada en FRÍO, con 2 peticiones de datos y consola
+  limpia. Las dos, y el porqué, en §17.
 - Cuando cambie cualquiera de los **hooks semánticos** en los que se apoyan los
   guiones. Los guiones fallan a propósito si divergen, y ahí está su valor:
   - `title` del marcador (`'EXTERIOR · vértice 1'`) — `viewer/sincronizacion.js`;
@@ -1701,8 +1751,10 @@ parcela del fichero). Para repetirlo:
   **nombrando el fichero soltado**.
 - `solapes.*.areaPx2: 0` en los CINCO, y `atribucionVisible: true`.
 - `tipografia.todosConLaFamiliaDeLaApp: true` ← ~~hoy `false`~~ ✅ **`true`
-  desde la corrección del defecto 1**: los tres botones se pintan en
-  `"Geist Sans", system-ui, -apple-system, sans-serif`.
+  desde la corrección del defecto 1**: los botones se pintan en
+  `"Geist Sans", system-ui, -apple-system, sans-serif`. Desde F09 (T4.2) son
+  **cuatro**: entra «Preparar informe (PDF)», que nació con el mismo reparto y se
+  rompería igual de callado.
 - `contraste.cerroSolo: true`, `nombraElFichero`, `diceQueNoEsDelCatastro` y
   `nombraElParcelario` los tres `true` (la procedencia es DOBLE: decir solo «Del
   Catastro» convertiría el fichero de un tercero en un dato oficial, y ése es EL
@@ -1715,7 +1767,11 @@ parcela del fichero). Para repetirlo:
   `restaurado: true`, `titulaComoTocaLegalmente: true`,
   `desmienteSerLaValidacionGrafica: true`,
   `seLlamaValidacionGraficaEnElTitulo: false`,
-  `diceQueEsProvisionalYSinFirma: true`, `nombraElFicheroDeOrigen: true` y
+  `diceQueNoLlevaPieDeFirma: true`, `remiteAlInformeFirmable: true` y
+  `siguePresumiendoDeQueElFirmableNoExiste: false` ← **reescritos en F09
+  (T4.2)**: el desmentido decía que el documento firmable «todavía no existe» y
+  ya existe, así que ahora se mide que niegue el pie de firma **y** remita a
+  «Preparar informe (PDF)», `nombraElFicheroDeOrigen: true` y
   `diagnosticoSigueAbierto: true` ← ~~hoy `false`~~ ✅ **`true` desde la
   corrección del defecto 2**.
 - `ficheroLargo`: `diagnosticoSeCerroAlAbrirLaComprobacion: true`,
@@ -2022,3 +2078,337 @@ Al encuadre de arranque solo se ven fragmentos (las vecinas son grandes y el lad
 que comparten con la propia queda debajo del amarillo, que es la decisión del
 pane); alejando dos niveles se leen enteras. Que eso **baste como acuse de
 recibo** es juicio, y es del checklist §7.7 — la mecánica ya está medida aquí.
+
+---
+
+## 17. `11-informe-pdf.js` — el informe firmable en PDF (F09 · T6.2)
+
+El guion de F09, y **el único de esta carpeta que mide un criterio de aceptación
+que la suite no puede medir en absoluto**. Los otros diez miden lo que jsdom hace
+mal o a medias —no calcula layout, no tiene cascada, no burbujea igual, no tiene
+`DataTransfer`—; aquí el problema es de otra clase: **en jsdom no hay contexto
+2D**. El paquete `canvas` no está instalado ni se va a instalar (es una
+dependencia nativa con toolchain de C++ para probar una línea), así que el
+criterio 1 de F09 —«el canvas compuesto exporta con `toDataURL` sin
+`SecurityError`»— **no tiene dónde ejecutarse**. El plan de F09 lo declaró como
+desviación 1 antes de escribir una línea y lo trasladó a este fichero.
+
+> ✅ **Sale `ok:true`, `problemas: []` y `advertencias: []`** (corrida de cierre,
+> **2026-08-02**, pasada en FRÍO con la base de IndexedDB borrada).
+> ⛔ **La PRIMERA corrida salió `ok:false`, y esta vez NO era un defecto de
+> producción: era LA MEDIDA.** El guion acusó al diálogo de robarle 33 px a la
+> caja de vértices, y esos 33 px eran de **F05**. Está contado abajo, en «El falso
+> positivo de la primera corrida», y no se borra por lo mismo que no se borra la
+> primera corrida de `10`: un guion que solo enseña su versión buena no enseña
+> nada.
+
+### Qué mide, y por qué NO lo mide la suite
+
+La suite ya cubre el escritor de PDF (`test/report/pdf.test.js`, **con snapshot de
+bytes** — algo que con jsPDF no se habría podido hacer), la maqueta
+(`test/report/pdf-parcela.test.js`), el encuadre y el troceado
+(`test/report/encuadre.test.js`), el literal (`test/report/literal.test.js`), la
+firma (`test/report/firma.test.js`), el diálogo
+(`test/app/dialogo-informe.dom.test.js`) y el cableado
+(`test/app/informe.dom.test.js`). **Aquí no se vuelve a medir nada de eso.** Lo
+que se añade es lo que solo existe con un navegador delante:
+
+1. ⭐ **EL CRITERIO 1, con CONTROL NEGATIVO.** Se pide una tesela **real** al WMS
+   del Catastro en `EPSG:25830`, se dibuja en un lienzo y se exporta:
+
+   - **caso positivo** — `crossOrigin='anonymous'` puesto **antes** de `src`,
+     `toDataURL('image/jpeg')` que **no lanza** y devuelve un JPEG de verdad (se
+     comprueba el prefijo: `toDataURL` **cae a PNG sin avisar** si el tipo no está
+     soportado, y es la segunda sustitución silenciosa que documenta
+     `report/canvas.js`);
+   - **control negativo** — la misma cartografía **sin** `crossOrigin`, que tiene
+     que dejar el lienzo contaminado y hacer que `toDataURL` **LANCE**.
+
+   ⚠️ **Si el control negativo no falla, el guion lo cuenta como PROBLEMA, no como
+   éxito.** Un control que no falla significa que el navegador no está aplicando la
+   política de origen (una extensión, una bandera de arranque, un proxy que
+   reescribe cabeceras) y que **el caso positivo saldría verde con el código
+   roto**. Es la misma doctrina que `04` con `coincidePorIdentidad`: una
+   comprobación que solo puede salir bien no es una comprobación.
+
+   ⚠️ **Y las dos cargas usan URLs DISTINTAS** (el BBOX del control va desplazado
+   un metro). No es aseo: la caché HTTP del navegador guarda la respuesta y una
+   segunda carga del mismo recurso puede reutilizarla, con lo que el resultado
+   dependería del orden de las dos y de qué guardó el disco.
+
+   Lo que la suite **sí** puede probar de esto, y es el fallo REAL, es que
+   `crossOrigin` se asigna **antes** que `src` (`test/report/canvas.dom.test.js`,
+   con un `Image` falso que registra el ORDEN). Al revés la petición ya salió sin
+   cabecera `Origin`, el navegador no la reintenta, y la única señal llega al final
+   del todo.
+
+2. **Que el PDF baje y sean BYTES.** Misma cadena
+   `Blob → createObjectURL → <a download> → click() → revoke` que miden `06` (el
+   GML) y `10` (el informe de texto), con el mismo patrón de captura (§12) y la
+   misma promesa: los tres envoltorios se restauran en un `finally` y el veredicto
+   lo DECLARA (`informe.captura.restaurado`). La diferencia con `10` es que aquí la
+   composición es **asíncrona** —hay una `GetMap` de 200 kB por medio—, así que los
+   envoltorios siguen puestos mientras se espera. Lo que se afirma es de **nivel de
+   byte**: `%PDF-1.4`, `%%EOF` al final, el nodo `/Type /Pages /Count N` del árbol
+   de páginas, y **una imagen `/DCTDecode`** dentro. Esa última es, de rebote, la
+   **prueba de extremo a extremo del criterio 1**: el plano solo puede entrar en el
+   PDF a través de `toDataURL` sobre el lienzo compuesto, así que si está, es que
+   no lanzó **dentro de la aplicación de verdad**.
+
+3. **Que componer NO CIERRE NADA POR DEBAJO.** Es la **tercera aparición de la
+   misma familia de defectos** en este proyecto, y por eso se mide en vez de
+   suponerse:
+
+   - **F08** — el `click()` del `<a download>` burbujeaba hasta `document`, el
+     guardián de clic-fuera del cajón de diagnóstico lo veía como un clic FUERA y
+     **cerraba el cajón**; el acuse de recibo se escribía en un `role="status"` que
+     acababa de quedar en `display:none`. Corregido en `gml/descargar.js`, con
+     `stopPropagation` en fase de **captura** sobre el propio anchor.
+   - **F09 · T5.1** — lo mismo con los clics **dentro del `<dialog>`**, que cuelga
+     del `<body>` y por tanto está FUERA del cajón: componer el PDF cerraba el
+     cajón **por debajo del modal**, y el usuario no lo veía hasta cerrar el
+     diálogo. Corregido en `viewer/cajon-diagnostico.js` con la guarda `enDialogo`,
+     en los DOS guardianes (clic fuera **y** `Escape`).
+
+   Se mide con las dos teclas del gesto: `Escape` sobre el diálogo y el clic de
+   «Componer PDF». Tras los dos, el cajón sigue abierto **y el contraste sigue
+   pintado en el mapa** (`<path>` en el pane `diagnostico`).
+
+4. **Que el `<dialog>` sea un modal DE VERDAD.** Lo que jsdom no tiene, MEDIDO
+   (jsdom 29.1.1): `HTMLDialogElement.prototype` expone **exactamente una** cosa,
+   la propiedad reflejada `open`. No hay `showModal()`, ni `close()`, ni capa
+   superior, ni `::backdrop`, ni atrape de foco, ni `inert`.
+   `app/dialogo-informe.js` detecta la capacidad y cae al atributo `open` para
+   poder probarse en la suite, así que **la mitad que de verdad se usa en
+   producción solo se ejercita aquí**: `:modal` (o sea, la capa superior), el foco
+   dentro al abrir, el **fondo inerte** —un `.focus()` sobre un control del panel
+   no se lleva el foco— y `Escape`.
+
+5. **Que el modal quepa en la ventana.** Tapa el mapa **a propósito** (Decisión 3
+   de F09: esto no anota la cartografía, prepara un documento), así que el solape
+   se publica como NÚMERO y sin juicio, igual que `09` publica el porcentaje de
+   lienzo que tapa el cajón. Lo que sí se caza es que se salga de la ventana
+   (formulario inalcanzable) o que la página desborde en horizontal.
+
+6. **El invariante heredado, cuarta fase seguida.** Y con una vuelta de tuerca: la
+   pérdida se **ATRIBUYE**. Ver «El falso positivo de la primera corrida».
+
+7. **La tipografía de los CUATRO botones nuevos**, derivada del token
+   `--font-sans` leído del `:root` y no de un literal copiado. Es la medida que
+   destapó el defecto 1 de `10`: una regla escrita, puesta y muerta porque un
+   `font:inherit` en línea le gana a la hoja. En jsdom no hay cascada que lo
+   delate.
+
+Y de propina, para el checklist: se publica **entero** el borrador del lindero que
+redacta `report/literal.js`, y se mide el mecanismo de la **presunción de vía
+pública** —el único sitio de toda la aplicación donde se PROPONE en vez de medir—:
+que el bloque de advertencia salga de `tramos[].presuncionNoVerificada` y no del
+texto, que «Componer PDF» nazca apagado con el motivo escrito en el mismo paso, y
+que marcar el acuse lo encienda. Si esa frase **se lee** como un veredicto es el
+punto BLOQUEANTE del checklist §10.5.
+
+### Régimen de red — léete el §13 antes de lanzarlo
+
+**Más barato que el de `09`**, y a propósito. Una pasada, sin bucles, y **el
+informe se compone UNA sola vez**. Seis peticiones como mucho, de dos clases:
+
+**DATOS del Catastro** (las que manda el override O8 — la denegación por abuso es
+de ~10 días):
+
+- **GetNeighbourParcel** — 1, al abrir el cajón de diagnóstico; **0** si otro
+  gesto ya trajo las vecinas o si la caché de IndexedDB sigue dentro del TTL (y
+  entonces el veredicto lo dice en `advertencias`, porque esa pasada no mide ni el
+  servicio ni CORS).
+- **Consulta_DNPRC** — 1, al pulsar «Preparar informe (PDF)». Es el **+1 de
+  presupuesto** que F09 declaró en su plan, y va **solo para la parcela propia**:
+  pedirlo también para las cuatro colindantes serían 5 peticiones por informe.
+  **Reabrir el diálogo cuesta 0** y también se comprueba
+  (`reapertura.peticionesDnprc`): `app/cableado-informe.js` cachea los descriptivos
+  por expediente.
+
+⚠️ **NO se pulsa «Traer del Catastro»**, a diferencia de `09`: la parcela de
+demostración **ya trae `geometriaOficial`** (es el estado de una parcela recién
+traída), así que el CTA nace encendido y el GetParcel no hace falta. Lo único que
+se pierde es la superficie catastral **declarada** de la tabla a tres bandas, que
+es de F07 y la mide `09`.
+
+**CARTOGRAFÍA** (WMS, sin cuota conocida, pero pesa):
+
+- **2 `GetMap` pequeñas** (512×384, ~44 kB cada una) para el experimento del
+  criterio 1 — una con CORS y otra sin él, con URLs distintas.
+- **1 `GetMap` grande** (2126×1535, **194.101 B**) — el plano del informe, a 300
+  ppp. Una, y solo una: por eso el informe se compone una vez. Si salieran más de
+  dos, el guion lo dice en `advertencias` (sería troceado, o el sondeo capa a capa
+  que `componerPlano` hace cuando la petición junta falla).
+
+### Cómo se lanza
+
+Página recién cargada, desde la raíz del repo:
+
+```bash
+$B viewport 1440x900
+$B goto http://localhost:PUERTO/concretagml/    # ⚠️ el base, no la raíz
+$B wait ".gml-tabla-vertices"
+$B console --clear
+$B network --clear
+$B eval scripts/smoke-navegador/11-informe-pdf.js
+
+$B console --errors                             # → (no console errors)
+$B network | grep -E "wfsCP|Consulta_DNPRC"     # → ≤ 2 peticiones de datos
+$B screenshot .gstack/smoke-f09.png             # la evidencia para el §10
+```
+
+Para forzar la pasada **en frío** —la única que mide los dos servicios de datos de
+verdad—, borrar la base antes de recargar; el `deleteDatabase` queda BLOQUEADO
+mientras la app tiene la conexión abierta, así que el orden importa:
+
+```bash
+$B js "await new Promise(r=>{const p=indexedDB.deleteDatabase('concreta-gml');p.onsuccess=r;p.onerror=r;p.onblocked=r}); return 'pedido'"
+$B reload && $B wait ".gml-tabla-vertices"
+```
+
+⚠️ **Orden y estado final.** El guion deja **el cajón de diagnóstico abierto con el
+contraste pintado** y el diálogo **cerrado** —lo cierra el propio cableado al bajar
+el PDF, programáticamente, así que no cuenta como que el usuario se echó atrás—, a
+propósito: la captura tiene que enseñar que componer **no se llevó nada por
+delante**. Lo declara en `estadoFinal`. No lo encadenes antes de `02` (le contamina
+la cuenta de `GetMap` con sus tres peticiones) ni de `06` (contrasta el `areaValue`
+contra el dataset de arranque). Para repetirlo:
+`$B reload && $B wait ".gml-tabla-vertices"`.
+
+### Qué cuenta como «pasa»
+
+`ok: true` y `problemas: []`, y además:
+
+- ⭐ `criterio1.conclusion` = **«CRITERIO 1 DEMOSTRADO: con CORS exporta, sin CORS
+  lanza»**. Las dos mitades, y las dos hacen falta:
+  `criterio1.conCors.exportacion.lanzo: false` con `esJpeg: true`, **y**
+  `criterio1.controlNegativo.contaminaComoDebe: true` con `esSecurityError: true`.
+- `criterio1.conCors.tamanoCoincideConLoPedido: true` — la comprobación que
+  `report/canvas.js` hace en producción contra el techo silencioso del WMS
+  (pasarse de 4000 px por eje **no recorta: SUSTITUYE**, con HTTP 200 y sin una
+  palabra).
+- `arranque.prepararHabilitado: false` **con el motivo escrito** (regla de oro 1) y
+  `arranque.bloqueInformeEnElPanel: false` (la Decisión 3: la interfaz de F09 es un
+  modal, no un bloque).
+- `arranque.dialogoEnElDomAlArrancar: true` — el `<dialog>` se fabrica al
+  construir, no al abrir: creado al vuelo, el `nodo()` del cableado lanzaría al
+  arrancar.
+- `modal.enLaCapaSuperior: true` (`:modal` casa), `focoDentroAlAbrir: true` y
+  `fondoInerte: true`.
+- `encaje.dentroDeLaVentana: true` y `paginaSinScrollHorizontal: true`. El
+  `solapeConElMapaPx2` es un número, **no un veredicto**.
+- `tipografia.todosConLaFamiliaDeLaApp: true` en los cuatro.
+- `escape.dialogoCerrado: true` **y** `escape.cajonSigueAbierto: true` **y**
+  `escape.contrasteSiguePintado: true`.
+- `reapertura.peticionesDnprc: 0`.
+- `presuncion.componerHabilitadoAntes: false` con `motivoEscrito: true`, y
+  `componerHabilitadoDespues: true` al marcar el acuse.
+- `informe.empiezaPorPDF: true`, `tieneEOF: true`, `paginasDeclaradas ≥ 1`,
+  `llevaPlanoJpeg: true`, `tipoDelBlob: "application/pdf"`,
+  `captura.restaurado: true`, `captura.blobsCapturados: 1` y
+  `captura.revocaLaQueCreo: true`.
+- `informe.nadaSeCerroPorDebajo`: `cajonSigueAbierto: true` y
+  `contrasteSiguePintado: true`, con `dialogoCerradoPorElCableado: true` (ése SÍ se
+  cierra, y es correcto).
+- `invariante.abrirNoRoboAltura: true` con `perdidaImputableAlDialogoPx: 0`.
+- `red.datos.total ≤ 2` y `consola.excepcionesNoCapturadas: 0`.
+
+`advertencias` **no** tumba nada: recoge lo que limita la medida (una pasada en
+caliente que no ejercita los servicios, el control negativo que no cargó, más de
+dos `GetMap` para el plano).
+
+### ⛔ El falso positivo de la primera corrida (2026-08-02) — y qué se cambió
+
+La primera corrida salió `ok:false` con **un** problema:
+
+> *«Abrir el diálogo le ha quitado altura a la caja de vértices (267 → 234 px en el
+> tick de la apertura, con las mismas 0 tarjetas de aviso).»*
+
+**Y era mentira, pero no del todo.** Los 33 px existen y están medidos; lo que no
+es cierto es de quién son. Medido paso a paso: pulsar «Diagnosticar encaje» pide
+las colindantes, y **cuando llegan —~300 ms después, incluso saliendo de
+IndexedDB, porque la lectura es asíncrona igual—** el renglón
+`[data-estado="cargar-catastro"]` **de F05** escribe «El Catastro ha devuelto 4
+colindantes de la parcela 9398516VK3799G.», crece a dos líneas, el bloque «Origen
+de la parcela» pasa de **135 a 173 px** y la caja de vértices baja de **267 a 234
+px**. No es un defecto: es la regla de oro 1 funcionando, y la caja sigue muy por
+encima del umbral de 220. Pero **estaba sin medir**, y el guion se lo cargó a F09
+porque su ventana de medida empezaba **antes** de que ese renglón hablara.
+
+Y hay un segundo hallazgo de la misma familia, éste de contabilidad: en la pasada
+en frío el guion decía `peticionesGetNeighbour: 0` **con la base recién borrada**.
+La causa es la misma: **Resource Timing solo apunta un recurso cuando TERMINA**, y
+el cajón se abre en el mismo tick del clic, así que la cuenta se tomaba con la
+petición todavía en vuelo. Un contador que dice cero por llegar pronto es peor que
+no tenerlo: se lee como «no se pidió nada».
+
+**Lo que se cambió, y dónde:** las dos cosas en el guion, ninguna en producción,
+porque no había nada roto que arreglar.
+
+1. **Se espera a que el panel se asiente** (`asentarPanel`: dos lecturas seguidas
+   con el mismo alto) antes de tomar la referencia del invariante **y** antes de
+   contar peticiones.
+2. **La pérdida se ATRIBUYE.** El veredicto publica `bloqueOrigenAntesPx` /
+   `bloqueOrigenDespuesPx` y solo acusa al diálogo de
+   `perdidaImputableAlDialogoPx`, que es lo que no explican ni ese bloque ni una
+   tarjeta de aviso nueva. Si algún día falla, dirá **quién** se llevó los píxeles.
+3. Y se publica el hallazgo como cifra propia:
+   `invariante.costeDeLasColindantesPx`, con el renglón que lo causó al lado.
+
+> **La lección, y es simétrica de la que ya pagó F07.** El guardián de F07 falló
+> por medir **demasiado tarde** («un rato luego») y acusó al cajón de 11 px que
+> eran de otros renglones hablando después. Su cabecera dejó escrito «nada de medir
+> un rato luego», y este guion pisó el error contrario: medir **demasiado pronto**,
+> con algo todavía en vuelo. La regla que sale de las dos no es «mide pronto» ni
+> «mide tarde»: es **espera a que se asiente y atribuye lo que pierdas**.
+
+### Cifras de referencia (corrida de cierre, **2026-08-02**, `npm run dev`, puerto 5173, pasada en FRÍO)
+
+`ok: true`, `problemas: []`, `advertencias: []`. Sirven para detectar una
+desviación, no como valores canónicos. Viewport 1440×900, lienzo 1048×900,
+duración **2,97 s**, consola **limpia** (`$B console --errors` → *(no console
+errors)*, `consola.excepcionesNoCapturadas: 0`), **2 peticiones de datos**
+(GetNeighbourParcel 11.969 B en 123 ms + Consulta_DNPRC 6.817 B en 769 ms, las dos
+200) y **3 al WMS**.
+
+| Medida | Valor |
+|---|---|
+| ⭐ **Criterio 1 · con CORS** | tesela 512×384 en **244 ms**, tamaño exacto; `toDataURL('image/jpeg')` **no lanza**, prefijo `data:image/jpeg;base64,/9j/4AA`, **77.987** caracteres |
+| ⭐ **Criterio 1 · control negativo** | misma cartografía sin `crossOrigin` ⇒ **`SecurityError: Tainted canvases may not be exported`** ✅ |
+| Peticiones del experimento | **2** `GetMap` de 512×384 · 44.163 B y 44.666 B, las dos 200 |
+| Caja de vértices al arrancar (avisos vacíos) | **267 px** — los mismos que dejaron F07 y F08 |
+| Caja tras pedir el diagnóstico | **234 px**. Los **33 px** son el renglón de colindantes **de F05** creciendo a dos líneas (bloque «Origen de la parcela»: 135 → 173 px). **No es de F09** |
+| Caja en el tick en que se abre el diálogo | **234 → 234 px** ⇒ **`perdidaImputableAlDialogoPx: 0`**. La Decisión 3 se cumplió |
+| El cajón de diagnóstico | 420 × 468 px en `(402, 401)`, mapa intacto, **4** `<path>` en el pane `diagnostico` |
+| El diálogo abierto | **760 × 792 px** en `(340, 54)`, dentro de la ventana, sin scroll horizontal de página |
+| Solape del diálogo con el mapa | **560.736 px²** = **59,5 %** del lienzo — **a propósito**: es un modal, no una anotación |
+| Contenido del diálogo | `scrollHeight` 1.336 > `clientHeight` 790 ⇒ **scrollea dentro**, con `overscroll-behavior: contain` |
+| `<dialog>` como modal | `:modal` **casa** · `aria-modal="true"` · velo `srgb(.059 .090 .165 / .45)` · foco dentro (`input`) · **fondo inerte** (`.focus()` sobre `[data-campo="refcat"]` no se lo lleva) |
+| `Escape` | cierra el diálogo · **cajón sigue abierto** · **4 → 4** trazos de contraste ✅ |
+| Reabrir el diálogo | **0** consultas al DNPRC |
+| Presunción de vía pública | **1 tramo** (Noroeste, 9 lados, 47,21 m). «Componer PDF» nace **apagado** con su motivo escrito; marcar el acuse lo **enciende** |
+| Borrador del lindero | **1.664 caracteres**, 4 tramos + nota técnica; perímetro 163,12 m; 3 colindantes nombradas por referencia + 1 presunción |
+| Composición del PDF | **856 ms**, **1** `GetMap` de 2126×1535 → **194.101 B** en 284 ms |
+| **El PDF** | **326.851 B** · `%PDF-1.4` · `%%EOF` · **4 páginas** declaradas · **1** imagen `/DCTDecode` ✅ · `application/pdf` |
+| Nombre del fichero | `informe-contraste-CG-9398516VK3799G-20260802-200537Z.pdf` (lleva el `idDocumento` dentro: dos informes del mismo día no se pisan) |
+| Blob | **1** creado, **1** revocado, **la misma URL**; anchor fuera del DOM; los 3 envoltorios restaurados |
+| **Tras componer** | cajón **abierto**, **4 → 4** trazos de contraste, diálogo cerrado por el cableado, acuse legible en el pie ✅ |
+| Tipografía de los 4 botones nuevos | `"Geist Sans", system-ui, -apple-system, sans-serif`, derivada de `--font-sans` |
+
+⚠️ La fila del solape del diálogo es la única de esta tabla que **no** es un
+veredicto: un modal centrado tapa el mapa por definición, y la cifra se publica
+para que el §10.6 del checklist la tenga delante.
+
+Evidencia: `.gstack/smoke-f09.png` — el cajón de diagnóstico abierto con el
+contraste pintado y el renglón diciendo «Descargado «informe-contraste-…pdf»», que
+es exactamente lo que hay que ver para creerse que componer no cerró nada.
+
+### Lo que este guion deja al checklist humano (§10)
+
+**Que el PDF abra**, y en tres lectores distintos: está escrito a mano, byte a
+byte, sin librería. Si el **plano se lee** (escala gráfica, cotas, norte). Si sale
+bien **en papel**. Y el punto BLOQUEANTE: si alguna frase del informe **se lee como
+un veredicto** —sobre el encaje o sobre el trabajo de otro técnico—, con mención
+expresa a la presunción de vía pública, que es el único sitio donde la aplicación
+propone en vez de medir.

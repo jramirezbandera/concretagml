@@ -274,12 +274,19 @@ emergente y con `interactive: false`** — el clic de F05 manda sobre el adorno.
   cadena: cabecera con el nombre legal, qué se leyó del fichero, el contraste con
   las métricas de `diagnosticar()` —**con sus omisiones y el motivo de cada una**,
   y «No consta» donde haya `null`, jamás 0—, relación de vértices y un pie que dice
-  que **es provisional y sin firma**. Sin plano, sin PDF. Así el recorrido queda
-  **cerrado y entregable desde el primer día** y F09 reutiliza los mismos datos en
-  vez de reinventar el índice. El nombre es **«Informe de contraste con el
-  parcelario catastral»**, nunca «Informe de validación gráfica»: VGA e IVG son
-  documentos oficiales con CSV, y un nombre casi homónimo haría creer al cliente
-  que ya se presentó.
+  que **no lleva plano, ni descripción del lindero, ni pie de firma**. Sin plano,
+  sin PDF. Así el recorrido queda **cerrado y entregable desde el primer día** y
+  F09 reutiliza los mismos datos en vez de reinventar el índice. El nombre es
+  **«Informe de contraste con el parcelario catastral»**, nunca «Informe de
+  validación gráfica»: VGA e IVG son documentos oficiales con CSV, y un nombre casi
+  homónimo haría creer al cliente que ya se presentó.
+  > **Al día en F09 (2026-08-02).** El desmentido decía además que el documento
+  > firmable «es el de la fase F09 de esta herramienta y **todavía no existe**».
+  > Ya existe, así que la frase se reescribió: sigue diciendo lo que este documento
+  > no lleva, y ahora **remite** al que sí lo lleva por el nombre de su botón,
+  > «Preparar informe (PDF)» (en el pie del cajón de diagnóstico, junto al de
+  > texto). El de texto no se jubila: se compone **sin red** y baja igual el día
+  > que el plano no se pueda armar.
 - **El módulo del informe no lee el reloj.** La `fecha` se **inyecta**, misma regla
   que `gml/` y por el mismo motivo: un *snapshot* tiene que valer lo mismo dentro
   de un año.

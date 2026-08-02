@@ -92,6 +92,7 @@ describe('config/operativos.json · contenido y regla de oro 9', () => {
     'grosorInvasionMinimoM',
     'cotaDiagnosticoMinimaPx',
   ]
+  const CLAVES_F09 = ['epsilonColindanteMetros', 'rumboSimilarGrados']
 
   it('conserva intactas las tolerancias de F02 (la extracción no cambió ninguna cifra)', () => {
     expect(OPERATIVOS.duplicadoMetros).toBe(0.001)
@@ -141,6 +142,37 @@ describe('config/operativos.json · contenido y regla de oro 9', () => {
     const muestrasLado30m = 30 / OPERATIVOS.pasoDesviacionMetros
     expect(muestrasLado30m).toBeGreaterThanOrEqual(50)
     expect(muestrasLado30m).toBeLessThanOrEqual(200)
+  })
+
+  it('añade las dos tolerancias de F09 con sus valores especificados', () => {
+    expect(OPERATIVOS.epsilonColindanteMetros).toBe(0.3)
+    expect(OPERATIVOS.rumboSimilarGrados).toBe(22.5)
+  })
+
+  it('`epsilonColindanteMetros` supera la precisión de captura del Catastro (<25 cm)', () => {
+    // La sonda con la que `report/literal.js` pregunta «¿quién hay al otro lado de
+    // este lindero?» se planta a esta distancia, PERPENDICULARMENTE y hacia fuera.
+    // Dos parcelas vecinas declaran cada una por su lado la MISMA línea de lindero,
+    // y esas dos versiones no coinciden al milímetro: las separan el paso de
+    // cuantización del WFS (0,01 m) y la precisión de captura del propio Catastro
+    // (<25 cm, 85 % ≤20 cm — SPEC §3, la misma cifra que sostiene `snapMetros`).
+    // Una sonda más corta que eso puede caer en la tierra de nadie que queda entre
+    // las dos y volver «sin colindante» teniéndolo pegado.
+    expect(OPERATIVOS.epsilonColindanteMetros).toBeGreaterThan(0.25)
+    // Y por arriba, muy por debajo del fondo de cualquier parcela real: la sonda
+    // tiene que ENTRAR en la vecina, no atravesarla.
+    expect(OPERATIVOS.epsilonColindanteMetros).toBeLessThan(1)
+  })
+
+  it('`rumboSimilarGrados` es el SEMISECTOR cardinal de `geo/rumbo.js` (45°/2)', () => {
+    // Los ocho cuadrantes miden 45° y están CENTRADOS en el rumbo que nombran, así
+    // que 22,5° es la distancia del centro de un sector a su borde: dos lados que
+    // se separen menos caen, como mucho, en sectores contiguos y el tramo agrupado
+    // puede llevar un cardinal que describa a los dos. No se lee de `geo/rumbo.js`
+    // —que no lo exporta— porque son dos decisiones distintas: allí define dónde
+    // parte un sector, aquí cuándo dos lados se cuentan como un solo tramo.
+    expect(OPERATIVOS.rumboSimilarGrados).toBe(45 / 2)
+    expect(OPERATIVOS.rumboSimilarGrados).toBeLessThan(45)
   })
 
   it('el patrón `duplicadoMetros² = areaNulaM2` sigue en pie (era casualidad implícita)', () => {
@@ -199,16 +231,17 @@ describe('config/operativos.json · contenido y regla de oro 9', () => {
     }
   })
 
-  it('no hay claves de más ni de menos: solo F02 + F06 + F07 + `_nota`', () => {
+  it('no hay claves de más ni de menos: solo F02 + F06 + F07 + F09 + `_nota`', () => {
     expect(Object.keys(OPERATIVOS).sort()).toEqual(
-      ['_nota', ...CLAVES_F02, ...CLAVES_F06, ...CLAVES_F07].sort(),
+      ['_nota', ...CLAVES_F02, ...CLAVES_F06, ...CLAVES_F07, ...CLAVES_F09].sort(),
     )
   })
 
-  it('la `_nota` dice de qué fases son las tolerancias, y ya son tres', () => {
+  it('la `_nota` dice de qué fases son las tolerancias, y ya son cuatro', () => {
     expect(OPERATIVOS._nota).toMatch(/F02/)
     expect(OPERATIVOS._nota).toMatch(/F06/)
     expect(OPERATIVOS._nota).toMatch(/F07/)
+    expect(OPERATIVOS._nota).toMatch(/F09/)
     expect(OPERATIVOS._nota).toMatch(/INGENIER[IÍ]A/i)
   })
 

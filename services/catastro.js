@@ -2,21 +2,22 @@
 //
 // ╔══════════════════════════════════════════════════════════════════════════════╗
 // ║ ESTE ES EL ÚNICO MÓDULO DEL CATASTRO QUE EL RESTO DE LA APP PUEDE IMPORTAR.  ║
-// ║ Los tres de debajo llevan guion bajo por eso: `_red.js` (bytes y códigos     ║
-// ║ HTTP), `_catastro-wfs.js` (el dialecto del WFS de parcelas) y                ║
-// ║ `_catastro-ovc.js` (la geocodificación inversa del OVC). Ninguno de ellos    ║
-// ║ habla el idioma de la aplicación: cada uno tiene su propio vocabulario       ║
-// ║ (`MOTIVO_RED`, `TIPO_RESPUESTA_WFS`, `TIPO_RCCOOR`) y los tres dejaron la    ║
+// ║ Los cuatro de debajo llevan guion bajo por eso: `_red.js` (bytes y códigos   ║
+// ║ HTTP), `_catastro-wfs.js` (el dialecto del WFS de parcelas),                 ║
+// ║ `_catastro-ovc.js` (la geocodificación inversa del OVC) y `_catastro-dnp.js` ║
+// ║ (los datos alfanuméricos de la parcela, F09). Ninguno de ellos habla el      ║
+// ║ idioma de la aplicación: cada uno tiene su propio vocabulario (`MOTIVO_RED`, ║
+// ║ `TIPO_RESPUESTA_WFS`, `TIPO_RCCOOR`, `TIPO_DNPRC`) y los cuatro dejaron la   ║
 // ║ traducción escrita en sus cabeceras como trabajo de este fichero. Aquí es    ║
-// ║ donde esos tres vocabularios se convierten en UNO —{@link MOTIVO_CATASTRO}—  ║
-// ║ y donde el resultado deja de ser «lo que contestó un servidor» y pasa a ser  ║
+// ║ donde esos vocabularios se convierten en UNO —{@link MOTIVO_CATASTRO}— y     ║
+// ║ donde el resultado deja de ser «lo que contestó un servidor» y pasa a ser    ║
 // ║ «lo que le puedo enseñar a un colegiado».                                    ║
 // ║                                                                              ║
 // ║ Consecuencia práctica de la regla de oro 7 y del override O7: si mañana el   ║
 // ║ Catastro retira su `Access-Control-Allow-Origin: *`, la contingencia se      ║
-// ║ toca en DOS constantes (`CATASTRO_WFS_CP` y `CATASTRO_OVC_RCCOOR_JSON`) y    ║
-// ║ ni la UI ni el modelo se enteran, porque nadie más que este módulo las ha    ║
-// ║ visto nunca.                                                                 ║
+// ║ toca en TRES constantes (`CATASTRO_WFS_CP`, `CATASTRO_OVC_RCCOOR_JSON` y     ║
+// ║ `CATASTRO_OVC_DNPRC_JSON`) y ni la UI ni el modelo se enteran, porque nadie  ║
+// ║ más que este módulo las ha visto nunca.                                      ║
 // ╚══════════════════════════════════════════════════════════════════════════════╝
 //
 // ── LO QUE DEVUELVE, Y POR QUÉ SIEMPRE LO MISMO ──────────────────────────────
@@ -43,9 +44,10 @@
 //      espía del `fetch` que vive en el test. Lo que solo se puede comprobar
 //      desde fuera no es una garantía del módulo: es una casualidad vigilada.
 //
-// ── LAS SIETE TRAMPAS QUE ESTE MÓDULO EXISTE PARA NO PISAR ───────────────────
-// Todas MEDIDAS contra el servicio real el 2026-07-27 y documentadas en
-// `test/fixtures/catastro/PROCEDENCIA.md`, que MANDA (regla de oro 8).
+// ── LAS OCHO TRAMPAS QUE ESTE MÓDULO EXISTE PARA NO PISAR ────────────────────
+// Todas MEDIDAS contra el servicio real —las siete primeras el 2026-07-27, la
+// octava el 2026-08-02— y documentadas en `test/fixtures/catastro/PROCEDENCIA.md`,
+// que MANDA (regla de oro 8).
 //
 // 1) **Se cuentan los `<member>`; JAMÁS los atributos de conteo.** Medido: con
 //    `count=10` el cuerpo trae 10 miembros y **tanto `numberMatched` como
@@ -114,6 +116,17 @@
 //    caso reproducible**: un motivo que ningún test puede provocar es un motivo que
 //    nadie ha visto.
 //
+// 8) **El parámetro de `Consulta_DNPRC` se llama `RefCat`, NO `RC`** (F09). Con
+//    `RC=` el servicio contesta HTTP 200 y `cod:"17"` «LA REFERENCIA CATASTRAL ES
+//    OBLIGATORIA» —de una referencia catastral que iba en la petición—. Es el
+//    tercer caso del patrón `cod:16`/`cod:76`: **un fallo NUESTRO contado con el
+//    vocabulario de un dato ausente**. `_catastro-dnp.js#urlDnprc` lo hace
+//    imposible validando la referencia antes de emitir, y `leerDnprc` NO tiene
+//    ninguna tabla que traduzca un `cod` a «esa parcela no existe»: nadie ha
+//    medido cómo se dice eso en ese endpoint. De ahí que `descriptivosPorRefcat`
+//    **no pueda producir `NO_ENCONTRADO`**, y que eso esté escrito y probado en
+//    vez de descubierto.
+//
 // ── EL REPARTO DE NIVELES: TODO ES `AVISO` ───────────────────────────────────
 // La regla del proyecto está fijada en `viewer/_comun.js`: **`ERROR` es lo que
 // BLOQUEA la generación del GML.** Que el Catastro no conteste no bloquea nada —la
@@ -130,10 +143,19 @@
 // y volver a contarlo aquí le diría al usuario **dos veces la misma cosa** en
 // cuanto la app cablee el mismo `alAvisar` a los dos, que es el cableado natural.
 //
-// Lo que sí va por el canal es exactamente lo que **no cabe en el resultado**: un
-// fallo de la CACHÉ. Es el único suceso de este módulo que, sin canal, sería
-// silencioso — la parcela se entrega igual y nadie se enteraría de que el
-// almacenamiento lleva semanas sin funcionar (trampa 6).
+// Lo que sí va por el canal es exactamente lo que **no cabe en el resultado**, y
+// hoy son DOS cosas:
+//
+//   · un fallo de la CACHÉ — la parcela se entrega igual y, sin canal, nadie se
+//     enteraría de que el almacenamiento lleva semanas sin funcionar (trampa 6);
+//   · las DISCREPANCIAS de un `Consulta_DNPRC` (F09, trampa 8): que los 18
+//     inmuebles de una parcela no digan el mismo municipio, o que `control.cudnp`
+//     no cuadre con los inmuebles contados. El dato se entrega —con el campo
+//     conflictivo en `null`, o sea “No consta”—, así que `ok` es `true` y el
+//     invariante del contrato obliga a que `mensaje` sea `null`: **sin este canal
+//     la discrepancia se perdería entera**, que es justo lo que prohíbe la regla
+//     de oro 1. Es la misma prueba de siempre: si un suceso no tiene por dónde
+//     salir, es que falta un sitio por donde sacarlo.
 //
 // ── LO QUE ESTE MÓDULO NO HACE, Y CONVIENE QUE ESTÉ POR ESCRITO ──────────────
 //   · **No deduplica peticiones en vuelo.** Dos llamadas simultáneas a la misma
@@ -157,6 +179,7 @@
 
 import { husoPorSrs } from '../geo/huso.js'
 import { NIVEL, resolverAvisar } from '../viewer/_comun.js'
+import { TIPO_DNPRC, leerDnprc, urlDnprc } from './_catastro-dnp.js'
 import { LONGITUD_REFCAT_PARCELA, TIPO_RCCOOR, leerRccoor, urlRccoor } from './_catastro-ovc.js'
 import {
   COUNT_BBOX_DEFECTO,
@@ -403,7 +426,9 @@ export const CACHE_NULA = Object.freeze({
  * @property {*} datos  El dato pedido, o `null`. Su forma depende de la función:
  *   {@link ParcelaGml} en `parcelaPorRefcat`, `{propia, colindantes}` en
  *   `parcelaYColindantes`, `{parcelas, nMiembros, truncado, count, declarado}` en
- *   `parcelasEnBbox` y `{candidatos, cuantos, unico}` en `refcatPorCoordenada`.
+ *   `parcelasEnBbox`, `{candidatos, cuantos, unico}` en `refcatPorCoordenada` y
+ *   `{municipio, provincia, paraje, poligono, parcela, domicilio, clase}` —los
+ *   siete `string|null` del contrato E— en `descriptivosPorRefcat`.
  * @property {string|null} motivo  Clave de {@link MOTIVO_CATASTRO}; `null` si `ok`.
  * @property {string|null} mensaje  Español presentable tal cual; `null` si `ok`.
  * @property {ProcedenciaCatastro} procedencia
@@ -463,10 +488,34 @@ const MOTIVO_POR_TIPO_RCCOOR = Object.freeze({
 })
 
 /**
- * Guardián de carga: los cuatro mapas de arriba tienen que ser TOTALES sobre su
- * dominio. Si `_red.js`, `_catastro-wfs.js` o `_catastro-ovc.js` añaden un caso y
- * aquí no se traduce, el módulo **no se carga** en vez de traducirlo a `undefined`
- * y meter un `motivo: undefined` en un resultado que la UI daría por bueno.
+ * `TIPO_DNPRC` → {@link MOTIVO_CATASTRO}, para los tipos que no traen datos.
+ *
+ * **Tiene UNA sola entrada, y esa escasez es el dato.** `_catastro-dnp.js` solo
+ * conoce dos desenlaces —`DESCRIPTIVOS` y `RESPUESTA_ILEGIBLE`— porque **nadie ha
+ * medido qué contesta `Consulta_DNPRC` a una referencia que no existe** (hueco
+ * declarado en `PROCEDENCIA.md`). Consecuencia directa y comprobada por test:
+ * `descriptivosPorRefcat` **no puede devolver `NO_ENCONTRADO`**, ni siquiera
+ * cuando el servicio manda un `cod` de error.
+ *
+ * ⛔ **El día que alguien mida ese caso, la tentación será mapear aquí el `cod`
+ * nuevo a `NO_ENCONTRADO` sin más.** No basta: hay que añadir el tipo en
+ * `_catastro-dnp.js`, su fixture en `test/fixtures/catastro/` y su ficha en
+ * `PROCEDENCIA.md`. Y en ningún caso se mete el `"17"` —que es un fallo NUESTRO—
+ * en ese camino: convertiría un bug reproducible en el 100 % de las peticiones en
+ * un tranquilizador «esa parcela no existe».
+ *
+ * @type {Readonly<Record<string, string>>}
+ */
+const MOTIVO_POR_TIPO_DNPRC = Object.freeze({
+  [TIPO_DNPRC.RESPUESTA_ILEGIBLE]: MOTIVO_CATASTRO.RESPUESTA_ILEGIBLE,
+})
+
+/**
+ * Guardián de carga: los cinco mapas de arriba tienen que ser TOTALES sobre su
+ * dominio. Si `_red.js`, `_catastro-wfs.js`, `_catastro-ovc.js` o
+ * `_catastro-dnp.js` añaden un caso y aquí no se traduce, el módulo **no se
+ * carga** en vez de traducirlo a `undefined` y meter un `motivo: undefined` en un
+ * resultado que la UI daría por bueno.
  *
  * Es ruidoso a propósito. Un módulo que no carga se arregla en cinco minutos; un
  * `motivo` indefinido viaja hasta la pantalla.
@@ -482,6 +531,11 @@ for (const [nombre, dominio, mapa] of [
     'TIPO_RCCOOR',
     Object.values(TIPO_RCCOOR).filter((t) => t !== TIPO_RCCOOR.CANDIDATOS),
     MOTIVO_POR_TIPO_RCCOOR,
+  ],
+  [
+    'TIPO_DNPRC',
+    Object.values(TIPO_DNPRC).filter((t) => t !== TIPO_DNPRC.DESCRIPTIVOS),
+    MOTIVO_POR_TIPO_DNPRC,
   ],
   ['MOTIVO_CATASTRO', Object.values(MOTIVO_CATASTRO), NIVEL_POR_MOTIVO],
 ]) {
@@ -670,7 +724,7 @@ function esCache(c) {
  *   Canal de aviso. **Solo se usa para los fallos de la CACHÉ**: ver la cabecera.
  * @returns {{parcelaPorRefcat: Function, parcelaYColindantes: Function,
  *            parcelasEnBbox: Function, refcatPorCoordenada: Function,
- *            estado: Function, destruir: Function}}
+ *            descriptivosPorRefcat: Function, estado: Function, destruir: Function}}
  * @throws {TypeError|RangeError}  Contrato roto por el programador.
  */
 export function crearClienteCatastro(opciones = {}) {
@@ -786,6 +840,25 @@ export function crearClienteCatastro(opciones = {}) {
    * acertaría NUNCA: un clic en el mapa no cae dos veces en el mismo float.
    */
   const clavePunto = (x, y, srs) => `revgeo:${srs}:${Math.round(x)}:${Math.round(y)}`
+
+  /**
+   * Clave de los datos alfanuméricos de una parcela (`Consulta_DNPRC`, F09).
+   *
+   * **SIN SRS, y no es un olvido**: la petición medida tiene tres parámetros
+   * —`Provincia`, `Municipio` y `RefCat`— y **ninguno es un sistema de
+   * referencia**. Meter el SRS en la clave partiría la caché en tres para un dato
+   * que no depende de él, o sea que multiplicaría por tres las peticiones a un
+   * servicio que sanciona el uso abusivo con ~10 días de denegación (override O8).
+   *
+   * **Reutiliza el prefijo `parcela:`, y eso es deliberado**: `storage/
+   * cache-catastro.js#ALMACEN_POR_PREFIJO` LANZA con una clave cuyo prefijo no
+   * conoce, así que un prefijo nuevo exigiría tocar `storage/` (y probablemente
+   * una migración). Con el sufijo `:descriptivos` la entrada es inconfundible y no
+   * pisa a nadie — es el mismo recurso que ya usa {@link claveVecindad}. Si algún
+   * día estos datos merecen almacén propio, se añade allí la entrada; hasta
+   * entonces, viven al lado de la parcela a la que describen.
+   */
+  const claveDescriptivos = (refcat) => `parcela:${refcat}:descriptivos`
 
   /**
    * Consulta la caché. **Nunca lanza y nunca cambia el curso de la consulta**: si
@@ -1318,6 +1391,149 @@ export function crearClienteCatastro(opciones = {}) {
     })
   }
 
+  /**
+   * Los DATOS ALFANUMÉRICOS de una parcela: municipio, provincia, paraje,
+   * polígono/parcela, domicilio y clase (OVC Callejero, `Consulta_DNPRC`). Es el
+   * **contrato E de F09**: lo que el encabezado del informe de contraste imprime
+   * y que la geometría del WFS no trae.
+   *
+   * ```js
+   * const r = await catastro.descriptivosPorRefcat(refcat)
+   * if (r.ok) encabezado(r.datos)   // los SIETE campos, string|null cada uno
+   * ```
+   *
+   * ⚠️ **`null` en un campo NO es un fallo: es «el servicio no lo trae», y el
+   * informe lo imprime como “No consta”.** En la parcela urbana de referencia del
+   * proyecto llegan municipio y provincia y **no** llegan paraje, polígono,
+   * parcela ni domicilio — porque es urbana y porque su respuesta viene por la
+   * rama de varios inmuebles, que no trae `ldt`. Eso está MEDIDO, no supuesto.
+   *
+   * ⛔ **NO acepta `srs`, y no por descuido**: esta operación **no lleva sistema
+   * de referencia** (la petición medida tiene tres parámetros y ninguno lo es).
+   * Pasarlo lanza en vez de ignorarse en silencio: un `srs` aceptado y tirado a la
+   * basura le haría creer a quien lo escribió que ha pedido algo que no ha pedido.
+   *
+   * ⛔ **NO puede devolver `NO_ENCONTRADO`** (trampa 8): nadie ha medido qué
+   * contesta este endpoint a una referencia inexistente, así que ningún `cod` se
+   * traduce a «esa parcela no está». Un error del servicio sale como
+   * `RESPUESTA_ILEGIBLE` con el `cod` y el `des` literales dentro del mensaje.
+   *
+   * **Caché primero, igual que `parcelaPorRefcat`** y por el mismo motivo (trampa
+   * 6): es una petición por parcela y por informe, y es la mayor medida
+   * anti-bloqueo que tiene el cliente. Se cachea **el texto crudo**, no el objeto
+   * ya leído, por las tres razones de {@link leerColeccionDeCache}: una corrección
+   * futura del lector arregla retroactivamente lo ya guardado, los bytes son la
+   * verdad externa y la forma del POJO es interna.
+   *
+   * Las discrepancias entre inmuebles y los contadores que no cuadran **salen por
+   * el canal de aviso**, no por el resultado: el dato se entrega igual (con el
+   * campo conflictivo en `null`) y el invariante del contrato obliga a que un
+   * resultado con `ok: true` lleve `mensaje: null`. Sin canal se perderían.
+   *
+   * @param {*} refcatCrudo  Lo que haya escrito el usuario; se normaliza aquí.
+   * @param {object} [opciones]
+   * @param {AbortSignal|null} [opciones.senal]
+   * @returns {Promise<ResultadoCatastro>}  `datos` es un
+   *   {@link import('./_catastro-dnp.js').Descriptivos}.
+   * @throws {TypeError}  Contrato roto por el programador (`opciones` que no es
+   *   objeto, o un `srs` que esta operación no tiene). **Una referencia mal
+   *   escrita NO lanza**: es dato del usuario y sale como `ENTRADA_INVALIDA`.
+   */
+  async function descriptivosPorRefcat(refcatCrudo, opciones = {}) {
+    const inicio = ahora()
+    if (opciones === null || typeof opciones !== 'object') {
+      throw new TypeError(
+        `descriptivosPorRefcat: 'opciones' debe ser un objeto; recibido ${typeof opciones}.`,
+      )
+    }
+    if (opciones.srs !== undefined) {
+      throw new TypeError(
+        `descriptivosPorRefcat: esta consulta NO lleva sistema de referencia y se ha recibido ` +
+          `srs=${JSON.stringify(opciones.srs)}. La petición medida (Consulta_DNPRC) tiene tres ` +
+          `parámetros —Provincia, Municipio y RefCat— y ninguno es un SRS: son datos ` +
+          `alfanuméricos, no geometría. Se lanza en vez de ignorarlo para que nadie crea que ` +
+          `ha pedido algo que no ha pedido.`,
+      )
+    }
+    const senal = opciones.senal === undefined ? null : opciones.senal
+    cuenta.consultas += 1
+    if (destruido) return cancelado(inicio)
+
+    const refcat = normalizarRefcat(refcatCrudo)
+    if (refcat === null) {
+      return local(
+        MOTIVO_CATASTRO.ENTRADA_INVALIDA,
+        `«${String(refcatCrudo)}» no tiene forma de referencia catastral de parcela: se ` +
+          `esperan ${LONGITUD_REFCAT_PARCELA} caracteres, solo letras y números (por ejemplo, ` +
+          `9398516VK3799G). No se consulta al Catastro: sin una referencia utilizable el ` +
+          `servicio contesta que «LA REFERENCIA CATASTRAL ES OBLIGATORIA», que suena a dato ` +
+          `que falta y en realidad es una petición mal construida.`,
+        inicio,
+      )
+    }
+
+    /** Convierte un {@link ResultadoDnprc} ya leído en el resultado público. */
+    const entregar = (dnp, procedencia) => {
+      if (dnp.tipo !== TIPO_DNPRC.DESCRIPTIVOS) {
+        return procedencia.origen === ORIGEN.RED
+          ? fallar(MOTIVO_POR_TIPO_DNPRC[dnp.tipo], dnp.mensaje, inicio, procedencia)
+          : null
+      }
+      // Lo que no cabe en el resultado sale por el canal. Una sola llamada, con
+      // todas las notas juntas: el usuario no necesita cuatro avisos seguidos.
+      if (dnp.avisos.length > 0) {
+        avisar(
+          `El Catastro ha devuelto los datos de la parcela ${refcat}, pero no son del todo ` +
+            `consistentes: ${dnp.avisos.join(' ')} Los campos afectados se quedan sin ` +
+            `determinar y el informe los imprimirá como «No consta».`,
+          { nivel: NIVEL.AVISO },
+        )
+      }
+      return crearResultado({
+        ok: true,
+        datos: dnp.datos,
+        origen: procedencia.origen,
+        edadMs: procedencia.edadMs ?? null,
+        intentos: procedencia.intentos ?? 0,
+        inicio,
+        url: procedencia.url ?? null,
+      })
+    }
+
+    const clave = claveDescriptivos(refcat)
+    const enCache = await leerDeCache(clave)
+    if (enCache !== null && typeof enCache.valor === 'string') {
+      const deCache = entregar(leerDnprc(enCache.valor), {
+        origen: ORIGEN.CACHE,
+        edadMs: enCache.edadMs,
+      })
+      // Un cuerpo cacheado que ya no se puede leer NO es un error: se trata como
+      // si no estuviera y se va a la red (misma regla que `leerColeccionDeCache`).
+      if (deCache !== null) return deCache
+    }
+
+    const url = urlDnprc(refcat)
+    const http = await transporte.pedirTexto(url, { senal })
+    const proc = { origen: ORIGEN.RED, intentos: http.intentos, url }
+    cuenta.deRed += 1
+
+    if (!http.ok) return fallar(MOTIVO_POR_MOTIVO_RED[http.motivo], http.mensaje, inicio, proc)
+    if (typeof http.texto !== 'string') {
+      return fallar(
+        MOTIVO_CATASTRO.RESPUESTA_ILEGIBLE,
+        'El servicio de datos alfanuméricos del Catastro ha respondido sin cuerpo: no hay nada ' +
+          'que leer.',
+        inicio,
+        proc,
+      )
+    }
+
+    const dnp = leerDnprc(http.texto)
+    const entregado = entregar(dnp, proc)
+    if (dnp.tipo === TIPO_DNPRC.DESCRIPTIVOS) await guardarEnCache(clave, http.texto)
+    return entregado
+  }
+
   // ── Estado y cierre ─────────────────────────────────────────────────────────
 
   /**
@@ -1358,6 +1574,7 @@ export function crearClienteCatastro(opciones = {}) {
     parcelaYColindantes,
     parcelasEnBbox,
     refcatPorCoordenada,
+    descriptivosPorRefcat,
     estado,
     destruir,
   }
