@@ -258,6 +258,7 @@ function montar({
   cliente: clienteDoble,
   conDiagnostico = false,
   conCatastro = false,
+  entradasExtra = [],
 } = {}) {
   const { mapa, destruir: destruirMapa } = montarMapa({ zoom: 19 })
 
@@ -288,6 +289,7 @@ function montar({
     cliente,
     srs: SRS,
     cajonDiagnostico,
+    entradasExtra,
     ventana: window,
   })
 
@@ -987,5 +989,117 @@ describe('cableado-comprobacion · el campo de la referencia catastral', () => {
     // Y «Deducir del mapa» ENCENDIDO: hay geometría y no hay referencia, que es
     // exactamente lo que el campo vacío está diciendo. No hay contradicción.
     expect(botonDeducir.disabled).toBe(false)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+// F10 · T5.1 · las entradas AJENAS de la única zona de fichero
+//
+// F10 necesita meter un `.json` por la misma puerta, y lo que NO se puede hacer es
+// instanciar una segunda `crearZonaFichero`: engancha `dragenter`/`dragover`/
+// `dragleave`/`drop` en la VENTANA ENTERA, así que dos zonas vivas cancelarían las
+// dos el mismo `drop` y entregarían el mismo fichero a dos destinos. Se prueba el
+// ENRUTADO, que es lo único que este módulo aporta a aquello.
+// ══════════════════════════════════════════════════════════════════════════════
+describe('F08 · T5.1 (ampliado en F10) · entradas ajenas por extensión', () => {
+  /** Una entrada ajena que solo apunta lo que le llega. */
+  function entradaEspia(extensiones = ['.json']) {
+    const recibidos = []
+    return { recibidos, entrada: { extensiones, alFichero: (f) => recibidos.push(f.name) } }
+  }
+
+  it('un fichero de una extensión ajena va a su destino y NO se comprueba como GML', async () => {
+    const { recibidos, entrada } = entradaEspia()
+    const { cajon } = montar({ entradasExtra: [entrada] })
+    const pintar = vi.spyOn(cajon, 'pintar')
+
+    await soltarYEsperar(ficheroDeTexto('{"formato":"concreta-gml/proyecto"}', 'p.json'))
+
+    expect(recibidos).toEqual(['p.json'])
+    // Anti-vacuidad de la mitad negativa: el cajón de comprobación ni se entera.
+    expect(pintar).not.toHaveBeenCalled()
+  })
+
+  it('…y un `.gml` sigue yendo al recorrido de siempre', async () => {
+    const { recibidos, entrada } = entradaEspia()
+    const { cajon } = montar({ entradasExtra: [entrada] })
+    const pintar = vi.spyOn(cajon, 'pintar')
+
+    await soltarYEsperar(ficheroDeBytes(leerBytes(...GML('UTM_1.gml')), 'UTM_1.gml'))
+
+    expect(recibidos).toEqual([])
+    // El cajón de comprobación SÍ se pinta: el fichero ha hecho el recorrido entero.
+    expect(pintar).toHaveBeenCalled()
+  })
+
+  it('el enrutado NO distingue mayúsculas, como el resto de la zona', async () => {
+    const { recibidos, entrada } = entradaEspia()
+    montar({ entradasExtra: [entrada] })
+    await soltarYEsperar(ficheroDeTexto('{}', 'PROYECTO.JSON'))
+    expect(recibidos).toEqual(['PROYECTO.JSON'])
+  })
+
+  it('la extensión ajena entra en el `accept` del input y en el texto del velo', () => {
+    const { entrada } = entradaEspia()
+    montar({ entradasExtra: [entrada] })
+
+    const input = document.querySelector(`.${CLASE_INPUT}`)
+    expect(input.accept).toBe('.gml,.xml,.json')
+    const velo = document.querySelector('.gml-soltar-superposicion-texto')
+    expect(velo.textContent).toContain('.json')
+  })
+
+  it('⚠️ una extensión ya tomada por el GML NO se puede secuestrar', () => {
+    expect(() => montar({ entradasExtra: [{ extensiones: ['.gml'], alFichero: () => {} }] })).toThrow(
+      /ya está tomada/,
+    )
+  })
+
+  it('dos entradas que se peleen por la misma extensión revientan al cablear', () => {
+    expect(() =>
+      montar({
+        entradasExtra: [
+          { extensiones: ['.json'], alFichero: () => {} },
+          { extensiones: ['.json'], alFichero: () => {} },
+        ],
+      }),
+    ).toThrow(/ya está tomada/)
+  })
+
+  it('una entrada mal escrita revienta nombrando su índice, no en el primer fichero', () => {
+    expect(() => montar({ entradasExtra: [{ extensiones: ['json'], alFichero: () => {} }] })).toThrow(
+      /entradasExtra\[0\]/,
+    )
+    expect(() => montar({ entradasExtra: [{ extensiones: ['.json'], alFichero: 'no' }] })).toThrow(
+      /entradasExtra\[0\]\.alFichero/,
+    )
+  })
+
+  it('un destino ajeno que revienta se cuenta por el panel, no se pierde', async () => {
+    const { panel } = montar({
+      entradasExtra: [
+        {
+          extensiones: ['.json'],
+          alFichero: () => {
+            throw new Error('boom')
+          },
+        },
+      ],
+    })
+    await soltarYEsperar(ficheroDeTexto('{}', 'p.json'))
+    expect(panel.avisar).toHaveBeenCalled()
+  })
+
+  it('`elegirFichero()` abre el selector de ESTA zona y de ninguna otra', () => {
+    const { cableado } = montar()
+    const input = document.querySelector(`.${CLASE_INPUT}`)
+    const clic = vi.spyOn(input, 'click').mockImplementation(() => {})
+    cableado.elegirFichero()
+    expect(clic).toHaveBeenCalledTimes(1)
+    // Y después de destruir no abre nada: un selector cuyo `change` no escucha nadie
+    // es un gesto que no lleva a ninguna parte.
+    cableado.destruir()
+    cableado.elegirFichero()
+    expect(clic).toHaveBeenCalledTimes(1)
   })
 })

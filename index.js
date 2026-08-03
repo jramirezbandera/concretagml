@@ -92,6 +92,23 @@ export * as comprobacion from './comprobacion/gml.js'
 // en producción y verde en la suite.
 export * as report from './report/index.js'
 
+// ── F10 · `export/` — la capa de SALIDA que no es el GML ─────────────────────
+// Tres ficheros más que la aplicación sabe escribir: el DXF para el CAD, el listado
+// de coordenadas para replanteo y el fichero de proyecto con el que un expediente
+// viaja a otro equipo. Entra por la MISMA razón que `report/` y que `comprobacion/`,
+// y no por simetría: **todo lo de `export/` es puro**. Entra geometría del modelo en
+// UTM y sale una cadena o un POJO; ni `Blob`, ni `document`, ni red, ni reloj (la
+// fecha se inyecta). Se puede cargar tal cual desde el proyecto Vitest `node`.
+//
+// ⚠️ El espacio se llama `exportar` y no `export` porque `export` es palabra
+// reservada: `export * as export from …` es un `SyntaxError`. El DIRECTORIO sí se
+// llama `export/`, que es el nombre que `spec/SPEC.md` §5 lleva reservado.
+//
+// La ENTREGA de esos tres ficheros sigue fuera, en `gml/descargar.js`, con los tipos
+// MIME de cada uno (`TIPO_MIME_DXF`, `TIPO_MIME_JSON`): la asimetría es la misma que
+// con `report/` —el impuro es el CONSUMIDOR del puro— y por eso la frontera aguanta.
+export * as exportar from './export/index.js'
+
 // ── `storage/` NO entra, EN BLOQUE, y no es por el DOM ───────────────────────
 // F09 estrena `storage/pie-firma.js`, que guarda el pie de firma entre sesiones, y
 // conviene decir por qué no sale aunque su vecino `report/firma.js` sí. `storage/`

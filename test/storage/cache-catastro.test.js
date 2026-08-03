@@ -95,7 +95,9 @@ import { fileURLToPath } from 'node:url'
 import { describe, it, expect, vi } from 'vitest'
 
 import {
+  ALMACENES_DE_CACHE,
   ALMACEN_POR_PREFIJO,
+  MOTIVO_PURGA,
   MS_TTL,
   PREFIJO,
   crearCacheCatastro,
@@ -867,5 +869,242 @@ describe('cache-catastro · estado() es el gancho informativo de F10', () => {
     await cache.leer(CLAVE_PARCELA)
     expect(foto.caducados).toBe(1)
     expect(cache.estado().caducados).toBe(2)
+  })
+})
+
+// ── La purga (F10 · T3.4) ────────────────────────────────────────────────────
+//
+// La degradación del criterio 4 de F10. Lo que hay que demostrar no es que borre
+// —eso es un `delete`—, sino las tres cosas que la hacen segura:
+//
+//   1. que **NO se lleva lo que todavía sirve**, porque esta caché es la mitigación
+//      anti-bloqueo del régimen O8 y el bloqueo del Catastro dura ~10 días;
+//   2. que **no puede alcanzar** los expedientes del usuario ni el pie de firma, que
+//      viven en la misma base y no son caché;
+//   3. que **lo dice**, con números, y que no lanza jamás.
+
+describe('cache-catastro · purgarCaducados (F10 · criterio 4)', () => {
+  /** Guarda `n` registros de parcela con la marca de tiempo que se le diga. */
+  async function sembrar(cache, entradas) {
+    for (const [sufijo, guardadoEn] of entradas) {
+      await cache.guardar(`${PREFIJO.PARCELA}${SRS_FIXTURE}:${sufijo}`, GML_PARCELA, { guardadoEn })
+    }
+  }
+
+  it('⭐ borra lo caducado y NO toca lo fresco', async () => {
+    const reloj = { t: T0 }
+    const cache = crearCacheCatastro({ bd: await baseNueva(), ahora: () => reloj.t })
+
+    await sembrar(cache, [
+      ['VIEJA1', T0 - MS_TTL - 1], // caducada por 1 ms
+      ['VIEJA2', T0 - MS_TTL * 3], // caducadísima
+      ['JUSTA', T0 - MS_TTL], // EXACTAMENTE el TTL: todavía acierta
+      ['FRESCA', T0 - 1000],
+    ])
+
+    const r = await cache.purgarCaducados()
+
+    expect(r.ok).toBe(true)
+    expect(r.revisados).toBe(4)
+    expect(r.purgados).toBe(2)
+    expect(r.sinFecha).toBe(0)
+    expect(r.porAlmacen[ALMACENES.PARCELAS]).toBe(2)
+
+    // Y lo que sobrevive, sobrevive de verdad: se lee y acierta.
+    expect(await cache.leer(`${PREFIJO.PARCELA}${SRS_FIXTURE}:FRESCA`)).not.toBeNull()
+    expect(await cache.leer(`${PREFIJO.PARCELA}${SRS_FIXTURE}:JUSTA`)).not.toBeNull()
+    expect(await cache.leer(`${PREFIJO.PARCELA}${SRS_FIXTURE}:VIEJA1`)).toBeNull()
+  })
+
+  it('el límite se compara con `>`, igual que en `leer`: el de exactamente 7 días se queda', async () => {
+    // Es el mismo criterio que la decisión 2 de la cabecera fija para la lectura. Si
+    // los dos divergieran, habría registros que `leer` sirve y la purga tira, o al
+    // revés — y nadie lo notaría hasta que faltase una parcela.
+    const cache = crearCacheCatastro({ bd: await baseNueva(), ahora: () => T0 })
+    await sembrar(cache, [['JUSTA', T0 - MS_TTL]])
+    expect((await cache.purgarCaducados()).purgados).toBe(0)
+    expect(await cache.leer(`${PREFIJO.PARCELA}${SRS_FIXTURE}:JUSTA`)).not.toBeNull()
+  })
+
+  it('un registro con la marca de tiempo rota también se va, y se cuenta APARTE', async () => {
+    // `leer` ya lo trata como caducado y no lo sirve nunca: es peso muerto. Pero «viejo»
+    // y «roto» no son lo mismo, y un `sinFecha` que sube señala a quien escriba mal.
+    const apertura = await baseNueva()
+    const cache = crearCacheCatastro({ bd: apertura, ahora: () => T0 })
+    await apertura.bd.put(ALMACENES.PARCELAS, {
+      refcat: `${PREFIJO.PARCELA}${SRS_FIXTURE}:ROTA`,
+      valor: GML_PARCELA,
+      guardadoEn: undefined,
+    })
+    await sembrar(cache, [['FRESCA', T0 - 1000]])
+
+    const r = await cache.purgarCaducados()
+    expect(r.purgados).toBe(1)
+    expect(r.sinFecha).toBe(1)
+    expect(r.revisados).toBe(2)
+  })
+
+  it('⭐ NO puede alcanzar los expedientes ni el pie de firma, que viven en la misma base', async () => {
+    // Es la garantía que da derivar los almacenes de la tabla de rutas en vez de
+    // escribirlos: una purga por espacio no se lleva el trabajo del usuario.
+    const apertura = await baseNueva()
+    const cache = crearCacheCatastro({ bd: apertura, ahora: () => T0 })
+
+    await apertura.bd.put(ALMACENES.EXPEDIENTES, {
+      id: 'EXP-1',
+      nombre: 'Trabajo del usuario',
+      refcat: null,
+      creado: '2020-01-01T00:00:00.000Z',
+      actualizado: '2020-01-01T00:00:00.000Z', // antiquísimo, por si acaso
+      srs: SRS_FIXTURE,
+      expediente: {},
+    })
+    await apertura.bd.put(ALMACENES.PIE_FIRMA, { id: 'PIE', guardadoEn: T0 - MS_TTL * 100 })
+    await sembrar(cache, [['VIEJA', T0 - MS_TTL * 2]])
+
+    const r = await cache.purgarCaducados()
+    expect(r.purgados).toBe(1)
+    expect(Object.keys(r.porAlmacen).sort()).toEqual([...ALMACENES_DE_CACHE].sort())
+    expect(r.porAlmacen[ALMACENES.EXPEDIENTES]).toBeUndefined()
+
+    // Anti-vacuidad: los dos registros ajenos SIGUEN ahí, no es que no existieran.
+    expect(await apertura.bd.get(ALMACENES.EXPEDIENTES, 'EXP-1')).toBeDefined()
+    expect(await apertura.bd.get(ALMACENES.PIE_FIRMA, 'PIE')).toBeDefined()
+  })
+
+  it('los almacenes de la purga se DERIVAN de la tabla de rutas', () => {
+    expect(ALMACENES_DE_CACHE).toEqual([...new Set(Object.values(ALMACEN_POR_PREFIJO))])
+    expect(ALMACENES_DE_CACHE).toContain(ALMACENES.PARCELAS)
+    expect(ALMACENES_DE_CACHE).toContain(ALMACENES.REVGEO)
+    expect(ALMACENES_DE_CACHE).not.toContain(ALMACENES.EXPEDIENTES)
+    expect(ALMACENES_DE_CACHE).not.toContain(ALMACENES.PIE_FIRMA)
+  })
+
+  it('purga los DOS almacenes, no solo el de parcelas', async () => {
+    const cache = crearCacheCatastro({ bd: await baseNueva(), ahora: () => T0 })
+    await cache.guardar(`${PREFIJO.PARCELA}${SRS_FIXTURE}:VIEJA`, GML_PARCELA, {
+      guardadoEn: T0 - MS_TTL * 2,
+    })
+    await cache.guardar(`${PREFIJO.REVGEO}${SRS_FIXTURE}:1:2`, { pc: 'X' }, {
+      guardadoEn: T0 - MS_TTL * 2,
+    })
+
+    const r = await cache.purgarCaducados()
+    expect(r.purgados).toBe(2)
+    expect(r.porAlmacen[ALMACENES.PARCELAS]).toBe(1)
+    expect(r.porAlmacen[ALMACENES.REVGEO]).toBe(1)
+  })
+
+  it('`bytesAprox` es una estimación POR EXCESO, y no se presenta como exacta', async () => {
+    const cache = crearCacheCatastro({ bd: await baseNueva(), ahora: () => T0 })
+    await sembrar(cache, [['VIEJA', T0 - MS_TTL * 2]])
+    const r = await cache.purgarCaducados()
+    // El GML del fixture ocupa lo suyo: si esto saliera 0, el estimador estaría roto.
+    expect(r.bytesAprox).toBeGreaterThan(GML_PARCELA.length)
+    // Y el nombre del campo dice que es aproximado; el mensaje, también.
+    expect(r.mensaje).toMatch(/unos \d+ kB/)
+  })
+
+  it('siempre DICE lo que ha tirado, y también cuando no ha tirado nada', async () => {
+    const avisos = []
+    const cache = crearCacheCatastro({
+      bd: await baseNueva(),
+      ahora: () => T0,
+      alAvisar: (m) => avisos.push(m),
+    })
+
+    // Sin nada caducado: hay mensaje, pero NO se avisa (sería ruido puro).
+    await sembrar(cache, [['FRESCA', T0 - 1000]])
+    const sinNada = await cache.purgarCaducados()
+    expect(sinNada.ok).toBe(true)
+    expect(sinNada.purgados).toBe(0)
+    expect(sinNada.mensaje).toMatch(/No había nada caducado/)
+    expect(avisos).toHaveLength(0)
+
+    // Con algo caducado: se avisa una vez, con la cifra dentro.
+    await sembrar(cache, [['VIEJA', T0 - MS_TTL * 2]])
+    const conAlgo = await cache.purgarCaducados()
+    expect(conAlgo.purgados).toBe(1)
+    expect(avisos).toHaveLength(1)
+    expect(avisos[0]).toContain('1 de los 2')
+    expect(avisos[0]).toMatch(/irá al servicio del Catastro/)
+  })
+
+  it('los contadores de `estado()` cuentan las purgas', async () => {
+    const cache = crearCacheCatastro({ bd: await baseNueva(), ahora: () => T0 })
+    await sembrar(cache, [['V1', T0 - MS_TTL * 2], ['V2', T0 - MS_TTL * 2]])
+    expect(cache.estado().purgas).toBe(0)
+    await cache.purgarCaducados()
+    await cache.purgarCaducados()
+    expect(cache.estado().purgas).toBe(2)
+    expect(cache.estado().purgados).toBe(2) // los dos de la primera; la segunda, cero
+  })
+
+  it('sin base no lanza: degrada con SIN_BD y su frase', async () => {
+    const cache = crearCacheCatastro({ bd: null, alAvisar: () => {} })
+    const r = await cache.purgarCaducados()
+    expect(r.ok).toBe(false)
+    expect(r.motivo).toBe(MOTIVO_PURGA.SIN_BD)
+    expect(r.purgados).toBe(0)
+    expect(typeof r.mensaje).toBe('string')
+  })
+
+  it('una base que cumple el PUERTO pero no sabe listar degrada con SIN_SOPORTE', async () => {
+    // `esBase` solo exige `get` y `put` —que es lo que pide el puerto— y no se le sube
+    // el listón para no dejar fuera a los dobles legítimos. La capacidad extra se
+    // comprueba donde hace falta, y su ausencia se cuenta, no se lanza.
+    const cache = crearCacheCatastro({ bd: baseConLecturaRota(), alAvisar: () => {} })
+    const r = await cache.purgarCaducados()
+    expect(r.ok).toBe(false)
+    expect(r.motivo).toBe(MOTIVO_PURGA.SIN_SOPORTE)
+  })
+
+  it('si el borrado revienta a mitad, lo borrado sigue borrado y se dice cuánto', async () => {
+    const apertura = await baseNueva()
+    const cache = crearCacheCatastro({ bd: apertura, ahora: () => T0, alAvisar: () => {} })
+    await sembrar(cache, [['V1', T0 - MS_TTL * 2], ['V2', T0 - MS_TTL * 2]])
+
+    // Una base que borra el primero y revienta con el segundo.
+    let borrados = 0
+    const rota = {
+      get: (a, k) => apertura.bd.get(a, k),
+      put: (a, v) => apertura.bd.put(a, v),
+      getAll: (a) => apertura.bd.getAll(a),
+      delete: async (a, k) => {
+        borrados += 1
+        if (borrados > 1) throw new DOMException('Transaction aborted.', 'AbortError')
+        return apertura.bd.delete(a, k)
+      },
+    }
+    const conFallo = crearCacheCatastro({ bd: rota, ahora: () => T0, alAvisar: () => {} })
+
+    const r = await conFallo.purgarCaducados()
+    expect(r.ok).toBe(false)
+    expect(r.motivo).toBe(MOTIVO_PURGA.ERROR)
+    expect(r.purgados).toBe(1)
+    expect(r.mensaje).toContain('1 registro(s)')
+    // Y el que sí se borró, borrado está: no hay medias tintas escondidas.
+    expect(await apertura.bd.count(ALMACENES.PARCELAS)).toBe(1)
+    expect(conFallo.estado().purgados).toBe(1)
+  })
+
+  it('un `ttlMs` inservible LANZA: borraría lo que todavía sirve', async () => {
+    const cache = crearCacheCatastro({ bd: await baseNueva(), ahora: () => T0 })
+    for (const ttlMs of [-1, NaN, Infinity, '7 días', null]) {
+      await expect(cache.purgarCaducados({ ttlMs })).rejects.toThrow(RangeError)
+    }
+    // Y un `ttlMs: 0` sí vale: es «purga todo lo que no se acabe de guardar».
+    await sembrar(cache, [['VIEJA', T0 - 1]])
+    expect((await cache.purgarCaducados({ ttlMs: 0 })).purgados).toBe(1)
+  })
+
+  it('`purgarCaducados` NO forma parte del puerto que consume el cliente', async () => {
+    // El cliente del Catastro sigue sin saber que esto se puede purgar, que es lo
+    // correcto: quién purga y cuándo es del cableado.
+    expect(Object.keys(CACHE_NULA)).not.toContain('purgarCaducados')
+    const cache = crearCacheCatastro({ bd: null, alAvisar: () => {} })
+    for (const clave of Object.keys(CACHE_NULA)) {
+      expect(typeof cache[clave]).toBe('function') // el puerto entero sigue estando
+    }
   })
 })

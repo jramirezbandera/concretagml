@@ -41,6 +41,15 @@
 // versión subió sola. Se deja escrito porque un diseño que dice «el día de mañana
 // esto será fácil» solo vale cuando llega ese día y se puede contar cómo fue.
 //
+// ✅ **Y comprobado otra vez en F10** (2026-08-03) con `expedientes`, aunque con
+// un matiz que conviene contar entero: **el almacén sí fueron las tres líneas de
+// siempre**, pero era el PRIMERO con índices, y eso obligó a que
+// {@link ESQUEMA_ALMACENES} aprendiera a declararlos —y a declararlos
+// obligatoriamente, también los almacenes que no tienen ninguno—. O sea: la parte
+// que la receta prometía barata salió barata; lo que costó fue la capacidad NUEVA,
+// que es exactamente donde uno espera pagar. La próxima vez que alguien añada un
+// almacén con índices ya no paga esto.
+//
 // ── LA ESCALERA SE APLICA CON `<`, NUNCA CON `===` ───────────────────────────
 // `aplicarMigraciones` ejecuta TODA migración cuya `version` sea mayor que la
 // versión que el navegador tenía (`oldVersion`), en orden. Un navegador que llega
@@ -201,6 +210,21 @@ export const ALMACENES = Object.freeze({
    * un almacén propio se borra entero de una vez.
    */
   PIE_FIRMA: 'pieFirma',
+  /**
+   * F10 · Los expedientes guardados, más el borrador del autoguardado. Clave: un
+   * identificador propio (`id`), NO la referencia catastral — se pueden guardar
+   * dos expedientes de la misma parcela (un antes y un después, dos hipótesis de
+   * lindero) y con la referencia por clave el segundo pisaría al primero sin que
+   * nadie lo pidiera. La referencia se guarda igual, pero como ÍNDICE.
+   *
+   * ⚠️ **Es el primer almacén de la base CON ÍNDICES.** Antes de F10 no había un
+   * solo `createIndex` en el proyecto, y por eso {@link ESQUEMA_ALMACENES} tuvo
+   * que aprender a declararlos: ver la nota de su bloque.
+   *
+   * Quién escribe aquí y qué guarda exactamente es de `storage/expedientes.js`,
+   * su único dueño.
+   */
+  EXPEDIENTES: 'expedientes',
 })
 
 /**
@@ -218,8 +242,23 @@ export const ALMACENES = Object.freeze({
  * Las claves se computan desde {@link ALMACENES}: el nombre de un almacén se
  * escribe UNA vez en este fichero.
  *
+ * ── POR QUÉ `indices` ES OBLIGATORIO Y NO OPCIONAL (F10) ─────────────────────
+ * Hasta F10 esta declaración solo decía `keyPath`, porque no había un solo
+ * `createIndex` en el proyecto. El almacén de expedientes estrena los índices, y
+ * con ellos aparece un agujero que conviene no dejar abierto: si `indices` fuera
+ * opcional, un almacén que se olvidara de declararlos quedaría **medio vigilado**
+ * —el test compararía su `keyPath` y no sus índices— y el olvido no daría la cara
+ * hasta que alguien hiciera un `getAllFromIndex` sobre un índice inexistente, con
+ * `NotFoundError`, en otro momento y en otro fichero. Así que **todas** las
+ * entradas lo declaran, y las tres que no tienen ninguno declaran `{}` a
+ * propósito: «no tiene índices» es una afirmación, no una ausencia.
+ * {@link comprobarInvariantes} lo exige al cargar el módulo.
+ *
  * @readonly
- * @type {Readonly<Record<string, Readonly<{keyPath: string}>>>}
+ * @type {Readonly<Record<string, Readonly<{
+ *   keyPath: string,
+ *   indices: Readonly<Record<string, Readonly<{keyPath: string, unique: boolean}>>>
+ * }>>>}
  */
 export const ESQUEMA_ALMACENES = Object.freeze({
   /**
@@ -227,7 +266,7 @@ export const ESQUEMA_ALMACENES = Object.freeze({
    * da desde F00 (`model/parcela.js`), NO `refCatastral` (ver la cabecera). El
    * registro guardado es un POJO que la lleva dentro; IndexedDB la extrae solo.
    */
-  [ALMACENES.PARCELAS]: Object.freeze({ keyPath: 'refcat' }),
+  [ALMACENES.PARCELAS]: Object.freeze({ keyPath: 'refcat', indices: Object.freeze({}) }),
   /**
    * `keyPath: 'clave'` — clave COMPUESTA por el llamante: `x,y,srs` con las
    * coordenadas ya redondeadas (`spec/feature-05-catastro-vivo.md`: «`round(x),
@@ -244,7 +283,7 @@ export const ESQUEMA_ALMACENES = Object.freeze({
    * registros «iguales» con distinto redondeo convivirían sin que nada lo
    * denuncie. Con una cadena canónica, la clave ES la política.
    */
-  [ALMACENES.REVGEO]: Object.freeze({ keyPath: 'clave' }),
+  [ALMACENES.REVGEO]: Object.freeze({ keyPath: 'clave', indices: Object.freeze({}) }),
   /**
    * `keyPath: 'id'` — y la clave la escribe el llamante, que siempre pone LA
    * MISMA (`storage/pie-firma.js#CLAVE_PIE_FIRMA`). Es deliberado: con una clave
@@ -257,7 +296,40 @@ export const ESQUEMA_ALMACENES = Object.freeze({
    * almacén se enruta por la tabla de prefijos de la caché: no es caché, no tiene
    * TTL y no se purga.
    */
-  [ALMACENES.PIE_FIRMA]: Object.freeze({ keyPath: 'id' }),
+  [ALMACENES.PIE_FIRMA]: Object.freeze({ keyPath: 'id', indices: Object.freeze({}) }),
+  /**
+   * F10 · `keyPath: 'id'` — identificador propio del registro, que escribe
+   * `storage/expedientes.js`. Con la referencia catastral por clave, guardar dos
+   * versiones de la misma parcela pisaría la primera; y una parcela sin
+   * referencia (dibujada, de un DXF, de un GML ajeno) no tendría clave ninguna.
+   *
+   * **Dos índices, y los dos existen por una pregunta concreta de la interfaz:**
+   *
+   *   · `actualizado` — el orden de la lista de expedientes. ⚠️ **Medido en la
+   *     fase 0 de F10:** un `getAll()` sobre este índice devuelve **el más
+   *     ANTIGUO primero** (ascendente por clave), que es justo al revés de lo que
+   *     una lista de trabajos recientes quiere. Quien lea por aquí recorre con
+   *     `openCursor(null, 'prev')`. Se deja escrito porque la ficha de la fase
+   *     decía `getAllFromIndex` a secas y el orden resultante habría pasado por
+   *     bueno: sale una lista plausible, solo que del revés.
+   *
+   *   · `refcat` — para responder «¿tengo ya algo guardado de esta parcela?»
+   *     cuando entra una referencia. **No es `unique`**, y esa es la mitad del
+   *     motivo por el que la clave no es la referencia: varios expedientes de la
+   *     misma parcela son el caso normal, no una anomalía. Un registro sin
+   *     referencia (`refcat: null`) sencillamente **no aparece en el índice** —
+   *     IndexedDB no indexa las entradas cuyo valor de índice es `undefined`, y
+   *     `null` sí es indexable pero agrupa a todos los anónimos bajo la misma
+   *     clave; por eso el listado NO se hace por este índice, sino por
+   *     `actualizado`, que todo registro tiene siempre.
+   */
+  [ALMACENES.EXPEDIENTES]: Object.freeze({
+    keyPath: 'id',
+    indices: Object.freeze({
+      actualizado: Object.freeze({ keyPath: 'actualizado', unique: false }),
+      refcat: Object.freeze({ keyPath: 'refcat', unique: false }),
+    }),
+  }),
 })
 
 // ── Escalera de migraciones ──────────────────────────────────────────────────
@@ -319,6 +391,26 @@ export const MIGRACIONES = Object.freeze([
     // `aplicarMigraciones` sostiene y lo que un `===` habría roto en silencio.
     aplicar(bd) {
       bd.createObjectStore('pieFirma', { keyPath: 'id' })
+    },
+  }),
+  Object.freeze({
+    version: 3,
+    // F10 · los expedientes guardados y el borrador del autoguardado.
+    //
+    // PRIMER peldaño que crea ÍNDICES. `createObjectStore` devuelve el almacén ya
+    // creado dentro de la transacción `versionchange`, y es AHÍ —y solo ahí—
+    // donde se puede llamar a `createIndex`: fuera de un `upgradeneeded` la
+    // llamada lanza `InvalidStateError`. Por eso el índice se crea aquí, en la
+    // historia, y no en la primera escritura.
+    //
+    // Los nombres y los `keyPath` van LITERALES, como en los dos peldaños de
+    // arriba y por el mismo motivo escrito en la cabecera de MIGRACIONES: una
+    // migración que se derivara de ESQUEMA_ALMACENES cambiaría con el tiempo y
+    // dejaría de describir lo que de verdad se aplicó en la base de alguien.
+    aplicar(bd) {
+      const almacen = bd.createObjectStore('expedientes', { keyPath: 'id' })
+      almacen.createIndex('actualizado', 'actualizado', { unique: false })
+      almacen.createIndex('refcat', 'refcat', { unique: false })
     },
   }),
 ])
@@ -383,8 +475,10 @@ export function aplicarMigraciones(bd, versionAnterior, { tx = null, migraciones
  * `import` —en el arranque de la app y en la primera prueba que la toque— y no
  * cuando alguien acierte a ejecutar la suite completa.
  *
- * Son los tres pares que pueden separarse al añadir un almacén (F10):
- * nombre ↔ esquema, esquema ↔ nombre, y peldaño ↔ versión.
+ * Son los pares que pueden separarse al añadir un almacén: nombre ↔ esquema,
+ * esquema ↔ nombre, peldaño ↔ versión, y —desde F10— **esquema ↔ declaración de
+ * índices**, que es el que se acaba de estrenar y por tanto el más fácil de
+ * olvidar la próxima vez.
  *
  * @throws {Error}  Nombrando exactamente lo que falta.
  */
@@ -410,6 +504,31 @@ function comprobarInvariantes() {
       `storage/bd.js: ESQUEMA_ALMACENES declara almacenes que no están en ALMACENES ` +
         `(${sinAlmacen.join(', ')}). Nadie podría nombrarlos para leerlos.`,
     )
+  }
+  // F10 · `indices` es OBLIGATORIO en toda entrada, aunque sea `{}` (ver el bloque
+  // de ESQUEMA_ALMACENES). Un almacén sin la clave quedaría medio vigilado por el
+  // test, y el olvido no daría la cara hasta el primer `getAllFromIndex`.
+  for (const [nombre, esquema] of Object.entries(ESQUEMA_ALMACENES)) {
+    if (typeof esquema.keyPath !== 'string' || esquema.keyPath.length === 0) {
+      throw new Error(
+        `storage/bd.js: ESQUEMA_ALMACENES['${nombre}'] no declara un 'keyPath' de texto.`,
+      )
+    }
+    if (!esquema.indices || typeof esquema.indices !== 'object') {
+      throw new Error(
+        `storage/bd.js: ESQUEMA_ALMACENES['${nombre}'] no declara 'indices'. Es obligatorio ` +
+          'aunque el almacén no tenga ninguno: escribe `indices: Object.freeze({})`. ' +
+          '«No tiene índices» es una afirmación que el test comprueba, no una ausencia.',
+      )
+    }
+    for (const [indice, def] of Object.entries(esquema.indices)) {
+      if (typeof def?.keyPath !== 'string' || typeof def?.unique !== 'boolean') {
+        throw new Error(
+          `storage/bd.js: ESQUEMA_ALMACENES['${nombre}'].indices['${indice}'] debe declarar ` +
+            `'keyPath' (texto) y 'unique' (booleano); recibido ${JSON.stringify(def)}.`,
+        )
+      }
+    }
   }
   MIGRACIONES.forEach((migracion, i) => {
     if (migracion.version !== i + 1) {
@@ -460,6 +579,20 @@ export const MOTIVO_SIN_BD = Object.freeze({
  *   {@link MOTIVO_SIN_BD}.
  * @property {string|null} mensaje  `null` si `disponible`; si no, texto en
  *   castellano directamente presentable al usuario (regla de oro 1).
+ */
+
+/**
+ * F10 · Lo que recibe quien quiera DECIDIR qué hacer cuando otra pestaña necesita
+ * subir la versión de la base y esta se lo está impidiendo.
+ *
+ * `cerrar()` desbloquea a la otra pestaña al instante, y deja esta conexión
+ * inservible: a partir de ahí toda lectura y toda escritura fallan con
+ * `InvalidStateError`. Por eso la acción se entrega y no se ejecuta sola — quien
+ * la llame debería tener a mano cómo decirle al usuario que recargue.
+ *
+ * @callback AlVersionChange
+ * @param {{versionAnterior: number, versionNueva: number, cerrar: () => void}} evento
+ * @returns {void}
  */
 
 /** Resultado de una apertura que ha salido bien. */
@@ -524,10 +657,11 @@ function esFabricaIndexedDb(f) {
  *
  * @param {*} fabrica  Fábrica ya validada.
  * @param {import('../viewer/_comun.js').Avisar} avisar
+ * @param {AlVersionChange|null} alVersionChange  Ver {@link abrirBd}.
  * @returns {Promise<*>}  Promesa de la base envuelta por `idb`; rechaza con lo que
  *   rechace la petición de apertura.
  */
-function abrirConEscalera(fabrica, avisar) {
+function abrirConEscalera(fabrica, avisar, alVersionChange) {
   const peticion = fabrica.open(NOMBRE_BD, VERSION_BD)
   const promesa = wrap(peticion)
 
@@ -555,13 +689,18 @@ function abrirConEscalera(fabrica, avisar) {
     (bd) => {
       // SOMOS NOSOTROS LOS QUE BLOQUEAMOS a otra pestaña que quiere actualizar.
       //
-      // DECISIÓN: NO se cierra la conexión aquí, aunque cerrarla desbloquearía a
-      // la otra pestaña al instante. Cerrarla dejaría a ESTA pestaña con una base
-      // muerta cuyos fallos aparecerían después y en otro sitio
-      // (`InvalidStateError` en la primera lectura de caché), que es peor que el
-      // bloqueo: el usuario no relacionaría una cosa con la otra. Se le cuenta lo
-      // que pasa y se le da la acción —recargar—, y la decisión de cerrar queda
-      // para la capa que tiene UI con la que preguntar (F10).
+      // DECISIÓN (F05): NO se cierra la conexión aquí por nuestra cuenta, aunque
+      // cerrarla desbloquearía a la otra pestaña al instante. Cerrarla dejaría a
+      // ESTA pestaña con una base muerta cuyos fallos aparecerían después y en
+      // otro sitio (`InvalidStateError` en la primera lectura de caché), que es
+      // peor que el bloqueo: el usuario no relacionaría una cosa con la otra.
+      //
+      // ✅ RESUELTO EN F10, y el reparto es el que aquella nota anticipaba: este
+      // módulo sigue sin decidir —avisa siempre, que es el suelo de la regla 1— y
+      // además le PASA LA DECISIÓN a quien sí tiene con qué preguntar, con el
+      // `cerrar()` ya preparado. Sin capacidad de cerrar, la otra pestaña se queda
+      // esperando para siempre; con ella escondida dentro de `bd.js`, la
+      // decisión la tomaría el módulo que menos sabe del usuario.
       bd.addEventListener('versionchange', (evento) => {
         avisar(
           'Otra pestaña de esta aplicación necesita actualizar el almacén local ' +
@@ -569,6 +708,16 @@ function abrirConEscalera(fabrica, avisar) {
             'Recarga esta página para que pueda continuar.',
           { nivel: NIVEL.AVISO, causa: evento },
         )
+        if (alVersionChange !== null) {
+          alVersionChange({
+            versionAnterior: evento.oldVersion,
+            versionNueva: evento.newVersion,
+            // Cerrar es IRREVERSIBLE para esta conexión: después, toda lectura y
+            // toda escritura fallan con `InvalidStateError`. Por eso se entrega
+            // como acción explícita y no se ejecuta sola.
+            cerrar: () => bd.close(),
+          })
+        }
       })
 
       // TERMINACIÓN ANORMAL: el navegador ha cerrado la conexión por su cuenta
@@ -602,11 +751,11 @@ function abrirConEscalera(fabrica, avisar) {
  * (regla de oro 1). Lanzar queda para el contrato roto por el programador.
  *
  * MEMOIZACIÓN: la segunda llamada devuelve LA MISMA promesa, no una equivalente.
- * Como consecuencia, `alAvisar` e `indexedDB` los fija la PRIMERA llamada —así
- * que la aplicación debe cablear su avisador al arrancar, antes de que nadie
- * consulte la caché—. Solo se memoiza el éxito: si la apertura falla, el memo se
- * olvida para que una llamada posterior pueda reintentar (la causa típica —otra
- * pestaña, o cuota momentánea— se resuelve sola con el tiempo, y memoizar un
+ * Como consecuencia, `alAvisar`, `alVersionChange` e `indexedDB` los fija la
+ * PRIMERA llamada —así que la aplicación debe cablearlos al arrancar, antes de que
+ * nadie consulte la caché—. Solo se memoiza el éxito: si la apertura falla, el
+ * memo se olvida para que una llamada posterior pueda reintentar (la causa típica
+ * —otra pestaña, o cuota momentánea— se resuelve sola con el tiempo, y memoizar un
  * fracaso lo volvería permanente).
  *
  * @param {object} [opciones]
@@ -617,18 +766,32 @@ function abrirConEscalera(fabrica, avisar) {
  * @param {import('../viewer/_comun.js').Avisar|null} [opciones.alAvisar=null]
  *   Canal de avisos. `null` ⇒ `avisoPorDefecto` de `viewer/_comun.js`
  *   (`console.warn`), que es el suelo mínimo de la regla 1; nunca el silencio.
+ * @param {AlVersionChange|null} [opciones.alVersionChange=null]  F10. Se llama
+ *   cuando OTRA pestaña necesita subir la versión de la base y esta se lo impide.
+ *   El aviso por `alAvisar` sale igual, siempre; esto es la ACCIÓN, no el aviso.
+ *   `null` ⇒ el comportamiento de F05: se avisa y no se cierra nada.
  * @returns {Promise<ResultadoApertura>}
  * @throws {TypeError}  Si `alAvisar` no es función ni nulo (lo lanza
- *   `resolverAvisar`); si `indexedDB` no es ni objeto ni función ni nulo; o si se
- *   vuelve a llamar con una fábrica DISTINTA de aquella con la que la base ya
- *   está abierta — devolver calladamente la conexión de otra base sería mentirle
- *   a quien llama, y este módulo solo sabe tener una.
+ *   `resolverAvisar`); si `alVersionChange` no es función ni nulo; si `indexedDB`
+ *   no es ni objeto ni función ni nulo; o si se vuelve a llamar con una fábrica
+ *   DISTINTA de aquella con la que la base ya está abierta — devolver calladamente
+ *   la conexión de otra base sería mentirle a quien llama, y este módulo solo sabe
+ *   tener una.
  */
-export function abrirBd({ indexedDB = globalThis.indexedDB, alAvisar = null } = {}) {
+export function abrirBd({
+  indexedDB = globalThis.indexedDB,
+  alAvisar = null,
+  alVersionChange = null,
+} = {}) {
   // Se resuelve SIEMPRE, también en la llamada memoizada: un `alAvisar` con
   // basura es un contrato roto por el programador y debe reventar la primera vez
   // que se escribe, no la primera vez que algo va mal.
   const avisar = resolverAvisar(alAvisar)
+  if (alVersionChange !== null && typeof alVersionChange !== 'function') {
+    throw new TypeError(
+      `abrirBd: 'alVersionChange' debe ser una función o null; recibido ${typeof alVersionChange}.`,
+    )
+  }
 
   if (conexion !== null) {
     if (indexedDB !== fabricaEnUso) {
@@ -661,7 +824,7 @@ export function abrirBd({ indexedDB = globalThis.indexedDB, alAvisar = null } = 
     return Promise.resolve(sinBase(MOTIVO_SIN_BD.SIN_INDEXEDDB, mensaje))
   }
 
-  const promesa = abrirConEscalera(indexedDB, avisar).then(
+  const promesa = abrirConEscalera(indexedDB, avisar, alVersionChange).then(
     (bd) => conBase(bd),
     (error) => {
       // Se olvida el memo para permitir reintentos (ver arriba). Se compara la

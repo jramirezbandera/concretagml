@@ -222,6 +222,44 @@ desde F03 no.
   ⚠️ **Deuda anotada**: el paquete queda en **675,5 kB** y Vite avisa por encima de
   500 — el aviso ya estaba en F08 y F09 lo empeora un 21,8 %. No hay dependencia que
   podar; el remedio es partir el paquete, y es materia de F16.
+- **F10** Persistencia y exportación — código y pruebas hechos, guion de navegador en
+  `ok: true`; **pendiente solo de la firma humana** del mismo checklist (su sección 11
+  es la que más depende del entorno de toda la lista, y trae **dos** puntos
+  bloqueantes).
+  👉 **Es la fase en la que la aplicación empieza a recordar.** Hasta aquí, recargar la
+  pestaña tiraba el trabajo entero: no había ni una línea de almacenamiento en todo el
+  proyecto. Ahora los expedientes se guardan en el navegador (IndexedDB), el trabajo en
+  curso **se autoguarda solo**, y lo guardado **se OFRECE al volver, no se impone** — la
+  pantalla arranca como siempre y aparece un renglón con lo que había, para recuperarlo
+  o descartarlo.
+  👉 **Y la geometría por fin sale hacia el CAD**: DXF con la **parcela oficial junto a
+  la editada, en capas separadas**, un listado de coordenadas para replanteo, y un
+  **fichero de proyecto `.json`** con el que llevarse el expediente a otro equipo.
+  ⚙️ **Ni una dependencia nueva, otra vez** — `idb` ya estaba desde F05.
+  ⛔ **El override del DXF, aplicado al pie de la letra, produce un fichero que no
+  abre.** Medido con `ezdxf`: faltaban los dos marcadores de subclase que el documento
+  no mencionaba. Y lo que hace que esto importe: **nuestro propio lector de DXF aprobó
+  ese fichero sin una queja** —2 anillos, coordenadas exactas, cero detecciones—, así
+  que la prueba de ida y vuelta habría salido **verde con un fichero que ningún CAD
+  abre**. Por eso el oráculo de esta fase es externo, y por eso abrirlo en un CAD de
+  verdad es un punto bloqueante del checklist.
+  ⛔ **`navigator.storage.persist()` devuelve `false`.** La ficha prometía que «evita el
+  desalojo» y no lo evita: Chrome solo concede persistencia a sitios instalados,
+  marcados o con interacción acumulada. Se pide igual —el día que el usuario marque la
+  página, la misma llamada empezará a decir que sí— y **el resultado se dice**, en el
+  acuse de cada guardado y en el diálogo. La aplicación no promete una durabilidad que
+  no tiene.
+  🔎 **Y el defecto que hay que recordar lo destapó el guion, no la suite**: un aviso
+  del arranque que le quitaba **52 px** a la tabla de vértices en cada carga y para
+  siempre. Se arregló quitando la tercera repetición del mensaje, no callándolo. Detalle
+  en [`spec/feature-10-persistencia-export.md`](spec/feature-10-persistencia-export.md)
+  M12.
+  ⚠️ **Lo que la suite no puede probar, dicho por escrito**: corre sobre
+  `fake-indexeddb`, que **no es una base de datos**, así que «el trabajo se guarda» es
+  ahí incomprobable por construcción. Lo mide el guion `12-expedientes.js` en un
+  navegador real, comparando la marca de tiempo del registro contra el instante en que
+  la página se cargó.
+  ⚠️ **Deuda anotada**: el paquete pasa a **736,2 kB**. Sigue siendo materia de F16.
 
 ### El régimen de uso, que es el riesgo real de F05
 
@@ -371,6 +409,42 @@ colores de mérito —el escritor solo sabe grises, y el gris se usa para jerarq
 para puntuar una cifra— y **no aparece ni una sigla de los documentos oficiales del
 Catastro**, ni siquiera para negar ser uno: en un papel que se firma, la sigla se lee
 y la negación no.
+
+### Cómo se guarda y cómo se saca el trabajo (F10)
+
+En la fila «Origen de la parcela» hay un botón **«Expediente»**. Ahí está todo lo que
+entra y sale del trabajo guardado — y **«Generar GML» sigue en el pie**, porque es la
+salida principal y no una salida lateral.
+
+| | Qué es | Se puede volver a abrir aquí |
+|---|---|---|
+| **Guardar en este navegador** | El expediente entero, en IndexedDB | Sí, desde la lista |
+| **Proyecto (`.json`)** | El expediente entero, en un fichero | **Sí** — es el único |
+| **DXF** | La parcela **oficial y la editada, en capas separadas** | No (entrada de DXF: pendiente) |
+| **Coordenadas (`.txt`)** | El listado de vértices para replantear | **No, y el propio fichero lo dice** |
+
+Cinco cosas que conviene saber, porque son decisiones:
+
+- **El autoguardado ofrece, no impone.** El trabajo en curso se guarda solo cada dos
+  segundos, pero al volver **la pantalla arranca como siempre**: aparece un renglón
+  diciendo qué había y desde cuándo, y se recupera o se descarta. Nada se mueve bajo
+  los pies de nadie. Y mientras esa oferta esté sin resolver, **el autoguardado
+  espera**: escribir encima borraría justo lo que se está ofreciendo.
+- **Se guarda la parcela y el sistema de referencia, y nada más — y el diálogo lo
+  enumera.** No viajan el historial de deshacer (empiezas una sesión de edición
+  nueva), ni las colindantes (se vuelven a pedir), ni el diagnóstico ni el informe
+  (se recalculan), ni el pie de firma (se guarda aparte y se borra aparte).
+- **Esto vive en tu navegador y en tu equipo, no en ningún servidor**, y el navegador
+  puede borrarlo si se queda sin espacio. Se le pide que no lo haga
+  (`navigator.storage.persist()`), **está medido que dice que no**, y la aplicación lo
+  dice en vez de prometer lo contrario. Para conservar un trabajo con seguridad:
+  exportarlo a fichero de proyecto.
+- **El listado de coordenadas no se puede volver a cargar aquí, y lo lleva escrito
+  dentro.** No es letra pequeña: se intentó, y lo que sale del parser son 18 pares de
+  coordenadas donde había 15 vértices, ninguno correcto — la primera columna es el
+  número de vértice, no la X. Para volver a abrir el trabajo está el `.json`.
+- **Borrar es en dos tiempos.** El primer clic avisa, el segundo borra. No hay
+  papelera: lo que se borra, se va.
 
 ## ✅ Verificado en la Sede Electrónica
 

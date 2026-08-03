@@ -264,6 +264,16 @@ function traeFicheros(dt) {
 
 /**
  * @typedef {Object} ZonaFichero
+ * @property {() => void} elegir  Abre el selector de ficheros del sistema, igual
+ *   que si el usuario hubiera pulsado el botón. **Añadido en F10 · T5.1**: el
+ *   diálogo «Expediente» tiene su propio «Abrir un proyecto…», y las dos vías
+ *   tienen que desembocar en ESTA zona — instanciar una segunda engancharía por
+ *   segunda vez el `drop` de la ventana entera y las dos se pisarían (lo dice el
+ *   plan de F10 y lo razona la cabecera de `app/cableado-comprobacion.js`).
+ *   Se expone el gesto en vez de dejar que el llamante haga `boton.click()` sobre
+ *   el botón de otro módulo: un `click()` sintético sobre un nodo ajeno funciona
+ *   hasta el día que ese otro módulo cambia de gesto o de nodo, y entonces falla
+ *   sin que nada lo relacione con esta zona.
  * @property {() => void} destruir  Retira TODOS los escuchadores (incluidos los
  *   de la ventana), el `<input type="file">` fabricado, el velo si lo creó este
  *   módulo, y el `data-arrastrando` del `<body>`. IDEMPOTENTE.
@@ -535,7 +545,10 @@ export function crearZonaFichero({
     // cáscara de esta app no tiene formularios, pero cancelar aquí cuesta una
     // línea y evita que meter esta zona en uno recargue la página.
     evento.preventDefault()
-    input.click()
+    // Por `elegir()` y no por `input.click()` a pelo: el botón del rótulo y el
+    // «Abrir un proyecto…» del diálogo tienen que abrir EL MISMO selector, y dos
+    // llamadas al mismo primitivo no pueden divergir.
+    elegir()
   }
 
   function alCambiar() {
@@ -571,7 +584,16 @@ export function crearZonaFichero({
     if (veloEsNuestro && velo && velo.parentNode) velo.parentNode.removeChild(velo)
   }
 
-  return { destruir }
+  /**
+   * Ver {@link ZonaFichero.elegir}. Después de `destruir()` no hace nada: el input
+   * ya no está en el documento y abrir un selector cuyo `change` no escucha nadie
+   * sería justo el gesto que no lleva a ninguna parte (regla de oro 1).
+   */
+  function elegir() {
+    if (!destruido) input.click()
+  }
+
+  return { elegir, destruir }
 }
 
 export default crearZonaFichero

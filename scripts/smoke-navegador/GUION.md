@@ -2412,3 +2412,195 @@ bien **en papel**. Y el punto BLOQUEANTE: si alguna frase del informe **se lee c
 un veredicto** —sobre el encaje o sobre el trabajo de otro técnico—, con mención
 expresa a la presunción de vía pública, que es el único sitio donde la aplicación
 propone en vez de medir.
+
+---
+
+## 18. `12-expedientes.js` — persistencia y exportación (F10 · T6.2)
+
+El guion de F10, y **el más barato de la carpeta: no toca la red ni una vez**. No
+pulsa «Traer del Catastro», no abre el cajón de diagnóstico y no compone ningún
+informe — todo lo que mide es local (IndexedDB y tres serializadores puros), así
+que se puede repetir sin mirar el §13.
+
+> ✅ **Sale `ok:true`, `problemas: []` y `advertencias: []`** (corrida de cierre,
+> **2026-08-03**, `npm run dev`, puerto 5173, viewport 1440×900).
+> ⚠️ **Hay que lanzarlo DOS VECES, con un `$B reload` en medio**, y no es opcional:
+> la primera corrida no puede medir la supervivencia (no hay carga anterior de la
+> que heredar) y lo DECLARA en `noCubierto`. La segunda es la que firma el
+> criterio 1.
+> ⛔ **La primera corrida destapó un defecto de producción**, y está contado abajo
+> en «El defecto que este guion destapó»: no se borra, por lo mismo que no se
+> borran los de `10` y `11`.
+
+### Qué mide, y por qué NO lo mide la suite
+
+**La suite de F10 corre entera sobre `fake-indexeddb`, que no es una base de
+datos**: es una implementación en memoria que muere con el proceso. O sea que la
+promesa entera de la fase —«el trabajo se guarda»— es, en la suite, incomprobable
+por construcción. Un test que dijera «sobrevive a la recarga» sería mentira de las
+tranquilizadoras. Aquí se cierra ese hueco por dos caminos complementarios:
+
+1. **Segunda conexión.** Se guarda un expediente por la interfaz y luego se abre
+   `indexedDB.open('concreta-gml')` **aparte**, sin pasar por `storage/bd.js` —que
+   MEMOIZA su conexión y devolvería la misma—, y se lee el registro de ahí. Si
+   aparece, los bytes están en el almacén del navegador y no en una variable de
+   módulo. De paso se comprueba que el almacén `expedientes` existe **con sus dos
+   índices** (`actualizado`, `refcat`), que es la migración de la versión 3.
+2. ⭐ **Herencia entre cargas.** El guion deja siempre un expediente marcado
+   (`HUMO F10 · dejado por 12-expedientes.js`) y, al arrancar, busca el que dejó
+   una carga anterior. **Y no se conforma con encontrarlo**: compara su
+   `actualizado` contra `performance.timeOrigin` —el instante en que este documento
+   empezó— y solo lo da por herencia si es ANTERIOR. Sin esa comparación, lanzar el
+   guion dos veces sin recargar daría el criterio por firmado encontrándose su
+   propia marca; con ella, el guion lo dice: «la marca que hay en la lista la ha
+   escrito ESTA misma carga, así que no cuenta».
+
+Y otras cinco cosas que jsdom no puede dar:
+
+3. **`navigator.storage.persist()` y `estimate()` reales.** Se publica el
+   **régimen** (`persisted()`), la cuota y el uso, como NÚMEROS y nunca como
+   problema: que el navegador diga que no es la respuesta normal de un sitio sin
+   interacción previa (medido en la fase 0) y no un defecto de la aplicación. Lo
+   que sí sería defecto —que la aplicación prometiera una durabilidad que no
+   tiene— se caza mirando el ACUSE del guardado.
+4. **Las tres exportaciones, con sus bytes.** Misma cadena
+   `Blob → createObjectURL → <a download> → click() → revoke` y mismo patrón de
+   captura que `06`, `10` y `11` (§12). Lo que se afirma es de nivel de byte: que
+   el DXF declara **`$ACADVER = AC1015`** (leído del propio fichero, no escrito a
+   mano en el guion) y trae **las dos capas en su TABLA LAYER** —no basta con que
+   las entidades las nombren: sin la sección `TABLES` el auditor de `ezdxf` da 0
+   errores y las capas NO EXISTEN—, que el listado lleva **coma decimal española**
+   y ni un punto inglés, y que el `.json` se vuelve a leer con su sobre
+   `concreta-gml/proyecto` y sus 15 vértices intactos.
+5. **Que abrir el diálogo y exportar no cierren nada por debajo.** CUARTA aparición
+   de la misma familia (F08: el `click()` del `<a download>`; F09: los clics dentro
+   del `<dialog>`; F10: otro diálogo y tres botones que descargan).
+6. **El invariante heredado de los 267 px** —quinta fase seguida—, con
+   `asentarPanel()` y con ATRIBUCIÓN de la pérdida, que son las dos lecciones ya
+   pagadas (F07 midió demasiado tarde, F09 demasiado pronto). Y una medida que solo
+   tiene sentido aquí: **la fila del rótulo con DOS botones dentro**, su alto y la
+   **holgura** que queda antes de que se parta.
+7. **El `<dialog>` como modal de verdad** (`:modal`, foco dentro, fondo inerte,
+   `Escape`, `display:none` al cerrar) y **la tipografía** de los botones nuevos,
+   derivada del token `--font-sans` del `:root` y no de un literal copiado.
+
+### Régimen de red
+
+**Cero peticiones.** El único guion de la carpeta del que se puede decir esto.
+
+### ⚠️ Este guion necesita `npm run dev`, NO `vite preview`
+
+Lo mismo que el §16 y el §17: las cifras de referencia están medidas sobre
+`npm run dev` bajo el `base` de Pages (`/concretagml/`).
+
+### Cómo se lanza
+
+```
+$B viewport 1440x900
+$B goto http://localhost:PUERTO/concretagml/     # ⚠️ el base, no la raíz
+$B wait ".gml-tabla-vertices"
+$B console --clear
+$B eval scripts/smoke-navegador/12-expedientes.js
+$B reload && $B wait ".gml-tabla-vertices"        # ⭐ y AHORA la segunda vez:
+$B eval scripts/smoke-navegador/12-expedientes.js #    mide la SUPERVIVENCIA
+$B console --errors                               # → (no console errors)
+$B screenshot .gstack/smoke-f10.png               # la evidencia para el §11
+```
+
+**Estado final.** El guion deja **un** expediente marcado en IndexedDB a propósito
+—es lo que la corrida siguiente hereda— y borra los sobrantes que haya creado él.
+Para dejar el perfil limpio del todo, el propio veredicto trae la orden en
+`estadoFinal.comoDejarLoLimpio` (un `$B js` que llama a
+`indexedDB.deleteDatabase("concreta-gml")` y espera a que resuelva).
+
+⚠️ Esa orden **borra también la caché del Catastro y el pie de firma**: la base es
+una sola. Después de borrarla, `07`, `09` y `11` volverán a pedir por red lo que
+tenían guardado.
+
+### Qué cuenta como «pasa»
+
+- `ok: true`, `problemas: []`.
+- `herencia.medido: true` **en la segunda corrida** (con `marcasDeOtraCarga ≥ 1` y
+  `masAntigua` anterior a `timeOrigin`). Si sale `false`, no es un fallo: es que
+  falta el `$B reload`.
+- `enDisco.tieneExpedientes: true`, `enDisco.indices: ["actualizado","refcat"]`,
+  `enDisco.version: 3`.
+- `exportaciones.blobsCapturados: 3`, `restaurado: true`, `revocaLasQueCrea: true`,
+  `dxf.acadver: "AC1015"` y `dxf.capasEnLaTabla` con las dos capas.
+- `arranque.altoCajaVerticesPx: 267` **con `tarjetasDeAvisos: 0`**.
+- `arranque.filaDelRotulo.mismaLinea: true`.
+- `modal.esModal: true`, `cierre.displayTrasCerrar: "none"`.
+- `$B console --errors` limpio.
+
+### ⛔ El defecto que este guion destapó (2026-08-03, primera corrida tras recargar) — CORREGIDO
+
+La primera vez que se lanzó **con un expediente ya guardado**, la caja de vértices
+arrancó en **215 px** en vez de 267 — por debajo del suelo de 220 que este proyecto
+lleva **cinco fases** defendiendo.
+
+La causa no era del diálogo ni del botón: era un **aviso** que el cableado de F10
+sacaba por el panel al arrancar, diciendo que el navegador no garantiza conservar
+los datos. Una tarjeta de aviso cuesta ~52 px, y **ese aviso no se resuelve nunca**:
+a diferencia de la oferta del borrador —que desaparece en cuanto el usuario la
+recupera o la descarta—, ese volvía en **cada carga y para siempre** en cuanto el
+usuario tuviera un expediente guardado. O sea: 52 px permanentes del sitio más caro
+del panel, a cambio de repetir por tercera vez algo que ya se dice donde importa.
+
+**Arreglado quitando la tercera repetición, no callando el hecho.** El régimen de
+almacenamiento se sigue diciendo en los dos sitios donde el usuario puede actuar:
+en el **acuse de cada guardado** («…El navegador no garantiza conservarlo…») y en el
+**renglón del diálogo al abrirlo**, junto al texto de durabilidad que ya vivía ahí.
+Lo que se quitó fue la tarjeta del arranque. Hay un test que lo fija
+(`test/app/expediente.dom.test.js`, «el régimen de almacenamiento NO gasta una
+tarjeta del panel al arrancar»), con el número medido escrito al lado.
+
+Es la misma lección de siempre y van tres: **el guion no confirmó lo que ya se
+sabía, midió lo que nadie había mirado**.
+
+### Y el falso positivo que el guion se corrigió a sí mismo
+
+Antes de la corrida buena, el guion acusaba al diálogo de no devolver el foco al
+botón «Expediente» al cerrarse con `Escape`. No era cierto: en un navegador de
+verdad un clic de ratón deja el foco en el botón, pero **`element.click()` no lo
+mueve**, así que el `focoPrevio` que el diálogo guarda al abrirse era el `<body>`.
+El guion no puede hacer gestos de ratón (§0), así que ahora hace `.focus()` antes
+del `.click()` y la medida vuelve a significar lo que dice. **Un guion que acusa a
+producción de un artefacto de su propia instrumentación es peor que no medir.**
+
+### Cifras de referencia (corrida de cierre, **2026-08-03**, `npm run dev`, puerto 5173)
+
+| Medida | Valor |
+|---|---|
+| Duración del guion | **1.947 ms** — sin una sola petición de red |
+| Caja de vértices al arrancar | **267 px**, con `tarjetasDeAvisos: 0` ✅ (quinta fase seguida) |
+| Fila «Origen de la parcela» | **15,94 px** de alto, **2 botones** dentro, **misma línea** ✅ |
+| Holgura antes de que la fila se parta | **21 px**, de los cuales **8 son el `gap`** ⇒ «Expediente» **no puede crecer** |
+| `navigator.storage` | `persisted()` **false** · cuota **1.809,3 MB** · uso **5,9 kB** antes de guardar |
+| Base en disco | versión **3** · almacenes `catastroCache`, `expedientes`, `pieFirma`, `revgeo` · índices `actualizado`, `refcat` |
+| ⭐ **Supervivencia a la recarga** | marca escrita a las **14:58:14,647Z**, página cargada a las **14:58:16,159Z** ⇒ **anterior** ✅ · **15 vértices** intactos |
+| `geometriaOficial` en el registro CRUDO | **descongelada** (`Object.isFrozen === false`) — el hecho de la fase 0 que obliga a rehidratar por `crearExpediente` |
+| Acuse del guardado | «Guardado «…» en este navegador. **El navegador no garantiza conservarlo**: si se queda sin espacio puede borrarlo por su cuenta.» ✅ |
+| `<dialog>` como modal | `:modal` **casa** · 620×721 en 1440×900 · **cabe** · foco en el campo `nombre` · **fondo inerte** ✅ |
+| Caja de vértices con el diálogo abierto | **267 px** — un modal cuelga del `<body>` y no le quita altura al panel |
+| **DXF** | **1.733 B** · `image/vnd.dxf` · `$ACADVER` **AC1015** · capas en la TABLA: `0`, `PARCELA_OFICIAL`, `PARCELA_EDITADA` ✅ · CRLF, **0 LF sueltos** |
+| **Listado** | **2.639 B** · `text/plain;charset=utf-8` · **coma decimal** ✅ · **0** puntos ingleses |
+| **Proyecto** | **3.193 B** · `application/json` · `concreta-gml/proyecto` v1 · `EPSG:25830` · **15 vértices** ✅ |
+| Nombres | `parcela_9398516VK3799G_….dxf` · `coordenadas_….txt` · `proyecto_….json` — los tres derivados de `nombreFicheroGml` |
+| Blobs | **3** creados, **3** revocados, **las mismas URLs**; los 3 envoltorios restaurados ✅ |
+| **Tras exportar** | diálogo **abierto**, `:modal` **true**, foco **dentro** ✅ (cuarta aparición de la familia: no se llevó nada por delante) |
+| `Escape` | cierra · `display:none` computado · **foco de vuelta** en «Expediente» ✅ |
+| Tipografía de los 4 botones | `"Geist Sans", …`, derivada de `--font-sans`, **0 estilos en línea** |
+| Limpieza | 2 marcas encontradas → **1** tras limpiar (borrado en dos tiempos, como en la interfaz) |
+
+Evidencia: `.gstack/smoke-f10.png`.
+
+### Lo que este guion deja al checklist humano (§11)
+
+**Cerrar el NAVEGADOR entero** (no la pestaña) y volver — que es donde de verdad se
+ve si el perfil conserva o desaloja. **Abrir el DXF en un CAD** con las dos capas
+seleccionables **por capa**, que es el punto BLOQUEANTE heredado del reparto que ya
+hizo F09 con el PDF: un DXF que valida contra nuestro propio parser y no abre en
+AutoCAD no está exportado, está de suerte. **Dos pestañas a la vez** y el
+`versionchange` de verdad. **Abrir un `.json` desde el disco**, y abrirlo en **otro
+perfil o en otra máquina**. Y el punto BLOQUEANTE que hereda del 8.1, el 9.4 y el
+10.5: si alguna frase de la lista de expedientes **se lee como un veredicto**.

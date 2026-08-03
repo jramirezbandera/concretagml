@@ -724,16 +724,46 @@ describe('G15 · fronteras de capa entre services/, storage/, model/ y app/', ()
 
   const importsDe = (rel) => especificadoresDe(fuenteDe(rel))
 
+  /**
+   * Los módulos que legítimamente NO importan nada, con su motivo. Misma técnica que
+   * {@link CAPAS_BASE_CON_LEAFLET} y por lo mismo: la excepción se declara y se
+   * comprueba en los DOS sentidos, así que el día que uno de estos empiece a importar
+   * algo, la excepción sobra y esta prueba lo dice.
+   *
+   * Que un módulo no importe nada es una propiedad, no un descuido: `autoguardado.js`
+   * recibe por parámetro el reloj, los temporizadores y la función de guardar, así que
+   * no tiene de qué depender. Es la misma decisión que el «CERO IMPORTS» de
+   * `report/contraste-texto.js`.
+   */
+  const SIN_IMPORTS = new Map([
+    [
+      'storage/autoguardado.js',
+      'debounce puro (F10 · T3.3): reloj, temporizadores y destino se inyectan, así que no ' +
+        'depende de nada',
+    ],
+  ])
+
   it('los recorridos no son vacuos', () => {
     expect(MODULOS_SERVICES.length).toBeGreaterThan(1)
     expect(MODULOS_STORAGE.length, 'el recorrido de storage/ no ha encontrado módulos')
       .toBeGreaterThan(0)
     expect(MODULOS_STORAGE).toContain('storage/cache-catastro.js')
-    // Y todos los módulos importan algo: si el extractor se rompiera, las cuatro
-    // reglas de abajo pasarían mirando listas vacías.
+    // Y todos los módulos importan algo —salvo los declarados—: si el extractor se
+    // rompiera, las cuatro reglas de abajo pasarían mirando listas vacías.
     for (const rel of [...MODULOS_SERVICES, ...MODULOS_STORAGE, CABLEADO]) {
+      if (SIN_IMPORTS.has(rel)) continue
       expect(importsDe(rel).length, `${rel} no importa nada: revisa el extractor`)
         .toBeGreaterThan(0)
+    }
+  })
+
+  it('las excepciones «no importa nada» siguen siendo ciertas', () => {
+    // Si una deja de serlo, la exención de arriba estaría tapando un extractor roto.
+    for (const [rel, motivo] of SIN_IMPORTS) {
+      expect(MODULOS_STORAGE, `${rel} ya no existe: quita la excepción`).toContain(rel)
+      expect(importsDe(rel), `${rel} ya importa algo (${motivo}): la excepción sobra`).toEqual([])
+      // Y no es que el fichero esté vacío: eso también dejaría la lista a cero.
+      expect(fuenteDe(rel).length).toBeGreaterThan(1000)
     }
   })
 

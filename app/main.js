@@ -129,6 +129,24 @@
 //                   sí está previsto —que el Catastro o el almacén local no se
 //                   hayan podido montar— entra como `null` y el informe se prepara
 //                   igual, diciendo qué no se ha consultado.
+//  12. EXPEDIENTE — `cablearExpediente(...)` de `./cableado-expediente.js` (F10,
+//                   tarea T5.1): el botón «Expediente» de la fila del rótulo, su
+//                   diálogo, el almacén local de IndexedDB, el autoguardado y las
+//                   tres exportaciones (DXF, listado de coordenadas y fichero de
+//                   proyecto). **Es donde la aplicación empieza a recordar** y
+//                   donde `crearExpediente` estrena llamante en producción — hasta
+//                   aquí el store llevaba una Parcela suelta y el `srs` era una
+//                   constante de módulo, exactamente lo que la cabecera de
+//                   `./demo-datos.js` lleva pidiendo desde F03.
+//                   Va DESPUÉS de todo porque consume piezas de cuatro pasos: el
+//                   store (paso 2, del que es el SÉPTIMO suscriptor), el gancho de
+//                   la edición (paso 6), la CACHÉ del Catastro (paso 7, y solo
+//                   para purgarla cuando falte espacio) y la comprobación (paso 9,
+//                   para que «Abrir un proyecto…» use la ÚNICA zona de fichero de
+//                   la aplicación en vez de fabricar una segunda).
+//                   ⚠️ Sin `try`, igual que los pasos 6, 8, 9 y 11, y con un
+//                   motivo de más: es el ÚLTIMO, así que un `catch` no protegería
+//                   a nadie — lo que hay debajo ya está montado.
 //
 // ── POR QUÉ EL STORE LO CREA ESTA FUNCIÓN Y NO `crearVisor` ─────────────────
 // `viewer/index.js` documenta que recibe el store ya hecho y NO lo fabrica, para
@@ -436,6 +454,8 @@ import { crearTransporte } from '../services/_red.js'
 import { crearClienteCatastro } from '../services/catastro.js'
 import { abrirBd } from '../storage/bd.js'
 import { crearCacheCatastro } from '../storage/cache-catastro.js'
+import { crearCuota } from '../storage/cuota.js'
+import { crearExpedientes } from '../storage/expedientes.js'
 import { crearPieDeFirmaGuardado } from '../storage/pie-firma.js'
 import { validarParcela } from '../validation/parcela.js'
 import { crearEstadoVista, NIVEL } from '../viewer/_comun.js'
@@ -450,6 +470,11 @@ import {
 } from './cableado-catastro.js'
 import { cablearComprobacion } from './cableado-comprobacion.js'
 import { cablearDiagnostico } from './cableado-diagnostico.js'
+import {
+  EXTENSIONES_PROYECTO,
+  MENSAJE_SIN_EXPEDIENTE,
+  cablearExpediente,
+} from './cableado-expediente.js'
 import { cablearInforme } from './cableado-informe.js'
 import {
   AVISO_DEMO_HUECO_SINTETICO,
@@ -1768,6 +1793,23 @@ let catastroCableado = null
  */
 let clienteCatastro = null
 
+/**
+ * La CACHÉ del Catastro, o `null` si no se llegó a construir. Vive fuera del `try`
+ * por la misma razón que las dos de arriba, y la consume el paso 12 para **una sola
+ * cosa**: purgarla por antigüedad cuando el almacén local se quede sin espacio
+ * (criterio 4 de F10).
+ *
+ * ⚠️ Se purga ESTA y no otra cosa porque es lo único de esta base que se puede
+ * volver a pedir. Los expedientes y el pie de firma viven en la misma base y **no
+ * son caché**: `storage/cache-catastro.js` solo enruta sus propios almacenes, y hay
+ * una prueba que lo afirma sembrando los otros dos. `null` aquí no es una excepción
+ * que tapar: significa que no hay nada que liberar automáticamente, y el cableado
+ * del expediente lo dice en vez de fingir que lo ha intentado.
+ *
+ * @type {ReturnType<typeof crearCacheCatastro>|null}
+ */
+let cacheCatastro = null
+
 try {
   // El transporte es el único que toca la red: cola de 2, timeout, backoff con
   // jitter. Su `alAvisar` es EL MISMO panel que todo lo demás (decisión 1).
@@ -1783,6 +1825,10 @@ try {
     bd: abrirBd({ alAvisar: panel.avisar }),
     alAvisar: panel.avisar,
   })
+  // Antes de construir el cliente, por el mismo motivo escrito en {@link clienteCatastro}:
+  // si lo que revienta es algo de más abajo, la caché está perfectamente construida y
+  // el paso 12 puede seguir purgándola para hacer sitio.
+  cacheCatastro = cache
 
   const cliente = crearClienteCatastro({
     transporte,
@@ -1956,6 +2002,21 @@ try {
 let comprobacionCableada = null
 
 /**
+ * El cableado del expediente del paso 12, o `null` mientras no exista. **Referencia
+ * ADELANTADA por exactamente el mismo motivo** que la de arriba, y aquí la lee la
+ * entrada extra de fichero que el paso 9 le pasa a la zona de arrastre: soltar un
+ * `.json` sobre la ventana ocurre mucho después del arranque, así que el destino se
+ * resuelve TARDE en vez de congelarse en el montaje.
+ *
+ * `null` en el momento de soltar un fichero solo puede significar una cosa —que el
+ * paso 12 reventó—, y entonces se dice: una extensión que la zona anuncia aceptar y
+ * que al soltarla no hace nada es el error silencioso de manual.
+ *
+ * @type {ReturnType<typeof cablearExpediente>|null}
+ */
+let expedienteCableado = null
+
+/**
  * El cableado del diagnóstico. **Se guarda la referencia desde F09** y no por
  * gusto: el paso 11 le pide `ultimoDiagnostico()`, que es el ÚNICO sitio donde
  * vive el diagnóstico que el cajón está enseñando ahora mismo. El informe firmable
@@ -2059,6 +2120,29 @@ comprobacionCableada = cablearComprobacion({
   // parcela anterior —cambiando la geometría que hay en pantalla y la que se
   // generaría— sería un error silencioso disfrazado de función (decisión 2 de F06).
   alCargarParcela: edicionCableada.alCargarParcela,
+  // ── F10 · el `.json` entra por ESTA zona y no por una segunda ─────────────
+  // `crearZonaFichero` engancha el arrastre en la VENTANA ENTERA: dos zonas vivas
+  // harían `preventDefault` las dos sobre el mismo `drop` y entregarían el mismo
+  // fichero a dos destinos. Así que la que ya existe acepta también `.json` y
+  // enruta por extensión — el mecanismo está en `cablearComprobacion`, y de ahí
+  // sale además el texto del velo («Suelta aquí el fichero (.gml, .xml o .json)»).
+  //
+  // El destino se resuelve TARDE, igual que el envoltorio `comprobacion` del paso
+  // 11: el paso 12 todavía no ha corrido cuando se monta esto.
+  entradasExtra: [
+    {
+      extensiones: EXTENSIONES_PROYECTO,
+      alFichero: (fichero) => {
+        if (expedienteCableado === null) {
+          panel.avisar(MENSAJE_SIN_EXPEDIENTE, { nivel: NIVEL.ERROR })
+          return
+        }
+        // La promesa se suelta a propósito: `abrirProyecto` no lanza y cuenta por
+        // el panel todo lo que decide (es la lección de F08 entera).
+        expedienteCableado.abrirProyecto(fichero)
+      },
+    },
+  ],
   // El botón del rótulo y el renglón de procedencia los localiza él con los
   // selectores de su contrato, y LANZA nombrándolos si `index.html` no los trae.
   // El `<input type="file">` y la superposición de arrastre NO están en la cáscara:
@@ -2587,4 +2671,71 @@ cablearInforme({
   // porque lo que hace falta no es esquivar el orden: es no congelar el valor.
   comprobacion: () =>
     comprobacionCableada === null ? null : comprobacionCableada.comprobacion(),
+})
+
+// ── 12 · Persistencia y exportación (F10 · T5.1) ─────────────────────────────
+
+// Once fases después, la aplicación **por fin recuerda**. Hasta esta línea, recargar
+// la pestaña tiraba el trabajo entero: no había ni una línea de almacenamiento, ni un
+// flag de sucio, ni forma de llevarse un expediente a otro equipo. Y aquí es también
+// donde `crearExpediente` —que existe en `model/parcela.js` desde F00 y cuyo único
+// llamante en todo el repo era `test/contrato.test.js`— **estrena llamante en
+// producción**, con el `srs` saliendo de `./demo-datos.js` tal y como la cabecera de
+// aquel fichero lleva pidiendo desde F03.
+//
+// Va EL ÚLTIMO, después incluso del informe, y no por antigüedad: es el que más
+// piezas de pasos anteriores consume y el único que las consume TODAS ya montadas.
+//   · el store (paso 2) — es su SÉPTIMO suscriptor, y el primero que no dibuja nada
+//     con lo que oye: lo usa para saber si lo que hay en pantalla es una edición del
+//     mismo documento o un documento nuevo;
+//   · el gancho de la EDICIÓN (paso 6), porque recuperar un expediente es abrir un
+//     documento nuevo y el historial se reinicia en vez de commitear encima;
+//   · la CACHÉ del Catastro (paso 7), y **solo para purgarla** cuando el almacén se
+//     quede sin espacio. Ver {@link cacheCatastro};
+//   · la COMPROBACIÓN (paso 9), para que «Abrir un proyecto…» abra el selector de la
+//     ÚNICA zona de fichero de la aplicación en vez de fabricar una segunda.
+//
+// ⚠️ SIN `try`, igual que los pasos 6, 8, 9 y 11: lo único que puede lanzar aquí es
+// un contrato del programador —el botón «Expediente» que `index.html` ya no trae, un
+// `srs` que el modelo no admite—. Y como es el ÚLTIMO paso, un `catch` no protegería
+// a nadie de nada: lo que hay debajo ya está montado. Lo que sí está previsto —que no
+// haya almacén local, que la caché no se montara— entra como degradación y se dice.
+//
+// **`index.html` aporta un botón y nada más**: el `<dialog>` lo fabrica
+// `app/dialogo-expediente.js`, igual que hicieron `app/zona-fichero.js`, los dos
+// cajones y el diálogo de F09.
+expedienteCableado = cablearExpediente({
+  // El MISMO store que las otras seis vistas.
+  estado,
+  panel,
+  // El SRS del expediente: el mismo que reciben el visor, el cliente, F08 y F09. Aquí
+  // deja de ser un dato suelto y pasa a ser lo que siempre debió ser — un campo del
+  // Expediente—, que es literalmente lo que `./demo-datos.js` lleva pidiendo desde F03.
+  srs: SRS_DEMO,
+  // ⚠️ `abrirBd` MEMOIZA su conexión, así que esta llamada reutiliza la que abrió la
+  // caché del Catastro en el paso 7 (o la del pie de firma en el 11) en vez de abrir
+  // una tercera; y va SIN `await` por lo mismo que allí: el almacén se resuelve solo
+  // en su primera operación, y atar el arranque a IndexedDB —a una base lenta, a otra
+  // pestaña que bloquea la versión, a un navegador que niega el almacenamiento— es
+  // justo lo que la decisión 2 de esta cabecera se negó a hacer.
+  expedientes: crearExpedientes({
+    bd: abrirBd({ alAvisar: panel.avisar }),
+    alAvisar: panel.avisar,
+  }),
+  // `navigator.storage` se toma del entorno (el defecto de `crearCuota`): aquí sí
+  // existe. El canal de avisos es solo para cuando una llamada LANZA — un «no» del
+  // navegador a `persist()` no es un incidente, es la respuesta normal y MEDIDA.
+  cuota: crearCuota({ alAvisar: panel.avisar }),
+  // `null` cuando el bloque del Catastro se cayó, y `null` ahí es una respuesta
+  // prevista: no hay nada que liberar y el cableado lo dice.
+  cache: cacheCatastro,
+  // El MISMO gancho que reciben el Catastro (paso 7) y la comprobación (paso 9).
+  alCargarParcela: edicionCableada.alCargarParcela,
+  // Se comprueba la FORMA en vez de pasarlo a ciegas, mismo criterio que el `catastro:`
+  // del paso 11: sin este canal, «Abrir un proyecto…» lo DICE en lugar de ser un botón
+  // que no hace nada, y el arrastre sobre la ventana sigue funcionando igual.
+  elegirFichero:
+    comprobacionCableada !== null && typeof comprobacionCableada.elegirFichero === 'function'
+      ? () => comprobacionCableada.elegirFichero()
+      : null,
 })

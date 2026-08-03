@@ -484,6 +484,20 @@ const esCliente = (v) => !!v && typeof v.parcelaPorRefcat === 'function'
  *   gancho que el de `cablearCatastro`: cargar una parcela de un fichero es abrir un
  *   documento nuevo, así que el historial de edición se REINICIA en vez de commitear
  *   encima (ver `app/main.js#cablearEdicion`). Sin él, el módulo funciona igual.
+ * @param {ReadonlyArray<{extensiones: readonly string[], alFichero: (f: File) => void}>}
+ *   [opciones.entradasExtra=[]]  **F10 · T5.1.** Otras familias de fichero que ESTA
+ *   MISMA zona acepta y que NO son un GML. Cada entrada declara sus extensiones y
+ *   quién las atiende; {@link alFichero} enruta por extensión antes de tocar nada.
+ *
+ *   ⚠️ **Existe para que no se instancie una segunda zona.** `crearZonaFichero`
+ *   engancha `dragenter`/`dragover`/`dragleave`/`drop` en la **VENTANA ENTERA**: dos
+ *   zonas vivas harían `preventDefault` las dos sobre el mismo `drop` y las dos
+ *   entregarían el mismo fichero, cada una a su destino. El plan de F10 lo dice con
+ *   estas palabras y aquí está el mecanismo que lo cumple.
+ *
+ *   Este módulo **no sabe** qué es un fichero de proyecto, igual que
+ *   `app/zona-fichero.js` no sabe qué es un GML: solo sabe que hay extensiones que
+ *   no son suyas y a quién dárselas.
  * @param {Window} [opciones.ventana=globalThis]  La ventana sobre la que se puede
  *   soltar el fichero. Se inyecta por lo mismo que en `crearZonaFichero`.
  * @param {HTMLElement} [opciones.boton]  Por defecto {@link SELECTOR_BOTON_ABRIR}.
@@ -496,6 +510,7 @@ const esCliente = (v) => !!v && typeof v.parcelaPorRefcat === 'function'
  * @returns {{comprobar: (fichero: File) => Promise<void>,
  *            contrastar: () => Promise<void>,
  *            comprobacion: () => object|null,
+ *            elegirFichero: () => void,
  *            cerrar: () => void,
  *            destruir: () => void}}
  * @throws {TypeError}  Contrato del programador.
@@ -510,6 +525,7 @@ export function cablearComprobacion({
   cliente = null,
   cajonDiagnostico = null,
   alCargarParcela = null,
+  entradasExtra = [],
   ventana = globalThis,
   boton = nodo(SELECTOR_BOTON_ABRIR),
   procedencia = nodo(SELECTOR_PROCEDENCIA),
@@ -554,6 +570,52 @@ export function cablearComprobacion({
         `${typeof alCargarParcela}.`,
     )
   }
+  // Las entradas ajenas se validan ENTERAS antes de montar nada: una extensión mal
+  // escrita o un destino que no es función se convertiría, si no, en una familia de
+  // ficheros que la zona anuncia aceptar y que al soltarla no hace nada. Es contrato
+  // del programador, así que lanza y nombra el índice.
+  if (!Array.isArray(entradasExtra)) {
+    throw new TypeError(
+      `cablearComprobacion: 'entradasExtra' debe ser un array de {extensiones, alFichero}; ` +
+        `recibido ${typeof entradasExtra}.`,
+    )
+  }
+  /** @type {Map<string, (f: File) => void>} extensión en minúsculas → destino. */
+  const rutasExtra = new Map()
+  entradasExtra.forEach((entrada, i) => {
+    if (!entrada || typeof entrada !== 'object' || !Array.isArray(entrada.extensiones)) {
+      throw new TypeError(
+        `cablearComprobacion: entradasExtra[${i}] debe ser {extensiones: string[], alFichero: fn}; ` +
+          `recibido ${JSON.stringify(entrada)}.`,
+      )
+    }
+    if (typeof entrada.alFichero !== 'function') {
+      throw new TypeError(
+        `cablearComprobacion: entradasExtra[${i}].alFichero debe ser una función (File) => void; ` +
+          `recibido ${typeof entrada.alFichero}.`,
+      )
+    }
+    for (const ext of entrada.extensiones) {
+      const limpia = typeof ext === 'string' ? ext.toLowerCase() : ext
+      if (typeof limpia !== 'string' || limpia.length < 2 || !limpia.startsWith('.')) {
+        throw new RangeError(
+          `cablearComprobacion: extensión inválida en entradasExtra[${i}]: ${JSON.stringify(ext)}. ` +
+            `Se espera un string con punto inicial, p. ej. '.json'.`,
+        )
+      }
+      // Una extensión que ya es del GML no se puede secuestrar: quien la reclamara
+      // se llevaría los ficheros que este módulo existe para comprobar, y el
+      // síntoma sería «he soltado un .gml y no pasa nada».
+      if (EXTENSIONES.includes(limpia) || rutasExtra.has(limpia)) {
+        throw new RangeError(
+          `cablearComprobacion: la extensión '${limpia}' de entradasExtra[${i}] ya está tomada ` +
+            `(por el GML o por otra entrada). Cada extensión tiene un solo destino.`,
+        )
+      }
+      rutasExtra.set(limpia, entrada.alFichero)
+    }
+  })
+
   // Delegado: `husoPorSrs` es el único sitio del proyecto que sabe qué husos están
   // implementados y cuál está diferido (Canarias, override O13). Lanza solo.
   husoPorSrs(srs)
@@ -891,6 +953,26 @@ export function cablearComprobacion({
    * @param {File} fichero
    */
   const alFichero = (fichero) => {
+    // ── El enrutado por extensión (F10 · T5.1) ────────────────────────────────
+    // Va ANTES de `comprobar` y no dentro: un `.json` que entrase al recorrido del
+    // GML se decodificaría, se parsearía y saldría un cajón diciendo que ese fichero
+    // no es un GML. Sería verdad y sería inútil — el usuario ha soltado exactamente
+    // el fichero que la aplicación le pidió—. Quien reclama la extensión la atiende.
+    const nombre = typeof fichero?.name === 'string' ? fichero.name : ''
+    const punto = nombre.lastIndexOf('.')
+    const extension = punto < 0 ? '' : nombre.slice(punto).toLowerCase()
+    const ajeno = rutasExtra.get(extension)
+    if (ajeno !== undefined) {
+      // El `try` es el mismo criterio que el de `zona-fichero.js#entregar` y por lo
+      // mismo MEDIDO: una excepción dentro de un oyente del DOM no llega a nadie. La
+      // diferencia es que aquí sí se sabe de quién es el fallo, así que se nombra.
+      try {
+        ajeno(fichero)
+      } catch (causa) {
+        reventar(`la entrega de un fichero ${extension} ha fallado fuera de todo control`, causa)
+      }
+      return
+    }
     comprobar(fichero).catch((causa) => {
       reventar('la comprobación del fichero ha fallado fuera de todo control', causa)
     })
@@ -919,7 +1001,10 @@ export function cablearComprobacion({
   const zona = crearZonaFichero({
     boton,
     ventana,
-    extensiones: [...EXTENSIONES],
+    // Las del GML PRIMERO y las ajenas detrás: `crearZonaFichero` compone con esta
+    // lista el `accept` del input y el texto del velo («Suelta aquí el fichero
+    // (.gml, .xml o .json)»), así que el orden es el que lee el usuario.
+    extensiones: [...EXTENSIONES, ...rutasExtra.keys()],
     alFichero,
     alAviso: panel.avisar,
   })
@@ -938,6 +1023,16 @@ export function cablearComprobacion({
 
     /** La última comprobación pintada, o `null`. Solo para leer. */
     comprobacion: () => comprobacion,
+
+    /**
+     * Abre el selector de ficheros de la ÚNICA zona de la aplicación, sin pasar por
+     * el botón del rótulo. Lo usa el «Abrir un proyecto…» del diálogo de F10: el
+     * fichero que se elija se enruta por su extensión como cualquier otro, así que
+     * elegir un `.gml` desde ahí lo comprueba, y elegir un `.json` va a su destino.
+     */
+    elegirFichero: () => {
+      if (!destruido) zona.elegir()
+    },
 
     cerrar,
 

@@ -48,9 +48,41 @@
 # esa incoherencia es el caso real contra el que se prueba el guardián de encoding
 # de F04. Aquí solo se fijan los finales de línea.
 
+#   4. `test/export/__snapshots__/*.dxf` (F10) — y es la ÚNICA regla de este
+#      fichero que fija **CRLF** y no LF. No es una excepción caprichosa: el
+#      escritor de DXF emite CRLF por fidelidad al dato externo —los tres DXF
+#      reales de AutoCAD de `test/fixtures/parsers/` son CRLF, medido—, y un DXF
+#      es un formato de intercambio que va a abrir un programa que no
+#      controlamos. Con `eol=crlf` el índice guarda LF (como todo) y el árbol de
+#      trabajo recibe CRLF **en todas las plataformas**, que es justo lo que la
+#      comparación byte a byte de `toMatchFileSnapshot` necesita. Sin esta línea,
+#      un clon limpio en Linux recibiría la snapshot en LF mientras el escritor
+#      sigue emitiendo CRLF, y `test/export/dxf.test.js` se pondría roja sin que
+#      nadie hubiera tocado nada. Lo comprueba una prueba de ese mismo fichero,
+#      que lee este `.gitattributes`.
+#
+#      ⚠️ Los `.dxf` de `test/fixtures/parsers/` NO llevan regla, y no es un
+#      olvido de esta tanda: son ENTRADA, los lee un parser que tolera los dos
+#      finales de línea a propósito (`/\r?\n/`), y ninguna prueba compara sus
+#      bytes. Cuando alguien publique su SHA-256, como se hizo con los de `gml/`
+#      y `catastro/`, entonces sí necesitarán línea.
+#
+#   5. `test/export/__snapshots__/*.txt` (F10) — y vuelve a ser **LF**, no CRLF,
+#      aunque viva en el mismo directorio que (4). No es incoherencia: el DXF es
+#      un formato de intercambio cuyos ejemplares reales son CRLF y que va a
+#      abrir un programa que no controlamos; el listado de coordenadas es texto
+#      plano que se lee en un bloc de notas, y el repo entero —GML incluido—
+#      emite `\n`. Cada regla sigue al ESCRITOR, no al directorio. Sin esta
+#      línea, `core.autocrlf=true` le da CRLF a un clon en Windows mientras
+#      `export/coordenadas.js` sigue emitiendo LF, y `test/export/coordenadas.test.js`
+#      se pone roja sin que nadie haya tocado nada: el mismo defecto que (1).
+#      Lo comprueba una prueba de ese fichero, que lee este `.gitattributes`.
+
 test/gml/__snapshots__/*.gml    text eol=lf
 test/fixtures/gml/*.gml         text eol=lf
 test/fixtures/gml/derivados/*.gml  text eol=lf
 test/fixtures/catastro/*.xml    text eol=lf
 test/fixtures/catastro/*.json   text eol=lf
 test/fixtures/catastro/derivados/*.json  text eol=lf
+test/export/__snapshots__/*.dxf text eol=crlf
+test/export/__snapshots__/*.txt text eol=lf

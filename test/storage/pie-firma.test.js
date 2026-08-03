@@ -140,11 +140,18 @@ describe('storage/bd · la migración del pie de firma (F09)', () => {
     })
   })
 
-  it('una base que YA existía en la versión 1 sube a la 2 sin perder lo que tenía', async () => {
+  it('una base que YA existía en la versión 1 sube a la de hoy sin perder lo que tenía', async () => {
     // El caso del usuario que ya usaba la aplicación antes de F09: entra por
-    // `oldVersion === 1`, ejecuta SOLO el peldaño nuevo, y su caché del Catastro
-    // sigue donde estaba. Es el primer ascenso real de la historia de esta base,
-    // así que hasta hoy nadie lo había ejercitado.
+    // `oldVersion === 1`, ejecuta los peldaños que le faltan, y su caché del
+    // Catastro sigue donde estaba. Es el primer ascenso real de la historia de
+    // esta base, así que hasta F09 nadie lo había ejercitado.
+    //
+    // ⚠️ La versión de llegada se DERIVA de `VERSION_BD`, no se escribe. Cuando
+    // esta prueba se escribió eran 1 → 2 y el número estaba a mano; con el
+    // peldaño de F10 pasó a ser 1 → 3 y la prueba se puso roja **por un cambio
+    // que no rompía nada** — exactamente el ruido que `VERSION_BD = MIGRACIONES.length`
+    // existe para no producir. Y de paso el salto pasa a ser de DOS peldaños, que
+    // es la primera vez que la escalera REAL distingue `<` de `===`.
     const fabrica = new IDBFactory()
 
     // (a) Se fabrica a mano la base TAL COMO ERA en F05: versión 1, dos almacenes.
@@ -167,13 +174,14 @@ describe('storage/bd · la migración del pie de firma (F09)', () => {
       peticion.onerror = () => rechazar(peticion.error)
     })
 
-    // (b) Y ahora abre la aplicación de hoy, que pide la versión 2.
+    // (b) Y ahora abre la aplicación de hoy, que pide la versión que toque.
     vi.resetModules()
-    const { abrirBd } = await import('../../storage/bd.js')
+    const { abrirBd, VERSION_BD } = await import('../../storage/bd.js')
     const { disponible, bd } = await abrirBd({ indexedDB: fabrica })
 
     expect(disponible).toBe(true)
-    expect(bd.version).toBe(2)
+    expect(bd.version).toBe(VERSION_BD)
+    expect(VERSION_BD).toBeGreaterThan(1) // anti-vacuidad: tiene que haber SUBIDO
     expect(new Set([...bd.objectStoreNames])).toEqual(new Set(Object.values(ALMACENES)))
     // Lo que había sigue ahí: la migración añade, no reconstruye.
     expect(await bd.get(ALMACENES.PARCELAS, 'parcela:EPSG:25830:VIEJA')).toMatchObject({

@@ -233,6 +233,43 @@ export const TIPO_MIME_TEXTO = 'text/plain;charset=utf-8'
  */
 export const TIPO_MIME_PDF = 'application/pdf'
 
+/**
+ * Tipo MIME del DXF de F10. Vive aquí por lo mismo que los otros tres: el
+ * vocabulario de la ENTREGA es de este módulo, aunque quien escribe el fichero sea
+ * `export/dxf.js` —que es puro y no sabe nada de `Blob`—.
+ *
+ * **`image/vnd.dxf` es el tipo REGISTRADO en IANA**, y sí, empieza por `image/`
+ * aunque un DXF sea texto plano: se registró bajo esa rama por historia de AutoCAD,
+ * no porque sea un mapa de bits. Se usa el registrado y no ninguno de los tres
+ * inventados que circulan (`application/dxf`, `application/x-dxf`, `image/x-dxf`)
+ * porque el que está registrado es el único que un tercero puede reconocer sin
+ * adivinar.
+ *
+ * **Sin `charset`, y no es un olvido.** El parámetro `charset` solo significa algo en
+ * los tipos `text/*`, así que aquí lo ignorarían todos. Y tampoco haría falta:
+ * `export/dxf.js` emite ASCII puro —códigos de grupo, números y los nombres de capa
+ * `PARCELA_OFICIAL`/`PARCELA_EDITADA`—, y por eso el fichero no necesita declarar
+ * `$DWGCODEPAGE`. El día que una capa lleve una `ñ`, el sitio donde eso se declara es
+ * la cabecera del DXF, no este MIME.
+ *
+ * @readonly
+ */
+export const TIPO_MIME_DXF = 'image/vnd.dxf'
+
+/**
+ * Tipo MIME del fichero de proyecto de F10.
+ *
+ * **Sin `charset`, y aquí el motivo es el más fuerte de los cuatro**: el registro de
+ * `application/json` NO define el parámetro, porque RFC 8259 §8.1 obliga a que un
+ * JSON intercambiado entre sistemas sea UTF-8. Añadir `;charset=utf-8` sería declarar
+ * como opcional algo que la norma da por obligatorio, y algunos analizadores estrictos
+ * rechazan el parámetro. Es justo lo contrario del caso del informe en texto, donde el
+ * `charset` es imprescindible porque `text/plain` deja al navegador ADIVINAR.
+ *
+ * @readonly
+ */
+export const TIPO_MIME_JSON = 'application/json'
+
 // ── Repertorio de caracteres del nombre de fichero ───────────────────────────
 
 /**

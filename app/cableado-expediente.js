@@ -1,0 +1,1391 @@
+// app/cableado-expediente.js — F10 · T5.1. DONDE SE COSE LA FASE ENTERA.
+//
+// Diez fases después, esta aplicación **por fin recuerda**. Hasta aquí recargar la
+// pestaña tiraba el trabajo entero: no había ni una línea de almacenamiento, ni un
+// flag de sucio, ni una forma de llevarse un expediente a otro equipo. Este módulo
+// es el único sitio donde todo eso se conecta, y no aporta reglas nuevas: pone en
+// contacto piezas que las fases 1 a 4 dejaron escritas y probadas por separado.
+//
+// ── LAS CINCO COSTURAS, Y QUÉ HACE CADA UNA ────────────────────────────────
+//
+//  1. **EL EXPEDIENTE POR FIN EXISTE.** `crearExpediente` vive en
+//     `model/parcela.js` desde F00 y su ÚNICO llamante en todo el repo era
+//     `test/contrato.test.js`: la aplicación trabajaba con una Parcela suelta en el
+//     store y el `srs` era una constante de módulo. Aquí se junta lo uno con lo
+//     otro —{@link cablearExpediente}`#expedienteActual`— con el `srs` saliendo de
+//     `app/demo-datos.js`, tal y como la cabecera de aquel fichero lleva pidiendo
+//     desde F03. El Expediente **se DERIVA, no se guarda**: la fuente de verdad de
+//     la geometría sigue siendo el store, y una segunda copia viva del mismo dato
+//     es la forma más segura de que las dos discrepen.
+//
+//  2. **EL AUTOGUARDADO**, séptimo suscriptor del mismo store, enchufando el
+//     debounce de T3.3 al almacén de T2.1. Ver el apartado «La espera del
+//     autoguardado», que es la decisión menos obvia del módulo.
+//
+//  3. **EL ARRANQUE**: se pide la persistencia, se lee lo guardado y, si hay
+//     trabajo autoguardado de otra sesión, **se OFRECE** (decisión 2 de la
+//     entrevista de F10: ofrecer, no imponer). La aplicación arranca exactamente
+//     como siempre; nada se mueve bajo los pies del usuario.
+//
+//  4. **LAS TRES DESCARGAS** —DXF, listado de coordenadas y fichero de proyecto—
+//     por `gml/descargar.js#descargarTexto`, con los nombres DERIVADOS de
+//     `nombreFicheroGml` (ver {@link nombreFicheroExport}).
+//
+//  5. **LA ENTRADA DEL `.json`**, que no instancia una segunda zona de fichero: se
+//     le añade la extensión a la ÚNICA que hay y se enruta por extensión. El
+//     mecanismo es `cablearComprobacion`·`entradasExtra`, y el porqué está escrito
+//     allí: dos zonas vivas engancharían las dos el `drop` de la ventana entera.
+//
+// Y la degradación del criterio 4: `QuotaExceededError` → purgar la caché del
+// Catastro por antigüedad → reintentar → si sigue fallando, **decirlo**.
+//
+// ── ⛔ LO QUE EL PLAN PROMETÍA Y NO SE HACE: `metadatos.idDocumento` ────────
+// El plan de F10 decía que con el Expediente por fin construido
+// «`metadatos.idDocumento` deja de componerse siempre», apuntando a
+// `app/cableado-informe.js`, que hoy llama a `componerIdDocumento(refcat, fecha)`
+// en cada informe. **No se hace, y hay dos motivos concretos:**
+//
+//   1. **El identificador del informe lleva dentro el instante de emisión.** Su
+//      forma es `CG-<refcat>-<AAAAMMDD>-<hhmmss>Z` (`report/firma.js`), y
+//      `esIdDocumento` existe para reconocerla. Reutilizar uno guardado en el
+//      expediente estamparía en un PDF de hoy la hora de la semana pasada: la
+//      matrícula mentiría sobre cuándo se hizo ese papel, que es justo lo que un
+//      documento firmable no puede hacer. El identificador del INFORME es del
+//      informe; el del EXPEDIENTE, si lo hubiera, sería otra cosa.
+//   2. **Un identificador guardado DENTRO del expediente sobrevive a `duplicar`.**
+//      `storage/expedientes.js#duplicar` hace `structuredClone` del registro y
+//      cambia **solo la clave**; nada toca `expediente.metadatos`. Una copia
+//      llevaría dentro la identidad del original, apuntando a otro registro, sin
+//      que nada fallara. La identidad de un expediente es su clave en el almacén,
+//      y tener dos nombres para la misma cosa es exactamente lo que la cabecera de
+//      `index.js` explica que este proyecto evita.
+//
+// Lo que sí cambia —y es la mitad de la promesa que sí se sostiene— es que
+// `metadatos.creado` y `metadatos.modificado` **dejan de reestamparse a «ahora» en
+// cada derivación**: se conservan en {@link cablearExpediente} y viajan al fichero
+// de proyecto, así que un `.json` exportado dice de verdad cuándo se empezó ese
+// trabajo en vez de decir la hora de la exportación.
+//
+// ── LA ESPERA DEL AUTOGUARDADO (y por qué no se arma al arrancar) ───────────
+// El borrador es UN registro con clave reservada (`ID_BORRADOR`): cada disparo del
+// debounce lo pisa. Si el autoguardado se armara al arrancar, **la primera edición
+// del usuario borraría el trabajo de la sesión anterior antes de que le diera
+// tiempo a verlo ofrecido** — y el síntoma sería que la oferta desaparece sola.
+// Así que mientras haya una oferta pendiente el autoguardado está EN ESPERA, y el
+// primer cambio que llega en ese estado lo dice una vez por el panel
+// ({@link MENSAJE_AUTOGUARDADO_EN_ESPERA}) en lugar de escribir en silencio. En
+// cuanto el usuario recupera o descarta, se arma y ya no vuelve a pararse.
+//
+// ── LO QUE ESTE MÓDULO NO HACE ─────────────────────────────────────────────
+//   · **No fabrica marcado de la cáscara.** El `<dialog>` lo fabrica
+//     `app/dialogo-expediente.js`; de `index.html` solo se coge el botón
+//     «Expediente», que sí está declarado allí (F10 · T4.1).
+//   · **No sabe de IndexedDB.** Habla con `storage/expedientes.js` y
+//     `storage/cuota.js` por sus resultados, y los dos entran CONSTRUIDOS desde
+//     `app/main.js` — mismo reparto que el transporte, la caché y el cliente del
+//     Catastro en F05.
+//   · **No decide si el trabajo está bien.** Guarda, recupera y escribe ficheros
+//     (regla de oro 9).
+//   · **No cambia de huso.** Si un expediente guardado está en otro `srs`, se dice
+//     y no se abre (desviación 8 del plan de F10). El diálogo ya apaga su botón con
+//     el motivo escrito; aquí está la guarda que no depende de un `disabled`.
+//
+// Su test es `test/app/expediente.dom.test.js`, con sufijo `.dom`: toca el DOM.
+
+import { crearExpediente } from '../model/parcela.js'
+import { SEVERIDAD } from '../export/_comun.js'
+import { serializarCoordenadasTxt } from '../export/coordenadas.js'
+import { serializarParcelaDxf } from '../export/dxf.js'
+import { aProyecto, deProyecto } from '../export/proyecto.js'
+import {
+  EXTENSION_GML,
+  PREFIJO_NOMBRE,
+  TIPO_MIME_DXF,
+  TIPO_MIME_JSON,
+  TIPO_MIME_TEXTO,
+  descargarTexto,
+  nombreFicheroGml,
+} from '../gml/descargar.js'
+import { MS_AUTOGUARDADO, crearAutoguardado } from '../storage/autoguardado.js'
+import { AVISO_SIN_PERSISTENCIA } from '../storage/cuota.js'
+import { NIVEL } from '../viewer/_comun.js'
+import { describirEdad } from './cableado-catastro.js'
+import { ACCION, crearDialogoExpediente, motivoOtroHuso } from './dialogo-expediente.js'
+
+// ── El contrato con `index.html` ─────────────────────────────────────────────
+
+/**
+ * El botón «Expediente» de la fila del rótulo «Origen de la parcela». Vive en la
+ * cáscara (F10 · T4.1) y **no lo fabrica nadie**: es el único nodo que este módulo
+ * necesita de `index.html`.
+ */
+export const SELECTOR_BOTON_EXPEDIENTE = '[data-accion="abrir-expediente"]'
+
+// ── Nombres de los tres ficheros ─────────────────────────────────────────────
+
+/**
+ * Extensiones que la zona de fichero acepta ADEMÁS de las del GML, y con las que
+ * `app/main.js` la amplía. Solo el fichero de proyecto: el DXF y el listado de
+ * coordenadas son de SALIDA — la aplicación los escribe y todavía no los sabe abrir
+ * desde la interfaz, que es una asimetría real y está declarada en el plan.
+ *
+ * @readonly
+ * @type {readonly string[]}
+ */
+export const EXTENSIONES_PROYECTO = Object.freeze(['.json'])
+
+/**
+ * Los tres ficheros que este cableado entrega, con su prefijo y su extensión.
+ *
+ * ⚠️ **El DXF conserva el prefijo `parcela`** —el mismo que el GML— y los otros dos
+ * llevan el suyo. No es descuido:
+ *
+ *   · El DXF y el GML son **la misma geometría en dos formatos**, y que se emparejen
+ *     de un vistazo en la carpeta de descargas es exactamente lo que se quiere. No
+ *     pueden colisionar porque la extensión ya los distingue.
+ *   · El listado **no puede** llamarse `parcela_…​.txt`: `.txt` ya lo usa el informe
+ *     de contraste de F08 (`contraste_…​.txt`), y dos ficheros de texto sobre la
+ *     misma parcela y el mismo instante distinguidos solo por el prefijo es
+ *     precisamente la razón por la que aquel eligió el suyo.
+ *   · El proyecto lleva el suyo porque es lo único de los tres que se puede volver
+ *     a abrir aquí, y el usuario tiene que poder encontrarlo sin abrirlo.
+ *
+ * @readonly
+ */
+export const FICHERO = Object.freeze({
+  DXF: Object.freeze({ prefijo: PREFIJO_NOMBRE, extension: '.dxf', mime: TIPO_MIME_DXF }),
+  COORDENADAS: Object.freeze({ prefijo: 'coordenadas', extension: '.txt', mime: TIPO_MIME_TEXTO }),
+  PROYECTO: Object.freeze({ prefijo: 'proyecto', extension: '.json', mime: TIPO_MIME_JSON }),
+})
+
+/**
+ * Compone el nombre de un fichero de salida: `<prefijo>_<referencia>_<marca>.<ext>`.
+ *
+ *     parcela_9398516VK3799G_2026-08-03T11-45-30.dxf
+ *     coordenadas_sin-referencia_2026-08-03T11-45-30.txt
+ *     proyecto_9398516VK3799G_2026-08-03T11-45-30.json
+ *
+ * ── POR QUÉ SE DERIVA DE `nombreFicheroGml` Y NO SE ESCRIBE OTRA VEZ ────────
+ * Exactamente el mismo argumento que ya dejó escrito `nombreFicheroInforme` en
+ * `app/cableado-diagnostico.js`, y por eso esta función es su gemela y no una
+ * segunda invención: el nombre de un fichero **no es texto libre**. La referencia
+ * catastral la teclea o la pega el usuario, y de ahí salen rutas (`/`, `\`, `..`),
+ * caracteres ilegales en Windows, nombres de DISPOSITIVO reservados (`CON.dxf` no
+ * se puede crear) y longitudes que revientan. Todo eso está resuelto —por lista
+ * BLANCA y con el porqué de cada decisión al lado— dentro de `gml/descargar.js`, y
+ * su saneador **no está exportado**. Se le pide el nombre HECHO y se le cambian las
+ * dos piezas que son de este dominio.
+ *
+ * Se generaliza en vez de escribir tres funciones casi iguales porque aquí son TRES
+ * ficheros: tres copias de la misma derivación son tres sitios donde arreglar la
+ * misma cosa el día que cambie.
+ *
+ * FUNCIÓN PURA: la fecha entra por parámetro, igual que en `gml/` y en `export/`.
+ *
+ * @param {object} args
+ * @param {string} args.prefijo    Uno de los de {@link FICHERO}.
+ * @param {string} args.extension  Con el punto.
+ * @param {string|null} [args.refcat=null]  Tal cual la tenga el expediente, SIN sanear.
+ * @param {Date} args.fecha  Instante que se estampa. OBLIGATORIO.
+ * @returns {string}  Nombre de fichero seguro.
+ * @throws {TypeError|RangeError}  Los de `nombreFicheroGml`, sin traducir: son
+ *   contratos del programador y su mensaje nombra el problema mejor.
+ */
+export function nombreFicheroExport({ prefijo, extension, refcat = null, fecha }) {
+  const delGml = nombreFicheroGml({ refcat, fecha })
+  // Se recorta por longitud y no con un `replace`, por lo mismo que allí: un
+  // `replace` de la cadena «parcela» acertaría también dentro de una referencia
+  // catastral que la contuviera.
+  const cuerpo = delGml.slice(PREFIJO_NOMBRE.length, delGml.length - EXTENSION_GML.length)
+  return `${prefijo}${cuerpo}${extension}`
+}
+
+// ── Traducción de severidades ────────────────────────────────────────────────
+
+/**
+ * Las TRES severidades de `export/` a los DOS niveles del panel. Misma tabla, y por
+ * las mismas razones, que la de `app/main.js` para `gml/`: `NIVEL.ERROR` significa
+ * BLOQUEANTE en toda la app, y un `INFO` de `export/` no es ruido de depuración
+ * —son `SIN_GEOMETRIA_OFICIAL` y `HUECO_EXPORTADO`—: el fichero que baja no dice
+ * todo lo que el usuario tiene en pantalla, y la regla de oro 1 dice que se entera.
+ *
+ * Una severidad futura da `undefined` y cae a `NIVEL.AVISO`, que es el suelo seguro:
+ * nunca inventa un bloqueo.
+ */
+const NIVEL_POR_SEVERIDAD = Object.freeze({
+  [SEVERIDAD.INFO]: NIVEL.AVISO,
+  [SEVERIDAD.AVISO]: NIVEL.AVISO,
+  [SEVERIDAD.ERROR]: NIVEL.ERROR,
+})
+
+// ── Tiempos ──────────────────────────────────────────────────────────────────
+
+/**
+ * Cuánto dura el armado de «Borrar» antes de olvidarse.
+ *
+ * ⚠️ **Borrar es irreversible y el diálogo no tiene pantalla de confirmación**: sus
+ * filas las pinta `app/dialogo-expediente.js`, que emite {@link ACCION}`.BORRAR` en
+ * cuanto se pulsa. Así que la confirmación la pone ESTE módulo sin tocar ni un nodo
+ * ajeno: el primer clic ARMA y lo escribe en el renglón de estado (que es
+ * `role="status"`, o sea que un lector de pantalla lo anuncia sin robar el foco), y
+ * el segundo clic **sobre la misma fila y dentro de este plazo** borra. Un clic en
+ * otra fila desarma: armar dos borrados a la vez sería peor que no armar ninguno.
+ *
+ * Limitación declarada para el §11 del checklist humano: el rótulo del botón sigue
+ * diciendo «Borrar» mientras está armado, porque el marcado de la fila es del
+ * diálogo. El aviso está en el renglón, no en el botón.
+ */
+export const MS_CONFIRMAR_BORRADO = 5000
+
+// ── Textos ───────────────────────────────────────────────────────────────────
+
+/**
+ * Lo que se dice al arrancar cuando hay trabajo autoguardado de otra sesión. Va al
+ * PANEL y no solo al diálogo, y esa es la diferencia entre ofrecer y esconder: un
+ * renglón que solo se ve abriendo el diálogo no es una oferta, porque el usuario no
+ * tiene ningún motivo para abrirlo.
+ *
+ * Dice las tres cosas que hacen falta: **qué hay**, **que no se ha tocado nada** y
+ * **dónde está el botón**.
+ *
+ * @param {string|null} refcat
+ * @param {string|null} edad
+ * @returns {string}
+ */
+export const mensajeHayBorrador = (refcat, edad) => {
+  const cuando = edad === null ? 'de una sesión anterior' : `de ${edad}`
+  const cual = refcat === null ? '' : `, de la parcela ${refcat}`
+  return (
+    `Hay trabajo autoguardado ${cuando}${cual}. No se ha abierto nada: la pantalla sigue como ` +
+    'siempre. Para recuperarlo o descartarlo, abre «Expediente», en la fila «Origen de la parcela».'
+  )
+}
+
+/** Ver el apartado «La espera del autoguardado» de la cabecera. Se dice UNA vez. */
+export const MENSAJE_AUTOGUARDADO_EN_ESPERA =
+  'El autoguardado está en espera: hay trabajo autoguardado de una sesión anterior sin recuperar, ' +
+  'y guardar encima lo borraría. Abre «Expediente» y recupéralo o descártalo; a partir de ahí el ' +
+  'trabajo en curso se guarda solo.'
+
+/** Cuando no hay ninguna parcela en pantalla y se pide guardar o exportar. */
+export const MENSAJE_SIN_PARCELA =
+  'No hay ninguna parcela en pantalla: no hay nada que guardar ni que exportar.'
+
+/** Cuando el expediente guardado no lleva parcela (un expediente de edificio, F11). */
+export const MENSAJE_GUARDADO_SIN_PARCELA =
+  'Ese expediente guardado no lleva ninguna parcela, así que no hay geometría que abrir en el ' +
+  'visor. No se ha borrado nada.'
+
+/** Cuando se choca con la cuota y no hay caché que purgar. */
+export const MENSAJE_SIN_PURGA =
+  'No hay espacio en el almacén local y esta pantalla no tiene la caché del Catastro cableada, ' +
+  'así que no hay nada que liberar automáticamente. Exporta el trabajo a un fichero de proyecto ' +
+  'y borra expedientes que ya no necesites, o libera espacio desde el navegador.'
+
+/** Cuando se ha purgado y aun así no cabe. */
+export const MENSAJE_CUOTA_TRAS_PURGAR =
+  'Sigue sin haber espacio en el almacén local después de liberar la caché del Catastro. Exporta ' +
+  'el trabajo a un fichero de proyecto —eso no depende del espacio del navegador— y borra ' +
+  'expedientes que ya no necesites.'
+
+/** Coletilla del acuse de guardado cuando el navegador no garantiza la conservación. */
+export const COLETILLA_SIN_PERSISTENCIA =
+  ' El navegador no garantiza conservarlo: si se queda sin espacio puede borrarlo por su cuenta.'
+
+/** Cuando falla el autoguardado varias veces seguidas. Se dice UNA vez por racha. */
+export const MENSAJE_AUTOGUARDADO_ROTO =
+  'El trabajo en curso no se está pudiendo autoguardar en este navegador. Lo que hay en pantalla ' +
+  'no corre peligro mientras la pestaña siga abierta, pero una recarga se lo llevaría: exporta el ' +
+  'expediente a un fichero de proyecto.'
+
+/** Cuando alguien suelta un `.json` y este cableado no llegó a montarse. */
+export const MENSAJE_SIN_EXPEDIENTE =
+  'No se ha podido preparar el expediente, así que un fichero de proyecto no se puede abrir en ' +
+  'esta sesión. El detalle técnico está en la consola del navegador.'
+
+/** Cuando «Abrir un proyecto…» no tiene a quién pedirle el selector de ficheros. */
+export const MENSAJE_SIN_SELECTOR =
+  'No se puede abrir el selector de ficheros desde aquí: la entrada por fichero de la aplicación ' +
+  'no está disponible en esta sesión. Puedes arrastrar el fichero de proyecto sobre la ventana.'
+
+// ── Duck typing de las dependencias inyectadas ───────────────────────────────
+
+/** ¿Sirve como store? Lo mismo que piden los otros cableados, y nada más. */
+function esStore(s) {
+  return (
+    !!s &&
+    typeof s === 'object' &&
+    typeof s.get === 'function' &&
+    typeof s.set === 'function' &&
+    typeof s.subscribe === 'function'
+  )
+}
+
+/**
+ * ¿Sirve como almacén de expedientes? DUCK TYPING sobre las nueve operaciones que
+ * este módulo usa, por el mismo motivo que en todo `storage/`: un doble de prueba no
+ * debería fingir una jerarquía entera para hacer de almacén.
+ */
+function esAlmacen(e) {
+  return (
+    !!e &&
+    typeof e === 'object' &&
+    typeof e.guardar === 'function' &&
+    typeof e.listar === 'function' &&
+    typeof e.recuperar === 'function' &&
+    typeof e.duplicar === 'function' &&
+    typeof e.borrar === 'function' &&
+    typeof e.guardarBorrador === 'function' &&
+    typeof e.leerBorrador === 'function' &&
+    typeof e.descartarBorrador === 'function'
+  )
+}
+
+/** ¿Sirve como gestor de cuota? Solo `pedirPersistencia`: `medir` no se usa aquí. */
+function esCuota(c) {
+  return !!c && typeof c === 'object' && typeof c.pedirPersistencia === 'function'
+}
+
+/** ¿Hay geometría que guardar? Un exterior con al menos un vértice. */
+function hayGeometria(parcela) {
+  return (
+    !!parcela &&
+    typeof parcela === 'object' &&
+    Array.isArray(parcela.recintos) &&
+    parcela.recintos.length > 0 &&
+    Array.isArray(parcela.recintos[0]?.vertices) &&
+    parcela.recintos[0].vertices.length > 0
+  )
+}
+
+// ── Nodos de la cáscara ──────────────────────────────────────────────────────
+
+/**
+ * Nodo de `index.html`, o `throw`. El marcado de la cáscara es CONTRATO, así que un
+ * selector que no encuentra nada es un bug del programador y no un dato malo: se
+ * lanza y **se nombra el selector**. Gemelo del de `cableado-catastro.js` y del de
+ * `cableado-diagnostico.js`; siguen siendo copias de cuatro líneas porque cada
+ * mensaje nombra su propio módulo, que es lo único que se lee cuando salta.
+ *
+ * @param {Document} doc
+ * @param {string} selector
+ * @returns {HTMLElement}
+ * @throws {Error}
+ */
+function nodoDe(doc, selector) {
+  const encontrado = doc.querySelector(selector)
+  if (encontrado === null) {
+    throw new Error(
+      `app/cableado-expediente.js: la cáscara no tiene ningún nodo '${selector}'. El marcado de ` +
+        `index.html es contrato de este cableado: si se ha renombrado o movido ese botón, hay que ` +
+        `arreglarlo en index.html, no aquí.`,
+    )
+  }
+  return /** @type {HTMLElement} */ (encontrado)
+}
+
+// ── El cableado ──────────────────────────────────────────────────────────────
+
+/**
+ * Cablea el expediente: el botón «Expediente», su diálogo, el almacén local, el
+ * autoguardado y las tres exportaciones.
+ *
+ * ```js
+ * const exp = cablearExpediente({
+ *   estado, panel, srs: SRS_DEMO,
+ *   expedientes: crearExpedientes({ bd: abrirBd({ alAvisar: panel.avisar }), alAvisar: panel.avisar }),
+ *   cuota: crearCuota({ alAvisar: panel.avisar }),
+ *   cache: cacheCatastro,
+ *   alCargarParcela: edicionCableada.alCargarParcela,
+ *   elegirFichero: () => comprobacionCableada.elegirFichero(),
+ * })
+ * ```
+ *
+ * @param {Object} opciones
+ * @param {import('../viewer/_comun.js').EstadoVista} opciones.estado  El MISMO store
+ *   que el mapa, la tabla, la ficha, el diagnóstico, la comprobación, el botón del
+ *   GML y el informe. Este cableado es su **séptimo** suscriptor.
+ * @param {import('./avisos.js').PanelAvisos} opciones.panel
+ * @param {string} opciones.srs  El SRS del expediente. Se valida al cablear.
+ * @param {object} opciones.expedientes  El de `storage/expedientes.js`, **ya
+ *   construido**: mismo reparto que el cliente del Catastro en F05, para que este
+ *   módulo no decida por el llamante la base, el reloj ni el canal de avisos.
+ * @param {object} opciones.cuota  El de `storage/cuota.js`, ya construido.
+ * @param {{purgarCaducados: Function}|null} [opciones.cache=null]  La caché del
+ *   Catastro, **solo para purgarla** cuando se agote la cuota (criterio 4). `null` ⇒
+ *   no hay nada que liberar automáticamente, y se DICE ({@link MENSAJE_SIN_PURGA}).
+ * @param {((parcela: object) => void)|null} [opciones.alCargarParcela=null]  Se llama
+ *   DESPUÉS del `estado.set`, con el POJO que ha entrado. El MISMO gancho que reciben
+ *   `cablearCatastro` y `cablearComprobacion`, y por lo mismo: recuperar un expediente
+ *   es **abrir un documento nuevo**, así que el historial se REINICIA en vez de
+ *   commitear encima (decisión 2 de F06).
+ * @param {(() => void)|null} [opciones.elegirFichero=null]  Abre el selector de
+ *   ficheros de la ÚNICA zona de la aplicación (`cablearComprobacion#elegirFichero`).
+ *   `null` ⇒ «Abrir un proyecto…» lo dice en vez de no hacer nada.
+ * @param {HTMLElement} [opciones.boton]  Por defecto {@link SELECTOR_BOTON_EXPEDIENTE}.
+ * @param {Document} [opciones.documento=globalThis.document]
+ * @param {typeof URL} [opciones.url=globalThis.URL]  Objeto con
+ *   `createObjectURL`/`revokeObjectURL`, que es lo que convierte una cadena en un
+ *   fichero descargado. **Se acepta aquí porque `descargarTexto` ya lo acepta**, y
+ *   por lo mismo: en jsdom no existe, así que sin inyectarlo las tres exportaciones
+ *   solo se podrían probar por su degradación y nunca por lo que bajan.
+ * @param {() => Date} [opciones.ahora]  De dónde sale «ahora». Inyectable porque sale
+ *   POR PANTALLA (la antigüedad de cada guardado) y por fichero (la marca de tiempo
+ *   de los tres nombres), y un módulo que lee el reloj del sistema no es reproducible.
+ * @param {number} [opciones.ms=MS_AUTOGUARDADO]  Espera del debounce.
+ * @param {(fn: Function, ms: number) => *} [opciones.programar]  Ver `storage/autoguardado.js`.
+ * @param {(id: *) => void} [opciones.cancelar]  Ídem.
+ * @returns {{abrir: () => void,
+ *            abrirProyecto: (fichero: File) => Promise<void>,
+ *            expedienteActual: () => object|null,
+ *            guardarBorradorYa: () => Promise<*>,
+ *            estado: () => object,
+ *            destruir: () => void}}
+ * @throws {TypeError}   Contrato del programador.
+ * @throws {RangeError}  Si el `srs` no es uno de los del modelo (lo lanza `crearExpediente`).
+ * @throws {Error}       Si la cáscara no trae el botón.
+ */
+export function cablearExpediente({
+  estado,
+  panel,
+  srs,
+  expedientes,
+  cuota,
+  cache = null,
+  alCargarParcela = null,
+  elegirFichero = null,
+  documento = globalThis.document,
+  url = globalThis.URL,
+  boton,
+  ahora = () => new Date(),
+  ms = MS_AUTOGUARDADO,
+  programar,
+  cancelar,
+} = {}) {
+  if (!esStore(estado)) {
+    throw new TypeError(
+      `cablearExpediente: 'estado' debe ser el store de crearEstadoVista ` +
+        `({get, set, subscribe}); recibido ${typeof estado}.`,
+    )
+  }
+  if (!panel || typeof panel.avisar !== 'function') {
+    throw new TypeError(
+      `cablearExpediente: 'panel' debe ser el panel de avisos (con 'avisar'); recibido ` +
+        `${typeof panel}. Sin él, un expediente que no se puede guardar no tendría dónde contarse.`,
+    )
+  }
+  if (!esAlmacen(expedientes)) {
+    throw new TypeError(
+      `cablearExpediente: 'expedientes' debe ser el almacén de storage/expedientes.js ` +
+        `(guardar, listar, recuperar, duplicar, borrar y el trío del borrador); recibido ` +
+        `${typeof expedientes}. Se pasa CONSTRUIDO, como el cliente del Catastro.`,
+    )
+  }
+  if (!esCuota(cuota)) {
+    throw new TypeError(
+      `cablearExpediente: 'cuota' debe ser el de storage/cuota.js (con pedirPersistencia); ` +
+        `recibido ${typeof cuota}.`,
+    )
+  }
+  if (cache !== null && typeof cache?.purgarCaducados !== 'function') {
+    throw new TypeError(
+      `cablearExpediente: 'cache' debe ser la caché del Catastro (con purgarCaducados) o null si ` +
+        `no hay ninguna que purgar; recibido ${typeof cache}.`,
+    )
+  }
+  if (alCargarParcela !== null && typeof alCargarParcela !== 'function') {
+    throw new TypeError(
+      `cablearExpediente: 'alCargarParcela' debe ser una función o null; recibido ` +
+        `${typeof alCargarParcela}.`,
+    )
+  }
+  if (elegirFichero !== null && typeof elegirFichero !== 'function') {
+    throw new TypeError(
+      `cablearExpediente: 'elegirFichero' debe ser una función o null; recibido ` +
+        `${typeof elegirFichero}.`,
+    )
+  }
+  if (typeof ahora !== 'function') {
+    throw new TypeError(`cablearExpediente: 'ahora' debe ser una función; recibido ${typeof ahora}.`)
+  }
+  // DELEGADO, igual que `cablearComprobacion` delega el huso en `husoPorSrs`: el
+  // único sitio que sabe qué `srs` admite el modelo es `crearExpediente`, y su
+  // mensaje («Válidos: …») nombra el problema mejor que cualquier paráfrasis. El
+  // expediente que sale se tira: lo que interesa es que no lance.
+  crearExpediente({ srs })
+
+  const doc = documento
+  const botonAbrir = boton ?? nodoDe(doc, SELECTOR_BOTON_EXPEDIENTE)
+
+  let destruido = false
+
+  // ── La identidad del expediente abierto ───────────────────────────────────
+  //
+  // Lo que NO está en el store y no puede deducirse de él: con qué registro se
+  // corresponde lo que hay en pantalla, cómo se llama y desde cuándo existe.
+  //
+  // `id === null` significa «esto todavía no se ha guardado nunca», que es el estado
+  // de partida y el de cada documento nuevo. Guardar con `id` pone al día ESE
+  // registro; guardar sin él crea uno.
+  const instanteISO = () => new Date(ahora()).toISOString()
+  let identidad = {
+    /** @type {string|null} */ id: null,
+    /** @type {string|null} */ nombre: null,
+    creado: instanteISO(),
+    modificado: instanteISO(),
+  }
+
+  /**
+   * El `idLocal` de la parcela que hay abierta. Es lo que distingue **una edición**
+   * de **otro documento**, y no es una elección nueva: `app/main.js` ya razona por
+   * escrito que `idLocal` es el único de los cuatro candidatos que sirve —`refcat` no
+   * (la demo es una parcela real), `origen` no (la demo ya es `WFS`), la identidad
+   * del POJO no (editar construye uno nuevo)—.
+   *
+   * Importa porque sin esto, traer otra parcela del Catastro y pulsar «Guardar»
+   * **pisaría el expediente anterior con una geometría que no es la suya**.
+   *
+   * @type {string|null}
+   */
+  let idLocalAbierto = estado.get()?.idLocal ?? null
+
+  /** Lo que devolvió `pedirPersistencia()`, o `null` mientras no se sepa. */
+  let persistencia = null
+
+  /**
+   * El borrador que se está OFRECIENDO, o `null` si no hay ninguno o si el usuario ya
+   * lo resolvió en esta sesión. Mientras no sea `null`, el autoguardado está en
+   * espera (ver la cabecera).
+   *
+   * @type {{refcat: string|null, edad: string|null}|null}
+   */
+  let ofrecido = null
+
+  /** ¿Se ha terminado ya la lectura de arranque? Hasta entonces no se pisa nada. */
+  let arrancado = false
+
+  /**
+   * Hubo un cambio en el store mientras el autoguardado estaba en espera. Sin esto,
+   * una edición hecha en el medio segundo que tarda la lectura de arranque —o mientras
+   * la oferta está en pie— **no se guardaría nunca**: el debounce solo escribe lo que
+   * le han contado, y a ese cambio nadie se lo contó. Se vuelca en cuanto la espera
+   * termina, que es lo que convierte «no pisar» en «no perder».
+   */
+  let cambioEnEspera = false
+
+  /** Para que {@link MENSAJE_AUTOGUARDADO_EN_ESPERA} se diga una vez y no en cada tecla. */
+  let dichaLaEspera = false
+
+  /** Ídem para la racha de fallos del autoguardado. */
+  let dichoElFalloAuto = false
+
+  /** El borrado armado: `{id, hasta}` en milisegundos de época. Ver {@link MS_CONFIRMAR_BORRADO}. */
+  let armado = null
+
+  // ── Utilidades de dicción ─────────────────────────────────────────────────
+
+  /** Al renglón del diálogo. Lo que se escriba aquí vale hasta el siguiente `fijar`. */
+  const decir = (texto) => {
+    if (!destruido) dialogo.estado(texto)
+  }
+
+  /** Al panel, que es donde queda constancia de lo que le pasa al DATO. */
+  const avisar = (mensaje, nivel = NIVEL.AVISO, causa) => {
+    if (!destruido) panel.avisar(mensaje, causa === undefined ? { nivel } : { nivel, causa })
+  }
+
+  /**
+   * Publica en el panel lo que decidió un escritor de `export/` (regla de oro 1).
+   * Un DXF que ha tenido que fundir dos vértices, o que sale con una capa en vez de
+   * dos, no es el dibujo que el usuario tiene en pantalla.
+   */
+  function publicarDetecciones(detecciones) {
+    for (const d of detecciones ?? []) {
+      avisar(d.mensaje, NIVEL_POR_SEVERIDAD[d.severidad] ?? NIVEL.AVISO)
+    }
+  }
+
+  /** «hace 6 días» a partir de una marca ISO. `null` si no se puede saber. */
+  function edadDe(marcaISO) {
+    const t = Date.parse(marcaISO)
+    if (!Number.isFinite(t)) return null
+    return describirEdad(ahora().getTime() - t)
+  }
+
+  // ── El Expediente, derivado del store ─────────────────────────────────────
+
+  /**
+   * El Expediente que corresponde a lo que hay ahora mismo en pantalla, o `null` si
+   * no hay geometría. **Se deriva en cada llamada y no se guarda**: la fuente de
+   * verdad de la geometría es el store, y una segunda copia viva sería la forma más
+   * segura de que las dos discreparan.
+   *
+   * `metadatos` NO se deja en su defecto: `crearExpediente` estampa «ahora» en
+   * `creado` y en `modificado` cuando no se le dan, así que un expediente derivado
+   * cada vez diría que se creó en el instante de exportarlo. Ver la cabecera.
+   *
+   * @returns {object|null}
+   * @throws {TypeError|RangeError}  Lo que lance `crearExpediente` si el store tiene
+   *   una parcela rota. Es un contrato roto, y quien llama lo cuenta.
+   */
+  function expedienteActual() {
+    const parcela = estado.get()
+    if (!hayGeometria(parcela)) return null
+    return crearExpediente({
+      srs,
+      parcela,
+      metadatos: {
+        creado: identidad.creado,
+        modificado: identidad.modificado,
+        // El autor NO lo sabe esta aplicación: el pie de firma es de F09, se guarda
+        // aparte y se borra aparte, y está en la lista de lo que este almacén NO
+        // guarda. Inventarlo aquí sería atribuirle un trabajo a alguien.
+        autor: '',
+        // Vacío A PROPÓSITO. Ver el apartado de la cabecera: el identificador del
+        // informe lleva dentro su instante de emisión, y uno guardado aquí
+        // sobreviviría a `duplicar` apuntando al registro original.
+        idDocumento: '',
+      },
+    })
+  }
+
+  /** La referencia catastral de lo que hay en pantalla, o `null`. */
+  const refcatActual = () => estado.get()?.refcat ?? null
+
+  // ── Carga de una parcela en el store ──────────────────────────────────────
+
+  /**
+   * Mete una parcela en el store como DOCUMENTO NUEVO. El orden importa: la identidad
+   * se fija ANTES del `set`, porque `set` notifica **de forma síncrona** y nuestro
+   * propio suscriptor se despertaría con la identidad vieja y tomaría esta carga por
+   * la llegada de un documento ajeno.
+   *
+   * @param {object} parcela
+   * @param {{id: string|null, nombre: string|null, creado: string, modificado: string}} nuevaIdentidad
+   */
+  function cargar(parcela, nuevaIdentidad) {
+    identidad = nuevaIdentidad
+    idLocalAbierto = parcela?.idLocal ?? null
+    estado.set(parcela)
+    if (alCargarParcela !== null) alCargarParcela(parcela)
+  }
+
+  // ── El autoguardado ───────────────────────────────────────────────────────
+
+  const auto = crearAutoguardado({
+    // Recibe la PARCELA y deriva aquí, no antes: `cambiado()` se llama en cada
+    // edición y derivar un Expediente entero en cada tecla sería copiar la geometría
+    // por gusto. Cuando el debounce decide escribir, ya solo queda una.
+    guardar: (parcela) => {
+      const exp = crearExpediente({
+        srs,
+        parcela,
+        metadatos: {
+          creado: identidad.creado,
+          modificado: identidad.modificado,
+          autor: '',
+          idDocumento: '',
+        },
+      })
+      return expedientes.guardarBorrador(exp)
+    },
+    ms,
+    ...(programar === undefined ? {} : { programar }),
+    ...(cancelar === undefined ? {} : { cancelar }),
+    ahora: () => ahora().getTime(),
+    // `guardarBorrador` NO avisa por el canal cuando falla, y lo dice por escrito: el
+    // autoguardado corre solo cada dos segundos y un fallo persistente llenaría el
+    // panel de tarjetas idénticas. Quien lo cuenta —UNA vez por racha— es esto.
+    alFallo: ({ consecutivos, causa }) => {
+      if (dichoElFalloAuto) return
+      dichoElFalloAuto = true
+      avisar(MENSAJE_AUTOGUARDADO_ROTO, NIVEL.AVISO, causa)
+      console.warn(`[expediente] el autoguardado lleva ${consecutivos} fallo(s) seguido(s):`, causa)
+    },
+    // Una racha rota vuelve a habilitar el aviso: si falla otra vez dentro de un rato,
+    // es un incidente nuevo y merece contarse otra vez.
+    alGuardado: () => {
+      dichoElFalloAuto = false
+    },
+  })
+
+  // ── El diálogo ────────────────────────────────────────────────────────────
+
+  const dialogo = crearDialogoExpediente({ documento: doc, alAvisar: panel.avisar })
+
+  /**
+   * Repinta el diálogo con lo que hay guardado ahora mismo.
+   *
+   * `nombre` se pasa SOLO cuando hay que cambiarlo: `fijar` sin esa clave no toca el
+   * campo a propósito, para que un repintado no le borre al usuario un rótulo a medio
+   * teclear.
+   *
+   * @param {{nombre?: string}} [opciones]
+   */
+  async function refrescar({ nombre } = {}) {
+    const listado = await expedientes.listar()
+    if (destruido) return
+    dialogo.fijar({
+      registros: listado.registros.map((r) => ({ ...r, edad: edadDe(r.actualizado) })),
+      borrador: ofrecido,
+      srsActual: srs,
+      puedeGuardar: hayGeometria(estado.get()),
+      ...(nombre === undefined ? {} : { nombre }),
+    })
+  }
+
+  // ── Arranque ──────────────────────────────────────────────────────────────
+
+  /**
+   * Lo que pasa al cargar la página. **No abre nada y no mueve nada**: pregunta por la
+   * persistencia, mira si hay trabajo de otra sesión y, si lo hay, lo OFRECE.
+   *
+   * `pedirPersistencia()` devuelve `false` y está MEDIDO (fase 0 de F10): la ficha de
+   * la feature prometía que «evita el desalojo» y no lo evita en un perfil sin
+   * interacción previa. Aun así se pide —en cuanto el usuario marque la página como
+   * favorita o la instale, la MISMA llamada empieza a devolver `true`— y el resultado
+   * **se dice**: en el acuse de cada guardado ({@link COLETILLA_SIN_PERSISTENCIA}) y,
+   * si ya hay trabajo guardado que perder, también al arrancar. No se dice al
+   * arrancar cuando no hay nada guardado, y esa es la única concesión: una advertencia
+   * sobre la conservación de un dato que todavía no existe no informa, asusta.
+   */
+  async function arrancar() {
+    persistencia = await cuota.pedirPersistencia()
+    if (destruido) return
+
+    const listado = await expedientes.listar()
+    if (destruido) return
+
+    if (listado.hayBorrador) {
+      const b = await expedientes.leerBorrador()
+      if (destruido) return
+      if (b.ok && b.registro !== null) {
+        ofrecido = { refcat: b.registro.refcat, edad: edadDe(b.registro.actualizado) }
+      } else {
+        // Hay un borrador que no se puede leer. Ni se ofrece (no habría qué recuperar)
+        // ni se pisa en silencio: se cuenta y se deja donde está. `recuperar` ya lo ha
+        // avisado por el canal con su motivo; aquí solo se decide no armarse.
+        ofrecido = null
+      }
+    }
+
+    // La oferta del borrador SÍ sale por el panel: es de una sola vez por sesión, es
+    // directamente accionable y desaparece en cuanto el usuario la resuelve.
+    if (ofrecido !== null) {
+      avisar(mensajeHayBorrador(ofrecido.refcat, ofrecido.edad))
+    }
+    // ⛔ **Y el aviso de persistencia NO sale por aquí, y es una corrección MEDIDA**
+    // (guion 12, 2026-08-03). Estaba puesto —al arrancar, si ya había algo guardado
+    // que perder— y la primera corrida tras recargar lo delató: **la caja de
+    // vértices pasaba de 267 a 215 px**, por debajo del suelo de 220 que este
+    // proyecto lleva cinco fases defendiendo. Y a cambio de nada: a diferencia de la
+    // oferta del borrador, este aviso NO se resuelve —vuelve en cada carga, para
+    // siempre, en cuanto el usuario tiene un expediente guardado—.
+    //
+    // No se calla: se dice donde tiene consecuencias y donde se puede actuar —en el
+    // acuse de CADA guardado ({@link COLETILLA_SIN_PERSISTENCIA}) y en el renglón del
+    // diálogo al abrirlo, junto al texto de durabilidad que ya vive ahí—. Lo que se
+    // quita es la TERCERA repetición, que es la única que cuesta píxeles permanentes.
+
+    arrancado = true
+    // Sin oferta pendiente, la espera se acaba aquí — y con ella se vuelca lo que
+    // hubiera cambiado mientras se leía el almacén. Con oferta, la espera sigue: la
+    // resolverá el usuario.
+    if (ofrecido === null) resolverOferta()
+    if (dialogo.abierto()) await refrescar()
+  }
+
+  // ── La degradación del criterio 4 ─────────────────────────────────────────
+
+  /**
+   * Se ha acabado el espacio. Purga la caché del Catastro **por antigüedad** y
+   * reintenta.
+   *
+   * ⚠️ La caché no es comodidad: `MEJORES_PRACTICAS_GML.md` §2.4 la llama «el mayor
+   * factor anti-bloqueo del cliente» frente al régimen O8. Por eso se purga POR
+   * ANTIGÜEDAD y nunca a lo bruto, y por eso lo que se tira **se dice** — el usuario
+   * notará que las próximas consultas tardan más y tiene derecho a saber por qué.
+   *
+   * Lo que esta purga **no puede** alcanzar son los expedientes ni el pie de firma:
+   * `storage/cache-catastro.js` solo enruta sus propios almacenes, y hay una prueba
+   * que lo afirma sembrando los otros dos.
+   *
+   * @param {() => Promise<{ok: boolean, mensaje?: string|null}>} reintentar
+   * @returns {Promise<{ok: boolean, mensaje: string|null, registro?: object|null}>}
+   */
+  async function purgarYReintentar(reintentar) {
+    if (cache === null) {
+      return { ok: false, mensaje: MENSAJE_SIN_PURGA, registro: null }
+    }
+    const purga = await cache.purgarCaducados()
+    if (destruido) return { ok: false, mensaje: null, registro: null }
+    // `purgarCaducados` solo avisa por su cuenta cuando ha tirado algo; que no haya
+    // tirado nada también es una respuesta y aquí sí importa, porque explica por qué
+    // el reintento no va a servir de nada.
+    if (!purga.ok || purga.purgados === 0) {
+      return { ok: false, mensaje: `${purga.mensaje} ${MENSAJE_CUOTA_TRAS_PURGAR}`, registro: null }
+    }
+    const segundo = await reintentar()
+    if (segundo.ok) return segundo
+    return { ...segundo, mensaje: MENSAJE_CUOTA_TRAS_PURGAR }
+  }
+
+  // ── Las acciones del diálogo ──────────────────────────────────────────────
+
+  /** «Guardar». Crea el expediente o pone al día el que esté abierto. */
+  async function guardar(nombre) {
+    const exp = expedienteActual()
+    if (exp === null) {
+      decir(MENSAJE_SIN_PARCELA)
+      return
+    }
+    const opts = {
+      ...(nombre === null ? {} : { nombre }),
+      ...(identidad.id === null ? {} : { id: identidad.id }),
+    }
+    let r = await expedientes.guardar(exp, opts)
+    if (destruido) return
+    if (!r.ok && r.esCuota) {
+      r = await purgarYReintentar(() => expedientes.guardar(exp, opts))
+      if (destruido) return
+    }
+    if (!r.ok) {
+      // El almacén ya ha avisado por el panel con su motivo técnico; aquí se escribe
+      // en el renglón, que es donde está mirando quien acaba de pulsar.
+      decir(r.mensaje ?? 'No se ha podido guardar el expediente.')
+      return
+    }
+    identidad = {
+      id: r.registro.id,
+      nombre: r.registro.nombre,
+      creado: r.registro.creado,
+      modificado: r.registro.actualizado,
+    }
+    await refrescar({ nombre: r.registro.nombre })
+    if (destruido) return
+    decir(
+      `Guardado «${r.registro.nombre}» en este navegador.` +
+        (persistencia?.persistido === false ? COLETILLA_SIN_PERSISTENCIA : ''),
+    )
+  }
+
+  /** «Recuperar» de una fila. */
+  async function recuperar(id) {
+    const r = await expedientes.recuperar(id)
+    if (destruido) return
+    if (!r.ok) {
+      decir(r.mensaje ?? 'No se ha podido recuperar ese expediente.')
+      return
+    }
+    // Guarda de cinturón sobre el huso. El diálogo ya apaga el botón de las filas de
+    // otro `srs` con el motivo escrito, pero un `disabled` es cortesía: la garantía es
+    // esta comprobación, y el texto es EL MISMO —importado, no redactado otra vez—.
+    if (r.registro.srs !== srs) {
+      decir(motivoOtroHuso(r.registro.srs))
+      return
+    }
+    const parcela = r.expediente?.parcela ?? null
+    if (!hayGeometria(parcela)) {
+      decir(MENSAJE_GUARDADO_SIN_PARCELA)
+      return
+    }
+    cargar(parcela, {
+      id: r.registro.id,
+      nombre: r.registro.nombre,
+      creado: r.expediente.metadatos?.creado ?? r.registro.creado,
+      modificado: r.registro.actualizado,
+    })
+    decir(`Abierto «${r.registro.nombre}».`)
+    // Se CIERRA: recuperar un expediente es pedir que se abra en el visor, y dejar el
+    // diálogo tapando el mapa obligaría a un segundo gesto para ver lo que se acaba de
+    // pedir. Lo que ha pasado no queda mudo —cambia la geometría del mapa, la tabla de
+    // vértices y la ficha del pie entera—, y el renglón de arriba lo dice para cuando
+    // se vuelva a abrir.
+    dialogo.cerrar()
+  }
+
+  /** «Duplicar» de una fila. */
+  async function duplicar(id) {
+    let r = await expedientes.duplicar(id)
+    if (destruido) return
+    if (!r.ok && r.esCuota) {
+      r = await purgarYReintentar(() => expedientes.duplicar(id))
+      if (destruido) return
+    }
+    if (!r.ok) {
+      decir(r.mensaje ?? 'No se ha podido duplicar ese expediente.')
+      return
+    }
+    await refrescar()
+    if (destruido) return
+    decir(`Duplicado: se ha creado «${r.registro.nombre}».`)
+  }
+
+  /** «Borrar» de una fila, en dos tiempos. Ver {@link MS_CONFIRMAR_BORRADO}. */
+  async function borrar(id) {
+    const t = ahora().getTime()
+    if (armado === null || armado.id !== id || t > armado.hasta) {
+      armado = { id, hasta: t + MS_CONFIRMAR_BORRADO }
+      decir(
+        'Vuelve a pulsar «Borrar» en esa misma fila para confirmarlo. Se borra de este navegador ' +
+          'y no se puede deshacer; si quieres conservarlo, guárdalo antes como fichero de proyecto.',
+      )
+      return
+    }
+    armado = null
+    const r = await expedientes.borrar(id)
+    if (destruido) return
+    if (!r.ok) {
+      decir(r.mensaje ?? 'No se ha podido borrar ese expediente.')
+      return
+    }
+    // Si el borrado era el expediente ABIERTO, lo que hay en pantalla deja de
+    // corresponder a ningún registro. No se toca la geometría —el usuario no ha pedido
+    // cerrar nada— pero la identidad se suelta, para que el siguiente «Guardar» cree un
+    // registro nuevo en vez de resucitar el que se acaba de borrar.
+    if (identidad.id === id) {
+      identidad = { ...identidad, id: null, nombre: null }
+    }
+    await refrescar()
+    if (destruido) return
+    decir('Borrado de este navegador.')
+  }
+
+  /** «Recuperar» el borrador del autoguardado. */
+  async function recuperarBorrador() {
+    const r = await expedientes.leerBorrador()
+    if (destruido) return
+    if (!r.ok) {
+      // El repintado va ANTES del renglón, siempre y en todo este módulo: `fijar`
+      // reescribe ahí el motivo del gate, así que decir primero y refrescar después
+      // borraría lo que se acaba de decir.
+      resolverOferta()
+      await refrescar()
+      if (destruido) return
+      decir(r.mensaje ?? 'Ya no queda trabajo autoguardado que recuperar.')
+      return
+    }
+    if (r.registro.srs !== srs) {
+      decir(motivoOtroHuso(r.registro.srs))
+      return
+    }
+    const parcela = r.expediente?.parcela ?? null
+    if (!hayGeometria(parcela)) {
+      resolverOferta()
+      await refrescar()
+      if (destruido) return
+      decir(MENSAJE_GUARDADO_SIN_PARCELA)
+      return
+    }
+    // El borrador NO se borra al recuperarlo, y es distinto de lo que sugiere la
+    // cabecera de `storage/expedientes.js`: allí se razona para un mundo sin
+    // autoguardado vivo. Aquí, borrarlo dejaría el trabajo sin red durante los dos
+    // segundos siguientes y el propio debounce lo reescribiría igual. Lo que se acaba
+    // es la OFERTA, que es de una sola vez por sesión.
+    // ⚠️ La oferta se resuelve ANTES de cargar, no después. `estado.set` notifica de
+    // forma SÍNCRONA, así que con la oferta todavía en pie nuestro propio suscriptor
+    // se despertaría dentro de la espera y sacaría por el panel un
+    // {@link MENSAJE_AUTOGUARDADO_EN_ESPERA} — un aviso de que no se guarda lo que se
+    // acaba de recuperar, justo mientras se recupera.
+    resolverOferta()
+    cargar(parcela, {
+      id: null,
+      nombre: null,
+      creado: r.expediente.metadatos?.creado ?? r.registro.creado,
+      modificado: r.registro.actualizado,
+    })
+    decir('Recuperado el trabajo autoguardado. Todavía no está guardado como expediente.')
+    dialogo.cerrar()
+  }
+
+  /** «Descartar» el borrador. */
+  async function descartarBorrador() {
+    const r = await expedientes.descartarBorrador()
+    if (destruido) return
+    resolverOferta()
+    await refrescar()
+    if (destruido) return
+    decir(
+      r.ok
+        ? 'Descartado el trabajo autoguardado. A partir de ahora se guarda solo lo de esta sesión.'
+        : (r.mensaje ?? 'No se ha podido descartar el trabajo autoguardado.'),
+    )
+  }
+
+  /**
+   * La oferta se acabó: el autoguardado se arma, deja de estar en espera y **vuelca
+   * lo que hubiera cambiado durante la espera**. Esa última parte es la que impide
+   * que una edición hecha con la oferta en pie se quede sin guardar para siempre.
+   */
+  function resolverOferta() {
+    ofrecido = null
+    dichaLaEspera = false
+    if (cambioEnEspera) {
+      cambioEnEspera = false
+      auto.cambiado(estado.get())
+    }
+  }
+
+  // ── Las tres exportaciones ────────────────────────────────────────────────
+
+  /**
+   * Entrega un texto como fichero. Punto único para las tres salidas: el nombre, el
+   * MIME y el acuse se deciden en un solo sitio, así que no pueden divergir.
+   *
+   * @param {string} texto
+   * @param {{prefijo: string, extension: string, mime: string}} formato
+   * @param {Date} fecha
+   * @param {string} queEs  Cómo se llama en el acuse.
+   */
+  function entregar(texto, formato, fecha, queEs) {
+    const nombreFichero = nombreFicheroExport({
+      prefijo: formato.prefijo,
+      extension: formato.extension,
+      refcat: refcatActual(),
+      fecha,
+    })
+    const entrega = descargarTexto(texto, {
+      nombreFichero,
+      mime: formato.mime,
+      documento: doc,
+      url,
+    })
+    // El desenlace se dice SIEMPRE, salga bien o mal. Cuando falla, `descargarTexto`
+    // trae un `mensaje` en castellano ya presentable.
+    decir(entrega.descargado ? `Descargado ${queEs}: «${entrega.nombre}».` : entrega.mensaje)
+    if (!entrega.descargado) avisar(entrega.mensaje, NIVEL.ERROR)
+  }
+
+  /** «Exportar DXF para CAD». */
+  function exportarDxf() {
+    const parcela = estado.get()
+    if (!hayGeometria(parcela)) {
+      decir(MENSAJE_SIN_PARCELA)
+      return
+    }
+    const { dxf, detecciones } = serializarParcelaDxf({
+      recintosEditados: parcela.recintos,
+      // La geometría OFICIAL va tal cual está (regla de oro 2). `null` cuando la
+      // parcela no vino del Catastro: sale una capa en vez de dos, y se declara.
+      recintosOficiales: parcela.geometriaOficial ?? null,
+    })
+    publicarDetecciones(detecciones)
+    entregar(dxf, FICHERO.DXF, ahora(), 'el DXF')
+  }
+
+  /** «Exportar coordenadas (.txt)». */
+  function exportarCoordenadas() {
+    const parcela = estado.get()
+    if (!hayGeometria(parcela)) {
+      decir(MENSAJE_SIN_PARCELA)
+      return
+    }
+    const fecha = ahora()
+    const { texto, detecciones } = serializarCoordenadasTxt({
+      recintos: parcela.recintos,
+      refcat: parcela.refcat ?? null,
+      srs,
+      fecha,
+      nombre: identidad.nombre,
+    })
+    publicarDetecciones(detecciones)
+    entregar(texto, FICHERO.COORDENADAS, fecha, 'el listado de coordenadas')
+  }
+
+  /** «Guardar proyecto (.json)». */
+  function exportarProyecto(nombre) {
+    const exp = expedienteActual()
+    if (exp === null) {
+      decir(MENSAJE_SIN_PARCELA)
+      return
+    }
+    const fecha = ahora()
+    const proyecto = aProyecto(exp, { fecha, nombre: nombre ?? identidad.nombre })
+    // Con sangría de 2: un fichero de proyecto se abre a mano más veces de las que
+    // parece —para ver por qué otro equipo no lo puede leer—, y lo que se gana en
+    // bytes al compactarlo se pierde en la primera vez que alguien tiene que mirarlo.
+    entregar(JSON.stringify(proyecto, null, 2), FICHERO.PROYECTO, fecha, 'el fichero de proyecto')
+  }
+
+  /**
+   * Abre un fichero de proyecto. Es lo que recibe la zona de fichero cuando la
+   * extensión es `.json`, y también lo que hace «Abrir un proyecto…».
+   *
+   * **No lanza por el contenido del fichero**, que es la lección de F08 entera:
+   * `deProyecto` devuelve su motivo y sus avisos, y aquí se cuentan.
+   *
+   * @param {File} fichero
+   * @returns {Promise<void>}
+   */
+  async function abrirProyecto(fichero) {
+    if (destruido) return
+    let texto
+    try {
+      texto = await fichero.text()
+    } catch (causa) {
+      avisar(
+        `No se ha podido leer «${fichero?.name ?? 'el fichero'}»: el navegador no ha dejado ` +
+          'acceder a su contenido. Prueba a copiarlo a otra carpeta y volver a abrirlo.',
+        NIVEL.ERROR,
+        causa,
+      )
+      return
+    }
+    if (destruido) return
+
+    const r = deProyecto(texto)
+    // Los avisos van SIEMPRE, salga bien o mal la lectura: una clave desconocida o una
+    // versión posterior son cosas que el usuario tiene que saber aunque el fichero se
+    // haya podido abrir (regla de oro 1).
+    publicarDetecciones(r.avisos)
+    if (!r.ok) {
+      avisar(r.mensaje, NIVEL.ERROR)
+      decir(r.mensaje)
+      return
+    }
+    if (r.expediente.srs !== srs) {
+      avisar(motivoOtroHuso(r.expediente.srs), NIVEL.ERROR)
+      decir(motivoOtroHuso(r.expediente.srs))
+      return
+    }
+    const parcela = r.expediente.parcela ?? null
+    if (!hayGeometria(parcela)) {
+      avisar(MENSAJE_GUARDADO_SIN_PARCELA)
+      decir(MENSAJE_GUARDADO_SIN_PARCELA)
+      return
+    }
+    // Entra SIN identificador: el fichero viene de otro equipo o de otra sesión y no se
+    // corresponde con ningún registro de ESTE navegador. El primer «Guardar» creará el
+    // suyo. El nombre sí viaja, porque es del trabajo y no del almacén.
+    cargar(parcela, {
+      id: null,
+      nombre: r.nombre,
+      creado: r.expediente.metadatos?.creado ?? instanteISO(),
+      modificado: instanteISO(),
+    })
+    avisar(
+      `Abierto el proyecto «${r.nombre ?? fichero.name}». Todavía no está guardado en este ` +
+        'navegador: usa «Guardar» en «Expediente» si quieres conservarlo aquí.',
+    )
+    decir(`Abierto el proyecto «${r.nombre ?? fichero.name}».`)
+    dialogo.cerrar()
+  }
+
+  /** «Abrir un proyecto…»: abre el selector de la ÚNICA zona de fichero de la app. */
+  function pedirProyecto() {
+    if (elegirFichero === null) {
+      decir(MENSAJE_SIN_SELECTOR)
+      avisar(MENSAJE_SIN_SELECTOR)
+      return
+    }
+    elegirFichero()
+  }
+
+  // ── Oyentes ───────────────────────────────────────────────────────────────
+
+  /**
+   * Todas las intenciones del diálogo entran por aquí. **Suelta la promesa a
+   * propósito y no puede lanzar**: una excepción dentro de un oyente del DOM no sale
+   * por `dispatchEvent` (medido en F08), así que dejarla propagar sería un error
+   * silencioso. El diálogo tiene su propia red (`MENSAJE_OYENTE_ROTO`) y aquí se
+   * atrapa antes, para poder decir de qué acción se trataba.
+   *
+   * @param {{accion: string, id: string|null, nombre: string|null}} suceso
+   */
+  function alAccion({ accion, id, nombre }) {
+    if (destruido) return
+    // Cualquier acción que no sea otro «Borrar» desarma el borrado pendiente: quien se
+    // ha ido a hacer otra cosa ya no está confirmando nada.
+    if (accion !== ACCION.BORRAR) armado = null
+
+    const tarea = () => {
+      switch (accion) {
+        case ACCION.GUARDAR:
+          return guardar(nombre)
+        case ACCION.RECUPERAR:
+          return recuperar(id)
+        case ACCION.DUPLICAR:
+          return duplicar(id)
+        case ACCION.BORRAR:
+          return borrar(id)
+        case ACCION.RECUPERAR_BORRADOR:
+          return recuperarBorrador()
+        case ACCION.DESCARTAR_BORRADOR:
+          return descartarBorrador()
+        case ACCION.EXPORTAR_DXF:
+          return exportarDxf()
+        case ACCION.EXPORTAR_COORDENADAS:
+          return exportarCoordenadas()
+        case ACCION.EXPORTAR_PROYECTO:
+          return exportarProyecto(nombre)
+        case ACCION.ABRIR_PROYECTO:
+          return pedirProyecto()
+        /* c8 ignore next 2 -- el diálogo solo emite las diez de arriba */
+        default:
+          return undefined
+      }
+    }
+
+    let resultado
+    try {
+      resultado = tarea()
+    } catch (causa) {
+      reventar(accion, causa)
+      return
+    }
+    if (resultado && typeof resultado.then === 'function') {
+      resultado.catch((causa) => reventar(accion, causa))
+    }
+  }
+
+  /**
+   * Un defecto de ESTA casa, contado por los dos canales. El mensaje nombra la acción
+   * porque «algo se ha interrumpido» no le dice al usuario si lo que ha fallado es
+   * guardar o exportar, que llevan a decisiones distintas.
+   */
+  function reventar(accion, causa) {
+    const mensaje =
+      `La orden «${accion}» ha llegado bien, pero la aplicación no ha podido completarla por un ` +
+      'fallo interno; no se ha cambiado nada. El detalle técnico está en la consola del navegador.'
+    avisar(mensaje, NIVEL.ERROR, causa)
+    decir(mensaje)
+    console.error(`[expediente] la acción «${accion}» ha fallado de forma inesperada:`, causa)
+  }
+
+  /**
+   * El SÉPTIMO suscriptor del store. Hace dos cosas y ninguna es dibujar:
+   *
+   *   1. Distingue **una edición** de **otro documento** por `idLocal` (ver
+   *      {@link idLocalAbierto}) y, si es otro documento, suelta la identidad: el
+   *      siguiente «Guardar» creará un registro nuevo en vez de pisar el anterior con
+   *      una geometría que no es la suya.
+   *   2. Avisa al debounce — salvo que el autoguardado esté en espera.
+   */
+  function alCambiarElStore(parcela) {
+    if (destruido) return
+
+    const idLocal = parcela?.idLocal ?? null
+    if (idLocal !== idLocalAbierto) {
+      idLocalAbierto = idLocal
+      identidad = { id: null, nombre: null, creado: instanteISO(), modificado: instanteISO() }
+    } else {
+      identidad = { ...identidad, modificado: instanteISO() }
+    }
+
+    // Hasta que la lectura de arranque no ha terminado no se sabe si hay una oferta
+    // pendiente, así que tampoco se escribe: dos segundos de espera son gratis y el
+    // trabajo de la sesión anterior no lo es.
+    if (!arrancado || ofrecido !== null) {
+      cambioEnEspera = true
+      if (!dichaLaEspera && ofrecido !== null) {
+        dichaLaEspera = true
+        avisar(MENSAJE_AUTOGUARDADO_EN_ESPERA)
+      }
+      return
+    }
+    auto.cambiado(parcela)
+
+    // Si el diálogo está abierto, lo que enseña («Guardar» encendido o apagado)
+    // acaba de cambiar.
+    if (dialogo.abierto()) {
+      refrescar().catch((causa) => reventar('refrescar', causa))
+    }
+  }
+
+  /** El botón «Expediente» de la fila del rótulo. */
+  function abrir() {
+    if (destruido) return
+    // Se abre YA y se refresca después: la lista sale de IndexedDB y hacer esperar a
+    // un diálogo por una lectura de disco es cómo se consigue que un botón parezca
+    // roto. Lo que se enseña mientras tanto es lo último que se supo, que no es
+    // mentira: es lo de hace un momento.
+    dialogo.abrir()
+    refrescar()
+      .then(() => {
+        // El régimen de almacenamiento, DICHO donde el usuario decide si confiarle un
+        // trabajo a este navegador. Va DESPUÉS de `refrescar` porque `fijar` reescribe
+        // el renglón, y solo cuando el gate está arriba: el motivo de un botón apagado
+        // manda sobre esto (mismo orden que en el resto del módulo).
+        if (persistencia?.persistido === false && dialogo.puedeGuardar()) {
+          decir(AVISO_SIN_PERSISTENCIA)
+        }
+      })
+      .catch((causa) => reventar('abrir', causa))
+  }
+
+  /**
+   * La pestaña se va a segundo plano. Es el único momento en el que se puede escribir
+   * lo pendiente con garantías: en `beforeunload`/`unload` una escritura de IndexedDB
+   * ya no llega a completarse, y por eso NO se cuelga nada de ahí. Lo que queda
+   * expuesto es la ventana del debounce, y está declarado.
+   */
+  function alOcultarse() {
+    if (destruido) return
+    if (doc.visibilityState !== 'hidden') return
+    auto.ahoraMismo().catch((causa) => {
+      console.warn('[expediente] no se ha podido volcar el borrador al ocultar la pestaña:', causa)
+    })
+  }
+
+  const oyentes = []
+  function escuchar(diana, tipo, fn) {
+    diana.addEventListener(tipo, fn)
+    oyentes.push({ diana, tipo, fn })
+  }
+
+  escuchar(botonAbrir, 'click', abrir)
+  escuchar(doc, 'visibilitychange', alOcultarse)
+  const bajaAccion = dialogo.alAccion(alAccion)
+  const desuscribirStore = estado.subscribe(alCambiarElStore)
+
+  // El arranque va SUELTO a propósito, sin `await` y sin bloquear el montaje: leer el
+  // almacén local no puede retrasar ni un milisegundo el primer pintado del mapa. Su
+  // `catch` es la red de la regla de oro 1 — nada de lo que hay dentro debería lanzar,
+  // y si lo hace tiene que verse.
+  arrancar().catch((causa) => reventar('arrancar', causa))
+
+  return {
+    /** Abre el diálogo sin pasar por el botón. */
+    abrir,
+
+    /** Abre un fichero de proyecto. Es lo que enruta la zona de fichero. No lanza. */
+    abrirProyecto,
+
+    /** El Expediente de lo que hay en pantalla, o `null`. Solo para leer. */
+    expedienteActual,
+
+    /** Escribe YA el borrador pendiente, sin esperar al debounce. Para el guion de humo. */
+    guardarBorradorYa: () => auto.ahoraMismo(),
+
+    /** Fotografía del estado interno: lo que el guion de humo necesita comprobar. */
+    estado: () => ({
+      idAbierto: identidad.id,
+      nombreAbierto: identidad.nombre,
+      creado: identidad.creado,
+      modificado: identidad.modificado,
+      ofreciendoBorrador: ofrecido !== null,
+      arrancado,
+      persistido: persistencia === null ? null : persistencia.persistido,
+      autoguardado: auto.estado(),
+    }),
+
+    /**
+     * Deja el cableado inerte: retira los dos escuchadores, la suscripción del store y
+     * la del diálogo, apaga el autoguardado **sin escribir lo pendiente** (hacerlo sería
+     * una escritura escondida dentro de un desmontaje) y destruye el diálogo, que sí es
+     * suyo. IDEMPOTENTE.
+     */
+    destruir() {
+      if (destruido) return
+      destruido = true
+      for (const { diana, tipo, fn } of oyentes) diana.removeEventListener(tipo, fn)
+      oyentes.length = 0
+      bajaAccion()
+      desuscribirStore()
+      auto.destruir()
+      dialogo.destruir()
+    },
+  }
+}
+
+export default cablearExpediente

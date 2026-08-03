@@ -473,10 +473,19 @@ function puedePedirColindantesDe(parcelaActual) {
  * es distinto de «hace 0 ms»: `services/catastro.js` deja `edadMs` en `null`
  * cuando la caché no guardó el instante, y ahí no se inventa una edad.
  *
+ * ⛔ **EXPORTADA desde F10 · T5.1, y solo por eso**, exactamente como se exportó
+ * {@link textoProcedencia} en F08 y con el mismo argumento: el diálogo «Expediente»
+ * escribe la antigüedad de cada guardado y del borrador («guardado hace 6 días»), y
+ * es LA MISMA frase sobre el mismo hecho. Una segunda redacción de esto no sería
+ * otra función: sería otra forma de decir los días, otro criterio para el escalón —
+ * ¿90 minutos son «hace 2 horas» o «hace 90 minutos»?— y otro juego de casos
+ * especiales («ayer», «anteayer»), y la que se quedase vieja sería siempre la nueva.
+ * Este módulo no cambia por ello ni una línea de comportamiento.
+ *
  * @param {number|null} edadMs
  * @returns {string|null}
  */
-function describirEdad(edadMs) {
+export function describirEdad(edadMs) {
   if (!Number.isFinite(edadMs) || edadMs < 0) return null
   let elegido = ESCALONES_EDAD[0]
   for (const escalon of ESCALONES_EDAD) {

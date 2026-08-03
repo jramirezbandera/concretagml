@@ -168,13 +168,32 @@ function fabricaEspia(real) {
   }
 }
 
-/** Base falsa que solo apunta lo que le mandan crear. Sin IndexedDB de por medio. */
+/**
+ * Base falsa que solo apunta lo que le mandan crear. Sin IndexedDB de por medio.
+ *
+ * F10 · `createObjectStore` DEVUELVE el almacén, porque el `IDBObjectStore` real
+ * también lo hace y porque es lo único sobre lo que se puede llamar a
+ * `createIndex` — que es exactamente lo que estrenó el peldaño 3. Una falsa que
+ * devolviera `undefined` haría que toda migración con índices reventara aquí con
+ * un `TypeError` sin relación aparente con lo que se está probando (pasó, y es
+ * por lo que esto está escrito).
+ */
 function bdFalsa() {
   const creados = []
   return {
     creados,
     createObjectStore(nombre, opciones) {
-      creados.push({ nombre, keyPath: opciones && opciones.keyPath })
+      const almacen = {
+        nombre,
+        keyPath: opciones && opciones.keyPath,
+        indices: {},
+        createIndex(indice, keyPath, opts) {
+          almacen.indices[indice] = { keyPath, unique: Boolean(opts && opts.unique) }
+          return { name: indice }
+        },
+      }
+      creados.push(almacen)
+      return almacen
     },
   }
 }
@@ -327,6 +346,31 @@ describe('storage/bd · la escalera se aplica con `<` y jamás con `===` (criter
     }
   })
 
+  it('la escalera REAL crea también los ÍNDICES que el esquema declara, y ni uno más', () => {
+    // F10 · la otra mitad del guardián, y la que faltaba: hasta esta fase el
+    // esquema solo declaraba `keyPath`, así que un índice olvidado en la escalera
+    // —o uno de más— no lo veía nadie hasta el primer `getAllFromIndex`, con un
+    // `NotFoundError` en otro fichero y en otro momento.
+    const bd = bdFalsa()
+    aplicarMigraciones(bd, 0)
+
+    for (const creado of bd.creados) {
+      const declarados = ESQUEMA_ALMACENES[creado.nombre].indices
+      expect(Object.keys(creado.indices).sort()).toEqual(Object.keys(declarados).sort())
+      for (const [indice, def] of Object.entries(declarados)) {
+        expect(creado.indices[indice]).toEqual({ keyPath: def.keyPath, unique: def.unique })
+      }
+    }
+
+    // Anti-vacuidad: si el esquema dejara de declarar índices en TODAS partes,
+    // el bucle de arriba pasaría comparando vacíos con vacíos y no probaría nada.
+    const totalDeclarados = Object.values(ESQUEMA_ALMACENES).reduce(
+      (n, e) => n + Object.keys(e.indices).length,
+      0,
+    )
+    expect(totalDeclarados).toBeGreaterThan(0)
+  })
+
   it("'versionAnterior' que no es un entero ≥ 0 es contrato roto por el programador: lanza", () => {
     expect(() => aplicarMigraciones(bdFalsa(), -1)).toThrow(TypeError)
     expect(() => aplicarMigraciones(bdFalsa(), 1.5)).toThrow(TypeError)
@@ -357,6 +401,18 @@ describe('storage/bd · apertura con base vacía (criterios 1 y 2)', () => {
     // Criterio 2: cada almacén con SU keyPath.
     for (const [nombre, { keyPath }] of Object.entries(modulo.ESQUEMA_ALMACENES)) {
       expect(bd.transaction(nombre).store.keyPath).toBe(keyPath)
+    }
+
+    // F10 · y con SUS índices, sobre la base de verdad y no sobre la falsa: esta
+    // es la comparación que el esquema existe para poder hacer.
+    for (const [nombre, { indices }] of Object.entries(modulo.ESQUEMA_ALMACENES)) {
+      const almacen = bd.transaction(nombre).store
+      expect([...almacen.indexNames].sort()).toEqual(Object.keys(indices).sort())
+      for (const [indice, def] of Object.entries(indices)) {
+        const real = almacen.index(indice)
+        expect(real.keyPath).toBe(def.keyPath)
+        expect(real.unique).toBe(def.unique)
+      }
     }
 
     bd.close()
@@ -494,6 +550,63 @@ describe('storage/bd · blocked/blocking/terminated van al canal Avisar (criteri
     )
     expect(otraPestana.readyState).toBe('done')
     if (otraPestana.result) otraPestana.result.close()
+  })
+
+  it('F10 · `alVersionChange` recibe las versiones y un `cerrar()`, y el aviso sale IGUAL', async () => {
+    // El reparto que la nota de F05 dejó escrito: este módulo avisa siempre —es el
+    // suelo de la regla 1— y ADEMÁS entrega la decisión a quien tenga con qué
+    // preguntar. El aviso no se sustituye por el gancho: se suman.
+    const modulo = await moduloFresco()
+    const fabrica = new IDBFactory()
+    const avisos = vi.fn()
+    const alVersionChange = vi.fn()
+    const { bd } = await modulo.abrirBd({ indexedDB: fabrica, alAvisar: avisos, alVersionChange })
+
+    const otraPestana = fabrica.open(NOMBRE_BD, VERSION_BD + 1)
+    await esperarA(() => alVersionChange.mock.calls.length > 0, 'la llamada a alVersionChange')
+
+    expect(avisos).toHaveBeenCalledTimes(1) // el aviso NO desaparece por haber gancho
+    expect(alVersionChange).toHaveBeenCalledTimes(1)
+    const [evento] = alVersionChange.mock.calls[0]
+    expect(evento.versionAnterior).toBe(VERSION_BD)
+    expect(evento.versionNueva).toBe(VERSION_BD + 1)
+    expect(typeof evento.cerrar).toBe('function')
+
+    // Y `cerrar()` hace lo único que desbloquea a la otra pestaña.
+    evento.cerrar()
+    await esperarA(() => otraPestana.readyState === 'done', 'que `cerrar()` desbloquee la otra apertura')
+    expect(otraPestana.readyState).toBe('done')
+    if (otraPestana.result) otraPestana.result.close()
+    bd.close()
+  })
+
+  it('F10 · SIN `alVersionChange` no se cierra nada: el comportamiento de F05 se conserva', async () => {
+    // El reverso del anterior, y la mitad que impide que el gancho cambie por su
+    // cuenta lo que hacía la aplicación antes de existir: sin él, se avisa y la
+    // otra pestaña SIGUE esperando. Si algún día alguien decide cerrar por
+    // defecto, esta prueba se pone roja y obliga a decirlo en voz alta.
+    const modulo = await moduloFresco()
+    const fabrica = new IDBFactory()
+    const avisos = vi.fn()
+    const { bd } = await modulo.abrirBd({ indexedDB: fabrica, alAvisar: avisos })
+
+    const otraPestana = fabrica.open(NOMBRE_BD, VERSION_BD + 1)
+    await esperarA(() => avisos.mock.calls.length > 0, 'el aviso de `blocking`')
+    expect(otraPestana.readyState).not.toBe('done') // sigue bloqueada: no cerramos solos
+
+    bd.close()
+    await esperarA(() => otraPestana.readyState === 'done', 'la apertura tras soltar la conexión')
+    if (otraPestana.result) otraPestana.result.close()
+  })
+
+  it("F10 · un `alVersionChange` que no es función ni null es contrato roto: lanza", async () => {
+    const modulo = await moduloFresco()
+    expect(() => modulo.abrirBd({ indexedDB: new IDBFactory(), alVersionChange: 42 })).toThrow(
+      TypeError,
+    )
+    expect(() =>
+      modulo.abrirBd({ indexedDB: new IDBFactory(), alVersionChange: 'cerrar' }),
+    ).toThrow(/alVersionChange/)
   })
 
   it('una terminación ANORMAL de la conexión llega al avisador', async () => {

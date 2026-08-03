@@ -45,6 +45,23 @@ visual**.
 > se firma junto con el 6, el 7, el 8 y el 9**; la cadena bloqueada pasa a ser
 > **F03 → F05 → F06 → F07 → F08 → F09**.
 >
+> Y desde F10 tiene un punto **11**, el de PERSISTENCIA Y EXPORTACIÓN, y es el que
+> más depende del ENTORNO de toda la lista. `12-expedientes.js` cierra el hueco más
+> grande que ha tenido nunca esta suite —**toda la de F10 corre sobre
+> `fake-indexeddb`, que no es una base de datos**— y mide la supervivencia a una
+> **recarga** de verdad. Pero cuatro cosas se le escapan por ser del entorno y no
+> del código: **cerrar el navegador entero** y volver (§11.1, que es donde de verdad
+> se ve si el perfil conserva o desaloja, y donde se comprueba que `persist()`
+> —MEDIDO en `false`— no cumple lo que la ficha prometía), **dos pestañas a la vez**
+> (§11.2), **abrir un `.json` desde el disco** y en otro perfil (§11.5), y sobre
+> todo **abrir el DXF en un CAD** con las dos capas seleccionables por capa (§11.4,
+> **BLOQUEANTE**, mismo reparto que el PDF en tres lectores del §10.1: en la fase 0
+> se midió que nuestro propio parser aprueba ficheros que ningún CAD abre). La
+> quinta es de lectura y HEREDA el carácter del 8.1, el 9.4 y el 10.5: si alguna
+> frase de la lista de expedientes **se lee como un veredicto** (§11.6,
+> BLOQUEANTE). **El punto 11 se firma junto con el 6, el 7, el 8, el 9 y el 10**;
+> la cadena bloqueada pasa a ser **F03 → F05 → F06 → F07 → F08 → F09 → F10**.
+>
 > ⛔ **Y el punto 9 ya se ha recorrido una vez, el 2026-08-02, y encontró TRES
 > DEFECTOS REALES — dos de los cuales ni siquiera eran de F08: venían de F03 y de
 > F05.** Están corregidos, con guardián en la suite y **medidos desde entonces por
@@ -1189,6 +1206,199 @@ defecto —es la regla de oro 1 funcionando— pero es alto real que desaparece.
 
 ---
 
+## 11 · Persistencia y exportación ⟨F10⟩ — lo que ni `12-expedientes.js` firma
+
+**Por qué está aquí.** `12-expedientes.js` es el guion más barato de la carpeta —no
+toca la red ni una vez— y aun así es el que cierra el hueco más grande que ha
+tenido nunca esta suite: **toda la de F10 corre sobre `fake-indexeddb`, que no es
+una base de datos**, sino una implementación en memoria que muere con el proceso.
+El guion mide la supervivencia a una **recarga** de verdad —comparando la marca de
+tiempo del registro contra `performance.timeOrigin`, para que lanzarlo dos veces sin
+recargar no dé un falso positivo—, lee los bytes por una **segunda conexión** a
+IndexedDB, y afirma sobre los tres ficheros que bajan: `$ACADVER = AC1015` y las dos
+capas **en la TABLA**, coma decimal en el listado, y el sobre
+`concreta-gml/proyecto` con sus 15 vértices. Cifras en `GUION.md` §18.
+
+**Y aun así no puede firmar cinco cosas.** Cuatro son de entorno —cerrar el
+navegador, dos pestañas, abrir un fichero del disco, y abrir un DXF en un CAD— y la
+quinta es de lectura, que no la mide ninguna máquina.
+
+⚠️ **Antes de nada, lee el §18 del `GUION.md`.** El guion sale hoy en `ok:true`,
+pero su primera corrida con un expediente ya guardado destapó **un defecto real de
+producción** (un aviso del arranque que le quitaba 52 px a la caja de vértices, en
+cada carga y para siempre) y, de paso, un falso positivo de su propia
+instrumentación. Los dos están contados allí porque las dos lecciones importan.
+
+Para recorrer esta lista, con la app viva: abre **«Expediente»** en la fila
+«Origen de la parcela», guarda el trabajo con un nombre, exporta los tres ficheros
+y recupera lo guardado. **Cuesta cero peticiones al Catastro**, así que aquí no hay
+régimen de red que respetar (§13): repítela las veces que haga falta.
+
+### 11.1 · ⛔ Cerrar el NAVEGADOR entero, no la pestaña ⟨obligatorio⟩
+
+**Por qué está aquí, y por qué no es lo mismo que recargar.** El guion mide que un
+expediente sobrevive a `$B reload`, que es volver a cargar el documento con el
+proceso del navegador vivo. Lo que F10 promete es otra cosa: que el trabajo siga ahí
+**mañana**. Entre las dos hay un mecanismo que ninguna máquina de este proyecto
+puede provocar: el **desalojo** que el navegador hace por su cuenta cuando le falta
+espacio, y que `navigator.storage.persist()` existe para evitar. Está MEDIDO que
+`persist()` devuelve `false` en un perfil sin interacción previa —la ficha de F10
+prometía que «evita el desalojo» y no lo evita—, así que esto es exactamente lo que
+hay que ver con el ordenador delante.
+
+- [ ] Guarda un expediente con un nombre reconocible. **Cierra el navegador
+      entero** (no la pestaña: el proceso). Vuelve a abrirlo, entra en la app y abre
+      «Expediente». ¿Está?
+- [ ] ¿Y la geometría es la que era? Recupéralo y compara la superficie del pie con
+      la que tenía.
+- [ ] **Marca la página como favorita** (o instálala como aplicación) y repite. En
+      DevTools → Application → Storage, ¿pone «Persistent» ahora? Si sí, apúntalo:
+      es el único camino conocido para que `persist()` devuelva `true`, y ninguna
+      máquina de este proyecto lo ha medido todavía.
+- [ ] ⚠️ En **ventana privada / incógnito**: ¿la app dice que no puede guardar, o se
+      queda callada? La regla de oro 1 exige que lo diga —y el mensaje existe
+      (`storage/expedientes.js`, «Los expedientes no se pueden guardar en este
+      navegador…»)—, pero **que ese camino se recorra de verdad solo se ve aquí**.
+
+### 11.2 · Dos pestañas a la vez, y el `versionchange`
+
+**Por qué está aquí.** `storage/bd.js` dejó anotado desde F05 el gancho de
+`versionchange` «para F10», y F10 lo resolvió: la pestaña vieja cierra su conexión y
+lo dice. En la fase 0 se provocó con **dos conexiones de la misma pestaña**, que es
+lo más parecido que se puede hacer sin abrir dos de verdad.
+
+- [ ] Abre la app en **dos pestañas**. Guarda un expediente en la primera. En la
+      segunda, abre «Expediente»: ¿aparece? (Puede que no hasta reabrir el diálogo:
+      no hay canal entre pestañas, y eso **no es un defecto** — es alcance que F10
+      no abrió. Lo que sí sería defecto es que una pestaña **pisara** el trabajo de
+      la otra sin decirlo.)
+- [ ] Con las dos abiertas, edita en una y en la otra. **El borrador es UN registro
+      con clave reservada**: la última que escriba gana. ¿Se nota? ¿Molesta?
+      Anótalo: si molesta, la salida no es un candado, es que el borrador sepa de
+      qué pestaña viene.
+- [ ] Con las dos abiertas, fuerza una subida de versión (hoy no hay ninguna
+      pendiente; se puede simular editando `MIGRACIONES` en local). ¿La pestaña
+      vieja **dice** que se ha cerrado, o se queda muda hasta que algo falla?
+
+### 11.3 · Recuperar, duplicar y **borrar**, con el ratón
+
+**Por qué está aquí.** El guion pulsa los botones con `el.click()`, que no es un
+gesto de ratón (§0). Y borrar es **irreversible**: el diálogo no tiene pantalla de
+confirmación, así que la confirmación la pone el cableado en **dos tiempos** —el
+primer clic arma y lo escribe en el renglón, el segundo borra, y un clic en otra
+fila desarma—. ⚠️ **El rótulo del botón sigue diciendo «Borrar» mientras está
+armado**, porque el marcado de la fila es del diálogo: es una limitación declarada y
+esto es justo lo que hay que juzgar.
+
+- [ ] Guarda dos expedientes. **Recupera** el primero: ¿cambia el mapa, la tabla y
+      la ficha del pie? ¿El renglón de edición dice que el historial empieza de cero?
+- [ ] **Duplica** uno: ¿aparece con «(copia)»? ¿El original sigue intacto?
+- [ ] **Borra** uno con el ratón. Al primer clic, ¿**te enteras** de que hay que
+      volver a pulsar? Lee el renglón: está debajo, en `role="status"`. **Si no te
+      enteras, es un defecto** — un botón que parece no hacer nada es peor que uno
+      que borra.
+- [ ] Pulsa «Borrar» en una fila y luego «Borrar» en **otra**: ¿no se borra ninguna?
+- [ ] Deja pasar más de cinco segundos entre los dos clics: ¿vuelve a armar en vez
+      de borrar?
+- [ ] ⚠️ **Juicio**: ¿te parece suficiente confirmación para una acción que se lleva
+      el trabajo de una tarde? Si no, la salida no es quitar el botón: es que la
+      fila lo diga (cambiar el rótulo a «¿Seguro?»), y eso es tocar
+      `app/dialogo-expediente.js`.
+
+### 11.4 · ⛔ Abrir el DXF en un CAD de verdad ⟨BLOQUEANTE⟩
+
+**Por qué es bloqueante, y es el mismo argumento que el PDF en tres lectores del
+§10.1.** En la fase 0 se escribió el DXF **exactamente como manda el override O12**
+—sin los dos marcadores de subclase— y `ezdxf` lanzó `DXFStructureError`: el fichero
+**no abría en ninguna parte**. Y `parsers/dxf.js`, nuestro propio lector, lo leyó tan
+feliz: 2 anillos, coordenadas exactas, cero detecciones. O sea que **la prueba de
+ida y vuelta habría salido verde con un DXF que no abre**. El oráculo de la suite es
+`ezdxf`, que corre fuera; pero ezdxf tampoco es AutoCAD.
+
+**Un DXF que valida contra nuestro parser y no abre en AutoCAD no está exportado:
+está de suerte.** Esto no lo firma ninguna máquina de este proyecto (en este equipo
+no hay `acad.exe`).
+
+- [ ] Exporta el DXF y **ábrelo en un CAD** (AutoCAD, BricsCAD, LibreCAD,
+      QCAD… apunta cuál).
+- [ ] ¿Aparecen **las dos capas** en el árbol de capas, con sus nombres
+      `PARCELA_OFICIAL` y `PARCELA_EDITADA`?
+- [ ] ⭐ ¿Se pueden **seleccionar por capa** —apagar una y que desaparezca solo su
+      contorno—? Es lo que pide el criterio 3, y es el punto entero del formato:
+      llevar la oficial junto a la editada **para poder compararlas**.
+- [ ] ¿Los dos contornos salen **cerrados**? (Emitimos `70=1` sin repetir el primer
+      vértice; los DXF reales del repo hacen lo contrario y `ezdxf` lee los nuestros
+      como `closed=True`.)
+- [ ] Mide un lado en el CAD y compáralo con la tabla de vértices de la app:
+      **¿coinciden los dos decimales?** (Es la misma constante que redondea el GML.)
+- [ ] ¿El auditor del CAD dice algo? (En AutoCAD, `AUDIT`.) Apunta lo que salga,
+      aunque «arregle» cosas sin quejarse: eso es exactamente lo que hay que saber.
+
+### 11.5 · El fichero de proyecto, en **otro** perfil o en otra máquina
+
+**Por qué está aquí.** Sin backend y sin cuentas, IndexedDB es una caja fuerte **sin
+puerta**: borrar los datos del sitio se lo lleva todo y no hay forma de mandarle el
+expediente a un compañero. El `.json` es esa puerta —y es alcance NUEVO, que no
+estaba en la ficha, ni en `SPEC.md`, ni en el dossier—. El guion no puede probarlo
+porque el selector de ficheros del sistema no se conduce desde `/browse`.
+
+- [ ] Exporta el proyecto. **Arrastra el `.json` sobre la ventana**: ¿entra? ¿Dice
+      por el panel que se ha abierto y que **todavía no está guardado** en este
+      navegador?
+- [ ] Prueba también con **«Abrir un proyecto…»** desde el diálogo: ¿abre el mismo
+      selector de ficheros que «Abrir un GML…»? (Es la misma zona a propósito: dos
+      zonas engancharían las dos el `drop` de la ventana entera.)
+- [ ] ⭐ Ábrelo en **otro perfil del navegador, o en otra máquina**. ¿Sale la misma
+      geometría, la misma referencia y el mismo huso?
+- [ ] Arrastra un **`.gml`** y un **`.json`** en la misma sesión: ¿cada uno va a lo
+      suyo? ¿El velo de arrastre dice «(.gml, .xml o .json)»?
+- [ ] Ábrelo con un editor de texto. ¿Se entiende qué es? ¿Lleva el `formato` y la
+      `version` a la vista, arriba?
+- [ ] Rompe el fichero a mano (bórrale una llave) y ábrelo: **¿dice qué le pasa, o
+      se queda callado?** Es la lección de F08 entera.
+
+### 11.6 · ⛔ Cómo se lee la lista de expedientes ⟨BLOQUEANTE⟩
+
+**Por qué es bloqueante, y hereda el carácter del 8.1, el 9.4 y el 10.5.** La regla
+de oro 9 dice que la aplicación **mide** y el colegiado **interpreta y firma**. Esta
+pantalla es nueva y escribe bastante texto: nombres, antigüedades, motivos de
+botones apagados, avisos de durabilidad y una lista de «lo que NO se guarda».
+
+- [ ] Lee la lista entera con ojos de técnico que no ha escrito el código. ¿Alguna
+      frase **se lee como un veredicto** sobre la parcela, sobre el trabajo o sobre
+      lo que hay que hacer?
+- [ ] El bloque **«Lo que NO se guarda»**: ¿se entiende que el historial de deshacer,
+      las colindantes, el diagnóstico y el pie de firma **no viajan**? ¿O parece
+      letra pequeña?
+- [ ] El aviso de durabilidad («Esto se guarda en este navegador y en este equipo,
+      no en ningún servidor…»): ¿asusta de más, o de menos? Está pensado para decir
+      **qué pasa y qué puede hacer el usuario**, sin dramatizar.
+- [ ] La oferta del borrador al arrancar: ¿queda claro que **no se ha tocado nada**?
+      ¿Se encuentra el botón «Expediente» con esa indicación?
+- [ ] Las antigüedades («hace 6 días», «ahora»): ¿alguna se lee mal? (Las escribe
+      `Intl.RelativeTimeFormat`, compartida con el renglón de procedencia de F05.)
+- [ ] ⚠️ El acuse de guardado dice «**El navegador no garantiza conservarlo**…».
+      ¿Lo lees como una advertencia útil o como ruido en cada guardado? Si es lo
+      segundo, apúntalo: es la tercera vez que este proyecto tiene que decidir dónde
+      cabe una verdad incómoda sin que estorbe.
+
+### 11.7 · Juicio visual del diálogo y de la fila del rótulo
+
+- [ ] La fila «Origen de la parcela» tiene ahora **dos botones**. ¿Se lee bien?
+      ¿«Expediente» se entiende, o suena a algo administrativo que no es?
+- [ ] ⚠️ **Quedan 21 px de holgura** antes de que la fila se parta en dos líneas
+      (8 de ellos son el `gap`). Prueba a **estrechar la ventana**: ¿a qué anchura
+      se parte? Cuando se parta, ¿pierde la caja de vértices los ~36 px?
+- [ ] Abre el diálogo. ¿Tapa el mapa? (Sí, es un modal: eso es a propósito.) ¿Se
+      llega a todos los controles sin que la ventana haga scroll horizontal?
+- [ ] Con el teclado: `Tab` desde el botón, ¿aterriza dentro? `Escape`, ¿cierra y
+      **devuelve el foco** al botón? ¿Se puede llegar a «Borrar» de una fila sin
+      ratón?
+- [ ] Con el zoom del navegador al **200 %**: ¿sigue cabiendo el diálogo?
+- [ ] Con **«movimiento reducido»** activado en el sistema: ¿aparece sin animación?
+
+---
+
 ## Qué hacer con el resultado
 
 - **Todo conforme** → F03 se marca hecha (`README.md` §Estado y `spec/SPEC.md`).
@@ -1309,6 +1519,43 @@ defecto —es la regla de oro 1 funcionando— pero es alto real que desaparece.
 - **El 10.7 (los 33 px del renglón de colindantes)** → **no bloquea**: es de F05,
   está medido y la caja sigue en 234 px, muy por encima del umbral de 220. Si se
   decide que el acuse caduque, el dueño es `app/cableado-catastro.js`.
+- **Algo del 11.1 falla** → **BLOQUEA F10**, y es la fase entera: si un expediente
+  no sobrevive a cerrar el navegador, F10 no ha hecho lo que promete. Ojo a la
+  atribución antes de abrir tarea: **que el navegador DESALOJE no es un defecto de
+  la aplicación** —`persist()` devuelve `false` y está medido—, así que lo primero
+  es mirar si el perfil tenía la página marcada. Lo que sí sería defecto nuestro es
+  que la app **no lo dijera**: el aviso existe (`storage/cuota.js#AVISO_SIN_PERSISTENCIA`)
+  y el acuse de cada guardado lo repite. Si lo que falla es la escritura, el dueño
+  es **`storage/expedientes.js`** (y su test), nunca un parche desde el cableado.
+- **Algo del 11.4 falla** → **BLOQUEA F10**, y es el criterio de aceptación 3 en la
+  mitad que ninguna máquina de este proyecto puede firmar. **Está medido que nuestro
+  propio parser aprueba ficheros que ningún CAD abre** (fase 0), así que aquí un «no
+  abre» manda sobre toda la suite. El dueño es **`export/dxf.js`**, y el arreglo va
+  con su snapshot de bytes actualizado y pasado por `ezdxf` — nunca aflojando el
+  test. Si lo que falla es que las capas no se pueden seleccionar por separado, mira
+  primero la sección `TABLES`: sin ella el auditor da 0 errores y las capas **no
+  existen**.
+- **Algo del 11.2, 11.3 o 11.5 no convence** → es producto o presentación, y **no
+  bloquea F10**: la mecánica ya está medida por `12-expedientes.js` y por la suite.
+  La confirmación en dos tiempos del borrado vive en
+  **`app/cableado-expediente.js#MS_CONFIRMAR_BORRADO`**; si se decide que la fila
+  cambie de rótulo al armarse, el dueño es **`app/dialogo-expediente.js`**. El
+  enrutado por extensión de la zona de fichero está en
+  **`app/cableado-comprobacion.js#entradasExtra`** — y ⚠️ **no se arregla
+  instanciando una segunda `crearZonaFichero`**: engancha el arrastre en la ventana
+  entera y las dos se pisarían.
+- **Algo del 11.6 se lee como un veredicto** → **BLOQUEA F10**, y hereda el carácter
+  del 8.1, el 9.4 y el 10.5. Aquí el sujeto es más modesto —una lista de trabajos
+  guardados— pero la regla es la misma: la app mide y el colegiado firma. Los textos
+  viven en **`app/dialogo-expediente.js`** (la intro, los motivos de los botones
+  apagados y el bloque «Lo que NO se guarda»), en
+  **`storage/expedientes.js`** (`NO_SE_GUARDA`, `AVISO_DURABILIDAD`) y en
+  **`app/cableado-expediente.js`** (los acuses). La salida no es callar: es rotular
+  mejor.
+- **El 11.7 (los 21 px de holgura de la fila del rótulo)** → **no bloquea**, pero se
+  anota: es el margen que le queda a la decisión de «coste 0 px» antes de que la
+  fila se parta y cueste ~36 px. Si hace falta un tercer botón ahí, **no cabe**, y
+  esa conversación es de diseño, no de código.
 
 ## Cuándo repetir esta lista
 
@@ -1359,8 +1606,21 @@ cualquiera de los tres lectores**: la compatibilidad de un PDF escrito a mano no
 de la app, es del entorno. El **10.3**, con cada impresora distinta. Los
 disparadores del mecanismo son los de `11-informe-pdf.js` (`GUION.md` §8 y §17).
 
+El punto **11** se repite cuando cambie el ESQUEMA de la base —`MIGRACIONES` o
+`ESQUEMA_ALMACENES` en `storage/bd.js`, que es donde una versión nueva puede
+llevarse por delante los datos de quien ya tenía la aplicación—, cuando cambie
+`export/dxf.js` (el **11.4** es sobre un formato que lee un programa ajeno: cada
+byte cuenta), y cuando cambie cualquier texto de `app/dialogo-expediente.js` o de
+`storage/expedientes.js` (el **11.6** es sobre la LECTURA). El **11.1** además cada
+vez que se pruebe en un navegador o un perfil nuevos: el desalojo no es de la app,
+es del entorno — y `persist()` puede empezar a devolver `true` el día que la página
+esté marcada o instalada, que es justo lo que ese punto va a mirar. El **11.4**,
+además, con cada CAD distinto: los visores perdonan cosas distintas, igual que los
+lectores de PDF del 10.1. Los disparadores del mecanismo son los de
+`12-expedientes.js` (`GUION.md` §8 y §18).
+
 ⛔ **Y toda la lista, ahora.** Se recorrió el 2026-08-02, salieron **tres defectos
 reales** (encabezado del punto 9), se corrigieron los tres y **la lista no llegó a
 firmarse**. Hay que volver a recorrerla entera con las correcciones puestas: es la
 propia regla de esta sección, y esta vez con el motivo delante. La cadena
-bloqueada es **F03 → F05 → F06 → F07 → F08 → F09**.
+bloqueada es **F03 → F05 → F06 → F07 → F08 → F09 → F10**.

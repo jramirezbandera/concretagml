@@ -124,14 +124,30 @@
 //     imposible razonar sobre una caché.
 //   · El registro caducado no estorba: la siguiente consulta de esa misma clave lo
 //     PISA con `put`, así que ni se duplica ni crece sin control.
-//   · Y sobre todo: **la purga por antigüedad y la gestión de cuota son de F10**
+//   · Y sobre todo: **la purga por antigüedad y la gestión de cuota eran de F10**
 //     (`navigator.storage.persist()` / `estimate()`, desalojo, y la UI con la que
-//     preguntarle al usuario antes de tirarle nada). Meterlas aquí sería invadir
-//     otra fase y, peor, hacerlo sin la pantalla con la que contarlo.
+//     preguntarle al usuario antes de tirarle nada).
 //
-// El único gancho que se deja es informativo: {@link crearCacheCatastro}·`estado()`
-// lleva `caducados`, que es el contador con el que F10 podrá decidir si merece la
-// pena purgar. **Es un gancho, no media purga a medio hacer.**
+// ✅ **F10 · T3.4 (2026-08-03): la purga ya está aquí, y sigue sin borrar al leer.**
+// Es {@link crearCacheCatastro}·`purgarCaducados`, una operación EXPLÍCITA que solo
+// corre cuando alguien la llama —el cableado, al chocarse con `QuotaExceededError`—.
+// `leer` no ha cambiado ni una línea: sigue sin mutar nada.
+//
+// ── 5bis · LA PURGA ES POR ANTIGÜEDAD, JAMÁS A LO BRUTO ─────────────────────
+// Y no es escrúpulo: **esta caché es la mitigación anti-bloqueo del régimen O8**.
+// `MEJORES_PRACTICAS_GML.md` §2.4 lo dice con todas las letras —«consultar IndexedDB
+// antes de cada `getParcelByRefcat` es el mayor factor anti-bloqueo del cliente»— y
+// el bloqueo del Catastro dura ~10 días. Vaciar la caché entera para hacer sitio
+// cambiaría unos megabytes de disco por diez días sin servicio, que es un trato
+// pésimo y que además nadie relacionaría con la purga cuando ocurriera.
+//
+// Así que solo se van los registros que **ya no puede servir nadie**: los pasados de
+// TTL —que `leer` ya trata como ausentes— y los que tienen una marca de tiempo
+// inservible, que nunca podrán acertar. Un registro fresco no se toca aunque el disco
+// esté lleno. Si después de purgar sigue sin caber, **se dice**; no se sigue borrando.
+//
+// El contador `caducados` de `estado()` sigue siendo el gancho informativo con el que
+// decidir si merece la pena llamar.
 //
 // ── 6 · SIN BASE DISPONIBLE, ESTO ES `CACHE_NULA` ──────────────────────────
 // `storage/bd.js#abrirBd` no lanza cuando no puede: devuelve
@@ -194,7 +210,9 @@
 //     de versión por base y `storage/bd.js` es LA puerta de apertura (su cabecera
 //     explica qué pasa cuando dos módulos abren por su cuenta: almacenes que no se
 //     crean nunca, sin un solo error).
-//   · **No purga ni gestiona cuota.** F10 (decisión 5).
+//   · **No gestiona la cuota.** Purga cuando se lo piden (decisión 5bis), pero quién
+//     mide el espacio y quién decide que hay que purgar son de `storage/cuota.js` y
+//     del cableado. Esta caché no sabe cuánto sitio queda y no tiene por qué.
 //   · **No compone claves ni redondea coordenadas.** Eso es de quien consulta.
 //   · **No sabe qué es una parcela.** Guarda valores clonables; que uno sea un GML
 //     y otro una lista de candidatos del OVC le da exactamente igual.
@@ -327,6 +345,39 @@ function rutaDe(clave) {
   )
 }
 
+/**
+ * Los almacenes que esta caché usa, **derivados de la tabla de rutas** y sin
+ * repetidos. Aquí no se escribe `'parcelas'` ni `'revgeo'`: añadir una clase de clave
+ * a {@link ALMACEN_POR_PREFIJO} la mete en la purga sin tocar una línea de
+ * `purgarCaducados`, y —lo que importa más— **una purga no puede alcanzar nunca un
+ * almacén que esta caché no enrute**. Los expedientes de F10 y el pie de firma viven
+ * en la misma base y no son caché: que no salgan de aquí es lo que garantiza que una
+ * purga por espacio no se lleve por delante el trabajo del usuario.
+ *
+ * @readonly
+ * @type {readonly string[]}
+ */
+export const ALMACENES_DE_CACHE = Object.freeze([...new Set(Object.values(ALMACEN_POR_PREFIJO))])
+
+/**
+ * Por qué una purga no ha podido ser. Códigos estables, para que quien llame decida
+ * sin leerle el texto al `mensaje` (mismo criterio que `MOTIVO_EXPEDIENTES`).
+ *
+ * @readonly
+ */
+export const MOTIVO_PURGA = Object.freeze({
+  /** No hay almacén local utilizable. No es un fallo: no había nada que purgar. */
+  SIN_BD: 'SIN_BD',
+  /**
+   * La base cableada sabe `leer` y `guardar` —cumple el puerto— pero no sabe listar ni
+   * borrar. Le pasa a un doble mínimo de test, no a `idb`. Se dice en vez de reventar
+   * con un `TypeError` sobre `undefined` a cien líneas de aquí.
+   */
+  SIN_SOPORTE: 'SIN_SOPORTE',
+  /** La lectura o el borrado reventaron en IndexedDB. Lo purgado hasta ahí, purgado. */
+  ERROR: 'ERROR',
+})
+
 // ── Contrato ─────────────────────────────────────────────────────────────────
 
 /** El puerto que este módulo implementa. Lo declara el consumidor, no nosotros. */
@@ -356,6 +407,29 @@ function rutaDe(clave) {
  * @property {number} fallosLectura   Lecturas que reventaron en IndexedDB.
  * @property {number} fallosEscritura  Escrituras que reventaron en IndexedDB
  *   (`QuotaExceededError` y compañía). **No cambiaron ningún resultado.**
+ * @property {number} purgas    Veces que se ha llamado a `purgarCaducados`.
+ * @property {number} purgados  Registros borrados, sumando todas las purgas.
+ */
+
+/**
+ * Lo que devuelve una purga. **Siempre lleva `mensaje`, también cuando sale bien**, al
+ * revés que el resto del módulo: el objeto entero de esta operación es un PARTE de lo
+ * que se ha tirado, y devolver `null` donde va la frase obligaría a quien llama a
+ * redactarla por su cuenta a partir de los números — que es como acaban existiendo dos
+ * versiones de la misma frase.
+ *
+ * @typedef {Object} ResultadoPurga
+ * @property {boolean} ok
+ * @property {number} purgados   Cuántos registros se han borrado.
+ * @property {number} revisados  Cuántos se han mirado. `revisados - purgados` son los
+ *   que siguen sirviendo y por eso no se tocan (decisión 5bis).
+ * @property {number} sinFecha   De los purgados, cuántos no tenían marca utilizable.
+ *   Se cuenta aparte porque no es lo mismo «viejo» que «roto», y un número que sube
+ *   aquí señala a quien esté escribiendo mal en la caché.
+ * @property {number} bytesAprox  **Estimación por exceso**, ver `purgarCaducados`.
+ * @property {Record<string, number>} porAlmacen  Cuántos por almacén.
+ * @property {string|null} motivo   Clave de {@link MOTIVO_PURGA}, o `null`.
+ * @property {string} mensaje  En castellano, listo para enseñar.
  */
 
 // ── Utilidades ───────────────────────────────────────────────────────────────
@@ -423,8 +497,13 @@ function esBase(v) {
  * @param {import('../viewer/_comun.js').Avisar|null} [opciones.alAvisar=null]
  *   Canal de aviso. `null` ⇒ `console.warn`, que es el suelo mínimo de la regla de
  *   oro 1; nunca el silencio.
- * @returns {CacheCatastro & {estado: () => EstadoCache}}  El puerto, más un
- *   `estado()` con los contadores (el gancho informativo de F10).
+ * @returns {CacheCatastro & {estado: () => EstadoCache, purgarCaducados: (opciones?: {ttlMs?: number}) => Promise<ResultadoPurga>}}
+ *   El puerto —`leer` y `guardar`, y nada más de lo que el consumidor conoce—, más
+ *   dos operaciones que **no forman parte de él**: `estado()` con los contadores y
+ *   `purgarCaducados()`. Que sobren claves no rompe el duck typing de
+ *   `crearClienteCatastro`, que exige las del puerto y no prohíbe las demás; el
+ *   cliente del Catastro seguirá sin saber que esto se puede purgar, que es lo
+ *   correcto: quién purga y cuándo es del cableado.
  * @throws {TypeError}  Contrato roto por el programador: `opciones` que no es un
  *   objeto, `ahora` que no es función, `alAvisar` que no es función ni nulo, o un
  *   `bd` que no es ni objeto ni nulo.
@@ -462,6 +541,8 @@ export function crearCacheCatastro(opciones = {}) {
     escrituras: 0,
     fallosLectura: 0,
     fallosEscritura: 0,
+    purgas: 0,
+    purgados: 0,
   }
 
   /**
@@ -689,6 +770,169 @@ export function crearCacheCatastro(opciones = {}) {
     }
   }
 
+  // ── La purga (F10 · T3.4) ─────────────────────────────────────────────────
+
+  /**
+   * ¿Puede esta base listar y borrar? {@link esBase} solo exige `get` y `put`, que es
+   * lo que pide el PUERTO, y no se amplía a propósito: subirle el listón dejaría fuera
+   * a los dobles legítimos que hoy implementan el puerto entero. Así que la capacidad
+   * extra se comprueba aquí, donde hace falta, y su ausencia se cuenta como
+   * degradación y no como excepción.
+   *
+   * @param {*} db
+   * @returns {boolean}
+   */
+  function sabePurgar(db) {
+    return typeof db.getAll === 'function' && typeof db.delete === 'function'
+  }
+
+  /**
+   * Tamaño APROXIMADO de un registro, en bytes. Se mide serializándolo a JSON.
+   *
+   * ⚠️ **Es una estimación POR EXCESO, y el nombre del campo lo dice.** IndexedDB no
+   * publica cuánto ocupa un registro concreto —`navigator.storage.estimate()` da el
+   * total del origen y nada más—, y en la fase 0 de F10 se midió que la base guarda
+   * más compacto que su JSON: un registro cuyo `JSON.stringify` pesaba 1.488 B sumaba
+   * **864 B** de `usage` real, o sea que el JSON sobreestima en torno a 1,7×. Se
+   * devuelve igualmente porque «se han liberado unos 40 kB» le dice algo a quien mira
+   * y «se han borrado 12 registros» no; lo que no se puede es presentarlo como exacto.
+   *
+   * @param {*} registro
+   * @returns {number}
+   */
+  function bytesAproximados(registro) {
+    try {
+      return JSON.stringify(registro)?.length ?? 0
+    } catch {
+      // Un registro con un ciclo no se puede pesar. No pasa con lo que esta caché
+      // guarda (texto y POJO clonables), pero devolver 0 es mejor que reventar una
+      // purga por no saber contar un byte.
+      return 0
+    }
+  }
+
+  /**
+   * Borra los registros que ya no puede servir nadie: los pasados de TTL y los que
+   * tienen una marca de tiempo inservible. **Nunca borra un registro fresco**, aunque
+   * el disco esté lleno (decisión 5bis: esta caché es la mitigación anti-bloqueo del
+   * régimen O8, y vaciarla cuesta ~10 días de servicio).
+   *
+   * Es una operación EXPLÍCITA: la llama el cableado al chocarse con
+   * `QuotaExceededError`, nunca `leer` ni `guardar`. Y **no lanza**: sin base, sin
+   * soporte o con la lectura rota devuelve `{ok: false, motivo, mensaje}` — la
+   * frontera de siempre.
+   *
+   * Recorre **solo** {@link ALMACENES_DE_CACHE}, que se deriva de la tabla de rutas:
+   * los expedientes del usuario y el pie de firma viven en la misma base y esta purga
+   * no puede alcanzarlos ni por error.
+   *
+   * @param {object} [opciones]
+   * @param {number} [opciones.ttlMs=MS_TTL]  Qué se considera caducado. Se deja
+   *   ajustable para que el test no tenga que mover el reloj siete días y para que un
+   *   día se pueda purgar más agresivamente **decidiéndolo desde fuera**, que es
+   *   distinto de que este módulo lo decida solo.
+   * @returns {Promise<ResultadoPurga>}
+   * @throws {RangeError}  Si `ttlMs` no es un número finito y no negativo. Contrato
+   *   roto por el programador: un TTL inservible borraría lo que no toca.
+   */
+  async function purgarCaducados(opciones = {}) {
+    const { ttlMs = MS_TTL } = opciones ?? {}
+    if (!Number.isFinite(ttlMs) || ttlMs < 0) {
+      throw new RangeError(
+        `cacheCatastro.purgarCaducados: 'ttlMs' debe ser un número finito y no negativo de ` +
+          `milisegundos; recibido ${JSON.stringify(ttlMs)}. Un TTL inservible borraría registros ` +
+          'que todavía sirven.',
+      )
+    }
+
+    const vacio = { purgados: 0, revisados: 0, sinFecha: 0, bytesAprox: 0, porAlmacen: {} }
+
+    const db = await base()
+    if (db === null) {
+      return {
+        ok: false,
+        ...vacio,
+        motivo: MOTIVO_PURGA.SIN_BD,
+        mensaje:
+          'No hay caché local que purgar en este navegador, así que tampoco hay espacio que ' +
+          'liberar por aquí.',
+      }
+    }
+    if (!sabePurgar(db)) {
+      return {
+        ok: false,
+        ...vacio,
+        motivo: MOTIVO_PURGA.SIN_SOPORTE,
+        mensaje:
+          'El almacén local cableado sabe leer y escribir, pero no listar ni borrar, así que la ' +
+          'caché no se puede purgar.',
+      }
+    }
+
+    const t = ahora()
+    const porAlmacen = {}
+    let purgados = 0
+    let revisados = 0
+    let sinFecha = 0
+    let bytesAprox = 0
+
+    try {
+      for (const almacen of ALMACENES_DE_CACHE) {
+        const campoClave = ESQUEMA_ALMACENES[almacen].keyPath
+        // `getAll` y no un cursor: hace falta el `guardadoEn` de cada registro para
+        // decidir, y las claves solas no lo traen. Trae también el valor, que es lo
+        // que permite estimar los bytes; el coste es leer la caché entera una vez, y
+        // esto corre cuando el disco ya se ha llenado, no en cada consulta.
+        const registros = await db.getAll(almacen)
+        porAlmacen[almacen] = 0
+        for (const registro of registros) {
+          revisados += 1
+          const marca = registro?.guardadoEn
+          const rota = !Number.isFinite(marca)
+          // El MISMO criterio que `leer`, y con el mismo `>`: un registro de
+          // exactamente el TTL todavía acierta, así que todavía no se tira.
+          if (!rota && t - marca <= ttlMs) continue
+
+          await db.delete(almacen, registro[campoClave])
+          purgados += 1
+          porAlmacen[almacen] += 1
+          if (rota) sinFecha += 1
+          bytesAprox += bytesAproximados(registro)
+        }
+      }
+    } catch (error) {
+      cuenta.purgas += 1
+      cuenta.purgados += purgados
+      const mensaje =
+        `La purga de la caché local se ha interrumpido (${detalleDe(error)}). Se habían borrado ` +
+        `${purgados} registro(s) antes del fallo, y esos sí están borrados; el resto sigue donde ` +
+        'estaba. La aplicación funciona igual: lo único que cambia es cuánto sitio queda libre.'
+      avisar(mensaje, { nivel: NIVEL.AVISO, causa: error })
+      return { ok: false, purgados, revisados, sinFecha, bytesAprox, porAlmacen, motivo: MOTIVO_PURGA.ERROR, mensaje }
+    }
+
+    cuenta.purgas += 1
+    cuenta.purgados += purgados
+
+    const kB = Math.round(bytesAprox / 1024)
+    const mensaje =
+      purgados === 0
+        ? `No había nada caducado que purgar: los ${revisados} registro(s) de la caché local ` +
+          'todavía sirven. Borrarlos igualmente obligaría a volver a pedírselos al Catastro.'
+        : `Se han borrado ${purgados} de los ${revisados} registro(s) de la caché local del ` +
+          `Catastro por llevar más de ${Math.round(ttlMs / 86400000)} día(s) guardados` +
+          (sinFecha > 0 ? ` (${sinFecha} de ellos sin fecha utilizable)` : '') +
+          `, y con ellos unos ${kB} kB. Los datos no se pierden: la próxima consulta de esas ` +
+          'parcelas irá al servicio del Catastro, que es más lento pero da lo mismo.'
+
+    // Se avisa SOLO cuando de verdad se ha borrado algo. Una purga que no encuentra
+    // nada es un no-suceso, y anunciarlo sería el ruido que entierra los avisos que sí
+    // traen información nueva (mismo criterio que la decisión 6).
+    if (purgados > 0) avisar(mensaje, { nivel: NIVEL.AVISO })
+
+    return { ok: true, purgados, revisados, sinFecha, bytesAprox, porAlmacen, motivo: null, mensaje }
+  }
+
   /**
    * Fotografía de los contadores. Objeto nuevo en cada llamada: quien la guarde
    * conserva la foto y no una referencia que cambia sola.
@@ -699,5 +943,5 @@ export function crearCacheCatastro(opciones = {}) {
     return { ...cuenta }
   }
 
-  return { leer, guardar, estado }
+  return { leer, guardar, purgarCaducados, estado }
 }

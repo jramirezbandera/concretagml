@@ -145,11 +145,46 @@
              Tampoco está aquí la superposición que se ve mientras se arrastra:
              la fabrica el mismo módulo y la gobierna `body[data-arrastrando="si"]`
              desde `estilos/app.css`. -->
+        <!-- ── F10 · «Expediente» ENTRA EN LA MISMA FILA, Y VAN ENVUELTOS ───────
+             Quinta fase seguida que no puede permitirse un bloque fijo nuevo en el
+             panel, y el mismo argumento medido de F08: una fila a lo ancho cuesta
+             ~36 px y se los quita la caja de vértices (267 px, suelo declarado en
+             220). `.gml-boton--menudo` cabe dentro del alto de línea del `<h2>`, así
+             que el bloque no crece ni un píxel.
+
+             ⚠️ LOS DOS BOTONES VAN DENTRO DE UN `.gml-rotulo-acciones`, y no sueltos.
+             `.gml-rotulo-fila` es `justify-content: space-between`: con TRES hijos,
+             los dos botones se irían a los extremos y el rótulo quedaría en medio.
+             Con el envoltorio la fila vuelve a tener dos hijos —rótulo a la
+             izquierda, acciones a la derecha— y la fila «Vértices», que sigue con
+             dos, no se entera de nada.
+
+             ✅ MEDIDO EN NAVEGADOR REAL (2026-08-03, 1440×900, Chrome):
+               · la fila mide **16 px**, exactamente lo que medía con el `<h2>` solo
+                 (alto de línea 15,95 px; los botones, 15 px). **Coste 0 px, y ahora
+                 es un hecho y no una cuenta.**
+               · la caja de vértices sigue en **267 px**. El invariante, intacto.
+               · los dos botones caen en la MISMA línea, sin desbordar los 392 px.
+               · ⚠️ pero la holgura es de **12 px**: el `<h2>` acaba en x=175 y las
+                 acciones empiezan en x=195, y 8 de esos 20 px son el `gap` declarado.
+                 O sea que «Expediente» **no puede crecer**: dos o tres caracteres más
+                 y la fila se parte, y partirse cuesta los 36 px que todo esto existe
+                 para no gastar. Si algún día hace falta un rótulo más largo, la
+                 salida no es una segunda fila: es acortar el otro.
+
+             El `<dialog>` que abre este botón NO se declara aquí: lo fabrica
+             `app/dialogo-expediente.js`, igual que hacen `app/zona-fichero.js` con su
+             `<input type="file">`, los dos cajones y el diálogo de F09. -->
         <div class="gml-rotulo-fila">
           <h2 class="gml-rotulo">Origen de la parcela</h2>
-          <button type="button" class="gml-boton gml-boton--menudo" data-accion="abrir-gml">
-            Abrir un GML…
-          </button>
+          <div class="gml-rotulo-acciones">
+            <button type="button" class="gml-boton gml-boton--menudo" data-accion="abrir-gml">
+              Abrir un GML…
+            </button>
+            <button type="button" class="gml-boton gml-boton--menudo" data-accion="abrir-expediente">
+              Expediente
+            </button>
+          </div>
         </div>
 
         <div class="gml-campo">

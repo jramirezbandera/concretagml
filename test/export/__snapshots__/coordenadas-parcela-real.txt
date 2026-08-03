@@ -1,0 +1,65 @@
+========================================================================
+LISTADO DE COORDENADAS DE VÉRTICES
+========================================================================
+
+  Fecha del listado ............ 03/08/2026 09:45 (UTC)
+  Referencia catastral ......... 9398516VK3799G
+  Sistema de referencia ........ EPSG:25830
+  Expediente ................... Parcela de prueba
+  Recintos ..................... 1 recinto
+  Vértices ..................... 15 vértices
+
+  Coordenadas UTM en metros —Este (X) y Norte (Y)—, con 2 decimales y
+  coma decimal. Los anillos van ABIERTOS: el último vértice no repite el
+  primero, aunque el lado que los une exista y se mida.
+
+  Este listado está pensado para leerlo una persona o para pasarlo a un
+  equipo de campo. NO se puede volver a cargar en esta aplicación: la
+  primera columna es el número de vértice, no una coordenada, y un
+  lector de dos columnas la tomaría por la X. Para volver a abrir el
+  trabajo aquí, usa el fichero de proyecto.
+
+------------------------------------------------------------------------
+CONTORNO EXTERIOR — 15 vértices
+------------------------------------------------------------------------
+
+  Nº       X (m)        Y (m)
+  ---------------------------
+   1   439283,23   4479671,27
+   2   439268,76   4479658,01
+   3   439257,63   4479647,80
+   4   439246,37   4479637,48
+   5   439244,43   4479640,02
+   6   439239,96   4479646,73
+   7   439229,31   4479665,26
+   8   439228,84   4479666,09
+   9   439227,62   4479668,26
+  10   439225,21   4479672,54
+  11   439222,89   4479677,12
+  12   439222,53   4479678,00
+  13   439222,47   4479678,13
+  14   439247,30   4479687,38
+  15   439276,64   4479673,63
+
+------------------------------------------------------------------------
+MEDIDAS
+------------------------------------------------------------------------
+
+  Superficie ................... 1.535,87 m²
+  Perímetro exterior ........... 163,12 m
+  Perímetro de los huecos ...... 0,00 m
+  Longitud total de lindero .... 163,12 m
+
+  La superficie es la neta: el contorno exterior menos los huecos. La
+  longitud total, en cambio, los SUMA — un hueco añade lindero, no lo
+  quita.
+
+  Las cuatro medidas están tomadas sobre las coordenadas de este
+  listado, ya redondeadas, y no sobre las del modelo interno: así, quien
+  vuelva a medir sobre las cifras impresas obtiene lo mismo que pone
+  aquí.
+
+  Este listado enumera y suma; no dice si la parcela está bien ni si sus
+  medidas encajan con ninguna otra. Esa lectura es de quien firma.
+
+========================================================================

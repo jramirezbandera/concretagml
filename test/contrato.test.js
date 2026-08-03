@@ -282,12 +282,23 @@ describe('contrato F08 · comprobación e informe salen por el barrel; la ENTREG
     //     es el fichero concreto que alguien intentaría exportar «para que el
     //     cableado lo importe bonito», que es la tentación que el resto de la
     //     cabecera de este bloque describe.
+    //
+    // F10 añade `app/dialogo-expediente.js` por lo mismo que el otro diálogo, y NO
+    // añade ningún módulo de `export/`: los cuatro son puros y la capa entera entra
+    // por `export/index.js` (ver el bloque de F10, más abajo). Los tres módulos
+    // nuevos de `storage/` —`expedientes`, `cuota` y `autoguardado`— los cubre
+    // `^\./storage/`, que es la regla que NO se autoprotege y por eso está escrita.
     const fuente = readFileSync(fileURLToPath(new URL('../index.js', import.meta.url)), 'utf8')
     const imports = [...fuente.matchAll(/(?:^|\n)[ \t]*export\s+\*[^\n]*from\s+['"]([^'"]+)['"]/g)].map(
       (m) => m[1],
     )
     expect(imports.length, 'no se ha leído ni un `export * as … from` del barrel').toBeGreaterThan(0)
-    const VETADOS = ['./gml/descargar.js', './report/canvas.js', './app/dialogo-informe.js']
+    const VETADOS = [
+      './gml/descargar.js',
+      './report/canvas.js',
+      './app/dialogo-informe.js',
+      './app/dialogo-expediente.js',
+    ]
     const infractores = imports.filter(
       (ruta) => /^\.\/(?:viewer|services|app|storage)\//.test(ruta) || VETADOS.includes(ruta),
     )
@@ -467,6 +478,172 @@ describe('contrato F09 · la capa del informe sale por el barrel; el plano y el 
         `el espacio 'report' ya no puede ser UN fichero: le falta '${nombre}'`,
       ).toContain(nombre)
     }
+  })
+})
+
+// ── Test-guardián del barrel raíz tras F10 (T4.2) ────────────────────────────
+// F10 estrena la capa `export/` —cuatro módulos puros que escriben el DXF, el
+// listado de coordenadas y el fichero de proyecto— y TRES módulos de `storage/`
+// más un diálogo. La frontera cae justo por el medio de la feature, y por eso este
+// bloque afirma las dos mitades:
+//
+//   · `export/` ENTRA, y entra por la misma razón que `report/` y `comprobacion/`:
+//     es puro. Entra geometría del modelo en UTM, sale una cadena o un POJO. Ni
+//     `Blob`, ni `document`, ni red, ni reloj (la fecha se inyecta).
+//   · `storage/expedientes.js`, `storage/cuota.js` y `storage/autoguardado.js` NO,
+//     y `app/dialogo-expediente.js` tampoco.
+//
+// ⚠️ Y conviene decir POR QUÉ este `it` existe habiendo tres reglas transversales
+// en el bloque de F08: porque de los cuatro módulos que aquí se prohíben, **ninguno
+// rompería nada al colarse**. `storage/*` se importa tan ricamente bajo el proyecto
+// `node` —`globalThis.indexedDB` se lee al LLAMAR, no al cargar—, y
+// `app/dialogo-expediente.js` sí reventaría… pero solo si alguien lo exportara con
+// `export * as`, que es la única forma que el detector estático mira. Meter
+// `storage/` en el barrel dejaría la suite EN VERDE PARA SIEMPRE. Esta prueba y la
+// mitad estática de F08 son lo único que lo impide.
+//
+// Momento de riesgo previsto: el día que el cableado de F10 necesite el almacén de
+// expedientes y alguien decida «sacarlo por el barrel, que ya está todo lo demás».
+// `app/cableado-expediente.js` lo importa DIRECTAMENTE, igual que `app/main.js`
+// importa `viewer/index.js` y `storage/bd.js`.
+describe('contrato F10 · `export/` sale por el barrel; el almacén y el diálogo no', () => {
+  const RAIZ_REPO = fileURLToPath(new URL('..', import.meta.url))
+
+  /** El instante del fichero, INYECTADO: ni un módulo de `export/` lee el reloj. */
+  const FECHA = new Date(Date.UTC(2026, 7, 3, 9, 45, 12))
+
+  it('el barrel expone las cuatro funciones puras de la capa de salida', () => {
+    expect(typeof barrel.exportar.serializarParcelaDxf).toBe('function')
+    expect(typeof barrel.exportar.serializarCoordenadasTxt).toBe('function')
+    expect(typeof barrel.exportar.aProyecto).toBe('function')
+    expect(typeof barrel.exportar.deProyecto).toBe('function')
+    // Y el vocabulario CERRADO con el que se leen sus resultados: sin él, la UI
+    // tendría que decidir mirando el TEXTO del mensaje, que es lo único que sí
+    // puede cambiar (regla de oro 1).
+    expect(Object.keys(barrel.exportar.TIPO_EXPORT).length).toBeGreaterThan(4)
+    expect(Object.keys(barrel.exportar.MOTIVO_PROYECTO).length).toBeGreaterThan(4)
+    expect(barrel.exportar.CAPAS.OFICIAL.nombre).toBe('PARCELA_OFICIAL')
+  })
+
+  it('y las CUATRO funcionan sin DOM, encadenadas sobre el fichero real', () => {
+    // La mitad anti-vacuidad, que es la que de verdad protege: `typeof x ===
+    // 'function'` seguiría en verde con un módulo cuyo grafo de imports tocara
+    // `window` en la primera llamada. Aquí se recorre la cadena entera —fichero →
+    // modelo → los tres ficheros de salida → y de vuelta— dentro del proyecto
+    // `node`, que corre sin `window`, sin `document` y sin `Blob`.
+    const texto = readFileSync(
+      join(RAIZ_REPO, 'test/fixtures/gml/cp_parcela_9398516VK3799G.gml'),
+      'utf8',
+    )
+    const parcela = barrel.gml.parsearGml(texto).parcelas[0]
+    expect(parcela.recintos.length).toBeGreaterThan(0)
+
+    // Contrato D · el DXF, con las dos capas en la TABLA (no solo nombradas por las
+    // entidades: sin `TABLES` el auditor de ezdxf da 0 errores y las capas no existen).
+    const { dxf, capas } = barrel.exportar.serializarParcelaDxf({
+      recintosEditados: parcela.recintos,
+      recintosOficiales: parcela.recintos,
+    })
+    expect(dxf.startsWith('0\r\nSECTION')).toBe(true)
+    expect(dxf).toContain(barrel.exportar.ACADVER)
+    expect(capas.map((c) => c.nombre)).toContain(barrel.exportar.CAPAS.EDITADA.nombre)
+
+    // Contrato E · el listado de coordenadas, con su fecha inyectada.
+    const { texto: listado, nVertices } = barrel.exportar.serializarCoordenadasTxt({
+      recintos: parcela.recintos,
+      refcat: parcela.refcat,
+      srs: parcela.srs,
+      fecha: FECHA,
+    })
+    expect(nVertices).toBe(parcela.recintos[0].vertices.length)
+    expect(listado).toContain('03/08/2026 09:45 (UTC)')
+    expect(listado).toContain(parcela.refcat)
+
+    // Contrato F · la ida y vuelta del proyecto, pasando por JSON como pasa de
+    // verdad entre exportar e importar.
+    const expediente = barrel.parcela.crearExpediente({
+      srs: parcela.srs,
+      metadatos: { creado: '2026-08-01T00:00:00.000Z', modificado: '2026-08-03T00:00:00.000Z' },
+      parcela: {
+        idLocal: 'P-1',
+        refcat: parcela.refcat,
+        origen: 'WFS',
+        recintos: parcela.recintos,
+        geometriaOficial: parcela.recintos,
+      },
+    })
+    const sobre = barrel.exportar.aProyecto(expediente, { fecha: FECHA, nombre: 'Contrato F10' })
+    expect(sobre.formato).toBe(barrel.exportar.FORMATO_PROYECTO)
+    const vuelta = barrel.exportar.deProyecto(JSON.parse(JSON.stringify(sobre)))
+    expect(vuelta.ok).toBe(true)
+    expect(vuelta.expediente).toEqual(expediente)
+    // Y la geometría oficial vuelve CONGELADA, que es lo que JSON no conserva.
+    expect(Object.isFrozen(vuelta.expediente.parcela.geometriaOficial)).toBe(true)
+  })
+
+  it('⚠️ el almacén de expedientes y el diálogo NO salen — y esto es lo único que lo impide', () => {
+    // Los cuatro nombres, por su nombre. Ninguno rompería nada al colarse: los tres
+    // de `storage/` se importan sin lanzar bajo el proyecto `node` (leen
+    // `globalThis.indexedDB` al LLAMAR), y el diálogo solo reventaría por la vía que
+    // el detector estático ya mira. O sea que sin esta prueba, meterlos en el barrel
+    // dejaría la suite en VERDE para siempre. Una regla que solo se sostiene cuando
+    // romperla revienta no es una regla, es una casualidad.
+    const prohibidos = [
+      'crearExpedientes',
+      'crearCuota',
+      'crearAutoguardado',
+      'crearDialogoExpediente',
+      // Y las constantes que más tentación dan de sacar «porque las necesita la UI»:
+      // la interfaz las importa de `storage/expedientes.js` DIRECTAMENTE, que es lo
+      // que hace `app/dialogo-expediente.js`.
+      'NO_SE_GUARDA',
+      'AVISO_DURABILIDAD',
+      'ID_BORRADOR',
+    ]
+    for (const [espacio, contenido] of Object.entries(barrel)) {
+      for (const nombre of prohibidos) {
+        expect(
+          Object.keys(contenido),
+          `el espacio '${espacio}' expone '${nombre}': 'storage/' es un adaptador de ENTORNO y ` +
+            `el barrel raíz es superficie de DOMINIO`,
+        ).not.toContain(nombre)
+      }
+    }
+    // Y el espacio entero tampoco, por si alguien lo mete con otro nombre.
+    for (const prohibido of ['storage', 'expedientes', 'autoguardado', 'cuota']) {
+      expect(Object.keys(barrel)).not.toContain(prohibido)
+    }
+  })
+
+  it('la ENTREGA de los tres ficheros nuevos tampoco sale, ni sus tipos MIME', () => {
+    // `TIPO_MIME_DXF` y `TIPO_MIME_JSON` viven en `gml/descargar.js`, que necesita
+    // `Blob` y `<a download>`. Están prohibidos por el mismo motivo que
+    // `descargarTexto`: el vocabulario de la ENTREGA viaja con quien entrega.
+    for (const [espacio, contenido] of Object.entries(barrel)) {
+      for (const nombre of ['TIPO_MIME_DXF', 'TIPO_MIME_JSON', 'descargarTexto']) {
+        expect(Object.keys(contenido), `el espacio '${espacio}' expone '${nombre}'`).not.toContain(
+          nombre,
+        )
+      }
+    }
+    // Anti-vacuidad: las dos constantes EXISTEN donde tienen que existir. Sin esto,
+    // la prohibición de arriba pasaría igual el día que alguien las borrara.
+    const descargar = readFileSync(join(RAIZ_REPO, 'gml/descargar.js'), 'utf8')
+    expect(descargar).toMatch(/export const TIPO_MIME_DXF = 'image\/vnd\.dxf'/)
+    expect(descargar).toMatch(/export const TIPO_MIME_JSON = 'application\/json'/)
+  })
+
+  it('la fábrica de detecciones de la capa tampoco sale: el vocabulario es para LEER', () => {
+    // Decisión 2 de `export/index.js`, y es el calco de por qué `report/index.js`
+    // deja fuera `crearDocumentoPdf`. `crearDeteccionExport` es puro y podría salir
+    // sin romper nada: está fuera porque una interfaz que fabricara detecciones de la
+    // capa de salida inventaría hallazgos que la capa no ha hecho, indistinguibles de
+    // los de verdad en la misma lista.
+    expect(Object.keys(barrel.exportar)).not.toContain('crearDeteccionExport')
+    // `NL` tampoco: describe cómo se escribe el fichero, no cómo se lee el resultado.
+    expect(Object.keys(barrel.exportar)).not.toContain('NL')
+    // Pero `resumirDetecciones` SÍ, que es lo que la UI usa para contar.
+    expect(typeof barrel.exportar.resumirDetecciones).toBe('function')
   })
 })
 
