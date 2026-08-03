@@ -656,7 +656,11 @@ export const TIPO_GML = Object.freeze({
   DIALECTO_RECHAZADO: 'DIALECTO_RECHAZADO', // es parcela, pero en 3.0 (la Sede lo rechaza)
   DIALECTO_OTRO_TEMA: 'DIALECTO_OTRO_TEMA', // es GML de EDIFICIO, no de parcela
   SIN_MIEMBROS: 'SIN_MIEMBROS', // FeatureCollection sin ninguna feature dentro
-  VARIOS_MIEMBROS: 'VARIOS_MIEMBROS', // más de una parcela: multiparcela está fuera de alcance
+  // Más de una parcela en el sobre. **No es un defecto del fichero**: la Sede lo ACEPTA
+  // (override O18, medido con IVG positivo el 2026-08-03) y lo instruye la propia
+  // plantilla oficial en su línea 42. `gml/parse.js` las lee TODAS y las devuelve; esta
+  // detección es un AVISO para que el llamante elija cuál contrasta, no un reproche.
+  VARIOS_MIEMBROS: 'VARIOS_MIEMBROS',
   // ── Lectura: sistema de referencia ──
   SRS_AUSENTE: 'SRS_AUSENTE', // la geometría no declara `srsName`
   SRS_FORMA_INESPERADA: 'SRS_FORMA_INESPERADA', // URN/corta/legado donde 4.0 pide URI (O2)

@@ -38,6 +38,24 @@ Este documento es el **maestro**. No contiene el detalle de cada fase; contiene 
 
 Móvil/responsive · multiusuario/cuentas/cloud · País Vasco y Navarra (catastros forales: "no encontrado" es estado válido, no fallo) · y todo lo del plan §2.3: multiparcela, unión/agregación, conversión v3→v4, división/segregación, entrada por distancia y rumbo, procedencia por vértice, comparador de vuelos, backend.
 
+> ⚠️ **«Multiparcela» y «expediente de varias parcelas» NO son lo mismo, y confundirlos
+> costó ocho fases construyendo para el caso raro** (descubierto el 2026-08-02, en una
+> entrevista de alcance):
+>
+> | | Qué es | Estado |
+> |---|---|---|
+> | **Multiparcela** | Un **formato de fichero**: N `gml:featureMember` en un sobre. | Bien excluido arriba **como decisión de v1**. Pero **la Sede lo acepta** (override O18), así que la exclusión es de prioridad, no de imposibilidad. |
+> | **Expediente de varias parcelas** | Un **flujo de trabajo**: alterar el parcelario exige aportar TODAS las geometrías afectadas —el colindante recortado, o la parcela nueva que ocupa el trozo cedido— o el IVG sale negativo. | **Nunca se especificó.** No estaba excluido: no tenía nombre. |
+>
+> El recorte del día 1 se apoyó en los contadores de descarga de gmlweb.com
+> (`HALLAZGOS_INVESTIGACION.md` §1.1: multiparcela ≈ 4 % del uso). **El dato es correcto y
+> la inferencia no:** un contador mide quién USÓ una herramienta, no quién la NECESITABA, y
+> es ciego al que lo resolvió a mano, al que lo encargó fuera y al que presentó mal y
+> reintentó. Además `GMLparcela` cuenta **parcelas** y `GMLmultiparcelas` cuenta
+> **expedientes**: el cociente compara denominadores distintos. Es el mismo patrón que §3.1
+> —medir con rigor la magnitud equivocada—, y aquí el efecto medido es que la aplicación no
+> podía cerrar **más de 4 de cada 5** de los expedientes de parcelario reales de su autor.
+
 ---
 
 ## 2 · Reglas de oro (gobiernan todo el código)
@@ -81,6 +99,8 @@ Donde el plan y el dossier discrepan, **manda el dossier** (capa de verificació
 | O11 | **BuildingPart** | §4.2 (modelo) | Confirmado: **una `BuildingPart` por volumen de altura homogénea**, cada una con huella propia + plantas sobre/bajo rasante independientes (fixture real: 13 partes). Valida el modelo del plan. | S4 (VERIFICADO) | F12, F13 |
 | O12 | **DXF mínimo** | §13.2 (genérico) | `LWPOLYLINE` no es válido en R12; mínimo real **AC1014 (R14)**, en la práctica **AC1015 (R2000)**. | B2 | F01, F10 |
 | O13 | **Canarias** | (no cubierto) | EPSG **32628** (WGS84/UTM 28N) único para todo el archipiélago; forzar huso 28. **DIFERIDO** por decisión de alcance. | S11/C5 | F00 (gancho) |
+| O18 | **Varias parcelas en un fichero** | §2.3: «multiparcela, fuera de v1». Se leyó como *«la entrega es de una parcela»* y de ahí salió `MIEMBROS = 1` en `gml/serialize-cp.js:281`. | ✅ **LA SEDE LO ACEPTA. MEDIDO 2026-08-03 (§7.1).** Un solo `.gml` con **dos `gml:featureMember`** subido al IVG dio **validación positiva**, CSV `XMWPXCN9J8DB9J89`, tipo de operación **Segregación**. Lo instruía ya la **línea 42 de la plantilla oficial** (`test/fixtures/gml/cp_ejemplo_explicativo.gml`): *«Si se desea incluir varias parcelas en un mismo fichero, se pondrá un nuevo grupo featureMember para cada parcela»*, y llevaba ahí sin leerse desde F04. El widget de subida además admite **una lista de ficheros**, así que las dos vías existen. ⚠️ **`gml:id` es `xs:ID`: con N miembros debe ser único ENTRE parcelas, no sólo dentro de una** (trampa 1 de §3.1, que con un solo miembro era teórica). ⚠️ Medido con **dos**; tres o más es plausible y **no está medido**. | MEDIDO 2026-08-03 | F04, F08 |
+| O19 | **`nationalCadastralReference` de una parcela segregada** | §3.1 trampa 2: «si la parcela no existe en el Catastro, va `ES.LOCAL.CP` con un identificador propio», leído como *«y la referencia catastral va vacía»* (`gml/serialize-cp.js:822`). | ⚠️ **MATIZADO 2026-08-03: en una SEGREGACIÓN, la referencia del padre con sufijo SÍ se acepta.** Medido: `localId` = `nationalCadastralReference` = `7136910UF1473N.1` bajo namespace `ES.LOCAL.CP`, **admitido con IVG positivo**. La Sede además **distingue** las dos parcelas del envío: marca la matriz con una insignia `RC` y la segregada no. Es una **excepción documentada, no una corrección**: que la forma con sufijo valga **no dice** que la vacía falle, y eso sigue sin medirse. Criterio del colegiado que firma, contra la recomendación de la revisión de ingeniería. | MEDIDO 2026-08-03 (parcial) | F04 |
 
 **Tolerancias oficiales de identidad** (dossier S6/C8, BOE-A-2020-12111), solo como capa informativa nunca como veredicto: perímetro **±0,50 m urbana / ±2,00 m rústica**, superficie **≤5%**, precisión de captura **<25 cm (85% ≤20 cm)**.
 
@@ -328,3 +348,61 @@ frente que ninguna parcela catastral alcanza se describe «presumiblemente con v
 pública … **dato NO verificado**, confirme antes de firmar». Tres candados: solo
 urbana, solo si de verdad se ha mirado, y la marca **viaja en el dato** y no solo en
 la prosa. Es el punto BLOQUEANTE de la §10 del checklist humano.
+
+---
+
+### 7.1 · Segunda verificación — ✅ IVG POSITIVO SOBRE VARIAS PARCELAS (2026-08-03)
+
+**Se subió a la Sede un único `.gml` con DOS `gml:featureMember` y el IVG devolvió
+POSITIVO.** CSV **`XMWPXCN9J8DB9J89`**, firmado el 03/08/2026, tipo de operación
+**SEGREGACIÓN**. Los **dos** miembros los escribió `gml/serialize-cp.js#serializarParcelaCp`
+en perfil `ENTREGA`.
+
+Expediente real **7136910UF1473N** (Benahavís, Málaga): la parcela reducida a **445 m²** y
+la cesión **`7136910UF1473N.1`** de **21 m²**.
+
+| | `localId` | `namespace` | `nationalCadastralReference` | `areaValue` | shoelace |
+|---|---|---|---|---|---|
+| 1 | `7136910UF1473N` | `ES.SDGC.CP` | `7136910UF1473N` | 445 | 445,34 |
+| 2 | `7136910UF1473N.1` | `ES.LOCAL.CP` | `7136910UF1473N.1` | 21 | 20,88 |
+
+**El cierre lo confirmaron tres fuentes independientes y coinciden:**
+
+| Fuente | Superficie del conjunto |
+|---|---|
+| Shoelace propio sobre las dos piezas | 466,22 m² |
+| WFS del Catastro (`GetParcel`, geometría oficial) | 466 declarado · **466,21** shoelace |
+| **La propia Sede**, panel del IVG: `AFECTADAS` | **466 m²** |
+
+Residuo **0,0064 m²** (64 cm² sobre 466 m², perímetro ~90 m): ruido de cuantización a 2
+decimales, no un hueco. Y `turf.intersect` de las dos piezas devuelve `null`: sin solape.
+
+Qué queda confirmado, y qué no:
+
+| | |
+|---|---|
+| ✅ **La entrega multiparcela funciona** | Un fichero, N geometrías, **una sola alteración**. Override **O18**. Consecuencia de diseño: para entregar varias parcelas **no hace falta ningún empaquetador** (se descartó escribir un ZIP), basta un bucle de `gml:featureMember`. |
+| ✅ **Una parcela de alta `ES.LOCAL.CP` convive con una `ES.SDGC.CP` en el mismo sobre** | La Sede las distingue: marca la matriz con insignia `RC` y la segregada no. |
+| ✅ **La referencia con sufijo del padre se acepta en segregación** | Override **O19**. |
+| ✅ **El serializador aguanta una franja de 1 m de ancho** | La cesión es una tira de 22,4 × ~0,9 m. `puntoInterior` resolvió por `POINT_ON_FEATURE` **dentro** de ella, y salieron **cero detecciones**. |
+| ⚠️ **Solo se midieron DOS parcelas** | Tres o más es plausible (la plantilla oficial no pone límite) y **no está medido**. |
+| ⚠️ **No se midió el caso del colindante** | El conjunto era matriz + segregada, del mismo titular. Dos fincas de titulares distintos es otro caso y no se ha probado. |
+| ⚠️ **No se midió `nationalCadastralReference` vacío** | Ver O19: sabemos que la forma con sufijo vale, no que la otra falle. |
+| 🆕 **La Sede exige declarar «Tipo de operación»** | Un desplegable del formulario, que el informe imprime. **La aplicación no lo contempla en ninguna capa**: ni en el modelo, ni en la interfaz, ni en el informe de F09. Es deuda declarada. |
+| 🆕 **La Sede tiene editor de parcelario propio** | *«Recuerde que puede realizar IVG sin necesidad de aportar GML usando el editor de parcelario de la SEC»*. Competidor **gratuito y oficial** que `HALLAZGOS_INVESTIGACION.md` §1 no analizó. |
+
+**Y el hallazgo colateral, que vale tanto como el principal.** El fichero de la cesión que
+producía **otro generador** traía el sobre de la **DESCARGA** del WFS
+(`wfs:FeatureCollection`, `member`, `srsName` en URI, `timeStamp`, `numberMatched`,
+`endLifespanVersion`, `referencePoint`) y falla el XSD contra cp/4.0 con **el error literal
+del 2026-07-27**:
+
+```
+Element '{http://www.opengis.net/wfs/2.0}FeatureCollection':
+No matching global declaration available for the validation root.
+```
+
+Su geometría era exacta; el envoltorio le habría costado el rechazo. **Lo detectó
+`npm run validar:xsd` en dos segundos y en local, antes de presentar nada.** Es esta
+herramienta haciendo su trabajo sobre un fichero real y ajeno — y ocurrió **antes** de que
+la entrega multiparcela estuviera implementada.

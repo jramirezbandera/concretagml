@@ -73,11 +73,19 @@ function validarInvarianteExterior(recintos, contexto) {
         `recibido tipo='${recintos[0].tipo}'.`,
     )
   }
+  // Una Parcela del modelo es UN exterior con huecos, y eso NO va a cambiar aunque la
+  // entrega multiparcela sí exista (override O18): un sobre con N parcelas son N objetos
+  // como éste, no un objeto con N exteriores. Dos trozos que no se tocan son dos fincas
+  // distintas, y cada una necesita su propio `idLocal`. Por eso el mensaje ya no dice
+  // «multiparcela está fuera de alcance» —era cierto en F00 y dejó de serlo el
+  // 2026-08-03—: dice qué hacer en su lugar.
   for (let i = 1; i < recintos.length; i++) {
     if (recintos[i].tipo !== TIPO_RECINTO.HUECO) {
       throw new Error(
-        `${contexto}: recintos[${i}] debe ser HUECO (sólo recintos[0] es EXTERIOR; ` +
-          `multiparcela está fuera de alcance); recibido tipo='${recintos[i].tipo}'.`,
+        `${contexto}: recintos[${i}] debe ser HUECO (sólo recintos[0] es EXTERIOR). ` +
+          `Si lo que tienes son varias piezas que NO se tocan, no son una parcela con ` +
+          `varios exteriores: son varias parcelas, y cada una se construye con su propia ` +
+          `llamada a crearParcela y su propio idLocal. Recibido tipo='${recintos[i].tipo}'.`,
       )
     }
   }
