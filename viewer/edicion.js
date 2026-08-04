@@ -558,6 +558,27 @@ export function crearEdicion({
   // ── Estado interno ────────────────────────────────────────────────────────
 
   let vivo = true
+  /**
+   * ── Rework de UI · rebanada 3 (Edición), 2026-08-04 ────────────────────────
+   * Si los CUATRO gestos de edición del mapa están vivos.
+   *
+   * **No es lo mismo que `vivo`**: aquél dice si el módulo existe (lo apaga
+   * `destruir()` y no se enciende de vuelta); éste dice si la pantalla activa es
+   * la de Edición, y se conmuta tantas veces como haga falta.
+   *
+   * ⛔ **LO QUE ESTO ARREGLA, MEDIDO.** Hasta hoy se podía arrastrar un vértice
+   * —y borrarlo con el botón derecho, e insertar otro con doble clic— desde
+   * CUALQUIERA de las cuatro pantallas: 15 de 15 marcadores arrastrables en
+   * Validación, exactamente los mismos que en Edición. O sea que el peldaño
+   * «Edición» del rail no cambiaba nada de lo que se podía hacer: era
+   * decorativo, que es justo el síntoma que este rework existe para curar.
+   *
+   * Nace en `true` a propósito: `crearEdicion` es de `viewer/` y no sabe nada de
+   * navegación (criterio 1 del plan). Quien lo conmuta es el aplicador de
+   * `app/main.js`, suscrito a `app/navegacion.js`. Un visor montado sin
+   * aplicador —los tests de este módulo, un mapa pelado— se comporta como antes.
+   */
+  let edicionActiva = true
   let toleranciaM = exigirTolerancia(tolerancia, 'crearEdicion')
   let snapEncendido = true
   /** Seguimiento propio de `Alt` (ver la cabecera: es el camino sin evento real). */
@@ -1213,8 +1234,13 @@ export function crearEdicion({
     }
     const ref = exigirFormaRef(refVertice, 'alCrearMarcador')
 
+    // Los marcadores se REHACEN en cada `sincronizar`, así que el estado de la
+    // pantalla hay que aplicarlo también aquí: sin esto, cargar una parcela
+    // estando en Validación devolvería 15 vértices arrastrables.
+    aplicarArrastre(marcador)
+
     marcador.on('contextmenu', (evento) => {
-      if (!vivo) return
+      if (!vivo || !edicionActiva) return
       // Sin esto saldría ADEMÁS el menú del navegador encima del vértice.
       const dom = evento && evento.originalEvent ? evento.originalEvent : evento
       if (dom && typeof dom.preventDefault === 'function') L.DomEvent.preventDefault(dom)
@@ -1237,8 +1263,34 @@ export function crearEdicion({
   // ── Gestos del mapa ───────────────────────────────────────────────────────
 
   /** Clic: selecciona el lindero más cercano, o deselecciona. NUNCA escribe. */
+  /**
+   * Pone el arrastre de UN marcador en lo que diga `edicionActiva`.
+   *
+   * `marcador.dragging` es el `L.Handler` que Leaflet monta cuando el marcador se
+   * crea con `draggable: true` (`viewer/sincronizacion.js:958`, cableado en duro).
+   * Apagar el oyente de `drag` NO bastaría: quien mueve el icono es `L.Draggable`
+   * por CSS, así que el vértice se movería en pantalla aunque el modelo no se
+   * enterara — el peor de los dos mundos.
+   */
+  function aplicarArrastre(marcador) {
+    if (!marcador || !marcador.dragging) return
+    if (edicionActiva) marcador.dragging.enable()
+    else marcador.dragging.disable()
+  }
+
+  /** Los marcadores de vértice VIVOS en el mapa. Se reconocen por `refVertice`,
+   *  que `viewer/sincronizacion.js` les cuelga a propósito para esto. */
+  function marcadoresDeVertice() {
+    const encontrados = []
+    if (typeof mapa.eachLayer !== 'function') return encontrados
+    mapa.eachLayer((capa) => {
+      if (capa && capa.refVertice && typeof capa.getLatLng === 'function') encontrados.push(capa)
+    })
+    return encontrados
+  }
+
   const alClicMapa = (evento) => {
-    if (!vivo || !evento || !evento.latlng) return
+    if (!vivo || !edicionActiva || !evento || !evento.latlng) return
     const parcela = estado.get()
     const mejor = ladoMasCercano(parcela, latLngAUTM(evento.latlng, zona))
     if (mejor === null) {
@@ -1254,7 +1306,7 @@ export function crearEdicion({
 
   /** Doble clic: inserta. Es el único gesto del MAPA que escribe en el modelo. */
   const alDobleClicMapa = (evento) => {
-    if (!vivo || !evento || !evento.latlng) return
+    if (!vivo || !edicionActiva || !evento || !evento.latlng) return
     const dom = evento.originalEvent
     if (dom && typeof dom.preventDefault === 'function') L.DomEvent.preventDefault(dom)
     insertarEn(evento.latlng)
@@ -1298,6 +1350,53 @@ export function crearEdicion({
   return {
     ajustar,
     alCrearMarcador,
+
+    /**
+     * Getter/setter de los CUATRO gestos de edición del mapa (rebanada 3).
+     *
+     * Sin argumento lee; con un booleano escribe y devuelve el valor ya escrito,
+     * igual que {@link snapActivo}.
+     *
+     * Apagarla hace tres cosas, y las tres hacen falta:
+     *   1. **desactiva el arrastre** de todos los marcadores vivos (y de los que
+     *      nazcan después, por `alCrearMarcador`);
+     *   2. **suelta la selección de lindero**, porque el resalte se quedaría
+     *      pintado señalando algo que ya no se puede desplazar;
+     *   3. **devuelve el zoom por doble clic** que este módulo le quita al mapa
+     *      mientras edita — si no, en las otras pantallas el doble clic no haría
+     *      NI insertar NI ampliar, que es un gesto muerto sin decirlo.
+     *
+     * Lo que NO apaga, a propósito: la API pública (`insertarEn`, `eliminar`,
+     * `desplazarSeleccion`…). Esas las conduce la barra, la barra solo se ve en
+     * Edición, y apagarlas aquí además dejaría a los tests de este módulo sin
+     * forma de ejercitar el motor. La frontera es **el gesto del mapa**.
+     *
+     * @param {boolean} [valor]
+     * @returns {boolean}
+     */
+    activa(valor) {
+      if (valor === undefined) return edicionActiva
+      if (typeof valor !== 'boolean') {
+        throw new TypeError(
+          `activa: 'valor' debe ser un booleano (o nada, para leer); recibido ${describir(valor)}.`,
+        )
+      }
+      if (valor === edicionActiva) return edicionActiva
+      edicionActiva = valor
+      for (const marcador of marcadoresDeVertice()) aplicarArrastre(marcador)
+      if (!edicionActiva) {
+        fijarSeleccion(null)
+        ocultarIndicador()
+      }
+      // Simétrico con el arranque: el módulo apaga el zoom por doble clic para
+      // que insertar un vértice no amplíe además el mapa. Si no se está
+      // editando, ese motivo no existe y el zoom vuelve.
+      if (zoomDobleClicEstaba && zoomDobleClic) {
+        if (edicionActiva) zoomDobleClic.disable()
+        else zoomDobleClic.enable()
+      }
+      return edicionActiva
+    },
     seleccionarLado,
     ladoSeleccionado,
     desplazarSeleccion,

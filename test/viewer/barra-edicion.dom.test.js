@@ -676,3 +676,29 @@ describe('barra de edición · contrato roto por el programador → throw', () =
     }
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Rework de UI · REBANADA 3 — la barra es de la pantalla de Edición
+// ═══════════════════════════════════════════════════════════════════════════
+describe('barra de edición · declara a qué pantalla pertenece (rebanada 3)', () => {
+  it('el contenedor lleva `data-pantalla="edicion"` y solo ese paso', () => {
+    // Medido antes de ponerlo (Chrome, 2026-08-04): la barra se veía en las
+    // CUATRO pantallas, con «Deshacer», «Rehacer» y «Desplazar lindero»
+    // apagados en las cuatro. La ocultan las cinco reglas de `estilos/app.css`,
+    // que son de descendencia desde `.gml-app` y por eso alcanzan también a lo
+    // que Leaflet cuelga dentro del mapa.
+    const { contenedor } = montarBarra()
+    const barra = contenedor.querySelector(`.${CLASE_BARRA.CONTENEDOR}`)
+    expect(barra, 'no se encuentra el contenedor de la barra').not.toBeNull()
+    expect(barra.dataset.pantalla).toBe('edicion')
+  })
+
+  it('⛔ el atributo va en la RAÍZ de la barra, no en un hijo', () => {
+    // La regla del CSS oculta el nodo que lo declara. En un hijo escondería una
+    // herramienta y dejaría la barra puesta y medio vacía, que es peor que las
+    // dos alternativas honestas.
+    const { contenedor } = montarBarra()
+    const barra = contenedor.querySelector(`.${CLASE_BARRA.CONTENEDOR}`)
+    expect(barra.querySelectorAll('[data-pantalla]')).toHaveLength(0)
+  })
+})

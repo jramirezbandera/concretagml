@@ -462,6 +462,58 @@ const pantalla = {
     pieAntesPx: 266.28,
     tablaVerticesAntesPx: 228.33,
   },
+  // ── Rebanada 3: ¿se puede EDITAR desde esta pantalla? ────────────────────
+  //
+  // Lo que se ve es una cosa y lo que se puede hacer es otra, y esta es la
+  // segunda. Hasta el 2026-08-04 los cuatro gestos de edición del mapa estaban
+  // vivos en las CUATRO pantallas: 15 de 15 marcadores arrastrables en
+  // Validación, los mismos que en Edición. El peldaño «Edición» del rail no
+  // cambiaba nada de lo que se podía hacer.
+  //
+  // Se mide por la clase que Leaflet pone y quita él —`leaflet-marker-draggable`,
+  // que sigue a `marker.dragging.enable()/disable()`— y no por nuestro propio
+  // estado: preguntarle a la aplicación si cree que ha apagado el arrastre no
+  // prueba que lo haya apagado.
+  edicion: (() => {
+    const marcadores = $$('.leaflet-marker-icon')
+    const arrastrables = marcadores.filter((n) => n.classList.contains('leaflet-marker-draggable'))
+    const barraEl = $('.gml-barra-edicion')
+    return {
+      marcadores: marcadores.length,
+      arrastrables: arrastrables.length,
+      sePuedeEditarAqui: arrastrables.length > 0,
+      barraSeVe: barraEl !== null && barraEl.getBoundingClientRect().height > 0,
+      barraDeclara: barraEl === null ? null : barraEl.getAttribute('data-pantalla'),
+      referencia:
+        'Antes de la rebanada 3, 1280×720: 15 arrastrables y barra visible en las CUATRO ' +
+        'pantallas. Después: solo en «edicion».',
+    }
+  })(),
+}
+
+// Los dos ejes tienen que decir lo mismo: si la barra de herramientas no está,
+// tampoco puede estar el gesto — y al revés. Que se separen es exactamente el
+// medio arreglo que se quiso evitar (esconder el «deshacer» dejando vivo el
+// gesto que lo necesita).
+if (pantalla.edicion.sePuedeEditarAqui && pasoActivo !== 'edicion') {
+  problemas.push(
+    `Se puede editar la geometría desde «${pasoActivo}»: ${pantalla.edicion.arrastrables} de ` +
+      `${pantalla.edicion.marcadores} marcadores son arrastrables. Los cuatro gestos del mapa son ` +
+      'de la pantalla de Edición; en las demás la geometría se mira.',
+  )
+}
+if (pantalla.edicion.barraSeVe !== (pasoActivo === 'edicion')) {
+  problemas.push(
+    `La barra de edición ${pantalla.edicion.barraSeVe ? 'SE VE' : 'no se ve'} en «${pasoActivo}», ` +
+      `y declara pertenecer a «${pantalla.edicion.barraDeclara}».`,
+  )
+}
+if (pantalla.edicion.barraSeVe !== pantalla.edicion.sePuedeEditarAqui) {
+  problemas.push(
+    'La barra de edición y los gestos del mapa no dicen lo mismo (barra visible: ' +
+      `${pantalla.edicion.barraSeVe}; se puede editar: ${pantalla.edicion.sePuedeEditarAqui}). ` +
+      'Esconder el «deshacer» dejando vivo el gesto que lo necesita es peor que no esconder nada.',
+  )
 }
 
 // ── 4 · La caja de vértices: el invariante que atribuye las pérdidas ───────

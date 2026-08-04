@@ -1090,3 +1090,132 @@ describe('viewer/edicion · destruir', () => {
     ctx.limpiar()
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Rework de UI · REBANADA 3 — Edición pasa a ser un paso de verdad
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⛔ EL DEFECTO QUE ESTO CIERRA, MEDIDO EN CHROME EL 2026-08-04: los cuatro
+// gestos de edición del mapa —arrastrar, borrar con el botón derecho, insertar
+// con doble clic y seleccionar un lindero— estaban vivos en las CUATRO
+// pantallas. **15 de 15 marcadores arrastrables en Validación**, exactamente los
+// mismos que en Edición. El peldaño «Edición» del rail no cambiaba nada de lo
+// que se podía hacer.
+//
+// Este módulo no sabe nada de navegación (criterio 1 del plan) y por eso el
+// interruptor nace en `true`: quien lo conmuta es el aplicador de `app/main.js`.
+describe('viewer/edicion · `activa()`, el interruptor de los cuatro gestos', () => {
+  it('nace ENCENDIDA: un visor sin aplicador se comporta como antes', () => {
+    const ctx = montar()
+    expect(ctx.edicion.activa()).toBe(true)
+    ctx.limpiar()
+  })
+
+  it('apagarla quita el arrastre de los marcadores YA creados', () => {
+    // Apagar el oyente de `drag` no bastaría: quien mueve el icono es
+    // `L.Draggable` por CSS, así que el vértice se movería en pantalla aunque el
+    // modelo no se enterara — el peor de los dos mundos.
+    const ctx = montar()
+    const marcador = marcadorCableado(ctx, V.A, { recinto: 0, indice: 0 })
+    expect(marcador.dragging.enabled()).toBe(true)
+
+    expect(ctx.edicion.activa(false)).toBe(false)
+    expect(marcador.dragging.enabled()).toBe(false)
+
+    ctx.edicion.activa(true)
+    expect(marcador.dragging.enabled()).toBe(true)
+    ctx.limpiar()
+  })
+
+  it('un marcador que NACE con la edición apagada no se arrastra', () => {
+    // Los marcadores se rehacen en cada `sincronizar`: sin esto, cargar una
+    // parcela estando en Validación devolvería 15 vértices arrastrables.
+    const ctx = montar()
+    ctx.edicion.activa(false)
+    const marcador = marcadorCableado(ctx, V.A, { recinto: 0, indice: 0 })
+    expect(marcador.dragging.enabled()).toBe(false)
+    ctx.limpiar()
+  })
+
+  it('apagada, el BOTÓN DERECHO ya no borra un vértice', () => {
+    const ctx = montar()
+    const marcador = marcadorCableado(ctx, V.A, { recinto: 0, indice: 0 })
+    const antes = anilloDe(ctx.store).length
+    ctx.edicion.activa(false)
+
+    marcador.fire('contextmenu', { originalEvent: { preventDefault: vi.fn() } })
+    expect(anilloDe(ctx.store)).toHaveLength(antes)
+    ctx.limpiar()
+  })
+
+  it('apagada, el DOBLE CLIC ya no inserta', () => {
+    const historial = crearHistorial()
+    const ctx = montar({ historial })
+    ctx.edicion.activa(false)
+
+    // ⚠️ El evento lleva `containerPoint` y esta prueba NO lo llevaba: con la
+    // edición apagada el zoom por doble clic VUELVE, así que el manejador de
+    // Leaflet corre de verdad y lo necesita. Lo descubrió ella misma reventando
+    // en `Map.DoubleClickZoom`, que es la mejor confirmación de que el zoom
+    // vuelve: la prueba de al lado lo afirma, y ésta lo sufre.
+    const latlng = L.latLng(aLatLng([439250, 4479655.3]))
+    ctx.mapa.fire('dblclick', {
+      latlng,
+      containerPoint: ctx.mapa.latLngToContainerPoint(latlng),
+      originalEvent: { preventDefault: vi.fn() },
+    })
+    expect(anilloDe(ctx.store)).toHaveLength(4)
+    expect(historial.pila).toHaveLength(0)
+    ctx.limpiar()
+  })
+
+  it('apagada, el CLIC ya no selecciona lindero, y suelta el que hubiera', () => {
+    // Un resalte que sobrevive señala un lado que ya no se puede desplazar: la
+    // pantalla estaría diciendo que se puede hacer algo que no.
+    const ctx = montar()
+    ctx.edicion.seleccionarLado({ recinto: 0, indice: 0 })
+    expect(ctx.edicion.ladoSeleccionado()).not.toBeNull()
+
+    ctx.edicion.activa(false)
+    expect(ctx.edicion.ladoSeleccionado()).toBeNull()
+    expect(resalteDe(ctx.mapa)).toBeNull()
+
+    ctx.mapa.fire('click', { latlng: L.latLng(aLatLng([439250, 4479655.3])) })
+    expect(ctx.edicion.ladoSeleccionado()).toBeNull()
+    ctx.limpiar()
+  })
+
+  it('apagada DEVUELVE el zoom por doble clic, y encendida vuelve a quitarlo', () => {
+    // El módulo se lo quita al mapa para que insertar un vértice no amplíe
+    // además. Sin editar, ese motivo no existe y el doble clic se quedaría sin
+    // hacer NADA: ni insertar ni ampliar. Un gesto muerto y en silencio.
+    const ctx = montar()
+    expect(ctx.mapa.doubleClickZoom.enabled()).toBe(false)
+
+    ctx.edicion.activa(false)
+    expect(ctx.mapa.doubleClickZoom.enabled()).toBe(true)
+
+    ctx.edicion.activa(true)
+    expect(ctx.mapa.doubleClickZoom.enabled()).toBe(false)
+    ctx.limpiar()
+  })
+
+  it('la API pública SIGUE viva con la edición apagada: la frontera es el GESTO', () => {
+    // `insertarEn`/`eliminar`/`desplazarSeleccion` las conduce la barra, y la
+    // barra solo se ve en Edición. Apagarlas aquí además dejaría a este mismo
+    // fichero sin forma de ejercitar el motor.
+    const ctx = montar({ historial: crearHistorial() })
+    ctx.edicion.activa(false)
+    ctx.edicion.insertarEn(L.latLng(aLatLng([439250, 4479655.3])))
+    expect(anilloDe(ctx.store)).toHaveLength(5)
+    ctx.limpiar()
+  })
+
+  it('con un valor que no es booleano LANZA, y leer no escribe', () => {
+    const ctx = montar()
+    expect(() => ctx.edicion.activa('si')).toThrow(TypeError)
+    expect(() => ctx.edicion.activa(1)).toThrow(TypeError)
+    expect(ctx.edicion.activa()).toBe(true)
+    ctx.limpiar()
+  })
+})

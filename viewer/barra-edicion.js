@@ -556,6 +556,21 @@ const BarraEdicion = L.Control.extend({
 
     const contenedor = crear(doc, 'div', CLASE_BARRA.CONTENEDOR)
     this._contenedor = contenedor
+    // ── Rework de UI · rebanada 3 (Edición), 2026-08-04 ──────────────────────
+    // Esta barra es de la pantalla de Edición y de ninguna otra. Se DECLARA aquí,
+    // con el mismo atributo que usa `index.html`, y la ocultan las cinco reglas
+    // de `estilos/app.css` — que son de descendencia desde `.gml-app`, así que
+    // alcanzan también a lo que Leaflet cuelga dentro del mapa.
+    //
+    // ⚠️ Declarar a qué pantalla PERTENECE no es mutar estado de navegación: el
+    // criterio 1 del plan prohíbe lo segundo («ningún módulo de `viewer/` muta
+    // estado de navegación») y esto es un dato estático, el mismo que el marcado
+    // escribe a mano en el HTML. Quién está en qué paso lo sigue decidiendo
+    // `app/navegacion.js`, y este módulo no lo pregunta ni lo sabe.
+    //
+    // Medido antes de ponerlo: la barra se veía en las CUATRO pantallas, con
+    // «Deshacer», «Rehacer» y «Desplazar lindero» apagados en las cuatro.
+    contenedor.dataset.pantalla = 'edicion'
     // Estilos MÍNIMOS en línea, mismo criterio que `viewer/capas.js`: este módulo
     // no importa ninguna hoja, así que la barra tiene que ser legible por sí
     // misma sobre cualquier cartografía. El resto lo viste `estilos/app.css`.

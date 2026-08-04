@@ -3673,6 +3673,36 @@ if (ctaDiagnosticar !== null) {
   })
 }
 
+// ── Rework de UI · rebanada 3 · EDICIÓN PASA A SER UN PASO DE VERDAD ────────
+//
+// ⛔ **EL DEFECTO QUE ESTO CIERRA, MEDIDO EN CHROME EL 2026-08-04.** Los cuatro
+// gestos de edición del mapa —arrastrar un vértice, borrarlo con el botón
+// derecho, insertar con doble clic y seleccionar un lindero— estaban vivos en
+// las CUATRO pantallas: **15 de 15 marcadores arrastrables en Validación**,
+// exactamente los mismos que en Edición. El peldaño «Edición» del rail no
+// cambiaba NADA de lo que se podía hacer; era decorativo, que es el síntoma que
+// este rework existe para curar.
+//
+// El interruptor vive en `viewer/edicion.js` y no sabe nada de navegación
+// (criterio 1). Quien decide es la autoridad; esto es solo el cable entre las
+// dos, y por eso está aquí y no allí.
+//
+// ⚠️ La barra de herramientas se esconde por OTRO camino —`data-pantalla` en
+// `viewer/barra-edicion.js` y las cinco reglas del CSS—, y es deliberado: son
+// dos ejes distintos (lo que se VE y lo que se PUEDE), y hacerlos pasar por el
+// mismo sitio los ataría de una forma que costaría deshacer el día que una
+// pantalla quiera enseñar la barra apagada con su motivo al lado.
+if (visor.edicion !== null && typeof visor.edicion.activa === 'function') {
+  // `subscribe` entrega la situación al suscriptor, igual que en `app/rama.js` y
+  // `app/contraste.js`; el arranque se hace a mano con `get()` porque el store no
+  // publica al suscribirse.
+  const aplicarEdicion = ({ paso } = navegacion.get()) => {
+    visor.edicion.activa(paso === PASO.EDICION)
+  }
+  aplicarEdicion(navegacion.get())
+  navegacion.subscribe(aplicarEdicion)
+}
+
 // ── La URL (decisión D3): hash, y el DATO manda sobre la URL ─────────────────
 //
 // `#/parcela/validacion`. El hash no necesita nada del servidor, así que GitHub

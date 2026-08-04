@@ -562,6 +562,41 @@ async function atajo(destino, tecla, conShift = false) {
 const esHueco = new URLSearchParams(location.search).get('demo') === 'hueco'
 const contenedor = document.querySelector('.leaflet-container')
 
+// ── ⛔ REBANADA 3 DEL REWORK (2026-08-04): ESTE GUION EXIGE ESTAR EN EDICIÓN ──
+//
+// Desde esa fecha los cuatro gestos de edición del mapa —arrastrar, borrar con
+// el botón derecho, insertar con doble clic y seleccionar lindero— **solo están
+// vivos en la pantalla de Edición**. Antes lo estaban en las cuatro, y el
+// peldaño del rail no cambiaba nada de lo que se podía hacer.
+//
+// Lanzado en cualquier otra pantalla, este guion salía con CUATRO problemas que
+// describían síntomas —«no ha aparecido ni un indicador de enganche», «el
+// vértice se dibuja donde está el ratón»— y ninguno decía la causa. Un guion que
+// reporta cuatro síntomas de una causa que sabe comprobar está haciendo perder
+// el tiempo a quien lo lea, así que lo comprueba ANTES y lo dice en una línea.
+//
+// Se pone aquí y no en una nota del GUION porque las notas del GUION no se leen
+// cuando el guion ya está corriendo (lección de T10).
+const pasoActivo = document.querySelector('[data-paso]')?.dataset.paso ?? null
+if (pasoActivo !== null && pasoActivo !== 'edicion') {
+  return {
+    guion: '08-edicion',
+    feature: 'F06',
+    tarea: 'T6.2',
+    ok: false,
+    url: location.href,
+    pasoActivo,
+    problemas: [
+      `Este guion conduce la EDICIÓN y la aplicación está en «${pasoActivo}». Desde la rebanada 3 ` +
+        'del rework los cuatro gestos de edición del mapa solo viven en la pantalla de Edición, ' +
+        'así que aquí no habría nada que medir y los fallos que reportaría serían todos falsos. ' +
+        'Relánzalo sobre `#/parcela/edicion` (recarga después de cambiar el hash: un cambio de ' +
+        'solo el hash NO recarga el documento).',
+    ],
+    advertencias: [],
+  }
+}
+
 if (contenedor === null || esHueco) {
   return {
     guion: '08-edicion',

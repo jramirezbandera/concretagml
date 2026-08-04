@@ -145,8 +145,10 @@ export const ASIENTOS = Object.freeze(
       nota: 'Avisos de rama y comentarios: cero CSS, y los artefactos salieron idénticos byte a byte.' },
     { hito: 'Rework T9-T10', commit: 'af508f7', total: 61108, nuestro: 46013, rebanada: null,
       nota: 'Pantalla de contraste: el cajón se viste con estilos en línea, así que no toca la hoja.' },
-    { hito: 'Rework rebanada 2', commit: '(sin commitear)', total: 61108, nuestro: 46013, rebanada: 'validacion',
+    { hito: 'Rework rebanada 2', commit: 'c176c3f', total: 61108, nuestro: 46013, rebanada: 'validacion',
       nota: '⭐ CERO BYTES: repartir el pie por pantallas es MARCADO (data-pantalla), y las cinco reglas del CSS ya estaban escritas desde T6.' },
+    { hito: 'Rework rebanada 3', commit: '(sin commitear)', total: 61108, nuestro: 46013, rebanada: 'edicion',
+      nota: '⭐ CERO BYTES otra vez: la barra declara su pantalla desde JS y el interruptor de los cuatro gestos es lógica, no estilo.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

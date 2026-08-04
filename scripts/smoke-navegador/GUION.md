@@ -3467,6 +3467,52 @@ Tres decisiones que salieron de la medición y no del gusto:
   conduce el guion 09, y los 32,39 px que devolvería solo se devolverían en la
   pantalla donde el bloque vive de todos modos.
 
+### Ampliación rebanada 3: ¿se puede EDITAR desde esta pantalla?
+
+Lo que se ve es una cosa y lo que se puede hacer es otra. El guion mide desde el
+2026-08-04 la segunda, y es lo único que puede medirla.
+
+⛔ **EL DEFECTO QUE DESTAPÓ.** Los **cuatro** gestos de edición del mapa
+—arrastrar un vértice, borrarlo con el botón derecho, insertar otro con doble
+clic y seleccionar un lindero— estaban vivos en las **cuatro pantallas**:
+
+| | Validación | Edición |
+|---|---|---|
+| Marcadores arrastrables | **15 de 15** | 15 de 15 |
+| Barra de edición sobre el mapa | **sí** | sí |
+| Botón derecho borra un vértice | **sí** | sí |
+
+O sea: **el peldaño «Edición» del rail no cambiaba nada de lo que se podía
+hacer.** Era decorativo, que es exactamente el síntoma que este rework existe
+para curar — un recorrido prometido que las pantallas no cumplen.
+
+**Se mide por la clase que pone y quita Leaflet** (`leaflet-marker-draggable`,
+que sigue a `marker.dragging.enable()/disable()`), **no por nuestro propio
+estado**: preguntarle a la aplicación si cree que ha apagado el arrastre no
+prueba que lo haya apagado.
+
+Y se comprueban **los dos ejes a la vez**, porque separarlos es el medio arreglo
+que se quiso evitar:
+
+1. no se puede editar fuera de Edición;
+2. la barra se ve exactamente donde se puede editar;
+3. **los dos dicen lo mismo** — esconder el «deshacer» dejando vivo el gesto que
+   lo necesita sería peor que no esconder nada.
+
+**Verificado por mutación**: dejando el aplicador de `app/main.js` en
+`activa(true)`, el guion sale rojo con **dos** problemas —«se puede editar la
+geometría desde validacion: 15 de 30 marcadores arrastrables» y «la barra y los
+gestos no dicen lo mismo»—, que son los dos ejes hablando por separado.
+
+⚠️ **Consecuencia para el guion `08-edicion.js`, y ya está resuelta.** Ese guion
+conduce la edición, así que fuera de Edición no tenía nada que medir: salía con
+**cuatro problemas que describían síntomas** —«no ha aparecido ni un indicador de
+enganche», «el vértice se dibuja donde está el ratón»— y ninguno decía la causa.
+Ahora lo comprueba él mismo al arrancar y lo dice **en una línea**, con la ruta a
+la que hay que relanzarlo. La guarda va dentro del guion y no en una nota de este
+documento a propósito: **las notas no se leen cuando el guion ya está corriendo**
+(lección de T10).
+
 ---
 
 ## 21. El presupuesto de la hoja de estilo (Rework de UI · T10)
