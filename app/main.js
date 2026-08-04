@@ -548,6 +548,8 @@ import {
   EXTENSIONES_PROYECTO,
   MENSAJE_SIN_EXPEDIENTE,
   cablearExpediente,
+  hayEdificio,
+  hayGeometria,
 } from './cableado-expediente.js'
 import { cablearInforme } from './cableado-informe.js'
 import {
@@ -556,7 +558,10 @@ import {
   parcelaDemo,
   parcelaDemoConHueco,
 } from './demo-datos.js'
+import { PASO, crearNavegacion } from './navegacion.js'
 import { crearPanelEdificio } from './panel-edificio.js'
+import { cablearPantalla } from './pantalla.js'
+import { cablearRail } from './rail.js'
 import { RAMA, cablearRama } from './rama.js'
 
 // ── Constantes de presentación ───────────────────────────────────────────────
@@ -3361,4 +3366,227 @@ expedienteCableado = cablearExpediente({
     comprobacionCableada !== null && typeof comprobacionCableada.elegirFichero === 'function'
       ? () => comprobacionCableada.elegirFichero()
       : null,
+})
+
+
+// ── 14 · EL RAIL DE NAVEGACIÓN (rework de UI · T5) ───────────────────────────
+//
+// El paso que le da a `app/navegacion.js` su PRIMER LLAMANTE. Aquel módulo se
+// escribió en T1 sin ninguno, a propósito y por orden del plan: «la autoridad de
+// navegación, sola y con pruebas propias, antes de tocar una línea de CSS».
+//
+// Va EL ÚLTIMO —después incluso del expediente— y no por antigüedad, sino porque
+// es el único paso que necesita **todo lo demás ya montado**: lee los dos stores
+// (2 y 13), el conmutador de rama (13), el diagnóstico (8) y el mapa (3).
+//
+// ⚠️ **NO decide nada.** Aquí solo se DERIVAN los hechos y se enchufan los cables.
+// Qué paso está disponible y por qué no lo está lo dice `app/navegacion.js`, que
+// no toca el DOM; quién lo pinta es `app/rail.js`, que no conoce ni una regla.
+// Este bloque es la costura, y la costura no opina.
+
+/**
+ * Los hechos de la rama PARCELA, para las guardas del rail.
+ *
+ * ⚠️ **Las dos primeras preguntas NO se responden aquí**: `hayGeometria` viene de
+ * `app/cableado-expediente.js`, que es quien ya decidía qué cuenta como geometría
+ * a la hora de guardar. Escribir aquí una segunda versión de esa regla la haría
+ * divergir el día que una de las dos cambiara, y el síntoma sería un rail que
+ * ofrece un paso que el pie no deja completar.
+ *
+ * `oficial` sí se lee del modelo directamente, y es deliberado: la pregunta
+ * equivalente de `app/cableado-diagnostico.js` (`oficialDe`) está declarada allí
+ * como **regla interna de esa pantalla** y con el motivo escrito, así que se
+ * respeta. Lo que se lee aquí es el CAMPO del POJO (`model/parcela.js`), no su
+ * regla: hay contorno oficial cuando `geometriaOficial` trae al menos un recinto.
+ *
+ * @param {object|null} parcela
+ * @returns {{geometria: boolean, oficial: boolean, diagnostico: boolean}}
+ */
+function hechosDeParcela(parcela) {
+  return {
+    geometria: hayGeometria(parcela),
+    oficial: Array.isArray(parcela?.geometriaOficial) && parcela.geometriaOficial.length > 0,
+    // El ÚLTIMO diagnóstico que se pintó en el cajón, leído por la misma puerta
+    // que usa el informe de F09 (`cablearDiagnostico#ultimoDiagnostico`). Es una
+    // lectura, no una segunda verdad: si se recalculara aquí, el rail podría
+    // ofrecer «Informe» sobre unas cifras y el PDF salir con otras.
+    diagnostico: diagnosticoCableado.ultimoDiagnostico() !== null,
+  }
+}
+
+/**
+ * Los hechos de la rama EDIFICIO. Solo el primero puede ser cierto en esta
+ * versión: el diagnóstico y el informe son de parcela, y el rail ya los apaga por
+ * RAMA —con su motivo— antes de mirar ningún dato.
+ *
+ * @param {object|null} edificio
+ * @returns {{geometria: boolean, oficial: boolean, diagnostico: boolean}}
+ */
+function hechosDeEdificio(edificio) {
+  return { geometria: hayEdificio(edificio), oficial: false, diagnostico: false }
+}
+
+/**
+ * La AUTORIDAD DE NAVEGACIÓN de la aplicación. Una sola instancia, y nace con la
+ * rama que el conmutador ya tiene puesta: `cablearRama` corrió en el paso 13 y
+ * dejó escrito el `data-rama` del `<body>`, así que preguntarle es más barato y
+ * más fiable que volver a decidirlo.
+ *
+ * El paso inicial es ENTRADA y se RECORTA solo si no se sostiene (contrato de
+ * `crearNavegacion`); con la parcela de demostración cargada, sí se sostiene.
+ */
+const navegacion = crearNavegacion({
+  rama: ramaCableada.get(),
+  paso: PASO.ENTRADA,
+  hechos: {
+    [RAMA.PARCELA]: hechosDeParcela(estado.get()),
+    [RAMA.EDIFICIO]: hechosDeEdificio(estadoEdificio.get()),
+  },
+  // El mismo canal que todo lo demás de esta cáscara: lo que el usuario tiene que
+  // saber va al panel de avisos, no a la consola.
+  avisar: panel.avisar,
+})
+
+/**
+ * Vuelve a derivar los hechos de las DOS ramas y repinta el rail.
+ *
+ * ⚠️ **Se llama de más a propósito.** Derivar cuesta cuatro lecturas de POJO y una
+ * llamada a un getter; equivocarse por defecto cuesta un rail que enseña un paso
+ * apagado cuando ya se puede entrar, que es la clase de mentira que este rework
+ * viene a quitar. `actualizarHechos` es idempotente y solo notifica si el paso
+ * activo deja de sostenerse, así que llamarlo de sobra no repinta de sobra.
+ *
+ * @returns {void}
+ */
+function refrescarHechos() {
+  navegacion.actualizarHechos(hechosDeParcela(estado.get()), RAMA.PARCELA)
+  navegacion.actualizarHechos(hechosDeEdificio(estadoEdificio.get()), RAMA.EDIFICIO)
+  // Los hechos pueden cambiar SIN que cambie `{rama, paso, modo}` —cargar una
+  // parcela no te mueve de paso, pero abre tres—, y en ese caso el store de la
+  // navegación no notifica. Por eso el repintado va a mano aquí.
+  rail.repintar()
+}
+
+const rail = cablearRail({
+  documento: document,
+  navegacion,
+  panel,
+  /**
+   * ⚠️ **`invalidateSize()` NO ES DECORATIVO, y es una de las cuatro decisiones
+   * que la revisión de ingeniería dejó abiertas.** Leaflet cachea el tamaño del
+   * contenedor y solo lo remide cuando se lo dicen. Mientras el rail no cambie de
+   * ancho, un cambio de paso no mueve el mapa; pero el día que una pantalla
+   * reparta el ancho de otra forma —Diagnóstico trae el mapa al centro—, sin esta
+   * línea el mapa se quedaría dibujando sobre un tamaño que ya no tiene: teselas
+   * en el sitio equivocado, clics desplazados y **ningún error en consola**.
+   *
+   * Va aquí y no dentro de `app/rail.js` porque aquel módulo no sabe que existe
+   * un mapa, y no tiene por qué saberlo.
+   */
+  alNavegar: () => {
+    if (visor?.mapa) visor.mapa.invalidateSize()
+  },
+})
+
+// El eje PASO de la cáscara (T6): escribe `data-paso` en el `<body>` y pone el
+// título de la pantalla. **No oculta nada por JavaScript**: quien esconde las
+// secciones que no tocan son las cinco reglas de `estilos/app.css`, y el porqué
+// —dos ejes escribiendo `hidden` serían dos dueños de la misma propiedad— está
+// en la cabecera de `app/pantalla.js`.
+cablearPantalla({ documento: document, navegacion })
+
+// ── La vía de MEDICIÓN PROPIA estrena botón (T6) ────────────────────────────
+//
+// Hasta hoy la única forma de meter un DXF o un TXT era ARRASTRARLO sobre la
+// ventana, y eso no se ve: un camino que solo conoce quien escribió el código no
+// es un camino. El botón abre el MISMO selector de fichero que «Abrir un GML…»
+// —hay UNA sola zona en toda la aplicación, porque dos harían `preventDefault`
+// las dos sobre el mismo `drop`— y el destino se resuelve por la extensión, que
+// es como funciona desde F10.
+const botonMedicion = document.querySelector('[data-accion="abrir-medicion"]')
+if (botonMedicion !== null) {
+  if (comprobacionCableada !== null && typeof comprobacionCableada.elegirFichero === 'function') {
+    botonMedicion.addEventListener('click', () => comprobacionCableada.elegirFichero())
+  } else {
+    // Regla de oro 1: un botón que no hace nada es peor que uno apagado. Si el
+    // paso 9 se cayó, este botón lo DICE con el motivo al lado en vez de tragar
+    // el clic — y el arrastre sobre la ventana sigue siendo la vía que queda.
+    botonMedicion.disabled = true
+    botonMedicion.title =
+      'El selector de ficheros no se ha podido montar en esta sesión. Puedes seguir soltando el ' +
+      'fichero sobre la ventana.'
+  }
+}
+
+// Los tres sitios de los que pueden venir hechos nuevos. Ninguno de los tres
+// sabe que existe un rail: se suscriben y ya.
+estado.subscribe(refrescarHechos)
+estadoEdificio.subscribe(refrescarHechos)
+ramaCableada.subscribe((rama) => {
+  navegacion.cambiarRama(rama)
+  refrescarHechos()
+})
+
+// El diagnóstico no notifica a nadie cuando termina —`ultimoDiagnostico()` es una
+// lectura, no un canal—, así que se refresca cuando el usuario pulsa el botón que
+// lo produce. Dos pasadas: una al soltar el clic (el camino síncrono) y otra
+// medio segundo después (el cajón pide las colindantes por red).
+//
+// ⚠️ **Es un APAÑO declarado, y tiene fecha de caducidad**: T9 funde Comprobación
+// y Diagnóstico en una pantalla propia, y ahí el diagnóstico pasa a ser un paso
+// con su propio estado en vez de un cajón sobre el mapa. Entonces esto se borra.
+const ctaDiagnosticar = document.querySelector('[data-accion="diagnosticar"]')
+if (ctaDiagnosticar !== null) {
+  ctaDiagnosticar.addEventListener('click', () => {
+    queueMicrotask(refrescarHechos)
+    setTimeout(refrescarHechos, 500)
+  })
+}
+
+// ── La URL (decisión D3): hash, y el DATO manda sobre la URL ─────────────────
+//
+// `#/parcela/validacion`. El hash no necesita nada del servidor, así que GitHub
+// Pages lo sirve tal cual y atrás/adelante/recargar funcionan. Al aterrizar se
+// valida el paso pedido contra los hechos que HAY: si no se sostiene, se cae al
+// último que sí Y SE DICE POR QUÉ, porque un enlace compartido lleva el paso pero
+// no lleva el expediente.
+
+/**
+ * Lleva el estado a la barra de direcciones.
+ *
+ * ⚠️ **El arranque REEMPLAZA y los cambios EMPUJAN**, y la diferencia se nota:
+ * con `location.hash` en el arranque, la primera entrada del historial sería la
+ * URL sin hash, y el primer «atrás» del usuario le sacaría de la aplicación
+ * creyendo que vuelve un paso. `replaceState` no dispara `hashchange`, que es
+ * justo lo que se quiere aquí (el estado ya es el que se está escribiendo).
+ *
+ * @param {{reemplazar?: boolean}} [opciones]
+ */
+function escribirRuta({ reemplazar = false } = {}) {
+  const ruta = navegacion.ruta()
+  if (location.hash === ruta) return
+  if (reemplazar) history.replaceState(null, '', ruta)
+  else location.hash = ruta
+}
+
+// El aterrizaje va ANTES de suscribirse: un enlace que no se sostiene provoca una
+// caída con su mensaje, y no hace falta escribir en la URL el paso intermedio.
+// Un hash que no es nuestro (`#seccion`, el de otra librería) no mueve nada y no
+// se cuenta: no es un error, es que no va con nosotros.
+if (location.hash !== '') navegacion.irARuta(location.hash)
+escribirRuta({ reemplazar: true })
+
+navegacion.subscribe(() => escribirRuta())
+
+// Atrás, adelante y pegar un enlace a mano entran todos por aquí.
+window.addEventListener('hashchange', () => {
+  if (location.hash === navegacion.ruta()) return
+  navegacion.irARuta(location.hash)
+})
+
+// Y una última remedida del mapa cuando el navegador ya ha maquetado el rail. En
+// el arranque la cáscara entera existe antes de que corra este fichero, así que
+// Leaflet mide bien; esto es la red para el día que deje de ser cierto.
+requestAnimationFrame(() => {
+  if (visor?.mapa) visor.mapa.invalidateSize()
 })

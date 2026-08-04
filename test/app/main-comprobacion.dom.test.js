@@ -328,7 +328,18 @@ const CASCARA_INDEX = (() => {
     )
   }
   const clase = /class="([^"]*)"/i.exec(encontrado[1])
-  return { clase: clase === null ? '' : clase[1], cuerpo: encontrado[2] }
+  // ⚠️ TODOS los atributos de la etiqueta de apertura, no solo la clase.
+  // `innerHTML` copia lo de DENTRO del <body> y nada de su etiqueta, así que lo
+  // que lleve puesto el <body> real hay que reponerlo a mano. Hasta el rework de
+  // UI bastaba con `class` (`app/rama.js` LANZA sin `.gml-app`); desde T6 el
+  // <body> lleva además `data-app="cascara"`, que es el gancho de
+  // `app/pantalla.js`, y sin él el arranque entero revienta. Se copian todos para
+  // que el próximo atributo que aparezca no vuelva a romper estos cuatro ficheros.
+  const atributos = [...encontrado[1].matchAll(/([\w-]+)\s*=\s*"([^"]*)"/g)].map(([, n, v]) => [
+    n,
+    v,
+  ])
+  return { clase: clase === null ? '' : clase[1], atributos, cuerpo: encontrado[2] }
 })()
 
 const CUERPO_INDEX = CASCARA_INDEX.cuerpo
@@ -340,6 +351,9 @@ const CUERPO_INDEX = CASCARA_INDEX.cuerpo
  */
 const montarCascara = () => {
   document.body.className = CASCARA_INDEX.clase
+  for (const [nombre, valor] of CASCARA_INDEX.atributos) {
+    document.body.setAttribute(nombre, valor)
+  }
   document.body.innerHTML = CUERPO_INDEX
 }
 

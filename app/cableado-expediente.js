@@ -464,7 +464,7 @@ const esRama = esStore
  * de la obra nueva**, no un vacío. Lo que no cuenta es `null`, que es como nace el
  * store.
  */
-function hayEdificio(edificio) {
+export function hayEdificio(edificio) {
   return (
     !!edificio &&
     typeof edificio === 'object' &&
@@ -473,8 +473,22 @@ function hayEdificio(edificio) {
   )
 }
 
-/** ¿Hay geometría que guardar? Un exterior con al menos un vértice. */
-function hayGeometria(parcela) {
+/**
+ * ¿Hay geometría que guardar? Un exterior con al menos un vértice.
+ *
+ * ⚠️ **`hayGeometria` y `hayEdificio` SE EXPORTAN desde el rework de UI (T5)**, y
+ * las dos eran privadas hasta entonces. El motivo es que el rail de navegación
+ * necesita exactamente esta pregunta —«¿hay algo con lo que trabajar en la rama
+ * activa?»— para decidir si el paso «Validación» está disponible, y la
+ * alternativa era escribir una TERCERA copia de la regla en `app/main.js`.
+ *
+ * Exportarlas no las convierte en API pública del proyecto: siguen sin salir por
+ * el barrel (`index.js` no expone `app/`, y hay una prueba de contrato que lo
+ * vigila). Son dos predicados ESTRUCTURALES sobre los POJO del modelo, no reglas
+ * de esta pantalla; ése es justo el criterio por el que `puedeDiagnosticar` de
+ * `app/cableado-diagnostico.js` sigue sin exportarse y estas dos sí.
+ */
+export function hayGeometria(parcela) {
   return (
     !!parcela &&
     typeof parcela === 'object' &&

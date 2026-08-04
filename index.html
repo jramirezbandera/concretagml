@@ -70,7 +70,61 @@
     <link rel="stylesheet" href="/estilos/app.css" />
   </head>
 
-  <body class="gml-app">
+  <!-- `data-app="cascara"` es el gancho de `app/pantalla.js`, que escribe aquí
+       `data-paso` — el único gancho de CSS del paso activo, molde exacto del
+       `data-rama` que pone `app/rama.js`. La clase NO vale como gancho: hay un
+       guardián (G16) que exige que todo `SELECTOR_*` de `app/` sea un selector de
+       atributo `data-*` con valor, y por buen motivo (las clases son del CSS, los
+       `data-*` son del contrato). -->
+  <body class="gml-app" data-app="cascara">
+    <!-- ══ EL RAIL DE NAVEGACIÓN (rework de UI · T5, 2026-08-04) ═══════════════
+         La cáscara pasa de DOS columnas a TRES: rail · panel · mapa.
+
+         ⚠️ ESTO REVIERTE UNA DECISIÓN DE F03, Y CONVIENE SABER CUÁL.
+         `estilos/app.css:10-12` decía: «es la mitad viva de la pantalla
+         Validación de la maqueta, SIN su rail de progreso lateral: ese rail
+         navegaría a pantallas que todavía no existen, así que no se copia». Era
+         verdad en F03. **Dejó de serlo en F04**, y nadie volvió a por el rail:
+         F01–F11 construyeron las cinco pantallas y las cinco acabaron viviendo
+         en el mismo panel de 392 px y altura fija, con siete controles flotando
+         sobre el mapa porque abajo ya no cabían.
+
+         QUÉ HAY AQUÍ Y QUÉ NO. Aquí está la CÁSCARA: el `<nav>`, la marca y un
+         `<ol>` VACÍO. Los cinco peldaños los fabrica `app/rail.js` a partir de
+         `PASOS` y `ROTULO_PASO` de `app/navegacion.js`, porque escribirlos aquí
+         a mano sería una segunda lista que hay que acordarse de mantener a la
+         par — y las segundas listas divergen. Mismo reparto que `app/rama.js`
+         con su conmutador y que `app/zona-fichero.js` con su `<input file>`.
+
+         QUIÉN MANDA. `app/navegacion.js` es el dueño único de `{rama, paso,
+         modo}`: decide qué paso está disponible y REDACTA el motivo cuando no lo
+         está. `app/rail.js` solo pinta. Si un paso sale apagado y quieres saber
+         por qué, la respuesta está en la tabla de guardas de aquel módulo, no
+         aquí ni en el CSS.
+
+         ⛔ UN PASO NO DISPONIBLE SE APAGA (`disabled` + el motivo escrito al
+         lado), NUNCA se saca del `<ol>`. Un rail que encoge y crece no deja
+         aprender el recorrido; y sacar nodos del documento es lo que huerfaniza
+         las referencias que `app/cableado-*.js` resuelve una sola vez al montar
+         (ver el aviso largo de más abajo, que es el mismo problema con otra
+         cara).
+
+         COSTE MEDIDO: 210 px de ancho, que salen del mapa y no del panel. A
+         1280×720 —el suelo declarado— el mapa se queda en 678 px, por encima del
+         suelo de 400 que vigila `scripts/smoke-navegador/14-shell.js`. -->
+    <nav class="gml-rail" data-rail="cascara" aria-label="Recorrido del expediente">
+      <div class="gml-rail-marca">
+        <p class="gml-rail-nombre">Concreta<sup>GML</sup></p>
+        <p class="gml-rail-apunte">Contraste catastral</p>
+      </div>
+      <p class="gml-rail-grupo" id="gml-rail-grupo">Recorrido</p>
+      <!-- Vacío A PROPÓSITO: lo rellena `app/rail.js`. Un `<ol>` con peldaños
+           escritos aquí saldría en la pantalla del usuario durante el instante
+           anterior al montaje, y con los rótulos que tuviera este fichero en vez
+           de los que tenga el código. -->
+      <ol class="gml-rail-pasos" data-rail="pasos" aria-labelledby="gml-rail-grupo"></ol>
+    </nav>
+
     <aside class="gml-panel">
       <header class="gml-panel-cabecera">
         <!-- `app/main.js` reescribe este texto SIEMPRE, desde el suscriptor de la
@@ -79,7 +133,13 @@
              Antes solo lo tocaba para el caso sintético; desde que se puede traer
              una parcela real, callar la procedencia sería maquillarla. -->
         <p class="gml-eyebrow" data-eyebrow>Parcela cargada</p>
-        <h1 class="gml-titulo">Validación del recinto</h1>
+        <!-- El título CAMBIA con la pantalla y lo escribe `app/pantalla.js`
+             (`TITULO_PANTALLA`). Lo que hay aquí es lo que se ve durante el
+             instante anterior al montaje, así que es el de la pantalla con la que
+             se arranca. **No es el rótulo del rail**: aquél dice «Entrada» porque
+             tiene 210 px, y éste dice «Empieza tu expediente», que es la respuesta
+             directa a «no sé por dónde empezar». -->
+        <h1 class="gml-titulo" data-titulo="pantalla">Empieza tu expediente</h1>
         <div class="gml-chips">
           <span class="gml-chip" data-contador="ERROR">0 errores</span>
           <span class="gml-chip" data-contador="AVISO">0 avisos</span>
@@ -150,7 +210,23 @@
            lista de candidatos nace además `hidden`: una lista visible y vacía
            afirmaría que la deducción no encontró nada, que es otra cosa muy
            distinta de que todavía no se haya deducido. -->
-      <section class="gml-bloque gml-bloque--catastro">
+      <!-- `data-pantalla` es el eje PASO del panel, y lo aplica el CSS a partir
+           del `data-paso` que `app/pantalla.js` escribe en el `<body>`. Una
+           sección SIN este atributo se ve en las cinco pantallas — es lo que hace
+           que los avisos y el pie no desaparezcan al cambiar de paso.
+
+           ⚠️ ES `data-pantalla` Y NO `data-paso` A PROPÓSITO: `app/rail.js` ya
+           usa `data-paso` en cada peldaño del rail, y una regla de descendencia
+           sobre ese atributo ocultaría cuatro de los cinco peldaños. Además éste
+           admite VARIAS pantallas separadas por espacios (selector `~=`), que es
+           lo que necesita la caja de vértices.
+
+           ⚠️ Y NO SE PELEA CON `hidden`: el eje RAMA oculta con el atributo
+           (`app/rama.js`) y éste con `display:none` del CSS, así que la
+           composición es la UNIÓN —oculto si CUALQUIERA de los dos lo dice— y
+           ninguno pisa al otro. Está razonado en la cabecera de
+           `app/pantalla.js`. -->
+      <section class="gml-bloque gml-bloque--catastro" data-pantalla="entrada">
         <!-- ── F08 · «Abrir un GML…» VA EN LA FILA DEL RÓTULO ────────────────
              Con este botón la app estrena su PRIMERA entrada por fichero: hasta
              F08 no había ni un `<input type="file">`, ni un `FileReader`, ni un
@@ -215,106 +291,175 @@
              El `<dialog>` que abre este botón NO se declara aquí: lo fabrica
              `app/dialogo-expediente.js`, igual que hacen `app/zona-fichero.js` con su
              `<input type="file">`, los dos cajones y el diálogo de F09. -->
-        <div class="gml-rotulo-fila">
-          <h2 class="gml-rotulo">Origen de la parcela</h2>
-          <div class="gml-rotulo-acciones">
-            <button type="button" class="gml-boton gml-boton--menudo" data-accion="abrir-gml">
-              Abrir un GML…
-            </button>
-            <button type="button" class="gml-boton gml-boton--menudo" data-accion="abrir-expediente">
-              Expediente
-            </button>
+        <!-- ══ LAS TRES VÍAS DE ENTRADA (rework de UI · T6) ═══════════════════
+             Criterio 7 del plan, literal: «la Entrada presenta las tres vías como
+             opciones NOMBRADAS Y SEPARADAS, no como botones sueltos compitiendo
+             en una fila del rótulo».
+
+             ⚠️ ASÍ ESTABA ANTES, Y POR ESO SE CAMBIA. Los tres caminos por los
+             que entra un expediente vivían en tres sitios distintos y ninguno
+             decía que fuera un camino:
+               · la referencia catastral, en un campo con su botón (el único que
+                 parecía la vía principal, y lo es);
+               · comprobar un GML ajeno, en un `.gml-boton--menudo` metido en la
+                 fila del `<h2>` (F08 lo puso ahí por una razón MEDIDA —una fila
+                 de botón a lo ancho cuesta ~36 px— que sigue siendo cierta, pero
+                 que en la pantalla de Entrada ya no aplica: aquí no compite con
+                 la tabla de vértices, que vive en otra pantalla);
+               · y la MEDICIÓN PROPIA **no tenía botón ninguno**: la única forma
+                 de meter un DXF era arrastrarlo sobre la ventana, y eso no se ve.
+                 Un camino que solo conoce quien escribió el código no es un
+                 camino: es un secreto.
+
+             ⚠️ LOS DOS BOTONES DE FICHERO ABREN EL MISMO SELECTOR, y es la verdad
+             de la aplicación, no un atajo: `app/zona-fichero.js` engancha el
+             arrastre en la VENTANA ENTERA y **dos zonas vivas harían
+             `preventDefault` las dos sobre el mismo `drop`**, así que hay UNA sola
+             y enruta por extensión. Lo que cambia aquí es que ahora se sabe qué se
+             puede soltar. -->
+
+        <div class="gml-via gml-via--principal">
+          <div class="gml-via-cabecera">
+            <h2 class="gml-rotulo">Referencia catastral</h2>
+            <span class="gml-via-marca">Vía principal</span>
           </div>
-        </div>
+          <p class="gml-via-apunte">
+            Trae el recinto oficial del Catastro y edítalo sobre la cartografía.
+          </p>
 
-        <div class="gml-campo">
-          <label class="gml-campo-etiqueta" for="campo-refcat">Referencia catastral</label>
-          <div class="gml-campo-fila">
-            <!-- Monoespaciada (`gml-mono`) a propósito: son caracteres
-                 alfanuméricos que el usuario coteja UNO A UNO contra un papel, y
-                 en proporcional la O y el 0, o la I y el 1, se confunden. El
-                 autocompletado y el corrector ortográfico no tienen nada que
-                 aportar sobre un código y solo estorban.
+          <div class="gml-campo">
+            <label class="gml-campo-etiqueta" for="campo-refcat">Referencia catastral</label>
+            <div class="gml-campo-fila">
+              <!-- Monoespaciada (`gml-mono`) a propósito: son caracteres
+                   alfanuméricos que el usuario coteja UNO A UNO contra un papel, y
+                   en proporcional la O y el 0, o la I y el 1, se confunden. El
+                   autocompletado y el corrector ortográfico no tienen nada que
+                   aportar sobre un código y solo estorban.
 
-                 ⛔ SIN `maxlength`, y es deliberado (2026-07-28). Tenía
-                 `maxlength="14"` y era un FALLO SILENCIOSO: recortaba lo pegado
-                 antes de que nadie lo mirase. Quien pegaba `9398516 VK3799G`
-                 —con el espacio con el que la Sede imprime las referencias, que
-                 `normalizarRefcat` tolera a propósito— perdía el último
-                 carácter y recibía «no tiene forma de referencia catastral» por
-                 una referencia correcta. Y la de INMUEBLE (20 caracteres, la de
-                 los recibos del IBI) solo funcionaba por accidente, porque el
-                 truncado se quedaba justo con sus 14 primeros.
-                 Ahora el campo no altera nada y quien valida y explica es
-                 `normalizarRefcat`, que acepta las dos formas. Lo detectó el
-                 guion de humo `07`. -->
-            <input
-              id="campo-refcat"
-              class="gml-entrada gml-mono"
-              type="text"
-              data-campo="refcat"
-              autocomplete="off"
-              spellcheck="false"
-              placeholder="29041A00800099"
-            />
+                   ⛔ SIN `maxlength`, y es deliberado (2026-07-28). Tenía
+                   `maxlength="14"` y era un FALLO SILENCIOSO: recortaba lo pegado
+                   antes de que nadie lo mirase. Quien pegaba `9398516 VK3799G`
+                   —con el espacio con el que la Sede imprime las referencias, que
+                   `normalizarRefcat` tolera a propósito— perdía el último
+                   carácter y recibía «no tiene forma de referencia catastral» por
+                   una referencia correcta. Y la de INMUEBLE (20 caracteres, la de
+                   los recibos del IBI) solo funcionaba por accidente, porque el
+                   truncado se quedaba justo con sus 14 primeros.
+                   Ahora el campo no altera nada y quien valida y explica es
+                   `normalizarRefcat`, que acepta las dos formas. Lo detectó el
+                   guion de humo `07`. -->
+              <input
+                id="campo-refcat"
+                class="gml-entrada gml-mono"
+                type="text"
+                data-campo="refcat"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="29041A00800099"
+              />
+              <button
+                type="button"
+                class="gml-boton gml-boton--primario"
+                data-accion="cargar-catastro"
+              >
+                Traer del Catastro
+              </button>
+            </div>
+          </div>
+
+          <!-- LAS DOS CONSULTAS DERIVADAS, EN PAREJA. Las dos parten de algo que
+               ya tiene que estar cargado, y por eso las dos NACEN `disabled`:
+               «Deducir del mapa» va de la geometría a la referencia, y «Traer
+               colindantes» va de la referencia a las parcelas vecinas (que F06
+               necesita como dianas de enganche). Quien las enciende —y quien
+               escribe el motivo cuando NO las enciende— es el cableado.
+
+               Van en UNA fila y no una debajo de la otra por una razón que ya no
+               es de altura pero sigue siendo buena: son la misma clase de cosa
+               —consultas al Catastro sobre algo que ya está cargado— y ninguna de
+               las dos es una VÍA de entrada, así que ni compiten con las tres de
+               arriba ni se anuncian como ellas.
+
+               ⚠️ `traer-colindantes` vive AQUÍ y no en la barra de edición del
+               mapa aunque sean las colindantes lo que F06 usa para enganchar:
+               esto es una CONSULTA al Catastro, no una edición, y la barra no
+               habla con la red. -->
+          <div class="gml-boton-par">
             <button
               type="button"
-              class="gml-boton gml-boton--primario"
-              data-accion="cargar-catastro"
+              class="gml-boton gml-boton--secundario"
+              data-accion="deducir-refcat"
+              disabled
             >
-              Traer del Catastro
+              Deducir del mapa
+            </button>
+            <button
+              type="button"
+              class="gml-boton gml-boton--secundario"
+              data-accion="traer-colindantes"
+              disabled
+            >
+              Traer colindantes
             </button>
           </div>
+
+          <!-- El desenlace de la acción. `role="status"` para que el lector de
+               pantalla lo anuncie SIN robar el foco, igual que el renglón de
+               «Generar GML»: el usuario sigue con las manos en el campo. -->
+          <p class="gml-accion-estado" data-estado="cargar-catastro" role="status"></p>
+
+          <ul class="gml-candidatos" data-candidatos="refcat" hidden></ul>
+
+          <!-- De dónde salió el dato y su antigüedad («del Catastro · guardado
+               hace 6 días»). Es lo único que impide que un dato viejo sacado de la
+               caché se presente como recién traído de la Sede. -->
+          <p class="gml-procedencia" data-procedencia="parcela"></p>
         </div>
 
-        <!-- LAS DOS CONSULTAS DERIVADAS, EN PAREJA. Las dos parten de algo que
-             ya tiene que estar cargado, y por eso las dos NACEN `disabled`:
-             «Deducir del mapa» va de la geometría a la referencia, y «Traer
-             colindantes» va de la referencia a las parcelas vecinas (que F06
-             necesita como dianas de enganche). Quien las enciende —y quien
-             escribe el motivo cuando NO las enciende— es el cableado.
+        <p class="gml-obien"><span>O bien</span></p>
 
-             Van en UNA fila y no una debajo de la otra por una razón medida, no
-             por gusto: el panel reparte una altura fija entre bloques fijos (ver
-             la nota de `.gml-bloque--avisos` en `estilos/app.css`). Una tercera
-             fila de botón a lo ancho habría costado ~36 px que se los quita la
-             tabla de vértices. Emparejarlas cuesta cero y además dice la verdad:
-             son la misma clase de cosa.
-
-             ⚠️ `traer-colindantes` vive AQUÍ y no en la barra de edición del mapa
-             aunque sean las colindantes lo que F06 usa para enganchar: esto es
-             una CONSULTA al Catastro, no una edición, y la barra no habla con la
-             red. -->
-        <div class="gml-boton-par">
+        <div class="gml-via">
+          <h2 class="gml-rotulo">Medición propia</h2>
+          <p class="gml-via-apunte">
+            Tu levantamiento en <span class="gml-mono">.dxf</span> o un volcado de coordenadas en
+            <span class="gml-mono">.txt</span>. También puedes soltarlo sobre la ventana.
+          </p>
           <button
             type="button"
-            class="gml-boton gml-boton--secundario"
-            data-accion="deducir-refcat"
-            disabled
+            class="gml-boton gml-boton--secundario gml-via-boton"
+            data-accion="abrir-medicion"
           >
-            Deducir del mapa
-          </button>
-          <button
-            type="button"
-            class="gml-boton gml-boton--secundario"
-            data-accion="traer-colindantes"
-            disabled
-          >
-            Traer colindantes
+            Elegir un fichero de medición…
           </button>
         </div>
 
-        <!-- El desenlace de la acción. `role="status"` para que el lector de
-             pantalla lo anuncie SIN robar el foco, igual que el renglón de
-             «Generar GML»: el usuario sigue con las manos en el campo. -->
-        <p class="gml-accion-estado" data-estado="cargar-catastro" role="status"></p>
+        <p class="gml-obien"><span>O bien</span></p>
 
-        <ul class="gml-candidatos" data-candidatos="refcat" hidden></ul>
+        <div class="gml-via">
+          <h2 class="gml-rotulo">Comprobar un GML existente</h2>
+          <p class="gml-via-apunte">
+            Contrasta un GML ya hecho contra el parcelario, sin generar uno nuevo.
+          </p>
+          <button
+            type="button"
+            class="gml-boton gml-boton--secundario gml-via-boton"
+            data-accion="abrir-gml"
+          >
+            Abrir un GML…
+          </button>
+        </div>
 
-        <!-- De dónde salió el dato y su antigüedad («del Catastro · guardado
-             hace 6 días»). Es lo único que impide que un dato viejo sacado de la
-             caché se presente como recién traído de la Sede. -->
-        <p class="gml-procedencia" data-procedencia="parcela"></p>
+        <!-- LA CUARTA VÍA, Y VA MÁS BAJA A PROPÓSITO. Recuperar un expediente
+             guardado es una ruta crítica del plan de pruebas (la 4), pero **no es
+             empezar**: quien la necesita ya sabe que existe, y anunciarla al mismo
+             nivel que las tres de arriba le daría a un recién llegado una cuarta
+             cosa que descartar antes de poder empezar. Se dice, en voz baja. -->
+        <p class="gml-entrada-pie">
+          ¿Ya tenías un expediente?
+          <button type="button" class="gml-boton gml-boton--menudo" data-accion="abrir-expediente">
+            Abrirlo
+          </button>
+        </p>
       </section>
 
       <!-- El modificador `--avisos` NO es decorativo: es lo que permite que este
@@ -331,7 +476,14 @@
         <div id="avisos" class="gml-avisos"></div>
       </section>
 
-      <section class="gml-bloque gml-bloque--vertices">
+      <!-- En CUATRO pantallas y no en una: los vértices son lo que se valida, lo
+           que se edita, lo que se contrasta y lo que se firma. La única en la que
+           NO están es Entrada, donde todavía no hay ninguno — y ése es justo el
+           sitio que las tres vías necesitaban para poder respirar. -->
+      <section
+        class="gml-bloque gml-bloque--vertices"
+        data-pantalla="validacion edicion diagnostico informe"
+      >
         <!-- El rótulo va FUERA de la caja: `sincronizar` vacía `#tabla-vertices`.
              El segundo hijo no necesita clase (hereda 11 px y gris de la fila). -->
         <div class="gml-rotulo-fila">
@@ -381,7 +533,31 @@
 
       <!-- La ficha del expediente: SEGUNDO suscriptor del mismo store que el visor.
            Los `<dd>` los rellena `app/main.js`; los `data-ficha` son su contrato. -->
-      <footer class="gml-panel-pie">
+      <!-- ⚠️ EL PIE NO ESTÁ EN ENTRADA, Y ES LO QUE HACE QUE ENTRADA QUEPA.
+           Mide **266,28 px** —ocho renglones de ficha más los dos CTA— y hasta
+           T6 se enseñaba en todas partes. Medido a 1280×720 con las tres vías
+           puestas: con el pie delante, la tercera vía («Comprobar un GML
+           existente») **no se veía y no había forma de llegar a ella**, que es
+           exactamente el criterio 7 incumplido.
+
+           Y además dice la verdad: en Entrada todavía no hay expediente que
+           fichar ni geometría que generar. Una ficha que describe una parcela
+           mientras el usuario está eligiendo de dónde traerla, y un «Generar GML»
+           encendido antes de tener nada, son las dos cosas que hacían que esta
+           pantalla se leyera como un formulario en vez de como una decisión.
+
+           ⚠️ SE OCULTA, NO SE QUITA: sigue `isConnected`, con sus 8 nodos
+           `data-ficha`, sus dos `data-accion` y sus dos renglones `role="status"`
+           —que `app/rama.js` lee y escribe al conmutar de rama— exactamente donde
+           estaban. Lo único que cambia es que el CSS no lo pinta.
+
+           ⚠️ CONSECUENCIA PARA EL GUION DE HUMO 13: arranca en Entrada, donde la
+           caja de vértices y el pie no se ven. Hay que lanzarlo sobre
+           `#/parcela/validacion` (ver la nota del §19 del GUION). -->
+      <footer
+        class="gml-panel-pie"
+        data-pantalla="validacion edicion diagnostico informe"
+      >
         <dl class="gml-ficha">
           <dt>Sistema de referencia</dt>
           <dd class="gml-mono" data-ficha="srs">—</dd>

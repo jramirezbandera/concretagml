@@ -327,6 +327,69 @@ if (panel.holguraHastaElBordePx !== null && panel.holguraHastaElBordePx < -DESBO
   )
 }
 
+// ── 3 bis · LA PANTALLA DE ENTRADA Y SUS TRES VÍAS (criterio 7, T6) ────────
+//
+// «La Entrada presenta las tres vías como opciones NOMBRADAS Y SEPARADAS, no como
+// botones sueltos compitiendo en una fila del rótulo.» Aquí se convierte en una
+// medición: **las tres tienen que verse ENTERAS sin scrollear**, porque una vía
+// que hay que buscar no es una opción, es un secreto — que es exactamente lo que
+// le pasaba a la medición propia antes de T6.
+//
+// Solo mide si la aplicación está EN Entrada. En cualquier otra pantalla no hay
+// vías, y contar cero sería un falso verde.
+
+const pasoActivo = app.getAttribute('data-paso')
+const seccionEntrada = $('.gml-bloque--catastro')
+const vias = $$('.gml-via')
+
+const entrada = {
+  pasoActivo,
+  seMide: pasoActivo === 'entrada',
+  cuantasVias: vias.length,
+  rotulos: vias.map((v) => v.querySelector('h2')?.textContent.trim() ?? '(sin rótulo)'),
+  separadores: $$('.gml-obien').length,
+  seccion: caja(seccionEntrada),
+  seccionDesbordaPx: desborde(seccionEntrada),
+  /** Cuántas vías caben ENTERAS dentro de la caja visible de su sección. */
+  viasCompletas: null,
+  /** La cuarta vía (abrir un expediente): informativa, va en voz baja a propósito. */
+  cuartaViaVisible: null,
+  botonDeMedicion: $('[data-accion="abrir-medicion"]') !== null,
+}
+
+if (entrada.seMide && seccionEntrada !== null && vias.length > 0) {
+  const limite = seccionEntrada.getBoundingClientRect().bottom + 0.5
+  entrada.viasCompletas = vias.filter((v) => v.getBoundingClientRect().bottom <= limite).length
+  const pieCuarta = $('.gml-entrada-pie')
+  entrada.cuartaViaVisible =
+    pieCuarta === null ? null : pieCuarta.getBoundingClientRect().bottom <= limite
+
+  if (entrada.cuantasVias < 3) {
+    problemas.push(
+      `La pantalla de Entrada enseña ${entrada.cuantasVias} vía(s) y el criterio 7 pide TRES ` +
+        `nombradas y separadas (referencia catastral, medición propia, comprobar un GML).`,
+    )
+  }
+  if (entrada.viasCompletas < entrada.cuantasVias) {
+    problemas.push(
+      `Solo ${entrada.viasCompletas} de las ${entrada.cuantasVias} vías de Entrada se ven ENTERAS ` +
+        `a ${window.innerWidth}×${window.innerHeight}: quedan ${entrada.seccionDesbordaPx} px ` +
+        `detrás del scroll. Una vía que hay que buscar no es una opción.`,
+    )
+  }
+  if (!entrada.botonDeMedicion) {
+    problemas.push(
+      'La vía de MEDICIÓN PROPIA no tiene control visible. Hasta T6 la única forma de meter un ' +
+        'DXF era arrastrarlo sobre la ventana, y eso no se ve: ése era el defecto.',
+    )
+  }
+} else if (!entrada.seMide) {
+  advertencias.push(
+    `Esta pasada mide la pantalla «${pasoActivo}», así que el criterio 7 (las tres vías de ` +
+      `Entrada) NO se ha comprobado. Para medirlo, recarga en \`#/parcela/entrada\`.`,
+  )
+}
+
 // ── 4 · La caja de vértices: el invariante que atribuye las pérdidas ───────
 //
 // Desde F07 mide 267,44 px a 1440×900 en la rama PARCELA, y seis fases seguidas
@@ -520,6 +583,7 @@ return {
   columnas,
   mapa,
   panel,
+  entrada,
   cajaVertices,
   avisos,
   sobreElMapa: {

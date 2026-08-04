@@ -2780,13 +2780,21 @@ servidor (`test/fixtures/parsers/…`): `vite preview` sirve `dist/`, donde no e
 
 ```
 $B viewport 1440x900
-$B goto http://localhost:PUERTO/concretagml/     # ⚠️ el base, no la raíz
+$B goto http://localhost:PUERTO/concretagml/#/parcela/validacion   # ⚠️ ver abajo
 $B wait ".gml-tabla-vertices"
 $B console --clear
 $B eval scripts/smoke-navegador/13-edificio.js
 $B console --errors                              # → (no console errors)
 $B screenshot .gstack/smoke-f11.png              # la evidencia para el §12
 ```
+
+⛔ **DESDE EL REWORK DE UI (T6) HAY QUE LANZARLO SOBRE `#/parcela/validacion`, Y
+NO SOBRE LA RAÍZ.** La aplicación arranca en la pantalla de **Entrada**, donde la
+caja de vértices y el pie del panel **no se ven** —el pie mide 266,28 px y sin
+esconderlo las tres vías de Entrada no cabían—. Este guion mide el invariante de
+los 267 px y el reparto de altura del panel: lanzado en Entrada leería ceros y los
+llamaría regresión. El hash lleva directamente a la pantalla que mide, sin
+pulsaciones.
 
 ⚠️ **Página recién cargada, y no es formalismo**: el invariante de los 267 px se
 mide con la lista de avisos VACÍA, y una tarjeta cuesta ~52 px del sitio más caro
@@ -3306,3 +3314,81 @@ guion 02. **El eje PASO**, mientras `modo` siga siendo `LINEA_BASE`.
 Las cinco tarjetas de aviso que él mismo ha provocado y **nada más**: no carga
 ficheros, no consulta al Catastro, no conmuta de rama y no edita. `$B reload` para
 volver al punto de partida.
+
+### Ampliación T6: la pantalla de Entrada y sus tres vías (criterio 7)
+
+Desde T6 el guion mide también la **pantalla de Entrada**, y solo cuando la
+aplicación está en ella (`data-paso === 'entrada'`); en cualquier otra publica una
+advertencia diciendo que ese criterio no se ha comprobado, porque contar cero vías
+donde no las hay sería un falso verde.
+
+El criterio 7 —«las tres vías, nombradas y separadas»— se convierte en tres
+mediciones: que haya **tres**, que las **tres se vean ENTERAS sin scrollear**, y
+que la de medición propia **tenga un control visible**. Esa última no es teórica:
+hasta T6 la única forma de meter un DXF era arrastrarlo sobre la ventana, y un
+camino que solo conoce quien escribió el código no es un camino.
+
+```
+$B viewport 1280x720
+$B goto http://localhost:PUERTO/concretagml/#/parcela/entrada
+$B reload                                        # ⚠️ OBLIGATORIO — ver abajo
+$B eval scripts/smoke-navegador/14-shell.js
+```
+
+⛔ **`$B goto` CON UN CAMBIO DE SOLO EL HASH NO RECARGA EL DOCUMENTO**, y esto
+costó dos mediciones falsas el 2026-08-04. Es navegación dentro del mismo
+documento: el estado anterior sigue vivo. En concreto, **las cinco tarjetas de
+aviso que este mismo guion provoca al final seguían en pantalla en la pasada
+siguiente**, robaban ~170 px al bloque de Entrada, y el guion informó de que la
+tercera vía no cabía cuando sí cabe. Con `$B reload` detrás, las cifras salieron
+limpias. La regla general: **si el guion deja estado, la pasada siguiente lleva
+`reload`.**
+
+### Cifras de la pantalla de Entrada (2026-08-04, tras T6)
+
+| | **1280×720** (suelo) | 1440×900 |
+|---|---|---|
+| Veredicto | **`ok: true`** | **`ok: true`** |
+| Vías completas | **3 / 3** | **3 / 3** |
+| Alto de la sección | 526,97 px | 556,22 px |
+| Escondido tras el scroll | 33 px | 4 px |
+| Cuarta vía (expediente) visible | no | sí |
+| Botón de medición propia | **sí** | **sí** |
+
+La cuarta vía —abrir un expediente guardado— queda 33 px por debajo del pliegue en
+el suelo declarado, y se alcanza scrolleando. Va ahí a propósito: recuperar
+trabajo **no es empezar**, y quien la necesita ya sabe que existe.
+
+### ⭐ El defecto que este guion cazó y a ojo no se veía
+
+La primera versión de T6 puso `flex: 1 1 auto` en la sección de Entrada y creó un
+**segundo estirador** en el panel, junto al de avisos. `app/rama.js` ya lo tenía
+escrito desde F11 —«dos estiradores a la vez descosen el reparto de altura»— y
+pasó exactamente eso, con un síntoma que parece imposible:
+
+> **a 1440×900 la sección de Entrada salía MÁS CORTA que a 1280×720**
+> (482,17 px contra 526,97), así que la tercera vía no cabía en la ventana GRANDE
+> y sí en la pequeña.
+
+El hueco sobrante se repartía entre los dos estiradores y la lista de avisos
+—vacía— se llevaba su parte. **A ojo no se ve**, porque quien mira una pantalla
+cómoda no sospecha de ella; y la suite tampoco, porque jsdom no calcula
+maquetación. Con `flex: 0 1 auto` el estirador vuelve a ser uno y el orden se
+restablece: 526,97 px a 1280 y 556,22 a 1440, que es como tiene que ser.
+
+### Lo que T6 le devuelve a la caja de vértices
+
+Sacar el bloque de Entrada de la pantalla de Validación —donde no pinta nada, y
+donde llevaba desde F05 quitándole sitio a lo que se está validando— tiene precio
+en píxeles, y es el mejor argumento de que este rework hace algo:
+
+| `#tabla-vertices` | Antes de T6 | Después de T6 | Ganancia |
+|---|---|---|---|
+| 1280×720 | 110,09 px | **228,33 px** | **+118,24 px** |
+| 1440×900 | 267,44 px | **385,67 px** | **+118,23 px** |
+
+Los 267,44 px de 1440×900 son el invariante que **siete fases seguidas** se
+esforzaron en no mover (F06 lo dejó en 303 sacando la edición al mapa, F07 en 267,
+y F08–F11 en 267 a coste cero). T6 no lo protege: lo **sube un 44 %**, y no
+optimizando nada — solo dejando de enseñar a la vez dos cosas que nunca se usan a
+la vez.

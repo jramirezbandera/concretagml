@@ -1,15 +1,24 @@
-/* estilos/app.css — F03 · Fase 4, tarea 4A.3. LA CÁSCARA DE LA APP.
+/* estilos/app.css — F03 · Fase 4 (4A.3) · rework de UI T5. LA CÁSCARA DE LA APP.
  *
- * Primera hoja de estilo propia del proyecto. Viste DOS cosas y nada más:
- *   1. la cáscara «sin rail» — panel izquierdo de 392 px (avisos + tabla de
- *      vértices + ficha del expediente) y mapa a la derecha ocupando el resto;
- *   2. el cromo que ya generan `viewer/sincronizacion.js` (la tabla) y
+ * Hoja de estilo de la cáscara. Viste TRES cosas y nada más:
+ *   1. la cáscara de TRES COLUMNAS — rail de 210 px, panel de 392 px (avisos +
+ *      tabla de vértices + ficha del expediente) y mapa ocupando el resto;
+ *   2. el rail de navegación, cuyos peldaños fabrica `app/rail.js`;
+ *   3. el cromo que ya generan `viewer/sincronizacion.js` (la tabla) y
  *      `viewer/capas.js` (el control de opacidad), más los retoques mínimos
  *      sobre las clases `.leaflet-*` que Leaflet crea por su cuenta.
  *
- * Es la mitad viva de la pantalla «Validación» de la maqueta de diseño, SIN su
- * rail de progreso lateral: ese rail navegaría a pantallas que todavía no
- * existen, así que no se copia (decisión de alcance del usuario).
+ * ── ⚠️ ESTE FICHERO DIJO DURANTE OCHO FASES UNA COSA QUE DEJÓ DE SER CIERTA ──
+ * Hasta el 2026-08-04, aquí ponía: «es la mitad viva de la pantalla Validación de
+ * la maqueta, SIN su rail de progreso lateral: ese rail navegaría a pantallas que
+ * todavía no existen, así que no se copia (decisión de alcance del usuario)».
+ *
+ * Era verdad en F03. **Dejó de serlo en F04** y nadie volvió a por el rail:
+ * F01–F11 construyeron las cinco pantallas y las cinco acabaron viviendo en el
+ * mismo panel de altura fija, con siete controles flotando sobre el mapa porque
+ * abajo ya no cabían. Se anota aquí en vez de borrarse porque el coste de este
+ * rework no fue el rail: fue **no haber vuelto a leer la razón por la que se
+ * quitó**. Una decisión de alcance necesita fecha de revisión, no solo motivo.
  *
  * ── REGLAS DURAS DE ESTE FICHERO (léelas antes de tocar nada) ────────────────
  *
@@ -65,6 +74,19 @@
  * verificación visual (tarea 4B.1) tenga una sola perilla que girar.
  */
 :root {
+  /* Ancho del RAIL de navegación (rework de UI · T5). Los 210 px salen de la
+     maqueta medida con las fuentes reales del repo, renderizada a 1280×720:
+     con ese ancho ningún motivo de bloqueo desborda y los cinco caben en
+     14/14/27/14 px de alto (uno envuelve a dos líneas).
+
+     ⚠️ EL RAIL SE LO QUITA AL MAPA, NO AL PANEL, y es a propósito: el panel es
+     el que lleva ocho fases peleándose por píxeles (la caja de vértices costó
+     recuperar hasta 303 px sacando la edición al mapa en F06), así que quitarle
+     210 px más sería empezar el rework rompiendo lo que viene a arreglar. A
+     1280×720 el mapa se queda en 678 px, por encima del suelo de 400 px que
+     vigila `scripts/smoke-navegador/14-shell.js`. */
+  --gml-rail-ancho: 210px;
+
   /* Ancho del panel izquierdo. La maqueta usa 392 px en «Validación». */
   --gml-panel-ancho: 392px;
 
@@ -205,6 +227,42 @@ body {
   display: none;
 }
 
+/* ═══ El eje PASO: qué sección se ve en cada pantalla (rework de UI · T6) ═════
+ *
+ * `app/pantalla.js` escribe `data-paso` en el `<body>`; estas cinco reglas hacen
+ * el resto. **Ni una línea de JavaScript oculta una sección del panel.**
+ *
+ * ── ⛔ POR QUÉ ESTO ES CSS Y EL EJE RAMA ES `hidden` ──────────────────────
+ * Porque son DOS ejes que pueden querer ocultar la MISMA sección, y si los dos
+ * escribieran `hidden` serían dos dueños de la misma propiedad: ganaría el que
+ * escribiera el último, y bastaría conmutar de rama estando en Validación para
+ * que reapareciera el bloque de Entrada. Con dos mecanismos distintos que acaban
+ * los dos en `display:none`, la composición es la UNIÓN —oculto si CUALQUIERA de
+ * los dos lo dice— y ninguno pisa al otro. El razonamiento largo está en la
+ * cabecera de `app/pantalla.js`.
+ *
+ * ── POR QUÉ CINCO REGLAS Y NO UNA ────────────────────────────────────────
+ * CSS no puede comparar el atributo de un ANCESTRO con el de un descendiente:
+ * no existe `[data-pantalla~=attr(data-paso)]`. Cinco reglas mecánicas y
+ * explícitas es la forma honesta de escribirlo; cualquier alternativa «lista»
+ * acabaría en JavaScript ocultando nodos, que es lo que se está evitando.
+ *
+ * ⚠️ `[data-pantalla]` y NO `[data-paso]`: `app/rail.js` usa `data-paso` en cada
+ * peldaño del rail, y como estas reglas son de DESCENDENCIA, escribirlas sobre
+ * ese atributo ocultaría cuatro de los cinco peldaños. Se probó, y pasa.
+ *
+ * Una sección SIN `data-pantalla` se ve en las cinco: los avisos y el pie son de
+ * todas las pantallas, y desaparecer el canal de errores al cambiar de paso sería
+ * el peor fallo silencioso que esta cáscara puede tener.
+ */
+.gml-app[data-paso='entrada'] [data-pantalla]:not([data-pantalla~='entrada']),
+.gml-app[data-paso='validacion'] [data-pantalla]:not([data-pantalla~='validacion']),
+.gml-app[data-paso='edicion'] [data-pantalla]:not([data-pantalla~='edicion']),
+.gml-app[data-paso='diagnostico'] [data-pantalla]:not([data-pantalla~='diagnostico']),
+.gml-app[data-paso='informe'] [data-pantalla]:not([data-pantalla~='informe']) {
+  display: none;
+}
+
 /* Anillo de foco de teclado para TODO lo que hay dentro de la app, controles de
    Leaflet incluidos. Se excluye la celda de coordenada, que tiene el suyo
    propio (más abajo): así el orden de las reglas deja de importar. */
@@ -231,6 +289,191 @@ body {
 
 .gml-app ::-webkit-scrollbar-thumb:hover {
   background-color: var(--color-scrollbar-hover);
+}
+
+/* ═══ El rail de navegación (rework de UI · T5) ══════════════════════════════
+ *
+ * PRIMERA columna de la cáscara. Su marcado se parte en dos y está razonado en
+ * `index.html`: la cáscara (`<nav>`, marca, `<ol>` vacío) es de allí; los cinco
+ * peldaños los fabrica `app/rail.js` desde `PASOS`.
+ *
+ * ── LAS CADENAS DE ESTE BLOQUE SON CONTRATO CON `app/rail.js` ──────────────
+ * `.gml-rail-paso`, `.gml-rail-boton`, `.gml-rail-punto`, `.gml-rail-rotulo`,
+ * `.gml-rail-motivo` y `[data-rail-estado]` los EXPORTA aquel módulo (`CLASE` y
+ * `ATRIBUTO_ESTADO`). Aquí se CITAN, no se copian de oído: si un nombre cambia
+ * allí, estas reglas quedan muertas y no lo dice nadie. El guardián es el guion
+ * de humo 14, que mide el rail en un navegador de verdad.
+ *
+ * ── ⛔ EL ESTADO SE PINTA DESDE `data-rail-estado` Y DE NINGÚN OTRO SITIO ──
+ * Ni desde `aria-current`, ni desde `:disabled`, ni desde una clase modificadora.
+ * UN atributo, un dueño — molde exacto del `data-rama` de `app/rama.js`. Dos
+ * fuentes para el mismo estado visible acaban divergiendo, y la que se queda
+ * atrás es siempre la de accesibilidad.
+ *
+ * ── ⛔ EL GRIS DEL PASO BLOQUEADO SALE DEL TOKEN, NUNCA DEL OJO ────────────
+ * La maqueta pintó los pasos bloqueados en `#94a3b8` sobre `#f8fafc`: **2,45:1,
+ * por debajo del 4,5:1 de AA**. `--color-text-disabled` (#64748b) da **4,55:1** y
+ * pasa; el token ya existía en `tokens/colors.css`, comentado «inactive modules,
+ * group labels, version». Un motivo que no se lee es un paso apagado en silencio,
+ * que es exactamente lo que este rail existe para evitar.
+ *
+ * ── MOVIMIENTO: 150 ms EN HOVER Y FOCO, CERO EN EL CAMBIO DE PASO ──────────
+ * Lo dice `tokens/motion.css` y corrige al plan del rework, que pedía «sin
+ * animaciones»: sin las primeras el rail se siente muerto al tocarlo; con lo
+ * segundo, el cambio de paso se siente lento. Es una transición de página.
+ */
+
+.gml-rail {
+  width: var(--gml-rail-ancho);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--space-4) 0;
+  background: var(--color-bg-surface);
+  border-right: 1px solid var(--color-border-main);
+}
+
+.gml-rail-marca {
+  flex: none;
+  padding: 0 var(--space-4) var(--space-3);
+}
+
+.gml-rail-nombre {
+  margin: 0;
+  font-size: var(--text-15);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+}
+
+/* El `GML` en monoespaciada y volado: es una sigla técnica, no parte del nombre. */
+.gml-rail-nombre sup {
+  margin-left: 3px;
+  font-family: var(--font-mono);
+  font-size: var(--text-10);
+  font-weight: 500;
+  color: var(--color-text-disabled);
+}
+
+.gml-rail-apunte {
+  margin: 2px 0 0;
+  font-size: var(--text-11);
+  color: var(--color-text-disabled);
+}
+
+.gml-rail-grupo {
+  flex: none;
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-2);
+  font-size: var(--text-10);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-disabled);
+}
+
+/* `min-height: 0` porque scrollea: sin él, cinco motivos largos empujarían el
+   rail entero y su contenido se saldría por abajo sin forma de alcanzarlo — el
+   mismo fallo que `.gml-panel` lleva ocho fases evitando. */
+.gml-rail-pasos {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gml-rail-paso {
+  /* El filo de la izquierda marca el paso activo. Se declara SIEMPRE, en
+     transparente, para que encenderlo no mueva el texto ni un píxel. */
+  border-left: 2px solid transparent;
+  transition: var(--transition);
+}
+
+.gml-rail-boton {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  width: 100%;
+  padding: 7px var(--space-4);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+/* Un paso bloqueado no se puede pulsar y su cursor lo dice antes de intentarlo. */
+.gml-rail-boton:disabled {
+  cursor: default;
+}
+
+.gml-rail-punto {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-top: 4px;
+  border: 1.5px solid var(--color-border-main);
+  border-radius: 50%;
+  background: transparent;
+  transition: var(--transition);
+}
+
+.gml-rail-texto {
+  display: block;
+  min-width: 0;
+}
+
+.gml-rail-rotulo {
+  display: block;
+  font-size: var(--text-13);
+  color: var(--color-text-disabled);
+  transition: var(--transition);
+}
+
+/* El motivo, cuando lo hay. Lo redacta `app/navegacion.js`; aquí solo se le da
+   sitio y el gris que SÍ pasa AA. */
+.gml-rail-motivo {
+  display: block;
+  margin-top: 1px;
+  font-size: var(--text-10);
+  line-height: 1.35;
+  color: var(--color-text-disabled);
+}
+
+/* ── Los tres estados, desde el único atributo que los declara ─────────────── */
+
+.gml-rail-paso[data-rail-estado='libre'] .gml-rail-punto {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.gml-rail-paso[data-rail-estado='libre'] .gml-rail-rotulo {
+  color: var(--color-text-secondary);
+}
+
+.gml-rail-paso[data-rail-estado='libre'] .gml-rail-boton:hover {
+  background: var(--color-bg-elevated);
+}
+
+.gml-rail-paso[data-rail-estado='activo'] {
+  border-left-color: var(--color-accent);
+  background: var(--color-bg-primary);
+}
+
+.gml-rail-paso[data-rail-estado='activo'] .gml-rail-punto {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.gml-rail-paso[data-rail-estado='activo'] .gml-rail-rotulo {
+  font-weight: 600;
+  color: var(--color-text-primary);
 }
 
 .gml-panel {
@@ -407,6 +650,121 @@ body {
  */
 .gml-bloque--catastro {
   gap: var(--space-2);
+  /* Desde T6 esta sección ES la pantalla de Entrada, y sus tres vías pueden
+     pasarse de alto en una ventana corta. Scrollea ELLA, no el panel: el panel es
+     `overflow: hidden` y lo que se le salga por abajo no se alcanza de ninguna
+     manera. `min-height: 0` es lo que permite que un hijo flex encoja por debajo
+     de su contenido — sin él, `overflow-y` no llega a morder nunca.
+
+     ⛔ `flex: 0 1 auto` Y NO `1 1 auto`, Y ESTÁ MEDIDO. La primera versión de T6
+     puso aquí un `flex: 1 1 auto` y creó un SEGUNDO ESTIRADOR en el panel, junto
+     al de avisos. `app/rama.js` ya lo tenía escrito —«dos estiradores a la vez
+     descosen el reparto de altura»— y pasó exactamente eso, con un síntoma que
+     parece imposible: **a 1440×900 la sección salía MÁS CORTA que a 1280×720**
+     (482,17 px contra 526,97), porque el hueco sobrante se repartía entre los dos
+     y la lista de avisos vacía se llevaba ~300 px. Resultado: la tercera vía no
+     cabía en la ventana GRANDE y sí en la pequeña. Lo cazó el guion 14 en la
+     primera pasada; a ojo no se ve, porque quien mira una pantalla cómoda no
+     sospecha de ella. Con `0 1 auto` esta sección pide su contenido, encoge solo
+     si hace falta, y el estirador vuelve a ser uno. */
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ═══ Las tres vías de Entrada (rework de UI · T6) ═══════════════════════════
+ *
+ * Criterio 7: opciones NOMBRADAS Y SEPARADAS, no botones sueltos compitiendo en
+ * una fila del rótulo. Cada vía es una caja con nombre, una frase que dice qué
+ * hace, y su acción; entre ellas, un separador que dice «O bien» — porque son
+ * ALTERNATIVAS y no pasos de una secuencia, y esa es la confusión que hoy tiene
+ * quien abre la aplicación por primera vez.
+ *
+ * El marcado está en `index.html`. Aquí no hay ni un `data-*` de contrato: estas
+ * clases son de presentación pura.
+ */
+
+.gml-via {
+  padding: 13px 14px;
+  border: 1px solid var(--color-border-main);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-primary);
+}
+
+/* La vía principal se marca con un filo de acento a la izquierda y NO con un
+   fondo distinto: el fondo la separaría del resto como si fuera otra cosa, y es
+   la misma cosa — solo que la que se usa casi siempre. */
+.gml-via--principal {
+  border-left: 2px solid var(--color-accent);
+}
+
+.gml-via-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.gml-via-marca {
+  padding: 2px 6px;
+  border-radius: var(--radius);
+  /* No hay token de «acento suave» en el sistema, y no se inventa un hexadecimal:
+     se MEZCLA el acento que sí existe, igual que hace `::selection` más arriba. El
+     texto va en `--color-accent-hover` (sky-700) y no en `--color-accent`, porque
+     sobre un fondo tan claro el sky-600 se queda corto de contraste. */
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent-hover);
+  font-size: var(--text-10);
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.gml-via-apunte {
+  margin: 4px 0 10px;
+  font-size: var(--text-12);
+  line-height: 1.45;
+  color: var(--color-text-disabled);
+}
+
+/* Un botón de vía ocupa el ancho de su caja: es LA acción de esa vía, y dejarlo
+   a su ancho natural lo dejaría flotando como un botón más de los de antes. */
+.gml-via-boton {
+  width: 100%;
+}
+
+/* El separador entre vías. La línea a los lados es lo que dice «son alternativas»
+   sin gastar una frase en decirlo. */
+.gml-obien {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 0;
+  font-size: var(--text-10);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-disabled);
+}
+
+.gml-obien::before,
+.gml-obien::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border-sub);
+}
+
+/* La cuarta vía —abrir un expediente guardado— va aquí abajo y en voz baja: no es
+   empezar, y quien la necesita ya sabe que existe. */
+.gml-entrada-pie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-sub);
+  font-size: var(--text-12);
+  color: var(--color-text-disabled);
 }
 
 /* Los márgenes NO se colapsan dentro de un contenedor flex: sin esto, el margen
