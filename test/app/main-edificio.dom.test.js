@@ -719,3 +719,171 @@ describe('app/main · F11 · el paso 12 sabe en qué rama está', () => {
     expect(arranque.expediente.rama.get()).toBe(RAMA.PARCELA)
   })
 })
+
+// ── 8 · ⭐ CONTRATO K.1 EN DOS EJES, SOBRE EL DOCUMENTO MONTADO ENTERO ────────
+//
+// Rework de UI · T3. Hasta hoy K.1 se vigilaba en `test/app/rama.dom.test.js`,
+// y bien, pero con dos límites que el rework convierte en agujeros:
+//
+//   · Comparaba **una rama contra la otra**, mirando solo dentro de las
+//     `<section>` marcadas con `data-rama-panel`. Todo lo que vive FUERA de una
+//     rama —el pie, los avisos, la cabecera, los dos `<dialog>`, la barra de
+//     edición, los cajones del mapa— no se comparaba con nada, y sin embargo
+//     compite por el mismo `querySelector`.
+//   · Corría sobre un DOBLE del panel de edificio y una cáscara montada a mano.
+//     Aquí corre sobre `app/main.js` de verdad, ya arrancado arriba: es el único
+//     fichero del repositorio donde la aplicación entera está en pie.
+//
+// ── LA REGLA, ESCRITA DE FORMA QUE NO CADUQUE ────────────────────────────────
+// No es «que no se repita entre ramas» ni «que no se repita entre pasos»: es que
+// **cada par atributo/valor de los cinco sea ÚNICO en el documento montado**,
+// salvo los que se declaran GRUPO abajo. `querySelector` devuelve el primero en
+// orden de documento —también si está `hidden`, también si está en la otra rama,
+// también si está en un `<dialog>` cerrado—, así que el eje que metió el nodo ahí
+// da igual. Escrito así, el guardián cubre rama×rama, paso×paso, rama×paso y
+// compartido×cualquiera, y **no habrá que tocarlo cuando el rail aterrice**.
+//
+// Ya pasó una vez y está documentado en `index.html:326-330`: dos controles con
+// el mismo nombre, uno se quedó mudo, y **nada avisó**.
+//
+// ── ⚠️ LOS DOS GRUPOS LEGÍTIMOS, DESTAPADOS AL ESCRIBIR ESTO ────────────────
+// La primera versión de este guardián exigía unicidad a secas y salió ROJA sobre
+// la aplicación real, con dos hallazgos que resultaron ser correctos:
+// `data-campo="modelo-edificio"` (×2) y `data-campo="capa-elegida"` (×N). No son
+// colisiones: son un grupo de radios y una casilla por capa del DXF, y **nadie
+// los resuelve nunca con `querySelector` en singular** —producción los lee por su
+// `Map` de radios y por `evento.target.dataset.campo`, y los tests con
+// `querySelectorAll`—. O sea: la regla de K.1 no es «un valor, un nodo», es «un
+// valor, un CONTROL». Un grupo de radios ES un control.
+//
+// Se declaran uno a uno, con dueño y motivo, y **cualquier otro duplicado sigue
+// siendo rojo**. Además se comprueba que las excepciones no se queden rancias: un
+// grupo que baje a un solo nodo deja de necesitar excepción.
+
+describe('app/main · K.1 en dos ejes · ningún `data-*` se repite en el documento montado', () => {
+  /** Los cinco `data-*` que el cableado resuelve por `querySelector` y guarda. */
+  const DATOS_EXCLUSIVOS = [
+    'data-campo',
+    'data-accion',
+    'data-estado',
+    'data-ficha',
+    'data-procedencia',
+  ]
+
+  /**
+   * Los pares atributo/valor que SON un grupo a propósito, con quién los pone y
+   * por qué no rompen K.1. Escrito a mano y corto: es una excepción, y una
+   * excepción sin nombre y sin motivo es un agujero.
+   */
+  const GRUPOS_DECLARADOS = Object.freeze({
+    'data-campo="modelo-edificio"':
+      'los radios de MODELO_EDIFICIO (app/panel-edificio.js:717). Un grupo de radios ES un ' +
+      'control: producción los lee por su Map, nunca por querySelector.',
+    'data-campo="capa-elegida"':
+      'una casilla por capa del DXF (app/panel-edificio.js:1083), leídas SIEMPRE con ' +
+      'querySelectorAll acotado a su lista (app/panel-edificio.js:1122).',
+  })
+
+  /** Cuántos nodos tiene un par atributo/valor ahora mismo. */
+  const cuantos = (par) => document.querySelectorAll(`[${par}]`).length
+
+  /**
+   * Los pares que aparecen más de una vez **y no están declarados como grupo**,
+   * con su cuenta. Devuelve cadenas ya formateadas para que el fallo NOMBRE al
+   * culpable en vez de decir «esperaba 0 y había 1».
+   *
+   * @returns {string[]}
+   */
+  function repetidosNoDeclarados() {
+    const encontrados = []
+    for (const atributo of DATOS_EXCLUSIVOS) {
+      const cuenta = new Map()
+      for (const el of document.querySelectorAll(`[${atributo}]`)) {
+        const valor = el.getAttribute(atributo)
+        cuenta.set(valor, (cuenta.get(valor) ?? 0) + 1)
+      }
+      for (const [valor, veces] of cuenta) {
+        const par = `${atributo}="${valor}"`
+        if (veces > 1 && !(par in GRUPOS_DECLARADOS)) encontrados.push(`${par} (×${veces})`)
+      }
+    }
+    return encontrados
+  }
+
+  /** Cuántos nodos de contrato hay montados ahora mismo. */
+  const censo = () =>
+    DATOS_EXCLUSIVOS.reduce((n, a) => n + document.querySelectorAll(`[${a}]`).length, 0)
+
+  it('con la rama PARCELA puesta', () => {
+    expect(
+      repetidosNoDeclarados(),
+      'un `data-*` repetido deja mudo a uno de los dos controles: querySelector se queda con ' +
+        'el primero del documento, también si está oculto',
+    ).toEqual([])
+  })
+
+  it('con la rama EDIFICIO puesta (el conmutador no introduce colisiones)', () => {
+    irA(RAMA.EDIFICIO)
+    expect(repetidosNoDeclarados()).toEqual([])
+  })
+
+  it('y con las dos ramas montadas a la vez, que es SIEMPRE', () => {
+    // Las secciones de la rama inactiva NO se sacan del DOM (ésa es la regla dura
+    // de `app/rama.js`), así que las dos compiten siempre por el `querySelector`.
+    // Que la de parcela esté `hidden` no la quita de en medio: ése es el motivo
+    // entero por el que K.1 existe.
+    expect(document.querySelectorAll('[data-rama-panel]').length).toBeGreaterThan(1)
+    irA(RAMA.EDIFICIO)
+    expect(document.querySelector('.gml-bloque--catastro').hidden).toBe(true)
+    expect(document.querySelector('.gml-bloque--catastro').isConnected).toBe(true)
+    expect(repetidosNoDeclarados()).toEqual([])
+  })
+
+  it('el censo no es vacuo: la aplicación entera trae más de treinta nodos de contrato', () => {
+    // Un suelo, no un número exacto: `toBe(n)` sería una lista escrita a mano con
+    // otro nombre y saldría roja cada vez que el marcado creciera con razón. Lo
+    // que este `expect` impide es que el guardián de arriba salga verde porque no
+    // había nada montado que mirar.
+    expect(censo()).toBeGreaterThan(30)
+  })
+
+  it('⛔ el guardián NO es vacuo: un duplicado inyectado sale rojo y con nombre', () => {
+    const intruso = document.createElement('p')
+    intruso.setAttribute('data-estado', 'generar-gml') // ya existe en el pie
+    document.body.appendChild(intruso)
+    try {
+      expect(repetidosNoDeclarados()).toEqual(['data-estado="generar-gml" (×2)'])
+    } finally {
+      intruso.remove()
+    }
+    expect(repetidosNoDeclarados()).toEqual([])
+  })
+
+  it('las excepciones no están rancias: los dos grupos declarados SIGUEN siendo grupos', () => {
+    // Si un grupo baja a un solo nodo, la excepción sobra y hay que retirarla: un
+    // permiso que ya no hace falta es un agujero abierto por si acaso.
+    irA(RAMA.EDIFICIO)
+    for (const [par, motivo] of Object.entries(GRUPOS_DECLARADOS)) {
+      expect(
+        cuantos(par),
+        `«${par}» ya no es un grupo, así que su excepción sobra — ${motivo}`,
+      ).toBeGreaterThan(1)
+    }
+  })
+
+  it('⭐ el grupo de radios tiene UN solo `name`, que es lo que impide que dos paneles se fundan', () => {
+    // `app/panel-edificio.js:713-715` sella el `name` con su marca justamente
+    // porque «dos paneles en el mismo documento con el mismo `name` serían UN
+    // grupo de radios, y elegir en uno desmarcaría el otro». Aquí se vigila.
+    irA(RAMA.EDIFICIO)
+    const radios = [...document.querySelectorAll('[data-campo="modelo-edificio"]')]
+    expect(radios.length).toBeGreaterThan(1)
+    const nombres = new Set(radios.map((r) => r.name))
+    expect(nombres.size, 'los radios del grupo no comparten `name`: no son un grupo').toBe(1)
+    const [nombre] = nombres
+    expect(
+      document.querySelectorAll(`input[name="${nombre}"]`).length,
+      'hay radios de FUERA del grupo compartiendo su `name`: elegir en uno desmarcaría el otro',
+    ).toBe(radios.length)
+  })
+})

@@ -120,30 +120,32 @@
 // tocar `viewer/_comun.js`: ver {@link TOPE_RECONCILIACION}.
 
 import { NIVEL, crearEstadoVista, resolverAvisar } from '../viewer/_comun.js'
+import { RAMA, RAMAS } from './navegacion.js'
 
 // ── El vocabulario ───────────────────────────────────────────────────────────
 
 /**
- * Las dos ramas de la aplicación. **Contrato G**: lo consumen `app/main.js`,
- * `app/cableado-edificio.js` y `app/cableado-expediente.js`, y los valores son
- * los mismos literales que viajan al `data-rama` del `<body>` y a los
- * `data-rama-panel` de las secciones — una sola cadena por concepto, así que no
- * puede haber un atributo escrito con un valor que nadie atienda.
+ * Las dos ramas de la aplicación (`RAMA`) y su orden de pintado y tabulación
+ * (`RAMAS`). **Contrato G**: lo consumen `app/main.js`, `app/cableado-edificio.js`
+ * y `app/cableado-expediente.js`, y los valores son los mismos literales que
+ * viajan al `data-rama` del `<body>` y a los `data-rama-panel` de las secciones —
+ * una sola cadena por concepto, así que no puede haber un atributo escrito con un
+ * valor que nadie atienda. `RAMAS` **es el orden del DOM**, no un adorno: el CSS
+ * de T1.6 declina a propósito usar `order` (cambia el orden visual y no el del
+ * foco, y un tabulador que salta hacia atrás es justo lo que prohíbe WCAG 2.4.3),
+ * así que quien decide el orden es esa lista.
+ *
+ * ⚠️ **Desde el rework de UI (T1) las dos se DECLARAN en `app/navegacion.js`** y
+ * aquí solo se reexportan, sin redefinir ni una cadena. El motivo es el sentido
+ * de la dependencia: `app/navegacion.js` es el dueño sin DOM de `{rama, paso,
+ * modo}` y este módulo va camino de ser su APLICADOR —se suscribirá y pintará,
+ * pero ya no decidirá—, así que el import tiene que ir aplicador → dueño. Dejarlo
+ * al revés obligaría a invertirlo el día de la rebanada 2 con siete llamantes
+ * colgando. Los siete siguen importando `RAMA` de aquí y no se enteran.
  *
  * @readonly
  */
-export const RAMA = Object.freeze({ PARCELA: 'PARCELA', EDIFICIO: 'EDIFICIO' })
-
-/**
- * Las ramas en el orden en que se pintan y se tabulan. **Es el orden del DOM**,
- * no un adorno: el CSS de T1.6 declina a propósito usar `order` (cambia el orden
- * visual y no el del foco, y un tabulador que salta hacia atrás es justo lo que
- * prohíbe WCAG 2.4.3), así que quien decide el orden es esta lista.
- *
- * @readonly
- * @type {readonly ('PARCELA'|'EDIFICIO')[]}
- */
-export const RAMAS = Object.freeze([RAMA.PARCELA, RAMA.EDIFICIO])
+export { RAMA, RAMAS }
 
 /** Lo que se lee en cada botón del conmutador. **No pueden crecer**: ver la
  *  cabecera (46,11 px de holgura medidos, y el guardián es de ancho). */

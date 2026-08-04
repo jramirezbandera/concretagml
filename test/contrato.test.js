@@ -900,7 +900,19 @@ describe('contrato F11 · `edificio/` sale por el barrel; el visor, el servicio 
           fuente,
           `'${nombre}' ya no se exporta desde ${fichero}: la prohibición de arriba ha dejado ` +
             `de proteger nada`,
-        ).toMatch(new RegExp(`export (?:const|function) ${nombre}\\b`))
+        ).toMatch(
+          // Tres formas, y las tres cuentan. La tercera se añadió en el rework de
+          // UI (T1): `RAMA` y `RAMAS` pasaron a DECLARARSE en `app/navegacion.js`
+          // —el dueño sin DOM de `{rama, paso, modo}`— y `app/rama.js` las
+          // REEXPORTA, porque el import tiene que ir aplicador → dueño. Lo que
+          // esta comprobación vigila es que el nombre siga SALIENDO de este
+          // fichero (es de ahí de donde lo importan los siete llamantes, y es esa
+          // salida la que la prohibición de arriba mantiene fuera del barrel), no
+          // por qué sintaxis sale.
+          new RegExp(
+            `export (?:const|function) ${nombre}\\b|export \\{[^}]*\\b${nombre}\\b[^}]*\\}`,
+          ),
+        )
       }
     }
   })

@@ -3161,3 +3161,148 @@ otras alturas de ventana** y el juicio sobre el panel aplastado del defecto A.
 **Abrir en un CAD** el DXF del que salen estas huellas y cotejar sus capas contra
 las que el diálogo ofrece. Y el punto BLOQUEANTE que hereda del 8.1, el 9.4, el
 10.5 y el 11.6: si algún texto de la rama **se lee como un veredicto**.
+
+---
+
+## 20. `14-shell.js` — la cáscara y su línea base (Rework de UI · T4)
+
+Este guion es **distinto de los diecinueve anteriores en una cosa**: no mide una
+funcionalidad recién terminada, mide **la maquetación**, y se escribió **antes**
+que la cáscara de tres columnas que va a juzgar. Ese orden es deliberado y es la
+mitad de su valor: *una medición hecha después del cambio no distingue lo que
+mejoró de lo que ya estaba bien*.
+
+La suite tiene 5.802 pruebas y **ninguna** puede sustituirlo: corren en `node` y
+en jsdom, y **jsdom no calcula maquetación**. `getBoundingClientRect()` devuelve
+ceros, `getComputedStyle` no resuelve `flex`, y un panel que se sale de la
+pantalla por abajo sale VERDE.
+
+### Se lanza DOS veces, y la primera es la que manda (decisión D5)
+
+**Viewport mínimo declarado: 1280×720.** Todas las mediciones históricas de este
+repositorio —267,44 px de la caja de vértices, 12 px de holgura del pie, 947 px
+del panel de Edificio— están hechas a 1440×900, que es una pantalla cómoda. Un
+colegiado con un portátil de 14" no la tiene. **Un defecto a 1280×720 es un
+defecto.**
+
+```bash
+npm run dev                                        # ⚠️ dev, no `vite preview`
+
+$B viewport 1280x720                               # el SUELO declarado
+$B goto http://localhost:PUERTO/concretagml/       # ⚠️ el base, no la raíz
+$B wait ".gml-tabla-vertices"
+$B console --clear
+$B eval scripts/smoke-navegador/14-shell.js
+
+$B viewport 1440x900                               # y la pasada cómoda
+$B reload
+$B wait ".gml-tabla-vertices"
+$B eval scripts/smoke-navegador/14-shell.js
+$B console --errors                                # → (no console errors)
+```
+
+⚠️ **Página recién cargada entre pasadas, y no es formalismo:** el guion PROVOCA
+cinco avisos para medir el bloque, y una tarjeta cuesta 79,28 px del sitio más
+caro del panel. Si arranca con avisos puestos lo dice y ATRIBUYE la pérdida, en
+vez de acusar a la cáscara — la lección que ya pagaron el guion 09 (midió
+demasiado tarde) y el 11 (midió demasiado pronto).
+
+### `modo`: el guion sabe en cuál de los dos mundos está
+
+| `modo` | Cuándo | Qué publica |
+|---|---|---|
+| `LINEA_BASE` | No hay rail (hoy) | El reparto de dos columnas de hoy |
+| `SHELL` | Hay rail (desde T5) | El reparto nuevo **y el coste del rail en px** (cifra de T10) |
+
+**Los umbrales son los mismos en los dos mundos**: el suelo no cambia porque
+cambie la cáscara.
+
+### Cifras de la LÍNEA BASE (2026-08-04, Chrome, `npm run dev`, rama PARCELA)
+
+| Medida | **1280×720** (suelo) | 1440×900 |
+|---|---|---|
+| Veredicto | **`ok: false`** | `ok: true` |
+| Panel: ancho / desborde | 392 px / **0** | 392 px / **0** |
+| Panel: % del ancho | 30,6 % | 27,2 % |
+| Mapa | 888 × 720 | 1048 × 900 |
+| `#tabla-vertices` (sin avisos) | **110,09 px** | **267,44 px** |
+| `#tabla-vertices` (con 5 avisos) | **71,23 px** | 166,50 px |
+| Coste de 5 avisos en la caja | **−38,86 px** | **−100,94 px** |
+| Bloque `#avisos` con 5 avisos | **34,22 px** | 118,95 px |
+| Alto de UNA tarjeta de aviso | 79,28 px | 79,28 px |
+| **Tarjetas que caben en pantalla** | **0,43** | 1,50 |
+| Escondido detrás del scroll | **394 px** | 309 px |
+| Cosas flotando sobre el mapa | 10 | 10 |
+
+### Las cuatro cosas que estas cifras corrigen o destapan
+
+**1 · ⭐ EL DEFECTO DE LOS AVISOS, POR FIN CON NÚMERO.** El autor abrió el rework
+diciendo «los avisos se recortan y pelean con las coordenadas». Aquí está medido:
+a 1280×720 con cinco avisos, **el bloque que los contiene mide 34,22 px y una
+tarjeta mide 79,28** ⇒ **no cabe NI UNA entera (0,43)**, y quedan **394 px detrás
+de un scroll**. Y la pelea con las coordenadas es literal: los mismos cinco avisos
+le quitan **38,86 px** a la caja de vértices, que baja a **71,23 px** — unas tres
+filas.
+
+⚠️ **Este umbral lo obligó a añadir la propia primera pasada.** La versión inicial
+del guion solo miraba si el TEXTO de cada tarjeta estaba recortado, y salía en
+verde: los textos salen enteros **dentro de su tarjeta**. Lo que estaba cortado
+era la LISTA. Medir el elemento equivocado da un verde que miente, que es
+exactamente el defecto que este proyecto lleva once fases persiguiendo.
+
+**2 · EL PANEL NO SE SOBRESUSCRIBE, y eso corrige una suposición del plan.** El
+design doc del rework cita «el panel actual se sobresuscribe 47,54 px a 1440×900».
+Medido hoy: **desborde 0 px en los dos viewports**. Aquella cifra era de la rama
+EDIFICIO **con los dos motivos largos de los CTA**, y F11 la arregló fundiéndolos
+en `MOTIVO_CTA_EN_EDIFICIO`. El defecto que queda de F11 es el otro: las dos cajas
+encogibles **18,33 px cortas** (§19), no el desbordamiento.
+
+**3 · EL INVARIANTE DE F07 SIGUE EN PIE, Y HAY QUE MIRAR EL NODO BUENO.**
+`#tabla-vertices` mide **267,44 px clavados** a 1440×900: siete fases seguidas sin
+moverlo. La primera pasada de este guion leyó 323,38 y pareció una regresión de
+56 px — estaba midiendo `.gml-bloque--vertices`, que **le suma el `<h2>`**. El
+guion publica ahora los tres nodos por separado (`bloque`, `tabla`,
+`contenedorConScroll`) y dice cuál es el comparable. **La cifra que vale es
+`contenedorConScroll`.**
+
+**4 · A 1280×720 LA CAJA DE VÉRTICES PIERDE 157,35 px.** De 267,44 a **110,09**.
+Nadie lo había medido: todas las cifras históricas son a 1440×900. Con cinco
+avisos encima se queda en **71,23 px**. El suelo declarado no es una pantalla
+cómoda, y ésa es justamente la razón de declararlo.
+
+### Qué cuenta como «pasa»
+
+`ok: true` con `problemas: []` **en las dos pasadas**. Hoy la de 1280×720 sale en
+rojo con un problema, y **eso es lo correcto**: el guion está midiendo el defecto
+que el rework existe para arreglar. **La primera vez que dé `ok:true` con
+`modo:'SHELL'` en las dos pasadas es el día que la rebanada esté bien de verdad.**
+
+Umbrales, con su motivo:
+
+| Umbral | Valor | Por qué |
+|---|---|---|
+| `SUELO_ALTO_MAPA` | 200 px | A 0, `viewer/wms-catastro.js` corta el encuadre **sin petición, sin aviso y sin error**. Pero a 80 px la cartografía tampoco sirve: el suelo es el alto por debajo del cual la parcela y su entorno no caben juntos. |
+| `SUELO_ANCHO_MAPA` | 400 px | La maqueta medida del shell le dejaba **680 px** a 1280×720. |
+| `DESBORDE_TOLERADO` | 1 px | `.gml-panel` es `overflow: hidden`: cada píxel de más es contenido **inalcanzable, ni con la rueda**. El píxel es de redondeo subpíxel. |
+| Tarjetas que caben | ≥ 1 | Un aviso del que no se ve ni una tarjeta entera es un aviso mudo. |
+
+### Lo que este guion **NO** puede medir
+
+**Si la pantalla es BONITA.** Publica anchos, altos y desbordes. Que el reparto se
+lea como un producto y no como un formulario de 2010 no tiene número, y es lo
+único que el autor dio como motivo del rework («solo mi incomodidad»).
+
+**Que un colegiado sepa por dónde empezar.** Nadie que no escribiera este código
+ha abierto nunca la aplicación. La asignación sigue abierta: sentarle delante con
+una referencia catastral en un papel y **callarse cinco minutos**.
+
+**Que el rail se pueda pulsar con el dedo** (§0: los sucesos van despachados a
+mano). **Que la cartografía se vea** — aquí se miden CAJAS, no píxeles pintados:
+un mapa de 700 px con el WMS caído da las mismas cifras que uno bueno; eso es del
+guion 02. **El eje PASO**, mientras `modo` siga siendo `LINEA_BASE`.
+
+### Estado que deja
+
+Las cinco tarjetas de aviso que él mismo ha provocado y **nada más**: no carga
+ficheros, no consulta al Catastro, no conmuta de rama y no edita. `$B reload` para
+volver al punto de partida.

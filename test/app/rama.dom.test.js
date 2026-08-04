@@ -476,6 +476,19 @@ describe('app/rama · ida y vuelta a EDIFICIO deja VIVA la rama parcela (M10)', 
 })
 
 // ── 4 · Ningún `data-*` repetido entre ramas (T0.3·6) ────────────────────────
+//
+// ⚠️ **ESTE BLOQUE YA NO ES EL ÚNICO GUARDIÁN DE K.1, NI EL PRINCIPAL** (rework
+// de UI · T3, 2026-08-04). Lo que hay aquí compara **una rama contra la otra**,
+// mirando solo dentro de las secciones marcadas con `data-rama-panel`, y sobre un
+// DOBLE del panel de edificio: es la comprobación de cerca, y sigue valiendo
+// porque es la que falla ANTES y nombrando la rama.
+//
+// La de lejos vive en `test/app/main-edificio.dom.test.js` (bloque 8), corre
+// sobre `app/main.js` de verdad ya arrancado, y afirma la regla generalizada:
+// **cada par atributo/valor es único en el documento montado ENTERO** —pie,
+// avisos, cabecera, los dos `<dialog>`, la barra de edición y los cajones
+// incluidos—, salvo dos grupos declarados con su motivo. Está escrita así para
+// que cubra también el eje PASO sin tocarla el día que el rail aterrice.
 
 describe('app/rama · ningún `data-*` se repite entre las dos ramas', () => {
   it('los cinco atributos del contrato K.1 no tienen ni un valor en común', () => {
