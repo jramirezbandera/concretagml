@@ -1607,6 +1607,16 @@ const visor = crearVisor(nodo('#mapa'), {
   // que es lo que ata los 20 cm del campo a estos 0,2 m POR CONSTRUCCIÓN y no
   // por casualidad.
   edicion: { tolerancia: OPERATIVOS.snapMetros },
+  // ⛔ AVISO PARA QUIEN LEA `diagnostico: true` Y `comprobacion: true` DE ABAJO
+  // (rework de UI · T8, 2026-08-04). Son banderas de **MONTAJE**: le dicen a
+  // `crearVisor` qué cajón CONSTRUIR, y nada más. **No son estado de modo, y no
+  // dicen en qué punto del recorrido está el usuario.** Están escritas así desde
+  // F07/F08 y las dos notas de abajo ya lo explican, pero el plan del rework las
+  // leyó como si fueran el modo activo y dio por hecho que la navegación ya
+  // existía; costó una revisión cruzada descubrir que no. Quien sabe el paso, la
+  // rama y el modo es `app/navegacion.js`, desde T1 — y el rail que lo pinta,
+  // `app/rail.js`. Si buscas «en qué pantalla estamos», no es esto.
+  //
   // ── F07 · el diagnóstico, montado (que no es lo mismo que abierto) ───────
   // `true` y no un objeto: las dos claves que admite —`posicion` y `minimoPx`—
   // valen aquí exactamente lo que sus defectos, y escribirlas sería fingir una

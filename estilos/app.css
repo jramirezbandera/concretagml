@@ -1010,7 +1010,37 @@ body {
    nuevo. La arquitectura sigue siendo la misma —altura fija repartida entre
    bloques fijos— y la solución de verdad sigue pendiente en
    `spec/feature-06-edicion-parcela.md` §2. El aire de arriba es aire prestado:
-   el primer bloque fijo que entre en el panel se lo sigue comiendo entero. */
+   el primer bloque fijo que entre en el panel se lo sigue comiendo entero.
+
+   ── ⭐ EL REWORK DE UI SÍ LO CAMBIÓ (T6, 2026-08-04) ──────────────────────
+   Cinco fases seguidas esquivando este presupuesto, y ninguna lo tocó. T6 sí,
+   y no metiendo ni sacando bloques: **partiendo el panel por PANTALLA**. Los
+   bloques ya no se enseñan todos a la vez; cada `<section>` declara en qué
+   pasos existe (`data-pantalla` en `index.html`) y las cinco reglas de
+   `display:none` de este mismo fichero apagan las demás. Medido por el guion
+   14, misma lista de avisos vacía:
+
+       caja de vértices ANTES de T6 ..... 267,44 px a 1440×900 · 110,09 a 1280×720
+       caja de vértices DESPUÉS ......... 385,67 px a 1440×900 · 228,33 a 1280×720
+       ganancia ......................... +118,2 px en los dos ⇒ +44 %
+
+   Los 267 px eran el invariante que F06, F07, F08, F09, F10 y F11 se
+   esforzaron en NO mover; subieron un 44 % sin optimizar ni una regla, solo
+   dejando de enseñar a la vez dos cosas que nunca se usan a la vez.
+
+   ⚠️ LO QUE NO ARREGLA, Y HAY QUE LEERLO ANTES DE CELEBRARLO. Dentro de UNA
+   pantalla el reparto es exactamente el de antes: altura fija entre bloques
+   fijos, esta cesión imprescindible, y `spec/feature-06-edicion-parcela.md` §2
+   todavía sin cerrar. Lo que T6 quita es la competencia ENTRE pantallas, no la
+   que hay dentro de una. **Un bloque fijo nuevo en Validación se sigue comiendo
+   los 385 px igual de rápido que se comía los 267.**
+
+   ⚠️ CUÁNDO REVISAR ESTA NOTA —y esta línea existe por lo que le pasó a la
+   cabecera de este mismo fichero, que dijo ocho fases una cosa que dejó de ser
+   cierta en la cuarta—: cuando entre un bloque fijo nuevo en CUALQUIER
+   pantalla, y en **T9**, que trae Comprobación y Diagnóstico a una pantalla
+   propia. Las cifras de arriba son de la rama PARCELA en Validación; si el
+   guion 14 devuelve otras, mandan las suyas y esta nota se corrige. */
 .gml-bloque--avisos {
   flex: 0 1 auto;
 }

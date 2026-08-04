@@ -378,7 +378,34 @@ const arranque = {
     $('aside .gml-bloque--expediente, aside [data-bloque="expediente"]') !== null,
 }
 
-// ⭐ LA MEDIDA QUE SOLO TIENE SENTIDO EN F10: la fila del rótulo con DOS botones.
+// ⭐ LA MEDIDA QUE SOLO TENÍA SENTIDO EN F10: la fila del rótulo con DOS botones.
+//
+// ⛔⛔ ESTE BLOQUE MIDE UNA FILA QUE YA NO EXISTE (comprobado el 2026-08-04, rework
+// de UI · T8). NO SE ARREGLA AQUÍ Y NO SE FINGE QUE FUNCIONA: se declara.
+//
+// T6 reestructuró Entrada en tres vías y se llevó los dos botones fuera de la fila
+// del `<h2>` «Origen de la parcela»: «Abrir un GML…» es hoy la tercera vía y
+// «Expediente» es el «Abrirlo» del pie de Entrada. **`.gml-rotulo-acciones` ya no
+// aparece en `index.html`** —solo lo fabrica `app/panel-edificio.js`, que es otra
+// pantalla—, y la consecuencia se mide en dos daños distintos:
+//
+//   1. `accionesRotulo` es SIEMPRE `null`, así que los dos guardianes de abajo
+//      —`mismaLinea === false` y `holguraPx !== null`— **no pueden disparar nunca**.
+//      Están verdes porque no miran nada, que es el peor verde que hay.
+//   2. Peor todavía: `$('.gml-rotulo-fila')` no devuelve `null`, devuelve **la fila
+//      de «Vértices»**, que es la otra que usa ese patrón. Así que `altoPx` y
+//      `altoDelH2Px` siguen publicando números plausibles bajo el rótulo
+//      `filaDelRotulo` — números de OTRO elemento. Es exactamente el error que T4
+//      dejó escrito: medir el elemento equivocado da un verde que miente.
+//
+// QUÉ HAY QUE HACER CUANDO SE RETOME (no es de T8, que es de documentación): la
+// decisión que esto protege —«la interfaz de F10 cuesta 0 px en el panel»— sigue
+// viva, pero su comprobación es otra: que «Abrirlo» siga siendo un
+// `.gml-boton--menudo` dentro de `.gml-entrada-pie`, en una sola línea, y que el
+// guardián de `bloqueExpedienteEnElPanel` —que ése SÍ sigue midiendo lo suyo— siga
+// en pie. Y el guion entero hay que lanzarlo sobre `#/parcela/validacion`, como ya
+// avisa el §19 del GUION: en Entrada la caja de vértices no se ve y el guardián de
+// los 220 px de más arriba levantaría una regresión que no existe.
 const filaRotulo = $('.gml-rotulo-fila')
 const h2Rotulo = filaRotulo === null ? null : filaRotulo.querySelector('.gml-rotulo')
 const accionesRotulo = filaRotulo === null ? null : filaRotulo.querySelector('.gml-rotulo-acciones')

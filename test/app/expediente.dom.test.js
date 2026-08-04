@@ -66,6 +66,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { crearPanelAvisos } from '../../app/avisos.js'
 import {
   COLETILLA_SIN_PERSISTENCIA,
+  DOCUMENTO,
   EXTENSIONES_PROYECTO,
   FICHERO,
   MENSAJE_AUTOGUARDADO_EN_ESPERA,
@@ -80,6 +81,9 @@ import {
   MS_CONFIRMAR_BORRADO,
   SELECTOR_BOTON_EXPEDIENTE,
   cablearExpediente,
+  mensajeEdificioFuera,
+  mensajeParcelaDeContexto,
+  mensajeParcelaFuera,
   nombreFicheroExport,
 } from '../../app/cableado-expediente.js'
 import { parcelaDemo, parcelaDemoConHueco, REFCAT_DEMO } from '../../app/demo-datos.js'
@@ -287,6 +291,9 @@ async function montar({
   conRama = false,
   ramaInicial = RAMA.PARCELA,
   edificio = null,
+  // Entra por parámetro desde T7: un `url` sin `createObjectURL` es la forma limpia de
+  // provocar que `descargarTexto` NO entregue, sin doblar el módulo entero.
+  url = espiaUrl(),
 } = {}) {
   const apertura = bd ?? (await baseNueva())
   let reloj = Date.UTC(2026, 7, 3, 10, 0, 0)
@@ -308,7 +315,6 @@ async function montar({
     },
   }
   const timers = temporizadores()
-  const url = espiaUrl()
   const cargadas = []
 
   // ── F11 · la rama, cuando la prueba la pide ────────────────────────────────
@@ -392,6 +398,26 @@ const TEXTOS_F11 = Object.freeze([
   MENSAJE_SIN_RAMA_EDIFICIO,
   MENSAJE_GUARDADO_SIN_EDIFICIO,
 ])
+
+/**
+ * Los textos que el rework de UI · T7 añade: los tres, **por los dos documentos**, o
+ * sea las seis cadenas que pueden salir por pantalla.
+ *
+ * ⛔ **La lista se escribió primero con un solo documento por texto, y una mutación lo
+ * cazó**: haciendo que el cableado avisara SIEMPRE, la prueba de «sin parcela debajo no
+ * dice nada de más» seguía en VERDE, porque el texto que salía llevaba el otro nombre
+ * de documento y el `not.toContain` no lo reconocía. Fijar una sola variante convierte
+ * las comprobaciones negativas en decorado.
+ *
+ * Entran además en los mismos dos guardianes de higiene que los de F11: un texto que no
+ * pase por ahí puede salir con Markdown crudo o con una palabra de mérito y nadie se
+ * entera.
+ */
+const TEXTOS_T7 = Object.freeze(
+  [mensajeEdificioFuera, mensajeParcelaDeContexto, mensajeParcelaFuera].flatMap((componer) =>
+    Object.values(DOCUMENTO).map((donde) => componer(donde)),
+  ),
+)
 
 /** Pulsa un botón del diálogo por selector. Falla nombrándolo si no está. */
 function pulsar(selector) {
@@ -1231,6 +1257,7 @@ describe('F10 · T5.1 · 10 · higiene', () => {
       MENSAJE_SIN_PURGA,
       MENSAJE_SIN_SELECTOR,
       ...TEXTOS_F11,
+      ...TEXTOS_T7,
     ]
     // Anti-vacuidad: el arranque ha dicho algo de verdad.
     expect(m.avisos().length).toBeGreaterThan(0)
@@ -1249,6 +1276,7 @@ describe('F10 · T5.1 · 10 · higiene', () => {
       MENSAJE_SIN_PURGA,
       MENSAJE_SIN_SELECTOR,
       ...TEXTOS_F11,
+      ...TEXTOS_T7,
     ].join('\n')
     expect(textos).not.toMatch(prohibidas)
     expect(fuente).toContain('regla de oro 9')
@@ -1699,5 +1727,199 @@ describe('F11 · T3.3 · 15 · higiene de la rama', () => {
     expect(m.cableado.estado().rama).toBe(RAMA.PARCELA)
     expect(m.cableado.estado().puedeGuardar).toBe(true)
     m.desmontar()
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Rework de UI · T7 · la rama que se queda FUERA, dicha
+//
+// Hallazgo A2 de la revisión de ingeniería: `expedienteActual()` deriva la rama
+// activa y **descarta la otra en silencio**. La semántica NO se cambia —la
+// exclusividad es de `model/parcela.js` y está ahí por un motivo—, así que lo que
+// estas pruebas miden no es que se guarde otra cosa: es que **se diga**.
+//
+// Con anti-vacuidad por los dos lados, que es lo que hace que digan algo: que salga
+// cuando hay que decirlo Y que NO salga cuando no. Un aviso que sale siempre no
+// informa de nada, y encima cuesta una tarjeta en el panel, que es justo el sitio
+// que este rework está intentando desatascar.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('Rework de UI · T7 · 16 · qué rama se guarda y cuál NO va en el fichero', () => {
+  it('⛔ «Guardar» con un edificio cargado lo DICE: por el renglón y por el panel', async () => {
+    const m = await montar({ conRama: true, edificio: edificioDemo() })
+    await abrir(m)
+    escribirNombre('Solo la parcela')
+    pulsar(SELECTOR.GUARDAR)
+    await reposar()
+
+    const esperado = mensajeEdificioFuera(DOCUMENTO.GUARDADO)
+    expect(m.renglon()).toContain(esperado)
+    // Y al panel también: el renglón se lo lleva el siguiente `fijar`, y esto hay que
+    // poder releerlo con el diálogo ya cerrado.
+    expect(m.avisos().join('\n')).toContain(esperado)
+    // El acuse de siempre no se ha perdido por el camino.
+    expect(m.renglon()).toContain('Solo la parcela')
+    m.desmontar()
+  })
+
+  it('⭐ y el mensaje no miente: el registro guardado de verdad NO lleva el edificio', async () => {
+    // Anti-vacuidad dura. Sin esta prueba, la de arriba mide un texto bonito y no que
+    // ese texto sea VERDAD — que es la única razón por la que vale la pena escribirlo.
+    const m = await montar({ conRama: true, edificio: edificioDemo() })
+    await abrir(m)
+    pulsar(SELECTOR.GUARDAR)
+    await reposar()
+
+    const { registros } = await m.expedientes.listar()
+    const r = await m.expedientes.recuperar(registros[0].id)
+    expect(r.expediente.tipo).toBe('PARCELA')
+    expect(r.expediente.edificio).toBeNull()
+    // …con el edificio bien vivo en el otro store mientras tanto: se ha quedado fuera
+    // del fichero, no de la sesión, y eso es exactamente lo que el texto promete.
+    expect(m.estadoEdificio.get().partes).toHaveLength(2)
+    m.desmontar()
+  })
+
+  it('…y SIN edificio cargado el acuse es el de F10, sin una palabra de más', async () => {
+    const m = await montar({ conRama: true, edificio: null })
+    await abrir(m)
+    pulsar(SELECTOR.GUARDAR)
+    await reposar()
+
+    expect(m.renglon()).toContain('en este navegador.')
+    for (const t of TEXTOS_T7) expect(m.renglon()).not.toContain(t)
+    for (const t of TEXTOS_T7) expect(m.avisos().join('\n')).not.toContain(t)
+    m.desmontar()
+  })
+
+  it('sin rama cableada (F10 puro) no aparece ninguno de los tres textos', async () => {
+    const m = await montar()
+    await abrir(m)
+    pulsar(SELECTOR.GUARDAR)
+    await reposar()
+    for (const t of TEXTOS_T7) expect(m.renglon()).not.toContain(t)
+    m.cableado.destruir()
+  })
+
+  it('⛔ el `.json` de un edificio dice que la parcela de debajo va solo como CONTEXTO', async () => {
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
+    await abrir(m)
+    pulsar(SELECTOR.EXPORTAR_PROYECTO)
+    await reposar()
+
+    const esperado = mensajeParcelaDeContexto(DOCUMENTO.PROYECTO)
+    expect(m.renglon()).toContain(esperado)
+    expect(m.avisos().join('\n')).toContain(esperado)
+    // Y NO el del caso peor: son dos situaciones distintas y el texto las distingue.
+    expect(m.renglon()).not.toContain(mensajeParcelaFuera(DOCUMENTO.PROYECTO))
+    m.desmontar()
+  })
+
+  it('⭐ la promesa de ese texto se MIDE: al reabrir el fichero la parcela no vuelve al panel', async () => {
+    // El mensaje afirma dos cosas comprobables —que la parcela viaja recortada y que al
+    // reabrir no aparece en el panel de parcela—, y las dos se miden aquí. Un mensaje
+    // que promete de más es peor que el silencio que viene a arreglar.
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
+    await abrir(m)
+    pulsar(SELECTOR.EXPORTAR_PROYECTO)
+    await reposar()
+
+    const texto = await m.url.blobs[0].text()
+    const leido = deProyecto(texto)
+    // Dentro del fichero SÍ está, como contexto y solo con los recintos.
+    expect(leido.expediente.edificio.parcelaContexto).toEqual(parcelaDemo().recintos)
+    expect(leido.expediente.parcela).toBeNull()
+
+    // Una parcela distinguible en el store, para poder ver si la trae o si la pisa.
+    m.estado.set(parcelaDemoConHueco())
+    await reposar()
+    await m.cableado.abrirProyecto(ficheroDeTexto('vuelta.json', texto))
+    await reposar()
+
+    expect(m.cargadas).toHaveLength(0)
+    expect(m.estado.get().recintos).toEqual(parcelaDemoConHueco().recintos)
+    // Se ha quedado donde el mensaje dice que se queda: dentro del edificio.
+    expect(m.estadoEdificio.get().parcelaContexto).toEqual(parcelaDemo().recintos)
+    m.desmontar()
+  })
+
+  it('⛔ con un edificio que YA traía contexto propio, el texto es el OTRO: la parcela no viaja', async () => {
+    const propio = [{ tipo: 'EXTERIOR', vertices: [[1, 1], [2, 1], [2, 2]] }]
+    const m = await montar({
+      conRama: true,
+      ramaInicial: RAMA.EDIFICIO,
+      edificio: edificioDemo({ parcelaContexto: propio }),
+    })
+    await abrir(m)
+    pulsar(SELECTOR.EXPORTAR_PROYECTO)
+    await reposar()
+
+    expect(m.renglon()).toContain(mensajeParcelaFuera(DOCUMENTO.PROYECTO))
+    expect(m.renglon()).not.toContain(mensajeParcelaDeContexto(DOCUMENTO.PROYECTO))
+    // Medido en el fichero, no solo en el texto: lo que viaja es el contexto propio.
+    const leido = deProyecto(await m.url.blobs[0].text())
+    expect(leido.expediente.edificio.parcelaContexto).toEqual(propio)
+    expect(leido.expediente.edificio.parcelaContexto).not.toEqual(parcelaDemo().recintos)
+    m.desmontar()
+  })
+
+  it('…y sin parcela debajo, el `.json` del edificio no dice nada de más', async () => {
+    const m = await montar({
+      conRama: true,
+      ramaInicial: RAMA.EDIFICIO,
+      edificio: edificioDemo(),
+      parcela: null,
+    })
+    await abrir(m)
+    pulsar(SELECTOR.EXPORTAR_PROYECTO)
+    await reposar()
+
+    expect(m.renglon()).toContain('Descargado el fichero de proyecto')
+    for (const t of TEXTOS_T7) expect(m.renglon()).not.toContain(t)
+    m.desmontar()
+  })
+
+  it('⭐ un fichero que NO ha bajado no arrastra la coletilla de lo que no lleva', async () => {
+    // Contarle a alguien qué no lleva un fichero que no existe es ruido encima de un
+    // fallo. Un `url` sin `createObjectURL` hace que `descargarTexto` salga por
+    // «este entorno no implementa…», que es la única rama de fallo provocable aquí.
+    const m = await montar({
+      conRama: true,
+      ramaInicial: RAMA.EDIFICIO,
+      edificio: edificioDemo(),
+      url: {},
+    })
+    await abrir(m)
+    pulsar(SELECTOR.EXPORTAR_PROYECTO)
+    await reposar()
+
+    expect(m.renglon()).toMatch(/no se ha descargado/i)
+    for (const t of TEXTOS_T7) expect(m.renglon()).not.toContain(t)
+    for (const t of TEXTOS_T7) expect(m.avisos().join('\n')).not.toContain(t)
+    m.desmontar()
+  })
+
+  it('el DXF y el listado quedan fuera de T7 a propósito: no descartan ninguna rama', async () => {
+    const m = await montar({ conRama: true, edificio: edificioDemo() })
+    await abrir(m)
+    pulsar(SELECTOR.EXPORTAR_DXF)
+    await reposar()
+    for (const t of TEXTOS_T7) expect(m.renglon()).not.toContain(t)
+
+    pulsar(SELECTOR.EXPORTAR_COORDENADAS)
+    await reposar()
+    for (const t of TEXTOS_T7) expect(m.renglon()).not.toContain(t)
+    m.desmontar()
+  })
+
+  it('los tres textos nombran su documento, dicen la salida que lo conserva y no se repiten', async () => {
+    expect(mensajeEdificioFuera(DOCUMENTO.GUARDADO)).toContain(DOCUMENTO.GUARDADO)
+    expect(mensajeEdificioFuera(DOCUMENTO.PROYECTO)).toContain(DOCUMENTO.PROYECTO)
+    // Tres textos × dos documentos, y las seis cadenas distintas: si dos coincidieran,
+    // el acuse estaría mandando al usuario a buscar donde no hay nada.
+    expect(new Set(TEXTOS_T7).size).toBe(6)
+    // Ninguno se queda en el diagnóstico: los tres dicen a qué rama ir y qué pulsar.
+    for (const t of TEXTOS_T7) expect(t).toMatch(/rama (Parcela|Edificio)/)
+    for (const t of TEXTOS_T7) expect(t).toMatch(/fichero de proyecto|\.json/)
   })
 })

@@ -12,22 +12,25 @@
 // ~36 px medidos y esos 36 px se los quita la CAJA DE VÉRTICES — que costó recuperar
 // hasta 303 px sacando «Edición» al mapa en F06 y que F07 dejó en 267, con suelo
 // declarado en 220. Un bloque «Expediente» con lista, campo de nombre y cuatro
-// botones se comería el presupuesto entero.
+// botones se comería el presupuesto entero. **Eso sigue siendo verdad dentro de
+// cualquier pantalla**, así que el `<dialog>` se queda.
 //
-// La fila del rótulo de «Origen de la parcela», en cambio, YA EXISTE, y
-// `.gml-boton--menudo` está dimensionado para caber DENTRO del alto de línea del
-// `<h2>` (15,2 px de botón contra 15,95 px de renglón). **Coste 0 px**, que es el
-// mismo argumento —y la misma medida— con la que F08 metió ahí «Abrir un GML…».
+// ⚠️ **DÓNDE ESTÁ EL BOTÓN: YA NO EN LA FILA DEL RÓTULO (rework de UI · T6,
+// 2026-08-04).** Aquí ponía que vivía a la derecha del `<h2>` de «Origen de la
+// parcela», emparejado con «Abrir un GML…» dentro de un `.gml-rotulo-acciones`, y que
+// la holgura de esa fila eran 12 px. **Esa fila ya no existe**: T6 reestructuró
+// Entrada en tres vías y el botón se fue al PIE de esa pantalla, con el rótulo
+// «Abrirlo» y la pregunta «¿Ya tenías un expediente?» delante. Va abajo a propósito
+// —recuperar trabajo no es empezar—, y el selector de contrato
+// (`SELECTOR_BOTON_EXPEDIENTE` en `app/cableado-expediente.js`) **no cambió**: es
+// `[data-accion="abrir-expediente"]` y sigue casando un solo nodo.
 //
-// ⚠️ Con dos botones esa fila pasa a tener TRES hijos y `.gml-rotulo-fila` es un
-// `space-between`: los dos botones se separarían a los extremos. Por eso van
-// envueltos en un `.gml-rotulo-acciones`, que es un hijo solo.
-//
-// ✅ **MEDIDO en navegador real (2026-08-03, 1440×900):** la fila mide **16 px**, que
-// es lo que medía con el `<h2>` solo, y la caja de vértices sigue en **267 px**. Los
-// dos botones caen en la misma línea sin desbordar los 392 px del panel — pero **con
-// 12 px de holgura**, así que el rótulo «Expediente» no puede crecer. Está anotado
-// también en `index.html`, que es donde alguien iría a cambiarlo.
+// Lo que de aquel razonamiento sobrevive intacto: `.gml-boton--menudo` sigue
+// dimensionado para caber DENTRO del alto de línea de un `<h2>` (15,2 px de botón
+// contra 15,95 px de renglón), que es lo que hace que el pie de Entrada no crezca. La
+// medida de los 267 px, en cambio, **caducó**: desde T6 la caja de vértices mide
+// 385,67 px a 1440×900. El registro completo está en `index.html`, donde estaba el
+// botón, y en la nota de `estilos/app.css`.
 //
 // ── POR QUÉ ES UN MODAL, Y NO UN CAJÓN SOBRE EL MAPA ───────────────────────
 // Mismo reparto que F09, y por el mismo motivo: **el mapa no aporta nada mientras se

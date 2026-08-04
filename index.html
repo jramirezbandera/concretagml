@@ -3,14 +3,23 @@
   Concreta GML — index.html · F03 · Fase 4, Tarea 4B.1. LA CÁSCARA VIVA DE LA APP.
 
   Sustituye la sonda de build de la tarea 4A.1. Aquí ya no hay andamiaje: este es
-  el esqueleto definitivo de la pantalla única de la app.
+  el esqueleto definitivo de la app.
+
+  ⛔ AQUÍ PONÍA «la pantalla ÚNICA de la app», y fue verdad de F03 a F11
+  (rectificado el 2026-08-04, rework de UI · T8). Ya no: la cáscara tiene TRES
+  columnas —rail · panel · mapa— y **CINCO pantallas** que se turnan en el panel
+  (Entrada, Validación, Edición, Diagnóstico e Informe). Ninguna `<section>` se
+  saca del DOM: se apagan con `data-pantalla` y cinco reglas de `display:none` de
+  `estilos/app.css`. Quien decide en cuál estamos es `app/navegacion.js`; quien
+  pinta el rail, `app/rail.js`; quien apaga las secciones, `app/pantalla.js`.
 
   ── QUÉ ES ESTE FICHERO, EXACTAMENTE ────────────────────────────────────────
   Un ESQUELETO DE CAJAS VACÍAS, y nada más. No pinta contenido dinámico: el
   interior de `#avisos` es de `app/avisos.js`, el de `#tabla-vertices` y el de
-  `#mapa` es de `viewer/` (`sincronizar` y `crearVisor`), y los textos de la
-  ficha del pie los escribe `app/main.js` desde el store. Lo único que este HTML
-  aporta son los NODOS y sus clases.
+  `#mapa` es de `viewer/` (`sincronizar` y `crearVisor`), los peldaños del rail
+  son de `app/rail.js` y los textos de la ficha del pie los escribe
+  `app/main.js` desde el store. Lo único que este HTML aporta son los NODOS y
+  sus clases.
 
   ⚠️ EL MARCADO ES CONTRATO, NO SUGERENCIA. `estilos/app.css` está escrito
   contra este esqueleto exacto (clases `gml-*`, anidamiento y orden incluidos).
@@ -227,70 +236,58 @@
            ninguno pisa al otro. Está razonado en la cabecera de
            `app/pantalla.js`. -->
       <section class="gml-bloque gml-bloque--catastro" data-pantalla="entrada">
-        <!-- ── F08 · «Abrir un GML…» VA EN LA FILA DEL RÓTULO ────────────────
-             Con este botón la app estrena su PRIMERA entrada por fichero: hasta
-             F08 no había ni un `<input type="file">`, ni un `FileReader`, ni un
-             `drop` en todo el proyecto. Y va aquí, a la derecha del `<h2>`, y NO
-             en una fila propia debajo.
+        <!-- ── AQUÍ ESTUVIERON «Abrir un GML…» (F08) Y «Expediente» (F10) ────
+             ⚠️ HASTA EL 2026-08-04 los dos vivían metidos en la fila del `<h2>`
+             «Origen de la parcela», envueltos en un `.gml-rotulo-acciones`. Si
+             buscas ese envoltorio o esa fila en esta pantalla: **ya no existen**.
+             El rework de UI (T6) los convirtió en lo que siempre fueron —vías de
+             entrada— y cada uno se fue a su sitio: «Abrir un GML…» es la tercera
+             vía de más abajo, y «Expediente» es el «Abrirlo» del pie.
 
-             LA RAZÓN ES MEDIDA, NO ESTÉTICA, y es LA MISMA que ya razona el
-             `.gml-boton-par` de unas líneas más abajo (el que empareja «Deducir
-             del mapa» con «Traer colindantes»): el panel reparte una altura FIJA
-             entre bloques fijos, así que una fila de botón a lo ancho cuesta
-             ~36 px y esos 36 px se los quita la CAJA DE VÉRTICES — que costó
-             recuperar hasta 303 px sacando el bloque «Edición» al mapa (F06) y
-             que F07 dejó en 267. La fila del rótulo, en cambio, YA EXISTE y le
-             sobra ancho: el botón cabe en el hueco vacío de su derecha.
+             POR QUÉ ESTUVIERON AHÍ, que es lo que hay que entender ANTES de
+             volver a meter nada en una fila de rótulo: el panel repartía una
+             altura fija entre bloques fijos que se enseñaban TODOS A LA VEZ, así
+             que una fila de botón a lo ancho costaba ~36 px medidos y esos 36 px
+             se los quitaba la caja de vértices —que costó recuperar hasta 303 px
+             sacando «Edición» al mapa (F06) y que F07 dejó en 267—. El hueco a la
+             derecha de un `<h2>` costaba 0, y era 0 medido: `.gml-boton--menudo`
+             mide 15,2 px contra los 15,95 px del renglón del rótulo.
 
-             COSTE CERO, y es literal: `.gml-boton--menudo` está dimensionado en
-             `estilos/app.css` para caber DENTRO del alto de línea del `<h2>`
-             (15,2 px de botón contra 15,95 px de renglón), así que el bloque no
-             crece ni un píxel y los 267 px de la tabla siguen siendo 267.
+             LO QUE DE AQUELLO SIGUE SIENDO VERDAD:
+               · `.gml-boton--menudo` sigue dimensionado en `estilos/app.css` para
+                 caber dentro del alto de línea de un `<h2>`. El «Abrirlo» del pie
+                 lo sigue usando.
+               · El patrón `.gml-rotulo-fila` sigue vivo en el bloque «Vértices»,
+                 con sus dos hijos.
+               · **La escasez no se ha acabado.** Dentro de UNA pantalla el panel
+                 sigue repartiendo altura fija entre bloques fijos. Lo que el
+                 rework quitó es que las cinco pantallas compitieran ENTRE SÍ.
 
-             Es el MISMO patrón `.gml-rotulo-fila` del bloque «Vértices» de más
-             abajo, donde el segundo hijo de la fila es el rótulo «X · Y (m)».
+             LO QUE DEJÓ DE SER VERDAD, con su cifra: la caja de vértices ya no
+             mide 267 px. Con Entrada fuera de su camino mide **385,67 px a
+             1440×900** y **228,33 px a 1280×720** (guion 14, 2026-08-04). El
+             invariante que siete fases se esforzaron en no mover subió un 44 % sin
+             optimizar nada: solo dejando de enseñar a la vez dos cosas que nunca
+             se usan a la vez.
 
-             ⚠️ AQUÍ NO VA NINGÚN `<input type="file">`, y es deliberado: lo
+             ⚠️ CUÁNDO CADUCA ESTA NOTA: el día que vuelva a haber DOS controles en
+             la fila de un rótulo. Entonces hay que volver a medir, porque la
+             holgura de aquella fila eran **12 px** —o sea nada— y partirse cuesta
+             los mismos 36 px de siempre.
+
+             ⚠️ AQUÍ NO VA NINGÚN `<input type="file">`, y eso NO ha cambiado: lo
              fabrica `app/zona-fichero.js`, que es además quien engancha el
              arrastre sobre la VENTANA ENTERA. Un input escrito también aquí daría
              dos dueños al mismo control, y el módulo tendría que adivinar cuál de
-             los dos es el suyo. Quien abre el selector al pulsar este botón —y
-             quien vacía su `value` para que soltar dos veces el mismo fichero
-             vuelva a disparar— es ese módulo.
+             los dos es el suyo. Quien abre el selector al pulsar los botones de
+             las vías —y quien vacía su `value` para que soltar dos veces el mismo
+             fichero vuelva a disparar— es ese módulo.
 
-             Tampoco está aquí la superposición que se ve mientras se arrastra:
-             la fabrica el mismo módulo y la gobierna `body[data-arrastrando="si"]`
-             desde `estilos/app.css`. -->
-        <!-- ── F10 · «Expediente» ENTRA EN LA MISMA FILA, Y VAN ENVUELTOS ───────
-             Quinta fase seguida que no puede permitirse un bloque fijo nuevo en el
-             panel, y el mismo argumento medido de F08: una fila a lo ancho cuesta
-             ~36 px y se los quita la caja de vértices (267 px, suelo declarado en
-             220). `.gml-boton--menudo` cabe dentro del alto de línea del `<h2>`, así
-             que el bloque no crece ni un píxel.
-
-             ⚠️ LOS DOS BOTONES VAN DENTRO DE UN `.gml-rotulo-acciones`, y no sueltos.
-             `.gml-rotulo-fila` es `justify-content: space-between`: con TRES hijos,
-             los dos botones se irían a los extremos y el rótulo quedaría en medio.
-             Con el envoltorio la fila vuelve a tener dos hijos —rótulo a la
-             izquierda, acciones a la derecha— y la fila «Vértices», que sigue con
-             dos, no se entera de nada.
-
-             ✅ MEDIDO EN NAVEGADOR REAL (2026-08-03, 1440×900, Chrome):
-               · la fila mide **16 px**, exactamente lo que medía con el `<h2>` solo
-                 (alto de línea 15,95 px; los botones, 15 px). **Coste 0 px, y ahora
-                 es un hecho y no una cuenta.**
-               · la caja de vértices sigue en **267 px**. El invariante, intacto.
-               · los dos botones caen en la MISMA línea, sin desbordar los 392 px.
-               · ⚠️ pero la holgura es de **12 px**: el `<h2>` acaba en x=175 y las
-                 acciones empiezan en x=195, y 8 de esos 20 px son el `gap` declarado.
-                 O sea que «Expediente» **no puede crecer**: dos o tres caracteres más
-                 y la fila se parte, y partirse cuesta los 36 px que todo esto existe
-                 para no gastar. Si algún día hace falta un rótulo más largo, la
-                 salida no es una segunda fila: es acortar el otro.
-
-             El `<dialog>` que abre este botón NO se declara aquí: lo fabrica
-             `app/dialogo-expediente.js`, igual que hacen `app/zona-fichero.js` con su
-             `<input type="file">`, los dos cajones y el diálogo de F09. -->
+             Tampoco está aquí la superposición que se ve mientras se arrastra: la
+             fabrica el mismo módulo y la gobierna `body[data-arrastrando="si"]`
+             desde `estilos/app.css`. Ni el `<dialog>` de «Expediente», que lo
+             fabrica `app/dialogo-expediente.js` — igual que los dos cajones y el
+             diálogo de F09. -->
         <!-- ══ LAS TRES VÍAS DE ENTRADA (rework de UI · T6) ═══════════════════
              Criterio 7 del plan, literal: «la Entrada presenta las tres vías como
              opciones NOMBRADAS Y SEPARADAS, no como botones sueltos compitiendo
@@ -467,7 +464,17 @@
            «Origen de la parcela» sumaba ~137 px fijos a un presupuesto fijo, y
            que con la lista de avisos llena por debajo de ~775 px de viewport el
            pie del panel —y con él «Generar GML»— se salía por abajo. Ver la
-           regla en `estilos/app.css`. -->
+           regla en `estilos/app.css`, que lleva el registro completo.
+
+           ⚠️ AL DÍA (rework de UI · T4/T6, 2026-08-04): aquel desbordamiento **ya
+           no se reproduce** —el guion 14 mide desborde 0 en el panel a 1280×720 y
+           a 1440×900—, y buena parte del mérito es de T6: «Origen de la parcela»
+           vive ahora en la pantalla Entrada y no compite con la tabla de
+           vértices. Pero la cesión NO se quita, por dos razones medidas: los
+           avisos siguen apareciendo en Validación —donde a 1280×720 no cabe ni
+           una tarjeta entera y quedan 394 px tras un scroll (T4)— y son lo único
+           del panel cuyo alto lo decide el DATO y no el marcado. Un bloque que no
+           cede es un bloque que empuja al pie. -->
       <section class="gml-bloque gml-bloque--avisos">
         <h2 class="gml-rotulo">Avisos</h2>
         <!-- Caja VACÍA: su interior es de `app/avisos.js`. Tope de alto y scroll propio
@@ -510,6 +517,11 @@
            `spec/feature-06-edicion-parcela.md` §2. Sobre el mapa esas
            herramientas no le quitan altura a nada.
 
+           ⚠️ Y SIGUEN FUERA DESPUÉS DEL REWORK (T6, 2026-08-04), aunque el eje
+           PASO le haya dado aire al panel: la barra pertenece a la pantalla
+           Edición y allí el reparto es el mismo de siempre. Que ahora quepan
+           385,67 px de tabla en vez de 267 no significa que sobren 270.
+
            QUÉ NO CAMBIÓ: la barra produce los MISMOS siete nodos, con los mismos
            `data-accion`/`data-campo`/`data-estado` y los mismos tipos de
            elemento, porque `app/main.js#cablearEdicion` los localiza POR
@@ -529,7 +541,16 @@
            diagnóstico se lee MIRANDO el mapa: el cajón señala en el dibujo lo que
            dice en la tabla, y a 40 cm de distancia eso no se sigue. Lo único que
            F07 pone en este fichero es el CTA del pie, que es una ACCIÓN y va donde
-           van las acciones. -->
+           van las acciones.
+
+           ⚠️ CUÁNDO CADUCA ESTA NOTA, y tiene fecha prevista: **T9 del rework**,
+           que funde Comprobación y Diagnóstico en UNA pantalla con la procedencia
+           del dato declarada. El segundo motivo —un diagnóstico se lee mirando el
+           mapa— sobrevive a ese cambio y hay que conservarlo; el primero —«el
+           presupuesto no da para otro bloque fijo»— es el que T9 tiene que volver
+           a medir, porque desde T6 el panel ya no enseña las cinco pantallas a la
+           vez. Que la razón siga escrita no la hace vigente: ésta es exactamente
+           la clase de motivo que caducó en F04 y nadie volvió a leer. -->
 
       <!-- La ficha del expediente: SEGUNDO suscriptor del mismo store que el visor.
            Los `<dd>` los rellena `app/main.js`; los `data-ficha` son su contrato. -->

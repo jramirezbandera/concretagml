@@ -1,11 +1,27 @@
-// app/rama.js — F11 · T2.4. EL DUEÑO ÚNICO DE LA RAMA ACTIVA.
+// app/rama.js — F11 · T2.4 (rework de UI · T1). EL APLICADOR DE LA RAMA ACTIVA.
 //
 // Once fases después, esta aplicación solo sabía de PARCELAS: el store lleva un
 // POJO de parcela con once suscriptores en producción, el panel se titula
 // «Origen de la parcela», el visor encuadra sobre `parcela.recintos` y el pie
 // genera un GML de parcela. F11 le añade una segunda rama —EDIFICIO— que
-// **SUSTITUYE** al panel de parcela en vez de sumarse a él, y este módulo es lo
-// único que sabe cuál de las dos está activa.
+// **SUSTITUYE** al panel de parcela en vez de sumarse a él, y este módulo es
+// quien lo PINTA.
+//
+// ── ⛔ ESTA CABECERA DECÍA «EL DUEÑO ÚNICO DE LA RAMA ACTIVA» ───────────────
+// Hasta el 2026-08-04 era verdad, y aquí ponía además «este módulo es lo único
+// que sabe cuál de las dos está activa». El rework de UI (T1) partió esa
+// responsabilidad en dos, porque la rama resultó ser **uno de tres ejes**
+// —`{rama, paso, modo}`— y este módulo ya conocía los CTA, la barra, los textos
+// y la visibilidad: seguir metiéndole estado lo convertía en el módulo que lo
+// sabe todo.
+//
+//   · **Quien DECIDE es `app/navegacion.js`**: dueño sin DOM de los tres ejes,
+//     de los guards y de los motivos en texto. Si un paso sale apagado y quieres
+//     saber por qué, la respuesta está allí y no aquí.
+//   · **Quien APLICA es este módulo**: se suscribe y pinta. No decide.
+//
+// Por eso `RAMA` y `RAMAS` se DECLARAN en `app/navegacion.js` y aquí solo se
+// reexportan (ver más abajo): el import tiene que ir aplicador → dueño.
 //
 // ── QUÉ HACE, EN UNA LÍNEA CADA COSA ────────────────────────────────────────
 //   1. Fabrica el CONMUTADOR («Parcela» / «Edificio») dentro de `.gml-chips`.

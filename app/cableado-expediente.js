@@ -120,6 +120,28 @@
 // cableado se comporta EXACTAMENTE como en F10, que es lo que permite que las 60
 // pruebas de aquella fase sigan valiendo sin tocarles una línea.
 //
+// ── ⛔ REWORK DE UI · T7 · Y LA RAMA QUE SE QUEDA FUERA, DICHA ──────────────
+// Lo de arriba dejó una consecuencia que hasta hoy no se contaba, y es el hallazgo
+// **A2** de la revisión de ingeniería del rework: con las DOS ramas con dato,
+// «Guardar» y «Guardar proyecto (.json)» escriben una y **descartan la otra en
+// silencio**. El usuario lee un acuse que dice que ha salido bien y la mitad de lo
+// que tiene en pantalla no está dentro.
+//
+// **La semántica no se cambia** —la exclusividad es del modelo y está ahí por un
+// motivo; el design doc lo pone en su tabla de «NOT in scope»: se avisa, no se
+// cambia—. Lo que se arregla es el silencio, que es la regla de oro 1. El acuse de
+// las dos acciones dice ahora qué rama ha entrado y cuál se ha quedado fuera, por el
+// renglón del diálogo **y** por el panel, con tres textos según el caso: ver
+// {@link mensajeEdificioFuera}, {@link mensajeParcelaDeContexto} y
+// {@link mensajeParcelaFuera}.
+//
+// ⚠️ **El DXF y el listado de coordenadas quedan fuera de T7 a propósito**: no
+// descartan ninguna rama —son de la parcela por definición— y con la rama EDIFICIO
+// ni siquiera bajan. Y **la asimetría del otro lado está declarada, no resuelta**:
+// al ABRIR un `.json` de edificio, la parcela de contexto que trae dentro no se
+// cuenta ni se abre en el panel de parcela. Se dice al exportar, que es donde el
+// usuario todavía puede hacer algo; contarlo también al abrir es de otra tarea.
+//
 // ── LO QUE ESTE MÓDULO NO HACE ─────────────────────────────────────────────
 //   · **No fabrica marcado de la cáscara.** El `<dialog>` lo fabrica
 //     `app/dialogo-expediente.js`; de `index.html` solo se coge el botón
@@ -375,6 +397,91 @@ export const MENSAJE_SIN_RAMA_EDIFICIO =
 export const MENSAJE_GUARDADO_SIN_EDIFICIO =
   'Ese fichero de proyecto dice llevar un edificio, pero no trae ninguno dentro, así que no hay ' +
   'nada que abrir. No se ha cambiado nada de lo que tenías.'
+
+// ── Rework de UI · T7 · la rama que se queda FUERA, dicha ────────────────────
+//
+// ⛔ **HALLAZGO A2 de la revisión de ingeniería del rework:** `expedienteActual()`
+// deriva la rama activa y **descarta la otra en silencio**. Con las dos ramas con
+// dato —que es el caso normal en cuanto alguien mira un edificio sobre su parcela— el
+// usuario pulsa «Guardar» o «Guardar proyecto (.json)», lee un acuse que dice que ha
+// salido bien, y **la mitad de lo que tiene en pantalla no está dentro**.
+//
+// La exclusividad NO se cambia: es del modelo (`model/parcela.js#crearExpediente`
+// lanza al recibir las dos ramas juntas) y está ahí por un motivo. Lo que se arregla
+// es el silencio, que es la regla de oro 1. Decidido así en A2, y el design doc lo
+// pone por escrito en su tabla de «NOT in scope»: **se avisa, no se cambia.**
+//
+// Los tres textos son FUNCIONES porque el acuse tiene que nombrar el documento que se
+// acaba de escribir —{@link DOCUMENTO}—: decir «el fichero» cuando lo que se ha
+// escrito es un registro del navegador manda al usuario a buscar donde no hay nada.
+
+/**
+ * Cómo se llama, en el acuse, cada uno de los dos documentos que este cableado
+ * escribe. Se exporta para que las pruebas compongan el mensaje esperado en vez de
+ * copiar el literal, igual que se hace con {@link MOTIVO_GUARDAR_EN_EDIFICIO}.
+ *
+ * @readonly
+ */
+export const DOCUMENTO = Object.freeze({
+  GUARDADO: 'El expediente guardado',
+  PROYECTO: 'El fichero de proyecto',
+})
+
+/**
+ * Rama PARCELA con un edificio cargado en la otra: **el edificio no va dentro**.
+ *
+ * Dice las cuatro cosas que hacen falta —qué lleva el documento, qué no, que lo que se
+ * queda fuera **sigue en pantalla** y qué hacer para conservarlo—, y la cuarta no es
+ * adorno: el almacén de este navegador todavía no sabe archivar un edificio
+ * ({@link MOTIVO_GUARDAR_EN_EDIFICIO}) y el autoguardado tampoco llega a esa rama
+ * (desviación 7 de F11), así que el `.json` es su ÚNICO refugio y una recarga se lo
+ * lleva. Enterarse de eso al volver mañana es enterarse tarde.
+ *
+ * @param {string} donde  Uno de {@link DOCUMENTO}.
+ * @returns {string}
+ */
+export const mensajeEdificioFuera = (donde) =>
+  `${donde} lleva la parcela y NO lleva el edificio: un expediente es de una cosa o de la otra, ` +
+  'nunca de las dos. El edificio que tienes cargado sigue en pantalla, pero esta versión no lo ' +
+  'archiva en este navegador y una recarga se lo llevaría: para conservarlo, conmuta a la rama ' +
+  'Edificio y guarda desde allí un fichero de proyecto (.json).'
+
+/**
+ * Rama EDIFICIO con una parcela debajo: la parcela **sí viaja, pero como contexto y
+ * recortada**. {@link cablearExpediente}`#conParcelaDeContexto` mete `parcela.recintos`
+ * en `edificio.parcelaContexto` (desviación 9 de F11), así que se quedan fuera la
+ * referencia catastral, la geometría oficial y la identidad local; y al reabrir ese
+ * fichero el contexto **no vuelve al panel de parcela**, porque
+ * {@link cablearExpediente}`#abrirProyectoDeEdificio` carga el store de edificio y no
+ * toca el otro. Las dos afirmaciones tienen su prueba: un mensaje que promete de más
+ * es peor que el silencio que viene a arreglar.
+ *
+ * @param {string} donde  Uno de {@link DOCUMENTO}.
+ * @returns {string}
+ */
+export const mensajeParcelaDeContexto = (donde) =>
+  `${donde} lleva el edificio. La parcela que se ve debajo no viaja como parcela: va dentro del ` +
+  'edificio como contexto, solo con sus recintos —sin la referencia catastral ni la geometría ' +
+  'oficial del Catastro—, y al volver a abrir este fichero no aparece en el panel de parcela. Si ' +
+  'la necesitas entera, vuelve a la rama Parcela y guarda desde allí un segundo fichero de proyecto.'
+
+/**
+ * Rama EDIFICIO, parcela debajo **y** un edificio que ya traía su propio
+ * `parcelaContexto`. Ése no se pisa —la parcela que se dibuja debajo puede estar
+ * editada a mano, y el contexto que vino con el edificio es el que le corresponde—,
+ * así que aquí la parcela de pantalla no viaja **ni siquiera como contexto**.
+ *
+ * Es el caso peor y por eso tiene texto propio: decirle a alguien que su parcela «va
+ * dentro como contexto» cuando no va sería mentir con más palabras.
+ *
+ * @param {string} donde  Uno de {@link DOCUMENTO}.
+ * @returns {string}
+ */
+export const mensajeParcelaFuera = (donde) =>
+  `${donde} lleva el edificio y NO lleva la parcela que se ve debajo: el edificio ya venía con su ` +
+  'propia parcela de contexto y ésa no se pisa con la que tengas en pantalla. Si quieres ' +
+  'conservar tu parcela, vuelve a la rama Parcela y guarda desde allí un segundo fichero de ' +
+  'proyecto.'
 
 /** Cuando se choca con la cuota y no hay caché que purgar. */
 export const MENSAJE_SIN_PURGA =
@@ -880,6 +987,29 @@ export function cablearExpediente({
   }
 
   /**
+   * Qué se queda FUERA del documento que se acaba de escribir, o `null` si no se queda
+   * nada. Es el hallazgo A2 dicho; el porqué de cada texto está arriba, con ellos.
+   *
+   * ⚠️ **Se llama DESPUÉS de escribir, y nunca antes.** No es una guarda: no impide
+   * nada, porque la exclusividad de rama es del modelo y no se cambia. Es la mitad del
+   * acuse que faltaba.
+   *
+   * @param {string} donde  Uno de {@link DOCUMENTO}.
+   * @returns {string|null}
+   */
+  function loQueSeQuedaFuera(donde) {
+    if (!enEdificio()) {
+      return hayEdificio(edificioActual()) ? mensajeEdificioFuera(donde) : null
+    }
+    if (!hayGeometria(estado.get())) return null
+    // La distinción NO es cosmética: con un contexto propio ya puesto, la parcela de
+    // pantalla no viaja ni como contexto. Ver {@link conParcelaDeContexto}.
+    return edificioActual()?.parcelaContexto == null
+      ? mensajeParcelaDeContexto(donde)
+      : mensajeParcelaFuera(donde)
+  }
+
+  /**
    * La referencia catastral de lo que hay en pantalla, o `null`. **De la rama activa**:
    * de ella sale el nombre de los ficheros que bajan, y estampar la RC de la parcela en
    * un fichero de edificio sería etiquetar mal un documento.
@@ -1147,10 +1277,19 @@ export function cablearExpediente({
     }
     await refrescar({ nombre: r.registro.nombre })
     if (destruido) return
+    // Rework de UI · T7: el acuse dice también lo que NO ha entrado. Va en la MISMA
+    // llamada a `decir` porque el renglón es uno solo y la segunda borraría la primera.
+    const fuera = loQueSeQuedaFuera(DOCUMENTO.GUARDADO)
     decir(
       `Guardado «${r.registro.nombre}» en este navegador.` +
-        (persistencia?.persistido === false ? COLETILLA_SIN_PERSISTENCIA : ''),
+        (persistencia?.persistido === false ? COLETILLA_SIN_PERSISTENCIA : '') +
+        (fuera === null ? '' : ` ${fuera}`),
     )
+    // Y al panel, que es donde queda constancia de lo que le pasa al DATO: el renglón
+    // del diálogo se lo lleva el siguiente `fijar`, y esto hay que poder releerlo con
+    // el diálogo ya cerrado. El panel agrupa los repetidos con su contador, así que
+    // guardar diez veces con un edificio cargado deja una tarjeta, no diez.
+    if (fuera !== null) avisar(fuera)
   }
 
   /** «Recuperar» de una fila. */
@@ -1324,8 +1463,12 @@ export function cablearExpediente({
    * @param {{prefijo: string, extension: string, mime: string}} formato
    * @param {Date} fecha
    * @param {string} queEs  Cómo se llama en el acuse.
+   * @param {string|null} [coletilla=null]  Lo que se queda fuera del fichero, cuando
+   *   algo se queda (rework de UI · T7). Va pegada al acuse **y solo si la descarga ha
+   *   salido**: contarle a alguien qué no lleva un fichero que no ha llegado a bajar es
+   *   ruido encima de un fallo.
    */
-  function entregar(texto, formato, fecha, queEs) {
+  function entregar(texto, formato, fecha, queEs, coletilla = null) {
     const nombreFichero = nombreFicheroExport({
       prefijo: formato.prefijo,
       extension: formato.extension,
@@ -1340,8 +1483,15 @@ export function cablearExpediente({
     })
     // El desenlace se dice SIEMPRE, salga bien o mal. Cuando falla, `descargarTexto`
     // trae un `mensaje` en castellano ya presentable.
-    decir(entrega.descargado ? `Descargado ${queEs}: «${entrega.nombre}».` : entrega.mensaje)
-    if (!entrega.descargado) avisar(entrega.mensaje, NIVEL.ERROR)
+    if (!entrega.descargado) {
+      decir(entrega.mensaje)
+      avisar(entrega.mensaje, NIVEL.ERROR)
+      return
+    }
+    decir(`Descargado ${queEs}: «${entrega.nombre}».${coletilla === null ? '' : ` ${coletilla}`}`)
+    // Al panel por el mismo motivo que {@link publicarDetecciones}: el fichero que baja
+    // no dice todo lo que el usuario tiene en pantalla, y eso es del DATO.
+    if (coletilla !== null) avisar(coletilla)
   }
 
   /**
@@ -1413,7 +1563,16 @@ export function cablearExpediente({
     // Con sangría de 2: un fichero de proyecto se abre a mano más veces de las que
     // parece —para ver por qué otro equipo no lo puede leer—, y lo que se gana en
     // bytes al compactarlo se pierde en la primera vez que alguien tiene que mirarlo.
-    entregar(JSON.stringify(proyecto, null, 2), FICHERO.PROYECTO, fecha, 'el fichero de proyecto')
+    entregar(
+      JSON.stringify(proyecto, null, 2),
+      FICHERO.PROYECTO,
+      fecha,
+      'el fichero de proyecto',
+      // Rework de UI · T7. Es la ÚNICA de las tres salidas que lo lleva: el DXF y el
+      // listado no descartan ninguna rama —son de la parcela por definición y con la
+      // rama EDIFICIO ni siquiera bajan ({@link MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO})—.
+      loQueSeQuedaFuera(DOCUMENTO.PROYECTO),
+    )
   }
 
   /**
