@@ -162,12 +162,13 @@ jobs:
       # y el techo del criterio 10 ni siquiera se exige hasta que las cinco
       # rebanadas estén cerradas.
       #
-      # ⚠️ SIN MEDIR TODAVÍA: que los bytes construidos salgan IDÉNTICOS en
-      # Linux y en Windows. Los asientos se midieron en Windows. El minificador
-      # trabaja sobre el AST, así que el fin de línea de la fuente no debería
-      # sobrevivir, pero eso es un razonamiento y no una medición: la primera
-      # corrida de este job ES la medición. Si sale rojo por unos pocos bytes,
-      # el sospechoso es éste y no un cambio de CSS.
+      # ✅ MEDIDO EL 2026-08-04, en la primera corrida (run 30926258304): Linux
+      # da **exactamente** los mismos bytes que Windows —61.108 / 46.013 /
+      # 15.095—, así que los asientos son portables y el fin de línea de la
+      # fuente no sobrevive al minificador. Se deja escrito porque durante unas
+      # horas fue un razonamiento y no una medición, y la diferencia importa:
+      # si algún día sale rojo por unos pocos bytes, este párrafo dice que el
+      # sospechoso NO es la plataforma.
       - name: npm run presupuesto
         run: npm run presupuesto
 
