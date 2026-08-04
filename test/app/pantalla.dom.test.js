@@ -299,3 +299,134 @@ describe('T6 · las tres vías de Entrada (criterio 7)', () => {
     expect(pie.closest('.gml-via')).toBeNull()
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Rework de UI · REBANADA 2 (Validación) — el pie deja de ser compartido
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Hasta el 2026-08-04 el pie del panel se enseñaba entero en CUATRO pantallas:
+// ocho campos de ficha y dos acciones, 266,28 px FIJOS que a 1280×720 son el
+// 37 % del panel. Medido en esa pantalla, el trabajo de Validación —los avisos
+// y la tabla de vértices— era el **46,75 %** de su propia pantalla; el resto,
+// mobiliario de otras.
+//
+// El reparto no se puede medir aquí (jsdom no aplica `estilos/app.css` y el eje
+// PASO es CSS puro), así que lo que se afirma es el MARCADO. La otra mitad, en
+// píxeles, la mide `scripts/smoke-navegador/14-shell.js`.
+describe('rebanada 2 · el pie enseña lo de cada pantalla', () => {
+  /** Los pares `<dt>`/`<dd>` de la ficha, emparejados por el DOM y no a mano. */
+  const paresDeLaFicha = () =>
+    [...document.querySelectorAll('.gml-ficha [data-ficha]')].map((dd) => ({
+      campo: dd.dataset.ficha,
+      dd,
+      dt: dd.previousElementSibling,
+    }))
+
+  const pantallasDe = (el) => (el.getAttribute(ATRIBUTO_PANTALLA) ?? '').split(/\s+/).filter(Boolean)
+
+  /** En qué pasos se ve un nodo, componiendo con TODOS sus ancestros marcados.
+   *  El eje PASO se hereda por descendencia (así está escrita la regla del CSS),
+   *  así que mirar solo el nodo daría una respuesta más optimista que la real. */
+  const visibleEn = (el) => {
+    let pasos = [...PASOS]
+    for (let n = el; n !== null && n !== document.body.parentElement; n = n.parentElement) {
+      const suyos = pantallasDe(n)
+      if (suyos.length > 0) pasos = pasos.filter((p) => suyos.includes(p))
+    }
+    return pasos
+  }
+
+  it('⛔ `<dt>` y `<dd>` de un campo declaran las MISMAS pantallas', () => {
+    // `.gml-ficha` es `display:grid` de dos columnas con los `<dt>`/`<dd>` como
+    // celdas HERMANAS, no como nodo e hijo. Ocultar solo una de las dos deja la
+    // otra corriendo la rejilla: los rótulos dejarían de casar con sus valores
+    // y la ficha diría cosas que no son. No hay forma de que se note en verde.
+    montarCascara()
+    const pares = paresDeLaFicha()
+    expect(pares.length, 'la ficha no tiene ni un campo: revisa el selector').toBeGreaterThan(0)
+    for (const { campo, dd, dt } of pares) {
+      expect(dt, `el campo «${campo}» no tiene <dt> delante`).not.toBeNull()
+      expect(dt.tagName).toBe('DT')
+      expect(
+        pantallasDe(dt),
+        `el rótulo y el valor de «${campo}» no se ocultan juntos: la rejilla se descoloca`,
+      ).toEqual(pantallasDe(dd))
+    }
+  })
+
+  it('⛔ ningún campo de la ficha es invisible en las CINCO pantallas', () => {
+    // Un campo que no se ve nunca es un dato que la aplicación calcula, escribe
+    // y no enseña jamás: silencio con coste. Una errata de una letra en el
+    // `data-pantalla` produce exactamente eso, y el guardián de arriba —que solo
+    // mira que el paso EXISTA— no la vería si la errata fuese un paso válido.
+    montarCascara()
+    for (const { campo, dd } of paresDeLaFicha()) {
+      expect(visibleEn(dd), `el campo «${campo}» no se ve en ninguna pantalla`).not.toEqual([])
+    }
+  })
+
+  it('los cinco campos de GEOMETRÍA se ven donde hay geometría que mirar', () => {
+    montarCascara()
+    const donde = Object.fromEntries(paresDeLaFicha().map(({ campo, dd }) => [campo, visibleEn(dd)]))
+    for (const campo of ['srs', 'refcat', 'vertices', 'superficie', 'perimetro']) {
+      expect(donde[campo], `«${campo}» es un hecho de la geometría`).toEqual([
+        PASO.VALIDACION,
+        PASO.EDICION,
+        PASO.DIAGNOSTICO,
+        PASO.INFORME,
+      ])
+    }
+  })
+
+  it('los tres campos de DIAGNÓSTICO no ocupan sitio antes de haberlo hecho', () => {
+    // Medido: en Validación decían «No consta», «No hay con qué comparar» y «Sin
+    // consultar». Reservar tres renglones para decir que todavía no hay nada que
+    // decir es lo que la regla de oro 1 NO pide.
+    montarCascara()
+    const donde = Object.fromEntries(paresDeLaFicha().map(({ campo, dd }) => [campo, visibleEn(dd)]))
+    for (const campo of ['superficie-catastral', 'delta-catastral', 'colindantes']) {
+      expect(donde[campo], `«${campo}» sale del diagnóstico`).toEqual([PASO.DIAGNOSTICO, PASO.INFORME])
+    }
+  })
+
+  it('las acciones del pie son de VALIDACIÓN y de ninguna otra', () => {
+    montarCascara()
+    const acciones = document.querySelector('.gml-acciones')
+    expect(acciones).not.toBeNull()
+    expect(visibleEn(acciones)).toEqual([PASO.VALIDACION])
+    // Y siguen siendo las dos: «Generar GML» se queda aquí por decisión del autor
+    // (el camino corto de una Subsanación no pasa por el diagnóstico).
+    expect([...acciones.querySelectorAll('[data-accion]')].map((b) => b.dataset.accion)).toEqual([
+      'generar-gml',
+      'diagnosticar',
+    ])
+  })
+
+  it('⛔ cada renglón de acuse se ve en las MISMAS pantallas que su botón', () => {
+    // Un `role="status"` oculto es un mensaje que nadie lee: la aplicación creería
+    // haber avisado. Es la regla de oro 1 rota en el sitio donde menos se nota,
+    // y el guion 10 ya la cazó una vez en F08 (el acuse de la descarga del
+    // informe, escrito en un renglón invisible).
+    montarCascara()
+    for (const boton of document.querySelectorAll('[data-accion]')) {
+      const renglon = document.querySelector(`[data-estado="${boton.dataset.accion}"]`)
+      if (renglon === null) continue
+      expect(
+        visibleEn(renglon),
+        `el acuse de «${boton.dataset.accion}» se ve en otras pantallas que su botón`,
+      ).toEqual(visibleEn(boton))
+    }
+  })
+
+  it('las CINCO pantallas conservan el canal de avisos y la cabecera', () => {
+    // Lo que NO se reparte, y es deliberado: desaparecer el canal de errores al
+    // cambiar de paso sería el peor fallo silencioso que esta cáscara puede
+    // tener (lo dice `estilos/app.css` donde declara las cinco reglas).
+    montarCascara()
+    for (const clase of ['gml-bloque--avisos', 'gml-panel-cabecera']) {
+      const nodo = document.querySelector('.' + clase)
+      expect(nodo, `falta «${clase}»`).not.toBeNull()
+      expect(visibleEn(nodo), `«${clase}» ha dejado de estar en las cinco`).toEqual([...PASOS])
+    }
+  })
+})

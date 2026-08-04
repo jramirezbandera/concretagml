@@ -599,12 +599,37 @@
           <dt>Perímetro</dt>
           <dd class="gml-mono" data-ficha="perimetro">—</dd>
 
+          <!-- ── Rework de UI · rebanada 2 (Validación), 2026-08-04 ──────────
+               LOS TRES CAMPOS DE AQUÍ ABAJO SON DE DIAGNÓSTICO, NO DE LA
+               GEOMETRÍA, y por eso llevan `data-pantalla` propio mientras los
+               cinco de arriba no lo llevan.
+
+               Medido antes de tocarlos: en Validación los tres decían «No
+               consta», «No hay con qué comparar» y «Sin consultar» —tres
+               renglones ocupando sitio para decir que todavía no hay nada que
+               decir— en un pie de 266,28 px FIJOS que a 1280×720 es el 37 % del
+               panel. La regla de oro 1 exige no callar; no exige reservar sitio
+               para un silencio.
+
+               ⚠️ `data-pantalla` va en el `<dt>` **y** en el `<dd>`: son dos
+               celdas hermanas de un `display:grid`, no un nodo con su hijo, así
+               que ocultar solo una dejaría la otra descolocando la rejilla.
+               ⚠️ Y los nodos NO se quitan del documento (regla de la casa, ver
+               la cabecera): `app/main.js` los resuelve al montar y les sigue
+               escribiendo — que estén ocultos no los desconecta. -->
+
           <!-- Los dos de F05 vienen del Catastro, no de la geometría del
                usuario. «Superficie catastral» va JUSTO DEBAJO de «Superficie»
                para que las dos cifras se comparen de un vistazo: la discrepancia
                entre lo medido y lo inscrito es media razón de ser de la app. -->
-          <dt>Superficie catastral</dt>
-          <dd class="gml-mono" data-ficha="superficie-catastral">—</dd>
+          <dt data-pantalla="diagnostico informe">Superficie catastral</dt>
+          <dd
+            class="gml-mono"
+            data-ficha="superficie-catastral"
+            data-pantalla="diagnostico informe"
+          >
+            —
+          </dd>
 
           <!-- F06. Esa discrepancia, ya restada, y JUSTO DEBAJO de la cifra que
                la produce.
@@ -617,11 +642,19 @@
                exactamente la decisión que no nos toca: el umbral depende del
                expediente, del municipio y del criterio del técnico que firma.
                Va en el mismo gris de texto que el resto de la ficha. -->
-          <dt>Δ catastral</dt>
-          <dd class="gml-mono" data-ficha="delta-catastral">—</dd>
+          <dt data-pantalla="diagnostico informe">Δ catastral</dt>
+          <dd
+            class="gml-mono"
+            data-ficha="delta-catastral"
+            data-pantalla="diagnostico informe"
+          >
+            —
+          </dd>
 
-          <dt>Colindantes</dt>
-          <dd class="gml-mono" data-ficha="colindantes">—</dd>
+          <dt data-pantalla="diagnostico informe">Colindantes</dt>
+          <dd class="gml-mono" data-ficha="colindantes" data-pantalla="diagnostico informe">
+            —
+          </dd>
         </dl>
 
         <!-- ── Las acciones del pie: «Generar GML» (F04) y «Diagnosticar» (F07)
@@ -639,7 +672,23 @@
              lector de pantalla anuncie el resultado de la generación sin robar
              el foco: es la única superficie donde el usuario se entera de que se
              le ha redondeado una coordenada o invertido un anillo. -->
-        <div class="gml-acciones">
+        <!-- ── Rework de UI · rebanada 2 (Validación), 2026-08-04 ─────────────
+             LAS DOS ACCIONES SON DE VALIDACIÓN Y DE NINGUNA OTRA PANTALLA.
+             Hasta hoy se enseñaban en cuatro, y costaban 72,78 px fijos en las
+             cuatro. Dónde vive «Generar GML» lo decidió el autor: **en
+             Validación**, porque el camino corto de una Subsanación no pasa por
+             el diagnóstico y obligarle a bajar hasta Informe para entregar
+             alargaría el caso más frecuente.
+
+             ⚠️ «Diagnosticar encaje» SE QUEDA, y la primera lectura de la
+             medición decía que sobra porque el peldaño «Diagnóstico» del rail
+             hace lo mismo. Se midió lo que costaba quitarlo y no compensa: el
+             nodo lo resuelve `app/cableado-diagnostico.js` al montar y lo
+             conduce el guion de humo 09, y los 32,39 px que devolvería solo se
+             devolverían en la pantalla donde el bloque vive de todos modos. El
+             rail es cromo de navegación; esto es el «y ahora qué» de la
+             pantalla. No es la misma frase dicha dos veces. -->
+        <div class="gml-acciones" data-pantalla="validacion">
           <button
             type="button"
             class="gml-boton gml-boton--primario"

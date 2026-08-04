@@ -3402,6 +3402,71 @@ y F08–F11 en 267 a coste cero). T6 no lo protege: lo **sube un 44 %**, y no
 optimizando nada — solo dejando de enseñar a la vez dos cosas que nunca se usan a
 la vez.
 
+### Ampliación rebanada 2: el marcado y los píxeles dicen lo mismo
+
+Desde el 2026-08-04 el guion mide también **el eje PASO**, y es la única cosa que
+puede medirlo. La verificación está partida en dos mitades y ninguna cubre sola:
+
+| Mitad | Quién | Qué afirma | Qué NO puede |
+|---|---|---|---|
+| Marcado | `test/app/pantalla.dom.test.js` | que cada `data-pantalla` sea un paso que existe, que `<dt>` y `<dd>` se oculten juntos, que las acciones sean de Validación | **jsdom no aplica `estilos/app.css`**: todo sería verde aunque las cinco reglas no existieran |
+| Píxeles | `14-shell.js` (esto) | que lo que se VE es exactamente lo que el marcado declara para el paso activo | si el marcado es coherente consigo mismo |
+
+**No hay lista escrita a mano** de qué va en cada pantalla: se leen los
+`data-pantalla` del documento y se contrasta con la caja real de cada nodo. Una
+segunda lista divergiría, que es la enfermedad que este repositorio ya se ha
+encontrado tres veces.
+
+⚠️ El guardián solo denuncia **lo que se ve sin tocarle**, no lo contrario: un
+nodo que toca en este paso puede estar oculto legítimamente por un ancestro
+marcado o por el eje RAMA. Verse sin declararlo, en cambio, no tiene excusa.
+
+**Verificado por mutación, y las dos mitades dispararon por su lado:** quitando
+del CSS la regla de Validación, la prueba de jsdom sale roja (lee el fichero) y
+el guion sale rojo **nombrando los 7 nodos** que aparecen donde no deben —el
+bloque de Entrada y los tres pares de la ficha de diagnóstico—. De propina saltó
+también el criterio 4: con el bloque de Entrada de vuelta, no cabe **ni una**
+tarjeta de aviso entera. Mutación revertida.
+
+### Lo que la rebanada 2 le devuelve al panel
+
+El pie del panel valía **266,28 px fijos en cuatro pantallas**: ocho campos de
+ficha y dos acciones, en la pantalla que los necesita y en las tres que no. A
+1280×720 eso era el **37 % del panel**, y el trabajo de Validación —los avisos y
+la tabla de vértices— era el **46,75 % de su propia pantalla**.
+
+Medido a 1280×720, antes y después:
+
+| | Pie: antes → ahora | `#tabla-vertices`: antes → ahora | Campos de ficha |
+|---|---|---|---|
+| **Validación** | 266,28 → **209,47** | 228,33 → **277,98** (+49,65) | 5 de 8 |
+| **Edición** | 266,28 → **122,69** | 228,33 → **353,84** (**+125,51**) | 5 de 8 |
+| **Diagnóstico** | 266,28 → **179,50** | 228,33 → **304,19** (+75,86) | 8 de 8 |
+
+A 1440×900 la caja de vértices de Validación pasa de 385,67 a **438,14 px**.
+
+**Edición es la que más gana**, y es donde más falta hace: es la pantalla en la
+que se arrastran vértices y se leen coordenadas. Las filas visibles de la tabla
+pasan de **9,25 a 11,26** en el suelo declarado.
+
+⭐ **Y cuesta CERO bytes de hoja de estilo** (§21): repartir el pie es marcado
+—`data-pantalla`— y las cinco reglas del CSS ya estaban escritas desde T5.
+
+Tres decisiones que salieron de la medición y no del gusto:
+
+- **Los tres campos de diagnóstico** —«Superficie catastral», «Δ catastral» y
+  «Colindantes»— decían en Validación «No consta», «No hay con qué comparar» y
+  «Sin consultar». La regla de oro 1 exige no callar; no exige reservar sitio
+  para un silencio.
+- **«Generar GML» se queda en Validación**, por decisión del autor: el camino
+  corto de una Subsanación no pasa por el diagnóstico, y mandarlo a Informe
+  —que hoy exige diagnóstico previo— alargaría el caso más frecuente.
+- **«Diagnosticar encaje» se queda también**, y la primera lectura decía que
+  sobra porque el peldaño del rail hace lo mismo. Se midió lo que costaba
+  quitarlo: el nodo lo resuelve `app/cableado-diagnostico.js` al montar y lo
+  conduce el guion 09, y los 32,39 px que devolvería solo se devolverían en la
+  pantalla donde el bloque vive de todos modos.
+
 ---
 
 ## 21. El presupuesto de la hoja de estilo (Rework de UI · T10)

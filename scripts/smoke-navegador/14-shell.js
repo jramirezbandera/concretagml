@@ -390,6 +390,80 @@ if (entrada.seMide && seccionEntrada !== null && vias.length > 0) {
   )
 }
 
+// ── 3 ter · ⭐ EL MARCADO Y LOS PÍXELES DICEN LO MISMO (rebanada 2) ─────────
+//
+// El eje PASO se declara en `index.html` con `data-pantalla` y lo aplica el CSS
+// con cinco reglas de `display:none`. Eso parte la verificación en dos mitades
+// que ninguna de las dos cubre sola:
+//
+//   · `test/app/pantalla.dom.test.js` afirma el MARCADO —que cada valor sea un
+//     paso que existe, que `<dt>` y `<dd>` se oculten juntos, que las acciones
+//     sean de Validación—, pero **jsdom no aplica `estilos/app.css`**: allí todo
+//     esto sería verde aunque las cinco reglas no existieran.
+//   · Aquí se afirma lo contrario y es lo único que puede hacerlo: que lo que se
+//     VE en pantalla es exactamente lo que el marcado declara para este paso.
+//
+// No hay lista escrita a mano de qué va en cada pantalla —sería una segunda
+// lista y divergiría—: se leen los `data-pantalla` del documento y se contrasta
+// con la caja real de cada nodo.
+const nodosDePantalla = $$('[data-pantalla]').map((n) => {
+  const declaradas = (n.getAttribute('data-pantalla') ?? '').split(/\s+/).filter(Boolean)
+  const r = n.getBoundingClientRect()
+  return {
+    nodo: `${n.tagName.toLowerCase()}${n.className ? '.' + String(n.className).split(/\s+/)[0] : ''}`,
+    ficha: n.dataset.ficha ?? null,
+    declaradas,
+    tocaEnEstePaso: declaradas.includes(pasoActivo),
+    seVe: r.width > 0 && r.height > 0,
+    alto: redondear(r.height),
+  }
+})
+
+// Un nodo puede estar oculto por un ANCESTRO marcado aunque él toque en este
+// paso; lo contrario —que se vea sin tocarle— no tiene excusa posible.
+const seVenSinTocarles = nodosDePantalla.filter((x) => x.seVe && !x.tocaEnEstePaso)
+if (seVenSinTocarles.length > 0) {
+  problemas.push(
+    `${seVenSinTocarles.length} nodo(s) se ven en «${pasoActivo}» sin declararlo en su ` +
+      `\`data-pantalla\`: ${JSON.stringify(seVenSinTocarles.map((x) => x.ficha ?? x.nodo))}. ` +
+      'El marcado dice una cosa y la pantalla otra, y el marcado es el contrato.',
+  )
+}
+
+const pantalla = {
+  paso: pasoActivo,
+  queEsEsto:
+    'La mitad que jsdom NO puede verificar: que las cinco reglas de `display:none` de ' +
+    '`estilos/app.css` cumplen lo que `index.html` declara con `data-pantalla`. La otra mitad ' +
+    '—que el marcado sea coherente— la afirma `test/app/pantalla.dom.test.js`.',
+  marcados: nodosDePantalla.length,
+  seVenSinTocarles: seVenSinTocarles.map((x) => x.ficha ?? x.nodo),
+  // El pie, que es lo que la rebanada 2 reparte. Antes eran 266,28 px FIJOS en
+  // las cuatro pantallas; ahora cada una paga lo suyo.
+  pie: (() => {
+    const pieEl = $('.gml-panel-pie')
+    const fichaEl = $('.gml-ficha')
+    const accionesEl = $('.gml-acciones')
+    return {
+      alto: caja(pieEl)?.alto ?? null,
+      fichaAlto: caja(fichaEl)?.alto ?? null,
+      accionesAlto: accionesEl === null ? null : redondear(accionesEl.getBoundingClientRect().height),
+      camposVisibles: $$('.gml-ficha [data-ficha]').filter(
+        (n) => n.getBoundingClientRect().height > 0,
+      ).length,
+      camposTotales: $$('.gml-ficha [data-ficha]').length,
+    }
+  })(),
+  referencia: {
+    queEs:
+      'Medido a 1280×720 ANTES de la rebanada 2 (2026-08-04): el pie valía 266,28 px fijos en ' +
+      'las cuatro pantallas, con sus 8 campos y sus 2 acciones, y la tabla de vértices 228,33 px. ' +
+      'Después: Validación 209,47 / 277,98 · Edición 122,69 / 353,84 · Diagnóstico 179,50 / 304,19.',
+    pieAntesPx: 266.28,
+    tablaVerticesAntesPx: 228.33,
+  },
+}
+
 // ── 4 · La caja de vértices: el invariante que atribuye las pérdidas ───────
 //
 // Desde F07 mide 267,44 px a 1440×900 en la rama PARCELA, y seis fases seguidas
@@ -583,6 +657,7 @@ return {
   columnas,
   mapa,
   panel,
+  pantalla,
   entrada,
   cajaVertices,
   avisos,

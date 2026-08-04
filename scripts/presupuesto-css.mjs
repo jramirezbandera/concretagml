@@ -143,8 +143,10 @@ export const ASIENTOS = Object.freeze(
       nota: 'Cáscara de tres columnas (+2.370) y pantalla de Entrada (+1.579). La primera rebanada.' },
     { hito: 'Rework T7-T8', commit: '848934f', total: 61108, nuestro: 46013, rebanada: null,
       nota: 'Avisos de rama y comentarios: cero CSS, y los artefactos salieron idénticos byte a byte.' },
-    { hito: 'Rework T9-T10', commit: '(sin commitear)', total: 61108, nuestro: 46013, rebanada: null,
+    { hito: 'Rework T9-T10', commit: 'af508f7', total: 61108, nuestro: 46013, rebanada: null,
       nota: 'Pantalla de contraste: el cajón se viste con estilos en línea, así que no toca la hoja.' },
+    { hito: 'Rework rebanada 2', commit: '(sin commitear)', total: 61108, nuestro: 46013, rebanada: 'validacion',
+      nota: '⭐ CERO BYTES: repartir el pie por pantallas es MARCADO (data-pantalla), y las cinco reglas del CSS ya estaban escritas desde T6.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 
