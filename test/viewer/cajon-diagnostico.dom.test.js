@@ -821,12 +821,33 @@ describe('viewer/cajon-diagnostico.js · el pie del informe (F08)', () => {
     // Y el valor del estado NO es el de ninguna acción del cajón: son dos espacios
     // de nombres distintos y cruzarlos es exactamente lo que costó M8.
     const acciones = [...raiz.querySelectorAll('[data-accion]')].map((el) => el.dataset.accion)
+    // La lista es EXHAUSTIVA a propósito: una acción nueva en el cajón tiene que
+    // pasar por aquí y por la comprobación de colisión de abajo. `tomar-geometria`
+    // la trae el rework de UI · T9 —la puerta de D4— y entró justamente así.
     expect(acciones.sort()).toEqual([
       'cerrar-diagnostico',
       'descargar-informe',
       'preparar-informe',
+      'tomar-geometria',
     ])
     for (const valor of valores) expect(acciones).not.toContain(valor)
+  })
+
+  it('⭐ T9 · la procedencia y la puerta no chocan con nada del resto de la aplicación', () => {
+    // El contrato K.1 (ningún par atributo/valor repetido en el documento montado)
+    // lo vigila `test/app/main-edificio.dom.test.js` sobre la app entera. Aquí se
+    // afirma la mitad que es de ESTE módulo: los dos valores que estrena T9 son los
+    // que se declararon, y son únicos dentro del cajón.
+    const { raiz } = conCajon()
+    const procedencias = [...raiz.querySelectorAll('[data-procedencia]')].map(
+      (el) => el.dataset.procedencia,
+    )
+    // `contraste`, y NUNCA `parcela`: ese valor ya lo usa el renglón de la vía del
+    // Catastro en `index.html`, y `querySelector` se queda con el primero del
+    // documento — el de aquí quedaría mudo y sin síntoma. Es M8 otra vez.
+    expect(procedencias).toEqual(['contraste'])
+    expect(nodo(raiz, SELECTOR.PROCEDENCIA)).not.toBeNull()
+    expect(nodo(raiz, SELECTOR.PUERTA)).not.toBeNull()
   })
 
   it('los selectores exportados apuntan a UN nodo cada uno', () => {
@@ -1106,7 +1127,10 @@ describe('viewer/cajon-diagnostico.js · «Preparar informe (PDF)» (F09)', () =
     const acciones = [...raiz.querySelectorAll('footer [data-accion]')].map(
       (el) => el.dataset.accion,
     )
-    expect(acciones).toEqual(['preparar-informe', 'descargar-informe'])
+    // ⚠️ T9 añade un TERCERO, y va el ÚLTIMO por decisión: los dos primeros producen
+    // un documento con lo que hay; la puerta cambia lo que se puede hacer a partir
+    // de ahora. Mezclarla con ellos invitaría a pulsarla por inercia.
+    expect(acciones).toEqual(['preparar-informe', 'descargar-informe', 'tomar-geometria'])
   })
 
   it('los dos botones comparten FILA: el segundo cuesta 0 px de alto', () => {

@@ -518,6 +518,16 @@ const esCliente = (v) => !!v && typeof v.parcelaPorRefcat === 'function'
  *   gancho que el de `cablearCatastro`: cargar una parcela de un fichero es abrir un
  *   documento nuevo, así que el historial de edición se REINICIA en vez de commitear
  *   encima (ver `app/main.js#cablearEdicion`). Sin él, el módulo funciona igual.
+ * @param {((comprobacion: object|null) => void)|null} [opciones.alComprobar=null]
+ *   **Rework de UI · T9.** Se llama justo DESPUÉS de abrir el cajón con un GML de
+ *   parcela, con la comprobación que se acaba de pintar. Existe para que
+ *   `app/main.js` entre en **modo COMPROBACIÓN**: a partir de ese instante el rail
+ *   apaga «Edición» con el motivo escrito, en vez de dejar que alguien edite el
+ *   trabajo de otro creyendo que es suyo (decisión D4).
+ *
+ *   ⚠️ **No se llama cuando el fichero se deriva a la rama de edificio**: allí no
+ *   hay ninguna parcela ajena que comprobar, y el recorrido termina en otra pantalla.
+ *   Sin este gancho el módulo se comporta EXACTAMENTE como en F08.
  * @param {ReadonlyArray<{extensiones: readonly string[], alFichero: (f: File) => void}>}
  *   [opciones.entradasExtra=[]]  **F10 · T5.1.** Otras familias de fichero que ESTA
  *   MISMA zona acepta y que NO son un GML. Cada entrada declara sus extensiones y
@@ -566,6 +576,7 @@ export function cablearComprobacion({
   cliente = null,
   cajonDiagnostico = null,
   alCargarParcela = null,
+  alComprobar = null,
   entradasExtra = [],
   alGmlDeEdificio = null,
   ventana = globalThis,
@@ -610,6 +621,12 @@ export function cablearComprobacion({
       `cablearComprobacion: 'alCargarParcela' debe ser una función (se le pasa el POJO de la ` +
         `parcela que acaba de entrar en el store) o null si no hace falta; recibido ` +
         `${typeof alCargarParcela}.`,
+    )
+  }
+  if (alComprobar !== null && typeof alComprobar !== 'function') {
+    throw new TypeError(
+      `cablearComprobacion: 'alComprobar' debe ser una función (se le pasa la comprobación recién ` +
+        `pintada) o null si a nadie le interesa; recibido ${typeof alComprobar}.`,
     )
   }
   if (alGmlDeEdificio !== null && typeof alGmlDeEdificio !== 'function') {
@@ -775,6 +792,27 @@ export function cablearComprobacion({
     // no se entera y se quedarían los dos apilados.
     if (cajonDiagnostico !== null) cajonDiagnostico.cerrar()
     cajon.abrir()
+
+    // ── Rework de UI · T9 · AQUÍ EMPIEZA EL MODO COMPROBACIÓN ────────────────
+    // Se avisa DESPUÉS de abrir el cajón y no antes, para que el aviso describa
+    // algo que ya está en pantalla. Quien escucha (`app/main.js`) entra en modo
+    // COMPROBACIÓN, y a partir de ese instante el rail apaga «Edición» **con el
+    // motivo escrito** en vez de dejar que el usuario edite el trabajo de otro
+    // creyendo que es suyo.
+    //
+    // ⚠️ Es un aviso OPCIONAL y este módulo no sabe qué hace quien lo escucha: no
+    // conoce `app/navegacion.js` ni tiene por qué. Sin él, F08 se comporta
+    // exactamente como antes — misma regla que `cajonDiagnostico` y `cliente`.
+    //
+    // Y va envuelto, igual que {@link notificarCarga}: un oyente roto no puede
+    // deshacer una comprobación que ya está en pantalla.
+    if (alComprobar !== null) {
+      try {
+        alComprobar(comprobacion)
+      } catch (causa) {
+        reventar('el aviso de comprobación abierta (alComprobar) ha fallado', causa, MENSAJE_SUSCRIPTOR_ROTO)
+      }
+    }
   }
 
   /**

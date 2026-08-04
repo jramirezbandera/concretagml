@@ -566,6 +566,134 @@ describe('app/main · F08 · las dos features, enlazadas', () => {
   })
 })
 
+// ══════════════════════════════════════════════════════════════════════════════
+// Rework de UI · T9 · LA RUTA CRÍTICA 2, ANDADA ENTERA
+//
+// «Comprobar un GML ajeno: Entrada (soltar `.gml`) → contraste → Informe.»
+//
+// ⛔ **Hasta T9 esta ruta no se podía andar, y está medido:** «Contrastar con el
+// parcelario» metía la parcela en el store y **no movía al usuario de sitio**.
+// Quien soltaba el GML de otro se quedaba en Entrada mirando las tres vías, con
+// una geometría ajena ya cargada por debajo y sin una sola línea en pantalla que
+// dijera de dónde había salido — el único renglón que lo decía
+// (`[data-procedencia="parcela"]`) vive DENTRO de la pantalla Entrada desde T6.
+//
+// Se prueba sobre la app REAL (el mismo arranque de arriba), porque lo que T9
+// añade es precisamente la costura entre cuatro módulos que solo se conocen aquí.
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** El `<li>` de un paso del rail. */
+const peldano = (paso) => document.querySelector(`[data-rail="pasos"] [data-paso="${paso}"]`)
+/** Su botón, que es donde vive el `disabled`. */
+const botonPeldano = (paso) => peldano(paso).querySelector('button')
+/** El paso activo, tal y como lo escribe `app/pantalla.js` en la raíz. */
+const pasoActivo = () => document.body.getAttribute('data-paso')
+/** El renglón de procedencia del cajón de diagnóstico (T9). */
+const procedenciaDelCajon = () =>
+  raizDiagnostico().querySelector('[data-procedencia="contraste"]')
+/** La puerta (D4). */
+const puerta = () => raizDiagnostico().querySelector('[data-accion="tomar-geometria"]')
+
+describe('app/main · T9 · la ruta crítica 2, de principio a fin', () => {
+  it('⛔ soltar un GML ajeno entra en modo COMPROBACIÓN: Edición se apaga CON motivo', async () => {
+    // ⚠️ **PUNTO DE PARTIDA LIMPIO, y no es ceremonia: lo obligó una mutación.** Los
+    // bloques de arriba dejan un diagnóstico calculado, así que «Informe» ya está
+    // encendido y la prueba del final salía VERDE aunque se quitara la suscripción
+    // que la sostiene. Vaciar el store lo olvida y deja el rail donde de verdad
+    // empieza esta ruta.
+    estadoDelArranque.set(null)
+    await cederTurno()
+    expect(botonPeldano('informe').disabled).toBe(true)
+
+    await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'del-vecino.gml'))
+
+    expect(comprobacionViva.abierto()).toBe(true)
+    // ⭐ **Y vuelve a ENTRADA, que es donde vive este cajón.** Lo destapó esta misma
+    // prueba: la anterior había dejado la app en Diagnóstico (por el CTA del pie),
+    // y sin esto el rail decía «Diagnóstico» mientras la esquina del mapa enseñaba
+    // el cajón de otra pantalla. Traer un fichero nuevo es empezar otro expediente.
+    expect(pasoActivo()).toBe('entrada')
+    // El rail lo dice ya, antes de contrastar: la geometría que vas a mirar es de
+    // otro y editarla no es lo que crees.
+    expect(botonPeldano('edicion').disabled).toBe(true)
+    expect(botonPeldano('edicion').textContent).toContain('Tomar esta geometría y editarla')
+    // Y el motivo NO es el de siempre («trae una parcela primero»): decir eso aquí
+    // mandaría al usuario a hacer un trabajo que ya ha hecho.
+    expect(botonPeldano('edicion').textContent).not.toMatch(/trae una parcela/i)
+  })
+
+  it('⭐ «Contrastar» ATERRIZA en Diagnóstico: antes de T9 se quedaba en Entrada', async () => {
+    expect(pasoActivo()).toBe('entrada')
+
+    pulsar(raizComprobacion().querySelector(SELECTOR_COMP.CONTRASTAR))
+    await cederTurno()
+
+    expect(pasoActivo()).toBe('diagnostico')
+    // Y la esquina del mapa la manda el paso: uno abierto, el otro cerrado, sin que
+    // los dos módulos se hayan puesto de acuerdo entre ellos.
+    expect(diagnosticoVivo.cajon.abierto()).toBe(true)
+    expect(comprobacionViva.abierto()).toBe(false)
+  })
+
+  it('⭐ y la PROCEDENCIA está declarada: dice que es de otro y nombra la puerta', async () => {
+    const renglon = procedenciaDelCajon()
+    expect(renglon).not.toBeNull()
+    // Se ve: la vista oculta el renglón solo cuando no hay nada que decir.
+    expect(renglon.style.display).not.toBe('none')
+    expect(renglon.textContent).toContain('otro técnico')
+    expect(renglon.textContent).toContain('Tomar esta geometría y editarla')
+    // El contrato K.1 en acción: este renglón NO es el de la vía del Catastro.
+    expect(renglon.dataset.procedencia).toBe('contraste')
+    expect(document.querySelectorAll('[data-procedencia="contraste"]')).toHaveLength(1)
+  })
+
+  it('la puerta se ENSEÑA, y no está apagada: no aplica o no está', () => {
+    expect(puerta().style.display).not.toBe('none')
+    expect(puerta().disabled).toBe(false)
+  })
+
+  it('⭐ cruzarla cambia el modo de verdad: el rail se completa y el renglón se reescribe', async () => {
+    pulsar(puerta())
+    await cederTurno()
+
+    // Edición ya está, y sin motivo colgando.
+    expect(botonPeldano('edicion').disabled).toBe(false)
+    expect(botonPeldano('edicion').textContent).not.toContain('Tomar esta geometría')
+    // La puerta se retira: ya se ha cruzado.
+    expect(puerta().style.display).toBe('none')
+    // Y el renglón no reescribe la historia — sigue diciendo de dónde salió el
+    // dibujo— pero ya no dice que sea de solo lectura.
+    expect(procedenciaDelCajon().textContent).toContain('otro técnico')
+    expect(procedenciaDelCajon().textContent).toContain('Lo has tomado como tuyo')
+    expect(procedenciaDelCajon().textContent).not.toContain('no se edita ni se genera GML')
+  })
+
+  it('⭐ el paso «Informe» se enciende SIN el apaño del temporizador que T9 borró', async () => {
+    // T5 refrescaba los hechos del rail con `queueMicrotask` + `setTimeout(…, 500)`
+    // porque `app/cableado-diagnostico.js` no notificaba a nadie: `ultimoDiagnostico()`
+    // era una lectura, no un canal. Un temporizador de medio segundo es una apuesta —
+    // con la red lenta, «Informe» se quedaba apagado y nada lo decía—. Ahora hay
+    // suscripción de verdad y es cierto en el mismo turno.
+    //
+    // ⛔ **VERIFICADO POR MUTACIÓN:** quitando `alDiagnostico(refrescarHechos)` de
+    // `app/main.js`, esta prueba sale ROJA. La primera versión NO lo hacía, porque
+    // medía un «Informe» que ya venía encendido de otro bloque. De ahí el vaciado
+    // del store en la primera prueba de este describe.
+    expect(botonPeldano('informe').disabled).toBe(false)
+  })
+
+  it('⭐ y con una parcela PROPIA la pantalla no habla de nadie: la procedencia distingue', async () => {
+    // Anti-vacuidad. Sin esta prueba, un renglón que dijera siempre «de otro
+    // técnico» pasaría las cinco de arriba.
+    estadoDelArranque.set({ ...estadoDelArranque.get(), origen: ORIGEN_PARCELA.WFS })
+    await cederTurno()
+
+    expect(procedenciaDelCajon().textContent).toContain('del Catastro')
+    expect(procedenciaDelCajon().textContent).not.toContain('otro técnico')
+    expect(puerta().style.display).toBe('none')
+  })
+})
+
 // ── El desmontaje. VA EL ÚLTIMO del primer arranque, y por eso está escrito ──
 // `destruir()` deja el cableado inerte a propósito: cualquier prueba que corriera
 // después encontraría la app viva pero sorda, y fallaría por un motivo que no es

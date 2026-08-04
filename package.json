@@ -12,6 +12,7 @@
     "test:watch": "node scripts/vitest.mjs --project node",
     "test:all": "node scripts/vitest.mjs run",
     "test:dom": "node scripts/vitest.mjs run --project dom",
+    "presupuesto": "node scripts/presupuesto-css.mjs",
     "validar:xsd": "node scripts/validar-xsd.mjs",
     "catastro:vivo": "node scripts/sonda-catastro.mjs"
   },

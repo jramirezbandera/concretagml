@@ -150,6 +150,27 @@ jobs:
           fi
           echo "OK: el bundle apunta dentro de /concretagml/"
 
+      # ── El presupuesto de la hoja de estilo (rework T10) ──────────────────
+      # Va aquí y no en `pruebas` porque se mide sobre el ARTEFACTO: la cifra
+      # presupuestada es la hoja construida con los comentarios ya comidos, no
+      # el fichero fuente (que es sobre todo registro de diseño y mide 3× más).
+      #
+      # Es un GATE, con la misma lógica que el job `esquema`: la hoja creció de
+      # 16.684 a 42.064 B en nueve fases sin que nadie publicara un número, y un
+      # presupuesto que no puede parar nada es una intención. Ponerlo en verde
+      # cuesta una línea —añadir el asiento en `scripts/presupuesto-css.mjs`—,
+      # y el techo del criterio 10 ni siquiera se exige hasta que las cinco
+      # rebanadas estén cerradas.
+      #
+      # ⚠️ SIN MEDIR TODAVÍA: que los bytes construidos salgan IDÉNTICOS en
+      # Linux y en Windows. Los asientos se midieron en Windows. El minificador
+      # trabaja sobre el AST, así que el fin de línea de la fuente no debería
+      # sobrevivir, pero eso es un razonamiento y no una medición: la primera
+      # corrida de este job ES la medición. Si sale rojo por unos pocos bytes,
+      # el sospechoso es éste y no un cambio de CSS.
+      - name: npm run presupuesto
+        run: npm run presupuesto
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3

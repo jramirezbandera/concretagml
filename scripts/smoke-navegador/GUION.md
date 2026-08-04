@@ -9,9 +9,16 @@ con la **maquinaria real de `L.Draggable`**.
 - **4D.1** (esta carpeta) escribió los guiones y los probó en seco.
 - **4D.2** es la ejecución oficial, con evidencia, siguiendo este documento.
 
-Trece guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
-para que el resultado no dependa de interpretar prosa. Doce son de aceptación;
+Catorce guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
+para que el resultado no dependa de interpretar prosa. Trece son de aceptación;
 `05` es de diagnóstico (§11):
+
+> ⛔ **Esta cuenta decía «trece» y se quedó vieja el 2026-08-04**, cuando T4 del
+> rework añadió `14-shell.js` y su §20 sin volver a esta tabla. Lo corrige T10, y
+> se anota en vez de borrarse porque es **el mismo defecto que T10 existe para
+> tapar**: una cifra escrita a mano en prosa que nadie vuelve a mirar. La de la
+> hoja de estilo ya no se escribe a mano (§21); ésta sigue haciéndolo, así que
+> **si añades un guion, esta tabla es parte del guion**.
 
 | Guion | Criterio | Mide | Veredicto pasa si |
 |---|---|---|---|
@@ -28,6 +35,7 @@ para que el resultado no dependa de interpretar prosa. Doce son de aceptación;
 | `11-informe-pdf.js` | F09 · **1** a 5 | ⭐ **el CRITERIO 1, que solo se puede medir aquí**: `toDataURL` sobre un lienzo con una tesela REAL del WMS, **con control negativo** (sin `crossOrigin` tiene que lanzar); el PDF que baja con BYTES de verdad (`%PDF`, páginas declaradas, el plano `/DCTDecode` dentro); que componer **no cierre nada por debajo** (tercera aparición del mismo defecto); el `<dialog>` como modal DE VERDAD (capa superior, fondo inerte, `Escape`), el encaje del modal en la ventana, el invariante de la caja de vértices y la tipografía de los cuatro botones nuevos | `ok:true` — ver §17 |
 | `12-expedientes.js` | F10 · 1 a 6 | ⭐ **que los bytes están en una base de VERDAD** (la suite entera de F10 corre sobre `fake-indexeddb`, que no es una base de datos): supervivencia a la recarga contrastada contra `performance.timeOrigin`, segunda conexión a IndexedDB, `persist()`/`estimate()` reales, las tres exportaciones con sus BYTES, el `<dialog>` como modal y el invariante de los 267 px | `ok:true` — ver §18 |
 | `13-edificio.js` | F11 · 1 a 4 | ⭐ **el guardián de ANCHO del conmutador, que solo existe aquí** (sustituye al `flex-wrap: nowrap` que el plan pedía por error); **M10 ida y vuelta en un navegador real** —mismo nodo, mismo valor, oyentes vivos—; el invariante de los 267 px y las tres cifras de M8; que las huellas del DXF **se ven y ENCIMA de la parcela** (orden real de los panes, no solo que existan los `<path>`); soltar un `.dxf` de verdad en las DOS ramas, con su diálogo de reparto por capas; la ficha del pie que cambia de cara; y ⭐ **el reparto de altura del panel, en vacío y con datos, con el recorte a CERO EXACTO y el déficit en píxeles cuando no llega** | ⛔ **`ok:false`: encontró DOS defectos reales; uno cerrado y el otro a medias** — ver §19 |
+| `14-shell.js` | Rework · 1 a 4 | la cáscara de tres columnas y su coste en píxeles, en **las DOS pasadas de D5** (1280×720 y 1440×900): ancho del rail, desborde del panel, el invariante de `#tabla-vertices`, cuántas tarjetas de aviso caben enteras y cuánto queda escondido tras el pliegue; **se detecta solo** en cuál de los dos mundos está (`LINEA_BASE` sin rail / `SHELL` con él) | `ok:true` en las dos — ver §20 |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
 spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
@@ -3392,3 +3400,155 @@ esforzaron en no mover (F06 lo dejó en 303 sacando la edición al mapa, F07 en 
 y F08–F11 en 267 a coste cero). T6 no lo protege: lo **sube un 44 %**, y no
 optimizando nada — solo dejando de enseñar a la vez dos cosas que nunca se usan a
 la vez.
+
+---
+
+## 21. El presupuesto de la hoja de estilo (Rework de UI · T10)
+
+La única medición de este runbook que **no necesita navegador**. Vive aquí porque
+éste es el sitio donde el repositorio guarda lo que se mide, y porque el número
+que vigila es de la misma familia que los píxeles del §20: los dos existen para
+que la pelea por el sitio deje rastro.
+
+```
+npm run build && npm run presupuesto
+```
+
+Medidor y registro son el mismo fichero: `scripts/presupuesto-css.mjs`.
+
+### Por qué esto es un script y no un párrafo
+
+El criterio 10 del rework dice que la hoja **acaba pesando menos de 57.159 B al
+cerrar la quinta rebanada**, que durante la migración puede subir, y que **cada
+rebanada anota cuánto**. La premisa que lo justificaba decía que la hoja había
+crecido «un 24 % en una fase y nadie lo vio».
+
+Nadie lo vio porque no había nada que mirar. Escribir ese número a mano en un
+markdown reproduce el mismo modo de fallo con más letra: el día que alguien
+engorde la hoja no se va a acordar de venir a actualizarlo — exactamente como
+nadie volvió a por el rail durante ocho fases (`estilos/app.css:11-21`), y
+exactamente como la tabla de guiones de la cabecera de este documento se quedó
+diciendo «trece» cuando ya eran catorce.
+
+Así que el registro es código y el medidor lo contrasta. **La regla no es «no
+crezcas»** —sería mentira durante una migración—: es **«crece si hace falta, pero
+queda anotado»**. La única forma de volver a ponerlo en verde después de tocar
+CSS es añadir el asiento.
+
+### ⛔ Qué número es éste, y cuál NO (léelo antes de citar el techo)
+
+**No es `estilos/app.css` en disco.** Ese fichero mide hoy ~182.000 B y casi todo
+son comentarios: aquí la hoja es también el registro de diseño, y presupuestar la
+fuente castigaría escribir el porqué de cada regla. El minificador se los come
+enteros; lo que sobrevive son REGLAS, que es lo que el criterio 10 quiere vigilar
+(«si de verdad se quitaron los apaños de la pelea por píxeles o solo se taparon»).
+Quien mire el fichero fuente creerá que el presupuesto ha reventado 3×.
+
+Es `dist/assets/index-*.css`: la hoja que se descarga. Contiene, en este orden,
+`estilos/app.css` con sus cinco `@import` de tokens fundidos, y detrás
+`leaflet/dist/leaflet.css`, que importa `app/main.js`.
+
+**Y ahí está la corrección que trae T10:** de los 57.159 B de la línea base,
+**15.095 son de Leaflet**. Medido en las doce builds del barrido histórico:
+15.095 B clavados en las doce, porque `leaflet@^1.9.4` no se ha movido desde F05.
+Dicho en bytes que este proyecto escribe, el techo del criterio 10 es de
+**42.064 B**, no de 57.159. El medidor publica los dos para que nadie tenga que
+acordarse de la resta.
+
+### La serie completa, medida (2026-08-04)
+
+Los doce primeros asientos **no se copiaron de ningún sitio**: se midieron
+reconstruyendo el artefacto en cada commit. Repetible en ~30 s:
+
+```bash
+# por cada hito: se sustituye SOLO estilos/, se construye y se lee dist/assets/*.css
+git checkout <commit> -- estilos/ && rm -rf dist && npm run build
+node -e "…"   # el corte por '.leaflet-pane,' que hace partirHoja()
+git checkout HEAD -- estilos/
+```
+
+| Hito | commit | Hoja entera | De este proyecto | Leaflet | Δ nuestro |
+|---|---|---:|---:|---:|---:|
+| F03 | `5d68f14` | 31.779 B | 16.684 B | 15.095 B | — |
+| F04 | `a1c1138` | 32.743 B | 17.648 B | 15.095 B | +964 |
+| F05 | `ba00138` | 34.938 B | 19.843 B | 15.095 B | +2.195 |
+| **F06** | `3dd7f99` | 42.221 B | **27.126 B** | 15.095 B | ⭐ **+7.283 (+36,7 %)** |
+| F07 | `a0e2a9d` | 43.641 B | 28.546 B | 15.095 B | +1.420 |
+| F08 | `3ea5d49` | 45.905 B | 30.810 B | 15.095 B | +2.264 |
+| F09 | `21366ac` | 49.244 B | 34.149 B | 15.095 B | +3.339 |
+| F10 | `c2df2c7` | 52.801 B | 37.706 B | 15.095 B | +3.557 |
+| **F11** | `960bb7a` | **57.159 B** | **42.064 B** | 15.095 B | +4.358 |
+| Rework T1–T4 | `cdaae52` | 57.159 B | 42.064 B | 15.095 B | ⭐ **0** |
+| Rework T5–T6 | `c2e0544` | 61.108 B | 46.013 B | 15.095 B | +3.949 |
+| Rework T7–T8 | `848934f` | 61.108 B | 46.013 B | 15.095 B | 0 |
+| Rework T9–T10 | (esta rebanada) | 61.108 B | 46.013 B | 15.095 B | 0 |
+
+**F11 es la línea base y el techo a la vez**: el criterio pide acabar por debajo
+de donde se empezó.
+
+### Tres cosas que la serie deja a la vista
+
+**1. El «24 % en una fase» de la premisa no reproduce en ninguna unidad** —ni en
+la hoja entera, ni en la parte nuestra, ni en el fichero fuente— y el salto real
+es **peor**: F06 engordó lo nuestro un **36,7 % de una vez** (+7.283 B), sacando
+la barra de edición al mapa. La premisa acertaba en el fondo y erraba en la
+cifra, que es exactamente lo que pasa cuando un número se escribe de memoria: la
+persona que redactó «nadie lo vio» tampoco lo había mirado.
+
+**2. T1–T4 costaron CERO bytes.** La autoridad de navegación, sus tres guardianes
+y el guion del shell son JS puro. Toda la subida del rework —**+3.949 B**— es de
+T5–T6: la cáscara de tres columnas (+2.370) y la pantalla de Entrada (+1.579).
+
+**3. Cuatro de los trece hitos costaron cero o casi.** F04 (+964 B), T1–T4 (0),
+T7–T8 (0) y T9 (0). Los cajones sobre el mapa se visten con **estilos en línea**
+desde `viewer/`, así que crecen sin tocar la hoja: el presupuesto **no ve** esa
+clase de crecimiento, y conviene saberlo antes de leer un 0 como una virtud.
+
+### Cómo se añade un asiento
+
+1. `npm run build`
+2. `npm run presupuesto` → sale ROJO y te da el par exacto (total, nuestro)
+3. lo copias en `ASIENTOS` con su hito, su commit y **una nota de una línea
+   diciendo qué subió o bajó**. La nota es la mitad del valor: un número sin causa
+   no se puede revisar después, y hay una prueba que la exige.
+
+El techo **no se exige** hasta que las cinco rebanadas —las cinco pantallas del
+rail— estén anotadas. Lo dice el criterio 10 y lo implementa `comparar()`.
+
+### Qué cuenta como «pasa»
+
+| Código | Significado |
+|---|---|
+| `0` | La hoja construida coincide con el último asiento. |
+| `1` | La hoja se movió y nadie lo anotó; o las cinco rebanadas están cerradas y no ha bajado del techo. |
+| `2` | **No se ha podido medir.** |
+
+El `2` es deliberado y viene de la lección más cara del repositorio
+(`scripts/validar-xsd.mjs`): **no poder medir es un fallo, nunca un salto
+benigno**. Un guardián que se salta solo no es un guardián, es una intención.
+
+### Los cuatro caminos rojos, verificados por mutación (2026-08-04)
+
+Las piezas puras las cubre `test/scripts/presupuesto-css.test.js` (15 pruebas).
+Los cuatro caminos de E/S no se pueden probar ahí, así que se dispararon a mano
+sobre el artefacto real:
+
+| Mutación | Resultado |
+|---|---|
+| Se añade una regla `.gml-` **dentro** de la parte nuestra de `dist/…css` | `1` — «la hoja se ha movido y NADIE lo ha anotado… +28 B» |
+| Se añade una regla `.gml-` **detrás** del bloque de Leaflet | `2` — «el vendor ha dejado de ser el final de la hoja» |
+| Se toca `estilos/app.css` sin reconstruir | `2` — «la hoja construida es MÁS VIEJA que estilos\app.css» |
+| Se borra `dist/` | `2` — «corre `npm run build` y vuelve» |
+
+El tercero no es hipotético: pasó a mano mientras se escribía T10. Un `dist/` de
+las 16:18 y un `estilos/app.css` de las 14:53 parecían coherentes y no lo eran.
+
+### Lo que este medidor **NO** puede ver
+
+- **Los estilos en línea de `viewer/`.** Los cinco cajones sobre el mapa se
+  visten desde JS; su coste va al bundle, no a la hoja.
+- **Si los bytes son buenos o malos.** Mide bytes, no apaños. Una hoja que
+  adelgaza reventando la especificidad pasaría en verde.
+- **El coste de transferencia.** Se presupuestan bytes en claro; la red mueve
+  ~14 kB comprimidos. Un solo número presupuestado, a propósito: dos invitan a
+  citar el que convenga.

@@ -22,6 +22,19 @@
  *
  * ── REGLAS DURAS DE ESTE FICHERO (léelas antes de tocar nada) ────────────────
  *
+ * · **ESTA HOJA TIENE PRESUPUESTO, Y SE MIDE SOLA** (rework T10, 2026-08-04):
+ *       npm run build && npm run presupuesto
+ *   No presupuesta ESTE fichero —que es sobre todo comentarios, y escribir el
+ *   porqué de una regla no debe costar nada—, sino la hoja CONSTRUIDA con los
+ *   comentarios ya comidos: `dist/assets/index-*.css`, descontados los 15.095 B
+ *   de Leaflet. Hoy son **46.013 B** nuestros y el techo del criterio 10 son
+ *   **42.064 B** al cerrar la quinta rebanada. La regla NO es «no crezcas»: es
+ *   que si creces **queda anotado**, y el medidor sale rojo hasta que añades el
+ *   asiento en `scripts/presupuesto-css.mjs`. Existe porque la hoja creció de
+ *   16.684 a 42.064 B en nueve fases sin que nadie publicara un solo número —el
+ *   salto gordo fue F06, +36,7 % de una vez—. Serie completa y por qué se mide
+ *   así, en `scripts/smoke-navegador/GUION.md` §21.
+ *
  * · **Ningún selector de elemento DESNUDO** fuera de `:root`, `*`, `html` y
  *   `body`. Nada de `table {}`, `input {}`, `a {}`, `button {}`. Los selectores
  *   de elemento SÍ se usan, pero siempre calificados y con raíz en una clase

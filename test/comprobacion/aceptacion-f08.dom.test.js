@@ -876,12 +876,22 @@ describe('F08 · AC3 · la acción principal del diagnóstico por esta vía es �
     // RED y sin plano. Lo que AC3 pedía de verdad —que la acción que consume el
     // diagnóstico esté en el cajón y no en el pie de la app, que no cueste píxeles
     // del panel y que sirva a las dos vías de entrada— sigue cumpliéndose entero.
+    // ⚠️ ACTUALIZADO OTRA VEZ EN EL REWORK DE UI (T9). El cajón estrena un cuarto
+    // botón —«Tomar esta geometría y editarla», la puerta de la decisión D4— que
+    // nace OCULTO y solo se enseña cuando la geometría es de otro. No toca AC3: no
+    // produce ningún documento, no comparte fila con los dos del informe y por lo
+    // tanto no le cuesta un píxel al panel.
     const botones = [...banco.raizDiag.querySelectorAll('button')]
     expect(botones.map((b) => b.dataset.accion).sort()).toEqual([
       'cerrar-diagnostico',
       'descargar-informe',
       'preparar-informe',
+      'tomar-geometria',
     ])
+    // Y nace escondido, que es lo que hace que AC3 siga midiendo lo mismo.
+    expect(banco.raizDiag.querySelector('[data-accion="tomar-geometria"]').style.display).toBe(
+      'none',
+    )
     // Y los dos del informe comparten fila, así que el cajón no ha crecido de alto:
     // la razón 2 (un CTA más cuesta ~36 px del panel) sigue en pie.
     const preparar = banco.raizDiag.querySelector('[data-accion="preparar-informe"]')

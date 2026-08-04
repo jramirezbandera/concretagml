@@ -604,6 +604,15 @@ export function cablearDiagnostico({
    */
   let ultimoDiagnostico = null
 
+  /**
+   * Quién quiere enterarse de que {@link ultimoDiagnostico} ha cambiado. Un `Set` y
+   * no un `= fn`, igual que los `alCambiar`/`alDescargar` del cajón: un asignador
+   * desengancharía al primer oyente en silencio. Ver {@link notificarDiagnostico}.
+   *
+   * @type {Set<(d: object|null) => void>}
+   */
+  const oyentesDiagnostico = new Set()
+
   // ── Escritura en la cáscara ────────────────────────────────────────────────
 
   /**
@@ -649,6 +658,30 @@ export function cablearDiagnostico({
    * este camino se alcanza desde un suscriptor del store, y dejar reventar ahí
    * tumbaría también a los otros suscriptores, que no tienen la culpa.
    */
+  /**
+   * Avisa de que {@link ultimoDiagnostico} acaba de cambiar (rework de UI · T9).
+   *
+   * ⛔ **Esto existe para borrar un apaño con fecha de caducidad.** T5 tuvo que
+   * refrescar los hechos del rail «a ojo» —una microtarea al soltar el clic del CTA
+   * y otra pasada 500 ms después, por si habían llegado las vecinas— porque este
+   * módulo **no notificaba a nadie**: `ultimoDiagnostico()` era una lectura, no un
+   * canal. El paso «Informe» del rail depende de que haya diagnóstico, así que sin
+   * aviso el rail se enteraba tarde, o no se enteraba.
+   *
+   * Se llama en los DOS sitios donde el diagnóstico deja de ser el que era: cuando
+   * se calcula uno nuevo y cuando se olvida el que había. Un oyente roto se cuenta y
+   * no interrumpe: quien avisa ya ha hecho su trabajo.
+   */
+  function notificarDiagnostico() {
+    for (const fn of [...oyentesDiagnostico]) {
+      try {
+        fn(ultimoDiagnostico)
+      } catch (causa) {
+        console.error('cablearDiagnostico: un oyente de alDiagnostico ha reventado', causa)
+      }
+    }
+  }
+
   function recalcular() {
     if (destruido || !cajon.abierto()) return
     const parcelaActual = estado.get()
@@ -681,6 +714,7 @@ export function cablearDiagnostico({
       ultimoDiagnostico = d
       cajon.pintar(d)
       contraste.pintar(d, { recintos, geometriaOficial })
+      notificarDiagnostico()
     } catch (causa) {
       // Se OLVIDA el anterior, y no es celo: el informe se compone del último
       // diagnóstico, y dejar en pie el de hace dos ediciones ofrecería descargar
@@ -703,8 +737,12 @@ export function cablearDiagnostico({
    * invariante que sostiene la guarda del botón no dependa de acordarse.
    */
   function olvidarDiagnostico() {
+    // Sin este `if`, olvidar dos veces seguidas —que pasa: cada `set` del store con
+    // la geometría vacía pasa por aquí— despertaría al rail para decirle lo mismo.
+    const habia = ultimoDiagnostico !== null
     ultimoDiagnostico = null
     cajon.pintar(null)
+    if (habia) notificarDiagnostico()
   }
 
   /**
@@ -962,6 +1000,27 @@ export function cablearDiagnostico({
     ultimoDiagnostico: () => ultimoDiagnostico,
 
     /**
+     * Se suscribe a los cambios del último diagnóstico. Devuelve la BAJA, igual que
+     * los `alAlgo` del cajón. **Rework de UI · T9**, y borra un apaño: ver
+     * {@link notificarDiagnostico}, donde está escrito qué se hacía antes y por qué
+     * no valía.
+     *
+     * Se le pasa el diagnóstico nuevo —o `null` si lo que ha pasado es que se ha
+     * olvidado el que había—, para que quien escuche no tenga que volver a
+     * preguntar. No promete no repetirse: lo que promete es no callarse.
+     *
+     * @param {(d: object|null) => void} fn
+     * @returns {() => void}
+     */
+    alDiagnostico(fn) {
+      if (typeof fn !== 'function') {
+        throw new TypeError(`alDiagnostico: 'fn' debe ser una función; recibido ${typeof fn}.`)
+      }
+      oyentesDiagnostico.add(fn)
+      return () => oyentesDiagnostico.delete(fn)
+    },
+
+    /**
      * Deja el cableado inerte: retira el oyente del CTA, la suscripción al store,
      * las TRES del cajón (cambio, cierre y descarga) y la de las colindantes, y
      * **limpia el mapa**. IDEMPOTENTE.
@@ -981,6 +1040,7 @@ export function cablearDiagnostico({
       bajaCierre()
       bajaDescargar()
       bajaColindantes()
+      oyentesDiagnostico.clear()
       contraste.pintar(null)
     },
   }

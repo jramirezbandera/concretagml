@@ -558,6 +558,7 @@ import {
   parcelaDemo,
   parcelaDemoConHueco,
 } from './demo-datos.js'
+import { cablearContraste } from './contraste.js'
 import { PASO, crearNavegacion } from './navegacion.js'
 import { crearPanelEdificio } from './panel-edificio.js'
 import { cablearPantalla } from './pantalla.js'
@@ -2600,14 +2601,47 @@ comprobacionCableada = cablearComprobacion({
   // La exclusión mutua de `bottomleft`. Soltar un fichero no es un clic, así que el
   // guardián de clic-fuera de F07 no se entera y su cajón se quedaría abierto
   // debajo; se le pasa el de F07 para que este cableado lo cierre al abrir el suyo.
+  //
+  // ⚠️ **Desde T9 esta exclusión tiene además un dueño de arriba** (`app/contraste.js`,
+  // paso 15): qué cajón puede estar abierto se DERIVA del paso. Ésta se queda porque
+  // cubre el instante exacto del `drop`, que ocurre antes de que nadie navegue — dos
+  // redes contra el mismo fallo, y la de aquí es la de dentro.
   cajonDiagnostico: visor.diagnostico.cajon,
+  // ── Rework de UI · T9 · el GML ajeno enciende el modo COMPROBACIÓN ────────
+  // Desde el instante en que se abre el cajón con el GML de otro, el rail apaga
+  // «Edición» **con el motivo escrito** («Estás comprobando el GML de otro. Pulsa
+  // "Tomar esta geometría y editarla"»). Antes de T9 no había nada que lo dijera: se
+  // podía editar el trabajo de otro técnico creyendo que era el propio.
+  //
+  // ⚠️ **Y VUELVE A ENTRADA, que no es un detalle: lo destapó una prueba.** El
+  // cajón de comprobación pertenece a la tercera vía de Entrada
+  // (`app/contraste.js#cajonDe`), así que soltar un fichero estando en Diagnóstico
+  // dejaba el rail diciendo «Diagnóstico» y la esquina del mapa enseñando el cajón
+  // de otra pantalla. Además es lo que el gesto significa: traer un fichero nuevo
+  // es empezar otro expediente, no seguir con el que había.
+  //
+  // ⚠️ `navegacion` se declara en el paso 14 y esto es el 9. No es un problema: la
+  // flecha se CREA aquí y se LLAMA cuando el usuario suelta un fichero, que es
+  // siempre después de que el módulo entero se haya evaluado.
+  alComprobar: () => {
+    navegacion.entrarEnComprobacion()
+    navegacion.navegarAPaso(PASO.ENTRADA)
+  },
   // ── F06 · abrir un documento nuevo ────────────────────────────────────────
   // El MISMO gancho que recibe el Catastro en el paso 7, y por la MISMA razón:
   // cargar la parcela de un fichero es abrir un documento nuevo, así que el
   // historial se REINICIA en vez de commitear encima. Un `Ctrl+Z` que devolviera la
   // parcela anterior —cambiando la geometría que hay en pantalla y la que se
   // generaría— sería un error silencioso disfrazado de función (decisión 2 de F06).
-  alCargarParcela: edicionCableada.alCargarParcela,
+  //
+  // ⚠️ **Y desde T9 aquí ATERRIZA la ruta crítica 2.** Contrastar mete la parcela en
+  // el store y hasta ahora dejaba al usuario donde estaba —en Entrada, mirando las
+  // tres vías, con la geometría de otro ya cargada por debajo y sin una sola línea
+  // que dijera de dónde había salido—. Ver {@link aterrizarTrasContrastar}.
+  alCargarParcela: (parcela) => {
+    edicionCableada.alCargarParcela(parcela)
+    aterrizarTrasContrastar()
+  },
   // ── F10 · el `.json` entra por ESTA zona y no por una segunda ─────────────
   // `crearZonaFichero` engancha el arrastre en la VENTANA ENTERA: dos zonas vivas
   // harían `preventDefault` las dos sobre el mismo `drop` y entregarían el mismo
@@ -3505,6 +3539,76 @@ const rail = cablearRail({
 // en la cabecera de `app/pantalla.js`.
 cablearPantalla({ documento: document, navegacion })
 
+// ── 15 · LA PANTALLA DE CONTRASTE (rework de UI · T9) ────────────────────────
+//
+// Funde Comprobación y Diagnóstico en UNA pantalla con la procedencia declarada.
+// Lo que cambia respecto a F07/F08 no es lo que se enseña: es **quién manda**.
+//
+//   · **La esquina del mapa la decide el PASO.** Hasta hoy los dos cajones de
+//     `bottomleft` se excluían por un acuerdo entre ellos —`cablearComprobacion`
+//     recibía el cajón del otro para cerrarlo—. Ahora se deriva de `{paso}` en
+//     `app/contraste.js#cajonDe`, que es una función pura de cuatro líneas.
+//   · **La procedencia se declara y no se pierde.** Sale de `parcela.origen` (el
+//     modelo) y del modo (la navegación), y se escribe en el propio cajón. Antes
+//     lo único que la decía era `[data-procedencia="parcela"]` de `index.html`, que
+//     T6 dejó DENTRO de la pantalla Entrada: en cuanto se navegaba, desaparecía.
+//   · **La puerta (D4)** conecta el CTA del cajón con `navegacion.abrirPuerta()`.
+//
+// Va aquí y no en `app/cableado-diagnostico.js` porque aquél es de F07 y no tiene
+// por qué enterarse de que existe una autoridad de navegación; ni en la vista, que
+// no sabe qué es un modo. Este módulo es el único sitio donde las tres cosas se
+// conocen, que es la definición de costura.
+const contrasteCableado = cablearContraste({
+  navegacion,
+  estado,
+  // ⚠️ El del CABLEADO, no el del cajón: `abrir()` comprueba que haya contorno
+  // oficial, recalcula y pide las vecinas. Abrir el cajón a pelo enseñaría las
+  // cifras del diagnóstico anterior.
+  //
+  // ⛔ **Y no se reabre lo que ya está abierto**, porque `abrir()` pide las
+  // parcelas colindantes por RED. El CTA «Diagnosticar encaje» del pie ya abre el
+  // cajón por su cuenta (paso 8) y le pasa SU evento —lo que impide que el guardián
+  // de clic-fuera lo cierre en el mismo gesto—; cuando el rail llega detrás y
+  // navega, el trabajo ya está hecho. Sin esta guarda, cada clic en el CTA costaría
+  // dos consultas al Catastro y la segunda pisaría a la primera.
+  abrirDiagnostico: () => {
+    if (visor.diagnostico.cajon.abierto()) return
+    diagnosticoCableado.abrir().catch((causa) => {
+      console.error('[main] la apertura del diagnóstico desde el rail ha fallado:', causa)
+    })
+  },
+  cerrarDiagnostico: () => visor.diagnostico.cajon.cerrar(),
+  cerrarComprobacion: () => comprobacionCableada?.cerrar(),
+  declararProcedencia: (texto) => visor.diagnostico.cajon.procedencia(texto),
+  mostrarPuerta: (visible) => visor.diagnostico.cajon.puerta(visible),
+  suscribirPuerta: (fn) => visor.diagnostico.cajon.alPuerta(fn),
+})
+
+/**
+ * Dónde aterriza el usuario después de «Contrastar con el parcelario». **Es la
+ * ruta crítica 2 del plan de pruebas**, y hasta T9 no se podía andar: contrastar
+ * cargaba la parcela y dejaba al usuario en Entrada, mirando las tres vías.
+ *
+ * Se intenta Diagnóstico, que es a lo que se venía. Si no se sostiene —el caso
+ * real y previsto: el Catastro no ha dado parcelario, así que no hay contorno
+ * oficial contra el que contrastar (degradación declarada de F08)— se cae a
+ * Validación **y se dice por qué**, en vez de dejar al usuario donde estaba
+ * preguntándose si el botón ha hecho algo.
+ *
+ * @returns {void}
+ */
+function aterrizarTrasContrastar() {
+  // Los hechos PRIMERO: la parcela acaba de entrar y sin esto el guardián de
+  // Diagnóstico decidiría contra los hechos de antes del `set`.
+  refrescarHechos()
+  const aDiagnostico = navegacion.navegarAPaso(PASO.DIAGNOSTICO)
+  if (aDiagnostico.ok) return
+  navegacion.navegarAPaso(PASO.VALIDACION)
+  if (typeof aDiagnostico.motivo === 'string' && aDiagnostico.motivo !== '') {
+    panel.avisar(aDiagnostico.motivo, { nivel: NIVEL.AVISO })
+  }
+}
+
 // ── La vía de MEDICIÓN PROPIA estrena botón (T6) ────────────────────────────
 //
 // Hasta hoy la única forma de meter un DXF o un TXT era ARRASTRARLO sobre la
@@ -3537,19 +3641,35 @@ ramaCableada.subscribe((rama) => {
   refrescarHechos()
 })
 
-// El diagnóstico no notifica a nadie cuando termina —`ultimoDiagnostico()` es una
-// lectura, no un canal—, así que se refresca cuando el usuario pulsa el botón que
-// lo produce. Dos pasadas: una al soltar el clic (el camino síncrono) y otra
-// medio segundo después (el cajón pide las colindantes por red).
+// ⭐ **AQUÍ ESTUVO EL APAÑO DE T5, Y T9 LO HA BORRADO.** Ponía esto:
 //
-// ⚠️ **Es un APAÑO declarado, y tiene fecha de caducidad**: T9 funde Comprobación
-// y Diagnóstico en una pantalla propia, y ahí el diagnóstico pasa a ser un paso
-// con su propio estado en vez de un cajón sobre el mapa. Entonces esto se borra.
+//     ctaDiagnosticar.addEventListener('click', () => {
+//       queueMicrotask(refrescarHechos)
+//       setTimeout(refrescarHechos, 500)   // «por si llegan las vecinas»
+//     })
+//
+// Existía porque `app/cableado-diagnostico.js` **no notificaba a nadie**:
+// `ultimoDiagnostico()` era una lectura, no un canal. Como el paso «Informe» del
+// rail depende de que haya diagnóstico, la única forma de enterarse era mirar dos
+// veces y esperar que la segunda llegara tarde. Un temporizador de 500 ms es una
+// apuesta: con la red lenta, el rail se quedaba sin encender «Informe» y nada lo
+// decía. Ahora hay suscripción de verdad ({@link cablearDiagnostico}`#alDiagnostico`).
+//
+// Y el CTA del pie NAVEGA, que es la otra mitad de T9: pulsar «Diagnosticar encaje»
+// era la única acción de la aplicación que producía una pantalla entera sin mover
+// el rail de sitio.
+diagnosticoCableado.alDiagnostico(refrescarHechos)
+
 const ctaDiagnosticar = document.querySelector('[data-accion="diagnosticar"]')
 if (ctaDiagnosticar !== null) {
+  // ⚠️ **El orden de los dos oyentes de este botón importa, y no es casualidad.**
+  // El del paso 8 (`cablearDiagnostico`) se registró antes, así que corre primero y
+  // abre el cajón pasándole SU evento —lo que impide que el guardián de clic-fuera
+  // lo cierre en el mismo gesto—. Cuando llega éste, el cajón ya está abierto y
+  // `abrirDiagnostico` del paso 15 se encuentra el trabajo hecho: por eso no vuelve
+  // a pedir las vecinas. Si algún día se invierten, se pedirían dos veces.
   ctaDiagnosticar.addEventListener('click', () => {
-    queueMicrotask(refrescarHechos)
-    setTimeout(refrescarHechos, 500)
+    navegacion.navegarAPaso(PASO.DIAGNOSTICO)
   })
 }
 
