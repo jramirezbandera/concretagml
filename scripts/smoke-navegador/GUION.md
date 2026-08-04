@@ -3590,6 +3590,65 @@ aviso y le come 60 px al panel. **`reload` NO limpia IndexedDB**; hay que borrar
 las bases. Con la base limpia, `ok:true`. Es la misma lección que ya pagó la
 rebanada 3 y conviene que esté escrita dos veces.
 
+### Ampliación rebanada 5: ¿el paso «Informe» produce el informe?
+
+⛔ **EL DEFECTO QUE DESTAPÓ, medido el 2026-08-05 a 1280×720.** La pantalla
+«Informe» **no tenía nada del informe**:
+
+- el panel enseñaba **exactamente lo mismo que Validación** —cabecera 117 +
+  avisos 63 + vértices 360 + pie 179 = 720 px— y **ni un bloque propio**;
+- de las tres acciones del informe («Preparar informe (PDF)», «Descargar informe
+  de contraste» y «Componer PDF») **no se veía NINGUNA**: las dos primeras viven
+  dentro del cajón de diagnóstico, que en Informe está cerrado, y la tercera
+  dentro del `<dialog>`;
+- o sea que **el PDF se sacaba desde Diagnóstico, con el rail marcando otra
+  cosa**: el peldaño «Informe» no participaba en producir el informe.
+
+Y el formulario, una vez abierto, escondía **704 px de 1.336 (52,7 %)** bajo el
+pliegue, con **«Componer PDF» y «Cancelar» a 379,53 px por debajo del borde** y
+el renglón de estado a 412,92.
+
+**Lo que mide el guion ahora:**
+
+1. **El informe se enseña exactamente en su pantalla** y en ninguna otra.
+2. ⭐ **Y no es un modal.** Un `<dialog>` abierto con `showModal()` deja inerte
+   todo lo de detrás, y desde el rework detrás está **el rail**. Se comprueba por
+   los dos lados: `aria-modal` y **`elementFromPoint` sobre el peldaño
+   «Validación»** — porque preguntarle al atributo no prueba que se pueda pulsar.
+3. **«Componer PDF» y el renglón de estado se ven** con el informe recién
+   abierto, con las tres patas de siempre.
+
+**Verificado por mutación:** dejando el aplicador en `comoPantalla(false)`, el
+guion saca **2 problemas** y el segundo es el que decide: **«con el informe
+delante, el rail no se puede pulsar»**. La caja sigue midiendo lo mismo
+(1070×720), así que la mutación aísla exactamente lo que hace el interruptor.
+
+**Lo que devuelve, medido:**
+
+| | antes | después |
+|---|---|---|
+| Caja del informe | 760 × 633,59, centrada | **1070 × 720**, a página completa |
+| Escondido | 704 px de 1.336 (**52,7 %**) | 442 px de 1.162 (**38,0 %**) |
+| «Componer PDF» | 379,53 px por debajo del borde | **se ve**, 0 px por debajo |
+| Renglón de estado | 412,92 px por debajo | **se ve**, 0 px por debajo |
+| Rail con el informe delante | inerte (modal) | **pulsable** |
+
+⚠️ **«Regenerar el borrador» sigue scrolleando**, y es correcto: vive dentro del
+grupo del lindero, junto al texto que regenera. Lo que se ancla es lo que produce
+el entregable y lo que habla, no todo lo que sea un botón.
+
+⚠️ **UNA MEDICIÓN QUE SALIÓ MAL Y HAY QUE NO REPETIR:** al llevar el diálogo a
+página completa con `top:0; bottom:0` la caja salió de **1.148,92 px sobre una
+ventana de 720** —428,92 px fuera de la pantalla y **sin scroll**—. La causa es
+que la hoja del navegador le da a `<dialog>` un `height: fit-content`, con el que
+`top` y `bottom` **no estiran** el elemento. Hace falta `height: auto` explícito.
+Sin medirlo, el arreglo habría sido peor que el defecto.
+
+⚠️ **Y la contaminación de IndexedDB, por tercera vez.** La pasada de Entrada
+salió roja («solo 2 de las 3 vías, 114 px tras el scroll») y no era un defecto:
+era el autoguardado de las corridas anteriores. Con la base borrada, `ok:true`.
+**`reload` NO limpia IndexedDB**; hay que borrar las bases entre corridas.
+
 ---
 
 ## 21. El presupuesto de la hoja de estilo (Rework de UI · T10)

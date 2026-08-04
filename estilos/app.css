@@ -2852,6 +2852,40 @@ body {
    desde 2023 en los tres motores. En un navegador anterior el `var()` no
    resolvería y el velo saldría transparente: se pierde el oscurecido, no la
    función. */
+/* ══ El informe A PÁGINA COMPLETA en su propio paso (rework · rebanada 5) ═══
+ *
+ * ⛔ MEDIDO EN CHROME EL 2026-08-05, a 1280×720, con el diálogo recién abierto:
+ * el formulario mide **1.336 px** y la caja de arriba enseña **632**, o sea que
+ * **704 px (52,7 %) nacen bajo el pliegue** — más de la mitad del documento que
+ * se va a firmar, incluidos «Componer PDF» y «Cancelar». Es el mismo defecto que
+ * la rebanada 4 midió en el cajón de diagnóstico, y aquí es mayor.
+ *
+ * En su propio paso el diálogo deja de ser una tarjeta centrada y ocupa el área
+ * de contenido entera. **El rail se queda fuera a propósito**: es la navegación,
+ * y taparlo convertiría la pantalla en una ratonera (por lo mismo que allí se
+ * presenta con `show()` y no con `showModal()`).
+ *
+ * No hay `display` aquí, y no es olvido: lo prohíbe el bloque de arriba.
+ */
+.gml-app[data-paso='informe'] .gml-dialogo-informe {
+  top: 0;
+  left: var(--gml-rail-ancho);
+  transform: none;
+  width: auto;
+  right: 0;
+  bottom: 0;
+  /* ⛔ ESTA LÍNEA HACE FALTA, y costó una medición: la hoja del navegador le da a
+     `<dialog>` un `height: fit-content`, y con eso `top` y `bottom` NO estiran el
+     elemento. Sin ella la caja salía de **1.148,92 px sobre una ventana de 720**
+     —428,92 px fuera de la pantalla y SIN scroll, porque el que scrollea es el
+     propio diálogo y se había quedado sin tope—. Peor que el pliegue que esta
+     regla viene a quitar. */
+  height: auto;
+  max-height: none;
+  border-radius: 0;
+  border-width: 0 0 0 1px;
+  box-shadow: none;
+}
 .gml-app .gml-dialogo-informe::backdrop {
   background: color-mix(in srgb, var(--color-text-primary) 45%, transparent);
 }
@@ -3066,6 +3100,19 @@ body {
 /* El renglón donde se escribe POR QUÉ está apagado «Componer PDF» (regla de oro
    1). `min-height` reservado para que encender el botón —y vaciar el renglón— no
    dé un salto de maquetación justo debajo de la mano que va a pulsar. */
+/* El bloque anclado del informe (rework · rebanada 5). Ver el porqué MEDIDO en
+   app/dialogo-informe.js: «Componer PDF» nacía 379,53 px por debajo del borde
+   visible y el renglón de estado 412,92. Mismo recurso que la puerta de D4 y que
+   el pie del cajón de diagnóstico. */
+.gml-dialogo-informe-anclado {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin: var(--space-4) calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--color-border-sub);
+  background: var(--color-bg-primary);
+}
 .gml-dialogo-informe-estado {
   margin: 0;
   min-height: 1.45em;

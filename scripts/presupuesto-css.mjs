@@ -151,6 +151,16 @@ export const ASIENTOS = Object.freeze(
       nota: '⭐ CERO BYTES otra vez: la barra declara su pantalla desde JS y el interruptor de los cuatro gestos es lógica, no estilo.' },
     { hito: 'Rework rebanada 4', commit: '44b02ad', total: 61108, nuestro: 46013, rebanada: 'diagnostico',
       nota: '⭐ CERO BYTES por TERCERA vez seguida, y aquí es un hecho sobre dónde vive el cromo del cajón: viewer/cajon-diagnostico.js se viste con estilos EN LÍNEA porque no importa ninguna hoja (para ser legible en jsdom y en un mapa pelado), así que anclarle el pie y subirle el tope de alto no toca app.css. Lo demás —que no se descarte y que el ✕ salga— es lógica.' },
+    { hito: 'Rework rebanada 5', commit: '(sin commitear)', total: 61587, nuestro: 46492, rebanada: null,
+      nota:
+        '⚠️ EL PRODUCTO DE LA QUINTA ESTÁ HECHO Y AQUÍ NO SE DECLARA CERRADA, A PROPÓSITO. Cerrarla ' +
+        'hace exigible el techo del criterio 10 (42.064 B nuestros) y hoy sobran 4.428. Se midió si ' +
+        'había de dónde sacarlos y NO lo hay: 0 clases y 0 pares data-* huérfanos sobre 178 y 22, y ' +
+        'el reparto son 286 reglas de las que ninguna pasa de 527 B una vez fuera los tokens (3.906) ' +
+        'y el tema oscuro (1.931). O sea: el techo solo se cumple quitando producto vivo. La decisión ' +
+        '—bajar la hoja o revisar el techo— es del autor, y hasta que la tome el registro dice la ' +
+        'verdad: hoja movida +479 B (el informe a página completa y su bloque anclado), rebanada ' +
+        'anotada, quinta SIN cerrar.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

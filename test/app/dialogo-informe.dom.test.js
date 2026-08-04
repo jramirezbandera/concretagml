@@ -1281,3 +1281,124 @@ describe('app/dialogo-informe · guardianes de marcado y de cromo', () => {
     }
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Rework de UI · rebanada 5 · ¿ESTO ES UN MODAL O ES LA PANTALLA?
+//
+// ⛔ EL DEFECTO, MEDIDO EN CHROME EL 2026-08-05 a 1280×720:
+//
+//   · la pantalla «Informe» NO tenía nada del informe. El panel enseñaba lo mismo
+//     que Validación (cabecera 117 + avisos 63 + vértices 360 + pie 179 = 720 px)
+//     y de las tres acciones del informe no se veía NINGUNA: dos viven dentro del
+//     cajón de diagnóstico —cerrado en Informe— y la tercera dentro del <dialog>;
+//   · el PDF se sacaba desde Diagnóstico, con el rail marcando otra cosa: el
+//     peldaño «Informe» no participaba en producir el informe;
+//   · y el formulario escondía 704 px de 1.336 (52,7 %) bajo el pliegue, con
+//     «Componer PDF» y «Cancelar» entre lo escondido.
+//
+// Aquí se prueba el INTERRUPTOR. Que el aplicador lo conmute donde toca es de
+// `app/main.js`, y que en un navegador de verdad se note, del guion 14.
+// ═══════════════════════════════════════════════════════════════════════════════
+describe('app/dialogo-informe.js · `comoPantalla` (rebanada 5)', () => {
+  it('nace en `false`: montado a pelo es EXACTAMENTE el modal de F09', () => {
+    const { dialogo } = montar()
+    expect(dialogo.comoPantalla()).toBe(false)
+  })
+
+  it('⛔ como PANTALLA, `Escape` no cierra: avisa de que quieren salir', () => {
+    const { dialogo, raiz } = montar()
+    const salidas = []
+    dialogo.alCancelar((motivo) => salidas.push(motivo))
+    dialogo.abrir()
+    dialogo.comoPantalla(true)
+
+    raiz.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+
+    expect(salidas).toHaveLength(1)
+    expect(dialogo.abierto(), 'la vista no se cierra sola: quien decide es la navegación').toBe(
+      true,
+    )
+
+    // ANTI-VACUIDAD: el mismo gesto con el interruptor al revés SÍ cierra. Sin
+    // esto la prueba pasaría igual aunque el `keydown` no llegara a ningún sitio.
+    dialogo.comoPantalla(false)
+    raiz.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(dialogo.abierto(), 'siendo modal tiene que seguir cerrándose').toBe(false)
+  })
+
+  it('⛔ como PANTALLA, «Cancelar» tampoco cierra: avisa', () => {
+    const { dialogo, raiz } = montar()
+    const salidas = []
+    dialogo.alCancelar((motivo) => salidas.push(motivo))
+    dialogo.abrir()
+    dialogo.comoPantalla(true)
+
+    // Se busca por TEXTO y no por selector: el botón no lleva `data-accion`, y un
+    // selector inventado devolvería `null` sin quejarse.
+    const botonCancelar = Array.from(raiz.querySelectorAll('button')).find((x) =>
+      /cancelar/i.test(x.textContent),
+    )
+    expect(botonCancelar, 'no está el botón «Cancelar»').toBeDefined()
+    botonCancelar.click()
+
+    expect(salidas).toHaveLength(1)
+    expect(dialogo.abierto()).toBe(true)
+  })
+
+  it('⛔ `aria-modal` deja de mentir: en modo pantalla lo de detrás NO está inerte', () => {
+    const { dialogo, raiz } = montar()
+    dialogo.abrir()
+    expect(raiz.getAttribute('aria-modal')).toBe('true')
+    dialogo.comoPantalla(true)
+    expect(raiz.getAttribute('aria-modal')).toBe('false')
+    dialogo.comoPantalla(false)
+    expect(raiz.getAttribute('aria-modal')).toBe('true')
+  })
+
+  it('⭐ conmutar con el diálogo ABIERTO lo vuelve a presentar, y sin avisar de nada', () => {
+    // El caso del CTA, que abre y navega en el mismo gesto: un `showModal()` solo
+    // se deshace cerrando, así que sin esto quedaría un modal encima de su propia
+    // pantalla. Y el cierre intermedio no puede contarse como que el usuario se
+    // ha echado atrás.
+    const { dialogo } = montar()
+    const salidas = []
+    dialogo.alCancelar(() => salidas.push('x'))
+    dialogo.abrir()
+    expect(dialogo.abierto()).toBe(true)
+
+    dialogo.comoPantalla(true)
+
+    expect(dialogo.abierto(), 'sigue abierto tras cambiar de presentación').toBe(true)
+    expect(salidas, 'cambiar de presentación no es echarse atrás').toHaveLength(0)
+  })
+
+  it('sin argumento LEE, y con algo que no es booleano LANZA', () => {
+    const { dialogo } = montar()
+    expect(dialogo.comoPantalla()).toBe(false)
+    expect(dialogo.comoPantalla(true)).toBe(true)
+    expect(dialogo.comoPantalla()).toBe(true)
+    expect(() => dialogo.comoPantalla('si')).toThrow(TypeError)
+    expect(() => dialogo.comoPantalla(0)).toThrow(TypeError)
+    expect(dialogo.comoPantalla()).toBe(true)
+  })
+
+  // ── ⛔ El bloque anclado: lo que se pulsa y lo que habla no puede esconderse ──
+  // Medido a 1280×720 con el informe ya a página completa: «Componer PDF» caía
+  // 379,53 px por debajo del borde visible, «Cancelar» otro tanto y el renglón de
+  // estado 412,92. jsdom no mide eso, así que se afirma la ESTRUCTURA.
+  it('⭐ «Componer PDF» y el renglón de estado van DENTRO del bloque anclado', () => {
+    const { raiz } = montar()
+    const componer = raiz.querySelector('[data-accion="componer-pdf"]')
+    const estado = raiz.querySelector('[data-estado="dialogo-informe"]')
+    expect(componer, 'no está el botón que produce el entregable').not.toBe(null)
+    expect(estado, 'no está el renglón por el que este diálogo habla').not.toBe(null)
+
+    const anclado = componer.closest(`.${CLASE.ANCLADO}`)
+    expect(anclado, '«Componer PDF» no cuelga de ningún bloque anclado').not.toBe(null)
+    expect(anclado.contains(estado), 'el renglón de estado se queda fuera del anclado').toBe(true)
+
+    // Y es lo ÚLTIMO del contenido: si algo se cuela detrás, el `sticky` se despega
+    // en cuanto ese algo asoma, que es exactamente cómo nace este defecto.
+    expect(anclado.parentElement.lastElementChild).toBe(anclado)
+  })
+})

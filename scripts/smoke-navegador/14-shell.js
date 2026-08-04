@@ -664,6 +664,127 @@ if (diagnostico.hayCajon && diagnostico.abierto) {
   }
 }
 
+// ── Rebanada 5: ¿el paso «Informe» produce el informe? ──────────────────────
+//
+// ⛔ MEDIDO EL 2026-08-05, antes de la corrección, a 1280×720:
+//
+//   · la pantalla «Informe» no tenía NADA del informe: el panel enseñaba lo mismo
+//     que Validación y de las tres acciones del informe no se veía ninguna —dos
+//     viven en el cajón de diagnóstico, cerrado ahí, y la tercera en el <dialog>—;
+//   · el PDF se sacaba desde Diagnóstico, con el rail marcando otra cosa;
+//   · y el formulario escondía 704 px de 1.336 (52,7 %), con «Componer PDF» y
+//     «Cancelar» entre lo escondido.
+//
+// jsdom no ve nada de esto: lo primero necesita saber qué CAJA tiene cada cosa y
+// lo segundo, maquetación.
+const informe = (() => {
+  const dlg = $('.gml-dialogo-informe')
+  if (dlg === null) {
+    return { hayDialogo: false, queSignifica: 'No hay diálogo de informe en esta página.' }
+  }
+  const abierto = dlg.open === true || dlg.hasAttribute('open')
+  const rc = dlg.getBoundingClientRect()
+
+  const seVeDentro = (sel) => {
+    const nodo = dlg.querySelector(sel)
+    if (nodo === null) return { existe: false }
+    const r = nodo.getBoundingClientRect()
+    if (r.width === 0 || r.height === 0) return { existe: true, seVe: false, oculto: true }
+    const cx = Math.round(r.left + r.width / 2)
+    const cy = Math.round(r.top + r.height / 2)
+    const enElPunto = document.elementFromPoint(cx, cy)
+    return {
+      existe: true,
+      oculto: false,
+      pxPorDebajoDelDialogo: redondear(Math.max(0, r.bottom - rc.bottom)),
+      seVe:
+        r.top >= rc.top - 1 &&
+        r.bottom <= rc.bottom + 1 &&
+        r.top >= 0 &&
+        r.bottom <= innerHeight &&
+        enElPunto !== null &&
+        (enElPunto === nodo || nodo.contains(enElPunto)),
+    }
+  }
+
+  // ¿Sigue vivo el rail con el informe delante? Con `showModal()` estaría inerte,
+  // y la pantalla sería una ratonera de la que solo se sale por Escape.
+  const botonRail = $('.gml-rail-paso[data-paso="validacion"] .gml-rail-boton')
+  let railAlcanzable = null
+  if (botonRail !== null) {
+    const r = botonRail.getBoundingClientRect()
+    const p = document.elementFromPoint(
+      Math.round(r.left + r.width / 2),
+      Math.round(r.top + r.height / 2),
+    )
+    railAlcanzable = p !== null && (p === botonRail || botonRail.contains(p))
+  }
+
+  return {
+    hayDialogo: true,
+    abierto,
+    ariaModal: dlg.getAttribute('aria-modal'),
+    caja: caja(dlg),
+    escondidoPx: dlg.scrollHeight - dlg.clientHeight,
+    escondidoPct:
+      dlg.scrollHeight > 0
+        ? redondear(((dlg.scrollHeight - dlg.clientHeight) / dlg.scrollHeight) * 100)
+        : null,
+    componerPdf: seVeDentro('[data-accion="componer-pdf"]'),
+    renglonDeEstado: seVeDentro('[data-estado="dialogo-informe"]'),
+    railAlcanzable,
+    referencia:
+      'Antes de la rebanada 5, 1280×720: diálogo 760×633,59 centrado, 704 px de 1.336 (52,7 %) ' +
+      'bajo el pliegue, «Componer PDF» a 379,53 px por debajo del borde, y el paso «Informe» sin ' +
+      'una sola acción del informe a la vista.',
+  }
+})()
+
+pantalla.informe = informe
+
+// 1 · El informe se enseña exactamente en su pantalla, y en ninguna otra.
+if (informe.hayDialogo && informe.abierto !== (pasoActivo === 'informe')) {
+  problemas.push(
+    `El informe ${informe.abierto ? 'ESTÁ ABIERTO' : 'está CERRADO'} en «${pasoActivo}». Tiene ` +
+      'que enseñarse en «informe» y solo ahí: es el contenido de esa pantalla, no un modal que ' +
+      'se abre desde otra.',
+  )
+}
+
+// 2 · En su pantalla no puede ser modal: dejaría inerte el rail, o sea la navegación.
+if (informe.hayDialogo && informe.abierto && pasoActivo === 'informe') {
+  if (informe.ariaModal !== 'false') {
+    problemas.push(
+      `El informe se presenta con \`aria-modal="${informe.ariaModal}"\` siendo la pantalla. Un ` +
+        'modal deja fuera de juego todo lo de detrás, y detrás está el RAIL: la pantalla se ' +
+        'convierte en una ratonera de la que solo se sale por Escape.',
+    )
+  }
+  if (informe.railAlcanzable === false) {
+    problemas.push(
+      'Con el informe delante, el rail no se puede pulsar: `elementFromPoint` sobre el peldaño ' +
+        '«Validación» no lo devuelve. La navegación de la aplicación no puede quedar tapada por ' +
+        'una de sus pantallas.',
+    )
+  }
+  // 3 · Y lo accionable no puede nacer bajo el pliegue.
+  for (const [nombre, quePasa] of [
+    ['«Componer PDF»', informe.componerPdf],
+    ['el renglón de estado del informe', informe.renglonDeEstado],
+  ]) {
+    if (quePasa.existe && quePasa.oculto !== true && quePasa.seVe !== true) {
+      problemas.push(
+        `${nombre} no se ve con el informe recién abierto` +
+          (quePasa.pxPorDebajoDelDialogo > 0
+            ? `: cae ${quePasa.pxPorDebajoDelDialogo} px por debajo del borde visible.`
+            : '.') +
+          ' Es el botón que produce el entregable de F09; esconderlo es el defecto que la ' +
+          'rebanada 5 midió y cerró.',
+      )
+    }
+  }
+}
+
 // ── 4 · La caja de vértices: el invariante que atribuye las pérdidas ───────
 //
 // Desde F07 mide 267,44 px a 1440×900 en la rama PARCELA, y seis fases seguidas

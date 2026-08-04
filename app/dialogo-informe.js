@@ -170,6 +170,9 @@ export const CLASE = Object.freeze({
   LISTA: 'gml-dialogo-informe-lista',
   CASILLA_FILA: 'gml-dialogo-informe-casilla-fila',
   CASILLA: 'gml-dialogo-informe-casilla',
+  // Rework de UI · rebanada 5: el bloque que mantiene a la vista lo que se pulsa
+  // y lo que habla. Ver el porqué medido junto a su construcción.
+  ANCLADO: 'gml-dialogo-informe-anclado',
   PIE: 'gml-dialogo-informe-pie',
   ESTADO: 'gml-dialogo-informe-estado',
 })
@@ -597,6 +600,11 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
   const oyentes = { componer: new Set(), regenerar: new Set(), cancelar: new Set() }
 
   /** Registro de escuchadores: cero fugas por construcción, igual que en `app/zona-fichero.js`. */
+  // Rework de UI · rebanada 5. `false` = el modal de F09; `true` = esto ES la
+  // pantalla del paso Informe. Lo conmuta `app/main.js`; este módulo no sabe qué
+  // es un paso. Ver {@link DialogoInforme.comoPantalla}.
+  let comoPantallaActivo = false
+
   const escuchados = []
   function escuchar(diana, tipo, fn) {
     diana.addEventListener(tipo, fn)
@@ -792,7 +800,29 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
   estadoNodo.dataset.estado = 'dialogo-informe'
   estadoNodo.setAttribute('role', 'status')
 
-  cuerpo.append(titulo, intro, grupoEncabezado, grupoLindero, grupoFirma, pie, estadoNodo)
+  // ── ⛔ EL BLOQUE ANCLADO (rework de UI · rebanada 5) ───────────────────────
+  // MEDIDO en Chrome el 2026-08-05, con el informe ya a página completa:
+  //
+  //     contenido 1.149 px en una caja de 720 → 429 px (37,3 %) BAJO EL PLIEGUE
+  //     «Componer PDF» ..... 379,53 px por debajo del borde visible
+  //     «Cancelar» ......... 379,53 px por debajo
+  //     el renglón de estado 412,92 px por debajo
+  //
+  // O sea: **el botón que produce el entregable de F09 nacía fuera de la vista**,
+  // y el renglón por el que este diálogo cumple la regla de oro 1, también. Es el
+  // tercer sitio del repositorio con el mismo defecto —la puerta de D4 (T9) y el
+  // pie del cajón (rebanada 4) fueron los otros dos— y se cura con la misma
+  // receta: un bloque sticky pegado abajo con fondo opaco, al final del contenido
+  // que scrollea, con márgenes negativos y su relleno para que el fondo llegue a
+  // los bordes y el texto no se vea pasar por debajo.
+  //
+  // Se ancla SIEMPRE, no solo en modo pantalla: el modal de F09 tenía el mismo
+  // defecto (704 px de 1.336 escondidos, medidos antes de esta rebanada) y
+  // arreglarlo a medias sería dejarlo roto para quien monte el diálogo suelto.
+  const anclado = crear('div', CLASE.ANCLADO)
+  anclado.append(pie, estadoNodo)
+
+  cuerpo.append(titulo, intro, grupoEncabezado, grupoLindero, grupoFirma, anclado)
   doc.body.appendChild(dialogo)
 
   // ── Pintado ───────────────────────────────────────────────────────────────
@@ -961,8 +991,32 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
     repartir(oyentes.componer, valores())
   }
 
+  /**
+   * «Cancelar» — y `Escape`, que pasa por el mismo sitio.
+   *
+   * ── ⛔ EN MODO PANTALLA NO CIERRA: AVISA ─────────────────────────────────
+   * Rework de UI · rebanada 5, y es la misma decisión que la rebanada 4 tomó con
+   * el ✕ del cajón de diagnóstico. Cerrar el diálogo estando en su propio paso
+   * dejaría la pantalla **vacía** —el rail diciendo «Informe», el `<h1>` diciendo
+   * «Informe de contraste» y nada debajo—, que es justo el defecto que este
+   * rework existe para quitar.
+   *
+   * Así que el gesto conserva su significado —«sácame de aquí»— y quien decide a
+   * dónde se sale es `app/main.js`, suscrito a {@link alCancelar}. Esta vista no
+   * sabe qué es un paso. Cuando la navegación llegue, el aplicador llamará a
+   * {@link cerrar} y el diálogo se cerrará por el camino de siempre.
+   */
+  function pedirCierre(motivo) {
+    if (!estaAbierto) return
+    if (comoPantallaActivo) {
+      repartir(oyentes.cancelar, motivo)
+      return
+    }
+    cerrarInterno(motivo, true)
+  }
+
   function alPulsarCancelar() {
-    cerrarInterno(MOTIVO_CIERRE.BOTON, true)
+    pedirCierre(MOTIVO_CIERRE.BOTON)
   }
 
   /**
@@ -1007,12 +1061,12 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
    */
   function alTecla(evento) {
     if (evento.key !== 'Escape') return
-    cerrarInterno(MOTIVO_CIERRE.ESCAPE, true)
+    pedirCierre(MOTIVO_CIERRE.ESCAPE)
   }
 
   /** La vía nativa, cuando existe. En jsdom no llega nunca. */
   function alCancelNativo() {
-    cerrarInterno(MOTIVO_CIERRE.ESCAPE, true)
+    pedirCierre(MOTIVO_CIERRE.ESCAPE)
   }
 
   /**
@@ -1060,11 +1114,39 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
     return dialogo
   }
 
-  function abrir() {
-    if (destruido || estaAbierto) return
-    focoPrevio = doc.activeElement ?? null
-    estaAbierto = true
-
+  /**
+   * Enseña el diálogo con la presentación que toque. **Es la única función que
+   * llama a `showModal`/`show`**, para que la diferencia entre modal y pantalla
+   * viva en un solo sitio.
+   *
+   * ── ⛔ POR QUÉ EN MODO PANTALLA ES `show()` Y NO `showModal()` ────────────
+   * Rework de UI · rebanada 5. Un `<dialog>` abierto con `showModal()` deja
+   * **inerte todo lo de detrás**, y desde el rework lo de detrás incluye **el
+   * rail**, que es la navegación de la aplicación. O sea: presentarlo como modal
+   * en su propio paso convertiría la pantalla en una ratonera de la que solo se
+   * sale por `Escape` o por «Cancelar». Con `show()` el diálogo se enseña sin
+   * capa superior y sin robar el foco de la página: el rail sigue vivo y la
+   * pantalla se abandona como cualquier otra.
+   *
+   * `aria-modal` acompaña a la decisión y no se queda mintiendo: en modo pantalla
+   * lo de detrás **no** está fuera de juego, y decir lo contrario a un lector de
+   * pantalla es peor que no decir nada.
+   */
+  function presentar() {
+    if (comoPantallaActivo) {
+      dialogo.setAttribute('aria-modal', 'false')
+      if (typeof dialogo.show === 'function') {
+        try {
+          dialogo.show()
+        } catch {
+          dialogo.setAttribute('open', '')
+        }
+      } else {
+        dialogo.setAttribute('open', '')
+      }
+      return
+    }
+    dialogo.setAttribute('aria-modal', 'true')
     // Detección de capacidad, no de navegador. Ver la cabecera: en jsdom
     // `showModal` no existe y llamarlo a pelo lanzaría `TypeError`.
     if (typeof dialogo.showModal === 'function') {
@@ -1079,7 +1161,13 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
     } else {
       dialogo.setAttribute('open', '')
     }
+  }
 
+  function abrir() {
+    if (destruido || estaAbierto) return
+    focoPrevio = doc.activeElement ?? null
+    estaAbierto = true
+    presentar()
     primerFoco().focus()
   }
 
@@ -1324,6 +1412,66 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
 
     abierto() {
       return !destruido && estaAbierto === true
+    },
+
+    /**
+     * ⭐ **EL INTERRUPTOR DE LA REBANADA 5: ¿esto es un modal o es la pantalla?**
+     *
+     * Sin argumento, LEE. Con un booleano, ESCRIBE y devuelve el valor aplicado.
+     *
+     * Cambia tres cosas, y las tres son la misma pregunta:
+     *
+     *   1. **Se enseña con `show()` y no con `showModal()`**, porque un modal deja
+     *      inerte el rail — o sea la navegación — y convertiría su propio paso en
+     *      una ratonera. Ver {@link presentar}.
+     *   2. **`Escape` y «Cancelar» dejan de cerrar y pasan a PEDIR LA SALIDA**
+     *      ({@link pedirCierre}): cerrar en su propio paso dejaría la pantalla
+     *      vacía, que es el defecto de la rebanada 4 otra vez.
+     *   3. **`aria-modal` dice la verdad**: en modo pantalla lo de detrás no está
+     *      fuera de juego.
+     *
+     * ⚠️ **Nace en `false`**, o sea el modal de F09 exactamente, para que un
+     * montaje sin aplicador —los tests, un uso suelto— se comporte como antes.
+     * Quien lo conmuta es `app/main.js`, suscrito a la autoridad de navegación.
+     *
+     * Si se conmuta con el diálogo YA ABIERTO se vuelve a presentar en el acto:
+     * un `showModal()` solo se deshace cerrando, así que sin esto el CTA que abre
+     * y navega en el mismo gesto dejaría un modal encima de su propia pantalla.
+     * El cierre intermedio es MUDO —`estaAbierto` se conserva— para que nadie
+     * confunda un cambio de presentación con que el usuario se haya echado atrás.
+     *
+     * @param {boolean} [valor]
+     * @returns {boolean}
+     */
+    comoPantalla(valor) {
+      if (destruido) return false
+      if (valor === undefined) return comoPantallaActivo === true
+      if (typeof valor !== 'boolean') {
+        throw new TypeError(
+          `comoPantalla: 'valor' debe ser booleano; recibido ${typeof valor}. Sin argumento LEE.`,
+        )
+      }
+      if (valor === comoPantallaActivo) return comoPantallaActivo
+      comoPantallaActivo = valor
+      if (estaAbierto) {
+        // Cierre MUDO y reapertura: se baja la bandera para que el `close` que
+        // emita el navegador salga por la primera línea de `cerrarInterno` (la
+        // idempotencia que este módulo ya documenta) y nadie reciba un «se ha
+        // echado atrás» que no ha ocurrido.
+        estaAbierto = false
+        if (typeof dialogo.close === 'function') {
+          try {
+            dialogo.close()
+          } catch {
+            dialogo.removeAttribute('open')
+          }
+        } else {
+          dialogo.removeAttribute('open')
+        }
+        estaAbierto = true
+        presentar()
+      }
+      return comoPantallaActivo
     },
 
     valores,

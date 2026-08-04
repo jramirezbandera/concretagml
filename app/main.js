@@ -3201,7 +3201,7 @@ cablearGeneracionGml({ estado, panel, srs: SRS_DEMO })
 // `app/dialogo-informe.js` —igual que `app/zona-fichero.js` fabrica su
 // `<input type="file">`— y los dos botones del pie los fabrica
 // `viewer/cajon-diagnostico.js`.
-cablearInforme({
+const informeCableado = cablearInforme({
   // El MISMO store que el mapa, la tabla, la ficha, el diagnóstico, la comprobación
   // y el botón del GML. No escribe en él: un informe mide y maqueta, no edita.
   estado,
@@ -3665,6 +3665,84 @@ ramaCableada.subscribe((rama) => {
 // era la única acción de la aplicación que producía una pantalla entera sin mover
 // el rail de sitio.
 diagnosticoCableado.alDiagnostico(refrescarHechos)
+
+// ── Rework de UI · rebanada 5 · EL INFORME ES UNA PANTALLA, NO UN MODAL ────
+//
+// ⛔ **EL DEFECTO QUE ESTO CIERRA, MEDIDO EN CHROME EL 2026-08-05.** La pantalla
+// «Informe» **no tenía nada del informe**: el panel enseñaba exactamente lo mismo
+// que Validación —cabecera 117 + avisos 63 + vértices 360 + pie 179 = 720 px— y
+// de las tres acciones del informe («Preparar informe (PDF)», «Descargar informe
+// de contraste» y «Componer PDF») **no se veía ninguna**: las dos primeras viven
+// dentro del cajón de diagnóstico, que en Informe está cerrado, y la tercera
+// dentro del `<dialog>`. Ni un solo bloque del panel es propio de esa pantalla.
+//
+// O sea: **el peldaño «Informe» del rail no participaba en producir el informe.**
+// El PDF se sacaba desde Diagnóstico, con el rail marcando otra cosa. Es el mismo
+// síntoma de la rebanada 3 (un peldaño decorativo) y de la 4 (una pantalla vacía),
+// y aquí estaban los dos a la vez.
+//
+// La corrección es la que el plan pedía —«Informe sale del `<dialog>` a página
+// completa»— hecha con el mismo interruptor que las dos rebanadas anteriores:
+// `app/dialogo-informe.js#comoPantalla`. La vista no sabe qué es un paso; esto es
+// el cable.
+if (
+  informeCableado.dialogo !== null &&
+  typeof informeCableado.dialogo.comoPantalla === 'function'
+) {
+  const dialogoInforme = informeCableado.dialogo
+
+  const aplicarInforme = ({ paso } = navegacion.get()) => {
+    const esSuPantalla = paso === PASO.INFORME
+    // ⚠️ El interruptor va ANTES de cerrar, y por lo mismo que en la rebanada 4:
+    // la presentación tiene que estar decidida cuando el diálogo se enseñe. El
+    // caso peor es el CTA, que abre y navega en el MISMO gesto; `comoPantalla`
+    // sabe volver a presentar un diálogo ya abierto justamente para que el orden
+    // de esos dos oyentes deje de importar.
+    dialogoInforme.comoPantalla(esSuPantalla)
+    if (!esSuPantalla) {
+      dialogoInforme.cerrar()
+      return
+    }
+    // ⛔ **Y LLEGAR AQUÍ TIENE QUE PRODUCIR LA PANTALLA.** Medido el 2026-08-05
+    // con la mitad de arriba ya puesta: el peldaño «Informe» del rail dejaba
+    // `data-paso="informe"` y **el diálogo cerrado** — la pantalla vacía otra
+    // vez, porque quien prepara el contenido es el CTA del cajón y desde el rail
+    // no lo pulsa nadie. Es exactamente el defecto que la rebanada 4 encontró en
+    // Diagnóstico, y aquí habría entrado por la puerta de al lado.
+    //
+    // ⚠️ Llamar a `preparar()` con una preparación ya en vuelo es SEGURO:
+    // `cablearInforme` lleva su propia guarda (`preparando`) desde F09 y lo dice
+    // por el renglón del cajón. Eso es justo lo que pasa en el camino del CTA, que
+    // prepara y navega en el mismo gesto: la segunda llamada se descarta sola. La
+    // guarda vive allí y no aquí a propósito — es una propiedad de preparar un
+    // informe, no de navegar.
+    if (!dialogoInforme.abierto()) informeCableado.preparar()
+  }
+  aplicarInforme(navegacion.get())
+  navegacion.subscribe(aplicarInforme)
+
+  // «Cancelar» y `Escape` en su propia pantalla no cierran: PIDEN SALIR (ver
+  // `dialogo-informe.js#pedirCierre`). Se sale a **Diagnóstico**, que es de donde
+  // viene el informe y donde están las cifras que firma; si no se sostuviera —hoy
+  // no puede: Informe exige `diagnostico` y Diagnóstico exige menos— se cae a
+  // Validación en vez de tragarse el gesto.
+  dialogoInforme.alCancelar(() => {
+    if (navegacion.get().paso !== PASO.INFORME) return
+    if (navegacion.navegarAPaso(PASO.DIAGNOSTICO).ok) return
+    navegacion.navegarAPaso(PASO.VALIDACION)
+  })
+}
+
+// Y «Preparar informe (PDF)» NAVEGA, igual que «Diagnosticar encaje» desde T9: era
+// la otra acción de la aplicación que producía una pantalla entera sin mover el
+// rail de sitio. El oyente del cableado (que prepara el contenido y abre) sigue
+// donde estaba; éste solo dice dónde estamos.
+const ctaPrepararInforme = document.querySelector('[data-accion="preparar-informe"]')
+if (ctaPrepararInforme !== null) {
+  ctaPrepararInforme.addEventListener('click', () => {
+    navegacion.navegarAPaso(PASO.INFORME)
+  })
+}
 
 const ctaDiagnosticar = document.querySelector('[data-accion="diagnosticar"]')
 if (ctaDiagnosticar !== null) {
