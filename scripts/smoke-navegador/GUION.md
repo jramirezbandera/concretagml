@@ -35,7 +35,7 @@ para que el resultado no dependa de interpretar prosa. Catorce son de aceptació
 | `11-informe-pdf.js` | F09 · **1** a 5 | ⭐ **el CRITERIO 1, que solo se puede medir aquí**: `toDataURL` sobre un lienzo con una tesela REAL del WMS, **con control negativo** (sin `crossOrigin` tiene que lanzar); el PDF que baja con BYTES de verdad (`%PDF`, páginas declaradas, el plano `/DCTDecode` dentro); que componer **no cierre nada por debajo** (tercera aparición del mismo defecto); el `<dialog>` como modal DE VERDAD (capa superior, fondo inerte, `Escape`), el encaje del modal en la ventana, el invariante de la caja de vértices y la tipografía de los cuatro botones nuevos | `ok:true` — ver §17 |
 | `12-expedientes.js` | F10 · 1 a 6 | ⭐ **que los bytes están en una base de VERDAD** (la suite entera de F10 corre sobre `fake-indexeddb`, que no es una base de datos): supervivencia a la recarga contrastada contra `performance.timeOrigin`, segunda conexión a IndexedDB, `persist()`/`estimate()` reales, las tres exportaciones con sus BYTES, el `<dialog>` como modal y el invariante de los 267 px | `ok:true` — ver §18 |
 | `13-edificio.js` | F11 · 1 a 4 | ⭐ **el guardián de ANCHO del conmutador, que solo existe aquí** (sustituye al `flex-wrap: nowrap` que el plan pedía por error); **M10 ida y vuelta en un navegador real** —mismo nodo, mismo valor, oyentes vivos—; el invariante de los 267 px y las tres cifras de M8; que las huellas del DXF **se ven y ENCIMA de la parcela** (orden real de los panes, no solo que existan los `<path>`); soltar un `.dxf` de verdad en las DOS ramas, con su diálogo de reparto por capas; la ficha del pie que cambia de cara; y ⭐ **el reparto de altura del panel, en vacío y con datos, con el recorte a CERO EXACTO y el déficit en píxeles cuando no llega** | ✅ **`ok:true` desde el 2026-08-04**: los dos defectos de F11 cerrados, el segundo **por el rework** — ver §19 |
-| `14-shell.js` | Rework · 1 a 4 | la cáscara de tres columnas y su coste en píxeles, en **las DOS pasadas de D5** (1280×720 y 1440×900): ancho del rail, desborde del panel, el invariante de `#tabla-vertices`, cuántas tarjetas de aviso caben enteras y cuánto queda escondido tras el pliegue; **se detecta solo** en cuál de los dos mundos está (`LINEA_BASE` sin rail / `SHELL` con él) | `ok:true` en las dos — ver §20 |
+| `14-shell.js` | Rework · 1 a 4 | la cáscara de tres columnas y su coste en píxeles, en **las DOS pasadas de D5** (1280×720 y 1440×900): ancho del rail, desborde del panel, el invariante de `#tabla-vertices`, cuántas tarjetas de aviso caben enteras y cuánto queda escondido tras el pliegue; **se detecta solo** en cuál de los dos mundos está (`LINEA_BASE` sin rail / `SHELL` con él); y desde la rebanada 4, **si el diagnóstico sigue en pantalla después de tocar el mapa** | `ok:true` en las dos — ver §20 |
 | `15-contraste.js` | Rework · T9 | ⭐ **la RUTA CRÍTICA 2 entera** (soltar el GML de otro → contrastarlo → cruzar la puerta), que hasta T9 no se podía andar; y sobre todo **que la puerta de D4 SE VE**: dentro del cajón, dentro de la ventana y con `elementFromPoint` devolviéndola —las tres patas, porque con una sola el defecto salía verde—; más la procedencia que cambia al cruzar y el invariante de la caja de vértices | ⛔ **encontró un defecto real el 2026-08-04, ya corregido; hoy `ok:true` en las dos** — ver §22 |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
@@ -3512,6 +3512,83 @@ Ahora lo comprueba él mismo al arrancar y lo dice **en una línea**, con la rut
 la que hay que relanzarlo. La guarda va dentro del guion y no en una nota de este
 documento a propósito: **las notas no se leen cuando el guion ya está corriendo**
 (lección de T10).
+
+### Ampliación rebanada 4: ¿el DIAGNÓSTICO es una pantalla o un cajón que se cierra solo?
+
+⛔ **EL DEFECTO QUE DESTAPÓ, y es el que más se parece a la frase que abrió
+este rework** («hay flujos diferentes viviendo en la misma pantalla»). Medido en
+Chrome el 2026-08-05, a 1280×720, por los tres caminos que llevan a Diagnóstico:
+
+| Cómo se llega | ¿queda el diagnóstico en pantalla? |
+|---|---|
+| por hash (`#/parcela/diagnostico`) | sí |
+| por el CTA del pie («Diagnosticar encaje») | sí |
+| **por el peldaño «Diagnóstico» del rail** | **NO** |
+
+O sea: **el único camino que no funcionaba era justo el que el rework promete.**
+El cajón se abría y su propio guardián de clic-fuera lo cerraba en el mismo
+gesto, porque el clic del rail no es el evento de apertura —y no puede serlo: la
+navegación no lleva eventos de DOM, criterio 1—. Sin error, sin aviso y sin nada
+en pantalla: el rail seguía marcando «Diagnóstico», el `<h1>` seguía diciendo
+«Diagnóstico de encaje» y no había diagnóstico en ninguna parte.
+
+Y había más, del mismo tronco:
+
+- **UN clic en el mapa lo cerraba**, y mirar el mapa es lo que se hace en esa
+  pantalla. `Escape` también.
+- **Una vez cerrado, el peldaño del rail NO lo devolvía**: navegar al paso en el
+  que ya estás no publica nada. El único camino de vuelta era el CTA del pie.
+- Y con el cajón abierto, **278 px de 650 (42,77 %) nacían bajo el pliegue**:
+  «Preparar informe (PDF)» a 207,53 px por debajo del borde, «Descargar informe
+  de contraste» a 248,38 px, el renglón de estado (`role="status"`, o sea el
+  canal por el que el cajón cumple la regla de oro 1) a 164,69 px y la invasión
+  a colindantes cortada a 15,73 px.
+
+**Lo que mide el guion ahora, y por qué solo se puede medir aquí:**
+
+1. **El cajón está abierto exactamente en su pantalla.** jsdom no puede: hace
+   falta el guardián del `document` corriendo de verdad.
+2. **Un clic en el mapa no lo cierra** — y el punto se elige a la derecha del
+   cajón y se comprueba con `elementFromPoint` que cae FUERA de él, porque con
+   el cajón más alto un punto cualquiera del mapa ya no lo está. Si no se
+   encuentra ese punto, el guion lo dice en `noCubierto` en vez de dar por
+   hecha una comprobación que no ha hecho.
+3. **`Escape` tampoco.**
+4. **Lo accionable y lo que habla se ven** con el cajón recién abierto: las tres
+   patas (dentro del cajón, dentro de la ventana y `elementFromPoint` devolviendo
+   el nodo), igual que la puerta en §22.
+
+**Verificado por mutación, DOS veces, y las dos hacían falta** porque la
+corrección tiene dos mitades independientes:
+
+- Dejando el aplicador de `app/main.js` mudo (`fijarDiagnosticoComoPantalla: () => {}`):
+  el guion saca **2 problemas** —el clic en el mapa y el `Escape`— y el cajón
+  vuelve a medir 374,39 px con **287 px (43,55 %) escondidos**.
+- Quitándole el `sticky` al bloque anclado: el guion saca **1 problema** —
+  «Descargar informe de contraste» cae 23,77 px por debajo del borde—. O sea:
+  **el anclaje es lo que salva los botones y el alto es lo que salva lo
+  descriptivo**, y al suelo declarado de D5 hacen falta los dos.
+
+**Lo que devuelve, medido después:**
+
+| | 1280×720 | 1440×900 |
+|---|---|---|
+| Cajón | 420 × **608** px (era 374,39) | 420 × **660,77** |
+| Escondido | **53 px (8,04 %)** (eran 278 / 42,77 %) | **0 px** |
+| Los dos CTA del informe y el renglón de estado | se ven, 0 px por debajo | ídem |
+
+⚠️ **Los 112 px de `ALTO_COMO_PANTALLA` son una MEDIDA, no un gusto**: el cajón
+vive en `bottomleft` con el borde inferior a 31 px del suelo, así que el techo
+queda en 81 px — **9 px por debajo del control de zoom, que acaba en 72**. Con
+más alto se pisarían y el mapa se quedaría sin manejar. Medido en Chrome: el
+cajón sale exactamente a `y: 81`.
+
+⚠️ **Y UNA CONTAMINACIÓN QUE COSTÓ UN FALSO ROJO, otra vez.** La pasada de
+Entrada salió con «solo 2 de las 3 vías se ven enteras» y no era un defecto: era
+el autoguardado en IndexedDB de las sondas anteriores, que añade una tarjeta de
+aviso y le come 60 px al panel. **`reload` NO limpia IndexedDB**; hay que borrar
+las bases. Con la base limpia, `ok:true`. Es la misma lección que ya pagó la
+rebanada 3 y conviene que esté escrita dos veces.
 
 ---
 

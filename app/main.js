@@ -3582,6 +3582,12 @@ const contrasteCableado = cablearContraste({
   declararProcedencia: (texto) => visor.diagnostico.cajon.procedencia(texto),
   mostrarPuerta: (visible) => visor.diagnostico.cajon.puerta(visible),
   suscribirPuerta: (fn) => visor.diagnostico.cajon.alPuerta(fn),
+  // ── Rework de UI · rebanada 4 ────────────────────────────────────────────
+  // El cajón de diagnóstico deja de ser descartable cuando ES la pantalla. La
+  // decisión de cuándo lo es la toma `app/contraste.js` (es quien conoce el
+  // paso); esto es el cable, igual que el aplicador de la edición de más abajo.
+  fijarDiagnosticoComoPantalla: (esPantalla) => visor.diagnostico.cajon.comoPantalla(esPantalla),
+  suscribirSalida: (fn) => visor.diagnostico.cajon.alSalir(fn),
 })
 
 /**

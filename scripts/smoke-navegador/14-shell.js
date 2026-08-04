@@ -516,6 +516,154 @@ if (pantalla.edicion.barraSeVe !== pantalla.edicion.sePuedeEditarAqui) {
   )
 }
 
+// ── Rebanada 4: ¿el DIAGNÓSTICO es una pantalla o un cajón que se cierra solo? ─
+//
+// ⛔ MEDIDO EL 2026-08-05, antes de la corrección, a 1280×720:
+//
+//   · llegar a Diagnóstico por el PELDAÑO DEL RAIL dejaba la pantalla vacía: el
+//     cajón se abría y su propio guardián de clic-fuera lo cerraba en el mismo
+//     gesto (el clic del rail no es el evento de apertura). Por hash y por el CTA
+//     del pie sí quedaba abierto — o sea que el camino que el rework promete era
+//     justo el único que no funcionaba;
+//   · UN clic en el mapa lo cerraba, y el mapa es lo que se mira en esa pantalla;
+//   · una vez cerrado, pulsar otra vez el peldaño NO lo devolvía;
+//   · y con el cajón abierto, 278 px de 650 (42,77 %) nacían bajo el pliegue:
+//     «Preparar informe (PDF)» a 207,53 px por debajo del borde, «Descargar
+//     informe de contraste» a 248,38 px y el renglón de estado a 164,69 px.
+//
+// Nada de eso lo puede ver jsdom: los tres primeros necesitan el guardián del
+// `document` corriendo de verdad, y el cuarto necesita maquetación.
+const diagnostico = (() => {
+  const cajonEl = $('.gml-cajon-diagnostico')
+  if (cajonEl === null) {
+    return {
+      hayCajon: false,
+      queSignifica: 'No hay cajón de diagnóstico montado en esta página.',
+    }
+  }
+  const abierto = () => getComputedStyle(cajonEl).display !== 'none'
+  const rc = () => cajonEl.getBoundingClientRect()
+
+  /** ¿Se ve este nodo DENTRO del cajón y sin que nadie lo tape? */
+  const seVeDentro = (sel) => {
+    const nodo = cajonEl.querySelector(sel)
+    if (nodo === null) return { existe: false }
+    const r = nodo.getBoundingClientRect()
+    const caja = rc()
+    if (r.width === 0 || r.height === 0) return { existe: true, seVe: false, oculto: true }
+    const cx = Math.round(r.left + r.width / 2)
+    const cy = Math.round(r.top + r.height / 2)
+    const enElPunto = document.elementFromPoint(cx, cy)
+    return {
+      existe: true,
+      oculto: false,
+      pxPorDebajoDelCajon: redondear(Math.max(0, r.bottom - caja.bottom)),
+      seVe:
+        r.top >= caja.top - 1 &&
+        r.bottom <= caja.bottom + 1 &&
+        r.top >= 0 &&
+        r.bottom <= innerHeight &&
+        enElPunto !== null &&
+        (enElPunto === nodo || nodo.contains(enElPunto)),
+    }
+  }
+
+  return {
+    hayCajon: true,
+    abierto: abierto(),
+    caja: caja(cajonEl),
+    escondidoPx: cajonEl.scrollHeight - cajonEl.clientHeight,
+    escondidoPct:
+      cajonEl.scrollHeight > 0
+        ? redondear(((cajonEl.scrollHeight - cajonEl.clientHeight) / cajonEl.scrollHeight) * 100)
+        : null,
+    // Lo que NO puede esconderse: lo que se pulsa y lo que habla.
+    prepararInforme: seVeDentro('[data-accion="preparar-informe"]'),
+    descargarInforme: seVeDentro('[data-accion="descargar-informe"]'),
+    renglonDeEstado: seVeDentro('[data-estado="cajon-diagnostico"]'),
+    referencia:
+      'Antes de la rebanada 4, 1280×720: cajón 420×374,39 con 650 px de contenido → 278 px ' +
+      '(42,77 %) bajo el pliegue; preparar-informe a 207,53 px por debajo del borde, ' +
+      'descargar-informe a 248,38 px y el renglón de estado a 164,69 px.',
+  }
+})()
+
+pantalla.diagnostico = diagnostico
+
+// 1 · El cajón está abierto exactamente en su pantalla, y en ninguna otra.
+if (diagnostico.hayCajon && diagnostico.abierto !== (pasoActivo === 'diagnostico')) {
+  problemas.push(
+    `El cajón de diagnóstico ${diagnostico.abierto ? 'está ABIERTO' : 'está CERRADO'} en ` +
+      `«${pasoActivo}». Tiene que estar abierto en «diagnostico» y solo ahí: es el contenido ` +
+      'de esa pantalla, no un cajón que se abre y se descarta.',
+  )
+}
+
+// 2 · Estando en su pantalla, un clic en el mapa no puede borrarla.
+if (diagnostico.hayCajon && pasoActivo === 'diagnostico' && diagnostico.abierto) {
+  const mapaEl = $('#mapa') ?? $('.leaflet-container')
+  const r = mapaEl.getBoundingClientRect()
+  // Un punto del mapa a la DERECHA del cajón, para que el clic caiga fuera de él.
+  const px = Math.round(r.right - 60)
+  const py = Math.round(r.top + r.height * 0.3)
+  const destino = document.elementFromPoint(px, py)
+  const fueraDelCajon = destino !== null && !$('.gml-cajon-diagnostico').contains(destino)
+  if (destino !== null && fueraDelCajon) {
+    for (const tipo of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+      destino.dispatchEvent(
+        new MouseEvent(tipo, {
+          bubbles: true,
+          cancelable: true,
+          clientX: px,
+          clientY: py,
+          view: window,
+        }),
+      )
+    }
+    const sigueAbierto = getComputedStyle($('.gml-cajon-diagnostico')).display !== 'none'
+    pantalla.diagnostico.sobreviveAlClicEnElMapa = sigueAbierto
+    if (!sigueAbierto) {
+      problemas.push(
+        'UN clic en el mapa ha cerrado el diagnóstico, y mirar el mapa es lo que se hace en esa ' +
+          'pantalla. Peor: el peldaño del rail no lo devuelve, porque navegar al paso en el que ' +
+          'ya estás no publica nada — el rail sigue marcando «Diagnóstico» y no hay diagnóstico.',
+      )
+    }
+    // Y Escape, que es la otra forma de perder la pantalla sin querer.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    const trasEscape = getComputedStyle($('.gml-cajon-diagnostico')).display !== 'none'
+    pantalla.diagnostico.sobreviveAEscape = trasEscape
+    if (!trasEscape) {
+      problemas.push('`Escape` ha cerrado el diagnóstico: descarta un cajón, no una pantalla.')
+    }
+  } else {
+    noCubierto.push(
+      'No se ha encontrado un punto del mapa fuera del cajón donde soltar el clic: la prueba de ' +
+        'que un clic en el mapa no borra el diagnóstico NO se ha hecho en esta corrida.',
+    )
+  }
+}
+
+// 3 · Y lo accionable no puede nacer bajo el pliegue.
+if (diagnostico.hayCajon && diagnostico.abierto) {
+  for (const [nombre, quePasa] of [
+    ['«Preparar informe (PDF)»', diagnostico.prepararInforme],
+    ['«Descargar informe de contraste»', diagnostico.descargarInforme],
+    ['el renglón de estado del cajón', diagnostico.renglonDeEstado],
+  ]) {
+    if (quePasa.existe && quePasa.oculto !== true && quePasa.seVe !== true) {
+      problemas.push(
+        `${nombre} no se ve con el cajón recién abierto` +
+          (quePasa.pxPorDebajoDelCajon > 0
+            ? `: cae ${quePasa.pxPorDebajoDelCajon} px por debajo del borde visible.`
+            : '.') +
+          ' Lo que se pulsa y lo que habla van anclados; esconderlos es el defecto que la ' +
+          'rebanada 4 midió y cerró.',
+      )
+    }
+  }
+}
+
 // ── 4 · La caja de vértices: el invariante que atribuye las pérdidas ───────
 //
 // Desde F07 mide 267,44 px a 1440×900 en la rama PARCELA, y seis fases seguidas

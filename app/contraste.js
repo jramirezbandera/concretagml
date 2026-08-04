@@ -220,6 +220,12 @@ const oNada = (fn) => (typeof fn === 'function' ? fn : () => {})
  * @param {(visible: boolean) => void} [opciones.mostrarPuerta]
  * @param {(fn: () => void) => (() => void)} [opciones.suscribirPuerta]  Cómo
  *   escuchar el CTA. Se le devuelve la baja, igual que `alCambiar` y compañía.
+ * @param {(esPantalla: boolean) => void} [opciones.fijarDiagnosticoComoPantalla]
+ *   Rework de UI · rebanada 4. Se le dice al cajón de diagnóstico si en este paso
+ *   **es la pantalla** o es un cajón flotante. Ver el bloque de abajo.
+ * @param {(fn: () => void) => (() => void)} [opciones.suscribirSalida]  Cómo
+ *   escuchar el ✕ del cajón cuando es pantalla: entonces ese botón no cierra
+ *   nada, PIDE SALIR, y a dónde se sale se decide aquí.
  * @returns {Contraste}
  * @throws {TypeError}  Contrato del programador.
  */
@@ -232,6 +238,8 @@ export function cablearContraste({
   declararProcedencia,
   mostrarPuerta,
   suscribirPuerta,
+  fijarDiagnosticoComoPantalla,
+  suscribirSalida,
 } = {}) {
   if (!esNavegacion(navegacion)) {
     throw new TypeError(
@@ -252,6 +260,7 @@ export function cablearContraste({
   const cerrarC = oNada(cerrarComprobacion)
   const declarar = oNada(declararProcedencia)
   const puerta = oNada(mostrarPuerta)
+  const comoPantalla = oNada(fijarDiagnosticoComoPantalla)
 
   let destruido = false
   /** El último cajón aplicado. `null` = todavía no se ha aplicado ninguno. */
@@ -286,6 +295,18 @@ export function cablearContraste({
     const toca = cajonDe(paso)
     if (toca !== aplicado) {
       aplicado = toca
+      // ── ⛔ ESTA LÍNEA VA ANTES DE ABRIR, Y NO ES ORDEN LIBRE (rebanada 4) ──
+      // El cajón de diagnóstico se descartaba al pulsar fuera. Si se abriera
+      // primero y se declarara pantalla después, quedaría un instante descartable
+      // — y ese instante es exactamente el que dura el clic del rail que acaba de
+      // abrirlo, que sigue burbujeando hacia el `document`. Medido antes de esto:
+      // **el peldaño «Diagnóstico» abría el cajón y su propio guardián lo cerraba
+      // en el mismo gesto, dejando la pantalla vacía sin decir nada.**
+      //
+      // Que sea EL CAJÓN DE ESTE PASO lo que manda —y no una constante— es lo que
+      // deja el de comprobación como estaba: aquél sí es un cajón, es la respuesta
+      // pasajera a soltar un `.gml` en Entrada, y descartarlo es lo correcto.
+      comoPantalla(toca === CAJON.DIAGNOSTICO)
       // Cerrar SIEMPRE va antes de abrir: los dos cajones comparten esquina, y
       // abrir primero los apilaría en vertical durante un fotograma.
       if (toca !== CAJON.COMPROBACION) cerrarC()
@@ -306,6 +327,26 @@ export function cablearContraste({
     typeof suscribirPuerta === 'function'
       ? suscribirPuerta(() => {
           if (!destruido) navegacion.abrirPuerta()
+        })
+      : () => {}
+
+  // ── La SALIDA del diagnóstico (rework de UI · rebanada 4) ──────────────────
+  //
+  // El ✕ de un cajón que no se descarta tiene que significar algo, y lo que
+  // significa es «sácame de aquí». Se sale a **Validación** y no a Entrada: es el
+  // paso anterior en el recorrido y el que enseña la misma geometría con sus
+  // vértices, así que salirse del diagnóstico no tira el trabajo hecho.
+  //
+  // El guardián de Validación pide `geometria`, y estar en Diagnóstico exige más
+  // que eso, así que desde aquí NUNCA puede fallar. Se comprueba igualmente y se
+  // cae a Entrada si algún día deja de ser verdad: un ✕ que no hace nada es
+  // exactamente el fallo silencioso que esta rebanada existe para quitar.
+  const bajaSalida =
+    typeof suscribirSalida === 'function'
+      ? suscribirSalida(() => {
+          if (destruido) return
+          if (navegacion.navegarAPaso(PASO.VALIDACION).ok) return
+          navegacion.navegarAPaso(PASO.ENTRADA)
         })
       : () => {}
 
@@ -330,6 +371,7 @@ export function cablearContraste({
       bajaNavegacion()
       bajaEstado()
       if (typeof bajaPuerta === 'function') bajaPuerta()
+      if (typeof bajaSalida === 'function') bajaSalida()
     },
   }
 }

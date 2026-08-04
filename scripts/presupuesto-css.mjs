@@ -147,8 +147,10 @@ export const ASIENTOS = Object.freeze(
       nota: 'Pantalla de contraste: el cajón se viste con estilos en línea, así que no toca la hoja.' },
     { hito: 'Rework rebanada 2', commit: 'c176c3f', total: 61108, nuestro: 46013, rebanada: 'validacion',
       nota: '⭐ CERO BYTES: repartir el pie por pantallas es MARCADO (data-pantalla), y las cinco reglas del CSS ya estaban escritas desde T6.' },
-    { hito: 'Rework rebanada 3', commit: '(sin commitear)', total: 61108, nuestro: 46013, rebanada: 'edicion',
+    { hito: 'Rework rebanada 3', commit: 'd0b7229', total: 61108, nuestro: 46013, rebanada: 'edicion',
       nota: '⭐ CERO BYTES otra vez: la barra declara su pantalla desde JS y el interruptor de los cuatro gestos es lógica, no estilo.' },
+    { hito: 'Rework rebanada 4', commit: '(sin commitear)', total: 61108, nuestro: 46013, rebanada: 'diagnostico',
+      nota: '⭐ CERO BYTES por TERCERA vez seguida, y aquí es un hecho sobre dónde vive el cromo del cajón: viewer/cajon-diagnostico.js se viste con estilos EN LÍNEA porque no importa ninguna hoja (para ser legible en jsdom y en un mapa pelado), así que anclarle el pie y subirle el tope de alto no toca app.css. Lo demás —que no se descarte y que el ✕ salga— es lógica.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

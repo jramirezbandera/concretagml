@@ -135,6 +135,25 @@ const POSICIONES = ['topleft', 'topright', 'bottomleft', 'bottomright']
  * —mismo criterio que `viewer/capas.js` y `viewer/barra-edicion.js`—, porque este
  * módulo no importa CSS: el CSS es responsabilidad de la entrada de la aplicación.
  */
+/**
+ * El tope de altura del cajón cuando es **un cajón**: una esquina del mapa que se
+ * abre y se descarta. Es el valor de F07 y no se toca.
+ */
+export const ALTO_COMO_CAJON = '52vh'
+
+/**
+ * Y el tope cuando es **la pantalla** (rework de UI · rebanada 4). Los 112 px
+ * están MEDIDOS en Chrome, no elegidos: el cajón vive en `bottomleft` y su borde
+ * inferior queda a 31 px del suelo de la ventana, así que restar 112 le deja el
+ * techo a 81 px — 9 px por debajo del control de zoom, que termina en 72. Con más
+ * altura se pisarían, y un cajón que tapa el zoom deja el mapa sin manejar.
+ *
+ * Rinde 608 px de los 650 que mide el contenido a 1280×720 (el suelo declarado en
+ * D5) y los 650 enteros a 1440×900. Lo que queda fuera en el caso peor es
+ * DESCRIPTIVO: lo accionable y lo que habla van en el bloque anclado.
+ */
+export const ALTO_COMO_PANTALLA = 'calc(100vh - 112px)'
+
 export const CLASE = Object.freeze({
   CONTENEDOR: 'gml-cajon-diagnostico',
   TITULAR: 'gml-cajon-titular',
@@ -397,8 +416,17 @@ const CajonDiagnostico = L.Control.extend({
     this._alEscape = (evento) => this._cerrarPorEscape(evento)
     this._abierto = false
     this._eventoApertura = null
+    // Rework de UI · rebanada 4. Nace en `false` —o sea, exactamente el cajón de
+    // F07— para que un visor montado sin aplicador (los tests, un mapa pelado) se
+    // comporte como antes. Quien lo conmuta es `app/contraste.js`, que es el único
+    // que sabe qué paso hay. Ver {@link crearCajonDiagnostico}#comoPantalla.
+    this._comoPantalla = false
     this._oyentes = {
       cerrar: new Set(),
+      // Rework de UI · rebanada 4. «Han pulsado el ✕ y este cajón NO se cierra
+      // porque es la pantalla»: quien decide a dónde se sale es la autoridad de
+      // navegación, y esta vista no sabe qué es un paso.
+      salir: new Set(),
       cambiar: new Set(),
       descargar: new Set(),
       preparar: new Set(),
@@ -429,7 +457,9 @@ const CajonDiagnostico = L.Control.extend({
       font: '13px/1.45 system-ui,sans-serif',
       color: '#334155',
       maxWidth: 'min(420px,42vw)',
-      maxHeight: '52vh',
+      // Nace como CAJÓN. Lo sube a pantalla `comoPantalla(true)`, y solo cuando
+      // alguien se lo pide: este módulo no sabe en qué paso está la aplicación.
+      maxHeight: ALTO_COMO_CAJON,
       overflowY: 'auto',
       overscrollBehavior: 'contain',
       display: 'none',
@@ -837,6 +867,52 @@ const CajonDiagnostico = L.Control.extend({
     acciones.append(preparar, descargar)
     pie.append(acciones, estadoInforme)
 
+    // ── ⛔ EL BLOQUE ANCLADO (rework de UI · rebanada 4, 2026-08-05) ──────────
+    // MEDIDO en Chrome a 1280×720, con el cajón recién abierto en su pantalla:
+    //
+    //     contenido 650 px en un cajón de 374,39 → 278 px (42,77 %) BAJO EL PLIEGUE
+    //     «Preparar informe (PDF)» ............ 207,53 px por debajo del borde
+    //     «Descargar informe de contraste» .... 248,38 px por debajo
+    //     el renglón de estado (role=status) .. 164,69 px por debajo
+    //     la invasión a colindantes ...........  15,73 px por debajo
+    //
+    // O sea: **la pantalla enseñaba el titular y las bandas, y escondía todo lo
+    // accionable y el canal por el que el cajón habla.** Es el mismo defecto que
+    // T9 le encontró a la puerta el 2026-08-04 —y por el que la puerta se pegó
+    // abajo—, solo que a los otros tres nadie los midió entonces.
+    //
+    // La corrección es la MISMA receta, aplicada al grupo entero en vez de a un
+    // botón: un bloque `sticky` pegado abajo, **hijo directo del contenedor** (que
+    // es el que scrollea), con márgenes negativos y su relleno para que el fondo
+    // llegue a los bordes del cajón y el contenido no se vea pasar por debajo. Lo
+    // que se ancla es exactamente lo que no puede esconderse: lo que HABLA (los
+    // dos renglones de estado) y lo que se PULSA (los dos del informe y la puerta).
+    //
+    // ⚠️ La puerta conserva su propio `position: sticky` aunque ya no lo necesite
+    // estando aquí dentro. No es descuido: es el cinturón además de los tirantes, y
+    // lo prueban dos guardianes distintos —uno mira la puerta y otro este bloque—,
+    // así que quitar uno no deja el defecto sin red.
+    const anclado = crear(doc, 'div')
+    anclado.dataset.diag = 'anclado'
+    estilar(anclado, {
+      position: 'sticky',
+      bottom: '0',
+      zIndex: '1',
+      marginTop: '12px',
+      marginLeft: '-12px',
+      marginRight: '-12px',
+      marginBottom: '-10px',
+      padding: '8px 12px 10px',
+      borderTop: '1px solid #E2E8F0',
+      background: '#fff',
+      boxSizing: 'border-box',
+      width: 'calc(100% + 24px)',
+    })
+    this._anclado = anclado
+    // El pie ya no pone su propio margen superior: lo pone el bloque.
+    estilar(pie, { marginTop: '0' })
+    anclado.append(estado, pie, puerta)
+
     contenedor.append(
       cabecera,
       procedencia,
@@ -844,10 +920,9 @@ const CajonDiagnostico = L.Control.extend({
       metricas,
       invasion,
       bloqueMargen,
-      estado,
-      pie,
-      // La puerta va la ÚLTIMA y fuera del pie: ver el bloque de arriba.
-      puerta,
+      // La puerta sigue siendo lo ÚLTIMO del cajón, ahora dentro del bloque
+      // anclado que la mantiene a la vista junto con el resto de lo accionable.
+      anclado,
     )
 
     // OBLIGATORIOS: sin ellos, pulsar dentro seleccionaría un lindero por debajo y
@@ -895,8 +970,27 @@ const CajonDiagnostico = L.Control.extend({
     if (!abierto) for (const fn of this._oyentes.cerrar) fn()
   },
 
+  /**
+   * El ✕.
+   *
+   * ── ⛔ CUANDO EL CAJÓN ES LA PANTALLA, CERRARLO ES SALIRSE ────────────────
+   * Rework de UI · rebanada 4. Si el cajón no se puede descartar pero el ✕ sigue
+   * ahí, el botón se queda mintiendo: pulsarlo no haría nada, y eso es peor que no
+   * tenerlo (regla de oro 1). Y esconderlo tampoco vale, porque «salir del
+   * diagnóstico» es una cosa que el usuario quiere poder hacer.
+   *
+   * Así que el ✕ conserva su significado —«quítame esto de delante»— y lo cumple
+   * de la única forma que tiene sentido en una pantalla: **avisando de que quieren
+   * salir**. A dónde se sale lo decide `app/contraste.js`, que es quien conoce la
+   * autoridad de navegación; esta vista no sabe qué es un paso y no va a empezar.
+   * Es el mismo reparto que la puerta de D4.
+   */
   _alPulsarCerrar(evento) {
     L.DomEvent.stop(evento)
+    if (this._comoPantalla) {
+      for (const fn of this._oyentes.salir) fn(evento)
+      return
+    }
     this._fijarAbierto(false)
   },
 
@@ -932,6 +1026,24 @@ const CajonDiagnostico = L.Control.extend({
    */
   _cerrarPorClicFuera(evento) {
     if (!this._abierto || !this._contenedor) return
+    // ── ⛔ UNA PANTALLA NO SE CIERRA AL TOCAR EL MAPA (rebanada 4) ──────────
+    // Medido en Chrome el 2026-08-05: **UN clic en el mapa cerraba el
+    // diagnóstico**, y mirar el mapa es literalmente lo que se hace en esa
+    // pantalla. Peor: una vez cerrado, el peldaño del rail no lo devolvía
+    // —navegar al paso en el que ya estás no publica nada—, así que el rail
+    // seguía marcando «Diagnóstico», el <h1> seguía diciendo «Diagnóstico de
+    // encaje» y no había diagnóstico en ninguna parte.
+    //
+    // Y el mismo guardián se comía la APERTURA: llegar por el peldaño del rail
+    // abría el cajón y este oyente lo cerraba en el mismo gesto, porque el clic
+    // del rail no es el evento de apertura (la navegación no lleva eventos de
+    // DOM, y no debe: criterio 1). Resultado medido: **el peldaño «Diagnóstico»
+    // llevaba a una pantalla vacía, sin error y sin aviso.**
+    //
+    // Esta guarda no «arregla» el guardián: lo pone en su sitio. Cerrar al pulsar
+    // fuera es comportamiento de cajón flotante, y sigue siendo lo correcto
+    // mientras el cajón lo sea.
+    if (this._comoPantalla) return
     if (evento === this._eventoApertura) {
       // Se consume: el SIGUIENTE clic fuera sí cierra.
       this._eventoApertura = null
@@ -952,6 +1064,10 @@ const CajonDiagnostico = L.Control.extend({
    */
   _cerrarPorEscape(evento) {
     if (!this._abierto) return
+    // Rebanada 4, y por lo mismo que el clic de fuera: Escape descarta un cajón
+    // flotante, no una pantalla. Dejarlo vivo aquí dejaba la aplicación diciendo
+    // «Diagnóstico» con la pantalla en blanco y sin forma de volver desde el rail.
+    if (this._comoPantalla) return
     if (evento.key !== 'Escape') return
     if (enDialogo(evento.target)) return
     this._fijarAbierto(false)
@@ -1028,7 +1144,8 @@ const CajonDiagnostico = L.Control.extend({
  *   abierto: Function, registral: Function, clase: Function,
  *   reiniciarExpediente: Function, estado: Function, estadoInforme: Function,
  *   alCambiar: Function, alDescargar: Function, alPreparar: Function,
- *   alCerrar: Function, destruir: Function}}
+ *   alCerrar: Function, comoPantalla: Function, alSalir: Function,
+ *   destruir: Function}}
  * @throws {TypeError|RangeError} Contrato del programador.
  */
 export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar } = {}) {
@@ -1391,6 +1508,75 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
     },
 
     /**
+     * ⭐ **EL INTERRUPTOR DE LA REBANADA 4: ¿esto es un cajón o es la pantalla?**
+     *
+     * Sin argumento, LEE. Con un booleano, ESCRIBE y devuelve el valor aplicado.
+     *
+     * Cambia tres cosas a la vez porque las tres son la misma pregunta:
+     *
+     *   1. **Ya no se descarta.** Ni al pulsar fuera, ni con Escape. Ver
+     *      {@link CajonDiagnostico._cerrarPorClicFuera}, donde está medido lo que
+     *      pasaba: un clic en el mapa borraba el diagnóstico, y el peldaño del
+     *      rail llevaba a una pantalla vacía porque el guardián se comía la
+     *      apertura.
+     *   2. **El ✕ pasa a pedir la SALIDA** en vez de vaciar la pantalla
+     *      ({@link CajonDiagnostico._alPulsarCerrar} y {@link alSalir}).
+     *   3. **Deja de caber en 52vh.** Medido a 1280×720: el contenido son 650 px
+     *      y el cajón enseñaba 372, o sea **278 px (42,77 %) bajo el pliegue**,
+     *      con los dos botones del informe 207 y 248 px por debajo del borde. Un
+     *      cajón que tapa una esquina del mapa puede permitirse esconder; una
+     *      pantalla, no. El tope nuevo es {@link ALTO_COMO_PANTALLA}, y ese
+     *      número está MEDIDO.
+     *
+     * ⚠️ **NO conoce la navegación**, igual que `viewer/edicion.js#activa`: nace
+     * en `false` y quien lo conmuta es `app/contraste.js`. Un visor montado a
+     * pelo se comporta exactamente como el cajón de F07.
+     *
+     * @param {boolean} [valor]
+     * @returns {boolean}
+     */
+    comoPantalla(valor) {
+      if (destruido) return false
+      if (valor === undefined) return control._comoPantalla === true
+      if (typeof valor !== 'boolean') {
+        throw new TypeError(
+          `comoPantalla: 'valor' debe ser booleano; recibido ${typeof valor}. Sin argumento LEE.`,
+        )
+      }
+      if (valor === control._comoPantalla) return control._comoPantalla
+      control._comoPantalla = valor
+      if (control._contenedor) {
+        control._contenedor.style.maxHeight = valor ? ALTO_COMO_PANTALLA : ALTO_COMO_CAJON
+      }
+      // El rótulo del ✕ deja de mentir a quien no ve la pantalla: en modo pantalla
+      // ese botón se sale del diagnóstico, no cierra un cajón.
+      if (control._botonCerrar) {
+        control._botonCerrar.setAttribute(
+          'aria-label',
+          valor ? 'Salir del diagnóstico' : 'Cerrar el diagnóstico',
+        )
+      }
+      return control._comoPantalla
+    },
+
+    /**
+     * Avisa de que han pulsado el ✕ **estando en modo pantalla**, o sea de que
+     * quieren SALIRSE del diagnóstico. En modo cajón este canal no dispara nunca:
+     * allí el ✕ cierra, que es lo que dice, y quien quiera enterarse tiene
+     * {@link alCerrar}.
+     *
+     * @param {Function} fn
+     * @returns {() => void}  Baja.
+     */
+    alSalir(fn) {
+      if (typeof fn !== 'function') {
+        throw new TypeError(`alSalir: 'fn' debe ser una función; recibido ${typeof fn}.`)
+      }
+      control._oyentes.salir.add(fn)
+      return () => control._oyentes.salir.delete(fn)
+    },
+
+    /**
      * La superficie registral tecleada, o `null` si el campo está vacío o no es un
      * número. **`null` y no 0**: un campo vacío significa «no consta», y un 0 diría
      * que la escritura declara cero metros.
@@ -1578,6 +1764,7 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       control._oyentes.descargar.clear()
       control._oyentes.preparar.clear()
       control._oyentes.puerta.clear()
+      control._oyentes.salir.clear()
       control.remove()
     },
   }

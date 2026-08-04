@@ -26,6 +26,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ETIQUETA } from '../../diagnostico/margen.js'
 import {
+  ALTO_COMO_CAJON,
+  ALTO_COMO_PANTALLA,
   CLASE,
   MOTIVO_INFORME_SIN_DIAGNOSTICO,
   SELECTOR,
@@ -1145,19 +1147,50 @@ describe('viewer/cajon-diagnostico.js · «Preparar informe (PDF)» (F09)', () =
   // ESTRUCTURA que lo garantiza — que es lo que se rompería si alguien deshace el
   // arreglo sin querer.
   describe('viewer/cajon-diagnostico.js · la puerta se pega abajo (T9, corregido 2026-08-04)', () => {
-    it('es hija DIRECTA del contenedor que scrollea, no del pie', () => {
+    // ⚠️ ESTA PRUEBA CAMBIÓ DE FORMA EL 2026-08-05 (rebanada 4) Y NO DE FONDO.
+    // Hasta entonces exigía que la puerta fuera hija DIRECTA del contenedor que
+    // scrollea, porque era el único elemento anclado. La rebanada 4 midió que los
+    // otros tres —los dos botones del informe y el renglón de estado— sufrían el
+    // MISMO defecto (207,53 px, 248,38 px y 164,69 px por debajo del borde), así
+    // que el anclaje pasó a ser de todo el grupo. Lo que hay que garantizar sigue
+    // siendo lo mismo: **entre la puerta y el elemento que scrollea hay un bloque
+    // `sticky` pegado abajo, y ese bloque es lo último del cajón**. Escrito así, la
+    // prueba habría pasado ANTES del cambio y pasa DESPUÉS: lo que no pasa es el
+    // defecto que las dos versiones vigilan.
+    it('cuelga de un bloque ANCLADO que es lo último del contenedor que scrollea', () => {
       const { raiz } = conCajon()
       const puerta = nodo(raiz, SELECTOR.PUERTA)
-      // Dentro del `<footer>`, `position: sticky` se pegaría dentro del bloque
-      // contenedor del pie —que vive al final del contenido—, o sea nunca.
+
+      // El que scrollea se busca SUBIENDO desde la puerta, no se supone.
+      let contenedor = null
+      for (let el = puerta.parentElement; el !== null && contenedor === null; el = el.parentElement) {
+        if (el.style?.overflowY === 'auto') contenedor = el
+      }
+      expect(contenedor, 'entre la puerta y la raíz nadie scrollea').not.toBe(null)
+      expect(
+        contenedor.classList.contains(CLASE.CONTENEDOR),
+        'el que scrollea tiene que ser el contenedor del cajón',
+      ).toBe(true)
+      expect(contenedor.style.maxHeight, 'y el que tiene tope de alto').not.toBe('')
+
+      // El ancla: la puerta o alguno de sus ancestros por debajo del que scrollea.
+      let ancla = null
+      for (let el = puerta; el !== null && el !== contenedor; el = el.parentElement) {
+        if (el.style.position === 'sticky' && el.style.bottom === '0px') ancla = el
+      }
+      expect(ancla, 'nada entre la puerta y el scroller está pegado abajo').not.toBe(null)
+
+      // Y ese bloque es lo ÚLTIMO: si algo se cuela detrás, el `sticky` se despega
+      // en cuanto ese algo asoma, que es exactamente cómo nació el defecto.
+      const ultimoDirecto = contenedor.lastElementChild
+      expect(
+        ultimoDirecto === ancla || ultimoDirecto.contains(ancla),
+        'el bloque anclado tiene que ser lo último del cajón',
+      ).toBe(true)
+
+      // La decisión de T9 sigue viva: la puerta no se mezcla con los entregables.
       expect(puerta.closest('footer')).toBe(null)
-      const padre = puerta.parentElement
-      expect(padre.style.overflowY, 'el padre de la puerta tiene que ser el que scrollea').toBe(
-        'auto',
-      )
-      expect(padre.style.maxHeight, 'y el que tiene tope de alto').not.toBe('')
-      // Y la ÚLTIMA: la decisión de T9 (no se mezcla con los entregables) sigue viva.
-      expect(padre.lastElementChild).toBe(puerta)
+      expect(puerta.parentElement.lastElementChild).toBe(puerta)
     })
 
     it('declara `sticky` y `bottom: 0`, que es lo que la mantiene a la vista', () => {
@@ -1336,4 +1369,168 @@ describe('viewer/cajon-diagnostico · los botones del informe no fijan la tipogr
       }
     })
   }
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Rework de UI · rebanada 4 · ¿ESTO ES UN CAJÓN O ES LA PANTALLA?
+//
+// ⛔ EL DEFECTO, MEDIDO EN CHROME EL 2026-08-05 a 1280×720:
+//
+//   · llegar a Diagnóstico por el peldaño del rail dejaba la pantalla VACÍA — el
+//     cajón se abría y este mismo guardián de clic-fuera lo cerraba en el mismo
+//     gesto, porque el clic del rail no es el evento de apertura;
+//   · UN clic en el mapa cerraba el diagnóstico, y mirar el mapa es exactamente
+//     lo que se hace en esa pantalla;
+//   · una vez cerrado, el peldaño del rail NO lo devolvía (navegar al paso en el
+//     que ya estás no publica nada), así que el rail seguía marcando
+//     «Diagnóstico», el `<h1>` seguía diciendo «Diagnóstico de encaje» y no había
+//     diagnóstico en ninguna parte.
+//
+// Aquí se prueba el INTERRUPTOR. Que el aplicador lo conmute donde toca es de
+// `test/app/contraste.test.js`, y que en un navegador de verdad se note, del
+// guion 14.
+// ═══════════════════════════════════════════════════════════════════════════════
+describe('viewer/cajon-diagnostico.js · `comoPantalla` (rebanada 4)', () => {
+  it('nace en `false`: un visor montado a pelo es EXACTAMENTE el cajón de F07', () => {
+    const { cajon } = conCajon()
+    expect(cajon.comoPantalla()).toBe(false)
+  })
+
+  it('⛔ como PANTALLA, un clic fuera ya no lo cierra; como cajón, sí', () => {
+    const { cajon } = conCajon()
+    cajon.abrir()
+    cajon.comoPantalla(true)
+
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(cajon.abierto(), 'un clic en el mapa NO puede borrar la pantalla').toBe(true)
+
+    // ANTI-VACUIDAD: el mismo gesto, con el interruptor al revés, SÍ cierra. Sin
+    // esto la prueba pasaría igual aunque el clic no llegara a ningún guardián.
+    cajon.comoPantalla(false)
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(cajon.abierto(), 'siendo cajón tiene que seguir descartándose').toBe(false)
+  })
+
+  it('⛔ como PANTALLA, Escape tampoco lo cierra; como cajón, sí', () => {
+    const { cajon } = conCajon()
+    cajon.abrir()
+    cajon.comoPantalla(true)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(cajon.abierto()).toBe(true)
+
+    cajon.comoPantalla(false)
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(cajon.abierto()).toBe(false)
+  })
+
+  it('⭐ como PANTALLA el cerrar NO cierra: avisa de que quieren salir', () => {
+    const { cajon, raiz } = conCajon()
+    const salidas = []
+    const cierres = []
+    cajon.alSalir(() => salidas.push('x'))
+    cajon.alCerrar(() => cierres.push('x'))
+    cajon.abrir()
+    cajon.comoPantalla(true)
+
+    nodo(raiz, SELECTOR.CERRAR).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(salidas).toHaveLength(1)
+    expect(cajon.abierto(), 'la vista no se cierra sola: quien decide es la navegación').toBe(true)
+    expect(cierres, 'y no dispara alCerrar, que significa otra cosa').toHaveLength(0)
+  })
+
+  it('…y como CAJÓN el cerrar cierra y no avisa de ninguna salida', () => {
+    const { cajon, raiz } = conCajon()
+    const salidas = []
+    cajon.alSalir(() => salidas.push('x'))
+    cajon.abrir()
+
+    nodo(raiz, SELECTOR.CERRAR).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(cajon.abierto()).toBe(false)
+    expect(salidas).toHaveLength(0)
+  })
+
+  it('⛔ como PANTALLA sube el tope de alto: 42,77 % del diagnóstico nacía escondido', () => {
+    // Medido a 1280×720: contenido 650 px en un cajón de 374,39 → 278 px bajo el
+    // pliegue, con «Preparar informe (PDF)» a 207,53 px por debajo del borde.
+    const { cajon, raiz } = conCajon()
+    expect(raiz.style.maxHeight).toBe(ALTO_COMO_CAJON)
+
+    cajon.comoPantalla(true)
+    expect(raiz.style.maxHeight).toBe(ALTO_COMO_PANTALLA)
+    expect(ALTO_COMO_PANTALLA).not.toBe(ALTO_COMO_CAJON)
+
+    cajon.comoPantalla(false)
+    expect(raiz.style.maxHeight).toBe(ALTO_COMO_CAJON)
+  })
+
+  it('el rótulo del botón de cerrar deja de mentir a quien no ve la pantalla', () => {
+    const { cajon, raiz } = conCajon()
+    const cerrar = nodo(raiz, SELECTOR.CERRAR)
+    expect(cerrar.getAttribute('aria-label')).toBe('Cerrar el diagnóstico')
+    cajon.comoPantalla(true)
+    expect(cerrar.getAttribute('aria-label')).toBe('Salir del diagnóstico')
+    cajon.comoPantalla(false)
+    expect(cerrar.getAttribute('aria-label')).toBe('Cerrar el diagnóstico')
+  })
+
+  it('sin argumento LEE, y con algo que no es booleano LANZA', () => {
+    const { cajon } = conCajon()
+    expect(cajon.comoPantalla()).toBe(false)
+    expect(cajon.comoPantalla(true)).toBe(true)
+    expect(cajon.comoPantalla()).toBe(true)
+    expect(() => cajon.comoPantalla('si')).toThrow(TypeError)
+    expect(() => cajon.comoPantalla(1)).toThrow(TypeError)
+    // Y el valor no se ha movido por el intento fallido.
+    expect(cajon.comoPantalla()).toBe(true)
+  })
+
+  it('alSalir devuelve su baja, y destruir limpia el canal', () => {
+    const { cajon, raiz } = conCajon()
+    const vistos = []
+    const baja = cajon.alSalir(() => vistos.push('x'))
+    cajon.abrir()
+    cajon.comoPantalla(true)
+    const cerrar = nodo(raiz, SELECTOR.CERRAR)
+
+    cerrar.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(vistos).toHaveLength(1)
+
+    baja()
+    cerrar.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(vistos, 'la baja tiene que callar el canal').toHaveLength(1)
+
+    expect(() => cajon.alSalir('no soy función')).toThrow(TypeError)
+  })
+
+  // ── ⛔ EL BLOQUE ANCLADO: lo que HABLA y lo que se PULSA no puede esconderse ──
+  // Los tres nodos de esta prueba estaban medidos por debajo del borde visible del
+  // cajón recién abierto: 207,53 px el primario del informe, 248,38 px el
+  // secundario y 164,69 px el renglón de estado (role="status", o sea el canal por
+  // el que este cajón cumple la regla de oro 1). jsdom no puede medir eso, así que
+  // se afirma la ESTRUCTURA que lo impide.
+  it('⭐ los dos botones del informe y el renglón de estado van DENTRO del bloque anclado', () => {
+    const { raiz } = conCajon()
+    const puerta = nodo(raiz, SELECTOR.PUERTA)
+
+    // El ancla se busca desde la puerta, que ya tiene su propio guardián: así los
+    // dos hablan del MISMO bloque y no de dos cosas que se llaman igual.
+    let ancla = null
+    for (let el = puerta; el !== null && el !== raiz; el = el.parentElement) {
+      if (el.style.position === 'sticky' && el.style.bottom === '0px') ancla = el
+    }
+    expect(ancla, 'no hay bloque anclado del que colgar lo accionable').not.toBe(null)
+
+    for (const sel of [SELECTOR.PREPARAR, SELECTOR.DESCARGAR, SELECTOR.ESTADO]) {
+      expect(ancla.contains(nodo(raiz, sel)), 'se queda fuera del bloque anclado: ' + sel).toBe(
+        true,
+      )
+    }
+    // Y el bloque lleva fondo opaco: un sticky transparente deja ver el texto que
+    // scrollea por detrás, y lo vuelve ilegible justo cuando más falta hace.
+    expect(ancla.style.background).not.toBe('')
+    expect(ancla.style.background).not.toBe('transparent')
+  })
 })

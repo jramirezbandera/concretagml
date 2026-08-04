@@ -436,3 +436,175 @@ describe('T9 · 4 · la procedencia y la puerta, cableadas', () => {
     c.destruir()
   })
 })
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Rework de UI · rebanada 4 · EL CAJÓN DE DIAGNÓSTICO ES LA PANTALLA
+//
+// ⛔ EL DEFECTO QUE ESTAS PRUEBAS CIERRAN, MEDIDO EN CHROME EL 2026-08-05:
+// llegar a Diagnóstico por el peldaño del rail dejaba la pantalla VACÍA. El cajón
+// se abría y su propio guardián de clic-fuera lo cerraba en el mismo gesto,
+// porque el clic del rail no es el evento de apertura —la navegación no lleva
+// eventos de DOM, y no debe—. Sin error, sin aviso y sin forma de recuperarlo
+// desde el rail: navegar al paso en el que ya estás no publica nada.
+//
+// La corrección tiene DOS mitades y las dos se prueban aquí, porque las dos son
+// del cable: QUÉ se le dice al cajón, y CUÁNDO.
+// ───────────────────────────────────────────────────────────────────────────────
+describe('app/contraste.js · el cajón de diagnóstico es la PANTALLA (rebanada 4)', () => {
+  it('declara pantalla al entrar en Diagnóstico y cajón al salir', () => {
+    const a = accionesConTextos()
+    const fijar = vi.fn()
+    const nav = navegacionCompleta(PASO.VALIDACION)
+    const c = cablearContraste({
+      navegacion: nav,
+      ...a,
+      fijarDiagnosticoComoPantalla: fijar,
+    })
+
+    // El arranque ya lo declara: aterrizar por hash en Diagnóstico no pasa por
+    // ninguna transición, y sin esto el primer clic en el mapa borraría la pantalla.
+    expect(fijar).toHaveBeenLastCalledWith(false)
+
+    nav.navegarAPaso(PASO.DIAGNOSTICO)
+    expect(fijar).toHaveBeenLastCalledWith(true)
+
+    nav.navegarAPaso(PASO.VALIDACION)
+    expect(fijar).toHaveBeenLastCalledWith(false)
+    c.destruir()
+  })
+
+  it('⛔ lo declara ANTES de abrirlo, que es lo único que evita el defecto', () => {
+    // El orden es la corrección entera. Si se abriera primero, el cajón quedaría
+    // descartable exactamente durante el gesto que lo abrió —el clic del rail, que
+    // sigue burbujeando hacia el `document`— y se cerraría solo.
+    const orden = []
+    const nav = navegacionCompleta(PASO.VALIDACION)
+    const c = cablearContraste({
+      navegacion: nav,
+      declararProcedencia: vi.fn(),
+      mostrarPuerta: vi.fn(),
+      cerrarDiagnostico: () => orden.push('cerrar'),
+      cerrarComprobacion: vi.fn(),
+      abrirDiagnostico: () => orden.push('abrir'),
+      fijarDiagnosticoComoPantalla: (v) => orden.push(`pantalla:${v}`),
+    })
+    orden.length = 0
+
+    nav.navegarAPaso(PASO.DIAGNOSTICO)
+
+    expect(orden).toEqual(['pantalla:true', 'abrir'])
+    expect(orden.indexOf('pantalla:true')).toBeLessThan(orden.indexOf('abrir'))
+    c.destruir()
+  })
+
+  it('el cajón de COMPROBACIÓN se queda como estaba: Entrada no declara pantalla', () => {
+    // No es una omisión: aquél SÍ es un cajón —la respuesta pasajera a soltar un
+    // `.gml` en Entrada— y descartarlo tocando fuera es lo correcto.
+    const a = accionesConTextos()
+    const fijar = vi.fn()
+    const nav = navegacionCompleta(PASO.DIAGNOSTICO)
+    const c = cablearContraste({
+      navegacion: nav,
+      ...a,
+      fijarDiagnosticoComoPantalla: fijar,
+    })
+    expect(fijar).toHaveBeenLastCalledWith(true)
+
+    nav.navegarAPaso(PASO.ENTRADA)
+
+    expect(cajonDe(PASO.ENTRADA)).toBe(CAJON.COMPROBACION)
+    expect(fijar).toHaveBeenLastCalledWith(false)
+    c.destruir()
+  })
+
+  it('el ✕ en modo pantalla SALE a Validación en vez de dejar la pantalla vacía', () => {
+    let alSalir = null
+    const a = accionesConTextos()
+    const nav = navegacionCompleta(PASO.DIAGNOSTICO)
+    const c = cablearContraste({
+      navegacion: nav,
+      ...a,
+      suscribirSalida: (fn) => {
+        alSalir = fn
+        return () => {
+          alSalir = null
+        }
+      },
+    })
+    expect(nav.get().paso).toBe(PASO.DIAGNOSTICO)
+
+    alSalir()
+
+    expect(nav.get().paso).toBe(PASO.VALIDACION)
+    // Y el cajón se cierra por el camino de siempre, el de la transición.
+    expect(a.cerrarDiagnostico).toHaveBeenCalled()
+    c.destruir()
+  })
+
+  // ⚠️ AQUÍ HUBO UNA PRUEBA QUE PASABA POR EL MOTIVO EQUIVOCADO, Y SE ANOTA.
+  // Intentaba ejercitar el respaldo («si Validación no se sostiene, se sale a
+  // Entrada») quitándole los hechos a la navegación. Pasaba en verde, y la
+  // aserción anti-vacuidad destapó por qué: **quitar los hechos ya mueve el paso a
+  // Entrada por su cuenta**, así que el respaldo no llegaba a correr y la prueba
+  // afirmaba el trabajo de otro. La sustituye ésta, que dice la verdad: con la
+  // autoridad de verdad ese camino NO SE PUEDE andar, y lo que se prueba es
+  // exactamente el invariante que lo hace inalcanzable.
+  it('desde Diagnóstico, Validación SIEMPRE se sostiene: el respaldo es inalcanzable', () => {
+    // Se recorren todos los conjuntos de hechos con los que Diagnóstico se aguanta
+    // —sin escribir la lista: sale del modelo— y en todos tiene que poderse volver.
+    const combinaciones = [
+      { geometria: true, oficial: true, diagnostico: true },
+      { geometria: true, oficial: true, diagnostico: false },
+    ]
+    let probadas = 0
+    for (const hechos of combinaciones) {
+      const nav = crearNavegacion({
+        rama: RAMA.PARCELA,
+        paso: PASO.ENTRADA,
+        hechos: { [RAMA.PARCELA]: hechos },
+      })
+      if (!nav.navegarAPaso(PASO.DIAGNOSTICO).ok) continue
+      probadas += 1
+      expect(
+        nav.puedeIrA(PASO.VALIDACION).disponible,
+        `estando en Diagnóstico con ${JSON.stringify(hechos)} hay que poder volver a Validación`,
+      ).toBe(true)
+    }
+    // ANTI-VACUIDAD: si ninguna combinación llegara a Diagnóstico, el bucle no
+    // afirmaría nada y esta prueba sería un adorno.
+    expect(
+      probadas,
+      'ninguna combinación llegó a Diagnóstico: la prueba no medía nada',
+    ).toBeGreaterThan(0)
+  })
+
+  it('`destruir()` también se da de baja de la salida', () => {
+    let alSalir = null
+    let dadoDeBaja = false
+    const nav = navegacionCompleta(PASO.DIAGNOSTICO)
+    const c = cablearContraste({
+      navegacion: nav,
+      ...accionesConTextos(),
+      suscribirSalida: (fn) => {
+        alSalir = fn
+        return () => {
+          dadoDeBaja = true
+        }
+      },
+    })
+
+    c.destruir()
+    alSalir()
+
+    expect(dadoDeBaja).toBe(true)
+    expect(nav.get().paso).toBe(PASO.DIAGNOSTICO)
+  })
+
+  it('sin los dos cables nuevos no lanza: montar sin ellos es un montaje válido', () => {
+    // `viewer/` puede quedarse atrás y esto no puede reventar la aplicación entera.
+    const nav = navegacionCompleta(PASO.VALIDACION)
+    const c = cablearContraste({ navegacion: nav, ...accionesConTextos() })
+    expect(() => nav.navegarAPaso(PASO.DIAGNOSTICO)).not.toThrow()
+    c.destruir()
+  })
+})
