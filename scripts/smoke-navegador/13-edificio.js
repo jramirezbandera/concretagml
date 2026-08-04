@@ -187,8 +187,25 @@ const noCubierto = []
  */
 const SUELO_HOLGURA = 24
 
-/** Lo que mide la caja de vértices en la rama PARCELA desde F07. Referencia. */
-const CAJA_VERTICES_REFERENCIA = 267
+/**
+ * Lo que mide la caja de vértices en la rama PARCELA, a 1440×900 y con la lista
+ * de avisos vacía. Referencia.
+ *
+ * ── ⛔ ESTE NÚMERO CAMBIÓ EL 2026-08-04, Y ES LA ÚNICA VEZ EN OCHO FASES ────
+ * Valía **267** desde F07, y F08, F09, F10 y F11 se esforzaron en no moverlo:
+ * cada una metió su interfaz en otro sitio (un cajón sobre el mapa, un modal, la
+ * fila del rótulo) precisamente para no tocarlo. Era el invariante de la casa.
+ *
+ * **T6 del rework de UI lo subió a 386** (385,67 px exactos), y no optimizando
+ * nada: sacando el bloque de Entrada de la pantalla de Validación, donde llevaba
+ * desde F05 quitándole sitio a lo que se está validando. Es un **+44 %**, y es la
+ * mejor cifra que tiene el rework para justificarse.
+ *
+ * Se sube la referencia en vez de bajarla porque el invariante sigue siéndolo:
+ * lo que se vigila es que nadie se lo coma otra vez. Quien vea este guion en rojo
+ * por esta línea, que mire primero el §20 del GUION antes de tocar nada.
+ */
+const CAJA_VERTICES_REFERENCIA = 386
 
 /** El violeta claro de la huella (`viewer/partes.js#COLOR_HUELLA`), en `rgb()`. */
 const COLOR_HUELLA_RGB = 'rgb(167, 139, 250)'
@@ -1172,7 +1189,17 @@ if (clasica.file === null) {
   const redDespues = peticiones()
   dxfEnParcela.avisosAntes = avisosAntes
   dxfEnParcela.avisosDespues = tarjetasDeAvisos()
-  dxfEnParcela.textoDelAviso = textosDeAvisos().slice(-1)[0] ?? null
+  // ⛔ NO vale `slice(-1)[0]`, y costó un rojo el 2026-08-04. Desde el rework de
+  // UI hay DOS clases de aviso: los del dominio («ese dibujo entra como partes de
+  // un edificio») y los de la AUTORIDAD DE NAVEGACIÓN («ya no se puede seguir en
+  // Validación… te dejo en Entrada»), y el segundo puede llegar detrás del
+  // primero. Leer «la última tarjeta» daba por respuesta el mensaje de navegación
+  // y acusaba al de dominio de no decir por dónde sí entra — cuando lo dice, y se
+  // comprobó soltando el mismo fichero en una página limpia.
+  //
+  // Se busca la tarjeta que habla DEL DIBUJO, no la que llegó al final.
+  dxfEnParcela.textoDelAviso =
+    textosDeAvisos().find((t) => /dibujo|\.dxf|edificio/i.test(t)) ?? textosDeAvisos().slice(-1)[0] ?? null
   dxfEnParcela.diceLaViaQueSiExiste =
     dxfEnParcela.textoDelAviso === null ? null : /rama Edificio/i.test(dxfEnParcela.textoDelAviso)
   dxfEnParcela.filasAntes = filasAntes
@@ -2132,7 +2159,10 @@ if (invariante.clavado === false && invariante.avisosQueEsteGuionHaProvocado > 0
       `camino han entrado ${invariante.avisosQueEsteGuionHaProvocado} tarjeta(s) de aviso que este ` +
       'guion provoca a propósito (~52 px cada una). La pérdida se ATRIBUYE a los avisos, no a la ' +
       'conmutación: para medir el invariante limpio, `$B reload` y mira `arranque` contra la ' +
-      'referencia de 267 px.',
+      // Deriva de la constante: escrito a mano decía «267» y se quedó viejo el
+      // 2026-08-04 sin que nadie lo viera, tres líneas debajo del sitio donde el
+      // número SÍ se actualizó. Dos copias de una cifra divergen siempre.
+      `referencia de ${CAJA_VERTICES_REFERENCIA} px.`,
   )
 }
 if (invariante.cabeceraClavada === false) {

@@ -31,10 +31,10 @@ para que el resultado no dependa de interpretar prosa. Catorce son de aceptació
 | `07-catastro-vivo.js` | F05 · T5C | **contra el servicio REAL**: CORS, IndexedDB de verdad y el recorrido entero (traer parcela · 2.ª consulta sin red · deducir la referencia) | `ok:true` |
 | `08-edicion.js` | F06 · 1 a 5 | la edición con `L.Draggable` real: snap a vértice y a lindero, `Alt`, cotas contra el zoom, offset, insertar/eliminar, undo/redo y su inhibición | `ok:true` |
 | `09-diagnostico.js` | F07 · 1 a 4 | el diagnóstico con SVG y layout reales: la diferencia sombreada por `fill-rule: evenodd`, el cajón que flota sin quitarle NI UN PÍXEL a la caja de vértices al abrirse, la banda del margen que conserva sus metros con el zoom y el tiempo del recálculo completo | `ok:true` |
-| `10-comprobar-gml.js` | F08 · 1 a 4 · **+ los tres arreglos del check visual** | **soltar un fichero de verdad** de punta a punta (bytes reales, velo con `opacity` calculada, `File.arrayBuffer()`), el cajón que no tapa ninguno de los cinco controles del mapa, los dos cajones que no coinciden, el informe que baja con BYTES, el invariante de los ~267 px, la tipografía real de los botones de los dos cajones y —desde el 2026-08-02— **el REENCUADRE** (viaja con otra parcela, no se mueve al editar), **las COLINDANTES dibujadas** y **el CAMPO de la referencia** | `ok:true` — ver §16 |
+| `10-comprobar-gml.js` | F08 · 1 a 4 · **+ los tres arreglos del check visual** | **soltar un fichero de verdad** de punta a punta (bytes reales, velo con `opacity` calculada, `File.arrayBuffer()`), el cajón que no tapa ninguno de los cinco controles del mapa, los dos cajones que no coinciden, el informe que baja con BYTES, el invariante de los ~267 px, la tipografía real de los botones de los dos cajones y —desde el 2026-08-02— **el REENCUADRE** (viaja con otra parcela, no se mueve al editar), **las COLINDANTES dibujadas** y **el CAMPO de la referencia** | ⚠️ **`ok:false` desde el 2026-08-04 y PENDIENTE DE REVISIÓN: conduce el flujo anterior al rework, no hay defecto de producto detrás** — ver §16 |
 | `11-informe-pdf.js` | F09 · **1** a 5 | ⭐ **el CRITERIO 1, que solo se puede medir aquí**: `toDataURL` sobre un lienzo con una tesela REAL del WMS, **con control negativo** (sin `crossOrigin` tiene que lanzar); el PDF que baja con BYTES de verdad (`%PDF`, páginas declaradas, el plano `/DCTDecode` dentro); que componer **no cierre nada por debajo** (tercera aparición del mismo defecto); el `<dialog>` como modal DE VERDAD (capa superior, fondo inerte, `Escape`), el encaje del modal en la ventana, el invariante de la caja de vértices y la tipografía de los cuatro botones nuevos | `ok:true` — ver §17 |
 | `12-expedientes.js` | F10 · 1 a 6 | ⭐ **que los bytes están en una base de VERDAD** (la suite entera de F10 corre sobre `fake-indexeddb`, que no es una base de datos): supervivencia a la recarga contrastada contra `performance.timeOrigin`, segunda conexión a IndexedDB, `persist()`/`estimate()` reales, las tres exportaciones con sus BYTES, el `<dialog>` como modal y el invariante de los 267 px | `ok:true` — ver §18 |
-| `13-edificio.js` | F11 · 1 a 4 | ⭐ **el guardián de ANCHO del conmutador, que solo existe aquí** (sustituye al `flex-wrap: nowrap` que el plan pedía por error); **M10 ida y vuelta en un navegador real** —mismo nodo, mismo valor, oyentes vivos—; el invariante de los 267 px y las tres cifras de M8; que las huellas del DXF **se ven y ENCIMA de la parcela** (orden real de los panes, no solo que existan los `<path>`); soltar un `.dxf` de verdad en las DOS ramas, con su diálogo de reparto por capas; la ficha del pie que cambia de cara; y ⭐ **el reparto de altura del panel, en vacío y con datos, con el recorte a CERO EXACTO y el déficit en píxeles cuando no llega** | ⛔ **`ok:false`: encontró DOS defectos reales; uno cerrado y el otro a medias** — ver §19 |
+| `13-edificio.js` | F11 · 1 a 4 | ⭐ **el guardián de ANCHO del conmutador, que solo existe aquí** (sustituye al `flex-wrap: nowrap` que el plan pedía por error); **M10 ida y vuelta en un navegador real** —mismo nodo, mismo valor, oyentes vivos—; el invariante de los 267 px y las tres cifras de M8; que las huellas del DXF **se ven y ENCIMA de la parcela** (orden real de los panes, no solo que existan los `<path>`); soltar un `.dxf` de verdad en las DOS ramas, con su diálogo de reparto por capas; la ficha del pie que cambia de cara; y ⭐ **el reparto de altura del panel, en vacío y con datos, con el recorte a CERO EXACTO y el déficit en píxeles cuando no llega** | ✅ **`ok:true` desde el 2026-08-04**: los dos defectos de F11 cerrados, el segundo **por el rework** — ver §19 |
 | `14-shell.js` | Rework · 1 a 4 | la cáscara de tres columnas y su coste en píxeles, en **las DOS pasadas de D5** (1280×720 y 1440×900): ancho del rail, desborde del panel, el invariante de `#tabla-vertices`, cuántas tarjetas de aviso caben enteras y cuánto queda escondido tras el pliegue; **se detecta solo** en cuál de los dos mundos está (`LINEA_BASE` sin rail / `SHELL` con él) | `ok:true` en las dos — ver §20 |
 | `15-contraste.js` | Rework · T9 | ⭐ **la RUTA CRÍTICA 2 entera** (soltar el GML de otro → contrastarlo → cruzar la puerta), que hasta T9 no se podía andar; y sobre todo **que la puerta de D4 SE VE**: dentro del cajón, dentro de la ventana y con `elementFromPoint` devolviéndola —las tres patas, porque con una sola el defecto salía verde—; más la procedencia que cambia al cruzar y el invariante de la caja de vértices | ⛔ **encontró un defecto real el 2026-08-04, ya corregido; hoy `ok:true` en las dos** — ver §22 |
 
@@ -3726,3 +3726,98 @@ es lo que distingue un guardián de una alarma.
 - **Que el texto de procedencia se entienda.** Se comprueba que dice de quién es
   la geometría y que cambia al cruzar; que un colegiado lo lea sin releerlo, no.
 - **Si el diagnóstico es correcto.** Eso es del guion 09 y de la suite.
+
+---
+
+## 23. La pasada de regresión del rework de UI (2026-08-04)
+
+Los cuatro guiones que ya existían se relanzaron después del rework, para ver qué
+había roto. El resultado, y **la conclusión importante: ningún defecto de
+producto**.
+
+| Guion | Veredicto | Qué pasa |
+|---|---|---|
+| `09-diagnostico.js` | ✅ `ok:true` | Sin tocar. Red dentro del régimen (1 GetParcel + 1 GetNeighbour). |
+| `10-comprobar-gml.js` | ⚠️ **`ok:false`** | **Conduce el flujo anterior a T9.** Pendiente de revisión — abajo. |
+| `12-expedientes.js` | ✅ `ok:true` | Sin tocar. Queda su advertencia de foco, que es anterior al rework. |
+| `13-edificio.js` | ✅ `ok:true` | Rojo por dos cosas suyas, las dos corregidas — abajo. |
+| `14-shell.js` | ✅ `ok:true` ×2 | Las dos pasadas de D5, cifras clavadas al registro de T5–T6. |
+| `15-contraste.js` | ✅ `ok:true` ×2 | Nuevo. Encontró y cerró el defecto de la puerta (§22). |
+
+⚠️ **Y una consecuencia práctica del rework que afecta a TODOS los runbooks de
+arriba:** la aplicación arranca en **Entrada**, donde `#tabla-vertices` está
+oculta, así que el `$B wait ".gml-tabla-vertices"` de las recetas **se queda
+colgado 15 s y falla**. Lánzalos sobre `#/parcela/validacion`, o espera a
+`.gml-rail`, que existe siempre.
+
+### `13-edificio.js` — dos cosas suyas, las dos corregidas
+
+**1. La referencia de la caja de vértices pasó de 267 a 386 px.** Valía 267 desde
+F07, y F08, F09, F10 y F11 se esforzaron en no moverla: cada una metió su interfaz
+en otro sitio precisamente para no tocarla. **T6 la subió a 385,67 px (+44 %)**
+sacando el bloque de Entrada de la pantalla de Validación. Se sube la referencia,
+no se baja el listón: lo que se vigila sigue siendo que nadie se la coma otra vez.
+
+**2. Leía «la última tarjeta de aviso» y el rework introdujo una segunda clase de
+mensaje.** Ahora hay avisos **de dominio** («ese dibujo entra como partes de un
+edificio… cambia a la rama Edificio») y avisos **de la autoridad de navegación**
+(«ya no se puede seguir en Validación… te dejo en Entrada»), y el segundo puede
+llegar detrás del primero. `slice(-1)[0]` devolvía el de navegación y el guion
+acusaba al de dominio de no decir por dónde sí entra —cuando lo dice—. Comprobado
+soltando el mismo fichero en una página limpia: el mensaje de dominio está intacto
+y nombra la rama Edificio. Ahora se busca la tarjeta **que habla del dibujo**, no
+la que llegó al final.
+
+### ⭐ Y de paso: el defecto A de F11 está CERRADO, y lo cerró el rework
+
+El §19 dejaba abierto el defecto A —«las dos cajas encogibles del panel de
+Edificio, **18,33 px cortas**: con 7 partes cargadas no se ve ninguna fila
+entera»—. Medido hoy con las mismas 7 partes:
+
+| | F11 (2026-08-04, antes del rework) | Hoy |
+|---|---|---|
+| Alto de la lista de partes | **18,33 px cortos** | **107,28 px** |
+| Filas que se ven enteras | **0** | **4** |
+
+El **criterio 9** del plan del rework decía: «el defecto A de F11 llega a 0 por
+construcción **tras la rebanada de Edificio**». Se cumple **antes**, y sin haberla
+hecho: se lo llevaron por delante los +118 px que T6 le devolvió al panel al dejar
+de enseñar a la vez dos cosas que nunca se usan a la vez.
+
+### ⚠️ `10-comprobar-gml.js` — PENDIENTE DE REVISIÓN, y por qué no se ha parcheado
+
+Sale `ok:false` con tres problemas y dos plazos agotados. **Los cinco tienen una
+sola causa raíz**: T9 cambió dónde te deja soltar un fichero. Antes te quedabas en
+la pantalla única; ahora **traer un fichero es empezar otro expediente**, así que
+la aplicación vuelve a **Entrada** — y este guion, escrito para lo anterior, sigue
+midiendo el panel de Validación y pulsando un CTA que en Entrada no está.
+
+Lo que reporta, y lo que se midió para saber si había defecto detrás:
+
+| Lo que dice el guion | Lo que se midió | Veredicto |
+|---|---|---|
+| «"Abrir un GML…" no está en `.gml-rotulo-fila`» | La fila del rótulo **murió en T6**; el botón vive en la tercera vía de Entrada, y el guion 14 lo mide entero y visible | **superado, no roto** |
+| «Soltar le ha quitado altura a la caja de vértices (386 → 0)» | En Entrada la caja **no se enseña**: es otra pantalla, no una pérdida | **superado** |
+| «Los botones derivados no cuadran (colindantes apagado)» | Medido en los cuatro instantes del recorrido: **«Traer colindantes» está ENCENDIDO siempre** | **artefacto**: el guion llega ahí con la app en un estado que no pretendía |
+| Plazos agotados (cajón de diagnóstico, colindantes) | El CTA «Diagnosticar» del pie **sí abre el cajón** (guion 09, `ok:true`), y la ruta de comprobación entera funciona (guion 15, `ok:true` ×2) | **artefacto de la misma causa** |
+
+**No se ha parcheado a propósito.** Son 1.990 líneas escritas alrededor de un
+recorrido que ya no existe, y media docena de sus invariantes ya no se pueden
+medir porque **el cajón de comprobación y la caja de vértices ya no coexisten**:
+viven en pantallas distintas. Un parche que lo pusiera en verde lo pondría verde
+**por el motivo equivocado**, que en este repositorio es el peor resultado
+posible. Necesita una revisión propia, y lo que hay que replantear es esto:
+
+1. La **Decisión 5 de F08** («el botón en la fila del rótulo, para que cueste
+   0 px») está **disuelta**, no incumplida: ya no hay fila del rótulo y el botón
+   no compite por la altura de nada.
+2. El invariante «abrir el cajón no le quita altura a la caja de vértices» es hoy
+   **inmedible**, por la misma razón.
+3. Todo lo que el guion mide **después de soltar** —el reencuadre, las
+   colindantes dibujadas, el campo de la referencia, los bytes del informe— sigue
+   siendo válido y valioso; lo único que hay que rehacer es **cómo llega hasta
+   ahí**: por «Contrastar con el parcelario» del cajón, como hace el `15`.
+
+Mientras tanto, la cobertura no se ha perdido: el `09` cubre el cajón de
+diagnóstico y su red, el `15` cubre la ruta de comprobación entera con la puerta,
+y el `12` cubre la persistencia.
