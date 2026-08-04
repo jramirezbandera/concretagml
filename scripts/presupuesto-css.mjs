@@ -151,7 +151,7 @@ export const ASIENTOS = Object.freeze(
       nota: '⭐ CERO BYTES otra vez: la barra declara su pantalla desde JS y el interruptor de los cuatro gestos es lógica, no estilo.' },
     { hito: 'Rework rebanada 4', commit: '44b02ad', total: 61108, nuestro: 46013, rebanada: 'diagnostico',
       nota: '⭐ CERO BYTES por TERCERA vez seguida, y aquí es un hecho sobre dónde vive el cromo del cajón: viewer/cajon-diagnostico.js se viste con estilos EN LÍNEA porque no importa ninguna hoja (para ser legible en jsdom y en un mapa pelado), así que anclarle el pie y subirle el tope de alto no toca app.css. Lo demás —que no se descarte y que el ✕ salga— es lógica.' },
-    { hito: 'Rework rebanada 5', commit: '(sin commitear)', total: 61587, nuestro: 46492, rebanada: null,
+    { hito: 'Rework rebanada 5', commit: '3e9c8b0', total: 61587, nuestro: 46492, rebanada: null,
       nota:
         '⚠️ EL PRODUCTO DE LA QUINTA ESTÁ HECHO Y AQUÍ NO SE DECLARA CERRADA, A PROPÓSITO. Cerrarla ' +
         'hace exigible el techo del criterio 10 (42.064 B nuestros) y hoy sobran 4.428. Se midió si ' +
