@@ -69,6 +69,63 @@ Por eso la raíz que emitimos lleva como `gml:id` el **namespace INSPIRE** (`ES.
 
 ## `bu_building_9398516VK3799G.gml` y `bu_buildingpart_9398516VK3799G.gml`
 
-GML de **edificio** (Building / BuildingPart, namespaces draft de la JRC). Otro tema: su
-serializador es F13. Aquí sirven para dos cosas: clasificar el dialecto y dar la mitad
-anti-vacuidad del guardián de elementos proscritos (`gml:boundedBy` SÍ aparece en ellos).
+GML de **edificio** (Building / BuildingPart, namespaces draft de la JRC). ~~Otro tema:
+su serializador es F13. Aquí sirven para dos cosas: clasificar el dialecto y dar la mitad
+anti-vacuidad del guardián de elementos proscritos (`gml:boundedBy` SÍ aparece en
+ellos).~~
+
+⭐ **Actualizado el 2026-08-04: desde F11 tienen LECTOR.** Que su **serializador** sea F13
+sigue siendo cierto, pero ya no es lo único: `gml/parse-bu.js` los lee de verdad —era el
+estreno que llevaban esperando desde F00— y `edificio/entrada.js` traduce su vocabulario
+INSPIRE al del modelo. Sus tres usos de hoy:
+
+1. **Clasificar el dialecto** (`gml/_comun.js#clasificarDialecto` → `DIALECTO.BU`).
+2. **La mitad anti-vacuidad** del guardián de elementos proscritos: `gml:boundedBy` **sí**
+   aparece en ellos.
+3. **La verdad externa del lector de F11** y de las dos vías BU de `edificio/entrada.js`.
+
+**Lo que se midió sobre ellos al escribir el lector** (F11 · T0.2 y T1.2), y que corrige
+la lectura ingenua del dialecto:
+
+| | |
+|---|---|
+| Partes | **13**, con **0 interiores** cada una |
+| Plantas | **las trece traen las dos**, no solo `part10`: `↑[1,7,7,6,7,6,7,6,6,0,6,6,6]` · `↓[0,0,1,0,1,0,1,1,1,1,1,1,1]` |
+| `conditionOfConstruction` de las partes | **`xsi:nil` en las trece** ⇒ el estado sale del `Building` |
+| `heightBelowGround` | **9 de 13** (no es exclusivo de `part10`) |
+| Patches del `Building` | **DOS** `gml:PolygonPatch` (`count` 5 y 53) |
+| `numberOfFloorsAboveGround` del `Building` | **`xsi:nil`** ⇒ `null`, que **no es lo mismo que «ausente»** |
+
+⛔ **Y cuatro trampas que un lector escrito «a ojo» sobre estos ficheros no ve:**
+
+1. **Las plantas y los atributos semánticos viven en `bu-ext2d`, NO en `bu-core2d`**
+   (`numberOfFloorsAboveGround`, `numberOfFloorsBelowGround`, `heightBelowGround`,
+   `currentUse`, `numberOfBuildingUnits`, `numberOfDwellings`, `officialArea`). En
+   `bu-core2d` van `conditionOfConstruction`, `dateOfConstruction`, `inspireId`,
+   `externalReference` y las lifespan. Buscarlas donde no están devuelve **`null` en las
+   trece** y **`part10` parece normal**.
+2. **`count` de `gml:posList` incluye el punto de cierre.** Los `[5,11,16,…]` son anillos
+   **CERRADOS**; el modelo los guarda **abiertos** (regla de oro 4), así que el lector
+   devuelve `[4,10,15,…]` y el `Building` da `[4,52]`.
+3. ⛔ **`part10` contradice el convenio «solo partes con volumen sobre rasante»**: tiene
+   **0 plantas sobre rasante y 1 bajo**. Manda el dato (regla de oro 8): entra marcada,
+   no se descarta ni se calla.
+4. **La RC no está en las partes.** `bu-core2d:reference` solo existe en el `Building`;
+   para las partes sale del `refcat=` del `xlink:href` de `cadastralParcels`, y **cortar
+   el `localId` falla** en cuanto aparece un sufijo como `_PI.1`.
+
+⚠️ **Y lo que ESTOS DOS FICHEROS NO TRAEN, que es lo que más costó:** la parcela de
+referencia del proyecto **tiene una piscina** —`OtherConstruction`,
+`constructionNature = openAirPool`, `gml:id` con sufijo `_PI.1`— y **aquí no aparece**.
+Su geometría es **`gml:Polygon` DIRECTO** (`exterior/LinearRing/posList`), **no**
+`Surface/patches/PolygonPatch`, y el contenedor es **`bu-ext2d:geometry`**: un lector
+escrito solo contra estos dos fixtures **se la pierde entera, en silencio**. Salió al
+sondear el servicio real, y por eso la verdad externa del dialecto BU **no son solo estos
+dos ficheros**: son estos dos más los cinco de `../catastro/wfsbu-*`, que trae la piscina,
+la colección vacía y la página de error del 404.
+
+⚠️ **`bu_building_*.gml` a solas sale con 0 partes**, y es correcto: la huella del
+`Building` es la **envolvente INSPIRE** (unión de las partes) y guardarla como parte sería
+guardar la envolvente con otro nombre —lo que `SPEC.md` §23.3 prohíbe— **y contar su
+superficie dos veces**. El lector lo dice nombrando `GetBuildingPartByParcel`, que es de
+donde sale lo que falta.

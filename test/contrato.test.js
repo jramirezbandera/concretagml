@@ -647,6 +647,289 @@ describe('contrato F10 · `export/` sale por el barrel; el almacén y el diálog
   })
 })
 
+// ── Test-guardián del barrel raíz tras F11 (T3.1) ────────────────────────────
+// F11 estrena la SEGUNDA RAMA de la aplicación y con ella cinco módulos nuevos.
+// La frontera vuelve a caer por el medio de la feature, y esta vez con una vuelta
+// de tuerca que no tenía ninguna de las anteriores:
+//
+//   · `edificio/` ENTRA —tres módulos: `_comun.js`, `mutaciones.js` y
+//     `entrada.js`—, y entra por la razón de siempre: es puro. Entran cadenas,
+//     anillos en UTM y POJOs; salen POJOs y detecciones. Ni `document`, ni
+//     Leaflet, ni red, ni reloj.
+//   · `viewer/partes.js`, `services/catastro-edificio.js`, `app/rama.js` y
+//     `app/panel-edificio.js` NO.
+//
+// ⚠️ Y aquí está la vuelta de tuerca, MEDIDA el 2026-08-03: de esos cuatro, **solo
+// `viewer/partes.js` se autoprotege**. Importarlo bajo el proyecto `node` revienta
+// con `ReferenceError: window is not defined`, porque importa Leaflet. Los otros
+// TRES cargan sin lanzar: solo nombran `document` DENTRO de sus funciones y de
+// `viewer/` únicamente tocan `_comun.js`, que no importa Leaflet. O sea que
+// colarlos dejaría la suite EN VERDE y la aplicación rota, exactamente igual que
+// pasaba con `storage/` en F09.
+//
+// Contra eso hay ya una defensa y aquí se añade la que falta:
+//
+//   1. La que YA existe y basta para el barrel raíz: la mitad ESTÁTICA del bloque
+//      de F08 veta los cuatro DIRECTORIOS en bloque
+//      (`^\./(?:viewer|services|app|storage)\/`). Por eso este bloque NO añade
+//      ninguno de los cuatro ficheros a `VETADOS`: sería redundante, y una segunda
+//      lista de prohibiciones acaba discrepando de la primera. El precedente de
+//      `report/canvas.js` —que sí hubo que nombrar— no aplica: aquel está en una
+//      capa que SÍ sale por el barrel, y estos cuatro no.
+//   2. La que FALTABA, y es lo que este bloque aporta: esa regla estática lee el
+//      fuente de `index.js`, y `edificio/index.js` es un fichero nuevo de una capa
+//      que SÍ sale. Un `export { crearCapaPartes } from '../viewer/partes.js'`
+//      escrito ahí dentro no lo ve la regla por directorio —no está en `index.js`—
+//      y, para tres de los cuatro, tampoco lo vería la suite. Se cierra por los
+//      NOMBRES de sus cuatro fábricas, recorriendo todos los espacios, que es
+//      exactamente lo que F09 hizo con `componerPlano` y F10 con `crearExpedientes`.
+//
+// Momento de riesgo previsto: el día que `app/cableado-edificio.js` necesite a la
+// vez la capa pura y la capa que pinta, y alguien decida «sacarlas las dos por el
+// barrel, que ya está `entradaEdificio`». La vía correcta es la de siempre:
+// `app/` importa `viewer/partes.js` y `services/catastro-edificio.js`
+// DIRECTAMENTE, igual que `app/main.js` importa `viewer/index.js`.
+describe('contrato F11 · `edificio/` sale por el barrel; el visor, el servicio y el panel no', () => {
+  const RAIZ_REPO = fileURLToPath(new URL('..', import.meta.url))
+
+  /** El DXF REAL de Consulta Masiva: 7 anillos en «Construccion» + 1 en «Parcela». */
+  const DXF_EDIFICIO = readFileSync(
+    join(RAIZ_REPO, 'test/fixtures/parsers/edificio_consulta_masiva_3515508VF0831N.dxf'),
+    'latin1',
+  )
+
+  /**
+   * ¿Cae el punto DENTRO del anillo? Ray casting escrito aquí a propósito, y no
+   * el `booleanPointInPolygon` que `gml/anillos.js#puntoInterior` usa por dentro:
+   * afirmar una propiedad con la misma función que la produjo no afirma nada. El
+   * anillo del modelo va ABIERTO (regla de oro 4) y el bucle lo cierra al vuelo
+   * arrancando `j` en el último vértice.
+   *
+   * @param {[number, number]} punto  En UTM.
+   * @param {Array<[number, number]>} vertices  Anillo abierto, en UTM.
+   */
+  function puntoEnAnillo([x, y], vertices) {
+    let dentro = false
+    for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+      const [xi, yi] = vertices[i]
+      const [xj, yj] = vertices[j]
+      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) dentro = !dentro
+    }
+    return dentro
+  }
+
+  it('el barrel expone la capa de entrada de edificio, y NO pisa el espacio del modelo', () => {
+    // Desviación 8 del plan de F11: el espacio se llama `entradaEdificio` porque
+    // `edificio` ya es `model/edificio.js` desde F00. Se afirman las DOS mitades,
+    // porque lo que importa no es que exista el nombre nuevo sino que el viejo
+    // siga significando lo mismo: `edificio` es qué ES un Edificio y
+    // `entradaEdificio` es cómo se llega hasta él.
+    expect(typeof barrel.edificio.crearEdificio).toBe('function')
+    expect(Object.keys(barrel.edificio)).not.toContain('entradaDesdeTexto')
+    // Contrato D: las tres fábricas, y el punto del que se deduce la RC.
+    expect(typeof barrel.entradaEdificio.entradaDesdeTexto).toBe('function')
+    expect(typeof barrel.entradaEdificio.entradaDesdeGmlBu).toBe('function')
+    expect(typeof barrel.entradaEdificio.entradaDesdeWfsBu).toBe('function')
+    expect(typeof barrel.entradaEdificio.puntoDeReferencia).toBe('function')
+    // Las cuatro mutaciones puras.
+    for (const nombre of ['conModelo', 'conRefcat', 'conParteRenombrada', 'conAtributos']) {
+      expect(Object.keys(barrel.entradaEdificio), `falta la mutación '${nombre}'`).toContain(nombre)
+    }
+    // Y el vocabulario CERRADO con el que se leen sus resultados: sin él, la UI
+    // tendría que decidir mirando el TEXTO del mensaje (regla de oro 1).
+    expect(Object.keys(barrel.entradaEdificio.VIA)).toEqual([
+      'DXF',
+      'LIST',
+      'TXT',
+      'GML_EXISTENTE',
+      'WFS',
+    ])
+    // ⛔ MOTIVO_ENTRADA son CINCO y son de EDIFICIO. Los dos bloqueos que T1.1
+    // añadió a `parsers/importar.js` —`ANILLOS_EN_VARIAS_CAPAS` y
+    // `SUPERFICIE_NO_POSITIVA`— hablan del reparto «un exterior + N huecos», que
+    // es una regla de la rama PARCELA: en ésta cada anillo es su propio exterior.
+    // Que no estén aquí es lo que permite que el caso normal de la fase —un DXF
+    // de vivienda + porche + piscina, que viene por definición de varias capas—
+    // no salga bloqueado.
+    expect(Object.keys(barrel.entradaEdificio.MOTIVO_ENTRADA)).toEqual([
+      'SIN_GEOMETRIA',
+      'COORDENADAS_EN_GRADOS',
+      'HUSO_NO_RESUELTO',
+      'SIN_CONSTRUCCION',
+      'DIALECTO_NO_BU',
+    ])
+    expect(Object.keys(barrel.entradaEdificio.TIPO_EDIFICIO).length).toBeGreaterThan(4)
+    expect(typeof barrel.entradaEdificio.resumirDetecciones).toBe('function')
+    expect(barrel.entradaEdificio.nombreParteGenerico(0)).toBe('Parte 1')
+  })
+
+  it('y la cadena entera FUNCIONA sin DOM, encadenada sobre los DOS ficheros reales', () => {
+    // La mitad anti-vacuidad, que es la que de verdad protege: `typeof x ===
+    // 'function'` seguiría en verde con un módulo cuyo grafo de imports tocara
+    // `window` en la primera llamada, y un guardián que solo comprueba que las
+    // claves existen está a un import de volverse mentira. Aquí se recorren las
+    // DOS vías que estrena la fase —fichero de CAD y GML de la Sede— dentro del
+    // proyecto `node`, que corre sin `window`, sin `document` y sin `Blob`.
+    const e = barrel.entradaEdificio
+
+    // ── Vía DXF (la principal de la fase) ──────────────────────────────────
+    // Con `capa: 'Construccion'`: decisión 5 del plan («ofrecer, no imponer»).
+    // Sin elegir capa el mismo fichero da OCHO partes, porque la octava es el
+    // contorno de la parcela — y esa es justamente la diferencia que el diálogo
+    // de reparto existe para que la elija una persona y no un heurístico.
+    const dxf = e.entradaDesdeTexto(DXF_EDIFICIO, { capa: 'Construccion' })
+    expect(dxf.resumen.via).toBe(e.VIA.DXF)
+    expect(dxf.resumen.nPartes).toBe(7)
+    expect(dxf.resumen.nVertices).toEqual([24, 4, 4, 8, 6, 12, 4])
+    expect(dxf.resumen.capas).toEqual(Array(7).fill('Construccion'))
+    expect(dxf.resumen.bloqueos).toEqual([])
+    expect(dxf.resumen.construido).toBe(true)
+    expect(dxf.resumen.huso.srs).toBe('EPSG:25830')
+    expect(e.entradaDesdeTexto(DXF_EDIFICIO).resumen.nPartes).toBe(8)
+    // El nombre genérico y el origen los decide ESTA capa y nadie más.
+    expect(dxf.edificio.partes.map((p) => p.nombre)).toEqual([
+      'Parte 1',
+      'Parte 2',
+      'Parte 3',
+      'Parte 4',
+      'Parte 5',
+      'Parte 6',
+      'Parte 7',
+    ])
+    expect([...new Set(dxf.edificio.partes.map((p) => p.origen))]).toEqual(['DXF'])
+    // Y el punto del que se deduce la RC: `puntoInterior`, no el centroide. Se
+    // afirma que CAE dentro de alguna huella, que es la propiedad por la que
+    // existe —el centroide de una figura en L cae fuera y el Catastro contesta
+    // con la referencia de la vecina, en silencio (medido en F05/F06)—.
+    const punto = e.puntoDeReferencia(dxf.edificio)
+    expect(punto.every(Number.isFinite)).toBe(true)
+    const dentroDeAlguna = dxf.edificio.partes.some((p) =>
+      p.recinto === null ? false : puntoEnAnillo(punto, p.recinto.vertices),
+    )
+    expect(dentroDeAlguna, 'el punto de referencia cae FUERA de todas las huellas').toBe(true)
+
+    // ── Vía GML de edificio (el fichero que se baja de la Sede) ────────────
+    const xml = readFileSync(
+      join(RAIZ_REPO, 'test/fixtures/gml/bu_buildingpart_9398516VK3799G.gml'),
+      'utf8',
+    )
+    const bu = e.entradaDesdeGmlBu(xml, { modelo: 'COMPLETO' })
+    expect(bu.resumen.via).toBe(e.VIA.GML_EXISTENTE)
+    expect(bu.resumen.nPartes).toBe(13)
+    expect(bu.resumen.capas).toBe(null) // un GML no tiene capas, y no se le inventan
+    expect(bu.resumen.bloqueos).toEqual([])
+    expect(bu.edificio.refcat).toBe('9398516VK3799G')
+    // ⛔ Desviación 10 del plan: `part10` es una parte SOLO bajo rasante, contra
+    // el convenio de la ficha. Manda el dato (regla de oro 8) y se DICE. Y las
+    // plantas, que F11 declara `null` por alcance, se descartan diciéndolo
+    // también: las dos detecciones son la regla de oro 1 hecha comprobable.
+    expect(Object.keys(bu.resumen.detecciones.porTipo)).toContain('PARTE_BAJO_RASANTE')
+    expect(Object.keys(bu.resumen.detecciones.porTipo)).toContain('PLANTAS_DESCARTADAS')
+    // El recuento del resumen es el de la lista: una sola forma de contar.
+    expect(e.resumirDetecciones(bu.detecciones)).toEqual(bu.resumen.detecciones)
+
+    // ── Las mutaciones, sobre lo que acaba de salir ────────────────────────
+    // Devuelven `{edificio, detecciones}`, NO un Edificio pelado, y el POJO
+    // original se queda como estaba: es lo que hace que `structuredClone` sirva
+    // de historial (regla de oro 4).
+    const renombrada = e.conParteRenombrada(bu.edificio, 0, 'vivienda')
+    expect(renombrada.edificio.partes[0].nombre).toBe('vivienda')
+    expect(bu.edificio.partes[0].nombre).toBe('Parte 1')
+    expect(renombrada.edificio).not.toBe(bu.edificio)
+    // `conModelo` a SIMPLIFICADO BORRA los siete atributos semánticos, y lo dice
+    // ANTES de que nadie escriba el resultado en el store.
+    const simplificado = e.conModelo(renombrada.edificio, 'SIMPLIFICADO')
+    expect(simplificado.detecciones.map((d) => d.tipo)).toContain('MODELO_CAMBIADO')
+    expect('usoDominante' in simplificado.edificio).toBe(false)
+    expect('usoDominante' in renombrada.edificio).toBe(true)
+
+    // ── Y el fichero que NO es de edificio ─────────────────────────────────
+    // La lección de F08 entera: no se lanza por el contenido de un fichero
+    // ajeno. Un GML de parcela por la vía de edificio sale por `bloqueos`.
+    const cp = readFileSync(
+      join(RAIZ_REPO, 'test/fixtures/gml/cp_parcela_9398516VK3799G.gml'),
+      'utf8',
+    )
+    const noEsBu = e.entradaDesdeGmlBu(cp)
+    expect(noEsBu.resumen.bloqueos).toEqual([e.MOTIVO_ENTRADA.DIALECTO_NO_BU])
+    expect(noEsBu.edificio).toBe(null)
+  })
+
+  it('⚠️ el visor, el servicio y las dos vistas de F11 NO salen — y tres de ellos NO revientan', () => {
+    // Los cinco nombres, por su nombre, recorriendo TODOS los espacios. No es
+    // redundante con la mitad estática del bloque de F08: aquella lee el fuente de
+    // `index.js` y veta los cuatro directorios, pero `edificio/index.js` es un
+    // fichero nuevo de una capa que SÍ sale por el barrel, y un
+    // `export { crearCapaPartes } from '../viewer/partes.js'` escrito ahí dentro no
+    // lo vería. MEDIDO el 2026-08-03: de los cuatro módulos, solo `viewer/partes.js`
+    // revienta al importarlo bajo `node` (Leaflet exige `window`); los otros tres
+    // cargan sin lanzar. Sin esta prueba, colarlos dejaría la suite en VERDE.
+    const impuros = [
+      'crearCapaPartes', // viewer/partes.js — Leaflet
+      'crearClienteEdificio', // services/catastro-edificio.js — red
+      'cablearRama', // app/rama.js — document
+      'crearPanelEdificio', // app/panel-edificio.js — document
+      // Y la constante que más tentación da de sacar «porque la necesita la UI»:
+      // el vocabulario de la rama activa. La interfaz lo importa de `app/rama.js`
+      // DIRECTAMENTE, igual que `app/main.js` importa `viewer/index.js`.
+      'RAMA',
+    ]
+    for (const [espacio, contenido] of Object.entries(barrel)) {
+      for (const nombre of impuros) {
+        expect(
+          Object.keys(contenido),
+          `el espacio '${espacio}' expone '${nombre}': toca Leaflet, la red o el DOM, y el ` +
+            `barrel lo carga el proyecto Vitest 'node' — donde tres de estos cuatro módulos ` +
+            `se importan SIN LANZAR, así que nadie más lo notaría`,
+        ).not.toContain(nombre)
+      }
+    }
+    // Anti-vacuidad: las cinco EXISTEN donde tienen que existir. Sin esto, la
+    // prohibición seguiría verde el día que alguien las renombrara, y protegería
+    // unos nombres que ya no usa nadie.
+    const donde = {
+      'viewer/partes.js': ['crearCapaPartes'],
+      'services/catastro-edificio.js': ['crearClienteEdificio'],
+      'app/rama.js': ['cablearRama', 'RAMA'],
+      'app/panel-edificio.js': ['crearPanelEdificio'],
+    }
+    for (const [fichero, nombres] of Object.entries(donde)) {
+      const fuente = readFileSync(join(RAIZ_REPO, fichero), 'utf8')
+      for (const nombre of nombres) {
+        expect(
+          fuente,
+          `'${nombre}' ya no se exporta desde ${fichero}: la prohibición de arriba ha dejado ` +
+            `de proteger nada`,
+        ).toMatch(new RegExp(`export (?:const|function) ${nombre}\\b`))
+      }
+    }
+  })
+
+  it('la fábrica de detecciones y las tablas del mapeo INSPIRE tampoco salen', () => {
+    // Decisión 2 de `edificio/index.js`, y es el calco de por qué `export/index.js`
+    // deja fuera `crearDeteccionExport` y `report/index.js` `crearDocumentoPdf`:
+    // `crearDeteccionEdificio` es puro y podría salir sin romper nada. Está fuera
+    // porque el vocabulario de `TIPO_EDIFICIO` es para LEER lo que la capa ha
+    // detectado, y una interfaz que fabricara detecciones inventaría hallazgos que
+    // la capa no ha hecho, indistinguibles de los de verdad en la misma lista.
+    expect(Object.keys(barrel.entradaEdificio)).not.toContain('crearDeteccionEdificio')
+    // Y las dos tablas del mapeo INSPIRE → modelo: describen CÓMO se traduce, no
+    // cómo se lee el resultado. El vocabulario que cruza esta frontera es el del
+    // MODELO, y ése ya sale por el espacio `edificio`.
+    expect(Object.keys(barrel.entradaEdificio)).not.toContain('CONDICION_A_ESTADO')
+    expect(Object.keys(barrel.entradaEdificio)).not.toContain('REFERENCIA_SUPERFICIE_CONSTRUIDA')
+    expect(Object.keys(barrel.edificio)).toContain('ESTADO_CONSERVACION')
+    // El espacio es la CAPA, no un fichero: si alguien lo redujera a `entrada.js`,
+    // esto lo diría (es el mismo `it` que `report/index.js` tiene desde F09).
+    for (const nombre of ['conModelo', 'MOTIVO_ENTRADA', 'nombreParteGenerico']) {
+      expect(
+        Object.keys(barrel.entradaEdificio),
+        `el espacio 'entradaEdificio' ya no puede ser UN fichero: le falta '${nombre}'`,
+      ).toContain(nombre)
+    }
+  })
+})
+
 // ── Guarda transversal de F03/Fase 4 · (a) el descubrimiento de tests es una ──
 // partición exacta de lo que hay en disco, y (b) proj4 no entra en la fuente.
 //

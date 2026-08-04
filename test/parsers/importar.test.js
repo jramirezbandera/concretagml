@@ -6,6 +6,10 @@
  * (LIST.txt / PARCELA.txt, misma parcela, huso 30, ~298755/4090054) y en      *
  * casos SINTÉTICOS inline para los detectores defensivos (criterio de         *
  * aceptación 3: "ninguna se arregla en silencio").                            *
+ *                                                                            *
+ * ⛔ F11 añade el bloque «reparto por capas», que arregla un defecto VIVO:    *
+ * hasta el 2026-08-03 `importar(UTM.dxf)` devolvía una parcela de −390,45 m²  *
+ * con `bloqueos: []` y `construida: true`. Ver la cabecera de importar.js.    *
  * -------------------------------------------------------------------------- */
 
 import { readFileSync } from 'node:fs'
@@ -13,14 +17,22 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, it, expect } from 'vitest'
 
-import { importar } from '../../parsers/importar.js'
+import {
+  importar,
+  BLOQUEOS,
+  BLOQUEOS_SOLO_PARCELA,
+  sinDeteccionesDeParcela,
+} from '../../parsers/importar.js'
 import { TIPO_DETECCION, SEVERIDAD } from '../../parsers/_comun.js'
 import { ORIGEN_PARCELA, TIPO_RECINTO } from '../../model/parcela.js'
+import { superficie } from '../../geo/area.js'
+import { CAPAS, serializarParcelaDxf } from '../../export/dxf.js'
 
 const leer = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
 const LIST_REAL = leer('../fixtures/parsers/LIST.txt')
 const PARCELA_REAL = leer('../fixtures/parsers/PARCELA.txt')
 const DXF_REAL = leer('../fixtures/parsers/UTM.dxf')
+const DXF_EDIFICIO = leer('../fixtures/parsers/edificio_consulta_masiva_3515508VF0831N.dxf')
 
 /** Helpers de filtrado de detecciones. */
 const porTipo = (dets, tipo) => dets.filter((d) => d.tipo === tipo)
@@ -350,7 +362,12 @@ describe('parsers/importar — formato, DXF y contrato de errores', () => {
     expect(resumen.formatoAutodetectado).toBe(true)
     expect(resumen.origen).toBe(ORIGEN_PARCELA.DXF)
     expect(porTipo(detecciones, TIPO_DETECCION.ENTIDAD_NO_SOPORTADA).length).toBeGreaterThan(0)
-    expect(parcela).not.toBeNull()
+    // ⛔ CAMBIADO EN F11. Hasta el 2026-08-03 aquí ponía `expect(parcela).not.toBeNull()`
+    // y era exactamente el defecto: la parcela que salía medía −390,45 m². Con 25
+    // anillos en 5 capas ya NO se construye; el bloque «reparto por capas» de abajo
+    // lo cuenta entero, y con `opts.capa` sí sale la parcela buena.
+    expect(parcela).toBeNull()
+    expect(resumen.bloqueos).toContain(BLOQUEOS.ANILLOS_EN_VARIAS_CAPAS)
   })
 
   it('respeta el formato EXPLÍCITO (no autodetecta)', () => {
@@ -375,5 +392,329 @@ describe('parsers/importar — formato, DXF y contrato de errores', () => {
     expect(Object.getPrototypeOf(r.resumen)).toBe(Object.prototype)
     expect(Object.getPrototypeOf(r.anillos[0][0])).toBe(Array.prototype)
     expect(Object.getPrototypeOf(r.parcela)).toBe(Object.prototype)
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+// F11 · EL REPARTO POR CAPAS — y el defecto de la superficie negativa
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Este bloque entero existe por una medición: `importar(UTM.dxf)` devolvía
+// −390,45 m² con `bloqueos: []`, y nadie lo veía porque NO HABÍA una sola prueba
+// que mirase la superficie de una parcela venida de un DXF. La tenía que haber.
+
+describe('parsers/importar — capas[] (contrato B)', () => {
+  it('DXF: `capas` sale en el objeto y en el resumen, 1:1 con los anillos', () => {
+    const r = importar(DXF_REAL)
+    expect(r.capas).toHaveLength(r.anillos.length)
+    expect(r.resumen.capas).toEqual(r.capas)
+    expect(r.resumen.nVertices).toHaveLength(r.capas.length)
+  })
+
+  it('UTM.dxf: el reparto exacto — FINO 16 · LINDE 4 · PARCELA 3 · BLANCO 1 · 0 ⇢ 1', () => {
+    const { detecciones, capas } = importar(DXF_REAL)
+    const reparto = {}
+    for (const c of capas) reparto[c] = (reparto[c] || 0) + 1
+    expect(reparto).toEqual({ FINO: 16, LINDE: 4, PARCELA: 3, BLANCO: 1, 0: 1 })
+
+    // Y el reparto se DICE, no solo se devuelve (regla de oro 1): la detección
+    // lleva las cinco capas con su recuento y nombra la decisión que no se toma.
+    const det = porTipo(detecciones, TIPO_DETECCION.SEPARADOR_POLIGONO)[0]
+    expect(det.severidad).toBe(SEVERIDAD.AVISO)
+    expect(det.datos.capas).toEqual({ FINO: 16, LINDE: 4, PARCELA: 3, BLANCO: 1, 0: 1 })
+    expect(det.datos.nCapas).toBe(5)
+    expect(det.datos.aplicado).toBe('NINGUNO')
+    expect(det.mensaje).toContain('25 polilínea(s) en 5 capa(s)')
+    expect(det.mensaje).toContain('«FINO» ⇢ 16')
+    expect(det.mensaje).toMatch(/no se adivina/i)
+  })
+
+  it('edificio real: 8 anillos en 2 capas — «Construccion» ⇢ 7, «Parcela» ⇢ 1', () => {
+    const { capas, detecciones } = importar(DXF_EDIFICIO)
+    expect(capas.filter((c) => c === 'Construccion')).toHaveLength(7)
+    expect(capas.filter((c) => c === 'Parcela')).toHaveLength(1)
+    const det = porTipo(detecciones, TIPO_DETECCION.SEPARADOR_POLIGONO)[0]
+    expect(det.datos.capas).toEqual({ Construccion: 7, Parcela: 1 })
+  })
+
+  it('LIST y TXT: `capas` son cadenas vacías, y NO se emite detección de reparto', () => {
+    // No tienen el concepto de capa; inventarle una sería adivinar. Y el array
+    // existe igual para que quien recorra `capas[i]` no se tope con `undefined`.
+    for (const texto of [LIST_REAL, PARCELA_REAL]) {
+      const r = importar(texto)
+      expect(r.capas).toEqual(r.anillos.map(() => ''))
+      expect(porTipo(r.detecciones, TIPO_DETECCION.SEPARADOR_POLIGONO)).toHaveLength(0)
+      expect(r.resumen.bloqueos).toEqual([]) // el camino feliz de F01, intacto
+    }
+  })
+})
+
+describe('parsers/importar — ⛔ el defecto: superficies NEGATIVAS en silencio', () => {
+  it('⭐ UTM.dxf ya NO da −390,45 m²: bloquea nombrando el reparto, no construye', () => {
+    const { parcela, resumen } = importar(DXF_REAL)
+    expect(parcela).toBeNull()
+    expect(resumen.construida).toBe(false)
+    expect(resumen.bloqueos).toEqual([
+      BLOQUEOS.ANILLOS_EN_VARIAS_CAPAS,
+      BLOQUEOS.SUPERFICIE_NO_POSITIVA,
+    ])
+  })
+
+  it('⭐ y con la capa elegida sale la parcela BUENA: 61,05 m², la de PARCELA.txt', () => {
+    // La verdad externa: el anillo de la capa `0` es el mismo polígono que
+    // `PARCELA.txt` (F01), vértice a vértice. Ésa es la parcela; los otros 24
+    // anillos son lindes, cajetín, marco y leyenda.
+    const { parcela, resumen, capas } = importar(DXF_REAL, { capa: '0' })
+    expect(resumen.bloqueos).toEqual([])
+    expect(resumen.construida).toBe(true)
+    expect(capas).toEqual(['0'])
+    expect(superficie(parcela.recintos)).toBeCloseTo(61.045, 2)
+
+    // Los 11 vértices, uno a uno y en el mismo orden, contra el volcado de
+    // coordenadas. Se comparan a 4 decimales (0,1 mm) y no con `toEqual` porque
+    // el DXF guarda más cifras que el TXT: `PARCELA.txt` viene redondeado a 4.
+    const delTxt = importar(PARCELA_REAL).parcela.recintos[0].vertices
+    const delDxf = parcela.recintos[0].vertices
+    expect(delDxf).toHaveLength(delTxt.length)
+    delDxf.forEach(([x, y], i) => {
+      expect(x).toBeCloseTo(delTxt[i][0], 4)
+      expect(y).toBeCloseTo(delTxt[i][1], 4)
+    })
+  })
+
+  it('⛔ elegir capa NO basta: «PARCELA» son 3 anillos disjuntos y dan −29,06 m²', () => {
+    // Por esto hacen falta los DOS guardas. La capa literalmente llamada
+    // «PARCELA» no contiene la parcela: contiene tres lindes sueltos, y el
+    // reparto «uno exterior + N huecos» sigue sin sostenerse dentro de una capa.
+    const { parcela, resumen, detecciones } = importar(DXF_REAL, { capa: 'PARCELA' })
+    expect(parcela).toBeNull()
+    expect(resumen.bloqueos).toEqual([BLOQUEOS.SUPERFICIE_NO_POSITIVA])
+    expect(resumen.bloqueos).not.toContain(BLOQUEOS.ANILLOS_EN_VARIAS_CAPAS) // ya es una sola
+    const aviso = porTipo(detecciones, TIPO_DETECCION.SEPARADOR_POLIGONO).find(
+      (d) => d.datos && typeof d.datos.superficie === 'number',
+    )
+    expect(aviso.severidad).toBe(SEVERIDAD.AVISO)
+    expect(aviso.datos.superficie).toBeCloseTo(-29.06, 1)
+    expect(aviso.mensaje).toContain('-29.06 m²') // la cifra, no un adjetivo
+  })
+
+  it('el DXF de dos capas que escribe export/dxf.js ya NO da −100,00 m²', () => {
+    // El otro caso medido en la fase 0, y el que hace que esto no sea un problema
+    // de «planos ajenos»: lo produce nuestro propio serializador.
+    const cuadrado = (lado, dx = 0, dy = 0) => [
+      [440123.45 + dx, 4470987.65 + dy],
+      [440123.45 + dx + lado, 4470987.65 + dy],
+      [440123.45 + dx + lado, 4470987.65 + dy + lado],
+      [440123.45 + dx, 4470987.65 + dy + lado],
+    ]
+    const { dxf } = serializarParcelaDxf({
+      recintosEditados: [
+        { vertices: cuadrado(40), tipo: 'EXTERIOR' },
+        { vertices: cuadrado(10, 10, 10), tipo: 'HUECO' },
+      ],
+      recintosOficiales: [{ vertices: cuadrado(40), tipo: 'EXTERIOR' }],
+    })
+
+    // Antes: 3 anillos → 1600 − 1600 − 100 = −100,00 m², con bloqueos: [].
+    const crudo = importar(dxf)
+    expect(crudo.parcela).toBeNull()
+    expect(crudo.resumen.bloqueos).toContain(BLOQUEOS.ANILLOS_EN_VARIAS_CAPAS)
+
+    // Y la asimetría que dejó escrita F10 se cierra: pidiendo la capa EDITADA
+    // vuelve la geometría del usuario, exterior y hueco, con sus 1.500 m².
+    const editada = importar(dxf, { capa: CAPAS.EDITADA.nombre })
+    expect(editada.resumen.bloqueos).toEqual([])
+    expect(editada.capas).toEqual([CAPAS.EDITADA.nombre, CAPAS.EDITADA.nombre])
+    expect(editada.parcela.recintos.map((r) => r.tipo)).toEqual(['EXTERIOR', 'HUECO'])
+    expect(superficie(editada.parcela.recintos)).toBeCloseTo(1500, 6)
+
+    // Y la OFICIAL vuelve por su lado, que es lo que el nombre de la capa prometía.
+    const oficial = importar(dxf, { capa: CAPAS.OFICIAL.nombre })
+    expect(superficie(oficial.parcela.recintos)).toBeCloseTo(1600, 6)
+  })
+
+  it('un DXF de UNA sola capa sigue construyendo la parcela: el guarda no es un peaje', () => {
+    // 03_lwpolyline_bulge.dxf: un anillo en la capa «PARCELA». Una sola capa y
+    // superficie positiva ⇒ camino feliz, con la constancia del reparto en INFO.
+    const bulge = leer('../fixtures/parsers/03_lwpolyline_bulge.dxf')
+    const { parcela, resumen, detecciones } = importar(bulge)
+    expect(resumen.bloqueos).toEqual([])
+    expect(parcela).not.toBeNull()
+    expect(resumen.capas).toEqual(['PARCELA'])
+    const det = porTipo(detecciones, TIPO_DETECCION.SEPARADOR_POLIGONO)[0]
+    expect(det.severidad).toBe(SEVERIDAD.INFO) // constancia, no aviso
+    expect(det.datos.nCapas).toBe(1)
+  })
+
+  it('la geometría de un solo anillo NUNCA se ve afectada (el camino de F01)', () => {
+    // El guarda de superficie no puede empezar a bloquear parcelas normales: se
+    // comprueba con los dos fixtures reales de F01 y con un cuadrado sintético.
+    for (const texto of [LIST_REAL, PARCELA_REAL, '500000 4000000\n500010 4000000\n500010 4000010\n500000 4000010']) {
+      const { parcela, resumen } = importar(texto)
+      expect(parcela).not.toBeNull()
+      expect(resumen.bloqueos).toEqual([])
+      expect(superficie(parcela.recintos)).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('parsers/importar — opts.capa: la oferta que resuelve el reparto', () => {
+  it('filtra a la capa pedida y DICE lo que ha dejado fuera', () => {
+    const { resumen, detecciones } = importar(DXF_EDIFICIO, { capa: 'Parcela' })
+    expect(resumen.nAnillos).toBe(1)
+    expect(resumen.capas).toEqual(['Parcela'])
+    const det = porTipo(detecciones, TIPO_DETECCION.SEPARADOR_POLIGONO)[0]
+    expect(det.severidad).toBe(SEVERIDAD.INFO)
+    expect(det.datos.aplicado).toBe('FILTRADO')
+    expect(det.datos.capaElegida).toBe('Parcela')
+    // El reparto ENTERO sigue en la detección, aunque solo se importe una capa.
+    expect(det.datos.capas).toEqual({ Construccion: 7, Parcela: 1 })
+    expect(det.mensaje).toContain('«Construccion» ⇢ 7')
+  })
+
+  it('una capa que no existe NO lanza: avisa nombrándola y queda SIN_GEOMETRIA', () => {
+    // Elegir mal una capa es una decisión sobre el dato, no un fallo de programa
+    // (frontera de errores de este módulo). Pero no puede quedar callado.
+    const { parcela, resumen, detecciones } = importar(DXF_REAL, { capa: 'PARCELA_OFICIAL' })
+    expect(parcela).toBeNull()
+    expect(resumen.bloqueos).toEqual([BLOQUEOS.SIN_GEOMETRIA])
+    const det = porTipo(detecciones, TIPO_DETECCION.SEPARADOR_POLIGONO)[0]
+    expect(det.severidad).toBe(SEVERIDAD.AVISO)
+    expect(det.datos.existe).toBe(false)
+    expect(det.mensaje).toContain('«PARCELA_OFICIAL»')
+    expect(det.mensaje).toContain('«FINO» ⇢ 16') // las capas disponibles, para elegir otra
+  })
+
+  it('la capa se compara LITERAL: «parcela» no es «PARCELA»', () => {
+    expect(importar(DXF_REAL, { capa: 'parcela' }).resumen.nAnillos).toBe(0)
+    expect(importar(DXF_REAL, { capa: 'PARCELA' }).resumen.nAnillos).toBe(3)
+  })
+
+  it('opts.capa que no es string → RangeError (eso sí es error de programación)', () => {
+    expect(() => importar(DXF_REAL, { capa: 0 })).toThrow(RangeError)
+    expect(() => importar(DXF_REAL, { capa: ['0'] })).toThrow(RangeError)
+    expect(() => importar(DXF_REAL, { capa: null })).toThrow(RangeError)
+  })
+})
+
+describe('parsers/importar — el catálogo BLOQUEOS', () => {
+  it('clave === valor, congelado, y son los cinco', () => {
+    expect(BLOQUEOS).toEqual({
+      SIN_GEOMETRIA: 'SIN_GEOMETRIA',
+      COORDENADAS_EN_GRADOS: 'COORDENADAS_EN_GRADOS',
+      HUSO_NO_RESUELTO: 'HUSO_NO_RESUELTO',
+      ANILLOS_EN_VARIAS_CAPAS: 'ANILLOS_EN_VARIAS_CAPAS',
+      SUPERFICIE_NO_POSITIVA: 'SUPERFICIE_NO_POSITIVA',
+    })
+    expect(Object.isFrozen(BLOQUEOS)).toBe(true)
+  })
+
+  it('los cinco se emiten LITERALES en el fichero (el catálogo no puede desincronizarse)', () => {
+    // Mitad estática del pacto: `parsers/importar.js` escribe los códigos a mano
+    // en sus `bloqueos.push(...)` porque hay guardas de OTRAS capas que buscan
+    // exactamente ese texto (`test/edificio/comun.test.js`). Este test ata las
+    // dos cosas: si alguien cambia el catálogo y no el push —o al revés—, cae aquí.
+    const fuente = readFileSync(
+      fileURLToPath(new URL('../../parsers/importar.js', import.meta.url)),
+      'utf8',
+    )
+    for (const codigo of Object.values(BLOQUEOS)) {
+      expect(fuente.includes(`bloqueos.push('${codigo}')`), `no se emite '${codigo}'`).toBe(true)
+    }
+  })
+
+  it('BLOQUEOS_SOLO_PARCELA son los DOS de F11, y ninguno de los tres heredados', () => {
+    // La rama EDIFICIO arrastra los bloqueos sin traducir: estos dos hablan del
+    // reparto exterior/huecos, que allí no aplica, y hay que filtrarlos. Un DXF de
+    // edificio SIEMPRE trae varias capas, así que sin el filtro quedaría bloqueado
+    // justo en su caso normal.
+    expect(BLOQUEOS_SOLO_PARCELA).toEqual([
+      BLOQUEOS.ANILLOS_EN_VARIAS_CAPAS,
+      BLOQUEOS.SUPERFICIE_NO_POSITIVA,
+    ])
+    expect(BLOQUEOS_SOLO_PARCELA).not.toContain(BLOQUEOS.SIN_GEOMETRIA)
+    expect(BLOQUEOS_SOLO_PARCELA).not.toContain(BLOQUEOS.COORDENADAS_EN_GRADOS)
+    expect(BLOQUEOS_SOLO_PARCELA).not.toContain(BLOQUEOS.HUSO_NO_RESUELTO)
+    // Y el filtro de una línea deja al edificio real sin ningún bloqueo.
+    const { resumen } = importar(DXF_EDIFICIO)
+    expect(resumen.bloqueos.filter((b) => !BLOQUEOS_SOLO_PARCELA.includes(b))).toEqual([])
+  })
+
+  // ── La SEGUNDA mitad del filtro, que faltaba (2026-08-04) ──────────────────
+  //
+  // Filtrar los bloqueos no bastaba: **la detección que acompaña a un bloqueo de
+  // parcela se seguía LEYENDO**. El guion de humo 13 midió la rama EDIFICIO
+  // diciendo a la vez «Cargadas 7 partes… 62 vértices» y «da −13,32 m²… No se
+  // construye la parcela». La suite estaba verde porque el reenvío completo era
+  // deliberado y estaba probado en `test/edificio/entrada.test.js`.
+
+  it('la detección de SUPERFICIE_NO_POSITIVA lleva `datos.bloqueo` con su código', () => {
+    const { detecciones } = importar(DXF_EDIFICIO, { capa: 'Construccion' })
+    const marcadas = detecciones.filter((d) => d?.datos?.bloqueo !== undefined)
+
+    expect(marcadas).toHaveLength(1)
+    expect(marcadas[0].datos.bloqueo).toBe(BLOQUEOS.SUPERFICIE_NO_POSITIVA)
+    // Y sigue siendo la misma detección de siempre, con su severidad y su cifra:
+    // marcar no es reescribir. La rama PARCELA la lee igual que antes.
+    expect(marcadas[0].tipo).toBe(TIPO_DETECCION.SEPARADOR_POLIGONO)
+    expect(marcadas[0].severidad).toBe(SEVERIDAD.AVISO)
+    expect(marcadas[0].mensaje).toMatch(/No se construye la parcela/)
+  })
+
+  it('⛔ toda detección con `datos.bloqueo` nombra un código de BLOQUEOS_SOLO_PARCELA', () => {
+    // El invariante que hace que la marca no pueda mentir. Se barren los cuatro
+    // fixtures reales y el DXF que escribimos nosotros: si alguien marca una
+    // detección con un bloqueo que NO es de parcela, el filtro de `edificio/` se
+    // la comería sin que nadie lo hubiera decidido.
+    const lado = (l, dx = 0, dy = 0) => [
+      [440123.45 + dx, 4470987.65 + dy],
+      [440123.45 + dx + l, 4470987.65 + dy],
+      [440123.45 + dx + l, 4470987.65 + dy + l],
+      [440123.45 + dx, 4470987.65 + dy + l],
+    ]
+    // Nuestro propio DXF de dos capas: el que producía −100,00 m² en silencio.
+    const { dxf: DXF_NUESTRO } = serializarParcelaDxf({
+      recintosEditados: [
+        { vertices: lado(40), tipo: 'EXTERIOR' },
+        { vertices: lado(10, 10, 10), tipo: 'HUECO' },
+      ],
+      recintosOficiales: [{ vertices: lado(40), tipo: 'EXTERIOR' }],
+    })
+    const textos = [LIST_REAL, PARCELA_REAL, DXF_REAL, DXF_EDIFICIO, DXF_NUESTRO]
+    let vistas = 0
+    for (const texto of textos) {
+      for (const opts of [{}, { capa: 'Construccion' }, { capa: CAPAS.OFICIAL.nombre }]) {
+        for (const d of importar(texto, opts).detecciones) {
+          if (d?.datos?.bloqueo === undefined) continue
+          vistas += 1
+          expect(BLOQUEOS_SOLO_PARCELA).toContain(d.datos.bloqueo)
+        }
+      }
+    }
+    // Anti-vacuidad: si el barrido dejara de producir ninguna marcada, este `it`
+    // pasaría afirmando nada.
+    expect(vistas).toBeGreaterThan(0)
+  })
+
+  it('`sinDeteccionesDeParcela` quita ESAS y no toca ninguna otra', () => {
+    const { detecciones } = importar(DXF_EDIFICIO, { capa: 'Construccion' })
+    const limpias = sinDeteccionesDeParcela(detecciones)
+
+    expect(limpias).toHaveLength(detecciones.length - 1)
+    expect(limpias.every((d) => d?.datos?.bloqueo === undefined)).toBe(true)
+    // El mensaje del reparto por capas comparte TIPO con la que se va, y se queda:
+    // filtrar por `tipo` habría matado la explicación que el edificio sí necesita.
+    expect(
+      limpias.some(
+        (d) => d.tipo === TIPO_DETECCION.SEPARADOR_POLIGONO && /capa\(s\)/.test(d.mensaje),
+      ),
+    ).toBe(true)
+    // Y no muta la entrada.
+    expect(detecciones).toHaveLength(limpias.length + 1)
+  })
+
+  it('`sinDeteccionesDeParcela` con una lista sin marcas la devuelve entera', () => {
+    const { detecciones } = importar(LIST_REAL)
+    expect(sinDeteccionesDeParcela(detecciones)).toHaveLength(detecciones.length)
   })
 })

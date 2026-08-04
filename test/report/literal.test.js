@@ -724,8 +724,25 @@ describe('report/literal · guardián de la regla de oro 9', () => {
   it('tampoco hay conclusiones encubiertas sobre el encaje o la superficie', () => {
     // El texto describe la finca. No dice si encaja con el parcelario (eso es F07),
     // ni si la superficie coincide con nada, ni qué habría que hacer.
+    //
+    // ⛔ CORREGIDO EN F11 · T5.3 (2026-08-04): `/\bdeberá\b/i` ESTABA MUERTA, y al
+    // revés de como se lee. `\b` se define sobre `\w = [A-Za-z0-9_]`, así que la
+    // frontera de la DERECHA cae detrás de una `á`, que no es `\w`: para casar,
+    // ahí tendría que venir un carácter que SÍ lo fuera. O sea que el patrón
+    // rechazaba «deberán» y dejaba pasar «deberá» — justo la forma que se quiere
+    // prohibir. Medido sobre los 72 patrones con `\b` del repo: era el ÚNICO roto
+    // (`válido`, `semáforo`, `erróneo`, `vía pública` tienen fronteras ASCII).
+    // **No tapaba nada**: `report/literal.js` no emite «deberá» en ningún sitio,
+    // y la entrada sigue verde ahora que de verdad mira. La frontera buena para
+    // una palabra acentuada es `(?<!\p{L})…(?!\p{L})` con bandera `u`.
     const texto = caso().texto
-    for (const prohibido of [/\bencaj/i, /\bdiscrepanci/i, /\bdeberá\b/i, /\bhay que\b/i, /\berror\b/i]) {
+    for (const prohibido of [
+      /\bencaj/i,
+      /\bdiscrepanci/i,
+      /(?<!\p{L})deberá(?!\p{L})/iu,
+      /\bhay que\b/i,
+      /\berror\b/i,
+    ]) {
       expect(prohibido.test(texto), `el texto está concluyendo: ${prohibido}`).toBe(false)
     }
   })

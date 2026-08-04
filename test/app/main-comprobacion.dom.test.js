@@ -170,6 +170,8 @@ const arranque = vi.hoisted(() => {
 
 // ── El cromo del mapa: el otro efecto de `crearVisor` sobre el documento ─────
 
+/** El `L.Map` del arnés, vivo. F11: lo consume `viewer/partes.js` (ver abajo). */
+let mapaVivo = null
 /** El cajón de F07 y su capa, vivos. */
 let diagnosticoVivo = null
 /** El cajón de F08, vivo. SUELTO, como en el visor real. */
@@ -187,6 +189,11 @@ function montarCromoDelMapa() {
   const { mapa } = montarMapa()
   crearPanes(mapa)
   crearBarraEdicion({ mapa })
+  // ⚠️ F11: el `L.Map` DE VERDAD se guarda y va al doble. Hasta aquí el
+  // `visor.mapa` era `{on, off}` —lo justo que consume `cablearCatastro` por duck
+  // typing—, y desde F11 hay un segundo consumidor, `viewer/partes.js`, que
+  // necesita `addLayer`/`removeLayer`/`getPane` para pintar las huellas.
+  mapaVivo = mapa
   diagnosticoVivo = {
     cajon: crearCajonDiagnostico({ mapa }),
     // El huso se DERIVA del SRS del expediente con la misma función que la app.
@@ -197,12 +204,19 @@ function montarCromoDelMapa() {
 
 // ── Los cuatro dobles ────────────────────────────────────────────────────────
 
-vi.mock('../../viewer/index.js', () => ({
+vi.mock('../../viewer/index.js', async (importarOriginal) => ({
+  // ⚠️ F11: se PARTE del módulo real y solo se sustituye `crearVisor`. Antes el
+  // doble era un objeto literal con una sola clave, y eso convertía cualquier
+  // export NUEVO del visor en un fallo de importación de este fichero — que es lo
+  // que pasó al exportar `encuadrarSobreRecintos` (T1.5), que consume
+  // `app/cableado-edificio.js`. Con `importOriginal` el doble es exactamente lo
+  // que dice ser: el visor real con el montaje sustituido.
+  ...(await importarOriginal()),
   crearVisor: (_contenedor, opciones) => {
     arranque.opciones = opciones
     montarCromoDelMapa()
     return {
-      mapa: { on() {}, off() {} },
+      mapa: mapaVivo,
       estado: opciones.estado,
       capas: {},
       acotaciones: null,
@@ -304,19 +318,28 @@ vi.mock('../../app/cableado-comprobacion.js', async (importarOriginal) => {
 
 // ── La cáscara REAL, leída de `index.html` ───────────────────────────────────
 
-const CUERPO_INDEX = (() => {
+const CASCARA_INDEX = (() => {
   const html = readFileSync(join(RAIZ, 'index.html'), 'utf8')
-  const encontrado = /<body[^>]*>([\s\S]*)<\/body>/i.exec(html)
+  const encontrado = /<body([^>]*)>([\s\S]*)<\/body>/i.exec(html)
   if (encontrado === null) {
     throw new Error(
       'test/app/main-comprobacion.dom.test.js: no se ha encontrado el <body> de index.html. La ' +
         'cáscara de estas pruebas se lee del fichero real a propósito (no se copia).',
     )
   }
-  return encontrado[1]
+  const clase = /class="([^"]*)"/i.exec(encontrado[1])
+  return { clase: clase === null ? '' : clase[1], cuerpo: encontrado[2] }
 })()
 
+const CUERPO_INDEX = CASCARA_INDEX.cuerpo
+
+/**
+ * ⚠️ Repone también la CLASE del `<body>`, que hasta F11 se perdía: el `innerHTML`
+ * copia lo de DENTRO del `<body>` y nada de su etiqueta de apertura. `app/rama.js`
+ * resuelve `.gml-app` para colgar ahí el `data-rama` y **LANZA** si no está.
+ */
 const montarCascara = () => {
+  document.body.className = CASCARA_INDEX.clase
   document.body.innerHTML = CUERPO_INDEX
 }
 

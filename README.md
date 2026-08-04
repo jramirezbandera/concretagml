@@ -173,10 +173,14 @@ desde F03 no.
   `<input type="file">`, ni un `FileReader`, ni un `drop`— y los parsers de F01
   llevaban desde la fase 1 en verde **sin que nadie los llamara**. Por eso la zona
   de fichero se hizo **genérica**: F01 se enchufa después sin rehacer la interfaz.
-  ⚠️ **Y el criterio 4 se cumple a medias, dicho por escrito**: un GML de edificio
+  ~~⚠️ **Y el criterio 4 se cumple a medias, dicho por escrito**: un GML de edificio
   se detiene con honradez y explica por qué, pero encaminarlo al contraste de
   construcción exige **F14**, que no existe. Fingir un destino sería peor que decir
-  que no. Las demás correcciones, con su evidencia, en
+  que no.~~ ✅ **Media deuda cerrada el 2026-08-04 por F11, y sin esperar a F14**: un
+  GML de edificio soltado en la ventana **conmuta la rama y se carga**. El desvío es
+  por el CONTENIDO del fichero, no por su extensión. Lo que sigue faltando es
+  contrastarlo contra lo registrado, que es F14. Las demás correcciones, con su
+  evidencia, en
   [`spec/feature-08-comprobar-gml.md`](spec/feature-08-comprobar-gml.md).
   ⚙️ **Ni una dependencia nueva, y el riesgo estrella de la fase no existía**: se
   temía que meter el lector de GML en el paquete lo engordara de golpe, y medido con
@@ -260,6 +264,93 @@ desde F03 no.
   navegador real, comparando la marca de tiempo del registro contra el instante en que
   la página se cargó.
   ⚠️ **Deuda anotada**: el paquete pasa a **736,2 kB**. Sigue siendo materia de F16.
+- **F11** Edificio: entrada y modelo — código y pruebas hechos; ⛔ **el guion de
+  navegador cierra en `ok: false` sobre un punto medido, por decisión tomada con el
+  número delante** (abajo); **pendiente de la firma humana** del mismo checklist (su
+  sección 12 hereda el punto bloqueante de los veredictos y añade uno propio, que no es
+  de gestos sino de comprensión: **que el reparto por capas del DXF se entienda sin
+  explicación**).
+  👉 **Es la fase en la que la aplicación deja de ser solo de parcelas.** Hasta aquí
+  todo —el panel, el visor, el pie, el almacén— hablaba de una parcela; la rama de
+  edificio existía en el modelo desde la primera fase y **no la llamaba nadie**. Ahora
+  hay un conmutador de dos posiciones en la cabecera del panel: se pulsa «Edificio» y
+  **el panel se cambia entero**, con el mismo mapa y el mismo visor debajo. Se elige
+  qué se necesita generar (simplificado, que es el del ICUC y el caso frecuente, o
+  completo), entra la geometría por **cinco vías** —DXF, pegar LIST, cargar TXT, soltar
+  un GML de edificio y traerla del Catastro por referencia— y las huellas **se pintan
+  en el mapa**, encima de la parcela, con su nombre al pasar por encima.
+  👉 **Y el DXF por fin entra.** Los lectores de CAD llevaban desde F01 en verde **sin
+  que nadie los llamara**: la app escribía DXF (F10) y no sabía reabrirlo. Ahora se
+  suelta un `.dxf` o un `.txt` en la ventana y entra **como partes de un edificio**.
+  ⚠️ **Media asimetría, no toda, y se dice**: reabrir un dibujo **como parcela** sigue
+  sin estar. Con la rama Parcela puesta, soltar un `.dxf` no hace nada callado: avisa de
+  que ese dibujo entra como partes de un edificio y de cómo llegar ahí.
+  ⛔ **«Cada polilínea es una parte» no se aplica a la letra, y el plano real del repo
+  es el motivo.** `UTM.dxf` —un plano de trabajo de verdad— trae **25 polilíneas en 5
+  capas**, y dieciséis de ellas son el cajetín, el marco y la leyenda: al pie de la
+  letra saldrían 25 partes y **el recuento estaría mal sin que nada avisara**. Así que
+  se lee la capa del dibujo y **se ofrece el reparto**, con el nombre literal de cada
+  capa y cuántos contornos trae. Y hay una segunda medición que lo cierra: **en ese
+  mismo fichero la parcela de verdad está en la capa `0`, no en la que se llama
+  `PARCELA`** —comparte los 12 vértices con el listado de coordenadas de al lado—, así
+  que **elegir la capa por su nombre falla en el único plano real que tenemos**.
+  Ofrecer no es prudencia: es lo que el dato exige.
+  ⛔ **La ficha mandaba traer las construcciones de la capa `constru` del Catastro, y
+  esa capa son PÍXELES.** Es una capa de imagen del servicio de cartografía; la
+  geometría vive en otro servicio (`wfsBU`), que **no estaba anotado en ninguna parte
+  del proyecto**. Sondeado antes de escribir código: tiene **cinco** consultas
+  preparadas y el dossier documentaba **tres**, y con la que faltaba un edificio cuesta
+  **dos peticiones en vez de tres**. Y su forma de fallar es **la contraria** a la del
+  servicio de parcelas —donde todo error llega con un `200 OK` engañoso—: aquí una
+  referencia inexistente acaba en un `404`, y **una parcela sin nada construido
+  contesta con una lista vacía perfectamente correcta**, que es el punto de partida de
+  una obra nueva y no un error.
+  ⭐ **Arregló un defecto vivo que no estaba en su alcance**: al enchufar la entrada de
+  DXF apareció que la aplicación construía parcelas de **superficie negativa** —−390,45
+  m² donde la real mide 61,05— **sin una sola advertencia**. Llevaba ahí desde que F10
+  estrenó los DXF de dos capas, por un camino que nadie recorría. Un diferenciador
+  probado y sin recorrido de usuario no diferencia nada, y esto es lo que cuesta
+  descubrirlo tarde.
+  ⭐ **Y cerró media deuda de F08**: un GML de edificio soltado en la ventana ya no se
+  detiene con una explicación, **conmuta la rama y se carga**.
+  ⚠️ **Lo que la rama de edificio todavía NO hace, dicho por escrito**: no asigna
+  plantas ni distingue vivienda de piscina (F12), no genera el GML de construcción
+  (F13) y no lo contrasta (F14) — los dos botones del pie se apagan **con el motivo
+  escrito al lado**, nunca grises y mudos. Y **no se guarda en el navegador ni se
+  autoguarda**: para llevarse el trabajo está el fichero de proyecto `.json`, que sí
+  funciona en las dos ramas.
+  🔎 **El guion de navegador salió `ok: false` y encontró dos defectos reales que las
+  5.700 pruebas no veían** — y lo que importa no es que los encontrara, sino que **la
+  suite estaba verde defendiéndolos**:
+  · **La aplicación se contradecía a sí misma al cargar un edificio.** El panel decía
+  «Cargadas 7 partes… 62 vértices» y a la vez entraba una tarjeta diciendo «da
+  **−13,32 m²**… **No se construye la parcela**». Las dos frases eran ciertas por
+  separado; juntas, el usuario no sabe cuál creerse. La rama de edificio filtraba los
+  *bloqueos* de parcela pero **reenviaba sus avisos, que es la mitad que se lee**. Y
+  había un test que exigía literalmente reenviarlos «todos, sin tocarlos».
+  · **El panel de la rama de edificio no cabía**: 947,54 px en 900, así que se recortaba
+  en silencio y **«Diagnosticar encaje» quedaba fuera de la pantalla, sin forma de llegar
+  a él**. Se arregló quitando **tres duplicaciones** —el apunte del modelo que no has
+  elegido, un motivo repetido para dos botones que se apagan por la misma causa, y el
+  aviso de autoguardado que se enseñaba entero **dos veces a la vez**—. **Ni un hecho
+  callado**: lo que se quitó era lo mismo dicho dos veces.
+  ⛔ **Lo que queda, y por qué F11 cierra igual.** Con 7 partes cargadas la lista mide
+  **7,06 px** y una fila necesita 25,39: **faltan 18,33 px**. La pérdida funcional ya está
+  arreglada (el panel cabe exacto y el botón se alcanza); toda palanca que queda es
+  recortar redacción o tocar la maqueta del panel, que es lo que el rework de interfaz
+  existe para hacer; y **F12 añade las plantas por parte sobre un panel sin holgura**, así
+  que recortar texto ahora se deshace en dos fases. Los 18,33 px **se entregan medidos**,
+  no se dan por resueltos.
+  ⚠️ **Deuda anotada**: el paquete pasa a **858,4 kB** — ni una dependencia nueva
+  (`package.json` no cambió), son once módulos de código propio. Con esta cifra,
+  **partir el paquete deja de ser una deuda teórica**: los ~89 kB de la rama de
+  edificio solo hacen falta cuando alguien pulsa «Edificio». Materia de F16.
+  ⚠️ **Y otra, declarada y no tapada**: en la rama de edificio se leen **cuatro textos que
+  hablan de «la parcela»** —«La parcela cae en el huso 30…», «no son geometría de
+  parcela»— porque los escriben los lectores de CAD, que son de la primera fase y no saben
+  que existen dos ramas. Tres de los cuatro son informativos. Se arreglan en F12, con el
+  mismo patrón que ya se usó para el encuadre: tocarlos ahora reabre los módulos más
+  antiguos del proyecto por un texto.
 
 ### El régimen de uso, que es el riesgo real de F05
 
@@ -420,8 +511,8 @@ salida principal y no una salida lateral.
 |---|---|---|
 | **Guardar en este navegador** | El expediente entero, en IndexedDB | Sí, desde la lista |
 | **Proyecto (`.json`)** | El expediente entero, en un fichero | **Sí** — es el único |
-| **DXF** | La parcela **oficial y la editada, en capas separadas** | No (entrada de DXF: pendiente) |
-| **Coordenadas (`.txt`)** | El listado de vértices para replantear | **No, y el propio fichero lo dice** |
+| **DXF** | La parcela **oficial y la editada, en capas separadas** | **No como parcela** — ⚠️ *matizado en F11: desde el 2026-08-04 un `.dxf` sí entra, pero **como partes de un edificio**; reabrirlo como parcela sigue sin estar, y al soltarlo con la rama Parcela puesta la app lo dice y señala la vía que sí existe* |
+| **Coordenadas (`.txt`)** | El listado de vértices para replantear | **No como parcela, y el propio fichero lo dice.** ⚠️ *Igual que el DXF: desde F11 entra por la rama de edificio, con un lector propio que lo reconoce por su firma* |
 
 Cinco cosas que conviene saber, porque son decisiones:
 

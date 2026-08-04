@@ -109,6 +109,36 @@ export * as report from './report/index.js'
 // con `report/` —el impuro es el CONSUMIDOR del puro— y por eso la frontera aguanta.
 export * as exportar from './export/index.js'
 
+// ── F11 · `edificio/` — la capa de ENTRADA de la segunda rama ────────────────
+// Diez fases después, esta aplicación solo sabía de parcelas. `edificio/` es la
+// capa que convierte lo que trae un fichero (DXF, LIST, TXT), un GML de edificio
+// de la Sede o la respuesta del `wfsBU` en el `Edificio` de `model/edificio.js`, y
+// lo que se le puede cambiar después sin volver a importarlo. Entra por la MISMA
+// razón que `comprobacion/`, `report/` y `export/`, y no por simetría: **todo lo
+// de `edificio/` es puro**. Entran cadenas, anillos en UTM y POJOs; salen POJOs y
+// detecciones. Ni `document`, ni Leaflet, ni red, ni reloj. Se puede cargar tal
+// cual desde el proyecto Vitest `node`.
+//
+// ⚠️ El espacio se llama `entradaEdificio` y NO `edificio` porque ese nombre lo
+// ocupa `model/edificio.js` en `:28` desde F00 (desviación 8 del plan de F11), y
+// la colisión de nombres dice bien el reparto: `edificio` es el MODELO —qué ES un
+// Edificio— y `entradaEdificio` es CÓMO SE LLEGA hasta él. El accidente concreto
+// no sería silencioso (dos `export * as edificio` es un `SyntaxError` de nombre
+// duplicado), pero el nombre bueno se elige antes, no cuando revienta.
+//
+// De la feature F11 se quedan FUERA cuatro módulos, y conviene decirlo aquí
+// porque **tres de ellos NO se autoprotegen**: medido el 2026-08-03, importar
+// `services/catastro-edificio.js`, `app/rama.js` y `app/panel-edificio.js` bajo
+// Node **no lanza** —solo nombran `document` dentro de sus funciones y de
+// `viewer/` únicamente tocan `_comun.js`, que no importa Leaflet—, así que
+// meterlos aquí dejaría la suite en VERDE y la aplicación rota. El único que
+// revienta al importarlo es `viewer/partes.js` (`ReferenceError: window is not
+// defined`, por Leaflet). Los cubre en bloque la regla por directorio del
+// guardián estático de `test/contrato.test.js`; y la puerta de atrás que esa regla
+// NO ve —que `edificio/index.js` los reexportara por su nombre— la cierra el
+// bloque «contrato F11» del mismo fichero.
+export * as entradaEdificio from './edificio/index.js'
+
 // ── `storage/` NO entra, EN BLOQUE, y no es por el DOM ───────────────────────
 // F09 estrena `storage/pie-firma.js`, que guarda el pie de firma entre sesiones, y
 // conviene decir por qué no sale aunque su vecino `report/firma.js` sí. `storage/`

@@ -28,6 +28,11 @@
 //                   nodos en la zona muerta del `const` y reventaría dentro del
 //                   `try` de `sincronizacion.js`: un aviso espurio en cada
 //                   arranque. Hasta F05 daba igual y estaba la sexta.
+//                   ⭐ DESDE F11 la ficha tiene DOS caras, porque hay dos
+//                   documentos posibles: ver {@link repintarFicha}. Cinco de sus
+//                   ocho renglones hablan de la parcela, así que con la rama
+//                   EDIFICIO puesta **estarían mintiendo**; se recorta a cuatro y
+//                   eso libera 75,75 px medidos para la lista de partes.
 //   5. VISOR      — `crearVisor(...)` de `../viewer/index.js`. Monta mapa +
 //                   capas + tabla de vértices, la EDICIÓN de F06 (`edicion:` y su
 //                   capa de acotaciones), el DIAGNÓSTICO de F07 (`diagnostico:`,
@@ -98,6 +103,16 @@
 //                   El enlace con F07 —que el informe de contraste cuente lo que
 //                   se leyó del fichero— está en el paso 8: ver
 //                   {@link comprobacionCableada}.
+//                   ⭐ DESDE F11 este paso reparte también lo que NO es de su tema,
+//                   y por dos mecanismos distintos que conviene no confundir:
+//                     · por EXTENSIÓN (`entradasExtra`) — el `.json` del expediente
+//                       (F10) y el `.dxf`/`.txt` del edificio (F11). La zona de
+//                       arrastre es UNA sola en toda la aplicación, así que quien
+//                       quiera una familia de ficheros la declara aquí;
+//                     · por CONTENIDO (`alGmlDeEdificio`, F11) — un `.gml` es un
+//                       `.gml` hasta que se lee, y solo entonces se sabe si describe
+//                       una parcela o una construcción. El GML de edificio deja de
+//                       ser el callejón sin salida que F08 declaró «a medias».
 //  10. GML        — `cablearGeneracionGml(...)` (F04, tarea T6.1). Necesita las
 //                   dos piezas anteriores: el store (de él sale la geometría que
 //                   se serializa, y de sus notificaciones el estado del botón) y
@@ -147,6 +162,59 @@
 //                   ⚠️ Sin `try`, igual que los pasos 6, 8, 9 y 11, y con un
 //                   motivo de más: es el ÚLTIMO, así que un `catch` no protegería
 //                   a nadie — lo que hay debajo ya está montado.
+//  13. RAMA Y     — `cablearRama(...)` de `./rama.js`, `crearPanelEdificio(...)` de
+//      EDIFICIO     `./panel-edificio.js` y `cablearEdificio(...)` de
+//                   `./cableado-edificio.js` (F11, tarea T4.1). **Aquí la
+//                   aplicación deja de tener un solo tema.** Hasta este paso todo
+//                   lo de arriba habla de parcelas: el store lleva una, el panel se
+//                   titula «Origen de la parcela», la ficha del pie mide su
+//                   contorno y el pie genera su GML. F11 añade un conmutador en la
+//                   cabecera y un SEGUNDO panel que SUSTITUYE al primero —no se le
+//                   suma: el panel no tiene un píxel libre, y está medido—, con su
+//                   propio store, sus cinco vías de entrada y sus huellas pintadas
+//                   sobre el mismo mapa.
+//                   ⛔ **SE ENSAMBLA ANTES QUE EL PASO 12, aunque lleve número
+//                   mayor.** Es la ÚNICA inversión de esta lista y tiene una causa
+//                   exacta: `cablearExpediente` **se suscribe** al conmutador
+//                   (`rama.subscribe`), así que la rama tiene que existir cuando él
+//                   se monta. Lo que NO cambia es que el expediente sigue siendo el
+//                   último en ejecutarse —que es justo lo que su apartado afirma—:
+//                   F11 se cuela delante, no detrás.
+//                   Sus dependencias vienen de cinco pasos anteriores:
+//                     · el SEGUNDO store (paso 2), que nace en `null`;
+//                     · el panel de avisos (paso 3);
+//                     · el VISOR (paso 5), por dos cosas distintas: el `L.Map`
+//                       sobre el que se pintan las huellas, y la BARRA DE EDICIÓN,
+//                       que la rama EDIFICIO oculta — con el edificio delante la
+//                       parcela es contexto, y un `Ctrl+Z` ahí desharía una edición
+//                       que el usuario cree estar haciendo sobre el edificio;
+//                     · los DOS clientes del paso 7 — el de edificio para traer la
+//                       construcción, y el de parcela SOLO para deducir la
+//                       referencia catastral desde la huella;
+//                     · el store de PARCELA (paso 2), que solo se LEE: lo que haya
+//                       en pantalla viaja como `edificio.parcelaContexto` y **nunca**
+//                       como rama `parcela` de un expediente (desviación 9 de F11);
+//                     · los dos CTA del pie (pasos 8 y 10), que la rama EDIFICIO
+//                       APAGA CON EL MOTIVO ESCRITO AL LADO: generar el GML de
+//                       edificio es F13 y diagnosticarlo es F14. Botón apagado con
+//                       motivo, jamás botón muerto.
+//                   ⚠️ SIN `try` propio, igual que los pasos 6, 8, 9, 11 y 12.
+//
+// ── F11 · EL ORDEN DE APAGADO, QUE ESTA PANTALLA NO EJERCE (Y POR ESO SE DICE) ─
+// `services/catastro.js#destruir` **aborta el transporte**, y desde F11 ese
+// transporte lo COMPARTEN dos clientes (override O8: una sola cola, un solo ritmo).
+// La cabecera de aquel módulo dejó escrito que «si algún día hiciera falta compartir
+// un transporte entre dos clientes, esto habría que revisarlo»; ese día es hoy, y la
+// asimetría está medida: `crearClienteEdificio.destruir()` solo se apaga a sí mismo,
+// pero `crearClienteCatastro.destruir()` deja al de edificio devolviendo `CANCELADA`
+// **sin que nadie lo haya destruido**.
+//
+// Aquí no muerde, y por una razón que conviene escribir en vez de dar por supuesta:
+// **este arranque no desmonta nada**. No hay `destruir()` de la aplicación ni
+// `import.meta.hot.dispose`; la pantalla vive hasta que el navegador descarga la
+// página, y entonces se va todo a la vez. El día que exista un desmontaje —una SPA,
+// un HMR fino, un test que monte y desmonte— el orden es: **primero el edificio,
+// después el resto**, y el cliente de parcela EL ÚLTIMO de los dos.
 //
 // ── POR QUÉ EL STORE LO CREA ESTA FUNCIÓN Y NO `crearVisor` ─────────────────
 // `viewer/index.js` documenta que recibe el store ya hecho y NO lo fabrica, para
@@ -446,12 +514,14 @@ import {
   undo,
 } from '../edit/historial.js'
 import { metricas } from '../edit/metricas.js'
+import { area } from '../geo/area.js'
 import { PERFIL, SEVERIDAD } from '../gml/_comun.js'
 import { descargarGml } from '../gml/descargar.js'
 import { NAMESPACE_INSPIRE_CATASTRO, NAMESPACE_INSPIRE_DEFECTO } from '../gml/ids.js'
 import { serializarParcelaCp } from '../gml/serialize-cp.js'
 import { crearTransporte } from '../services/_red.js'
 import { crearClienteCatastro } from '../services/catastro.js'
+import { crearClienteEdificio } from '../services/catastro-edificio.js'
 import { abrirBd } from '../storage/bd.js'
 import { crearCacheCatastro } from '../storage/cache-catastro.js'
 import { crearCuota } from '../storage/cuota.js'
@@ -471,6 +541,10 @@ import {
 import { cablearComprobacion } from './cableado-comprobacion.js'
 import { cablearDiagnostico } from './cableado-diagnostico.js'
 import {
+  EXTENSIONES as EXTENSIONES_EDIFICIO,
+  cablearEdificio,
+} from './cableado-edificio.js'
+import {
   EXTENSIONES_PROYECTO,
   MENSAJE_SIN_EXPEDIENTE,
   cablearExpediente,
@@ -482,6 +556,8 @@ import {
   parcelaDemo,
   parcelaDemoConHueco,
 } from './demo-datos.js'
+import { crearPanelEdificio } from './panel-edificio.js'
+import { RAMA, cablearRama } from './rama.js'
 
 // ── Constantes de presentación ───────────────────────────────────────────────
 
@@ -502,6 +578,19 @@ const DEMO_HUECO = 'hueco'
 const EYEBROW_SINTETICA = 'Parcela sintética · demostración'
 const EYEBROW_DEMOSTRACION = 'Parcela de demostración'
 const EYEBROW_CATASTRO = 'Parcela del Catastro'
+
+/**
+ * Los DOS eyebrows de la rama EDIFICIO (F11). Los tres de arriba empiezan por
+ * «Parcela» y con el edificio delante serían falsos los tres — la cabecera estaría
+ * anunciando el documento de la otra rama.
+ *
+ * Son dos y no tres porque en esta rama **no existe la demostración**: el segundo
+ * store nace en `null` a propósito (no se inventa un edificio de muestra, misma
+ * regla por la que `demo-datos.js` no le añade un patio a la parcela real), así que
+ * los dos estados que hay son «no hay nada» y «hay un edificio».
+ */
+const EYEBROW_EDIFICIO_VACIO = 'Edificio · sin cargar'
+const EYEBROW_EDIFICIO = 'Edificio'
 
 /** Texto de la ficha cuando la parcela no tiene referencia catastral. */
 const SIN_REFCAT = 'Sin referencia'
@@ -573,6 +662,118 @@ const FORMATO_DECLARADO = new Intl.NumberFormat('es-ES', { maximumFractionDigits
 
 /** Enteros con separador de millares español (para el recuento de vértices). */
 const FORMATO_ENTERO = new Intl.NumberFormat('es-ES')
+
+// ── F11 · la ficha del pie, en su versión de EDIFICIO ────────────────────────
+//
+// La ficha tiene ocho pares y **cinco de sus rótulos hablan de la parcela**
+// (Vértices, Perímetro, Superficie catastral, Δ catastral, Colindantes). Con la
+// rama EDIFICIO puesta esos renglones no es que sobren: es que **afirmarían cosas
+// del otro documento**, que es exactamente el error silencioso que este proyecto no
+// admite. Así que en esa rama se quedan CUATRO, y los cuatro se pueden sostener:
+//
+//   1. Sistema de referencia — es del EXPEDIENTE, no del tema. Idéntico.
+//   2. Referencia catastral — la del edificio, que puede no tenerla.
+//   3. **Partes** — el mismo `<dd>` que cuenta los vértices en la otra rama, con su
+//      `<dt>` reescrito. Contar es lo que hace esa línea; cambia qué se cuenta.
+//   4. **Superficie en planta** — la suma de las huellas.
+//
+// ⭐ Y no es solo higiene: recortar la ficha a cuatro pares libera **75,75 px
+// medidos** (8 × 31,88 px → 4), que es la mayor palanca de altura de toda la fase y
+// lo que le da sitio a la lista de partes.
+//
+// ⚠️ **«Superficie en planta» y no «Superficie» a secas, y la distinción importa**:
+// lo que se mide aquí es el suelo que ocupan las huellas, no la superficie
+// CONSTRUIDA, que es un atributo declarado del modelo COMPLETO (`superficieConstruida`,
+// el `grossFloorArea` del Catastro) y que en un edificio de tres plantas es
+// aproximadamente el triple. Llamarlas igual invitaría a compararlas, y la comparación
+// no significa nada. Es la misma clase de distinción que separa {@link SIN_SUPERFICIE_CATASTRAL}
+// de {@link SIN_DELTA_CATASTRAL}.
+
+/** Rótulo del `<dt>` que cuenta, en cada rama. Mismo `<dd>`, otra pregunta. */
+const ROTULO_VERTICES = 'Vértices'
+const ROTULO_PARTES = 'Partes'
+
+/** Ídem para el `<dd>` de la superficie. Ver el bloque de arriba. */
+const ROTULO_SUPERFICIE = 'Superficie'
+const ROTULO_SUPERFICIE_PLANTA = 'Superficie en planta'
+
+/**
+ * Ficha: no hay ningún edificio cargado. El segundo store nace en `null` y esto es
+ * lo que se lee mientras nadie haya traído nada. Se DICE, en vez de dejar el guion
+ * del HTML —que se lee como «esto no ha cargado»— o un «0», que afirmaría que el
+ * edificio tiene cero partes cuando lo que pasa es que no hay edificio.
+ */
+const SIN_EDIFICIO = 'Sin cargar'
+
+/**
+ * Ficha: hay partes, pero alguna no trae contorno dibujable, así que la superficie
+ * en planta es la de las que SÍ lo traen. Se dice entre paréntesis en el renglón de
+ * «Partes» en vez de callarlo, porque si no la suma de abajo sería una superficie
+ * incompleta con pinta de completa (regla de oro 1). El recuento de las que faltan
+ * lo cuenta además `viewer/partes.js` en su propio aviso, y las dos cifras salen del
+ * mismo sitio: el modelo.
+ *
+ * @param {number} conContorno
+ * @param {number} total
+ * @returns {string}
+ */
+const textoPartes = (conContorno, total) =>
+  conContorno === total
+    ? FORMATO_ENTERO.format(total)
+    : `${FORMATO_ENTERO.format(total)} (${FORMATO_ENTERO.format(total - conContorno)} sin contorno)`
+
+/**
+ * Los cuatro `data-ficha` que la rama EDIFICIO **oculta**, porque sus rótulos hablan
+ * de la parcela y en esta rama serían una afirmación sobre el otro documento. Se
+ * ocultan el `<dd>` y su `<dt>`, con `hidden`: `.gml-app [hidden]` es (0,2,0) y
+ * ninguna regla de `.gml-ficha` declara `display`, así que basta.
+ */
+const FICHA_SOLO_PARCELA = Object.freeze([
+  'perimetro',
+  'superficie-catastral',
+  'delta-catastral',
+  'colindantes',
+])
+
+// ── F11 · lo que este ENSAMBLAJE tiene que decir por su cuenta ───────────────
+//
+// Los tres mensajes son de ESTE fichero y no de `./cableado-edificio.js`, por el
+// mismo reparto que puso `MENSAJE_SIN_EXPEDIENTE` en `./cableado-expediente.js`:
+// hablan de cómo se ha montado la aplicación —qué paso ha corrido, qué rama está
+// puesta—, y eso solo lo sabe quien la monta.
+
+/**
+ * La zona de arrastre anuncia aceptar `.dxf` y `.txt`, y el paso 13 no ha llegado a
+ * montarse. Es un fallo del programa, no del usuario, y por eso es ERROR: una
+ * extensión que se anuncia y al soltarla no hace nada es el error silencioso de
+ * manual. Mismo criterio y misma redacción que `MENSAJE_SIN_EXPEDIENTE`.
+ */
+const MENSAJE_SIN_EDIFICIO_CABLEADO =
+  'La rama de edificio no se ha podido montar en este arranque, así que ese fichero no tiene ' +
+  'dónde entrar. Recarga la página; si vuelve a pasar, es un fallo de la aplicación y está en ' +
+  'la consola del navegador.'
+
+/**
+ * Se ha soltado un dibujo (`.dxf`/`.txt`) con la rama PARCELA puesta. **No es un
+ * fallo**: es una vía que F11 no abre y que la ficha de F10 dejó anotada —la app
+ * escribe un DXF de parcela que todavía no sabe reabrir—. AVISO y no ERROR, y con
+ * la vía que sí existe escrita al lado: decir «no» sin decir «por dónde» es la mitad
+ * de un mensaje.
+ */
+const MENSAJE_DIBUJO_EN_PARCELA =
+  'Ese dibujo entra como PARTES DE UN EDIFICIO, y ahora mismo estás en la rama Parcela. Cambia ' +
+  'a la rama Edificio con el conmutador de la cabecera y vuelve a soltarlo. Reabrir un dibujo ' +
+  'como parcela todavía no está: esta versión sabe escribir su DXF, pero no leerlo de vuelta.'
+
+/**
+ * El `.gml` soltado resultó describir una construcción y se ha encaminado a la otra
+ * rama. Se DICE, y no es cortesía: la pantalla acaba de cambiar de panel sola, y un
+ * cambio de contexto que el usuario no ha pedido y que nadie explica se lee como un
+ * fallo. AVISO, porque no ha ido nada mal — ha ido a donde tenía que ir.
+ */
+const MENSAJE_GML_ES_DE_EDIFICIO =
+  'Ese GML describe una construcción, no una parcela: se ha cambiado a la rama Edificio para ' +
+  'poder enseñártelo. El contraste contra el parcelario es de la rama Parcela y no se aplica aquí.'
 
 // ── Constantes del cableado de F04 ───────────────────────────────────────────
 
@@ -849,6 +1050,28 @@ const eyebrow = nodo('[data-eyebrow]')
 // y la ficha del pie (ver la cabecera).
 const estado = crearEstadoVista(parcela)
 
+// ── F11 · el SEGUNDO store, el de la rama EDIFICIO (contrato H) ──────────────
+//
+// Se crea AQUÍ, junto al de parcela y por el mismo motivo escrito arriba («POR QUÉ
+// EL STORE LO CREA ESTA FUNCIÓN Y NO `crearVisor`»): para poder COMPARTIRLO. Lo
+// leen tres módulos del paso 13 y del 12 —el cableado de edificio, el panel y el
+// expediente—, y ninguno de ellos puede fabricarlo sin dejar a los otros dos
+// mirando otra cosa.
+//
+// **Es un store SEPARADO y no un campo del primero**, y no es un atajo: es lo que el
+// modelo lleva imponiendo desde F00. `crearExpediente` **prohíbe** llevar las dos
+// ramas a la vez (`model/parcela.js`), así que un solo store con las dos dentro
+// tendría que representar un estado que el dominio declara imposible. Y los ONCE
+// suscriptores del de parcela no se enteran de que existe éste: ni una línea suya
+// cambia en F11.
+//
+// ⚠️ **Nace en `null`, y eso es una decisión.** No se inventa un edificio de
+// demostración: es la misma regla por la que `./demo-datos.js` no le añade un patio
+// a la parcela real. Lo que sí hace el panel de edificio es DECIR qué hacer, con las
+// cinco vías a la vista, en vez de enseñar una lista vacía que se lee como «esto no
+// ha cargado».
+const estadoEdificio = crearEstadoVista(null)
+
 // UNA sola pila de deshacer, compartida por los DOS módulos que commitean:
 // `viewer/sincronizacion.js` (una celda tecleada, un vértice arrastrado) y
 // `viewer/edicion.js` (insertar, eliminar, desplazar un lindero). Los dos la
@@ -893,6 +1116,48 @@ const fichaDelta = nodo('[data-ficha="delta-catastral"]')
 const fichaColindantes = nodo('[data-ficha="colindantes"]')
 
 /**
+ * El `<dt>` de un `<dd data-ficha="…">`. **F11**: hasta aquí los rótulos eran fijos
+ * y bastaba con el `<dd>`; ahora dos de ellos cambian de pregunta según la rama
+ * («Vértices» ⇢ «Partes») y otros cuatro se ocultan enteros, y ocultar un `<dd>`
+ * dejando su `<dt>` a solas partiría la rejilla de dos columnas por la mitad.
+ *
+ * Se DERIVA del `<dd>` en vez de darle un `data-*` propio a cada `<dt>`, por lo
+ * mismo que la ficha tiene un solo dueño: dos contratos para el mismo par de nodos
+ * acaban divergiendo, y el par es lo que `<dl>` ya emparejaba.
+ *
+ * LANZA si el vecino no es un `<dt>`: eso sería la cáscara reordenada por debajo, un
+ * contrato del programador, y tiene que sonar en desarrollo (regla de oro 1).
+ *
+ * @param {Element} dd
+ * @returns {Element}
+ */
+function rotuloDe(dd) {
+  const dt = dd.previousElementSibling
+  if (dt === null || dt.tagName !== 'DT') {
+    throw new Error(
+      `app/main.js: el <dd data-ficha="${dd.getAttribute('data-ficha')}"> del pie no viene ` +
+        `precedido de su <dt> (encontrado: ${dt === null ? 'nada' : dt.tagName}). La ficha es una ` +
+        `<dl> de pares y F11 necesita el rótulo para reescribirlo y para ocultarlo con su valor.`,
+    )
+  }
+  return dt
+}
+
+/** Los pares completos, para poder ocultar el rótulo junto con el valor. */
+const fichaPares = new Map(
+  [
+    ['srs', fichaSrs],
+    ['refcat', fichaRefcat],
+    ['vertices', fichaVertices],
+    ['superficie', fichaSuperficie],
+    ['perimetro', fichaPerimetro],
+    ['superficie-catastral', fichaSuperficieCatastral],
+    ['delta-catastral', fichaDelta],
+    ['colindantes', fichaColindantes],
+  ].map(([clave, valor]) => [clave, { valor, rotulo: rotuloDe(valor) }]),
+)
+
+/**
  * Cuántas parcelas colindantes se han traído del Catastro, o `null` mientras
  * nadie las haya pedido. Es un `let` de módulo y no un dato del store a
  * propósito: `model/parcela.js` no tiene dónde guardar unas vecinas —lo dice
@@ -903,6 +1168,20 @@ const fichaColindantes = nodo('[data-ficha="colindantes"]')
  * @type {number|null}
  */
 let colindantesTraidas = null
+
+/**
+ * Qué rama está en pantalla, **desde el punto de vista de la ficha del pie**. Es un
+ * `let` de módulo y no una lectura de `ramaCableada.get()` por una razón de orden:
+ * la ficha se monta en el paso 4 y el conmutador no existe hasta el 13, así que
+ * entre los dos hay nueve pasos en los que preguntarle sería preguntarle a `null`.
+ * Lo escribe {@link aplicarRamaALaFicha}, que es el suscriptor del conmutador.
+ *
+ * Nace en PARCELA porque es con lo que arranca la pantalla: `index.html` declara esa
+ * rama y `cablearRama` la confirma. **No existe el estado «sin rama».**
+ *
+ * @type {'PARCELA'|'EDIFICIO'}
+ */
+let ramaEnPantalla = RAMA.PARCELA
 
 /**
  * El rótulo de PROCEDENCIA de la cabecera (`data-eyebrow`): qué es, exactamente,
@@ -1108,6 +1387,122 @@ function actualizarFicha(parcelaActual) {
     colindantesTraidas === null ? SIN_COLINDANTES : FORMATO_ENTERO.format(colindantesTraidas)
 }
 
+// ── F11 · la otra cara de la misma ficha ─────────────────────────────────────
+
+/**
+ * El rótulo de PROCEDENCIA de la cabecera con la rama EDIFICIO puesta. Dos estados
+ * y no tres, porque en esta rama **no hay demostración**: el store nace vacío a
+ * propósito. Ver {@link EYEBROW_EDIFICIO}.
+ *
+ * @param {object|null} edificioActual
+ * @returns {string}
+ */
+function rotuloDelEdificio(edificioActual) {
+  return edificioActual === null || edificioActual === undefined
+    ? EYEBROW_EDIFICIO_VACIO
+    : EYEBROW_EDIFICIO
+}
+
+/**
+ * Las partes de un Edificio, o `[]`. Mismo criterio que {@link recintosDe}: en este
+ * store «no hay nada» es un estado legítimo y no una excepción.
+ *
+ * @param {object|null} edificioActual
+ * @returns {Array<object>}
+ */
+function partesDe(edificioActual) {
+  return edificioActual && Array.isArray(edificioActual.partes) ? edificioActual.partes : []
+}
+
+/**
+ * Repinta la ficha desde el POJO `Edificio`. Suscriptor del SEGUNDO store, y la
+ * mitad de {@link repintarFicha} que se ejecuta con la rama EDIFICIO puesta.
+ *
+ * Pinta CUATRO renglones y no ocho: los otros cuatro los oculta
+ * {@link aplicarRamaALaFicha}, porque sus rótulos hablan de la parcela y aquí
+ * estarían afirmando cosas del otro documento (ver el bloque de {@link ROTULO_PARTES}).
+ *
+ * ⚠️ **La superficie se mide sobre las huellas que TIENEN contorno**, y las que no
+ * lo tienen se cuentan en el renglón de arriba: una suma incompleta con pinta de
+ * completa es la regla de oro 1 rota. `geo/area.js#area` devuelve el valor absoluto,
+ * así que una huella dibujada al revés suma igual — el sentido de giro es asunto del
+ * serializador (F13), no de una cifra que se lee.
+ *
+ * @param {object|null} edificioActual  POJO de Edificio del segundo store (o `null`).
+ * @returns {void}
+ */
+function actualizarFichaEdificio(edificioActual) {
+  eyebrow.textContent = rotuloDelEdificio(edificioActual)
+
+  // El SRS es del EXPEDIENTE, no del tema: la misma línea en las dos ramas.
+  fichaSrs.textContent = SRS_DEMO
+  fichaRefcat.textContent = (edificioActual && edificioActual.refcat) || SIN_REFCAT
+
+  const partes = partesDe(edificioActual)
+  if (edificioActual === null || edificioActual === undefined) {
+    // Sin edificio no hay nada que contar ni que medir, y se DICE. Un «0» aquí
+    // afirmaría que el edificio tiene cero partes, que es otra cosa.
+    fichaVertices.textContent = SIN_EDIFICIO
+    fichaSuperficie.textContent = SIN_EDIFICIO
+    return
+  }
+
+  const huellas = partes
+    .map((parte) => parte?.recinto?.vertices)
+    .filter((vertices) => Array.isArray(vertices) && vertices.length > 0)
+
+  fichaVertices.textContent = textoPartes(huellas.length, partes.length)
+  fichaSuperficie.textContent = `${FORMATO_SUPERFICIE.format(
+    huellas.reduce((suma, vertices) => suma + area(vertices), 0),
+  )} m²`
+}
+
+/**
+ * **El único punto de entrada de la ficha desde F11.** Mira qué rama está en
+ * pantalla y le pasa el trabajo al pintor que toca, cada uno leyendo SU store.
+ *
+ * Existe por lo mismo que {@link pintarMedidas} es un solo sitio: los dos stores
+ * notifican por su cuenta y la ficha es una sola. Sin este reparto, un `estado.set`
+ * de la parcela —una edición, un `undo`, una parcela traída del Catastro— repintaría
+ * cifras de parcela encima de las del edificio **sin que nadie lo pidiera**, y el
+ * usuario vería la superficie de otra cosa en la línea que está mirando.
+ *
+ * @returns {void}
+ */
+function repintarFicha() {
+  if (ramaEnPantalla === RAMA.EDIFICIO) actualizarFichaEdificio(estadoEdificio.get())
+  else actualizarFicha(estado.get())
+}
+
+/**
+ * Deja la ficha con la forma de una rama: reescribe los dos rótulos que cambian de
+ * pregunta, oculta (o repone) los cuatro pares que solo tienen sentido en la parcela
+ * y repinta. Es el suscriptor del conmutador del paso 13.
+ *
+ * Se ocultan **el `<dd>` y su `<dt>`**: la ficha es una rejilla de dos columnas y
+ * dejar el rótulo solo la partiría por la mitad.
+ *
+ * @param {'PARCELA'|'EDIFICIO'} ramaNueva
+ * @returns {void}
+ */
+function aplicarRamaALaFicha(ramaNueva) {
+  ramaEnPantalla = ramaNueva === RAMA.EDIFICIO ? RAMA.EDIFICIO : RAMA.PARCELA
+  const enEdificio = ramaEnPantalla === RAMA.EDIFICIO
+
+  fichaPares.get('vertices').rotulo.textContent = enEdificio ? ROTULO_PARTES : ROTULO_VERTICES
+  fichaPares.get('superficie').rotulo.textContent = enEdificio
+    ? ROTULO_SUPERFICIE_PLANTA
+    : ROTULO_SUPERFICIE
+
+  for (const clave of FICHA_SOLO_PARCELA) {
+    const par = fichaPares.get(clave)
+    par.valor.hidden = enEdificio
+    par.rotulo.hidden = enEdificio
+  }
+
+  repintarFicha()
+}
+
 /**
  * Deja constancia de cuántas parcelas colindantes se han traído (o de que ya no
  * hay ninguna consulta vigente, con `null`) y repinta la ficha.
@@ -1117,7 +1512,7 @@ function actualizarFicha(parcelaActual) {
  */
 function fijarRecuentoColindantes(cuantas) {
   colindantesTraidas = cuantas
-  actualizarFicha(estado.get())
+  repintarFicha()
 }
 
 /**
@@ -1141,6 +1536,12 @@ function fijarRecuentoColindantes(cuantas) {
  * @returns {void}
  */
 function previsualizarMedidas(anillosUTM) {
+  // ⚠️ F11: con la rama EDIFICIO puesta este canal NO pinta. La parcela sigue en el
+  // mapa como CONTEXTO y sus vértices se pueden arrastrar —la barra de edición está
+  // oculta, los marcadores no—, así que sin esta guarda un arrastre escribiría la
+  // superficie de la parcela en la línea que está enseñando la del edificio. Es la
+  // misma razón por la que {@link repintarFicha} reparte en vez de pintar.
+  if (ramaEnPantalla === RAMA.EDIFICIO) return
   const parcelaActual = estado.get()
   const base = recintosDe(parcelaActual)
   pintarMedidas(
@@ -1149,11 +1550,15 @@ function previsualizarMedidas(anillosUTM) {
   )
 }
 
-estado.subscribe(actualizarFicha)
+estado.subscribe(repintarFicha)
+// F11 · el SEGUNDO store también repinta la ficha, y por el mismo camino: es la
+// misma vista de dos documentos distintos. Suscribirse a los dos y repartir dentro
+// —en vez de tener dos fichas— es lo que hace que no puedan divergir.
+estadoEdificio.subscribe(repintarFicha)
 // `subscribe` NO notifica al suscribirse (ver `crearEstadoVista`): el primer
 // pintado se hace a mano, o la ficha se quedaría con los guiones del HTML hasta
 // la primera edición.
-actualizarFicha(estado.get())
+repintarFicha()
 
 // ── 5 · Visor ────────────────────────────────────────────────────────────────
 
@@ -1794,6 +2199,23 @@ let catastroCableado = null
 let clienteCatastro = null
 
 /**
+ * El cliente del servicio de EDIFICIO (F11), o `null` si no se llegó a construir.
+ * Vive fuera del `try` por lo mismo que los tres de arriba, y lo consume el paso 13.
+ *
+ * ⚠️ **Comparte el `transporte` con {@link clienteCatastro}, y eso no es estilo**:
+ * la cola de concurrencia 2, los reintentos y el ritmo son de la APLICACIÓN frente
+ * al servidor del Catastro, no de cada cliente — es literalmente lo que exige el
+ * override O8. `crearClienteEdificio` lo comprueba y lanza si le dan otro.
+ *
+ * `null` no es una excepción que tapar: la rama EDIFICIO se monta igual y lo DICE
+ * (`MENSAJE_SIN_CLIENTE` de `./cableado-edificio.js`). Las cuatro vías por fichero
+ * —DXF, listado, GML de edificio y proyecto— no tocan la red.
+ *
+ * @type {ReturnType<typeof crearClienteEdificio>|null}
+ */
+let clienteEdificio = null
+
+/**
  * La CACHÉ del Catastro, o `null` si no se llegó a construir. Vive fuera del `try`
  * por la misma razón que las dos de arriba, y la consume el paso 12 para **una sola
  * cosa**: purgarla por antigüedad cuando el almacén local se quede sin espacio
@@ -1847,6 +2269,27 @@ try {
   // que reviente después de esta línea deja el bloque del Catastro apagado, pero
   // NO deja al paso 9 sin parcelario.
   clienteCatastro = cliente
+
+  // ── F11 · el segundo cliente, con EL MISMO transporte y LA MISMA caché ─────
+  // El `wfsBU` es otro endpoint del mismo servidor, así que compartir transporte no
+  // es una comodidad: es lo que hace que las dos ramas sumen a la MISMA cola y al
+  // mismo ritmo (override O8). Compartir la caché tampoco es casual — sus claves
+  // llevan el prefijo `parcela:<srs>:<refcat>:bu:<consulta>`, reusando el almacén
+  // que ya existe en vez de estrenar uno que obligaría a migrar la base.
+  //
+  // Va DESPUÉS del cliente de parcela y antes de `cablearCatastro` por el mismo
+  // criterio de arriba: cada línea deja construido lo que ya se puede construir, y
+  // lo que reviente después no se lleva por delante lo anterior.
+  clienteEdificio = crearClienteEdificio({
+    transporte,
+    cache,
+    // Explícito, como el de parcela y por lo mismo: el sistema de referencia es del
+    // EXPEDIENTE (el que se pinta en la ficha), no del servicio.
+    srs: SRS_DEMO,
+    // Solo para los fallos de la CACHÉ, que es lo único suyo que no cabe en ningún
+    // resultado. Los resultados los devuelve y los publica el cableado.
+    alAvisar: panel.avisar,
+  })
 
   const catastro = cablearCatastro({
     // El MISMO store que el mapa, la tabla y la ficha. `viewer/index.js`
@@ -2017,6 +2460,36 @@ let comprobacionCableada = null
 let expedienteCableado = null
 
 /**
+ * El cableado de la rama EDIFICIO del paso 13, o `null` mientras no exista.
+ * **Referencia ADELANTADA por el mismo motivo que las dos de arriba**, y aquí la
+ * leen DOS destinos que el paso 9 le entrega a la zona de fichero: el `.dxf`/`.txt`
+ * (por extensión) y el GML de edificio (por contenido). Las dos cosas ocurren mucho
+ * después del arranque, así que el destino se resuelve TARDE en vez de congelarse en
+ * el montaje.
+ *
+ * `null` en el momento de soltar un fichero solo puede significar que el paso 13
+ * reventó, y entonces **se dice**: una zona que anuncia aceptar `.dxf` y que al
+ * soltarlo no hace nada es el error silencioso de manual. Es literalmente el mismo
+ * razonamiento que F10 escribió para el `.json`.
+ *
+ * @type {ReturnType<typeof cablearEdificio>|null}
+ */
+let edificioCableado = null
+
+/**
+ * El conmutador de rama del paso 13, o `null` mientras no exista. Tercera referencia
+ * adelantada del fichero, y la lee el desvío `alGmlDeEdificio` que el paso 9 le
+ * entrega a la zona de fichero: encaminar un GML de construcción implica **conmutar
+ * la rama**, y eso no lo puede hacer `cablearComprobacion` porque no sabe que existen.
+ *
+ * ⚠️ No se usa para preguntar «¿qué rama hay?» en el resto del fichero: para eso
+ * está {@link ramaEnPantalla}, que existe desde el paso 4 y no desde el 13.
+ *
+ * @type {ReturnType<typeof cablearRama>|null}
+ */
+let ramaCableada = null
+
+/**
  * El cableado del diagnóstico. **Se guarda la referencia desde F09** y no por
  * gusto: el paso 11 le pide `ultimoDiagnostico()`, que es el ÚNICO sitio donde
  * vive el diagnóstico que el cajón está enseñando ahora mismo. El informe firmable
@@ -2142,7 +2615,65 @@ comprobacionCableada = cablearComprobacion({
         expedienteCableado.abrirProyecto(fichero)
       },
     },
+    // ── F11 · el `.dxf` y el `.txt`, que esta app sabía ESCRIBIR y no abrir ───
+    // F10 dejó la asimetría escrita: la aplicación exporta un DXF que no sabe
+    // reabrir, y `parsers/dxf.js` llevaba desde F01 sin un solo llamante en
+    // producción. Aquí estrena llamante.
+    //
+    // ⚠️ **Y la asimetría queda cerrada A MEDIAS, que es lo honrado escribir.**
+    // Un dibujo entra como PARTES DE UN EDIFICIO; reabrirlo como PARCELA —que es
+    // la mitad que F10 dejó anotada— sigue sin existir, y es lo que dice
+    // {@link MENSAJE_DIBUJO_EN_PARCELA} unas líneas más abajo. Con `capas[]` ya
+    // disponible es tarea pequeña, y su sitio es F12.
+    //
+    // ⚠️ **El destino depende de la RAMA ACTIVA, y por eso se resuelve dentro** y
+    // no capturando una referencia: con la rama PARCELA un DXF es una medición de
+    // la parcela, y con la EDIFICIO son las huellas de la construcción. Es el mismo
+    // fichero y son dos documentos distintos, así que decidirlo en el montaje —donde
+    // ni siquiera existe todavía el conmutador— sería congelar la respuesta a una
+    // pregunta que el usuario contesta después.
+    {
+      extensiones: EXTENSIONES_EDIFICIO,
+      alFichero: (fichero) => {
+        if (edificioCableado === null) {
+          panel.avisar(MENSAJE_SIN_EDIFICIO_CABLEADO, { nivel: NIVEL.ERROR })
+          return
+        }
+        // ⚠️ Con la rama PARCELA todavía NO hay a quién dárselo: la entrada por DXF
+        // de la parcela es la otra mitad de la asimetría de F10 y **no entra en
+        // F11**. Se dice, con la vía que sí existe, en vez de cargar las huellas en
+        // una rama que está enseñando otra cosa.
+        if (ramaEnPantalla !== RAMA.EDIFICIO) {
+          panel.avisar(MENSAJE_DIBUJO_EN_PARCELA, { nivel: NIVEL.AVISO })
+          return
+        }
+        // La promesa se suelta a propósito, igual que arriba: `alFichero` no lanza
+        // y cuenta por el panel y por su renglón todo lo que decide.
+        edificioCableado.alFichero(fichero)
+      },
+    },
   ],
+  // ── F11 · el GML de EDIFICIO, por CONTENIDO y no por extensión ─────────────
+  // Un `.gml` es un `.gml` hasta que se lee. `comprobacion/gml.js` reconoce el
+  // dialecto BU desde F08 y hasta hoy se paraba ahí con honradez, porque no había
+  // sitio al que llevarlo: era el criterio 4 de F08, declarado «a medias». Ya hay
+  // sitio, así que el fichero se encamina y **la rama se conmuta**, que es la parte
+  // que `cablearComprobacion` no puede hacer porque no sabe que existen las ramas.
+  //
+  // Resolución TARDE, por lo mismo que las dos entradas de arriba.
+  alGmlDeEdificio: (fichero) => {
+    if (edificioCableado === null || ramaCableada === null) {
+      panel.avisar(MENSAJE_SIN_EDIFICIO_CABLEADO, { nivel: NIVEL.ERROR })
+      return
+    }
+    // Primero la rama y después el fichero, y el orden importa: `alFichero` escribe
+    // en el segundo store y pinta las huellas en el mapa, y hacerlo con el panel de
+    // parcela todavía delante dejaría al usuario mirando cómo cambia un documento
+    // que no está viendo.
+    ramaCableada.set(RAMA.EDIFICIO)
+    panel.avisar(MENSAJE_GML_ES_DE_EDIFICIO, { nivel: NIVEL.AVISO })
+    edificioCableado.alFichero(fichero)
+  },
   // El botón del rótulo y el renglón de procedencia los localiza él con los
   // selectores de su contrato, y LANZA nombrándolos si `index.html` no los trae.
   // El `<input type="file">` y la superposición de arrastre NO están en la cáscara:
@@ -2673,6 +3204,86 @@ cablearInforme({
     comprobacionCableada === null ? null : comprobacionCableada.comprobacion(),
 })
 
+// ── 13 · La segunda rama: EDIFICIO (F11 · T4.1) ──────────────────────────────
+//
+// Aquí la aplicación deja de tener un solo tema. Once fases hablando de parcelas y
+// este paso monta el conmutador, el panel de edificio que SUSTITUYE al de parcela y
+// el cableado que cose sus cinco vías de entrada con el segundo store y con el mapa.
+//
+// ⛔ **VA ANTES DEL PASO 12 aunque lleve número mayor** (ver la cabecera): el
+// expediente **se suscribe** al conmutador, así que la rama tiene que existir cuando
+// él se monta. El expediente sigue siendo el último en ejecutarse; F11 se cuela
+// delante.
+//
+// SIN `try` propio, igual que los pasos 6, 8, 9, 11 y 12: lo único que puede lanzar
+// aquí es un contrato del programador —una cáscara sin `.gml-chips`, un `<body>` sin
+// `gml-app`, un CTA del pie que `index.html` ya no trae, un `srs` que no es un huso
+// implementado—, y eso tiene que ser ruidoso en desarrollo en vez de degradarse en
+// silencio en producción. Lo que sí está previsto —que el bloque del Catastro se
+// cayera y no haya clientes— entra como `null` y la rama se monta igual, diciendo
+// que no hay servicio: las cuatro vías por fichero no tocan la red.
+
+// El conmutador PRIMERO, y no por gusto: `cablearEdificio` le pregunta con qué rama
+// nace la pantalla para dejar sus dos secciones con el `hidden` correcto. Al revés
+// también funciona —las secciones de EDIFICIO se descubren por `data-rama-panel` en
+// cada conmutación, no al cablear—, pero entonces el panel de edificio se quedaría
+// visible encima del de parcela hasta la primera pulsación.
+ramaCableada = cablearRama({
+  documento: document,
+  panel,
+  // ⛔ Se le pasa el VISOR entero y él pregunta por `visor.barraEdicion`, jamás por
+  // `visor.edicion`: son dos preguntas distintas y la segunda no implica la primera
+  // (con `edicion: {barra: false}` la edición se monta y la barra no). Está medido.
+  visor,
+})
+
+// La ficha del pie es el TERCER suscriptor del conmutador —después del propio DOM y
+// del expediente—, y el único que no cambia de panel: cambia de PREGUNTA. Cinco de
+// sus ocho renglones hablan de la parcela y con el edificio delante estarían
+// afirmando cosas del otro documento. Ver {@link aplicarRamaALaFicha}.
+ramaCableada.subscribe(aplicarRamaALaFicha)
+
+// El panel de la rama, **creado aquí y montado por el cableado**. Es el mismo reparto
+// que el `cliente` de `cablearCatastro` y por lo mismo: crearlo dentro decidiría por
+// el llamante el documento y el canal de avisos de una vista. Quien lo monta es
+// `cablearEdificio`, que además le sella las dos `<section>` con `data-rama-panel`
+// —sin esa marca el conmutador no las gobierna y la rama no se enseñaría nunca—.
+const panelEdificio = crearPanelEdificio({ documento: document, alAvisar: panel.avisar })
+
+edificioCableado = cablearEdificio({
+  // El SEGUNDO store (paso 2). Su estado ES el POJO `Edificio` o `null`, simétrico a
+  // como el de parcela es el POJO Parcela.
+  estado: estadoEdificio,
+  panel,
+  panelEdificio,
+  // El mismo SRS del expediente que reciben el visor, los dos clientes, F08 y F09.
+  srs: SRS_DEMO,
+  // `null` cuando el bloque del paso 7 se cayó, y `null` ahí es una respuesta
+  // prevista: la rama se monta igual y dice que no hay servicio.
+  cliente: clienteEdificio,
+  // ⚠️ El de PARCELA, y **solo** para deducir la referencia catastral desde la
+  // huella. No se le pasa el cableado del paso 7 por lo mismo que en el paso 9:
+  // `cargar()` haría un `estado.set` en el store de la OTRA rama.
+  clienteParcela: clienteCatastro,
+  // El `L.Map` del visor, para pintar las huellas en su pane propio (422) y para
+  // encuadrar sobre ellas. Es el MISMO mapa: las dos ramas comparten la cartografía.
+  mapa: visor.mapa,
+  // Solo se LEE, y solo para que la parcela que hubiera en pantalla viaje como
+  // `edificio.parcelaContexto` — que es literalmente lo que `model/edificio.js`
+  // previó— y **nunca** como rama `parcela` de un expediente (desviación 9 de F11).
+  estadoParcela: estado,
+  // Para saber con qué rama nace la pantalla, y nada más.
+  //
+  // ⚠️ **Hoy es REDUNDANTE, y se pasa igual.** Medido por mutación: quitarlo no
+  // cambia ni una prueba, porque `cablearEdificio` se cae a leer el `data-rama` del
+  // documento y `cablearRama` —que corre tres líneas más arriba— ya lo ha escrito.
+  // Es decir: la redundancia la produce el ORDEN que se eligió aquí, no el
+  // parámetro. El día que alguien monte el panel de edificio antes que el
+  // conmutador, esta línea es lo único que evita que las dos secciones nuevas se
+  // queden visibles encima del panel de parcela hasta la primera pulsación.
+  rama: ramaCableada,
+})
+
 // ── 12 · Persistencia y exportación (F10 · T5.1) ─────────────────────────────
 
 // Once fases después, la aplicación **por fin recuerda**. Hasta esta línea, recargar
@@ -2729,6 +3340,18 @@ expedienteCableado = cablearExpediente({
   // `null` cuando el bloque del Catastro se cayó, y `null` ahí es una respuesta
   // prevista: no hay nada que liberar y el cableado lo dice.
   cache: cacheCatastro,
+  // ── F11 · las dos piezas que impiden guardar el documento equivocado ───────
+  // Sin ellas `expedienteActual()` devolvería SIEMPRE `{srs, parcela}`, y con la
+  // rama EDIFICIO puesta eso tenía dos desenlaces y los dos eran malos: guardar la
+  // parcela mientras en pantalla hay un edificio (documento equivocado, **en
+  // silencio**), o pasarle las dos ramas a `crearExpediente`, que LANZA dentro de un
+  // `click` porque el modelo impone la exclusividad desde F00.
+  //
+  // ⚠️ Y de aquí sale la razón por la que el paso 13 corre ANTES que éste: este
+  // cableado **se suscribe** al conmutador —para poder ofrecer que se guarde lo que
+  // cambió antes de salir de la rama—, así que no vale pasárselo después.
+  rama: ramaCableada,
+  estadoEdificio,
   // El MISMO gancho que reciben el Catastro (paso 7) y la comprobación (paso 9).
   alCargarParcela: edicionCableada.alCargarParcela,
   // Se comprueba la FORMA en vez de pasarlo a ciegas, mismo criterio que el `catastro:`

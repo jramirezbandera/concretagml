@@ -62,6 +62,36 @@ visual**.
 > BLOQUEANTE). **El punto 11 se firma junto con el 6, el 7, el 8, el 9 y el 10**;
 > la cadena bloqueada pasa a ser **F03 → F05 → F06 → F07 → F08 → F09 → F10**.
 >
+> Y desde F11 tiene un punto **12**, el de EDIFICIO, ENTRADA Y MODELO, y llega con
+> una diferencia respecto a los seis anteriores: **el guion que lo precede encontró
+> defectos**. `13-edificio.js` destapó **dos de producción** que la suite no ve
+> porque jsdom no calcula un solo píxel — el panel de la rama Edificio **no cabía**
+> (la lista de partes en 2 px, la de avisos en 0 y el pie recortado 48 px en
+> silencio, con «Diagnosticar encaje» fuera de la pantalla) y la aplicación **se
+> contradecía** al cargar un edificio («Cargadas 7 partes» y «No se construye la
+> parcela», a la vez). **Los dos se corrigieron el mismo día**: el segundo está
+> cerrado, y del primero se ganaron **164,99 px medidos** —el panel ya cabe y el
+> recorte es 0—, pero **sus dos cajas encogibles siguen sin sitio con datos
+> dentro**: faltan **32,70 px** para el mínimo decente y **569,31** para verlo todo.
+> Así que el §12.1 es BLOQUEANTE y lo que se pide no es descubrirlo, es **decidir de
+> dónde salen esos píxeles**. Se suman otros dos bloqueantes: que la huella **caiga
+> donde está el edificio** (§12.3 — comparar la mancha violeta con el tejado de la
+> ortofoto es la comprobación entera que justifica pintarlas, y ninguna máquina la
+> hace) y el de lectura que HEREDA el carácter del 8.1, el 9.4, el 10.5 y el 11.6
+> (§12.9). Más **la vía en vivo del `wfsBU`** (§12.7), que el guion no toca a
+> propósito y que trae su propio régimen de red, y una comprobación que solo se
+> puede hacer con los oídos: que el **segundo CTA no quede mudo** para un lector de
+> pantalla, ahora que su motivo vive en el renglón del otro botón (§12.4). **El
+> punto 12 se firma junto con el 6, el 7, el 8, el 9, el 10 y el 11**; la cadena
+> bloqueada pasa a ser **F03 → F05 → F06 → F07 → F08 → F09 → F10 → F11**.
+>
+> ⭐ **Y una anotación de método que no es de F11**: los tres arreglos de arriba
+> salieron de tres corridas del mismo guion, y **cada uno de una cifra que la
+> corrida anterior había puesto encima de la mesa**. Ninguna de las tres la podía
+> dar la suite —jsdom no calcula un píxel—, y el tercero ni siquiera era un defecto
+> de maquetación: era **una advertencia dicha dos veces**, que solo se ve cuando
+> alguien mide lo que ocupa. Es el argumento entero de esta carpeta.
+>
 > ⛔ **Y el punto 9 ya se ha recorrido una vez, el 2026-08-02, y encontró TRES
 > DEFECTOS REALES — dos de los cuales ni siquiera eran de F08: venían de F03 y de
 > F05.** Están corregidos, con guardián en la suite y **medidos desde entonces por
@@ -1399,6 +1429,340 @@ botones apagados, avisos de durabilidad y una lista de «lo que NO se guarda».
 
 ---
 
+## 12 · Edificio, entrada y modelo ⟨F11⟩ — lo que ni `13-edificio.js` firma
+
+**Por qué está aquí.** F11 le da a esta aplicación **una segunda rama**. Once fases
+hablando de parcelas y ahora hay un conmutador en la cabecera que cambia el panel
+entero, un segundo store, huellas violetas sobre la ortofoto y un diálogo que
+pregunta qué capas del dibujo entran. `13-edificio.js` mide lo que jsdom no puede
+—píxeles, panes, ficheros soltados de verdad, el conmutador ida y vuelta con la
+aplicación entera montada—, y de paso **destapó dos defectos de producción** que la
+suite no veía. Cifras y detalle en `GUION.md` §19.
+
+> ⛔ **LEE EL §19 ANTES DE EMPEZAR.** El guion encontró **dos defectos reales** el
+> 2026-08-04 y se corrió **tres veces** ese día, cada una detrás de un arreglo:
+> **4 problemas → 3 → 1**. Estado de hoy:
+>
+> - **el aviso que contradecía a la aplicación: CERRADO** (`avisoQueNiegaLaCarga:
+>   null`), arreglado en su origen y con guardián puesto;
+> - **el panel que no cabía: CABE.** El recorte de `.gml-panel` es **0 px** en
+>   vacío y con datos, y «Diagnosticar encaje» y su motivo **se ven**;
+> - **la advertencia del autoguardado se decía DOS VECES** —entera en el renglón y
+>   entera otra vez como tarjeta—: ahora va **breve en el renglón** y **entera en la
+>   tarjeta, una vez**. Con eso `#avisos` pasó de 6,69 a **24,84 px** y la lista, en
+>   vacío, de 58,70 a **90,03 px (tres filas)**;
+> - ⛔ **lo único que QUEDA**: con 7 partes cargadas la lista mide **7,06 px** para
+>   184 de contenido, así que **no se ve ni una fila entera**. **Faltan 18,33 px**
+>   (eran 32,70) y **546,10 px** para verlo todo.
+>
+> Si vienes a esta lista sin saberlo, vas a redescubrirlo en el punto 12.1 y a
+> pensar que has roto algo. No lo has roto: está medido y está escrito. Lo que se
+> te pide aquí **no es descubrirlo, es decidir de dónde salen esos 18,33 px** — y
+> de ellos **8,84 están al lado**, en el margen que hoy tiene `#avisos`.
+
+**Cómo prepararlo, y cuesta CERO peticiones al Catastro.** Con la app viva, pulsa
+**«Edificio»** en la cabecera y suelta sobre la ventana
+`test/fixtures/parsers/edificio_consulta_masiva_3515508VF0831N.dxf` (7 anillos en
+`Construccion` + 1 en `Parcela`, descarga real de Consulta Masiva). Todo lo de los
+puntos 12.1 a 12.6 se recorre con ficheros locales y se puede repetir las veces que
+haga falta. **Solo el 12.7 toca la red**, y tiene su régimen.
+
+### 12.1 · ⛔ Los 18,33 px que faltan, con los ojos ⟨BLOQUEANTE⟩
+
+**Por qué es bloqueante.** Es lo que queda del **defecto A** del §19, y lo que hay
+que decidir aquí no es si existe —está medido— sino **de dónde salen los píxeles**,
+que es una decisión de producto y no de máquina. Van **tres** ahorros aplicados, y
+cada uno salió de una cifra que la corrida anterior del guion había medido:
+
+| Ahorro | Ganancia | Qué cerró |
+|---|---|---|
+| Solo el apunte del modelo ELEGIDO | −97,62 px | |
+| UN motivo para los dos CTA | −67,37 px | el recorte del panel: 48/115 → **0/0** |
+| La advertencia del autoguardado **una vez** (breve en el renglón, entera en la tarjeta) | −44,53 / −29,68 px | `#avisos`: 6,69 → **24,84 px** · lista en vacío: 58,70 → **90,03 px (3 filas)** |
+
+⛔ **Lo que no cerró ninguno**: con 7 partes cargadas la lista mide **7,06 px** para
+184 de contenido. **Faltan 18,33 px** para que se vea UNA fila.
+
+- [ ] Conmuta a **Edificio** sin cargar nada. La lista mide ahora **90,03 px** (tres
+      filas). ¿Se lee entero el renglón de las cinco vías de entrada (ocupa 124 px),
+      o se corta? ⚠️ **Ese renglón es lo PRIMERO que ve el usuario de esta rama.**
+- [ ] Carga el DXF y mira otra vez: **7 partes en la ficha del pie y en el rótulo,
+      y ninguna a la vista** (la lista cae a 7,06 px). ¿Se entiende que están ahí?
+      ¿Buscarías la barra de scroll?
+- [ ] ✅ Mira el rótulo «AVISOS»: ahora se ve la cabecera de una tarjeta. ¿Se lee
+      lo suficiente como para saber que hay algo, o solo se intuye?
+- [ ] ✅ Baja hasta el pie: **«Diagnosticar encaje» y su motivo tienen que verse
+      enteros.** Si no se ven, el primer arreglo se ha deshecho: vuelve al §19.
+- [ ] ⭐ **JUICIO, y es lo que se pide de verdad.** Faltan **18,33 px** para una
+      fila (**176,94** para las siete, **546,10** para verlo todo). Y hay dos sitios
+      de donde pueden salir, en orden de cercanía:
+      · **8,84 px están AL LADO**: es el margen que `#avisos` tiene hoy por encima de
+      su mínimo (24,84 contra los 16 de una línea). No hay que quitárselos a nadie,
+      pero dejan a los avisos justo en el hueso. **¿Lo aceptas?**
+      · los **9,49 px restantes** salen de los tres fijos, que con datos suman
+      **772,23 px** de 900: `.gml-bloque--edificio` **397,19** (rótulo 15,94 +
+      **selector 174,41** + refcat 54,94 + estado **44,53** + procedencia **59,38**;
+      ⚠️ los dos últimos **solo aparecen con datos**, +74,22 px, o sea justo cuando la
+      lista tiene algo que enseñar), `.gml-panel-pie` **257,91** (ficha 72,75 +
+      acciones **140,16**) y la cabecera **117,13**.
+      ¿Cuál cede? Apunta tu orden. La salida **NO** es subir
+      `--gml-partes-alto-max`: el tope (234 px) **no muerde ni una vez**.
+- [ ] ⚠️ **Y mira el margen antes de firmar**: hoy sobran **8,84 px** en `#avisos` y
+      **0** en la lista. **F12 añade las plantas por parte** —más texto por fila y
+      filas más altas—, o sea que entra en un panel sin holgura. Si crees que hay que
+      ensanchar el panel o repensar la maqueta, **este es el momento de decirlo**.
+- [ ] Prueba con la ventana más alta (pantalla completa, 1080 o 1440 de alto): ¿a
+      partir de qué altura se ven las 7 filas? Apunta la cifra: es el dato que dice
+      si esto es «se queda corto en portátiles» o «se queda corto siempre».
+
+### 12.2 · Lo que la carga DICE, ahora que ya no se contradice
+
+**Por qué está aquí.** Era el **defecto B** del §19 —el panel decía «Cargadas 7
+partes» y a la vez una tarjeta decía «**No se construye la parcela**»— y **está
+cerrado**: `edificio/entrada.js` filtra ahora las detecciones de parcela con la
+misma lista publicada con la que ya filtraba los bloqueos, y el guion lo vigila. Lo
+que queda aquí es de LECTURA, y hereda el carácter del 8.1, el 9.4, el 10.5 y el
+11.6: la regla de oro 9 dice que la aplicación **mide** y el colegiado
+**interpreta y firma**.
+
+- [ ] Carga el DXF de edificio. Lee el renglón del panel: «Cargadas 7 partes… 62
+      vértices en total. 4 nota(s) más en el detalle del fichero.»
+- [ ] ✅ Vuelve a la rama **Parcela** (donde los avisos se ven) y comprueba que **NO
+      hay ninguna tarjeta que hable de «la parcela» ni de metros negativos**. Si la
+      hay, el arreglo se ha deshecho.
+- [ ] Los tres avisos que sí deben estar: **huso ambiguo** (2 interpretaciones,
+      30 y 31), **«esta rama no se guarda sola»** y —si has soltado un dibujo en la
+      rama Parcela— el que te manda a la otra rama. ¿Alguno se lee como un veredicto
+      sobre tu trabajo?
+- [ ] «4 nota(s) más en el detalle del fichero»: ¿sabes **dónde** está ese detalle?
+      Si no lo encuentras, la frase promete algo que no entrega.
+- [ ] ⚠️ El de **huso ambiguo** es el que de verdad importa y es el que enlaza con
+      el 12.3: «se ofrece la 30 por defecto». ¿Te queda claro que **tienes que
+      confirmarlo**, o parece que ya está resuelto?
+
+### 12.3 · ⭐ Que la huella caiga DONDE ESTÁ EL EDIFICIO ⟨BLOQUEANTE⟩
+
+**Por qué es bloqueante, y es la razón entera por la que las partes se pintan.** La
+decisión 3 de la fase lo dice: «un edificio importado de un DXF que cae 40 m al
+norte por un huso mal deducido es **indistinguible de uno bueno en la lista del
+panel**, y salta a la vista en cuanto se pinta sobre la ortofoto». El guion mide que
+el `<path>` existe, que cuelga del pane 422, que está por encima de la parcela y que
+su caja cae dentro del lienzo. **Comparar la mancha violeta con el tejado de la
+imagen no lo puede hacer ninguna máquina de este proyecto.**
+
+- [ ] Con el DXF cargado: ¿las siete huellas violetas caen **sobre cubiertas**, o
+      sobre un descampado / un tejado que no es? Mira con la ortofoto PNOA y con el
+      parcelario catastral superpuesto.
+- [ ] ⚠️ El fichero **dispara el aviso de huso ambiguo** («2 interpretaciones
+      viables (30, 31). Se ofrece la 30 por defecto»). ¿Has visto ese aviso? ¿La 30
+      es la buena? Es la comprobación entera: **la 31 pondría el edificio a cientos
+      de kilómetros y la lista del panel diría exactamente lo mismo.**
+- [ ] ¿Se distingue el **violeta** de la huella del **amarillo** de la parcela que
+      queda justo debajo? ¿Y sobre una cubierta en sombra? (El violeta claro
+      `#A78BFA` se eligió por descarte justamente para eso.)
+- [ ] El relleno está al **25 %** a propósito, para que se siga viendo la cubierta
+      debajo. ¿Tapa de más? ¿De menos? Es la comprobación que justifica pintarlas.
+- [ ] Pasa el puntero por encima de una huella: ¿sale el rótulo con el nombre de la
+      parte? ¿Sigue al puntero (es `sticky`) o se planta en un sitio raro?
+- [ ] ⭐ **Con la huella delante, pincha en el mapa para «Deducir del mapa»** (rama
+      Parcela). Las huellas van en el pane **422, por encima de la parcela**, y su
+      `interactive: true` podría robarle el clic. El guion mide que el ratón burbujea;
+      **que el gesto de verdad funcione se ve aquí**.
+
+### 12.4 · El conmutador de rama, con el dedo y con el teclado
+
+**Por qué está aquí.** El guion pulsa con `el.click()`, que no es un gesto de ratón
+(§0). Y el conmutador tiene **45,12 px de holgura medidos** antes de que la fila de
+chips se parta en dos líneas y se coma ~20–29 px de la tabla de vértices.
+
+- [ ] Pulsa «Parcela» y «Edificio» con el ratón varias veces. ¿Se nota cuál está
+      activo? El estado activo se pinta desde `data-rama` (no desde `aria-pressed`),
+      y es lo único con color de toda la rama.
+- [ ] Los botones miden **25,39 px** de alto (WCAG 2.5.8 pide 24), y ese estirón es
+      un regalo del chip que tienen al lado. ¿Se aciertan sin apuntar dos veces?
+- [ ] ⚠️ **Estrecha la ventana** hasta que la fila de chips se parta en dos líneas.
+      ¿A qué anchura? Cuando se parte, ¿pierde la caja de vértices los ~20–29 px?
+      (Con `flex-wrap: nowrap` esto no se vería: el elemento se saldría 102,53 px y
+      el panel lo recortaría en silencio. Por eso se dejó `wrap`.)
+- [ ] Con el teclado: `Tab` hasta el conmutador, `Espacio`/`Intro`. ¿Conmuta? ¿El
+      orden del foco coincide con el orden visual? (No hay ni un `order` en el CSS,
+      a propósito, por WCAG 2.4.3.)
+- [ ] Con un **lector de pantalla**: ¿anuncia el grupo («Qué se está preparando») y
+      el estado pulsado? `aria-pressed` es lo único que oye, y ninguna máquina de
+      este proyecto lo puede escuchar.
+- [ ] ⭐ **Y con el lector, el segundo CTA del pie.** Desde el arreglo del defecto A
+      los dos botones comparten **un solo motivo**, escrito debajo del primero; el
+      renglón del segundo está **vacío a propósito** y lo que lo salva es un
+      `aria-describedby`. Ve con el lector hasta «Diagnosticar encaje»: **¿lee el
+      motivo?** El guion comprueba que el atributo, el nodo y el texto existen;
+      **que el lector lo diga de verdad solo se oye aquí**. Si no lo dice, ese botón
+      es mudo para quien no ve la pantalla, y la decisión de píxeles se ha llevado
+      por delante a alguien.
+- [ ] Escribe algo en la referencia catastral de **Parcela**, conmuta a Edificio y
+      vuelve. ¿Sigue ahí lo que escribiste? (El guion lo mide: mismo nodo, mismo
+      valor, oyentes vivos. Que además **se vea** es esto.)
+
+### 12.5 · El diálogo de reparto por capas, con el ratón
+
+**Por qué está aquí.** El reparto se **ofrece y no se impone**, y no es prudencia:
+en `UTM.dxf` —el único plano real que tiene este proyecto— **la parcela de verdad
+está en la capa `0` y NO en la que se llama `PARCELA`**. Elegir por el nombre falla
+en el primer fichero real. Y hay una trampa medida: **marcar una casilla asignando
+`.checked` no dispara `change`**, así que el guion tiene que despacharlo a mano; con
+el ratón eso pasa solo, y es justo lo que hay que ver.
+
+- [ ] Suelta el DXF de edificio. ¿Se abre el diálogo? ¿Ves las dos capas con sus
+      nombres **literales** (`Construccion`, `Parcela`) y su recuento (7 y 1)?
+- [ ] «Cargar las partes» **nace apagado**. ¿Se lee el motivo, ahí al lado? ¿Se
+      entiende que ninguna venga marcada, o parece que la aplicación no ha hecho su
+      trabajo?
+- [ ] Marca `Construccion` **con el ratón**: ¿se enciende el botón al instante?
+      ¿Desaparece el motivo? Desmárcala: ¿vuelve a apagarse con su motivo?
+- [ ] Marca **las dos** capas y aplica: ¿entran 8 partes? ¿Los nombres se
+      **renumeran** (Parte 1…Parte 8) o hay dos «Parte 1»?
+- [ ] Cancela con **Escape** y con el botón «Cancelar». ¿Dice que no se ha cargado
+      nada, y **cómo volver**? («No ha pasado nada» es lo único que el usuario no
+      puede interpretar.)
+- [ ] Con el teclado: `Tab` dentro del diálogo, `Espacio` sobre la casilla,
+      `Escape`. ¿El foco vuelve a donde estaba? ¿Se puede llegar a todo sin ratón?
+- [ ] Prueba con `test/fixtures/parsers/UTM.dxf` (**25 polilíneas en 5 capas**:
+      FINO 16, LINDE 4, PARCELA 3, BLANCO 1 y `0` 1). ¿Se lee la lista? ¿Reconocerías
+      tus capas ahí? ⭐ ¿Se entiende que **la capa `PARCELA` no es la parcela**?
+- [ ] Con el zoom del navegador al **200 %**: ¿sigue cabiendo el diálogo?
+
+### 12.6 · Soltar un dibujo en la rama que NO toca
+
+**Por qué está aquí.** El destino de un `.dxf` se resuelve por la **rama activa**:
+el mismo fichero son dos documentos distintos. Con la rama Parcela no hay a quién
+dárselo —reabrir un dibujo como parcela es la otra mitad de la asimetría que dejó
+F10— y la aplicación tiene que **decirlo, y decir por dónde sí entra**.
+
+- [ ] Con la rama **Parcela**, suelta un `.dxf`. ¿Aparece el aviso? ¿Te dice que
+      cambies de rama, o solo que no se puede?
+- [ ] ¿La tabla de vértices se ha quedado **intacta**? ¿No ha aparecido ninguna
+      huella en el mapa?
+- [ ] Suelta un `.txt` de coordenadas en cada rama: ¿va a lo suyo?
+- [ ] ⭐ Suelta un **GML de edificio** (`.gml`). La aplicación **conmuta de rama
+      sola** y lo dice. ¿Te enteras de que la pantalla ha cambiado, o te parece un
+      fallo? Un cambio de contexto que el usuario no ha pedido y que nadie explica se
+      lee como un error.
+- [ ] El velo de arrastre: ¿anuncia las extensiones que de verdad acepta?
+
+### 12.7 · ⚠️ El `wfsBU` en vivo — RÉGIMEN DE RED, léelo antes
+
+**Por qué está aquí, y por qué el guion NO lo toca.** F11 se puede cerrar entera con
+ficheros locales, y el override **O8** pide **una pasada, sin bucles**. Así que la
+vía en vivo del servicio de edificios del Catastro no la mide ninguna máquina de
+este proyecto: se firma aquí, con la cabeza puesta.
+
+> ⛔ **UNA pasada por punto, y sin repetir «a ver si ahora».** El coste medido es de
+> **2 peticiones por edificio** (o **1** si la referencia no existe: se para en la
+> primera). Mira el §13 de `GUION.md`: el régimen es el mismo.
+
+- [ ] Escribe una referencia catastral real en la rama Edificio y pulsa «Traer del
+      Catastro». ¿Llega el edificio? ¿Cuántas partes? ¿Se pintan donde deben?
+- [ ] ⚠️ Con una referencia **que no existe**: medido en la fase 0, este endpoint
+      contesta **`302` → `404` con HTML de ASP.NET** —justo al revés que el de
+      parcela, donde todo error llega `200`—. ¿Qué te dice la aplicación? ⭐ El
+      renglón bueno es el del panel de edificio; **el canal de avisos trae además un
+      mensaje del transporte que dice «esa dirección no existe»**, hablando de una
+      URL cuando tú has escrito una referencia catastral. ¿Confunde? Anótalo: no se
+      arregla sin tocar `services/_red.js`.
+- [ ] Con una parcela **sin construcción**: la colección vacía es `200 OK` y
+      significa que la parcela existe y no tiene nada construido. **Es el punto de
+      partida de una obra nueva, no un fallo.** ¿Se lee así?
+- [ ] Con la referencia de la parcela del proyecto (`9398516VK3799G`): ⭐ **tiene una
+      PISCINA** (`openAirPool`), y su geometría viene en un dialecto distinto al de
+      los fixtures de F00. ¿Aparece? ¿Cuántas partes esperabas y cuántas hay?
+- [ ] Deja la referencia en blanco y pulsa: ¿dice que hace falta escribirla, o que
+      hace falta cargar una huella de la que deducirla? Son dos mensajes distintos a
+      propósito.
+- [ ] ⚠️ **El orden de apagado importa** (medido): destruir el cliente de parcela
+      aborta el transporte compartido y a partir de ahí el de edificio devuelve
+      «cancelada» sin que nadie lo haya destruido. No se puede provocar desde la
+      interfaz, pero si ves una consulta cancelada sin motivo, **es este camino**.
+
+### 12.8 · Los siete atributos, el modelo y lo que se pierde al cambiarlo
+
+**Por qué está aquí.** El selector de modelo es el criterio de aceptación 1 de la
+ficha, y F11 lo cumple **de una forma más fuerte de la que pedía**: en modo
+Simplificado los siete atributos **no están ocultos, no existen** —ni el bloque ni el
+botón que lo abre—. Y cambiar de modelo **borra datos**.
+
+- [ ] En **Simplificado**: ¿ves el botón «Atributos» en la fila del rótulo? (No debe
+      estar.) Cambia a **Completo**: ¿aparece?
+- [ ] Abre «Atributos», rellena algunos y guarda. Vuelve a **Simplificado**: ¿te
+      avisa de que **se borran los siete**? ¿Antes o después de borrarlos?
+- [ ] Vuelve a **Completo**: los campos salen **vacíos**, no con los valores de
+      antes. ¿Lo decía el apunte del radio? ¿Te ha pillado por sorpresa?
+- [ ] Escribe «mil novecientos» en el año de construcción y guarda: ¿te dice **qué
+      campo** no lleva un número, o se guarda como «sin indicar» en silencio? (Los
+      campos son `type="text"` con `inputmode="numeric"` a propósito: con `number` el
+      navegador vacía el valor y el dato se perdería mudo.)
+- [ ] Escribe la superficie construida con **coma decimal** (`120,5`): ¿la acepta?
+- [ ] ⭐ **JUICIO**: desde el arreglo del defecto A **solo se enseña el apunte del
+      modelo ELEGIDO** (el otro va con `hidden`), y el `.gml-campo` del selector pasó
+      de **272,03 a 174,41 px**. ¿Se echa de menos el otro? El apunte de la opción
+      que **no** has elegido describe una decisión que no has tomado —pero el de
+      SIMPLIFICADO dice **qué se pierde** al elegirlo, y eso sí hay que leerlo antes
+      de pulsar. Con el arreglo, ese texto solo aparece **después** de elegir.
+      ¿Llegas tarde? Es la pregunta que decide si este ahorro se queda.
+
+### 12.9 · ⛔ Cómo se lee la rama entera ⟨BLOQUEANTE⟩
+
+**Por qué es bloqueante, y hereda el carácter del 8.1, el 9.4, el 10.5 y el 11.6.**
+La regla de oro 9: la aplicación **mide** y el colegiado **interpreta y firma**. Esta
+rama estrena mucho texto —apuntes de modelo, motivos de botones apagados, el renglón
+de las cinco vías, la procedencia con el aviso del autoguardado, los mensajes de las
+cinco entradas—.
+
+- [ ] Léelo todo con ojos de técnico que no ha escrito el código. ¿Alguna frase **se
+      lee como un veredicto** sobre el edificio, sobre el dibujo o sobre lo que hay
+      que hacer?
+- [ ] ⭐ «Esta rama **no se guarda sola**» se dice ahora en **DOS SITIOS Y DOS
+      FORMAS**, después de que el guion midiera que se estaba diciendo **dos veces
+      entera** (y costaba 89 px): una **línea** permanente en el renglón de
+      procedencia («…exporta el dibujo desde tu CAD antes de cerrar la pestaña») y la
+      **tarjeta completa** en el panel de avisos, una sola vez, cuando ya hay algo
+      que perder. Léelas las dos seguidas: **¿se leen como una advertencia que se
+      concreta, o como dos avisos distintos?** ¿La línea corta basta para el que solo
+      mire el renglón? ¿La tarjeta larga aporta lo suficiente para ocupar su sitio?
+      Si la respuesta a alguna es que no, el reparto hay que rehacerlo — y ahí hay
+      hasta 29,69 px en juego.
+- [ ] Los cuatro rótulos del estado de conservación —«Funcional», «En construcción»,
+      «Ruinoso», «Derruido»— **no son un juicio de la aplicación**: son el vocabulario
+      de INSPIRE y el valor de un campo que tú eliges. ¿Se lee así, o parece que la
+      app está calificando el edificio?
+- [ ] La ficha del pie en esta rama dice «Partes» y «Superficie en planta». ¿Se
+      entiende que **no** es la superficie construida? Y si alguna parte no trae
+      contorno, ¿se entiende el «(N sin contorno)»?
+- [ ] El renglón de las **cinco vías** de la lista vacía: ¿se lee como una ayuda o
+      como una lista de cosas que no funcionan? (Ojo: hoy solo se ven **58,70 px de
+      los 124** que ocupa, por el residuo del defecto A. Míralo estirando la ventana.)
+- [ ] El motivo **conjunto** de los dos CTA apagados: nombra los dos botones en una
+      frase para no gastar dos párrafos (ver 12.1). ¿Se entiende que están apagados
+      **los dos**, o parece que solo habla del de arriba? Los dos motivos por
+      separado siguen escritos en `app/rama.js` y son lo que vuelve el día que el
+      pie tenga sitio: **si esta frase corta no basta, dilo.**
+
+### 12.10 · Abrir en un CAD el dibujo del que salen las huellas
+
+**Por qué está aquí.** Es la otra mitad del §11.4, y el argumento es el mismo: **un
+fichero que valida contra nuestro propio parser y no abre igual en un CAD no está
+leído, está de suerte.**
+
+- [ ] Abre `edificio_consulta_masiva_3515508VF0831N.dxf` en un CAD (apunta cuál).
+      ¿Cuántas polilíneas ves en la capa `Construccion`? ¿Y en `Parcela`?
+- [ ] ¿Coinciden con las **7 y 1** que ofrece el diálogo de reparto?
+- [ ] Mide una huella en el CAD y compárala con la «Superficie en planta» del pie
+      (medido: **165,99 m²** con las 7 partes de `Construccion`). ¿Cuadra?
+- [ ] ⚠️ Ese fixture es **el primero real con `POLYLINE`/`VERTEX`/`SEQEND`** del
+      proyecto (los demás traen `LWPOLYLINE`). Si tu CAD lo abre distinto, es un dato
+      que no tenemos en ninguna parte: apúntalo.
+- [ ] Prueba con un DXF **tuyo**, de un trabajo real: ¿entra? ¿Reconoces tus capas
+      en el diálogo? ¿Cuántas partes salen y cuántas esperabas?
+
+---
 ## Qué hacer con el resultado
 
 - **Todo conforme** → F03 se marca hecha (`README.md` §Estado y `spec/SPEC.md`).
@@ -1619,8 +1983,34 @@ además, con cada CAD distinto: los visores perdonan cosas distintas, igual que 
 lectores de PDF del 10.1. Los disparadores del mecanismo son los de
 `12-expedientes.js` (`GUION.md` §8 y §18).
 
+El punto **12** se repite cuando cambie cualquier texto de la rama Edificio
+—`app/panel-edificio.js` (los dos `APUNTE_MODELO`, `SIN_PARTES`, `INTRO_CAPAS`,
+`MOTIVO_SIN_CAPAS`), `app/cableado-edificio.js` (`MENSAJE_SIN_AUTOGUARDADO` y los
+dos mapas de resumen) y `app/rama.js` (los dos motivos de los CTA apagados)—,
+porque el **12.9** es sobre la LECTURA y **el 12.1 es sobre lo que esos textos
+MIDEN**: cada línea que crezca sale de la lista de partes. Se repite además cuando
+cambien `viewer/partes.js` o su pane (`viewer/_comun.js#PANES`): el color, la
+opacidad del relleno y el emergente son juicio visual, y el **12.3** es lo que
+justifica que las huellas se pinten. El **12.1**, con **cada altura de ventana
+nueva** (el reparto no es de la app, es del entorno) y **obligatoriamente cuando se
+arregle el defecto A**. El **12.7**, con cada cambio de `services/edificio.js` o de
+`gml/parse-bu.js`, y respetando su régimen de red. El **12.10**, con cada CAD
+distinto, igual que el 11.4. Los disparadores del mecanismo son los de
+`13-edificio.js` (`GUION.md` §8 y §19).
+
 ⛔ **Y toda la lista, ahora.** Se recorrió el 2026-08-02, salieron **tres defectos
 reales** (encabezado del punto 9), se corrigieron los tres y **la lista no llegó a
 firmarse**. Hay que volver a recorrerla entera con las correcciones puestas: es la
 propia regla de esta sección, y esta vez con el motivo delante. La cadena
-bloqueada es **F03 → F05 → F06 → F07 → F08 → F09 → F10**.
+bloqueada es **F03 → F05 → F06 → F07 → F08 → F09 → F10 → F11**.
+
+⛔ **Y hay un motivo NUEVO para no firmar todavía**: el punto 12 llega con un
+**residuo ya medido** (`GUION.md` §19). De los dos defectos que encontró el guion,
+el contradictorio está cerrado y el panel ya cabe; y el tercer arreglo —la
+advertencia del autoguardado, que se decía dos veces— cerró además los avisos en los
+dos estados. Queda **una sola cosa**: con 7 partes cargadas la lista mide **7,06 px**
+y **no se ve ni una fila**. Recorrer el §12.1 no es descubrirlo —eso ya está hecho—
+sino **decidir de dónde salen los 18,33 px** que faltan (8,84 de ellos están al lado,
+en el margen de `#avisos`), y esa decisión es de producto. ⚠️ Y hay que tomarla
+**antes de F12**, que añade las plantas por parte y entra en un panel con **0 px** de
+holgura en la lista.

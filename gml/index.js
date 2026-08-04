@@ -98,6 +98,19 @@
 export { parsearGml } from './parse.js'
 export { serializarParcelaCp } from './serialize-cp.js'
 
+// ── F11: el segundo lector, y por qué es PÚBLICO ─────────────────────────────
+// `parsearGmlBu` lee el dialecto BU (edificio), que `parsearGml` se niega a leer
+// a propósito y con un mensaje bueno (`TIPO_GML.DIALECTO_OTRO_TEMA`). Sale por
+// aquí porque lo consumen DOS capas de fuera de `gml/`: `edificio/entrada.js`
+// (un fichero que suelta el usuario) y `services/catastro-edificio.js` (la
+// respuesta del `wfsBU`). Un lector que solo usara `gml/` sería privado.
+//
+// Lo decidió el guardián de `test/gml/contrato-gml.test.js`, que existe para
+// esto y lo dice en su propio comentario: «si mañana aparece `gml/serialize-bu.js`
+// y nadie decide si es público, este test lo dice». Apareció `parse-bu.js` y lo
+// dijo el mismo día.
+export { parsearGmlBu } from './parse-bu.js'
+
 // ── El escalón de debajo: bytes → texto (F08) ────────────────────────────────
 // `parsearGml` recibe un `string` y nunca ha sabido de dónde salía. Cuando el
 // fichero lo trae el usuario —que es F08— alguien tiene que decidir con qué

@@ -9,8 +9,8 @@ con la **maquinaria real de `L.Draggable`**.
 - **4D.1** (esta carpeta) escribió los guiones y los probó en seco.
 - **4D.2** es la ejecución oficial, con evidencia, siguiendo este documento.
 
-Once guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
-para que el resultado no dependa de interpretar prosa. Diez son de aceptación;
+Trece guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
+para que el resultado no dependa de interpretar prosa. Doce son de aceptación;
 `05` es de diagnóstico (§11):
 
 | Guion | Criterio | Mide | Veredicto pasa si |
@@ -26,6 +26,8 @@ para que el resultado no dependa de interpretar prosa. Diez son de aceptación;
 | `09-diagnostico.js` | F07 · 1 a 4 | el diagnóstico con SVG y layout reales: la diferencia sombreada por `fill-rule: evenodd`, el cajón que flota sin quitarle NI UN PÍXEL a la caja de vértices al abrirse, la banda del margen que conserva sus metros con el zoom y el tiempo del recálculo completo | `ok:true` |
 | `10-comprobar-gml.js` | F08 · 1 a 4 · **+ los tres arreglos del check visual** | **soltar un fichero de verdad** de punta a punta (bytes reales, velo con `opacity` calculada, `File.arrayBuffer()`), el cajón que no tapa ninguno de los cinco controles del mapa, los dos cajones que no coinciden, el informe que baja con BYTES, el invariante de los ~267 px, la tipografía real de los botones de los dos cajones y —desde el 2026-08-02— **el REENCUADRE** (viaja con otra parcela, no se mueve al editar), **las COLINDANTES dibujadas** y **el CAMPO de la referencia** | `ok:true` — ver §16 |
 | `11-informe-pdf.js` | F09 · **1** a 5 | ⭐ **el CRITERIO 1, que solo se puede medir aquí**: `toDataURL` sobre un lienzo con una tesela REAL del WMS, **con control negativo** (sin `crossOrigin` tiene que lanzar); el PDF que baja con BYTES de verdad (`%PDF`, páginas declaradas, el plano `/DCTDecode` dentro); que componer **no cierre nada por debajo** (tercera aparición del mismo defecto); el `<dialog>` como modal DE VERDAD (capa superior, fondo inerte, `Escape`), el encaje del modal en la ventana, el invariante de la caja de vértices y la tipografía de los cuatro botones nuevos | `ok:true` — ver §17 |
+| `12-expedientes.js` | F10 · 1 a 6 | ⭐ **que los bytes están en una base de VERDAD** (la suite entera de F10 corre sobre `fake-indexeddb`, que no es una base de datos): supervivencia a la recarga contrastada contra `performance.timeOrigin`, segunda conexión a IndexedDB, `persist()`/`estimate()` reales, las tres exportaciones con sus BYTES, el `<dialog>` como modal y el invariante de los 267 px | `ok:true` — ver §18 |
+| `13-edificio.js` | F11 · 1 a 4 | ⭐ **el guardián de ANCHO del conmutador, que solo existe aquí** (sustituye al `flex-wrap: nowrap` que el plan pedía por error); **M10 ida y vuelta en un navegador real** —mismo nodo, mismo valor, oyentes vivos—; el invariante de los 267 px y las tres cifras de M8; que las huellas del DXF **se ven y ENCIMA de la parcela** (orden real de los panes, no solo que existan los `<path>`); soltar un `.dxf` de verdad en las DOS ramas, con su diálogo de reparto por capas; la ficha del pie que cambia de cara; y ⭐ **el reparto de altura del panel, en vacío y con datos, con el recorte a CERO EXACTO y el déficit en píxeles cuando no llega** | ⛔ **`ok:false`: encontró DOS defectos reales; uno cerrado y el otro a medias** — ver §19 |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
 spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
@@ -79,6 +81,21 @@ dónde ejecutarse. El plan de F09 lo declaró por escrito como desviación 1 y l
 trasladó aquí. Y como una comprobación que solo puede salir bien no prueba nada,
 lleva **control negativo**: la misma cartografía cargada sin `crossOrigin`, que
 tiene que contaminar el lienzo y hacer que `toDataURL` **lance**. Ver §17.
+
+`13` es el de F11 y **el tercero de esta carpeta que encuentra defectos de
+producción** (el `10` encontró dos, el `12` uno, y éste otros dos). Mide la segunda
+rama de la aplicación: el conmutador, el panel de edificio que SUSTITUYE al de
+parcela, las huellas del DXF pintadas en el mapa y el reparto de altura del panel
+nuevo. Lo último es lo que más caro sale de no hacer, y por eso está aquí y no en
+la suite: **jsdom no calcula ni un píxel**, así que un panel que no cabe sale verde
+en las 5.734 pruebas. Encontró **dos defectos** el 2026-08-04 y se corrió **tres
+veces** ese día, cada una detrás de un arreglo que salía de la cifra que la
+anterior había medido: 4 problemas → 3 → **1**. Hoy queda **una fila de lista:
+18,33 px**. Las tres corridas están en §19 y **no se borran, igual que las del §16
+y el §18**: la secuencia es lo que vale. Es también el guion que pone el **guardián
+de ANCHO** que la sección de F11 de `estilos/app.css` reclama por escrito, el que
+exige el **recorte del panel a cero exacto** y el que vigila que una advertencia no
+se diga **dos veces**. Ver §19 **antes** de citarlo.
 
 Cada guion lleva en su cabecera **qué mide y qué NO puede medir**. Léelas antes
 de citar un resultado.
@@ -2604,3 +2621,543 @@ AutoCAD no está exportado, está de suerte. **Dos pestañas a la vez** y el
 `versionchange` de verdad. **Abrir un `.json` desde el disco**, y abrirlo en **otro
 perfil o en otra máquina**. Y el punto BLOQUEANTE que hereda del 8.1, el 9.4 y el
 10.5: si alguna frase de la lista de expedientes **se lee como un veredicto**.
+
+---
+
+## 19. `13-edificio.js` — la segunda rama (F11 · T5.2)
+
+El guion de F11, y **el TERCERO de esta carpeta que encuentra defectos de
+producción** (después del `10`, que encontró dos, y del `12`, que encontró uno).
+
+> **TRES corridas, y hay que leerlas en orden: la secuencia es lo que vale.**
+> Todas el **2026-08-04**, `npm run dev`, 1440×900, consola limpia y **cero
+> peticiones a los servicios de datos del Catastro**.
+>
+> | # | Veredicto | Qué pasó |
+> |---|---|---|
+> | **1.ª** | `ok:false` · 4 problemas | **Encontró DOS defectos reales de producción** que la suite no ve. |
+> | **2.ª** | `ok:false` · 3 problemas | **Defecto B cerrado.** Del A se ganaron **164,99 px**: el panel ya CABE (recorte 48/115 → **0/0**) pero sus dos cajas encogibles siguen sin sitio. Faltaban **32,70 px**. |
+> | **3.ª** | `ok:false` · **1 problema** | Se atacó la causa que la 2.ª señaló —la advertencia del autoguardado se decía **dos veces a la vez**—. **`#avisos` cerrado** en los dos estados. Falta **una fila de la lista: 18,33 px**. |
+>
+> **Ninguna se borra.** Encontrar los defectos es el mérito de este guion (igual
+> que en el §16 y el §18); saber **cuánto ganó cada arreglo** es lo que impide
+> volver a pagarlo, y cada arreglo salió de una cifra que la corrida anterior
+> había puesto encima de la mesa.
+>
+> Corrida vigente (3.ª): puerto 5173, **1.965 ms**. Todo lo demás que mide sale en
+> verde y con las cifras clavadas.
+
+### Qué mide, y por qué NO lo mide la suite
+
+La suite de F11 cubre el modelo, el lector de GML BU, la entrada, las mutaciones,
+el cliente del `wfsBU`, el conmutador en jsdom, el panel y el cableado. **Lo que
+no puede cubrir es el layout**: jsdom no calcula ni un píxel, así que un panel que
+no cabe sale VERDE en las 5.697 pruebas. Aquí se miden ocho cosas:
+
+1. ⭐ **EL GUARDIÁN DE ANCHO DEL CONMUTADOR, QUE SOLO EXISTE AQUÍ.** La sección de
+   F11 de `estilos/app.css` lo dice con estas palabras: «el guardián no es de
+   altura, es de ANCHO, y lo pone el guion de humo 13». Es lo que **SUSTITUYE** al
+   `flex-wrap: nowrap` que el plan le pedía a T1.6 y que **estaba mal**: medido, con
+   `nowrap` el elemento que no cabe **se sale 102,53 px** y `.gml-panel`
+   —`overflow: hidden`— **lo recorta en silencio**; con `wrap` el fallo al menos se
+   ve, pero cuesta **20,28–29,19 px** de la caja de vértices sin que nada avise.
+   El guardián es, sobre `.gml-chips`: **`saltoDeLinea === false`** y
+   **`holguraPx > 24`**.
+2. ⭐ **M10 en un navegador de verdad, ida y vuelta.** La regla dura de
+   `app/rama.js` —el intercambio es `seccion.hidden`, JAMÁS `replaceChildren`— se
+   midió en la fase 0; aquí se vuelve a medir **con la aplicación entera montada**,
+   que es donde de verdad hay **30 nodos de `app/` resueltos una sola vez** en el
+   montaje. Se comprueba sobre `[data-campo="refcat"]` de parcela: mismo nodo
+   (identidad `===`), `isConnected`, su valor intacto y **sus oyentes disparando**.
+   ⚠️ **La sonda del oyente es del guion, y está dicho por qué**:
+   `app/cableado-catastro.js` **no engancha ningún `input`** a ese campo (lo lee al
+   pulsar «Traer del Catastro»), y pulsar ese botón sería una petición al Catastro
+   que este guion no hace. Un guion que finge medir un oyente ajeno es peor que uno
+   que declara el suyo.
+3. **El invariante de los 267,44 px y las TRES cifras de M8 después del cambio.**
+   ⚠️ **El invariante vale SOLO en la rama PARCELA**, y no es una excepción: en
+   EDIFICIO la caja que se estira es `.gml-partes`. Son dos cifras, no una.
+4. **Que las huellas SE VEN y ENCIMA de la parcela.** Se lee **el orden real de los
+   panes en el DOM**, no solo que existan los `<path>`: un pane con el zIndex bien
+   puesto y el `<path>` colgando de otro sitio se vería igual de mal. Y el
+   emergente se abre **de verdad** (`bindTooltip` no fabrica el nodo hasta que se
+   abre, así que preguntar por `aria-describedby` cerrado siempre diría que no).
+5. **Soltar un `.dxf` de verdad, en las DOS ramas.** El destino se resuelve por la
+   rama activa, así que el mismo fichero son dos documentos distintos. Dos fixtures
+   reales: `poly_clasica.dxf` (una capa ⇒ vía directa) y
+   `edificio_consulta_masiva_3515508VF0831N.dxf` (**7 anillos en `Construccion` +
+   1 en `Parcela`** ⇒ diálogo de reparto).
+   ⚠️ **Marcar una casilla asignando `.checked` NO dispara `change`** y el guion lo
+   mide a propósito, para dejar escrito que el gate lo gobierna un suceso y no un
+   sondeo: `aplicarTrasAsignarChecked: true` (sigue apagado) →
+   `aplicarTrasDespacharChange: false` (encendido).
+6. **La ficha del pie cambia de cara**: cuatro pares ocultos (`<dt>` **y** `<dd>`) y
+   dos rótulos que cambian de pregunta.
+7. **El panel nuevo: tipografía, reglas que LLEGAN y el tope de 26vh.** La sección
+   de F11 del CSS se escribió **en paralelo con los módulos del marcado y sin
+   verlos**, citando el contrato K. El único fallo silencioso que ese reparto puede
+   producir es una regla escrita contra un nombre que nadie pone, y el propio
+   fichero dice que «el guion de humo 13 es quien lo caza»: por eso no basta con que
+   las clases existan, se comprueba que la regla **computa**.
+8. **Consola limpia y régimen de red.**
+9. ⭐ **EL REPARTO DE ALTURA DEL PANEL, EN VACÍO Y CON DATOS** — y es la medida
+   que más caro sale de no hacer. El panel mide lo que la ventana; cabecera,
+   bloque de origen y pie son `flex: 0 0 auto` y **no ceden**; lo que sobra se lo
+   reparten los **dos únicos encogibles**, `#avisos` (`0 1 auto`) y la lista de
+   partes (`1 1 auto`). Si los fijos se pasan, esos dos se aplastan **a la vez** y
+   `.gml-panel` —`overflow: hidden`— recorta el resto **por abajo y en silencio**.
+   Tres guardianes, y los tres nacieron de la primera corrida:
+   - **el recorte del panel a CERO EXACTO**, medido **dos veces** (en vacío y con
+     las 7 partes). `scrollHeight` y `clientHeight` son enteros: no hay redondeo
+     que tolerar, y cualquier píxel por encima de 0 es contenido del pie que el
+     usuario **no puede alcanzar**. Es el guardián que habría cazado el defecto A
+     en su primer minuto;
+   - **la lista tiene que enseñar al menos una fila** y **`#avisos` al menos una
+     línea**, en los dos estados;
+   - y cuando no llegan, el guion **no dice «no cabe»: dice cuántos píxeles
+     faltan** (`topeConPartes.deficit`, con dos umbrales declarados —el mínimo
+     decente y el todo—) y **de dónde salen** (`hijos`, `origenDesglose`,
+     `pieDesglose`). «Cabe» es un booleano y no es accionable.
+10. **La contradicción, vigilada por su nombre**: tras cargar el DXF por capas,
+    ninguna tarjeta de `#avisos` puede decir «No se construye la parcela»
+    mientras el panel dice que hay partes. Se mide con el literal exacto y no con
+    un `/parcela/i`, que daría falsos positivos sobre mensajes legítimos (el del
+    autoguardado nombra la rama Parcela a propósito, y está bien).
+11. ⭐ **QUE LA ADVERTENCIA DEL AUTOGUARDADO SE DIGA UNA VEZ, Y QUE SE DIGA.** Es
+    el guardián que impide que vuelvan 89 px. La misma advertencia se estaba
+    enseñando **dos veces a la vez**: entera y permanente concatenada en
+    `[data-procedencia="edificio"]` —donde medía **89,06 px**— y entera otra vez
+    como tarjeta del panel de avisos en cuanto había algo que perder. Decir dos
+    veces lo mismo no es el doble de honrado. El reparto que se decidió tiene DOS
+    mitades y **las dos se exigen**:
+    - en el renglón, **una línea** (el literal breve), permanente, porque no
+      guardar es una PROPIEDAD de esta versión y no un suceso;
+    - en el panel de avisos, **la tarjeta entera y UNA vez**, cuando pasa a haber
+      algo que perder, que es cuando la advertencia se puede accionar.
+    ⛔ Un guardián que solo mirara la primera mitad aprobaría el peor desenlace:
+    que el ahorro **se llevara la advertencia por delante**. Por eso la tarjeta se
+    exige, no se supone.
+    ⚠️ **El texto largo no se copia en el guion: se DERIVA de la tarjeta de la
+    propia aplicación**, y la repetición se comprueba contra él. Copiarlo
+    obligaría a mantener 271 caracteres en dos sitios, que es exactamente la clase
+    de duplicado que este bloque existe para cazar. Lo único que se cita es el
+    literal breve, que es el contrato del renglón.
+12. **Que el segundo CTA no quede mudo.** Desde el arreglo del defecto A los dos
+    botones comparten **un solo motivo**, escrito en el renglón del primero; el
+    del segundo queda **vacío a propósito**. Lo que sostiene entonces la regla de
+    la casa —botón apagado CON MOTIVO, jamás botón muerto— es la cadena
+    `aria-describedby` → nodo → **texto**, y se comprueba **por sus tres
+    eslabones**: un `aria-describedby` que apunta a un `id` inexistente, o a un
+    renglón vacío, es peor que no ponerlo (el marcado afirma que hay explicación y
+    el lector de pantalla no lee nada). Y al volver a PARCELA **no puede quedar ni
+    el atributo ni el `id`**: ahí apuntaría al renglón de OTRO botón.
+
+### ⚠️ Cómo se clasifica la red, y por qué NO por `STOREDQUERIE_ID`
+
+**`STOREDQUERIE_ID` lo usan LOS DOS endpoints** del Catastro (medido en la fase 0
+de F11): clasificar por ese parámetro manda las peticiones de parcela a la rama de
+edificio y deja la cuenta **mintiendo en verde**. Aquí se distingue por
+**`wfsCP.aspx` / `wfsBU.aspx`**, que es lo único que las separa.
+
+Y **«soltar un fichero no dispara ni una petición» es cierto del DIBUJO y falso de
+la CARTOGRAFÍA**, así que se publican dos cifras y no una: cargar un edificio
+**encuadra el mapa sobre sus huellas** y mover el mapa pide teselas. Eso no es leer
+el dibujo. La cifra que tiene que ser **0** es `red.datosCatastroDuranteElGuion`.
+
+### Régimen de red
+
+**Cero peticiones a los servicios de datos.** El `wfsBU` **no se toca a propósito**:
+F11 se mide entera con ficheros locales y el override O8 pide una pasada sin
+bucles. La vía en vivo es del checklist §12. Cartografía medida en la corrida de
+cierre: **10 peticiones**, todas por el reencuadre del mapa sobre las huellas.
+
+### ⚠️ Este guion necesita `npm run dev`, NO `vite preview`
+
+Fabrica `File`s con los BYTES REALES de dos fixtures traídos por `fetch` del propio
+servidor (`test/fixtures/parsers/…`): `vite preview` sirve `dist/`, donde no están.
+
+### Cómo se lanza
+
+```
+$B viewport 1440x900
+$B goto http://localhost:PUERTO/concretagml/     # ⚠️ el base, no la raíz
+$B wait ".gml-tabla-vertices"
+$B console --clear
+$B eval scripts/smoke-navegador/13-edificio.js
+$B console --errors                              # → (no console errors)
+$B screenshot .gstack/smoke-f11.png              # la evidencia para el §12
+```
+
+⚠️ **Página recién cargada, y no es formalismo**: el invariante de los 267 px se
+mide con la lista de avisos VACÍA, y una tarjeta cuesta ~52 px del sitio más caro
+del panel. Si arranca con avisos, el guion lo dice y **ATRIBUYE** la pérdida en vez
+de acusar a F11 — las dos lecciones que ya pagaron `09` (midió demasiado tarde) y
+`11` (demasiado pronto).
+
+**Estado final.** Deja la aplicación en la rama **PARCELA**, con un edificio de 7
+partes en el segundo store, sus huellas en el mapa, el mapa encuadrado sobre ellas
+y **4 tarjetas de aviso** que el propio guion provoca. Para volver al punto de
+partida: `$B reload`.
+
+### ⚠️ Segunda pasada opcional: el tope a 768 px de alto
+
+Un tope en `vh` protege del contenido largo, **no de la ventana corta**. El guion
+mide en el viewport en el que se lance y **DERIVA** la otra cifra, diciendo que es
+derivada (`topeConPartes.derivadoA768`). Para medirla:
+
+```
+$B viewport 1440x768 && $B goto http://localhost:PUERTO/concretagml/
+$B wait ".gml-tabla-vertices" && $B eval scripts/smoke-navegador/13-edificio.js
+```
+
+Medido el **2026-08-04**: a 1440×768 el tope vale **199,68 px** (contra 234,00 a
+900), el panel necesita **947,53 px** para 768 disponibles y **recorta 180 px**.
+
+### Qué cuenta como «pasa»
+
+- `ok: true`, `problemas: []`. **Hoy NO pasa**: ver abajo.
+- `arranque.altoCajaVerticesPx: 267` **con `tarjetasDeAvisos: 0`**.
+- `conmutadorAncho.saltoDeLinea: false` y `holguraPx > 24`.
+- `invariante.cabeceraClavada: true` (117,13 en las dos ramas).
+- `idaYVuelta.mismoNodo: true`, `valorAhora` intacto, `sondaSigueDisparando: true`.
+- `capaHuellas.zPartes: 422`, entre 420 y 430, y los `<path>` colgando del pane.
+- `reparto.partesTrasAplicar: 7` y `huellasTrasAplicar: 7`.
+- `contratoK1.colisiones: []`.
+- `red.datosCatastroDuranteElGuion: 0`.
+- `enEdificio.motivoGenerar` nombra **los dos** botones · `motivoDiagnosticar: ""`
+  · `describedbyDelSegundoCta === idDelRenglonPrincipal` y ese nodo **lleva texto**.
+- `idaYVuelta.describedbyDelSegundoCta: null` y `idDelRenglonPrincipal: null`.
+- `reparto.avisoQueNiegaLaCarga: null`. ✅ **desde el arreglo del defecto B.**
+- ⭐ `repartoDeAltura.recorteDelPanelPx: 0` **y** `topeConPartes.recorteDelPanelPx: 0`.
+  ✅ **desde el 1.er arreglo del defecto A.**
+- ⭐ `advertenciaSinAutoguardado.renglonLlevaLaBreve: true` ·
+  `elRenglonRepiteLaTarjeta: false` · `tarjetasConLaAdvertencia: 1`.
+  ✅ **desde el 2.º arreglo del defecto A.** Las tres a la vez: la primera es la
+  advertencia permanente, la segunda es la repetición y la tercera es la
+  advertencia entera. Quitar cualquiera de las tres es un desenlace distinto y
+  ninguno bueno.
+- `repartoDeAltura.listaDePartes.altoPx ≥ 26` (**hoy 90,03** ✅, 3 filas) y
+  `avisos.altoPx ≥ 16` (**hoy 24,09** ✅).
+- `topeConPartes.filasEnterasQueCaben ≥ 1` (**hoy 0** ⛔, faltan 18,33 px) y
+  `avisos.altoPx ≥ 16` con tarjetas dentro (**hoy 24,84** ✅).
+- `$B console --errors` limpio.
+
+### ⛔ Los DOS defectos que este guion destapó (2026-08-04)
+
+Los dos son **de producción** y los dos son **invisibles para la suite**: jsdom no
+calcula un solo píxel, y las detecciones se afirman como lista y no como lo que
+acaba en el panel. Los dos se corrigieron el mismo día. Lo que sigue es la
+primera corrida —la que los encontró— y, al final de cada uno, **qué se ganó
+medido con los arreglos puestos**.
+
+#### Defecto A — el panel de la rama EDIFICIO **no cabía** ⟶ ✅ ARREGLADO A MEDIAS
+
+El presupuesto, medido a 1440×900 con la rama recién conmutada y **nada cargado**:
+
+| Hijo de `.gml-panel` | `flex` | Alto medido |
+|---|---|---|
+| `.gml-panel-cabecera` | `0 0 auto` | 117,13 px |
+| `.gml-bloque--edificio` | `0 0 auto` | **457,13 px** |
+| `.gml-bloque--avisos` | `0 1 auto` | **16,00 px** ⟵ víctima |
+| `.gml-bloque--partes` | `1 1 auto` | **32,00 px** ⟵ víctima |
+| `.gml-panel-pie` | `0 0 auto` | **325,28 px** |
+| **Suma** | | **947,54 px** para un panel de **900** |
+
+⇒ **47,54 px de sobresuscripción** con el panel vacío, y **114,91 px** con las 7
+partes cargadas y sus avisos. Las consecuencias, medidas:
+
+- **`.gml-partes` mide 2 px** y su contenido 124 px vacío / 184 px con 7 partes:
+  **no cabe ni una fila** (una fila mide 25,39 px medidos). El usuario carga 7
+  partes y **no ve ninguna**.
+- **`#avisos` mide 0 px de contenido** con 4 tarjetas dentro. Es la **segunda
+  víctima**, exactamente la que T0.3·1 avisó que tendría esta rama: «el desastre de
+  F06 repetido, con dos víctimas en vez de una».
+- **`.gml-panel` recorta 48 px** por abajo (115 px con datos), y es
+  `overflow: hidden`: el motivo del CTA «Diagnosticar encaje» **no se ve y no hay
+  forma de llegar a él**.
+- El tope `--gml-partes-alto-max: 26vh` (234,00 px) **no muerde ni una vez**: el
+  problema no está ahí, y T1.6 ya lo había corregido al medirlo.
+
+**Las dos causas, separadas y con su cifra:**
+
+1. **`.gml-bloque--edificio` mide 457,13 px y T1.6 lo midió en 177,34** (+279,79).
+   El desglose: rótulo 15,94 · **`.gml-campo` del selector de modelo 272,03 px**
+   (los dos `APUNTE_MODELO` son párrafos de varias líneas a 11 px) · refcat 54,94 ·
+   **`.gml-procedencia` 74,22 px** (porque `MENSAJE_SIN_AUTOGUARDADO` se
+   **concatena** al texto de procedencia y son tres líneas). Con datos cargados
+   sube a **524,50 px**.
+2. **El pie CRECE en esta rama, no encoge.** La ficha libera los **75,75 px**
+   prometidos (148,50 → 72,75 ✅, la cifra de T0.3·8 clavada), pero
+   `.gml-acciones` pasa de **72,78 a 207,53 px** (**+134,75**) porque los dos
+   renglones `role="status"` llevan los motivos de los CTA apagados, que son
+   párrafos enteros. Neto del pie: **+58,99 px**.
+
+**Lo que NO es**: no es el conmutador (cuesta 0 px medidos: cabecera 117,13 en las
+dos ramas), no es el tope en `vh`, y no son los siete atributos semánticos (que
+salieron al `<dialog>` en la desviación 12 y ahí siguen). Es que **el presupuesto
+de 80 px que T0.3·1 calculó se gastó tres veces**: en los apuntes del selector, en
+el renglón de procedencia concatenado y en los dos motivos del pie.
+
+Evidencia: `.gstack/f11-panel-aplastado.png` — «AVISOS» y «PARTES · 7 partes» son
+dos rótulos con nada debajo.
+
+##### ✅ Lo que se arregló, y lo que se ganó MEDIDO
+
+Dos ahorros, uno por cada causa, sin tocar ni un texto de los que ya estaban
+escritos —los dos motivos siguen exportados y siguen siendo verdad; lo que cambió
+es **cuál se enseña**—:
+
+1. **`app/panel-edificio.js#pintarModelo`: solo se enseña el apunte del modelo
+   ELEGIDO** (el otro va con `hidden`, no se retira del DOM). El apunte visible
+   mide **79,69 px**; `.gml-campo` del selector baja de **272,03 → 174,41 px**
+   (**−97,62**).
+2. **`app/rama.js`: UN solo motivo para los dos CTA** (`MOTIVO_CTA_EN_EDIFICIO`),
+   escrito en el renglón del primero y con el segundo apuntándole por
+   `aria-describedby` al `id` `gml-motivo-cta-edificio`. `.gml-acciones` baja de
+   **207,53 → 140,16 px** (**−67,37**).
+
+**Total ganado: −164,99 px.** Y con eso:
+
+| | Antes | Después |
+|---|---|---|
+| `.gml-bloque--edificio` (vacío) | 457,13 px | **359,50 px** |
+| `.gml-bloque--edificio` (7 partes) | 524,50 px | **426,88 px** |
+| `.gml-acciones` | 207,53 px | **140,16 px** |
+| Suma de los hijos (vacío) | 947,54 px | **900,01 px** |
+| Sobresuscripción (vacío / cargado) | 47,54 / 114,91 px | **0,01 / 0,00 px** |
+| ⭐ **Recorte del panel** (vacío / cargado) | **48 / 115 px** | **0 / 0 px** ✅ |
+| Lista de partes (vacío) | 2,00 px | **58,70 px** (2 filas) ✅ |
+| «Diagnosticar encaje» y su motivo | **fuera de la pantalla** | **a la vista** ✅ |
+
+##### ⛔ Lo que quedó tras el primer arreglo (2.ª corrida), y la causa que señaló
+
+**El panel ya cabía. Lo que no cabía era lo que va dentro de sus dos cajas
+encogibles en cuanto entran datos**, y eso es otra cosa —y hay que decirlo
+distinto, porque «cabe» es un booleano que no es accionable—:
+
+| Hijo de `.gml-panel` | `flex` | Vacío | Con 7 partes |
+|---|---|---|---|
+| `.gml-panel-cabecera` | `0 0 auto` | 117,13 | 117,13 |
+| `.gml-bloque--edificio` | `0 0 auto` | 359,50 | **426,88** |
+| `.gml-bloque--avisos` | `0 1 auto` | 50,83 | 46,63 |
+| `.gml-bloque--partes` | `1 1 auto` | 114,64 | 51,47 |
+| `.gml-panel-pie` | `0 0 auto` | 257,91 | 257,91 |
+| **Suma / recorte** | | 900,01 / **0** | 900,00 / **0** |
+| ⛔ `.gml-partes` (contenido) | | 58,70 (de 124) | **2,00** (de 184) |
+| ⛔ `#avisos` (contenido) | | 10,89 (de 39) | **6,69** (de 394, 3 tarjetas) |
+
+Déficit medido entonces: **23,39 px** para una fila de la lista, **9,31 px** para
+una línea de avisos ⇒ **32,70 px de mínimo decente**, **569,31 px** para verlo
+todo. Y de los tres fijos, que sumaban **801,92 px** de 900, la partida que saltaba
+a la vista era `.gml-procedencia` con **89,06 px**, porque
+`MENSAJE_SIN_AUTOGUARDADO` **se concatenaba ahí, además de ir al panel de avisos**.
+
+#### El 2.º arreglo del defecto A: la advertencia se decía DOS VECES (3.ª corrida)
+
+Esa cifra era la punta de un defecto de redacción, no de maquetación: **la misma
+advertencia se estaba enseñando dos veces a la vez** —entera y permanente en el
+renglón, y entera otra vez como tarjeta en cuanto había algo que perder—. Decir dos
+veces lo mismo no es el doble de honrado, y aquí además costaba 89 px del sitio más
+disputado del panel.
+
+`app/cableado-edificio.js` estrena **`MENSAJE_SIN_AUTOGUARDADO_BREVE`** (87
+caracteres frente a 289) para el renglón; **la versión larga no se toca y sigue
+saliendo entera** por el panel de avisos, una sola vez. Cada mitad hace lo suyo: la
+línea del renglón es permanente porque **no guardar es una propiedad de esta
+versión y no un suceso** —que es el argumento con el que se puso ahí y sigue siendo
+bueno—, y la tarjeta dice las tres cosas (qué no pasa, por qué, y qué hacer) donde
+caben sin quitarle sitio a nada.
+
+Medido:
+
+| | 2.ª corrida | 3.ª corrida |
+|---|---|---|
+| `.gml-procedencia` (vacío) | 74,22 px | **29,69 px** (−44,53) |
+| `.gml-procedencia` (7 partes) | 89,06 px | **59,38 px** (−29,68) |
+| `.gml-bloque--edificio` (vacío) | 359,50 px | **314,97 px** |
+| `.gml-bloque--edificio` (7 partes) | 426,88 px | **397,19 px** |
+| `#avisos` contenido (vacío) | 10,89 px ⛔ | **24,09 px** ✅ |
+| `#avisos` contenido (7 partes) | 6,69 px ⛔ | **24,84 px** ✅ |
+| `.gml-partes` (vacío) | 58,70 px (2 filas) | **90,03 px (3 filas)** ✅ |
+| `.gml-partes` (7 partes) | 2,00 px ⛔ | **7,06 px** ⛔ |
+| **Déficit del mínimo decente** | **32,70 px** | **18,33 px** |
+| Tarjeta larga en `#avisos` | 1 | **1** ✅ (271 caracteres, entera) |
+| El renglón repite la tarjeta | **sí** | **no** ✅ |
+
+⇒ **Cerrados 14,37 px de los 32,70**, y con ellos **las dos advertencias de
+`#avisos`, en los dos estados**. La advertencia larga **sigue apareciendo**: el
+ahorro no se la ha llevado por delante, y hay un guardián que lo exige.
+
+##### ⛔ Lo que QUEDA hoy: 18,33 px, y de dónde salen
+
+Una sola cosa: **con 7 partes cargadas la lista mide 7,06 px y una fila mide
+25,39**, así que no se ve ni una entera. El estado vacío ya está resuelto (90,03 px,
+tres filas).
+
+| Hijo de `.gml-panel` | `flex` | Vacío | Con 7 partes |
+|---|---|---|---|
+| `.gml-panel-cabecera` | `0 0 auto` | 117,13 | 117,13 |
+| `.gml-bloque--edificio` | `0 0 auto` | **314,97** | **397,19** |
+| `.gml-bloque--avisos` | `0 1 auto` | 64,03 | 64,78 |
+| `.gml-bloque--partes` | `1 1 auto` | 145,97 | 63,00 |
+| `.gml-panel-pie` | `0 0 auto` | 257,91 | 257,91 |
+| **Suma / recorte** | | 900,01 / **0** | 900,00 / **0** |
+| `.gml-partes` (contenido) | | **90,03** (de 124) ✅ | ⛔ **7,06** (de 184) |
+| `#avisos` (contenido) | | **24,09** (de 39) ✅ | **24,84** (de 394) ✅ |
+
+**Cuántos píxeles faltan:** **18,33 px** para UNA fila · **176,94 px** para las
+siete · **546,10 px** para verlo todo (las 7 filas y las 3 tarjetas enteras).
+
+**De dónde pueden salir, en orden de cercanía:**
+
+1. **8,84 px están AL LADO**: es el margen que `#avisos` tiene hoy por encima de su
+   propio mínimo (24,84 contra los 16 de una línea). Son los únicos que no hay que
+   quitarle a nadie — pero dejan a los avisos justo en el hueso.
+2. Los **9,49 px restantes** tienen que salir de los tres bloques fijos, que con
+   datos suman **772,23 px** de 900:
+   - `.gml-bloque--edificio` **397,19** = rótulo 15,94 + **selector de modelo
+     174,41** + refcat 54,94 + renglón de estado **44,53** + procedencia **59,38**.
+     ⚠️ Los dos últimos **solo existen con datos cargados** (0 y 29,69 en vacío):
+     son **+74,22 px** que llegan justo cuando la lista tiene algo que enseñar, y
+     por eso el panel vacío cabe con tres filas y el cargado no cabe con una.
+   - `.gml-panel-pie` **257,91** = ficha 72,75 + acciones **140,16**.
+   - `.gml-panel-cabecera` **117,13** (el conmutador sigue costando 0 px).
+
+**Margen para F12**, que es la otra cara de la misma cuenta: hoy sobran **8,84 px**
+en `#avisos` y **0** en la lista. F12 añade las plantas por parte —o sea, más texto
+por fila y una fila más alta—: **entra en un panel sin holgura**, y esta tabla es el
+sitio donde mirarlo antes de escribir nada.
+
+**Lo que sigue sin ser la causa**: el tope `--gml-partes-alto-max` (234,00 px) no
+muerde ni una vez, en ninguna de las tres corridas.
+
+Evidencia: `.gstack/f11-panel-edificio-tras-arreglo.png` — «Diagnosticar encaje» y
+su motivo se ven, «AVISOS» enseña ya la cabecera de una tarjeta («AVISO ×2»), y
+«PARTES · 7 partes» sigue siendo un rótulo con una tira de píxeles debajo.
+
+#### Defecto B — la aplicación se contradecía a sí misma al cargar un edificio ⟶ ✅ ARREGLADO
+
+Al soltar `edificio_consulta_masiva_3515508VF0831N.dxf` y aplicar la capa
+`Construccion`, el renglón del panel dice:
+
+> «Cargadas 7 partes de «edificio_consulta_masiva…dxf»: 62 vértices en total.»
+
+y **a la vez** entra en el panel de avisos una tarjeta que dice:
+
+> «El contorno menos los huecos da **-13.32 m²** con 7 anillo(s): el reparto «el
+> primero es el contorno y los demás son huecos» NO se sostiene. **No se construye
+> la parcela**; revisa qué anillos del fichero son de verdad la parcela.»
+
+Las dos frases no pueden ser ciertas a la vez, y quien tiene que decidir cuál se
+cree es el usuario. El aviso viene de `parsers/importar.js:669-678`
+(`SUPERFICIE_NO_POSITIVA`, la detección que T1.1 añadió para tapar el −390,45 m²
+silencioso) y **habla del reparto «un exterior + N huecos», que es DE PARCELA**: en
+la rama EDIFICIO **cada anillo es su propio exterior**, así que ni el número
+negativo ni la palabra «parcela» significan nada aquí.
+
+Lo llamativo es que **la mitad del arreglo ya está hecha y documentada**:
+`edificio/entrada.js:422` filtra esos dos códigos de `resumen.bloqueos` con
+`BLOQUEOS_SOLO_PARCELA` —y su cabecera explica por qué, con este mismo fixture
+como ejemplo—. Lo que **no** se filtra es su **DETECCIÓN**, que es justamente la
+mitad que el usuario LEE. La suite está verde porque `entradaDesdeTexto` reenvía
+las detecciones de aguas arriba «tal cual» a propósito, y eso está probado.
+
+Evidencia: `.gstack/f11-aviso-contradictorio.png`.
+
+##### ✅ Lo que se arregló, y por qué está bien arreglado
+
+**En su origen, y con la lista que ya existía**, no con un parche en la interfaz:
+
+- `parsers/importar.js` marca la detección de superficie ≤ 0 con
+  `datos.bloqueo = 'SUPERFICIE_NO_POSITIVA'` y publica
+  **`sinDeteccionesDeParcela(detecciones)`**;
+- `edificio/entrada.js:430-431` filtra ahora **las dos mitades con la MISMA lista
+  publicada** (`BLOQUEOS_SOLO_PARCELA`): los bloqueos y sus detecciones. **No se
+  filtra por tipo ni por texto**, que es lo que habría vuelto a divergir el día que
+  alguien añadiera un sexto bloqueo de parcela.
+
+**Medido en la corrida de comprobación**: cargar el DXF real por la capa
+`Construccion` da **7 partes** y `reparto.avisoQueNiegaLaCarga: null`. Los avisos
+que quedan son los tres legítimos —huso ambiguo, «esta rama no se guarda sola» y
+el del dibujo soltado en la rama Parcela— y ninguno contradice al panel. El
+guardián se queda puesto: es el que impide que vuelva.
+
+### Y una cosa que NO es un defecto, para que nadie la denuncie dos veces
+
+`.gml-conmutador-rama` declara `display: inline-flex` en la hoja y **computa
+`flex`**. No es una regla muerta: **los ítems flex se bloquifican** (CSS Display 3,
+§2.7), y el conmutador es hijo de `.gml-chips`, que es `display: flex`. El efecto es
+idéntico; lo único que queda es que la palabra `inline-` de la hoja es inerte por
+construcción. El guion lo publica (`conmutadorAncho.display` /
+`displayDeclaradoEnLaHoja`) y **exige solo que sea flex de alguna forma**.
+
+### Cifras de referencia (**3.ª corrida**, 2026-08-04, con los tres arreglos puestos)
+
+| Medida | Valor |
+|---|---|
+| Duración del guion | **1.965 ms** · **0** peticiones a los datos del Catastro · 8 de cartografía |
+| Caja de vértices al arrancar | **267 px** con `tarjetasDeAvisos: 0` ✅ (sexta fase seguida) |
+| Cabecera del panel | **117,13 px** en PARCELA · **117,13 px** en EDIFICIO ⇒ el conmutador cuesta **0 px** ✅ |
+| ⭐ **Guardián de ancho** | conmutador **116,17 px** de **169,29** libres ⇒ **holgura 45,12 px** · **sin salto de línea** ✅ (fase 0: 116,17 / 169,28 / 46,11) |
+| Desborde del panel (ancho) | **0 px** — con `nowrap` habrían sido 102,53, recortados en silencio |
+| Objetivo de pulsación del conmutador | **25,39 px** (WCAG 2.5.8 pide 24) — regalo del `align-items: stretch` contra el chip |
+| ⭐ **M10 ida y vuelta** | **mismo nodo** ✅ · `isConnected` ✅ · valor `9398516VK3799G` intacto ✅ · **oyentes disparando** (1 → 2) ✅ |
+| Los dos CTA del pie | apagados en EDIFICIO con **UN** motivo que **nombra los dos** ✅ · el segundo con `aria-describedby="gml-motivo-cta-edificio"` → nodo que existe y **lleva texto** ✅ · **restaurados exactos** al volver, **sin `aria-describedby` ni `id` residuales** ✅ |
+| Barra de edición | oculta en EDIFICIO ✅ · vuelve al volver ✅ |
+| Ficha del pie | 8 pares → **4** · **libera 75,75 px** (148,50 → 72,75) — la cifra de T0.3·8, clavada ✅ |
+| Rótulos que cambian | «Vértices» ⇢ **«Partes»** · «Superficie» ⇢ **«Superficie en planta»** ✅ (y vuelven) |
+| Contrato K.1 | **0 colisiones** de `data-*` entre ramas, con la app entera montada ✅ |
+| Panes | `parcelaEditada:420` → **`partes:422`** → `acotaciones:425` → `diagnostico:428` → `vertices:430` ✅ |
+| Huella | `<path class="gml-huella">` en `leaflet-partes-pane` · `rgb(167,139,250)` (#A78BFA) · `fill-opacity 0.25` · trazo 2 px · **dentro del lienzo** ✅ |
+| Emergente | abre en `mouseover` · clase `gml-huella-emergente` · texto «Parte 1» · **el ratón sigue burbujeando al mapa** ✅ |
+| `.dxf` con rama **PARCELA** | **0** partes, **0** huellas, tabla intacta en 15 filas, **1 aviso** que dice por dónde sí entra ✅ |
+| `.dxf` con rama **EDIFICIO** | `poly_clasica.dxf` → **1 parte / 4 vértices / 1 huella** · ficha «1» y «100,00 m²» ✅ |
+| Diálogo de reparto | **2 capas**: `Construccion` **7 polilíneas** · `Parcela` **1 polilínea** · **ninguna marcada** · «Cargar las partes» **nace apagado con motivo** ✅ · `:modal` ✅ |
+| ⚠️ La trampa del `change` | `.checked = true` ⇒ el botón **sigue apagado**; con el `change` despachado ⇒ **se enciende** |
+| Tras aplicar `Construccion` | **7 partes / 7 huellas / 62 vértices** · ficha «7» y «165,99 m²» ✅ |
+| Tipografía | 8 dianas, todas derivadas de `--font-sans`/`--font-mono` · **0 estilos en línea** ✅ |
+| Selector de modelo | **1 apunte visible** de 2 (el elegido, 79,69 px; el otro `hidden`) ✅ |
+| Tope `--gml-partes-alto-max` | **234,00 px** a 900 de alto · **no muerde nunca** · manda el reparto flex ✅ |
+| ⭐ **Recorte del panel** | **0 px** en vacío **y** **0 px** con 7 partes ✅ (1.ª corrida: 48 y 115) |
+| ⭐ **Aviso contradictorio** | **no aparece** (`avisoQueNiegaLaCarga: null`) ✅ (defecto B cerrado) |
+| ⭐ **Advertencia del autoguardado** | renglón con la **breve** (192 car. con la procedencia delante) · **no repite** la tarjeta ✅ · **1** tarjeta con la larga **entera** (271 car.) ✅ |
+| Suma de los hijos del panel | **900,01 px** vacío · **900,00 px** con 7 partes, para 900 disponibles |
+| **Caja de avisos** | **24,09 px** vacío ✅ · **24,84 px** con 3 tarjetas ✅ (1.ª: 0 · 2.ª: 10,89 / 6,69) |
+| **Lista de partes (vacío)** | **90,03 px** ⇒ **3 filas** ✅ (1.ª: 2,00 · 2.ª: 58,70) |
+| ⛔ **Lista de partes (7 partes)** | **7,06 px** para 184 de contenido ⇒ **0 filas** ⟵ lo único que queda |
+| ⛔ **Déficit medido** | **18,33 px** para una fila (era 32,70) · **546,10 px** para verlo todo |
+| Margen que queda | **8,84 px** en `#avisos` · **0** en la lista ⟵ con esto se encuentra F12 |
+
+Evidencia: `.gstack/smoke-f11.png`,
+`.gstack/f11-panel-edificio-tras-arreglo.png` (estado de hoy) ·
+`.gstack/f11-panel-aplastado.png` y `.gstack/f11-aviso-contradictorio.png`
+(la primera corrida, que no se borran).
+
+### El resumen de las tres corridas, en una tabla
+
+Se deja aquí porque es la lección, y no es sobre F11: **cada arreglo salió de una
+cifra que la corrida anterior había puesto encima de la mesa**, y ninguna de las
+tres cifras la podía dar la suite.
+
+| | 1.ª | 2.ª | 3.ª |
+|---|---|---|---|
+| Problemas | 4 | 3 | **1** |
+| Recorte del panel (vacío / cargado) | 48 / 115 px | **0 / 0** | **0 / 0** |
+| Aviso que contradice la carga | **sí** | no | no |
+| `.gml-bloque--edificio` (vacío / cargado) | 457,13 / 524,50 | 359,50 / 426,88 | **314,97 / 397,19** |
+| `.gml-acciones` | 207,53 | **140,16** | **140,16** |
+| `.gml-procedencia` (vacío / cargado) | 74,22 / 89,06 | 74,22 / 89,06 | **29,69 / 59,38** |
+| `#avisos` (vacío / cargado) | 0 / 0 | 10,89 / 6,69 | **24,09 / 24,84** |
+| `.gml-partes` (vacío / cargado) | 2,00 / 2,00 | 58,70 / 2,00 | **90,03 / 7,06** |
+| Déficit del mínimo decente | — (no cabía) | 32,70 px | **18,33 px** |
+
+### Lo que este guion deja al checklist humano (§12)
+
+**Que la huella caiga DONDE ESTÁ EL EDIFICIO** — comparar la mancha violeta con el
+tejado de la ortofoto es la comprobación entera que justifica pintarlas, y pide
+ojos. **La vía en vivo del `wfsBU`**, con su régimen de una pasada. **El tope a
+otras alturas de ventana** y el juicio sobre el panel aplastado del defecto A.
+**Un gesto de ratón de verdad** sobre el conmutador y sobre la casilla del diálogo.
+**Abrir en un CAD** el DXF del que salen estas huellas y cotejar sus capas contra
+las que el diálogo ofrece. Y el punto BLOQUEANTE que hereda del 8.1, el 9.4, el
+10.5 y el 11.6: si algún texto de la rama **se lee como un veredicto**.

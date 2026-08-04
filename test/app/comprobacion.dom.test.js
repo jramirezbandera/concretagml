@@ -259,6 +259,7 @@ function montar({
   conDiagnostico = false,
   conCatastro = false,
   entradasExtra = [],
+  alGmlDeEdificio = null,
 } = {}) {
   const { mapa, destruir: destruirMapa } = montarMapa({ zoom: 19 })
 
@@ -290,6 +291,7 @@ function montar({
     srs: SRS,
     cajonDiagnostico,
     entradasExtra,
+    alGmlDeEdificio,
     ventana: window,
   })
 
@@ -734,6 +736,104 @@ describe('cableado-comprobacion · un GML de edificio', () => {
 
     expect(estado.set).not.toHaveBeenCalled()
     expect(transporte.peticiones).toHaveLength(0)
+  })
+})
+
+// ── 8 bis · F11 · el desvío: ese callejón ya tiene salida ────────────────────
+//
+// Los dos `it` de arriba siguen siendo el comportamiento **sin desvío inyectado**,
+// que es el de F08 y el de cualquier pantalla sin rama de edificio. Lo que se
+// prueba aquí es el otro montaje: `alGmlDeEdificio` puesto.
+//
+// ⚠️ Y hay una razón medida para que estas pruebas existan y no baste con las del
+// ensamblaje: la primera versión del desvío llevaba un `ReferenceError` —`DIALECTO`
+// sin importar— que **esta suite no podía ver**, porque con el desvío en `null` el
+// `&&` corta antes de evaluarlo. Lo cazó `main-comprobacion.dom.test.js` cuando ya
+// estaba montado en `app/main.js`. Un guardián que no ejercita la rama nueva no es
+// un guardián.
+
+describe('cableado-comprobacion · F11 · el GML de edificio se ENCAMINA', () => {
+  const ficheroBu = () =>
+    ficheroDeBytes(leerBytes(...GML('bu_building_9398516VK3799G.gml')), 'edificio.gml')
+
+  it('entrega el fichero al desvío, y NO abre el cajón de parcela', async () => {
+    const destino = vi.fn()
+    const { cajon, estado } = montar({ alGmlDeEdificio: destino })
+
+    await soltarYEsperar(ficheroBu())
+
+    expect(destino).toHaveBeenCalledTimes(1)
+    // El MISMO `File`, no una copia ni sus bytes: quien lo recibe vuelve a leerlo.
+    expect(destino.mock.calls[0][0].name).toBe('edificio.gml')
+    expect(cajon.abierto()).toBe(false)
+    // Y el store de PARCELA sigue intacto: este fichero no era suyo.
+    expect(estado.set).not.toHaveBeenCalled()
+  })
+
+  it('cierra el cajón si venía ABIERTO de un fichero anterior', async () => {
+    const destino = vi.fn()
+    const { cajon } = montar({ alGmlDeEdificio: destino })
+
+    // Primero una parcela de verdad: el cajón se abre y dice lo suyo.
+    await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
+    expect(cajon.abierto()).toBe(true)
+
+    // Y ahora el de edificio, que se va a otra rama.
+    await soltarYEsperar(ficheroBu())
+
+    expect(destino).toHaveBeenCalledTimes(1)
+    // Sin este cierre, el usuario se quedaría mirando el cajón del fichero ANTERIOR
+    // mientras la pantalla cambia de rama debajo.
+    expect(cajon.abierto()).toBe(false)
+  })
+
+  it('SUELTA la comprobación: el informe de F09 no puede citar un edificio como fuente', async () => {
+    const { cableado } = montar({ alGmlDeEdificio: vi.fn() })
+
+    await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
+    expect(cableado.comprobacion()).not.toBeNull()
+
+    await soltarYEsperar(ficheroBu())
+
+    // `comprobacion()` es lo que `cablearInforme` imprime bajo «lo que se leyó del
+    // fichero». Dejar ahí la comprobación del GML de construcción haría que el
+    // informe de contraste de una parcela citara como procedencia un edificio.
+    expect(cableado.comprobacion()).toBeNull()
+  })
+
+  it('un GML de PARCELA no se desvía aunque el desvío esté puesto', async () => {
+    const destino = vi.fn()
+    const { cajon, cableado } = montar({ alGmlDeEdificio: destino })
+
+    await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
+
+    expect(destino).not.toHaveBeenCalled()
+    expect(cajon.abierto()).toBe(true)
+    expect(cableado.comprobacion()).not.toBeNull()
+  })
+
+  it('un desvío que revienta se cuenta por el panel, no se lo traga el `drop`', async () => {
+    const destino = vi.fn(() => {
+      throw new Error('el cableado de edificio ha explotado')
+    })
+    const { panel } = montar({ alGmlDeEdificio: destino })
+    const consola = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await soltarYEsperar(ficheroBu())
+
+    expect(destino).toHaveBeenCalledTimes(1)
+    // El reparto de este módulo: al usuario el mensaje único de fallo interno, y el
+    // detalle —con el NOMBRE del fichero y la causa— a la consola. Se comprueban las
+    // dos mitades, porque una sin la otra es «no ha pasado nada».
+    expect(mensajes(panel)).toContain(MENSAJE_FALLO_INESPERADO)
+    expect(consola.mock.calls[0][0]).toMatch(/edificio\.gml/)
+    expect(consola.mock.calls[0][1]).toBeInstanceOf(Error)
+    consola.mockRestore()
+  })
+
+  it('`alGmlDeEdificio` que no es función LANZA al cablear (contrato del programador)', () => {
+    expect(() => montar({ alGmlDeEdificio: 'sí, por favor' })).toThrow(TypeError)
+    expect(() => montar({ alGmlDeEdificio: 'sí, por favor' })).toThrow(/alGmlDeEdificio/)
   })
 })
 

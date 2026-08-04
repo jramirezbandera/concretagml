@@ -82,6 +82,36 @@
 // {@link cablearComprobacion} devuelve `cerrar()` para que quien monte la pantalla
 // pueda atarlo si algún día molesta.
 //
+// ── F11 · EL GML DE EDIFICIO DEJA DE SER UN CALLEJÓN SIN SALIDA ─────────────
+// `comprobacion/gml.js` reconoce el dialecto **BU** desde F08 y se para con
+// honradez: «este GML describe una CONSTRUCCIÓN, no una parcela […] aquí el camino
+// se acaba». Era verdad, y era el **criterio 4 de F08, declarado “a medias”**: el
+// fichero se leía bien y no había ningún sitio al que llevarlo.
+//
+// F11 abre ese sitio, así que este módulo estrena un desvío: {@link alGmlDeEdificio}.
+// Cuando se inyecta —lo hace `app/main.js` en el paso 13— y el fichero resulta ser
+// del dialecto BU, **el fichero se entrega a esa rama y este recorrido termina sin
+// abrir el cajón**. Cuatro decisiones, y las cuatro tienen su porqué:
+//
+//   1. **La detección sigue siendo de `comprobacion/gml.js`, que NO se toca.** Aquí
+//      se lee `comprobacion.dialecto.id`, que ese módulo ya publica. Reconocer el BU
+//      por segunda vez —por la raíz, por el namespace— sería una segunda redacción
+//      de la misma pregunta, y las dos redacciones divergen.
+//   2. **Se comprueba ANTES de pintar**, que hasta F11 era un solo paso. Si el
+//      fichero se va a otra rama, el cajón de parcela no llega ni a enterarse:
+//      dejarle dentro una comprobación que nadie va a ver prepararía el «aquí el
+//      camino se acaba» para el siguiente que lo abriera.
+//   3. **Y el cajón se CIERRA**, porque puede venir abierto del fichero anterior.
+//   4. **`fuente` y `comprobacion` se sueltan.** `comprobacion()` es lo que el
+//      informe de F09 imprime como «lo que se leyó del fichero», y un GML de
+//      construcción no es la procedencia de ninguna parcela.
+//
+// Sin el desvío inyectado —que es el montaje de toda la suite de F08— el módulo se
+// comporta EXACTAMENTE como hasta aquí: el cajón se abre y dice lo que decía.
+//
+// ⚠️ Lo que este módulo **no** hace es conmutar la rama: no sabe que existen. Le da
+// el `File` a quien se lo pidió y `app/main.js` decide.
+//
 // ── LO QUE ESTE MÓDULO **NO** HACE ──────────────────────────────────────────
 //   · **No importa Leaflet ni toca el mapa.** El cajón entra ya construido
 //     (`visor.comprobacion`) y se le habla por sus métodos.
@@ -101,6 +131,10 @@
 
 import { comprobarGml } from '../comprobacion/gml.js'
 import { husoPorSrs } from '../geo/huso.js'
+// F11: el vocabulario de dialectos, para reconocer el GML de EDIFICIO y desviarlo.
+// Se compara contra la clave, nunca contra el texto de la etiqueta: el rótulo se
+// puede reescribir y el identificador no.
+import { DIALECTO } from '../gml/_comun.js'
 import { decodificarGml } from '../gml/decodificar.js'
 import { ORIGEN_PARCELA, crearParcela } from '../model/parcela.js'
 import { normalizarRefcat } from '../services/catastro.js'
@@ -498,6 +532,13 @@ const esCliente = (v) => !!v && typeof v.parcelaPorRefcat === 'function'
  *   Este módulo **no sabe** qué es un fichero de proyecto, igual que
  *   `app/zona-fichero.js` no sabe qué es un GML: solo sabe que hay extensiones que
  *   no son suyas y a quién dárselas.
+ * @param {((f: File) => void)|null} [opciones.alGmlDeEdificio=null]  **F11 · T4.1.**
+ *   Dónde va un `.gml`/`.xml` que resulta ser del dialecto **BU** (una
+ *   construcción). Es un desvío por CONTENIDO y no por extensión, que es la
+ *   diferencia con `entradasExtra`: la extensión es la misma que la de un GML de
+ *   parcela y solo se sabe qué es después de leerlo. `null` ⇒ el recorrido es el de
+ *   F08 y el cajón dice que ahí se acaba el camino, que es lo que hacía la
+ *   aplicación entera hasta esta fase. Ver el apartado «F11» de la cabecera.
  * @param {Window} [opciones.ventana=globalThis]  La ventana sobre la que se puede
  *   soltar el fichero. Se inyecta por lo mismo que en `crearZonaFichero`.
  * @param {HTMLElement} [opciones.boton]  Por defecto {@link SELECTOR_BOTON_ABRIR}.
@@ -526,6 +567,7 @@ export function cablearComprobacion({
   cajonDiagnostico = null,
   alCargarParcela = null,
   entradasExtra = [],
+  alGmlDeEdificio = null,
   ventana = globalThis,
   boton = nodo(SELECTOR_BOTON_ABRIR),
   procedencia = nodo(SELECTOR_PROCEDENCIA),
@@ -568,6 +610,13 @@ export function cablearComprobacion({
       `cablearComprobacion: 'alCargarParcela' debe ser una función (se le pasa el POJO de la ` +
         `parcela que acaba de entrar en el store) o null si no hace falta; recibido ` +
         `${typeof alCargarParcela}.`,
+    )
+  }
+  if (alGmlDeEdificio !== null && typeof alGmlDeEdificio !== 'function') {
+    throw new TypeError(
+      `cablearComprobacion: 'alGmlDeEdificio' debe ser una función (File) => void —a la que se le ` +
+        `entrega el fichero cuando resulta ser del dialecto BU— o null si esta pantalla no tiene ` +
+        `rama de edificio; recibido ${typeof alGmlDeEdificio}.`,
     )
   }
   // Las entradas ajenas se validan ENTERAS antes de montar nada: una extensión mal
@@ -705,7 +754,15 @@ export function cablearComprobacion({
       const datos = new Uint8Array(crudo)
       const { texto, encodingUsado, detecciones } = decodificarGml(datos)
       fuente = { nombre, bytes: datos.byteLength, texto, detecciones, encodingUsado }
-      pintar(0)
+      // ⚠️ F11: COMPROBAR y PINTAR dejan de ser un solo paso, y el motivo está en la
+      // cabecera (decisión 2 del apartado «F11»): si el fichero se va a la rama de
+      // edificio, el cajón de parcela no llega ni a enterarse.
+      const primera = comprobarFuente(0)
+      if (alGmlDeEdificio !== null && primera?.dialecto?.id === DIALECTO.BU) {
+        derivarAEdificio(fichero, nombre)
+        return
+      }
+      cajon.pintar(primera)
     } catch (causa) {
       fuente = null
       comprobacion = null
@@ -721,13 +778,19 @@ export function cablearComprobacion({
   }
 
   /**
-   * Recomprueba el fichero en memoria con el índice pedido y lo pinta. Es el punto
-   * único: lo comparten la primera lectura y cada cambio de radio, para que no haya
-   * dos formas de calcular lo mismo.
+   * Recomprueba el fichero en memoria con el índice pedido y **deja el resultado en
+   * `comprobacion`**. Es el punto único del CÁLCULO: lo comparten la primera lectura
+   * y cada cambio de radio, para que no haya dos formas de medir lo mismo.
+   *
+   * Está separado de {@link pintar} desde F11 y por una sola razón, escrita en la
+   * cabecera: hay un fichero —el GML de edificio— que se comprueba y **no se pinta
+   * aquí**, porque se va a otra rama. Fundir las dos cosas obligaría a ensuciar el
+   * cajón para volver a limpiarlo.
    *
    * @param {number} indice
+   * @returns {object} La comprobación recién calculada.
    */
-  function pintar(indice) {
+  function comprobarFuente(indice) {
     comprobacion = comprobarGml({
       texto: fuente.texto,
       nombreFichero: fuente.nombre,
@@ -736,7 +799,44 @@ export function cablearComprobacion({
       encodingUsado: fuente.encodingUsado,
       indiceElegido: indice,
     })
-    cajon.pintar(comprobacion)
+    return comprobacion
+  }
+
+  /**
+   * Recomprueba y PINTA. El punto único de la vista, y el que usan el botón de
+   * radio de un fichero multiparcela y la primera lectura de un GML de parcela.
+   *
+   * @param {number} indice
+   */
+  function pintar(indice) {
+    cajon.pintar(comprobarFuente(indice))
+  }
+
+  /**
+   * El fichero es un GML de **edificio** y hay una rama a la que llevarlo (F11). Se
+   * le entrega y este recorrido termina: ver el apartado «F11» de la cabecera, donde
+   * están las cuatro decisiones y sus porqués.
+   *
+   * **No lanza**: una excepción del destino es un fallo del programa —el cableado de
+   * edificio no ha llegado a montarse, un oyente roto— y se cuenta por el panel en
+   * vez de subir por un `drop` del navegador, donde no la recogería nadie.
+   *
+   * @param {File} fichero
+   * @param {string} nombre
+   */
+  function derivarAEdificio(fichero, nombre) {
+    // Puede venir ABIERTO del fichero anterior, y lo que enseña es de otra rama.
+    cajon.cerrar()
+    // Las dos referencias se sueltan: un GML de construcción no es la procedencia de
+    // ninguna parcela, y `comprobacion()` es justo lo que el informe de F09 imprime
+    // bajo ese título.
+    fuente = null
+    comprobacion = null
+    try {
+      alGmlDeEdificio(fichero)
+    } catch (causa) {
+      reventar(`la entrega de «${nombre}» a la rama de edificio ha fallado`, causa)
+    }
   }
 
   /**

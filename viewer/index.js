@@ -179,6 +179,18 @@
 // completa (geometría → `vistaInicial` → `throw`) reutilizando la misma función
 // que el paso 6.
 //
+// ── ENCUADRAR SOBRE UNA GEOMETRÍA QUE NO ESTÁ EN ESTE STORE (F11) ───────────
+// `visor.encuadrar()` y el reencuadre vivo miran los dos AL STORE que se le pasó
+// al visor, o sea al de PARCELA. F11 estrena una segunda rama con su propio store
+// —las partes de construcción de un edificio— y ahí ninguno de los dos sirve. Por
+// eso este módulo EXPORTA, además de `crearVisor`:
+//
+//   encuadrarSobreRecintos({ mapa, recintos, zona, alAvisar, sujeto })
+//
+// que es LA MISMA pieza que usan el paso 6 y el paso 7, con el caso degenerado
+// dentro, y que no lee ningún store. Su porqué completo —y por qué se extrae en
+// vez de reimplementarse en `app/`— está en su JSDoc.
+//
 // ── EL TOPE DE ZOOM VIVE AQUÍ, NO EN `viewer/mapa.js` ───────────────────────
 // `montarCapas` devuelve el `maxNativeZoom` DERIVADO de las capas realmente
 // montadas. **Hoy vale SIEMPRE 20**: `montarCapas` monta las seis capas y no
@@ -260,6 +272,17 @@ const EXTENSION_MINIMA_M = 0.5
  * solo (`Map#_limitZoom`).
  */
 const ZOOM_PUNTO = 19
+
+/**
+ * Sujeto de la frase del aviso de vértices no numéricos de
+ * {@link encuadrarSobreRecintos}. Existe como parámetro —y no como literal— desde
+ * F11: la MISMA función encuadra ahora la parcela y las huellas de un edificio, y
+ * decirle al usuario «La parcela tiene 3 vértices con coordenadas no numéricas»
+ * mientras mira un edificio es contarle un fallo real sobre el objeto equivocado.
+ * El defecto es el literal de F03, byte a byte, para que la rama de parcela diga
+ * exactamente lo que decía.
+ */
+const SUJETO_POR_DEFECTO = 'La parcela'
 
 // ── Helpers privados ─────────────────────────────────────────────────────────
 
@@ -542,28 +565,33 @@ function claveDeParcela(parcela) {
 const CONTEXTO_VISTA_INICIAL = "crearVisor: 'opciones.vistaInicial'"
 
 /**
- * TODOS los vértices UTM finitos de TODOS los recintos del estado, aplanados.
+ * TODOS los vértices UTM finitos de TODOS los recintos recibidos, aplanados.
  *
- * Se encuadra sobre `recintos` (la geometría EDITABLE), no sobre
- * `geometriaOficial`: la oficial es la referencia congelada del Catastro y,
- * cuando existe, la editable nace de ella — encuadrar sobre las dos no cambiaría
- * el resultado en el caso normal y en el caso editado mostraría de más.
+ * En la rama de PARCELA se encuadra sobre `parcela.recintos` (la geometría
+ * EDITABLE), no sobre `geometriaOficial`: la oficial es la referencia congelada
+ * del Catastro y, cuando existe, la editable nace de ella — encuadrar sobre las
+ * dos no cambiaría el resultado en el caso normal y en el caso editado mostraría
+ * de más. Quién decide QUÉ recintos son es del llamante desde F11 (ver
+ * {@link encuadrarSobreRecintos}); aquí solo se aplanan.
  *
  * Un vértice NO FINITO se descarta y se AVISA (nunca en silencio: regla de oro
  * 1). No es paranoia: `L.LatLng` LANZA con un `NaN`, así que un solo vértice
  * corrupto tumbaría el encuadre entero con un error de Leaflet ilegible en vez
  * de con un aviso que el usuario pueda entender.
  *
- * @param {object|null} parcela
+ * @param {*} recintos  Array de `{vertices: [x,y][]}` en UTM. Cualquier otra cosa
+ *   —`null`, `undefined`, un no-array— se trata como "no hay recintos" y devuelve
+ *   `[]`: el store puede estar vacío, y eso es un estado legítimo, no un bug.
  * @param {import('./_comun.js').Avisar} avisar
+ * @param {string} sujeto  Sujeto de la frase del aviso (ver {@link SUJETO_POR_DEFECTO}).
  * @returns {Array<[number, number]>}
  */
-function verticesFinitos(parcela, avisar) {
-  const recintos = parcela && Array.isArray(parcela.recintos) ? parcela.recintos : []
+function verticesFinitos(recintos, avisar, sujeto) {
+  const lista = Array.isArray(recintos) ? recintos : []
   const vertices = []
   let descartados = 0
 
-  for (const recinto of recintos) {
+  for (const recinto of lista) {
     if (!recinto || !Array.isArray(recinto.vertices)) continue
     for (const vertice of recinto.vertices) {
       if (Array.isArray(vertice) && Number.isFinite(vertice[0]) && Number.isFinite(vertice[1])) {
@@ -576,7 +604,7 @@ function verticesFinitos(parcela, avisar) {
 
   if (descartados > 0) {
     avisar(
-      `La parcela tiene ${descartados} vértice(s) con coordenadas no numéricas: el encuadre ` +
+      `${sujeto} tiene ${descartados} vértice(s) con coordenadas no numéricas: el encuadre ` +
         `inicial del mapa los ignora.`,
       // AVISO y no ERROR: el visor se encuadra igual con el resto de vértices y
       // el GML se puede seguir generando (la regla está junto al typedef
@@ -641,22 +669,79 @@ function extensionUTM(vertices) {
   }
 }
 
+// ── El encuadre sobre una geometría (público desde F11) ──────────────────────
+
 /**
- * RAMA 1 de la cascada, aislada: encuadrar sobre la geometría del estado, si la
- * hay. Es la ÚNICA rama que usa el reencuadre automático del paso 7 (el porqué
- * está en la cabecera: dentro de una notificación del store no puede haber ni un
- * `throw` de contrato ni un salto a `vistaInicial`).
+ * Encuadra el mapa sobre UNOS RECINTOS EN UTM, con margen — y con el caso
+ * degenerado resuelto.
+ *
+ * ── POR QUÉ ES PÚBLICA (F11 · T1.5), habiendo sido privada cuatro fases ──────
+ * Hasta F10 el único encuadre posible era «lo que hay en el store de PARCELA», y
+ * para eso ya está `visor.encuadrar()`. F11 estrena una SEGUNDA rama con su
+ * propio store (el de edificio), y ahí `visor.encuadrar()` **no sirve**: ejecuta
+ * la cascada sobre el store de parcela, que en esa rama es contexto y puede estar
+ * vacío o hablar de otro municipio. Un edificio traído por referencia catastral o
+ * soltado como GML puede caer a **cientos de kilómetros** de lo que se está
+ * mirando, y ese es exactamente el defecto que la firma humana encontró en F03 y
+ * que `README.md:58-63` documenta: «se traía una parcela de Sevilla y el mapa
+ * seguía mirando la de demostración».
+ *
+ * Se EXTRAE en vez de reimplementarse en `app/` por una razón concreta y medible:
+ * el **caso degenerado**. Un edificio de un solo vértice, o con todos los vértices
+ * coincidentes, produce unos bounds SIN EXTENSIÓN, y `fitBounds` sobre eso calcula
+ * una escala infinita y devuelve el `maxZoom` del mapa (24) sobre un punto. Esa
+ * regla —y el medio metro de {@link EXTENSION_MINIMA_M} que la dispara— es
+ * conocimiento del visor, no del cableado, y copiarla a `app/` sería tener dos
+ * criterios de «esto es un punto y no un recinto» destinados a divergir.
+ *
+ * **No lee el store, no conoce la parcela y no conoce el edificio**: recibe
+ * recintos. Por eso sirve igual para las huellas de las partes de construcción
+ * (`edificio.partes[].recinto`) que para `parcela.recintos`, y por eso la rama 1
+ * de la cascada del viewport ({@link encuadrarGeometria}) es hoy tres líneas que
+ * la llaman.
  *
  * @param {object} args
- * @param {import('leaflet').Map} args.mapa
- * @param {import('./_comun.js').EstadoVista} args.estado
- * @param {number} args.zona
- * @param {import('./_comun.js').Avisar} args.avisar
- * @returns {boolean}  `true` si ha encuadrado; `false` si no había geometría (y
- *   entonces NO ha tocado la vista).
+ * @param {import('leaflet').Map} args.mapa  Mapa de Leaflet YA montado.
+ * @param {Array<{vertices: Array<[number, number]>}>|null} args.recintos  Recintos
+ *   en UTM. `null`, `undefined` o un array vacío significan «no hay nada que
+ *   encuadrar» y devuelven `false` SIN tocar la vista: es un estado legítimo (el
+ *   store de edificio nace vacío), no un contrato roto.
+ * @param {number} args.zona  Huso UTM (29/30/31) de esos recintos.
+ * @param {import('./_comun.js').Avisar} [args.alAvisar]  Canal de aviso del visor.
+ *   Se resuelve con `resolverAvisar`, así que se puede pasar el ya resuelto.
+ * @param {string} [args.sujeto='La parcela']  Sujeto de la frase del aviso de
+ *   vértices no numéricos (`'El edificio'`, `'La parte «Porche»'`…). Ver
+ *   {@link SUJETO_POR_DEFECTO}.
+ * @returns {boolean}  `true` si ha encuadrado; `false` si no había ni un vértice
+ *   utilizable (y entonces NO ha tocado la vista: quedarse donde se está es lo
+ *   único que no sorprende).
+ * @throws {TypeError}  Si `mapa` no es un mapa de Leaflet, o si `alAvisar` no es
+ *   una función (contrato del programador, desde `resolverAvisar`).
  */
-function encuadrarGeometria({ mapa, estado, zona, avisar }) {
-  const vertices = verticesFinitos(estado.get(), avisar)
+export function encuadrarSobreRecintos({
+  mapa,
+  recintos,
+  zona,
+  alAvisar,
+  sujeto = SUJETO_POR_DEFECTO,
+} = {}) {
+  // DUCK TYPING, igual que `esStore` y que `viewer/capas.js#esMapa`: se comprueba
+  // lo que de verdad se usa. Sin esta guarda, un `mapa` equivocado reventaría
+  // dentro de Leaflet con un error ilegible y a tres saltos de aquí.
+  if (
+    !mapa ||
+    typeof mapa !== 'object' ||
+    typeof mapa.setView !== 'function' ||
+    typeof mapa.fitBounds !== 'function'
+  ) {
+    throw new TypeError(
+      `encuadrarSobreRecintos: 'mapa' debe ser un mapa de Leaflet (el de ` +
+        `viewer/mapa.js#crearMapa), con setView/fitBounds; recibido ${JSON.stringify(mapa)}.`,
+    )
+  }
+  const avisar = resolverAvisar(alAvisar)
+
+  const vertices = verticesFinitos(recintos, avisar, sujeto)
   if (vertices.length === 0) return false
 
   const { ancho, alto, centro } = extensionUTM(vertices)
@@ -679,6 +764,36 @@ function encuadrarGeometria({ mapa, estado, zona, avisar }) {
     { padding: [MARGEN_ENCUADRE_PX, MARGEN_ENCUADRE_PX] },
   )
   return true
+}
+
+/**
+ * RAMA 1 de la cascada, aislada: encuadrar sobre la geometría del estado, si la
+ * hay. Es la ÚNICA rama que usa el reencuadre automático del paso 7 (el porqué
+ * está en la cabecera: dentro de una notificación del store no puede haber ni un
+ * `throw` de contrato ni un salto a `vistaInicial`).
+ *
+ * Desde F11 es un ADAPTADOR de tres líneas sobre {@link encuadrarSobreRecintos}:
+ * lo único que aporta es LEER EL STORE, que es justo lo que la rama de edificio no
+ * puede reutilizar (su documento vive en otro store). Todo lo demás —el margen, el
+ * caso degenerado, la proyección vértice a vértice, el aviso de los vértices no
+ * numéricos— es la misma función y no una copia.
+ *
+ * @param {object} args
+ * @param {import('leaflet').Map} args.mapa
+ * @param {import('./_comun.js').EstadoVista} args.estado
+ * @param {number} args.zona
+ * @param {import('./_comun.js').Avisar} args.avisar
+ * @returns {boolean}  `true` si ha encuadrado; `false` si no había geometría (y
+ *   entonces NO ha tocado la vista).
+ */
+function encuadrarGeometria({ mapa, estado, zona, avisar }) {
+  const parcela = estado.get()
+  return encuadrarSobreRecintos({
+    mapa,
+    recintos: parcela && parcela.recintos,
+    zona,
+    alAvisar: avisar,
+  })
 }
 
 /**
@@ -764,6 +879,24 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  * @property {import('./acotaciones.js').Acotaciones|null} acotaciones  La capa de
  *   cotas de F06, o **`null`** por el mismo motivo. Se monta y se desmonta con la
  *   edición: son las dos mitades de la misma opción.
+ * @property {import('./barra-edicion.js').BarraMontada|null} barraEdicion  La
+ *   BARRA FLOTANTE de herramientas de F06 (`viewer/barra-edicion.js`), o **`null`**
+ *   si el visor se montó sin edición **o con `edicion.barra:false`** (mismo
+ *   criterio que las anteriores: `null` es una respuesta, `undefined` sería un
+ *   olvido). Ojo a esa segunda vía: `visor.edicion` puede no ser `null` y
+ *   `visor.barraEdicion` sí — son dos preguntas distintas.
+ *
+ *   Se devuelve desde F11 y para UNA cosa: **poder ocultarla sin desmontarla**
+ *   cuando la rama activa es EDIFICIO (`app/rama.js`). El nodo es
+ *   `visor.barraEdicion.control.getContainer()` —`getContainer()` es API pública de
+ *   `L.Control`— y se esconde con `hidden`, la misma disciplina con la que se
+ *   intercambian las dos secciones del panel: **jamás `remove()` ni
+ *   `replaceChildren()`**, porque `app/main.js#cablearEdicion` resolvió sus siete
+ *   nodos UNA sola vez en el montaje y una referencia huérfana sigue siendo
+ *   escribible y muda (medido en F11 · T0.3).
+ *
+ *   Lo que este visor NO hace es ocultarla él: no sabe qué rama está activa, y
+ *   averiguarlo sería devolverle a la vista un conocimiento de la aplicación.
  * @property {{cajon: ReturnType<typeof crearCajonDiagnostico>,
  *   contraste: ReturnType<typeof crearContraste>}|null} diagnostico  Las dos
  *   piezas de F07, o **`null`** si el visor se montó sin ellas (mismo criterio que
@@ -1115,6 +1248,8 @@ export function crearVisor(contenedor, opciones = {}) {
     let acotaciones = null
     /** @type {ReturnType<typeof crearEdicion>|null} */
     let edicion = null
+    /** @type {import('./barra-edicion.js').BarraMontada|null} */
+    let barraEdicion = null
     if (opcionesEdicion !== null) {
       acotaciones = crearAcotaciones({
         mapa,
@@ -1148,9 +1283,20 @@ export function crearVisor(contenedor, opciones = {}) {
       // Vive sobre el mapa y no en el panel porque el bloque «Edición» del panel
       // se comía 270 px fijos y dejaba la tabla de vértices en 1,6 renglones de
       // los 15 de la parcela (medido en navegador, ver `spec/feature-06`).
+      //
+      // Se guarda en `barraEdicion` y SE DEVUELVE (F11 · T1.5) porque hay un
+      // llamante que necesita OCULTARLA sin desmontarla: con la rama EDIFICIO
+      // activa, la parcela que hay en el mapa es CONTEXTO, y `viewer/edicion.js`
+      // seguiría dejando arrastrar sus vértices y respondiendo a Ctrl+Z — o sea,
+      // deshaciendo una edición de parcela mientras el usuario cree estar
+      // trabajando sobre el edificio. Ocultar es lo correcto y desmontar no:
+      // `crearEdicion` apaga el `doubleClickZoom` y lo restaura al destruirse, y
+      // volver de rama tendría que reconstruir la barra entera y volver a
+      // cablearla desde `app/main.js`. Ver la propiedad `barraEdicion` del
+      // typedef {@link Visor}.
       if (opcionesEdicion.barra) {
-        const barra = crearBarraEdicion({ mapa, posicion: opcionesEdicion.posicionBarra })
-        deshacer.push(() => barra.destruir())
+        barraEdicion = crearBarraEdicion({ mapa, posicion: opcionesEdicion.posicionBarra })
+        deshacer.push(() => barraEdicion.destruir())
       }
     }
 
@@ -1331,6 +1477,7 @@ export function crearVisor(contenedor, opciones = {}) {
       capas,
       edicion,
       acotaciones,
+      barraEdicion,
       diagnostico,
       comprobacion,
       colindantes,

@@ -98,6 +98,44 @@
      (La lista de PARCELAS no se acota, y el porqué está donde se aplica.) */
   --gml-cajon-lista-alto-max: 22vh;
 
+  /* Tope de altura de la LISTA DE PARTES de la rama edificio (F11), cuarta de
+     esta familia y por el MISMO motivo que las tres de arriba: avisos 34vh,
+     cajón 22vh, candidatos 20vh, partes 26vh.
+
+     Los 26vh son 234,00 px a 1440×900, que a razón de 26,84 px por fila
+     (`.gml-parte`, medido) dan 8 partes enteras de las 13 del fixture real.
+     Sin tope y con la lista fuera del reparto de altura, esas 13 partes echan
+     el pie 67,66 px fuera del panel y «Generar GML» DEJA DE VERSE
+     (`ctaGenerarVisible: false`, medido en navegador el 2026-08-03). Es
+     exactamente el desastre que `--gml-avisos-alto-max` evita en su lista.
+
+     ⛔ PERO A 900 px EL TOPE NO LLEGA A MORDER, y hay que decirlo aquí porque
+     quien lea «tope» creerá que es él quien sostiene el pie. Medido: en la rama
+     EDIFICIO la caja que se estira se queda en 225,22 px —los 267,44 px de la
+     tabla de vértices menos los 42,07 px que el bloque de edificio (177,34)
+     cuesta de más que el de parcela (135,27)—, y 225,22 < 234,00. O sea que a
+     1440×900 quien sostiene el pie es el REPARTO FLEX de `.gml-bloque--partes`
+     (`flex:1 1 auto` + `min-height:0` en el hijo que scrollea), y este tope es
+     la RED para cuando esa cadena se rompa. Las dos cifras dan 8 partes
+     enteras, así que la conclusión del contrato K.4 no cambia; lo que cambia es
+     cuál de las dos la produce.
+
+     ⚠️ Y EN VENTANA ALTA SÍ MUERDE, DEJANDO HUECO. Casi todo el presupuesto
+     del panel (cabecera 117,13 · bloque de edificio 177,34 · pie 266,28) es
+     FIJO en píxeles, así que lo que sobra para la lista crece con la ventana
+     casi 1:1 mientras 26vh crece a 0,26. Por encima de ~910 px de alto (cifra
+     DERIVADA de esa aproximación, NO medida) manda el tope y lo que sobra queda
+     en blanco dentro del bloque. No es un fallo silencioso —se ve— pero es feo,
+     y quien lo arregle que empiece por aquí.
+
+     ⚠️ SOLO SE HA MEDIDO A 1440×900. Un tope en `vh` protege del CONTENIDO
+     largo, no de la VENTANA corta, y en la corta el tope aprieta MÁS: a 768 px
+     de alto el presupuesto fijo deja 207 px (medido en T0.3·9) y 26vh valen ahí
+     199,68 px, o sea 7 filas enteras en vez de 8. Le pasa lo mismo a
+     `--gml-avisos-alto-max` desde F02, y por eso esto se escribe en vez de
+     taparse. */
+  --gml-partes-alto-max: 26vh;
+
   /* El título del panel (19px/600) cae entre --text-15 y la escala de display:
      el sistema no tiene un token para ese tamaño. */
   --gml-titulo-tam: 19px;
@@ -232,6 +270,15 @@ body {
   line-height: 1.2;
 }
 
+/* ⛔ EL `wrap` DE AQUÍ ES CARGA ÚTIL Y NO SE CAMBIA A `nowrap`. Desde F11 esta
+   fila no lleva solo chips: lleva también el conmutador de rama, y el plan de F11
+   pedía `nowrap` para que no saltara de línea. Se midió y estaba MAL: con `nowrap`
+   el elemento que no cabe se sale 102,53 px del panel (`scrollWidth` 476 contra
+   `clientWidth` 343) y `.gml-panel` es `overflow:hidden`, o sea que se RECORTA EN
+   SILENCIO — y los chips no se encogen para dejarle sitio porque llevan
+   `white-space:nowrap`. Con `wrap` el fallo al menos SE VE: la fila crece y cuesta
+   20,28–29,19 px según qué salte. El guardián no es de altura, es de ANCHO, y lo
+   pone el guion de humo 13. El razonamiento largo, en `.gml-conmutador-rama`. */
 .gml-chips {
   display: flex;
   flex-wrap: wrap;
@@ -2882,6 +2929,618 @@ body {
    `min-height` reservado para que encender el botón —y vaciar el renglón— no dé un
    salto de maquetación justo debajo de la mano que va a pulsar. */
 .gml-dialogo-expediente-estado {
+  margin: 0;
+  min-height: 1.45em;
+  font-size: var(--text-12);
+  color: var(--color-text-secondary);
+}
+
+/* ═══ Edificio: la segunda rama de la aplicación (F11 · T1.6) ════════════════
+ *
+ * Once fases después, esta aplicación solo sabía de PARCELAS. F11 le añade una
+ * segunda rama —EDIFICIO— que **sustituye** al panel de parcela en vez de
+ * sumarse a él, y ésta es su ropa entera: el conmutador, el bloque de origen, la
+ * lista de partes y dos `<dialog>`.
+ *
+ * ── CÓMO SE ESCRIBIÓ ESTA SECCIÓN: A CIEGAS, CONTRA EL CONTRATO K ───────────
+ * Se escribió EN PARALELO con los módulos que fabrican el marcado, sin verlos.
+ * Los literales de clase y de `data-*` los EXPORTAN ellos —`app/rama.js` y
+ * `app/panel-edificio.js`, igual que `app/zona-fichero.js` exporta
+ * `CLASE_SUPERPOSICION` y `DATO_ARRASTRANDO`—; aquí no se copian de ningún
+ * sitio, se CITAN. Si un nombre de aquí no aparece en aquellos módulos, la regla
+ * está muerta y no lo dice nadie: es el único fallo silencioso que este reparto
+ * de trabajo puede producir, y el guion de humo 13 es quien lo caza.
+ *
+ * ── ⛔ LA REGLA QUE GOBIERNA TODA ESTA SECCIÓN: EL `display` Y EL `hidden` ───
+ * Aquí se intercambian DOS `<section>` con el atributo `hidden`, y quien las
+ * oculta es `.gml-app [hidden]{display:none}` —(0,2,0), declarada arriba del
+ * todo—. Cualquier regla de ESTA sección con especificidad (0,2,0) o más que
+ * declare `display` está escrita DESPUÉS y GANARÍA POR ORDEN: la sección oculta
+ * se vería, las dos ramas estarían en pantalla a la vez y el panel se descosería
+ * sin que ninguna hoja pareciera decir nada raro. Es la tercera vez que este
+ * fichero se topa con la misma trampa (ver `.gml-dialogo-informe-presuncion` y
+ * `.gml-dialogo-expediente-borrador`), y aquí tiene DOS víctimas en vez de una.
+ *
+ * INVARIANTE, y se puede verificar leyendo: **todas las declaraciones de
+ * `display` de esta sección van en selectores de UNA sola clase (0,1,0)**. Las
+ * de (0,2,0) o más —las que llevan `.gml-app` delante o apuntan por `data-*`—
+ * no declaran `display` ni una vez. Quien añada una regla aquí, que haga la
+ * cuenta antes.
+ *
+ * Corolario: el intercambio de secciones **no necesita ni una regla propia**.
+ * `[data-rama-panel="PARCELA"|"EDIFICIO"]` es el contrato de identificación de
+ * `app/rama.js` para encontrarlas y conmutar su `.hidden`; el CSS solo tiene que
+ * no estorbar. Por eso no se declara nada sobre ese atributo: una regla que
+ * volviera a decir «esto se oculta» daría DOS dueños a la misma visibilidad, y
+ * dos dueños acaban divergiendo.
+ *
+ * ── ⛔ Y JAMÁS `replaceChildren` PARA CONMUTAR (medido, T0.3·5) ─────────────
+ * No es cosa del CSS, pero es la razón de que el intercambio sea por
+ * visibilidad y por tanto de que esta sección exista tal como está: con `hidden`
+ * el nodo sigue conectado, conserva su valor y sus oyentes siguen disparando;
+ * con `replaceChildren` la referencia queda huérfana, escribible y MUDA
+ * —escribir en ella no lanza— y la referencia catastral recién traída del
+ * Catastro acaba en un nodo fuera del documento mientras el usuario ve el campo
+ * vacío. Hay 30 nodos de `app/` resueltos una sola vez con `nodo(...)`.
+ *
+ * ── ⚠️ NINGÚN COLOR DE MÉRITO, TAMPOCO AQUÍ (regla de oro 9, SPEC §2) ───────
+ * Ni verde de «edificio correcto» ni rojo de «faltan datos». Lo único con color
+ * es el estado ACTIVO del conmutador, y no es un juicio: es cuál de las dos
+ * ramas se está mirando. Un hecho, como la severidad de un aviso.
+ *
+ * @see app/rama.js             RAMA, y quién pone `data-rama` en el <body>.
+ * @see app/panel-edificio.js   Las clases y los `data-*` del panel y del diálogo.
+ * @see model/edificio.js       MODELO_EDIFICIO: los valores de los radios.
+ */
+
+/* ── K.1 · EL CONMUTADOR DE RAMA, DENTRO DE `.gml-chips` ─────────────────────
+ *
+ * Dos `.gml-boton--menudo` («Parcela» / «Edificio») metidos en la fila de chips
+ * de la cabecera. Sexta fase seguida a COSTE 0 px, y esta vez el 0 está medido
+ * antes de escribir nada (2026-08-03, Chrome, 1440×900):
+ *
+ *     ancho libre de `.gml-chips` ........................ 169,28 px
+ *     los dos botones con `gap:4px` ...................... 116,17 px
+ *     holgura ............................................  46,11 px  (≈4 caracteres anchos)
+ *     alto de `.gml-panel-cabecera` ...... 117,13 px ANTES → 117,13 px DESPUÉS
+ *     caja de vértices ................... 267,44 px ANTES → 267,44 px DESPUÉS
+ *
+ * Y las tres alternativas se descartaron CON NÚMERO, no por gusto: una fila
+ * nueva en la cabecera cuesta −28,31 px de tabla (⛔ no los ~36 px que decía el
+ * plan: los 36 son los de una fila en el bloque «Origen de la parcela», con su
+ * margen); un tercer botón en `.gml-rotulo-acciones`, −13,94 px; y dos
+ * `.gml-chip` dejarían 0,65 px de holgura, que no es caber, es tener suerte.
+ *
+ * ── ⛔ POR QUÉ NO SE PONE `flex-wrap: nowrap` EN `.gml-chips` ───────────────
+ * El plan de F11 se lo pedía a esta tarea y ESTABA MAL. Medido: con `nowrap` la
+ * fila se queda en sus 25,39 px y la tabla intacta, pero el elemento que no cabe
+ * SE SALE 102,53 px del panel (`scrollWidth` 476 contra `clientWidth` 343) y
+ * `.gml-panel` es `overflow:hidden`, así que se recorta en silencio; y los chips
+ * no le hacen sitio encogiendo porque llevan `white-space:nowrap`. Con `wrap`
+ * —lo que ya hay— el fallo AL MENOS SE VE: la fila salta de línea y cuesta
+ * 20,28–29,19 px según qué elemento salte. Entre un fallo caro que se ve y uno
+ * gratis que no se ve, este fichero elige siempre el primero. El guardián es de
+ * ANCHO y vive en el guion de humo 13: `saltoDeLinea === false` y
+ * `holguraPx > 24` sobre `.gml-chips`. Traducido: los rótulos «Parcela» y
+ * «Edificio» **no pueden crecer**, igual que «Expediente» no puede crecer en la
+ * fila del rótulo (F10, 12 px de holgura).
+ *
+ * ── `align-items` EN EL VALOR POR DEFECTO, Y ES CARGA ÚTIL ──────────────────
+ * `stretch` está escrito, no heredado por inercia (mismo caso que
+ * `.gml-campo-fila`). `.gml-chips` no declara `align-items`, así que el
+ * conmutador se estira al alto de la fila —que lo gobierna el chip, 25,39 px— y
+ * con él sus dos botones, que solos medirían 15,19 px. El objetivo de pulsación
+ * pasa de 15 px a ~25 px (WCAG 2.5.8 pide 24) SIN COSTAR UN PÍXEL, porque la
+ * fila ya medía eso. Es el mismo regalo que el `::after` de `.gml-boton--menudo`
+ * consigue por otro camino, y aquí se suman: ~37 px reales de objetivo.
+ * Si algún día la fila se queda sin chips, el conmutador vuelve a sus 15,19 px y
+ * la fila encoge: nadie sale perdiendo.
+ *
+ * ── NI UN `order`, A PROPÓSITO ─────────────────────────────────────────────
+ * Sería tentador forzar con `order:-1` que el conmutador salga a la izquierda de
+ * los chips sin depender de dónde lo inserte `app/rama.js`. No se hace: `order`
+ * cambia el orden VISUAL y no el del foco, y un tabulador que salta hacia atrás
+ * es justo lo que prohíbe WCAG 2.4.3. Quien quiera ese orden, que lo ponga en el
+ * DOM. */
+.gml-conmutador-rama {
+  display: inline-flex;
+  align-items: stretch;
+  /* 4 px y no `--space-2` (8 px): los dos botones son UNA cosa —un conmutador de
+     dos posiciones—, y con el mismo hueco que los separa de los chips se leerían
+     como dos botones sueltos. Además son los 4 px con los que se midieron los
+     116,17 px que caben. */
+  gap: 4px;
+  /* No crece ni encoge: tiene que medir lo que miden sus dos rótulos. Si algún
+     día no cabe, que salte de línea (y se vea), no que se aplaste. */
+  flex: none;
+}
+
+/* El estado ACTIVO, gobernado desde `body[data-rama]` y NO desde `aria-pressed`.
+   Es una decisión, no un descuido: `data-rama` es el mismo atributo del que
+   depende qué `<section>` se ve, así que pintar desde él hace IMPOSIBLE que el
+   botón se vea pulsado para una rama que no está activa. `aria-pressed` sigue
+   siendo obligatorio en el marcado (contrato K.1) porque es lo que oye el lector
+   de pantalla; lo que no es, es la fuente del aspecto. Dos fuentes para el mismo
+   estado acaban divergiendo, y esa divergencia no se ve hasta que engaña.
+
+   El `<body>` es `.gml-app`, así que esto es (0,3,0): gana por ESPECIFICIDAD a
+   `.gml-boton--menudo` (0,1,0) y a su `:hover:not(:disabled)` (0,2,0), no por
+   orden — el criterio de todo el fichero. Y por eso también resuelve el problema
+   del `border` abreviado que documentan las tres variantes de `.gml-boton`.
+
+   ⚠️ SOLO PROPIEDADES QUE NO MIDEN. Nada de `padding`, `font-size`,
+   `font-weight` ni `border-width` aquí: cualquiera de ellas movería el ancho del
+   conmutador y se comería los 46,11 px de holgura que hacen que quepa. El peso
+   del rótulo activo tampoco se toca, porque un texto que engorda al pulsarlo
+   desplaza al de al lado. */
+.gml-app[data-rama='PARCELA'] [data-ir-a-rama='PARCELA'],
+.gml-app[data-rama='EDIFICIO'] [data-ir-a-rama='EDIFICIO'] {
+  background: var(--color-tint-accent);
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
+}
+
+/* ── K.2 · «ORIGEN DEL EDIFICIO»: EL BLOQUE QUE SUSTITUYE AL DE PARCELA ──────
+ *
+ * Gemelo de `.gml-bloque--catastro` y con su mismo `flex:none` heredado de
+ * `.gml-bloque`: pase lo que pase con el reparto de altura, el campo por el que
+ * entra el dato sigue ahí. Quien absorbe y cede es la lista de partes.
+ *
+ * ── LA CUENTA DE ALTURA DE LA RAMA, ENTERA Y MEDIDA ────────────────────────
+ *     ocultar «Origen de la parcela» devuelve ............ +118,23 px
+ *     este bloque, sin los atributos semánticos .......... −177,34 px
+ *     («Origen de la parcela» medía 135,27 px ⇒ este cuesta 42,07 px MÁS)
+ *     lo que le queda a la lista de partes ............... 225,22 px  (medido)
+ *     267,44 − 42,07 = 225,37 ⇒ la cuenta cierra con 0,15 px de resto.
+ *
+ * O sea: en la rama EDIFICIO la caja que se estira arranca ~42 px por debajo de
+ * lo que mide la tabla de vértices en la rama PARCELA. El invariante de los
+ * 267,44 px sigue valiendo —pero SOLO en la rama PARCELA—, y eso es exactamente
+ * lo que el guion 13 tiene que comprobar: que ir a EDIFICIO y volver los deja
+ * clavados.
+ *
+ * ── ⛔ LOS SIETE ATRIBUTOS SEMÁNTICOS NO ESTÁN AQUÍ, Y ES LO MEJOR DE F11 ───
+ * Medidos: 370,56 px apilados y 150,00 px en su forma más densa todavía
+ * editable (etiqueta en línea, dos columnas). El presupuesto es de 80 px con la
+ * ficha del pie recortada a 4 pares y de 4 px con la de hoy. No caben en ninguna
+ * maqueta. Y con la maqueta apilada el desastre tiene DOS víctimas: `#avisos` se
+ * queda en 0 px de contenido aunque lleve 12 tarjetas dentro —el desastre de F06
+ * repetido—. Se van a un `<dialog>` (más abajo), con los tres precedentes de la
+ * casa: F06 sacó la edición a una barra, F07 el diagnóstico a un cajón, F09 el
+ * informe a un modal. Y el criterio de aceptación 1 se cumple igual y mejor: en
+ * SIMPLIFICADO no existen ni el bloque ni el botón que lo abre.
+ *
+ * ── DÓNDE VA EL BOTÓN QUE ABRE ESE DIÁLOGO ─────────────────────────────────
+ * En el `.gml-rotulo-fila` de este bloque, como `.gml-boton--menudo`, que es el
+ * hueco de coste 0 px que estrenó F08 y repitió F10. No en una fila propia: eso
+ * son ~36 px que salen de la lista de partes.
+ *
+ * ⚠️ Y VALE PALABRA POR PALABRA LO ANOTADO EN `.gml-bloque--catastro`: aquí
+ * tampoco se usa `--gml-color-usuario` (#FFD600 da ~1,4:1 sobre el blanco del
+ * panel), y ninguna regla declara `outline` ni lo anula — el foco lo pone la
+ * regla global `.gml-app :focus-visible`. */
+.gml-bloque--edificio {
+  gap: var(--space-2);
+}
+
+/* Los márgenes NO se colapsan dentro de un contenedor flex: sin esto el margen
+   inferior del rótulo se SUMARÍA al `gap` del bloque. Mismo arreglo, y por lo
+   mismo, que en `.gml-bloque--catastro`. El selector es doble porque el rótulo
+   de este bloque va envuelto en un `.gml-rotulo-fila` (para colgarle a la
+   derecha los botones menudos) y esa fila trae su propio `margin-bottom`. */
+.gml-bloque--edificio .gml-rotulo,
+.gml-bloque--edificio .gml-rotulo-fila,
+.gml-bloque--partes .gml-rotulo,
+.gml-bloque--partes .gml-rotulo-fila {
+  margin-bottom: 0;
+}
+
+/* ── El selector de modelo: «¿Qué necesitas generar?», una línea por opción ───
+ *
+ * Radios con los valores de `MODELO_EDIFICIO` SIN TRADUCIR en el `value`
+ * (contrato K.2); lo que se lee es el rótulo, que sí está en castellano.
+ *
+ * Una línea por opción y no una fila de dos: la diferencia entre SIMPLIFICADO y
+ * COMPLETO no cabe en dos palabras —una de ellas hace aparecer siete atributos y
+ * la otra los borra— y cada opción necesita su renglón de apunte debajo. Dos
+ * columnas obligarían a resumir justo lo que hay que explicar.
+ *
+ * `.gml-opcion` es `<label>` envolviendo al radio: así el objetivo de pulsación
+ * es la línea entera y no el círculo de 13 px. `align-items: baseline` alinea el
+ * radio con la primera línea del rótulo aunque el rótulo se parta en dos.
+ *
+ * ── POR QUÉ ES UNA REJILLA Y NO UN `flex` ──────────────────────────────────
+ * Porque el apunte tiene que caer DEBAJO del rótulo y ALINEADO con él, no debajo
+ * del radio. En un contenedor flex, un hijo con `display:block` sigue siendo un
+ * ítem flex y se pondría en la MISMA línea, como tercera columna: parece un
+ * detalle y es un renglón ilegible. Con dos columnas —radio / texto— el apunte
+ * solo tiene que decir `grid-column: 2` y cae en su sitio sin sangrados mágicos.
+ * Y funciona tanto si el rótulo va suelto en el `<label>` (la rejilla envuelve el
+ * texto directo en un ítem anónimo) como si va en su propio `<span>`. */
+.gml-opciones {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.gml-opcion {
+  display: grid;
+  /* `minmax(0, 1fr)` y no `1fr`: la base automática de una columna de rejilla es
+     el tamaño de su contenido, y un rótulo largo sin espacios ensancharía la
+     opción por encima del panel — que es `overflow:hidden` y lo recortaría en
+     silencio. */
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 2px var(--space-2);
+  font-size: var(--text-12);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+/* El apunte de la opción: qué implica elegirla —y en el caso de SIMPLIFICADO,
+   qué se PIERDE al elegirla, que es la regla de oro 1 aplicada a un radio—.
+   `--text-11` y gris, como todo lo que en este panel explica en vez de afirmar.
+   Segunda columna: debajo del rótulo, nunca debajo del radio. */
+.gml-opcion-apunte {
+  grid-column: 2;
+  font-size: var(--text-11);
+  color: var(--color-text-secondary);
+}
+
+/* ── K.2 · LA LISTA DE PARTES: EL NUEVO ESTIRADOR DEL PANEL ──────────────────
+ *
+ * ⚠️ ESTE BLOQUE HACE EN LA RAMA EDIFICIO EL PAPEL QUE `.gml-bloque--vertices`
+ * hace en la de parcela: es el ÚNICO que se estira, absorbe la altura sobrante y
+ * deja el pie pegado abajo. `min-height:0` lo hereda de `.gml-bloque` y es lo
+ * que le permite encoger por debajo del alto de su contenido: sin él, 13 partes
+ * empujan el pie —y con él «Generar GML»— fuera de la pantalla. Es la misma
+ * cadena de altura que documenta la cabecera de este fichero, y el mismo
+ * desastre que F06 provocó y midió.
+ *
+ * Las dos ramas no pueden estirarse a la vez, y no hace falta ninguna regla para
+ * impedirlo: la sección que no toca está `hidden`, o sea `display:none`, o sea
+ * que no es hijo flex de nada.
+ *
+ * El `padding-bottom` es el mismo que el de `.gml-bloque--vertices` y por lo
+ * mismo: `.gml-bloque` deja el borde inferior a 0 porque cuenta con que debajo
+ * venga otro bloque, y el que se estira es el último. El `gap` va con la anulación
+ * de márgenes de arriba (la de `.gml-bloque--catastro`, misma trampa: los
+ * márgenes NO se colapsan dentro de un contenedor flex y el del rótulo se
+ * SUMARÍA al hueco). */
+.gml-bloque--partes {
+  flex: 1 1 auto;
+  gap: var(--space-2);
+  padding-bottom: var(--space-4);
+}
+
+/* La caja que scrollea. Gemela de `.gml-tabla-caja`, y las tres propiedades
+   estructurales son las mismas por el mismo motivo:
+   · `flex: 1 1 auto` + `min-height: 0` .... toma lo que sobra Y puede encoger.
+     Sin el `min-height:0` un hijo flex NO baja del alto de su contenido y la
+     lista empujaría el pie: es LA trampa de este fichero, escrita ya tres veces.
+   · `overflow-y: auto` ..................... para que encoger signifique
+     scrollear y no recortar.
+   · `max-height: var(--gml-partes-alto-max)` ... la RED, no el mecanismo. A
+     1440×900 no llega a morder (234,00 px de tope contra 225,22 px de sitio);
+     está para cuando la cadena flex se rompa por arriba. El porqué completo y
+     las dos cifras que se cruzan, en `:root`.
+   · `overscroll-behavior: contain` ......... la rueda al final de la lista no
+     puede acabar haciendo scroll en la app.
+   Se viste como `.gml-candidatos` —caja con borde sobre `--color-bg-surface`, y
+   los renglones separados por `border-top`— porque es la misma clase de cosa:
+   una relación de elementos que el usuario recorre. Sin `display` propio: es un
+   `<ul>` en flujo de bloque, y así el `[hidden]` de arriba nunca pierde. */
+.gml-partes {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: var(--gml-partes-alto-max);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-border-sub);
+  border-radius: var(--radius);
+  background: var(--color-bg-surface);
+}
+
+/* ── Una parte, una fila ─────────────────────────────────────────────────────
+ *
+ * ⚠️ SU ALTO ES UN PRESUPUESTO, NO UN GUSTO. Las cifras de «cuántas partes se
+ * ven enteras» se mueven con esta regla: 26,84 px por fila es lo que se midió
+ * con una fila de mentira, y de ahí salen las 8 partes de 13 que caben. Las
+ * cuentas de esta regla, con los tokens del fichero:
+ *
+ *     rótulo ............ 12 px × 1,45 (`line-height` de `.gml-app`) = 17,40 px
+ *     padding ........... 2 × --space-1 ................ =  8,00 px
+ *     separador ......... 1 px de `border-top` .......... =  1,00 px
+ *     TOTAL ............................................ = 26,40 px
+ *
+ * o sea 0,44 px por debajo del proxy medido: las 8 partes se mantienen (225,22 /
+ * 26,40 = 8,53). El botón «Renombrar» es `.gml-boton--menudo`, que mide 15,19 px
+ * y por tanto NO gobierna la fila. Si alguien toca aquí `padding`, `font-size` o
+ * `line-height`, que rehaga la resta: el número robusto es el de PÍXELES, no el
+ * de partes.
+ *
+ * `justify-content: space-between` es cinturón sobre tirantes: con
+ * `.gml-parte-nombre` presente y absorbiendo (`flex:1 1 auto`) no sobra espacio
+ * y no hace nada; si ese nombre llegara sin su clase, sigue mandando el nombre a
+ * la izquierda y las acciones a la derecha en vez de amontonarlo todo. */
+.gml-parte {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-top: 1px solid var(--color-border-sub);
+  font-size: var(--text-12);
+  color: var(--color-text-primary);
+}
+
+.gml-partes .gml-parte:first-child {
+  border-top: 0;
+}
+
+/* El nombre de la parte. `min-width:0` es lo que le deja encoger dentro del flex
+   —sin él, el ancho de su contenido es un suelo duro— y `overflow-wrap:anywhere`
+   lo parte antes que desbordar: `.gml-panel` es `overflow:hidden`, así que un
+   nombre largo no desbordaría, se RECORTARÍA EN SILENCIO. Es la misma medida que
+   `.gml-cajon-fichero` toma con los nombres de fichero, y por lo mismo. */
+.gml-parte-nombre {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* La cifra de la fila (superficie, nº de vértices). Mono con cifras tabulares
+   —regla tipográfica del sistema para todo valor numérico— y `flex:none` para
+   que no la encoja el nombre. En el gris del cromo: es una anotación sobre la
+   parte, no el dato que se está eligiendo. */
+.gml-parte-dato {
+  flex: none;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  font-size: var(--text-11);
+  color: var(--color-text-secondary);
+}
+
+/* El estado vacío de la lista. El store de edificio NACE VACÍO a propósito —no
+   se inventa un edificio de demostración—, así que este renglón es lo PRIMERO
+   que ve el usuario de esta rama y no puede leerse como «esto no ha cargado».
+   Se viste como `.gml-avisos-vacio`, que resuelve el mismo problema. */
+.gml-partes-vacio {
+  margin: 0;
+  padding: 10px var(--space-3);
+  font-size: var(--text-12);
+  color: var(--color-text-disabled);
+}
+
+/* ── K.3 · LOS DOS `<dialog>` DE LA RAMA: REPARTO POR CAPAS Y ATRIBUTOS ──────
+ *
+ * Los fabrica y los retira `app/panel-edificio.js`; `index.html` no los trae,
+ * igual que los de F09 y F10.
+ *
+ *   · EL DE CAPAS ofrece el reparto de un DXF en vez de imponerlo, y no es
+ *     prudencia: es lo que el dato exige. Medido en `UTM.dxf`, el único plano
+ *     real que tiene este proyecto: 25 polilíneas en 5 capas (FINO 16 —cajetín,
+ *     marco, leyenda—, LINDE 4, PARCELA 3, BLANCO 1 y `0` 1), y **la parcela de
+ *     verdad está en la capa `0`, no en la que se llama `PARCELA`**. Elegir por
+ *     el nombre falla en el primer fichero real. Por eso los nombres de capa se
+ *     enseñan LITERALES, sin bajar a minúsculas: el usuario reconoce los suyos.
+ *   · EL DE ATRIBUTOS es la desviación 12, y su porqué está arriba, en
+ *     `.gml-bloque--edificio`: 150 px de contenido para un presupuesto de 80.
+ *
+ * ── ⛔ NI UN `display` EN LAS CLASES DEL `<dialog>`. NUNCA. ────────────────
+ * La trampa de siempre, por tercera y cuarta vez en este fichero: lo que oculta
+ * un `<dialog>` cerrado es `dialog:not([open]){display:none}` de la hoja del
+ * NAVEGADOR, y las reglas de autor le ganan SIEMPRE, sin mirar especificidad. Un
+ * inocente `display:flex` aquí dejaría el diálogo plantado sobre la aplicación
+ * para siempre. Quien reparte el interior es el `-cuerpo`, que es un `<div>` de
+ * dentro y no puede hacer daño.
+ *
+ * ── ⛔ Y TAMPOCO EN `[data-bloque="atributos-edificio"]`, POR UNA RAZÓN NUEVA ─
+ * El contrato K.2 nombra ese atributo pero NO dice sobre qué nodo cuelga, y esta
+ * hoja se escribió sin ver el módulo: puede acabar en el propio `<dialog>` o en
+ * un `<fieldset>` de dentro. Si cae en el `<dialog>` y aquí hubiera un `display`,
+ * es la bomba del párrafo anterior con otro nombre. Así que a ese atributo solo
+ * se le dan propiedades que no maquetan (el reseteo del `<fieldset>`), y el
+ * `display` va en `.gml-dialogo-atributos-rejilla`, que sí sabemos qué es.
+ *
+ * La CAJA se declara para las tres formas en que el módulo puede nombrar el
+ * diálogo de atributos —su clase de familia o el atributo del contrato—, porque
+ * equivocarse aquí no da un diálogo feo: da un diálogo SIN caja, a pelo sobre el
+ * mapa. Vestir de más cuesta unos bytes; vestir de menos, un modal ilegible.
+ *
+ * @see app/dialogo-expediente.js  El molde: CLASE, CLASE_REUTILIZADA y SELECTOR.
+ * @see parsers/dxf.js             De dónde sale el nombre de capa (código 8). */
+
+/* La caja. Mismas medidas y mismo razonamiento que los diálogos de F09 y F10:
+   `fixed` + centrado por `transform` (con la altura en `auto`, `inset:0` +
+   `margin:auto` no centra en vertical), `z-index` por encima del velo de soltar
+   un fichero (1100) y de los controles de Leaflet (1000), y
+   `overscroll-behavior: contain` porque debajo hay un mapa y una rueda que se
+   escapara haría zoom sobre la parcela. 620 px como el de F10: ninguno de los
+   dos tiene nada más ancho que una etiqueta y su campo. */
+.gml-app .gml-dialogo-capas,
+.gml-app .gml-dialogo-atributos,
+.gml-app dialog[data-bloque='atributos-edificio'] {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1200;
+  width: min(620px, calc(100vw - 2 * var(--space-4)));
+  max-height: min(88vh, 900px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-main);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.28);
+}
+
+.gml-app .gml-dialogo-capas::backdrop,
+.gml-app .gml-dialogo-atributos::backdrop,
+.gml-app dialog[data-bloque='atributos-edificio']::backdrop {
+  background: color-mix(in srgb, var(--color-text-primary) 45%, transparent);
+}
+
+/* Quien reparte el interior. Ver arriba por qué esto NO está en el `<dialog>`. */
+.gml-dialogo-capas-cuerpo,
+.gml-dialogo-atributos-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.gml-dialogo-capas-titulo,
+.gml-dialogo-atributos-titulo {
+  margin: 0;
+  font-size: var(--gml-titulo-tam);
+  font-weight: var(--fw-semibold);
+  line-height: 1.25;
+  color: var(--color-text-primary);
+}
+
+.gml-dialogo-capas-intro,
+.gml-dialogo-atributos-intro {
+  margin: 0;
+  max-width: 68ch;
+  font-size: var(--text-12);
+  color: var(--color-text-secondary);
+}
+
+/* ── El reparto por capas ──────────────────────────────────────────────────── */
+
+/* La relación de capas del fichero. Sin `display`: es (0,2,0) y una declaración
+   aquí ganaría por orden a `.gml-app [hidden]`. En flujo de bloque hace
+   exactamente lo mismo, con los renglones separados por `border-top` como en
+   `.gml-candidatos`. */
+.gml-dialogo-capas [data-lista='capas'] {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-border-sub);
+  border-radius: var(--radius);
+  background: var(--color-bg-surface);
+}
+
+.gml-dialogo-capas [data-capa] {
+  border-top: 1px solid var(--color-border-sub);
+}
+
+.gml-dialogo-capas [data-capa]:first-child {
+  border-top: 0;
+}
+
+/* El renglón: casilla, nombre literal de la capa y cuántos anillos trae. El
+   padding lo pone la FILA y no el `<li>` para que el objetivo de pulsación sea
+   la línea entera, igual que en `.gml-candidatos`.
+
+   ⚠️ La lista NO se acota con `max-height` ni scrollea por su cuenta, y es
+   deliberado: lleva casillas dentro, y un contenedor con `overflow:auto` RECORTA
+   el anillo de foco de lo que está pegado a sus bordes — quien elija con el
+   teclado dejaría de ver dónde está. El diálogo entero ya scrollea (`max-height`
+   arriba), así que una lista larga tiene salida igual. Es la misma decisión, y
+   escrita con las mismas palabras, que la lista de parcelas del cajón de F08.
+
+   ⚠️ SE LLAMAN `gml-dialogo-capas-*` Y NO `gml-capa-*`, y no es por gusto: en
+   este proyecto «capa» ya significa OTRA COSA —`viewer/capas.js` fabrica
+   `.gml-capa-blanca` para un pane de Leaflet—, y dos familias que empiezan igual
+   y hablan de cosas distintas se acaban confundiendo en un `querySelectorAll`.
+   Aquí «capa» es la del código de grupo 8 de un DXF. */
+.gml-dialogo-capas-fila {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-12);
+  cursor: pointer;
+}
+
+/* El nombre de la capa, LITERAL y en mono. No es adorno: es una cadena que el
+   usuario coteja contra lo que ve en su CAD, y en proporcional la O y el 0, o la
+   I y la l, se confunden — el mismo argumento que la referencia catastral del
+   panel y el nombre de fichero del cajón. `anywhere` porque un nombre de capa
+   puede no traer un solo espacio en 40 caracteres. */
+.gml-dialogo-capas-nombre {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+  color: var(--color-text-primary);
+}
+
+/* «16 polilíneas». Cifra, luego mono y tabular. Gris: describe la capa, no la
+   juzga — que 16 de 25 anillos sean cajetín y marco lo decide quien mira. */
+.gml-dialogo-capas-cuenta {
+  flex: none;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  font-size: var(--text-11);
+  color: var(--color-text-secondary);
+}
+
+/* ── Los siete atributos semánticos ────────────────────────────────────────── */
+
+/* Reseteo del `<fieldset>` que los agrupa, SIN `display` (ver arriba: no sabemos
+   si este atributo cuelga del `<dialog>` o de un nodo de dentro). Un
+   `display:flex` sobre un `<fieldset>` descoloca además la `<legend>`, que el
+   navegador maqueta como caja especial: por eso el reparto va en la rejilla.
+
+   Y si el atributo acaba cayendo en el propio `<dialog>`, este reseteo NO le
+   quita la caja: es (0,2,0) y la regla de la caja de arriba es (0,2,1) —lleva el
+   `dialog` delante—, así que su `padding`, su `border` y su `margin` ganan por
+   especificidad. Ése es exactamente el motivo de escribir el `dialog` ahí. */
+.gml-app [data-bloque='atributos-edificio'] {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* Dos columnas, y aquí SÍ caben: fuera del panel el ancho es de 620 px y no de
+   392, que es justo la razón de ser de la desviación 12. `minmax(0, 1fr)` y no
+   `1fr` a secas para que una etiqueta larga no ensanche su columna. Los campos
+   de dentro reutilizan `.gml-campo`, `.gml-campo-etiqueta` y `.gml-entrada`, que
+   ya existen: no se inventa un cromo paralelo para los mismos controles. */
+.gml-dialogo-atributos-rejilla {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+}
+
+/* ── El pie de los dos diálogos ────────────────────────────────────────────── */
+
+.gml-dialogo-capas-pie,
+.gml-dialogo-atributos-pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+/* Los botones van EN FILA y a su tamaño: en el panel `.gml-boton` es de ancho
+   completo y aquí eso los apilaría. (0,3,0) contra la (0,1,0) de la base: por
+   especificidad, nunca por orden. */
+.gml-app .gml-dialogo-capas-pie .gml-boton,
+.gml-app .gml-dialogo-atributos-pie .gml-boton {
+  width: auto;
+  flex: none;
+}
+
+/* El renglón donde se escribe POR QUÉ está apagado «Aplicar» (regla de oro 1:
+   botón apagado con el motivo al lado, jamás botón mudo). `min-height`
+   reservado para que encender el botón —y vaciar el renglón— no dé un salto de
+   maquetación justo debajo de la mano que va a pulsar. */
+.gml-dialogo-capas-estado,
+.gml-dialogo-atributos-estado {
   margin: 0;
   min-height: 1.45em;
   font-size: var(--text-12);

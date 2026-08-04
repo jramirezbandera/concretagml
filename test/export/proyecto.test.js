@@ -373,8 +373,9 @@ describe('export/proyecto · lo que se tolera, se dice', () => {
     expect(r.expediente.diagnostico).toBeUndefined()
   })
 
-  it('un expediente de EDIFICIO se LEE, y se avisa de que no se sabe enseñar', () => {
-    const r = conSobre({
+  /** Un sobre con un expediente de EDIFICIO dentro. Se usa dos veces. */
+  const conEdificio = () =>
+    conSobre({
       expediente: porElFichero(
         crearExpediente({
           tipo: 'EDIFICIO',
@@ -384,10 +385,41 @@ describe('export/proyecto · lo que se tolera, se dice', () => {
         }),
       ),
     })
+
+  it('un expediente de EDIFICIO se LEE, y se avisa de qué se puede hacer con él', () => {
+    const r = conEdificio()
     expect(r.ok).toBe(true)
     expect(r.expediente.tipo).toBe('EDIFICIO')
     expect(r.expediente.edificio.modelo).toBe('SIMPLE')
     expect(r.avisos.some((a) => /EDIFICIO/.test(a.mensaje))).toBe(true)
+    // El código no distingue («VERSION_POSTERIOR» lo comparte con otras dos cosas), así
+    // que quien decida por código lo hace por `datos.tipo`. Es lo que sostiene el aviso
+    // del cableado, y está declarado en el fichero.
+    const aviso = r.avisos.find((a) => a.datos?.tipo === 'EDIFICIO')
+    expect(aviso).toBeDefined()
+    expect(aviso.severidad).toBe(SEVERIDAD.AVISO)
+  })
+
+  it('⛔ F11 · el aviso DICE LA VERDAD sobre lo que la aplicación sabe hacer hoy', () => {
+    // Este `it` existe porque el aviso de F10 se quedó viejo el día que aterrizó la
+    // segunda rama: decía «esta versión de la aplicación solo sabe enseñar y editar la
+    // rama de parcela», y desde F11 la rama de edificio se abre, se dibuja y se edita.
+    // Un aviso caducado es peor que ninguno: el usuario decide con él.
+    const aviso = conEdificio().avisos.find((a) => a.datos?.tipo === 'EDIFICIO')
+
+    // 1 · Lo que YA NO es cierto no puede seguir escrito.
+    expect(aviso.mensaje).not.toMatch(/solo sabe enseñar/i)
+    expect(aviso.mensaje).not.toMatch(/solo\s+.{0,20}la rama de parcela/i)
+
+    // 2 · Lo que SÍ hace F11, dicho: se abre en su rama y se ve.
+    expect(aviso.mensaje).toMatch(/rama Edificio/)
+
+    // 3 · Y las tres cosas que NO hace, nombradas una a una (desviación 6 del plan de
+    //     F11 y las fases F13/F14). Sin esto el aviso sería una promesa a medias.
+    expect(aviso.mensaje).toMatch(/guardarlo en el almacén de este navegador/i)
+    expect(aviso.mensaje).toMatch(/fichero de proyecto/i)
+    expect(aviso.mensaje).toMatch(/GML/)
+    expect(aviso.mensaje).toMatch(/contrastarlo/i)
   })
 
   it('el resumen cuenta lo mismo que la lista de avisos', () => {

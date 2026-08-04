@@ -10,7 +10,9 @@
 //     desproyección vive aquí, en la capa de vista, y NUNCA se guarda en el
 //     modelo. `geo/utm.js` es la maquinaria; este módulo es el adaptador de
 //     vista (recinto/vértice UTM → [lat,lon] para Leaflet, y de vuelta).
-//   · Regla 4 — POJO plano. El estado del store ES el POJO de parcela que
+//   · Regla 4 — POJO plano. El estado del store ES el POJO del DOCUMENTO DE LA
+//     RAMA —una Parcela, o un Edificio desde F11, que estrena una segunda
+//     instancia del mismo store— y es el que
 //     `edit/historial.js#commit` fotografía con `structuredClone` (decisión de
 //     review, hallazgo 1). Reparto real (corregido en 2D.2): el `commit` ya lo
 //     hace F03 — `viewer/sincronizacion.js` commitea una instantánea por
@@ -132,6 +134,7 @@ export const PANE = Object.freeze({
   COLINDANTES: 'colindantes',
   PARCELA_OFICIAL: 'parcelaOficial',
   PARCELA_EDITADA: 'parcelaEditada',
+  PARTES: 'partes',
   ACOTACIONES: 'acotaciones',
   DIAGNOSTICO: 'diagnostico',
   VERTICES: 'vertices',
@@ -196,6 +199,29 @@ export const PANE = Object.freeze({
  *     mantiene vivo el clic de «Deducir del mapa» de F05: medido en
  *     `test/viewer/colindantes.dom.test.js`, no supuesto.
  *
+ * `partes` (F11, T1.5 — las HUELLAS de las partes de construcción, que pinta
+ * `viewer/partes.js`) se intercala en **422**, en el único hueco que quedaba entre
+ * `parcelaEditada` (420) y `acotaciones` (425). Los tres porqués, con el mismo
+ * detalle que los de arriba:
+ *   · por ENCIMA de `parcelaEditada` (420) porque en la rama EDIFICIO el ASUNTO es
+ *     el edificio y la parcela es CONTEXTO — la relación es exactamente la inversa
+ *     de la de `colindantes`, y por eso este pane cae al otro lado de la geometría
+ *     de la parcela. Y no es una preferencia estética: la huella de una parte se
+ *     RELLENA (es el asunto, no una anotación que lo comente), y por debajo de 420
+ *     el relleno amarillo de la parcela editada la TAPARÍA — el técnico creería
+ *     estar mirando su edificio mientras mira el solar.
+ *   · por DEBAJO de `acotaciones` (425) y de `diagnostico` (428), que son
+ *     ANOTACIONES sobre una geometría: una cota o una sombra explicativa debajo del
+ *     relleno del polígono que pretende explicar no se lee. La huella es geometría;
+ *     la cota, no. Es el mismo criterio con el que esos dos panes se colocaron
+ *     sobre `parcelaEditada`, aplicado ahora a un tercer polígono relleno.
+ *   · por DEBAJO de `vertices` (430) porque el vértice sigue siendo LO QUE SE
+ *     AGARRA, y en F12 lo que se agarrará son los vértices de la parte. Una huella
+ *     rellena por encima del marcador dejaría al usuario apuntando al polígono en
+ *     vez de a la esquina que quiere mover.
+ * Con la rama PARCELA activa este pane existe y está VACÍO, exactamente igual que
+ * `diagnostico` mientras nadie diagnostica: el pane lo crea el mapa, no la opción.
+ *
  * `viewer/mapa.js#crearMapa` ITERA esta lista para crear los panes, así que
  * añadir una entrada aquí es todo lo que hace falta: ni ese módulo ni el arnés
  * de test (`test/viewer/_ayuda-jsdom.js#crearPanes`) llevan nombres a mano.
@@ -206,6 +232,7 @@ export const PANES = Object.freeze([
   { nombre: PANE.COLINDANTES, zIndex: 405 },
   { nombre: PANE.PARCELA_OFICIAL, zIndex: 410 },
   { nombre: PANE.PARCELA_EDITADA, zIndex: 420 },
+  { nombre: PANE.PARTES, zIndex: 422 },
   { nombre: PANE.ACOTACIONES, zIndex: 425 },
   { nombre: PANE.DIAGNOSTICO, zIndex: 428 },
   { nombre: PANE.VERTICES, zIndex: 430 },
@@ -340,23 +367,37 @@ export function latLngAUTM(latlng, zona) {
 /**
  * Un suscriptor del store: se le notifica con el estado actual tras cada `set`.
  * @callback Suscriptor
- * @param {object|null} estado  El POJO de parcela actual (o null).
+ * @param {object|null} estado  El POJO del documento de la rama activa —una
+ *   Parcela o un Edificio— actual (o null). Ver {@link crearEstadoVista}.
  * @returns {void}
  */
 
 /**
  * @typedef {Object} EstadoVista
- * @property {() => (object|null)} get               Devuelve el estado actual.
- * @property {(parcela: object|null) => void} set    Reemplaza el estado y notifica.
+ * @property {() => (object|null)} get                 Devuelve el estado actual.
+ * @property {(documento: object|null) => void} set    Reemplaza el estado y notifica.
  * @property {(fn: Suscriptor) => (() => void)} subscribe  Registra un suscriptor;
  *   devuelve una función para darse de baja.
  */
 
 /**
- * Crea el store observable del visor. El estado ES el POJO de parcela (o null),
- * la MISMA forma que `edit/historial.js#commit` fotografía (decisión de review,
- * hallazgo 1): F06 enchufará undo/redo haciendo `commit(historial, estado.get())`
- * sin reformar nada.
+ * Crea el store observable del visor. El estado ES **el POJO del documento de la
+ * rama** (o null): una Parcela (`model/parcela.js`) en la rama PARCELA, un
+ * Edificio (`model/edificio.js`) en la rama EDIFICIO de F11. En los dos casos es
+ * un POJO plano (regla de oro 4) y la MISMA forma que `edit/historial.js#commit`
+ * fotografía con `structuredClone` (decisión de review, hallazgo 1): F06 enchufó
+ * undo/redo haciendo `commit(historial, estado.get())` sin reformar nada.
+ *
+ * ⚠️ **Hasta F10 esta documentación decía «el POJO de parcela», y desde F11 hay
+ * DOS instancias vivas a la vez** —la de parcela, con sus once suscriptores en
+ * producción, y la de edificio, que nace en `null`— porque la rama EDIFICIO
+ * SUSTITUYE al panel de parcela en vez de sumarse a él. Que eso funcione **sin
+ * tocar ni una línea de este cuerpo** no es suerte ni una suposición: esto es un
+ * CLOSURE, así que `estado`, el `Set` de `suscriptores` y la guarda
+ * anti-reentrada `notificando` son **por instancia**. Dos `crearEstadoVista()` no
+ * comparten estado, no comparten suscriptores y no se pisan la guarda; hay un
+ * `it` que lo atesta en `test/viewer/comun.dom.test.js`. Lo que este módulo NO
+ * hace —y sigue sin hacer— es saber qué rama está activa: eso es de `app/rama.js`.
  *
  * Tabla y mapa son AMBOS vistas del mismo estado: se suscriben, y cuando uno
  * edita llama a `set`, que reemplaza el estado y notifica a todos. Una GUARDA
@@ -364,19 +405,20 @@ export function latLngAUTM(latlng, zona) {
  * loop"): si un suscriptor llama a `set` durante la notificación, el estado se
  * actualiza pero NO se relanza la notificación en cascada.
  *
- * @param {object|null} [parcelaInicial=null]  POJO de parcela inicial (o null).
+ * @param {object|null} [documentoInicial=null]  POJO inicial del documento de la
+ *   rama (Parcela o Edificio), o null para nacer vacío.
  * @returns {EstadoVista}
  */
-export function crearEstadoVista(parcelaInicial = null) {
-  let estado = parcelaInicial
+export function crearEstadoVista(documentoInicial = null) {
+  let estado = documentoInicial
   const suscriptores = new Set()
   let notificando = false
 
   return {
     get: () => estado,
 
-    set(parcela) {
-      estado = parcela
+    set(documento) {
+      estado = documento
       // Guarda anti-reentrada: si el set ocurre DENTRO de una notificación
       // (un suscriptor que reacciona escribiendo), no relanzamos la cascada.
       if (notificando) return

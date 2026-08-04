@@ -31,6 +31,14 @@
 #      sola línea, sin ningún salto: para ellos la regla es inocua y se declara solo
 #      para que nadie tenga que preguntárselo.
 #
+#   3ter. `test/fixtures/catastro/*.html` (F11) — el cuerpo de error del WFS de
+#      EDIFICIO (`wfsBU.aspx`) **no es XML**: ese servicio no emite `ExceptionReport`
+#      ninguno, contesta `302 → /OVCError.aspx` y esa página devuelve `404` con una
+#      pantalla de ASP.NET en HTML. Es la respuesta literal que recibe el cliente
+#      —medida el 2026-08-03, SHA-256 publicado en `PROCEDENCIA.md`—, así que
+#      necesita la misma estabilidad de bytes que los `.xml` de al lado. La
+#      extensión es distinta porque el contenido lo es; la regla, la misma.
+#
 #   3bis. `test/fixtures/catastro/derivados/*.json` (F09) — fixtures SINTÉTICOS del
 #      servicio, derivados de los reales por una mutación escrita y reproducible en
 #      su `PROCEDENCIA.md`, que publica su SHA-256. Necesitan línea PROPIA por lo
@@ -67,6 +75,23 @@
 #      bytes. Cuando alguien publique su SHA-256, como se hizo con los de `gml/`
 #      y `catastro/`, entonces sí necesitarán línea.
 #
+#   4bis. `test/fixtures/parsers/edificio_consulta_masiva_*.dxf` (F11) — y ha
+#      llegado ese día: es el primer fixture de esa carpeta con **SHA-256
+#      publicado** (`PROCEDENCIA.md`, creado por F11 · T0.2), así que le toca la
+#      línea que el párrafo de arriba dejaba anunciada. Va en **CRLF**, y por un
+#      motivo distinto al de (4): allí el criterio era seguir al ESCRITOR; aquí
+#      no hay escritor nuestro, hay una **descarga literal de la Sede** cuyos
+#      bytes son CRLF (1.080 CRLF, 0 LF sueltos, medido). Con `eol=crlf` el
+#      índice guarda LF —como todo— y el árbol de trabajo recibe CRLF **en todas
+#      las plataformas**, que es lo único que hace que el SHA-256 publicado se
+#      pueda comprobar contra la descarga original desde cualquier clon.
+#      ⚠️ Los otros cuatro `.dxf`/`.txt` de esa carpeta siguen SIN regla a
+#      propósito: sus SHA-256 no están publicados (su procedencia es de F01 y
+#      quedó sin escribir), así que no hay nada que estabilizar todavía y una
+#      regla con comodín les cambiaría los bytes del árbol de trabajo sin que
+#      ninguna prueba lo pidiera. `PROCEDENCIA.md` publica su hash de BLOB de
+#      git, que es estable de por sí y no depende de la plataforma.
+#
 #   5. `test/export/__snapshots__/*.txt` (F10) — y vuelve a ser **LF**, no CRLF,
 #      aunque viva en el mismo directorio que (4). No es incoherencia: el DXF es
 #      un formato de intercambio cuyos ejemplares reales son CRLF y que va a
@@ -83,6 +108,8 @@ test/fixtures/gml/*.gml         text eol=lf
 test/fixtures/gml/derivados/*.gml  text eol=lf
 test/fixtures/catastro/*.xml    text eol=lf
 test/fixtures/catastro/*.json   text eol=lf
+test/fixtures/catastro/*.html   text eol=lf
 test/fixtures/catastro/derivados/*.json  text eol=lf
 test/export/__snapshots__/*.dxf text eol=crlf
 test/export/__snapshots__/*.txt text eol=lf
+test/fixtures/parsers/edificio_consulta_masiva_*.dxf text eol=crlf

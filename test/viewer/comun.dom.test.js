@@ -103,6 +103,30 @@ describe('viewer/_comun · constantes de dominio', () => {
     expect(entrada.zIndex).toBeLessThan(430)
   })
 
+  it('PANE.PARTES existe y su zIndex (422) cae entre la parcela editada (420) y los vértices (430)', () => {
+    // F11, T1.5: el pane nuevo de las HUELLAS de las partes de construcción, que
+    // pinta `viewer/partes.js`. Lo que este test fija es EL HUECO —el rango en el
+    // que el apilado es correcto— y de paso la cifra real, para que un cambio
+    // accidental no pase desapercibido.
+    expect(PANE.PARTES).toBe('partes')
+    const entrada = PANES.find((p) => p.nombre === PANE.PARTES)
+    expect(entrada).toBeDefined()
+    expect(entrada.zIndex).toBe(422)
+
+    const z = Object.fromEntries(PANES.map((p) => [p.nombre, p.zIndex]))
+    // Por ENCIMA de la parcela editada: en la rama EDIFICIO el asunto es el
+    // edificio y la parcela es CONTEXTO. Y la huella se RELLENA, así que por
+    // debajo de 420 el relleno amarillo de la parcela la taparía entera.
+    expect(entrada.zIndex).toBeGreaterThan(z[PANE.PARCELA_EDITADA])
+    // Por DEBAJO de los vértices, que es lo que se agarra (y lo que F12 agarrará
+    // sobre la propia parte).
+    expect(entrada.zIndex).toBeLessThan(z[PANE.VERTICES])
+    // Y por debajo de las dos capas de ANOTACIÓN: una cota o la sombra del
+    // diagnóstico bajo el relleno del polígono que explican no se leerían.
+    expect(entrada.zIndex).toBeLessThan(z[PANE.ACOTACIONES])
+    expect(entrada.zIndex).toBeLessThan(z[PANE.DIAGNOSTICO])
+  })
+
   it('la geometría del usuario es amarillo #FFD600 (revisión visual de la Fase 5)', () => {
     // Guardián de identidad a propósito: este color NO es una preferencia
     // suelta, es una decisión con tres restricciones detrás (no colisionar con
@@ -186,6 +210,74 @@ describe('viewer/_comun · crearEstadoVista (store, sin feedback loop)', () => {
   it('subscribe exige una función', () => {
     const estado = crearEstadoVista(null)
     expect(() => estado.subscribe(42)).toThrow(TypeError)
+  })
+
+  // ── F11: DOS instancias vivas a la vez (parcela y edificio) ────────────────
+  // El plan de F11 da por hecho que `crearEstadoVista` sirve como SEGUNDO store
+  // «sin tocarlo», porque es un closure. Eso es cierto, pero hasta ahora era una
+  // suposición leída del código y no un hecho atestado: nunca hubo dos stores
+  // vivos en la misma página. Estas tres pruebas lo convierten en contrato, y son
+  // la red de la decisión 2 de la fase entera (los ONCE suscriptores de la rama
+  // parcela no se tocan ni una línea). Si alguien "optimizara" esto a un módulo
+  // con estado a nivel de fichero, salen en rojo aquí y no en producción.
+
+  it('dos stores NO comparten estado: escribir en uno deja el otro intacto', () => {
+    const parcela = crearEstadoVista({ idLocal: 'parcela-1' })
+    const edificio = crearEstadoVista(null)
+
+    expect(edificio.get()).toBeNull()
+    edificio.set({ refcat: 'EDIF-1' })
+
+    expect(edificio.get()).toEqual({ refcat: 'EDIF-1' })
+    expect(parcela.get()).toEqual({ idLocal: 'parcela-1' })
+
+    parcela.set({ idLocal: 'parcela-2' })
+    expect(edificio.get()).toEqual({ refcat: 'EDIF-1' })
+  })
+
+  it('dos stores NO comparten suscriptores: cada set notifica solo a los suyos', () => {
+    const parcela = crearEstadoVista(null)
+    const edificio = crearEstadoVista(null)
+    const espiaParcela = vi.fn()
+    const espiaEdificio = vi.fn()
+    parcela.subscribe(espiaParcela)
+    edificio.subscribe(espiaEdificio)
+
+    edificio.set({ refcat: 'EDIF-1' })
+    expect(espiaEdificio).toHaveBeenCalledTimes(1)
+    expect(espiaEdificio).toHaveBeenCalledWith({ refcat: 'EDIF-1' })
+    expect(espiaParcela).not.toHaveBeenCalled()
+
+    parcela.set({ idLocal: 'P' })
+    expect(espiaParcela).toHaveBeenCalledTimes(1)
+    expect(espiaParcela).toHaveBeenCalledWith({ idLocal: 'P' })
+    expect(espiaEdificio).toHaveBeenCalledTimes(1)
+
+    // Y darse de baja en uno no da de baja en el otro.
+    const baja = edificio.subscribe(() => {})
+    baja()
+    edificio.set({ refcat: 'EDIF-2' })
+    expect(espiaEdificio).toHaveBeenCalledTimes(2)
+  })
+
+  it('la guarda anti-reentrada es POR INSTANCIA: un set cruzado sí notifica', () => {
+    // El caso real de F11: un suscriptor de la rama edificio que, al recibir un
+    // documento nuevo, escribe en el store de PARCELA (p. ej. para dejarla como
+    // contexto). Si la bandera `notificando` fuera compartida —un módulo con
+    // estado de fichero, o un singleton— ese segundo `set` se tragaría su
+    // notificación EN SILENCIO y la parcela dejaría de repintarse sin que nada
+    // avisara. Es exactamente el fallo que la regla de oro 1 prohíbe.
+    const parcela = crearEstadoVista(null)
+    const edificio = crearEstadoVista(null)
+    const espiaParcela = vi.fn()
+    parcela.subscribe(espiaParcela)
+    edificio.subscribe(() => parcela.set({ idLocal: 'contexto' }))
+
+    edificio.set({ refcat: 'EDIF-1' })
+
+    expect(espiaParcela).toHaveBeenCalledTimes(1)
+    expect(espiaParcela).toHaveBeenCalledWith({ idLocal: 'contexto' })
+    expect(parcela.get()).toEqual({ idLocal: 'contexto' })
   })
 })
 

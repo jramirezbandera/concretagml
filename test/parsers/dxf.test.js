@@ -11,6 +11,11 @@
  *   3. poly_clasica.dxf SINTÉTICO (ver nota abajo): POLYLINE/VERTEX/SEQEND.    *
  *   4. AC4: entidad no soportada → aviso claro, no excepción.                  *
  *   5. Entrada inválida → TypeError (regla de oro 1).                          *
+ *   6. F11 · `capas[]`: la CAPA (código de grupo 8) de cada anillo, literal.   *
+ *      Incluye el reparto MEDIDO de los dos DXF reales, la trampa de la        *
+ *      POLYLINE clásica (la capa va en la CABECERA, no en VERTEX ni SEQEND),   *
+ *      la ida y vuelta con `export/dxf.js` y el caso sin código 8, que hay     *
+ *      que FABRICAR porque ningún DXF real del repo lo tiene.                  *
  *                                                                              *
  * ⚠️ DISCREPANCIA FEATURE vs FIXTURE REAL (verificada, ver nota en el test de  *
  * "arcos"): el valor 0.6011385410059346 que el enunciado da por "bulge" NO es  *
@@ -26,18 +31,33 @@
 
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
 import { parseDXF } from '../../parsers/dxf.js'
 import { discretizarBulge } from '../../geo/arco.js'
 import { TIPO_DETECCION, SEVERIDAD } from '../../parsers/_comun.js'
+import { CAPAS, serializarParcelaDxf } from '../../export/dxf.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const fixture = (nombre) => resolve(__dirname, '../fixtures/parsers', nombre)
 // El DXF real está en cp1252 (ANSI_1252); las rutas/coords son ASCII → 'latin1'.
 const UTM = readFileSync(fixture('UTM.dxf'), 'latin1')
 const POLY_CLASICA = readFileSync(fixture('poly_clasica.dxf'), 'utf8')
+// F11 · el primer DXF REAL del repo con POLYLINE/VERTEX/SEQEND clásicos
+// (descarga de Consulta Masiva; procedencia en fixtures/parsers/PROCEDENCIA.md).
+const EDIFICIO = readFileSync(fixture('edificio_consulta_masiva_3515508VF0831N.dxf'), 'latin1')
+// Los otros dos fixtures de F01, que hasta F11 solo leía test/parsers/aceptacion-f01.
+const BULGE_FIXTURE = readFileSync(fixture('03_lwpolyline_bulge.dxf'), 'latin1')
+const NO_SOPORTADO_FIXTURE = readFileSync(fixture('05_no_soportado_insert_spline.dxf'), 'latin1')
+
+/** Reparto {capa: nºAnillos} a partir de `capas[]`. */
+const repartoDe = (capas) => {
+  const m = {}
+  for (const c of capas) m[c] = (m[c] || 0) + 1
+  return m
+}
 
 const BULGE = 0.6011385410059346 // el valor del enunciado, usado donde SÍ es bulge.
 
@@ -282,4 +302,183 @@ describe('parseDXF · validación de entrada', () => {
     expect(() => parseDXF(['0', 'SECTION'])).toThrow(TypeError)
     expect(() => parseDXF(undefined)).toThrow(TypeError)
   })
+})
+
+// ── 7 · F11 · la CAPA (código de grupo 8) de cada anillo ──────────────────────
+//
+// F01 leía la geometría y tiraba la capa, que es EL discriminante del fichero:
+// sin ella, «una polilínea = una parte» produce 25 partes en un plano donde 16
+// son cajetín, marco y leyenda. Estas pruebas fijan el reparto MEDIDO de los dos
+// DXF reales (verdad externa, `fixtures/parsers/PROCEDENCIA.md`).
+
+describe('parseDXF · capas[] (F11, contrato A)', () => {
+  it('UTM.dxf: 25 anillos repartidos en 5 capas — FINO 16 · LINDE 4 · PARCELA 3 · BLANCO 1 · 0 ⇢ 1', () => {
+    const r = parseDXF(UTM)
+    expect(r.capas).toHaveLength(r.anillos.length) // 1:1, sin excepción
+    expect(repartoDe(r.capas)).toEqual({ FINO: 16, LINDE: 4, PARCELA: 3, BLANCO: 1, 0: 1 })
+  })
+
+  it('UTM.dxf: la parcela de verdad está en la capa «0», NO en la llamada «PARCELA»', () => {
+    // ⛔ La trampa medida en la fase 0: el anillo de la capa `0` (11 vértices) es
+    // el que comparte sus 12 vértices con PARCELA.txt, la verdad externa de F01.
+    // La capa literalmente llamada «PARCELA» trae OTROS tres anillos. Por eso el
+    // reparto se OFRECE y no se adivina por el nombre (decisión 5 de F11).
+    const r = parseDXF(UTM)
+    const enCapaCero = r.anillos.filter((_, i) => r.capas[i] === '0')
+    expect(enCapaCero).toHaveLength(1)
+    expect(enCapaCero[0]).toHaveLength(11)
+    expect(r.anillos.filter((_, i) => r.capas[i] === 'PARCELA')).toHaveLength(3)
+  })
+
+  it('las capas llegan LITERALES: ni minúsculas, ni recortes, ni normalización', () => {
+    const r = parseDXF(UTM)
+    expect(r.capas).toContain('PARCELA') // no 'parcela'
+    expect(parseDXF(EDIFICIO).capas).toContain('Construccion') // no 'construccion' ni 'CONSTRUCCION'
+  })
+
+  it('edificio real: 7 anillos en «Construccion» y 1 en «Parcela»', () => {
+    const r = parseDXF(EDIFICIO)
+    expect(r.anillos).toHaveLength(8)
+    expect(repartoDe(r.capas)).toEqual({ Construccion: 7, Parcela: 1 })
+  })
+
+  it('⚠️ y es POLYLINE/VERTEX/SEQEND, no LWPOLYLINE: la capa va en la CABECERA', () => {
+    // La razón de ser de este fixture. El SEQEND de cada POLYLINE declara la capa
+    // `0`; si la capa se leyera del SEQEND (o de los VERTEX), las siete huellas
+    // saldrían en la capa `0` y el reparto sería un 8 ⇢ «0» silencioso.
+    expect(EDIFICIO).toMatch(/\bPOLYLINE\b/)
+    expect(EDIFICIO).not.toMatch(/\bLWPOLYLINE\b/)
+    expect(EDIFICIO).toMatch(/SEQEND\r?\n[ \t]*8\r?\n0\r?\n/) // el SEQEND dice «0»
+    const r = parseDXF(EDIFICIO)
+    expect(r.capas.filter((c) => c === '0')).toHaveLength(0) // …y aun así ninguna huella cae en «0»
+  })
+
+  it('poly_clasica.dxf (VERTEX que SÍ repiten 8/0) sigue dando la capa «0»', () => {
+    // El caso contrario del anterior: aquí cabecera y vértices coinciden, así que
+    // leer la cabecera no puede empeorar nada.
+    expect(parseDXF(POLY_CLASICA).capas).toEqual(['0'])
+  })
+
+  it('una entidad SIN código 8 da `` y nunca `undefined` (caso fabricado: no lo trae ningún DXF real)', () => {
+    // ⚠️ Ninguno de los cinco DXF del repo tiene una entidad sin capa —AutoCAD
+    // siempre la escribe—, así que el caso se fabrica aquí. Importa porque
+    // `capas[i]` es `string` en el contrato: quien lo recorra no puede toparse
+    // con `undefined` y creer que el índice no existe.
+    const texto = dxf(
+      '0', 'SECTION', '2', 'ENTITIES',
+      '0', 'LWPOLYLINE', '90', '2', '70', '0', // ← sin código 8
+      '10', '298750.0', '20', '4090050.0',
+      '10', '298760.0', '20', '4090050.0',
+      '0', 'LWPOLYLINE', '8', 'CON_CAPA', '90', '2', '70', '0',
+      '10', '298750.0', '20', '4090060.0',
+      '10', '298760.0', '20', '4090060.0',
+      '0', 'ENDSEC', '0', 'EOF',
+    )
+    const r = parseDXF(texto)
+    expect(r.anillos).toHaveLength(2)
+    expect(r.capas).toEqual(['', 'CON_CAPA'])
+    expect(r.capas[0]).not.toBeUndefined()
+    for (const c of r.capas) expect(typeof c).toBe('string')
+  })
+
+  it('una POLYLINE clásica sin código 8 en su cabecera también da ``', () => {
+    const texto = dxf(
+      '0', 'SECTION', '2', 'ENTITIES',
+      '0', 'POLYLINE', '66', '1', '70', '0', // ← sin código 8 en la CABECERA
+      '0', 'VERTEX', '8', 'DA_IGUAL', '10', '298750.0', '20', '4090050.0',
+      '0', 'VERTEX', '8', 'DA_IGUAL', '10', '298760.0', '20', '4090050.0',
+      '0', 'SEQEND', '8', 'TAMPOCO',
+      '0', 'ENDSEC', '0', 'EOF',
+    )
+    // Manda la cabecera: ni el VERTEX ni el SEQEND aportan la capa.
+    expect(parseDXF(texto).capas).toEqual([''])
+  })
+
+  it('`capas` y `anillos` tienen la MISMA longitud en los cinco DXF del repo', () => {
+    for (const texto of [UTM, EDIFICIO, POLY_CLASICA, BULGE_FIXTURE, NO_SOPORTADO_FIXTURE]) {
+      const r = parseDXF(texto)
+      expect(r.capas).toHaveLength(r.anillos.length)
+    }
+  })
+})
+
+// ── 8 · F11 · la ida y vuelta con export/dxf.js (la asimetría que dejó F10) ───
+
+describe('parseDXF · relee las capas del DXF que escribe export/dxf.js', () => {
+  const cuadrado = (lado, dx = 0, dy = 0) => [
+    [440123.45 + dx, 4470987.65 + dy],
+    [440123.45 + dx + lado, 4470987.65 + dy],
+    [440123.45 + dx + lado, 4470987.65 + dy + lado],
+    [440123.45 + dx, 4470987.65 + dy + lado],
+  ]
+  const recinto = (vertices, tipo = 'EXTERIOR') => ({ vertices, tipo })
+
+  it('PARCELA_OFICIAL y PARCELA_EDITADA vuelven 1:1 con sus anillos, con el literal que escribe el serializador', () => {
+    const { dxf: escrito } = serializarParcelaDxf({
+      recintosEditados: [recinto(cuadrado(40, 1.67))],
+      recintosOficiales: [recinto(cuadrado(40))],
+    })
+    const r = parseDXF(escrito)
+    expect(r.anillos).toHaveLength(2)
+    // El orden de ENTITIES es oficial → editada (lo fija export/dxf.js).
+    expect(r.capas).toEqual([CAPAS.OFICIAL.nombre, CAPAS.EDITADA.nombre])
+    // Y no es una cadena escrita a mano en el test: es la del módulo que escribe.
+    expect(r.capas).toEqual(['PARCELA_OFICIAL', 'PARCELA_EDITADA'])
+  })
+
+  it('con un hueco vuelven TRES anillos y la capa dice a cuál pertenece cada uno', () => {
+    const { dxf: escrito } = serializarParcelaDxf({
+      recintosEditados: [recinto(cuadrado(40)), recinto(cuadrado(10, 10, 10), 'HUECO')],
+      recintosOficiales: [recinto(cuadrado(40))],
+    })
+    const r = parseDXF(escrito)
+    expect(r.anillos).toHaveLength(3)
+    expect(r.capas).toEqual([
+      CAPAS.OFICIAL.nombre,
+      CAPAS.EDITADA.nombre,
+      CAPAS.EDITADA.nombre, // el hueco es de la geometría EDITADA, no otra parcela
+    ])
+    // El formato DXF no tiene el concepto de hueco (por eso export/dxf.js lo avisa):
+    // la capa es lo único que dice que esos dos anillos son la misma figura.
+    expect(repartoDe(r.capas)).toEqual({ PARCELA_OFICIAL: 1, PARCELA_EDITADA: 2 })
+  })
+
+  it('leer un DXF propio NO produce ni una detección (el cambio de F11 es aditivo)', () => {
+    // Guarda del acuerdo escrito en la cabecera de parsers/dxf.js: la detección
+    // del reparto la emite `parsers/importar.js`, no este parser, precisamente
+    // para no poner roja esta afirmación (que además es cierta y hay que mantener).
+    const { dxf: escrito } = serializarParcelaDxf({
+      recintosEditados: [recinto(cuadrado(40, 1.67))],
+      recintosOficiales: [recinto(cuadrado(40))],
+    })
+    expect(parseDXF(escrito).detecciones).toEqual([])
+  })
+})
+
+// ── 9 · F11 · los 4 fixtures de F01 dan EXACTAMENTE los mismos anillos ────────
+//
+// «Si algún test de F01 cambia de resultado, parar: significa que se ha tocado la
+// geometría». Esto lo hace ejecutable: la huella SHA-256 de `JSON.stringify(anillos)`
+// se tomó con el `parsers/dxf.js` de HEAD (commit c2df2c7, antes de F11) y se
+// comprobó idéntica con el de ahora. Si una de estas cuatro cae, NO se actualiza
+// la cifra: se revierte el cambio que la movió.
+
+describe('parseDXF · F01 intacto (huella exacta de los anillos, tomada antes de F11)', () => {
+  const HUELLAS = [
+    ['UTM.dxf', UTM, 25, '5e23097cd9aeb8fda8f2a7942b0b4c04a797e9d4cdeaebd56c1db62951abd3c4'],
+    ['03_lwpolyline_bulge.dxf', BULGE_FIXTURE, 1, '92a4ad8106520a795cf3ba6bdc8d7102e91d0b2015a60654eb61def1da7ee223'],
+    ['05_no_soportado_insert_spline.dxf', NO_SOPORTADO_FIXTURE, 1, '200d81f7348364b03b40d844e121af08aee5e69f509f1c0e2e6d4a875be6f45e'],
+    ['poly_clasica.dxf', POLY_CLASICA, 1, 'ad3cc5d411a13c33aa227a6e6cba9beb1d539d8f2435dfa7758c383fe9a61b5f'],
+  ]
+
+  for (const [nombre, texto, nAnillos, huella] of HUELLAS) {
+    it(`${nombre}: ${nAnillos} anillo(s), vértice a vértice, sin una sola coordenada movida`, () => {
+      const r = parseDXF(texto)
+      expect(r.anillos).toHaveLength(nAnillos)
+      expect(
+        createHash('sha256').update(JSON.stringify(r.anillos)).digest('hex'),
+        `F11 debía ser ADITIVO y ha movido la geometría de ${nombre}: revierte, no actualices la huella`,
+      ).toBe(huella)
+    })
+  }
 })

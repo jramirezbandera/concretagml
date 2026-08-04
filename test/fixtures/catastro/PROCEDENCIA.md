@@ -693,6 +693,361 @@ reproducible en el 100 % de las peticiones en un mensaje tranquilizador y falso.
 
 ---
 
+# `wfsBU.aspx` — el servicio de EDIFICIO (F11)
+
+Las cinco fichas siguientes son de **otro endpoint**: `https://ovc.catastro.meh.es/INSPIRE/wfsBU.aspx`,
+el WFS INSPIRE de **edificios**, hermano del `wfsCP.aspx` que congelan las fichas de arriba. Es el que
+F11 necesitaba sondear antes de decidir si cablea la vía del Catastro para la rama de edificio.
+
+**Tanda del 2026-08-03 (F11 · T0.1): 7 peticiones HTTP.** Mismo método que las dos anteriores: `curl`
+(8.15.0), secuenciales, **una sola petición por caso**, sin bucles ni reintentos, con el `User-Agent`
+por defecto de `curl` y sin ninguna cabecera añadida. Contadas una a una:
+
+| # | Caso | HTTP | s | B |
+|---|---|---|---|---|
+| 1 | `DescribeStoredQueries` | 200 | 0,259 | 5.429 |
+| 2 | `GetAllConstructionByParcel` de `9398516VK3799G` | 200 | 0,237 | 9.409 |
+| 3 | `GetAllConstructionByParcel` de `0000000XX0000X` (inexistente) | **302** | 0,169 | 131 |
+| 4 | la misma del 3, repetida al seguir el redirect con `curl -L` | **302** | — | 131 |
+| 5 | `/OVCError.aspx` (destino del redirect) | **404** | 0,137 (4+5) | 1.924 |
+| 6 | `GetAllConstructionByParcel` de `13005A10900001` (rústica) | 200 | 0,245 | 5.754 |
+| 7 | `GetOtherBuildingByParcel` de `13005A10900001` | 200 | 0,159 | 1.497 |
+
+> **Sobre la séptima, que se sale del presupuesto de seis y se declara.** El encargo de T0.1 pedía medir
+> «un RC de solar sin construcción registrada», que en el flujo de obra nueva **no es un error sino el
+> punto de partida normal**. Se eligió a ciegas la rústica `13005A10900001` (petición 6) y resultó
+> tener un `Building` de 2004: **no era un solar**. En vez de seguir adivinando referencias —que es un
+> bucle, y el bucle es justo lo que el override O8 prohíbe—, se cambió de estrategia y se gastó **una
+> sola petición más**, mejor apuntada: la misma parcela, que ya se sabía existente, preguntada por un
+> tipo de construcción que casi seguro no tiene (`GetOtherBuildingByParcel`). Eso mide el discriminante
+> que de verdad hacía falta —**cómo dice este servicio «no hay nada que devolver» cuando la parcela sí
+> existe**— sin depender de acertar con un solar. Siete peticiones, una vez, y no las habrá más.
+
+## Ocho hechos transversales del `wfsBU`, medidos en las 7 respuestas
+
+Se numeran aparte de los del `wfsCP` **porque cuatro de ellos lo contradicen**. Este endpoint no se
+comporta como su hermano, y dar por bueno aquí lo aprendido allí produce un cliente roto.
+
+**1 · ⛔ EL ERROR NO LLEGA CON HTTP 200. Llega con 302, y acaba en 404.** Es la inversión exacta del
+hecho transversal 1 de este documento. Una referencia catastral inexistente **no** devuelve
+`ExceptionReport`: devuelve `HTTP/1.1 302 Found` con `Location: /OVCError.aspx`, y esa página contesta
+**`HTTP/1.1 404 Not Found`** con una pantalla de error de ASP.NET en HTML.
+
+> Consecuencia para el cliente, y es la más importante de esta tanda: **aquí `response.ok` SÍ
+> clasifica**, al revés que en el `wfsCP`. `fetch` sigue el redirect por defecto
+> (`redirect: 'follow'`), así que lo que le llega a la aplicación es el **404**. Un cliente escrito
+> con la lección del `wfsCP` en la cabeza —«no mires el estado, lee el cuerpo»— intentaría parsear
+> como GML una página HTML de ASP.NET.
+
+**2 · ⛔ LA COLECCIÓN VACÍA SÍ EXISTE.** El otro vuelco. En el `wfsCP` está medido que «no hay nada
+aquí» se dice con un `ExceptionReport` indistinguible del de un fallo. En el `wfsBU`, una parcela que
+existe y no tiene construcciones de ese tipo devuelve **`200 OK` con un `gml:FeatureCollection` sin ni
+un `gml:featureMember` dentro** (fixture `wfsbu-coleccion-vacia-13005A10900001.xml`, 1.497 B).
+
+> Los dos hechos juntos dan una clasificación **limpia y de tres estados**, que es más de lo que este
+> proyecto ha conseguido en ningún otro endpoint del Catastro:
+>
+> | Observado | Significa |
+> |---|---|
+> | 200 + `FeatureCollection` con N `featureMember` | hay N construcciones |
+> | 200 + `FeatureCollection` **sin ningún** `featureMember` | la parcela existe y **no hay nada construido de ese tipo** — el punto de partida de la obra nueva, no un error |
+> | 302 → 404 + HTML | la referencia no existe, o la petición está mal construida |
+>
+> Y ninguno de los tres exige mirar texto libre. **No hay que ramificar sobre ningún `CDATA`**, que es
+> lo que el `wfsCP` sí obliga a hacer.
+
+**3 · ⛔ NO HAY NI UN `ExceptionReport` EN LAS 7 RESPUESTAS.** Cero OWS, cero `exceptionCode`, cero
+`ExceptionText`. Este servicio no usa el vocabulario de errores de OGC en ningún camino medido. Por
+tanto **no hay ningún mensaje del servicio que enseñarle al usuario**: el 404 es mudo y genérico
+(«The resource cannot be found»), y no distingue «esa referencia no existe» de «te has equivocado al
+construir la URL». Quien quiera decirle algo útil al usuario tendrá que redactarlo él.
+
+**4 · ⛔ LA RAÍZ SÍ LLEVA PREFIJO, Y NO ES LA DEL WFS.** El hecho transversal 5 de este documento dice
+que ninguna raíz lleva prefijo. En el `wfsBU` la raíz es **`<gml:FeatureCollection gml:id="ES.SDGC.BU">`**
+—prefijo `gml:`, namespace `http://www.opengis.net/gml/3.2`—, no el `<FeatureCollection>` del namespace
+`…/wfs/2.0` por defecto que emite el `wfsCP`. Son dos sobres distintos:
+
+| | `wfsCP.aspx` | `wfsBU.aspx` |
+|---|---|---|
+| Raíz | `FeatureCollection` (ns `…/wfs/2.0`, sin prefijo) | `gml:FeatureCollection` (ns `…/gml/3.2`) |
+| Miembros | `<member>` | `<gml:featureMember>` |
+| `numberMatched`/`numberReturned` | sí (y **mienten**) | **no existen** |
+
+Que no existan los contadores es, en la práctica, una buena noticia: aquí los miembros **hay que**
+contarlos, no hay ningún atributo que invite a fiarse.
+
+**5 · ⭐ EL `Content-Type` NO ES XML.** Las cuatro respuestas de datos llegan con
+`Content-Type: application/x-unknown; charset=utf-8` y, además,
+`Content-Disposition: filename="Building_<REFCAT>.gml"`: el servicio quiere que el navegador **se lo
+descargue como fichero**, no que lo lea. El `DescribeStoredQueries`, en cambio, sí llega con
+`text/xml; charset=utf-8`. Un cliente que decida si parsear mirando el `content-type` no parsearía
+ninguna de las respuestas útiles de este endpoint.
+
+**6 · ✅ CORS abierto, también aquí, y también en los caminos de error.** Las **7** respuestas traen
+`Access-Control-Allow-Origin: *` — incluidos el **302** y el **404**. Sigue siendo la única cabecera
+CORS presente (no hay `-Headers` ni `-Methods`), así que valen las dos consecuencias ya escritas en el
+hecho transversal 2: no añadir cabeceras propias y no usar `credentials: 'include'`. Y sigue mandando
+cookie de sesión (`TS01da3df4`, la misma familia que el `wfsCP`).
+
+> Que el 404 lleve CORS no es un detalle: significa que en el navegador el fallo llega **como
+> respuesta legible**, no como error de red opaco. La aplicación puede distinguir «el Catastro dice
+> que no» de «no hay internet», que es justo lo que la regla de oro 1 exige.
+
+**7 · El XML vuelve a mentir sobre su propio encoding, y el catálogo además viene DOBLEMENTE
+CODIFICADO.** Los cuatro `.xml` declaran `ISO-8859-1` (o `iso-8859-1`) y sus bytes son UTF-8: la misma
+incoherencia de siempre, salvada por la cabecera HTTP. Pero el catálogo trae algo peor y nuevo, medido
+byte a byte: **las tres primeras descripciones llevan `par\xc3\xa1metros` (UTF-8 correcto) y las dos
+últimas `par\xc3\x83\xc2\xa1metros` (UTF-8 de «Ã¡», o sea la doble codificación)**, en el mismo
+documento y en la misma respuesta. No se corrige: es lo que el servicio sirve. Ver su ficha.
+
+**8 · Latencias: 0,137 – 0,259 s** en las 7. Ninguna se acercó a los 2,9 s del peor caso del OVC. No
+convierte el hecho transversal 3 en falso —sigue sin haber cota— pero deja medido que este endpoint se
+portó como el `wfsCP`, no como el `.svc/json`.
+
+## `wfsbu-describestoredqueries.xml` — LAS CINCO CONSULTAS DE EDIFICIO, Y UNA QUE NADIE ESPERABA
+
+| | |
+|---|---|
+| Origen | WFS INSPIRE de **edificios**, `DescribeStoredQueries` |
+| URL | `https://ovc.catastro.meh.es/INSPIRE/wfsBU.aspx?service=wfs&version=2.0.0&request=DescribeStoredQueries` |
+| Descargado | 2026-08-03 |
+| HTTP | 200 OK · `text/xml; charset=utf-8` · `Access-Control-Allow-Origin: *` · 0,259 s |
+| SHA-256 descargado | `a131902223d4e7354f6df3beff281c375f2807c158cf131429673801118d53e9` (5.429 B, CRLF) |
+| Aquí | 5.349 B, LF |
+
+**Qué congela: el catálogo completo del servicio de edificio, dicho por él mismo.** Son **cinco**:
+
+| `id` | Parámetros | `returnFeatureTypes` declarado | Qué devuelve DE VERDAD |
+|---|---|---|---|
+| `GetBuildingByParcel` | `REFCAT`, `SRSNAME` | `bu:Building` | el `Building` (envolvente + los atributos semánticos) |
+| `GetFeatureById` | `ID`, `SRSNAME` | `bu:Building` | por identificador de elemento |
+| `GetBuildingPartByParcel` | `REFCAT`, `SRSNAME` | `bu:Building` | los `BuildingPart` — **la geometría de las partes** |
+| `GetOtherBuildingByParcel` | `REFCAT`, `SRSNAME` | `bu:Building` | los `OtherConstruction` (piscinas y demás) |
+| ⭐ **`GetAllConstructionByParcel`** | `REFCAT`, `SRSNAME` | `bu:Building` | **`Building` + `OtherConstruction` en un solo documento** |
+
+**Las tres respuestas que T0.1 tenía que dar, en esta tabla:**
+
+1. ✅ **`GetBuildingByParcel` y `GetBuildingPartByParcel` EXISTEN y se llaman exactamente así**, con esa
+   caja. Lo que el dossier documentaba en `MEJORES_PRACTICAS_GML.md` §2.1 era correcto, y es la primera
+   vez en este proyecto que una lista de *stored queries* del dossier sobrevive a la medición: en F05,
+   `GetParcelsByBBox` **no existía**.
+2. ⭐ **`GetAllConstructionByParcel` no está en el dossier** —§2.1 lista tres consultas del `wfsBU` y
+   son cinco— y es la que ahorra una petición: ver la ficha siguiente.
+3. ⛔ **`returnFeatureTypes` vale `bu:Building` en las CINCO**, incluida la de partes y la de «otros».
+   Es un error del propio servicio: `GetBuildingPartByParcel` devuelve `BuildingPart` y
+   `GetOtherBuildingByParcel` devuelve `OtherConstruction`, medido en esta misma tanda. **Ese atributo
+   no sirve para saber qué llega**; hay que mirar el documento.
+
+Detalles menores pero reales:
+
+- El namespace declarado en la raíz para `bu` es `urn:x-inspire:specification:gmlas:Buildings:3.0`, que
+  **no es** ninguno de los dos que usan los documentos de datos (`bu-core2d/2.0` y `bu-ext2d/2.0`). El
+  catálogo y los datos no hablan del mismo esquema.
+- Como en el `wfsCP`, las cinco declaran `isPrivate="true"`: el servicio no publica la expresión
+  interna de ninguna. Solo se puede ir por el `id`.
+- **La doble codificación del hecho transversal 7 está aquí**, y no es aleatoria: afecta a las
+  descripciones de las **dos últimas** consultas (`GetOtherBuildingByParcel` y
+  `GetAllConstructionByParcel`) y no a las tres primeras. Se lee `parÃ¡metros` y `peticiÃ³n` donde las
+  otras dicen `parámetros` y `petición`. Se transcribe tal cual; cualquier comparación contra estos
+  textos hay que hacerla contra los bytes que hay, no contra el castellano correcto.
+
+## `wfsbu-allconstruction-9398516VK3799G.xml` — UN EDIFICIO CUESTA DOS PETICIONES, NO TRES (Y HAY PISCINA)
+
+| | |
+|---|---|
+| Origen | WFS INSPIRE de edificios, *stored query* `GetAllConstructionByParcel` |
+| URL | `https://ovc.catastro.meh.es/INSPIRE/wfsBU.aspx?service=wfs&version=2&request=getfeature&STOREDQUERIE_ID=GetAllConstructionByParcel&refcat=9398516VK3799G&srsname=EPSG::25830` |
+| Descargado | 2026-08-03 |
+| HTTP | 200 OK · `application/x-unknown; charset=utf-8` · `Content-Disposition: filename="Building_9398516VK3799G.gml"` · `Access-Control-Allow-Origin: *` · 0,237 s |
+| SHA-256 descargado | `53a2966e93e981194e523d3aae432e99ebbeea460739bdd5db8dcaddce9d62a3` (9.409 B, CRLF) |
+| Aquí | 9.297 B, LF |
+
+Es la parcela `9398516VK3799G`, la de referencia del proyecto, la misma de `../gml/`.
+
+**Qué congela, primero: el COSTE.** Medido, contando los `gml:featureMember`:
+
+| Consulta | `Building` | `BuildingPart` | `OtherConstruction` |
+|---|---|---|---|
+| `GetAllConstructionByParcel` (este fichero) | **1** | **0** | **1** |
+| `GetBuildingByParcel` (fixture `../gml/bu_building_*.gml`) | 1 | 0 | 0 |
+| `GetBuildingPartByParcel` (fixture `../gml/bu_buildingpart_*.gml`) | 0 | **13** | 0 |
+
+> **`GetAllConstructionByParcel` NO trae las partes.** Su `Abstract` es honrado —dice «Edificios y
+> Otros Edificios», no «partes»— y la medición lo confirma: **cero `BuildingPart`** en la respuesta.
+> Así que un edificio del Catastro **cuesta 2 peticiones**, no 1 y no 3:
+>
+> `GetAllConstructionByParcel` (envolvente + los siete atributos semánticos + las piscinas)
+> **+** `GetBuildingPartByParcel` (la geometría de las 13 partes).
+>
+> El ahorro frente a lo obvio es real —serían **3** yendo por `GetBuilding` + `GetOtherBuilding` +
+> `GetBuildingPart`— y es exactamente un tercio del coste. Contra el override **O8**, que es lo que
+> había que pesar: **2 peticiones por edificio**, cacheables por referencia catastral igual que las de
+> parcela, y emitidas por la cola de concurrencia 2 que ya comparte todo el cliente.
+
+**Qué congela, segundo: ⭐ LA PARCELA DE REFERENCIA DEL PROYECTO TIENE UNA PISCINA.** Nadie lo sabía:
+los dos fixtures de F00 son de `Building` y de `BuildingPart`, y ninguno la contiene. El segundo
+miembro de este documento es:
+
+```xml
+<bu-ext2d:OtherConstruction gml:id="ES.SDGC.BU.9398516VK3799G_PI.1">
+  …
+  <bu-ext2d:constructionNature>openAirPool</bu-ext2d:constructionNature>
+  <bu-ext2d:geometry>
+    <gml:Polygon gml:id="Polygon_ES.SDGC.BU.9398516VK3799G_PI.1" srsName="urn:ogc:def:crs:EPSG::25830">
+      <gml:exterior><gml:LinearRing><gml:posList srsDimension="2" count="19"> … </gml:posList></gml:LinearRing></gml:exterior>
+    </gml:Polygon>
+  </bu-ext2d:geometry>
+</bu-ext2d:OtherConstruction>
+```
+
+Cinco cosas de ahí, y las tres primeras cambian el lector que haya que escribir:
+
+1. ⛔ **La geometría del `OtherConstruction` es `gml:Polygon` DIRECTO**, con
+   `gml:exterior/gml:LinearRing/gml:posList` — **no** `gml:Surface/gml:patches/gml:PolygonPatch`, que
+   es la forma que usan el `Building` (2 patches) y los 13 `BuildingPart` (1 cada uno) **en este mismo
+   servicio**. Dos formas geométricas distintas en documentos del mismo endpoint, y una de ellas es la
+   que un lector escrito contra los fixtures de F00 **no vería**: se perdería la piscina entera, en
+   silencio.
+2. **El elemento contenedor es `bu-ext2d:geometry`**, del namespace *extendido*, mientras que en el
+   `Building` y en el `BuildingPart` la geometría cuelga de `bu-core2d:geometry`. Buscar por un solo
+   namespace deja fuera un tipo.
+3. **`constructionNature` es un campo que no existe en el `Building`.** Aquí vale `openAirPool`
+   (crudo, sin traducir). Es el que dice **qué** es esa construcción.
+4. **El `gml:id` lleva sufijo `_PI.1`** (`ES.SDGC.BU.9398516VK3799G_PI.1`), donde el `Building` es
+   `ES.SDGC.BU.9398516VK3799G` a secas. El `localId` del `inspireId` lleva el mismo sufijo. La
+   referencia catastral **no** se puede sacar cortando el `localId` por longitud.
+5. **Su `conditionOfConstruction` viene `xsi:nil="true" nilReason="other:unpopulated"`**, igual que en
+   los 13 `BuildingPart`. El único sitio donde ese dato tiene valor sigue siendo el `Building`.
+
+**Y el `Building` de esta respuesta viva coincide con el fixture de F00**: mismo `gml:id`, mismos
+**2 `gml:PolygonPatch`** (la advertencia del contrato **C** de F11 queda confirmada contra el servicio,
+no solo contra el fichero de julio de 2026), `conditionOfConstruction` = `functional`,
+`dateOfConstruction` referido al **1 de enero** (`1997-01-01T00:00:00`) y **0 `gml:interior`**.
+
+## `wfsbu-allconstruction-13005A10900001.xml` — LA MITAD ANTI-VACUIDAD DE LA COLECCIÓN VACÍA
+
+| | |
+|---|---|
+| Origen | WFS INSPIRE de edificios, `GetAllConstructionByParcel` sobre una parcela **rústica** |
+| URL | `https://ovc.catastro.meh.es/INSPIRE/wfsBU.aspx?service=wfs&version=2&request=getfeature&STOREDQUERIE_ID=GetAllConstructionByParcel&refcat=13005A10900001&srsname=EPSG::25830` |
+| Descargado | 2026-08-03 |
+| HTTP | 200 OK · `application/x-unknown; charset=utf-8` · `Access-Control-Allow-Origin: *` · 0,245 s |
+| SHA-256 descargado | `fed2792eee787388eb766da3c0225cdf3a4fa1f0b3cd2fb2df4c08d002128a56` (5.754 B, CRLF) |
+| Aquí | 5.679 B, LF |
+
+**De dónde sale esta parcela, y por qué se queda aunque no era la que se buscaba.** Se pidió como
+candidata a *solar sin construcción* —es rústica, del polígono 109 de Alcázar de San Juan, vecina de la
+`13005A10900005` que ya congela la ficha de `ovc-dnprc-rustica-*`— y **resultó tener construcción**: un
+`Building` funcional con `dateOfConstruction` de **2004**. La apuesta falló.
+
+No se descarta, porque es **exactamente la mitad anti-vacuidad** que necesita el fixture siguiente: la
+**misma referencia catastral**, en el **mismo servicio**, devuelve **1 miembro** con esta consulta y
+**0 miembros** con `GetOtherBuildingByParcel`. Eso es lo que demuestra que una colección vacía significa
+«no hay nada de ese tipo» y **no** «esa parcela no existe» — que es la única lectura peligrosa que
+quedaba. Sin este fichero, el vacío del siguiente sería ambiguo.
+
+De paso deja medido que el `wfsBU` **funciona igual en rústica**, con la misma forma de documento.
+
+## `wfsbu-coleccion-vacia-13005A10900001.xml` — «AQUÍ NO HAY NADA CONSTRUIDO», Y SE DICE CON UN 200
+
+| | |
+|---|---|
+| Origen | WFS INSPIRE de edificios, `GetOtherBuildingByParcel` sobre una parcela **que sí existe** |
+| URL | `https://ovc.catastro.meh.es/INSPIRE/wfsBU.aspx?service=wfs&version=2&request=getfeature&STOREDQUERIE_ID=GetOtherBuildingByParcel&refcat=13005A10900001&srsname=EPSG::25830` |
+| Descargado | 2026-08-03 |
+| HTTP | **200 OK** · `application/x-unknown; charset=utf-8` · `Content-Disposition: filename="Building_13005A10900001.gml"` · `Access-Control-Allow-Origin: *` · 0,159 s |
+| SHA-256 descargado | `2d99b2b6b0998faddb83b10d319d6d4a1f363a8ecb1836fbdd72dc614590b7fc` (1.497 B, CRLF) |
+| Aquí | 1.493 B, LF |
+
+**Qué congela: LA COLECCIÓN VACÍA, que en el `wfsCP` no existe.** El cuerpo entero, quitando la lista
+de namespaces de la raíz, es esto:
+
+```xml
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--Edificios de la D.G. del Catastro.-->
+<gml:FeatureCollection gml:id="ES.SDGC.BU"  xmlns:ad="…" … >
+</gml:FeatureCollection>
+```
+
+Cero `gml:featureMember`. **200 OK.** Ni `ExceptionReport`, ni redirect, ni cuerpo vacío, ni contadores
+que interpretar: una colección bien formada y sin nada dentro.
+
+> **Este es el fixture del que depende el veredicto de F11**, y por eso se pidió aunque costara la
+> séptima petición. El flujo de edificio de esta aplicación es **a menudo obra nueva**: se parte de un
+> solar o de una parcela sin nada registrado, y preguntarle al Catastro qué hay construido allí tiene
+> que poder contestar **«nada»** sin que eso se lea como una avería. Aquí «nada» tiene forma propia,
+> distinguible y trivial de detectar: **contar los miembros**.
+>
+> Compárese con el `wfsCP`, donde `wfs-bbox-vacio-mar.xml` demuestra que «no hay parcelas aquí» y «esa
+> referencia no existe» llegan **byte por byte de la misma forma** y solo se distinguen por texto libre
+> no contractual. En el `wfsBU` esa ambigüedad **no existe**.
+
+⚠️ **Lo que este fixture NO es: un solar.** La parcela `13005A10900001` **tiene** un `Building` (ver la
+ficha anterior). Lo que está medido es el caso «la parcela existe y no hay construcciones **de ese
+tipo**», que es el mismo hecho de protocolo —cómo se dice el vacío— pero no el mismo caso de negocio.
+**Que un solar de verdad conteste con esta misma forma es una inferencia, no una medición**, y va
+anotada como tal en «Huecos declarados». Es lo bastante razonable como para diseñar sobre ella —el
+servicio no tiene por qué saber si el vacío viene de que no hay piscinas o de que no hay nada— y lo
+bastante no-medida como para que quede escrito aquí.
+
+## `wfsbu-error-404-ovcerror.html` — EL ERROR QUE NO ES XML, Y LA PÁGINA DE ERROR QUE NO EXISTE
+
+| | |
+|---|---|
+| Origen | `wfsBU.aspx` con una referencia catastral inexistente → redirect → `/OVCError.aspx` |
+| URL | `https://ovc.catastro.meh.es/INSPIRE/wfsBU.aspx?service=wfs&version=2&request=getfeature&STOREDQUERIE_ID=GetAllConstructionByParcel&refcat=0000000XX0000X&srsname=EPSG::25830` |
+| URL final | `https://ovc.catastro.meh.es/OVCError.aspx` (tras 1 redirect) |
+| Descargado | 2026-08-03 |
+| HTTP | **302 Found** → **404 Not Found** · `text/html; charset=utf-8` · `Access-Control-Allow-Origin: *` en **los dos** saltos · 0,137 s el total |
+| SHA-256 descargado | `37c2510d9fc9bbe19f396e4a70cff159d76a9c4c323978972b649b1b604b1f7e` (1.924 B, CRLF) |
+| Aquí | 1.882 B, LF |
+
+La referencia `0000000XX0000X` es la misma que usa `wfs-exceptionreport-rc-inexistente.xml`: sintáctica-
+mente plausible y no existente. **El mismo caso, en el otro endpoint, contesta de otra manera.**
+
+**El primer salto** (302, 131 B, SHA-256 `346da63dfa4f3159973df718de1852dbb5ddbb45cd889f537a536950e80b7211`)
+va literal aquí porque no tiene fichero propio y sin él no se entiende el mecanismo:
+
+```html
+<html><head><title>Object moved</title></head><body>
+<h2>Object moved to <a href="/OVCError.aspx">here</a>.</h2>
+</body></html>
+```
+
+**Qué congela el fichero: que el destino del redirect DEVUELVE 404.** La página a la que el propio
+servicio manda a sus errores **no está publicada**. Lo dice ella misma, con la pantalla estándar de
+ASP.NET:
+
+```
+Server Error in '/' Application.
+   The resource cannot be found.
+Description: HTTP 404. The resource you are looking for (or one of its dependencies) could have been
+removed, had its name changed, or is temporarily unavailable. …
+Requested URL: /OVCError.aspx
+```
+
+Los cinco detalles que importan:
+
+1. ⛔ **No hay `ExceptionReport`, ni `exceptionCode`, ni `ExceptionText`.** Todo el aparato de
+   clasificación que `services/_catastro-wfs.js` construyó para el `wfsCP` —namespace OWS 1.1, cajón
+   de sastre `OperationProcessingFailed`, `CDATA` que se arrastra sin analizar— **no aplica en este
+   endpoint**. No hay nada que leer.
+2. ⛔ **El estado final es 404, no 200.** `fetch` sigue el redirect solo, así que la aplicación recibe
+   `response.ok === false`. **Aquí el estado sí clasifica**, y es el único camino de error medido.
+3. ✅ **CORS abierto en los dos saltos**, 302 incluido. El fallo llega al navegador como respuesta
+   legible y no como error de red opaco: se puede distinguir «el Catastro dice que no» de «no hay
+   internet».
+4. ⚠️ **El 404 es MUDO.** No dice qué referencia falló, ni por qué, ni en qué parámetro. «RC que no
+   existe» y «URL mal construida» —el fallo que `ovc-dnprc-cod17.json` y `ovc-rccoor-cod76.json`
+   documentan como el más traicionero de esta familia de servicios— **son indistinguibles aquí**. Ese
+   es el precio de no tener `ExceptionReport`: se gana un estado HTTP que clasifica y se pierde el
+   diagnóstico.
+5. **El cuerpo es HTML con `<!DOCTYPE html>`**, 1.9 kB de estilos de ASP.NET. Un cliente que lo pase a
+   un lector de XML/GML obtiene basura o una excepción de parseo, según el lector. La defensa correcta
+   es mirar el estado **antes** de parsear — al revés que en el `wfsCP`.
+
+---
+
 ## El `GetParcel` bueno no se duplica aquí
 
 El camino de éxito de la *stored query* `GetParcel` ya está versionado, y **no se copia a esta
@@ -726,6 +1081,30 @@ SHA-256 de la versión LF, que es la que está en el repo:
 | `wfs-bbox-count10.xml` | `5d065369419d245681bf7e0654c2b12b698d18dd0ab04f002fcd807f907e75bd` |
 | `wfs-describestoredqueries.xml` | `5606b19b6b221ed428c67a258dd15735d569590c89f4299daea9832b30142049` |
 | `wfs-bbox-vacio-mar.xml` | `cb83cbd6b9af9970c83c496c95f1f76a0fdb3544c7129dc1b04adaa7888dc6d4` |
+
+**Los cinco de la tanda de F11 (2026-08-03)** siguen la misma regla, y **uno de ellos no es XML**:
+
+| Fichero | Descargado (CRLF) | Aquí (LF) | SHA-256 (LF, en repo) |
+|---|---|---|---|
+| `wfsbu-describestoredqueries.xml` | 5.429 B | 5.349 B | `93febaf24eb3ca2826d82f5149f741ade538b0426da3e78bd713b56fbe0940d6` |
+| `wfsbu-allconstruction-9398516VK3799G.xml` | 9.409 B | 9.297 B | `c14862bdf4784868b9bf4be5a53cc8f4b072549426b8e03c139c6db974282601` |
+| `wfsbu-allconstruction-13005A10900001.xml` | 5.754 B | 5.679 B | `c6cedcfb0206cc8827061f6066de3a007a74fc4e154ee6f54908b96327978aba` |
+| `wfsbu-coleccion-vacia-13005A10900001.xml` | 1.497 B | 1.493 B | `6501d7e97b38f3c929504a1a44b0261849c6c593f888467ffb53b389c61394cc` |
+| `wfsbu-error-404-ovcerror.html` | 1.924 B | 1.882 B | `0e2c8fb0328b04f012b305bd55e08afc3b5668a9025cce1f3397b676b69147cf` |
+
+Los cuatro `.xml` estaban en CRLF puro (0 `CR` sueltos, comprobado), así que la sustitución
+`\r\n → \n` es reversible sin pérdida y el infoset es idéntico, por el mismo XML 1.0 §2.11 de arriba.
+
+⚠️ **`wfsbu-error-404-ovcerror.html` necesitó una línea NUEVA en `.gitattributes`**
+(`test/fixtures/catastro/*.html text eol=lf`, con su razonamiento en el punto 3ter de ese fichero): la
+regla existente cubría `*.xml` y `*.json`, y **una extensión no declarada la reescribe `core.autocrlf`
+en cada checkout de Windows**, con lo que el SHA-256 publicado aquí dejaría de cuadrar. Es el mismo
+defecto que ya obligó a dar línea propia a los subdirectorios `derivados/`. La extensión es distinta
+porque el contenido lo es: este servicio contesta sus errores en HTML, no en XML.
+
+⚠️ **La doble codificación de `wfsbu-describestoredqueries.xml` sobrevive a la normalización**, y tiene
+que sobrevivir: afecta a bytes de contenido (`\xc3\x83\xc2\xa1`), no a finales de línea. Si alguien
+«arregla» ese fichero, deja de ser lo que el servicio sirve.
 
 Es lícito y no cambia nada del contenido: **XML 1.0 §2.11 obliga a todo procesador a normalizar
 `\r\n` a `\n` antes de entregar el documento**, incluso dentro de `CDATA`. El infoset es
@@ -799,6 +1178,41 @@ Y los que deja abiertos la tanda de F09 (2026-08-02):
 - **Ninguna petición de esta carpeta ha llevado nunca cabecera `Origin`.** Ver el matiz sobre el
   CORS en los hechos transversales: lo medido respalda la petición **simple**, no un
   *preflight*.
+
+Y los que deja abiertos la tanda de F11 (2026-08-03), sobre el `wfsBU`:
+
+- ⚠️ **NO se ha medido un solar de verdad**, y es el hueco que más importa de esta lista porque el
+  flujo de edificio parte a menudo de una obra nueva. Lo medido es «parcela que existe, cero
+  construcciones **de ese tipo**» (`GetOtherBuildingByParcel` sobre una rústica que sí tiene
+  `Building`), no «parcela que existe, cero construcciones **de ninguna clase**». Que un solar conteste
+  con la misma colección vacía **es una inferencia razonable y no una medición**: el servicio no tiene
+  por qué distinguir de dónde viene el vacío. Se diseña sobre ella a sabiendas, y queda escrito aquí
+  para que nadie lo cite como medido. Costó dos apuestas fallidas —`13005A10900005` y
+  `13005A10900001`, las dos con construcción— y encontrar un solar garantizado exigía consultar el
+  `Consulta_DNPRC` de cada candidato: dos peticiones por intento, contra el override O8.
+- **No se ha medido `GetBuildingByParcel` ni `GetBuildingPartByParcel` en vivo.** Sus caminos de éxito
+  ya están versionados desde F00 en `../gml/bu_building_9398516VK3799G.gml` y
+  `../gml/bu_buildingpart_9398516VK3799G.gml`, y **no se duplican aquí**, por lo mismo que no se
+  duplica el `GetParcel` bueno. Lo que sí quedó comprobado es que el `Building` que devuelve hoy
+  `GetAllConstructionByParcel` **coincide con el fixture de F00** (mismo `gml:id`, mismos 2
+  `PolygonPatch`, mismo `conditionOfConstruction`), así que aquellos dos ficheros siguen
+  representando la realidad.
+  > ⚠️ **Sus URL no están anotadas en ningún sitio.** `../gml/PROCEDENCIA.md` describe los dos
+  > fixtures BU sin dar la petición con que se capturaron, y los `xlink:href` que llevan dentro
+  > **apuntan a `wfsAD.aspx` y `wfsCP.aspx`, no al `wfsBU.aspx`**: son enlaces a las direcciones y a
+  > la parcela del edificio, no la procedencia del propio fichero. Reconstruibles con la plantilla de
+  > las fichas de arriba, cambiando el `STOREDQUERIE_ID`.
+- **No se ha medido `GetFeatureById`**, la quinta *stored query* del catálogo. No hace falta para
+  ningún flujo previsto: se pide por identificador de elemento y esta aplicación entra siempre por
+  referencia catastral.
+- **No se ha medido una parcela con `BuildingPart` bajo rasante en el `GetAllConstructionByParcel`**,
+  ni una con varios `OtherConstruction`. El primer caso lo cubre el fixture de F00 (su `part10` tiene
+  0 plantas sobre rasante y 1 bajo); el segundo no lo cubre nada.
+- **No se ha medido qué contesta el `wfsBU` a una petición mal construida** (parámetro con otro
+  nombre, `STOREDQUERIE_ID` inexistente). Por el hecho transversal 1 se espera el mismo 302 → 404
+  mudo que la referencia inexistente, y por eso mismo daría igual: **el 404 no distingue los dos
+  casos**. Medirlo costaría una petición para confirmar una indistinguibilidad ya conocida.
+- **Ninguna de estas 7 peticiones llevó cabecera `Origin`** tampoco. Mismo matiz de CORS que arriba.
 - **La metadata `?singleWsdl` no se versiona.** Se leyó para averiguar el nombre real del
   parámetro (`RefCat`) y para nada más; son ~100 kB de WSDL que no describen ningún
   comportamiento que estos fixtures no congelen ya. Reproducible en

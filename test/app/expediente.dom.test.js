@@ -43,6 +43,17 @@
  * escupa «Not implemented: navigation to another Document». Se espía el `click`  *
  * del prototipo en vez de dejarlo pasar: así la prueba mide que la entrega llegó *
  * hasta el gesto sin llenar la salida de la suite de ruido ajeno.                *
+ *                                                                              *
+ * ── ⛔ F11 · T3.3 · LOS BLOQUES 11 A 15 ──                                      *
+ * F11 le añade a la aplicación una segunda rama, y este cableado es donde podía  *
+ * romper F10 **sin hacer ruido**. Lo de arriba (bloques 1–10) se monta SIN rama  *
+ * —`rama: null` ⇒ PARCELA, exactamente F10— y sigue valiendo sin tocar una línea;*
+ * lo de abajo es lo único que la mide.                                          *
+ *                                                                              *
+ * ⚠️ **Y una trampa de arnés medida, que cuesta media hora**: asignar el `<body>` *
+ * de `index.html` con `innerHTML` **no trae la clase `gml-app`** —copia el       *
+ * contenido, no los atributos de la etiqueta— y `cablearRama` la exige. Tiene su *
+ * `it` en el bloque 11, para que la próxima persona la lea en vez de sufrirla.   *
  * -------------------------------------------------------------------------- */
 
 import { readFileSync } from 'node:fs'
@@ -58,9 +69,14 @@ import {
   EXTENSIONES_PROYECTO,
   FICHERO,
   MENSAJE_AUTOGUARDADO_EN_ESPERA,
+  MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO,
+  MENSAJE_GUARDADO_SIN_EDIFICIO,
+  MENSAJE_SIN_EDIFICIO,
   MENSAJE_SIN_PARCELA,
   MENSAJE_SIN_PURGA,
+  MENSAJE_SIN_RAMA_EDIFICIO,
   MENSAJE_SIN_SELECTOR,
+  MOTIVO_GUARDAR_EN_EDIFICIO,
   MS_CONFIRMAR_BORRADO,
   SELECTOR_BOTON_EXPEDIENTE,
   cablearExpediente,
@@ -68,9 +84,11 @@ import {
 } from '../../app/cableado-expediente.js'
 import { parcelaDemo, parcelaDemoConHueco, REFCAT_DEMO } from '../../app/demo-datos.js'
 import { SELECTOR, motivoOtroHuso, selectorFila } from '../../app/dialogo-expediente.js'
+import { ATRIBUTO_PANEL, RAMA, cablearRama } from '../../app/rama.js'
 import { ACADVER } from '../../export/dxf.js'
 import { deProyecto } from '../../export/proyecto.js'
 import { nombreFicheroGml } from '../../gml/descargar.js'
+import { crearEdificio } from '../../model/edificio.js'
 import { crearExpediente } from '../../model/parcela.js'
 import { ALMACENES } from '../../storage/bd.js'
 import { crearExpedientes } from '../../storage/expedientes.js'
@@ -204,6 +222,59 @@ function almacenSinEspacio(real, n = 1) {
   }
 }
 
+// ── F11 · la segunda rama ────────────────────────────────────────────────────
+
+/**
+ * Un Edificio de verdad, del modelo. Dos partes, para que un recuento pueda
+ * distinguirlo de un edificio vacío.
+ */
+function edificioDemo({ refcat = 'EDIF-1', parcelaContexto = null } = {}) {
+  return crearEdificio({
+    refcat,
+    parcelaContexto,
+    partes: [
+      {
+        nombre: 'cuerpo principal',
+        origen: 'DXF',
+        recinto: { tipo: 'EXTERIOR', vertices: [[0, 0], [10, 0], [10, 8], [0, 8]] },
+      },
+      {
+        nombre: 'porche',
+        origen: 'DXF',
+        recinto: { tipo: 'EXTERIOR', vertices: [[10, 0], [14, 0], [14, 4], [10, 4]] },
+      },
+    ],
+  })
+}
+
+/**
+ * Un conmutador de rama de MENTIRA. Se usa **solo** donde hay que medir la BAJA de
+ * la suscripción: con el de verdad, quitar `bajaRama()` de `destruir()` seguiría en
+ * verde porque los manejadores empiezan por `if (destruido) return` —la lección de
+ * los dos guardianes verdes de T2.4—. Aquí la baja es un espía y se mide que se
+ * llama, que es lo único que la mutación no puede fingir.
+ */
+function ramaDeMentira(inicial = RAMA.PARCELA) {
+  let valor = inicial
+  const suscriptores = new Set()
+  const bajas = []
+  return {
+    bajas,
+    cuantosSuscriptores: () => suscriptores.size,
+    get: () => valor,
+    set(r) {
+      valor = r
+      for (const fn of [...suscriptores]) fn(r)
+    },
+    subscribe(fn) {
+      suscriptores.add(fn)
+      const baja = vi.fn(() => suscriptores.delete(fn))
+      bajas.push(baja)
+      return baja
+    },
+  }
+}
+
 /** El montaje completo. Devuelve todo lo que las pruebas necesitan tocar. */
 async function montar({
   parcela = parcelaDemo(),
@@ -213,6 +284,9 @@ async function montar({
   elegirFichero = null,
   almacen = null,
   bd = null,
+  conRama = false,
+  ramaInicial = RAMA.PARCELA,
+  edificio = null,
 } = {}) {
   const apertura = bd ?? (await baseNueva())
   let reloj = Date.UTC(2026, 7, 3, 10, 0, 0)
@@ -237,6 +311,24 @@ async function montar({
   const url = espiaUrl()
   const cargadas = []
 
+  // ── F11 · la rama, cuando la prueba la pide ────────────────────────────────
+  let rama = null
+  let estadoEdificio = null
+  if (conRama) {
+    // ⛔ MEDIDO: asignar el `<body>` de `index.html` con `innerHTML` **no trae la
+    // clase `gml-app`** —los atributos de la etiqueta `<body>` se quedan fuera—, y
+    // `cablearRama` la exige (`SELECTOR.APP`). Hay un `it` que lo atesta más abajo.
+    document.body.className = 'gml-app'
+    // Una sección de edificio de mentira: el panel de verdad es de otra tarea, y sin
+    // ninguna `cablearRama` saca un ERROR por el panel al conmutar (y con razón).
+    const seccionEdificio = document.createElement('section')
+    seccionEdificio.setAttribute(ATRIBUTO_PANEL, RAMA.EDIFICIO)
+    seccionEdificio.hidden = true
+    document.body.appendChild(seccionEdificio)
+    estadoEdificio = crearEstadoVista(edificio)
+    rama = cablearRama({ documento: document, panel, ramaInicial })
+  }
+
   const cableado = cablearExpediente({
     estado,
     panel,
@@ -244,6 +336,8 @@ async function montar({
     expedientes,
     cuota,
     cache,
+    rama,
+    estadoEdificio,
     elegirFichero,
     alCargarParcela: (p) => cargadas.push(p),
     ahora: () => new Date(reloj),
@@ -259,11 +353,18 @@ async function montar({
     cableado,
     cargadas,
     estado,
+    estadoEdificio,
     expedientes,
     panel,
     persistencias,
+    rama,
     timers,
     url,
+    /** Desmonta las dos cosas que una prueba con rama deja puestas. */
+    desmontar() {
+      cableado.destruir()
+      if (rama !== null) rama.destruir()
+    },
     avisos: () => [...document.querySelectorAll('#avisos .gml-aviso-texto')].map((t) => t.textContent),
     renglon: () => document.querySelector(SELECTOR.ESTADO).textContent,
     avanzar(ms) {
@@ -274,6 +375,23 @@ async function montar({
     },
   }
 }
+
+/** El panel de avisos REAL sobre la cáscara real. Tres nodos, siempre los mismos. */
+const panelDePrueba = () =>
+  crearPanelAvisos({
+    contenedor: document.querySelector('#avisos'),
+    chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
+    chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
+  })
+
+/** Los cinco textos que F11 añade. Entran en los dos guardianes de higiene. */
+const TEXTOS_F11 = Object.freeze([
+  MOTIVO_GUARDAR_EN_EDIFICIO,
+  MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO,
+  MENSAJE_SIN_EDIFICIO,
+  MENSAJE_SIN_RAMA_EDIFICIO,
+  MENSAJE_GUARDADO_SIN_EDIFICIO,
+])
 
 /** Pulsa un botón del diálogo por selector. Falla nombrándolo si no está. */
 function pulsar(selector) {
@@ -303,6 +421,9 @@ let clickEspiado
 
 beforeEach(() => {
   document.body.innerHTML = CUERPO_INDEX
+  // `innerHTML` no trae los atributos de la etiqueta `<body>`: se deja explícito
+  // vacío para que la trampa de F11 sea medible y no herencia de otra prueba.
+  document.body.className = ''
   // Ver la trampa de entorno de la cabecera.
   clickEspiado = vi
     .spyOn(window.HTMLAnchorElement.prototype, 'click')
@@ -312,6 +433,7 @@ beforeEach(() => {
 afterEach(() => {
   clickEspiado.mockRestore()
   document.body.innerHTML = ''
+  document.body.className = ''
   vi.restoreAllMocks()
 })
 
@@ -1108,6 +1230,7 @@ describe('F10 · T5.1 · 10 · higiene', () => {
       MENSAJE_SIN_PARCELA,
       MENSAJE_SIN_PURGA,
       MENSAJE_SIN_SELECTOR,
+      ...TEXTOS_F11,
     ]
     // Anti-vacuidad: el arranque ha dicho algo de verdad.
     expect(m.avisos().length).toBeGreaterThan(0)
@@ -1125,8 +1248,456 @@ describe('F10 · T5.1 · 10 · higiene', () => {
       MENSAJE_SIN_PARCELA,
       MENSAJE_SIN_PURGA,
       MENSAJE_SIN_SELECTOR,
+      ...TEXTOS_F11,
     ].join('\n')
     expect(textos).not.toMatch(prohibidas)
     expect(fuente).toContain('regla de oro 9')
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+// F11 · T3.3 · la rama y el expediente
+//
+// Aquí es donde F11 podía romper F10 sin hacer ruido. Todo lo de arriba sigue
+// montando el cableado SIN rama —`rama: null` ⇒ PARCELA, exactamente F10—, así que
+// estas pruebas son el único sitio donde se mide la segunda rama.
+//
+// ⚠️ Se usa el `cablearRama` DE VERDAD, no un doble, por lo mismo que el resto de
+// este fichero usa el almacén de verdad: lo que se prueba es el CABLE. El único
+// doble es el de la prueba de la baja, y allí está dicho por qué.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('F11 · T3.3 · 11 · la trampa del arnés', () => {
+  it('⛔ el `<body>` de index.html metido con `innerHTML` NO trae la clase `gml-app`', () => {
+    // Medido, y cuesta media hora encontrarlo: `innerHTML` copia el CONTENIDO del
+    // `<body>`, no sus atributos. `cablearRama` resuelve `.gml-app` y lanza sin ella.
+    expect(CUERPO_INDEX).not.toMatch(/^\s*<body/i)
+    expect(document.body.className).toBe('')
+    const panel = panelDePrueba()
+    expect(() => cablearRama({ documento: document, panel })).toThrow(/gml-app/)
+  })
+})
+
+describe('F11 · T3.3 · 12 · (a) `expedienteActual()` pregunta por la rama', () => {
+  it('⛔ con la rama EDIFICIO NO devuelve la parcela: devuelve el edificio', async () => {
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
+    const exp = m.cableado.expedienteActual()
+
+    expect(exp.tipo).toBe('EDIFICIO')
+    expect(exp.edificio.partes).toHaveLength(2)
+    expect(exp.parcela).toBeNull()
+    // Anti-vacuidad: en el store de parcela HAY una parcela entera, y aun así no sale.
+    expect(m.estado.get().refcat).toBe(REFCAT_DEMO)
+    m.desmontar()
+  })
+
+  it('⭐ y en la rama PARCELA sigue devolviendo la parcela, con el edificio cargado', async () => {
+    // La otra mitad del anti-vacuidad: si devolviera siempre el edificio, la prueba
+    // de arriba tampoco diría nada.
+    const m = await montar({ conRama: true, edificio: edificioDemo() })
+    const exp = m.cableado.expedienteActual()
+    expect(exp.tipo).toBe('PARCELA')
+    expect(exp.parcela.refcat).toBe(REFCAT_DEMO)
+    expect(exp.edificio).toBeNull()
+    m.desmontar()
+  })
+
+  it('⛔ NUNCA se le pasan las DOS ramas a `crearExpediente`: no lanza con las dos llenas', async () => {
+    // `model/parcela.js#crearExpediente` LANZA si le llegan `parcela` y `edificio`
+    // juntos, y `expedienteActual()` se llama desde dentro de un `click`. Con los dos
+    // stores llenos y la rama conmutada a EDIFICIO, esto es la prueba directa.
+    const m = await montar({ conRama: true, edificio: edificioDemo() })
+    expect(m.estado.get()).not.toBeNull()
+    expect(m.estadoEdificio.get()).not.toBeNull()
+
+    m.rama.set(RAMA.EDIFICIO)
+    expect(() => m.cableado.expedienteActual()).not.toThrow()
+    const exp = m.cableado.expedienteActual()
+    // Una rama y solo una, en cada sentido.
+    expect([exp.parcela, exp.edificio].filter((r) => r !== null)).toHaveLength(1)
+    m.desmontar()
+  })
+
+  it('⭐ la parcela de pantalla viaja como `edificio.parcelaContexto` (desviación 9)', async () => {
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
+    const exp = m.cableado.expedienteActual()
+
+    expect(exp.edificio.parcelaContexto).toEqual(parcelaDemo().recintos)
+    // Y no se ha colado por la puerta de al lado.
+    expect(exp.parcela).toBeNull()
+    // El store no se ha mutado (regla de oro 4): el POJO de allí sigue sin contexto.
+    expect(m.estadoEdificio.get().parcelaContexto).toBeNull()
+    m.desmontar()
+  })
+
+  it('…y NO pisa un `parcelaContexto` que ya traía el edificio', async () => {
+    const propio = [{ tipo: 'EXTERIOR', vertices: [[1, 1], [2, 1], [2, 2]] }]
+    const m = await montar({
+      conRama: true,
+      ramaInicial: RAMA.EDIFICIO,
+      edificio: edificioDemo({ parcelaContexto: propio }),
+    })
+    expect(m.cableado.expedienteActual().edificio.parcelaContexto).toEqual(propio)
+    m.desmontar()
+  })
+
+  it('sin edificio en el store devuelve null, no un expediente vacío', async () => {
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: null })
+    expect(m.cableado.expedienteActual()).toBeNull()
+    m.desmontar()
+  })
+
+  it('el nombre del fichero sale con la RC del EDIFICIO, no con la de la parcela', async () => {
+    const m = await montar({
+      conRama: true,
+      ramaInicial: RAMA.EDIFICIO,
+      edificio: edificioDemo({ refcat: 'EDIF9999' }),
+    })
+    await abrir(m)
+    pulsar(SELECTOR.EXPORTAR_PROYECTO)
+    await reposar()
+    expect(m.renglon()).toContain('EDIF9999')
+    expect(m.renglon()).not.toContain(REFCAT_DEMO)
+    m.desmontar()
+  })
+})
+
+describe('F11 · T3.3 · 13 · (b) F11 no guarda expedientes de edificio, y lo dice', () => {
+  it('⛔ «Guardar» nace APAGADO con la rama EDIFICIO, y el motivo está escrito', async () => {
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
+    await abrir(m)
+
+    expect(document.querySelector(SELECTOR.GUARDAR).disabled).toBe(true)
+    expect(m.renglon()).toBe(MOTIVO_GUARDAR_EN_EDIFICIO)
+    // Botón apagado CON motivo, jamás botón muerto: el motivo nombra la alternativa.
+    expect(MOTIVO_GUARDAR_EN_EDIFICIO).toContain('.json')
+    m.desmontar()
+  })
+
+  it('⭐ y el motivo que sale NO es el genérico del diálogo, que aquí sería falso', async () => {
+    // `app/dialogo-expediente.js#MOTIVO_SIN_GEOMETRIA` dice «todavía no hay ninguna
+    // parcela en pantalla que guardar». Con la rama EDIFICIO eso es mentira: hay un
+    // edificio, y lo que falta es el identificador. Un motivo equivocado manda al
+    // usuario a arreglar lo que no está roto.
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
+    await abrir(m)
+    expect(m.renglon()).not.toMatch(/ninguna parcela en pantalla/i)
+    m.desmontar()
+  })
+
+  it('conmutar de rama con el diálogo ABIERTO enciende y apaga «Guardar» al vuelo', async () => {
+    const m = await montar({ conRama: true, edificio: edificioDemo() })
+    await abrir(m)
+    expect(document.querySelector(SELECTOR.GUARDAR).disabled).toBe(false)
+
+    m.rama.set(RAMA.EDIFICIO)
+    await reposar()
+    expect(document.querySelector(SELECTOR.GUARDAR).disabled).toBe(true)
+    expect(m.renglon()).toBe(MOTIVO_GUARDAR_EN_EDIFICIO)
+
+    m.rama.set(RAMA.PARCELA)
+    await reposar()
+    expect(document.querySelector(SELECTOR.GUARDAR).disabled).toBe(false)
+    m.desmontar()
+  })
+
+  it('⭐ y la guarda NO depende de ese `disabled`: forzando el clic tampoco guarda', async () => {
+    // Mismo argumento que la guarda del huso de F10: un `disabled` es cortesía. El
+    // precio de que se colara es archivar el expediente de la PARCELA mientras el
+    // usuario está mirando un edificio, en silencio.
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
+    await abrir(m)
+    escribirNombre('No debería existir')
+    const boton = document.querySelector(SELECTOR.GUARDAR)
+    boton.disabled = false
+    boton.dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
+    await reposar()
+
+    expect((await m.expedientes.listar()).registros).toHaveLength(0)
+    expect(m.renglon()).toBe(MOTIVO_GUARDAR_EN_EDIFICIO)
+    m.desmontar()
+  })
+
+  it('⛔ el autoguardado NO se dispara con la rama EDIFICIO activa (desviación 7)', async () => {
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
+    expect(m.timers.cuantos).toBe(0)
+
+    m.estado.set(parcelaDemoConHueco())
+    await reposar()
+
+    // Ni se ha programado el debounce…
+    expect(m.timers.cuantos).toBe(0)
+    // …ni hay borrador escrito, que es lo que de verdad importa.
+    expect((await m.expedientes.listar()).hayBorrador).toBe(false)
+    m.desmontar()
+  })
+
+  it('⭐ anti-vacuidad: el MISMO cambio en la rama PARCELA sí programa y sí escribe', async () => {
+    const m = await montar({ conRama: true, edificio: edificioDemo() })
+    m.estado.set(parcelaDemoConHueco())
+    await reposar()
+
+    expect(m.timers.cuantos).toBe(1)
+    m.timers.disparar()
+    await reposar()
+    expect((await m.expedientes.listar()).hayBorrador).toBe(true)
+    m.desmontar()
+  })
+
+  it('⭐ lo cambiado durante la rama EDIFICIO no se PIERDE: se vuelca al volver', async () => {
+    // «No pisar» no puede convertirse en «no guardar nunca». Es exactamente lo que
+    // resuelve `resolverOferta` para la oferta del borrador, y aquí para la rama.
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
+    m.estado.set(parcelaDemoConHueco())
+    await reposar()
+    expect(m.timers.cuantos).toBe(0)
+
+    m.rama.set(RAMA.PARCELA)
+    await reposar()
+    expect(m.timers.cuantos).toBe(1)
+    m.timers.disparar()
+    await reposar()
+
+    const borrador = await m.expedientes.leerBorrador()
+    expect(borrador.ok).toBe(true)
+    expect(borrador.expediente.parcela.recintos).toHaveLength(2) // la del hueco
+    m.desmontar()
+  })
+
+  it('⭐ ni siquiera DESCARTAR el borrador vuelca en la rama EDIFICIO', async () => {
+    // `resolverOferta` es el otro sitio que vuelca lo pendiente, y desde F11 también
+    // pregunta por la rama: descartar el trabajo de ayer estando en la rama Edificio
+    // no puede escribir el borrador de la parcela de debajo.
+    const apertura = await baseNueva()
+    const almacen = crearExpedientes({ bd: apertura, ahora: () => Date.UTC(2026, 7, 2) })
+    await almacen.guardarBorrador(crearExpediente({ srs: SRS, parcela: parcelaDemo() }))
+    const m = await montar({
+      bd: apertura,
+      conRama: true,
+      ramaInicial: RAMA.EDIFICIO,
+      edificio: edificioDemo(),
+    })
+    expect(m.cableado.estado().ofreciendoBorrador).toBe(true)
+
+    m.estado.set(parcelaDemoConHueco())
+    await reposar()
+    await abrir(m)
+    pulsar(`${SELECTOR.BORRADOR} [data-accion="descartar-borrador"]`)
+    await reposar()
+
+    expect(m.timers.cuantos).toBe(0)
+    m.desmontar()
+  })
+
+  it('⛔ el DXF y el listado de coordenadas se apagan con motivo, no bajan la parcela', async () => {
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
+    await abrir(m)
+
+    for (const selector of [SELECTOR.EXPORTAR_DXF, SELECTOR.EXPORTAR_COORDENADAS]) {
+      document
+        .querySelector(selector)
+        .dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
+      await reposar()
+      expect(m.renglon()).toBe(MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO)
+    }
+    // Lo que importa: no ha bajado NADA. Un DXF de la parcela de debajo mientras el
+    // usuario mira un edificio es el documento equivocado, en silencio.
+    expect(m.url.blobs).toHaveLength(0)
+    m.desmontar()
+  })
+
+  it('⭐ pero el fichero de proyecto SÍ se lleva el edificio: es su única puerta', async () => {
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
+    await abrir(m)
+    pulsar(SELECTOR.EXPORTAR_PROYECTO)
+    await reposar()
+
+    expect(m.url.blobs).toHaveLength(1)
+    const leido = deProyecto(await m.url.blobs[0].text())
+    expect(leido.ok).toBe(true)
+    expect(leido.expediente.tipo).toBe('EDIFICIO')
+    expect(leido.expediente.edificio.partes.map((p) => p.nombre)).toEqual([
+      'cuerpo principal',
+      'porche',
+    ])
+    m.desmontar()
+  })
+
+  it('sin edificio, exportar el proyecto lo dice hablando de EDIFICIOS', async () => {
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: null })
+    await abrir(m)
+    pulsar(SELECTOR.EXPORTAR_PROYECTO)
+    await reposar()
+    expect(m.renglon()).toBe(MENSAJE_SIN_EDIFICIO)
+    expect(m.renglon()).not.toBe(MENSAJE_SIN_PARCELA)
+    m.desmontar()
+  })
+})
+
+describe('F11 · T3.3 · 14 · (c) `abrirProyecto` conmuta la rama', () => {
+  /** Un `.json` de edificio, escrito por la propia aplicación. Ida y vuelta de verdad. */
+  async function jsonDeEdificio(m) {
+    await abrir(m)
+    pulsar(SELECTOR.EXPORTAR_PROYECTO)
+    await reposar()
+    const texto = await m.url.blobs.at(-1).text()
+    m.url.blobs.length = 0
+    return texto
+  }
+
+  it('⛔ un `.json` con un expediente de EDIFICIO CONMUTA la rama y entra en SU store', async () => {
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
+    const texto = await jsonDeEdificio(m)
+
+    // Se vuelve a la rama de parcela y se vacía el store de edificio: si `abrirProyecto`
+    // no conmutara, todo lo de abajo saldría igual de vacío.
+    m.rama.set(RAMA.PARCELA)
+    m.estadoEdificio.set(null)
+    await reposar()
+    expect(m.rama.get()).toBe(RAMA.PARCELA)
+
+    await m.cableado.abrirProyecto(ficheroDeTexto('proyecto.json', texto))
+    await reposar()
+
+    expect(m.rama.get()).toBe(RAMA.EDIFICIO)
+    expect(m.estadoEdificio.get().partes).toHaveLength(2)
+    // Y NO se ha metido un edificio en el store de la parcela.
+    expect(m.estado.get().refcat).toBe(REFCAT_DEMO)
+    expect(m.estado.get().partes).toBeUndefined()
+    m.desmontar()
+  })
+
+  it('…y lo cuenta por el panel, diciendo ya que no se va a poder guardar', async () => {
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
+    const texto = await jsonDeEdificio(m)
+    m.rama.set(RAMA.PARCELA)
+    await reposar()
+
+    await m.cableado.abrirProyecto(ficheroDeTexto('proyecto.json', texto))
+    await reposar()
+
+    const dicho = m.avisos().join('\n')
+    expect(dicho).toMatch(/rama Edificio/)
+    expect(dicho).toMatch(/no lo puede guardar en este navegador/i)
+    m.desmontar()
+  })
+
+  it('⭐ y un `.json` de PARCELA abierto desde la rama EDIFICIO conmuta al revés', async () => {
+    const m = await montar({ conRama: true, edificio: edificioDemo() })
+    await abrir(m)
+    pulsar(SELECTOR.EXPORTAR_PROYECTO)
+    await reposar()
+    const texto = await m.url.blobs.at(-1).text()
+
+    m.rama.set(RAMA.EDIFICIO)
+    await reposar()
+
+    await m.cableado.abrirProyecto(ficheroDeTexto('proyecto.json', texto))
+    await reposar()
+
+    expect(m.rama.get()).toBe(RAMA.PARCELA)
+    expect(m.estado.get().refcat).toBe(REFCAT_DEMO)
+    m.desmontar()
+  })
+
+  it('sin rama montada, un `.json` de edificio lo DICE y no toca nada', async () => {
+    // Es el montaje de F10 entero: `rama: null` y `estadoEdificio: null`.
+    const conRama = await montar({
+      conRama: true,
+      ramaInicial: RAMA.EDIFICIO,
+      edificio: edificioDemo(),
+    })
+    const texto = await jsonDeEdificio(conRama)
+    conRama.desmontar()
+
+    document.body.innerHTML = CUERPO_INDEX
+    document.body.className = ''
+    const m = await montar()
+    await m.cableado.abrirProyecto(ficheroDeTexto('proyecto.json', texto))
+    await reposar()
+
+    expect(m.avisos().join('\n')).toContain(MENSAJE_SIN_RAMA_EDIFICIO)
+    expect(m.estado.get().refcat).toBe(REFCAT_DEMO)
+    m.cableado.destruir()
+  })
+
+  it('un `.json` que dice ser de EDIFICIO y no trae edificio se cuenta, sin reventar', async () => {
+    const m = await montar({ conRama: true, edificio: edificioDemo() })
+    const sobre = {
+      formato: 'concreta-gml/proyecto',
+      version: 1,
+      generado: '2026-08-03T09:00:00.000Z',
+      nombre: 'roto',
+      expediente: { tipo: 'EDIFICIO', srs: SRS, metadatos: {}, parcela: null, edificio: null },
+    }
+    await expect(
+      m.cableado.abrirProyecto(ficheroDeTexto('roto.json', JSON.stringify(sobre))),
+    ).resolves.toBeUndefined()
+
+    expect(m.avisos().join('\n')).toContain(MENSAJE_GUARDADO_SIN_EDIFICIO)
+    expect(m.rama.get()).toBe(RAMA.PARCELA)
+    m.desmontar()
+  })
+})
+
+describe('F11 · T3.3 · 15 · higiene de la rama', () => {
+  it('`rama` que no es un conmutador revienta AL CABLEAR, nombrando lo que se espera', async () => {
+    const apertura = await baseNueva()
+    const panel = panelDePrueba()
+    const base = {
+      estado: crearEstadoVista(parcelaDemo()),
+      panel,
+      srs: SRS,
+      expedientes: crearExpedientes({ bd: apertura }),
+      cuota: { pedirPersistencia: async () => ({ ok: true, persistido: true }) },
+    }
+    expect(() => cablearExpediente({ ...base, rama: 'EDIFICIO' })).toThrow(/rama/)
+    expect(() => cablearExpediente({ ...base, estadoEdificio: {} })).toThrow(/estadoEdificio/)
+  })
+
+  it('⭐ `destruir()` da de BAJA la suscripción a la rama (medido con la baja, no con la bandera)', async () => {
+    // ⛔ Lección de T2.4: dos de sus ocho guardianes salieron VERDES con la mutación
+    // puesta, porque los manejadores empiezan por `if (destruido) return` y la prueba
+    // medía la bandera. Aquí se mide **la llamada a la baja**, que es lo único que
+    // quitar `bajaRama()` de `destruir()` no puede fingir.
+    const doble = ramaDeMentira()
+    const apertura = await baseNueva()
+    const panel = panelDePrueba()
+    const cableado = cablearExpediente({
+      estado: crearEstadoVista(parcelaDemo()),
+      panel,
+      srs: SRS,
+      expedientes: crearExpedientes({ bd: apertura }),
+      cuota: { pedirPersistencia: async () => ({ ok: true, persistido: true }) },
+      rama: doble,
+      estadoEdificio: crearEstadoVista(null),
+    })
+    await reposar()
+
+    expect(doble.bajas).toHaveLength(1)
+    expect(doble.cuantosSuscriptores()).toBe(1)
+
+    cableado.destruir()
+    expect(doble.bajas[0]).toHaveBeenCalledTimes(1)
+    expect(doble.cuantosSuscriptores()).toBe(0)
+    expect(() => cableado.destruir()).not.toThrow()
+  })
+
+  it('sin `rama` cableada la respuesta es PARCELA: F10 se comporta exactamente igual', async () => {
+    const m = await montar()
+    expect(m.cableado.estado().rama).toBe(RAMA.PARCELA)
+    expect(m.cableado.estado().puedeGuardar).toBe(true)
+    expect(m.cableado.expedienteActual().tipo).toBe('PARCELA')
+    m.cableado.destruir()
+  })
+
+  it('la fotografía de estado dice la rama y si se puede guardar', async () => {
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
+    expect(m.cableado.estado().rama).toBe(RAMA.EDIFICIO)
+    expect(m.cableado.estado().puedeGuardar).toBe(false)
+    m.rama.set(RAMA.PARCELA)
+    expect(m.cableado.estado().rama).toBe(RAMA.PARCELA)
+    expect(m.cableado.estado().puedeGuardar).toBe(true)
+    m.desmontar()
   })
 })

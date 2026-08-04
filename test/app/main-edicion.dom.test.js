@@ -108,6 +108,9 @@ import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
 /** Cómo desmontar el cromo vivo ahora mismo (y su mapa), o `null` si no hay. */
 let desmontarCromoVivo = null
 
+/** El `L.Map` del arnés, vivo. F11: lo consume `viewer/partes.js` (ver abajo). */
+let mapaVivo = null
+
 /** El cajón y la capa de F07 vivos, para que el doble los entregue. */
 let diagnosticoVivo = null
 
@@ -149,6 +152,11 @@ function montarCromoDelMapa() {
   // escribir «30» aquí sería una tercera copia de ese dato.
   const contraste = crearContraste({ mapa, zona: husoPorSrs(SRS_DEMO) })
   const cajonComprobacion = crearCajonComprobacion({ mapa })
+  // ⚠️ F11: el `L.Map` DE VERDAD se guarda y va al doble. Hasta aquí el
+  // `visor.mapa` era `{on, off}` —lo justo que consume `cablearCatastro` por duck
+  // typing—, y desde F11 hay un segundo consumidor, `viewer/partes.js`, que
+  // necesita `addLayer`/`removeLayer`/`getPane` para pintar las huellas.
+  mapaVivo = mapa
   diagnosticoVivo = { cajon, contraste }
   comprobacionViva = cajonComprobacion
   desmontarCromoVivo = () => {
@@ -157,6 +165,7 @@ function montarCromoDelMapa() {
     cajon.destruir()
     barra.destruir()
     destruirMapa()
+    mapaVivo = null
     diagnosticoVivo = null
     comprobacionViva = null
   }
@@ -201,7 +210,14 @@ const arranque = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('../../viewer/index.js', () => ({
+vi.mock('../../viewer/index.js', async (importarOriginal) => ({
+  // ⚠️ F11: se PARTE del módulo real y solo se sustituye `crearVisor`. Antes el
+  // doble era un objeto literal con una sola clave, y eso convertía cualquier
+  // export NUEVO del visor en un fallo de importación de este fichero — que es lo
+  // que pasó al exportar `encuadrarSobreRecintos` (T1.5), que consume
+  // `app/cableado-edificio.js`. Con `importOriginal` el doble es exactamente lo
+  // que dice ser: el visor real con el montaje sustituido.
+  ...(await importarOriginal()),
   crearVisor: (_contenedor, opciones) => {
     arranque.opciones = opciones
     // El segundo efecto del original sobre el documento: si el doble no lo
@@ -211,7 +227,7 @@ vi.mock('../../viewer/index.js', () => ({
     montarCromoDelMapa()
     let tau = opciones.edicion && opciones.edicion.tolerancia
     return {
-      mapa: { on() {}, off() {} },
+      mapa: mapaVivo,
       estado: opciones.estado,
       capas: {},
       acotaciones: null,
@@ -317,17 +333,20 @@ const publicarColindantes = (resultado) => {
 
 const RAIZ = join(import.meta.dirname, '..', '..')
 
-const CUERPO_INDEX = (() => {
+const CASCARA_INDEX = (() => {
   const html = readFileSync(join(RAIZ, 'index.html'), 'utf8')
-  const encontrado = /<body[^>]*>([\s\S]*)<\/body>/i.exec(html)
+  const encontrado = /<body([^>]*)>([\s\S]*)<\/body>/i.exec(html)
   if (encontrado === null) {
     throw new Error(
       'test/app/main-edicion.dom.test.js: no se ha encontrado el <body> de index.html. La ' +
         'cáscara de estas pruebas se lee del fichero real a propósito (no se copia).',
     )
   }
-  return encontrado[1]
+  const clase = /class="([^"]*)"/i.exec(encontrado[1])
+  return { clase: clase === null ? '' : clase[1], cuerpo: encontrado[2] }
 })()
+
+const CUERPO_INDEX = CASCARA_INDEX.cuerpo
 
 /**
  * Monta la cáscara real en el documento del test.
@@ -335,8 +354,15 @@ const CUERPO_INDEX = (() => {
  * ⚠️ Se lleva por delante TODO lo que hubiera en el `<body>`, incluida la barra
  * de edición (que vive dentro del contenedor del mapa). Quien la use en un
  * `beforeEach` tiene que volver a montarla: ver {@link montarCromoDelMapa}.
+ *
+ * ⚠️ **Y repone la CLASE del `<body>`, que hasta F11 se perdía.** El `innerHTML`
+ * copia lo de DENTRO del `<body>` y nada de su etiqueta de apertura, así que la
+ * cáscara venía sin `gml-app`. Daba igual hasta que dejó de darlo: `app/rama.js`
+ * resuelve `.gml-app` para colgar ahí el `data-rama` y **LANZA** si no está — un
+ * contrato del programador legítimo, porque la clase está en `index.html` desde F03.
  */
 function montarCascara() {
+  document.body.className = CASCARA_INDEX.clase
   document.body.innerHTML = CUERPO_INDEX
 }
 

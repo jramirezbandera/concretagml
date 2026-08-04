@@ -86,6 +86,46 @@
         </div>
       </header>
 
+      <!-- ── DOS DE ESTAS `<section>` PUEDEN QUEDAR `hidden` (F11, 2026-08-04) ──
+           Si depuras «esta sección no aparece»: desde F11 hay DOS RAMAS —PARCELA y
+           EDIFICIO— y el panel se INTERCAMBIA en vez de sumarse. Se ocultan
+           `.gml-bloque--catastro` (justo debajo) y `.gml-bloque--vertices` (más
+           abajo); `.gml-bloque--avisos` y el pie son comunes y no se ocultan.
+
+           QUIÉN LAS GOBIERNA: `app/rama.js`, dueño único de la rama activa. Pone
+           `data-rama` en el `<body>` (único gancho de CSS de la rama) y MARCA él
+           mismo estas dos con `data-rama-panel="PARCELA"` (su lista, por selector
+           de clase, está en `app/rama.js#SECCIONES_PARCELA`): no vienen marcadas
+           aquí porque F11 no tocó el marcado. Las de la rama EDIFICIO no están en
+           este fichero —las fabrica `app/panel-edificio.js`— y **quien las SELLA
+           con `data-rama-panel="EDIFICIO"` es `app/cableado-edificio.js`**;
+           `rama.js` las descubre por ese atributo en cada conmutación, así que el
+           orden de cableado da igual. (Que nadie lo escribiera fue un hueco real:
+           la rama edificio no se habría mostrado nunca.) El intercambio lo hace
+           `.gml-app [hidden]`, y NO hay ni una regla sobre `[data-rama-panel]`: dos
+           reglas serían dos dueños de la misma visibilidad.
+
+           ⚠️ SE OCULTAN CON `hidden`, JAMÁS SUSTITUYENDO EL DOM, y está medido: con
+           `replaceChildren`/`remove()` la referencia que `app/` guardó queda
+           huérfana, ESCRIBIBLE y MUDA —`isConnected:false`, escribir no lanza, los
+           oyentes siguen disparando—, así que la referencia catastral acabaría en un
+           nodo fuera del documento mientras el usuario ve el campo vacío. Hay 30
+           nodos de `app/` resueltos una sola vez, en el montaje.
+
+           ⚠️ SI AÑADES NODOS AQUÍ: ningún `data-campo`/`data-accion`/`data-estado`/
+           `data-ficha`/`data-procedencia` puede REPETIRSE entre ramas.
+           `querySelector` se queda con el primero del documento —y parcela va
+           antes, TAMBIÉN estando `hidden`—, así que el cableado de edificio leería
+           y escribiría en el campo invisible de la otra rama. De ahí
+           `refcat-edificio` y no `refcat`. Es la trampa del bloque «Edición» de F06
+           de más abajo, con otra cara.
+
+           ⚠️ `.gml-bloque--vertices` no se oculta de propina: `.gml-bloque--partes`
+           la SUSTITUYE como estirador del panel (`flex:1 1 auto; min-height:0`), y
+           dos estiradores a la vez descosen el reparto.
+
+           Cifras en `spec/feature-11-edificio-entrada.md` M18 y M19. -->
+
       <!-- ── DE DÓNDE VIENE EL DATO: la parcela del Catastro (F05) ────────────
            Es la PRIMERA sección del panel, y el orden es una decisión, no el
            azar de haberla escrito la última: la primera acción de quien abre la

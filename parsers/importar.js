@@ -25,6 +25,55 @@
 // usuario (coords en grados, huso fuera de España, cierre que no cierra, X/Y
 // invertidas) produce DETECCIONES y `parcela=null`, NUNCA una excepción. Los
 // throw se reservan a errores de PROGRAMACIÓN (texto no-string, opts inválidas).
+//
+// ── F11 · EL REPARTO POR CAPAS, Y EL DEFECTO QUE DESTAPÓ ─────────────────────
+//
+// ⛔ Hasta F11 este módulo construía parcelas de superficie NEGATIVA en silencio.
+// MEDIDO el 2026-08-03: `importar(UTM.dxf)` devolvía **−390,45 m²** (la parcela
+// real mide 61,05) y el DXF de dos capas que escribe `export/dxf.js` devolvía
+// **−100,00 m²** (la real, 1.500,00); las dos veces con `bloqueos: []` y
+// `construida: true`. La causa está abajo, en el paso 5: `recintos[0]` es el
+// EXTERIOR y TODO lo demás HUECO. Esa regla vale cuando los anillos son una
+// figura con sus patios —el caso de LIST/TXT, para el que se escribió— y es
+// falsa en cuanto el DXF trae más de un dibujo: en `UTM.dxf` el anillo 0 es un
+// linde de 107,94 m² de la capa «PARCELA» y los otros 24 (cajetín, marco,
+// leyenda…) se le restan. Es la regla de oro 1 en su forma más pura: un error
+// que no avisa. F11 no podía cablear la entrada DXF sin arreglarlo.
+//
+// El arreglo NO adivina, porque el dato demuestra que adivinar falla: en
+// `UTM.dxf` la parcela de verdad está en la capa «0» y NO en la llamada
+// «PARCELA» (sus 11 vértices coinciden uno a uno con `PARCELA.txt`, la verdad
+// externa de F01). Elegir por el nombre habría fallado en el único plano real
+// que tenemos. Así que se hace lo que este módulo hace con todo lo demás
+// —ofrecer, no imponer— con DOS guardas y UNA oferta:
+//
+//   · `ANILLOS_EN_VARIAS_CAPAS` (bloqueo) — si los anillos vienen de más de una
+//     capa, no hay forma honrada de decir cuál es el exterior y cuáles los
+//     huecos. Se BLOQUEA nombrando el reparto entero, en vez de adivinar por
+//     posición.
+//   · `SUPERFICIE_NO_POSITIVA` (bloqueo) — la prueba, no la causa: si el
+//     exterior menos los huecos sale ≤ 0, eso no es una parcela, se llame como
+//     se llame. Hace falta ADEMÁS del anterior porque el reparto también se
+//     rompe DENTRO de una sola capa: en `UTM.dxf`, `opts.capa: 'PARCELA'` deja
+//     tres anillos disjuntos (107,94 − 65,70 − 71,31) y da **−29,06 m² medidos**.
+//   · `opts.capa` (la oferta) — el llamante elige una capa y se importa solo
+//     esa. Es el mismo patrón que `opts.intercambiarXY`, `opts.compensarCierre`
+//     y `opts.retirarCierre`: la detección OFRECE, `opts` APLICA. Con
+//     `opts.capa: '0'` sobre `UTM.dxf` salen los 61,05 m² buenos y `bloqueos: []`.
+//     Y es también la respuesta a la asimetría que dejó escrita F10: nuestro
+//     propio DXF vuelve con `PARCELA_OFICIAL` y `PARCELA_EDITADA` 1:1 con sus
+//     anillos, así que la geometría editada se recupera pidiendo su capa.
+//
+// ⚠️ Los dos bloqueos nuevos son DE PARCELA, no del dato: dicen que el reparto
+// «uno exterior + N huecos» no se sostiene, no que el fichero esté mal. Para la
+// rama EDIFICIO —donde cada anillo es su propio exterior— **no aplican**; ver el
+// catálogo `BLOQUEOS` más abajo, que lo declara uno a uno.
+//
+// ⚠️ El tipo de las detecciones de reparto es `SEPARADOR_POLIGONO`, que es el
+// único hueco del léxico CONGELADO de `parsers/_comun.js` que habla de cómo se
+// reparten los anillos en polígonos (allí, la palabra `separador` de LIST/TXT;
+// aquí, la capa del DXF). El nombre propio sería `REPARTO_POR_CAPAS`, pero
+// ampliar ese léxico no es de esta tarea: `parsers/_comun.js` no se toca en F11.
 
 import { parseLIST } from './list.js'
 import { parseTXT } from './txt.js'
@@ -57,6 +106,69 @@ const TOL_CIERRE_MISCLOSURE = 0.5
 const UMBRAL_SUPERFICIE = 0.01
 
 const FORMATOS = Object.freeze({ LIST: 'LIST', TXT: 'TXT', DXF: 'DXF' })
+
+/**
+ * Catálogo de motivos por los que `parcela` sale `null`. Existía disperso en
+ * literales; F11 lo reúne para que nadie lo escriba a mano y —sobre todo— para
+ * poder DECIR cuál es universal y cuál es de la rama parcela.
+ *
+ * Universales (valen igual para un edificio):
+ *   · `SIN_GEOMETRIA`         — no llegó ni un anillo.
+ *   · `COORDENADAS_EN_GRADOS` — algún anillo entero parece lat/lon, no UTM.
+ *   · `HUSO_NO_RESUELTO`      — el punto no cae en la España peninsular ni Baleares.
+ *
+ * ⚠️ SOLO DE PARCELA (F11): hablan del reparto «recintos[0] EXTERIOR y el resto
+ * HUECO», que es una regla de este módulo y NO del fichero. Un edificio no los
+ * hereda —para él cada anillo es su propio exterior—, así que quien reutilice
+ * este orquestador para otra rama tiene que FILTRARLOS, no arrastrarlos:
+ *   · `ANILLOS_EN_VARIAS_CAPAS` — los anillos vienen de más de una capa del DXF.
+ *   · `SUPERFICIE_NO_POSITIVA`  — exterior menos huecos da ≤ 0 m².
+ * El filtro es una línea, {@link BLOQUEOS_SOLO_PARCELA}, y hace falta: un DXF de
+ * edificio SIEMPRE trae varias capas (el fixture real son «Construccion» ⇢ 7 y
+ * «Parcela» ⇢ 1), así que arrastrarlos dejaría la rama de edificio bloqueada
+ * justo en su caso normal.
+ *
+ * @readonly
+ */
+export const BLOQUEOS = Object.freeze({
+  SIN_GEOMETRIA: 'SIN_GEOMETRIA',
+  COORDENADAS_EN_GRADOS: 'COORDENADAS_EN_GRADOS',
+  HUSO_NO_RESUELTO: 'HUSO_NO_RESUELTO',
+  ANILLOS_EN_VARIAS_CAPAS: 'ANILLOS_EN_VARIAS_CAPAS',
+  SUPERFICIE_NO_POSITIVA: 'SUPERFICIE_NO_POSITIVA',
+})
+
+/** Los dos bloqueos que hablan del reparto de parcela y NO del fichero. */
+export const BLOQUEOS_SOLO_PARCELA = Object.freeze([
+  BLOQUEOS.ANILLOS_EN_VARIAS_CAPAS,
+  BLOQUEOS.SUPERFICIE_NO_POSITIVA,
+])
+
+/**
+ * ⛔ **Y hay una segunda mitad, que se descubrió en producción y no en la suite.**
+ * Filtrar `resumen.bloqueos` no basta: **la detección que acompaña a un bloqueo de
+ * parcela se sigue LEYENDO**, y es la mitad que ve el usuario. El guion de humo 13
+ * (F11 · T5.2, 2026-08-04) midió la rama EDIFICIO diciendo a la vez «Cargadas 7
+ * partes… 62 vértices en total» y «El contorno menos los huecos da **−13,32 m²**…
+ * **No se construye la parcela**». Las dos frases eran ciertas por separado; juntas
+ * son una contradicción, y la suite estaba verde porque reenviar las detecciones
+ * «tal cual» era deliberado y estaba probado.
+ *
+ * Por eso esas detecciones llevan **`datos.bloqueo`** con el código al que
+ * acompañan, y quien filtre los bloqueos filtra también las detecciones con la
+ * MISMA lista. No se filtra por `tipo` —`SEPARADOR_POLIGONO` lo comparte con el
+ * mensaje del reparto por capas, que sí le sirve al edificio— ni por texto, que es
+ * lo único de una detección que se puede reescribir sin avisar.
+ *
+ * @param {ReadonlyArray<object>} detecciones
+ * @returns {Array<object>}  Las que NO hablan del reparto de parcela.
+ */
+export function sinDeteccionesDeParcela(detecciones) {
+  return detecciones.filter((d) => {
+    const bloqueo = d?.datos?.bloqueo
+    return bloqueo === undefined || !BLOQUEOS_SOLO_PARCELA.includes(bloqueo)
+  })
+}
 
 // ── Autodetección de formato ──────────────────────────────────────────────────
 
@@ -331,6 +443,84 @@ function resolverHuso(anilloExterior, opts, detecciones) {
   return huso
 }
 
+// ── Reparto por capas (solo DXF: es el único formato que trae código 8) ───────
+//
+// Cuenta cuántos anillos aporta cada capa, aplica `opts.capa` si el llamante ha
+// elegido una, y deja constancia del reparto ENTERO (regla 1: el usuario tiene
+// que poder ver las 5 capas de su plano aunque solo importemos una).
+
+/** Reparto {capa: nºAnillos}, ordenado de más a menos anillos (empates: orden
+ *  de aparición). Es el orden en que la interfaz debe ofrecerlo: primero el
+ *  grupo grande, que es el que suele ser mobiliario de dibujo o el bueno. */
+function contarCapas(capas) {
+  const m = new Map()
+  for (const c of capas) m.set(c, (m.get(c) || 0) + 1)
+  return [...m.entries()].sort((a, b) => b[1] - a[1])
+}
+
+/** «"FINO" ⇢ 16, "LINDE" ⇢ 4, …» — con el nombre entrecomillado porque una capa
+ *  puede llamarse «0» y «0 1» no se lee. */
+function textoReparto(pares) {
+  return pares.map(([nombre, n]) => `«${nombre}» ⇢ ${n}`).join(', ')
+}
+
+/**
+ * Aplica el reparto por capas: emite la detección-resumen y, si `opts.capa` pide
+ * una, filtra los anillos a esa capa. Devuelve el subconjunto a importar.
+ *
+ * @param {number[][][]} anillos  Anillos crudos del parser.
+ * @param {string[]} capas        `capas[i]` es la capa de `anillos[i]`.
+ * @param {string|undefined} capaElegida
+ * @param {import('./_comun.js').Deteccion[]} detecciones  Se le empuja la detección.
+ * @returns {{ anillos: number[][][], capas: string[], nCapas: number }}
+ */
+function resolverCapas(anillos, capas, capaElegida, detecciones) {
+  const pares = contarCapas(capas)
+  const nCapas = pares.length
+  const reparto = Object.fromEntries(pares)
+  const cabecera =
+    `${anillos.length} polilínea(s) en ${nCapas} capa(s): ${textoReparto(pares)}.`
+
+  // (a) El llamante ha elegido capa: se filtra y se dice qué se ha dejado fuera.
+  if (capaElegida !== undefined) {
+    const indices = capas.map((c, i) => [c, i]).filter(([c]) => c === capaElegida)
+    const existe = indices.length > 0
+    detecciones.push(
+      crearDeteccion(
+        TIPO_DETECCION.SEPARADOR_POLIGONO,
+        existe
+          ? `${cabecera} Se importa SOLO la capa «${capaElegida}» (${indices.length} anillo(s)); ` +
+            `el resto queda fuera a petición del llamante.`
+          : `${cabecera} La capa pedida, «${capaElegida}», NO existe en el fichero: ` +
+            `no se importa ningún anillo. Elige una de las de arriba.`,
+        existe ? SEVERIDAD.INFO : SEVERIDAD.AVISO,
+        { capas: reparto, nCapas, nAnillos: anillos.length, aplicado: 'FILTRADO', capaElegida, existe },
+      ),
+    )
+    return {
+      anillos: indices.map(([, i]) => anillos[i]),
+      capas: indices.map(([c]) => c),
+      nCapas: existe ? 1 : 0,
+    }
+  }
+
+  // (b) Sin elección: una sola capa es el camino feliz; varias, una decisión que
+  //     NO nos toca tomar (bloquea abajo, en el paso 7).
+  detecciones.push(
+    crearDeteccion(
+      TIPO_DETECCION.SEPARADOR_POLIGONO,
+      nCapas > 1
+        ? `${cabecera} Con los anillos repartidos en varias capas NO se puede decir cuál es el ` +
+          `contorno y cuáles los huecos: no se adivina por posición. Elige la capa a importar ` +
+          `(opts.capa). Aplicado: NINGUNO.`
+        : cabecera,
+      nCapas > 1 ? SEVERIDAD.AVISO : SEVERIDAD.INFO,
+      { capas: reparto, nCapas, nAnillos: anillos.length, aplicado: 'NINGUNO', capaElegida: null },
+    ),
+  )
+  return { anillos, capas, nCapas }
+}
+
 // ── Cotejo de superficie (valor añadido; solo LIST con meta.areaReportada) ────
 function cotejarSuperficie(recintos, areaReportada, umbral) {
   const calculada = superficie(recintos)
@@ -367,10 +557,15 @@ function contarDetecciones(detecciones) {
  * @property {string} origen                 ORIGEN_PARCELA del parser.
  * @property {number} nAnillos               Nº de anillos importados.
  * @property {number[]} nVertices            Nº de vértices por anillo (ya abiertos).
+ * @property {string[]} capas                Capa de cada anillo, 1:1 con `nVertices`
+ *   y con `anillos`. LITERAL (F11). Solo el DXF trae capas: en LIST y TXT todas
+ *   son `''`, porque esos formatos no tienen el concepto y NO se inventa.
  * @property {{zona:number,srs:string,lon:number,lat:number,ambiguo:boolean}|null} huso
  *   Punto de caída (dónde cae la parcela) del huso deducido; null si no se resolvió.
  * @property {object|null} superficie        Cotejo calculada vs reportada (solo LIST con meta).
- * @property {string[]} bloqueos             Motivos por los que `parcela` es null (vacío si se construyó).
+ * @property {string[]} bloqueos             Motivos por los que `parcela` es null (vacío si se
+ *   construyó). Valores de {@link BLOQUEOS}; ⚠️ los de {@link BLOQUEOS_SOLO_PARCELA} hablan del
+ *   reparto exterior/huecos de ESTE módulo y no del fichero (ver la cabecera).
  * @property {boolean} construida            true si se construyó la parcela.
  * @property {{total:number,porTipo:object,porSeveridad:object}} detecciones  Recuentos.
  */
@@ -394,10 +589,15 @@ function contarDetecciones(detecciones) {
  * @param {','|'.'} [opts.separadorDecimal]  Reenviado a los parsers LIST/TXT.
  * @param {string} [opts.palabraSeparador]  Reenviado a los parsers LIST/TXT.
  * @param {number} [opts.flechaMax]  Reenviado al parser DXF (discretización de arcos).
- * @returns {{ parcela: object|null, anillos: number[][][],
+ * @param {string} [opts.capa]  (F11) Importar SOLO los anillos de esta capa del DXF, con su
+ *   nombre LITERAL. Es la oferta que resuelve `ANILLOS_EN_VARIAS_CAPAS`. Si la capa no existe
+ *   en el fichero NO se lanza: se avisa nombrándola, no entra ningún anillo y el bloqueo pasa a
+ *   ser `SIN_GEOMETRIA` — elegir mal una capa es una decisión sobre el dato, no un fallo del programa.
+ * @returns {{ parcela: object|null, anillos: number[][][], capas: string[],
  *   detecciones: import('./_comun.js').Deteccion[], resumen: ResumenImportacion }}
+ *   `capas[i]` es la capa de `anillos[i]` (F11); ver `ResumenImportacion.capas`.
  * @throws {TypeError}   Si `texto` no es un string (error de programación).
- * @throws {RangeError}  Si `opts.formato` u `opts.huso` son inválidos (error de programación).
+ * @throws {RangeError}  Si `opts.formato`, `opts.huso` u `opts.capa` son inválidos (error de programación).
  */
 export function importar(texto, opts = {}) {
   if (typeof texto !== 'string') {
@@ -414,6 +614,13 @@ export function importar(texto, opts = {}) {
       // nunca se escriben a mano: el mensaje no puede desincronizarse de la
       // comprobación el día que entre Canarias. Igual que `geo/huso.js:142-143`.
       `importar: 'opts.huso' inválido: ${JSON.stringify(opts.huso)}. Válidos: ${HUSOS_VALIDOS.join(', ')} (Canarias diferido).`,
+    )
+  }
+  if (opts.capa !== undefined && typeof opts.capa !== 'string') {
+    // El TIPO es contrato del programador (RangeError, como los de arriba); que la
+    // capa EXISTA o no en el fichero es dato del usuario y se resuelve con detecciones.
+    throw new RangeError(
+      `importar: 'opts.capa' debe ser el nombre literal de una capa (string); recibido ${typeof opts.capa}.`,
     )
   }
 
@@ -434,10 +641,22 @@ export function importar(texto, opts = {}) {
   // 2) Arrastramos las detecciones del parser al informe final.
   const detecciones = [...res.detecciones]
 
+  // 2bis) Reparto por capas (F11). Solo el DXF trae capas; LIST y TXT no tienen
+  //   el concepto, así que se rellena con '' para que `capas` sea SIEMPRE un
+  //   array 1:1 con `anillos` —quien lo recorra no se encuentra un `undefined`—
+  //   y para que «más de una capa» sea trivialmente falso ahí.
+  const traeCapas = Array.isArray(res.capas)
+  const capasCrudas = traeCapas ? res.capas : res.anillos.map(() => '')
+  const reparto =
+    traeCapas && res.anillos.length > 0
+      ? resolverCapas(res.anillos, capasCrudas, opts.capa, detecciones)
+      : { anillos: res.anillos, capas: capasCrudas, nCapas: capasCrudas.length > 0 ? 1 : 0 }
+
   // 3) Detectores defensivos por anillo: cierre → saneo (swap/grados).
   const anillos = []
+  const capas = [...reparto.capas]
   let gradosCualquiera = false
-  res.anillos.forEach((anilloCrudo) => {
+  reparto.anillos.forEach((anilloCrudo) => {
     const esGrados = pareceGrados(anilloCrudo)
     const abierto = resolverCierre(anilloCrudo, esGrados, optsInternas, detecciones)
     const { anillo, gradosAll } = resolverSaneo(abierto, optsInternas, detecciones)
@@ -467,12 +686,62 @@ export function importar(texto, opts = {}) {
     cotejo = cotejarSuperficie(recintos, res.meta.areaReportada, umbral)
   }
 
+  // 6bis) La superficie del reparto (F11). Es la PRUEBA de que «uno exterior y
+  //   el resto huecos» se sostiene: si sale ≤ 0, no es una parcela y no se
+  //   construye. No es lo mismo que el cotejo de arriba, que compara contra el
+  //   Área que reporta la LISTA de AutoCAD y solo existe en el formato LIST.
+  const superficieReparto = recintos && recintos.length > 0 ? superficie(recintos) : null
+  if (superficieReparto !== null && superficieReparto <= 0) {
+    detecciones.push(
+      crearDeteccion(
+        TIPO_DETECCION.SEPARADOR_POLIGONO,
+        `El contorno menos los huecos da ${superficieReparto.toFixed(2)} m² con ${recintos.length} ` +
+          `anillo(s): el reparto «el primero es el contorno y los demás son huecos» NO se sostiene. ` +
+          `No se construye la parcela; revisa qué anillos del fichero son de verdad la parcela.`,
+        SEVERIDAD.AVISO,
+        // ⛔ `bloqueo` NO es decoración: es lo que permite FILTRAR esta detección
+        // desde fuera sin mirar su texto ni su tipo. Añadido el 2026-08-04, después
+        // de que el guion de humo 13 destapara que la rama EDIFICIO enseñaba a la
+        // vez «Cargadas 7 partes, 62 vértices» y «da −13,32 m²… No se construye la
+        // parcela» — las dos ciertas, y juntas una contradicción.
+        //
+        // El bloqueo gemelo ya se filtraba con `BLOQUEOS_SOLO_PARCELA` (ver su
+        // JSDoc); lo que no se podía filtrar era **la mitad que el usuario LEE**.
+        // Filtrarla por `tipo` no vale: `SEPARADOR_POLIGONO` lo comparte con el
+        // mensaje del reparto por capas, que sí le sirve al edificio. Y filtrarla
+        // por texto sería atarse a la única cosa que se puede reescribir.
+        //
+        // ⚠️ Quien añada aquí otra detección que solo tenga sentido para PARCELA
+        // tiene que ponerle su `datos.bloqueo`, o volverá a salir en la otra rama.
+        // Hay un test que exige que toda detección con `datos.bloqueo` nombre un
+        // código de `BLOQUEOS_SOLO_PARCELA`.
+        {
+          superficie: superficieReparto,
+          nRecintos: recintos.length,
+          bloqueo: BLOQUEOS.SUPERFICIE_NO_POSITIVA,
+        },
+      ),
+    )
+  }
+
   // 7) Bloqueos → parcela o null (SIEMPRE con informe, nunca excepción por dato malo).
+  //    ⚠️ Los códigos se escriben LITERALES y no `BLOQUEOS.X`, a propósito: hay
+  //    guardas estáticos que buscan `bloqueos.push('CÓDIGO')` en el texto de este
+  //    fichero para que un renombrado aquí caiga en su test y no en producción
+  //    (`test/edificio/comun.test.js`, misma fórmula que el grep de proj4 de
+  //    `test/contrato.test.js`). La coherencia con el catálogo la ata un test
+  //    propio en `test/parsers/importar.test.js`, así que no puede desincronizarse.
   const bloqueos = []
   if (anillos.length === 0) bloqueos.push('SIN_GEOMETRIA')
   else {
     if (gradosCualquiera) bloqueos.push('COORDENADAS_EN_GRADOS')
     if (huso === null) bloqueos.push('HUSO_NO_RESUELTO')
+    // Los dos de F11 van AL FINAL, detrás de los tres de F01, para que un
+    // `bloqueos[0]` de F01 siga significando lo mismo que significaba.
+    if (reparto.nCapas > 1) bloqueos.push('ANILLOS_EN_VARIAS_CAPAS')
+    if (superficieReparto !== null && superficieReparto <= 0) {
+      bloqueos.push('SUPERFICIE_NO_POSITIVA')
+    }
   }
   const parcela =
     bloqueos.length === 0 && recintos
@@ -486,6 +755,7 @@ export function importar(texto, opts = {}) {
     origen: res.origen,
     nAnillos: anillos.length,
     nVertices: anillos.map((r) => r.length),
+    capas,
     huso: huso ? { zona: huso.zona, srs: huso.srs, lon: huso.lon, lat: huso.lat, ambiguo: huso.ambiguo } : null,
     superficie: cotejo,
     bloqueos,
@@ -493,7 +763,7 @@ export function importar(texto, opts = {}) {
     detecciones: contarDetecciones(detecciones),
   }
 
-  return { parcela, anillos, detecciones, resumen }
+  return { parcela, anillos, capas, detecciones, resumen }
 }
 
 export default importar

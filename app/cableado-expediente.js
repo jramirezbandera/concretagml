@@ -76,6 +76,50 @@
 // ({@link MENSAJE_AUTOGUARDADO_EN_ESPERA}) en lugar de escribir en silencio. En
 // cuanto el usuario recupera o descarta, se arma y ya no vuelve a pararse.
 //
+// ── ⛔ F11 · LA SEGUNDA RAMA, Y POR QUÉ ESTE MÓDULO TENÍA QUE ENTERARSE ─────
+// F11 le añade a la aplicación una rama EDIFICIO que **sustituye** al panel de
+// parcela (`app/rama.js`). Este módulo es el sitio donde esa novedad podía romper
+// F10 **sin hacer ruido**, y por eso la rama entra aquí como dependencia:
+//
+//  · **`expedienteActual()` PREGUNTA POR LA RAMA.** Hasta F11 construía siempre
+//    `{srs, parcela}`. Con la rama EDIFICIO activa eso tenía dos desenlaces y los
+//    dos eran malos: guardar el expediente **de la parcela** mientras en pantalla
+//    hay un edificio —documento equivocado, en silencio, regla de oro 1 rota— o
+//    pasarle las dos ramas a `crearExpediente`, que **lanza** (`model/parcela.js`
+//    impone la exclusividad) dentro de un `click`. Ahora deriva la rama que toca,
+//    y **nunca las dos**.
+//  · **La parcela que hubiera en pantalla viaja como `edificio.parcelaContexto`**
+//    —un array de recintos, que es literalmente lo que el modelo previó— y jamás
+//    como rama `parcela` del expediente. Es la desviación 9 del plan de F11.
+//  · ⛔ **F11 NO guarda expedientes de edificio en este navegador, y lo DICE.**
+//    {@link idLocalAbierto} deriva la identidad del documento de `parcela.idLocal`
+//    y **un `Edificio` no tiene `idLocal`**: `crearEdificio` devuelve `refcat`,
+//    `modelo`, `partes`, `parcelaContexto` y `construccionOficial`, y nada más.
+//    Inventarle identidad obliga a tocar `model/edificio.js`, que la desviación 2
+//    del plan prohíbe. Así que «Guardar» se apaga **con el motivo escrito al lado**
+//    ({@link MOTIVO_GUARDAR_EN_EDIFICIO}): botón apagado con motivo, jamás botón
+//    muerto. **Deuda anotada para F12.**
+//  · **Y el autoguardado tampoco se extiende** (desviación 7). Es suscriptor del
+//    store de PARCELA; suscribirlo también al de edificio sin resolver lo anterior
+//    haría que el borrador de edificio **pisara el de parcela**, porque el borrador
+//    es un registro único de clave reservada (ver «La espera del autoguardado»).
+//    Con la rama EDIFICIO activa **no se dispara**, y lo que hubiera cambiado se
+//    vuelca al volver a PARCELA, igual que se vuelca al acabarse la oferta.
+//    ⚠️ El renglón que se lo cuenta al usuario lo pone el panel de edificio
+//    (`app/cableado-edificio.js`): **aquí no se duplica**.
+//  · **Lo que SÍ se puede hacer con un edificio es llevárselo en un `.json`**, y no
+//    es una concesión: siendo el único sitio donde se conserva, el fichero de
+//    proyecto pasa de ser la puerta de la caja fuerte a ser la caja entera. Por eso
+//    {@link cablearExpediente}`#abrirProyecto` **conmuta la rama** al abrir uno.
+//  · **Las otras dos exportaciones NO se conmutan**: el DXF y el listado de
+//    coordenadas son de la PARCELA (`serializarParcelaDxf` habla de recintos, no de
+//    partes). Con la rama EDIFICIO se apagan diciéndolo, en vez de bajar un fichero
+//    de la parcela que hay debajo mientras el usuario está mirando un edificio.
+//
+// ⚠️ Los dos parámetros nuevos son **opcionales y nacen en `null`**: sin ellos este
+// cableado se comporta EXACTAMENTE como en F10, que es lo que permite que las 60
+// pruebas de aquella fase sigan valiendo sin tocarles una línea.
+//
 // ── LO QUE ESTE MÓDULO NO HACE ─────────────────────────────────────────────
 //   · **No fabrica marcado de la cáscara.** El `<dialog>` lo fabrica
 //     `app/dialogo-expediente.js`; de `index.html` solo se coge el botón
@@ -92,7 +136,7 @@
 //
 // Su test es `test/app/expediente.dom.test.js`, con sufijo `.dom`: toca el DOM.
 
-import { crearExpediente } from '../model/parcela.js'
+import { TIPO_EXPEDIENTE, crearExpediente } from '../model/parcela.js'
 import { SEVERIDAD } from '../export/_comun.js'
 import { serializarCoordenadasTxt } from '../export/coordenadas.js'
 import { serializarParcelaDxf } from '../export/dxf.js'
@@ -111,6 +155,7 @@ import { AVISO_SIN_PERSISTENCIA } from '../storage/cuota.js'
 import { NIVEL } from '../viewer/_comun.js'
 import { describirEdad } from './cableado-catastro.js'
 import { ACCION, crearDialogoExpediente, motivoOtroHuso } from './dialogo-expediente.js'
+import { RAMA } from './rama.js'
 
 // ── El contrato con `index.html` ─────────────────────────────────────────────
 
@@ -271,10 +316,65 @@ export const MENSAJE_AUTOGUARDADO_EN_ESPERA =
 export const MENSAJE_SIN_PARCELA =
   'No hay ninguna parcela en pantalla: no hay nada que guardar ni que exportar.'
 
-/** Cuando el expediente guardado no lleva parcela (un expediente de edificio, F11). */
+/** Cuando el expediente guardado dice ser de PARCELA y no trae ninguna geometría. */
 export const MENSAJE_GUARDADO_SIN_PARCELA =
   'Ese expediente guardado no lleva ninguna parcela, así que no hay geometría que abrir en el ' +
   'visor. No se ha borrado nada.'
+
+// ── F11 · lo que la rama EDIFICIO cambia, dicho ──────────────────────────────
+
+/**
+ * Por qué «Guardar» está apagado con la rama EDIFICIO activa. **Desviación 6 del
+ * plan de F11**, y la regla de la casa: botón apagado **con motivo**, jamás botón
+ * muerto.
+ *
+ * Dice las tres cosas que hacen falta —qué no se puede, por qué, y qué hacer en su
+ * lugar—, y la tercera no es un consuelo: el fichero de proyecto **sí** guarda un
+ * expediente de edificio entero, y esta misma pantalla lo vuelve a abrir.
+ *
+ * Se exporta para que su prueba lo afirme sin copiar el literal, igual que
+ * `MOTIVO_GENERAR_GML_EN_EDIFICIO` en `app/rama.js`.
+ */
+export const MOTIVO_GUARDAR_EN_EDIFICIO =
+  '«Guardar» está apagado mientras estás en la rama Edificio: esta versión todavía no sabe ' +
+  'archivar un edificio en el almacén de este navegador, porque un edificio no tiene aún el ' +
+  'identificador con el que se distinguen los expedientes guardados. Usa «Guardar proyecto ' +
+  '(.json)»: ese fichero se lleva el edificio entero y se vuelve a abrir aquí.'
+
+/**
+ * Por qué el DXF y el listado de coordenadas no bajan con la rama EDIFICIO activa.
+ *
+ * Los dos escritores son de PARCELA —`serializarParcelaDxf` y
+ * `serializarCoordenadasTxt` hablan de recintos, y el nombre del fichero saldría con
+ * la referencia catastral de la parcela—, así que dejarlos correr entregaría **el
+ * documento de la otra rama, en silencio**, que es exactamente lo que F11 no puede
+ * publicar (regla de oro 1).
+ */
+export const MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO =
+  'El DXF y el listado de coordenadas son de la parcela, y ahora mismo estás en la rama Edificio: ' +
+  'no se ha descargado nada para no entregarte el dibujo de otra cosa. Vuelve a la rama Parcela ' +
+  'para exportarlos, o usa «Guardar proyecto (.json)», que sí se lleva el edificio.'
+
+/** Cuando se pide exportar el proyecto y el store de edificio está vacío. */
+export const MENSAJE_SIN_EDIFICIO =
+  'No hay ningún edificio en pantalla: no hay nada que exportar. Carga uno desde un fichero o ' +
+  'desde el Catastro, en la rama Edificio.'
+
+/**
+ * Cuando llega un `.json` con un expediente de EDIFICIO y esta pantalla no tiene
+ * cableada la rama de edificio. Es un fallo de montaje de la aplicación, pero el
+ * usuario ve un fichero que no se abre: se cuenta por los dos canales y no se toca
+ * nada de lo que hubiera en pantalla.
+ */
+export const MENSAJE_SIN_RAMA_EDIFICIO =
+  'Ese fichero de proyecto lleva un edificio, y en esta pantalla no está montada la rama Edificio, ' +
+  'así que no hay dónde abrirlo. No se ha cambiado nada de lo que tenías. Si esto pasa siempre, es ' +
+  'un fallo de montaje de la aplicación.'
+
+/** Cuando el `.json` dice ser de EDIFICIO y no trae edificio dentro. */
+export const MENSAJE_GUARDADO_SIN_EDIFICIO =
+  'Ese fichero de proyecto dice llevar un edificio, pero no trae ninguno dentro, así que no hay ' +
+  'nada que abrir. No se ha cambiado nada de lo que tenías.'
 
 /** Cuando se choca con la cuota y no hay caché que purgar. */
 export const MENSAJE_SIN_PURGA =
@@ -346,6 +446,33 @@ function esCuota(c) {
   return !!c && typeof c === 'object' && typeof c.pedirPersistencia === 'function'
 }
 
+/**
+ * ¿Sirve como conmutador de rama? Las tres de {@link esStore} —`app/rama.js` es por
+ * dentro un `crearEstadoVista`— y nada más: `destruir` es de quien lo cableó, no de
+ * este módulo, y pedirlo obligaría a los dobles de prueba a fingirlo.
+ */
+const esRama = esStore
+
+/**
+ * ¿Hay un Edificio en el store de la otra rama? **La misma vara que usa
+ * `crearExpediente`** para su chequeo estructural (`model/parcela.js`): un objeto con
+ * `partes[]` y `modelo` de texto. Ni más —validar el dominio es de `model/edificio.js`,
+ * que F11 no toca— ni menos.
+ *
+ * ⚠️ Un edificio con CERO partes cuenta como edificio, y es a propósito: una parcela
+ * del Catastro sin construcción devuelve exactamente eso, y es **el punto de partida
+ * de la obra nueva**, no un vacío. Lo que no cuenta es `null`, que es como nace el
+ * store.
+ */
+function hayEdificio(edificio) {
+  return (
+    !!edificio &&
+    typeof edificio === 'object' &&
+    Array.isArray(edificio.partes) &&
+    typeof edificio.modelo === 'string'
+  )
+}
+
 /** ¿Hay geometría que guardar? Un exterior con al menos un vértice. */
 function hayGeometria(parcela) {
   return (
@@ -414,6 +541,14 @@ function nodoDe(doc, selector) {
  * @param {{purgarCaducados: Function}|null} [opciones.cache=null]  La caché del
  *   Catastro, **solo para purgarla** cuando se agote la cuota (criterio 4). `null` ⇒
  *   no hay nada que liberar automáticamente, y se DICE ({@link MENSAJE_SIN_PURGA}).
+ * @param {{get: Function, set: Function, subscribe: Function}|null} [opciones.rama=null]
+ *   El conmutador de rama de `app/rama.js`, **ya cableado**. `null` ⇒ esta pantalla
+ *   solo tiene la rama de parcela y todo se comporta como en F10, que es el montaje de
+ *   cualquier test de aquella fase. Ver el apartado «F11 · la segunda rama» de la
+ *   cabecera: de aquí sale la respuesta a «¿qué documento hay en pantalla?».
+ * @param {import('../viewer/_comun.js').EstadoVista|null} [opciones.estadoEdificio=null]
+ *   El SEGUNDO store, el de la rama EDIFICIO. Nace en `null` y lo llena
+ *   `app/cableado-edificio.js`. `null` ⇒ no hay rama de edificio montada.
  * @param {((parcela: object) => void)|null} [opciones.alCargarParcela=null]  Se llama
  *   DESPUÉS del `estado.set`, con el POJO que ha entrado. El MISMO gancho que reciben
  *   `cablearCatastro` y `cablearComprobacion`, y por lo mismo: recuperar un expediente
@@ -452,6 +587,8 @@ export function cablearExpediente({
   expedientes,
   cuota,
   cache = null,
+  rama = null,
+  estadoEdificio = null,
   alCargarParcela = null,
   elegirFichero = null,
   documento = globalThis.document,
@@ -491,6 +628,19 @@ export function cablearExpediente({
     throw new TypeError(
       `cablearExpediente: 'cache' debe ser la caché del Catastro (con purgarCaducados) o null si ` +
         `no hay ninguna que purgar; recibido ${typeof cache}.`,
+    )
+  }
+  if (rama !== null && !esRama(rama)) {
+    throw new TypeError(
+      `cablearExpediente: 'rama' debe ser el conmutador de app/rama.js#cablearRama ` +
+        `({get, set, subscribe}) o null si esta pantalla solo tiene la rama de parcela; recibido ` +
+        `${typeof rama}.`,
+    )
+  }
+  if (estadoEdificio !== null && !esStore(estadoEdificio)) {
+    throw new TypeError(
+      `cablearExpediente: 'estadoEdificio' debe ser el store de la rama EDIFICIO ` +
+        `({get, set, subscribe}) o null si no hay ninguna montada; recibido ${typeof estadoEdificio}.`,
     )
   }
   if (alCargarParcela !== null && typeof alCargarParcela !== 'function') {
@@ -612,13 +762,47 @@ export function cablearExpediente({
     return describirEdad(ahora().getTime() - t)
   }
 
-  // ── El Expediente, derivado del store ─────────────────────────────────────
+  // ── La rama activa (F11) ──────────────────────────────────────────────────
+
+  /**
+   * Qué rama está activa. **Sin conmutador cableado la respuesta es PARCELA**, que es
+   * lo que hace que este módulo se comporte exactamente como en F10 cuando nadie le
+   * pasa `rama`: no hay estado «sin rama» ni hay que preguntarlo en veinte sitios.
+   *
+   * @returns {'PARCELA'|'EDIFICIO'}
+   */
+  const ramaActual = () => (rama === null ? RAMA.PARCELA : rama.get())
+
+  /** Atajo de lectura: `ramaActual() === RAMA.EDIFICIO`. */
+  const enEdificio = () => ramaActual() === RAMA.EDIFICIO
+
+  /** El Edificio del segundo store, o `null`. */
+  const edificioActual = () => (estadoEdificio === null ? null : estadoEdificio.get())
+
+  /**
+   * Lleva la pantalla a una rama, si hace falta y si hay conmutador. Se llama al ABRIR
+   * un documento: recuperar una parcela con la rama EDIFICIO puesta dejaría la
+   * geometría en un store que nadie está mirando.
+   *
+   * @param {'PARCELA'|'EDIFICIO'} destino
+   */
+  function irARama(destino) {
+    if (rama === null || rama.get() === destino) return
+    rama.set(destino)
+  }
+
+  // ── El Expediente, derivado del store de la rama activa ───────────────────
 
   /**
    * El Expediente que corresponde a lo que hay ahora mismo en pantalla, o `null` si
-   * no hay geometría. **Se deriva en cada llamada y no se guarda**: la fuente de
-   * verdad de la geometría es el store, y una segunda copia viva sería la forma más
-   * segura de que las dos discreparan.
+   * no hay nada que expedientar. **Se deriva en cada llamada y no se guarda**: la
+   * fuente de verdad de la geometría es el store, y una segunda copia viva sería la
+   * forma más segura de que las dos discreparan.
+   *
+   * ⛔ **PREGUNTA POR LA RAMA, y ésta es la costura donde F11 podía romper F10 sin
+   * hacer ruido** (ver la cabecera). Devuelve **una** rama y nunca las dos:
+   * `crearExpediente` impone la exclusividad y lanzaría —dentro de un `click`— si se
+   * le pasaran juntas.
    *
    * `metadatos` NO se deja en su defecto: `crearExpediente` estampa «ahora» en
    * `creado` y en `modificado` cuando no se le dan, así que un expediente derivado
@@ -629,28 +813,65 @@ export function cablearExpediente({
    *   una parcela rota. Es un contrato roto, y quien llama lo cuenta.
    */
   function expedienteActual() {
+    const metadatos = {
+      creado: identidad.creado,
+      modificado: identidad.modificado,
+      // El autor NO lo sabe esta aplicación: el pie de firma es de F09, se guarda
+      // aparte y se borra aparte, y está en la lista de lo que este almacén NO
+      // guarda. Inventarlo aquí sería atribuirle un trabajo a alguien.
+      autor: '',
+      // Vacío A PROPÓSITO. Ver el apartado de la cabecera: el identificador del
+      // informe lleva dentro su instante de emisión, y uno guardado aquí
+      // sobreviviría a `duplicar` apuntando al registro original.
+      idDocumento: '',
+    }
+    if (enEdificio()) {
+      const edificio = edificioActual()
+      if (!hayEdificio(edificio)) return null
+      return crearExpediente({
+        tipo: TIPO_EXPEDIENTE.EDIFICIO,
+        srs,
+        edificio: conParcelaDeContexto(edificio),
+        metadatos,
+      })
+    }
     const parcela = estado.get()
     if (!hayGeometria(parcela)) return null
-    return crearExpediente({
-      srs,
-      parcela,
-      metadatos: {
-        creado: identidad.creado,
-        modificado: identidad.modificado,
-        // El autor NO lo sabe esta aplicación: el pie de firma es de F09, se guarda
-        // aparte y se borra aparte, y está en la lista de lo que este almacén NO
-        // guarda. Inventarlo aquí sería atribuirle un trabajo a alguien.
-        autor: '',
-        // Vacío A PROPÓSITO. Ver el apartado de la cabecera: el identificador del
-        // informe lleva dentro su instante de emisión, y uno guardado aquí
-        // sobreviviría a `duplicar` apuntando al registro original.
-        idDocumento: '',
-      },
-    })
+    return crearExpediente({ srs, parcela, metadatos })
   }
 
-  /** La referencia catastral de lo que hay en pantalla, o `null`. */
-  const refcatActual = () => estado.get()?.refcat ?? null
+  /**
+   * El edificio, con la parcela que hubiera en pantalla metida como CONTEXTO.
+   *
+   * ⛔ **Desviación 9 del plan de F11, y es la que evita el fallo caro**: la parcela
+   * que se ve debajo del edificio no puede viajar como rama `parcela` del expediente
+   * —ni el modelo la admitiría junto al edificio, ni sería verdad: el documento es el
+   * edificio—, pero tirarla tampoco vale. `model/edificio.js` previó exactamente este
+   * sitio: `parcelaContexto` es un array de recintos.
+   *
+   * **No pisa lo que ya hubiera.** Si el edificio viene del WFS con su parcela de
+   * contexto, esa es la buena: la que se dibuja debajo puede estar editada a mano.
+   *
+   * No muta el POJO del store (regla de oro 4): devuelve uno nuevo, y `crearExpediente`
+   * hace además su propia copia profunda.
+   *
+   * @param {object} edificio
+   * @returns {object}
+   */
+  function conParcelaDeContexto(edificio) {
+    if (edificio.parcelaContexto != null) return edificio
+    const parcela = estado.get()
+    if (!hayGeometria(parcela)) return edificio
+    return { ...edificio, parcelaContexto: parcela.recintos }
+  }
+
+  /**
+   * La referencia catastral de lo que hay en pantalla, o `null`. **De la rama activa**:
+   * de ella sale el nombre de los ficheros que bajan, y estampar la RC de la parcela en
+   * un fichero de edificio sería etiquetar mal un documento.
+   */
+  const refcatActual = () =>
+    (enEdificio() ? edificioActual()?.refcat : estado.get()?.refcat) ?? null
 
   // ── Carga de una parcela en el store ──────────────────────────────────────
 
@@ -660,14 +881,40 @@ export function cablearExpediente({
    * propio suscriptor se despertaría con la identidad vieja y tomaría esta carga por
    * la llegada de un documento ajeno.
    *
+   * ⚠️ **Y la rama se conmuta ANTES del `set`, por lo mismo** (F11): abrir una parcela
+   * con la rama EDIFICIO puesta la metería en un store que nadie está mirando, y el
+   * usuario vería su fichero «abrirse» sin que cambiara nada en pantalla. Conmutar
+   * después tampoco valdría: nuestro propio suscriptor —y los otros diez— se
+   * despertarían con la rama equivocada.
+   *
    * @param {object} parcela
    * @param {{id: string|null, nombre: string|null, creado: string, modificado: string}} nuevaIdentidad
    */
   function cargar(parcela, nuevaIdentidad) {
     identidad = nuevaIdentidad
     idLocalAbierto = parcela?.idLocal ?? null
+    irARama(RAMA.PARCELA)
     estado.set(parcela)
     if (alCargarParcela !== null) alCargarParcela(parcela)
+  }
+
+  /**
+   * Lo mismo con un EDIFICIO: conmuta a su rama y lo escribe en el SEGUNDO store.
+   * Nunca en el de parcela — meter un edificio en el store de la parcela es
+   * exactamente el fallo que la tarea T3.3 existe para no cometer.
+   *
+   * No hay `alCargarParcela` que llamar (ese gancho reinicia el historial de edición
+   * de la parcela, y aquí no ha entrado ninguna) ni `idLocalAbierto` que mover: un
+   * `Edificio` no tiene `idLocal`, que es justo la razón por la que no se puede
+   * guardar en el almacén ({@link MOTIVO_GUARDAR_EN_EDIFICIO}).
+   *
+   * @param {object} edificio
+   * @param {{id: string|null, nombre: string|null, creado: string, modificado: string}} nuevaIdentidad
+   */
+  function cargarEdificio(edificio, nuevaIdentidad) {
+    identidad = nuevaIdentidad
+    irARama(RAMA.EDIFICIO)
+    estadoEdificio.set(edificio)
   }
 
   // ── El autoguardado ───────────────────────────────────────────────────────
@@ -729,10 +976,24 @@ export function cablearExpediente({
       registros: listado.registros.map((r) => ({ ...r, edad: edadDe(r.actualizado) })),
       borrador: ofrecido,
       srsActual: srs,
-      puedeGuardar: hayGeometria(estado.get()),
+      puedeGuardar: puedeGuardarse(),
       ...(nombre === undefined ? {} : { nombre }),
     })
+    // ⛔ F11 · el motivo VERDADERO del gate, justo después de `fijar`, que es quien
+    // escribe ahí el genérico. Con la rama EDIFICIO el diálogo diría «todavía no hay
+    // ninguna parcela en pantalla que guardar» —su único motivo, y vive en
+    // `app/dialogo-expediente.js`, que esta tarea no toca—, y eso es FALSO: hay un
+    // edificio, y lo que falta es el identificador. Un motivo equivocado manda al
+    // usuario a arreglar lo que no está roto.
+    if (enEdificio()) decir(MOTIVO_GUARDAR_EN_EDIFICIO)
   }
+
+  /**
+   * ¿Se puede guardar en el almacén lo que hay en pantalla? Dos condiciones, y la
+   * segunda es de F11: que haya geometría **y** que no estemos en la rama EDIFICIO
+   * (desviación 6 del plan; el porqué está en {@link MOTIVO_GUARDAR_EN_EDIFICIO}).
+   */
+  const puedeGuardarse = () => !enEdificio() && hayGeometria(estado.get())
 
   // ── Arranque ──────────────────────────────────────────────────────────────
 
@@ -834,6 +1095,15 @@ export function cablearExpediente({
 
   /** «Guardar». Crea el expediente o pone al día el que esté abierto. */
   async function guardar(nombre) {
+    // ⛔ F11 · la guarda que NO depende del `disabled` del botón. El diálogo lo apaga
+    // —`refrescar` le pasa `puedeGuardar: false`— pero un `disabled` es cortesía:
+    // exactamente el mismo argumento que ya escribió `recuperar` para el huso. Y aquí
+    // importa más, porque el precio de que se colara es guardar el expediente de la
+    // parcela mientras el usuario está mirando un edificio, en silencio.
+    if (enEdificio()) {
+      decir(MOTIVO_GUARDAR_EN_EDIFICIO)
+      return
+    }
     const exp = expedienteActual()
     if (exp === null) {
       decir(MENSAJE_SIN_PARCELA)
@@ -1020,7 +1290,11 @@ export function cablearExpediente({
   function resolverOferta() {
     ofrecido = null
     dichaLaEspera = false
-    if (cambioEnEspera) {
+    // ⚠️ Con la rama EDIFICIO activa NO se vuelca: el autoguardado no llega a esa rama
+    // (desviación 7) y volcar aquí escribiría el borrador de la parcela mientras el
+    // usuario está en la otra. Lo pendiente se queda pendiente y sale al volver, que es
+    // lo que hace {@link alCambiarLaRama}.
+    if (cambioEnEspera && !enEdificio()) {
       cambioEnEspera = false
       auto.cambiado(estado.get())
     }
@@ -1056,8 +1330,20 @@ export function cablearExpediente({
     if (!entrega.descargado) avisar(entrega.mensaje, NIVEL.ERROR)
   }
 
+  /**
+   * ¿Se puede entregar un fichero DE LA PARCELA? Con la rama EDIFICIO no: los dos
+   * escritores hablan de recintos y el nombre del fichero saldría con otra referencia.
+   * Ver {@link MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO}.
+   */
+  function bloqueaLaRamaEdificio() {
+    if (!enEdificio()) return false
+    decir(MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO)
+    return true
+  }
+
   /** «Exportar DXF para CAD». */
   function exportarDxf() {
+    if (bloqueaLaRamaEdificio()) return
     const parcela = estado.get()
     if (!hayGeometria(parcela)) {
       decir(MENSAJE_SIN_PARCELA)
@@ -1075,6 +1361,7 @@ export function cablearExpediente({
 
   /** «Exportar coordenadas (.txt)». */
   function exportarCoordenadas() {
+    if (bloqueaLaRamaEdificio()) return
     const parcela = estado.get()
     if (!hayGeometria(parcela)) {
       decir(MENSAJE_SIN_PARCELA)
@@ -1092,11 +1379,19 @@ export function cablearExpediente({
     entregar(texto, FICHERO.COORDENADAS, fecha, 'el listado de coordenadas')
   }
 
-  /** «Guardar proyecto (.json)». */
+  /**
+   * «Guardar proyecto (.json)».
+   *
+   * ⭐ **Es la ÚNICA salida que sirve para las dos ramas**, y en F11 pasa a ser algo
+   * más que una comodidad: siendo el almacén de este navegador incapaz de archivar un
+   * edificio (desviación 6), este fichero es el único sitio donde un edificio se
+   * conserva. `expedienteActual()` ya devuelve la rama que toca, así que aquí no hay
+   * ni un `if`: lo que cambia es el mensaje de cuando no hay nada.
+   */
   function exportarProyecto(nombre) {
     const exp = expedienteActual()
     if (exp === null) {
-      decir(MENSAJE_SIN_PARCELA)
+      decir(enEdificio() ? MENSAJE_SIN_EDIFICIO : MENSAJE_SIN_PARCELA)
       return
     }
     const fecha = ahora()
@@ -1148,6 +1443,15 @@ export function cablearExpediente({
       decir(motivoOtroHuso(r.expediente.srs))
       return
     }
+    // ⛔ F11 · UN `.json` DE EDIFICIO CONMUTA LA RAMA. Antes de esto, el expediente de
+    // edificio se leía entero (`export/proyecto.js` lo admite desde F10) y **se caía
+    // por el desagüe**: la rama `parcela` venía `null`, así que salía por el
+    // «no lleva ninguna parcela» de abajo y el trabajo no aparecía por ninguna parte.
+    // Ahora va al store que le corresponde y la pantalla se conmuta para enseñarlo.
+    if (r.expediente.tipo === TIPO_EXPEDIENTE.EDIFICIO) {
+      abrirProyectoDeEdificio(r, fichero)
+      return
+    }
     const parcela = r.expediente.parcela ?? null
     if (!hayGeometria(parcela)) {
       avisar(MENSAJE_GUARDADO_SIN_PARCELA)
@@ -1168,6 +1472,51 @@ export function cablearExpediente({
         'navegador: usa «Guardar» en «Expediente» si quieres conservarlo aquí.',
     )
     decir(`Abierto el proyecto «${r.nombre ?? fichero.name}».`)
+    dialogo.cerrar()
+  }
+
+  /**
+   * La mitad de {@link abrirProyecto} que va por la rama EDIFICIO. Está aparte para que
+   * la de parcela se lea igual que en F10 y para que las dos degradaciones nuevas —sin
+   * rama montada, y un expediente de edificio sin edificio dentro— no se escondan
+   * dentro de una cadena de `if`.
+   *
+   * **No toca nada cuando no puede abrir**: lo que hubiera en pantalla se queda como
+   * estaba, y se dice por los dos canales.
+   *
+   * @param {{expediente: object, nombre: string|null}} r  Lo que devolvió `deProyecto`.
+   * @param {File} fichero
+   */
+  function abrirProyectoDeEdificio(r, fichero) {
+    const edificio = r.expediente.edificio ?? null
+    if (!hayEdificio(edificio)) {
+      avisar(MENSAJE_GUARDADO_SIN_EDIFICIO)
+      decir(MENSAJE_GUARDADO_SIN_EDIFICIO)
+      return
+    }
+    if (rama === null || estadoEdificio === null) {
+      avisar(MENSAJE_SIN_RAMA_EDIFICIO, NIVEL.ERROR)
+      decir(MENSAJE_SIN_RAMA_EDIFICIO)
+      return
+    }
+    // Entra SIN identificador, igual que la parcela y por lo mismo: el fichero viene de
+    // otro equipo o de otra sesión. Y en esta rama, además, no va a poder tener ninguno
+    // hasta F12 ({@link MOTIVO_GUARDAR_EN_EDIFICIO}).
+    cargarEdificio(edificio, {
+      id: null,
+      nombre: r.nombre,
+      creado: r.expediente.metadatos?.creado ?? instanteISO(),
+      modificado: instanteISO(),
+    })
+    // El aviso dice lo que ha pasado Y lo que NO va a poder hacer, en el mismo sitio:
+    // enterarse de que un edificio no se guarda **después** de haber trabajado una hora
+    // es enterarse tarde.
+    avisar(
+      `Abierto el proyecto «${r.nombre ?? fichero.name}», que lleva un edificio: la pantalla ha ` +
+        'cambiado a la rama Edificio para enseñarlo. Esta versión no lo puede guardar en este ' +
+        'navegador, así que consérvalo con «Guardar proyecto (.json)».',
+    )
+    decir(`Abierto el proyecto «${r.nombre ?? fichero.name}» en la rama Edificio.`)
     dialogo.cerrar()
   }
 
@@ -1272,6 +1621,18 @@ export function cablearExpediente({
       identidad = { ...identidad, modificado: instanteISO() }
     }
 
+    // ⛔ F11 · EL AUTOGUARDADO NO SE EXTIENDE A LA RAMA EDIFICIO (desviación 7), y con
+    // ella activa **tampoco se dispara para la parcela**. Dos motivos, y el segundo es
+    // el caro: (1) el borrador es UN registro de clave reservada, así que la parcela y
+    // el edificio se pisarían el uno al otro; (2) con la rama EDIFICIO puesta lo que el
+    // usuario está tocando es el edificio, y escribir un borrador de la parcela de
+    // debajo sería guardar el documento que no es. Lo pendiente se marca y se vuelca al
+    // volver a PARCELA — el mismo mecanismo, exacto, que la espera de la oferta.
+    if (enEdificio()) {
+      cambioEnEspera = true
+      return
+    }
+
     // Hasta que la lectura de arranque no ha terminado no se sabe si hay una oferta
     // pendiente, así que tampoco se escribe: dos segundos de espera son gratis y el
     // trabajo de la sesión anterior no lo es.
@@ -1287,6 +1648,31 @@ export function cablearExpediente({
 
     // Si el diálogo está abierto, lo que enseña («Guardar» encendido o apagado)
     // acaba de cambiar.
+    if (dialogo.abierto()) {
+      refrescar().catch((causa) => reventar('refrescar', causa))
+    }
+  }
+
+  /**
+   * F11 · el suscriptor del CONMUTADOR de rama. Hace dos cosas, y ninguna es dibujar:
+   *
+   *   1. **Vuelve a armar el autoguardado al volver a PARCELA** y vuelca lo que hubiera
+   *      cambiado mientras la otra rama estaba puesta. Sin esto, una edición hecha en la
+   *      parcela justo antes de conmutar —o por cualquiera de los otros diez
+   *      suscriptores— **no se guardaría nunca**: el debounce solo escribe lo que le han
+   *      contado. Es el mismo desenlace que `resolverOferta` resuelve para la oferta, y
+   *      se resuelve igual.
+   *   2. Repinta el diálogo si está abierto: «Guardar» acaba de encenderse o de apagarse
+   *      y su motivo cambia con él.
+   *
+   * @param {string} ramaNueva
+   */
+  function alCambiarLaRama(ramaNueva) {
+    if (destruido) return
+    if (ramaNueva !== RAMA.EDIFICIO && arrancado && ofrecido === null && cambioEnEspera) {
+      cambioEnEspera = false
+      auto.cambiado(estado.get())
+    }
     if (dialogo.abierto()) {
       refrescar().catch((causa) => reventar('refrescar', causa))
     }
@@ -1337,6 +1723,9 @@ export function cablearExpediente({
   escuchar(doc, 'visibilitychange', alOcultarse)
   const bajaAccion = dialogo.alAccion(alAccion)
   const desuscribirStore = estado.subscribe(alCambiarElStore)
+  // Sin conmutador cableado no hay a qué suscribirse, y la baja es un no-op: así
+  // `destruir()` no tiene que preguntar.
+  const bajaRama = rama === null ? () => {} : rama.subscribe(alCambiarLaRama)
 
   // El arranque va SUELTO a propósito, sin `await` y sin bloquear el montaje: leer el
   // almacén local no puede retrasar ni un milisegundo el primer pintado del mapa. Su
@@ -1365,6 +1754,10 @@ export function cablearExpediente({
       modificado: identidad.modificado,
       ofreciendoBorrador: ofrecido !== null,
       arrancado,
+      /** F11 · qué rama ve este cableado. `PARCELA` también cuando no hay conmutador. */
+      rama: ramaActual(),
+      /** Si «Guardar» está encendido, y por tanto si la rama lo permite. */
+      puedeGuardar: puedeGuardarse(),
       persistido: persistencia === null ? null : persistencia.persistido,
       autoguardado: auto.estado(),
     }),
@@ -1382,6 +1775,7 @@ export function cablearExpediente({
       oyentes.length = 0
       bajaAccion()
       desuscribirStore()
+      bajaRama()
       auto.destruir()
       dialogo.destruir()
     },

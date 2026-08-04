@@ -64,6 +64,16 @@
 //     misma parcela NO las borra;
 //   · y que la suscripción se da de baja en `destruir()`.
 //
+// Y desde F11 · T1.5, los tres cambios quirúrgicos que abren la rama EDIFICIO sin
+// tocar el visor de parcela (el bloque grande del final de este fichero):
+//   · el pane `PANE.PARTES`, que lo crea el MAPA iterando `PANES` y no una opción;
+//   · `encuadrarSobreRecintos(...)`, hasta ahora privado: encuadra sobre recintos
+//     AJENOS al store —`visor.encuadrar()` no sirve en la rama edificio, porque
+//     ejecuta la cascada sobre el store de PARCELA— y trae el caso degenerado
+//     dentro. Hay un test que exige que la vía nueva y la vieja dejen el mapa en
+//     EXACTAMENTE la misma vista: esto es una extracción, no una reescritura.
+//   · `visor.barraEdicion`, para poder OCULTARLA sin desmontarla.
+//
 // Y la OPCIÓN `colindantes` (la capa de parcelas vecinas, que tampoco existía:
 // se traían del Catastro y no las pintaba nadie), con el mismo reparto de
 // siempre — lo que la PIEZA hace vive en `colindantes.dom.test.js`; aquí solo el
@@ -76,11 +86,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import L from 'leaflet'
 
-import { crearVisor } from '../../viewer/index.js'
-import { NIVEL, PANE, crearEstadoVista, vertUTMaLatLng } from '../../viewer/_comun.js'
+import { crearVisor, encuadrarSobreRecintos } from '../../viewer/index.js'
+import { NIVEL, PANE, PANES, crearEstadoVista, vertUTMaLatLng } from '../../viewer/_comun.js'
 import { BASE_POR_DEFECTO, ID_CAPA, maxZoomNativo, CAPAS } from '../../viewer/capas.js'
 import { ATRIBUCION } from '../../viewer/atribucion.js'
 import { CLASE_ACOTACION, textoDeLongitud } from '../../viewer/acotaciones.js'
+import { CLASE_BARRA } from '../../viewer/barra-edicion.js'
 import { CLASE_COLINDANTE } from '../../viewer/colindantes.js'
 import { CLASE as CLASE_CAJON, SELECTOR as SELECTOR_CAJON } from '../../viewer/cajon-diagnostico.js'
 import {
@@ -2429,5 +2440,369 @@ describe('crearVisor · destruir con colindantes', () => {
 
     expect(contenedor.children).toHaveLength(0)
     expect(document.querySelector(`.${CLASE_COLINDANTE}`)).toBeNull()
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// F11 · T1.5 — el pane de las PARTES, el encuadre EXTRAÍDO y la barra EXPUESTA
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Tres cambios quirúrgicos para que la rama EDIFICIO pueda existir SIN tocar el
+// visor de parcela, que lleva cuatro fases en verde:
+//
+//   · `PANE.PARTES` — una entrada en `viewer/_comun.js#PANES` y nada más:
+//     `crearMapa` itera esa lista. Aquí se comprueba desde el ENSAMBLAJE (que es
+//     donde se ve que no hace falta ninguna opción para tenerlo) y que llega
+//     VACÍO, como el de diagnóstico mientras nadie diagnostica.
+//   · `encuadrarSobreRecintos(...)` — hasta F10 era privado. La rama edificio lo
+//     necesita ENTERO, y sobre todo el caso degenerado: un edificio de un vértice
+//     tiene que ir a `setView` con zoom de parcela y NUNCA a un `fitBounds` sobre
+//     bounds sin extensión, que daría el `maxZoom` del mapa (24) sobre un punto.
+//     `visor.encuadrar()` no sirve ahí: ejecuta la cascada sobre el store de
+//     PARCELA. Y es EXTRACCIÓN, no reescritura: hay un test que exige que el caso
+//     degenerado por la vía nueva dé EXACTAMENTE la misma vista que por la vieja.
+//   · `visor.barraEdicion` — para poder OCULTARLA (no desmontarla) cuando la rama
+//     activa es EDIFICIO: con la parcela como contexto, `viewer/edicion.js`
+//     seguiría dejando arrastrar sus vértices y un Ctrl+Z ahí deshace una edición
+//     que el usuario cree estar haciendo sobre el edificio.
+
+/** El pane recibe zIndex desde `PANES`; el valor NO se copia aquí a mano. */
+const zIndexDe = (nombre) => PANES.find((p) => p.nombre === nombre).zIndex
+
+/** Capas montadas en un pane concreto, sin contar el renderizador de Leaflet. */
+function capasEnPane(mapa, nombre) {
+  const out = []
+  mapa.eachLayer((capa) => {
+    if (capa instanceof L.Renderer) return
+    if (capa.options && capa.options.pane === nombre) out.push(capa)
+  })
+  return out
+}
+
+/** Un recinto suelto (la forma que consume `encuadrarSobreRecintos`). */
+const recintoDe = (vertices) => ({ vertices })
+
+/**
+ * Un recinto de 100×80 m a ~150 km de la parcela de demostración, en el MISMO
+ * huso. Es el caso real de F11: un edificio traído por referencia catastral que
+ * cae lejísimos de lo que se está mirando — el defecto que la firma humana
+ * encontró en F03 y que `README.md:58-63` documenta.
+ */
+const RECINTOS_LEJOS = Object.freeze([
+  recintoDe([
+    [300000, 4400000],
+    [300100, 4400000],
+    [300100, 4400080],
+    [300000, 4400080],
+  ]),
+])
+
+describe('crearVisor · PANE.PARTES (F11): el pane lo crea el MAPA, no una opción', () => {
+  it('existe en un visor pelado, con su zIndex, y llega VACÍO', () => {
+    const { visor } = abrirVisor()
+
+    const pane = visor.mapa.getPane(PANE.PARTES)
+    expect(pane).toBeTruthy()
+    expect(pane.style.zIndex).toBe(String(zIndexDe(PANE.PARTES)))
+    // Montar el visor no pinta ninguna parte: `viewer/partes.js` es de T2.3 y aquí
+    // ni se importa. Igual que el pane del diagnóstico sin diagnosticar.
+    expect(capasEnPane(visor.mapa, PANE.PARTES)).toHaveLength(0)
+  })
+
+  it('no le ha costado nada al resto: los otros seis panes siguen exactos', () => {
+    // La entrada nueva se intercala entre `parcelaEditada` y `acotaciones`, así que
+    // lo que hay que atestar es que NO ha movido a nadie. Todo derivado de `PANES`.
+    const { visor } = abrirVisor()
+
+    for (const { nombre, zIndex } of PANES) {
+      expect(visor.mapa.getPane(nombre), `falta el pane «${nombre}»`).toBeTruthy()
+      expect(visor.mapa.getPane(nombre).style.zIndex).toBe(String(zIndex))
+    }
+    // Y la geometría de la parcela sigue donde estaba: por DEBAJO de las huellas.
+    expect(zIndexDe(PANE.PARCELA_EDITADA)).toBeLessThan(zIndexDe(PANE.PARTES))
+    expect(zIndexDe(PANE.PARTES)).toBeLessThan(zIndexDe(PANE.VERTICES))
+  })
+})
+
+describe('encuadrarSobreRecintos (F11): el encuadre, sin store de por medio', () => {
+  it('sale del módulo: es una función exportada por `viewer/index.js`', () => {
+    // Guardián de la exportación: `app/cableado-edificio.js` (T3.2) programa contra
+    // ella, y `viewer/` NO sale por el barrel raíz (Leaflet exige `window`), así que
+    // esta es la única puerta.
+    expect(typeof encuadrarSobreRecintos).toBe('function')
+  })
+
+  it('encuadra sobre recintos AJENOS al store: ni lo lee ni lo escribe', () => {
+    const { visor, store, parcela } = abrirVisor()
+    expect(encuadraA(visor.mapa, parcela)).toBe(true)
+
+    const encuadrado = encuadrarSobreRecintos({
+      mapa: visor.mapa,
+      recintos: RECINTOS_LEJOS,
+      zona: HUSO_DEMO,
+    })
+
+    expect(encuadrado).toBe(true)
+    const bounds = visor.mapa.getBounds()
+    for (const [x, y] of RECINTOS_LEJOS[0].vertices) {
+      expect(bounds.contains(L.latLng(vertUTMaLatLng([x, y], HUSO_DEMO)))).toBe(true)
+    }
+    // El mapa se ha ido de verdad: la parcela del store ya no se ve.
+    expect(encuadraA(visor.mapa, parcela)).toBe(false)
+    // Y el store no se ha tocado: es la propiedad que hace que esto sirva para el
+    // SEGUNDO store de F11 sin que la rama parcela se entere de nada.
+    expect(store.get()).toBe(parcela)
+  })
+
+  it('CASO DEGENERADO: un solo vértice va a setView, y JAMÁS a fitBounds', () => {
+    const punto = [439250, 4479662.5]
+    const { visor } = abrirVisor()
+    const setView = vi.spyOn(visor.mapa, 'setView')
+    const fitBounds = vi.spyOn(visor.mapa, 'fitBounds')
+
+    expect(
+      encuadrarSobreRecintos({
+        mapa: visor.mapa,
+        recintos: [recintoDe([punto])],
+        zona: HUSO_DEMO,
+      }),
+    ).toBe(true)
+
+    // Lo que este test impide: `fitBounds` sobre unos bounds SIN EXTENSIÓN calcula
+    // una escala infinita y devuelve el maxZoom del mapa (24) sobre un punto.
+    expect(fitBounds).not.toHaveBeenCalled()
+    expect(setView).toHaveBeenCalledTimes(1)
+    expect(visor.mapa.getZoom()).toBeLessThan(visor.mapa.getMaxZoom())
+    expect(visor.mapa.getZoom()).toBeGreaterThanOrEqual(15)
+    expect(visor.mapa.getZoom()).toBeLessThanOrEqual(MAX_NATIVO)
+    const [lat, lon] = vertUTMaLatLng(punto, HUSO_DEMO)
+    expect(visor.mapa.getCenter().lat).toBeCloseTo(lat, 9)
+    expect(visor.mapa.getCenter().lng).toBeCloseTo(lon, 9)
+  })
+
+  it('EXTRACCIÓN, NO REESCRITURA: el punto da la MISMA vista que por la vía del montaje', () => {
+    // La prueba que hace de este cambio una extracción y no una copia: el mismo
+    // vértice degenerado, encuadrado (a) por la cascada del montaje leyendo el
+    // store —el camino de F03, intacto— y (b) por la función recién exportada,
+    // tiene que dejar el mapa EXACTAMENTE en el mismo sitio y al mismo zoom.
+    const punto = [439250, 4479662.5]
+
+    const { visor: porElMontaje } = abrirVisor({ parcela: parcelaDegenerada([punto]) })
+    const { visor: porLaFuncion } = abrirVisor()
+    encuadrarSobreRecintos({
+      mapa: porLaFuncion.mapa,
+      recintos: [recintoDe([punto])],
+      zona: HUSO_DEMO,
+    })
+
+    expect(vistaDe(porLaFuncion.mapa)).toEqual(vistaDe(porElMontaje.mapa))
+  })
+
+  it('vértices TODOS COINCIDENTES se tratan igual que un punto', () => {
+    const punto = [439250, 4479662.5]
+    const { visor } = abrirVisor()
+    const fitBounds = vi.spyOn(visor.mapa, 'fitBounds')
+
+    encuadrarSobreRecintos({
+      mapa: visor.mapa,
+      recintos: [recintoDe([punto, punto, punto])],
+      zona: HUSO_DEMO,
+    })
+
+    expect(fitBounds).not.toHaveBeenCalled()
+    expect(visor.mapa.getZoom()).toBeLessThan(visor.mapa.getMaxZoom())
+  })
+
+  it('con extensión de verdad SÍ usa fitBounds, y con margen', () => {
+    const { visor } = abrirVisor()
+    const fitBounds = vi.spyOn(visor.mapa, 'fitBounds')
+
+    encuadrarSobreRecintos({ mapa: visor.mapa, recintos: RECINTOS_LEJOS, zona: HUSO_DEMO })
+
+    expect(fitBounds).toHaveBeenCalledTimes(1)
+    // Se proyecta VÉRTICE A VÉRTICE (no las dos esquinas del bbox UTM: la
+    // desproyección no conserva los ejes) y va con `padding`.
+    const [bounds, opciones] = fitBounds.mock.calls[0]
+    expect(bounds).toHaveLength(RECINTOS_LEJOS[0].vertices.length)
+    expect(opciones.padding[0]).toBeGreaterThan(0)
+  })
+
+  it('sin nada que encuadrar devuelve false y NO toca la vista (no es un error)', () => {
+    // El store de edificio NACE VACÍO: «no hay recintos» es un estado legítimo del
+    // recorrido, no un contrato roto. Quedarse donde se está es lo único que no
+    // sorprende — la misma regla que el reencuadre vivo con `set(null)`.
+    const { visor } = abrirVisor()
+    const antes = vistaDe(visor.mapa)
+
+    for (const recintos of [null, undefined, [], [{ vertices: [] }], 'no es un array']) {
+      expect(
+        encuadrarSobreRecintos({ mapa: visor.mapa, recintos, zona: HUSO_DEMO }),
+        `«${JSON.stringify(recintos)}» debería no encuadrar`,
+      ).toBe(false)
+    }
+    expect(vistaDe(visor.mapa)).toEqual(antes)
+  })
+
+  it('un vértice no numérico se descarta y se AVISA, con el SUJETO que le den', () => {
+    const { visor } = abrirVisor()
+    const alAvisar = vi.fn()
+
+    encuadrarSobreRecintos({
+      mapa: visor.mapa,
+      recintos: [
+        recintoDe([
+          [300000, 4400000],
+          [300100, 4400000],
+          [300100, 4400080],
+          [Number.NaN, 4400080],
+        ]),
+      ],
+      zona: HUSO_DEMO,
+      alAvisar,
+      sujeto: 'El edificio',
+    })
+
+    expect(alAvisar).toHaveBeenCalledTimes(1)
+    const [mensaje, detalle] = alAvisar.mock.calls[0]
+    // El sujeto es parámetro justamente para esto: decir «La parcela tiene…»
+    // mientras el usuario mira un edificio sería contarle un fallo REAL sobre el
+    // objeto equivocado.
+    expect(mensaje).toContain('El edificio tiene 1 vértice(s)')
+    expect(mensaje).not.toContain('La parcela')
+    // AVISO y no ERROR: se encuadra igual con el resto y el GML sigue generable.
+    expect(detalle.nivel).toBe(NIVEL.AVISO)
+  })
+
+  it('SIN sujeto el aviso es el literal de F03, letra por letra (la rama parcela no cambia)', () => {
+    // Guardián de la extracción por el otro lado. El defecto de `sujeto` es «La
+    // parcela» justamente para que la rama que lleva cuatro fases en verde no
+    // cambie ni una letra de lo que el usuario lee: `encuadrarGeometria` —la rama
+    // 1 de la cascada del viewport— llama a esta función SIN pasar sujeto.
+    //
+    // ⚠️ Y se prueba llamando DIRECTAMENTE, no montando un visor con un vértice
+    // NaN, porque eso último es imposible desde F03 y no por culpa del encuadre:
+    // `viewer/sincronizacion.js` proyecta los vértices en el paso 4 del montaje y
+    // `geo/utm.js#inverse` LANZA con un NaN, o sea antes de que el encuadre (paso
+    // 6) llegue a mirarlos. Por la rama de parcela este aviso es hoy inalcanzable;
+    // por la de edificio no lo será, porque `app/cableado-edificio.js` llama aquí
+    // directamente y sin `sincronizar` de por medio.
+    const { visor } = abrirVisor()
+    const alAvisar = vi.fn()
+
+    encuadrarSobreRecintos({
+      mapa: visor.mapa,
+      recintos: [
+        recintoDe([
+          [300000, 4400000],
+          [300100, 4400000],
+          [300100, 4400080],
+          [300000, Number.NaN],
+        ]),
+      ],
+      zona: HUSO_DEMO,
+      alAvisar,
+    })
+
+    expect(alAvisar).toHaveBeenCalledTimes(1)
+    expect(alAvisar.mock.calls[0][0]).toBe(
+      'La parcela tiene 1 vértice(s) con coordenadas no numéricas: el encuadre ' +
+        'inicial del mapa los ignora.',
+    )
+  })
+
+  it('un `mapa` que no es de Leaflet es contrato roto → TypeError', () => {
+    // Regla de oro 1: sin esta guarda, un mapa equivocado revienta DENTRO de
+    // Leaflet, a tres saltos de aquí y con un mensaje ilegible.
+    for (const mapa of [null, undefined, {}, 'mapa', 42]) {
+      expect(() =>
+        encuadrarSobreRecintos({ mapa, recintos: RECINTOS_LEJOS, zona: HUSO_DEMO }),
+      ).toThrow(TypeError)
+    }
+  })
+
+  it('un `alAvisar` que no es función es contrato roto → TypeError', () => {
+    const { visor } = abrirVisor()
+    expect(() =>
+      encuadrarSobreRecintos({
+        mapa: visor.mapa,
+        recintos: RECINTOS_LEJOS,
+        zona: HUSO_DEMO,
+        alAvisar: 'no soy una función',
+      }),
+    ).toThrow(TypeError)
+  })
+})
+
+describe('crearVisor · `barraEdicion` en el objeto devuelto (F11)', () => {
+  const barraEnDom = (contenedor) => contenedor.querySelector(`.${CLASE_BARRA.CONTENEDOR}`)
+
+  it('sin edición vale null, NO undefined', () => {
+    const { visor } = abrirVisor()
+    expect(visor.barraEdicion).toBeNull()
+    expect('barraEdicion' in visor).toBe(true)
+  })
+
+  it('con edición devuelve la BarraMontada, y su control apunta al nodo REAL', () => {
+    const { visor, contenedor } = abrirVisor({ edicion: true })
+
+    expect(visor.barraEdicion).not.toBeNull()
+    expect(typeof visor.barraEdicion.destruir).toBe('function')
+    // `getContainer()` es API pública de `L.Control`, y es la puerta por la que
+    // `app/rama.js` (T2.4) va a ocultarla.
+    const nodo = visor.barraEdicion.control.getContainer()
+    expect(nodo).toBe(barraEnDom(contenedor))
+    expect(nodo.isConnected).toBe(true)
+  })
+
+  it('`edicion:{barra:false}` monta la edición y NO la barra: son dos preguntas', () => {
+    const { visor, contenedor } = abrirVisor({ edicion: { barra: false } })
+
+    expect(visor.edicion).not.toBeNull()
+    expect(visor.barraEdicion).toBeNull()
+    expect(barraEnDom(contenedor)).toBeNull()
+  })
+
+  it('OCULTARLA con `hidden` no la desmonta: los siete nodos del contrato siguen ahí', () => {
+    // El motivo por el que se expone (T2.4): con la rama EDIFICIO activa la barra
+    // estorba —un Ctrl+Z ahí deshace una edición de la parcela, que en ese momento
+    // es contexto—, pero desmontarla obligaría a reconstruirla y a recablearla al
+    // volver. Y la lección medida de F11 · T0.3: `hidden` conserva el nodo,
+    // `replaceChildren` deja la referencia huérfana, escribible y muda.
+    const { visor, contenedor } = abrirVisor({ edicion: true })
+    const nodo = visor.barraEdicion.control.getContainer()
+
+    nodo.hidden = true
+
+    expect(nodo.isConnected).toBe(true)
+    expect(barraEnDom(contenedor)).toBe(nodo)
+    // Los siete nodos que `app/main.js#cablearEdicion` resolvió UNA sola vez en el
+    // montaje siguen siendo los mismos y siguen estando en el documento.
+    for (const selector of [
+      '[data-accion="deshacer"]',
+      '[data-accion="rehacer"]',
+      '[data-accion="offset"]',
+      '[data-campo="snap"]',
+      '[data-campo="snap-tolerancia"]',
+      '[data-campo="offset-distancia"]',
+      '[data-estado="edicion"]',
+    ]) {
+      const encontrado = contenedor.querySelector(selector)
+      expect(encontrado, `falta ${selector} tras ocultar la barra`).not.toBeNull()
+      expect(encontrado.isConnected).toBe(true)
+    }
+
+    // Y se vuelve: enseñarla otra vez es una línea, sin reconstruir nada.
+    nodo.hidden = false
+    expect(visor.barraEdicion.control.getContainer()).toBe(nodo)
+  })
+
+  it('`destruir()` se la lleva, y sigue siendo idempotente', () => {
+    const { visor, contenedor } = abrirVisor({ edicion: true })
+    expect(barraEnDom(contenedor)).not.toBeNull()
+
+    visor.destruir()
+
+    expect(barraEnDom(contenedor)).toBeNull()
+    expect(() => visor.destruir()).not.toThrow()
   })
 })

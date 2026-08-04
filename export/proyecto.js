@@ -66,7 +66,13 @@
 //     construir el modelo y se dice CUÁL. Una clave que se cae en silencio es trabajo
 //     de alguien que desaparece;
 //   · un expediente de **EDIFICIO**: se lee —el modelo lo admite desde F00— y se avisa
-//     de que esta versión no sabe enseñarlo (F11–F14).
+//     de lo que la aplicación sabe y no sabe hacer con él. ⚠️ **Ese aviso cambió en
+//     F11** y no es un retoque de estilo: hasta F10 decía «esta versión solo sabe
+//     enseñar y editar la rama de parcela», y desde que F11 aterriza eso es FALSO —la
+//     rama de edificio existe, se dibuja y se edita—. Lo que sigue sin poder hacerse es
+//     **guardarlo en el almacén de este navegador** (un `Edificio` no tiene `idLocal`,
+//     desviación 6 del plan de F11), escribir su GML (F13) y contrastarlo (F14). Un
+//     aviso que se queda viejo es peor que no tenerlo: el usuario decide con él.
 //
 // ── LO QUE NO VIAJA EN EL FICHERO ─────────────────────────────────────────
 // Lo mismo que no se guarda en IndexedDB, y por los mismos motivos escritos: el
@@ -451,15 +457,31 @@ export function deProyecto(entrada) {
     )
   }
 
-  // La rama EDIFICIO se lee —el modelo la admite desde F00— pero esta versión no sabe
-  // enseñarla (F11–F14). Callarlo dejaría al usuario delante de una pantalla vacía
-  // preguntándose qué ha pasado con su fichero.
+  // La rama EDIFICIO se lee —el modelo la admite desde F00— y se dice QUÉ se va a poder
+  // hacer con ella y qué no. Callarlo dejaría al usuario suponiendo (regla de oro 1).
+  //
+  // ⛔ **Reescrito en F11 · T3.3.** El texto de F10 —«esta versión de la aplicación solo
+  // sabe enseñar y editar la rama de parcela»— dejó de ser cierto el día que aterrizó la
+  // segunda rama: hoy el fichero se abre EN la rama de edificio, sus partes se dibujan en
+  // el mapa y sus datos se editan. Lo que sigue sin poder hacerse son tres cosas
+  // concretas, y las tres se nombran: **guardarlo en el almacén de este navegador**
+  // —`app/cableado-expediente.js` deriva la identidad del documento de `parcela.idLocal`
+  // y un `Edificio` no tiene ninguno—, escribir su GML (F13) y contrastarlo (F14).
+  //
+  // ⚠️ El tipo sigue siendo `VERSION_POSTERIOR` y **no es el nombre que le pega**: esto
+  // no habla de la versión del formato. `TIPO_EXPORT` vive en `export/_comun.js`, que
+  // F11 · T3.3 no toca, así que darle código propio es deuda declarada y no un olvido.
+  // Quien decida por CÓDIGO en vez de por texto —que es para lo que están los códigos—
+  // tiene `datos.tipo === 'EDIFICIO'`, que sí lo distingue sin ambigüedad.
   if (expediente.tipo === TIPO_EXPEDIENTE.EDIFICIO) {
     avisos.push(
       crearDeteccionExport(
         TIPO_EXPORT.VERSION_POSTERIOR,
-        'El fichero trae un expediente de EDIFICIO. Se ha leído entero y no se ha perdido nada, ' +
-          'pero esta versión de la aplicación solo sabe enseñar y editar la rama de parcela.',
+        'El fichero trae un expediente de EDIFICIO. Se ha leído entero y no se ha perdido nada: ' +
+          'la aplicación lo abre en la rama Edificio, dibuja sus partes en el mapa y deja editar ' +
+          'sus datos. Lo que esta versión todavía no hace es guardarlo en el almacén de este ' +
+          'navegador —de momento solo se conserva en el fichero de proyecto—, escribir su GML ' +
+          'ni contrastarlo con el Catastro.',
         SEVERIDAD.AVISO,
         { tipo: expediente.tipo },
       ),

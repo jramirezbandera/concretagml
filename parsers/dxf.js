@@ -23,6 +23,37 @@
 // Discretización de arcos: se delega ENTERAMENTE en geo/arco.js#discretizarBulge
 // (no se reimplementa la matemática). Convención: devuelve SOLO los vértices NUEVOS
 // intermedios (sin P1 ni P2); el tramo se reconstruye como [P1, ...vertices, P2].
+//
+// ── F11 · LA CAPA (código de grupo 8) ────────────────────────────────────────
+//
+// F01 leía la geometría y TIRABA la capa. Es el discriminante que el fichero ya
+// trae y sin el cual no se puede decir cuáles de las N polilíneas son la parcela
+// (o las huellas del edificio): en `UTM.dxf` hay 25 anillos repartidos en 5
+// capas y DIECISÉIS son mobiliario de dibujo (cajetín, marco, leyenda). Desde
+// F11 se devuelve `capas[]`, en paralelo a `anillos[]` y con la misma longitud.
+//
+//   · LITERAL, sin bajar a minúsculas: el usuario reconoce sus nombres de capa
+//     («Construccion» no es «construccion»). Solo se recorta el espacio, que es
+//     ruido de formato y no puede formar parte de un nombre de capa de AutoCAD.
+//   · `''` si la entidad no traía código 8 (nunca `undefined`: quien recorra
+//     `capas[i]` tiene siempre un string, y el hueco se ve).
+//   · ⚠️ MEDIDO y contraintuitivo: en una POLYLINE clásica la capa la lleva la
+//     CABECERA, no los VERTEX ni el SEQEND. En el fixture real de edificio el
+//     SEQEND dice `0` mientras la POLYLINE dice `Construccion`; en
+//     poly_clasica.dxf los VERTEX sí repiten `8/0`. Por eso `abrirPoly` captura
+//     la capa y `cerrarPoly` la usa: leerla del SEQEND daría `0` para las siete
+//     huellas del edificio, y el reparto saldría mal EN SILENCIO.
+//
+// POR QUÉ ESTE MÓDULO NO EMITE NINGUNA DETECCIÓN NUEVA POR LA CAPA (decidido al
+// medirlo, F11·T1.1): `test/export/dxf.test.js` exige `detecciones` EXACTAMENTE
+// vacías al releer el DXF que escribe `export/dxf.js`, que tiene DOS capas
+// (`PARCELA_OFICIAL` / `PARCELA_EDITADA`). Cualquier detección de reparto —aun
+// condicionada a «más de una capa»— pondría roja esa prueba, que no es de F11 y
+// que además tiene razón: releer un fichero propio no es una anomalía. El
+// resumen legible del reparto («25 polilíneas en 5 capas: FINO 16, LINDE 4…») lo
+// emite `parsers/importar.js`, que es por donde pasan TODOS los consumidores del
+// reparto, y así este parser sigue siendo estrictamente aditivo: mismos anillos,
+// mismas detecciones, un campo más.
 
 import { crearDeteccion, TIPO_DETECCION, SEVERIDAD } from './_comun.js'
 import { discretizarBulge } from '../geo/arco.js'
@@ -80,13 +111,32 @@ function leerPares(texto) {
 // ── Parser público ────────────────────────────────────────────────────────────
 
 /**
+ * Lee la CAPA (código de grupo 8) de los pares de una entidad.
+ *
+ * Devuelve el PRIMER código 8 recortado —una entidad DXF lleva uno solo— o `''`
+ * si la entidad no lo trae. Nunca `undefined`: el contrato dice `string`.
+ *
+ * @param {Array<[string, string]>} grupos  Pares (código, valor) de la entidad.
+ * @returns {string}  Nombre de capa LITERAL (sin normalizar) o `''`.
+ */
+function capaDe(grupos) {
+  for (const [code, val] of grupos) {
+    if (code === '8') return val.trim()
+  }
+  return ''
+}
+
+/**
  * Parsea un DXF ASCII y devuelve los anillos de la sección ENTITIES en UTM crudo.
  *
  * @param {string} texto  Contenido completo del .dxf (ASCII).
  * @param {object} [opts]
  * @param {number} [opts.flechaMax=0.01]  Flecha máx. (m) para discretizar arcos
  *   (se pasa tal cual a geo/arco.js#discretizarBulge).
- * @returns {{ anillos: number[][][], detecciones: import('./_comun.js').Deteccion[], origen: 'DXF' }}
+ * @returns {{ anillos: number[][][], capas: string[],
+ *   detecciones: import('./_comun.js').Deteccion[], origen: 'DXF' }}
+ *   `capas[i]` es la capa de `anillos[i]` (LITERAL, `''` si no había código 8);
+ *   los dos arrays tienen SIEMPRE la misma longitud.
  * @throws {TypeError}  Si `texto` no es un string (regla de oro 1: no se adivina).
  */
 export function parseDXF(texto, opts = {}) {
@@ -100,6 +150,7 @@ export function parseDXF(texto, opts = {}) {
 
   // ── Acumuladores del resultado ──────────────────────────────────────────────
   const anillos = []
+  const capas = [] // capas[i] ↔ anillos[i]; se empujan SIEMPRE a la vez.
   const detecciones = []
   let zCount = 0 // vértices con código 30 (Z) descartada.
   const anotaciones = new Map() // tipo → nº (resumen INFO).
@@ -116,13 +167,15 @@ export function parseDXF(texto, opts = {}) {
   //
   // verts: [{ x, y, b }] en orden. `b` = bulge del segmento DESDE este vértice
   // HASTA el siguiente (0 = recto). `closed`: el último segmento envuelve Vn-1→V0.
+  // `capa`: la capa de la ENTIDAD (no la de sus vértices) — ver la cabecera.
   // Devuelve el anillo ABIERTO (sin repetir V0 al final) con los vértices de arco
   // insertados en su sitio, incluido el segmento de cierre.
-  const ensamblarAnillo = (verts) => {
+  const ensamblarAnillo = (verts, capa) => {
     const v = verts.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
     if (v.length === 0) return
     if (v.length < 2) {
       anillos.push(v.map((p) => [p.x, p.y]))
+      capas.push(capa)
       return
     }
     const n = v.length
@@ -154,6 +207,7 @@ export function parseDXF(texto, opts = {}) {
       }
     }
     anillos.push(out)
+    capas.push(capa)
   }
 
   // ── Parseo de las group codes de una LWPOLYLINE → anillo ──────────────────────
@@ -174,7 +228,9 @@ export function parseDXF(texto, opts = {}) {
       }
     }
     if (cur) verts.push(cur)
-    ensamblarAnillo(verts)
+    // La capa se lee en una pasada APARTE (código 8), para no tocar ni una rama
+    // del bucle de arriba: F11 no puede alterar ni un anillo de F01.
+    ensamblarAnillo(verts, capaDe(grupos))
   }
 
   // ── POLYLINE / VERTEX / SEQEND clásicos ───────────────────────────────────────
@@ -185,6 +241,9 @@ export function parseDXF(texto, opts = {}) {
     }
     polyAbierto = []
     polyAbierto.closed = closed
+    // ⚠️ La capa se captura AQUÍ, en la cabecera, y NO en los VERTEX ni en el
+    // SEQEND: es la trampa medida en el fixture real de edificio (ver cabecera).
+    polyAbierto.capa = capaDe(grupos)
   }
   const agregarVertice = (grupos) => {
     let x = NaN
@@ -199,7 +258,7 @@ export function parseDXF(texto, opts = {}) {
     polyAbierto.push({ x, y, b })
   }
   const cerrarPoly = () => {
-    ensamblarAnillo(polyAbierto)
+    ensamblarAnillo(polyAbierto, polyAbierto.capa)
     polyAbierto = null
   }
 
@@ -330,7 +389,7 @@ export function parseDXF(texto, opts = {}) {
     )
   }
 
-  return { anillos, detecciones, origen: ORIGEN }
+  return { anillos, capas, detecciones, origen: ORIGEN }
 }
 
 export default parseDXF
