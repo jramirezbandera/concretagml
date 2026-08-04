@@ -1127,10 +1127,66 @@ describe('viewer/cajon-diagnostico.js · «Preparar informe (PDF)» (F09)', () =
     const acciones = [...raiz.querySelectorAll('footer [data-accion]')].map(
       (el) => el.dataset.accion,
     )
-    // ⚠️ T9 añade un TERCERO, y va el ÚLTIMO por decisión: los dos primeros producen
-    // un documento con lo que hay; la puerta cambia lo que se puede hacer a partir
-    // de ahora. Mezclarla con ellos invitaría a pulsarla por inercia.
-    expect(acciones).toEqual(['preparar-informe', 'descargar-informe', 'tomar-geometria'])
+    // ⚠️ La PUERTA de T9 estuvo aquí un día y se sacó el 2026-08-04, medida en
+    // Chrome: ver el bloque «la puerta se pega abajo» de más abajo. El pie vuelve a
+    // ser lo que era, los dos entregables del informe.
+    expect(acciones).toEqual(['preparar-informe', 'descargar-informe'])
+  })
+
+  // ── ⛔ La puerta se pega abajo, y esto no es estética ──────────────────────
+  // El guion de humo del 2026-08-04 midió que la puerta, metida al final del
+  // `<footer>`, NACÍA FUERA DE LA VISTA: el cajón enseña 372 px de 686 a 1280×720
+  // (466 de 744 a 1440×900) y el botón caía 314 px (267 px) por debajo del borde
+  // visible, con el scroll en 0 y sin nada que dijera que estaba ahí. El renglón
+  // de procedencia llegaba a NOMBRARLO, señalando a algo invisible.
+  //
+  // Las siete pruebas de la ruta 2 lo daban por visible **en verde**, porque jsdom
+  // no calcula maquetación. Aquí no se puede medir el píxel, así que se afirma la
+  // ESTRUCTURA que lo garantiza — que es lo que se rompería si alguien deshace el
+  // arreglo sin querer.
+  describe('viewer/cajon-diagnostico.js · la puerta se pega abajo (T9, corregido 2026-08-04)', () => {
+    it('es hija DIRECTA del contenedor que scrollea, no del pie', () => {
+      const { raiz } = conCajon()
+      const puerta = nodo(raiz, SELECTOR.PUERTA)
+      // Dentro del `<footer>`, `position: sticky` se pegaría dentro del bloque
+      // contenedor del pie —que vive al final del contenido—, o sea nunca.
+      expect(puerta.closest('footer')).toBe(null)
+      const padre = puerta.parentElement
+      expect(padre.style.overflowY, 'el padre de la puerta tiene que ser el que scrollea').toBe(
+        'auto',
+      )
+      expect(padre.style.maxHeight, 'y el que tiene tope de alto').not.toBe('')
+      // Y la ÚLTIMA: la decisión de T9 (no se mezcla con los entregables) sigue viva.
+      expect(padre.lastElementChild).toBe(puerta)
+    })
+
+    it('declara `sticky` y `bottom: 0`, que es lo que la mantiene a la vista', () => {
+      const { raiz } = conCajon()
+      const puerta = nodo(raiz, SELECTOR.PUERTA)
+      expect(puerta.style.position).toBe('sticky')
+      expect(puerta.style.bottom).toBe('0px')
+    })
+
+    it('al enseñarla se pone `block`, porque `sticky` no se pega sobre un elemento en línea', () => {
+      const { cajon, raiz } = conCajon()
+      const puerta = nodo(raiz, SELECTOR.PUERTA)
+      expect(puerta.style.display).toBe('none')
+      cajon.puerta(true)
+      // `''` dejaría el `<button>` en `inline-block` y el arreglo se deshace sin
+      // que nada lo diga: por eso se afirma el valor y no «distinto de none».
+      expect(puerta.style.display).toBe('block')
+      cajon.puerta(false)
+      expect(puerta.style.display).toBe('none')
+    })
+
+    it('lleva fondo opaco, o el contenido se vería pasar por debajo', () => {
+      const { raiz } = conCajon()
+      const puerta = nodo(raiz, SELECTOR.PUERTA)
+      // Un sticky transparente deja ver el texto que scrollea detrás, y el botón se
+      // vuelve ilegible justo cuando más falta hace.
+      expect(puerta.style.background).not.toBe('transparent')
+      expect(puerta.style.background).not.toBe('')
+    })
   })
 
   it('los dos botones comparten FILA: el segundo cuesta 0 px de alto', () => {

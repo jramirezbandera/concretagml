@@ -9,8 +9,8 @@ con la **maquinaria real de `L.Draggable`**.
 - **4D.1** (esta carpeta) escribió los guiones y los probó en seco.
 - **4D.2** es la ejecución oficial, con evidencia, siguiendo este documento.
 
-Catorce guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
-para que el resultado no dependa de interpretar prosa. Trece son de aceptación;
+Quince guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
+para que el resultado no dependa de interpretar prosa. Catorce son de aceptación;
 `05` es de diagnóstico (§11):
 
 > ⛔ **Esta cuenta decía «trece» y se quedó vieja el 2026-08-04**, cuando T4 del
@@ -36,6 +36,7 @@ para que el resultado no dependa de interpretar prosa. Trece son de aceptación;
 | `12-expedientes.js` | F10 · 1 a 6 | ⭐ **que los bytes están en una base de VERDAD** (la suite entera de F10 corre sobre `fake-indexeddb`, que no es una base de datos): supervivencia a la recarga contrastada contra `performance.timeOrigin`, segunda conexión a IndexedDB, `persist()`/`estimate()` reales, las tres exportaciones con sus BYTES, el `<dialog>` como modal y el invariante de los 267 px | `ok:true` — ver §18 |
 | `13-edificio.js` | F11 · 1 a 4 | ⭐ **el guardián de ANCHO del conmutador, que solo existe aquí** (sustituye al `flex-wrap: nowrap` que el plan pedía por error); **M10 ida y vuelta en un navegador real** —mismo nodo, mismo valor, oyentes vivos—; el invariante de los 267 px y las tres cifras de M8; que las huellas del DXF **se ven y ENCIMA de la parcela** (orden real de los panes, no solo que existan los `<path>`); soltar un `.dxf` de verdad en las DOS ramas, con su diálogo de reparto por capas; la ficha del pie que cambia de cara; y ⭐ **el reparto de altura del panel, en vacío y con datos, con el recorte a CERO EXACTO y el déficit en píxeles cuando no llega** | ⛔ **`ok:false`: encontró DOS defectos reales; uno cerrado y el otro a medias** — ver §19 |
 | `14-shell.js` | Rework · 1 a 4 | la cáscara de tres columnas y su coste en píxeles, en **las DOS pasadas de D5** (1280×720 y 1440×900): ancho del rail, desborde del panel, el invariante de `#tabla-vertices`, cuántas tarjetas de aviso caben enteras y cuánto queda escondido tras el pliegue; **se detecta solo** en cuál de los dos mundos está (`LINEA_BASE` sin rail / `SHELL` con él) | `ok:true` en las dos — ver §20 |
+| `15-contraste.js` | Rework · T9 | ⭐ **la RUTA CRÍTICA 2 entera** (soltar el GML de otro → contrastarlo → cruzar la puerta), que hasta T9 no se podía andar; y sobre todo **que la puerta de D4 SE VE**: dentro del cajón, dentro de la ventana y con `elementFromPoint` devolviéndola —las tres patas, porque con una sola el defecto salía verde—; más la procedencia que cambia al cruzar y el invariante de la caja de vértices | ⛔ **encontró un defecto real el 2026-08-04, ya corregido; hoy `ok:true` en las dos** — ver §22 |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
 spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
@@ -3552,3 +3553,176 @@ las 16:18 y un `estilos/app.css` de las 14:53 parecían coherentes y no lo eran.
 - **El coste de transferencia.** Se presupuestan bytes en claro; la red mueve
   ~14 kB comprimidos. Un solo número presupuestado, a propósito: dos invitan a
   citar el que convenga.
+
+---
+
+## 22. `15-contraste.js` — la ruta crítica 2 (Rework de UI · T9)
+
+El cuarto guion de esta carpeta que **encuentra un defecto de producción** (el
+`10` encontró dos, el `12` uno, el `13` otros dos), y el primero que encuentra
+uno que **la suite defendía en verde con siete pruebas escritas a propósito para
+cubrirlo**.
+
+Mide la ruta crítica 2 andada de una vez sobre la aplicación real:
+
+```
+soltar el GML de otro  →  contrastarlo con el parcelario  →  cruzar la puerta
+```
+
+Hasta T9 ese recorrido **no se podía andar**: nada navegaba solo, y «Contrastar
+con el parcelario» te dejaba en Entrada mirando las tres vías.
+
+### ⛔ El defecto que lo obligó a existir
+
+La puerta de D4 —«Tomar esta geometría y editarla», el botón que es toda la razón
+de ser del modo comprobación— nacía **dentro del `<footer>` del cajón**, al final.
+Medido en Chrome:
+
+| | El cajón enseña | La puerta cae | Scroll al llegar |
+|---|---|---|---|
+| **1280×720** | 372 px de 686 | **314 px por debajo** | `0` |
+| **1440×900** | 466 px de 744 | **267 px por debajo** | `0` |
+
+O sea: **el botón nacía fuera de la vista**, al final de un scroll interno que
+arranca arriba del todo, y nada decía que estuviera ahí. Peor: el renglón de
+procedencia llegaba a **nombrarlo** («pulsa «Tomar esta geometría y editarla»»),
+señalando a algo invisible. Un botón que no se ve es menos que ningún botón,
+porque además promete.
+
+**Las siete pruebas de la ruta 2 lo daban por bueno** porque jsdom no calcula
+maquetación: `getBoundingClientRect()` devuelve ceros y no hay `overflow`. Un
+`display` distinto de `none` les basta para decir «se ve».
+
+### ⚠️ La trampa que este guion documenta: «tiene caja» NO es «se ve»
+
+La primera sonda cayó en ella. Daba la puerta por visible —ancho 394, alto
+30,84— mientras estaba 280 px por debajo del borde de la ventana. La
+comprobación que vale tiene **tres patas**, y hacen falta las tres:
+
+1. **dentro del contenedor** que scrollea (`rect` contra `rect`),
+2. **dentro de la ventana** (`top >= 0 && bottom <= innerHeight`),
+3. **`elementFromPoint` sobre su centro devuelve LA PUERTA** — que además prueba
+   que nadie la está tapando.
+
+Medir el elemento equivocado da un verde que miente: es la misma lección que ya
+pagaron el guion 14 (midió el texto de la tarjeta en vez de la lista) y el 09.
+
+### El arreglo, y por qué es donde es
+
+`position: sticky; bottom: 0`, y la puerta pasa a ser **hija directa del
+contenedor**, no del pie. `sticky` se pega dentro del bloque contenedor del
+elemento: metida en el `<footer>` —que vive al final del contenido— solo se
+pegaría cuando el pie ya estuviera a la vista, o sea nunca.
+
+Dos cosas más que salieron de medir y no de suponer:
+
+- **`display: block` explícito.** Un `<button>` sin `display` vuelve a
+  `inline-block`, y `sticky` no se pega sobre un elemento en línea. Con la cadena
+  vacía el arreglo se deshace sin que nada lo diga.
+- **`width: calc(100% + 24px)` y `box-sizing: border-box`.** `width: auto` no
+  vale: un `<button>` con `display: block` **sigue dimensionándose por su
+  contenido**, así que la barra salía de **220,83 px en un cajón de 420** y el
+  texto que scrollea por detrás asomaba por la derecha. Medido después: 418 px de
+  puerta en 420 de cajón, 1 px a cada lado, que es el borde.
+
+El arreglo **cuesta 0 bytes de presupuesto** (§21): el cajón se viste con estilos
+en línea.
+
+### Régimen de red — léete el §13 antes de lanzarlo
+
+Toca el servicio REAL: una pasada, sin bucles, **como mucho dos peticiones de
+datos**. Si el servicio no contesta, el guion lo dice y no reintenta; el problema
+que reporta distingue explícitamente «no se abre el cajón» de «el servicio no ha
+contestado», para que nadie acuse a la aplicación de lo que es de la red.
+
+⚠️ **Necesita `npm run dev`, no `vite preview`**: el fixture se trae por `fetch`
+de `test/fixtures/gml/`, y `preview` sirve `dist/`, donde no está.
+
+### ⚠️ Este guion deja estado en INDEXEDDB, y `reload` NO lo limpia
+
+Al terminar la ruta hay un **expediente autoguardado**. La corrida siguiente
+arranca con una tarjeta de aviso más —«hay trabajo autoguardado de una sesión
+anterior sin recuperar»— que le come **73,14 px** a la caja de vértices.
+
+Costó una falsa regresión el 2026-08-04: la caja pasó de 228,33 a 155,19 px justo
+después de arreglar la puerta, y pareció culpa del arreglo. No lo era. El guion lo
+detecta y lo dice en `advertencias` en vez de dejarte comparar peras con manzanas,
+pero **la limpieza hay que hacerla a mano**, con un `js` que recorra
+`indexedDB.databases()` y llame a `deleteDatabase` en cada una, y un `reload`
+detrás.
+
+Es la regla del §20 llevada un paso más allá: **si el guion deja estado en disco,
+la pasada siguiente lleva borrado, no `reload`.**
+
+### Cómo se lanza
+
+```bash
+npm run dev                                        # ⚠️ dev, no `vite preview`
+
+$B viewport 1280x720                               # el SUELO declarado (D5)
+# … borrar IndexedDB (arriba) …
+$B goto http://localhost:PUERTO/concretagml/#/parcela/entrada
+$B reload
+$B wait ".gml-rail"
+$B console --clear
+$B eval scripts/smoke-navegador/15-contraste.js
+
+$B viewport 1440x900                               # y la pasada cómoda
+# … borrar IndexedDB otra vez …
+$B reload && $B wait ".gml-rail"
+$B eval scripts/smoke-navegador/15-contraste.js
+$B console --errors                                # → (no console errors)
+```
+
+### Qué cuenta como «pasa»
+
+`ok: true` y `problemas: []` en **las dos** pasadas, y además:
+
+- `puerta.seVe: true`, con `loQueHayEnSuCentro` devolviendo el propio botón.
+- Tras soltar: `paso === 'entrada'` (traer un fichero es empezar otro
+  expediente), cajón de comprobación puesto y el de diagnóstico no.
+- Tras contrastar: `paso === 'diagnostico'`, los cajones intercambiados, la
+  procedencia visible diciendo «otro técnico» y nombrando la puerta, y **Edición
+  apagada** (la comprobación es de solo lectura).
+- Tras cruzar: la puerta desaparece, Edición se enciende y la procedencia pasa a
+  «Lo has tomado como tuyo… el fichero del que salió no se modifica».
+
+### Cifras de referencia (corrida de cierre, 2026-08-04, `npm run dev`, puerto 5176)
+
+| | **1280×720** | 1440×900 |
+|---|---|---|
+| Veredicto | **`ok: true`** | **`ok: true`** |
+| Puerta: se ve | **sí** | **sí** |
+| Puerta: caja | 418 × 39,84 px | 418 × 39,84 px |
+| Cajón: enseña / contenido | 372 / 727 px | 466 / 727 px |
+| Puerta por debajo del cajón | **−11 px** (dentro) | **−11 px** (dentro) |
+| `#tabla-vertices` tras contrastar | **228,33 px** | **385,67 px** |
+| Consola | limpia | limpia |
+
+Los 228,33 y 385,67 px son **exactamente** los que T6 dejó (§20): abrir el cajón
+de diagnóstico sobre el mapa no le quita ni un píxel al panel, que es la razón
+por la que el cajón flota y no baja al panel (F07).
+
+### La verificación del propio guion
+
+Un guion que solo ha visto la versión arreglada no prueba nada. Éste se lanzó
+**contra el defecto original** —puerta devuelta al `<footer>`, `sticky` quitado—
+y salió:
+
+```
+ok: false
+"LA PUERTA NO SE VE, y la procedencia la está nombrando. Dentro del cajón: false;
+ dentro de la ventana: false; en su centro hay «FUERA DE LA VENTANA». Se sale
+ 259.75 px por debajo del cajón, que enseña 466 px de 727."
+```
+
+Un solo problema, el correcto, con la cifra: el resto de la ruta siguió verde. Eso
+es lo que distingue un guardián de una alarma.
+
+### Lo que este guion deja al checklist humano
+
+- **Que alguien ENCUENTRE la puerta sin que se la señalen.** Este guion mide que
+  se ve; que se lea como el siguiente paso del recorrido no tiene número.
+- **Que el texto de procedencia se entienda.** Se comprueba que dice de quién es
+  la geometría y que cambia al cruzar; que un colegiado lo lea sin releerlo, no.
+- **Si el diagnóstico es correcto.** Eso es del guion 09 y de la suite.

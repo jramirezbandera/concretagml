@@ -769,6 +769,32 @@ const CajonDiagnostico = L.Control.extend({
     // {@link crearCajonDiagnostico}`#puerta`. Un botón que no aplica no se apaga —
     // se quita, porque un «tomar esta geometría» gris sobre tu propia parcela no
     // tiene ningún motivo que escribir al lado.
+    //
+    // ── ⛔ POR QUÉ ES HERMANO DEL PIE Y NO HIJO SUYO (corregido el 2026-08-04) ──
+    // La primera versión de T9 lo metió DENTRO del `<footer>`, al final. En jsdom
+    // eso sale verde —no hay maquetación— y las siete pruebas de la ruta 2 lo
+    // daban por visible. En Chrome, medido:
+    //
+    //     1280×720  el cajón enseña 372 px de 686 → la puerta cae 314 px por debajo
+    //     1440×900  el cajón enseña 466 px de 744 → la puerta cae 267 px por debajo
+    //
+    // O sea: **el botón que es toda la razón de ser del modo comprobación nacía
+    // fuera de la vista**, al final de un scroll interno que arranca en 0, y nada
+    // decía que estuviera ahí. El renglón de procedencia llegaba a nombrarlo
+    // («pulsa «Tomar esta geometría y editarla»») señalando a algo invisible, que
+    // es peor que no tener botón.
+    //
+    // Se arregla con `position: sticky`, y por eso tiene que ser **hijo directo
+    // del contenedor**: `sticky` se pega dentro del bloque contenedor del
+    // elemento, y estando dentro del `<footer>` —que vive al final del contenido—
+    // solo se pegaría cuando el pie ya estuviera a la vista, o sea nunca. Como
+    // hijo del contenedor —que ES el que scrollea (`maxHeight: 52vh` +
+    // `overflowY: auto`)— queda clavado abajo en cualquier posición del scroll.
+    //
+    // Los márgenes negativos con su relleno del mismo tamaño no son un apaño:
+    // llevan el fondo blanco hasta los bordes del cajón (que tiene
+    // `padding: 10px 12px`), y sin eso el contenido se vería pasar por debajo del
+    // botón por los cuatro costados.
     const puerta = crear(doc, 'button', null, 'Tomar esta geometría y editarla')
     puerta.type = 'button'
     puerta.dataset.accion = 'tomar-geometria'
@@ -777,25 +803,39 @@ const CajonDiagnostico = L.Control.extend({
     // en línea ganaría a `estilos/app.css` y el botón saldría en `system-ui`.
     estilar(puerta, {
       display: 'none',
-      marginTop: '10px',
-      paddingTop: '10px',
+      position: 'sticky',
+      bottom: '0',
+      zIndex: '1',
+      marginTop: '12px',
+      marginLeft: '-12px',
+      marginRight: '-12px',
+      marginBottom: '-10px',
+      padding: '10px 12px',
       borderTop: '1px solid #E2E8F0',
       borderLeft: '0',
       borderRight: '0',
       borderBottom: '0',
-      background: 'transparent',
+      background: '#fff',
       color: '#0F172A',
       cursor: 'pointer',
       fontSize: 'inherit',
       lineHeight: 'inherit',
       fontWeight: '600',
       textAlign: 'left',
-      width: '100%',
+      // ⚠️ `width: auto` NO vale, y costó una medición: un `<button>` con
+      // `display: block` **sigue dimensionándose por su contenido** (shrink to
+      // fit), así que la barra salía de 220,83 px en un cajón de 420 y el texto
+      // que scrollea por detrás asomaba por la derecha del botón. `100%` sería el
+      // ancho del CONTENIDO del cajón (394 px), que deja fuera sus dos rellenos de
+      // 12 px: de ahí el `+ 24px`, que es justo lo que compensan los márgenes
+      // negativos de arriba. Con `border-box` el relleno propio va incluido.
+      boxSizing: 'border-box',
+      width: 'calc(100% + 24px)',
     })
     this._puerta = puerta
 
     acciones.append(preparar, descargar)
-    pie.append(acciones, estadoInforme, puerta)
+    pie.append(acciones, estadoInforme)
 
     contenedor.append(
       cabecera,
@@ -806,6 +846,8 @@ const CajonDiagnostico = L.Control.extend({
       bloqueMargen,
       estado,
       pie,
+      // La puerta va la ÚLTIMA y fuera del pie: ver el bloque de arriba.
+      puerta,
     )
 
     // OBLIGATORIOS: sin ellos, pulsar dentro seleccionaría un lindero por debajo y
@@ -1429,7 +1471,10 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
      */
     puerta(visible) {
       if (destruido || !control._puerta) return
-      control._puerta.style.display = visible === true ? '' : 'none'
+      // `block` explícito y no `''`: un `<button>` sin `display` vuelve a
+      // `inline-block`, y `position: sticky` sobre un elemento en línea no se
+      // pega — el arreglo del 2026-08-04 se deshace sin que nada lo diga.
+      control._puerta.style.display = visible === true ? 'block' : 'none'
     },
 
     /**
