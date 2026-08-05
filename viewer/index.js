@@ -233,7 +233,9 @@ import { crearCajonDiagnostico } from './cajon-diagnostico.js'
 import { crearCapaColindantes } from './colindantes.js'
 import { crearContraste } from './contraste.js'
 import { crearEdicion } from './edicion.js'
+import { crearListaSobrante } from './lista-sobrante.js'
 import { crearMapa } from './mapa.js'
+import { crearCapaPiezas } from './piezas.js'
 import { montarCapas } from './capas.js'
 import { sincronizar } from './sincronizacion.js'
 
@@ -511,6 +513,34 @@ function normalizarColindantes(colindantes) {
       `${describir(colindantes)}. No admite objeto de opciones porque la capa de vecinas ` +
       `no tiene ninguna: las parcelas colindantes llegan del WFS DESPUÉS de montar el ` +
       `visor y se pintan con visor.colindantes.pintar([{refcat, recintos}]).`,
+  )
+}
+
+/**
+ * Normaliza `opciones.sobrante` a un booleano (F17 · 4.2).
+ *
+ * ⚠️ **BOOLEANO y no objeto de opciones**, al revés que `diagnostico` y
+ * `comprobacion` y por la misma razón que `colindantes`: sus dos piezas no tienen
+ * nada que elegir al montarse. La lista NO es un control de Leaflet —no hay
+ * esquina que escoger: la cuelga `app/main.js` de la sección anfitriona del
+ * panel—, y la capa de manchas no mide en píxeles, así que tampoco tiene
+ * `minimoPx`. Lo que sí hay que darle es la FOTO, y eso llega después de montar
+ * el visor: `visor.sobrante.lista.pintar(derivarCesion({...}))`.
+ *
+ * @param {*} sobrante
+ * @returns {boolean}
+ * @throws {TypeError}
+ */
+function normalizarSobrante(sobrante) {
+  if (sobrante === undefined || sobrante === false) return false
+  if (sobrante === true) return true
+
+  throw new TypeError(
+    `crearVisor: 'opciones.sobrante' es un BOOLEANO (o undefined); recibido ` +
+      `${describir(sobrante)}. No admite objeto de opciones porque sus dos piezas no eligen ` +
+      `nada al montarse: la lista no es un control del mapa (la aloja app/main.js en la ` +
+      `sección [data-anfitrion="sobrante"] del panel) y la capa de manchas no mide en ` +
+      `píxeles. La foto se pinta con visor.sobrante.lista.pintar(derivarCesion({...})).`,
   )
 }
 
@@ -914,6 +944,14 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  *   capa las señala en el mapa), mientras que F08 es UNA. Envolverla en
  *   `{cajon}` para que se pareciera obligaría a todos sus llamantes a escribir
  *   `visor.comprobacion.cajon` por una simetría que no existe.
+ * @property {{lista: ReturnType<typeof crearListaSobrante>,
+ *   capa: ReturnType<typeof crearCapaPiezas>}|null} sobrante  Las dos piezas de
+ *   F17, o **`null`** si el visor se montó sin ellas. Van JUNTAS en un objeto, como
+ *   `diagnostico` y por lo mismo: se usan siempre a la vez —la lista enseña las
+ *   cifras y la capa las manchas del mismo sobrante— y así `if (visor.sobrante)` es
+ *   una sola pregunta.
+ *   ⚠️ **`lista.nodo` NO está en el documento**: `crearVisor` la fabrica y la
+ *   devuelve, y quien la cuelga de la sección anfitriona del panel es `app/main.js`.
  * @property {import('./colindantes.js').CapaColindantes|null} colindantes  La capa
  *   de PARCELAS VECINAS (`viewer/colindantes.js`), o **`null`** si el visor se
  *   montó sin ella (mismo criterio que las anteriores: `null` es una respuesta,
@@ -1125,13 +1163,29 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  *
  *   **Es booleano y no admite objeto**, al revés que las tres opciones de arriba:
  *   la capa no tiene ni una opción de montaje (ver {@link normalizarColindantes}).
+ * @param {boolean} [opciones.sobrante=false]  Monta las dos piezas de F17: la
+ *   LISTA del sobrante (`viewer/lista-sobrante.js`) y la capa de MANCHAS
+ *   numeradas (`viewer/piezas.js`).
+ *
+ *   · **`false` (el DEFECTO) ⇒ el visor de antes, sin un nodo ni un pane ocupado
+ *     de más.** `visor.sobrante` vale `null`.
+ *   · **`true`** ⇒ las dos, VACÍAS. Montarlas no deriva nada: derivar es una resta
+ *     booleana que hace la aplicación cuando el usuario la pide. Se pintan con
+ *     `visor.sobrante.lista.pintar(cesion)` y `visor.sobrante.capa.pintar(cesion.piezas)`.
+ *
+ *   ⚠️ **`lista.nodo` sale SIN COLGAR de ningún sitio**: hay que insertarlo en la
+ *   sección `[data-anfitrion="sobrante"]` del panel. Lo hace `app/main.js`, que es
+ *   el único módulo que conoce la cáscara.
+ *
+ *   **Es booleano y no admite objeto**, por lo mismo que `colindantes` (ver
+ *   {@link normalizarSobrante}).
  * @returns {Visor}
  * @throws {TypeError}  Contrato del programador: `opciones` no es un objeto,
  *   `estado` no es el store, `vistaInicial` malformada, `srs` no es un string
  *   (desde `husoPorSrs`), `contenedor`/`tablaEl` no son elementos del DOM (desde
  *   `crearMapa`/`sincronizar`), `edicion`, `diagnostico` o `comprobacion` que no
- *   son booleano ni objeto, `colindantes` que no es booleano, `alPrevisualizar`
- *   que no es función, o **no hay ni geometría ni `vistaInicial`**.
+ *   son booleano ni objeto, `colindantes`/`sobrante` que no son booleanos,
+ *   `alPrevisualizar` que no es función, o **no hay ni geometría ni `vistaInicial`**.
  * @throws {RangeError}  `srs` no soportado (desde `husoPorSrs`), `baseInicial`
  *   inexistente (desde `montarCapas`), `maxZoom` que no supera el zoom nativo
  *   de las capas montadas, `edicion.tolerancia` negativa (desde `crearEdicion`),
@@ -1161,6 +1215,7 @@ export function crearVisor(contenedor, opciones = {}) {
     diagnostico: opcionDiagnostico = false,
     comprobacion: opcionComprobacion = false,
     colindantes: opcionColindantes = false,
+    sobrante: opcionSobrante = false,
     alPrevisualizar,
     ...opcionesMapa
   } = opciones
@@ -1187,6 +1242,7 @@ export function crearVisor(contenedor, opciones = {}) {
   const opcionesDiagnostico = normalizarDiagnostico(opcionDiagnostico)
   const opcionesComprobacion = normalizarComprobacion(opcionComprobacion)
   const montarColindantes = normalizarColindantes(opcionColindantes)
+  const montarSobrante = normalizarSobrante(opcionSobrante)
   // Misma política que `resolverAvisar` y que los tres ganchos de `sincronizar`:
   // "no me han pasado nada" es legítimo (cae a `null`); "me han pasado basura
   // donde iba una función" es contrato roto, y eso aquí es `throw`.
@@ -1386,6 +1442,33 @@ export function crearVisor(contenedor, opciones = {}) {
       deshacer.push(() => comprobacion.destruir())
     }
 
+    // 5 ter · Las dos piezas de F17: la LISTA del sobrante y sus MANCHAS. Nacen
+    // las dos vacías —la lista con el botón apagado y su motivo escrito, la capa
+    // sin un polígono puesto—, así que aquí son tan inertes como los dos cajones
+    // anteriores y por el mismo motivo: no se suscriben a nada del mapa.
+    //
+    // ⚠️ La lista **no se cuelga de ningún sitio aquí**: se fabrica y se devuelve.
+    // Quién la aloja es `app/main.js` (la sección `[data-anfitrion="sobrante"]` del
+    // panel), que es el único módulo que conoce la cáscara. Es la misma división
+    // que el cajón de diagnóstico estrenó el 2026-08-05 con `anfitrion()`, con una
+    // diferencia: aquél nace en una esquina del mapa y SE MUDA; éste nunca ha
+    // estado en el mapa, así que hasta que alguien lo cuelgue no está en el
+    // documento — y por eso `crearVisor` lo devuelve en vez de darlo por puesto.
+    /** @type {{lista: object, capa: object}|null} */
+    let sobrante = null
+    if (montarSobrante) {
+      const capaPiezas = crearCapaPiezas({ mapa, zona, alAvisar: avisar })
+      deshacer.push(() => capaPiezas.destruir())
+
+      const listaSobrante = crearListaSobrante({
+        documento: contenedor.ownerDocument ?? undefined,
+        alAvisar: avisar,
+      })
+      deshacer.push(() => listaSobrante.destruir())
+
+      sobrante = { lista: listaSobrante, capa: capaPiezas }
+    }
+
     // 6 · El encuadre, lo ÚLTIMO del MONTAJE (ver cabecera: así la capa WMS del
     // Catastro pide UNA sola imagen, y del encuadre bueno).
     encuadrar({ mapa, estado, zona, vistaInicial, avisar })
@@ -1481,6 +1564,7 @@ export function crearVisor(contenedor, opciones = {}) {
       diagnostico,
       comprobacion,
       colindantes,
+      sobrante,
 
       /**
        * El encuadre EXPLÍCITO. Misma función que el paso 6 —cascada completa— y

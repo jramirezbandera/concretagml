@@ -134,6 +134,7 @@ export const PANE = Object.freeze({
   COLINDANTES: 'colindantes',
   PARCELA_OFICIAL: 'parcelaOficial',
   PARCELA_EDITADA: 'parcelaEditada',
+  PIEZAS: 'piezas',
   PARTES: 'partes',
   ACOTACIONES: 'acotaciones',
   DIAGNOSTICO: 'diagnostico',
@@ -222,6 +223,31 @@ export const PANE = Object.freeze({
  * Con la rama PARCELA activa este pane existe y está VACÍO, exactamente igual que
  * `diagnostico` mientras nadie diagnostica: el pane lo crea el mapa, no la opción.
  *
+ * `piezas` (F17, tarea 4.1 — el SOBRANTE derivado, que pinta `viewer/piezas.js`)
+ * se intercala en **421**, el único hueco que quedaba entre `parcelaEditada` (420)
+ * y `partes` (422). Los tres porqués:
+ *   · por ENCIMA de `parcelaOficial` (410) y de `parcelaEditada` (420) porque una
+ *     pieza del sobrante **no es una anotación sobre esas dos geometrías: es una
+ *     tercera geometría del mismo expediente** —la finca que se va a segregar—, y
+ *     se RELLENA. Por debajo de 410 la ortofoto seguiría viéndose pero el contorno
+ *     oficial la cruzaría por encima, y el usuario estaría revisando una finca
+ *     tachada por la línea de la que sale.
+ *   · **el sitio se decide contra F07 y no contra F11**: la pieza ocupa
+ *     EXACTAMENTE el mismo terreno que la «diferencia sombreada» que
+ *     `viewer/contraste.js` pinta en el pane 428 (las dos son `P_of − P_new`). Por
+ *     eso esta va DEBAJO: aquélla es la anotación que explica, ésta es el objeto
+ *     que se propone, y si el usuario navega a Diagnóstico sin limpiar, lo que
+ *     tiene que ganar es la explicación. Que además se distingan por color (cian
+ *     contra gris) es la segunda línea de defensa, no la única.
+ *   · por DEBAJO de `vertices` (430) por lo mismo que `partes`: el vértice sigue
+ *     siendo LO QUE SE AGARRA, y en F17 la edición está viva mientras se revisa el
+ *     sobrante — el flujo real es derivar, ver que una astilla sobra, mover el
+ *     vértice y volver a derivar.
+ * El orden relativo contra `partes` (422) **no es observable**: aquéllas son de la
+ * rama EDIFICIO y ésta de la rama PARCELA, y las dos ramas no coexisten. Se elige
+ * 421 para que las tres capas de GEOMETRÍA queden contiguas por debajo de las tres
+ * de ANOTACIÓN, que es el criterio con el que está ordenada toda esta lista.
+ *
  * `viewer/mapa.js#crearMapa` ITERA esta lista para crear los panes, así que
  * añadir una entrada aquí es todo lo que hace falta: ni ese módulo ni el arnés
  * de test (`test/viewer/_ayuda-jsdom.js#crearPanes`) llevan nombres a mano.
@@ -232,6 +258,7 @@ export const PANES = Object.freeze([
   { nombre: PANE.COLINDANTES, zIndex: 405 },
   { nombre: PANE.PARCELA_OFICIAL, zIndex: 410 },
   { nombre: PANE.PARCELA_EDITADA, zIndex: 420 },
+  { nombre: PANE.PIEZAS, zIndex: 421 },
   { nombre: PANE.PARTES, zIndex: 422 },
   { nombre: PANE.ACOTACIONES, zIndex: 425 },
   { nombre: PANE.DIAGNOSTICO, zIndex: 428 },
