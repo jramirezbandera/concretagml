@@ -14,7 +14,8 @@
     "test:dom": "node scripts/vitest.mjs run --project dom",
     "presupuesto": "node scripts/presupuesto-css.mjs",
     "validar:xsd": "node scripts/validar-xsd.mjs",
-    "catastro:vivo": "node scripts/sonda-catastro.mjs"
+    "catastro:vivo": "node scripts/sonda-catastro.mjs",
+    "validar:dxf": "node scripts/validar-dxf.mjs"
   },
   "devDependencies": {
     "@turf/boolean-clockwise": "^7.3.5",

@@ -4068,3 +4068,73 @@ posible. Necesita una revisión propia, y lo que hay que replantear es esto:
 Mientras tanto, la cobertura no se ha perdido: el `09` cubre el cajón de
 diagnóstico y su red, el `15` cubre la ruta de comprobación entera con la puerta,
 y el `12` cubre la persistencia.
+---
+
+## 24. ¿Abre el DXF en un CAD? (`npm run validar:dxf`)
+
+La segunda medición de este runbook que **no necesita navegador**, y la gemela del
+§21: las dos existen porque una cifra que nadie vuelve a mirar deja de ser una
+medición.
+
+```
+npm run validar:dxf              # informa
+npm run validar:dxf -- --estricto  # y NO poder medir es un fallo (código 2)
+```
+
+Motor y oráculo: **`ezdxf`**, que no es nuestro. `scripts/validar-dxf.mjs` genera
+los casos con `export/dxf.js` —no lee fixtures: audita lo que la aplicación
+produce **hoy**— y `scripts/validar-dxf.py` los abre.
+
+**⛔ POR QUÉ HACE FALTA, Y NO ES CELO.** Medido el 2026-08-03, al escribir F10: el
+DXF del override O12 al pie de la letra **no abre** (`DXFStructureError`), y
+**`parsers/dxf.js` —nuestro propio lector— lo aprobaba sin una queja**: dos
+anillos, coordenadas exactas, cero detecciones. La prueba de ida y vuelta que iba
+a ser la red de seguridad **habría salido verde con un fichero que no abre en
+ninguna parte**.
+
+F10 corrigió el exportador y dejó los hechos de aquella ablación escritos a mano
+sobre los bytes en `test/export/dxf.test.js`. Eso es mucho, y **sigue sin ser un
+lector**: son pruebas que comprueban NUESTRA lectura del formato. El oráculo de
+verdad corrió **una vez, a mano, fuera de la suite**. Esto lo hace repetible, que
+es la diferencia entre una medición y un guardián.
+
+**Las tres cosas que comprueba, y por qué cada una:**
+
+1. **Abre con `readfile`, no con `recover`.** `recover` está para rescatar
+   ficheros rotos: usarlo aquí sería preguntar «¿se puede salvar?» en vez de
+   «¿está bien?».
+2. **El auditor no encuentra NADA que arreglar: 0 errores y 0 arreglos.** Un
+   arreglo no es un aprobado, es el lector tapando un defecto en silencio.
+3. ⭐ **Las capas que las entidades NOMBRAN están en la tabla LAYER.** Es la
+   trampa gorda de F10: sin la sección `TABLES`, ezdxf abre el fichero, ve las
+   polilíneas y el auditor da 0 y 0 — pero las capas **no existen**, y el
+   criterio «abre en CAD con las dos capas separadas» fallaría entero sin que
+   nada avisara.
+
+**Estado (2026-08-05):** los tres casos ✓ con ezdxf 1.4.4 — dos capas, una sola y
+con huecos—, `readfile` sin recuperación y auditor a 0/0.
+
+**Verificado POR MUTACIÓN, dos veces:**
+
+| Mutación en `export/dxf.js` | La suite | El validador |
+|---|---|---|
+| quitar `100=AcDbPolyline` | 2 rojas | **`NO ABRE: DXFStructureError: missing 'AcDbPolyline' subclass`** en los 3 casos |
+| todas las entidades con el MISMO handle | 2 rojas | **«Removed entity LWPOLYLINE(#30) with a conflicting handle»** — o sea, el lector **borra una polilínea** para poder abrirlo |
+
+⚠️ **Y la suite no estaba ciega a ninguna de las dos**, conviene decirlo: F10 dejó
+esas aserciones escritas. Lo que añade el validador es **quién juzga** — y se ve
+en la segunda mutación: la suite dice «un snapshot no cuadra», el validador dice
+**qué entidad se pierde al abrir el fichero**.
+
+⚠️ **Un defecto de este propio script, cazado por su primera mutación:** `ezdxf`
+no le define `__str__` a `ErrorEntry`, así que el informe imprimía
+`<ezdxf.audit.ErrorEntry object at 0x…>`. Cazaba el defecto y **no sabía decir
+cuál era**, que es media regla de oro 1 sin cumplir. Ahora imprime código,
+mensaje y entidad.
+
+⚠️ **En Windows hay que reconfigurar la salida a UTF-8**: la consola sale en
+`cp1252` y el primer `✓` reventaba el script con `UnicodeEncodeError`, o sea que
+el validador «fallaba» por un carácter y no por el fichero.
+
+**Es gate en CI** (`deploy.yml`, job `esquema`, junto al del XSD y con
+`pip install ezdxf`).

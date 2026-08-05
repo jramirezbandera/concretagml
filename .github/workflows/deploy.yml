@@ -99,6 +99,10 @@ jobs:
       # vez de usar `libxml2-utils` porque el script cachea en disco los XSD que
       # descarga, y eso solo lo hace por la vía de Python.
       - run: pip install lxml
+      # Y ezdxf, que es el ORÁCULO del DXF por la misma razón que el XSD lo es
+      # del GML: nuestro propio parser aprobó una vez un DXF que no abría en
+      # ninguna parte. Ver la cabecera de scripts/validar-dxf.mjs.
+      - run: pip install ezdxf
 
       - run: npm ci
 
@@ -110,6 +114,11 @@ jobs:
 
       - name: npm run validar:xsd -- --estricto
         run: npm run validar:xsd -- --estricto
+
+      # El DXF no necesita snapshots previos: el validador GENERA los casos con
+      # el exportador de verdad, así que audita lo que la aplicación produce hoy.
+      - name: npm run validar:dxf -- --estricto
+        run: npm run validar:dxf -- --estricto
 
   construir:
     name: Construir el bundle
