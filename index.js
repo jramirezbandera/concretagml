@@ -157,3 +157,25 @@ export * as entradaEdificio from './edificio/index.js'
 // regla, es una casualidad. Por eso la prohibición se escribe entera y no se deja en
 // «basta con no exportarlo».
 
+
+// ── F17 · `derivacion/` — la capa que PRODUCE las parcelas que faltan ────────
+// Once fases después, esta aplicación sabía describir UNA parcela y no sabía
+// cerrar un expediente. `derivacion/` es la capa que, a partir de la geometría
+// OFICIAL y de la EDITADA, produce lo que el IVG exige aportar además: el trozo
+// que la parcela suelta, con su superficie y su grosor, listo para entregarse como
+// una parcela más del mismo fichero (override O18).
+//
+// Entra por la MISMA razón que `comprobacion/`, `report/`, `export/` y
+// `edificio/`: **todo lo que sale por este barrel es puro**. Entran anillos en UTM
+// y POJOs; salen POJOs y detecciones. Ni `document`, ni Leaflet, ni red, ni reloj.
+//
+// ⛔ Y lo que NO sale es tan importante como lo que sale: `derivacion/topologia.js`
+// —el único fichero de la capa que importa Turf— se queda fuera, exactamente como
+// `diagnostico/topologia.js` se queda fuera del suyo. No es por pureza (es puro):
+// es que `restar()` devuelve geometría sin interpretar, y quien sabe qué significa
+// —qué es una astilla, en qué orden van las piezas, qué pasa cuando la parcela
+// CRECE en vez de menguar— es `cesion.js`. Sacar la primitiva por el barrel
+// invitaría a llamarla desde la interfaz y a repartir por ahí esa interpretación,
+// que es justo lo que esta capa existe para concentrar. Lo vigila
+// `test/derivacion/comun.test.js`.
+export * as derivacion from './derivacion/index.js'

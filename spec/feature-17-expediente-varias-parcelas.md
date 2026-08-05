@@ -118,14 +118,13 @@ minuendos ya están en memoria.
 | **M2** *(2026-08-05, fase 0)* | `SPEC.md` §7.1 publica un residuo de **0,0064 m²** | La cuenta que se puede REHACER hoy da **0,00595**. No se contradicen: aquélla salió de las superficies **sin redondear** de las dos piezas y la tabla publica las de 2 decimales. Cerrar los 4,5 cm² exigiría el `.gml` de dos miembros que se subió, y **ese fichero no está versionado**. Para lo que la cifra defiende da igual cuál sea: **las dos son mayores que cero**, y es eso lo que descarta el `==` |
 | **M3** *(2026-08-05, fase 0)* | La auditoría de comentarios caducos listaba **ocho** sitios | Son **nueve**: el guardián encontró `report/pdf-parcela.js:1467`, que la lista no tenía. Y de paso destapó que **el PDF YA lista las N parcelas del fichero con su columna «En este informe»** — por el camino de COMPROBACIÓN. El informe del camino propio todavía no la tiene |
 | **M4** *(2026-08-05, revisión de diseño)* | El bloque del sobrante «cabe en el panel» | **Medido en la aplicación real** a 1440×900 y 1280×720: cuesta **96,63 px vacío + 31,00 px por fila**. El invariante de **267,44 px** de la tabla de vértices se rompe con la **QUINTA pieza**. ⛔ Y el panel **no desborda: la tabla encoge en silencio**, que es la regla de oro 1 en versión maquetación |
+| **M5** *(2026-08-05, fase 1)* | ⛔ **El límite conocido del grosor estaba AL REVÉS.** F07 escribió —como conjetura— que una pieza anular «se subestima y podría descartarse» | Medido al extraer la función: para un anillo de grosor **UNIFORME** `2A/P = h` **exactamente**, y no solo si es delgado (comprobado a 0,001 · 0,01 · 0,05 · 1 · 20 y 25 m, los seis con error 0 en float64) — así que **el sobrante de un encogimiento uniforme se mide bien**, que es la buena noticia que F17 necesitaba. ⛔ El riesgo real es el contrario y es peor: con un anillo **no uniforme** la cifra promedia y **SOBREestima el lado fino** (marco de 100×100 con el hueco descentrado, 1 m de grosor en un lado y 49 en el otro: declara **25 m**). No descarta de más, **admite de más**, y aquí eso es lo grave porque una astilla admitida se emite y se firma |
+| **M6** *(2026-08-05, fase 1)* | Que `@turf/difference` añadiría «el envoltorio y no el álgebra», porque `polyclip-ts` ya está en `node_modules` vía `@turf/intersect`. **Inferencia 8/10, no medición** | **4.309 B = 4,21 kB** sobre el paquete construido, medidos cableando `restar` al punto de entrada real de la aplicación y comparando (883.971 → 888.280 B). La dirección de la inferencia era correcta —está muy lejos de los ~50 kB del motor booleano completo— y la cifra ya no es una apuesta. ⚠️ **Hoy el paquete NO lo lleva**: `restar` no tiene llamante en producción hasta que entre `cesion.js` (fase 2), así que el coste está medido pero aún no pagado |
+| **M7** *(2026-08-05, fase 1)* | El riesgo de `xs:ID` con N miembros: «dos miembros con el mismo `refcat` repiten los cuatro ids» | **Cierto a medias, y la primera versión del test se equivocaba donde el código acertaba**: la base del id es `namespace + refcat`, así que **la misma referencia bajo namespaces distintos NO choca**. No es un tecnicismo — es exactamente la forma del expediente aceptado (matriz en `ES.SDGC.CP`, cesión en `ES.LOCAL.CP` arrastrando la referencia del padre), y un guardián de «mismo refcat ⇒ error» habría rechazado el único caso con IVG positivo que este proyecto tiene |
+| **M8** *(2026-08-05, fase 1)* | El XSD estricto sobre un fichero de N miembros | **Validan** contra `cp/4.0` con lxml, en `--estricto`: **3.487 B** con dos miembros y **4.893 B** con tres. ⚠️ Lo que esto dice es que el ESCRITOR aguanta; que la Sede acepte tres o más **sigue sin medirse** |
 
 ## Deuda declarada
 
-- ⏳ **Los tres comentarios caducos de `gml/serialize-cp.js`** siguen afirmando que
-  «multiparcela está fuera de alcance». Los reescribe la tarea que convierte
-  `MIEMBROS = 1` en un bucle, porque toca esa misma zona. La excepción está
-  **declarada y vigilada** en `test/contrato.test.js`: cuando esa tarea entre, la
-  lista tiene que vaciarse o la suite se pone roja.
 - ⏳ **El `.gml` de dos `featureMember` que la Sede aceptó no está versionado.**
   Mientras siga así, la prueba de cierre contrasta contra los 466,2141 del fixture
   pero **no reproduce byte a byte** lo que obtuvo el CSV.
@@ -141,6 +140,14 @@ minuendos ya están en memoria.
   incoherente (Segregación con un miembro, o al revés).
 
 ## Deuda saldada
+
+- ✅ **Los comentarios caducos de `gml/serialize-cp.js`**, que la fase 0 dejó
+  exentos y vigilados. La tarea 1.3 los reescribió y **la lista de excepciones se
+  vació**, que era lo que su guardián exigía. ⛔ Y al vaciarla, el guardián dio
+  verde sin mirar nada: la frase había quedado partida en dos renglones al
+  reajustar el comentario, y el detector escaneaba línea a línea. Ahora aplana el
+  texto y devuelve la línea donde empieza. **Un detector que solo ve lo que cabe en
+  100 columnas no protege de nada.**
 
 - ✅ **El vocabulario.** «Multiparcela está fuera de alcance» dejó de ser cierto el
   2026-08-03 y seguía sosteniendo invariantes en nueve sitios. Corregido **el
@@ -167,13 +174,31 @@ minuendos ya están en memoria.
 
 ## Estado
 
-⏳ **EN CURSO.** Fase 0 (abrir la fase) **hecha el 2026-08-05**: el expediente de
+⏳ **EN CURSO.**
+
+**Fase 0 · abrir la fase — hecha el 2026-08-05** (6.011 / 133): el expediente de
 oro entra como fixture con guardián, las justificaciones caducadas dejan de
 sostener invariantes, el fichero de varias parcelas estrena nombre, y esta ficha
-existe. Suite en **6.011 pruebas / 133 ficheros**.
+existe.
 
-Quedan las fases 1 a 5: los tres cimientos puros, la derivación y el cierre, la
-entrega y el acto jurídico, la pantalla del sobrante, y los gates.
+**Fase 1 · los tres cimientos puros — hecha el 2026-08-05** (6.073 / 137):
+
+- **1.1** `geo/grosor.js` y `geo/poligono.js#coordsRegion` salen de donde estaban
+  presos (privados en `diagnostico/topologia.js`), y `esRecintoApto` deja de estar
+  escrita tres veces. `coordsRegion` devuelve **coordenadas y no un `Feature`**:
+  `geo/` sigue sin importar Turf, que es lo que impide que pueda arrastrarlo.
+  Corrige el límite conocido del grosor (**M5**).
+- **1.2** la capa `derivacion/` con su barrel, su léxico —quinta copia del contrato
+  **D**— y `restar()` devolviendo **`{piezas, saltados, detecciones}`**, para que
+  `[]` no pueda significar «no hay sobrante» y «no se pudo medir» a la vez. Entra
+  `@turf/difference` por subpaquete, **con su delta medido** (**M6**). Y el
+  guardián que ata las CINCO fábricas de detección, que hasta hoy nadie comparaba.
+- **1.3** `serializarExpedienteCp`: el sobre deja de ser de una parcela.
+  `MIEMBROS = 1` era constante desde F04 y su JSDoc anticipaba este día. La
+  regresión de una sola parcela tiene prueba **de cadena completa** (**M7**, **M8**).
+
+Quedan las fases 2 a 5: la derivación y el cierre, la entrega y el acto jurídico,
+la pantalla del sobrante, y los gates.
 
 ## Referencias
 

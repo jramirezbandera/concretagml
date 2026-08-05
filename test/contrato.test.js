@@ -18,6 +18,13 @@ import * as cierre from '../geo/cierre.js'
 import * as utm from '../geo/utm.js'
 import * as huso from '../geo/huso.js'
 import * as barrel from '../index.js'
+// Los CINCO léxicos de detección, para el bloque «contrato D» del final: hasta F17
+// eran cuatro copiados a mano y nada que los comparase.
+import * as parsersComun from '../parsers/_comun.js'
+import * as gmlComun from '../gml/_comun.js'
+import * as exportComun from '../export/_comun.js'
+import * as edificioComun from '../edificio/_comun.js'
+import * as derivacionComun from '../derivacion/_comun.js'
 import fixture from './fixtures/geo/parcela-ring.json' with { type: 'json' }
 
 // ── Test-guardián del contrato transversal de F00 (criterio de aceptación 5) ──
@@ -1322,7 +1329,7 @@ describe('guarda transversal Fase 4 · partición de tests derivada y fuente sin
     expect(afirmacionesCaducadas()).toEqual([])
   })
 
-  it('⛔ el detector ve la frase aunque esté PARTIDA en dos líneas', () => {
+  it('⛔ el detector ve la frase aunque esté PARTIDA en dos líneas (F17)', () => {
     // El hueco que tenía la primera versión, hecho test. Sin esto, envolver el
     // comentario a 100 columnas bastaría para que una justificación muerta
     // sobreviviera al guardián sin que nadie lo pretendiera.
@@ -1332,5 +1339,130 @@ describe('guarda transversal Fase 4 · partición de tests derivada y fuente sin
     // Y el mapa devuelve la línea donde EMPIEZA, que es donde hay que mirar.
     const { plano, lineaDe } = aplanar(partida)
     expect(lineaDe[plano.search(FRASE_CADUCADA)]).toBe(1)
+  })
+})
+
+// ── F17 · contrato D · LOS CINCO LÉXICOS DICEN LO MISMO ──────────────────────
+//
+// `parsers/`, `gml/`, `export/`, `edificio/` y ahora `derivacion/` tienen cada uno
+// su fábrica de detecciones con la MISMA forma —`{tipo, mensaje, severidad,
+// datos?}`— y su propia `SEVERIDAD`. La duplicación está razonada en las cinco
+// cabeceras: el léxico de TIPOS es lo que impide que una detección de una capa se
+// cuele en otra, y un `TIPO_DETECCION` común daría mensajes que la interfaz no sabe
+// interpretar.
+//
+// ⛔ **Lo que NO estaba razonado es que nadie las comparase.** Hasta F17 eran cuatro
+// fábricas copiadas a mano, con cuatro validaciones escritas a mano, y **ni un solo
+// test que dijera que siguen coincidiendo**. La primera que se relajara —aceptar un
+// `datos` que no es objeto plano, admitir una severidad nueva, dejar pasar un
+// mensaje vacío— lo haría en silencio, y la interfaz pinta las cinco con el mismo
+// componente.
+//
+// Este bloque es la alternativa BARATA a extraer el contrato común (opción 6B del
+// plan, descartada: metería cuatro suites en un diff que va de restar polígonos).
+// Compra la protección sin el refactor.
+
+describe('contrato D · las CINCO fábricas de detección no pueden divergir (F17)', () => {
+  const capas = [
+    { capa: 'parsers', mod: parsersComun, fabrica: parsersComun.crearDeteccion, tipos: parsersComun.TIPO_DETECCION },
+    { capa: 'gml', mod: gmlComun, fabrica: gmlComun.crearDeteccionGml, tipos: gmlComun.TIPO_GML },
+    { capa: 'export', mod: exportComun, fabrica: exportComun.crearDeteccionExport, tipos: exportComun.TIPO_EXPORT },
+    { capa: 'edificio', mod: edificioComun, fabrica: edificioComun.crearDeteccionEdificio, tipos: edificioComun.TIPO_EDIFICIO },
+    { capa: 'derivacion', mod: derivacionComun, fabrica: derivacionComun.crearDeteccionDerivacion, tipos: derivacionComun.TIPO_DERIVACION },
+  ]
+
+  /** Un tipo válido cualquiera de esa capa, para poder ejercitar la fábrica. */
+  const unTipo = (c) => Object.values(c.tipos)[0]
+
+  it('las cinco declaran EXACTAMENTE la misma escala de severidad', () => {
+    for (const c of capas) {
+      expect(c.mod.SEVERIDAD, `${c.capa}.SEVERIDAD`).toEqual({
+        INFO: 'INFO',
+        AVISO: 'AVISO',
+        ERROR: 'ERROR',
+      })
+      expect(Object.isFrozen(c.mod.SEVERIDAD), `${c.capa}.SEVERIDAD no está congelada`).toBe(true)
+    }
+  })
+
+  it('las cinco producen la MISMA forma: `{tipo, mensaje, severidad}` y nada más', () => {
+    for (const c of capas) {
+      const d = c.fabrica(unTipo(c), 'un mensaje', 'AVISO')
+      expect(Object.keys(d).sort(), `${c.capa}`).toEqual(['mensaje', 'severidad', 'tipo'])
+      expect(d).toEqual({ tipo: unTipo(c), mensaje: 'un mensaje', severidad: 'AVISO' })
+    }
+  })
+
+  it('`datos` es OPCIONAL en las cinco, y solo aparece si se aporta', () => {
+    // El contrato es `datos?`: una clave `datos: undefined` obligaría a todo
+    // consumidor a distinguir «no hay» de «hay pero vacío».
+    for (const c of capas) {
+      expect('datos' in c.fabrica(unTipo(c), 'm', 'INFO'), `${c.capa} sin datos`).toBe(false)
+      const con = c.fabrica(unTipo(c), 'm', 'INFO', { a: 1 })
+      expect(con.datos, `${c.capa} con datos`).toEqual({ a: 1 })
+    }
+  })
+
+  it('⛔ las cinco RECHAZAN lo mismo: tipo, severidad y mensaje inválidos', () => {
+    for (const c of capas) {
+      expect(() => c.fabrica('NO_EXISTE_ESTE_TIPO', 'm', 'INFO'), `${c.capa} tipo`).toThrow(
+        RangeError,
+      )
+      expect(() => c.fabrica(unTipo(c), 'm', 'GRAVE'), `${c.capa} severidad`).toThrow(RangeError)
+      expect(() => c.fabrica(unTipo(c), '', 'INFO'), `${c.capa} mensaje vacío`).toThrow(TypeError)
+      expect(() => c.fabrica(unTipo(c), 42, 'INFO'), `${c.capa} mensaje no texto`).toThrow(
+        TypeError,
+      )
+    }
+  })
+
+  it('⛔ NINGÚN tipo de una capa cuela en la fábrica de otra', () => {
+    // Es la razón entera de que haya cinco léxicos y no uno. Si esto dejara de ser
+    // cierto, la duplicación habría dejado de pagar por sí misma.
+    for (const c of capas) {
+      for (const otra of capas) {
+        if (otra === c) continue
+        const ajenos = Object.values(otra.tipos).filter(
+          (t) => !Object.values(c.tipos).includes(t),
+        )
+        if (ajenos.length === 0) continue
+        expect(() => c.fabrica(ajenos[0], 'm', 'INFO'), `${otra.capa}→${c.capa}`).toThrow(
+          RangeError,
+        )
+      }
+    }
+  })
+
+  it('las cuatro que cuentan detecciones dan el MISMO objeto ante la misma entrada', () => {
+    // `resumirDetecciones` está copiado en cuatro capas (`parsers/` usa otro
+    // nombre). Que cuenten distinto sería que la interfaz enseñara cifras que no
+    // cuadran entre pantallas.
+    const conResumen = capas.filter((c) => typeof c.mod.resumirDetecciones === 'function')
+    expect(conResumen.length, 'ninguna capa expone resumirDetecciones').toBeGreaterThan(2)
+    const entrada = [
+      { tipo: 'A', mensaje: 'm', severidad: 'INFO' },
+      { tipo: 'A', mensaje: 'm', severidad: 'ERROR' },
+      { tipo: 'B', mensaje: 'm', severidad: 'ERROR' },
+    ]
+    const esperado = {
+      total: 3,
+      porTipo: { A: 2, B: 1 },
+      porSeveridad: { INFO: 1, ERROR: 2 },
+    }
+    for (const c of conResumen) {
+      expect(c.mod.resumirDetecciones(entrada), `${c.capa}`).toEqual(esperado)
+    }
+  })
+
+  it('⛔ el guardián no es vacuo: una capa relajada lo pondría rojo', () => {
+    // Se simula la divergencia que este bloque existe para cazar: una fábrica que
+    // acepta una severidad nueva. Si el bucle de arriba no comprobara el rechazo,
+    // esto pasaría desapercibido.
+    const relajada = (tipo, mensaje, severidad) => ({ tipo, mensaje, severidad })
+    expect(() => relajada('X', 'm', 'GRAVE')).not.toThrow()
+    // …y la real sí lanza, que es la diferencia.
+    expect(() => derivacionComun.crearDeteccionDerivacion(unTipo(capas[4]), 'm', 'GRAVE')).toThrow(
+      RangeError,
+    )
   })
 })
