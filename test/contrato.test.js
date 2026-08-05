@@ -1466,3 +1466,79 @@ describe('contrato D · las CINCO fábricas de detección no pueden divergir (F1
     )
   })
 })
+
+// ── F17 · fase 2 · `comprobacion/` DEJA DE SER UN FICHERO Y PASA A SER LA CAPA ─
+//
+// Hasta hoy `index.js:74` decía `export * as comprobacion from './comprobacion/gml.js'`:
+// el espacio de nombres `comprobacion` ERA UN MÓDULO. Con `conjunto.js` la capa
+// tiene dos módulos públicos y entra por su barrel, exactamente como hizo `report/`
+// en F09. Este bloque ata las tres cosas que ese cambio podría romper en silencio:
+//
+//   1. que lo de F08 siga saliendo por donde salía (`comprobarGml`);
+//   2. que lo nuevo salga y lo interno NO;
+//   3. ⛔ que `comprobacion/conjunto.js` **no importe Turf**, que es lo que su
+//      cabecera afirma y lo que mantiene a esta capa como composición y no como un
+//      quinto sitio donde se llama al motor booleano.
+
+describe('contrato F17 · `comprobacion/` entra por su barrel, y `derivacion/` crece', () => {
+  it('lo de F08 sigue saliendo por donde salía: es una REGRESIÓN, no una migración', () => {
+    expect(typeof barrel.comprobacion.comprobarGml).toBe('function')
+    expect(typeof barrel.comprobacion.etiquetaDialecto).toBe('function')
+  })
+
+  it('el cierre del conjunto sale, con sus dos números derivados', () => {
+    expect(typeof barrel.comprobacion.comprobarConjunto).toBe('function')
+    expect(typeof barrel.comprobacion.toleranciaCierre).toBe('function')
+    expect(barrel.comprobacion.GROSOR_REDONDEO_M).toBeCloseTo(0.005 * Math.SQRT2, 15)
+    // El catálogo de tipos sale para poder comparar una detección sin escribir el
+    // literal a mano; la FÁBRICA no, porque nadie de fuera de la capa fabrica una.
+    expect(Object.keys(barrel.comprobacion.TIPO_COMPROBACION)).toContain('COBERTURA_INCOMPLETA')
+    expect(Object.keys(barrel.comprobacion)).not.toContain('crearDeteccionComprobacion')
+    expect(Object.keys(barrel.comprobacion)).not.toContain('exigirOpciones')
+  })
+
+  it('⛔ `comprobacion/conjunto.js` NO importa Turf: compone, no calcula', () => {
+    // Es lo que su cabecera promete y lo que sostiene la capa. El día que alguien
+    // le meta un `@turf/union` «para no encadenar restas», esto lo dirá.
+    const fuente = readFileSync(
+      fileURLToPath(new URL('../comprobacion/conjunto.js', import.meta.url)),
+      'utf8',
+    )
+    const turf = [...fuente.matchAll(/from\s+'(@turf\/[\w-]+|turf)'/g)].map((m) => m[1])
+    expect(turf).toEqual([])
+    // Mitad anti-vacuidad: el detector ve un import de Turf si lo hay.
+    expect(
+      [...("import u from '@turf/union'\n").matchAll(/from\s+'(@turf\/[\w-]+|turf)'/g)].map(
+        (m) => m[1],
+      ),
+    ).toEqual(['@turf/union'])
+  })
+
+  it('`derivacion/` saca la derivación y la identidad, y sigue sin sacar `restar`', () => {
+    expect(typeof barrel.derivacion.derivarCesion).toBe('function')
+    expect(typeof barrel.derivacion.identidadDeParcela).toBe('function')
+    expect(typeof barrel.derivacion.identidadDeCesion).toBe('function')
+    expect(barrel.derivacion.restar).toBeUndefined()
+  })
+
+  it('⭐ la cadena entera corre bajo el proyecto `node`, sin `window`', () => {
+    // Que este fichero cargue el barrel raíz y llame a las dos ya lo demuestra: si
+    // alguna de las dos capas arrastrara DOM, el import de arriba habría reventado.
+    const rect = (x0, y0, x1, y1) => [
+      { tipo: 'EXTERIOR', vertices: [[x0, y0], [x1, y0], [x1, y1], [x0, y1]] },
+    ]
+    const cesion = barrel.derivacion.derivarCesion({
+      recintos: rect(0, 0, 18, 10),
+      geometriaOficial: rect(0, 0, 20, 10),
+    })
+    expect(cesion.piezas).toHaveLength(1)
+    const cierre = barrel.comprobacion.comprobarConjunto({
+      geometriaOficial: rect(0, 0, 20, 10),
+      miembros: [
+        { etiqueta: 'matriz', recintos: rect(0, 0, 18, 10) },
+        { etiqueta: 'cesión 1', recintos: cesion.piezas[0].recintos },
+      ],
+    })
+    expect(cierre.cierra).toBe(true)
+  })
+})

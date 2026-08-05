@@ -97,6 +97,24 @@ export const TIPO_COMPROBACION = Object.freeze({
   PARCELA_ELEGIDA: 'PARCELA_ELEGIDA',
   // ── Higiene de las listas: dos capas que informan del mismo hecho ──
   DETECCION_SOLAPADA: 'DETECCION_SOLAPADA',
+  // ── C5 · el CIERRE DEL CONJUNTO (F17) ────────────────────────────────────
+  // El catálogo se AMPLÍA, y hay que decir por qué eso no contradice al «cerrado»
+  // de arriba: cerrado significa que ninguna otra capa mete tipos suyos aquí, no
+  // que esta capa no pueda crecer. C5 es una comprobación NUEVA de la misma capa
+  // —`comprobacion/conjunto.js`—, con la misma disciplina: un tipo positivo por
+  // afirmación, para que «se ha mirado y cuadra» no se confunda con «no se ha
+  // mirado».
+  //
+  // ⛔ Y son TRES afirmaciones y no una, que es la decisión de fondo de esta
+  // comprobación: **un solape y un hueco se compensan en área**, así que la suma
+  // sola cuadra sobre un parcelario roto.
+  SUMA_COTEJADA: 'SUMA_COTEJADA', // Σ de lo emitido == lo oficial, dentro de la tolerancia
+  SUMA_DISCREPANTE: 'SUMA_DISCREPANTE', // no cuadra, y por cuánto
+  SIN_SOLAPE: 'SIN_SOLAPE', // ningún par de miembros comparte superficie
+  MIEMBROS_SOLAPADOS: 'MIEMBROS_SOLAPADOS', // dos miembros se pisan: qué par y cuánto
+  COBERTURA_VERIFICADA: 'COBERTURA_VERIFICADA', // los miembros cubren el contorno oficial
+  COBERTURA_INCOMPLETA: 'COBERTURA_INCOMPLETA', // queda superficie oficial sin cubrir: el hueco
+  CONJUNTO_NO_COTEJABLE: 'CONJUNTO_NO_COTEJABLE', // no se ha podido medir, que NO es «cuadra»
 })
 
 /**

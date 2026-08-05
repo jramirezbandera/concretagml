@@ -71,7 +71,12 @@ export * as gml from './gml/index.js'
 // entrega. Cualquiera de los tres rompería la suite `node` entera en el import,
 // no en el uso. El mismo razonamiento está escrito en `gml/index.js`
 // (decisión 1) y en la cabecera de `app/main.js`.
-export * as comprobacion from './comprobacion/gml.js'
+//
+// ⚠️ F17: esta línea decía `from './comprobacion/gml.js'`, o sea que el espacio
+// `comprobacion` ERA UN FICHERO y no una capa —el mismo atajo que `report/` tuvo
+// hasta F09—. Con `comprobacion/conjunto.js` la capa pasa a tener dos módulos
+// públicos y entra por su barrel, que es donde están escritas sus decisiones.
+export * as comprobacion from './comprobacion/index.js'
 
 // ── F09 · `report` deja de ser UN FICHERO y pasa a ser LA CAPA ───────────────
 // Hasta aquí la línea decía `export * as report from './report/contraste-texto.js'`:
