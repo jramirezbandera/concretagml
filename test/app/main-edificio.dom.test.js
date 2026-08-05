@@ -643,17 +643,40 @@ describe('app/main · F11 · el dibujo entra por la zona que ya existía', () =>
     expect(edificio.parcelaContexto[0].vertices).toEqual(enPantalla.recintos[0].vertices)
   })
 
-  it('⛔ con la rama PARCELA el mismo DXF no carga nada, y dice por dónde', async () => {
-    const panelAvisos = q('#avisos')
+  it('⭐ con la rama PARCELA el mismo DXF entra como MEDICIÓN, no en el edificio', async () => {
+    // ⛔ **ESTA PRUEBA AFIRMABA LO CONTRARIO HASTA F18, y era correcta entonces.**
+    // Decía «con la rama PARCELA el mismo DXF no carga nada, y dice por dónde», y
+    // comprobaba que el panel dijera «rama Edificio». F11 solo cableó `.dxf`/`.txt`
+    // a una rama, así que con la otra puesta no había a quién dárselo.
+    //
+    // Se deja escrito porque el guardián no estaba mal: defendía un límite
+    // declarado. Lo que cambió es el límite — el paso 17 abre el segundo destino y
+    // ahora la entrada es simétrica. Lo que **sigue** guardándose es lo importante:
+    // que el fichero va donde el usuario está mirando y no a la otra rama.
     const antes = storeParcela().get()
 
     await soltarYEsperar(ficheroDeBytes(DXF_UNA_CAPA, 'huella.dxf'))
 
-    // El destino se resuelve TARDE, por la rama activa: aquí no hay a quién dárselo.
+    // El destino se resuelve TARDE, por la rama activa: con PARCELA puesta, el
+    // edificio NO se toca…
     expect(storeEdificio().get()).toBeNull()
-    expect(storeParcela().get()).toBe(antes)
-    // Y no se calla: decir «no» sin decir «por dónde» es la mitad de un mensaje.
-    expect(panelAvisos.textContent).toMatch(/rama Edificio/i)
+    // …y la parcela sí: ha entrado geometría nueva.
+    const despues = storeParcela().get()
+    expect(despues).not.toBe(antes)
+    expect(despues.recintos.length).toBeGreaterThan(0)
+    expect(despues.origen).toBe('DXF')
+
+    // ⛔ **Y LA CABECERA NO PUEDE DECIR QUE ESTO VIENE DEL CATASTRO.**
+    // Este guardián existe porque el guion 17 encontró el defecto en su primera
+    // corrida (2026-08-06) y **ninguna de las 6.339 pruebas lo veía**: hasta F18
+    // «no es la demostración» implicaba «la trajo el Catastro», porque no había
+    // otra puerta al store. La afirmación no estaba mal — es que no existía.
+    //
+    // Es el error caro de esta aplicación: hacer pasar por oficial una geometría
+    // que ha dibujado el usuario. A partir de ahí se firma sobre ella.
+    const eyebrow = q('[data-eyebrow]').textContent.trim()
+    expect(eyebrow).not.toMatch(/parcela del catastro/i)
+    expect(eyebrow).toMatch(/medici[óo]n/i)
   })
 
   it('el DXF real de siete capas pregunta por el reparto y lo carga al elegir', async () => {

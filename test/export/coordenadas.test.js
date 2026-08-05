@@ -34,11 +34,16 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { SEVERIDAD, TIPO_EXPORT } from '../../export/_comun.js'
-import { AVISO_NO_REIMPORTABLE, serializarCoordenadasTxt } from '../../export/coordenadas.js'
+import {
+  AVISO_NO_REIMPORTABLE,
+  esListadoDeReplanteo,
+  serializarCoordenadasTxt,
+} from '../../export/coordenadas.js'
 import { superficie } from '../../geo/area.js'
 import { detectarHuso, sanear } from '../../geo/huso.js'
 import { DECIMALES_COORD, redondearAnillo } from '../../gml/anillos.js'
 import { parsearGml } from '../../gml/parse.js'
+import { importar } from '../../parsers/importar.js'
 import { parseTXT } from '../../parsers/txt.js'
 
 const RAIZ = join(import.meta.dirname, '..', '..')
@@ -223,6 +228,90 @@ describe('export/coordenadas · la asimetría, medida y fijada', () => {
     expect(plano(texto)).toContain(AVISO_NO_REIMPORTABLE)
     expect(AVISO_NO_REIMPORTABLE).toMatch(/no se puede volver a cargar/i)
     expect(AVISO_NO_REIMPORTABLE).toMatch(/fichero de proyecto/i)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 2 bis · F18 · Y ahora, además, se RECONOCE cuando vuelve por la puerta
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// El bloque de arriba fija que este fichero no se puede releer. Mientras el `.txt`
+// no entrara por ningún sitio eso era letra impresa; F18 cablea la entrada de
+// `.txt` como medición de la parcela y hay que atender el gesto más natural del
+// mundo: exportar el listado y volver a soltarlo.
+
+describe('export/coordenadas · F18 · esListadoDeReplanteo', () => {
+  it('⭐ reconoce un listado REAL, recién exportado (ida y vuelta, no la constante)', () => {
+    // La prueba se hace contra el fichero que sale de verdad y NO contra
+    // `AVISO_NO_REIMPORTABLE`: un detector comparado con su propia constante se
+    // prueba a sí mismo y no reconoce ni un fichero. Ver el `it` siguiente.
+    expect(esListadoDeReplanteo(listadoReal().texto)).toBe(true)
+  })
+
+  it('⛔ y el motivo de que haya que colapsar blancos, medido: el aviso va PARTIDO', () => {
+    // Esto es lo que habría hecho fracasar a un detector escrito «tal cual», y sale
+    // verde midiéndolo: el listado NO contiene la constante como cadena literal,
+    // porque `parrafo()` la envuelve a 70 columnas. Si algún día dejara de
+    // envolverse, esta prueba avisa de que la razón del colapso ha cambiado.
+    const { texto } = listadoReal()
+    expect(texto).not.toContain(AVISO_NO_REIMPORTABLE)
+    expect(plano(texto)).toContain(AVISO_NO_REIMPORTABLE)
+  })
+
+  it('sigue reconociéndolo con la cabecera crecida (expediente largo y 400 vértices)', () => {
+    // La ventana de cabecera es finita a propósito —el detector corre sobre TODO lo
+    // que se suelta, un DXF de varios MB incluido—, así que se comprueba que el peor
+    // caso razonable sigue cayendo dentro.
+    const largo = 'Expediente de segregación de la parcela sita en el polígono 8 parcela 99 del término municipal de Málaga'
+    const muchos = Array.from({ length: 400 }, (_, i) => [440123.45 + i * 0.37, 4470987.65 + i * 0.11])
+    const { texto } = serializarCoordenadasTxt({
+      recintos: [recinto(muchos)],
+      refcat: REF,
+      srs: SRS,
+      nombre: largo,
+      fecha: FECHA,
+    })
+    expect(esListadoDeReplanteo(texto)).toBe(true)
+  })
+
+  it('NO confunde un volcado del técnico: un TXT de coordenadas, un LIST ni un DXF', () => {
+    // Anti-vacuidad. Un detector que dijera `true` a todo pasaría las tres pruebas
+    // de arriba y rompería la entrada de F18 entera.
+    expect(esListadoDeReplanteo('440123.45 4470987.65\n440133.45 4470987.65')).toBe(false)
+    expect(esListadoDeReplanteo('X = 440123.45, Y = 4470987.65, Z = 0.00')).toBe(false)
+    expect(esListadoDeReplanteo('0\nSECTION\n2\nENTITIES\n0\nLWPOLYLINE')).toBe(false)
+  })
+
+  it('un texto vacío o lo que no es texto dan false, sin lanzar', () => {
+    // Corre sobre lo que suelte el usuario: no puede reventar por la entrada.
+    for (const v of ['', null, undefined, 42, {}, []]) {
+      expect(esListadoDeReplanteo(v)).toBe(false)
+    }
+  })
+
+  it('⛔ lo que HOY le pasa a este fichero si nadie lo reconoce, medido el 2026-08-06', () => {
+    // Esta es la razón de ser del detector, y NO es la que se había supuesto. Se fija
+    // aquí con los valores exactos porque corrige una inferencia:
+    //
+    //   · NO entra una parcela falsa — `construida` es `false`;
+    //   · entra un DIAGNÓSTICO falso: el único bloqueo es `HUSO_NO_RESUELTO`, o sea
+    //     «no se ha podido resolver el huso», que manda al usuario a arreglar un huso
+    //     que no está roto en vez de decirle que este fichero no se reabre.
+    //
+    // Y la protección de hoy es incidental: descansa en que los números parásitos de
+    // la cabecera envenenen la comprobación del huso. Si algún día `importar()`
+    // aprendiera a saltarse la cabecera, esto se pondría rojo — y entonces el detector
+    // sería lo ÚNICO que separa al usuario de una parcela inventada.
+    const { texto } = listadoReal()
+    const { resumen, parcela } = importar(texto, { formato: 'TXT' })
+
+    expect(resumen.nVertices).toEqual([18]) // la parcela real tiene 15
+    expect(resumen.construida).toBe(false)
+    expect(parcela).toBeNull()
+    expect(resumen.bloqueos).toEqual(['HUSO_NO_RESUELTO'])
+
+    // Y forzar el huso tampoco lo salva: los pares parásitos caen fuera igual.
+    expect(importar(texto, { formato: 'TXT', huso: 30 }).resumen.construida).toBe(false)
   })
 })
 

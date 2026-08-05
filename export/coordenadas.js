@@ -147,6 +147,82 @@ export const AVISO_NO_REIMPORTABLE =
   'número de vértice, no una coordenada, y un lector de dos columnas la tomaría por ' +
   'la X. Para volver a abrir el trabajo aquí, usa el fichero de proyecto.'
 
+// ── F18 · Reconocer NUESTRO PROPIO listado cuando vuelve por la puerta ────────
+//
+// F18 cablea la entrada de `.txt` como medición de la parcela, y con ella abre un
+// camino que hasta hoy no existía: **soltar aquí el listado que esta misma
+// aplicación acaba de exportar**. Es el gesto más natural del mundo y hay que
+// atenderlo, porque el fichero NO es reimportable — lo dice él mismo unas líneas
+// más arriba, y la primera columna es el número de vértice.
+//
+// ⭐ **LO QUE PASA HOY, MEDIDO EL 2026-08-06 y no inferido.** Un listado de 15
+// vértices entra por `importar()` y salen **18 pares** —la cifra que F10 dejó
+// anotada, reproducida—, pero **la parcela NO se construye**: sale
+// `bloqueos: ['HUSO_NO_RESUELTO']` y `construida: false` en las tres variantes
+// probadas (con y sin `refcat`/`srs`, y con `huso: 30` forzado). Los pares
+// parásitos que el lector recoge de la cabecera y del pie —el «2» de «2
+// decimales», la fecha, la columna «Nº»— caen fuera del huso y envenenan la
+// comprobación.
+//
+// ⛔ **Así que el defecto NO es una parcela falsa: es un DIAGNÓSTICO FALSO.** El
+// usuario recibe «no se ha podido resolver el huso», que es plausible, es lo que
+// dice el catálogo de bloqueos, y **es mentira**: no hay ningún huso que arreglar,
+// lo que hay es un fichero que no se puede reabrir. Un error correcto en la forma
+// y equivocado en el fondo manda al usuario a perseguir algo que no existe, y eso
+// es peor que no decir nada (regla de oro 1).
+//
+// Y la protección de hoy es **incidental, no diseñada**: descansa en que unos
+// números sueltos rompan la comprobación del huso. Nada en la suite la defiende
+// y nadie la escribió a propósito. Esto sí.
+//
+// ── POR QUÉ SE COLAPSAN LOS ESPACIOS, Y NO ES COSMÉTICA ─────────────────────
+// El aviso NO viaja literal en el fichero: se emite con `parrafo()`, que lo
+// **envuelve a 70 columnas**. Medido: `texto.includes(AVISO_NO_REIMPORTABLE)`
+// devuelve **`false`** sobre un listado real. Un detector escrito contra la
+// constante «tal cual» habría salido verde en su test —comparándose consigo
+// mismo— y no habría reconocido ni uno solo de los ficheros de verdad.
+//
+// Se compara contra {@link AVISO_NO_REIMPORTABLE} y no contra una copia, que es
+// la regla de esta casa: dos redacciones del mismo hecho divergen, y la que se
+// queda vieja siempre es la nueva.
+
+/**
+ * Cuántos caracteres de cabecera se miran. El aviso vive SIEMPRE en la cabecera,
+ * antes de la primera tabla de vértices, y no se recorre el fichero entero porque
+ * este detector se ejecuta sobre **todo** lo que se suelta en la aplicación,
+ * incluido un DXF de varios MB.
+ *
+ * ⭐ **2000 sería suficiente, medido**: en el peor caso razonable —expediente de
+ * 150 caracteres y 400 vértices— el aviso termina en el offset **1195**. Se toma
+ * el doble porque el margen no cuesta nada y la cabecera puede crecer.
+ */
+const VENTANA_CABECERA = 4000
+
+/** Todo blanco consecutivo —saltos de línea incluidos— pasa a UN espacio. */
+const colapsarBlancos = (texto) => texto.replace(/\s+/g, ' ').trim()
+
+/**
+ * ¿Este texto es el LISTADO DE COORDENADAS que exporta {@link serializarCoordenadasTxt}?
+ *
+ * Se reconoce por el aviso que el propio listado lleva impreso, comparado sobre el
+ * texto con los blancos colapsados: ver el bloque de arriba para las dos cosas que
+ * hay medidas detrás de esa decisión.
+ *
+ * **No es una heurística de formato** —no cuenta columnas ni busca cabeceras de
+ * tabla—: busca una frase que este módulo escribe y que ningún volcado de un CAD
+ * va a contener. Un TXT de coordenadas del técnico, un LIST de AutoCAD o un DXF
+ * dan `false`.
+ *
+ * @param {string} texto  El fichero ya decodificado a texto.
+ * @returns {boolean} `true` si es un listado de replanteo emitido por esta app.
+ */
+export function esListadoDeReplanteo(texto) {
+  if (typeof texto !== 'string' || texto === '') return false
+  return colapsarBlancos(texto.slice(0, VENTANA_CABECERA)).includes(
+    colapsarBlancos(AVISO_NO_REIMPORTABLE),
+  )
+}
+
 // ── Formato de números, en español ───────────────────────────────────────────
 
 const nf = (decimales, agrupar = true) =>

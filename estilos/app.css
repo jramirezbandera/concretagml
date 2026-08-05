@@ -3961,6 +3961,7 @@ body {
    dos tiene nada más ancho que una etiqueta y su campo. */
 .gml-app .gml-dialogo-capas,
 .gml-app .gml-dialogo-atributos,
+.gml-app .gml-dialogo-importacion,
 .gml-app dialog[data-bloque='atributos-edificio'] {
   position: fixed;
   top: 50%;
@@ -3982,20 +3983,23 @@ body {
 
 .gml-app .gml-dialogo-capas::backdrop,
 .gml-app .gml-dialogo-atributos::backdrop,
+.gml-app .gml-dialogo-importacion::backdrop,
 .gml-app dialog[data-bloque='atributos-edificio']::backdrop {
   background: color-mix(in srgb, var(--color-text-primary) 45%, transparent);
 }
 
 /* Quien reparte el interior. Ver arriba por qué esto NO está en el `<dialog>`. */
 .gml-dialogo-capas-cuerpo,
-.gml-dialogo-atributos-cuerpo {
+.gml-dialogo-atributos-cuerpo,
+.gml-dialogo-importacion-cuerpo {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
 
 .gml-dialogo-capas-titulo,
-.gml-dialogo-atributos-titulo {
+.gml-dialogo-atributos-titulo,
+.gml-dialogo-importacion-titulo {
   margin: 0;
   font-size: var(--gml-titulo-tam);
   font-weight: var(--fw-semibold);
@@ -4004,7 +4008,8 @@ body {
 }
 
 .gml-dialogo-capas-intro,
-.gml-dialogo-atributos-intro {
+.gml-dialogo-atributos-intro,
+.gml-dialogo-importacion-intro {
   margin: 0;
   max-width: 68ch;
   font-size: var(--text-12);
@@ -4115,7 +4120,8 @@ body {
 /* ── El pie de los dos diálogos ────────────────────────────────────────────── */
 
 .gml-dialogo-capas-pie,
-.gml-dialogo-atributos-pie {
+.gml-dialogo-atributos-pie,
+.gml-dialogo-importacion-pie {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -4127,7 +4133,8 @@ body {
    completo y aquí eso los apilaría. (0,3,0) contra la (0,1,0) de la base: por
    especificidad, nunca por orden. */
 .gml-app .gml-dialogo-capas-pie .gml-boton,
-.gml-app .gml-dialogo-atributos-pie .gml-boton {
+.gml-app .gml-dialogo-atributos-pie .gml-boton,
+.gml-app .gml-dialogo-importacion-pie .gml-boton {
   width: auto;
   flex: none;
 }
@@ -4137,9 +4144,121 @@ body {
    reservado para que encender el botón —y vaciar el renglón— no dé un salto de
    maquetación justo debajo de la mano que va a pulsar. */
 .gml-dialogo-capas-estado,
-.gml-dialogo-atributos-estado {
+.gml-dialogo-atributos-estado,
+.gml-dialogo-importacion-estado {
   margin: 0;
   min-height: 1.45em;
+  font-size: var(--text-12);
+  color: var(--color-text-secondary);
+}
+
+/* ── F18 · La revisión de una medición ────────────────────────────────────────
+ *
+ * Solo lo PROPIO: la caja, el backdrop, el cuerpo, el título, la intro, el pie y
+ * el renglón de estado se los reparte con los diálogos de F11 —está añadido a sus
+ * listas de selectores, arriba— porque son exactamente la misma pieza. Duplicar
+ * ahí habría sido una segunda descripción del mismo diálogo, y las segundas
+ * descripciones divergen.
+ *
+ * Lo que esta pantalla tiene y aquéllas no son GRUPOS: hasta cuatro decisiones
+ * (capa, X/Y, cierre, huso) en la misma vista, cada una con su rótulo, su apunte
+ * y sus opciones. */
+
+.gml-dialogo-importacion-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-sub);
+}
+
+/* El primero no lleva raya: iría pegada debajo de la intro y leería como si
+   separase el título del contenido, que no es lo que separa. */
+.gml-dialogo-importacion-grupo:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.gml-dialogo-importacion-rotulo {
+  margin: 0;
+  font-size: var(--text-12);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.gml-dialogo-importacion-apunte {
+  margin: 0;
+  max-width: 68ch;
+  font-size: var(--text-12);
+  color: var(--color-text-secondary);
+}
+
+/* El motivo por el que algo no ha entrado. Va en el color de aviso y NO en rojo:
+   un reparto por capas sin resolver no es un error del usuario ni de la
+   aplicación — es una pregunta sin contestar. */
+.gml-dialogo-importacion-bloqueo {
+  margin: 0;
+  max-width: 68ch;
+  padding: var(--space-2);
+  border-radius: var(--radius);
+  background: var(--color-bg-surface);
+  border-left: 3px solid var(--color-aviso, var(--color-border-main));
+  font-size: var(--text-12);
+  color: var(--color-text-primary);
+}
+
+/* Las opciones de una decisión. Sin `display` en el `<ul>` informativo por lo
+   mismo que la lista de capas de F11: `.gml-app [hidden]` es (0,2,0) y una
+   declaración aquí ganaría por orden. */
+.gml-dialogo-importacion-lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-border-sub);
+  border-radius: var(--radius);
+  background: var(--color-bg-surface);
+}
+
+.gml-dialogo-importacion-lista > li {
+  padding: var(--space-2);
+  font-size: var(--text-12);
+  color: var(--color-text-secondary);
+  border-top: 1px solid var(--color-border-sub);
+}
+
+.gml-dialogo-importacion-lista > li:first-child {
+  border-top: 0;
+}
+
+/* Una opción elegible. El padding lo pone la ETIQUETA y no un contenedor, para
+   que el objetivo de pulsación sea la línea entera — misma decisión que
+   `.gml-candidatos` y que el reparto por capas de F11.
+
+   ⚠️ Sin `overflow` ni `max-height` en la lista: lleva radios dentro y un
+   contenedor recortante se comería el anillo de foco de los de los bordes. El
+   diálogo entero ya scrollea. */
+.gml-dialogo-importacion-opcion {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-top: 1px solid var(--color-border-sub);
+  font-size: var(--text-13, var(--text-12));
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.gml-dialogo-importacion-opcion:first-child {
+  border-top: 0;
+}
+
+/* Cuántas polilíneas trae la capa. A la derecha y en tabular para que las cifras
+   se puedan comparar de un vistazo entre renglones. */
+.gml-dialogo-importacion-cuenta {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
   font-size: var(--text-12);
   color: var(--color-text-secondary);
 }

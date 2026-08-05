@@ -115,7 +115,18 @@ export { ACADVER, CAPAS, serializarParcelaDxf } from './dxf.js'
 // y la interfaz tiene que poder decir lo mismo que dice el fichero en vez de una
 // segunda redacción parecida.
 
-export { AVISO_NO_REIMPORTABLE, serializarCoordenadasTxt } from './coordenadas.js'
+// ⭐ **Y desde F18 sale además `esListadoDeReplanteo`, que es la otra mitad del
+// mismo hecho.** Hasta F18 el aviso podía quedarse en letra impresa porque el `.txt`
+// no entraba por ningún sitio; F18 cablea la entrada de `.txt` como medición de la
+// parcela y abre la puerta a que este fichero vuelva. Reconocerlo vive AQUÍ —junto
+// a la frase que lo delata— y no en el cableado, para que el detector y el texto no
+// puedan divergir. Ver el bloque de `coordenadas.js` para lo que está medido detrás.
+
+export {
+  AVISO_NO_REIMPORTABLE,
+  esListadoDeReplanteo,
+  serializarCoordenadasTxt,
+} from './coordenadas.js'
 
 // ── Contrato F · el fichero de proyecto ──────────────────────────────────────
 // La única puerta de esta caja fuerte: sin backend y sin cuentas, es la única forma de

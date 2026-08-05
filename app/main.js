@@ -519,6 +519,14 @@ import { PERFIL, SEVERIDAD } from '../gml/_comun.js'
 import { descargarGml } from '../gml/descargar.js'
 import { NAMESPACE_INSPIRE_CATASTRO, NAMESPACE_INSPIRE_DEFECTO } from '../gml/ids.js'
 import { serializarParcelaCp } from '../gml/serialize-cp.js'
+// ⭐ **F18 · el PRIMER import del modelo en este fichero, y solo por el rótulo.**
+// `app/main.js` lleva doce fases ensamblando sin conocer el modelo: quien construye
+// parcelas son los cableados. Se importa `ORIGEN_PARCELA` —un catálogo, no una
+// fábrica— porque {@link rotuloDelDato} tiene que distinguir de dónde vino la
+// geometría, y derivarlo del catálogo es lo único que impide que el rótulo se quede
+// viejo cuando el modelo estrene un origen. Escribirlo a mano aquí es exactamente
+// lo que produjo el defecto que el guion 17 destapó.
+import { ORIGEN_PARCELA } from '../model/parcela.js'
 import { crearTransporte } from '../services/_red.js'
 import { crearClienteCatastro } from '../services/catastro.js'
 import { crearClienteEdificio } from '../services/catastro-edificio.js'
@@ -541,10 +549,14 @@ import {
 import { cablearComprobacion } from './cableado-comprobacion.js'
 import { cablearDerivacion } from './cableado-derivacion.js'
 import { cablearDiagnostico } from './cableado-diagnostico.js'
-import {
-  EXTENSIONES as EXTENSIONES_EDIFICIO,
-  cablearEdificio,
-} from './cableado-edificio.js'
+// ⚠️ **El alias dice `DIBUJO` y no `EDIFICIO` desde F18, y es una corrección de
+// vocabulario, no un capricho.** Esa lista (`.dxf`, `.txt`) la sigue publicando el
+// cableado de edificio —es su contrato desde F11 y allí se queda, con UN solo
+// dueño para que no pueda divergir—, pero **ya no describe un destino**: las mismas
+// dos extensiones entran ahora en las dos ramas y quien elige es la rama en
+// pantalla. Llamarla `EXTENSIONES_EDIFICIO` aquí haría leer el `entradasExtra` del
+// paso 9 como si el fichero fuera del edificio antes de saberlo.
+import { EXTENSIONES as EXTENSIONES_DIBUJO, cablearEdificio } from './cableado-edificio.js'
 import {
   EXTENSIONES_PROYECTO,
   MENSAJE_SIN_EXPEDIENTE,
@@ -553,6 +565,7 @@ import {
   hayGeometria,
 } from './cableado-expediente.js'
 import { cablearInforme } from './cableado-informe.js'
+import { cablearMedicion } from './cableado-medicion.js'
 import {
   AVISO_DEMO_HUECO_SINTETICO,
   SRS_DEMO,
@@ -585,6 +598,33 @@ const DEMO_HUECO = 'hueco'
 const EYEBROW_SINTETICA = 'Parcela sintética · demostración'
 const EYEBROW_DEMOSTRACION = 'Parcela de demostración'
 const EYEBROW_CATASTRO = 'Parcela del Catastro'
+
+/**
+ * ⛔ **EL CUARTO, Y LO DESTAPÓ EL GUION 17 EN SU PRIMERA CORRIDA (2026-08-06).**
+ * Con F18 la cabecera decía «Parcela del Catastro» **después de importar el
+ * levantamiento del propio técnico**, y eso es exactamente el error caro que toda
+ * la maquinaria de procedencia existe para impedir: la aplicación afirmando que
+ * una geometría viene de la Sede cuando la ha dibujado el usuario. A partir de ahí
+ * se mira una medición propia creyéndola oficial, y se firma sobre ella.
+ *
+ * No lo vio ninguna de las 6.339 pruebas, y por un motivo que conviene tener
+ * escrito: **la afirmación no existía**. `rotuloDelDato` tenía tres estados y
+ * hasta F18 «no es la demo» implicaba «la trajo el Catastro», porque no había
+ * ninguna otra forma de meter geometría en el store. F18 estrena la cuarta.
+ */
+const EYEBROW_MEDICION = 'Tu medición · no del Catastro'
+
+/**
+ * Los orígenes de `ORIGEN_PARCELA` que significan «lo ha medido el técnico». Se
+ * derivan del catálogo del modelo y **no se escriben a mano**: el día que
+ * `model/parcela.js` estrene un origen, esto se entera o se rompe, que es
+ * justamente lo que no pasó con el criterio anterior.
+ */
+const ORIGENES_MEDIDOS = new Set([
+  ORIGEN_PARCELA.LIST,
+  ORIGEN_PARCELA.TXT,
+  ORIGEN_PARCELA.DXF,
+])
 
 /**
  * Los DOS eyebrows de la rama EDIFICIO (F11). Los tres de arriba empiezan por
@@ -761,16 +801,37 @@ const MENSAJE_SIN_EDIFICIO_CABLEADO =
   'la consola del navegador.'
 
 /**
- * Se ha soltado un dibujo (`.dxf`/`.txt`) con la rama PARCELA puesta. **No es un
- * fallo**: es una vía que F11 no abre y que la ficha de F10 dejó anotada —la app
- * escribe un DXF de parcela que todavía no sabe reabrir—. AVISO y no ERROR, y con
- * la vía que sí existe escrita al lado: decir «no» sin decir «por dónde» es la mitad
- * de un mensaje.
+ * Gemelo del de arriba para la otra rama (F18 · paso 17). Son DOS mensajes y no uno
+ * genérico a propósito: si lo que ha reventado es la vía de medición, la rama de
+ * edificio sigue sirviendo —y al revés—, así que decir «no se ha podido montar»
+ * sin decir *qué* dejaría al usuario sin saber que le queda una salida.
  */
-const MENSAJE_DIBUJO_EN_PARCELA =
-  'Ese dibujo entra como PARTES DE UN EDIFICIO, y ahora mismo estás en la rama Parcela. Cambia ' +
-  'a la rama Edificio con el conmutador de la cabecera y vuelve a soltarlo. Reabrir un dibujo ' +
-  'como parcela todavía no está: esta versión sabe escribir su DXF, pero no leerlo de vuelta.'
+const MENSAJE_SIN_MEDICION_CABLEADA =
+  'La vía de medición propia no se ha podido montar en este arranque, así que ese dibujo no ' +
+  'tiene dónde entrar como parcela. Recarga la página; si vuelve a pasar, es un fallo de la ' +
+  'aplicación y está en la consola del navegador.'
+
+// ⭐ **AQUÍ VIVÍA `MENSAJE_DIBUJO_EN_PARCELA`, Y F18 LO HA BORRADO.** Decía esto:
+//
+//     'Ese dibujo entra como PARTES DE UN EDIFICIO, y ahora mismo estás en la rama
+//      Parcela. Cambia a la rama Edificio con el conmutador de la cabecera y vuelve
+//      a soltarlo. Reabrir un dibujo como parcela todavía no está: esta versión
+//      sabe escribir su DXF, pero no leerlo de vuelta.'
+//
+// Era honrado y era correcto: F11 solo cableó el `.dxf`/`.txt` a la rama EDIFICIO,
+// así que con la rama PARCELA puesta no había a quién darle el fichero. Lo que no
+// era, es sostenible — **la pantalla de Entrada anunciaba esa vía con su propio
+// botón** («Elegir un fichero de medición…»), y el usuario que lo pulsaba se comía
+// este aviso. Un cartel sin puerta detrás.
+//
+// El paso 17 abre la puerta: ya no hay una rama que rechace lo que la otra acepta.
+// Se deja escrito lo que decía, en vez de borrarlo sin más, porque el mensaje
+// documenta una decisión de F11 que fue correcta en su momento.
+//
+// ⚠️ Y queda un guardián en `test/app/main-medicion.dom.test.js` que comprueba que ese
+// identificador **no vuelve** al código: mientras exista, la vía no está cerrada.
+// (Lee la fuente con los comentarios quitados, para no acusarse a sí mismo por
+// estas líneas.)
 
 /**
  * El `.gml` soltado resultó describir una construcción y se ha encaminado a la otra
@@ -1217,17 +1278,35 @@ let ramaEnPantalla = RAMA.PARCELA
  *     `./demo-datos.js`), no traída del Catastro ahora. Decirle «Parcela
  *     cargada» —lo que trae `index.html`— sería, con el campo del Catastro al
  *     lado, hacerla pasar por una consulta que no se ha hecho.
+ *   · **{@link EYEBROW_MEDICION}** — ⛔ **el cuarto, y lo estrena F18**: la
+ *     geometría la ha medido el técnico y ha entrado por un `.dxf` o un `.txt`.
+ *     Ver el bloque de esa constante para el defecto que cierra.
  *
  * Sin parcela (`null`, que el store admite) se cae al lado conservador: el de la
  * demostración. Nunca se afirma «del Catastro» sin una parcela que lo respalde.
+ *
+ * ⚠️ **La pregunta es por el ORIGEN y no por el `idLocal`**, que es lo que hacía
+ * hasta F18. Aquel criterio decía «si no es la demo, la trajo el Catastro», y era
+ * cierto mientras el Catastro fuera la única puerta. Hoy hay cuatro orígenes en
+ * `ORIGEN_PARCELA` y tres de ellos NO son la Sede.
+ *
+ * ⚠️ **`GML_EXISTENTE` sigue cayendo en «del Catastro», y es una inconsistencia
+ * PREEXISTENTE que F18 no toca.** Medida al pasar: un GML de otro técnico también
+ * es geometría de un fichero, así que el rótulo tampoco le corresponde. No se
+ * arregla aquí porque ese rótulo es parte del recorrido de F08 —que además cruza
+ * a Contraste y reescribe `data-procedencia`— y cambiarlo de refilón, en la última
+ * tarea de otra fase, es como se rompen las cosas que nadie estaba mirando. Queda
+ * dicho, con su fecha, en la ficha de F18.
  *
  * @param {object|null} parcelaActual  POJO de parcela del store (o `null`).
  * @returns {string}
  */
 function rotuloDelDato(parcelaActual) {
   const hayParcela = parcelaActual !== null && parcelaActual !== undefined
-  if (hayParcela && parcelaActual.idLocal !== ID_LOCAL_DEMO) return EYEBROW_CATASTRO
-  return esSintetica ? EYEBROW_SINTETICA : EYEBROW_DEMOSTRACION
+  if (!hayParcela || parcelaActual.idLocal === ID_LOCAL_DEMO) {
+    return esSintetica ? EYEBROW_SINTETICA : EYEBROW_DEMOSTRACION
+  }
+  return ORIGENES_MEDIDOS.has(parcelaActual.origen) ? EYEBROW_MEDICION : EYEBROW_CATASTRO
 }
 
 /**
@@ -2535,6 +2614,18 @@ let edificioCableado = null
 let ramaCableada = null
 
 /**
+ * El cableado de la MEDICIÓN PROPIA del paso 17, o `null` mientras no exista.
+ * Cuarta referencia adelantada del fichero, y la lee el mismo destino que resuelve
+ * `edificioCableado`: el `.dxf`/`.txt` que el paso 9 le entrega a la zona.
+ *
+ * ⭐ **Con esto, esa entrada pasa de tener UN destino y un rechazo a tener DOS**, y
+ * la elige {@link ramaEnPantalla}. Ver el `entradasExtra` del paso 9.
+ *
+ * @type {ReturnType<typeof cablearMedicion>|null}
+ */
+let medicionCableada = null
+
+/**
  * El cableado del diagnóstico. **Se guarda la referencia desde F09** y no por
  * gusto: el paso 11 le pide `ultimoDiagnostico()`, que es el ÚNICO sitio donde
  * vive el diagnóstico que el cajón está enseñando ahora mismo. El informe firmable
@@ -2693,16 +2784,11 @@ comprobacionCableada = cablearComprobacion({
         expedienteCableado.abrirProyecto(fichero)
       },
     },
-    // ── F11 · el `.dxf` y el `.txt`, que esta app sabía ESCRIBIR y no abrir ───
+    // ── El `.dxf` y el `.txt`: DOS destinos, y los elige la rama ──────────────
     // F10 dejó la asimetría escrita: la aplicación exporta un DXF que no sabe
     // reabrir, y `parsers/dxf.js` llevaba desde F01 sin un solo llamante en
-    // producción. Aquí estrena llamante.
-    //
-    // ⚠️ **Y la asimetría queda cerrada A MEDIAS, que es lo honrado escribir.**
-    // Un dibujo entra como PARTES DE UN EDIFICIO; reabrirlo como PARCELA —que es
-    // la mitad que F10 dejó anotada— sigue sin existir, y es lo que dice
-    // {@link MENSAJE_DIBUJO_EN_PARCELA} unas líneas más abajo. Con `capas[]` ya
-    // disponible es tarea pequeña, y su sitio es F12.
+    // producción. F11 le dio la mitad —entra como partes de un edificio— y
+    // **F18 cierra la otra**: entra como medición de la parcela.
     //
     // ⚠️ **El destino depende de la RAMA ACTIVA, y por eso se resuelve dentro** y
     // no capturando una referencia: con la rama PARCELA un DXF es una medición de
@@ -2710,24 +2796,29 @@ comprobacionCableada = cablearComprobacion({
     // fichero y son dos documentos distintos, así que decidirlo en el montaje —donde
     // ni siquiera existe todavía el conmutador— sería congelar la respuesta a una
     // pregunta que el usuario contesta después.
+    //
+    // ⭐ **Hasta F18 esta entrada tenía un destino y un rechazo**, y el rechazo caía
+    // justo en la vía que la pantalla de Entrada anuncia con su propio botón. Ahora
+    // son dos destinos simétricos y no hace falta avisar de nada: el fichero va
+    // donde el usuario está mirando.
     {
-      extensiones: EXTENSIONES_EDIFICIO,
+      extensiones: EXTENSIONES_DIBUJO,
       alFichero: (fichero) => {
-        if (edificioCableado === null) {
-          panel.avisar(MENSAJE_SIN_EDIFICIO_CABLEADO, { nivel: NIVEL.ERROR })
+        const enEdificio = ramaEnPantalla === RAMA.EDIFICIO
+        const destino = enEdificio ? edificioCableado : medicionCableada
+        if (destino === null) {
+          // Un paso que no ha montado. Se dice CUÁL, porque el motivo es distinto y
+          // la salida también: si falta la rama de edificio, la de parcela sigue
+          // sirviendo, y al revés.
+          panel.avisar(
+            enEdificio ? MENSAJE_SIN_EDIFICIO_CABLEADO : MENSAJE_SIN_MEDICION_CABLEADA,
+            { nivel: NIVEL.ERROR },
+          )
           return
         }
-        // ⚠️ Con la rama PARCELA todavía NO hay a quién dárselo: la entrada por DXF
-        // de la parcela es la otra mitad de la asimetría de F10 y **no entra en
-        // F11**. Se dice, con la vía que sí existe, en vez de cargar las huellas en
-        // una rama que está enseñando otra cosa.
-        if (ramaEnPantalla !== RAMA.EDIFICIO) {
-          panel.avisar(MENSAJE_DIBUJO_EN_PARCELA, { nivel: NIVEL.AVISO })
-          return
-        }
-        // La promesa se suelta a propósito, igual que arriba: `alFichero` no lanza
-        // y cuenta por el panel y por su renglón todo lo que decide.
-        edificioCableado.alFichero(fichero)
+        // La promesa se suelta a propósito, igual que arriba: los dos `alFichero`
+        // no lanzan y cuentan por el panel todo lo que deciden.
+        destino.alFichero(fichero)
       },
     },
   ],
@@ -3911,6 +4002,45 @@ const derivacionCableada = cablearDerivacion({
   panel,
   srs: SRS_DEMO,
 })
+
+// ── 17 · LA MEDICIÓN PROPIA (F18) ────────────────────────────────────────────
+//
+// El paso que le da a `parsers/importar.js` su PRIMER LLAMANTE en producción para
+// la rama de PARCELA. Aquel módulo se escribió en F01 —con sus detectores de X/Y
+// invertidas, geográficas pegadas, cierre que no cierra y reparto por capas— y se
+// quedó once fases en verde sin que nadie pudiera llamarlo: en F01 todavía no
+// había aplicación, y cuando la hubo, F08 cableó `.gml`, F10 declinó el DXF por
+// escrito y F11 llevó `.dxf`/`.txt` solo a la rama de edificio.
+//
+// Mientras tanto la pantalla de Entrada anunciaba la vía con su propio botón. Este
+// paso es lo que hay detrás del cartel.
+//
+// ⚠️ **Va después del 13 (la rama) y del 14 (el rail), y no por antigüedad**: el
+// destino del fichero lo elige {@link ramaEnPantalla} y el aterrizaje mueve el
+// rail. Las dos cosas tienen que existir antes.
+//
+// ⚠️ SIN `try` propio, igual que los pasos 6, 8, 9, 11, 12, 13 y 16.
+const medicion = cablearMedicion({
+  estado,
+  panel,
+  idLocalDemo: ID_LOCAL_DEMO,
+  // ⛔ **El gancho va ENVUELTO, y es el mismo envoltorio que usa el paso 9 para
+  // «Contrastar».** `alCargarParcela` reinicia el historial —para que un `Ctrl+Z`
+  // no devuelva la parcela anterior, decisión 2 de `cablearEdicion`— pero no mueve
+  // al usuario de sitio. Y aquí la ruta crítica también ATERRIZA: acaba de entrar
+  // geometría nueva, y dejar al usuario en Entrada mirando las tres vías con su
+  // propia medición ya cargada por debajo es exactamente el defecto que T9 del
+  // rework corrigió para el Catastro.
+  //
+  // {@link aterrizarTrasContrastar} intenta Diagnóstico y se cae a Validación
+  // diciendo por qué: con la parcela oficial delante el encaje se puede medir, y
+  // sin ella —el caso de empezar un expediente desde cero— no, y se dice.
+  alCargarParcela: (parcela) => {
+    edicionCableada.alCargarParcela(parcela)
+    aterrizarTrasContrastar()
+  },
+})
+medicionCableada = medicion
 
 // Y una última remedida del mapa cuando el navegador ya ha maquetado el rail. En
 // el arranque la cáscara entera existe antes de que corra este fichero, así que

@@ -2128,3 +2128,65 @@ a 1280×720 el margen sobre el suelo es de **1,57 px** y el síntoma es mudo. El
 firma ahí no es la aplicación, es **lo que la Sede acepta**, y eso solo lo sabe la
 Sede. Los disparadores del mecanismo son los de `16-derivar-cesion.js`
 (`GUION.md` §8 y §25).
+
+---
+
+## 14 · Entrada de parcela por fichero ⟨F18⟩ — lo que `17-medicion-propia.js` no firma
+
+**Por qué está aquí.** F18 no añade una función nueva: **abre una puerta que llevaba
+doce fases con el cartel puesto**. La pantalla de Entrada anuncia tres formas de
+empezar un expediente y una de ellas —«Medición propia · tu levantamiento en `.dxf`
+o un volcado de coordenadas en `.txt`»— rechazaba el fichero con un aviso.
+
+El guion 17 mide el modal, los píxeles, los `<path>` y el rechazo del listado propio,
+y ya encontró y cerró un defecto real (`GUION.md` §26). Lo que queda aquí son **tres
+puntos**, y el primero es **BLOQUEANTE**.
+
+### 14.1 · ⛔ BLOQUEANTE · Un plano REAL de trabajo, y que el reparto por capas se entienda
+
+Coge **un DXF tuyo de un encargo de verdad** —no `UTM.dxf`, que ya es fixture— y
+suéltalo con la rama Parcela puesta.
+
+- [ ] La lista de capas que se ofrece **te dice algo**: reconoces tus capas por el
+      nombre y por cuántas polilíneas trae cada una.
+- [ ] Eliges una y entra **la parcela que esperabas**, no otra cosa.
+- [ ] La superficie que sale coincide con la que tú tienes medida.
+
+⚠️ **Y la pregunta que solo puede contestar una persona:** ¿se entiende, sin que
+nadie te lo explique, **por qué la aplicación te pregunta** en vez de elegir ella? La
+decisión entera («ofrecer, no adivinar») se apoya en eso, y tiene detrás un hecho
+medido en F11: en `UTM.dxf` la parcela de verdad está en la capa `0` y **no** en la
+que se llama `PARCELA`. Elegir por el nombre falla en el único plano real que hay.
+Si la pantalla se lee como un trámite, la decisión está mal presentada aunque sea
+correcta.
+
+### 14.2 · El recorrido que el guion no puede andar: medición contra parcelario
+
+Exige red, así que no lo firma ninguna máquina de este proyecto.
+
+- [ ] Trae una parcela **del Catastro** por su referencia.
+- [ ] Suelta encima **tu levantamiento** de esa misma parcela.
+- [ ] La geometría oficial **sigue ahí** (se ve por debajo) y la referencia catastral
+      **no se ha perdido**.
+- [ ] **El Diagnóstico de encaje se abre sin traer nada más**, y las cifras que da
+      tienen sentido para ti.
+
+Es el flujo real del perito —*traigo la oficial, meto mi levantamiento, contrasto*— y
+es lo que hace que esta fase valga algo más que «ya se puede abrir un DXF».
+
+### 14.3 · Que no se lea como un veredicto (heredado de F07, F08 y F09)
+
+- [ ] Ninguna frase de la pantalla de revisión —ni las de las correcciones que se
+      ofrecen, ni el motivo por el que algo no ha entrado— se lee como un **juicio
+      sobre tu levantamiento**. La aplicación describe lo que ha visto y ofrece; no
+      dictamina si tu medición está bien.
+- [ ] El rótulo de la cabecera deja claro, de un vistazo, que lo que hay en pantalla
+      **es tuyo y no del Catastro**. (Esto es lo que falló en la primera corrida del
+      guion: decía «Parcela del Catastro». Míralo con tus ojos, no solo en verde.)
+
+---
+
+**14.1** se repite **con cada cambio de `parsers/dxf.js`, `parsers/importar.js` o del
+diálogo de revisión**: lo que se firma ahí no es que el código funcione —eso lo dicen
+6.339 pruebas— sino que **un técnico entiende lo que la aplicación le está
+preguntando**, y eso solo lo sabe un técnico.

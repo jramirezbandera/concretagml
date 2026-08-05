@@ -9,7 +9,7 @@ con la **maquinaria real de `L.Draggable`**.
 - **4D.1** (esta carpeta) escribió los guiones y los probó en seco.
 - **4D.2** es la ejecución oficial, con evidencia, siguiendo este documento.
 
-Dieciséis guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
+Diecisiete guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
 para que el resultado no dependa de interpretar prosa. Quince son de aceptación;
 `05` es de diagnóstico (§11):
 
@@ -38,6 +38,7 @@ para que el resultado no dependa de interpretar prosa. Quince son de aceptación
 | `14-shell.js` | Rework · 1 a 4 | la cáscara de tres columnas y su coste en píxeles, en **las DOS pasadas de D5** (1280×720 y 1440×900): ancho del rail, desborde del panel, el invariante de `#tabla-vertices`, cuántas tarjetas de aviso caben enteras y cuánto queda escondido tras el pliegue; **se detecta solo** en cuál de los dos mundos está (`LINEA_BASE` sin rail / `SHELL` con él); y desde la rebanada 4, **si el diagnóstico sigue en pantalla después de tocar el mapa** | `ok:true` en las dos — ver §20 |
 | `15-contraste.js` | Rework · T9 | ⭐ **la RUTA CRÍTICA 2 entera** (soltar el GML de otro → contrastarlo → cruzar la puerta), que hasta T9 no se podía andar; y sobre todo **que la puerta de D4 SE VE**: dentro del cajón, dentro de la ventana y con `elementFromPoint` devolviéndola —las tres patas, porque con una sola el defecto salía verde—; más la procedencia que cambia al cruzar y el invariante de la caja de vértices | ⛔ **encontró un defecto real el 2026-08-04, ya corregido; hoy `ok:true` en las dos** — ver §22 |
 | `16-derivar-cesion.js` | F17 · 1 a 4 · **+ el criterio 6** | ⭐ **EL PRECIO EN PÍXELES, que es lo único de F17 que la suite no puede ver**: F17 rompe a propósito la racha de «0 px en el panel» de cinco fases, y ⛔ **cuando se pasa, el panel NO desborda — la tabla de vértices encoge en silencio**. Mide el recorrido entero sin tocar la red (mover el lindero hacia dentro → derivar → revisar y nombrar → descargar), la PUERTA explicando con cifras al crecer, la correspondencia fila↔mancha en los dos sentidos, los BYTES del expediente (N `featureMember`, los `localId` de O19 y **que el nombre escrito NO viaja al fichero**), y la invalidación de la foto al editar | ✅ **`ok:true` en las DOS** desde el 2026-08-05, tras encontrar **un defecto real a 1280×720** y corregirlo — ver §25 |
+| `17-medicion-propia.js` | F18 · 1 a 4 | ⭐ **QUE EL `<dialog>` DE REVISIÓN SEA UN MODAL DE VERDAD**, que la suite **no puede** ver: en jsdom `HTMLDialogElement.prototype` tiene exactamente `constructor` y `open` —ni `showModal()`, ni `::backdrop`, ni capa superior—, así que las 6.339 pruebas ejercitan el camino DEGRADADO; más soltar `UTM.dxf` de verdad con la rama PARCELA (bytes reales, cinco capas, el botón apagado con su motivo), que la geometría **se pinte** en sus panes, el **coste en píxeles** de la tabla de vértices, y que **nuestro propio listado de replanteo se rechace por su nombre y NO con el diagnóstico falso del huso** | ⛔ **su primera corrida salió `ok:false` y destapó UN DEFECTO REAL que la suite no veía**: la cabecera decía **«Parcela del Catastro» sobre el levantamiento del propio técnico**. Corregido con guardián; hoy **`ok:true`** — ver §26 |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
 spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
@@ -4366,3 +4367,83 @@ con IVG positivo) y es la referencia del padre con el ordinal detrás. Así que 
 guion comprueba lo contrario, y las dos mitades: que el nombre **se queda en la
 pantalla** y **no aparece en los bytes**, y que lo que sí llega al fichero son los
 `localId` de O19 (`9398516VK3799G`, `…G.1`, `…G.2`) con sus dos namespaces.
+
+---
+
+## 26. `17-medicion-propia.js` — la vía que anunciábamos y no existía (F18 · T5)
+
+```bash
+npm run dev                                   # EXIGE dev: los fixtures no están en dist/
+$B goto http://localhost:PUERTO/concretagml/  # ⚠️ recarga ANTES de correrlo
+$B eval scripts/smoke-navegador/17-medicion-propia.js
+```
+
+⚠️ **Recarga la página antes de cada corrida.** El botón de la vía vive en el panel
+de Entrada, y el propio guion aterriza en Validación: lanzarlo dos veces seguidas
+sobre la misma pestaña deja la segunda sin poder medirlo. El guion lo **detecta y
+lo dice** como advertencia en vez de acusar en falso, pero la medida se pierde.
+
+### Qué mide, y por qué no lo puede medir la suite
+
+1. ⭐ **Que el `<dialog>` de revisión sea un modal DE VERDAD.** En jsdom
+   `HTMLDialogElement.prototype` tiene **exactamente** `constructor` y `open`: ni
+   `showModal()`, ni `close()`, ni `cancel`, ni `::backdrop`, ni capa superior, ni
+   atrape de foco. El módulo detecta la capacidad y cae al atributo `open`, así que
+   **las 6.339 pruebas ejercitan el camino degradado**. Si `showModal()` fallara, o
+   si el diálogo saliera por debajo del mapa, saldría verde en toda la suite.
+   Medido: `open === true`, `z-index 1200`, `position: fixed`, backdrop presente,
+   `620×792` dentro de una ventana de `1440×900`, y `elementFromPoint` devolviéndolo.
+2. ⭐ **El coste en píxeles.** F18 dice costar **0 px** del panel porque el diálogo
+   flota. En jsdom `getBoundingClientRect()` devuelve ceros, así que un panel que no
+   cabe **sale verde**. Medido: la tabla de vértices pasa de 0 px (vacía, en Entrada)
+   a **162,16 px** con los 12 vértices dentro. No encoge nada.
+3. ⭐ **Que la geometría importada se pinte.** Se cuentan `<path>` de verdad: **6**
+   tras importar. La firma humana de F08 destapó dos veces el mismo defecto —el mapa
+   sin reencuadrar, las colindantes sin dibujar— y ninguna la vio un test.
+4. ⭐ **Que nuestro propio listado de replanteo se rechace POR SU NOMBRE**, y las dos
+   mitades: que se diga lo que es, y que **no** se diga lo del huso.
+
+### ⛔ Su primera corrida salió `ok:false`, y encontró un defecto real
+
+**La cabecera decía «Parcela del Catastro» después de importar el levantamiento del
+propio técnico.** Es el error caro de esta aplicación —hacerle pasar por oficial una
+geometría que ha dibujado el usuario—, y a partir de ahí se firma sobre ella.
+
+**No lo vio ninguna de las 6.339 pruebas**, y el motivo conviene tenerlo escrito: no
+es que la afirmación fuera débil, es que **no existía**. `rotuloDelDato` tenía tres
+estados y hasta F18 «no es la demostración» implicaba «la trajo el Catastro», porque
+el Catastro era la única puerta al store. F18 estrena la cuarta y nadie fue a mirar
+ese rótulo. Corregido (`EYEBROW_MEDICION`, y el criterio pasa a ser el **origen** y
+no el `idLocal`), con guardián de comportamiento en `main-edificio.dom.test.js`.
+
+⚠️ **Y de paso, una lección sobre el guardián mismo.** El primer intento acusaba con
+`/catastro/i` — y salió rojo sobre el rótulo **ya corregido**, «Tu medición · **no**
+del Catastro», porque la palabra estaba ahí, negada. Un guardián que casa por la
+forma del texto acusa a la frase que lo arregla; hoy acusa por la **afirmación**
+(`/parcela del catastro/i`, más la exigencia positiva de que diga «medición»). Es la
+tercera vez que este proyecto paga lo mismo: ver F17 · fase 1.
+
+Los otros tres «problemas» de aquella corrida **eran del guion, no del producto**, y
+los tres por dar por hecho un estado en vez de medirlo: el selector de `<path>` era
+`.leaflet-overlay-pane` (este visor pinta en **quince panes propios**), el botón se
+exigía en Validación, y los avisos se diffeaban con `replace()` sobre texto
+acumulado — con lo que un «Huso ambiguo…» legítimo de la importación anterior se
+leyó como emitido por el fichero recién soltado.
+
+### Régimen de red: ninguna
+
+⭐ Medido: **1 petición en toda la corrida**, y es el fixture del propio servidor.
+Cero cartográficas, cero a servicios de datos. La vía de medición propia es local por
+definición: el levantamiento lo trae el técnico.
+
+### Lo que este guion NO puede medir
+
+- **Que el reparto por capas se entienda sin explicación.** Que la capa `0` sea la
+  buena en `UTM.dxf` está medido en la suite (coincide vértice a vértice con
+  `PARCELA.txt`); que se **comprenda** es juicio humano → `CHECKLIST-HUMANO.md` §14.
+- **La composición sobre una parcela traída del Catastro**: exige red. La cubren 22
+  pruebas de `test/app/cableado-medicion.dom.test.js`; que el Diagnóstico se abra
+  después, con un expediente real delante, va al §14.
+- **El arrastre como gesto de ratón** (§0): se disparan `dragenter`/`dragover`/`drop`.
+- **Coordenadas en grados**: `importar()` las detecta y esta versión **no sabe
+  proyectarlas**. Deuda con dueño en la ficha de F18.
