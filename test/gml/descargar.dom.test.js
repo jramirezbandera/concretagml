@@ -70,6 +70,7 @@ import {
   CARACTERES_PROHIBIDOS_WINDOWS,
   NOMBRES_RESERVADOS_WINDOWS,
   MOTIVO_NO_DESCARGADO,
+  PREFIJO_NOMBRE_EXPEDIENTE,
   nombreFicheroGml,
   descargarGml,
   descargarTexto,
@@ -240,6 +241,53 @@ describe('gml/descargar · nombreFicheroGml, la parte que no necesita DOM', () =
     const nombre = nombreFicheroGml({ refcat: REFCAT, fecha: FECHA })
     expect(nombre.endsWith(EXTENSION_GML)).toBe(true)
     expect(partesDe(nombre)).toEqual([PREFIJO_NOMBRE, REFCAT, MARCA_TIEMPO])
+  })
+
+  // ── F17 · el fichero de VARIAS parcelas estrena prefijo ────────────────────
+
+  it('⛔ REGRESIÓN: pedir 1 miembro da el MISMO nombre que no pedir ninguno', () => {
+    // Es el camino del 100 % del uso actual. `miembros` entró con F17 y su valor
+    // por defecto no puede mover ni un byte del nombre que la aplicación lleva
+    // generando desde F04 — hay tres exportaciones más (DXF, TXT, JSON) que se
+    // DERIVAN de esta cadena cortándola por la longitud del prefijo.
+    const deSiempre = nombreFicheroGml({ refcat: REFCAT, fecha: FECHA })
+    expect(nombreFicheroGml({ refcat: REFCAT, fecha: FECHA, miembros: 1 })).toBe(deSiempre)
+    expect(deSiempre.startsWith(`${PREFIJO_NOMBRE}${SEPARADOR_NOMBRE}`)).toBe(true)
+    // Y también sin referencia, que es el otro camino vivo (alta nueva).
+    const sinRc = nombreFicheroGml({ refcat: null, fecha: FECHA })
+    expect(nombreFicheroGml({ refcat: null, fecha: FECHA, miembros: 1 })).toBe(sinRc)
+  })
+
+  it('con varias parcelas el prefijo dice «expediente», y solo cambia eso', () => {
+    // «parcela», en singular, sería mentira en el sitio más visible de toda la
+    // operación: la barra de descargas. Lo que NO cambia es el resto — la
+    // referencia sigue siendo la de la matriz y la marca de tiempo sigue siendo la
+    // misma que va dentro del fichero—, así que el nombre se sigue partiendo en
+    // tres por `_`.
+    const uno = nombreFicheroGml({ refcat: REFCAT, fecha: FECHA, miembros: 1 })
+    const dos = nombreFicheroGml({ refcat: REFCAT, fecha: FECHA, miembros: 2 })
+    expect(partesDe(dos)).toEqual([PREFIJO_NOMBRE_EXPEDIENTE, REFCAT, MARCA_TIEMPO])
+    expect(dos).not.toBe(uno)
+    // Lo único distinto es el primer segmento.
+    expect(partesDe(dos).slice(1)).toEqual(partesDe(uno).slice(1))
+    // Y da igual cuántas sean a partir de dos: el nombre dice QUÉ es el fichero,
+    // no cuántas lleva. Contarlas es trabajo del propio GML, que las trae dentro.
+    expect(nombreFicheroGml({ refcat: REFCAT, fecha: FECHA, miembros: 9 })).toBe(dos)
+  })
+
+  it('⛔ LANZA con un número de miembros que no puede ser cierto', () => {
+    // Regla de oro 1: un 0 o un 1,5 aquí significan que quien llama no sabe cuántas
+    // parcelas está escribiendo. Redondear por lo bajo daría el nombre de siempre
+    // para un fichero que ya no es de siempre, que es el fallo mudo que este
+    // parámetro existe para evitar.
+    for (const malo of [0, -1, 1.5, '2', null, NaN]) {
+      expect(() => nombreFicheroGml({ refcat: REFCAT, fecha: FECHA, miembros: malo })).toThrow(
+        TypeError,
+      )
+    }
+    expect(() => nombreFicheroGml({ refcat: REFCAT, fecha: FECHA, miembros: 0 })).toThrow(
+      /entero >= 1/,
+    )
   })
 
   it('la marca de tiempo es la MISMA que va dentro del fichero, sin los «:» (Windows)', () => {

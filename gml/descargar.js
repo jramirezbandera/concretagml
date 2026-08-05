@@ -306,6 +306,30 @@ export const SEPARADOR_NOMBRE = '_'
 export const PREFIJO_NOMBRE = 'parcela'
 
 /**
+ * Primera parte del nombre cuando el fichero lleva **varias** parcelas.
+ *
+ * ⭐ Entra con F17 y es lo único que hacía falta para nombrar una entrega
+ * multiparcela: `PREFIJO_NOMBRE` dice «parcela», en singular, y con N
+ * `gml:featureMember` dentro eso sería mentira en el sitio más visible de toda la
+ * operación —la barra de descargas del navegador—.
+ *
+ * ⛔ NO ES UN DISCRIMINANTE POR PIEZA, y conviene saber por qué no. El diseño de
+ * agosto preveía añadirle al nombre algo que distinguiera cada trozo cedido,
+ * porque la entrega iba a ser un ZIP con un `.gml` por parcela y dos cesiones
+ * anónimas de la misma fecha habrían colisionado **en silencio**. El ZIP se
+ * canceló al medir que la Sede acepta un sobre único (override O18), y con **una
+ * sola descarga no hay nombres que colisionen**: el problema desapareció con la
+ * solución que lo causaba.
+ *
+ * `expediente` y no `parcelas` a secas: es la palabra con la que el usuario de
+ * esta aplicación llama al conjunto de fincas de una misma alteración, y es la
+ * que ya usa el almacén (`storage/expedientes.js`).
+ *
+ * @readonly
+ */
+export const PREFIJO_NOMBRE_EXPEDIENTE = 'expediente'
+
+/**
  * Segmento que ocupa el lugar de la referencia catastral cuando NO hay ninguna.
  * Es el caso normal de un alta nueva: la parcela todavía no existe en las bases
  * del Catastro, así que no tiene referencia y no se le puede inventar una. El
@@ -516,12 +540,20 @@ function segmentoDeRefcat(refcat) {
  *   referencia, que es un estado legítimo y no un error.
  * @param {Date} args.fecha  Instante que se estampa en el nombre. OBLIGATORIO y
  *   por parámetro: ver la cabecera del módulo.
+ * @param {number} [args.miembros=1]  Cuántas parcelas lleva DENTRO el fichero.
+ *   Con 1 el nombre es EXACTAMENTE el de siempre; con más, el prefijo pasa a
+ *   {@link PREFIJO_NOMBRE_EXPEDIENTE}. Se pide el HECHO —cuántas van— y no el
+ *   prefijo: si el llamante pudiera elegir el nombre, podría llamar «parcela» a
+ *   un fichero con tres, que es justo lo que este primitivo existe para impedir.
+ *   La `refcat` que se pasa en ese caso es la de la MATRIZ, y no cambia de papel:
+ *   sigue siendo de quién es el expediente.
  * @returns {string}  Nombre de fichero seguro, terminado en {@link EXTENSION_GML}.
- * @throws {TypeError}   Si `refcat` no es un string ni nulo, o si `fecha` no es
- *   una fecha (contrato roto por el programador).
+ * @throws {TypeError}   Si `refcat` no es un string ni nulo, si `fecha` no es
+ *   una fecha, o si `miembros` no es un entero ≥ 1 (contrato roto por el
+ *   programador).
  * @throws {RangeError}  Si `fecha` es una fecha inválida (tiempo no finito).
  */
-export function nombreFicheroGml({ refcat = null, fecha } = {}) {
+export function nombreFicheroGml({ refcat = null, fecha, miembros = 1 } = {}) {
   if (refcat !== null && refcat !== undefined && typeof refcat !== 'string') {
     throw new TypeError(
       `nombreFicheroGml: 'refcat' debe ser un string o nulo; ` +
@@ -539,13 +571,32 @@ export function nombreFicheroGml({ refcat = null, fecha } = {}) {
   if (!Number.isFinite(fecha.getTime())) {
     throw new RangeError("nombreFicheroGml: 'fecha' es inválida (tiempo no finito).")
   }
+  // LANZA en vez de corregir: un 0, un 1,5 o un `'2'` aquí significan que quien
+  // llama no sabe cuántas parcelas está escribiendo, y ése es un bug del programa.
+  // Redondear por lo bajo produciría el nombre de siempre para un fichero que ya
+  // no es de siempre — un fallo mudo en el sitio más visible de la operación.
+  if (!Number.isInteger(miembros) || miembros < 1) {
+    throw new TypeError(
+      `nombreFicheroGml: 'miembros' debe ser un entero >= 1; recibido ` +
+        `${JSON.stringify(miembros)}. Es CUÁNTAS parcelas lleva el fichero, y de ahí ` +
+        'sale el prefijo del nombre.',
+    )
+  }
 
   // El dateTime del Catastro (`AAAA-MM-DDTHH:mm:ss`) solo necesita perder los dos
   // puntos: el resto de su repertorio —dígitos, guiones y la `T`— ya está dentro
   // de la lista blanca del nombre.
   const marcaTiempo = dateTimeCatastro(fecha).split(':').join(SUSTITUTO_NOMBRE)
 
-  const base = [PREFIJO_NOMBRE, segmentoDeRefcat(refcat), marcaTiempo].join(SEPARADOR_NOMBRE)
+  // ⛔ Con `miembros === 1` esto tiene que dar EXACTAMENTE el nombre de siempre:
+  // es el camino del 100 % del uso actual, y hay un guardián de regresión que lo
+  // exige byte a byte. El prefijo es lo ÚNICO que cambia con varias parcelas —la
+  // referencia y la marca de tiempo siguen significando lo mismo—, así que las
+  // tres partes separadas por `_` se siguen partiendo igual, y `nombreFicheroExport`
+  // (que corta por la longitud del prefijo) no se entera de nada mientras siga
+  // pidiendo el fichero de una sola.
+  const prefijo = miembros === 1 ? PREFIJO_NOMBRE : PREFIJO_NOMBRE_EXPEDIENTE
+  const base = [prefijo, segmentoDeRefcat(refcat), marcaTiempo].join(SEPARADOR_NOMBRE)
 
   // Segunda pasada de neutralización, ahora sobre el nombre COMPLETO. Con la
   // plantilla de hoy nunca puede disparar (el nombre empieza por «parcela_» y
