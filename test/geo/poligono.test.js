@@ -399,8 +399,17 @@ describe('geo/poligono.js · una sola definición en todo el proyecto (F07, T1.1
       fileURLToPath(new URL('../../geo/poligono.js', import.meta.url)),
       'utf8',
     )
+    // ⛔ EL DETECTOR EXIGE `from`, y eso se corrigió el 2026-08-05 (F17, tarea
+    // 1.1). Decía `(?:import|export)[^\n]*['"]`, o sea que acusaba a CUALQUIER
+    // línea que empezara por `export` y llevara una comilla — y la primera
+    // constante exportada con un literal de texto (`MOTIVO_REGION`, tres cadenas
+    // dentro de un `Object.freeze`) lo puso rojo sin que el fichero hubiera
+    // importado nada. Un guardián que acusa por la forma de la línea en vez de
+    // por lo que hace es el mismo defecto que persigue: un número plausible y
+    // equivocado. `import(...)` y `require(...)` se siguen mirando aparte, que
+    // ésas sí son llamadas.
     const IMPORTA =
-      /(?:^|\n)[ \t]*(?:import|export)[^\n]*['"]|(?:import|require)\([ \t]*['"]/
+      /(?:^|\n)[ \t]*(?:import|export)[^\n]*\bfrom[ \t]+['"]|(?:^|\n)[ \t]*import[ \t]+['"]|(?:import|require)\([ \t]*['"]/
     expect(IMPORTA.test(FUENTE), 'geo/poligono.js debe seguir sin dependencias').toBe(false)
     // El detector no es vacuo: dispara sobre un módulo que sí importa.
     const conImports = readFileSync(
@@ -408,6 +417,13 @@ describe('geo/poligono.js · una sola definición en todo el proyecto (F07, T1.1
       'utf8',
     )
     expect(IMPORTA.test(conImports)).toBe(true)
+    // Y sigue disparando con las tres formas, no solo con la de `validation/`:
+    expect(IMPORTA.test("import { x } from './a.js'\n")).toBe(true)
+    expect(IMPORTA.test("import './efecto.js'\n")).toBe(true)
+    expect(IMPORTA.test("export { x } from './a.js'\n")).toBe(true)
+    expect(IMPORTA.test("const m = await import('./a.js')\n")).toBe(true)
+    // …y NO sobre lo que solo se le parece: exportar datos no es importar.
+    expect(IMPORTA.test("export const T = Object.freeze({ A: 'A' })\n")).toBe(false)
   })
 
   it('lo que sale de aquí lo acepta `crearRecinto` SIN avisar de anillo cerrado', () => {

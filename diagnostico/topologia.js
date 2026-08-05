@@ -163,10 +163,17 @@
 // (`OPERATIVOS.grosorInvasionMinimoM` = 1 mm = `duplicadoMetros`: una pieza más
 // delgada que la distancia a la que dos puntos son el mismo punto está entre dos
 // linderos que son el mismo lindero). El grosor no depende de `L`, y sobre las
-// piezas medidas separa las dos poblaciones por tres órdenes de magnitud. Ver
-// {@link medirPieza} para la estimación y su límite conocido, y el JSDoc de
-// `config/operativos.js` para por qué un umbral de área se acercaba a un veredicto
-// y uno de grosor no.
+// piezas medidas separa las dos poblaciones por tres órdenes de magnitud. La
+// estimación vive en **`geo/grosor.js#medirPieza`** desde F17 (aquí era privada), y
+// el JSDoc de `config/operativos.js` explica por qué un umbral de área se acercaba
+// a un veredicto y uno de grosor no.
+//
+// ⛔ **Y el límite conocido que esta cabecera declaraba estaba AL REVÉS**, medido al
+// extraer la función (F17): decía que una pieza anular se subestima y podría
+// descartarse. Un anillo de grosor UNIFORME se mide **exactamente** (`2A/P = h`, sin
+// aproximar y a cualquier grosor); lo que falla es el anillo NO uniforme, que
+// **SOBREestima el lado fino** —medido: 25 m declarados con un lado de 1 m—. No
+// descarta de más: **admite de más**. Detalle y cifras en `geo/grosor.js`.
 //
 // Módulo PURO: sin DOM, sin Leaflet, sin estado, sin reloj. No entra en el barrel.
 
@@ -176,7 +183,8 @@ import { featureCollection, polygon } from '@turf/helpers'
 import { OPERATIVOS } from '../config/operativos.js'
 import { superficie } from '../geo/area.js'
 import { perimetro } from '../geo/metrica.js'
-import { anilloCerrado, recintosDeGeometriaTurf } from '../geo/poligono.js'
+import { medirPieza } from '../geo/grosor.js'
+import { MOTIVO_REGION, coordsRegion, recintosDeGeometriaTurf } from '../geo/poligono.js'
 import { describir, exigirRecintos } from './_comun.js'
 
 /** @typedef {import('./_comun.js').Recinto} Recinto */
@@ -191,45 +199,22 @@ import { describir, exigirRecintos } from './_comun.js'
  *     hueco como exterior mediría el patio en vez de la parcela).
  *   · `HUECO_NO_APTO`    — un hueco no forma anillo. La región se mide SIN él, así
  *     que el área sale por EXCESO en la superficie de ese hueco.
+ *
+ * ⚠️ **Los tres valores y el conteo se mudaron a `geo/poligono.js` en F17** (tarea
+ * 1.1): la derivación del sobrante necesita el mismo puente recintos → región y
+ * duplicarlo habría dado dos definiciones de qué es la región de una parcela. Los
+ * literales NO cambian —son contrato de esta capa desde F07— y este alias los
+ * mantiene visibles con el nombre con el que este fichero los venía usando.
  */
-const MOTIVO = Object.freeze({
-  SIN_RECINTOS: 'SIN_RECINTOS',
-  EXTERIOR_NO_APTO: 'EXTERIOR_NO_APTO',
-  HUECO_NO_APTO: 'HUECO_NO_APTO',
-})
+const MOTIVO = MOTIVO_REGION
 
 /**
  * Un recinto saltado, con su sitio para que se pueda NOMBRAR en la interfaz.
+ * Definido en `geo/poligono.js` desde F17; el tipo se reexporta aquí para que los
+ * JSDoc de este módulo sigan leyéndose solos.
  *
- * @typedef {Object} RecintoSaltado
- * @property {string} donde  Nombre del argumento donde estaba (`'recintosA'`,
- *   `` `vecinas[2].recintos` ``…), tal como lo diría un mensaje de error.
- * @property {number|null} indice  Índice dentro de esa lista; `null` si el motivo
- *   es que la lista estaba vacía.
- * @property {number} nVertices  Cuántos vértices tenía (0 si no tenía anillo).
- * @property {'SIN_RECINTOS'|'EXTERIOR_NO_APTO'|'HUECO_NO_APTO'} motivo
+ * @typedef {import('../geo/poligono.js').RecintoSaltado} RecintoSaltado
  */
-
-/**
- * ¿El recinto tiene vértices suficientes para formar un polígono de Turf sin que
- * `polygon()` lance? El modelo guarda los anillos ABIERTOS: n vértices → n+1
- * posiciones al cerrar, y Turf exige ≥ 4 posiciones cerradas ⇒ n ≥ 3. Misma
- * función, con el mismo razonamiento, que `validation/reglas-topologia.js`.
- *
- * @param {unknown} recinto
- * @returns {boolean}
- */
-const esRecintoApto = (recinto) =>
-  !!recinto &&
-  typeof recinto === 'object' &&
-  Array.isArray(recinto.vertices) &&
-  recinto.vertices.length >= 3
-
-/** Cuántos vértices declara un recinto, tolerando que no sea ni un objeto. */
-const nVerticesDe = (recinto) =>
-  recinto && typeof recinto === 'object' && Array.isArray(recinto.vertices)
-    ? recinto.vertices.length
-    : 0
 
 /**
  * La REGIÓN de unos recintos como polígono de Turf: exterior más sus huecos como
@@ -244,34 +229,12 @@ const nVerticesDe = (recinto) =>
  *   medible (y entonces el motivo ya está en `saltados`).
  */
 function poligonoDeRegion(recintos, donde, saltados) {
-  if (recintos.length === 0) {
-    saltados.push({ donde, indice: null, nVertices: 0, motivo: MOTIVO.SIN_RECINTOS })
-    return null
-  }
-  if (!esRecintoApto(recintos[0])) {
-    saltados.push({
-      donde,
-      indice: 0,
-      nVertices: nVerticesDe(recintos[0]),
-      motivo: MOTIVO.EXTERIOR_NO_APTO,
-    })
-    return null
-  }
-
-  const anillos = [anilloCerrado(recintos[0].vertices)]
-  for (let i = 1; i < recintos.length; i++) {
-    if (esRecintoApto(recintos[i])) {
-      anillos.push(anilloCerrado(recintos[i].vertices))
-      continue
-    }
-    saltados.push({
-      donde,
-      indice: i,
-      nVertices: nVerticesDe(recintos[i]),
-      motivo: MOTIVO.HUECO_NO_APTO,
-    })
-  }
-  return polygon(anillos)
+  // Las coordenadas y el conteo de lo saltado los pone `geo/poligono.js`; lo único
+  // que queda aquí es el `polygon(...)`, que es el import de Turf de esta capa y no
+  // baja a `geo/` (su cabecera lo dice: prepara coordenadas, no llama a la librería).
+  const { anillos, saltados: nuevos } = coordsRegion(recintos, donde)
+  saltados.push(...nuevos)
+  return anillos === null ? null : polygon(anillos)
 }
 
 /**
@@ -296,38 +259,18 @@ function interseccionMedida(polA, polB) {
 }
 
 /**
- * Mide una pieza de intersección: su área y su GROSOR.
+ * ⭐ `medirPieza` VIVE EN `geo/grosor.js` DESDE F17 (tarea 1.1), y no es un
+ * traslado de conveniencia: la derivación del sobrante necesita exactamente la
+ * misma aritmética para decidir si un trozo es una cesión o una astilla, y dos
+ * copias serían dos definiciones de «astilla» libres de divergir en el primer
+ * ajuste. Allí está también el razonamiento completo de por qué `2A/P` y cuál es
+ * su límite conocido — que con F17 deja de ser hipotético, porque el sobrante
+ * ANULAR es un caso normal (y sale medido bien: para un anillo delgado `2A/P = h`
+ * exactamente).
  *
- * El grosor se estima como `2·área / perímetro`, y hay que saber qué es y qué no
- * es. Para una franja alargada de base `L` y altura `h` (el caso que importa: la
- * astilla de un lindero compartido es exactamente eso) el perímetro es ≈ `2L` y el
- * área `≈ L·h/2`, así que `2A/P ≈ h/2` — proporcional a la altura y, lo esencial,
- * **INDEPENDIENTE de `L`**. Es la propiedad por la que este filtro sustituyó al de
- * área: el área de la astilla crece con la longitud del lindero y el grosor no.
- *
- * No es el grosor exacto de nadie (para un cuadrado de lado `s` da `s/2`, no `s`),
- * y no hace falta que lo sea: lo que se le pide es separar por órdenes de magnitud
- * dos poblaciones que están a tres de distancia —0,071 mm la astilla real medida
- * sobre el fixture, 4,9 cm una franja invadida de 2 m × 5 cm—. Un ancho mínimo
- * exacto (la anchura del rectángulo de área mínima que la contiene) costaría una
- * envolvente convexa y calipers rotatorios para decidir lo mismo.
- *
- * **Límite conocido:** una pieza con hueco (un anillo) tiene mucho perímetro y poca
- * área, así que su grosor sale por debajo del real y podría descartarse. Entre dos
- * parcelas colindantes una invasión con forma de anillo es una geometría
- * patológica —exige que la vecina rodee por completo un trozo de la propia sin
- * tocarlo—, no se ha visto ninguna, y el descarte quedaría en `descartadas` con sus
- * cifras. Se anota aquí en vez de defenderse contra ella.
- *
- * @param {Recinto[]} pieza  Una pieza de intersección (un `recintos` válido).
- * @returns {{pieza: Recinto[], area: number, grosor: number}}  `grosor` en metros;
- *   `0` si el perímetro es 0 (pieza degenerada), que la deja siempre descartada.
+ * El umbral con el que se compara sigue siendo de esta capa
+ * (`OPERATIVOS.grosorInvasionMinimoM`): `geo/` mide, quien descarta es el llamante.
  */
-function medirPieza(pieza) {
-  const area = superficie(pieza)
-  const { total } = perimetro(pieza)
-  return { pieza, area, grosor: total === 0 ? 0 : (2 * area) / total }
-}
 
 /**
  * Superficie COMÚN a dos regiones (la métrica «Solape» de la spec, §10.1).

@@ -741,10 +741,20 @@ describe('diagnostico/topologia.js · guardián: de Turf, SOLO lo topológico (r
     // Es lo que corta la referencia viva a `geometriaOficial` (regla de oro 2, y el
     // test de arriba mide el peligro). Un `[...vertices, vertices[0]]` escrito a
     // mano funcionaría igual de bien... hasta el día que alguien lo optimice.
-    expect(FUENTE).toMatch(/anilloCerrado\(recintos\[0\]\.vertices\)/)
+    //
+    // ⚠️ Desde F17 (tarea 1.1) el cierre NO se escribe en este fichero: lo hace
+    // `geo/poligono.js#coordsRegion`, que es el puente que la derivación del
+    // sobrante también necesitaba. Lo que este guardián vigila sigue siendo lo
+    // mismo —que aquí no haya un cierre artesanal y que el que se use venga de
+    // `geo/poligono.js`—, y se añade la comprobación de que ALLÍ sigue estando,
+    // porque si no seguiría la letra sin proteger nada.
     expect(FUENTE).toMatch(/from '\.\.\/geo\/poligono\.js'/)
-    // Ningún cierre artesanal: ni concatenar el primer vértice ni empujarlo.
+    expect(FUENTE).toMatch(/coordsRegion\(/)
+    const POLIGONO = readFileSync(join(RAIZ, 'geo', 'poligono.js'), 'utf8')
+    expect(POLIGONO).toMatch(/anilloCerrado\(recintos\[0\]\.vertices\)/)
+    // Ningún cierre artesanal, ni aquí ni allí.
     expect(FUENTE).not.toMatch(/vertices\[0\]\s*\]/)
+    expect(POLIGONO).not.toMatch(/vertices,\s*[a-zA-Z.]*vertices\[0\]\s*\]/)
   })
 
   it('el área de CADA pieza la mide `geo/area.js#superficie`, no Turf', () => {

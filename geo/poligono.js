@@ -174,6 +174,137 @@ export function coordsPoligono(recinto) {
   return [anilloCerrado(recinto.vertices)]
 }
 
+/**
+ * ¿El recinto tiene vértices suficientes para formar un anillo que Turf acepte?
+ *
+ * El modelo guarda los anillos ABIERTOS: n vértices → n+1 posiciones al cerrar, y
+ * `polygon()` de @turf/helpers exige ≥ 4 posiciones cerradas ⇒ **n ≥ 3**.
+ *
+ * ⚠️ Estaba escrita TRES veces con el mismo razonamiento —`validation/reglas-topologia.js`,
+ * `diagnostico/topologia.js` y, al escribir F17, habría hecho falta una cuarta en
+ * `derivacion/`—. Baja aquí por el mismo motivo que bajaron `anilloCerrado` y
+ * `coordsPoligono` en F07: la definición de «apto para Turf» depende del formato
+ * del anillo, que es de esta capa, y tres copias son tres sitios donde envejecer.
+ *
+ * @param {unknown} recinto
+ * @returns {boolean}
+ */
+export const esRecintoApto = (recinto) =>
+  !!recinto &&
+  typeof recinto === 'object' &&
+  Array.isArray(recinto.vertices) &&
+  recinto.vertices.length >= 3
+
+/** Cuántos vértices declara un recinto, tolerando que no sea ni un objeto. */
+export const nVerticesDe = (recinto) =>
+  recinto && typeof recinto === 'object' && Array.isArray(recinto.vertices)
+    ? recinto.vertices.length
+    : 0
+
+/**
+ * Por qué un recinto se quedó fuera al construir una REGIÓN. Los tres valores
+ * posibles de `saltados[i].motivo`, escritos aquí y no repartidos por el código:
+ *   · `SIN_RECINTOS`     — la lista venía vacía: no hay región que construir.
+ *   · `EXTERIOR_NO_APTO` — `recintos[0]` no forma anillo (< 3 vértices). Sin
+ *     exterior no hay región: los huecos, solos, no la definen.
+ *   · `HUECO_NO_APTO`    — un hueco no forma anillo. La región SÍ sale, sin él, y
+ *     por eso sale un poco MAYOR de lo que debería: se dice.
+ *
+ * ⚠️ Los tres literales son los que `diagnostico/topologia.js` viene publicando en
+ * sus `saltados` desde F07: **son contrato con quien lee esa capa**, así que se
+ * mueven de sitio sin cambiar de valor.
+ *
+ * @readonly
+ */
+export const MOTIVO_REGION = Object.freeze({
+  SIN_RECINTOS: 'SIN_RECINTOS',
+  EXTERIOR_NO_APTO: 'EXTERIOR_NO_APTO',
+  HUECO_NO_APTO: 'HUECO_NO_APTO',
+})
+
+/**
+ * @typedef {Object} RecintoSaltado
+ * @property {string} donde  Nombre del argumento donde estaba (`'recintosA'`,
+ *   `` `vecinas[2].recintos` ``…), tal como lo diría un mensaje de error.
+ * @property {number|null} indice  Índice dentro de esa lista; `null` si el motivo
+ *   es que la lista estaba vacía.
+ * @property {number} nVertices  Cuántos vértices tenía (0 si no tenía anillo).
+ * @property {'SIN_RECINTOS'|'EXTERIOR_NO_APTO'|'HUECO_NO_APTO'} motivo
+ */
+
+/**
+ * Coordenadas GeoJSON de una REGIÓN: el exterior más sus huecos como anillos
+ * INTERIORES del mismo polígono. Listo para `polygon(anillos)` de @turf/helpers.
+ *
+ * ⭐ ES LA OTRA MITAD DE `coordsPoligono`, Y LA ASIMETRÍA ES DELIBERADA. Allí un
+ * recinto es UN polígono de un anillo porque la pregunta es «¿este hueco concreto
+ * está mal?» y hay que poder NOMBRARLO; aquí la pregunta es «¿cuánta superficie
+ * ocupa esta parcela?», y **el patio no es superficie de la parcela**. Dos
+ * preguntas distintas, dos formas del mismo dato. Ninguna de las dos sirve para lo
+ * de la otra: pasar un recinto con huecos por `coordsPoligono` mide de más, y
+ * partir una región en polígonos sueltos impide nombrar el hueco que falla.
+ *
+ * ⚠️ **Existía desde F07 y era PRIVADA** (`diagnostico/topologia.js#poligonoDeRegion`).
+ * F17 necesita exactamente el mismo puente para restar dos parcelas, y duplicarlo
+ * habría dado dos definiciones de qué es la región de una parcela. Sube aquí la
+ * parte que no toca Turf —las coordenadas y el conteo de lo saltado— y cada capa
+ * pone su `polygon(...)`, que es donde vive su import de Turf.
+ *
+ * Los anillos se cierran con `anilloCerrado`, que **copia siempre** ⇒ quien reciba
+ * esto nunca tiene una referencia viva a la geometría del modelo (regla de oro 2).
+ *
+ * NO LANZA por un recinto degenerado, y es a propósito: devolver `anillos: null`
+ * con su motivo deja que el llamante decida —F07 lo cuenta en `saltados`, F17 lo
+ * enseña—, mientras que lanzar convertiría un dato malo del usuario en un fallo del
+ * programa. Sí lanza si `recintos` no es un array: eso es un bug del llamante.
+ *
+ * @param {Array<{vertices: Array<[number,number]>}>} recintos  Recintos del modelo,
+ *   anillos ABIERTOS en UTM. `recintos[0]` es el exterior; el resto, huecos.
+ * @param {string} [donde='recintos']  Nombre del argumento, para poblar `saltados`.
+ * @returns {{anillos: Array<Array<[number,number]>>|null, saltados: RecintoSaltado[]}}
+ *   `anillos` es `null` si no hay región medible, y entonces el motivo está en
+ *   `saltados`. `saltados` puede traer entradas aunque `anillos` NO sea nulo: son
+ *   los huecos que no se han podido restar.
+ * @throws {TypeError} Si `recintos` no es un array.
+ */
+export function coordsRegion(recintos, donde = 'recintos') {
+  if (!Array.isArray(recintos)) {
+    throw new TypeError(
+      `coordsRegion: 'recintos' debe ser un array de recintos; recibido ${JSON.stringify(recintos)}.`,
+    )
+  }
+
+  const saltados = []
+  if (recintos.length === 0) {
+    saltados.push({ donde, indice: null, nVertices: 0, motivo: MOTIVO_REGION.SIN_RECINTOS })
+    return { anillos: null, saltados }
+  }
+  if (!esRecintoApto(recintos[0])) {
+    saltados.push({
+      donde,
+      indice: 0,
+      nVertices: nVerticesDe(recintos[0]),
+      motivo: MOTIVO_REGION.EXTERIOR_NO_APTO,
+    })
+    return { anillos: null, saltados }
+  }
+
+  const anillos = [anilloCerrado(recintos[0].vertices)]
+  for (let i = 1; i < recintos.length; i++) {
+    if (esRecintoApto(recintos[i])) {
+      anillos.push(anilloCerrado(recintos[i].vertices))
+      continue
+    }
+    saltados.push({
+      donde,
+      indice: i,
+      nVertices: nVerticesDe(recintos[i]),
+      motivo: MOTIVO_REGION.HUECO_NO_APTO,
+    })
+  }
+  return { anillos, saltados }
+}
+
 // ── Turf → Modelo (quitar el vértice de cierre) ───────────────────────────────
 
 /**

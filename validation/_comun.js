@@ -224,5 +224,13 @@ export function anguloVertice(prev, v, next) {
  * `recintos` del modelo, en LISTA porque la intersección puede salir en varias
  * piezas disjuntas). No se re-exporta aquí: F02 no la necesita y este módulo es
  * el contrato de la validación, no un barrel.
+ *
+ * ⚠️ **`esRecintoApto` se une al re-export en F17** (tarea 1.1). Estaba escrita
+ * TRES veces con el mismo razonamiento —aquí en `reglas-topologia.js`, en
+ * `diagnostico/topologia.js`, y habría hecho falta una cuarta en `derivacion/`— y
+ * lo que define es «cuántos vértices necesita un anillo para que Turf lo acepte»,
+ * que depende del FORMATO del anillo y por tanto es de `geo/`. Misma jugada que
+ * `anilloCerrado` en F07: baja una vez y sube re-exportada, sin tocar a quien la
+ * usaba.
  */
-export { anilloCerrado, coordsPoligono } from '../geo/poligono.js'
+export { anilloCerrado, coordsPoligono, esRecintoApto } from '../geo/poligono.js'

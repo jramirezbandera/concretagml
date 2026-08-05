@@ -23,7 +23,15 @@
 //   · Huecos solapados      — intersect(FC([hi,hj])) ≠ null. Marca ambos huecos.
 //                            Verbo: "Separar los huecos que se solapan".
 
-import { NIVEL, crearHallazgo, ref, refsAnillo, coordsPoligono, distancia } from './_comun.js'
+import {
+  NIVEL,
+  crearHallazgo,
+  ref,
+  refsAnillo,
+  coordsPoligono,
+  distancia,
+  esRecintoApto,
+} from './_comun.js'
 import kinks from '@turf/kinks'
 import booleanContains from '@turf/boolean-contains'
 import intersect from '@turf/intersect'
@@ -31,17 +39,11 @@ import { polygon, featureCollection } from '@turf/helpers'
 
 // ── Helpers internos ─────────────────────────────────────────────────────────
 
-/**
- * ¿El recinto tiene suficientes vértices para formar un polígono Turf sin lanzar?
- * El modelo guarda anillos ABIERTOS: n vértices → n+1 posiciones al cerrar. Turf
- * exige ≥ 4 posiciones cerradas, luego el mínimo abierto es n ≥ 3. Los recintos
- * con menos se saltan (su degeneración la emite reglas-geometria, regla 1).
- *
- * @param {{vertices: Array<[number,number]>}} recinto
- * @returns {boolean}
- */
-const esRecintoApto = (recinto) =>
-  !!recinto && Array.isArray(recinto.vertices) && recinto.vertices.length >= 3
+// ⚠️ `esRecintoApto` ya NO se define aquí (F17, tarea 1.1): vive en
+// `geo/poligono.js` y llega por el re-export de `./_comun.js`, igual que
+// `anilloCerrado` y `coordsPoligono` desde F07. Estaba escrita tres veces con el
+// mismo razonamiento, y lo que define —cuántos vértices necesita un anillo para
+// que Turf lo acepte— depende del formato del anillo, que es de `geo/`.
 
 /** Nombre legible del recinto para los mensajes (0 = exterior; resto = huecos). */
 const nombreRecinto = (indice) =>
