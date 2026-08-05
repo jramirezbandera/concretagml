@@ -122,6 +122,11 @@ minuendos ya están en memoria.
 | **M6** *(2026-08-05, fase 1)* | Que `@turf/difference` añadiría «el envoltorio y no el álgebra», porque `polyclip-ts` ya está en `node_modules` vía `@turf/intersect`. **Inferencia 8/10, no medición** | **4.309 B = 4,21 kB** sobre el paquete construido, medidos cableando `restar` al punto de entrada real de la aplicación y comparando (883.971 → 888.280 B). La dirección de la inferencia era correcta —está muy lejos de los ~50 kB del motor booleano completo— y la cifra ya no es una apuesta. ⚠️ **Hoy el paquete NO lo lleva**: `restar` no tiene llamante en producción hasta que entre `cesion.js` (fase 2), así que el coste está medido pero aún no pagado |
 | **M7** *(2026-08-05, fase 1)* | El riesgo de `xs:ID` con N miembros: «dos miembros con el mismo `refcat` repiten los cuatro ids» | **Cierto a medias, y la primera versión del test se equivocaba donde el código acertaba**: la base del id es `namespace + refcat`, así que **la misma referencia bajo namespaces distintos NO choca**. No es un tecnicismo — es exactamente la forma del expediente aceptado (matriz en `ES.SDGC.CP`, cesión en `ES.LOCAL.CP` arrastrando la referencia del padre), y un guardián de «mismo refcat ⇒ error» habría rechazado el único caso con IVG positivo que este proyecto tiene |
 | **M8** *(2026-08-05, fase 1)* | El XSD estricto sobre un fichero de N miembros | **Validan** contra `cp/4.0` con lxml, en `--estricto`: **3.487 B** con dos miembros y **4.893 B** con tres. ⚠️ Lo que esto dice es que el ESCRITOR aguanta; que la Sede acepte tres o más **sigue sin medirse** |
+| **M9** *(2026-08-05, fase 2)* | ⛔ Que el residuo de un expediente DERIVADO sería despreciable, «porque las piezas comparten vértices con la parcela editada y un mismo float redondeado da siempre lo mismo». Escrito en la cabecera de `comprobacion/conjunto.js`, con un umbral fijo de **0,01 m²** debajo | **Falso, y refutado media hora después** sobre la geometría del oro. El error del razonamiento: los vértices que la derivación CREA caen **dentro de un LADO** del contorno oficial, no sobre uno de sus vértices, y al redondearlos se salen de ese lado. Doce recortes de 0,2 m a 12 m dan residuos de hasta **0,1008 m²**: el umbral fijo habría dado **falso positivo en la mitad** de los casos, sobre expedientes perfectamente cerrados. Sustituido por una **COTA derivada** —`δ·P` con `δ = ½·10⁻ᴰ·√2` de `DECIMALES_COORD`, que sale de la derivada del shoelace—: no puede dar falso positivo, y sobre el oro deja **12,4×** de margen medido |
+| **M10** *(2026-08-05, fase 2)* | Que el umbral de astilla de F07 (**1 mm**) se heredaba tal cual, y que si no se sostenía se abriría clave propia en `config/operativos.js` (decisión 3 del plan) | **No se sostiene**: las cuñas que mete el redondeo llegan a **2,49 mm** medidas sobre el oro. El fenómeno es OTRO —en F07 las dos fronteras vienen ya en la retícula y discrepan en décimas de milímetro; aquí una es un punto creado sobre un lado y redondeado fuera de él—. ⚠️ Y la clave **NO se abre**, contra lo que preveía el plan: `GROSOR_REDONDEO_M` = **7,07 mm** se DERIVA del formato (`½·10⁻ᴰ·√2`), y ponerlo entre los números que sí se ajustan diría que es una preferencia. Los datos sólo confirman la aritmética: 2,8× de margen sin haber ajustado nada |
+| **M11** *(2026-08-05, fase 2)* | La decisión 1A: `@turf/boolean-contains` sólo comprueba vértices, así que en cóncavo diría `true` con un lado fuera | **MEDIDO y convertido en test**, no citado: sobre una parcela en U, `booleanContains` devuelve **`true`** mientras **20 m²** están por fuera. `restar()` sí lo ve, con su área y su grosor. El día que Turf lo arregle, el test se pondrá rojo y la decisión podrá revisarse con el dato delante |
+| **M12** *(2026-08-05, fase 2)* | — | ⭐ **El caso que de verdad hace F17 —arrastrar un vértice existente— cierra EXACTO**: residuo `0` y cero cuñas, porque no crea ningún vértice nuevo que redondear fuera de sitio. El caso feo es el del CORTE. Saberlo importa: dice que el margen de M9 sobra en el camino normal y hace falta en el raro |
+| **M13** *(2026-08-05, fase 2)* | El coste de paquete de la fase | **+264 B**, y **todos** son los siete tipos nuevos de `TIPO_COMPROBACION` (883.971 → 884.235 B, atribuido revirtiendo sólo ese fichero). Los tres módulos nuevos —`cesion.js`, `identidad.js`, `conjunto.js`— cuestan **0**: `app/` todavía no los importa, y el barrel raíz **no entra en el paquete** (nadie de `app/`, `viewer/` ni `services/` lo importa; medido) |
 
 ## Deuda declarada
 
@@ -138,6 +143,18 @@ minuendos ya están en memoria.
 - ⏳ **El desplegable de «Tipo de operación» no se ha explorado más allá de sus dos
   opciones**, y **no se ha medido** si el IVG se queja ante una combinación
   incoherente (Segregación con un miembro, o al revés).
+- ⏳ **La cuarta afirmación del cierre —que ningún miembro se SALGA del contorno
+  oficial— se DEDUCE, no se mide.** El álgebra es exacta (sin solape,
+  `área(∪) = Σ áreas`; con la suma, eso es `área(oficial)`; con la cobertura,
+  `oficial ⊆ ∪`, luego lo de fuera es 0), pero las tres mediciones de las que
+  cuelga no lo son: vale hasta la tolerancia de la suma y hasta el umbral de
+  astilla. Para el camino de F17 da igual —una pieza de `P_of − P_new` está dentro
+  de `P_of` por construcción—, y **el día que `comprobarConjunto` coma un fichero
+  ajeno habrá que medirlo**.
+- ⏳ **La cesión con `nationalCadastralReference` VACÍA no está medida.** O19 dice
+  que la forma con sufijo vale; que la otra falle sigue sin comprobarse, y ese
+  camino es el que toma `identidadDeCesion` cuando la matriz tampoco tiene
+  referencia (un alta que se segrega).
 
 ## Deuda saldada
 
@@ -197,8 +214,25 @@ existe.
   `MIEMBROS = 1` era constante desde F04 y su JSDoc anticipaba este día. La
   regresión de una sola parcela tiene prueba **de cadena completa** (**M7**, **M8**).
 
-Quedan las fases 2 a 5: la derivación y el cierre, la entrega y el acto jurídico,
-la pantalla del sobrante, y los gates.
+**Fase 2 · la derivación y el cierre — hecha el 2026-08-05** (6.137 / 140):
+
+- **2.1** `derivacion/cesion.js`: `derivarCesion` mide el sobrante pieza a pieza,
+  lo numera con un orden **total y determinista** —norte→sur, oeste→este, área, y
+  una firma canónica que lo hace independiente del orden en que Turf devuelva las
+  piezas— y resuelve la puerta `P_new ⊆ P_of` **restando al revés** (**M11**). Las
+  astillas se **listan** con sus cifras, al revés que en F07: aquí no son ruido de
+  un aviso, son trozos de finca. La puerta tiene **tres** estados y el tercero es
+  `null`.
+- **2.3** `derivacion/identidad.js`: los tres campos del `inspireId` como **una
+  sola afirmación**, con la cesión implementando **lo medido** (O19: referencia del
+  padre sufijada, no vacía) y no lo deducido.
+- **2.2** `comprobacion/conjunto.js` con el barrel que la capa estrena: el cierre
+  sobre coordenadas **ya redondeadas**, con las **tres** afirmaciones. Los dos
+  números que las gobiernan dejaron de ser constantes elegidas y pasaron a
+  derivarse del formato, porque la medición refutó los dos (**M9**, **M10**).
+
+Quedan las fases 3 a 5: la entrega y el acto jurídico, la pantalla del sobrante, y
+los gates.
 
 ## Referencias
 
