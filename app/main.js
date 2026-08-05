@@ -932,6 +932,18 @@ export const SELECTOR_BOTON_OFFSET = '[data-accion="offset"]'
 export const SELECTOR_ESTADO_EDICION = '[data-estado="edicion"]'
 
 /**
+ * La sección VACÍA del panel donde se cuelga el diagnóstico cuando es la pantalla
+ * (2026-08-05). Ver `viewer/cajon-diagnostico.js#anfitrion` para el porqué del
+ * traslado, y el bloque de comentario de esa `<section>` en `index.html` para por
+ * qué está vacía y no se puede duplicar.
+ *
+ * `anfitrion` y no `bloque` ni `diagnostico` a secas: dice lo que el nodo HACE
+ * —alojar a otro—, que es lo único que lo distingue de las demás secciones del
+ * panel. Y `[data-estado="diagnosticar"]` ya existe en el pie para otra cosa.
+ */
+export const SELECTOR_ANFITRION_DIAGNOSTICO = '[data-anfitrion="diagnostico"]'
+
+/**
  * La conversión que `index.html` pide expresamente que haga esta capa: el campo
  * de tolerancia se teclea en CENTÍMETROS y `viewer/edicion.js#tolerancia` habla
  * METROS.
@@ -3558,6 +3570,25 @@ cablearPantalla({ documento: document, navegacion })
 // por qué enterarse de que existe una autoridad de navegación; ni en la vista, que
 // no sabe qué es un modo. Este módulo es el único sitio donde las tres cosas se
 // conocen, que es la definición de costura.
+// ── ⭐ EL DIAGNÓSTICO SE MUDA A LA COLUMNA IZQUIERDA (2026-08-05) ────────────
+//
+// Se le da al cajón el nodo del panel donde tiene que colgarse cuando ES la
+// pantalla. A partir de aquí, `comoPantalla(true)` no solo le sube el tope de alto:
+// lo saca de la esquina del mapa y lo mete en el panel, donde sustituye a la tabla
+// de vértices (que dejó de declarar esa pantalla en `index.html`).
+//
+// ⚠️ VA ANTES DE `cablearContraste`, y no es orden libre: aquél aplica el paso
+// actual en su última línea —para dejar la pantalla coherente cuando se aterriza
+// desde un hash `#/parcela/diagnostico`—, así que si el anfitrión no estuviera
+// puesto todavía, ese primer `comoPantalla(true)` dejaría el diagnóstico flotando
+// sobre el mapa hasta la siguiente navegación. `anfitrion()` reubica por su cuenta,
+// así que invertir el orden no rompería nada; simplemente se vería el salto.
+//
+// Un cambio de sitio no cambia el tamaño del MAPA (el panel mide lo mismo en las
+// cinco pantallas), así que no hace falta `invalidateSize` aquí: quien lo llama en
+// cada navegación es `alNavegar`, más arriba.
+visor.diagnostico.cajon.anfitrion(nodo(SELECTOR_ANFITRION_DIAGNOSTICO))
+
 const contrasteCableado = cablearContraste({
   navegacion,
   estado,

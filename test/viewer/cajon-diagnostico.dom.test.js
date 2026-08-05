@@ -29,6 +29,8 @@ import {
   ALTO_COMO_CAJON,
   ALTO_COMO_PANTALLA,
   CLASE,
+  ESTILO_EN_EL_PANEL,
+  ESTILO_SOBRE_EL_MAPA,
   MOTIVO_INFORME_SIN_DIAGNOSTICO,
   SELECTOR,
   crearCajonDiagnostico,
@@ -1532,5 +1534,188 @@ describe('viewer/cajon-diagnostico.js · `comoPantalla` (rebanada 4)', () => {
     // scrollea por detrás, y lo vuelve ilegible justo cuando más falta hace.
     expect(ancla.style.background).not.toBe('')
     expect(ancla.style.background).not.toBe('transparent')
+  })
+})
+
+/* -------------------------------------------------------------------------- *
+ * `anfitrion`: el diagnóstico se muda a la COLUMNA IZQUIERDA (2026-08-05)      *
+ *                                                                              *
+ * Lo que se verifica aquí es lo que puede fallar EN SILENCIO al mudar un nodo   *
+ * de sitio: que se mude de verdad, que vuelva, que se vista para cada sitio     *
+ * (dos juegos de estilos con las MISMAS claves — el que una lista mencione y la *
+ * otra no se queda pegado al cambiar), y sobre todo que **el nodo sea el        *
+ * mismo**: duplicarlo daría dos `[data-campo="superficie-registral"]` en el     *
+ * documento y `querySelector` se quedaría con el primero, dejando al otro mudo. *
+ *                                                                              *
+ * Lo que se ve de verdad —que quepa, que scrollee, que el pie no se salga— se   *
+ * mide en un navegador: `scripts/smoke-navegador/09-diagnostico.js`.            *
+ * -------------------------------------------------------------------------- */
+describe('viewer/cajon-diagnostico.js · `anfitrion` (2026-08-05)', () => {
+  /** Una sección del panel de mentira, hermana del mapa y no descendiente suya. */
+  function conPanel() {
+    const panel = document.createElement('section')
+    document.body.append(panel)
+    montados.push(() => panel.remove())
+    return panel
+  }
+
+  it('nace en `null`: un visor montado a pelo sigue siendo el cajón de F07', () => {
+    const { cajon, raiz } = conCajon()
+    expect(cajon.anfitrion()).toBe(null)
+    cajon.comoPantalla(true)
+    // Sin anfitrión, ser la pantalla solo cambia el tope de alto (rebanada 4).
+    expect(cajon.anfitrion()).toBe(null)
+    expect(raiz.style.maxHeight).toBe(ALTO_COMO_PANTALLA)
+    expect(raiz.parentElement.className, 'sigue en la esquina de Leaflet').toContain('leaflet')
+  })
+
+  it('⭐ como PANTALLA se cuelga del anfitrión, y al dejar de serlo VUELVE', () => {
+    const { cajon, raiz } = conCajon()
+    const esquina = raiz.parentElement
+    const panel = conPanel()
+
+    cajon.anfitrion(panel)
+    expect(cajon.anfitrion()).toBe(panel)
+    // Todavía no es la pantalla: tener anfitrión no basta, hacen falta las DOS.
+    expect(raiz.parentElement, 'un anfitrión no muda nada por sí solo').toBe(esquina)
+
+    cajon.comoPantalla(true)
+    expect(raiz.parentElement).toBe(panel)
+
+    cajon.comoPantalla(false)
+    expect(raiz.parentElement, 'al dejar de ser la pantalla vuelve a su esquina').toBe(esquina)
+  })
+
+  it('…y da igual el orden: primero pantalla y después anfitrión llega al mismo sitio', () => {
+    const { cajon, raiz } = conCajon()
+    const panel = conPanel()
+    cajon.comoPantalla(true)
+    cajon.anfitrion(panel)
+    expect(raiz.parentElement).toBe(panel)
+  })
+
+  it('`anfitrion(null)` lo devuelve a la esquina aunque siga siendo la pantalla', () => {
+    const { cajon, raiz } = conCajon()
+    const esquina = raiz.parentElement
+    cajon.anfitrion(conPanel())
+    cajon.comoPantalla(true)
+    expect(cajon.anfitrion(null)).toBe(null)
+    expect(raiz.parentElement).toBe(esquina)
+    expect(raiz.style.maxHeight, 'y recupera el tope de la pantalla flotante').toBe(
+      ALTO_COMO_PANTALLA,
+    )
+  })
+
+  it('⛔ es EL MISMO nodo: no se duplica ningún `data-*` del contrato', () => {
+    // Dos juegos de nodos con el mismo `data-*` es el fallo mudo que index.html
+    // lleva documentando desde F06: `querySelector` se queda con el primero del
+    // documento y el otro nace escribible, conectado y sin efecto.
+    const { cajon, raiz } = conCajon()
+    const registral = nodo(raiz, SELECTOR.REGISTRAL)
+    registral.value = '1500'
+
+    cajon.anfitrion(conPanel())
+    cajon.comoPantalla(true)
+
+    for (const sel of [SELECTOR.REGISTRAL, SELECTOR.PREPARAR, SELECTOR.TITULAR, SELECTOR.ESTADO]) {
+      expect(document.querySelectorAll(sel), `«${sel}» está dos veces en el documento`).toHaveLength(
+        1,
+      )
+    }
+    // El nodo viaja con su estado y con sus oyentes puestos: `append` reengancha,
+    // no reconstruye. Si se hubiera fabricado otro, el valor tecleado se perdería.
+    expect(document.querySelector(SELECTOR.REGISTRAL)).toBe(registral)
+    expect(cajon.registral()).toBe(1500)
+  })
+
+  it('⛔ en el panel deja de ser una ventana: ni sombra, ni radio, ni tope de alto', () => {
+    const { cajon, raiz } = conCajon()
+    cajon.anfitrion(conPanel())
+    cajon.comoPantalla(true)
+
+    expect(raiz.style.boxShadow, 'una sombra dentro del panel dibuja una tarjeta').toBe('none')
+    expect(raiz.style.borderRadius).toBe('0px')
+    // En el panel la altura se REPARTE (flex), no se declara contra la ventana.
+    expect(raiz.style.maxHeight).toBe('none')
+    expect(raiz.style.maxWidth).toBe('none')
+    expect(raiz.style.flex).not.toBe('')
+    expect(raiz.style.minHeight).toBe('0px')
+  })
+
+  it('⛔ y al volver a la esquina recupera EL JUEGO ENTERO, sin restos del panel', () => {
+    // Es lo que se pierde si las dos listas de estilos dejan de tener las mismas
+    // claves: lo que una pone y la otra no menciona se queda pegado. Un cajón
+    // flotante sin sombra y sin `max-width` sobre una ortofoto es ilegible.
+    const { cajon, raiz } = conCajon()
+    cajon.anfitrion(conPanel())
+    cajon.comoPantalla(true)
+    cajon.comoPantalla(false)
+
+    expect(raiz.style.boxShadow).not.toBe('none')
+    expect(raiz.style.maxWidth).not.toBe('none')
+    expect(raiz.style.maxHeight).toBe(ALTO_COMO_CAJON)
+    expect(raiz.style.borderRadius).toBe('8px')
+    expect(raiz.style.flex, 'el reparto flex es del panel y ahí no aplica').toBe('')
+    expect(raiz.style.minHeight).toBe('')
+  })
+
+  it('los dos juegos de estilos declaran LAS MISMAS claves', () => {
+    // El guardián de lo de arriba, dicho una sola vez y sin pasar por el DOM: una
+    // clave en un juego y no en el otro se queda pegada al mudar de sitio.
+    expect(Object.keys(ESTILO_EN_EL_PANEL).sort()).toEqual(
+      Object.keys(ESTILO_SOBRE_EL_MAPA).sort(),
+    )
+  })
+
+  it('⛔ el relleno horizontal del panel es el MISMO que sobre el mapa (12 px)', () => {
+    // No es aseo: el bloque anclado del pie se sale de ese relleno con
+    // `margin: -12px` y `width: calc(100% + 24px)` para que su fondo llegue a los
+    // bordes. Si el relleno del panel cambiara, el pie se saldría 12 px por cada
+    // lado — y jsdom no lo vería, porque no maqueta. El de ABAJO también tiene que
+    // sobrevivir, porque lo compensa `margin-bottom: -10px`.
+    const { cajon, raiz } = conCajon()
+    const sobreElMapa = raiz.style.padding
+    cajon.anfitrion(conPanel())
+    cajon.comoPantalla(true)
+    const enElPanel = raiz.style.padding
+
+    const lados = (p) => {
+      const t = p.split(/\s+/)
+      if (t.length === 2) return { lr: t[1], abajo: t[0] }
+      if (t.length === 3) return { lr: t[1], abajo: t[2] }
+      return { lr: t[1] ?? t[0], abajo: t[2] ?? t[0] }
+    }
+    expect(lados(enElPanel).lr, `«${enElPanel}» contra «${sobreElMapa}»`).toBe(
+      lados(sobreElMapa).lr,
+    )
+    expect(lados(enElPanel).abajo).toBe(lados(sobreElMapa).abajo)
+  })
+
+  it('sin argumento LEE, y con algo que no es elemento ni `null` LANZA', () => {
+    const { cajon } = conCajon()
+    const panel = conPanel()
+    expect(cajon.anfitrion()).toBe(null)
+    expect(cajon.anfitrion(panel)).toBe(panel)
+    for (const malo of ['#panel', 42, {}, true]) {
+      expect(() => cajon.anfitrion(malo)).toThrow(TypeError)
+    }
+    // Y el anfitrión no se ha movido por los intentos fallidos.
+    expect(cajon.anfitrion()).toBe(panel)
+  })
+
+  it('`destruir()` retira el contenedor esté donde esté, y no deja restos en el panel', () => {
+    const { mapa, cajon, raiz } = conCajon()
+    const panel = conPanel()
+    cajon.anfitrion(panel)
+    cajon.comoPantalla(true)
+    expect(panel.children).toHaveLength(1)
+
+    cajon.destruir()
+    expect(raiz.isConnected, 'el contenedor se ha quedado colgando del panel').toBe(false)
+    expect(panel.children).toHaveLength(0)
+    // Y después de destruir, la API calla en vez de reventar (contrato de la casa).
+    expect(cajon.anfitrion()).toBe(null)
+    expect(cajon.anfitrion(panel)).toBe(null)
+    expect(mapa).toBeTruthy()
   })
 })

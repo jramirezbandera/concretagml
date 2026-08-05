@@ -483,13 +483,57 @@
         <div id="avisos" class="gml-avisos"></div>
       </section>
 
-      <!-- En CUATRO pantallas y no en una: los vértices son lo que se valida, lo
-           que se edita, lo que se contrasta y lo que se firma. La única en la que
-           NO están es Entrada, donde todavía no hay ninguno — y ése es justo el
-           sitio que las tres vías necesitaban para poder respirar. -->
+      <!-- ══ EL DIAGNÓSTICO, EN LA COLUMNA (2026-08-05) ═══════════════════════
+           CAJA VACÍA, y la más vacía de todo el fichero: aquí no hay ni un nodo
+           hijo escrito a mano. Lo que se ve dentro en la pantalla Diagnóstico es
+           el contenedor de `viewer/cajon-diagnostico.js` —el mismo, con sus
+           oyentes puestos—, que se MUDA aquí desde la esquina del mapa cuando
+           `app/main.js` le da este nodo por `cajon.anfitrion(...)`.
+
+           ⛔ NO SE FABRICA AQUÍ NI SE DUPLICA, y el motivo es la trampa que este
+           fichero lleva documentando desde F06: un segundo juego de
+           `[data-diag]`, `[data-campo="superficie-registral"]` y
+           `[data-accion="preparar-informe"]` dejaría al primero o al segundo mudo
+           —`querySelector` se queda con el PRIMERO del documento— sin un solo
+           síntoma, porque los cableados resuelven esos nodos UNA vez al montar.
+
+           POR QUÉ AHORA SÍ CABE, que es lo que cambió: hasta T6 el panel repartía
+           una altura fija entre bloques que se enseñaban TODOS A LA VEZ, y por eso
+           F07 se llevó el diagnóstico al mapa (el razonamiento entero, con sus
+           cifras, sigue escrito en la cabecera de aquel módulo). Desde T6 el panel
+           enseña UNA pantalla cada vez, y en Diagnóstico no compite con nadie: la
+           tabla de vértices de abajo ya no declara esta pantalla.
+
+           Y POR QUÉ SE MUEVE, que es lo que se gana: un diagnóstico se lee MIRANDO
+           EL MAPA —las manchas del solape y la cota de la desviación las pinta
+           `viewer/contraste.js` sobre el dibujo—, y flotando en la esquina tapaba
+           justo lo que sus cifras señalan.
+
+           ⚠️ Sin `data-rama-panel`: la rama EDIFICIO no llega nunca a esta
+           pantalla (`MOTIVO_RAMA[PASO.DIAGNOSTICO]` de `app/navegacion.js` la
+           bloquea), así que el eje PASO ya la deja fuera y marcarla además sería
+           un segundo dueño de la misma visibilidad. -->
+      <section
+        class="gml-bloque gml-bloque--contraste"
+        data-pantalla="diagnostico"
+        data-anfitrion="diagnostico"
+      ></section>
+
+      <!-- En TRES pantallas: los vértices son lo que se valida, lo que se edita y
+           lo que se firma.
+
+           ⛔ AQUÍ PONÍA «en CUATRO», y la cuarta era Diagnóstico (rectificado el
+           2026-08-05). Ya no: en esa pantalla la columna la ocupa el bloque de
+           arriba, que es lo que el autor pidió — las cifras del contraste en vez de
+           una tabla de coordenadas y un «Sin avisos». No se pierden: se vuelven a
+           ver en Informe, que es el paso siguiente.
+
+           La otra en la que NO están es Entrada, donde todavía no hay ninguno — y
+           ése es justo el sitio que las tres vías necesitaban para poder
+           respirar. -->
       <section
         class="gml-bloque gml-bloque--vertices"
-        data-pantalla="validacion edicion diagnostico informe"
+        data-pantalla="validacion edicion informe"
       >
         <!-- El rótulo va FUERA de la caja: `sincronizar` vacía `#tabla-vertices`.
              El segundo hijo no necesita clase (hereda 11 px y gris de la fila). -->
@@ -567,17 +611,40 @@
            encendido antes de tener nada, son las dos cosas que hacían que esta
            pantalla se leyera como un formulario en vez de como una decisión.
 
+           ⛔ Y TAMPOCO ESTÁ EN DIAGNÓSTICO desde el 2026-08-05, por un motivo
+           que NO es de sitio sino de repetición. Cuando el contraste se mudó a
+           la columna (ver `.gml-bloque--contraste` más arriba), el pie quedó
+           debajo diciendo por segunda vez lo que el bloque ya decía mejor y con
+           más contexto:
+
+               ficha del pie          →  lo mismo, arriba, en el contraste
+               ─────────────────────     ────────────────────────────────────
+               Superficie             →  «Medición»
+               Superficie catastral   →  «Parcelario vigente»
+               Δ catastral            →  la fila «Medición − Catastro», que
+                                         además trae la diferencia RELATIVA
+               Colindantes (cuántas)  →  «Invasión a colindantes», que dice
+                                         cuáles y con cuántos m²
+
+           Los cuatro renglones que NO se repetían —SRS, referencia catastral,
+           vértices y perímetro— se van con ellos, y es el precio declarado: son
+           datos de identidad del expediente, están en las otras tres pantallas,
+           y la referencia además la nombra el renglón del margen de identidad.
+           A cambio, el diagnóstico deja de necesitar scroll a 1440×900.
+
            ⚠️ SE OCULTA, NO SE QUITA: sigue `isConnected`, con sus 8 nodos
            `data-ficha`, sus dos `data-accion` y sus dos renglones `role="status"`
            —que `app/rama.js` lee y escribe al conmutar de rama— exactamente donde
-           estaban. Lo único que cambia es que el CSS no lo pinta.
+           estaban. Lo único que cambia es que el CSS no lo pinta. Los guiones de
+           humo que LEEN la ficha (`03`, `06`, `07`, `09`) siguen funcionando:
+           `textContent` no depende de `display`.
 
            ⚠️ CONSECUENCIA PARA EL GUION DE HUMO 13: arranca en Entrada, donde la
            caja de vértices y el pie no se ven. Hay que lanzarlo sobre
            `#/parcela/validacion` (ver la nota del §19 del GUION). -->
       <footer
         class="gml-panel-pie"
-        data-pantalla="validacion edicion diagnostico informe"
+        data-pantalla="validacion edicion informe"
       >
         <dl class="gml-ficha">
           <dt>Sistema de referencia</dt>
@@ -600,7 +667,7 @@
           <dd class="gml-mono" data-ficha="perimetro">—</dd>
 
           <!-- ── Rework de UI · rebanada 2 (Validación), 2026-08-04 ──────────
-               LOS TRES CAMPOS DE AQUÍ ABAJO SON DE DIAGNÓSTICO, NO DE LA
+               LOS TRES CAMPOS DE AQUÍ ABAJO SON DE CONTRASTE, NO DE LA
                GEOMETRÍA, y por eso llevan `data-pantalla` propio mientras los
                cinco de arriba no lo llevan.
 
@@ -610,6 +677,17 @@
                decir— en un pie de 266,28 px FIJOS que a 1280×720 es el 37 % del
                panel. La regla de oro 1 exige no callar; no exige reservar sitio
                para un silencio.
+
+               ⛔ DECÍAN `diagnostico informe` HASTA EL 2026-08-05 y ahora dicen
+               solo `informe`. Es la vuelta completa de la tuerca: entraron aquí
+               para que se vieran EN Diagnóstico, y ahí es justo donde ya no hacen
+               falta, porque el bloque de contraste dice las tres cosas mejor
+               —con la diferencia relativa al lado, y nombrando las colindantes
+               invadidas en vez de contarlas—. El pie entero está fuera de esa
+               pantalla (ver el bloque de arriba), así que dejarlos declarando
+               `diagnostico` sería una declaración que ya no puede cumplirse: el
+               guardián del guion 14 la toleraría —solo persigue lo que se VE sin
+               declararlo— y nadie se enteraría de que miente.
 
                ⚠️ `data-pantalla` va en el `<dt>` **y** en el `<dd>`: son dos
                celdas hermanas de un `display:grid`, no un nodo con su hijo, así
@@ -622,11 +700,11 @@
                usuario. «Superficie catastral» va JUSTO DEBAJO de «Superficie»
                para que las dos cifras se comparen de un vistazo: la discrepancia
                entre lo medido y lo inscrito es media razón de ser de la app. -->
-          <dt data-pantalla="diagnostico informe">Superficie catastral</dt>
+          <dt data-pantalla="informe">Superficie catastral</dt>
           <dd
             class="gml-mono"
             data-ficha="superficie-catastral"
-            data-pantalla="diagnostico informe"
+            data-pantalla="informe"
           >
             —
           </dd>
@@ -642,17 +720,17 @@
                exactamente la decisión que no nos toca: el umbral depende del
                expediente, del municipio y del criterio del técnico que firma.
                Va en el mismo gris de texto que el resto de la ficha. -->
-          <dt data-pantalla="diagnostico informe">Δ catastral</dt>
+          <dt data-pantalla="informe">Δ catastral</dt>
           <dd
             class="gml-mono"
             data-ficha="delta-catastral"
-            data-pantalla="diagnostico informe"
+            data-pantalla="informe"
           >
             —
           </dd>
 
-          <dt data-pantalla="diagnostico informe">Colindantes</dt>
-          <dd class="gml-mono" data-ficha="colindantes" data-pantalla="diagnostico informe">
+          <dt data-pantalla="informe">Colindantes</dt>
+          <dd class="gml-mono" data-ficha="colindantes" data-pantalla="informe">
             —
           </dd>
         </dl>

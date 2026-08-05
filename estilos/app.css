@@ -600,6 +600,65 @@ body {
   padding-bottom: var(--space-4);
 }
 
+/* ── El diagnóstico, EN LA COLUMNA (2026-08-05) ───────────────────────────────
+ *
+ * La sección anfitriona de `viewer/cajon-diagnostico.js` cuando la pantalla es
+ * Diagnóstico. Está VACÍA en `index.html`: el contenedor se muda aquí desde la
+ * esquina del mapa (`cajon.anfitrion(...)`), con sus oyentes puestos.
+ *
+ * Es el estirador de ESA pantalla, exactamente como `.gml-bloque--vertices` lo es
+ * de Validación — y por eso mismo aquella dejó de declarar `diagnostico`: **dos
+ * estiradores a la vez descosen el reparto**, que es el mismo aviso que
+ * `app/rama.js` dejó escrito para `.gml-bloque--partes`. Aquí no puede haber
+ * conflicto con ésa, además, porque la rama EDIFICIO no llega a esta pantalla.
+ *
+ * ⚠️ EL RELLENO SON 12 px Y NO `--space-6`, Y NO ES UNA ERRATA. El contenedor del
+ * cajón trae 12 px propios EN LÍNEA que no se le pueden quitar: su pie anclado se
+ * sale de ellos con `margin: -12px` + `width: calc(100% + 24px)` para que el fondo
+ * llegue a los bordes, y cambiarlos descuadraría esa compensación sin que nada
+ * avisara. 12 + 12 = los 24 (`--space-6`) que gastan los demás bloques del panel.
+ * La cuenta está también en `ESTILO_EN_EL_PANEL` de aquel módulo, que es el otro
+ * extremo de este acuerdo. */
+.gml-bloque--contraste {
+  flex: 1 1 auto;
+  padding: var(--space-4) 12px 0;
+}
+
+/* Y en el panel el cajón deja de ser una ventana: ni borde, ni sombra, ni suelo de
+ * ancho. Las tres son de `.gml-app .gml-cajon-diagnostico` (más abajo en esta
+ * hoja), que las pone para que flote legible sobre una ortofoto; aquí no flota
+ * sobre nada. El selector lleva `.gml-app` delante SOLO para ganar la cascada
+ * (0,3,0 contra 0,2,0) sin depender del orden de los bloques de este fichero.
+ *
+ * `min-width` importa más de lo que parece: `min(300px,42vw)` es el suelo que la
+ * tabla de cruces necesita sobre el mapa, y dentro de un panel de 392 px obligaría
+ * a scroll horizontal en cuanto la ventana bajara de ~715 px de ancho. */
+.gml-app .gml-bloque--contraste .gml-cajon-diagnostico {
+  min-width: 0;
+  border: 0;
+  box-shadow: none;
+}
+
+/* ── ⛔ LOS AVISOS EN DIAGNÓSTICO: SE CALLAN, PERO NO SE ESCONDEN ─────────────
+ * El autor pidió que en Diagnóstico la columna la ocupe el contraste «y sustituya
+ * a los vértices y avisos». Los vértices se resuelven con `data-pantalla` (son
+ * datos, y en esa pantalla no se miran). Los avisos NO, y la diferencia es de
+ * fondo: son el canal de errores de la aplicación entera, y hay una prueba que
+ * exige que `.gml-bloque--avisos` no declare pantalla precisamente porque
+ * esconderlo al cambiar de paso sería el peor fallo mudo que esta cáscara puede
+ * tener. No es teórico aquí: `app/cableado-diagnostico.js` manda al panel de
+ * avisos los fallos del cálculo y de la composición del informe, y sus renglones
+ * de estado dicen literalmente «Mira el panel de avisos».
+ *
+ * Así que se oculta lo que sobraba y solo eso: **el bloque cuando está VACÍO**, que
+ * es lo que se veía en la captura («AVISOS / Sin avisos.», ~60 px para decir que no
+ * hay nada que decir). Con un solo hallazgo dentro, reaparece. El gancho es el
+ * `.gml-avisos-vacio` que fabrica `app/avisos.js`, así que el estado de la lista y
+ * el de esta regla no pueden divergir: son el mismo nodo. */
+.gml-app[data-paso='diagnostico'] .gml-bloque--avisos:has(.gml-avisos-vacio) {
+  display: none;
+}
+
 .gml-rotulo {
   margin: 0 0 var(--space-2);
   font-size: var(--text-11);

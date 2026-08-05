@@ -1,19 +1,33 @@
-// viewer/cajon-diagnostico.js — F07 · El CAJÓN del diagnóstico, sobre el mapa.
+// viewer/cajon-diagnostico.js — F07 · El diagnóstico: sobre el mapa o EN EL PANEL.
 //
-// ── QUÉ PROBLEMA RESUELVE, Y POR QUÉ NO ESTÁ EN EL PANEL ────────────────────
-// La spec de F07 insinuaba un bloque más en el panel lateral. No cabe, y está
-// MEDIDO: el panel reparte una altura FIJA entre bloques fijos, y el bloque
-// «Edición» de F06 —270 px— dejó la caja de vértices en **64 px a 1440×900**, o sea
-// un vértice y medio de los quince de la parcela. F06 lo cerró el 2026-07-29
-// llevándose las herramientas a una barra flotante y la caja recuperó **303 px**,
-// pero el problema de fondo sigue abierto: `estilos/app.css` avisa por escrito de
-// que «el siguiente bloque que entre —F07 trae uno de diagnóstico— se lo vuelve a
-// comer». Así que el diagnóstico no entra en el panel: vive **sobre el mapa**, como
-// la barra de edición, y el panel no pierde ni un píxel.
+// ── ⛔ DÓNDE VIVE ESTO, Y POR QUÉ HA CAMBIADO (2026-08-05) ──────────────────
+// Este fichero se llama «cajón» porque durante F07–F11 lo fue: una ventanita
+// flotante en la esquina inferior izquierda del mapa. **Desde el 2026-08-05 ya no
+// lo es en la aplicación**: en la pantalla de Diagnóstico el mismo contenedor se
+// cuelga de la COLUMNA IZQUIERDA, donde sustituye a la tabla de vértices. Quien lo
+// muda de sitio es {@link anfitrion}, y ahí está el porqué largo. Sigue siendo un
+// cajón para quien monte el visor a pelo, que es el defecto.
 //
-// De paso gana lo que el panel no podía darle: **anchura**. La tabla a tres bandas
-// (§10.2) enfrenta tres superficies con tres diferencias cruzadas, y eso son cinco
-// columnas que en 320 px de panel no se leen.
+// ── LO QUE DECÍA AQUÍ, Y QUÉ PARTE SIGUE SIENDO VERDAD ──────────────────────
+// Decía: «la spec de F07 insinuaba un bloque más en el panel lateral; no cabe, y
+// está MEDIDO — el panel reparte una altura FIJA entre bloques fijos, y el bloque
+// «Edición» de F06 (270 px) dejó la caja de vértices en 64 px a 1440×900». Era
+// cierto y ya no aplica: **el rework de UI (T6) partió el panel por pasos**, así
+// que en Diagnóstico no hay ni tabla de vértices ni bloque de Entrada con los que
+// competir. La altura ya no se reparte entre bloques fijos: la absorbe el único
+// bloque de esa pantalla.
+//
+// Lo que sí sobrevive de aquel razonamiento —y hay que conservarlo— es la otra
+// mitad: **un diagnóstico se lee MIRANDO EL MAPA**. Las manchas del solape, la cota
+// de la desviación máxima y el lindero invadido los pinta `viewer/contraste.js`
+// sobre el dibujo. Por eso el cambio de sitio no es cosmético: flotando, este
+// contenedor TAPABA justo lo que sus cifras señalan.
+//
+// Lo que se pierde es la **anchura** que el mapa le daba. La tabla a tres bandas
+// (§10.2) son cinco columnas, y en los ~344 px útiles del panel van más justas que
+// en los 420 del cajón. Se acepta a cambio de ver el mapa entero, y por eso las
+// cifras siguen en `tabular-nums` (`estilos/app.css`): sin alineación de comas esa
+// tabla no se compararía de un vistazo en ningún ancho.
 //
 // ── ESTE MÓDULO ES UNA VISTA, Y NADA MÁS ────────────────────────────────────
 // Fabrica nodos, los rellena, los abre y los cierra. **No conoce el modelo, ni el
@@ -44,6 +58,14 @@
 //      quieren el mismo informe. El cajón es común a las dos, así que no hay que
 //      ramificar la interfaz por procedencia — y `report/contraste-texto.js` acepta
 //      `comprobacion: null` precisamente para eso.
+//
+// ⚠️ **DE LAS TRES, LA 2 CADUCÓ EL 2026-08-05** y las otras dos salieron
+// reforzadas. La 2 decía «aquí cuesta 0 px de panel»: ya no es cierto —este
+// contenedor ES el panel en su pantalla— y da igual, porque el presupuesto que
+// protegía (una altura fija repartida entre bloques fijos) desapareció con el
+// rework. La 1 («la acción que CONSUME el diagnóstico va donde el diagnóstico se
+// lee») y la 3 («sirve igual a las dos vías de entrada») valen palabra por palabra,
+// y ahora además sin obligar a leer a un palmo de distancia. Ver {@link anfitrion}.
 //
 // Lo que este módulo NO sabe es qué se escribe dentro del informe ni cómo baja:
 // solo enciende el botón, lo apaga y avisa de que lo han pulsado. Componer el
@@ -153,6 +175,69 @@ export const ALTO_COMO_CAJON = '52vh'
  * DESCRIPTIVO: lo accionable y lo que habla van en el bloque anclado.
  */
 export const ALTO_COMO_PANTALLA = 'calc(100vh - 112px)'
+
+/**
+ * ⭐ **EL CROMO DEL CONTENEDOR EN CADA UNO DE SUS DOS SITIOS** (2026-08-05).
+ *
+ * Hasta hoy este contenedor solo vivía en una esquina del mapa, así que sus
+ * estilos se escribían de una vez en `onAdd` y no se volvían a tocar. Desde que la
+ * pantalla de Diagnóstico lo aloja en el PANEL IZQUIERDO (ver {@link anfitrion}),
+ * el mismo nodo tiene que saber vestirse de las dos maneras — y las dos listas
+ * tienen que llevar **las mismas claves**, porque `estilar` asigna propiedad a
+ * propiedad y lo que una ponga y la otra no mencione se quedaría pegado al cambiar
+ * de sitio. Hay una prueba que compara los dos juegos de claves justo por eso.
+ *
+ * Sobre el mapa: una ventanita blanca con sombra que flota sobre la ortofoto.
+ */
+export const ESTILO_SOBRE_EL_MAPA = Object.freeze({
+  background: '#fff',
+  padding: '10px 12px',
+  borderRadius: '8px',
+  boxShadow: '0 2px 10px rgba(15,23,42,.25)',
+  maxWidth: 'min(420px,42vw)',
+  maxHeight: ALTO_COMO_CAJON,
+  flex: '',
+  minHeight: '',
+})
+
+/**
+ * Y en el panel: **ni ventana ni sombra**. Ahí no flota sobre nada — es el
+ * contenido de la columna, como la tabla de vértices lo es en Validación—, así que
+ * el fondo, el radio y la sombra sobrarían: dibujarían una tarjeta dentro de un
+ * panel que ya es una tarjeta.
+ *
+ * Las tres decisiones que no se leen solas:
+ *
+ *   · **`padding: '0 12px 10px'`**, con los mismos 12 px horizontales y los mismos
+ *     10 px de abajo que sobre el mapa. NO es descuido dejarlos: el bloque anclado
+ *     del pie se sale de ellos con `margin: -12px` y `width: calc(100% + 24px)`
+ *     para que su fondo llegue a los bordes, y cambiar el relleno aquí descuadraría
+ *     esa compensación sin que nada avisara (el pie se saldría 12 px por cada lado
+ *     y 10 px por abajo, y ese último se lo comería el recorte del scroll). Lo
+ *     único que se quita es el relleno de ARRIBA, que ya lo pone la sección
+ *     anfitriona. Los 12 px que quedan más los 12 de `.gml-bloque--contraste` en
+ *     `estilos/app.css` suman los 24 (`--space-6`) que gastan los demás bloques del
+ *     panel.
+ *   · **`maxHeight: 'none'` + `flex: '1 1 auto'` + `minHeight: '0'`**: en el panel
+ *     la altura no se declara, se REPARTE. La sección anfitriona es un
+ *     `display:flex` en columna (lo hereda de `.gml-bloque`), así que el cajón
+ *     absorbe lo que sobra entre la cabecera y el pie del panel y scrollea por
+ *     dentro — exactamente como hacía la caja de vértices, a la que sustituye.
+ *     Un `max-height` en vh aquí volvería a medir contra la ventana en vez de
+ *     contra el hueco, que es el error que se lleva arrastrando desde F07.
+ *   · **`background: 'transparent'`** y no `#fff`: el panel ya tiene su fondo, y
+ *     fijarlo aquí sería el único sitio de la aplicación que se salta el token.
+ */
+export const ESTILO_EN_EL_PANEL = Object.freeze({
+  background: 'transparent',
+  padding: '0 12px 10px',
+  borderRadius: '0',
+  boxShadow: 'none',
+  maxWidth: 'none',
+  maxHeight: 'none',
+  flex: '1 1 auto',
+  minHeight: '0',
+})
 
 export const CLASE = Object.freeze({
   CONTENEDOR: 'gml-cajon-diagnostico',
@@ -421,6 +506,14 @@ const CajonDiagnostico = L.Control.extend({
     // comporte como antes. Quien lo conmuta es `app/contraste.js`, que es el único
     // que sabe qué paso hay. Ver {@link crearCajonDiagnostico}#comoPantalla.
     this._comoPantalla = false
+    // Dónde vive el contenedor cuando ES la pantalla. `null` = en la esquina del
+    // mapa, que es lo de F07 y lo que ve un visor montado a pelo. Quien lo fija es
+    // `app/main.js`, que es el único que conoce la cáscara. Ver {@link anfitrion}.
+    this._anfitrion = null
+    // La esquina de Leaflet a la que hay que devolverlo. La rellena
+    // `crearCajonDiagnostico` justo después de `addControl`, que es cuando Leaflet
+    // ya ha colgado el contenedor de su sitio (en `onAdd` todavía no tiene padre).
+    this._esquina = null
     this._oyentes = {
       cerrar: new Set(),
       // Rework de UI · rebanada 4. «Han pulsado el ✕ y este cajón NO se cierra
@@ -450,20 +543,16 @@ const CajonDiagnostico = L.Control.extend({
     // cajón tiene que ser legible por sí solo (en `npm run dev` sin CSS, y en
     // jsdom). El cromo fino es de `estilos/app.css`.
     estilar(contenedor, {
-      background: '#fff',
-      padding: '10px 12px',
-      borderRadius: '8px',
-      boxShadow: '0 2px 10px rgba(15,23,42,.25)',
       font: '13px/1.45 system-ui,sans-serif',
       color: '#334155',
-      maxWidth: 'min(420px,42vw)',
-      // Nace como CAJÓN. Lo sube a pantalla `comoPantalla(true)`, y solo cuando
-      // alguien se lo pide: este módulo no sabe en qué paso está la aplicación.
-      maxHeight: ALTO_COMO_CAJON,
       overflowY: 'auto',
       overscrollBehavior: 'contain',
       display: 'none',
     })
+    // Nace como CAJÓN SOBRE EL MAPA. Lo muda de sitio {@link _reubicar}, y solo
+    // cuando alguien le da un anfitrión y le dice que es la pantalla: este módulo
+    // no sabe en qué paso está la aplicación ni qué es un panel.
+    estilar(contenedor, ESTILO_SOBRE_EL_MAPA)
 
     // ── Cabecera: titular descriptivo + cerrar ──────────────────────────────
     const cabecera = crear(doc, 'header')
@@ -958,6 +1047,52 @@ const CajonDiagnostico = L.Control.extend({
     this._abierto = false
   },
 
+  // ── Dónde vive el contenedor ──────────────────────────────────────────────
+
+  /**
+   * ⭐ **MUEVE EL CONTENEDOR AL SITIO QUE LE TOCA Y LO VISTE PARA ESE SITIO.**
+   *
+   * Hay exactamente DOS sitios, y cuál toca es una sola pregunta con dos mitades:
+   * `¿es la pantalla?` **y** `¿alguien ha dicho dónde?`.
+   *
+   *   · **En el panel** — `comoPantalla(true)` y hay anfitrión. Es lo que ve el
+   *     usuario de la aplicación desde el 2026-08-05.
+   *   · **En la esquina del mapa** — todo lo demás. Es lo de F07, y sigue siendo lo
+   *     que ve quien monte el visor a pelo (los tests, un mapa sin cáscara). Ahí
+   *     `comoPantalla` solo cambia el tope de alto, como venía haciendo.
+   *
+   * ── ⚠️ POR QUÉ SE MUEVE EL NODO Y NO SE FABRICA OTRO ────────────────────────
+   * Un segundo contenedor sería un segundo `[data-diag="titular"]`, un segundo
+   * `[data-campo="superficie-registral"]` y un segundo `[data-accion=
+   * "preparar-informe"]` en el mismo documento — y `querySelector` se queda con el
+   * PRIMERO. `app/cableado-diagnostico.js` y `app/cableado-informe.js` resuelven
+   * esos nodos UNA vez, al montar, así que el segundo juego nacería mudo y sin un
+   * solo síntoma. Es la trampa que `index.html` lleva documentando desde F06, y la
+   * razón por la que aquí se muda el nodo entero con sus oyentes puestos: `append`
+   * lo reengancha en el sitio nuevo sin desatar nada.
+   *
+   * `control.remove()` de Leaflet sigue funcionando esté donde esté: hace
+   * `DomUtil.remove(this._container)`, que le pregunta al nodo por su padre real.
+   *
+   * IDEMPOTENTE y barata: si ya está donde toca, `append` no hace nada.
+   */
+  _reubicar() {
+    const contenedor = this._contenedor
+    if (!contenedor) return
+    const enPanel = this._comoPantalla === true && this._anfitrion !== null
+    const destino = enPanel ? this._anfitrion : this._esquina
+    if (destino && contenedor.parentNode !== destino) destino.append(contenedor)
+    if (enPanel) {
+      estilar(contenedor, ESTILO_EN_EL_PANEL)
+      return
+    }
+    estilar(contenedor, ESTILO_SOBRE_EL_MAPA)
+    // El tope de alto sobre el mapa depende de si además es la pantalla, y por eso
+    // se escribe DESPUÉS del juego base: son 52vh de cajón descartable contra el
+    // `calc(100vh - 112px)` medido de la pantalla. Ver {@link ALTO_COMO_PANTALLA}.
+    contenedor.style.maxHeight = this._comoPantalla ? ALTO_COMO_PANTALLA : ALTO_COMO_CAJON
+  },
+
   // ── Apertura y cierre ─────────────────────────────────────────────────────
 
   _fijarAbierto(abierto, evento = null) {
@@ -1134,9 +1269,11 @@ const CajonDiagnostico = L.Control.extend({
  * @param {Object} opciones
  * @param {import('leaflet').Map} opciones.mapa  El mapa del visor.
  * @param {string} [opciones.posicion='bottomleft']  Esquina de Leaflet. El defecto
- *   NO es arbitrario: `topleft` la ocupa la barra de edición de F06, `topright` el
- *   control de capas y `bottomright` el de opacidad **y** la atribución. `bottomleft`
- *   es la única esquina libre del visor.
+ *   NO es arbitrario: `topleft` la ocupa el control de zoom —y hasta el 2026-08-05
+ *   también la barra de edición de F06, que hoy vive centrada en el borde inferior,
+ *   en una quinta esquina que `viewer/barra-edicion.js` le añade a Leaflet—,
+ *   `topright` el control de capas y `bottomright` el de opacidad **y** la
+ *   atribución. `bottomleft` es la única esquina libre del visor.
  * @param {((mensaje: string, detalle?: object) => void)|null} [opciones.alAvisar]
  *   Canal de aviso (regla de oro 1). Se resuelve y valida aunque no se use, que es
  *   el patrón obligatorio del visor.
@@ -1144,8 +1281,8 @@ const CajonDiagnostico = L.Control.extend({
  *   abierto: Function, registral: Function, clase: Function,
  *   reiniciarExpediente: Function, estado: Function, estadoInforme: Function,
  *   alCambiar: Function, alDescargar: Function, alPreparar: Function,
- *   alCerrar: Function, comoPantalla: Function, alSalir: Function,
- *   destruir: Function}}
+ *   alCerrar: Function, comoPantalla: Function, anfitrion: Function,
+ *   alSalir: Function, destruir: Function}}
  * @throws {TypeError|RangeError} Contrato del programador.
  */
 export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar } = {}) {
@@ -1172,6 +1309,12 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
 
   const control = new CajonDiagnostico({ position: posicion })
   mapa.addControl(control)
+  // La esquina a la que hay que devolverlo si algún día deja de ser la pantalla.
+  // Se lee AQUÍ y no en `onAdd` porque Leaflet cuelga el contenedor DESPUÉS de que
+  // aquél devuelva, así que dentro todavía no tiene padre. Guardarla —en vez de
+  // recalcularla con `map._controlCorners[posicion]`— evita depender de un campo
+  // privado de Leaflet. Ver {@link CajonDiagnostico._reubicar}.
+  control._esquina = control._contenedor === undefined ? null : control._contenedor.parentNode
 
   let destruido = false
 
@@ -1545,9 +1688,9 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       }
       if (valor === control._comoPantalla) return control._comoPantalla
       control._comoPantalla = valor
-      if (control._contenedor) {
-        control._contenedor.style.maxHeight = valor ? ALTO_COMO_PANTALLA : ALTO_COMO_CAJON
-      }
+      // Y con eso puede cambiar de SITIO, no solo de tamaño: si hay anfitrión, ser
+      // la pantalla significa vivir en el panel. Ver {@link _reubicar}.
+      control._reubicar()
       // El rótulo del ✕ deja de mentir a quien no ve la pantalla: en modo pantalla
       // ese botón se sale del diagnóstico, no cierra un cajón.
       if (control._botonCerrar) {
@@ -1557,6 +1700,59 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
         )
       }
       return control._comoPantalla
+    },
+
+    /**
+     * ⭐ **DÓNDE VIVE EL DIAGNÓSTICO CUANDO ES LA PANTALLA** (2026-08-05).
+     *
+     * Sin argumento, LEE. Con un elemento, lo adopta como anfitrión; con `null`,
+     * devuelve el cajón a la esquina del mapa. Devuelve el anfitrión aplicado.
+     *
+     * ── QUÉ CAMBIA, Y POR QUÉ SE CAMBIA ────────────────────────────────────
+     * La cabecera de este fichero explica —con las cifras de F07— por qué el
+     * diagnóstico no entró en el panel: allí se repartía una altura FIJA entre
+     * bloques fijos que se enseñaban TODOS A LA VEZ, así que un bloque más dejaba
+     * la caja de vértices en 64 px. **Esa razón caducó con el rework de UI**: desde
+     * T6 el panel enseña UNA pantalla cada vez, y en la de Diagnóstico ni la tabla
+     * de vértices ni las tres vías de Entrada compiten por el sitio — el panel
+     * entero está libre.
+     *
+     * Lo que quedaba en pie era una ventana flotante que TAPABA el mapa justo en la
+     * pantalla que se lee mirando el mapa: las manchas del solape, la cota de la
+     * desviación máxima y el lindero invadido son la mitad del diagnóstico, y el
+     * cajón se ponía encima de ellos. En el panel se leen las cifras Y se ve lo que
+     * señalan, que era el objetivo desde el principio.
+     *
+     * ── LO QUE **NO** CAMBIA, Y ES LA MITAD DEL VALOR DE ESTA API ───────────
+     * Este módulo sigue sin saber qué es un panel, ni un paso, ni la cáscara: le
+     * dan un nodo y se cuelga de él. Nace en `null`, así que un visor montado a
+     * pelo —los tests, `npm run dev` sobre un mapa suelto— se comporta EXACTAMENTE
+     * como el cajón de F07. Es la misma doctrina que {@link comoPantalla} y que
+     * `viewer/edicion.js#activa`.
+     *
+     * ⚠️ **No abre ni cierra nada.** Mudar de sitio y estar abierto son cosas
+     * distintas: quien decide lo segundo sigue siendo `app/cableado-diagnostico.js`
+     * por el CTA y `app/contraste.js` por el paso.
+     *
+     * @param {HTMLElement|null} [nodo]
+     * @returns {HTMLElement|null}
+     * @throws {TypeError}  Contrato del programador: cualquier cosa que no sea un
+     *   elemento del DOM ni `null`. Un `undefined` colado aquí sería una LECTURA
+     *   silenciosa, y la pantalla se quedaría sobre el mapa sin que nada lo dijera.
+     */
+    anfitrion(nodo) {
+      if (destruido) return null
+      if (nodo === undefined) return control._anfitrion
+      if (nodo !== null && !(nodo && typeof nodo === 'object' && nodo.nodeType === 1)) {
+        throw new TypeError(
+          `anfitrion: 'nodo' debe ser un elemento del DOM (donde colgar el diagnóstico cuando ` +
+            `es la pantalla) o null para devolverlo a la esquina del mapa; recibido ` +
+            `${typeof nodo}. Sin argumento LEE.`,
+        )
+      }
+      control._anfitrion = nodo
+      control._reubicar()
+      return control._anfitrion
     },
 
     /**

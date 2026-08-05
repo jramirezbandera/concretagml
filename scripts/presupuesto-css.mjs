@@ -161,6 +161,15 @@ export const ASIENTOS = Object.freeze(
         '—bajar la hoja o revisar el techo— es del autor, y hasta que la tome el registro dice la ' +
         'verdad: hoja movida +479 B (el informe a página completa y su bloque anclado), rebanada ' +
         'anotada, quinta SIN cerrar.' },
+    { hito: 'Diagnóstico en la columna', commit: '(sin commitear)', total: 61830, nuestro: 46735, rebanada: null,
+      nota:
+        '+243 B, y es lo que cuesta sacar el diagnóstico de encima del mapa: la sección anfitriona ' +
+        'del panel (`.gml-bloque--contraste`, el estirador de esa pantalla), tres propiedades que ' +
+        'le quitan al cajón el cromo de ventana flotante cuando vive dentro, y la regla que colapsa ' +
+        'el bloque de avisos VACÍO en Diagnóstico. El cajón sigue vistiéndose EN LÍNEA para sus dos ' +
+        'sitios (`ESTILO_SOBRE_EL_MAPA` / `ESTILO_EN_EL_PANEL`), así que el traslado en sí no toca ' +
+        'esta hoja: los 243 B son solo el hueco que lo recibe. Sobran 4.671 sobre el techo, 243 más ' +
+        'que en el asiento anterior y por la misma causa de fondo, que sigue sin resolverse.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

@@ -173,6 +173,65 @@ describe('T6 · ⭐ marcado y CSS dicen lo mismo (el fallo mudo)', () => {
     expect(vertices.split(/\s+/)).toContain(PASO.VALIDACION)
   })
 
+  // ── ⭐ EL DIAGNÓSTICO EN LA COLUMNA (2026-08-05) ──────────────────────────
+  // La pantalla de Diagnóstico deja de tener una ventana flotando sobre el mapa:
+  // el contenedor de `viewer/cajon-diagnostico.js` se muda a esta sección del
+  // panel (`cajon.anfitrion(...)`) y sustituye a la tabla de vértices. Aquí se
+  // verifica la mitad que vive en el MARCADO; la otra mitad —que el nodo se muda
+  // de verdad y se viste para el sitio nuevo— está en
+  // `test/viewer/cajon-diagnostico.dom.test.js`.
+  it('⭐ la cáscara trae la sección anfitriona del diagnóstico, VACÍA y única', () => {
+    montarCascara()
+    const anfitriones = document.querySelectorAll('[data-anfitrion="diagnostico"]')
+    expect(
+      anfitriones,
+      'sin esta sección el diagnóstico se queda flotando sobre el mapa (y `app/main.js` LANZA)',
+    ).toHaveLength(1)
+    const seccion = anfitriones[0]
+    expect(seccion.getAttribute(ATRIBUTO_PANTALLA).split(/\s+/)).toEqual([PASO.DIAGNOSTICO])
+    // VACÍA a propósito: escribir aquí los nodos del diagnóstico daría un SEGUNDO
+    // juego de `[data-diag]` y `[data-campo="superficie-registral"]` en el
+    // documento, y `querySelector` se queda con el primero — el otro nacería
+    // conectado, escribible y mudo. Es la trampa que index.html documenta desde F06.
+    expect(seccion.children, 'la sección anfitriona no fabrica nada: solo aloja').toHaveLength(0)
+  })
+
+  it('⛔ en Diagnóstico la columna NO la ocupan los vértices: son dos estiradores', () => {
+    // `.gml-bloque--vertices` y `.gml-bloque--contraste` son los dos `flex:1 1 auto`
+    // del panel, y dos estiradores a la vez descosen el reparto (el mismo aviso que
+    // `app/rama.js` dejó escrito para `.gml-bloque--partes`). Que no coincidan en
+    // ninguna pantalla es lo que lo impide.
+    montarCascara()
+    const pantallasDe = (sel) =>
+      document.querySelector(sel).getAttribute(ATRIBUTO_PANTALLA).split(/\s+/)
+    const vertices = pantallasDe('.gml-bloque--vertices')
+    const contraste = pantallasDe('.gml-bloque--contraste')
+    expect(vertices).not.toContain(PASO.DIAGNOSTICO)
+    expect(contraste).toEqual([PASO.DIAGNOSTICO])
+    expect(vertices.filter((p) => contraste.includes(p))).toEqual([])
+    // Y los dos declaran el reparto en el CSS, que es lo que los hace estiradores.
+    for (const clase of ['gml-bloque--vertices', 'gml-bloque--contraste']) {
+      expect(CSS, `.${clase} ha dejado de ser el estirador de su pantalla`).toMatch(
+        new RegExp(`\\.${clase}\\s*\\{[^}]*flex:\\s*1 1 auto`),
+      )
+    }
+  })
+
+  it('⛔ los avisos siguen SIN declarar pantalla: solo se colapsan VACÍOS', () => {
+    // El autor pidió que el contraste sustituyera «a los vértices y avisos». Los
+    // vértices se van con `data-pantalla`; los avisos NO pueden, porque son el
+    // canal de errores de la aplicación entera —`app/cableado-diagnostico.js` manda
+    // ahí los fallos del cálculo y del informe, y sus renglones dicen «Mira el
+    // panel de avisos»—. Lo que se oculta es el bloque cuando no tiene nada que
+    // decir, por el mismo nodo (`.gml-avisos-vacio`) que fabrica `app/avisos.js`,
+    // así que la regla y la lista no pueden divergir.
+    montarCascara()
+    expect(document.querySelector('.gml-bloque--avisos').hasAttribute(ATRIBUTO_PANTALLA)).toBe(false)
+    expect(CSS).toContain(
+      `.gml-app[data-paso='${PASO.DIAGNOSTICO}'] .gml-bloque--avisos:has(.gml-avisos-vacio)`,
+    )
+  })
+
   it('el pie del panel tampoco está en Entrada (mide 266 px y no cabía)', () => {
     montarCascara()
     const pie = document.querySelector('.gml-panel-pie')
@@ -181,6 +240,34 @@ describe('T6 · ⭐ marcado y CSS dicen lo mismo (el fallo mudo)', () => {
     expect(pie.isConnected).toBe(true)
     expect(pie.querySelector('[data-accion="generar-gml"]')).not.toBeNull()
     expect(pie.querySelectorAll('[data-ficha]').length).toBeGreaterThan(0)
+  })
+
+  it('⛔ ni en Diagnóstico: repetía debajo lo que el contraste dice arriba', () => {
+    // Con el contraste en la columna, el pie quedaba debajo diciendo por segunda
+    // vez «Superficie», «Superficie catastral», «Δ catastral» y «Colindantes» —y
+    // el bloque de arriba las dice mejor: con la diferencia relativa al lado y
+    // nombrando las colindantes invadidas en vez de contarlas—. Son ~180 px que
+    // obligaban a rodar la rueda para leer el propio diagnóstico.
+    montarCascara()
+    const pie = document.querySelector('.gml-panel-pie')
+    expect(pie.getAttribute(ATRIBUTO_PANTALLA).split(/\s+/)).not.toContain(PASO.DIAGNOSTICO)
+    // Y los tres renglones de contraste de la ficha DEJAN de declararlo también.
+    // Si siguieran diciendo `diagnostico`, nadie se enteraría de que mienten: el
+    // ancestro los oculta, y el guardián del guion 14 solo persigue lo que se VE
+    // sin declararlo, nunca lo contrario.
+    for (const ficha of ['superficie-catastral', 'delta-catastral', 'colindantes']) {
+      const dd = document.querySelector(`[data-ficha="${ficha}"]`)
+      expect(dd, `falta [data-ficha="${ficha}"] en index.html`).not.toBeNull()
+      const declara = dd.getAttribute(ATRIBUTO_PANTALLA).split(/\s+/)
+      expect(declara, `«${ficha}» sigue declarando una pantalla donde su pie no está`).toEqual([
+        PASO.INFORME,
+      ])
+      // El `<dt>` hermano tiene que decir LO MISMO: son dos celdas de un grid, y
+      // ocultar solo una descoloca la rejilla.
+      expect(dd.previousElementSibling.getAttribute(ATRIBUTO_PANTALLA)).toBe(
+        dd.getAttribute(ATRIBUTO_PANTALLA),
+      )
+    }
   })
 })
 
@@ -366,26 +453,38 @@ describe('rebanada 2 · el pie enseña lo de cada pantalla', () => {
   })
 
   it('los cinco campos de GEOMETRÍA se ven donde hay geometría que mirar', () => {
+    // ⛔ AQUÍ TAMBIÉN ESTABA `DIAGNOSTICO` HASTA EL 2026-08-05. Se cae con el pie
+    // entero: en esa pantalla el contraste ocupa la columna y el pie repetía
+    // debajo la mitad de sus renglones. Los cuatro que NO se repetían —SRS,
+    // referencia, vértices y perímetro— se van con ellos, y es el precio
+    // declarado: son datos de identidad, están en las otras tres pantallas.
     montarCascara()
     const donde = Object.fromEntries(paresDeLaFicha().map(({ campo, dd }) => [campo, visibleEn(dd)]))
     for (const campo of ['srs', 'refcat', 'vertices', 'superficie', 'perimetro']) {
       expect(donde[campo], `«${campo}» es un hecho de la geometría`).toEqual([
         PASO.VALIDACION,
         PASO.EDICION,
-        PASO.DIAGNOSTICO,
         PASO.INFORME,
       ])
     }
   })
 
-  it('los tres campos de DIAGNÓSTICO no ocupan sitio antes de haberlo hecho', () => {
-    // Medido: en Validación decían «No consta», «No hay con qué comparar» y «Sin
-    // consultar». Reservar tres renglones para decir que todavía no hay nada que
-    // decir es lo que la regla de oro 1 NO pide.
+  it('los tres campos de CONTRASTE solo se ven donde nadie los repite', () => {
+    // Nacieron con `data-pantalla` propio (rebanada 2) porque en Validación
+    // decían «No consta», «No hay con qué comparar» y «Sin consultar»: tres
+    // renglones reservando sitio para un silencio, que es lo que la regla de oro
+    // 1 NO pide.
+    //
+    // ⛔ Y EL 2026-08-05 SALIERON TAMBIÉN DE DIAGNÓSTICO, que es donde entraron a
+    // vivir. No por sitio, por REPETICIÓN: el bloque de contraste dice las tres
+    // cosas arriba y mejor —«Parcelario vigente», la fila «Medición − Catastro»
+    // con su diferencia relativa, y «Invasión a colindantes» nombrando cuáles en
+    // vez de contarlas—. Queda Informe, que es la única pantalla donde la ficha
+    // es lo que las dice.
     montarCascara()
     const donde = Object.fromEntries(paresDeLaFicha().map(({ campo, dd }) => [campo, visibleEn(dd)]))
     for (const campo of ['superficie-catastral', 'delta-catastral', 'colindantes']) {
-      expect(donde[campo], `«${campo}» sale del diagnóstico`).toEqual([PASO.DIAGNOSTICO, PASO.INFORME])
+      expect(donde[campo], `«${campo}» no se ve donde debe`).toEqual([PASO.INFORME])
     }
   })
 

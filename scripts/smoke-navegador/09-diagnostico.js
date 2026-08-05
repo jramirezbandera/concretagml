@@ -17,10 +17,17 @@
 //      (dos comandos `M` en su `d`) y tiene relleno con opacidad > 0. Lo que un
 //      humano confirma encima —que la mancha se LEE como «la diferencia»— es del
 //      checklist (§8); la captura final queda para eso.
-//   2. **Que el cajón no tape el mapa ni empuje nada**: `getBoundingClientRect`
-//      real del cajón contra el del mapa, y el tamaño del mapa ANTES y DESPUÉS de
-//      abrir (un control de Leaflet flota; si el mapa cambiara de tamaño, algo se
-//      habría empujado). Y cuánto lienzo tapa, como número sin juicio.
+//   2. **Que el diagnóstico esté en la COLUMNA y no encima del mapa**:
+//      `getBoundingClientRect` real del contenedor contra el del panel y contra el
+//      del lienzo, más el tamaño del mapa ANTES y DESPUÉS de abrir.
+//
+//      ⛔ HASTA EL 2026-08-05 ESTE PUNTO DECÍA LO CONTRARIO —«que el cajón no tape
+//      el mapa ni empuje nada», medido exigiendo que estuviera DENTRO del lienzo—
+//      y era correcto mientras el diagnóstico fue un control flotante de Leaflet.
+//      El autor pidió lo otro: las cifras en la columna izquierda, sustituyendo a
+//      la tabla de vértices, porque una ventana flotante tapaba justo las manchas
+//      y la cota que esas cifras señalan. Ahora se exige lo simétrico: dentro del
+//      panel Y ni un píxel sobre el mapa.
 //   3. **Que la banda del margen mantenga su anchura en METROS al cambiar el
 //      zoom**: el trazo se recalcula en `zoomend` (ancho px = metros × escala), y
 //      eso solo significa algo con una proyección real. Se mide el `stroke-width`
@@ -34,12 +41,16 @@
 //      dispara. Es MEDIDA, no aceptación: se publica sin umbral.
 //   5. **El presupuesto de altura del panel, HEREDADO de `08-edicion.js` (§10)**:
 //      aquel apartado dejó escrito que «el siguiente bloque que entre (F07 mete el
-//      suyo de diagnóstico) puede volver a comérsela». F07 decidió NO meter ningún
-//      bloque (Decisión 1: cajón flotante sobre el mapa) y este guion lo demuestra
-//      en DOS medidas: la caja arranca en ~267 px con los avisos vacíos —los ~36 px
-//      que faltan hasta los 303 de F06 son el CTA del pie, el único coste de F07
-//      en el panel y deliberado (index.html lo razona)— y **abrir el cajón no le
-//      quita NADA** (medido: 172 → 172 px en el tick del clic).
+//      suyo de diagnóstico) puede volver a comérsela».
+//
+//      ⛔ Y ACABÓ ENTRANDO, el 2026-08-05, después de que el rework (T6) partiera
+//      el panel por pasos: en Diagnóstico ya no hay tabla de vértices que comerse.
+//      Así que la comparación «abrir el cajón no le quita NADA a la caja» dejó de
+//      ser medible —el antes y el después son pantallas distintas— y la sustituye
+//      el presupuesto que de verdad importaba: **el panel no desborda (ni a lo
+//      alto ni a lo ancho) y su pie cabe entero**. Es el mismo riesgo con otra
+//      cara: `.gml-panel` es `overflow:hidden`, así que lo que no cabe no
+//      scrollea, se recorta y no avisa.
 //
 // Y de propina, la regla de oro 9 con el DOM de verdad: el texto completo del
 // cajón pintado se escanea contra las palabras de veredicto, igual que hace la
@@ -320,35 +331,69 @@ const renglonCtaCrecioPx = Math.max(
   0,
   Math.round(renglonCta.getBoundingClientRect().height) - renglonCtaAltoAntes,
 )
-const abrirNoRoboAltura =
-  cajaTrasAbrir !== null &&
-  cajaAntesDeAbrir !== null &&
-  cajaAntesDeAbrir - cajaTrasAbrir <= renglonCtaCrecioPx + 2
 
 const abierto = getComputedStyle(cajonEl).display !== 'none'
 if (!abierto) problemas.push('Pulsar el CTA no ha abierto el cajón.')
 
 const rectMapa = mapaEl.getBoundingClientRect()
 const rectCajon = cajonEl.getBoundingClientRect()
+const panelEl = $('.gml-panel')
+const rectPanel = panelEl === null ? null : panelEl.getBoundingClientRect()
 const cajon = {
   abierto,
   rect: { ancho: Math.round(rectCajon.width), alto: Math.round(rectCajon.height) },
-  dentroDelMapa:
-    rectCajon.left >= rectMapa.left - 1 &&
-    rectCajon.right <= rectMapa.right + 1 &&
-    rectCajon.top >= rectMapa.top - 1 &&
-    rectCajon.bottom <= rectMapa.bottom + 1,
-  porcentajeDelLienzo: redondear(((rectCajon.width * rectCajon.height) / (rectMapa.width * rectMapa.height)) * 100, 1),
+  // ── ⛔ ESTO MEDÍA `dentroDelMapa` HASTA EL 2026-08-05 ──────────────────────
+  // Y era el invariante correcto mientras el diagnóstico fue un control flotante
+  // de Leaflet. **Ya no lo es**: el autor pidió que el contraste ocupara la
+  // columna izquierda en vez de tapar el mapa, así que ahora el contenedor vive
+  // en `.gml-bloque--contraste` (ver `viewer/cajon-diagnostico.js#anfitrion`) y
+  // exigir que esté dentro del lienzo saldría rojo POR ESTAR BIEN.
+  //
+  // El invariante que lo sustituye dice lo mismo de la relación que importaba
+  // —el diagnóstico y el mapa no se pisan— con los papeles al revés: ahora es el
+  // mapa el que no puede llevar nada encima. Se mide con las DOS mitades porque
+  // media verdad aquí es indistinguible de un montaje roto: el cajón dentro del
+  // panel Y ni un píxel suyo sobre el lienzo.
+  enElPanel: rectPanel !== null && panelEl.contains(cajonEl),
+  fueraDelMapa: rectCajon.right <= rectMapa.left + 1 || rectCajon.left >= rectMapa.right - 1,
+  // Se CALCULA el solape real y no se escribe un 0: un cero constante dentro de un
+  // bloque que dice «MEDIDA» es la clase de cifra que sigue diciendo que sí el día
+  // que deja de ser verdad. Es la misma cifra que publicaba F07 —cuánto lienzo
+  // tapa el diagnóstico—, y lo que ha cambiado es la respuesta, no la pregunta.
+  porcentajeDelLienzo: redondear(
+    ((Math.max(0, Math.min(rectCajon.right, rectMapa.right) - Math.max(rectCajon.left, rectMapa.left)) *
+      Math.max(0, Math.min(rectCajon.bottom, rectMapa.bottom) - Math.max(rectCajon.top, rectMapa.top))) /
+      (rectMapa.width * rectMapa.height)) *
+      100,
+    1,
+  ),
+  // El mapa NO cambia de tamaño al abrir, y sigue siendo verdad por una razón
+  // distinta de la de F07: no es que el cajón flote, es que el panel mide lo
+  // mismo en las cinco pantallas. La medida se conserva porque el día que una
+  // pantalla reparta el ancho de otra forma, Leaflet dibujaría sobre un tamaño
+  // que ya no tiene (teselas descolocadas, clics desplazados, cero errores en
+  // consola). Ver `alNavegar` en `app/main.js`.
   mapaIntacto: mapaEl.clientWidth === mapaAntes.ancho && mapaEl.clientHeight === mapaAntes.alto,
   titular: texto('[data-diag="titular"]'),
 }
-if (!cajon.dentroDelMapa) {
-  problemas.push('El cajón se sale del lienzo del mapa: no es un control que FLOTA, está empujando algo.')
+if (!cajon.enElPanel) {
+  problemas.push(
+    'El diagnóstico no está dentro de `.gml-panel`: desde el 2026-08-05 su sitio es la columna ' +
+      'izquierda (`[data-anfitrion="diagnostico"]`), no una esquina del mapa. O el anfitrión no ' +
+      'se ha cableado en `app/main.js`, o el paso no es Diagnóstico.',
+  )
+}
+if (!cajon.fueraDelMapa) {
+  problemas.push(
+    'El diagnóstico pisa el lienzo del mapa: eso es exactamente lo que el traslado a la columna ' +
+      'venía a quitar (las manchas del solape y la cota de la desviación se leen MIRANDO el mapa).',
+  )
 }
 if (!cajon.mapaIntacto) {
   problemas.push(
     `Abrir el cajón ha cambiado el tamaño del mapa (${mapaAntes.ancho}×${mapaAntes.alto} → ` +
-      `${mapaEl.clientWidth}×${mapaEl.clientHeight}): la Decisión 1 era que el mapa no pierde ni un píxel.`,
+      `${mapaEl.clientWidth}×${mapaEl.clientHeight}): el panel mide lo mismo en las cinco ` +
+      'pantallas, así que cambiar de paso no puede mover el lienzo.',
   )
 }
 if (!/^Contraste con el parcelario/.test(cajon.titular || '')) {
@@ -588,47 +633,108 @@ if (banda0 === undefined) {
 
 // ── 8 · El presupuesto de altura, heredado de 08-edicion.js §10 ─────────────
 //
-// MEDIDA, no juicio. `08` dejó escrito que el siguiente bloque del panel podía
-// volver a comerse la caja de vértices; F07 decidió no meter ninguno, y esto es
-// la comprobación: la caja se mide CON el cajón abierto.
+// MEDIDA, no juicio.
+//
+// ── ⛔ QUÉ MEDÍA ESTE APARTADO HASTA EL 2026-08-05, Y POR QUÉ YA NO ────────
+// Medía «abrir el cajón no le roba altura a la caja de vértices», que era LA
+// prueba de la Decisión 1 de F07 (el diagnóstico flota sobre el mapa y no entra
+// en el panel). Hoy esa comparación es IMPOSIBLE de hacer, y no por un fallo:
+// abrir el diagnóstico **navega a la pantalla Diagnóstico**, donde la caja de
+// vértices no se enseña (`data-pantalla` en `index.html`). El «antes» y el
+// «después» ya no describen la misma pantalla, así que restarlos no significa
+// nada — es el mismo motivo por el que la regresión del rework declaró
+// inmedibles media docena de invariantes de `10-comprobar-gml`.
+//
+// Lo que SÍ sigue siendo medible es el presupuesto de verdad, y es el que
+// importaba desde 08 §10: **que el panel no desborde y que su pie quepa**. El
+// diagnóstico es ahora el estirador de su pantalla (`flex:1 1 auto` con scroll
+// propio), así que si algún día no cediera, lo que se saldría por abajo sería la
+// ficha del expediente y los dos CTA — en silencio, porque `.gml-panel` es
+// `overflow:hidden`. Eso es lo que se vigila.
+//
+// Las dos cifras del instante de abrir se PUBLICAN igual, sin juicio: son la
+// prueba de que la caja de vértices se retira entera al cambiar de pantalla, que
+// es lo que se quería.
 
 const filaCualquiera = $('#tabla-vertices tr[data-indice]')
 const cabeceraTabla = $('#tabla-vertices thead')
 const altoCaja = altoCajaVertices()
 const altoFila = filaCualquiera === null ? null : filaCualquiera.getBoundingClientRect().height
 const altoCabecera = cabeceraTabla === null ? 0 : cabeceraTabla.getBoundingClientRect().height
+const pieEl = $('.gml-panel-pie')
+const rectPie = pieEl === null ? null : pieEl.getBoundingClientRect()
 
 const panel = {
   queEs: 'MEDIDA de layout real, sin juicio (regla de oro 9).',
-  // El estado FINAL del guion (tras editar, teclear y el zoom de la banda): la
-  // cifra informativa que hereda de 08 §10, con sus tarjetas al lado.
+  // El estado FINAL del guion (tras editar, teclear y el zoom de la banda). En
+  // Diagnóstico vale 0: la caja de vértices es de OTRA pantalla desde 2026-08-05.
   altoCajaVerticesAlFinalPx: altoCaja,
-  // LA prueba de la Decisión 1: los tres números del instante de abrir, con el
-  // renglón del CTA descontado si habló. Calculados arriba, en el tick del clic.
   altoAntesDeAbrirPx: cajaAntesDeAbrir,
   altoTrasAbrirPx: cajaTrasAbrir,
   renglonCtaCrecioPx,
-  abrirNoRoboAltura,
+  // El diagnóstico EN la columna: lo que ocupa y cuánto se queda bajo el pliegue
+  // de su propio scroll. Se publica sin umbral —lo accionable va en el bloque
+  // anclado, que tiene su propio guardián en la suite— para que el checklist §8
+  // pueda juzgarlo con la captura delante.
+  altoDiagnosticoEnElPanelPx: Math.round(rectCajon.height),
+  bajoElPliegueDelDiagnosticoPx: Math.max(0, cajonEl.scrollHeight - cajonEl.clientHeight),
   renglonesBajoLaCabecera: altoCaja && altoFila ? redondear((altoCaja - altoCabecera) / altoFila, 1) : null,
   tarjetasDeAvisos: tarjetasDeAvisos(),
   altoBloqueEdicionPx: (() => {
     const bloque = $('.gml-bloque--edicion')
     return bloque === null ? null : Math.round(bloque.getBoundingClientRect().height)
   })(),
-  bloqueDiagnosticoEnElPanel: $('.gml-bloque--diagnostico') !== null,
+  // EL presupuesto que sustituye al de F07: el panel no desborda y el diagnóstico
+  // llega hasta el suelo sin pasarse.
+  desbordePanelPx: panelEl === null ? null : panelEl.scrollHeight - panelEl.clientHeight,
+  // ⚠️ El PIE del panel no se mide aquí, y no es un olvido: desde el 2026-08-05
+  // no se enseña en esta pantalla (`data-pantalla="validacion edicion informe"`
+  // en `index.html`), porque repetía debajo lo que el contraste ya dice arriba y
+  // mejor. Un `getBoundingClientRect()` sobre un `display:none` devuelve ceros, y
+  // un guardián que compara contra ceros sale VERDE pase lo que pase — que es
+  // peor que no tenerlo. Lo que se mide es que siga oculto, y cuánto suelo del
+  // panel alcanza el diagnóstico ahora que lo tiene entero para él.
+  pieSeVeEnDiagnostico: rectPie !== null && rectPie.height > 0,
+  holguraBajoElDiagnosticoPx:
+    rectPanel === null ? null : redondear(rectPanel.bottom - rectCajon.bottom, 2),
+  // Y el desborde HORIZONTAL, que en este panel es el fallo mudo por excelencia:
+  // `.gml-panel` es `overflow:hidden`, así que lo que no cabe a lo ancho se
+  // recorta sin scroll y sin aviso. El bloque anclado del diagnóstico se sale a
+  // propósito de los rellenos del contenedor (`width: calc(100% + 24px)`), que es
+  // justo la clase de cosa que puede pasarse de la raya.
+  desbordeHorizontalPanelPx: panelEl === null ? null : panelEl.scrollWidth - panelEl.clientWidth,
+  desbordeHorizontalDiagnosticoPx: cajonEl.scrollWidth - cajonEl.clientWidth,
 }
-if (panel.bloqueDiagnosticoEnElPanel) {
+if (panel.desbordePanelPx !== null && panel.desbordePanelPx > 1) {
   problemas.push(
-    'Hay un `.gml-bloque--diagnostico` en el panel: la Decisión 1 de F07 era exactamente que ese ' +
-      'bloque NO existiera (el cajón flota sobre el mapa).',
+    `El panel desborda ${panel.desbordePanelPx} px con el diagnóstico abierto, y ` +
+      '`.gml-panel` es `overflow:hidden`: eso se recorta EN SILENCIO. El diagnóstico tiene que ' +
+      'ceder altura (es el estirador de su pantalla), no empujar.',
   )
 }
-if (!panel.abrirNoRoboAltura) {
+if (panel.pieSeVeEnDiagnostico) {
   problemas.push(
-    `Abrir el cajón le ha quitado altura a la caja de vértices (${panel.altoAntesDeAbrirPx} → ` +
-      `${panel.altoTrasAbrirPx} px en el mismo tick del clic, y el renglón del CTA solo explica ` +
-      `${panel.renglonCtaCrecioPx} px): la Decisión 1 de F07 está incumplida.`,
+    'El pie del panel se ve en Diagnóstico: sus renglones repiten «Superficie», «Superficie ' +
+      'catastral», «Δ catastral» y «Colindantes», que el bloque de contraste ya dice arriba y ' +
+      'con más contexto. Sobra, y es lo que obligaba a rodar la rueda.',
   )
+}
+if (panel.holguraBajoElDiagnosticoPx !== null && panel.holguraBajoElDiagnosticoPx < -1) {
+  problemas.push(
+    `El diagnóstico se sale ${Math.abs(panel.holguraBajoElDiagnosticoPx)} px por debajo del ` +
+      'panel: tiene que ceder altura (es el estirador de su pantalla), no empujar.',
+  )
+}
+for (const [que, px] of [
+  ['el panel', panel.desbordeHorizontalPanelPx],
+  ['el diagnóstico', panel.desbordeHorizontalDiagnosticoPx],
+]) {
+  if (px !== null && px > 1) {
+    problemas.push(
+      `Desborde HORIZONTAL de ${px} px en ${que}: en una columna de 392 px con ` +
+        '`overflow:hidden` eso no scrollea, se recorta y no avisa.',
+    )
+  }
 }
 
 // ── 9 · Cerrar limpia; reabrir para la captura ──────────────────────────────
