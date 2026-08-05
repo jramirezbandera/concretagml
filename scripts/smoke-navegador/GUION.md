@@ -9,8 +9,8 @@ con la **maquinaria real de `L.Draggable`**.
 - **4D.1** (esta carpeta) escribió los guiones y los probó en seco.
 - **4D.2** es la ejecución oficial, con evidencia, siguiendo este documento.
 
-Quince guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
-para que el resultado no dependa de interpretar prosa. Catorce son de aceptación;
+Dieciséis guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
+para que el resultado no dependa de interpretar prosa. Quince son de aceptación;
 `05` es de diagnóstico (§11):
 
 > ⛔ **Esta cuenta decía «trece» y se quedó vieja el 2026-08-04**, cuando T4 del
@@ -37,6 +37,7 @@ para que el resultado no dependa de interpretar prosa. Catorce son de aceptació
 | `13-edificio.js` | F11 · 1 a 4 | ⭐ **el guardián de ANCHO del conmutador, que solo existe aquí** (sustituye al `flex-wrap: nowrap` que el plan pedía por error); **M10 ida y vuelta en un navegador real** —mismo nodo, mismo valor, oyentes vivos—; el invariante de los 267 px y las tres cifras de M8; que las huellas del DXF **se ven y ENCIMA de la parcela** (orden real de los panes, no solo que existan los `<path>`); soltar un `.dxf` de verdad en las DOS ramas, con su diálogo de reparto por capas; la ficha del pie que cambia de cara; y ⭐ **el reparto de altura del panel, en vacío y con datos, con el recorte a CERO EXACTO y el déficit en píxeles cuando no llega** | ✅ **`ok:true` desde el 2026-08-04**: los dos defectos de F11 cerrados, el segundo **por el rework** — ver §19 |
 | `14-shell.js` | Rework · 1 a 4 | la cáscara de tres columnas y su coste en píxeles, en **las DOS pasadas de D5** (1280×720 y 1440×900): ancho del rail, desborde del panel, el invariante de `#tabla-vertices`, cuántas tarjetas de aviso caben enteras y cuánto queda escondido tras el pliegue; **se detecta solo** en cuál de los dos mundos está (`LINEA_BASE` sin rail / `SHELL` con él); y desde la rebanada 4, **si el diagnóstico sigue en pantalla después de tocar el mapa** | `ok:true` en las dos — ver §20 |
 | `15-contraste.js` | Rework · T9 | ⭐ **la RUTA CRÍTICA 2 entera** (soltar el GML de otro → contrastarlo → cruzar la puerta), que hasta T9 no se podía andar; y sobre todo **que la puerta de D4 SE VE**: dentro del cajón, dentro de la ventana y con `elementFromPoint` devolviéndola —las tres patas, porque con una sola el defecto salía verde—; más la procedencia que cambia al cruzar y el invariante de la caja de vértices | ⛔ **encontró un defecto real el 2026-08-04, ya corregido; hoy `ok:true` en las dos** — ver §22 |
+| `16-derivar-cesion.js` | F17 · 1 a 4 · **+ el criterio 6** | ⭐ **EL PRECIO EN PÍXELES, que es lo único de F17 que la suite no puede ver**: F17 rompe a propósito la racha de «0 px en el panel» de cinco fases, y ⛔ **cuando se pasa, el panel NO desborda — la tabla de vértices encoge en silencio**. Mide el recorrido entero sin tocar la red (mover el lindero hacia dentro → derivar → revisar y nombrar → descargar), la PUERTA explicando con cifras al crecer, la correspondencia fila↔mancha en los dos sentidos, los BYTES del expediente (N `featureMember`, los `localId` de O19 y **que el nombre escrito NO viaja al fichero**), y la invalidación de la foto al editar | ✅ **`ok:true` en las DOS** desde el 2026-08-05, tras encontrar **un defecto real a 1280×720** y corregirlo — ver §25 |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
 spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
@@ -4211,3 +4212,129 @@ el validador «fallaba» por un carácter y no por el fichero.
 
 **Es gate en CI** (`deploy.yml`, job `esquema`, junto al del XSD y con
 `pip install ezdxf`).
+
+---
+
+## 25. `16-derivar-cesion.js` — el sobrante y su precio en píxeles (F17 · 5.1)
+
+Es el guion de F17 y **el cuarto de esta carpeta que encuentra un defecto de
+producción** (el `10` encontró dos, el `12` uno, el `13` otros dos). Mide el
+recorrido entero del sobrante —mover el lindero hacia dentro, derivar, revisar y
+nombrar, descargar el expediente de N `gml:featureMember`— y, sobre todo, **lo
+único de F17 que ninguna de las 6.279 pruebas puede ver: cuánto cuesta en
+píxeles**.
+
+⭐ **Y no toca ni un servicio.** Es la afirmación de diseño de F17: los dos
+minuendos —la geometría oficial y la editada— ya están en memoria, así que el
+recorrido entero se anda sin red. Es el único guion de esta carpeta del que se
+puede decir eso y que además conduce una feature completa.
+
+### Se lanza DOS veces, y la primera es la que manda (decisión D5)
+
+```bash
+npm run dev                                        # ⚠️ dev, no `vite preview`
+
+$B viewport 1280x720                               # el SUELO declarado
+$B goto http://localhost:PUERTO/concretagml/       # ⚠️ el base, no la raíz
+$B reload                                          # ⚠️ ver abajo
+$B console --clear
+$B eval scripts/smoke-navegador/16-derivar-cesion.js
+
+$B viewport 1440x900
+$B reload
+$B eval scripts/smoke-navegador/16-derivar-cesion.js
+$B console --errors                                # → (no console errors)
+```
+
+⛔ **PÁGINA RECIÉN CARGADA ENTRE PASADAS, Y AQUÍ NO ES FORMALISMO.** Este guion
+deja la parcela editada, un sobrante derivado y un expediente autoguardado.
+Lanzarlo dos veces sin recargar mide otra cosa, y la corrida 2 del 2026-08-05
+salió `ok:false` acusando al producto de tres defectos que eran su propio estado.
+El guion ahora **se planta y lo dice** cuando arranca con el bloque puesto y
+piezas dentro; con tarjeta de autoguardado, hay que **borrar IndexedDB** además
+de recargar (§22).
+
+### ⛔ EL DEFECTO QUE ENCONTRÓ (2026-08-05, a 1280×720)
+
+Con dos piezas derivadas, la caja de vértices bajaba a **119,14 px** en el
+viewport MÍNIMO declarado: la cabecera pegajosa, la fila del recinto y **DOS**
+vértices de los quince. Y **el panel no desbordaba** —desborde 0 en los dos
+ejes—, así que no había ningún síntoma visible: la tabla encogía en silencio, que
+es el error silencioso en versión maquetación.
+
+El suelo contra el que se juzga **no se eligió, se DERIVA** de lo que miden las
+filas de esa misma tabla (Chrome, 1280×720):
+
+```
+  cabecera pegajosa (thead) ......  24,00 px
+  fila del recinto («EXTERIOR») ..  26,50 px
+  tres filas de vértice × 24,69 ..  74,07 px
+  SUELO ......................... 124,57 px
+```
+
+⚠️ **La primera versión de este guion decía 120 y era un número inventado.** El
+punto de comparación que sí significa algo es F06: allí el bloque de edición dejó
+la tabla en **64 px** —cabecera y 1,6 renglones— y ése fue el defecto que costó
+mudar la edición al mapa.
+
+**Tres correcciones, las tres con su cifra**, y ninguna toca la hoja de estilo:
+
+| Qué | Cuánto devuelve | Por qué |
+|---|---|---|
+| El renglón del pie **se calla** cuando hay piezas | **22,84 px** | Lo que diría —cuántas y cuánto miden— lo dice ya el BLOQUE, con su contador y una fila por pieza, y lo dice mejor porque cada cifra está junto a la pieza que describe. Sin piezas SÍ habla: ahí no aparece ningún bloque |
+| El porqué de la PUERTA sale del renglón y va al panel de avisos | ~0 px netos, pero el renglón deja de ser un párrafo | Cinco líneas de prosa a 343 px de ancho en un `role="status"` del pie. Lo accionable con su cifra arriba; la explicación, donde este proyecto pone las explicaciones |
+| El hueco del bloque baja de 8 a **4 px** | **8 px** | `--space-1` es vocabulario del proyecto y la columna ya es densa (12 px de cuerpo). Esos 8 px eran la diferencia entre enseñar DOS filas de vértices y enseñar TRES |
+
+### La otra cifra que corrigió: **la fila mide 26 px, no 31**
+
+La revisión de diseño publicó **31,00 px por fila** y ese número salía de una
+maqueta escrita antes que el componente. Medido sobre la lista de verdad: **26**.
+No era un defecto —ninguna pieza desaparece y el contador dice cuántas hay—, pero
+el tope quedaba en 124 px y enseñaba **4,77 filas** en vez de 4: **20 px de panel
+cobrados de más** en la pantalla donde F17 está gastando a propósito.
+`ALTO_FILA_PX` pasa a 26 y el tope a 104.
+
+### Cifras del cierre (2026-08-05, Chrome, `npm run dev`, `ok:true` en las dos)
+
+| Medida | **1280×720** (suelo) | 1440×900 |
+|---|---|---|
+| Veredicto | **`ok: true`** | `ok: true` |
+| `#tabla-vertices` en Validación, sin bloque | 242,69 px | **400,03 px** |
+| `#tabla-vertices` con el bloque y 2 piezas | **126,14 px** | **283,48 px** |
+| Coste del bloque | **116,55 px** | 116,55 px |
+| Alto del bloque (2 piezas) | 117,33 px | 117,33 px |
+| Alto de una fila / tope de la lista | 26 px / 104 px | 26 px / 104 px |
+| Filas que caben sin scroll | **4,00** | 4,00 |
+| Pie del panel (TRES botones) | **249,86 px** | 249,86 px |
+| Pie: lo que cuesta el tercer botón | **+40,39 px** | +40,39 px |
+| Desborde del panel (vertical / horizontal) | **0 / 0** | 0 / 0 |
+| Expediente descargado | 3 `featureMember` | 3 `featureMember` |
+
+⭐ **A 1440×900 la tabla queda en 283,48 px, POR ENCIMA de los 267,44 que el
+proyecto defiende desde F07** — o sea que la racha se rompe a propósito y, con las
+tres correcciones puestas, no se rompe tanto como el plan temía. A 1280×720 el
+margen es de **1,57 px** sobre el suelo, y eso hay que decirlo: **cualquier cosa
+que se le añada al bloque lo revienta**, y el síntoma seguirá siendo mudo.
+
+### Lo que este guion **no** puede medir
+
+- **Que la Sede acepte el fichero.** Ningún XSD expresa las reglas del IVG. Es el
+  criterio 4 de F17 y la única verificación que cierra la fase: `CHECKLIST-HUMANO.md` §13.
+- **Que «se propone, no se crea» se entienda sin explicación.** Toda la decisión
+  D7 se apoya en eso y no lo firma un test.
+- **Si el sobrante es geométricamente correcto.** Eso es de la suite.
+- **El arrastre como gesto de ratón** (§0): el lindero se mueve TECLEANDO en la
+  celda de coordenada. Es además el camino que F17 midió como el bueno — mover un
+  vértice existente cierra exacto, sin cuñas de redondeo.
+- **Que el fichero aterrice en el disco**: el Blob se intercepta en la página,
+  como en el guion 06.
+
+### ⚠️ Un criterio del plan que este guion CAMBIA, y por qué
+
+El plan de F17 le mandaba comprobar que «el nombre escrito llega al `localId` del
+fichero». ⛔ **No puede, y no por falta de trabajo: porque sería un defecto.** El
+`localId` de una cesión está MEDIDO (override O19, el único envío de este proyecto
+con IVG positivo) y es la referencia del padre con el ordinal detrás. Así que el
+guion comprueba lo contrario, y las dos mitades: que el nombre **se queda en la
+pantalla** y **no aparece en los bytes**, y que lo que sí llega al fichero son los
+`localId` de O19 (`9398516VK3799G`, `…G.1`, `…G.2`) con sus dos namespaces.

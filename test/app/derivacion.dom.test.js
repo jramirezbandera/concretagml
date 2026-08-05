@@ -232,7 +232,18 @@ describe('cablearDerivacion', () => {
       expect(manchas()).toHaveLength(1)
       expect(numeros()).toHaveLength(1)
       expect(seccion().hidden).toBe(false)
-      expect(renglon().textContent).toMatch(/Derivadas 1 pieza\(s\), 400,00 m²/)
+      // ⛔ Y el renglón del PIE se calla, a propósito: lo que diría —cuántas y
+      // cuánto miden— lo dice el bloque con su contador y una fila por pieza, y lo
+      // dice mejor. Medido por el guion 16: repetirlo cuesta 22,84 px de tabla de
+      // vértices, que a 1280×720 son casi tres cuartos de fila de las quince.
+      expect(renglon().textContent).toBe('')
+    })
+
+    it('sin piezas SÍ habla, porque no aparece ningún bloque que lo diga', () => {
+      cablear()
+      estado.set(parcela({ mengua: 0 }))
+      boton().click()
+      expect(renglon().textContent).toMatch(/No hay sobrante/)
     })
 
     it('el botón de entrega se enciende con la selección puesta', () => {
@@ -267,15 +278,21 @@ describe('cablearDerivacion', () => {
       expect(seccion().hidden).toBe(true)
       expect(renglon().textContent).toMatch(/SE SALE del contorno oficial/)
       expect(renglon().textContent).toMatch(/400,00 m²/)
-      expect(renglon().textContent).toMatch(/fase 2 de esta feature/)
       expect(renglon().classList.contains('gml-accion-estado--error')).toBe(true)
+      // ⚠️ Y el PORQUÉ va al panel de avisos, no al renglón. La partición está
+      // MEDIDA por el guion 16: las cinco líneas del mensaje entero, a 343 px de
+      // ancho, le comían 74,96 px a la tabla de vértices — un tercio de lo que le
+      // queda a 1280×720. Lo accionable con su cifra arriba; el porqué, abajo.
+      expect(renglon().textContent.length, 'el renglón del pie no puede ser un párrafo').toBeLessThan(150)
+      expect(avisos.map((a) => a.mensaje).join(' ')).toMatch(
+        /es terreno de alguien.*fase 2 de esta feature/s,
+      )
     })
 
-    it('sin mengua ninguna, lo dice sin llamarlo error', () => {
+    it('y no se llama error: no haber sobrante es un resultado legítimo', () => {
       cablear()
       estado.set(parcela({ mengua: 0 }))
       boton().click()
-      expect(renglon().textContent).toMatch(/No hay sobrante/)
       expect(renglon().classList.contains('gml-accion-estado--error')).toBe(false)
     })
 

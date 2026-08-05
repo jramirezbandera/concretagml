@@ -1783,6 +1783,88 @@ leído, está de suerte.**
       en el diálogo? ¿Cuántas partes salen y cuántas esperabas?
 
 ---
+## 13 · Expediente de varias parcelas ⟨F17⟩ — lo que ni `16-derivar-cesion.js` firma
+
+**Por qué está aquí, y por qué es la sección más corta y la más cara.** F17 cierra
+el hueco que dejaba a esta aplicación sin poder entregar **más de 1 de cada 5**
+expedientes de parcelario reales de su autor: mover un lindero hacia dentro obliga
+a aportar TAMBIÉN la finca que se suelta, o el IVG vuelve negativo. La aplicación ya
+sabe derivarla, medirla, validarla, componer el sobre de N `gml:featureMember` y
+demostrar que el conjunto cierra sobre coordenadas ya redondeadas — y **nada de eso
+prueba que la Sede lo acepte**.
+
+`16-derivar-cesion.js` mide el recorrido y la maquetación, y ya encontró y cerró un
+defecto real a 1280×720 (`GUION.md` §25). Lo que queda aquí son **dos puntos, los
+dos BLOQUEANTES**, y ninguna máquina de este proyecto puede firmar ninguno.
+
+> ⛔ **LEE EL §25 ANTES DE EMPEZAR.** El guion sale `ok:true` en las dos
+> resoluciones, pero deja una cifra que hay que tener delante: a **1280×720** la
+> tabla de vértices queda en **126,14 px** con dos piezas, y el suelo derivado son
+> **124,57**. El margen es de **1,57 px**. Cualquier cosa que se le añada al bloque
+> del sobrante lo revienta, y ⛔ **el síntoma seguirá siendo mudo**: el panel no
+> desborda, la tabla encoge en silencio.
+
+**Cómo prepararlo, y cuesta CERO peticiones al Catastro.** Con la app viva, ve a
+**Validación**, mueve dos o tres vértices hacia dentro (tecleando en la tabla o
+arrastrándolos) y pulsa **«Derivar sobrante»** en el pie del panel.
+
+### 13.1 · ⛔ ¿Se entiende que las piezas se PROPONEN? ⟨BLOQUEANTE⟩
+
+**Por qué es bloqueante.** Toda la decisión de fondo de F17 es que la aplicación
+**mide y propone; quien firma decide**. Si el usuario lee la lista como «esto ya
+está hecho» en vez de como «esto es lo que he encontrado, dime cuál va», entonces la
+aplicación ha decidido por él qué fincas se segregan — y eso no lo arregla ningún
+test, porque **en la suite las 3.925 pruebas de esa capa siguen verdes igual**.
+
+Míralo con los ojos de quien no ha escrito el código:
+
+- ¿Se entiende que **puedes quitar** una pieza? ¿O las casillas se leen como una
+  confirmación de algo ya decidido?
+- La marca **«estrecha»** — ¿se lee como «esto sobra, quítalo» (que sería un
+  veredicto, y la regla de oro 9 lo prohíbe) o como «esto es muy fino, míralo»?
+- El **número** de la fila y el del mapa: ¿sirven de verdad para saber qué mancha
+  estás nombrando, o hay que buscarla? Prueba a nombrar la pieza 2 sin pasar el ratón
+  por ninguna fila.
+- El contador «se emitirán N de M»: con **más de cuatro piezas** hay scroll. ¿Se
+  nota que hay más abajo, o parece que son cuatro?
+- Y lo que **no** dice ninguna cifra: ¿te fiarías de firmar el papel que sale de
+  aquí?
+
+⛔ Hereda además el punto bloqueante de la §8 y de la §10.5: **ninguna cifra de esta
+pantalla puede leerse como un veredicto**. Ni el área, ni el grosor, ni el residuo
+del cierre.
+
+### 13.2 · ⛔ VERDAD EXTERNA: un expediente REAL, y que el IVG vuelva POSITIVO ⟨BLOQUEANTE⟩
+
+**Por qué es bloqueante, y por qué cierra la fase.** Es el criterio 4 de F17 y la
+regla de oro 8 en su forma más literal: **ningún XSD expresa las reglas de negocio
+del IVG**. El validador de esquema dice que el documento está bien formado; no dice
+que la Sede lo acepte. Es la misma clase de gate que cerró F04 —y que ya destapó una
+vez un fichero RECHAZADO con 1.784 pruebas en verde— y la que midió la fase 0 de esta
+misma feature.
+
+Lo que hay que hacer, y no vale una parte:
+
+1. Coger un expediente **de verdad**, con un lindero que de verdad se mueve hacia
+   dentro. No la parcela de demostración.
+2. Derivar el sobrante en la aplicación, revisarlo, nombrarlo y **descargar el
+   `.gml`**. Comprobar que baja con prefijo **`expediente_`** y no `parcela_`.
+3. Subirlo a la Sede, declarar el **«Tipo de operación»** que el informe propone
+   —⚠️ y comprobar que es el que la Sede espera: es el único dato del expediente con
+   redundancia cero— y **emitir el IVG**.
+4. Anotar el **CSV** del certificado en `spec/SPEC.md` §7.1, junto a los dos que ya
+   están.
+
+**Si vuelve NEGATIVO**, lo que hay que traer no es «ha fallado»: es **el motivo
+literal que da el IVG**, que es lo que alimenta el diccionario de errores de F15 y lo
+que dice qué hipótesis de este proyecto era falsa.
+
+⚠️ **Y una comprobación de más, que sale gratis y cierra una deuda declarada**:
+mirar si el desplegable de «Tipo de operación» de la Sede ofrece **más de las dos
+opciones** que este proyecto ha visto (Segregación y Subsanación), y si el IVG se
+queja al emitir una combinación incoherente —Segregación con un solo miembro, o al
+revés—. Las dos cosas están escritas como no medidas en la ficha de F17.
+
 ## Qué hacer con el resultado
 
 - **Todo conforme** → F03 se marca hecha (`README.md` §Estado y `spec/SPEC.md`).
@@ -2034,3 +2116,15 @@ sino **decidir de dónde salen los 18,33 px** que faltan (8,84 de ellos están a
 en el margen de `#avisos`), y esa decisión es de producto. ⚠️ Y hay que tomarla
 **antes de F12**, que añade las plantas por parte y entra en un panel con **0 px** de
 holgura en la lista.
+
+⛔ **F17 añade su propia cadena, y es la más corta de firmar y la más cara de
+saltarse.** El punto **13.1** se repite cuando cambie cualquier texto de la lista
+del sobrante (`viewer/lista-sobrante.js`: `SIN_PIEZAS`, `MOTIVO_SIN_DERIVAR`,
+`MOTIVO_NINGUNA_INCLUIDA`, `MOTIVO_FOTO_CADUCA`, `ROTULO_ESTRECHA` y el contador) o
+los motivos de `app/cableado-derivacion.js`, **y con cada altura de ventana nueva**:
+a 1280×720 el margen sobre el suelo es de **1,57 px** y el síntoma es mudo. El
+**13.2** se repite **con cada cambio del serializador o de la identidad** —
+`gml/serialize-cp.js`, `gml/ids.js`, `derivacion/identidad.js`—, porque lo que se
+firma ahí no es la aplicación, es **lo que la Sede acepta**, y eso solo lo sabe la
+Sede. Los disparadores del mecanismo son los de `16-derivar-cesion.js`
+(`GUION.md` §8 y §25).

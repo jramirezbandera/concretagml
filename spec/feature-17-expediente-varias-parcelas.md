@@ -138,6 +138,13 @@ minuendos ya están en memoria.
 | **M22** *(2026-08-05, fase 4)* | El plan declaraba el contrato de la vista con `alDerivar` dentro | ⛔ **No está, y es la decisión D2 aplicada.** El CTA «Derivar sobrante» bajó al PIE del panel, porque el bloque aparece SOLO cuando hay sobrante y un botón dentro de él sería un botón que solo existe después de haberlo pulsado. Lo que sí vive en la lista es `alEntregar` —la acción que CONSUME lo que el bloque enseña—, con el mismo criterio con el que F08 metió «Descargar informe de contraste» dentro del cajón de F07. ⚠️ **El pie pasa a tener TRES botones** y el precio en píxeles **no se ha medido todavía**: es del guion 16 |
 | **M23** *(2026-08-05, fase 4)* | Las **cuatro decisiones de diseño que la revisión dejó ABIERTAS** | Cerradas las cuatro, y las cuatro dentro del propio bloque: (1) **nombre accesible** explícito en cada casilla y cada campo —dentro de la etiqueta el texto es el NÚMERO, así que sin `aria-label` un lector de pantalla diría «casilla, 1» sin decir nunca de qué—; (2) el mensaje de **invalidación de 3C** se pinta en el bloque y no en el canal global, porque un aviso se lee donde estaba lo que ha desaparecido; (3) los **`saltados` de 5A**, igual, y con la frase que importa: «puede faltar sobrante en esta lista»; (4) una **pieza fuera del encuadre** se cuenta en un aviso propio, separado de «sin contorno» y de «sin número», porque son tres hechos con tres remedios distintos |
 | **M24** *(2026-08-05, fase 4)* | — | ⚠️ **La marca de la pieza estrecha es la PALABRA «estrecha», no un símbolo.** El plan pedía «un ⚠ del vocabulario del proyecto, no un emoji suelto»; el vocabulario de aviso de esta aplicación es el rótulo **«Aviso»** de `app/avisos.js`, que es texto. Y un carácter de advertencia lo lee un lector de pantalla como «signo de exclamación», como «warning» o como nada, según la plataforma. La palabra se lee igual con los ojos y con el oído, y **no dictamina** (regla 9): dice que es estrecha, no que sobre |
+| **M25** *(2026-08-05, fase 5)* | ⛔ **El guion 16 encontró un DEFECTO REAL a 1280×720**, que es el viewport MÍNIMO declarado del proyecto | Con dos piezas derivadas la tabla de vértices bajaba a **119,14 px**: la cabecera, la fila del recinto y **DOS** vértices de los quince. Y **el panel no desbordaba** —0 en los dos ejes—, así que no había síntoma: la tabla encogía en silencio. Corregido con **tres cambios, ninguno de CSS**, y cada uno con su cifra: el renglón del pie **se calla** cuando hay piezas porque el bloque ya lo dice mejor (**+22,84 px**); el porqué de la puerta sale del renglón y va al panel de avisos (cinco líneas de prosa en un `role="status"` de 343 px); y el hueco del bloque baja de 8 a **4 px** (**+8 px**), que eran exactamente la diferencia entre enseñar dos filas de vértices y enseñar tres |
+| **M26** *(2026-08-05, fase 5)* | El suelo contra el que se juzga la tabla de vértices: la primera versión del guion decía **120 px** | ⛔ **Me lo inventé.** Se DERIVA de lo que miden esas filas (Chrome, 1280×720): cabecera pegajosa **24,00** + fila del recinto **26,50** + tres vértices × **24,69** = **124,57 px**. El punto de comparación que sí significa algo es F06, donde el bloque de edición dejó la tabla en **64 px** —cabecera y 1,6 renglones— y ése fue el defecto que costó mudar la edición al mapa |
+| **M27** *(2026-08-05, fase 5)* | El alto por fila de la lista: la revisión de diseño publicó **31,00 px** | **26 px** medidos sobre la lista de verdad. Aquel número salía de una maqueta escrita antes que el componente. No era un defecto —ninguna pieza desaparece y el contador dice cuántas hay— pero el tope quedaba en 124 px y enseñaba **4,77 filas** en vez de 4: **20 px de panel cobrados de más** justo en la pantalla donde F17 está gastando a propósito. `ALTO_FILA_PX` pasa a 26 y el tope a **104** |
+| **M28** *(2026-08-05, fase 5)* | ⭐ El precio del panel, con las tres correcciones puestas | **1440×900: la tabla queda en 283,48 px, POR ENCIMA de los 267,44** que el proyecto defiende desde F07 — la racha se rompe a propósito y no se rompe tanto como el plan temía. **1280×720: 126,14 px**, sobre el suelo de 124,57 con **1,57 px de margen**, y eso hay que decirlo: **cualquier cosa que se le añada al bloque lo revienta y el síntoma seguirá siendo mudo**. El bloque cuesta **116,55 px** y mide **117,33** con dos piezas. Desborde **0 en los dos ejes** en las dos resoluciones |
+| **M29** *(2026-08-05, fase 5)* | El pie del panel con el TERCER botón: la revisión de diseño avisó de que había que comprobar que no lo empuja | **249,86 px**, o sea **+40,39** sobre los 209,47 que medía con dos, y **CABE**: `dentroDelPanel: true`, 0 px por debajo, y el botón se ve con las tres patas (dentro de la ventana, nadie lo tapa, `elementFromPoint` lo devuelve) |
+| **M30** *(2026-08-05, fase 5)* | El delta de `@turf/difference` sobre el punto de entrada REAL (tarea 5.2) | **1.859 B** (935.021 → 933.162 sustituyendo el import por un tope). Ver **M20**: es menos de la mitad de lo que estimó la fase 1 cableándolo a mano, y confirma la inferencia del plan — `polyclip-ts` ya estaba en el paquete vía `@turf/intersect` desde F07, así que lo que añade es el envoltorio y no el álgebra |
+| **M31** *(2026-08-05, fase 5)* | El criterio del plan «el nombre escrito llega al `localId` del fichero», que **M14** ya declaró imposible | Medido en el navegador y convertido en las dos afirmaciones que sí valen: el nombre **se queda en la pantalla** y **NO aparece en los bytes** del `.gml`, y lo que sí llega son los `localId` de O19 —`9398516VK3799G`, `…G.1`, `…G.2`— con sus dos namespaces (`ES.SDGC.CP` y `ES.LOCAL.CP`). El fichero baja con prefijo **`expediente_`** y 3 `gml:featureMember`. ⏳ La deuda de «el guion 16 cambia de criterio» queda **saldada** |
 
 ## Deuda declarada
 
@@ -158,19 +165,12 @@ minuendos ya están en memoria.
   astilla. Para el camino de F17 da igual —una pieza de `P_of − P_new` está dentro
   de `P_of` por construcción—, y **el día que `comprobarConjunto` coma un fichero
   ajeno habrá que medirlo**.
-- ⏳ **El guion 16 tiene que cambiar de criterio.** El plan le mandaba comprobar que
-  «el nombre escrito llega al `localId` del fichero», y por **M14** el nombre NO va
-  al `.gml`. Lo que tiene que comprobar es que llega al INFORME.
-- ⏳ **El pie del panel con TRES botones no se ha medido.** Medía **209,47 px** con
-  dos, y la revisión de diseño avisó de que había que comprobar que el tercero no
-  lo empuja. En jsdom no hay maquetación: es del guion 16, junto con lo que la
-  lista le quita de verdad a la tabla de vértices.
+- ⏳ **A 1280×720 el margen sobre el suelo es de 1,57 px** (**M28**), y el síntoma
+  de pasarse **es mudo**: el panel no desborda, la tabla de vértices encoge en
+  silencio. Cualquier cosa que se le añada al bloque del sobrante hay que medirla
+  con el guion 16 en esa resolución, no solo mirarla a 1440×900.
 - ⏳ **El paquete pasa de 935 kB** (**M21**) con un techo de aviso de 500, así que
   la deuda de partirlo (**F16**) deja de ser teórica. F17 no la resuelve.
-- ⏳ **Los 31,00 px por fila son de la maqueta de la revisión, no de ESTA lista.**
-  La aritmética de la fila escrita da 30,40 px y se ha dejado el 31 —el número
-  medido— para que el tope sobre y no falte. El número que manda es el que mida el
-  guion 16 en un navegador de verdad.
 - ⏳ **La cesión con `nationalCadastralReference` VACÍA no está medida.** O19 dice
   que la forma con sufijo vale; que la otra falle sigue sin comprobarse, y ese
   camino es el que toma `identidadDeCesion` cuando la matriz tampoco tiene
@@ -178,6 +178,9 @@ minuendos ya están en memoria.
 
 ## Deuda saldada
 
+- ✅ **El criterio del guion 16.** El plan le mandaba comprobar que el nombre llega
+  al `localId`; comprueba lo contrario y las dos mitades (**M31**), que es lo que
+  protege el único identificador de finca que la Sede ha aceptado.
 - ✅ **Las cuatro decisiones de accesibilidad que la revisión de diseño dejó
   abiertas**, cerradas en la fase 4 y las cuatro dentro del propio bloque
   (**M23**). La que más costaba era la primera y no era la más difícil: sin
@@ -305,7 +308,26 @@ existe.
   botón entregara dos cosas distintas según un estado que no se ve. El pie estrena
   un tercer CTA y su precio en píxeles queda **pendiente de medir** (**M22**).
 
-Queda la fase 5: los gates.
+**Fase 5 · los gates — hecha el 2026-08-05** (6.279 / 147):
+
+- **5.1** `scripts/smoke-navegador/16-derivar-cesion.js`, `ok:true` en **las dos**
+  resoluciones y consola limpia. ⛔ **Encontró un defecto real a 1280×720** —la
+  tabla de vértices en 119,14 px, sin desborde y por tanto sin síntoma— y se
+  corrigió con tres cambios, ninguno de CSS (**M25**). Corrigió además dos números
+  que este proyecto estaba usando sin haberlos medido: el suelo de la tabla
+  (**M26**) y el alto de fila (**M27**). Es el **cuarto** guion de la carpeta que
+  destapa un defecto de producción, y el único que conduce una feature entera
+  **sin tocar la red**.
+- **5.2** El delta de `@turf/difference` sobre el punto de entrada real: **1.859 B**
+  (**M30**), menos de la mitad de lo estimado en la fase 1.
+- **5.3** `CHECKLIST-HUMANO.md` §13, con sus **dos** puntos y los dos BLOQUEANTES:
+  que «se propone, no se crea» se entienda sin explicación, y la **verdad externa**
+  —un expediente REAL derivado por la app, presentado en la Sede, con IVG positivo
+  y su CSV anotado en `SPEC.md` §7.1—.
+
+⏳ **F17 NO se cierra aquí.** Queda el criterio 4, que es el único que la máquina no
+puede firmar: **el IVG positivo sobre un expediente real**. Hasta entonces lo que
+hay es una aplicación que hace el recorrido entero y un guion que lo demuestra.
 
 ## Referencias
 

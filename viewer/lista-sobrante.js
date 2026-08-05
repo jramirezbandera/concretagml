@@ -132,20 +132,29 @@ export const FILAS_VISIBLES = 4
 /**
  * Alto de una fila, en píxeles, para calcular el tope de la caja que scrollea.
  *
- * Los 31,00 px están MEDIDOS en la revisión de diseño sobre la aplicación real.
- * La aritmética de esta maqueta, con los tokens del proyecto, da casi lo mismo:
+ * ⛔ **26 px, MEDIDOS SOBRE ESTA LISTA en Chrome el 2026-08-05** por el guion 16.
+ * La revisión de diseño publicó **31,00** y ese número no era de aquí: salía de
+ * una maqueta escrita antes que el componente. Con 31 el tope quedaba en 124 px y
+ * enseñaba **4,77 filas** en vez de 4 — no un defecto (ninguna pieza desaparece y
+ * el contador dice cuántas hay), pero **20 px de panel cobrados de más**, y el
+ * panel es justo lo que F17 está gastando a propósito.
+ *
+ * La aritmética de la fila escrita, con los tokens del proyecto, cuadra con lo
+ * medido y no con la maqueta:
  *
  *     campo de nombre .... 12 px × 1,45 + 2×2 de relleno + 2×1 de borde = 23,40 px
  *     relleno de la fila . 2 × 3 px ......................................  6,00 px
  *     separador .......... 1 px de `border-top` .........................  1,00 px
  *     TOTAL ............................................................. 30,40 px
  *
- * Se deja el 31 —el número MEDIDO— y no el 30,40 calculado: el tope de la caja
- * tiene que sobrar, no faltar, o la cuarta fila se vería cortada por la mitad y
- * parecería que hay scroll cuando no lo hay. El número que manda sigue siendo el
- * que mide el guion 16 en un navegador de verdad.
+ * (Los 4,4 px de diferencia con lo medido son que la fila NO gasta el
+ * `line-height` de 1,45 completo: el `<input>` fija su propia caja.)
+ *
+ * ⚠️ Quien toque el relleno, el tamaño de letra o el borde de `.gml-entrada`
+ * mueve este número, y el guion 16 lo dirá con una advertencia. **El que manda es
+ * el que mide el navegador**, no el de esta constante.
  */
-export const ALTO_FILA_PX = 31
+export const ALTO_FILA_PX = 26
 
 // ── Textos ───────────────────────────────────────────────────────────────────
 
@@ -244,10 +253,24 @@ export function textoContador(incluidas, total) {
 
 // ── Estilos en línea (ver la cabecera: este módulo no importa CSS) ───────────
 
+/**
+ * ⚠️ **El hueco entre las partes del bloque son 4 px y no 8, y el número lo
+ * decidió una medición**, no el gusto. Con 8 px el bloque medía 133,33 px y a
+ * 1280×720 —el viewport MÍNIMO declarado del proyecto— dejaba la tabla de
+ * vértices en **119,14 px**: la cabecera, la fila del recinto y **dos** vértices
+ * de los quince. El suelo que este proyecto se exige son TRES (124,57 px,
+ * derivados de lo que miden esas filas), y los 8 px que faltaban estaban justo
+ * aquí. Medido por el guion 16 el 2026-08-05.
+ *
+ * `--space-1` (4 px) es vocabulario del proyecto y esta columna ya es densa
+ * —12 px de cuerpo—, así que el bloque no queda apretado: queda como el resto del
+ * panel. Quien lo suba tiene que rehacer la resta a 1280×720, no solo mirarlo a
+ * 1440.
+ */
 const ESTILO_BLOQUE = Object.freeze({
   display: 'flex',
   flexDirection: 'column',
-  gap: '8px',
+  gap: '4px',
   minHeight: '0',
 })
 

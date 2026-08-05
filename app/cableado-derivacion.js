@@ -91,8 +91,15 @@ export const MOTIVO_SIN_GEOMETRIA =
  *
  * Es el caso que el plan llamó por su nombre: el sobrante saldría VACÍO mientras
  * hay vecinos afectados, y la aplicación exportaría un expediente incompleto con
- * total confianza. Se dice, con las cifras, y se remite a la fase 2 de F17 (el
- * colindante recortado), que es donde ese caso se resuelve de verdad.
+ * total confianza.
+ *
+ * ⚠️ **Son DOS mensajes y no uno, y la partición está MEDIDA** (guion 16,
+ * 2026-08-05). La primera versión decía las cifras Y el porqué en el mismo
+ * renglón, y ese renglón vive en el PIE del panel: cinco líneas a 343 px de ancho
+ * le comieron **74,96 px** a la tabla de vértices, que a 1280×720 es un tercio de
+ * lo que le queda. Así que aquí va **lo accionable con su cifra** —dos líneas— y
+ * el porqué largo sale por el canal de avisos, que tiene scroll propio y es donde
+ * este proyecto pone las explicaciones. Ninguna de las dos mitades se pierde.
  *
  * @param {import('../derivacion/cesion.js').PuertaCesion} puerta
  * @param {(n:number, d?:number) => string} formatear
@@ -101,12 +108,27 @@ export const MOTIVO_SIN_GEOMETRIA =
 export function motivoPuerta(puerta, formatear) {
   const cuantas = puerta.piezas.length
   return (
-    `La geometría medida SE SALE del contorno oficial en ${cuantas} sitio(s), ` +
-    `${formatear(puerta.area)} m² en total (el trozo más ancho mide ` +
-    `${formatear(puerta.grosorMaximo, 4)} m). Lo que sobresale no es sobrante propio: es ` +
-    `terreno de alguien, y repartirlo es un acto jurídico que esta versión no cubre ` +
-    `(está anotado como la fase 2 de esta feature). Corrige el lindero hacia dentro y ` +
-    `vuelve a derivar.`
+    `La geometría medida SE SALE del contorno oficial: ${formatear(puerta.area)} m² en ` +
+    `${cuantas} sitio(s). Corrige el lindero hacia dentro y vuelve a derivar.`
+  )
+}
+
+/**
+ * Y el porqué, que va al panel de avisos. Se separa de {@link motivoPuerta} por
+ * el presupuesto de píxeles del pie, no por gusto: ver el aviso de allí.
+ *
+ * @param {import('../derivacion/cesion.js').PuertaCesion} puerta
+ * @param {(n:number, d?:number) => string} formatear
+ * @returns {string}
+ */
+export function explicacionPuerta(puerta, formatear) {
+  return (
+    `No se ha derivado ningún sobrante: la geometría medida se sale del contorno oficial en ` +
+    `${puerta.piezas.length} sitio(s), ${formatear(puerta.area)} m² en total, y el trozo más ` +
+    `ancho mide ${formatear(puerta.grosorMaximo, 4)} m. Lo que sobresale NO es sobrante propio: ` +
+    `es terreno de alguien, y repartirlo (que pase al vecino o que sea una cesión) es un acto ` +
+    `jurídico y no una operación geométrica. Esta versión no lo cubre; está anotado como la ` +
+    `fase 2 de esta feature.`
   )
 }
 
@@ -446,6 +468,9 @@ export function cablearDerivacion({
     // ── LA PUERTA ───────────────────────────────────────────────────────────
     if (derivada.puerta.contenida === false) {
       invalidar(null)
+      // Lo accionable al renglón, el porqué al panel. La partición está medida:
+      // ver {@link motivoPuerta}.
+      panel.avisar(explicacionPuerta(derivada.puerta, formatearNumero), { nivel: NIVEL.AVISO })
       decir(motivoPuerta(derivada.puerta, formatearNumero), true)
       return null
     }
@@ -465,11 +490,22 @@ export function cablearDerivacion({
     lista.pintar(derivada)
     capa.pintar(derivada.piezas)
     mostrarBloque(true)
+    // ⛔ **CON PIEZAS, EL RENGLÓN DEL PIE SE CALLA**, y no es un descuido de la
+    // regla de oro 1: lo que tendría que decir —cuántas piezas y cuánto miden— lo
+    // dice ya el BLOQUE, con su contador y una fila por pieza, y lo dice mejor
+    // porque cada cifra está junto a la pieza que describe. Repetirlo aquí es una
+    // segunda redacción del mismo hecho que además CUESTA: medido por el guion 16,
+    // el renglón le quita **22,84 px** a la tabla de vértices, que a 1280×720 son
+    // casi tres cuartos de fila de las quince. `.gml-accion-estado:empty` lo
+    // colapsa a 0 px, así que el hueco se devuelve entero.
+    //
+    // Sin piezas SÍ habla, y ahí es imprescindible: no aparece ningún bloque, así
+    // que si el renglón callara el usuario habría pulsado un botón que no hace
+    // nada visible.
     decir(
       derivada.piezas.length === 0
         ? 'No hay sobrante: la geometría medida cubre el contorno oficial entero.'
-        : `Derivadas ${derivada.piezas.length} pieza(s), ${formatearNumero(derivada.areaTotal)} m² ` +
-            `en total. Revísalas antes de entregar.`,
+        : '',
     )
     refrescarEntrega()
     return derivada
