@@ -2492,8 +2492,9 @@ Y otras cinco cosas que jsdom no puede dar:
 4. **Las tres exportaciones, con sus bytes.** Misma cadena
    `Blob → createObjectURL → <a download> → click() → revoke` y mismo patrón de
    captura que `06`, `10` y `11` (§12). Lo que se afirma es de nivel de byte: que
-   el DXF declara **`$ACADVER = AC1015`** (leído del propio fichero, no escrito a
-   mano en el guion) y trae **las dos capas en su TABLA LAYER** —no basta con que
+   el DXF **cumple la versión que declara** (⛔ ver §24: hasta el 2026-08-05 aquí se
+   comprobaba `$ACADVER === 'AC1015'`, y el fichero cumplía eso y nada más — colgaba
+   ZWCAD) y trae **las dos capas en su TABLA LAYER** —no basta con que
    las entidades las nombren: sin la sección `TABLES` el auditor de `ezdxf` da 0
    errores y las capas NO EXISTEN—, que el listado lleva **coma decimal española**
    y ni un punto inglés, y que el `.json` se vuelve a leer con su sobre
@@ -2552,7 +2553,17 @@ tenían guardado.
 - `enDisco.tieneExpedientes: true`, `enDisco.indices: ["actualizado","refcat"]`,
   `enDisco.version: 3`.
 - `exportaciones.blobsCapturados: 3`, `restaurado: true`, `revocaLasQueCrea: true`,
-  `dxf.acadver: "AC1015"` y `dxf.capasEnLaTabla` con las dos capas.
+  `dxf.acadver: "AC1009"` (R12), `dxf.secciones: ["HEADER","TABLES","ENTITIES"]` y
+  `dxf.capasEnLaTabla` con las dos capas.
+
+⛔ **`arranque.altoCajaVerticesPx` ya NO se puede leer así, y da `0` (medido el
+2026-08-05).** No es un defecto de producto ni tiene que ver con el DXF: tras el
+rework de UI la tabla de vértices vive en
+`<section data-pantalla="validacion edicion informe">`, y al arrancar el paso es
+`entrada`, así que esa sección está en `display:none` **por diseño**. El guion mide
+el invariante de los 267 px en el sitio donde ya no está. **Este guion queda
+pendiente de revisión igual que el `10`**: lo que hay que decidir no es un selector,
+sino en qué pantalla se defiende ese invariante ahora que hay cinco.
 - `arranque.altoCajaVerticesPx: 267` **con `tarjetasDeAvisos: 0`**.
 - `arranque.filaDelRotulo.mismaLinea: true`.
 - `modal.esModal: true`, `cierre.displayTrasCerrar: "none"`.
@@ -2608,7 +2619,8 @@ producción de un artefacto de su propia instrumentación es peor que no medir.*
 | Acuse del guardado | «Guardado «…» en este navegador. **El navegador no garantiza conservarlo**: si se queda sin espacio puede borrarlo por su cuenta.» ✅ |
 | `<dialog>` como modal | `:modal` **casa** · 620×721 en 1440×900 · **cabe** · foco en el campo `nombre` · **fondo inerte** ✅ |
 | Caja de vértices con el diálogo abierto | **267 px** — un modal cuelga del `<body>` y no le quita altura al panel |
-| **DXF** | **1.733 B** · `image/vnd.dxf` · `$ACADVER` **AC1015** · capas en la TABLA: `0`, `PARCELA_OFICIAL`, `PARCELA_EDITADA` ✅ · CRLF, **0 LF sueltos** |
+| **DXF** *(hasta 2026-08-05)* | ⛔ **1.733 B** · `$ACADVER` **AC1015** — **este es el fichero que colgó ZWCAD 2023** (§24). Se deja escrito porque el guion lo daba por bueno |
+| **DXF** *(remedido 2026-08-05, 1440×900, `localhost:5180`)* | **2.567 B** · `image/vnd.dxf` · `$ACADVER` **AC1009** (R12) · secciones `HEADER`, `TABLES`, `ENTITIES` ✅ · capas en la TABLA: `0`, `PARCELA_OFICIAL`, `PARCELA_EDITADA` ✅ · CRLF, **0 LF sueltos** |
 | **Listado** | **2.639 B** · `text/plain;charset=utf-8` · **coma decimal** ✅ · **0** puntos ingleses |
 | **Proyecto** | **3.193 B** · `application/json` · `concreta-gml/proyecto` v1 · `EPSG:25830` · **15 vértices** ✅ |
 | Nombres | `parcela_9398516VK3799G_….dxf` · `coordenadas_….txt` · `proyecto_….json` — los tres derivados de `nombreFicheroGml` |
@@ -4098,33 +4110,94 @@ lector**: son pruebas que comprueban NUESTRA lectura del formato. El oráculo de
 verdad corrió **una vez, a mano, fuera de la suite**. Esto lo hace repetible, que
 es la diferencia entre una medición y un guardián.
 
-**Las tres cosas que comprueba, y por qué cada una:**
+### ⛔ 2026-08-05 · ESTE VALIDADOR DIO VERDE A UN FICHERO QUE COLGABA UN CAD
 
-1. **Abre con `readfile`, no con `recover`.** `recover` está para rescatar
+Un usuario abrió en **ZWCAD 2023 Professional** el DXF que la aplicación acababa
+de exportar (parcela 9398516VK3799G). **El programa se quedó en blanco y
+bloqueado, reteniendo el fichero.** Y este validador, la suite (5.964 pruebas) y
+el guion 12 daban los tres verde.
+
+La causa, medida comparando estructuras crudas:
+
+| fichero | secciones | tablas | versión |
+|---|---|---|---|
+| el nuestro | HEADER → TABLES → ENTITIES | LAYER | **`AC1015`** |
+| los 3 DXF reales de AutoCAD del repo | HEADER → **CLASSES** → TABLES → **BLOCKS** → ENTITIES → **OBJECTS** | 9 tablas | `AC1015` |
+| los del **Catastro** (`ConsultaMasiva_.dxf`) | HEADER → TABLES → ENTITIES | LTYPE, LAYER | **ninguna** (R12) |
+
+**Declarábamos R2000 sin emitir nada de lo que R2000 exige**: ni `CLASSES`, ni la
+tabla `BLOCK_RECORD`, ni `BLOCKS` con `*Model_Space` —quien POSEE a las
+entidades—, ni `OBJECTS` con el diccionario raíz. Un lector estricto lee la
+versión, aplica sus reglas y se queda sin suelo.
+
+⚠️ **Por qué ezdxf no lo veía, que es la lección de verdad:** *ezdxf rellena por
+su cuenta las tablas y secciones que faltan al cargar*. Su documento siempre las
+tiene. Preguntarle «¿traía este fichero la tabla BLOCK_RECORD?» **responde por su
+modelo, nunca por el fichero**. No es un fallo de ezdxf: es que un lector
+tolerante no sirve para juzgar si algo está completo.
+
+**Qué se hizo.** Se probaron tres candidatos en el ZWCAD del usuario: **R12
+abre**, **R2000 completo abre**, y **el nuestro con extents añadidas NO** —lo que
+descarta que fuera un problema de vista—. La salida pasó a **R12**, que es la
+versión que el módulo puede cumplir entera y la que el Catastro le entrega a este
+mismo público. Ver la cabecera de `export/dxf.js` para las tres razones.
+
+**Las cinco cosas que comprueba ahora, y en qué pasada:**
+
+*Pasada de los BYTES (sin ezdxf, porque para cuando él tiene un documento ya ha
+rellenado los huecos):*
+
+1. ⭐ **La versión declarada se CUMPLE.** Si el fichero dice R13 o superior, tiene
+   que traer `CLASSES`, `BLOCK_RECORD`, `BLOCKS` con `*Model_Space` y `OBJECTS`.
+   Es el defecto de ZWCAD, y el único de los cinco que ezdxf no puede ver.
+2. **Ningún tipo de línea nombrado por una capa se queda sin declarar** (ezdxf se
+   inventa la tabla `LTYPE` si falta, así que también hay que mirarlo aquí).
+
+*Pasada de ezdxf, el lector independiente:*
+
+3. **Abre con `readfile`, no con `recover`.** `recover` está para rescatar
    ficheros rotos: usarlo aquí sería preguntar «¿se puede salvar?» en vez de
    «¿está bien?».
-2. **El auditor no encuentra NADA que arreglar: 0 errores y 0 arreglos.** Un
+4. **El auditor no encuentra NADA que arreglar: 0 errores y 0 arreglos.** Un
    arreglo no es un aprobado, es el lector tapando un defecto en silencio.
-3. ⭐ **Las capas que las entidades NOMBRAN están en la tabla LAYER.** Es la
+5. ⭐ **Las capas que las entidades NOMBRAN están en la tabla LAYER.** Es la
    trampa gorda de F10: sin la sección `TABLES`, ezdxf abre el fichero, ve las
    polilíneas y el auditor da 0 y 0 — pero las capas **no existen**, y el
    criterio «abre en CAD con las dos capas separadas» fallaría entero sin que
    nada avisara.
 
 **Estado (2026-08-05):** los tres casos ✓ con ezdxf 1.4.4 — dos capas, una sola y
-con huecos—, `readfile` sin recuperación y auditor a 0/0.
+con huecos—, `readfile` sin recuperación y auditor a 0/0, salida R12.
 
-**Verificado POR MUTACIÓN, dos veces:**
+⭐ **El veredicto del validador coincide con el de ZWCAD en los CINCO ficheros de
+los que hay veredicto humano**, que es la única calibración que tiene sentido:
+
+| fichero | ZWCAD 2023 | el validador |
+|---|---|---|
+| el que exportábamos (`AC1015` pelado) | ⛔ blanco y bloqueado | ✗ «declara AC1015 y NO trae: …» |
+| ese mismo + extents | ⛔ blanco y bloqueado | ✗ lo mismo |
+| R12 | ✅ abre | ✓ |
+| R2000 completo (escrito por ezdxf) | ✅ abre | ✓ |
+| `ConsultaMasiva_.dxf` del Catastro | ✅ (se abre a diario) | ✓ «sin declarar (R12)» |
+
+**Verificado POR MUTACIÓN, tres veces** (las dos primeras, del día que nació el
+script, cuando la salida era R2000):
 
 | Mutación en `export/dxf.js` | La suite | El validador |
 |---|---|---|
 | quitar `100=AcDbPolyline` | 2 rojas | **`NO ABRE: DXFStructureError: missing 'AcDbPolyline' subclass`** en los 3 casos |
 | todas las entidades con el MISMO handle | 2 rojas | **«Removed entity LWPOLYLINE(#30) with a conflicting handle»** — o sea, el lector **borra una polilínea** para poder abrirlo |
+| ⭐ volver a declarar `AC1015` sin el esqueleto | 1 roja | **«declara "AC1015" y NO trae: sección CLASSES, sección BLOCKS, sección OBJECTS, tabla BLOCK_RECORD, bloque \*Model_Space»** |
 
-⚠️ **Y la suite no estaba ciega a ninguna de las dos**, conviene decirlo: F10 dejó
-esas aserciones escritas. Lo que añade el validador es **quién juzga** — y se ve
-en la segunda mutación: la suite dice «un snapshot no cuadra», el validador dice
-**qué entidad se pierde al abrir el fichero**.
+⚠️ **Y la suite no estaba ciega a ninguna de las tres**, conviene decirlo. Lo que
+añade el validador es **quién juzga** — y se ve en la segunda mutación: la suite
+dice «un snapshot no cuadra», el validador dice **qué entidad se pierde al abrir
+el fichero**.
+
+⛔ **Lo que NINGUNA de las dos pasadas sustituye: abrir el fichero en un CAD.**
+Este defecto lo destapó una persona con ZWCAD, no una máquina, después de que
+tres guardianes distintos lo dieran por bueno. El punto BLOQUEANTE del checklist
+§11.4 no es una formalidad.
 
 ⚠️ **Un defecto de este propio script, cazado por su primera mutación:** `ezdxf`
 no le define `__str__` a `ErrorEntry`, así que el informe imprimía

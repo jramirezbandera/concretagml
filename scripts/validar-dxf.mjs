@@ -12,13 +12,31 @@
 //
 // F10 corrigió el exportador y dejó en `test/export/dxf.test.js` los hechos de
 // aquella ablación escritos a mano sobre los bytes. Eso es mucho mejor que nada y
-// **sigue sin ser un lector**: son 5.955 pruebas comprobando NUESTRA lectura del
+// **sigue sin ser un lector**: son pruebas comprobando NUESTRA lectura del
 // formato. El oráculo de verdad —ezdxf— corrió **una vez, a mano, fuera de la
 // suite**, y desde entonces nadie ha vuelto a preguntárselo.
 //
 // Esto lo hace repetible, que es la diferencia entre una medición y un guardián.
 // Es el gemelo exacto de `validar-xsd.mjs`, que existe por lo mismo: el GML lo
 // valida el XSD oficial y no nuestro serializador.
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+// ⛔ Y EL 2026-08-05 ESTE VALIDADOR DIO VERDE A UN FICHERO QUE COLGABA UN CAD
+// ═══════════════════════════════════════════════════════════════════════════════
+// Un usuario abrió en ZWCAD 2023 el DXF que la aplicación exportaba y el programa se
+// quedó en blanco y bloqueado. El fichero declaraba `AC1015` (R2000) **sin nada de
+// lo que R2000 exige**: ni `CLASSES`, ni `BLOCK_RECORD`, ni `BLOCKS` con
+// `*Model_Space`, ni `OBJECTS`. `ezdxf` **rellena por su cuenta lo que falta al
+// cargar**, así que abría, auditaba 0/0 y encontraba las capas.
+//
+// La lección no es «ezdxf es malo»: es que **preguntarle a un lector tolerante si un
+// fichero está completo es preguntar por su modelo, no por el fichero**. Desde
+// entonces `validar-dxf.py` hace DOS pasadas, y la segunda no toca ezdxf: lee los
+// bytes y comprueba que la versión declarada se cumpla. Con esos ficheros a mano se
+// verificó que su veredicto coincide con el de ZWCAD en los cinco casos de los que
+// hay veredicto humano.
+//
+// ⚠️ Aun así, **esto no sustituye a abrirlo en un CAD**. Lo destapó una persona.
 //
 // ── QUÉ HACE ────────────────────────────────────────────────────────────────
 //   1. Genera DXF con el exportador de verdad (`export/dxf.js`) sobre unos casos

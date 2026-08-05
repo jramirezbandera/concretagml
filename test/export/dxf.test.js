@@ -24,6 +24,16 @@
  * 0 errores y 0 arreglos — y las capas no existen. El criterio 3 entero       *
  * («abre en CAD con las dos capas separadas») fallaría mudo.                  *
  *                                                                            *
+ * ── ⛔ 2026-08-05: EL ORÁCULO EXTERNO TAMPOCO BASTABA ──                      *
+ * Un usuario abrió en ZWCAD 2023 el DXF que esta suite daba por bueno y el    *
+ * programa se quedó en blanco y bloqueado: declarábamos `AC1015` (R2000) sin  *
+ * emitir NADA de lo que R2000 exige. **ezdxf daba verde** porque rellena por  *
+ * su cuenta las tablas que faltan al cargar, así que jamás se entera. La      *
+ * salida es ahora R12, que es la versión que este módulo puede cumplir        *
+ * entera, y de aquel agujero queda aquí una prueba: «la versión declarada es  *
+ * la que el fichero CUMPLE». No se sostiene sola —esto lo destapó una         *
+ * persona, no una máquina—, pero impide que vuelva a colarse en silencio.     *
+ *                                                                            *
  * ── LA SNAPSHOT VA EN CRLF, Y ESO NO ES GRATIS ──                            *
  * El escritor emite CRLF por fidelidad a los tres DXF reales del repo. Para   *
  * que un clon limpio en otra plataforma no reciba la snapshot con LF —y la    *
@@ -98,6 +108,58 @@ function capasDeLasEntidades(dxf) {
   return usadas
 }
 
+/**
+ * Las entidades de la sección ENTITIES, en orden, con sus group codes.
+ *
+ * Hace falta desde que la salida es R12: un contorno ya no es UNA entidad, son
+ * `POLYLINE` + N `VERTEX` + `SEQEND`, y lo que hay que auditar es justo la
+ * secuencia.
+ */
+function entidades(dxf) {
+  const p = pares(dxf)
+  const out = []
+  let dentro = false
+  for (const [c, v] of p) {
+    const val = (v ?? '').trim()
+    if (c === '2' && val === 'ENTITIES') dentro = true
+    else if (c === '0' && val === 'ENDSEC') dentro = false
+    else if (dentro && c === '0') out.push({ tipo: val, grupos: [] })
+    else if (dentro && out.length > 0) out[out.length - 1].grupos.push([c, val])
+  }
+  return out
+}
+
+/** Los tipos de línea declarados en la TABLA LTYPE. */
+function ltypesDeLaTabla(dxf) {
+  const p = pares(dxf)
+  const nombres = []
+  let enTabla = false
+  let enRegistro = false
+  for (const [c, v] of p) {
+    const val = (v ?? '').trim()
+    if (c === '2' && val === 'LTYPE' && !enTabla) enTabla = true
+    else if (c === '0' && val === 'ENDTAB') enTabla = false
+    else if (enTabla && c === '0') enRegistro = val === 'LTYPE'
+    else if (enTabla && enRegistro && c === '2') {
+      nombres.push(val)
+      enRegistro = false
+    }
+  }
+  return nombres
+}
+
+/** Las secciones del fichero, en orden. */
+function secciones(dxf) {
+  const p = pares(dxf)
+  const out = []
+  for (let i = 0; i < p.length; i++) {
+    if (p[i][0] === '0' && p[i][1].trim() === 'SECTION' && p[i + 1]?.[0] === '2') {
+      out.push(p[i + 1][1].trim())
+    }
+  }
+  return out
+}
+
 /** El DXF de referencia del fichero: dos capas, un contorno en cada una. */
 const dosCapas = () =>
   serializarParcelaDxf({
@@ -109,28 +171,46 @@ const dosCapas = () =>
 // 1 · ⭐ Lo que el override O12 no decía, y sin lo cual el fichero no abre
 // ═════════════════════════════════════════════════════════════════════════════
 
-describe('export/dxf · lo imprescindible, medido con ezdxf en la fase 0', () => {
-  it('cada LWPOLYLINE lleva `100 AcDbEntity` ANTES del `8` y `100 AcDbPolyline` DESPUÉS', () => {
-    // El orden importa: ezdxf lee las subclases en secuencia, y con `AcDbEntity`
-    // fuera de sitio el error que da es «missing AcDbPolyline», que manda a buscar
-    // al sitio equivocado. Por eso se afirma la POSICIÓN y no solo la presencia.
+describe('export/dxf · lo imprescindible, medido con ezdxf y con un CAD de verdad', () => {
+  it('cada contorno sale como POLYLINE → VERTEX… → SEQEND, con la capa en las TRES', () => {
+    // R12 no tiene LWPOLYLINE. `66=1` («detrás vienen VERTEX») es obligatorio: sin
+    // él la cabecera queda huérfana y los VERTEX pasan a ser entidades sueltas.
+    // Y la capa se repite en cada VERTEX y en el SEQEND porque así la etiquetan los
+    // ficheros del Catastro y así la lee `parsers/dxf.js` (ver su cabecera).
     const { dxf } = dosCapas()
-    const p = pares(dxf)
+    const ents = entidades(dxf)
+    const lado = 4 // vértices de `cuadrado()`
 
-    const inicios = p.map(([c, v], i) => (c === '0' && v.trim() === 'LWPOLYLINE' ? i : -1)).filter((i) => i >= 0)
-    expect(inicios.length).toBe(2) // anti-vacuidad: si no hubiera polilíneas, lo de abajo no probaría nada
+    expect(ents.map((e) => e.tipo)).toEqual([
+      'POLYLINE', ...Array(lado).fill('VERTEX'), 'SEQEND',
+      'POLYLINE', ...Array(lado).fill('VERTEX'), 'SEQEND',
+    ])
 
-    for (const inicio of inicios) {
-      const trozo = p.slice(inicio, inicio + 12).map(([c, v]) => `${c}=${v.trim()}`)
-      const iEntity = trozo.indexOf('100=AcDbEntity')
-      const iCapa = trozo.findIndex((s) => s.startsWith('8='))
-      const iPolyline = trozo.indexOf('100=AcDbPolyline')
-
-      expect(iEntity, 'falta 100=AcDbEntity: ezdxf no abriría el fichero').toBeGreaterThan(-1)
-      expect(iPolyline, 'falta 100=AcDbPolyline: ezdxf no abriría el fichero').toBeGreaterThan(-1)
-      expect(iEntity).toBeLessThan(iCapa)
-      expect(iCapa).toBeLessThan(iPolyline)
+    const cabeceras = ents.filter((e) => e.tipo === 'POLYLINE')
+    expect(cabeceras).toHaveLength(2) // anti-vacuidad: sin esto lo de abajo no prueba nada
+    for (const cab of cabeceras) {
+      const g = cab.grupos.map(([c, v]) => `${c}=${v}`)
+      expect(g, 'sin 66=1 los VERTEX se sueltan de su polilínea').toContain('66=1')
+      expect(g, 'sin 70=1 el contorno sale abierto').toContain('70=1')
     }
+
+    // Cada tramo POLYLINE…SEQEND habla de una sola capa.
+    let capaEnCurso = null
+    for (const e of ents) {
+      const capa = e.grupos.find(([c]) => c === '8')?.[1]
+      if (e.tipo === 'POLYLINE') capaEnCurso = capa
+      expect(capa, `la entidad ${e.tipo} va sin capa`).toBe(capaEnCurso)
+    }
+  })
+
+  it('⚠️ no queda ni un marcador de subclase `100`: eso es vocabulario de R2000', () => {
+    // Emitir `100=AcDbEntity` en un fichero que dice ser R12 es la misma mentira que
+    // nos colgó ZWCAD, del revés. Los `100` fueron imprescindibles mientras la salida
+    // era AC1015; ahora sobran, y dejarlos «por si acaso» sería contradecir la
+    // versión que el fichero declara.
+    const { dxf } = dosCapas()
+    expect(pares(dxf).some(([c]) => c === '100')).toBe(false)
+    expect(dxf).not.toContain('LWPOLYLINE')
   })
 
   it('⭐ las dos capas ESTÁN EN LA TABLA, no solo nombradas por las entidades', () => {
@@ -155,69 +235,105 @@ describe('export/dxf · lo imprescindible, medido con ezdxf en la fase 0', () =>
     expect(capas.find((c) => c.nombre === CAPAS.OFICIAL.nombre).entidades).toBe(0)
   })
 
-  it('la cabecera de la tabla LAYER lleva handle: sin él el auditor la «arregla»', () => {
+  it('⭐ ninguna referencia apunta fuera del fichero, tampoco POR NOMBRE', () => {
+    // La regla que este módulo se impuso en F10 era «ningún handle colgando», y aun
+    // así dejaba colgar `6=CONTINUOUS`, confiando en que el CAD lo trajera. Después
+    // de que un hueco estructural bloqueara ZWCAD, «esto lo traerá el lector» dejó
+    // de valer: el tipo de línea se declara en su tabla.
     const { dxf } = dosCapas()
     const p = pares(dxf)
-    const iTabla = p.findIndex(([c, v]) => c === '0' && v.trim() === 'TABLE')
-    const trozo = p.slice(iTabla, iTabla + 6).map(([c, v]) => `${c}=${v.trim()}`)
-    expect(trozo).toContain('2=LAYER')
-    expect(trozo.some((s) => s.startsWith('5='))).toBe(true)
+
+    const usados = p.filter(([c]) => c === '6').map(([, v]) => v.trim())
+    expect(usados.length).toBeGreaterThan(0) // anti-vacuidad
+    for (const nombre of usados) expect(ltypesDeLaTabla(dxf)).toContain(nombre)
   })
 
-  it('NO se emite ninguna referencia por handle cuyo destino no esté en el fichero', () => {
-    // La regla que este módulo se impone: un handle colgando es peor que un campo
-    // opcional ausente. Los `330` que hay apuntan a la cabecera de la tabla LAYER,
-    // que sí se emite; las entidades no llevan `330` porque apuntaría al
-    // BLOCK_RECORD del espacio-modelo, que no se emite. Y no hay `390`.
+  it('R12 no tiene handles, y eso borra una CLASE de defecto en vez de vigilarla', () => {
+    // Sin `5`, sin `330` y sin `390` no hay grafo de propietarios que pueda quedar
+    // roto, ni `$HANDSEED` que pueda ir por detrás de los handles usados. Es la
+    // mitad de la razón por la que se eligió R12 sobre el R2000 completo: la otra
+    // mitad es que un R2000 correcto son ~18 kB que ningún oráculo nuestro juzga.
     const { dxf } = dosCapas()
     const p = pares(dxf)
-
-    const handlesEmitidos = new Set(p.filter(([c]) => c === '5').map(([, v]) => v.trim()))
-    const referencias = p.filter(([c]) => c === '330').map(([, v]) => v.trim())
-
-    expect(referencias.length).toBeGreaterThan(0) // anti-vacuidad
-    for (const ref of referencias) expect(handlesEmitidos).toContain(ref)
-    expect(p.some(([c]) => c === '390')).toBe(false) // apuntaría a OBJECTS, que no se emite
+    for (const codigo of ['5', '330', '390']) {
+      expect(p.some(([c]) => c === codigo), `sobra el código de grupo ${codigo}`).toBe(false)
+    }
+    expect(dxf).not.toContain('$HANDSEED')
   })
 
   it('las secciones van en el orden del formato y el fichero acaba en EOF', () => {
     const { dxf } = dosCapas()
-    const secciones = []
-    const p = pares(dxf)
-    for (let i = 0; i < p.length; i++) {
-      if (p[i][0] === '0' && p[i][1].trim() === 'SECTION' && p[i + 1]?.[0] === '2') {
-        secciones.push(p[i + 1][1].trim())
-      }
-    }
-    expect(secciones).toEqual(['HEADER', 'TABLES', 'ENTITIES'])
+    expect(secciones(dxf)).toEqual(['HEADER', 'TABLES', 'ENTITIES'])
     expect(dxf.endsWith(`0${NL}EOF${NL}`)).toBe(true)
   })
 
-  it('la versión es AC1015 (R2000) y las unidades, metros', () => {
+  it('⭐ la versión que se DECLARA es la que el fichero CUMPLE', () => {
+    // ⛔ LA PRUEBA DEL DEFECTO DE ZWCAD. Emitíamos `AC1015` (R2000) con la estructura
+    // de un R12, y R2000 exige un esqueleto entero: `CLASSES`, la tabla
+    // `BLOCK_RECORD`, `BLOCKS` con `*Model_Space` —quien POSEE a las entidades— y
+    // `OBJECTS` con el diccionario raíz. Un lector estricto aplica las reglas de la
+    // versión declarada y se queda sin suelo: ZWCAD 2023 se quedó en blanco y
+    // bloqueado. ezdxf no lo veía porque rellena por su cuenta lo que falta.
+    //
+    // Esto no se afirma como «la versión es AC1009», que sería fijar una constante:
+    // se afirma la REGLA, así que subir la versión sin traer el esqueleto pone la
+    // prueba en rojo, que es exactamente lo que no pasó en su día.
     const { dxf } = dosCapas()
     expect(dxf).toContain(`9${NL}$ACADVER${NL}1${NL}${ACADVER}`)
-    expect(dxf).toContain(`9${NL}$INSUNITS${NL}70${NL}6`)
+
+    const numero = Number.parseInt(ACADVER.slice(2), 10)
+    const PRIMERA_CON_ESQUELETO = 1012 // R13: es donde nacen los handles y OBJECTS
+    if (numero >= PRIMERA_CON_ESQUELETO) {
+      expect(secciones(dxf), `${ACADVER} exige CLASSES/BLOCKS/OBJECTS`).toEqual(
+        expect.arrayContaining(['CLASSES', 'BLOCKS', 'OBJECTS']),
+      )
+      expect(dxf).toContain('BLOCK_RECORD')
+      expect(dxf.toUpperCase()).toContain('*MODEL_SPACE')
+    } else {
+      // Y al revés: si somos R12, no se emite vocabulario de R2000 que prometa lo
+      // que no hay. `$INSUNITS` («metros») es de R2000 y desaparece con él; las
+      // coordenadas son UTM absolutas, así que no queda ninguna escala ambigua.
+      expect(secciones(dxf)).toEqual(['HEADER', 'TABLES', 'ENTITIES'])
+      expect(dxf).not.toContain('$INSUNITS')
+    }
   })
 
-  it('`$HANDSEED` es MAYOR que todos los handles emitidos', () => {
-    // Si un CAD añade entidades partiendo de un `$HANDSEED` ya usado, repite
-    // handles, y eso es un fichero corrupto que abre igual.
+  it('⭐ la cabecera declara las extents, o la parcela abre fuera de la pantalla', () => {
+    // El SEGUNDO problema del caso de ZWCAD, independiente del primero: sin
+    // `$EXTMIN`/`$EXTMAX` la vista abre en el 0,0 y una parcela en UTM está a 4,4
+    // millones de unidades de ahí. El fichero está sano y la pantalla, en blanco.
     const { dxf } = dosCapas()
     const p = pares(dxf)
-    const iSemilla = p.findIndex(([, v]) => (v ?? '').trim() === '$HANDSEED')
-    const semilla = parseInt(p[iSemilla + 1][1].trim(), 16)
+    const valorTras = (nombre) => {
+      const i = p.findIndex(([, v]) => (v ?? '').trim() === nombre)
+      expect(i, `falta ${nombre} en la cabecera`).toBeGreaterThan(-1)
+      return [Number.parseFloat(p[i + 1][1]), Number.parseFloat(p[i + 2][1])]
+    }
+    const [minX, minY] = valorTras('$EXTMIN')
+    const [maxX, maxY] = valorTras('$EXTMAX')
 
-    // ⚠️ Los handles se cuentan DESPUÉS de la cabecera: el propio `$HANDSEED` se
-    // escribe con el código de grupo 5, así que un filtro sobre el fichero entero
-    // se lo traga a sí mismo y la comparación sale `53 > 53`.
-    const iFinHeader = p.findIndex(([c, v]) => c === '0' && v.trim() === 'ENDSEC')
-    const handles = p
-      .slice(iFinHeader)
-      .filter(([c]) => c === '5')
-      .map(([, v]) => parseInt(v.trim(), 16))
+    // Y describen la geometría EMITIDA, no una caja cualquiera. Los vértices se
+    // sacan por `entidades()` y NO filtrando los códigos 10/20 del fichero entero:
+    // la propia cabecera usa esos mismos códigos y se colaría en el mínimo.
+    const vertices = entidades(dxf)
+      .filter((e) => e.tipo === 'VERTEX')
+      .map((e) => [
+        Number.parseFloat(e.grupos.find(([c]) => c === '10')[1]),
+        Number.parseFloat(e.grupos.find(([c]) => c === '20')[1]),
+      ])
+    expect(vertices.length).toBeGreaterThan(0) // anti-vacuidad
 
-    expect(handles.length).toBeGreaterThan(0)
-    for (const h of handles) expect(semilla).toBeGreaterThan(h)
+    expect(minX).toBe(Math.min(...vertices.map((v) => v[0])))
+    expect(maxX).toBe(Math.max(...vertices.map((v) => v[0])))
+    expect(minY).toBe(Math.min(...vertices.map((v) => v[1])))
+    expect(maxY).toBe(Math.max(...vertices.map((v) => v[1])))
+    expect(maxX).toBeGreaterThan(minX) // una caja de área cero pasaría lo de arriba
+  })
+
+  it('sin geometría NO se inventan extents: mandarían la vista a un sitio vacío', () => {
+    const { dxf } = serializarParcelaDxf({ recintosEditados: [], recintosOficiales: [] })
+    expect(dxf).not.toContain('$EXTMIN')
+    expect(dxf).not.toContain('$EXTMAX')
   })
 })
 
@@ -296,7 +412,7 @@ describe('export/dxf · coordenadas', () => {
     const colapso = detecciones.find((d) => d.tipo === TIPO_EXPORT.COLAPSO_POR_REDONDEO)
     expect(colapso).toBeDefined()
     expect(colapso.datos.colapsados).toBe(1)
-    expect(dxf).toContain(`90${NL}3`) // 4 vértices → 3
+    expect(entidades(dxf).filter((e) => e.tipo === 'VERTEX')).toHaveLength(3) // 4 → 3
     expect(capas.find((c) => c.nombre === CAPAS.EDITADA.nombre).entidades).toBe(1)
   })
 
@@ -307,7 +423,11 @@ describe('export/dxf · coordenadas', () => {
     const d = detecciones.find((x) => x.tipo === TIPO_EXPORT.ANILLO_DESCARTADO)
     expect(d).toBeDefined()
     expect(d.severidad).toBe(SEVERIDAD.AVISO)
-    expect(dxf).not.toContain('LWPOLYLINE')
+    // ⚠️ Se afirma sobre las ENTIDADES, no sobre la cadena 'POLYLINE': esa aparece
+    // igual dentro de 'LWPOLYLINE', y la versión anterior de esta prueba —heredada
+    // de cuando la salida era R2000— se quedó pasando por casualidad al cambiar el
+    // formato, sin comprobar ya nada.
+    expect(entidades(dxf)).toEqual([])
   })
 
   it('la polilínea sale CERRADA por bandera, sin repetir el primer vértice', () => {
@@ -318,15 +438,18 @@ describe('export/dxf · coordenadas', () => {
     const anillo = cuadrado(40)
     const { dxf } = serializarParcelaDxf({ recintosEditados: [recinto(anillo)] })
     expect(dxf).toContain(`70${NL}1`)
-    expect(dxf).toContain(`90${NL}${anillo.length}`)
+    expect(entidades(dxf).filter((e) => e.tipo === 'VERTEX')).toHaveLength(anillo.length)
 
     // ⚠️ Se comparan PARES (x,y), no la X suelta: en un cuadrado, el primer y el
     // último vértice comparten la X, así que contar apariciones de la X daría 2 y
     // acusaría al escritor de repetir el cierre cuando no lo repite.
-    const p = pares(dxf)
-    const xs = p.filter(([c]) => c === '10').map(([, v]) => v.trim())
-    const ys = p.filter(([c]) => c === '20').map(([, v]) => v.trim())
-    const emitidos = xs.map((x, i) => `${x},${ys[i]}`)
+    //
+    // ⚠️ Y se leen por `entidades()`, no filtrando los códigos 10/20 del fichero:
+    // así estaba escrita y se puso roja al llegar las extents, que usan esos mismos
+    // códigos en la cabecera. Contaba 6 vértices en un cuadrado de 4.
+    const emitidos = entidades(dxf)
+      .filter((e) => e.tipo === 'VERTEX')
+      .map((e) => `${e.grupos.find(([c]) => c === '10')[1]},${e.grupos.find(([c]) => c === '20')[1]}`)
 
     expect(emitidos).toHaveLength(anillo.length)
     expect(new Set(emitidos).size).toBe(anillo.length) // ni uno repetido
@@ -365,7 +488,7 @@ describe('export/dxf · la parcela que nunca se contrastó con el Catastro', () 
   it('sin ninguna geometría sale un DXF VÁLIDO y vacío, no un null que interpretar', () => {
     const { dxf, detecciones } = serializarParcelaDxf({ recintosEditados: [], recintosOficiales: [] })
     expect(typeof dxf).toBe('string')
-    expect(dxf).toContain('AC1015')
+    expect(dxf).toContain(ACADVER)
     expect(parseDXF(dxf).anillos).toEqual([])
     expect(detecciones.filter((d) => d.tipo === TIPO_EXPORT.CAPA_VACIA)).toHaveLength(2)
   })

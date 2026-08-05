@@ -1245,9 +1245,16 @@ una base de datos**, sino una implementación en memoria que muere con el proces
 El guion mide la supervivencia a una **recarga** de verdad —comparando la marca de
 tiempo del registro contra `performance.timeOrigin`, para que lanzarlo dos veces sin
 recargar no dé un falso positivo—, lee los bytes por una **segunda conexión** a
-IndexedDB, y afirma sobre los tres ficheros que bajan: `$ACADVER = AC1015` y las dos
-capas **en la TABLA**, coma decimal en el listado, y el sobre
-`concreta-gml/proyecto` con sus 15 vértices. Cifras en `GUION.md` §18.
+IndexedDB, y afirma sobre los tres ficheros que bajan: que el DXF **cumple la
+versión que declara** y trae las dos capas **en la TABLA**, coma decimal en el
+listado, y el sobre `concreta-gml/proyecto` con sus 15 vértices. Cifras en
+`GUION.md` §18.
+
+⛔ **Y este guion ya se equivocó una vez, así que léelo con eso puesto.** Hasta el
+**2026-08-05** comprobaba `$ACADVER === 'AC1015'` y daba verde a un fichero que
+**dejaba ZWCAD 2023 en blanco y bloqueado**: declarábamos R2000 sin traer nada de
+lo que R2000 exige. Lo destapó un usuario abriendo el fichero. La suite, `ezdxf` y
+este guion decían los tres que estaba bien. Ver `GUION.md` §24.
 
 **Y aun así no puede firmar cinco cosas.** Cuatro son de entorno —cerrar el
 navegador, dos pestañas, abrir un fichero del disco, y abrir un DXF en un CAD— y la
@@ -1756,9 +1763,9 @@ leído, está de suerte.**
 - [ ] ¿Coinciden con las **7 y 1** que ofrece el diálogo de reparto?
 - [ ] Mide una huella en el CAD y compárala con la «Superficie en planta» del pie
       (medido: **165,99 m²** con las 7 partes de `Construccion`). ¿Cuadra?
-- [ ] ⚠️ Ese fixture es **el primero real con `POLYLINE`/`VERTEX`/`SEQEND`** del
-      proyecto (los demás traen `LWPOLYLINE`). Si tu CAD lo abre distinto, es un dato
-      que no tenemos en ninguna parte: apúntalo.
+- [ ] ⚠️ Ese fixture trae `POLYLINE`/`VERTEX`/`SEQEND`, que es **la misma forma que
+      esta aplicación exporta desde el 2026-08-05** (ver `GUION.md` §24). Si tu CAD lo
+      abre distinto, es un dato que no tenemos en ninguna parte: apúntalo.
 - [ ] Prueba con un DXF **tuyo**, de un trabajo real: ¿entra? ¿Reconoces tus capas
       en el diálogo? ¿Cuántas partes salen y cuántas esperabas?
 

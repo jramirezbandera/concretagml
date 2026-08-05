@@ -46,7 +46,7 @@
 //      (el GML), `10` (el informe de texto) y `11` (el PDF), con el mismo patrón de
 //      captura (GUION.md §12) y la misma promesa: los envoltorios se restauran en
 //      un `finally` y el veredicto lo DECLARA. Lo que se afirma es de nivel de
-//      byte: que el DXF **empieza por la cabecera `AC1015`** y trae las dos capas
+//      byte: que el DXF **cumple la versión que declara** y trae las dos capas
 //      en su TABLA, que el listado lleva coma decimal española, y que el `.json`
 //      se puede volver a leer (`JSON.parse` + el sobre `concreta-gml/proyecto`).
 //   4. **Que abrir el diálogo y exportar NO CIERREN NADA POR DEBAJO.** Es la
@@ -89,12 +89,15 @@
 //
 // ── QUÉ **NO** PUEDE MEDIR — LÉELO ANTES DE CITAR ESTE GUION ────────────────
 //
-//   · **NO abre el DXF en un CAD.** Afirma sobre sus bytes —cabecera `AC1015`, las
-//     dos capas en la TABLA, tamaño—, que es todo lo que un guion puede ver. Que
-//     AutoCAD lo abra con las dos capas SELECCIONABLES POR CAPA es el punto
-//     BLOQUEANTE del checklist §11.4, y es el mismo reparto que hizo F09 con el PDF
-//     en tres lectores: **un DXF que valida contra nuestro propio parser y no abre
-//     en AutoCAD no está exportado, está de suerte**.
+//   · **NO abre el DXF en un CAD, y el 2026-08-05 eso dejó de ser una advertencia
+//     teórica.** Este guion daba verde a un fichero que **colgaba ZWCAD 2023**:
+//     declaraba `AC1015` sin traer nada de lo que R2000 exige, y aquí se comprobaba
+//     la versión contra esa misma constante, o sea que se medía que el fichero
+//     supiera decirla. Lo destapó un usuario abriendo el fichero, no una máquina.
+//     Ahora se afirma la REGLA (la versión declarada se cumple, §12), pero el punto
+//     BLOQUEANTE del checklist §11.4 —abrirlo en un CAD de verdad— sigue siendo la
+//     única prueba que vale: **un DXF que valida contra nuestro propio parser, y
+//     hasta contra `ezdxf`, y no abre en un CAD, no está exportado, está de suerte**.
 //   · **NO cierra el navegador.** Mide la supervivencia a una RECARGA (§1); cerrar
 //     el navegador entero y volver es del checklist §11.1.
 //   · **NO abre dos pestañas.** El `versionchange` con dos pestañas de verdad se
@@ -330,6 +333,26 @@ function capasDeLaTabla(dxf) {
     else if (enTabla && enRegistro && c === '2') nombres.push(val)
   }
   return nombres
+}
+
+/**
+ * Las secciones que trae el fichero, en orden.
+ *
+ * ⛔ Existe desde el **2026-08-05**, y por un defecto que este guion daba por bueno:
+ * el DXF declaraba `AC1015` (R2000) con la estructura de un R12 —sin `CLASSES`, sin
+ * `BLOCKS`, sin `OBJECTS`, sin la tabla `BLOCK_RECORD`— y **ZWCAD 2023 se quedaba en
+ * blanco y bloqueado**. Aquí se comprobaba la versión contra la constante `AC1015`,
+ * que es justo lo que el fichero cumplía: decirla.
+ */
+function seccionesDe(dxf) {
+  const p = paresDxf(dxf)
+  const salida = []
+  for (let i = 0; i < p.length; i += 1) {
+    if (p[i][0] === '0' && p[i][1].trim() === 'SECTION' && p[i + 1] && p[i + 1][0] === '2') {
+      salida.push(p[i + 1][1].trim())
+    }
+  }
+  return salida
 }
 
 // ── 1 · Página recién cargada y F10 montada ─────────────────────────────────
@@ -874,6 +897,7 @@ if (dialogoEl.open) {
             return i < 0 || p[i + 1] === undefined ? null : p[i + 1][1].trim()
           })(),
           capasEnLaTabla: capasDeLaTabla(leidos[iDxf].texto),
+          secciones: seccionesDe(leidos[iDxf].texto),
           crlf: leidos[iDxf].texto.includes('\r\n'),
           lfSueltos: leidos[iDxf].texto.replace(/\r\n/g, '').includes('\n'),
         }
@@ -914,11 +938,31 @@ if (dialogoEl.open) {
 
   if (exportaciones.dxf !== null) {
     if (exportaciones.dxf.bytes === 0) problemas.push('El DXF ha bajado con 0 bytes.')
-    if (exportaciones.dxf.acadver !== 'AC1015') {
-      problemas.push(
-        `El DXF declara $ACADVER ${JSON.stringify(exportaciones.dxf.acadver)} y no AC1015 (R2000): ` +
-          'medido en la fase 0 con `ezdxf`, `LWPOLYLINE` no es válido por debajo de R14.',
-      )
+    // ⛔ 2026-08-05 · LA VERSIÓN DECLARADA TIENE QUE CUMPLIRSE. Aquí se comparaba
+    // contra la constante `AC1015`, y el fichero la cumplía en el único sentido que
+    // esa comprobación medía: la decía. Le faltaba TODO lo que R2000 exige, y ZWCAD
+    // 2023 se quedaba en blanco y bloqueado. Ahora se comprueba la regla.
+    const version = Number.parseInt(String(exportaciones.dxf.acadver ?? '').slice(2), 10)
+    const esqueleto = ['CLASSES', 'BLOCKS', 'OBJECTS']
+    if (Number.isFinite(version) && version >= 1012) {
+      const faltan = esqueleto.filter((s) => !exportaciones.dxf.secciones.includes(s))
+      if (faltan.length > 0) {
+        problemas.push(
+          `El DXF declara $ACADVER ${JSON.stringify(exportaciones.dxf.acadver)} (R13 o superior) y no ` +
+            `trae ${faltan.join(', ')}. Desde R13 las entidades las POSEE un BLOCK_RECORD y los ` +
+            'objetos viven bajo el diccionario raíz de OBJECTS: un lector estricto se queda sin ' +
+            'suelo. Es el defecto que colgó ZWCAD 2023 el 2026-08-05, y `ezdxf` lo aprobaba porque ' +
+            'rellena por su cuenta lo que falta al cargar.',
+        )
+      }
+    } else {
+      const sobran = esqueleto.filter((s) => exportaciones.dxf.secciones.includes(s))
+      if (sobran.length > 0) {
+        problemas.push(
+          `El DXF va como R12 (${JSON.stringify(exportaciones.dxf.acadver)}) y trae ${sobran.join(', ')}: ` +
+            'promete estructura de una versión que no declara, que es la misma mentira del revés.',
+        )
+      }
     }
     if (exportaciones.dxf.capasEnLaTabla.length < 2) {
       problemas.push(
@@ -1107,9 +1151,11 @@ if (agotado()) {
 noCubierto.push(
   'CERRAR EL NAVEGADOR ENTERO (no la pestaña) y volver: es donde de verdad se ve si el perfil ' +
     'conserva o desaloja. Checklist humano §11.1.',
-  'ABRIR EL DXF EN UN CAD con las dos capas seleccionables POR CAPA. Este guion afirma sobre sus ' +
-    'bytes ($ACADVER, capas en la TABLA); que AutoCAD lo abra no lo puede firmar ninguna máquina ' +
-    'de este proyecto. Punto BLOQUEANTE del checklist §11.4.',
+  '⛔ ABRIR EL DXF EN UN CAD con las dos capas seleccionables POR CAPA. Este guion afirma sobre sus ' +
+    'bytes (que la versión declarada se cumple, capas en la TABLA); que un CAD lo abra no lo puede ' +
+    'firmar ninguna máquina de este proyecto — y el 2026-08-05 se cobró la pieza: este guion, la ' +
+    'suite y `ezdxf` daban verde a un fichero que dejaba ZWCAD 2023 en blanco y bloqueado. Punto ' +
+    'BLOQUEANTE del checklist §11.4, y no es una formalidad.',
   'DOS PESTAÑAS A LA VEZ y el `versionchange` de verdad. Checklist §11.2.',
   'ABRIR UN `.json` DESDE EL DISCO: el selector de ficheros del sistema no se conduce desde aquí. ' +
     'Checklist §11.5.',

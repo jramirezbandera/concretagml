@@ -80,6 +80,7 @@ medido (regla de oro 8).
 | **M13** | (no previsto) | **Dos mensajes de usuario llevaban Markdown crudo** (`**Sigue guardado**`, `**No se ha abierto nada**`) y el panel de avisos pinta `textContent`: en pantalla salían **los asteriscos**. Lo vio el navegador, no la suite. Corregido quitando la sintaxis y **no añadiendo un intérprete de Markdown**: enfatizar con palabras siempre funciona, y meter marcado en un canal que muestra nombres de fichero abriría una superficie de inyección. Con guardián |
 | **M14** | «`export/dxf.js`» (dos ficheros en total, con `storage/`) | **Son nueve módulos nuevos y ocho tocados.** `export/` es un **directorio nuevo** con cuatro ficheros y **barrel propio**, que entra en el barrel raíz como espacio **`exportar`** — porque `export` es palabra reservada y `export * as export from …` es un `SyntaxError`. Ver «Ficheros» |
 | **M15** | (no previsto) | **Un `element.click()` no mueve el foco**, y por poco cuesta una acusación falsa: el guion 12 denunciaba que el diálogo no devolvía el foco al botón al cerrarse con `Escape`. No era cierto — en un navegador de verdad un clic de ratón sí lo deja ahí, pero el guion no puede hacer gestos de ratón (GUION §0). Corregido **en el guion** (`.focus()` antes del `.click()`), no en producción. **Un guion que acusa a producción de un artefacto de su propia instrumentación es peor que no medir** |
+| **M16** *(2026-08-05, POSTERIOR AL CIERRE)* | Criterio 3: «abre en CAD con las dos capas separadas», dado por bueno con M6+M8 | ⛔ **El DXF que esta aplicación exportaba dejaba ZWCAD 2023 EN BLANCO Y BLOQUEADO, y los tres guardianes daban verde.** El M6 acertó en el diagnóstico y falló en la conclusión: emitir `LWPOLYLINE` obliga a declarar R2000, **y declarar R2000 obliga a emitir todo su esqueleto** — `CLASSES`, tabla `BLOCK_RECORD`, `BLOCKS` con `*Model_Space` (quien POSEE a las entidades) y `OBJECTS` con el diccionario raíz—. No emitíamos ninguno. ⚠️ **Por qué ezdxf lo aprobaba: rellena por su cuenta las tablas que faltan al cargar**, así que preguntarle si el fichero las traía responde por su modelo, no por el fichero — la misma familia del M7, un oráculo que mide otra cosa. **Lo destapó un usuario abriendo el fichero**, no una máquina. Corregido pasando a **R12 (`AC1009`) con `POLYLINE`/`VERTEX`/`SEQEND`**, que es lo que el propio Catastro entrega (`ConsultaMasiva_.dxf`) y lo que se verificó abriendo tres candidatos en su ZWCAD. Segundo hallazgo del mismo caso: **faltaban `$EXTMIN`/`$EXTMAX`**, así que la vista abría en el 0,0 y la parcela estaba a 4,4 M de unidades — pantalla en blanco con el fichero sano. Ver `GUION.md` §24 |
 
 ## Criterios de aceptación
 
@@ -301,6 +302,11 @@ con el dato exacto** — marca escrita a las 14:58:14,647Z, página cargada a la
 14:58:16,159Z, 15 vértices intactos. Los tres ficheros bajan con sus bytes: DXF
 1.733 B con `$ACADVER AC1015` y las dos capas en la TABLA, listado 2.639 B con coma
 decimal, proyecto 3.193 B que se vuelve a leer.
+
+⛔ **Las cifras del DXF de ese párrafo están CADUCADAS y se dejan escritas a
+propósito**: aquel fichero de 1.733 B con `AC1015` es exactamente el que el
+**2026-08-05** dejó ZWCAD 2023 en blanco y bloqueado (M16). El guion daba `ok:true`
+porque comprobaba que el fichero supiera decir su versión, no que la cumpliera.
 
 ⛔ **Y la primera corrida del guion destapó un defecto de producción que la suite no
 podía ver** (M12): un aviso del arranque que le quitaba **52 px** a la caja de

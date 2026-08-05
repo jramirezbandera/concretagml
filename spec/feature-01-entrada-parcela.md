@@ -34,6 +34,7 @@ No soportar bloques, INSERT, xrefs ni splines. Si aparecen: decirlo e indicar qu
 ## 🔻 OVERRIDE (dossier)
 
 - **O12 — DXF:** al *exportar* (F10) `LWPOLYLINE` exige ≥ AC1014/R14 (en la práctica AC1015/R2000). No afecta a la lectura, pero fija el mínimo del round-trip. *(dossier B2).*
+  - ⛔ **CADUCADO el 2026-08-05, y por un fichero que colgó un CAD.** El razonamiento del override es correcto —`LWPOLYLINE` sí exige R14+— pero lleva a la conclusión contraria: **declarar `AC1015` obliga a emitir TODO el esqueleto de R2000** (`CLASSES`, `BLOCK_RECORD`, `BLOCKS` con `*Model_Space`, `OBJECTS`), y sin él **ZWCAD 2023 se queda en blanco y bloqueado**. La exportación es ahora **R12 (`AC1009`) con `POLYLINE`/`VERTEX`/`SEQEND`**, que es la forma en la que el propio Catastro entrega sus DXF. Medido y verificado en el CAD del usuario; ver `GUION.md` §24 y la cabecera de `export/dxf.js`. **La LECTURA no cambia**: `parsers/dxf.js` sigue leyendo las dos vías.
 
 ## Fuera de alcance
 

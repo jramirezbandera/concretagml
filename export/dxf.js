@@ -6,63 +6,74 @@
 // comparar las dos con las herramientas que ya sabe usar.
 //
 // ═══════════════════════════════════════════════════════════════════════════════
-// ⛔ EL OVERRIDE O12, AL PIE DE LA LETRA, PRODUCE UN FICHERO QUE NO ABRE
+// ⛔ 2026-08-05 · ESTE MÓDULO EMITÍA UN FICHERO QUE COLGABA ZWCAD, Y NINGUNA
+//    MEDICIÓN NUESTRA LO VEÍA
 // ═══════════════════════════════════════════════════════════════════════════════
-// `spec/feature-10-persistencia-export.md` manda emitir, literalmente:
+// Un usuario abrió en **ZWCAD 2023 Professional** el DXF de la parcela
+// 9398516VK3799G que esta aplicación acababa de exportar. El programa se quedó en
+// blanco y bloqueado, reteniendo el fichero. **No era la vista: el fichero no
+// llegaba a cargar.**
 //
-//     HEADER ($ACADVER AC1015) → TABLES (LAYER) → ENTITIES → EOF
-//     LWPOLYLINE: 0=LWPOLYLINE, 8=capa, 90=nº vértices, 70=1, y 10/20 por vértice
+// La causa, medida comparando estructuras crudas:
 //
-// Escrito así y pasado por `ezdxf` —una implementación independiente del formato—
-// el resultado es:
+//   | fichero                          | secciones                                        | tablas   | versión |
+//   |----------------------------------|--------------------------------------------------|----------|---------|
+//   | el nuestro (hasta hoy)           | HEADER → TABLES → ENTITIES                        | LAYER    | AC1015  |
+//   | los 3 DXF reales de AutoCAD      | HEADER → CLASSES → TABLES → BLOCKS → ENTITIES → OBJECTS | 9 tablas | AC1015  |
+//   | los del CATASTRO (ConsultaMasiva)| HEADER → TABLES → ENTITIES                        | LTYPE, LAYER | ninguna |
 //
-//     DXFStructureError: missing 'AcDbPolyline' subclass in LWPOLYLINE
+// **Declarábamos `AC1015` (R2000) sin emitir nada de lo que R2000 exige**: ni
+// `CLASSES`, ni la tabla `BLOCK_RECORD`, ni la sección `BLOCKS` con `*Model_Space`
+// —que es quien POSEE a las entidades—, ni `OBJECTS` con el diccionario raíz. Un
+// lector estricto lee la versión, aplica sus reglas y se queda sin suelo.
 //
-// No se lee mal: **no se abre**. Faltan los MARCADORES DE SUBCLASE `100=AcDbEntity`
-// (antes del `8`) y `100=AcDbPolyline` (después), que el override no menciona y que
-// los tres DXF reales de AutoCAD del repo sí llevan. Medido el 2026-08-03.
+// ⚠️ **Y lo que hace de esto una lección y no una errata: los DOS oráculos que este
+// módulo tenía dieron verde.** `ezdxf` abre el fichero con `readfile`, audita 0
+// errores y 0 arreglos y encuentra las capas en la tabla —porque **rellena por su
+// cuenta las tablas que faltan al cargar**, así que jamás se entera de que no
+// estaban—; y `parsers/dxf.js` lo relee perfecto. Ni la suite ni `validar:dxf` ni
+// el guion 12 podían ver este defecto: hacía falta un CAD. Lo vio un usuario.
 //
-// ⚠️ **Y lo que convierte esto en una lección y no en una errata:** `parsers/dxf.js`
-// —nuestro propio lector— lee ese fichero roto tan feliz: dos anillos, coordenadas
-// exactas, cero detecciones. La prueba de ida y vuelta que iba a ser la red de
-// seguridad **habría salido verde con un DXF que no abre en ninguna parte**. Por eso
-// el oráculo de este módulo es `ezdxf` y nuestro parser es el SEGUNDO, no el primero.
+// ── LA SALIDA ES R12, Y ES UNA ELECCIÓN MEDIDA ──────────────────────────────
+// Se probaron tres candidatos en el ZWCAD del usuario. Abren **R12** y **R2000
+// completo**; el nuestro con extents añadidas **NO** (lo que descarta que fuera un
+// problema de vista). Entre los dos que abren se elige R12:
 //
-// ── QUÉ SOSTIENE EL PESO, MEDIDO POR ABLACIÓN (12 piezas, una fuera cada vez) ──
-// Solo TRES cosas son imprescindibles para que un lector independiente abra el
-// fichero y lo audite sin un solo arreglo:
-//   1. `100=AcDbEntity` en cada entidad;
-//   2. `100=AcDbPolyline` en cada LWPOLYLINE;
-//   3. el handle (`5`) en la CABECERA de la tabla LAYER — sin él, el auditor de
-//      ezdxf «arregla» la tabla, y un fichero que hay que arreglar al abrirlo no es
-//      un fichero que se pueda firmar.
-// Todo lo demás salió opcional: handles de entidad, `330`, `$HANDSEED`,
-// `$INSUNITS`, `6=CONTINUOUS`, `390`, los `100` de la tabla, y CRLF frente a LF.
+//   · **R12 no tiene grafo de handles.** La regla que este módulo ya se había
+//     impuesto —«no emitir ninguna referencia cuyo destino no se emita»— pasa de ser
+//     una cuerda floja a ser imposible de violar. Aquí se sube el listón: ahora
+//     tampoco hay referencias POR NOMBRE colgando, porque `CONTINUOUS` se declara en
+//     su tabla `LTYPE` en vez de confiar en que el CAD la traiga.
+//   · **Un R2000 correcto son ~18 kB de andamio** (`CLASSES`, `BLOCK_RECORD`,
+//     `*Model_Space`, diccionario raíz) **cuya corrección no puede juzgar ningún
+//     oráculo automático que tengamos**: ezdxf aprueba igual el andamio bueno y su
+//     ausencia. Sería mucho código sostenido por nada — que es exactamente lo que
+//     acaba de fallar.
+//   · **Es lo que el Catastro le entrega a este mismo público.** `ConsultaMasiva_.dxf`
+//     es R12 con `POLYLINE`/`VERTEX`/`SEQEND` y estos peritos lo abren a diario. Es
+//     verdad externa y además en la dirección correcta: un DXF hecho PARA abrirse en
+//     un CAD, no uno que nosotros leemos.
 //
-// ⭐ **Y la trampa gorda: sin la sección TABLES, ezdxf lee el fichero, ve las dos
-// polilíneas y el auditor da 0 errores y 0 arreglos — pero LAS CAPAS NO EXISTEN.**
-// Las entidades dicen `PARCELA_OFICIAL` y `PARCELA_EDITADA`, y preguntarle al
-// documento si esas capas están devuelve `False` para las dos. El criterio 3 de la
-// fase —«abre en CAD **con las dos capas separadas**»— fallaría entero sin que nada
+// **Lo que se pierde y no se disimula:** `$INSUNITS = 6` («metros») es de R2000 y
+// desaparece, así que el dibujo va sin declaración de unidades — igual que los del
+// Catastro. No hay ambigüedad de escala porque las coordenadas son UTM absolutas.
+//
+// ── QUÉ LLEVA LA CABECERA, Y POR QUÉ TAN POCO ───────────────────────────────
+// Dos cosas, y las dos son hechos que podemos respaldar:
+//   1. `$ACADVER = AC1009`. **Decir lo que somos es justo lo que no hacíamos.**
+//   2. `$EXTMIN`/`$EXTMAX`, calculadas sobre la geometría REALMENTE emitida. Sin
+//      ellas la vista abre en el 0,0 y una parcela en UTM está a 4,4 millones de
+//      unidades de ahí: pantalla en blanco con un fichero sano. Era el SEGUNDO
+//      problema del caso de ZWCAD, independiente del primero.
+// No se emiten `$LIMMIN`/`$LIMMAX` ni `$INSBASE`: describen un entorno de dibujo que
+// aquí no existe, y emitirlos sería inventar un estado.
+//
+// ── DE LA ABLACIÓN DE F10 SOBREVIVE LO QUE SIGUE SIENDO CIERTO ──────────────
+// ⭐ **Sin la sección TABLES, ezdxf lee el fichero, ve las polilíneas y el auditor da
+// 0 errores y 0 arreglos — pero LAS CAPAS NO EXISTEN.** El criterio 3 de la fase
+// —«abre en CAD **con las dos capas separadas**»— fallaría entero sin que nada
 // avisara. De ahí que el test no compruebe que las entidades NOMBRAN las capas, sino
 // que las capas ESTÁN EN LA TABLA.
-//
-// ── QUÉ SE EMITE DE MÁS, Y POR QUÉ NO ES «POR SI ACASO» ─────────────────────
-// Se emiten cosas que la ablación declaró opcionales, y conviene justificar cada
-// una, porque este proyecto no emite nada «por si acaso»:
-//   · **ezdxf no es AutoCAD.** Lo único que la ablación demuestra es qué necesita
-//     ESE lector. Donde un DXF real de AutoCAD lleva algo y cuesta una línea, se
-//     emite: es la elección conservadora para un formato de intercambio que va a
-//     abrir un tercero con un programa que aquí no hay.
-//   · **Y con un límite duro: no se emite ninguna REFERENCIA POR HANDLE cuyo
-//     destino no se emita también.** Por eso hay `330` en los registros de capa
-//     (apuntan a la cabecera de la tabla, que sí está) y NO lo hay en las entidades
-//     (apuntaría al BLOCK_RECORD del espacio-modelo, que no se emite), y por eso no
-//     hay `390` (apuntaría al estilo de trazado, que vive en OBJECTS). Un handle
-//     colgando es peor que un campo opcional ausente.
-//   · `6=CONTINUOUS` sí se emite aunque tampoco haya tabla LTYPE, y la diferencia
-//     no es un capricho: es una referencia POR NOMBRE a un tipo de línea que todo
-//     CAD trae predefinido, no un handle a un objeto de este fichero.
 //
 // ── LAS COORDENADAS SALEN A 2 DECIMALES, Y ES LA MISMA CONSTANTE DEL GML ────
 // `DECIMALES_COORD` de `gml/anillos.js`, no un «2» nuevo escrito aquí. Es lo que
@@ -83,14 +94,13 @@ import { SEVERIDAD, TIPO_EXPORT, crearDeteccionExport, resumirDetecciones } from
 // ── Constantes del formato ───────────────────────────────────────────────────
 
 /**
- * La versión que se emite. **R2000**, y no el R12 del plan v4 ni el R14 del
- * override: `LWPOLYLINE` se introdujo en R14 (`AC1014`), pero las herramientas del
- * mundo real saltan de R12 a R2000 y no escriben R13/R14, así que un `AC1014` es
- * una versión que casi nadie produce y que por tanto casi nadie prueba.
+ * La versión que se emite. **R12**, y la razón está en la cabecera del fichero: es
+ * la versión que este módulo puede CUMPLIR entera. `AC1015` era una promesa que no
+ * se sostenía y colgaba el CAD del usuario.
  *
  * @readonly
  */
-export const ACADVER = 'AC1015'
+export const ACADVER = 'AC1009'
 
 /**
  * Terminador de línea. **CRLF**, que es lo que llevan los tres DXF reales de
@@ -126,14 +136,16 @@ export const CAPAS = Object.freeze({
 /** La capa 0 existe en todo DXF; se declara para no dejarla implícita. */
 const CAPA_CERO = Object.freeze({ nombre: '0', color: 7 })
 
-/** Handle de la cabecera de la tabla LAYER. Convencional y fijo. */
-const HANDLE_TABLA_LAYER = '2'
-
-/** Primer handle libre para registros y entidades. Por debajo van las tablas. */
-const PRIMER_HANDLE = 0x30
-
-/** `$INSUNITS = 6` es «metros». El modelo está en UTM, así que no hay duda que dejar. */
-const INSUNITS_METROS = 6
+/**
+ * El tipo de línea que nombran las tres capas.
+ *
+ * ⭐ **Se declara en su tabla en vez de darlo por supuesto.** Todo CAD trae
+ * `CONTINUOUS` predefinido y el Catastro también lo emite; declararlo cierra la
+ * última referencia por nombre que colgaba fuera del fichero. Después de que un
+ * hueco estructural nos colgara un CAD, «esto lo traerá el lector» dejó de valer
+ * como argumento.
+ */
+const LTYPE_CONTINUO = Object.freeze({ nombre: 'CONTINUOUS', descripcion: 'Solid line' })
 
 // ── Utillaje de escritura ────────────────────────────────────────────────────
 
@@ -146,6 +158,9 @@ const INSUNITS_METROS = 6
  * @returns {string}
  */
 const par = (codigo, valor) => `${codigo}${NL}${valor}`
+
+/** Una coordenada, con la precisión de salida del GML. */
+const coord = (n) => n.toFixed(DECIMALES_COORD)
 
 // ── Typedefs ─────────────────────────────────────────────────────────────────
 
@@ -167,60 +182,70 @@ const par = (codigo, valor) => `${codigo}${NL}${valor}`
 // ── Composición de las secciones ─────────────────────────────────────────────
 
 /**
- * La sección HEADER. Tres variables y ni una más: las 250 que trae un DXF de
- * AutoCAD describen un entorno de dibujo (rejillas, estilos de cota, vistas) que
- * aquí no existe, y emitirlas sería inventar un estado.
+ * La sección HEADER. Dos variables y ni una más, y las dos son hechos que se pueden
+ * respaldar: la versión que de verdad cumplimos y la envolvente de lo que se emite.
+ * Las 250 que trae un DXF de AutoCAD describen un entorno de dibujo que aquí no
+ * existe, y emitirlas sería inventar un estado.
  *
- * @param {string} handSeed  Primer handle libre, en hexadecimal.
+ * @param {{minX: number, minY: number, maxX: number, maxY: number}|null} envolvente
+ *   `null` cuando no se ha emitido ni una geometría: entonces no hay extents que
+ *   declarar y **no se inventan**. Unas extents de 0,0 a 0,0 mandarían la vista del
+ *   CAD a un punto donde no hay nada, que es peor que no decir nada.
  * @returns {string[]}
  */
-function seccionHeader(handSeed) {
-  return [
-    par(0, 'SECTION'),
-    par(2, 'HEADER'),
-    par(9, '$ACADVER'),
-    par(1, ACADVER),
-    // El siguiente handle libre. Si un CAD añade entidades al fichero, empieza por
-    // aquí en vez de arriesgarse a repetir uno de los nuestros.
-    par(9, '$HANDSEED'),
-    par(5, handSeed),
-    par(9, '$INSUNITS'),
-    par(70, INSUNITS_METROS),
-    par(0, 'ENDSEC'),
-  ]
+function seccionHeader(envolvente) {
+  const lineas = [par(0, 'SECTION'), par(2, 'HEADER'), par(9, '$ACADVER'), par(1, ACADVER)]
+  if (envolvente !== null) {
+    lineas.push(
+      par(9, '$EXTMIN'),
+      par(10, coord(envolvente.minX)),
+      par(20, coord(envolvente.minY)),
+      par(30, '0.0'),
+      par(9, '$EXTMAX'),
+      par(10, coord(envolvente.maxX)),
+      par(20, coord(envolvente.maxY)),
+      par(30, '0.0'),
+    )
+  }
+  lineas.push(par(0, 'ENDSEC'))
+  return lineas
 }
 
 /**
- * La sección TABLES con la tabla LAYER. **Es la que sostiene el criterio 3**: sin
+ * La sección TABLES: `LTYPE` y `LAYER`. **Es la que sostiene el criterio 3**: sin
  * ella el fichero abre igual y las capas no existen (ver la cabecera).
  *
  * @param {readonly {nombre: string, color: number}[]} capas
- * @param {() => string} siguienteHandle
  * @returns {string[]}
  */
-function seccionTables(capas, siguienteHandle) {
+function seccionTables(capas) {
   const lineas = [
     par(0, 'SECTION'),
     par(2, 'TABLES'),
+    // LTYPE primero: las capas de abajo lo nombran, y una tabla que se nombra antes
+    // de declararse es justo el tipo de deuda que colgó el CAD.
+    par(0, 'TABLE'),
+    par(2, 'LTYPE'),
+    par(70, 1),
+    par(0, 'LTYPE'),
+    par(2, LTYPE_CONTINUO.nombre),
+    par(70, 64),
+    par(3, LTYPE_CONTINUO.descripcion),
+    par(72, 65), // 'A', el código de alineación; es el único valor que R12 admite
+    par(73, 0), // sin tramos: la línea es continua
+    par(40, '0.0'), // longitud total del patrón
+    par(0, 'ENDTAB'),
     par(0, 'TABLE'),
     par(2, 'LAYER'),
-    par(5, HANDLE_TABLA_LAYER), // ← imprescindible: sin esto el auditor «arregla»
-    par(100, 'AcDbSymbolTable'),
     par(70, capas.length),
   ]
   for (const capa of capas) {
     lineas.push(
       par(0, 'LAYER'),
-      par(5, siguienteHandle()),
-      // Propietario: la cabecera de esta misma tabla, que SÍ se emite. Es la única
-      // referencia por handle de todo el fichero cuyo destino existe.
-      par(330, HANDLE_TABLA_LAYER),
-      par(100, 'AcDbSymbolTableRecord'),
-      par(100, 'AcDbLayerTableRecord'),
       par(2, capa.nombre),
       par(70, 0), // sin banderas: ni congelada, ni bloqueada, ni oculta
       par(62, capa.color),
-      par(6, 'CONTINUOUS'), // referencia por NOMBRE, no por handle (ver la cabecera)
+      par(6, LTYPE_CONTINUO.nombre), // y ahora su destino ESTÁ en el fichero
     )
   }
   lineas.push(par(0, 'ENDTAB'), par(0, 'ENDSEC'))
@@ -228,35 +253,40 @@ function seccionTables(capas, siguienteHandle) {
 }
 
 /**
- * Una `LWPOLYLINE` cerrada.
+ * Una polilínea cerrada, en la forma clásica `POLYLINE` → `VERTEX`… → `SEQEND`.
  *
  * El anillo entra **abierto** (regla de oro 4: el modelo no guarda el vértice de
  * cierre) y sale con `70=1`, que es la bandera de «cerrada». **No se repite el
  * primer vértice al final**, y esa es una diferencia deliberada con los DXF reales
- * del repo: los suyos llevan `70=0` y repiten el vértice, que es cómo AutoCAD
- * guarda una polilínea que el usuario cerró a ojo. Emitir la bandera dice lo mismo
- * sin depender de que dos coordenadas coincidan hasta el último decimal.
+ * del repo: los suyos repiten el vértice, que es cómo AutoCAD guarda una polilínea
+ * que el usuario cerró a ojo. Emitir la bandera dice lo mismo sin depender de que
+ * dos coordenadas coincidan hasta el último decimal.
+ *
+ * ⚠️ **Sin punto mudo `10/20/30` en la cabecera y sin `30` en los vértices.** El
+ * manual de R12 describe el punto mudo, pero ni el DXF del Catastro ni el fixture
+ * `poly_clasica.dxf` del repo lo llevan, y un `30` por vértice haría que
+ * `parsers/dxf.js` declarase una `Z_DESCARTADA` que no existe: estaríamos emitiendo
+ * una tercera dimensión que el modelo no tiene para luego avisar de haberla tirado.
+ *
+ * ⚠️ **La capa va en la cabecera Y en cada `VERTEX` y en el `SEQEND`.** No es
+ * redundancia decorativa: es la trampa que `parsers/dxf.js` documenta del fixture
+ * real de edificio, y los ficheros del Catastro la etiquetan igual.
  *
  * @param {Array<[number, number]>} vertices  Anillo abierto, YA redondeado.
  * @param {string} capa
- * @param {string} handle
  * @returns {string[]}
  */
-function lwpolyline(vertices, capa, handle) {
+function polilinea(vertices, capa) {
   const lineas = [
-    par(0, 'LWPOLYLINE'),
-    par(5, handle),
-    // Aquí NO va `330`: apuntaría al BLOCK_RECORD del espacio-modelo, que este
-    // fichero no emite, y un handle colgando es peor que un campo ausente.
-    par(100, 'AcDbEntity'), // ⛔ sin esto, ezdxf no abre el fichero
+    par(0, 'POLYLINE'),
     par(8, capa),
-    par(100, 'AcDbPolyline'), // ⛔ ni sin esto
-    par(90, vertices.length),
+    par(66, 1), // «detrás vienen VERTEX»; en R12 es obligatorio
     par(70, 1), // cerrada
   ]
   for (const [x, y] of vertices) {
-    lineas.push(par(10, x.toFixed(DECIMALES_COORD)), par(20, y.toFixed(DECIMALES_COORD)))
+    lineas.push(par(0, 'VERTEX'), par(8, capa), par(10, coord(x)), par(20, coord(y)))
   }
+  lineas.push(par(0, 'SEQEND'), par(8, capa))
   return lineas
 }
 
@@ -311,7 +341,7 @@ function esListaDeRecintos(v) {
 // ── API pública ──────────────────────────────────────────────────────────────
 
 /**
- * Serializa una parcela a DXF R2000 con la geometría oficial y la editada en capas
+ * Serializa una parcela a DXF R12 con la geometría oficial y la editada en capas
  * separadas.
  *
  * **No lanza por un dato malo del usuario** —una parcela sin geometría oficial, un
@@ -355,14 +385,25 @@ export function serializarParcelaDxf(opciones = {}) {
   /** @type {DeteccionExport[]} */
   const detecciones = []
 
-  let handle = PRIMER_HANDLE
-  const siguienteHandle = () => (handle++).toString(16).toUpperCase()
+  // La envolvente de lo REALMENTE emitido, para `$EXTMIN`/`$EXTMAX`. Se acumula
+  // sobre los vértices ya redondeados, no sobre los de entrada: las extents tienen
+  // que describir el dibujo que el CAD va a ver, no el modelo del que salió.
+  let envolvente = null
+  const abarcar = (x, y) => {
+    if (envolvente === null) envolvente = { minX: x, minY: y, maxX: x, maxY: y }
+    else {
+      envolvente.minX = Math.min(envolvente.minX, x)
+      envolvente.minY = Math.min(envolvente.minY, y)
+      envolvente.maxX = Math.max(envolvente.maxX, x)
+      envolvente.maxY = Math.max(envolvente.maxY, y)
+    }
+  }
 
   // ── Las capas van SIEMPRE las dos a la tabla, tenga o no geometría cada una ──
   // Una capa declarada y vacía dice «aquí no había nada»; una capa ausente deja al
   // usuario preguntándose si el exportador se la comió.
   const capas = [CAPA_CERO, CAPAS.OFICIAL, CAPAS.EDITADA]
-  const lineasTablas = seccionTables(capas, siguienteHandle)
+  const lineasTablas = seccionTables(capas)
 
   // ── Entidades ─────────────────────────────────────────────────────────────
   const lineasEntidades = [par(0, 'SECTION'), par(2, 'ENTITIES')]
@@ -418,7 +459,8 @@ export function serializarParcelaDxf(opciones = {}) {
         )
       }
 
-      lineasEntidades.push(...lwpolyline(vertices, capa.nombre, siguienteHandle()))
+      lineasEntidades.push(...polilinea(vertices, capa.nombre))
+      for (const [x, y] of vertices) abarcar(x, y)
       cuenta[capa.nombre] += 1
     })
   }
@@ -453,11 +495,11 @@ export function serializarParcelaDxf(opciones = {}) {
 
   lineasEntidades.push(par(0, 'ENDSEC'))
 
-  // `$HANDSEED` se escribe al final porque solo entonces se sabe cuántos handles se
-  // han gastado. Es el motivo por el que la cabecera se compone la última aunque se
-  // escriba la primera.
+  // La cabecera se compone la ÚLTIMA aunque se escriba la primera: hasta aquí no se
+  // sabe la envolvente de lo emitido, y unas extents inventadas serían peores que
+  // ninguna.
   const lineas = [
-    ...seccionHeader(handle.toString(16).toUpperCase()),
+    ...seccionHeader(envolvente),
     ...lineasTablas,
     ...lineasEntidades,
     par(0, 'EOF'),

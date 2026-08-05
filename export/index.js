@@ -98,9 +98,13 @@ export { SEVERIDAD, TIPO_EXPORT, resumirDetecciones } from './_comun.js'
 // perito abre para comparar las dos con las herramientas que ya sabe usar.
 //
 // `CAPAS` sale porque es el contrato de lo que el usuario va a ver en el árbol de
-// capas de su CAD, y `ACADVER` porque es la versión del formato: el guion de humo
-// comprueba que el fichero descargado empieza por esa cabecera, y no puede escribir
-// `'AC1015'` a mano sin que las dos cadenas puedan divergir.
+// capas de su CAD, y `ACADVER` porque es la versión del formato.
+//
+// ⚠️ **Y `ACADVER` no basta con leerlo: hay que comprobar que se cumple.** El
+// 2026-08-05 el fichero declaraba `AC1015` con la estructura de un R12 y **colgaba
+// ZWCAD 2023**; el guion de humo comprobaba la cabecera contra esa misma constante,
+// o sea que medía que el fichero supiera decir su versión, no que la tuviera. Hoy la
+// salida es `AC1009` (R12), que es la que este módulo puede cumplir entera.
 
 export { ACADVER, CAPAS, serializarParcelaDxf } from './dxf.js'
 

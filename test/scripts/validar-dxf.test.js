@@ -21,7 +21,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { CASOS, escribirCasos, pythonConEzdxf } from '../../scripts/validar-dxf.mjs'
-import { CAPAS } from '../../export/dxf.js'
+import { ACADVER, CAPAS } from '../../export/dxf.js'
 
 const directorios = []
 const conDirectorio = () => {
@@ -83,8 +83,12 @@ describe('scripts/validar-dxf.mjs · lo que escribe', () => {
     const [dosCapas] = escribirCasos(dir)
     const contenido = readFileSync(dosCapas.ruta, 'latin1')
 
-    expect(contenido).toContain('AcDbEntity')
-    expect(contenido).toContain('AcDbPolyline')
+    expect(contenido).toContain('POLYLINE')
+    expect(contenido).toContain('SEQEND')
+    // La VERSIÓN, que es lo que el validador aprendió a juzgar el 2026-08-05: el
+    // fichero que colgó ZWCAD llevaba estas mismas capas y esta misma geometría, y
+    // lo que le sobraba era prometer un R2000 que no traía.
+    expect(contenido).toContain(ACADVER)
     // Y la tabla de capas, que es la trampa gorda: sin ella el fichero abre, el
     // auditor da 0 y 0, y las capas no existen.
     expect(contenido).toContain('TABLES')
