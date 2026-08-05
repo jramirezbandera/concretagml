@@ -132,6 +132,12 @@ minuendos ya están en memoria.
 | **M16** *(2026-08-05, fase 3)* | El XSD estricto sobre el sobre de varias parcelas: en la fase 1 se validó un fichero **construido a mano** para la ocasión | Ahora lo valida sobre un expediente **derivado del oro por el código de producción**: `test/gml/__snapshots__/expediente-entrega.gml`, 3.619 B, dos `gml:featureMember`, escrito por `prepararEntrega` y añadido a la lista por defecto de `npm run validar:xsd`. La forma que la Sede aceptó el 2026-08-03 pasa a tener guardián automático, que hasta hoy no tenía |
 | **M17** *(2026-08-05, fase 3)* | El coste de paquete de la fase | **+8.657 B** (884.235 → 892.892). ⭐ Y **ni un byte es algoritmo**: comprobado por ausencia en el paquete construido de `restar`, `derivarCesion`, `prepararEntrega` y `comprobarConjunto`. Es texto —los `porQue` de la propuesta, el aviso declarativo por duplicado, la sección del informe y el grupo del diálogo— más los dos módulos puros que `app/` sí importa ya (`identidad.js` y `operacion.js`). ⚠️ El orquestador **sigue sin llamante en producción** hasta la fase 4 |
 | **M18** *(2026-08-05, fase 3)* | — | **CSS: cero bytes.** El desplegable nuevo reutiliza `gml-entrada` y `gml-dialogo-informe-entrada`, que ya traían anchura, familia y `letter-spacing` normalizado para prosa. El presupuesto no se mueve y no hace falta asiento |
+| **M19** *(2026-08-05, fase 4)* | El plan y la revisión de diseño daban por hecho que la lista del sobrante **costaría CSS**: la tarea 4.1 nombraba `estilos/app.css` y `scripts/presupuesto-css.mjs`, y el plan avisaba de que «cualquier byte obliga a un asiento nuevo o CI sale rojo» | **CERO BYTES**, y no por casualidad: la sección anfitriona de `index.html` **no lleva clase modificadora** —`.gml-bloque` ya da columna flex, `min-height:0` y el relleno 16/24/0, y el bloque **no se estira**, porque el estirador de Validación sigue siendo `.gml-bloque--vertices` y dos estiradores descosen el reparto— y el cromo de dentro se lo pone `viewer/lista-sobrante.js` **en línea**, como el cajón de F07, porque `viewer/*` no importa ninguna hoja. Se reutilizan seis clases que ya existían (`gml-rotulo`, `gml-rotulo-fila`, `gml-boton`, `gml-accion-estado`, `gml-entrada`, `gml-mono`). ⚠️ El asiento **se anota igual** (`F17 · fase 4`, 62.309 / 47.214 B): un hito sin fila haría que el registro dejara de contar la historia |
+| **M20** *(2026-08-05, fase 4)* | ⭐ El coste de paquete de `@turf/difference`, que la fase 1 estimó en **4.309 B** cableándolo a mano y que la tarea 5.2 del plan dejaba pendiente de medir sobre el punto de entrada real | **1.859 B**, medidos sustituyendo el import por un tope en `derivacion/topologia.js` y reconstruyendo (935.021 → 933.162 B). Es **menos de la mitad** de lo estimado, y la dirección de la inferencia del plan era correcta: `polyclip-ts` ya estaba en el paquete vía `@turf/intersect` (F07), así que lo que añade es el envoltorio y no el álgebra — muy lejos de los ~50 kB del motor booleano completo |
+| **M21** *(2026-08-05, fase 4)* | El coste de paquete de la fase | **+42.129 B** (892.892 → 935.021), y es el más caro de F17 con diferencia — porque es la fase donde **todo lo anterior estrena llamante**. Atribuido en dos: **+29.410 B** los cuelga el cableado (`derivacion/entrega.js`, `cesion.js`, `topologia.js`, `comprobacion/conjunto.js` y `@turf/difference`, que hasta hoy **no entraban en el paquete** aunque llevaran tres fases escritos y probados), y **+12.719 B** las dos vistas nuevas más la fontanería (`viewer/index.js` las importa siempre, monte o no la bandera). ⚠️ Y con esto la deuda de partir el paquete (**F16**) deja de ser teórica: 935 kB con un techo de aviso de 500 |
+| **M22** *(2026-08-05, fase 4)* | El plan declaraba el contrato de la vista con `alDerivar` dentro | ⛔ **No está, y es la decisión D2 aplicada.** El CTA «Derivar sobrante» bajó al PIE del panel, porque el bloque aparece SOLO cuando hay sobrante y un botón dentro de él sería un botón que solo existe después de haberlo pulsado. Lo que sí vive en la lista es `alEntregar` —la acción que CONSUME lo que el bloque enseña—, con el mismo criterio con el que F08 metió «Descargar informe de contraste» dentro del cajón de F07. ⚠️ **El pie pasa a tener TRES botones** y el precio en píxeles **no se ha medido todavía**: es del guion 16 |
+| **M23** *(2026-08-05, fase 4)* | Las **cuatro decisiones de diseño que la revisión dejó ABIERTAS** | Cerradas las cuatro, y las cuatro dentro del propio bloque: (1) **nombre accesible** explícito en cada casilla y cada campo —dentro de la etiqueta el texto es el NÚMERO, así que sin `aria-label` un lector de pantalla diría «casilla, 1» sin decir nunca de qué—; (2) el mensaje de **invalidación de 3C** se pinta en el bloque y no en el canal global, porque un aviso se lee donde estaba lo que ha desaparecido; (3) los **`saltados` de 5A**, igual, y con la frase que importa: «puede faltar sobrante en esta lista»; (4) una **pieza fuera del encuadre** se cuenta en un aviso propio, separado de «sin contorno» y de «sin número», porque son tres hechos con tres remedios distintos |
+| **M24** *(2026-08-05, fase 4)* | — | ⚠️ **La marca de la pieza estrecha es la PALABRA «estrecha», no un símbolo.** El plan pedía «un ⚠ del vocabulario del proyecto, no un emoji suelto»; el vocabulario de aviso de esta aplicación es el rótulo **«Aviso»** de `app/avisos.js`, que es texto. Y un carácter de advertencia lo lee un lector de pantalla como «signo de exclamación», como «warning» o como nada, según la plataforma. La palabra se lee igual con los ojos y con el oído, y **no dictamina** (regla 9): dice que es estrecha, no que sobre |
 
 ## Deuda declarada
 
@@ -141,10 +147,6 @@ minuendos ya están en memoria.
 - ⏳ **El techo de CSS.** La hoja va **5.150 B por encima** del techo de 42.064 B, y
   la quinta rebanada del rework sigue sin cerrar. F17 **no lo resuelve y sí lo
   empeora**: cada byte suyo entra con asiento propio y `rebanada: null`.
-- ⏳ **Cuatro decisiones de accesibilidad abiertas** (revisión de diseño): nombre
-  accesible de las casillas y los campos, dónde se pinta la invalidación de la
-  lista, dónde se pintan los `saltados` de una resta que no se pudo medir, y qué se
-  enseña cuando una pieza cae fuera del encuadre del mapa.
 - ⏳ **El desplegable de «Tipo de operación» no se ha explorado más allá de sus dos
   opciones**, y **no se ha medido** si el IVG se queja ante una combinación
   incoherente (Segregación con un miembro, o al revés).
@@ -159,12 +161,28 @@ minuendos ya están en memoria.
 - ⏳ **El guion 16 tiene que cambiar de criterio.** El plan le mandaba comprobar que
   «el nombre escrito llega al `localId` del fichero», y por **M14** el nombre NO va
   al `.gml`. Lo que tiene que comprobar es que llega al INFORME.
+- ⏳ **El pie del panel con TRES botones no se ha medido.** Medía **209,47 px** con
+  dos, y la revisión de diseño avisó de que había que comprobar que el tercero no
+  lo empuja. En jsdom no hay maquetación: es del guion 16, junto con lo que la
+  lista le quita de verdad a la tabla de vértices.
+- ⏳ **El paquete pasa de 935 kB** (**M21**) con un techo de aviso de 500, así que
+  la deuda de partirlo (**F16**) deja de ser teórica. F17 no la resuelve.
+- ⏳ **Los 31,00 px por fila son de la maqueta de la revisión, no de ESTA lista.**
+  La aritmética de la fila escrita da 30,40 px y se ha dejado el 31 —el número
+  medido— para que el tope sobre y no falte. El número que manda es el que mida el
+  guion 16 en un navegador de verdad.
 - ⏳ **La cesión con `nationalCadastralReference` VACÍA no está medida.** O19 dice
   que la forma con sufijo vale; que la otra falle sigue sin comprobarse, y ese
   camino es el que toma `identidadDeCesion` cuando la matriz tampoco tiene
   referencia (un alta que se segrega).
 
 ## Deuda saldada
+
+- ✅ **Las cuatro decisiones de accesibilidad que la revisión de diseño dejó
+  abiertas**, cerradas en la fase 4 y las cuatro dentro del propio bloque
+  (**M23**). La que más costaba era la primera y no era la más difícil: sin
+  `aria-label` explícito, un lector de pantalla lee «casilla, 1», «casilla, 2»…
+  porque el texto que la etiqueta envuelve es el NÚMERO.
 
 - ✅ **Los comentarios caducos de `gml/serialize-cp.js`**, que la fase 0 dejó
   exentos y vigilados. La tarea 1.3 los reescribió y **la lista de excepciones se
@@ -262,7 +280,32 @@ existe.
   aplicación lo nombra hoy, en el caso de uso más frecuente, que era el hueco que
   `SPEC.md` §7.2 dejaba escrito.
 
-Quedan las fases 4 y 5: la pantalla del sobrante y los gates.
+**Fase 4 · la pantalla del sobrante — hecha el 2026-08-05** (6.278 / 147):
+
+- **4.1** `viewer/piezas.js` y `viewer/lista-sobrante.js`. Las manchas llevan un
+  **número permanente** y el resaltado es **recíproco**: sin eso, «las piezas se
+  proponen, no se crean solas» cumple la letra y no el propósito — revisar sin
+  poder decir qué mancha estás nombrando es teatro. La lista tope **4 filas con
+  scroll y no recorte**, y el contador dice cuántas hay aunque solo se vean
+  cuatro. ⛔ El panel **no desborda** cuando esto crece: la tabla de vértices
+  encoge en silencio, así que aquí no hay síntoma visible y el guardián tiene que
+  ser el guion 16. **Cero bytes de CSS** (**M19**), y las cuatro decisiones
+  abiertas de diseño, cerradas (**M23**, **M24**).
+- **4.2** `app/cableado-derivacion.js` y el **paso 16** de `app/main.js`.
+  `derivacion/entrega.js` estrena llamante en producción, y con él toda la cadena
+  de las fases 1 a 3 (**M21**). El predicado del CTA es **barato y estructural** y
+  **no mira la superficie** —«área menor» no implica «estar dentro»—; la puerta
+  corre al pulsar y explica con cifras. ⛔ **No basta `xml !== null`**: se mira
+  `puedeEntregarse`, porque el fichero de una sola parcela sería un GML impecable
+  y válido contra el XSD mientras el EXPEDIENTE está mal. ⛔ La foto **caduca con
+  cualquier cambio del store**, no solo cuando entra otra parcela: mover un
+  vértice es exactamente lo que la invalida, y la identidad no cambia al moverlo.
+- ⚠️ **«Generar GML» no se toca**: sigue significando el GML de UNA parcela.
+  Cambiarle el comportamiento por debajo cuando hay sobrante sería que el mismo
+  botón entregara dos cosas distintas según un estado que no se ve. El pie estrena
+  un tercer CTA y su precio en píxeles queda **pendiente de medir** (**M22**).
+
+Queda la fase 5: los gates.
 
 ## Referencias
 

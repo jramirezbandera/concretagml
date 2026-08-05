@@ -181,6 +181,23 @@ export const ASIENTOS = Object.freeze(
         'iconos. Se DEVUELVEN dos reglas: la que encogía el icono del botón partido a 14 px (ese ' +
         'tamaño lo fija ahora el módulo, que solo emite un icono) y el `min-width` cuadrado de las ' +
         'herramientas, que con palabra dentro sobra. Sobran 5.150 sobre el techo.' },
+    { hito: 'F17 · fase 4 · la pantalla del sobrante', commit: '28179ec', total: 62309, nuestro: 47214, rebanada: null,
+      nota:
+        '⭐ CERO BYTES, y aquí NO era lo esperado: F17 mete un bloque NUEVO en la columna de ' +
+        'Validación —la lista del sobrante, con sus filas, su casilla por pieza, su campo de ' +
+        'nombre, su contador y su botón—, que es producto de verdad y no un traslado. Sale a ' +
+        'cero por dos decisiones tomadas al escribirlo: (1) la sección anfitriona de index.html ' +
+        'NO lleva clase modificadora, porque `.gml-bloque` ya da columna flex, `min-height:0` y ' +
+        'el relleno 16/24/0, y el bloque no se estira —el estirador de Validación sigue siendo ' +
+        '`.gml-bloque--vertices`, y dos estiradores descosen el reparto—; y (2) el cromo de ' +
+        'dentro se lo pone `viewer/lista-sobrante.js` EN LÍNEA, como el cajón del diagnóstico, ' +
+        'porque `viewer/*` no importa ninguna hoja y tiene que ser legible en jsdom y sobre un ' +
+        'mapa pelado. Lo que sí se reutiliza son CLASES que ya existen (`gml-rotulo`, ' +
+        '`gml-rotulo-fila`, `gml-boton`, `gml-accion-estado`, `gml-entrada`, `gml-mono`), así ' +
+        'que el bloque hereda el sistema de diseño sin declarar ni un color ni un espaciado ' +
+        'propios. El asiento se anota aunque el número no se mueva: un hito sin fila haría que ' +
+        'el registro dejara de contar la historia, que es la mitad de para lo que existe. ' +
+        'Sobran 5.150 sobre el techo, los mismos que en el asiento anterior.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 
