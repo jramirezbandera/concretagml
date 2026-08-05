@@ -1,6 +1,6 @@
 # F12 · Edificio: partes y plantas
 
-**Fase:** 12 · **Prioridad:** P12 (baja) · **Riesgo:** Medio · **Depende de:** F11 · **Habilita:** F13.
+**Fase:** 12 · **Prioridad:** P14 (baja) · **Riesgo:** Medio · **Depende de:** F11 · **Habilita:** F13.
 **Ficheros:** `edit/dibujo.js` (completar), envolvente derivada en `model/edificio.js`.
 
 ## Objetivo
