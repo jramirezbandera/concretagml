@@ -551,8 +551,9 @@
            «Desplazar lindero», el renglón `[data-estado="edicion"]` o la ayuda de
            gestos: ya no están en el panel. Se fueron ENTEROS a la BARRA FLOTANTE
            sobre el mapa, que fabrica `viewer/barra-edicion.js` y monta
-           `viewer/index.js` como control de Leaflet en la esquina superior
-           izquierda del `<main id="mapa">` de más abajo.
+           `viewer/index.js` como control de Leaflet CENTRADO EN EL BORDE INFERIOR
+           del `<main id="mapa">` de más abajo (estuvo en la esquina superior
+           izquierda, apilada bajo el zoom, hasta el 2026-08-05).
 
            POR QUÉ SE FUERON: el bloque se comía 270 px de un panel que reparte
            una altura FIJA entre bloques fijos, y dejaba la caja de vértices en

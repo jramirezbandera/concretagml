@@ -37,7 +37,13 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect, afterEach } from 'vitest'
-import { CLASE_BARRA, GESTOS, crearBarraEdicion } from '../../viewer/barra-edicion.js'
+import {
+  CENTRO_ABAJO,
+  CLASE_BARRA,
+  CLASE_ESQUINA_CENTRO_ABAJO,
+  GESTOS,
+  crearBarraEdicion,
+} from '../../viewer/barra-edicion.js'
 import { UMBRAL_PUNTERIA_PX } from '../../viewer/edicion.js'
 import { montarMapa } from './_ayuda-jsdom.js'
 
@@ -519,16 +525,30 @@ describe('barra de edición · accesibilidad', () => {
     }
   })
 
-  it('cada botón con icono lleva texto accesible y el SVG va aria-hidden', () => {
+  it('NINGUNA herramienta se queda sin nombre accesible, la nombre un texto o un rótulo oculto', () => {
     const { contenedor } = montarBarra()
-    const conIcono = [...contenedor.querySelectorAll(`.${CLASE_BARRA.ICONO}`)]
-    expect(conIcono.length).toBeGreaterThan(0)
-    for (const icono of conIcono) {
+    // El nombre accesible de un botón es su contenido de texto, venga del `<span>`
+    // visible o del de 1×1 px. Lo que se exige aquí es que exista: una herramienta
+    // muda es la trampa que el diseño de solo-iconos hacía fácil de dejar.
+    const herramientas = [...contenedor.querySelectorAll(`.${CLASE_BARRA.HERRAMIENTA}`)]
+    expect(herramientas.length).toBe(5)
+    for (const herramienta of herramientas) {
+      const nombre = herramienta.textContent.trim()
+      expect(nombre.length, `herramienta sin nombre: ${herramienta.outerHTML}`).toBeGreaterThan(0)
+    }
+    // La sexta herramienta es la casilla, que se nombra por su `<label for>`.
+    const rotuloAjuste = nodo(`.${CLASE_BARRA.CONMUTADOR_ROTULO}`)
+    expect(rotuloAjuste.textContent.trim()).toBe('Ajuste al parcelario')
+  })
+
+  it('los iconos que queden van aria-hidden (el nombre no lo pone un dibujo)', () => {
+    const { contenedor } = montarBarra()
+    const iconos = [...contenedor.querySelectorAll(`.${CLASE_BARRA.ICONO}`)]
+    // Exactamente dos: las puntas de flecha de las dos herramientas que despliegan.
+    expect(iconos.length).toBe(2)
+    for (const icono of iconos) {
       expect(icono.getAttribute('aria-hidden')).toBe('true')
-      // Un icono suelto no lo lee nadie: su botón (o su <label>) trae el rótulo.
-      const rotulo = icono.parentElement.querySelector(`.${CLASE_BARRA.ROTULO}`)
-      expect(rotulo, `un icono sin rótulo accesible en ${icono.parentElement.tagName}`).not.toBeNull()
-      expect(rotulo.textContent.trim().length).toBeGreaterThan(0)
+      expect(icono.getAttribute('focusable')).toBe('false')
     }
   })
 
@@ -663,8 +683,8 @@ describe('barra de edición · contrato roto por el programador → throw', () =
     expect(() => crearBarraEdicion({ mapa, alAvisar: 'ruidito' })).toThrow(TypeError)
   })
 
-  it('acepta las cuatro esquinas y monta la barra dentro del contenedor del mapa', () => {
-    for (const posicion of ['topleft', 'topright', 'bottomleft', 'bottomright']) {
+  it('acepta las cuatro esquinas Y la quinta posición, dentro del contenedor del mapa', () => {
+    for (const posicion of ['topleft', 'topright', 'bottomleft', 'bottomright', CENTRO_ABAJO]) {
       const { mapa, contenedor, destruir } = montarMapa()
       const barra = crearBarraEdicion({ mapa, posicion })
       const caja = contenedor.querySelector(`.${CLASE_BARRA.CONTENEDOR}`)
@@ -700,5 +720,163 @@ describe('barra de edición · declara a qué pantalla pertenece (rebanada 3)', 
     const { contenedor } = montarBarra()
     const barra = contenedor.querySelector(`.${CLASE_BARRA.CONTENEDOR}`)
     expect(barra.querySelectorAll('[data-pantalla]')).toHaveLength(0)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Rework de UI · 2026-08-05 — la barra deja de ser seis iconos apilados bajo el
+// zoom y pasa a ser seis PALABRAS centradas en el borde inferior del mapa.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('barra de edición · la quinta esquina (centrada abajo)', () => {
+  it('por DEFECTO se monta centrada abajo, en una esquina que Leaflet no traía', () => {
+    const { mapa, contenedor } = montarBarra()
+    // Las cuatro de Leaflet siguen ahí y la quinta se le ha añadido.
+    expect(Object.keys(mapa._controlCorners)).toContain(CENTRO_ABAJO)
+
+    const esquina = contenedor.querySelector(`.${CLASE_ESQUINA_CENTRO_ABAJO}`)
+    expect(esquina, 'no existe el <div> de la quinta esquina').not.toBeNull()
+    // `leaflet-bottom` NO es decorativa: de ella salen position/bottom/z-index y
+    // el margen inferior de los controles. Sin ella la barra se iría arriba a la
+    // izquierda sin que nada avisara.
+    expect(esquina.classList.contains('leaflet-bottom')).toBe(true)
+    expect(esquina.contains(nodo(`.${CLASE_BARRA.CONTENEDOR}`))).toBe(true)
+  })
+
+  it('dos barras sobre el mismo mapa reutilizan la esquina: no se crea dos veces', () => {
+    const { mapa, contenedor, destruir } = montarMapa()
+    const primera = crearBarraEdicion({ mapa })
+    const segunda = crearBarraEdicion({ mapa })
+    pendientes.push(() => {
+      primera.destruir()
+      segunda.destruir()
+      destruir()
+    })
+    expect(contenedor.querySelectorAll(`.${CLASE_ESQUINA_CENTRO_ABAJO}`)).toHaveLength(1)
+  })
+
+  it('un mapa que no expone `_controlCorners` NO revienta: cae a bottomleft AVISANDO', () => {
+    // El punto entero de que esto sea un aviso y no un `throw`: `esMapa` acepta
+    // por DUCK TYPING cualquier cosa con addControl/removeControl/getContainer
+    // —es una decisión del módulo, documentada—, y esos mapas no tienen por qué
+    // traer la API privada de la que sale la quinta esquina. Con ellos la barra
+    // tiene que seguir apareciendo: peor puesta, pero dicho en voz alta y no en
+    // un `TypeError` dentro de Leaflet.
+    const contenedorFalso = document.createElement('div')
+    document.body.appendChild(contenedorFalso)
+    const mapaDeMentira = {
+      addControl(control) {
+        control._map = this
+        control._container = control.onAdd(this)
+        control._container.classList.add('leaflet-control')
+        contenedorFalso.appendChild(control._container)
+        return this
+      },
+      removeControl(control) {
+        control.remove()
+        return this
+      },
+      getContainer: () => contenedorFalso,
+      on() {},
+      off() {},
+    }
+
+    const avisos = []
+    const barra = crearBarraEdicion({
+      mapa: mapaDeMentira,
+      alAvisar: (mensaje, detalle) => avisos.push({ mensaje, detalle }),
+    })
+    pendientes.push(() => {
+      barra.destruir()
+      contenedorFalso.remove()
+    })
+
+    expect(avisos).toHaveLength(1)
+    expect(avisos[0].mensaje).toMatch(/bottomleft/)
+    expect(avisos[0].detalle.nivel).toBe('AVISO')
+    expect(barra.control.options.position).toBe('bottomleft')
+    // Y la barra ESTÁ, que es lo que se estaba protegiendo.
+    expect(contenedorFalso.querySelector(`.${CLASE_BARRA.CONTENEDOR}`)).not.toBeNull()
+  })
+
+  it('destruir el mapa se lleva la esquina añadida (la limpia el propio Leaflet)', () => {
+    const { mapa, contenedor, destruir } = montarMapa()
+    const barra = crearBarraEdicion({ mapa })
+    expect(contenedor.querySelector(`.${CLASE_ESQUINA_CENTRO_ABAJO}`)).not.toBeNull()
+
+    barra.destruir()
+    destruir()
+
+    // `L.Map#_clearControlPos` recorre `_controlCorners` entero, así que la quinta
+    // se va con las otras cuatro sin que este módulo tenga que acordarse.
+    expect(contenedor.querySelector(`.${CLASE_ESQUINA_CENTRO_ABAJO}`)).toBeNull()
+  })
+})
+
+describe('barra de edición · las herramientas se llaman por su nombre', () => {
+  it('las seis herramientas llevan su nombre ESCRITO, en el orden de la barra', () => {
+    const { contenedor } = montarBarra()
+    const nombres = [...contenedor.querySelectorAll(`.${CLASE_BARRA.TEXTO}`)].map((n) =>
+      n.textContent.trim(),
+    )
+    // Cinco palabras visibles. La sexta herramienta —la punta de flecha del
+    // ajuste— es la única que sigue sin texto, y por eso no aparece aquí: es la
+    // mitad estrecha de un botón partido y su nombre va oculto + en el `title`.
+    expect(nombres).toEqual(['Deshacer', 'Rehacer', 'Ajuste', 'Desplazar lindero', 'Ayuda'])
+    expect(nodo('[data-desplegable="snap"]').title).toBe('Tolerancia del ajuste')
+  })
+
+  it('el nombre accesible COMPLETA al visible, no lo pisa', () => {
+    montarBarra()
+    // Se ve «Ayuda»; se oye «Ayuda sobre los gestos de edición». Con `aria-label`
+    // se habría oído solo lo segundo y la palabra de la pantalla no la diría
+    // nadie: ese es el fallo del rótulo doble, y aquí no se comete.
+    const ayuda = nodo('[data-accion="ayuda"]')
+    expect(ayuda.hasAttribute('aria-label')).toBe(false)
+    expect(ayuda.textContent.replace(/\s+/g, ' ').trim()).toBe(
+      'Ayuda sobre los gestos de edición',
+    )
+    expect(ayuda.querySelector(`.${CLASE_BARRA.TEXTO}`).textContent).toBe('Ayuda')
+  })
+
+  it('quedan CINCO iconos menos: solo las dos puntas de flecha de lo que despliega', () => {
+    const { contenedor } = montarBarra()
+    const conCaret = [...contenedor.querySelectorAll(`.${CLASE_BARRA.ICONO}`)].map(
+      (i) => i.parentElement,
+    )
+    expect(conCaret).toEqual([nodo('[data-desplegable="snap"]'), nodo('[data-desplegable="offset"]')])
+    // Y ninguna de las que NO despliegan lleva dibujo. Los dos primeros selectores
+    // salen de `app/main.js`, como todo el contrato: escribirlos aquí a mano es lo
+    // que `test/services/contrato-catastro.test.js` prohíbe, y con razón.
+    for (const selector of [
+      SELECTOR.SELECTOR_BOTON_DESHACER,
+      SELECTOR.SELECTOR_BOTON_REHACER,
+      '[data-accion="ayuda"]',
+    ]) {
+      expect(nodo(selector).querySelector('svg'), selector).toBeNull()
+    }
+  })
+
+  it('los grupos van separados por un `role="separator"` de verdad', () => {
+    const { contenedor } = montarBarra()
+    const separadores = [...contenedor.querySelectorAll(`.${CLASE_BARRA.SEPARADOR}`)]
+    // Historial · ajuste · desplazamiento · ayuda ⇒ tres filetes.
+    expect(separadores).toHaveLength(3)
+    for (const separador of separadores) {
+      expect(separador.getAttribute('role')).toBe('separator')
+      expect(separador.getAttribute('aria-orientation')).toBe('vertical')
+    }
+  })
+
+  it('los separadores NO son paradas de las flechas del teclado', () => {
+    montarBarra()
+    // Las flechas recorren `_herramientas`, que son los seis controles. Si un
+    // filete se colara ahí, el foco caería en un `<span>` que no hace nada.
+    const casilla = nodo(SELECTOR.SELECTOR_CAMPO_SNAP)
+    casilla.focus()
+    tecla(casilla, 'ArrowRight')
+    expect(document.activeElement).toBe(nodo('[data-desplegable="snap"]'))
+    tecla(document.activeElement, 'ArrowRight')
+    expect(document.activeElement).toBe(nodo('[data-desplegable="offset"]'))
   })
 })

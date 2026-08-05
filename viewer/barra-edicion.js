@@ -98,12 +98,54 @@
 // como acelerador, saltando las deshabilitadas en el momento de la pulsación, que
 // es el único instante en el que hace falta saberlo.
 //
-// ── ICONOS: SVG EN LÍNEA ────────────────────────────────────────────────────
-// Ni fuentes de iconos ni PNG, por el mismo motivo que `viewer/sincronizacion.js`
-// usa `L.divIcon` y no `L.Icon` (hallazgo C8): los assets con URL se rompen entre
-// dev, build y jsdom, y una fuente de iconos añade una descarga que puede fallar
-// para dibujar una flecha. Cada botón lleva además **texto accesible** en un
-// `<span>` visualmente oculto: un icono suelto no lo lee nadie.
+// ── LAS HERRAMIENTAS SE LLAMAN POR SU NOMBRE, NO POR UN DIBUJO ──────────────
+// Rework de UI, 2026-08-05. Hasta hoy las seis herramientas eran iconos SVG de
+// 18 px con el nombre escondido en un `<span>` para el lector de pantalla. El
+// autor lo rechazó, y la objeción es la de siempre con una barra de iconos: un
+// imán en herradura, dos linderos con una flecha y una interrogación son tres
+// símbolos que hay que APRENDERSE, y aquí no se usan lo bastante a menudo como
+// para aprendérselos. Un `title` no arregla eso: aparece al segundo de pasar el
+// ratón, o sea después de haber dudado.
+//
+// Así que las herramientas llevan su nombre ESCRITO. Consecuencias:
+//   · La barra se ensancha (~470 px medidos frente a ~200), y por eso vive
+//     centrada abajo, donde hay ancho de sobra — ver la sección siguiente.
+//   · **Queda un solo tipo de icono**: la punta de flecha (`ICONOS.CARET`) de las
+//     dos herramientas que abren un desplegable, que no nombra nada — dice «esto
+//     despliega», que es justo lo que una palabra no dice. Sigue siendo SVG en
+//     línea, por el mismo motivo que `viewer/sincronizacion.js` usa `L.divIcon` y
+//     no `L.Icon` (hallazgo C8): los assets con URL se rompen entre dev, build y
+//     jsdom, y una fuente de iconos añade una descarga que puede fallar para
+//     dibujar una flecha.
+//   · `crearRotulo` (el `<span>` de 1×1 px) NO desaparece: ahora sirve para
+//     COMPLETAR el nombre accesible cuando el texto visible se abrevia — «Ajuste»
+//     se lee «Ajuste al parcelario», «Ayuda» se lee «Ayuda sobre los gestos de
+//     edición»— y para nombrar la única herramienta que sigue sin texto, la punta
+//     de flecha del ajuste.
+//
+// ── POR QUÉ LA POSICIÓN POR DEFECTO ES `bottomcenter` Y NO UNA ESQUINA ───────
+// La barra estaba en `topleft`, donde Leaflet la APILA justo debajo del control
+// de zoom: dos cajas de cromo pegadas, la de la app colgando de la del mapa como
+// si fuera parte de él. El autor lo rechazó también, y las cuatro esquinas de
+// Leaflet no tienen dónde ir: `topleft` es el zoom, `topright` el control de
+// capas, `bottomright` el de opacidad **y** la atribución, y `bottomleft` el
+// control de escala más los cajones de F07 y F08. Cualquier esquina repite el
+// apilamiento en otro sitio.
+//
+// El sitio libre es el CENTRO del borde inferior, que además es donde la ponen
+// los editores. Leaflet no lo ofrece: `map._controlCorners` trae exactamente
+// cuatro claves. Se le añade una quinta —ver {@link asegurarEsquinaCentroAbajo}—,
+// que es la técnica conocida para esto y la única que no obliga a renunciar a
+// `L.Control` (y con él a `getContainer()`, del que depende `app/rama.js`, y a
+// `disableClickPropagation`). Es API privada de Leaflet, así que la función lo
+// comprueba antes de tocar nada y **avisa y cae a `bottomleft`** si el mapa no la
+// expone, en vez de reventar dentro de un `addControl`.
+//
+// ⚠️ Abajo del todo, los desplegables tienen que abrirse HACIA ARRIBA o la fila
+// de herramientas se movería al pulsarla (la esquina está anclada por su borde
+// inferior, así que crecer significa subir el techo). No se resuelve aquí: lo
+// hace `estilos/app.css` con un `order` sobre la fila dentro de esa esquina, y
+// está explicado allí.
 //
 // ── SOLO-NAVEGADOR ──────────────────────────────────────────────────────────
 // Importa Leaflet ⇒ su test lleva sufijo `.dom` y este módulo NUNCA entra por el
@@ -121,7 +163,7 @@
 import L from 'leaflet'
 
 import { OPERATIVOS } from '../config/operativos.js'
-import { DENSIDAD_BASE_PX, resolverAvisar } from './_comun.js'
+import { DENSIDAD_BASE_PX, NIVEL, resolverAvisar } from './_comun.js'
 import { UMBRAL_PUNTERIA_PX } from './edicion.js'
 
 // ── Clases CSS estables ──────────────────────────────────────────────────────
@@ -144,6 +186,10 @@ export const CLASE_BARRA = Object.freeze({
   HERRAMIENTA: 'gml-barra-herramienta',
   /** Modificador de la herramienta que abre un desplegable (la punta de flecha). */
   HERRAMIENTA_FLECHA: 'gml-barra-herramienta--flecha',
+  /** El `<span>` con el nombre VISIBLE de una herramienta. */
+  TEXTO: 'gml-barra-texto',
+  /** Filete vertical que separa los grupos de herramientas. */
+  SEPARADOR: 'gml-barra-separador',
   /** El «botón partido»: la casilla del ajuste + su desplegable. */
   PARTIDO: 'gml-barra-partido',
   /** La casilla del ajuste (`appearance:none` la convierte en botón de barra). */
@@ -201,8 +247,42 @@ const CLASE_ESTADO_PANEL = 'gml-accion-estado'
 
 // ── Constantes ───────────────────────────────────────────────────────────────
 
-/** Esquinas válidas de un `L.Control`. Son las claves de `map._controlCorners`. */
-const POSICIONES = Object.freeze(['topleft', 'topright', 'bottomleft', 'bottomright'])
+/**
+ * La QUINTA posición, que Leaflet no trae: centrada en el borde inferior del
+ * mapa. Es el defecto de la barra desde el rework de 2026-08-05; el porqué está
+ * en la cabecera y el cómo en {@link asegurarEsquinaCentroAbajo}.
+ */
+export const CENTRO_ABAJO = 'bottomcenter'
+
+/**
+ * Clase de la esquina que se le añade a Leaflet. Lleva ADEMÁS `leaflet-bottom`,
+ * que es de donde saca `position:absolute; bottom:0` y el margen inferior de sus
+ * controles; lo único que pone esta clase —en `estilos/app.css`— es el centrado
+ * horizontal y el hueco que deja libre la atribución.
+ *
+ * **Estable**: `estilos/app.css` apunta a este literal, igual que a las de
+ * {@link CLASE_BARRA}.
+ */
+export const CLASE_ESQUINA_CENTRO_ABAJO = 'gml-esquina-centro-abajo'
+
+/**
+ * Posiciones válidas: las cuatro esquinas de `map._controlCorners` más
+ * {@link CENTRO_ABAJO}, que este módulo fabrica.
+ */
+const POSICIONES = Object.freeze([
+  'topleft',
+  'topright',
+  'bottomleft',
+  'bottomright',
+  CENTRO_ABAJO,
+])
+
+/**
+ * La esquina a la que se cae si el mapa no deja añadir la quinta. Es la menos
+ * mala de las cuatro para una barra ancha: comparte sitio con el control de
+ * escala, que es bajo y estrecho.
+ */
+const POSICION_DE_RESERVA = 'bottomleft'
 
 /** Centímetros por metro. La conversión que el campo de tolerancia obliga a hacer. */
 const CENTIMETROS_POR_METRO = 100
@@ -316,31 +396,23 @@ export const GESTOS = Object.freeze([
   }),
 ])
 
-// ── Iconos (SVG en línea; ver la cabecera) ───────────────────────────────────
+// ── El único icono que queda (SVG en línea; ver la cabecera) ─────────────────
 
 const NS_SVG = 'http://www.w3.org/2000/svg'
 
 /**
- * Trazos de cada icono, en un lienzo de 24×24 y solo con `<path>` (también los
- * círculos): un único tipo de nodo hace que {@link crearIcono} no tenga ramas.
+ * Trazos del icono, en un lienzo de 24×24 y solo con `<path>`: un único tipo de
+ * nodo hace que {@link crearIcono} no tenga ramas.
+ *
+ * Aquí había seis iconos hasta el 2026-08-05 —deshacer, rehacer, imán, offset,
+ * interrogación y punta de flecha—. Los cinco primeros los sustituye el NOMBRE
+ * escrito de su herramienta (ver la cabecera). Sobrevive la punta de flecha
+ * porque no nombra nada: es la señal de «esto despliega», y esa sí es más clara
+ * dibujada que escrita.
  */
 const ICONOS = Object.freeze({
-  /** Flecha que vuelve sobre sus pasos hacia la izquierda. */
-  DESHACER: Object.freeze(['M4 9h11a5 5 0 0 1 0 10h-6', 'M8 5 4 9l4 4']),
-  /** La misma, reflejada. */
-  REHACER: Object.freeze(['M20 9H9a5 5 0 0 0 0 10h6', 'M16 5l4 4-4 4']),
-  /** Imán en herradura: «engancha». */
-  AJUSTE: Object.freeze(['M5 4v7a7 7 0 0 0 14 0V4', 'M5 10h5', 'M14 10h5']),
-  /** Dos linderos paralelos y una flecha que va de uno al otro. */
-  OFFSET: Object.freeze(['M3 6h18', 'M3 18h18', 'M12 8v8', 'M9 13l3 3 3-3']),
-  /** Interrogación en un círculo. */
-  AYUDA: Object.freeze([
-    'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18',
-    'M9.4 9.2a2.7 2.7 0 1 1 3.6 2.5c-.7.3-1 .9-1 1.6v.4',
-    'M12 17.2h.01',
-  ]),
   /** Punta de flecha hacia abajo: «esto abre algo». */
-  FLECHA: Object.freeze(['M7 10l5 5 5-5']),
+  CARET: Object.freeze(['M7 10l5 5 5-5']),
 })
 
 // ── Fábricas de DOM ──────────────────────────────────────────────────────────
@@ -377,8 +449,12 @@ function crearIcono(doc, trazos) {
   const svg = doc.createElementNS(NS_SVG, 'svg')
   svg.setAttribute('class', CLASE_BARRA.ICONO)
   svg.setAttribute('viewBox', '0 0 24 24')
-  svg.setAttribute('width', '18')
-  svg.setAttribute('height', '18')
+  // 14 px, y el tamaño se fija AQUÍ y no en la hoja: queda un solo icono —la
+  // punta de flecha— y tiene que verse igual de pequeña al lado de una palabra
+  // aunque `estilos/app.css` no llegue. Eran 18 cuando cada herramienta era un
+  // dibujo y el dibujo era todo lo que había que ver.
+  svg.setAttribute('width', '14')
+  svg.setAttribute('height', '14')
   svg.setAttribute('fill', 'none')
   // `currentColor` para que el icono herede el color del botón y no haya que
   // repintarlo en cada estado (hover, deshabilitado, foco).
@@ -399,12 +475,20 @@ function crearIcono(doc, trazos) {
 }
 
 /**
- * Texto accesible VISUALMENTE OCULTO: el nombre del botón para quien no ve el
- * icono. Se oculta con estilo EN LÍNEA, no solo con la clase, por la misma razón
- * que `viewer/capas.js` inlinea el mínimo de su control: este módulo no importa
+ * Texto accesible VISUALMENTE OCULTO. Desde que las herramientas llevan su
+ * nombre escrito tiene dos usos, y los dos siguen siendo necesarios:
+ *
+ *   1. **Completar un nombre que se abrevia en pantalla.** «Ajuste» cabe en la
+ *      barra; «Ajuste al parcelario» es lo que hay que oír. El trozo que falta va
+ *      aquí, detrás del texto visible, y el nombre accesible sale de la suma.
+ *   2. **Nombrar lo que sigue sin texto**: la punta de flecha del ajuste, que es
+ *      un botón entero («Tolerancia del ajuste») dibujado con 14 px de flecha.
+ *
+ * Se oculta con estilo EN LÍNEA, no solo con la clase, por la misma razón que
+ * `viewer/capas.js` inlinea el mínimo de su control: este módulo no importa
  * ninguna hoja de estilo y tiene que ser correcto por sí mismo. Un rótulo que
  * dependiera de que `estilos/app.css` esté cargada sería una barra llena de
- * palabras el día que la hoja no llegue.
+ * palabras repetidas el día que la hoja no llegue.
  *
  * Es la técnica estándar (1×1 px + `clip-path`), NO `display:none` ni
  * `visibility:hidden`: esas dos lo esconden también del lector de pantalla, que
@@ -430,25 +514,57 @@ function crearRotulo(doc, texto) {
 }
 
 /**
- * Botón de la barra: icono + rótulo accesible. `type="button"` SIEMPRE (un
- * `<button>` sin tipo envía formularios; aquí no hay ninguno, pero el día que la
- * barra viva dentro de uno sería un recargue de página sin explicación).
+ * Botón de la barra. `type="button"` SIEMPRE (un `<button>` sin tipo envía
+ * formularios; aquí no hay ninguno, pero el día que la barra viva dentro de uno
+ * sería un recargue de página sin explicación).
+ *
+ * El nombre accesible se compone en el ORDEN en que se cuelgan los hijos:
+ * `texto` visible + `resto` oculto. Por eso «Ayuda» + «&nbsp;sobre los gestos de
+ * edición» se lee entero y se ve corto, sin `aria-label` — que además habría
+ * PISADO el texto visible en vez de completarlo, y dejaría a la vista una palabra
+ * que el lector de pantalla no dice (el fallo clásico del rótulo doble).
  *
  * @param {Document} doc
  * @param {object} opciones
  * @param {Element} opciones.padre
- * @param {ReadonlyArray<string>} opciones.trazos  Icono.
- * @param {string} opciones.rotulo                 Nombre accesible.
+ * @param {string} [opciones.texto]   Nombre VISIBLE. Sin él, el botón es solo icono.
+ * @param {string} [opciones.resto]   Cola del nombre accesible, oculta a la vista.
+ * @param {string} [opciones.titulo]  `title`. Solo donde el texto visible no basta.
+ * @param {boolean} [opciones.caret]  Añade la punta de flecha de «esto despliega».
  * @param {string} [opciones.clase]
  * @returns {HTMLButtonElement}
  */
-function crearBoton(doc, { padre, trazos, rotulo, clase = CLASE_BARRA.HERRAMIENTA }) {
+function crearBoton(doc, { padre, texto, resto, titulo, caret = false, clase = CLASE_BARRA.HERRAMIENTA }) {
   const boton = /** @type {HTMLButtonElement} */ (crear(doc, 'button', clase, padre))
   boton.type = 'button'
-  boton.title = rotulo
-  boton.appendChild(crearIcono(doc, trazos))
-  boton.appendChild(crearRotulo(doc, rotulo))
+  if (titulo) boton.title = titulo
+  if (texto) {
+    const etiqueta = crear(doc, 'span', CLASE_BARRA.TEXTO, boton)
+    etiqueta.textContent = texto
+  }
+  if (resto) boton.appendChild(crearRotulo(doc, resto))
+  if (caret) boton.appendChild(crearIcono(doc, ICONOS.CARET))
   return boton
+}
+
+/**
+ * Filete vertical entre grupos de herramientas. Es `role="separator"` de verdad
+ * y no un borde en el vecino: dentro de un `role="toolbar"` el separador está en
+ * el vocabulario ARIA, y así el agrupamiento que se ve —historial · ajuste ·
+ * desplazamiento · ayuda— es el mismo que se oye.
+ *
+ * No entra en `_herramientas`: no es focusable y las flechas del teclado lo
+ * saltan sin tener que saber nada de él.
+ *
+ * @param {Document} doc
+ * @param {Element} padre
+ * @returns {HTMLElement}
+ */
+function crearSeparador(doc, padre) {
+  const separador = crear(doc, 'span', CLASE_BARRA.SEPARADOR, padre)
+  separador.setAttribute('role', 'separator')
+  separador.setAttribute('aria-orientation', 'vertical')
+  return separador
 }
 
 /**
@@ -502,6 +618,54 @@ function esMapa(mapa) {
   )
 }
 
+// ── La quinta esquina ────────────────────────────────────────────────────────
+
+/**
+ * Le añade a Leaflet la esquina {@link CENTRO_ABAJO}, si no la tiene ya.
+ *
+ * ── QUÉ ES `_controlCorners` Y POR QUÉ SE TOCA ──────────────────────────────
+ * `L.Map#_initControlPos` crea CUATRO `<div>` dentro del contenedor de controles
+ * —`topleft`, `topright`, `bottomleft`, `bottomright`— y los indexa en
+ * `map._controlCorners`. `L.Control#addTo` busca ahí, POR NOMBRE, la esquina de
+ * su `options.position`. O sea que añadir una quinta clave a ese objeto es todo
+ * lo que hace falta para tener una posición nueva, y es la técnica conocida para
+ * esto. El guion bajo dice que es privada, con lo que eso implica:
+ *
+ *   · **Se comprueba antes de tocar.** Si el mapa no expone `_controlCorners` y
+ *     `_controlContainer` (un doble de test, o un Leaflet futuro que los
+ *     renombre), esta función devuelve `false` y el llamante cae a una esquina de
+ *     las de verdad AVISANDO. Nunca se revienta dentro de un `addControl`.
+ *   · **No hay que limpiarla.** `L.Map#_clearControlPos` recorre este mismo
+ *     objeto para quitar los `<div>` al destruir el mapa, así que la quinta se va
+ *     con las otras cuatro sin que este módulo tenga que acordarse.
+ *   · **Es idempotente y por mapa.** Cada `L.Map` tiene su propio
+ *     `_controlCorners`, así que dos mapas en la misma página no se pisan; y
+ *     montar dos barras sobre el mismo mapa reutiliza la esquina ya creada.
+ *
+ * La clase `leaflet-bottom` no es decorativa: de ella salen el `position:absolute`,
+ * el `bottom:0`, el `z-index` y el `margin-bottom` de los controles que caiga
+ * dentro. Y `L.Control#addTo` mira `position.indexOf('bottom')` para decidir si
+ * inserta al principio o al final del `<div>`, así que el nombre `bottomcenter`
+ * —con «bottom» dentro— también le dice a Leaflet lo que tiene que hacer.
+ *
+ * @param {import('leaflet').Map} mapa
+ * @returns {boolean}  `true` si la esquina existe al volver.
+ */
+function asegurarEsquinaCentroAbajo(mapa) {
+  const esquinas = mapa._controlCorners
+  const contenedor = mapa._controlContainer
+  if (!esquinas || typeof esquinas !== 'object') return false
+  if (!contenedor || typeof contenedor.appendChild !== 'function') return false
+  if (!esquinas[CENTRO_ABAJO]) {
+    esquinas[CENTRO_ABAJO] = L.DomUtil.create(
+      'div',
+      `leaflet-bottom ${CLASE_ESQUINA_CENTRO_ABAJO}`,
+      contenedor,
+    )
+  }
+  return true
+}
+
 // ── El control ───────────────────────────────────────────────────────────────
 
 /**
@@ -516,6 +680,12 @@ function esMapa(mapa) {
  */
 const BarraEdicion = L.Control.extend({
   options: {
+    // ⚠️ El defecto de la CLASE es una esquina de las de Leaflet, no
+    // {@link CENTRO_ABAJO}, y es a propósito: quien construya esta clase a pelo no
+    // ha pasado por `crearBarraEdicion` y por tanto NADIE le ha creado la quinta
+    // esquina, así que `addTo` buscaría un `_controlCorners['bottomcenter']` que
+    // no existe y reventaría dentro de Leaflet. El defecto de VERDAD —el que ve
+    // quien usa el módulo— lo pone `crearBarraEdicion`, que sí la fabrica antes.
     position: 'topleft',
     etiqueta: 'Herramientas de edición de la parcela',
   },
@@ -584,26 +754,25 @@ const BarraEdicion = L.Control.extend({
     fila.setAttribute('role', 'toolbar')
     fila.setAttribute('aria-label', this.options.etiqueta)
 
-    // Deshacer y rehacer. ⚠️ Llevan MARCADO dentro (el `<kbd>` del atajo): quien
-    // los cablea enciende y apaga su `disabled`, y NUNCA les reescribe el
-    // `textContent` — se llevaría por delante el atajo, que es justo lo que hace
-    // descubrible la función para quien va por teclado. Lo decía `index.html`
-    // junto a ellos y sigue valiendo aquí.
+    // Deshacer y rehacer. ⚠️ Llevan MARCADO dentro (el `<span>` del nombre y el
+    // `<kbd>` del atajo): quien los cablea enciende y apaga su `disabled`, y NUNCA
+    // les reescribe el `textContent` — se llevaría por delante las dos cosas. Lo
+    // decía `index.html` junto a ellos y sigue valiendo aquí.
     this._botonDeshacer = this._crearBotonHistorial(doc, fila, {
       accion: 'deshacer',
-      trazos: ICONOS.DESHACER,
-      rotulo: 'Deshacer',
+      texto: 'Deshacer',
       tecla: 'Ctrl+Z',
       // `aria-keyshortcuts` usa los nombres de tecla de UI Events, no el rótulo.
       atajo: 'Control+Z',
     })
     this._botonRehacer = this._crearBotonHistorial(doc, fila, {
       accion: 'rehacer',
-      trazos: ICONOS.REHACER,
-      rotulo: 'Rehacer',
+      texto: 'Rehacer',
       tecla: 'Ctrl+Y',
       atajo: 'Control+Y',
     })
+
+    crearSeparador(doc, fila)
 
     // ── Botón partido del ajuste: la casilla conmuta, la flecha despliega ─────
     const partido = crear(doc, 'span', CLASE_BARRA.PARTIDO, fila)
@@ -630,35 +799,49 @@ const BarraEdicion = L.Control.extend({
     // `checked` escrito en el HTML habría hecho.
     casilla.defaultChecked = true
 
+    // El `<label>` es la PIEL del conmutador y por tanto quien lleva su nombre.
+    // Visible dice «Ajuste» —que es lo que cabe en una barra—; el nombre accesible
+    // completo sale de sumarle el `<span>` oculto de detrás.
     const rotuloCasilla = crear(doc, 'label', CLASE_BARRA.CONMUTADOR_ROTULO, partido)
     rotuloCasilla.setAttribute('for', ID.snap)
     rotuloCasilla.title = 'Ajustar al parcelario'
-    rotuloCasilla.appendChild(crearIcono(doc, ICONOS.AJUSTE))
-    rotuloCasilla.appendChild(crearRotulo(doc, 'Ajustar al parcelario'))
+    const textoAjuste = crear(doc, 'span', CLASE_BARRA.TEXTO, rotuloCasilla)
+    textoAjuste.textContent = 'Ajuste'
+    rotuloCasilla.appendChild(crearRotulo(doc, ' al parcelario'))
 
+    // La única herramienta que sigue SIN texto: es la mitad estrecha de un botón
+    // partido y una palabra ahí duplicaría el ancho del ajuste entero. Su nombre
+    // va oculto, y además en el `title` porque es lo que el ratón encuentra.
     this._dispSnap = crearBoton(doc, {
       padre: partido,
-      trazos: ICONOS.FLECHA,
-      rotulo: 'Tolerancia del ajuste',
+      resto: 'Tolerancia del ajuste',
+      titulo: 'Tolerancia del ajuste',
+      caret: true,
       clase: `${CLASE_BARRA.HERRAMIENTA} ${CLASE_BARRA.HERRAMIENTA_FLECHA}`,
     })
     this._dispSnap.dataset.desplegable = 'snap'
+
+    crearSeparador(doc, fila)
 
     // ── Desplazar lindero ────────────────────────────────────────────────────
     // ⚠️ Este botón NO se deshabilita NUNCA: abre siempre su desplegable. Ver
     // {@link MOTIVO_SIN_LADO}.
     this._dispOffset = crearBoton(doc, {
       padre: fila,
-      trazos: ICONOS.OFFSET,
-      rotulo: 'Desplazar lindero',
+      texto: 'Desplazar lindero',
+      caret: true,
     })
     this._dispOffset.dataset.desplegable = 'offset'
 
+    crearSeparador(doc, fila)
+
     // ── Ayuda ────────────────────────────────────────────────────────────────
+    // «Ayuda» a la vista, «Ayuda sobre los gestos de edición» al oído: la palabra
+    // sola no dice ayuda DE QUÉ, y en una app con cuatro pantallas eso importa.
     this._botonAyuda = crearBoton(doc, {
       padre: fila,
-      trazos: ICONOS.AYUDA,
-      rotulo: 'Gestos de edición',
+      texto: 'Ayuda',
+      resto: ' sobre los gestos de edición',
     })
     this._botonAyuda.dataset.accion = 'ayuda'
 
@@ -793,16 +976,19 @@ const BarraEdicion = L.Control.extend({
   // ── Construcción de piezas ─────────────────────────────────────────────────
 
   /**
-   * Un botón del historial: icono + rótulo accesible + el `<kbd>` VISIBLE del
-   * atajo. El `<kbd>` no es decoración y no va en un `title`: un atajo que solo
-   * aparece al pasar el ratón no lo descubre quien va por teclado. Y
-   * `aria-keyshortcuts` lo dice además en el árbol de accesibilidad, que es donde
-   * un lector de pantalla lo busca.
+   * Un botón del historial: su nombre + el `<kbd>` VISIBLE del atajo. El `<kbd>`
+   * no es decoración y no va en un `title`: un atajo que solo aparece al pasar el
+   * ratón no lo descubre quien va por teclado. Y `aria-keyshortcuts` lo dice
+   * además en el árbol de accesibilidad, que es donde un lector de pantalla lo
+   * busca.
+   *
+   * Sin `title`, a diferencia de los demás: el nombre y el atajo ya están los dos
+   * escritos en el propio botón, y un tooltip que repita lo que se está leyendo
+   * es ruido que además tapa la parcela al segundo de pasar por encima.
    */
-  _crearBotonHistorial(doc, padre, { accion, trazos, rotulo, tecla, atajo }) {
-    const boton = crearBoton(doc, { padre, trazos, rotulo })
+  _crearBotonHistorial(doc, padre, { accion, texto, tecla, atajo }) {
+    const boton = crearBoton(doc, { padre, texto })
     boton.dataset.accion = accion
-    boton.title = `${rotulo} (${tecla})`
     boton.setAttribute('aria-keyshortcuts', atajo)
     const kbd = crear(doc, 'kbd', CLASE_BARRA.TECLA, boton)
     kbd.textContent = tecla
@@ -1024,21 +1210,23 @@ const BarraEdicion = L.Control.extend({
  *
  * @param {object} opciones
  * @param {import('leaflet').Map} opciones.mapa  Mapa de `viewer/mapa.js#crearMapa`.
- * @param {string} [opciones.posicion='topleft']  Esquina de Leaflet. Arriba a la
- *   izquierda: es donde la barra tapa menos la parcela, que se encuadra centrada.
+ * @param {string} [opciones.posicion='bottomcenter']  Dónde flota. Además de las
+ *   cuatro esquinas de Leaflet admite {@link CENTRO_ABAJO}, que es el DEFECTO y la
+ *   única posición donde la barra no se apila debajo de otro control del mapa
+ *   (ver la cabecera). Si el mapa no deja añadir esa quinta esquina, se cae a
+ *   `bottomleft` **avisando por `alAvisar`**.
  * @param {import('./_comun.js').Avisar} [opciones.alAvisar]  Canal de aviso del
- *   visor. **Se acepta y hoy no se usa**, exactamente igual que en
- *   `viewer/capas.js#crearCapaBlanca` y por el mismo motivo: esta barra es una
- *   VISTA que fabrica nodos y no habla con nadie, así que no tiene sucesos que
- *   contar; pero se RESUELVE —y por tanto se VALIDA la forma— para que quien pase
- *   basura donde va el canal se entere aquí y no tres módulos más allá. Es el
- *   patrón obligatorio del visor y no se salta ni cuando el canal está mudo.
+ *   visor. Tiene UN suceso que contar —y solo uno—: que la barra no ha podido
+ *   centrarse abajo. Todo lo demás de este módulo es fabricar nodos, abrirlos y
+ *   cerrarlos, que no le interesa a nadie de fuera. Se resuelve SIEMPRE, haya
+ *   algo que avisar o no, para que quien pase basura donde va el canal se entere
+ *   aquí y no tres módulos más allá: es el patrón obligatorio del visor.
  * @returns {BarraMontada}
  * @throws {TypeError}   Si `mapa` no es un mapa de Leaflet, si `posicion` no es
  *   una cadena, o si `alAvisar` no es una función.
- * @throws {RangeError}  Si `posicion` no es una esquina de Leaflet.
+ * @throws {RangeError}  Si `posicion` no es una posición conocida.
  */
-export function crearBarraEdicion({ mapa, posicion = 'topleft', alAvisar } = {}) {
+export function crearBarraEdicion({ mapa, posicion = CENTRO_ABAJO, alAvisar } = {}) {
   if (!esMapa(mapa)) {
     throw new TypeError(
       `crearBarraEdicion: 'mapa' debe ser un mapa de Leaflet (el de viewer/mapa.js#crearMapa), ` +
@@ -1057,10 +1245,25 @@ export function crearBarraEdicion({ mapa, posicion = 'topleft', alAvisar } = {})
         `${JSON.stringify(posicion)}. Válidas: ${POSICIONES.join(', ')}.`,
     )
   }
-  // Patrón obligatorio del visor: se resuelve (y se valida) aunque no se use.
-  resolverAvisar(alAvisar)
+  // Patrón obligatorio del visor: se resuelve (y se valida) siempre.
+  const avisar = resolverAvisar(alAvisar)
 
-  const control = new BarraEdicion({ position: posicion })
+  // La quinta esquina se fabrica ANTES del `addControl`: `L.Control#addTo` la
+  // busca por nombre en `map._controlCorners` y con `undefined` reventaría dentro
+  // de Leaflet, con una traza que no nombraría a este módulo.
+  let esquina = posicion
+  if (posicion === CENTRO_ABAJO && !asegurarEsquinaCentroAbajo(mapa)) {
+    esquina = POSICION_DE_RESERVA
+    avisar(
+      `La barra de edición no ha podido centrarse en el borde inferior del mapa y se ha puesto ` +
+        `en '${POSICION_DE_RESERVA}', donde comparte sitio con el control de escala. Este mapa no ` +
+        `expone '_controlCorners'/'_controlContainer', que es de donde Leaflet saca las esquinas ` +
+        `de sus controles.`,
+      { nivel: NIVEL.AVISO },
+    )
+  }
+
+  const control = new BarraEdicion({ position: esquina })
   mapa.addControl(control)
 
   let destruido = false

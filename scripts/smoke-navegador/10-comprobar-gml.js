@@ -20,8 +20,13 @@
 //   2. **Que el cajón de comprobación NO TAPE nada.** Comparte la esquina
 //      `bottomleft` con el de diagnóstico y las otras tres están ocupadas desde
 //      F03/F06. Se mide el ÁREA DE SOLAPE, en píxeles, contra la barra de edición
-//      (`topleft`), el control de capas (`topright`), la atribución y el control
-//      de opacidad (`bottomright`). Sin layout esto no significa nada.
+//      (centrada en el borde INFERIOR desde el 2026-08-05; estuvo en `topleft`
+//      hasta entonces), el control de capas (`topright`), la atribución y el
+//      control de opacidad (`bottomright`). Sin layout esto no significa nada.
+//      ⚠️ La barra se mide igual aunque hoy no pueda coincidir con el cajón —con
+//      la comprobación abierta el paso «Edición» está bloqueado, así que la barra
+//      no está en pantalla—: si esa exclusión del recorrido se rompiera algún día,
+//      el borde inferior es justo donde se notaría, y esta medida es quien lo diría.
 //   3. **Que los DOS CAJONES no aparezcan a la vez.** Dos de los tres caminos
 //      están blindados por `app/cableado-comprobacion.js` y se comprueban aquí
 //      sobre controles de Leaflet reales; **el tercero está declarado y no
@@ -786,10 +791,11 @@ if (!soltarNoRoboAltura) {
 
 // ── 5 · El cajón no tapa NINGUNO de los cuatro controles del mapa ───────────
 //
-// Las cuatro esquinas del mapa estaban ocupadas antes de F08 (`topleft` la barra
-// de edición, `topright` el control de capas, `bottomright` la opacidad y la
-// atribución, `bottomleft` el cajón de F07). Esto es lo único que puede decir si
-// compartir `bottomleft` salió bien: áreas de solape, en píxeles reales.
+// Las cuatro esquinas del mapa estaban ocupadas antes de F08 (`topleft` el zoom y
+// —hasta el 2026-08-05— la barra de edición, `topright` el control de capas,
+// `bottomright` la opacidad y la atribución, `bottomleft` el cajón de F07). Esto
+// es lo único que puede decir si compartir `bottomleft` salió bien: áreas de
+// solape, en píxeles reales.
 
 const vecinos = {
   barraEdicion: rect('.gml-barra-edicion'),

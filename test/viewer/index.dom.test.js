@@ -1448,8 +1448,10 @@ describe('crearVisor · `edicion` y `diagnostico` son INDEPENDIENTES', () => {
     expect(visor.diagnostico).not.toBeNull()
     expect(cajonDe(contenedor)).not.toBeNull()
     expect(cotasDe(contenedor).length).toBeGreaterThan(0)
-    // La barra de edición (topleft) y el cajón (bottomleft) no se pelean por la
-    // esquina: es exactamente por lo que el cajón va abajo.
+    // `topleft` sigue teniendo cromo (el control de zoom). Lo tenía también la
+    // barra de edición hasta el 2026-08-05, cuando se fue al centro del borde
+    // inferior porque apilarse bajo el zoom era justo lo que se quería quitar;
+    // el cajón sigue abajo a la izquierda y ninguno de los tres se pisa.
     expect(contenedor.querySelector('.leaflet-top.leaflet-left').children.length).toBeGreaterThan(0)
   })
 

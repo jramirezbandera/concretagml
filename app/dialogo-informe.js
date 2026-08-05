@@ -14,9 +14,10 @@
 //     el mapa mientras se leen es parte de leerlos.
 //   · Esto **prepara un documento**. El mapa no aporta nada mientras se teclea un
 //     número de colegiado, y las cuatro esquinas de Leaflet están ocupadas desde
-//     F08 (`topleft` la barra de edición, `topright` el control de capas,
-//     `bottomleft` los dos cajones turnándose, `bottomright` la opacidad y la
-//     atribución). Los dos cajones actuales suman ya **946 px sobre 900 de
+//     F08 (`topleft` el zoom, `topright` el control de capas, `bottomleft` los dos
+//     cajones turnándose, `bottomright` la opacidad y la atribución) — y desde el
+//     2026-08-05 también el centro del borde inferior, donde vive la barra de
+//     edición. Los dos cajones actuales suman ya **946 px sobre 900 de
 //     lienzo**: un formulario de diez campos ahí dentro empeora una deuda que ya
 //     está declarada.
 //

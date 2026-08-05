@@ -170,6 +170,17 @@ export const ASIENTOS = Object.freeze(
         'sitios (`ESTILO_SOBRE_EL_MAPA` / `ESTILO_EN_EL_PANEL`), así que el traslado en sí no toca ' +
         'esta hoja: los 243 B son solo el hueco que lo recibe. Sobran 4.671 sobre el techo, 243 más ' +
         'que en el asiento anterior y por la misma causa de fondo, que sigue sin resolverse.' },
+    { hito: 'Barra de edición: palabras y centrada abajo', commit: '(sin commitear)', total: 62309, nuestro: 47214, rebanada: null,
+      nota:
+        '+479 B, y NO son producto nuevo: es el rediseño que el autor pidió al ver la barra ' +
+        '(«no me gustan los iconos y no me gusta que esté debajo de los botones +− del zoom»). ' +
+        'Reparto medido: la quinta esquina de Leaflet y su maquetación —centrado, hueco de la ' +
+        'atribución y el `order` que abre los desplegables hacia ARRIBA para que la fila no se ' +
+        'mueva al pulsarla— unos 300 B; el filete `role="separator"` entre grupos ~90; y el resto, ' +
+        'vestir las herramientas como texto (familia, tamaño, grosor, `nowrap`) en vez de como ' +
+        'iconos. Se DEVUELVEN dos reglas: la que encogía el icono del botón partido a 14 px (ese ' +
+        'tamaño lo fija ahora el módulo, que solo emite un icono) y el `min-width` cuadrado de las ' +
+        'herramientas, que con palabra dentro sobra. Sobran 5.150 sobre el techo.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

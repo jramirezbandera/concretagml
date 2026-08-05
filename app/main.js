@@ -1645,8 +1645,9 @@ const visor = crearVisor(nodo('#mapa'), {
   // —`posicion`— vale aquí exactamente lo que su defecto, `bottomleft`.
   //
   // ⚠️ Y `bottomleft` es LA MISMA esquina que el cajón de F07, a sabiendas: las
-  // cuatro esquinas del mapa estaban ocupadas antes de F08 (`topleft` la barra
-  // de edición, `topright` el control de capas, `bottomright` la opacidad y la
+  // cuatro esquinas del mapa estaban ocupadas antes de F08 (`topleft` el zoom
+  // —y hasta el 2026-08-05 también la barra de edición, que hoy vive centrada
+  // abajo—, `topright` el control de capas, `bottomright` la opacidad y la
   // atribución). Los dos cajones son mutuamente excluyentes por diseño —la
   // comprobación PRECEDE al diagnóstico y no coexiste con él—, así que montarlos
   // los dos es lo normal y abrirlos a la vez no; de esa exclusión responde el

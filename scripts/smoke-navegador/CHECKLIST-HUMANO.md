@@ -516,9 +516,10 @@ era «¿se leen?», y ahora es **«¿alguien lo abre?»**.
 - [ ] Si lo abre: ¿encuentra lo que buscaba en la tabla, o se pierde entre ocho
       filas? Ocho es más de lo que cabía en el panel, y ese es justo el motivo de que
       la ayuda tenga ahora sitio propio.
-- [ ] **El icono «?» compite con cuatro herramientas más.** ¿Se lee como «ayuda», o
-      como un botón más de la barra? Míralo sin pasar el ratón por encima: el `title`
-      solo aparece al detenerse.
+- [ ] **«Ayuda» compite con cuatro herramientas más.** Desde el 2026-08-05 es una
+      palabra y no un «?», y está detrás de un filete, al final de la barra: ¿se lee
+      como la salida de auxilio, o como una herramienta más? Míralo sin pasar el
+      ratón por encima.
 - [ ] **El clic derecho para eliminar**: ¿es descubrible, o la gente esperaba una
       tecla `Supr` con el vértice seleccionado? Hoy `Supr` no hace nada. Pruébalo
       con alguien que no haya visto la app.
@@ -600,13 +601,22 @@ izquierda; el panel de ayuda abierto mide 460 × 558 px, o sea el **27 % del lie
 pregunta es si molesta cuando se está trabajando.
 
 - [ ] **¿Estorba sobre la parcela?** La geometría se encuadra centrada y la barra
-      vive en la esquina superior izquierda, que es donde debería tapar menos. Trae
-      dos o tres parcelas distintas (una alargada, una en esquina) y mira si en
-      alguna se come vértices que hay que agarrar. Si estorba, la salida es
-      `posicionBarra` —admite las cuatro esquinas de Leaflet—, no quitar la barra.
-- [ ] **¿Convive con los controles de Leaflet?** El zoom, el selector de capas y el
-      control de opacidad están en el mismo mapa. ¿Se lee como una barra de
-      herramientas de la app, o como cuatro cajas sueltas amontonadas?
+      vive **centrada en el borde inferior** (desde el 2026-08-05; hasta entonces
+      estaba arriba a la izquierda, apilada bajo el zoom, y el autor la rechazó
+      ahí). Trae dos o tres parcelas distintas (una alargada, una en esquina) y mira
+      si en alguna se come vértices que hay que agarrar — el borde de abajo es donde
+      cae el lindero sur. Si estorba, la salida es `posicionBarra` —admite las
+      cuatro esquinas de Leaflet más `bottomcenter`—, no quitar la barra.
+- [ ] **¿Convive con los controles de Leaflet?** El zoom, el selector de capas, el
+      control de opacidad, la escala y la atribución están en el mismo mapa. ¿Se lee
+      como una barra de herramientas de la app, o como cajas sueltas amontonadas?
+      Medido el 2026-08-05 a 1920×1080 y a 1440×900: centrada al píxel, 26 px por
+      encima del suelo del mapa y sin tocar la atribución.
+- [ ] ⚠️ **Los desplegables abren HACIA ARRIBA y la fila no se mueve.** Es lo que
+      hace usable una barra pegada al suelo. Medido a 0 px de desplazamiento, pero
+      lo que hay que mirar aquí es otra cosa: el panel de ayuda mide 558 px a
+      1440×900 y tapa medio mapa mientras está abierto. ¿Molesta, o es lo esperable
+      de una ayuda que se pide y se cierra?
 - [ ] ⚠️ **El conmutador del ajuste: ¿se ve encendido de un vistazo?** Nace
       **marcado** (el estado que protege del error más caro de esta app: dejar
       milímetros de hueco entre dos parcelas que en el terreno son la misma línea).
@@ -614,12 +624,15 @@ pregunta es si molesta cuando se está trabajando.
       solo un cambio de fondo. Apágalo y enciéndelo mirando a otra parte entre medias:
       ¿sabrías decir en qué estado está **sin** pulsarlo? Si no, es un error
       silencioso de manual y **bloquea**, porque el usuario no puede saber si lo que
-      acaba de arrastrar enganchó o no.
+      acaba de arrastrar enganchó o no. ⚠️ Desde el 2026-08-05 el botón dice
+      «Ajuste», así que ahora hay dos preguntas y no una: si se ve el estado, y si se
+      lee QUÉ es lo que está encendido.
 - [ ] **¿Se descubren los desplegables?** La tolerancia y la distancia del offset ya
       no están a la vista: se abren desde su herramienta. El ajuste es un **botón
-      partido** (imán + flecha) y «Desplazar lindero» abre siempre. ¿Se entiende que
-      la flecha abre algo, o parece parte del icono? ¿Alguien encuentra la tolerancia
-      sin que se la enseñen?
+      partido** («Ajuste» + flecha) y «Desplazar lindero» abre siempre y lleva su
+      flecha al lado. ¿Se entiende que la flecha abre algo? ¿Alguien encuentra la
+      tolerancia sin que se la enseñen? La flecha del ajuste es la única herramienta
+      de la barra que sigue sin palabra, y es la que más cuesta encontrar.
 - [ ] **«Desplazar lindero» no se apaga nunca** — el que se apaga es el botón de
       dentro, y su motivo («Elige antes un lindero en el mapa: basta un clic sobre
       él.») está en el desplegable. Ábrelo sin haber elegido lindero: ¿se lee el

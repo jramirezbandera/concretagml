@@ -18,6 +18,15 @@
 // `bottomright` el control de opacidad **y** la atribución de Leaflet. El plan de
 // F08 decía `topright` y estaba mal.
 //
+// ⚠️ Actualización del 2026-08-05: la barra de edición se fue de `topleft` al
+// CENTRO del borde inferior, en una quinta esquina que `viewer/barra-edicion.js`
+// le añade a Leaflet. Eso NO libera `topleft` —ahí sigue el control de zoom, que
+// era con quien la barra se apilaba— y no cambia nada de lo de abajo: este cajón
+// y el de F07 se siguen turnando en `bottomleft`. Lo que sí hay que saber es que
+// el borde inferior ya no está vacío; que no se solapen no depende de la
+// geometría sino del recorrido (con este cajón abierto, el paso «Edición» está
+// bloqueado, así que la barra no está en pantalla). Medido en navegador.
+//
 // La decisión es compartir `bottomleft` con el cajón de diagnóstico, y que los dos
 // sean **mutuamente excluyentes por diseño**. No es un apaño: es lo que el
 // recorrido ya dice. La comprobación PRECEDE al diagnóstico y no coexiste con él
@@ -653,8 +662,9 @@ const CajonComprobacion = L.Control.extend({
  * @param {string} [opciones.posicion='bottomleft']  Esquina de Leaflet. El defecto
  *   **la comparte con el cajón de diagnóstico de F07**, y los dos son mutuamente
  *   excluyentes por diseño: ver la cabecera del módulo. Las otras tres esquinas
- *   están ocupadas (`topleft` la barra de edición, `topright` el control de capas,
- *   `bottomright` el de opacidad y la atribución).
+ *   están ocupadas (`topleft` el control de zoom, `topright` el de capas,
+ *   `bottomright` el de opacidad y la atribución), y desde el 2026-08-05 el centro
+ *   del borde inferior lo ocupa la barra de edición.
  * @param {((mensaje: string, detalle?: object) => void)|null} [opciones.alAvisar]
  *   Canal de aviso (regla de oro 1). **Se acepta y hoy no se usa**, exactamente
  *   igual que en `viewer/barra-edicion.js` y en el cajón de F07: esta vista fabrica

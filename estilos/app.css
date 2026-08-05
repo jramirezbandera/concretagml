@@ -1908,10 +1908,43 @@ body {
 
 /* ═══ La barra flotante de edición (F06) ═════════════════════════════════════
  *
- * El cromo de `viewer/barra-edicion.js`, que monta un `L.Control` propio en la
- * esquina superior izquierda del mapa. Aquí estaba antes el bloque «Edición» del
- * panel; el porqué del traslado está escrito en `index.html`, donde estaba, y en
- * la cabecera de aquel módulo.
+ * El cromo de `viewer/barra-edicion.js`, que monta un `L.Control` propio
+ * CENTRADO EN EL BORDE INFERIOR del mapa. Aquí estaba antes el bloque «Edición»
+ * del panel; el porqué del traslado está escrito en `index.html`, donde estaba, y
+ * en la cabecera de aquel módulo.
+ *
+ * ── DÓNDE VIVE, DESDE EL REWORK DE 2026-08-05 ───────────────────────────────
+ * Estuvo en `topleft` desde F06, o sea APILADA justo debajo del control de zoom.
+ * El autor la rechazó ahí (y rechazó también los seis iconos, que hoy son
+ * palabras: eso es cosa del módulo, no de esta hoja). Ninguna de las otras tres
+ * esquinas está libre —capas arriba a la derecha, opacidad y atribución abajo a
+ * la derecha, escala y los cajones de F07/F08 abajo a la izquierda—, así que la
+ * barra se lleva al centro del borde inferior, que es donde la ponen los editores
+ * y el único sitio del mapa donde no se apila con nada.
+ *
+ * Leaflet no tiene esa posición: `viewer/barra-edicion.js` le AÑADE una quinta
+ * esquina (`asegurarEsquinaCentroAbajo`) con las clases `leaflet-bottom` y
+ * `gml-esquina-centro-abajo`. De la primera salen `position:absolute`, `bottom:0`,
+ * el `z-index:1000` y el `margin-bottom:10px` de sus controles; **lo único que
+ * pone esta hoja es el centrado horizontal y el hueco de la atribución.**
+ *
+ * ── ⚠️ ABAJO DEL TODO, LOS DESPLEGABLES TIENEN QUE ABRIRSE HACIA ARRIBA ──────
+ * Y no es una preferencia. La esquina está anclada por su borde INFERIOR, así que
+ * al abrir un desplegable la caja crece hacia arriba: con el orden natural del
+ * marcado —fila primero, paneles debajo— la fila subiría de golpe el alto del
+ * panel, y el botón que se acaba de pulsar se iría de debajo del cursor. Medido:
+ * el desplegable del ajuste son 62 px, el de la ayuda 300.
+ *
+ * Se arregla con UNA declaración —`order:2` sobre la fila— y no reordenando el
+ * marcado, que rompería dos invariantes del módulo (el `<p>` del motivo tiene que
+ * seguir siendo el hermano SIGUIENTE de su botón, y el orden de tabulación de la
+ * barra es el del documento). Con `order`, el reparto visual queda: panel abierto
+ * arriba, renglón de estado debajo, y la fila SIEMPRE pegada al suelo de la caja,
+ * que es lo que la deja quieta.
+ *
+ * Las tres reglas de la esquina están acotadas a `.gml-esquina-centro-abajo` a
+ * propósito: `posicion` sigue admitiendo las cuatro esquinas de Leaflet, y ahí lo
+ * correcto es lo contrario (los paneles se abren hacia abajo).
  *
  * Es el MISMO caso que `.gml-control-opacidad`, justo arriba, y se resuelve igual:
  *
@@ -1977,9 +2010,37 @@ body {
   color: var(--color-text-secondary);
 }
 
+/* ── La quinta esquina: centrada abajo ───────────────────────────────────────
+   El `<div>` que fabrica `viewer/barra-edicion.js`. `leaflet-bottom` ya le da
+   `position:absolute` y `bottom:0`, pero SIN `left` ni `right`: se queda pegado
+   al borde izquierdo del contenedor de controles con el ancho de su contenido.
+   Estas dos líneas son las que lo llevan al centro. */
+.gml-app .gml-esquina-centro-abajo {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* El hueco de la atribución. `.leaflet-bottom .leaflet-control` deja 10 px, y la
+   atribución del Catastro y el IGN vive pegada al suelo (`margin:0` de
+   `leaflet.css`) y ocupa ~16 px: con los 10 de serie la barra se le montaría
+   encima. 26 = 16 + 10, o sea los mismos 10 px de aire que los demás controles
+   pero contados desde arriba de la atribución. */
+.gml-app .gml-esquina-centro-abajo .gml-barra-edicion {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 26px;
+}
+
+/* LA declaración que hace que la fila no se mueva al abrir un desplegable. El
+   porqué completo está en la cabecera de este bloque; en corto: la caja crece
+   hacia arriba, así que lo que tiene que quedarse abajo es la fila. */
+.gml-app .gml-esquina-centro-abajo .gml-barra-edicion-fila {
+  order: 2;
+}
+
 /* La fila `role="toolbar"`. `nowrap` es carga útil: si las herramientas se
-   partieran en dos líneas, la barra ganaría alto sobre la parcela justo cuando
-   menos sitio hay. Son seis y caben de sobra. */
+   partieran en dos líneas, la barra ganaría alto sobre la ortofoto justo cuando
+   menos sitio hay. Son seis y ~470 px medidos, que caben de sobra centradas. */
 .gml-app .gml-barra-edicion-fila {
   display: flex;
   flex-wrap: nowrap;
@@ -1988,10 +2049,28 @@ body {
   font-family: var(--font-sans);
 }
 
+/* El filete entre grupos (`role="separator"`). Alto fijo y no `stretch`: así no
+   toca los bordes de la barra y se lee como una pausa, no como una división. */
+.gml-app .gml-barra-separador {
+  flex: none;
+  width: 1px;
+  height: 16px;
+  margin: 0 var(--space-1);
+  background: var(--color-border-main);
+}
+
 /* ── Cada herramienta de la fila ─────────────────────────────────────────────
- * Botón cuadrado de 26 px, transparente sobre el fondo de la barra: lo que se ve
- * es el icono, y el relleno aparece al señalar. Los de historial llevan además su
- * `<kbd>`, así que la caja crece a lo ancho — de ahí `min-width` y no `width`.
+ * Una PALABRA sobre fondo transparente; el relleno aparece al señalar. Desde el
+ * rework de 2026-08-05 los iconos son texto (el porqué, en la cabecera de
+ * `viewer/barra-edicion.js`), así que el ancho lo fija el contenido y ya no hace
+ * falta el `min-width` de cuando eran cuadrados de 26 px.
+ *
+ * `white-space:nowrap` no es adorno: «Desplazar lindero» son dos palabras y
+ * partirlas duplicaría el alto de la barra entera, que es lo mismo que el
+ * `flex-wrap:nowrap` de la fila impide un nivel más arriba. Por eso tampoco hay
+ * ninguna regla para `.gml-barra-texto`: el `<span>` del nombre visible existe
+ * para separarlo de la cola OCULTA del nombre accesible (y para que el `gap` lo
+ * trate igual que al `<kbd>` y a la flecha), no para vestirlo aparte.
  *
  * El estado APAGADO importa tanto como el encendido: deshacer y rehacer nacen así
  * (con la pila vacía no hay nada que deshacer) y es como el usuario los ve al
@@ -2002,16 +2081,17 @@ body {
   align-items: center;
   justify-content: center;
   gap: var(--space-1);
-  min-width: 26px;
-  height: 26px;
-  padding: 0 5px;
+  height: 28px;
+  padding: 0 var(--space-2);
   border: 1px solid transparent;
-  border-radius: 3px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--color-text-secondary);
   font-family: var(--font-sans);
-  font-size: var(--text-11);
+  font-size: var(--text-12);
+  font-weight: var(--fw-medium);
   line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
   transition: var(--transition);
 }
@@ -2038,16 +2118,13 @@ body {
 }
 
 /* La punta de flecha del botón partido: es un apéndice de la herramienta que
-   tiene al lado, no una herramienta más, y su tamaño lo dice. */
+   tiene al lado, no una herramienta más, y su tamaño lo dice. Es la ÚNICA
+   herramienta sin palabra, así que aquí el `min-width` sí sigue haciendo falta:
+   sin él la caja mediría los 14 px de la flecha y no habría dónde pinchar. */
 .gml-app .gml-barra-herramienta--flecha {
-  min-width: 16px;
+  min-width: 18px;
   padding: 0;
-  border-radius: 0 2px 2px 0;
-}
-
-.gml-app .gml-barra-herramienta--flecha .gml-barra-icono {
-  width: 14px;
-  height: 14px;
+  border-radius: 0 3px 3px 0;
 }
 
 /* ── El botón partido del ajuste al parcelario ───────────────────────────────
@@ -2056,9 +2133,9 @@ body {
  *
  * Por qué superpuestos, que es lo único no obvio de esta sección: el módulo tiene
  * que producir un `<input type="checkbox">` de verdad —`app/main.js` lee su
- * `.checked` y escucha su `change`—, pero quien lleva el icono es su `<label for>`
- * hermano. Apilándolos en la MISMA celda, el `<label>` pinta la piel del botón y
- * la casilla queda debajo, invisible pero con la caja EXACTA del botón: así el
+ * `.checked` y escucha su `change`—, pero quien lleva la palabra es su
+ * `<label for>` hermano. Apilándolos en la MISMA celda, el `<label>` pinta la piel
+ * del botón y la casilla queda debajo, invisible pero con la caja EXACTA: así el
  * anillo de foco global (`.gml-app :focus-visible`) se dibuja donde el usuario ve
  * el control, y no alrededor de una casilla suelta a un lado. El `<label>` queda
  * encima y recibe el clic, que su `for` reenvía a la casilla — y de paso conserva
@@ -2070,9 +2147,9 @@ body {
   display: grid;
   grid-template-columns: auto auto;
   align-items: stretch;
-  height: 26px;
+  height: 28px;
   border: 1px solid var(--color-border-main);
-  border-radius: 3px;
+  border-radius: var(--radius);
   background: var(--color-bg-primary);
 }
 
@@ -2096,26 +2173,37 @@ body {
   padding: 0;
   appearance: none;
   border: 0;
-  border-radius: 2px 0 0 2px;
+  border-radius: 3px 0 0 3px;
   background: transparent;
   cursor: pointer;
 }
 
 /* La piel del conmutador. **Este es el estado más consultado de la barra**, así
    que la diferencia entre encendido y apagado no puede ser un matiz: apagado es
-   una superficie clara con el imán en gris; encendido es un bloque macizo en el
-   azul de acción del sistema con el imán en blanco (≈5,7:1, los mismos tokens
-   que «Generar GML» — no un color inventado aquí). Se distingue de un vistazo y
-   sin leer nada, que es el requisito. */
+   una superficie clara con la palabra en gris; encendido es un bloque macizo en
+   el azul de acción del sistema con la palabra en blanco (≈5,7:1, los mismos
+   tokens que «Generar GML» — no un color inventado aquí). Se distingue de un
+   vistazo y sin leer nada, que es el requisito: lo que ha cambiado con el rework
+   es que ahora, además, se puede leer QUÉ está encendido.
+
+   ⚠️ Y por eso el apagado dejó de ser `--color-text-disabled`: con un imán daba
+   igual, pero una PALABRA en gris de deshabilitado dice «este control no
+   responde», y el ajuste apagado responde perfectamente — solo está apagado. Es
+   el mismo `--color-text-secondary` que las demás herramientas de la fila. */
 .gml-app .gml-barra-conmutador-rotulo {
   grid-area: 1 / 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 5px;
+  padding: 0 var(--space-2);
   border-right: 1px solid var(--color-border-main);
-  border-radius: 2px 0 0 2px;
-  color: var(--color-text-disabled);
+  border-radius: 3px 0 0 3px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-12);
+  font-weight: var(--fw-medium);
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
   transition: var(--transition);
 }
@@ -2138,7 +2226,9 @@ body {
 }
 
 /* `block` mata el hueco de línea base que deja un `<svg>` en línea y que, en un
-   botón de 26 px, se nota como un icono descentrado hacia arriba. */
+   botón de 28 px, se nota como una flecha descentrada hacia arriba. El tamaño lo
+   fija el módulo (14×14, atributos del `<svg>`) porque solo queda UN icono y no
+   hay dos medidas que conciliar desde aquí. */
 .gml-app .gml-barra-icono {
   display: block;
   flex: none;

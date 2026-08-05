@@ -73,13 +73,36 @@ Dos consecuencias que conviene tener escritas:
   restaura al destruirla. Insertar un vértice y ampliar el mapa con el mismo gesto
   sí sería un efecto sorpresa.
 
-### Dónde viven las herramientas (cambiado el 2026-07-29)
+### Dónde viven las herramientas (cambiado el 2026-07-29 y el 2026-08-05)
 
-**Sobre el mapa, no en el panel.** `viewer/barra-edicion.js` monta un `L.Control` en
-`topleft` con **cinco herramientas**: deshacer, rehacer, **ajuste al parcelario**
-(botón partido: el conmutador a la izquierda, y a su derecha una flecha que abre el
-desplegable con la tolerancia en cm), **desplazar lindero** (desplegable con la
-distancia en m y su botón) y **ayuda «?»**. Lo monta `viewer/index.js#crearVisor`
+> **Rework del 2026-08-05 — dos rechazos del autor sobre la barra ya montada.**
+> «No me gustan los iconos y no me gusta que esté puesta debajo de los botones +−
+> de zoom del mapa.» Lo que cambió, y lo que NO:
+>
+> · **Iconos → palabras.** Las cinco herramientas llevan su nombre escrito. Un imán
+>   en herradura, dos linderos con una flecha y una interrogación son símbolos que
+>   hay que aprenderse, y esta barra no se usa lo bastante a menudo como para
+>   aprendérselos; un `title` no lo arregla, porque aparece después de haber dudado.
+>   Sobrevive UN icono: la punta de flecha de lo que despliega, que no nombra nada
+>   —dice «esto abre algo», que es lo que una palabra no dice—.
+> · **`topleft` → centrada abajo.** Ninguna esquina de Leaflet estaba libre (zoom,
+>   capas, opacidad + atribución, escala + los dos cajones), así que se le AÑADE al
+>   mapa una quinta esquina, `bottomcenter`. Está medido: centrada al píxel a
+>   1920×1080 y a 1440×900, 26 px sobre el suelo del mapa, sin tocar la atribución.
+> · **Los desplegables abren HACIA ARRIBA**, y no es adorno: la esquina está anclada
+>   por su borde inferior, así que crecer significa subir el techo, y con el orden
+>   natural del marcado la fila se habría movido 62 px (ajuste) o 300 (ayuda) al
+>   pulsarla. Lo resuelve `estilos/app.css` con un `order` sobre la fila.
+> · **El contrato de `app/main.js` NO se ha tocado**: los mismos siete nodos, los
+>   mismos `data-*`, los mismos tipos de elemento. Por eso todo lo de abajo sigue
+>   valiendo tal cual, y `08-edicion.js` siguió dando `ok:true` sin tocarlo.
+
+**Sobre el mapa, no en el panel.** `viewer/barra-edicion.js` monta un `L.Control`
+**centrado en el borde inferior** con **cinco herramientas**: deshacer, rehacer,
+**ajuste al parcelario** (botón partido: el conmutador a la izquierda, y a su
+derecha una flecha que abre el desplegable con la tolerancia en cm), **desplazar
+lindero** (desplegable con la distancia en m y su botón) y **ayuda**. Lo monta
+`viewer/index.js#crearVisor`
 cuando la edición está activa, por la opción `edicion.barra`, que es **cierta por
 defecto**: la barra es la única superficie desde la que se puede deshacer, conmutar
 el enganche o desplazar un lindero, así que un visor con edición y sin barra tiene
@@ -568,7 +591,9 @@ Medido con `npm run build` sobre el mismo árbol, antes y después del traslado:
 **Tampoco entró ninguna dependencia nueva**: los iconos son SVG en línea, y por el
 mismo motivo que `viewer/sincronizacion.js` usa `L.divIcon` (hallazgo C8) — ni una
 fuente de iconos ni un PNG, porque los assets con URL se rompen entre dev, build y
-jsdom, y una descarga que puede fallar no es forma de dibujar una flecha.
+jsdom, y una descarga que puede fallar no es forma de dibujar una flecha. (Desde el
+rework del 2026-08-05 queda **un** icono, la punta de flecha; los otros cinco son
+palabras. La regla de «SVG en línea, nunca un asset con URL» sigue en pie para él.)
 
 Los 13 kB de JS son el módulo nuevo (fábricas de DOM, los SVG, la tabla de gestos y
 media cabecera de razones); los 6 kB de CSS son la barra, sus desplegables y el panel
