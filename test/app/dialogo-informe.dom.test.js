@@ -792,13 +792,27 @@ describe('app/dialogo-informe · el pie de firma', () => {
   it('⚠️ NEUTRALIDAD: ni un desplegable, ni una lista, ni autocompletado de profesión', () => {
     // MEJORES_PRACTICAS_GML.md §5.2: quién puede firmar qué está en disputa. Una
     // lista cerrada sería tomar partido, y `colegio` es texto libre por eso.
+    //
+    // ⚠️ El guardián se ACOTA al grupo de la firma con F17, y conviene decir por qué
+    // en vez de dejarlo como un ajuste: decía «ni un `<select>` en todo el diálogo»
+    // y eso era el alcance de cuando el diálogo no tenía ninguno. Lo que defiende no
+    // es la ausencia de desplegables —el de «Tipo de operación» es obligado, sus dos
+    // opciones son las que la Sede impone y están medidas—: defiende que **de quién
+    // firma no se ofrezca una lista**. Ampliarlo a todo el documento habría obligado
+    // a quitar un control que la Sede exige para conservar una regla sobre otro.
     const { raiz } = conInforme()
-    expect(raiz.querySelectorAll('select')).toHaveLength(0)
+    const firma = nodo(raiz, SELECTOR.FIRMA)
+    expect(firma.querySelectorAll('select')).toHaveLength(0)
     expect(raiz.querySelectorAll('datalist')).toHaveLength(0)
     for (const campo of CAMPOS_FIRMA) {
       const entrada = nodo(raiz, selectorFirma(campo))
       expect(entrada.hasAttribute('list'), campo).toBe(false)
     }
+    // Y el ÚNICO desplegable del diálogo es el de la operación, que vive fuera de
+    // este grupo. Si mañana apareciera otro, esto lo dice.
+    const selects = [...raiz.querySelectorAll('select')]
+    expect(selects).toHaveLength(1)
+    expect(selects[0].dataset.operacion).toBe('tipo')
   })
 
   it('⚠️ NEUTRALIDAD: ninguna etiqueta presupone titulación', () => {

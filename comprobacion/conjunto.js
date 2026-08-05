@@ -334,6 +334,13 @@ export function comprobarConjunto(entrada) {
     ...prepararRecintos(m.recintos),
   }))
 
+  // Concordancia: con un solo miembro «Las 1 parcelas» delata que nadie leyó el
+  // mensaje. Un renglón que suena a máquina se lee como un renglón de máquina.
+  const cuantas =
+    preparados.length === 1
+      ? 'La única parcela del envío suma'
+      : `Las ${preparados.length} parcelas del envío suman`
+
   const areaOficial = oficial.superficieRedondeada
   const areaMiembros = preparados.reduce((s, p) => s + p.superficieRedondeada, 0)
 
@@ -405,7 +412,7 @@ export function comprobarConjunto(entrada) {
     sumaCumple
       ? crearDeteccionComprobacion(
           TIPO_COMPROBACION.SUMA_COTEJADA,
-          `Las ${preparados.length} parcelas del envío suman ${numero(areaMiembros)} m² sobre ` +
+          `${cuantas} ${numero(areaMiembros)} m² sobre ` +
             `los ${numero(areaOficial)} m² del contorno oficial: ` +
             `${numero(Math.abs(residuo), 4)} m² de diferencia, dentro de los ` +
             `${numero(tolerancia, 4)} m² que se admiten por el redondeo a 2 decimales.`,
@@ -414,7 +421,7 @@ export function comprobarConjunto(entrada) {
         )
       : crearDeteccionComprobacion(
           TIPO_COMPROBACION.SUMA_DISCREPANTE,
-          `Las ${preparados.length} parcelas del envío suman ${numero(areaMiembros)} m² y el ` +
+          `${cuantas} ${numero(areaMiembros)} m² y el ` +
             `contorno oficial mide ${numero(areaOficial)} m²: ` +
             `${residuo > 0 ? 'sobran' : 'faltan'} ${numero(Math.abs(residuo), 4)} m², muy por ` +
             `encima de los ${numero(tolerancia, 4)} m² del redondeo. Con esta diferencia el ` +
@@ -537,7 +544,7 @@ export function comprobarConjunto(entrada) {
     detecciones.push(
       crearDeteccionComprobacion(
         TIPO_COMPROBACION.COBERTURA_VERIFICADA,
-        `Las ${preparados.length} parcelas cubren el contorno oficial completo: no queda ` +
+        `${preparados.length === 1 ? 'La única parcela cubre' : `Las ${preparados.length} parcelas cubren`} el contorno oficial completo: no queda ` +
           'ningún trozo sin dueño.' +
           (huecosDescartados.length === 0
             ? ''

@@ -133,6 +133,16 @@
 //     por quien sabe por qué, y se copian literales (regla de oro 1).
 //   · **No redondea el modelo** (regla 11): el redondeo es de SALIDA.
 
+// ⚠️ Éste SÍ se importa, al revés que `report/literal.js#PRESUNCION` —del que este
+// mismo fichero guarda una copia literal unas líneas más abajo—, y la diferencia es
+// medible: aquel módulo arrastra `@turf/boolean-point-in-polygon` y `@turf/helpers`
+// al grafo de un maquetador que tiene que poder probarse sin geometría.
+// `derivacion/operacion.js` no arrastra nada: solo importa `derivacion/identidad.js`,
+// que no importa nada. Copiar aquí las dos palabras del desplegable habría dado
+// TRES sitios donde escribir «Subsanación» —éste, el informe de texto y la
+// derivación— para un dato que ya tiene redundancia cero. Hay un guardián que
+// comprueba que ese módulo sigue sin arrastrar nada, para que el motivo no caduque.
+import { AVISO_DECLARATIVO, ROTULO_OPERACION } from '../derivacion/operacion.js'
 import { OMISION_CONOCIDA } from './contraste-texto.js'
 import { NO_CONSTA, TITULO_FIRMA, lineasEncabezado, lineasFirma } from './firma.js'
 import { A4_ALTO_MM, A4_ANCHO_MM, crearDocumentoPdf } from './pdf.js'
@@ -770,6 +780,111 @@ function portada(maqueta) {
  * servicio cuando la consulta falló— se imprime debajo, en cuerpo menor, porque un
  * «No se ha podido consultar» sin el porqué obliga a llamar por teléfono.
  */
+/**
+ * ⭐ EL ALCANCE DEL EXPEDIENTE (F17 · 8A y T12), y por qué va la SEGUNDA.
+ *
+ * Este informe describe **una** parcela: una geometría, una tabla de vértices, un
+ * literal de lindero. Cuando el expediente lleva varias —lo que F17 hace posible—,
+ * un papel que no lo dijera se leería como si abarcara el envío entero. Y con el
+ * «Tipo de operación» impreso encima, diría «Segregación» enseñando una sola finca.
+ *
+ * Va justo después de «Identificación» y no al final por un motivo de lectura: el
+ * alcance condiciona TODO lo que viene detrás. Puesto en la última página llegaría
+ * cuando el lector ya ha interpretado las cifras.
+ *
+ * ⛔ **El tipo de operación se imprime como lo que es: declarativo.** No lo
+ * comprueba la Sede —cuando se elige, ya ha validado—, no viaja dentro del `.gml` y
+ * hasta hoy este informe no lo nombraba. Es la única pieza del expediente con
+ * redundancia cero, así que lleva las tres marcas de F09 dentro de la frase que el
+ * lector copia, y no en una nota al pie que se quede atrás al recortar.
+ *
+ * @returns {string[]} Incidencias para el bloque final. Vacío si no hay nada raro.
+ */
+function seccionExpediente(maqueta, num, { expediente }) {
+  epigrafe(maqueta, num, 'Alcance de este informe')
+
+  const miembros = lista(expediente?.miembros)
+  const tipo = textoONulo(expediente?.tipoOperacion)
+  const propuesto = expediente?.propuesto !== false
+  const incidencias = []
+
+  maqueta.campo(
+    'Tipo de operación',
+    tipo === null ? 'SIN DECLARAR' : (ROTULO_OPERACION[tipo] ?? tipo),
+    { grisValor: GRIS.TEXTO },
+  )
+  maqueta.campo(
+    'Quién lo declara',
+    propuesto
+      ? 'Lo propone la aplicación a partir de la forma del fichero; no se ha cambiado.'
+      : 'Lo ha elegido quien presenta el expediente.',
+  )
+  const porQue = textoONulo(expediente?.porQue)
+  if (porQue !== null) {
+    maqueta.parrafo(porQue, { tam: TAM.MENOR, gris: GRIS.SECUNDARIO, sangria: ANCHO_ROTULO })
+  }
+
+  maqueta.hueco(AIRE.PARRAFO)
+  maqueta.recuadro([AVISO_DECLARATIVO])
+
+  if (tipo === null) {
+    incidencias.push(
+      'El expediente se ha compuesto sin declarar el tipo de operación: la Sede lo exige en un ' +
+        'desplegable antes de emitir, y este informe no puede decir cuál se eligió.',
+    )
+  }
+
+  // ── Las parcelas del expediente ────────────────────────────────────────────
+  // El patrón del `<-- ELEGIDA` de `report/contraste-texto.js`, trasladado al papel
+  // firmable: se listan TODAS y se marca la que este informe describe. Sin la
+  // marca, la lista sería peor que no ponerla — parecería que el informe las cubre.
+  maqueta.hueco(AIRE.ANTES_APARTADO)
+  maqueta.renglon('Parcelas que lleva el expediente', { tam: TAM.APARTADO, fuente: 'negrita' })
+  maqueta.hueco(AIRE.DESPUES_APARTADO)
+
+  if (miembros.length === 0) {
+    maqueta.parrafo(
+      'No se ha indicado qué parcelas lleva el expediente, así que este informe no puede ' +
+        'declarar su alcance. Léalo como lo que es: la descripción de una sola parcela.',
+    )
+    incidencias.push('El informe no ha recibido la relación de parcelas del expediente.')
+    return incidencias
+  }
+
+  maqueta.tabla(
+    ['Nº', 'Identificador', 'Espacio de nombres', 'Superficie', 'En este informe'],
+    miembros.map((m, i) => [
+      String(i + 1),
+      textoONulo(m?.localId) ?? textoONulo(m?.etiqueta) ?? NO_CONSTA,
+      textoONulo(m?.namespace) ?? NO_CONSTA,
+      esNumero(m?.areaValue) ? `${cuenta(m.areaValue)} m²` : NO_CONSTA,
+      m?.descrita === true ? 'SÍ — es la que se describe' : 'no',
+    ]),
+    { anchos: [10, 52, 34, 26, 58], izquierda: [1, 2, 4], sangria: 0 },
+  )
+
+  const descritas = miembros.filter((m) => m?.descrita === true).length
+  maqueta.hueco(AIRE.PARRAFO)
+  maqueta.parrafo(
+    miembros.length === 1
+      ? 'El expediente lleva una sola parcela y es la que describe este informe.'
+      : `El expediente lleva ${cuenta(miembros.length)} parcelas y este informe describe UNA de ` +
+        'ellas: la marcada arriba. Las demás forman parte del mismo envío y no están medidas en ' +
+        'estas páginas.',
+    { tam: TAM.MENOR, gris: GRIS.SECUNDARIO },
+  )
+
+  // Ni cero ni dos: la marca existe para señalar a UNA, y si no lo hace, el papel
+  // dice algo que no es. Se declara como incidencia en vez de corregirse sola.
+  if (descritas !== 1) {
+    incidencias.push(
+      `La relación de parcelas del expediente marca ${cuenta(descritas)} como descrita en este ` +
+        'informe, y tiene que marcar exactamente una.',
+    )
+  }
+  return incidencias
+}
+
 function seccionEncabezado(maqueta, num, { encabezado, procedencia, parcela, comprobacion }) {
   epigrafe(maqueta, num, 'Identificación')
 
@@ -1876,6 +1991,14 @@ function exigirPlano(plano, encuadre) {
  *   `report/firma.js#procedenciaDescriptivos`, o el sobre del contrato E tal cual.
  *   `null` significa **no se ha consultado**, que se imprime distinto de «no
  *   consta».
+ * @param {Object|null} [entrada.expediente=null]  ⭐ F17 · el ALCANCE:
+ *   `{tipoOperacion, propuesto, porQue, miembros: [{localId, namespace, areaValue,
+ *   descrita}]}`. El `tipoOperacion` es una clave de
+ *   `derivacion/operacion.js#TIPO_OPERACION`, o `null` si no se ha declarado.
+ *   ⚠️ **`expediente: null` NO imprime la sección**, y es deliberado: un informe sin
+ *   ella dice lo mismo que decían todos los de F09 —describe una parcela—, mientras
+ *   que imprimir «Subsanación» por defecto declararía un acto jurídico que nadie ha
+ *   elegido. Ver {@link seccionExpediente}.
  * @returns {{bytes: Uint8Array, nPaginas: number, idDocumento: string, titulo: string,
  *   nombreFichero: string, sustituciones: ReadonlyArray<Object>, incidencias: string[]}}
  *   `incidencias` son, en español, las cosas que el informe ha tenido que declarar
@@ -1906,6 +2029,7 @@ export function informePdfParcela(entrada) {
     literal = null,
     firma = null,
     procedencia = null,
+    expediente = null,
   } = entrada
 
   if (!esObjeto(diagnostico)) {
@@ -1957,6 +2081,14 @@ export function informePdfParcela(entrada) {
 
   portada(maqueta)
   seccionEncabezado(maqueta, num, { encabezado, procedencia, parcela, comprobacion })
+  // ⚠️ `null` = el llamante no ha dicho nada del expediente, y entonces la sección
+  // NO se imprime. Es deliberado y tiene su límite escrito: un informe sin ella se
+  // lee exactamente como se leían todos los de F09 —la descripción de una parcela—,
+  // que es la verdad mientras nadie declare otra cosa. Imprimir «Subsanación» por
+  // defecto sería declarar un acto jurídico que nadie ha elegido, y eso es
+  // justamente lo que el override O20 prohíbe.
+  const incidenciasExpediente =
+    expediente === null ? [] : seccionExpediente(maqueta, num, { expediente })
   seccionPlano(maqueta, num, { plano, encuadre, srs })
   seccionVertices(maqueta, num, { parcela, comprobacion, diagnostico, srs })
   seccionDiagnostico(maqueta, num, { diagnostico })
@@ -1965,6 +2097,7 @@ export function informePdfParcela(entrada) {
   seccionFirma(maqueta, num, { firma })
 
   // ── Lo que hubo que declarar ───────────────────────────────────────────────
+  incidencias.push(...incidenciasExpediente)
   for (const c of lista(plano?.capasCaidas)) {
     incidencias.push(
       `La capa de cartografía «${textoONulo(c?.capa) ?? NO_CONSTA}» no se ha dibujado en el ` +

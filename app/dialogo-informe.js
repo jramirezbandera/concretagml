@@ -137,6 +137,11 @@ import {
   TITULO_FIRMA,
 } from '../report/firma.js'
 import { PRESUNCION } from '../report/literal.js'
+// Las dos palabras del desplegable de la Sede, IMPORTADAS y no copiadas: `app/` es
+// la capa impura y puede tirar de cualquier capa pura de debajo sin que nadie tenga
+// que razonar el grafo. Aquí una tercera copia de «Subsanación» sería, además, la
+// que más daño hace: es la que ve el usuario justo antes de teclearla en la Sede.
+import { ROTULO_OPERACION } from '../derivacion/operacion.js'
 import { NIVEL, resolverAvisar } from '../viewer/_comun.js'
 
 // ── El contrato de marcado con `estilos/app.css` y con el cableado ───────────
@@ -230,6 +235,9 @@ export const SELECTOR = Object.freeze({
   TITULO: '[data-informe="titulo"]',
   INTRO: '[data-informe="intro"]',
   ENCABEZADO: '[data-informe="encabezado"]',
+  OPERACION: '[data-informe="operacion"]',
+  OPERACION_TIPO: '[data-operacion="tipo"]',
+  OPERACION_PORQUE: '[data-operacion="porque"]',
   LINDERO: '[data-informe="lindero"]',
   LITERAL: '[data-informe="literal"]',
   PRESUNCION: '[data-informe="presuncion"]',
@@ -343,6 +351,22 @@ export const SIN_DATOS =
  *
  * Se exporta para que el test y el cableado lo afirmen sin copiar el literal.
  */
+/**
+ * Por qué está apagado «Componer PDF» cuando no hay tipo de operación elegido.
+ *
+ * Solo puede aparecer cuando la aplicación **no ha podido proponer ninguno**: la
+ * forma del fichero no se corresponde con ninguna de las dos que la Sede ha
+ * aceptado. Dice qué falta y por qué importa, porque la reacción natural ante un
+ * campo obligatorio sin explicación es elegir el primero.
+ *
+ * @readonly
+ */
+export const MOTIVO_OPERACION_SIN_ELEGIR =
+  'Elige el tipo de operación antes de componer. La aplicación no ha podido proponerlo porque ' +
+  'la forma de este expediente no se corresponde con ninguna de las dos que la Sede ha ' +
+  'aceptado, y es un dato que no comprueba nadie: si se declara mal, el informe de validación ' +
+  'sale positivo con la etiqueta equivocada.'
+
 export const MOTIVO_PRESUNCION_SIN_ACUSE =
   'El botón «Componer PDF» está apagado: el borrador propone linderos que la aplicación no ha ' +
   'medido. Repáselos arriba y marque la casilla para seguir.'
@@ -595,6 +619,12 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
   let borrador = ''
   /** Los tramos con presunción del borrador vigente. */
   let presunciones = []
+  /**
+   * Si el usuario ha TOCADO el desplegable del tipo de operación. No basta con
+   * comparar el valor con lo propuesto: elegir a mano exactamente lo que se
+   * proponía deja de ser una propuesta, y el informe imprime esa diferencia.
+   */
+  let operacionTocada = false
   /** Quién tenía el foco antes de abrir, para devolvérselo al cerrar. */
   let focoPrevio = null
 
@@ -660,6 +690,55 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
   )
   const rejillaEncabezado = crear('div', CLASE.REJILLA)
   grupoEncabezado.append(rejillaEncabezado)
+
+  // ── ⭐ Tipo de operación (F17 · T12, override O20) ─────────────────────────
+  //
+  // El único dato del expediente con REDUNDANCIA CERO: la Sede lo exige en un
+  // desplegable antes de emitir el IVG, no lo comprueba nadie —cuando se elige, la
+  // validación geométrica ya ha ocurrido—, no viaja dentro del `.gml` y hasta hoy
+  // el informe no lo nombraba. Un valor equivocado produce un IVG POSITIVO con la
+  // etiqueta mal puesta, firmado y con su CSV.
+  //
+  // Por eso está AQUÍ y no en ninguna otra pantalla: éste es el único sitio de la
+  // aplicación donde el usuario revisa lo que se va a imprimir antes de imprimirlo.
+  //
+  // ⚠️ Y va con las DOS opciones y nada más. Está medido (O20): el desplegable de
+  // la Sede no es una taxonomía de alteraciones catastrales —no hay agrupación, ni
+  // división, ni rectificación de linderos—, son dos, y cada una se corresponde con
+  // una de las dos formas de fichero que esta aplicación sabe producir. Añadir una
+  // tercera «por completitud» ofrecería algo que la Sede no acepta.
+  const grupoOperacion = crear('fieldset', CLASE.GRUPO)
+  grupoOperacion.dataset.informe = 'operacion'
+  grupoOperacion.hidden = true
+  grupoOperacion.append(crear('legend', CLASE.LEYENDA, 'Tipo de operación'))
+  grupoOperacion.append(
+    crear(
+      'p',
+      CLASE.APUNTE,
+      'La Sede lo pide en un desplegable antes de emitir el informe de validación, y no lo ' +
+        'comprueba nadie: no viaja dentro del .gml y cuando se elige la geometría ya está ' +
+        'validada. La aplicación lo propone mirando la forma del fichero; la palabra que se ' +
+        'declare aquí es la que se imprime, y tiene que ser la misma que se elija en la Sede.',
+    ),
+  )
+  const rejillaOperacion = crear('div', CLASE.REJILLA)
+  const cajaOperacion = crear('div', CLASE.CAMPO)
+  const rotuloOperacion = crear('label', CLASE.ROTULO, 'Tipo de operación')
+  rotuloOperacion.htmlFor = id('operacion')
+  // `<select>` con las clases de un campo de texto de esta aplicación: cero
+  // vocabulario visual nuevo y cero bytes de hoja (el presupuesto de CSS lo mide).
+  const selectorOperacion = crear('select', `gml-entrada ${CLASE.ENTRADA}`)
+  selectorOperacion.id = id('operacion')
+  selectorOperacion.dataset.operacion = 'tipo'
+  cajaOperacion.append(rotuloOperacion, selectorOperacion)
+  rejillaOperacion.append(cajaOperacion)
+  grupoOperacion.append(rejillaOperacion)
+
+  // El porqué de la propuesta, con las cifras dentro. Sin él, el desplegable sería
+  // un valor caído del cielo y cambiarlo, una moneda al aire.
+  const porqueOperacion = crear('p', CLASE.APUNTE)
+  porqueOperacion.dataset.operacion = 'porque'
+  grupoOperacion.append(porqueOperacion)
 
   // ── Lindero ───────────────────────────────────────────────────────────────
   const grupoLindero = crear('fieldset', CLASE.GRUPO)
@@ -823,7 +902,7 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
   const anclado = crear('div', CLASE.ANCLADO)
   anclado.append(pie, estadoNodo)
 
-  cuerpo.append(titulo, intro, grupoEncabezado, grupoLindero, grupoFirma, anclado)
+  cuerpo.append(titulo, intro, grupoEncabezado, grupoOperacion, grupoLindero, grupoFirma, anclado)
   doc.body.appendChild(dialogo)
 
   // ── Pintado ───────────────────────────────────────────────────────────────
@@ -942,7 +1021,15 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
         ? SIN_DATOS
         : presunciones.length > 0 && !acuse.checked
           ? MOTIVO_PRESUNCION_SIN_ACUSE
-          : null
+          : // ⛔ Un expediente cuya forma no encaja en ninguna de las dos que la Sede
+            // ha aceptado llega SIN preselección, y sin elegir no se compone. Imprimir
+            // «SIN DECLARAR» habría sido lo cómodo: el documento saldría y el hueco
+            // se descubriría delante del desplegable de la Sede, con el papel ya
+            // firmado. Se bloquea aquí, que es donde todavía se puede arreglar, y con
+            // el motivo escrito — nunca un botón gris y mudo.
+            datos.operacion !== null && limpiar(selectorOperacion.value) === null
+            ? MOTIVO_OPERACION_SIN_ELEGIR
+            : null
     componer.disabled = motivo !== null
     estadoNodo.textContent = motivo ?? ''
   }
@@ -1088,6 +1175,10 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
   escuchar(cancelar, 'click', alPulsarCancelar)
   escuchar(regenerar, 'click', alPulsarRegenerar)
   escuchar(acuse, 'change', alCambiarAcuse)
+  escuchar(selectorOperacion, 'change', () => {
+    operacionTocada = true
+    repintarGate()
+  })
   escuchar(dialogo, 'keydown', alTecla)
   escuchar(dialogo, 'cancel', alCancelNativo)
   escuchar(dialogo, 'close', alCerrarNativo)
@@ -1237,6 +1328,49 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
     }
   }
 
+  /**
+   * Pinta el desplegable de «Tipo de operación» con lo que propone
+   * `derivacion/operacion.js#tipoDeOperacion`.
+   *
+   * ⛔ Cuando la propuesta es `null` —la forma del fichero no se parece a ninguna de
+   * las dos que se han presentado en la Sede— **no se preselecciona nada** y la
+   * primera opción es «(elija una)». Preseleccionar la más probable convertiría una
+   * incógnita en una respuesta, y aquí la respuesta la firma alguien.
+   *
+   * @param {object|null} operacion  Lo que devuelve `tipoDeOperacion`, o `null`.
+   */
+  function pintarOperacion(operacion) {
+    grupoOperacion.hidden = operacion === null
+    selectorOperacion.replaceChildren()
+    if (operacion === null) {
+      porqueOperacion.textContent = ''
+      return
+    }
+
+    const propuesto = typeof operacion.tipo === 'string' ? operacion.tipo : null
+    if (propuesto === null) {
+      const vacia = crear('option', '', '(elija una)')
+      vacia.value = ''
+      selectorOperacion.append(vacia)
+    }
+    for (const [valor, rotulo] of Object.entries(ROTULO_OPERACION)) {
+      const opcion = crear('option', '', rotulo)
+      opcion.value = valor
+      if (valor === propuesto) opcion.selected = true
+      selectorOperacion.append(opcion)
+    }
+    selectorOperacion.value = propuesto ?? ''
+
+    const porQue = typeof operacion.porQue === 'string' ? operacion.porQue : ''
+    // ⚠️ Cuando la FORMA no es una de las dos medidas se dice, y se dice aquí y no
+    // solo en el informe: quien elige tiene que saber que está en terreno que este
+    // proyecto no ha pisado.
+    porqueOperacion.textContent =
+      operacion.formaMedida === false
+        ? `${porQue} Esta forma de fichero NO se ha presentado nunca en la Sede.`.trim()
+        : porQue
+  }
+
   /** El cuerpo de {@link DialogoInforme.fijarLindero}, sin la guarda. */
   function cargarLindero(lindero) {
     borrador = lindero.texto
@@ -1279,6 +1413,16 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
       recordarFirma: recordar.checked === true,
       presunciones: [...presunciones],
       acusePresuncion: presunciones.length > 0 && acuse.checked === true,
+      // ⭐ El «Tipo de operación» que se va a imprimir, y **si sigue siendo el que
+      // propuso la aplicación**. Las dos cosas hacen falta: el informe escribe
+      // literalmente «lo propone la aplicación» o «lo ha elegido quien presenta», y
+      // eso no se puede deducir del valor —el usuario puede haber elegido a mano
+      // exactamente lo mismo que se le proponía, y eso ya no es una propuesta.
+      tipoOperacion: datos.operacion === null ? null : (limpiar(selectorOperacion.value) ?? null),
+      operacionPropuesta:
+        datos.operacion !== null &&
+        selectorOperacion.value === (datos.operacion.tipo ?? '') &&
+        !operacionTocada,
     }
   }
 
@@ -1322,8 +1466,10 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
         presunciones = []
         literal.value = ''
         recordar.checked = false
+        operacionTocada = false
         for (const campo of CAMPOS_FIRMA) entradasFirma.get(campo).value = ''
         pintarEncabezado()
+        pintarOperacion(null)
         pintarPresuncion()
         repintarGate()
         return
@@ -1335,8 +1481,14 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
             `recordarFirma} o null; recibido ${describir(entrada)}.`,
         )
       }
-      const { encabezado, procedencia = null, lindero, firma = null, recordarFirma = false } =
-        entrada
+      const {
+        encabezado,
+        procedencia = null,
+        lindero,
+        firma = null,
+        recordarFirma = false,
+        operacion = null,
+      } = entrada
       if (!esObjeto(encabezado)) {
         throw new TypeError(
           `fijar: 'encabezado' debe ser el objeto de report/firma.js#componerEncabezado; ` +
@@ -1352,14 +1504,24 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
       const normalizada = normalizarFirma(firma)
       lineasEncabezado(encabezado, { procedencia })
       exigirLindero(lindero, 'fijar')
+      if (operacion !== null && !esObjeto(operacion)) {
+        throw new TypeError(
+          `fijar: 'operacion' debe ser lo que devuelve derivacion/operacion.js#tipoDeOperacion ` +
+            `({tipo, porQue, propuesto, formaMedida}) o null; recibido ${describir(operacion)}. ` +
+            '`null` esconde el grupo entero, que es lo correcto mientras nadie sepa qué acto ' +
+            'jurídico es esto.',
+        )
+      }
 
-      datos = { encabezado, procedencia }
+      datos = { encabezado, procedencia, operacion }
       for (const campo of CAMPOS_FIRMA) {
         entradasFirma.get(campo).value = normalizada[campo] ?? ''
       }
       recordar.checked = recordarFirma === true
+      operacionTocada = false
 
       pintarEncabezado()
+      pintarOperacion(operacion)
       cargarLindero(lindero)
     },
 

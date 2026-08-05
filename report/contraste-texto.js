@@ -135,6 +135,42 @@ export const OMISION_CONOCIDA = Object.freeze({
 })
 
 /**
+ * Las dos opciones del «Tipo de operación» de la Sede, espejo de
+ * `derivacion/operacion.js#TIPO_OPERACION` (F17, override O20).
+ *
+ * ⚠️ **Aquí se copia aunque `derivacion/operacion.js` no arrastre nada** —solo
+ * importa `derivacion/identidad.js`, que no importa nada—, al revés que en
+ * `report/pdf-parcela.js`, que sí lo importa. La asimetría es deliberada: la regla
+ * de ESTE fichero no es «no arrastres Turf», es **cero imports**, y su valor está
+ * en que se comprueba de un vistazo. Una excepción razonada hace discutible la
+ * siguiente. Lo que impide la divergencia es el mismo test-guarda que ata
+ * {@link OMISION_CONOCIDA}: compara las dos listas leyendo el fuente del otro
+ * módulo, y también el aviso palabra por palabra.
+ *
+ * @type {Readonly<Record<string, string>>}
+ */
+export const OPERACION_CONOCIDA = Object.freeze({
+  SUBSANACION: 'SUBSANACION',
+  SEGREGACION: 'SEGREGACION',
+})
+
+/** Cómo se escribe cada una. Con tilde, que es como aparecen en el desplegable. */
+const ROTULO_OPERACION = Object.freeze({
+  [OPERACION_CONOCIDA.SUBSANACION]: 'Subsanación',
+  [OPERACION_CONOCIDA.SEGREGACION]: 'Segregación',
+})
+
+/**
+ * El aviso del dato declarativo, LITERAL de
+ * `derivacion/operacion.js#AVISO_DECLARATIVO`. Se copia entero y no se resume: es
+ * la frase que el lector copia, y las tres advertencias tienen que viajar dentro.
+ */
+const AVISO_DECLARATIVO =
+  'Dato DECLARATIVO, no medido: lo elige quien presenta y esta aplicación solo lo propone a ' +
+  'partir de la forma del fichero. No viaja dentro del .gml y la Sede no lo comprueba, así que ' +
+  'un valor equivocado no lo caza nadie. Confírmelo en la Sede antes de emitir.'
+
+/**
  * Rótulo humano de cada sección que puede quedar sin medir. Se usa en el recuento
  * final; el MOTIVO se imprime en el sitio de la cifra que falta.
  */
@@ -535,6 +571,65 @@ function detecciones(detecciones_, vacio) {
  * se emite (ni como epígrafe vacío: un epígrafe con «no procede» debajo es un hueco
  * raro con otro nombre).
  */
+/**
+ * ⭐ EL ALCANCE (F17 · 8A y T12). Gemela de
+ * `report/pdf-parcela.js#seccionExpediente`, y por el mismo motivo: este informe
+ * describe **una** parcela, y cuando el expediente lleva varias hay que decirlo o
+ * el papel se lee como si las cubriera todas.
+ *
+ * Traslada aquí el `<-- ELEGIDA` que este mismo fichero ya usa para las parcelas
+ * del FICHERO leído. Son dos listas distintas y conviene no confundirlas: aquélla
+ * dice «el fichero que abriste traía estas y describo ésta»; ésta dice «el
+ * expediente que vas a presentar lleva estas y describo ésta».
+ *
+ * @returns {string[]}
+ */
+function alcance({ num, expediente }) {
+  const salida = [...num.seccion('Alcance de este informe')]
+  const miembros = lista(expediente?.miembros)
+  const tipo = textoONulo(expediente?.tipoOperacion)
+  const propuesto = expediente?.propuesto !== false
+
+  salida.push(
+    ...campo('Tipo de operación', tipo === null ? 'SIN DECLARAR' : (ROTULO_OPERACION[tipo] ?? tipo)),
+    ...campo(
+      'Quién lo declara',
+      propuesto
+        ? 'Lo propone la aplicación a partir de la forma del fichero; no se ha cambiado.'
+        : 'Lo ha elegido quien presenta el expediente.',
+    ),
+  )
+  const porQue = textoONulo(expediente?.porQue)
+  if (porQue !== null) salida.push(...sangrar(porQue, 4))
+  salida.push('', ...sangrar(AVISO_DECLARATIVO, 2))
+
+  salida.push('', `  Parcelas que lleva el expediente: ${plural(miembros.length, 'parcela', 'parcelas')}`)
+  if (miembros.length === 0) {
+    salida.push(
+      ...sangrar(
+        'No se ha indicado qué parcelas lleva el expediente, así que este informe no puede ' +
+          'declarar su alcance. Léalo como lo que es: la descripción de una sola parcela.',
+        4,
+      ),
+    )
+    return salida
+  }
+
+  miembros.forEach((m, i) => {
+    const marca = m?.descrita === true ? '  <-- LA QUE SE DESCRIBE' : ''
+    const etiqueta =
+      textoONulo(m?.localId) ?? textoONulo(m?.etiqueta) ?? NO_CONSTA
+    salida.push(...vineta(`nº ${i + 1}`, `${etiqueta}${marca}`))
+    const detalle = [
+      textoONulo(m?.namespace) ?? NO_CONSTA,
+      esNumero(m?.areaValue) ? `${cuenta(m.areaValue)} m²` : NO_CONSTA,
+    ]
+    salida.push(...sangrar(detalle.join(' · '), 9))
+  })
+
+  return salida
+}
+
 function queSeLeyo({ num, comprobacion }) {
   const dialecto = esObjeto(comprobacion.dialecto) ? comprobacion.dialecto : {}
   const fichero = esObjeto(comprobacion.fichero) ? comprobacion.fichero : {}
@@ -1196,7 +1291,7 @@ export function informeContrasteTexto(entrada) {
     )
   }
 
-  const { comprobacion = null, diagnostico, parcela = null, fecha } = entrada
+  const { comprobacion = null, diagnostico, parcela = null, fecha, expediente = null } = entrada
 
   if (!esObjeto(diagnostico)) {
     throw new TypeError(
@@ -1236,6 +1331,11 @@ export function informeContrasteTexto(entrada) {
   const lineas = [
     ...cabecera(),
     ...identificacion({ num, comprobacion, diagnostico, parcela, fecha }),
+    // ⚠️ `expediente: null` la omite ENTERA, igual que en el PDF y por lo mismo: un
+    // informe sin ella dice lo que decían todos los de F09 —describe una parcela—,
+    // mientras que imprimir «Subsanación» por defecto declararía un acto jurídico
+    // que nadie ha elegido (override O20).
+    ...(expediente === null ? [] : alcance({ num, expediente })),
     // La sección del fichero SOLO existe si hubo fichero. Ver {@link queSeLeyo}.
     ...(comprobacion === null ? [] : queSeLeyo({ num, comprobacion })),
     ...contraste({ num, diagnostico }),

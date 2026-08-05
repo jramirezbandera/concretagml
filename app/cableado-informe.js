@@ -113,6 +113,8 @@
 //
 // Su test es `test/app/informe.dom.test.js`, con sufijo `.dom`: toca el DOM.
 
+import { identidadDeParcela } from '../derivacion/identidad.js'
+import { tipoDeOperacion } from '../derivacion/operacion.js'
 import { TIPO_MIME_PDF, descargarBinario } from '../gml/descargar.js'
 import { componerPlano } from '../report/canvas.js'
 import { encuadrar } from '../report/encuadre.js'
@@ -833,6 +835,22 @@ export function cablearInforme({
       const { firma, recordado } = await recuperarFirma()
       if (destruido) return
 
+      // ⭐ F17 · T12 · EL ACTO JURÍDICO, QUE ESTA APLICACIÓN NO NOMBRABA.
+      //
+      // Todo lo que hacen F06 (mover el lindero), F07 (diagnosticar) y F09 (este
+      // informe) **es una Subsanación**, y la palabra no aparecía en ninguna capa
+      // del proyecto (`spec/SPEC.md` §7.2). El hueco no estaba en el futuro: estaba
+      // en el caso de uso más frecuente, y se cierra aquí — con una parcela, la
+      // forma del fichero es la que la Sede aceptó el 2026-07-27.
+      //
+      // Se deduce de la IDENTIDAD y no del recuento a secas, porque la pareja
+      // `localId`↔`namespace` es lo que distingue una finca inscrita de un alta.
+      const identidad = identidadDeParcela({
+        refcat: referenciaDe(parcelaActual),
+        idLocal: parcelaActual?.idLocal ?? null,
+      })
+      const operacion = tipoDeOperacion([identidad])
+
       // `fijar` valida las tres piezas ANTES de tocar un solo nodo, así que si algo
       // está mal el diálogo se queda exactamente como estaba y el `catch` de abajo
       // lo cuenta. Por eso el estado interno se apunta DESPUÉS.
@@ -842,6 +860,7 @@ export function cablearInforme({
         lindero: literal,
         firma,
         recordarFirma: recordado,
+        operacion,
       })
       preparado = {
         fecha,
@@ -850,6 +869,8 @@ export function cablearInforme({
         literal,
         diagnostico: d,
         parcela: parcelaActual,
+        identidad,
+        operacion,
       }
       vista.abrir()
 
@@ -1014,6 +1035,24 @@ export function cablearInforme({
           // ⚠️ LA PROCEDENCIA, OTRA VEZ. Sin ella el PDF imprimiría «No se ha
           // consultado» en los campos que sí se consultaron. Ver la cabecera.
           procedencia,
+          // ⭐ El ALCANCE. Con una sola parcela la lista tiene una fila y la marca
+          // señala a la única, y eso NO es redundante: es la frase que impide leer
+          // el papel como si abarcara un expediente entero el día que lleve varias.
+          // El tipo que se imprime es el que quedó en el DESPLEGABLE, no el que se
+          // propuso — y si el usuario lo tocó, el informe lo dice.
+          expediente: {
+            tipoOperacion: valores.tipoOperacion,
+            propuesto: valores.operacionPropuesta,
+            porQue: preparado.operacion?.porQue ?? null,
+            miembros: [
+              {
+                localId: preparado.identidad?.refcat ?? null,
+                namespace: preparado.identidad?.namespaceInspire ?? null,
+                areaValue: null,
+                descrita: true,
+              },
+            ],
+          },
         })
       } catch (causa) {
         vista.estado('El PDF no se ha podido componer. Mira el panel de avisos.')
