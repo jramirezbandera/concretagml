@@ -152,3 +152,122 @@ export function resumirDetecciones(detecciones) {
   }
   return { total: detecciones.length, porTipo, porSeveridad }
 }
+
+// ── Presentación de números (SALIDA, no modelo) ──────────────────────────────
+
+/**
+ * Un número para un MENSAJE, en castellano: coma decimal y `decimales` como mucho,
+ * sin ceros de relleno ni separador de millares.
+ *
+ * ⚠️ **Segunda copia declarada**, gemela de `comprobacion/_comun.js#numero` y con
+ * el mismo cuerpo. Importarla sería una dependencia `derivacion/ → comprobacion/`
+ * para redactar un mensaje, y encima al revés: es `comprobacion/conjunto.js` quien
+ * consume esta capa, no al contrario. Las dos copias son EL par que pagaría la
+ * deuda del `_comun` neutro anotada más abajo.
+ *
+ * Redondear aquí no contradice la regla de oro 11 («el modelo en float64 completo;
+ * redondear solo al SALIR»): esto es exactamente una salida. El valor sin tocar
+ * viaja siempre en `datos` de la detección y en los campos numéricos del resultado,
+ * que es lo que consumen el comprobador de conjunto y el informe.
+ *
+ * No se usa `Intl.NumberFormat`: el resultado dependería de los datos de locale
+ * instalados, y un mensaje que cambia de una máquina a otra no se puede afirmar en
+ * un test.
+ *
+ * @param {number} n
+ * @param {number} [decimales=2]
+ * @returns {string}
+ */
+export function numero(n, decimales = 2) {
+  if (!Number.isFinite(n)) return String(n)
+  const fijo = n.toFixed(decimales)
+  const limpio = decimales > 0 ? fijo.replace(/\.?0+$/, '') : fijo
+  return (limpio === '' || limpio === '-' ? fijo : limpio).replace('.', ',')
+}
+
+// ── Guardas de contrato (el `throw` es del PROGRAMADOR, SPEC §2.1) ───────────
+//
+// La frontera es la de siempre y aquí importa más que en ninguna otra capa: un
+// dato MALO del usuario —una parcela con un anillo degenerado, un sobrante que no
+// se puede medir— sale por `detecciones` y por `saltados`; un CONTRATO ROTO —el
+// llamante pasa un string donde va una lista de recintos— LANZA. Confundirlos
+// convertiría un bug del programa en una detección que culpa a la geometría del
+// usuario, en verde y con toda la confianza.
+//
+// ── LA SEXTA COPIA DE `describir`, DECLARADA ────────────────────────────────
+// Existe ya en `validation/_comun.js`, `viewer/_comun.js`, `edit/_comun.js`,
+// `diagnostico/_comun.js` y `comprobacion/_comun.js`. No es un olvido: es la regla
+// que este repo se dio en `edit/_comun.js` («unificar ENTRE capas no es el
+// alcance»), y la alternativa —importar la de `diagnostico/`— sería una dependencia
+// `derivacion/ → diagnostico/` para redactar el mensaje de un `throw`, que es
+// exactamente la dependencia al revés que obligó a bajar `distancia` a
+// `geo/metrica.js` en F06 y `anilloCerrado` a `geo/poligono.js` en F07. La deuda
+// está anotada desde entonces en `spec/feature-07-diagnostico-parcela.md` (un
+// `_comun` neutro por debajo de las capas, ~15 líneas movidas y ningún consumidor
+// que lo pida); F17 la hereda y la vuelve a escribir en vez de disimularla.
+
+/** Describe un valor para el mensaje de un `throw`: tipo + valor si es serializable. */
+export function describir(valor) {
+  if (valor === undefined) return 'undefined'
+  if (typeof valor === 'function') return 'function'
+  try {
+    const json = JSON.stringify(valor)
+    return json === undefined ? String(valor) : `${typeof valor} ${json}`
+  } catch {
+    return `${typeof valor} (no serializable)`
+  }
+}
+
+/**
+ * Contrato del llamante: `opciones` es un objeto llano.
+ *
+ * Sin esta guarda, un `derivarCesion(parcela.recintos)` —el error natural, porque
+ * el nombre invita— desestructuraría el array, `recintos` saldría `undefined` y la
+ * derivación se iría entera por el camino de «esta parcela no tiene geometría»: en
+ * verde, y culpando al expediente del usuario de un bug del programa.
+ *
+ * @param {unknown} opciones
+ * @param {string} fn
+ * @param {string} [forma='un objeto de opciones']
+ */
+export function exigirOpciones(opciones, fn, forma = 'un objeto de opciones') {
+  if (opciones === null || typeof opciones !== 'object' || Array.isArray(opciones)) {
+    throw new TypeError(`${fn}: se esperaba ${forma}; recibido ${describir(opciones)}.`)
+  }
+}
+
+/**
+ * Contrato del llamante: `recintos` es un array. Que los anillos sean aptos NO se
+ * comprueba aquí —eso sale por `saltados`, con su motivo y su sitio—: aquí solo se
+ * exige la forma.
+ *
+ * @param {unknown} recintos
+ * @param {string} fn
+ * @param {string} [nombre='recintos']
+ */
+export function exigirRecintos(recintos, fn, nombre = 'recintos') {
+  if (!Array.isArray(recintos)) {
+    throw new TypeError(
+      `${fn}: '${nombre}' debe ser un array de recintos del modelo (anillos ABIERTOS en ` +
+        `UTM, recintos[0] EXTERIOR); recibido ${describir(recintos)}.`,
+    )
+  }
+}
+
+/**
+ * Contrato del llamante: un texto no vacío ni en blanco. `porQue` explica para qué
+ * sirve el campo, porque un «debe ser un string» a secas no dice qué poner.
+ *
+ * @param {unknown} valor
+ * @param {string} fn
+ * @param {string} nombre
+ * @param {string} [porQue='']
+ */
+export function exigirTextoNoVacio(valor, fn, nombre, porQue = '') {
+  if (typeof valor !== 'string' || valor.trim().length === 0) {
+    throw new TypeError(
+      `${fn}: '${nombre}' debe ser un texto no vacío; recibido ${describir(valor)}.` +
+        (porQue === '' ? '' : ` ${porQue}`),
+    )
+  }
+}

@@ -71,14 +71,31 @@ describe('derivacion/_comun · el léxico de la capa', () => {
 })
 
 describe('derivacion/index · el barrel expone el vocabulario y NADA de geometría', () => {
-  it('saca las cinco cosas del léxico y ninguna más', () => {
+  it('saca el léxico entero, la derivación y la identidad — y nada más', () => {
+    // ⚠️ Lista CERRADA a propósito, y crece con la capa: la fase 2 le añadió
+    // `derivarCesion` y las cinco cosas de `identidad.js`. Lo que este test defiende
+    // no es el tamaño de la lista, es que nada entre aquí sin que alguien lo escriba.
     expect(Object.keys(barrel).sort()).toEqual([
       'MOTIVO_RESTA',
+      'NAMESPACE_CATASTRO',
+      'NAMESPACE_LOCAL',
+      'SEPARADOR_SEGREGADA',
       'SEVERIDAD',
       'TIPO_DERIVACION',
       'crearDeteccionDerivacion',
+      'derivarCesion',
+      'identidadDeCesion',
+      'identidadDeParcela',
       'resumirDetecciones',
     ])
+  })
+
+  it('⛔ las guardas de `_comun.js` NO salen: son herramientas internas', () => {
+    // Sacarlas daría dos caminos hasta la misma comprobación, y el día que uno
+    // cambie de promesa el otro seguirá diciendo la de antes.
+    for (const interno of ['describir', 'exigirOpciones', 'exigirRecintos', 'numero']) {
+      expect(Object.keys(barrel), `el barrel no puede exponer '${interno}'`).not.toContain(interno)
+    }
   })
 
   it('⛔ `restar` NO sale por ninguna vía, tampoco por el barrel raíz', () => {

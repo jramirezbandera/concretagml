@@ -14,8 +14,10 @@
 // astilla, qué orden llevan las piezas, qué pasa cuando la parcela crece—, que es
 // justamente lo que esta capa existe para concentrar.
 //
-// `_comun.js` tampoco sale: es el vocabulario interno. Lo que la aplicación
-// necesita saber de él —los tipos de detección— viaja DENTRO de las detecciones.
+// De `_comun.js` sale el VOCABULARIO —los tipos, la escala de severidad y la
+// fábrica— y nada más: sus guardas de contrato (`exigirRecintos`, `describir`…) y
+// su formateador de números son herramientas internas de la capa, y sacarlas daría
+// dos caminos hasta la misma comprobación.
 //
 // Este barrel entra en el barrel raíz (`index.js`) como espacio `derivacion`.
 
@@ -26,3 +28,20 @@ export {
   crearDeteccionDerivacion,
   resumirDetecciones,
 } from './_comun.js'
+
+// La entrada de la capa: `restar()` da geometría, `derivarCesion()` da el SOBRANTE
+// —medido, ordenado y con la puerta `P_new ⊆ P_of` resuelta—, que es lo único que
+// la aplicación puede usar sin volver a interpretar nada.
+export { derivarCesion } from './cesion.js'
+
+// Quién es cada parcela del expediente. Sale porque lo necesitan tres sitios que no
+// se ven entre sí —la matriz en `app/`, la cesión en `derivacion/entrega.js` y el
+// informe— y porque tenerlo escrito una vez es lo que impide que la pareja
+// `localId`↔`namespace` se combine mal (SPEC §3.1, trampa 2).
+export {
+  NAMESPACE_CATASTRO,
+  NAMESPACE_LOCAL,
+  SEPARADOR_SEGREGADA,
+  identidadDeCesion,
+  identidadDeParcela,
+} from './identidad.js'

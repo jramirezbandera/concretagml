@@ -27,7 +27,7 @@
  * Proyecto Vitest `node`: aritmética y Turf, sin DOM.                           *
  * -------------------------------------------------------------------------- */
 
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect, vi } from 'vitest'
 
@@ -269,8 +269,17 @@ describe('derivacion/topologia.js · guardián: de Turf, SOLO lo topológico (re
 
   it('es el ÚNICO fichero de `derivacion/` que importa Turf', () => {
     // Lo que permite que este guardián sea una línea de regex y no una lista de
-    // excepciones. Se comprueba sobre los ficheros que la capa tiene HOY.
-    for (const nombre of ['_comun.js', 'index.js']) {
+    // excepciones. ⚠️ La lista NO se escribe a mano: se LEE del directorio, porque
+    // una lista escrita se queda corta en cuanto la capa crece —pasó en la fase 2,
+    // que le añadió `cesion.js` e `identidad.js`— y quedarse corta aquí significa
+    // dar verde sobre un fichero que nadie mira.
+    const hermanos = readdirSync(join(RAIZ, 'derivacion')).filter(
+      (n) => n.endsWith('.js') && n !== 'topologia.js',
+    )
+    expect(hermanos.length, 'la capa tiene que tener más ficheros que topologia.js').toBeGreaterThan(
+      1,
+    )
+    for (const nombre of hermanos) {
       const otro = readFileSync(join(RAIZ, 'derivacion', nombre), 'utf8')
       expect(turfImportado(otro), `derivacion/${nombre} importa Turf`).toEqual([])
     }
@@ -293,7 +302,9 @@ describe('derivacion/topologia.js · guardián: de Turf, SOLO lo topológico (re
     const exportaDe = (texto) => [
       ...texto.matchAll(/(?:^|\n)[ \t]*export[\s\S]*?\bfrom[ \t]+['"]([^'"]+)['"]/g),
     ].map((m) => m[1])
-    expect(exportaDe(barrel)).toEqual(['./_comun.js'])
+    // Lo que importa NO es la lista exacta —la capa crece— sino que `topologia.js`
+    // no esté en ella y que la lista no esté vacía.
+    expect(exportaDe(barrel).length).toBeGreaterThan(0)
     expect(exportaDe(barrel)).not.toContain('./topologia.js')
     // Anti-vacuidad: el detector ve un reexport si lo hay.
     expect(exportaDe("export { restar } from './topologia.js'\n")).toEqual(['./topologia.js'])
