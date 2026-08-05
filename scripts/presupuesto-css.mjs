@@ -161,7 +161,7 @@ export const ASIENTOS = Object.freeze(
         '—bajar la hoja o revisar el techo— es del autor, y hasta que la tome el registro dice la ' +
         'verdad: hoja movida +479 B (el informe a página completa y su bloque anclado), rebanada ' +
         'anotada, quinta SIN cerrar.' },
-    { hito: 'Diagnóstico en la columna', commit: '(sin commitear)', total: 61830, nuestro: 46735, rebanada: null,
+    { hito: 'Diagnóstico en la columna', commit: '4d73c6d', total: 61830, nuestro: 46735, rebanada: null,
       nota:
         '+243 B, y es lo que cuesta sacar el diagnóstico de encima del mapa: la sección anfitriona ' +
         'del panel (`.gml-bloque--contraste`, el estirador de esa pantalla), tres propiedades que ' +
@@ -170,7 +170,7 @@ export const ASIENTOS = Object.freeze(
         'sitios (`ESTILO_SOBRE_EL_MAPA` / `ESTILO_EN_EL_PANEL`), así que el traslado en sí no toca ' +
         'esta hoja: los 243 B son solo el hueco que lo recibe. Sobran 4.671 sobre el techo, 243 más ' +
         'que en el asiento anterior y por la misma causa de fondo, que sigue sin resolverse.' },
-    { hito: 'Barra de edición: palabras y centrada abajo', commit: '(sin commitear)', total: 62309, nuestro: 47214, rebanada: null,
+    { hito: 'Barra de edición: palabras y centrada abajo', commit: 'bfcc63a', total: 62309, nuestro: 47214, rebanada: null,
       nota:
         '+479 B, y NO son producto nuevo: es el rediseño que el autor pidió al ver la barra ' +
         '(«no me gustan los iconos y no me gusta que esté debajo de los botones +− del zoom»). ' +
