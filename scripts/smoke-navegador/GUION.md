@@ -1428,6 +1428,15 @@ quedó mudo donde debería haber hablado.
 
 ## 15. `09-diagnostico.js` — el diagnóstico de encaje (F07 · T6.2)
 
+> ⚠️ **HAY QUE LANZARLO SOBRE `#/parcela/validacion`, y esto se descubrió el
+> 2026-08-05** en la pasada de regresión de F17. Desde el rework la aplicación
+> arranca en **Entrada**, donde la caja de vértices no se pinta, así que su primera
+> medición sale **0 px** y el guion acusa —con toda la lógica de su guardián— de
+> que «algo del tamaño de un BLOQUE ha entrado en el panel». No es un defecto de
+> producto y **tampoco es de F17**: es la misma consecuencia del rework que el §19
+> ya dejó escrita para el guion 13, y a este nadie volvió a anotársela. Con
+> `$B goto .../concretagml/#/parcela/validacion` sale `ok:true`.
+
 El guion de F07: abre el contraste con el parcelario sobre la parcela REAL y mide
 lo que la suite —2.900 y pico pruebas, incluida la aceptación de los cuatro
 criterios— no puede tocar porque exige un motor de layout, un renderizador SVG y
@@ -4081,6 +4090,25 @@ posible. Necesita una revisión propia, y lo que hay que replantear es esto:
 Mientras tanto, la cobertura no se ha perdido: el `09` cubre el cajón de
 diagnóstico y su red, el `15` cubre la ruta de comprobación entera con la puerta,
 y el `12` cubre la persistencia.
+
+### La segunda pasada, con F17 dentro (2026-08-05)
+
+F17 mete un bloque nuevo en la columna de Validación y un tercer botón en el pie,
+así que se relanzaron los tres guiones que miden ESE panel. **Ningún defecto de
+producto, y un hallazgo de método.**
+
+| Guion | Veredicto | Qué pasa |
+|---|---|---|
+| `14-shell.js` | ✅ `ok:true` en **las dos** (1280×720 y 1440×900) | El reparto de la cáscara aguanta el bloque nuevo. |
+| `09-diagnostico.js` | ✅ `ok:true` **lanzándolo sobre `#/parcela/validacion`** | ⚠️ Desde Entrada sale `ok:false` con «la caja de vértices arranca en 0 px». No es de F17 ni es un defecto: es la consecuencia del rework que el §19 anotó para el 13 y que a éste **nadie le anotó**. Ahora está escrito en su §15. |
+| `15-contraste.js` | ✅ `ok:true`, consola limpia | La ruta crítica 2 sigue andándose entera. |
+
+⛔ **Lo que este hallazgo dice del mecanismo**: una nota de lanzamiento escrita en
+la sección de UN guion no protege a los otros catorce. El §19 la escribió para el
+13 hace un día y el 09 llevaba el mismo problema desde entonces, en verde, porque
+nadie lo relanzó. **Un guion que hay que lanzar de una manera concreta tiene que
+decirlo en SU sección**, que es donde lo va a leer quien lo lance.
+
 ---
 
 ## 24. ¿Abre el DXF en un CAD? (`npm run validar:dxf`)
