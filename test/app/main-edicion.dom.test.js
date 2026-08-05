@@ -101,6 +101,8 @@ import { crearBarraEdicion } from '../../viewer/barra-edicion.js'
 import { crearCajonComprobacion } from '../../viewer/cajon-comprobacion.js'
 import { crearCajonDiagnostico } from '../../viewer/cajon-diagnostico.js'
 import { crearContraste } from '../../viewer/contraste.js'
+import { crearListaSobrante } from '../../viewer/lista-sobrante.js'
+import { crearCapaPiezas } from '../../viewer/piezas.js'
 import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
 
 // ── EL CROMO DEL MAPA: el segundo efecto de `crearVisor` sobre el documento ──
@@ -116,6 +118,9 @@ let diagnosticoVivo = null
 
 /** El cajón de F08 vivo, ídem. Va SUELTO, como en el visor real. */
 let comprobacionViva = null
+
+/** La lista y la capa de F17 vivas. Van JUNTAS, como en el visor real. */
+let sobranteVivo = null
 
 /**
  * Pone en el documento lo que `crearVisor` monta SOBRE EL MAPA cuando la edición y
@@ -152,6 +157,9 @@ function montarCromoDelMapa() {
   // escribir «30» aquí sería una tercera copia de ese dato.
   const contraste = crearContraste({ mapa, zona: husoPorSrs(SRS_DEMO) })
   const cajonComprobacion = crearCajonComprobacion({ mapa })
+  // F17: las dos piezas del sobrante, DE VERDAD (ver el doble).
+  const listaSobrante = crearListaSobrante({ documento: document })
+  const capaPiezas = crearCapaPiezas({ mapa, zona: husoPorSrs(SRS_DEMO) })
   // ⚠️ F11: el `L.Map` DE VERDAD se guarda y va al doble. Hasta aquí el
   // `visor.mapa` era `{on, off}` —lo justo que consume `cablearCatastro` por duck
   // typing—, y desde F11 hay un segundo consumidor, `viewer/partes.js`, que
@@ -159,7 +167,10 @@ function montarCromoDelMapa() {
   mapaVivo = mapa
   diagnosticoVivo = { cajon, contraste }
   comprobacionViva = cajonComprobacion
+  sobranteVivo = { lista: listaSobrante, capa: capaPiezas }
   desmontarCromoVivo = () => {
+    capaPiezas.destruir()
+    listaSobrante.destruir()
     cajonComprobacion.destruir()
     contraste.destruir()
     cajon.destruir()
@@ -168,6 +179,7 @@ function montarCromoDelMapa() {
     mapaVivo = null
     diagnosticoVivo = null
     comprobacionViva = null
+    sobranteVivo = null
   }
 }
 
@@ -276,6 +288,9 @@ vi.mock('../../viewer/index.js', async (importarOriginal) => ({
       // La de F08, ídem, y SUELTA como en el visor real (`visor.comprobacion`, no
       // `visor.comprobacion.cajon`): F07 son dos piezas inseparables y F08 es una.
       comprobacion: comprobacionViva,
+      // Y las de F17, ídem: `cablearDerivacion` hace duck typing de once métodos
+      // de la lista y cuatro de la capa, y va fuera de todo `try`.
+      sobrante: sobranteVivo,
       destruir() {},
     }
   },

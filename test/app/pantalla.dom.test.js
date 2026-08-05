@@ -493,11 +493,19 @@ describe('rebanada 2 · el pie enseña lo de cada pantalla', () => {
     const acciones = document.querySelector('.gml-acciones')
     expect(acciones).not.toBeNull()
     expect(visibleEn(acciones)).toEqual([PASO.VALIDACION])
-    // Y siguen siendo las dos: «Generar GML» se queda aquí por decisión del autor
-    // (el camino corto de una Subsanación no pasa por el diagnóstico).
+    // «Generar GML» se queda aquí por decisión del autor (el camino corto de una
+    // Subsanación no pasa por el diagnóstico).
+    //
+    // ⭐ Y DESDE F17 SON TRES, no dos. «Derivar sobrante» entra en el pie y no
+    // dentro de su propio bloque porque ese bloque aparece SOLO cuando hay
+    // sobrante (decisión de diseño D2): un botón dentro de él sería un botón que
+    // solo existe después de haberlo pulsado. ⚠️ El tercero tiene un precio en
+    // píxeles que este test no puede ver —el pie medía 209,47 px con dos— y lo
+    // mide el guion de humo 16.
     expect([...acciones.querySelectorAll('[data-accion]')].map((b) => b.dataset.accion)).toEqual([
       'generar-gml',
       'diagnosticar',
+      'derivar-sobrante',
     ])
   })
 

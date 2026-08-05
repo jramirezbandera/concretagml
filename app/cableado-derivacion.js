@@ -1,0 +1,590 @@
+// app/cableado-derivacion.js — F17 · 4.2. LA COSTURA DEL SOBRANTE.
+//
+// Une las cuatro cosas que ningún otro módulo conoce a la vez: el STORE (de donde
+// sale la geometría y el contorno oficial), la LISTA del panel y la CAPA de
+// manchas (`viewer/lista-sobrante.js` y `viewer/piezas.js`, que no saben qué es
+// una parcela), la DERIVACIÓN pura (`derivacion/`, que no sabe qué es el DOM) y
+// los DOS CTA de la cáscara.
+//
+// ── LO QUE ESTE MÓDULO NO HACE, Y ES LA MITAD DE SU DEFINICIÓN ──────────────
+// No mide, no ordena piezas, no decide qué es una astilla, no compone XML y no
+// nombra ficheros. Todo eso está hecho, medido y probado en las fases 1 a 3. Aquí
+// solo se enchufan cables y se escriben motivos.
+//
+// ── ⛔ EL CTA SE ENCIENDE CON UN PREDICADO BARATO, Y LA PUERTA CORRE AL PULSAR ─
+// `puedeDerivar` mira DOS hechos estructurales: hay contorno oficial y hay
+// geometría del usuario. Nada más. El patrón es el de
+// `app/cableado-diagnostico.js#puedeDiagnosticar`, y aquí importa todavía más
+// porque este predicado corre en CADA notificación del store — o sea, en cada
+// vértice arrastrado.
+//
+// ⛔ **Y no puede mirar la SUPERFICIE.** «Área menor» NO implica «está dentro»:
+// una parcela puede menguar 3 m² por un lado y crecer 5 cm por otro, y entonces el
+// sobrante no es la mitad de la verdad, es una entrega incompleta con total
+// confianza. Comprobarlo de verdad es una resta booleana (`restar(P_new, P_of)`, y
+// **jamás `booleanContains`**, que solo mira vértices y dice `true` con un lado
+// fuera en una parcela cóncava — medido). Eso cuesta lo que cuesta, así que corre
+// AL PULSAR y explica con cifras cuando dice que no.
+//
+// ── EL SOBRANTE ES UNA FOTO, Y AQUÍ ES DONDE CADUCA (decisión 3C) ───────────
+// Cualquier cambio en el store invalida la derivación entera: los nombres escritos
+// se pierden y **se dice**. Jamás se reasignan por clave heurística — el `orden` de
+// una pieza vale solo dentro de SU derivación, y un nombre pegado a la pieza
+// equivocada es una finca mal nombrada en un papel que se firma.
+//
+// ⚠️ **Se invalida por CUALQUIER cambio del store, no solo por «otra parcela».**
+// `viewer/index.js` suelta las colindantes cuando cambia la IDENTIDAD de la
+// parcela, y ese gancho no sirve aquí: la identidad no cambia al mover un vértice,
+// y mover un vértice es exactamente lo que caduca el sobrante. Son dos hechos
+// distintos y por eso son dos sitios distintos.
+//
+// ── DÓNDE VIVE CADA BOTÓN, Y POR QUÉ ────────────────────────────────────────
+//   · **«Derivar sobrante»** está en el PIE del panel (`index.html`), junto a
+//     «Generar GML» y «Diagnosticar encaje». Tiene que existir ANTES de que haya
+//     bloque: el bloque aparece solo cuando hay sobrante, así que un botón dentro
+//     de él sería un botón que solo existe después de haberlo pulsado.
+//   · **«Descargar expediente»** está DENTRO del bloque, y lo fabrica la lista. Es
+//     la acción que CONSUME lo que el bloque enseña —qué piezas van y cómo se
+//     llaman—, el mismo criterio con el que F08 metió «Descargar informe de
+//     contraste» en el cajón de F07 en vez de poner un tercer botón en el pie.
+//
+// ⚠️ **«Generar GML» NO se toca.** Sigue significando lo que significaba: el GML
+// de UNA parcela. Cambiarle el comportamiento por debajo cuando hay sobrante sería
+// que el mismo botón entregara dos cosas distintas según un estado que no se ve, y
+// eso es peor que tener dos botones. Lo que sí hace este módulo es DECIRLO en el
+// renglón del sobrante cuando el usuario excluye todas las piezas.
+
+import { derivarCesion } from '../derivacion/cesion.js'
+import { prepararEntrega } from '../derivacion/entrega.js'
+import { descargarGml } from '../gml/descargar.js'
+import { NIVEL } from '../viewer/_comun.js'
+import {
+  MOTIVO_NINGUNA_INCLUIDA,
+  MOTIVO_SIN_DERIVAR,
+} from '../viewer/lista-sobrante.js'
+
+// ── Selectores de la cáscara (contrato con `index.html`) ─────────────────────
+
+/** El CTA del pie. */
+export const SELECTOR_BOTON = '[data-accion="derivar-sobrante"]'
+/** Su renglón `role="status"`. */
+export const SELECTOR_ESTADO = '[data-estado="derivar-sobrante"]'
+/** La sección del panel que aloja el bloque. */
+export const SELECTOR_ANFITRION = '[data-anfitrion="sobrante"]'
+
+// ── Motivos, escritos una vez y en un solo sitio ─────────────────────────────
+
+/**
+ * Por qué «Derivar sobrante» está apagado. Se escribe en el renglón **en el mismo
+ * instante** en que se apaga: un botón gris y mudo es un error silencioso.
+ */
+export const MOTIVO_SIN_OFICIAL =
+  'No hay contorno oficial con el que comparar, así que no se puede saber qué parte de la ' +
+  'parcela se suelta. Trae la parcela del Catastro (o un GML con su geometría) y vuelve.'
+
+/** Y cuando lo que falta es la geometría del usuario. */
+export const MOTIVO_SIN_GEOMETRIA =
+  'Todavía no hay geometría medida que comparar con el contorno oficial.'
+
+/**
+ * ⛔ La respuesta de la PUERTA cuando la parcela ha CRECIDO en vez de menguar.
+ *
+ * Es el caso que el plan llamó por su nombre: el sobrante saldría VACÍO mientras
+ * hay vecinos afectados, y la aplicación exportaría un expediente incompleto con
+ * total confianza. Se dice, con las cifras, y se remite a la fase 2 de F17 (el
+ * colindante recortado), que es donde ese caso se resuelve de verdad.
+ *
+ * @param {import('../derivacion/cesion.js').PuertaCesion} puerta
+ * @param {(n:number, d?:number) => string} formatear
+ * @returns {string}
+ */
+export function motivoPuerta(puerta, formatear) {
+  const cuantas = puerta.piezas.length
+  return (
+    `La geometría medida SE SALE del contorno oficial en ${cuantas} sitio(s), ` +
+    `${formatear(puerta.area)} m² en total (el trozo más ancho mide ` +
+    `${formatear(puerta.grosorMaximo, 4)} m). Lo que sobresale no es sobrante propio: es ` +
+    `terreno de alguien, y repartirlo es un acto jurídico que esta versión no cubre ` +
+    `(está anotado como la fase 2 de esta feature). Corrige el lindero hacia dentro y ` +
+    `vuelve a derivar.`
+  )
+}
+
+/** Cuando ni siquiera se ha podido MEDIR si cabe dentro. */
+export const MOTIVO_PUERTA_INDECIDIBLE =
+  'No se ha podido comprobar si la geometría medida cabe dentro del contorno oficial, así que ' +
+  'no se deriva nada: un sobrante calculado sobre una comparación que ha fallado sería una ' +
+  'cifra inventada. Mira el panel de avisos.'
+
+/** El bloqueo que trae la propia derivación (detecciones ERROR). */
+export const MOTIVO_BLOQUEADA =
+  'La derivación no se puede entregar. Mira el panel de avisos: ahí está el detalle.'
+
+/** Cuando el expediente compuesto no cierra. */
+export const MOTIVO_NO_CIERRA =
+  'El expediente NO cierra sobre el contorno oficial, así que no se descarga: un fichero que ' +
+  'no cubre la finca de partida sale con IVG negativo aunque cada parcela suya sea impecable. ' +
+  'Mira el panel de avisos.'
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Formato español para las cifras de los motivos. Local, como en el visor. */
+function formatearNumero(n, decimales = 2) {
+  if (!Number.isFinite(n)) return 'sin medir'
+  return new Intl.NumberFormat('es-ES', {
+    minimumFractionDigits: decimales,
+    maximumFractionDigits: decimales,
+  }).format(n)
+}
+
+/** Describe un valor para un mensaje de contrato roto. */
+function describir(valor) {
+  if (valor === null) return 'null'
+  if (Array.isArray(valor)) return 'un array'
+  return typeof valor
+}
+
+/**
+ * Localiza un nodo del contrato, o LANZA nombrándolo. Mismo criterio (y casi el
+ * mismo texto) que `app/cableado-diagnostico.js#nodo`: el marcado de `index.html`
+ * es contrato de este cableado, y un `querySelector` que devuelve `null` en
+ * silencio deja el botón muerto sin síntoma.
+ */
+function nodo(selector, documento) {
+  const encontrado = documento.querySelector(selector)
+  if (encontrado === null) {
+    throw new Error(
+      `app/cableado-derivacion.js: la cáscara no tiene ningún nodo '${selector}'. El marcado ` +
+        `de index.html es contrato de este cableado: si se ha renombrado o movido ese nodo, ` +
+        `hay que arreglarlo en index.html, no aquí.`,
+    )
+  }
+  return /** @type {HTMLElement} */ (encontrado)
+}
+
+/** Los recintos del POJO que haya en el store, sin dar nada por hecho. */
+function recintosDe(parcela) {
+  const recintos = parcela === null || parcela === undefined ? null : parcela.recintos
+  return Array.isArray(recintos) ? recintos : []
+}
+
+/** El contorno OFICIAL del POJO, o `null`. Vacío y `null` significan lo mismo. */
+function oficialDe(parcela) {
+  const oficial = parcela === null || parcela === undefined ? null : parcela.geometriaOficial
+  return Array.isArray(oficial) && oficial.length > 0 ? oficial : null
+}
+
+/**
+ * ¿Tiene sentido ofrecer «Derivar sobrante»? Hay contorno oficial Y hay geometría
+ * del usuario. Ni una comprobación más: ver la cabecera.
+ *
+ * No se exporta: es una regla INTERNA de esta pantalla, y sacarla invitaría a que
+ * otro módulo decidiera con ella. Se comprueba desde fuera por su efecto (el
+ * `disabled` del botón), que es lo que el usuario ve.
+ */
+function puedeDerivar(parcela) {
+  return oficialDe(parcela) !== null && recintosDe(parcela).length > 0
+}
+
+/** Qué parcela es ésta, para distinguir «otra» de «la misma editada». */
+function claveDeParcela(parcela) {
+  if (parcela === null || parcela === undefined) return null
+  const refcat = typeof parcela.refcat === 'string' ? parcela.refcat.trim() : ''
+  if (refcat !== '') return `refcat:${refcat}`
+  const idLocal = typeof parcela.idLocal === 'string' ? parcela.idLocal : ''
+  return idLocal === '' ? null : `idLocal:${idLocal}`
+}
+
+/** La referencia catastral PARA EL NOMBRE del fichero, o `null`. */
+function referenciaDe(parcela) {
+  if (parcela === null || parcela === undefined) return null
+  const refcat = typeof parcela.refcat === 'string' ? parcela.refcat : ''
+  return refcat.trim() === '' ? null : refcat
+}
+
+// ── Contratos de las dependencias (duck typing, como en todo `app/`) ─────────
+
+const esStore = (v) => !!v && typeof v.get === 'function' && typeof v.subscribe === 'function'
+
+const esLista = (v) =>
+  !!v &&
+  typeof v.pintar === 'function' &&
+  typeof v.invalidar === 'function' &&
+  typeof v.seleccionadas === 'function' &&
+  typeof v.nombres === 'function' &&
+  typeof v.entrega === 'function' &&
+  typeof v.estado === 'function' &&
+  typeof v.alEntregar === 'function' &&
+  typeof v.alCambiarSeleccion === 'function' &&
+  typeof v.alSenalar === 'function' &&
+  typeof v.resaltar === 'function' &&
+  !!v.nodo
+
+const esCapa = (v) =>
+  !!v &&
+  typeof v.pintar === 'function' &&
+  typeof v.resaltar === 'function' &&
+  typeof v.alSenalar === 'function' &&
+  typeof v.limpiar === 'function'
+
+const esPanel = (v) => !!v && typeof v.avisar === 'function'
+
+// ── API ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Cablea el sobrante: los dos CTA, el bloque del panel, las manchas del mapa y la
+ * entrega del expediente.
+ *
+ * ```js
+ * const derivacion = cablearDerivacion({
+ *   estado,
+ *   lista: visor.sobrante.lista,
+ *   capa: visor.sobrante.capa,
+ *   panel,
+ *   srs: SRS_DEMO,
+ * })
+ * // … al cerrar la aplicación:
+ * derivacion.destruir()
+ * ```
+ *
+ * @param {object} opciones
+ * @param {import('../viewer/_comun.js').EstadoVista} opciones.estado  El store del
+ *   visor. Se LEE y se ESCUCHA; **nunca se escribe**: derivar no edita la parcela.
+ * @param {object} opciones.lista  `visor.sobrante.lista`.
+ * @param {object} opciones.capa  `visor.sobrante.capa`.
+ * @param {import('./avisos.js').PanelAvisos} opciones.panel  Panel de avisos: ahí
+ *   van las DETECCIONES de la derivación y del expediente, que es lo que le pasa
+ *   al DATO. Los motivos de los botones van en sus renglones, que es lo que le
+ *   pasa a la ACCIÓN.
+ * @param {string} opciones.srs  Forma corta (`'EPSG:25830'`…). Va a la validación
+ *   de cada pieza y al documento.
+ * @param {Document} [opciones.documento=globalThis.document]
+ * @param {HTMLElement} [opciones.boton]  El CTA del pie. Por defecto, el de la cáscara.
+ * @param {HTMLElement} [opciones.renglon]  Su `role="status"`.
+ * @param {HTMLElement} [opciones.anfitrion]  La sección que aloja el bloque.
+ * @param {() => Date} [opciones.ahora]  De dónde sale «ahora» para el
+ *   `beginLifespanVersion` y para el nombre del fichero. Parámetro y no llamada
+ *   directa por lo mismo que en `cablearDiagnostico` y `cablearGeneracionGml`:
+ *   es lo único que permite afirmar algo exacto sobre el nombre en una prueba.
+ * @param {typeof descargarGml} [opciones.descargar]  La entrega del fichero.
+ * @returns {{derivar: () => (object|null), entregar: () => (object|null),
+ *   ultimaCesion: () => (object|null), destruir: () => void}}
+ * @throws {TypeError}  Contrato del programador.
+ * @throws {Error}  Si la cáscara no trae los tres nodos del contrato.
+ */
+export function cablearDerivacion({
+  estado,
+  lista,
+  capa,
+  panel,
+  srs,
+  documento = globalThis.document,
+  boton,
+  renglon,
+  anfitrion,
+  ahora = () => new Date(),
+  descargar = descargarGml,
+} = {}) {
+  if (!esStore(estado)) {
+    throw new TypeError(
+      `cablearDerivacion: 'estado' debe ser el store de crearEstadoVista ({get, subscribe}); ` +
+        `recibido ${describir(estado)}.`,
+    )
+  }
+  if (!esLista(lista)) {
+    throw new TypeError(
+      `cablearDerivacion: 'lista' debe ser la de viewer/lista-sobrante.js (la devuelve ` +
+        `crearVisor en visor.sobrante.lista); recibido ${describir(lista)}. Si vale undefined, ` +
+        `el visor se montó sin 'sobrante: true'.`,
+    )
+  }
+  if (!esCapa(capa)) {
+    throw new TypeError(
+      `cablearDerivacion: 'capa' debe ser la de viewer/piezas.js (visor.sobrante.capa); ` +
+        `recibido ${describir(capa)}.`,
+    )
+  }
+  if (!esPanel(panel)) {
+    throw new TypeError(
+      `cablearDerivacion: 'panel' debe ser el de app/avisos.js ({avisar}); recibido ` +
+        `${describir(panel)}. Las detecciones de la derivación van ahí: son lo que le pasa ` +
+        `al DATO, no a la acción.`,
+    )
+  }
+  if (typeof srs !== 'string' || srs.trim() === '') {
+    throw new TypeError(
+      `cablearDerivacion: 'srs' debe ser la forma corta del sistema de referencia ` +
+        `(p. ej. 'EPSG:25830'); recibido ${describir(srs)}.`,
+    )
+  }
+  if (typeof ahora !== 'function' || typeof descargar !== 'function') {
+    throw new TypeError(
+      `cablearDerivacion: 'ahora' y 'descargar' deben ser funciones; recibidos ` +
+        `${typeof ahora} y ${typeof descargar}.`,
+    )
+  }
+
+  const elBoton = boton ?? nodo(SELECTOR_BOTON, documento)
+  const elRenglon = renglon ?? nodo(SELECTOR_ESTADO, documento)
+  const laSeccion = anfitrion ?? nodo(SELECTOR_ANFITRION, documento)
+
+  // El bloque se cuelga AQUÍ y no en `app/main.js`: quien conoce a la vez la
+  // sección anfitriona y la lista es este módulo. La sección viene VACÍA de
+  // `index.html` a propósito (ver su comentario), así que esto no pisa nada.
+  laSeccion.append(lista.nodo)
+
+  // ── Estado interno ────────────────────────────────────────────────────────
+  let vivo = true
+  /** La última FOTO derivada, o `null`. */
+  let cesion = null
+  /** La clave de la parcela sobre la que se derivó esa foto. */
+  let claveDerivada = null
+
+  /** Escribe el renglón del CTA del pie. */
+  function decir(texto, esError = false) {
+    elRenglon.textContent = texto
+    elRenglon.classList.toggle('gml-accion-estado--error', esError === true)
+  }
+
+  /** Publica en el panel de avisos lo que la derivación (o la entrega) detectó. */
+  function publicar(detecciones) {
+    if (!Array.isArray(detecciones)) return
+    for (const d of detecciones) {
+      panel.avisar(d.mensaje, { nivel: d.severidad === 'ERROR' ? NIVEL.ERROR : NIVEL.AVISO })
+    }
+  }
+
+  /** Enseña o esconde el bloque. El `hidden` lo apaga `.gml-app [hidden]`. */
+  function mostrarBloque(visible) {
+    laSeccion.hidden = !visible
+  }
+
+  /**
+   * La foto ha caducado (3C). Vacía las dos vistas —la lista Y las manchas— y lo
+   * dice **en el bloque**, no en el canal global.
+   */
+  function invalidar(motivo) {
+    cesion = null
+    claveDerivada = null
+    capa.limpiar()
+    if (motivo === null) {
+      lista.pintar(null)
+      mostrarBloque(false)
+    } else {
+      lista.invalidar(motivo)
+      // El bloque SE QUEDA a la vista mientras el mensaje esté puesto: esconderlo
+      // haría desaparecer al mismo tiempo la lista y la explicación de por qué ha
+      // desaparecido, que es la definición de fallo silencioso.
+      mostrarBloque(true)
+    }
+  }
+
+  /**
+   * Recalcula lo BARATO: el estado del CTA del pie, con su motivo. Corre en cada
+   * notificación del store, o sea en cada vértice arrastrado.
+   */
+  function refrescar(parcela) {
+    if (!vivo) return
+
+    const hayOficial = oficialDe(parcela) !== null
+    const hayGeometria = recintosDe(parcela).length > 0
+    elBoton.disabled = !(hayOficial && hayGeometria)
+    if (elBoton.disabled) {
+      decir(hayOficial ? MOTIVO_SIN_GEOMETRIA : MOTIVO_SIN_OFICIAL)
+    } else if (cesion === null) {
+      decir('')
+    }
+
+    // ── 3C · la foto caduca con CUALQUIER cambio ────────────────────────────
+    if (cesion === null) return
+    const clave = claveDeParcela(parcela)
+    invalidar(
+      clave === claveDerivada
+        ? undefined // el texto por defecto: «la parcela ha cambiado»
+        : 'Ha entrado otra parcela, así que el sobrante de la anterior ya no le corresponde. ' +
+            'Los nombres escritos se han perdido: vuelve a derivar.',
+    )
+    decir('')
+  }
+
+  /**
+   * Deriva. Es lo CARO: la resta booleana y la puerta.
+   *
+   * @returns {object|null}  La `Cesion`, o `null` si la puerta no deja pasar.
+   */
+  function derivar() {
+    if (!vivo) return null
+    const parcela = estado.get()
+    if (!puedeDerivar(parcela)) {
+      // No debería llegarse (el botón está apagado), pero llamar a `derivar()` es
+      // legítimo desde un test o desde otro cable, y devolver `null` mudo sería lo
+      // que la regla de oro 1 prohíbe.
+      decir(oficialDe(parcela) === null ? MOTIVO_SIN_OFICIAL : MOTIVO_SIN_GEOMETRIA, true)
+      return null
+    }
+
+    let derivada
+    try {
+      derivada = derivarCesion({
+        recintos: recintosDe(parcela),
+        geometriaOficial: oficialDe(parcela),
+      })
+    } catch (causa) {
+      // Un fallo INESPERADO del cálculo. Va al panel de avisos porque es lo que le
+      // pasa al dato, y al renglón porque el usuario acaba de pulsar un botón y
+      // tiene derecho a saber que no ha pasado nada.
+      panel.avisar(`No se ha podido derivar el sobrante: ${causa?.message ?? causa}`, {
+        nivel: NIVEL.ERROR,
+      })
+      decir('La derivación ha fallado. Mira el panel de avisos.', true)
+      return null
+    }
+
+    // Regla de oro 1: TODO lo que decidió la derivación, al panel.
+    publicar(derivada.detecciones)
+
+    // ── LA PUERTA ───────────────────────────────────────────────────────────
+    if (derivada.puerta.contenida === false) {
+      invalidar(null)
+      decir(motivoPuerta(derivada.puerta, formatearNumero), true)
+      return null
+    }
+    if (derivada.puerta.contenida === null) {
+      invalidar(null)
+      decir(MOTIVO_PUERTA_INDECIDIBLE, true)
+      return null
+    }
+    if (!derivada.puedeEntregarse) {
+      invalidar(null)
+      decir(MOTIVO_BLOQUEADA, true)
+      return null
+    }
+
+    cesion = derivada
+    claveDerivada = claveDeParcela(parcela)
+    lista.pintar(derivada)
+    capa.pintar(derivada.piezas)
+    mostrarBloque(true)
+    decir(
+      derivada.piezas.length === 0
+        ? 'No hay sobrante: la geometría medida cubre el contorno oficial entero.'
+        : `Derivadas ${derivada.piezas.length} pieza(s), ${formatearNumero(derivada.areaTotal)} m² ` +
+            `en total. Revísalas antes de entregar.`,
+    )
+    refrescarEntrega()
+    return derivada
+  }
+
+  /** Enciende o apaga «Descargar expediente», SIEMPRE con su motivo. */
+  function refrescarEntrega() {
+    if (cesion === null) {
+      lista.entrega({ habilitado: false, motivo: MOTIVO_SIN_DERIVAR })
+      return
+    }
+    if (lista.seleccionadas().length === 0) {
+      lista.entrega({ habilitado: false, motivo: MOTIVO_NINGUNA_INCLUIDA })
+      return
+    }
+    lista.entrega({ habilitado: true, motivo: '' })
+  }
+
+  /**
+   * Compone el expediente entero y lo entrega. UN solo fichero con N
+   * `gml:featureMember` — el ZIP se canceló por medición, y una sola descarga
+   * evita por diseño el bloqueo de la segunda descarga automática, que **no se
+   * puede detectar desde JavaScript**.
+   *
+   * @returns {object|null}  El resultado de la descarga, o `null`.
+   */
+  function entregar() {
+    if (!vivo || cesion === null) return null
+    const parcela = estado.get()
+    const fecha = ahora()
+
+    let entrega
+    try {
+      entrega = prepararEntrega({
+        parcela,
+        srs,
+        cesion,
+        incluidas: lista.seleccionadas(),
+        nombres: lista.nombres(),
+      })
+    } catch (causa) {
+      panel.avisar(`No se ha podido componer el expediente: ${causa?.message ?? causa}`, {
+        nivel: NIVEL.ERROR,
+      })
+      lista.estado('La composición del expediente ha fallado. Mira el panel de avisos.', {
+        error: true,
+      })
+      return null
+    }
+
+    publicar(entrega.detecciones)
+
+    // ⛔ NO BASTA `xml !== null`. El fichero de una sola parcela sería un GML
+    // impecable y válido contra el XSD; lo que estaría mal es el EXPEDIENTE, y eso
+    // no lo ve ningún validador de esquema. `puedeEntregarse` es lo que hay que
+    // mirar, y lo dice `derivacion/entrega.js` tras las TRES afirmaciones del
+    // cierre (suma, cero solape, cobertura).
+    if (!entrega.puedeEntregarse || entrega.xml === null) {
+      lista.estado(MOTIVO_NO_CIERRA, { error: true })
+      return null
+    }
+
+    const resultado = descargar(entrega.xml, {
+      refcat: referenciaDe(parcela),
+      fecha,
+      // El HECHO, no el prefijo: `nombreFicheroGml` decide con él si el fichero se
+      // llama «parcela-…» o «expediente-…». Si el llamante pudiera elegir el
+      // nombre, podría llamar «parcela» a un fichero con tres.
+      miembros: entrega.nMiembros,
+      documento,
+    })
+    lista.estado(
+      resultado.descargado
+        ? `Descargado «${resultado.nombre}» con ${entrega.nMiembros} parcelas.`
+        : resultado.mensaje,
+      { error: !resultado.descargado },
+    )
+    return resultado
+  }
+
+  // ── Los cables ────────────────────────────────────────────────────────────
+
+  elBoton.addEventListener('click', derivar)
+  const bajaEntrega = lista.alEntregar(entregar)
+  const bajaSeleccion = lista.alCambiarSeleccion(refrescarEntrega)
+
+  // El resaltado RECÍPROCO, que es media razón de ser de esta pantalla. Ni la
+  // lista conoce el mapa ni el mapa la lista: los une este módulo, y en los dos
+  // sentidos. La reentrada no es un problema porque los dos `resaltar` son
+  // idempotentes y no vuelven a emitir.
+  const bajaSenalLista = lista.alSenalar((orden) => capa.resaltar(orden))
+  const bajaSenalCapa = capa.alSenalar((orden) => lista.resaltar(orden))
+
+  const bajaStore = estado.subscribe(refrescar)
+  // `subscribe` NO notifica al suscribirse, así que el primer estado del botón se
+  // calcula a mano. Sin esta línea el CTA se quedaría en el `disabled` con el que
+  // nace en `index.html` —y con el renglón vacío— hasta la primera edición:
+  // exactamente el botón gris y mudo que no se admite.
+  refrescar(estado.get())
+  mostrarBloque(false)
+
+  return {
+    derivar,
+    entregar,
+    ultimaCesion: () => cesion,
+
+    destruir() {
+      if (!vivo) return
+      vivo = false
+      elBoton.removeEventListener('click', derivar)
+      bajaEntrega()
+      bajaSeleccion()
+      bajaSenalLista()
+      bajaSenalCapa()
+      bajaStore()
+    },
+  }
+}

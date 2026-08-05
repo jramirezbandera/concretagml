@@ -880,6 +880,15 @@ describe('contrato F11 · `edificio/` sale por el barrel; el visor, el servicio 
       // el vocabulario de la rama activa. La interfaz lo importa de `app/rama.js`
       // DIRECTAMENTE, igual que `app/main.js` importa `viewer/index.js`.
       'RAMA',
+      // ── F17 · fase 4 · las tres piezas de la pantalla del sobrante ────────
+      // `viewer/piezas.js` revienta bajo `node` (Leaflet). Las otras DOS no: ni
+      // `viewer/lista-sobrante.js` ni `app/cableado-derivacion.js` importan
+      // Leaflet —una fabrica nodos y el otro los cablea—, así que se importarían
+      // SIN LANZAR y colarlas dejaría la suite en verde. Es exactamente el caso
+      // que el párrafo de arriba describe, y por eso van en la misma lista.
+      'crearCapaPiezas', // viewer/piezas.js — Leaflet
+      'crearListaSobrante', // viewer/lista-sobrante.js — document
+      'cablearDerivacion', // app/cableado-derivacion.js — document
     ]
     for (const [espacio, contenido] of Object.entries(barrel)) {
       for (const nombre of impuros) {
@@ -899,6 +908,9 @@ describe('contrato F11 · `edificio/` sale por el barrel; el visor, el servicio 
       'services/catastro-edificio.js': ['crearClienteEdificio'],
       'app/rama.js': ['cablearRama', 'RAMA'],
       'app/panel-edificio.js': ['crearPanelEdificio'],
+      'viewer/piezas.js': ['crearCapaPiezas'],
+      'viewer/lista-sobrante.js': ['crearListaSobrante'],
+      'app/cableado-derivacion.js': ['cablearDerivacion'],
     }
     for (const [fichero, nombres] of Object.entries(donde)) {
       const fuente = readFileSync(join(RAIZ_REPO, fichero), 'utf8')

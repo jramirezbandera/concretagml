@@ -92,6 +92,8 @@ import { crearBarraEdicion } from '../../viewer/barra-edicion.js'
 import { crearCajonComprobacion } from '../../viewer/cajon-comprobacion.js'
 import { crearCajonDiagnostico } from '../../viewer/cajon-diagnostico.js'
 import { crearContraste } from '../../viewer/contraste.js'
+import { crearListaSobrante } from '../../viewer/lista-sobrante.js'
+import { crearCapaPiezas } from '../../viewer/piezas.js'
 import { CLASE_HUELLA } from '../../viewer/partes.js'
 import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
 
@@ -161,6 +163,9 @@ let mapaVivo = null
 let diagnosticoVivo = null
 let comprobacionViva = null
 
+/** La lista y la capa de F17 vivas. Van JUNTAS, como en el visor real. */
+let sobranteVivo = null
+
 /**
  * Pone en el documento lo que `crearVisor` monta SOBRE EL MAPA, con los módulos de
  * producción y no con copias: los siete nodos de la barra de edición, el cajón y la
@@ -177,6 +182,13 @@ function montarCromoDelMapa() {
     contraste: crearContraste({ mapa, zona: husoPorSrs(SRS_DEMO) }),
   }
   comprobacionViva = crearCajonComprobacion({ mapa })
+  // F17: las dos piezas del sobrante, también DE VERDAD — `cablearDerivacion`
+  // hace duck typing de once métodos de la lista y cuatro de la capa, y va fuera
+  // de todo `try`, así que un doble a mano tumbaría esta suite entera.
+  sobranteVivo = {
+    lista: crearListaSobrante({ documento: document }),
+    capa: crearCapaPiezas({ mapa, zona: husoPorSrs(SRS_DEMO) }),
+  }
 }
 
 // ── Los dobles ───────────────────────────────────────────────────────────────
@@ -209,6 +221,7 @@ vi.mock('../../viewer/index.js', async (importarOriginal) => ({
       colindantes: { pintar() {}, limpiar() {}, destruir() {} },
       diagnostico: diagnosticoVivo,
       comprobacion: comprobacionViva,
+      sobrante: sobranteVivo,
       destruir() {},
     }
   },

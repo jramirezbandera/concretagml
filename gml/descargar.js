@@ -1048,6 +1048,12 @@ export function descargarBinario(bytes, opciones = {}) {
  * @param {Date} opciones.fecha  Ver {@link nombreFicheroGml}. Obligatorio, y se
  *   valida SIEMPRE —incluso cuando `xml` es `null` y no va a bajar nada—, para
  *   que un cableado mal hecho no se descubra el día en que el serializador acierta.
+ * @param {number} [opciones.miembros=1]  Cuántas parcelas lleva DENTRO el `xml`.
+ *   Se reenvía tal cual a {@link nombreFicheroGml}, que es quien decide el prefijo.
+ *   ⛔ **El defecto es 1 y con él el nombre es EXACTAMENTE el de siempre**: F17
+ *   añade un caso, no cambia el que había. Quien entrega un expediente de varias
+ *   parcelas (`derivacion/entrega.js`) tiene el hecho a mano en `entrega.nMiembros`
+ *   y lo pasa; nadie tiene que acordarse de elegir un prefijo.
  * @param {Document} [opciones.documento=globalThis.document]  Documento donde se
  *   crea el anchor. El valor por defecto lo aplica {@link descargarTexto}, que es
  *   quien lo usa: un solo sitio donde caer al global.
@@ -1065,7 +1071,7 @@ export function descargarGml(xml, opciones = {}) {
   // `documento` y `url` se reenvían SIN resolver el global: el defecto vive en
   // `descargarTexto` y tenerlo en dos sitios sería la primera grieta por la que
   // se cuela un duplicado.
-  const { refcat = null, fecha, documento, url } = opciones ?? {}
+  const { refcat = null, fecha, miembros = 1, documento, url } = opciones ?? {}
 
   if (xml !== null && typeof xml !== 'string') {
     throw new TypeError(
@@ -1077,7 +1083,7 @@ export function descargarGml(xml, opciones = {}) {
 
   // Se calcula ANTES de mirar `xml`: el contrato de `refcat`/`fecha` se cumple o
   // no se cumple, y no depende de que haya algo que descargar.
-  const nombre = nombreFicheroGml({ refcat, fecha })
+  const nombre = nombreFicheroGml({ refcat, fecha, miembros })
 
   // Este caso NO se delega, y no es un descuido: `descargarTexto` también se
   // niega a bajar 0 bytes, pero con un mensaje genérico. El de aquí nombra la

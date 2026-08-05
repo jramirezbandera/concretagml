@@ -539,6 +539,7 @@ import {
   cablearCatastro,
 } from './cableado-catastro.js'
 import { cablearComprobacion } from './cableado-comprobacion.js'
+import { cablearDerivacion } from './cableado-derivacion.js'
 import { cablearDiagnostico } from './cableado-diagnostico.js'
 import {
   EXTENSIONES as EXTENSIONES_EDIFICIO,
@@ -1671,6 +1672,21 @@ const visor = crearVisor(nodo('#mapa'), {
   // Sin `colindantes: true` aquí, `visor.colindantes` vale `null` y el suscriptor
   // que las pinta (paso 7) no tendría dónde pintarlas.
   colindantes: true,
+  // ── F17 · el SOBRANTE, montado (que tampoco es derivado) ─────────────────
+  // Monta las dos piezas de F17: la LISTA del panel y la capa de MANCHAS
+  // numeradas. Booleana por contrato, como `colindantes`, porque ninguna de las
+  // dos elige nada al montarse: la lista NO es un control del mapa —no hay esquina
+  // que escoger— y la capa no mide en píxeles.
+  //
+  // ⚠️ **`visor.sobrante.lista.nodo` sale SIN COLGAR de ningún sitio.** No es un
+  // olvido: la sección anfitriona del panel la conoce `app/`, no `viewer/`. Quien
+  // lo inserta es el paso 16, y hasta entonces el nodo existe y no está en el
+  // documento — que es también lo que impide que sus `data-*` compitan por el
+  // `querySelector` mientras nadie lo ha pedido.
+  //
+  // Nacen las dos VACÍAS: montarlas no deriva nada. Derivar es una resta booleana
+  // que cuesta lo que cuesta, y corre cuando el usuario pulsa el CTA (paso 16).
+  sobrante: true,
   // El canal EN VIVO de la ficha (criterio de aceptación 4). Es opción de PRIMER
   // NIVEL y no una clave de `edicion` porque medir mientras se arrastra no exige
   // poder insertar vértices ni enganchar al parcelario: son dos cosas distintas.
@@ -3858,6 +3874,42 @@ navegacion.subscribe(() => escribirRuta())
 window.addEventListener('hashchange', () => {
   if (location.hash === navegacion.ruta()) return
   navegacion.irARuta(location.hash)
+})
+
+// ── 16 · EL SOBRANTE (F17 · 4.2) ─────────────────────────────────────────────
+//
+// El último paso, y el que cierra el hueco que dejaba a esta aplicación sin poder
+// entregar **más de 1 de cada 5** expedientes de parcelario reales: mover un
+// lindero hacia dentro obliga a aportar también la finca que se suelta, o el IVG
+// sale negativo. Hasta hoy la app sabía derivarla, medirla, validarla, componer el
+// sobre de N `gml:featureMember` y comprobar que el conjunto cierra — y nadie
+// llamaba a nada de eso. `derivacion/entrega.js` llevaba desde la fase 3 sin
+// llamante en producción; aquí lo estrena.
+//
+// Va EL ÚLTIMO por lo mismo que el informe y el expediente: es el que más
+// dependencias tiene, y las tiene todas de pasos anteriores.
+//   · el STORE (paso 2), del que sale la geometría editada Y el contorno oficial,
+//     y del que este cableado es un suscriptor más — el que invalida la foto;
+//   · el VISOR (paso 5), por sus DOS piezas de F17: la lista del panel y la capa
+//     de manchas numeradas;
+//   · el PANEL de avisos (paso 3), a donde van las detecciones de la derivación y
+//     del expediente: eso es lo que le pasa al DATO. Los motivos de los botones
+//     van en sus renglones, que es lo que le pasa a la ACCIÓN.
+//
+// ⚠️ **La sección anfitriona la rellena el propio cableado**, que es quien conoce
+// a la vez el nodo del panel y la lista. Es la misma división que estrenó el
+// diagnóstico el 2026-08-05 con `cajon.anfitrion(...)`, con una diferencia: aquél
+// nace en una esquina del mapa y SE MUDA, y éste nunca ha estado en el mapa.
+//
+// ⚠️ SIN `try` propio, igual que los pasos 6, 8, 9, 11, 12 y 13: lo único que
+// puede lanzar aquí es un contrato del programador (o que la cáscara haya dejado
+// de traer los tres nodos, y entonces hay que arreglar `index.html`).
+const derivacionCableada = cablearDerivacion({
+  estado,
+  lista: visor.sobrante.lista,
+  capa: visor.sobrante.capa,
+  panel,
+  srs: SRS_DEMO,
 })
 
 // Y una última remedida del mapa cuando el navegador ya ha maquetado el rail. En

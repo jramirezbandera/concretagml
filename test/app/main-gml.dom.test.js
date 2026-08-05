@@ -80,6 +80,8 @@ import { crearBarraEdicion } from '../../viewer/barra-edicion.js'
 import { crearCajonComprobacion } from '../../viewer/cajon-comprobacion.js'
 import { crearCajonDiagnostico } from '../../viewer/cajon-diagnostico.js'
 import { crearContraste } from '../../viewer/contraste.js'
+import { crearListaSobrante } from '../../viewer/lista-sobrante.js'
+import { crearCapaPiezas } from '../../viewer/piezas.js'
 import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
 
 /**
@@ -128,6 +130,16 @@ function montarCromoDelMapa() {
     // SUELTO y no dentro de un objeto, igual que en el visor real: F07 son dos
     // piezas inseparables y F08 es una sola.
     comprobacion: crearCajonComprobacion({ mapa }),
+    // Y desde F17, las DOS piezas del sobrante, también las de verdad y por el
+    // mismo motivo que las de F07: `cablearDerivacion` comprueba por duck typing
+    // once métodos de la lista y cuatro de la capa, y va FUERA de todo `try`, así
+    // que un doble escrito a mano no dejaría un bloque muerto — tumbaría esta
+    // suite entera. La lista NO se cuelga de ningún sitio aquí: eso lo hace el
+    // propio cableado sobre `[data-anfitrion="sobrante"]` de la cáscara real.
+    sobrante: {
+      lista: crearListaSobrante({ documento: document }),
+      capa: crearCapaPiezas({ mapa, zona: husoPorSrs(SRS_DEMO) }),
+    },
   }
 }
 
@@ -190,6 +202,7 @@ vi.mock('../../viewer/index.js', async (importarOriginal) => ({
       colindantes: { pintar() {}, limpiar() {}, destruir() {} },
       diagnostico: cromo.diagnostico,
       comprobacion: cromo.comprobacion,
+      sobrante: cromo.sobrante,
       destruir() {},
     }
   },

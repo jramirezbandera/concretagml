@@ -546,6 +546,41 @@
         <div id="tabla-vertices" class="gml-tabla-caja"></div>
       </section>
 
+      <!-- ══ EL SOBRANTE, EN LA COLUMNA (F17) ═════════════════════════════════
+           CAJA VACÍA, como la del diagnóstico de arriba y por el mismo motivo:
+           lo que se ve dentro lo fabrica `viewer/lista-sobrante.js` y lo cuelga
+           aquí `app/main.js` (paso 16). Aquí no hay ni un nodo hijo escrito a
+           mano, así que no hay un segundo juego de `[data-sobrante]` ni de
+           `[data-accion="entregar-expediente"]` compitiendo por el
+           `querySelector` — la trampa que este fichero documenta desde F06.
+
+           NACE `hidden`, Y ESO ES PRODUCTO, NO ARRANQUE (decisión de diseño D2):
+           el bloque aparece SOLO cuando hay sobrante que enseñar. Medido: vacío
+           cuesta 96,63 px, y cobrarlos en el 100 % de las sesiones para una
+           función que se usa en una fracción se comería justo el margen que hace
+           que la tabla de vértices siga por encima de sus 267,44 px. Quien lo
+           enseña y lo esconde es `app/cableado-derivacion.js`; el `hidden` lo
+           apaga `.gml-app [hidden]`, y el eje PASO lo deja además fuera de las
+           otras cuatro pantallas.
+
+           ⚠️ POR QUÉ NO LLEVA CLASE MODIFICADORA: `.gml-bloque` ya da lo que
+           necesita (columna flex, `min-height:0`, relleno de 16/24/0) y el bloque
+           NO se estira — el estirador de Validación sigue siendo
+           `.gml-bloque--vertices`, y dos estiradores a la vez descosen el
+           reparto. El cromo de dentro se lo pone el módulo EN LÍNEA, como el
+           cajón del diagnóstico: `viewer/*` no importa ninguna hoja. Resultado
+           medido: **cero bytes de CSS**.
+
+           ⚠️ Y VA DEBAJO DE LOS VÉRTICES, NO ENCIMA: lo que se revisa aquí es
+           consecuencia de la geometría de la tabla, y el ojo baja. Encima
+           empujaría la tabla hacia el pie en cuanto la lista creciera. -->
+      <section
+        class="gml-bloque"
+        data-pantalla="validacion"
+        data-anfitrion="sobrante"
+        hidden
+      ></section>
+
       <!-- ── AQUÍ ESTUVO EL BLOQUE «EDICIÓN» (F06) HASTA EL 2026-07-29 ────────
            Si buscas «Deshacer», «Ajustar al parcelario», la tolerancia, el
            «Desplazar lindero», el renglón `[data-estado="edicion"]` o la ayuda de
@@ -807,6 +842,48 @@
             Diagnosticar encaje
           </button>
           <p class="gml-accion-estado" data-estado="diagnosticar" role="status"></p>
+
+          <!-- ── F17 · «Derivar sobrante» ──────────────────────────────────
+               EL TERCER CTA DE VALIDACIÓN, y el que cierra el hueco que dejaba
+               a la aplicación sin poder entregar **más de 1 de cada 5**
+               expedientes reales: mover un lindero hacia dentro obliga a aportar
+               también la finca que se suelta, o el IVG sale negativo.
+
+               SECUNDARIO, como «Diagnosticar encaje» y por lo mismo: es una
+               salida lateral del camino principal. Quien la toma sabe que ha
+               menguado la parcela; quien no, no tiene por qué enterarse de que
+               existe una topología booleana.
+
+               ⚠️ VA EN EL PIE Y NO DENTRO DEL BLOQUE DEL SOBRANTE, y es
+               deliberado (decisión de diseño D2): el bloque aparece SOLO cuando
+               hay sobrante, así que un botón dentro de él sería un botón que
+               solo existe después de haberlo pulsado. La acción que sí vive
+               dentro del bloque es la que lo CONSUME —«Descargar expediente»—,
+               con el mismo criterio con el que F08 metió «Descargar informe de
+               contraste» en el cajón de F07 en vez de poner aquí un cuarto.
+
+               NACE DESHABILITADO, como sus dos hermanos, y el predicado que lo
+               enciende es BARATO y ESTRUCTURAL —hay contorno oficial y hay
+               geometría del usuario—, nunca la superficie: ⛔ **área menor NO
+               implica estar dentro**, y comprobarlo de verdad cuesta una resta
+               booleana que no se puede pagar en cada `input` de un arrastre. La
+               puerta corre AL PULSAR y explica con cifras. Quien lo habilita, y
+               quien escribe el motivo mientras no lo habilita, es
+               `app/cableado-derivacion.js`.
+
+               ⚠️ `data-estado="derivar-sobrante"`, con la misma cadena que su
+               `data-accion` (convención del pie: `generar-gml`/`generar-gml`).
+               El renglón del BLOQUE se llama `entregar-expediente` y es otra
+               cosa: aquél cuenta la descarga, éste la derivación. -->
+          <button
+            type="button"
+            class="gml-boton gml-boton--secundario"
+            data-accion="derivar-sobrante"
+            disabled
+          >
+            Derivar sobrante
+          </button>
+          <p class="gml-accion-estado" data-estado="derivar-sobrante" role="status"></p>
         </div>
       </footer>
     </aside>
