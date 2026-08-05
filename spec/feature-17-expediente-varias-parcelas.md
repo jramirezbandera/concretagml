@@ -127,6 +127,11 @@ minuendos ya están en memoria.
 | **M11** *(2026-08-05, fase 2)* | La decisión 1A: `@turf/boolean-contains` sólo comprueba vértices, así que en cóncavo diría `true` con un lado fuera | **MEDIDO y convertido en test**, no citado: sobre una parcela en U, `booleanContains` devuelve **`true`** mientras **20 m²** están por fuera. `restar()` sí lo ve, con su área y su grosor. El día que Turf lo arregle, el test se pondrá rojo y la decisión podrá revisarse con el dato delante |
 | **M12** *(2026-08-05, fase 2)* | — | ⭐ **El caso que de verdad hace F17 —arrastrar un vértice existente— cierra EXACTO**: residuo `0` y cero cuñas, porque no crea ningún vértice nuevo que redondear fuera de sitio. El caso feo es el del CORTE. Saberlo importa: dice que el margen de M9 sobra en el camino normal y hace falta en el raro |
 | **M13** *(2026-08-05, fase 2)* | El coste de paquete de la fase | **+264 B**, y **todos** son los siete tipos nuevos de `TIPO_COMPROBACION` (883.971 → 884.235 B, atribuido revirtiendo sólo ese fichero). Los tres módulos nuevos —`cesion.js`, `identidad.js`, `conjunto.js`— cuestan **0**: `app/` todavía no los importa, y el barrel raíz **no entra en el paquete** (nadie de `app/`, `viewer/` ni `services/` lo importa; medido) |
+| **M14** *(2026-08-05, fase 3)* | El plan: «el nombre escrito llega al `localId` del fichero» (criterio del guion 16) | ⛔ **No puede, y se desvía a propósito.** El `localId` de una cesión está MEDIDO (O19, IVG positivo del 2026-08-03) y es la referencia del padre con el ordinal detrás. Meter ahí un texto libre cambiaría el único identificador de finca que este proyecto ha visto aceptar; y `cp:label` tampoco vale, porque significa el número de orden de la parcela dentro del polígono. **El nombre viaja al informe y a la pantalla**, que es donde le sirve a una persona. ⚠️ El guion 16 tiene que comprobar eso y no lo del plan |
+| **M15** *(2026-08-05, fase 3)* | El plan: `entrega.js` «serializa → un solo fichero **por `descargarTexto`**» | ⛔ **No lo llama**, y por la misma frontera de siempre: `gml/descargar.js` necesita `Blob`, `URL.createObjectURL` y un `<a download>`, y meterlo aquí sacaría a `derivacion/` del barrel raíz y **rompería la suite `node` entera en el import**. Devuelve `{xml, nMiembros, refcat}` y quien descarga es la aplicación — la misma asimetría que `report/`: **el impuro es el CONSUMIDOR del puro**. Por lo mismo tampoco compone el NOMBRE del fichero |
+| **M16** *(2026-08-05, fase 3)* | El XSD estricto sobre el sobre de varias parcelas: en la fase 1 se validó un fichero **construido a mano** para la ocasión | Ahora lo valida sobre un expediente **derivado del oro por el código de producción**: `test/gml/__snapshots__/expediente-entrega.gml`, 3.619 B, dos `gml:featureMember`, escrito por `prepararEntrega` y añadido a la lista por defecto de `npm run validar:xsd`. La forma que la Sede aceptó el 2026-08-03 pasa a tener guardián automático, que hasta hoy no tenía |
+| **M17** *(2026-08-05, fase 3)* | El coste de paquete de la fase | **+8.657 B** (884.235 → 892.892). ⭐ Y **ni un byte es algoritmo**: comprobado por ausencia en el paquete construido de `restar`, `derivarCesion`, `prepararEntrega` y `comprobarConjunto`. Es texto —los `porQue` de la propuesta, el aviso declarativo por duplicado, la sección del informe y el grupo del diálogo— más los dos módulos puros que `app/` sí importa ya (`identidad.js` y `operacion.js`). ⚠️ El orquestador **sigue sin llamante en producción** hasta la fase 4 |
+| **M18** *(2026-08-05, fase 3)* | — | **CSS: cero bytes.** El desplegable nuevo reutiliza `gml-entrada` y `gml-dialogo-informe-entrada`, que ya traían anchura, familia y `letter-spacing` normalizado para prosa. El presupuesto no se mueve y no hace falta asiento |
 
 ## Deuda declarada
 
@@ -151,6 +156,9 @@ minuendos ya están en memoria.
   astilla. Para el camino de F17 da igual —una pieza de `P_of − P_new` está dentro
   de `P_of` por construcción—, y **el día que `comprobarConjunto` coma un fichero
   ajeno habrá que medirlo**.
+- ⏳ **El guion 16 tiene que cambiar de criterio.** El plan le mandaba comprobar que
+  «el nombre escrito llega al `localId` del fichero», y por **M14** el nombre NO va
+  al `.gml`. Lo que tiene que comprobar es que llega al INFORME.
 - ⏳ **La cesión con `nationalCadastralReference` VACÍA no está medida.** O19 dice
   que la forma con sufijo vale; que la otra falle sigue sin comprobarse, y ese
   camino es el que toma `identidadDeCesion` cuando la matriz tampoco tiene
@@ -231,8 +239,30 @@ existe.
   números que las gobiernan dejaron de ser constantes elegidas y pasaron a
   derivarse del formato, porque la medición refutó los dos (**M9**, **M10**).
 
-Quedan las fases 3 a 5: la entrega y el acto jurídico, la pantalla del sobrante, y
-los gates.
+**Fase 3 · la entrega y el acto jurídico — hecha el 2026-08-05** (6.197 / 144):
+
+- **3.1** `derivacion/entrega.js`: el orquestador. Deriva, valida **cada pieza** por
+  `validation/parcela.js` entera —también las que calcula el programa, que son las
+  que nadie ha mirado—, comprueba que el conjunto CIERRE **antes de escribir nada**,
+  y emite un `.gml` con N `gml:featureMember`. ⛔ Una pieza excluida se dice con su
+  superficie, y si lo excluido rompe el cierre **la entrega se bloquea**: un
+  expediente que no cierra vuelve con IVG negativo. Dos desviaciones del plan
+  escritas y razonadas (**M14**, **M15**), y el snapshot que estrena guardián de
+  esquema para el sobre de varias parcelas (**M16**).
+- **3.x** `derivacion/operacion.js`: el «Tipo de operación», deducido de la FORMA
+  del fichero y **propuesto, nunca decidido**. ⛔ Cuando la forma no se corresponde
+  con ninguna de las dos que la Sede ha aceptado, `tipo` sale `null` en vez de una
+  suposición, y el diálogo **no deja componer** hasta que alguien elija.
+- **3.2** El informe DECLARA SU ALCANCE: lista las N parcelas marcando la que
+  describe —el `<-- ELEGIDA` de F08 trasladado al papel firmable— e imprime el tipo
+  de operación con los tres candados de F09 dentro de la frase. En el PDF y en el
+  informe de texto. Y el desplegable entra en «Preparar informe», con **cero bytes
+  de CSS** (**M18**).
+- ⭐ Con esto **el flujo F06→F07→F09 deja de ser una Subsanación sin nombre**: la
+  aplicación lo nombra hoy, en el caso de uso más frecuente, que era el hueco que
+  `SPEC.md` §7.2 dejaba escrito.
+
+Quedan las fases 4 y 5: la pantalla del sobrante y los gates.
 
 ## Referencias
 
