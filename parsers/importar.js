@@ -671,7 +671,10 @@ export function importar(texto, opts = {}) {
   const huso = anillos.length > 0 ? resolverHuso(anillos[0], opts, detecciones) : null
 
   // 5) Modelo. Los recintos se construyen salvo que sean grados (no son UTM).
-  //    recintos[0] = EXTERIOR; el resto = HUECO (multiparcela fuera de alcance).
+  //    recintos[0] = EXTERIOR; el resto = HUECO. ⚠️ El motivo dejó de ser
+  //    «multiparcela fuera de alcance» el 2026-08-03 (override O18): es que un
+  //    fichero importado describe UNA parcela, y los anillos que trae detrás del
+  //    primero se leen como sus huecos.
   let recintos = null
   if (anillos.length > 0 && !gradosCualquiera) {
     recintos = anillos.map((r, i) =>

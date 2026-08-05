@@ -30,7 +30,9 @@
 //     vértice de cierre y al volver se QUITA, siempre de forma explícita.
 //   · Regla 1 — Ver más abajo dónde está la frontera entre lanzar y no lanzar.
 //   · Invariante de `recintos` (`model/parcela.js`): `recintos[0]` es el EXTERIOR
-//     y el resto son HUECOS; multiparcela está fuera de alcance (SPEC §1).
+//     y el resto son HUECOS. ⚠️ El motivo ya NO es «multiparcela está fuera de
+//     alcance» —caducó el 2026-08-03 con el override O18—: es que una `Parcela`
+//     del modelo describe UNA finca, y N piezas disjuntas son N `Parcela`.
 //
 // POR QUÉ `recintosDeGeometriaTurf` DEVUELVE UNA LISTA DE `recintos` Y NO UN
 // `recintos`. La intersección de dos parcelas puede salir en VARIAS PIEZAS

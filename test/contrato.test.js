@@ -1208,4 +1208,87 @@ describe('guarda transversal Fase 4 · partición de tests derivada y fuente sin
     expect(IMPORTA_PROJ4.test(readFileSync(join(RAIZ, fabrica), 'utf8'))).toBe(true)
     expect(FUENTES).not.toContain(fabrica)
   })
+
+  // ── F17 · fase 0 · ninguna justificación caducada sigue viva ───────────────
+  //
+  // «Multiparcela está fuera de alcance (SPEC §1)» fue CIERTO desde F00 y dejó de
+  // serlo el 2026-08-03: la Sede aceptó un `.gml` con dos `gml:featureMember` y un
+  // IVG positivo (override **O18**, `SPEC.md` §7.1). La frase se había copiado a
+  // ocho sitios como MOTIVO de invariantes que siguen siendo correctos, y un
+  // invariante correcto sostenido por una razón falsa es la peor clase de
+  // comentario: el día que alguien lo lea para decidir, decidirá con un hecho
+  // muerto.
+  //
+  // ⛔ LO QUE SE CORRIGIÓ ES EL MOTIVO, JAMÁS EL INVARIANTE. Una `Parcela` sigue
+  // siendo UN exterior con huecos. Lo que cambia es por qué: no porque la entrega
+  // de varias esté prohibida, sino porque N piezas disjuntas son N `Parcela`.
+  //
+  // Este guardián deja RETRACTAR la frase (citarla para decir que caducó) y no
+  // deja AFIRMARLA: exige que cerca de cada aparición esté la marca de su
+  // caducidad. Sin él, la próxima copia entraría sola.
+  const FRASE_CADUCADA = /multiparcela (?:está )?fuera de alcance/i
+  const MARCA_RETRACTADA = /O18|2026-08-03|cadu/i
+  /** Cuántas líneas arriba y abajo se acepta que esté la marca. */
+  const CERCA = 8
+
+  /**
+   * ⏳ Pendientes A PROPÓSITO, y no es una lista de perdón: los tres comentarios
+   * caducados de `gml/serialize-cp.js` los reescribe la **tarea 1.3** de F17, que
+   * es la que convierte `MIEMBROS = 1` en un bucle de `gml:featureMember` y toca
+   * esa misma zona. Arreglarlos aquí sería meter dos tareas en el mismo fichero
+   * (el plan lo señala como conflicto). **Cuando 1.3 entre, esta lista se vacía y
+   * la prueba de más abajo lo exige.**
+   */
+  const PENDIENTES_DE_LA_TAREA_1_3 = Object.freeze(['gml/serialize-cp.js'])
+
+  const afirmacionesCaducadas = () => {
+    const infractores = []
+    for (const rel of FUENTES) {
+      if (PENDIENTES_DE_LA_TAREA_1_3.includes(rel)) continue
+      const lineas = readFileSync(join(RAIZ, rel), 'utf8').split('\n')
+      lineas.forEach((linea, i) => {
+        if (!FRASE_CADUCADA.test(linea)) return
+        const contexto = lineas.slice(Math.max(0, i - CERCA), i + CERCA + 1).join('\n')
+        if (!MARCA_RETRACTADA.test(contexto)) infractores.push(`${rel}:${i + 1}`)
+      })
+    }
+    return infractores
+  }
+
+  it('⛔ ninguna fuente sostiene un invariante con «multiparcela fuera de alcance»', () => {
+    expect(
+      afirmacionesCaducadas(),
+      'esa frase caducó el 2026-08-03 (override O18: la Sede acepta N featureMember). ' +
+        'Si el invariante que estás justificando es «una Parcela es UN exterior con ' +
+        'huecos», el motivo verdadero es que N piezas disjuntas son N Parcela, cada una ' +
+        'con su idLocal — no que la entrega de varias esté prohibida, porque no lo está',
+    ).toEqual([])
+  })
+
+  it('el guardián no es vacuo: la frase sigue en el árbol, retractada', () => {
+    // Si nadie la mencionara ya, la comprobación de arriba sería trivialmente
+    // verde y nadie se enteraría de que dejó de proteger nada.
+    const mencionan = FUENTES.filter((f) => FRASE_CADUCADA.test(readFileSync(join(RAIZ, f), 'utf8')))
+    expect(mencionan.length, 'nadie menciona la frase: este guardián ya no mira nada').toBeGreaterThan(
+      0,
+    )
+    // Y DISPARA de verdad: la misma frase sin marca de caducidad cerca es roja.
+    const sinMarca = 'const x = 1 // multiparcela está fuera de alcance (SPEC §1)\n'
+    expect(FRASE_CADUCADA.test(sinMarca)).toBe(true)
+    expect(MARCA_RETRACTADA.test(sinMarca)).toBe(false)
+  })
+
+  it('⏳ la deuda de la tarea 1.3 está declarada y es exactamente un fichero', () => {
+    // El día que 1.3 reescriba la raíz del documento, este test se pone rojo y
+    // obliga a vaciar la lista. Una excepción que nadie vigila se queda para
+    // siempre.
+    expect(PENDIENTES_DE_LA_TAREA_1_3).toEqual(['gml/serialize-cp.js'])
+    for (const rel of PENDIENTES_DE_LA_TAREA_1_3) expect(FUENTES).toContain(rel)
+    const texto = readFileSync(join(RAIZ, 'gml/serialize-cp.js'), 'utf8')
+    expect(
+      FRASE_CADUCADA.test(texto),
+      'gml/serialize-cp.js ya no sostiene la frase caducada: quítalo de ' +
+        'PENDIENTES_DE_LA_TAREA_1_3 y deja que el guardián lo mire como a los demás',
+    ).toBe(true)
+  })
 })

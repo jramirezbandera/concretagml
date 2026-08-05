@@ -62,8 +62,14 @@ function deepFreeze(valor) {
 
 /**
  * Valida la invariante estructural: si hay recintos, `recintos[0]` es EXTERIOR y
- * todos los demás son HUECO (multiparcela está fuera de alcance). Lanza —de
- * forma NO silenciosa— si detecta algo raro (regla 1).
+ * todos los demás son HUECO. Lanza —de forma NO silenciosa— si detecta algo raro
+ * (regla 1).
+ *
+ * ⚠️ Decía «(multiparcela está fuera de alcance)» y **eso caducó el 2026-08-03**
+ * (override O18: la Sede acepta un `.gml` con N `gml:featureMember`). El
+ * invariante NO cambia y el motivo sí: una `Parcela` es UN exterior con huecos, y
+ * varias piezas que no se tocan son varias `Parcela`, cada una con su `idLocal`.
+ * El cuerpo de la función ya lo decía bien; esta línea se había quedado atrás.
  */
 function validarInvarianteExterior(recintos, contexto) {
   if (recintos.length === 0) return

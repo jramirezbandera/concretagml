@@ -253,8 +253,10 @@ describe('comprobacion/gml.js · un caso por fichero', () => {
     // Por defecto, la primera.
     expect(c.elegido).toBe(0)
 
-    // Y el llamante manda: SOLO entra la elegida, nunca la unión de las tres
-    // (multiparcela está fuera de alcance, SPEC §1).
+    // Y el llamante manda: SOLO entra la elegida, nunca la unión de las tres.
+    // ⚠️ El motivo dejó de ser «multiparcela está fuera de alcance» el 2026-08-03
+    // (override O18): es que la comprobación describe UNA parcela, y la unión de
+    // tres no sería ninguna de las que trae el fichero.
     const segunda = comprobarFixture(MULTI, { indiceElegido: 1 })
     expect(segunda.elegido).toBe(1)
     expect(segunda.geometria.recintos).toHaveLength(1)

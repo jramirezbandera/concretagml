@@ -541,8 +541,9 @@ describe('viewer/cajon-comprobacion.js · tres parcelas (derivados/cp_multiparce
   })
 
   it('son RADIOS del mismo grupo: una elección, no varias', () => {
-    // Un `checkbox` diría que se pueden comprobar dos a la vez, y multiparcela está
-    // fuera de alcance (SPEC §1): se elige UNA y las demás se quedan en el fichero.
+    // Un `checkbox` diría que se pueden comprobar dos a la vez, y aquí se elige UNA:
+    // las demás se quedan en el fichero. ⚠️ No es que «multiparcela esté fuera de
+    // alcance» —caducó el 2026-08-03, override O18—: es que se comprueba de una en una.
     const { raiz } = conFichero(MULTI)
     const radios = [...raiz.querySelectorAll(SELECTOR_MIEMBRO)]
     for (const r of radios) expect(r.type).toBe('radio')
@@ -601,7 +602,7 @@ describe('viewer/cajon-comprobacion.js · tres parcelas (derivados/cp_multiparce
     expect(nombreA).not.toBe(nombreB)
   })
 
-  it('se DICE que las otras se quedan en el fichero (multiparcela está fuera de alcance)', () => {
+  it('se DICE que las otras se quedan en el fichero, que es lo que hay que saber', () => {
     const { raiz } = conFichero(MULTI)
     expect(texto(raiz, SELECTOR.MIEMBROS)).toContain('3 parcelas')
     expect(texto(raiz, SELECTOR.MIEMBROS)).toMatch(/se quedan\s+en el fichero/)

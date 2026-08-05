@@ -588,9 +588,14 @@ function queSeLeyo({ num, comprobacion }) {
   }
 
   // ── Las parcelas del fichero ───────────────────────────────────────────────
-  // Multiparcela está fuera de alcance (SPEC §1): se ELIGE una, nunca se unen. Las
-  // demás se listan porque quedan en el fichero y el usuario tiene derecho a saber
-  // que están ahí y que no entran en este informe.
+  // Se ELIGE una, nunca se unen. Las demás se listan porque quedan en el fichero y
+  // el usuario tiene derecho a saber que están ahí y que no entran en este informe.
+  //
+  // ⚠️ El motivo ya NO es «multiparcela está fuera de alcance (SPEC §1)»: eso
+  // caducó el 2026-08-03 con el override O18. Es que **este informe describe UNA
+  // parcela**, y por eso la lista con su `<-- ELEGIDA` es imprescindible y no
+  // decorativa — es lo único que impide leer el papel como si abarcara el fichero
+  // entero. F17 traslada exactamente este patrón al PDF firmable.
   salida.push('', `  Parcelas que trae el fichero: ${plural(miembros.length, 'parcela', 'parcelas')}`)
   if (miembros.length === 0) {
     salida.push('    El fichero no trae parcelas legibles.')

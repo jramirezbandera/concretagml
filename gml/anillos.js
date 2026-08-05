@@ -403,7 +403,12 @@ const mismoPunto = (a, b) => a[0] === b[0] && a[1] === b[1]
 /**
  * Valida la estructura que exigen {@link prepararRecintos} y
  * {@link puntoInterior}: array no vacío, `recintos[0]` EXTERIOR y el resto
- * HUECO (multiparcela está fuera de alcance, SPEC §1).
+ * HUECO.
+ *
+ * ⚠️ Decía «(multiparcela está fuera de alcance, SPEC §1)» y eso **caducó el
+ * 2026-08-03** (override O18). Lo que exige un exterior único no es el alcance de
+ * la entrega: es que estas funciones preparan LOS ANILLOS DE UNA PARCELA. Un
+ * fichero con N parcelas pasa por aquí N veces, una por miembro.
  *
  * LANZA en vez de emitir detección a propósito: el invariante lo impone
  * `model/parcela.js` desde F00 y `geo/area.js#superficie` ya lanza por lo mismo.

@@ -84,8 +84,13 @@
 // lo que prohíbe la regla de oro 9.
 //
 // ── ESTE MÓDULO NO DECIDE QUÉ PARCELA SE COMPRUEBA ──────────────────────────
-// Un GML ajeno puede traer varias y **multiparcela está fuera de alcance** (SPEC
-// §1): se elige UNA, nunca se unen, y las demás se quedan en el fichero. El índice
+// Un GML ajeno puede traer varias: se elige UNA, nunca se unen, y las demás se
+// quedan en el fichero. ⚠️ El motivo dejó de ser «multiparcela está fuera de
+// alcance (SPEC §1)» el 2026-08-03 —la ENTREGA de N parcelas en un fichero existe
+// (override O18)— y pasó a ser éste: **la comprobación y el diagnóstico describen
+// UNA parcela**, y unir varias daría una geometría que no es ninguna de las del
+// fichero. Que el usuario pueda elegir es la respuesta correcta, y lo era ya. El
+// índice
 // lo manda el llamante (`indiceElegido`), igual que `parsearGml` devuelve TODAS las
 // parcelas y no elige. Lo único que se hace aquí es decir cuál se ha cogido.
 //

@@ -604,10 +604,17 @@ function leerGeometria(ctx, miembro, feature, nsFeature, srsNames, tolerarPolygo
         ctx,
         miembro,
         TIPO_GML.MULTIPLES_CARAS,
+        // ⚠️ Este mensaje decía «la multiparcela está fuera de alcance (SPEC §1)»
+        // y eso CADUCÓ el 2026-08-03 (override O18: la Sede acepta un fichero con
+        // N `gml:featureMember`). Lo que sigue siendo cierto es lo otro, y es de
+        // lo que va este aviso: varias CARAS dentro de UNA `cp:CadastralParcel`
+        // no son varias parcelas, son una parcela mal expresada. Ahora el mensaje
+        // dice qué hacer en su lugar, que es lo que le faltaba.
         `La geometría trae ${nSurfaceMembers} «gml:surfaceMember». Una parcela es UN ` +
-          'perímetro exterior con sus huecos como «interior», no varias caras: la ' +
-          'multiparcela está fuera de alcance (SPEC §1) y el IVG rechaza el MultiPolygon. ' +
-          'Se lee el primero y los demás se dejan fuera.',
+          'perímetro exterior con sus huecos como «interior», no varias caras. Si son ' +
+          'piezas que no se tocan, cada una es una parcela distinta y van como varios ' +
+          '«gml:featureMember», no como varias caras de la misma. Se lee el primero y ' +
+          'los demás se dejan fuera.',
         SEVERIDAD.ERROR,
         { surfaceMembers: nSurfaceMembers },
       )
