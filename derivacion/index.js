@@ -34,6 +34,16 @@ export {
 // la aplicación puede usar sin volver a interpretar nada.
 export { derivarCesion } from './cesion.js'
 
+// El expediente entero: derivar, validar cada pieza, comprobar que CIERRA, proponer
+// el acto jurídico y escribir un `.gml` con N miembros. ⚠️ NO descarga: quien tiene
+// `Blob` es `gml/descargar.js`, que se queda fuera del barrel raíz.
+export { prepararEntrega } from './entrega.js'
+
+// Qué acto jurídico dice ser esto. Sale aparte de `entrega.js` porque lo consumen
+// también el diálogo del informe y el propio informe, y ninguno de los dos debe
+// arrastrar el orquestador —ni con él a Turf— para imprimir una palabra.
+export { AVISO_DECLARATIVO, ROTULO_OPERACION, TIPO_OPERACION, tipoDeOperacion } from './operacion.js'
+
 // Quién es cada parcela del expediente. Sale porque lo necesitan tres sitios que no
 // se ven entre sí —la matriz en `app/`, la cesión en `derivacion/entrega.js` y el
 // informe— y porque tenerlo escrito una vez es lo que impide que la pareja

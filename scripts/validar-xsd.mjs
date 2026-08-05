@@ -51,13 +51,23 @@ import { join, resolve } from 'node:path'
 const RAIZ = resolve(import.meta.dirname, '..')
 
 /**
- * Los GML que se validan si no se pasa ninguno: los dos snapshots del round-trip.
+ * Los GML que se validan si no se pasa ninguno: los snapshots del round-trip.
  * El de ENTREGA es el que importa —es la forma que produce la app— y el de WFS
  * está a propósito para que se vea que SE COMPORTAN DISTINTO: contra `cp/4.0` a
  * secas, el de entrega valida y el de WFS no. Esa asimetría es el hallazgo.
+ *
+ * ⭐ F17 añade el TERCERO: un expediente REAL de dos `gml:featureMember`, derivado
+ * por `derivacion/entrega.js` sobre la geometría oficial de `7136910UF1473N` —el
+ * único envío de este proyecto con IVG positivo— y escrito por la suite
+ * (`test/derivacion/entrega.test.js`). No es una variante de laboratorio: es la
+ * forma de fichero que la Sede aceptó el 2026-08-03, y hasta hoy ninguna
+ * comprobación automática la miraba. Que el esquema no exprese las reglas de
+ * negocio del IVG no lo hace menos necesario: **que esto falle sí garantiza un
+ * problema**, y esa es la red que faltaba para el sobre de varias parcelas.
  */
 const GML_POR_DEFECTO = [
   join(RAIZ, 'test', 'gml', '__snapshots__', 'parcela-entrega.gml'),
+  join(RAIZ, 'test', 'gml', '__snapshots__', 'expediente-entrega.gml'),
   join(RAIZ, 'test', 'fixtures', 'gml', 'cp_ejemplo_explicativo.gml'),
 ]
 

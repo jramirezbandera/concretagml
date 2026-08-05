@@ -23,13 +23,22 @@ import * as barrel from '../../derivacion/index.js'
 import * as raiz from '../../index.js'
 
 describe('derivacion/_comun · el léxico de la capa', () => {
-  it('cubre los seis casos de la fase, y las claves valen su propio nombre', () => {
-    // Vocabulario COMPLETO desde ya, aunque la tarea 1.2 solo emita tres: `cesion.js`
-    // y `entrega.js` hablan este mismo idioma, como hicieron los cuatro léxicos
-    // anteriores. Clave === valor para que una detección se lea sola en un volcado.
+  it('cubre los casos de MEDIR el sobrante y los de ARMAR el expediente', () => {
+    // ⚠️ La tarea 1.2 escribió «vocabulario COMPLETO desde ya» y lo era para lo que
+    // entonces se sabía: los seis primeros son de MEDIR. Los cuatro de la fase 3 son
+    // de ARMAR —qué entra en el fichero, si cierra, si cada pieza valida—, que es
+    // otra pregunta y no se podía nombrar antes de que existiera `entrega.js`. Se
+    // añadieron en vez de estirar los otros: `REGION_NO_APTA` significa «no se pudo
+    // construir la geometría», y usarlo para «la pieza no valida» dejaría a la
+    // interfaz sin distinguir un fallo del motor de un lindero que se cruza solo.
+    // Clave === valor para que una detección se lea sola en un volcado.
     expect(Object.keys(TIPO_DERIVACION).sort()).toEqual([
+      'CONJUNTO_NO_CIERRA',
       'CRECE_FUERA',
+      'ENTREGA_LISTA',
       'PIEZA_ESTRECHA',
+      'PIEZA_EXCLUIDA',
+      'PIEZA_INVALIDA',
       'REGION_NO_APTA',
       'RESTA_FALLIDA',
       'SIN_GEOMETRIA_OFICIAL',
@@ -73,20 +82,26 @@ describe('derivacion/_comun · el léxico de la capa', () => {
 describe('derivacion/index · el barrel expone el vocabulario y NADA de geometría', () => {
   it('saca el léxico entero, la derivación y la identidad — y nada más', () => {
     // ⚠️ Lista CERRADA a propósito, y crece con la capa: la fase 2 le añadió
-    // `derivarCesion` y las cinco cosas de `identidad.js`. Lo que este test defiende
-    // no es el tamaño de la lista, es que nada entre aquí sin que alguien lo escriba.
+    // `derivarCesion` y las cinco cosas de `identidad.js`, y la 3 el orquestador y
+    // el acto jurídico. Lo que este test defiende no es el tamaño de la lista, es
+    // que nada entre aquí sin que alguien lo escriba.
     expect(Object.keys(barrel).sort()).toEqual([
+      'AVISO_DECLARATIVO',
       'MOTIVO_RESTA',
       'NAMESPACE_CATASTRO',
       'NAMESPACE_LOCAL',
+      'ROTULO_OPERACION',
       'SEPARADOR_SEGREGADA',
       'SEVERIDAD',
       'TIPO_DERIVACION',
+      'TIPO_OPERACION',
       'crearDeteccionDerivacion',
       'derivarCesion',
       'identidadDeCesion',
       'identidadDeParcela',
+      'prepararEntrega',
       'resumirDetecciones',
+      'tipoDeOperacion',
     ])
   })
 

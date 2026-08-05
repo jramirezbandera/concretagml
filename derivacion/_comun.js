@@ -60,6 +60,23 @@ export const TIPO_DERIVACION = Object.freeze({
   CRECE_FUERA: 'CRECE_FUERA',
   /** No hay `geometriaOficial` contra la que restar (dibujo a mano, DXF, TXT). */
   SIN_GEOMETRIA_OFICIAL: 'SIN_GEOMETRIA_OFICIAL',
+  // ── Los de la ENTREGA (fase 3), que la fase 2 no podía prever ─────────────
+  // ⚠️ El JSDoc de arriba decía «vocabulario COMPLETO desde ya», y lo era para lo
+  // que la fase 1 sabía: los seis de arriba son los de MEDIR el sobrante. Estos
+  // cuatro son de ARMAR el expediente, que es una pregunta distinta —qué entra en
+  // el fichero, si cierra, y si cada pieza pasa la validación—, y no se podían
+  // nombrar antes de que existiera `entrega.js`. Se añaden en vez de reinterpretar
+  // los de arriba: `REGION_NO_APTA` significa «no se pudo construir la geometría»
+  // y estirarlo a «la pieza no valida» dejaría a la interfaz sin poder distinguir
+  // un fallo del motor de un lindero que se cruza consigo mismo.
+  /** El expediente sale: se ha mirado todo y no hay nada que impida entregarlo. */
+  ENTREGA_LISTA: 'ENTREGA_LISTA',
+  /** Una pieza incluida NO pasa `validation/parcela.js`: no puede ir al fichero. */
+  PIEZA_INVALIDA: 'PIEZA_INVALIDA',
+  /** El usuario ha dejado fuera una pieza del sobrante. Se dice SIEMPRE. */
+  PIEZA_EXCLUIDA: 'PIEZA_EXCLUIDA',
+  /** Lo que se va a entregar NO cubre el contorno oficial: el IVG saldría negativo. */
+  CONJUNTO_NO_CIERRA: 'CONJUNTO_NO_CIERRA',
 })
 
 /**
