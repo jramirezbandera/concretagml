@@ -230,11 +230,16 @@ describe('la receta de derivación de PROCEDENCIA.md reproduce los ficheros del 
     // los fixtures sintéticos entrarían en las pruebas de los reales.
     const barrido = readdirSync(DIR_REALES).filter((n) => n.toLowerCase().endsWith('.gml'))
     for (const nombre of DERIVADOS) expect(barrido).not.toContain(nombre)
+    // El inventario se escribe entero, y por eso esta prueba salió roja el
+    // 2026-08-05 al entrar `cp_parcela_7136910UF1473N.gml` (F17): un fixture nuevo
+    // no puede colarse en los barridos de nadie sin que alguien lo mire, que es la
+    // mitad del trabajo de este fichero.
     expect(barrido.sort()).toEqual([
       'UTM_1.gml',
       'bu_building_9398516VK3799G.gml',
       'bu_buildingpart_9398516VK3799G.gml',
       EJEMPLO,
+      'cp_parcela_7136910UF1473N.gml',
       DESCARGA,
     ])
   })

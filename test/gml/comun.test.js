@@ -445,7 +445,16 @@ describe('gml/_comun · DIALECTOS — clasifica los cuatro fixtures del disco', 
       .map((a) => a.nombre)
       .sort()
     expect(soportados).toEqual(featureEnCp40)
-    expect(soportados).toHaveLength(2)
+    // Eran DOS hasta el 2026-08-05. El tercero es `cp_parcela_7136910UF1473N.gml`,
+    // la geometría oficial del expediente de oro de F17 (`PROCEDENCIA.md`), que es
+    // otra descarga del mismo WFS: mismo dialecto, otra parcela. Se cuentan por
+    // nombre y no solo por cantidad, porque el número solo dice cuántos hay y lo
+    // que importa aquí es CUÁLES.
+    expect(soportados).toEqual([
+      'cp_ejemplo_explicativo.gml',
+      'cp_parcela_7136910UF1473N.gml',
+      'cp_parcela_9398516VK3799G.gml',
+    ])
   })
 
   it('los dos CP 4.0 son soportados y se distinguen por el SOBRE, no por el contenido', () => {

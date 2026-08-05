@@ -307,8 +307,40 @@ function unicoDeDialecto(id) {
   return encontrados[0]
 }
 
-/** El dato OFICIAL: la parcela 4.0 del WFS. Es la verdad-terreno de todo esto. */
-const CP40 = unicoDeDialecto(DIALECTO.CP_4_0_WFS)
+/**
+ * El fixture de un dialecto que se pide POR NOMBRE, y que tiene que ser de ese
+ * dialecto.
+ *
+ * ⛔ Existe desde el 2026-08-05 y sustituye a `unicoDeDialecto` para el WFS, por
+ * un motivo que conviene entender antes de tocarlo: hasta F17 había UN solo GML
+ * de descarga en el disco, y «el único de su dialecto» y «la parcela de
+ * referencia de F04» eran la misma frase. Dejaron de serlo cuando entró
+ * `cp_parcela_7136910UF1473N.gml`, que es la geometría oficial del expediente de
+ * oro de F17 y no tiene nada que ver con la aceptación de F04.
+ *
+ * Se pide por nombre y NO se relaja el guardián: si el fichero no está, o si
+ * dejara de clasificarse como se espera, esto lanza igual. Lo que se abandona es
+ * la exclusividad, que era una propiedad del inventario y no de esta fase.
+ */
+function deDialectoLlamado(id, nombre) {
+  const encontrado = deDialecto(id).find((f) => f.nombre === nombre)
+  if (!encontrado) {
+    throw new Error(
+      `test/fixtures/gml/${nombre} debe existir y ser de dialecto ${id}; ` +
+        `de ese dialecto hay ${JSON.stringify(deDialecto(id).map((f) => f.nombre))}.`,
+    )
+  }
+  return encontrado
+}
+
+/**
+ * El dato OFICIAL: la parcela 4.0 del WFS. Es la verdad-terreno de todo esto.
+ *
+ * `9398516VK3799G` es LA parcela de referencia del proyecto —la que recorre F01
+ * a F11— y el round-trip de F04 se mide contra ella, no contra «la descarga que
+ * haya». Ver `deDialectoLlamado`.
+ */
+const CP40 = deDialectoLlamado(DIALECTO.CP_4_0_WFS, 'cp_parcela_9398516VK3799G.gml')
 /** El CONTRAEJEMPLO: alta de particular en CP 3.0, de otro generador. */
 const UTM1 = unicoDeDialecto(DIALECTO.CP_3_0)
 /** Los GML de EDIFICIO: aportan el caso donde `boundedBy` SÍ existe de verdad. */
@@ -960,9 +992,15 @@ describe('F04 · guardián 12 · tabla de dialectos frente a los GML del disco',
     for (const f of FIXTURES) {
       expect(f.leido.soportado, `${f.nombre} (${f.leido.dialecto})`).toBe(esCp40(f.leido.dialecto))
     }
-    // Anti-vacuidad por los dos lados: hay soportados y hay rechazados.
+    // Anti-vacuidad por los dos lados: hay soportados y hay rechazados. Lo que se
+    // defiende aquí es la PROPIEDAD —soportado ⇔ el feature va en cp/4.0—, no el
+    // censo del directorio, que tiene su guardián propio en `comun.test.js` y en
+    // `fixtures-derivados.test.js`. Decía `toBe(2)` hasta el 2026-08-05, y el
+    // tercero (`cp_parcela_7136910UF1473N.gml`, el expediente de oro de F17) lo
+    // ponía rojo sin que nada estuviera mal: un número de inventario repetido en
+    // tres sitios envejece en tres sitios.
     const soportados = FIXTURES.filter((f) => f.leido.soportado)
-    expect(soportados.length).toBe(2)
+    expect(soportados.length).toBeGreaterThan(0)
     expect(FIXTURES.length - soportados.length).toBeGreaterThan(0)
   })
 

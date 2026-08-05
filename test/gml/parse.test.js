@@ -230,15 +230,17 @@ describe('gml/parse · clasifica los CINCO fixtures del disco en su dialecto', (
     }
   })
 
-  it('los soportados son los DOS de CP 4.0, y son los únicos sin `bloqueos`', () => {
+  it('los soportados son los TRES de CP 4.0, y son los únicos sin `bloqueos`', () => {
     // Eran «exactamente UNO» hasta el 2026-07-27, cuando se descubrió que el
     // fichero que la Sede ADMITE —la plantilla oficial— era uno de los que este
-    // lector rechazaba por no traer la raíz de WFS.
+    // lector rechazaba por no traer la raíz de WFS. Y DOS hasta el 2026-08-05,
+    // cuando entró `cp_parcela_7136910UF1473N.gml`: la geometría oficial del
+    // expediente de oro de F17, otra descarga del mismo WFS.
     const soportados = ANALISIS.filter((a) => parsear(a).soportado).map((a) => a.nombre)
     const sinBloqueos = ANALISIS.filter((a) => parsear(a).resumen.bloqueos.length === 0).map(
       (a) => a.nombre,
     )
-    expect(soportados).toHaveLength(2)
+    expect(soportados).toHaveLength(3)
     expect(sinBloqueos).toEqual(soportados)
     expect(soportados).toContain('cp_ejemplo_explicativo.gml')
   })

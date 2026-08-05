@@ -129,3 +129,72 @@ la colección vacía y la página de error del 404.
 guardar la envolvente con otro nombre —lo que `SPEC.md` §23.3 prohíbe— **y contar su
 superficie dos veces**. El lector lo dice nombrando `GetBuildingPartByParcel`, que es de
 donde sale lo que falta.
+
+## `cp_parcela_7136910UF1473N.gml` — ⭐ EL EXPEDIENTE DE ORO DE F17
+
+**La geometría oficial contra la que se contrasta el cierre de un expediente de varias
+parcelas.** Es el único caso de todo el proyecto donde **tres fuentes independientes
+coinciden** sobre la misma superficie y donde además hay un **IVG positivo** detrás
+(CSV `XMWPXCN9J8DB9J89`, 03/08/2026, tipo de operación *Segregación*; `SPEC.md` §7.1).
+
+| | |
+|---|---|
+| Origen | `https://ovc.catastro.meh.es/INSPIRE/wfsCP.aspx?service=wfs&version=2&request=getfeature&STOREDQUERIE_ID=GetParcel&refcat=7136910UF1473N&srsname=EPSG::25830` |
+| Cómo se pidió | `urlGetParcel('7136910UF1473N', 'EPSG:25830')` de `services/_catastro-wfs.js` — la MISMA llamada que hace la aplicación en producción |
+| Descargado | 2026-08-05 · `HTTP 200` · `text/xml; charset=utf-8` |
+| SHA-256 del original | `b95116e302e9aca5def530e68602c6c4c66d2033891fd9bf38fdc21397224f4d` (2.811 B, CRLF) |
+| Aquí | 2.770 B, LF por `.gitattributes` · SHA-256 `21e30de868b43e9e996b52f500f377927606dc6aedaca44a135f0760704126bd` |
+| Parcela | **7136910UF1473N** — Benahavís, Málaga |
+
+**Lo medido el 2026-08-05 con el código de este repositorio** (`gml/parse.js` +
+`geo/area.js`), sobre estos bytes:
+
+| | |
+|---|---|
+| `areaValue` declarado | **466** m² |
+| Shoelace propio sobre los 12 vértices | **466,2141** m² |
+| `localId` / `namespace` | `7136910UF1473N` / `ES.SDGC.CP` |
+| Recintos · vértices · huecos | 1 · 12 · 0 |
+| Orientación | `[-1]` (exterior HORARIO) |
+| Detecciones al leerlo | `ENCODING_DECLARADO` (aviso) · `CIERRE_RETIRADO` (info) |
+
+Y así es como cierra el expediente que la Sede aceptó, que es para lo que existe el
+fixture:
+
+| Fuente | Superficie del conjunto |
+|---|---|
+| Shoelace propio sobre las dos piezas entregadas (445,34 + 20,88) | 466,22 m² |
+| **Este fichero** — WFS del Catastro | 466 declarado · **466,2141** shoelace |
+| La propia Sede, panel del IVG: `AFECTADAS` | 466 m² |
+
+Residuo entre lo entregado y lo oficial: **59,5 cm²** sobre 466 m² con un perímetro de
+~90 m, o sea ruido de cuantización a 2 decimales. **No es un hueco**, y por eso el
+comprobador de conjunto de F17 afirma con una tolerancia DECLARADA y no con un `==`, que
+sobre float64 redondeado sería falso.
+
+⚠️ **`SPEC.md` §7.1 publica 0,0064 m² y la cuenta que se puede REHACER hoy da 0,00595.**
+No se contradicen: aquella cifra salió de las superficies **sin redondear** de las dos
+piezas, y las que la tabla publica ya vienen a 2 decimales (445,34 y 20,88). Los 4,5 cm²
+de diferencia entre las dos cuentas son exactamente eso, la diferencia entre medir con las
+cifras completas y medir con las publicadas. Reproducir el 0,0064 exigiría el `.gml` de
+dos miembros que se subió, y **ese fichero no está versionado**. Para lo que la cifra
+defiende da igual cuál sea: las dos son mayores que cero, y es eso lo que mata al `==`.
+Lo ejecuta `test/gml/fixture-oro-f17.test.js`.
+
+⚠️ **EL PARCELARIO SIGUE SIN LA SEGREGACIÓN, y es lo que hace útil al fichero.** Se
+descargó dos días DESPUÉS del IVG positivo y el Catastro sigue publicando los 466 m² de
+la matriz entera: la alteración está presentada, no incorporada. Eso es exactamente lo
+que la aplicación tiene delante cuando alguien deriva un sobrante —la geometría oficial
+es el ANTES—, así que el fixture reproduce la situación real y no una posterior.
+
+⚠️ **Declara `encoding="ISO-8859-1"` y sus bytes son UTF-8**, igual que
+`cp_parcela_9398516VK3799G.gml`: el fichero miente sobre sí mismo y no se corrige. Que
+dos descargas independientes del mismo servicio, con nueve días de diferencia, mientan
+igual, confirma que es del servicio y no de una descarga concreta.
+
+⛔ **LO QUE ESTE FIXTURE NO ES: el fichero que se subió.** Aquí está el ANTES —la
+geometría oficial—, no las dos piezas entregadas. El `.gml` de dos `featureMember` que
+obtuvo el CSV `XMWPXCN9J8DB9J89` **no está versionado**, y sus cifras (445,34 y 20,88)
+viven solo en la tabla de `SPEC.md` §7.1. Mientras siga así, la prueba de cierre de F17
+puede contrastar contra los **466,2141** de aquí, pero no reproducir byte a byte lo que
+la Sede aceptó.
