@@ -96,7 +96,7 @@
 // Todo lo demás de este fichero existe para poder leer lo que devuelven.
 
 export { parsearGml } from './parse.js'
-export { serializarParcelaCp } from './serialize-cp.js'
+export { serializarParcelaCp, serializarExpedienteCp } from './serialize-cp.js'
 
 // ── F11: el segundo lector, y por qué es PÚBLICO ─────────────────────────────
 // `parsearGmlBu` lee el dialecto BU (edificio), que `parsearGml` se niega a leer

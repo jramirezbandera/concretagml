@@ -1232,25 +1232,54 @@ describe('guarda transversal Fase 4 · partición de tests derivada y fuente sin
   const CERCA = 8
 
   /**
-   * ⏳ Pendientes A PROPÓSITO, y no es una lista de perdón: los tres comentarios
-   * caducados de `gml/serialize-cp.js` los reescribe la **tarea 1.3** de F17, que
-   * es la que convierte `MIEMBROS = 1` en un bucle de `gml:featureMember` y toca
-   * esa misma zona. Arreglarlos aquí sería meter dos tareas en el mismo fichero
-   * (el plan lo señala como conflicto). **Cuando 1.3 entre, esta lista se vacía y
-   * la prueba de más abajo lo exige.**
+   * ✅ **VACÍA desde el 2026-08-05.** Tuvo dentro `gml/serialize-cp.js` mientras la
+   * fase 0 no podía tocarlo: sus comentarios caducados los reescribía la tarea 1.3,
+   * que es la que convierte `MIEMBROS = 1` en un documento de N `gml:featureMember`
+   * y toca esa misma zona; arreglarlos antes habría metido dos tareas en el mismo
+   * fichero. **La tarea 1.3 entró y la lista se vació**, que es exactamente lo que
+   * la última prueba de este bloque exigía.
+   *
+   * Se deja declarada, y no se borra el mecanismo: la próxima excepción que haga
+   * falta tiene dónde ir y con qué vigilarse. Una excepción que nadie vigila se
+   * queda para siempre.
    */
-  const PENDIENTES_DE_LA_TAREA_1_3 = Object.freeze(['gml/serialize-cp.js'])
+  const PENDIENTES_DE_LA_TAREA_1_3 = Object.freeze([])
+
+  /**
+   * El texto de un comentario APLANADO: sin saltos de línea y sin los `//`, `*` o
+   * `#` que arrastra el ajuste de línea, con un mapa de vuelta a la línea original.
+   *
+   * ⛔ Existe porque la primera versión de este guardián escaneaba línea a línea, y
+   * eso lo dejaba ciego ante lo más normal del mundo: **la frase partida en dos
+   * renglones**. Ocurrió el mismo día, en `gml/serialize-cp.js` —«…justificada con
+   * «multiparcela está / fuera de alcance»…»— y el guardián la dio por ausente. Un
+   * detector que solo ve lo que cabe en 100 columnas no protege de nada.
+   */
+  function aplanar(texto) {
+    const lineas = texto.split('\n')
+    let plano = ''
+    const lineaDe = []
+    lineas.forEach((linea, i) => {
+      const limpia = linea.replace(/^\s*(?:\/\/+|\*+|#)\s?/, '')
+      for (let c = 0; c < limpia.length; c += 1) lineaDe.push(i + 1)
+      plano += limpia
+      lineaDe.push(i + 1)
+      plano += ' '
+    })
+    return { plano, lineaDe, lineas }
+  }
 
   const afirmacionesCaducadas = () => {
     const infractores = []
     for (const rel of FUENTES) {
       if (PENDIENTES_DE_LA_TAREA_1_3.includes(rel)) continue
-      const lineas = readFileSync(join(RAIZ, rel), 'utf8').split('\n')
-      lineas.forEach((linea, i) => {
-        if (!FRASE_CADUCADA.test(linea)) return
+      const { plano, lineaDe, lineas } = aplanar(readFileSync(join(RAIZ, rel), 'utf8'))
+      for (const casa of plano.matchAll(new RegExp(FRASE_CADUCADA, 'gi'))) {
+        const linea = lineaDe[casa.index] ?? 1
+        const i = linea - 1
         const contexto = lineas.slice(Math.max(0, i - CERCA), i + CERCA + 1).join('\n')
-        if (!MARCA_RETRACTADA.test(contexto)) infractores.push(`${rel}:${i + 1}`)
-      })
+        if (!MARCA_RETRACTADA.test(contexto)) infractores.push(`${rel}:${linea}`)
+      }
     }
     return infractores
   }
@@ -1278,17 +1307,30 @@ describe('guarda transversal Fase 4 · partición de tests derivada y fuente sin
     expect(MARCA_RETRACTADA.test(sinMarca)).toBe(false)
   })
 
-  it('⏳ la deuda de la tarea 1.3 está declarada y es exactamente un fichero', () => {
-    // El día que 1.3 reescriba la raíz del documento, este test se pone rojo y
-    // obliga a vaciar la lista. Una excepción que nadie vigila se queda para
-    // siempre.
-    expect(PENDIENTES_DE_LA_TAREA_1_3).toEqual(['gml/serialize-cp.js'])
-    for (const rel of PENDIENTES_DE_LA_TAREA_1_3) expect(FUENTES).toContain(rel)
-    const texto = readFileSync(join(RAIZ, 'gml/serialize-cp.js'), 'utf8')
-    expect(
-      FRASE_CADUCADA.test(texto),
-      'gml/serialize-cp.js ya no sostiene la frase caducada: quítalo de ' +
-        'PENDIENTES_DE_LA_TAREA_1_3 y deja que el guardián lo mire como a los demás',
-    ).toBe(true)
+  it('✅ la deuda de la tarea 1.3 está SALDADA: no queda ninguna excepción', () => {
+    // Este test pedía lo contrario hasta que 1.3 entró: exigía que la lista tuviera
+    // dentro `gml/serialize-cp.js` y que ese fichero siguiera sosteniendo la frase.
+    // Ahora exige que no quede nada, que es la otra mitad del mismo trato — una
+    // excepción declarada tiene que poder cerrarse, y cerrarla tiene que notarse.
+    expect(PENDIENTES_DE_LA_TAREA_1_3).toEqual([])
+    // Y el fichero que estaba exento pasa por el guardián general como los demás:
+    // menciona la frase, pero solo para decir que caducó. Se mira sobre el texto
+    // APLANADO porque allí la frase va partida en dos renglones — que es justo lo
+    // que destapó el hueco del detector.
+    const { plano } = aplanar(readFileSync(join(RAIZ, 'gml/serialize-cp.js'), 'utf8'))
+    expect(FRASE_CADUCADA.test(plano)).toBe(true)
+    expect(afirmacionesCaducadas()).toEqual([])
+  })
+
+  it('⛔ el detector ve la frase aunque esté PARTIDA en dos líneas', () => {
+    // El hueco que tenía la primera versión, hecho test. Sin esto, envolver el
+    // comentario a 100 columnas bastaría para que una justificación muerta
+    // sobreviviera al guardián sin que nadie lo pretendiera.
+    const partida = '// justificada con «multiparcela está\n// fuera de alcance», y ya no.\n'
+    expect(FRASE_CADUCADA.test(partida), 'sin aplanar NO se ve').toBe(false)
+    expect(FRASE_CADUCADA.test(aplanar(partida).plano), 'aplanada SÍ').toBe(true)
+    // Y el mapa devuelve la línea donde EMPIEZA, que es donde hay que mirar.
+    const { plano, lineaDe } = aplanar(partida)
+    expect(lineaDe[plano.search(FRASE_CADUCADA)]).toBe(1)
   })
 })

@@ -143,9 +143,13 @@
 // `numberMatched` / `numberReturned` se emiten en `PERFIL.WFS`. La plantilla
 // anotada del dossier los omite; el XSD de WFS 2.0 los declara `use="required"`
 // en `FeatureCollection` y el fichero real del WFS los trae. Manda el fichero
-// (regla de oro 8). Se derivan del nº de miembros, que hoy es siempre 1
-// (multiparcela está fuera de alcance, SPEC §1). En `PERFIL.ENTREGA` no existen:
-// la raíz no es de WFS y esos atributos no están declarados en ningún sitio.
+// (regla de oro 8). Se derivan del nº de miembros del documento, que **desde F17
+// puede ser mayor que 1**: `serializarExpedienteCp` escribe varias parcelas en un
+// solo fichero (override O18, medido con IVG positivo el 2026-08-03). ⚠️ Hasta
+// entonces esto era la constante `MIEMBROS = 1` justificada con «multiparcela está
+// fuera de alcance», y esa justificación caducó — era cierta en F04 y dejó de
+// serlo—. En `PERFIL.ENTREGA` no existen: la raíz no es de WFS y esos atributos no
+// están declarados en ningún sitio.
 //
 // El `gml:id` de la raíz (solo en `PERFIL.ENTREGA`, donde la raíz hereda de
 // `gml:AbstractGML` y lo exige) es el NAMESPACE INSPIRE —`ES.LOCAL.CP`— y no la
@@ -273,12 +277,20 @@ export const SRS_DIMENSION = '2'
 export const RE_DATETIME_CATASTRO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/
 
 /**
- * Miembros del documento. HOY es siempre 1: multiparcela está fuera de alcance
- * (SPEC §1). De aquí salen `numberMatched` y `numberReturned` de la raíz, que se
- * DERIVAN en vez de escribirse a mano para que el día que entren varias parcelas
- * no queden dos sitios que actualizar.
+ * Miembros del documento cuando se serializa UNA parcela. De aquí salen
+ * `numberMatched` y `numberReturned` de la raíz, que se DERIVAN en vez de
+ * escribirse a mano.
+ *
+ * ⭐ **Ese «día que entren varias parcelas» llegó el 2026-08-03** (override O18: la
+ * Sede aceptó un `.gml` con dos `gml:featureMember` e IVG positivo), y el JSDoc de
+ * esta constante lo anticipaba desde F04. Ya no es que «multiparcela esté fuera de
+ * alcance» —dejó de estarlo—: es que **una llamada a `serializarParcelaCp`
+ * serializa una parcela**, y el documento de varias lo escribe
+ * {@link serializarExpedienteCp}, que pasa su propio recuento.
+ *
+ * @readonly
  */
-const MIEMBROS = 1
+const MIEMBROS_UNA_PARCELA = 1
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -682,9 +694,14 @@ function nodoReferencePoint(punto, srsName, ids) {
  * @param {import('./_comun.js').PerfilEmision} perfil
  * @param {string|null} timeStamp
  * @param {string} gmlIdRaiz  Solo se usa si `perfil.raizLlevaGmlId`.
+ * @param {number} miembros  Cuántos `featureMember` lleva el documento. Se PIDE y
+ *   no se supone: `numberMatched`/`numberReturned` describen el documento entero,
+ *   y desde F17 puede llevar varias parcelas (override O18). Cuando eran siempre
+ *   uno esto era una constante del módulo, que es justo lo que hacía imposible
+ *   escribir el segundo miembro sin que la raíz mintiera.
  * @returns {Array<[string, string]>}
  */
-function atributosRaiz(perfil, timeStamp, gmlIdRaiz) {
+function atributosRaiz(perfil, timeStamp, gmlIdRaiz, miembros) {
   const atributos = []
   if (perfil.raizLlevaGmlId) atributos.push(['gml:id', gmlIdRaiz])
   for (const prefijo of perfil.prefijosRaiz) atributos.push([`xmlns:${prefijo}`, NS[prefijo]])
@@ -696,7 +713,7 @@ function atributosRaiz(perfil, timeStamp, gmlIdRaiz) {
   if (!perfil.raiz.includes(':')) atributos.push(['xmlns', perfil.raizNs])
   if (perfil.atributosWfs) {
     if (timeStamp !== null) atributos.push(['timeStamp', timeStamp])
-    atributos.push(['numberMatched', String(MIEMBROS)], ['numberReturned', String(MIEMBROS)])
+    atributos.push(['numberMatched', String(miembros)], ['numberReturned', String(miembros)])
   }
   return atributos
 }
@@ -745,11 +762,10 @@ function contarDetecciones(detecciones) {
  *   override O13), si `refcat` está en blanco, o si alguna coordenada queda
  *   fuera del rango publicable (`gml/anillos.js#redondearCoord`).
  */
-export function serializarParcelaCp(opciones = {}) {
+function prepararMiembroCp(opciones = {}, quien = 'serializarParcelaCp', miembros = 1) {
   if (opciones === null || typeof opciones !== 'object' || Array.isArray(opciones)) {
     throw new TypeError(
-      `serializarParcelaCp: se esperaba un objeto de opciones; ` +
-        `recibido ${JSON.stringify(opciones)}.`,
+      `${quien}: se esperaba un objeto de opciones; ` + `recibido ${JSON.stringify(opciones)}.`,
     )
   }
 
@@ -791,7 +807,7 @@ export function serializarParcelaCp(opciones = {}) {
   if (timeStamp !== null) {
     if (!perfil.atributosWfs) {
       throw new TypeError(
-        `serializarParcelaCp: 'timeStamp' no existe en el perfil ${perfil.id}. Es un atributo ` +
+        `${quien}: 'timeStamp' no existe en el perfil ${perfil.id}. Es un atributo ` +
           `de la raíz «${PERFILES[PERFIL.WFS].raiz}», que marca cuándo respondió el servicio; ` +
           `un fichero que se SUBE a la Sede no responde a ninguna petición y su raíz ` +
           `(«${PERFILES[PERFIL.ENTREGA].raiz}») no admite el atributo.`,
@@ -809,7 +825,8 @@ export function serializarParcelaCp(opciones = {}) {
   )
   if (refcat.trim().length === 0) {
     throw new RangeError(
-      'serializarParcelaCp: `refcat` no puede estar en blanco. En un alta sin referencia ' +
+      `${quien}: \`refcat\` no puede estar en blanco. ` +
+        'En un alta sin referencia ' +
         'catastral asignada, pasa el `idLocal` del modelo (model/parcela.js#crearParcela lo ' +
         'exige, así que siempre hay uno) y deja `nationalCadastralReference` vacío: eso es ' +
         'justo el patrón del alta de particular que hace UTM_1.gml.',
@@ -870,12 +887,15 @@ export function serializarParcelaCp(opciones = {}) {
     referencePointEmitido: perfil.emiteReferencePoint,
     beginLifespanVersion,
     timeStamp,
-    numberMatched: perfil.atributosWfs ? MIEMBROS : null,
-    numberReturned: perfil.atributosWfs ? MIEMBROS : null,
+    numberMatched: perfil.atributosWfs ? miembros : null,
+    numberReturned: perfil.atributosWfs ? miembros : null,
     detecciones: contarDetecciones(detecciones),
   }
 
-  if (bloqueos.length > 0) return { xml: null, detecciones, resumen }
+  /** Lo que el envoltorio necesita saber además del nodo. */
+  const sobre = { perfil, ids, comentarios, indentacion, timeStamp }
+
+  if (bloqueos.length > 0) return { nodo: null, detecciones, resumen, ...sobre }
 
   // Sin bloqueos, `referencia.punto` NO es nulo: `puntoInterior` solo devuelve
   // `null` acompañado de una detección de severidad ERROR, que ya habría entrado
@@ -925,25 +945,208 @@ export function serializarParcelaCp(opciones = {}) {
     ORDEN_CADASTRAL_PARCEL,
   )
 
+  return {
+    nodo: elem('cp:CadastralParcel', [['gml:id', ids.parcela]], hijos),
+    detecciones,
+    resumen,
+    ...sobre,
+  }
+}
+
+/**
+ * El DOCUMENTO a partir de los miembros ya preparados: raíz, prólogo y texto.
+ *
+ * El `gml:id` de la RAÍZ es el namespace INSPIRE saneado, no la identidad de
+ * ninguna parcela: `xs:ID` es único en el documento y repetirlo lo invalida
+ * entero (ver la cabecera). Lo compone `gml/ids.js` como los demás.
+ *
+ * @param {object} sobre  Perfil, ids, comentarios, indentación y timeStamp del
+ *   PRIMER miembro: son comunes a todo el documento (ver `serializarExpedienteCp`,
+ *   que lo exige en vez de suponerlo).
+ * @param {object[]} nodos  Los `cp:CadastralParcel` ya construidos.
+ * @returns {string}
+ */
+function documentoCp(sobre, nodos) {
   const raiz = elem(
-    perfil.raiz,
-    // El `gml:id` de la RAÍZ es el namespace INSPIRE saneado, no la identidad de
-    // la parcela: `xs:ID` es único en el documento y repetirlo invalida el
-    // fichero entero (ver la cabecera). Lo compone `gml/ids.js` como los demás.
-    atributosRaiz(perfil, timeStamp, ids.coleccion),
-    [elem(perfil.miembro, [], [elem('cp:CadastralParcel', [['gml:id', ids.parcela]], hijos)])],
+    sobre.perfil.raiz,
+    atributosRaiz(sobre.perfil, sobre.timeStamp, sobre.ids.coleccion, nodos.length),
+    nodos.map((n) => elem(sobre.perfil.miembro, [], [n])),
   )
 
-  // ── 7 · Texto ─────────────────────────────────────────────────────────────
   // El prólogo es lo único que no pasa por `render` (no son elementos). Los
   // comentarios ya vienen comprobados por `normalizarComentarios`.
   const lineas = [
     DECLARACION_XML,
-    ...comentarios.map((c) => `<!--${c}-->`),
-    render(raiz, { indentacion }),
+    ...sobre.comentarios.map((c) => `<!--${c}-->`),
+    render(raiz, { indentacion: sobre.indentacion }),
   ]
+  return `${lineas.join('\n')}\n`
+}
 
-  return { xml: `${lineas.join('\n')}\n`, detecciones, resumen }
+/**
+ * Serializa UNA parcela. Es la API de F04 y no cambia: el 100 % del uso actual
+ * pasa por aquí, y hay un snapshot que exige que el fichero salga byte a byte
+ * igual que antes de F17.
+ *
+ * @param {OpcionesParcelaCp} [opciones]
+ * @returns {ResultadoSerializacion}
+ */
+export function serializarParcelaCp(opciones = {}) {
+  const m = prepararMiembroCp(opciones, 'serializarParcelaCp', MIEMBROS_UNA_PARCELA)
+  if (m.nodo === null) return { xml: null, detecciones: m.detecciones, resumen: m.resumen }
+  return { xml: documentoCp(m, [m.nodo]), detecciones: m.detecciones, resumen: m.resumen }
+}
+
+/**
+ * Serializa UN EXPEDIENTE: varias parcelas en **un solo documento**, una por
+ * `gml:featureMember`.
+ *
+ * ⭐ **MEDIDO, no deducido** (override **O18**, `SPEC.md` §7.1): el 2026-08-03 se
+ * subió a la Sede un `.gml` con dos miembros y el IVG devolvió POSITIVO, CSV
+ * `XMWPXCN9J8DB9J89`. Lo instruía además la línea 42 de la plantilla oficial
+ * —«Si se desea incluir varias parcelas en un mismo fichero, se pondrá un nuevo
+ * grupo featureMember para cada parcela»— desde antes de F04. ⚠️ Medido con **dos**;
+ * tres o más es plausible y NO está medido.
+ *
+ * Consecuencia de diseño que conviene tener presente: para entregar varias
+ * parcelas **no hace falta ningún empaquetador**. El ZIP que el plan preveía se
+ * canceló al medir esto.
+ *
+ * ── ⛔ EL RIESGO DE ESTA FUNCIÓN ES `xs:ID`, Y NO ES TEÓRICO ─────────────────
+ * `idsDeParcela` compone los cuatro identificadores a partir del `refcat`, así que
+ * **dos miembros con la misma referencia repiten los cuatro `gml:id` y el
+ * documento entero queda inválido** — un error que ninguna herramienta local
+ * enseña y que el IVG rechaza semanas después. Con un solo miembro la trampa era
+ * teórica (`SPEC.md` §3.1, trampa 1); aquí es el modo de fallo principal. Por eso
+ * se comprueba ANTES de renderizar y se LANZA nombrando el id repetido y las dos
+ * posiciones: es un contrato roto por el programador, no un dato malo del usuario.
+ *
+ * ── QUÉ ES COMÚN AL DOCUMENTO Y QUÉ ES DE CADA MIEMBRO ──────────────────────
+ * El sobre es UNO: perfil, prólogo, comentarios e indentación. Se exige que todos
+ * los miembros declaren el mismo `perfil` y el mismo `srs` en vez de tomarlos del
+ * primero y callar: mezclar un miembro de ENTREGA con uno de WFS produciría un
+ * documento cuyo sobre contradice a su contenido, y hacerlo en silencio sería el
+ * fallo mudo que este módulo persigue.
+ *
+ * ⚠️ El `gml:id` de la COLECCIÓN sale del `namespaceInspire` del PRIMER miembro, y
+ * eso es correcto **aunque los miembros tengan namespaces distintos**: es
+ * exactamente el caso medido —la matriz bajo `ES.SDGC.CP` y la cesión bajo
+ * `ES.LOCAL.CP`— y el documento aceptado llevaba un solo id de colección.
+ *
+ * @param {object} opciones
+ * @param {OpcionesParcelaCp[]} opciones.parcelas  Una entrada por parcela, con las
+ *   mismas opciones que {@link serializarParcelaCp}. `comentario` e `indentacion`
+ *   se ignoran aquí (son del documento) y se pasan aparte.
+ * @param {string|null} [opciones.comentario=null]  Comentario(s) del prólogo.
+ * @param {string} [opciones.indentacion='  ']  Indentación del documento.
+ * @param {string|null} [opciones.timeStamp=null]  Solo en `PERFIL.WFS`.
+ * @returns {{xml: string|null, detecciones: object[], resumen: object}}  `resumen`
+ *   trae `porMiembro` (el resumen de cada parcela, tal cual) más el AGREGADO del
+ *   documento. `xml` es `null` si CUALQUIER miembro está bloqueado: un expediente
+ *   incompleto no se descarga, porque la Sede lo valida como un todo.
+ * @throws {TypeError}   Si `parcelas` no es un array no vacío, si los miembros no
+ *   coinciden en `perfil`/`srs`, o si dos miembros repiten un `gml:id`.
+ */
+export function serializarExpedienteCp(opciones = {}) {
+  if (opciones === null || typeof opciones !== 'object' || Array.isArray(opciones)) {
+    throw new TypeError(
+      `serializarExpedienteCp: se esperaba un objeto de opciones; recibido ${JSON.stringify(opciones)}.`,
+    )
+  }
+  const { parcelas, comentario = null, indentacion = '  ', timeStamp = null } = opciones
+
+  if (!Array.isArray(parcelas) || parcelas.length === 0) {
+    throw new TypeError(
+      `serializarExpedienteCp: 'parcelas' debe ser un array con al menos una parcela; ` +
+        `recibido ${JSON.stringify(parcelas)}. Para una sola, `.concat(
+          'serializarParcelaCp es la función directa y su salida no cambia.',
+        ),
+    )
+  }
+
+  // Cada miembro se prepara con el recuento REAL del documento: `numberMatched` y
+  // `numberReturned` de la raíz WFS tienen que decir cuántas van, no cuántas iban
+  // cuando el sobre solo admitía una.
+  const miembros = parcelas.map((p, i) =>
+    prepararMiembroCp(
+      { ...p, comentario, indentacion, timeStamp },
+      `serializarExpedienteCp: parcelas[${i}]`,
+      parcelas.length,
+    ),
+  )
+
+  // ── El sobre es UNO: se exige, no se supone ───────────────────────────────
+  const cabeza = miembros[0]
+  for (let i = 1; i < miembros.length; i++) {
+    if (miembros[i].resumen.perfil !== cabeza.resumen.perfil) {
+      throw new TypeError(
+        `serializarExpedienteCp: parcelas[${i}] declara el perfil ` +
+          `«${miembros[i].resumen.perfil}» y parcelas[0] «${cabeza.resumen.perfil}». Un documento ` +
+          'tiene UN sobre: mezclarlos daría una raíz que contradice a su contenido.',
+      )
+    }
+    if (miembros[i].resumen.srsName !== cabeza.resumen.srsName) {
+      throw new TypeError(
+        `serializarExpedienteCp: parcelas[${i}] declara el SRS «${miembros[i].resumen.srs}» y ` +
+          `parcelas[0] «${cabeza.resumen.srs}». Las geometrías de un mismo expediente están en el ` +
+          'mismo sistema de referencia, y el `srsName` se escribe una vez por geometría: ' +
+          'admitir dos husos aquí produciría un fichero cuyas parcelas no encajan entre sí.',
+      )
+    }
+  }
+
+  // ── ⛔ `xs:ID` único en TODO el documento ──────────────────────────────────
+  const vistos = new Map()
+  miembros.forEach((m, i) => {
+    const suyos = [m.ids.parcela, m.ids.multiSurface, ...m.ids.surfaces, m.ids.puntoReferencia]
+    for (const id of suyos) {
+      if (vistos.has(id)) {
+        throw new TypeError(
+          `serializarExpedienteCp: el gml:id «${id}» sale en parcelas[${vistos.get(id)}] y en ` +
+            `parcelas[${i}]. \`xs:ID\` es único en el DOCUMENTO, así que esto invalidaría el ` +
+            'fichero entero — y el IVG lo rechazaría semanas después sin decir dónde. Los ids se ' +
+            'componen a partir de `refcat`: dos parcelas del mismo expediente necesitan ' +
+            'identidades distintas (en la segregación medida, la cesión llevaba el sufijo `.1`).',
+        )
+      }
+      vistos.set(id, i)
+    }
+  })
+
+  const detecciones = miembros.flatMap((m) => m.detecciones)
+  const bloqueos = [...new Set(miembros.flatMap((m) => m.resumen.bloqueos))]
+
+  const resumen = {
+    emitido: bloqueos.length === 0,
+    bloqueos,
+    perfil: cabeza.resumen.perfil,
+    subibleALaSede: cabeza.resumen.subibleALaSede,
+    srs: cabeza.resumen.srs,
+    srsName: cabeza.resumen.srsName,
+    nMiembros: miembros.length,
+    localIds: miembros.map((m) => m.resumen.localId),
+    namespaces: miembros.map((m) => m.resumen.namespaceInspire),
+    // La suma de lo REDONDEADO, que es lo que va escrito y lo que juzga el IVG
+    // (regla de oro 11). Sumar el float64 del modelo daría otra cifra y sería la
+    // que no se puede comprobar abriendo el fichero.
+    areaValueTotal: miembros.reduce((s, m) => s + m.resumen.areaValue, 0),
+    superficieRedondeadaTotal: miembros.reduce((s, m) => s + m.resumen.superficieRedondeada, 0),
+    timeStamp,
+    numberMatched: cabeza.resumen.numberMatched,
+    numberReturned: cabeza.resumen.numberReturned,
+    porMiembro: miembros.map((m) => m.resumen),
+    detecciones: contarDetecciones(detecciones),
+  }
+
+  // Un expediente incompleto NO se descarga: la Sede valida el conjunto, y bajar
+  // el fichero con una parcela menos es la invitación a presentarlo así.
+  if (bloqueos.length > 0) return { xml: null, detecciones, resumen }
+
+  return {
+    xml: documentoCp(cabeza, miembros.map((m) => m.nodo)),
+    detecciones,
+    resumen,
+  }
 }
 
 export default serializarParcelaCp
