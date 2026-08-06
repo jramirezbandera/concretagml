@@ -193,6 +193,7 @@ const SEL = {
   PUERTA: '[data-accion="tomar-geometria"]',
   CONTRASTAR: '[data-accion="contrastar-parcelario"]',
   MAPA: '.leaflet-container',
+  AVISOS: '#avisos',
 }
 
 const altoVertices = () => caja($(SEL.TABLA_VERTICES))?.alto ?? null
@@ -431,6 +432,88 @@ if (list.texto && linea.paso === 'entrada') {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// 1bis · ⛔ EL CASO REAL DEL 2026-08-06: una LISTA copiada A MEDIAS
+//
+// Un técnico pegó la LISTA de una parcela suya y entraron **16 vértices y
+// 168,5851 m²** cuando el dibujo declaraba **276,5018**. La copia se había
+// cortado —la LISTA pagina en la ventana de texto del CAD— y faltaba el último
+// vértice; los 107,9167 m² y los 8,7738 m de perímetro que faltaban eran EL
+// MISMO TRIÁNGULO. La aplicación lo dijo bien **una vez, en el diálogo**, y al
+// aceptar el panel no lo repetía: se quedaba mirando 168,59 m² sin rastro de los
+// 276,50 de su fichero. Aquí se mide que **sobrevive al diálogo**.
+// ═════════════════════════════════════════════════════════════════════════════
+
+let cortada = null
+
+if ($(SEL.BOTON_PEGAR) && !$(SEL.BOTON_PEGAR).disabled) {
+  const LISTA_CORTADA = [
+    'Comando: LISTA',
+    '                           Capa:  0',
+    '            Marcas de polilínea:  Cerrado',
+    '                           Área:  276.5018',
+    '                      Perímetro:  64.8189',
+    ...[
+      [372516.02, 4084674.06], [372514.61, 4084657.0], [372502.97, 4084657.97],
+      [372502.54, 4084658.13], [372502.16, 4084658.32], [372501.85, 4084658.49],
+      [372501.5, 4084658.75], [372501.19, 4084659.0], [372500.85, 4084659.31],
+      [372500.53, 4084659.63], [372500.23, 4084659.95], [372499.89, 4084660.4],
+      [372499.63, 4084660.81], [372499.31, 4084661.38], [372499.04, 4084661.99],
+      [372498.77, 4084662.8],
+    ].map(([x, y]) => `        Ubicación:  X= ${x.toFixed(4)}  Y= ${y.toFixed(4)}  Z= 0.0000`),
+  ].join('\n')
+
+  $(SEL.BOTON_PEGAR).click()
+  const dialogo = await esperarA(() => {
+    const d = $(SEL.DIALOGO)
+    return d && (d.open || d.hasAttribute('open')) ? d : null
+  })
+
+  if (dialogo) {
+    escribirEn($(SEL.CAMPO), LISTA_CORTADA)
+    await dormir(150)
+    const enElDialogo = $(SEL.LECTURA)?.textContent ?? ''
+    $(SEL.USAR)?.click()
+    await dormir(500)
+
+    const enElPanel = $$(`${SEL.AVISOS} li, ${SEL.AVISOS} .gml-aviso`).map((n) => n.textContent)
+    const elCotejo = enElPanel.find((t) => t.includes('276,5018')) ?? null
+    cortada = {
+      loDijoElDialogo: /276,5018/.test(enElDialogo) && /NO coinciden/i.test(enElDialogo),
+      loDiceElPanel: elCotejo !== null,
+      // ⭐ Y **VISIBLE**, que es lo que de verdad importa: el panel ordena el más
+      // reciente primero y enseña **12 tarjetas** como mucho; la trece se resume
+      // en una línea. Enterrado ahí abajo, el aviso no está dicho.
+      //
+      // ⚠️ **No se exige que sea el PRIMERO, y la primera corrida enseñó por qué**:
+      // después de meter la parcela, la navegación emite su propio mensaje de
+      // aterrizaje —legítimo, y posterior— que se coloca encima. Exigir el primer
+      // puesto era exigir algo que este módulo no controla; lo que hay que exigir
+      // es que se LEA sin desplegar nada.
+      posicion: enElPanel.findIndex((t) => t.includes('276,5018')),
+      avisos: enElPanel.length,
+      filas: filasDeVertice().length,
+    }
+
+    if (!cortada.loDijoElDialogo) {
+      problemas.push('El diálogo no avisa de que las dos superficies NO cuadran.')
+    }
+    if (!cortada.loDiceElPanel) {
+      problemas.push(
+        '⛔ El aviso de que la superficie no cuadra MUERE AL ACEPTAR: el panel se queda con la ' +
+          'geometría equivocada y sin decir que el dibujo declaraba otra cosa. Es el caso real ' +
+          'del 2026-08-06.',
+      )
+    }
+    if (cortada.loDiceElPanel && cortada.posicion >= 12) {
+      problemas.push(
+        `El cotejo está en el panel pero en la posición ${cortada.posicion + 1}, y solo se ven 12 ` +
+          'tarjetas: de la trece en adelante queda resumido en una línea, o sea sin decir.',
+      )
+    }
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // 2 · ⭐ Coordenadas EN GRADOS: se ofrece proyectarlas (la deuda M10 de F18)
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -664,6 +747,7 @@ return {
   linea,
   modal,
   previa,
+  cortada,
   pegado,
   grados,
   ajeno,

@@ -157,6 +157,55 @@ export const PEGADO_SIN_GEOMETRIA =
   'Del comando LISTA hay que copiar el bloque entero, con las líneas «Ubicación: X= … Y= …».'
 
 /**
+ * ⛔ **El aviso del cotejo que NO cuadra, y existe por un caso REAL del 2026-08-06.**
+ *
+ * Un técnico pegó la LISTA de una parcela suya y la aplicación entró con **16
+ * vértices, 168,5851 m²**, cuando el dibujo declaraba **276,5018 m²**. Faltaba un
+ * vértice: la copia se había cortado —la LISTA pagina en la ventana de texto del
+ * CAD— y el último punto se quedó fuera. Las dos cifras que faltaban cuadraban
+ * entre sí: los **107,9167 m²** de superficie y los **8,7738 m** de perímetro son
+ * el mismo triángulo, el que el vértice perdido habría formado con la arista de
+ * cierre.
+ *
+ * **La aplicación lo había dicho, y lo dijo bien** — el diálogo del pegado enseña
+ * las dos cifras—, **pero lo decía UNA vez y en una pantalla que se cierra**.
+ * Aceptada la importación, el panel se quedaba con sus avisos y ninguno era ese:
+ * el usuario miraba 168,59 m² sin rastro de los 276,50 que declaraba su fichero.
+ * Y por la vía de FICHERO no aparecía en ningún sitio, que era la decisión 5 de
+ * F19 sin implementar.
+ *
+ * ⚠️ **Solo se emite cuando NO cuadran**, y es a propósito: {@link avisosDe}
+ * descarta las detecciones `INFO` porque este panel es el de los avisos, no un
+ * registro. Una coincidencia no es un aviso — se dice donde importa, que es en el
+ * diálogo del pegado, mientras todavía se puede cancelar.
+ *
+ * @param {object|null} cotejo  `resumen.superficie` de `importar()`.
+ * @returns {string|null}  El aviso, o `null` si no hay nada que decir.
+ */
+export function avisoDeSuperficie(cotejo) {
+  if (!cotejo || cotejo.coincide !== false) return null
+  const declarada = FORMATO_M2.format(cotejo.reportada)
+  const calculada = FORMATO_M2.format(cotejo.calculada)
+  const diferencia = FORMATO_M2.format(cotejo.diferencia)
+  // ⚠️ El SIGNO importa y por eso se distingue: que el dibujo declare MÁS de lo
+  // que sale suele ser geometría que no ha llegado —vértices perdidos al copiar—,
+  // y que declare MENOS suele ser un vértice repetido o un anillo de más. Se
+  // nombra la sospecha y **no se dictamina**: la aplicación no sabe cuál de las dos
+  // cifras es la buena, y decidirlo por el técnico sería inventarse un veredicto.
+  const sospecha =
+    cotejo.reportada > cotejo.calculada
+      ? 'Cuando el dibujo declara MÁS de lo que sale, lo normal es que no haya llegado toda la ' +
+        'geometría: la LISTA pagina en la ventana de texto del CAD y es fácil copiarla a medias.'
+      : 'Cuando el dibujo declara MENOS de lo que sale, suele haber un vértice repetido o un ' +
+        'contorno de más.'
+  return (
+    `La superficie no cuadra con la que declara el dibujo: él dice ${declarada} m² y aquí sale ` +
+    `${calculada} m², ${diferencia} m² de diferencia. La geometría ha entrado tal cual venía. ` +
+    sospecha
+  )
+}
+
+/**
  * Mira un texto pegado y cuenta **qué se ha entendido**, sin cambiar nada. Es lo
  * que se enseña en el diálogo de pegado ANTES de aceptar, y es el único momento en
  * el que el usuario puede cancelar viendo las cifras.
@@ -492,7 +541,18 @@ export function cablearMedicion({
     // Lo que hubo que decidir o que conviene saber, DESPUÉS de que la pantalla ya
     // enseñe la geometría: un aviso sobre algo que todavía no se ve no se entiende.
     for (const { mensaje, nivel } of avisosDe(resultado.detecciones)) avisar(mensaje, nivel)
+
     if (parcela.refcat === null) avisar(MENSAJE_SIN_REFERENCIA)
+
+    // ⛔ **EL ÚLTIMO EN EMITIRSE PARA QUEDAR EL PRIMERO EN LEERSE.** Comprobado en
+    // `app/avisos.js`, no supuesto: el panel ordena **el más reciente arriba**
+    // (regla de diseño 6) y enseña 12 tarjetas como mucho. Si el dibujo declara
+    // una superficie y no es la que ha entrado, eso es LA cosa que hay que leer
+    // —significa que la geometría que estás mirando no es la que mediste—, y
+    // enterrarla bajo doce avisos de separadores decimales sería no decirla.
+    // Ver {@link avisoDeSuperficie} para el caso real que lo puso aquí.
+    const cotejo = avisoDeSuperficie(resultado.resumen.superficie)
+    if (cotejo !== null) avisar(cotejo)
 
     // ⛔ EL ÚLTIMO, y si revienta lo de arriba ya está hecho: una parcela cargada no
     // se descarga porque falle un oyente. Mismo criterio que `notificarCarga` en

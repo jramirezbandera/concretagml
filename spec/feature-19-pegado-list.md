@@ -217,6 +217,55 @@ tener escritos porque son de método:
   store**; la parcela ajena no entra hasta pulsar «Contrastar con el parcelario»
   (diseño de F08). Sin ese clic, el bloque entero pasaba en verde sin medir nada.
 
+## ⛔ El caso REAL del día de la publicación, y el hueco que destapó
+
+Horas después de publicar F19, el autor pegó la LISTA de una parcela suya. Entraron
+**16 vértices y 168,5851 m²**; el dibujo declaraba **276,5018**. Su diagnóstico fue
+el correcto: *«al copiar el comando LIST, el último punto no me lo ha cogido»* — la
+LISTA **pagina en la ventana de texto del CAD** y la copia se cortó.
+
+**Los dos números que faltaban son el mismo triángulo**, y eso es lo que permite
+reconstruir el vértice perdido sin volver al CAD:
+
+| | Declara el dibujo | Calcula la app | Falta |
+|---|---|---|---|
+| Superficie | 276,5018 m² | 168,5851 m² | **107,9167 m²** |
+| Perímetro | 64,8189 m | 56,0451 m | **8,7738 m** |
+
+Un vértice entre el último copiado y el primero convierte la arista de cierre de
+**20,5998 m** en dos lados. Con la altura que exige el área —`2·107,9167/20,5998` =
+**10,477 m**— sale en **X 372501,67 · Y 4084677,20**, y metiéndolo la superficie da
+**276,5018 m²**: el valor declarado, clavado a cuatro decimales. Los dos lados suman
+29,3847 m contra los 29,3736 que pide el perímetro (11 mm, que es la suposición de
+que cae en el punto medio).
+
+### ⛔ Y el hueco: la aplicación lo dijo UNA vez, en una pantalla que se cierra
+
+El diálogo del pegado enseñó las dos cifras — hizo su trabajo. **Pero al aceptar, el
+panel no lo repetía**: el usuario se quedaba mirando 168,59 m² con ocho avisos,
+ninguno de ellos el que importaba. **Y por la vía de FICHERO no salía en ningún
+sitio**, que era **la decisión 5 de F19 sin implementar** («por fichero el cotejo
+sale por el panel, después»).
+
+Corregido con `avisoDeSuperficie`, pura y con ocho pruebas:
+
+- Se emite **solo cuando NO cuadran**. `avisosDe` ya descarta las `INFO` porque ese
+  panel es el de los avisos, no un registro: **una coincidencia no es un aviso**. La
+  confirmación se da donde sirve —el diálogo, mientras aún se puede cancelar— y ahí
+  se da siempre (decisión 4, intacta).
+- **Nombra la sospecha según el SIGNO** —declarar de más apunta a geometría que no
+  ha llegado; de menos, a un vértice repetido— **y no dictamina**: la aplicación no
+  sabe cuál de las dos cifras es la buena.
+- **La geometría entra igual.** Rechazarla sería dar por bueno el dibujo.
+- Va **el último en emitirse**, comprobado en `app/avisos.js` y no supuesto: el panel
+  ordena el más reciente arriba y enseña **12 tarjetas**. ⚠️ Y **no se exige el
+  primer puesto**: la navegación emite después su mensaje de aterrizaje, legítimo y
+  posterior. Medido en Chrome: **posición 2 de 6**.
+
+⚠️ **La rama EDIFICIO se queda fuera y se dice**: `edificio/entrada.js` no propaga el
+cotejo, así que ahí no hay nada que enseñar. No se toca en esta corrección — es otro
+módulo y otra fase.
+
 ## Criterios de aceptación
 
 | # | Criterio | Estado |
@@ -230,6 +279,7 @@ tener escritos porque son de método:
 | 7 | La cabecera **no dice «Parcela del Catastro»** sobre un GML ajeno, y cambia al cruzar | ✅ «de otro técnico» → «tomado como tuyo», medido en Chrome |
 | 8 | Guion `18-pegado-coordenadas.js` en `ok:true` | ✅ tras una primera corrida en rojo con **un defecto real** |
 | 9 | Se **mide y se declara** lo que cuesta | ✅ **0 px** en el panel · **+12,32 kB** de JS, **+1,62** de CSS |
+| 10 | El cotejo que **no cuadra** llega al panel y **sobrevive al diálogo**, en las dos vías | ✅ 8 pruebas + guion (posición 2 de 6, medido en Chrome) — *añadido el 2026-08-06 por el caso real* |
 
 ## Lo que NO cubre ningún test de la suite, dicho por escrito
 
@@ -244,7 +294,9 @@ tener escritos porque son de método:
 
 ## Estado
 
-✅ **Código y pruebas: 6.393 pruebas / 151 ficheros, verde** (partida: 6.339/150).
+✅ **Código y pruebas: 6.397 pruebas / 151 ficheros, verde** (partida: 6.339/150),
+medidas **en aislado**: en el árbol compartido salen más porque otra sesión trabaja
+en F12 a la vez.
 ✅ **Guion `18-pegado-coordenadas.js` en `ok:true`, `problemas: []`.**
 ⏳ **Firma humana**: `CHECKLIST-HUMANO.md` §15, con un punto **BLOQUEANTE**.
 

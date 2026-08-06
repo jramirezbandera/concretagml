@@ -25,6 +25,7 @@ import {
   MENSAJE_ES_LISTADO_PROPIO,
   MENSAJE_FICHERO_NO_LEIDO,
   MENSAJE_SIN_REFERENCIA,
+  avisoDeSuperficie,
   cablearMedicion,
   componerParcelaMedida,
   textoProcedenciaMedicion,
@@ -395,5 +396,128 @@ describe('cableado-medicion · alFichero', () => {
     expect(() =>
       cablearMedicion({ estado: store, panel: panelFalso, procedencia, alCargarParcela: 42 }),
     ).toThrow(TypeError)
+  })
+})
+
+/* -------------------------------------------------------------------------- *
+ * F19 · El cotejo de superficie llega AL PANEL, y sobrevive al diálogo        *
+ *                                                                            *
+ * ⛔ Esto lo puso aquí un caso REAL del 2026-08-06, el día que F19 se         *
+ * publicó. Un técnico pegó la LISTA de una parcela suya y entraron 16         *
+ * vértices y 168,5851 m² cuando el dibujo declaraba 276,5018: la copia se     *
+ * había cortado —la LISTA pagina en la ventana de texto del CAD— y faltaba    *
+ * el último vértice. Los 107,9167 m² y los 8,7738 m de perímetro que          *
+ * faltaban eran EL MISMO TRIÁNGULO, el del vértice perdido.                   *
+ *                                                                            *
+ * La aplicación lo dijo bien... una vez, en el diálogo del pegado, que se     *
+ * cierra. Después el panel no lo repetía, y por la vía de FICHERO no salía    *
+ * en ningún sitio — la decisión 5 de F19, sin implementar.                    *
+ * -------------------------------------------------------------------------- */
+
+/** El pegado REAL del 2026-08-06, con su último vértice perdido. */
+const LIST_TRUNCADO = [
+  'Comando: LISTA',
+  '--------------------- LWPOLYLINE ----------------------------------',
+  '                           Capa:  0',
+  '            Marcas de polilínea:  Cerrado',
+  '                           Área:  276.5018',
+  '                      Perímetro:  64.8189',
+  ...[
+    [372516.02, 4084674.06], [372514.61, 4084657.0], [372502.97, 4084657.97],
+    [372502.54, 4084658.13], [372502.16, 4084658.32], [372501.85, 4084658.49],
+    [372501.5, 4084658.75], [372501.19, 4084659.0], [372500.85, 4084659.31],
+    [372500.53, 4084659.63], [372500.23, 4084659.95], [372499.89, 4084660.4],
+    [372499.63, 4084660.81], [372499.31, 4084661.38], [372499.04, 4084661.99],
+    [372498.77, 4084662.8],
+  ].map(([x, y]) => `                      Ubicación:  X= ${x.toFixed(4)}  Y= ${y.toFixed(4)}  Z= 0.0000`),
+].join('\n')
+
+describe('app/cableado-medicion · F19 · el cotejo de superficie en el panel', () => {
+  it('⛔ el caso real: entra la geometría Y el panel dice que la superficie no cuadra', async () => {
+    const medicion = cablear({ dialogo: dialogoQueResponde() })
+    await medicion.alTexto(LIST_TRUNCADO, 'coordenadas pegadas')
+
+    // La geometría ENTRA: la aplicación no sabe cuál de las dos cifras es la
+    // buena, y rechazar el fichero sería dictaminar que el dibujo tiene razón.
+    expect(store.set).toHaveBeenCalledTimes(1)
+    expect(store.set.mock.calls[0][0].recintos[0].vertices).toHaveLength(16)
+
+    // Y se DICE, con las dos cifras y la diferencia.
+    expect(dijo('276,5018')).toBe(true) // la que declara el dibujo
+    expect(dijo('168,5851')).toBe(true) // la que sale aquí
+    expect(dijo('107,9167')).toBe(true) // lo que se ha perdido
+  })
+
+  it('⭐ y nombra la sospecha SIN dictaminar cuál de las dos cifras es la buena', async () => {
+    const medicion = cablear({ dialogo: dialogoQueResponde() })
+    await medicion.alTexto(LIST_TRUNCADO, 'coordenadas pegadas')
+
+    const aviso = avisos.find((a) => a.mensaje.includes('276,5018')).mensaje
+    // Declara MÁS de lo que sale ⇒ la sospecha es geometría que no ha llegado.
+    expect(aviso).toMatch(/pagina|copiarla a medias|no haya llegado/i)
+    // ⚠️ Pero no afirma que el dibujo esté bien ni que la medición esté mal.
+    expect(aviso).not.toMatch(/incorrect|erróne|mal medid/i)
+  })
+
+  it('⭐ es EL ÚLTIMO en emitirse, porque el panel pone el más reciente arriba', async () => {
+    // Comprobado en `app/avisos.js` (regla de diseño 6) y no supuesto: con doce
+    // tarjetas de tope, enterrar esto bajo los avisos de separador decimal sería
+    // no decirlo. Este guardián es lo que impide que alguien lo reordene sin ver.
+    const medicion = cablear({ dialogo: dialogoQueResponde() })
+    await medicion.alTexto(LIST_TRUNCADO, 'coordenadas pegadas')
+
+    expect(avisos.length).toBeGreaterThan(1)
+    expect(avisos[avisos.length - 1].mensaje).toMatch(/276,5018/)
+  })
+
+  it('⭐ y sale también POR FICHERO, que es la decisión 5 de F19 sin implementar', async () => {
+    // Por esta vía no hay diálogo de pegado que lo enseñe: si no saliera aquí, no
+    // saldría en ninguna parte. Es el hueco que el caso real destapó.
+    const medicion = cablear({ dialogo: dialogoQueResponde() })
+    await medicion.alFichero(ficheroDeTexto(LIST_TRUNCADO, 'parcela.txt'))
+
+    expect(dijo('276,5018')).toBe(true)
+    expect(dijo('168,5851')).toBe(true)
+  })
+
+  it('cuando las dos cifras CUADRAN el panel se calla: una coincidencia no es un aviso', async () => {
+    // `avisosDe` ya descarta las INFO por lo mismo. La confirmación se da donde
+    // sirve —el diálogo del pegado, mientras aún se puede cancelar— y ahí se da
+    // SIEMPRE (decisión 4). Aquí sería ruido sobre el canal de los problemas.
+    const bueno = LIST_TRUNCADO.replace('276.5018', '168.5851')
+    const medicion = cablear({ dialogo: dialogoQueResponde() })
+    await medicion.alTexto(bueno, 'coordenadas pegadas')
+
+    expect(store.set).toHaveBeenCalledTimes(1)
+    expect(dijo('168,5851')).toBe(false)
+    expect(dijo('no cuadra')).toBe(false)
+  })
+
+  it('sin superficie declarada no se inventa ninguna: `.dxf` y `.txt` no la traen', async () => {
+    const medicion = cablear({ dialogo: dialogoQueResponde() })
+    await medicion.alTexto(CUADRADO, 'coordenadas pegadas')
+
+    expect(dijo('no cuadra')).toBe(false)
+    expect(dijo('declara')).toBe(false)
+  })
+})
+
+describe('app/cableado-medicion · F19 · avisoDeSuperficie (la función pura)', () => {
+  it('sin cotejo, o cuadrando, no hay nada que decir', () => {
+    expect(avisoDeSuperficie(null)).toBeNull()
+    expect(avisoDeSuperficie(undefined)).toBeNull()
+    expect(avisoDeSuperficie({ coincide: true, reportada: 61, calculada: 61, diferencia: 0 })).toBeNull()
+  })
+
+  it('declarar MENOS de lo que sale apunta a un vértice repetido, no a uno perdido', () => {
+    const aviso = avisoDeSuperficie({
+      coincide: false,
+      reportada: 100,
+      calculada: 150,
+      diferencia: 50,
+    })
+    expect(aviso).toMatch(/MENOS/)
+    expect(aviso).toMatch(/repetido|de más/i)
+    expect(aviso).not.toMatch(/pagina/i) // la sospecha del otro signo, aquí no
   })
 })

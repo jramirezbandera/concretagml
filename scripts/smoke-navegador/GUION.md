@@ -4490,6 +4490,12 @@ Anda las tres cosas que F18 sacó de su alcance **con casa escrita**:
    del Catastro»** antes de la puerta y **«GML de otro técnico · tomado como tuyo»**
    después. Es la deuda que F18 midió al pasar y dejó dicha.
 6. **El coste en píxeles: 0.** El diálogo flota y no le quita sitio a nada.
+7. ⛔ **EL CASO REAL DEL 2026-08-06, incorporado el mismo día.** Se pega la LISTA de
+   una parcela de verdad **copiada a medias** —la que declara 276,5018 m² y trae
+   solo 16 vértices, 168,5851— y se exige que el aviso **sobreviva al diálogo**:
+   que el panel lo diga y que se lea sin desplegar nada. Medido: **posición 2 de 6**
+   tarjetas. ⚠️ **No se exige el primer puesto**, y la primera corrida enseñó por
+   qué: la navegación emite después su mensaje de aterrizaje, legítimo y posterior.
 
 ### ⛔ Lo que destapó la primera corrida, y son TRES cosas del guion y una de la app
 
