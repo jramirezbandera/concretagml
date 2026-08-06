@@ -39,6 +39,7 @@ para que el resultado no dependa de interpretar prosa. Quince son de aceptación
 | `15-contraste.js` | Rework · T9 | ⭐ **la RUTA CRÍTICA 2 entera** (soltar el GML de otro → contrastarlo → cruzar la puerta), que hasta T9 no se podía andar; y sobre todo **que la puerta de D4 SE VE**: dentro del cajón, dentro de la ventana y con `elementFromPoint` devolviéndola —las tres patas, porque con una sola el defecto salía verde—; más la procedencia que cambia al cruzar y el invariante de la caja de vértices | ⛔ **encontró un defecto real el 2026-08-04, ya corregido; hoy `ok:true` en las dos** — ver §22 |
 | `16-derivar-cesion.js` | F17 · 1 a 4 · **+ el criterio 6** | ⭐ **EL PRECIO EN PÍXELES, que es lo único de F17 que la suite no puede ver**: F17 rompe a propósito la racha de «0 px en el panel» de cinco fases, y ⛔ **cuando se pasa, el panel NO desborda — la tabla de vértices encoge en silencio**. Mide el recorrido entero sin tocar la red (mover el lindero hacia dentro → derivar → revisar y nombrar → descargar), la PUERTA explicando con cifras al crecer, la correspondencia fila↔mancha en los dos sentidos, los BYTES del expediente (N `featureMember`, los `localId` de O19 y **que el nombre escrito NO viaja al fichero**), y la invalidación de la foto al editar | ✅ **`ok:true` en las DOS** desde el 2026-08-05, tras encontrar **un defecto real a 1280×720** y corregirlo — ver §25 |
 | `17-medicion-propia.js` | F18 · 1 a 4 | ⭐ **QUE EL `<dialog>` DE REVISIÓN SEA UN MODAL DE VERDAD**, que la suite **no puede** ver: en jsdom `HTMLDialogElement.prototype` tiene exactamente `constructor` y `open` —ni `showModal()`, ni `::backdrop`, ni capa superior—, así que las 6.339 pruebas ejercitan el camino DEGRADADO; más soltar `UTM.dxf` de verdad con la rama PARCELA (bytes reales, cinco capas, el botón apagado con su motivo), que la geometría **se pinte** en sus panes, el **coste en píxeles** de la tabla de vértices, y que **nuestro propio listado de replanteo se rechace por su nombre y NO con el diagnóstico falso del huso** | ⛔ **su primera corrida salió `ok:false` y destapó UN DEFECTO REAL que la suite no veía**: la cabecera decía **«Parcela del Catastro» sobre el levantamiento del propio técnico**. Corregido con guardián; hoy **`ok:true`** — ver §26 |
+| `18-pegado-coordenadas.js` | F19 · 1 a 3 | ⭐ **LAS TRES DEUDAS DE F18, andadas en un navegador de verdad**: el **pegado de la LISTA** —la vía que `feature-01` llama principal y que llevaba doce fases sin un solo manejador de `paste`—, **proyectar unos grados** (que hasta F19 se detectaban y no se podían atender), y **el rótulo del GML ajeno**. Y lo que la suite no puede ver: que el `<dialog>` sea modal DE VERDAD, que **las dos cifras de superficie se lean** (el cotejo que `importar()` calculaba desde F01 sin llamante), y que la parcela pegada **se pinte** | ⛔ **su primera corrida salió `ok:false` con TRES fallos del guion y UN DEFECTO REAL**: el renglón decía «medida por ti, **del fichero** «coordenadas pegadas»» —llamar fichero a lo pegado, en la línea que existe para decir de dónde salió el dato— y **la prueba de la suite lo aprobaba** porque casaba «pegad». Hoy **`ok:true`** — ver §27 |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
 spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
@@ -4447,3 +4448,83 @@ definición: el levantamiento lo trae el técnico.
 - **El arrastre como gesto de ratón** (§0): se disparan `dragenter`/`dragover`/`drop`.
 - **Coordenadas en grados**: `importar()` las detecta y esta versión **no sabe
   proyectarlas**. Deuda con dueño en la ficha de F18.
+
+---
+
+## 27. `18-pegado-coordenadas.js` — las tres deudas de F18, cobradas (F19 · T4)
+
+```bash
+npm run dev                                   # EXIGE dev: los fixtures no están en dist/
+$B goto http://localhost:PUERTO/concretagml/  # ⚠️ recarga ANTES de correrlo
+$B eval scripts/smoke-navegador/18-pegado-coordenadas.js
+```
+
+⚠️ **Recarga la página antes de cada corrida**, por lo mismo que el §26: el botón
+«Pegar coordenadas…» vive en el panel de Entrada y el propio guion aterriza fuera.
+Lo detecta y lo dice como advertencia, pero la medida se pierde.
+
+Anda las tres cosas que F18 sacó de su alcance **con casa escrita**:
+
+    pegar la LISTA de AutoCAD → la parcela entra y se ve
+    pegar coordenadas EN GRADOS → se ofrece proyectarlas → entran en metros
+    soltar el GML de otro técnico → la cabecera lo dice → cruzar la puerta
+
+### Qué mide, y por qué no lo puede medir la suite
+
+1. ⭐ **Que el `<dialog>` de pegado sea un modal DE VERDAD.** Mismo motivo que el
+   §26: en jsdom no hay `showModal()`. Medido: `open === true`, `620×585` dentro de
+   `1280×720`, `elementFromPoint` devolviéndolo, backdrop presente, y **el foco en
+   el campo** — que es lo que hace que un `Ctrl+V` llegue a alguna parte.
+2. ⭐ **Que las dos cifras de superficie se LEAN.** El cotejo lo calcula
+   `importar()` desde F01 en `resumen.superficie` y **hasta F19 no lo leía nadie**.
+   Medido en pantalla: «el dibujo declara **61,0450 m²** y aquí sale **61,0450 m²**
+   (coinciden)», en una caja de `586×146,56` que no está tapada por nada.
+3. ⭐ **Que lo pegado ENTRE y se pinte.** Medido: **11 filas** de vértice, primer
+   vértice `298755.589 / 4090054.379` —el de `LIST.txt`—, **6 `<path>`** en el mapa.
+4. ⭐ **Que unos grados se proyecten de verdad.** Medido: la revisión **ofrece**
+   proyectar, **dice dónde cae** (lat 36,72 · huso 30), la opción marcada de salida
+   es **no tocar el dato**, y al aceptar la tabla enseña **373062.907 /
+   4064897.582** — el valor exacto de `forward()`. Y **no** aparece por ninguna
+   parte el motivo falso que había hasta F19 («no cae en la España peninsular»).
+5. ⭐ **Que la cabecera nombre al GML ajeno.** Medido: **«GML de otro técnico · no
+   del Catastro»** antes de la puerta y **«GML de otro técnico · tomado como tuyo»**
+   después. Es la deuda que F18 midió al pasar y dejó dicha.
+6. **El coste en píxeles: 0.** El diálogo flota y no le quita sitio a nada.
+
+### ⛔ Lo que destapó la primera corrida, y son TRES cosas del guion y una de la app
+
+La primera corrida salió `ok:false`, y conviene tener escrito qué era cada cosa:
+
+- **Dos acuses en FALSO, los dos por medir la tabla de vértices con el selector de
+  manual.** El `<tbody>` lleva **una fila de cabecera por recinto**
+  (`<th colspan="3">EXTERIOR</th>`), así que 11 vértices son **12 filas** y el guion
+  denunció una tabla correcta; y las coordenadas viven en **`<input value>`** —la
+  tabla es editable desde F06—, así que leer `td.textContent` devolvió `""` y el
+  guion denunció que la proyección no había entrado teniendo `373062.907` delante.
+  Es la misma familia que los 33 px que el guion 11 le achacó al diálogo de F09.
+- **Un guardián anti-vacuidad que era él mismo vacuo.** Se escribió
+  `cargo: antes !== previo || Boolean(puerta)` para detectar «el GML no ha
+  cargado»… y `Boolean(puerta)` es **cierto aunque la puerta esté oculta**, porque
+  el nodo vive en `index.html` desde el arranque. Hoy se exige `offsetParent`.
+- ⛔ **Y UN DEFECTO REAL de la aplicación**: el renglón de procedencia decía
+  **«Geometría medida por ti, del fichero «coordenadas pegadas»»**. Llamar *fichero*
+  a lo que el usuario acaba de pegar es una afirmación falsa sobre el origen del
+  dato, **escrita justo en la línea que existe para decir de dónde salió**. No lo vio
+  ninguna prueba: la de la suite exigía que la frase contuviera «pegad», y lo
+  contenía — dentro de la frase que afirmaba lo contrario. Corregido con
+  `deFichero`, y el guardián ahora exige **que NO diga «del fichero»**.
+
+### Régimen de red: ninguna
+
+⭐ Medido: **2 peticiones en toda la corrida**, las dos fixtures del propio
+servidor. Cero cartográficas, cero a servicios de datos.
+
+### Lo que este guion NO puede medir
+
+- **Que se entienda por qué se pregunta antes de proyectar** → `CHECKLIST-HUMANO.md` §15.
+- **El portapapeles del sistema.** Se sintetiza un `ClipboardEvent` con su
+  `DataTransfer`; ⚠️ **medido: Chromium no aplica el pegado por defecto de un evento
+  no fiable**, así que el guion escribe el valor y **lo dice como advertencia**. El
+  `Ctrl+V` con teclado de verdad va al §15.
+- **Canarias en grados**: no hay fixture y no se inventa uno. Lo cubren la suite
+  (tres pruebas) y la ficha.

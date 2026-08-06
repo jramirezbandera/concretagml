@@ -156,6 +156,12 @@ que este proyecto paga lo mismo (ver F17 · fase 1).
 
 ## Deuda declarada
 
+> ✅ **Las tres se han cobrado: [F19](feature-19-pegado-list.md) se abrió el
+> **2026-08-06**, dos días después de esta ficha, y se lleva las tres —el pegado,
+> los grados y el rótulo de `GML_EXISTENTE`—. La entrevista de F19 la amplió de
+> **una tarea a tres**: lo que aquí se llamó «una tarea» era solo la primera.
+> **Que se abriera en dos días y no en once fases es lo que esta ficha pedía.**
+
 - ⛔ **LIST pegado sigue sin construirse, y sale con dueño: F19, una tarea.** Es la
   vía que [`feature-01:14`](feature-01-entrada-parcela.md#L14) llama **principal** y
   no tiene ni un manejador de `paste` en producción (medido: grep, cero). Fuera por

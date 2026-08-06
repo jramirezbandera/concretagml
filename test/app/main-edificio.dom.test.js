@@ -937,3 +937,107 @@ describe('app/main · K.1 en dos ejes · ningún `data-*` se repite en el docume
     ).toBe(radios.length)
   })
 })
+
+/* -------------------------------------------------------------------------- *
+ * F19 · El paso 18: EL PEGADO, sobre la aplicación viva                       *
+ *                                                                            *
+ * Aquí se mide el CABLE entero, no el diálogo (que tiene su propia suite):    *
+ * que el botón exista en la pantalla de Entrada, que abra la pantalla, que    *
+ * lo pegado ENTRE de verdad en el store, y que el destino lo elija la rama.   *
+ * -------------------------------------------------------------------------- */
+
+const LIST_TEXTO = readFileSync(join(RAIZ, 'test', 'fixtures', 'parsers', 'LIST.txt'), 'utf8')
+
+const botonPegar = () => q('[data-accion="abrir-pegado"]')
+const dialogoPegado = () => q('.gml-dialogo-pegado')
+
+/** Abre la pantalla, pega, y pulsa «Usar estas coordenadas». Como el usuario. */
+async function pegarYUsar(texto) {
+  botonPegar().click()
+  await cederTurno()
+  const campo = dialogoPegado().querySelector('[data-campo="pegado"]')
+  campo.value = texto
+  campo.dispatchEvent(new window.Event('input', { bubbles: true }))
+  dialogoPegado().querySelector('[data-accion="usar-pegado"]').click()
+  await cederTurno()
+}
+
+describe('app/main · F19 · el pegado de coordenadas', () => {
+  it('⛔ el botón EXISTE en la pantalla de Entrada, junto al de fichero', () => {
+    // La vía que `feature-01` llama PRINCIPAL llevaba doce fases sin un solo
+    // manejador de `paste` en producción. Este es el gesto que la abre.
+    expect(botonPegar()).not.toBeNull()
+    expect(botonPegar().disabled).toBe(false)
+    expect(botonPegar().textContent).toMatch(/pegar/i)
+    // Y está en la MISMA vía que el de fichero: son dos formas de lo mismo.
+    expect(botonPegar().closest('.gml-via')).toBe(q('[data-accion="abrir-medicion"]').closest('.gml-via'))
+  })
+
+  it('⭐ pegar la LISTA real mete la parcela: 11 vértices y 61,0450 m²', async () => {
+    const antes = storeParcela().get()
+
+    await pegarYUsar(LIST_TEXTO)
+
+    const despues = storeParcela().get()
+    expect(despues).not.toBe(antes)
+    expect(despues.origen).toBe('LIST')
+    expect(despues.recintos[0].vertices).toHaveLength(11)
+    // ⭐ El mismo número que F18 midió por las OTRAS DOS vías (`UTM.dxf` capa «0»
+    // y `PARCELA.txt`): las tres vías de F01 son la misma parcela, y ahora las
+    // tres puertas están abiertas.
+    expect(area(despues.recintos[0].vertices)).toBeCloseTo(61.045, 3)
+    // Y el edificio ni se entera: con PARCELA puesta el destino es la parcela.
+    expect(storeEdificio().get()).toBeNull()
+  })
+
+  it('⛔ y la cabecera dice que es TUYA, no del Catastro', () => {
+    // Mismo error caro que F18 cerró para el fichero: hacer pasar por oficial una
+    // geometría que ha medido el usuario. Por el pegado entra igual de fácil.
+    const eyebrow = q('[data-eyebrow]').textContent.trim()
+    expect(eyebrow).not.toMatch(/parcela del catastro/i)
+    expect(eyebrow).toMatch(/medici[óo]n/i)
+  })
+
+  it('⛔ la procedencia NO llama «fichero» a lo que se ha pegado', () => {
+    // ⚠️ **Esta prueba nació DÉBIL y la primera corrida del guion 18 lo destapó.**
+    // Decía solo `expect(renglon).toMatch(/pegad/i)`, y pasaba en verde sobre el
+    // renglón defectuoso: «Geometría medida por ti, **del fichero** «coordenadas
+    // pegadas» — NO del Catastro». La palabra estaba ahí, dentro de la frase que
+    // afirmaba lo contrario. Es la misma trampa de casar por la FORMA del texto en
+    // vez de por la afirmación que este proyecto lleva pagando desde F17.
+    const renglon = q('[data-procedencia="parcela"]').textContent
+    expect(renglon).toMatch(/pegad/i)
+    expect(renglon).not.toMatch(/del fichero/i)
+    expect(renglon).toMatch(/NO del Catastro/)
+  })
+
+  it('⭐ con la rama EDIFICIO el MISMO gesto carga partes, no una parcela', async () => {
+    const parcelaAntes = storeParcela().get()
+    irA(RAMA.EDIFICIO)
+
+    await pegarYUsar(LIST_TEXTO)
+
+    // La decisión 7: la rama decide el destino, igual que con el fichero de F18.
+    // Que un gesto valga en una rama y no en la otra es la asimetría que F11 dejó
+    // a medias y que F18 borró; F19 no la vuelve a abrir.
+    const edificio = storeEdificio().get()
+    expect(edificio).not.toBeNull()
+    expect(edificio.partes).toHaveLength(1)
+    expect(edificio.partes[0].origen).toBe('LIST')
+    // Y la parcela no se ha tocado.
+    expect(storeParcela().get()).toBe(parcelaAntes)
+  })
+
+  it('cancelar no cambia nada de lo que hay en pantalla', async () => {
+    const antes = storeParcela().get()
+    botonPegar().click()
+    await cederTurno()
+    dialogoPegado().querySelector('[data-accion="cancelar-pegado"]').click()
+    await cederTurno()
+    expect(storeParcela().get()).toBe(antes)
+  })
+
+  it('⛔ y no toca la red: leer lo que el técnico pega no consulta a nadie', () => {
+    expect(arranque.peticiones).toHaveLength(0)
+  })
+})

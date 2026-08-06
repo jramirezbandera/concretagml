@@ -428,6 +428,19 @@
           >
             Elegir un fichero de medición…
           </button>
+          <!-- F19 · La otra mitad de esta vía, y la que `feature-01` llama
+               PRINCIPAL: el pegado de la LISTA de AutoCAD. Hasta F19 no había ni
+               un manejador de `paste` en producción, así que el técnico que copia
+               su polilínea en el CAD —el gesto más corto que tiene— no tenía
+               dónde soltarla. La pantalla la fabrica `app/dialogo-pegado.js`:
+               aquí solo está el botón que la abre. -->
+          <button
+            type="button"
+            class="gml-boton gml-boton--secundario gml-via-boton"
+            data-accion="abrir-pegado"
+          >
+            Pegar coordenadas…
+          </button>
         </div>
 
         <p class="gml-obien"><span>O bien</span></p>

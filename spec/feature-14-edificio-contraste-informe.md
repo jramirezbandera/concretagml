@@ -1,6 +1,6 @@
 # F14 · Edificio: contraste e informe
 
-**Fase:** 14 · **Prioridad:** P16 (baja) · **Riesgo:** Bajo · **Depende de:** F13, F09 · **Habilita:** —.
+**Fase:** 14 · **Prioridad:** P17 (baja) · **Riesgo:** Bajo · **Depende de:** F13, F09 · **Habilita:** —.
 **Ficheros:** `diagnostico/edificio.js`, `report/pdf-edificio.js`.
 
 ## Objetivo

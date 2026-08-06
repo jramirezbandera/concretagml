@@ -202,16 +202,106 @@ describe('parsers/importar — detectores defensivos SINTÉTICOS (nada en silenc
     expect(g).toHaveLength(1)
     expect(g[0].severidad).toBe(SEVERIDAD.AVISO)
     expect(g[0].datos.reproyectar).toBe(true)
-    // NO se reproyecta (regla 3): el anillo se devuelve intacto, en grados.
+    // NO se reproyecta MIENTRAS NO SE PIDA: el anillo se devuelve intacto, en grados.
     expect(anillos[0]).toEqual(grados)
     expect(parcela).toBeNull()
     expect(resumen.bloqueos).toContain('COORDENADAS_EN_GRADOS')
-    // El centroide en grados no cae en España → AVISO de huso (fueraDeEspana).
-    expect(resumen.huso).toBeNull()
-    const husoAviso = detecciones.find(
-      (d) => d.tipo === TIPO_DETECCION.HUSO_DETECTADO && d.datos && d.datos.fueraDeEspana,
+
+    // ⛔ RETRACTADO EN F19, y se deja escrito porque el error es instructivo.
+    // Aquí decía: «El centroide en grados no cae en España → AVISO de huso
+    // (fueraDeEspana)», y exigía `resumen.huso === null` y ese aviso. Las dos
+    // afirmaciones eran ciertas sobre el código y FALSAS sobre el mundo: este
+    // cuadrado está en la provincia de Cádiz. `detectarHuso` trataba los grados
+    // como metros y desproyectaba un disparate, así que la aplicación rechazaba
+    // el fichero por un motivo inventado. **Un guardián en verde puede estar
+    // defendiendo el defecto** (F11 M28-M30, F18): este llevaba desde F01.
+    expect(resumen.huso).not.toBeNull()
+    expect(resumen.huso.zona).toBe(30) // lo dice la LONGITUD, no una desproyección
+    expect(resumen.huso.ambiguo).toBe(false) // en grados no hay ambigüedad de huso
+    expect(
+      detecciones.some((d) => d.datos && d.datos.fueraDeEspana),
+    ).toBe(false)
+    // Y el único bloqueo es el que de verdad hay: están en grados. Decir además
+    // «no se ha podido resolver el huso» sería contradecir la frase de al lado.
+    expect(resumen.bloqueos).not.toContain('HUSO_NO_RESUELTO')
+    expect(g[0].mensaje).toMatch(/huso 30/)
+    expect(g[0].datos.situacion.region).toBe('PENINSULA_BALEARES')
+  })
+
+  it('GRADOS: con `proyectarGrados` se proyecta, y las dos lecturas caen en el mismo sitio', () => {
+    // El mismo punto escrito en los dos órdenes que llegan de un CAD o un GPS.
+    const lonLat = [
+      [-4.42143, 36.7213],
+      [-4.42133, 36.7213],
+      [-4.42133, 36.7214],
+      [-4.42143, 36.7214],
+    ]
+    const latLon = lonLat.map(([lon, lat]) => [lat, lon])
+
+    const a = importar(aTXT(lonLat), { formato: 'TXT', proyectarGrados: true })
+    const b = importar(aTXT(latLon), { formato: 'TXT', proyectarGrados: true })
+
+    expect(a.resumen.construida).toBe(true)
+    expect(b.resumen.construida).toBe(true)
+    expect(a.resumen.bloqueos).toEqual([])
+    // ⭐ El orden de las columnas NO se pregunta y no hace falta: los rangos de
+    // España son disjuntos (lon ∈ [−9,5 · 4,5], lat ∈ [35,5 · 44,5]), así que solo
+    // una de las dos lecturas cae dentro. Las dos entradas dan la MISMA parcela.
+    expect(b.anillos[0]).toEqual(a.anillos[0])
+    expect(a.anillos[0][0][0]).toBeCloseTo(373062.9068, 4)
+    expect(a.anillos[0][0][1]).toBeCloseTo(4064897.5821, 4)
+    // Y el huso con el que se proyectó no vuelve a «deducirse»: se verifica.
+    expect(a.resumen.huso.zona).toBe(30)
+    expect(a.resumen.huso.ambiguo).toBe(false)
+    const proyectadas = porTipo(a.detecciones, TIPO_DETECCION.GRADOS)
+    expect(proyectadas).toHaveLength(1)
+    expect(proyectadas[0].severidad).toBe(SEVERIDAD.INFO) // ya no es un aviso: está hecho
+    expect(proyectadas[0].datos.aplicado).toBe(true)
+    expect(porTipo(b.detecciones, TIPO_DETECCION.GRADOS)[0].mensaje).toMatch(
+      /\(latitud, longitud\)/,
     )
-    expect(husoAviso.severidad).toBe(SEVERIDAD.AVISO)
+  })
+
+  it('GRADOS: Canarias se NOMBRA y no se proyecta, aunque se pida (O13)', () => {
+    const canarias = [
+      [-15.42, 28.12],
+      [-15.419, 28.12],
+      [-15.419, 28.121],
+      [-15.42, 28.121],
+    ]
+    const { parcela, resumen, detecciones, anillos } = importar(aTXT(canarias), {
+      formato: 'TXT',
+      proyectarGrados: true, // se pide, y aun así NO se proyecta
+    })
+    expect(parcela).toBeNull()
+    expect(anillos[0]).toEqual(canarias) // intacto
+    expect(resumen.bloqueos).toContain('COORDENADAS_EN_GRADOS')
+    const g = porTipo(detecciones, TIPO_DETECCION.GRADOS)[0]
+    // Lo que importa: se dice CANARIAS. Dejarla caer en «fuera de España» sería
+    // cierto de una forma inútil, y el usuario no sabría qué ha pasado.
+    expect(g.mensaje).toMatch(/Canarias/)
+    expect(g.datos.situacion.region).toBe('CANARIAS')
+    expect(g.datos.situacion.zona).toBe(28)
+    expect(g.datos.situacion.proyectable).toBe(false)
+  })
+
+  it('GRADOS: lo que no cae en ningún territorio conocido lo dice, sin inventarse un huso', () => {
+    const paris = [
+      [2.2945, 48.8582],
+      [2.2946, 48.8582],
+      [2.2946, 48.8583],
+      [2.2945, 48.8583],
+    ]
+    const { resumen, detecciones } = importar(aTXT(paris), {
+      formato: 'TXT',
+      proyectarGrados: true,
+    })
+    expect(resumen.construida).toBe(false)
+    expect(resumen.huso).toBeNull()
+    expect(resumen.bloqueos).toContain('HUSO_NO_RESUELTO') // aquí SÍ es verdad
+    const g = porTipo(detecciones, TIPO_DETECCION.GRADOS)[0]
+    expect(g.datos.situacion.region).toBe('FUERA')
+    expect(g.mensaje).toMatch(/los dos órdenes/)
   })
 
   it('GRADOS inconsistente → AVISO de datos sospechosos (no todo el anillo es grados)', () => {

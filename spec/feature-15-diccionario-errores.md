@@ -1,6 +1,6 @@
 # F15 · Diccionario de errores del validador
 
-**Fase:** 15 · **Prioridad:** P17 · **Riesgo:** Bajo · **Depende de:** F04 · **Habilita:** —.
+**Fase:** 15 · **Prioridad:** P18 · **Riesgo:** Bajo · **Depende de:** F04 · **Habilita:** —.
 **Ficheros:** `config/errores-ivg.json`.
 
 ## Objetivo

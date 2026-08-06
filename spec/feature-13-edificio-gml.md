@@ -1,6 +1,6 @@
 # F13 · Edificio: validación y generación de GML
 
-**Fase:** 13 · **Prioridad:** P15 (baja) · **Riesgo:** Alto (fidelidad ICUC) · **Depende de:** F12 · **Habilita:** F14.
+**Fase:** 13 · **Prioridad:** P16 (baja) · **Riesgo:** Alto (fidelidad ICUC) · **Depende de:** F12 · **Habilita:** F14.
 **Ficheros:** `validation/edificio.js`, `gml/serialize-bu.js`, fixtures `wfsBU.aspx`.
 
 ## Objetivo

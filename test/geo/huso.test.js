@@ -20,8 +20,14 @@ import {
   husoPorSrsOpcional,
   detectarHuso,
   sanear,
+  situarGrados,
+  zonaPorLon,
+  pareceEnGrados,
   CANDIDATOS_DEFECTO,
   HUSOS_VALIDOS,
+  BBOX_ESPANA,
+  BBOX_CANARIAS,
+  UMBRAL_GRADOS,
 } from '../../geo/huso.js'
 import { forward } from '../../geo/utm.js'
 import { SRS_VALIDOS } from '../../model/parcela.js'
@@ -259,5 +265,125 @@ describe('geo/huso — Canarias DIFERIDO (override O13)', () => {
     expect(src).toMatch(/\/\/\s*DIFERIDO:\s*Canarias\b/)
     expect(src).toMatch(/28/)
     expect(src).toMatch(/32628/)
+  })
+})
+
+/* -------------------------------------------------------------------------- *
+ * F19 · Situar unos grados para poder proyectarlos                            *
+ *                                                                            *
+ * Hasta F19 este módulo sabía decir «esto son grados» y se paraba ahí. Lo que *
+ * faltaba no era la proyección —forward() está desde F00— sino el orden de    *
+ * las columnas y el huso. Las dos se contestan sin heurísticas.               *
+ * -------------------------------------------------------------------------- */
+
+describe('geo/huso — zonaPorLon', () => {
+  it('da el huso de una longitud: −9,5 → 29, −4 → 30, +2 → 31', () => {
+    expect(zonaPorLon(-9.5)).toBe(29)
+    expect(zonaPorLon(-4)).toBe(30)
+    expect(zonaPorLon(2)).toBe(31)
+  })
+
+  it('⭐ el bbox de España mapea EXACTAMENTE a los tres husos soportados', () => {
+    // No es una coincidencia que se pueda usar: es la razón por la que el huso
+    // se puede deducir de la longitud sin desproyectar nada.
+    expect(zonaPorLon(BBOX_ESPANA.lonMin)).toBe(29)
+    expect(zonaPorLon(BBOX_ESPANA.lonMax)).toBe(31)
+    expect([...HUSOS_VALIDOS]).toEqual([29, 30, 31])
+  })
+
+  it('contesta también donde el proyecto no proyecta: Canarias es el huso 28', () => {
+    // Es a propósito (ver su JSDoc): quien pregunta necesita poder NOMBRAR lo que
+    // ha visto. Filtrar aquí obligaría a contestar null y el mensaje sería mudo.
+    expect(zonaPorLon(-15)).toBe(28)
+    expect(HUSOS_VALIDOS).not.toContain(28)
+  })
+
+  it('una longitud fuera de [−180,180) no inventa un huso 61', () => {
+    expect(zonaPorLon(185)).toBe(zonaPorLon(-175))
+    expect(zonaPorLon(185)).toBeLessThanOrEqual(60)
+  })
+
+  it('una longitud no finita es error de programación, no un resultado raro', () => {
+    expect(() => zonaPorLon('−4')).toThrow(TypeError)
+    expect(() => zonaPorLon(NaN)).toThrow(TypeError)
+  })
+})
+
+describe('geo/huso — pareceEnGrados', () => {
+  it('el umbral es UNO y está exportado (eran dos copias antes de F19)', () => {
+    expect(UMBRAL_GRADOS).toBe(1000)
+    expect(pareceEnGrados([-4.42, 36.72])).toBe(true)
+    expect(pareceEnGrados([298755, 4090054])).toBe(false)
+    // Las dos componentes, no una: un par mixto no son grados (unidades mezcladas).
+    expect(pareceEnGrados([-5, 4000000])).toBe(false)
+  })
+
+  it('la frontera es estricta: |v| = 1000 no son grados', () => {
+    expect(pareceEnGrados([999.9, 999.9])).toBe(true)
+    expect(pareceEnGrados([1000, 999])).toBe(false)
+  })
+})
+
+describe('geo/huso — situarGrados', () => {
+  it('⭐ los rangos de lon y lat de España son DISJUNTOS: el orden no es ambiguo', () => {
+    // Este es el hecho del que cuelga la decisión de deducir el orden en vez de
+    // preguntarlo. Si algún día los bbox se solapan, esta prueba lo dice ANTES de
+    // que la aplicación empiece a adivinar mal.
+    expect(BBOX_ESPANA.lonMax).toBeLessThan(BBOX_ESPANA.latMin)
+    expect(BBOX_CANARIAS.lonMax).toBeLessThan(BBOX_CANARIAS.latMin)
+  })
+
+  it('(lon, lat) de Málaga: huso 30, sin invertir', () => {
+    const s = situarGrados([-4.42143, 36.7213])
+    expect(s.orden).toBe('LON_LAT')
+    expect(s.invertido).toBe(false)
+    expect(s.zona).toBe(30)
+    expect(s.srs).toBe('EPSG:25830')
+    expect(s.region).toBe('PENINSULA_BALEARES')
+    expect(s.proyectable).toBe(true)
+  })
+
+  it('el MISMO punto al revés se reconoce y se deja ya en el orden bueno', () => {
+    const s = situarGrados([36.7213, -4.42143])
+    expect(s.orden).toBe('LAT_LON')
+    expect(s.invertido).toBe(true)
+    expect(s.lon).toBe(-4.42143) // lon y lat salen colocadas, no como vinieron
+    expect(s.lat).toBe(36.7213)
+    expect(s.zona).toBe(30)
+  })
+
+  it('Galicia cae en el 29 y Cataluña en el 31 (el huso lo da la longitud)', () => {
+    expect(situarGrados([-8.5, 42.5]).zona).toBe(29)
+    expect(situarGrados([2.1, 41.4]).zona).toBe(31)
+  })
+
+  it('⛔ Canarias se reconoce, se nombra y NO es proyectable (O13)', () => {
+    const s = situarGrados([-15.42, 28.12])
+    expect(s.region).toBe('CANARIAS')
+    expect(s.zona).toBe(28)
+    expect(s.srs).toBeNull() // srsPorHuso(28) no existe, y no se inventa
+    expect(s.proyectable).toBe(false)
+  })
+
+  it('París no cae en ninguno de los dos, en ninguno de los dos órdenes', () => {
+    const s = situarGrados([2.2945, 48.8582])
+    expect(s.region).toBe('FUERA')
+    expect(s.orden).toBeNull()
+    expect(s.zona).toBeNull()
+    expect(s.proyectable).toBe(false)
+  })
+
+  it('una coordenada no finita es error de programación', () => {
+    expect(() => situarGrados([NaN, 36])).toThrow(TypeError)
+    expect(() => situarGrados([-4])).toThrow(TypeError)
+  })
+
+  it('lo que sitúa se puede proyectar con forward y vuelve a caer donde decía', () => {
+    // La prueba de que las dos piezas encajan: situarGrados no proyecta (regla 3),
+    // pero lo que devuelve es exactamente lo que forward necesita.
+    const s = situarGrados([-4.42143, 36.7213])
+    const { x, y, zona } = forward(s.lat, s.lon, s.zona)
+    expect(zona).toBe(30)
+    expect(detectarHuso([x, y], [s.zona]).zona).toBe(30)
   })
 })

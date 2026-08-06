@@ -566,6 +566,7 @@ import {
 } from './cableado-expediente.js'
 import { cablearInforme } from './cableado-informe.js'
 import { cablearMedicion } from './cableado-medicion.js'
+import { NOMBRE_PEGADO, crearDialogoPegado } from './dialogo-pegado.js'
 import {
   AVISO_DEMO_HUECO_SINTETICO,
   SRS_DEMO,
@@ -573,7 +574,7 @@ import {
   parcelaDemoConHueco,
 } from './demo-datos.js'
 import { cablearContraste } from './contraste.js'
-import { PASO, crearNavegacion } from './navegacion.js'
+import { MODO, PASO, crearNavegacion } from './navegacion.js'
 import { crearPanelEdificio } from './panel-edificio.js'
 import { cablearPantalla } from './pantalla.js'
 import { cablearRail } from './rail.js'
@@ -613,6 +614,26 @@ const EYEBROW_CATASTRO = 'Parcela del Catastro'
  * ninguna otra forma de meter geometría en el store. F18 estrena la cuarta.
  */
 const EYEBROW_MEDICION = 'Tu medición · no del Catastro'
+
+/**
+ * ⚠️ **EL QUINTO, Y ES LA DEUDA QUE F18 DEJÓ DICHA Y NO TOCÓ.** Un GML de otro
+ * técnico caía en «Parcela del Catastro» por el mismo motivo que la medición
+ * propia: `GML_EXISTENTE` tampoco es la Sede. F18 lo midió al pasar y **no lo
+ * arregló a propósito** —ese rótulo es parte del recorrido de F08, que cruza a
+ * Contraste y reescribe `data-procedencia`, y cambiarlo de refilón en la última
+ * tarea de otra fase es como se rompe lo que nadie está mirando—. F19 es su casa.
+ *
+ * ⭐ **Y son DOS, porque este rótulo sí cambia con el MODO.** Mientras estás
+ * comprobando, la geometría es de otro; al cruzar la puerta de F08 («Tomar esta
+ * geometría y editarla») pasa a ser tuya **sin que el origen cambie** — el origen
+ * dice de dónde salió el dibujo y eso no cambia nunca (`app/contraste.js`). Seguir
+ * diciendo «de otro técnico» sobre algo que llevas media hora editando sería tan
+ * falso como decir «del Catastro»; y decir «tu medición» sería peor todavía,
+ * porque no la mediste tú. Es la misma distinción que `textoProcedencia` hace en
+ * el renglón de procedencia desde F08, aplicada por fin a la cabecera.
+ */
+const EYEBROW_GML_AJENO = 'GML de otro técnico · no del Catastro'
+const EYEBROW_GML_TOMADO = 'GML de otro técnico · tomado como tuyo'
 
 /**
  * Los orígenes de `ORIGEN_PARCELA` que significan «lo ha medido el técnico». Se
@@ -1264,6 +1285,24 @@ let colindantesTraidas = null
 let ramaEnPantalla = RAMA.PARCELA
 
 /**
+ * El MODO que hay en pantalla, y el **espejo** de `app/navegacion.js`, que es su
+ * dueño. Existe por el mismo motivo estructural que {@link ramaEnPantalla} y con
+ * una razón medida encima (F19):
+ *
+ * ⛔ **`navegacion` se declara en el paso 14 y la ficha se pinta en el paso 4.**
+ * `repintarFicha()` se llama a mano al montar —si no, la cabecera se quedaría con
+ * los guiones del HTML hasta la primera edición—, así que leer `navegacion` desde
+ * {@link rotuloDelDato} es un `ReferenceError` de zona muerta **al cargar el
+ * módulo**: no fallaría el rótulo, no arrancaría la aplicación.
+ *
+ * Nace en NORMAL porque es con lo que arranca la pantalla: a Comprobación se entra
+ * soltando el GML de otro, que es un gesto del usuario y siempre posterior.
+ *
+ * @type {'NORMAL'|'COMPROBACION'}
+ */
+let modoEnPantalla = MODO.NORMAL
+
+/**
  * El rótulo de PROCEDENCIA de la cabecera (`data-eyebrow`): qué es, exactamente,
  * lo que hay en pantalla. Tres estados, que son los tres que la app distingue:
  *
@@ -1290,13 +1329,28 @@ let ramaEnPantalla = RAMA.PARCELA
  * cierto mientras el Catastro fuera la única puerta. Hoy hay cuatro orígenes en
  * `ORIGEN_PARCELA` y tres de ellos NO son la Sede.
  *
- * ⚠️ **`GML_EXISTENTE` sigue cayendo en «del Catastro», y es una inconsistencia
- * PREEXISTENTE que F18 no toca.** Medida al pasar: un GML de otro técnico también
- * es geometría de un fichero, así que el rótulo tampoco le corresponde. No se
- * arregla aquí porque ese rótulo es parte del recorrido de F08 —que además cruza
- * a Contraste y reescribe `data-procedencia`— y cambiarlo de refilón, en la última
- * tarea de otra fase, es como se rompen las cosas que nadie estaba mirando. Queda
- * dicho, con su fecha, en la ficha de F18.
+ *   · **{@link EYEBROW_GML_AJENO}** / **{@link EYEBROW_GML_TOMADO}** — ⚠️ **el
+ *     quinto y el sexto, y los estrena F19**: la geometría viene del GML de otro
+ *     técnico. Son dos porque este caso —y solo este— **cambia al cruzar la
+ *     puerta** de F08: el origen sigue diciendo `GML_EXISTENTE`, que es la verdad,
+ *     pero ya la has tomado como tuya. Hasta F19 los dos decían «del Catastro»;
+ *     F18 lo midió al pasar y lo dejó dicho con su fecha, sin tocarlo.
+ *
+ * Sin parcela (`null`, que el store admite) se cae al lado conservador: el de la
+ * demostración. Nunca se afirma «del Catastro» sin una parcela que lo respalde.
+ *
+ * ⚠️ **La pregunta es por el ORIGEN y no por el `idLocal`**, que es lo que hacía
+ * hasta F18. Aquel criterio decía «si no es la demo, la trajo el Catastro», y era
+ * cierto mientras el Catastro fuera la única puerta. Hoy hay cuatro orígenes en
+ * `ORIGEN_PARCELA` y tres de ellos NO son la Sede.
+ *
+ * ⛔ **Y el modo NO se lee de `navegacion`, aunque sea quien manda: se lee del
+ * espejo {@link modoEnPantalla}.** Medido antes de escribirlo: la ficha se pinta a
+ * mano al montar (`repintarFicha()`, paso 4) y `crearNavegacion` es **el paso
+ * 14**, así que tocar `navegacion` desde aquí es un `ReferenceError` de zona
+ * muerta que **impide arrancar la aplicación entera**, no un fallo del rótulo. El
+ * patrón —una variable de módulo que el suscriptor mantiene al día— es el mismo
+ * que `ramaEnPantalla` de F11, y por el mismo motivo.
  *
  * @param {object|null} parcelaActual  POJO de parcela del store (o `null`).
  * @returns {string}
@@ -1305,6 +1359,9 @@ function rotuloDelDato(parcelaActual) {
   const hayParcela = parcelaActual !== null && parcelaActual !== undefined
   if (!hayParcela || parcelaActual.idLocal === ID_LOCAL_DEMO) {
     return esSintetica ? EYEBROW_SINTETICA : EYEBROW_DEMOSTRACION
+  }
+  if (parcelaActual.origen === ORIGEN_PARCELA.GML_EXISTENTE) {
+    return modoEnPantalla === MODO.COMPROBACION ? EYEBROW_GML_AJENO : EYEBROW_GML_TOMADO
   }
   return ORIGENES_MEDIDOS.has(parcelaActual.origen) ? EYEBROW_MEDICION : EYEBROW_CATASTRO
 }
@@ -3786,6 +3843,23 @@ ramaCableada.subscribe((rama) => {
   refrescarHechos()
 })
 
+// F19 · El espejo del MODO, y el único sitio que lo escribe.
+//
+// ⛔ **Sin esto, cruzar la puerta de F08 no cambiaría la cabecera**, y ese es el
+// caso entero: «Tomar esta geometría y editarla» no toca el store —la parcela es
+// la misma, el origen sigue siendo `GML_EXISTENTE`—, así que ningún suscriptor de
+// `estado` se entera. Lo que cambia es el MODO, y lo publica la navegación.
+//
+// El repintado va DESPUÉS de escribir el espejo y solo si el modo ha cambiado de
+// verdad: la navegación notifica también por paso y por rama, y repintar la ficha
+// entera en cada peldaño del rail sería trabajo de sobra en el camino caliente.
+navegacion.subscribe(({ modo }) => {
+  const nuevo = modo === MODO.COMPROBACION ? MODO.COMPROBACION : MODO.NORMAL
+  if (nuevo === modoEnPantalla) return
+  modoEnPantalla = nuevo
+  repintarFicha()
+})
+
 // ⭐ **AQUÍ ESTUVO EL APAÑO DE T5, Y T9 LO HA BORRADO.** Ponía esto:
 //
 //     ctaDiagnosticar.addEventListener('click', () => {
@@ -4041,6 +4115,41 @@ const medicion = cablearMedicion({
   },
 })
 medicionCableada = medicion
+
+// ── Paso 18 · F19 · EL PEGADO DE COORDENADAS ────────────────────────────────
+//
+// La vía que `feature-01` llama **principal** y que llevaba doce fases sin
+// construirse: `parsers/list.js` está en verde desde la fase 1 y **no había ni un
+// manejador de `paste` en producción**. Ver `app/dialogo-pegado.js`.
+//
+// ⚠️ **Va después del 17 y por lo mismo que él**: el destino se resuelve TARDE,
+// por {@link ramaEnPantalla}, y los dos cableados tienen que existir ya. Con
+// PARCELA lo pegado entra como medición; con EDIFICIO, como partes. **El mismo
+// gesto en las dos ramas** (decisión 7): que valga en una y no en la otra es la
+// asimetría que F11 dejó a medias y F18 borró para el fichero.
+const dialogoPegado = crearDialogoPegado({ documento: document, alAvisar: panel.avisar })
+const botonPegado = document.querySelector('[data-accion="abrir-pegado"]')
+if (botonPegado !== null) {
+  botonPegado.addEventListener('click', async () => {
+    const enEdificio = ramaEnPantalla === RAMA.EDIFICIO
+    const destino = enEdificio ? edificioCableado : medicionCableada
+    if (destino === null || typeof destino.alTexto !== 'function') {
+      // Regla de oro 1: un botón que traga el clic es peor que uno apagado.
+      panel.avisar(
+        'La pantalla de pegar coordenadas no está disponible en esta sesión. Puedes seguir ' +
+          'usando «Elegir un fichero de medición…» o soltando el fichero sobre la ventana.',
+        { nivel: NIVEL.AVISO },
+      )
+      return
+    }
+
+    const texto = await dialogoPegado.abrir({ inspeccionar: destino.inspeccionarTexto })
+    // `null` es cancelar, y cancelar no es un fallo: no se dice nada. El diálogo
+    // solo devuelve texto cuando su propia vista previa ha dicho que sirve.
+    if (texto === null) return
+    await destino.alTexto(texto, NOMBRE_PEGADO)
+  })
+}
 
 // Y una última remedida del mapa cuando el navegador ya ha maquetado el rail. En
 // el arranque la cáscara entera existe antes de que corra este fichero, así que

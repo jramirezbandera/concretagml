@@ -77,6 +77,7 @@ import { NIVEL, resolverAvisar } from '../viewer/_comun.js'
  */
 export const TIPO_DECISION = Object.freeze({
   CAPA: 'CAPA',
+  GRADOS: 'GRADOS',
   SWAP_XY: 'SWAP_XY',
   CIERRE: 'CIERRE',
   HUSO: 'HUSO',
@@ -94,19 +95,20 @@ export const LECTURA_CIERRE = Object.freeze({
  * ofrecer**, con lo que hay que hacer en su lugar. Se dicen con todas las letras
  * en vez de dejar un botón muerto o un diálogo con un solo «Cancelar».
  *
- * ⛔ **`COORDENADAS_EN_GRADOS` está aquí y duele, porque F01 pedía «detectar y
- * ofrecer proyectar».** Medido el 2026-08-06: la detección existe y trae
- * `datos.reproyectar: true`, pero **`importar()` no tiene ninguna opción para
- * aplicarla** — `geo/huso.js#sanear` declara que no proyecta (regla de oro 3) y la
- * proyección vive en `geo/utm.js#forward`, sin nadie que las una. Enchufarlas es
- * trabajo de la capa de geometría, no de esta; F18 es cableado y UI. Se dice lo
- * que pasa y qué hacer, y queda como deuda con dueño en la ficha de la fase.
+ * ⛔ **`COORDENADAS_EN_GRADOS` estuvo aquí desde F18 y dolía, porque F01 pedía
+ * «detectar y ofrecer proyectar».** Lo que se midió entonces era cierto: la
+ * detección traía `datos.reproyectar: true` y **`importar()` no tenía ninguna
+ * opción para aplicarla**. **F19 la escribió**, así que este caso ya no vive aquí
+ * salvo cuando de verdad no hay salida —Canarias, diferida por O13, y lo que no
+ * cae en ningún territorio conocido—, y entonces el texto lo compone
+ * {@link mensajeGradosSinCorreccion} con lo que se sabe del sitio. El renglón
+ * genérico se conserva para cuando no viene situación ninguna.
  */
 const SIN_CORRECCION = Object.freeze({
   [BLOQUEOS.COORDENADAS_EN_GRADOS]:
-    'Las coordenadas están en grados geográficos (latitud y longitud), no en UTM. Esta versión ' +
-    'sabe reconocerlo pero todavía no sabe proyectarlas: vuelve a exportar el dibujo en ' +
-    'coordenadas UTM desde tu CAD y suéltalo otra vez.',
+    'Las coordenadas están en grados geográficos (latitud y longitud), no en UTM, y no se ha ' +
+    'podido situar la parcela para proyectarlas: vuelve a exportar el dibujo en coordenadas ' +
+    'UTM desde tu CAD y suéltalo otra vez.',
   [BLOQUEOS.HUSO_NO_RESUELTO]:
     'Con estas coordenadas no se puede deducir en qué huso cae la parcela: ninguna de las tres ' +
     'lecturas (29, 30, 31) la sitúa en España. Suele significar que el fichero no está ' +
@@ -118,6 +120,33 @@ const SIN_CORRECCION = Object.freeze({
     'que no se puede decir cuál es el contorno y cuáles los huecos. Si el dibujo tiene varias ' +
     'capas, elegir una sola suele resolverlo.',
 })
+
+/**
+ * Qué se le dice al usuario cuando el fichero viene en grados y **no se puede
+ * proyectar**. Se compone con lo que `geo/huso.js#situarGrados` ha averiguado, en
+ * vez de dar una frase única: «no cae en España» sobre unas coordenadas de Las
+ * Palmas es cierto de una forma inútil, y el usuario no sabe qué ha pasado.
+ *
+ * @param {object|null} situacion  `datos.situacion` de la detección GRADOS.
+ * @returns {string}
+ */
+function mensajeGradosSinCorreccion(situacion) {
+  if (situacion?.region === 'CANARIAS') {
+    return (
+      'Las coordenadas están en grados geográficos y caen en Canarias. Esta versión trabaja en ' +
+      'los husos 29, 30 y 31 (Península y Baleares) y todavía no proyecta el 28, que es el de ' +
+      'Canarias: vuelve a exportar el dibujo en coordenadas UTM desde tu CAD.'
+    )
+  }
+  if (situacion?.region === 'FUERA') {
+    return (
+      'Las coordenadas están en grados geográficos, y leídas en los dos órdenes posibles no caen ' +
+      'ni en la España peninsular y Baleares ni en Canarias. Revisa si el fichero está en otro ' +
+      'sistema de referencia, o vuelve a exportarlo en coordenadas UTM desde tu CAD.'
+    )
+  }
+  return SIN_CORRECCION[BLOQUEOS.COORDENADAS_EN_GRADOS]
+}
 
 // ── Textos de la pantalla ────────────────────────────────────────────────────
 
@@ -146,6 +175,7 @@ const APUNTE_CAPAS =
 
 const MOTIVO_SIN_CAPA = 'Elige una capa para continuar.'
 
+const ROTULO_GRADOS = 'Coordenadas en grados'
 const ROTULO_SWAP = 'X e Y invertidas'
 const ROTULO_CIERRE = 'El contorno no cierra del todo'
 const ROTULO_HUSO = 'Huso'
@@ -287,6 +317,34 @@ export function decisionesDe(resultado) {
       ],
       bloqueos: bloqueos.filter((b) => b.codigo !== BLOQUEOS.SUPERFICIE_NO_POSITIVA),
       informativas: informativasDe(detecciones),
+    }
+  }
+
+  // ── 1bis · F19 · Coordenadas en grados, que si se pueden proyectar es lo
+  //   ÚNICO que se pregunta, y por el mismo motivo que el reparto por capas: el
+  //   cierre, el huso y la superficie están medidos sobre unos números que están
+  //   a punto de cambiar de unidad. Aceptada la proyección, el cableado vuelve a
+  //   llamar a `importar()` y las decisiones de verdad aparecen sobre metros.
+  const enGrados = porTipo(detecciones, TIPO_DETECCION.GRADOS).find(
+    (d) => d?.datos?.situacion && d.datos.aplicado !== true,
+  )
+  const situacion = enGrados?.datos?.situacion ?? null
+  if (codigos.includes(BLOQUEOS.COORDENADAS_EN_GRADOS)) {
+    if (situacion?.proyectable === true) {
+      return {
+        decisiones: [{ tipo: TIPO_DECISION.GRADOS, situacion }],
+        // El bloqueo NO se enseña: tiene corrección y está justo encima. Decir a la
+        // vez «vuelve a exportar desde el CAD» y «pulsa aquí para proyectar» es la
+        // contradicción de M28 de F11, escrita en dos párrafos seguidos.
+        bloqueos: bloqueos.filter((b) => b.codigo !== BLOQUEOS.COORDENADAS_EN_GRADOS),
+        informativas: informativasDe(detecciones),
+      }
+    }
+    // Sin corrección posible: el motivo se compone con lo que se sabe del sitio.
+    for (const b of bloqueos) {
+      if (b.codigo === BLOQUEOS.COORDENADAS_EN_GRADOS) {
+        b.mensaje = mensajeGradosSinCorreccion(situacion)
+      }
     }
   }
 
@@ -494,6 +552,35 @@ export function crearDialogoImportacion({ documento = document, alAvisar } = {})
     return caja
   }
 
+  /**
+   * El grupo de los grados. Enseña **dónde ha caído la parcela** antes de tocar
+   * nada, que es lo que `feature-01` §Detecciones pide para el huso y vale igual
+   * aquí: «huso 30» a secas no le dice nada a nadie; «cae en lat 36,72 · lon
+   * −4,42, huso 30» sí. Y si las columnas venían al revés, se dice también: el
+   * usuario tiene que poder reconocer su propio fichero en lo que lee.
+   */
+  function pintarGrados(decision) {
+    const s = decision.situacion
+    const orden = s.invertido
+      ? 'Las columnas vienen como (latitud, longitud), al revés de lo habitual. '
+      : ''
+    const caja = grupo(
+      ROTULO_GRADOS,
+      `${orden}Leídas así, la parcela cae en lat ${s.lat.toFixed(6)} · lon ${s.lon.toFixed(6)}, ` +
+        `dentro del huso ${s.zona} (${s.srs}). El modelo trabaja en metros: para poder medir, ` +
+        'dibujar y generar el GML hay que proyectarlas.',
+    )
+    const lista = crear('div', CLASE.LISTA)
+    lista.append(
+      // El «no» va primero y marcado, como en X/Y invertidas: la opción por
+      // defecto de esta pantalla es NO tocar el dato del usuario.
+      opcionRadio('grados', 'no', 'Dejarlas en grados (no entrará ninguna parcela)', true),
+      opcionRadio('grados', 'si', `Proyectar a UTM huso ${s.zona} (${s.srs})`, false),
+    )
+    caja.append(lista)
+    return caja
+  }
+
   function pintarSwap(decision) {
     const caja = grupo(
       ROTULO_SWAP,
@@ -603,6 +690,9 @@ export function crearDialogoImportacion({ documento = document, alAvisar } = {})
       if (d.tipo === TIPO_DECISION.CAPA) {
         const capa = leer('capa')
         if (capa) opts.capa = capa.value
+      }
+      if (d.tipo === TIPO_DECISION.GRADOS) {
+        if (leer('grados')?.value === 'si') opts.proyectarGrados = true
       }
       if (d.tipo === TIPO_DECISION.SWAP_XY) {
         if (leer('swap')?.value === 'si') opts.intercambiarXY = true
@@ -733,6 +823,7 @@ export function crearDialogoImportacion({ documento = document, alAvisar } = {})
 
       for (const d of decisiones) {
         if (d.tipo === TIPO_DECISION.CAPA) grupos.append(pintarCapas(d))
+        if (d.tipo === TIPO_DECISION.GRADOS) grupos.append(pintarGrados(d))
         if (d.tipo === TIPO_DECISION.SWAP_XY) grupos.append(pintarSwap(d))
         if (d.tipo === TIPO_DECISION.CIERRE) grupos.append(pintarCierre(d))
         if (d.tipo === TIPO_DECISION.HUSO) grupos.append(pintarHuso(d))

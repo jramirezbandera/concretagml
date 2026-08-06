@@ -1,6 +1,6 @@
 # F16 · Integración Concreta y cierre
 
-**Fase:** 16 · **Prioridad:** P18 · **Riesgo:** Bajo · **Depende de:** F09, F10 · **Habilita:** —.
+**Fase:** 16 · **Prioridad:** P19 · **Riesgo:** Bajo · **Depende de:** F09, F10 · **Habilita:** —.
 **Ficheros:** integración global, página de créditos/licencias.
 
 ## Objetivo

@@ -318,6 +318,16 @@ export const MENSAJE_FALLO_INESPERADO =
   'La operación sobre el edificio se ha interrumpido por un fallo interno de la aplicación; no se ' +
   'ha cambiado nada. El detalle técnico está en la consola del navegador.'
 
+/** F19 · El campo del pegado, vacío. No es un error: es el estado de partida. */
+export const PEGADO_VACIO_EDIFICIO =
+  'Pega aquí las coordenadas de las huellas del edificio: el resultado del comando LISTA de ' +
+  'AutoCAD, o dos columnas por vértice.'
+
+/** F19 · Se ha pegado algo y no hay dentro ni una huella que leer. */
+export const PEGADO_SIN_GEOMETRIA_EDIFICIO =
+  'En ese texto no hay ningún par de coordenadas que pueda ser la huella de una parte. Del ' +
+  'comando LISTA hay que copiar el bloque entero, con las líneas «Ubicación: X= … Y= …».'
+
 /**
  * No hay a quién pedirle el edificio. **No es un fallo**: es una pantalla montada
  * sin el cliente del servicio, que es un montaje legítimo (y es lo que queda si el
@@ -1108,6 +1118,8 @@ export function cablearEdificio({
     }
     if (destruido) return
 
+    let texto
+    let deteccionesTexto = []
     try {
       // ⚠️ `new Uint8Array(...)` y no el búfer a pelo: la vista se construye con
       // el `Uint8Array` de ESTE realm, que es el mismo del `instanceof` de
@@ -1117,12 +1129,49 @@ export function cablearEdificio({
       // ⚠️ Los cinco ficheros BU reales declaran `ISO-8859-1` en su prólogo y
       // mienten: `entradaDesdeGmlBu` espera el XML YA DECODIFICADO, y decidir el
       // encoding por PRUEBA es de este módulo, igual que en la comprobación.
-      const { texto, detecciones: deteccionesTexto } = decodificarGml(datos)
+      ;({ texto, detecciones: deteccionesTexto } = decodificarGml(datos))
+    } catch (causa) {
+      reventar(`la lectura de «${nombre}» ha fallado`, causa)
+      return
+    }
 
+    alTexto(texto, nombre, deteccionesTexto)
+  }
+
+  /**
+   * Un volcado YA EN TEXTO con la rama EDIFICIO puesta: de un fichero (arriba) o
+   * del pegado de coordenadas (F19, `app/dialogo-pegado.js`).
+   *
+   * ⚠️ **La rama decide, y por eso el pegado también entra por aquí**: el mismo
+   * gesto que con PARCELA carga una medición, con EDIFICIO carga partes. Que un
+   * gesto valga en una rama y no en la otra es la asimetría que F11 dejó «cerrada
+   * a medias» y que F18 borró para el fichero; F19 no la vuelve a abrir.
+   *
+   * **No lanza nunca.**
+   *
+   * @param {string} texto
+   * @param {string} [nombre]
+   * @param {Array<object>} [deteccionesTexto]  Las de la decodificación, si venía
+   *   de un fichero. Un pegado ya es texto y no tiene ninguna.
+   * @param {boolean} [deFichero=true]  Solo cambia CÓMO SE NOMBRA la procedencia:
+   *   llamar «fichero» a lo que el usuario acaba de pegar es una afirmación falsa
+   *   sobre el origen del dato, que es justo lo que este renglón existe para decir.
+   * @returns {void}
+   */
+  function alTexto(texto, nombre = 'coordenadas pegadas', deteccionesTexto = [], deFichero = true) {
+    if (destruido) return
+    const deDonde = deFichero ? `Del fichero «${nombre}»` : `De ${nombre}`
+    try {
       if (pareceXml(texto)) {
         const entrada = normalizar(entradaDesdeGmlBu(texto, comunes()))
         entrada.detecciones = [...deteccionesTexto, ...entrada.detecciones]
-        aplicar(entrada, `«${nombre}»`, `Del GML de edificio «${nombre}», leído en esta pantalla.`)
+        aplicar(
+          entrada,
+          `«${nombre}»`,
+          deFichero
+            ? `Del GML de edificio «${nombre}», leído en esta pantalla.`
+            : 'Del GML de edificio pegado en esta pantalla.',
+        )
         return
       }
 
@@ -1144,7 +1193,7 @@ export function cablearEdificio({
 
       const entrada = normalizar(previa)
       entrada.detecciones = [...deteccionesTexto, ...entrada.detecciones]
-      aplicar(entrada, `«${nombre}»`, `Del fichero «${nombre}», medido por el técnico.`)
+      aplicar(entrada, `«${nombre}»`, `${deDonde}, medido por el técnico.`)
     } catch (causa) {
       pendiente = null
       reventar(`la lectura de «${nombre}» ha fallado`, causa)
@@ -1452,8 +1501,62 @@ export function cablearEdificio({
   // store que puede nacer vacío o venir con algo puesto.
   repintar(estado.get())
 
+  /**
+   * F19 · La vista previa del pegado con la rama EDIFICIO puesta. Mismo contrato
+   * que `app/cableado-medicion.js#inspeccionarTexto` —lo consume el mismo
+   * `<dialog>`— y por eso devuelve exactamente la misma forma.
+   *
+   * ⚠️ **No hay cotejo de superficie aquí y no es un olvido**: ese renglón sale
+   * del «Área:» que declara la LISTA de AutoCAD, y en un edificio lo que se pega
+   * son las huellas de las partes, cuya superficie no la declara nadie. Enseñar un
+   * renglón vacío o un cero afirmaría algo falso.
+   *
+   * @param {string} texto
+   * @returns {{ok: boolean, titular: string, renglones: string[], motivo: string|null}}
+   */
+  function inspeccionarTexto(texto) {
+    if (typeof texto !== 'string' || texto.trim() === '') {
+      return { ok: false, titular: '', renglones: [], motivo: PEGADO_VACIO_EDIFICIO }
+    }
+    if (pareceXml(texto)) {
+      // Un GML pegado entra por la otra rama del `alTexto`, y se dice: la vista
+      // previa no puede callar que va a leerlo como un documento y no como una
+      // lista de coordenadas.
+      return {
+        ok: true,
+        titular: 'Documento XML · se leerá como un GML de edificio',
+        renglones: [],
+        motivo: null,
+      }
+    }
+    let previa
+    try {
+      previa = entradaDesdeTexto(texto, comunes())
+    } catch (causa) {
+      console.error('[edificio] la vista previa del pegado ha fallado:', causa)
+      return { ok: false, titular: '', renglones: [], motivo: MENSAJE_FALLO_INESPERADO }
+    }
+    const { resumen } = previa
+    if (resumen.nPartes === 0) {
+      return { ok: false, titular: '', renglones: [], motivo: PEGADO_SIN_GEOMETRIA_EDIFICIO }
+    }
+    const vertices = resumen.nVertices.reduce((suma, n) => suma + n, 0)
+    const renglones = []
+    if (resumen.huso) renglones.push(`Cae en el huso ${resumen.huso.zona} (${resumen.huso.srs}).`)
+    return {
+      ok: true,
+      titular:
+        `${resumen.nPartes} parte${resumen.nPartes === 1 ? '' : 's'} · ` +
+        `${vertices} vértice${vertices === 1 ? '' : 's'} · ${resumen.via}`,
+      renglones,
+      motivo: null,
+    }
+  }
+
   return {
     alFichero,
+    alTexto,
+    inspeccionarTexto,
     cargar,
 
     /** Las `<section>` que este módulo ha sellado. Para el test y para T4.1. */

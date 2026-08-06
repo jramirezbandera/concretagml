@@ -3962,6 +3962,7 @@ body {
 .gml-app .gml-dialogo-capas,
 .gml-app .gml-dialogo-atributos,
 .gml-app .gml-dialogo-importacion,
+.gml-app .gml-dialogo-pegado,
 .gml-app dialog[data-bloque='atributos-edificio'] {
   position: fixed;
   top: 50%;
@@ -3984,6 +3985,7 @@ body {
 .gml-app .gml-dialogo-capas::backdrop,
 .gml-app .gml-dialogo-atributos::backdrop,
 .gml-app .gml-dialogo-importacion::backdrop,
+.gml-app .gml-dialogo-pegado::backdrop,
 .gml-app dialog[data-bloque='atributos-edificio']::backdrop {
   background: color-mix(in srgb, var(--color-text-primary) 45%, transparent);
 }
@@ -3991,6 +3993,7 @@ body {
 /* Quien reparte el interior. Ver arriba por qué esto NO está en el `<dialog>`. */
 .gml-dialogo-capas-cuerpo,
 .gml-dialogo-atributos-cuerpo,
+.gml-dialogo-pegado-cuerpo,
 .gml-dialogo-importacion-cuerpo {
   display: flex;
   flex-direction: column;
@@ -3999,6 +4002,7 @@ body {
 
 .gml-dialogo-capas-titulo,
 .gml-dialogo-atributos-titulo,
+.gml-dialogo-pegado-titulo,
 .gml-dialogo-importacion-titulo {
   margin: 0;
   font-size: var(--gml-titulo-tam);
@@ -4121,6 +4125,7 @@ body {
 
 .gml-dialogo-capas-pie,
 .gml-dialogo-atributos-pie,
+.gml-dialogo-pegado-pie,
 .gml-dialogo-importacion-pie {
   display: flex;
   flex-wrap: wrap;
@@ -4134,6 +4139,7 @@ body {
    especificidad, nunca por orden. */
 .gml-app .gml-dialogo-capas-pie .gml-boton,
 .gml-app .gml-dialogo-atributos-pie .gml-boton,
+.gml-app .gml-dialogo-pegado-pie .gml-boton,
 .gml-app .gml-dialogo-importacion-pie .gml-boton {
   width: auto;
   flex: none;
@@ -4145,6 +4151,7 @@ body {
    maquetación justo debajo de la mano que va a pulsar. */
 .gml-dialogo-capas-estado,
 .gml-dialogo-atributos-estado,
+.gml-dialogo-pegado-estado,
 .gml-dialogo-importacion-estado {
   margin: 0;
   min-height: 1.45em;
@@ -4261,6 +4268,95 @@ body {
   font-variant-numeric: tabular-nums;
   font-size: var(--text-12);
   color: var(--color-text-secondary);
+}
+
+/* ── F19 · El pegado de coordenadas ───────────────────────────────────────────
+ *
+ * Solo lo PROPIO, por el mismo criterio que F18: la caja, el backdrop, el cuerpo,
+ * el título, el pie y el renglón de estado están añadidos a las listas de arriba,
+ * porque es exactamente la misma pieza. Lo que esta pantalla tiene y las otras no
+ * es UN CAMPO GRANDE y la vista previa de lo que se ha entendido. */
+
+.gml-dialogo-pegado-apunte,
+.gml-dialogo-pegado-etiqueta {
+  margin: 0;
+  max-width: 68ch;
+  font-size: var(--text-12);
+  color: var(--color-text-secondary);
+}
+
+.gml-dialogo-pegado-etiqueta {
+  display: block;
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* El campo. Alto FIJO en `rows` y `resize: vertical`: el pegado de una LISTA de
+   400 vértices no puede empujar el pie del diálogo fuera de la pantalla, y el
+   cuerpo ya tiene su propio `overflow-y`. Monoespaciado por el atributo
+   `.gml-mono` que le pone el módulo — aquí se leen columnas de números. */
+.gml-app .gml-dialogo-pegado-campo {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 8em;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border-main);
+  border-radius: var(--radius);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-size: var(--text-12);
+  line-height: 1.4;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+
+/* La vista previa. `min-height` reservado por lo mismo que el renglón de estado
+   de los otros diálogos: escribir en el campo repinta esto en cada tecla, y sin
+   un suelo la caja saltaría de alto debajo de la mano que está pegando. */
+.gml-dialogo-pegado-lectura {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: 4.5em;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-sub);
+}
+
+.gml-dialogo-pegado-titular {
+  margin: 0;
+  font-size: var(--text-12);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text-primary);
+}
+
+/* El rótulo de la caja, que es el PRIMER `.gml-dialogo-pegado-titular`: va en
+   secundario y en versalitas, como los rótulos de grupo de F18. */
+.gml-dialogo-pegado-lectura > h3.gml-dialogo-pegado-titular {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.gml-dialogo-pegado-renglon {
+  font-size: var(--text-12);
+  color: var(--color-text-secondary);
+}
+
+/* Por qué no se puede usar lo pegado. Mismo tratamiento que el bloqueo de F18 —
+   color de aviso y no rojo—: pegar media LISTA no es un error, es una pregunta
+   sin contestar, y la pantalla se queda abierta para poder contestarla. */
+.gml-dialogo-pegado-motivo:not(:empty) {
+  margin: 0;
+  max-width: 68ch;
+  padding: var(--space-2);
+  border-radius: var(--radius);
+  background: var(--color-bg-surface);
+  border-left: 3px solid var(--color-aviso, var(--color-border-main));
+  font-size: var(--text-12);
+  color: var(--color-text-primary);
 }
 
 /* ═══ Movimiento reducido ════════════════════════════════════════════════════

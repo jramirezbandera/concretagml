@@ -1,6 +1,6 @@
 # F11 · Edificio: entrada y modelo
 
-**Fase:** 11 · **Prioridad:** P13 (baja, capítulo posterior) · **Riesgo:** Medio ·
+**Fase:** 11 · **Prioridad:** P14 (baja, capítulo posterior) · **Riesgo:** Medio ·
 **Depende de:** F10 · **Habilita:** F12 (partes y plantas), F13 (GML de edificio),
 F14 (contraste e informe de edificio).
 

@@ -79,7 +79,14 @@ import { parseLIST } from './list.js'
 import { parseTXT } from './txt.js'
 import { parseDXF } from './dxf.js'
 import { crearDeteccion, TIPO_DETECCION, SEVERIDAD } from './_comun.js'
-import { detectarHuso, sanear, HUSOS_VALIDOS } from '../geo/huso.js'
+import {
+  detectarHuso,
+  sanear,
+  situarGrados,
+  pareceEnGrados,
+  HUSOS_VALIDOS,
+} from '../geo/huso.js'
+import { forward } from '../geo/utm.js'
 import { errorCierre, compensarCierre } from '../geo/cierre.js'
 import { superficie } from '../geo/area.js'
 import { crearParcela, crearRecinto, TIPO_RECINTO, ORIGEN_PARCELA } from '../model/parcela.js'
@@ -227,9 +234,32 @@ function centroideVertices(anillo) {
 }
 
 /** ¿Todos los vértices parecen grados geográficos (|v|<1000)? Criterio de sanear,
- *  usado como PRE-chequeo para no medir "misclosure en metros" sobre grados. */
+ *  usado como PRE-chequeo para no medir "misclosure en metros" sobre grados.
+ *  ⚠️ El umbral NO se reescribe aquí desde F19: es `geo/huso.js#UMBRAL_GRADOS`,
+ *  el mismo que usa `sanear`. Eran dos copias y F19 iba a añadir la tercera. */
 function pareceGrados(anillo) {
-  return anillo.length > 0 && anillo.every(([x, y]) => Math.abs(x) < 1000 && Math.abs(y) < 1000)
+  return anillo.length > 0 && anillo.every((v) => pareceEnGrados(v))
+}
+
+/**
+ * Proyecta un anillo de grados a UTM con la situación ya decidida
+ * ({@link situarGrados}). La Z no existe aquí: los parsers ya la descartaron.
+ *
+ * ⚠️ **El orden lo manda la situación, no el fichero**: si las columnas venían
+ * como (lat, lon) —cosa que pasa con los volcados de GPS— se leen al revés y se
+ * escriben SIEMPRE como [Este, Norte], que es lo único que el modelo admite.
+ *
+ * @param {number[][]} anillo
+ * @param {import('../geo/huso.js').SituacionGrados} situacion
+ * @returns {number[][]}
+ */
+function proyectarAnillo(anillo, situacion) {
+  return anillo.map(([a, b]) => {
+    const lon = situacion.invertido ? b : a
+    const lat = situacion.invertido ? a : b
+    const { x, y } = forward(lat, lon, situacion.zona)
+    return [x, y]
+  })
 }
 
 // ── Detección defensiva de CIERRE sobre un anillo crudo ───────────────────────
@@ -306,6 +336,45 @@ function resolverCierre(anilloCrudo, esGrados, opts, detecciones) {
   return salida
 }
 
+/**
+ * La cola del mensaje de GRADOS: qué se puede hacer con estas coordenadas.
+ *
+ * ⛔ **Existe porque hasta F19 aquí se decía «se ofrece proyectar» y no había
+ * NADIE que supiera hacerlo** (F18, M10). Ahora cada rama dice lo que de verdad
+ * pasa, y la de Canarias la nombra en vez de dejarla caer en un «fuera de
+ * España» que es cierto de forma inútil.
+ *
+ * @param {import('../geo/huso.js').SituacionGrados|null} situacion
+ * @returns {string}
+ */
+function textoSituacionGrados(situacion) {
+  if (situacion === null) return 'Se ofrece proyectar; no se reproyecta aquí (regla 3).'
+
+  const comoVienen = situacion.invertido
+    ? 'Las columnas vienen como (latitud, longitud), al revés de lo habitual. '
+    : ''
+
+  if (situacion.proyectable) {
+    return (
+      `${comoVienen}Cae en la España peninsular o Baleares, huso ${situacion.zona} ` +
+      `(${situacion.srs}), en lon=${situacion.lon.toFixed(6)}, lat=${situacion.lat.toFixed(6)}. ` +
+      `Se OFRECE proyectarlas a UTM; no se proyecta nada sin confirmarlo.`
+    )
+  }
+  if (situacion.region === 'CANARIAS') {
+    return (
+      `${comoVienen}Cae en Canarias (huso ${situacion.zona}), en lon=${situacion.lon.toFixed(6)}, ` +
+      `lat=${situacion.lat.toFixed(6)}. **Esta versión no proyecta Canarias** (está diferida): ` +
+      `vuelve a exportar el dibujo en UTM desde el CAD.`
+    )
+  }
+  return (
+    `Leídas en los dos órdenes posibles, no caen ni en la España peninsular y Baleares ni en ` +
+    `Canarias, así que no se puede deducir el huso. Revisa el orden de las columnas o el sistema ` +
+    `de referencia, y vuelve a exportar el dibujo en UTM desde el CAD.`
+  )
+}
+
 // ── Detección defensiva de SWAP_XY / GRADOS sobre un anillo (por anillo) ───────
 //
 // sanear es POR coordenada; aquí se decide POR ANILLO. Devuelve el anillo a
@@ -324,13 +393,18 @@ function resolverSaneo(anillo, opts, detecciones) {
   // ── GRADOS (geográficas pegadas) ──
   const gradosAll = nGrados === n
   if (gradosAll) {
+    // F19 · La situación (dónde cae, en qué orden vienen las columnas y si el
+    // proyecto sabe proyectarla) la calcula `importar()` UNA vez sobre el anillo
+    // exterior —el huso es uno para toda la parcela— y la deja aquí. Si no viene,
+    // el mensaje es el de antes: este módulo no la deduce por su cuenta.
+    const situacion = opts.situacionGrados ?? null
     detecciones.push(
       crearDeteccion(
         TIPO_DETECCION.GRADOS,
         `Todo el anillo (${n} vértices) parece estar en grados geográficos (|v|<1000), no en UTM. ` +
-          `Se ofrece proyectar; no se reproyecta aquí (regla 3).`,
+          textoSituacionGrados(situacion),
         SEVERIDAD.AVISO,
-        { vertices: n, reproyectar: true },
+        { vertices: n, reproyectar: true, situacion },
       ),
     )
   } else if (nGrados > 0) {
@@ -441,6 +515,33 @@ function resolverHuso(anilloExterior, opts, detecciones) {
   }
 
   return huso
+}
+
+/**
+ * El huso cuando el fichero viene en grados y NO se ha proyectado. No se deduce
+ * nada aquí: se traslada lo que {@link situarGrados} ya sabe, con la misma forma
+ * que devuelve {@link resolverHuso} para que `resumen.huso` sea siempre lo mismo.
+ *
+ * ⚠️ **Sin `ambiguo`**: en grados no hay ambigüedad de huso —la longitud lo fija—,
+ * al revés que partiendo de metros, donde el Este vale ~500.000 en todos y por eso
+ * `detectarHuso` devuelve varios candidatos.
+ *
+ * Que esto conteste algo (y no `null`) es lo que evita que el usuario reciba a la
+ * vez «cae en el huso 30, ¿lo proyecto?» y «no se ha podido resolver el huso»:
+ * dos frases ciertas que juntas se leen como una contradicción.
+ *
+ * @param {import('../geo/huso.js').SituacionGrados|null} situacion
+ * @returns {{zona:number, srs:string, lon:number, lat:number, ambiguo:boolean}|null}
+ */
+function husoDeGrados(situacion) {
+  if (situacion === null || !situacion.proyectable) return null
+  return {
+    zona: situacion.zona,
+    srs: situacion.srs,
+    lon: situacion.lon,
+    lat: situacion.lat,
+    ambiguo: false,
+  }
 }
 
 // ── Reparto por capas (solo DXF: es el único formato que trae código 8) ───────
@@ -586,6 +687,12 @@ function contarDetecciones(detecciones) {
  * @param {number} [opts.toleranciaCierre=0.5]  Ventana (m) para tratar el error de cierre como misclosure.
  * @param {'bowditch'|'lineal'} [opts.metodoCierre='bowditch']  Método de compensación ofrecido.
  * @param {number} [opts.umbralSuperficie=0.01]  Umbral relativo del cotejo de superficie.
+ * @param {boolean} [opts.proyectarGrados=false]  **F19.** Proyecta a UTM un
+ *   fichero que viene ENTERO en grados geográficos. Solo se aplica si además el
+ *   destino es proyectable por este proyecto (Península y Baleares; Canarias está
+ *   diferida por O13) y **nunca por su cuenta**: hasta que el llamante la pida, la
+ *   detección `GRADOS` dice dónde cae y ahí se queda. El orden de las columnas —
+ *   (lon, lat) o (lat, lon)— lo decide `geo/huso.js#situarGrados`, no esta opción.
  * @param {','|'.'} [opts.separadorDecimal]  Reenviado a los parsers LIST/TXT.
  * @param {string} [opts.palabraSeparador]  Reenviado a los parsers LIST/TXT.
  * @param {number} [opts.flechaMax]  Reenviado al parser DXF (discretización de arcos).
@@ -652,14 +759,46 @@ export function importar(texto, opts = {}) {
       ? resolverCapas(res.anillos, capasCrudas, opts.capa, detecciones)
       : { anillos: res.anillos, capas: capasCrudas, nCapas: capasCrudas.length > 0 ? 1 : 0 }
 
+  // 2ter) F19 · ¿Está TODO el fichero en grados? Se decide y se sitúa ANTES del
+  //   bucle, y sobre el anillo EXTERIOR, por dos motivos: el huso es uno solo para
+  //   toda la parcela (proyectar cada anillo con el suyo la partiría en pedazos que
+  //   no encajan), y proyectar antes del bucle hace que el cierre, el saneo, el
+  //   huso y la superficie trabajen sobre metros, que es lo que saben hacer.
+  const todoEnGrados = reparto.anillos.length > 0 && reparto.anillos.every(pareceGrados)
+  const situacionGrados = todoEnGrados
+    ? situarGrados(centroideVertices(reparto.anillos[0]))
+    : null
+  // Se proyecta SOLO si el usuario lo ha pedido (regla de oro 1: ninguna corrección
+  // se aplica sola) y si el proyecto sabe hacerlo (Canarias está diferida, O13).
+  const proyectando =
+    situacionGrados !== null && situacionGrados.proyectable && opts.proyectarGrados === true
+  if (proyectando) {
+    detecciones.push(
+      crearDeteccion(
+        TIPO_DETECCION.GRADOS,
+        `Coordenadas PROYECTADAS de grados a UTM huso ${situacionGrados.zona} ` +
+          `(${situacionGrados.srs}), leyendo las columnas como ` +
+          `${situacionGrados.invertido ? '(latitud, longitud)' : '(longitud, latitud)'}. ` +
+          `Lo que se mide y lo que se exporta desde aquí son metros.`,
+        SEVERIDAD.INFO,
+        { situacion: situacionGrados, aplicado: true },
+      ),
+    )
+  }
+  const conSituacion = situacionGrados === null ? optsInternas : { ...optsInternas, situacionGrados }
+
   // 3) Detectores defensivos por anillo: cierre → saneo (swap/grados).
   const anillos = []
   const capas = [...reparto.capas]
   let gradosCualquiera = false
   reparto.anillos.forEach((anilloCrudo) => {
-    const esGrados = pareceGrados(anilloCrudo)
-    const abierto = resolverCierre(anilloCrudo, esGrados, optsInternas, detecciones)
-    const { anillo, gradosAll } = resolverSaneo(abierto, optsInternas, detecciones)
+    // La proyección va la PRIMERA: de aquí abajo todo el mundo ve metros, y el
+    // saneo deja de reconocer grados por sí solo (que es justo lo que queremos:
+    // ya no los hay).
+    const crudo = proyectando ? proyectarAnillo(anilloCrudo, situacionGrados) : anilloCrudo
+    const esGrados = pareceGrados(crudo)
+    const abierto = resolverCierre(crudo, esGrados, conSituacion, detecciones)
+    const { anillo, gradosAll } = resolverSaneo(abierto, conSituacion, detecciones)
     anillos.push(anillo)
     // Un anillo ENTERO en grados (exterior O hueco) contamina el modelo con unidades
     // mezcladas → bloquea la construcción (regla 1). Antes solo se miraba el exterior:
@@ -668,7 +807,27 @@ export function importar(texto, opts = {}) {
   })
 
   // 4) Huso sobre el anillo exterior (siempre se informa el punto de caída).
-  const huso = anillos.length > 0 ? resolverHuso(anillos[0], opts, detecciones) : null
+  //
+  // ⛔ F19 · Con el anillo en GRADOS esto no se llama, y el motivo es un defecto
+  // medido: `detectarHuso` trata la pareja como metros, desproyecta un disparate y
+  // contestaba «el centroide (−4.42, 36.72) no cae en la España peninsular ni
+  // Baleares» sobre un punto que ES Málaga. El bloqueo era correcto y **el motivo
+  // era falso**. En grados el huso no hay que deducirlo: lo da la longitud, y ya lo
+  // ha hecho `situarGrados` unas líneas más arriba.
+  //
+  // ⚠️ Y si hemos proyectado NOSOTROS, el huso se le pasa como único candidato: no
+  // hay nada que deducir sobre unas coordenadas que acabamos de fabricar con él.
+  // Sin esto, `detectarHuso` vuelve a encontrar 30 y 31 viables —el Este vale
+  // ~500.000 en todos los husos— y la pantalla enseñaba «proyectadas al huso 30» y
+  // «huso ambiguo, confirma cuál» una debajo de la otra. Es el modo VERIFICAR que
+  // su propia documentación recomienda cuando el dato ya trae huso.
+  const optsHuso = proyectando ? { ...opts, huso: situacionGrados.zona } : opts
+  const huso =
+    anillos.length === 0
+      ? null
+      : gradosCualquiera
+        ? husoDeGrados(situacionGrados)
+        : resolverHuso(anillos[0], optsHuso, detecciones)
 
   // 5) Modelo. Los recintos se construyen salvo que sean grados (no son UTM).
   //    recintos[0] = EXTERIOR; el resto = HUECO. ⚠️ El motivo dejó de ser

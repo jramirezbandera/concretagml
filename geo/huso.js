@@ -64,6 +64,24 @@ export const CANDIDATOS_DEFECTO = Object.freeze([30, 29, 31])
 // en F00: cuando se aborde, añadir 28 a los candidatos, un bbox Canarias propio
 // (lon −18.5…−13.0, lat 27.5…29.5) y srsPorHuso(28) → 'EPSG:32628'.
 
+// El bbox del gancho de arriba, ESCRITO (F19). No se implementa Canarias con
+// esto: se usa para poder DECIR «esto es Canarias y esta versión no la proyecta»
+// en vez de dejar caer un archipiélago entero en «fuera de España», que es lo
+// que hacía hasta F19 y es un motivo falso. Ver {@link situarGrados}.
+export const BBOX_CANARIAS = Object.freeze({
+  lonMin: -18.5,
+  lonMax: -13.0,
+  latMin: 27.5,
+  latMax: 29.5,
+})
+
+/** Umbral de «esto son grados y no metros»: |v| < 1000 en las DOS componentes
+ *  (dossier §3.2). Vivía escrito dos veces —aquí dentro de `sanear` y otra vez
+ *  en `parsers/importar.js#pareceGrados`—; F19 lo saca a un solo sitio antes de
+ *  añadir el tercer llamante, que es como una constante duplicada se convierte
+ *  en dos constantes distintas. */
+export const UMBRAL_GRADOS = 1000
+
 // Mapa huso → forma del campo `srs` del modelo (§4.1). El dialecto srsName del GML
 // (URI vs URN, override O2) lo decide F04, NO aquí.
 const SRS_POR_HUSO = Object.freeze({
@@ -186,14 +204,14 @@ function nortePlausible(y) {
   return y >= NORTE_MIN && y <= NORTE_MAX
 }
 
+/** ¿(lon,lat) dentro de un bbox cualquiera de los declarados arriba? */
+function enBbox(lon, lat, bbox) {
+  return lon >= bbox.lonMin && lon <= bbox.lonMax && lat >= bbox.latMin && lat <= bbox.latMax
+}
+
 /** ¿(lon,lat) dentro del bbox Península + Baleares? */
 function enBboxEspana(lon, lat) {
-  return (
-    lon >= BBOX_ESPANA.lonMin &&
-    lon <= BBOX_ESPANA.lonMax &&
-    lat >= BBOX_ESPANA.latMin &&
-    lat <= BBOX_ESPANA.latMax
-  )
+  return enBbox(lon, lat, BBOX_ESPANA)
 }
 
 /**
@@ -278,7 +296,7 @@ export function sanear(coord) {
   const correcciones = []
 
   // Geográficas pegadas: ambos |v| < 1000 → grados (lon,lat), no UTM.
-  if (Math.abs(c0) < 1000 && Math.abs(c1) < 1000) {
+  if (pareceEnGrados([c0, c1])) {
     correcciones.push({
       tipo: 'GRADOS',
       mensaje:
@@ -309,4 +327,142 @@ export function sanear(coord) {
   }
 
   return { coord: [c0, c1], correcciones }
+}
+
+// ---------------------------------------------------------------------------
+// F19 · Grados: situarlos para poder PROYECTARLOS
+//
+// Hasta F19 este módulo sabía decir «esto son grados» y ahí se paraba: la
+// detección viajaba con `reproyectar: true` y NO HABÍA NADIE que supiera
+// atenderla (medido en F18, M10). Lo que faltaba no era la proyección —
+// `geo/utm.js#forward` está escrita y verificada desde F00— sino las dos
+// preguntas de antes: en qué ORDEN vienen las dos columnas, y en qué HUSO cae.
+//
+// Las dos se contestan sin desproyectar nada y sin heurísticas:
+//
+//   · El ORDEN, porque los rangos de España son DISJUNTOS. lon ∈ [−9,5 · 4,5] y
+//     lat ∈ [35,5 · 44,5] no se solapan, así que ninguna pareja puede leerse
+//     como válida en los dos órdenes: como mucho una cae dentro. No es una
+//     preferencia, es aritmética de intervalos, y por eso aquí se DEDUCE en vez
+//     de preguntarse (F19, decisión 8).
+//   · El HUSO, porque en grados la longitud LO DA: zona = ⌊(lon+180)/6⌋+1. Nada
+//     que ver con `detectarHuso`, que existe para el problema inverso —partir de
+//     metros— y que en grados contesta un disparate (ver abajo).
+//
+// ⛔ Y esto último no es teórico: hasta F19, un pegado de Málaga en grados se
+// rechazaba diciendo «el centroide (−4.42, 36.72) NO CAE en la España peninsular
+// ni Baleares», sobre un punto que ES Málaga. El bloqueo era correcto y el
+// motivo era falso. Es la misma familia del diagnóstico falso que F18 midió en el
+// `.txt` de replanteo propio: lo que se le dice al usuario tiene que ser verdad
+// aunque la decisión de no seguir sea la buena.
+// ---------------------------------------------------------------------------
+
+/**
+ * ¿Esta pareja parece estar en grados y no en metros? (dossier §3.2).
+ *
+ * @param {[number, number]} coord
+ * @returns {boolean}
+ */
+export function pareceEnGrados(coord) {
+  return (
+    Array.isArray(coord) &&
+    Number.isFinite(coord[0]) &&
+    Number.isFinite(coord[1]) &&
+    Math.abs(coord[0]) < UMBRAL_GRADOS &&
+    Math.abs(coord[1]) < UMBRAL_GRADOS
+  )
+}
+
+/**
+ * Huso UTM que corresponde a una longitud. Vale para CUALQUIER longitud del
+ * planeta —incluida una que este proyecto no sabe proyectar—, y es a propósito:
+ * quien pregunta necesita poder decir «esto es el huso 28, que es Canarias, y
+ * esta versión no lo hace». Filtrar aquí por {@link HUSOS_VALIDOS} obligaría a
+ * contestar `null` y el llamante no podría nombrar lo que ha visto.
+ *
+ * @param {number} lon  Longitud en grados decimales.
+ * @returns {number}    Huso UTM 1..60.
+ * @throws {TypeError}  Si `lon` no es un número finito.
+ */
+export function zonaPorLon(lon) {
+  if (!Number.isFinite(lon)) {
+    throw new TypeError(`zonaPorLon: se esperaba una longitud finita; recibido ${JSON.stringify(lon)}`)
+  }
+  // Normalizamos a [−180, 180) para que una longitud de 185° (que existe en
+  // ficheros de verdad) no dé el huso 61, que no existe.
+  const normal = ((((lon + 180) % 360) + 360) % 360) - 180
+  return Math.floor((normal + 180) / 6) + 1
+}
+
+/**
+ * @typedef {Object} SituacionGrados
+ * @property {'LON_LAT'|'LAT_LON'|null} orden  Cómo hay que leer la pareja, o
+ *   `null` si ninguna de las dos lecturas cae en territorio conocido.
+ * @property {number|null} lon  Longitud YA en el orden bueno.
+ * @property {number|null} lat  Latitud YA en el orden bueno.
+ * @property {number|null} zona  Huso deducido de la longitud (28 en Canarias).
+ * @property {string|null} srs   `srsPorHuso(zona)` si es proyectable; `null` si no.
+ * @property {'PENINSULA_BALEARES'|'CANARIAS'|'FUERA'} region  Dónde ha caído.
+ * @property {boolean} proyectable  Si esta versión sabe llevarlo a UTM.
+ * @property {boolean} invertido  `true` si hubo que leerla como (lat, lon).
+ */
+
+/**
+ * Sitúa una pareja de grados: decide el orden de las columnas, el huso y si el
+ * proyecto sabe proyectarla. **No proyecta** (regla de oro 3: este módulo no
+ * expone lat/lon al modelo); devuelve lo que hace falta para preguntárselo al
+ * usuario y, si dice que sí, para que `parsers/importar.js` llame a `forward`.
+ *
+ * Canarias sale como `region: 'CANARIAS'` con `proyectable: false` y **con su
+ * huso 28 dicho**, no como un «fuera de España» genérico: el override O13 la
+ * difiere, y difierir no es lo mismo que no reconocerla.
+ *
+ * @param {[number, number]} coord  La pareja tal cual viene del fichero.
+ * @returns {SituacionGrados}
+ * @throws {TypeError}  Si `coord` no es un par de números finitos.
+ */
+export function situarGrados(coord) {
+  if (!Array.isArray(coord) || coord.length < 2) {
+    throw new TypeError(`situarGrados: se esperaba [a, b]; recibido ${JSON.stringify(coord)}`)
+  }
+  const [a, b] = coord
+  if (!Number.isFinite(a) || !Number.isFinite(b)) {
+    throw new TypeError(`situarGrados: coordenada no finita [${a}, ${b}]`)
+  }
+
+  // Las dos lecturas posibles, y los dos territorios que sabemos nombrar. El
+  // orden de la búsqueda importa poco —los cuatro casos son excluyentes por los
+  // rangos— pero se prueba antes la Península, que es el 99 % del trabajo.
+  const lecturas = [
+    { orden: 'LON_LAT', lon: a, lat: b, invertido: false },
+    { orden: 'LAT_LON', lon: b, lat: a, invertido: true },
+  ]
+
+  for (const region of ['PENINSULA_BALEARES', 'CANARIAS']) {
+    const bbox = region === 'CANARIAS' ? BBOX_CANARIAS : BBOX_ESPANA
+    for (const lectura of lecturas) {
+      if (enBbox(lectura.lon, lectura.lat, bbox)) {
+        const zona = zonaPorLon(lectura.lon)
+        const proyectable = HUSOS_VALIDOS.includes(zona)
+        return {
+          ...lectura,
+          zona,
+          srs: proyectable ? srsPorHuso(zona) : null,
+          region,
+          proyectable,
+        }
+      }
+    }
+  }
+
+  return {
+    orden: null,
+    lon: null,
+    lat: null,
+    zona: null,
+    srs: null,
+    region: 'FUERA',
+    proyectable: false,
+    invertido: false,
+  }
 }

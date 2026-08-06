@@ -665,9 +665,33 @@ describe('app/main · T9 · la ruta crítica 2, de principio a fin', () => {
     expect(puerta().disabled).toBe(false)
   })
 
+  it('⛔ F19 · y LA CABECERA tampoco dice que esto venga del Catastro', () => {
+    // Este guardián es la deuda que F18 midió al pasar y dejó dicha sin tocar: el
+    // renglón de procedencia del cajón sabía distinguir desde F08 —lo prueban las
+    // cuatro de arriba— y **la cabecera no**, porque `rotuloDelDato` solo tenía
+    // «demo / medición / Catastro» y un GML ajeno caía en el último.
+    //
+    // Es el mismo error caro que F18 cerró para la medición propia, con la misma
+    // forma: la aplicación afirmando que la Sede respalda una geometría que ha
+    // traído alguien en un fichero. La afirmación no estaba mal, NO EXISTÍA.
+    const eyebrow = document.querySelector('[data-eyebrow]').textContent.trim()
+    expect(eyebrow).not.toMatch(/parcela del catastro/i)
+    expect(eyebrow).toMatch(/otro t[ée]cnico/i)
+    // Y mientras no se cruce la puerta, no dice que sea tuya.
+    expect(eyebrow).not.toMatch(/tuyo/i)
+  })
+
   it('⭐ cruzarla cambia el modo de verdad: el rail se completa y el renglón se reescribe', async () => {
+    // F19 · La cabecera ANTES de cruzar, para poder exigir que CAMBIE. Sin esta
+    // foto, la prueba de abajo pasaría aunque el rótulo hubiera dicho «tomado como
+    // tuyo» desde el principio — que es exactamente lo que hace la aplicación si
+    // se le quita el espejo del modo. Verificado por mutación el 2026-08-06.
+    const eyebrowAntes = document.querySelector('[data-eyebrow]').textContent.trim()
+
     pulsar(puerta())
     await cederTurno()
+
+    expect(document.querySelector('[data-eyebrow]').textContent.trim()).not.toBe(eyebrowAntes)
 
     // Edición ya está, y sin motivo colgando.
     expect(botonPeldano('edicion').disabled).toBe(false)
@@ -679,6 +703,20 @@ describe('app/main · T9 · la ruta crítica 2, de principio a fin', () => {
     expect(procedenciaDelCajon().textContent).toContain('otro técnico')
     expect(procedenciaDelCajon().textContent).toContain('Lo has tomado como tuyo')
     expect(procedenciaDelCajon().textContent).not.toContain('no se edita ni se genera GML')
+  })
+
+  it('⭐ F19 · y la CABECERA cruza con ella: deja de ser «de otro» y sigue sin ser del Catastro', () => {
+    // ⛔ El caso entero de este rótulo, y por qué no bastaba con suscribirse al
+    // store: **cruzar la puerta no toca la parcela**. El POJO es el mismo y su
+    // origen sigue diciendo `GML_EXISTENTE`, que es la verdad. Lo único que cambia
+    // es el MODO, así que sin el suscriptor de la navegación esta línea seguiría
+    // diciendo «de otro técnico» sobre algo que ya estás editando como tuyo.
+    const eyebrow = document.querySelector('[data-eyebrow]').textContent.trim()
+    expect(eyebrow).toMatch(/tomado como tuyo/i)
+    // Y no reescribe la historia por el otro lado: no se convierte en «tu
+    // medición» —no la mediste tú— ni en una parcela del Catastro.
+    expect(eyebrow).not.toMatch(/parcela del catastro/i)
+    expect(eyebrow).not.toMatch(/tu medici[óo]n/i)
   })
 
   it('⭐ el paso «Informe» se enciende SIN el apaño del temporizador que T9 borró', async () => {

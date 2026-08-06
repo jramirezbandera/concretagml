@@ -133,6 +133,97 @@ export const MENSAJE_SIN_REFERENCIA =
  */
 export const ENCABEZADO_NO_CONSTRUIDA = 'No ha entrado ninguna parcela de ese fichero.'
 
+// ── F19 · La vista previa del pegado ─────────────────────────────────────────
+
+/** Cómo se llama en pantalla cada formato. «TXT» no le dice nada a nadie. */
+const NOMBRE_FORMATO = Object.freeze({
+  LIST: 'LISTA de AutoCAD',
+  TXT: 'coordenadas en dos columnas',
+  DXF: 'DXF',
+})
+
+/** Cuatro decimales, como el resto de superficies medidas de la aplicación. */
+const FORMATO_M2 = new Intl.NumberFormat('es-ES', {
+  minimumFractionDigits: 4,
+  maximumFractionDigits: 4,
+})
+
+/** Nada que leer todavía: el campo está vacío. No es un error, es el estado inicial. */
+export const PEGADO_VACIO = 'Pega aquí el resultado del comando LISTA de AutoCAD, o dos columnas de coordenadas.'
+
+/** Se ha pegado algo y no hay ni un par de coordenadas dentro. */
+export const PEGADO_SIN_GEOMETRIA =
+  'En ese texto no hay ningún par de coordenadas que pueda ser el contorno de una parcela. ' +
+  'Del comando LISTA hay que copiar el bloque entero, con las líneas «Ubicación: X= … Y= …».'
+
+/**
+ * Mira un texto pegado y cuenta **qué se ha entendido**, sin cambiar nada. Es lo
+ * que se enseña en el diálogo de pegado ANTES de aceptar, y es el único momento en
+ * el que el usuario puede cancelar viendo las cifras.
+ *
+ * ⭐ **Aquí es donde el cotejo de superficie estrena llamante.** `importar()` lo
+ * calcula desde F01 en `resumen.superficie` —solo la LISTA declara su «Área:»— y
+ * hasta F19 **no lo leía nadie** en toda la aplicación. Se enseñan **las dos
+ * cifras siempre**, coincidan o no: la declarada por el dibujo y la calculada
+ * aquí. Callar la comprobación cuando sale bien es quitarle al usuario la única
+ * prueba de que se ha hecho.
+ *
+ * @param {string} texto
+ * @returns {{ok: boolean, titular: string, renglones: string[], motivo: string|null}}
+ */
+export function inspeccionarTexto(texto) {
+  const vacio = !esTexto(texto)
+  if (vacio) return { ok: false, titular: '', renglones: [], motivo: PEGADO_VACIO }
+
+  // El listado propio, antes que nada y por el mismo motivo que en `alTexto`.
+  if (esListadoDeReplanteo(texto)) {
+    return { ok: false, titular: '', renglones: [], motivo: MENSAJE_ES_LISTADO_PROPIO }
+  }
+
+  let resultado
+  try {
+    resultado = importar(texto)
+  } catch (causa) {
+    // Un pegado no puede tirar la pantalla. `importar()` solo lanza por contrato
+    // del programador, así que llegar aquí es un defecto NUESTRO: se dice sin
+    // adornos y se deja constancia en la consola.
+    console.error('[medicion] la vista previa del pegado ha fallado:', causa)
+    return { ok: false, titular: '', renglones: [], motivo: MENSAJE_FALLO_INESPERADO }
+  }
+
+  const { resumen } = resultado
+  if (resumen.nAnillos === 0) {
+    return { ok: false, titular: '', renglones: [], motivo: PEGADO_SIN_GEOMETRIA }
+  }
+
+  const vertices = resumen.nVertices.reduce((suma, n) => suma + n, 0)
+  const contornos =
+    resumen.nAnillos === 1 ? 'un contorno' : `${resumen.nAnillos} contornos (uno y sus huecos)`
+  const titular =
+    `${vertices} vértice${vertices === 1 ? '' : 's'} · ${contornos} · ` +
+    `${NOMBRE_FORMATO[resumen.formato] ?? resumen.formato}`
+
+  const renglones = []
+  const cotejo = resumen.superficie
+  if (cotejo) {
+    renglones.push(
+      `Superficie: el dibujo declara ${FORMATO_M2.format(cotejo.reportada)} m² y aquí sale ` +
+        `${FORMATO_M2.format(cotejo.calculada)} m² ` +
+        (cotejo.coincide
+          ? '(coinciden).'
+          : `— NO coinciden, se diferencian en ${FORMATO_M2.format(cotejo.diferencia)} m².`),
+    )
+  }
+  if (resumen.huso) {
+    renglones.push(`Cae en el huso ${resumen.huso.zona} (${resumen.huso.srs}).`)
+  }
+
+  // ⚠️ `ok` NO es `construida`. Unas coordenadas en grados no construyen y aun así
+  // se puede seguir: la pantalla de revisión ofrece proyectarlas (F19 · T2). Lo que
+  // impide seguir es no haber entendido ni una coordenada.
+  return { ok: true, titular, renglones, motivo: null }
+}
+
 // ── Textos de procedencia ────────────────────────────────────────────────────
 
 /**
@@ -156,16 +247,31 @@ export const ENCABEZADO_NO_CONSTRUIDA = 'No ha entrado ninguna parcela de ese fi
  * mentira que ese renglón existe para evitar, así que se dice lo único que consta:
  * que el parcelario es el que ya había en pantalla.
  *
+ * ⛔ **Y «fichero» no vale para todo, lo cual costó una corrida del guion 18.** Con
+ * F19 esta misma vía la estrena el PEGADO, y el renglón salía diciendo «del fichero
+ * «coordenadas pegadas»» — una afirmación falsa sobre el origen del dato, escrita
+ * justo en la línea que existe para decir de dónde salió. No lo vio ninguna prueba
+ * porque las de la suite comprobaban que la frase contuviera «pegad», y lo contenía.
+ * Ahora el sustantivo lo decide {@link deFichero}.
+ *
  * @param {object} args
  * @param {string} args.nombreFichero
  * @param {string|null} [args.capa=null]  La capa elegida del DXF, si hubo elección.
  * @param {boolean} args.conParcelario  Si se ha conservado la geometría oficial.
  * @param {{zona: number, srs: string}|null} [args.huso=null]
+ * @param {boolean} [args.deFichero=true]  `false` cuando el volcado se ha pegado.
  * @returns {string}
  */
-export function textoProcedenciaMedicion({ nombreFichero, capa = null, conParcelario, huso = null }) {
+export function textoProcedenciaMedicion({
+  nombreFichero,
+  capa = null,
+  conParcelario,
+  huso = null,
+  deFichero = true,
+}) {
   const deCapa = esTexto(capa) ? ` (capa «${capa}»)` : ''
-  const geometria = `Geometría medida por ti, del fichero «${nombreFichero}»${deCapa} — NO del Catastro.`
+  const origen = deFichero ? `del fichero «${nombreFichero}»` : `de ${nombreFichero}`
+  const geometria = `Geometría medida por ti, ${origen}${deCapa} — NO del Catastro.`
   const parcelario = conParcelario
     ? ' Se conserva el parcelario que ya estaba en pantalla, solo para contrastar.'
     : ' Sin parcelario con el que contrastarla: tráelo con la referencia catastral.'
@@ -351,8 +457,9 @@ export function cablearMedicion({
    * @param {object} resultado  El definitivo de `importar()`.
    * @param {string} nombre
    * @param {string|null} capa
+   * @param {boolean} deFichero  Ver {@link textoProcedenciaMedicion}.
    */
-  function aplicar(resultado, nombre, capa) {
+  function aplicar(resultado, nombre, capa, deFichero) {
     const origen = ORIGEN_POR_FORMATO[resultado.resumen.formato]
     if (origen === undefined) {
       // Inalcanzable: `importar` solo emite LIST/TXT/DXF. Si deja de ser cierto que
@@ -378,6 +485,7 @@ export function cablearMedicion({
         capa,
         conParcelario: parcela.geometriaOficial !== null,
         huso: resultado.resumen.huso,
+        deFichero,
       })
     }
 
@@ -403,6 +511,11 @@ export function cablearMedicion({
    *
    * **No lanza nunca** y cuenta por el panel todo lo que decide.
    *
+   * ⚠️ **Lo único que hace de fichero es sacarle el texto.** De ahí abajo el
+   * camino es {@link alTexto} y es el MISMO que el del pegado (F19): las rondas de
+   * decisión, la composición y el `estado.set` nunca supieron de dónde venía el
+   * volcado, y por eso el pegado costó partir esta función y no escribir otra.
+   *
    * @param {File} fichero
    * @returns {Promise<void>}
    */
@@ -421,13 +534,44 @@ export function cablearMedicion({
     }
     if (destruido) return
 
+    let texto
     try {
       // ⚠️ `new Uint8Array(...)` y no el búfer a pelo: la vista se construye con el
       // `Uint8Array` de ESTE realm, que es el del `instanceof` de
       // `gml/decodificar.js#aBytes`. Uno de otro realm —jsdom, un iframe— haría
       // lanzar a aquella función. Medido en F08 y reaprovechado en F11.
-      const { texto } = decodificarGml(new Uint8Array(crudo))
+      ;({ texto } = decodificarGml(new Uint8Array(crudo)))
+    } catch (causa) {
+      reventar(`la lectura de «${nombre}» ha fallado`, causa)
+      return
+    }
 
+    await alTexto(texto, nombre, true)
+  }
+
+  /**
+   * Un volcado de coordenadas YA EN TEXTO, venga de donde venga: de un fichero
+   * (arriba) o del pegado de la LISTA de AutoCAD (F19, `app/dialogo-pegado.js`).
+   *
+   * **No lanza nunca** y cuenta por el panel todo lo que decide.
+   *
+   * @param {string} texto   El volcado.
+   * @param {string} nombre  Cómo llamarlo en pantalla y en el `idLocal`.
+   * @param {boolean} [deFichero=false]  Solo cambia CÓMO SE NOMBRA el origen en el
+   *   renglón de procedencia: llamar «fichero» a lo que el usuario acaba de pegar
+   *   es una afirmación falsa, y justo en la línea que existe para decir de dónde
+   *   salió el dato. Lo destapó la primera corrida del guion 18.
+   * @returns {Promise<void>}
+   */
+  async function alTexto(texto, nombre = 'coordenadas pegadas', deFichero = false) {
+    if (destruido) return
+    if (!esTexto(texto)) {
+      // Contrato del programador, no dato del usuario: un pegado vacío lo para el
+      // diálogo mucho antes de llegar aquí.
+      throw new TypeError(`cablearMedicion.alTexto: 'texto' debe ser un string no vacío.`)
+    }
+
+    try {
       // ── 1 · ¿Es NUESTRO listado de replanteo? ────────────────────────────
       // Antes de `importar()`, porque su diagnóstico sobre este fichero es falso.
       if (esListadoDeReplanteo(texto)) {
@@ -465,7 +609,7 @@ export function cablearMedicion({
         return
       }
 
-      aplicar(resultado, nombre, esTexto(opts.capa) ? opts.capa : null)
+      aplicar(resultado, nombre, esTexto(opts.capa) ? opts.capa : null, deFichero)
     } catch (causa) {
       reventar(`la lectura de «${nombre}» ha fallado`, causa)
     }
@@ -473,6 +617,8 @@ export function cablearMedicion({
 
   return {
     alFichero,
+    alTexto,
+    inspeccionarTexto,
 
     /** Cierra la revisión que hubiera abierta y se desengancha. Idempotente. */
     destruir() {

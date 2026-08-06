@@ -2190,3 +2190,55 @@ es lo que hace que esta fase valga algo más que «ya se puede abrir un DXF».
 diálogo de revisión**: lo que se firma ahí no es que el código funcione —eso lo dicen
 6.339 pruebas— sino que **un técnico entiende lo que la aplicación le está
 preguntando**, y eso solo lo sabe un técnico.
+
+---
+
+## §15 · F19 · El pegado, los grados y el rótulo del GML ajeno
+
+Las tres deudas que F18 sacó de su alcance con casa escrita. El guion 18 sale
+`ok:true` sobre las tres, pero lo de aquí abajo **ninguna máquina de este proyecto
+lo puede firmar**.
+
+### 15.1 · El `Ctrl+V` de verdad — ⛔ BLOQUEANTE
+
+⚠️ **Medido el 2026-08-06: Chromium NO aplica el pegado por defecto de un
+`ClipboardEvent` sintético**, así que el guion escribe el valor en el campo y lo dice
+como advertencia. **El gesto real está sin medir por definición.**
+
+- [ ] Abre AutoCAD (o ZWCAD) con un plano **de trabajo de verdad**, ejecuta `LISTA`
+      sobre la polilínea de la parcela y **copia con `Ctrl+C`**.
+- [ ] En la aplicación, «Pegar coordenadas…» → **`Ctrl+V`** con el teclado.
+- [ ] El texto aparece en el campo **a la primera**, sin tener que hacer clic dentro.
+- [ ] Debajo, sin pulsar nada más, aparece **cuántos vértices** se han entendido y
+      **las dos superficies** (la que declara tu dibujo y la que calcula la app).
+- [ ] Las dos cifras **cuadran con lo que sabes de esa parcela**. Si no cuadran, la
+      aplicación lo dice y **te deja cancelar sin haber metido nada**.
+
+### 15.2 · Que se entienda por qué se pregunta antes de proyectar
+
+- [ ] Pega unas coordenadas **en grados** (lat/lon) de una parcela tuya.
+- [ ] Lo que la pantalla dice —**dónde ha caído** y **en qué huso**— te basta para
+      decidir, sin que nadie te lo explique, si eso es tu parcela o no.
+- [ ] La opción marcada de salida es **no tocar el dato**, y eso te parece lo
+      correcto y no un estorbo.
+- [ ] Tras aceptar, la parcela cae **donde tenía que caer** sobre la cartografía.
+      (Esto es lo único que de verdad prueba que la proyección es la buena: los
+      números cuadran en un test, pero que el polígono se superponga al parcelario
+      real solo lo ves tú.)
+
+### 15.3 · El rótulo del GML ajeno
+
+- [ ] Con el GML de otro técnico cargado, la cabecera dice que es **de otro técnico**
+      y **no del Catastro**, y eso se entiende de un vistazo.
+- [ ] Al pulsar «Tomar esta geometría y editarla», el rótulo cambia a **«tomado como
+      tuyo»** — y esa frase **no se lee como si tú la hubieras medido**, porque no la
+      mediste.
+- [ ] Ninguna de las dos frases se lee como un **juicio sobre el trabajo del otro
+      técnico** (heredado de §9).
+
+---
+
+**15.1 es BLOQUEANTE** y se repite **con cada cambio de `app/dialogo-pegado.js`**: lo
+que se firma ahí no es que el código funcione —eso lo dicen 6.393 pruebas y el guion
+18— sino que **el gesto más corto que tiene el técnico llega a alguna parte**, y ese
+gesto no lo puede hacer una máquina de este proyecto.

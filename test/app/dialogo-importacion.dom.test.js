@@ -152,15 +152,62 @@ describe('dialogo-importacion · decisionesDe', () => {
   })
 
   it('los bloqueos sin corrección se dicen con su salida, no con un botón muerto', () => {
-    const grados = decisionesDe(txt('-4.42 36.72\n-4.41 36.72\n-4.41 36.73\n-4.42 36.73'))
-    const codigos = grados.bloqueos.map((b) => b.codigo)
+    // ⛔ RETRACTADO EN F19. Aquí el caso de ejemplo eran unos grados de Málaga, y
+    // la prueba afirmaba: «No se ofrece proyectar porque `importar()` no sabe: se
+    // dice qué hacer». Era cierto y ya no lo es —F19 escribió la proyección—, así
+    // que el mismo fichero pasa de bloqueo a DECISIÓN y hace falta un caso que de
+    // verdad no tenga salida. Canarias lo es, y por escrito (override O13).
+    const canarias = decisionesDe(txt('-15.42 28.12\n-15.41 28.12\n-15.41 28.13\n-15.42 28.13'))
+    const codigos = canarias.bloqueos.map((b) => b.codigo)
 
     expect(codigos).toContain(BLOQUEOS.COORDENADAS_EN_GRADOS)
-    // No se ofrece proyectar porque `importar()` no sabe: se dice qué hacer.
-    expect(grados.decisiones).toEqual([])
-    const mensaje = grados.bloqueos.find((b) => b.codigo === BLOQUEOS.COORDENADAS_EN_GRADOS).mensaje
+    expect(canarias.decisiones).toEqual([])
+    const mensaje = canarias.bloqueos.find(
+      (b) => b.codigo === BLOQUEOS.COORDENADAS_EN_GRADOS,
+    ).mensaje
     expect(mensaje).toMatch(/UTM/)
     expect(mensaje).toMatch(/vuelve a exportar/i)
+    // Y NOMBRA Canarias en vez de decir «no cae en España», que sobre unas
+    // coordenadas de Las Palmas es cierto de una forma que no ayuda a nadie.
+    expect(mensaje).toMatch(/Canarias/)
+  })
+
+  it('F19 · unos grados de la Península son una DECISIÓN, y la única de la pantalla', () => {
+    const malaga = decisionesDe(txt('-4.42 36.72\n-4.41 36.72\n-4.41 36.73\n-4.42 36.73'))
+
+    expect(malaga.decisiones).toHaveLength(1)
+    const [d] = malaga.decisiones
+    expect(d.tipo).toBe(TIPO_DECISION.GRADOS)
+    expect(d.situacion.zona).toBe(30)
+    expect(d.situacion.proyectable).toBe(true)
+    // ⛔ Y el bloqueo NO se enseña además: tendría al usuario leyendo «vuelve a
+    // exportar desde tu CAD» justo encima del botón que lo arregla.
+    expect(malaga.bloqueos.map((b) => b.codigo)).not.toContain(BLOQUEOS.COORDENADAS_EN_GRADOS)
+  })
+
+  it('F19 · la pantalla enseña DÓNDE cae antes de proyectar, y ofrece no hacerlo', () => {
+    const dialogo = crearDialogoImportacion({ documento: document })
+    const malaga = txt('-4.42 36.72\n-4.41 36.72\n-4.41 36.73\n-4.42 36.73')
+    dialogo.abrir({ nombre: 'gps.txt', resultado: malaga })
+
+    const texto = dialogo.nodo.textContent
+    expect(texto).toMatch(/36\.72/) // la latitud donde ha caído
+    expect(texto).toMatch(/huso 30/)
+    expect(texto).toMatch(/EPSG:25830/)
+    // La opción marcada de salida es NO tocar el dato (regla de oro 1).
+    const marcado = dialogo.nodo.querySelector('input[data-campo="grados"]:checked')
+    expect(marcado.value).toBe('no')
+    dialogo.destruir()
+  })
+
+  it('F19 · y si vienen al revés (lat, lon) se dice, en vez de callarlo', () => {
+    const dialogo = crearDialogoImportacion({ documento: document })
+    dialogo.abrir({
+      nombre: 'gps.txt',
+      resultado: txt('36.72 -4.42\n36.72 -4.41\n36.73 -4.41\n36.73 -4.42'),
+    })
+    expect(dialogo.nodo.textContent).toMatch(/al rev[ée]s/i)
+    dialogo.destruir()
   })
 
   it('las informativas no repiten, y las que acompañan a un bloqueo no salen dos veces', () => {
