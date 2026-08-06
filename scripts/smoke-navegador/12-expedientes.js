@@ -381,9 +381,42 @@ const superficieArranque = (() => {
   return m === null ? null : Number(m[0].replace(/\./g, '').replace(',', '.'))
 })()
 
+// ⛔ 2026-08-06 · EL GUION MEDÍA EL INVARIANTE DE LA CAJA DE VÉRTICES EN LA
+// PANTALLA DONDE ESA CAJA NO EXISTE, y por eso salía `ok:false` acusando a F10 de
+// haberle metido un bloque al panel.
+//
+// Este guion se escribió cuando la aplicación arrancaba con el panel entero
+// delante. El **rework de UI** la partió en pasos (Entrada · Validación · Edición ·
+// Diagnóstico · Informe) y el arranque pasó a ser **Entrada**, donde la tabla de
+// vértices no está montada: `altoCajaVertices()` devuelve **0**, el guardián lo lee
+// como «algo del tamaño de un bloque ha entrado en el panel» y denuncia un defecto
+// que no existe. Medido hoy: en Entrada **0 px**, y en Validación **455,97 px** a
+// 1440×900 — muy por encima de los 267 de referencia.
+//
+// Es la misma avería que GUION.md ya tiene declarada del `10` («conduce el flujo
+// anterior al rework, no hay defecto de producto detrás»), y se arregla igual que lo
+// haría una persona: **yendo a la pantalla de la que habla la medida**. No se toca el
+// umbral —bajarlo a 0 sería apagar el guardián para que deje de avisar—.
+const irAValidacion = () => {
+  const paso = document.querySelector('[data-paso]')
+  if (paso === null || paso.dataset.paso === 'validacion') return paso?.dataset.paso ?? null
+  const boton = [...document.querySelectorAll('button, a')].find(
+    (e) => e.textContent.trim() === 'Validación',
+  )
+  if (boton === undefined) return paso.dataset.paso
+  boton.click()
+  return document.querySelector('[data-paso]')?.dataset.paso ?? null
+}
+const pasoDePartida = document.querySelector('[data-paso]')?.dataset.paso ?? null
+const pasoMedido = irAValidacion()
+
 await asentarPanel()
 
 const arranque = {
+  // Se declara desde dónde se ha medido: una cifra de píxeles sin la pantalla en la
+  // que se tomó no significa nada desde el rework.
+  pasoDePartida,
+  pasoMedido,
   filas: filasDeTabla(),
   superficieFicha: superficieArranque,
   refcatFicha: texto('[data-ficha="refcat"]'),
@@ -636,6 +669,32 @@ const modal = {
     return !seLoLlevo
   })(),
   altoCajaVerticesConElDialogoAbierto: altoCajaVertices(),
+  // ⭐ F20 · EL PIE DE «llevarse el trabajo a un fichero», que ahora tiene CINCO
+  // botones y que **la suite no puede medir**: jsdom no maqueta, así que un pie que
+  // desborda sale verde en las 6.777 pruebas. Es la medida que la fase 3 declaró
+  // pendiente por escrito, y esta es su casa.
+  pieFicheros: (() => {
+    const pie = dialogoEl.querySelector(
+      '[data-expediente="ficheros"] .gml-dialogo-expediente-pie',
+    )
+    if (pie === null) return null
+    const botones = [...pie.querySelectorAll('button')]
+    const caja = pie.getBoundingClientRect()
+    return {
+      botones: botones.length,
+      rotulos: botones.map((b) => b.textContent.trim()),
+      // Desborde horizontal del propio contenedor.
+      desborda: pie.scrollWidth > pie.clientWidth + 1,
+      sobraAncho: Math.round((pie.clientWidth - pie.scrollWidth) * 100) / 100,
+      // Y lo que de verdad importa: que NINGUNO se salga del diálogo. Un botón que
+      // se sale no está apagado ni escondido: está inalcanzable, que es peor.
+      todosDentro: botones.every((b) => {
+        const r = b.getBoundingClientRect()
+        return r.width > 0 && r.height > 0 && r.right <= caja.right + 1 && r.left >= caja.left - 1
+      }),
+      alto: Math.round(caja.height * 100) / 100,
+    }
+  })(),
 }
 modal.cabeEnLaVentana =
   modal.rect === null
@@ -655,6 +714,28 @@ if (modal.cabeEnLaVentana === false) {
     `El diálogo se sale de la ventana (${JSON.stringify(modal.rect)} en ${modal.ventana.w}×${modal.ventana.h}): ` +
       'parte del formulario queda inalcanzable.',
   )
+}
+// ── F20 · el pie de exportaciones, con cinco botones ────────────────────────
+if (modal.pieFicheros === null) {
+  problemas.push(
+    'No se encuentra el pie del grupo «llevarse el trabajo a un fichero»: o ha cambiado la clase o ' +
+      'el `data-expediente`, y con él se ha perdido la única medida de que los botones quepan.',
+  )
+} else {
+  if (modal.pieFicheros.botones !== 5) {
+    problemas.push(
+      `El pie de exportaciones tiene ${modal.pieFicheros.botones} botones y se esperaban 5 ` +
+        `(proyecto, abrir, DXF, .txt y .xlsx). Rótulos: ${JSON.stringify(modal.pieFicheros.rotulos)}.`,
+    )
+  }
+  if (modal.pieFicheros.desborda || modal.pieFicheros.todosDentro === false) {
+    problemas.push(
+      `El pie de exportaciones DESBORDA con ${modal.pieFicheros.botones} botones ` +
+        `(desborda: ${modal.pieFicheros.desborda}, todos dentro: ${modal.pieFicheros.todosDentro}, ` +
+        `sobra: ${modal.pieFicheros.sobraAncho} px). Un botón que se sale no está apagado ni ` +
+        'escondido: está inalcanzable, y no hay forma de exportar por esa vía.',
+    )
+  }
 }
 if (modal.scrollHorizontalDeLaPagina > 0) {
   problemas.push(
@@ -807,9 +888,15 @@ if (dialogoEl.open) {
     return el
   }
 
+  // ⭐ F20 · la CUARTA salida entra aquí y no en un guion nuevo, y es deliberado:
+  // es el MISMO diálogo, el MISMO arnés de captura y la misma cadena
+  // `Blob → createObjectURL → <a download> → click() → revoke`. Un guion propio
+  // habría duplicado cien líneas de envoltorios para medir un botón más — y, peor,
+  // habría dejado a ÉSTE midiendo tres de cuatro salidas y diciendo «✅».
   const ACCIONES = [
     ['exportar-dxf', 'dxf'],
     ['exportar-coordenadas', 'coordenadas'],
+    ['exportar-excel', 'excel'],
     ['exportar-proyecto', 'proyecto'],
   ]
   const renglones = {}
@@ -856,10 +943,14 @@ if (dialogoEl.open) {
         '`document.createElement`: cualquier medida posterior de esta sesión es sospechosa.',
     )
   }
-  if (exportaciones.blobsCapturados !== 3) {
+  // ⚠️ La cuenta se DERIVA de `ACCIONES` y no se escribe a mano: estaba fijada en 3 y
+  // F20 la habría dejado vieja en silencio, midiendo tres de cuatro salidas y diciendo
+  // que todo bien. Es el mismo defecto que la tabla de guiones de GUION.md declara de
+  // sí misma.
+  if (exportaciones.blobsCapturados !== ACCIONES.length) {
     problemas.push(
-      `Se esperaban 3 descargas (DXF, coordenadas y proyecto) y ha habido ${exportaciones.blobsCapturados}. ` +
-        `Renglones: ${JSON.stringify(renglones)}.`,
+      `Se esperaban ${ACCIONES.length} descargas (${ACCIONES.map(([, c]) => c).join(', ')}) y ha ` +
+        `habido ${exportaciones.blobsCapturados}. Renglones: ${JSON.stringify(renglones)}.`,
     )
   }
   if (exportaciones.blobsCapturados > 0 && !exportaciones.revocaLasQueCrea) {
@@ -871,14 +962,26 @@ if (dialogoEl.open) {
 
   // Los BYTES, uno a uno. Se leen de los Blobs capturados, que sobreviven a la
   // revocación de su URL.
+  //
+  // ⚠️ Desde F20 se lee además el CRUDO. Tres de las cuatro salidas son texto y
+  // `b.text()` basta; el `.xlsx` es un ZIP, y decodificarlo como texto lo destroza —
+  // que es justo el fallo contra el que existe `descargarBinario`.
   const leidos = []
-  for (const b of blobs) leidos.push({ tipo: b.type, bytes: b.size, texto: await b.text() })
+  for (const b of blobs) {
+    leidos.push({
+      tipo: b.type,
+      bytes: b.size,
+      texto: await b.text(),
+      crudo: new Uint8Array(await b.arrayBuffer()),
+    })
+  }
 
   const porExtension = (ext) =>
     exportaciones.nombres.findIndex((n) => n.toLowerCase().endsWith(ext))
 
   const iDxf = porExtension('.dxf')
   const iTxt = porExtension('.txt')
+  const iXlsx = porExtension('.xlsx')
   const iJson = porExtension('.json')
 
   exportaciones.dxf =
@@ -913,6 +1016,49 @@ if (dialogoEl.open) {
           puntoIngles: /\d+\.\d{2}\s*m²/.test(leidos[iTxt].texto),
           primeraLinea: leidos[iTxt].texto.split('\n')[1] ?? null,
         }
+  // ── F20 · el libro de Excel, sobre sus BYTES ──────────────────────────────
+  //
+  // ⭐ Se puede mirar el contenido sin descomprimir nada, y **eso mismo es una de
+  // las medidas**: `export/xlsx.js` emite el ZIP en `STORE`, así que el XML de las
+  // hojas está literalmente ahí. Si alguien metiera un `deflate`, estas búsquedas
+  // dejarían de encontrar nada y este guion se enteraría.
+  exportaciones.excel =
+    iXlsx < 0 || leidos[iXlsx] === undefined
+      ? null
+      : (() => {
+          const crudo = leidos[iXlsx].crudo
+          const firma = (desde, bytes) => bytes.every((b, i) => crudo[desde + i] === b)
+          // Latin-1: cada byte, un carácter. No se pretende decodificar UTF-8 — se
+          // pretende buscar cadenas ASCII (nombres de parte, etiquetas XML) sin que
+          // el decodificador se coma un byte por el camino.
+          let texto = ''
+          for (let i = 0; i < crudo.length; i++) texto += String.fromCharCode(crudo[i])
+          return {
+            nombre: exportaciones.nombres[iXlsx],
+            tipo: leidos[iXlsx].tipo,
+            bytes: leidos[iXlsx].bytes,
+            // El contenedor: firma al principio y fin de directorio central al final.
+            firmaZip: firma(0, [0x50, 0x4b, 0x03, 0x04]),
+            eocd: firma(crudo.length - 22, [0x50, 0x4b, 0x05, 0x06]),
+            // Las partes obligatorias de OOXML, por su nombre dentro del ZIP.
+            partes: [
+              '[Content_Types].xml',
+              '_rels/.rels',
+              'xl/workbook.xml',
+              'xl/_rels/workbook.xml.rels',
+              'xl/styles.xml',
+              'xl/worksheets/sheet1.xml',
+            ].filter((p) => texto.includes(p)),
+            // Sin comprimir: si esto falla, lo de abajo deja de significar nada.
+            sinComprimir: texto.includes('<worksheet'),
+            titulo: texto.includes('Coordenadas Parcela'),
+            // ⭐ Lo que es media fase: la coordenada tiene que ser una celda NUMÉRICA
+            // (`<v>372516.02</v>`) y no una cadena con la coma metida dentro.
+            celdaNumerica: /<v>\d{6}\.\d{2}<\/v>/.test(texto),
+            comaDentroDelValor: /<v>[\d]+,[\d]+<\/v>/.test(texto),
+          }
+        })()
+
   exportaciones.proyecto =
     iJson < 0 || leidos[iJson] === undefined
       ? null
@@ -982,6 +1128,53 @@ if (dialogoEl.open) {
         'El listado de coordenadas lleva un decimal con PUNTO inglés en las medidas: es exactamente ' +
           'el defecto que F09 se comió en el PDF, y un equipo de campo que teclee con el separador ' +
           'equivocado replantea en el sitio equivocado.',
+      )
+    }
+  }
+  // ── F20 · lo que tiene que cumplir el libro de Excel ──────────────────────
+  if (exportaciones.excel === null) {
+    problemas.push(
+      'No ha bajado ningún `.xlsx`: el botón «Exportar coordenadas (.xlsx)» no ha entregado nada.',
+    )
+  } else {
+    const x = exportaciones.excel
+    if (x.bytes === 0) problemas.push('El libro de Excel ha bajado con 0 bytes.')
+    if (!x.firmaZip || !x.eocd) {
+      problemas.push(
+        `El \`.xlsx\` no es un ZIP bien terminado (firma ${x.firmaZip}, EOCD ${x.eocd}). Es el ` +
+          'síntoma de que los bytes han pasado por una cadena: `descargarTexto` codifica en UTF-8 y ' +
+          'destroza un contenedor binario dejando la firma `PK` intacta al principio.',
+      )
+    }
+    if (x.partes.length !== 6) {
+      problemas.push(
+        `Al \`.xlsx\` le faltan partes de OOXML: solo se encuentran ${x.partes.length} de 6 ` +
+          `(${JSON.stringify(x.partes)}). Excel abre eso con «hemos encontrado un problema».`,
+      )
+    }
+    if (!x.sinComprimir) {
+      problemas.push(
+        'El XML de la hoja no aparece en claro dentro del `.xlsx`: o va comprimido —y F20 decidió ' +
+          'emitirlo en STORE— o la parte no está.',
+      )
+    }
+    if (!x.titulo) {
+      problemas.push('El libro no lleva el título «Coordenadas Parcela» que pide la maqueta.')
+    }
+    // ⭐ El criterio que justifica la fase entera.
+    if (!x.celdaNumerica || x.comaDentroDelValor) {
+      problemas.push(
+        'Las coordenadas del `.xlsx` NO son celdas numéricas ' +
+          `(numérica: ${x.celdaNumerica}, coma dentro del valor: ${x.comaDentroDelValor}). ` +
+          'Una coordenada escrita como texto no se puede sumar ni ordenar, que es exactamente la ' +
+          'carencia del `.txt` por la que existe esta salida.',
+      )
+    }
+    if (x.tipo !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+      problemas.push(
+        `El Blob del \`.xlsx\` declara el MIME ${JSON.stringify(x.tipo)}. El registrado para un ` +
+          '`.xlsx` es `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`; ' +
+          '`application/vnd.ms-excel` es de OTRO formato, el `.xls` binario de antes de 2007.',
       )
     }
   }

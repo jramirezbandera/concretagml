@@ -2361,3 +2361,72 @@ reales de la parcela 9398516VK3799G.
       menos verlo? ¿Encuentras la forma de volver a abrirlo sin buscarla?
 - [ ] Cámbialo a **Completo** con partes ya cargadas. ¿Entiendes qué acabas de
       cambiar y a qué afecta?
+
+---
+
+## §17 · F20 · El listado de coordenadas en Excel
+
+**Ninguna máquina de este proyecto puede firmar esto.** La suite comprueba los
+bytes, `npm run validar:xlsx` se los da a openpyxl y el guion `12` los mide en un
+navegador real — y **openpyxl no es Excel**. Es literalmente la lección que costó
+el DXF: `ezdxf` daba verde a un fichero que dejaba **ZWCAD 2023 en blanco y
+bloqueado**, porque un lector tolerante rellena por su cuenta lo que falta y
+responde por su modelo, no por el fichero. Lo destapó una persona.
+
+### 17.1 · ⛔ BLOQUEANTE — que Excel lo abra, y sin una queja
+
+- [ ] Trae una parcela, abre **«Expediente» → «Exportar coordenadas (.xlsx)»** y
+      **ábrelo con Excel de verdad** (no con el visor del navegador, ni con Google
+      Sheets, ni con LibreOffice: esos van después).
+- [ ] ⛔ **¿Sale algún aviso al abrirlo?** «Hemos encontrado un problema con el
+      contenido…», «formato no coincide», «vista protegida» con reparación. Si
+      aparece cualquiera de ellos, **esto no está entregado**: apunta el texto
+      literal y la versión de Excel.
+- [ ] Ábrelo también en **LibreOffice Calc** y en **Google Sheets** (subiéndolo).
+      Es el mismo reparto que F09 pidió para el PDF: un fichero que solo abre en
+      un programa no está exportado, está de suerte.
+
+### 17.2 · ⛔ Lo que de verdad justifica la fase: que se pueda CALCULAR
+
+Esto es lo que el `.txt` no permitía, y por lo que existe F20. Si falla, la fase
+no sirve para nada aunque el fichero abra.
+
+- [ ] Ponte en una celda vacía y escribe `=SUMA(B10:B24)` sobre la columna de la X.
+      **¿Da un número o da 0?** Si da 0, las coordenadas han entrado como TEXTO.
+- [ ] Ordena la tabla por la columna Y. ¿Ordena por valor o alfabéticamente
+      (`1.000` antes que `999`)? Lo segundo es el mismo defecto.
+- [ ] Mira una coordenada: **¿la ves con coma decimal?** El fichero guarda
+      `372516.02` y es Excel quien tiene que pintarlo `372516,02` en un equipo en
+      español. Si ves el punto, el formato no ha llegado.
+- [ ] La celda de **Superficie** enseña `1.510,87 m²`. Pincha en ella y mira la
+      barra de fórmulas: **tiene que haber un número, sin el «m²» dentro**. La
+      unidad va en el formato. Y ⚠️ verás la cifra COMPLETA
+      (`1510,865149996761`): es correcto y está declarado — el redondeo es de la
+      presentación, no del dato.
+
+### 17.3 · Que sirva para lo que se pide un Excel
+
+- [ ] **Copia las tres columnas y pégalas** donde de verdad las vayas a usar.
+      ¿Llegan como números? ¿Hace falta tocar algo?
+- [ ] Con una parcela **con huecos**: hay una pestaña por recinto. ¿Los nombres
+      («Contorno exterior», «Hueco 1») te dicen lo que son? ⭐ Y la pregunta que
+      solo contestas tú: **las medidas están solo en la primera pestaña**, porque
+      la superficie es la NETA de la parcela entera. ¿Se entiende, o parece que a
+      las otras les falta algo?
+- [ ] ¿Las columnas tienen el ancho suficiente? **Una coordenada que se ve
+      `#####` no está.**
+- [ ] Imprímelo, o mira la vista previa. ¿Cabe? ¿Se lee?
+
+### 17.4 · Lo que dice de sí mismo
+
+- [ ] Al pie hay un aviso de que esta hoja **no se puede volver a cargar en la
+      aplicación** y de que la primera columna es el número de vértice. ¿Lo
+      encuentras sin buscarlo? ¿Te queda claro que para retomar el trabajo hay que
+      usar el fichero de proyecto?
+- [ ] Punto BLOQUEANTE heredado del 8.1, 9.4, 10.5 y 11: **¿alguna celda se lee
+      como un veredicto?** Este libro enumera y suma; no dice si la parcela está
+      bien. Si alguna frase suena a «esto está correcto», es un defecto.
+- [ ] Baja **el `.txt` y el `.xlsx` de la misma parcela** y compáralos. Tienen el
+      mismo prefijo y la misma marca de tiempo a propósito. ⭐ **¿Dicen lo mismo?**
+      Misma superficie, mismo perímetro, y el vértice 7 de uno es el vértice 7 del
+      otro. Si no coinciden, es el defecto más grave que puede tener esta fase.

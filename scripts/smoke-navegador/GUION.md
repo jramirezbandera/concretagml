@@ -33,7 +33,7 @@ para que el resultado no dependa de interpretar prosa. Quince son de aceptación
 | `09-diagnostico.js` | F07 · 1 a 4 | el diagnóstico con SVG y layout reales: la diferencia sombreada por `fill-rule: evenodd`, el cajón que flota sin quitarle NI UN PÍXEL a la caja de vértices al abrirse, la banda del margen que conserva sus metros con el zoom y el tiempo del recálculo completo | `ok:true` |
 | `10-comprobar-gml.js` | F08 · 1 a 4 · **+ los tres arreglos del check visual** | **soltar un fichero de verdad** de punta a punta (bytes reales, velo con `opacity` calculada, `File.arrayBuffer()`), el cajón que no tapa ninguno de los cinco controles del mapa, los dos cajones que no coinciden, el informe que baja con BYTES, el invariante de los ~267 px, la tipografía real de los botones de los dos cajones y —desde el 2026-08-02— **el REENCUADRE** (viaja con otra parcela, no se mueve al editar), **las COLINDANTES dibujadas** y **el CAMPO de la referencia** | ⚠️ **`ok:false` desde el 2026-08-04 y PENDIENTE DE REVISIÓN: conduce el flujo anterior al rework, no hay defecto de producto detrás** — ver §16 |
 | `11-informe-pdf.js` | F09 · **1** a 5 | ⭐ **el CRITERIO 1, que solo se puede medir aquí**: `toDataURL` sobre un lienzo con una tesela REAL del WMS, **con control negativo** (sin `crossOrigin` tiene que lanzar); el PDF que baja con BYTES de verdad (`%PDF`, páginas declaradas, el plano `/DCTDecode` dentro); que componer **no cierre nada por debajo** (tercera aparición del mismo defecto); el `<dialog>` como modal DE VERDAD (capa superior, fondo inerte, `Escape`), el encaje del modal en la ventana, el invariante de la caja de vértices y la tipografía de los cuatro botones nuevos | `ok:true` — ver §17 |
-| `12-expedientes.js` | F10 · 1 a 6 | ⭐ **que los bytes están en una base de VERDAD** (la suite entera de F10 corre sobre `fake-indexeddb`, que no es una base de datos): supervivencia a la recarga contrastada contra `performance.timeOrigin`, segunda conexión a IndexedDB, `persist()`/`estimate()` reales, las tres exportaciones con sus BYTES, el `<dialog>` como modal y el invariante de los 267 px | `ok:true` — ver §18 |
+| `12-expedientes.js` | F10 · 1 a 6 · **+ F20** | ⭐ **que los bytes están en una base de VERDAD** (la suite entera de F10 corre sobre `fake-indexeddb`, que no es una base de datos): supervivencia a la recarga contrastada contra `performance.timeOrigin`, segunda conexión a IndexedDB, `persist()`/`estimate()` reales, **las CUATRO exportaciones** con sus BYTES, el `<dialog>` como modal y el invariante de los 267 px. **Desde F20 (2026-08-06)** mide además el `.xlsx` sobre sus bytes —firma `PK`, EOCD, las seis partes de OOXML, sin comprimir y ⭐ **que la coordenada sea una celda NUMÉRICA y no una cadena con la coma dentro**, que es el criterio que justifica la fase entera— y **que los CINCO botones del pie de exportaciones quepan**, que es la medida que la suite no puede dar porque jsdom no maqueta | `ok:true` — ver §18 |
 | `13-edificio.js` | F11 · 1 a 4 | ⭐ **el guardián de ANCHO del conmutador, que solo existe aquí** (sustituye al `flex-wrap: nowrap` que el plan pedía por error); **M10 ida y vuelta en un navegador real** —mismo nodo, mismo valor, oyentes vivos—; el invariante de los 267 px y las tres cifras de M8; que las huellas del DXF **se ven y ENCIMA de la parcela** (orden real de los panes, no solo que existan los `<path>`); soltar un `.dxf` de verdad en las DOS ramas, con su diálogo de reparto por capas; la ficha del pie que cambia de cara; y ⭐ **el reparto de altura del panel, en vacío y con datos, con el recorte a CERO EXACTO y el déficit en píxeles cuando no llega** | ✅ **`ok:true` desde el 2026-08-04**: los dos defectos de F11 cerrados, el segundo **por el rework** — ver §19 |
 | `14-shell.js` | Rework · 1 a 4 | la cáscara de tres columnas y su coste en píxeles, en **las DOS pasadas de D5** (1280×720 y 1440×900): ancho del rail, desborde del panel, el invariante de `#tabla-vertices`, cuántas tarjetas de aviso caben enteras y cuánto queda escondido tras el pliegue; **se detecta solo** en cuál de los dos mundos está (`LINEA_BASE` sin rail / `SHELL` con él); y desde la rebanada 4, **si el diagnóstico sigue en pantalla después de tocar el mapa** | `ok:true` en las dos — ver §20 |
 | `15-contraste.js` | Rework · T9 | ⭐ **la RUTA CRÍTICA 2 entera** (soltar el GML de otro → contrastarlo → cruzar la puerta), que hasta T9 no se podía andar; y sobre todo **que la puerta de D4 SE VE**: dentro del cajón, dentro de la ventana y con `elementFromPoint` devolviéndola —las tres patas, porque con una sola el defecto salía verde—; más la procedencia que cambia al cruzar y el invariante de la caja de vértices | ⛔ **encontró un defecto real el 2026-08-04, ya corregido; hoy `ok:true` en las dos** — ver §22 |
@@ -2656,6 +2656,52 @@ AutoCAD no está exportado, está de suerte. **Dos pestañas a la vez** y el
 perfil o en otra máquina**. Y el punto BLOQUEANTE que hereda del 8.1, el 9.4 y el
 10.5: si alguna frase de la lista de expedientes **se lee como un veredicto**.
 
+### 18.1 · F20 · la CUARTA exportación entra aquí (2026-08-06)
+
+El listado de coordenadas en Excel se mide en **este** guion y no en uno nuevo, y es
+deliberado: es el mismo diálogo, el mismo arnés de captura
+(`Blob → createObjectURL → <a download> → click() → revoke`) y la misma promesa de
+restaurar los envoltorios en un `finally`. Un guion propio habría duplicado cien
+líneas para medir un botón más y —peor— habría dejado a **éste** midiendo tres de
+cuatro salidas y diciendo «✅».
+
+Lo que añade, con la corrida de cierre del **2026-08-06** (`npm run dev`, puerto
+5185, viewport 1440×900, `ok:true`, `problemas: []`):
+
+| Qué | Medido |
+|---|---|
+| El `.xlsx` baja de verdad | `coordenadas_9398516VK3799G_….xlsx`, **10.586 B** |
+| MIME | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` (el registrado, no el del `.xls`) |
+| Contenedor | firma `PK` al principio **y EOCD al final** — la prueba de que no ha pasado por `descargarTexto` |
+| Partes de OOXML | las **6**, por su nombre dentro del ZIP |
+| Sin comprimir | el XML de la hoja aparece en claro: la decisión `STORE` de F20 se cumple |
+| ⭐ **La coordenada es una celda NUMÉRICA** | `celdaNumerica: true` · `comaDentroDelValor: false` |
+| ⭐ **Los CINCO botones del pie caben** | `desborda: false` · `todosDentro: true` · alto **72,78 px** |
+
+Las dos últimas son las que justifican que esto esté aquí y no en la suite: una
+coordenada convertida a texto no se puede sumar —que es la carencia por la que existe
+la fase entera— y **jsdom no maqueta**, así que un pie de diálogo que desborda sale
+verde en las 6.794 pruebas.
+
+⛔ **Y su primera corrida salió `ok:false` por un defecto DEL GUION, no del
+producto.** Acusaba: *«la caja de vértices arranca en 0 px … algo del tamaño de un
+BLOQUE ha entrado en el panel»*. **No había entrado nada.** Este guion se escribió
+cuando la aplicación arrancaba con el panel entero delante; el **rework de UI** la
+partió en pasos y el arranque pasó a ser **Entrada**, donde la tabla de vértices ni
+siquiera está montada. Medido ese día: **0 px en Entrada** y **455,97 px en
+Validación** a 1440×900, muy por encima de los 267 de referencia.
+
+Es exactamente la avería que el §16 ya tiene declarada del `10` («conduce el flujo
+anterior al rework, no hay defecto de producto detrás»), y se ha arreglado como lo
+haría una persona: **yendo a la pantalla de la que habla la medida** antes de tomarla,
+y declarando en el veredicto desde dónde se midió (`pasoDePartida` → `pasoMedido`).
+**El umbral no se ha tocado**: bajarlo a 0 habría sido apagar el guardián para que
+dejara de avisar.
+
+⚠️ Lo que este guion **no** puede firmar del `.xlsx` es que **Excel lo abra**. Eso lo
+mide `npm run validar:xlsx` contra openpyxl (§29) y, en última instancia, una persona
+con Excel delante: `CHECKLIST-HUMANO.md` §16, **BLOQUEANTE**.
+
 ---
 
 ## 19. `13-edificio.js` — la segunda rama (F11 · T5.2)
@@ -4671,3 +4717,61 @@ volvió falsos, y que se corrigieron aquí porque la causa es de F12.
   lista no está en pantalla (sus peldaños exigen geometría), así que un `0 px` ahí
   no es un aplastamiento. Se apaga diciéndolo; el presupuesto **con datos** se
   sigue midiendo en su `topeConPartes` y entero en este guion.
+
+---
+
+## 29. ¿Abre en Excel el libro que exportamos? (`npm run validar:xlsx`)
+
+Gemelo de §24 (`validar:dxf`) y de `validar:xsd`, y existe por lo mismo: **un
+oráculo que no es nuestro**. `test/export/xlsx.test.js` comprueba los bytes con
+mucho detalle, pero sigue siendo nuestro lector leyendo nuestro fichero, y este
+proyecto ya sabe adónde lleva eso — el DXF de F10 no abría en ningún CAD y
+`parsers/dxf.js` lo aprobaba sin una queja.
+
+```bash
+npm run validar:xlsx              # informativo
+npm run validar:xlsx -- --estricto  # «no poder medir» es un FALLO
+```
+
+**Dos pasadas, y la segunda no toca openpyxl.** Es la lección de ZWCAD del
+2026-08-05 aplicada por adelantado: `ezdxf` daba verde a un fichero que colgaba el
+CAD porque **rellena por su cuenta lo que falta al cargar**, y openpyxl hace lo
+mismo. Así que:
+
+| | Qué pregunta | Con qué |
+|---|---|---|
+| **Pasada 1** | ¿se puede LEER? ¿los números son números, los formatos están, las pestañas se llaman como deben? | openpyxl |
+| **Pasada 2** | ¿el paquete está BIEN FORMADO? | **solo la biblioteca estándar** |
+
+La pasada 2 comprueba lo que un lector tolerante perdona y Excel no: el **CRC de
+cada entrada**, que todas vayan **sin comprimir** (la decisión de F20), que cada
+parte del ZIP esté **declarada en `[Content_Types].xml`** y cada `Override`
+declarado exista, que cada **`r:id` del libro** apunte a una parte que está —si esto
+se descoloca, Excel abre la hoja equivocada bajo cada pestaña: el fichero no se
+rompe, solo se vuelve mentira— y que cada **`s="N"`** caiga dentro de `cellXfs`.
+
+**Códigos de salida**: `0` bien · `1` mal · `2` no se pudo ni intentar y se pidió
+`--estricto` · `3` el paquete está bien pero **no hay openpyxl**, o sea media
+medición. ⚠️ **A diferencia del de DXF, este NO exige openpyxl para elegir
+intérprete**: la pasada estructural corre con la biblioteca estándar, así que un
+Python pelado ya mide la mitad más valiosa.
+
+### ⭐ Y NO es vacuo: está medido (2026-08-06)
+
+Un guardián que no se pone rojo con nada no protege de nada, y este proyecto ya
+pagó uno («`Boolean(puerta)` es cierto con la puerta oculta», F19). Se le pasaron
+cuatro ficheros averiados a propósito, con el control intacto al lado:
+
+| Fichero | Código | Motivo que dio |
+|---|---|---|
+| control intacto | **0** | — |
+| un byte cambiado sin tocar su CRC | **1** | el CRC de una parte no cuadra con sus bytes |
+| basura pegada tras el EOCD | **1** | «no acaba en un EOCD sin comentario: hay cola de más» |
+| pestaña renombrada en el manifiesto | **1** | «las pestañas son […] y se esperaban […]» |
+| vértice movido en el manifiesto | **1** | «B9 vale 373000 y se esperaba 999999» |
+
+Corrida de cierre: **5 casos, `python + openpyxl 3.1.5`, código 0.**
+
+⚠️ **Y aun así, esto NO es Excel.** El propio script lo dice al terminar. Abrir el
+fichero en Excel de verdad es `CHECKLIST-HUMANO.md` §16 y es **BLOQUEANTE**: lo del
+DXF lo destapó una persona, no una máquina.

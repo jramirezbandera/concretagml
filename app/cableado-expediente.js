@@ -162,6 +162,7 @@ import { TIPO_EXPEDIENTE, crearExpediente } from '../model/parcela.js'
 import { conIdLocal } from '../edificio/mutaciones.js'
 import { SEVERIDAD } from '../export/_comun.js'
 import { serializarCoordenadasTxt } from '../export/coordenadas.js'
+import { serializarCoordenadasExcel } from '../export/excel-coordenadas.js'
 import { serializarParcelaDxf } from '../export/dxf.js'
 import { aProyecto, deProyecto } from '../export/proyecto.js'
 import {
@@ -170,6 +171,8 @@ import {
   TIPO_MIME_DXF,
   TIPO_MIME_JSON,
   TIPO_MIME_TEXTO,
+  TIPO_MIME_XLSX,
+  descargarBinario,
   descargarTexto,
   nombreFicheroGml,
 } from '../gml/descargar.js'
@@ -194,13 +197,18 @@ import { RAMA } from './rama.js'
  */
 export const SELECTOR_BOTON_EXPEDIENTE = '[data-accion="abrir-expediente"]'
 
-// ── Nombres de los tres ficheros ─────────────────────────────────────────────
+// ── Nombres de los cuatro ficheros ───────────────────────────────────────────
 
 /**
  * Extensiones que la zona de fichero acepta ADEMÁS de las del GML, y con las que
- * `app/main.js` la amplía. Solo el fichero de proyecto: el DXF y el listado de
+ * `app/main.js` la amplía. Solo el fichero de proyecto: el DXF y los dos listados de
  * coordenadas son de SALIDA — la aplicación los escribe y todavía no los sabe abrir
  * desde la interfaz, que es una asimetría real y está declarada en el plan.
+ *
+ * ⚠️ Con el `.xlsx` de F20 esa asimetría **no empeora, pero cambia de naturaleza**: el
+ * `.dxf` y el `.txt` sí los sabe leer la aplicación por otras vías (F18 y F19 los
+ * cablearon como medición propia), y un libro de Excel **no lo sabe leer en absoluto**.
+ * Por eso su aviso impreso da esa razón y no la del `.txt`.
  *
  * @readonly
  * @type {readonly string[]}
@@ -208,9 +216,9 @@ export const SELECTOR_BOTON_EXPEDIENTE = '[data-accion="abrir-expediente"]'
 export const EXTENSIONES_PROYECTO = Object.freeze(['.json'])
 
 /**
- * Los tres ficheros que este cableado entrega, con su prefijo y su extensión.
+ * Los cuatro ficheros que este cableado entrega, con su prefijo y su extensión.
  *
- * ⚠️ **El DXF conserva el prefijo `parcela`** —el mismo que el GML— y los otros dos
+ * ⚠️ **El DXF conserva el prefijo `parcela`** —el mismo que el GML— y los otros
  * llevan el suyo. No es descuido:
  *
  *   · El DXF y el GML son **la misma geometría en dos formatos**, y que se emparejen
@@ -220,14 +228,22 @@ export const EXTENSIONES_PROYECTO = Object.freeze(['.json'])
  *     de contraste de F08 (`contraste_…​.txt`), y dos ficheros de texto sobre la
  *     misma parcela y el mismo instante distinguidos solo por el prefijo es
  *     precisamente la razón por la que aquel eligió el suyo.
- *   · El proyecto lleva el suyo porque es lo único de los tres que se puede volver
+ *   · El proyecto lleva el suyo porque es lo único de los cuatro que se puede volver
  *     a abrir aquí, y el usuario tiene que poder encontrarlo sin abrirlo.
+ *
+ * ⭐ **Y el Excel de F20 comparte el prefijo `coordenadas` con el `.txt`, a
+ * propósito.** Es el argumento del DXF y el GML aplicado otra vez: son **el mismo
+ * documento en dos envases**, y que aparezcan uno al lado del otro en la carpeta de
+ * descargas es justo lo que se busca. Tampoco pueden colisionar —la extensión los
+ * distingue—, y quien baje los dos verá `coordenadas_…​.txt` y `coordenadas_…​.xlsx`
+ * con la MISMA marca de tiempo, que es la forma de saber que dicen lo mismo.
  *
  * @readonly
  */
 export const FICHERO = Object.freeze({
   DXF: Object.freeze({ prefijo: PREFIJO_NOMBRE, extension: '.dxf', mime: TIPO_MIME_DXF }),
   COORDENADAS: Object.freeze({ prefijo: 'coordenadas', extension: '.txt', mime: TIPO_MIME_TEXTO }),
+  EXCEL: Object.freeze({ prefijo: 'coordenadas', extension: '.xlsx', mime: TIPO_MIME_XLSX }),
   PROYECTO: Object.freeze({ prefijo: 'proyecto', extension: '.json', mime: TIPO_MIME_JSON }),
 })
 
@@ -402,18 +418,24 @@ export const MOTIVO_GUARDAR_EN_EDIFICIO =
   'entero y se vuelve a abrir aquí.'
 
 /**
- * Por qué el DXF y el listado de coordenadas no bajan con la rama EDIFICIO activa.
+ * Por qué el DXF y los dos listados de coordenadas no bajan con la rama EDIFICIO
+ * activa.
  *
- * Los dos escritores son de PARCELA —`serializarParcelaDxf` y
- * `serializarCoordenadasTxt` hablan de recintos, y el nombre del fichero saldría con
- * la referencia catastral de la parcela—, así que dejarlos correr entregaría **el
- * documento de la otra rama, en silencio**, que es exactamente lo que F11 no puede
- * publicar (regla de oro 1).
+ * Los tres escritores son de PARCELA —`serializarParcelaDxf`,
+ * `serializarCoordenadasTxt` y `serializarCoordenadasExcel` hablan de recintos, y el
+ * nombre del fichero saldría con la referencia catastral de la parcela—, así que
+ * dejarlos correr entregaría **el documento de la otra rama, en silencio**, que es
+ * exactamente lo que F11 no puede publicar (regla de oro 1).
+ *
+ * ⚠️ **Este texto ENUMERA las salidas, así que caduca cada vez que se añade una.** Ya
+ * pasó con el Excel de F20: decía «El DXF y el listado de coordenadas» cuando ya eran
+ * tres. Un mensaje que enumera hay que revisarlo al ampliar {@link FICHERO}, y por eso
+ * su prueba lo comprueba contra el catálogo y no contra una cadena escrita a mano.
  */
 export const MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO =
-  'El DXF y el listado de coordenadas son de la parcela, y ahora mismo estás en la rama Edificio: ' +
-  'no se ha descargado nada para no entregarte el dibujo de otra cosa. Vuelve a la rama Parcela ' +
-  'para exportarlos, o usa «Guardar proyecto (.json)», que sí se lleva el edificio.'
+  'El DXF y los listados de coordenadas (.txt y .xlsx) son de la parcela, y ahora mismo estás en ' +
+  'la rama Edificio: no se ha descargado nada para no entregarte el dibujo de otra cosa. Vuelve a ' +
+  'la rama Parcela para exportarlos, o usa «Guardar proyecto (.json)», que sí se lleva el edificio.'
 
 /** Cuando se pide exportar el proyecto y el store de edificio está vacío. */
 export const MENSAJE_SIN_EDIFICIO =
@@ -1658,13 +1680,24 @@ export function cablearExpediente({
     if (hayEnEspera()) volcarLoPendiente()
   }
 
-  // ── Las tres exportaciones ────────────────────────────────────────────────
+  // ── Las cuatro exportaciones ──────────────────────────────────────────────
 
   /**
-   * Entrega un texto como fichero. Punto único para las tres salidas: el nombre, el
-   * MIME y el acuse se deciden en un solo sitio, así que no pueden divergir.
+   * Entrega un fichero. Punto único para las cuatro salidas: el nombre, el MIME y el
+   * acuse se deciden en un solo sitio, así que no pueden divergir.
    *
-   * @param {string} texto
+   * ⭐ **Desde F20 admite BYTES además de texto**, y el reparto se hace por el tipo de
+   * lo que llega, no por un parámetro que haya que acordarse de pasar. El motivo de
+   * que no valga un solo primitivo está escrito en `gml/descargar.js`: `descargarTexto`
+   * codifica en UTF-8 por especificación, así que pasar por él los bytes de un `.xlsx`
+   * —que es un ZIP— los **corrompería en silencio**, con la firma `PK` intacta al
+   * principio y el defecto invisible hasta que Excel dijera que el fichero está dañado.
+   * Es el mismo motivo por el que F09 tuvo que escribir `descargarBinario` para el PDF.
+   *
+   * Se elige por tipo y no por bandera precisamente porque una bandera se olvida: quien
+   * añada la quinta salida no tiene que leer esta cabecera para acertar.
+   *
+   * @param {string|Uint8Array} contenido  Texto, o los bytes de un fichero binario.
    * @param {{prefijo: string, extension: string, mime: string}} formato
    * @param {Date} fecha
    * @param {string} queEs  Cómo se llama en el acuse.
@@ -1673,21 +1706,20 @@ export function cablearExpediente({
    *   salido**: contarle a alguien qué no lleva un fichero que no ha llegado a bajar es
    *   ruido encima de un fallo.
    */
-  function entregar(texto, formato, fecha, queEs, coletilla = null) {
+  function entregar(contenido, formato, fecha, queEs, coletilla = null) {
     const nombreFichero = nombreFicheroExport({
       prefijo: formato.prefijo,
       extension: formato.extension,
       refcat: refcatActual(),
       fecha,
     })
-    const entrega = descargarTexto(texto, {
-      nombreFichero,
-      mime: formato.mime,
-      documento: doc,
-      url,
-    })
-    // El desenlace se dice SIEMPRE, salga bien o mal. Cuando falla, `descargarTexto`
-    // trae un `mensaje` en castellano ya presentable.
+    const opcionesDescarga = { nombreFichero, mime: formato.mime, documento: doc, url }
+    const entrega =
+      typeof contenido === 'string'
+        ? descargarTexto(contenido, opcionesDescarga)
+        : descargarBinario(contenido, opcionesDescarga)
+    // El desenlace se dice SIEMPRE, salga bien o mal. Cuando falla, los dos primitivos
+    // traen un `mensaje` en castellano ya presentable.
     if (!entrega.descargado) {
       decir(entrega.mensaje)
       avisar(entrega.mensaje, NIVEL.ERROR)
@@ -1700,7 +1732,7 @@ export function cablearExpediente({
   }
 
   /**
-   * ¿Se puede entregar un fichero DE LA PARCELA? Con la rama EDIFICIO no: los dos
+   * ¿Se puede entregar un fichero DE LA PARCELA? Con la rama EDIFICIO no: los tres
    * escritores hablan de recintos y el nombre del fichero saldría con otra referencia.
    * Ver {@link MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO}.
    */
@@ -1746,6 +1778,33 @@ export function cablearExpediente({
     })
     publicarDetecciones(detecciones)
     entregar(texto, FICHERO.COORDENADAS, fecha, 'el listado de coordenadas')
+  }
+
+  /**
+   * «Exportar coordenadas (.xlsx)» — F20.
+   *
+   * Gemela de {@link exportarCoordenadas} hasta en el orden de las líneas, y es lo
+   * que se quiere: **son el mismo documento en dos envases**, así que reciben lo mismo
+   * y comparten hasta la aritmética (`export/coordenadas.js#prepararListado`). Lo
+   * único que cambia es el escritor y que lo que baja son bytes.
+   */
+  function exportarExcel() {
+    if (bloqueaLaRamaEdificio()) return
+    const parcela = estado.get()
+    if (!hayGeometria(parcela)) {
+      decir(MENSAJE_SIN_PARCELA)
+      return
+    }
+    const fecha = ahora()
+    const { bytes, detecciones } = serializarCoordenadasExcel({
+      recintos: parcela.recintos,
+      refcat: parcela.refcat ?? null,
+      srs,
+      fecha,
+      nombre: identidadActual().nombre,
+    })
+    publicarDetecciones(detecciones)
+    entregar(bytes, FICHERO.EXCEL, fecha, 'el listado de coordenadas en Excel')
   }
 
   /**
@@ -1955,6 +2014,8 @@ export function cablearExpediente({
           return exportarDxf()
         case ACCION.EXPORTAR_COORDENADAS:
           return exportarCoordenadas()
+        case ACCION.EXPORTAR_EXCEL:
+          return exportarExcel()
         case ACCION.EXPORTAR_PROYECTO:
           return exportarProyecto(nombre)
         case ACCION.ABRIR_PROYECTO:

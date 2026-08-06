@@ -132,7 +132,7 @@ const NL = '\n'
  * «cero» o como «nada que reseñar», y aquí significa que el dato no consta. Mismo
  * texto, a propósito, que `report/contraste-texto.js` y que el cajón del diagnóstico.
  */
-const NO_CONSTA = 'No consta'
+export const NO_CONSTA = 'No consta'
 
 /**
  * La frase con la que el fichero avisa de que no se puede volver a soltar en la
@@ -249,8 +249,15 @@ const coordenada = (v) => (esNumero(v) ? FORMATO_COORD.format(v) : NO_CONSTA)
 /** Un string no vacío, o `null`. Evita que un `''` pase por dato. */
 const textoONulo = (v) => (typeof v === 'string' && v.trim() !== '' ? v : null)
 
-/** Rótulo de un recinto: el 0 es el exterior; los huecos se numeran desde 1. */
-const rotuloRecinto = (i) => (i === 0 ? 'Contorno exterior' : `Hueco ${i}`)
+/**
+ * Rótulo de un recinto: el 0 es el exterior; los huecos se numeran desde 1.
+ *
+ * ⭐ **Se exporta desde F20**, y no por comodidad: el listado en Excel rotula con él
+ * la PESTAÑA de cada recinto. Dos documentos de esta aplicación llamando distinto al
+ * mismo anillo —«Hueco 1» en el `.txt` y «Hueco 2» en el `.xlsx` porque uno cuente
+ * desde el exterior y el otro no— es la clase de divergencia que aquí se paga cara.
+ */
+export const rotuloRecinto = (i) => (i === 0 ? 'Contorno exterior' : `Hueco ${i}`)
 
 /**
  * Singular o plural según la cuenta, para no escribir «1 vértice(s)»: un paréntesis
@@ -328,7 +335,9 @@ function tabla(cabeceras, filas, sangria) {
 }
 
 /**
- * Fecha → `dd/mm/aaaa hh:mm (UTC)`, por COMPONENTES UTC.
+ * Fecha → `dd/mm/aaaa hh:mm (UTC)`, por COMPONENTES UTC. **Exportada desde F20** por
+ * lo mismo que {@link rotuloRecinto}: el listado en Excel estampa su fecha con esta
+ * función y no con una segunda redacción del mismo formato.
  *
  * Ni se consulta el reloj ni se usa un formateador dependiente del entorno: el mismo
  * instante tiene que producir el mismo texto en CI y en el equipo de quien firma
@@ -339,7 +348,7 @@ function tabla(cabeceras, filas, sangria) {
  * @param {Date} fecha
  * @returns {string}
  */
-function fechaLarga(fecha) {
+export function fechaLarga(fecha) {
   const dos = (n) => String(n).padStart(2, '0')
   return (
     `${dos(fecha.getUTCDate())}/${dos(fecha.getUTCMonth() + 1)}/${fecha.getUTCFullYear()} ` +
@@ -399,6 +408,121 @@ function esListaDeRecintos(v) {
 // ── Typedefs ─────────────────────────────────────────────────────────────────
 
 /** @typedef {import('./_comun.js').DeteccionExport} DeteccionExport */
+
+/**
+ * @typedef {Object} RecintoPreparado
+ * @property {number} indice  Su posición en la parcela; el 0 es el exterior.
+ * @property {Array<[number, number]>} vertices  Ya REDONDEADOS a la precisión de
+ *   salida y sin los que se fundieron al redondear. Anillo ABIERTO.
+ * @property {'EXTERIOR'|'HUECO'} tipo
+ */
+
+/**
+ * @typedef {Object} ListadoPreparado
+ * @property {RecintoPreparado[]} preparados
+ * @property {DeteccionExport[]} detecciones
+ * @property {number|null} superficieNeta  Exterior menos huecos, en m². `null` cuando
+ *   no hay ni un anillo medible.
+ * @property {{exterior: number, huecos: number, total: number}|null} perimetro
+ * @property {number} nVertices  Los realmente listados, sumando todos los recintos.
+ */
+
+/**
+ * Prepara la geometría de una parcela para publicarla como listado de coordenadas:
+ * redondea, funde lo que se funde, mide sobre lo redondeado y anota por el camino
+ * todo lo que hubo que decidir.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * ⭐ POR QUÉ ESTO ES UNA FUNCIÓN, Y NO EL PRIMER TERCIO DE `serializarCoordenadasTxt`
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * Porque desde F20 **hay dos documentos que publican este mismo listado**: el `.txt`
+ * de replanteo y el `.xlsx` (`export/excel-coordenadas.js`). No son dos documentos
+ * parecidos: son **el mismo contenido en dos envases**, y su ficha lo pide con todas
+ * las letras — *«la superficie y el perímetro del `.xlsx` son idénticos a los del
+ * `.txt` para la misma parcela»* (criterio 5).
+ *
+ * Se podía haber cumplido con una prueba que comparase las dos salidas. **Es más
+ * débil**, y este proyecto tiene escrito por qué: un guardián puede estar verde y
+ * estar defendiendo el defecto (F11 · M28–M30), y dos redacciones del mismo hecho
+ * divergen, quedándose vieja siempre la que no se tocó. Compartir el CÁLCULO no es
+ * una comodidad: es lo que hace que la coincidencia **no se pueda romper**, en vez de
+ * hacer que se note cuando se rompa.
+ *
+ * ⚠️ Y no se sube a `export/_comun.js`: allí vive el vocabulario de detecciones de
+ * las TRES salidas, y esto es del listado de coordenadas y de nadie más. El DXF
+ * prepara sus anillos aparte y **debe seguir haciéndolo** — cierra la polilínea con
+ * `70=1` y aquí el anillo se imprime abierto, que es la asimetría que
+ * {@link prepararAnillo} ya tenía razonada.
+ *
+ * @param {Array<{vertices: Array<[number, number]>}>} recintos  `recintos[0]` es el
+ *   EXTERIOR y el resto huecos.
+ * @returns {ListadoPreparado}
+ * @throws {RangeError}  Lo que lance `redondearCoord` con una coordenada fuera del
+ *   rango publicable, con su motivo.
+ */
+export function prepararListado(recintos) {
+  /** @type {DeteccionExport[]} */
+  const detecciones = []
+
+  // Se redondea primero y se mide después, sobre lo redondeado: ver la cabecera.
+  const preparados = recintos.map((r, i) => {
+    const { vertices, colapsados } = prepararAnillo(r.vertices)
+    if (colapsados > 0) {
+      detecciones.push(
+        crearDeteccionExport(
+          TIPO_EXPORT.COLAPSO_POR_REDONDEO,
+          `En el ${rotuloRecinto(i).toLowerCase()} se han fundido ${plural(colapsados, 'vértice', 'vértices')} ` +
+            `al redondear a ${DECIMALES_COORD} decimales: caían en el mismo punto que el vértice ` +
+            'anterior, y dos estacas en el mismo sitio no se pueden replantear. El listado lleva ' +
+            `${plural(vertices.length, 'vértice', 'vértices')}.`,
+          SEVERIDAD.AVISO,
+          { recinto: i, colapsados, vertices: vertices.length },
+        ),
+      )
+    }
+    if (vertices.length < 3) {
+      detecciones.push(
+        crearDeteccionExport(
+          TIPO_EXPORT.ANILLO_DESCARTADO,
+          `El ${rotuloRecinto(i).toLowerCase()} se queda con ${plural(vertices.length, 'vértice', 'vértices')} ` +
+            'y no forma un anillo, así que no aporta superficie ni perímetro. Sus vértices sí se ' +
+            'listan: están en el fichero, y decidir qué hacer con ellos es de quien firma.',
+          SEVERIDAD.AVISO,
+          { recinto: i, vertices: vertices.length },
+        ),
+      )
+    }
+    return { indice: i, vertices, tipo: i === 0 ? 'EXTERIOR' : 'HUECO' }
+  })
+
+  if (preparados.length === 0) {
+    detecciones.push(
+      crearDeteccionExport(
+        TIPO_EXPORT.CAPA_VACIA,
+        'La parcela no tiene geometría, así que el listado sale sin un solo vértice. No es un ' +
+          'fallo del fichero: es lo que hay que replantear.',
+        SEVERIDAD.AVISO,
+        { recintos: 0 },
+      ),
+    )
+  }
+
+  // Las medidas van sobre las coordenadas YA REDONDEADAS —las que se imprimen— y solo
+  // sobre los anillos que de verdad lo son: `geo/area.js` y `geo/metrica.js` devuelven
+  // 0 para menos de 3 vértices, pero exigen el invariante EXTERIOR/HUECO, así que los
+  // degenerados se quedan fuera para no romperlo cuando el exterior es el degenerado.
+  const medibles = preparados.filter((p) => p.vertices.length >= 3)
+  const hayExterior = medibles.length > 0 && medibles[0].indice === 0
+  const paraMedir = hayExterior ? medibles.map((p) => ({ vertices: p.vertices, tipo: p.tipo })) : []
+
+  return {
+    preparados,
+    detecciones,
+    superficieNeta: paraMedir.length > 0 ? superficie(paraMedir) : null,
+    perimetro: paraMedir.length > 0 ? perimetro(paraMedir) : null,
+    nVertices: preparados.reduce((s, p) => s + p.vertices.length, 0),
+  }
+}
 
 /**
  * @typedef {Object} ResultadoCoordenadas
@@ -488,64 +612,8 @@ export function serializarCoordenadasTxt(opciones = {}) {
     throw new RangeError("serializarCoordenadasTxt: 'fecha' es inválida (tiempo no finito).")
   }
 
-  /** @type {DeteccionExport[]} */
-  const detecciones = []
-
-  // ── Preparar la geometría ANTES de escribir nada ──────────────────────────
-  // Se redondea primero y se mide después, sobre lo redondeado: ver la cabecera.
-  const preparados = recintos.map((r, i) => {
-    const { vertices, colapsados } = prepararAnillo(r.vertices)
-    if (colapsados > 0) {
-      detecciones.push(
-        crearDeteccionExport(
-          TIPO_EXPORT.COLAPSO_POR_REDONDEO,
-          `En el ${rotuloRecinto(i).toLowerCase()} se han fundido ${plural(colapsados, 'vértice', 'vértices')} ` +
-            `al redondear a ${DECIMALES_COORD} decimales: caían en el mismo punto que el vértice ` +
-            'anterior, y dos estacas en el mismo sitio no se pueden replantear. El listado lleva ' +
-            `${plural(vertices.length, 'vértice', 'vértices')}.`,
-          SEVERIDAD.AVISO,
-          { recinto: i, colapsados, vertices: vertices.length },
-        ),
-      )
-    }
-    if (vertices.length < 3) {
-      detecciones.push(
-        crearDeteccionExport(
-          TIPO_EXPORT.ANILLO_DESCARTADO,
-          `El ${rotuloRecinto(i).toLowerCase()} se queda con ${plural(vertices.length, 'vértice', 'vértices')} ` +
-            'y no forma un anillo, así que no aporta superficie ni perímetro. Sus vértices sí se ' +
-            'listan: están en el fichero, y decidir qué hacer con ellos es de quien firma.',
-          SEVERIDAD.AVISO,
-          { recinto: i, vertices: vertices.length },
-        ),
-      )
-    }
-    return { indice: i, vertices, tipo: i === 0 ? 'EXTERIOR' : 'HUECO' }
-  })
-
-  if (preparados.length === 0) {
-    detecciones.push(
-      crearDeteccionExport(
-        TIPO_EXPORT.CAPA_VACIA,
-        'La parcela no tiene geometría, así que el listado sale sin un solo vértice. No es un ' +
-          'fallo del fichero: es lo que hay que replantear.',
-        SEVERIDAD.AVISO,
-        { recintos: 0 },
-      ),
-    )
-  }
-
-  // Las medidas van sobre las coordenadas YA REDONDEADAS —las que se imprimen— y solo
-  // sobre los anillos que de verdad lo son: `geo/area.js` y `geo/metrica.js` devuelven
-  // 0 para menos de 3 vértices, pero exigen el invariante EXTERIOR/HUECO, así que los
-  // degenerados se quedan fuera para no romperlo cuando el exterior es el degenerado.
-  const medibles = preparados.filter((p) => p.vertices.length >= 3)
-  const hayExterior = medibles.length > 0 && medibles[0].indice === 0
-  const paraMedir = hayExterior ? medibles.map((p) => ({ vertices: p.vertices, tipo: p.tipo })) : []
-  const superficieNeta = paraMedir.length > 0 ? superficie(paraMedir) : null
-  const per = paraMedir.length > 0 ? perimetro(paraMedir) : null
-
-  const nVertices = preparados.reduce((s, p) => s + p.vertices.length, 0)
+  const { preparados, detecciones, superficieNeta, perimetro: per, nVertices } =
+    prepararListado(recintos)
 
   // ── Cabecera ──────────────────────────────────────────────────────────────
   const lineas = [

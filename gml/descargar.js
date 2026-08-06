@@ -270,6 +270,34 @@ export const TIPO_MIME_DXF = 'image/vnd.dxf'
  */
 export const TIPO_MIME_JSON = 'application/json'
 
+/**
+ * Tipo MIME del listado de coordenadas en Excel de F20. Vive aquí por lo mismo que
+ * los otros cinco, aunque quien escribe el fichero sea `export/xlsx.js` —puro, sin
+ * `Blob` y sin saber nada de descargas—.
+ *
+ * **Es el más largo del repertorio y hay que copiarlo entero.** El tipo registrado
+ * para un `.xlsx` es
+ * `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, y las abreviaturas
+ * que circulan —`application/vnd.ms-excel`, `application/excel`, `application/x-xlsx`—
+ * son o de OTRO formato (el `.xls` binario de antes de 2007) o inventadas. Declarar el
+ * del `.xls` sobre un `.xlsx` es exactamente el fallo que este proyecto ya pagó con el
+ * DXF que declaraba `AC1015` sin serlo: el fichero dice ser una cosa y es otra, y quien
+ * lo abre por el MIME se encuentra un ZIP donde esperaba un OLE.
+ *
+ * **Sin `charset`**, como el DXF y el JSON, y aquí el motivo no admite matiz: un
+ * `.xlsx` es un contenedor **binario** (un ZIP). El texto que lleva dentro va en UTF-8
+ * porque lo dice OOXML en cada una de sus partes XML, no porque lo diga esta cabecera.
+ *
+ * ⚠️ Y baja por {@link descargarBinario}, **nunca por `descargarTexto`**: pasar estos
+ * bytes por una cadena los corrompería en silencio, con la firma `PK` intacta al
+ * principio y el defecto invisible hasta que Excel dijera que el fichero está dañado.
+ * Es el mismo razonamiento que hizo falta escribir para el PDF en F09.
+ *
+ * @readonly
+ */
+export const TIPO_MIME_XLSX =
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
 // ── Repertorio de caracteres del nombre de fichero ───────────────────────────
 
 /**

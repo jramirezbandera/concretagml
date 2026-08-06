@@ -159,6 +159,7 @@ export const ACCION = Object.freeze({
   DESCARTAR_BORRADOR: 'descartar-borrador',
   EXPORTAR_DXF: 'exportar-dxf',
   EXPORTAR_COORDENADAS: 'exportar-coordenadas',
+  EXPORTAR_EXCEL: 'exportar-excel',
   EXPORTAR_PROYECTO: 'exportar-proyecto',
   ABRIR_PROYECTO: 'abrir-proyecto',
 })
@@ -188,6 +189,7 @@ export const SELECTOR = Object.freeze({
   ABRIR_PROYECTO: `[data-accion="${ACCION.ABRIR_PROYECTO}"]`,
   EXPORTAR_DXF: `[data-accion="${ACCION.EXPORTAR_DXF}"]`,
   EXPORTAR_COORDENADAS: `[data-accion="${ACCION.EXPORTAR_COORDENADAS}"]`,
+  EXPORTAR_EXCEL: `[data-accion="${ACCION.EXPORTAR_EXCEL}"]`,
   EXPORTAR_PROYECTO: `[data-accion="${ACCION.EXPORTAR_PROYECTO}"]`,
   CERRAR: '[data-accion="cerrar-expediente"]',
   ESTADO: '[data-estado="dialogo-expediente"]',
@@ -567,18 +569,28 @@ export function crearDialogoExpediente({ documento, alAvisar } = {}) {
     crear(
       'p',
       CLASE.APUNTE,
-      'El fichero de proyecto es el único de los tres que se puede volver a abrir aquí: guarda ' +
-        'el expediente entero. El DXF y el listado de coordenadas son para llevar la geometría a ' +
-        'otro programa.',
+      'El fichero de proyecto es el único de los cuatro que se puede volver a abrir aquí: guarda ' +
+        'el expediente entero. El DXF y los dos listados de coordenadas son para llevar la ' +
+        'geometría a otro programa.',
     ),
   )
   const pieFicheros = crear('div', CLASE.PIE)
-  /** Los botones de exportación, en el orden en el que se ofrecen. */
+  /**
+   * Los botones de exportación, en el orden en el que se ofrecen.
+   *
+   * ⚠️ **Los dos listados de coordenadas van juntos y con su extensión a la vista.**
+   * Son el MISMO documento en dos envases (F20), así que lo único que los distingue
+   * es para qué se van a usar: el `.txt` se lleva al campo o se pega en una libreta,
+   * y el `.xlsx` se abre en una hoja de cálculo para sumar y ordenar. Con los rótulos
+   * pegados y las extensiones visibles, esa elección se hace de un vistazo; separados
+   * o sin extensión, parecerían dos cosas distintas.
+   */
   const BOTONES_FICHERO = [
     [ACCION.EXPORTAR_PROYECTO, 'Guardar proyecto (.json)'],
     [ACCION.ABRIR_PROYECTO, 'Abrir un proyecto…'],
     [ACCION.EXPORTAR_DXF, 'Exportar DXF para CAD'],
     [ACCION.EXPORTAR_COORDENADAS, 'Exportar coordenadas (.txt)'],
+    [ACCION.EXPORTAR_EXCEL, 'Exportar coordenadas (.xlsx)'],
   ]
   for (const [accion, rotulo] of BOTONES_FICHERO) {
     const boton = crear('button', 'gml-boton gml-boton--secundario', rotulo)

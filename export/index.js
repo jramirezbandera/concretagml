@@ -80,6 +80,7 @@
 /**
  * @typedef {import('./_comun.js').DeteccionExport} DeteccionExport
  * @typedef {import('./coordenadas.js').ResultadoCoordenadas} ResultadoCoordenadas
+ * @typedef {import('./excel-coordenadas.js').ResultadoExcel} ResultadoExcel
  * @typedef {import('./proyecto.js').Proyecto} Proyecto
  * @typedef {import('./proyecto.js').ResultadoProyecto} ResultadoProyecto
  */
@@ -127,6 +128,27 @@ export {
   esListadoDeReplanteo,
   serializarCoordenadasTxt,
 } from './coordenadas.js'
+
+// ── Contrato G · el listado de coordenadas, en Excel (F20) ───────────────────
+// El mismo listado en otro envase, para lo que el `.txt` no puede: sumar, ordenar y
+// pegar en una columna. Sale `AVISO_NO_REIMPORTABLE_EXCEL` junto a él por lo mismo que
+// sale el del `.txt` —la interfaz tiene que poder decir lo que dice el fichero sin
+// escribir una segunda redacción parecida—, y es una frase PROPIA y no una copia: aquí
+// el motivo de fondo es más simple (la aplicación no sabe abrir ficheros de Excel).
+//
+// ⛔ **`serializarLibroXlsx` NO sale, y tampoco `crc32` ni `ESTILO`.** Es exactamente
+// la decisión que `report/index.js` tomó con `crearDocumentoPdf`: lo que la aplicación
+// necesita es EL DOCUMENTO, no un motor de hojas de cálculo. Publicar el escritor
+// invitaría a componer libros por fuera de la maqueta —y con ellos, a que un segundo
+// sitio decidiera qué dice esta aplicación sobre una parcela—. Quien de verdad lo
+// necesite (hoy nadie fuera de `export/`) lo importa directamente:
+//
+//   import { serializarLibroXlsx } from '../export/xlsx.js'
+
+export {
+  AVISO_NO_REIMPORTABLE_EXCEL,
+  serializarCoordenadasExcel,
+} from './excel-coordenadas.js'
 
 // ── Contrato F · el fichero de proyecto ──────────────────────────────────────
 // La única puerta de esta caja fuerte: sin backend y sin cuentas, es la única forma de

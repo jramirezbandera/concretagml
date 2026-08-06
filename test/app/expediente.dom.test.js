@@ -91,7 +91,7 @@ import { SELECTOR, motivoOtroHuso, selectorFila } from '../../app/dialogo-expedi
 import { ATRIBUTO_PANEL, RAMA, cablearRama } from '../../app/rama.js'
 import { ACADVER } from '../../export/dxf.js'
 import { deProyecto } from '../../export/proyecto.js'
-import { nombreFicheroGml } from '../../gml/descargar.js'
+import { TIPO_MIME_TEXTO, TIPO_MIME_XLSX, nombreFicheroGml } from '../../gml/descargar.js'
 import { crearEdificio } from '../../model/edificio.js'
 import { TIPO_EXPEDIENTE, crearExpediente } from '../../model/parcela.js'
 import { ALMACENES } from '../../storage/bd.js'
@@ -963,6 +963,97 @@ describe('F10 · T5.1 · 6 · las tres exportaciones', () => {
     m.cableado.destruir()
   })
 
+  // ── F20 · la cuarta salida ──────────────────────────────────────────────
+  //
+  // Lo que se mide aquí es EL CABLEADO, no la maqueta: que el botón exista, que
+  // baje un fichero de verdad, que lo haga por el primitivo BINARIO y que se llame
+  // como tiene que llamarse. Qué hay dentro de cada celda lo prueba
+  // `test/export/excel-coordenadas.test.js`, y que Excel lo abra, `validar-xlsx`.
+
+  it('⭐ el Excel baja como BYTES, y llegan intactos hasta el Blob', async () => {
+    const m = await montar()
+    await abrir(m)
+    pulsar(SELECTOR.EXPORTAR_EXCEL)
+    await reposar()
+
+    expect(m.url.blobs).toHaveLength(1)
+    const bytes = new Uint8Array(await m.url.blobs[0].arrayBuffer())
+    // ⛔ La firma `PK` es la prueba de que NO ha pasado por `descargarTexto`: ese
+    // primitivo codifica en UTF-8 y habría corrompido el ZIP en silencio, dejando
+    // estos mismos cuatro bytes intactos al principio y el destrozo más adentro.
+    expect(Array.from(bytes.subarray(0, 4))).toEqual([0x50, 0x4b, 0x03, 0x04])
+    // Y el final: el EOCD. Si el cuerpo se hubiera recodificado, no cuadraría.
+    expect(Array.from(bytes.subarray(bytes.length - 22, bytes.length - 18))).toEqual([
+      0x50, 0x4b, 0x05, 0x06,
+    ])
+    m.cableado.destruir()
+  })
+
+  it('el Excel baja con el MISMO prefijo que el .txt y otra extensión', async () => {
+    const m = await montar()
+    await abrir(m)
+    pulsar(SELECTOR.EXPORTAR_EXCEL)
+    await reposar()
+
+    expect(m.renglon()).toContain(`${FICHERO.EXCEL.prefijo}_${REFCAT_DEMO}`)
+    expect(m.renglon()).toContain('.xlsx')
+    expect(FICHERO.EXCEL.prefijo).toBe(FICHERO.COORDENADAS.prefijo)
+    m.cableado.destruir()
+  })
+
+  it('declara el MIME registrado del .xlsx, y no el del .xls de antes de 2007', async () => {
+    const m = await montar()
+    await abrir(m)
+    pulsar(SELECTOR.EXPORTAR_EXCEL)
+    await reposar()
+
+    expect(m.url.blobs[0].type).toBe(TIPO_MIME_XLSX)
+    expect(TIPO_MIME_XLSX).not.toContain('ms-excel')
+    m.cableado.destruir()
+  })
+
+  it('⭐ los dos listados de la misma parcela dicen lo mismo, y el .xlsx pesa más', async () => {
+    // No es una prueba de tamaño: es que bajar los dos seguidos funcione y produzca
+    // dos ficheros DISTINTOS y ambos no vacíos. El «dicen lo mismo» de verdad lo
+    // vigila el guardián cruzado de `test/export/excel-coordenadas.test.js`.
+    const m = await montar()
+    await abrir(m)
+    pulsar(SELECTOR.EXPORTAR_COORDENADAS)
+    await reposar()
+    pulsar(SELECTOR.EXPORTAR_EXCEL)
+    await reposar()
+
+    expect(m.url.blobs).toHaveLength(2)
+    expect(m.url.blobs[0].size).toBeGreaterThan(0)
+    expect(m.url.blobs[1].size).toBeGreaterThan(0)
+    expect(m.url.blobs[0].type).toBe(TIPO_MIME_TEXTO)
+    expect(m.url.blobs[1].type).toBe(TIPO_MIME_XLSX)
+    m.cableado.destruir()
+  })
+
+  it('sin parcela no baja nada y se dice', async () => {
+    const m = await montar({ parcela: null })
+    await abrir(m)
+    pulsar(SELECTOR.EXPORTAR_EXCEL)
+    await reposar()
+
+    expect(m.url.blobs).toHaveLength(0)
+    expect(m.renglon()).toBe(MENSAJE_SIN_PARCELA)
+    m.cableado.destruir()
+  })
+
+  it('⭐ el aviso de la rama EDIFICIO nombra las salidas que de verdad hay', async () => {
+    // Este mensaje ENUMERA, así que caduca cada vez que se añade una salida — y ya
+    // caducó una vez: decía «El DXF y el listado de coordenadas» cuando ya eran tres.
+    // Se comprueba contra el catálogo, no contra una cadena escrita a mano.
+    for (const formato of [FICHERO.DXF, FICHERO.COORDENADAS, FICHERO.EXCEL]) {
+      expect(
+        MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO,
+        `el aviso no nombra la salida ${formato.extension}`,
+      ).toContain(formato.extension === '.dxf' ? 'DXF' : formato.extension)
+    }
+  })
+
   it('⭐ el fichero de proyecto se relee: ida y vuelta completa', async () => {
     const m = await montar()
     await abrir(m)
@@ -981,13 +1072,19 @@ describe('F10 · T5.1 · 6 · las tres exportaciones', () => {
     m.cableado.destruir()
   })
 
-  it('los tres nombres derivan de `nombreFicheroGml` y no colisionan entre sí ni con el GML', async () => {
+  it('los nombres derivan de `nombreFicheroGml` y no colisionan entre sí ni con el GML', async () => {
     const fecha = new Date(Date.UTC(2026, 7, 3, 10, 0, 0))
     const nombres = Object.values(FICHERO).map((f) =>
       nombreFicheroExport({ prefijo: f.prefijo, extension: f.extension, refcat: REFCAT_DEMO, fecha }),
     )
     const delGml = nombreFicheroGml({ refcat: REFCAT_DEMO, fecha })
-    expect(new Set([...nombres, delGml]).size).toBe(4)
+    // ⚠️ La cuenta se DERIVA de `FICHERO` y no se escribe a mano. Estaba fijada en 4 y
+    // F20 la puso en rojo al añadir la cuarta salida — un rojo correcto, porque el test
+    // hacía su trabajo, pero por el motivo equivocado: lo que aquí importa es que TODOS
+    // sean distintos, no cuántos hay. ⭐ Y el caso que de verdad vigila es el `.xlsx`,
+    // que comparte el prefijo `coordenadas` con el `.txt` a propósito: los distingue la
+    // extensión y nada más.
+    expect(new Set([...nombres, delGml]).size).toBe(nombres.length + 1)
     // La marca de tiempo es LA MISMA: es lo que empareja los ficheros en la carpeta.
     const marca = delGml.slice('parcela_'.length + REFCAT_DEMO.length + 1, -'.gml'.length)
     for (const n of nombres) expect(n).toContain(marca)
@@ -1563,11 +1660,15 @@ describe('F11 · T3.3 · 13 · (b) F11 no guarda expedientes de edificio, y lo d
     m.desmontar()
   })
 
-  it('⛔ el DXF y el listado de coordenadas se apagan con motivo, no bajan la parcela', async () => {
+  it('⛔ el DXF y los dos listados se apagan con motivo, no bajan la parcela', async () => {
     const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
     await abrir(m)
 
-    for (const selector of [SELECTOR.EXPORTAR_DXF, SELECTOR.EXPORTAR_COORDENADAS]) {
+    for (const selector of [
+      SELECTOR.EXPORTAR_DXF,
+      SELECTOR.EXPORTAR_COORDENADAS,
+      SELECTOR.EXPORTAR_EXCEL,
+    ]) {
       document
         .querySelector(selector)
         .dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
