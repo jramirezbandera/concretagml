@@ -36,9 +36,14 @@ import { ORIGEN_PARTE, crearParteConstruccion } from '../../model/edificio.js'
 import { COLOR_USUARIO, NIVEL, PANE, PANES, vertUTMaLatLng } from '../../viewer/_comun.js'
 import {
   CLASE_EMERGENTE,
+  CLASE_ENVOLVENTE,
   CLASE_HUELLA,
+  CLASE_HUELLA_ACTIVA,
+  CLASE_ROTULO_PLANTAS,
   SIN_NOMBRE,
   crearCapaPartes,
+  numeroRomano,
+  rotuloPlantas,
   textoEmergenteParte,
 } from '../../viewer/partes.js'
 import { crearPanes, montarMapa } from './_ayuda-jsdom.js'
@@ -632,5 +637,144 @@ describe('viewer/partes · limpiar y destruir', () => {
     // Y ni siquiera lanza con basura: tras destruir no se valida nada porque no se
     // hace nada.
     expect(() => capa.pintar('basura')).not.toThrow()
+  })
+})
+
+/* ══════════════════════════════════════════════════════════════════════════ *
+ * F12 · T3.4 — RÓTULOS DE PLANTAS, PARTE ACTIVA Y ENVOLVENTE                 *
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+describe('F12 · numeroRomano', () => {
+  it('los que se ven en un plano de verdad', () => {
+    expect(numeroRomano(1)).toBe('I')
+    expect(numeroRomano(2)).toBe('II')
+    expect(numeroRomano(3)).toBe('III')
+    expect(numeroRomano(4)).toBe('IV')
+    expect(numeroRomano(6)).toBe('VI')
+    expect(numeroRomano(7)).toBe('VII')
+    expect(numeroRomano(9)).toBe('IX')
+    expect(numeroRomano(14)).toBe('XIV')
+  })
+
+  it('⛔ el CERO no tiene número romano, y no es un vacío legal', () => {
+    // Es la parte SOLO BAJO RASANTE, que existe de verdad: `part10` del fixture
+    // del Catastro. Rotularla «0» sería inventarse una notación.
+    expect(numeroRomano(0)).toBeNull()
+  })
+
+  it('`null`, decimales y negativos no se aproximan: no hay rótulo', () => {
+    for (const malo of [null, undefined, -1, 2.5, NaN, '3']) {
+      expect(numeroRomano(malo), String(malo)).toBeNull()
+    }
+  })
+})
+
+describe('F12 · rotuloPlantas', () => {
+  const conPlantas = (sobre, bajo, tipo = 'PRINCIPAL') =>
+    crearParteConstruccion({
+      nombre: 'x',
+      tipo,
+      recinto: rect(X0, Y0, X0 + 5, Y0 + 5),
+      plantasSobreRasante: sobre,
+      plantasBajoRasante: bajo,
+      origen: ORIGEN_PARTE.DXF,
+    })
+
+  it('solo sobre rasante: el romano a secas', () => {
+    expect(rotuloPlantas(conPlantas(2, null))).toBe('II')
+    expect(rotuloPlantas(conPlantas(7, 0))).toBe('VII')
+  })
+
+  it('con sótanos, entre paréntesis y con signo menos', () => {
+    expect(rotuloPlantas(conPlantas(6, 1))).toBe('VI (−1)')
+  })
+
+  it('⭐ solo bajo rasante: se rotula por su sótano, que es lo que es', () => {
+    expect(rotuloPlantas(conPlantas(0, 1))).toBe('(−1)')
+  })
+
+  it('sin plantas declaradas no hay rótulo — que no es un rótulo vacío', () => {
+    expect(rotuloPlantas(conPlantas(null, null))).toBeNull()
+  })
+
+  it('⛔ una piscina NUNCA lleva rótulo: sus plantas son `null` por convenio', () => {
+    expect(rotuloPlantas(conPlantas(3, 1, 'OTRA'))).toBeNull()
+  })
+})
+
+describe('F12 · lo que se pinta de más', () => {
+  const conPlantas = (nombre, recinto, sobre) =>
+    crearParteConstruccion({
+      nombre,
+      recinto,
+      plantasSobreRasante: sobre,
+      plantasBajoRasante: null,
+      origen: ORIGEN_PARTE.DXF,
+    })
+
+  it('un rótulo por parte CON plantas, y ninguno por las que no las tienen', () => {
+    const { mapa, capa } = conMapa()
+    capa.pintar([
+      conPlantas('a', rect(X0, Y0, X0 + 10, Y0 + 10), 2),
+      conPlantas('b', rect(X0 + 20, Y0, X0 + 30, Y0 + 10), null),
+    ])
+    const rotulos = [...mapa.getPane(PANE.PARTES).querySelectorAll(`.${CLASE_ROTULO_PLANTAS}`)]
+    expect(rotulos).toHaveLength(1)
+    expect(rotulos[0].textContent).toContain('II')
+  })
+
+  it('la parte ACTIVA se distingue por clase y por grosor, no por color', () => {
+    const { mapa, capa } = conMapa()
+    capa.pintar([VIVIENDA, PORCHE], { activa: 1 })
+    const activas = [...mapa.getPane(PANE.PARTES).querySelectorAll(`.${CLASE_HUELLA_ACTIVA}`)]
+    expect(activas).toHaveLength(1)
+    // El color no cambia: la huella no puede significar nada (regla de oro 9).
+    expect(activas[0].getAttribute('stroke')).toBe(
+      mapa.getPane(PANE.PARTES).querySelector(`.${CLASE_HUELLA}:not(.${CLASE_HUELLA_ACTIVA})`)
+        .getAttribute('stroke'),
+    )
+  })
+
+  it('sin `activa` no hay ninguna resaltada', () => {
+    const { mapa, capa } = conMapa()
+    capa.pintar([VIVIENDA, PORCHE])
+    expect(mapa.getPane(PANE.PARTES).querySelectorAll(`.${CLASE_HUELLA_ACTIVA}`)).toHaveLength(0)
+  })
+
+  it('⭐ la envolvente admite N piezas: el edificio real del Catastro son DOS', () => {
+    const { mapa, capa } = conMapa()
+    capa.pintar([VIVIENDA, PISCINA], {
+      envolvente: [[rect(X0, Y0, X0 + 12, Y0 + 10)], [rect(X0, Y0 + 14, X0 + 8, Y0 + 18)]],
+    })
+    expect(mapa.getPane(PANE.PARTES).querySelectorAll(`.${CLASE_ENVOLVENTE}`)).toHaveLength(2)
+  })
+
+  it('⛔ la envolvente NO se puede tocar: es derivada, no un dato editable', () => {
+    const { mapa, capa } = conMapa()
+    capa.pintar([VIVIENDA], { envolvente: [[rect(X0, Y0, X0 + 12, Y0 + 10)]] })
+    const linea = mapa.getPane(PANE.PARTES).querySelector(`.${CLASE_ENVOLVENTE}`)
+    // `interactive:false` en Leaflet quita la clase que capta el puntero.
+    expect(linea.classList.contains('leaflet-interactive')).toBe(false)
+    // Y sin relleno: es un contorno, no una superficie más.
+    expect(linea.getAttribute('fill')).toBe('none')
+  })
+
+  it('repintar sin envolvente la quita: no se queda una vieja pegada', () => {
+    const { mapa, capa } = conMapa()
+    capa.pintar([VIVIENDA], { envolvente: [[rect(X0, Y0, X0 + 12, Y0 + 10)]] })
+    expect(mapa.getPane(PANE.PARTES).querySelectorAll(`.${CLASE_ENVOLVENTE}`)).toHaveLength(1)
+    capa.pintar([VIVIENDA])
+    expect(mapa.getPane(PANE.PARTES).querySelectorAll(`.${CLASE_ENVOLVENTE}`)).toHaveLength(0)
+  })
+
+  it('una envolvente que no es un array LANZA (contrato del programador)', () => {
+    const { capa } = conMapa()
+    expect(() => capa.pintar([VIVIENDA], { envolvente: 'x' })).toThrow(TypeError)
+  })
+
+  it('las opciones son opcionales: la llamada de F11 sigue valiendo', () => {
+    const { mapa, capa } = conMapa()
+    capa.pintar([VIVIENDA, PORCHE])
+    expect(mapa.getPane(PANE.PARTES).querySelectorAll(`.${CLASE_HUELLA}`)).toHaveLength(2)
   })
 })

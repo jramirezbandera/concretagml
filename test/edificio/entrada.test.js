@@ -470,27 +470,40 @@ describe('entradaDesdeGmlBu — las trece partes del fixture real', () => {
     expect(entrada.edificio.partes.at(-1).nombre).toBe('Parte 13')
   })
 
-  it('⚠️ las plantas se tiran por ALCANCE, y se dicen: las trece, con sus números', () => {
-    for (const p of entrada.edificio.partes) {
-      expect(p.plantasSobreRasante).toBeNull()
-      expect(p.plantasBajoRasante).toBeNull()
-    }
+  it('⭐ las plantas ENTRAN, y se dicen: las trece, con sus números', () => {
+    // ⛔ **F12 · fase 5 · esta prueba afirmaba lo contrario**, y lo afirmaba bien:
+    // F11 tiraba las plantas por alcance y lo decía. **F12 es la fase que las
+    // recoge** y llegó a la fase 5 sin que nadie tocara `partesDeFeature`: la
+    // suite seguía verde porque ninguna prueba pedía que llegaran al modelo. Lo
+    // destapó el guion 19 en un navegador real —cero rótulos romanos sobre trece
+    // huellas—, no esta suite.
+    const crudo = parsearGmlBu(GML_PARTES)
+    expect(entrada.edificio.partes.map((p) => p.plantasSobreRasante)).toEqual(
+      crudo.partes.map((p) => p.numberOfFloorsAboveGround),
+    )
+    expect(entrada.edificio.partes.map((p) => p.plantasBajoRasante)).toEqual(
+      crudo.partes.map((p) => p.numberOfFloorsBelowGround),
+    )
+    // MITAD ANTI-VACUIDAD: si el lector devolviera `null` en las trece —el fallo
+    // silencioso del namespace equivocado—, esto pasaría comparando nada con nada.
+    expect(crudo.partes.every((p) => p.numberOfFloorsAboveGround !== null)).toBe(true)
 
     const dicho = de(entrada, TIPO_EDIFICIO.PLANTAS_DESCARTADAS)
     expect(dicho).toHaveLength(1)
     expect(dicho[0].datos.partes).toHaveLength(13)
     // Los números salen del lector, no de este fichero de test: se comprueba que
     // son EXACTAMENTE los que el documento trae.
-    const crudo = parsearGmlBu(GML_PARTES)
     expect(dicho[0].datos.partes.map((p) => p.arriba)).toEqual(
       crudo.partes.map((p) => p.numberOfFloorsAboveGround),
     )
     expect(dicho[0].datos.partes.map((p) => p.abajo)).toEqual(
       crudo.partes.map((p) => p.numberOfFloorsBelowGround),
     )
-    // MITAD ANTI-VACUIDAD: si el lector devolviera `null` en las trece —el fallo
-    // silencioso del namespace equivocado—, no habría nada que descartar.
-    expect(crudo.partes.every((p) => p.numberOfFloorsAboveGround !== null)).toBe(true)
+    // ⭐ Y el aviso ya NO dice que se pierdan: lo marca `datos.entran`, que es lo
+    // que un llamante puede mirar sin leer el texto (el tipo sigue llamándose
+    // `PLANTAS_DESCARTADAS` y es deuda declarada, no un olvido).
+    expect(dicho[0].datos.entran).toBe(true)
+    expect(dicho[0].mensaje).not.toMatch(/NO las guarda/i)
   })
 
   it('⛔ part10 es SOLO bajo rasante: entra marcada, no se descarta', () => {

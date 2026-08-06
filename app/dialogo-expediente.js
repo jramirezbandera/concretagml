@@ -85,6 +85,7 @@
 // vista sería la segunda forma de decir la misma cosa, con sus dos maneras de
 // redondear. Esta pantalla imprime lo que le den.
 
+import { TIPO_EXPEDIENTE } from '../model/parcela.js'
 import { AVISO_DURABILIDAD, NO_SE_GUARDA } from '../storage/expedientes.js'
 import { NIVEL, resolverAvisar } from '../viewer/_comun.js'
 
@@ -231,6 +232,51 @@ const INTRO =
 
 /** Lo que dice el renglón de estado al nacer, y tras `fijar(null)`. */
 export const SIN_DATOS = 'Todavía no se ha mirado si hay expedientes guardados en este navegador.'
+
+/**
+ * Cómo se nombra **en una frase** el documento de cada rama (F12 · T4.3).
+ *
+ * ⚠️ No es el `ROTULO` de `app/rama.js`, que son los rótulos de los dos botones del
+ * conmutador («Parcela», «Edificio») y van en mayúscula y sueltos. Éstos van dentro
+ * de una oración, con artículo. Son dos usos distintos de la misma palabra, y por eso
+ * son dos constantes y no un `toLowerCase()` sobre aquélla, que ataría el texto de
+ * este diálogo a la mayúscula de un botón.
+ *
+ * Vive **aquí y no en el cableado** porque quien lo consume son textos —el bloque del
+ * borrador de este diálogo y los acuses del cableado—, y el cableado ya importa de
+ * aquí `motivoOtroHuso` por exactamente el mismo motivo. Al revés habría cerrado un
+ * ciclo: este módulo no importa nada del cableado, a propósito.
+ *
+ * Las claves son las de `TIPO_EXPEDIENTE` (`model/parcela.js`).
+ *
+ * @readonly
+ */
+export const ROTULO_RAMA = Object.freeze({
+  [TIPO_EXPEDIENTE.PARCELA]: 'la parcela',
+  [TIPO_EXPEDIENTE.EDIFICIO]: 'el edificio',
+})
+
+/**
+ * Enumera lo que hay autoguardado: «de la parcela 9398516VK3799G», «del edificio», «de
+ * la parcela 9398516VK3799G y del edificio». Devuelve `''` cuando no hay nada que
+ * nombrar, que es lo que permite componer la frase sin un `if` en cada llamante.
+ *
+ * @param {Array<{tipo: string, refcat: string|null}>} borradores
+ * @returns {string}
+ */
+export const enumerarBorradores = (borradores) => {
+  const piezas = (Array.isArray(borradores) ? borradores : []).map((b) => {
+    const rotulo = ROTULO_RAMA[b?.tipo] ?? 'el trabajo'
+    // «de el edificio» no lo dice nadie. La contracción se hace pieza a pieza y no con
+    // un reemplazo sobre la frase entera, que acabaría tocando un «de el…» ajeno —por
+    // ejemplo dentro de una referencia catastral con esas letras.
+    const con = rotulo.startsWith('el ') ? `del ${rotulo.slice(3)}` : `de ${rotulo}`
+    const refcat = textoONulo(b?.refcat)
+    return refcat === null ? con : `${con} ${refcat}`
+  })
+  if (piezas.length === 0) return ''
+  return piezas.length === 1 ? piezas[0] : `${piezas.slice(0, -1).join(', ')} y ${piezas.at(-1)}`
+}
 
 /**
  * Por qué está apagado «Guardar» cuando no hay nada que guardar. Regla de oro 1: el
@@ -631,19 +677,27 @@ export function crearDialogoExpediente({ documento, alAvisar } = {}) {
     for (const r of registros) lista.append(pintarFila(r, datos.srsActual))
   }
 
-  /** El bloque del borrador: OFRECE, no impone. */
+  /**
+   * El bloque del borrador: OFRECE, no impone.
+   *
+   * ⚠️ **Enumera todas las ramas que tengan trabajo** (F12 · T4.3), y la edad que
+   * dice es la primera que consta. Nombrar solo una habría dejado la otra escondida
+   * detrás de un botón que la recupera igual: el usuario pulsaría «Recuperar»
+   * creyendo que abre una cosa y le vendrían dos.
+   */
   function pintarBorrador() {
     const b = datos?.borrador ?? null
-    bloqueBorrador.hidden = b === null
-    if (b === null) {
+    bloqueBorrador.hidden = b === null || b.length === 0
+    if (b === null || b.length === 0) {
       textoBorrador.textContent = ''
       return
     }
+    const edad = b.map((x) => x.edad).find((e) => e !== null) ?? null
     const partes = ['Hay trabajo sin terminar que la aplicación guardó sola']
-    if (b.edad !== null) partes.push(b.edad)
-    const referencia = b.refcat === null ? null : `de la parcela ${b.refcat}`
+    if (edad !== null) partes.push(edad)
+    const referencia = enumerarBorradores(b)
     textoBorrador.textContent =
-      `${partes.join(', ')}${referencia === null ? '' : `, ${referencia}`}. ` +
+      `${partes.join(', ')}${referencia === '' ? '' : `, ${referencia}`}. ` +
       'Recupéralo para seguir donde lo dejaste, o descártalo para empezar de cero. Mientras no ' +
       'hagas ninguna de las dos cosas, se queda donde está.'
   }
@@ -846,8 +900,9 @@ export function crearDialogoExpediente({ documento, alAvisar } = {}) {
      * @param {Object|null} entrada
      * @param {FilaExpediente[]} [entrada.registros=[]]  Del más reciente al más
      *   antiguo, como los devuelve `storage/expedientes.js#listar`.
-     * @param {{refcat: string|null, edad: string|null}|null} [entrada.borrador=null]
-     *   El trabajo autoguardado, si lo hay.
+     * @param {Array<{tipo?: string, refcat: string|null, edad: string|null}>|{refcat: string|null, edad: string|null}|null} [entrada.borrador=null]
+     *   El trabajo autoguardado, si lo hay: **una lista, una por rama**. Un objeto
+     *   suelto se admite y se envuelve, por compatibilidad con F10.
      * @param {string|null} [entrada.srsActual=null]  El huso en el que trabaja la
      *   pantalla. Con `null` no se marca ninguna fila: es «todavía no se sabe», que no
      *   es lo mismo que «coinciden todas».
@@ -904,10 +959,18 @@ export function crearDialogoExpediente({ documento, alAvisar } = {}) {
 
       datos = {
         registros: filas,
+        // ⛔ F12 · T4.3 · es una LISTA. Un objeto suelto entra igual y se envuelve —hay
+        // un `fijar({borrador: {refcat, edad}})` en las pruebas de F10 y en el guion 12,
+        // y romperlos por un cambio de forma interno no le arregla nada a nadie—, pero
+        // lo que se guarda y se pinta es siempre una lista.
         borrador:
           borrador === null || borrador === undefined
             ? null
-            : { refcat: textoONulo(borrador.refcat), edad: textoONulo(borrador.edad) },
+            : (Array.isArray(borrador) ? borrador : [borrador]).map((b) => ({
+                tipo: textoONulo(b?.tipo) ?? TIPO_EXPEDIENTE.PARCELA,
+                refcat: textoONulo(b?.refcat),
+                edad: textoONulo(b?.edad),
+              })),
         srsActual: textoONulo(srsActual),
         puedeGuardar: puedeGuardar === true,
       }

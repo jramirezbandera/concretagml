@@ -557,3 +557,62 @@ export function resolverAvisar(fn) {
       `por defecto; recibido ${typeof fn} (${JSON.stringify(fn)}).`,
   )
 }
+
+// ── El zoom por doble clic de un mapa, contado POR MAPA (F12 · M4) ───────────
+//
+// `viewer/edicion.js` le apaga al mapa el `doubleClickZoom` mientras edita, para
+// que insertar un vértice no amplíe además; `viewer/dibujo.js` hace lo mismo
+// mientras se dibuja, porque ahí el doble clic CIERRA el recinto. Con un solo
+// interesado eso era una bandera capturada al construir, y funcionaba.
+//
+// ⛔ **Con DOS no funciona, y está medido** (F12 · M4, 2026-08-06): el segundo
+// llega cuando el primero ya lo ha apagado, así que su `enabled()` da `false`,
+// cree que ya estaba así de fábrica y no se hace responsable. Resultado: **soltar
+// el PRIMERO devolvía el zoom mientras el segundo seguía trabajando**, y a partir
+// de ahí un doble clic ampliaba el mapa además de hacer lo suyo.
+//
+// La cuenta arregla las dos mitades: el estado de fábrica lo captura **quien
+// llega primero**, y el zoom no vuelve hasta que lo suelta **el último**. Vive
+// aquí y no en `edicion.js` porque los dos módulos tienen que compartir EL MISMO
+// registro: dos cuentas separadas serían el mismo defecto con más pasos.
+//
+// `WeakMap` para no retener mapas ya destruidos.
+
+/** @type {WeakMap<object, {cuenta: number, estaba: boolean}>} */
+const ZOOM_DOBLE_CLIC = new WeakMap()
+
+/**
+ * Un interesado más quiere el zoom por doble clic apagado en `mapa`.
+ *
+ * @param {object} mapa  Un `L.Map`. Sin `doubleClickZoom` no hace nada.
+ * @returns {void}
+ */
+export function pedirZoomDobleClicApagado(mapa) {
+  const zoom = mapa && mapa.doubleClickZoom
+  if (!zoom || typeof zoom.enabled !== 'function') return
+  let registro = ZOOM_DOBLE_CLIC.get(mapa)
+  if (registro === undefined) {
+    // El primero que llega es quien ve el estado de fábrica.
+    registro = { cuenta: 0, estaba: zoom.enabled() }
+    ZOOM_DOBLE_CLIC.set(mapa, registro)
+  }
+  registro.cuenta += 1
+  if (registro.estaba && typeof zoom.disable === 'function') zoom.disable()
+}
+
+/**
+ * Un interesado menos. El zoom vuelve **solo cuando lo suelta el último**, y solo
+ * si estaba encendido antes de que nadie lo pidiera.
+ *
+ * @param {object} mapa
+ * @returns {void}
+ */
+export function soltarZoomDobleClicApagado(mapa) {
+  const zoom = mapa && mapa.doubleClickZoom
+  const registro = ZOOM_DOBLE_CLIC.get(mapa)
+  if (!zoom || registro === undefined) return
+  registro.cuenta -= 1
+  if (registro.cuenta > 0) return
+  ZOOM_DOBLE_CLIC.delete(mapa)
+  if (registro.estaba && typeof zoom.enable === 'function') zoom.enable()
+}

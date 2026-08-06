@@ -33,6 +33,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ACCION,
   APUNTE_MODELO,
+  AYUDA_PLANTAS,
   AYUDA_RENOMBRAR,
   CAMPO_ATRIBUTO,
   CLASE,
@@ -44,12 +45,17 @@ import {
   MOTIVO_CIERRE,
   MOTIVO_SIN_CAPAS,
   MOTIVO_SIN_REFCAT,
+  PENDIENTE_DE_DIBUJAR,
   ROTULO_ESTADO_CONSERVACION,
   ROTULO_MODELO,
+  ROTULO_TIPO_PARTE,
   SELECTOR,
   SELECTOR_COMPLETO,
+  SELECTOR_PRINCIPAL,
   SIN_DATOS,
+  SIN_MEDIDA,
   SIN_PARTES,
+  SIN_PARTE_ACTIVA,
   TITULO_ATRIBUTOS,
   TITULO_CAPAS,
   TITULO_ORIGEN,
@@ -59,11 +65,13 @@ import {
   selectorCapa,
   selectorParte,
 } from '../../app/panel-edificio.js'
+import { PASOS } from '../../app/navegacion.js'
 import { ROTULO_ATRIBUTO } from '../../edificio/mutaciones.js'
 import {
   ATRIBUTOS_COMPLETO,
   ESTADO_CONSERVACION,
   MODELO_EDIFICIO,
+  TIPO_PARTE,
   crearEdificio,
 } from '../../model/edificio.js'
 import { NIVEL } from '../../viewer/_comun.js'
@@ -80,6 +88,28 @@ const parte = (nombre, n) => ({
   tipo: 'PRINCIPAL',
   recinto: n === null ? null : recinto(n),
   origen: 'DXF',
+})
+
+/**
+ * El edificio con el que se prueba F12: una parte principal con plantas, una
+ * piscina (`OTRA`, sin plantas por invariante del modelo) y una parte recién
+ * añadida que todavía no tiene recinto. Los tres casos del bloque de parte
+ * activa, en un solo fixture.
+ */
+const EDIFICIO_F12 = crearEdificio({
+  refcat: '9398516VK3799G',
+  partes: [
+    {
+      nombre: 'Cuerpo principal',
+      tipo: TIPO_PARTE.PRINCIPAL,
+      recinto: recinto(11),
+      plantasSobreRasante: 2,
+      plantasBajoRasante: 1,
+      origen: 'WFS',
+    },
+    { nombre: 'Piscina', tipo: TIPO_PARTE.OTRA, recinto: recinto(5), origen: 'WFS' },
+    { nombre: 'Parte 3', tipo: TIPO_PARTE.PRINCIPAL, recinto: null, origen: 'DIBUJADA' },
+  ],
 })
 
 const EDIFICIO_SIMPLE = crearEdificio({
@@ -161,22 +191,33 @@ function textosDelPanel() {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe('app/panel-edificio · el marcado que el cableado espera', () => {
-  it('fabrica DOS secciones y UN `<dialog>`, y los monta en el documento', () => {
-    // `index.html` no trae ninguno de los tres: mismo reparto que los diálogos de
-    // F09 y F10 y que la zona de fichero de F08.
+  it('fabrica TRES secciones y UN `<dialog>`, y los monta en el documento', () => {
+    // `index.html` no trae ninguno: mismo reparto que los diálogos de F09 y F10 y
+    // que la zona de fichero de F08. La tercera es de F12 · T4.1.
     expect(panel.seccionOrigen.tagName).toBe('SECTION')
     expect(panel.seccionPartes.tagName).toBe('SECTION')
+    expect(panel.seccionActiva.tagName).toBe('SECTION')
     expect(panel.dialogoCapas.tagName).toBe('DIALOG')
     for (const raiz of panel.raices()) expect(raiz.isConnected).toBe(true)
     // Sin atributos (nace SIMPLIFICADO) el único `<dialog>` es el de capas.
     expect(document.querySelectorAll('dialog').length).toBe(1)
   })
 
-  it('las dos secciones llevan `.gml-bloque` y su modificador', () => {
+  it('`secciones()` son EXACTAMENTE las `<section>`, sin los `<dialog>`', () => {
+    // Es lo que el cableado sella con `data-rama-panel`, y meter ahí un `<dialog>`
+    // sería fabricar un `<dialog open hidden>` en la primera conmutación de rama:
+    // un diálogo que se abre y no se ve.
+    panel.fijar({ edificio: EDIFICIO_COMPLETO })
+    expect(panel.secciones()).toEqual([panel.seccionOrigen, panel.seccionPartes, panel.seccionActiva])
+    for (const seccion of panel.secciones()) expect(seccion.tagName).toBe('SECTION')
+  })
+
+  it('las tres secciones llevan `.gml-bloque` y su modificador', () => {
     // `.gml-bloque` es lo que les da `flex:none`, `min-height:0` y el `padding`
     // del panel; sin él, el modificador solo no maqueta nada.
     expect(panel.seccionOrigen.className).toBe(`gml-bloque ${CLASE.BLOQUE}`)
     expect(panel.seccionPartes.className).toBe(`gml-bloque ${CLASE.BLOQUE_PARTES}`)
+    expect(panel.seccionActiva.className).toBe(`gml-bloque ${CLASE.BLOQUE_ACTIVA}`)
   })
 
   it('TODOS los selectores de SELECTOR existen desde el primer momento', () => {
@@ -185,13 +226,24 @@ describe('app/panel-edificio · el marcado que el cableado espera', () => {
     for (const selector of Object.values(SELECTOR)) nodo(selector)
   })
 
-  it('la sección de partes va DESPUÉS de la de origen en el documento', () => {
-    // No es cosmética: `.gml-bloque--partes` es el estirador de esta rama
-    // (`flex: 1 1 auto`) y ocupa el sitio de la caja de vértices, que va la
-    // última. Puestas al revés, el reparto de altura del panel deja de parecerse
-    // al de la rama de parcela.
-    const posicion = panel.seccionOrigen.compareDocumentPosition(panel.seccionPartes)
-    expect(posicion & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  it('⛔ los de SELECTOR_PRINCIPAL NO existen todavía: dependen de la parte activa', () => {
+    // La otra mitad del contrato: si el cableado se agarrase a éstos en el
+    // montaje se quedaría con una referencia a un nodo que va a morir la primera
+    // vez que alguien elija una piscina.
+    for (const selector of Object.values(SELECTOR_PRINCIPAL)) {
+      expect(document.querySelector(selector), `${selector} no debería existir aún`).toBeNull()
+    }
+    expect(panel.plantasDisponibles()).toBe(false)
+  })
+
+  it('las tres secciones van en el orden del trabajo: origen → partes → parte activa', () => {
+    // No es cosmética. `.gml-bloque--partes` es el estirador de esta rama y ocupa
+    // el sitio de la caja de vértices, que va la última; y «la parte activa» solo
+    // significa algo DEBAJO de la lista de la que se elige.
+    const trasOrigen = panel.seccionOrigen.compareDocumentPosition(panel.seccionPartes)
+    expect(trasOrigen & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const trasPartes = panel.seccionPartes.compareDocumentPosition(panel.seccionActiva)
+    expect(trasPartes & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('`montar` LANZA si el ancla no está en el documento', () => {
@@ -270,13 +322,35 @@ describe('app/panel-edificio · los `data-*` no se pisan con los de index.html',
   const deIndexHtml = () =>
     new Set((HTML.match(/data-[a-z-]+="[^"]*"/g) ?? []).map((s) => s.replace(/"/g, '')))
 
+  /**
+   * Los `data-*` que las dos ramas comparten A PROPÓSITO, y que por tanto quedan
+   * fuera del guardián de choques.
+   *
+   * ⚠️ **La excepción no afloja la regla: la enuncia.** Lo que el contrato K.1
+   * prohíbe es repetir un atributo que el cableado resuelve con `querySelector`
+   * para quedarse con UN nodo — ahí manda el orden del documento y parcela va
+   * primero, así que el nombre repetido deja muerta a una rama en silencio. Los
+   * de esta lista no son de esa clase:
+   *
+   *   · `data-pantalla` es el eje PASO, y lo lee **el CSS con un selector que
+   *     casa con TODOS** (`estilos/app.css:271-275`). Que las dos ramas usen el
+   *     mismo vocabulario no es un choque: es el mecanismo. Una sección de
+   *     edificio con un `data-pantalla` propio no se ocultaría nunca.
+   *
+   * Si algún día entra otro, que entre con su párrafo. Una lista de exclusión sin
+   * motivos escritos es la manera de desactivar un guardián sin que se note.
+   */
+  const EJES_COMPARTIDOS = new Set(['data-pantalla'])
+
   /** @returns {Set<string>} los mismos pares, pero de este módulo. */
   function delPanel() {
     const pares = new Set()
     for (const raiz of panel.raices()) {
       for (const el of [raiz, ...raiz.querySelectorAll('*')]) {
         for (const attr of el.attributes) {
-          if (attr.name.startsWith('data-')) pares.add(`${attr.name}=${attr.value}`)
+          if (!attr.name.startsWith('data-')) continue
+          if (EJES_COMPARTIDOS.has(attr.name)) continue
+          pares.add(`${attr.name}=${attr.value}`)
         }
       }
     }
@@ -309,6 +383,43 @@ describe('app/panel-edificio · los `data-*` no se pisan con los de index.html',
     const enHtml = deIndexHtml()
     const chocan = [...delPanel()].filter((par) => enHtml.has(par))
     expect(chocan).toEqual([])
+  })
+
+  it('⛔ las TRES secciones declaran `data-pantalla`, y con pasos que existen', () => {
+    // El defecto M2, medido el 2026-08-06 y arreglado en T4.1: hasta ese día
+    // NINGUNA sección de edificio lo declaraba, así que las tres se veían en los
+    // cinco pasos —314,97 / 157,06 px IDÉNTICOS— y el rail encendía cinco
+    // peldaños sobre una sola pantalla.
+    //
+    // ⚠️ Y la segunda mitad importa igual: un paso mal escrito no da un error,
+    // da una sección que **no se ve en ninguna** de las cinco pantallas, porque
+    // las cinco reglas de `estilos/app.css:271-275` la ocultarían todas. Es un
+    // fallo silencioso de manual, así que se comprueba contra `PASOS`.
+    for (const seccion of panel.secciones()) {
+      const declarado = seccion.getAttribute('data-pantalla')
+      expect(declarado, `${seccion.className} no declara data-pantalla`).toBeTruthy()
+      for (const paso of declarado.split(/\s+/)) {
+        expect(PASOS, `«${paso}» no es un paso del rail`).toContain(paso)
+      }
+    }
+  })
+
+  it('el eje PASO es el MISMO vocabulario que el de `index.html`, no uno paralelo', () => {
+    // La otra cara de `EJES_COMPARTIDOS`: la excepción solo vale si las dos ramas
+    // hablan de verdad el mismo idioma. Si un día alguien le pusiera a esta rama
+    // pasos propios, el CSS de `index.html` no los conocería y el guardián de
+    // choques —que ya no los mira— no diría nada.
+    const enHtml = new Set(
+      (HTML.match(/data-pantalla="[^"]*"/g) ?? []).flatMap((s) =>
+        s.replace(/^data-pantalla="|"$/g, '').split(/\s+/),
+      ),
+    )
+    expect(enHtml.size).toBeGreaterThan(2) // anti-vacuidad
+    for (const seccion of panel.secciones()) {
+      for (const paso of seccion.getAttribute('data-pantalla').split(/\s+/)) {
+        expect(enHtml, `index.html no usa la pantalla «${paso}»`).toContain(paso)
+      }
+    }
   })
 
   it('la referencia catastral de esta rama se llama `refcat-edificio`, jamás `refcat`', () => {
@@ -1139,5 +1250,377 @@ describe('app/panel-edificio · regla de oro 9: la aplicación mide, el colegiad
     // capa `0` y no en la que se llama `PARCELA`.
     expect(INTRO_CAPAS).toContain('PARCELA')
     expect(INTRO_CAPAS).toContain('la aplicación no elige por el nombre')
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 8 · F12 · T4.1 — la fila que se elige, y el bloque de la parte activa
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe('app/panel-edificio · F12: elegir una parte', () => {
+  it('el nombre de la fila es un `<button>`, no un `<span>` con un `click` encima', () => {
+    // Una fila clicable que no es un control no se alcanza con el tabulador, no
+    // responde a Intro ni a Espacio y no se anuncia como pulsable. El cromo se lo
+    // quita `estilos/app.css`; aquí no se escribe ni un estilo (hay un `it`).
+    panel.fijar({ edificio: EDIFICIO_F12 })
+    const elegir = nodo(`${selectorParte(0)} [data-accion="${ACCION.SELECCIONAR_PARTE}"]`)
+    expect(elegir.tagName).toBe('BUTTON')
+    expect(elegir.type).toBe('button')
+    expect(elegir.className).toBe(CLASE.PARTE_NOMBRE)
+    expect(elegir.textContent).toBe('Cuerpo principal')
+  })
+
+  it('pulsar una fila emite su índice, y el panel NO se elige solo', () => {
+    // El panel no decide qué está activo: lo decide el store, y vuelve por
+    // `fijar`. Mismo viaje de ida y vuelta que el renombrado.
+    const vistas = []
+    panel.alAccion((a) => vistas.push(a))
+    panel.fijar({ edificio: EDIFICIO_F12 })
+    expect(panel.parteActiva()).toBeNull()
+
+    nodo(`${selectorParte(1)} [data-accion="${ACCION.SELECCIONAR_PARTE}"]`).click()
+    expect(vistas).toHaveLength(1)
+    expect(vistas[0]).toMatchObject({ accion: ACCION.SELECCIONAR_PARTE, indice: 1 })
+    expect(panel.parteActiva()).toBeNull()
+  })
+
+  it('pulsar la fila que YA estaba activa vuelve a emitir (el segundo clic reencuadra)', () => {
+    const vistas = []
+    panel.alAccion((a) => vistas.push(a))
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 1 })
+    nodo(`${selectorParte(1)} [data-accion="${ACCION.SELECCIONAR_PARTE}"]`).click()
+    expect(vistas.map((a) => a.indice)).toEqual([1])
+  })
+
+  it('la fila activa se marca con `aria-current` y con su modificador de clase', () => {
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 2 })
+    const fila = nodo(selectorParte(2))
+    expect(fila.classList.contains(CLASE.PARTE_ACTIVA)).toBe(true)
+    const elegir = fila.querySelector(`[data-accion="${ACCION.SELECCIONAR_PARTE}"]`)
+    expect(elegir.getAttribute('aria-current')).toBe('true')
+    // Y SOLO una: dos filas marcadas dirían que se editan dos a la vez.
+    expect(todos(`.${CLASE.PARTE_ACTIVA}`)).toHaveLength(1)
+    expect(todos('[aria-current="true"]')).toHaveLength(1)
+  })
+
+  it('`fijar` sin `activa` CONSERVA la que hubiera: un repintado no deselecciona', () => {
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 1 })
+    panel.fijar({ edificio: EDIFICIO_F12 })
+    expect(panel.parteActiva()).toBe(1)
+  })
+
+  it('⛔ un índice fuera de la lista NO lanza: se queda sin parte activa', () => {
+    // Es lo que pasa al eliminar la última parte, o sea un uso normal. Lanzar
+    // aquí reventaría dentro de un `click`.
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 2 })
+    expect(() => panel.fijar({ edificio: EDIFICIO_F12, activa: 9 })).not.toThrow()
+    expect(panel.parteActiva()).toBeNull()
+    expect(nodo(SELECTOR.ESTADO_ACTIVA).textContent).toBe(SIN_PARTE_ACTIVA)
+  })
+
+  it('«Añadir parte» vive en el hueco de coste 0 px del rótulo, y emite sin índice', () => {
+    const vistas = []
+    panel.alAccion((a) => vistas.push(a))
+    const boton = nodo(SELECTOR.ANADIR_PARTE)
+    expect(boton.className).toContain('gml-boton--menudo')
+    expect(boton.closest('.gml-rotulo-fila')).not.toBeNull()
+    boton.click()
+    expect(vistas[0]).toMatchObject({ accion: ACCION.ANADIR_PARTE, indice: null })
+  })
+
+  it('«Añadir parte» funciona con la lista VACÍA: es de donde sale la primera', () => {
+    const vistas = []
+    panel.alAccion((a) => vistas.push(a))
+    expect(nodo(SELECTOR.ANADIR_PARTE).disabled).toBe(false)
+    nodo(SELECTOR.ANADIR_PARTE).click()
+    expect(vistas).toHaveLength(1)
+  })
+})
+
+describe('app/panel-edificio · F12: el bloque de la parte activa', () => {
+  it('sin parte elegida el cuerpo se oculta y se dice POR QUÉ, con el botón apagado', () => {
+    // Regla de oro 1: el botón apagado y su motivo, en el mismo paso.
+    panel.fijar({ edificio: EDIFICIO_F12 })
+    expect(nodo(SELECTOR.ESTADO_ACTIVA).textContent).toBe(SIN_PARTE_ACTIVA)
+    expect(nodo(SELECTOR.ELIMINAR_PARTE).disabled).toBe(true)
+    expect(nodo(SELECTOR.TIPO_PARTE).closest('[hidden]')).not.toBeNull()
+  })
+
+  it('⛔ el `hidden` va en el CUERPO, JAMÁS en la `<section>`', () => {
+    // `app/rama.js` gobierna el `hidden` de las `<section>` que descubre por
+    // `data-rama-panel` —lo ESCRIBE en cada conmutación—, así que dos dueños del
+    // mismo atributo es un intercambio que se descuadra solo.
+    panel.fijar({ edificio: EDIFICIO_F12 })
+    expect(panel.seccionActiva.hidden).toBe(false)
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 0 })
+    expect(panel.seccionActiva.hidden).toBe(false)
+  })
+
+  it('con parte elegida enseña su nombre, su tipo y sus plantas', () => {
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 0 })
+    expect(nodo(SELECTOR.ESTADO_ACTIVA).textContent).toBe('')
+    expect(nodo(SELECTOR.ELIMINAR_PARTE).disabled).toBe(false)
+    expect(nodo(SELECTOR.TIPO_PARTE).value).toBe(TIPO_PARTE.PRINCIPAL)
+    expect(nodo(SELECTOR_PRINCIPAL.PLANTAS_SOBRE).value).toBe('2')
+    expect(nodo(SELECTOR_PRINCIPAL.PLANTAS_BAJO).value).toBe('1')
+    expect(panel.seccionActiva.textContent).toContain('Cuerpo principal')
+  })
+
+  it('el `<select>` de tipo lleva los valores de TIPO_PARTE SIN TRADUCIR', () => {
+    // Contrato K.2: lo que viaja es el valor del modelo; lo que se lee es el
+    // rótulo. Y el rótulo de OTRA dice qué cabe dentro, que es lo que hace falta
+    // para reconocerlo.
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 0 })
+    const select = nodo(SELECTOR.TIPO_PARTE)
+    expect([...select.options].map((o) => o.value)).toEqual(Object.values(TIPO_PARTE))
+    expect([...select.options].map((o) => o.textContent)).toEqual(
+      Object.values(TIPO_PARTE).map((t) => ROTULO_TIPO_PARTE[t]),
+    )
+    expect(ROTULO_TIPO_PARTE[TIPO_PARTE.OTRA]).toContain('piscina')
+  })
+
+  it('una parte SIN recinto lo dice, y manda a la herramienta que lo arregla', () => {
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 2 })
+    const dicho = nodo(SELECTOR.ESTADO_ACTIVA).textContent
+    expect(dicho).toBe(PENDIENTE_DE_DIBUJAR)
+    expect(dicho).toContain('Dibujar recinto')
+    // Y la fila de la lista lo dice también, con sus palabras.
+    expect(nodo(selectorParte(2)).textContent).toContain('sin contorno')
+  })
+
+  it('⛔ la caja de la tabla de coordenadas nace y se queda VACÍA', () => {
+    // Su dueño es `viewer/sincronizacion.js`, que hace `replaceChildren()` dentro
+    // en cada repintado. Lo que este módulo metiera ahí desaparecería al primer
+    // `set` del store, sin avisar.
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 0 })
+    const caja = nodo(SELECTOR.TABLA_ACTIVA)
+    expect(caja).toBe(panel.tablaParteActiva)
+    expect(caja.childNodes).toHaveLength(0)
+    expect(caja.className).toBe('gml-tabla-caja')
+    // Y el rótulo va FUERA, o se lo llevaría por delante ese mismo repintado.
+    expect(panel.seccionActiva.textContent).toContain('Vértices')
+  })
+
+  it('⛔ la superficie se devuelve al guion en cada `fijar`, para no mentir de parte', () => {
+    // Una cifra correcta atribuida al objeto equivocado es peor que un guion:
+    // cambiar de «Parte 10» a «Parte 11» dejaría los 245,90 m² de la primera bajo
+    // el nombre de la segunda hasta que alguien llamase a `medidas`.
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 0 })
+    panel.medidas({ activa: '245,90 m²', huella: '322,13 m² de huella' })
+    expect(nodo(SELECTOR.SUPERFICIE_ACTIVA).textContent).toBe('245,90 m²')
+    expect(nodo(SELECTOR.HUELLA).textContent).toBe('322,13 m² de huella')
+
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 1 })
+    expect(nodo(SELECTOR.SUPERFICIE_ACTIVA).textContent).toBe(SIN_MEDIDA)
+  })
+
+  it('`medidas` con una sola cifra no toca la otra', () => {
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 0 })
+    panel.medidas({ activa: '10,00 m²', huella: '99,00 m²' })
+    panel.medidas({ activa: '11,00 m²' })
+    expect(nodo(SELECTOR.HUELLA).textContent).toBe('99,00 m²')
+  })
+
+  it('«Eliminar parte» emite el índice de la ACTIVA, y vive en su bloque', () => {
+    // No en la fila ni en la cabecera de la lista: un «Eliminar» a 300 px de la
+    // fila elegida, en una lista de trece que se parecen, se pulsa por error.
+    const vistas = []
+    panel.alAccion((a) => vistas.push(a))
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 1 })
+    const boton = nodo(SELECTOR.ELIMINAR_PARTE)
+    expect(panel.seccionActiva.contains(boton)).toBe(true)
+    boton.click()
+    expect(vistas[0]).toMatchObject({ accion: ACCION.ELIMINAR_PARTE, indice: 1 })
+  })
+
+  it('sin parte activa, «Eliminar parte» no emite NADA aunque le llegue un `click`', () => {
+    const vistas = []
+    panel.alAccion((a) => vistas.push(a))
+    panel.fijar({ edificio: EDIFICIO_F12 })
+    nodo(SELECTOR.ELIMINAR_PARTE).click()
+    expect(vistas).toEqual([])
+  })
+})
+
+describe('app/panel-edificio · F12 criterio 1: una piscina NO tiene contadores', () => {
+  it('⛔ en una parte OTRA los campos de plantas NO están ocultos: NO ESTÁN', () => {
+    // Misma forma comprobable que el criterio 1 de F11 con los siete atributos:
+    // se puede señalar con el dedo. Un «0» sería mentira —`conPlantas` lo dice
+    // así: «en ésas las plantas no son cero: no aplican»— y un campo vacío
+    // invitaría a rellenarlo.
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 1 })
+    expect(nodo(SELECTOR.TIPO_PARTE).value).toBe(TIPO_PARTE.OTRA)
+    for (const selector of Object.values(SELECTOR_PRINCIPAL)) {
+      expect(document.querySelector(selector), `${selector} sigue en el documento`).toBeNull()
+    }
+    expect(panel.plantasDisponibles()).toBe(false)
+  })
+
+  it('la ayuda de rasante se va con los campos que explica', () => {
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 0 })
+    expect(panel.seccionActiva.textContent).toContain(AYUDA_PLANTAS)
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 1 })
+    expect(panel.seccionActiva.textContent).not.toContain(AYUDA_PLANTAS)
+  })
+
+  it('la ayuda es la LITERAL de la ficha, con las dos mitades', () => {
+    // Es la única frase del proyecto que dice qué es la rasante; dos redacciones
+    // serían dos definiciones.
+    expect(AYUDA_PLANTAS).toContain('sótanos')
+    expect(AYUDA_PLANTAS).toContain('la línea del terreno')
+  })
+
+  it('volver a PRINCIPAL los repone, y con los valores del store', () => {
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 1 })
+    expect(panel.plantasDisponibles()).toBe(false)
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 0 })
+    expect(panel.plantasDisponibles()).toBe(true)
+    expect(nodo(SELECTOR_PRINCIPAL.PLANTAS_SOBRE).value).toBe('2')
+  })
+
+  it('una parte principal SIN plantas deja los campos en blanco, no en «0»', () => {
+    // `null` es «aún no se sabe» y cero es un número de plantas. La distinción es
+    // del modelo y esta vista no puede borrarla.
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 2 })
+    expect(nodo(SELECTOR_PRINCIPAL.PLANTAS_SOBRE).value).toBe('')
+    expect(nodo(SELECTOR_PRINCIPAL.PLANTAS_BAJO).value).toBe('')
+  })
+})
+
+describe('app/panel-edificio · F12: lo que se teclea en las plantas', () => {
+  const teclear = (selector, valor) => {
+    const campo = nodo(selector)
+    campo.value = valor
+    campo.dispatchEvent(new Event('change', { bubbles: true }))
+  }
+
+  it('los dos campos son `type="text"`, para poder DECIR que no llevan un número', () => {
+    // Con `type="number"` el navegador VACÍA `.value` ante lo que no sabe leer, y
+    // «dos» se guardaría como «sin indicar» en silencio. Medido en F11 con los años.
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 0 })
+    for (const selector of Object.values(SELECTOR_PRINCIPAL)) {
+      expect(nodo(selector).type).toBe('text')
+      expect(nodo(selector).getAttribute('inputmode')).toBe('numeric')
+    }
+  })
+
+  it('un número entra como NÚMERO, y se mandan los dos campos', () => {
+    const vistas = []
+    panel.alAccion((a) => vistas.push(a))
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 0 })
+    teclear(SELECTOR_PRINCIPAL.PLANTAS_SOBRE, '3')
+    expect(vistas[0]).toMatchObject({
+      accion: ACCION.CAMBIAR_PLANTAS,
+      indice: 0,
+      plantas: { sobre: 3, bajo: 1 },
+    })
+  })
+
+  it('⛔ lo que NO es un número viaja TAL CUAL, para que el aviso pueda citarlo', () => {
+    // `NaN` no significa nada para quien escribió «dos». Y `conPlantas` no lanza
+    // nunca con esto: viene de un teclado.
+    const vistas = []
+    panel.alAccion((a) => vistas.push(a))
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 0 })
+    teclear(SELECTOR_PRINCIPAL.PLANTAS_SOBRE, 'dos')
+    expect(vistas[0].plantas.sobre).toBe('dos')
+  })
+
+  it('un decimal o un negativo SÍ salen como número: quien los juzga es la mutación', () => {
+    // El reparto está escrito en las dos capas: aquí se decide si es un número,
+    // y «entero de cero para arriba» vive en `edificio/mutaciones.js`.
+    const vistas = []
+    panel.alAccion((a) => vistas.push(a))
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 0 })
+    teclear(SELECTOR_PRINCIPAL.PLANTAS_SOBRE, '2,5')
+    teclear(SELECTOR_PRINCIPAL.PLANTAS_BAJO, '-1')
+    expect(vistas[0].plantas.sobre).toBe(2.5)
+    expect(vistas[1].plantas.bajo).toBe(-1)
+  })
+
+  it('vaciar un campo manda `null` («aún no se sabe»), no cero', () => {
+    const vistas = []
+    panel.alAccion((a) => vistas.push(a))
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 0 })
+    teclear(SELECTOR_PRINCIPAL.PLANTAS_SOBRE, '   ')
+    expect(vistas[0].plantas.sobre).toBeNull()
+  })
+
+  it('cambiar el tipo emite el valor SIN TRADUCIR y el índice de la activa', () => {
+    const vistas = []
+    panel.alAccion((a) => vistas.push(a))
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 0 })
+    teclear(SELECTOR.TIPO_PARTE, TIPO_PARTE.OTRA)
+    expect(vistas[0]).toMatchObject({
+      accion: ACCION.CAMBIAR_TIPO_PARTE,
+      indice: 0,
+      tipo: TIPO_PARTE.OTRA,
+    })
+  })
+
+  it('sin parte activa, un `change` en el bloque no emite nada', () => {
+    const vistas = []
+    panel.alAccion((a) => vistas.push(a))
+    panel.fijar({ edificio: EDIFICIO_F12 })
+    teclear(SELECTOR.TIPO_PARTE, TIPO_PARTE.OTRA)
+    expect(vistas).toEqual([])
+  })
+})
+
+describe('app/panel-edificio · F12: el selector de modelo se pliega', () => {
+  it('nace DESPLEGADO: elegir el modelo es lo primero que hay que poder hacer', () => {
+    expect(panel.modeloPlegado()).toBe(false)
+    expect(nodo(SELECTOR.MODELO).closest('[hidden]')).toBeNull()
+    expect(nodo(SELECTOR.DESPLEGAR_MODELO).closest('[hidden]')).not.toBeNull()
+  })
+
+  it('⛔ pulsar un radio NO lo pliega: ahí es cuando hay que leer qué se pierde', () => {
+    // Plegar en el `change` haría desaparecer bajo el propio cursor el apunte que
+    // dice «se borran los siete atributos». Es la frase que justifica el gesto.
+    const radio = todos(SELECTOR.MODELO).find((r) => r.value === MODELO_EDIFICIO.COMPLETO)
+    radio.click()
+    expect(panel.modeloPlegado()).toBe(false)
+    expect(panel.seccionOrigen.textContent).toContain(APUNTE_MODELO[MODELO_EDIFICIO.COMPLETO])
+  })
+
+  it('entrar un edificio SÍ lo pliega, y el renglón dice el rótulo entero', () => {
+    // 174,41 px MEDIDOS que vuelven al panel (F12 · M1, 1280×720).
+    panel.fijar({ edificio: EDIFICIO_F12 })
+    expect(panel.modeloPlegado()).toBe(true)
+    expect(nodo(SELECTOR.MODELO).closest('[hidden]')).not.toBeNull()
+    const renglon = nodo(SELECTOR.DESPLEGAR_MODELO).closest(`.${CLASE.MODELO_PLEGADO}`)
+    expect(renglon.hidden).toBe(false)
+    expect(renglon.textContent).toContain(ROTULO_MODELO[MODELO_EDIFICIO.SIMPLIFICADO])
+  })
+
+  it('«Cambiar» lo despliega, deja el foco en el radio puesto y NO emite nada', () => {
+    // No cambia ningún dato: mandárselo al cableado sería pedirle que devolviera
+    // una orden que no tiene nada que decidir.
+    const vistas = []
+    panel.alAccion((a) => vistas.push(a))
+    panel.fijar({ edificio: EDIFICIO_F12 })
+    nodo(SELECTOR.DESPLEGAR_MODELO).click()
+    expect(panel.modeloPlegado()).toBe(false)
+    expect(vistas).toEqual([])
+    expect(document.activeElement.value).toBe(MODELO_EDIFICIO.SIMPLIFICADO)
+  })
+
+  it('⛔ y un repintado NO se lo vuelve a cerrar en las manos', () => {
+    // Hay un `fijar` por cada mutación —renombrar, añadir, plantas—, así que sin
+    // esto el selector se cerraría solo en cuanto el usuario tocara cualquier cosa.
+    panel.fijar({ edificio: EDIFICIO_F12 })
+    nodo(SELECTOR.DESPLEGAR_MODELO).click()
+    panel.fijar({ edificio: EDIFICIO_F12, activa: 0 })
+    expect(panel.modeloPlegado()).toBe(false)
+  })
+
+  it('`fijar(null)` vuelve a empezar: desplegado, y sin recordar el «Cambiar»', () => {
+    panel.fijar({ edificio: EDIFICIO_F12 })
+    nodo(SELECTOR.DESPLEGAR_MODELO).click()
+    panel.fijar(null)
+    expect(panel.modeloPlegado()).toBe(false)
+    expect(panel.parteActiva()).toBeNull()
+    panel.fijar({ edificio: EDIFICIO_F12 })
+    expect(panel.modeloPlegado()).toBe(true)
   })
 })

@@ -473,7 +473,17 @@ describe('AC3 · «La RC se deduce del centroide de la huella y es editable.»',
 // ══════════════════════════════════════════════════════════════════════════════
 describe('AC4 · «El modelo respeta los convenios (piscina con plantas `null`; envolvente no almacenada).»', () => {
   /** Las claves que un `Edificio` SIMPLIFICADO tiene, y son todas las que tiene. */
-  const CLAVES_SIMPLIFICADO = ['refcat', 'modelo', 'partes', 'parcelaContexto', 'construccionOficial']
+  // `idLocal` la añade F12 · T1.1: sin identidad un Edificio no se puede
+  // archivar ni autoguardar. Sigue siendo una lista EXHAUSTIVA, que es lo que
+  // este guardián defiende: una clave nueva tiene que aparecer aquí a mano.
+  const CLAVES_SIMPLIFICADO = [
+    'idLocal',
+    'refcat',
+    'modelo',
+    'partes',
+    'parcelaContexto',
+    'construccionOficial',
+  ]
 
   /** Nombres con los que se podría colar una envolvente guardada. */
   const NOMBRES_DE_ENVOLVENTE = [
@@ -532,14 +542,45 @@ describe('AC4 · «El modelo respeta los convenios (piscina con plantas `null`; 
       for (const prohibida of NOMBRES_DE_ENVOLVENTE) {
         expect(prohibida in entrada.edificio, `la vía ${quien} guarda '${prohibida}'`).toBe(false)
       }
+      // ⛔ **F12 · fase 5: las plantas ya no son `null` en las cinco vías.** Esto
+      // exigía `null` en todas y era cierto en F11, que las tiraba por alcance. Lo
+      // que se puede exigir ahora es lo que de verdad promete el modelo: que el
+      // campo EXISTA y sea `null` o un entero no negativo. Los DXF/LIST/TXT no
+      // traen plantas —un volcado de CAD no las declara— y siguen entrando a
+      // `null`; el dialecto BU las trae y ahora entran.
+      //
+      // ⚠️ **La vía WFS tampoco las trae, y MEDIRLO corrigió esta prueba.** Su
+      // fixture (`wfsbu-allconstruction-…`) tiene **cero `BuildingPart` y una
+      // `OtherConstruction`**: es la PISCINA, y una piscina no declara
+      // `numberOfFloors*` ni debe. Dar por hecho que las dos vías del BU traen
+      // plantas era una inferencia; el fichero real dice otra cosa.
+      const traeLasPlantas = quien === 'GML_EXISTENTE'
       for (const parte of entrada.edificio.partes) {
         expect(parte.origen, `origen de la vía ${quien}`).toBe(origen)
-        expect(parte.plantasSobreRasante, `plantas de la vía ${quien}`).toBeNull()
-        expect(parte.plantasBajoRasante, `plantas de la vía ${quien}`).toBeNull()
+        for (const campo of ['plantasSobreRasante', 'plantasBajoRasante']) {
+          const v = parte[campo]
+          expect(
+            v === null || (Number.isInteger(v) && v >= 0),
+            `${campo} de la vía ${quien}: ${JSON.stringify(v)}`,
+          ).toBe(true)
+        }
+        if (!traeLasPlantas) {
+          expect(parte.plantasSobreRasante, `plantas de la vía ${quien}`).toBeNull()
+          expect(parte.plantasBajoRasante, `plantas de la vía ${quien}`).toBeNull()
+        }
         // Y ninguna parte guarda una envolvente propia por la puerta de atrás.
         expect(Object.keys(parte).sort()).toEqual(
           ['nombre', 'tipo', 'recinto', 'plantasSobreRasante', 'plantasBajoRasante', 'origen'].sort(),
         )
+      }
+      // ⭐ MITAD ANTI-VACUIDAD: si el lector dejara de traerlas, la comprobación de
+      // arriba pasaría igual (`null` es válido). Las dos vías del BU tienen que
+      // traer alguna de verdad.
+      if (traeLasPlantas) {
+        expect(
+          entrada.edificio.partes.some((p) => p.plantasSobreRasante !== null),
+          `la vía ${quien} no ha traído ni una planta`,
+        ).toBe(true)
       }
     }
   })
@@ -636,10 +677,15 @@ describe('AC4 · «El modelo respeta los convenios (piscina con plantas `null`; 
     expect(avisos).toHaveLength(1)
     expect(avisos[0].datos.partes[0]).toMatchObject({ localId: '9398516VK3799G_part10', indice: 9 })
     expect(entrada.edificio.partes[9].recinto.vertices).toHaveLength(35)
-    // Que las plantas del modelo sigan a `null` no es que se hayan perdido: se
-    // dice que se descartan por alcance, con sus trece pares.
     expect(tipos(entrada)).toContain(TIPO_EDIFICIO.PLANTAS_DESCARTADAS)
-    expect(entrada.edificio.partes[9].plantasBajoRasante).toBeNull()
+    // ⛔ **F12 · fase 5: esto exigía `null` y ahora exige el dato.** En F11 las
+    // plantas se tiraban por alcance y este `null` lo atestaba; ahora entran, y lo
+    // que hay que poder afirmar es que **la parte que el fichero declara sótano se
+    // guarda COMO SÓTANO** —0 arriba, 1 abajo— y no corregida a algo plausible.
+    // Es además la parte MAYOR del edificio (245,90 m² de 568,03), así que de este
+    // par de números depende que la envolvente derivada sea la buena.
+    expect(entrada.edificio.partes[9].plantasSobreRasante).toBe(0)
+    expect(entrada.edificio.partes[9].plantasBajoRasante).toBe(1)
   })
 
   it('en SIMPLIFICADO los siete atributos semánticos ni existen ni se serializan', () => {

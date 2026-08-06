@@ -159,6 +159,7 @@
 // Su test es `test/app/expediente.dom.test.js`, con sufijo `.dom`: toca el DOM.
 
 import { TIPO_EXPEDIENTE, crearExpediente } from '../model/parcela.js'
+import { conIdLocal } from '../edificio/mutaciones.js'
 import { SEVERIDAD } from '../export/_comun.js'
 import { serializarCoordenadasTxt } from '../export/coordenadas.js'
 import { serializarParcelaDxf } from '../export/dxf.js'
@@ -176,7 +177,12 @@ import { MS_AUTOGUARDADO, crearAutoguardado } from '../storage/autoguardado.js'
 import { AVISO_SIN_PERSISTENCIA } from '../storage/cuota.js'
 import { NIVEL } from '../viewer/_comun.js'
 import { describirEdad } from './cableado-catastro.js'
-import { ACCION, crearDialogoExpediente, motivoOtroHuso } from './dialogo-expediente.js'
+import {
+  ACCION,
+  crearDialogoExpediente,
+  enumerarBorradores,
+  motivoOtroHuso,
+} from './dialogo-expediente.js'
 import { RAMA } from './rama.js'
 
 // ── El contrato con `index.html` ─────────────────────────────────────────────
@@ -315,16 +321,23 @@ export const MS_CONFIRMAR_BORRADO = 5000
  * Dice las tres cosas que hacen falta: **qué hay**, **que no se ha tocado nada** y
  * **dónde está el botón**.
  *
- * @param {string|null} refcat
- * @param {string|null} edad
+ * ⚠️ **Recibe una LISTA desde F12 · T4.3** (antes, `(refcat, edad)`): con las dos
+ * ramas autoguardando puede haber trabajo en las dos, y decir solo una habría dejado
+ * la otra en la base sin que nadie supiera que estaba. La edad que se dice es **la
+ * más reciente**, que es la que responde a «¿de cuándo es esto?».
+ *
+ * @param {Array<{tipo: string, refcat: string|null, edad: string|null}>} borradores
  * @returns {string}
  */
-export const mensajeHayBorrador = (refcat, edad) => {
-  const cuando = edad === null ? 'de una sesión anterior' : `de ${edad}`
-  const cual = refcat === null ? '' : `, de la parcela ${refcat}`
+export const mensajeHayBorrador = (borradores) => {
+  const lista = Array.isArray(borradores) ? borradores : []
+  const edad = lista.map((b) => b.edad).find((e) => e !== null && e !== undefined) ?? null
+  const cuando = edad === null || edad === undefined ? 'de una sesión anterior' : `de ${edad}`
+  const cual = enumerarBorradores(lista)
   return (
-    `Hay trabajo autoguardado ${cuando}${cual}. No se ha abierto nada: la pantalla sigue como ` +
-    'siempre. Para recuperarlo o descartarlo, abre «Expediente», en la fila «Origen de la parcela».'
+    `Hay trabajo autoguardado ${cuando}${cual === '' ? '' : `, ${cual}`}. No se ha abierto nada: ` +
+    'la pantalla sigue como siempre. Para recuperarlo o descartarlo, abre «Expediente», en la ' +
+    'fila «Origen de la parcela».'
   )
 }
 
@@ -337,6 +350,17 @@ export const MENSAJE_AUTOGUARDADO_EN_ESPERA =
 /** Cuando no hay ninguna parcela en pantalla y se pide guardar o exportar. */
 export const MENSAJE_SIN_PARCELA =
   'No hay ninguna parcela en pantalla: no hay nada que guardar ni que exportar.'
+
+/**
+ * Con qué nombre entra un edificio que llega en un fichero de proyecto **sin
+ * identidad dentro** —un `.json` escrito antes de F12— y cuyo fichero tampoco tiene
+ * nombre utilizable. Es el último recurso del último recurso; el normal es el nombre
+ * del fichero. Ver `app/cableado-edificio.js#IDENTIDAD_SIN_NOMBRE`, que es su gemelo
+ * en la otra puerta.
+ *
+ * @readonly
+ */
+export const IDENTIDAD_DE_PROYECTO = 'edificio-de-proyecto'
 
 /** Cuando el expediente guardado dice ser de PARCELA y no trae ninguna geometría. */
 export const MENSAJE_GUARDADO_SIN_PARCELA =
@@ -354,14 +378,28 @@ export const MENSAJE_GUARDADO_SIN_PARCELA =
  * lugar—, y la tercera no es un consuelo: el fichero de proyecto **sí** guarda un
  * expediente de edificio entero, y esta misma pantalla lo vuelve a abrir.
  *
+ * ⛔ **F12 · T4.3 · EL MOTIVO SE REESCRIBIÓ PORQUE HABÍA DEJADO DE SER VERDAD.**
+ * Decía «porque un edificio no tiene aún el identificador con el que se distinguen
+ * los expedientes guardados», y esta misma tarea se lo da (`model/edificio.js#idLocal`
+ * de T1.1, estampado por `app/cableado-edificio.js`). Mandaba a esperar por algo que
+ * ya está.
+ *
+ * Lo que **sigue** sin estar es la vuelta: la lista de guardados no distingue de qué
+ * rama es cada fila y «Recuperar» solo sabe abrir parcelas, así que archivar un
+ * edificio ahí sería meterlo donde no se puede sacar. Ésa es la razón que queda, es
+ * comprobable —hay una prueba de que `recuperar` rechaza un registro de edificio— y
+ * es la que se dice. **El trabajo en curso sí se guarda solo desde T4.3**, y el
+ * motivo lo dice para que nadie crea que se está perdiendo lo que tiene en pantalla.
+ *
  * Se exporta para que su prueba lo afirme sin copiar el literal, igual que
  * `MOTIVO_GENERAR_GML_EN_EDIFICIO` en `app/rama.js`.
  */
 export const MOTIVO_GUARDAR_EN_EDIFICIO =
-  '«Guardar» está apagado mientras estás en la rama Edificio: esta versión todavía no sabe ' +
-  'archivar un edificio en el almacén de este navegador, porque un edificio no tiene aún el ' +
-  'identificador con el que se distinguen los expedientes guardados. Usa «Guardar proyecto ' +
-  '(.json)»: ese fichero se lleva el edificio entero y se vuelve a abrir aquí.'
+  '«Guardar» está apagado mientras estás en la rama Edificio: la lista de expedientes guardados ' +
+  'todavía es de la rama Parcela y «Recuperar» no sabría volver a abrir un edificio desde ahí. ' +
+  'El trabajo en curso no se pierde —esta rama se autoguarda y se recupera al volver—; para ' +
+  'archivarlo con nombre, usa «Guardar proyecto (.json)»: ese fichero se lleva el edificio ' +
+  'entero y se vuelve a abrir aquí.'
 
 /**
  * Por qué el DXF y el listado de coordenadas no bajan con la rama EDIFICIO activa.
@@ -432,18 +470,22 @@ export const DOCUMENTO = Object.freeze({
  *
  * Dice las cuatro cosas que hacen falta —qué lleva el documento, qué no, que lo que se
  * queda fuera **sigue en pantalla** y qué hacer para conservarlo—, y la cuarta no es
- * adorno: el almacén de este navegador todavía no sabe archivar un edificio
- * ({@link MOTIVO_GUARDAR_EN_EDIFICIO}) y el autoguardado tampoco llega a esa rama
- * (desviación 7 de F11), así que el `.json` es su ÚNICO refugio y una recarga se lo
- * lleva. Enterarse de eso al volver mañana es enterarse tarde.
+ * adorno: el almacén de este navegador todavía no sabe archivar un edificio con nombre
+ * ({@link MOTIVO_GUARDAR_EN_EDIFICIO}), así que el `.json` es la única forma de
+ * llevárselo. Enterarse de eso al volver mañana es enterarse tarde.
+ *
+ * ⚠️ **F12 · T4.3 corrigió la mitad que se quedó falsa.** Decía «y una recarga se lo
+ * llevaría», y eso valía mientras el autoguardado no llegaba a esa rama (desviación 7
+ * de F11). Ahora llega: una recarga lo devuelve. Lo que no hay es archivo con nombre,
+ * y es lo único que se sigue diciendo.
  *
  * @param {string} donde  Uno de {@link DOCUMENTO}.
  * @returns {string}
  */
 export const mensajeEdificioFuera = (donde) =>
   `${donde} lleva la parcela y NO lleva el edificio: un expediente es de una cosa o de la otra, ` +
-  'nunca de las dos. El edificio que tienes cargado sigue en pantalla, pero esta versión no lo ' +
-  'archiva en este navegador y una recarga se lo llevaría: para conservarlo, conmuta a la rama ' +
+  'nunca de las dos. El edificio que tienes cargado sigue en pantalla y esta versión lo ' +
+  'autoguarda, pero no lo archiva con nombre: para conservarlo aparte, conmuta a la rama ' +
   'Edificio y guarda desde allí un fichero de proyecto (.json).'
 
 /**
@@ -790,7 +832,7 @@ export function cablearExpediente({
 
   let destruido = false
 
-  // ── La identidad del expediente abierto ───────────────────────────────────
+  // ── La identidad del expediente abierto, UNA POR RAMA ─────────────────────
   //
   // Lo que NO está en el store y no puede deducirse de él: con qué registro se
   // corresponde lo que hay en pantalla, cómo se llama y desde cuándo existe.
@@ -798,37 +840,68 @@ export function cablearExpediente({
   // `id === null` significa «esto todavía no se ha guardado nunca», que es el estado
   // de partida y el de cada documento nuevo. Guardar con `id` pone al día ESE
   // registro; guardar sin él crea uno.
+  //
+  // ⛔ **F12 · T4.3 · era UNA y ahora son DOS**, y el motivo es el mismo que parte en
+  // dos la clave del borrador: con las dos ramas autoguardando a la vez, una sola
+  // identidad haría que el borrador del edificio se escribiera con el `creado` de la
+  // parcela y que cargar una parcela le reseteara la fecha al edificio. Cada rama
+  // lleva la suya, y `ramaActual()` decide cuál se está mirando.
   const instanteISO = () => new Date(ahora()).toISOString()
-  let identidad = {
+
+  /** Una identidad recién nacida: sin registro y estrenando fechas. */
+  const identidadNueva = () => ({
     /** @type {string|null} */ id: null,
     /** @type {string|null} */ nombre: null,
     creado: instanteISO(),
     modificado: instanteISO(),
+  })
+
+  const identidades = {
+    [RAMA.PARCELA]: identidadNueva(),
+    [RAMA.EDIFICIO]: identidadNueva(),
   }
 
+  /** La identidad de la rama que se está mirando. Nunca `undefined`. */
+  const identidadActual = () => identidades[ramaActual()]
+
   /**
-   * El `idLocal` de la parcela que hay abierta. Es lo que distingue **una edición**
-   * de **otro documento**, y no es una elección nueva: `app/main.js` ya razona por
-   * escrito que `idLocal` es el único de los cuatro candidatos que sirve —`refcat` no
-   * (la demo es una parcela real), `origen` no (la demo ya es `WFS`), la identidad
-   * del POJO no (editar construye uno nuevo)—.
+   * El `idLocal` del documento abierto **en cada rama**. Es lo que distingue **una
+   * edición** de **otro documento**, y no es una elección nueva: `app/main.js` ya
+   * razona por escrito que `idLocal` es el único de los cuatro candidatos que sirve
+   * —`refcat` no (la demo es una parcela real), `origen` no (la demo ya es `WFS`), la
+   * identidad del POJO no (editar construye uno nuevo)—.
    *
    * Importa porque sin esto, traer otra parcela del Catastro y pulsar «Guardar»
    * **pisaría el expediente anterior con una geometría que no es la suya**.
    *
-   * @type {string|null}
+   * ⚠️ Y desde F12 el `Edificio` también lo tiene (`model/edificio.js#idLocal`, T1.1):
+   * hasta T4.3 este mapa habría tenido un `null` fijo en esa rama, que es
+   * exactamente lo que la desviación 7 de F11 dio como motivo para no autoguardarla.
+   *
+   * @type {Record<string, string|null>}
    */
-  let idLocalAbierto = estado.get()?.idLocal ?? null
+  const idLocalAbierto = {
+    [RAMA.PARCELA]: estado.get()?.idLocal ?? null,
+    [RAMA.EDIFICIO]: estadoEdificio?.get()?.idLocal ?? null,
+  }
 
   /** Lo que devolvió `pedirPersistencia()`, o `null` mientras no se sepa. */
   let persistencia = null
 
   /**
-   * El borrador que se está OFRECIENDO, o `null` si no hay ninguno o si el usuario ya
-   * lo resolvió en esta sesión. Mientras no sea `null`, el autoguardado está en
-   * espera (ver la cabecera).
+   * Los borradores que se están OFRECIENDO, o `null` si no hay ninguno o si el
+   * usuario ya los resolvió en esta sesión. Mientras no sea `null`, el autoguardado
+   * está en espera (ver la cabecera).
    *
-   * @type {{refcat: string|null, edad: string|null}|null}
+   * ⛔ **Es una LISTA desde F12 · T4.3**, y no por simetría: con las dos ramas
+   * autoguardando, lo normal es acabar una sesión con trabajo en las dos. Ofrecer
+   * solo uno habría dejado el otro en la base sin nadie que lo recuperara y sin nadie
+   * que lo dijera — un borrador invisible es peor que ninguno, porque ocupa sitio y
+   * el usuario cree que lo ha perdido.
+   *
+   * El orden es el de `ID_BORRADOR_POR_TIPO`, que es el que devuelve `listar()`.
+   *
+   * @type {Array<{tipo: string, refcat: string|null, edad: string|null}>|null}
    */
   let ofrecido = null
 
@@ -836,13 +909,27 @@ export function cablearExpediente({
   let arrancado = false
 
   /**
-   * Hubo un cambio en el store mientras el autoguardado estaba en espera. Sin esto,
-   * una edición hecha en el medio segundo que tarda la lectura de arranque —o mientras
-   * la oferta está en pie— **no se guardaría nunca**: el debounce solo escribe lo que
-   * le han contado, y a ese cambio nadie se lo contó. Se vuelca en cuanto la espera
-   * termina, que es lo que convierte «no pisar» en «no perder».
+   * Hubo un cambio en el store **de esta rama** mientras el autoguardado estaba en
+   * espera. Sin esto, una edición hecha en el medio segundo que tarda la lectura de
+   * arranque —o mientras la oferta está en pie— **no se guardaría nunca**: el debounce
+   * solo escribe lo que le han contado, y a ese cambio nadie se lo contó. Se vuelca en
+   * cuanto la espera termina, que es lo que convierte «no pisar» en «no perder».
+   *
+   * ⚠️ **Es uno por rama desde F12 · T4.3, y con una bandera única salía mal.** Al
+   * volcar habría que escribir las dos —no se sabría cuál cambió—, y eso escribiría el
+   * borrador de una rama que el usuario no ha tocado: la próxima carga le ofrecería
+   * «trabajo sin terminar» de algo que nunca empezó. Un borrador inventado es una
+   * afirmación falsa, aunque sea una afirmación cómoda.
+   *
+   * @type {Record<string, boolean>}
    */
-  let cambioEnEspera = false
+  const cambioEnEspera = {
+    [RAMA.PARCELA]: false,
+    [RAMA.EDIFICIO]: false,
+  }
+
+  /** ¿Queda algo por volcar en alguna rama? */
+  const hayEnEspera = () => Object.values(cambioEnEspera).some(Boolean)
 
   /** Para que {@link MENSAJE_AUTOGUARDADO_EN_ESPERA} se diga una vez y no en cada tecla. */
   let dichaLaEspera = false
@@ -934,6 +1021,7 @@ export function cablearExpediente({
    *   una parcela rota. Es un contrato roto, y quien llama lo cuenta.
    */
   function expedienteActual() {
+    const identidad = identidadActual()
     const metadatos = {
       creado: identidad.creado,
       modificado: identidad.modificado,
@@ -1035,8 +1123,8 @@ export function cablearExpediente({
    * @param {{id: string|null, nombre: string|null, creado: string, modificado: string}} nuevaIdentidad
    */
   function cargar(parcela, nuevaIdentidad) {
-    identidad = nuevaIdentidad
-    idLocalAbierto = parcela?.idLocal ?? null
+    identidades[RAMA.PARCELA] = nuevaIdentidad
+    idLocalAbierto[RAMA.PARCELA] = parcela?.idLocal ?? null
     irARama(RAMA.PARCELA)
     estado.set(parcela)
     if (alCargarParcela !== null) alCargarParcela(parcela)
@@ -1047,58 +1135,107 @@ export function cablearExpediente({
    * Nunca en el de parcela — meter un edificio en el store de la parcela es
    * exactamente el fallo que la tarea T3.3 existe para no cometer.
    *
-   * No hay `alCargarParcela` que llamar (ese gancho reinicia el historial de edición
-   * de la parcela, y aquí no ha entrado ninguna) ni `idLocalAbierto` que mover: un
-   * `Edificio` no tiene `idLocal`, que es justo la razón por la que no se puede
-   * guardar en el almacén ({@link MOTIVO_GUARDAR_EN_EDIFICIO}).
+   * No hay `alCargarParcela` que llamar: ese gancho reinicia el historial de edición
+   * de la parcela, y aquí no ha entrado ninguna.
+   *
+   * ⚠️ **`idLocalAbierto` SÍ se mueve desde F12 · T4.3.** Antes no: un `Edificio` no
+   * tenía `idLocal` y esta función lo decía. Ahora lo tiene, y sin moverlo aquí el
+   * suscriptor del segundo store tomaría este documento recién abierto por «otro» y
+   * le tiraría la identidad que se le acaba de dar en la línea anterior.
    *
    * @param {object} edificio
    * @param {{id: string|null, nombre: string|null, creado: string, modificado: string}} nuevaIdentidad
    */
   function cargarEdificio(edificio, nuevaIdentidad) {
-    identidad = nuevaIdentidad
+    identidades[RAMA.EDIFICIO] = nuevaIdentidad
+    idLocalAbierto[RAMA.EDIFICIO] = edificio?.idLocal ?? null
     irARama(RAMA.EDIFICIO)
     estadoEdificio.set(edificio)
   }
 
-  // ── El autoguardado ───────────────────────────────────────────────────────
+  // ── El autoguardado, UNO POR RAMA ─────────────────────────────────────────
+  //
+  // ⛔ **F12 · T4.3 · son DOS debounces, no uno que reparte.** La tentación era
+  // pasarle al único `crearAutoguardado` un `{rama, dato}` y decidir dentro, y sale
+  // mal por cómo funciona un debounce: `cambiado()` **coalesce, se queda con el
+  // último y tira los anteriores** (`storage/autoguardado.js`, la variable `ultimo`).
+  // Editar la parcela, conmutar y tocar el edificio dentro de la misma ventana de dos
+  // segundos habría hecho que el cambio de la parcela **no se escribiera nunca** — y
+  // en un autoguardado eso no lo nota nadie hasta el día que hace falta.
+  //
+  // Dos instancias no pueden coalescer la una en la otra. Cada una escribe en su
+  // clave reservada (`storage/expedientes.js#ID_BORRADOR_POR_TIPO`) y lleva su propia
+  // cuenta de fallos; lo único que comparten es el aviso, que se dice una vez.
 
-  const auto = crearAutoguardado({
-    // Recibe la PARCELA y deriva aquí, no antes: `cambiado()` se llama en cada
-    // edición y derivar un Expediente entero en cada tecla sería copiar la geometría
-    // por gusto. Cuando el debounce decide escribir, ya solo queda una.
-    guardar: (parcela) => {
-      const exp = crearExpediente({
-        srs,
-        parcela,
-        metadatos: {
-          creado: identidad.creado,
-          modificado: identidad.modificado,
-          autor: '',
-          idDocumento: '',
-        },
-      })
-      return expedientes.guardarBorrador(exp)
-    },
-    ms,
-    ...(programar === undefined ? {} : { programar }),
-    ...(cancelar === undefined ? {} : { cancelar }),
-    ahora: () => ahora().getTime(),
-    // `guardarBorrador` NO avisa por el canal cuando falla, y lo dice por escrito: el
-    // autoguardado corre solo cada dos segundos y un fallo persistente llenaría el
-    // panel de tarjetas idénticas. Quien lo cuenta —UNA vez por racha— es esto.
-    alFallo: ({ consecutivos, causa }) => {
-      if (dichoElFalloAuto) return
-      dichoElFalloAuto = true
-      avisar(MENSAJE_AUTOGUARDADO_ROTO, NIVEL.AVISO, causa)
-      console.warn(`[expediente] el autoguardado lleva ${consecutivos} fallo(s) seguido(s):`, causa)
-    },
-    // Una racha rota vuelve a habilitar el aviso: si falla otra vez dentro de un rato,
-    // es un incidente nuevo y merece contarse otra vez.
-    alGuardado: () => {
-      dichoElFalloAuto = false
-    },
+  /**
+   * Fabrica el autoguardado de una rama. Lo único que cambia entre los dos es cómo se
+   * arma el Expediente; todo lo demás —cadencia, reloj, temporizadores inyectados y
+   * el aviso de racha rota— es idéntico a propósito: dos cadencias distintas serían
+   * dos comportamientos que explicar.
+   *
+   * @param {(dato: *) => object} armar  Del dato del store al Expediente.
+   * @returns {ReturnType<typeof crearAutoguardado>}
+   */
+  const autoDeRama = (armar) =>
+    crearAutoguardado({
+      // Recibe el DATO del store y deriva aquí, no antes: `cambiado()` se llama en cada
+      // edición y derivar un Expediente entero en cada tecla sería copiar la geometría
+      // por gusto. Cuando el debounce decide escribir, ya solo queda uno.
+      guardar: (dato) => expedientes.guardarBorrador(armar(dato)),
+      ms,
+      ...(programar === undefined ? {} : { programar }),
+      ...(cancelar === undefined ? {} : { cancelar }),
+      ahora: () => ahora().getTime(),
+      // `guardarBorrador` NO avisa por el canal cuando falla, y lo dice por escrito: el
+      // autoguardado corre solo cada dos segundos y un fallo persistente llenaría el
+      // panel de tarjetas idénticas. Quien lo cuenta —UNA vez por racha— es esto.
+      //
+      // ⚠️ La bandera es COMPARTIDA por los dos: el usuario no tiene dos almacenes,
+      // tiene uno, y si se ha llenado la causa es la misma. Dos tarjetas diciendo lo
+      // mismo con distinta palabra serían dos problemas para quien lee.
+      alFallo: ({ consecutivos, causa }) => {
+        if (dichoElFalloAuto) return
+        dichoElFalloAuto = true
+        avisar(MENSAJE_AUTOGUARDADO_ROTO, NIVEL.AVISO, causa)
+        console.warn(`[expediente] el autoguardado lleva ${consecutivos} fallo(s) seguido(s):`, causa)
+      },
+      // Una racha rota vuelve a habilitar el aviso: si falla otra vez dentro de un rato,
+      // es un incidente nuevo y merece contarse otra vez.
+      alGuardado: () => {
+        dichoElFalloAuto = false
+      },
+    })
+
+  /** Los metadatos del borrador de una rama. Ver la cabecera: `creado` NO se reestampa. */
+  const metadatosDe = (r) => ({
+    creado: identidades[r].creado,
+    modificado: identidades[r].modificado,
+    autor: '',
+    idDocumento: '',
   })
+
+  const auto = autoDeRama((parcela) =>
+    crearExpediente({ srs, parcela, metadatos: metadatosDe(RAMA.PARCELA) }),
+  )
+
+  /**
+   * El de la rama EDIFICIO. **La parcela que hubiera debajo viaja como contexto**,
+   * por el mismo `conParcelaDeContexto` con el que viajan «Guardar proyecto» y
+   * `expedienteActual`: si no, recuperar el borrador devolvería el edificio flotando
+   * sobre nada y el usuario no vería lo que dejó en pantalla.
+   *
+   * Nace aunque `estadoEdificio` sea `null` —una pantalla sin rama de edificio, que
+   * es el montaje de todas las pruebas de F10—: sin suscriptor no recibe un solo
+   * `cambiado()`, así que no escribe nada, y tenerlo evita un `if` en cada uso.
+   */
+  const autoEdificio = autoDeRama((edificio) =>
+    crearExpediente({
+      tipo: TIPO_EXPEDIENTE.EDIFICIO,
+      srs,
+      edificio: conParcelaDeContexto(edificio),
+      metadatos: metadatosDe(RAMA.EDIFICIO),
+    }),
+  )
 
   // ── El diálogo ────────────────────────────────────────────────────────────
 
@@ -1161,23 +1298,28 @@ export function cablearExpediente({
     const listado = await expedientes.listar()
     if (destruido) return
 
-    if (listado.hayBorrador) {
-      const b = await expedientes.leerBorrador()
+    // ⛔ F12 · T4.3 · se leen los borradores de TODAS las ramas que tengan uno, no
+    // «el» borrador. `listar()` dice cuáles hay (`borradores`), y el respaldo a
+    // PARCELA es lo que mantiene en pie las pruebas de F10, que no conocen el campo.
+    const conBorrador = listado.borradores ?? (listado.hayBorrador ? [TIPO_EXPEDIENTE.PARCELA] : [])
+    const encontrados = []
+    for (const tipo of conBorrador) {
+      const b = await expedientes.leerBorrador(tipo)
       if (destruido) return
+      // Un borrador que no se puede leer NI se ofrece (no habría qué recuperar) NI se
+      // pisa en silencio: se deja donde está. `recuperar` ya lo ha avisado por el
+      // canal con su motivo; aquí solo se decide no armarse por él. Y los demás sí se
+      // ofrecen: uno ilegible no puede secuestrar el trabajo de la otra rama.
       if (b.ok && b.registro !== null) {
-        ofrecido = { refcat: b.registro.refcat, edad: edadDe(b.registro.actualizado) }
-      } else {
-        // Hay un borrador que no se puede leer. Ni se ofrece (no habría qué recuperar)
-        // ni se pisa en silencio: se cuenta y se deja donde está. `recuperar` ya lo ha
-        // avisado por el canal con su motivo; aquí solo se decide no armarse.
-        ofrecido = null
+        encontrados.push({ tipo, refcat: b.registro.refcat, edad: edadDe(b.registro.actualizado) })
       }
     }
+    ofrecido = encontrados.length === 0 ? null : encontrados
 
     // La oferta del borrador SÍ sale por el panel: es de una sola vez por sesión, es
     // directamente accionable y desaparece en cuanto el usuario la resuelve.
     if (ofrecido !== null) {
-      avisar(mensajeHayBorrador(ofrecido.refcat, ofrecido.edad))
+      avisar(mensajeHayBorrador(ofrecido))
     }
     // ⛔ **Y el aviso de persistencia NO sale por aquí, y es una corrección MEDIDA**
     // (guion 12, 2026-08-03). Estaba puesto —al arrancar, si ya había algo guardado
@@ -1255,7 +1397,7 @@ export function cablearExpediente({
     }
     const opts = {
       ...(nombre === null ? {} : { nombre }),
-      ...(identidad.id === null ? {} : { id: identidad.id }),
+      ...(identidadActual().id === null ? {} : { id: identidadActual().id }),
     }
     let r = await expedientes.guardar(exp, opts)
     if (destruido) return
@@ -1269,7 +1411,7 @@ export function cablearExpediente({
       decir(r.mensaje ?? 'No se ha podido guardar el expediente.')
       return
     }
-    identidad = {
+    identidades[ramaActual()] = {
       id: r.registro.id,
       nombre: r.registro.nombre,
       creado: r.registro.creado,
@@ -1366,40 +1508,77 @@ export function cablearExpediente({
     // corresponder a ningún registro. No se toca la geometría —el usuario no ha pedido
     // cerrar nada— pero la identidad se suelta, para que el siguiente «Guardar» cree un
     // registro nuevo en vez de resucitar el que se acaba de borrar.
-    if (identidad.id === id) {
-      identidad = { ...identidad, id: null, nombre: null }
+    // Se mira en las DOS ramas y no solo en la activa: el registro borrado puede ser
+    // el que estaba abierto en la otra, y dejarle ahí el `id` haría que el siguiente
+    // «Guardar» de aquella rama resucitara lo que se acaba de borrar.
+    for (const r of Object.keys(identidades)) {
+      if (identidades[r].id === id) identidades[r] = { ...identidades[r], id: null, nombre: null }
     }
     await refrescar()
     if (destruido) return
     decir('Borrado de este navegador.')
   }
 
-  /** «Recuperar» el borrador del autoguardado. */
+  /**
+   * Las ramas que se están ofreciendo. Con la oferta ya resuelta —o sin ella— es la
+   * de PARCELA, que es lo que hacían las llamadas de F10 sin decirlo.
+   *
+   * @returns {string[]}
+   */
+  const ramasOfrecidas = () =>
+    ofrecido === null || ofrecido.length === 0
+      ? [TIPO_EXPEDIENTE.PARCELA]
+      : ofrecido.map((b) => b.tipo)
+
+  /**
+   * «Recuperar» el borrador del autoguardado.
+   *
+   * ⛔ **Recupera TODAS las ramas ofrecidas, no una** (F12 · T4.3). No son documentos
+   * que compitan: son las dos mitades de lo que había en pantalla, y devolver solo una
+   * sería devolver media sesión. Lo que sí es exclusivo es la RAMA que queda puesta al
+   * acabar, y se elige la del borrador **más reciente**, que es la respuesta a «sigue
+   * donde lo dejaste».
+   *
+   * Un borrador que no se puede abrir no impide abrir el otro: se cuenta al final, con
+   * el resto, en una sola frase.
+   */
   async function recuperarBorrador() {
-    const r = await expedientes.leerBorrador()
-    if (destruido) return
-    if (!r.ok) {
-      // El repintado va ANTES del renglón, siempre y en todo este módulo: `fijar`
-      // reescribe ahí el motivo del gate, así que decir primero y refrescar después
-      // borraría lo que se acaba de decir.
-      resolverOferta()
-      await refrescar()
+    const lecturas = []
+    for (const tipo of ramasOfrecidas()) {
+      const r = await expedientes.leerBorrador(tipo)
       if (destruido) return
-      decir(r.mensaje ?? 'Ya no queda trabajo autoguardado que recuperar.')
-      return
+      lecturas.push({ tipo, r })
     }
-    if (r.registro.srs !== srs) {
-      decir(motivoOtroHuso(r.registro.srs))
-      return
+
+    // Lo que sí se puede abrir, y por qué no lo demás. Las dos listas se llenan en el
+    // mismo bucle para que no puedan discrepar en el recuento.
+    const abribles = []
+    const estorbos = []
+    for (const { tipo, r } of lecturas) {
+      if (!r.ok) {
+        estorbos.push(r.mensaje ?? 'Ya no queda trabajo autoguardado que recuperar.')
+        continue
+      }
+      if (r.registro.srs !== srs) {
+        estorbos.push(motivoOtroHuso(r.registro.srs))
+        continue
+      }
+      const parcela = r.expediente?.parcela ?? null
+      const edificio = r.expediente?.edificio ?? null
+      if (tipo === TIPO_EXPEDIENTE.EDIFICIO) {
+        // Sin rama de edificio montada no hay dónde ponerlo, y decirlo es mejor que
+        // abrirlo en un store que nadie mira (es el mismo criterio de `abrirProyecto`).
+        if (!hayEdificio(edificio) || rama === null || estadoEdificio === null) {
+          estorbos.push(MENSAJE_GUARDADO_SIN_EDIFICIO)
+          continue
+        }
+      } else if (!hayGeometria(parcela)) {
+        estorbos.push(MENSAJE_GUARDADO_SIN_PARCELA)
+        continue
+      }
+      abribles.push({ tipo, r })
     }
-    const parcela = r.expediente?.parcela ?? null
-    if (!hayGeometria(parcela)) {
-      resolverOferta()
-      await refrescar()
-      if (destruido) return
-      decir(MENSAJE_GUARDADO_SIN_PARCELA)
-      return
-    }
+
     // El borrador NO se borra al recuperarlo, y es distinto de lo que sugiere la
     // cabecera de `storage/expedientes.js`: allí se razona para un mundo sin
     // autoguardado vivo. Aquí, borrarlo dejaría el trabajo sin red durante los dos
@@ -1411,27 +1590,57 @@ export function cablearExpediente({
     // {@link MENSAJE_AUTOGUARDADO_EN_ESPERA} — un aviso de que no se guarda lo que se
     // acaba de recuperar, justo mientras se recupera.
     resolverOferta()
-    cargar(parcela, {
-      id: null,
-      nombre: null,
-      creado: r.expediente.metadatos?.creado ?? r.registro.creado,
-      modificado: r.registro.actualizado,
-    })
-    decir('Recuperado el trabajo autoguardado. Todavía no está guardado como expediente.')
+
+    if (abribles.length === 0) {
+      await refrescar()
+      if (destruido) return
+      decir(estorbos[0] ?? 'Ya no queda trabajo autoguardado que recuperar.')
+      return
+    }
+
+    // ⚠️ **Del más antiguo al más reciente, y por eso se ordena.** Cada carga conmuta
+    // a su rama, así que la ÚLTIMA es la que queda en pantalla: cargar en el orden del
+    // almacén dejaría puesta la rama que el usuario tocó primero.
+    abribles.sort((a, b) => String(a.r.registro.actualizado).localeCompare(String(b.r.registro.actualizado)))
+
+    for (const { tipo, r } of abribles) {
+      const nueva = {
+        id: null,
+        nombre: null,
+        creado: r.expediente.metadatos?.creado ?? r.registro.creado,
+        modificado: r.registro.actualizado,
+      }
+      if (tipo === TIPO_EXPEDIENTE.EDIFICIO) cargarEdificio(r.expediente.edificio, nueva)
+      else cargar(r.expediente.parcela, nueva)
+    }
+
+    const que = enumerarBorradores(abribles.map(({ tipo, r }) => ({ tipo, refcat: r.registro.refcat })))
+    decir(
+      `Recuperado el trabajo autoguardado ${que}. Todavía no está guardado como expediente.` +
+        (estorbos.length === 0 ? '' : ` ${estorbos.join(' ')}`),
+    )
     dialogo.cerrar()
   }
 
-  /** «Descartar» el borrador. */
+  /**
+   * «Descartar» el borrador. **Descarta las ramas ofrecidas, todas**: la oferta es una
+   * y el gesto es uno, y dejar media atrás la resucitaría en la carga siguiente
+   * —después de que el usuario ya hubiera dicho que no la quería—.
+   */
   async function descartarBorrador() {
-    const r = await expedientes.descartarBorrador()
-    if (destruido) return
+    const fallos = []
+    for (const tipo of ramasOfrecidas()) {
+      const r = await expedientes.descartarBorrador(tipo)
+      if (destruido) return
+      if (!r.ok) fallos.push(r.mensaje ?? 'No se ha podido descartar el trabajo autoguardado.')
+    }
     resolverOferta()
     await refrescar()
     if (destruido) return
     decir(
-      r.ok
+      fallos.length === 0
         ? 'Descartado el trabajo autoguardado. A partir de ahora se guarda solo lo de esta sesión.'
-        : (r.mensaje ?? 'No se ha podido descartar el trabajo autoguardado.'),
+        : fallos.join(' '),
     )
   }
 
@@ -1443,14 +1652,10 @@ export function cablearExpediente({
   function resolverOferta() {
     ofrecido = null
     dichaLaEspera = false
-    // ⚠️ Con la rama EDIFICIO activa NO se vuelca: el autoguardado no llega a esa rama
-    // (desviación 7) y volcar aquí escribiría el borrador de la parcela mientras el
-    // usuario está en la otra. Lo pendiente se queda pendiente y sale al volver, que es
-    // lo que hace {@link alCambiarLaRama}.
-    if (cambioEnEspera && !enEdificio()) {
-      cambioEnEspera = false
-      auto.cambiado(estado.get())
-    }
+    // ⛔ F12 · T4.3 · aquí había una excepción —«con la rama EDIFICIO activa no se
+    // vuelca»— que existía porque el autoguardado no llegaba a esa rama. Ahora llega,
+    // y cada una escribe en su clave, así que se vuelca lo que cada una tenga pendiente.
+    if (hayEnEspera()) volcarLoPendiente()
   }
 
   // ── Las tres exportaciones ────────────────────────────────────────────────
@@ -1537,7 +1742,7 @@ export function cablearExpediente({
       refcat: parcela.refcat ?? null,
       srs,
       fecha,
-      nombre: identidad.nombre,
+      nombre: identidadActual().nombre,
     })
     publicarDetecciones(detecciones)
     entregar(texto, FICHERO.COORDENADAS, fecha, 'el listado de coordenadas')
@@ -1559,7 +1764,7 @@ export function cablearExpediente({
       return
     }
     const fecha = ahora()
-    const proyecto = aProyecto(exp, { fecha, nombre: nombre ?? identidad.nombre })
+    const proyecto = aProyecto(exp, { fecha, nombre: nombre ?? identidadActual().nombre })
     // Con sangría de 2: un fichero de proyecto se abre a mano más veces de las que
     // parece —para ver por qué otro equipo no lo puede leer—, y lo que se gana en
     // bytes al compactarlo se pierde en la primera vez que alguien tiene que mirarlo.
@@ -1672,22 +1877,34 @@ export function cablearExpediente({
       decir(MENSAJE_SIN_RAMA_EDIFICIO)
       return
     }
-    // Entra SIN identificador, igual que la parcela y por lo mismo: el fichero viene de
-    // otro equipo o de otra sesión. Y en esta rama, además, no va a poder tener ninguno
-    // hasta F12 ({@link MOTIVO_GUARDAR_EN_EDIFICIO}).
-    cargarEdificio(edificio, {
+    // Entra SIN identificador **de expediente**, igual que la parcela y por lo mismo:
+    // el fichero viene de otro equipo o de otra sesión.
+    //
+    // ⚠️ La IDENTIDAD LOCAL sí se le pone si no traía ninguna (F12 · T4.3): un `.json`
+    // escrito antes de esta fase lleva dentro un `Edificio` con `idLocal: null`, y sin
+    // identidad no se autoguarda ({@link alCambiarElEdificio} lo dice y calla). El
+    // nombre sale del propio fichero, que es lo único que consta — mismo último
+    // recurso que en la rama de parcela.
+    const nombreFichero = r.nombre ?? fichero.name
+    const deFichero = typeof nombreFichero === 'string' ? nombreFichero.trim() : ''
+    const conIdentidad =
+      (edificio.idLocal ?? null) !== null
+        ? edificio
+        : conIdLocal(edificio, deFichero === '' ? IDENTIDAD_DE_PROYECTO : deFichero).edificio
+    cargarEdificio(conIdentidad, {
       id: null,
       nombre: r.nombre,
       creado: r.expediente.metadatos?.creado ?? instanteISO(),
       modificado: instanteISO(),
     })
     // El aviso dice lo que ha pasado Y lo que NO va a poder hacer, en el mismo sitio:
-    // enterarse de que un edificio no se guarda **después** de haber trabajado una hora
-    // es enterarse tarde.
+    // enterarse de que un edificio no se archiva **después** de haber trabajado una
+    // hora es enterarse tarde. ⚠️ Ya no dice «no lo puede guardar»: desde T4.3 lo
+    // autoguarda. Lo que no hace es archivarlo con nombre.
     avisar(
-      `Abierto el proyecto «${r.nombre ?? fichero.name}», que lleva un edificio: la pantalla ha ` +
-        'cambiado a la rama Edificio para enseñarlo. Esta versión no lo puede guardar en este ' +
-        'navegador, así que consérvalo con «Guardar proyecto (.json)».',
+      `Abierto el proyecto «${nombreFichero}», que lleva un edificio: la pantalla ha ` +
+        'cambiado a la rama Edificio para enseñarlo. Esta versión lo autoguarda pero no lo ' +
+        'archiva con nombre en este navegador, así que consérvalo con «Guardar proyecto (.json)».',
     )
     decir(`Abierto el proyecto «${r.nombre ?? fichero.name}» en la rama Edificio.`)
     dialogo.cerrar()
@@ -1775,48 +1992,65 @@ export function cablearExpediente({
   }
 
   /**
-   * El SÉPTIMO suscriptor del store. Hace dos cosas y ninguna es dibujar:
+   * Pone al día la identidad de una rama a partir del documento que acaba de entrar
+   * en su store. Distingue **una edición** de **otro documento** por `idLocal` (ver
+   * {@link idLocalAbierto}) y, si es otro documento, suelta la identidad: el
+   * siguiente «Guardar» creará un registro nuevo en vez de pisar el anterior con una
+   * geometría que no es la suya.
    *
-   *   1. Distingue **una edición** de **otro documento** por `idLocal` (ver
-   *      {@link idLocalAbierto}) y, si es otro documento, suelta la identidad: el
-   *      siguiente «Guardar» creará un registro nuevo en vez de pisar el anterior con
-   *      una geometría que no es la suya.
-   *   2. Avisa al debounce — salvo que el autoguardado esté en espera.
+   * Una sola función para las dos ramas desde F12 · T4.3: era el cuerpo de
+   * `alCambiarElStore` y se sacó tal cual, sin cambiarle una regla, para que las dos
+   * no puedan divergir en cuándo se considera que ha llegado otro documento.
+   *
+   * @param {string} r  Una de `RAMA`.
+   * @param {object|null} documento  Lo que hay ahora en el store de esa rama.
    */
-  function alCambiarElStore(parcela) {
-    if (destruido) return
-
-    const idLocal = parcela?.idLocal ?? null
-    if (idLocal !== idLocalAbierto) {
-      idLocalAbierto = idLocal
-      identidad = { id: null, nombre: null, creado: instanteISO(), modificado: instanteISO() }
+  function refrescarIdentidad(r, documento) {
+    const idLocal = documento?.idLocal ?? null
+    if (idLocal !== idLocalAbierto[r]) {
+      idLocalAbierto[r] = idLocal
+      identidades[r] = identidadNueva()
     } else {
-      identidad = { ...identidad, modificado: instanteISO() }
+      identidades[r] = { ...identidades[r], modificado: instanteISO() }
     }
+  }
 
-    // ⛔ F11 · EL AUTOGUARDADO NO SE EXTIENDE A LA RAMA EDIFICIO (desviación 7), y con
-    // ella activa **tampoco se dispara para la parcela**. Dos motivos, y el segundo es
-    // el caro: (1) el borrador es UN registro de clave reservada, así que la parcela y
-    // el edificio se pisarían el uno al otro; (2) con la rama EDIFICIO puesta lo que el
-    // usuario está tocando es el edificio, y escribir un borrador de la parcela de
-    // debajo sería guardar el documento que no es. Lo pendiente se marca y se vuelca al
-    // volver a PARCELA — el mismo mecanismo, exacto, que la espera de la oferta.
-    if (enEdificio()) {
-      cambioEnEspera = true
-      return
-    }
-
-    // Hasta que la lectura de arranque no ha terminado no se sabe si hay una oferta
-    // pendiente, así que tampoco se escribe: dos segundos de espera son gratis y el
-    // trabajo de la sesión anterior no lo es.
+  /**
+   * ¿Puede escribir ya el autoguardado, o hay que apuntarlo para después?
+   *
+   * Hasta que la lectura de arranque no ha terminado no se sabe si hay una oferta
+   * pendiente, así que tampoco se escribe: dos segundos de espera son gratis y el
+   * trabajo de la sesión anterior no lo es.
+   *
+   * ⛔ **Lo que YA NO mira es la rama** (F12 · T4.3). Lo hacía —«con la rama EDIFICIO
+   * puesta tampoco se dispara para la parcela»— por un motivo que era bueno y que ha
+   * dejado de existir: el borrador era UN registro de clave reservada y las dos ramas
+   * se habrían pisado. Con una clave por rama no se pisan, y suprimirlo ahora sería
+   * dejar de guardar la parcela por una razón que ya no se sostiene.
+   *
+   * @param {string} r  La rama que quiere escribir. Se apunta SOLO ella.
+   * @returns {boolean}
+   */
+  function autoguardadoArmado(r) {
     if (!arrancado || ofrecido !== null) {
-      cambioEnEspera = true
+      cambioEnEspera[r] = true
       if (!dichaLaEspera && ofrecido !== null) {
         dichaLaEspera = true
         avisar(MENSAJE_AUTOGUARDADO_EN_ESPERA)
       }
-      return
+      return false
     }
+    return true
+  }
+
+  /**
+   * El SÉPTIMO suscriptor del store de PARCELA. Hace dos cosas y ninguna es dibujar:
+   * pone al día la identidad de su rama y avisa a su debounce.
+   */
+  function alCambiarElStore(parcela) {
+    if (destruido) return
+    refrescarIdentidad(RAMA.PARCELA, parcela)
+    if (!autoguardadoArmado(RAMA.PARCELA)) return
     auto.cambiado(parcela)
 
     // Si el diálogo está abierto, lo que enseña («Guardar» encendido o apagado)
@@ -1827,27 +2061,75 @@ export function cablearExpediente({
   }
 
   /**
+   * Su gemelo en la rama EDIFICIO (F12 · T4.3). **Es lo que la desviación 7 de F11
+   * dejó sin hacer**, y lo que hace que un edificio dibujado a mano sobreviva a una
+   * recarga: hasta aquí, cerrar la pestaña con partes dibujadas se las llevaba y lo
+   * único que quedaba era el aviso diciéndolo.
+   *
+   * @param {object|null} edificio
+   */
+  function alCambiarElEdificio(edificio) {
+    if (destruido) return
+    refrescarIdentidad(RAMA.EDIFICIO, edificio)
+    if (!autoguardadoArmado(RAMA.EDIFICIO)) return
+    // ⚠️ **Un edificio sin identidad no se autoguarda**, y se calla a propósito: es el
+    // estado de un `Edificio` construido a mano fuera de las vías de entrada (los
+    // dobles de prueba, un `.json` de antes de F12), no un fallo del usuario. Lo que
+    // no puede pasar es escribirlo: dos documentos sin identidad son indistinguibles,
+    // y el segundo pisaría al primero creyendo que es una edición suya.
+    if (edificio !== null && (edificio.idLocal ?? null) === null) return
+    autoEdificio.cambiado(edificio)
+
+    if (dialogo.abierto()) {
+      refrescar().catch((causa) => reventar('refrescar', causa))
+    }
+  }
+
+  /**
    * F11 · el suscriptor del CONMUTADOR de rama. Hace dos cosas, y ninguna es dibujar:
    *
-   *   1. **Vuelve a armar el autoguardado al volver a PARCELA** y vuelca lo que hubiera
-   *      cambiado mientras la otra rama estaba puesta. Sin esto, una edición hecha en la
-   *      parcela justo antes de conmutar —o por cualquiera de los otros diez
-   *      suscriptores— **no se guardaría nunca**: el debounce solo escribe lo que le han
-   *      contado. Es el mismo desenlace que `resolverOferta` resuelve para la oferta, y
-   *      se resuelve igual.
+   *   1. **Vuelca lo que hubiera quedado pendiente** mientras el autoguardado estaba
+   *      en espera. Sin esto, una edición hecha justo antes de conmutar —o por
+   *      cualquiera de los otros diez suscriptores— **no se guardaría nunca**: el
+   *      debounce solo escribe lo que le han contado. Es el mismo desenlace que
+   *      `resolverOferta` resuelve para la oferta, y se resuelve igual.
    *   2. Repinta el diálogo si está abierto: «Guardar» acaba de encenderse o de apagarse
    *      y su motivo cambia con él.
    *
-   * @param {string} ramaNueva
+   * ⛔ **F12 · T4.3: ya no mira A QUÉ rama se va.** Miraba `!== EDIFICIO` porque
+   * aquella rama no se autoguardaba; ahora las dos lo hacen, y el volcado es de las
+   * dos. Dejarlo como estaba habría hecho que conmutar HACIA el edificio no volcara
+   * nada — que es justo el gesto tras el que uno se va a mirar otra cosa.
+   *
+   * @param {string} _ramaNueva  Ya no decide nada. Se conserva en la firma porque es
+   *   lo que entrega `rama.subscribe`, y quitarlo escondería de dónde viene la llamada.
    */
-  function alCambiarLaRama(ramaNueva) {
+  function alCambiarLaRama(_ramaNueva) {
     if (destruido) return
-    if (ramaNueva !== RAMA.EDIFICIO && arrancado && ofrecido === null && cambioEnEspera) {
-      cambioEnEspera = false
-      auto.cambiado(estado.get())
-    }
+    if (arrancado && ofrecido === null && hayEnEspera()) volcarLoPendiente()
     if (dialogo.abierto()) {
       refrescar().catch((causa) => reventar('refrescar', causa))
+    }
+  }
+
+  /**
+   * Le cuenta a cada debounce lo que hay en su store ahora mismo. Es lo que convierte
+   * «no pisar» en «no perder»: mientras el autoguardado está en espera los cambios se
+   * marcan pero no se cuentan, y sin esta llamada se quedarían sin contar para siempre.
+   *
+   * ⚠️ Las dos ramas, siempre. Volcar solo la activa dejaría el trabajo de la otra sin
+   * escribir hasta que el usuario volviera a tocarla, que puede ser nunca.
+   */
+  function volcarLoPendiente() {
+    if (cambioEnEspera[RAMA.PARCELA]) {
+      cambioEnEspera[RAMA.PARCELA] = false
+      auto.cambiado(estado.get())
+    }
+    if (cambioEnEspera[RAMA.EDIFICIO]) {
+      cambioEnEspera[RAMA.EDIFICIO] = false
+      const edificio = estadoEdificio === null ? null : estadoEdificio.get()
+      // Misma guarda que en el suscriptor: sin identidad no se escribe. Ver allí.
+      if (edificio !== null && (edificio.idLocal ?? null) !== null) autoEdificio.cambiado(edificio)
     }
   }
 
@@ -1881,10 +2163,15 @@ export function cablearExpediente({
   function alOcultarse() {
     if (destruido) return
     if (doc.visibilityState !== 'hidden') return
-    auto.ahoraMismo().catch((causa) => {
+    // Los DOS, y sin esperar al otro: son escrituras a claves distintas y encadenarlas
+    // haría que un fallo de la primera se llevara por delante la segunda.
+    escribirYa().catch((causa) => {
       console.warn('[expediente] no se ha podido volcar el borrador al ocultar la pestaña:', causa)
     })
   }
+
+  /** Escribe YA lo pendiente de las dos ramas. `Promise.all` para poder esperarlas. */
+  const escribirYa = () => Promise.all([auto.ahoraMismo(), autoEdificio.ahoraMismo()])
 
   const oyentes = []
   function escuchar(diana, tipo, fn) {
@@ -1897,8 +2184,11 @@ export function cablearExpediente({
   const bajaAccion = dialogo.alAccion(alAccion)
   const desuscribirStore = estado.subscribe(alCambiarElStore)
   // Sin conmutador cableado no hay a qué suscribirse, y la baja es un no-op: así
-  // `destruir()` no tiene que preguntar.
+  // `destruir()` no tiene que preguntar. Lo mismo con el segundo store, que en las
+  // pantallas sin rama de edificio —y en todas las pruebas de F10— es `null`.
   const bajaRama = rama === null ? () => {} : rama.subscribe(alCambiarLaRama)
+  const bajaEdificio =
+    estadoEdificio === null ? () => {} : estadoEdificio.subscribe(alCambiarElEdificio)
 
   // El arranque va SUELTO a propósito, sin `await` y sin bloquear el montaje: leer el
   // almacén local no puede retrasar ni un milisegundo el primer pintado del mapa. Su
@@ -1916,23 +2206,36 @@ export function cablearExpediente({
     /** El Expediente de lo que hay en pantalla, o `null`. Solo para leer. */
     expedienteActual,
 
-    /** Escribe YA el borrador pendiente, sin esperar al debounce. Para el guion de humo. */
-    guardarBorradorYa: () => auto.ahoraMismo(),
+    /**
+     * Escribe YA los borradores pendientes, sin esperar al debounce. Para el guion de
+     * humo. **Los dos**, desde F12 · T4.3: quien pide esto quiere el estado actual en
+     * la base, y «actual» incluye la rama que no se esté mirando.
+     */
+    guardarBorradorYa: () => escribirYa(),
 
     /** Fotografía del estado interno: lo que el guion de humo necesita comprobar. */
     estado: () => ({
-      idAbierto: identidad.id,
-      nombreAbierto: identidad.nombre,
-      creado: identidad.creado,
-      modificado: identidad.modificado,
+      idAbierto: identidadActual().id,
+      nombreAbierto: identidadActual().nombre,
+      creado: identidadActual().creado,
+      modificado: identidadActual().modificado,
       ofreciendoBorrador: ofrecido !== null,
+      /** F12 · de qué ramas hay trabajo ofrecido. `[]` cuando no hay oferta. */
+      ramasOfrecidas: ofrecido === null ? [] : ofrecido.map((b) => b.tipo),
       arrancado,
       /** F11 · qué rama ve este cableado. `PARCELA` también cuando no hay conmutador. */
       rama: ramaActual(),
       /** Si «Guardar» está encendido, y por tanto si la rama lo permite. */
       puedeGuardar: puedeGuardarse(),
       persistido: persistencia === null ? null : persistencia.persistido,
+      /**
+       * ⚠️ Sigue siendo el de PARCELA, y por eso el de edificio tiene clave propia:
+       * `autoguardado` lo lee el guion 12 desde F10 y cambiarle el significado habría
+       * hecho que siguiera pasando midiendo otra cosa.
+       */
       autoguardado: auto.estado(),
+      /** F12 · T4.3 · el segundo debounce, el de la rama EDIFICIO. */
+      autoguardadoEdificio: autoEdificio.estado(),
     }),
 
     /**
@@ -1949,7 +2252,9 @@ export function cablearExpediente({
       bajaAccion()
       desuscribirStore()
       bajaRama()
+      bajaEdificio()
       auto.destruir()
+      autoEdificio.destruir()
       dialogo.destruir()
     },
   }

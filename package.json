@@ -33,6 +33,7 @@
     "@turf/intersect": "^7.3.5",
     "@turf/kinks": "^7.3.5",
     "@turf/point-on-feature": "^7.3.5",
+    "@turf/union": "^7.4.0",
     "idb": "^8.0.3",
     "leaflet": "^1.9.4"
   }

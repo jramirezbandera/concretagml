@@ -431,10 +431,18 @@ const arranque = {
   // mecanismo— y por `display` —el efecto—: una regla de CSS con `display` y
   // especificidad ≥(0,2,0) en la sección de F11 dejaría las DOS ramas en pantalla
   // a la vez y el `hidden` seguiría puesto, callado.
+  // ⛔ **F12 · fase 5 · `hidden` YA NO ES LA RESPUESTA A «¿se ve?».** `app/rama.js`
+  // esconde por RAMA con el atributo `hidden`; T4.1 estrenó el eje PASO en esta
+  // rama y ése esconde por CSS (`data-pantalla` + `display: none`). Contar
+  // `hidden === false` daba TRES secciones de edificio en «Entrada» cuando en
+  // pantalla solo hay una. Se mide la CAJA, que es lo que decide qué ve el usuario.
   seccionesVisibles: $$('[data-rama-panel]').map((s) => ({
     rama: s.getAttribute('data-rama-panel'),
     clase: s.className,
-    hidden: s.hidden,
+    hidden: s.hidden || s.getBoundingClientRect().height === 0,
+    hiddenAtributo: s.hidden,
+    pantalla: s.getAttribute('data-pantalla'),
+    altoPx: redondear(s.getBoundingClientRect().height),
     display: getComputedStyle(s).display,
   })),
   ctaGenerarApagado: ctaGenerar === null ? null : ctaGenerar.disabled,
@@ -637,10 +645,18 @@ const enEdificio = {
     parcela: botonParcela.getAttribute('aria-pressed'),
     edificio: botonEdificio.getAttribute('aria-pressed'),
   },
+  // ⛔ **F12 · fase 5 · `hidden` YA NO ES LA RESPUESTA A «¿se ve?».** `app/rama.js`
+  // esconde por RAMA con el atributo `hidden`; T4.1 estrenó el eje PASO en esta
+  // rama y ése esconde por CSS (`data-pantalla` + `display: none`). Contar
+  // `hidden === false` daba TRES secciones de edificio en «Entrada» cuando en
+  // pantalla solo hay una. Se mide la CAJA, que es lo que decide qué ve el usuario.
   seccionesVisibles: $$('[data-rama-panel]').map((s) => ({
     rama: s.getAttribute('data-rama-panel'),
     clase: s.className,
-    hidden: s.hidden,
+    hidden: s.hidden || s.getBoundingClientRect().height === 0,
+    hiddenAtributo: s.hidden,
+    pantalla: s.getAttribute('data-pantalla'),
+    altoPx: redondear(s.getBoundingClientRect().height),
     display: getComputedStyle(s).display,
   })),
   // La caja de vértices ya no está: su sección está oculta. Es lo esperado y se
@@ -710,11 +726,24 @@ if (enEdificio.ariaPressed.edificio !== 'true' || enEdificio.ariaPressed.parcela
   const visiblesDeParcela = enEdificio.seccionesVisibles.filter(
     (s) => s.rama === 'PARCELA' && s.hidden === false,
   )
-  if (visiblesDeEdificio.length !== 2) {
+  // ⛔ **F12 · fase 5 · ESTE NÚMERO ERA 2 Y AHORA ES 1..2, Y ES LO CONTRARIO DE
+  // UN RELAJO.** F11 dejaba las dos secciones visibles **en los cinco pasos** —lo
+  // midió la fase 0 de F12 (defecto M2): 314,97 / 157,06 px idénticos en todos—,
+  // así que «siempre dos» era la firma de que el eje PASO no tocaba a esta rama.
+  // T4.1 les puso `data-pantalla` y añadió una TERCERA (la parte activa), y desde
+  // entonces lo correcto es que **cambien con el paso**: en «Entrada» se ve una
+  // (origen), en «Validación» otra (partes) y en «Edición» dos (partes y activa).
+  //
+  // Lo que este guardián puede seguir exigiendo —y es lo que de verdad importaba—
+  // es que **nunca se vean las tres a la vez**: eso sería el panel de F11 otra
+  // vez, con los 397,19 px de la fase 0 y una fila de lista. Que el eje PASO las
+  // mueva de verdad lo mide el guion 19, que es de F12.
+  if (visiblesDeEdificio.length === 0 || visiblesDeEdificio.length > 2) {
     problemas.push(
-      `Con la rama EDIFICIO puesta se ven ${visiblesDeEdificio.length} secciones suyas y tendrían que ` +
-        'ser DOS («Origen del edificio» y «Partes»). La segunda no es un extra: `.gml-bloque--partes` ' +
-        'SUSTITUYE a `.gml-bloque--vertices` como estirador del panel.',
+      `Con la rama EDIFICIO puesta se ven ${visiblesDeEdificio.length} secciones suyas. En ningún ` +
+        'paso pueden verse las tres a la vez —sería el panel de F11, con 397,19 px de origen y una ' +
+        'sola fila de lista— ni ninguna: `.gml-bloque--partes` SUSTITUYE a `.gml-bloque--vertices` ' +
+        'como estirador del panel.',
     )
   }
   if (visiblesDeParcela.length !== 0) {
@@ -817,6 +846,23 @@ if (!enEdificio.listaVacia) {
 //
 // Y hay un tercer efecto, peor porque no se ve: `.gml-panel` es `overflow: hidden`,
 // así que lo que no cabe **se recorta en silencio** por abajo — el pie.
+//
+// ⛔ **F12 · fase 5 · EL PRESUPUESTO «EN VACÍO» YA NO SE PUEDE MEDIR AQUÍ, y no
+// es una pérdida: es que el defecto que medía ha dejado de ser posible.** F11
+// enseñaba las dos secciones de edificio **en los cinco pasos** (la fase 0 de F12
+// lo midió y lo llamó defecto M2: 314,97 / 157,06 px idénticos en todos), así que
+// con la rama vacía la lista estaba en pantalla y podía aplastarse a 0 px — que es
+// justo lo que este bloque cazó en su día.
+//
+// T4.1 le puso `data-pantalla`: la lista vive en «Validación», «Edición» e
+// «Informe», y **con la rama vacía esos tres peldaños están apagados** (el rail
+// exige `geometria`). O sea que en vacío la lista NO ESTÁ, y medirla daba `0 px`
+// acusando de un aplastamiento que ya no puede ocurrir.
+//
+// El presupuesto CON DATOS sigue midiéndose, y en dos sitios: `topeConPartes` más
+// abajo (7 partes, este guion) y el guion 19 entero (13 partes, F12). Aquí se
+// conserva el desglose —que es información buena— y **se apagan los dos guardianes
+// que dependían de que la lista estuviera en pantalla**, diciéndolo.
 
 const repartoDeAltura = (() => {
   if (panelIzquierdo === null) return { medido: false }
@@ -901,7 +947,18 @@ const repartoDeAltura = (() => {
 if (repartoDeAltura.medido) {
   const lista = repartoDeAltura.listaDePartes
   const avisosCaja = repartoDeAltura.avisos
-  if (lista !== null && lista.altoPx !== null && lista.altoPx < 26) {
+  // ⚠️ Solo si la lista ESTÁ en pantalla: ver la nota de arriba. Con la rama vacía
+  // su sección pertenece a peldaños que el rail tiene apagados, y un `0 px` ahí no
+  // es un aplastamiento — es que no hay nada que aplastar.
+  const listaEnPantalla = lista !== null && lista.altoPx !== null && lista.altoPx > 0
+  if (!listaEnPantalla) {
+    advertencias.push(
+      'El presupuesto EN VACÍO no se ha medido: con la rama EDIFICIO sin datos la lista de partes ' +
+        'no está en pantalla (F12 · T4.1 le puso `data-pantalla` y sus peldaños exigen geometría). ' +
+        'El presupuesto CON DATOS sí se mide, aquí en `topeConPartes` y entero en el guion 19.',
+    )
+  }
+  if (listaEnPantalla && lista.altoPx < 26) {
     problemas.push(
       `LA LISTA DE PARTES MIDE ${lista.altoPx} px y su contenido ${lista.contenidoPx} px: en la rama ` +
         'EDIFICIO no cabe NI UNA fila (una fila mide ~26,40 px). El panel no reparte altura, la ' +
@@ -1708,16 +1765,26 @@ if (edificioMasivo.file === null) {
 // es exactamente la clase de duplicado que este bloque existe para cazar. Lo único
 // que se cita es el literal BREVE, que es el contrato del renglón.
 
-/** El literal que TIENE que llevar el renglón de procedencia (contrato con
- *  `app/cableado-edificio.js#MENSAJE_SIN_AUTOGUARDADO_BREVE`). */
-const BREVE = 'Esta rama no se guarda sola: exporta el dibujo desde tu CAD antes de cerrar la pestaña.'
+/**
+ * El literal que TIENE que llevar el renglón de procedencia (contrato con
+ * `app/cableado-edificio.js#MENSAJE_SIN_AUTOGUARDADO_BREVE`).
+ *
+ * ⛔ **F12 · T4.3 · ACTUALIZADO, porque el anterior CADUCÓ dentro de esa tarea.**
+ * Decía «Esta rama no se guarda sola: exporta el dibujo desde tu CAD antes de cerrar
+ * la pestaña», y las dos mitades dejaron de ser verdad el mismo día: la rama pasó a
+ * autoguardarse (clave de borrador propia + identidad del `Edificio`) y el recinto
+ * pasó a poderse dibujar aquí, así que no hay CAD del que reexportarlo. Este guion
+ * habría seguido exigiendo la frase vieja y habría dado `ok:false` acusando al
+ * producto de un defecto que era suyo.
+ */
+const BREVE = 'Esta rama guarda el trabajo en curso, pero todavía no lo archiva con nombre.'
 
 const advertenciaSinAutoguardado = (() => {
   const renglon = $('[data-procedencia="edificio"]')
   const textoRenglon = renglon === null ? null : renglon.textContent.trim()
-  // La tarjeta larga, tomada de la aplicación: la que empieza igual que la breve
-  // y no ES la breve. Así el guion no guarda una segunda copia de 289 caracteres.
-  const tarjetas = textosDeAvisos().filter((t) => /^Esta rama no se guarda sola/i.test(t))
+  // La tarjeta larga, tomada de la aplicación: la que empieza como la breve —las dos
+  // hablan de «esta rama»— y no ES la breve. Así el guion no guarda una segunda copia.
+  const tarjetas = textosDeAvisos().filter((t) => /^Esta rama /i.test(t))
   const larga = tarjetas.find((t) => t !== BREVE) ?? null
   return {
     queEs:
@@ -1741,10 +1808,10 @@ const advertenciaSinAutoguardado = (() => {
 
 if (advertenciaSinAutoguardado.renglonLlevaLaBreve === false) {
   problemas.push(
-    'El renglón `[data-procedencia="edificio"]` no lleva la advertencia breve de que esta rama no se ' +
-      `guarda sola. Dice: ${JSON.stringify(advertenciaSinAutoguardado.textoDelRenglon)}. Esa línea es ` +
-      'permanente a propósito: no guardar es una propiedad de esta versión, no un suceso, y el ' +
-      'usuario tiene que verla ANTES de perder nada.',
+    'El renglón `[data-procedencia="edificio"]` no lleva la advertencia breve de que esta rama ' +
+      `todavía no ARCHIVA con nombre. Dice: ${JSON.stringify(advertenciaSinAutoguardado.textoDelRenglon)}. ` +
+      'Esa línea es permanente a propósito: no archivar es una propiedad de esta versión, no un ' +
+      'suceso, y el usuario tiene que verla ANTES de contar con algo que no va a estar.',
   )
 }
 if (advertenciaSinAutoguardado.elRenglonRepiteLaTarjeta === true) {
@@ -1757,10 +1824,10 @@ if (advertenciaSinAutoguardado.elRenglonRepiteLaTarjeta === true) {
 }
 if (advertenciaSinAutoguardado.tarjetasConLaAdvertencia === 0) {
   problemas.push(
-    'Se ha cargado un edificio y NO hay ninguna tarjeta en el panel de avisos que diga que esta rama ' +
-      'no se guarda sola. Ahora sí hay algo que perder, y ése es justo el momento en que la ' +
-      'advertencia se puede accionar. Un ahorro de píxeles que se lleva la advertencia por delante es ' +
-      'peor que los píxeles que ahorraba.',
+    'Se ha cargado un edificio y NO hay ninguna tarjeta en el panel de avisos que diga qué hace y ' +
+      'qué no hace esta rama con lo que se acaba de cargar. Ahora sí hay algo en juego, y ése es ' +
+      'justo el momento en que la advertencia se puede accionar. Un ahorro de píxeles que se lleva ' +
+      'la advertencia por delante es peor que los píxeles que ahorraba.',
   )
 }
 if (advertenciaSinAutoguardado.tarjetasConLaAdvertencia > 1) {
@@ -2132,7 +2199,7 @@ const invariante = {
   avisosAlVolver: idaYVuelta.tarjetasDeAvisos,
   // La ATRIBUCIÓN: una tarjeta de aviso cuesta ~52 px, y este guion FABRICA
   // avisos a propósito (suelta un DXF en la rama que no toca, y cargar un
-  // edificio dice que esta rama no se guarda sola). Eso no es coste de F11.
+  // edificio dice qué archiva y qué no esta rama). Eso no es coste de F11.
   avisosQueEsteGuionHaProvocado: idaYVuelta.tarjetasDeAvisos - arranque.tarjetasDeAvisos,
   textosDeLosAvisos: textosDeAvisos().map((t) => t.slice(0, 120)),
   // En la rama EDIFICIO: cuánto le queda al estirador, que es la otra cifra.

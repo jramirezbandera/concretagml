@@ -128,11 +128,85 @@
 // son el vocabulario declarado de `ESTADO_CONSERVACION` (que es el
 // `conditionOfConstruction` de INSPIRE), o sea el VALOR de un campo que el
 // usuario elige, no una calificación que la aplicación emita sobre nada.
+//
+// ═════════════════════════════════════════════════════════════════════════════
+// ═══ F12 · T4.1 · LA TERCERA SECCIÓN: LA PARTE ACTIVA ════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════
+// F11 dejó la lista de partes en modo LECTURA: se podían mirar y renombrar, y
+// nada más. F12 la hace trabajar, y para eso hacen falta cuatro cosas que no
+// caben en una fila: el tipo, las plantas, la superficie en vivo y **la tabla de
+// coordenadas de la parte que se está editando**.
+//
+// ── POR QUÉ UNA `<section>` PROPIA Y NO UN BLOQUE DENTRO DE «Partes» ─────────
+// Porque la tabla de coordenadas es un ESTIRADOR, y en esta rama ya hay uno:
+// `.gml-bloque--partes`. Dos estiradores en el mismo panel descosen el reparto
+// —está escrito en `estilos/app.css` y costó una fase medirlo en la otra rama—.
+// Con secciones separadas cada una declara su `data-pantalla` y el problema se
+// disuelve: la lista se ve en tres pantallas y la tabla **solo en «Edición»**,
+// que es exactamente lo que `.gml-bloque--vertices` hace en la rama de parcela.
+//
+// ⚠️ **Y el `data-pantalla` lo escribe ESTE módulo, no el cableado.** Es una
+// desviación consciente del reparto de F11, donde `data-rama-panel` lo sella
+// `app/cableado-edificio.js` porque `app/rama.js` lo DESCUBRE. Aquí es al revés:
+// a qué pantallas pertenece una sección es una propiedad de LO QUE LA SECCIÓN
+// ES, y `index.html` lo declara en línea en cada una de las suyas. Quien fabrica
+// la sección declara sus pantallas; si no, este módulo tendría secciones que se
+// ven en las cinco pantallas hasta que alguien, en otro fichero, se acuerde.
+// **Eso era exactamente el defecto M2 que la fase 0 midió** (2026-08-06): los
+// dos bloques de edificio medían 314,97 / 157,06 px IDÉNTICOS en los cinco
+// pasos, o sea cinco peldaños encendidos sobre una sola pantalla.
+//
+// ── EL BLOQUE NO ENSEÑA CONTADORES DE PLANTAS EN UNA PISCINA ────────────────
+// ⭐ Criterio de aceptación 1, y con la MISMA forma comprobable que F11 estrenó
+// con los siete atributos: en una parte de tipo «Otra» los dos campos de plantas
+// **no están ocultos: NO ESTÁN** (ver {@link SELECTOR_PRINCIPAL} y
+// {@link montarPlantas}). Un «0» sería mentira —`conPlantas` lo dice con estas
+// palabras: «en ésas las plantas no son cero: no aplican»— y un campo vacío
+// invitaría a rellenarlo. La ayuda de rasante se va con ellos: explica unos
+// campos que no existen.
+//
+// ── LA CONVERSIÓN DE LAS PLANTAS SE PARTE EN DOS, Y CADA MITAD EN SU CAPA ────
+// Esta vista convierte lo que **es** un número y no juzga si es un número de
+// PLANTAS: la regla «entero de cero para arriba» vive en
+// `edificio/mutaciones.js`, que es la capa que sabe qué es una planta, y allí
+// está escrito por qué. Así que de aquí sale:
+//   · `''`            → `null`, que significa «aún no se sabe»;
+//   · `'2'`           → `2`;
+//   · `'2,5'`, `'-1'` → el número, que la mutación rechaza NOMBRÁNDOLO;
+//   · `'dos'`         → **la cadena tal cual**, para que el aviso pueda citar lo
+//     que se tecleó en vez de un `NaN` que no significa nada para nadie.
+// Es distinto de {@link leerAtributos}, que sí retiene lo ilegible: allí
+// `crearEdificio` LANZARÍA con un `NaN`, y aquí `conPlantas` **no lanza nunca**
+// porque las plantas vienen de un teclado. Dos asimetrías, dos motivos escritos.
+//
+// ── EL SELECTOR DE MODELO SE PLIEGA CUANDO ENTRA UN EDIFICIO ────────────────
+// **MEDIDO (F12 · M1, 1280×720):** el bloque de origen mide 397,19 px y de ésos
+// **174,41 px son el selector de modelo permanente**, con lo que la lista de
+// partes se quedaba en 45,17 px = UNA fila. Plegado a un renglón con «Cambiar»,
+// esos 174,41 px vuelven al panel.
+//
+// ⛔ **Y se pliega al entrar un edificio, NO al pulsar el radio.** Es la
+// diferencia que importa: el apunte de la opción elegida dice qué se PIERDE al
+// elegirla —«se borran los siete atributos»— y tiene que seguir a la vista
+// **justo después de elegir**, que es cuando importa (ver {@link pintarModelo},
+// donde ya está razonado para el otro apunte). Plegar en el `change` haría
+// desaparecer esa frase bajo el propio cursor que la provocó. Cuando entra un
+// edificio la pregunta ya está contestada y el panel pasa de elegir a trabajar.
+//
+// ── ⛔ LA TABLA DE COORDENADAS ES UNA CAJA VACÍA, Y NO ES NEGOCIABLE ────────
+// `viewer/sincronizacion.js` hace `tablaEl.replaceChildren()` en CADA repintado,
+// así que cualquier cosa que este módulo meta dentro de {@link tablaParteActiva}
+// se borra al primer `set` del store — sin avisar. Es la misma nota que lleva
+// `index.html` sobre `#tabla-vertices`, y aquí vale palabra por palabra: **el
+// rótulo va FUERA de la caja**. Este módulo fabrica el `<div>` y no vuelve a
+// tocarlo jamás; lo publica para que el cableado (T4.2) se lo pase a
+// `sincronizar`, que es su único dueño.
 
 import {
   ATRIBUTOS_COMPLETO,
   ESTADO_CONSERVACION,
   MODELO_EDIFICIO,
+  TIPO_PARTE,
 } from '../model/edificio.js'
 import { ROTULO_ATRIBUTO } from '../edificio/mutaciones.js'
 import { NIVEL, resolverAvisar } from '../viewer/_comun.js'
@@ -155,16 +229,28 @@ import { NIVEL, resolverAvisar } from '../viewer/_comun.js'
 export const CLASE = Object.freeze({
   BLOQUE: 'gml-bloque--edificio',
   BLOQUE_PARTES: 'gml-bloque--partes',
+  BLOQUE_ACTIVA: 'gml-bloque--parte-activa',
 
   OPCIONES: 'gml-opciones',
   OPCION: 'gml-opcion',
   OPCION_APUNTE: 'gml-opcion-apunte',
+  MODELO_PLEGADO: 'gml-modelo-plegado',
+  MODELO_PLEGADO_VALOR: 'gml-modelo-plegado-valor',
 
   PARTES: 'gml-partes',
   PARTE: 'gml-parte',
+  // ⚠️ `--activa` NO es un juicio de valor: dice CUÁL de las trece se está
+  // editando, que es un hecho de la interfaz. Y es lo mismo que `viewer/partes.js`
+  // distingue en el mapa con el doble grosor.
+  PARTE_ACTIVA: 'gml-parte--activa',
   PARTE_NOMBRE: 'gml-parte-nombre',
   PARTE_DATO: 'gml-parte-dato',
   PARTES_VACIO: 'gml-partes-vacio',
+
+  ACTIVA_ROTULO: 'gml-parte-activa-rotulo',
+  ACTIVA_PLANTAS: 'gml-parte-activa-plantas',
+  ACTIVA_AYUDA: 'gml-parte-activa-ayuda',
+  ACTIVA_MEDIDA: 'gml-parte-activa-medida',
 
   DIALOGO_CAPAS: 'gml-dialogo-capas',
   CAPAS_CUERPO: 'gml-dialogo-capas-cuerpo',
@@ -211,6 +297,12 @@ export const CLASE_REUTILIZADA = Object.freeze([
   'gml-boton--menudo',
   'gml-accion-estado',
   'gml-procedencia',
+  // F12 · T4.1. La caja con `overflow:auto` contra la que scrollea la cabecera
+  // pegajosa de la tabla de vértices. Es LA MISMA clase que `#tabla-vertices` de
+  // `index.html`, y a propósito: las dos ramas enseñan la misma tabla, la fabrica
+  // el mismo `viewer/sincronizacion.js` y un segundo cromo para lo mismo sería
+  // una segunda manera de que se descuadre.
+  'gml-tabla-caja',
 ])
 
 /**
@@ -235,6 +327,23 @@ export const ACCION = Object.freeze({
   RENOMBRAR_PARTE: 'renombrar-parte',
   APLICAR_CAPAS: 'aplicar-capas',
   CANCELAR_CAPAS: 'cancelar-capas',
+
+  // ── F12 · T4.1 ────────────────────────────────────────────────────────────
+  SELECCIONAR_PARTE: 'seleccionar-parte',
+  ANADIR_PARTE: 'anadir-parte',
+  ELIMINAR_PARTE: 'eliminar-parte',
+  /** Sale del `change` del `<select>` de tipo, como {@link ACCION}.CAMBIAR_MODELO. */
+  CAMBIAR_TIPO_PARTE: 'cambiar-tipo-parte',
+  /** Sale del `change` de los dos campos de plantas. */
+  CAMBIAR_PLANTAS: 'cambiar-plantas',
+  /**
+   * ⚠️ **NO se emite: se atiende aquí y se acaba.** Desplegar el selector de
+   * modelo no cambia ningún dato —solo deshace un pliegue de la vista—, y
+   * mandárselo al cableado sería pedirle que devolviera una orden que no tiene
+   * nada que decidir. Se declara igual porque necesita su `data-accion` para que
+   * el oyente delegado lo reconozca, exactamente como {@link ACCION}.ABRIR_ATRIBUTOS.
+   */
+  DESPLEGAR_MODELO: 'desplegar-modelo',
 })
 
 /**
@@ -264,6 +373,39 @@ export const SELECTOR = Object.freeze({
   APLICAR_CAPAS: `[data-accion="${ACCION.APLICAR_CAPAS}"]`,
   CANCELAR_CAPAS: `[data-accion="${ACCION.CANCELAR_CAPAS}"]`,
   ESTADO_CAPAS: '[data-estado="dialogo-capas"]',
+
+  // ── F12 · T4.1 ────────────────────────────────────────────────────────────
+  DESPLEGAR_MODELO: `[data-accion="${ACCION.DESPLEGAR_MODELO}"]`,
+  ANADIR_PARTE: `[data-accion="${ACCION.ANADIR_PARTE}"]`,
+  ELIMINAR_PARTE: `[data-accion="${ACCION.ELIMINAR_PARTE}"]`,
+  TIPO_PARTE: '[data-campo="tipo-parte"]',
+  HUELLA: '[data-campo="huella-edificio"]',
+  SUPERFICIE_ACTIVA: '[data-campo="superficie-parte"]',
+  ESTADO_ACTIVA: '[data-estado="parte-activa"]',
+  /**
+   * ⛔ La caja de la tabla de coordenadas de la parte activa. **Vacía siempre**:
+   * su dueño es `viewer/sincronizacion.js`, que la vacía en cada repintado. Ver
+   * la cabecera y {@link tablaParteActiva}.
+   */
+  TABLA_ACTIVA: '[data-tabla="parte-activa"]',
+})
+
+/**
+ * Los `data-*` de las plantas, que **solo existen cuando la parte activa es de
+ * tipo PRINCIPAL**. En una parte «Otra» —una piscina— no están ocultos: **no
+ * están**.
+ *
+ * ⭐ Ésta es la segunda mitad comprobable del **criterio de aceptación 1** («las
+ * piscinas no muestran contadores»), y está separada de {@link SELECTOR} por lo
+ * mismo que {@link SELECTOR_COMPLETO}: para que el cableado sepa, leyendo esta
+ * constante, que a estos nodos **no puede agarrarse en el montaje**. Hay
+ * {@link plantasDisponibles} para preguntarlo sin espiar el DOM.
+ *
+ * @readonly
+ */
+export const SELECTOR_PRINCIPAL = Object.freeze({
+  PLANTAS_SOBRE: '[data-campo="plantas-sobre"]',
+  PLANTAS_BAJO: '[data-campo="plantas-bajo"]',
 })
 
 /**
@@ -396,6 +538,82 @@ export const SIN_PARTES =
 
 /** Lo que dice el renglón de procedencia mientras no se ha traído nada. */
 export const SIN_PROCEDENCIA = ''
+
+// ── F12 · T4.1 · El vocabulario de la parte activa ───────────────────────────
+
+/** Lo que rotula la tercera sección del panel. */
+export const TITULO_PARTE_ACTIVA = 'Parte activa'
+
+/** Lo que rotula la caja de coordenadas. Va FUERA de la caja: ver la cabecera. */
+export const TITULO_TABLA_ACTIVA = 'Vértices'
+
+/** Lo que se lee en el botón que añade una parte a la lista. */
+export const ROTULO_ANADIR = 'Añadir parte'
+
+/** Lo que se lee en el botón que quita la parte activa. */
+export const ROTULO_ELIMINAR = 'Eliminar parte'
+
+/** Lo que se lee en el botón que despliega otra vez el selector de modelo. */
+export const ROTULO_CAMBIAR_MODELO = 'Cambiar'
+
+/** Con qué se rotula el renglón plegado del modelo. */
+export const ETIQUETA_MODELO_PLEGADO = 'Modelo'
+
+/**
+ * Rótulo humano de cada tipo de parte. El `value` de la opción es el valor de
+ * `TIPO_PARTE` **sin traducir** (contrato K.2); lo que se lee es esto.
+ *
+ * ⚠️ «Otra construcción» lleva el paréntesis del modelo —`model/edificio.js` dice
+ * «`OTRA` = piscina y similares»— porque el rótulo a secas no dice qué cabe
+ * dentro, y lo que cabe dentro es justo lo que hay que reconocer para elegirlo.
+ *
+ * @readonly
+ */
+export const ROTULO_TIPO_PARTE = Object.freeze({
+  [TIPO_PARTE.PRINCIPAL]: 'Principal',
+  [TIPO_PARTE.OTRA]: 'Otra construcción (piscina y similares)',
+})
+
+/** Rótulo del contador de plantas sobre rasante. */
+export const ROTULO_PLANTAS_SOBRE = 'Plantas sobre rasante'
+
+/** Rótulo del contador de plantas bajo rasante. */
+export const ROTULO_PLANTAS_BAJO = 'Bajo rasante'
+
+/**
+ * La ayuda de los dos contadores. **Literal de la ficha de F12** (§15.1): *«bajo
+ * rasante = sótanos; rasante es la línea del terreno»*. Se cita con esas palabras
+ * y no con una redacción propia: es la única frase del proyecto que explica qué
+ * es la rasante, y dos versiones de ella serían dos definiciones.
+ */
+export const AYUDA_PLANTAS = 'Bajo rasante = sótanos; rasante es la línea del terreno.'
+
+/**
+ * Lo que dice el bloque cuando la parte activa todavía no tiene contorno. Es la
+ * versión ACCIONABLE de lo que la fila ya dice con «sin contorno»: aquí hay sitio
+ * para decir qué hacer, y el gesto vive en la barra sobre el mapa —donde ocurre—,
+ * no en un botón de este panel.
+ */
+export const PENDIENTE_DE_DIBUJAR =
+  'Esta parte todavía no tiene recinto: está pendiente de dibujarlo. Se dibuja sobre el mapa, ' +
+  'vértice a vértice, con «Dibujar recinto» de la barra de edición; hasta entonces no se pinta ' +
+  'ni suma superficie.'
+
+/**
+ * Lo que dice el bloque cuando no hay ninguna parte elegida — que es también el
+ * motivo por el que «Eliminar parte» está apagado, y por eso lo dice entero: un
+ * botón gris y un renglón vacío obligan a adivinar.
+ */
+export const SIN_PARTE_ACTIVA =
+  'No hay ninguna parte elegida. Pulsa una de la lista de arriba para ver y editar su tipo, sus ' +
+  'plantas y sus vértices, o añade una nueva con «Añadir parte».'
+
+/**
+ * Lo que se lee en el renglón de la medida mientras no hay nada que medir. Un
+ * guion y no un «0 m²»: cero metros cuadrados es una superficie, y aquí no la
+ * hay. Misma distinción que las plantas de una piscina.
+ */
+export const SIN_MEDIDA = '—'
 
 /**
  * Rótulo humano de cada estado de conservación. ⚠️ Son el vocabulario declarado de
@@ -593,6 +811,10 @@ let sello = 0
  * @property {string[]|null} capas  Las capas marcadas, solo en `APLICAR_CAPAS`.
  * @property {object|null} atributos  Los siete ya convertidos, solo en
  *   `APLICAR_ATRIBUTOS`. Los que quedaron en blanco viajan como `null`.
+ * @property {string|null} tipo  El tipo destino, solo en `CAMBIAR_TIPO_PARTE`.
+ * @property {{sobre: *, bajo: *}|null} plantas  Lo que hay en los dos campos,
+ *   solo en `CAMBIAR_PLANTAS`, ya convertido a número **cuando es un número** —y
+ *   tal cual cuando no lo es, para que el aviso pueda citarlo—. Ver la cabecera.
  * @property {{modelo: string, refcat: string|null}} valores  Lo que hubiera en el
  *   panel al actuar. Viaja con la acción para que el cableado no tenga que
  *   acordarse de leerlo.
@@ -658,6 +880,20 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
   let capas = null
   /** Qué parte tiene el editor de nombre abierto. `null` = ninguna. */
   let renombrando = null
+  /** Qué parte se está editando. `null` = ninguna. F12 · T4.1. */
+  let activa = null
+  /**
+   * ¿Está plegado el selector de modelo? Nace DESPLEGADO: mientras no ha entrado
+   * ningún edificio, elegir el modelo es lo primero que hay que poder hacer.
+   */
+  let plegado = false
+  /**
+   * ¿Lo ha desplegado el usuario con «Cambiar»? Mientras siga habiendo edificio,
+   * eso GANA sobre el pliegue automático: un repintado —y hay uno por cada
+   * mutación— no puede cerrarle el selector en las manos a quien acaba de
+   * abrirlo. Se olvida con `fijar(null)`, que es volver a empezar.
+   */
+  let desplegadoAMano = false
   /** Qué diálogos están abiertos, y a quién devolverle el foco. */
   const abierto = { capas: false, atributos: false }
   const focoPrevio = { capas: null, atributos: null }
@@ -671,9 +907,32 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
     escuchados.push({ diana, tipo, fn })
   }
 
+  // ══ El eje PASO de esta rama (F12 · T4.1, defecto M2) ═════════════════════
+  //
+  // ⛔ **Hasta el 2026-08-06 las secciones de edificio NO declaraban esto**, y
+  // medirlo fue el hallazgo M2 de la fase 0: los dos bloques daban 314,97 y
+  // 157,06 px **idénticos en los cinco pasos**, o sea que el rail encendía cinco
+  // peldaños sobre una sola pantalla. Es el mismo defecto decorativo que la
+  // rebanada 3 del rework curó en la rama de parcela.
+  //
+  // El reparto CALCA al de `index.html`, porque las dos ramas hacen el mismo
+  // trabajo con otros objetos:
+  //   · «Origen del edificio» → `entrada`, como `.gml-bloque--catastro`.
+  //   · «Partes» → `validacion edicion informe`, como `.gml-bloque--vertices`:
+  //     es la relación de lo que hay, y se consulta en las tres.
+  //   · «Parte activa» → `edicion` **y solo ahí**. Lleva la tabla de coordenadas,
+  //     que es un estirador, y dos estiradores a la vez descosen el panel. Fuera
+  //     de «Edición» no hay nada que editar.
+  const PANTALLA = Object.freeze({
+    ORIGEN: 'entrada',
+    PARTES: 'validacion edicion informe',
+    ACTIVA: 'edicion',
+  })
+
   // ══ Sección 1 · «Origen del edificio» ═════════════════════════════════════
 
   const seccionOrigen = crear('section', `gml-bloque ${CLASE.BLOQUE}`)
+  seccionOrigen.setAttribute('data-pantalla', PANTALLA.ORIGEN)
 
   const filaRotulo = crear('div', 'gml-rotulo-fila')
   const rotuloOrigen = crear('h2', 'gml-rotulo', TITULO_ORIGEN)
@@ -730,6 +989,24 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
   campoModelo.append(preguntaModelo, opciones)
   seccionOrigen.append(campoModelo)
 
+  // ── El renglón que sustituye al selector cuando ya hay edificio ────────────
+  // 174,41 px MEDIDOS que vuelven al panel (F12 · M1, 1280×720). Nace `hidden`:
+  // es el selector entero quien manda mientras la pregunta siga abierta. El
+  // porqué de plegar al ENTRAR un edificio y no al pulsar el radio, en la
+  // cabecera.
+  const resumenModelo = crear('p', CLASE.MODELO_PLEGADO)
+  resumenModelo.append(crear('span', null, `${ETIQUETA_MODELO_PLEGADO}: `))
+  const resumenModeloValor = crear('span', CLASE.MODELO_PLEGADO_VALOR, '')
+  const botonCambiarModelo = crear('button', 'gml-boton gml-boton--menudo', ROTULO_CAMBIAR_MODELO)
+  botonCambiarModelo.type = 'button'
+  botonCambiarModelo.dataset.accion = ACCION.DESPLEGAR_MODELO
+  // El botón dice «Cambiar» a secas —cabe en el renglón— y el lector de pantalla
+  // oye la frase entera: sin esto, «Cambiar» suelto no dice cambiar QUÉ.
+  botonCambiarModelo.setAttribute('aria-label', 'Cambiar el modelo del edificio')
+  resumenModelo.append(resumenModeloValor, botonCambiarModelo)
+  resumenModelo.hidden = true
+  seccionOrigen.append(resumenModelo)
+
   // ── La referencia catastral ───────────────────────────────────────────────
   // Misma disciplina que `[data-campo="refcat"]` de `index.html:199-210`, y por lo
   // mismo: monoespaciada porque son caracteres que se cotejan UNO A UNO contra un
@@ -776,17 +1053,125 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
   // ══ Sección 2 · «Partes» — el nuevo estirador del panel ═══════════════════
 
   const seccionPartes = crear('section', `gml-bloque ${CLASE.BLOQUE_PARTES}`)
+  seccionPartes.setAttribute('data-pantalla', PANTALLA.PARTES)
   const filaRotuloPartes = crear('div', 'gml-rotulo-fila')
   filaRotuloPartes.append(crear('h2', 'gml-rotulo', TITULO_PARTES))
   // Segundo hijo de la fila, sin clase: hereda 11 px y gris, igual que el «X · Y
   // (m)» de la fila de «Vértices».
   const cuentaPartes = crear('span', null, '0 partes')
   filaRotuloPartes.append(cuentaPartes)
+  // La suma de huella sobre rasante (ficha §15.4). Llega REDACTADA desde fuera,
+  // como la procedencia y por lo mismo: la envolvente la calcula
+  // `edificio/envolvente.js` y la mide `geo/area.js`; una vista que sumara áreas
+  // sería una segunda forma de decir la misma cifra, con su propio redondeo.
+  const huellaNodo = crear('span', null, '')
+  huellaNodo.dataset.campo = 'huella-edificio'
+  filaRotuloPartes.append(huellaNodo)
+  // «Añadir parte» va en el hueco de COSTE 0 px de la fila del `<h2>` —el que
+  // estrenó F08 y midió F11: `.gml-boton--menudo` mide 15,19 px contra los 15,95
+  // del renglón del rótulo—, y no en una fila propia, que serían ~36 px salidos
+  // de la lista. «Eliminar parte» NO le hace compañía aquí: actúa sobre la parte
+  // ACTIVA, así que vive en el bloque que habla de ella, donde se ve sobre qué se
+  // está pulsando. Un «Eliminar» a 300 px de la fila seleccionada, en una lista
+  // de trece filas que se parecen, es la clase de botón que se pulsa por error.
+  const accionesPartes = crear('div', 'gml-rotulo-acciones')
+  const botonAnadir = crear('button', 'gml-boton gml-boton--menudo', ROTULO_ANADIR)
+  botonAnadir.type = 'button'
+  botonAnadir.dataset.accion = ACCION.ANADIR_PARTE
+  accionesPartes.append(botonAnadir)
+  filaRotuloPartes.append(accionesPartes)
   seccionPartes.append(filaRotuloPartes)
 
   const listaPartes = crear('ul', CLASE.PARTES)
   listaPartes.dataset.lista = 'partes'
   seccionPartes.append(listaPartes)
+
+  // ══ Sección 3 · «Parte activa» — tipo, plantas, medida y coordenadas ══════
+  //
+  // Sección propia y no un bloque dentro de «Partes»: la tabla de coordenadas es
+  // un estirador y en esta rama ya hay uno. El razonamiento entero, y el
+  // `data-pantalla` que lo hace posible, en la cabecera.
+
+  const seccionActiva = crear('section', `gml-bloque ${CLASE.BLOQUE_ACTIVA}`)
+  seccionActiva.setAttribute('data-pantalla', PANTALLA.ACTIVA)
+
+  const filaRotuloActiva = crear('div', 'gml-rotulo-fila')
+  const rotuloActiva = crear('h2', 'gml-rotulo', TITULO_PARTE_ACTIVA)
+  rotuloActiva.id = id('rotulo-activa')
+  filaRotuloActiva.append(rotuloActiva)
+  const nombreActiva = crear('span', CLASE.ACTIVA_ROTULO, '')
+  filaRotuloActiva.append(nombreActiva)
+  const accionesActiva = crear('div', 'gml-rotulo-acciones')
+  const botonEliminar = crear('button', 'gml-boton gml-boton--menudo', ROTULO_ELIMINAR)
+  botonEliminar.type = 'button'
+  botonEliminar.dataset.accion = ACCION.ELIMINAR_PARTE
+  accionesActiva.append(botonEliminar)
+  filaRotuloActiva.append(accionesActiva)
+  seccionActiva.append(filaRotuloActiva)
+
+  // El renglón que dice por qué. Va ANTES del cuerpo porque cuando no hay parte
+  // elegida es lo ÚNICO que hay, y porque es el motivo del «Eliminar parte»
+  // apagado (regla de oro 1: el botón y su porqué, en el mismo paso).
+  const estadoActiva = crear('p', 'gml-accion-estado', '')
+  estadoActiva.dataset.estado = 'parte-activa'
+  estadoActiva.setAttribute('role', 'status')
+  seccionActiva.append(estadoActiva)
+
+  // ⛔ EL CUERPO SE OCULTA CON `hidden`, PERO LA `<section>` NO. Y hay motivo
+  // medido: `app/rama.js` gobierna el `hidden` de las `<section>` que descubre
+  // por `data-rama-panel` —lo ESCRIBE en cada conmutación— así que un `hidden`
+  // puesto aquí sobre la sección se lo llevaría por delante la primera vez que
+  // alguien tocase el conmutador de rama, y al revés. Dos dueños del mismo
+  // atributo es un intercambio que se descuadra solo. El cuerpo es un `<div>`
+  // interior y de ése no hay más dueño que este módulo.
+  const cuerpoActiva = crear('div', null)
+  seccionActiva.append(cuerpoActiva)
+
+  // ── El tipo ───────────────────────────────────────────────────────────────
+  // Un `<select>` de dos y no dos radios: los radios de esta rama ya significan
+  // otra cosa —el modelo—, y un segundo `radiogroup` a tres renglones de
+  // distancia se lee como una continuación del primero. Además el tipo se cambia
+  // pocas veces y no necesita ver las dos opciones a la vez.
+  const campoTipo = crear('div', 'gml-campo')
+  const etiquetaTipo = crear('label', 'gml-campo-etiqueta', 'Tipo')
+  etiquetaTipo.htmlFor = id('tipo-parte')
+  const selectTipo = doc.createElement('select')
+  selectTipo.id = id('tipo-parte')
+  selectTipo.className = 'gml-entrada'
+  selectTipo.dataset.campo = 'tipo-parte'
+  for (const valor of Object.values(TIPO_PARTE)) {
+    const opcion = doc.createElement('option')
+    opcion.value = valor // ⛔ SIN TRADUCIR: es el valor de TIPO_PARTE.
+    opcion.textContent = ROTULO_TIPO_PARTE[valor]
+    selectTipo.append(opcion)
+  }
+  campoTipo.append(etiquetaTipo, selectTipo)
+  cuerpoActiva.append(campoTipo)
+
+  // ── Las plantas: NACEN Y MUEREN CON EL TIPO ───────────────────────────────
+  // En una parte «Otra» no existen. Ver `SELECTOR_PRINCIPAL` y el criterio 1.
+  /** @type {HTMLElement|null} */
+  let cajaPlantas = null
+  /** @type {HTMLInputElement|null} */
+  let entradaSobre = null
+  /** @type {HTMLInputElement|null} */
+  let entradaBajo = null
+
+  // ── La medida en vivo ─────────────────────────────────────────────────────
+  const medidaNodo = crear('p', CLASE.ACTIVA_MEDIDA, SIN_MEDIDA)
+  medidaNodo.dataset.campo = 'superficie-parte'
+  cuerpoActiva.append(medidaNodo)
+
+  // ── La tabla de coordenadas ───────────────────────────────────────────────
+  // ⛔ CAJA VACÍA. El rótulo va FUERA porque `sincronizar` hace
+  // `replaceChildren()` dentro en cada repintado; metido dentro desaparecería al
+  // primer `set`. Misma disposición, y misma nota, que `#tabla-vertices` en
+  // `index.html`.
+  const rotuloTabla = crear('p', 'gml-campo-etiqueta', TITULO_TABLA_ACTIVA)
+  cuerpoActiva.append(rotuloTabla)
+  const tablaActiva = crear('div', 'gml-tabla-caja')
+  tablaActiva.dataset.tabla = 'parte-activa'
+  cuerpoActiva.append(tablaActiva)
 
   // ══ El `<dialog>` de reparto por capas ════════════════════════════════════
 
@@ -966,6 +1351,72 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
     botonAtributos = null
   }
 
+  // ── Las plantas, que solo existen en una parte PRINCIPAL ──────────────────
+
+  /**
+   * Fabrica los dos contadores de plantas y su ayuda, justo debajo del tipo.
+   *
+   * ⭐ Criterio de aceptación 1, segunda mitad: en una parte «Otra» esto no se
+   * llama, así que **los campos no están ocultos: no están**. Igual que el
+   * `<dialog>` de los siete atributos en modelo SIMPLIFICADO, y por lo mismo — se
+   * puede señalar con el dedo, y hay un `it` que lo hace.
+   */
+  function montarPlantas() {
+    if (cajaPlantas !== null) return
+
+    cajaPlantas = crear('div', 'gml-campo')
+    const rejilla = crear('div', CLASE.ACTIVA_PLANTAS)
+
+    const par = (sufijo, rotulo) => {
+      const etiqueta = crear('label', 'gml-campo-etiqueta', rotulo)
+      etiqueta.htmlFor = id(sufijo)
+      const entrada = doc.createElement('input')
+      // ⚠️ `type="text"` con `inputmode="numeric"` y NO `type="number"`, por el
+      // mismo motivo MEDIDO que los años del diálogo de atributos: con `number`
+      // el navegador VACÍA `.value` ante lo que no sabe leer, así que «dos»
+      // llegaría aquí como cadena vacía y se guardaría como «sin indicar» en
+      // silencio. Con `text` el texto llega entero y `conPlantas` puede CITARLO
+      // en su aviso.
+      entrada.type = 'text'
+      entrada.setAttribute('inputmode', 'numeric')
+      entrada.setAttribute('autocomplete', 'off')
+      entrada.id = id(sufijo)
+      entrada.className = 'gml-entrada'
+      entrada.dataset.campo = sufijo
+      return { etiqueta, entrada }
+    }
+
+    const sobre = par('plantas-sobre', ROTULO_PLANTAS_SOBRE)
+    const bajo = par('plantas-bajo', ROTULO_PLANTAS_BAJO)
+    // Las dos etiquetas y luego los dos campos: con la rejilla de dos columnas de
+    // `estilos/app.css` eso deja los rótulos en un renglón y los campos en otro,
+    // alineados. En orden etiqueta-campo-etiqueta-campo quedarían escalonados.
+    rejilla.append(sobre.etiqueta, bajo.etiqueta, sobre.entrada, bajo.entrada)
+    entradaSobre = sobre.entrada
+    entradaBajo = bajo.entrada
+
+    cajaPlantas.append(rejilla, crear('p', CLASE.ACTIVA_AYUDA, AYUDA_PLANTAS))
+    campoTipo.after(cajaPlantas)
+  }
+
+  /**
+   * Retira los dos contadores y su ayuda.
+   *
+   * ⚠️ **Esto no borra ninguna planta**, igual que {@link desmontarAtributos} no
+   * borra ningún atributo: las plantas viven en el `ParteConstruccion` del store.
+   * Quien las borra de verdad es el modelo, que fuerza a `null` las de una parte
+   * `OTRA` —y `conTipoParte` lo anuncia con `PLANTAS_NO_APLICAN` antes de que el
+   * cableado lo aplique—. La ayuda se va con los campos porque explica unos
+   * campos que ya no existen.
+   */
+  function desmontarPlantas() {
+    if (cajaPlantas === null) return
+    if (cajaPlantas.parentNode) cajaPlantas.parentNode.removeChild(cajaPlantas)
+    cajaPlantas = null
+    entradaSobre = null
+    entradaBajo = null
+  }
+
   // ── Pintado ───────────────────────────────────────────────────────────────
 
   /**
@@ -984,6 +1435,7 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
   function pintarParte(parte, i) {
     const li = crear('li', CLASE.PARTE)
     li.dataset.parteIndice = String(i)
+    if (activa === i) li.classList.add(CLASE.PARTE_ACTIVA)
 
     if (renombrando === i) {
       const entrada = doc.createElement('input')
@@ -995,7 +1447,19 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
       entrada.setAttribute('aria-label', `Nombre de la parte ${i + 1}`)
       li.append(entrada)
     } else {
-      li.append(crear('span', CLASE.PARTE_NOMBRE, parte.nombre))
+      // ⚠️ EL NOMBRE ES UN `<button>`, NO UN `<span>` CON UN `click` ENCIMA.
+      // Elegir la parte es la acción principal de la fila, y una fila clicable
+      // que no es un control no se alcanza con el tabulador, no responde a Intro
+      // ni a Espacio, y no se anuncia como algo pulsable. El cromo del navegador
+      // lo quita `estilos/app.css` con `.gml-parte-nombre` sobre un botón; aquí
+      // no se escribe ni un estilo (ver la cabecera).
+      const elegir = crear('button', CLASE.PARTE_NOMBRE, parte.nombre)
+      elegir.type = 'button'
+      elegir.dataset.accion = ACCION.SELECCIONAR_PARTE
+      // `aria-current` y no `aria-pressed`: no es un interruptor que se queda
+      // pulsado, es CUÁL de los elementos de una lista es el actual.
+      if (activa === i) elegir.setAttribute('aria-current', 'true')
+      li.append(elegir)
       li.append(crear('span', CLASE.PARTE_DATO, parte.dato))
     }
 
@@ -1032,6 +1496,43 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
   }
 
   /**
+   * El bloque de la parte activa: tipo, plantas, medida, estado y coordenadas.
+   *
+   * ⚠️ **La medida se devuelve SIEMPRE a {@link SIN_MEDIDA}**, también cuando la
+   * parte sí tiene contorno. No es descuido: esta función corre al cambiar de
+   * parte, y dejar ahí la superficie de la anterior enseñaría los 245,90 m² de
+   * «Parte 10» bajo el nombre de «Parte 11» hasta que alguien llamase a
+   * {@link medidas}. Una cifra correcta atribuida al objeto equivocado es peor
+   * que un guion. Quien la escribe es el cableado, justo después.
+   */
+  function pintarParteActiva() {
+    const fila = activa === null ? null : (datos?.partes?.[activa] ?? null)
+
+    // ⛔ La `<section>` no se toca: su `hidden` es de `app/rama.js`. Ver el
+    // comentario del montaje de `cuerpoActiva`.
+    cuerpoActiva.hidden = fila === null
+    botonEliminar.disabled = fila === null
+    medidaNodo.textContent = SIN_MEDIDA
+
+    if (fila === null) {
+      desmontarPlantas()
+      nombreActiva.textContent = ''
+      estadoActiva.textContent = SIN_PARTE_ACTIVA
+      return
+    }
+
+    nombreActiva.textContent = fila.nombre
+    selectTipo.value = fila.tipo
+
+    if (fila.tipo === TIPO_PARTE.PRINCIPAL) montarPlantas()
+    else desmontarPlantas()
+    if (entradaSobre) entradaSobre.value = fila.sobre === null ? '' : String(fila.sobre)
+    if (entradaBajo) entradaBajo.value = fila.bajo === null ? '' : String(fila.bajo)
+
+    estadoActiva.textContent = fila.tieneRecinto ? '' : PENDIENTE_DE_DIBUJAR
+  }
+
+  /**
    * Los radios, desde el modelo que se está enseñando.
    *
    * ⛔ **Y solo se enseña el apunte de la opción ELEGIDA** (2026-08-04; lo destapó
@@ -1058,6 +1559,16 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
     for (const [valor, apunte] of apuntes) apunte.hidden = valor !== modeloActual
     if (modeloActual === MODELO_EDIFICIO.COMPLETO) montarAtributos()
     else desmontarAtributos()
+
+    // El pliegue: o el selector entero, o el renglón. Nunca los dos, nunca
+    // ninguno. Se ocultan con `hidden` —no se retiran— porque los dos tienen que
+    // poder volver sin refabricarse; lo que sí se RETIRA es el diálogo de
+    // atributos, que es otra cosa y es el criterio 1.
+    campoModelo.hidden = plegado
+    resumenModelo.hidden = !plegado
+    // El rótulo completo, no una abreviatura: el renglón plegado sustituye a la
+    // opción elegida y tiene que decir lo mismo que decía ella.
+    resumenModeloValor.textContent = ROTULO_MODELO[modeloActual] ?? modeloActual
   }
 
   /**
@@ -1181,9 +1692,33 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
       nombre: null,
       capas: null,
       atributos: null,
+      tipo: null,
+      plantas: null,
       ...extra,
       valores: instantanea(),
     })
+  }
+
+  /**
+   * Convierte lo tecleado en un contador de plantas.
+   *
+   * La mitad de la conversión que le toca a la interfaz, y solo ésa: **aquí se
+   * decide si es un número, no si es un número de PLANTAS**. La regla «entero de
+   * cero para arriba» vive en `edificio/mutaciones.js#conPlantas`, que es la capa
+   * que sabe qué es una planta y que además **no lanza nunca** con esto, porque
+   * viene de un teclado. Lo ilegible viaja TAL CUAL para que el aviso pueda
+   * citarlo: `NaN` no significa nada para quien escribió «dos».
+   *
+   * @param {HTMLInputElement|null} entrada
+   * @returns {number|string|null|undefined}  `undefined` = ese campo no existe,
+   *   que en `conPlantas` significa «no tocar».
+   */
+  function leerPlantas(entrada) {
+    if (!entrada) return undefined
+    const bruto = typeof entrada.value === 'string' ? entrada.value.trim() : ''
+    if (bruto === '') return null
+    const numero = Number(bruto.replace(',', '.'))
+    return Number.isFinite(numero) ? numero : bruto
   }
 
   /**
@@ -1285,6 +1820,36 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
       else abrirRenombre(i)
       return
     }
+    if (accion === ACCION.SELECCIONAR_PARTE) {
+      const fila = boton.closest('[data-parte-indice]')
+      if (!fila) return
+      const i = Number(fila.dataset.parteIndice)
+      // Se emite también cuando ya era la activa, y es a propósito: el cableado
+      // usa esa orden para volver a encuadrar el mapa sobre la parte, que es lo
+      // que espera quien pulsa dos veces la misma fila. Filtrarlo aquí sería que
+      // el segundo clic no hiciera nada sin decir por qué.
+      emitir(ACCION.SELECCIONAR_PARTE, { indice: i })
+      return
+    }
+    if (accion === ACCION.ELIMINAR_PARTE) {
+      // El botón nace apagado y solo se enciende con una parte elegida, así que
+      // esta guarda no debería alcanzarse; está por lo mismo que la de `disabled`
+      // de arriba: un `click()` sintético puede llegar por otras vías, y emitir
+      // «elimina la parte null» sería mandarle al cableado una orden imposible.
+      if (activa === null) return
+      emitir(ACCION.ELIMINAR_PARTE, { indice: activa })
+      return
+    }
+    if (accion === ACCION.DESPLEGAR_MODELO) {
+      // ⚠️ NO se emite: no cambia ningún dato. Ver {@link ACCION}.DESPLEGAR_MODELO.
+      plegado = false
+      desplegadoAMano = true
+      pintarModelo()
+      // El foco salta al radio de la opción que está puesta: quien ha pulsado
+      // «Cambiar» quiere elegir, y el botón que acaba de pulsar ya no está.
+      radios.get(modeloActual)?.focus()
+      return
+    }
     if (accion === ACCION.ABRIR_ATRIBUTOS) {
       abrirDialogo(DIALOGO.ATRIBUTOS)
       return
@@ -1326,6 +1891,36 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
     pintarModelo()
     pintarAtributos()
     emitir(ACCION.CAMBIAR_MODELO)
+  }
+
+  /**
+   * El `change` del `<select>` de tipo y de los dos contadores de plantas.
+   *
+   * ⚠️ **`change` y no `input`**: `input` dispara en cada tecla, así que teclear
+   * «12» mandaría primero un «1» —que es un número de plantas perfectamente
+   * válido— y lo escribiría en el store antes de que el usuario acabase. Con
+   * `change` la orden sale al salir del campo o al pulsar Intro, que es cuando
+   * el dato está dicho.
+   */
+  function alCambiarActiva(evento) {
+    const campo = evento.target?.dataset?.campo
+    if (campo === 'tipo-parte') {
+      if (activa === null) return
+      emitir(ACCION.CAMBIAR_TIPO_PARTE, { indice: activa, tipo: evento.target.value })
+      return
+    }
+    if (campo === 'plantas-sobre' || campo === 'plantas-bajo') {
+      if (activa === null) return
+      // Se mandan LOS DOS, no solo el que ha cambiado. `conPlantas` interpreta
+      // `undefined` como «no tocar», así que mandar uno solo sería correcto; pero
+      // mandar los dos hace que la orden describa el estado completo del
+      // formulario, que es lo que el usuario ve, y evita que un campo a medio
+      // corregir se quede fuera del envío por no haber salido de él.
+      emitir(ACCION.CAMBIAR_PLANTAS, {
+        indice: activa,
+        plantas: { sobre: leerPlantas(entradaSobre), bajo: leerPlantas(entradaBajo) },
+      })
+    }
   }
 
   /** El `change` de las casillas del diálogo de capas. */
@@ -1405,6 +2000,8 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
   escuchar(seccionOrigen, 'change', alCambiarModelo)
   escuchar(seccionPartes, 'click', alPulsar)
   escuchar(seccionPartes, 'keydown', alTeclaPartes)
+  escuchar(seccionActiva, 'click', alPulsar)
+  escuchar(seccionActiva, 'change', alCambiarActiva)
   escuchar(dialogoCapas, 'click', alPulsar)
   escuchar(dialogoCapas, 'change', alCambiarCapa)
   escuchar(dialogoCapas, 'keydown', alTeclaCapas)
@@ -1491,9 +2088,12 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
     if (notificar) repartir(oyentes.cerrar, { dialogo: cual, motivo })
   }
 
-  // Estado inicial coherente: SIMPLIFICADO, sin partes, sin capas.
+  // Estado inicial coherente: SIMPLIFICADO, sin partes, sin capas, sin parte
+  // activa y con el selector DESPLEGADO — mientras no ha entrado ningún
+  // edificio, elegir el modelo es lo primero que hay que poder hacer.
   pintarModelo()
   pintarPartes()
+  pintarParteActiva()
   pintarCapas()
   repintarGate()
 
@@ -1504,8 +2104,23 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
     seccionOrigen,
     /** La sección «Partes», que es el estirador de esta rama. */
     seccionPartes,
+    /** La sección «Parte activa» (F12 · T4.1). Solo se ve en la pantalla «Edición». */
+    seccionActiva,
     /** El `<dialog>` de reparto por capas. Existe siempre. */
     dialogoCapas,
+
+    /**
+     * La caja de la tabla de coordenadas de la parte activa, para pasársela a
+     * `viewer/index.js#sincronizar` como su `tablaEl`.
+     *
+     * ⛔ **Su dueño es `sincronizar`, no este módulo.** Aquella función hace
+     * `replaceChildren()` dentro en cada repintado, así que lo que se meta aquí
+     * desaparece al primer `set` del store, sin avisar. Este módulo la fabrica
+     * una vez y no la vuelve a tocar; el rótulo va FUERA, en la sección.
+     *
+     * @type {HTMLElement}
+     */
+    tablaParteActiva: tablaActiva,
 
     /**
      * Todas las raíces que este módulo tiene HOY en el documento: las dos
@@ -1516,13 +2131,27 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
      * @returns {HTMLElement[]}
      */
     raices() {
-      const lista = [seccionOrigen, seccionPartes, dialogoCapas]
+      const lista = [seccionOrigen, seccionPartes, seccionActiva, dialogoCapas]
       if (dialogoAtributos !== null) lista.push(dialogoAtributos)
       return lista
     },
 
     /**
-     * Mete las dos secciones en el panel.
+     * Las `<section>` que este módulo mete en el panel, en el orden en que
+     * quedan. Existe para que el cableado las selle con `data-rama-panel` **sin
+     * nombrarlas de una en una**: F11 las selló a mano y añadir la tercera habría
+     * dejado una sección de edificio visible sobre la rama de parcela, en
+     * silencio, hasta que alguien lo viera con los ojos.
+     *
+     * @returns {HTMLElement[]}
+     */
+    secciones() {
+      return [seccionOrigen, seccionPartes, seccionActiva]
+    },
+
+    /**
+     * Mete las tres secciones en el panel. Se piden DOS anclas y no tres: la de
+     * «Parte activa» va pegada a la de «Partes» (ver más abajo).
      *
      * ⚠️ **El orden es carga útil, no comodidad.** `.gml-bloque--partes` es
      * `flex: 1 1 auto` y hace en esta rama el papel que `.gml-bloque--vertices`
@@ -1551,6 +2180,9 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
       }
       trasOrigen.after(seccionOrigen)
       trasPartes.after(seccionPartes)
+      // La tercera va PEGADA a la lista, y no pide ancla propia: «la parte
+      // activa» solo significa algo debajo de la lista de la que se elige.
+      seccionPartes.after(seccionActiva)
     },
 
     /**
@@ -1569,6 +2201,11 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
      *   que haya escrito el usuario NO se toca**: un repintado de la lista no puede
      *   borrarle la referencia a medio teclear.
      * @param {boolean} [entrada.puedeConsultarCatastro=true]
+     * @param {number|null} [entrada.activa]  Qué parte se está editando, por su
+     *   índice. **Si se omite se conserva la que hubiera**, y si el índice no
+     *   cae dentro de la lista nueva se queda en `null` — que es lo que pasa al
+     *   eliminar la parte activa, o sea un uso normal y no un error: por eso no
+     *   lanza.
      * @throws {TypeError}  Contrato del programador.
      */
     fijar(entrada) {
@@ -1577,7 +2214,14 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
       if (entrada === null || entrada === undefined) {
         datos = null
         renombrando = null
+        activa = null
+        // Vuelve a nacer: sin edificio, la pregunta del modelo se reabre — y se
+        // olvida que alguien la hubiera reabierto a mano.
+        plegado = false
+        desplegadoAMano = false
+        pintarModelo()
         pintarPartes()
+        pintarParteActiva()
         pintarAtributos()
         repintarGate()
         return
@@ -1588,7 +2232,13 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
             `recibido ${describir(entrada)}.`,
         )
       }
-      const { edificio = null, modelo, refcat, puedeConsultarCatastro = true } = entrada
+      const {
+        edificio = null,
+        modelo,
+        refcat,
+        puedeConsultarCatastro = true,
+        activa: activaNueva,
+      } = entrada
       if (edificio !== null && !esObjeto(edificio)) {
         throw new TypeError(
           `fijar: 'edificio' debe ser el POJO de crearEdificio o null; recibido ${describir(edificio)}.`,
@@ -1618,8 +2268,28 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
               : vertices === 1
                 ? '1 vértice'
                 : `${vertices} vértices`,
+          // Lo que necesita el bloque de parte activa. Un `tipo` que no sea de
+          // `TIPO_PARTE` se trata como PRINCIPAL **para pintar**, y no lanza: el
+          // modelo ya lo impide al construir, así que aquí solo puede llegar por
+          // un POJO fabricado a mano en una prueba, y reventar la vista por eso
+          // sería castigar al llamante equivocado.
+          tipo: p?.tipo === TIPO_PARTE.OTRA ? TIPO_PARTE.OTRA : TIPO_PARTE.PRINCIPAL,
+          sobre: Number.isFinite(p?.plantasSobreRasante) ? p.plantasSobreRasante : null,
+          bajo: Number.isFinite(p?.plantasBajoRasante) ? p.plantasBajoRasante : null,
+          tieneRecinto: vertices !== null,
         }
       })
+
+      // La parte activa se valida ANTES de escribir, como el modelo: un índice
+      // fuera de la lista no puede dejar el panel con la lista nueva y el bloque
+      // apuntando a una parte que ya no está. **No lanza**: quedarse sin parte
+      // activa es lo que pasa cuando se elimina la que estaba, y eso es un uso
+      // normal, no un error de programación.
+      const activaPedida = activaNueva === undefined ? activa : activaNueva
+      const activaFinal =
+        Number.isInteger(activaPedida) && activaPedida >= 0 && activaPedida < filas.length
+          ? activaPedida
+          : null
 
       const atributos = {}
       for (const clave of ATRIBUTOS_COMPLETO) {
@@ -1642,10 +2312,22 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
       if (refcat !== undefined) {
         entradaRefcat.value = typeof refcat === 'string' ? refcat : ''
       }
+      activa = activaFinal
+
+      // ⛔ EL PLIEGUE, Y SU MOMENTO. Entra un edificio ⇒ la pregunta «¿qué
+      // necesitas generar?» ya está contestada y esos 174,41 px medidos vuelven
+      // al panel. **No se pliega en el `change` del radio**, que es cuando el
+      // apunte de la opción elegida —el que dice qué se pierde— tiene que estar a
+      // la vista. El porqué entero, en la cabecera.
+      //
+      // Y no se cierra solo: si el usuario lo abrió con «Cambiar», un repintado
+      // —y hay uno por cada mutación— no puede cerrárselo en las manos.
+      if (edificio !== null && !desplegadoAMano) plegado = true
 
       renombrando = null
       pintarModelo()
       pintarPartes()
+      pintarParteActiva()
       pintarAtributos()
       repintarGate()
     },
@@ -1714,6 +2396,75 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
      */
     atributosDisponibles() {
       return !destruido && dialogoAtributos !== null
+    },
+
+    /**
+     * ¿Existen los dos contadores de plantas? Es `true` **si y solo si** hay una
+     * parte activa y es de tipo PRINCIPAL. Gemelo de {@link atributosDisponibles},
+     * y por lo mismo: en una piscina los contadores no están ocultos, no están
+     * (criterio de aceptación 1).
+     */
+    plantasDisponibles() {
+      return !destruido && cajaPlantas !== null
+    },
+
+    /**
+     * Qué parte se está editando, por su índice, o `null`. Es lo que el panel
+     * cree; la verdad está en el store, y las dos se juntan en cada `fijar`.
+     *
+     * @returns {number|null}
+     */
+    parteActiva() {
+      return destruido ? null : activa
+    },
+
+    /** ¿Está plegado el selector de modelo a un renglón? */
+    modeloPlegado() {
+      return !destruido && plegado
+    },
+
+    /**
+     * Escribe las dos cifras EN VIVO: la superficie de la parte activa y la suma
+     * de huella sobre rasante del edificio (ficha §15.4).
+     *
+     * ⚠️ **Llegan REDACTADAS desde fuera**, igual que {@link procedencia} y por el
+     * mismo motivo escrito allí: quien mide es `geo/area.js` y quien une las
+     * huellas es `edificio/envolvente.js`. Una vista que sumara áreas sería una
+     * segunda forma de decir la misma cifra, con su propio redondeo — y dos
+     * redondeos distintos del mismo número es exactamente lo que un informe
+     * firmable no se puede permitir.
+     *
+     * ⚠️ Y valen **hasta el siguiente `fijar`**, que devuelve la de la parte a
+     * {@link SIN_MEDIDA}: ver {@link pintarParteActiva}, donde está el porqué.
+     *
+     * `undefined` en cualquiera de las dos significa **no tocar ésa**.
+     *
+     * @param {Object} [cifras]
+     * @param {string} [cifras.activa]  La superficie de la parte activa.
+     * @param {string} [cifras.huella]  La suma de huella sobre rasante.
+     */
+    medidas({ activa: textoActiva, huella } = {}) {
+      if (destruido) return
+      if (textoActiva !== undefined) {
+        medidaNodo.textContent = typeof textoActiva === 'string' ? textoActiva : SIN_MEDIDA
+      }
+      if (huella !== undefined) {
+        huellaNodo.textContent = typeof huella === 'string' ? huella : ''
+      }
+    },
+
+    /**
+     * Escribe el renglón de estado del bloque de parte activa.
+     *
+     * ⚠️ Mismo aviso que {@link estado}: vale hasta el siguiente `fijar`, que
+     * vuelve a poner ahí {@link SIN_PARTE_ACTIVA} o {@link PENDIENTE_DE_DIBUJAR}
+     * — y ése es el orden correcto, porque «esta parte no tiene recinto» manda
+     * sobre el desenlace de la operación anterior.
+     *
+     * @param {string} texto
+     */
+    estadoParteActiva(texto) {
+      if (!destruido) estadoActiva.textContent = typeof texto === 'string' ? texto : ''
     },
 
     /** @param {string} cual  Uno de {@link DIALOGO}. */
@@ -1804,7 +2555,7 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
       oyentes.accion.clear()
       oyentes.cerrar.clear()
 
-      for (const nodo of [seccionOrigen, seccionPartes, dialogoCapas]) {
+      for (const nodo of [seccionOrigen, seccionPartes, seccionActiva, dialogoCapas]) {
         if (nodo.parentNode) nodo.parentNode.removeChild(nodo)
       }
     },

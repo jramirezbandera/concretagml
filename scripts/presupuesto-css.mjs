@@ -198,6 +198,32 @@ export const ASIENTOS = Object.freeze(
         'propios. El asiento se anota aunque el número no se mueva: un hito sin fila haría que ' +
         'el registro dejara de contar la historia, que es la mitad de para lo que existe. ' +
         'Sobran 5.150 sobre el techo, los mismos que en el asiento anterior.' },
+    { hito: 'F18 y F19, sin asiento propio', commit: '3a6717c', total: 65828, nuestro: 50733, rebanada: null,
+      nota:
+        '⚠️ **ASIENTO DE ATRIBUCIÓN, no de una fase.** Entre el asiento anterior y éste entraron ' +
+        'F18 (entrada de parcela por fichero) y F19 (pegado de LIST, grados y rótulo del GML ' +
+        'ajeno) **sin anotar ninguno de los dos**, y sus +3.519 B llegaron juntos a la fase 5 de ' +
+        'F12 confundidos con los suyos. Se separan aquí, midiendo la hoja en el commit 3a6717c ' +
+        'con `estilos/app.css` de HEAD y sin nada de F12: 65.828 B / 50.733 B nuestros. El ' +
+        'reparto entre F18 y F19 NO se deshace —haría falta reconstruir en e469541, y las dos ' +
+        'son de otra sesión—, así que la fila las nombra a las dos y no atribuye la cifra a ' +
+        'ninguna. Lo que sí queda claro es qué NO es de F12. Sobran 8.669 sobre el techo.' },
+    { hito: 'F12 · fase 5 · edificio: partes y plantas', commit: '(sin commitear)', total: 67334, nuestro: 52239, rebanada: null,
+      nota:
+        '**+1.506 B, medidos aparte** (ver el asiento anterior): se construyó la hoja con y sin ' +
+        'los cambios de F12 para no cargarle los 3.519 B que venían sin atribuir. Y es la ' +
+        'primera vez en seis fases que esta rama cuesta CSS, porque es la primera que le da ' +
+        'pantalla propia. El reparto: la sección K.4 entera —el bloque de la parte activa (sus ' +
+        'dos contadores de plantas en rejilla, el renglón de ayuda, la superficie en vivo y su ' +
+        'estado), la fila de parte SELECCIONABLE (un `<button>` al que hay que devolverle el ' +
+        'aspecto de texto, más el resalte de la activa) y el renglón plegado del selector de ' +
+        'modelo—, más el relevo del estirador en «Edición». Dos reglas son de UNA LÍNEA y valen ' +
+        'más que su tamaño: `.gml-barra-herramienta[hidden] { display: none }`, que arregla un ' +
+        '`hidden` que NO funcionaba (la regla de la herramienta le ganaba a la hoja del ' +
+        'navegador y «Dibujar recinto» se veía en la rama Parcela desde la fase 3), y el ' +
+        '`min-height: 77px` de la lista de partes, que impide que el flex la apriete a dos filas ' +
+        'de catorce. Las dos las encontró el guion 19 en un navegador real; en jsdom no hay ' +
+        'cascada que resolver ni altura que repartir. Sobran 10.175 sobre el techo.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

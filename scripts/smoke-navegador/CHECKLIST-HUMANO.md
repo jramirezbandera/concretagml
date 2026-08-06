@@ -1551,9 +1551,10 @@ que queda aquí es de LECTURA, y hereda el carácter del 8.1, el 9.4, el 10.5 y 
       hay ninguna tarjeta que hable de «la parcela» ni de metros negativos**. Si la
       hay, el arreglo se ha deshecho.
 - [ ] Los tres avisos que sí deben estar: **huso ambiguo** (2 interpretaciones,
-      30 y 31), **«esta rama no se guarda sola»** y —si has soltado un dibujo en la
-      rama Parcela— el que te manda a la otra rama. ¿Alguno se lee como un veredicto
-      sobre tu trabajo?
+      30 y 31), **«esta rama se guarda sola pero todavía no se archiva»** (F12 · T4.3;
+      hasta entonces decía «no se guarda sola», y dejó de ser verdad) y —si has soltado
+      un dibujo en la rama Parcela— el que te manda a la otra rama. ¿Alguno se lee como
+      un veredicto sobre tu trabajo?
 - [ ] «4 nota(s) más en el detalle del fichero»: ¿sabes **dónde** está ese detalle?
       Si no lo encuentras, la frase promete algo que no entrega.
 - [ ] ⚠️ El de **huso ambiguo** es el que de verdad importa y es el que enlaza con
@@ -1739,16 +1740,24 @@ cinco entradas—.
 - [ ] Léelo todo con ojos de técnico que no ha escrito el código. ¿Alguna frase **se
       lee como un veredicto** sobre el edificio, sobre el dibujo o sobre lo que hay
       que hacer?
-- [ ] ⭐ «Esta rama **no se guarda sola**» se dice ahora en **DOS SITIOS Y DOS
+- [ ] ⭐ Lo que esta rama **guarda y no guarda** se dice en **DOS SITIOS Y DOS
       FORMAS**, después de que el guion midiera que se estaba diciendo **dos veces
       entera** (y costaba 89 px): una **línea** permanente en el renglón de
-      procedencia («…exporta el dibujo desde tu CAD antes de cerrar la pestaña») y la
-      **tarjeta completa** en el panel de avisos, una sola vez, cuando ya hay algo
-      que perder. Léelas las dos seguidas: **¿se leen como una advertencia que se
-      concreta, o como dos avisos distintos?** ¿La línea corta basta para el que solo
-      mire el renglón? ¿La tarjeta larga aporta lo suficiente para ocupar su sitio?
-      Si la respuesta a alguna es que no, el reparto hay que rehacerlo — y ahí hay
-      hasta 29,69 px en juego.
+      procedencia («Esta rama guarda el trabajo en curso, pero todavía no lo archiva
+      con nombre») y la **tarjeta completa** en el panel de avisos, una sola vez,
+      cuando ya hay algo en juego. Léelas las dos seguidas: **¿se leen como una
+      advertencia que se concreta, o como dos avisos distintos?** ¿La línea corta
+      basta para el que solo mire el renglón? ¿La tarjeta larga aporta lo suficiente
+      para ocupar su sitio? Si la respuesta a alguna es que no, el reparto hay que
+      rehacerlo — y ahí hay hasta 29,69 px en juego.
+- [ ] ⛔ **F12 · T4.3 reescribió las dos, y esto es lo que hay que juzgar de nuevo.**
+      Antes decían «esta rama **no se guarda sola**… exporta el dibujo desde tu CAD»,
+      y las dos mitades caducaron en esa misma tarea: la rama pasó a autoguardarse y
+      el recinto pasó a poderse dibujar aquí (no hay CAD del que reexportarlo). El
+      texto de ahora distingue **guardar el trabajo en curso** de **archivarlo con
+      nombre**. La pregunta para ti: **¿esa distinción se entiende sin haber leído el
+      código?** Si alguien lee «se guarda sola» y da por hecho que su edificio estará
+      en la lista de expedientes mañana, la frase no ha servido de nada.
 - [ ] Los cuatro rótulos del estado de conservación —«Funcional», «En construcción»,
       «Ruinoso», «Derruido»— **no son un juicio de la aplicación**: son el vocabulario
       de INSPIRE y el valor de un campo que tú eliges. ¿Se lee así, o parece que la
@@ -2242,3 +2251,113 @@ como advertencia. **El gesto real está sin medir por definición.**
 que se firma ahí no es que el código funcione —eso lo dicen 6.393 pruebas y el guion
 18— sino que **el gesto más corto que tiene el técnico llega a alguna parte**, y ese
 gesto no lo puede hacer una máquina de este proyecto.
+
+---
+
+## §16 · F12 · Partes, plantas y el recinto que se dibuja a mano
+
+**Lo que `19-partes-plantas.js` NO firma.** El guion mide que quepa, que se
+pinte, que se guarde y que los números salgan. Lo de aquí abajo es lo que solo
+puede decir alguien que trabaje con edificios: si lo que sale **se entiende**, y
+si es **lo que un técnico esperaba**.
+
+Antes de empezar: abre la aplicación, conmuta a **Edificio** y suelta
+`test/fixtures/gml/bu_buildingpart_9398516VK3799G.gml`. Son las trece partes
+reales de la parcela 9398516VK3799G.
+
+### 16.1 · La lista y su ficha: ¿es una lista con detalle, o dos cosas sueltas?
+
+- [ ] Ve a **Edición**. Arriba hay una lista de partes y debajo un bloque con la
+      parte elegida. **Léelos seguidos, sin tocar nada.** ¿Se entiende que el de
+      abajo habla de la fila marcada? ¿O parecen dos secciones que no se hablan?
+- [ ] Elige otra parte. ¿**Ves** que ha cambiado el bloque de abajo, o tienes que
+      buscar la diferencia? Un cambio que hay que buscar es un cambio que en una
+      sesión de dos horas se pasa por alto.
+- [ ] ⭐ A 1280×720 la lista se queda en **tres filas** de las catorce (es un
+      suelo puesto a propósito: sin él el reparto la aplasta a dos). **Trabaja
+      así diez minutos**: elige partes, mira sus plantas, vuelve atrás. ¿Tres
+      filas bastan para saber dónde estás, o te pierdes cada vez que te
+      desplazas? Si te pierdes, el suelo tiene que subir — y lo paga el bloque de
+      abajo, que es donde está la tabla de coordenadas.
+- [ ] Si tienes pantalla grande, mira lo mismo a 1440×900 (allí caben cuatro).
+      ¿La diferencia entre tres y cuatro filas cambia la sensación?
+
+### 16.2 · Las plantas: el dato que distingue un volumen de otro
+
+- [ ] Elige una parte principal. Salen **dos contadores**: plantas sobre rasante
+      y bajo rasante, con la ayuda «bajo rasante = sótanos; rasante es la línea
+      del terreno». ⭐ **¿Esa frase te hace falta, te sobra, o dice lo que no
+      es?** Está escrita para alguien que no es topógrafo.
+- [ ] Cambia el tipo de la parte a **«Otra»** (una piscina, un porche). Los dos
+      contadores **desaparecen**: no se apagan, no se quedan en blanco — no
+      están. ¿Se lee como «esto no aplica» o como «se ha roto algo»?
+- [ ] ⛔ **Y ahora el juicio que ninguna máquina puede hacer.** El fichero real
+      trae `Parte 10` con **0 plantas sobre rasante y 1 bajo**: es un sótano, y
+      es la parte **MÁS GRANDE** del edificio (245,90 m² de 568,03 en total).
+      Búscala en la lista. **¿Se ve que es un sótano sin abrirla?** Su rótulo en
+      el mapa es `(−1)`, sin romano delante. Si tienes que abrir cada parte para
+      saber cuáles cuentan, la lista no está diciendo lo que hace falta.
+- [ ] Hasta esta fase las plantas del fichero **se tiraban** y la aplicación lo
+      decía. Ahora entran. Lee el aviso que sale al cargar: enumera las trece
+      («sobre rasante 1, 7, 7, 6…»). ¿Sirve de algo esa lista de números, o es
+      ruido que te tapa un aviso que sí importa?
+
+### 16.3 · El mapa: los romanos y la envolvente
+
+- [ ] Mira las huellas. Cada una lleva su rótulo en romano (`VII`, `VI`,
+      `VII (−1)`). **¿Se leen sobre el ortofoto?** Prueba con la capa aérea y con
+      la del Catastro: el fondo cambia mucho.
+- [ ] ¿**Estorban**? Trece rótulos sobre trece huellas pequeñas pueden ser más
+      ruido que dato. Si te estorban, dilo: la alternativa es enseñarlos solo
+      para la parte activa.
+- [ ] ⭐ **La envolvente.** Con las plantas reales, la línea de «envolvente
+      calculada» **deja fuera la parte más grande** —el sótano— y el edificio
+      pasa de 568,03 m² a 322,13. Míralo en el mapa. **¿Se entiende POR QUÉ falta
+      ese trozo?** Es correcto y es contraintuitivo: si a ti te chirría, a quien
+      firme el GML también.
+- [ ] Cambia a `0` las plantas sobre rasante de otra parte y mira cómo se
+      redibuja la envolvente. ¿El cambio es visible? ¿Te avisa de algo, o la
+      línea se mueve en silencio?
+
+### 16.4 · Dibujar un recinto: el caso del encargo real
+
+- [ ] Pulsa **«Añadir parte»**. Aparece al final de la lista, ya elegida, con el
+      renglón «pendiente de dibujar el recinto». ¿Sabes **qué hacer a
+      continuación** sin que nadie te lo diga?
+- [ ] Pulsa **«Dibujar recinto»** en la barra sobre el mapa. Pincha cuatro
+      esquinas y cierra con doble clic. ⭐ **¿El enganche al parcelario ayuda o
+      estorba** al declarar un porche pegado a la fachada? Prueba con `Alt`
+      sostenida, que lo apaga.
+- [ ] Empieza otro y pulsa **`Escape`** a medias. ¿Queda claro que no se ha
+      guardado nada?
+- [ ] Abre la **Ayuda** de la barra **mientras dibujas**. Los cuatro gestos del
+      dibujo están ahí desde esta fase (antes no estaban). ¿Los encuentras? ¿La
+      columna «dónde» te deja claro que el mismo clic hace dos cosas distintas
+      según si hay un trazo abierto?
+
+### 16.5 · Lo que se guarda y lo que no — léelo con cuidado
+
+- [ ] ⛔ **Esta rama estrena autoguardado en F12, y el mensaje cambió entero.**
+      Antes decía «esta rama **no se guarda sola**… exporta el dibujo desde tu
+      CAD»; ahora distingue **guardar el trabajo en curso** de **archivarlo con
+      nombre**. Lee las dos versiones (el renglón de procedencia y la tarjeta del
+      panel). **¿Esa distinción se entiende sin haber leído el código?**
+- [ ] La prueba de fuego: **dibuja un recinto, recarga la página y recupera el
+      trabajo cuando te lo ofrezca.** ¿Vuelve lo que habías hecho? ¿La oferta te
+      dice **de qué** es —«de la parcela … y del edificio …»— o tienes que
+      aceptarla para averiguarlo?
+- [ ] Abre **«Expediente»** con la rama Edificio puesta. «Guardar» está apagado y
+      el motivo dice que la lista de expedientes es de la rama Parcela. ⭐ ¿Ese
+      motivo te parece **una limitación entendible** o **una avería**? Y lo que
+      más importa: después de leerlo, **¿crees que tu edificio estará ahí
+      mañana?** Si la respuesta es que sí, la frase no ha servido de nada.
+- [ ] Trabaja con un edificio, carga **otro** encima y comprueba que el aviso te
+      había advertido de que el trabajo en curso es UNO. ¿Te enteraste a tiempo?
+
+### 16.6 · El pliegue del selector de modelo
+
+- [ ] Al entrar un edificio, el selector de modelo (Simplificado / Completo) se
+      pliega a un renglón. Son **174,41 px** que vuelven al panel. ¿Echas de
+      menos verlo? ¿Encuentras la forma de volver a abrirlo sin buscarla?
+- [ ] Cámbialo a **Completo** con partes ya cargadas. ¿Entiendes qué acabas de
+      cambiar y a qué afecta?

@@ -3508,6 +3508,17 @@ edificioCableado = cablearEdificio({
   // conmutador, esta línea es lo único que evita que las dos secciones nuevas se
   // queden visibles encima del panel de parcela hasta la primera pulsación.
   rama: ramaCableada,
+  // ── F12 · T4.2 · lo que la edición de la parte activa necesita ─────────────
+  // El MISMO historial que la rama de parcela, y a propósito: `Ctrl+Z` es UNA
+  // tecla y el usuario no lleva la cuenta de en qué rama la pulsa. Con dos pilas
+  // separadas, deshacer en Edificio dejaría intacta la última cosa que se ve
+  // haber hecho —o desharía algo de la otra rama— y las dos lecturas son peores
+  // que una sola pila que fotografía el POJO que toque.
+  historial,
+  // La barra sobre el mapa, SOLO para encender la palabra «Dibujar recinto». Se
+  // le pasa `visor.barraEdicion` y no `visor.edicion`: son dos preguntas
+  // distintas y la segunda no implica la primera (medido por T1.5 de F11).
+  barraEdicion: visor.barraEdicion,
 })
 
 // ── 12 · Persistencia y exportación (F10 · T5.1) ─────────────────────────────
@@ -3989,15 +4000,48 @@ if (ctaDiagnosticar !== null) {
 // dos ejes distintos (lo que se VE y lo que se PUEDE), y hacerlos pasar por el
 // mismo sitio los ataría de una forma que costaría deshacer el día que una
 // pantalla quiera enseñar la barra apagada con su motivo al lado.
+//
+// ── ⛔ F12 · T4.2 · Y DESDE QUE HAY DOS EDICIONES, ESTE ES **EL** SITIO ──────
+// La rama EDIFICIO tiene su propio `crearEdicion` sobre el mismo `L.Map`, y las
+// dos NO pueden estar encendidas a la vez: los gestos se pisarían y el usuario
+// arrastraría un vértice de la parcela creyendo mover el del edificio. Quién
+// edita depende de DOS ejes —qué rama y qué paso—, y los dos solo se cruzan
+// aquí: `app/rama.js` no sabe de pasos y `app/navegacion.js` no sabe de ramas.
+//
+// Por eso las dos ediciones se nombran **en la misma función**, con la condición
+// escrita una sola vez. Repartir esta decisión entre los dos módulos sería
+// dejarla a merced del orden en que llegasen sus avisos.
 if (visor.edicion !== null && typeof visor.edicion.activa === 'function') {
   // `subscribe` entrega la situación al suscriptor, igual que en `app/rama.js` y
   // `app/contraste.js`; el arranque se hace a mano con `get()` porque el store no
   // publica al suscribirse.
-  const aplicarEdicion = ({ paso } = navegacion.get()) => {
-    visor.edicion.activa(paso === PASO.EDICION)
+  const aplicarEdicion = () => {
+    const editando = navegacion.get().paso === PASO.EDICION
+    const enEdificio = ramaCableada !== null && ramaCableada.get() === RAMA.EDIFICIO
+    visor.edicion.activa(editando && !enEdificio)
+    edificioCableado?.edicion(editando && enEdificio)
   }
-  aplicarEdicion(navegacion.get())
+  aplicarEdicion()
   navegacion.subscribe(aplicarEdicion)
+  // ⚠️ Y también al conmutador de rama: sin esta segunda suscripción, cambiar de
+  // rama sin cambiar de paso dejaría encendida la edición de la rama que se
+  // acaba de abandonar. `app/rama.js` publica `subscribe` desde F11.
+  ramaCableada?.subscribe(aplicarEdicion)
+}
+
+// ── F12 · T4.2 · «Dibujar recinto», la sexta palabra de la barra ─────────────
+//
+// Se cablea aquí y no en `viewer/barra-edicion.js` por lo mismo que «Deshacer» y
+// «Offset»: la barra FABRICA el botón y no sabe qué hace, y quien lo sabe es el
+// cableado de la rama. El botón nace ESCONDIDO —no apagado— y lo enseña
+// `cablearEdificio` cuando hay una parte elegida y esta rama tiene el mando.
+{
+  const botonDibujar = document.querySelector('[data-accion="dibujar-recinto"]')
+  if (botonDibujar !== null && edificioCableado !== null) {
+    botonDibujar.addEventListener('click', () => {
+      edificioCableado.alternarDibujo()
+    })
+  }
 }
 
 // ── La URL (decisión D3): hash, y el DATO manda sobre la URL ─────────────────

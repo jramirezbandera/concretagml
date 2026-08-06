@@ -44,12 +44,33 @@
 // llevarse un trabajo con seguridad hay que **exportarlo a un fichero**.
 //
 // ── EL BORRADOR ES UN REGISTRO MÁS, CON CLAVE RESERVADA ─────────────────────
-// El autoguardado no escribe en un almacén aparte: escribe en ESTE, con la clave
-// fija {@link ID_BORRADOR}, así que cada disparo del debounce PISA al anterior y no
-// se acumula un historial que nadie ha pedido. Es el mismo diseño de registro único
-// que `storage/pie-firma.js`. {@link crearExpedientes}`.listar()` lo excluye: el
+// El autoguardado no escribe en un almacén aparte: escribe en ESTE, con una clave
+// fija, así que cada disparo del debounce PISA al anterior y no se acumula un
+// historial que nadie ha pedido. Es el mismo diseño de registro único que
+// `storage/pie-firma.js`. {@link crearExpedientes}`.listar()` los excluye: el
 // trabajo en curso no es un expediente guardado, y mezclarlos haría que la lista
 // creciera sola mientras el usuario dibuja.
+//
+// ⛔ **F12 · T4.3 · LA CLAVE ES UNA POR RAMA, y no por gusto.** Hasta aquí era UNA
+// sola ({@link ID_BORRADOR}) porque solo autoguardaba la rama de parcela. F12 le
+// da identidad al `Edificio` y suscribe el autoguardado a su store, y con una
+// clave compartida eso tendría un desenlace exacto y silencioso: **el borrador de
+// edificio pisaría al de parcela y al revés**, dos segundos después de conmutar,
+// sin que nada fallara. Lo dejó escrito la desviación 7 del plan de F11 —«el
+// autoguardado no se extiende: el borrador es un registro único de clave
+// reservada»—, y esto es lo que la levanta.
+//
+// El reparto está en {@link ID_BORRADOR_POR_TIPO} y lo enruta **el `tipo` del
+// propio Expediente**: {@link crearExpedientes}`.guardarBorrador` no recibe la
+// clave por parámetro, la deriva de lo que le dan. Un parámetro más sería un
+// parámetro que se puede pasar equivocado, y equivocarlo aquí es exactamente el
+// fallo que este reparto viene a impedir.
+//
+// ⚠️ **Y el valor de la clave de parcela NO cambia.** Estrenar un nombre nuevo
+// habría dejado huérfano el borrador de quien cerrara la pestaña ayer: seguiría en
+// la base, invisible para la lista y para la oferta, ocupando espacio y sin nadie
+// que lo pudiera recuperar. La clave vieja es la de parcela, y la nueva es la de
+// la rama nueva.
 //
 // ── POR QUÉ LA LECTURA PASA SIEMPRE POR `crearExpediente` ───────────────────
 // **Medido en la fase 0, no deducido:** IndexedDB guarda y devuelve con el algoritmo
@@ -71,7 +92,7 @@
 // lee al llamar, no al cargar—, así que el único que lo impide es el guardián de
 // `test/contrato.test.js`.
 
-import { crearExpediente } from '../model/parcela.js'
+import { TIPO_EXPEDIENTE, crearExpediente } from '../model/parcela.js'
 import { NIVEL, resolverAvisar } from '../viewer/_comun.js'
 import { ALMACENES, ESQUEMA_ALMACENES } from './bd.js'
 // `esCuotaExcedida` es PURA: no toca `navigator.storage` ni nada del entorno, así
@@ -83,16 +104,75 @@ import { esCuotaExcedida } from './cuota.js'
 // ── Identidad de los registros ───────────────────────────────────────────────
 
 /**
- * La clave reservada del borrador del autoguardado. Se exporta para que el guion de
- * humo y una herramienta de diagnóstico puedan mirarlo sin adivinar cómo se llama.
+ * La clave reservada del borrador del autoguardado **de la rama PARCELA**. Se
+ * exporta para que el guion de humo y una herramienta de diagnóstico puedan mirarlo
+ * sin adivinar cómo se llama.
  *
  * Empieza por letra, como todo identificador de este proyecto (regla de oro 10 en
  * espíritu), y lleva un prefijo que lo distingue a simple vista de un expediente
  * guardado cuando alguien abra el inspector del navegador.
  *
+ * ⚠️ **Su valor no se toca nunca.** Ver el apartado del borrador en la cabecera:
+ * renombrarla dejaría huérfano el trabajo de quien cerrara la pestaña con la
+ * versión anterior. El nombre sigue sin decir «parcela» por eso mismo — es un
+ * literal ya escrito en bases de datos reales, no un rótulo que se pueda mejorar.
+ *
  * @readonly
  */
 export const ID_BORRADOR = 'EXP-borrador-en-curso'
+
+/**
+ * La clave reservada del borrador **de la rama EDIFICIO** (F12 · T4.3). Estrena
+ * nombre porque estrena rama: aquí no hay nada anterior que huerfanar.
+ *
+ * @readonly
+ */
+export const ID_BORRADOR_EDIFICIO = 'EXP-borrador-edificio-en-curso'
+
+/**
+ * Qué clave le toca a cada rama. **Es el índice por el que enruta todo el módulo**:
+ * ningún sitio de aquí abajo vuelve a nombrar una de las dos claves a pelo, para que
+ * añadir una tercera rama algún día sea añadir una entrada y no buscar literales.
+ *
+ * Las claves del mapa son las de `TIPO_EXPEDIENTE` (`model/parcela.js`), que es el
+ * mismo vocabulario con el que el Expediente se declara a sí mismo. No hay un
+ * segundo enumerado paralelo: dos vocabularios para lo mismo acaban discrepando en
+ * el que nadie mire.
+ *
+ * @readonly
+ * @type {Readonly<Record<string, string>>}
+ */
+export const ID_BORRADOR_POR_TIPO = Object.freeze({
+  [TIPO_EXPEDIENTE.PARCELA]: ID_BORRADOR,
+  [TIPO_EXPEDIENTE.EDIFICIO]: ID_BORRADOR_EDIFICIO,
+})
+
+/** Las dos claves reservadas, para excluirlas del listado de una sola pasada. */
+const CLAVES_BORRADOR = Object.freeze(Object.values(ID_BORRADOR_POR_TIPO))
+
+/**
+ * A qué clave escribe (o de cuál lee) el borrador de este tipo de expediente.
+ *
+ * **LANZA con un tipo desconocido**, y es lo correcto: el tipo no lo teclea nadie,
+ * sale de `TIPO_EXPEDIENTE` o del Expediente que ya ha pasado por el modelo. Un
+ * defecto por defecto —«si no lo conozco, parcela»— escribiría el edificio encima
+ * del borrador de la parcela, que es justo lo que este reparto existe para impedir.
+ *
+ * @param {string} tipo  Uno de `TIPO_EXPEDIENTE`.
+ * @param {string} fn  Nombre de quien pregunta, para el mensaje.
+ * @returns {string}
+ * @throws {RangeError}
+ */
+function claveBorrador(tipo, fn) {
+  const clave = ID_BORRADOR_POR_TIPO[tipo]
+  if (clave === undefined) {
+    throw new RangeError(
+      `${fn}: 'tipo' de expediente desconocido: ${JSON.stringify(tipo)}. ` +
+        `Válidos: ${Object.keys(ID_BORRADOR_POR_TIPO).join(', ')}.`,
+    )
+  }
+  return clave
+}
 
 /** El campo en el que la base espera la clave. **Derivado**, nunca escrito. */
 const CAMPO_CLAVE = ESQUEMA_ALMACENES[ALMACENES.EXPEDIENTES].keyPath
@@ -211,11 +291,31 @@ function esBase(v) {
  * hueco en blanco (regla de oro 1: «Sin referencia catastral» y «todavía no se ha
  * mirado» no son lo mismo, pero un rótulo vacío no distingue ni eso).
  *
+ * ⚠️ **La frase nombra la RAMA** (F12 · T4.3). Antes decía «Parcela sin referencia»
+ * siempre, porque solo había una rama; con dos, un edificio sin RC habría entrado en
+ * la lista llamándose «Parcela», que es el único dato que el usuario tendría para
+ * distinguirlo y estaría diciéndole lo que no es.
+ *
  * @param {string|null} refcat
+ * @param {string} [tipo=TIPO_EXPEDIENTE.PARCELA]  Uno de `TIPO_EXPEDIENTE`.
  * @returns {string}
  */
-function nombrePorDefecto(refcat) {
-  return typeof refcat === 'string' && refcat.length > 0 ? refcat : 'Parcela sin referencia'
+function nombrePorDefecto(refcat, tipo = TIPO_EXPEDIENTE.PARCELA) {
+  if (typeof refcat === 'string' && refcat.length > 0) return refcat
+  return tipo === TIPO_EXPEDIENTE.EDIFICIO ? 'Edificio sin referencia' : 'Parcela sin referencia'
+}
+
+/**
+ * La referencia catastral de un Expediente, **venga de la rama que venga**. Una sola
+ * función porque el registro tiene UN campo `refcat` indexado y las dos ramas lo
+ * llenan: mirar solo `parcela` dejaba el de edificio a `null` y su rótulo por defecto
+ * en «sin referencia» teniéndola.
+ *
+ * @param {object} expediente  Ya normalizado por `crearExpediente`.
+ * @returns {string|null}
+ */
+function refcatDe(expediente) {
+  return expediente.parcela?.refcat ?? expediente.edificio?.refcat ?? null
 }
 
 // ── Typedefs ─────────────────────────────────────────────────────────────────
@@ -253,9 +353,13 @@ function nombrePorDefecto(refcat) {
  *   Vacío si no hay ninguno o si no se pudo leer: quien pregunta mira `ok`.
  * @property {number} invisibles  Cuántos registros hay en el almacén que el índice
  *   NO devuelve. Debería ser 0 siempre; ver la nota de `listar`.
- * @property {boolean} hayBorrador  Si existe trabajo en curso autoguardado. Se
- *   devuelve aquí —y no obligando a una lectura aparte— porque la lista ya ha
- *   tenido el registro en la mano para excluirlo.
+ * @property {boolean} hayBorrador  Si existe trabajo en curso autoguardado **en
+ *   alguna rama**. Se devuelve aquí —y no obligando a una lectura aparte— porque la
+ *   lista ya ha tenido los registros en la mano para excluirlos. **Derivado** de
+ *   `borradores`, nunca escrito aparte.
+ * @property {string[]} borradores  De qué ramas hay trabajo en curso: `TIPO_EXPEDIENTE`
+ *   en el orden de {@link ID_BORRADOR_POR_TIPO}. Vacío si no hay ninguno. Es lo que
+ *   la oferta del arranque necesita para decir QUÉ ha encontrado (F12 · T4.3).
  * @property {string|null} motivo
  * @property {string|null} mensaje
  */
@@ -493,7 +597,7 @@ export function crearExpedientes(opciones = {}) {
 
     const clave = id ?? idNuevo()
     const marca = new Date(ahora()).toISOString()
-    const refcat = normal.parcela?.refcat ?? null
+    const refcat = refcatDe(normal)
 
     // Si ya existía, se conserva su `creado`: guardar otra vez no es crear otra vez.
     let creado = marca
@@ -506,7 +610,10 @@ export function crearExpedientes(opciones = {}) {
       // `creado` y `actualizado` saldrán iguales.
     }
 
-    const rotulo = nombre !== undefined && nombre.trim().length > 0 ? nombre.trim() : nombrePorDefecto(refcat)
+    const rotulo =
+      nombre !== undefined && nombre.trim().length > 0
+        ? nombre.trim()
+        : nombrePorDefecto(refcat, normal.tipo)
     const registro = {
       [CAMPO_CLAVE]: clave,
       nombre: rotulo,
@@ -542,15 +649,26 @@ export function crearExpedientes(opciones = {}) {
    */
   async function listar() {
     const db = await base()
-    if (db === null) return conSinBase({ registros: [], invisibles: 0 })
+    // `hayBorrador`/`borradores` van explícitos aunque no haya base: sin ellos salían
+    // `undefined`, y `undefined` en una bandera se lee como `false` sin haberlo dicho.
+    if (db === null) {
+      return conSinBase({ registros: [], invisibles: 0, hayBorrador: false, borradores: [] })
+    }
 
     try {
       const crudos = await db.getAllFromIndex(ALMACENES.EXPEDIENTES, INDICE.ACTUALIZADO)
       const total = await db.count(ALMACENES.EXPEDIENTES)
 
-      const visibles = crudos.filter((r) => r?.[CAMPO_CLAVE] !== ID_BORRADOR)
-      const hayBorrador = crudos.length !== visibles.length
-      // `total` incluye el borrador si existe; `crudos` también, si está indexado.
+      const visibles = crudos.filter((r) => !CLAVES_BORRADOR.includes(r?.[CAMPO_CLAVE]))
+      // Qué RAMAS tienen trabajo en curso, no cuántos registros hay: es lo que la
+      // oferta del arranque necesita para decir qué se ha encontrado (F12 · T4.3).
+      const borradores = Object.entries(ID_BORRADOR_POR_TIPO)
+        .filter(([, clave]) => crudos.some((r) => r?.[CAMPO_CLAVE] === clave))
+        .map(([tipo]) => tipo)
+      // DERIVADO, nunca escrito aparte: dos banderas que dicen lo mismo son dos
+      // banderas que pueden discrepar, y ésta la leen tres sitios desde F10.
+      const hayBorrador = borradores.length > 0
+      // `total` incluye los borradores si existen; `crudos` también, si están indexados.
       const invisibles = Math.max(0, total - crudos.length)
 
       const registros = visibles.reverse().map(soloCabecera)
@@ -568,6 +686,7 @@ export function crearExpedientes(opciones = {}) {
         registros,
         invisibles,
         hayBorrador,
+        borradores,
         motivo: null,
         mensaje: null,
       }
@@ -580,6 +699,7 @@ export function crearExpedientes(opciones = {}) {
         registros: [],
         invisibles: 0,
         hayBorrador: false,
+        borradores: [],
         motivo: MOTIVO_EXPEDIENTES.ERROR_LECTURA,
         mensaje,
       }
@@ -721,8 +841,13 @@ export function crearExpedientes(opciones = {}) {
   // ── El borrador del autoguardado ──────────────────────────────────────────
 
   /**
-   * Guarda el trabajo en curso, pisando el borrador anterior. Lo llama el debounce
-   * de `storage/autoguardado.js`, no el usuario.
+   * Guarda el trabajo en curso, pisando el borrador anterior **de su misma rama**.
+   * Lo llama el debounce de `storage/autoguardado.js`, no el usuario.
+   *
+   * ⛔ **La clave la decide el `tipo` del expediente, no quien llama** (F12 · T4.3).
+   * Ver el apartado del borrador en la cabecera: un parámetro de clave sería un
+   * parámetro que se puede pasar equivocado, y equivocarlo aquí es escribir el
+   * edificio encima de la parcela sin que nada falle.
    *
    * A diferencia de {@link guardar}, **no avisa por el canal cuando falla**: el
    * autoguardado corre solo, cada dos segundos, y un fallo persistente llenaría el
@@ -743,14 +868,19 @@ export function crearExpedientes(opciones = {}) {
       parcela: expediente?.parcela ?? null,
       edificio: expediente?.edificio ?? null,
     })
+    // Va DESPUÉS de normalizar y antes de tocar la base: `crearExpediente` ya ha
+    // validado el tipo, así que llegar aquí con uno desconocido solo puede ser que
+    // este mapa se haya quedado corto — y eso tiene que verse, no degradar.
+    const clave = claveBorrador(normal.tipo, 'guardarBorrador')
+
     const db = await base()
     if (db === null) return conSinBase({ registro: null, esCuota: false })
 
     const marca = new Date(ahora()).toISOString()
-    const refcat = normal.parcela?.refcat ?? null
+    const refcat = refcatDe(normal)
     const registro = {
-      [CAMPO_CLAVE]: ID_BORRADOR,
-      nombre: nombrePorDefecto(refcat),
+      [CAMPO_CLAVE]: clave,
+      nombre: nombrePorDefecto(refcat, normal.tipo),
       refcat,
       creado: marca,
       actualizado: marca,
@@ -774,24 +904,37 @@ export function crearExpedientes(opciones = {}) {
   }
 
   /**
-   * El trabajo en curso, si lo hay. `ok: false` con `NO_ENCONTRADO` **no es un
-   * fallo**: es que no hay borrador, que es el caso normal del primer arranque.
+   * El trabajo en curso **de una rama**, si lo hay. `ok: false` con `NO_ENCONTRADO`
+   * **no es un fallo**: es que no hay borrador, que es el caso normal del primer
+   * arranque — y, desde F12, también el de la rama que el usuario no haya tocado.
    *
+   * El defecto es `PARCELA` porque es la rama con la que arranca la aplicación y la
+   * única que existía cuando esto se escribió: las llamadas de F10 siguen valiendo
+   * palabra por palabra. Un tipo desconocido **lanza** (ver {@link claveBorrador}).
+   *
+   * @param {string} [tipo=TIPO_EXPEDIENTE.PARCELA]  Uno de `TIPO_EXPEDIENTE`.
    * @returns {Promise<ResultadoRecuperar>}
+   * @throws {RangeError}  Con un tipo que no tiene clave reservada.
    */
-  async function leerBorrador() {
-    return recuperar(ID_BORRADOR)
+  async function leerBorrador(tipo = TIPO_EXPEDIENTE.PARCELA) {
+    return recuperar(claveBorrador(tipo, 'leerBorrador'))
   }
 
   /**
-   * Tira el borrador. Lo llama «Descartar», y también el cableado en cuanto el
-   * usuario recupera el trabajo: dejarlo ahí después de recuperarlo haría que la
-   * próxima carga volviera a ofrecer algo que ya está en pantalla.
+   * Tira el borrador **de una rama**. Lo llama «Descartar», y también el cableado en
+   * cuanto el usuario recupera el trabajo: dejarlo ahí después de recuperarlo haría
+   * que la próxima carga volviera a ofrecer algo que ya está en pantalla.
    *
+   * ⚠️ Borra el de UNA rama, no los dos. Quien quiera acabar con la oferta entera
+   * llama dos veces, y lo hace a la vista: un «descarta todo» escondido detrás de un
+   * defecto tiraría el trabajo de una rama que el usuario no estaba mirando.
+   *
+   * @param {string} [tipo=TIPO_EXPEDIENTE.PARCELA]  Uno de `TIPO_EXPEDIENTE`.
    * @returns {Promise<{ok: boolean, motivo: string|null, mensaje: string|null}>}
+   * @throws {RangeError}  Con un tipo que no tiene clave reservada.
    */
-  async function descartarBorrador() {
-    return borrar(ID_BORRADOR)
+  async function descartarBorrador(tipo = TIPO_EXPEDIENTE.PARCELA) {
+    return borrar(claveBorrador(tipo, 'descartarBorrador'))
   }
 
   /**

@@ -93,7 +93,7 @@ import { ACADVER } from '../../export/dxf.js'
 import { deProyecto } from '../../export/proyecto.js'
 import { nombreFicheroGml } from '../../gml/descargar.js'
 import { crearEdificio } from '../../model/edificio.js'
-import { crearExpediente } from '../../model/parcela.js'
+import { TIPO_EXPEDIENTE, crearExpediente } from '../../model/parcela.js'
 import { ALMACENES } from '../../storage/bd.js'
 import { crearExpedientes } from '../../storage/expedientes.js'
 import { crearEstadoVista } from '../../viewer/_comun.js'
@@ -232,8 +232,11 @@ function almacenSinEspacio(real, n = 1) {
  * Un Edificio de verdad, del modelo. Dos partes, para que un recuento pueda
  * distinguirlo de un edificio vacío.
  */
-function edificioDemo({ refcat = 'EDIF-1', parcelaContexto = null } = {}) {
+function edificioDemo({ refcat = 'EDIF-1', parcelaContexto = null, idLocal = 'EDIF-DEMO' } = {}) {
   return crearEdificio({
+    // F12 · T4.3: con identidad por defecto, que es como entra en producción por las
+    // cuatro puertas. Las pruebas que midan qué pasa SIN ella la piden a `null`.
+    idLocal,
     refcat,
     parcelaContexto,
     partes: [
@@ -1413,6 +1416,17 @@ describe('F11 · T3.3 · 13 · (b) F11 no guarda expedientes de edificio, y lo d
     m.desmontar()
   })
 
+  it('⛔ F12 · T4.3 · el motivo ya NO dice que falte el identificador: se lo dio esta fase', () => {
+    // El motivo de F11 razonaba «porque un edificio no tiene aún el identificador con el
+    // que se distinguen los expedientes guardados», y T1.1 se lo dio. Mandaba a esperar
+    // por algo que ya está. Lo que queda es la razón que SIGUE siendo cierta: la lista y
+    // «Recuperar» son de la rama Parcela. Y dice lo que sí pasa, para que nadie crea que
+    // está perdiendo lo que tiene en pantalla.
+    expect(MOTIVO_GUARDAR_EN_EDIFICIO).not.toMatch(/no tiene aún el identificador/i)
+    expect(MOTIVO_GUARDAR_EN_EDIFICIO).toMatch(/lista de expedientes/i)
+    expect(MOTIVO_GUARDAR_EN_EDIFICIO).toMatch(/autoguarda/i)
+  })
+
   it('conmutar de rama con el diálogo ABIERTO enciende y apaga «Guardar» al vuelo', async () => {
     const m = await montar({ conRama: true, edificio: edificioDemo() })
     await abrir(m)
@@ -1446,17 +1460,29 @@ describe('F11 · T3.3 · 13 · (b) F11 no guarda expedientes de edificio, y lo d
     m.desmontar()
   })
 
-  it('⛔ el autoguardado NO se dispara con la rama EDIFICIO activa (desviación 7)', async () => {
+  // ⛔ **F12 · T4.3 · AQUÍ HABÍA TRES PRUEBAS QUE YA NO PUEDEN EXISTIR**, y no porque
+  // fueran malas: medían con precisión la desviación 7 de F11 —«el autoguardado no se
+  // dispara con la rama EDIFICIO activa, ni siquiera para la parcela»— que existía por
+  // un motivo escrito: **el borrador era UN registro de clave reservada** y las dos
+  // ramas se habrían pisado. T4.3 le da una clave a cada rama
+  // (`storage/expedientes.js#ID_BORRADOR_POR_TIPO`), el motivo desaparece, y seguir sin
+  // guardar la parcela sería dejar de guardarla porque sí.
+  //
+  // Lo que se afirma ahora es lo contrario, y con el mismo rigor: se dispara, escribe
+  // en SU clave, y **no toca la del otro**. Esa última es la que importa: era el riesgo
+  // entero de la desviación 7 y es lo único que la levanta con seguridad.
+
+  it('⭐ el autoguardado SÍ se dispara con la rama EDIFICIO activa (T4.3 levanta la desviación 7)', async () => {
     const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
     expect(m.timers.cuantos).toBe(0)
 
     m.estado.set(parcelaDemoConHueco())
     await reposar()
 
-    // Ni se ha programado el debounce…
-    expect(m.timers.cuantos).toBe(0)
-    // …ni hay borrador escrito, que es lo que de verdad importa.
-    expect((await m.expedientes.listar()).hayBorrador).toBe(false)
+    expect(m.timers.cuantos).toBe(1)
+    m.timers.disparar()
+    await reposar()
+    expect((await m.expedientes.listar()).hayBorrador).toBe(true)
     m.desmontar()
   })
 
@@ -1472,17 +1498,13 @@ describe('F11 · T3.3 · 13 · (b) F11 no guarda expedientes de edificio, y lo d
     m.desmontar()
   })
 
-  it('⭐ lo cambiado durante la rama EDIFICIO no se PIERDE: se vuelca al volver', async () => {
-    // «No pisar» no puede convertirse en «no guardar nunca». Es exactamente lo que
-    // resuelve `resolverOferta` para la oferta del borrador, y aquí para la rama.
+  it('⭐ lo cambiado durante la rama EDIFICIO se guarda, y en la clave de PARCELA', async () => {
+    // Antes de T4.3 esto se quedaba pendiente y se volcaba al volver. Ahora se escribe
+    // en el momento — y sigue yendo al borrador de PARCELA, que es lo que hace que la
+    // rama de al lado no lo pise.
     const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
     m.estado.set(parcelaDemoConHueco())
     await reposar()
-    expect(m.timers.cuantos).toBe(0)
-
-    m.rama.set(RAMA.PARCELA)
-    await reposar()
-    expect(m.timers.cuantos).toBe(1)
     m.timers.disparar()
     await reposar()
 
@@ -1492,10 +1514,30 @@ describe('F11 · T3.3 · 13 · (b) F11 no guarda expedientes de edificio, y lo d
     m.desmontar()
   })
 
-  it('⭐ ni siquiera DESCARTAR el borrador vuelca en la rama EDIFICIO', async () => {
-    // `resolverOferta` es el otro sitio que vuelca lo pendiente, y desde F11 también
-    // pregunta por la rama: descartar el trabajo de ayer estando en la rama Edificio
-    // no puede escribir el borrador de la parcela de debajo.
+  it('⛔ y el borrador de EDIFICIO no pisa el de PARCELA: son dos registros', async () => {
+    // **La afirmación que sostenía la desviación 7 entera**, ahora en positivo. Si las
+    // dos claves volvieran a ser una, uno de estos dos `leerBorrador` devolvería el
+    // documento de la otra rama y esta prueba se pondría roja.
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
+    m.estado.set(parcelaDemoConHueco())
+    m.estadoEdificio.set(edificioDemo({ idLocal: 'el-de-la-prueba' }))
+    await reposar()
+    m.timers.disparar()
+    await reposar()
+
+    const deParcela = await m.expedientes.leerBorrador(TIPO_EXPEDIENTE.PARCELA)
+    const deEdificio = await m.expedientes.leerBorrador(TIPO_EXPEDIENTE.EDIFICIO)
+    expect(deParcela.ok).toBe(true)
+    expect(deParcela.expediente.parcela.recintos).toHaveLength(2)
+    expect(deEdificio.ok).toBe(true)
+    expect(deEdificio.expediente.edificio.idLocal).toBe('el-de-la-prueba')
+    m.desmontar()
+  })
+
+  it('⭐ DESCARTAR el borrador vuelca lo pendiente de las DOS ramas', async () => {
+    // `resolverOferta` es el otro sitio que vuelca lo pendiente. Hasta T4.3 preguntaba
+    // por la rama y se callaba en EDIFICIO; ahora vuelca las dos, porque las dos tienen
+    // dónde escribir.
     const apertura = await baseNueva()
     const almacen = crearExpedientes({ bd: apertura, ahora: () => Date.UTC(2026, 7, 2) })
     await almacen.guardarBorrador(crearExpediente({ srs: SRS, parcela: parcelaDemo() }))
@@ -1509,11 +1551,15 @@ describe('F11 · T3.3 · 13 · (b) F11 no guarda expedientes de edificio, y lo d
 
     m.estado.set(parcelaDemoConHueco())
     await reposar()
+    // Con la oferta en pie NO se escribe: eso no ha cambiado, y es lo que impide que la
+    // primera edición se lleve por delante el trabajo de ayer antes de ofrecerlo.
+    expect(m.timers.cuantos).toBe(0)
+
     await abrir(m)
     pulsar(`${SELECTOR.BORRADOR} [data-accion="descartar-borrador"]`)
     await reposar()
 
-    expect(m.timers.cuantos).toBe(0)
+    expect(m.timers.cuantos).toBe(1)
     m.desmontar()
   })
 
@@ -1562,6 +1608,257 @@ describe('F11 · T3.3 · 13 · (b) F11 no guarda expedientes de edificio, y lo d
   })
 })
 
+// ═════════════════════════════════════════════════════════════════════════════
+// F12 · T4.3 · EL AUTOGUARDADO DE LA RAMA EDIFICIO
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Lo que la desviación 7 de F11 aplazó, con su motivo escrito: el borrador era UN
+// registro de clave reservada y suscribir el segundo store habría hecho que las dos
+// ramas se pisaran. T4.3 parte la clave en dos, le da identidad al `Edificio` y
+// suscribe el debounce. Lo que se comprueba aquí es lo que el usuario nota: que un
+// edificio dibujado a mano sobrevive a cerrar la pestaña.
+
+describe('F12 · T4.3 · la rama EDIFICIO se autoguarda', () => {
+  it('⭐ tocar el edificio programa SU debounce y escribe SU borrador', async () => {
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: null })
+    expect(m.timers.cuantos).toBe(0)
+
+    m.estadoEdificio.set(edificioDemo({ idLocal: 'UTM.dxf' }))
+    await reposar()
+    expect(m.timers.cuantos).toBe(1)
+
+    m.timers.disparar()
+    await reposar()
+    const b = await m.expedientes.leerBorrador(TIPO_EXPEDIENTE.EDIFICIO)
+    expect(b.ok).toBe(true)
+    expect(b.expediente.tipo).toBe(TIPO_EXPEDIENTE.EDIFICIO)
+    expect(b.expediente.edificio.partes).toHaveLength(2)
+    m.desmontar()
+  })
+
+  it('⭐ y la parcela de debajo viaja dentro, como CONTEXTO', async () => {
+    // Recuperar el borrador y devolver el edificio flotando sobre nada sería devolver
+    // media pantalla. Es el mismo `conParcelaDeContexto` de «Guardar proyecto».
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: null })
+    m.estadoEdificio.set(edificioDemo({ idLocal: 'UTM.dxf' }))
+    await reposar()
+    m.timers.disparar()
+    await reposar()
+
+    const b = await m.expedientes.leerBorrador(TIPO_EXPEDIENTE.EDIFICIO)
+    expect(b.expediente.edificio.parcelaContexto).toEqual(parcelaDemo().recintos)
+    m.desmontar()
+  })
+
+  it('⛔ un edificio SIN identidad no se autoguarda, y no se inventa una', async () => {
+    // Dos documentos sin identidad son indistinguibles: el segundo pisaría al primero
+    // creyendo que es una edición suya. Es lo que hacía imposible el autoguardado
+    // antes de que `model/edificio.js` tuviera `idLocal` (T1.1).
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: null })
+    m.estadoEdificio.set(edificioDemo({ idLocal: null }))
+    await reposar()
+
+    expect(m.timers.cuantos).toBe(0)
+    expect((await m.expedientes.listar()).borradores).toEqual([])
+    m.desmontar()
+  })
+
+  it('cargar OTRO edificio suelta la identidad del anterior', async () => {
+    // Si no, el siguiente «Guardar» pisaría el registro del primero con la geometría
+    // del segundo. Mismo criterio que `idLocalAbierto` para la parcela desde F10.
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: null })
+    m.estadoEdificio.set(edificioDemo({ idLocal: 'primero.dxf' }))
+    await reposar()
+    const creado = m.cableado.estado().creado
+
+    m.avanzar(60_000)
+    m.estadoEdificio.set(edificioDemo({ idLocal: 'segundo.dxf' }))
+    await reposar()
+    expect(m.cableado.estado().creado).not.toBe(creado)
+    m.desmontar()
+  })
+
+  it('editar el MISMO edificio conserva el `creado`: es una edición, no otro documento', async () => {
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: null })
+    m.estadoEdificio.set(edificioDemo({ idLocal: 'uno.dxf' }))
+    await reposar()
+    const creado = m.cableado.estado().creado
+
+    m.avanzar(60_000)
+    m.estadoEdificio.set(edificioDemo({ idLocal: 'uno.dxf', refcat: 'OTRA-RC' }))
+    await reposar()
+    expect(m.cableado.estado().creado).toBe(creado)
+    m.desmontar()
+  })
+
+  it('⛔ las dos identidades son INDEPENDIENTES: cargar una parcela no toca la del edificio', async () => {
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: null })
+    m.estadoEdificio.set(edificioDemo({ idLocal: 'uno.dxf' }))
+    await reposar()
+    const delEdificio = m.cableado.estado().creado
+
+    m.avanzar(60_000)
+    m.estado.set(parcelaDemoConHueco()) // otro documento en la OTRA rama
+    await reposar()
+    expect(m.cableado.estado().creado).toBe(delEdificio)
+    m.desmontar()
+  })
+
+  it('la suscripción al segundo store se retira al destruir', async () => {
+    // Se mide por lo que HACE y no por un contador de suscriptores: `crearEstadoVista`
+    // no publica ninguno, y un doble que lo publicara mediría el doble, no el cable.
+    const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: null })
+    m.cableado.destruir()
+    m.estadoEdificio.set(edificioDemo({ idLocal: 'despues.dxf' }))
+    await reposar()
+    expect(m.timers.cuantos).toBe(0)
+    if (m.rama !== null) m.rama.destruir()
+  })
+
+  it('sin rama de edificio montada nada de esto se monta, y F10 sigue igual', async () => {
+    // El montaje de todas las pruebas de F10: `rama: null` y `estadoEdificio: null`.
+    const m = await montar()
+    m.estado.set(parcelaDemoConHueco())
+    await reposar()
+    m.timers.disparar()
+    await reposar()
+    expect((await m.expedientes.listar()).borradores).toEqual([TIPO_EXPEDIENTE.PARCELA])
+    expect(m.cableado.estado().autoguardadoEdificio.escrituras).toBe(0)
+    m.desmontar()
+  })
+})
+
+describe('F12 · T4.3 · la oferta del arranque conoce las dos ramas', () => {
+  /** Cuándo se empezó el trabajo que se siembra. Fijo, para poder afirmarlo. */
+  const CREADO_DE_AYER = '2026-08-01T07:30:00.000Z'
+
+  /** Siembra los borradores que pida la prueba, en una base que se le devuelve. */
+  async function conBorradores({ parcela = false, edificio = false } = {}) {
+    const apertura = await baseNueva()
+    const almacen = crearExpedientes({ bd: apertura, ahora: () => Date.UTC(2026, 7, 2, 9, 0, 0) })
+    if (parcela) await almacen.guardarBorrador(crearExpediente({ srs: SRS, parcela: parcelaDemo() }))
+    if (edificio) {
+      await almacen.guardarBorrador(
+        crearExpediente({
+          tipo: TIPO_EXPEDIENTE.EDIFICIO,
+          srs: SRS,
+          edificio: edificioDemo({ idLocal: 'de-ayer.dxf', refcat: null }),
+          // ⚠️ Explícitos: `crearExpediente` estampa el reloj DEL SISTEMA cuando faltan
+          // —el `ahora` inyectado es el del almacén, no el del modelo—, y una prueba
+          // sobre una fecha del sistema sería intermitente por diseño.
+          metadatos: { creado: CREADO_DE_AYER, modificado: CREADO_DE_AYER, autor: '', idDocumento: '' },
+        }),
+      )
+    }
+    return apertura
+  }
+
+  it('⭐ un borrador SOLO de edificio se ofrece, y el aviso lo nombra por su rama', async () => {
+    const m = await montar({
+      bd: await conBorradores({ edificio: true }),
+      conRama: true,
+      edificio: null,
+    })
+    expect(m.cableado.estado().ofreciendoBorrador).toBe(true)
+    expect(m.cableado.estado().ramasOfrecidas).toEqual([TIPO_EXPEDIENTE.EDIFICIO])
+    // «del edificio», no «de la parcela»: es el único dato con el que el usuario puede
+    // saber qué le van a devolver.
+    expect(m.avisos().join('\n')).toMatch(/del edificio/)
+    m.desmontar()
+  })
+
+  it('⭐ con las DOS, el aviso enumera las dos', async () => {
+    const m = await montar({
+      bd: await conBorradores({ parcela: true, edificio: true }),
+      conRama: true,
+      edificio: null,
+    })
+    expect(m.cableado.estado().ramasOfrecidas).toEqual([
+      TIPO_EXPEDIENTE.PARCELA,
+      TIPO_EXPEDIENTE.EDIFICIO,
+    ])
+    const dicho = m.avisos().join('\n')
+    expect(dicho).toMatch(/de la parcela/)
+    expect(dicho).toMatch(/y del edificio/)
+    m.desmontar()
+  })
+
+  it('⭐ «Recuperar» abre las DOS ramas: son las dos mitades de una pantalla', async () => {
+    const m = await montar({
+      bd: await conBorradores({ parcela: true, edificio: true }),
+      conRama: true,
+      edificio: null,
+    })
+    await abrir(m)
+    pulsar(`${SELECTOR.BORRADOR} [data-accion="recuperar-borrador"]`)
+    await reposar()
+
+    expect(m.estadoEdificio.get().idLocal).toBe('de-ayer.dxf')
+    expect(m.estado.get().refcat).toBe(REFCAT_DEMO)
+    m.desmontar()
+  })
+
+  it('⭐ y «Descartar» se lleva las dos: la oferta es una y el gesto es uno', async () => {
+    const m = await montar({
+      bd: await conBorradores({ parcela: true, edificio: true }),
+      conRama: true,
+      edificio: null,
+    })
+    await abrir(m)
+    pulsar(`${SELECTOR.BORRADOR} [data-accion="descartar-borrador"]`)
+    await reposar()
+
+    expect((await m.expedientes.listar()).borradores).toEqual([])
+    expect(m.cableado.estado().ofreciendoBorrador).toBe(false)
+    m.desmontar()
+  })
+
+  it('⛔ recuperar el borrador conserva su `creado`: no lo toma por un documento nuevo', async () => {
+    // `cargarEdificio` fija la identidad y DESPUÉS hace `set`, que notifica de forma
+    // síncrona. Si no moviera también `idLocalAbierto`, nuestro propio suscriptor
+    // tomaría este documento recién abierto por «otro» y le tiraría el `creado` que se
+    // le acaba de poner — el trabajo recuperado diría haber empezado ahora mismo.
+    const m = await montar({
+      bd: await conBorradores({ edificio: true }),
+      conRama: true,
+      edificio: null,
+    })
+    m.avanzar(3 * 86_400_000) // tres días después de sembrarlo
+    await abrir(m)
+    pulsar(`${SELECTOR.BORRADOR} [data-accion="recuperar-borrador"]`)
+    await reposar()
+
+    expect(m.cableado.estado().rama).toBe(RAMA.EDIFICIO)
+    expect(m.cableado.estado().creado).toBe(CREADO_DE_AYER)
+    m.desmontar()
+  })
+
+  it('recuperar un borrador de edificio deja la pantalla EN su rama', async () => {
+    const m = await montar({
+      bd: await conBorradores({ edificio: true }),
+      conRama: true,
+      edificio: null,
+    })
+    expect(m.rama.get()).toBe(RAMA.PARCELA)
+    await abrir(m)
+    pulsar(`${SELECTOR.BORRADOR} [data-accion="recuperar-borrador"]`)
+    await reposar()
+    expect(m.rama.get()).toBe(RAMA.EDIFICIO)
+    m.desmontar()
+  })
+
+  it('⛔ sin rama de edificio montada, un borrador de edificio se dice y no se abre', async () => {
+    // El montaje de F10: no hay dónde ponerlo. Abrirlo en un store que nadie mira
+    // sería un «recuperado» que no cambia nada en pantalla.
+    const m = await montar({ bd: await conBorradores({ edificio: true }) })
+    await abrir(m)
+    pulsar(`${SELECTOR.BORRADOR} [data-accion="recuperar-borrador"]`)
+    await reposar()
+    expect(m.renglon()).toBe(MENSAJE_GUARDADO_SIN_EDIFICIO)
+    m.desmontar()
+  })
+})
+
 describe('F11 · T3.3 · 14 · (c) `abrirProyecto` conmuta la rama', () => {
   /** Un `.json` de edificio, escrito por la propia aplicación. Ida y vuelta de verdad. */
   async function jsonDeEdificio(m) {
@@ -1595,7 +1892,10 @@ describe('F11 · T3.3 · 14 · (c) `abrirProyecto` conmuta la rama', () => {
     m.desmontar()
   })
 
-  it('…y lo cuenta por el panel, diciendo ya que no se va a poder guardar', async () => {
+  it('…y lo cuenta por el panel, diciendo ya que no se va a poder ARCHIVAR', async () => {
+    // ⛔ F12 · T4.3 · antes exigía «no lo puede guardar en este navegador», y eso dejó
+    // de ser cierto en esta misma fase: el edificio se autoguarda. Lo que se sigue
+    // diciendo —y lo que esta prueba defiende ahora— es que no se archiva con nombre.
     const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
     const texto = await jsonDeEdificio(m)
     m.rama.set(RAMA.PARCELA)
@@ -1606,7 +1906,9 @@ describe('F11 · T3.3 · 14 · (c) `abrirProyecto` conmuta la rama', () => {
 
     const dicho = m.avisos().join('\n')
     expect(dicho).toMatch(/rama Edificio/)
-    expect(dicho).toMatch(/no lo puede guardar en este navegador/i)
+    expect(dicho).toMatch(/no .*archiva con nombre/i)
+    // Y no vuelve a decir lo caducado: que una recarga se lo llevaría.
+    expect(dicho).not.toMatch(/no lo puede guardar en este navegador/i)
     m.desmontar()
   })
 

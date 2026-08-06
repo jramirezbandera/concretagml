@@ -165,10 +165,15 @@ describe('T5 · los tres estados, y ninguno en silencio', () => {
 
   it('en la rama EDIFICIO el motivo es el de RAMA, que es otro texto', () => {
     cablear({ rama: RAMA.EDIFICIO, hechos: { [RAMA.EDIFICIO]: { geometria: true } } })
-    expect(motivoDe(PASO.EDICION)).toBe(MOTIVO_RAMA[PASO.EDICION])
     expect(motivoDe(PASO.DIAGNOSTICO)).toBe(MOTIVO_RAMA[PASO.DIAGNOSTICO])
+    expect(motivoDe(PASO.INFORME)).toBe(MOTIVO_RAMA[PASO.INFORME])
     // Y Validación SÍ está: un edificio cargado se puede mirar.
     expect(estadoDe(PASO.VALIDACION)).toBe(ESTADO.LIBRE)
+    // ⭐ Y Edición TAMBIÉN, desde F12: con un edificio cargado se edita. Hasta el
+    // 2026-08-06 este peldaño estaba apagado en esta rama, y con él apagado todo
+    // el motor de edición de la parte activa era inalcanzable.
+    expect(estadoDe(PASO.EDICION)).toBe(ESTADO.LIBRE)
+    expect(motivoDe(PASO.EDICION)).toBe('')
   })
 
   it('un paso disponible no arrastra motivo, y su hueco está oculto', () => {

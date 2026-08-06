@@ -236,10 +236,16 @@ export const HECHOS_VACIOS = Object.freeze({ geometria: false, oficial: false, d
  * `MOTIVO_CTA_EN_EDIFICIO` (`app/rama.js`), que es el mismo hecho contado en el
  * pie, donde sí hay sitio para el párrafo completo.
  *
+ * ⛔ **`EDICION` YA NO ESTÁ AQUÍ, y su ausencia es carga útil.** Hasta el
+ * 2026-08-06 decía «esta versión edita parcelas, todavía no construcciones»; F12
+ * es la fase que la convierte en falsa, así que la frase se retira en vez de
+ * quedarse a envejecer. Un motivo que sobrevive a la limitación que explicaba es
+ * peor que ninguno: no se enseña nunca —el paso está disponible— pero el que
+ * venga a leer este objeto se creerá que la limitación sigue.
+ *
  * @readonly
  */
 export const MOTIVO_RAMA = Object.freeze({
-  [PASO.EDICION]: 'Esta versión edita parcelas, todavía no construcciones.',
   [PASO.DIAGNOSTICO]: 'El diagnóstico contrasta parcelas; aún no sabe con un edificio.',
   [PASO.INFORME]: 'El informe firma un diagnóstico, y el diagnóstico es de parcela.',
 })
@@ -265,6 +271,27 @@ export const MOTIVO_DATO = Object.freeze({
   geometria: 'Trae antes una parcela: por referencia catastral o desde tu medición.',
   oficial: 'Falta el parcelario del Catastro: tráelo desde Entrada.',
   diagnostico: 'Haz antes el diagnóstico de encaje: el informe firma su resultado.',
+})
+
+/**
+ * Lo mismo, **cuando la rama es EDIFICIO**. Solo los hechos que allí significan
+ * otra cosa; el resto sigue saliendo de {@link MOTIVO_DATO}.
+ *
+ * ⛔ **Existe porque el de arriba MENTÍA en esta rama**, y F12 lo hizo visible al
+ * abrir el paso Edición aquí: `geometria` no es «hay parcela» sino «hay
+ * edificio» (`hayEdificio`, y ojo: un edificio con CERO partes SÍ cuenta), así
+ * que mandar a alguien a traer una parcela para poder editar su construcción es
+ * mandarle a hacer lo que no le desbloquea nada. Ya pasaba en Validación desde
+ * F11; se arregla aquí porque es aquí donde se midió.
+ *
+ * La nota de arriba —«indexado por el hecho y no por el paso»— sigue valiendo:
+ * lo que cambia no es el paso desde el que se mira, es **qué es el hecho** en
+ * cada rama.
+ *
+ * @readonly
+ */
+export const MOTIVO_DATO_EDIFICIO = Object.freeze({
+  geometria: 'Trae antes un edificio, o añade una parte y dibuja su recinto.',
 })
 
 /** El rótulo del CTA que cruza la puerta. Lo pinta el aplicador; el nombre es de
@@ -349,8 +376,23 @@ export const TOPE_RECONCILIACION = 8
 const REGLA = Object.freeze({
   [PASO.ENTRADA]: { ramas: RAMAS, enComprobacion: true, requiere: Object.freeze([]) },
   [PASO.VALIDACION]: { ramas: RAMAS, enComprobacion: true, requiere: Object.freeze(['geometria']) },
+  // ⛔ **F12 · T4.2 · EDICIÓN PASA A EXISTIR TAMBIÉN EN LA RAMA EDIFICIO.**
+  //
+  // Hasta el 2026-08-06 este paso era `[RAMA.PARCELA]` y su motivo decía «esta
+  // versión edita parcelas, todavía no construcciones». Era verdad, y F12 es
+  // exactamente la fase que la deja de serlo: la rama EDIFICIO tiene ya su
+  // edición de la parte activa, su dibujo de recinto y su tabla de coordenadas.
+  //
+  // ⚠️ Y no es cosmética: **con el peldaño apagado, TODO el motor que cablea
+  // `app/cableado-edificio.js` era inalcanzable en producción** —nadie llamaría
+  // nunca a `edificio.edicion(true)`, la palabra «Dibujar recinto» no aparecería
+  // y F12 sería código que solo existe en los tests, que es lo que le pasó a F11
+  // hasta su T4.1—. Lo destapó una prueba de T4.2 al intentar navegar hasta aquí.
+  //
+  // `enComprobacion: false` NO cambia: comprobar el GML de otro sigue siendo un
+  // modo de la rama de parcela, y ahí la puerta se cruza con su CTA.
   [PASO.EDICION]: {
-    ramas: Object.freeze([RAMA.PARCELA]),
+    ramas: RAMAS,
     enComprobacion: false,
     requiere: Object.freeze(['geometria']),
   },
@@ -393,7 +435,9 @@ export function evaluarPaso(paso, { rama, modo, hechos }) {
   // 3 · DATO — lo único que se resuelve solo según se avanza.
   for (const hecho of regla.requiere) {
     if (hechos[hecho] !== true) {
-      return { disponible: false, causa: CAUSA.DATO, motivo: MOTIVO_DATO[hecho] ?? null }
+      // El de la rama manda cuando lo hay: ver {@link MOTIVO_DATO_EDIFICIO}.
+      const propio = rama === RAMA.EDIFICIO ? MOTIVO_DATO_EDIFICIO[hecho] : undefined
+      return { disponible: false, causa: CAUSA.DATO, motivo: propio ?? MOTIVO_DATO[hecho] ?? null }
     }
   }
   return { disponible: true, causa: null, motivo: null }

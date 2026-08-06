@@ -34,6 +34,7 @@ import {
   MODO,
   MODOS,
   MOTIVO_DATO,
+  MOTIVO_DATO_EDIFICIO,
   MOTIVO_MODO,
   MOTIVO_RAMA,
   MOTIVO_SIN_PUERTA,
@@ -186,21 +187,33 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     // La maqueta midió estos motivos en 14–27 px de alto a 1280×720. El tope no
     // es estético: alargarlos empuja la ficha del pie del rail fuera de pantalla,
     // que es el defecto que este rework viene a arreglar.
-    const todos = [...Object.values(MOTIVO_RAMA), ...Object.values(MOTIVO_MODO), ...Object.values(MOTIVO_DATO)]
+    const todos = [
+      ...Object.values(MOTIVO_RAMA),
+      ...Object.values(MOTIVO_MODO),
+      ...Object.values(MOTIVO_DATO),
+      ...Object.values(MOTIVO_DATO_EDIFICIO),
+    ]
     expect(todos.length).toBeGreaterThan(0)
     for (const motivo of todos) expect(motivo.length).toBeLessThanOrEqual(90)
   })
 
   it('el orden de las causas es RAMA → MODO → DATO, y se ve con las tres a la vez', () => {
-    // Edificio + comprobación + sin dato: las tres causas apuntan a Edición.
+    // ⚠️ Se prueba con DIAGNÓSTICO y no con Edición: desde F12 Edición existe en
+    // las dos ramas, así que ya no sirve para enseñar la causa RAMA. El orden que
+    // se afirma es el del código, no el de un paso concreto.
     const todoEnContra = {
       rama: RAMA.EDIFICIO,
       modo: MODO.COMPROBACION,
       hechos: { ...HECHOS_VACIOS },
     }
-    expect(evaluarPaso(PASO.EDICION, todoEnContra).causa).toBe(CAUSA.RAMA)
+    expect(evaluarPaso(PASO.DIAGNOSTICO, todoEnContra).causa).toBe(CAUSA.RAMA)
 
-    // Quitada la rama, manda el modo.
+    // Quitada la rama, manda el dato (Diagnóstico SÍ está en comprobación).
+    expect(evaluarPaso(PASO.DIAGNOSTICO, { ...todoEnContra, rama: RAMA.PARCELA }).causa).toBe(
+      CAUSA.DATO,
+    )
+
+    // Y el escalón del MODO se ve en Edición, que es el paso que lo tiene.
     expect(
       evaluarPaso(PASO.EDICION, { ...todoEnContra, rama: RAMA.PARCELA }).causa,
     ).toBe(CAUSA.MODO)
@@ -233,13 +246,13 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     expect(veredicto.disponible).toBe(true)
   })
 
-  it('en la rama EDIFICIO se apagan Edición, Diagnóstico e Informe, con su motivo', () => {
+  it('en la rama EDIFICIO se apagan Diagnóstico e Informe, con su motivo', () => {
     const enEdificio = {
       rama: RAMA.EDIFICIO,
       modo: MODO.NORMAL,
       hechos: { geometria: true, oficial: true, diagnostico: true },
     }
-    for (const paso of [PASO.EDICION, PASO.DIAGNOSTICO, PASO.INFORME]) {
+    for (const paso of [PASO.DIAGNOSTICO, PASO.INFORME]) {
       const veredicto = evaluarPaso(paso, enEdificio)
       expect(veredicto.disponible).toBe(false)
       expect(veredicto.causa).toBe(CAUSA.RAMA)
@@ -247,6 +260,42 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     }
     // Entrada y Validación SÍ: un edificio cargado se puede mirar.
     expect(evaluarPaso(PASO.VALIDACION, enEdificio).disponible).toBe(true)
+  })
+
+  it('⭐ F12 · y EDICIÓN también: esta versión ya edita construcciones', () => {
+    // ⛔ **Hasta el 2026-08-06 este paso era de la rama PARCELA y nada más**, con
+    // el motivo «esta versión edita parcelas, todavía no construcciones». F12 es
+    // la fase que lo deja de ser, y con el peldaño apagado **todo el motor de
+    // edición de la parte activa era inalcanzable en producción**: nadie llamaría
+    // nunca a `cablearEdificio().edicion(true)`. Lo destapó una prueba de T4.2 al
+    // intentar navegar hasta aquí.
+    const enEdificio = {
+      rama: RAMA.EDIFICIO,
+      modo: MODO.NORMAL,
+      hechos: { geometria: true, oficial: false, diagnostico: false },
+    }
+    expect(evaluarPaso(PASO.EDICION, enEdificio).disponible).toBe(true)
+    // Y la frase caducada NO se queda a envejecer en el objeto de motivos.
+    expect(MOTIVO_RAMA[PASO.EDICION]).toBeUndefined()
+  })
+
+  it('⭐ F12 · sin edificio, el motivo habla de un EDIFICIO y no de una parcela', () => {
+    // `geometria` en esta rama es «hay edificio», así que el motivo general
+    // —«trae antes una parcela»— mandaría a hacer algo que no desbloquea nada.
+    const sinNada = {
+      rama: RAMA.EDIFICIO,
+      modo: MODO.NORMAL,
+      hechos: { ...HECHOS_VACIOS },
+    }
+    const veredicto = evaluarPaso(PASO.EDICION, sinNada)
+    expect(veredicto.disponible).toBe(false)
+    expect(veredicto.causa).toBe(CAUSA.DATO)
+    expect(veredicto.motivo).toBe(MOTIVO_DATO_EDIFICIO.geometria)
+    expect(veredicto.motivo).not.toContain('parcela')
+    // Y en la rama PARCELA sigue diciendo lo de siempre.
+    expect(evaluarPaso(PASO.EDICION, { ...sinNada, rama: RAMA.PARCELA }).motivo).toBe(
+      MOTIVO_DATO.geometria,
+    )
   })
 
   it('un paso que no existe LANZA nombrando los que sí', () => {

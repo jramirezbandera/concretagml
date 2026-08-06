@@ -182,6 +182,40 @@ export const TIPO_EDIFICIO = Object.freeze({
    * `click`. Se conserva el nombre anterior y se dice.
    */
   RENOMBRADO_IGNORADO: 'RENOMBRADO_IGNORADO',
+
+  // ── De las mutaciones que estrena F12 (partes y plantas) ──────────────────
+  /**
+   * F12. Se ha quitado una parte de la lista, y **lo que se lleva se dice antes
+   * de llevárselo**: su nombre, su tipo y —lo caro— cuántos vértices tenía su
+   * contorno. Eliminar una parte que alguien acaba de dibujar a mano no es como
+   * eliminar una fila vacía, y las dos se piden con el mismo botón.
+   *
+   * No es un error y no impide nada: el undo/redo la devuelve (`edit/historial.js`
+   * fotografía el POJO entero). Lo que esta detección evita es que se vaya en
+   * silencio, que es lo que pasa cuando la lista tiene trece filas iguales.
+   */
+  PARTE_ELIMINADA: 'PARTE_ELIMINADA',
+  /**
+   * F12. Se han intentado poner plantas en una parte de tipo `OTRA` —una piscina
+   * y similares—, o se ha pasado a `OTRA` una parte que ya las tenía. En los dos
+   * casos `crearParteConstruccion` las fuerza a `null` (`model/edificio.js:161-168`)
+   * y el convenio es deliberado: en una piscina las plantas **no son cero, es que
+   * no aplican**.
+   *
+   * ⚠️ Es UN tipo para los DOS caminos, y se distinguen por `datos.motivo`
+   * (`ASIGNACION` | `CAMBIO_DE_TIPO`). El hecho que se cuenta es el mismo —«estas
+   * plantas no se han guardado, y por qué»— y dos códigos para el mismo hecho son
+   * dos sitios donde la interfaz se puede olvidar de uno.
+   */
+  PLANTAS_NO_APLICAN: 'PLANTAS_NO_APLICAN',
+  /**
+   * F12. Lo que ha llegado como número de plantas no lo es: un decimal, un
+   * negativo, o algo que no es número. **NO lanza**, y esa es toda la decisión:
+   * viene de un `<input type="number">`, o sea de un teclado, y es un DATO DE
+   * USUARIO. Se conserva lo que hubiera y se dice qué se ha ignorado — la misma
+   * asimetría que {@link RENOMBRADO_IGNORADO} ya defiende para el nombre.
+   */
+  PLANTAS_NO_VALIDAS: 'PLANTAS_NO_VALIDAS',
 })
 
 // ── Factory ──────────────────────────────────────────────────────────────────

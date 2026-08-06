@@ -39,6 +39,7 @@ para que el resultado no dependa de interpretar prosa. Quince son de aceptación
 | `15-contraste.js` | Rework · T9 | ⭐ **la RUTA CRÍTICA 2 entera** (soltar el GML de otro → contrastarlo → cruzar la puerta), que hasta T9 no se podía andar; y sobre todo **que la puerta de D4 SE VE**: dentro del cajón, dentro de la ventana y con `elementFromPoint` devolviéndola —las tres patas, porque con una sola el defecto salía verde—; más la procedencia que cambia al cruzar y el invariante de la caja de vértices | ⛔ **encontró un defecto real el 2026-08-04, ya corregido; hoy `ok:true` en las dos** — ver §22 |
 | `16-derivar-cesion.js` | F17 · 1 a 4 · **+ el criterio 6** | ⭐ **EL PRECIO EN PÍXELES, que es lo único de F17 que la suite no puede ver**: F17 rompe a propósito la racha de «0 px en el panel» de cinco fases, y ⛔ **cuando se pasa, el panel NO desborda — la tabla de vértices encoge en silencio**. Mide el recorrido entero sin tocar la red (mover el lindero hacia dentro → derivar → revisar y nombrar → descargar), la PUERTA explicando con cifras al crecer, la correspondencia fila↔mancha en los dos sentidos, los BYTES del expediente (N `featureMember`, los `localId` de O19 y **que el nombre escrito NO viaja al fichero**), y la invalidación de la foto al editar | ✅ **`ok:true` en las DOS** desde el 2026-08-05, tras encontrar **un defecto real a 1280×720** y corregirlo — ver §25 |
 | `17-medicion-propia.js` | F18 · 1 a 4 | ⭐ **QUE EL `<dialog>` DE REVISIÓN SEA UN MODAL DE VERDAD**, que la suite **no puede** ver: en jsdom `HTMLDialogElement.prototype` tiene exactamente `constructor` y `open` —ni `showModal()`, ni `::backdrop`, ni capa superior—, así que las 6.339 pruebas ejercitan el camino DEGRADADO; más soltar `UTM.dxf` de verdad con la rama PARCELA (bytes reales, cinco capas, el botón apagado con su motivo), que la geometría **se pinte** en sus panes, el **coste en píxeles** de la tabla de vértices, y que **nuestro propio listado de replanteo se rechace por su nombre y NO con el diagnóstico falso del huso** | ⛔ **su primera corrida salió `ok:false` y destapó UN DEFECTO REAL que la suite no veía**: la cabecera decía **«Parcela del Catastro» sobre el levantamiento del propio técnico**. Corregido con guardián; hoy **`ok:true`** — ver §26 |
+| `19-partes-plantas.js` | F12 · 1 a 4 | ⭐ **EL TRABAJO SOBRE UN EDIFICIO, andado entero**: traer 13 partes → elegir una → ponerle plantas → verlas en el mapa → añadir una piscina → dibujarle el recinto a mano. Mide lo que en jsdom sale verde pase lo que pase: que el **bloque de parte activa quepa** con 14 partes a 1280×720 (y que el síntoma no sea mudo), que los **rótulos romanos se lean**, que la **envolvente se repinte** al poner a 0 las plantas de una parte, que **dibujar con clics de verdad** cierre un recinto, que «Dibujar recinto» aparezca **solo donde sirve**, que el **eje PASO toque a esta rama** (defecto M2 de la fase 0), y —lo único que no es de píxeles— que el **borrador de edificio se escriba en IndexedDB de VERDAD y no pise el de parcela** | ⛔ **su primera corrida salió `ok:false` con TRES defectos reales**, uno de ellos que **las plantas del GML nunca llegaban al modelo** —F11 las tiraba por alcance y F12 llegó a la fase 5 sin recogerlas, con la suite en verde—. Hoy **`ok:true` en las dos ventanas** — ver §28 |
 | `18-pegado-coordenadas.js` | F19 · 1 a 3 | ⭐ **LAS TRES DEUDAS DE F18, andadas en un navegador de verdad**: el **pegado de la LISTA** —la vía que `feature-01` llama principal y que llevaba doce fases sin un solo manejador de `paste`—, **proyectar unos grados** (que hasta F19 se detectaban y no se podían atender), y **el rótulo del GML ajeno**. Y lo que la suite no puede ver: que el `<dialog>` sea modal DE VERDAD, que **las dos cifras de superficie se lean** (el cotejo que `importar()` calculaba desde F01 sin llamante), y que la parcela pegada **se pinte** | ⛔ **su primera corrida salió `ok:false` con TRES fallos del guion y UN DEFECTO REAL**: el renglón decía «medida por ti, **del fichero** «coordenadas pegadas»» —llamar fichero a lo pegado, en la línea que existe para decir de dónde salió el dato— y **la prueba de la suite lo aprobaba** porque casaba «pegad». Hoy **`ok:true`** — ver §27 |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
@@ -3119,9 +3120,10 @@ Evidencia: `.gstack/f11-aviso-contradictorio.png`.
 
 **Medido en la corrida de comprobación**: cargar el DXF real por la capa
 `Construccion` da **7 partes** y `reparto.avisoQueNiegaLaCarga: null`. Los avisos
-que quedan son los tres legítimos —huso ambiguo, «esta rama no se guarda sola» y
-el del dibujo soltado en la rama Parcela— y ninguno contradice al panel. El
-guardián se queda puesto: es el que impide que vuelva.
+que quedan son los tres legítimos —huso ambiguo, el de lo que esta rama guarda y no
+guarda (⚠️ **F12 · T4.3 lo reescribió**: hasta entonces decía «esta rama no se guarda
+sola», y esa fase lo volvió falso) y el del dibujo soltado en la rama Parcela— y
+ninguno contradice al panel. El guardián se queda puesto: es el que impide que vuelva.
 
 ### Y una cosa que NO es un defecto, para que nadie la denuncie dos veces
 
@@ -4534,3 +4536,138 @@ servidor. Cero cartográficas, cero a servicios de datos.
   `Ctrl+V` con teclado de verdad va al §15.
 - **Canarias en grados**: no hay fixture y no se inventa uno. Lo cubren la suite
   (tres pruebas) y la ficha.
+
+---
+
+## 28. `19-partes-plantas.js` — el trabajo sobre un edificio (F12 · T5.1)
+
+**Qué mide.** El recorrido entero de F12 sobre la aplicación real, en una sola
+corrida y sin tocar ni un servicio:
+
+> traer 13 partes → elegir una → ponerle plantas → verlas en el mapa
+> → añadir una piscina → dibujarle el recinto a mano → que quepa todo
+
+Las 6.771 pruebas de la suite cubren la lógica. Aquí se mide lo otro, y son seis
+cosas que **en jsdom salen verdes pase lo que pase** (no hay maquetación, no hay
+cascada y no hay una base de datos de verdad):
+
+1. Que el **bloque de parte activa quepa** con 14 partes a 1280×720 — y que el
+   síntoma no sea mudo, que es la lección de F17 fase 5: el panel **no desborda**,
+   encoge la tabla de al lado.
+2. Que los **rótulos romanos se lean** sobre el mapa, no solo que el nodo exista.
+3. Que la **envolvente se repinte** al poner a `0` las plantas sobre rasante de
+   una parte (criterio 3: pasa a ser un sótano y sale de la unión).
+4. Que **dibujar con clics de verdad** cierre un recinto: hit-testing, proyección
+   y un mapa que se mueve.
+5. Que **«Dibujar recinto» aparezca solo donde sirve** — nace oculto, no apagado.
+6. Que el **eje PASO toque a esta rama**, que es el defecto M2 de la fase 0.
+
+Y una que no es de píxeles: que el **borrador de edificio se escriba en IndexedDB
+de verdad y no pise el de parcela**. La suite de T4.3 corre sobre
+`fake-indexeddb`, que no es una base de datos, y ésa era la afirmación que
+sostenía entera la desviación 7 del plan de F11.
+
+⚠️ **Exige `npm run dev`**: trae el fixture BU por `fetch` del propio servidor, y
+`vite preview` sirve `dist/`, donde los fixtures no están. Igual que los §16, §19,
+§26 y §27.
+
+### ⛔ La primera corrida: TRES defectos reales
+
+**1 · Las plantas del GML nunca llegaban al modelo.** El síntoma medido fue
+exacto y mudo: **cero rótulos romanos sobre trece huellas** que sí traen sus
+plantas. `edificio/entrada.js` las ponía a `null` con este comentario:
+
+> Las plantas van a `null` por ALCANCE, no porque no vengan […] en F11 toda parte
+> entra con las plantas sin asignar, **y se asignan una a una en la fase
+> siguiente**.
+
+**F12 es esa fase**, y llegó a la fase 5 sin que nadie tocara esa línea. La suite
+seguía verde porque **ninguna prueba pedía que el dato llegara al modelo** — había
+una que exigía lo contrario, y era correcta cuando se escribió. Lo destapó este
+guion mirando el mapa. Con las plantas dentro, el edificio real cambia de forma:
+la envolvente pasa de **568,03 m² a 322,13**, porque `Parte 10` —la MAYOR, 245,90
+m² de 568,03— declara `0` plantas sobre rasante y es un sótano.
+
+**2 · `[hidden]` no funcionaba en la barra de edición.** `.gml-barra-herramienta`
+fija `display: inline-flex` con especificidad (0,2,0), y eso **le gana al
+`display: none` que el navegador le da a `[hidden]`**. Medido en Chrome:
+`boton.hidden === true` y `getBoundingClientRect().height === 28`. Lo pagaba
+«Dibujar recinto», que **nace oculto a propósito** y se estaba viendo en la rama
+Parcela **desde la fase 3**. Su separador sí desaparecía —un `<span>` sin esa
+clase—, así que el síntoma era un botón suelto, sin separador, en una barra donde
+no hace nada. Arreglado con una regla de una línea.
+
+**3 · La lista de partes se aplastaba a DOS filas de catorce.** El `max-height:
+18vh` que T4.1 escribió permite 4,9 filas… y no era el que mandaba: quien la
+encogía era el `flex-shrink` del bloque, que con el panel sin sitio la aprieta por
+debajo de su contenido. **Un tope máximo no defiende de nada por abajo.** Se le
+puso suelo de tres filas (77 px = 3 × 25,39 medidos); paga el bloque de la parte
+activa, cuya tabla ya se desplaza sola.
+
+### Y CUATRO defectos del propio guion, que son de método
+
+- **Un guardián escrito desde la ficha y no desde el código.** Exigía que el
+  rótulo fuera `/^[IVXLCDM]+$/` y acusó al fixture real de cumplir: la forma que
+  fija `viewer/partes.js#rotuloPlantas` son **tres** —`VII`, `VII (−1)` y `(−1)`—
+  porque las partes traen sótanos.
+- **Contar nodos en mitad de una transición es contar fantasmas.** Elegir una
+  parte repinta la capa, y `L.Tooltip.onRemove` **deja el nodo viejo 200 ms en el
+  DOM con `opacity: 0`** cuando el mapa tiene `fadeAnimation` (el defecto de
+  Leaflet). Medido: **26 rótulos para 13 partes** justo después de elegir, y 13 un
+  segundo después. Habría acusado de una fuga de memoria que no existe. Hoy se
+  espera al desvanecido y **se cuentan solo los opacos**, con un guardián aparte
+  para la fuga de verdad.
+- **La tercera pata se rompe con `pointer-events: none`.** `elementFromPoint`
+  devuelve lo que RECIBE EL PUNTERO, no lo que se ve encima; un rótulo que a
+  propósito no intercepta el ratón nunca puede salir de ahí, y el guardián lo leía
+  como «tapado». Medido: el rótulo está en el índice 2 de su pane y el SVG de las
+  huellas en el 0, o sea que **pinta encima**. Para esos nodos la pregunta se
+  contesta por orden de pintado.
+- Y uno menor: **`className` no es un string en SVG**. El guion escupía «tapado
+  por [object SVGAnimatedString]» justo en el único sitio donde todo es SVG.
+
+### Las cifras de la corrida buena
+
+| | 1280×720 | 1440×900 |
+|---|---|---|
+| Lista de partes (14 cargadas) | **77,00 px = 3 filas** (el suelo, mordiendo) | **108,39 px = 4 filas** (manda el flex) |
+| Bloque de parte activa | 130,36 px | 180,27 px |
+| Rótulos de plantas | 13 de 13 en el DOM | 13 de 13 |
+| Recinto dibujado a mano | 44,56 m², 5 vértices | 43,30 m², 5 vértices |
+| Borrador de edificio en IndexedDB | `tipo: EDIFICIO`, `idLocal: bu_partes.gml`, 14 partes | ídem |
+| Red | 1 petición, 0 a servicios de datos | ídem |
+
+`ok: true` en las dos, sin advertencias.
+
+### Lo que este guion NO puede medir
+
+- **Si las plantas del fichero son las que el técnico esperaba**: es un hecho del
+  fixture, no un acierto nuestro → `CHECKLIST-HUMANO.md` §16.
+- **Si el reparto del panel se ENTIENDE**: que quepa se mide aquí; que se lea como
+  una lista con su ficha debajo es juicio humano → §16.
+- **El arrastre como gesto de ratón** (§0).
+- **Que la envolvente sea la correcta**: la topología la prueban 30 tests con
+  Turf; aquí solo se mira si CAMBIA.
+
+### La regresión de la fase, y a quién pertenece cada rojo
+
+| Guion | Resultado | De quién |
+|---|---|---|
+| `08-edicion.js` | ✅ `ok:true` | — (⚠️ **hay que lanzarlo sobre `#/parcela/edicion`**; desde la rebanada 3 los gestos solo viven ahí, y él mismo lo dice al arrancar en otra pantalla) |
+| `13-edificio.js` | ⛔ `ok:false`, **5 problemas** | ⚠️ **NINGUNO es de F12, y está MEDIDO**: se corrió el guion con el árbol en `git stash` —o sea, HEAD `3a6717c`, sin una línea de F12— y salieron **los cinco iguales**. Son caducidad de F18 (soltar un `.dxf` en la rama Parcela ahora carga medición propia a propósito → 3 problemas) y del rework (la caja de vértices no está en «Entrada» → 1). **Decisión pendiente del autor**, anotada desde la fase 0 |
+| `14-shell.js` | ⛔ `ok:false`, 1 problema | **De F19**: «solo 2 de las 3 vías de Entrada se ven enteras, quedan 63 px detrás del scroll». La tercera vía es el botón «Pegar coordenadas…» que F19 añadió a `index.html` (commit `0ed2340`) |
+
+⚠️ **Lo que F12 SÍ le arregló al guion 13**: dos guardianes suyos que esta fase
+volvió falsos, y que se corrigieron aquí porque la causa es de F12.
+
+- **«tendrían que ser DOS secciones».** T4.1 añade una tercera (la parte activa) y
+  les da `data-pantalla`. El número fijo era, en su día, la firma de que el eje
+  PASO **no** tocaba a esta rama; ahora lo que se puede exigir es que **nunca se
+  vean las tres a la vez**.
+- **`hidden` ya no responde a «¿se ve?»**. `app/rama.js` esconde por RAMA con el
+  atributo; el eje PASO esconde por CSS. Contar `hidden === false` daba tres
+  secciones en «Entrada» cuando en pantalla hay una. Ahora se mide la caja.
+- Y su presupuesto **«en vacío»** dejó de ser medible: con la rama sin datos la
+  lista no está en pantalla (sus peldaños exigen geometría), así que un `0 px` ahí
+  no es un aplastamiento. Se apaga diciéndolo; el presupuesto **con datos** se
+  sigue midiendo en su `topeConPartes` y entero en este guion.

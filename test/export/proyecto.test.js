@@ -407,17 +407,26 @@ describe('export/proyecto · lo que se tolera, se dice', () => {
     // Un aviso caducado es peor que ninguno: el usuario decide con él.
     const aviso = conEdificio().avisos.find((a) => a.datos?.tipo === 'EDIFICIO')
 
-    // 1 · Lo que YA NO es cierto no puede seguir escrito.
+    // ⛔ **Y se volvió a quedar viejo en F12 · T4.3**, que es exactamente lo que este
+    // `it` existe para que pase en rojo y no en silencio: decía «lo que todavía no hace
+    // es guardarlo en el almacén de este navegador, de momento solo se conserva en el
+    // fichero de proyecto», y desde T4.3 el edificio tiene identidad, clave de borrador
+    // propia y autoguardado. Lo que sigue faltando es archivarlo CON NOMBRE.
+
+    // 1 · Lo que YA NO es cierto no puede seguir escrito. Las dos caducidades, la de
+    //     F11 y la de F12, se quedan aquí: son la memoria de por qué el texto es éste.
     expect(aviso.mensaje).not.toMatch(/solo sabe enseñar/i)
     expect(aviso.mensaje).not.toMatch(/solo\s+.{0,20}la rama de parcela/i)
+    expect(aviso.mensaje).not.toMatch(/guardarlo en el almacén de este navegador/i)
+    expect(aviso.mensaje).not.toMatch(/solo se conserva en el fichero/i)
 
-    // 2 · Lo que SÍ hace F11, dicho: se abre en su rama y se ve.
+    // 2 · Lo que SÍ hace, dicho: se abre en su rama, se ve, y se autoguarda.
     expect(aviso.mensaje).toMatch(/rama Edificio/)
+    expect(aviso.mensaje).toMatch(/autoguarda/i)
 
-    // 3 · Y las tres cosas que NO hace, nombradas una a una (desviación 6 del plan de
-    //     F11 y las fases F13/F14). Sin esto el aviso sería una promesa a medias.
-    expect(aviso.mensaje).toMatch(/guardarlo en el almacén de este navegador/i)
-    expect(aviso.mensaje).toMatch(/fichero de proyecto/i)
+    // 3 · Y las tres cosas que NO hace, nombradas una a una (F12 · T4.3 y las fases
+    //     F13/F14). Sin esto el aviso sería una promesa a medias.
+    expect(aviso.mensaje).toMatch(/archivarlo con nombre/i)
     expect(aviso.mensaje).toMatch(/GML/)
     expect(aviso.mensaje).toMatch(/contrastarlo/i)
   })

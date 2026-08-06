@@ -331,10 +331,22 @@ const TOLERANCIA_INICIAL_CM = String(
 const MOTIVO_SIN_LADO = 'Elige antes un lindero en el mapa: basta un clic sobre él.'
 
 /**
- * Los ocho gestos de edición, tal y como los fija la tabla «El mapa de gestos» de
+ * Los gestos de edición, tal y como los fija la tabla «El mapa de gestos» de
  * `spec/feature-06-edicion-parcela.md` (que a su vez recoge lo que implementa
  * `viewer/edicion.js`). **Es la única copia**: el panel de ayuda se genera de
  * aquí, no de una tabla escrita a mano en el marcado.
+ *
+ * ⛔ **F12 · fase 5 · eran OCHO y ahora son DOCE**, y los cuatro nuevos son la
+ * mitad de T3.5 que se había quedado sin hacer. `viewer/dibujo.js` estrenó cuatro
+ * gestos sobre el mapa —clic, doble clic, `Enter`, `Retroceso`, `Escape`— y la
+ * ayuda no decía ni uno: quien la abriera **mientras dibuja** vería ocho gestos y
+ * ninguno sería el que está usando. Que `MENSAJE_DIBUJANDO` los cuente en el
+ * renglón no lo arregla — ese renglón se va en cuanto el dibujo acaba, y la ayuda
+ * es justo el sitio al que se vuelve cuando uno ya no se acuerda.
+ *
+ * Los cuatro llevan `donde: 'dibujando un recinto'`, que es lo que los distingue
+ * de los de arriba: **el mismo clic hace dos cosas distintas** según si hay un
+ * trazo abierto o no, y la tabla tiene que poder decirlo sin ambigüedad.
  *
  * `gesto` es una lista de SEGMENTOS para poder marcar las teclas con `<kbd>` sin
  * inventarse un mini-lenguaje: una cadena es texto, un `{kbd}` es una tecla.
@@ -393,6 +405,34 @@ export const GESTOS = Object.freeze([
     hace:
       'Deshacer y rehacer. Se callan dentro de un campo de texto: ahí ese atajo es el del ' +
       'navegador sobre lo que se está escribiendo, y las celdas de coordenada son campos.',
+  }),
+
+  // ── F12 · los cuatro del dibujo, que solo valen con un trazo abierto ───────
+  Object.freeze({
+    gesto: Object.freeze(['Clic']),
+    donde: 'dibujando un recinto',
+    hace:
+      'Añade una esquina, enganchada al parcelario igual que un arrastre. Mientras hay un trazo ' +
+      'abierto el clic NO selecciona linderos: dibuja.',
+  }),
+  Object.freeze({
+    gesto: Object.freeze(['Doble clic o ', { kbd: 'Enter' }]),
+    donde: 'dibujando un recinto',
+    hace:
+      'Cierra el recinto y se lo asigna a la parte elegida. Con menos de tres esquinas no cierra ' +
+      'y lo dice: dos puntos no encierran superficie.',
+  }),
+  Object.freeze({
+    gesto: Object.freeze([{ kbd: 'Retroceso' }, ' / ', { kbd: 'Supr' }]),
+    donde: 'dibujando un recinto',
+    hace: 'Quita la última esquina puesta. No sale del dibujo: se sigue trazando.',
+  }),
+  Object.freeze({
+    gesto: Object.freeze([{ kbd: 'Escape' }]),
+    donde: 'dibujando un recinto',
+    hace:
+      'Cancela el trazo entero sin escribir nada. Lo que hubiera dibujado la parte antes del ' +
+      'trazo se queda como estaba.',
   }),
 ])
 
@@ -835,6 +875,29 @@ const BarraEdicion = L.Control.extend({
 
     crearSeparador(doc, fila)
 
+    // ── Dibujar recinto (F12) ────────────────────────────────────────────────
+    // La herramienta con la que se declara un porche o una piscina que no estaban
+    // en ningún fichero, que es el caso COMÚN de la rama EDIFICIO.
+    //
+    // ⚠️ **Nace OCULTO**, no apagado: en la rama PARCELA no existe una «parte» que
+    // dibujar, y un botón permanentemente gris con un motivo que habla de otra
+    // rama sería peor que no tenerlo. Lo enseña `dibujoVisible(true)`, que llama
+    // el cableado del edificio. Es la única herramienta de esta barra que se
+    // esconde, y por eso se dice aquí en vez de dejarlo al `display` de la hoja.
+    //
+    // Lleva PALABRAS y no un icono, como las demás desde el rediseño del
+    // 2026-08-05: un lápiz querría decir «dibujar» y también «editar», que es
+    // justo lo que hace el botón de al lado.
+    this._botonDibujar = crearBoton(doc, {
+      padre: fila,
+      texto: 'Dibujar recinto',
+      titulo: 'Dibujar el recinto de la parte activa, vértice a vértice',
+    })
+    this._botonDibujar.dataset.accion = 'dibujar-recinto'
+    this._botonDibujar.hidden = true
+    this._separadorDibujar = crearSeparador(doc, fila)
+    this._separadorDibujar.hidden = true
+
     // ── Ayuda ────────────────────────────────────────────────────────────────
     // «Ayuda» a la vista, «Ayuda sobre los gestos de edición» al oído: la palabra
     // sola no dice ayuda DE QUÉ, y en una app con cuatro pantallas eso importa.
@@ -971,6 +1034,56 @@ const BarraEdicion = L.Control.extend({
       this._doc.removeEventListener('keydown', this._alEscape)
     }
     this._abierto = null
+  },
+
+  // ── F12 · «Dibujar recinto» ────────────────────────────────────────────────
+
+  /**
+   * Enseña o esconde «Dibujar recinto» **y su separador**.
+   *
+   * ⚠️ Se ESCONDE, no se apaga, y es la única herramienta de esta barra que lo
+   * hace: en la rama PARCELA no hay ninguna «parte» que dibujar, así que un botón
+   * gris permanente con un motivo que habla de otra rama diría menos que su
+   * ausencia. Las que sí se apagan con motivo —«Deshacer», «Desplazar lindero»—
+   * describen algo que *aquí* se puede hacer y ahora mismo no.
+   *
+   * El separador va con él por la misma razón por la que existe: separa dos grupos
+   * de herramientas, y un separador que no separa nada es una raya suelta.
+   *
+   * @param {boolean} visible
+   * @returns {boolean}  Lo que ha quedado.
+   */
+  dibujoVisible(visible) {
+    if (visible === undefined) return this._botonDibujar ? !this._botonDibujar.hidden : false
+    if (typeof visible !== 'boolean') {
+      throw new TypeError(
+        `dibujoVisible: 'visible' debe ser un booleano (o nada, para leer); ` +
+          `recibido ${typeof visible}.`,
+      )
+    }
+    if (this._botonDibujar) this._botonDibujar.hidden = !visible
+    if (this._separadorDibujar) this._separadorDibujar.hidden = !visible
+    return visible
+  },
+
+  /**
+   * Pone el botón en «dibujando» o lo devuelve a su estado normal.
+   *
+   * Cambia el RÓTULO, no solo un color: mientras se dibuja, lo que hace el botón
+   * es *cancelar*, y un botón que hace una cosa distinta tiene que decirlo con
+   * palabras. `aria-pressed` lo dice además en el árbol de accesibilidad.
+   *
+   * @param {boolean} dibujando
+   * @returns {void}
+   */
+  dibujoEnCurso(dibujando) {
+    if (!this._botonDibujar) return
+    const texto = this._botonDibujar.querySelector(`.${CLASE_BARRA.TEXTO}`)
+    if (texto) texto.textContent = dibujando ? 'Cancelar dibujo' : 'Dibujar recinto'
+    this._botonDibujar.setAttribute('aria-pressed', dibujando ? 'true' : 'false')
+    this._botonDibujar.title = dibujando
+      ? 'Cancelar el dibujo en curso (Escape)'
+      : 'Dibujar el recinto de la parte activa, vértice a vértice'
   },
 
   // ── Construcción de piezas ─────────────────────────────────────────────────
@@ -1270,6 +1383,24 @@ export function crearBarraEdicion({ mapa, posicion = CENTRO_ABAJO, alAvisar } = 
 
   return {
     control,
+
+    /**
+     * F12. Enseña o esconde «Dibujar recinto». Se delega en el control para que el
+     * llamante no tenga que conocer sus interioridades — el mismo trato que ya
+     * tienen `activa()` en `viewer/edicion.js` y `comoPantalla()` en el cajón.
+     *
+     * @param {boolean} [visible]
+     * @returns {boolean}
+     */
+    dibujoVisible: (visible) => control.dibujoVisible(visible),
+
+    /**
+     * F12. Pone el botón en «dibujando» (rótulo «Cancelar dibujo») o lo devuelve.
+     *
+     * @param {boolean} dibujando
+     * @returns {void}
+     */
+    dibujoEnCurso: (dibujando) => control.dibujoEnCurso(dibujando),
 
     /**
      * Quita el control del mapa —lo que dispara `onRemove` y con él la retirada de

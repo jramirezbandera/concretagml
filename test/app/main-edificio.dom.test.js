@@ -84,6 +84,7 @@ import {
   SELECTOR as SELECTOR_RAMA,
   selectorBoton,
 } from '../../app/rama.js'
+import { PASO } from '../../app/navegacion.js'
 import { CLASE_INPUT } from '../../app/zona-fichero.js'
 import { area } from '../../geo/area.js'
 import { husoPorSrs } from '../../geo/huso.js'
@@ -145,6 +146,12 @@ const arranque = vi.hoisted(() => {
     expediente: null,
     /** URLs pedidas al transporte. Vacío = no se ha tocado la red. */
     peticiones,
+    /** F12 · T4.2. Cada `visor.edicion.activa(x)` que `app/main.js` ha hecho. */
+    edicionParcela: [],
+    /** F12 · T4.2. Cada `dibujoVisible(x)` que ha recibido la barra de edición. */
+    dibujoVisible: [],
+    /** F12 · T4.2. Cada `dibujoEnCurso(x)`. */
+    dibujoEnCurso: [],
   }
   estado.transporte = {
     async pedirTexto(url) {
@@ -160,6 +167,7 @@ const arranque = vi.hoisted(() => {
 // ── El cromo del mapa: el otro efecto de `crearVisor` sobre el documento ─────
 
 let mapaVivo = null
+let barraViva = null
 let diagnosticoVivo = null
 let comprobacionViva = null
 
@@ -175,7 +183,7 @@ let sobranteVivo = null
 function montarCromoDelMapa() {
   const { mapa } = montarMapa()
   crearPanes(mapa)
-  crearBarraEdicion({ mapa })
+  barraViva = crearBarraEdicion({ mapa })
   mapaVivo = mapa
   diagnosticoVivo = {
     cajon: crearCajonDiagnostico({ mapa }),
@@ -213,11 +221,31 @@ vi.mock('../../viewer/index.js', async (importarOriginal) => ({
         alCambiarSeleccion: () => () => {},
         fijarColindantes() {},
         desplazarSeleccion: () => ({ aplicado: false, modo: null, detecciones: [] }),
+        // ⛔ F12 · T4.2. **Sin `activa` este doble dejaba MUERTO el bloque de
+        // `app/main.js` que reparte quién edita**, porque aquel empieza por
+        // `typeof visor.edicion.activa === 'function'`. O sea: el eje que decide
+        // que las dos ediciones no se pisen no se ejercitaba en ninguna prueba, y
+        // la suite entera seguía verde. Se apunta CADA llamada, que es lo que hay
+        // que medir: no basta con que se llame, hay que ver con qué.
+        activa: (valor) => {
+          arranque.edicionParcela.push(valor)
+          return valor
+        },
       },
       // La barra que `app/rama.js` oculta con la rama EDIFICIO. Se devuelve la de
       // verdad —montada arriba sobre el mapa del arnés— y no un doble: el módulo
       // pregunta por `barraEdicion.control.getContainer()`.
-      barraEdicion: null,
+      //
+      // ⚠️ F12 · T4.2. Y ahora además se le apuntan los `dibujoVisible(x)`, que
+      // son la señal OBSERVABLE de que la rama EDIFICIO ha recibido el mando de
+      // la edición: sin esto, quitarle a `app/main.js` la línea que se lo da no
+      // ponía roja ni una prueba (mutación medida). `control` se deja porque
+      // `app/rama.js` lo usa para esconder la barra entera.
+      barraEdicion: {
+        control: barraViva.control,
+        dibujoVisible: (v) => arranque.dibujoVisible.push(v),
+        dibujoEnCurso: (v) => arranque.dibujoEnCurso.push(v),
+      },
       colindantes: { pintar() {}, limpiar() {}, destruir() {} },
       diagnostico: diagnosticoVivo,
       comprobacion: comprobacionViva,
@@ -361,13 +389,20 @@ describe('app/main · F11 · el paso 13 monta la segunda rama', () => {
     expect(botonRama(RAMA.EDIFICIO).getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('⭐ las DOS secciones de edificio están SELLADAS y ocultas al arrancar', () => {
+  it('⭐ las TRES secciones de edificio están SELLADAS y ocultas al arrancar', () => {
     const secciones = [...document.querySelectorAll(`[${ATRIBUTO_PANEL}="${RAMA.EDIFICIO}"]`)]
 
     // Sin la marca, `app/rama.js` no las descubre y la rama EDIFICIO no se
     // enseñaría NUNCA: es la costura que la fase 2 dejó rota y la 3 cosió, y esta
     // es la única prueba que la ejercita con el arranque de verdad.
-    expect(secciones).toHaveLength(2)
+    //
+    // ⚠️ Eran dos hasta F12; la tercera es «Parte activa» (T4.1). Y el número se
+    // escribe a mano A PROPÓSITO —aquí no se le pregunta al panel—: esta prueba
+    // arranca `app/main.js` de verdad, así que es el único sitio donde se ve si
+    // el cableado se dejó una sección sin sellar en el arranque real. Preguntarle
+    // al panel cuántas tiene haría que las dos mitades se pusieran de acuerdo
+    // solas, que es justo lo que no se quiere comprobar aquí.
+    expect(secciones).toHaveLength(3)
     expect(secciones.every((s) => s.hidden)).toBe(true)
     // Y las de parcela, marcadas y a la vista.
     const deParcela = [...document.querySelectorAll(`[${ATRIBUTO_PANEL}="${RAMA.PARCELA}"]`)]
@@ -433,6 +468,134 @@ describe('app/main · F11 · el paso 13 monta la segunda rama', () => {
 })
 
 // ── 2 · La ficha del pie: la misma vista, dos documentos ─────────────────────
+
+// ═════════════════════════════════════════════════════════════════════════════
+// F12 · T4.2 — LOS DOS EJES DICIENDO LO MISMO: QUIÉN EDITA
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe('app/main · F12 · las dos ediciones no pueden estar encendidas a la vez', () => {
+  /**
+   * Lleva la pantalla a un paso pulsando su peldaño del rail, como el usuario.
+   *
+   * ⚠️ **Si el peldaño está apagado, esto FALLA en vez de no hacer nada.** Un
+   * ayudante que se salta el gesto en silencio deja el `it` midiendo la pantalla
+   * equivocada y en verde: es la lección de F03 —«un guardián que se salta solo
+   * no protege»— aplicada al arnés.
+   */
+  const irAPaso = (paso) => {
+    const boton = q(`[data-paso="${paso}"] button`)
+    expect(boton, `el rail no tiene el peldaño «${paso}»`).not.toBeNull()
+    expect(boton.disabled, `el peldaño «${paso}» está apagado: ${boton.textContent}`).toBe(false)
+    boton.click()
+    expect(cuerpo.getAttribute('data-paso')).toBe(paso)
+  }
+
+  /** El último `activa(x)` que ha recibido la edición de PARCELA. */
+  const ultimoParcela = () => arranque.edicionParcela.at(-1)
+
+  // Se deja la pantalla como la encontró: rama PARCELA y paso Entrada, que es el
+  // arranque. Los demás bloques de este fichero cuentan con eso (decisión 1).
+  afterEach(() => {
+    irA(RAMA.PARCELA)
+    irAPaso(PASO.ENTRADA)
+  })
+
+  it('⛔ el reparto de quién edita existe: `app/main.js` llama a `activa`', () => {
+    // Anti-vacuidad, y no es paranoia: hasta F12 el doble del visor de este
+    // fichero NO tenía `activa`, así que el bloque entero de `app/main.js` que
+    // reparte la edición estaba muerto en las pruebas y nadie lo notaba.
+    expect(arranque.edicionParcela.length).toBeGreaterThan(0)
+  })
+
+  it('en la rama PARCELA y en el paso Edición, edita la PARCELA', () => {
+    irA(RAMA.PARCELA)
+    irAPaso(PASO.EDICION)
+    expect(ultimoParcela()).toBe(true)
+  })
+
+  it('⭐ conmutar a EDIFICIO APAGA la edición de parcela', () => {
+    // Éste es el defecto que T4.2 cierra. Sin la suscripción al conmutador de
+    // rama, la edición de la rama abandonada se quedaría encendida y el usuario
+    // arrastraría un vértice de la parcela creyendo mover el del edificio.
+    irA(RAMA.PARCELA)
+    irAPaso(PASO.EDICION)
+    expect(ultimoParcela()).toBe(true)
+
+    irA(RAMA.EDIFICIO)
+    expect(ultimoParcela()).toBe(false)
+  })
+
+  it('⭐⭐ en la rama EDIFICIO y en Edición, la parcela SIGUE sin editarse', () => {
+    // ⛔ **Éste es el `it` que de verdad vigila el cruce de los dos ejes**, y lo
+    // señaló una mutación que salió VERDE: quitarle a `app/main.js` la condición
+    // de rama no ponía roja ni una prueba, porque conmutar ya devuelve la
+    // navegación a Entrada y ahí nadie edita de todas formas. El caso que sí lo
+    // distingue es éste: **entrar en Edición YA dentro de la rama EDIFICIO**. Sin
+    // la condición, la edición de la parcela se encendería aquí y el usuario
+    // arrastraría un vértice de la parcela creyendo mover el del edificio.
+    //
+    // ⛔ **Y para llegar aquí hubo que abrir el peldaño.** Hasta el 2026-08-06
+    // «Edición» estaba apagado en esta rama —«esta versión edita parcelas,
+    // todavía no construcciones»—, así que este `it` no se podía ni escribir: la
+    // frase la convierte en falsa esta misma fase, y con el peldaño cerrado todo
+    // el motor de edición del edificio era inalcanzable en producción.
+    irA(RAMA.EDIFICIO)
+    // Con el store vacío el peldaño sigue apagado, y **por el motivo correcto**:
+    // falta el dato, no la rama. Esa frase es la que F12 hizo hablar de edificios.
+    expect(q(`[data-paso="${PASO.EDICION}"] button`).disabled).toBe(true)
+    expect(q(`[data-paso="${PASO.EDICION}"] button`).textContent).not.toContain('todavía no')
+
+    storeEdificio().set(crearEdificio({ refcat: '3515508VF0831N' }))
+    irAPaso(PASO.EDICION)
+    expect(cuerpo.getAttribute(ATRIBUTO_RAMA)).toBe(RAMA.EDIFICIO)
+    expect(ultimoParcela()).toBe(false)
+
+    // ⭐ Y la otra mitad: **el edificio SÍ recibe el mando**. Se mide por la
+    // señal que llega a la barra —la palabra «Dibujar recinto» se le ofrece a
+    // esta rama y a ninguna otra—, porque afirmar solo que la parcela se apaga
+    // dejaría pasar la versión en la que no edita NADIE. Otra mutación medida.
+    expect(arranque.dibujoVisible.length).toBeGreaterThan(0)
+    expect(arranque.dibujoVisible.at(-1)).toBe(false) // aún sin parte elegida
+
+    // Con una parte elegida, la palabra aparece.
+    q('[data-accion="anadir-parte"]').click()
+    expect(arranque.dibujoVisible.at(-1)).toBe(true)
+  })
+
+  it('⚠️ conmutar de rama devuelve la navegación a Entrada, y por eso NADIE edita', () => {
+    // MEDIDO el 2026-08-06 con una sonda, y **no era lo que esta prueba suponía**:
+    // se escribió esperando que la rama cambiase sin tocar el paso. No es así — el
+    // conmutador lleva la navegación a Entrada, porque la rama nueva no tiene
+    // todavía nada validado que editar—, y esto lo deja anotado en vez de
+    // disimularlo. La consecuencia para F12 es la buena: al conmutar, las DOS
+    // ediciones se apagan, y la de la rama a la que se llega se enciende cuando el
+    // usuario vuelve a pedir el paso Edición.
+    irA(RAMA.PARCELA)
+    irAPaso(PASO.EDICION)
+    irA(RAMA.EDIFICIO)
+    expect(cuerpo.getAttribute('data-paso')).toBe(PASO.ENTRADA)
+    expect(ultimoParcela()).toBe(false)
+
+    irA(RAMA.PARCELA)
+    expect(cuerpo.getAttribute('data-paso')).toBe(PASO.ENTRADA)
+    expect(ultimoParcela()).toBe(false)
+  })
+
+  it('fuera del paso Edición no edita NINGUNA de las dos, esté la rama que esté', () => {
+    // Es la rebanada 3 del rework, que hizo que «Edición» significara algo: los
+    // cuatro gestos estaban vivos en las CINCO pantallas (15 de 15 marcadores
+    // arrastrables en Validación, medido). La rama nueva no puede reabrir eso.
+    // ⚠️ Se prueba con Validación y Entrada, **no con Diagnóstico**: entrar en
+    // Diagnóstico pide las colindantes al Catastro, y este fichero afirma más
+    // abajo que las vías por fichero no tocan la red. Una prueba que ensucia el
+    // espía de otra es una prueba que rompe a distancia.
+    irA(RAMA.PARCELA)
+    irAPaso(PASO.VALIDACION)
+    expect(ultimoParcela()).toBe(false)
+    irAPaso(PASO.ENTRADA)
+    expect(ultimoParcela()).toBe(false)
+  })
+})
 
 describe('app/main · F11 · la ficha del pie cambia de cara, no de dueño', () => {
   it('con la rama EDIFICIO quedan CUATRO pares, y los otros cuatro se van enteros', () => {

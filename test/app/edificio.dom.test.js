@@ -79,6 +79,7 @@ import {
   ANCLA_ORIGEN,
   ANCLA_PARTES,
   EXTENSIONES,
+  IDENTIDAD_DIBUJADO,
   MENSAJE_ELIGE_CAPAS,
   MENSAJE_FICHERO_NO_LEIDO,
   MENSAJE_SIN_AUTOGUARDADO,
@@ -105,6 +106,7 @@ import { parsearGmlBu } from '../../gml/parse-bu.js'
 import { MOTIVO_CATASTRO, ORIGEN } from '../../services/catastro.js'
 import { NIVEL, crearEstadoVista } from '../../viewer/_comun.js'
 import { encuadrarSobreRecintos } from '../../viewer/index.js'
+import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
 
 const RAIZ = join(import.meta.dirname, '..', '..')
 
@@ -165,29 +167,50 @@ async function cederTurno(veces = 40) {
 
 // ── Dobles ───────────────────────────────────────────────────────────────────
 
+/** Los mapas montados en la prueba en curso, para desmontarlos en el `afterEach`. */
+const mapasVivos = []
+
 /**
- * Un mapa de mentira con lo único que `encuadrarSobreRecintos` duck-typea, y con
- * las llamadas CONTADAS: lo que hay que medir del encuadre es «¿ha tocado la
- * vista?», y con un `L.Map` de verdad eso no se ve.
+ * Un `L.Map` DE VERDAD, con `setView` y `fitBounds` espiados.
+ *
+ * ⛔ **Hasta F12 esto era un POJO de cinco funciones**, y bastaba: lo único que
+ * este cableado hacía con el mapa era pasárselo a la capa de huellas y al
+ * encuadre, y los dos se conforman con `addLayer`/`setView`/`fitBounds`. T4.2 le
+ * añadió el motor de edición de la parte activa, y `crearEdicion` **exige un mapa
+ * de verdad** —`latLngToLayerPoint` es lo que mide la puntería en píxeles—, así
+ * que el doble dejó de servir y lo dijo con 52 rojos.
+ *
+ * Se cambia el doble, **no el contrato**: bajar la exigencia de `crearEdicion`
+ * para que un POJO pasara sería falsificar la pieza que se está probando. Y lo
+ * que el doble medía —«¿ha tocado la vista el encuadre?», que con un mapa de
+ * verdad no se ve— se conserva entero con dos espías, que es justo para lo que
+ * existe `vi.spyOn`.
+ *
+ * @returns {import('leaflet').Map}  Con `mapa.setView` y `mapa.fitBounds` ya
+ *   espiados (`.mock.calls`), y sus panes creados.
  */
 function crearMapaDoble() {
-  return {
-    setView: vi.fn(),
-    fitBounds: vi.fn(),
-    // Por si algún día la capa real entrase por aquí.
-    addLayer: vi.fn(),
-    removeLayer: vi.fn(),
-    getPane: () => ({}),
-  }
+  const { mapa, destruir } = montarMapa()
+  crearPanes(mapa)
+  vi.spyOn(mapa, 'setView')
+  vi.spyOn(mapa, 'fitBounds')
+  mapasVivos.push(destruir)
+  return mapa
 }
 
 /** La capa de huellas, de mentira: se mide QUÉ se le manda pintar y con qué huso. */
 function crearCapaDoble() {
-  const llamadas = { creada: [], pintado: [], destruida: 0 }
+  const llamadas = { creada: [], pintado: [], opciones: [], destruida: 0 }
   const crearCapa = (args) => {
     llamadas.creada.push(args)
     return {
-      pintar: (partes) => llamadas.pintado.push(partes),
+      // ⚠️ Se guardan LOS DOS argumentos: desde F12 el segundo lleva la parte
+      // activa y la envolvente derivada, y un doble que se quedara solo con el
+      // primero dejaría sin comprobar el criterio de aceptación 3.
+      pintar: (partes, opciones) => {
+        llamadas.pintado.push(partes)
+        llamadas.opciones.push(opciones ?? null)
+      },
       limpiar: () => {},
       destruir: () => {
         llamadas.destruida += 1
@@ -281,6 +304,14 @@ function montar({
   // edificio todavía sin montar).
   const rama = conRama ? cablearRama({ documento: document, panel }) : null
 
+  // F12 · T4.2. La barra de mentira: solo se mide qué se le manda, que es lo
+  // único que este módulo hace con ella.
+  const barra = { visible: [], enCurso: [] }
+  const barraEdicion = {
+    dibujoVisible: (v) => barra.visible.push(v),
+    dibujoEnCurso: (v) => barra.enCurso.push(v),
+  }
+
   const cableado = cablearEdificio({
     estado,
     panel,
@@ -291,6 +322,7 @@ function montar({
     mapa,
     estadoParcela,
     rama,
+    barraEdicion,
     documento: document,
     crearCapa,
     ...(encuadrar === undefined ? {} : { encuadrar }),
@@ -305,6 +337,7 @@ function montar({
     mapa,
     capa: llamadas,
     rama,
+    barra,
     cableado,
     bajas,
   }
@@ -323,6 +356,10 @@ afterEach(() => {
     panelEdificio.destruir()
   }
   montados = []
+  // Los mapas de Leaflet se desmontan ANTES de vaciar el `<body>`: `mapa.remove()`
+  // retira sus oyentes del documento, y hacerlo con el contenedor ya borrado deja
+  // el `L.Map` vivo escuchando a un nodo huérfano.
+  for (const destruirMapa of mapasVivos.splice(0)) destruirMapa()
   document.body.replaceChildren()
   document.body.className = ''
   vi.restoreAllMocks()
@@ -346,13 +383,21 @@ async function soltar(cableado, fichero) {
 // ══ 1 · LA COSTURA ROTA ══════════════════════════════════════════════════════
 
 describe('⛔⛔ el sellado de data-rama-panel — la costura que ningún contrato asignó', () => {
-  it('sella las DOS secciones del panel con la rama EDIFICIO', () => {
+  it('sella TODAS las secciones del panel con la rama EDIFICIO', () => {
+    // ⛔ **Y se le PREGUNTAN al panel, no se nombran.** Hasta F12 aquí había una
+    // lista literal de dos, y cuando T4.1 añadió la tercera («Parte activa») se
+    // quedó corta sin que nada se pusiera rojo: una sección de edificio SIN
+    // `data-rama-panel` no entra en el intercambio, o sea que se queda VISIBLE
+    // encima del panel de parcela. Ninguna prueba puede echar de menos una
+    // sección que no sabe que existe, así que la cuenta la da el propio panel.
     const { panelEdificio } = montar()
-    for (const seccion of [panelEdificio.seccionOrigen, panelEdificio.seccionPartes]) {
+    const suyas = panelEdificio.secciones()
+    expect(suyas.length).toBeGreaterThanOrEqual(3)
+    for (const seccion of suyas) {
       expect(seccion.getAttribute(ATRIBUTO_PANEL)).toBe(RAMA.EDIFICIO)
     }
-    // Y las dos están DENTRO del documento: sellar una sección suelta no sirve.
-    expect(document.querySelectorAll(selectorPanel(RAMA.EDIFICIO))).toHaveLength(2)
+    // Y todas están DENTRO del documento: sellar una sección suelta no sirve.
+    expect(document.querySelectorAll(selectorPanel(RAMA.EDIFICIO))).toHaveLength(suyas.length)
   })
 
   it('NO sella los <dialog>: un <dialog open hidden> es un diálogo que no se ve', () => {
@@ -862,7 +907,17 @@ describe('⛔ el servicio de edificios y sus cuatro trampas medidas', () => {
 
 // ══ 6 · LA DEGRADACIÓN HONRADA DEL AUTOGUARDADO ══════════════════════════════
 
-describe('el renglón que dice que esta rama NO se autoguarda (desviación 7)', () => {
+describe('el renglón que dice qué NO archiva esta rama (desviación 7, reescrita en T4.3)', () => {
+  // ⛔ **F12 · T4.3 · LOS DOS MENSAJES SE REESCRIBIERON, y estas pruebas con ellos.**
+  // Lo que afirmaban era verdad hasta esta fase y dejó de serlo dentro de ella:
+  // decían «no se guarda sola» y «exporta el dibujo desde tu CAD», y T4.3 le da al
+  // edificio identidad, clave de borrador propia y autoguardado. Un mensaje honrado
+  // que caduca es peor que ninguno, y una prueba que lo defiende en verde también.
+  //
+  // Lo que se comprueba ahora es la mitad que SIGUE siendo cierta —no hay archivo con
+  // nombre— y, sobre todo, que **lo caducado no vuelve**: las dos frases viejas tienen
+  // su propia prueba en negativo, para que nadie las reponga sin enterarse.
+  //
   // ⛔ CORREGIDO EL 2026-08-04, y lo midió el GUION DE HUMO 13, no esta suite.
   //
   // Aquí se exigía el mensaje ENTERO en el renglón, y el `it` de más abajo exige
@@ -893,8 +948,10 @@ describe('el renglón que dice que esta rama NO se autoguarda (desviación 7)', 
     await soltar(cableado, ficheroDe(RUTA_LIST, 'LIST.txt'))
     // Si vuelve, vuelven los 89,06 px y el panel deja de caber.
     expect(procedencia()).not.toContain(MENSAJE_SIN_AUTOGUARDADO)
-    // Y la breve dice lo mismo en una línea: qué no pasa y qué hacer.
-    expect(MENSAJE_SIN_AUTOGUARDADO_BREVE).toMatch(/no se guarda sola/i)
+    // Y la breve dice en una línea lo que sigue siendo cierto: se guarda el trabajo en
+    // curso, no se archiva con nombre.
+    expect(MENSAJE_SIN_AUTOGUARDADO_BREVE).toMatch(/trabajo en curso/i)
+    expect(MENSAJE_SIN_AUTOGUARDADO_BREVE).toMatch(/no lo archiva/i)
     expect(MENSAJE_SIN_AUTOGUARDADO_BREVE.length).toBeLessThan(
       MENSAJE_SIN_AUTOGUARDADO.length / 2,
     )
@@ -912,9 +969,88 @@ describe('el renglón que dice que esta rama NO se autoguarda (desviación 7)', 
   })
 
   it('el mensaje dice las tres cosas: qué no pasa, por qué y qué hacer', () => {
-    expect(MENSAJE_SIN_AUTOGUARDADO).toMatch(/no se guarda sola/i)
+    // Qué SÍ pasa (se guarda sola), qué NO (archivar con nombre), y qué hacer.
+    expect(MENSAJE_SIN_AUTOGUARDADO).toMatch(/se guarda sola/i)
+    expect(MENSAJE_SIN_AUTOGUARDADO).toMatch(/no se archiva/i)
     expect(MENSAJE_SIN_AUTOGUARDADO).toMatch(/rama Parcela/i)
-    expect(MENSAJE_SIN_AUTOGUARDADO).toMatch(/se pierde/i)
+    expect(MENSAJE_SIN_AUTOGUARDADO).toMatch(/proyecto \(\.json\)/i)
+  })
+
+  // ⛔ Las dos frases que T4.3 retiró, en negativo. No son adorno: son la única forma
+  // de que reponer una de ellas —copiando de un commit viejo, o «restaurando» un
+  // mensaje que parecía más completo— ponga algo en rojo.
+  it('⛔ ninguna de las dos vuelve a decir que esta rama no se guarda sola', () => {
+    for (const m of [MENSAJE_SIN_AUTOGUARDADO, MENSAJE_SIN_AUTOGUARDADO_BREVE]) {
+      expect(m).not.toMatch(/no se guarda sola/i)
+    }
+  })
+
+  it('⛔ ninguna de las dos manda ya al CAD: desde F12 el recinto se dibuja aquí', () => {
+    for (const m of [MENSAJE_SIN_AUTOGUARDADO, MENSAJE_SIN_AUTOGUARDADO_BREVE]) {
+      expect(m).not.toMatch(/CAD/i)
+    }
+  })
+})
+
+// ══ 6 bis · F12 · T4.3 · LA IDENTIDAD DEL EDIFICIO ═══════════════════════════
+//
+// Sin `idLocal` no hay autoguardado posible: `app/cableado-expediente.js` distingue
+// «otro documento» de «una edición» comparando identidades, y con `null` a los dos
+// lados esa comparación dice «es el mismo» siempre. Estas pruebas son las que
+// impiden que la estampa se caiga de alguna de las cuatro puertas de entrada.
+
+describe('F12 · T4.3 · todo edificio entra con identidad', () => {
+  it('por fichero, la identidad es el nombre del fichero', async () => {
+    const { cableado, estado } = montar()
+    await soltar(cableado, ficheroDe(RUTA_LIST, 'LIST.txt'))
+    expect(estado.get().idLocal).toBe('LIST.txt')
+  })
+
+  it('por GML de edificio, también', async () => {
+    const { cableado, estado } = montar()
+    await soltar(cableado, ficheroDe(RUTA_GML_PARTES, 'BU.gml'))
+    expect(estado.get().idLocal).toBe('BU.gml')
+  })
+
+  it('por pegado, lo que consta es que se pegó', async () => {
+    const { cableado, estado } = montar()
+    cableado.alTexto(textoDe(RUTA_LIST), 'coordenadas pegadas', [], false)
+    expect(estado.get().idLocal).toBe('coordenadas pegadas')
+  })
+
+  it('del Catastro, la identidad es la referencia catastral CANÓNICA', async () => {
+    const datos = { ...parsearGmlBu(textoDe(RUTA_GML_PARTES)), refcat: '9398516VK3799G' }
+    const cliente = { edificioPorRefcat: async () => resultadoOk(datos) }
+    const { cableado, estado } = montar({ cliente })
+    // Se teclea en minúsculas y con un espacio: lo que se guarda es la forma canónica,
+    // no lo que se tecleó. Si no, dos sesiones de la misma parcela serían dos
+    // documentos distintos para el autoguardado.
+    document.querySelector(SELECTOR_PANEL.REFCAT).value = '9398516 vk3799g'
+    await cableado.cargar()
+    expect(estado.get().idLocal).toBe('9398516VK3799G')
+  })
+
+  it('⭐ un edificio empezado DESDE CERO con «Añadir parte» nace con identidad', () => {
+    const { estado } = montar()
+    expect(estado.get()).toBe(null)
+    document.querySelector('[data-accion="anadir-parte"]').click()
+    expect(estado.get().idLocal).toBe(IDENTIDAD_DIBUJADO)
+  })
+
+  it('la identidad SOBREVIVE a las mutaciones: añadir una parte no la borra', async () => {
+    const { cableado, estado } = montar()
+    await soltar(cableado, ficheroDe(RUTA_LIST, 'LIST.txt'))
+    document.querySelector('[data-accion="anadir-parte"]').click()
+    expect(estado.get().idLocal).toBe('LIST.txt')
+  })
+
+  it('cargar OTRO fichero cambia la identidad: son dos documentos, no una edición', async () => {
+    const { cableado, estado } = montar()
+    await soltar(cableado, ficheroDe(RUTA_LIST, 'LIST.txt'))
+    const primera = estado.get().idLocal
+    await soltar(cableado, ficheroDe(RUTA_TXT, 'PARCELA.txt'))
+    expect(estado.get().idLocal).toBe('PARCELA.txt')
+    expect(estado.get().idLocal).not.toBe(primera)
   })
 })
 
@@ -1032,10 +1168,16 @@ describe('destruir()', () => {
     // empiezan por `if (destruido) return`, así que medía la bandera. Es la
     // lección de T2.4 repetida. Ahora se cuenta la baja, interviniendo
     // `subscribe` y `alAccion` en el arnés.
+    //
+    // ⚠️ **Y las suscripciones al store son DOS desde F12 · T4.2**, no una: la
+    // segunda es la de `edificio/parte-activa.js`, la fachada que le presenta al
+    // motor de edición la parte elegida con forma de parcela. Que se cuenten las
+    // dos aquí es la prueba de que el adaptador **también** se da de baja: una
+    // fachada que sobreviviera al cableado seguiría reemitiendo a un mapa muerto.
     const { cableado, bajas } = montar()
     expect(bajas).toEqual({ store: 0, panel: 0, cierre: 0 })
     cableado.destruir()
-    expect(bajas).toEqual({ store: 1, panel: 1, cierre: 1 })
+    expect(bajas).toEqual({ store: 2, panel: 1, cierre: 1 })
   })
 
   it('y además deja de repintar: el comportamiento coincide con la retirada', () => {
@@ -1202,6 +1344,355 @@ describe('regla de oro 9: la aplicación mide, el colegiado interpreta', () => {
     // ⛔ `.gml`/`.xml` NO están: las reclama `app/cableado-comprobacion.js` y
     // `entradasExtra` lanza si se intenta tomar una extensión ya tomada.
     expect(EXTENSIONES).not.toContain('.gml')
+  })
+})
+
+// ══ 11 · F12 · T4.2 — LA PARTE ACTIVA, DE PUNTA A PUNTA ══════════════════════
+
+/** El edificio de trabajo de F12: dos partes, la segunda un sótano. */
+function edificioDosPartes() {
+  return crearEdificio({
+    refcat: '9398516VK3799G',
+    partes: [
+      {
+        nombre: 'Cuerpo principal',
+        tipo: 'PRINCIPAL',
+        recinto: {
+          vertices: [
+            [439200, 4479600],
+            [439220, 4479600],
+            [439220, 4479620],
+            [439200, 4479620],
+          ],
+          tipo: 'EXTERIOR',
+        },
+        plantasSobreRasante: 2,
+        plantasBajoRasante: 0,
+        origen: 'WFS',
+      },
+      {
+        // ⭐ El hallazgo M5 de la fase 0, hecho fixture: en el expediente real la
+        // parte MAYOR tiene 0 plantas sobre rasante —es un sótano— y por tanto la
+        // envolvente EXCLUYE la parte más grande del edificio.
+        nombre: 'Sótano',
+        tipo: 'PRINCIPAL',
+        recinto: {
+          vertices: [
+            [439230, 4479600],
+            [439280, 4479600],
+            [439280, 4479660],
+            [439230, 4479660],
+          ],
+          tipo: 'EXTERIOR',
+        },
+        plantasSobreRasante: 0,
+        plantasBajoRasante: 1,
+        origen: 'WFS',
+      },
+    ],
+  })
+}
+
+/** El último `{activa, envolvente}` que se le mandó pintar a la capa. */
+const ultimoPintado = (ctx) => ctx.capa.opciones[ctx.capa.opciones.length - 1]
+
+/** Dispara una intención del panel como si la hubiera pulsado el usuario. */
+const intencion = (ctx, accion, extra = {}) =>
+  ctx.cableado === null
+    ? null
+    : document.querySelector(`[data-accion="${accion}"]`) && extra
+
+describe('F12 · T4.2 · añadir, elegir y eliminar partes', () => {
+  it('⭐ «Añadir parte» funciona SIN edificio: es como se empieza uno desde cero', () => {
+    // Es el caso del encargo real —declarar el porche que no estaba— y la única
+    // mutación que no puede exigir que ya haya un edificio cargado.
+    const ctx = montar()
+    expect(ctx.estado.get()).toBeNull()
+    document.querySelector(`[${'data-accion'}="anadir-parte"]`).click()
+
+    const edificio = ctx.estado.get()
+    expect(edificio).not.toBeNull()
+    expect(edificio.partes).toHaveLength(1)
+    expect(edificio.partes[0].origen).toBe('DIBUJADA')
+    expect(edificio.partes[0].recinto).toBeNull()
+    // Y queda ELEGIDA: quien añade una parte lo hace para dibujarla.
+    expect(ctx.cableado.parteActiva()).toBe(0)
+  })
+
+  it('añadir con edificio puesto pone la parte al final y la elige', () => {
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+    document.querySelector('[data-accion="anadir-parte"]').click()
+    expect(ctx.estado.get().partes).toHaveLength(3)
+    expect(ctx.cableado.parteActiva()).toBe(2)
+  })
+
+  it('elegir una fila la marca en el panel Y en el mapa, con el mismo índice', () => {
+    // Las dos mitades tienen que decir lo mismo: dos fuentes de «cuál es la parte
+    // activa» es el estado duplicado que el rework de UI existió para quitar.
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+    document
+      .querySelector('[data-parte-indice="1"] [data-accion="seleccionar-parte"]')
+      .click()
+    expect(ctx.cableado.parteActiva()).toBe(1)
+    expect(ctx.panelEdificio.parteActiva()).toBe(1)
+    expect(ultimoPintado(ctx).activa).toBe(1)
+  })
+
+  it('⛔ eliminar la parte activa deja de haber activa, y NO lanza', () => {
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+    document
+      .querySelector('[data-parte-indice="1"] [data-accion="seleccionar-parte"]')
+      .click()
+    expect(() => document.querySelector('[data-accion="eliminar-parte"]').click()).not.toThrow()
+    expect(ctx.estado.get().partes).toHaveLength(1)
+    expect(ctx.cableado.parteActiva()).toBeNull()
+    expect(ctx.panelEdificio.parteActiva()).toBeNull()
+  })
+
+  it('eliminar DICE qué se lleva, con su recuento de vértices', () => {
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+    document
+      .querySelector('[data-parte-indice="0"] [data-accion="seleccionar-parte"]')
+      .click()
+    document.querySelector('[data-accion="eliminar-parte"]').click()
+    const dicho = ctx.avisos.map((a) => a.mensaje).join(' ')
+    expect(dicho).toContain('Cuerpo principal')
+    expect(dicho).toContain('4 vértices')
+    expect(dicho).toContain('Deshacer la devuelve')
+  })
+})
+
+describe('F12 · T4.2 · tipo y plantas', () => {
+  const elegir = (i) =>
+    document.querySelector(`[data-parte-indice="${i}"] [data-accion="seleccionar-parte"]`).click()
+
+  const cambiar = (selector, valor) => {
+    const campo = document.querySelector(selector)
+    campo.value = valor
+    campo.dispatchEvent(new Event('change', { bubbles: true }))
+  }
+
+  it('asignar plantas las guarda en la parte, no en el edificio', () => {
+    // Override O11: las plantas van POR PARTE. Es el dato que distingue un volumen
+    // de otro en el modelo INSPIRE.
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+    elegir(0)
+    cambiar('[data-campo="plantas-sobre"]', '5')
+    expect(ctx.estado.get().partes[0].plantasSobreRasante).toBe(5)
+    expect(ctx.estado.get().partes[1].plantasSobreRasante).toBe(0)
+  })
+
+  it('⛔ un número de plantas imposible se IGNORA y se dice, citando lo tecleado', () => {
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+    elegir(0)
+    cambiar('[data-campo="plantas-sobre"]', '2,5')
+    // El valor bueno del otro campo SÍ entra: la mutación va valor a valor.
+    expect(ctx.estado.get().partes[0].plantasSobreRasante).toBe(2)
+    const dicho = ctx.avisos.map((a) => a.mensaje).join(' ')
+    expect(dicho).toContain('entero de cero para arriba')
+    expect(dicho).toContain('2.5')
+  })
+
+  it('pasar a «Otra» avisa de que las plantas se pierden, y las pone a null', () => {
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+    elegir(0)
+    cambiar('[data-campo="tipo-parte"]', 'OTRA')
+    expect(ctx.estado.get().partes[0].tipo).toBe('OTRA')
+    expect(ctx.estado.get().partes[0].plantasSobreRasante).toBeNull()
+    // Y se dice QUÉ se pierde, con las cifras que tenía: es la regla de oro 1
+    // aplicada a una acción destructiva.
+    const dicho = ctx.avisos.map((a) => a.mensaje).join(' ')
+    expect(dicho).toContain('ésas no llevan plantas')
+    expect(dicho).toContain('2 sobre rasante')
+  })
+
+  it('y entonces el panel deja de tener contadores: no están vacíos, NO ESTÁN', () => {
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+    elegir(0)
+    expect(ctx.panelEdificio.plantasDisponibles()).toBe(true)
+    cambiar('[data-campo="tipo-parte"]', 'OTRA')
+    expect(ctx.panelEdificio.plantasDisponibles()).toBe(false)
+    expect(document.querySelector('[data-campo="plantas-sobre"]')).toBeNull()
+  })
+})
+
+describe('F12 · T4.2 · la envolvente derivada (criterio de aceptación 3)', () => {
+  it('⭐ EXCLUYE los sótanos, y por eso la cifra dice cuántas partes quedan fuera', () => {
+    // El hallazgo M5, medido en el expediente real: la parte MAYOR es un sótano,
+    // así que la envolvente se come el 43 % de la superficie. Un número así sin
+    // decir por qué es un número que nadie puede defender.
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+    const { envolvente } = ultimoPintado(ctx)
+    expect(Array.isArray(envolvente)).toBe(true)
+    expect(envolvente.length).toBeGreaterThan(0)
+    const huella = document.querySelector('[data-campo="huella-edificio"]').textContent
+    expect(huella).toContain('400,00 m² de huella')
+    expect(huella).toContain('1 parte fuera')
+  })
+
+  it('⭐ se RECALCULA al cambiar las plantas de una parte, sin tocar nada más', () => {
+    // Es la forma comprobable del criterio 3: el criterio de «sobre rasante» se
+    // evalúa en cada repintado, así que subirle una planta al sótano lo mete.
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+    const antes = ultimoPintado(ctx).envolvente.length
+    document
+      .querySelector('[data-parte-indice="1"] [data-accion="seleccionar-parte"]')
+      .click()
+    const campo = document.querySelector('[data-campo="plantas-sobre"]')
+    campo.value = '1'
+    campo.dispatchEvent(new Event('change', { bubbles: true }))
+
+    const despues = ultimoPintado(ctx)
+    expect(despues.envolvente.length).toBeGreaterThan(antes)
+    const huella = document.querySelector('[data-campo="huella-edificio"]').textContent
+    expect(huella).not.toContain('fuera')
+
+    // ⛔ **Y la suma es PIEZA A PIEZA, no de una pasada.** Los dos cuerpos no se
+    // tocan (20×20 = 400 m² y 50×60 = 3.000 m²), así que la envolvente son DOS
+    // piezas. Aplanarlas antes de medir haría que el exterior de la segunda se
+    // leyera como un hueco de la primera —el invariante de `edit/metricas.js` es
+    // que `recintos[0]` es el EXTERIOR y el resto huecos— y la cifra saldría
+    // NEGATIVA: 400 − 3.000. Es el defecto que esta línea impide volver a meter.
+    //
+    // (Sin punto de millar en «3400»: es la convención española que aplica
+    // `Intl.NumberFormat('es-ES')` —no se agrupa a partir de cuatro cifras—, y se
+    // escribe aquí tal cual sale para que la prueba no invente un formato.)
+    expect(despues.envolvente).toHaveLength(2)
+    expect(huella).toContain('3400,00 m² de huella')
+  })
+
+  it('sin partes no hay envolvente, y eso es `null` y no una lista vacía', () => {
+    const ctx = montar()
+    ctx.estado.set(null)
+    expect(ultimoPintado(ctx).envolvente).toBeNull()
+    expect(document.querySelector('[data-campo="huella-edificio"]').textContent).toBe('')
+  })
+})
+
+describe('F12 · T4.2 · la superficie en vivo (§15.4)', () => {
+  it('la de la parte activa se escribe en su bloque, medida por `edit/metricas.js`', () => {
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+    document
+      .querySelector('[data-parte-indice="0"] [data-accion="seleccionar-parte"]')
+      .click()
+    // 20 × 20 m = 400 m². La cifra la mide `edit/metricas.js`, que es el único
+    // sitio de la aplicación que mide; aquí solo se comprueba que llega.
+    expect(document.querySelector('[data-campo="superficie-parte"]').textContent).toBe('400,00 m²')
+  })
+
+  it('sin parte elegida enseña un guion, JAMÁS un «0,00 m²»', () => {
+    // Cero metros cuadrados es una superficie, y aquí no la hay.
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+    expect(document.querySelector('[data-campo="superficie-parte"]').textContent).toBe('—')
+  })
+})
+
+describe('F12 · T4.2 · quién edita, y la palabra de la barra', () => {
+  it('⛔ la edición de la parte activa nace APAGADA: la pantalla nace en Parcela', () => {
+    // `crearEdicion` nace en `true`, así que sin apagarla los gestos de las DOS
+    // ediciones estarían vivos desde el primer fotograma, sobre el mismo mapa.
+    //
+    // ⚠️ Esta prueba nació midiendo `ctx.barra.visible` —o sea, un efecto lateral—
+    // y salió VERDE con la mutación puesta. Ahora se le pregunta al cableado, que
+    // para eso `edicion()` sin argumento LEE.
+    const ctx = montar()
+    expect(ctx.cableado.edicion()).toBe(false)
+    expect(ctx.barra.visible).toEqual([])
+  })
+
+  it('y `edicion(true)` la enciende, y `edicion()` lo dice', () => {
+    const ctx = montar()
+    ctx.cableado.edicion(true)
+    expect(ctx.cableado.edicion()).toBe(true)
+    ctx.cableado.edicion(false)
+    expect(ctx.cableado.edicion()).toBe(false)
+  })
+
+  it('la palabra «Dibujar recinto» solo aparece con el mando Y con parte elegida', () => {
+    // Se ESCONDE, no se apaga: un botón gris permanente cuyo motivo hable de otra
+    // rama dice menos que su ausencia.
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+
+    ctx.cableado.edicion(true)
+    expect(ctx.barra.visible.at(-1)).toBe(false) // con el mando, sin parte
+
+    document
+      .querySelector('[data-parte-indice="0"] [data-accion="seleccionar-parte"]')
+      .click()
+    expect(ctx.barra.visible.at(-1)).toBe(true)
+
+    ctx.cableado.edicion(false) // se va de la pantalla
+    expect(ctx.barra.visible.at(-1)).toBe(false)
+  })
+
+  it('⭐ dibujar un recinto se lo pone a la parte activa, por `conParteRedibujada`', () => {
+    // El criterio de aceptación 2, de punta a punta: una parte recién añadida no
+    // tiene geometría, se dibuja vértice a vértice y el recinto acaba en el modelo
+    // por el MISMO camino que arrastrar un vértice.
+    const ctx = montar()
+    document.querySelector('[data-accion="anadir-parte"]').click()
+    expect(ctx.estado.get().partes[0].recinto).toBeNull()
+
+    ctx.cableado.edicion(true)
+    ctx.cableado.alternarDibujo()
+    expect(ctx.barra.enCurso.at(-1)).toBe(true)
+
+    // Los tres clics sobre el mapa, con el mismo gesto que usa el usuario.
+    for (const [lat, lng] of [
+      [40.45, -3.7],
+      [40.4501, -3.7],
+      [40.4501, -3.6999],
+    ]) {
+      ctx.mapa.fire('click', { latlng: { lat, lng } })
+    }
+    ctx.mapa.fire('dblclick', { latlng: { lat: 40.4501, lng: -3.6999 } })
+
+    const recinto = ctx.estado.get().partes[0].recinto
+    expect(recinto).not.toBeNull()
+    expect(recinto.vertices.length).toBeGreaterThanOrEqual(3)
+    expect(ctx.barra.enCurso.at(-1)).toBe(false)
+  })
+
+  it('cambiar de parte con un dibujo a medias lo CANCELA: el recinto es de una sola', () => {
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+    document
+      .querySelector('[data-parte-indice="0"] [data-accion="seleccionar-parte"]')
+      .click()
+    ctx.cableado.edicion(true)
+    ctx.cableado.alternarDibujo()
+    ctx.mapa.fire('click', { latlng: { lat: 40.45, lng: -3.7 } })
+
+    document
+      .querySelector('[data-parte-indice="1"] [data-accion="seleccionar-parte"]')
+      .click()
+    expect(ctx.barra.enCurso.at(-1)).toBe(false)
+    // Y el recinto de la parte 1 sigue siendo el suyo, con sus cuatro vértices.
+    expect(ctx.estado.get().partes[1].recinto.vertices).toHaveLength(4)
+  })
+
+  it('`destruir()` apaga el motor de la parte activa y esconde la palabra', () => {
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+    ctx.cableado.edicion(true)
+    ctx.cableado.destruir()
+    expect(ctx.barra.visible.at(-1)).toBe(false)
+    // Y no lanza si alguien vuelve a pedirle algo: es inerte, no roto.
+    expect(() => ctx.cableado.alternarDibujo()).not.toThrow()
+    expect(() => ctx.cableado.edicion(true)).not.toThrow()
   })
 })
 

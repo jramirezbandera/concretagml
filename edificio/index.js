@@ -232,3 +232,54 @@ export {
   conParteRenombrada,
   conRefcat,
 } from './mutaciones.js'
+
+// ── Y las SEIS de F12: cinco que hacen que la lista sea una lista, y la identidad ─
+// Las cuatro de arriba tratan al edificio como algo que ya está: se le cambia el
+// modelo, la referencia y el rótulo de sus partes, pero la lista es la que trajo
+// el fichero. Éstas la abren: se añade, se quita, se clasifica, se le ponen
+// plantas y se le cambia el contorno.
+//
+// Salen con las otras cuatro, y no en un espacio aparte, porque para el llamante
+// son la misma pregunta —«qué le puedo cambiar a un edificio ya cargado»— y
+// tienen el mismo contrato: `{edificio, detecciones}`, `crearEdificio` como
+// único constructor, y el POJO del store intacto.
+//
+// ⚠️ `conParteRedibujada` es la ÚNICA puerta por la que el mapa escribe en la
+// geometría de una parte: por ella entra tanto lo que dibuja `edit/dibujo.js`
+// desde cero como lo que devuelve la edición de F06. Una sola puerta es lo que
+// permite que el store se reconstruya siempre igual, y por eso no hay una
+// segunda para «mover un vértice».
+//
+// Y la sexta es `conIdLocal` (T4.3), que no toca la lista: le pone al edificio la
+// identidad con la que se le puede archivar y autoguardar. Sale por aquí porque
+// quien la estampa es el cableado de la rama —es él quien sabe de qué fichero o de
+// qué referencia viene el documento—, no el modelo.
+
+export {
+  conIdLocal,
+  conParteAnadida,
+  conParteEliminada,
+  conParteRedibujada,
+  conPlantas,
+  conTipoParte,
+} from './mutaciones.js'
+
+// ── La envolvente, que se DERIVA y no se guarda ──────────────────────────────
+// Criterio de aceptación 3 de F12. Sale por aquí porque quien la necesita es la
+// interfaz —para pintarla y para poder decir qué partes se han quedado fuera—, y
+// `MOTIVO_FUERA` sale con ella por lo de siempre: sin el vocabulario, la pantalla
+// tendría que decidir mirando el texto.
+//
+// ⚠️ **Vive en `edificio/envolvente.js` y NO en `model/edificio.js`**, que es lo
+// que la ficha de la fase escribe en «Ficheros». Desviación declarada: el modelo
+// es el sitio de lo que SE GUARDA, y esto es exactamente lo que no se guarda.
+
+export { MOTIVO_FUERA, envolventeDe } from './envolvente.js'
+
+// ── La vista editable de la parte activa ─────────────────────────────────────
+// El adaptador que hace que `viewer/edicion.js` —atado al store de PARCELA desde
+// F06— sirva para editar la huella de una parte sin tocar una línea suya. Sale
+// por el barrel porque su llamante es `app/`, y entra en esta capa PURA porque no
+// sabe nada de mapas: es una fachada `{get,set,subscribe}` sobre POJOs.
+
+export { crearVistaParteActiva } from './parte-activa.js'

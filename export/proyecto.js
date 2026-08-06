@@ -460,13 +460,17 @@ export function deProyecto(entrada) {
   // La rama EDIFICIO se lee —el modelo la admite desde F00— y se dice QUÉ se va a poder
   // hacer con ella y qué no. Callarlo dejaría al usuario suponiendo (regla de oro 1).
   //
-  // ⛔ **Reescrito en F11 · T3.3.** El texto de F10 —«esta versión de la aplicación solo
-  // sabe enseñar y editar la rama de parcela»— dejó de ser cierto el día que aterrizó la
-  // segunda rama: hoy el fichero se abre EN la rama de edificio, sus partes se dibujan en
-  // el mapa y sus datos se editan. Lo que sigue sin poder hacerse son tres cosas
-  // concretas, y las tres se nombran: **guardarlo en el almacén de este navegador**
-  // —`app/cableado-expediente.js` deriva la identidad del documento de `parcela.idLocal`
-  // y un `Edificio` no tiene ninguno—, escribir su GML (F13) y contrastarlo (F14).
+  // ⛔ **Reescrito en F11 · T3.3, y otra vez en F12 · T4.3.** El texto de F10 —«esta
+  // versión de la aplicación solo sabe enseñar y editar la rama de parcela»— dejó de ser
+  // cierto el día que aterrizó la segunda rama. Y el de F11 —«todavía no hace es
+  // guardarlo en el almacén de este navegador, de momento solo se conserva en el fichero
+  // de proyecto»— dejó de serlo el día que el `Edificio` tuvo `idLocal` y el
+  // autoguardado llegó a su rama: **el trabajo en curso SÍ se guarda en este navegador**.
+  //
+  // Lo que sigue sin poder hacerse son tres cosas concretas, y las tres se nombran:
+  // **archivarlo con nombre** en la lista de expedientes
+  // (`app/cableado-expediente.js#MOTIVO_GUARDAR_EN_EDIFICIO` razona por qué: la lista y
+  // «Recuperar» son de la rama de parcela), escribir su GML (F13) y contrastarlo (F14).
   //
   // ⚠️ El tipo sigue siendo `VERSION_POSTERIOR` y **no es el nombre que le pega**: esto
   // no habla de la versión del formato. `TIPO_EXPORT` vive en `export/_comun.js`, que
@@ -478,10 +482,10 @@ export function deProyecto(entrada) {
       crearDeteccionExport(
         TIPO_EXPORT.VERSION_POSTERIOR,
         'El fichero trae un expediente de EDIFICIO. Se ha leído entero y no se ha perdido nada: ' +
-          'la aplicación lo abre en la rama Edificio, dibuja sus partes en el mapa y deja editar ' +
-          'sus datos. Lo que esta versión todavía no hace es guardarlo en el almacén de este ' +
-          'navegador —de momento solo se conserva en el fichero de proyecto—, escribir su GML ' +
-          'ni contrastarlo con el Catastro.',
+          'la aplicación lo abre en la rama Edificio, dibuja sus partes en el mapa, deja editar ' +
+          'sus datos y autoguarda el trabajo en curso. Lo que esta versión todavía no hace es ' +
+          'archivarlo con nombre entre los expedientes guardados, escribir su GML ni ' +
+          'contrastarlo con el Catastro.',
         SEVERIDAD.AVISO,
         { tipo: expediente.tipo },
       ),

@@ -581,21 +581,69 @@ function partesDeFeature(feature, indiceFeature, que, origen, siguienteIndice, d
     )
   }
 
+  // ⛔ **F12 · fase 5 · LAS PLANTAS DEJAN DE TIRARSE, y lo destapó el guion 19.**
+  // F11 las ponía a `null` por alcance —«se asignan una a una en la fase
+  // siguiente»— y F12 ES esa fase, pero llegó a la fase 5 sin que nadie tocara
+  // esta línea: la suite seguía verde porque ninguna prueba afirmaba que el
+  // fichero las trajera hasta el modelo. El síntoma en pantalla era exacto y
+  // mudo: **cero rótulos romanos sobre trece huellas** que sí traen sus plantas
+  // (medido en la fase 0, M5), y una envolvente derivada de un dato que no está.
+  //
+  // ⚠️ Se copian **tal cual vienen**, sin corregir nada: `crearParteConstruccion`
+  // valida, y una parte con `0` sobre rasante y `1` bajo rasante es un SÓTANO —el
+  // caso de `Parte 10` del fixture real, que es además la parte MAYOR—. Deducir
+  // ahí un «seguro que quería decir 1» sería inventarle plantas a un edificio.
+  const sobre = numeroONulo(feature.numberOfFloorsAboveGround)
+  const bajo = numeroONulo(feature.numberOfFloorsBelowGround)
+
   return anillos.map((anillo, j) =>
     crearParteConstruccion({
       nombre: nombreParteGenerico(siguienteIndice + j),
       tipo: TIPO_PARTE.PRINCIPAL, // F11: siempre PRINCIPAL (desviación 5).
       recinto: recintoDe(anillo),
-      // Las plantas van a `null` por ALCANCE, no porque no vengan: ver
-      // `PLANTAS_DESCARTADAS` más abajo.
-      plantasSobreRasante: null,
-      plantasBajoRasante: null,
+      // ⚠️ **Las N partes de un feature comparten sus plantas**, y es lo único
+      // que se puede decir: el dialecto BU declara las plantas por
+      // `BuildingPart`, no por anillo. Repartirlas —o dárselas solo a la primera—
+      // sería inventar un criterio que el fichero no trae.
+      plantasSobreRasante: sobre,
+      plantasBajoRasante: bajo,
       origen,
     }),
   )
 }
 
-/** Las plantas de las partes que el documento SÍ traía y aquí se tiran. */
+/**
+ * Un entero no negativo, o `null`. Lo que no lo sea entra como `null` en vez de
+ * hacer lanzar a `crearParteConstruccion` dentro de una importación: un fichero
+ * con un `numberOfFloorsAboveGround` raro es dato del usuario, no contrato roto.
+ *
+ * @param {*} v
+ * @returns {number|null}
+ */
+function numeroONulo(v) {
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : null
+}
+
+/**
+ * Las plantas que el documento traía y que AHORA SÍ entran.
+ *
+ * ⛔ **F12 · fase 5 · esta función decía lo contrario, y la frase caducó.** Hasta
+ * aquí anunciaba que las plantas «NO se guardan» porque F11 las tiraba por
+ * alcance; F12 es la fase que las recoge, y dejar el aviso habría sido decirle al
+ * usuario que se pierde un dato que está delante, en la lista y en el mapa.
+ *
+ * **No se retira del todo, y ése es el criterio**: que el fichero traiga plantas
+ * es un hecho del documento que conviene decir —el técnico las va a ver y va a
+ * querer saber si son suyas o del Catastro—, y sobre todo hay un caso que **no
+ * se puede callar**: las que vienen a `0` sobre rasante. Ver
+ * {@link decirSoloBajoRasante}, que las nombra una a una.
+ *
+ * ⚠️ El tipo sigue siendo `PLANTAS_DESCARTADAS` y **no es el nombre que le pega**
+ * ya. Vive en `edificio/_comun.js`, que esta tarea no toca, y renombrarlo
+ * obligaría a mover el enumerado y sus dos guardianes: deuda declarada, no
+ * olvido. Quien decida por CÓDIGO tiene `datos.entran === true`, que sí lo
+ * distingue del mundo anterior sin ambigüedad.
+ */
 function decirPlantasDescartadas(partesBu, detecciones) {
   const conPlantas = partesBu
     .map((p, i) => ({
@@ -612,11 +660,11 @@ function decirPlantasDescartadas(partesBu, detecciones) {
       TIPO_EDIFICIO.PLANTAS_DESCARTADAS,
       `El documento trae las plantas de ${conPlantas.length} de las ${partesBu.length} partes ` +
         `(sobre rasante ${conPlantas.map((p) => p.arriba ?? '—').join(', ')}; bajo rasante ` +
-        `${conPlantas.map((p) => p.abajo ?? '—').join(', ')}) y esta versión NO las guarda: en ` +
-        'F11 toda parte entra con las plantas sin asignar, y se asignan una a una en la fase ' +
-        'siguiente. El dato sigue en el fichero, sin tocar.',
-      SEVERIDAD.AVISO,
-      { partes: conPlantas, total: partesBu.length },
+        `${conPlantas.map((p) => p.abajo ?? '—').join(', ')}) y se cargan tal cual vienen. ` +
+        'Revísalas: son el dato con el que se decide qué partes entran en la envolvente, y las ' +
+        'que declaren 0 plantas sobre rasante se quedan fuera por ser sótanos.',
+      SEVERIDAD.INFO,
+      { partes: conPlantas, total: partesBu.length, entran: true },
     ),
   )
 }

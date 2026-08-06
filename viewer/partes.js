@@ -95,6 +95,18 @@ export const CLASE_HUELLA = 'gml-huella'
 /** Clase CSS del título emergente con el nombre de la parte. */
 export const CLASE_EMERGENTE = 'gml-huella-emergente'
 
+/** F12. Clase del rótulo de plantas que va SOBRE cada parte («II», «I»). */
+export const CLASE_ROTULO_PLANTAS = 'gml-huella-plantas'
+
+/** F12. Clase de la huella de la parte ACTIVA (la que se está editando). */
+export const CLASE_HUELLA_ACTIVA = 'gml-huella--activa'
+
+/** F12. Clase de la línea de la envolvente derivada. */
+export const CLASE_ENVOLVENTE = 'gml-envolvente'
+
+/** F12. Lo que rotula la envolvente, palabra por palabra de la ficha (§15.3). */
+export const ROTULO_ENVOLVENTE = 'envolvente calculada'
+
 /**
  * Color de la huella de una parte de construcción. Elegido por DESCARTE, con el
  * mismo método que `COLOR_USUARIO` (ver `viewer/_comun.js`) y que
@@ -194,6 +206,73 @@ export function textoEmergenteParte(nombre) {
 /** ¿Es un par UTM `[x,y]` utilizable (finito en las dos componentes)? */
 function esParUTM(v) {
   return Array.isArray(v) && v.length >= 2 && Number.isFinite(v[0]) && Number.isFinite(v[1])
+}
+
+/**
+ * Un entero en números romanos, que es como se rotulan las plantas de un edificio
+ * en un plano —«II» sobre el cuerpo de dos alturas, «I» sobre el porche— y lo que
+ * pide la ficha de F12 (§15.1).
+ *
+ * ⚠️ **Fuera de `[1, 3999]` devuelve `null` y no una aproximación**, y ahí caen
+ * los dos casos que importan de verdad:
+ *   · **`0` no tiene número romano**, y no es un vacío legal: es la parte SOLO
+ *     BAJO RASANTE, que existe de verdad —`part10` del fixture del Catastro—.
+ *     Rotularla «0» sería inventarse una notación; dejarla sin rótulo es lo que
+ *     hace un plano.
+ *   · **`null`** es «todavía no se sabe», que es como entran todas las partes de
+ *     un DXF hasta que el técnico las rellena.
+ * En los dos casos: sin rótulo. Sin rótulo no es lo mismo que un rótulo vacío.
+ *
+ * @param {number|null|undefined} n
+ * @returns {string|null}
+ */
+export function numeroRomano(n) {
+  if (!Number.isInteger(n) || n < 1 || n > 3999) return null
+  const tabla = [
+    [1000, 'M'],
+    [900, 'CM'],
+    [500, 'D'],
+    [400, 'CD'],
+    [100, 'C'],
+    [90, 'XC'],
+    [50, 'L'],
+    [40, 'XL'],
+    [10, 'X'],
+    [9, 'IX'],
+    [5, 'V'],
+    [4, 'IV'],
+    [1, 'I'],
+  ]
+  let resto = n
+  let salida = ''
+  for (const [valor, letra] of tabla) {
+    while (resto >= valor) {
+      salida += letra
+      resto -= valor
+    }
+  }
+  return salida
+}
+
+/**
+ * El rótulo de plantas de una parte: el romano de las que hay sobre rasante, y
+ * los sótanos entre paréntesis si los hay («II (−1)»).
+ *
+ * Las de tipo `OTRA` —piscinas— **no llevan rótulo NUNCA**: sus plantas son `null`
+ * por convenio (override O11) y poner algo ahí sería contradecir al modelo en
+ * pantalla. Devuelve `null`, que quiere decir «no pongas nada».
+ *
+ * @param {object} parte  `ParteConstruccion`.
+ * @returns {string|null}
+ */
+export function rotuloPlantas(parte) {
+  if (!parte || parte.tipo === 'OTRA') return null
+  const sobre = numeroRomano(parte.plantasSobreRasante)
+  const bajo = Number.isInteger(parte.plantasBajoRasante) && parte.plantasBajoRasante > 0
+  if (sobre === null && !bajo) return null
+  // Un sótano sin nada encima se rotula solo con su sótano: es lo que es.
+  if (sobre === null) return `(−${parte.plantasBajoRasante})`
+  return bajo ? `${sobre} (−${parte.plantasBajoRasante})` : sobre
 }
 
 // ── API ──────────────────────────────────────────────────────────────────────
@@ -301,6 +380,51 @@ export function crearCapaPartes({ mapa, zona, alAvisar } = {}) {
     return finitos.map((v) => vertUTMaLatLng(v, zona))
   }
 
+  /**
+   * Pinta la envolvente derivada: el contorno que rodea a todas las partes sobre
+   * rasante, etiquetado «envolvente calculada».
+   *
+   * ⚠️ **NO es editable, y se nota**: va `interactive: false` —no se puede agarrar
+   * ni pinchar— y sin relleno. Es el criterio de aceptación 3 de la ficha, y la
+   * forma de cumplirlo en pantalla y no solo en el modelo: lo que no se puede
+   * tocar no se puede confundir con un dato que se edita.
+   *
+   * ⭐ **Son N piezas, no una.** Medido sobre el edificio real del Catastro
+   * (F12 · M5): sus 13 partes dan **DOS** contornos separados, porque son dos
+   * cuerpos. Leer `recintos[0]` y creer que ya está dejaría medio edificio sin
+   * rodear.
+   *
+   * @param {Array<Array<object>>} piezas  Lo que devuelve
+   *   `edificio/envolvente.js#envolventeDe`.`recintos`.
+   */
+  function pintarEnvolvente(piezas) {
+    if (!Array.isArray(piezas)) {
+      throw new TypeError(
+        `pintar: 'envolvente' debe ser el array de piezas de envolventeDe().recintos ` +
+          `o null; recibido ${describir(piezas)}.`,
+      )
+    }
+    for (const pieza of piezas) {
+      if (!Array.isArray(pieza) || pieza.length === 0) continue
+      const anillos = pieza.map(anilloLatLng).filter((a) => a !== null)
+      if (anillos.length === 0) continue
+      const contorno = L.polygon(anillos, {
+        pane: PANE.PARTES,
+        className: CLASE_ENVOLVENTE,
+        interactive: false,
+        color: COLOR_HUELLA,
+        weight: GROSOR_HUELLA,
+        opacity: OPACIDAD_TRAZO,
+        dashArray: '8 5',
+        // Sin relleno: es un CONTORNO. Con relleno sumaría color sobre las partes
+        // que ya lo tienen y parecería una superficie más.
+        fill: false,
+      })
+      contorno.addTo(mapa)
+      capas.push(contorno)
+    }
+  }
+
   /** Quita del mapa todo lo puesto por el último `pintar`. */
   function limpiar() {
     for (const capa of capas) {
@@ -325,7 +449,7 @@ export function crearCapaPartes({ mapa, zona, alAvisar } = {}) {
    * @returns {void}
    * @throws {TypeError} Si `partes` no es un array ni `null`.
    */
-  function pintar(partes) {
+  function pintar(partes, { activa = null, envolvente = null } = {}) {
     // Tras `destruir()` esto es un no-op y no un throw: el desmontaje del visor va
     // en orden inverso y una respuesta del WFS de edificio en vuelo puede llegar
     // después. Mismo criterio que `colindantes.pintar` y `contraste.pintar`.
@@ -342,22 +466,34 @@ export function crearCapaPartes({ mapa, zona, alAvisar } = {}) {
       )
     }
 
+    // La ENVOLVENTE va PRIMERO, para que quede por debajo de las huellas: es el
+    // contorno del conjunto, no una parte más, y taparlas sería decir lo
+    // contrario de lo que es. Se dibuja sin relleno, por lo mismo.
+    if (envolvente !== null && envolvente !== undefined) {
+      pintarEnvolvente(envolvente)
+    }
+
     let saltadas = 0
-    for (const parte of partes) {
+    for (const [indice, parte] of partes.entries()) {
       const anillo = anilloLatLng(parte && parte.recinto)
       if (anillo === null) {
         saltadas++
         continue
       }
 
+      const esActiva = indice === activa
       const poligono = L.polygon(anillo, {
         pane: PANE.PARTES,
-        className: CLASE_HUELLA,
+        className: esActiva ? `${CLASE_HUELLA} ${CLASE_HUELLA_ACTIVA}` : CLASE_HUELLA,
         // Interactiva a propósito, por el emergente. El porqué —y por qué no le
         // roba el clic al mapa— está en la cabecera.
         interactive: true,
         color: COLOR_HUELLA,
-        weight: GROSOR_HUELLA,
+        // La activa se distingue por GROSOR y no por color: el color de la huella
+        // está elegido por descarte y no puede significar nada (regla de oro 9),
+        // así que un segundo color pediría un segundo descarte y además diría
+        // «esta parte es distinta» en vez de «ésta es la que estás tocando».
+        weight: esActiva ? GROSOR_HUELLA * 2 : GROSOR_HUELLA,
         opacity: OPACIDAD_TRAZO,
         // Con relleno VISIBLE, al revés que en `colindantes.js`: aquí la huella es
         // el asunto. Ver {@link OPACIDAD_RELLENO} para por qué es bajo.
@@ -378,6 +514,35 @@ export function crearCapaPartes({ mapa, zona, alAvisar } = {}) {
 
       poligono.addTo(mapa)
       capas.push(poligono)
+
+      // El rótulo de plantas, SOBRE la huella y en romano («II», «I»). Va como
+      // `tooltip` permanente y no como emergente: es un dato del plano, no una
+      // ayuda que aparece al pasar por encima.
+      const rotulo = rotuloPlantas(parte)
+      if (rotulo !== null) {
+        const marca = L.marker(poligono.getBounds().getCenter(), {
+          pane: PANE.PARTES,
+          // No se agarra ni intercepta el puntero: es un rótulo, no un control.
+          interactive: false,
+          keyboard: false,
+          icon: L.divIcon({ className: '', html: '', iconSize: [0, 0] }),
+        })
+        marca.bindTooltip(rotulo, {
+          permanent: true,
+          direction: 'center',
+          className: CLASE_ROTULO_PLANTAS,
+          // Sin la flechita: un rótulo centrado en su huella no apunta a nada.
+          offset: [0, 0],
+          // ⚠️ En el pane de las PARTES (422) y no en el `tooltipPane` de Leaflet,
+          // que vive en 650 —por encima de todo—. Un rótulo de plantas no puede
+          // taparle a nadie el vértice que está intentando agarrar: es un dato del
+          // plano, no un aviso. Sin este `pane` el rótulo se pinta fuera de la capa
+          // y además sobrevuela los marcadores de edición.
+          pane: PANE.PARTES,
+        })
+        marca.addTo(mapa)
+        capas.push(marca)
+      }
     }
 
     if (saltadas > 0) {

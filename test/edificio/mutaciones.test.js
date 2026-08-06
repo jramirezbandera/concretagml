@@ -16,16 +16,23 @@ import { describe, expect, it } from 'vitest'
 import {
   ROTULO_ATRIBUTO,
   conAtributos,
+  conIdLocal,
   conModelo,
+  conParteAnadida,
+  conParteEliminada,
+  conParteRedibujada,
   conParteRenombrada,
+  conPlantas,
   conRefcat,
+  conTipoParte,
 } from '../../edificio/mutaciones.js'
-import { SEVERIDAD, TIPO_EDIFICIO } from '../../edificio/_comun.js'
+import { SEVERIDAD, TIPO_EDIFICIO, nombreParteGenerico } from '../../edificio/_comun.js'
 import {
   ATRIBUTOS_COMPLETO,
   ESTADO_CONSERVACION,
   MODELO_EDIFICIO,
   ORIGEN_PARTE,
+  TIPO_PARTE,
   crearEdificio,
   crearParteConstruccion,
 } from '../../model/edificio.js'
@@ -167,7 +174,7 @@ describe('conModelo — COMPLETO → SIMPLIFICADO borra los siete, y lo dice ant
       expect(clave in edificio, `${clave} sigue estando`).toBe(false)
     }
     expect(Object.keys(edificio).sort()).toEqual(
-      ['construccionOficial', 'modelo', 'parcelaContexto', 'partes', 'refcat'].sort(),
+      ['construccionOficial', 'idLocal', 'modelo', 'parcelaContexto', 'partes', 'refcat'].sort(),
     )
   })
 
@@ -253,6 +260,55 @@ describe('conRefcat', () => {
   it('LANZA con undefined: si no, borraría la RC en silencio', () => {
     expect(() => conRefcat(edificioCompleto(), undefined)).toThrow(TypeError)
     expect(() => conRefcat(edificioCompleto(), 42)).toThrow(TypeError)
+  })
+})
+
+// ── conIdLocal (F12 · T4.3) ───────────────────────────────────────────────────
+//
+// Sin identidad no hay autoguardado: `app/cableado-expediente.js` distingue «otro
+// documento» de «una edición» comparando `idLocal`, y con `null` a los dos lados esa
+// comparación dice «es el mismo» siempre.
+
+describe('conIdLocal', () => {
+  it('pone la identidad y no toca nada más', () => {
+    const original = edificioCompleto()
+    const { edificio, detecciones } = sinMutar(original, (e) => conIdLocal(e, 'UTM.dxf'))
+    expect(edificio.idLocal).toBe('UTM.dxf')
+    expect(detecciones).toEqual([])
+    expect(edificio.refcat).toBe(original.refcat)
+    expect(edificio.partes).toEqual(original.partes)
+    for (const clave of ATRIBUTOS_COMPLETO) {
+      expect(edificio[clave]).toEqual(original[clave])
+    }
+  })
+
+  it('acepta null («todavía sin identidad») y no normaliza lo que le den', () => {
+    expect(conIdLocal(edificioCompleto(), null).edificio.idLocal).toBeNull()
+    // Un nombre de fichero con espacios alrededor se guarda LITERAL: es lo que consta,
+    // y corregirlo por su cuenta es lo mismo que `conRefcat` se prohíbe.
+    expect(conIdLocal(edificioCompleto(), ' plano final.dxf ').edificio.idLocal).toBe(
+      ' plano final.dxf ',
+    )
+  })
+
+  it('LANZA con undefined: si no, borraría la identidad en silencio', () => {
+    expect(() => conIdLocal(edificioCompleto(), undefined)).toThrow(TypeError)
+    expect(() => conIdLocal(edificioCompleto(), 42)).toThrow(TypeError)
+  })
+
+  it('⛔ LANZA con un texto en blanco: una identidad falsa es peor que ninguna', () => {
+    // El día que se archivara, un `''` pisaría a otro registro sin decir nada. Lo
+    // impide `crearEdificio` y esta prueba comprueba que la mutación no lo esquiva.
+    expect(() => conIdLocal(edificioCompleto(), '')).toThrow(TypeError)
+    expect(() => conIdLocal(edificioCompleto(), '   ')).toThrow(TypeError)
+  })
+
+  it('la identidad SOBREVIVE a las otras mutaciones: `reconstruir` la arrastra', () => {
+    // Sin esto, renombrar una parte borraría la identidad del documento y el
+    // autoguardado tomaría la edición siguiente por la llegada de otro edificio.
+    const conNombre = conIdLocal(edificioCompleto(), 'UTM.dxf').edificio
+    expect(conParteRenombrada(conNombre, 0, 'nave').edificio.idLocal).toBe('UTM.dxf')
+    expect(conRefcat(conNombre, '1234567AB1234C').edificio.idLocal).toBe('UTM.dxf')
   })
 })
 
@@ -426,5 +482,306 @@ describe('las mutaciones y la geometría oficial (regla de oro 2)', () => {
     expect(d.construccionOficial).toHaveLength(1)
     expect('numeroInmuebles' in d).toBe(false) // se perdió al simplificar, avisado
     expect(c.numeroInmuebles).toBe(7) // y el paso anterior lo conserva
+  })
+})
+
+/* ══════════════════════════════════════════════════════════════════════════ *
+ * F12 · T1.2 — LAS CINCO QUE HACEN QUE LA LISTA DE PARTES SEA UNA LISTA      *
+ *                                                                            *
+ * Además de lo de siempre (no mutan, misma forma, índice fuera de rango       *
+ * LANZA y dato de usuario NO), aquí se defiende:                              *
+ *   · que `idLocal` SOBREVIVE a las nueve — sin eso el autoguardado dejaría   *
+ *     de reconocer el borrador que él mismo escribió;                         *
+ *   · que en una piscina las plantas no son cero, es que NO APLICAN, por los  *
+ *     dos caminos (asignarlas y cambiar el tipo);                             *
+ *   · que redibujar NO cambia `origen`: eso dice de dónde ENTRÓ la geometría, *
+ *     no quién la ha tocado después.                                          *
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+describe('F12 · conParteAnadida', () => {
+  it('añade al final, sin contorno, y lo DICE', () => {
+    const r = sinMutar(edificioSimplificado(), (e) => conParteAnadida(e))
+    expect(r.edificio.partes).toHaveLength(4)
+    const nueva = r.edificio.partes[3]
+    expect(nueva.recinto).toBeNull()
+    expect(nueva.plantasSobreRasante).toBeNull()
+    expect(nueva.plantasBajoRasante).toBeNull()
+    expect(r.detecciones.map((d) => d.tipo)).toEqual([TIPO_EDIFICIO.PARTE_SIN_GEOMETRIA])
+    expect(r.detecciones[0].severidad).toBe(SEVERIDAD.INFO)
+  })
+
+  it('⭐ el nombre por defecto sale de `nombreParteGenerico`, como las tres vías de entrada', () => {
+    // Si esto divergiera, la aplicación acabaría con dos convenciones de nombre
+    // para el mismo objeto en la misma lista. Lo dice el barrel con esas palabras.
+    const r = conParteAnadida(edificioSimplificado())
+    expect(r.edificio.partes[3].nombre).toBe(nombreParteGenerico(3))
+    expect(r.edificio.partes[3].nombre).toBe('Parte 4')
+  })
+
+  it('el nombre genérico describe la POSICIÓN, no la historia', () => {
+    // Tras quitar una de tres, la siguiente vuelve a ser «Parte 3».
+    const sinLaSegunda = conParteEliminada(edificioSimplificado(), 1).edificio
+    expect(conParteAnadida(sinLaSegunda).edificio.partes[2].nombre).toBe('Parte 3')
+  })
+
+  it('el origen es siempre DIBUJADA, y no se puede elegir', () => {
+    expect(conParteAnadida(edificioSimplificado()).edificio.partes[3].origen).toBe(
+      ORIGEN_PARTE.DIBUJADA,
+    )
+  })
+
+  it('un nombre en blanco NO es un aviso aquí: nadie ha borrado nada', () => {
+    // Al contrario que en `conParteRenombrada`, donde vaciar el campo SÍ avisa.
+    const r = conParteAnadida(edificioSimplificado(), { nombre: '   ' })
+    expect(r.edificio.partes[3].nombre).toBe('Parte 4')
+    expect(r.detecciones.map((d) => d.tipo)).toEqual([TIPO_EDIFICIO.PARTE_SIN_GEOMETRIA])
+  })
+
+  it('acepta el tipo, y una piscina nace sin plantas', () => {
+    const r = conParteAnadida(edificioSimplificado(), { nombre: 'piscina', tipo: TIPO_PARTE.OTRA })
+    expect(r.edificio.partes[3].tipo).toBe(TIPO_PARTE.OTRA)
+    expect(r.edificio.partes[3].plantasSobreRasante).toBeNull()
+  })
+
+  it('un tipo con typo LANZA: no puede degradar en silencio a PRINCIPAL', () => {
+    expect(() => conParteAnadida(edificioSimplificado(), { tipo: 'PISCINA' })).toThrow(RangeError)
+  })
+})
+
+describe('F12 · conParteEliminada', () => {
+  it('quita la parte y dice LO QUE SE LLEVA, con sus vértices', () => {
+    const r = sinMutar(edificioSimplificado(), (e) => conParteEliminada(e, 0))
+    expect(r.edificio.partes.map((p) => p.nombre)).toEqual(['Parte 2', 'Parte 3'])
+    const d = r.detecciones[0]
+    expect(d.tipo).toBe(TIPO_EDIFICIO.PARTE_ELIMINADA)
+    expect(d.severidad).toBe(SEVERIDAD.AVISO)
+    expect(d.datos.nVertices).toBe(4)
+    expect(d.mensaje).toContain('Parte 1')
+    expect(d.mensaje).toContain('4 vértices')
+  })
+
+  it('distingue quitar una fila vacía de quitar un contorno dibujado', () => {
+    // La tercera parte del andamiaje no tiene recinto.
+    const d = conParteEliminada(edificioSimplificado(), 2).detecciones[0]
+    expect(d.datos.nVertices).toBeNull()
+    expect(d.mensaje).toContain('no tenía contorno')
+  })
+
+  it('índice fuera de rango LANZA (contrato del programador)', () => {
+    expect(() => conParteEliminada(edificioSimplificado(), 3)).toThrow(RangeError)
+    expect(() => conParteEliminada(edificioSimplificado(), -1)).toThrow(RangeError)
+    expect(() => conParteEliminada(edificioSimplificado(), 1.5)).toThrow(TypeError)
+  })
+})
+
+describe('F12 · conPlantas', () => {
+  it('aplica lo que es un número de plantas, sin decir nada', () => {
+    const r = sinMutar(edificioSimplificado(), (e) => conPlantas(e, 0, { sobre: 3, bajo: 1 }))
+    expect(r.edificio.partes[0].plantasSobreRasante).toBe(3)
+    expect(r.edificio.partes[0].plantasBajoRasante).toBe(1)
+    expect(r.detecciones).toEqual([])
+    expect(r.edificio.partes[1].plantasSobreRasante).toBeNull()
+  })
+
+  it('`undefined` es NO TOCAR y `null` es VACIAR — como en conAtributos', () => {
+    const conAmbas = conPlantas(edificioSimplificado(), 0, { sobre: 3, bajo: 2 }).edificio
+    const soloSobre = conPlantas(conAmbas, 0, { sobre: 5 }).edificio
+    expect(soloSobre.partes[0].plantasSobreRasante).toBe(5)
+    expect(soloSobre.partes[0].plantasBajoRasante).toBe(2) // intacta: no se mencionó
+    const vaciada = conPlantas(soloSobre, 0, { bajo: null }).edificio
+    expect(vaciada.partes[0].plantasBajoRasante).toBeNull()
+    expect(vaciada.partes[0].plantasSobreRasante).toBe(5)
+  })
+
+  it('cero es un número de plantas legítimo: es la parte solo bajo rasante', () => {
+    // `part10` del fixture real trae exactamente esto, y no es un error.
+    const r = conPlantas(edificioSimplificado(), 0, { sobre: 0, bajo: 1 })
+    expect(r.edificio.partes[0].plantasSobreRasante).toBe(0)
+    expect(r.detecciones).toEqual([])
+  })
+
+  it('⛔ un decimal o un negativo NO se guardan, y NO lanzan: vienen de un teclado', () => {
+    const r = conPlantas(edificioSimplificado(), 0, { sobre: 2.5, bajo: -1 })
+    expect(r.edificio.partes[0].plantasSobreRasante).toBeNull()
+    expect(r.edificio.partes[0].plantasBajoRasante).toBeNull()
+    expect(r.detecciones.map((d) => d.tipo)).toEqual([TIPO_EDIFICIO.PLANTAS_NO_VALIDAS])
+    expect(r.detecciones[0].datos.ignorados).toHaveLength(2)
+  })
+
+  it('lo válido entra aunque lo otro no: no es todo o nada', () => {
+    const r = conPlantas(edificioSimplificado(), 0, { sobre: 4, bajo: 'dos' })
+    expect(r.edificio.partes[0].plantasSobreRasante).toBe(4)
+    expect(r.edificio.partes[0].plantasBajoRasante).toBeNull()
+    expect(r.detecciones[0].datos.ignorados).toEqual([{ clave: 'bajo', valor: 'dos' }])
+  })
+
+  it('⛔ en una parte OTRA las plantas NO APLICAN, y se contesta a ESA pregunta', () => {
+    const conPiscina = conParteAnadida(edificioSimplificado(), {
+      nombre: 'piscina',
+      tipo: TIPO_PARTE.OTRA,
+    }).edificio
+    const r = conPlantas(conPiscina, 3, { sobre: 2.5 })
+    // Ni siquiera se queja del 2,5: sería contestar a la pregunta equivocada.
+    expect(r.detecciones.map((d) => d.tipo)).toEqual([TIPO_EDIFICIO.PLANTAS_NO_APLICAN])
+    expect(r.detecciones[0].datos.motivo).toBe('ASIGNACION')
+    expect(r.detecciones[0].mensaje).toContain('no son cero')
+    expect(r.edificio.partes[3].plantasSobreRasante).toBeNull()
+  })
+
+  it('a una OTRA sin pedirle nada no se le avisa de nada', () => {
+    const conPiscina = conParteAnadida(edificioSimplificado(), { tipo: TIPO_PARTE.OTRA }).edificio
+    expect(conPlantas(conPiscina, 3, {}).detecciones).toEqual([])
+  })
+
+  it('`plantas` que no es objeto plano LANZA (contrato del programador)', () => {
+    expect(() => conPlantas(edificioSimplificado(), 0, null)).toThrow(TypeError)
+    expect(() => conPlantas(edificioSimplificado(), 0, [2, 1])).toThrow(TypeError)
+  })
+})
+
+describe('F12 · conTipoParte', () => {
+  it('cambia el tipo y no toca nada más', () => {
+    const r = sinMutar(edificioSimplificado(), (e) => conTipoParte(e, 0, TIPO_PARTE.OTRA))
+    expect(r.edificio.partes[0].tipo).toBe(TIPO_PARTE.OTRA)
+    expect(r.edificio.partes[0].recinto).toEqual(edificioSimplificado().partes[0].recinto)
+    expect(r.edificio.partes[1].tipo).toBe(TIPO_PARTE.PRINCIPAL)
+  })
+
+  it('⛔ pasar a OTRA con plantas puestas las BORRA, y lo anuncia con lo que valían', () => {
+    const conPlantasPuestas = conPlantas(edificioSimplificado(), 0, { sobre: 3, bajo: 1 }).edificio
+    const r = conTipoParte(conPlantasPuestas, 0, TIPO_PARTE.OTRA)
+    expect(r.edificio.partes[0].plantasSobreRasante).toBeNull()
+    expect(r.edificio.partes[0].plantasBajoRasante).toBeNull()
+    const d = r.detecciones[0]
+    expect(d.tipo).toBe(TIPO_EDIFICIO.PLANTAS_NO_APLICAN)
+    expect(d.datos.motivo).toBe('CAMBIO_DE_TIPO')
+    expect(d.datos.sobreRasante).toBe(3)
+    expect(d.datos.bajoRasante).toBe(1)
+  })
+
+  it('sin plantas que perder NO avisa: dos `null` que se van no son noticia', () => {
+    expect(conTipoParte(edificioSimplificado(), 0, TIPO_PARTE.OTRA).detecciones).toEqual([])
+  })
+
+  it('volver a PRINCIPAL deja las plantas vacías: no se inventa ninguna', () => {
+    const conPlantasPuestas = conPlantas(edificioSimplificado(), 0, { sobre: 3 }).edificio
+    const aOtra = conTipoParte(conPlantasPuestas, 0, TIPO_PARTE.OTRA).edificio
+    const vuelta = conTipoParte(aOtra, 0, TIPO_PARTE.PRINCIPAL).edificio
+    expect(vuelta.partes[0].plantasSobreRasante).toBeNull()
+  })
+
+  it('un tipo con typo LANZA', () => {
+    expect(() => conTipoParte(edificioSimplificado(), 0, 'OTRO')).toThrow(RangeError)
+  })
+})
+
+describe('F12 · conParteRedibujada', () => {
+  const nuevoRecinto = () => ({
+    tipo: 'EXTERIOR',
+    vertices: [
+      [1, 1],
+      [5, 1],
+      [5, 5],
+    ],
+  })
+
+  it('reemplaza el contorno y no toca el resto de la parte', () => {
+    const r = sinMutar(edificioSimplificado(), (e) => conParteRedibujada(e, 0, nuevoRecinto()))
+    expect(r.edificio.partes[0].recinto.vertices).toHaveLength(3)
+    expect(r.edificio.partes[0].nombre).toBe('Parte 1')
+    expect(r.detecciones).toEqual([])
+  })
+
+  it('⛔ NO cambia `origen`: eso dice de dónde ENTRÓ, no quién la ha tocado', () => {
+    // Si cambiara aquí, la primera vez que alguien moviera un vértice el edificio
+    // dejaría de saber de qué fichero salió, y lo haría en silencio.
+    const r = conParteRedibujada(edificioSimplificado(), 0, nuevoRecinto())
+    expect(r.edificio.partes[0].origen).toBe(ORIGEN_PARTE.DXF)
+  })
+
+  it('da geometría a la parte que no la tenía, sin decir nada', () => {
+    const r = conParteRedibujada(edificioSimplificado(), 2, nuevoRecinto())
+    expect(r.edificio.partes[2].recinto.vertices).toHaveLength(3)
+    expect(r.detecciones).toEqual([])
+  })
+
+  it('QUITAR el contorno sí avisa: la parte deja de verse en el mapa', () => {
+    const r = conParteRedibujada(edificioSimplificado(), 0, null)
+    expect(r.edificio.partes[0].recinto).toBeNull()
+    expect(r.detecciones.map((d) => d.tipo)).toEqual([TIPO_EDIFICIO.PARTE_SIN_GEOMETRIA])
+    expect(r.detecciones[0].severidad).toBe(SEVERIDAD.AVISO)
+    expect(r.detecciones[0].datos.nVerticesAnteriores).toBe(4)
+  })
+
+  it('quitar lo que ya no estaba no avisa de nada', () => {
+    expect(conParteRedibujada(edificioSimplificado(), 2, null).detecciones).toEqual([])
+  })
+
+  it('copia el recinto: el modelo no comparte referencia con quien lo dibujó', () => {
+    const vivo = nuevoRecinto()
+    const r = conParteRedibujada(edificioSimplificado(), 0, vivo)
+    vivo.vertices[0][0] = 999
+    expect(r.edificio.partes[0].recinto.vertices[0][0]).toBe(1)
+  })
+})
+
+describe('F12 · lo que las NUEVE tienen que respetar', () => {
+  it('⭐ `idLocal` sobrevive a las nueve: sin él el autoguardado pierde el borrador', () => {
+    const base = crearEdificio({
+      idLocal: 'EXP-edificio-1',
+      modelo: MODELO_EDIFICIO.COMPLETO,
+      partes: partesDeEjemplo(),
+    })
+    const cadena = [
+      (e) => conRefcat(e, '9398516VK3799G'),
+      (e) => conParteRenombrada(e, 0, 'vivienda'),
+      (e) => conAtributos(e, { numeroViviendas: 2 }),
+      (e) => conParteAnadida(e, { nombre: 'porche' }),
+      (e) => conPlantas(e, 0, { sobre: 2 }),
+      (e) => conTipoParte(e, 3, TIPO_PARTE.OTRA),
+      (e) =>
+        conParteRedibujada(e, 1, {
+          tipo: 'EXTERIOR',
+          vertices: [
+            [0, 0],
+            [3, 0],
+            [3, 3],
+          ],
+        }),
+      (e) => conParteEliminada(e, 2),
+      (e) => conModelo(e, MODELO_EDIFICIO.SIMPLIFICADO),
+    ]
+    let e = base
+    for (const paso of cadena) {
+      e = paso(e).edificio
+      expect(e.idLocal, 'una mutación ha perdido la identidad').toBe('EXP-edificio-1')
+    }
+    expect(e.partes.map((p) => p.nombre)).toEqual(['vivienda', 'Parte 2', 'porche'])
+  })
+
+  it('las CINCO nuevas devuelven {edificio, detecciones}, como las cuatro de F11', () => {
+    const e = edificioSimplificado()
+    for (const r of [
+      conParteAnadida(e),
+      conParteEliminada(e, 0),
+      conPlantas(e, 0, { sobre: 1 }),
+      conTipoParte(e, 0, TIPO_PARTE.OTRA),
+      conParteRedibujada(e, 0, null),
+    ]) {
+      expect(Object.keys(r).sort()).toEqual(['detecciones', 'edificio'])
+      expect(Array.isArray(r.detecciones)).toBe(true)
+    }
+  })
+
+  it('ninguna acepta algo que no sea un Edificio', () => {
+    for (const fn of [
+      () => conParteAnadida(null),
+      () => conParteEliminada({ partes: 'no' }, 0),
+      () => conPlantas(undefined, 0, {}),
+      () => conTipoParte([], 0, TIPO_PARTE.OTRA),
+      () => conParteRedibujada({}, 0, null),
+    ]) {
+      expect(fn).toThrow(TypeError)
+    }
   })
 })

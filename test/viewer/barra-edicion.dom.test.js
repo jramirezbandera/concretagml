@@ -452,15 +452,16 @@ describe('barra de edición · el panel de ayuda cuenta los OCHO gestos', () => 
     expect(document.activeElement).toBe(ayuda)
   })
 
-  it('la tabla nombra los ocho gestos, en el orden de la spec', () => {
+  it('la tabla nombra los doce gestos, en el orden de la spec', () => {
     montarBarra()
     clic(nodo('[data-accion="ayuda"]'))
     const filas = [...panel('ayuda').querySelectorAll('tbody tr')]
-    expect(filas.length).toBe(8)
+    expect(filas.length).toBe(12)
 
     // Escritos A MANO a propósito: si se derivaran de `GESTOS` este test no diría
-    // nada. Son los ocho de la tabla «El mapa de gestos» de
-    // `spec/feature-06-edicion-parcela.md`.
+    // nada. Los ocho primeros son los de la tabla «El mapa de gestos» de
+    // `spec/feature-06-edicion-parcela.md`; los cuatro últimos, los del dibujo de
+    // F12 (`viewer/dibujo.js`), que hasta la fase 5 no salían en la ayuda.
     expect(filas.map((fila) => fila.cells[0].textContent.trim())).toEqual([
       'Clic',
       'Doble clic',
@@ -470,22 +471,63 @@ describe('barra de edición · el panel de ayuda cuenta los OCHO gestos', () => 
       'Teclear una coordenada',
       'Desplazar lindero',
       'Ctrl+Z / Ctrl+Y',
+      'Clic',
+      'Doble clic o Enter',
+      'Retroceso / Supr',
+      'Escape',
     ])
   })
 
-  it('GESTOS son ocho y el umbral de puntería se DERIVA de viewer/edicion.js', () => {
+  it('⛔ el «Clic» aparece DOS veces, y la columna «dónde» es lo que los distingue', () => {
+    // No es un duplicado: el mismo gesto hace dos cosas distintas según si hay un
+    // trazo abierto. Una tabla que lo dijera una sola vez estaría mintiendo en el
+    // caso que más se usa. Si alguien «limpia» el repetido, esto se pone rojo.
     montarBarra()
-    expect(GESTOS.length).toBe(8)
+    clic(nodo('[data-accion="ayuda"]'))
+    const filas = [...panel('ayuda').querySelectorAll('tbody tr')]
+    const clics = filas.filter((f) => f.cells[0].textContent.trim() === 'Clic')
+    expect(clics).toHaveLength(2)
+    expect(clics.map((f) => f.cells[1].textContent.trim())).toEqual([
+      'mapa',
+      'dibujando un recinto',
+    ])
+  })
+
+  it('GESTOS son doce y el umbral de puntería se DERIVA de viewer/edicion.js', () => {
+    montarBarra()
+    expect(GESTOS.length).toBe(12)
     clic(nodo('[data-accion="ayuda"]'))
     // Si alguien ajusta `UMBRAL_PUNTERIA_PX`, la ayuda lo dice sola.
     expect(panel('ayuda').textContent).toContain(`${UMBRAL_PUNTERIA_PX} px`)
+  })
+
+  it('los cuatro gestos del dibujo están en la ayuda (F12 · T3.5, la mitad que faltaba)', () => {
+    // La barra enseña «Dibujar recinto» desde la fase 3, pero la ayuda no decía ni
+    // una palabra de qué hacer una vez pulsado. Quien la abriera MIENTRAS dibuja
+    // vería ocho gestos y ninguno sería el que está usando.
+    montarBarra()
+    clic(nodo('[data-accion="ayuda"]'))
+    const texto = panel('ayuda').textContent
+    expect(texto).toContain('dibujando un recinto')
+    expect(texto).toMatch(/Añade una esquina/i)
+    expect(texto).toMatch(/menos de tres esquinas/i)
+    expect(texto).toMatch(/Quita la última esquina/i)
+    expect(texto).toMatch(/Cancela el trazo entero/i)
   })
 
   it('las teclas de la tabla van en <kbd>, no en texto plano', () => {
     montarBarra()
     clic(nodo('[data-accion="ayuda"]'))
     const teclas = [...panel('ayuda').querySelectorAll('tbody kbd')].map((k) => k.textContent)
-    expect(teclas).toEqual(['Alt', 'Ctrl+Z', 'Ctrl+Y'])
+    expect(teclas).toEqual([
+      'Alt',
+      'Ctrl+Z',
+      'Ctrl+Y',
+      'Enter',
+      'Retroceso',
+      'Supr',
+      'Escape',
+    ])
   })
 })
 
@@ -531,7 +573,11 @@ describe('barra de edición · accesibilidad', () => {
     // visible o del de 1×1 px. Lo que se exige aquí es que exista: una herramienta
     // muda es la trampa que el diseño de solo-iconos hacía fácil de dejar.
     const herramientas = [...contenedor.querySelectorAll(`.${CLASE_BARRA.HERRAMIENTA}`)]
-    expect(herramientas.length).toBe(5)
+    // Seis desde F12: la sexta es «Dibujar recinto», que nace escondida pero está
+    // en el marcado y por tanto tiene que llevar nombre igual que las demás. Una
+    // herramienta que aparece muda al enseñarla es peor que una muda desde el
+    // principio: nadie la mira dos veces.
+    expect(herramientas.length).toBe(6)
     for (const herramienta of herramientas) {
       const nombre = herramienta.textContent.trim()
       expect(nombre.length, `herramienta sin nombre: ${herramienta.outerHTML}`).toBeGreaterThan(0)
@@ -819,10 +865,23 @@ describe('barra de edición · las herramientas se llaman por su nombre', () => 
     const nombres = [...contenedor.querySelectorAll(`.${CLASE_BARRA.TEXTO}`)].map((n) =>
       n.textContent.trim(),
     )
-    // Cinco palabras visibles. La sexta herramienta —la punta de flecha del
-    // ajuste— es la única que sigue sin texto, y por eso no aparece aquí: es la
-    // mitad estrecha de un botón partido y su nombre va oculto + en el `title`.
-    expect(nombres).toEqual(['Deshacer', 'Rehacer', 'Ajuste', 'Desplazar lindero', 'Ayuda'])
+    // Seis palabras visibles. La punta de flecha del ajuste es la única
+    // herramienta que sigue sin texto, y por eso no aparece aquí: es la mitad
+    // estrecha de un botón partido y su nombre va oculto + en el `title`.
+    //
+    // ⚠️ «Dibujar recinto» (F12) SÍ está en el marcado desde el montaje, pero nace
+    // con `hidden`: en la rama PARCELA no hay ninguna parte que dibujar. Se cuenta
+    // aquí porque este guardián mira el MARCADO —que la herramienta lleve su
+    // nombre escrito—, no lo que se ve; que nazca escondida lo defiende su propia
+    // prueba, más abajo.
+    expect(nombres).toEqual([
+      'Deshacer',
+      'Rehacer',
+      'Ajuste',
+      'Desplazar lindero',
+      'Dibujar recinto',
+      'Ayuda',
+    ])
     expect(nodo('[data-desplegable="snap"]').title).toBe('Tolerancia del ajuste')
   })
 
@@ -860,8 +919,10 @@ describe('barra de edición · las herramientas se llaman por su nombre', () => 
   it('los grupos van separados por un `role="separator"` de verdad', () => {
     const { contenedor } = montarBarra()
     const separadores = [...contenedor.querySelectorAll(`.${CLASE_BARRA.SEPARADOR}`)]
-    // Historial · ajuste · desplazamiento · ayuda ⇒ tres filetes.
-    expect(separadores).toHaveLength(3)
+    // Historial · ajuste · desplazamiento · dibujo · ayuda ⇒ cuatro filetes. El
+    // del dibujo nace escondido con su botón: un separador que no separa nada es
+    // una raya suelta.
+    expect(separadores).toHaveLength(4)
     for (const separador of separadores) {
       expect(separador.getAttribute('role')).toBe('separator')
       expect(separador.getAttribute('aria-orientation')).toBe('vertical')
@@ -878,5 +939,66 @@ describe('barra de edición · las herramientas se llaman por su nombre', () => 
     expect(document.activeElement).toBe(nodo('[data-desplegable="snap"]'))
     tecla(document.activeElement, 'ArrowRight')
     expect(document.activeElement).toBe(nodo('[data-desplegable="offset"]'))
+  })
+})
+
+// ── F12 · T3.5 · «Dibujar recinto» ───────────────────────────────────────────
+
+describe('F12 · la herramienta de dibujo', () => {
+  it('⛔ nace ESCONDIDA, no apagada: en la rama Parcela no hay parte que dibujar', () => {
+    // Es la única herramienta de esta barra que se esconde. Las que se apagan
+    // —«Deshacer», «Desplazar lindero»— describen algo que AQUÍ se puede hacer y
+    // ahora mismo no; un botón gris permanente cuyo motivo hable de otra rama
+    // diría menos que su ausencia.
+    const { barra } = montarBarra()
+    const boton = nodo('[data-accion="dibujar-recinto"]')
+    expect(boton).not.toBeNull()
+    expect(boton.hidden).toBe(true)
+    expect(boton.disabled).toBe(false)
+    expect(barra.dibujoVisible()).toBe(false)
+  })
+
+  it('`dibujoVisible(true)` la enseña, con su separador', () => {
+    const { barra, contenedor } = montarBarra()
+    barra.dibujoVisible(true)
+    expect(nodo('[data-accion="dibujar-recinto"]').hidden).toBe(false)
+    const visibles = [...contenedor.querySelectorAll(`.${CLASE_BARRA.SEPARADOR}`)].filter(
+      (s) => !s.hidden,
+    )
+    expect(visibles).toHaveLength(4)
+    barra.dibujoVisible(false)
+    expect(nodo('[data-accion="dibujar-recinto"]').hidden).toBe(true)
+  })
+
+  it('un separador escondido no deja una raya suelta', () => {
+    const { contenedor } = montarBarra()
+    const escondidos = [...contenedor.querySelectorAll(`.${CLASE_BARRA.SEPARADOR}`)].filter(
+      (s) => s.hidden,
+    )
+    expect(escondidos).toHaveLength(1)
+  })
+
+  it('mientras se dibuja, el botón CAMBIA DE PALABRA: lo que hace es cancelar', () => {
+    const { barra } = montarBarra()
+    const boton = nodo('[data-accion="dibujar-recinto"]')
+    const texto = () => boton.querySelector(`.${CLASE_BARRA.TEXTO}`).textContent
+    expect(texto()).toBe('Dibujar recinto')
+    barra.dibujoEnCurso(true)
+    expect(texto()).toBe('Cancelar dibujo')
+    expect(boton.getAttribute('aria-pressed')).toBe('true')
+    barra.dibujoEnCurso(false)
+    expect(texto()).toBe('Dibujar recinto')
+    expect(boton.getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('lleva palabras y no un dibujo, como el resto desde el rediseño', () => {
+    montarBarra()
+    expect(nodo('[data-accion="dibujar-recinto"]').querySelector('svg')).toBeNull()
+  })
+
+  it('`dibujoVisible` con algo que no es booleano LANZA, y leer no escribe', () => {
+    const { barra } = montarBarra()
+    expect(() => barra.dibujoVisible('si')).toThrow(TypeError)
+    expect(barra.dibujoVisible()).toBe(false)
   })
 })

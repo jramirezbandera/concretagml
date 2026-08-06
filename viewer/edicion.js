@@ -131,7 +131,16 @@ import { MENSAJE_POR_MOTIVO, eliminarVertice, insertarVertice } from '../edit/ve
 import { HUSOS_VALIDOS } from '../geo/huso.js'
 import { distancia as distanciaEntre } from '../geo/metrica.js'
 import { LONGITUD_NULA_METROS, proyectarEnSegmento } from '../geo/segmento.js'
-import { COLOR_USUARIO, NIVEL, PANE, latLngAUTM, resolverAvisar, vertUTMaLatLng } from './_comun.js'
+import {
+  COLOR_USUARIO,
+  NIVEL,
+  PANE,
+  latLngAUTM,
+  pedirZoomDobleClicApagado,
+  resolverAvisar,
+  soltarZoomDobleClicApagado,
+  vertUTMaLatLng,
+} from './_comun.js'
 
 // ── Constantes ───────────────────────────────────────────────────────────────
 
@@ -717,12 +726,17 @@ export function crearEdicion({
    * @returns {import('../edit/snap.js').Dianas}
    */
   function dianasVigentes(parcela, ref) {
+    // ⚠️ `ref` puede ser `null` (F12: un punto que se está dibujando, que no es
+    // vértice de nada todavía). Entonces no hay nada que excluir, y la caché se
+    // indexa por `null`/`null` — que es una clave más, no un caso aparte.
+    const recintoRef = ref === null ? null : ref.recinto
+    const indiceRef = ref === null ? null : ref.indice
     if (
       cacheDianas !== null &&
       cacheDianas.parcela === parcela &&
       cacheDianas.vecinas === vecinasParaDianas &&
-      cacheDianas.recinto === ref.recinto &&
-      cacheDianas.indice === ref.indice
+      cacheDianas.recinto === recintoRef &&
+      cacheDianas.indice === indiceRef
     ) {
       return cacheDianas.dianas
     }
@@ -730,8 +744,8 @@ export function crearEdicion({
     cacheDianas = {
       parcela,
       vecinas: vecinasParaDianas,
-      recinto: ref.recinto,
-      indice: ref.indice,
+      recinto: recintoRef,
+      indice: indiceRef,
       dianas,
     }
     return dianas
@@ -1175,8 +1189,20 @@ export function crearEdicion({
    * se pueda reutilizar (ver la caché de dianas) y no se toca el store.
    *
    * @param {[number, number]} utm  Posición actual del vértice, UTM (m).
-   * @param {RefVertice} refVertice  El vértice que se está moviendo. Se pasa a
-   *   `dianasDe` como `excluir`: sin eso el vértice se engancha a sí mismo.
+   * @param {RefVertice|null} refVertice  El vértice que se está moviendo. Se pasa
+   *   a `dianasDe` como `excluir`: sin eso el vértice se engancha a sí mismo.
+   *
+   *   ⛔ **`null` es un valor LEGÍTIMO desde F12, y significa «no estoy moviendo
+   *   ningún vértice existente»**: es el caso de `viewer/dibujo.js`, que engancha
+   *   los puntos de un recinto que todavía no está en el modelo. Ahí no hay nada
+   *   que excluir del catálogo, y `dianasDe` ya admite `excluir: null` desde F06.
+   *
+   *   Hasta el 2026-08-06 esto **lanzaba** con `null`, y era un defecto de encaje
+   *   de manual: los dos módulos pasaban sus pruebas por separado —las de
+   *   `viewer/dibujo.js` con un `ajustar` de mentira— y no encajaban. Lo destapó
+   *   la primera prueba que los juntó, en `app/cableado-edificio.js`. Lo que sí
+   *   sigue lanzando es una referencia MAL FORMADA (`{}`, `3`, un array): eso es
+   *   el contrato del programador que `exigirFormaRef` defiende, y no se afloja.
    * @param {object|null} [eventoOriginal]  El evento del gesto, si lo hay. Solo se
    *   le mira `altKey` (directo o en `originalEvent`).
    * @returns {Enganche|null}  `null` significa **«no tengo opinión: usa tu punto tal
@@ -1186,7 +1212,9 @@ export function crearEdicion({
    */
   function ajustar(utm, refVertice, eventoOriginal = null) {
     if (!vivo) return null
-    const ref = exigirFormaRef(refVertice, 'ajustar')
+    // `null` = «no muevo ningún vértice»; cualquier otra cosa tiene que tener la
+    // forma de una RefVertice. Ver el porqué en la firma.
+    const ref = refVertice === null ? null : exigirFormaRef(refVertice, 'ajustar')
 
     const tau = toleranciaEfectiva(eventoOriginal)
     if (tau <= 0) {
@@ -1200,7 +1228,11 @@ export function crearEdicion({
     // engancha. Y no es un error tragado: mover un vértice que ya no existe lo
     // detecta y lo cuenta `sincronizacion.js#aplicarVertice` en el `dragend`, que es
     // su dueño. Aquí solo se renuncia a opinar.
-    if (!verticeExiste(parcela, ref.recinto, ref.indice)) {
+    //
+    // ⚠️ Sin referencia no hay nada que comprobar: el punto que se está dibujando
+    // no está en el modelo por definición, y exigirle que exista lo dejaría sin
+    // enganche justo en el gesto para el que se hizo el enganche.
+    if (ref !== null && !verticeExiste(parcela, ref.recinto, ref.indice)) {
       ocultarIndicador()
       return null
     }
@@ -1233,6 +1265,11 @@ export function crearEdicion({
       )
     }
     const ref = exigirFormaRef(refVertice, 'alCrearMarcador')
+
+    // Éste es MÍO: es la única marca de propiedad que hay, y de ella depende que
+    // `activa()` no toque los marcadores de la otra edición (ver
+    // {@link marcadoresDeVertice}).
+    mios.add(marcador)
 
     // Los marcadores se REHACEN en cada `sincronizar`, así que el estado de la
     // pantalla hay que aplicarlo también aquí: sin esto, cargar una parcela
@@ -1278,13 +1315,36 @@ export function crearEdicion({
     else marcador.dragging.disable()
   }
 
-  /** Los marcadores de vértice VIVOS en el mapa. Se reconocen por `refVertice`,
-   *  que `viewer/sincronizacion.js` les cuelga a propósito para esto. */
+  /**
+   * Los marcadores de vértice **DE ESTA INSTANCIA** que están vivos en el mapa.
+   *
+   * ⛔ **Hasta F12 esto barría el mapa ENTERO** (`eachLayer` + `capa.refVertice`),
+   * y con una sola edición daba igual. Con DOS —la de la parcela y la de la parte
+   * activa del edificio, que es lo que F12 estrena— **no da igual, y está medido**
+   * (F12 · M4, 2026-08-06, jsdom): con 4 marcadores de cada una en el mismo pane,
+   * `edicionA.activa(false)` dejaba **0 de 8** arrastrables —apagaba también los de
+   * B— y `activa(true)` volvía a encender **los 8**, incluidos los de una edición
+   * que estaba apagada. El interruptor de una mandaba sobre la otra en los dos
+   * sentidos, y en silencio.
+   *
+   * El dueño se sabe sin ninguna heurística: `sincronizar` le entrega cada
+   * marcador recién creado a la edición cuyo gancho `alCrearMarcador` recibió, así
+   * que **cada instancia cabla exactamente los suyos** y aquí solo hay que
+   * acordarse. Un `WeakSet` y no un array: los marcadores se REHACEN en cada
+   * `sincronizar` y una lista propia se quedaría llena de fantasmas —el mismo
+   * argumento que ya está escrito en `alCrearMarcador` para no llevar lista de
+   * oyentes—. El `eachLayer` se conserva porque además hay que estar VIVO en el
+   * mapa: un marcador cablado y luego retirado no cuenta.
+   */
+  const mios = new WeakSet()
+
   function marcadoresDeVertice() {
     const encontrados = []
     if (typeof mapa.eachLayer !== 'function') return encontrados
     mapa.eachLayer((capa) => {
-      if (capa && capa.refVertice && typeof capa.getLatLng === 'function') encontrados.push(capa)
+      if (capa && capa.refVertice && typeof capa.getLatLng === 'function' && mios.has(capa)) {
+        encontrados.push(capa)
+      }
     })
     return encontrados
   }
@@ -1321,10 +1381,13 @@ export function crearEdicion({
   // sorpresa. Se apaga el zoom por doble clic mientras este módulo vive, y se
   // restaura tal como estaba en `destruir()` (dejar el mapa como se encontró es la
   // regla del visor).
-  const zoomDobleClic = mapa.doubleClickZoom
-  const zoomDobleClicEstaba =
-    zoomDobleClic && typeof zoomDobleClic.enabled === 'function' ? zoomDobleClic.enabled() : false
-  if (zoomDobleClicEstaba) zoomDobleClic.disable()
+  //
+  // ⚠️ Desde F12 se pide y se suelta por CUENTA y no con una bandera propia: con
+  // dos ediciones sobre el mismo mapa, la bandera hacía que apagar una devolviera
+  // el zoom mientras la otra seguía editando (ver {@link pedirZoomDobleClicApagado}).
+  // `tengoElZoom` es lo que evita descontar dos veces.
+  let tengoElZoom = true
+  pedirZoomDobleClicApagado(mapa)
 
   if (doc) {
     doc.addEventListener('keydown', alTeclear)
@@ -1390,10 +1453,14 @@ export function crearEdicion({
       }
       // Simétrico con el arranque: el módulo apaga el zoom por doble clic para
       // que insertar un vértice no amplíe además el mapa. Si no se está
-      // editando, ese motivo no existe y el zoom vuelve.
-      if (zoomDobleClicEstaba && zoomDobleClic) {
-        if (edicionActiva) zoomDobleClic.disable()
-        else zoomDobleClic.enable()
+      // editando, ese motivo no existe y el zoom vuelve — **pero solo si no lo
+      // está reteniendo otra edición del mismo mapa** (F12 · M4).
+      if (edicionActiva && !tengoElZoom) {
+        tengoElZoom = true
+        pedirZoomDobleClicApagado(mapa)
+      } else if (!edicionActiva && tengoElZoom) {
+        tengoElZoom = false
+        soltarZoomDobleClicApagado(mapa)
       }
       return edicionActiva
     },
@@ -1517,8 +1584,9 @@ export function crearEdicion({
         doc.removeEventListener('keyup', alTeclear)
       }
       if (ventana) ventana.removeEventListener('blur', alPerderFoco)
-      if (zoomDobleClicEstaba && zoomDobleClic && typeof zoomDobleClic.enable === 'function') {
-        zoomDobleClic.enable()
+      if (tengoElZoom) {
+        tengoElZoom = false
+        soltarZoomDobleClicApagado(mapa)
       }
       ocultarIndicador()
       quitarResalte()

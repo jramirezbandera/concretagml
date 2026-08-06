@@ -2096,6 +2096,26 @@ body {
   transition: var(--transition);
 }
 
+/* ⛔ F12 · fase 5 · `[hidden]` NO FUNCIONABA EN ESTA BARRA, y lo midió el guion 19.
+ *
+ * La regla de arriba fija `display: inline-flex` con la especificidad de
+ * `.gml-app .gml-barra-herramienta` (0,2,0), y eso **gana al `display: none` que
+ * la hoja del navegador le da a `[hidden]`** (0,1,0 en la hoja de usuario-agente,
+ * que además pierde siempre contra la del autor). Resultado medido en Chrome:
+ * `boton.hidden === true` y `getBoundingClientRect().height === 28`.
+ *
+ * Lo pagaba «Dibujar recinto», que **nace oculto a propósito** —en la rama
+ * PARCELA no existe una «parte» que dibujar— y se estaba viendo ahí desde la fase
+ * 3. Su separador sí desaparecía (un `<span>` sin esta clase), así que el síntoma
+ * era un botón suelto de la otra rama, sin separador, en una barra donde no hace
+ * nada. La suite no podía verlo: en jsdom no hay cascada que resolver.
+ *
+ * Va aquí y no en la regla de arriba porque `[hidden]` tiene que ganar SIEMPRE,
+ * también a las variantes de abajo. */
+.gml-app .gml-barra-herramienta[hidden] {
+  display: none;
+}
+
 .gml-app .gml-barra-herramienta:hover:not(:disabled) {
   background: var(--color-bg-elevated);
   border-color: var(--color-border-sub);
@@ -3911,6 +3931,197 @@ body {
   padding: 10px var(--space-3);
   font-size: var(--text-12);
   color: var(--color-text-disabled);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   K.4 · F12 · LA PARTE ACTIVA, EL PLIEGUE DEL MODELO Y LA FILA QUE SE ELIGE
+   ════════════════════════════════════════════════════════════════════════════
+
+   Tres cosas que F11 no necesitaba y F12 sí, y las tres salen del mismo sitio:
+   la rama EDIFICIO pasa de MIRARSE a TRABAJARSE.
+
+   ── EL PRESUPUESTO, QUE ES DE DÓNDE SALE TODO LO DEMÁS ────────────────────
+   MEDIDO el 2026-08-06 a 1280×720 con 7 partes (F12 · M1), y refuta al rework,
+   que midió a 1440×900:
+
+       bloque «Origen del edificio» .................... 397,19 px
+         · de ésos, el selector de modelo permanente ... 174,41 px
+       lista de partes .................. 45,17 px = UNA fila de trece
+
+   Dos remedios, y ninguno es apretar tipografías:
+     1. `data-pantalla` en las tres secciones (lo escribe `app/panel-edificio.js`;
+        hasta el 2026-08-06 NO LO LLEVABAN y por eso las tres se veían en los
+        cinco pasos — 314,97 / 157,06 px idénticos, defecto M2). Con eso el bloque
+        de origen y el de la parte activa **no coinciden nunca en pantalla**.
+     2. El selector de modelo se pliega a un renglón en cuanto entra un edificio.
+        174,41 px que vuelven al panel.
+
+   ── ⚠️ Y AQUÍ APARECE EL SEGUNDO ESTIRADOR, QUE ES LA TRAMPA DE ESTE FICHERO ─
+   `.gml-bloque--parte-activa` lleva la tabla de coordenadas, o sea que quiere
+   estirarse; `.gml-bloque--partes` ya se estira. **Dos estiradores a la vez
+   descosen el reparto** —está escrito tres veces más arriba y costó una fase
+   medirlo en la rama de parcela—. Las dos secciones solo coinciden en la
+   pantalla «Edición», así que ahí, y solo ahí, la lista deja de estirarse y baja
+   su tope: el que se estira pasa a ser el bloque de la parte activa, que es
+   donde está la tabla. Es la misma jerarquía que en la otra rama, donde quien
+   manda es `.gml-bloque--vertices`. */
+
+/* ── El renglón plegado del modelo ─────────────────────────────────────────
+   Sustituye al selector entero: rótulo, valor y un botón menudo. `baseline` para
+   que el botón se apoye en la línea del texto y no lo suba; `wrap` porque «Completo
+   — huellas y atributos del edificio» no cabe en 392 px junto al botón, y partir
+   en dos renglones sigue costando la mitad que los 174,41 px del selector. */
+.gml-modelo-plegado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+  font-size: var(--text-11);
+  color: var(--color-text-secondary);
+}
+
+/* El valor manda sobre su etiqueta: es lo que se ha elegido. */
+.gml-modelo-plegado-valor {
+  color: var(--color-text-primary);
+}
+
+/* ── La fila que se elige ──────────────────────────────────────────────────
+   ⛔ `.gml-parte-nombre` ES AHORA UN `<button>`, y esta regla es lo que hace que
+   no lo parezca. El módulo lo fabricó como botón a propósito —una fila clicable
+   que no es un control no se alcanza con el tabulador ni responde a Intro— y
+   toda la deuda de eso se paga aquí, que es donde se puede pagar: en el módulo
+   no se escribe ni un estilo en línea.
+
+   `font: inherit` es obligatorio y no cosmético: sin él el botón se queda con la
+   tipografía del sistema (13 px Arial en Windows) dentro de una fila dimensionada
+   a `--text-12`, y las 8 partes visibles de las 13 se convierten en 7.
+   `text-align: left` porque el valor por defecto de un botón es `center`, y un
+   nombre centrado en una lista de trece rompe la columna que el ojo sigue. */
+button.gml-parte-nombre {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* La fila elegida. ⚠️ SE DISTINGUE POR PESO Y POR UN FILETE, NO POR COLOR: es la
+   misma decisión que `viewer/partes.js` toma en el mapa (doble grosor, mismo
+   color) y por el mismo motivo — en esta aplicación el color de una geometría no
+   puede significar nada (regla de oro 9), y dos convenios distintos para «ésta es
+   la que estás editando» serían dos cosas que aprender.
+
+   El filete va en `box-shadow` y no en `border-left`: un borde de 2 px movería el
+   texto de la fila activa 2 px a la derecha y la lista entera bailaría al cambiar
+   de parte. `inset` no ocupa sitio. */
+.gml-parte--activa {
+  box-shadow: inset 2px 0 0 var(--color-text-primary);
+  background: var(--color-bg-elevated);
+}
+
+.gml-parte--activa .gml-parte-nombre {
+  font-weight: 600;
+}
+
+/* ── El bloque de la parte activa ──────────────────────────────────────────
+   Fuera de «Edición» ni siquiera está en el documento visible (`data-pantalla`),
+   así que aquí se dimensiona para el único caso en que se ve. `flex:none` de
+   partida: quien decide quién se estira es el par de reglas de más abajo. */
+.gml-bloque--parte-activa {
+  gap: var(--space-2);
+  padding-bottom: var(--space-4);
+}
+
+.gml-bloque--parte-activa .gml-rotulo,
+.gml-bloque--parte-activa .gml-rotulo-fila {
+  margin-bottom: 0;
+}
+
+/* ⚠️ EL RELEVO DEL ESTIRADOR, Y SOLO EN «Edición». Ver la nota de la cabecera de
+   esta sección: es donde las dos secciones coinciden. */
+.gml-app[data-paso='edicion'] .gml-bloque--partes {
+  flex: 0 1 auto;
+}
+
+.gml-app[data-paso='edicion'] .gml-bloque--parte-activa {
+  flex: 1 1 auto;
+}
+
+/* Y con el bloque de la parte activa en pantalla, la lista tiene que dejarle
+   sitio: 18vh son 129,60 px a 720 px de alto, o sea 4,9 filas de 26,40 px. Cinco
+   filas es lo que hace falta para reconocer dónde estás en una lista de trece sin
+   comerse el bloque que se está editando. Fuera de «Edición» sigue mandando el
+   tope general de `:root`, que es el que da 8 filas.
+
+   ⛔ **Y el `max-height` NO ERA EL QUE MANDABA — lo midió el guion 19.** A
+   1280×720 con 14 partes la lista salía a **58,48 px = 2 filas**, no a las 4,9
+   que este tope permite: quien la encogía era el `flex-shrink: 1` de
+   `.gml-bloque--partes`, que con el panel sin sitio la aprieta por debajo de su
+   contenido (la lista tiene `overflow-y: auto`, así que no hay altura mínima
+   automática que lo impida). Un tope máximo no defiende de nada por abajo.
+
+   El SUELO son tres filas: con dos, elegir una parte en una lista de catorce es
+   desplazarse a ciegas, y el punto entero del bloque de abajo es saber cuál
+   estás tocando. 3 × 25,39 px medidos = 76,17 → **77px**, redondeado hacia
+   arriba para que la tercera fila entre entera y no cortada.
+
+   Quien paga el suelo es el bloque de la parte activa, y es el reparto correcto:
+   su tabla de coordenadas ya se desplaza sola. */
+.gml-app[data-paso='edicion'] .gml-partes {
+  max-height: 18vh;
+  min-height: 77px;
+}
+
+/* El nombre de la parte que se está editando, al lado del `<h2>`. Segundo hijo de
+   la fila de rótulo, como la cuenta de partes: hereda el sitio y no cuesta alto. */
+.gml-parte-activa-rotulo {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--text-11);
+  color: var(--color-text-secondary);
+}
+
+/* Los dos contadores de plantas: rótulos arriba, campos abajo, dos columnas.
+   El módulo los mete en orden etiqueta, etiqueta, campo, campo — así la rejilla
+   los alinea sin que ninguna regla tenga que nombrarlos de uno en uno.
+
+   ⚠️ `minmax(0, 1fr)` y no `1fr`, por lo mismo que en `.gml-opcion`: la base
+   automática de una columna es el tamaño de su contenido, y «Plantas sobre
+   rasante» sin partir ensancharía el bloque por encima del panel, que es
+   `overflow:hidden` y lo recortaría EN SILENCIO. */
+.gml-parte-activa-plantas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 2px var(--space-2);
+  align-items: baseline;
+}
+
+/* La ayuda de rasante. Literal de la ficha, y por eso no se abrevia: es la única
+   frase del proyecto que dice qué es la rasante. Nace y muere con los campos que
+   explica — en una piscina no hay contadores, así que tampoco hay ayuda. */
+.gml-parte-activa-ayuda {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-11);
+  color: var(--color-text-secondary);
+}
+
+/* La superficie en vivo. Mono con cifras tabulares —regla tipográfica del sistema
+   para todo valor numérico— para que no baile mientras se arrastra un vértice,
+   que es exactamente cuando se está mirando. */
+.gml-parte-activa-medida {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  font-size: var(--text-12);
+  color: var(--color-text-primary);
 }
 
 /* ── K.3 · LOS DOS `<dialog>` DE LA RAMA: REPARTO POR CAPAS Y ATRIBUTOS ──────

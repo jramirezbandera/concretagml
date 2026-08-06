@@ -177,6 +177,27 @@ export function crearParteConstruccion({
  * atributos semánticos del edificio; solo aparecen en `COMPLETO`. La envolvente
  * del edificio NO se guarda: es derivada (F12).
  *
+ * ── `idLocal`: LA IDENTIDAD, Y POR QUÉ AQUÍ ADMITE `null` Y EN PARCELA NO ────
+ * F12 · T1.1. Sin identidad un `Edificio` no se puede archivar ni autoguardar:
+ * `crearExpediente` (`model/parcela.js`) ya admite `tipo:'EDIFICIO'` desde F00,
+ * y el borrador de `storage/expedientes.js` es un registro de clave reservada.
+ * Esto levanta a propósito la desviación 2 de F11 («`model/edificio.js` no se
+ * toca»), y se levanta por su nombre.
+ *
+ * ⚠️ **Y es asimétrico con `crearParcela`, que lo exige.** Aquí puede ser
+ * `null`, y la asimetría es la respuesta honrada a un hecho: una parcela entra
+ * siempre desde una procedencia que trae con qué nombrarla (el `localId` del
+ * GML, la referencia catastral, el nombre del fichero), pero un edificio puede
+ * empezar **vacío**, con el técnico añadiendo partes a mano antes de que exista
+ * ningún documento del que sacar un nombre. Exigirlo obligaría a **inventarlo**,
+ * que es justo lo que la regla de oro 9 prohíbe; un identificador inventado que
+ * acierta a veces es peor que no tenerlo, porque nadie vuelve a revisarlo.
+ *
+ * `null` significa **«todavía no se puede archivar»**, y quien lo consuma tiene
+ * que decirlo en vez de callarlo. Lo que NO puede pasar es que valga `''` o un
+ * puñado de espacios: eso sí sería una identidad falsa con aspecto de identidad,
+ * y por eso LANZA.
+ *
  * Validación (regla 1, auditoría A4): `modelo` se comprueba contra
  * MODELO_EDIFICIO y LANZA si no es válido — un typo no puede degradar en
  * silencio al comportamiento SIMPLIFICADO (que omite atributos).
@@ -188,6 +209,8 @@ export function crearParteConstruccion({
  *     intacta literal, sin renormalizar (es el término de comparación, regla 2).
  *
  * @param {object} [args]
+ * @param {string|null} [args.idLocal=null]                   Identidad local, o `null`
+ *   («todavía no se puede archivar»). Nunca `''` ni solo espacios: eso LANZA.
  * @param {string|null} [args.refcat=null]
  * @param {'SIMPLIFICADO'|'COMPLETO'} [args.modelo='SIMPLIFICADO']
  * @param {object[]} [args.partes=[]]
@@ -203,6 +226,7 @@ export function crearParteConstruccion({
  * @returns {object} Edificio
  */
 export function crearEdificio({
+  idLocal = null,
   refcat = null,
   modelo = MODELO_EDIFICIO.SIMPLIFICADO,
   partes = [],
@@ -225,6 +249,15 @@ export function crearEdificio({
   if (refcat !== null && typeof refcat !== 'string') {
     throw new TypeError(`crearEdificio: 'refcat' debe ser string o null; recibido ${typeof refcat}.`)
   }
+  // `null` es un estado legítimo («aún no se puede archivar»); un texto vacío o
+  // en blanco NO lo es: sería una identidad falsa con aspecto de identidad, y el
+  // día que se archivara pisaría a otro registro sin decir nada.
+  if (idLocal !== null && (typeof idLocal !== 'string' || idLocal.trim().length === 0)) {
+    throw new TypeError(
+      `crearEdificio: 'idLocal' debe ser un texto no vacío o null (todavía sin identidad); ` +
+        `recibido ${JSON.stringify(idLocal)}.`,
+    )
+  }
   if (!Array.isArray(partes)) {
     throw new TypeError(`crearEdificio: 'partes' debe ser un array; recibido ${typeof partes}.`)
   }
@@ -240,6 +273,7 @@ export function crearEdificio({
   }
 
   const edificio = {
+    idLocal,
     refcat,
     modelo,
     // Copia defensiva + validación de cada parte (simétrico a crearParcela).

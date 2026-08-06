@@ -192,7 +192,19 @@ import {
   entradaDesdeWfsBu,
   puntoDeReferencia,
 } from '../edificio/entrada.js'
-import { conAtributos, conModelo, conParteRenombrada } from '../edificio/mutaciones.js'
+import { envolventeDe } from '../edificio/envolvente.js'
+import {
+  conAtributos,
+  conIdLocal,
+  conModelo,
+  conParteAnadida,
+  conParteEliminada,
+  conParteRenombrada,
+  conPlantas,
+  conTipoParte,
+} from '../edificio/mutaciones.js'
+import { crearVistaParteActiva } from '../edificio/parte-activa.js'
+import { metricas } from '../edit/metricas.js'
 // ⚠️ `conRefcat` NO se importa, y es una decisión: la referencia que el usuario
 // teclea NO entra en el modelo por el hecho de teclearla. Viaja como `opts.refcat`
 // de la fábrica cuando entra un documento nuevo (ver {@link comunes}), que es la
@@ -205,10 +217,13 @@ import { decodificarGml } from '../gml/decodificar.js'
 import { MODELO_EDIFICIO, crearEdificio } from '../model/edificio.js'
 import { MOTIVO_CATASTRO, NIVEL_POR_MOTIVO, ORIGEN, normalizarRefcat } from '../services/catastro.js'
 import { NIVEL } from '../viewer/_comun.js'
+import { crearDibujo } from '../viewer/dibujo.js'
+import { crearEdicion } from '../viewer/edicion.js'
 import { encuadrarSobreRecintos } from '../viewer/index.js'
 import { crearCapaPartes } from '../viewer/partes.js'
+import { sincronizar } from '../viewer/sincronizacion.js'
 import { textoProcedencia } from './cableado-catastro.js'
-import { ACCION, DIALOGO } from './panel-edificio.js'
+import { ACCION, DIALOGO, SIN_MEDIDA } from './panel-edificio.js'
 import { ATRIBUTO_PANEL, ATRIBUTO_RAMA, RAMA } from './rama.js'
 
 // ── El contrato con `index.html` ─────────────────────────────────────────────
@@ -263,15 +278,96 @@ export const EXTENSIONES = Object.freeze(['.dxf', '.txt'])
 export const SUJETO_ENCUADRE = 'El edificio'
 
 /**
- * El renglón permanente de esta rama: aquí no se guarda nada. Del mismo tipo que
- * `app/cableado-expediente.js#MENSAJE_AUTOGUARDADO_EN_ESPERA` y por la misma
- * razón: **degradación honrada, no silencio**. Dice las tres cosas que hacen
- * falta —qué no pasa, por qué, y qué hacer para no perder el trabajo—.
+ * Metros cuadrados MEDIDOS por la aplicación, con sus dos decimales (F12 · T4.2).
+ *
+ * ⚠️ **Es una SEGUNDA declaración del mismo formato**, y hay que decirlo: la
+ * primera es `FORMATO_SUPERFICIE` de `app/main.js`, cuya cabecera avisa de que un
+ * segundo formateador con las mismas opciones «solo añade un sitio desde el que
+ * divergir». Aquí no se puede importar —`app/main.js` es el punto de entrada y se
+ * ejecuta al cargarse—, así que la duplicación se declara en vez de disimularse.
+ *
+ * Lo que **no** está duplicado es lo que importa: el NÚMERO sale de
+ * `edit/metricas.js`, que es el único sitio de la aplicación que mide. Esto solo
+ * lo escribe.
+ */
+export const FORMATO_SUPERFICIE = new Intl.NumberFormat('es-ES', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
+/** Los m² de una cifra ya medida, en español. */
+const formatearM2 = (n) => FORMATO_SUPERFICIE.format(n)
+
+/** Lo que se enseña cuando no hay superficie que enseñar. La del panel, no otra. */
+const SIN_MEDIDA_EDIFICIO = SIN_MEDIDA
+
+/**
+ * Lo que se dice cuando la envolvente no se ha podido calcular con todas las
+ * partes. Sale **una vez por cambio**, no una por repintado: `repintar` corre en
+ * cada `set` del store —y arrastrar un vértice son sesenta al segundo—, así que
+ * avisar en cada uno convertiría el panel en un contador.
+ *
+ * @param {number} n
+ * @returns {string}
+ */
+/**
+ * Lo que se dice si un recinto dibujado se cierra sin parte a la que asignarlo.
+ * No debería ocurrir —la palabra de la barra solo aparece con una parte elegida—,
+ * pero si ocurre, tirar treinta clics en silencio es lo que la regla de oro 1
+ * prohíbe.
+ */
+export const MENSAJE_DIBUJO_SIN_PARTE =
+  'El recinto se ha cerrado, pero no había ninguna parte elegida a la que asignárselo, así que no ' +
+  'se ha guardado. Elige una parte en la lista y vuelve a dibujarlo.'
+
+export const mensajeEnvolventeSaltada = (n) =>
+  `${n} contorno${n === 1 ? '' : 's'} de parte no ${n === 1 ? 'ha' : 'han'} podido entrar en la ` +
+  'envolvente calculada: la línea que se dibuja rodea al resto. Suele ser un contorno que se ' +
+  'cruza consigo mismo; la validación de la parte lo señala.'
+
+/**
+ * Con qué nombre entra un edificio cuando no consta ninguno. Ver {@link idLocalDe}:
+ * es el respaldo, no el caso normal.
+ *
+ * @readonly
+ */
+export const IDENTIDAD_SIN_NOMBRE = 'edificio-sin-nombre'
+
+/**
+ * Con qué nombre nace un edificio que se empieza **desde cero**, añadiendo una parte
+ * sin haber cargado nada. No hay fichero ni referencia de la que sacarlo, y el
+ * respaldo es literal —el mismo `'medicion-propia'` de `componerParcelaMedida` en la
+ * otra rama—: un identificador inventado que acierta a veces sería peor.
+ *
+ * @readonly
+ */
+export const IDENTIDAD_DIBUJADO = 'edificio-dibujado'
+
+/**
+ * ⛔ **F12 · T4.3 · ESTA FRASE SE REESCRIBIÓ ENTERA, y el motivo es esta misma
+ * fase.** Lo que decía era verdad y dejó de serlo:
+ *
+ * > «Esta rama no se guarda sola: el autoguardado y los expedientes de esta versión
+ * > son de la rama Parcela… exporta el dibujo desde tu CAD o vuelve a soltar el
+ * > fichero.»
+ *
+ * Las dos mitades caducaron el mismo día. La primera porque T4.3 le da al edificio
+ * su identidad y su propia clave de borrador (`storage/expedientes.js#ID_BORRADOR_EDIFICIO`),
+ * así que **esta rama SÍ se guarda sola** desde ahora. Y la segunda porque a partir
+ * de F12 se puede dibujar un recinto a mano: mandar al usuario a «exportarlo desde
+ * su CAD» es mandarlo a un sitio donde ese dibujo no ha estado nunca.
+ *
+ * Se retira **con la misma honradez con la que se puso**, que era la condición: lo
+ * que sigue sin poderse hacer se dice, y por su nombre. Sigue sin poderse **archivar
+ * como expediente con nombre** ({@link MOTIVO_GUARDAR_EN_EDIFICIO} de
+ * `app/cableado-expediente.js` lo razona), y el borrador es UNO por rama: cargar
+ * otro edificio pisa el anterior.
  */
 export const MENSAJE_SIN_AUTOGUARDADO =
-  'Esta rama no se guarda sola: el autoguardado y los expedientes de esta versión son de la rama ' +
-  'Parcela, y un edificio todavía no tiene dónde guardarse. Si cierras la pestaña, lo que hayas ' +
-  'cargado aquí se pierde; exporta el dibujo desde tu CAD o vuelve a soltar el fichero.'
+  'Esta rama se guarda sola en este navegador, pero todavía no se archiva: el trabajo en curso se ' +
+  'recupera al volver, y «Guardar» —la lista de expedientes con nombre— sigue siendo de la rama ' +
+  'Parcela. Y el trabajo en curso es UNO: si cargas otro edificio, el anterior se pierde. Para ' +
+  'conservar éste, guarda un fichero de proyecto (.json) desde «Expediente».'
 
 /**
  * La misma advertencia, **en un renglón**, para el sitio donde tiene que estar
@@ -286,7 +382,7 @@ export const MENSAJE_SIN_AUTOGUARDADO =
  * cupieran con una fila cada uno.
  *
  * El reparto queda así, y cada mitad hace lo suyo:
- *   · **Aquí, permanente y en una línea** — porque no guardar es una PROPIEDAD de
+ *   · **Aquí, permanente y en una línea** — porque no archivar es una PROPIEDAD de
  *     esta versión y no un suceso, que es el argumento con el que se puso en el
  *     renglón y sigue siendo bueno.
  *   · **La tarjeta entera, en el panel de avisos y UNA vez** — cuando pasa a haber
@@ -295,9 +391,15 @@ export const MENSAJE_SIN_AUTOGUARDADO =
  *
  * ⚠️ La versión larga **no se borra y sigue exportada**: es la que se dice cuando
  * importa y la que la suite afirma entera.
+ *
+ * ⛔ **F12 · T4.3: también se reescribió, y por lo mismo que la larga.** «No se
+ * guarda sola» pasó a ser falso el día que el autoguardado llegó a esta rama, y
+ * «exporta el dibujo desde tu CAD» pasó a ser falso el día que se puede dibujar uno
+ * aquí. Lo que queda es lo que sigue siendo cierto, en un renglón: se guarda el
+ * trabajo en curso, no se archiva con nombre.
  */
 export const MENSAJE_SIN_AUTOGUARDADO_BREVE =
-  'Esta rama no se guarda sola: exporta el dibujo desde tu CAD antes de cerrar la pestaña.'
+  'Esta rama guarda el trabajo en curso, pero todavía no lo archiva con nombre.'
 
 /**
  * Lo que se le dice al usuario cuando el navegador no ha podido leer los bytes
@@ -765,6 +867,15 @@ const esPanelEdificio = (p) =>
  *   `app/rama.js`, **solo** para saber con qué rama nace la pantalla y dejar las
  *   secciones nuevas con el `hidden` correcto. Si no se pasa, se lee el
  *   `data-rama` del documento; si tampoco lo hay, no se toca.
+ * @param {object|null} [opciones.historial=null]  El de `edit/historial.js`, para
+ *   que deshacer/rehacer alcance también a la geometría de una parte (F12 · T4.2).
+ *   `null` ⇒ la edición de la parte activa funciona **sin deshacer**, que es un
+ *   montaje legítimo y no se disimula.
+ * @param {object|null} [opciones.barraEdicion=null]  La barra sobre el mapa
+ *   (`visor.barraEdicion`), **solo** para encender la palabra «Dibujar recinto» y
+ *   cambiarla a «Cancelar dibujo» mientras dura. `null` ⇒ no hay barra que tocar
+ *   (montaje con `edicion:{barra:false}`, que T1.5 de F11 midió que existe), y
+ *   entonces el dibujo sigue siendo alcanzable por teclado pero no por botón.
  * @param {Document} [opciones.documento=document]
  * @param {HTMLElement} [opciones.trasOrigen]  Ídem {@link ANCLA_ORIGEN}.
  * @param {HTMLElement} [opciones.trasPartes]  Ídem {@link ANCLA_PARTES}.
@@ -788,6 +899,8 @@ export function cablearEdificio({
   mapa = null,
   estadoParcela = null,
   rama = null,
+  historial = null,
+  barraEdicion = null,
   documento = typeof document === 'undefined' ? undefined : document,
   trasOrigen,
   trasPartes,
@@ -860,6 +973,22 @@ export function cablearEdificio({
   /** El aviso de «esta rama no se guarda» se da UNA vez, y cuando toca. */
   let dichoAutoguardado = false
 
+  /** Qué parte se está editando, por su índice. `null` = ninguna. F12 · T4.2. */
+  let activa = null
+
+  /**
+   * Cuántos contornos se quedaron fuera de la envolvente la última vez que se
+   * dijo. Sirve para decirlo **una vez por cambio** y no una por repintado.
+   */
+  let saltadasDichas = 0
+
+  /**
+   * ¿Tiene esta rama el mando de la edición? Lo dice {@link edicion}, y lo decide
+   * `app/main.js` cruzando los dos ejes (qué rama y qué paso). Nace en `false`
+   * porque la pantalla nace con la rama de parcela puesta.
+   */
+  let mandoMio = false
+
   // ── El panel: montar, SELLAR y dejarlo con la visibilidad correcta ──────────
   //
   // Ver el apartado ⛔⛔ de la cabecera. Se anota qué marcas ha puesto ESTE módulo
@@ -868,10 +997,24 @@ export function cablearEdificio({
 
   panelEdificio.montar({ trasOrigen: anclaOrigen, trasPartes: anclaPartes })
 
-  /** Las `<section>` de esta rama: las dos que se intercambian, y nada más. */
-  const secciones = [panelEdificio.seccionOrigen, panelEdificio.seccionPartes].filter(
-    (s) => !!s && s.nodeType === 1,
-  )
+  /**
+   * Las `<section>` de esta rama: las que se intercambian, y nada más.
+   *
+   * ⛔ **Se le PREGUNTAN al panel, ya no se nombran de una en una.** Hasta F12
+   * aquí había una lista literal de dos —`seccionOrigen` y `seccionPartes`—, y
+   * cuando T4.1 añadió la tercera («Parte activa») esa lista se quedó corta: la
+   * sección nueva nacía **sin `data-rama-panel`**, o sea fuera del intercambio, o
+   * sea VISIBLE encima del panel de parcela. Y la suite entera seguía en verde,
+   * porque ninguna prueba puede echar de menos una sección que no sabe que
+   * existe. Con `secciones()` el panel es quien dice cuántas tiene, que es quien
+   * lo sabe. La lista literal queda de respaldo para los dobles de test de F11,
+   * que no tienen ese método.
+   */
+  const secciones = (
+    typeof panelEdificio.secciones === 'function'
+      ? panelEdificio.secciones()
+      : [panelEdificio.seccionOrigen, panelEdificio.seccionPartes]
+  ).filter((s) => !!s && s.nodeType === 1)
 
   /** @type {{seccion: Element, marcada: boolean}[]} */
   const marcas = []
@@ -900,6 +1043,100 @@ export function cablearEdificio({
     mapa === null
       ? null
       : crearCapa({ mapa, zona: huso, alAvisar: (m, o) => panel.avisar(m, o) })
+
+  // ══ F12 · T4.2 · EL MOTOR DE EDICIÓN DE LA PARTE ACTIVA ═══════════════════
+  //
+  // Aquí se estrena todo lo que las fases 1 a 3 dejaron sin llamante: el store
+  // adaptador, `edit/dibujo.js`, `viewer/dibujo.js` y la envolvente derivada.
+  //
+  // ── ⛔ POR QUÉ HAY DOS `crearEdicion` VIVAS SOBRE EL MISMO `L.Map` ─────────
+  // Porque la de parcela no se puede reutilizar: lee `estado.get().recintos` del
+  // store de PARCELA. Lo que se reutiliza —entero y sin tocar— es el MOTOR, a
+  // través de `edificio/parte-activa.js`, que le presenta la parte elegida con
+  // forma de parcela.
+  //
+  // Que convivan dos costó un arreglo quirúrgico, y está MEDIDO (F12 · M4,
+  // 2026-08-06): antes de él, `activa(false)` en una apagaba **los 8** marcadores
+  // del mapa —los suyos y los de la otra— porque `marcadoresDeVertice()` barría
+  // el mapa con `eachLayer`; y la segunda capturaba el `doubleClickZoom` ya
+  // apagado, así que apagar la primera se lo devolvía al mapa mientras la otra
+  // seguía editando. Las dos mitades se arreglaron en `viewer/edicion.js` y
+  // `viewer/_comun.js`, con guardián y verificadas por mutación.
+  //
+  // ── ⛔ Y NUNCA ESTÁN LAS DOS ENCENDIDAS A LA VEZ ──────────────────────────
+  // Eso NO lo decide este módulo: lo decide `app/main.js`, que es quien tiene los
+  // dos ejes (qué rama y qué paso). Aquí solo se publica {@link edicion} para que
+  // allí haya **un solo sitio** donde se diga quién edita — y el interruptor nace
+  // APAGADO, porque el montaje ocurre con la rama de parcela puesta.
+
+  /**
+   * La parte activa vista como una parcela. Es la fachada de F12 · T3.1, y quien
+   * la mueve es {@link seleccionarParte} — nunca este cableado a mano.
+   */
+  const vistaActiva = crearVistaParteActiva(estado, {
+    // Las detecciones de `conParteRedibujada` («el recinto quedó con N vértices»)
+    // salen por el mismo canal que las de todas las mutaciones. La fachada las
+    // DEVUELVE en vez de aplicarlas: decidir si se avisa es de aquí.
+    alDetectar: (detecciones) => publicarDetecciones(detecciones),
+  })
+
+  /** @type {object|null} La segunda edición: gestos sobre la parte activa. */
+  let edicionActiva = null
+  /** @type {object|null} La segunda sincronización: su tabla de coordenadas. */
+  let sincronizacionActiva = null
+  /** @type {object|null} El dibujo vértice a vértice de un recinto nuevo. */
+  let dibujoActivo = null
+
+  // ⚠️ El montaje entero depende de DOS cosas que pueden faltar en un montaje
+  // legítimo: el mapa (una pantalla sin visor) y la caja de la tabla (un doble de
+  // test de F11, que no la tiene). Sin ellas la rama sigue cargando y etiquetando
+  // como en F11 —no se rompe nada—, pero no se puede editar, y eso **se dice**
+  // en vez de dejar una barra que promete gestos que no ocurren.
+  const tablaActiva =
+    typeof panelEdificio.tablaParteActiva === 'object' ? panelEdificio.tablaParteActiva : null
+
+  if (mapa !== null && tablaActiva !== null) {
+    edicionActiva = crearEdicion({
+      mapa,
+      estado: vistaActiva,
+      zona: huso,
+      historial,
+      alAvisar: (m, o) => panel.avisar(m, o),
+    })
+    // ⛔ APAGADA de nacimiento: `crearEdicion` nace en `true` y la pantalla nace
+    // en la rama de parcela. Sin esto, los gestos de las dos ediciones estarían
+    // vivos a la vez desde el primer fotograma.
+    edicionActiva.activa(false)
+
+    sincronizacionActiva = sincronizar({
+      mapa,
+      estado: vistaActiva,
+      tablaEl: tablaActiva,
+      zona: huso,
+      historial,
+      alAvisar: (m, o) => panel.avisar(m, o),
+      // Los dos ganchos que `crearEdicion` entrega y que hay que pasar AQUÍ: no
+      // hay ninguna vía para enchufarlos después (contrato de `sincronizar`).
+      ajustar: edicionActiva.ajustar,
+      alCrearMarcador: edicionActiva.alCrearMarcador,
+      // ⚠️ `alPrevisualizar: null` a propósito. En la rama de parcela ese gancho
+      // alimenta las acotaciones en vivo; aquí no hay acotaciones montadas, y
+      // pasarle un gancho que no pinta nada sería pagar el coste de sesenta
+      // llamadas por segundo a cambio de nada. Las cotas de la parte activa, si
+      // se piden, son de otra fase.
+      alPrevisualizar: null,
+    })
+
+    dibujoActivo = crearDibujo({
+      mapa,
+      zona: huso,
+      // El MISMO enganche que la edición: el dibujo no reimplementa el snap, que
+      // es lo que `edit/dibujo.js` dejó escrito al nacer.
+      ajustar: edicionActiva.ajustar,
+      alCerrar: (recinto) => cerrarDibujo(recinto),
+      alAvisar: (m, o) => panel.avisar(m, o),
+    })
+  }
 
   // ── Los fallos, cada uno contado donde ocurre ──────────────────────────────
 
@@ -985,10 +1222,180 @@ export function cablearEdificio({
       entrada.refcat = refcatPendiente
       refcatPendiente = null
     }
+
+    // ── F12 · T4.2 · La parte activa, la envolvente y las dos medidas ────────
+    //
+    // ⚠️ El índice se REVALIDA contra la lista de ahora antes de nada: eliminar
+    // la parte 2 de tres deja el índice 2 fuera de rango, y un adaptador
+    // apuntando a una parte que ya no existe editaría el aire.
+    const partes = edificio === null || !Array.isArray(edificio.partes) ? [] : edificio.partes
+    if (activa !== null && activa >= partes.length) seleccionarParte(null)
+    entrada.activa = activa
+
     panelEdificio.fijar(entrada)
     if (cliente === null) panelEdificio.estado(MENSAJE_SIN_CLIENTE)
-    capa?.pintar(edificio === null ? null : edificio.partes)
+
+    // La envolvente se DERIVA en cada repintado, no se guarda. Es el criterio de
+    // aceptación 3 de la ficha, y su forma comprobable: cambiar las plantas de
+    // una parte la recalcula porque el criterio de «sobre rasante» se evalúa aquí
+    // mismo, sobre el edificio que acaba de entrar.
+    const derivada = partes.length === 0 ? null : envolventeDe(partes)
+    capa?.pintar(edificio === null ? null : partes, {
+      activa,
+      envolvente: derivada === null ? null : derivada.recintos,
+    })
+    avisarSaltadas(derivada?.saltados?.length ?? 0)
+
+    panelEdificio.medidas({
+      activa: textoSuperficie(vistaActiva.get()?.recintos ?? null),
+      huella: textoHuella(derivada),
+    })
     escribirProcedencia()
+  }
+
+  /**
+   * Cuántos metros cuadrados mide una geometría, redactados.
+   *
+   * ⛔ **La cifra la calcula `edit/metricas.js`, que es quien mide en toda la
+   * aplicación**, y no una suma escrita aquí: dos implementaciones del área son
+   * dos maneras de redondear el mismo número, y un informe firmable no se lo
+   * puede permitir. Este módulo solo pone las palabras.
+   *
+   * @param {Array|null} recintos
+   * @returns {string}  {@link SIN_MEDIDA_EDIFICIO} si no hay nada que medir.
+   */
+  function textoSuperficie(recintos) {
+    if (!Array.isArray(recintos) || recintos.length === 0) return SIN_MEDIDA_EDIFICIO
+    try {
+      return `${formatearM2(metricas(recintos).superficie)} m²`
+    } catch (causa) {
+      // No se deja subir: esto corre dentro de un repintado, que a su vez corre
+      // dentro de un oyente del store. Y no se inventa una cifra (regla 9).
+      console.error('[edificio] la superficie de la parte activa ha fallado:', causa)
+      return SIN_MEDIDA_EDIFICIO
+    }
+  }
+
+  /**
+   * La suma de huella sobre rasante, redactada — **y con lo que se ha quedado
+   * fuera, si es que ha quedado algo**.
+   *
+   * ⚠️ Decirlo importa, y lo midió la fase 0: en el fixture real de trece partes
+   * la MAYOR (245,90 m² contra 126,87) tiene 0 plantas sobre rasante, o sea que es
+   * un sótano, o sea que la envolvente **excluye la parte más grande** y baja de
+   * 568,03 a 322,13 m² (−43,3 %). Un número que se come el 43 % del edificio sin
+   * decir por qué es un número que nadie va a poder defender.
+   *
+   * ⛔ **Se mide PIEZA A PIEZA y se suma, jamás de una pasada.** `envolventeDe`
+   * devuelve un array de PIEZAS y cada pieza es una lista de recintos; el
+   * invariante de `edit/metricas.js` es que `recintos[0]` es el EXTERIOR y el
+   * resto HUECOS, así que aplanar dos piezas haría que el exterior de la segunda
+   * se leyera como un hueco de la primera **y se restara**. Dos cuerpos separados
+   * de 100 m² darían 0. Lo destapó una prueba de T4.2, no un usuario.
+   *
+   * @param {{recintos: Array<Array>, excluidas: Array}|null} derivada
+   * @returns {string}
+   */
+  function textoHuella(derivada) {
+    if (derivada === null || derivada.recintos.length === 0) return ''
+    let m2 = 0
+    try {
+      for (const pieza of derivada.recintos) m2 += metricas(pieza).superficie
+    } catch (causa) {
+      console.error('[edificio] la superficie de la envolvente ha fallado:', causa)
+      return ''
+    }
+    const fuera = derivada.excluidas.length
+    return (
+      `${formatearM2(m2)} m² de huella` +
+      (fuera === 0 ? '' : ` · ${fuera} parte${fuera === 1 ? '' : 's'} fuera`)
+    )
+  }
+
+  /**
+   * Dice, UNA vez por cambio, cuántos contornos no entraron en la envolvente.
+   *
+   * `repintar` corre en cada `set` del store y arrastrar un vértice son sesenta
+   * por segundo: avisar en todos convertiría el panel de avisos en un contador.
+   * Y callarlo del todo sería peor — la línea que se dibuja rodearía menos
+   * edificio del que hay, sin decirlo (regla de oro 1).
+   *
+   * @param {number} n
+   */
+  function avisarSaltadas(n) {
+    if (n === saltadasDichas) return
+    saltadasDichas = n
+    if (n > 0) panel.avisar(mensajeEnvolventeSaltada(n), { nivel: NIVEL.AVISO })
+  }
+
+  /**
+   * Elige la parte que se edita — **en los DOS sitios a la vez**, que es todo el
+   * asunto de esta función: el índice que pinta el panel y el que proyecta el
+   * adaptador tienen que ser el mismo, siempre. Dos fuentes de «cuál es la parte
+   * activa» es exactamente la clase de estado duplicado que el rework de UI
+   * existió para quitar.
+   *
+   * Un índice que no cae dentro de la lista se trata como `null` **sin lanzar**:
+   * es lo que pasa al eliminar la parte que estaba puesta, y eso es un uso normal.
+   *
+   * @param {number|null} i
+   * @returns {number|null}  Lo que ha quedado elegido de verdad.
+   */
+  function seleccionarParte(i) {
+    const edificio = estado.get()
+    const partes = Array.isArray(edificio?.partes) ? edificio.partes : []
+    const valido = Number.isInteger(i) && i >= 0 && i < partes.length ? i : null
+    activa = valido
+    vistaActiva.seleccionar(valido)
+    // El dibujo en curso es de UNA parte: cambiar de parte lo cancela, o el
+    // recinto acabaría en la que no era. `cancelar` es idempotente.
+    if (dibujoActivo?.dibujando()) cancelarDibujo()
+    refrescarBarra()
+    return valido
+  }
+
+  /**
+   * Pone la palabra «Dibujar recinto» de la barra acorde con lo que se puede
+   * hacer ahora mismo.
+   *
+   * ⚠️ Se ESCONDE, no se apaga, y es la decisión de T3.5: un botón gris
+   * permanente cuyo motivo hable de otra rama dice menos que su ausencia. Aparece
+   * cuando hay una parte elegida y esta rama tiene el mando.
+   */
+  function refrescarBarra() {
+    if (barraEdicion === null) return
+    const puede = mandoMio && activa !== null && dibujoActivo !== null
+    barraEdicion.dibujoVisible?.(puede)
+    barraEdicion.dibujoEnCurso?.(dibujoActivo?.dibujando() === true)
+  }
+
+  /**
+   * El usuario ha cerrado un recinto dibujado. Entra por
+   * `conParteRedibujada` a través del adaptador —que es quien reconstruye el
+   * `Edificio`—, así que el recorrido es el mismo que el de arrastrar un vértice
+   * y el historial lo ve igual.
+   *
+   * @param {{vertices: Array<[number, number]>, tipo?: string}} recinto
+   */
+  function cerrarDibujo(recinto) {
+    if (destruido) return
+    if (activa === null) {
+      // No debería llegar —la palabra solo aparece con una parte elegida—, pero
+      // si llega, tirar el recinto en silencio sería perder el trabajo de treinta
+      // clics sin decir nada.
+      panelEdificio.estadoParteActiva(MENSAJE_DIBUJO_SIN_PARTE)
+      refrescarBarra()
+      return
+    }
+    const anterior = vistaActiva.get()
+    vistaActiva.set({ ...(anterior ?? {}), recintos: [recinto] })
+    refrescarBarra()
+  }
+
+  /** Cancela el dibujo en curso y deja la barra diciendo la verdad. */
+  function cancelarDibujo() {
+    dibujoActivo?.cancelar()
+    refrescarBarra()
   }
 
   /**
@@ -1020,12 +1427,33 @@ export function cablearEdificio({
   }
 
   /**
+   * Con qué nombre entra un documento en esta rama (F12 · T4.3).
+   *
+   * **Es el mismo último recurso que la rama de parcela**, no un criterio nuevo:
+   * `app/cableado-medicion.js#componerParcelaMedida` usa el nombre del fichero y
+   * `parsers/importar.js` cae en `'parcela-importada'` cuando no consta ninguno.
+   * Aquí el nombre es el del fichero, el de la referencia catastral cuando viene del
+   * Catastro, o «coordenadas pegadas» cuando viene del pegado — que es lo único que
+   * consta en cada caso, y nada de eso está inventado.
+   *
+   * ⚠️ El respaldo NO es adorno: `crearEdificio` **lanza** con un texto en blanco, y
+   * lanzar aquí convertiría un fichero con nombre raro en un fallo interno.
+   *
+   * @param {*} texto
+   * @returns {string}
+   */
+  const idLocalDe = (texto) => textoNoVacio(texto) ?? IDENTIDAD_SIN_NOMBRE
+
+  /**
    * Las opciones comunes de las cinco fábricas de entrada.
    *
    * `refcat` sale del CAMPO: quien haya escrito una referencia antes de soltar el
    * dibujo espera que el edificio la lleve. Es dato del usuario, así que no se
    * normaliza aquí (`conRefcat` de T1.3 dejó escrito por qué: corregir por su
    * cuenta lo que alguien tecleó es la regla de oro 1 al revés).
+   *
+   * ⚠️ **`idLocal` NO va aquí, y es a propósito**: lo estampa {@link aplicar}, que es
+   * el único sitio por el que entra un documento nuevo. Ver el comentario de allí.
    */
   function comunes() {
     return {
@@ -1047,9 +1475,12 @@ export function cablearEdificio({
    *   se aplica si el edificio ENTRA**: si no entra, el store sigue con lo que
    *   tuviera y su procedencia sigue siendo la de antes. Pisarla sería mentir
    *   sobre de dónde salió lo que se está viendo.
+   * @param {string} identidad  Con qué nombre entra este documento. Ver
+   *   {@link idLocalDe}: es lo que permite distinguir «otro edificio» de «una
+   *   edición del mismo», y sin ello no hay autoguardado posible (F12 · T4.3).
    * @returns {boolean}  `true` si el edificio ha entrado en el store.
    */
-  function aplicar(entrada, rotulo, procedencia) {
+  function aplicar(entrada, rotulo, procedencia, identidad) {
     const informativas = publicarDetecciones(entrada.detecciones)
     const cola = informativas === 0 ? '' : ` ${informativas} nota(s) más en el detalle del fichero.`
 
@@ -1066,19 +1497,29 @@ export function cablearEdificio({
       return false
     }
 
-    // El aviso del autoguardado, UNA vez y cuando pasa a haber algo que perder.
+    // El aviso de lo que esta rama NO archiva, UNA vez y cuando pasa a haber algo
+    // que perder. Ya no dice «no se guarda sola» —desde T4.3 se guarda—: dice lo que
+    // sigue sin poderse hacer, que es archivarlo como expediente con nombre.
     if (!dichoAutoguardado) {
       dichoAutoguardado = true
       panel.avisar(MENSAJE_SIN_AUTOGUARDADO, { nivel: NIVEL.AVISO })
     }
 
-    procedenciaDato = procedencia
-    refcatPendiente = entrada.edificio.refcat ?? ''
-    estado.set(entrada.edificio)
-    encuadrarSobre(entrada.edificio)
+    // ⛔ LA IDENTIDAD SE ESTAMPA AQUÍ, y aquí es el único sitio (T4.3). Éste es el
+    // único punto del módulo por el que un documento NUEVO entra en el store, así
+    // que es donde se sabe que lo es. Estamparla en las cinco fábricas de entrada
+    // habría sido pasar el nombre del fichero por una capa pura que no lo necesita
+    // para nada más — y dejar `entradaPorCapas`, que compone su propio `Edificio`,
+    // como el sexto sitio que hay que acordarse de tocar.
+    const conNombre = conIdLocal(entrada.edificio, identidad).edificio
 
-    const n = entrada.edificio.partes.length
-    const vertices = entrada.edificio.partes.reduce(
+    procedenciaDato = procedencia
+    refcatPendiente = conNombre.refcat ?? ''
+    estado.set(conNombre)
+    encuadrarSobre(conNombre)
+
+    const n = conNombre.partes.length
+    const vertices = conNombre.partes.reduce(
       (total, p) => total + (p.recinto?.vertices?.length ?? 0),
       0,
     )
@@ -1171,6 +1612,7 @@ export function cablearEdificio({
           deFichero
             ? `Del GML de edificio «${nombre}», leído en esta pantalla.`
             : 'Del GML de edificio pegado en esta pantalla.',
+          idLocalDe(nombre),
         )
         return
       }
@@ -1193,7 +1635,7 @@ export function cablearEdificio({
 
       const entrada = normalizar(previa)
       entrada.detecciones = [...deteccionesTexto, ...entrada.detecciones]
-      aplicar(entrada, `«${nombre}»`, `${deDonde}, medido por el técnico.`)
+      aplicar(entrada, `«${nombre}»`, `${deDonde}, medido por el técnico.`, idLocalDe(nombre))
     } catch (causa) {
       pendiente = null
       reventar(`la lectura de «${nombre}» ha fallado`, causa)
@@ -1219,6 +1661,7 @@ export function cablearEdificio({
         entrada,
         `«${nombre}»`,
         `Del fichero «${nombre}», medido por el técnico · capas ${elegidas.map((c) => `«${c}»`).join(', ')}.`,
+        idLocalDe(nombre),
       )
     } catch (causa) {
       pendiente = null
@@ -1385,7 +1828,11 @@ export function cablearEdificio({
         }),
       )
       const procedencia = textoProcedencia(resultado.procedencia, ahora())
-      aplicar(entrada, 'el Catastro', procedencia)
+      // La identidad es la RC canónica, no el nombre de ningún fichero: es lo que
+      // consta, y es la misma con la que la rama de parcela nombra lo que trae del
+      // Catastro. Se coge de lo que el edificio LLEVA —ya normalizado arriba—, no de
+      // lo que se tecleó, para que las dos digan lo mismo.
+      aplicar(entrada, 'el Catastro', procedencia, idLocalDe(entrada.edificio?.refcat ?? refcat))
 
       if (resultado.procedencia.origen === ORIGEN.CACHE) {
         // Al panel además del renglón de procedencia: ese renglón es gris de 11 px
@@ -1438,7 +1885,7 @@ export function cablearEdificio({
    *          capas: string[]|null, atributos: object|null,
    *          valores: {modelo: string, refcat: string|null}}} intencion
    */
-  function atender({ accion, indice, nombre, capas, atributos, valores }) {
+  function atender({ accion, indice, nombre, capas, atributos, tipo, plantas, valores }) {
     if (destruido) return
 
     if (accion === ACCION.CARGAR_CATASTRO) {
@@ -1473,6 +1920,66 @@ export function cablearEdificio({
       panelEdificio.cerrarAtributos()
       return
     }
+
+    // ── F12 · T4.2 · las cinco de la parte activa ────────────────────────────
+
+    if (accion === ACCION.SELECCIONAR_PARTE) {
+      seleccionarParte(indice)
+      // Se repinta a mano: elegir no muta el `Edificio`, así que el store no
+      // notifica y sin esto el panel se quedaría con la fila anterior marcada.
+      repintar(estado.get())
+      return
+    }
+    if (accion === ACCION.ANADIR_PARTE) {
+      // ⛔ Sin edificio NO se sale por la puerta de atrás, al revés que las
+      // mutaciones de arriba: «Añadir parte» es la vía por la que se empieza un
+      // edificio DESDE CERO —el caso del encargo real: declarar el porche que no
+      // estaba— y exigir que ya hubiera uno cargado la dejaría muerta justo
+      // cuando hace falta. Se crea el edificio vacío con el modelo que el panel
+      // tiene elegido, que es la misma doctrina que `comunes()`.
+      //
+      // Y nace CON IDENTIDAD (T4.3): sin ella el autoguardado no sabría distinguir
+      // este edificio del siguiente, y lo que se dibujara aquí no se recuperaría al
+      // volver. `IDENTIDAD_DIBUJADO` es un literal y no un nombre inventado por
+      // cada uno, por el mismo motivo que en la otra rama: ver su JSDoc.
+      const base =
+        estado.get() ??
+        crearEdificio({ modelo: panelEdificio.valores().modelo, idLocal: IDENTIDAD_DIBUJADO })
+      try {
+        const { edificio: nuevo, detecciones } = conParteAnadida(base)
+        estado.set(nuevo)
+        publicarDetecciones(detecciones)
+        // Y se queda elegida: quien añade una parte lo hace para dibujarla, y
+        // obligarle a pulsarla después sería un paso que no aporta nada.
+        seleccionarParte(nuevo.partes.length - 1)
+        repintar(estado.get())
+      } catch (causa) {
+        reventar('añadir una parte ha fallado', causa)
+      }
+      return
+    }
+    if (accion === ACCION.ELIMINAR_PARTE) {
+      aplicarMutacion(
+        (e) => conParteEliminada(e, indice),
+        `la eliminación de la parte ${indice} ha fallado`,
+      )
+      return
+    }
+    if (accion === ACCION.CAMBIAR_TIPO_PARTE) {
+      aplicarMutacion(
+        (e) => conTipoParte(e, indice, tipo),
+        `el cambio de tipo de la parte ${indice} ha fallado`,
+      )
+      return
+    }
+    if (accion === ACCION.CAMBIAR_PLANTAS) {
+      aplicarMutacion(
+        (e) => conPlantas(e, indice, plantas ?? {}),
+        `la asignación de plantas de la parte ${indice} ha fallado`,
+      )
+      return
+    }
+
     // Las tres restantes las resuelve el panel por dentro y no las emite. Si
     // alguna vez lo hiciera, callarlo sería un botón mudo: se dice por consola.
     console.warn(`[edificio] intención sin destino en el cableado: ${accion}`)
@@ -1563,6 +2070,58 @@ export function cablearEdificio({
     secciones: () => [...secciones],
 
     /**
+     * Enciende o apaga la edición de la parte activa (F12 · T4.2).
+     *
+     * ⛔ **Este módulo no decide cuándo.** Lo decide `app/main.js`, que es el
+     * único que tiene los DOS ejes: qué rama está puesta y qué paso. Tenerlo
+     * publicado es lo que permite que allí exista **un solo sitio** donde se diga
+     * quién edita, con las dos ediciones nombradas en la misma línea — que es lo
+     * que impide que se queden las dos encendidas y los gestos se pisen.
+     *
+     * Apagar cancela un dibujo en curso: irse de la pantalla con medio recinto
+     * hecho y volver más tarde con los vértices todavía puestos sería encontrarse
+     * un trabajo a medias que uno ya no recuerda haber empezado.
+     *
+     * **Sin argumento LEE** en vez de escribir, igual que `activa()` en
+     * `viewer/edicion.js` y por el mismo motivo: sin eso, «¿está encendida?» solo
+     * se puede responder mirando si un marcador se deja arrastrar, y una
+     * afirmación que solo se puede comprobar por sus efectos secundarios es una
+     * afirmación que ninguna prueba vigila. (Lo destapó una mutación de T4.2 que
+     * salió VERDE: quitar el apagado de nacimiento no ponía roja ni una prueba.)
+     *
+     * ⛔ **Y lo que lee es la EDICIÓN, no la bandera de este módulo.** La primera
+     * versión devolvía `mandoMio`, y la mutación siguió saliendo verde: dos
+     * estados que dicen lo mismo son dos estados que pueden discrepar, y el que
+     * importa es el del motor. `mandoMio` solo responde cuando no hay motor —una
+     * pantalla sin mapa—, que es el único caso en que no hay a quién preguntar.
+     *
+     * @param {boolean} [encendida]
+     * @returns {boolean}  Si edita esta rama ahora mismo.
+     */
+    edicion(encendida) {
+      if (destruido) return false
+      if (encendida === undefined) {
+        return edicionActiva === null ? mandoMio : edicionActiva.activa() === true
+      }
+      mandoMio = encendida === true
+      edicionActiva?.activa(mandoMio)
+      if (!mandoMio) dibujoActivo?.cancelar()
+      refrescarBarra()
+      return mandoMio
+    },
+
+    /** Empieza a dibujar el recinto de la parte activa, o lo cancela si ya iba. */
+    alternarDibujo() {
+      if (destruido || dibujoActivo === null) return
+      if (dibujoActivo.dibujando()) cancelarDibujo()
+      else if (activa !== null) dibujoActivo.empezar()
+      refrescarBarra()
+    },
+
+    /** Qué parte se está editando. Para el guion de humo y para el test. */
+    parteActiva: () => activa,
+
+    /**
      * Retira los oyentes, apaga la capa de huellas y quita las marcas que puso.
      *
      * ⚠️ **Ni destruye el `panelEdificio` ni destruye los clientes**: los tres
@@ -1590,6 +2149,20 @@ export function cablearEdificio({
       bajaPanel()
       bajaStore()
       capa?.destruir()
+
+      // ⚠️ El motor de la parte activa se apaga en el ORDEN INVERSO al montaje:
+      // `sincronizar` consume los ganchos de `crearEdicion`, así que destruir la
+      // edición primero le dejaría la tabla cableada a funciones de un módulo ya
+      // muerto. Y el dibujo va el primero de todos: es el único que puede tener
+      // capas a medio poner en el mapa.
+      dibujoActivo?.destruir()
+      sincronizacionActiva?.destruir()
+      edicionActiva?.destruir()
+      vistaActiva.destruir()
+      dibujoActivo = null
+      sincronizacionActiva = null
+      edicionActiva = null
+      barraEdicion?.dibujoVisible?.(false)
 
       for (const { seccion, marcada } of marcas) {
         if (marcada) seccion.removeAttribute(ATRIBUTO_PANEL)

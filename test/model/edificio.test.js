@@ -109,15 +109,50 @@ describe('crearEdificio · defaults y modelo SIMPLIFICADO', () => {
     expect(edificio.construccionOficial).toBeNull()
   })
 
+  // ── F12 · T1.1 · la identidad ──────────────────────────────────────────────
+  // Sin `idLocal` un Edificio no se puede archivar ni autoguardar. Es
+  // ASIMÉTRICO con `crearParcela`, que lo exige, y la asimetría está razonada en
+  // la cabecera de la fábrica: un edificio puede empezar vacío, y exigirlo
+  // obligaría a inventarlo.
+
+  it('nace SIN identidad, y `null` es un estado legítimo («aún no se archiva»)', () => {
+    expect(crearEdificio().idLocal).toBeNull()
+    expect('idLocal' in crearEdificio()).toBe(true)
+  })
+
+  it('conserva el `idLocal` que se le da, literal', () => {
+    expect(crearEdificio({ idLocal: 'ES.SDGC.BU.9398516VK3799G' }).idLocal).toBe(
+      'ES.SDGC.BU.9398516VK3799G',
+    )
+    // No se recorta ni se normaliza: el identificador es del documento que lo trae.
+    expect(crearEdificio({ idLocal: ' con espacios ' }).idLocal).toBe(' con espacios ')
+  })
+
+  it('⛔ LANZA con una identidad FALSA: vacía o solo espacios', () => {
+    // Éste es el caso que justifica la validación. Un `''` pasaría por
+    // identidad, y el día que se archivara pisaría a otro registro en silencio.
+    expect(() => crearEdificio({ idLocal: '' })).toThrow(TypeError)
+    expect(() => crearEdificio({ idLocal: '   ' })).toThrow(TypeError)
+    expect(() => crearEdificio({ idLocal: 7 })).toThrow(TypeError)
+    expect(() => crearEdificio({ idLocal: {} })).toThrow(TypeError)
+    // …y `undefined` NO lanza: es «no me lo has dicho», que es el defecto.
+    expect(() => crearEdificio({ idLocal: undefined })).not.toThrow()
+  })
+
+  it('el mensaje dice las DOS salidas: texto no vacío o null', () => {
+    expect(() => crearEdificio({ idLocal: '' })).toThrow(/no vac[íi]o o null/i)
+  })
+
   it('SIMPLIFICADO OMITE los atributos semánticos (undefined, sin clave)', () => {
     const edificio = crearEdificio({ modelo: MODELO_EDIFICIO.SIMPLIFICADO })
     for (const clave of ATRIBUTOS_COMPLETO) {
       expect(clave in edificio).toBe(false)
       expect(edificio[clave]).toBeUndefined()
     }
-    // El shape SIMPLIFICADO tiene exactamente las 5 claves geométricas/estado.
+    // El shape SIMPLIFICADO tiene exactamente las 6 claves geométricas/estado.
+    // `idLocal` entra en F12 · T1.1 (la identidad, sin la cual no se archiva).
     expect(Object.keys(edificio).sort()).toEqual(
-      ['refcat', 'modelo', 'partes', 'parcelaContexto', 'construccionOficial'].sort(),
+      ['idLocal', 'refcat', 'modelo', 'partes', 'parcelaContexto', 'construccionOficial'].sort(),
     )
   })
 

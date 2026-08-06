@@ -203,10 +203,15 @@ describe('viewer/edicion · contratos del programador (throw, regla 1)', () => {
 
   it('lanza con una RefVertice sin forma, y NO por que apunte a un vértice inexistente', () => {
     const ctx = montar()
-    expect(() => ctx.edicion.ajustar([439240, 4479655], null)).toThrow(TypeError)
     expect(() => ctx.edicion.ajustar([439240, 4479655], { recinto: 0 })).toThrow(TypeError)
+    expect(() => ctx.edicion.ajustar([439240, 4479655], 3)).toThrow(TypeError)
     expect(() => ctx.edicion.eliminar({ recinto: '0', indice: 0 })).toThrow(TypeError)
     expect(() => ctx.edicion.seleccionarLado({ recinto: 0, indice: 1.5 })).toThrow(TypeError)
+    // ⛔ Y `null` SIGUE lanzando en `eliminar`, que sí necesita un vértice: la
+    // apertura de abajo es de `ajustar` y solo de `ajustar`. (`seleccionarLado`
+    // ya admitía `null` desde F06, y ahí significa «suelta la selección».)
+    expect(() => ctx.edicion.eliminar(null)).toThrow(TypeError)
+    expect(ctx.edicion.seleccionarLado(null)).toBeNull()
 
     // Fuera de rango NO lanza: es un gesto sobre algo que ya no está (ver el
     // reparto de responsabilidades en la cabecera del módulo).
@@ -215,6 +220,41 @@ describe('viewer/edicion · contratos del programador (throw, regla 1)', () => {
       aplicado: false,
       motivo: null,
     })
+    ctx.limpiar()
+  })
+
+  it('⛔ F12 · `ajustar` con `null` NO lanza: es un punto que se está dibujando', () => {
+    // ⛔ **Hasta el 2026-08-06 esto LANZABA**, y era un defecto de encaje de
+    // manual: `viewer/dibujo.js` engancha los puntos de un recinto que todavía no
+    // está en el modelo, así que le pasa `null` —no hay ningún vértice que
+    // excluir del catálogo—, y los dos módulos pasaban sus pruebas por separado
+    // porque las del dibujo usaban un `ajustar` de mentira. Lo destapó la primera
+    // prueba que los juntó, en `app/cableado-edificio.js`.
+    //
+    // `dianasDe` admite `excluir: null` desde F06, así que la apertura no inventa
+    // nada: solo deja de exigir lo que la capa de abajo nunca exigió.
+    const ctx = montar()
+    expect(() => ctx.edicion.ajustar([439240, 4479655], null)).not.toThrow()
+
+    // Y ENGANCHA de verdad: el punto cae a 5 cm de un vértice de la parcela y
+    // sale pegado a él. Sin esto, la prueba pasaría con un `ajustar` que
+    // devolviera `null` siempre y el dibujo se quedaría sin snap en silencio.
+    const r = ctx.edicion.ajustar([439240.05, 4479655.05], null)
+    expect(r).not.toBeNull()
+    expect(r.enganchado).toBe(true)
+    expect(r.punto).toEqual([439240, 4479655])
+    ctx.limpiar()
+  })
+
+  it('F12 · sin referencia NO se excluye ningún vértice del catálogo', () => {
+    // La otra mitad: cuando SÍ hay referencia, ese vértice se excluye para que no
+    // se enganche a sí mismo. Sin referencia no hay nada que excluir, así que el
+    // mismo punto que con `{recinto:0,indice:0}` no engancha, sin ella SÍ.
+    const ctx = montar()
+    expect(ctx.edicion.ajustar([439240.05, 4479655.05], { recinto: 0, indice: 0 }).punto).not.toEqual(
+      [439240, 4479655],
+    )
+    expect(ctx.edicion.ajustar([439240.05, 4479655.05], null).punto).toEqual([439240, 4479655])
     ctx.limpiar()
   })
 
@@ -1216,6 +1256,117 @@ describe('viewer/edicion · `activa()`, el interruptor de los cuatro gestos', ()
     expect(() => ctx.edicion.activa('si')).toThrow(TypeError)
     expect(() => ctx.edicion.activa(1)).toThrow(TypeError)
     expect(ctx.edicion.activa()).toBe(true)
+    ctx.limpiar()
+  })
+})
+
+// ── F12 · M4 · DOS EDICIONES SOBRE EL MISMO MAPA ─────────────────────────────
+//
+// F12 monta una SEGUNDA `crearEdicion` sobre el mismo `L.Map`: la de la parcela y
+// la de la parte activa del edificio. Los dos defectos que esto arregla están
+// MEDIDOS (fase 0 de F12, 2026-08-06, jsdom) y ninguno era visible con una sola:
+//
+//   · con 4 marcadores de cada una, `edicionA.activa(false)` dejaba **0 de 8**
+//     arrastrables —apagaba también los de B— y `activa(true)` encendía **los 8**;
+//   · la segunda instancia nacía con el `doubleClickZoom` YA apagado por la
+//     primera, así que no se hacía responsable, y apagar la primera **devolvía el
+//     zoom por doble clic mientras la segunda seguía editando**.
+
+describe('F12 · dos ediciones sobre el mismo mapa no se pisan', () => {
+  /** Monta una segunda edición sobre el mapa de `ctx`, con su propio store. */
+  function segundaEdicion(ctx) {
+    const store = crearEstadoVista(parcelaCon(TRIANGULO_AGUDO))
+    const edicion = crearEdicion({
+      mapa: ctx.mapa,
+      estado: store,
+      zona: HUSO,
+      alAvisar: vi.fn(),
+    })
+    return { store, edicion }
+  }
+
+  /** Un marcador cableado por UNA edición concreta. */
+  function marcadorDe(ctx, edicion, utm, ref) {
+    const marcador = L.marker(aLatLng(utm), { draggable: true }).addTo(ctx.mapa)
+    marcador.refVertice = ref
+    edicion.alCrearMarcador(marcador, ref)
+    return marcador
+  }
+
+  it('⛔ apagar UNA no toca los marcadores de la OTRA', () => {
+    const ctx = montar()
+    const b = segundaEdicion(ctx)
+    const mA = marcadorDe(ctx, ctx.edicion, V.A, { recinto: 0, indice: 0 })
+    const mB = marcadorDe(ctx, b.edicion, V.B, { recinto: 0, indice: 1 })
+    expect(mA.dragging.enabled()).toBe(true)
+    expect(mB.dragging.enabled()).toBe(true)
+
+    ctx.edicion.activa(false)
+    expect(mA.dragging.enabled(), 'la edición A no ha apagado el suyo').toBe(false)
+    expect(mB.dragging.enabled(), 'A ha apagado el marcador de B').toBe(true)
+
+    // Y al revés: encender A no puede resucitar los de B, que sigue encendida…
+    ctx.edicion.activa(true)
+    b.edicion.activa(false)
+    expect(mA.dragging.enabled()).toBe(true)
+    expect(mB.dragging.enabled(), 'B no ha apagado el suyo').toBe(false)
+
+    b.edicion.destruir()
+    ctx.limpiar()
+  })
+
+  it('⛔ el zoom por doble clic no vuelve mientras QUEDE una editando', () => {
+    const ctx = montar()
+    expect(ctx.mapa.doubleClickZoom.enabled()).toBe(false)
+    const b = segundaEdicion(ctx)
+    expect(ctx.mapa.doubleClickZoom.enabled()).toBe(false)
+
+    // Apagar la primera NO lo devuelve: la segunda sigue insertando vértices.
+    ctx.edicion.activa(false)
+    expect(ctx.mapa.doubleClickZoom.enabled(), 'el zoom ha vuelto con B editando').toBe(false)
+
+    // Solo cuando lo suelta la última.
+    b.edicion.activa(false)
+    expect(ctx.mapa.doubleClickZoom.enabled()).toBe(true)
+
+    // Y volver a encender una lo apaga otra vez.
+    b.edicion.activa(true)
+    expect(ctx.mapa.doubleClickZoom.enabled()).toBe(false)
+
+    b.edicion.destruir()
+    ctx.limpiar()
+  })
+
+  it('destruir una tampoco devuelve el zoom si la otra sigue viva', () => {
+    const ctx = montar()
+    const b = segundaEdicion(ctx)
+    b.edicion.destruir()
+    expect(ctx.mapa.doubleClickZoom.enabled(), 'A sigue viva y el zoom ha vuelto').toBe(false)
+    // …y cuando se va la última, sí. Se mide ANTES de tirar el mapa: sobre un
+    // mapa ya destruido `enabled()` da `false` pase lo que pase, y eso sería un
+    // verde (o un rojo) que no habla de este módulo.
+    ctx.edicion.destruir()
+    expect(ctx.mapa.doubleClickZoom.enabled()).toBe(true)
+    ctx.limpiar()
+  })
+
+  it('destruir dos veces no descuenta dos veces', () => {
+    const ctx = montar()
+    const b = segundaEdicion(ctx)
+    b.edicion.destruir()
+    b.edicion.destruir()
+    expect(ctx.mapa.doubleClickZoom.enabled()).toBe(false)
+    ctx.limpiar()
+  })
+
+  it('cada una escribe SOLO en su store', () => {
+    const ctx = montar({ parcela: parcelaCon(TRIANGULO_AGUDO) })
+    const b = segundaEdicion(ctx)
+    const antesB = b.store.get()
+    ctx.edicion.insertarEn(L.latLng(aLatLng([439290, 4479655])))
+    expect(anilloDe(ctx.store).length).toBeGreaterThan(3)
+    expect(b.store.get(), 'la edición A ha escrito en el store de B').toBe(antesB)
+    b.edicion.destruir()
     ctx.limpiar()
   })
 })

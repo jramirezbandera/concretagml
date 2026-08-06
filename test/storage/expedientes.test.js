@@ -30,12 +30,15 @@ import 'fake-indexeddb/auto'
 import { IDBFactory } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
 
-import { crearExpediente, crearParcela } from '../../model/parcela.js'
+import { crearEdificio } from '../../model/edificio.js'
+import { TIPO_EXPEDIENTE, crearExpediente, crearParcela } from '../../model/parcela.js'
 import { ALMACENES, ESQUEMA_ALMACENES } from '../../storage/bd.js'
 import {
   AVISO_DURABILIDAD,
   CAMPOS_REGISTRO,
   ID_BORRADOR,
+  ID_BORRADOR_EDIFICIO,
+  ID_BORRADOR_POR_TIPO,
   MOTIVO_EXPEDIENTES,
   NO_SE_GUARDA,
   crearExpedientes,
@@ -72,6 +75,25 @@ function expedienteDePrueba({ refcat = '9398516VK3799G', dx = 0 } = {}) {
       geometriaOficial: [{ vertices: anillo(40), tipo: 'EXTERIOR' }],
       superficieCatastral: 1600,
       origen: 'WFS',
+    }),
+  })
+}
+
+/** Su gemelo en la rama EDIFICIO (F12 · T4.3). Con identidad, como entra en producción. */
+function expedienteDeEdificio({ refcat = 'EDIF-RC', idLocal = 'EDIF-1' } = {}) {
+  return crearExpediente({
+    tipo: TIPO_EXPEDIENTE.EDIFICIO,
+    srs: 'EPSG:25830',
+    edificio: crearEdificio({
+      idLocal,
+      refcat,
+      partes: [
+        {
+          nombre: 'cuerpo principal',
+          origen: 'DXF',
+          recinto: { tipo: 'EXTERIOR', vertices: anillo(20) },
+        },
+      ],
     }),
   })
 }
@@ -362,6 +384,129 @@ describe('storage/expedientes · el borrador es un registro con clave reservada'
     expect(r.esCuota).toBe(true)
     expect(avisos).not.toHaveBeenCalled()
 
+    bd.close()
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 4 bis · F12 · T4.3 · UNA CLAVE RESERVADA POR RAMA
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Hasta F12 el borrador era UNO. Suscribir el autoguardado al store de edificio con
+// una sola clave habría hecho que las dos ramas se pisaran dos segundos después de
+// conmutar, sin que nada fallara: es el motivo por escrito de la desviación 7 del
+// plan de F11. Estas pruebas son las que dejan esa puerta cerrada.
+
+describe('storage/expedientes · el borrador es UNO POR RAMA (F12 · T4.3)', () => {
+  it('⛔ el borrador de EDIFICIO no pisa el de PARCELA: son dos registros', async () => {
+    const { bd } = await baseNueva()
+    const exp = crearExpedientes({ bd, ahora: relojQueAvanza() })
+
+    await exp.guardarBorrador(expedienteDePrueba({ dx: 7 }))
+    await exp.guardarBorrador(expedienteDeEdificio())
+
+    expect(await bd.count(ALMACENES.EXPEDIENTES)).toBe(2)
+    const deParcela = await exp.leerBorrador(TIPO_EXPEDIENTE.PARCELA)
+    const deEdificio = await exp.leerBorrador(TIPO_EXPEDIENTE.EDIFICIO)
+    expect(deParcela.expediente.parcela.recintos[0].vertices[0][0]).toBe(440123.45 + 7)
+    expect(deEdificio.expediente.edificio.idLocal).toBe('EDIF-1')
+    // Y cada uno en SU clave, no en una cualquiera.
+    expect(await bd.get(ALMACENES.EXPEDIENTES, ID_BORRADOR)).toBeDefined()
+    expect(await bd.get(ALMACENES.EXPEDIENTES, ID_BORRADOR_EDIFICIO)).toBeDefined()
+
+    bd.close()
+  })
+
+  it('la clave la decide el TIPO del expediente, no quien llama', async () => {
+    // No hay parámetro que equivocar: `guardarBorrador` la deriva de lo que le dan.
+    const { bd } = await baseNueva()
+    const exp = crearExpedientes({ bd, ahora: relojQueAvanza() })
+    const { registro } = await exp.guardarBorrador(expedienteDeEdificio())
+    expect(registro.id).toBe(ID_BORRADOR_EDIFICIO)
+    expect(registro.id).toBe(ID_BORRADOR_POR_TIPO[TIPO_EXPEDIENTE.EDIFICIO])
+    bd.close()
+  })
+
+  it('⚠️ la clave de PARCELA NO cambió de valor: un borrador de ayer sigue ahí', async () => {
+    // Estrenar nombre habría dejado huérfano el trabajo de quien cerrara la pestaña
+    // con la versión anterior: seguiría en la base, invisible, y sin nadie que lo
+    // pudiera recuperar. El literal se afirma a pelo, que es de lo que se trata.
+    expect(ID_BORRADOR).toBe('EXP-borrador-en-curso')
+    expect(ID_BORRADOR_POR_TIPO[TIPO_EXPEDIENTE.PARCELA]).toBe(ID_BORRADOR)
+  })
+
+  it('`listar` los excluye a LOS DOS y dice de qué ramas hay', async () => {
+    const { bd } = await baseNueva()
+    const exp = crearExpedientes({ bd, ahora: relojQueAvanza() })
+
+    await exp.guardar(expedienteDePrueba(), { nombre: 'a mano' })
+    expect((await exp.listar()).borradores).toEqual([])
+
+    await exp.guardarBorrador(expedienteDePrueba({ dx: 1 }))
+    expect((await exp.listar()).borradores).toEqual([TIPO_EXPEDIENTE.PARCELA])
+
+    await exp.guardarBorrador(expedienteDeEdificio())
+    const listado = await exp.listar()
+    expect(listado.borradores).toEqual([TIPO_EXPEDIENTE.PARCELA, TIPO_EXPEDIENTE.EDIFICIO])
+    expect(listado.hayBorrador).toBe(true)
+    expect(listado.registros.map((r) => r.nombre)).toEqual(['a mano'])
+
+    bd.close()
+  })
+
+  it('`descartarBorrador` borra el de UNA rama y deja el de la otra', async () => {
+    const { bd } = await baseNueva()
+    const exp = crearExpedientes({ bd, ahora: relojQueAvanza() })
+
+    await exp.guardarBorrador(expedienteDePrueba())
+    await exp.guardarBorrador(expedienteDeEdificio())
+    expect(await exp.descartarBorrador(TIPO_EXPEDIENTE.EDIFICIO)).toMatchObject({ ok: true })
+
+    expect(await bd.get(ALMACENES.EXPEDIENTES, ID_BORRADOR_EDIFICIO)).toBeUndefined()
+    expect(await bd.get(ALMACENES.EXPEDIENTES, ID_BORRADOR)).toBeDefined()
+    expect((await exp.listar()).borradores).toEqual([TIPO_EXPEDIENTE.PARCELA])
+
+    bd.close()
+  })
+
+  it('sin tipo, las tres siguen hablando de PARCELA: F10 no se entera de nada', async () => {
+    const { bd } = await baseNueva()
+    const exp = crearExpedientes({ bd, ahora: relojQueAvanza() })
+    await exp.guardarBorrador(expedienteDePrueba({ dx: 3 }))
+    const r = await exp.leerBorrador()
+    expect(r.ok).toBe(true)
+    expect(r.registro.id).toBe(ID_BORRADOR)
+    expect(await exp.descartarBorrador()).toMatchObject({ ok: true })
+    expect((await exp.listar()).hayBorrador).toBe(false)
+    bd.close()
+  })
+
+  it('⛔ un tipo desconocido LANZA en vez de caer en PARCELA por defecto', async () => {
+    // Un defecto silencioso aquí escribiría el edificio encima de la parcela. Es
+    // contrato del programador: el tipo sale de `TIPO_EXPEDIENTE`, no de un teclado.
+    const { bd } = await baseNueva()
+    const exp = crearExpedientes({ bd, ahora: relojQueAvanza() })
+    await expect(exp.leerBorrador('CONSTRUCCION')).rejects.toThrow(RangeError)
+    await expect(exp.descartarBorrador('CONSTRUCCION')).rejects.toThrow(RangeError)
+    bd.close()
+  })
+
+  it('el rótulo por defecto NOMBRA la rama: un edificio no se llama «Parcela sin…»', async () => {
+    const { bd } = await baseNueva()
+    const exp = crearExpedientes({ bd, ahora: relojQueAvanza() })
+    const { registro } = await exp.guardarBorrador(expedienteDeEdificio({ refcat: null }))
+    expect(registro.nombre).toBe('Edificio sin referencia')
+    bd.close()
+  })
+
+  it('y la referencia catastral del registro sale también de la rama EDIFICIO', async () => {
+    // El campo `refcat` del registro está INDEXADO y es lo que la oferta enseña. Antes
+    // se leía solo de `parcela`, así que un edificio con RC salía como «sin referencia».
+    const { bd } = await baseNueva()
+    const exp = crearExpedientes({ bd, ahora: relojQueAvanza() })
+    const { registro } = await exp.guardarBorrador(expedienteDeEdificio({ refcat: '9398516VK3799G' }))
+    expect(registro.refcat).toBe('9398516VK3799G')
+    expect(registro.nombre).toBe('9398516VK3799G')
     bd.close()
   })
 })

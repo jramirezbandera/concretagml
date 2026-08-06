@@ -738,8 +738,21 @@ describe('contrato F11 · `edificio/` sale por el barrel; el visor, el servicio 
     expect(typeof barrel.entradaEdificio.entradaDesdeGmlBu).toBe('function')
     expect(typeof barrel.entradaEdificio.entradaDesdeWfsBu).toBe('function')
     expect(typeof barrel.entradaEdificio.puntoDeReferencia).toBe('function')
-    // Las cuatro mutaciones puras.
-    for (const nombre of ['conModelo', 'conRefcat', 'conParteRenombrada', 'conAtributos']) {
+    // Las mutaciones puras: cuatro de F11 y cinco de F12 (las que hacen que la
+    // lista de partes sea una lista). Esta lista se amplía a mano a propósito —
+    // que una capa saque una función nueva por el barrel es una decisión, no un
+    // efecto secundario.
+    for (const nombre of [
+      'conModelo',
+      'conRefcat',
+      'conParteRenombrada',
+      'conAtributos',
+      'conParteAnadida',
+      'conParteEliminada',
+      'conPlantas',
+      'conTipoParte',
+      'conParteRedibujada',
+    ]) {
       expect(Object.keys(barrel.entradaEdificio), `falta la mutación '${nombre}'`).toContain(nombre)
     }
     // Y el vocabulario CERRADO con el que se leen sus resultados: sin él, la UI
