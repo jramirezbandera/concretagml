@@ -274,7 +274,7 @@ export const ASIENTOS = Object.freeze(
         '`<dialog>` con `document.querySelector`, que se queda con el PRIMERO—, no para vestirlo ' +
         'distinto. ⚠️ La mitad de la fase que arregla la piscina cuesta **0 B**: es lógica de ' +
         '`edificio/entrada.js` y no toca el DOM. Sobran 10.506 sobre el techo.' },
-    { hito: 'Los avisos salen del panel a un diálogo', commit: '(sin commitear)',
+    { hito: 'Los avisos salen del panel a un diálogo', commit: '5aa0ac0',
       total: 69122, nuestro: 54027, rebanada: null,
       nota:
         '**+1.457 B, y es el primer asiento de este proyecto que compra SITIO EN PANTALLA con ' +
@@ -299,7 +299,7 @@ export const ASIENTOS = Object.freeze(
         '`[data-paso=diagnostico] …:has(.gml-avisos-vacio)`. Ese apaño existía solo porque el ' +
         'bloque competía con el contraste en aquella pantalla; sin bloque, no hay competencia. ' +
         'Los 1.457 B son ya el NETO de esos tres borrados. Sobran 11.963 sobre el techo.' },
-    { hito: 'El vértice seleccionado se ve en el mapa y en la tabla', commit: '(sin commitear)',
+    { hito: 'El vértice seleccionado se ve en el mapa y en la tabla', commit: '5aa0ac0',
       total: 69401, nuestro: 54306, rebanada: null,
       nota:
         '**+279 B por DOS reglas, y es el asiento más barato del proyecto que añade una ' +
