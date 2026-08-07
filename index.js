@@ -32,6 +32,13 @@ export * as metricas from './edit/metricas.js'
 export * as snap from './edit/snap.js'
 export * as offset from './edit/offset.js'
 export * as validacion from './validation/parcela.js'
+// F13 · la validación de la OTRA rama. Espacio propio y no una función más de
+// `validacion`, por lo mismo que `entradaEdificio` no se llama `edificio`: son dos
+// preguntas distintas sobre dos objetos distintos, y su contrato NO es el mismo —
+// `validarEdificio` devuelve además `porParte` (con trece partes, «qué recinto»
+// deja de identificar nada) y `noComprobado` (sin parcela cargada, dos de sus
+// reglas no se pueden ejecutar, y callarlo sería leer un silencio como un cero).
+export * as validacionEdificio from './validation/edificio.js'
 // gml: capa de dominio, sin Leaflet ni DOM, luego sí entra aquí. La ENTREGA del
 // fichero (`gml/descargar.js`) se queda fuera —necesita Blob/URL/document—,
 // igual que viewer/ y services/; el motivo, en la cabecera de `gml/index.js`.

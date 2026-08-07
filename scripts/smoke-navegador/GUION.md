@@ -9,8 +9,8 @@ con la **maquinaria real de `L.Draggable`**.
 - **4D.1** (esta carpeta) escribió los guiones y los probó en seco.
 - **4D.2** es la ejecución oficial, con evidencia, siguiendo este documento.
 
-Diecisiete guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
-para que el resultado no dependa de interpretar prosa. Quince son de aceptación;
+**Veinte** guiones, un veredicto **serializable** cada uno (`{ok: boolean, …medidas}`),
+para que el resultado no dependa de interpretar prosa. Diecinueve son de aceptación;
 `05` es de diagnóstico (§11):
 
 > ⛔ **Esta cuenta decía «trece» y se quedó vieja el 2026-08-04**, cuando T4 del
@@ -19,6 +19,12 @@ para que el resultado no dependa de interpretar prosa. Quince son de aceptación
 > tapar**: una cifra escrita a mano en prosa que nadie vuelve a mirar. La de la
 > hoja de estilo ya no se escribe a mano (§21); ésta sigue haciéndolo, así que
 > **si añades un guion, esta tabla es parte del guion**.
+>
+> ⚠️ **Y volvió a quedarse vieja**: decía «diecisiete» con **diecinueve** ficheros
+> en la carpeta —`18-pegado-coordenadas.js` (F19) y `19-partes-plantas.js` (F12)
+> entraron con su § y sin tocar esta línea—. F13 la pone en **veinte** al añadir
+> `20-gml-edificio.js`. La cuenta se puede verificar en un segundo:
+> `ls scripts/smoke-navegador/*.js | wc -l`.
 
 | Guion | Criterio | Mide | Veredicto pasa si |
 |---|---|---|---|
@@ -41,6 +47,7 @@ para que el resultado no dependa de interpretar prosa. Quince son de aceptación
 | `17-medicion-propia.js` | F18 · 1 a 4 | ⭐ **QUE EL `<dialog>` DE REVISIÓN SEA UN MODAL DE VERDAD**, que la suite **no puede** ver: en jsdom `HTMLDialogElement.prototype` tiene exactamente `constructor` y `open` —ni `showModal()`, ni `::backdrop`, ni capa superior—, así que las 6.339 pruebas ejercitan el camino DEGRADADO; más soltar `UTM.dxf` de verdad con la rama PARCELA (bytes reales, cinco capas, el botón apagado con su motivo), que la geometría **se pinte** en sus panes, el **coste en píxeles** de la tabla de vértices, y que **nuestro propio listado de replanteo se rechace por su nombre y NO con el diagnóstico falso del huso** | ⛔ **su primera corrida salió `ok:false` y destapó UN DEFECTO REAL que la suite no veía**: la cabecera decía **«Parcela del Catastro» sobre el levantamiento del propio técnico**. Corregido con guardián; hoy **`ok:true`** — ver §26 |
 | `19-partes-plantas.js` | F12 · 1 a 4 | ⭐ **EL TRABAJO SOBRE UN EDIFICIO, andado entero**: traer 13 partes → elegir una → ponerle plantas → verlas en el mapa → añadir una piscina → dibujarle el recinto a mano. Mide lo que en jsdom sale verde pase lo que pase: que el **bloque de parte activa quepa** con 14 partes a 1280×720 (y que el síntoma no sea mudo), que los **rótulos romanos se lean**, que la **envolvente se repinte** al poner a 0 las plantas de una parte, que **dibujar con clics de verdad** cierre un recinto, que «Dibujar recinto» aparezca **solo donde sirve**, que el **eje PASO toque a esta rama** (defecto M2 de la fase 0), y —lo único que no es de píxeles— que el **borrador de edificio se escriba en IndexedDB de VERDAD y no pise el de parcela** | ⛔ **su primera corrida salió `ok:false` con TRES defectos reales**, uno de ellos que **las plantas del GML nunca llegaban al modelo** —F11 las tiraba por alcance y F12 llegó a la fase 5 sin recogerlas, con la suite en verde—. Hoy **`ok:true` en las dos ventanas** — ver §28 |
 | `18-pegado-coordenadas.js` | F19 · 1 a 3 | ⭐ **LAS TRES DEUDAS DE F18, andadas en un navegador de verdad**: el **pegado de la LISTA** —la vía que `feature-01` llama principal y que llevaba doce fases sin un solo manejador de `paste`—, **proyectar unos grados** (que hasta F19 se detectaban y no se podían atender), y **el rótulo del GML ajeno**. Y lo que la suite no puede ver: que el `<dialog>` sea modal DE VERDAD, que **las dos cifras de superficie se lean** (el cotejo que `importar()` calculaba desde F01 sin llamante), y que la parcela pegada **se pinte** | ⛔ **su primera corrida salió `ok:false` con TRES fallos del guion y UN DEFECTO REAL**: el renglón decía «medida por ti, **del fichero** «coordenadas pegadas»» —llamar fichero a lo pegado, en la línea que existe para decir de dónde salió el dato— y **la prueba de la suite lo aprobaba** porque casaba «pegad». Hoy **`ok:true`** — ver §27 |
+| `20-gml-edificio.js` | F13 · 1 a 6 | ⭐ **LA SALIDA DE LA RAMA EDIFICIO, andada entera**: rama vacía (botón apagado con su motivo) → traer 13 partes → el botón se enciende → pulsarlo → **el fichero baja de verdad** (Blob, ancla con su `download`, URL revocada y los BYTES: raíz `gml:`, `Building` sí y `BuildingPart` **no**, `footPrint`, srsName **URN**, `localId` desnudo) → romperlo a propósito → conmutar de rama y volver. Lo que la suite no puede ver: que el botón tenga **DOS dueños vivos** y no se pisen (se mide con el edificio roto, que es la única situación en la que las dos ramas discrepan), que el motivo **quepa** en su renglón, que los **dos mensajes retirados** por F13 no vuelvan, y que lo que no se ha podido comprobar **se diga y solo entonces** | ⛔ **su primera corrida no midió NADA**: medía el CTA en la pantalla de Entrada, donde `.gml-acciones` va en `display:none`, así que todas las cajas salían a cero y en verde. Hoy **`ok:true` en las dos ventanas** — ver §30 |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
 spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
@@ -4775,3 +4782,183 @@ Corrida de cierre: **5 casos, `python + openpyxl 3.1.5`, código 0.**
 ⚠️ **Y aun así, esto NO es Excel.** El propio script lo dice al terminar. Abrir el
 fichero en Excel de verdad es `CHECKLIST-HUMANO.md` §16 y es **BLOQUEANTE**: lo del
 DXF lo destapó una persona, no una máquina.
+
+---
+
+## 30. `20-gml-edificio.js` — la salida de la rama Edificio (F13 · T4.3)
+
+```bash
+npm run dev                                   # EXIGE dev: los fixtures no están en dist/
+
+$B viewport 1280x720                          # el SUELO declarado (D5)
+$B js "await new Promise(r=>{const p=indexedDB.deleteDatabase('concreta-gml');p.onsuccess=r;p.onerror=r;p.onblocked=r}); return 'pedido'"
+$B goto http://localhost:PUERTO/concretagml/#/parcela/entrada
+$B reload && $B wait ".gml-app"
+$B console --clear
+$B eval scripts/smoke-navegador/20-gml-edificio.js
+
+$B viewport 1440x900                          # y la pasada cómoda
+# … borrar IndexedDB otra vez, recargar …
+$B eval scripts/smoke-navegador/20-gml-edificio.js
+$B console --errors                           # → (no console errors)
+```
+
+⚠️ **Recarga entre pasadas.** El guion deja un edificio de 14 partes, una de ellas
+sin recinto a propósito, y un borrador autoguardado. Lanzarlo dos veces sobre la
+misma pestaña mide otra cosa.
+
+**Qué mide.** El recorrido de salida entero, sin tocar un solo servicio:
+
+> rama vacía (botón apagado con su motivo) → traer 13 partes → el botón se
+> enciende → pulsarlo → el fichero **baja** → romperlo a propósito → conmutar de
+> rama y volver
+
+Las 6.899 pruebas cubren la lógica. Aquí se mide lo otro, y son cinco cosas que en
+jsdom salen verdes pase lo que pase:
+
+1. ⭐ **Que el fichero baje de verdad, y con su nombre.** La cadena
+   `Blob → createObjectURL → <a download> → click()` no existe en jsdom. Y hay un
+   defecto concreto que vigilar: hasta la fase 3 este cableado llamaba a
+   `descargarGml`, que **compone el nombre por su cuenta**, así que el fichero del
+   ICUC habría bajado como `parcela_…` **en silencio**.
+2. ⭐ **Que el botón tenga DOS dueños y no se pisen.** Desde F13 hay dos cableados
+   vivos sobre el mismo `[data-accion="generar-gml"]`. Si `app/main.js` repintara
+   solo el que ENTRA, el botón se quedaría como lo dejó la rama que se abandona.
+   Se mide **con el edificio roto a propósito**, que es la única situación en la
+   que las dos ramas discrepan y la medida discrimina.
+3. ⭐ **Que el motivo se lea y quepa.** Un renglón de 30 px con un párrafo dentro
+   cabe perfectamente en jsdom, donde `getBoundingClientRect()` devuelve ceros.
+4. ⭐ **Que los dos mensajes retirados no vuelvan** por ninguno de los renglones.
+5. ⭐ **Que lo que no se ha podido comprobar se diga — y solo entonces.** Se
+   comprueba en los DOS sentidos: sin parcela, el aviso tiene que estar; con
+   parcela, no puede estar.
+
+### ⛔ La primera corrida no midió NADA, y el motivo es de método
+
+Salió `ok:false` con un problema… y **todas las cajas a cero**. El botón estaba
+encendido, el motivo escrito, y **no se veía ninguna de las dos cosas**: en la
+pantalla de **Entrada** el bloque `.gml-acciones` va en `display: none`. El guion
+medía un nodo invisible y lo aprobaba. El pie de acciones **solo existe en
+Validación** (218 × 343 px medidos), así que todo lo de este guion se hace allí, y
+hay un guardián de que el CTA **se vea** cuando hay datos.
+
+Y el problema que dio era una **acusación en falso**: exigía el aviso de «no se ha
+comprobado si las construcciones caen dentro de la parcela» dando por supuesto que
+no había parcela. **La aplicación arranca con una** (la de demostración, que es
+justo la de este edificio), así que la comprobación sí se hizo y el aviso sobraba.
+Hoy la regla es un bicondicional y las dos mitades son exigibles.
+
+### ⚠️ Y un hallazgo que no es un defecto, pero deja un mensaje sin destinatario
+
+**Con la rama EDIFICIO vacía, todos los peldaños salvo «Entrada» están apagados**
+(`validacion`, `edicion`, `diagnostico`, `informe`: `disabled === true`, y sin
+`title` que lo explique). Como el pie de acciones solo existe en Validación:
+
+> `MOTIVO_SIN_EDIFICIO` está escrito, probado… y **no hay forma de leerlo**.
+
+No es una mentira —el botón está apagado y tiene motivo— pero es un motivo al que
+nadie llega. **La puerta no la cierra F13**: es el eje PASO del rework, anterior.
+Queda anotado con dueño: quien abra Validación en esta rama sin datos (F14 la toca
+de todas formas) hereda esta línea.
+
+### ⛔ Lo que este guion NO puede medir, y por qué el primero es grave
+
+**El resalte por parte NO EXISTE.** La ficha §16.1 pide que «el resalte del aviso
+rodea la parte que se sale, no otra», y la fase 1 construyó `porParte` justamente
+para eso —el plan lo escribió así: «`porParte` es lo que consume el mapa»—.
+**Medido el 2026-08-06: `porParte` no tiene ni un llamante fuera de su propio
+módulo y sus pruebas.** No es que el guion no lo mida: es trabajo que no está
+entregado. Es la misma lección de F11 y F12 (código sin llamante no está
+entregado) apareciendo por tercera vez, y **el dueño es F14**, que es la fase que
+trae el diagnóstico a esta rama y necesita el mismo canal para pintar por parte.
+
+Lo demás: si el **ICUC acepta el fichero** (verdad externa → `CHECKLIST-HUMANO.md`
+§18); el **arrastre como gesto de ratón** (§0); y la **validación contra el XSD**,
+que para este dialecto no existe — ver abajo.
+
+### Las cifras de la corrida buena (2026-08-06)
+
+| | 1280×720 | 1440×900 |
+|---|---|---|
+| Partes cargadas del fixture BU | 13 | 13 |
+| Huella declarada en el panel | **322,13 m² · 1 parte fuera** | ídem |
+| Botón «Generar GML» | **32,39 × 343 px**, encendido | ídem |
+| Fichero descargado | `edificio_9398516VK3799G_…gml`, **3.672 B**, 1 Blob, URL revocada | ídem |
+| Bytes | raíz `gml:`, `Building` sí / `BuildingPart` **no**, `footPrint`, srsName **URN**, `localId` desnudo, UTF-8, 2 `posList` | ídem |
+| Renglón con el edificio roto | **29,69 px** para 92 caracteres, **sin recorte** | ídem |
+| Motivo del error | «1 error bloquea la generación del GML: Parte 14 no tiene recinto: está pendiente de dibujar.» | ídem |
+| Los dos dueños | roto → **apagado** · a PARCELA → **encendido, renglón vacío** · al volver → **apagado con su motivo** | ídem |
+| Red | 1–2 peticiones, **0 a servicios de datos** | ídem |
+
+`ok: true` en las dos, sin errores de consola, con **una** advertencia (la de los
+peldaños apagados, arriba).
+
+### La regresión de la fase, y a quién pertenece cada rojo
+
+| Guion | Resultado | De quién |
+|---|---|---|
+| `19-partes-plantas.js` | ✅ `ok:true` | — |
+| `14-shell.js` | ⛔ `ok:false`, 1 problema | **De F19**, y es el mismo de §28: «solo 2 de las 3 vías de Entrada se ven enteras, quedan 63 px detrás del scroll» |
+| `13-edificio.js` | ⛔ `ok:false`, **5 problemas** | **Los mismos CINCO que documenta §28**, ninguno de F13. ⚠️ Pero su primera corrida dio **ocho**, y los TRES de más eran suyos: ver abajo |
+
+⚠️ **Los tres guardianes del guion 13 que F13 volvió falsos, y que se corrigen
+aquí porque la causa es de F13** (mismo criterio que aplicó F12 con otros dos):
+
+- **«Los dos CTA del pie tenían que quedar apagados».** Ya no: F13 **enciende**
+  «Generar GML» en esta rama, y lo apaga el DATO y no la rama. Lo que se exige
+  ahora es que el motivo que dé, si lo da, sea de esta rama y no de la otra.
+- **«El motivo no nombra LOS DOS botones».** Lo exigía porque el 2026-08-04 los dos
+  apagados compartían renglón —dos párrafos permanentes costaban **+134,75 px**
+  medidos—. Con un solo botón apagado, su motivo cabe entero al lado: **F13
+  deshace** ese problema en vez de administrarlo.
+- **«"Diagnosticar encaje" no tiene `aria-describedby`».** Ya no lo necesita: el
+  reparto existía para que el segundo no quedara mudo con el renglón vacío, y hoy
+  tiene renglón propio con su motivo entero. Lo que se exige ahora son las tres
+  patas de ese renglón: que lleve texto, que nombre al botón y que diga que la
+  causa es la rama.
+
+### ⛔ Y el 2026-08-06 la Sede rechazó el fichero, con la suite en verde
+
+**El guion daba `ok:true` y el ICUC contestó «*no se han cargado al no ser
+válidos*».** Es la asimetría de F04 repitiéndose, y ahora medida en los dos
+sentidos. La causa: **faltaba `xmlns:xlink` en la raíz** — que ningún elemento
+usa, que el XSD no exige y que la ayuda oficial no menciona. Sin él el ICUC
+rechaza cualquier GML de edificio, **incluido el suyo propio**.
+
+Se acotó bisecando en **cuatro rondas de subida**, aprovechando que el servicio
+**nombra los ficheros que fallan** y admite hasta 60 por envío: cada subida es un
+experimento de varias variables a la vez. Por el camino se descartaron, medidos:
+el nombre del fichero, los `xsi:nil`, la codificación, `gml:boundedBy`, los
+atributos semánticos de `bu-ext2d`, los extras de `bu-core2d` y el namespace
+`ES.LOCAL.BU`. El relato entero está en `spec/feature-13-edificio-gml.md`.
+
+⛔ **Y estaba escrito en el repo desde julio**: `gml/_comun.js` dice de la parcela
+que «`gmd`, `ogc` y `xlink` van declarados aunque ningún elemento los use, por
+fidelidad a los ficheros reales». Al escribir el serializador de edificio se
+declararon **solo los prefijos que los elementos usan** — se limpió, y ahí nació
+el defecto.
+
+Desde entonces este guion lo mide sobre los bytes que baja el navegador
+(`bytes.declaraXlink`), y lo hace con su mitad anti-vacuidad: si algún día un
+elemento **usara** el prefijo, el guardián dejaría de proteger lo que dice
+proteger y lo avisa.
+
+### ⭐ Y sí hay oráculo externo: el espejo del propio Catastro
+
+`npm run validar:xsd` valida desde el 2026-08-06 **los dos dialectos**, seis
+ficheros. Para parcela, `cp/4.0` de la Comisión. Para edificio **no** la URL que
+declaran los ficheros —`inspire.ec.europa.eu/draft-schemas/…` sigue contestando
+**200 OK con 376.809 bytes de HTML**, la página «Inspire Registry - Page not
+found»— sino la copia que sirve el Catastro y que la ayuda del ICUC llama «*un
+esquema ligeramente modificado que se mantiene en local*» (modificado para
+admitir `openAirPool`). Es **mejor** oráculo que el de la Comisión aunque
+estuviera vivo: es contra el que valida el ICUC de verdad.
+
+⚠️ **Pero no basta, y el script lo dice al terminar**: el fichero que la Sede
+rechazó **validaba contra ese mismo esquema**. Lo que cubre el hueco es comparar
+con los ficheros REALES del Catastro, y desde F13 también **en la raíz** y no
+solo en la geometría.
+
+De rebote se tapó un fallo vivo: `validar-xsd.py` cacheaba por URL **sin mirar los
+bytes**, así que habría guardado esos 376 kB de HTML como `.xsd` y luego habría
+informado de que **el fichero** no valida.

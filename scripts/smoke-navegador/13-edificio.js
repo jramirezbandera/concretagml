@@ -666,17 +666,29 @@ const enEdificio = {
   altoBloqueOrigenPx: alto(bloqueEdificio),
   altoBloquePartesPx: alto(bloquePartes),
   altoListaPartesPx: alto('.gml-partes'),
-  // Los dos CTA del pie, apagados CON EL MOTIVO ESCRITO AL LADO.
+  // Los CTA del pie en la rama EDIFICIO, apagados CON EL MOTIVO ESCRITO AL LADO.
   //
-  // ⛔ **Y desde el 2026-08-04 el motivo es UNO y no dos, por lo que midió la
-  // corrida anterior de este mismo guion**: los dos párrafos permanentes costaban
-  // +134,75 px de `.gml-acciones` en un panel de altura fija sin holgura, y el
-  // recorte se llevaba por delante «Diagnosticar encaje» ENTERO. La causa de los
-  // dos apagados es la misma —estás en la rama Edificio—, así que se dice una vez
-  // NOMBRANDO LOS DOS BOTONES, y el segundo no queda mudo porque apunta al renglón
-  // del primero con `aria-describedby`. `MOTIVO_GENERAR_GML_EN_EDIFICIO` y
-  // `MOTIVO_DIAGNOSTICAR_EN_EDIFICIO` siguen exportados y siguen siendo verdad: lo
-  // que cambió es cuál se ENSEÑA. Aquí se mide lo que se enseña.
+  // ⛔ **REESCRITO EL 2026-08-06 POR F13, y la causa es de F13.** Lo que había
+  // aquí medía el reparto del 2026-08-04: **dos** botones apagados por la misma
+  // causa, un solo motivo que los NOMBRABA A LOS DOS y `aria-describedby` para
+  // que el segundo no quedara mudo. Existía por una medida cara —dos párrafos
+  // permanentes costaban **+134,75 px** en `.gml-acciones`, y el recorte se
+  // llevaba «Diagnosticar encaje» entero—, y esa medida sigue valiendo.
+  //
+  // Lo que cambió es el hecho: **F13 enciende «Generar GML» en esta rama**. Ya no
+  // se apaga por estar donde estás, sino por el DATO, y lo cablea
+  // `app/cableado-edificio-gml.js`. Queda UN solo botón apagado por rama
+  // («Diagnosticar encaje», hasta F14), así que su motivo cabe entero en su
+  // propio renglón y el reparto con `aria-describedby` ya no hace falta: F13
+  // **deshace** el problema de los 134,75 px en vez de administrarlo.
+  //
+  // ⚠️ Si algún día vuelven a ser dos, hay que volver al reparto — y MEDIRLO
+  // antes. La cifra está en la cabecera de `app/rama.js`, donde también quedó
+  // escrito el texto de los dos mensajes retirados.
+  //
+  // Aquí se mide LO QUE SE ENSEÑA, y las tres patas del que sigue apagado: que
+  // esté apagado, que su renglón lleve texto propio y que ese texto explique de
+  // verdad por qué.
   ctaGenerarApagado: ctaGenerar === null ? null : ctaGenerar.disabled,
   ctaDiagnosticarApagado: ctaDiagnosticar === null ? null : ctaDiagnosticar.disabled,
   motivoGenerar: renglonGenerar === null ? null : renglonGenerar.textContent.trim(),
@@ -755,65 +767,70 @@ if (enEdificio.ariaPressed.edificio !== 'true' || enEdificio.ariaPressed.parcela
     )
   }
 }
-if (enEdificio.ctaGenerarApagado !== true || enEdificio.ctaDiagnosticarApagado !== true) {
+// ⭐ **«Diagnosticar encaje» sigue apagado en esta rama, y eso NO cambia hasta
+// F14.** Un botón encendido aquí ofrecería contrastar un edificio contra el
+// parcelario, que es justo lo que el diagnóstico todavía no sabe hacer.
+if (enEdificio.ctaDiagnosticarApagado !== true) {
   problemas.push(
-    `Los dos CTA del pie tenían que quedar APAGADOS en la rama EDIFICIO (generar=` +
-      `${enEdificio.ctaGenerarApagado}, diagnosticar=${enEdificio.ctaDiagnosticarApagado}): esta ` +
-      'versión escribe el GML de una parcela y no el de una construcción, y generarlo mientras el ' +
-      'usuario mira un edificio es el fallo silencioso que F11 no puede publicar.',
+    `«Diagnosticar encaje» tenía que quedar APAGADO en la rama EDIFICIO y está en ` +
+      `disabled=${enEdificio.ctaDiagnosticarApagado}: el diagnóstico contrasta una parcela medida ` +
+      'contra el parcelario del Catastro y todavía no sabe hacerlo con una construcción (es F14).',
   )
 }
-// El motivo se enseña UNA vez y NOMBRA LOS DOS BOTONES: si nombrara solo uno,
-// volveríamos a tener un botón apagado sin explicación, que es lo que la regla de
-// la casa prohíbe — y esta vez sin los 134,75 px que justificaban el cambio.
-if (!enEdificio.motivoGenerar || !/rama Edificio/i.test(enEdificio.motivoGenerar)) {
-  problemas.push(
-    'Los dos CTA del pie están apagados y el renglón del primero no dice por qué: ' +
-      JSON.stringify(enEdificio.motivoGenerar) +
-      '. Regla de la casa: botón apagado CON MOTIVO, jamás botón muerto.',
-  )
-}
+// ⭐ **Y «Generar GML» ya NO se apaga por la rama: lo decide el DATO (F13).** El
+// guardián que había aquí exigía lo contrario y era verdad hasta el 2026-08-06.
+// Lo que se exige ahora es que el motivo, si lo hay, sea de esta rama: un renglón
+// que hable de parcelas con un edificio en pantalla significa que manda el
+// cableado equivocado. Que el botón se encienda **cuando se puede** lo mide el
+// guion 20, que es el de esa fase.
 if (
   enEdificio.motivoGenerar &&
-  !(/Generar GML/i.test(enEdificio.motivoGenerar) && /Diagnosticar encaje/i.test(enEdificio.motivoGenerar))
+  /(^|\s)parcela\b/i.test(enEdificio.motivoGenerar) &&
+  !/rama Parcela/i.test(enEdificio.motivoGenerar)
 ) {
   problemas.push(
-    'El motivo que se enseña en el pie no nombra LOS DOS botones: ' +
+    'Con la rama EDIFICIO puesta, el renglón de «Generar GML» habla de una parcela: ' +
       JSON.stringify(enEdificio.motivoGenerar) +
-      '. Desde el 2026-08-04 hay un solo renglón para los dos (costaban 134,75 px medidos), así que ' +
-      'ese texto es la única explicación que reciben ambos: si nombra a uno, el otro queda mudo.',
+      '. Desde F13 ese botón tiene DOS dueños y el que manda aquí es el de edificio; si contesta ' +
+      'el otro, quien lo pulse se lleva el fichero de la otra rama.',
   )
 }
-// ⭐ El segundo CTA no puede quedar mudo: su renglón está vacío A PROPÓSITO, y lo
-// que sostiene la regla es la cadena `aria-describedby` → nodo → texto, entera.
-if (enEdificio.motivoDiagnosticar !== '' && enEdificio.motivoDiagnosticar !== null) {
-  advertencias.push(
-    'El renglón de «Diagnosticar encaje» lleva texto propio: ' +
+// ⭐ El botón que SÍ sigue apagado no puede quedar mudo. Desde F13 su motivo va
+// ENTERO en su propio renglón: es el único apagado, así que cabe —y por eso ya no
+// hace falta el reparto con `aria-describedby` que hubo mientras eran dos—.
+if (!enEdificio.motivoDiagnosticar) {
+  problemas.push(
+    '«Diagnosticar encaje» está apagado y su renglón está VACÍO: es un botón muerto sin ' +
+      'explicación, que es lo que la regla de la casa prohíbe. Desde F13 es el único CTA que esta ' +
+      'rama apaga, así que su motivo cabe entero al lado y no hay excusa de píxeles.',
+  )
+} else if (!/Diagnosticar encaje/i.test(enEdificio.motivoDiagnosticar)) {
+  problemas.push(
+    'El motivo de «Diagnosticar encaje» no nombra al botón del que habla: ' +
       JSON.stringify(enEdificio.motivoDiagnosticar) +
-      '. Desde el 2026-08-04 tenía que quedar VACÍO y el botón apuntar al renglón del primer CTA. Si ' +
-      'han vuelto los dos párrafos, vuelven con ellos los 134,75 px que se llevaron por delante ' +
-      '«Diagnosticar encaje» entero — mira `repartoDeAltura.recorteDelPanelPx`.',
+      '. Con un solo renglón por CTA, cada uno explica el suyo.',
+  )
+} else if (!/rama Edificio/i.test(enEdificio.motivoDiagnosticar)) {
+  advertencias.push(
+    'El motivo de «Diagnosticar encaje» no dice que la causa sea la rama en la que estás: ' +
+      JSON.stringify(enEdificio.motivoDiagnosticar) +
+      '. Sin eso, el usuario no sabe que volviendo a Parcela el botón se enciende.',
   )
 }
-if (!enEdificio.describedbyDelSegundoCta) {
-  problemas.push(
-    '«Diagnosticar encaje» está apagado, su renglón está vacío y el botón NO tiene ' +
-      '`aria-describedby`: para quien navega con lector de pantalla es un botón apagado sin ninguna ' +
-      'explicación. El renglón vacío es la decisión de píxeles; el `aria-describedby` es lo que ' +
-      'impide que esa decisión deje a alguien fuera.',
-  )
-} else if (enEdificio.describedbyDelSegundoCta !== enEdificio.idDelRenglonPrincipal) {
-  problemas.push(
-    `«Diagnosticar encaje» apunta con \`aria-describedby\` a «${enEdificio.describedbyDelSegundoCta}» y ` +
-      `el renglón que lleva el motivo tiene el id «${enEdificio.idDelRenglonPrincipal}»: la asociación ` +
-      'no llega a ninguna parte.',
-  )
-} else if (!enEdificio.textoDelNodoDescriptor) {
-  problemas.push(
-    `\`aria-describedby\` apunta a «${enEdificio.describedbyDelSegundoCta}», que existe pero está ` +
-      'VACÍO. Un descriptor sin texto es peor que no ponerlo: el marcado afirma que hay explicación y ' +
-      'el lector de pantalla no lee nada.',
-  )
+// ⛔ **Y el mensaje que F13 retiró no puede volver por ninguno de los dos
+// renglones.** Hablaba de los dos botones en una frase («…están apagados en la
+// rama Edificio: esta versión sabe hacer las dos cosas con una parcela y todavía
+// no con una construcción») y su segunda mitad es falsa desde el 2026-08-06.
+for (const [donde, texto] of [
+  ['Generar GML', enEdificio.motivoGenerar],
+  ['Diagnosticar encaje', enEdificio.motivoDiagnosticar],
+]) {
+  if (typeof texto === 'string' && /todav[ií]a no con una construcci[oó]n/i.test(texto)) {
+    problemas.push(
+      `⛔ Ha vuelto el mensaje que F13 RETIRÓ, en el renglón de «${donde}»: ${JSON.stringify(texto)}. ` +
+        'Decía que esta versión no sabe generar el GML de una construcción, y desde F13 sí sabe.',
+    )
+  }
 }
 if (enEdificio.barraEdicionOculta === false) {
   problemas.push(

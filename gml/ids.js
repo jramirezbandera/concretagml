@@ -84,6 +84,24 @@ export const NAMESPACE_INSPIRE_DEFECTO = 'ES.LOCAL.CP'
 export const NAMESPACE_INSPIRE_CATASTRO = 'ES.SDGC.CP'
 
 /**
+ * Los dos namespaces de EDIFICIO (F13), gemelos de los dos de arriba y con la
+ * misma división: `LOCAL` es el dato que declara un particular y `SDGC` el que
+ * trae el WFS del Catastro. Cambia el tema —`BU` de *Buildings*, no `CP` de
+ * *Cadastral Parcels*— y no cambia nada más.
+ *
+ * ⭐ **La ayuda del ICUC admite los dos por su nombre** («namespace `ES.SDGC.BU`/
+ * `ES.LOCAL.BU`», dossier §1.3), que es más de lo que se sabe del de parcela: ahí
+ * el `ES.LOCAL.CP` se dio por bueno porque lo usa un alta real (`UTM_1.gml`), no
+ * porque nadie lo hubiera publicado.
+ *
+ * @readonly
+ */
+export const NAMESPACE_BU_DEFECTO = 'ES.LOCAL.BU'
+
+/** @readonly */
+export const NAMESPACE_BU_CATASTRO = 'ES.SDGC.BU'
+
+/**
  * Prefijo de tipo de cada id, leído del fixture 4.0. Las claves son las mismas
  * que las de {@link IdsParcela} para que no haya que traducir entre ambos.
  *
@@ -96,6 +114,11 @@ export const PREFIJO_ID = Object.freeze({
   multiSurface: 'MultiSurface_',
   surface: 'Surface_',
   puntoReferencia: 'ReferencePoint_',
+  // F13 · el de la geometría de una construcción «otra» (piscina). Es
+  // `Polygon_` y no `Surface_` porque su geometría es un `gml:Polygon` DIRECTO,
+  // sin `Surface`/`patches` — leído del fixture `wfsbu-allconstruction-…`, que es
+  // el único fichero real del repo que trae una.
+  poligono: 'Polygon_',
   // Este NO sale de ningún fixture: la raíz de la plantilla oficial lleva el
   // namespace pelado (`gml:id="ES.SDGC.CP"`) y ese es el caso normal. El prefijo
   // solo entra en el caso degenerado de namespace vacío, donde hace falta un id
@@ -413,6 +436,142 @@ export function idsDeParcela({
 
   return {
     ids: { coleccion, parcela, multiSurface, surfaces, puntoReferencia },
+    detecciones,
+  }
+}
+
+/**
+ * ⚠️ Sufijo de las construcciones «otras» (piscinas y demás), leído del fixture
+ * real: `ES.SDGC.BU.9398516VK3799G_PI.1`. El guion bajo y el punto salen de ahí,
+ * y la numeración empieza en **1**, no en 0.
+ *
+ * Es lo único de la identidad de edificio que NO se deduce de la de parcela, y
+ * es también lo que salva del choque de `xs:ID`: el sufijo lo pone el ÍNDICE, no
+ * el nombre que el usuario le haya puesto a la parte. Dos piscinas llamadas
+ * «Piscina» producen `_PI.1` y `_PI.2`; si el nombre entrara aquí, producirían el
+ * mismo id y el documento entero sería inválido — el modo de fallo que
+ * `serializarExpedienteCp` documenta como el suyo principal.
+ *
+ * @readonly
+ */
+export const SUFIJO_OTRA_CONSTRUCCION = '_PI'
+
+/**
+ * @typedef {Object} IdsEdificio
+ * @property {string} coleccion  `gml:id` de la raíz: el namespace pelado.
+ * @property {string} edificio   `gml:id` del `bu-ext2d:Building`.
+ * @property {string} localId    `base:localId` del `Building` (SIN el namespace).
+ * @property {string} namespace  `base:namespace`, tal cual se emite.
+ * @property {string} superficie `gml:id` del `gml:Surface` de la huella.
+ * @property {Array<{gmlId: string, localId: string, poligono: string}>} otras  Una
+ *   entrada por construcción «otra», en el mismo orden en que se pasaron.
+ */
+
+/**
+ * Compone los `gml:id` de una construcción. Gemelo de {@link idsDeParcela} y con
+ * las mismas reglas: base `<namespaceInspire>.<refcat>`, saneado por
+ * {@link toXmlId} uno a uno, y ni un identificador inventado.
+ *
+ * Dos diferencias con el de parcela, las dos leídas de ficheros reales:
+ *
+ *   1. **No hay `MultiSurface`.** La huella es UN `gml:Surface` con N
+ *      `PolygonPatch` (override del dossier §1.2), así que hay un solo id de
+ *      geometría y no una pareja numerada.
+ *   2. **Aparecen las «otras»**, con su `_PI.n` y con su `gml:Polygon` —no
+ *      `Surface`— porque así las escribe el Catastro.
+ *
+ * El `localId` sale aparte de los `gml:id` a propósito: el `base:localId` del
+ * fixture es la referencia **sin** el namespace (`9398516VK3799G`), mientras que
+ * el `gml:id` sí lo lleva (`ES.SDGC.BU.9398516VK3799G`). Devolver solo los
+ * segundos obligaría al serializador a recortar cadenas para obtener el primero,
+ * que es la clase de aritmética de strings con la que se pierde una identidad.
+ *
+ * @param {object} args
+ * @param {string} [args.namespaceInspire=NAMESPACE_BU_DEFECTO]
+ * @param {string} args.refcat   Identidad del edificio. Ver {@link idsDeParcela}.
+ * @param {number} [args.nOtras=0]  Cuántas construcciones «otras» numerar.
+ * @returns {{ids: IdsEdificio, detecciones: import('./_comun.js').DeteccionGml[]}}
+ * @throws {TypeError}   Si los tipos no cuadran.
+ * @throws {RangeError}  Si `refcat` está vacía o `nOtras` es negativo.
+ */
+export function idsDeEdificio({
+  namespaceInspire = NAMESPACE_BU_DEFECTO,
+  refcat,
+  nOtras = 0,
+} = {}) {
+  if (typeof namespaceInspire !== 'string') {
+    throw new TypeError(
+      `idsDeEdificio: 'namespaceInspire' debe ser un string; ` +
+        `recibido ${JSON.stringify(namespaceInspire)}.`,
+    )
+  }
+  if (typeof refcat !== 'string') {
+    throw new TypeError(
+      `idsDeEdificio: 'refcat' debe ser un string; recibido ${JSON.stringify(refcat)}.`,
+    )
+  }
+  if (refcat.trim().length === 0) {
+    throw new RangeError(
+      'idsDeEdificio: `refcat` no puede estar vacía: el gml:id del edificio es su ' +
+        'identidad, y no se inventa una aquí.',
+    )
+  }
+  if (!Number.isInteger(nOtras) || nOtras < 0) {
+    throw new RangeError(
+      `idsDeEdificio: 'nOtras' debe ser un entero >= 0; recibido ${JSON.stringify(nOtras)}.`,
+    )
+  }
+
+  const namespaceVacio = namespaceInspire.trim().length === 0
+  const base = namespaceVacio ? refcat : `${namespaceInspire}${SEPARADOR_ID}${refcat}`
+
+  const detecciones = []
+  const componer = (crudo) => {
+    const { id, detecciones: dets } = toXmlId(crudo)
+    detecciones.push(...dets)
+    return id
+  }
+
+  const edificio = componer(base)
+  const superficie = componer(`${PREFIJO_ID.surface}${base}`)
+  const otras = []
+  for (let i = 0; i < nOtras; i++) {
+    const sufijo = `${SUFIJO_OTRA_CONSTRUCCION}${SEPARADOR_ID}${BASE_NUMERACION_SURFACE + i}`
+    otras.push({
+      gmlId: componer(`${base}${sufijo}`),
+      // ⛔ SIN sanear, y es lo contrario de un descuido: ver la nota de `localId`
+      // más abajo. `base:localId` no es un `xs:ID`.
+      localId: `${refcat}${sufijo}`,
+      poligono: componer(`${PREFIJO_ID.poligono}${base}${sufijo}`),
+    })
+  }
+
+  // Mismo razonamiento que en `idsDeParcela`: el id de la colección es el
+  // namespace a secas, y sin namespace hay que recurrir al prefijo de tipo para
+  // no repetir el del edificio y no dejarlo mudo.
+  const coleccion = namespaceVacio
+    ? componer(`${PREFIJO_ID.coleccion}${base}`)
+    : componer(namespaceInspire)
+
+  return {
+    ids: {
+      coleccion,
+      edificio,
+      // ⛔ **`localId` NO pasa por `toXmlId`, y esto se aprendió rompiéndolo.**
+      // La primera versión lo saneaba como a los demás y emitía
+      // `<base:localId>_9398516VK3799G</base:localId>`: el guion bajo se lo pone
+      // el saneador porque una referencia catastral EMPIEZA POR DÍGITO y un
+      // `xs:ID` no puede. Pero `base:localId` **no es un `xs:ID`**: es un
+      // `xs:string`, es la IDENTIDAD del edificio, y el fichero real del Catastro
+      // la trae desnuda (`<base:localId>9398516VK3799G</base:localId>`).
+      // Sanearla cambia la identidad del objeto que se declara — en silencio para
+      // quien no compare carácter a carácter — y ésa es la clase de error que la
+      // Sede devuelve semanas después. Lo mismo vale para `namespace`.
+      localId: refcat,
+      namespace: namespaceInspire,
+      superficie,
+      otras,
+    },
     detecciones,
   }
 }

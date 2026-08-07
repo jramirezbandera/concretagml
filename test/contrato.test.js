@@ -144,6 +144,42 @@ describe('contrato F02 · la validación sale por el barrel y no expone lat/lon'
   })
 })
 
+describe('contrato F13 · la validación de EDIFICIO sale por su propio espacio', () => {
+  it('el barrel expone `validacionEdificio`, separado de `validacion`', () => {
+    expect(typeof barrel.validacionEdificio.validarEdificio).toBe('function')
+    // Son dos espacios, no uno con dos funciones: `validacion` sigue siendo el de
+    // parcela y no ha aprendido a validar construcciones por la puerta de atrás.
+    expect(barrel.validacion).not.toHaveProperty('validarEdificio')
+  })
+
+  it('devuelve las DOS claves que `validarParcela` no tiene, y con contenido', () => {
+    // `porParte` y `noComprobado` son la diferencia de contrato, y existen por un
+    // hecho medido: con trece partes, `{recinto, indice}` no identifica a nadie, y
+    // sin parcela cargada —el caso NORMAL— dos reglas no se pueden ejecutar.
+    const recinto = { vertices: anillo.map(([x, y]) => [x, y]), tipo: 'EXTERIOR' }
+    const partes = [
+      crearParteConstruccion({
+        nombre: 'Cuerpo principal',
+        recinto,
+        origen: 'DIBUJADA',
+        plantasSobreRasante: 1,
+      }),
+    ]
+    const r = barrel.validacionEdificio.validarEdificio(partes, { srs: fixture.srs })
+    expect(Array.isArray(r.errores)).toBe(true)
+    expect(Array.isArray(r.avisos)).toBe(true)
+    expect(typeof r.puedeGenerar).toBe('boolean')
+    expect(r.porParte).toHaveLength(1)
+    expect(r.porParte[0].nombre).toBe('Cuerpo principal')
+    // Sin `parcelaContexto` NO se da por comprobado lo que no se ha mirado.
+    expect(r.noComprobado.map((n) => n.comprobacion)).toEqual([
+      barrel.validacionEdificio.COMPROBACION.FUERA_DE_PARCELA,
+      barrel.validacionEdificio.COMPROBACION.DISTANCIA_A_PARCELA,
+    ])
+    expect(clavesGeograficas(r)).toEqual([])
+  })
+})
+
 // ── Test-guardián del barrel raíz frente al visor (F03, hallazgo C1/T10) ──────
 // `viewer/index.js` y `services/*` importan Leaflet, que exige `window`. Este
 // fichero corre en el proyecto Vitest `node` (sin DOM), así que en la práctica el

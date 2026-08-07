@@ -45,7 +45,7 @@
 //   2 → no se pudo validar y se pidió `--estricto`
 
 import { spawnSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const RAIZ = resolve(import.meta.dirname, '..')
@@ -76,6 +76,79 @@ const CACHE = join(RAIZ, 'esquemas', 'cache')
 
 /** El esquema en su sitio oficial. Es de la Comisión Europea, NO del Catastro. */
 const XSD_REMOTO = 'https://inspire.ec.europa.eu/schemas/cp/4.0/CadastralParcels.xsd'
+const NS_CP40 = 'http://inspire.ec.europa.eu/schemas/cp/4.0'
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ⛔ EL ESQUEMA DE EDIFICIO NO ESTÁ DONDE LO DECLARAN LOS FICHEROS
+// ═════════════════════════════════════════════════════════════════════════════
+// F13 emite GML de EDIFICIO (`bu-ext2d:Building` + `bu-ext2d:OtherConstruction`)
+// y hay que validarlo igual que el de parcela. La trampa es dónde buscarlo:
+//
+//   · `https://inspire.ec.europa.eu/draft-schemas/bu-ext2d/2.0/BuildingExtended2D.xsd`
+//     —la URL que declara el `xsi:schemaLocation` de TODO fichero BU del
+//     Catastro, incluidos los dos fixtures reales de este repo— contesta
+//     **200 OK con 376.809 bytes de `text/html`**: la página «Inspire Registry -
+//     Page not found» (medido el 2026-08-06). Todo `/draft-schemas/` igual, y en
+//     `/schemas/` no existe `bu-ext2d` en ninguna versión (404).
+//   · ⭐ **Pero el esquema SÍ existe: lo sirve el propio Catastro.** Es la copia
+//     que la ayuda del ICUC llama «*un esquema ligeramente modificado que se
+//     mantiene en local*» —modificado para admitir `openAirPool`, el valor con el
+//     que la D.G.C. califica las piscinas y que el draft público no tiene—, y
+//     está enlazada desde `catastro.hacienda.gob.es/ayuda/vga/ayuda_ICUC.htm`.
+//     76.443 bytes de `text/xml`, con todo el árbol de imports en el mismo
+//     espejo. Es el esquema contra el que valida el ICUC de verdad, así que es
+//     **mejor** oráculo que el de la Comisión aunque estuviera vivo.
+//
+// ⚠️ Un `200` no dice nada (la lección del WFS del Catastro, F05). Sin la guarda
+// de bytes que lleva `validar-xsd.py`, esos 376 kB de HTML se guardarían en la
+// caché con extensión `.xsd` y el script informaría de que **el fichero** no
+// valida: acusaría al GML de un defecto del servidor del esquema.
+//
+// ⛔ **Y AUN ASÍ, ESTO NO BASTA — medido contra el ICUC real el 2026-08-06.** El
+// fichero que producía la app **validaba contra este mismo esquema** y el
+// servicio lo rechazaba: le faltaba `xmlns:xlink` en la raíz, que ningún elemento
+// usa, que el XSD no exige y que la ayuda oficial no menciona. Se acotó bisecando
+// en cuatro rondas de subida. La red es asimétrica y así hay que leerla: **que
+// esto diga OK no garantiza que la Sede lo acepte; que falle sí garantiza que hay
+// un problema.** Lo que cubre ese hueco es el guardián de
+// `test/gml/serialize-bu.test.js`, que compara contra el fichero real del
+// Catastro — también en la raíz, no solo en la geometría.
+const XSD_BU_DECLARADO =
+  'https://inspire.ec.europa.eu/draft-schemas/bu-ext2d/2.0/BuildingExtended2D.xsd'
+
+/** El espejo del Catastro: el que sí responde, y contra el que valida el ICUC. */
+const XSD_BU_REMOTO =
+  'https://www.catastro.hacienda.gob.es/ws/esquemas/GML/inspire.ec.europa.eu/' +
+  'draft-schemas/bu-ext2d/2.0/BuildingExtended2D.xsd'
+
+/** El namespace por el que se reconoce un GML de edificio, lo declare quien lo declare. */
+const NS_BU_EXT2D = 'http://inspire.jrc.ec.europa.eu/schemas/bu-ext2d/2.0'
+
+/**
+ * Los GML de EDIFICIO que se validan si no se pasa ninguno: el fichero de entrega
+ * que produce la app —el que se sube al ICUC— y los dos ficheros reales del
+ * Catastro, que son el contrato de verdad de este dialecto.
+ */
+const GML_BU_POR_DEFECTO = [
+  join(RAIZ, 'test', 'gml', '__snapshots__', 'edificio-entrega.gml'),
+  join(RAIZ, 'test', 'fixtures', 'gml', 'bu_building_9398516VK3799G.gml'),
+  join(RAIZ, 'test', 'fixtures', 'gml', 'bu_buildingpart_9398516VK3799G.gml'),
+]
+
+/**
+ * ¿Es este fichero del dialecto de EDIFICIO?
+ *
+ * Se mira el namespace y no el nombre: un GML de edificio renombrado sigue siendo
+ * invalidable contra `cp/4.0`, y lo que hay que evitar es el FALLO que suena a
+ * defecto del fichero. Basta con la cabecera: el `xmlns` va en la raíz.
+ */
+function esDeEdificio(ruta) {
+  try {
+    return readFileSync(ruta, 'utf8').slice(0, 4000).includes(NS_BU_EXT2D)
+  } catch {
+    return false
+  }
+}
 
 const AYUDA_INSTALACION = [
   'Hace falta UNA de estas dos cosas:',
@@ -98,21 +171,46 @@ const linea = (s = '') => process.stdout.write(`${s}\n`)
 const argv = process.argv.slice(2)
 const estricto = argv.includes('--estricto')
 const rutas = argv.filter((a) => !a.startsWith('-'))
-const ficheros = rutas.length > 0 ? rutas.map((r) => resolve(r)) : GML_POR_DEFECTO
+const pedidos =
+  rutas.length > 0 ? rutas.map((r) => resolve(r)) : [...GML_POR_DEFECTO, ...GML_BU_POR_DEFECTO]
 
-const faltan = ficheros.filter((f) => !existsSync(f))
+const faltan = pedidos.filter((f) => !existsSync(f))
 if (faltan.length > 0) {
   linea('')
   linea('  ERROR · no existe(n) el/los fichero(s) a validar:')
   for (const f of faltan) linea(`    ${f}`)
   if (rutas.length === 0) {
     linea('')
-    linea('  Son los snapshots del round-trip de F04 y los genera la suite.')
+    linea('  Son los snapshots del round-trip (F04 y F13) y los genera la suite.')
     linea('  Ejecuta primero `npm test` y vuelve a intentarlo.')
   }
   linea('')
   process.exit(1)
 }
+
+// ── Cada dialecto con SU esquema (F13) ──────────────────────────────────
+//
+// Se separan por el NAMESPACE del propio fichero, no por su nombre ni por la
+// carpeta: validar un GML de edificio contra `cp/4.0` da un FALLO que suena a
+// defecto del fichero cuando lo único que pasa es que se le ha dado el esquema
+// equivocado — y ese ruido es justo lo que hace que un guardián deje de leerse.
+
+const grupos = [
+  {
+    nombre: 'PARCELA',
+    ns: NS_CP40,
+    xsd: XSD_REMOTO,
+    nota: '(SOLO cp/4.0, como el IVG)',
+    ficheros: pedidos.filter((f) => !esDeEdificio(f)),
+  },
+  {
+    nombre: 'EDIFICIO',
+    ns: NS_BU_EXT2D,
+    xsd: XSD_BU_REMOTO,
+    nota: '(el espejo del Catastro: el declarado da 200 + HTML)',
+    ficheros: pedidos.filter(esDeEdificio),
+  },
+].filter((g) => g.ficheros.length > 0)
 
 // ── Elección del motor ────────────────────────────────────────────────────────
 
@@ -161,49 +259,65 @@ if (!hayXmllint && python === null) {
   process.exit(0)
 }
 
-// ── Validación ────────────────────────────────────────────────────────────────
+// ── Validación ────────────────────────────────────────────────
 
 linea('')
 linea(`  Motor      ${hayXmllint ? 'xmllint' : `${python} + lxml`}`)
-linea(`  Esquema    ${XSD_REMOTO}  (SOLO cp/4.0, como el IVG)`)
-linea('')
 
-let codigo
-if (hayXmllint) {
-  // `xmllint` resuelve los imports por red él solo. No se le pasa `wfs.xsd` a
-  // propósito: ver la cabecera.
-  const r = spawnSync('xmllint', ['--noout', '--schema', XSD_REMOTO, ...ficheros], {
-    stdio: 'inherit',
-  })
-  codigo = r.status === 0 ? 0 : 1
-} else {
-  const r = spawnSync(python, [join(RAIZ, 'scripts', 'validar-xsd.py'), CACHE, ...ficheros], {
-    stdio: 'inherit',
-  })
-  if (r.status === 2) {
-    linea('')
-    linea('  NO SE PUDO CONSTRUIR EL ESQUEMA (¿sin red y sin caché?).')
-    linea('')
-    process.exit(estricto ? 2 : 0)
+let codigo = 0
+for (const grupo of grupos) {
+  linea('')
+  linea(`  ${grupo.nombre}`)
+  linea(`  Esquema    ${grupo.xsd}`)
+  linea(`             ${grupo.nota}`)
+  linea('')
+
+  let r
+  if (hayXmllint) {
+    // `xmllint` resuelve los imports por red él solo. A parcela no se le pasa
+    // `wfs.xsd` a propósito: ver la cabecera.
+    r = spawnSync('xmllint', ['--noout', '--schema', grupo.xsd, ...grupo.ficheros], {
+      stdio: 'inherit',
+    })
+  } else {
+    r = spawnSync(
+      python,
+      [join(RAIZ, 'scripts', 'validar-xsd.py'), CACHE, grupo.ns, grupo.xsd, ...grupo.ficheros],
+      { stdio: 'inherit' },
+    )
+    if (r.status === 2) {
+      linea('')
+      linea(`  NO SE PUDO CONSTRUIR EL ESQUEMA de ${grupo.nombre} (¿sin red y sin caché?).`)
+      linea('')
+      process.exit(estricto ? 2 : 0)
+    }
   }
-  codigo = r.status === 0 ? 0 : 1
+  if (r.status !== 0) codigo = 1
 }
 
 linea('')
 if (codigo === 0) {
-  linea('  OK · valida(n) contra el esquema oficial de parcela 4.0.')
+  linea('  OK · valida(n) contra su esquema oficial.')
   linea('')
-  linea('  Recordatorio: el XSD NO comprueba la orientación de los anillos, ni que')
+  linea('  ⚠️  Y ESTO NO GARANTIZA QUE LA SEDE LO ACEPTE. La red es asimétrica: que')
+  linea('  falle SÍ garantiza que hay un problema; que pase, no garantiza nada.')
+  linea('')
+  linea('  De PARCELA el XSD no comprueba la orientación de los anillos, ni que')
   linea('  areaValue cuadre con las coordenadas, ni la ausencia de boundedBy /')
-  linea('  validFrom / zoning (que el esquema ADMITE y el IVG rechaza). Eso lo')
-  linea('  cubre la suite.')
+  linea('  validFrom / zoning (que el esquema ADMITE y el IVG rechaza).')
+  linea('')
+  linea('  De EDIFICIO hay un caso MEDIDO el 2026-08-06: el fichero validaba aquí y')
+  linea('  el ICUC lo rechazaba por no declarar `xmlns:xlink` en la raíz — que ningún')
+  linea('  elemento usa, que el XSD no exige y que la ayuda oficial no menciona.')
+  linea('')
+  linea('  Eso lo cubre la suite, comparando contra los ficheros REALES del Catastro.')
 } else {
-  linea('  FALLO · NO valida contra el esquema (el detalle está arriba).')
+  linea('  FALLO · algún fichero NO valida contra su esquema (el detalle está arriba).')
   linea('')
   linea('  Si el error es «No matching global declaration available for the')
-  linea('  validation root», el fichero trae la raíz de la DESCARGA del WFS')
-  linea('  (`wfs:FeatureCollection`) y no la de ENTREGA (`gml:FeatureCollection`).')
-  linea('  Es el fallo del 2026-07-27: mira el `perfil` con que se serializó.')
+  linea('  validation root» en un GML de PARCELA, el fichero trae la raíz de la')
+  linea('  DESCARGA del WFS (`wfs:FeatureCollection`) y no la de ENTREGA')
+  linea('  (`gml:FeatureCollection`). Es el fallo del 2026-07-27: mira el `perfil`.')
 }
 linea('')
 process.exit(codigo)

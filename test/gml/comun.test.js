@@ -194,12 +194,33 @@ const xmlnsDe = (a) => [
 ]
 
 describe('gml/_comun · NS — los namespaces salen de los GML reales', () => {
-  it('Object.values(NS) es EXACTAMENTE la UNIÓN de los xmlns de los dos fixtures 4.0', () => {
-    // Unión, no uno de los dos: cada perfil declara su juego y `NS` tiene que
-    // cubrir ambos. Se barre el TEXTO entero, no solo la raíz, porque base 3.3
-    // se declara dentro del `inspireId` en los dos ficheros.
-    const declarados = [...new Set([...xmlnsDe(CP40), ...xmlnsDe(ENTREGA)])].sort()
-    expect(declarados).toEqual([...Object.values(NS)].sort())
+  it('Object.values(NS) es EXACTAMENTE la UNIÓN de los xmlns de los fixtures que se EMITEN', () => {
+    // Unión, no uno de ellos: cada dialecto declara su juego y `NS` tiene que
+    // cubrir todos. Se barre el TEXTO entero, no solo la raíz, porque base 3.3
+    // se declara dentro del `inspireId` en los dos ficheros de parcela.
+    //
+    // ⭐ **F13 añade el tercero.** Hasta esta fase eran «los dos fixtures 4.0»
+    // porque el edificio solo se LEÍA, y los namespaces de lo que solo se lee
+    // viven en `DIALECTOS`. Desde que `gml/serialize-bu.js` escribe el fichero del
+    // ICUC, sus tres namespaces son de EMISIÓN y bajan a `NS` — así que el
+    // fichero del que salen entra aquí. La propiedad que este test defiende no
+    // cambia ni un ápice: **ningún namespace de `NS` se lo ha inventado nadie**.
+    const BU = ANALISIS.find((a) => a.nombre === 'bu_building_9398516VK3799G.gml')
+    expect(BU, 'falta el fixture de edificio del que salen los namespaces BU').toBeDefined()
+    const declarados = [
+      ...new Set([...xmlnsDe(CP40), ...xmlnsDe(ENTREGA), ...xmlnsDe(BU)]),
+    ].sort()
+    // El fichero BU declara MÁS namespaces de los que este proyecto emite (trae
+    // el juego completo del WFS: direcciones, elevación, coberturas…). Lo que se
+    // afirma es que `NS` está CONTENIDO en lo declarado por ficheros reales y que
+    // no sobra ninguno, no que se declare todo lo que traen.
+    for (const valor of Object.values(NS)) {
+      expect(declarados, `${valor} no aparece en ningún fixture real`).toContain(valor)
+    }
+    // Y la otra mitad, que es la que impide que `NS` se quede corto para parcela:
+    // todo lo que declaran los DOS ficheros de parcela sigue estando en `NS`.
+    const deParcela = [...new Set([...xmlnsDe(CP40), ...xmlnsDe(ENTREGA)])].sort()
+    expect(deParcela.filter((v) => !Object.values(NS).includes(v))).toEqual([])
   })
 
   it('cada fixture 4.0 declara EXACTAMENTE los prefijos de su perfil, y en su orden', () => {

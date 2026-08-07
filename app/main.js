@@ -557,6 +557,9 @@ import { cablearDiagnostico } from './cableado-diagnostico.js'
 // pantalla. Llamarla `EXTENSIONES_EDIFICIO` aquí haría leer el `entradasExtra` del
 // paso 9 como si el fichero fuera del edificio antes de saberlo.
 import { EXTENSIONES as EXTENSIONES_DIBUJO, cablearEdificio } from './cableado-edificio.js'
+// F13 · el segundo dueño de «Generar GML»: la rama EDIFICIO ya sabe escribir su
+// fichero (el del ICUC), así que el botón deja de estar apagado por ser edificio.
+import { cablearGeneracionGmlEdificio } from './cableado-edificio-gml.js'
 import {
   EXTENSIONES_PROYECTO,
   MENSAJE_SIN_EXPEDIENTE,
@@ -3123,6 +3126,19 @@ export function cablearGeneracionGml({
   renglon = nodo(SELECTOR_ESTADO_GML),
   ahora = () => new Date(),
   descargar = descargarGml,
+  // ── ⭐ F13 · quién manda sobre el botón ────────────────────────────────────
+  // Hasta F13 este cableado era el ÚNICO dueño de «Generar GML», y cuando la rama
+  // era EDIFICIO `app/rama.js` lo apagaba entero. Desde que la rama de edificio
+  // también sabe generar, el botón tiene DOS pretendientes suscritos a DOS stores
+  // distintos, y el de parcela seguiría escribiéndole el renglón cada vez que
+  // cambiara la parcela —aunque el usuario esté mirando un edificio—.
+  //
+  // `mando()` es la condición, y se escribe UNA vez en `app/main.js`: es el mismo
+  // reparto que F12 hizo con las dos ediciones sobre el mismo mapa, y por el mismo
+  // motivo (dos módulos escribiendo el mismo nodo acaban dependiendo del orden en
+  // que lleguen sus avisos). Por defecto `true`, para que quien cablee esto solo
+  // —los tests de F04— no tenga que saber nada de ramas.
+  mando = () => true,
 } = {}) {
   /**
    * Escribe el renglón `role="status"`. Vacío + sin modificador es el estado
@@ -3166,6 +3182,10 @@ export function cablearGeneracionGml({
    * @param {object|null} parcelaActual
    */
   function refrescar(parcelaActual) {
+    // ⭐ F13 · si esta rama no tiene el mando, no se toca el botón NI el renglón:
+    // el otro dueño está diciendo algo suyo ahí y pisárselo dejaría al usuario
+    // leyendo el motivo de una parcela mientras trabaja con un edificio.
+    if (!mando()) return
     let errores
     let puedeGenerar
     try {
@@ -3262,6 +3282,11 @@ export function cablearGeneracionGml({
    *   `null` si no se llegó a intentar la descarga.
    */
   function recorrido(entrandoEnEntrega) {
+    // Segunda mitad de la guarda de `mando()`: sin ella, un clic que llegase con
+    // la otra rama puesta descargaría el GML de la parcela mientras el usuario
+    // mira un edificio — el fallo silencioso que `app/rama.js` interceptaba con su
+    // guarda de captura antes de que este botón tuviera dos dueños.
+    if (!mando()) return null
     const parcelaActual = estado.get()
 
     // ── 1 · Validación ──────────────────────────────────────────────────────
@@ -3346,6 +3371,11 @@ export function cablearGeneracionGml({
 
   return {
     generar,
+    // ⭐ F13 · lo publica para que el reparto del mando pueda REPINTAR al cambiar
+    // de rama. Sin esto, conmutar dejaría el botón como lo hubiera dejado el otro
+    // dueño hasta que su store cambiara: un botón encendido sin motivo, o apagado
+    // con el motivo de la otra rama.
+    refrescar: () => refrescar(estado.get()),
     destruir() {
       boton.removeEventListener('click', generar)
       desuscribir()
@@ -3353,9 +3383,34 @@ export function cablearGeneracionGml({
   }
 }
 
+/**
+ * ⭐ **F13 · quién manda sobre «Generar GML», escrito UNA vez.**
+ *
+ * Desde esta fase el botón tiene DOS dueños —el de parcela y el de construcción—,
+ * cada uno suscrito a su store y los dos vivos a la vez. Si cada uno escribiera
+ * cuando su store cambia, el usuario acabaría leyendo el motivo de una parcela
+ * mientras mira un edificio, y el ganador dependería del orden en que llegaran los
+ * avisos. Es exactamente la situación de las dos ediciones sobre el mismo mapa
+ * (F12 · T4.2) y se resuelve igual: la condición se escribe aquí, en el único
+ * sitio que conoce los dos ejes, y baja a los dos cableados como función.
+ *
+ * `ramaEnPantalla` y no `ramaCableada.get()`: existe desde el paso 4 y vale
+ * `PARCELA` desde el primer instante, así que sirve también antes de que el
+ * conmutador esté montado (paso 13).
+ */
+const mandoDeParcela = () => ramaEnPantalla !== RAMA.EDIFICIO
+/** La otra mitad. Se escribe como negación de la de arriba para que no puedan
+ *  ser las dos ciertas —ni las dos falsas— el día que alguien toque una. */
+const mandoDeEdificio = () => !mandoDeParcela()
+
 // Sin nodos explícitos: los localiza `cablearGeneracionGml` con los selectores
 // del contrato, y LANZA nombrándolos si `index.html` ha dejado de traerlos.
-cablearGeneracionGml({ estado, panel, srs: SRS_DEMO })
+const gmlDeParcela = cablearGeneracionGml({
+  estado,
+  panel,
+  srs: SRS_DEMO,
+  mando: mandoDeParcela,
+})
 
 // ── 11 · Informe de contraste firmable en PDF (F09 · T5.1) ───────────────────
 
@@ -4028,6 +4083,30 @@ if (visor.edicion !== null && typeof visor.edicion.activa === 'function') {
   // acaba de abandonar. `app/rama.js` publica `subscribe` desde F11.
   ramaCableada?.subscribe(aplicarEdicion)
 }
+
+// ── ⭐ F13 · «Generar GML» en la rama EDIFICIO ───────────────────────────────
+//
+// El segundo dueño del botón. Se cablea AQUÍ y no junto al de parcela (paso 10)
+// porque necesita el conmutador ya montado para poder repintarse al cambiar de
+// rama, y el conmutador es el paso 13.
+//
+// ⚠️ **Los dos tienen que repintarse en cada conmutación, y no solo el que
+// entra.** El que sale dejó el botón como estaba con SU dato; si solo repintara
+// el entrante, un botón encendido por la parcela seguiría encendido en la rama
+// Edificio hasta que el store de edificio cambiara — y pulsarlo generaría el GML
+// de la construcción sin que nada lo hubiera dicho. Se llama a los dos y decide
+// `mando()`: el que no lo tiene, no toca nada.
+const gmlDeEdificio = cablearGeneracionGmlEdificio({
+  estadoEdificio,
+  panel,
+  srs: SRS_DEMO,
+  mando: mandoDeEdificio,
+})
+
+ramaCableada?.subscribe(() => {
+  gmlDeParcela.refrescar()
+  gmlDeEdificio.refrescar()
+})
 
 // ── F12 · T4.2 · «Dibujar recinto», la sexta palabra de la barra ─────────────
 //

@@ -59,3 +59,8 @@ Formato GML parcela catastral.pdf
 # ── Capturas de diseño y screenshots de desarrollo ────────────────────────────
 IMAGENES CLAUDEDESIGN/
 prototipo/screenshots/
+
+# ── Pruebas de subida al ICUC (F13, desechables) ─────────────────────────────
+# Variantes que se generan para bisecar un rechazo de la Sede. No son código ni
+# fixtures: se rehacen con un comando y no tienen valor fuera de la sesión.
+icuc-pruebas/

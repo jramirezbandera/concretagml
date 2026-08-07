@@ -28,10 +28,15 @@
 //   2. Pone `data-rama` en el `<body>` —el ÚNICO gancho de CSS de la rama—.
 //   3. Intercambia las `<section>` marcadas con `data-rama-panel`, por
 //      VISIBILIDAD y jamás por sustitución del DOM (ver la regla dura de abajo).
-//   4. APAGA los dos CTA del pie con el motivo escrito al lado cuando la rama es
-//      EDIFICIO: generar el GML de una construcción y diagnosticarla todavía no
-//      se saben hacer, y un botón encendido que no cumple es peor que uno
+//   4. APAGA con el motivo escrito al lado los CTA del pie que esta rama todavía
+//      no sabe atender, y un botón encendido que no cumple es peor que uno
 //      apagado que explica.
+//      ⭐ **F13 · hoy es UNO, no dos.** Hasta esta fase se apagaban los dos
+//      —«Generar GML» y «Diagnosticar encaje»— porque «todavía no se saben hacer
+//      con una construcción». **Generar el GML de una construcción YA se sabe**
+//      (`gml/serialize-bu.js`, el fichero del ICUC), así que ese botón lo gobierna
+//      ahora `app/cableado-edificio-gml.js` según el DATO. Aquí solo queda
+//      «Diagnosticar encaje», que es F14.
 //   5. OCULTA la barra de edición flotante: con la rama EDIFICIO la parcela del
 //      mapa es CONTEXTO, y un `Ctrl+Z` ahí deshace una edición que el usuario
 //      cree estar haciendo sobre el edificio.
@@ -260,54 +265,53 @@ export const SECCIONES_PARCELA = Object.freeze(['.gml-bloque--catastro', '.gml-b
 const CLASE_ESTADO_ERROR = 'gml-accion-estado--error'
 
 /**
- * Por qué «Generar GML» está apagado en la rama EDIFICIO. Regla de la casa:
- * **botón apagado con motivo, jamás botón muerto** — y el motivo dice las tres
- * cosas que hacen falta: qué no se puede, por qué, y cómo volver a poder.
+ * ⭐ **F13 · RETIRADO: «Generar GML» YA NO SE APAGA EN LA RAMA EDIFICIO.**
  *
- * Se exporta para que su test lo afirme sin copiar el literal, igual que
- * `MOTIVO_SIN_OFICIAL` de F07 y `MOTIVO_COLINDANTES_APAGADO` de F05.
+ * Aquí vivía `MOTIVO_GENERAR_GML_EN_EDIFICIO`, que decía —y era verdad cuando se
+ * escribió— «esta versión escribe el GML de una parcela y todavía no el de una
+ * construcción». **F13 es la fase que lo vuelve falso**: `gml/serialize-bu.js`
+ * escribe el fichero del ICUC y `app/cableado-edificio-gml.js` lo cablea a este
+ * mismo botón.
+ *
+ * Se retira con la misma honradez con la que se puso, así que hay que decir qué
+ * queda fuera: el botón **sigue pudiendo estar apagado** en esta rama, pero por
+ * un motivo del DATO —no hay construcción cargada, le faltan las plantas a una
+ * parte, dos se solapan— y ese motivo lo escribe el cableado nuevo en el mismo
+ * renglón. Lo que desaparece no es el apagado: es el apagado *por ser edificio*.
+ *
+ * ⚠️ Y queda uno de los dos: «Diagnosticar encaje» sigue apagado —es F14— con el
+ * motivo de aquí abajo, que ahora se enseña **entero y por su cuenta**.
+ *
+ * Por qué «Diagnosticar encaje» está apagado en la rama EDIFICIO.
  */
-export const MOTIVO_GENERAR_GML_EN_EDIFICIO =
-  '«Generar GML» está apagado mientras estás en la rama Edificio: esta versión escribe el GML de ' +
-  'una parcela y todavía no el de una construcción. Vuelve a la rama Parcela y el botón se ' +
-  'enciende con lo que tuvieras cargado.'
-
-/** Por qué «Diagnosticar encaje» está apagado en la rama EDIFICIO. */
 export const MOTIVO_DIAGNOSTICAR_EN_EDIFICIO =
   '«Diagnosticar encaje» está apagado mientras estás en la rama Edificio: el diagnóstico contrasta ' +
   'una parcela medida contra el parcelario del Catastro y todavía no sabe hacerlo con un edificio. ' +
   'Vuelve a la rama Parcela y el botón se enciende.'
 
 /**
- * ⛔ **EL MOTIVO QUE SE ENSEÑA DE VERDAD, Y POR QUÉ ES UNO Y NO DOS**
- * (2026-08-04; lo destapó el guion de humo 13, no la suite).
+ * ⭐ **F13 · RETIRADO TAMBIÉN, y por la mitad que se volvió falsa.**
  *
- * Los dos motivos de arriba están bien escritos y están en la escala de la casa
- * —219 y 240 caracteres, frente a 181 de `MOTIVO_COLINDANTES_APAGADO` (F05), 230
- * de `MOTIVO_SIN_OFICIAL` (F07) y 221 de `MENSAJE_AUTOGUARDADO_EN_ESPERA` (F10)—.
- * El problema no era su longitud: era que **en esta rama se enseñan LOS DOS a la
- * vez y de forma permanente**, y `.gml-acciones` pasaba de **72,78 a 207,53 px**
- * (**+134,75 px medidos**) en un panel de altura fija que ya no tenía holgura. El
- * resultado, medido a 1440×900: el panel se sobresuscribía **47,54 px en vacío**
- * (114,91 con 7 partes), `.gml-panel` recortaba por abajo con su `overflow:hidden`
- * y **«Diagnosticar encaje» y su motivo no se veían ni había forma de llegar a
- * ellos**. Un botón cuyo motivo está fuera de la pantalla es un botón mudo, que es
- * exactamente lo que la regla de la casa prohíbe.
+ * Aquí vivía `MOTIVO_CTA_EN_EDIFICIO`, que decía «*«Generar GML» y «Diagnosticar
+ * encaje» están apagados en la rama Edificio: esta versión sabe hacer las dos
+ * cosas con una parcela y todavía no con una construcción*». Existía por una
+ * medida cara del 2026-08-04, y conviene no perderla al retirarlo:
  *
- * Y la causa de los dos apagados **es LA MISMA** —estás en la rama Edificio—, así
- * que dos párrafos permanentes decían dos veces lo mismo y costaban el doble. Se
- * dice UNA vez, **nombrando los dos botones**, que es lo que mantiene la regla en
- * pie: ninguno de los dos queda sin explicación.
+ * > Enseñar los DOS motivos completos a la vez costaba **+134,75 px** en
+ * > `.gml-acciones` (de 72,78 a 207,53), el panel se sobresuscribía **47,54 px en
+ * > vacío** a 1440×900, `.gml-panel` recortaba por abajo con su `overflow:hidden`
+ * > y **«Diagnosticar encaje» y su motivo se quedaban fuera de la pantalla**. Un
+ * > botón cuyo motivo no se puede leer es un botón mudo.
  *
- * ⚠️ Los dos literales de arriba **NO se borran y siguen exportados**: son el
- * motivo COMPLETO de cada botón por separado, los sigue afirmando la suite, y son
- * lo que hay que reponer el día que el pie tenga sitio (el rework de UI). Aquí se
- * elige cuál se enseña, no se reescribe lo que se sabe.
+ * Se resolvió con UN mensaje que nombraba los dos botones. **F13 deshace el
+ * problema en vez de administrarlo**: como «Generar GML» ya no se apaga por ser
+ * edificio, queda **un solo** CTA apagado y su motivo cabe entero y por su cuenta.
+ * No hay dos párrafos que sumar.
+ *
+ * ⚠️ **La lección sigue viva para quien apague un segundo CTA aquí**: dos motivos
+ * permanentes en este pie no caben, y hay que medirlo antes de darlo por bueno, no
+ * después. Está escrito en {@link aplicarCtas}, que es donde se decidiría.
  */
-export const MOTIVO_CTA_EN_EDIFICIO =
-  '«Generar GML» y «Diagnosticar encaje» están apagados en la rama Edificio: esta versión sabe ' +
-  'hacer las dos cosas con una parcela y todavía no con una construcción. Vuelve a la rama ' +
-  'Parcela y se encienden con lo que tuvieras cargado.'
 
 /**
  * Lo que se dice cuando se conmuta a EDIFICIO y no hay panel de edificio montado.
@@ -559,16 +563,23 @@ export function cablearRama({
   // Se resuelven UNA vez, y aquí sí es seguro: viven en el pie del panel, que
   // NO participa del intercambio de secciones. La regla dura de la cabecera
   // protege justamente a las referencias como éstas.
+  // ⭐ F13 · `apagaEnEdificio` es lo que cambió. «Generar GML» ya NO se apaga por
+  // estar en esta rama —lo cablea `app/cableado-edificio-gml.js` y lo enciende o
+  // lo apaga según el DATO—, y «Diagnosticar encaje» sigue apagado hasta F14. Los
+  // dos siguen resolviéndose aquí porque los dos viven en el mismo pie y el que
+  // ya no se apaga hay que **reponerlo** si venía apagado de antes.
   const ctas = [
     {
       boton: botonGenerar ?? nodo(documento, SELECTOR.CTA_GENERAR),
       renglon: renglonGenerar ?? nodo(documento, SELECTOR.ESTADO_GENERAR),
-      motivo: MOTIVO_GENERAR_GML_EN_EDIFICIO,
+      motivo: null,
+      apagaEnEdificio: false,
     },
     {
       boton: botonDiagnosticar ?? nodo(documento, SELECTOR.CTA_DIAGNOSTICAR),
       renglon: renglonDiagnosticar ?? nodo(documento, SELECTOR.ESTADO_DIAGNOSTICAR),
       motivo: MOTIVO_DIAGNOSTICAR_EN_EDIFICIO,
+      apagaEnEdificio: true,
     },
   ]
   /** Lo que tenía cada CTA antes de que esta rama lo apagase. `null` = no apagado. */
@@ -696,22 +707,25 @@ export function cablearRama({
   // ── Los dos CTA del pie ────────────────────────────────────────────────────
 
   /**
-   * Apaga (o repone) los dos CTA del pie.
+   * Apaga (o repone) los CTA del pie que esta rama todavía no sabe atender.
    *
-   * ⛔ **El motivo se escribe UNA vez y en el renglón del PRIMER CTA**, no uno por
-   * botón: ver {@link MOTIVO_CTA_EN_EDIFICIO}, donde están los 134,75 px medidos
-   * que costaba la otra forma y por qué costarlos dejaba «Diagnosticar encaje»
-   * fuera de la pantalla. El renglón del segundo queda **vacío a propósito**, y
-   * para que ese botón no quede mudo para quien no ve la pantalla se le apunta con
-   * `aria-describedby` al renglón que sí lleva el texto: la asociación queda en el
-   * árbol de accesibilidad y no solo en la disposición visual.
+   * ⭐ **F13 · hoy es UNO SOLO** («Diagnosticar encaje»), así que su motivo se
+   * escribe entero en su propio renglón y no hace falta el reparto con
+   * `aria-describedby` que hubo mientras eran dos.
+   *
+   * ⛔ **Si algún día vuelven a ser dos, MÍDELO ANTES.** El 2026-08-04 se midió
+   * que dos motivos permanentes en este pie cuestan **+134,75 px** en
+   * `.gml-acciones` y dejan el segundo botón —y su explicación— fuera de la
+   * pantalla, con `.gml-panel` recortando por su `overflow:hidden`. La salida de
+   * entonces fue un mensaje único que nombraba los dos; la de hoy es que solo hay
+   * uno. La que no vale es añadir el segundo y ver qué pasa.
    *
    * @param {string} rama
    */
   function aplicarCtas(rama) {
-    const principal = ctas[0]
-    ctas.forEach((cta, i) => {
-      if (rama === RAMA.EDIFICIO) {
+    const apagados = ctas.filter((c) => c.apagaEnEdificio)
+    ctas.forEach((cta) => {
+      if (rama === RAMA.EDIFICIO && cta.apagaEnEdificio) {
         if (!ctaPrevio.has(cta.boton)) {
           ctaPrevio.set(cta.boton, {
             disabled: cta.boton.disabled === true,
@@ -724,15 +738,16 @@ export function cablearRama({
         cta.boton.disabled = true
         // El motivo va en el renglón `role="status"` que ya existe al lado del
         // botón: el lector de pantalla lo anuncia sin robar el foco.
-        cta.renglon.textContent = i === 0 ? MOTIVO_CTA_EN_EDIFICIO : ''
+        const primero = apagados[0] === cta
+        cta.renglon.textContent = primero ? cta.motivo : ''
         cta.renglon.classList.remove(CLASE_ESTADO_ERROR)
-        if (i === 0) {
+        if (primero) {
           // `index.html` no le pone `id` a este renglón porque hasta hoy nadie lo
           // necesitaba. Se le pone aquí y se retira al reponer, como todo lo demás
           // que toca este módulo.
           if (!cta.renglon.id) cta.renglon.id = ID_MOTIVO_CTA
         } else {
-          cta.boton.setAttribute('aria-describedby', principal.renglon.id)
+          cta.boton.setAttribute('aria-describedby', apagados[0].renglon.id)
         }
         return
       }
@@ -750,13 +765,18 @@ export function cablearRama({
   }
 
   /**
-   * Guarda de última línea sobre los dos CTA, en fase de CAPTURA. El botón ya
-   * está `disabled`, así que en condiciones normales esto no llega a correr
-   * nunca; existe porque los dos CTA tienen OTROS dueños —`cablearGeneracionGml`
-   * y `cablearDiagnostico`, suscritos al store de PARCELA— que los encienden
-   * cuando ese store cambia, y podrían reencenderlos con la rama EDIFICIO
-   * puesta. Generar el GML de la parcela mientras el usuario está mirando un
-   * edificio es exactamente el fallo silencioso que F11 no puede publicar.
+   * Guarda de última línea sobre los CTA que esta rama apaga, en fase de CAPTURA.
+   * El botón ya está `disabled`, así que en condiciones normales esto no llega a
+   * correr nunca; existe porque esos CTA tienen OTROS dueños —`cablearDiagnostico`,
+   * suscrito al store de PARCELA— que los encienden cuando ese store cambia y
+   * podrían reencenderlos con la rama EDIFICIO puesta. Diagnosticar el encaje de
+   * la parcela mientras el usuario mira un edificio es exactamente el fallo
+   * silencioso que F11 no podía publicar.
+   *
+   * ⭐ **F13 · y por eso el oyente ya NO se pone en «Generar GML»**: ese botón
+   * tiene ahora dueño en esta rama (`app/cableado-edificio-gml.js`) y bloquearle
+   * el clic sería impedir justamente lo que la fase viene a permitir. La guarda se
+   * pone solo donde sigue habiendo algo que guardar — ver dónde se suscribe.
    *
    * @param {Event} evento
    */
@@ -837,7 +857,11 @@ export function cablearRama({
 
   escuchar(botones[RAMA.PARCELA], 'click', alPulsar)
   escuchar(botones[RAMA.EDIFICIO], 'click', alPulsar)
-  for (const cta of ctas) escuchar(cta.boton, 'click', alPulsarCta, true)
+  // Solo sobre los que esta rama apaga: ver {@link alPulsarCta}. Ponerlo sobre
+  // «Generar GML» impediría el clic que F13 viene a permitir.
+  for (const cta of ctas) {
+    if (cta.apagaEnEdificio) escuchar(cta.boton, 'click', alPulsarCta, true)
+  }
 
   /** @param {Event} evento */
   function alPulsar(evento) {

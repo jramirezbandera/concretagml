@@ -358,6 +358,23 @@ export const PREFIJO_NOMBRE = 'parcela'
 export const PREFIJO_NOMBRE_EXPEDIENTE = 'expediente'
 
 /**
+ * Primera parte del nombre cuando lo que se entrega es una CONSTRUCCIÓN (F13).
+ *
+ * ⭐ Lo anticipaba, con estas palabras, el JSDoc de {@link PREFIJO_NOMBRE} desde
+ * F04: «*los GML de parcela (F04) y los de edificio (F13) acabarán conviviendo en
+ * la misma carpeta de descargas del mismo usuario, y la extensión no los
+ * distingue*». Aquí está el segundo, y la previsión se cumple entera: los dos
+ * ficheros son `.gml`, los dos llevan la misma referencia catastral y la misma
+ * marca de tiempo, y **lo único que los distingue en la barra de descargas es
+ * esta palabra**. Sin ella, quien genere los dos de la misma parcela en el mismo
+ * minuto se encuentra con `parcela_9398516VK3799G_….gml` dos veces y no sabe cuál
+ * subir a cuál servicio — el IVG y el ICUC son formularios distintos.
+ *
+ * @readonly
+ */
+export const PREFIJO_NOMBRE_EDIFICIO = 'edificio'
+
+/**
  * Segmento que ocupa el lugar de la referencia catastral cuando NO hay ninguna.
  * Es el caso normal de un alta nueva: la parcela todavía no existe en las bases
  * del Catastro, así que no tiene referencia y no se le puede inventar una. El
@@ -632,6 +649,37 @@ export function nombreFicheroGml({ refcat = null, fecha, miembros = 1 } = {}) {
   // correcto mientras nadie toque la plantilla no es un saneador, es una
   // coincidencia. Cuesta una comparación de cadena por descarga.
   return `${neutralizarReservado(base)}${EXTENSION_GML}`
+}
+
+/**
+ * El nombre del fichero de una CONSTRUCCIÓN (F13).
+ *
+ * ⚠️ **Función aparte y no un parámetro más de {@link nombreFicheroGml}**, y el
+ * motivo lo dice el JSDoc de aquella: «*se pide el HECHO —cuántas van— y no el
+ * prefijo: si el llamante pudiera elegir el nombre, podría llamar «parcela» a un
+ * fichero con tres*». Un `edificio: true` sería exactamente esa palanca —un
+ * booleano que elige el rótulo—, y además convive mal con `miembros`, que aquí no
+ * significa nada: un fichero de construcción lleva UN `Building` y las
+ * construcciones «otras» que haya, y contarlas no cambiaría el nombre.
+ *
+ * Un artefacto distinto, un primitivo distinto. Las tres partes del nombre y las
+ * dos pasadas de saneado son LAS MISMAS: se comparten aquí abajo, no se copian.
+ *
+ * @param {object} args
+ * @param {string|null} [args.refcat=null]  Ver {@link nombreFicheroGml}.
+ * @param {Date} args.fecha
+ * @returns {string}
+ * @throws {TypeError|RangeError}  Los mismos que {@link nombreFicheroGml}.
+ */
+export function nombreFicheroGmlEdificio({ refcat = null, fecha } = {}) {
+  // Se delega para heredar las guardas y el saneado sin repetirlos, y luego se
+  // cambia SOLO el primer segmento. `split`/`join` sobre el separador y no un
+  // `replace` a ciegas: el prefijo es el primer segmento, y una referencia
+  // catastral que contuviera la palabra «parcela» no debe verse afectada.
+  const deParcela = nombreFicheroGml({ refcat, fecha, miembros: 1 })
+  const partes = deParcela.split(SEPARADOR_NOMBRE)
+  partes[0] = PREFIJO_NOMBRE_EDIFICIO
+  return partes.join(SEPARADOR_NOMBRE)
 }
 
 // ── Descarga ──────────────────────────────────────────────────────────────────

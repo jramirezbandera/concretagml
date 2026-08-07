@@ -105,8 +105,13 @@
  * también en lo que a nosotros nos parezca superfluo). Cuál se declara en cada
  * caso lo dice {@link PERFILES}, no esta tabla.
  *
- * Los namespaces de los dialectos que solo se LEEN (CP 3.0, edificio) no están
- * aquí: viven en {@link DIALECTOS}, porque son de reconocimiento, no de emisión.
+ * ⚠️ **Esta frase estuvo aquí desde F04 y F13 la vuelve falsa**, así que se
+ * reescribe en vez de dejarla envejecer: decía que «los namespaces de los
+ * dialectos que solo se LEEN (CP 3.0, edificio) no están aquí, viven en
+ * {@link DIALECTOS}, porque son de reconocimiento y no de emisión». Sigue siendo
+ * cierto del **CP 3.0** —ése solo se lee, y se rechaza—, pero el de EDIFICIO ya
+ * se emite: `gml/serialize-bu.js` escribe el fichero del ICUC. Sus tres
+ * namespaces bajan aquí por eso.
  *
  * @readonly
  */
@@ -119,7 +124,36 @@ export const NS = Object.freeze({
   xlink: 'http://www.w3.org/1999/xlink',
   gmd: 'http://www.isotc211.org/2005/gmd',
   ogc: 'http://www.opengis.net/ogc',
+  // ── F13 · EDIFICIO ────────────────────────────────────────────────────────
+  // ⚠️ Los dos `bu-*` van bajo `inspire.JRC.ec.europa.eu` y el `base` es una URN
+  // `urn:x-inspire:…`, mientras que los de parcela van bajo
+  // `inspire.ec.europa.eu`. No es una errata que haya que «arreglar»: son los
+  // namespaces *draft* que declara literalmente cada fichero BU del Catastro, y
+  // un namespace es una CADENA de identidad, no una dirección que se visita.
+  // Cambiarlos por los «buenos» convertiría el documento en otro documento.
+  base32: 'urn:x-inspire:specification:gmlas:BaseTypes:3.2',
+  'bu-core2d': 'http://inspire.jrc.ec.europa.eu/schemas/bu-core2d/2.0',
+  'bu-ext2d': 'http://inspire.jrc.ec.europa.eu/schemas/bu-ext2d/2.0',
 })
+
+/**
+ * `xsi:schemaLocation` del fichero de EDIFICIO (F13). Un solo par, copiado
+ * carácter a carácter de los ficheros reales del Catastro.
+ *
+ * ⛔ **Su URL está MUERTA, medido el 2026-08-06, y se emite igual.** Todo
+ * `inspire.ec.europa.eu/draft-schemas/…` contesta **`200 OK` con la página HTML
+ * «Inspire Registry - Page not found»** (376.809 bytes), y en `/schemas/` no
+ * existe `bu-ext2d` en ninguna versión. No es motivo para cambiarla: un
+ * `schemaLocation` DECLARA qué esquema gobierna el documento, no manda
+ * descargarlo, y el ICUC valida contra su propia copia local (la que admite
+ * `openAirPool`). Poner aquí otra URL —o quitarla— haría que nuestro fichero
+ * dejara de parecerse al que la Sede espera, a cambio de nada.
+ *
+ * @readonly
+ */
+export const SCHEMA_LOCATION_BU =
+  'http://inspire.jrc.ec.europa.eu/schemas/bu-ext2d/2.0 ' +
+  'http://inspire.ec.europa.eu/draft-schemas/bu-ext2d/2.0/BuildingExtended2D.xsd'
 
 /**
  * `xsi:schemaLocation` de la ENTREGA: UN solo par `namespace espacio xsd`, el de

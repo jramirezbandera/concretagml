@@ -111,6 +111,24 @@ export { serializarParcelaCp, serializarExpedienteCp } from './serialize-cp.js'
 // dijo el mismo día.
 export { parsearGmlBu } from './parse-bu.js'
 
+// ── F13: y el segundo ESCRITOR, que este guardián predijo ────────────────────
+// El `it` de `test/gml/contrato-gml.test.js` decía, con estas palabras, «si mañana
+// aparece `gml/serialize-bu.js` y nadie decide si es público, este test lo dice».
+// Apareció, y la decisión es que SÍ: lo consume `app/`, que es quien monta el
+// fichero del ICUC con la envolvente que deriva `edificio/envolvente.js`.
+//
+// `MODELO` sale con él por lo de siempre —sin el vocabulario, la interfaz tendría
+// que decidir mirando el texto— y `NAMESPACE_BU_DEFECTO`/`_CATASTRO` porque elegir
+// entre declarar un dato propio (`ES.LOCAL.BU`) o uno del Catastro (`ES.SDGC.BU`)
+// es una decisión de PRODUCTO, la misma que en parcela justifica que salgan sus
+// dos namespaces.
+export {
+  MODELO,
+  NAMESPACE_BU_CATASTRO,
+  NAMESPACE_BU_DEFECTO,
+  serializarEdificioBu,
+} from './serialize-bu.js'
+
 // ── El escalón de debajo: bytes → texto (F08) ────────────────────────────────
 // `parsearGml` recibe un `string` y nunca ha sabido de dónde salía. Cuando el
 // fichero lo trae el usuario —que es F08— alguien tiene que decidir con qué

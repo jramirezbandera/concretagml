@@ -82,9 +82,10 @@ import {
   MENSAJE_CONMUTAR_ROTO,
   MENSAJE_SIN_PANEL_EDIFICIO,
   ID_MOTIVO_CTA,
-  MOTIVO_CTA_EN_EDIFICIO,
+  // ⭐ F13 · `MOTIVO_CTA_EN_EDIFICIO` y `MOTIVO_GENERAR_GML_EN_EDIFICIO` ya no
+  // existen: los retiró la fase que volvió falsa su afirmación. Hay un `it` que
+  // comprueba que no vuelven.
   MOTIVO_DIAGNOSTICAR_EN_EDIFICIO,
-  MOTIVO_GENERAR_GML_EN_EDIFICIO,
   RAMA,
   RAMAS,
   ROTULO,
@@ -95,6 +96,11 @@ import {
   selectorBoton,
   selectorPanel,
 } from '../../app/rama.js'
+// El espacio entero, para poder afirmar que los dos motivos retirados en F13 NO
+// vuelven. Con `import {…}` no se puede: un nombre que no existe se importa como
+// `undefined` en unos empaquetadores y revienta la carga en otros; sobre el
+// espacio se comprueba sin ambigüedad.
+import * as moduloRama from '../../app/rama.js'
 import { NIVEL } from '../../viewer/_comun.js'
 
 // ── La cáscara REAL, leída de `index.html` ───────────────────────────────────
@@ -526,141 +532,155 @@ describe('app/rama · ningún `data-*` se repite entre las dos ramas', () => {
 
 // ── 5 · Los dos CTA del pie ──────────────────────────────────────────────────
 
-describe('app/rama · los dos CTA del pie se apagan CON MOTIVO', () => {
+describe('app/rama · el CTA que esta rama no sabe atender se apaga CON MOTIVO', () => {
   const ctaGenerar = () => document.querySelector(SELECTOR.CTA_GENERAR)
   const ctaDiagnosticar = () => document.querySelector(SELECTOR.CTA_DIAGNOSTICAR)
   const renglonGenerar = () => document.querySelector(SELECTOR.ESTADO_GENERAR)
   const renglonDiagnosticar = () => document.querySelector(SELECTOR.ESTADO_DIAGNOSTICAR)
 
-  // ⛔ CORREGIDO EL 2026-08-04, y lo destapó el GUION DE HUMO 13, no esta suite.
+  // ── ⭐ REESCRITO EN F13 (2026-08-06) ────────────────────────────────────────
   //
-  // Aquí se exigía UN MOTIVO POR BOTÓN, y los dos se escribían a la vez y de forma
-  // permanente. Medido a 1440×900: `.gml-acciones` pasaba de 72,78 a **207,53 px**
-  // (+134,75), el panel de la rama EDIFICIO se sobresuscribía **47,54 px en vacío**
-  // (114,91 con 7 partes), y `.gml-panel` recortaba por abajo con su
-  // `overflow:hidden` dejando **«Diagnosticar encaje» y su motivo fuera de la
-  // pantalla, sin forma de llegar a ellos**. Un botón cuyo motivo no se puede leer
-  // es un botón mudo, que es justo lo que la regla de la casa prohíbe — así que
-  // esta suite estaba verde afirmando el cumplimiento de una regla que en pantalla
-  // se estaba rompiendo.
+  // Hasta esta fase se apagaban LOS DOS CTA con un motivo único que los nombraba,
+  // y ese motivo único venía a su vez de una corrección del 2026-08-04 que
+  // destapó el guion de humo 13: dos motivos permanentes costaban **+134,75 px**
+  // en `.gml-acciones` (72,78 → 207,53), el panel se sobresuscribía **47,54 px en
+  // vacío** a 1440×900 y `.gml-panel` recortaba por abajo dejando «Diagnosticar
+  // encaje» y su explicación fuera de la pantalla.
   //
-  // Se dice UNA vez, nombrando los DOS botones, y el segundo se ata al renglón que
-  // lleva el texto con `aria-describedby`, para que la asociación esté también en
-  // el árbol de accesibilidad y no solo en la disposición visual.
+  // **F13 deshace el problema en vez de administrarlo**: «Generar GML» ya no se
+  // apaga por estar en la rama Edificio, porque esta versión SÍ sabe escribir el
+  // GML de una construcción. Queda un solo CTA apagado —«Diagnosticar encaje»,
+  // que es F14— y su motivo cabe entero, en su propio renglón.
+  //
+  // ⚠️ Lo de abajo defiende las dos cosas: lo que hace hoy, y que los literales
+  // retirados NO vuelvan.
 
-  it('en EDIFICIO quedan `disabled` y con UN motivo que nombra a los dos', () => {
+  it('en EDIFICIO «Diagnosticar encaje» queda `disabled` con su motivo entero', () => {
     const { rama } = cablear()
-    // Se encienden primero, como los enciende `cablearGeneracionGml` cuando hay
+    // Se enciende primero, como lo enciende `cablearDiagnostico` cuando hay
     // geometría: apagar algo que ya nacía apagado no probaría nada.
-    ctaGenerar().disabled = false
     ctaDiagnosticar().disabled = false
 
     rama.set(RAMA.EDIFICIO)
 
-    expect(ctaGenerar().disabled).toBe(true)
     expect(ctaDiagnosticar().disabled).toBe(true)
-    expect(renglonGenerar().textContent).toBe(MOTIVO_CTA_EN_EDIFICIO)
-    // El segundo renglón queda VACÍO a propósito: el motivo es uno.
-    expect(renglonDiagnosticar().textContent).toBe('')
+    expect(renglonDiagnosticar().textContent).toBe(MOTIVO_DIAGNOSTICAR_EN_EDIFICIO)
     // El motivo va en un `role="status"`: se anuncia sin robar el foco.
-    expect(renglonGenerar().getAttribute('role')).toBe('status')
+    expect(renglonDiagnosticar().getAttribute('role')).toBe('status')
   })
 
-  it('⛔ el segundo botón NO queda mudo: apunta al renglón que lleva el motivo', () => {
+  it('⭐ y «Generar GML» YA NO SE APAGA por estar en la rama Edificio', () => {
+    // Es el cambio de F13: `gml/serialize-bu.js` escribe el fichero del ICUC y
+    // `app/cableado-edificio-gml.js` gobierna este botón según el DATO. Este
+    // módulo no lo toca, ni para apagarlo ni para escribirle el renglón.
+    const { rama } = cablear()
+    ctaGenerar().disabled = false
+    renglonGenerar().textContent = 'GML preparado hace un momento.'
+
+    rama.set(RAMA.EDIFICIO)
+
+    expect(ctaGenerar().disabled).toBe(false)
+    expect(renglonGenerar().textContent).toBe('GML preparado hace un momento.')
+  })
+
+  it('el que sigue apagado NO queda mudo: su motivo está en su propio renglón', () => {
     const { rama } = cablear()
     rama.set(RAMA.EDIFICIO)
 
-    const id = ctaDiagnosticar().getAttribute('aria-describedby')
-    expect(id).toBe(ID_MOTIVO_CTA)
-    expect(renglonGenerar().id).toBe(id)
-    // Y lo que describe es el motivo de verdad, no una cadena vacía.
-    expect(document.getElementById(id).textContent).toBe(MOTIVO_CTA_EN_EDIFICIO)
+    // Con UN solo CTA apagado no hace falta repartir el texto con
+    // `aria-describedby`: el motivo está donde el botón lo tiene al lado.
+    expect(renglonDiagnosticar().textContent).toBe(MOTIVO_DIAGNOSTICAR_EN_EDIFICIO)
+    expect(renglonDiagnosticar().id).toBe(ID_MOTIVO_CTA)
+    expect(ctaDiagnosticar().hasAttribute('aria-describedby')).toBe(false)
   })
 
-  it('al volver a PARCELA se retiran el `aria-describedby` y el `id` que puso', () => {
+  it('al volver a PARCELA se retira el `id` que puso', () => {
     const { rama } = cablear()
-    expect(ctaDiagnosticar().hasAttribute('aria-describedby')).toBe(false)
-    expect(renglonGenerar().hasAttribute('id')).toBe(false)
+    expect(renglonDiagnosticar().hasAttribute('id')).toBe(false)
 
     rama.set(RAMA.EDIFICIO)
     rama.set(RAMA.PARCELA)
 
     // Este módulo devuelve el documento a como estaba, atributo a atributo.
+    expect(renglonDiagnosticar().hasAttribute('id')).toBe(false)
     expect(ctaDiagnosticar().hasAttribute('aria-describedby')).toBe(false)
-    expect(renglonGenerar().hasAttribute('id')).toBe(false)
   })
 
   it('el motivo dice qué no se puede, por qué y cómo volver a poder', () => {
-    // Los dos literales POR BOTÓN se conservan exportados —son el motivo completo
-    // de cada uno y son lo que hay que reponer el día que el pie tenga sitio—, así
-    // que se siguen afirmando junto al que hoy se enseña.
-    for (const motivo of [
-      MOTIVO_CTA_EN_EDIFICIO,
-      MOTIVO_GENERAR_GML_EN_EDIFICIO,
-      MOTIVO_DIAGNOSTICAR_EN_EDIFICIO,
-    ]) {
-      expect(motivo).toMatch(/apagad/i)
-      expect(motivo).toMatch(/Edificio/)
-      expect(motivo).toMatch(/Vuelve a la rama Parcela/)
-      // Regla de oro 9: se cuenta un hecho sobre esta versión, no se juzga nada.
-      expect(motivo).not.toMatch(/(error|inválid|incorrect|prohibid)/i)
-    }
-    // Y el que se enseña nombra LOS DOS botones: es lo que evita que el segundo
-    // quede apagado sin explicación.
-    expect(MOTIVO_CTA_EN_EDIFICIO).toMatch(/Generar GML/)
-    expect(MOTIVO_CTA_EN_EDIFICIO).toMatch(/Diagnosticar encaje/)
-    // Y es más corto que la suma de los dos, que es la razón de que exista.
-    expect(MOTIVO_CTA_EN_EDIFICIO.length).toBeLessThan(
-      MOTIVO_GENERAR_GML_EN_EDIFICIO.length + MOTIVO_DIAGNOSTICAR_EN_EDIFICIO.length,
-    )
+    const motivo = MOTIVO_DIAGNOSTICAR_EN_EDIFICIO
+    expect(motivo).toMatch(/apagad/i)
+    expect(motivo).toMatch(/Edificio/)
+    expect(motivo).toMatch(/Vuelve a la rama Parcela/)
+    expect(motivo).toMatch(/Diagnosticar encaje/)
+    // Regla de oro 9: se cuenta un hecho sobre esta versión, no se juzga nada.
+    expect(motivo).not.toMatch(/(error|inválid|incorrect|prohibid)/i)
+  })
+
+  it('⛔ y NO vuelve a decir que el GML de edificio no se sabe escribir', () => {
+    // Guardián de la retirada: los dos literales de F11 afirmaban que «esta
+    // versión escribe el GML de una parcela y todavía no el de una construcción»,
+    // y F13 lo volvió falso. Si alguien los repone, esto se pone rojo.
+    expect(MOTIVO_DIAGNOSTICAR_EN_EDIFICIO).not.toMatch(/Generar GML/)
+    expect(MOTIVO_DIAGNOSTICAR_EN_EDIFICIO).not.toMatch(/todavía no.*construcción/i)
+    expect(moduloRama.MOTIVO_CTA_EN_EDIFICIO).toBeUndefined()
+    expect(moduloRama.MOTIVO_GENERAR_GML_EN_EDIFICIO).toBeUndefined()
   })
 
   it('al volver a PARCELA se restauran el `disabled` y el renglón que había', () => {
     const { rama } = cablear()
-    ctaGenerar().disabled = false
-    renglonGenerar().textContent = 'GML preparado hace un momento.'
-    ctaDiagnosticar().disabled = true
+    ctaDiagnosticar().disabled = false
+    renglonDiagnosticar().textContent = 'Diagnóstico hecho hace un momento.'
 
     rama.set(RAMA.EDIFICIO)
     rama.set(RAMA.PARCELA)
 
-    expect(ctaGenerar().disabled).toBe(false)
-    expect(renglonGenerar().textContent).toBe('GML preparado hace un momento.')
-    // El que estaba apagado sigue apagado: se restaura lo que HABÍA, no un
-    // «encendido» inventado.
-    expect(ctaDiagnosticar().disabled).toBe(true)
+    expect(ctaDiagnosticar().disabled).toBe(false)
+    expect(renglonDiagnosticar().textContent).toBe('Diagnóstico hecho hace un momento.')
   })
 
   it('retira el modificador `--error` mientras el motivo es la rama, y lo devuelve', () => {
     const { rama } = cablear()
-    renglonGenerar().classList.add('gml-accion-estado--error')
+    renglonDiagnosticar().classList.add('gml-accion-estado--error')
 
     rama.set(RAMA.EDIFICIO)
-    // Que el GML de edificio no se escriba todavía no es un error del usuario.
-    expect(renglonGenerar().classList.contains('gml-accion-estado--error')).toBe(false)
+    // Que el diagnóstico de edificio no exista todavía no es un error del usuario.
+    expect(renglonDiagnosticar().classList.contains('gml-accion-estado--error')).toBe(false)
 
     rama.set(RAMA.PARCELA)
-    expect(renglonGenerar().classList.contains('gml-accion-estado--error')).toBe(true)
+    expect(renglonDiagnosticar().classList.contains('gml-accion-estado--error')).toBe(true)
   })
 
   it('aunque otro módulo lo reencienda, pulsarlo en EDIFICIO no llega a su oyente', () => {
     const { rama } = cablear()
     const oido = vi.fn()
-    ctaGenerar().addEventListener('click', oido)
+    ctaDiagnosticar().addEventListener('click', oido)
 
     rama.set(RAMA.EDIFICIO)
-    // `cablearGeneracionGml` está suscrito al store de PARCELA y podría
-    // reencenderlo con la rama EDIFICIO puesta. Generar el GML de la parcela
-    // mientras el usuario mira un edificio es el fallo silencioso que F11 no
-    // puede publicar.
-    ctaGenerar().disabled = false
-    renglonGenerar().textContent = ''
-    ctaGenerar().click()
+    // `cablearDiagnostico` está suscrito al store de PARCELA y podría reencenderlo
+    // con la rama EDIFICIO puesta. Diagnosticar el encaje de la parcela mientras
+    // el usuario mira un edificio es el fallo silencioso que F11 no podía publicar.
+    ctaDiagnosticar().disabled = false
+    renglonDiagnosticar().textContent = ''
+    ctaDiagnosticar().click()
 
     expect(oido).not.toHaveBeenCalled()
     // Y se vuelve a decir por qué.
-    expect(renglonGenerar().textContent).toBe(MOTIVO_CTA_EN_EDIFICIO)
-    expect(ctaGenerar().disabled).toBe(true)
+    expect(renglonDiagnosticar().textContent).toBe(MOTIVO_DIAGNOSTICAR_EN_EDIFICIO)
+    expect(ctaDiagnosticar().disabled).toBe(true)
+  })
+
+  it('⭐ y «Generar GML» SÍ llega a su oyente en la rama Edificio', () => {
+    // El otro lado del cambio: la guarda de captura ya no se pone en este botón,
+    // porque impedir su clic sería impedir justamente lo que F13 viene a permitir.
+    const { rama } = cablear()
+    const oido = vi.fn()
+    ctaGenerar().addEventListener('click', oido)
+    ctaGenerar().disabled = false
+
+    rama.set(RAMA.EDIFICIO)
+    ctaGenerar().click()
+
+    expect(oido).toHaveBeenCalledTimes(1)
   })
 
   it('en PARCELA la guarda es inerte: el CTA funciona como siempre', () => {

@@ -2430,3 +2430,119 @@ no sirve para nada aunque el fichero abra.
       mismo prefijo y la misma marca de tiempo a propósito. ⭐ **¿Dicen lo mismo?**
       Misma superficie, mismo perímetro, y el vértice 7 de uno es el vértice 7 del
       otro. Si no coinciden, es el defecto más grave que puede tener esta fase.
+
+---
+
+## §18 · F13 · El GML de edificio, y el único juez que cuenta
+
+✅ **HECHO, Y CON DOS DESENLACES.** El 2026-08-06 la Sede **rechazó** el fichero;
+el 2026-08-07, corregido, salió **POSITIVO con CSV `E1HTN9QN6AKZB4XY`**. No es un
+guion hipotético: es el que encontró el defecto. Queda aquí porque hay que
+repetirlo **cada vez que se toque el serializador**, y porque de él salieron dos
+hallazgos que siguen sin dueño (18.2 y 18.3).
+
+**Lo que pasó, en una línea:** el ICUC contestó «*Los siguientes ficheros no se
+han cargado al no ser válidos*», sin más detalle, a un fichero que **validaba
+contra su propio esquema**. Faltaba `xmlns:xlink` en la raíz — que ningún
+elemento usa, que el XSD no exige y que la ayuda no menciona. Se acotó bisecando
+en cuatro rondas de subida y **está corregido**, con guardián en la suite y en el
+guion 20. El relato entero: `spec/feature-13-edificio-gml.md`, «El rechazo del
+ICUC».
+
+**Y la lección para esta lista, que es la que justifica que exista:** las 6.899
+pruebas estaban en verde, el guion 20 daba `ok:true`, `npm run validar:xsd` daba
+OK contra el esquema oficial… y el fichero no se cargaba. **Ninguna máquina de
+este proyecto podía verlo.** Es exactamente lo que pasó con el DXF que no abría
+en ningún CAD y con el GML que el IVG rechazó en julio.
+
+### 18.1 · ✅ HECHO — ICUC POSITIVO el 2026-08-07
+
+| | |
+|---|---|
+| **Resultado** | ⭐ **POSITIVO** |
+| **CSV** | `E1HTN9QN6AKZB4XY` |
+| **Parcela** | `9398516VK3799G` — CL SAN RESTITUTO 72 (C), Madrid |
+| **Fichero** | `edificio_9398516VK3799G_2026-08-07T08-14-11.gml`, 3.672 B |
+| ⭐ **Superficie de huella** | el informe dice **322 m²**; la app dice **322,13** |
+
+Ya no hay que repetirlo salvo que cambie el serializador. **Si lo cambias, esto
+vuelve a ser bloqueante**: la suite daba verde y la Sede rechazó el fichero el día
+anterior.
+
+### 18.2 · ✅ CONTESTADO — el ICUC NO tiene «Tipo de operación»
+
+Se preguntaba porque F17 entregó el desplegable Segregación / Subsanación para el
+**IVG** (parcela) y el formulario del ICUC **no se había medido nunca**. Medido:
+**ese campo no existe**. O20 no se propaga a edificio.
+
+⚠️ **Lo que sí tiene su paso 1, y la app no sabe nada de ello:**
+
+- **Datos del técnico**: NIF y nombre (del certificado), **email** y **teléfono**
+  obligatorios, **identificación profesional** (titulación, lista cerrada) y
+  **fecha de toma de datos del trabajo profesional**.
+- **Especificaciones del trabajo profesional**: ⭐ **precisión del trabajo** en
+  metros (obligatoria, 0,000–9,999), **metodología de captura** (GNSS…) y
+  **¿existe desplazamiento de la cartografía?** con sus seis parámetros
+  (`AX BX CX AY BY CY`).
+
+Se teclea a mano y viaja en el XML adjunto al informe, no en el GML. **El ICUC no
+es «subir un fichero»**: es un trámite con formulario, y la app cubre la mitad.
+
+- [ ] ⛔ **Decisión pendiente del autor**: `horizontalGeometryEstimatedAccuracy`
+      sale `xsi:nil` en nuestro GML porque se decidió «no afirmar una precisión que
+      no se ha medido»… y **la Sede la exige tres pantallas antes** (aquí se
+      declaró **0,010 m, GNSS**). El serializador ya acepta `precisionMetros`; lo
+      que falta es que la app lo pida y lo pase. ¿Merece fase propia?
+
+### 18.3 · Lo que el fichero dice, y lo que se calla
+
+- [ ] Abre el `.gml` descargado con un editor de texto. **¿Ves un solo
+      `Building`, y ninguna `BuildingPart`?** Es a propósito: la ayuda oficial del
+      ICUC dice que solo procesa `Building` con `footPrint` u `OtherConstruction`,
+      así que emitir trece partes sería meter en un documento firmado trece
+      afirmaciones que nadie comprueba. **¿Te parece bien esa decisión ahora que
+      la ves?** Si el ICUC las necesitara, esto habría que rehacerlo.
+- [ ] ⛔ **La piscina, y aquí hay un defecto MEDIDO (2026-08-07).** Si la
+      construcción entró por un GML del Catastro que la trae, `edificio/entrada.js`
+      la convierte en parte **PRINCIPAL** —con un aviso que dice que el tipo
+      correcto «se asigna en la fase siguiente», y esa fase era F12—, así que
+      **se emitiría dentro de la huella del `Building`** en vez de como
+      `OtherConstruction`. Mira la lista de partes: **¿hay alguna piscina marcada
+      como principal?** Si la hay, cámbiale el tipo a «Otra» antes de generar, o la
+      superficie que declares será mayor que la real.
+- [ ] `numberOfFloorsAboveGround` lleva **el máximo** de las partes sobre rasante.
+      Míralo contra el edificio real: ¿es el número de plantas que declararías?
+- [ ] `horizontalGeometryEstimatedAccuracy` va **nulo**. El fichero del Catastro
+      pone `0,1 m`; nosotros no copiamos esa cifra porque sería afirmar una
+      precisión de levantamiento que nadie ha medido. **¿Estás de acuerdo, o
+      prefieres poder declararla?**
+
+### 18.4 · ⛔ El resalte que la ficha pide y que NO está
+
+La ficha §16.1 dice: «*el resalte del aviso "parte fuera de la parcela" rodea la
+parte que se sale, no otra*». **Eso no está entregado.** La capa de validación
+agrupa los hallazgos por parte (`porParte`) desde la fase 1, y **no hay nadie que
+los pinte**: en el mapa, una parte con aviso se ve igual que las demás. Está
+anotado con dueño (**F14**) en §30 del `GUION.md`.
+
+- [ ] Con una construcción que se salga de su parcela, ¿echas de menos el resalte,
+      o el aviso de texto te basta? La respuesta decide si F14 lo trae o si el
+      requisito se reescribe.
+
+### 18.5 · Lo que se ve, y solo lo firma una persona
+
+- [ ] Con la rama **Edificio vacía**, el botón «Generar GML» está apagado y su
+      motivo dice «no hay ninguna construcción cargada»… pero **no hay forma de
+      llegar a esa pantalla**: sin datos, el peldaño «Validación» está apagado.
+      **¿Te has encontrado buscándolo?** Si a ti no te ha estorbado, no es urgente;
+      si has ido a buscar el botón y no estaba, dilo.
+- [ ] Rompe el edificio a propósito (añade una parte y no le dibujes el recinto).
+      El renglón dice «*1 error bloquea la generación del GML: Parte N no tiene
+      recinto…*». **¿Se lee entero?** ¿Sabes qué hacer a continuación?
+- [ ] Con el edificio roto, vete a la rama **Parcela** y vuelve. El botón tiene
+      **dos dueños** desde F13. ¿Contesta siempre el de la rama en la que estás, o
+      alguna vez te ha dado un motivo que hablaba de la otra cosa?
+- [ ] Punto BLOQUEANTE heredado del 8.1, 9.4, 10.5, 11 y 17: **¿algo de lo que
+      sale se lee como un veredicto?** La app mide y declara; no dice si la
+      construcción está bien. Si alguna frase suena a «esto está correcto», es un
+      defecto.

@@ -275,14 +275,19 @@ describe('T2 · apagado son DOS afirmaciones: oculto Y deshabilitado', () => {
     expect(barra.hidden).toBe(false)
   })
 
-  it('volver RESTAURA el estado que tenía cada CTA, no lo enciende a la fuerza', () => {
-    // Matiz medido al escribir esta prueba: `index.html:450` sirve «Generar GML»
-    // ya `disabled` —sin parcela no hay nada que generar—, y `app/rama.js`
-    // **restaura lo que se encontró** en vez de forzar el encendido. Si forzara,
-    // volver de Edificio dejaría un botón encendido que no cumple, que es
-    // justamente lo que la regla de la casa prohíbe. Se prueba en los dos
-    // sentidos, porque un `expect(disabled).toBe(true)` a secas también pasaría
-    // con un módulo que no reponga nada.
+  it('volver RESTAURA el estado que tenía el CTA, no lo enciende a la fuerza', () => {
+    // Matiz medido al escribir esta prueba: `index.html` sirve los CTA ya
+    // `disabled` —sin dato no hay nada que hacer—, y `app/rama.js` **restaura lo
+    // que se encontró** en vez de forzar el encendido. Si forzara, volver de
+    // Edificio dejaría un botón encendido que no cumple, que es justamente lo que
+    // la regla de la casa prohíbe. Se prueba en los dos sentidos, porque un
+    // `expect(disabled).toBe(true)` a secas también pasaría con un módulo que no
+    // reponga nada.
+    //
+    // ⭐ **F13 · «Generar GML» salió de esta prueba, y no por comodidad**: desde
+    // que la rama Edificio sabe escribir su propio GML, ese botón ya no lo apaga
+    // este módulo — lo gobierna `app/cableado-edificio-gml.js` según el dato. Lo
+    // que se afirma de él ahora es lo contrario: que la conmutación NO lo toca.
     montarCascara()
     const { rama } = cablear()
     const generar = document.querySelector(SELECTOR.CTA_GENERAR)
@@ -293,15 +298,34 @@ describe('T2 · apagado son DOS afirmaciones: oculto Y deshabilitado', () => {
     diagnosticar.disabled = true
 
     rama.set(RAMA.EDIFICIO)
-    expect(generar.disabled).toBe(true)
+    expect(diagnosticar.disabled).toBe(true)
+    // «Generar GML» se queda como estaba: este módulo ya no manda sobre él.
+    expect(generar.disabled).toBe(false)
+
+    rama.set(RAMA.PARCELA)
+    expect(diagnosticar.disabled).toBe(true)
+    expect(generar.disabled).toBe(false)
+    // Y el motivo del apagado se retira: si se quedara, explicaría un apagado
+    // que ya no existe.
+    expect(document.querySelector(SELECTOR.ESTADO_DIAGNOSTICAR).textContent).not.toContain(
+      'Edificio',
+    )
+  })
+
+  it('⭐ F13 · el CTA que SÍ se restaura es el que este módulo apaga', () => {
+    // El control del cambio: con «Diagnosticar encaje» encendido antes de
+    // conmutar, volver tiene que devolverlo encendido —no dejarlo apagado ni
+    // forzarlo—, que es la propiedad que la prueba de arriba defendía con los dos.
+    montarCascara()
+    const { rama } = cablear()
+    const diagnosticar = document.querySelector(SELECTOR.CTA_DIAGNOSTICAR)
+    diagnosticar.disabled = false
+
+    rama.set(RAMA.EDIFICIO)
     expect(diagnosticar.disabled).toBe(true)
 
     rama.set(RAMA.PARCELA)
-    expect(generar.disabled).toBe(false)
-    expect(diagnosticar.disabled).toBe(true)
-    // Y el motivo del apagado se retira: si se quedara, explicaría un apagado
-    // que ya no existe.
-    expect(document.querySelector(SELECTOR.ESTADO_GENERAR).textContent).not.toContain('Edificio')
+    expect(diagnosticar.disabled).toBe(false)
   })
 })
 

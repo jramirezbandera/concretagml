@@ -208,7 +208,7 @@ export const ASIENTOS = Object.freeze(
         'reparto entre F18 y F19 NO se deshace —haría falta reconstruir en e469541, y las dos ' +
         'son de otra sesión—, así que la fila las nombra a las dos y no atribuye la cifra a ' +
         'ninguna. Lo que sí queda claro es qué NO es de F12. Sobran 8.669 sobre el techo.' },
-    { hito: 'F12 · fase 5 · edificio: partes y plantas', commit: '(sin commitear)', total: 67334, nuestro: 52239, rebanada: null,
+    { hito: 'F12 · fase 5 · edificio: partes y plantas', commit: 'cc6ac46', total: 67334, nuestro: 52239, rebanada: null,
       nota:
         '**+1.506 B, medidos aparte** (ver el asiento anterior): se construyó la hoja con y sin ' +
         'los cambios de F12 para no cargarle los 3.519 B que venían sin atribuir. Y es la ' +
@@ -224,6 +224,19 @@ export const ASIENTOS = Object.freeze(
         '`min-height: 77px` de la lista de partes, que impide que el flex la apriete a dos filas ' +
         'de catorce. Las dos las encontró el guion 19 en un navegador real; en jsdom no hay ' +
         'cascada que resolver ni altura que repartir. Sobran 10.175 sobre el techo.' },
+    { hito: 'F13 · edificio: validación y generación de GML', commit: '(sin commitear)', total: 67334, nuestro: 52239, rebanada: null,
+      nota:
+        '**CERO BYTES, y la hoja sale byte a byte idéntica al asiento anterior.** F13 no escribe ' +
+        'ni una regla: enciende un botón que ya existía —con sus clases, su renglón `role=status` ' +
+        'y su modificador de error—, y su capa nueva (`validation/edificio.js`, ' +
+        '`gml/serialize-bu.js`) no toca el DOM. Lo único que se movió en pantalla fue RETIRAR dos ' +
+        'mensajes, que es al revés que gastar. ⚠️ **Y el 0 no es solo de F13**: entre el asiento ' +
+        'anterior y éste entró también F20 (el listado de coordenadas en hoja de cálculo, ' +
+        'c8295ed) SIN asiento propio, y como el total no se ha movido ni un byte, lo que queda ' +
+        'medido es que **ninguna de las dos escribió CSS** — no hay reparto que hacer porque no ' +
+        'hay nada que repartir. El asiento se anota igual, por lo mismo que el de F17 fase 4: un ' +
+        'hito sin fila deja de contar la historia, y aquí la historia es que la fase con más ' +
+        'código nuevo desde F09 costó 0 px de hoja. Sobran 10.175 sobre el techo, los mismos.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 
