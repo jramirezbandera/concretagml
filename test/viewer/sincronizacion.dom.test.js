@@ -1296,3 +1296,215 @@ describe('viewer/sincronizacion · destruir()', () => {
     ctx.limpiar()
   })
 })
+
+// ── Selección de vértice: mapa ↔ tabla ───────────────────────────────────────
+//
+// La tercera vista del mismo dato (las otras dos son el dibujo y la tabla), y la
+// única que NO está en el modelo: qué vértice está mirando el usuario. Se blinda
+// aquí porque los tres riesgos de la feature son de ENCAJE, no de cálculo:
+//   · el clic del marcador SE COME el del mapa (`Map#_findEventTargets`), y de
+//     ese clic viven el trazado de F12, el lindero de F06 y el Catastro de F05;
+//   · `setIcon` rehace el `MarkerDrag` del marcador, así que seleccionar podría
+//     devolverle el arrastre a un vértice que la pantalla había apagado;
+//   · el resalte cuelga de `filas`/`marcadores`, que se TIRAN en cada
+//     reconstrucción.
+
+describe('viewer/sincronizacion · selección de vértice (mapa ↔ tabla)', () => {
+  /** ¿El marcador está pintado como seleccionado? (lo que se VE, no la opción.) */
+  const marcadorResaltado = (marcador) =>
+    marcador.getElement().classList.contains('gml-vertice-seleccionado')
+
+  /** ¿La fila está marcada? Se lee el ARIA, que es la ÚNICA marca que se pone. */
+  const filaMarcada = (tablaEl, r, i) =>
+    filaDe(tablaEl, r, i).getAttribute('aria-current') === 'true'
+
+  /** Clic de Leaflet sobre un marcador (el que dispara el hit-testing real). */
+  const clicarVertice = (marcador) =>
+    marcador.fire('click', { latlng: marcador.getLatLng(), originalEvent: null })
+
+  it('un clic en el vértice lo marca en el mapa Y en su fila', () => {
+    const ctx = montar()
+    const marcador = marcadorDe(ctx.mapa, 0, 2)
+
+    expect(ctx.sinc.verticeSeleccionado()).toBeNull()
+    expect(marcadorResaltado(marcador)).toBe(false)
+
+    clicarVertice(marcador)
+
+    expect(ctx.sinc.verticeSeleccionado()).toEqual({ recinto: 0, indice: 2 })
+    expect(marcadorResaltado(marcador)).toBe(true)
+    expect(filaMarcada(ctx.tablaEl, 0, 2)).toBe(true)
+    // Y SOLO ésa: una selección que marca dos filas no señala ninguna.
+    expect(ctx.tablaEl.querySelectorAll('tr[aria-current]')).toHaveLength(1)
+    expect(marcadorResaltado(marcadorDe(ctx.mapa, 0, 1))).toBe(false)
+
+    ctx.limpiar()
+  })
+
+  it('un clic en la fila marca el vértice del mapa (y el hueco también)', () => {
+    const ctx = montar()
+
+    filaDe(ctx.tablaEl, 1, 1).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(ctx.sinc.verticeSeleccionado()).toEqual({ recinto: 1, indice: 1 })
+    expect(marcadorResaltado(marcadorDe(ctx.mapa, 1, 1))).toBe(true)
+    expect(filaMarcada(ctx.tablaEl, 1, 1)).toBe(true)
+
+    ctx.limpiar()
+  })
+
+  it('entrar en una celda con el TECLADO también señala su vértice', () => {
+    const ctx = montar()
+    // `focus` NO burbujea y el oyente es delegado: si el módulo escuchara `focus`
+    // en vez de `focusin`, esta prueba se quedaría sin selección.
+    inputsDe(filaDe(ctx.tablaEl, 0, 3)).y.focus()
+
+    expect(ctx.sinc.verticeSeleccionado()).toEqual({ recinto: 0, indice: 3 })
+    expect(marcadorResaltado(marcadorDe(ctx.mapa, 0, 3))).toBe(true)
+
+    ctx.limpiar()
+  })
+
+  it('un clic en el mapa (en el vacío) suelta la selección', () => {
+    const ctx = montar()
+    clicarVertice(marcadorDe(ctx.mapa, 0, 0))
+    expect(ctx.sinc.verticeSeleccionado()).not.toBeNull()
+
+    ctx.mapa.fire('click', { latlng: ctx.mapa.getCenter() })
+
+    expect(ctx.sinc.verticeSeleccionado()).toBeNull()
+    expect(marcadorResaltado(marcadorDe(ctx.mapa, 0, 0))).toBe(false)
+    expect(ctx.tablaEl.querySelectorAll('tr[aria-current]')).toHaveLength(0)
+
+    ctx.limpiar()
+  })
+
+  it('EL CLIC DEL VÉRTICE SE LE DEVUELVE AL MAPA, y no se suelta a sí mismo', () => {
+    // El riesgo estrella: en cuanto una capa escucha `click`, Leaflet deja de
+    // disparar el del mapa. Si este test se pone rojo, lo que se ha roto no es la
+    // selección: es poner un punto del trazo (F12), seleccionar el lindero (F06) y
+    // deducir del Catastro (F05) pinchando sobre un vértice.
+    const ctx = montar()
+    const clics = []
+    ctx.mapa.on('click', (e) => clics.push(e.latlng))
+
+    const marcador = marcadorDe(ctx.mapa, 0, 1)
+    clicarVertice(marcador)
+
+    expect(clics).toHaveLength(1)
+    expect(clics[0].lat).toBeCloseTo(marcador.getLatLng().lat, 9)
+    expect(clics[0].lng).toBeCloseTo(marcador.getLatLng().lng, 9)
+    // Y la guarda de reentrada: el clic reemitido NO puede leerse como «ha
+    // pinchado en el vacío» y soltar lo que se acaba de seleccionar.
+    expect(ctx.sinc.verticeSeleccionado()).toEqual({ recinto: 0, indice: 1 })
+    expect(marcadorResaltado(marcador)).toBe(true)
+
+    ctx.limpiar()
+  })
+
+  it('seleccionar NO devuelve el arrastre a un vértice que estaba apagado', () => {
+    // `setIcon` rehace el `MarkerDrag` (`Marker#_initIcon` → `_initInteraction`).
+    // La pantalla de Validación apaga el arrastre con `dragging.disable()`, y
+    // seleccionar un vértice no puede volver a encenderlo por la espalda.
+    const ctx = montar()
+    const apagado = marcadorDe(ctx.mapa, 0, 0)
+    const encendido = marcadorDe(ctx.mapa, 0, 1)
+    apagado.dragging.disable()
+
+    clicarVertice(apagado)
+    expect(apagado.dragging.enabled()).toBe(false)
+
+    clicarVertice(encendido)
+    expect(encendido.dragging.enabled()).toBe(true)
+
+    ctx.limpiar()
+  })
+
+  it('tras seleccionar, el arrastre sigue escribiendo en el modelo', () => {
+    const historial = historialReal()
+    const ctx = montar({ historial })
+    const antes = structuredClone(ctx.store.get())
+    const [x, y] = antes.recintos[0].vertices[0]
+    const [lat, lng] = vertUTMaLatLng([x + 1, y + 1], 30)
+
+    const marcador = marcadorDe(ctx.mapa, 0, 0)
+    clicarVertice(marcador)
+    marcador.setLatLng({ lat, lng })
+    marcador.fire('drag')
+    marcador.fire('dragend')
+
+    expect(ctx.store.get().recintos[0].vertices[0][0]).toBeCloseTo(x + 1, 2)
+    expect(commitsDe(historial)).toBe(1)
+    // Y el vértice movido sigue siendo el señalado.
+    expect(ctx.sinc.verticeSeleccionado()).toEqual({ recinto: 0, indice: 0 })
+    expect(marcadorResaltado(marcadorDe(ctx.mapa, 0, 0))).toBe(true)
+
+    ctx.limpiar()
+  })
+
+  it('la selección sobrevive a un render en sitio y se suelta si el vértice se va', () => {
+    const ctx = montar()
+    clicarVertice(marcadorDe(ctx.mapa, 0, 2))
+
+    // 1 · Misma FORMA: se actualiza en sitio, no se recrea nada. El resalte sigue.
+    const movida = structuredClone(ctx.store.get())
+    movida.recintos[0].vertices[0] = [439241, 4479656]
+    ctx.store.set(movida)
+    expect(ctx.sinc.verticeSeleccionado()).toEqual({ recinto: 0, indice: 2 })
+    expect(marcadorResaltado(marcadorDe(ctx.mapa, 0, 2))).toBe(true)
+    expect(filaMarcada(ctx.tablaEl, 0, 2)).toBe(true)
+
+    // 2 · Otra FORMA: se reconstruye todo. Filas y marcadores son objetos NUEVOS,
+    // y el resalte tiene que volver a ponerse sobre ellos.
+    const conUnoMas = structuredClone(ctx.store.get())
+    conUnoMas.recintos[0].vertices.push([439250, 4479675])
+    ctx.store.set(conUnoMas)
+    expect(marcadorResaltado(marcadorDe(ctx.mapa, 0, 2))).toBe(true)
+    expect(filaMarcada(ctx.tablaEl, 0, 2)).toBe(true)
+
+    // 3 · El vértice señalado DESAPARECE: la selección se suelta sola, en vez de
+    // quedarse apuntando a un hueco y reaparecer sobre el vértice equivocado.
+    const recortada = structuredClone(ctx.store.get())
+    recortada.recintos[0].vertices.splice(2)
+    ctx.store.set(recortada)
+    expect(ctx.sinc.verticeSeleccionado()).toBeNull()
+    expect(ctx.tablaEl.querySelectorAll('tr[aria-current]')).toHaveLength(0)
+
+    ctx.limpiar()
+  })
+
+  it('seleccionarVertice(): lanza con basura, y una ref que no existe suelta', () => {
+    const ctx = montar()
+
+    for (const basura of [3, 'x', [], { recinto: 0 }, { recinto: -1, indice: 0 }]) {
+      expect(() => ctx.sinc.seleccionarVertice(basura)).toThrow(TypeError)
+    }
+
+    expect(ctx.sinc.seleccionarVertice({ recinto: 0, indice: 1 })).toEqual({
+      recinto: 0,
+      indice: 1,
+    })
+    // Fuera de rango: NO se guarda (un resalte fantasma reaparecería en el
+    // siguiente render). Y no es un contrato roto: la parcela ha podido cambiar
+    // entre el clic y la llamada.
+    expect(ctx.sinc.seleccionarVertice({ recinto: 9, indice: 0 })).toBeNull()
+    expect(ctx.sinc.verticeSeleccionado()).toBeNull()
+    expect(ctx.sinc.seleccionarVertice(null)).toBeNull()
+
+    ctx.limpiar()
+  })
+
+  it('destruir() deja de escuchar el clic del mapa y suelta la selección', () => {
+    const ctx = montar()
+    clicarVertice(marcadorDe(ctx.mapa, 0, 0))
+    expect(ctx.sinc.verticeSeleccionado()).not.toBeNull()
+
+    ctx.sinc.destruir()
+
+    expect(ctx.sinc.verticeSeleccionado()).toBeNull()
+    expect(ctx.sinc.seleccionarVertice({ recinto: 0, indice: 0 })).toBeNull()
+    expect(() => ctx.mapa.fire('click', { latlng: ctx.mapa.getCenter() })).not.toThrow()
+
+    ctx.limpiar()
+  })
+})

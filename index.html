@@ -137,11 +137,19 @@
     <aside class="gml-panel">
       <header class="gml-panel-cabecera">
         <!-- `app/main.js` reescribe este texto SIEMPRE, desde el suscriptor de la
-             ficha, con tres estados: «Parcela de demostración», «Parcela sintética ·
-             demostración» (?demo=hueco) y «Parcela del Catastro» (traída por F05).
-             Antes solo lo tocaba para el caso sintético; desde que se puede traer
-             una parcela real, callar la procedencia sería maquillarla. -->
-        <p class="gml-eyebrow" data-eyebrow>Parcela cargada</p>
+             ficha, con SIETE estados de procedencia (ver `rotuloDelDato`): sin
+             parcela, de demostración, sintética (?demo=hueco), del Catastro, tu
+             medición, y las dos del GML ajeno. Callar la procedencia sería
+             maquillarla.
+
+             ⭐ EL TEXTO DE AQUÍ CAMBIÓ EL 2026-08-07, y no es cosmética: decía
+             «Parcela cargada», que era lo que se veía **durante el instante
+             anterior al montaje**. Mientras la aplicación arrancaba con la
+             demostración dentro, esa frase era verdad un segundo después. Desde
+             que arranca VACÍA, «Parcela cargada» es falso al abrir y sigue siendo
+             falso hasta que el usuario traiga algo — y es la primera línea que se
+             lee de la pantalla. Ahora dice lo que hay. -->
+        <p class="gml-eyebrow" data-eyebrow>Sin parcela</p>
         <!-- El título CAMBIA con la pantalla y lo escribe `app/pantalla.js`
              (`TITULO_PANTALLA`). Lo que hay aquí es lo que se ve durante el
              instante anterior al montaje, así que es el de la pantalla con la que
@@ -149,9 +157,22 @@
              tiene 210 px, y éste dice «Empieza tu expediente», que es la respuesta
              directa a «no sé por dónde empezar». -->
         <h1 class="gml-titulo" data-titulo="pantalla">Empieza tu expediente</h1>
+        <!-- ⭐ SON BOTONES DESDE EL 2026-08-07, y ése es todo el cambio de la
+             mudanza de los avisos. Cada uno abre `app/dialogo-avisos.js` con SU
+             pestaña puesta. Antes eran `<span>`: cuando la lista vivía debajo,
+             en la columna, el chip no tenía a dónde llevar.
+
+             El `type="button"` no es adorno: sin él, un `<button>` dentro de un
+             formulario envía. Aquí no hay formulario hoy, pero el marcado no
+             puede depender de que nunca lo haya.
+
+             `aria-haspopup="dialog"` lo pone `app/dialogo-avisos.js` al cablear,
+             no está escrito aquí: así el atributo y el oyente son el mismo acto.
+             Si el chip no lo tiene en pantalla, es que nadie lo cableó — y eso
+             es un fallo que se quiere ver. -->
         <div class="gml-chips">
-          <span class="gml-chip" data-contador="ERROR">0 errores</span>
-          <span class="gml-chip" data-contador="AVISO">0 avisos</span>
+          <button type="button" class="gml-chip" data-contador="ERROR">0 errores</button>
+          <button type="button" class="gml-chip" data-contador="AVISO">0 avisos</button>
         </div>
       </header>
 
@@ -472,29 +493,30 @@
         </p>
       </section>
 
-      <!-- El modificador `--avisos` NO es decorativo: es lo que permite que este
-           bloque CEDA altura. Lo añadió F05 al medir que su bloque nuevo de
-           «Origen de la parcela» sumaba ~137 px fijos a un presupuesto fijo, y
-           que con la lista de avisos llena por debajo de ~775 px de viewport el
-           pie del panel —y con él «Generar GML»— se salía por abajo. Ver la
-           regla en `estilos/app.css`, que lleva el registro completo.
+      <!-- ══ AQUÍ ESTABA EL BLOQUE «AVISOS», Y SE FUE EL 2026-08-07 ═══════════
+           Si buscas `#avisos` o `.gml-bloque--avisos`: la lista **existe y se
+           llama igual**, pero vive dentro de un `<dialog>` que fabrica
+           `app/dialogo-avisos.js`, y se abre pinchando uno de los dos chips de
+           la cabecera de aquí arriba. No se ha borrado nada del canal de avisos.
 
-           ⚠️ AL DÍA (rework de UI · T4/T6, 2026-08-04): aquel desbordamiento **ya
-           no se reproduce** —el guion 14 mide desborde 0 en el panel a 1280×720 y
-           a 1440×900—, y buena parte del mérito es de T6: «Origen de la parcela»
-           vive ahora en la pantalla Entrada y no compite con la tabla de
-           vértices. Pero la cesión NO se quita, por dos razones medidas: los
-           avisos siguen apareciendo en Validación —donde a 1280×720 no cabe ni
-           una tarjeta entera y quedan 394 px tras un scroll (T4)— y son lo único
-           del panel cuyo alto lo decide el DATO y no el marcado. Un bloque que no
-           cede es un bloque que empuja al pie. -->
-      <section class="gml-bloque gml-bloque--avisos">
-        <h2 class="gml-rotulo">Avisos</h2>
-        <!-- Caja VACÍA: su interior es de `app/avisos.js`. Tope de alto y scroll propio
-             los pone `.gml-avisos` (--gml-avisos-alto-max), para que una tanda larga de
-             hallazgos de F02 no empuje la tabla ni el pie fuera del panel. -->
-        <div id="avisos" class="gml-avisos"></div>
-      </section>
+           POR QUÉ SE FUE, con las cifras que este mismo fichero llevaba
+           anotando desde F05: el bloque cedía hasta 34vh (`--gml-avisos-alto-max`)
+           del sitio más caro de la aplicación, el que se reparten la tabla de
+           vértices y el pie donde vive «Generar GML»; a 1280×720 con cinco
+           avisos **no cabía ni una tarjeta entera** y quedaban 394 px detrás de
+           un scroll (rework de UI · T4); y el resto del tiempo gastaba ~60 px en
+           poner «AVISOS / Sin avisos.».
+
+           LO QUE NO SE FUE, porque es lo que sostiene la regla de oro 1: los dos
+           chips siguen en la cabecera, siempre visibles, y **destellan** cuando
+           su cuenta sube (`app/avisos.js`). El detalle se guarda; el marcador,
+           no.
+
+           ⛔ NO SE VUELVA A FABRICAR AQUÍ UN `<div id="avisos">`. Habría dos, y
+           `app/main.js` cablearía el suyo: el de este fichero se quedaría vacío
+           para siempre y el de verdad seguiría dentro del diálogo. Es la misma
+           trampa del `[data-diag]` duplicado que este fichero documenta más
+           abajo. -->
 
       <!-- ══ EL DIAGNÓSTICO, EN LA COLUMNA (2026-08-05) ═══════════════════════
            CAJA VACÍA, y la más vacía de todo el fichero: aquí no hay ni un nodo

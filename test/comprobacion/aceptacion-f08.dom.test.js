@@ -105,7 +105,7 @@ import { join } from 'node:path'
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-import { crearPanelAvisos } from '../../app/avisos.js'
+import { crearDialogoAvisos } from '../../app/dialogo-avisos.js'
 import {
   SELECTOR_PROCEDENCIA,
   cablearComprobacion,
@@ -383,11 +383,7 @@ function montar({ responder, conVecinas = true } = {}) {
   const estado = crearEstadoVista(null)
   vi.spyOn(estado, 'set')
 
-  const panel = crearPanelAvisos({
-    contenedor: document.getElementById('avisos'),
-    chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
-    chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
-  })
+  const panel = crearDialogoAvisos({ documento: document })
 
   const transporte = crearTransporteDoble(responder)
   const cliente = crearClienteCatastro({ transporte, srs: SRS })

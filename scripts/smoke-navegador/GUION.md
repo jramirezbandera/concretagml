@@ -49,6 +49,7 @@ para que el resultado no dependa de interpretar prosa. Diecinueve son de aceptac
 | `18-pegado-coordenadas.js` | F19 · 1 a 3 | ⭐ **LAS TRES DEUDAS DE F18, andadas en un navegador de verdad**: el **pegado de la LISTA** —la vía que `feature-01` llama principal y que llevaba doce fases sin un solo manejador de `paste`—, **proyectar unos grados** (que hasta F19 se detectaban y no se podían atender), y **el rótulo del GML ajeno**. Y lo que la suite no puede ver: que el `<dialog>` sea modal DE VERDAD, que **las dos cifras de superficie se lean** (el cotejo que `importar()` calculaba desde F01 sin llamante), y que la parcela pegada **se pinte** | ⛔ **su primera corrida salió `ok:false` con TRES fallos del guion y UN DEFECTO REAL**: el renglón decía «medida por ti, **del fichero** «coordenadas pegadas»» —llamar fichero a lo pegado, en la línea que existe para decir de dónde salió el dato— y **la prueba de la suite lo aprobaba** porque casaba «pegad». Hoy **`ok:true`** — ver §27 |
 | `20-gml-edificio.js` | F13 · 1 a 6 | ⭐ **LA SALIDA DE LA RAMA EDIFICIO, andada entera**: rama vacía (botón apagado con su motivo) → traer 13 partes → el botón se enciende → pulsarlo → **el fichero baja de verdad** (Blob, ancla con su `download`, URL revocada y los BYTES: raíz `gml:`, `Building` sí y `BuildingPart` **no**, `footPrint`, srsName **URN**, `localId` desnudo) → romperlo a propósito → conmutar de rama y volver. Lo que la suite no puede ver: que el botón tenga **DOS dueños vivos** y no se pisen (se mide con el edificio roto, que es la única situación en la que las dos ramas discrepan), que el motivo **quepa** en su renglón, que los **dos mensajes retirados** por F13 no vuelvan, y que lo que no se ha podido comprobar **se diga y solo entonces** | ⛔ **su primera corrida no midió NADA**: medía el CTA en la pantalla de Entrada, donde `.gml-acciones` va en `display:none`, así que todas las cajas salían a cero y en verde. Hoy **`ok:true` en las dos ventanas** — ver §30 |
 | `21-contraste-edificio.js` | F14 · 1 a 4 | ⭐ **LOS DOS PELDAÑOS QUE F14 ABRE**, andados enteros: rama Edificio → soltar el GML de las 13 partes → Diagnóstico → **qué cajón se monta** → las cifras → Informe → **el PDF baja** (304.026 B, «Informe de contraste con la construcción catastral») → y con un DXF, los sabores de «no hay». Lo que la suite no puede ver: que la pantalla sea **la de esta rama** y no la de parcela (el defecto que la fase 4a midió: 367 × 413 px del cajón equivocado), que **ni un selector se duplique** con los dos cajones vivos, que lo accionable esté **sobre el pliegue**, que el **resalte por parte** exista y se distinga por trazo y **no por color**, y que «sin consultar» no se lea como «no consta ninguna» | `ok:true` en las dos ventanas — ver §31. ⚠️ Su primera corrida pulsaba un botón `disabled` y daba el DXF por cargado mirando el dato equivocado |
+| `22-arranque-vacio.js` | 2026-08-07 · 1 a 5 | ⭐ **EL ARRANQUE QUE VE EL USUARIO, y es el único guion que se lanza SIN `?demo=`.** Desde que la aplicación empieza sin nada precargado, los veintiún guiones anteriores llevan `?demo=real` — o sea que **el arranque real dejaría de ejercitarlo nadie**. Mide lo que jsdom no puede: que el mapa **pinta cartografía de verdad** con el encuadre en vacío (`vistaInicial`, España entera) —si esa rama fallara, el usuario vería una cuadrícula gris y **nada se quejaría**: no es un error, es un mapa mirando a la nada—; que **se puede EMPEZAR** (las cinco vías de Entrada existen, se ven ENTERAS a 1280×720 y se pueden pulsar); que **lo apagado dice por qué** (con la app vacía casi todo está apagado, y ahí la regla de oro 1 se juega en el primer minuto de uso); que **no se consulta ningún servicio ajeno**; y que el rótulo de procedencia **no dice «de demostración» ni «del Catastro» sobre un store vacío** | ✅ `ok:true` a 1280×720 el 2026-08-07. ⚠️ Con **una advertencia abierta**: a zoom 6 se pide el WMS del Catastro con un BBOX de **1.658 km de ancho** — la capa nace encendida y no tiene zoom mínimo. No rompe nada; la decisión es del autor |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
 spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
@@ -167,6 +168,38 @@ sin avisar más que en esa línea.
 
 > Vite bindea **IPv6**: usa `http://localhost:PUERTO`. **`127.0.0.1` falla.**
 
+> ### ⭐⭐ 2026-08-07 · `?demo=real` ES OBLIGATORIO DESDE HOY EN CASI TODOS
+>
+> **La aplicación ya NO arranca con la parcela de demostración dentro.** Petición
+> del autor: *«borra los datos de partida por defecto del módulo, para que empiece
+> sin nada precargado»*. `http://localhost:PUERTO/concretagml/` a secas abre ahora
+> el store **vacío**, en la pantalla Entrada, con el mapa mirando a España y los
+> cuatro peldaños siguientes del rail apagados con su motivo escrito.
+>
+> Los datasets **no se han borrado**, solo han dejado de ser el arranque:
+>
+> | URL | Qué carga |
+> |---|---|
+> | `…/concretagml/` | **nada** (el arranque de producción) |
+> | `…/concretagml/?demo=real` | la parcela REAL 9398516VK3799G, 15 vértices |
+> | `…/concretagml/?demo=hueco` | la SINTÉTICA con patio, 8 vértices |
+> | `…/concretagml/?demo=loquesea` | **nada** — un typo NO carga la real, a propósito |
+>
+> ⚠️ **Todas las líneas `$B goto` de este documento llevan ya `?demo=real`**, y no
+> es adorno: los guiones que miden el visor, la edición, el diagnóstico, el
+> informe o la cáscara **necesitan geometría en pantalla**, y sin ella no fallan
+> con estruendo — miden cero vértices y cero superficie y pueden dar verdes que no
+> significan nada. Los que traen sus propios datos (Catastro en vivo, comprobar un
+> GML, medición propia, pegado, edificio) no la necesitan, pero llevarla puesta es
+> exactamente el estado en el que se midieron hasta hoy, así que se deja para no
+> cambiar dos cosas a la vez.
+>
+> ⛔ **El `?demo=` va ANTES del `#`**: `…/concretagml/?demo=real#/parcela/entrada`.
+> Al revés (`…/#/parcela/entrada?demo=real`) la query queda **dentro del hash**,
+> `location.search` sale vacío y la app arranca sin datos **sin decir nada**.
+>
+> Para medir el arranque de verdad —el vacío—, quita el `?demo=real`: es el **§32**, el guion `22-arranque-vacio.js`.
+
 También sirve `npx vite preview` sobre `npm run build` (más parecido a
 producción, sin módulos sueltos ni HMR). Si se usa `preview`, el puerto es otro
 (4173 por defecto) y desaparecen los mensajes `[vite] connecting…` de la consola.
@@ -189,7 +222,7 @@ En Windows el binario real es `browse.exe`; Git Bash resuelve `browse` →
 
 ```bash
 $B viewport 1440x900
-$B goto http://localhost:PUERTO/concretagml/    # ⚠️ el base, no la raíz
+$B goto http://localhost:PUERTO/concretagml/?demo=real    # ⚠️ el base, no la raíz
 $B wait ".gml-tabla-vertices"
 $B console --clear
 $B network --clear
@@ -894,7 +927,7 @@ mentira todo lo que se mida después de él.
 sobre qué dataset está: lee `?demo=`):
 
 ```bash
-$B goto http://localhost:PUERTO/concretagml/             # parcela REAL
+$B goto http://localhost:PUERTO/concretagml/?demo=real             # parcela REAL
 $B wait ".gml-tabla-vertices"
 $B eval scripts/smoke-navegador/06-generar-gml.js
 
@@ -1061,7 +1094,7 @@ con la que `cableado-catastro.js#puedeDeducirDe` habilita el botón. Así mide l
 regla, no el parámetro.
 
 ```bash
-$B goto http://localhost:PUERTO/concretagml/              # recorrido «carga»
+$B goto http://localhost:PUERTO/concretagml/?demo=real              # recorrido «carga»
 $B wait ".gml-tabla-vertices"
 $B eval scripts/smoke-navegador/07-catastro-vivo.js
 
@@ -1294,7 +1327,7 @@ de arranque) y lo dice antes que nada si no se cumple:
 
 ```bash
 $B viewport 1440x900
-$B goto http://localhost:PUERTO/concretagml/
+$B goto http://localhost:PUERTO/concretagml/?demo=real
 $B wait ".gml-tabla-vertices"
 $B console --clear
 $B eval scripts/smoke-navegador/08-edicion.js
@@ -1506,7 +1539,7 @@ Página recién cargada, desde la raíz del repo:
 
 ```bash
 $B viewport 1440x900
-$B goto http://localhost:PUERTO/concretagml/
+$B goto http://localhost:PUERTO/concretagml/?demo=real
 $B wait ".gml-tabla-vertices"
 $B console --clear
 $B eval scripts/smoke-navegador/09-diagnostico.js
@@ -1741,7 +1774,7 @@ Página recién cargada, desde la raíz del repo:
 
 ```bash
 $B viewport 1440x900
-$B goto http://localhost:PUERTO/concretagml/
+$B goto http://localhost:PUERTO/concretagml/?demo=real
 $B wait ".gml-tabla-vertices"
 $B console --clear
 $B network --clear
@@ -2294,7 +2327,7 @@ Página recién cargada, desde la raíz del repo:
 
 ```bash
 $B viewport 1440x900
-$B goto http://localhost:PUERTO/concretagml/    # ⚠️ el base, no la raíz
+$B goto http://localhost:PUERTO/concretagml/?demo=real    # ⚠️ el base, no la raíz
 $B wait ".gml-tabla-vertices"
 $B console --clear
 $B network --clear
@@ -2545,7 +2578,7 @@ Lo mismo que el §16 y el §17: las cifras de referencia están medidas sobre
 
 ```
 $B viewport 1440x900
-$B goto http://localhost:PUERTO/concretagml/     # ⚠️ el base, no la raíz
+$B goto http://localhost:PUERTO/concretagml/?demo=real     # ⚠️ el base, no la raíz
 $B wait ".gml-tabla-vertices"
 $B console --clear
 $B eval scripts/smoke-navegador/12-expedientes.js
@@ -2868,7 +2901,7 @@ servidor (`test/fixtures/parsers/…`): `vite preview` sirve `dist/`, donde no e
 
 ```
 $B viewport 1440x900
-$B goto http://localhost:PUERTO/concretagml/#/parcela/validacion   # ⚠️ ver abajo
+$B goto http://localhost:PUERTO/concretagml/?demo=real#/parcela/validacion   # ⚠️ ver abajo
 $B wait ".gml-tabla-vertices"
 $B console --clear
 $B eval scripts/smoke-navegador/13-edificio.js
@@ -2902,7 +2935,7 @@ mide en el viewport en el que se lance y **DERIVA** la otra cifra, diciendo que 
 derivada (`topeConPartes.derivadoA768`). Para medirla:
 
 ```
-$B viewport 1440x768 && $B goto http://localhost:PUERTO/concretagml/
+$B viewport 1440x768 && $B goto http://localhost:PUERTO/concretagml/?demo=real
 $B wait ".gml-tabla-vertices" && $B eval scripts/smoke-navegador/13-edificio.js
 ```
 
@@ -2947,6 +2980,14 @@ primera corrida —la que los encontró— y, al final de cada uno, **qué se ga
 medido con los arreglos puestos**.
 
 #### Defecto A — el panel de la rama EDIFICIO **no cabía** ⟶ ✅ ARREGLADO A MEDIAS
+
+> ⚠️ **Las tres tablas de este apartado llevan una fila `.gml-bloque--avisos`, y
+> ese bloque dejó de existir el 2026-08-07** (la lista se fue a un `<dialog>`,
+> §20). Las tablas **no se corrigen**: son mediciones fechadas de lo que había
+> aquel día, y reescribirlas convertiría el registro en una ficción. Lo que hay
+> que saber al leerlas es que **hoy esa fila vale 0,00 px** y que su presupuesto
+> se lo reparten los bloques que quedan — o sea que el defecto A tiene desde
+> entonces entre 16 y 64 px más de holgura de la que dicen estas cifras.
 
 El presupuesto, medido a 1440×900 con la rama recién conmutada y **nada cargado**:
 
@@ -3286,7 +3327,7 @@ defecto.**
 npm run dev                                        # ⚠️ dev, no `vite preview`
 
 $B viewport 1280x720                               # el SUELO declarado
-$B goto http://localhost:PUERTO/concretagml/       # ⚠️ el base, no la raíz
+$B goto http://localhost:PUERTO/concretagml/?demo=real       # ⚠️ el base, no la raíz
 $B wait ".gml-tabla-vertices"
 $B console --clear
 $B eval scripts/smoke-navegador/14-shell.js
@@ -3303,6 +3344,35 @@ cinco avisos para medir el bloque, y una tarjeta cuesta 79,28 px del sitio más
 caro del panel. Si arranca con avisos puestos lo dice y ATRIBUYE la pérdida, en
 vez de acusar a la cáscara — la lección que ya pagaron el guion 09 (midió
 demasiado tarde) y el 11 (midió demasiado pronto).
+
+> ### ⭐⭐ 2026-08-07 · LA §5 DE ESTE GUION SE REESCRIBIÓ, Y HAY QUE SABER POR QUÉ
+>
+> **La lista de avisos ya no está en el panel.** Se mudó a un `<dialog>`
+> (`app/dialogo-avisos.js`) que abren los dos contadores de la cabecera, que
+> ahora son botones. El motivo es exactamente lo que este guion había medido y
+> que se lee tres párrafos más abajo: a 1280×720 no cabía **ni una tarjeta
+> entera** y quedaban 394 px detrás de un scroll.
+>
+> ⛔ **Y si la §5 se hubiera dejado como estaba, habría dado VERDE MINTIENDO.**
+> No es hipótesis: `$('#avisos')` sigue encontrando el nodo, pero dentro de un
+> `<dialog>` cerrado, o sea con `display:none`. Alto 0, desborde 0,
+> `scrollWidth === clientWidth` ⇒ **cero textos cortados, cero desborde**: la
+> forma exacta de un verde perfecto, sin haber mirado ni un aviso. Es la trampa
+> de «medir el elemento equivocado» que este mismo guion destapó en su primera
+> pasada, repetida por el lado contrario.
+>
+> Ahora la §5 mide **en dos tiempos**: con el diálogo CERRADO (las tarjetas
+> siguen en el DOM, los contadores las cuentan, y la columna no paga nada por
+> ellas) y con el diálogo ABIERTO (los textos se leen enteros, cabe más de una
+> tarjeta, y «Cerrar» se alcanza sin scroll). El guion abre el diálogo él mismo y
+> **lo vuelve a cerrar** antes de seguir.
+>
+> ⚠️ **Los otros doce guiones que cuentan `#avisos .gml-aviso` NO se han tocado y
+> siguen siendo válidos**, porque el `id` no ha cambiado y un `<dialog>` cerrado
+> conserva sus hijos. Eso es una condición, no una casualidad: si alguien hace
+> que cerrar vacíe la lista o deje un filtro puesto, esos doce guiones empiezan a
+> contar de menos **todos a la vez y en verde**. Lo vigilan `avisos.dom.test.js`,
+> `dialogo-avisos.dom.test.js` y la §5 de aquí.
 
 ### `modo`: el guion sabe en cuál de los dos mundos está
 
@@ -3347,6 +3417,24 @@ verde: los textos salen enteros **dentro de su tarjeta**. Lo que estaba cortado
 era la LISTA. Medir el elemento equivocado da un verde que miente, que es
 exactamente el defecto que este proyecto lleva once fases persiguiendo.
 
+> **✅ CERRADO EL 2026-08-07, y con el mismo guion que lo abrió.** El defecto no
+> se optimizó: se quitó de en medio sacando la lista del panel. Remedido el mismo
+> día, misma pantalla (Validación, rama PARCELA), mismo nodo:
+>
+> | | 1280×720 | 1440×900 |
+> |---|---|---|
+> | Lista de avisos EN LA COLUMNA | **0,00 px** (era 34,22) | **0,00 px** (era 118,95) |
+> | Coste de 5 avisos en `#tabla-vertices` | **0,00 px** (era −38,86) | **0,00 px** (era −100,94) |
+> | `#tabla-vertices`, con 5 avisos | **297,08 px** (era 71,23) | **477,08 px** (era 166,50) |
+> | Tarjetas que caben enteras | **5,52** (era 0,43) | **5,52** (era 1,50) |
+> | Textos cortados | 0 | 0 |
+> | Holgura del pie del diálogo | +17 px | +17 px |
+>
+> Y contra el último invariante anotado —el de T6, con la lista todavía en la
+> columna y VACÍA (228,33 px a 1280×720 · 385,67 a 1440×900)—, la caja de
+> vértices sube **+68,75 px (+30,1 %)** y **+91,41 px (+23,7 %)**, esta vez con
+> cinco avisos puestos en vez de con la lista vacía.
+
 **2 · EL PANEL NO SE SOBRESUSCRIBE, y eso corrige una suposición del plan.** El
 design doc del rework cita «el panel actual se sobresuscribe 47,54 px a 1440×900».
 Medido hoy: **desborde 0 px en los dos viewports**. Aquella cifra era de la rama
@@ -3381,7 +3469,11 @@ Umbrales, con su motivo:
 | `SUELO_ALTO_MAPA` | 200 px | A 0, `viewer/wms-catastro.js` corta el encuadre **sin petición, sin aviso y sin error**. Pero a 80 px la cartografía tampoco sirve: el suelo es el alto por debajo del cual la parcela y su entorno no caben juntos. |
 | `SUELO_ANCHO_MAPA` | 400 px | La maqueta medida del shell le dejaba **680 px** a 1280×720. |
 | `DESBORDE_TOLERADO` | 1 px | `.gml-panel` es `overflow: hidden`: cada píxel de más es contenido **inalcanzable, ni con la rueda**. El píxel es de redondeo subpíxel. |
-| Tarjetas que caben | ≥ 1 | Un aviso del que no se ve ni una tarjeta entera es un aviso mudo. |
+| Tarjetas que caben (diálogo abierto) | ≥ 1 | Un aviso del que no se ve ni una tarjeta entera es un aviso mudo. |
+| Lista en la columna, en reposo | ≤ 1 px | Desde el 2026-08-07 la lista vive en el diálogo. Si vuelve a ocupar sitio en el panel, es que ha vuelto a la columna por algún sitio: eso es lo que la mudanza vino a quitar. |
+| Coste de 5 avisos en `#tabla-vertices` | ≤ 1 px | Mismo motivo, medido por el otro lado. Era la queja original del autor. |
+| Holgura del pie del diálogo | ≥ 0 px | Un modal del que hay que buscar la salida es peor que el bloque que se quitó. |
+| Los contadores son `<button>` | sí | Son la ÚNICA puerta al detalle desde la mudanza. Si vuelven a ser `<span>`, el detalle de un error bloqueante deja de ser alcanzable. |
 
 ### Lo que este guion **NO** puede medir
 
@@ -3401,7 +3493,8 @@ guion 02. **El eje PASO**, mientras `modo` siga siendo `LINEA_BASE`.
 ### Estado que deja
 
 Las cinco tarjetas de aviso que él mismo ha provocado y **nada más**: no carga
-ficheros, no consulta al Catastro, no conmuta de rama y no edita. `$B reload` para
+ficheros, no consulta al Catastro, no conmuta de rama y no edita. Abre el diálogo
+de avisos para medirlo por dentro y **lo vuelve a cerrar**. `$B reload` para
 volver al punto de partida.
 
 ### Ampliación T6: la pantalla de Entrada y sus tres vías (criterio 7)
@@ -3419,7 +3512,7 @@ camino que solo conoce quien escribió el código no es un camino.
 
 ```
 $B viewport 1280x720
-$B goto http://localhost:PUERTO/concretagml/#/parcela/entrada
+$B goto http://localhost:PUERTO/concretagml/?demo=real#/parcela/entrada
 $B reload                                        # ⚠️ OBLIGATORIO — ver abajo
 $B eval scripts/smoke-navegador/14-shell.js
 ```
@@ -3988,7 +4081,7 @@ npm run dev                                        # ⚠️ dev, no `vite previe
 
 $B viewport 1280x720                               # el SUELO declarado (D5)
 # … borrar IndexedDB (arriba) …
-$B goto http://localhost:PUERTO/concretagml/#/parcela/entrada
+$B goto http://localhost:PUERTO/concretagml/?demo=real#/parcela/entrada
 $B reload
 $B wait ".gml-rail"
 $B console --clear
@@ -4321,7 +4414,7 @@ puede decir eso y que además conduce una feature completa.
 npm run dev                                        # ⚠️ dev, no `vite preview`
 
 $B viewport 1280x720                               # el SUELO declarado
-$B goto http://localhost:PUERTO/concretagml/       # ⚠️ el base, no la raíz
+$B goto http://localhost:PUERTO/concretagml/?demo=real       # ⚠️ el base, no la raíz
 $B reload                                          # ⚠️ ver abajo
 $B console --clear
 $B eval scripts/smoke-navegador/16-derivar-cesion.js
@@ -4431,7 +4524,7 @@ pantalla** y **no aparece en los bytes**, y que lo que sí llega al fichero son 
 
 ```bash
 npm run dev                                   # EXIGE dev: los fixtures no están en dist/
-$B goto http://localhost:PUERTO/concretagml/  # ⚠️ recarga ANTES de correrlo
+$B goto http://localhost:PUERTO/concretagml/?demo=real  # ⚠️ recarga ANTES de correrlo
 $B eval scripts/smoke-navegador/17-medicion-propia.js
 ```
 
@@ -4511,7 +4604,7 @@ definición: el levantamiento lo trae el técnico.
 
 ```bash
 npm run dev                                   # EXIGE dev: los fixtures no están en dist/
-$B goto http://localhost:PUERTO/concretagml/  # ⚠️ recarga ANTES de correrlo
+$B goto http://localhost:PUERTO/concretagml/?demo=real  # ⚠️ recarga ANTES de correrlo
 $B eval scripts/smoke-navegador/18-pegado-coordenadas.js
 ```
 
@@ -4793,7 +4886,7 @@ npm run dev                                   # EXIGE dev: los fixtures no está
 
 $B viewport 1280x720                          # el SUELO declarado (D5)
 $B js "await new Promise(r=>{const p=indexedDB.deleteDatabase('concreta-gml');p.onsuccess=r;p.onerror=r;p.onblocked=r}); return 'pedido'"
-$B goto http://localhost:PUERTO/concretagml/#/parcela/entrada
+$B goto http://localhost:PUERTO/concretagml/?demo=real#/parcela/entrada
 $B reload && $B wait ".gml-app"
 $B console --clear
 $B eval scripts/smoke-navegador/20-gml-edificio.js
@@ -4972,12 +5065,12 @@ informado de que **el fichero** no valida.
 npm run dev                                   # EXIGE dev: los fixtures no están en dist/
 
 $B viewport 1280x720                          # el SUELO declarado (D5)
-$B goto http://localhost:PUERTO/concretagml/
+$B goto http://localhost:PUERTO/concretagml/?demo=real
 $B console --clear
 $B eval scripts/smoke-navegador/21-contraste-edificio.js
 
 $B viewport 1440x900                          # y la pasada cómoda
-$B goto http://localhost:PUERTO/concretagml/
+$B goto http://localhost:PUERTO/concretagml/?demo=real
 $B eval scripts/smoke-navegador/21-contraste-edificio.js
 ```
 
@@ -5055,3 +5148,105 @@ medido cuál de las dos verdades quiere el autor.
 - **Si el informe sirve para firmar** → `CHECKLIST-HUMANO.md` §19.
 - **El pie de firma en esta rama**: F14 toma el que F09 recuerde y no tiene diálogo
   propio (límite declarado en su ficha).
+
+---
+
+## 32. `22-arranque-vacio.js` — el arranque de PRODUCCIÓN (2026-08-07)
+
+**Es el único guion de este documento que se lanza SIN `?demo=`**, y ésa es su
+razón de ser entera.
+
+El 2026-08-07 la aplicación dejó de arrancar con la parcela de demostración
+dentro (petición del autor: *«borra los datos de partida por defecto del módulo,
+para que empiece sin nada precargado»*). Consecuencia inmediata: **los veintiún
+guiones anteriores pasaron a llevar `?demo=real`**, porque miden el visor, la
+edición, el diagnóstico o el informe y sin geometría no medirían nada.
+
+⛔ **Y ahí estaba la trampa**: veintiún guiones en verde sobre una URL que ningún
+usuario escribe, y **el arranque de verdad sin ejercitar por nadie**. Este guion
+cubre ese hueco.
+
+### Cómo se lanza
+
+```bash
+$B viewport 1280x720                              # el SUELO declarado
+$B goto http://localhost:PUERTO/concretagml/      # ⛔ SIN ?demo=, es el punto
+$B wait ".gml-rail-pasos"
+$B console --clear
+$B network --clear                                # ⚠️ o atribuye lo de la página anterior
+$B eval scripts/smoke-navegador/22-arranque-vacio.js
+$B console --errors                               # → (no console errors)
+```
+
+El guion **aborta con un problema** si detecta `?demo=` en la URL o vértices en la
+tabla: los dos significan que está midiendo el arranque de otra aplicación, y
+callarlo daría un verde que no significa nada.
+
+### Las cinco cosas que mide, y por qué ninguna la puede dar la suite
+
+| # | Qué | Por qué aquí |
+|---|---|---|
+| 1 | **El mapa pinta cartografía** | Sin geometría el encuadre cae en `vistaInicial`. Si esa rama fallara, el usuario vería una **cuadrícula gris** — y no es un error: no hay excepción, no hay aviso, y jsdom devuelve ceros y sale verde |
+| 2 | **Se puede EMPEZAR** | Las cinco vías de Entrada existen, se ven **enteras** y se pueden pulsar. Vacío + sin puertas = pantalla muerta |
+| 3 | **Lo apagado dice por qué** | Con la app vacía casi todo está apagado. Un botón apagado y mudo es la regla de oro 1 rota **en el primer minuto de uso** |
+| 4 | **No se consulta nada ajeno** | Una aplicación que arranca sin datos no tiene a quién pedírselos |
+| 5 | **El rótulo no miente** | Ni «de demostración» ni «del Catastro» ni «cargada» sobre un store vacío |
+
+### Cifras de referencia (2026-08-07, Chrome, `npm run dev`, 1280×720)
+
+| Medida | Valor |
+|---|---|
+| Veredicto | **`ok: true`** |
+| Paso / rama al abrir | `entrada` / `PARCELA` |
+| Rótulo de procedencia | **«Sin parcela»** |
+| Vértices en la tabla | 0 |
+| Mapa | 678 × 720, **12 teselas pintadas**, escala «100 km» |
+| Vías de Entrada abiertas | **5 de 5**, todas enteras |
+| Peldaños apagados / de ellos mudos | 4 / **0** |
+| Servicios ajenos consultados | **0** |
+| Consola | limpia |
+
+### ⛔ El defecto que encontró en su primera corrida, y era REAL
+
+A 1280×720 —el suelo declarado— la cuarta vía, **«¿Ya tenías un expediente?
+Abrirlo»**, quedaba **45 px por debajo del borde de la ventana**, con
+`.gml-panel` en `overflow: hidden` y `scrollHeight === clientHeight`: no recortada
+tras un scroll, sino **inalcanzable y en silencio**. Y es la **ruta crítica 4** del
+plan de pruebas.
+
+La causa, medida: con el store vacío aparecía el motivo de «Traer colindantes»
+—tres frases para un botón secundario— que ocupa **59,00 px** y que con la
+aplicación arrancando vacía **duplicaba lo que el rail ya dice** («Trae antes una
+parcela: por referencia catastral o desde tu medición»). Es la palanca 3 de
+**F11 · M29** otra vez: no era un recorte de honradez, era quitar la segunda copia.
+
+Corregido en `app/cableado-catastro.js#refrescar`: el motivo **solo se escribe si
+HAY parcela** y le falta la referencia —el caso del `.dxf`, del pegado o del GML
+ajeno, donde el botón apagado sí sorprende—. Con el cambio, el pie entra con
+**14 px de holgura**, los mismos que tenía con la demostración cargada. Guardián en
+`test/app/catastro.dom.test.js`.
+
+### ⚠️ La advertencia que deja ABIERTA, y es decisión del autor
+
+A zoom 6 —España entera— la aplicación pide al WMS del Catastro una imagen con un
+**BBOX de 1.658.378 × 1.761.109 m** (1.658 km de ancho) en 678 × 720 px. A esa
+escala el servicio no distingue una parcela: la petición no sirve para nada, y se
+hace **en cada apertura** desde que la aplicación arranca mirando a España.
+
+La capa «Cartografía catastral» nace encendida y `viewer/wms-catastro.js` **no
+tiene zoom mínimo**. Mientras la aplicación abría encuadrada sobre una parcela
+esto no se notaba nunca. **No rompe nada** —por eso es advertencia y no problema—,
+pero es una petición inútil a un servicio de una administración pública. Ponerle un
+zoom mínimo a la capa o dejarlo es decisión del autor; el guion lo mide en cada
+pasada para que la decisión no se olvide.
+
+### Lo que NO cubre
+
+- **Que las tres vías FUNCIONEN.** Aquí se mide que la puerta existe y se puede
+  pulsar, no lo que hay detrás: eso son los guiones 07 (Catastro en vivo), 17
+  (medición propia) y 18 (pegado).
+- **Si la pantalla es acogedora.** Que un colegiado que abre esto por primera vez
+  sepa por dónde empezar no tiene número → `CHECKLIST-HUMANO.md`.
+- **Que la cartografía sea la CORRECTA.** Se cuentan teselas pintadas, no se mira
+  qué hay en ellas: un PNOA de otra zona daría la misma cifra. El encuadre fino es
+  del guion 02.

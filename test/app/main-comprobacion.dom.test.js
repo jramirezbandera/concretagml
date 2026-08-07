@@ -442,6 +442,14 @@ arranque.responder = (url) => ({
   url,
 })
 
+// ⭐ **`?demo=real` ES OBLIGATORIO DESDE EL 2026-08-07**, y va ANTES del import:
+// ese día la aplicación dejó de arrancar con la parcela de demostración dentro
+// y el store nace `null`. Este fichero contrasta un GML soltado CONTRA la parcela
+// que hay en pantalla, así que sin parcela no hay contraste que medir. El porqué
+// de `history.replaceState` (y de que vaya antes del `import`) está escrito
+// entero en `main-edicion.dom.test.js`.
+window.history.replaceState({}, '', '?demo=real')
+
 await import('../../app/main.js')
 
 /** El store REAL del ensamblaje (el mismo que comparten las cinco vistas). */

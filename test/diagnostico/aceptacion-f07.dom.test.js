@@ -85,7 +85,7 @@ import { join } from 'node:path'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import L from 'leaflet'
 
-import { crearPanelAvisos } from '../../app/avisos.js'
+import { crearDialogoAvisos } from '../../app/dialogo-avisos.js'
 import { SELECTOR_BOTON_DIAGNOSTICAR, cablearDiagnostico } from '../../app/cableado-diagnostico.js'
 import * as comun from '../../diagnostico/_comun.js'
 import * as bandasModulo from '../../diagnostico/bandas.js'
@@ -297,11 +297,7 @@ function montar({ parcelaInicial = parcelaDelCatastro() } = {}) {
   crearPanes(mapa)
 
   const estado = crearEstadoVista(parcelaInicial)
-  const panel = crearPanelAvisos({
-    contenedor: document.getElementById('avisos'),
-    chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
-    chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
-  })
+  const panel = crearDialogoAvisos({ documento: document })
   const cajon = crearCajonDiagnostico({ mapa })
   const contraste = crearContraste({ mapa, zona: HUSO })
   const cableado = cablearDiagnostico({ estado, cajon, contraste, panel, catastro: crearCatastroDoble() })

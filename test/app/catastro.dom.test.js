@@ -107,7 +107,7 @@ import {
   SELECTOR_PROCEDENCIA,
   cablearCatastro,
 } from '../../app/cableado-catastro.js'
-import { crearPanelAvisos } from '../../app/avisos.js'
+import { crearDialogoAvisos } from '../../app/dialogo-avisos.js'
 import { ORIGEN_PUNTO, puntoInterior } from '../../gml/anillos.js'
 import { parsearGml } from '../../gml/parse.js'
 import { ORIGEN_PARCELA, TIPO_RECINTO, crearParcela, crearRecinto } from '../../model/parcela.js'
@@ -419,11 +419,7 @@ function cablear(opciones = {}) {
     subscribe: real.subscribe,
   }
 
-  const panel = crearPanelAvisos({
-    contenedor: document.getElementById('avisos'),
-    chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
-    chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
-  })
+  const panel = crearDialogoAvisos({ documento: document })
 
   const cliente = crearClienteCatastro({ transporte, cache, srs: SRS, ahora: () => ahoraMs })
 
@@ -1350,14 +1346,31 @@ describe('cableado-catastro · «Traer colindantes» lo enciende el ESTADO', () 
     expect(montado.botonColindantes.disabled).toBe(false)
   })
 
-  it('⚠️ apagado sin nada en el store, y el renglón DICE por qué', () => {
+  it('⭐ apagado sin nada en el store, y el renglón se CALLA (2026-08-07)', () => {
+    // ── ESTE CASO AFIRMABA LO CONTRARIO HASTA HOY, Y EL CAMBIO ESTÁ MEDIDO ──
+    // Decía «y el renglón DICE por qué», y era lo correcto mientras el store
+    // vacío fuera un estado raro: la aplicación arrancaba con la parcela de
+    // demostración dentro. Desde el 2026-08-07 arranca VACÍA, así que éste es el
+    // estado en el que se ABRE, y el mensaje dejó de ganarse su sitio:
+    //
+    //   · **Duplica al rail.** Con el store vacío el peldaño «Validación» ya
+    //     dice «Trae antes una parcela: por referencia catastral o desde tu
+    //     medición». Esto lo repetía en tres frases y para un botón secundario.
+    //     Es la palanca 3 de F11·M29: quitar la segunda copia, no callar un hecho.
+    //   · **Costaba 59,00 px MEDIDOS en navegador** y a 1280×720 —el suelo
+    //     declarado— empujaba «¿Ya tenías un expediente? Abrirlo» **45 px por
+    //     debajo del borde**, con `.gml-panel` en `overflow:hidden` y
+    //     `scrollHeight === clientHeight`: no recortada tras un scroll, sino
+    //     INALCANZABLE y en silencio. Y esa es la ruta 4 del plan de pruebas.
+    //     Sin el mensaje, el pie entra con 14 px de holgura.
+    //
+    // Lo que NO cambia y lo vigila el caso siguiente: **con parcela y sin
+    // referencia el mensaje sigue saliendo**, que es donde de verdad importa.
     const montado = cablear({ parcelaInicial: null })
     expect(montado.botonColindantes.disabled).toBe(true)
-    // Un botón gris y mudo es un error silencioso (regla de oro 1). El literal se
-    // importa del módulo: una copia aquí podría divergir sin que nadie se entere.
-    expect(montado.renglon.textContent).toBe(MOTIVO_COLINDANTES_APAGADO)
-    // Y no es un fallo: nadie ha pedido nada todavía, sólo se explica un botón.
+    expect(montado.renglon.textContent).toBe('')
     expect(renglonEnFallo(montado.renglon)).toBe(false)
+    // Y callarse en el renglón no es mandarlo por otro canal: no hay aviso.
     expect(montado.panel.resumen()).toEqual({ [NIVEL.ERROR]: 0, [NIVEL.AVISO]: 0 })
   })
 

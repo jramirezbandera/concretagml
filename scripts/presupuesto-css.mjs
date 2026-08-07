@@ -274,6 +274,48 @@ export const ASIENTOS = Object.freeze(
         '`<dialog>` con `document.querySelector`, que se queda con el PRIMERO—, no para vestirlo ' +
         'distinto. ⚠️ La mitad de la fase que arregla la piscina cuesta **0 B**: es lógica de ' +
         '`edificio/entrada.js` y no toca el DOM. Sobran 10.506 sobre el techo.' },
+    { hito: 'Los avisos salen del panel a un diálogo', commit: '(sin commitear)',
+      total: 69122, nuestro: 54027, rebanada: null,
+      nota:
+        '**+1.457 B, y es el primer asiento de este proyecto que compra SITIO EN PANTALLA con ' +
+        'bytes de hoja.** Los diez anteriores compraban producto; éste retira producto de la ' +
+        'columna: la lista de avisos deja de vivir en `.gml-bloque--avisos` —que cedía hasta 34vh ' +
+        'del panel, el sitio que se reparten la tabla de vértices y el pie de «Generar GML»— y se ' +
+        'muda a un `<dialog>`. **Lo que se compra no se mide en bytes**: se mide en los 34vh que ' +
+        'la columna recupera y en los ~60 px que el bloque gastaba en poner «Sin avisos.» el 95 % ' +
+        'del tiempo. ── EL REPARTO ── El contenedor sigue el molde de F14 y F21 y cuesta lo ' +
+        'mismo que ellos: `.gml-dialogo-avisos` entra en las dos reglas acotadas al `<dialog>` ' +
+        '(caja `fixed` y `::backdrop`) más `-cuerpo`, `-titulo` y `-pie`, que ya existían. Las ' +
+        'tarjetas de dentro (`.gml-aviso` y sus cinco hijos) valen **0 B**: no se ha tocado ni ' +
+        'una. Lo que SÍ cuesta y no estaba previsto son **las tres piezas que la mudanza obliga ' +
+        'a inventar**: (1) el reseteo de `.gml-chip`, porque pasa de `<span>` a `<button>` y hay ' +
+        'que deshacerle al navegador la tipografía, el fondo y el borde; (2) el destello del ' +
+        'chip —`@keyframes` + la clase + su rama de `prefers-reduced-motion`—, que es lo ÚNICO ' +
+        'que sustituye a la tarjeta roja de 52 px que antes aparecía sola en la columna; y (3) ' +
+        'las tres pestañas de filtro (`.gml-filtro-avisos`, con su `:hover` y su `--puesto`), ' +
+        'que no reutilizan `.gml-boton` a propósito: son alternancias de 12 px y heredar el ' +
+        'botón de la casa habría costado más deshacerlo que escribirlo. ── LO QUE SE DEVUELVE ── ' +
+        'Se BORRAN tres reglas: `.gml-bloque--avisos { flex }`, su `min-height` y el apaño ' +
+        '`[data-paso=diagnostico] …:has(.gml-avisos-vacio)`. Ese apaño existía solo porque el ' +
+        'bloque competía con el contraste en aquella pantalla; sin bloque, no hay competencia. ' +
+        'Los 1.457 B son ya el NETO de esos tres borrados. Sobran 11.963 sobre el techo.' },
+    { hito: 'El vértice seleccionado se ve en el mapa y en la tabla', commit: '(sin commitear)',
+      total: 69401, nuestro: 54306, rebanada: null,
+      nota:
+        '**+279 B por DOS reglas, y es el asiento más barato del proyecto que añade una ' +
+        'interacción entera.** Pinchar un vértice lo señala en la tabla, y pinchar la fila lo ' +
+        'señala en el mapa. ── POR QUÉ CUESTA TAN POCO ── La mitad de la feature **no pasa por ' +
+        'esta hoja**: el cuadradito grande con anillo oscuro del vértice seleccionado es otro ' +
+        '`L.divIcon` con estilos EN LÍNEA, porque `viewer/sincronizacion.js` es librería y no ' +
+        'puede importar CSS (la misma razón que ya tenía el vértice normal desde F03). Lo que se ' +
+        'paga aquí es solo la fila: un fondo ámbar diluido con `color-mix` sobre ' +
+        '`--gml-color-usuario-sobre-claro` —el MISMO token que ya pintaba el nº de vértice de esa ' +
+        'tabla, así que no entra ni un color nuevo— y una barra de 3 px como `inset box-shadow` ' +
+        'en la celda del índice. ── Y NO HAY CLASE DE ESTADO ── Las dos reglas cuelgan de ' +
+        '`[aria-current=\'true\']`, que el módulo ya tiene que poner para el lector de pantalla: ' +
+        'es la misma decisión que la barra de edición tomó con `aria-expanded`, y aquí además ' +
+        'ahorra el atributo `class` que habría que escribir en cada `<tr>`. Sobran 12.242 sobre ' +
+        'el techo.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

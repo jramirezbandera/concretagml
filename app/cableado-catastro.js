@@ -764,9 +764,35 @@ export function cablearCatastro({
     botonDeducir.disabled = ocupado || !puedeDeducirDe(parcelaActual)
     const sinReferencia = !puedePedirColindantesDe(parcelaActual)
     botonColindantes.disabled = ocupado || sinReferencia
-    // `ocupado` fuera: mientras hay algo en vuelo el motivo de estar apagado es la
-    // consulta en curso, no la falta de referencia, y contarlo sería mentir.
-    if (!ocupado && sinReferencia && renglon.textContent === '') {
+
+    // ⭐ **Y NO SE ESCRIBE CON EL STORE VACÍO** (2026-08-07). Desde que la
+    // aplicación arranca sin nada precargado, éste es el estado en el que se
+    // ABRE, y ahí el motivo dejó de ganarse su sitio por dos razones, las dos
+    // medidas el mismo día a 1280×720 —el suelo declarado del proyecto—:
+    //
+    //   · **DUPLICA AL RAIL.** Con el store vacío, el peldaño «Validación» ya
+    //     dice «Trae antes una parcela: por referencia catastral o desde tu
+    //     medición». Este párrafo repite eso mismo en tres frases y para un
+    //     botón secundario. Es exactamente la palanca 3 de F11·M29: no es un
+    //     recorte de honradez, es quitar la segunda copia.
+    //   · **COSTABA 59,00 px MEDIDOS Y SE COMÍA UNA RUTA CRÍTICA.** Con él
+    //     puesto, «¿Ya tenías un expediente? Abrirlo» —la ruta 4 del plan de
+    //     pruebas— quedaba **45 px por debajo del borde**, y `.gml-panel` es
+    //     `overflow:hidden` con `scrollHeight === clientHeight`: no recortada
+    //     tras un scroll, sino **inalcanzable y en silencio**. Sin él, el pie
+    //     entra con 14 px de holgura.
+    //
+    // ⚠️ **Con parcela y sin referencia SÍ se escribe, y ahí es donde importa**:
+    // una parcela que ha entrado por `.dxf`, por pegado o por un GML ajeno no
+    // tiene refcat, y entonces el botón apagado SÍ sorprende — el usuario ve una
+    // parcela en pantalla y un botón de colindantes que no responde. Ése es el
+    // caso para el que se escribió el mensaje.
+    //
+    // `ocupado` fuera de la condición: mientras hay algo en vuelo el motivo de
+    // estar apagado es la consulta en curso, no la falta de referencia, y
+    // contarlo sería mentir.
+    const hayParcela = parcelaActual !== null && parcelaActual !== undefined
+    if (!ocupado && hayParcela && sinReferencia && renglon.textContent === '') {
       // `false`: no es un fallo. Nadie ha pedido nada todavía; se explica un botón.
       decir(MOTIVO_COLINDANTES_APAGADO, false)
     }

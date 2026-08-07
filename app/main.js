@@ -544,7 +544,12 @@ import { crearEstadoVista, NIVEL } from '../viewer/_comun.js'
 // visor supiera qué es una rama —que es exactamente lo que no sabe—.
 import { crearCajonContrasteEdificio } from '../viewer/cajon-contraste-edificio.js'
 import { crearVisor } from '../viewer/index.js'
-import { crearPanelAvisos } from './avisos.js'
+// F03 pasó por `./avisos.js` directo; desde el 2026-08-07 se entra por el
+// diálogo, que es quien fabrica el `<div id="avisos">` y cablea los dos chips.
+// Lo que devuelve trae `avisar` en la raíz, así que sirve tal cual donde antes
+// iba el panel: los quince `panel.avisar(...)` de este fichero y los `typeof
+// panel?.avisar === 'function'` de los cableados no se han tocado.
+import { crearDialogoAvisos } from './dialogo-avisos.js'
 import {
   SELECTOR_BOTON_CARGAR,
   SELECTOR_BOTON_COLINDANTES,
@@ -598,11 +603,53 @@ import { RAMA, cablearRama } from './rama.js'
 // ── Constantes de presentación ───────────────────────────────────────────────
 
 /**
- * Valor de `?demo=` que selecciona el dataset SINTÉTICO con hueco. Es la única
- * vía para verlo: la parcela por defecto es la REAL del Catastro y nunca se le
- * añade un patio inventado encima (ver la cabecera de `./demo-datos.js`).
+ * Los dos valores de `?demo=`, y desde el 2026-08-07 son la ÚNICA vía de entrar
+ * con datos puestos.
+ *
+ * ── ⭐ QUÉ CAMBIÓ Y POR QUÉ ─────────────────────────────────────────────────
+ * Hasta hoy la aplicación **arrancaba siempre con la parcela de demostración
+ * cargada** —la real 9398516VK3799G, copiada dentro del código— y `?demo=hueco`
+ * era la única forma de ver otra cosa. Petición del autor: *«que empiece sin
+ * nada precargado»*. Y tiene razón de fondo, no solo de gusto: el recorrido que
+ * la aplicación enseña en el rail empieza por **Entrada**, con sus tres vías, y
+ * arrancar con una parcela ya dentro se saltaba el primer paso del producto y
+ * ponía a todo el mundo a editar un dato que no es suyo.
+ *
+ * Los datasets **no se borran**: siguen siendo la forma de mirar el visor sin
+ * red y son contra lo que miden los guiones de humo 06 y 08. Solo dejan de ser
+ * el arranque por defecto.
+ *
+ *   · `?demo=real`  → {@link parcelaDemo}, la parcela REAL 9398516VK3799G.
+ *   · `?demo=hueco` → {@link parcelaDemoConHueco}, SINTÉTICA con patio. Nunca se
+ *     le añade un patio inventado a la real (ver la cabecera de
+ *     `./demo-datos.js`).
+ *   · sin `?demo=`, o con cualquier otro valor → **nada**, el store nace `null`.
+ *
+ * ⚠️ Un `?demo=` con un valor que no es ninguno de los dos cae en «nada», no en
+ * la real. Es lo conservador: un typo (`?demo=rael`) que cargara datos haría
+ * creer que se está mirando el dataset que se pidió.
  */
-const DEMO_HUECO = 'hueco'
+const DEMO = Object.freeze({ REAL: 'real', HUECO: 'hueco' })
+
+/**
+ * A dónde mira el mapa cuando **no hay nada cargado**, que desde el 2026-08-07 es
+ * el arranque normal.
+ *
+ * ⛔ **No es opcional, y por eso está aquí arriba con su porqué:** `crearVisor`
+ * **LANZA** si no hay ni geometría ni `vistaInicial` (`viewer/index.js#encuadrar`),
+ * y lo hace a propósito — «un visor sin parcela obliga a que alguien decida a
+ * dónde mirar». Ese alguien es este fichero, y ésta es la decisión.
+ *
+ * **España entera** (decisión del autor, 2026-08-07). No privilegia ninguna
+ * provincia, deja situarse antes de buscar, y mantiene útil «Deducir del mapa»
+ * —que necesita cartografía debajo para poder pinchar—. Es además lo que hace la
+ * propia Sede del Catastro al abrir sin referencia.
+ *
+ * `zoom: 6` encuadra la península y los dos archipiélagos quedan a un
+ * desplazamiento; el centro es el centroide aproximado del territorio peninsular,
+ * no Madrid (que caería 40 km al norte y dejaría Andalucía más cerca del borde).
+ */
+const VISTA_SIN_PARCELA = Object.freeze({ centro: [40.0, -3.7], zoom: 6 })
 
 /**
  * Los TRES eyebrows de la cabecera, que son los tres estados de PROCEDENCIA que
@@ -614,6 +661,25 @@ const DEMO_HUECO = 'hueco'
 const EYEBROW_SINTETICA = 'Parcela sintética · demostración'
 const EYEBROW_DEMOSTRACION = 'Parcela de demostración'
 const EYEBROW_CATASTRO = 'Parcela del Catastro'
+
+/**
+ * ⭐ **EL SÉPTIMO, Y ES EL ESTADO NORMAL DESDE EL 2026-08-07**: no hay ninguna
+ * parcela en el store.
+ *
+ * Antes este caso no existía en la práctica —la aplicación arrancaba con la
+ * demostración dentro— y `rotuloDelDato` lo resolvía cayendo a
+ * {@link EYEBROW_DEMOSTRACION}, que era un lado conservador razonable **mientras
+ * siempre hubiera una demo que respaldara la frase**. Hoy ya no la hay, y decir
+ * «Parcela de demostración» sobre un store vacío sería inventarse un dato: es
+ * exactamente lo que la regla de oro contra maquillar datos prohíbe, cometido por
+ * el rótulo que existe para declarar la procedencia.
+ *
+ * Dice **«Sin parcela»** y no «Cargando…»: no se está cargando nada, se está
+ * esperando a que el usuario elija una de las vías de Entrada. Un «Cargando…»
+ * permanente es la forma más rápida de que alguien piense que la aplicación se ha
+ * colgado.
+ */
+const EYEBROW_VACIO = 'Sin parcela'
 
 /**
  * ⛔ **EL CUARTO, Y LO DESTAPÓ EL GUION 17 EN SU PRIMERA CORRIDA (2026-08-06).**
@@ -1139,11 +1205,15 @@ function nodo(selector) {
 
 // ── 1 · Datos ────────────────────────────────────────────────────────────────
 
-// `?demo=hueco` es la vía explícita para ver en pantalla un hueco interior, su
-// rótulo «HUECO 1» y el recorte de anillos anidados. Cualquier otro valor (o
-// ninguno) carga la parcela REAL del Catastro.
-const esSintetica = new URLSearchParams(window.location.search).get('demo') === DEMO_HUECO
-const parcela = esSintetica ? parcelaDemoConHueco() : parcelaDemo()
+// ⭐ **SIN NADA PRECARGADO** (2026-08-07, petición del autor). La aplicación
+// arranca con el store VACÍO y el usuario elige una de las vías de Entrada. Los
+// dos datasets de demostración siguen ahí, detrás de `?demo=` — ver {@link DEMO}
+// para el porqué del cambio y por qué un `?demo=` con un valor raro NO carga la
+// parcela real.
+const queDemo = new URLSearchParams(window.location.search).get('demo')
+const esSintetica = queDemo === DEMO.HUECO
+const parcela =
+  esSintetica ? parcelaDemoConHueco() : queDemo === DEMO.REAL ? parcelaDemo() : null
 
 /**
  * El `idLocal` del dataset de DEMOSTRACIÓN con el que arranca la app. Es lo que
@@ -1162,8 +1232,21 @@ const parcela = esSintetica ? parcelaDemoConHueco() : parcelaDemo()
  *     construye un objeto nuevo y la parcela seguiría siendo la de demostración.
  * `idLocal` en cambio viaja con el dato: sobrevive a las ediciones y solo cambia
  * cuando ENTRA otra parcela, que es exactamente la pregunta que se hace.
+ *
+ * ⚠️ **`null` cuando no se arranca con demostración**, que desde el 2026-08-07 es
+ * lo normal. Y el `?.` no es defensivo por si acaso: **sin él la aplicación no
+ * arrancaba**. Medido en navegador el mismo día — con el store naciendo vacío,
+ * este `parcela.idLocal` lanzaba un `TypeError` en el paso 1, o sea antes del
+ * panel de avisos, del visor y del rail; en pantalla quedaba `index.html` sin
+ * vestir de JavaScript (todos los bloques a la vez, rail vacío, mapa en blanco) y
+ * **la consola no decía nada**, porque el error ocurre antes de que nadie escuche.
+ * Cuatro «defectos» aparentes que eran uno solo.
+ *
+ * Con `null`, la comparación de {@link rotuloDelDato} nunca acierta —ningún
+ * `idLocal` real es `null`—, que es justo lo que se quiere: sin demostración, no
+ * hay nada que pueda «seguir siendo» la demostración.
  */
-const ID_LOCAL_DEMO = parcela.idLocal
+const ID_LOCAL_DEMO = parcela?.idLocal ?? null
 
 // El eyebrow ya no se escribe aquí. Lo escribe SIEMPRE la ficha (paso 6), que es
 // el único suscriptor que ve entrar y salir parcelas del store y por tanto el
@@ -1214,14 +1297,13 @@ commit(historial, estado.get())
 
 // ── 3 · Panel de avisos ──────────────────────────────────────────────────────
 
-// Los dos chips del contador se localizan por `data-contador`, que es el
-// contrato de `index.html`: nacen NEUTROS («0 errores» / «0 avisos») y es
-// `app/avisos.js` quien pone y quita los modificadores de color.
-const panel = crearPanelAvisos({
-  contenedor: nodo('#avisos'),
-  chipError: nodo('.gml-chip[data-contador="ERROR"]'),
-  chipAviso: nodo('.gml-chip[data-contador="AVISO"]'),
-})
+// ⚠️ **`#avisos` ya NO se busca en `index.html`**: lo fabrica el diálogo, dentro
+// de sí mismo. Los dos chips sí siguen siendo contrato del marcado y se
+// localizan por `data-contador`; nacen NEUTROS («0 errores» / «0 avisos») y es
+// `app/avisos.js` quien pone y quita los modificadores de color y el destello.
+// Aquí no se pasan a mano porque el diálogo los busca por el mismo selector y
+// lanza con su propio mensaje si faltan.
+const panel = crearDialogoAvisos({ documento: document })
 
 // El dataset sintético lo dice también EN LA LISTA de avisos, no solo en el
 // eyebrow: el eyebrow se lee una vez al abrir y la lista queda.
@@ -1383,7 +1465,14 @@ let modoEnPantalla = MODO.NORMAL
  */
 function rotuloDelDato(parcelaActual) {
   const hayParcela = parcelaActual !== null && parcelaActual !== undefined
-  if (!hayParcela || parcelaActual.idLocal === ID_LOCAL_DEMO) {
+  // ⭐ Sin parcela se dice SIN PARCELA (2026-08-07). Hasta hoy este caso caía en
+  // «Parcela de demostración», y era el lado conservador **mientras siempre
+  // hubiera una demo dentro**; desde que la aplicación arranca vacía, esa frase
+  // sería un dato inventado. Ver {@link EYEBROW_VACIO}.
+  if (!hayParcela) return EYEBROW_VACIO
+  // `ID_LOCAL_DEMO` es `null` cuando no se arrancó con `?demo=`, y ningún
+  // `idLocal` real vale `null`: sin demostración esta rama no se toma nunca.
+  if (ID_LOCAL_DEMO !== null && parcelaActual.idLocal === ID_LOCAL_DEMO) {
     return esSintetica ? EYEBROW_SINTETICA : EYEBROW_DEMOSTRACION
   }
   if (parcelaActual.origen === ORIGEN_PARCELA.GML_EXISTENTE) {
@@ -1752,6 +1841,15 @@ const visor = crearVisor(nodo('#mapa'), {
   // la cabecera pegajosa. `sincronizar` crea la `<table>` dentro.
   tablaEl: nodo('#tabla-vertices'),
   srs: SRS_DEMO,
+  // ⭐ A DÓNDE MIRA EL MAPA CUANDO NO HAY NADA (2026-08-07). Desde que la
+  // aplicación arranca vacía, ésta es la rama que se toma **casi siempre** al
+  // abrir: `encuadrar` prefiere la geometría cuando la hay y solo cae aquí
+  // cuando el store está vacío, así que en cuanto entre una parcela el mapa
+  // vuela a ella y esto no se vuelve a usar. **Sin esta línea `crearVisor`
+  // LANZA** y la aplicación no arranca — es el contrato de `viewer/index.js`, y
+  // es deliberado: un visor sin parcela obliga a decidir a dónde mirar. El
+  // porqué del sitio elegido, en {@link VISTA_SIN_PARCELA}.
+  vistaInicial: VISTA_SIN_PARCELA,
   // El ÚNICO camino para que un fallo de red de la cartografía o una celda
   // ilegible acaben en el panel en vez de en el `console.warn` por defecto.
   alAvisar: panel.avisar,

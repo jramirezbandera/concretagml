@@ -14,7 +14,11 @@
 //      sea que lo que no cabe **se recorta en silencio**. Es el defecto que
 //      destapó el guion 13 en la rama Edificio y el que abrió este rework.
 //   3. **Los avisos no se cortan a media frase.** Con varios hallazgos a la vez,
-//      que es el caso real de un diagnóstico.
+//      que es el caso real de un diagnóstico. ⚠️ **Desde el 2026-08-07 la lista
+//      vive en un `<dialog>`** y este criterio se mide EN DOS TIEMPOS: cerrado
+//      (las tarjetas siguen en el DOM y la columna no paga nada por ellas) y
+//      abierto (los textos se leen enteros y «Cerrar» se alcanza). El porqué de
+//      los dos tiempos —y el verde falso que se evitó— está en la §5.
 //   4. **Cuánto cuesta el rail, en píxeles, medido y anotado** (T10).
 //
 // ── ⚠️ ESTE GUION NACE ANTES QUE LA CÁSCARA QUE MIDE, A PROPÓSITO ──────────
@@ -64,7 +68,8 @@
 //
 // ⚠️ **Estado final.** Deja la aplicación con las tarjetas de aviso que él mismo
 // ha provocado y **nada más**: no carga ficheros, no toca el Catastro, no conmuta
-// de rama y no edita. Para volver al punto de partida: `$B reload`.
+// de rama y no edita. Abre el diálogo de avisos para medirlo por dentro y **lo
+// vuelve a cerrar** antes de seguir. Para volver al punto de partida: `$B reload`.
 //
 // ── QUÉ **NO** PUEDE MEDIR — LÉELO ANTES DE CITAR ESTE GUION ────────────────
 //   · **NO es un gesto de ratón** (§0 del GUION): los sucesos van despachados a
@@ -821,9 +826,34 @@ const cajaVertices = {
 }
 
 // ── 5 · Los avisos: que no se corten a media frase ─────────────────────────
+//
+// ══ ⭐⭐ REESCRITA EL 2026-08-07, Y HAY QUE LEER POR QUÉ ANTES DE CITARLA ═════
+//
+// Esta sección medía **el bloque de avisos dentro del panel**: cuánto medía, si
+// cabía una tarjeta entera, y cuánta altura le robaba a la caja de vértices. Ese
+// bloque YA NO EXISTE — la lista se mudó a un `<dialog>` (`app/dialogo-avisos.js`)
+// justamente porque la respuesta a todas aquellas preguntas era «mal».
+//
+// ⛔ **Y si esta sección se hubiera dejado como estaba, habría dado VERDE
+// MINTIENDO.** No es una hipótesis: `#avisos` sigue existiendo y `$('#avisos')`
+// lo sigue encontrando, pero dentro de un `<dialog>` cerrado, o sea con
+// `display:none`. Todas sus medidas valen 0: alto 0, desborde 0, `scrollWidth ===
+// clientWidth` ⇒ **cero textos cortados** y **cero desborde**, que es exactamente
+// la forma de un verde perfecto. El guion habría certificado que los avisos se
+// leen de maravilla sin haber mirado ni uno.
+//
+// Lo que se mide ahora son las DOS mitades de la mudanza, y las dos hacen falta:
+//
+//   A · **Lo que se ganó**, con el diálogo CERRADO: las cinco tarjetas siguen en
+//       el DOM (de eso viven los otros doce guiones), los chips las cuentan, y la
+//       caja de vértices **ya no paga nada** por ellas. Ese coste era la queja
+//       original del autor —«los avisos se recortan y pelean con las
+//       coordenadas»— y aquí es donde se comprueba que dejó de existir.
+//   B · **Lo que no se puede haber roto**, con el diálogo ABIERTO: los textos se
+//       leen enteros, cabe más de una tarjeta, y el pie con «Cerrar» se alcanza
+//       sin scroll. Un modal del que no se puede salir es peor que el bloque.
 
 const avisosAntes = tarjetas().length
-const altoAvisosAntes = avisosNodo ? redondear(avisosNodo.getBoundingClientRect().height) : null
 const nodoTablaConScroll = $('#tabla-vertices')
 const altoVerticesAntes = nodoTablaConScroll
   ? redondear(nodoTablaConScroll.getBoundingClientRect().height)
@@ -840,87 +870,211 @@ for (const ext of EXTENSIONES.slice(0, AVISOS_A_PROVOCAR)) {
 }
 await esperar(250)
 
-const tarjetasAhora = tarjetas()
-const cortadas = textosDeAvisos()
-  .map((t, i) => ({ i, ...recortado(t), texto: t.textContent.trim().slice(0, 60) }))
-  .filter((r) => r.porAlto || r.porAncho)
+// ── A · Con el diálogo CERRADO ────────────────────────────────────────────
 
-/**
- * ⭐ **LO QUE CUESTA UNA TARJETA, Y CUÁNTAS CABEN.** Medir solo si el TEXTO de
- * cada tarjeta está recortado no basta, y lo destapó la primera pasada de este
- * guion: a 1280×720 con cinco avisos, ningún texto salía recortado —salen
- * enteros, dentro de su tarjeta— pero **el bloque que las contiene medía 34,22 px
- * y escondía 394 detrás de un scroll**, o sea que en pantalla no había ni una
- * tarjeta completa. El texto estaba bien; lo que estaba cortado era la lista.
- */
-const altoDeUnaTarjeta = tarjetasAhora.length > 0 ? redondear(tarjetasAhora[0].getBoundingClientRect().height) : null
-const altoDelBloque = avisosNodo ? redondear(avisosNodo.getBoundingClientRect().height) : null
-const tarjetasQueCaben =
-  altoDeUnaTarjeta && altoDelBloque ? redondear(altoDelBloque / altoDeUnaTarjeta, 2) : null
+const dialogoNodo = $('.gml-dialogo-avisos')
+const chipAvisoNodo = $('.gml-chip[data-contador="AVISO"]')
+const chipErrorNodo = $('.gml-chip[data-contador="ERROR"]')
+
+const tarjetasCerrado = tarjetas().length
+const cajaVerticesDespues = nodoTablaConScroll
+  ? redondear(nodoTablaConScroll.getBoundingClientRect().height)
+  : null
+
+const enReposo = {
+  dialogoExiste: dialogoNodo !== null,
+  dialogoAbierto: dialogoNodo ? dialogoNodo.hasAttribute('open') : null,
+  /** ⭐ Las tarjetas EN EL DOM con el diálogo cerrado. Si esto cae a 0, los doce
+   *  guiones que cuentan `#avisos .gml-aviso` empiezan a mentir todos a la vez. */
+  tarjetasEnElDom: tarjetasCerrado,
+  /** Los chips son ahora el ÚNICO rastro visible. Se leen tal cual. */
+  chipError: chipErrorNodo ? chipErrorNodo.textContent.trim() : null,
+  chipAviso: chipAvisoNodo ? chipAvisoNodo.textContent.trim() : null,
+  chipsSonBotones:
+    chipErrorNodo?.tagName === 'BUTTON' && chipAvisoNodo?.tagName === 'BUTTON' ? true : false,
+  /** El alto que la lista ocupa EN LA COLUMNA. Tiene que ser 0: ya no está ahí. */
+  altoEnLaColumna: avisosNodo ? redondear(avisosNodo.getBoundingClientRect().height) : null,
+  panelDesbordaPx: desborde(panelNodo),
+}
 
 const avisos = {
   provocados: AVISOS_A_PROVOCAR,
   tarjetasAntes: avisosAntes,
-  tarjetasDespues: tarjetasAhora.length,
+  tarjetasDespues: tarjetasCerrado,
   /** ⚠️ Si esto no sube, el resto de la sección no ha medido nada. */
-  tarjetasNuevas: tarjetasAhora.length - avisosAntes,
-  altoDelBloqueAntes: altoAvisosAntes,
-  altoDelBloqueDespues: altoDelBloque,
-  bloqueDesbordaPx: desborde(avisosNodo),
-  bloqueOverflow: avisosNodo ? getComputedStyle(avisosNodo).overflow : null,
-  /** ⭐ Las tres cifras que de verdad describen «los avisos se recortan». */
-  altoDeUnaTarjetaPx: altoDeUnaTarjeta,
-  tarjetasQueCabenEnPantalla: tarjetasQueCaben,
-  /** Tarjetas cuyo TEXTO está recortado dentro de su propia tarjeta. */
-  textosCortados: cortadas,
+  tarjetasNuevas: tarjetasCerrado - avisosAntes,
+  enReposo,
   /**
-   * ⭐ **QUÉ LE CUESTAN LOS AVISOS A LA CAJA DE VÉRTICES.** Ésta es la pelea que
-   * el autor describió con estas palabras: «los avisos se recortan y pelean con
-   * las coordenadas». Medida sobre `#tabla-vertices`, que es la cifra que llevan
-   * seis fases vigilando.
+   * ⭐⭐ **QUÉ LE CUESTAN LOS AVISOS A LA CAJA DE VÉRTICES.** Ésta es la pelea
+   * que el autor describió con estas palabras: «los avisos se recortan y pelean
+   * con las coordenadas», y la cifra por la que se hizo la mudanza. Antes del
+   * 2026-08-07 esto era un número POSITIVO y grande; desde la mudanza tiene que
+   * ser 0 — y si vuelve a subir, es que la lista ha vuelto a la columna.
    */
   costeEnLaCajaDeVertices:
-    altoVerticesAntes !== null && nodoTablaConScroll
-      ? redondear(altoVerticesAntes - nodoTablaConScroll.getBoundingClientRect().height)
+    altoVerticesAntes !== null && cajaVerticesDespues !== null
+      ? redondear(altoVerticesAntes - cajaVerticesDespues)
       : null,
   cajaVerticesAntesPx: altoVerticesAntes,
-  cajaVerticesDespuesPx: nodoTablaConScroll
-    ? redondear(nodoTablaConScroll.getBoundingClientRect().height)
-    : null,
-  panelDesbordaAhoraPx: desborde(panelNodo),
+  cajaVerticesDespuesPx: cajaVerticesDespues,
+  panelDesbordaAhoraPx: enReposo.panelDesbordaPx,
 }
 
 if (avisos.tarjetasNuevas <= 0) {
   advertencias.push(
     `Soltar ${AVISOS_A_PROVOCAR} ficheros no ha producido ninguna tarjeta de aviso nueva, así que ` +
       `la sección de avisos de esta pasada NO ha medido nada. Puede que la vía de rechazo por ` +
-      `extensión haya cambiado; revísala antes de leer \`textosCortados\` como un verde.`,
+      `extensión haya cambiado; revísala antes de leer nada de aquí como un verde.`,
   )
-} else {
-  if (avisos.textosCortados.length > 0) {
-    problemas.push(
-      `${avisos.textosCortados.length} aviso(s) se leen CORTADOS dentro de su tarjeta con ` +
-        `${avisos.tarjetasDespues} en pantalla a ${window.innerWidth}×${window.innerHeight}. Un ` +
-        `aviso a medias es peor que ninguno: el usuario sabe que algo pasa y no sabe qué.`,
-    )
-  }
-  // ⭐ El umbral que la primera pasada obligó a añadir: no basta con que el TEXTO
-  // quepa en su tarjeta si la LISTA no enseña ni una tarjeta entera.
-  if (tarjetasQueCaben !== null && tarjetasQueCaben < 1) {
-    problemas.push(
-      `Con ${avisos.tarjetasDespues} avisos, el bloque que los contiene mide ${altoDelBloque} px y ` +
-        `una tarjeta mide ${altoDeUnaTarjeta}: en pantalla no cabe NI UNA entera ` +
-        `(${tarjetasQueCaben} tarjetas). Quedan ${avisos.bloqueDesbordaPx} px detrás de un scroll ` +
-        `de ${avisos.bloqueOverflow}. A ${window.innerWidth}×${window.innerHeight}.`,
-    )
-  }
 }
+
+if (!enReposo.dialogoExiste) {
+  problemas.push(
+    'No hay ningún `.gml-dialogo-avisos` en la página. Desde el 2026-08-07 la lista de avisos vive ' +
+      'ahí y los chips son su única puerta: sin diálogo, el detalle de los errores es INALCANZABLE ' +
+      'para el usuario aunque los contadores digan un número.',
+  )
+}
+
+if (!enReposo.chipsSonBotones) {
+  problemas.push(
+    'Los contadores de la cabecera no son `<button>`. Son la ÚNICA forma de abrir la lista de ' +
+      'avisos desde que se fue del panel: si vuelven a ser `<span>`, el detalle de un error ' +
+      'bloqueante deja de ser alcanzable con el ratón y con el teclado a la vez.',
+  )
+}
+
+// ⭐ El guardián de la mudanza. La lista NO puede volver a ocupar sitio en la
+// columna: es lo que este cambio vino a quitar. Se tolera el mismo píxel de
+// redondeo subpíxel que el resto del guion.
+if (enReposo.altoEnLaColumna !== null && enReposo.altoEnLaColumna > DESBORDE_TOLERADO) {
+  problemas.push(
+    `Con ${avisos.tarjetasDespues} avisos y el diálogo CERRADO, la lista ocupa ` +
+      `${enReposo.altoEnLaColumna} px de la columna. Tendría que ocupar 0: se mudó a un ` +
+      `<dialog> precisamente porque esos píxeles se los quitaba a la tabla de vértices y al pie.`,
+  )
+}
+
+if (avisos.costeEnLaCajaDeVertices !== null && avisos.costeEnLaCajaDeVertices > DESBORDE_TOLERADO) {
+  problemas.push(
+    `Los ${avisos.tarjetasDespues} avisos le han costado ${avisos.costeEnLaCajaDeVertices} px a la ` +
+      `caja de vértices (de ${altoVerticesAntes} a ${cajaVerticesDespues}). Desde la mudanza del ` +
+      `2026-08-07 tendrían que costarle CERO. Si esto sube, la lista ha vuelto a la columna por ` +
+      `algún sitio.`,
+  )
+}
+
 if (avisos.panelDesbordaAhoraPx !== null && avisos.panelDesbordaAhoraPx > DESBORDE_TOLERADO) {
   problemas.push(
     `Con ${avisos.tarjetasDespues} avisos en pantalla, el panel se sobresuscribe ` +
       `${avisos.panelDesbordaAhoraPx} px y recorta por abajo. Éste es el caso real de un ` +
       `diagnóstico con varios hallazgos, no un caso de laboratorio.`,
   )
+}
+
+// ── B · Con el diálogo ABIERTO ────────────────────────────────────────────
+//
+// Aquí es donde de verdad se comprueba el criterio 3 del plan («los avisos no se
+// cortan a media frase»): es el único momento en que las tarjetas tienen caja.
+
+if (chipAvisoNodo !== null && dialogoNodo !== null) {
+  chipAvisoNodo.click()
+  await esperar(200)
+}
+
+const abierto = dialogoNodo !== null && dialogoNodo.hasAttribute('open')
+const listaAbierta = abierto ? $('#avisos') : null
+const tarjetasAbierto = abierto ? tarjetas() : []
+const pieDialogo = abierto ? $('.gml-dialogo-avisos-pie') : null
+
+const cortadas = abierto
+  ? textosDeAvisos()
+      .map((t, i) => ({ i, ...recortado(t), texto: t.textContent.trim().slice(0, 60) }))
+      .filter((r) => r.porAlto || r.porAncho)
+  : []
+
+/**
+ * ⭐ **LO QUE CUESTA UNA TARJETA, Y CUÁNTAS CABEN.** Medir solo si el TEXTO de
+ * cada tarjeta está recortado no basta, y lo destapó la primera pasada de este
+ * guion en 2026-08: a 1280×720 con cinco avisos, ningún texto salía recortado
+ * —salen enteros, dentro de su tarjeta— pero **el bloque que las contenía medía
+ * 34,22 px y escondía 394 detrás de un scroll**, o sea que en pantalla no había
+ * ni una tarjeta completa. El texto estaba bien; lo que estaba cortado era la
+ * lista. La comprobación se conserva palabra por palabra, solo que ahora se hace
+ * contra la caja del diálogo, que es donde la lista vive.
+ */
+const altoDeUnaTarjeta =
+  tarjetasAbierto.length > 0 ? redondear(tarjetasAbierto[0].getBoundingClientRect().height) : null
+const altoDeLaLista = listaAbierta ? redondear(listaAbierta.getBoundingClientRect().height) : null
+const tarjetasQueCaben =
+  altoDeUnaTarjeta && altoDeLaLista ? redondear(altoDeLaLista / altoDeUnaTarjeta, 2) : null
+
+/** ¿Se alcanza «Cerrar» sin scrollear? Un modal del que no se sale es peor que
+ *  el bloque que este cambio vino a quitar. */
+const pieDentro =
+  pieDialogo && dialogoNodo
+    ? redondear(
+        dialogoNodo.getBoundingClientRect().bottom - pieDialogo.getBoundingClientRect().bottom,
+      )
+    : null
+
+const avisosAbierto = {
+  seAbrePinchandoElChip: abierto,
+  tarjetasVisibles: tarjetasAbierto.length,
+  altoDeLaListaPx: altoDeLaLista,
+  altoDeUnaTarjetaPx: altoDeUnaTarjeta,
+  tarjetasQueCabenEnPantalla: tarjetasQueCaben,
+  listaDesbordaPx: desborde(listaAbierta),
+  listaOverflow: listaAbierta ? getComputedStyle(listaAbierta).overflowY : null,
+  /** Tarjetas cuyo TEXTO está recortado dentro de su propia tarjeta. */
+  textosCortados: cortadas,
+  /** Positivo = el pie está dentro de la caja. Negativo = «Cerrar» se sale. */
+  holguraDelPiePx: pieDentro,
+  cajaDelDialogo: caja(dialogoNodo),
+  /** Los rótulos de las tres pestañas, tal cual se leen. */
+  pestanas: $$('.gml-filtro-avisos').map((b) => b.textContent.trim()),
+}
+avisos.abierto = avisosAbierto
+
+if (avisos.tarjetasNuevas > 0) {
+  if (!abierto) {
+    problemas.push(
+      'Pinchar el contador de avisos NO ha abierto el diálogo. Es la única puerta al detalle de ' +
+        'los errores desde que la lista se fue del panel: con esto roto, los contadores dan un ' +
+        'número que no lleva a ninguna parte.',
+    )
+  } else {
+    if (avisosAbierto.textosCortados.length > 0) {
+      problemas.push(
+        `${avisosAbierto.textosCortados.length} aviso(s) se leen CORTADOS dentro de su tarjeta con ` +
+          `${avisosAbierto.tarjetasVisibles} en pantalla a ${window.innerWidth}×${window.innerHeight}. ` +
+          `Un aviso a medias es peor que ninguno: el usuario sabe que algo pasa y no sabe qué.`,
+      )
+    }
+    if (tarjetasQueCaben !== null && tarjetasQueCaben < 1) {
+      problemas.push(
+        `Con ${avisosAbierto.tarjetasVisibles} avisos, la lista dentro del diálogo mide ` +
+          `${altoDeLaLista} px y una tarjeta mide ${altoDeUnaTarjeta}: no cabe NI UNA entera ` +
+          `(${tarjetasQueCaben} tarjetas). Quedan ${avisosAbierto.listaDesbordaPx} px detrás de un ` +
+          `scroll de ${avisosAbierto.listaOverflow}. A ${window.innerWidth}×${window.innerHeight}.`,
+      )
+    }
+    if (pieDentro !== null && pieDentro < 0) {
+      problemas.push(
+        `El pie del diálogo —donde está «Cerrar»— se sale ${Math.abs(pieDentro)} px de la caja a ` +
+          `${window.innerWidth}×${window.innerHeight}. Un modal del que hay que buscar la salida ` +
+          `es peor que el bloque que esta mudanza vino a quitar.`,
+      )
+    }
+  }
+}
+
+// Se cierra: el resto del guion mide la cáscara, y un modal abierto encima le
+// cambiaría el foco y le taparía el mapa.
+if (abierto) {
+  const cerrarNodo = $('.gml-dialogo-avisos-pie [data-accion="cerrar-avisos"]')
+  if (cerrarNodo) cerrarNodo.click()
+  await esperar(150)
 }
 
 // ── 6 · Lo que flota sobre el mapa (criterio 5 del plan) ──────────────────

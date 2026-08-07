@@ -19,6 +19,22 @@
 // línea de cierre que dice cuántos avisos más quedan fuera. Ninguna
 // implementación de este módulo sin ese tope es aceptable.
 //
+// ── ⭐ DÓNDE VIVE LA LISTA (CAMBIÓ EL 2026-08-07) ────────────────────────────
+// Hasta hoy el `contenedor` era una `<section class="gml-bloque--avisos">` de la
+// columna izquierda de `index.html`, y ése era el problema: la lista es lo ÚNICO
+// del panel cuyo alto lo decide el DATO y no el marcado, así que se comía hasta
+// 34vh del sitio más caro de la aplicación **para no decir nada el 95 % del
+// tiempo** («AVISOS / Sin avisos.», ~60 px). Desde hoy el `contenedor` se lo da
+// {@link ../app/dialogo-avisos.js}: es el `<div id="avisos">` de dentro de un
+// `<dialog>` que se abre pinchando un chip. La columna recupera el sitio y los
+// avisos siguen estando enteros a un clic.
+//
+// **Este módulo no se enteró del cambio**, y es a propósito: sigue recibiendo un
+// `contenedor` y pintando dentro. Lo único que se le añadió es el FILTRO por
+// nivel (para las tres pestañas del diálogo) y el DESTELLO del chip (para que un
+// error nuevo se note sin abrir nada). Se puede seguir montando contra un `<div>`
+// suelto, y así lo hace `test/app/avisos.dom.test.js`.
+//
 // ── LO QUE ESTE MÓDULO NO HACE ───────────────────────────────────────────────
 //   · No pinta `causa` (regla 2 de la tarea): puede ser un `Event` del DOM o un
 //     `Error`, y volcarlo a la UI es ruido para un usuario que no es programador.
@@ -27,6 +43,8 @@
 //   · No importa Leaflet ni nada `viewer/*`: es cáscara de UI pura, consume
 //     únicamente el vocabulario `NIVEL` de `viewer/_comun.js` (re-exportado de
 //     `validation/_comun.js`) y el typedef `Avisar` que define ese mismo módulo.
+//   · **No abre ni cierra el diálogo, ni sabe que existe.** Quien oye el clic del
+//     chip es `app/dialogo-avisos.js`. Aquí los chips solo se PINTAN.
 
 import { NIVEL } from '../viewer/_comun.js'
 
@@ -43,6 +61,22 @@ const ETIQUETA_NIVEL = {
   [NIVEL.ERROR]: 'Bloqueante',
   [NIVEL.AVISO]: 'Aviso',
 }
+
+/**
+ * Clase que se le pone al chip durante {@link MS_DESTELLO} cuando su cuenta
+ * SUBE. Es el sustituto de lo que se perdió al sacar la lista de la columna: sin
+ * ella, un error nuevo solo cambiaba un número pequeño en una esquina y no lo
+ * veía nadie. El destello NO abre nada (decisión del 2026-08-07: un modal que
+ * salta solo interrumpe una edición de vértices), solo llama la atención.
+ *
+ * Baja SOLA por temporizador y no por `animationend`: si el usuario tiene
+ * `prefers-reduced-motion` la animación no se ejecuta, el evento no llega nunca
+ * y la clase se quedaría puesta para siempre.
+ */
+const CLASE_DESTELLO = 'gml-chip--destello'
+
+/** Cuánto dura el destello. El mismo número está en `estilos/app.css`. */
+const MS_DESTELLO = 600
 
 /**
  * ¿Sirve como elemento del DOM? DUCK TYPING deliberado, no `instanceof
@@ -122,6 +156,11 @@ function normalizarNivel(detalle) {
  *   al estado vacío («Sin avisos.»).
  * @property {() => ResumenAvisos} resumen  Recuento de mensajes DISTINTOS por
  *   nivel, el mismo dato que pintan los chips.
+ * @property {(nivel: 'ERROR'|'AVISO'|null) => void} filtro  Deja en la lista
+ *   solo las tarjetas de ese nivel. `null` (o cualquier valor que no esté en
+ *   `NIVEL`) las enseña todas. Lo maneja `app/dialogo-avisos.js` desde sus tres
+ *   pestañas; nadie más tiene por qué tocarlo.
+ * @property {() => 'ERROR'|'AVISO'|null} filtroActual  Qué filtro está puesto.
  * @property {() => void} destruir  Desmonta el panel. IDEMPOTENTE.
  */
 
@@ -143,11 +182,16 @@ function normalizarNivel(detalle) {
  *   `34vh` son cosa del CSS, independientes del tope de 12 tarjetas de aquí).
  * @param {HTMLElement} opciones.chipError  Chip-resumen de nivel `NIVEL.ERROR`.
  * @param {HTMLElement} opciones.chipAviso  Chip-resumen de nivel `NIVEL.AVISO`.
+ * @param {(resumen: ResumenAvisos) => void} [opciones.alCambiar]  Se llama
+ *   DESPUÉS de cada repintado, con el mismo recuento que pintan los chips. Lo
+ *   usa `app/dialogo-avisos.js` para poner al día los rótulos de sus tres
+ *   pestañas sin tener que recontar por su cuenta. Si lanza, el fallo NO tumba
+ *   el canal de avisos: se traga y se anota en consola.
  * @returns {PanelAvisos}
  * @throws {TypeError}  Si `contenedor`, `chipError` o `chipAviso` no son
  *   elementos del DOM.
  */
-export function crearPanelAvisos({ contenedor, chipError, chipAviso } = {}) {
+export function crearPanelAvisos({ contenedor, chipError, chipAviso, alCambiar } = {}) {
   if (!esElementoDOM(contenedor)) {
     throw new TypeError(
       `crearPanelAvisos: 'contenedor' debe ser un elemento del DOM; recibido ${JSON.stringify(contenedor)}.`,
@@ -177,6 +221,22 @@ export function crearPanelAvisos({ contenedor, chipError, chipAviso } = {}) {
   let secuencia = 0
 
   let destruido = false
+
+  /** Nivel al que está reducida la lista, o `null` para «todos». Ver
+   * `PanelAvisos#filtro`. */
+  let filtroPuesto = null
+
+  /** Lo último que se pintó en cada chip, para saber si la cuenta SUBE (y
+   * entonces destellar) o solo cambia de otra forma. */
+  const cuentaPintada = { [NIVEL.ERROR]: 0, [NIVEL.AVISO]: 0 }
+
+  /** Temporizadores del destello vivos, por chip. Se cancelan en `destruir`. */
+  const destellos = new Map()
+
+  // El `setTimeout` de la VENTANA del contenedor, no el global: así el panel
+  // funciona dentro de un iframe y el test puede sustituirlo. Mismo criterio de
+  // «nada de globales implícitos» que `documento` en el resto de la casa.
+  const ventana = doc?.defaultView ?? globalThis
 
   /** @returns {ResumenAvisos} */
   function resumen() {
@@ -212,6 +272,40 @@ export function crearPanelAvisos({ contenedor, chipError, chipAviso } = {}) {
       nivel === NIVEL.ERROR
         ? `${cuenta} ${cuenta === 1 ? 'error' : 'errores'}`
         : `${cuenta} ${cuenta === 1 ? 'aviso' : 'avisos'}`
+
+    // El destello SOLO cuando la cuenta sube. Al bajar (un `limpiar`, o el
+    // usuario resolviendo un hallazgo) no hay nada nuevo que mirar, y destellar
+    // ahí enseñaría a ignorar el destello.
+    if (cuenta > cuentaPintada[nivel]) destellar(chip)
+    cuentaPintada[nivel] = cuenta
+  }
+
+  /**
+   * Pone {@link CLASE_DESTELLO} en el chip y la quita sola. Reentrante: dos
+   * errores seguidos reinician el destello en vez de solaparse (si no se
+   * cancelara el temporizador anterior, el primero apagaría el segundo a media
+   * animación y el usuario vería medio parpadeo).
+   *
+   * @param {HTMLElement} chip
+   */
+  function destellar(chip) {
+    const pendiente = destellos.get(chip)
+    if (pendiente !== undefined) {
+      ventana.clearTimeout(pendiente)
+      chip.classList.remove(CLASE_DESTELLO)
+    }
+    // Doble `requestAnimationFrame` sería lo canónico para reiniciar una
+    // animación CSS, pero aquí no hace falta: `remove` + `add` en la misma
+    // vuelta del bucle basta porque entre medias no hay repintado, y el caso
+    // «dos errores en el mismo tick» ya lo cubre el `clearTimeout` de arriba.
+    chip.classList.add(CLASE_DESTELLO)
+    destellos.set(
+      chip,
+      ventana.setTimeout(() => {
+        destellos.delete(chip)
+        chip.classList.remove(CLASE_DESTELLO)
+      }, MS_DESTELLO),
+    )
   }
 
   /** Construye una tarjeta `.gml-aviso` (contrato de DOM de la tarea). */
@@ -246,19 +340,39 @@ export function crearPanelAvisos({ contenedor, chipError, chipAviso } = {}) {
     return articulo
   }
 
-  /** Repinta la lista completa y los dos chips a partir de `grupos`. */
+  /**
+   * Repinta la lista y los dos chips a partir de `grupos`.
+   *
+   * ── ⚠️ EL FILTRO SE APLICA **ANTES** DEL TOPE, Y NO AL REVÉS ───────────────
+   * Es la diferencia entre un filtro que funciona y uno que miente. Con 40
+   * avisos y 3 errores, filtrar sobre las 12 tarjetas ya recortadas podría
+   * enseñar CERO errores —si los tres cayeron fuera del top-12 por recencia—
+   * justo cuando el usuario ha pinchado el chip rojo para verlos. Filtrando
+   * primero, el tope recorta dentro del nivel elegido y los 3 errores salen
+   * siempre.
+   *
+   * El CSS no puede hacer este trabajo por la misma razón: `display:none` sobre
+   * las tarjetas descartadas no rehace el tope.
+   */
   function render() {
     contenedor.replaceChildren()
 
-    if (grupos.size === 0) {
+    // Más recientes arriba (regla de diseño 6): orden descendente por la última
+    // vez que CADA grupo tuvo actividad (alta o repetición).
+    const ordenados = Array.from(grupos.values())
+      .filter((grupo) => filtroPuesto === null || grupo.nivel === filtroPuesto)
+      .sort((a, b) => b.orden - a.orden)
+
+    if (ordenados.length === 0) {
       const vacio = doc.createElement('p')
       vacio.className = 'gml-avisos-vacio'
-      vacio.textContent = 'Sin avisos.'
+      // «Sin avisos.» es el texto de SIEMPRE y no se toca: es el gancho del
+      // guion 14 y de media docena de pruebas. Solo el filtro de errores dice
+      // otra cosa, porque «Sin avisos.» bajo la pestaña «Errores» se leería como
+      // que no hay avisos —que puede ser falso: puede haber cinco—.
+      vacio.textContent = filtroPuesto === NIVEL.ERROR ? 'Sin errores.' : 'Sin avisos.'
       contenedor.appendChild(vacio)
     } else {
-      // Más recientes arriba (regla de diseño 6): orden descendente por la
-      // última vez que CADA grupo tuvo actividad (alta o repetición).
-      const ordenados = Array.from(grupos.values()).sort((a, b) => b.orden - a.orden)
       const visibles = ordenados.slice(0, TOPE_TARJETAS)
       const resto = ordenados.length - visibles.length
 
@@ -274,9 +388,23 @@ export function crearPanelAvisos({ contenedor, chipError, chipAviso } = {}) {
       }
     }
 
-    const { [NIVEL.ERROR]: cuentaError, [NIVEL.AVISO]: cuentaAviso } = resumen()
-    pintarChip(chipError, NIVEL.ERROR, cuentaError, 'gml-chip--error')
-    pintarChip(chipAviso, NIVEL.AVISO, cuentaAviso, 'gml-chip--aviso')
+    // Los chips cuentan SIEMPRE sobre el total, nunca sobre lo filtrado: son el
+    // marcador de la aplicación entera, y un «0 errores» porque está puesta la
+    // pestaña de avisos sería exactamente el fallo silencioso que este módulo
+    // existe para no tener.
+    const conteo = resumen()
+    pintarChip(chipError, NIVEL.ERROR, conteo[NIVEL.ERROR], 'gml-chip--error')
+    pintarChip(chipAviso, NIVEL.AVISO, conteo[NIVEL.AVISO], 'gml-chip--aviso')
+
+    if (typeof alCambiar === 'function') {
+      try {
+        alCambiar(conteo)
+      } catch (causa) {
+        // Este módulo ES el canal de avisos: si se cayera por un fallo de su
+        // propio oyente, el siguiente error de la aplicación no lo vería nadie.
+        console.error('[avisos] el oyente `alCambiar` ha lanzado:', causa)
+      }
+    }
   }
 
   /**
@@ -315,15 +443,38 @@ export function crearPanelAvisos({ contenedor, chipError, chipAviso } = {}) {
     render()
   }
 
+  /**
+   * Deja en la lista solo las tarjetas de un nivel. Cualquier valor que no esté
+   * en {@link NIVEL} —`null`, `undefined`, un typo— vale como «enséñalo todo»,
+   * por lo mismo que {@link normalizarNivel}: un filtro es una preferencia de
+   * vista, y una preferencia rara no puede esconderle avisos a nadie.
+   *
+   * @param {'ERROR'|'AVISO'|null} nivel
+   */
+  function filtro(nivel) {
+    if (destruido) return
+    const siguiente = NIVELES_VALIDOS.has(nivel) ? nivel : null
+    if (siguiente === filtroPuesto) return
+    filtroPuesto = siguiente
+    render()
+  }
+
   /** Desmonta el panel. IDEMPOTENTE: la segunda llamada no hace nada. */
   function destruir() {
     if (destruido) return
     destruido = true
     grupos = new Map()
     contenedor.replaceChildren()
+    // Un destello a medias dejaría la clase puesta para siempre en un chip que
+    // ya no gobierna nadie.
+    for (const [chip, temporizador] of destellos) {
+      ventana.clearTimeout(temporizador)
+      chip.classList.remove(CLASE_DESTELLO)
+    }
+    destellos.clear()
   }
 
   render() // Estado inicial: «Sin avisos.» y los dos chips a cero.
 
-  return { avisar, limpiar, resumen, destruir }
+  return { avisar, limpiar, resumen, filtro, filtroActual: () => filtroPuesto, destruir }
 }

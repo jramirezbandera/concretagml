@@ -40,7 +40,7 @@ import { join } from 'node:path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import L from 'leaflet'
 
-import { crearPanelAvisos } from '../../app/avisos.js'
+import { crearDialogoAvisos } from '../../app/dialogo-avisos.js'
 import {
   COLA_SIN_VECINAS,
   EXTENSION_INFORME,
@@ -364,11 +364,7 @@ function montar({
   crearPanes(mapa)
 
   const estado = crearEstadoVista(parcelaInicial)
-  const panel = crearPanelAvisos({
-    contenedor: document.getElementById('avisos'),
-    chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
-    chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
-  })
+  const panel = crearDialogoAvisos({ documento: document })
   const cajon = crearCajonDiagnostico({ mapa })
   const contraste = crearContraste({ mapa, zona: HUSO })
   const cableado = cablearDiagnostico({
@@ -668,11 +664,7 @@ describe('cableado-diagnostico · la parcela propia NO se cuela entre las colind
     const { mapa, destruir: destruirMapa } = montarMapa({ zoom: 19 })
     crearPanes(mapa)
     const estado = crearEstadoVista(parcelaDelCatastro())
-    const panel = crearPanelAvisos({
-      contenedor: document.getElementById('avisos'),
-      chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
-      chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
-    })
+    const panel = crearDialogoAvisos({ documento: document })
     const catastro = cablearCatastro({ estado, panel, cliente, srs: SRS })
     const cajon = crearCajonDiagnostico({ mapa })
     const contraste = crearContraste({ mapa, zona: HUSO })
@@ -1237,11 +1229,7 @@ describe('cableado-diagnostico · contratos del programador', () => {
     crearPanes(mapa)
     const cajon = crearCajonDiagnostico({ mapa })
     const contraste = crearContraste({ mapa, zona: HUSO })
-    const panel = crearPanelAvisos({
-      contenedor: document.getElementById('avisos'),
-      chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
-      chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
-    })
+    const panel = crearDialogoAvisos({ documento: document })
     const estado = crearEstadoVista(null)
     const base = { estado, cajon, contraste, panel }
 
@@ -1265,11 +1253,7 @@ describe('cableado-diagnostico · contratos del programador', () => {
     crearPanes(mapa)
     const cajon = crearCajonDiagnostico({ mapa })
     const contraste = crearContraste({ mapa, zona: HUSO })
-    const panel = crearPanelAvisos({
-      contenedor: document.getElementById('avisos'),
-      chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
-      chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
-    })
+    const panel = crearDialogoAvisos({ documento: document })
     const base = { estado: crearEstadoVista(null), cajon, contraste, panel }
 
     expect(() => cablearDiagnostico({ ...base, comprobacion: {} })).toThrow(/comprobacion/)
@@ -1287,11 +1271,7 @@ describe('cableado-diagnostico · contratos del programador', () => {
     crearPanes(mapa)
     const cajon = crearCajonDiagnostico({ mapa })
     const contraste = crearContraste({ mapa, zona: HUSO })
-    const panel = crearPanelAvisos({
-      contenedor: document.getElementById('avisos'),
-      chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
-      chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
-    })
+    const panel = crearDialogoAvisos({ documento: document })
     const base = { estado: crearEstadoVista(null), contraste, panel }
 
     for (const que of ['alDescargar', 'estadoInforme']) {

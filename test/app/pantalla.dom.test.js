@@ -152,9 +152,15 @@ describe('T6 · ⭐ marcado y CSS dicen lo mismo (el fallo mudo)', () => {
 
   it('los canales que NO pueden desaparecer no declaran pantalla', () => {
     montarCascara()
-    // Los avisos son el canal de errores de la aplicación entera: esconderlo al
-    // cambiar de paso sería el peor fallo silencioso que esta cáscara puede tener.
-    for (const selector of ['.gml-bloque--avisos', '.gml-panel-cabecera']) {
+    // El canal de errores es el de la aplicación entera: esconderlo al cambiar de
+    // paso sería el peor fallo silencioso que esta cáscara puede tener.
+    //
+    // ⚠️ HASTA EL 2026-08-07 aquí también estaba `.gml-bloque--avisos`. Ya no
+    // existe: la lista se fue a `app/dialogo-avisos.js` y de la columna quedan los
+    // dos chips, que viven DENTRO de `.gml-panel-cabecera` — o sea que el
+    // invariante no se ha debilitado, se ha concentrado en un solo nodo. Que los
+    // chips sigan ahí lo comprueba el caso de aquí abajo.
+    for (const selector of ['.gml-panel-cabecera']) {
       const nodo = document.querySelector(selector)
       expect(nodo, `${selector} ha desaparecido de index.html`).not.toBeNull()
       expect(
@@ -162,6 +168,36 @@ describe('T6 · ⭐ marcado y CSS dicen lo mismo (el fallo mudo)', () => {
         `${selector} declara pantalla, así que desaparece en las demás`,
       ).toBe(false)
     }
+  })
+
+  it('⭐ los dos chips viven en la cabecera, son BOTONES y no declaran pantalla', () => {
+    // El guardián que sustituye al del bloque de avisos. Desde que la lista está
+    // en un diálogo, estos dos nodos son **el único rastro permanente** de que
+    // algo ha ido mal, y además la única puerta para abrir el detalle: si dejan
+    // de ser botones, o si alguien les cuelga un `data-pantalla`, el canal de
+    // errores desaparece en cuatro de las cinco pantallas sin que nada lo diga.
+    montarCascara()
+    const cabecera = document.querySelector('.gml-panel-cabecera')
+    for (const nivel of ['ERROR', 'AVISO']) {
+      const chip = document.querySelector(`.gml-chip[data-contador="${nivel}"]`)
+      expect(chip, `falta el chip de ${nivel} en index.html`).not.toBeNull()
+      expect(cabecera.contains(chip), `el chip de ${nivel} se ha salido de la cabecera`).toBe(true)
+      expect(chip.tagName, `el chip de ${nivel} tiene que poder pincharse`).toBe('BUTTON')
+      expect(chip.getAttribute('type'), 'un <button> sin type envía el formulario').toBe('button')
+      expect(chip.hasAttribute(ATRIBUTO_PANTALLA)).toBe(false)
+    }
+  })
+
+  it('⛔ index.html ya NO trae un `#avisos`: lo fabrica el diálogo', () => {
+    // La trampa que este cambio deja abierta, y por eso hay guardián: si alguien
+    // vuelve a escribir un `<div id="avisos">` en el marcado, habría DOS —el suyo
+    // y el del diálogo— y `app/main.js` cablearía el del diálogo. El de index.html
+    // se quedaría vacío para siempre, en silencio, y quien lo hubiera puesto
+    // creería que los avisos «han dejado de funcionar». Es la misma trampa del
+    // `[data-diag]` duplicado que index.html lleva documentando desde F06.
+    montarCascara()
+    expect(document.querySelectorAll('#avisos')).toHaveLength(0)
+    expect(document.querySelectorAll('.gml-bloque--avisos')).toHaveLength(0)
   })
 
   it('la Entrada y la caja de vértices están en pantallas DISTINTAS', () => {
@@ -244,19 +280,26 @@ describe('T6 · ⭐ marcado y CSS dicen lo mismo (el fallo mudo)', () => {
     ).toMatch(/\.gml-bloque--contraste-edificio\s+\.gml-cajon-contraste-edificio/)
   })
 
-  it('⛔ los avisos siguen SIN declarar pantalla: solo se colapsan VACÍOS', () => {
+  it('⛔ en Diagnóstico la columna es del contraste, y ya sin apaños', () => {
+    // ── HISTORIA, porque este caso comprobaba lo contrario hasta el 2026-08-07 ──
     // El autor pidió que el contraste sustituyera «a los vértices y avisos». Los
-    // vértices se van con `data-pantalla`; los avisos NO pueden, porque son el
-    // canal de errores de la aplicación entera —`app/cableado-diagnostico.js` manda
-    // ahí los fallos del cálculo y del informe, y sus renglones dicen «Mira el
-    // panel de avisos»—. Lo que se oculta es el bloque cuando no tiene nada que
-    // decir, por el mismo nodo (`.gml-avisos-vacio`) que fabrica `app/avisos.js`,
-    // así que la regla y la lista no pueden divergir.
+    // vértices se iban con `data-pantalla`; los avisos NO podían, porque son el
+    // canal de errores de la aplicación entera. El apaño era una regla CSS que
+    // colapsaba el bloque solo cuando estaba VACÍO, colgada de `:has(.gml-avisos-vacio)`.
+    //
+    // Ese apaño ya no hace falta ni existe: la lista se fue a un diálogo, así que
+    // en Diagnóstico la columna es del contraste SIEMPRE, esté la lista vacía o
+    // llena, y el canal de errores sigue entero en los chips de la cabecera. Lo
+    // que se comprueba ahora es que el apaño **se ha retirado de verdad**: una
+    // regla `:has()` colgada de un nodo que ya nadie fabrica no falla, no avisa y
+    // no hace nada — se queda ahí para siempre confundiendo a quien la lea.
     montarCascara()
-    expect(document.querySelector('.gml-bloque--avisos').hasAttribute(ATRIBUTO_PANTALLA)).toBe(false)
-    expect(CSS).toContain(
+    expect(document.querySelectorAll('.gml-bloque--avisos')).toHaveLength(0)
+    expect(CSS, 'la regla del apaño sigue en la hoja y ya no gobierna nada').not.toContain(
       `.gml-app[data-paso='${PASO.DIAGNOSTICO}'] .gml-bloque--avisos:has(.gml-avisos-vacio)`,
     )
+    // Lo que sí sigue siendo cierto y sostiene la regla de oro 1 en esta pantalla.
+    expect(document.querySelector('.gml-panel-cabecera').hasAttribute(ATRIBUTO_PANTALLA)).toBe(false)
   })
 
   it('el pie del panel tampoco está en Entrada (mide 266 px y no cabía)', () => {
@@ -613,11 +656,20 @@ describe('rebanada 2 · el pie enseña lo de cada pantalla', () => {
     // Lo que NO se reparte, y es deliberado: desaparecer el canal de errores al
     // cambiar de paso sería el peor fallo silencioso que esta cáscara puede
     // tener (lo dice `estilos/app.css` donde declara las cinco reglas).
+    //
+    // Desde el 2026-08-07 el canal ES la cabecera: los dos chips viven dentro, la
+    // lista se abre desde ellos y el bloque de la columna ya no existe. Por eso
+    // aquí queda una sola clase donde había dos — y por eso se comprueba también
+    // el chip, que es lo que de verdad tiene que verse en las cinco.
     montarCascara()
-    for (const clase of ['gml-bloque--avisos', 'gml-panel-cabecera']) {
+    for (const clase of ['gml-panel-cabecera']) {
       const nodo = document.querySelector('.' + clase)
       expect(nodo, `falta «${clase}»`).not.toBeNull()
       expect(visibleEn(nodo), `«${clase}» ha dejado de estar en las cinco`).toEqual([...PASOS])
     }
+    const chip = document.querySelector('.gml-chip[data-contador="ERROR"]')
+    expect(visibleEn(chip), 'el contador de errores ha dejado de estar en las cinco').toEqual([
+      ...PASOS,
+    ])
   })
 })

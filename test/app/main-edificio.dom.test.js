@@ -308,6 +308,15 @@ for (const [nombre, valor] of CASCARA_INDEX.atributos) {
 }
 document.body.innerHTML = CASCARA_INDEX.cuerpo
 
+// ⭐ **`?demo=real` ES OBLIGATORIO DESDE EL 2026-08-07**, y va ANTES del import:
+// ese día la aplicación dejó de arrancar con la parcela de demostración dentro y
+// el store de parcela nace `null`. Este fichero mide la CONVIVENCIA de las dos
+// ramas —que arrastrar un vértice de la parcela no escriba en la ficha del
+// edificio, que la parcela en pantalla viaje como `parcelaContexto`—, y todo eso
+// necesita una parcela en pantalla. El porqué de `history.replaceState` (y de
+// que vaya antes del `import`) está escrito entero en `main-edicion.dom.test.js`.
+window.history.replaceState({}, '', '?demo=real')
+
 // El arranque REAL, una sola vez. Si el paso 13 rompiera el ensamblaje, este
 // fichero entero fallaría aquí y no en un `it`.
 await import('../../app/main.js')

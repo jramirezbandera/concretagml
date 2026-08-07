@@ -63,7 +63,7 @@ import 'fake-indexeddb/auto'
 import { IDBFactory } from 'fake-indexeddb'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { crearPanelAvisos } from '../../app/avisos.js'
+import { crearDialogoAvisos } from '../../app/dialogo-avisos.js'
 import {
   COLETILLA_SIN_PERSISTENCIA,
   DOCUMENTO,
@@ -301,11 +301,7 @@ async function montar({
   const apertura = bd ?? (await baseNueva())
   let reloj = Date.UTC(2026, 7, 3, 10, 0, 0)
 
-  const panel = crearPanelAvisos({
-    contenedor: document.querySelector('#avisos'),
-    chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
-    chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
-  })
+  const panel = crearDialogoAvisos({ documento: document })
   const estado = crearEstadoVista(parcela)
   const expedientes =
     almacen ??
@@ -387,11 +383,7 @@ async function montar({
 
 /** El panel de avisos REAL sobre la cáscara real. Tres nodos, siempre los mismos. */
 const panelDePrueba = () =>
-  crearPanelAvisos({
-    contenedor: document.querySelector('#avisos'),
-    chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
-    chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
-  })
+  crearDialogoAvisos({ documento: document })
 
 /** Los cinco textos que F11 añade. Entran en los dos guardianes de higiene. */
 const TEXTOS_F11 = Object.freeze([
@@ -515,11 +507,7 @@ describe('F10 · T5.1 · 1 · el Expediente por fin existe', () => {
 
   it('un `srs` que el modelo no admite revienta AL CABLEAR, no en el primer guardado', async () => {
     const apertura = await baseNueva()
-    const panel = crearPanelAvisos({
-      contenedor: document.querySelector('#avisos'),
-      chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
-      chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
-    })
+    const panel = crearDialogoAvisos({ documento: document })
     expect(() =>
       cablearExpediente({
         estado: crearEstadoVista(parcelaDemo()),

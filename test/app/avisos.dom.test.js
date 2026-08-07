@@ -24,7 +24,7 @@
  * cambia, estas pruebas dicen QUÉ número rige en vez de fallar por dos sitios.  *
  * -------------------------------------------------------------------------- */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 import { crearPanelAvisos } from '../../app/avisos.js'
 import { NIVEL } from '../../viewer/_comun.js'
@@ -348,5 +348,187 @@ describe('app/avisos · encaja como canal `Avisar` del visor', () => {
     }
     const nivelesPintados = tarjetas(cascara.contenedor).map((t) => t.dataset.nivel)
     expect(new Set(nivelesPintados)).toEqual(new Set(Object.values(NIVEL)))
+  })
+})
+
+/* ══ EL FILTRO Y EL DESTELLO (2026-08-07) ═══════════════════════════════════ *
+ *                                                                             *
+ * Los dos existen por la MISMA mudanza: la lista se fue de la columna a un     *
+ * `<dialog>` (`app/dialogo-avisos.js`). El filtro es lo que accionan sus tres  *
+ * pestañas; el destello es lo que sustituye a la tarjeta roja de 52 px que     *
+ * antes aparecía sola en mitad del panel y que ahora no aparece en ningún      *
+ * sitio hasta que alguien abre el diálogo.                                     *
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+describe('app/avisos · el filtro por nivel', () => {
+  /** Siembra 2 errores y 3 avisos, con textos reconocibles. */
+  function sembrar() {
+    panel.avisar('Error uno.', { nivel: NIVEL.ERROR })
+    panel.avisar('Aviso uno.', { nivel: NIVEL.AVISO })
+    panel.avisar('Error dos.', { nivel: NIVEL.ERROR })
+    panel.avisar('Aviso dos.', { nivel: NIVEL.AVISO })
+    panel.avisar('Aviso tres.', { nivel: NIVEL.AVISO })
+  }
+
+  it('sin filtro se ven las cinco; con filtro, solo las de su nivel', () => {
+    sembrar()
+    expect(panel.filtroActual()).toBeNull()
+    expect(tarjetas(cascara.contenedor)).toHaveLength(5)
+
+    panel.filtro(NIVEL.ERROR)
+    expect(panel.filtroActual()).toBe(NIVEL.ERROR)
+    expect(textos(cascara.contenedor)).toEqual(['Error dos.', 'Error uno.'])
+
+    panel.filtro(NIVEL.AVISO)
+    expect(textos(cascara.contenedor)).toEqual(['Aviso tres.', 'Aviso dos.', 'Aviso uno.'])
+
+    panel.filtro(null)
+    expect(tarjetas(cascara.contenedor)).toHaveLength(5)
+  })
+
+  it('⭐ los CHIPS cuentan el TOTAL, nunca lo filtrado', () => {
+    // Es la regla de oro 1 aplicada al filtro: un «0 errores» porque está puesta
+    // la pestaña de avisos sería el peor fallo mudo que este módulo puede tener.
+    sembrar()
+    panel.filtro(NIVEL.AVISO)
+    expect(cascara.chipError.textContent).toBe('2 errores')
+    expect(cascara.chipAviso.textContent).toBe('3 avisos')
+    expect(panel.resumen()).toEqual({ [NIVEL.ERROR]: 2, [NIVEL.AVISO]: 3 })
+  })
+
+  it('⭐ el filtro se aplica ANTES del tope: los errores no se caen por recencia', () => {
+    // El fallo que esta prueba impide: con el tope aplicado PRIMERO, los dos
+    // errores —los más ANTIGUOS— quedarían fuera de las 12 tarjetas más recientes
+    // y la pestaña «Errores» saldría VACÍA justo cuando se ha pinchado el chip
+    // rojo para verlos.
+    panel.avisar('Error viejísimo.', { nivel: NIVEL.ERROR })
+    panel.avisar('Otro error viejo.', { nivel: NIVEL.ERROR })
+    for (let i = 0; i < TOPE_TARJETAS * 2; i += 1) {
+      panel.avisar(`Tesela ${i} que no carga.`, { nivel: NIVEL.AVISO })
+    }
+    // Sin filtro los dos errores NO se ven: el tope se los ha comido. Esto no es
+    // el fallo, es la premisa — sin ella la prueba no probaría nada.
+    expect(textos(cascara.contenedor)).not.toContain('Error viejísimo.')
+
+    panel.filtro(NIVEL.ERROR)
+    expect(textos(cascara.contenedor)).toEqual(['Otro error viejo.', 'Error viejísimo.'])
+  })
+
+  it('con el filtro puesto, el tope sigue rigiendo DENTRO del nivel', () => {
+    for (let i = 0; i < TOPE_TARJETAS + 5; i += 1) {
+      panel.avisar(`Aviso ${i}.`, { nivel: NIVEL.AVISO })
+    }
+    panel.filtro(NIVEL.AVISO)
+    expect(tarjetas(cascara.contenedor)).toHaveLength(TOPE_TARJETAS)
+    expect(cascara.contenedor.querySelector('.gml-avisos-resto').textContent).toBe(
+      '…y 5 avisos más.',
+    )
+  })
+
+  it('un filtro sin tarjetas lo DICE, y con el texto de su nivel', () => {
+    panel.avisar('Solo un aviso.', { nivel: NIVEL.AVISO })
+    panel.filtro(NIVEL.ERROR)
+    // «Sin avisos.» bajo la pestaña «Errores» se leería como que no hay avisos.
+    // Y sí los hay: hay uno.
+    expect(cascara.contenedor.querySelector('.gml-avisos-vacio').textContent).toBe('Sin errores.')
+
+    panel.filtro(NIVEL.AVISO)
+    expect(cascara.contenedor.querySelector('.gml-avisos-vacio')).toBeNull()
+  })
+
+  it('un filtro con un valor que no está en NIVEL enseña TODO (no esconde nada)', () => {
+    sembrar()
+    for (const raro of ['error', 'ERRORES', 42, undefined, {}]) {
+      panel.filtro(NIVEL.ERROR) // primero uno de verdad, para que haya algo que deshacer
+      panel.filtro(raro)
+      expect(panel.filtroActual(), `«${String(raro)}» ha filtrado algo`).toBeNull()
+      expect(tarjetas(cascara.contenedor)).toHaveLength(5)
+    }
+  })
+
+  it('un aviso NUEVO que no pasa el filtro no se pinta, pero SÍ cuenta en el chip', () => {
+    panel.filtro(NIVEL.ERROR)
+    panel.avisar('Tesela que no carga.', { nivel: NIVEL.AVISO })
+    expect(tarjetas(cascara.contenedor)).toHaveLength(0)
+    expect(cascara.chipAviso.textContent).toBe('1 aviso')
+  })
+
+  it('`alCambiar` recibe el recuento en cada repintado, y su fallo NO tumba el canal', () => {
+    const propia = montarCascara()
+    const recibidos = []
+    const suyo = crearPanelAvisos({
+      ...propia,
+      alCambiar: (conteo) => {
+        recibidos.push(conteo)
+        throw new Error('el oyente se ha caído')
+      },
+    })
+    // El primero es el del render inicial (todo a cero).
+    expect(recibidos).toEqual([{ [NIVEL.ERROR]: 0, [NIVEL.AVISO]: 0 }])
+    expect(() => suyo.avisar('Algo.', { nivel: NIVEL.ERROR })).not.toThrow()
+    expect(recibidos.at(-1)).toEqual({ [NIVEL.ERROR]: 1, [NIVEL.AVISO]: 0 })
+    // Y el aviso se pintó igualmente: un oyente roto no se lleva por delante la
+    // única UI de la regla de oro 1.
+    expect(textos(propia.contenedor)).toEqual(['Algo.'])
+    suyo.destruir()
+  })
+})
+
+describe('app/avisos · el destello del chip', () => {
+  const DESTELLO = 'gml-chip--destello'
+
+  it('el chip destella cuando su cuenta SUBE, y solo el suyo', () => {
+    expect(cascara.chipError.classList.contains(DESTELLO)).toBe(false)
+    panel.avisar('Un error.', { nivel: NIVEL.ERROR })
+    expect(cascara.chipError.classList.contains(DESTELLO)).toBe(true)
+    expect(cascara.chipAviso.classList.contains(DESTELLO)).toBe(false)
+  })
+
+  it('el destello se apaga SOLO, por temporizador', () => {
+    // Por temporizador y no por `animationend`: con `prefers-reduced-motion` la
+    // animación no corre, el evento no llega nunca y la clase se quedaría puesta
+    // para siempre — el chip destellando eternamente por un error de hace media
+    // hora es peor que no destellar.
+    vi.useFakeTimers()
+    try {
+      const propia = montarCascara()
+      const suyo = crearPanelAvisos(propia)
+      suyo.avisar('Un error.', { nivel: NIVEL.ERROR })
+      expect(propia.chipError.classList.contains(DESTELLO)).toBe(true)
+      vi.advanceTimersByTime(2000)
+      expect(propia.chipError.classList.contains(DESTELLO)).toBe(false)
+      suyo.destruir()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('⛔ NO destella cuando la cuenta no sube: repetición o vaciado', () => {
+    panel.avisar('Un error.', { nivel: NIVEL.ERROR })
+    cascara.chipError.classList.remove(DESTELLO)
+
+    // Repetición del MISMO mensaje: sube el `×N`, no sube la cuenta de mensajes
+    // distintos. No hay nada nuevo que mirar, y destellar aquí enseñaría a
+    // ignorar el destello (una tanda de teselas del IGN son decenas de llamadas).
+    panel.avisar('Un error.', { nivel: NIVEL.ERROR })
+    expect(cascara.chipError.classList.contains(DESTELLO)).toBe(false)
+
+    panel.limpiar()
+    expect(cascara.chipError.classList.contains(DESTELLO)).toBe(false)
+  })
+
+  it('destruir() no deja el destello pegado ni el temporizador vivo', () => {
+    vi.useFakeTimers()
+    try {
+      const propia = montarCascara()
+      const suyo = crearPanelAvisos(propia)
+      suyo.avisar('Un error.', { nivel: NIVEL.ERROR })
+      expect(propia.chipError.classList.contains(DESTELLO)).toBe(true)
+      suyo.destruir()
+      expect(propia.chipError.classList.contains(DESTELLO)).toBe(false)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

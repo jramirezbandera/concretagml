@@ -63,6 +63,28 @@
 // fotogramas del arrastre»): se llaman POR FRAME, pero ninguno escribe en el
 // store ni commitea. El gesto sigue dejando UN `set` y UN `commit`, en `dragend`.
 //
+// ── La SELECCIÓN de vértice: el mismo argumento, una vez más ────────────────
+// «Pincho un punto y quiero ver cuál es en la tabla; pincho una fila y quiero ver
+// cuál es en el mapa.» Eso es, otra vez, DOS VISTAS DE UN MISMO DATO, y por eso
+// vive aquí y no en un módulo nuevo: este es el único sitio del proyecto que
+// tiene a la vez los `L.Marker` y las `<tr>`, y tenerlos los dos es toda la
+// feature. Un módulo aparte tendría que ir a buscarlos por selector y volver a
+// enterarse de cuándo se reconstruyen.
+//
+// Tres reglas que la sostienen, y ninguna es evidente:
+//   · **La selección NO es del modelo.** No entra en el estado, no se commitea y
+//     no aparece en el GML: es qué está mirando el usuario ahora mismo. Por eso
+//     no pasa por `estado.set` (metería un snapshot en el historial por cada
+//     clic) y por eso sobrevive a los renders desde aquí y no desde el store.
+//   · **El clic sobre el vértice se REEMITE al mapa.** Ver `crearMarcador`: en
+//     cuanto una capa escucha `click`, Leaflet deja de disparar el del mapa, y de
+//     ese clic viven hoy tres cosas ajenas a este módulo.
+//   · **Se pinta con ARIA, no con una clase de estado.** La fila seleccionada
+//     lleva `aria-current="true"` y `estilos/app.css` estila sobre ese atributo,
+//     que es la misma decisión —y por el mismo motivo— que la barra de edición
+//     tomó con `aria-expanded`: una clase paralela al ARIA acaba divergiendo de
+//     él, y quien lee con lector de pantalla se queda sin la mitad.
+//
 // ── Frontera de vista (regla 3) ─────────────────────────────────────────────
 // El modelo va SIEMPRE en UTM. lat/lon aparece solo para pintar, y solo a
 // través de `vertUTMaLatLng`/`recintoALatLng`/`latLngAUTM` de `_comun.js`.
@@ -126,8 +148,28 @@ const DECIMALES_VISIBLES = 3
 /** Lado del cuadradito de vértice, en px CSS. */
 const LADO_VERTICE_PX = 10
 
+/**
+ * Lado del cuadradito del vértice SELECCIONADO, en px CSS.
+ *
+ * Más grande, y no solo de otro color: el vértice se mira sobre una ortofoto, y
+ * un cambio de tono sobre cubierta clara o sobre asfalto puede no leerse. El
+ * tamaño sí se lee siempre. El ancla se recalcula sola (`lado / 2`), así que el
+ * punto no se mueve ni un píxel al seleccionarlo.
+ */
+const LADO_VERTICE_SELECCIONADO_PX = 16
+
 /** Neutro sobrio para la geometría OFICIAL: es la referencia, no lo editable. */
 const COLOR_OFICIAL = '#6B7280'
+
+/**
+ * Atributo con el que se marca la fila del vértice seleccionado.
+ *
+ * `aria-current` y no una clase `gml-fila--seleccionada`: es exactamente «el
+ * elemento actual dentro de un conjunto», que es lo que significa, y así el
+ * lector de pantalla y la hoja de estilo leen LA MISMA fuente (ver la cabecera
+ * del módulo). `estilos/app.css` estila sobre `[aria-current='true']`.
+ */
+const ARIA_SELECCION = 'aria-current'
 
 /** Clases CSS del cromo de la tabla (estables: Fase 3 y F06 estilan sobre ellas). */
 const CLASE = Object.freeze({
@@ -141,6 +183,7 @@ const CLASE = Object.freeze({
   CELDA_Y: 'gml-celda-y',
   INPUT: 'gml-input-coordenada',
   VERTICE: 'gml-vertice',
+  VERTICE_SELECCIONADO: 'gml-vertice-seleccionado',
 })
 
 // ── Helpers de módulo (puros) ────────────────────────────────────────────────
@@ -229,6 +272,61 @@ function formaDe(parcela) {
 function mismaForma(a, b) {
   if (a === null || b === null) return false
   return a.length === b.length && a.every((n, i) => n === b[i])
+}
+
+/** ¿Las dos referencias señalan el mismo vértice? (`null` solo casa con `null`). */
+function mismaRef(a, b) {
+  if (a === null || b === null) return a === b
+  return a.recinto === b.recinto && a.indice === b.indice
+}
+
+/**
+ * `{recinto, indice}` con los dos enteros ≥ 0, o `null`.
+ *
+ * `null` para «suelta la selección» es un valor legítimo; cualquier otra cosa que
+ * no tenga la forma de una `RefVertice` es un contrato roto por el PROGRAMADOR y
+ * lo detecta quien llama (`seleccionarVertice`), no esta función.
+ *
+ * @param {*} ref
+ * @returns {RefVertice|null|undefined}  `undefined` = la referencia no vale.
+ */
+function normalizarRef(ref) {
+  if (ref === null || ref === undefined) return null
+  if (typeof ref !== 'object' || Array.isArray(ref)) return undefined
+  const { recinto, indice } = ref
+  if (!Number.isInteger(recinto) || recinto < 0) return undefined
+  if (!Number.isInteger(indice) || indice < 0) return undefined
+  return { recinto, indice }
+}
+
+/**
+ * Un `L.divIcon` de vértice, con el cuadradito EN LÍNEA.
+ *
+ * Los estilos van en línea y no en una hoja porque este módulo es librería y no
+ * puede importar CSS (ver la cabecera, «Por qué `L.divIcon`»): el vértice tiene
+ * que verse igual en dev, en build y en jsdom, con `estilos/app.css` cargada o
+ * sin ella. Lo único que la hoja de la app le pone es el cursor.
+ *
+ * @param {object} args
+ * @param {number} args.lado  Lado del cuadradito, en px CSS. El ancla es su
+ *   centro exacto, así que cambiarlo NO mueve el punto.
+ * @param {number} args.borde  Grosor del filete blanco, en px.
+ * @param {string} args.anillo  El `box-shadow` que rodea al filete.
+ * @param {string} args.clase  `className` del icono (contrato para la hoja y
+ *   para los guiones de humo).
+ * @returns {import('leaflet').DivIcon}
+ */
+function crearIconoVertice({ lado, borde, anillo, clase }) {
+  return L.divIcon({
+    className: clase,
+    iconSize: [lado, lado],
+    iconAnchor: [lado / 2, lado / 2],
+    html:
+      `<span style="display:block;box-sizing:border-box;` +
+      `width:${lado}px;height:${lado}px;` +
+      `background:${COLOR_USUARIO};border:${borde}px solid #fff;border-radius:2px;` +
+      `box-shadow:${anillo};"></span>`,
+  })
 }
 
 /**
@@ -370,6 +468,11 @@ function esHistorialUsable(h) {
  *   · filas de vértice ......... `tr[data-indice]`  (o `tr[data-recinto][data-indice]`)
  *   · celda X / Y de una fila .. `input[data-eje="x"]` / `input[data-eje="y"]`
  *
+ * Y una sola marca de ESTADO, que no es del modelo: la fila del vértice
+ * seleccionado lleva `aria-current="true"` (`tr[data-indice][aria-current]`), y
+ * su marcador cambia al icono `.gml-vertice.gml-vertice-seleccionado`. Ver la
+ * sección «La SELECCIÓN de vértice» de la cabecera.
+ *
  * La pareja `data-recinto` / `data-indice` de cada fila ES la `RefVertice`
  * `{recinto, indice}` de `validation/_comun.js` (índice 0-based en el anillo
  * ABIERTO): la misma clave con la que F02 señala vértices con problemas, para
@@ -405,7 +508,12 @@ function esHistorialUsable(h) {
  *   vivo (F06). Ver {@link AlPrevisualizar}.
  * @param {AlCrearMarcador|null} [args.alCrearMarcador=null]  Gancho de creación
  *   de marcador (F06). Ver {@link AlCrearMarcador}.
- * @returns {{ destruir: () => void, refrescar: () => void }}
+ * @returns {{
+ *   destruir: () => void,
+ *   refrescar: () => void,
+ *   seleccionarVertice: (ref: RefVertice|null) => (RefVertice|null),
+ *   verticeSeleccionado: () => (RefVertice|null),
+ * }}
  */
 export function sincronizar({
   mapa,
@@ -512,17 +620,26 @@ export function sincronizar({
     fill: false,
     interactive: false,
   }
-  // Un solo divIcon compartido por todos los marcadores: `createIcon()` fabrica
-  // un elemento nuevo en cada uso, así que compartirlo es seguro y más barato.
-  const iconoVertice = L.divIcon({
-    className: CLASE.VERTICE,
-    iconSize: [LADO_VERTICE_PX, LADO_VERTICE_PX],
-    iconAnchor: [LADO_VERTICE_PX / 2, LADO_VERTICE_PX / 2],
-    html:
-      `<span style="display:block;box-sizing:border-box;` +
-      `width:${LADO_VERTICE_PX}px;height:${LADO_VERTICE_PX}px;` +
-      `background:${COLOR_USUARIO};border:2px solid #fff;border-radius:2px;` +
-      `box-shadow:0 0 0 1px rgba(0,0,0,.35);"></span>`,
+  // DOS divIcon por sincronización, compartidos por todos los marcadores:
+  // `createIcon()` fabrica (o reutiliza) un elemento en cada uso, así que
+  // compartirlos es seguro y más barato. La identidad de estos dos objetos ES lo
+  // que `pintarSeleccion` compara para no rehacer iconos que ya están bien.
+  const iconoVertice = crearIconoVertice({
+    lado: LADO_VERTICE_PX,
+    borde: 2,
+    anillo: '0 0 0 1px rgba(0,0,0,.35)',
+    clase: CLASE.VERTICE,
+  })
+  // El seleccionado conserva el amarillo (sigue siendo geometría del usuario) y
+  // se distingue por TAMAÑO y por un anillo oscuro cerrado, que es lo que se lee
+  // igual sobre cubierta clara que sobre asfalto. Lleva las DOS clases: la hoja
+  // de la app pone el cursor sobre `.gml-vertice` y no puede perderlo al
+  // seleccionar.
+  const iconoVerticeSeleccionado = crearIconoVertice({
+    lado: LADO_VERTICE_SELECCIONADO_PX,
+    borde: 3,
+    anillo: '0 0 0 2px #111827',
+    clase: `${CLASE.VERTICE} ${CLASE.VERTICE_SELECCIONADO}`,
   })
 
   // ── Estado interno de la vista ────────────────────────────────────────────
@@ -568,6 +685,19 @@ export function sincronizar({
   let filas = []
   let poligonoEditado = null
   let poligonoOficial = null
+  /**
+   * Vértice seleccionado (`{recinto, indice}`), o `null`. NO es del modelo: es
+   * qué está mirando el usuario (ver la cabecera). Nunca entra en `estado.set`.
+   */
+  let seleccion = null
+  /**
+   * Guarda de reentrada del clic que el marcador REEMITE al mapa (ver
+   * `crearMarcador`). Sin ella el clic reemitido llegaría a `alClicarMapa` —que
+   * es quien suelta la selección al pinchar en el vacío— y soltaría, en el mismo
+   * tick, la selección que se acaba de hacer: pinchar un vértice no seleccionaría
+   * nada y no habría forma de saber por qué.
+   */
+  let reemitiendoClic = false
 
   // ── Ganchos opcionales de F06 (ver cabecera del módulo) ───────────────────
   //
@@ -937,6 +1067,146 @@ export function sincronizar({
     escribirInput(celdas.inputY, utm[1])
   }
 
+  // ── Selección: el mismo vértice, señalado en las DOS vistas ───────────────
+
+  /** ¿El vértice `r,i` es el seleccionado? */
+  const estaSeleccionado = (r, i) =>
+    seleccion !== null && seleccion.recinto === r && seleccion.indice === i
+
+  /**
+   * Pinta la selección en las dos vistas, desde cero y en las estructuras que
+   * haya AHORA. Es idempotente y barato de repetir, y por eso se llama al cerrar
+   * cada render: tras una reconstrucción, `filas` y `marcadores` son objetos
+   * nuevos y el resalte anterior se fue con los viejos.
+   *
+   * @param {object} [opciones]
+   * @param {boolean} [opciones.acercarFila=false]  Lleva la fila seleccionada a
+   *   la vista de la caja con scroll. Solo cuando la selección viene del MAPA:
+   *   si viene de la tabla, el usuario ya está mirando la fila y moverle el
+   *   scroll bajo el dedo sería un tirón gratuito.
+   */
+  function pintarSeleccion({ acercarFila = false } = {}) {
+    for (let r = 0; r < filas.length; r += 1) {
+      const anillo = filas[r]
+      if (!anillo) continue
+      for (let i = 0; i < anillo.length; i += 1) {
+        const celdas = anillo[i]
+        if (!celdas) continue
+        if (estaSeleccionado(r, i)) {
+          celdas.fila.setAttribute(ARIA_SELECCION, 'true')
+          // jsdom no implementa `scrollIntoView` (y un contenedor sin scroll
+          // tampoco lo necesita): se pregunta antes de llamar, en vez de
+          // envolverlo en un try/catch que se tragaría fallos de verdad.
+          if (acercarFila && typeof celdas.fila.scrollIntoView === 'function') {
+            // `block:'nearest'` = el mínimo movimiento que hace visible la fila.
+            // Con 'center' la tabla daría un salto en cada clic del mapa.
+            celdas.fila.scrollIntoView({ block: 'nearest' })
+          }
+        } else {
+          // Se QUITA el atributo en vez de ponerlo a 'false': `aria-current="false"`
+          // es válido pero significa «este no es», y dejarlo en 60 filas es ruido
+          // para el lector de pantalla.
+          celdas.fila.removeAttribute(ARIA_SELECCION)
+        }
+      }
+    }
+
+    for (let r = 0; r < marcadores.length; r += 1) {
+      const anillo = marcadores[r]
+      if (!anillo) continue
+      for (let i = 0; i < anillo.length; i += 1) {
+        const marcador = anillo[i]
+        if (!marcador) continue
+        const icono = estaSeleccionado(r, i) ? iconoVerticeSeleccionado : iconoVertice
+        // La comparación no es cosmética: `setIcon` rehace el `MarkerDrag` del
+        // marcador (`Marker#_initIcon` → `_initInteraction`), y esto corre al
+        // cerrar CADA render —o sea, en cada `set` del store—. Sin ella se
+        // reconstruiría el arrastre de todos los vértices al teclear una celda.
+        if (marcador.options.icon !== icono) marcador.setIcon(icono)
+      }
+    }
+  }
+
+  /**
+   * Fija la selección y la pinta. Silencioso si no cambia nada.
+   *
+   * Una referencia que ya no señala ningún vértice NO se guarda: se suelta la
+   * selección. Pasa de verdad —la fila se pincha y, entre medias, un undo deja
+   * la parcela con menos vértices— y guardarla dejaría un resalte fantasma que
+   * reaparecería en el siguiente render.
+   *
+   * @param {RefVertice|null} ref
+   * @param {object} [opciones]
+   * @param {boolean} [opciones.acercarFila=false]  Ver {@link pintarSeleccion}.
+   * @returns {RefVertice|null}  La selección resultante, en COPIA.
+   */
+  function fijarSeleccion(ref, { acercarFila = false } = {}) {
+    const existe = ref !== null && verticeDelModelo(ref.recinto, ref.indice) !== null
+    const pedida = existe ? { recinto: ref.recinto, indice: ref.indice } : null
+    if (mismaRef(seleccion, pedida)) {
+      // Repintar aunque no cambie: es lo que deja que `seleccionarVertice` sirva
+      // para RESTABLECER el resalte si algo de fuera lo hubiera borrado.
+      pintarSeleccion({ acercarFila })
+      return seleccion === null ? null : { ...seleccion }
+    }
+    seleccion = pedida
+    pintarSeleccion({ acercarFila })
+    return seleccion === null ? null : { ...seleccion }
+  }
+
+  /**
+   * Reconcilia la selección con el estado al cerrar un render: si el vértice
+   * señalado ya no existe (se ha borrado, o ha entrado otra parcela), la
+   * selección se suelta en vez de quedar apuntando a un hueco.
+   */
+  function sincronizarSeleccion() {
+    if (seleccion !== null && !verticeDelModelo(seleccion.recinto, seleccion.indice)) {
+      seleccion = null
+    }
+    pintarSeleccion()
+  }
+
+  /**
+   * `RefVertice` de la fila que contiene a `nodo`, o `null` si no está en una.
+   * @param {EventTarget|null} nodo
+   * @returns {RefVertice|null}
+   */
+  function refDeFila(nodo) {
+    const fila = nodo && typeof nodo.closest === 'function' ? nodo.closest('tr[data-indice]') : null
+    if (!fila) return null
+    return { recinto: Number(fila.dataset.recinto), indice: Number(fila.dataset.indice) }
+  }
+
+  /**
+   * Handler DELEGADO de `click` y `focusin` en `tablaEl` (como el de `change`:
+   * sobrevive a las reconstrucciones de la tabla).
+   *
+   * Los DOS eventos y no solo el clic: al tabular por la tabla o al entrar en una
+   * celda con el teclado también se está señalando un vértice, y sin `focusin` el
+   * mapa se quedaría resaltando el de antes mientras se teclea en otro — que es
+   * justo la mentira que esta feature viene a quitar.
+   *
+   * @param {Event} evento
+   */
+  function alSeñalarFila(evento) {
+    if (!vivo) return
+    const ref = refDeFila(evento.target)
+    if (ref === null) return
+    fijarSeleccion(ref)
+  }
+
+  /**
+   * Clic en el MAPA: suelta la selección. Es lo que se espera de un clic en el
+   * vacío, y deja una forma evidente de deseleccionar sin buscar un botón (la
+   * misma decisión, y la misma frase, que `viewer/edicion.js` con el lindero).
+   *
+   * No se avisa de nada: no ha fallado nada, el usuario ha pinchado fuera.
+   */
+  function alClicarMapa() {
+    if (!vivo || reemitiendoClic) return
+    fijarSeleccion(null)
+  }
+
   // ── Marcadores ───────────────────────────────────────────────────────────
 
   /**
@@ -1015,6 +1285,39 @@ export function sincronizar({
       colocar(punto, pos, enganchado)
       previsualizar(anillosUTM, marcador.refVertice)
     }
+
+    marcador.on('click', (evento) => {
+      if (!vivo) return
+      // `acercarFila`: la selección viene del mapa, así que la tabla tiene que ir
+      // a buscarla. Con 15 vértices la fila cabe en pantalla; con 60 no, y
+      // resaltar una fila que no se ve no señala nada.
+      fijarSeleccion(marcador.refVertice, { acercarFila: true })
+
+      // ⚠️ Y AHORA SE LE DEVUELVE EL CLIC AL MAPA, QUE ES SUYO.
+      //
+      // En cuanto UNA capa escucha `click`, Leaflet deja de disparar el del mapa
+      // (`Map#_findEventTargets`: si encuentra un objetivo que escucha, el mapa ya
+      // no entra en la lista de destinatarios). Hasta esta línea ningún marcador
+      // escuchaba `click`, así que pinchar un vértice ERA un clic de mapa como
+      // cualquier otro — y de ese clic viven hoy tres cosas que no son de este
+      // módulo y que se romperían EN SILENCIO:
+      //   · `viewer/dibujo.js` pone un punto del trazo (F12), y clavar un punto
+      //     nuevo sobre un vértice existente es justo lo que se hace al dibujar
+      //     una parte que apoya en el lindero;
+      //   · `viewer/edicion.js` selecciona el lindero más cercano (F06);
+      //   · `app/cableado-catastro.js` deduce la parcela de ese punto (F05).
+      // Seleccionar un vértice es información AÑADIDA, no una acción que sustituya
+      // a las de nadie, así que el evento se reemite tal cual —con su `latlng`, su
+      // `originalEvent` y todo— y el mapa lo recibe como si el marcador no
+      // existiera. La guarda `reemitiendoClic` es lo único que hay que recordar:
+      // impide que `alClicarMapa` lo lea como «ha pinchado en el vacío».
+      reemitiendoClic = true
+      try {
+        mapa.fire('click', evento)
+      } finally {
+        reemitiendoClic = false
+      }
+    })
 
     marcador.on('dragstart', () => {
       // `dragstart` es inequívoco: empieza un gesto NUEVO. Por eso reabre el
@@ -1166,6 +1469,10 @@ export function sincronizar({
     if (mismaForma(forma, nuevaForma)) actualizarEnSitio(parcela)
     else reconstruir(parcela)
     forma = nuevaForma
+    // Después de pintar y ANTES de cerrar el ciclo: tras una reconstrucción las
+    // filas y los marcadores son objetos nuevos, así que el resalte hay que
+    // volver a ponerlo (y soltarlo si el vértice señalado ya no existe).
+    sincronizarSeleccion()
     sincronizarOficial(parcela)
     // Las vistas en vivo se re-sincronizan con el ESTADO al cerrar cada ciclo
     // (`refVertice:null` = "esto no es un frame de arrastre, es la verdad"): así
@@ -1241,6 +1548,12 @@ export function sincronizar({
   // ── Arranque ─────────────────────────────────────────────────────────────
 
   tablaEl.addEventListener('change', alCambiarCelda)
+  // Los dos de la selección por tabla, delegados en el mismo nodo y por el mismo
+  // motivo que el de `change`. `focusin` y no `focus`: `focus` NO burbujea, así
+  // que delegado no llegaría nunca.
+  tablaEl.addEventListener('click', alSeñalarFila)
+  tablaEl.addEventListener('focusin', alSeñalarFila)
+  mapa.on('click', alClicarMapa)
 
   // Un ÚNICO suscriptor: el render. La guarda `arrastrando` evita repintar en
   // medio de un gesto (recrear la fila que se está actualizando o pisar la
@@ -1267,6 +1580,38 @@ export function sincronizar({
     },
 
     /**
+     * Señala UN vértice en las dos vistas a la vez: el cuadradito del mapa crece
+     * y su fila de la tabla se marca (y se acerca, si la tabla tiene scroll).
+     *
+     * Es la misma puerta por la que entran el clic sobre el vértice y el clic
+     * sobre la fila, así que un llamante de fuera —resaltar el vértice de un
+     * hallazgo de F02, por ejemplo— no necesita nada más.
+     *
+     * @param {RefVertice|null} ref  `{recinto, indice}` (0-based, el mismo par que
+     *   `data-recinto`/`data-indice` de la fila), o `null` para soltar.
+     * @returns {RefVertice|null}  La selección resultante, en COPIA. Es `null`
+     *   también cuando la referencia no señala ningún vértice de la parcela.
+     * @throws {TypeError}  Si `ref` no es `null` ni una `RefVertice` bien formada
+     *   (contrato del programador, regla 1: nunca corrección callada).
+     */
+    seleccionarVertice(ref) {
+      if (!vivo) return null
+      const normalizada = normalizarRef(ref)
+      if (normalizada === undefined) {
+        throw new TypeError(
+          `seleccionarVertice: 'ref' debe ser {recinto, indice} con dos enteros ≥ 0, ` +
+            `o null para soltar la selección; recibido ${describir(ref)}.`,
+        )
+      }
+      return fijarSeleccion(normalizada, { acercarFila: true })
+    },
+
+    /** El vértice seleccionado, en COPIA, o `null`. */
+    verticeSeleccionado() {
+      return seleccion === null ? null : { ...seleccion }
+    },
+
+    /**
      * Deshace todo: marcadores, polígonos, listeners del mapa y del DOM, baja
      * del store y vacía `tablaEl`. Idempotente.
      */
@@ -1275,6 +1620,9 @@ export function sincronizar({
       vivo = false
       bajaDelStore()
       tablaEl.removeEventListener('change', alCambiarCelda)
+      tablaEl.removeEventListener('click', alSeñalarFila)
+      tablaEl.removeEventListener('focusin', alSeñalarFila)
+      mapa.off('click', alClicarMapa)
       quitarMarcadores()
       if (poligonoEditado) {
         mapa.removeLayer(poligonoEditado)
@@ -1288,6 +1636,8 @@ export function sincronizar({
       anillosLatLng = []
       anillosUTM = []
       forma = null
+      seleccion = null
+      reemitiendoClic = false
       arrastrando = false
       renderPendiente = false
       tablaEl.replaceChildren()

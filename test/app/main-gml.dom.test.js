@@ -67,7 +67,7 @@ import { join } from 'node:path'
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-import { crearPanelAvisos } from '../../app/avisos.js'
+import { crearDialogoAvisos } from '../../app/dialogo-avisos.js'
 import { REFCAT_DEMO, SRS_DEMO, parcelaDemo, parcelaDemoConHueco } from '../../app/demo-datos.js'
 import { husoPorSrs } from '../../geo/huso.js'
 import { SEVERIDAD, dateTimeCatastro } from '../../gml/_comun.js'
@@ -434,11 +434,7 @@ function crearEspiaDeEntrega() {
  */
 function cablear(parcelaInicial, extra = {}) {
   const estado = crearEstadoVista(parcelaInicial)
-  const panel = crearPanelAvisos({
-    contenedor: document.getElementById('avisos'),
-    chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
-    chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
-  })
+  const panel = crearDialogoAvisos({ documento: document })
   const entrega = crearEspiaDeEntrega()
   const cableado = cablearGeneracionGml({
     estado,
@@ -873,11 +869,7 @@ describe('app/main · el marcado de index.html es CONTRATO', () => {
   ])('falta %s ⇒ lanza NOMBRANDO el selector', (_caso, selector) => {
     document.querySelector(selector).remove()
     const estado = crearEstadoVista(parcelaDemo())
-    const panel = crearPanelAvisos({
-      contenedor: document.getElementById('avisos'),
-      chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
-      chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
-    })
+    const panel = crearDialogoAvisos({ documento: document })
     expect(() => cablearGeneracionGml({ estado, panel, srs: SRS_DEMO })).toThrow(selector)
   })
 
@@ -894,11 +886,7 @@ describe('app/main · el marcado de index.html es CONTRATO', () => {
 
   it('sin nodos explícitos los localiza solo (es como lo llama `app/main.js`)', () => {
     const estado = crearEstadoVista(parcelaDemo())
-    const panel = crearPanelAvisos({
-      contenedor: document.getElementById('avisos'),
-      chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
-      chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
-    })
+    const panel = crearDialogoAvisos({ documento: document })
     expect(() => cablearGeneracionGml({ estado, panel, srs: SRS_DEMO })).not.toThrow()
     expect(document.querySelector(SELECTOR_BOTON_GML).disabled).toBe(false)
   })

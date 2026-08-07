@@ -108,10 +108,27 @@
      usa la maqueta en la rejilla de vértices. */
   --gml-celda-pad-x: 10px;
 
-  /* Tope de altura de la lista de avisos. F02 puede emitir MUCHOS hallazgos, y
-     sin tope la lista empujaría la tabla y el pie fuera del panel. Con tope, la
-     lista scrollea sola y el reparto de altura del panel es estable. */
-  --gml-avisos-alto-max: 34vh;
+  /* Tope de altura de la lista de avisos.
+
+     ── ⭐ EL NÚMERO CAMBIÓ EL 2026-08-07, Y EL MOTIVO TAMBIÉN ────────────────
+     Valía 34vh, y esos 34vh salían DEL PANEL: la lista vivía en la columna
+     izquierda y el tope estaba ahí para que una tanda larga de hallazgos de F02
+     no empujara la tabla de vértices y el pie fuera de la pantalla. Ése era el
+     problema entero —«el panel de avisos ocupa demasiado espacio de las barras»—
+     y se resolvió mudando la lista a un `<dialog>` (`app/dialogo-avisos.js`).
+
+     Dentro del diálogo el tope ya no protege a nadie de nada: el `<dialog>`
+     tiene su propio `max-height: min(88vh, 900px)` y su propio scroll. Pero
+     tampoco puede quitarse sin más, porque la lista **no es lo único que hay
+     dentro**: encima están el título, el apunte y las tres pestañas, y debajo el
+     pie con «Vaciar» y «Cerrar». Sin tope propio, cuarenta tarjetas empujan el
+     pie fuera del diálogo y hay que scrollear la caja entera para encontrar el
+     botón de cerrar.
+
+     Así que el tope se queda y se sube a 56vh, que es lo que le sobra al
+     diálogo tras la cabecera y el pie. La lista scrollea sola dentro y los dos
+     botones no se mueven. */
+  --gml-avisos-alto-max: 56vh;
 
   /* Tope de altura de la lista de candidatos de referencia catastral, por el
      MISMO motivo que el de avisos: una deducción sobre un centroide ambiguo
@@ -545,11 +562,26 @@ body {
    fondo elevado. Los modificadores solo añaden color. El punto lo pone un
    ::before y no un elemento, para que `chip.textContent = '3 errores'` (que
    reemplaza los HIJOS) no lo borre. */
+/* ⭐ ES UN `<button>` DESDE EL 2026-08-07 (antes era un `<span>`), así que este
+   bloque tiene que deshacer lo que el navegador le pone a un botón —tipografía
+   propia del sistema, `background` gris, borde 3D— o el chip se ve como un botón
+   de formulario de 1998 en medio de la cabecera. El `font: inherit` es el que
+   más importa: sin él, `--text-12` y `--fw-semibold` no llegan.
+
+   `text-align: left` porque un botón centra por defecto y aquí manda el
+   `inline-flex`; `line-height: inherit` porque el `normal` del botón desalinea el
+   punto del `::before` con el texto. */
 .gml-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 3px 9px;
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
   border: 1px solid var(--color-border-sub);
   border-radius: 3px;
   background: var(--color-bg-elevated);
@@ -579,6 +611,65 @@ body {
   color: var(--color-state-warn);
   background: var(--color-tint-warn);
   border-color: color-mix(in srgb, var(--color-state-warn) 32%, transparent);
+}
+
+/* Que se note que ABRE algo. El chip no tiene sitio para un rótulo tipo «ver
+   detalle» —mide lo que mide «0 errores»—, así que lo dicen el cursor y el borde
+   al pasar por encima. El anillo de FOCO no se declara aquí: ya lo pone
+   `.gml-app :focus-visible` para todo lo de dentro de la app, y repetirlo es
+   exactamente lo que este fichero se prohíbe en otras tres variantes de botón. */
+.gml-chip:hover {
+  border-color: var(--color-border-main);
+}
+
+/* ── ⭐ EL DESTELLO: lo que sustituye a la lista que se fue de la columna ─────
+ *
+ * Mientras los avisos vivían en el panel, un error nuevo aparecía como una
+ * tarjeta roja de 52 px en mitad de la columna. Ahora aparece como un número más
+ * alto dentro de un chip de 12 px, y eso no lo ve nadie. Este parpadeo es la
+ * compensación, y la decisión del autor (2026-08-07) fue explícitamente ÉSTA y no
+ * abrir el modal solo: un diálogo que salta encima de una edición de vértices se
+ * aprende a cerrar sin leerlo.
+ *
+ * La clase la pone y la quita `app/avisos.js` cuando la cuenta SUBE; los 600 ms
+ * de aquí son los mismos que su `MS_DESTELLO`, y si se cambia uno hay que cambiar
+ * el otro (el JS no lee el CSS: la clase baja por temporizador y no por
+ * `animationend`, precisamente para que `prefers-reduced-motion` no la deje
+ * pegada para siempre).
+ *
+ * `outline` y no `box-shadow` ni `transform`: el chip vive en un `flex` con
+ * `wrap`, y cualquier cosa que cambie su CAJA reflowea la fila entera —el mismo
+ * desbordamiento de 102,53 px que documenta `.gml-chips` aquí arriba—. El
+ * `outline` no ocupa sitio. */
+@keyframes gml-chip-destello {
+  0%,
+  100% {
+    outline-color: transparent;
+  }
+  35%,
+  65% {
+    outline-color: currentColor;
+  }
+}
+
+/* 300 ms × 2 pasadas = los 600 ms de `MS_DESTELLO`. Dos parpadeos y no uno
+   porque uno solo, a la velocidad a la que el ojo recorre una cabecera, se
+   confunde con un repintado. */
+.gml-chip--destello {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  animation: gml-chip-destello 300ms ease-in-out 2;
+}
+
+/* Quien pide menos movimiento no pide menos información: el chip se queda con el
+   anillo PUESTO y fijo durante los mismos 600 ms, sin parpadear. La alternativa
+   —no hacer nada— dejaría a ese usuario sin ninguna señal de que ha entrado un
+   error, que es justo lo que esta regla existe para dar. */
+@media (prefers-reduced-motion: reduce) {
+  .gml-chip--destello {
+    outline-color: currentColor;
+    animation: none;
+  }
 }
 
 /* ═══ Bloques y rótulos ══════════════════════════════════════════════════════ */
@@ -645,25 +736,19 @@ body {
   box-shadow: none;
 }
 
-/* ── ⛔ LOS AVISOS EN DIAGNÓSTICO: SE CALLAN, PERO NO SE ESCONDEN ─────────────
- * El autor pidió que en Diagnóstico la columna la ocupe el contraste «y sustituya
- * a los vértices y avisos». Los vértices se resuelven con `data-pantalla` (son
- * datos, y en esa pantalla no se miran). Los avisos NO, y la diferencia es de
- * fondo: son el canal de errores de la aplicación entera, y hay una prueba que
- * exige que `.gml-bloque--avisos` no declare pantalla precisamente porque
- * esconderlo al cambiar de paso sería el peor fallo mudo que esta cáscara puede
- * tener. No es teórico aquí: `app/cableado-diagnostico.js` manda al panel de
- * avisos los fallos del cálculo y de la composición del informe, y sus renglones
- * de estado dicen literalmente «Mira el panel de avisos».
+/* ── ✅ RESUELTO POR LA MUDANZA (2026-08-07) ──────────────────────────────────
+ * Aquí vivía una regla que ocultaba `.gml-bloque--avisos` en Diagnóstico **solo
+ * cuando estaba vacío**, colgada de `:has(.gml-avisos-vacio)`. Era un apaño fino
+ * para un encargo del autor —«que el contraste sustituya a los vértices y
+ * avisos»— que no se podía cumplir del todo: los avisos son el canal de errores
+ * de la aplicación entera, y `app/cableado-diagnostico.js` manda ahí los fallos
+ * del cálculo y del informe.
  *
- * Así que se oculta lo que sobraba y solo eso: **el bloque cuando está VACÍO**, que
- * es lo que se veía en la captura («AVISOS / Sin avisos.», ~60 px para decir que no
- * hay nada que decir). Con un solo hallazgo dentro, reaparece. El gancho es el
- * `.gml-avisos-vacio` que fabrica `app/avisos.js`, así que el estado de la lista y
- * el de esta regla no pueden divergir: son el mismo nodo. */
-.gml-app[data-paso='diagnostico'] .gml-bloque--avisos:has(.gml-avisos-vacio) {
-  display: none;
-}
+ * La regla se ha borrado porque el bloque ya no existe: la lista se fue a
+ * `app/dialogo-avisos.js` y en Diagnóstico la columna es del contraste sin
+ * competencia. El canal no se ha perdido —los chips siguen en la cabecera, en
+ * las cinco pantallas—, así que lo que aquella regla equilibraba ya no hay que
+ * equilibrarlo. */
 
 .gml-rotulo {
   margin: 0 0 var(--space-2);
@@ -1018,12 +1103,41 @@ body {
 
 /* ═══ Avisos ═════════════════════════════════════════════════════════════════ */
 
-/* El bloque de avisos CEDE ALTURA. Es el único `.gml-bloque` además del de
-   vértices que no es `flex:none`, y la diferencia entre los dos es deliberada:
+/* ── ⭐⭐ LA LISTA SE FUE DEL PANEL (2026-08-07) ───────────────────────────────
+ *
+ * Lo que sigue es el REGISTRO de siete fases peleándose por la altura del panel,
+ * y se conserva entero porque la pelea sigue viva para los demás bloques. Pero
+ * las DOS REGLAS que lo cerraban —`.gml-bloque--avisos { flex: 0 1 auto }` y su
+ * `min-height: 0`— **ya no existen**: el bloque tampoco. La lista de avisos vive
+ * desde hoy en un `<dialog>` (`app/dialogo-avisos.js`) y de la columna solo
+ * quedan los dos chips de la cabecera, que son `flex:none` y miden lo que mide
+ * una línea de 12 px.
+ *
+ * Lo que esto le devuelve al panel, en las cifras de este mismo comentario: los
+ * hasta 34vh que la lista podía ocupar, más los ~60 px que gastaba en decir «Sin
+ * avisos.» el 95 % del tiempo. Es la primera vez en siete fases que el
+ * presupuesto de altura crece porque algo SALE en vez de porque algo se
+ * reorganice.
+ *
+ * ⚠️ **NO ARREGLA EL PROBLEMA DE FONDO**, y esto hay que leerlo antes de
+ * celebrarlo, igual que en la nota de T6 de más abajo: el panel sigue repartiendo
+ * una altura FIJA entre bloques FIJOS, y `spec/feature-06-edicion-parcela.md` §2
+ * sigue sin cerrar. Lo que se ha ido es el único bloque cuyo alto lo decidía el
+ * DATO. El próximo bloque fijo que entre se sigue comiendo el aire igual de
+ * rápido.
+ *
+ * ⛔ Si vuelves a meter la lista en la columna, estas dos reglas vuelven contigo:
+ * sin `flex: 0 1 auto` y sin `min-height: 0` en la caja interior, la sección no
+ * puede ceder nada y lo primero que se sale por abajo es «Generar GML». El
+ * registro de por qué está justo aquí debajo.
+ *
+ * ── EL REGISTRO (histórico, F05 → rework de UI) ─────────────────────────────
+ * El bloque de avisos CEDÍA ALTURA. Era el único `.gml-bloque` además del de
+   vértices que no era `flex:none`, y la diferencia entre los dos era deliberada:
    vértices `1 1 auto` (crece Y encoge, absorbe lo que sobra), avisos `0 1 auto`
    (NO crece, pero encoge cuando falta).
 
-   Por qué existe esta regla, medido durante F05: el panel reparte una altura
+   Por qué existió esa regla, medido durante F05: el panel reparte una altura
    fija entre bloques fijos, y el bloque nuevo «Origen de la parcela» añadió
    ~137 px a ese presupuesto. Con la lista de avisos llena (su tope es 34vh) y
    un viewport de portátil, la suma se pasaba: la tabla encogía hasta cero y lo
@@ -1118,14 +1232,28 @@ body {
    cierta en la cuarta—: cuando entre un bloque fijo nuevo en CUALQUIER
    pantalla, y en **T9**, que trae Comprobación y Diagnóstico a una pantalla
    propia. Las cifras de arriba son de la rama PARCELA en Validación; si el
-   guion 14 devuelve otras, mandan las suyas y esta nota se corrige. */
-.gml-bloque--avisos {
-  flex: 0 1 auto;
-}
+   guion 14 devuelve otras, mandan las suyas y esta nota se corrige.
 
-.gml-bloque--avisos .gml-avisos {
-  min-height: 0;
-}
+   ── ⭐ Y LA MUDANZA DE LOS AVISOS LO VOLVIÓ A SUBIR (2026-08-07) ───────────
+   Todas las cifras de arriba están medidas con la lista de avisos todavía en la
+   columna. Se fue, y el guion 14 lo ha vuelto a medir el mismo día, sobre el
+   mismo nodo (`#tabla-vertices`) y en la misma pantalla (Validación, rama
+   PARCELA):
+
+       caja de vértices, T6 (con la lista) .... 385,67 px a 1440×900 · 228,33 a 1280×720
+       caja de vértices, HOY (sin ella) ....... 477,08 px a 1440×900 · 297,08 a 1280×720
+       ganancia .............................. +91,41 px (+23,7 %) · +68,75 px (+30,1 %)
+
+   Y hay una segunda cifra que importa más que la primera, porque es la que
+   describe la queja original del autor («los avisos se recortan y pelean con las
+   coordenadas»): **lo que cinco avisos le cuestan ahora a esa caja es 0,00 px**,
+   medido en los dos viewports. Antes se los comía. La lista, en reposo, ocupa
+   0,00 px de la columna.
+
+   ⚠️ Sigue siendo aire prestado, exactamente igual que en la nota de T6: el
+   reparto dentro de una pantalla no ha cambiado, y el próximo bloque fijo que
+   entre se lo come. Lo que ha cambiado es que ya no hay ningún bloque en el
+   panel cuyo alto lo decida el dato. */
 
 .gml-avisos {
   display: flex;
@@ -1335,6 +1463,41 @@ body {
    sombreadas. */
 .gml-tabla-vertices .gml-fila-vertice:hover {
   background: var(--color-bg-elevated);
+}
+
+/* ── La fila del vértice SELECCIONADO ────────────────────────────────────────
+ *
+ * El otro extremo del cable que `viewer/sincronizacion.js` tiende entre el mapa
+ * y la tabla: se pincha el cuadradito amarillo del mapa y se marca esta fila; se
+ * pincha esta fila (o se entra en una de sus celdas con el teclado) y crece el
+ * cuadradito del mapa.
+ *
+ * `[aria-current='true']` y NO una clase de estado: el módulo ya tiene que
+ * marcar la fila para el lector de pantalla («el elemento actual del conjunto»,
+ * que es exactamente lo que significa), y colgar además una clase paralela sería
+ * un segundo sitio donde decir lo mismo — el día que uno se olvide, el resalte y
+ * el ARIA dejan de coincidir. Es la misma decisión que la barra de edición ya
+ * tomó con `aria-expanded`.
+ *
+ * TERCERA en el orden y no por casualidad: zebra (0,2,0) → hover (0,3,0) → ésta
+ * (0,3,0). Con la misma especificidad que el hover gana la última, así que pasar
+ * el ratón por encima de la fila seleccionada NO le borra el resalte. Si mueves
+ * esta regla arriba, la selección desaparece justo cuando el usuario apunta a
+ * ella con el ratón, que es cuando más la está mirando.
+ *
+ * El ámbar es el mismo `--gml-color-usuario-sobre-claro` con el que ya se pinta
+ * el nº de vértice de esta tabla (la versión legible sobre blanco del amarillo
+ * del mapa), diluido para que siga siendo fondo y no reclamo: el dato tiene que
+ * poder leerse encima. La barra de la izquierda va como `inset box-shadow` sobre
+ * la celda del índice y no como `border-left` en el <tr>, porque un borde en una
+ * tabla con `border-collapse:collapse` desplaza la columna y la tabla entera
+ * temblaría al seleccionar. */
+.gml-tabla-vertices .gml-fila-vertice[aria-current='true'] {
+  background: color-mix(in srgb, var(--gml-color-usuario-sobre-claro) 12%, transparent);
+}
+
+.gml-tabla-vertices .gml-fila-vertice[aria-current='true'] .gml-celda-indice {
+  box-shadow: inset 3px 0 0 var(--gml-color-usuario-sobre-claro);
 }
 
 /* El nº de vértice, en el ámbar reservado a la GEOMETRÍA DEL USUARIO sobre
@@ -1835,6 +1998,13 @@ body {
 .gml-app .gml-vertice {
   cursor: grab;
 }
+
+/* El vértice SELECCIONADO (`gml-vertice gml-vertice-seleccionado`) NO tiene
+   regla propia, y es deliberado: su cuadradito —más grande y con anillo oscuro—
+   también va en línea, y lleva las DOS clases precisamente para que el cursor de
+   arriba lo siga alcanzando. La clase se publica como contrato para los guiones
+   de humo, que necesitan poder preguntar «¿cuál está seleccionado?» sin leer
+   estilos en línea. */
 
 .gml-app .gml-vertice:active {
   cursor: grabbing;
@@ -4203,6 +4373,7 @@ button.gml-parte-nombre {
 .gml-app .gml-dialogo-trabajo,
 .gml-app .gml-dialogo-importacion,
 .gml-app .gml-dialogo-pegado,
+.gml-app .gml-dialogo-avisos,
 .gml-app dialog[data-bloque='atributos-edificio'] {
   position: fixed;
   top: 50%;
@@ -4234,6 +4405,7 @@ button.gml-parte-nombre {
 .gml-app .gml-dialogo-trabajo::backdrop,
 .gml-app .gml-dialogo-importacion::backdrop,
 .gml-app .gml-dialogo-pegado::backdrop,
+.gml-app .gml-dialogo-avisos::backdrop,
 .gml-app dialog[data-bloque='atributos-edificio']::backdrop {
   background: color-mix(in srgb, var(--color-text-primary) 45%, transparent);
 }
@@ -4242,15 +4414,24 @@ button.gml-parte-nombre {
 .gml-dialogo-capas-cuerpo,
 .gml-dialogo-atributos-cuerpo,
 .gml-dialogo-pegado-cuerpo,
+.gml-dialogo-avisos-cuerpo,
 .gml-dialogo-importacion-cuerpo {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
 
+/* El diálogo de avisos aprieta su reparto: entre el título y las pestañas, y
+   entre las pestañas y la lista, `--space-4` deja la caja con más aire que
+   contenido cuando solo hay un aviso dentro. */
+.gml-dialogo-avisos-cuerpo {
+  gap: var(--space-3);
+}
+
 .gml-dialogo-capas-titulo,
 .gml-dialogo-atributos-titulo,
 .gml-dialogo-pegado-titulo,
+.gml-dialogo-avisos-titulo,
 .gml-dialogo-importacion-titulo {
   margin: 0;
   font-size: var(--gml-titulo-tam);
@@ -4374,6 +4555,7 @@ button.gml-parte-nombre {
 .gml-dialogo-capas-pie,
 .gml-dialogo-atributos-pie,
 .gml-dialogo-pegado-pie,
+.gml-dialogo-avisos-pie,
 .gml-dialogo-importacion-pie {
   display: flex;
   flex-wrap: wrap;
@@ -4388,9 +4570,17 @@ button.gml-parte-nombre {
 .gml-app .gml-dialogo-capas-pie .gml-boton,
 .gml-app .gml-dialogo-atributos-pie .gml-boton,
 .gml-app .gml-dialogo-pegado-pie .gml-boton,
+.gml-app .gml-dialogo-avisos-pie .gml-boton,
 .gml-app .gml-dialogo-importacion-pie .gml-boton {
   width: auto;
   flex: none;
+}
+
+/* «Cerrar» a la derecha del todo. Es el primario y el que más se pulsa, y en el
+   pie de este diálogo el otro botón («Vaciar la lista») es destructivo: separarlos
+   evita el clic de más. */
+.gml-dialogo-avisos-pie [data-accion='cerrar-avisos'] {
+  margin-left: auto;
 }
 
 /* El renglón donde se escribe POR QUÉ está apagado «Aplicar» (regla de oro 1:
@@ -4405,6 +4595,78 @@ button.gml-parte-nombre {
   min-height: 1.45em;
   font-size: var(--text-12);
   color: var(--color-text-secondary);
+}
+
+/* ══ EL DIÁLOGO DE AVISOS (2026-08-07) ═══════════════════════════════════════
+ *
+ * Casi todo lo suyo ya está escrito más arriba: la caja, el velo, el cuerpo, el
+ * título y el pie entran en las listas de selectores de la familia de diálogos, y
+ * las tarjetas de dentro son las mismas `.gml-aviso` de siempre, que no se han
+ * tocado ni una línea. Lo que queda aquí son las TRES cosas que solo tiene este:
+ * el apunte, las pestañas de filtro y el ajuste de la lista dentro de la caja. */
+
+.gml-dialogo-avisos-apunte {
+  margin: 0;
+  max-width: 68ch;
+  font-size: var(--text-12);
+  color: var(--color-text-secondary);
+}
+
+/* ── Las tres pestañas ────────────────────────────────────────────────────────
+ *
+ * Botones de alternancia, no `role="tab"` (el porqué, en `app/dialogo-avisos.js`).
+ * El estado puesto lo marcan DOS cosas a la vez, la clase y `aria-pressed`, y el
+ * CSS se cuelga de la clase: si un día el módulo se olvidara de una de las dos, se
+ * ve en pantalla en vez de quedarse solo en el árbol de accesibilidad.
+ *
+ * `flex-wrap` por lo mismo que en `.gml-chips`: con «Errores 12» y «Avisos 148» la
+ * fila crece en vez de recortarse en silencio. */
+.gml-dialogo-avisos-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.gml-app .gml-filtro-avisos {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 4px 11px;
+  font: inherit;
+  font-size: var(--text-12);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.45;
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-sub);
+  border-radius: 3px;
+  transition: var(--transition-border);
+}
+
+.gml-app .gml-filtro-avisos:hover {
+  border-color: var(--color-border-main);
+  color: var(--color-text-primary);
+}
+
+.gml-app .gml-filtro-avisos--puesto {
+  color: var(--color-accent);
+  background: var(--color-tint-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+
+/* ── La lista, dentro de la caja ──────────────────────────────────────────────
+ *
+ * `.gml-avisos` ya trae de su regla general el `flex-direction:column`, el
+ * `overflow-y:auto`, el `overscroll-behavior:contain` y el tope de altura
+ * (`--gml-avisos-alto-max`, que subió a 56vh con esta mudanza). Lo único que hace
+ * falta añadir aquí es el `min-height`: sin él, un hijo flex no encoge por debajo
+ * del alto de su contenido y cuarenta tarjetas empujarían el pie —«Vaciar» y
+ * «Cerrar»— fuera de la caja. Es la misma línea que necesitaba el bloque cuando
+ * vivía en el panel, por la misma razón, y por eso se mudó con él. */
+.gml-dialogo-avisos .gml-avisos {
+  min-height: 0;
 }
 
 /* ── F18 · La revisión de una medición ────────────────────────────────────────

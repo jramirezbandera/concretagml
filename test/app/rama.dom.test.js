@@ -469,13 +469,25 @@ describe('app/rama · ida y vuelta a EDIFICIO deja VIVA la rama parcela (M10)', 
     expect(seccionVertices().getAttribute(ATRIBUTO_PANEL)).toBe(RAMA.PARCELA)
   })
 
-  it('«Avisos» y el pie NO se intercambian: son de las dos ramas', () => {
+  it('los chips de avisos y el pie NO se intercambian: son de las dos ramas', () => {
+    // Hasta el 2026-08-07 el nodo vigilado aquí era `.gml-bloque--avisos`. Se fue
+    // del panel (la lista vive en `app/dialogo-avisos.js`) y lo que queda de los
+    // avisos en la columna son los dos chips de la cabecera. El invariante es el
+    // mismo y sigue haciendo la misma falta: la rama EDIFICIO **intercambia**
+    // secciones del panel, y si se llevara por delante el contador de errores, la
+    // mitad de la aplicación se quedaría sin canal de avisos al conmutar.
     const { rama } = cablear()
-    const avisos = document.querySelector('.gml-bloque--avisos')
+    const cabecera = document.querySelector('.gml-panel-cabecera')
+    const chipError = document.querySelector('.gml-chip[data-contador="ERROR"]')
+    const chipAviso = document.querySelector('.gml-chip[data-contador="AVISO"]')
     const pie = document.querySelector('.gml-panel-pie')
     rama.set(RAMA.EDIFICIO)
-    expect(avisos.hasAttribute(ATRIBUTO_PANEL)).toBe(false)
-    expect(avisos.hidden).toBe(false)
+    expect(cabecera.hasAttribute(ATRIBUTO_PANEL)).toBe(false)
+    expect(cabecera.hidden).toBe(false)
+    for (const chip of [chipError, chipAviso]) {
+      expect(chip.hasAttribute(ATRIBUTO_PANEL)).toBe(false)
+      expect(chip.hidden).toBe(false)
+    }
     expect(pie.hidden).toBe(false)
   })
 })

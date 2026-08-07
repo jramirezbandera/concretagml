@@ -89,7 +89,7 @@ import { join } from 'node:path'
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-import { crearPanelAvisos } from '../../app/avisos.js'
+import { crearDialogoAvisos } from '../../app/dialogo-avisos.js'
 import { SRS_DEMO, parcelaDemo } from '../../app/demo-datos.js'
 import { OPERATIVOS } from '../../config/operativos.js'
 import { commit, crearHistorial, puedeDeshacer, puedeRehacer } from '../../edit/historial.js'
@@ -401,6 +401,19 @@ function montarCascara() {
 // el import de la línea siguiente, y este fichero reproduce ese orden.
 montarCascara()
 
+// ⭐ **`?demo=real` ES OBLIGATORIO DESDE EL 2026-08-07**, y va ANTES del import.
+// Ese día la aplicación dejó de arrancar con la parcela de demostración dentro
+// (petición del autor: «que empiece sin nada precargado») y el store nace `null`.
+// Este fichero mide la EDICIÓN y la ficha del pie sobre geometría real, así que
+// sin esta línea no está probando de menos: está probando otra cosa —14 casos
+// caían con `Cannot read properties of null`—.
+//
+// `history.replaceState` y no `location.search = …`: en jsdom la asignación
+// directa intenta navegar y no llega a ninguna parte. Y va antes del `import`
+// porque `app/main.js` lee la query **en su código de nivel superior**: puesta
+// después, el módulo ya habría decidido arrancar vacío.
+window.history.replaceState({}, '', '?demo=real')
+
 const {
   cablearEdicion,
   cablearGeneracionGml,
@@ -581,11 +594,7 @@ function cablear(parcelaInicial, extra = {}) {
   // primera edición del usuario sería irreversible.
   commit(historial, estado.get())
 
-  const panel = crearPanelAvisos({
-    contenedor: document.getElementById('avisos'),
-    chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
-    chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
-  })
+  const panel = crearDialogoAvisos({ documento: document })
   const edicion = extra.edicion ?? crearEdicionFalsa()
   const colindantesContadas = []
 
@@ -1404,11 +1413,7 @@ describe('app/main · el botón «Generar GML» sigue al store tras un undo', ()
     const estado = crearEstadoVista(parcelaCuadrada())
     const historial = crearHistorial()
     commit(historial, estado.get())
-    const panel = crearPanelAvisos({
-      contenedor: document.getElementById('avisos'),
-      chipError: document.querySelector('.gml-chip[data-contador="ERROR"]'),
-      chipAviso: document.querySelector('.gml-chip[data-contador="AVISO"]'),
-    })
+    const panel = crearDialogoAvisos({ documento: document })
     const gml = cablearGeneracionGml({ estado, panel, srs: SRS_DEMO })
     const edicionCableada = cablearEdicion({
       estado,
