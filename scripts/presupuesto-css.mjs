@@ -259,7 +259,7 @@ export const ASIENTOS = Object.freeze(
         '46ch de `.gml-cajon-margen`. **Las clases de los HIJOS cuestan CERO**: sus reglas son ' +
         '`.gml-app .gml-cajon-titular`, `…-cifra`, `…-seccion dt`, `…-invasion` — sin contenedor ' +
         'delante—, así que alcanzan a los dos cajones sin tocarlas. Sobran 10.436 sobre el techo.' },
-    { hito: 'F21 · edificio: la piscina en su tipo y la precisión declarable', commit: '(sin commitear)',
+    { hito: 'F21 · edificio: la piscina en su tipo y la precisión declarable', commit: '2706cef',
       total: 67665, nuestro: 52570, rebanada: null,
       nota:
         '**+70 B, y son el asiento más barato que ha tenido una pantalla nueva en este proyecto.** ' +
