@@ -224,7 +224,7 @@ export const ASIENTOS = Object.freeze(
         '`min-height: 77px` de la lista de partes, que impide que el flex la apriete a dos filas ' +
         'de catorce. Las dos las encontró el guion 19 en un navegador real; en jsdom no hay ' +
         'cascada que resolver ni altura que repartir. Sobran 10.175 sobre el techo.' },
-    { hito: 'F13 · edificio: validación y generación de GML', commit: '(sin commitear)', total: 67334, nuestro: 52239, rebanada: null,
+    { hito: 'F13 · edificio: validación y generación de GML', commit: '1a97b60', total: 67334, nuestro: 52239, rebanada: null,
       nota:
         '**CERO BYTES, y la hoja sale byte a byte idéntica al asiento anterior.** F13 no escribe ' +
         'ni una regla: enciende un botón que ya existía —con sus clases, su renglón `role=status` ' +
@@ -244,7 +244,7 @@ export const ASIENTOS = Object.freeze(
     // techo solo se cumple quitando producto vivo») y la elección —bajar la hoja o
     // revisar el techo— reservada al autor. F14 añade producto a esa pantalla; no
     // la cierra ni resuelve aquello.
-    { hito: 'F14 · edificio: contraste e informe', commit: '(sin commitear)', total: 67595, nuestro: 52500, rebanada: null,
+    { hito: 'F14 · edificio: contraste e informe', commit: 'dccc6aa', total: 67595, nuestro: 52500, rebanada: null,
       nota:
         '**+261 B, y el plan los daba por CERO.** La idea era que el cajón de contraste de ' +
         'edificio reutilizara la clase del de parcela y no costara ni un byte. Se descartó al ' +

@@ -165,7 +165,7 @@ md5 **`6aff47acc668a2ee9fbf4c930a61f3ab`** — es la red de la extracción del m
 
 # Lo medido al hacerla (2026-08-07)
 
-Estado: **hecha y en verde**, sin commitear. Suite **7.076 / 166**; guion 21
+Estado: **hecha y en verde**, commit `dccc6aa`. Suite **7.076 / 166**; guion 21
 `ok:true` a 1280×720 y a 1440×900; **14/14 mutaciones rojas**; `validar:xsd` OK en
 los seis ficheros; presupuesto anotado (+261 B).
 
