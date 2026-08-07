@@ -390,6 +390,12 @@ export function cablearGeneracionGmlEdificio({
       modelo: edificio.modelo,
       plantasSobreRasante: plantasDelEdificio(edificio.partes),
       estadoConservacion: edificio.estadoConservacion ?? null,
+      // ⭐ F21 · LA LÍNEA QUE F13 DEJÓ SIN ESCRIBIR. `serializarEdificioBu` acepta
+      // `precisionMetros` desde su fase 2 y **nadie se lo pasaba nunca**, así que
+      // el `horizontalGeometryEstimatedAccuracy` salía `xsi:nil` siempre: honrado
+      // mientras el dato no existía, y falso desde que la Sede lo exige en su paso
+      // 1 y el técnico lo tiene delante. Sin declarar sigue siendo `null` ⇒ `nil`.
+      precisionMetros: edificio.precisionMetros ?? null,
       // Los semánticos solo tienen efecto en COMPLETO; se pasan siempre y decide
       // el serializador, para que no haya dos sitios que sepan cuál es cuál.
       usoDominante: edificio.usoDominante ?? null,

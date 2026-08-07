@@ -167,8 +167,12 @@ describe('AC1 · «El selector oculta los atributos semánticos en modo simplifi
     for (const campo of Object.values(CAMPO_ATRIBUTO)) {
       expect(document.querySelector(`[data-campo="${campo}"]`), `${campo} existe`).toBeNull()
     }
-    // Y el único `<dialog>` del panel es el del reparto por capas.
-    expect(todos('dialog')).toHaveLength(1)
+    // Y los `<dialog>` que quedan son el del reparto por capas y —desde F21— el
+    // del trabajo profesional, que nace con el módulo y **no con el modelo**: la
+    // precisión que exige el ICUC hay que poder declararla también aquí. Ninguno
+    // de los dos es el de atributos, que es lo que este criterio defiende.
+    expect(todos('dialog')).toHaveLength(2)
+    expect(document.querySelector(SELECTOR.PRECISION)).not.toBeNull()
 
     // Anti-vacuidad: los que existen SIEMPRE sí están. Si el panel entero
     // estuviera vacío, todo lo de arriba pasaría igual y no diría nada.

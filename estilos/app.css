@@ -4200,6 +4200,7 @@ button.gml-parte-nombre {
    dos tiene nada más ancho que una etiqueta y su campo. */
 .gml-app .gml-dialogo-capas,
 .gml-app .gml-dialogo-atributos,
+.gml-app .gml-dialogo-trabajo,
 .gml-app .gml-dialogo-importacion,
 .gml-app .gml-dialogo-pegado,
 .gml-app dialog[data-bloque='atributos-edificio'] {
@@ -4221,8 +4222,16 @@ button.gml-parte-nombre {
   box-shadow: 0 8px 30px rgba(15, 23, 42, 0.28);
 }
 
+/* ⭐ F21 · `.gml-dialogo-trabajo` entra en las DOS reglas del CONTENEDOR y en
+   ninguna más, y ése es todo su coste: el interior —cuerpo, título, intro, pie y
+   renglón de estado— reutiliza las clases del diálogo de capas, así que no hay
+   una sola declaración nueva para ellas. Mismo reparto que F14 hizo con el cajón
+   de contraste de edificio, y por el mismo motivo: la clase propia existe para
+   que `document.querySelector('.gml-dialogo-capas')` de los guiones de humo no se
+   quede con el nodo equivocado, no para vestirlo distinto. */
 .gml-app .gml-dialogo-capas::backdrop,
 .gml-app .gml-dialogo-atributos::backdrop,
+.gml-app .gml-dialogo-trabajo::backdrop,
 .gml-app .gml-dialogo-importacion::backdrop,
 .gml-app .gml-dialogo-pegado::backdrop,
 .gml-app dialog[data-bloque='atributos-edificio']::backdrop {

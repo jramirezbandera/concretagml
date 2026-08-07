@@ -173,9 +173,41 @@ describe('conModelo — COMPLETO → SIMPLIFICADO borra los siete, y lo dice ant
     for (const clave of ATRIBUTOS_COMPLETO) {
       expect(clave in edificio, `${clave} sigue estando`).toBe(false)
     }
+    // ⭐ F21 · `precisionMetros` SOBREVIVE al paso a SIMPLIFICADO, y ésa es la
+    // diferencia que la separa de los siete: no es un atributo semántico del
+    // edificio, así que cambiar de modelo no puede borrarla.
     expect(Object.keys(edificio).sort()).toEqual(
-      ['construccionOficial', 'idLocal', 'modelo', 'parcelaContexto', 'partes', 'refcat'].sort(),
+      [
+        'construccionOficial',
+        'idLocal',
+        'modelo',
+        'parcelaContexto',
+        'partes',
+        'precisionMetros',
+        'refcat',
+      ].sort(),
     )
+  })
+
+  it('⛔ F21 · la precisión declarada SOBREVIVE a toda mutación, incluida la de modelo', () => {
+    // Sin `precisionMetros` en `reconstruir`, `crearEdificio` le pone su `null` por
+    // defecto y CUALQUIER mutación —renombrar una parte, teclear la RC, cambiar de
+    // modelo— borra en silencio un dato que el técnico va a firmar. Es el mismo
+    // agujero que F12 tapó con `idLocal`, y aquí se comprueba sobre las tres
+    // mutaciones que tocan cosas distintas del objeto.
+    const original = crearEdificio({
+      ...edificioCompleto(),
+      precisionMetros: 0.01,
+    })
+    expect(original.precisionMetros).toBe(0.01)
+
+    expect(conModelo(original, MODELO_EDIFICIO.SIMPLIFICADO).edificio.precisionMetros).toBe(0.01)
+    expect(conRefcat(original, '9398516VK3799G').edificio.precisionMetros).toBe(0.01)
+    expect(conParteRenombrada(original, 0, 'Cuerpo').edificio.precisionMetros).toBe(0.01)
+
+    // MITAD ANTI-VACUIDAD: `0.01` no es el valor por defecto, así que un `null`
+    // que se colara aquí no podría confundirse con «es que siempre valió eso».
+    expect(crearEdificio({}).precisionMetros).toBeNull()
   })
 
   it('conserva TODO lo demás: RC, partes, contexto y geometría oficial', () => {

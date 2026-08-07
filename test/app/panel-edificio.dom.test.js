@@ -60,8 +60,11 @@ import {
   TITULO_CAPAS,
   TITULO_ORIGEN,
   TITULO_PARTES,
+  TITULO_TRABAJO,
   crearPanelEdificio,
   motivoNoNumerico,
+  motivoPrecisionFueraDeRango,
+  motivoPrecisionIlegible,
   selectorCapa,
   selectorParte,
 } from '../../app/panel-edificio.js'
@@ -71,6 +74,7 @@ import {
   ATRIBUTOS_COMPLETO,
   ESTADO_CONSERVACION,
   MODELO_EDIFICIO,
+  PRECISION_MAXIMA_METROS,
   TIPO_PARTE,
   crearEdificio,
 } from '../../model/edificio.js'
@@ -191,7 +195,7 @@ function textosDelPanel() {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe('app/panel-edificio · el marcado que el cableado espera', () => {
-  it('fabrica TRES secciones y UN `<dialog>`, y los monta en el documento', () => {
+  it('fabrica TRES secciones y DOS `<dialog>`, y los monta en el documento', () => {
     // `index.html` no trae ninguno: mismo reparto que los diálogos de F09 y F10 y
     // que la zona de fichero de F08. La tercera es de F12 · T4.1.
     expect(panel.seccionOrigen.tagName).toBe('SECTION')
@@ -199,8 +203,12 @@ describe('app/panel-edificio · el marcado que el cableado espera', () => {
     expect(panel.seccionActiva.tagName).toBe('SECTION')
     expect(panel.dialogoCapas.tagName).toBe('DIALOG')
     for (const raiz of panel.raices()) expect(raiz.isConnected).toBe(true)
-    // Sin atributos (nace SIMPLIFICADO) el único `<dialog>` es el de capas.
-    expect(document.querySelectorAll('dialog').length).toBe(1)
+    // ⭐ F21 · SON DOS y no uno, y ésa es la forma comprobable de la decisión 3:
+    // el del trabajo profesional nace con el módulo, en SIMPLIFICADO también. El
+    // de atributos sigue sin existir aquí, que es el criterio 1 de F11.
+    expect(document.querySelectorAll('dialog').length).toBe(2)
+    expect(document.querySelector(SELECTOR.PRECISION)).not.toBeNull()
+    expect(document.querySelector(SELECTOR_COMPLETO.BLOQUE_ATRIBUTOS)).toBeNull()
   })
 
   it('`secciones()` son EXACTAMENTE las `<section>`, sin los `<dialog>`', () => {
@@ -331,7 +339,8 @@ describe('app/panel-edificio · el marcado que el cableado espera', () => {
 
   it('`destruir` es idempotente y deja el documento como estaba', () => {
     panel.fijar({ edificio: EDIFICIO_COMPLETO })
-    expect(document.querySelectorAll('dialog').length).toBe(2)
+    // Capas + atributos (COMPLETO) + trabajo (F21, siempre) = tres.
+    expect(document.querySelectorAll('dialog').length).toBe(3)
     panel.destruir()
     panel.destruir()
     expect(document.querySelectorAll('dialog').length).toBe(0)
@@ -533,7 +542,10 @@ describe('app/panel-edificio · criterio 1: en SIMPLIFICADO los atributos NO EXI
     for (const selector of Object.values(SELECTOR_COMPLETO)) {
       expect(document.querySelector(selector)).toBeNull()
     }
-    expect(document.querySelectorAll('dialog').length).toBe(1)
+    // Queda el de capas y el del trabajo (F21): éste NO se va con el modelo, que
+    // es justo lo que lo hace útil en el recorrido corto.
+    expect(document.querySelectorAll('dialog').length).toBe(2)
+    expect(document.querySelector(SELECTOR.PRECISION)).not.toBeNull()
   })
 
   it('los radios llevan los valores de MODELO_EDIFICIO SIN TRADUCIR', () => {
@@ -1015,6 +1027,151 @@ describe('app/panel-edificio · el diálogo de atributos (desviación 12)', () =
 })
 
 // ═════════════════════════════════════════════════════════════════════════════
+// 7bis · F21 · El diálogo del trabajo profesional
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// ⭐ Lo que este bloque defiende, y no es cosmético: la precisión que el ICUC
+// exige en su paso 1 tiene que poder declararse **también en SIMPLIFICADO**, que
+// es el recorrido de una obra nueva y el que llevó el fichero aceptado de F13. Un
+// campo que solo existiera en COMPLETO cumpliría la ficha en el papel y dejaría
+// el caso normal sin salida.
+
+describe('app/panel-edificio · F21 · las especificaciones del trabajo', () => {
+  it('⭐ el diálogo y su botón existen en SIMPLIFICADO, que es donde hacían falta', () => {
+    // Sin llamar a nada: el panel nace SIMPLIFICADO.
+    expect(panel.valores().modelo).toBe(MODELO_EDIFICIO.SIMPLIFICADO)
+    expect(panel.atributosDisponibles()).toBe(false)
+
+    const boton = nodo(SELECTOR.ABRIR_TRABAJO)
+    expect(boton.tagName).toBe('BUTTON')
+    expect(nodo(`.${CLASE.DIALOGO_TRABAJO}`).tagName).toBe('DIALOG')
+    expect(nodo(SELECTOR.PRECISION).closest('dialog')).not.toBeNull()
+
+    // MITAD ANTI-VACUIDAD: en esta misma pantalla el de atributos NO existe, así
+    // que «existe un diálogo» no se está cumpliendo por accidente con el otro.
+    expect(document.querySelector(SELECTOR_COMPLETO.ABRIR_ATRIBUTOS)).toBeNull()
+  })
+
+  it('el campo es `text` con `inputmode="decimal"`, no `number`', () => {
+    // Mismo motivo MEDIDO que los atributos de F11: con `number` el navegador
+    // vacía `.value` ante lo que no sabe leer, y «un centímetro» se guardaría
+    // como «no consta» EN SILENCIO.
+    const campo = nodo(SELECTOR.PRECISION)
+    expect(campo.type).toBe('text')
+    expect(campo.getAttribute('inputmode')).toBe('decimal')
+  })
+
+  it('enseña lo que trae el edificio, y sin declarar sale VACÍO (no «0»)', () => {
+    panel.fijar({ edificio: crearEdificio({ partes: [parte('Parte 1', 4)] }) })
+    panel.abrirTrabajo()
+    expect(nodo(SELECTOR.PRECISION).value).toBe('')
+
+    panel.fijar({
+      edificio: crearEdificio({ partes: [parte('Parte 1', 4)], precisionMetros: 0.01 }),
+    })
+    expect(nodo(SELECTOR.PRECISION).value).toBe('0.01')
+  })
+
+  it('«Guardar» emite el número, y la COMA decimal se lee en vez de rechazarse', () => {
+    const vistas = []
+    panel.alAccion((a) => vistas.push(a))
+    panel.abrirTrabajo()
+    nodo(SELECTOR.PRECISION).value = '0,010'
+    nodo(SELECTOR.APLICAR_TRABAJO).click()
+    expect(vistas).toHaveLength(1)
+    expect(vistas[0].accion).toBe(ACCION.APLICAR_TRABAJO)
+    expect(vistas[0].precision).toBe(0.01)
+  })
+
+  it('⭐ el blanco es `null` y se EMITE: no declararla es una respuesta, no un fallo', () => {
+    const vistas = []
+    panel.fijar({
+      edificio: crearEdificio({ partes: [parte('Parte 1', 4)], precisionMetros: 0.01 }),
+    })
+    panel.alAccion((a) => vistas.push(a))
+    panel.abrirTrabajo()
+    nodo(SELECTOR.PRECISION).value = ''
+    nodo(SELECTOR.APLICAR_TRABAJO).click()
+    // Si esto NO se emitiera, borrar el campo no borraría nada y el técnico se
+    // quedaría con una precisión que ya no quiere declarar en un documento firmado.
+    expect(vistas).toHaveLength(1)
+    expect(vistas[0].precision).toBeNull()
+    expect(nodo(SELECTOR.ESTADO_TRABAJO).textContent).toBe('')
+  })
+
+  it('⛔ lo que no es un número NO se guarda: se cita, y el diálogo se queda abierto', () => {
+    const vistas = []
+    panel.alAccion((a) => vistas.push(a))
+    panel.abrirTrabajo()
+    nodo(SELECTOR.PRECISION).value = 'un centímetro'
+    nodo(SELECTOR.APLICAR_TRABAJO).click()
+    expect(vistas).toEqual([])
+    expect(nodo(SELECTOR.ESTADO_TRABAJO).textContent).toBe(
+      motivoPrecisionIlegible('un centímetro'),
+    )
+    expect(nodo(SELECTOR.ESTADO_TRABAJO).textContent).toContain('un centímetro')
+    expect(panel.abiertoDialogo(DIALOGO.TRABAJO)).toBe(true)
+  })
+
+  it('⛔ y lo que la Sede no admitiría tampoco, DICIENDO que el rango es suyo', () => {
+    const vistas = []
+    panel.alAccion((a) => vistas.push(a))
+    panel.abrirTrabajo()
+    nodo(SELECTOR.PRECISION).value = '12'
+    nodo(SELECTOR.APLICAR_TRABAJO).click()
+    expect(vistas).toEqual([])
+    expect(nodo(SELECTOR.ESTADO_TRABAJO).textContent).toBe(motivoPrecisionFueraDeRango(12))
+    expect(nodo(SELECTOR.ESTADO_TRABAJO).textContent).toContain('ICUC')
+
+    // El tope se lee del modelo, no se copia: el máximo EXACTO sí entra.
+    nodo(SELECTOR.PRECISION).value = String(PRECISION_MAXIMA_METROS)
+    nodo(SELECTOR.APLICAR_TRABAJO).click()
+    expect(vistas).toHaveLength(1)
+    expect(vistas[0].precision).toBe(PRECISION_MAXIMA_METROS)
+  })
+
+  it('⭐ cancelar NO guarda, y al reabrir no queda ni rastro de lo tecleado', () => {
+    const vistas = []
+    panel.fijar({
+      edificio: crearEdificio({ partes: [parte('Parte 1', 4)], precisionMetros: 0.01 }),
+    })
+    panel.alAccion((a) => vistas.push(a))
+    panel.abrirTrabajo()
+    nodo(SELECTOR.PRECISION).value = '5'
+    nodo(SELECTOR.CANCELAR_TRABAJO).click()
+    expect(vistas).toEqual([])
+    expect(panel.abiertoDialogo(DIALOGO.TRABAJO)).toBe(false)
+
+    // Y ésta es la mitad que hace verdadera la promesa: al reabrir manda el store.
+    panel.abrirTrabajo()
+    expect(nodo(SELECTOR.PRECISION).value).toBe('0.01')
+  })
+
+  it('`Escape` cierra y avisa, como en los otros dos diálogos', () => {
+    const cierres = []
+    panel.alCerrar((c) => cierres.push(c))
+    panel.abrirTrabajo()
+    nodo(`.${CLASE.DIALOGO_TRABAJO}`).dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    )
+    expect(panel.abiertoDialogo(DIALOGO.TRABAJO)).toBe(false)
+    expect(cierres).toEqual([{ dialogo: DIALOGO.TRABAJO, motivo: MOTIVO_CIERRE.ESCAPE }])
+  })
+
+  it('el título y la intro dicen lo que la app NO hace, y no prometen el formulario', () => {
+    // Decisión 4 de la ficha: solo la precisión cabe en el GML. La intro tiene que
+    // decirlo, porque una pantalla llamada «especificaciones del trabajo» que
+    // callara el resto haría creer que la app cubre el trámite entero.
+    panel.abrirTrabajo()
+    expect(nodo(`.${CLASE.DIALOGO_TRABAJO} h2`).textContent).toBe(TITULO_TRABAJO)
+    const intro = nodo(`.${CLASE.DIALOGO_TRABAJO} p`).textContent
+    for (const loQueNoHace of ['titulación', 'metodología de captura', 'no los guarda']) {
+      expect(intro, `la intro no menciona «${loQueNoHace}»`).toContain(loQueNoHace)
+    }
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
 // 8 · Los dos diálogos: foco, Escape y cierre
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -1098,7 +1255,8 @@ describe('app/panel-edificio · abrir y cerrar los dos diálogos', () => {
     radio.checked = true
     radio.dispatchEvent(new Event('change', { bubbles: true }))
     expect(panel.abiertoDialogo(DIALOGO.ATRIBUTOS)).toBe(false)
-    expect(document.querySelectorAll('dialog').length).toBe(1)
+    // El de capas y el del trabajo siguen ahí: solo se retira el de atributos.
+    expect(document.querySelectorAll('dialog').length).toBe(2)
   })
 })
 

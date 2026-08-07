@@ -259,6 +259,21 @@ export const ASIENTOS = Object.freeze(
         '46ch de `.gml-cajon-margen`. **Las clases de los HIJOS cuestan CERO**: sus reglas son ' +
         '`.gml-app .gml-cajon-titular`, `…-cifra`, `…-seccion dt`, `…-invasion` — sin contenedor ' +
         'delante—, así que alcanzan a los dos cajones sin tocarlas. Sobran 10.436 sobre el techo.' },
+    { hito: 'F21 · edificio: la piscina en su tipo y la precisión declarable', commit: '(sin commitear)',
+      total: 67665, nuestro: 52570, rebanada: null,
+      nota:
+        '**+70 B, y son el asiento más barato que ha tenido una pantalla nueva en este proyecto.** ' +
+        'F21 estrena un `<dialog>` entero —«Especificaciones del trabajo profesional», con su ' +
+        'título, su intro, su campo, su pie de dos botones y su renglón `role=status`— y paga ' +
+        'SOLO por el contenedor: `.gml-dialogo-trabajo` entra en las dos reglas que van acotadas ' +
+        'al `<dialog>` (la caja `fixed` centrada y su `::backdrop`) y en ninguna más. El interior ' +
+        'reutiliza `gml-dialogo-capas-cuerpo`, `…-titulo`, `…-intro`, `…-pie` y `…-estado` tal ' +
+        'cual, y el campo reutiliza `gml-campo` + `gml-entrada` + `gml-mono`: **ni una ' +
+        'declaración nueva**. Es el mismo reparto que F14 hizo con el cajón de contraste, y la ' +
+        'clase propia existe por el mismo motivo medido —los guiones de humo resuelven los ' +
+        '`<dialog>` con `document.querySelector`, que se queda con el PRIMERO—, no para vestirlo ' +
+        'distinto. ⚠️ La mitad de la fase que arregla la piscina cuesta **0 B**: es lógica de ' +
+        '`edificio/entrada.js` y no toca el DOM. Sobran 10.506 sobre el techo.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

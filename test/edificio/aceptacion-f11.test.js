@@ -476,6 +476,9 @@ describe('AC4 · «El modelo respeta los convenios (piscina con plantas `null`; 
   // `idLocal` la añade F12 · T1.1: sin identidad un Edificio no se puede
   // archivar ni autoguardar. Sigue siendo una lista EXHAUSTIVA, que es lo que
   // este guardián defiende: una clave nueva tiene que aparecer aquí a mano.
+  // `precisionMetros` la añade F21: la precisión del trabajo profesional que el
+  // ICUC exige en su paso 1, y que va en los DOS modelos porque no es un atributo
+  // semántico del edificio sino del levantamiento.
   const CLAVES_SIMPLIFICADO = [
     'idLocal',
     'refcat',
@@ -483,6 +486,7 @@ describe('AC4 · «El modelo respeta los convenios (piscina con plantas `null`; 
     'partes',
     'parcelaContexto',
     'construccionOficial',
+    'precisionMetros',
   ]
 
   /** Nombres con los que se podría colar una envolvente guardada. */
@@ -585,39 +589,46 @@ describe('AC4 · «El modelo respeta los convenios (piscina con plantas `null`; 
     }
   })
 
-  it('⭐ la PISCINA real entra por el WFS, con plantas `null`, y se dice que su tipo es forzado', () => {
+  it('⭐ la PISCINA real entra por el WFS con SU TIPO, sin plantas y sin avisar de nada', () => {
     // 3.3 · El ejemplar real del convenio: `OtherConstruction` con
-    // `constructionNature = openAirPool`, en la parcela de referencia. En F11
-    // toda parte nace `PRINCIPAL` (desviación 5), lo cual para una piscina es un
-    // dato que se sabe provisional: entra, porque tirarla sería peor, y LO DICE.
+    // `constructionNature = openAirPool`, en la parcela de referencia.
+    //
+    // ⛔ **F21 · ESTA PRUEBA EXIGÍA EL DEFECTO.** Decía «entra como PRINCIPAL y se
+    // DICE que su tipo es forzado», que era el convenio de F11 (desviación 5, «el
+    // tipo correcto se asigna en F12»). F12 pasó sin tocarlo y este `it` seguía
+    // verde defendiéndolo: cuarta vez en el proyecto que un guardián está en verde
+    // afirmando lo que en el documento firmado estaba mal (F11 · M28–M30).
     const entrada = entradaDesdeWfsBu(parsearGmlBu(WFS_TODO))
     expect(entrada.resumen.via).toBe(VIA.WFS)
     expect(entrada.edificio.partes).toHaveLength(1)
 
     const piscina = entrada.edificio.partes[0]
+    expect(piscina.tipo).toBe(TIPO_PARTE.OTRA)
     expect(piscina.plantasSobreRasante).toBeNull()
     expect(piscina.plantasBajoRasante).toBeNull()
     expect(piscina.recinto.vertices).toHaveLength(18)
 
-    const forzados = de(entrada, TIPO_EDIFICIO.TIPO_PARTE_FORZADO)
-    expect(forzados).toHaveLength(1)
-    expect(forzados[0].mensaje).toContain('openAirPool')
-    expect(forzados[0].datos.construcciones[0]).toMatchObject({
-      constructionNature: 'openAirPool',
-      parte: 0,
-    })
+    // ⭐ MITAD ANTI-VACUIDAD: el tipo sale de la LISTA de la que viene el feature,
+    // no de un valor por defecto que acierta por casualidad. El documento la trae
+    // en `otras` y no en `partes`, y eso se lee del XML crudo.
+    expect(WFS_TODO).toContain('bu-ext2d:OtherConstruction')
+    expect(WFS_TODO).toContain('openAirPool')
+    expect(parsearGmlBu(WFS_TODO).otras).toHaveLength(1)
+    expect(parsearGmlBu(WFS_TODO).partes).toHaveLength(0)
 
-    // Y cuando F12 le ponga su tipo, el convenio sigue sujetando: `OTRA` anula
-    // las plantas aunque se le pasen. Es el mismo invariante de F00, aplicado a
-    // la geometría que de verdad ha entrado por el servicio.
-    const conTipo = crearParteConstruccion({
+    // Y ya no se avisa de ningún tipo forzado, porque no se fuerza ninguno.
+    expect(entrada.detecciones.map((d) => d.tipo)).not.toContain('TIPO_PARTE_FORZADO')
+
+    // El invariante de F00 sigue sujetando por su cuenta: `OTRA` anula las plantas
+    // aunque se le pasen. Aquí ya no hay nada que anular, así que se comprueba
+    // sobre una copia a la que se le fuerzan a mano.
+    const conPlantas = crearParteConstruccion({
       ...piscina,
-      tipo: TIPO_PARTE.OTRA,
       plantasSobreRasante: 1,
       plantasBajoRasante: 1,
     })
-    expect(conTipo.plantasSobreRasante).toBeNull()
-    expect(conTipo.plantasBajoRasante).toBeNull()
+    expect(conPlantas.plantasSobreRasante).toBeNull()
+    expect(conPlantas.plantasBajoRasante).toBeNull()
   })
 
   it('⭐ la ENVOLVENTE del `Building` NO se guarda: ni como parte, ni como oficial, y se dice', () => {

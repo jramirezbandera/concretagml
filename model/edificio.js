@@ -45,6 +45,19 @@ export const ESTADO_CONSERVACION = Object.freeze({
   DERRUIDO: 'DERRUIDO',
 })
 
+/**
+ * ⭐ F21 · El tope de `precisionMetros`, **y no es nuestro**: es el del formulario
+ * del ICUC, medido en la subida real del 2026-08-07 («precisión del trabajo en
+ * metros, obligatoria, entre 0,000 y 9,999»). Se escribe aquí y no en la interfaz
+ * para que el modelo no dependa de que la pantalla valide, que es la lección de la
+ * regla 1: un dato de dominio se comprueba donde vive el dominio.
+ *
+ * ⚠️ El **0 se admite**, aunque declarar 0 m de precisión sea una afirmación
+ * fuerte: el rango es de la Sede y no se le recorta por criterio propio. Quien lo
+ * teclee está diciendo lo que va a firmar tres pantallas después.
+ */
+export const PRECISION_MAXIMA_METROS = 9.999
+
 /** Procedencia de la geometría de una parte. */
 export const ORIGEN_PARTE = Object.freeze({
   DXF: 'DXF',
@@ -216,6 +229,9 @@ export function crearParteConstruccion({
  * @param {object[]} [args.partes=[]]
  * @param {object[]|null} [args.parcelaContexto=null]        Recinto[] de la parcela (WFS).
  * @param {object[]|null} [args.construccionOficial=null]    Copia congelada (regla 2).
+ * @param {number|null} [args.precisionMetros=null]          La precisión del
+ *   trabajo profesional, en metros. Ver {@link PRECISION_MAXIMA_METROS}: va en los
+ *   DOS modelos a propósito, porque no es un atributo del edificio.
  * @param {string} [args.usoDominante]                       Solo COMPLETO.
  * @param {'FUNCIONAL'|'EN_CONSTRUCCION'|'RUINOSO'|'DERRUIDO'} [args.estadoConservacion] Solo COMPLETO.
  * @param {number} [args.anioConstruccion]                   Solo COMPLETO.
@@ -232,6 +248,7 @@ export function crearEdificio({
   partes = [],
   parcelaContexto = null,
   construccionOficial = null,
+  precisionMetros = null,
   usoDominante,
   estadoConservacion,
   anioConstruccion,
@@ -271,6 +288,19 @@ export function crearEdificio({
       `crearEdificio: 'construccionOficial' debe ser un array de partes o null; recibido ${typeof construccionOficial}.`,
     )
   }
+  if (
+    precisionMetros !== null &&
+    (typeof precisionMetros !== 'number' ||
+      !Number.isFinite(precisionMetros) ||
+      precisionMetros < 0 ||
+      precisionMetros > PRECISION_MAXIMA_METROS)
+  ) {
+    throw new RangeError(
+      `crearEdificio: 'precisionMetros' debe ser null o un número entre 0 y ` +
+        `${PRECISION_MAXIMA_METROS} (el rango del formulario del ICUC); recibido ` +
+        `${JSON.stringify(precisionMetros)}.`,
+    )
+  }
 
   const edificio = {
     idLocal,
@@ -282,6 +312,12 @@ export function crearEdificio({
     // Intacta LITERAL (sin renormalizar) + congelada: barrera de la regla 2.
     construccionOficial:
       construccionOficial === null ? null : deepFreeze(structuredClone(construccionOficial)),
+    // ⭐ F21 · EN LOS DOS MODELOS, y es lo que la distingue de los siete de abajo.
+    // La precisión del levantamiento **no es un atributo del edificio**: es del
+    // trabajo del técnico que lo declara, y el ICUC la exige en su paso 1 tanto si
+    // el modelo es completo como si no. Ponerla con los semánticos la haría
+    // indeclarable justo en el recorrido corto, que es el normal de una obra nueva.
+    precisionMetros,
   }
 
   // Los atributos semánticos SOLO existen en modelo COMPLETO. En SIMPLIFICADO

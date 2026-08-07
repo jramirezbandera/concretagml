@@ -155,14 +155,15 @@ export const TIPO_EDIFICIO = Object.freeze({
    * declara, y así F12 sabe que el lector ya los devuelve.
    */
   PLANTAS_DESCARTADAS: 'PLANTAS_DESCARTADAS',
-  /**
-   * ⚠️ Declarado para T2.1: en F11 toda parte nace `PRINCIPAL` (desviación 5), y
-   * el WFS de edificio devuelve además `OtherConstruction` —la parcela de
-   * referencia **tiene una piscina**, `constructionNature = openAirPool`, medido
-   * en T0.1·7—. Una piscina entrando como `PRINCIPAL` es un dato falso; entra,
-   * porque tirarla sería peor, pero **lo dice**. El tipo correcto se asigna en F12.
-   */
-  TIPO_PARTE_FORZADO: 'TIPO_PARTE_FORZADO',
+
+  // ⛔ **AQUÍ VIVÍA `TIPO_PARTE_FORZADO`, RETIRADO POR F21.** Decía que una
+  // `OtherConstruction` —la piscina de la parcela de referencia— entraba como
+  // parte `PRINCIPAL` porque en F11 el tipo estaba fuera de alcance, y que «el
+  // tipo correcto se asigna en F12». F12 pasó sin tocarlo, F13 lo volvió a medir,
+  // y F21 hace que la construcción entre **con su tipo**: el aviso deja de tener
+  // hecho que contar y por eso se va, en vez de quedarse como miembro muerto de un
+  // léxico que se recorre entero en las pruebas. `test/edificio/comun.test.js` y
+  // `test/edificio/entrada.test.js` tienen el guardián de que no vuelve.
 
   // ── De las mutaciones del documento (mutaciones.js) ───────────────────────
   /**

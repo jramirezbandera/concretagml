@@ -248,6 +248,29 @@ describe('cablearGeneracionGmlEdificio · la entrega', () => {
     expect(xml.match(/<gml:PolygonPatch>/g)).toHaveLength(1)
   })
 
+  it('⭐ F21 · la precisión declarada LLEGA AL XML, y sin declarar sigue saliendo nil', () => {
+    // ⛔ EL GUARDIÁN DE LA CADENA ENTERA. `serializarEdificioBu` sabía emitir
+    // `horizontalGeometryEstimatedAccuracy` desde F13 y **nadie se lo pasaba**:
+    // era el enésimo canal sin llamante de esta rama (F11 · `parsers/dxf.js`,
+    // F12 · el peldaño Edición, F13/F14 · `porParte`). Se ata aquí, en el módulo
+    // que compone el fichero, y no solo en el panel que lo teclea.
+    const { estadoEdificio } = cablear()
+
+    // Sin declararla: `xsi:nil`, que es lo que decía hasta esta fase y es verdad.
+    estadoEdificio.set(edificioBueno())
+    boton().click()
+    expect(descargas[0].texto).toContain(
+      '<bu-core2d:horizontalGeometryEstimatedAccuracy uom="m" xsi:nil="true"',
+    )
+
+    // Declarada: sale el número, con su unidad y sin `nil`.
+    estadoEdificio.set(crearEdificio({ ...edificioBueno(), precisionMetros: 0.01 }))
+    boton().click()
+    const xml = descargas[1].texto
+    expect(xml).toContain('<bu-core2d:horizontalGeometryEstimatedAccuracy uom="m">0.01<')
+    expect(xml).not.toContain('horizontalGeometryEstimatedAccuracy uom="m" xsi:nil')
+  })
+
   it('si la descarga falla, se dice y no se calla', () => {
     const { estadoEdificio } = cablear({
       descargar: () => ({ descargado: false, nombre: null, mensaje: 'El navegador no ha podido.' }),

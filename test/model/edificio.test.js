@@ -149,11 +149,24 @@ describe('crearEdificio · defaults y modelo SIMPLIFICADO', () => {
       expect(clave in edificio).toBe(false)
       expect(edificio[clave]).toBeUndefined()
     }
-    // El shape SIMPLIFICADO tiene exactamente las 6 claves geométricas/estado.
-    // `idLocal` entra en F12 · T1.1 (la identidad, sin la cual no se archiva).
+    // El shape SIMPLIFICADO tiene exactamente estas claves.
+    // `idLocal` entra en F12 · T1.1 (la identidad, sin la cual no se archiva) y
+    // `precisionMetros` en F21: ⭐ está AQUÍ y no entre los siete de arriba a
+    // propósito —la precisión del levantamiento no es un atributo del edificio,
+    // sino del trabajo, y el ICUC la exige también en el recorrido corto—.
     expect(Object.keys(edificio).sort()).toEqual(
-      ['idLocal', 'refcat', 'modelo', 'partes', 'parcelaContexto', 'construccionOficial'].sort(),
+      [
+        'idLocal',
+        'refcat',
+        'modelo',
+        'partes',
+        'parcelaContexto',
+        'construccionOficial',
+        'precisionMetros',
+      ].sort(),
     )
+    // Y sin declararla vale `null`, que es «no consta» y sale `xsi:nil`.
+    expect(edificio.precisionMetros).toBeNull()
   })
 
   it('ignora atributos semánticos aunque se pasen si el modelo es SIMPLIFICADO', () => {

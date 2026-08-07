@@ -1131,6 +1131,29 @@ describe('las intenciones del panel llegan a las mutaciones', () => {
     expect(estado.get().anioConstruccion).toBe(1998)
   })
 
+  it('⭐ F21 · la precisión del trabajo llega al modelo, y en SIMPLIFICADO también', async () => {
+    // ⛔ Y lo de «en SIMPLIFICADO también» es la mitad que importa: el diálogo de
+    // atributos NO existe en ese modelo, así que colgar de él la precisión la
+    // habría dejado indeclarable justo en el recorrido corto — el de una obra
+    // nueva, y el que llevó el fichero que el ICUC aceptó en F13.
+    const { cableado, estado } = montar()
+    await soltar(cableado, ficheroDe(RUTA_LIST, 'LIST.txt'))
+    expect(estado.get().modelo).toBe(MODELO_EDIFICIO.SIMPLIFICADO)
+    expect(estado.get().precisionMetros).toBeNull()
+
+    document.querySelector('[data-accion="abrir-trabajo-edificio"]').click()
+    document.querySelector('[data-campo="precision-edificio"]').value = '0,010'
+    document.querySelector('[data-accion="aplicar-trabajo"]').click()
+
+    expect(estado.get().precisionMetros).toBe(0.01)
+
+    // Y sobrevive a la siguiente mutación, que es donde `reconstruir` la habría
+    // perdido: sin su línea, renombrar una parte la devolvía a `null` en silencio.
+    document.querySelector(SELECTOR_PANEL.REFCAT).value = '9398516VK3799G'
+    estado.set(estado.get())
+    expect(estado.get().precisionMetros).toBe(0.01)
+  })
+
   it('un repintado NO le borra al usuario la referencia que está tecleando', async () => {
     const { cableado, estado } = montar()
     await soltar(cableado, ficheroDe(RUTA_LIST, 'LIST.txt'))

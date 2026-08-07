@@ -201,6 +201,7 @@ import {
   conParteEliminada,
   conParteRenombrada,
   conPlantas,
+  conPrecision,
   conTipoParte,
 } from '../edificio/mutaciones.js'
 import { crearVistaParteActiva } from '../edificio/parte-activa.js'
@@ -1925,7 +1926,17 @@ export function cablearEdificio({
    *          capas: string[]|null, atributos: object|null,
    *          valores: {modelo: string, refcat: string|null}}} intencion
    */
-  function atender({ accion, indice, nombre, capas, atributos, tipo, plantas, valores }) {
+  function atender({
+    accion,
+    indice,
+    nombre,
+    capas,
+    atributos,
+    tipo,
+    plantas,
+    precision,
+    valores,
+  }) {
     if (destruido) return
 
     if (accion === ACCION.CARGAR_CATASTRO) {
@@ -1958,6 +1969,18 @@ export function cablearEdificio({
         'la escritura de los atributos ha fallado',
       )
       panelEdificio.cerrarAtributos()
+      return
+    }
+    if (accion === ACCION.APLICAR_TRABAJO) {
+      // ⚠️ `precision` puede ser `null` y eso NO es «no hagas nada»: es «no la
+      // declaro», que el GML dice con `xsi:nil`. Borrarla es una decisión del
+      // técnico tan válida como ponerla, así que la mutación se aplica igual. El
+      // panel ya ha rechazado lo ilegible y lo que se sale del rango del ICUC.
+      aplicarMutacion(
+        (e) => conPrecision(e, precision),
+        'la escritura de la precisión del trabajo ha fallado',
+      )
+      panelEdificio.cerrarTrabajo()
       return
     }
 

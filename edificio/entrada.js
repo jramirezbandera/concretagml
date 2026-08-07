@@ -47,11 +47,12 @@
 // que `parsers/importar.js` publica ya agrupado justo para esto.
 //
 // ── LO QUE SE TIRA, Y DÓNDE SE DICE ─────────────────────────────────────────
-// F11 declara por alcance que toda parte nace `PRINCIPAL` con las plantas a
-// `null` (desviación 5 del plan: el tipo y las plantas son F12). Pero el lector
-// SÍ trae esos datos, así que tirarlos en silencio sería la regla de oro 1 rota:
+// F11 declaró por alcance que toda parte nacía `PRINCIPAL` con las plantas a
+// `null` (desviación 5 del plan: el tipo y las plantas eran F12). De aquello ya no
+// queda nada: F12 trajo las plantas y **F21 el tipo**. Lo que el lector trae y el
+// modelo no puede guardar sí se sigue diciendo, porque tirarlo en silencio sería la
+// regla de oro 1 rota:
 //   · Las plantas de las trece partes    → {@link TIPO_EDIFICIO}.PLANTAS_DESCARTADAS
-//   · La piscina entrando como PRINCIPAL → {@link TIPO_EDIFICIO}.TIPO_PARTE_FORZADO
 //   · La parte SOLO bajo rasante         → {@link TIPO_EDIFICIO}.PARTE_BAJO_RASANTE
 //   · La envolvente del `Building`       → {@link TIPO_EDIFICIO}.PATCHES_MULTIPLES
 //   · Los atributos que no caben         → {@link TIPO_EDIFICIO}.ATRIBUTO_NO_MAPEADO
@@ -613,10 +614,24 @@ const rotulo = (feature, i, que) =>
  * `ParteConstruccion`: **una por anillo**, porque un `ParteConstruccion` guarda UN
  * recinto y en esta rama cada anillo es su propio exterior.
  *
+ * ⭐ **F21 · El `tipo` lo pone el LLAMANTE, y por eso es un parámetro.** Hasta
+ * aquí toda parte nacía `PRINCIPAL` con el motivo escrito de F11 («desviación 5:
+ * `TIPO_PARTE.OTRA` es de F12»), y F12 pasó sin tocar la línea. Quien sabe de qué
+ * lista viene el feature es el bucle de `traducirBu` —`partes` o `otras`—, no esta
+ * función: pasarlo desde allí es lo que hace que **no se pueda volver a olvidar**,
+ * porque un llamante nuevo tiene que decirlo.
+ *
+ * @param {object} feature
+ * @param {number} indiceFeature
+ * @param {string} que  Cómo se le llama en los mensajes («La parte», «La construcción»).
+ * @param {'PRINCIPAL'|'OTRA'} tipo  El de `model/edificio.js#TIPO_PARTE`.
+ * @param {string} origen
+ * @param {number} siguienteIndice
+ * @param {object[]} detecciones
  * @returns {object[]} Las partes creadas (vacío nunca: sin anillos sale una sin
  *   contorno, que el modelo admite como «pendiente de dibujar»).
  */
-function partesDeFeature(feature, indiceFeature, que, origen, siguienteIndice, detecciones) {
+function partesDeFeature(feature, indiceFeature, que, tipo, origen, siguienteIndice, detecciones) {
   const quien = rotulo(feature, indiceFeature, que)
   const anillos = Array.isArray(feature.anillos) ? feature.anillos : []
   const huecos = Array.isArray(feature.huecos) ? feature.huecos : []
@@ -635,7 +650,7 @@ function partesDeFeature(feature, indiceFeature, que, origen, siguienteIndice, d
     return [
       crearParteConstruccion({
         nombre: nombreParteGenerico(siguienteIndice),
-        tipo: TIPO_PARTE.PRINCIPAL,
+        tipo,
         recinto: null,
         origen,
       }),
@@ -698,7 +713,7 @@ function partesDeFeature(feature, indiceFeature, que, origen, siguienteIndice, d
   return anillos.map((anillo, j) =>
     crearParteConstruccion({
       nombre: nombreParteGenerico(siguienteIndice + j),
-      tipo: TIPO_PARTE.PRINCIPAL, // F11: siempre PRINCIPAL (desviación 5).
+      tipo,
       recinto: recintoDe(anillo),
       // ⚠️ **Las N partes de un feature comparten sus plantas**, y es lo único
       // que se puede decir: el dialecto BU declara las plantas por
@@ -994,46 +1009,39 @@ function traducirBu(res, cfg) {
   }
 
   // ── 4 · Las partes ────────────────────────────────────────────────────────
+  //
+  // ⭐ **F21 · CADA LISTA TRAE SU TIPO, y de ahí sale el arreglo de la fase.** El
+  // dialecto BU separa los `BuildingPart` de las `OtherConstruction` en dos listas
+  // distintas —`gml/parse-bu.js` las devuelve así— y el tipo del modelo se lee de
+  // cuál de las dos viene, sin mirar el `constructionNature`. Es a propósito:
+  // `openAirPool` es el único valor que traen los ficheros reales del repo, y
+  // clasificar por él dejaría un porche o un cobertizo entrando como cuerpo de
+  // edificio por no estar en una lista de nombres que nadie ha medido. La
+  // pertenencia a `otras` **la afirma el documento**; la naturaleza concreta, no
+  // siempre.
   const partes = []
   partesBu.forEach((p, i) => {
     partes.push(
-      ...partesDeFeature(p, i, 'La parte', cfg.origen, partes.length, detecciones),
+      ...partesDeFeature(p, i, 'La parte', TIPO_PARTE.PRINCIPAL, cfg.origen, partes.length, detecciones),
     )
   })
-  const desdeOtras = partes.length
   otrasBu.forEach((o, i) => {
     partes.push(
-      ...partesDeFeature(o, i, 'La construcción', cfg.origen, partes.length, detecciones),
+      ...partesDeFeature(o, i, 'La construcción', TIPO_PARTE.OTRA, cfg.origen, partes.length, detecciones),
     )
   })
 
-  // ⚠️ La piscina entra como PRINCIPAL porque en F11 `TIPO_PARTE.OTRA` está fuera
-  // de alcance (desviación 5), y eso es un dato FALSO: se dice. Tirarla sería
-  // peor —es una construcción real de la parcela, y el enunciado literal de la
-  // ficha §14.2 es «vivienda + porche + piscina»—. El tipo bueno se asigna en F12.
-  if (otrasBu.length > 0) {
-    const naturalezas = otrasBu.map((o) => o.constructionNature ?? 'sin declarar')
-    detecciones.push(
-      crearDeteccionEdificio(
-        TIPO_EDIFICIO.TIPO_PARTE_FORZADO,
-        `${otrasBu.length === 1 ? 'Una construcción' : `${otrasBu.length} construcciones`} del ` +
-          `documento no ${otrasBu.length === 1 ? 'es' : 'son'} un cuerpo de edificio ` +
-          `(${naturalezas.map((n) => `«${n}»`).join(', ')}) y entra${otrasBu.length === 1 ? '' : 'n'} ` +
-          `como parte${otrasBu.length === 1 ? '' : 's'} PRINCIPAL. Esta versión solo maneja ese ` +
-          'tipo; el que le corresponde («otra construcción», sin plantas) se asigna en la fase ' +
-          `siguiente. ${otrasBu.length === 1 ? 'Es la parte' : 'Son las partes'} ` +
-          `${otrasBu.map((_, i) => desdeOtras + i + 1).join(', ')} de la lista.`,
-        SEVERIDAD.AVISO,
-        {
-          construcciones: otrasBu.map((o, i) => ({
-            localId: o.localId ?? null,
-            constructionNature: o.constructionNature ?? null,
-            parte: desdeOtras + i,
-          })),
-        },
-      ),
-    )
-  }
+  // ⛔ **AQUÍ VIVÍA EL AVISO `TIPO_PARTE_FORZADO`, Y F21 LO RETIRA.** Decía que la
+  // construcción entraba «como parte PRINCIPAL» porque «el que le corresponde se
+  // asigna en la fase siguiente». Esa fase era F12 y pasó sin tocarlo; F13 lo
+  // volvió a medir; F21 es la que lo hace falso, así que el aviso se va con él.
+  //
+  // No se reescribe como INFO: ya **no se fuerza nada**, y un mensaje que describe
+  // un comportamiento que no existe enseña a desconfiar de una decisión correcta.
+  // El hecho sigue siendo comprobable donde importa —el `<select>` de tipo del
+  // panel lo enseña por parte, y el `.gml` lleva su `OtherConstruction`—. Mismo
+  // gesto que F13 con los dos mensajes de `app/rama.js`, y con su mismo guardián
+  // de que no vuelve (`test/edificio/entrada.test.js`).
 
   decirPlantasDescartadas(partesBu, detecciones)
   decirBajoRasante(partesBu, detecciones)

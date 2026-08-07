@@ -264,6 +264,15 @@ export {
   conTipoParte,
 } from './mutaciones.js'
 
+// ── Y la de F21: la precisión del trabajo profesional ────────────────────────
+// `conPrecision` no toca ni la lista ni el modelo: le pone al edificio el metro
+// que el ICUC exige declarar en su paso 1, y que `gml/serialize-bu.js` sabe emitir
+// desde F13 sin que nadie se lo pasara nunca. Sale por aquí por lo mismo que
+// `conIdLocal`: quien lo estampa es la interfaz —es el técnico quien conoce su
+// levantamiento—, no el modelo.
+
+export { conPrecision } from './mutaciones.js'
+
 // ── La envolvente, que se DERIVA y no se guarda ──────────────────────────────
 // Criterio de aceptación 3 de F12. Sale por aquí porque quien la necesita es la
 // interfaz —para pintarla y para poder decir qué partes se han quedado fuera—, y

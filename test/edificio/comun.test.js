@@ -57,11 +57,24 @@ describe('edificio/_comun — TIPO_EDIFICIO', () => {
       'MODELO_CAMBIADO',
       'PATCHES_MULTIPLES',
       'PLANTAS_DESCARTADAS',
-      'TIPO_PARTE_FORZADO',
       'RENOMBRADO_IGNORADO',
     ]) {
       expect(TIPO_EDIFICIO[k], `falta el tipo ${k}`).toBe(k)
     }
+  })
+
+  it('⛔ `TIPO_PARTE_FORZADO` NO vuelve: F21 hizo falso el hecho que contaba', () => {
+    // Existió de F11 a F14 para decir que una `OtherConstruction` —la piscina—
+    // entraba como parte `PRINCIPAL` «hasta la fase siguiente». F12 pasó sin
+    // tocarlo, F13 lo volvió a medir, y F21 hace que entre con su tipo: el aviso
+    // se queda sin hecho que contar. Este guardián existe porque un miembro de
+    // léxico es barato de resucitar por costumbre, y volver a emitirlo sería
+    // contarle al técnico un forzado que ya no ocurre.
+    expect(TIPO_EDIFICIO.TIPO_PARTE_FORZADO).toBeUndefined()
+    expect(Object.keys(TIPO_EDIFICIO)).not.toContain('TIPO_PARTE_FORZADO')
+    // MITAD ANTI-VACUIDAD: el léxico sigue vivo y con sus vecinos dentro, así que
+    // esto no pasa por haberse quedado el objeto vacío.
+    expect(TIPO_EDIFICIO.PLANTAS_DESCARTADAS).toBe('PLANTAS_DESCARTADAS')
   })
 
   it('está congelado: no se le añaden tipos en caliente', () => {

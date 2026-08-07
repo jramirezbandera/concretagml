@@ -206,6 +206,7 @@ import {
   ATRIBUTOS_COMPLETO,
   ESTADO_CONSERVACION,
   MODELO_EDIFICIO,
+  PRECISION_MAXIMA_METROS,
   TIPO_PARTE,
 } from '../model/edificio.js'
 import { ROTULO_ATRIBUTO } from '../edificio/mutaciones.js'
@@ -277,6 +278,14 @@ export const CLASE = Object.freeze({
   ATRIBUTOS_REJILLA: 'gml-dialogo-atributos-rejilla',
   ATRIBUTOS_PIE: 'gml-dialogo-atributos-pie',
   ATRIBUTOS_ESTADO: 'gml-dialogo-atributos-estado',
+
+  // ── F21 · el tercer `<dialog>`: las especificaciones del trabajo ───────────
+  // ⭐ **Reutiliza el cromo de los otros dos y solo estrena el contenedor.** El
+  // cuerpo, el título, la intro, el pie y el renglón de estado son los mismos
+  // nodos con las mismas clases; lo único propio es `DIALOGO_TRABAJO`, que existe
+  // porque los guiones de humo resuelven los `<dialog>` con `document.querySelector`
+  // y tres nodos con la misma clase serían la trampa M8 de F07 por cuarta vez.
+  DIALOGO_TRABAJO: 'gml-dialogo-trabajo',
 })
 
 /**
@@ -332,6 +341,15 @@ export const ACCION = Object.freeze({
   ABRIR_ATRIBUTOS: 'abrir-atributos-edificio',
   APLICAR_ATRIBUTOS: 'aplicar-atributos',
   CANCELAR_ATRIBUTOS: 'cancelar-atributos',
+
+  // ── F21 · las especificaciones del trabajo profesional ────────────────────
+  // ⭐ **Existen en los DOS modelos**, y ésa es la diferencia con las tres de
+  // arriba. La precisión del levantamiento no es un atributo semántico del
+  // edificio: es del trabajo del técnico, y el ICUC la exige en su paso 1 tanto en
+  // el recorrido largo como en el corto —que es el normal de una obra nueva—.
+  ABRIR_TRABAJO: 'abrir-trabajo-edificio',
+  APLICAR_TRABAJO: 'aplicar-trabajo',
+  CANCELAR_TRABAJO: 'cancelar-trabajo',
   RENOMBRAR_PARTE: 'renombrar-parte',
   APLICAR_CAPAS: 'aplicar-capas',
   CANCELAR_CAPAS: 'cancelar-capas',
@@ -381,6 +399,15 @@ export const SELECTOR = Object.freeze({
   APLICAR_CAPAS: `[data-accion="${ACCION.APLICAR_CAPAS}"]`,
   CANCELAR_CAPAS: `[data-accion="${ACCION.CANCELAR_CAPAS}"]`,
   ESTADO_CAPAS: '[data-estado="dialogo-capas"]',
+
+  // ── F21 · el trabajo profesional. Va en ESTE grupo y no en SELECTOR_COMPLETO
+  // porque existe SIEMPRE: es lo que hace declarable la precisión también en
+  // SIMPLIFICADO, que es el recorrido de una obra nueva.
+  ABRIR_TRABAJO: `[data-accion="${ACCION.ABRIR_TRABAJO}"]`,
+  APLICAR_TRABAJO: `[data-accion="${ACCION.APLICAR_TRABAJO}"]`,
+  CANCELAR_TRABAJO: `[data-accion="${ACCION.CANCELAR_TRABAJO}"]`,
+  PRECISION: '[data-campo="precision-edificio"]',
+  ESTADO_TRABAJO: '[data-estado="dialogo-trabajo"]',
 
   // ── F12 · T4.1 ────────────────────────────────────────────────────────────
   DESPLEGAR_MODELO: `[data-accion="${ACCION.DESPLEGAR_MODELO}"]`,
@@ -665,6 +692,59 @@ export const INTRO_ATRIBUTOS =
   'construida va en metros cuadrados. Lo que se deje en blanco queda sin indicar, que no es lo ' +
   'mismo que cero.'
 
+// ── F21 · El diálogo del trabajo profesional ─────────────────────────────────
+
+/** Título del diálogo de la precisión. */
+export const TITULO_TRABAJO = 'Especificaciones del trabajo profesional'
+
+/**
+ * Qué es este diálogo, y **por qué la app solo pide uno de sus campos**.
+ *
+ * ⭐ La honradez de este texto es la mitad de la decisión 4 de la ficha: el paso 1
+ * del ICUC pide además email, teléfono, titulación, fecha de toma de datos,
+ * metodología de captura y desplazamiento de cartografía. **Nada de eso cabe en el
+ * GML** (`gml/serialize-bu.js#ORDEN_BUILDING_GEOMETRY`), así que la aplicación no
+ * lo pide: prometerlo aquí haría creer que cubre un trámite que no cubre.
+ */
+export const INTRO_TRABAJO =
+  'La Sede pide la precisión del levantamiento antes de dejar subir el fichero, y es el único ' +
+  'dato de esa pantalla que viaja dentro del GML. Los demás —titulación, fecha de toma de ' +
+  'datos, metodología de captura y desplazamiento de cartografía— se teclean allí y esta ' +
+  'aplicación no los guarda. Dejarlo en blanco es válido: el fichero sale diciendo que no ' +
+  'consta, que es lo que decía hasta ahora.'
+
+/** Rótulo del único campo. Lleva la unidad porque el formulario del ICUC la lleva. */
+export const ROTULO_PRECISION = 'Precisión del trabajo (m)'
+
+/**
+ * Lo que se le dice a quien teclea algo que no es un número.
+ *
+ * Misma doctrina que {@link motivoNoNumerico} de los atributos: no se emite nada,
+ * el diálogo se queda abierto y **se cita lo tecleado**. Guardar «lo que se haya
+ * entendido» de un campo que va a un documento firmado es la regla de oro 1 al
+ * revés.
+ *
+ * @param {string} texto  Lo que hay en el campo, tal cual.
+ * @returns {string}
+ */
+export const motivoPrecisionIlegible = (texto) =>
+  `«${texto}» no es un número de metros. La precisión va en metros con la coma decimal como ` +
+  'punto (por ejemplo 0.010 para un centímetro). Déjalo en blanco si prefieres no declararla.'
+
+/**
+ * Y lo que se le dice cuando el número es legible pero la Sede no lo aceptaría.
+ *
+ * ⚠️ **El rango no es nuestro**: es el del formulario del ICUC, medido en la subida
+ * real del 2026-08-07 («entre 0,000 y 9,999»). Se dice de dónde sale, porque un
+ * tope sin procedencia se lee como un capricho de la aplicación.
+ *
+ * @param {number} valor
+ * @returns {string}
+ */
+export const motivoPrecisionFueraDeRango = (valor) =>
+  `${valor} está fuera de lo que admite el formulario del ICUC, que pide la precisión entre ` +
+  `0 y ${PRECISION_MAXIMA_METROS} metros. El rango es suyo, no de esta aplicación.`
+
 /** Lo que dice el renglón de estado del panel al nacer y tras `fijar(null)`. */
 export const SIN_DATOS = 'Todavía no se ha cargado ningún edificio.'
 
@@ -726,10 +806,12 @@ export const MOTIVO_CIERRE = Object.freeze({
   PROGRAMATICO: 'PROGRAMATICO',
 })
 
-/** Cuál de los dos diálogos. Viaja en el aviso de {@link MOTIVO_CIERRE}. */
+/** Cuál de los TRES diálogos. Viaja en el aviso de {@link MOTIVO_CIERRE}. */
 export const DIALOGO = Object.freeze({
   CAPAS: 'capas',
   ATRIBUTOS: 'atributos',
+  /** F21 · «Especificaciones del trabajo profesional». Existe en los dos modelos. */
+  TRABAJO: 'trabajo',
 })
 
 // ── Utilidades ───────────────────────────────────────────────────────────────
@@ -902,9 +984,16 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
    * abrirlo. Se olvida con `fijar(null)`, que es volver a empezar.
    */
   let desplegadoAMano = false
+  /**
+   * F21 · La precisión del trabajo que se está enseñando, en metros. `null` = sin
+   * declarar, que es lo que el GML dice con `xsi:nil` y lo que era verdad hasta
+   * esta fase. Vive aquí y no se lee del `<input>` porque el `<input>` puede tener
+   * texto a medio teclear que el usuario canceló.
+   */
+  let precisionActual = null
   /** Qué diálogos están abiertos, y a quién devolverle el foco. */
-  const abierto = { capas: false, atributos: false }
-  const focoPrevio = { capas: null, atributos: null }
+  const abierto = { capas: false, atributos: false, trabajo: false }
+  const focoPrevio = { capas: null, atributos: null, trabajo: null }
 
   const oyentes = { accion: new Set(), cerrar: new Set() }
 
@@ -953,6 +1042,18 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
   const rotuloOrigen = crear('h2', 'gml-rotulo', TITULO_ORIGEN)
   rotuloOrigen.id = id('rotulo')
   filaRotulo.append(rotuloOrigen)
+
+  // ⭐ F21 · «Trabajo» va en el hueco de COSTE 0 px de la fila del `<h2>`, el
+  // mismo que F08 estrenó y F11 midió (`.gml-boton--menudo` mide 15,19 px contra
+  // los 15,95 del renglón del rótulo). **Y nace SIEMPRE**, a diferencia de
+  // «Atributos»: es lo que hace declarable la precisión en SIMPLIFICADO, que es el
+  // recorrido de una obra nueva y el que llevaba F13 al ICUC.
+  const accionesTrabajo = crear('div', 'gml-rotulo-acciones')
+  const botonTrabajo = crear('button', 'gml-boton gml-boton--menudo', 'Trabajo')
+  botonTrabajo.type = 'button'
+  botonTrabajo.dataset.accion = ACCION.ABRIR_TRABAJO
+  accionesTrabajo.append(botonTrabajo)
+  filaRotulo.append(accionesTrabajo)
   seccionOrigen.append(filaRotulo)
 
   // El botón «Atributos» y su envoltorio se fabrican y se retiran con el modelo:
@@ -1245,6 +1346,63 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
   cuerpoCapas.append(tituloCapas, introCapas, listaCapas, pieCapas, estadoCapas)
   dialogoCapas.append(cuerpoCapas)
   doc.body.appendChild(dialogoCapas)
+
+  // ══ F21 · El `<dialog>` del trabajo profesional (en los DOS modelos) ══════
+  //
+  // ⭐ **Nace con el módulo y no con el modelo**, que es lo que lo separa del de
+  // atributos. La precisión del levantamiento la exige el ICUC en su paso 1
+  // —medido el 2026-08-07: obligatoria, entre 0,000 y 9,999 m— y no depende de que
+  // el edificio se declare en modo completo. Colgarla del otro diálogo la habría
+  // dejado indeclarable justo en el recorrido corto.
+  //
+  // ⚠️ Reutiliza el cromo del de capas —cuerpo, título, intro, pie y renglón de
+  // estado son las mismas clases— y solo estrena el contenedor. Ver `CLASE`.
+
+  const dialogoTrabajo = crear('dialog', CLASE.DIALOGO_TRABAJO)
+  dialogoTrabajo.setAttribute('aria-labelledby', id('trabajo-titulo'))
+  dialogoTrabajo.setAttribute('aria-modal', 'true')
+  dialogoTrabajo.tabIndex = -1
+
+  const cuerpoTrabajo = crear('div', CLASE.CAPAS_CUERPO)
+  const tituloTrabajo = crear('h2', CLASE.CAPAS_TITULO, TITULO_TRABAJO)
+  tituloTrabajo.id = id('trabajo-titulo')
+  const introTrabajo = crear('p', CLASE.CAPAS_INTRO, INTRO_TRABAJO)
+
+  const campoPrecision = crear('div', 'gml-campo')
+  const etiquetaPrecision = crear('label', 'gml-campo-etiqueta', ROTULO_PRECISION)
+  etiquetaPrecision.htmlFor = id('precision')
+  // ⚠️ `type="text"` con `inputmode="decimal"` y NO `type="number"`, por el mismo
+  // motivo MEDIDO que los atributos de F11: con `number` el navegador vacía
+  // `.value` ante lo que no sabe leer, así que «un centímetro» llegaría como
+  // cadena vacía y se guardaría como «no consta» EN SILENCIO. Con `text` el texto
+  // llega entero, esta vista lo mira y **lo cita** al rechazarlo (regla de oro 1).
+  const entradaPrecision = doc.createElement('input')
+  entradaPrecision.type = 'text'
+  entradaPrecision.setAttribute('inputmode', 'decimal')
+  entradaPrecision.setAttribute('autocomplete', 'off')
+  entradaPrecision.id = id('precision')
+  entradaPrecision.className = 'gml-entrada gml-mono'
+  entradaPrecision.dataset.campo = 'precision-edificio'
+  campoPrecision.append(etiquetaPrecision, entradaPrecision)
+
+  const pieTrabajo = crear('div', CLASE.CAPAS_PIE)
+  const aplicarTrabajo = crear('button', 'gml-boton gml-boton--primario', 'Guardar')
+  aplicarTrabajo.type = 'button'
+  aplicarTrabajo.dataset.accion = ACCION.APLICAR_TRABAJO
+  const cancelarTrabajo = crear('button', 'gml-boton gml-boton--secundario', 'Cancelar')
+  cancelarTrabajo.type = 'button'
+  cancelarTrabajo.dataset.accion = ACCION.CANCELAR_TRABAJO
+  pieTrabajo.append(aplicarTrabajo, cancelarTrabajo)
+
+  const estadoTrabajo = crear('p', CLASE.CAPAS_ESTADO, '')
+  estadoTrabajo.id = id('trabajo-estado')
+  estadoTrabajo.dataset.estado = 'dialogo-trabajo'
+  estadoTrabajo.setAttribute('role', 'status')
+  aplicarTrabajo.setAttribute('aria-describedby', estadoTrabajo.id)
+
+  cuerpoTrabajo.append(tituloTrabajo, introTrabajo, campoPrecision, pieTrabajo, estadoTrabajo)
+  dialogoTrabajo.append(cuerpoTrabajo)
+  doc.body.appendChild(dialogoTrabajo)
 
   // ══ El `<dialog>` de los siete atributos (solo en COMPLETO) ═══════════════
   //
@@ -1732,9 +1890,57 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
       atributos: null,
       tipo: null,
       plantas: null,
+      // F21 · la precisión del trabajo, solo en `APLICAR_TRABAJO`. `null` significa
+      // «no la declaro», que es un valor y no una ausencia: el GML lo dice con
+      // `xsi:nil` y es lo que este proyecto emitía hasta ahora.
+      precision: null,
       ...extra,
       valores: instantanea(),
     })
+  }
+
+  /**
+   * F21 · Convierte lo tecleado en la precisión del trabajo, o dice por qué no.
+   *
+   * ⚠️ **Aquí SÍ se comprueba el rango, y en `crearEdificio` también.** No es una
+   * duplicación por descuido: son dos preguntas distintas con dos desenlaces
+   * distintos. El modelo LANZA —es su invariante y protege al documento— y esta
+   * vista no puede permitirse que un `RangeError` suba desde dentro de un `click`,
+   * así que lo caza antes y lo cuenta con palabras. La cifra la manda el modelo
+   * (`PRECISION_MAXIMA_METROS`), que se importa en vez de copiarse: dos topes
+   * escritos a mano son dos topes que un día no coinciden.
+   *
+   * ⭐ El blanco es `null` **y no un fallo**: no declarar la precisión es lo que la
+   * aplicación hacía hasta esta fase, y sigue siendo una respuesta legítima.
+   *
+   * @returns {{precision: number|null, motivo: string|null}}
+   */
+  function leerPrecision() {
+    const bruto = typeof entradaPrecision.value === 'string' ? entradaPrecision.value.trim() : ''
+    if (bruto === '') return { precision: null, motivo: null }
+    // La coma decimal se acepta porque es la que tiene el teclado de aquí, y es lo
+    // mismo que ya hace `leerPlantas`. Traducirla NO es corregir al usuario: es
+    // leer el mismo número que él ha escrito.
+    const numero = Number(bruto.replace(',', '.'))
+    if (!Number.isFinite(numero)) {
+      return { precision: null, motivo: motivoPrecisionIlegible(bruto) }
+    }
+    if (numero < 0 || numero > PRECISION_MAXIMA_METROS) {
+      return { precision: null, motivo: motivoPrecisionFueraDeRango(numero) }
+    }
+    return { precision: numero, motivo: null }
+  }
+
+  /**
+   * Vuelca al campo lo que hay en el store. Se llama al ABRIR (ver `alPulsar`) y
+   * en cada `fijar`, para que cancelar no deje residuo tecleado.
+   */
+  function pintarTrabajo() {
+    // ⚠️ `String(n)` y no un formateador con decimales fijos: `0.01` tiene que
+    // volver a leerse como `0.01`, y un «0,010» de adorno se releería como otro
+    // número si alguien lo guarda dos veces. Lo que se enseña es lo que se guardó.
+    entradaPrecision.value = precisionActual === null ? '' : String(precisionActual)
+    estadoTrabajo.textContent = ''
   }
 
   /**
@@ -1892,6 +2098,32 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
       abrirDialogo(DIALOGO.ATRIBUTOS)
       return
     }
+    if (accion === ACCION.ABRIR_TRABAJO) {
+      // Se repinta al abrir y no al cerrar: así el campo enseña siempre lo que hay
+      // en el store, incluso si el usuario canceló la vez anterior dejando texto a
+      // medias. Cerrar NO guarda, y eso solo es cierto si al volver a abrir el
+      // texto de antes no sigue ahí.
+      pintarTrabajo()
+      abrirDialogo(DIALOGO.TRABAJO)
+      return
+    }
+    if (accion === ACCION.CANCELAR_TRABAJO) {
+      cerrarDialogo(DIALOGO.TRABAJO, MOTIVO_CIERRE.BOTON, true)
+      return
+    }
+    if (accion === ACCION.APLICAR_TRABAJO) {
+      const { precision, motivo } = leerPrecision()
+      if (motivo !== null) {
+        // No se emite nada y el diálogo se queda abierto, igual que con los
+        // atributos: guardar «lo que se haya entendido» de un campo que va a un
+        // documento firmado es la regla de oro 1 al revés.
+        estadoTrabajo.textContent = motivo
+        return
+      }
+      estadoTrabajo.textContent = ''
+      emitir(ACCION.APLICAR_TRABAJO, { precision })
+      return
+    }
     if (accion === ACCION.CANCELAR_ATRIBUTOS) {
       cerrarDialogo(DIALOGO.ATRIBUTOS, MOTIVO_CIERRE.BOTON, true)
       return
@@ -2034,6 +2266,23 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
     cerrarDialogo(DIALOGO.ATRIBUTOS, MOTIVO_CIERRE.NATIVO, true)
   }
 
+  // F21 · las tres del tercer diálogo. ⚠️ Ninguna guarda el número: cerrar por
+  // `Escape` o por la equis del navegador es CANCELAR, igual que en los otros dos,
+  // y esa promesa la sostiene `pintarTrabajo()` al volver a abrir.
+  function alTeclaTrabajo(evento) {
+    if (evento.key !== 'Escape') return
+    cerrarDialogo(DIALOGO.TRABAJO, MOTIVO_CIERRE.ESCAPE, true)
+  }
+
+  function alCancelTrabajo() {
+    cerrarDialogo(DIALOGO.TRABAJO, MOTIVO_CIERRE.ESCAPE, true)
+  }
+
+  function alCloseTrabajo() {
+    if (dialogoTrabajo.open) return
+    cerrarDialogo(DIALOGO.TRABAJO, MOTIVO_CIERRE.NATIVO, true)
+  }
+
   escuchar(seccionOrigen, 'click', alPulsar)
   escuchar(seccionOrigen, 'change', alCambiarModelo)
   escuchar(seccionPartes, 'click', alPulsar)
@@ -2045,6 +2294,12 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
   escuchar(dialogoCapas, 'keydown', alTeclaCapas)
   escuchar(dialogoCapas, 'cancel', alCancelCapas)
   escuchar(dialogoCapas, 'close', alCloseCapas)
+  // F21 · los mismos cinco menos el `change`: aquí no hay nada que reaccione al
+  // teclear, porque el número no se guarda hasta pulsar «Guardar».
+  escuchar(dialogoTrabajo, 'click', alPulsar)
+  escuchar(dialogoTrabajo, 'keydown', alTeclaTrabajo)
+  escuchar(dialogoTrabajo, 'cancel', alCancelTrabajo)
+  escuchar(dialogoTrabajo, 'close', alCloseTrabajo)
 
   // ── Apertura y cierre ─────────────────────────────────────────────────────
 
@@ -2071,7 +2326,9 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
 
   /** @param {string} cual  Uno de {@link DIALOGO}. */
   function nodoDialogo(cual) {
-    return cual === DIALOGO.CAPAS ? dialogoCapas : dialogoAtributos
+    if (cual === DIALOGO.CAPAS) return dialogoCapas
+    if (cual === DIALOGO.TRABAJO) return dialogoTrabajo
+    return dialogoAtributos
   }
 
   function abrirDialogo(cual) {
@@ -2277,10 +2534,16 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
         // olvida que alguien la hubiera reabierto a mano.
         plegado = false
         desplegadoAMano = false
+        // ⚠️ Y la precisión también vuelve a `null`. Es un dato del documento que
+        // se está declarando, no una preferencia del técnico: dejarla puesta la
+        // heredaría el edificio siguiente, que es otro trabajo y puede ser de otro
+        // levantamiento. Lo mismo que hace `idLocal` al cambiar de expediente.
+        precisionActual = null
         pintarModelo()
         pintarPartes()
         pintarParteActiva()
         pintarAtributos()
+        pintarTrabajo()
         repintarGate()
         return
       }
@@ -2367,6 +2630,12 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
 
       datos = { partes: filas, atributos, puedeConsultarCatastro: puedeConsultarCatastro === true }
       if (modeloNuevo !== null) modeloActual = modeloNuevo
+      // F21 · La precisión sale del edificio, no del `<input>`: si el usuario
+      // canceló el diálogo con texto a medias, el store manda. Sin edificio se
+      // vuelve a `null`, que es «no consta» y no «cero metros».
+      precisionActual = Number.isFinite(edificio?.precisionMetros)
+        ? edificio.precisionMetros
+        : null
       if (refcat !== undefined) {
         entradaRefcat.value = typeof refcat === 'string' ? refcat : ''
       }
@@ -2387,6 +2656,7 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
       pintarPartes()
       pintarParteActiva()
       pintarAtributos()
+      pintarTrabajo()
       repintarGate()
     },
 
@@ -2445,6 +2715,21 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
 
     cerrarAtributos() {
       cerrarDialogo(DIALOGO.ATRIBUTOS, MOTIVO_CIERRE.PROGRAMATICO, false)
+    },
+
+    /**
+     * F21 · Abre el diálogo del trabajo profesional. **Funciona en los dos
+     * modelos**, al revés que {@link abrirAtributos}: no depende de que nadie lo
+     * haya fabricado antes, porque nace con el módulo.
+     */
+    abrirTrabajo() {
+      pintarTrabajo()
+      abrirDialogo(DIALOGO.TRABAJO)
+    },
+
+    /** Cierra el diálogo del trabajo sin guardar nada y sin avisar. */
+    cerrarTrabajo() {
+      cerrarDialogo(DIALOGO.TRABAJO, MOTIVO_CIERRE.PROGRAMATICO, false)
     },
 
     /**
@@ -2604,6 +2889,7 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
     destruir() {
       if (destruido) return
       cerrarDialogo(DIALOGO.CAPAS, MOTIVO_CIERRE.PROGRAMATICO, false)
+      cerrarDialogo(DIALOGO.TRABAJO, MOTIVO_CIERRE.PROGRAMATICO, false)
       desmontarAtributos()
       destruido = true
 
@@ -2625,6 +2911,11 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
         seccionActiva,
         seccionContraste,
         dialogoCapas,
+        // F21 · el tercero. Cuelga de `body` como el de capas —no de una sección—,
+        // así que si no se nombra aquí se queda huérfano en el documento y el
+        // siguiente montaje deja DOS con el mismo `data-campo`: exactamente la
+        // trampa que `SELECTOR` existe para no pisar.
+        dialogoTrabajo,
       ]) {
         if (nodo.parentNode) nodo.parentNode.removeChild(nodo)
       }

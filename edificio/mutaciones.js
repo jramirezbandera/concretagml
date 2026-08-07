@@ -131,6 +131,14 @@ function reconstruir(edificio, cambios) {
     partes: edificio.partes,
     parcelaContexto: edificio.parcelaContexto ?? null,
     construccionOficial: edificio.construccionOficial ?? null,
+    // ⛔ F21 · POR EL MISMO MOTIVO QUE `idLocal`, Y CASI SE ME OLVIDA. Sin esta
+    // línea, `crearEdificio` le pondría su `null` por defecto y **cualquier**
+    // mutación —renombrar una parte, mover un vértice, cambiar de modelo— borraría
+    // la precisión declarada sin decir nada, para reaparecer como `xsi:nil` en un
+    // documento firmado. Lo cazó el guardián del shape de `test/model/edificio.js`
+    // al ponerse rojo por la clave nueva; el valor no lo miraba nadie todavía, así
+    // que `test/edificio/mutaciones.test.js` lo mira ahora.
+    precisionMetros: edificio.precisionMetros ?? null,
   }
   for (const clave of ATRIBUTOS_COMPLETO) {
     if (clave in edificio) base[clave] = edificio[clave]
@@ -321,6 +329,52 @@ export function conIdLocal(edificio, idLocal) {
     )
   }
   return { edificio: reconstruir(edificio, { idLocal }), detecciones: [] }
+}
+
+// ── conPrecision ─────────────────────────────────────────────────────────────
+
+/**
+ * Fija la precisión del trabajo profesional, en metros (F21).
+ *
+ * ⭐ **Es el dato que la Sede exige tres pantallas antes de que el fichero
+ * exista.** El paso 1 del ICUC pide «precisión del trabajo en metros» como campo
+ * obligatorio (medido en la subida del 2026-08-07: se declaró 0,010 m con
+ * metodología GNSS), y `gml/serialize-bu.js` sabe emitirla desde F13 en su
+ * `horizontalGeometryEstimatedAccuracy`. Lo que faltaba era que el técnico pudiera
+ * decirla.
+ *
+ * ⚠️ **`null` es un valor legítimo y NO es lo mismo que no llamar.** Significa «no
+ * consta», que es lo que el GML dice con `xsi:nil` y lo que era verdad hasta F21:
+ * borrar el campo es una decisión del usuario tan válida como rellenarlo.
+ * `undefined`, en cambio, LANZA — por lo mismo que en {@link conRefcat}:
+ * `crearEdificio` lo tomaría por su valor por defecto y borraría en silencio un
+ * dato que se va a firmar.
+ *
+ * ⛔ **El rango lo comprueba `crearEdificio` y no esta función**, a propósito: es
+ * un invariante del dominio, no de esta mutación, y duplicarlo aquí sería tener dos
+ * sitios que pueden divergir sobre cuánto vale un metro. Lo que sí se hace es
+ * distinguir los dos fallos, como el resto del módulo — un tipo equivocado es
+ * contrato del programador (`TypeError`) y un número fuera de rango sube tal cual
+ * el `RangeError` del modelo, con su mensaje, que ya nombra el formulario.
+ *
+ * @param {object} edificio  El `Edificio` actual (no se muta).
+ * @param {number|null} precisionMetros  La precisión, o `null` para dejarla sin
+ *   declarar.
+ * @returns {ResultadoMutacion}  `detecciones` siempre vacío: no se descarta nada
+ *   ni se decide nada por el usuario, así que no hay qué contarle.
+ * @throws {TypeError}   Si `edificio` no tiene forma de Edificio, o si
+ *   `precisionMetros` no es número ni `null` (incluido `undefined`).
+ * @throws {RangeError}  Lo que lance `crearEdificio` fuera de `[0, 9.999]`.
+ */
+export function conPrecision(edificio, precisionMetros) {
+  exigirEdificio(edificio, 'conPrecision')
+  if (precisionMetros !== null && typeof precisionMetros !== 'number') {
+    throw new TypeError(
+      `conPrecision: 'precisionMetros' debe ser un número o null (sin declarar); ` +
+        `recibido ${JSON.stringify(precisionMetros)}.`,
+    )
+  }
+  return { edificio: reconstruir(edificio, { precisionMetros }), detecciones: [] }
 }
 
 // ── conParteRenombrada ───────────────────────────────────────────────────────

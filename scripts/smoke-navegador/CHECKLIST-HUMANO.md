@@ -2488,11 +2488,15 @@ Se preguntaba porque F17 entregó el desplegable Segregación / Subsanación par
 Se teclea a mano y viaja en el XML adjunto al informe, no en el GML. **El ICUC no
 es «subir un fichero»**: es un trámite con formulario, y la app cubre la mitad.
 
-- [ ] ⛔ **Decisión pendiente del autor**: `horizontalGeometryEstimatedAccuracy`
-      sale `xsi:nil` en nuestro GML porque se decidió «no afirmar una precisión que
-      no se ha medido»… y **la Sede la exige tres pantallas antes** (aquí se
-      declaró **0,010 m, GNSS**). El serializador ya acepta `precisionMetros`; lo
-      que falta es que la app lo pida y lo pase. ¿Merece fase propia?
+- [x] ⛔ ~~**Decisión pendiente del autor**: `horizontalGeometryEstimatedAccuracy`
+      sale `xsi:nil` porque se decidió «no afirmar una precisión que no se ha
+      medido»… y **la Sede la exige tres pantallas antes**.~~ ✅ **CONTESTADA y
+      ENTREGADA por F21 el 2026-08-07**: sí merecía, y entró junto al otro hallazgo.
+      La precisión se teclea en el `<dialog>` «Especificaciones del trabajo
+      profesional» (botón **«Trabajo»** en la fila de «Origen del edificio»), **en
+      los dos modelos**, y llega al GML con su `uom="m"`. Sin declararla sigue
+      saliendo `xsi:nil`, que es verdad. ⚠️ **Solo la precisión**: el resto del paso
+      1 del ICUC no cabe en el GML y la propia pantalla dice que no lo guarda.
 
 ### 18.3 · Lo que el fichero dice, y lo que se calla
 
@@ -2502,20 +2506,38 @@ es «subir un fichero»**: es un trámite con formulario, y la app cubre la mita
       así que emitir trece partes sería meter en un documento firmado trece
       afirmaciones que nadie comprueba. **¿Te parece bien esa decisión ahora que
       la ves?** Si el ICUC las necesitara, esto habría que rehacerlo.
-- [ ] ⛔ **La piscina, y aquí hay un defecto MEDIDO (2026-08-07).** Si la
+- [x] ⛔ ~~**La piscina, y aquí hay un defecto MEDIDO (2026-08-07).** Si la
       construcción entró por un GML del Catastro que la trae, `edificio/entrada.js`
-      la convierte en parte **PRINCIPAL** —con un aviso que dice que el tipo
-      correcto «se asigna en la fase siguiente», y esa fase era F12—, así que
-      **se emitiría dentro de la huella del `Building`** en vez de como
-      `OtherConstruction`. Mira la lista de partes: **¿hay alguna piscina marcada
-      como principal?** Si la hay, cámbiale el tipo a «Otra» antes de generar, o la
-      superficie que declares será mayor que la real.
+      la convierte en parte **PRINCIPAL**… cámbiale el tipo a «Otra» antes de
+      generar, o la superficie que declares será mayor que la real.~~
+      ✅ **ARREGLADO por F21 el mismo día.** Entra con su tipo, sin tocar nada.
+      Y el enunciado de arriba se quedaba corto: **no había forma de que saliera
+      bien** — tal cual entraba, «Generar GML» estaba APAGADO porque la validación
+      le exigía a la piscina unas plantas que una piscina no tiene, así que para
+      desbloquearlo había que teclear un dato falso. Con «1 planta» la huella salía
+      **406,69 m²** (84,56 de más); con «0», salía 322,13 pero **declarando la
+      piscina sótano** y sin emitirla. Ahora: **322,13 m² + su `OtherConstruction`**,
+      que es lo que el ICUC aceptó.
+- [ ] ⭐ **Compruébalo tú una vez, que esto no lo ha visto la Sede.** Carga el
+      edificio de `9398516VK3799G` **desde el Catastro en vivo** (no por fichero) y
+      mira la lista de partes: la última tiene que decir **«Otra construcción»**.
+      Abre el `.gml` y comprueba que hay **un `OtherConstruction` con `openAirPool`**
+      y que la huella del `Building` **no** lo incluye. ⚠️ **El fichero que la Sede
+      aceptó era el de F13, sin piscina**: que un GML CON `OtherConstruction` cargue
+      en el ICUC **está sin medir**.
 - [ ] `numberOfFloorsAboveGround` lleva **el máximo** de las partes sobre rasante.
       Míralo contra el edificio real: ¿es el número de plantas que declararías?
-- [ ] `horizontalGeometryEstimatedAccuracy` va **nulo**. El fichero del Catastro
-      pone `0,1 m`; nosotros no copiamos esa cifra porque sería afirmar una
-      precisión de levantamiento que nadie ha medido. **¿Estás de acuerdo, o
-      prefieres poder declararla?**
+- [x] ~~`horizontalGeometryEstimatedAccuracy` va **nulo**… **¿Estás de acuerdo, o
+      prefieres poder declararla?**~~ ✅ **F21 la hace declarable** y mantiene el
+      nulo como valor por defecto: seguimos sin copiar el `0,1 m` del Catastro —eso
+      es una afirmación suya sobre SU dato—, pero ahora el técnico puede poner la
+      suya. Sin tocar nada, el fichero sigue saliendo exactamente igual que antes.
+- [ ] ⭐ **Y míralo con tu número puesto.** Pulsa **«Trabajo»**, teclea la
+      precisión que declaraste en la Sede (en el envío real fueron **0,010 m,
+      GNSS**), genera el GML y comprueba que dentro pone
+      `<bu-core2d:horizontalGeometryEstimatedAccuracy uom="m">0.01</…>`. **¿Es el
+      número que firmarías?** Y al revés: bórralo, vuelve a generar, y comprueba que
+      vuelve el `xsi:nil` — no declarar tiene que seguir siendo posible.
 
 ### 18.4 · ⛔ El resalte que la ficha pide y que NO está
 

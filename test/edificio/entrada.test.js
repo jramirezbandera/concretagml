@@ -39,6 +39,12 @@ import {
   puntoDeReferencia,
 } from '../../edificio/entrada.js'
 import { MOTIVO_ENTRADA, TIPO_EDIFICIO } from '../../edificio/_comun.js'
+// F21 · la envolvente y la validación entran aquí porque el criterio 2 de la ficha
+// se mide sobre el edificio que ESTA capa construye: comprobarlo en el módulo de al
+// lado dejaría sin guardián justo la juntura que estuvo mal tres fases.
+import { envolventeDe } from '../../edificio/envolvente.js'
+import { validarEdificio } from '../../validation/edificio.js'
+import { superficie } from '../../geo/area.js'
 import { parsearGmlBu } from '../../gml/parse-bu.js'
 import {
   ESTADO_CONSERVACION,
@@ -593,18 +599,50 @@ describe('entradaDesdeGmlBu — las trece partes del fixture real', () => {
 describe('entradaDesdeGmlBu — la piscina, la envolvente y los atributos', () => {
   const entrada = entradaDesdeGmlBu(GML_TODO)
 
-  it('⛔ la piscina se lee, entra como PRINCIPAL y se DICE que es un tipo forzado', () => {
+  it('⭐ F21 · la piscina se lee y entra con su TIPO, sin avisar de ningún forzado', () => {
+    // ⛔ Este `it` exigía lo contrario —«entra como PRINCIPAL y se DICE que es un
+    // tipo forzado»— y estuvo verde tres fases defendiendo el defecto que F21
+    // arregla. El convenio de F11 («el tipo correcto se asigna en F12») caducó sin
+    // que nadie lo recogiera.
     expect(entrada.resumen.nPartes).toBe(1)
-    expect(entrada.edificio.partes[0].tipo).toBe(TIPO_PARTE.PRINCIPAL)
-    // ORÁCULO: el documento trae una `OtherConstruction` con esa naturaleza.
+    expect(entrada.edificio.partes[0].tipo).toBe(TIPO_PARTE.OTRA)
+    // ORÁCULO: el documento trae una `OtherConstruction` con esa naturaleza, y el
+    // tipo sale de la LISTA en la que viene, no del `constructionNature`.
     expect(GML_TODO).toContain('bu-ext2d:OtherConstruction')
     expect(GML_TODO).toContain('openAirPool')
 
-    const forzado = de(entrada, TIPO_EDIFICIO.TIPO_PARTE_FORZADO)
-    expect(forzado).toHaveLength(1)
-    expect(forzado[0].datos.construcciones).toEqual([
-      { localId: '9398516VK3799G_PI.1', constructionNature: 'openAirPool', parte: 0 },
-    ])
+    // El aviso que decía el forzado ya no tiene hecho que contar, y su tipo no
+    // existe en el léxico: se comprueba por la CADENA, para que esto siga siendo
+    // legible cuando nadie recuerde qué fue `TIPO_PARTE_FORZADO`.
+    expect(entrada.detecciones.map((d) => d.tipo)).not.toContain('TIPO_PARTE_FORZADO')
+    expect(TIPO_EDIFICIO.TIPO_PARTE_FORZADO).toBeUndefined()
+  })
+
+  it('⭐ F21 · y por eso `puedeGenerar` es true sin teclearle plantas a una piscina', () => {
+    // ⛔ LA MEDIDA QUE DEFINE LA FASE. Con la piscina como PRINCIPAL,
+    // `validation/edificio.js` la rechazaba —correctamente en su marco— por no
+    // declarar plantas sobre rasante… que es un dato que una piscina NO TIENE: el
+    // modelo las fuerza a `null` en las partes `OTRA`. El técnico tenía que teclear
+    // una mentira para desbloquear el botón.
+    const v = validarEdificio(entrada.edificio.partes, { srs: 'EPSG:25830' })
+    expect(v.puedeGenerar).toBe(true)
+    expect(v.errores).toHaveLength(0)
+
+    // ⭐ MITAD ANTI-VACUIDAD: la regla que lo bloqueaba SIGUE VIVA, y se demuestra
+    // sobre la misma geometría con el tipo cambiado a mano. Sin esto, un día que
+    // la regla desapareciera esta prueba seguiría verde por el motivo equivocado.
+    const comoAntes = [
+      crearParteConstruccion({
+        nombre: entrada.edificio.partes[0].nombre,
+        tipo: TIPO_PARTE.PRINCIPAL,
+        recinto: entrada.edificio.partes[0].recinto,
+        origen: entrada.edificio.partes[0].origen,
+      }),
+    ]
+    const antes = validarEdificio(comoAntes, { srs: 'EPSG:25830' })
+    expect(antes.puedeGenerar).toBe(false)
+    expect(antes.errores).toHaveLength(1)
+    expect(antes.errores[0].mensaje).toContain('plantas sobre rasante')
   })
 
   it('⛔ la huella del Building es la ENVOLVENTE: no entra como parte, y se dice', () => {
@@ -891,8 +929,14 @@ describe('entradaDesdeWfsBu — el ahorro grande de F11', () => {
     expect(entrada.edificio.partes.at(-1).nombre).toBe('Parte 14')
     expect(entrada.resumen.bloqueos).toEqual([])
 
-    // Y las cuatro cosas que esta fase declara que tira, dichas todas a la vez.
-    expect(de(entrada, TIPO_EDIFICIO.TIPO_PARTE_FORZADO)[0].datos.construcciones[0].parte).toBe(13)
+    // ⭐ F21 · LAS TRECE SON CUERPOS Y LA CATORCE ES LA PISCINA, y el reparto sale
+    // de las dos listas del documento, no de un nombre ni de una superficie.
+    expect(entrada.edificio.partes.map((p) => p.tipo)).toEqual([
+      ...Array(13).fill(TIPO_PARTE.PRINCIPAL),
+      TIPO_PARTE.OTRA,
+    ])
+
+    // Y las cosas que esta fase declara que tira, dichas todas a la vez.
     expect(de(entrada, TIPO_EDIFICIO.PLANTAS_DESCARTADAS)[0].datos.partes).toHaveLength(13)
     expect(de(entrada, TIPO_EDIFICIO.PARTE_BAJO_RASANTE)).toHaveLength(1)
     expect(
@@ -905,6 +949,56 @@ describe('entradaDesdeWfsBu — el ahorro grande de F11', () => {
     expect(entrada.edificio.superficieConstruida).toBe(2513)
     expect(entrada.edificio.refcat).toBe('9398516VK3799G')
     expect(entrada.edificio.construccionOficial).toHaveLength(14)
+  })
+
+  it('⭐ F21 · y la huella que se declararía es 322,13 m², la que el ICUC ACEPTÓ', () => {
+    // ⛔⛔ EL CRITERIO 2 DE LA FICHA, Y LA RAZÓN DE SER DE LA FASE. Por esta vía
+    // —la del servicio, la que caminó el guion 21 de F14— el `Building` declaraba
+    // 406,69 m² en 3 piezas: **84,56 de más, que son la piscina entera**, metida
+    // dentro de la huella del edificio en un documento que se firma.
+    //
+    // ⭐ Y el número bueno NO lo elige esta prueba: **322,13 m² es la cifra que la
+    // Sede aceptó** el 2026-08-07 en el ICUC positivo `E1HTN9QN6AKZB4XY`, donde el
+    // Catastro declara 322 m² de huella. Es diana de oro EXTERNA, no un snapshot
+    // nuestro (F13, y la misma que su round-trip usa vértice a vértice).
+    const leidos = [parsearGmlBu(GML_TODO), parsearGmlBu(GML_PARTES)]
+    const entrada = entradaDesdeWfsBu({
+      ok: true,
+      refcat: '9398516VK3799G',
+      dialecto: leidos[0].dialecto,
+      srs: leidos[0].srs,
+      srsName: leidos[0].srsName,
+      edificio: leidos.find((d) => d.edificio !== null).edificio,
+      partes: leidos.flatMap((d) => d.partes),
+      otras: leidos.flatMap((d) => d.otras),
+      sinConstrucciones: false,
+      nMiembros: leidos.reduce((n, d) => n + d.nMiembros, 0),
+      consultas: 2,
+      detecciones: leidos.flatMap((d) => d.detecciones),
+    })
+
+    const env = envolventeDe(entrada.edificio.partes)
+    const area = env.recintos.reduce((t, pieza) => t + superficie(pieza), 0)
+    expect(env.recintos).toHaveLength(2)
+    expect(area).toBeCloseTo(322.13, 2)
+
+    // La piscina queda fuera POR SER OTRA, y no por ser un sótano: son dos motivos
+    // distintos y el segundo sería una clasificación falsa. Se comprueba el motivo,
+    // no solo la cifra — declarar 0 plantas da la MISMA superficie por el camino
+    // equivocado (medido en la fase 0, M2).
+    expect(env.excluidas.map((e) => [e.nombre, e.motivo])).toEqual([
+      ['Parte 10', 'SOLO_BAJO_RASANTE'],
+      ['Parte 14', 'NO_ES_PRINCIPAL'],
+    ])
+
+    // ⭐ MITAD ANTI-VACUIDAD: la piscina no se ha perdido por el camino. Sigue en
+    // el modelo, con sus 84,56 m², y es lo que `otrasDe` recoge para emitirla como
+    // `OtherConstruction` — la mitad del serializador que F13 dejó SIN llamante
+    // vivo por la vía de entrada.
+    const otras = entrada.edificio.partes.filter((p) => p.tipo === TIPO_PARTE.OTRA)
+    expect(otras).toHaveLength(1)
+    expect(superficie([otras[0].recinto])).toBeCloseTo(84.56, 2)
+    expect(area + superficie([otras[0].recinto])).toBeCloseTo(406.69, 2)
   })
 
   it('pasarle el ResultadoEdificioCatastro entero en vez de su `.datos` LANZA', () => {

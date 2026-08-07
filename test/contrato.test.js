@@ -817,6 +817,9 @@ describe('contrato F11 · `edificio/` sale por el barrel; el visor, el servicio 
       'conPlantas',
       'conTipoParte',
       'conParteRedibujada',
+      // F21 · la precisión del trabajo profesional, el dato que el ICUC exige y
+      // que el serializador sabía emitir desde F13 sin que nadie se lo pasara.
+      'conPrecision',
     ]) {
       expect(Object.keys(barrel.entradaEdificio), `falta la mutación '${nombre}'`).toContain(nombre)
     }
