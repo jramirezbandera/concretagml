@@ -96,6 +96,54 @@ describe('T9 · 1 · qué cajón permite cada paso', () => {
     expect(cuenta(CAJON.DIAGNOSTICO)).toBe(1)
     expect(cuenta(CAJON.COMPROBACION)).toBe(1)
   })
+
+  // ── ⭐ F14 · el segundo eje ────────────────────────────────────────────────
+
+  it('⭐ F14 · en la rama EDIFICIO, Diagnóstico trae el cajón de CONTRASTE', () => {
+    // El defecto que esto cierra está MEDIDO en Chrome (fase 4a): con los peldaños
+    // recién abiertos, `#/edificio/diagnostico` montaba `.gml-cajon-diagnostico`
+    // —el de PARCELA, 367 × 413 px— encima de una construcción. El peldaño estaba
+    // abierto y enseñaba la pantalla equivocada.
+    expect(cajonDe(PASO.DIAGNOSTICO, RAMA.EDIFICIO)).toBe(CAJON.CONTRASTE_EDIFICIO)
+    expect(cajonDe(PASO.DIAGNOSTICO, RAMA.PARCELA)).toBe(CAJON.DIAGNOSTICO)
+  })
+
+  it('⛔ F14 · la COMPROBACIÓN es de parcela, y en la rama EDIFICIO no aparece', () => {
+    // Se entra soltando un `.gml` de parcela en Entrada, y
+    // `viewer/cajon-comprobacion.js` lee `ParcelaGml`. En la otra rama esa esquina
+    // se queda vacía, que es la verdad y no un hueco.
+    expect(cajonDe(PASO.ENTRADA, RAMA.EDIFICIO)).toBe(CAJON.NINGUNO)
+    expect(cajonDe(PASO.ENTRADA, RAMA.PARCELA)).toBe(CAJON.COMPROBACION)
+  })
+
+  it('sin rama se comporta como PARCELA: es el defecto de la aplicación', () => {
+    for (const paso of PASOS) expect(cajonDe(paso)).toBe(cajonDe(paso, RAMA.PARCELA))
+    // Y una rama inventada tampoco lanza, por lo mismo que un paso inventado.
+    expect(() => cajonDe(PASO.DIAGNOSTICO, 'INVENTADA')).not.toThrow()
+    expect(cajonDe(PASO.DIAGNOSTICO, 'INVENTADA')).toBe(CAJON.DIAGNOSTICO)
+  })
+
+  it('⭐ los CINCO pasos por las DOS ramas tienen respuesta, y sale del modelo', () => {
+    // El mismo guardián anti-caducidad de arriba, ahora sobre el producto de los
+    // dos ejes: una rama nueva —o un paso nuevo— sin decidir qué hace con la
+    // esquina sale aquí y no en producción.
+    const ramas = Object.values(RAMA)
+    expect(ramas.length).toBeGreaterThan(1)
+    for (const rama of ramas) {
+      for (const paso of PASOS) {
+        expect(
+          Object.values(CAJON),
+          `«${paso}» en la rama «${rama}» no tiene cajón decidido`,
+        ).toContain(cajonDe(paso, rama))
+      }
+      // Y en cada rama, como mucho UN paso abre cada cajón: la exclusión de la
+      // esquina no puede depender de que dos módulos se pongan de acuerdo.
+      for (const cual of Object.values(CAJON)) {
+        if (cual === CAJON.NINGUNO) continue
+        expect(PASOS.filter((p) => cajonDe(p, rama) === cual).length).toBeLessThanOrEqual(1)
+      }
+    }
+  })
 })
 
 // ══════════════════════════════════════════════════════════════════════════════

@@ -48,6 +48,7 @@ para que el resultado no dependa de interpretar prosa. Diecinueve son de aceptac
 | `19-partes-plantas.js` | F12 · 1 a 4 | ⭐ **EL TRABAJO SOBRE UN EDIFICIO, andado entero**: traer 13 partes → elegir una → ponerle plantas → verlas en el mapa → añadir una piscina → dibujarle el recinto a mano. Mide lo que en jsdom sale verde pase lo que pase: que el **bloque de parte activa quepa** con 14 partes a 1280×720 (y que el síntoma no sea mudo), que los **rótulos romanos se lean**, que la **envolvente se repinte** al poner a 0 las plantas de una parte, que **dibujar con clics de verdad** cierre un recinto, que «Dibujar recinto» aparezca **solo donde sirve**, que el **eje PASO toque a esta rama** (defecto M2 de la fase 0), y —lo único que no es de píxeles— que el **borrador de edificio se escriba en IndexedDB de VERDAD y no pise el de parcela** | ⛔ **su primera corrida salió `ok:false` con TRES defectos reales**, uno de ellos que **las plantas del GML nunca llegaban al modelo** —F11 las tiraba por alcance y F12 llegó a la fase 5 sin recogerlas, con la suite en verde—. Hoy **`ok:true` en las dos ventanas** — ver §28 |
 | `18-pegado-coordenadas.js` | F19 · 1 a 3 | ⭐ **LAS TRES DEUDAS DE F18, andadas en un navegador de verdad**: el **pegado de la LISTA** —la vía que `feature-01` llama principal y que llevaba doce fases sin un solo manejador de `paste`—, **proyectar unos grados** (que hasta F19 se detectaban y no se podían atender), y **el rótulo del GML ajeno**. Y lo que la suite no puede ver: que el `<dialog>` sea modal DE VERDAD, que **las dos cifras de superficie se lean** (el cotejo que `importar()` calculaba desde F01 sin llamante), y que la parcela pegada **se pinte** | ⛔ **su primera corrida salió `ok:false` con TRES fallos del guion y UN DEFECTO REAL**: el renglón decía «medida por ti, **del fichero** «coordenadas pegadas»» —llamar fichero a lo pegado, en la línea que existe para decir de dónde salió el dato— y **la prueba de la suite lo aprobaba** porque casaba «pegad». Hoy **`ok:true`** — ver §27 |
 | `20-gml-edificio.js` | F13 · 1 a 6 | ⭐ **LA SALIDA DE LA RAMA EDIFICIO, andada entera**: rama vacía (botón apagado con su motivo) → traer 13 partes → el botón se enciende → pulsarlo → **el fichero baja de verdad** (Blob, ancla con su `download`, URL revocada y los BYTES: raíz `gml:`, `Building` sí y `BuildingPart` **no**, `footPrint`, srsName **URN**, `localId` desnudo) → romperlo a propósito → conmutar de rama y volver. Lo que la suite no puede ver: que el botón tenga **DOS dueños vivos** y no se pisen (se mide con el edificio roto, que es la única situación en la que las dos ramas discrepan), que el motivo **quepa** en su renglón, que los **dos mensajes retirados** por F13 no vuelvan, y que lo que no se ha podido comprobar **se diga y solo entonces** | ⛔ **su primera corrida no midió NADA**: medía el CTA en la pantalla de Entrada, donde `.gml-acciones` va en `display:none`, así que todas las cajas salían a cero y en verde. Hoy **`ok:true` en las dos ventanas** — ver §30 |
+| `21-contraste-edificio.js` | F14 · 1 a 4 | ⭐ **LOS DOS PELDAÑOS QUE F14 ABRE**, andados enteros: rama Edificio → soltar el GML de las 13 partes → Diagnóstico → **qué cajón se monta** → las cifras → Informe → **el PDF baja** (304.026 B, «Informe de contraste con la construcción catastral») → y con un DXF, los sabores de «no hay». Lo que la suite no puede ver: que la pantalla sea **la de esta rama** y no la de parcela (el defecto que la fase 4a midió: 367 × 413 px del cajón equivocado), que **ni un selector se duplique** con los dos cajones vivos, que lo accionable esté **sobre el pliegue**, que el **resalte por parte** exista y se distinga por trazo y **no por color**, y que «sin consultar» no se lea como «no consta ninguna» | `ok:true` en las dos ventanas — ver §31. ⚠️ Su primera corrida pulsaba un botón `disabled` y daba el DXF por cargado mirando el dato equivocado |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
 spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
@@ -4962,3 +4963,95 @@ solo en la geometría.
 De rebote se tapó un fallo vivo: `validar-xsd.py` cacheaba por URL **sin mirar los
 bytes**, así que habría guardado esos 376 kB de HTML como `.xsd` y luego habría
 informado de que **el fichero** no valida.
+
+---
+
+## 31. `21-contraste-edificio.js` — los dos peldaños que F14 abre (F14 · fase 6)
+
+```bash
+npm run dev                                   # EXIGE dev: los fixtures no están en dist/
+
+$B viewport 1280x720                          # el SUELO declarado (D5)
+$B goto http://localhost:PUERTO/concretagml/
+$B console --clear
+$B eval scripts/smoke-navegador/21-contraste-edificio.js
+
+$B viewport 1440x900                          # y la pasada cómoda
+$B goto http://localhost:PUERTO/concretagml/
+$B eval scripts/smoke-navegador/21-contraste-edificio.js
+```
+
+**Corrida de cierre (2026-08-07): `ok:true` en las dos ventanas, `problemas: []`,
+`advertencias: []`.**
+
+### Qué mide, y por qué no lo puede medir la suite
+
+Andado sobre la aplicación real: rama Edificio → soltar el GML de las 13 partes →
+Diagnóstico → **qué cajón se monta** → las cifras → Informe → **el PDF baja** → y
+con un DXF (sin nada oficial) → los sabores de «no hay».
+
+1. ⭐ **Que la pantalla sea la de esta rama.** Es el defecto que la fase 4a midió y
+   que la suite entera aprobaba: `#/edificio/diagnostico` montaba
+   `.gml-cajon-diagnostico` —el de PARCELA, **367 × 413 px**— encima de una
+   construcción. En jsdom los dos cajones están en el DOM siempre y `display:none`
+   no se calcula. Se miden **las dos mitades**: que el de edificio se vea Y que el
+   de parcela no; con una sola, el caso en que se apilan pasaría.
+2. ⭐ **Que haya UN SOLO nodo por selector**, con los dos cajones vivos (trampa M8).
+3. ⭐ **Que lo accionable esté a la vista.** Medido: los cuatro nodos del bloque
+   anclado salen entre **20 y 71 px POR ENCIMA** del borde, con 63 px de scroll
+   interno por debajo.
+4. ⭐ **El resalte por parte** — que el §30 declaró «no cubierto porque NO EXISTE» y
+   que F14 enchufa: **13 huellas, 3 señaladas, `stroke-dasharray: "6 4"`, mismo
+   `stroke`** que las demás. El color se compara a propósito: un rojo ahí sería un
+   dictamen (regla de oro 9).
+5. ⭐ **Que el PDF baje con su nombre legal** (criterio 4): `304.026 bytes`,
+   «Informe de contraste con la construcción catastral».
+6. ⭐ **Los sabores de «no hay», leídos distinto**: con el DXF, «Sin consultar» y el
+   renglón diciendo «no es lo mismo que no haber nada» — nunca «no consta ninguna».
+
+### ⛔ Dos cosas que la primera corrida hizo mal, y valen como aviso
+
+- **Pulsaba «Cargar las partes» del diálogo de capas sin marcar ninguna.** El
+  producto tenía razón y el guion no: ese botón nace APAGADO con su motivo escrito
+  («no hay ninguna capa marcada… ninguna viene marcada de fábrica a propósito,
+  elegir por el nombre de la capa falla en los planos reales», decisión de F11).
+  Un guion que pulsa un `disabled` y sigue midiendo **aprueba la pantalla anterior**.
+- **Daba por cargado el DXF mirando si había filas de parte**, que ya estaban del
+  GML. El testigo que no se puede fingir es **la superficie que el cajón enseña**:
+  322,13 m² · 2 piezas → 244,95 m² · 1 pieza.
+
+### ⛔ Y una lección que afecta a TODO este fichero
+
+**Los guiones no se pueden encadenar en una sola tanda.** Medidos en batch, el `09`
+salía con 1 problema y el `14` con «63 px»; medidos **uno por carga de página**, el
+09 sale limpio y el 14 da **128 px en los dos árboles**. El estado de la página
+anterior contamina al siguiente. La regresión de F14 se hizo con un **árbol de F13
+en paralelo** (`git worktree` + un segundo Vite en el 5199) y una carga por guion:
+
+| guion | F13 (`1a97b60`) | F14 |
+|---|---|---|
+| `09-diagnostico` | ok:true | **ok:true** |
+| `11-informe-pdf` | ok:false · 3 | ok:false · **los mismos 3** |
+| `13-edificio` | ok:false · 4 | ok:false · **los mismos 4** |
+| `14-shell` | ok:false · 1 (128 px) | ok:false · **1 (128 px)** |
+| `19-partes-plantas` | ok:true | **ok:true** |
+| `20-gml-edificio` | ok:true | **ok:true** |
+
+⚠️ **La tabla de arriba de este fichero dice `ok:true` del `11-informe-pdf`, y hoy
+no lo es** — en F13 tampoco. Sus tres problemas (el diálogo no es `:modal`, cierra
+el cajón de debajo y borra el contraste del mapa) son consecuencia de la
+**rebanada 5 del rework**, que sacó el Informe a pantalla completa con `show()` en
+vez de `showModal()`: en su pantalla, lo de detrás **no** está inerte, y el guion
+sigue exigiendo el modal de F09. **No es de F14 y no se toca aquí**: corregir un
+guion de otra fase con la mano en esta sería cambiar lo que afirma sin haber
+medido cuál de las dos verdades quiere el autor.
+
+### Lo que NO cubre
+
+- **La pantalla honesta de verdad** (`SIN_CONSTRUCCIONES`): hace falta preguntarle
+  al `wfsBU` por una parcela sin nada construido, y este guion no consulta
+  servicios de datos. La suite la cubre con el fixture de colección vacía; que la
+  frase **tranquilice** es juicio humano → `CHECKLIST-HUMANO.md` §19.
+- **Si el informe sirve para firmar** → `CHECKLIST-HUMANO.md` §19.
+- **El pie de firma en esta rama**: F14 toma el que F09 recuerde y no tiene diálogo
+  propio (límite declarado en su ficha).

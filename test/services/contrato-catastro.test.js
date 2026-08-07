@@ -991,10 +991,55 @@ describe('G16 · todo `SELECTOR_*` de app/ casa exactamente un nodo, y de UNA so
 
   const NOMBRES_BARRA = new Set(declaradosEnLaBarra(FUENTE_BARRA))
 
+  // ── ⭐ F14 · LA TERCERA FUENTE: EL PANEL DE LA RAMA EDIFICIO ───────────────
+  //
+  // Hasta F14 la partición era binaria —lo que trae `index.html` y lo que fabrica
+  // la barra de edición— y bastaba, porque no había nada más que fabricara nodos
+  // con contrato. F14 estrena la tercera: `app/panel-edificio.js` fabrica la
+  // `<section>` anfitriona del contraste de construcción, así que
+  // `SELECTOR_ANFITRION_CONTRASTE_EDIFICIO` casa CERO nodos de `index.html` — y con
+  // razón.
+  //
+  // ⚠️ **No se exime por nombre**, que sería una lista escrita a mano con otro
+  // aspecto. Se comprueba que el módulo que dice fabricarlo LO FABRIQUE de verdad:
+  // se le busca el par atributo/valor en su fuente. El día que deje de ponerlo, el
+  // selector cae solo en la mitad de la cáscara —donde casa cero— y este guardián
+  // vuelve a fallar, que es exactamente lo que tiene que pasar.
+  const FABRICANTE = 'app/panel-edificio.js'
+  const FUENTE_FABRICANTE = codigoDe(fuenteDe(FABRICANTE))
+
+  /**
+   * ¿Este selector de atributo lo escribe {@link FABRICANTE} en su código?
+   *
+   * ⛔ Se busca el `setAttribute` con **el par entero**, y no las dos cadenas por
+   * separado. La primera versión hacía eso último y salió roja al primer intento,
+   * con razón: `[data-anfitrion="diagnostico"]` —que sí viene de `index.html`—
+   * casaba, porque el panel de edificio contiene `'data-anfitrion'` (para SU
+   * sección) y contiene `'diagnostico'` (el valor de su `data-pantalla`). Dos
+   * cadenas que aparecen en el mismo fichero no son un nodo fabricado.
+   *
+   * @param {string} selector
+   * @returns {boolean}
+   */
+  const loFabricaElPanel = (selector) => {
+    const par = /^\[(data-[\w-]+)="([^"]+)"\]$/.exec(selector)
+    if (par === null) return false
+    const [, atributo, valor] = par
+    return new RegExp(
+      `setAttribute\\(\\s*'${atributo}'\\s*,\\s*'${valor}'\\s*\\)`,
+    ).test(FUENTE_FABRICANTE)
+  }
+
   /** Los que fabrica la barra… */
   const DE_LA_BARRA = SELECTORES.filter(({ nombre }) => NOMBRES_BARRA.has(nombre))
+  /** …los que fabrica el panel de edificio… */
+  const DEL_PANEL_EDIFICIO = SELECTORES.filter(
+    ({ nombre, selector }) => !NOMBRES_BARRA.has(nombre) && loFabricaElPanel(selector),
+  )
   /** …y todos los demás, que tienen que estar en la cáscara. */
-  const DE_LA_CASCARA = SELECTORES.filter(({ nombre }) => !NOMBRES_BARRA.has(nombre))
+  const DE_LA_CASCARA = SELECTORES.filter(
+    ({ nombre, selector }) => !NOMBRES_BARRA.has(nombre) && !loFabricaElPanel(selector),
+  )
 
   /**
    * Los selectores de `lista` cuyo recuento en `doc` NO es el esperado, ya
@@ -1039,10 +1084,14 @@ describe('G16 · todo `SELECTOR_*` de app/ casa exactamente un nodo, y de UNA so
   it('la partición es EXHAUSTIVA y SIN SOLAPES: ningún selector se cuela por la rendija', () => {
     // Las dos mitades cubren el todo y no se pisan. No se afirma NINGÚN número:
     // eso sería la lista escrita a mano otra vez, con otro nombre.
-    expect([...DE_LA_CASCARA, ...DE_LA_BARRA].map((s) => s.nombre).sort()).toEqual(
-      SELECTORES.map((s) => s.nombre).sort(),
-    )
+    expect(
+      [...DE_LA_CASCARA, ...DE_LA_BARRA, ...DEL_PANEL_EDIFICIO].map((s) => s.nombre).sort(),
+    ).toEqual(SELECTORES.map((s) => s.nombre).sort())
     expect(DE_LA_CASCARA.filter((s) => NOMBRES_BARRA.has(s.nombre))).toEqual([])
+    // Y las TRES mitades son disjuntas de verdad: un nombre en dos buckets querría
+    // decir que dos módulos fabrican el mismo nodo, que es la trampa M8 al revés.
+    expect(DE_LA_BARRA.filter((s) => DEL_PANEL_EDIFICIO.includes(s))).toEqual([])
+    expect(DE_LA_CASCARA.filter((s) => DEL_PANEL_EDIFICIO.includes(s))).toEqual([])
     // Y ninguna de las dos está vacía: con una vacía, la mitad correspondiente de
     // este guardián no estaría mirando nada.
     expect(DE_LA_CASCARA.length, 'ningún selector viene ya de index.html').toBeGreaterThan(0)
@@ -1068,7 +1117,24 @@ describe('G16 · todo `SELECTOR_*` de app/ casa exactamente un nodo, y de UNA so
         'un cableado a la nada; dos es peor, porque el módulo agarra el primero y el segundo ' +
         'queda muerto en pantalla con el mismo aspecto que el vivo. Los tests de app/ no lo ' +
         'ven: montan su propio DOM y ahí el nodo siempre está. Si el selector es de los que ' +
-        `fabrica viewer/barra-edicion.js, su sitio es la tabla CONTRATO de ${TEST_BARRA}`,
+        `fabrica viewer/barra-edicion.js, su sitio es la tabla CONTRATO de ${TEST_BARRA}; si lo ` +
+        `fabrica ${FABRICANTE}, este guardián lo reconoce solo por su par atributo/valor`,
+    ).toEqual([])
+  })
+
+  it(`⭐ F14 · los que fabrica ${FABRICANTE} NO están además en index.html`, () => {
+    // La tercera fuente, con la misma exigencia que la barra: un solo dueño. Dos
+    // nodos con el mismo par atributo/valor y `querySelector` se queda con el
+    // primero — el otro nacería conectado, escribible y mudo.
+    expect(
+      DEL_PANEL_EDIFICIO.length,
+      `ningún SELECTOR_* de app/ lo fabrica ya ${FABRICANTE}. O el panel dejó de crear su ` +
+        `<section> anfitriona (y entonces el selector tiene que volver a index.html), o el ` +
+        'reconocimiento por par atributo/valor se ha roto y la partición ha dejado de existir',
+    ).toBeGreaterThan(0)
+    expect(
+      desviados(documento, DEL_PANEL_EDIFICIO, 0),
+      `selectores que fabrica ${FABRICANTE} y que ADEMÁS aparecen en index.html`,
     ).toEqual([])
   })
 

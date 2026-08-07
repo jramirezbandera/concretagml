@@ -49,7 +49,7 @@
 // contrato K.1 cubre lo primero; lo segundo —`app/zona-fichero.js` engancha el
 // `drop` sobre la ventana entera— sigue abierto y anotado en la revisión.
 
-import { PASO, PASOS } from './navegacion.js'
+import { PASO, PASOS, RAMA } from './navegacion.js'
 
 // ── El contrato de marcado ──────────────────────────────────────────────────
 
@@ -89,6 +89,61 @@ export const TITULO_PANTALLA = Object.freeze({
   [PASO.DIAGNOSTICO]: 'Diagnóstico de encaje',
   [PASO.INFORME]: 'Informe de contraste',
 })
+
+/**
+ * ⭐ **F14 · Los títulos que la rama EDIFICIO dice DISTINTO.**
+ *
+ * Es una tabla de EXCEPCIONES y no un segundo juego completo, y esa forma es
+ * deliberada: lo que no está aquí cae en {@link TITULO_PANTALLA}, así que un paso
+ * nuevo no puede quedarse sin título en una rama y con él en la otra. Solo se
+ * escribe lo que de verdad se llama de otra manera.
+ *
+ * ⛔ **El defecto que esto cierra está MEDIDO** (fase 4a, 2026-08-07): con los
+ * peldaños recién abiertos, `#/edificio/informe` ponía «Informe de contraste» —el
+ * título de la PARCELA— sobre un informe de construcción, y `#/edificio/edicion`
+ * decía «Edición del recinto» sobre trece partes. Un `<h1>` que nombra otra cosa
+ * de la que hay debajo es la clase de error que nadie reporta y todo el mundo
+ * nota.
+ *
+ * Las tres que cambian, y por qué:
+ *   · **Edición** — no se edita «el recinto»: se editan las PARTES, cada una con
+ *     su tabla de coordenadas y sus plantas.
+ *   · **Diagnóstico** — no se encaja con el parcelario: se contrasta con la
+ *     construcción que el Catastro publica, que es otra pregunta.
+ *   · **Informe** — el nombre legal del documento **cambia según haya habido
+ *     contraste o no** (criterio de aceptación 4), así que el `<h1>` dice lo que
+ *     los dos tienen en común y no promete el que no toque.
+ *
+ * `Entrada` y `Validación` NO cambian: «Empieza tu expediente» y «Validación del
+ * recinto» valen igual para las dos ramas —una construcción también son recintos—
+ * y darles un título propio sería ruido.
+ *
+ * @readonly
+ */
+export const TITULO_EN_EDIFICIO = Object.freeze({
+  [PASO.EDICION]: 'Edición de las partes',
+  [PASO.DIAGNOSTICO]: 'Contraste con la construcción catastral',
+  [PASO.INFORME]: 'Informe de construcción',
+})
+
+/**
+ * El título que le toca a una situación. **FUNCIÓN PURA**, y exportada para que
+ * el test recorra los cinco pasos por las dos ramas sin escribir la lista.
+ *
+ * Devuelve `undefined` —y no una cadena inventada— cuando el paso no tiene título
+ * declarado: quien la usa deja entonces el que hubiera, porque inventar uno sería
+ * peor que no cambiarlo.
+ *
+ * @param {string} paso
+ * @param {string} [rama=RAMA.PARCELA]
+ * @returns {string|undefined}
+ */
+export function tituloDe(paso, rama = RAMA.PARCELA) {
+  if (rama === RAMA.EDIFICIO && typeof TITULO_EN_EDIFICIO[paso] === 'string') {
+    return TITULO_EN_EDIFICIO[paso]
+  }
+  return TITULO_PANTALLA[paso]
+}
 
 // ── Utilidades ──────────────────────────────────────────────────────────────
 
@@ -153,14 +208,18 @@ export function cablearPantalla({ documento, navegacion, app, titulo } = {}) {
 
   let destruido = false
 
-  /** @param {{paso: string}} situacion */
-  function aplicar({ paso }) {
+  /** @param {{paso: string, rama: string}} situacion */
+  function aplicar({ paso, rama }) {
     if (destruido) return
     raiz.setAttribute(ATRIBUTO_PASO, paso)
     // El título es lo ÚNICO que este módulo escribe además del atributo. Si el
     // paso no tiene título declarado se deja el que hubiera: inventar uno sería
     // peor que no cambiarlo.
-    const nuevo = TITULO_PANTALLA[paso]
+    //
+    // ⭐ F14 · Y depende de la RAMA, no solo del paso: ver {@link TITULO_EN_EDIFICIO},
+    // donde está medido lo que pasaba sin esto («Informe de contraste» sobre un
+    // informe de construcción).
+    const nuevo = tituloDe(paso, rama)
     if (esElementoDOM(nodoTitulo) && typeof nuevo === 'string') nodoTitulo.textContent = nuevo
   }
 

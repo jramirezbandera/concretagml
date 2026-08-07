@@ -39,8 +39,10 @@ import {
   CLASE_ENVOLVENTE,
   CLASE_HUELLA,
   CLASE_HUELLA_ACTIVA,
+  CLASE_HUELLA_SENALADA,
   CLASE_ROTULO_PLANTAS,
   SIN_NOMBRE,
+  TRAZO_SENALADA,
   crearCapaPartes,
   numeroRomano,
   rotuloPlantas,
@@ -739,6 +741,61 @@ describe('F12 · lo que se pinta de más', () => {
     const { mapa, capa } = conMapa()
     capa.pintar([VIVIENDA, PORCHE])
     expect(mapa.getPane(PANE.PARTES).querySelectorAll(`.${CLASE_HUELLA_ACTIVA}`)).toHaveLength(0)
+  })
+
+  // ── ⭐ F14 · El resalte por parte (`porParte` → mapa) ─────────────────────
+
+  it('⭐ F14 · la parte SEÑALADA se distingue por TRAZO, y no por color', () => {
+    const { mapa, capa } = conMapa()
+    capa.pintar([VIVIENDA, PORCHE], { senaladas: [1] })
+    const pane = mapa.getPane(PANE.PARTES)
+    const senaladas = [...pane.querySelectorAll(`.${CLASE_HUELLA_SENALADA}`)]
+    expect(senaladas).toHaveLength(1)
+    expect(senaladas[0].getAttribute('stroke-dasharray')).toBe(TRAZO_SENALADA)
+
+    // ⛔ El COLOR no cambia, y es la regla de oro 9 aplicada a la cartografía:
+    // `COLOR_HUELLA` está elegido por descarte para que no signifique nada, y un
+    // rojo aquí diría «esta parte está mal» — que es el dictamen que no nos toca.
+    // Lo que se dice es «el aviso que estás leyendo habla de ÉSTA».
+    const normal = pane.querySelector(`.${CLASE_HUELLA}:not(.${CLASE_HUELLA_SENALADA})`)
+    expect(senaladas[0].getAttribute('stroke')).toBe(normal.getAttribute('stroke'))
+    expect(senaladas[0].getAttribute('fill')).toBe(normal.getAttribute('fill'))
+  })
+
+  it('sin `senaladas` —o con `[]`— no hay ninguna señalada ni ningún trazo', () => {
+    const { mapa, capa } = conMapa()
+    for (const opciones of [{}, { senaladas: [] }, { senaladas: null }]) {
+      capa.pintar([VIVIENDA, PORCHE], opciones)
+      const pane = mapa.getPane(PANE.PARTES)
+      expect(pane.querySelectorAll(`.${CLASE_HUELLA_SENALADA}`)).toHaveLength(0)
+      // ⚠️ Y ni un `stroke-dasharray` puesto a la cadena «null», que es lo que pasa
+      // si se le pasa `null` a Leaflet en vez de `undefined`.
+      for (const path of pane.querySelectorAll(`.${CLASE_HUELLA}`)) {
+        expect(path.getAttribute('stroke-dasharray')).toBeNull()
+      }
+    }
+  })
+
+  it('⭐ una parte puede estar ACTIVA y SEÑALADA a la vez, y se leen las dos', () => {
+    // Por eso una marca es el grosor y la otra el trazo: si las dos fueran lo
+    // mismo, la parte que se está editando y que además tiene un aviso enseñaría
+    // una sola de las dos cosas.
+    const { mapa, capa } = conMapa()
+    capa.pintar([VIVIENDA, PORCHE], { activa: 1, senaladas: [1] })
+    const pane = mapa.getPane(PANE.PARTES)
+    const ambas = pane.querySelector(`.${CLASE_HUELLA_ACTIVA}.${CLASE_HUELLA_SENALADA}`)
+    expect(ambas).not.toBeNull()
+    expect(ambas.getAttribute('stroke-dasharray')).toBe(TRAZO_SENALADA)
+    const otra = pane.querySelector(`.${CLASE_HUELLA}:not(.${CLASE_HUELLA_ACTIVA})`)
+    expect(Number(ambas.getAttribute('stroke-width'))).toBeGreaterThan(
+      Number(otra.getAttribute('stroke-width')),
+    )
+  })
+
+  it('varias partes señaladas a la vez, y un índice fuera de rango no rompe nada', () => {
+    const { mapa, capa } = conMapa()
+    capa.pintar([VIVIENDA, PORCHE], { senaladas: [0, 1, 7] })
+    expect(mapa.getPane(PANE.PARTES).querySelectorAll(`.${CLASE_HUELLA_SENALADA}`)).toHaveLength(2)
   })
 
   it('⭐ la envolvente admite N piezas: el edificio real del Catastro son DOS', () => {

@@ -78,7 +78,7 @@
 import { parseLIST } from './list.js'
 import { parseTXT } from './txt.js'
 import { parseDXF } from './dxf.js'
-import { crearDeteccion, TIPO_DETECCION, SEVERIDAD } from './_comun.js'
+import { crearDeteccion, declinar, SUJETOS, TIPO_DETECCION, SEVERIDAD } from './_comun.js'
 import {
   detectarHuso,
   sanear,
@@ -469,11 +469,15 @@ function resolverHuso(anilloExterior, opts, detecciones) {
   const candidatos = opts.huso != null ? [opts.huso] : undefined
   const huso = detectarHuso(centro, candidatos)
 
+  // ⭐ F14 · De QUÉ se habla. El defecto es «la parcela», así que la rama de
+  // parcela dice exactamente lo que decía. Ver `parsers/_comun.js#SUJETO`.
+  const sujeto = declinar(opts.sujeto)
+
   if (huso === null) {
     detecciones.push(
       crearDeteccion(
         TIPO_DETECCION.HUSO_DETECTADO,
-        `El centroide de la parcela (${centro[0].toFixed(2)}, ${centro[1].toFixed(2)}) no cae en la ` +
+        `El centroide ${sujeto.genitivo} (${centro[0].toFixed(2)}, ${centro[1].toFixed(2)}) no cae en la ` +
           `España peninsular ni Baleares: no se pudo deducir el huso. Revisa coordenadas/huso.`,
         SEVERIDAD.AVISO,
         { fueraDeEspana: true, centroide: centro },
@@ -486,7 +490,7 @@ function resolverHuso(anilloExterior, opts, detecciones) {
   detecciones.push(
     crearDeteccion(
       TIPO_DETECCION.HUSO_DETECTADO,
-      `La parcela cae en el huso ${huso.zona} (${huso.srs}): ` +
+      `${sujeto.nominativo} cae en el huso ${huso.zona} (${huso.srs}): ` +
         `lon=${huso.lon.toFixed(6)}, lat=${huso.lat.toFixed(6)}.`,
       SEVERIDAD.INFO,
       {
@@ -696,6 +700,12 @@ function contarDetecciones(detecciones) {
  * @param {','|'.'} [opts.separadorDecimal]  Reenviado a los parsers LIST/TXT.
  * @param {string} [opts.palabraSeparador]  Reenviado a los parsers LIST/TXT.
  * @param {number} [opts.flechaMax]  Reenviado al parser DXF (discretización de arcos).
+ * @param {'PARCELA'|'CONSTRUCCION'} [opts.sujeto='PARCELA']  **F14.** De QUÉ hablan
+ *   los mensajes de esta capa. Desde F11 el MISMO importador lee el volcado de una
+ *   parcela y el de una construcción (`edificio/entrada.js`), y decirle al usuario
+ *   «la parcela cae en el huso 30» con trece partes de un edificio delante le hace
+ *   buscar un fallo real donde no está. El defecto conserva los literales de
+ *   siempre, byte a byte. Ver `parsers/_comun.js#SUJETO`.
  * @param {string} [opts.capa]  (F11) Importar SOLO los anillos de esta capa del DXF, con su
  *   nombre LITERAL. Es la oferta que resuelve `ANILLOS_EN_VARIAS_CAPAS`. Si la capa no existe
  *   en el fichero NO se lanza: se avisa nombrándola, no entra ningún anillo y el bloqueo pasa a
@@ -721,6 +731,18 @@ export function importar(texto, opts = {}) {
       // nunca se escriben a mano: el mensaje no puede desincronizarse de la
       // comprobación el día que entre Canarias. Igual que `geo/huso.js:142-143`.
       `importar: 'opts.huso' inválido: ${JSON.stringify(opts.huso)}. Válidos: ${HUSOS_VALIDOS.join(', ')} (Canarias diferido).`,
+    )
+  }
+  if (opts.sujeto !== undefined && !SUJETOS.includes(opts.sujeto)) {
+    // Contrato del programador, como `formato` y `huso`: un sujeto mal escrito
+    // haría que los avisos hablaran del objeto por defecto sin que nada lo dijera,
+    // y son avisos sobre fallos REALES del fichero. Se lanza al ENTRAR, que es
+    // donde el error es de quien llama; dentro de los parsers, `declinar` se cae al
+    // defecto y no revienta (ver su JSDoc).
+    throw new RangeError(
+      `importar: 'opts.sujeto' inválido: ${JSON.stringify(opts.sujeto)}. ` +
+        `Válidos: ${SUJETOS.join(', ')}. Es de QUÉ hablan los mensajes de esta capa: el MISMO ` +
+        `importador lee el volcado de una parcela y el de una construcción desde F11.`,
     )
   }
   if (opts.capa !== undefined && typeof opts.capa !== 'string') {

@@ -230,6 +230,14 @@ export const CLASE = Object.freeze({
   BLOQUE: 'gml-bloque--edificio',
   BLOQUE_PARTES: 'gml-bloque--partes',
   BLOQUE_ACTIVA: 'gml-bloque--parte-activa',
+  /**
+   * F14 · La anfitriona del contraste, VACÍA: su contenido se muda aquí desde la
+   * esquina del mapa con `cajon.anfitrion(...)`, con sus oyentes puestos. Se llama
+   * `--contraste-edificio` y no `--contraste` a secas porque `index.html` ya usa
+   * ese nombre para la de la otra rama, y dos secciones con la misma clase
+   * confundirían a `querySelector` y a la hoja de estilos.
+   */
+  BLOQUE_CONTRASTE: 'gml-bloque--contraste-edificio',
 
   OPCIONES: 'gml-opciones',
   OPCION: 'gml-opcion',
@@ -923,10 +931,17 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
   //   · «Parte activa» → `edicion` **y solo ahí**. Lleva la tabla de coordenadas,
   //     que es un estirador, y dos estiradores a la vez descosen el panel. Fuera
   //     de «Edición» no hay nada que editar.
+  //
+  // ⭐ **F14 añade la cuarta**: «Contraste», que solo existe en `diagnostico` y es
+  // la anfitriona de `viewer/cajon-contraste-edificio.js`. Es el espejo exacto de
+  // `.gml-bloque--contraste` de `index.html` en la otra rama, y por el mismo
+  // motivo: hasta F14 la rama EDIFICIO no llegaba a esa pantalla y no tenía nada
+  // que enseñar en ella.
   const PANTALLA = Object.freeze({
     ORIGEN: 'entrada',
     PARTES: 'validacion edicion informe',
     ACTIVA: 'edicion',
+    CONTRASTE: 'diagnostico',
   })
 
   // ══ Sección 1 · «Origen del edificio» ═════════════════════════════════════
@@ -1172,6 +1187,29 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
   const tablaActiva = crear('div', 'gml-tabla-caja')
   tablaActiva.dataset.tabla = 'parte-activa'
   cuerpoActiva.append(tablaActiva)
+
+  // ══ Sección 4 · «Contraste» — la anfitriona, VACÍA (F14) ══════════════════
+  //
+  // Espejo exacto de `.gml-bloque--contraste` de `index.html` en la otra rama, y
+  // por los mismos tres motivos, que conviene no volver a discutir:
+  //
+  //   · **VACÍA, y no se fabrica aquí nada de lo que va dentro.** El contenido lo
+  //     muda `viewer/cajon-contraste-edificio.js#anfitrion` desde la esquina del
+  //     mapa, con sus oyentes puestos. Duplicar sus nodos pondría un segundo
+  //     `[data-contraste="titular"]` y un segundo
+  //     `[data-accion="preparar-informe-edificio"]` en el documento, y
+  //     `querySelector` se queda con el PRIMERO: uno de los dos juegos nacería
+  //     mudo y sin un solo síntoma.
+  //   · **`data-pantalla="diagnostico"` y solo ahí.** Es el estirador de esa
+  //     pantalla, igual que «Parte activa» lo es de Edición, y por eso no comparte
+  //     pantalla con ninguna otra: dos estiradores a la vez descosen el reparto.
+  //   · **Sin `data-rama-panel` escrito aquí.** Lo sella `app/cableado-edificio.js`
+  //     al montar el panel, que es quien tiene esa responsabilidad desde F11 —
+  //     `secciones()` la incluye, así que entra en el intercambio sola, que es
+  //     justo lo que T4.1 aprendió cuando la tercera sección se quedó fuera.
+  const seccionContraste = crear('section', `gml-bloque ${CLASE.BLOQUE_CONTRASTE}`)
+  seccionContraste.setAttribute('data-pantalla', PANTALLA.CONTRASTE)
+  seccionContraste.setAttribute('data-anfitrion', 'contraste-edificio')
 
   // ══ El `<dialog>` de reparto por capas ════════════════════════════════════
 
@@ -2106,6 +2144,12 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
     seccionPartes,
     /** La sección «Parte activa» (F12 · T4.1). Solo se ve en la pantalla «Edición». */
     seccionActiva,
+    /**
+     * La sección anfitriona del contraste (F14). **VACÍA a propósito**: su
+     * contenido se muda aquí desde la esquina del mapa. Solo se ve en la pantalla
+     * «Diagnóstico».
+     */
+    seccionContraste,
     /** El `<dialog>` de reparto por capas. Existe siempre. */
     dialogoCapas,
 
@@ -2123,7 +2167,7 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
     tablaParteActiva: tablaActiva,
 
     /**
-     * Todas las raíces que este módulo tiene HOY en el documento: las dos
+     * Todas las raíces que este módulo tiene HOY en el documento: las CUATRO
      * secciones, el diálogo de capas y —solo en COMPLETO— el de atributos. Existe
      * para que un test recorra lo que este módulo escribe **sin suponer** cuántas
      * piezas hay.
@@ -2131,7 +2175,13 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
      * @returns {HTMLElement[]}
      */
     raices() {
-      const lista = [seccionOrigen, seccionPartes, seccionActiva, dialogoCapas]
+      const lista = [
+        seccionOrigen,
+        seccionPartes,
+        seccionActiva,
+        seccionContraste,
+        dialogoCapas,
+      ]
       if (dialogoAtributos !== null) lista.push(dialogoAtributos)
       return lista
     },
@@ -2143,15 +2193,19 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
      * dejado una sección de edificio visible sobre la rama de parcela, en
      * silencio, hasta que alguien lo viera con los ojos.
      *
+     * ⭐ Y esa lección se cobra hoy: F14 añade la CUARTA («Contraste») y no hay
+     * que tocar el cableado — entra en el sellado y en el intercambio sola, por
+     * estar aquí.
+     *
      * @returns {HTMLElement[]}
      */
     secciones() {
-      return [seccionOrigen, seccionPartes, seccionActiva]
+      return [seccionOrigen, seccionPartes, seccionActiva, seccionContraste]
     },
 
     /**
-     * Mete las tres secciones en el panel. Se piden DOS anclas y no tres: la de
-     * «Parte activa» va pegada a la de «Partes» (ver más abajo).
+     * Mete las CUATRO secciones en el panel. Se piden DOS anclas y no cuatro: las
+     * de «Parte activa» y «Contraste» van pegadas a la de «Partes» (ver abajo).
      *
      * ⚠️ **El orden es carga útil, no comodidad.** `.gml-bloque--partes` es
      * `flex: 1 1 auto` y hace en esta rama el papel que `.gml-bloque--vertices`
@@ -2183,6 +2237,10 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
       // La tercera va PEGADA a la lista, y no pide ancla propia: «la parte
       // activa» solo significa algo debajo de la lista de la que se elige.
       seccionPartes.after(seccionActiva)
+      // Y la cuarta detrás de la tercera, así que en Diagnóstico —donde ninguna de
+      // las otras se ve— queda ella sola ocupando la columna. Tampoco pide ancla:
+      // el contraste se lee después de haber visto las partes, no antes.
+      seccionActiva.after(seccionContraste)
     },
 
     /**
@@ -2555,7 +2613,19 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
       oyentes.accion.clear()
       oyentes.cerrar.clear()
 
-      for (const nodo of [seccionOrigen, seccionPartes, seccionActiva, dialogoCapas]) {
+      // ⚠️ `seccionContraste` se saca como las demás, y con ella **se va el cajón
+      // que tenga dentro**: `viewer/cajon-contraste-edificio.js` cuelga su
+      // contenedor de esta sección cuando es la pantalla. No es un problema —el
+      // visor se desmonta aparte y `control.remove()` le pregunta al nodo por su
+      // padre real, esté donde esté—, pero conviene saberlo: el orden de apagado de
+      // esta rama está escrito en la cabecera de `app/cableado-edificio.js`.
+      for (const nodo of [
+        seccionOrigen,
+        seccionPartes,
+        seccionActiva,
+        seccionContraste,
+        dialogoCapas,
+      ]) {
         if (nodo.parentNode) nodo.parentNode.removeChild(nodo)
       }
     },

@@ -197,30 +197,38 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     for (const motivo of todos) expect(motivo.length).toBeLessThanOrEqual(90)
   })
 
-  it('el orden de las causas es RAMA → MODO → DATO, y se ve con las tres a la vez', () => {
-    // ⚠️ Se prueba con DIAGNÓSTICO y no con Edición: desde F12 Edición existe en
-    // las dos ramas, así que ya no sirve para enseñar la causa RAMA. El orden que
-    // se afirma es el del código, no el de un paso concreto.
+  it('el orden de las causas es RAMA → MODO → DATO, y se ve con las dos que quedan', () => {
+    // ⛔ **Este `it` ha perdido su primer escalón, y hay que decirlo.** Se probaba
+    // con DIAGNÓSTICO porque era el paso que aún se apagaba por RAMA; **F14 abre
+    // los cinco peldaños en las dos ramas**, así que ya NO HAY ningún paso con el
+    // que enseñar la causa RAMA sobre datos reales, y `MOTIVO_RAMA` está vacío.
+    //
+    // La compuerta sigue en el código y sigue siendo la primera: lo que se prueba
+    // aquí es el orden de las dos que quedan vivas, y el de la primera se prueba
+    // en `evaluarPaso` con una regla FABRICADA, más abajo. Aflojar esto a «MODO →
+    // DATO» sin decir por qué dejaría la impresión de que el orden cambió.
     const todoEnContra = {
-      rama: RAMA.EDIFICIO,
+      rama: RAMA.PARCELA,
       modo: MODO.COMPROBACION,
       hechos: { ...HECHOS_VACIOS },
     }
-    expect(evaluarPaso(PASO.DIAGNOSTICO, todoEnContra).causa).toBe(CAUSA.RAMA)
 
-    // Quitada la rama, manda el dato (Diagnóstico SÍ está en comprobación).
-    expect(evaluarPaso(PASO.DIAGNOSTICO, { ...todoEnContra, rama: RAMA.PARCELA }).causa).toBe(
+    // El escalón del MODO se ve en Edición, que es el paso que lo tiene.
+    expect(evaluarPaso(PASO.EDICION, todoEnContra).causa).toBe(CAUSA.MODO)
+
+    // Quitado el modo, manda el dato.
+    expect(evaluarPaso(PASO.EDICION, { ...todoEnContra, modo: MODO.NORMAL }).causa).toBe(
       CAUSA.DATO,
     )
 
-    // Y el escalón del MODO se ve en Edición, que es el paso que lo tiene.
+    // Y con la rama EDIFICIO —donde ya no hay compuerta de rama— el diagnóstico
+    // cae por DATO y no por RAMA, que es justo el cambio de F14.
     expect(
-      evaluarPaso(PASO.EDICION, { ...todoEnContra, rama: RAMA.PARCELA }).causa,
-    ).toBe(CAUSA.MODO)
-
-    // Quitado el modo, manda el dato.
-    expect(
-      evaluarPaso(PASO.EDICION, { ...todoEnContra, rama: RAMA.PARCELA, modo: MODO.NORMAL }).causa,
+      evaluarPaso(PASO.DIAGNOSTICO, {
+        rama: RAMA.EDIFICIO,
+        modo: MODO.NORMAL,
+        hechos: { ...HECHOS_VACIOS },
+      }).causa,
     ).toBe(CAUSA.DATO)
   })
 
@@ -246,20 +254,79 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     expect(veredicto.disponible).toBe(true)
   })
 
-  it('en la rama EDIFICIO se apagan Diagnóstico e Informe, con su motivo', () => {
+  it('⭐ F14 · en la rama EDIFICIO están ya LOS CINCO peldaños', () => {
+    // ⛔ **Hasta el 2026-08-07 este `it` afirmaba lo contrario**: que Diagnóstico e
+    // Informe se apagaban por RAMA, con sus dos motivos. Era verdad, y **F14 es la
+    // fase que lo vuelve falso** — trae `diagnostico/edificio.js` y
+    // `report/pdf-edificio.js`—. Se reescribe aquí, que es donde está la causa, y
+    // no se «arregla» aflojando la aserción.
     const enEdificio = {
       rama: RAMA.EDIFICIO,
       modo: MODO.NORMAL,
-      hechos: { geometria: true, oficial: true, diagnostico: true },
+      hechos: { geometria: true, oficial: false, diagnostico: false },
     }
-    for (const paso of [PASO.DIAGNOSTICO, PASO.INFORME]) {
-      const veredicto = evaluarPaso(paso, enEdificio)
-      expect(veredicto.disponible).toBe(false)
-      expect(veredicto.causa).toBe(CAUSA.RAMA)
-      expect(veredicto.motivo).toBe(MOTIVO_RAMA[paso])
+    for (const paso of PASOS) {
+      expect(evaluarPaso(paso, enEdificio).disponible, `el paso ${paso}`).toBe(true)
     }
-    // Entrada y Validación SÍ: un edificio cargado se puede mirar.
-    expect(evaluarPaso(PASO.VALIDACION, enEdificio).disponible).toBe(true)
+  })
+
+  it('⭐ F14 · y el Diagnóstico de EDIFICIO no exige el parcelario, a propósito', () => {
+    // La decisión que hace alcanzable la pantalla honesta. En PARCELA el
+    // diagnóstico exige `oficial` porque sin parcelario no hay nada que
+    // contrastar; en EDIFICIO **no**, porque su caso estrella —la obra nueva, «no
+    // consta construcción registrada»— es precisamente aquel en el que no hay
+    // huella oficial. Exigirla dejaría esa pantalla escrita, probada y sin forma
+    // de llegar a ella: la trampa de `MOTIVO_SIN_EDIFICIO` en F13.
+    const soloGeometria = { geometria: true, oficial: false, diagnostico: false }
+
+    expect(
+      evaluarPaso(PASO.DIAGNOSTICO, {
+        rama: RAMA.EDIFICIO,
+        modo: MODO.NORMAL,
+        hechos: soloGeometria,
+      }).disponible,
+    ).toBe(true)
+
+    // Y en PARCELA, con los mismos hechos, sigue exigiéndolo.
+    const enParcela = evaluarPaso(PASO.DIAGNOSTICO, {
+      rama: RAMA.PARCELA,
+      modo: MODO.NORMAL,
+      hechos: soloGeometria,
+    })
+    expect(enParcela.disponible).toBe(false)
+    expect(enParcela.causa).toBe(CAUSA.DATO)
+  })
+
+  it('⭐ F14 · el Informe de EDIFICIO no exige diagnóstico: sale «solo declarativo»', () => {
+    // Ficha §17: «si no [hubo contraste], informe solo declarativo, sin sección de
+    // contraste». El informe de construcción se sostiene con la construcción.
+    const sinDiagnostico = { geometria: true, oficial: false, diagnostico: false }
+
+    expect(
+      evaluarPaso(PASO.INFORME, {
+        rama: RAMA.EDIFICIO,
+        modo: MODO.NORMAL,
+        hechos: sinDiagnostico,
+      }).disponible,
+    ).toBe(true)
+
+    // En PARCELA el informe firma un diagnóstico, y sin él no hay qué firmar.
+    expect(
+      evaluarPaso(PASO.INFORME, {
+        rama: RAMA.PARCELA,
+        modo: MODO.NORMAL,
+        hechos: sinDiagnostico,
+      }).disponible,
+    ).toBe(false)
+  })
+
+  it('⛔ F14 · la tabla de motivos de RAMA está VACÍA, y es a propósito', () => {
+    // No es un olvido ni una tabla a medio rellenar: **no queda ninguna limitación
+    // por rama que declarar**. La compuerta se conserva como mecanismo —el día que
+    // haga falta otra vez tiene que estar— pero una FRASE falsa no se conserva.
+    // Si alguien la rellena «por simetría», esto se pone rojo y le manda a leer el
+    // comentario de `app/navegacion.js`.
+    expect(Object.keys(MOTIVO_RAMA)).toEqual([])
   })
 
   it('⭐ F12 · y EDICIÓN también: esta versión ya edita construcciones', () => {

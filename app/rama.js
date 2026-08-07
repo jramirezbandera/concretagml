@@ -249,13 +249,30 @@ export const selectorPanel = (rama) => `[${ATRIBUTO_PANEL}="${rama}"]`
 
 /**
  * Las secciones de `index.html` que este módulo marca como de la rama PARCELA
- * cuando el llamante no dice otra cosa. **Son DOS y la segunda no es un extra**:
- * ver la cabecera (el estirador cambia de dueño).
+ * cuando el llamante no dice otra cosa. **La segunda no es un extra**: ver la
+ * cabecera (el estirador cambia de dueño).
+ *
+ * ⭐ **F14 · Entra la tercera: `.gml-bloque--contraste`.** Hasta hoy no estaba, y
+ * era CORRECTO que no estuviera: la rama EDIFICIO no llegaba a la pantalla de
+ * Diagnóstico —`MOTIVO_RAMA[PASO.DIAGNOSTICO]` la bloqueaba—, así que el eje PASO
+ * ya la dejaba fuera y marcarla además habría sido un segundo dueño de la misma
+ * visibilidad. `index.html` llegó a decirlo con esas palabras.
+ *
+ * **F14 es la fase que vuelve falso ese razonamiento**: abre los dos peldaños en
+ * la rama de edificio, y desde entonces la sección anfitriona del diagnóstico de
+ * PARCELA se vería en `#/edificio/diagnostico` — está MEDIDO, y era el defecto que
+ * la fase 4a dejó abierto: el cajón de parcela (367 × 413 px) montado sobre una
+ * construcción. Ahora la rama la esconde y en su lugar se ve la del edificio, que
+ * fabrica `app/panel-edificio.js` y sella `app/cableado-edificio.js`.
  *
  * @readonly
  * @type {readonly string[]}
  */
-export const SECCIONES_PARCELA = Object.freeze(['.gml-bloque--catastro', '.gml-bloque--vertices'])
+export const SECCIONES_PARCELA = Object.freeze([
+  '.gml-bloque--catastro',
+  '.gml-bloque--vertices',
+  '.gml-bloque--contraste',
+])
 
 // ── Lo que se le dice al usuario ─────────────────────────────────────────────
 
@@ -279,15 +296,30 @@ const CLASE_ESTADO_ERROR = 'gml-accion-estado--error'
  * parte, dos se solapan— y ese motivo lo escribe el cableado nuevo en el mismo
  * renglón. Lo que desaparece no es el apagado: es el apagado *por ser edificio*.
  *
- * ⚠️ Y queda uno de los dos: «Diagnosticar encaje» sigue apagado —es F14— con el
- * motivo de aquí abajo, que ahora se enseña **entero y por su cuenta**.
+ * ⭐ **F14 · Y AHORA SE RETIRA EL OTRO.**
  *
- * Por qué «Diagnosticar encaje» está apagado en la rama EDIFICIO.
+ * Aquí vivía además `MOTIVO_DIAGNOSTICAR_EN_EDIFICIO`:
+ *
+ * > «*«Diagnosticar encaje» está apagado mientras estás en la rama Edificio: el
+ * > diagnóstico contrasta una parcela medida contra el parcelario del Catastro y
+ * > todavía no sabe hacerlo con un edificio. Vuelve a la rama Parcela y el botón
+ * > se enciende.*»
+ *
+ * Era verdad, y **F14 es la fase que lo vuelve falso**: `diagnostico/edificio.js`
+ * contrasta la construcción medida con la registrada, y el peldaño Diagnóstico
+ * existe ya en esta rama (`app/navegacion.js#REGLA`).
+ *
+ * Con esto **`app/rama.js` deja de apagar ningún CTA por ser edificio**, que es lo
+ * que este módulo llevaba haciendo desde F11. Lo que queda es lo que siempre debió
+ * ser: la rama intercambia paneles y conmuta, y **quién puede pulsar qué lo deciden
+ * el dato y el peldaño**, cada uno en su sitio. `ctaPrevio` y la mecánica de
+ * reponer se conservan —son el contrato con los dos cableados que comparten el
+ * botón— y hoy no tienen a quién aplicar: hay un test que lo afirma, para que nadie
+ * vuelva a colgar de aquí un apagado por rama.
+ *
+ * Hay guardián de que **ninguno de los dos textos reaparece** en pantalla, igual
+ * que F13 lo dejó para los suyos.
  */
-export const MOTIVO_DIAGNOSTICAR_EN_EDIFICIO =
-  '«Diagnosticar encaje» está apagado mientras estás en la rama Edificio: el diagnóstico contrasta ' +
-  'una parcela medida contra el parcelario del Catastro y todavía no sabe hacerlo con un edificio. ' +
-  'Vuelve a la rama Parcela y el botón se enciende.'
 
 /**
  * ⭐ **F13 · RETIRADO TAMBIÉN, y por la mitad que se volvió falsa.**
@@ -578,8 +610,11 @@ export function cablearRama({
     {
       boton: botonDiagnosticar ?? nodo(documento, SELECTOR.CTA_DIAGNOSTICAR),
       renglon: renglonDiagnosticar ?? nodo(documento, SELECTOR.ESTADO_DIAGNOSTICAR),
-      motivo: MOTIVO_DIAGNOSTICAR_EN_EDIFICIO,
-      apagaEnEdificio: true,
+      // ⭐ F14 · `apagaEnEdificio: false`, igual que su hermano desde F13. Los dos
+      // CTA se siguen resolviendo aquí porque los dos viven en el mismo pie y hay
+      // que poder REPONERLOS si vinieran apagados de antes.
+      motivo: null,
+      apagaEnEdificio: false,
     },
   ]
   /** Lo que tenía cada CTA antes de que esta rama lo apagase. `null` = no apagado. */

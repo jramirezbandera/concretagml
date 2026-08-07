@@ -2546,3 +2546,80 @@ anotado con dueño (**F14**) en §30 del `GUION.md`.
       sale se lee como un veredicto?** La app mide y declara; no dice si la
       construcción está bien. Si alguna frase suena a «esto está correcto», es un
       defecto.
+
+---
+
+## §19 · F14 · El contraste de la construcción y su informe
+
+**Qué está medido ya y no hace falta que repitas:** que la pantalla de Diagnóstico
+de la rama Edificio monta **su** cajón y no el de parcela, que las cifras salen
+(322,13 m² · 2 piezas contra el `Building` del Catastro, solape 100,00 %), que el
+PDF **baja** con su nombre legal, que el resalte por parte se ve con trazo
+discontinuo y del mismo color, y que nada de esto ha tocado la rama de parcela.
+Todo eso lo firma `21-contraste-edificio.js`, `ok:true` en las dos ventanas.
+
+Lo que sigue **no lo puede firmar ninguna máquina de esta carpeta**.
+
+### 19.1 · ⭐ ¿La pantalla honesta TRANQUILIZA? — BLOQUEANTE
+
+Es la razón de ser del estado `SIN_CONSTRUCCIONES`, y lo único que no se puede
+comprobar con una aserción: **que un técnico que lee «no consta construcción
+registrada» no crea que ha hecho algo mal.**
+
+1. Carga en la rama Edificio un dibujo tuyo de una **obra nueva** (una parcela sin
+   nada construido en el Catastro), escribe su referencia catastral y ve a
+   Diagnóstico.
+2. Pulsa **«Consultar el Catastro»**.
+3. Lee el renglón de arriba entero, tal y como te lo encuentras.
+
+> No consta construcción registrada en el Catastro para esta parcela, así que no
+> hay nada con lo que contrastar. No es un problema: el contraste es un paso
+> opcional y el GML que se genera es plenamente válido sin él — es justo lo que se
+> espera de una obra nueva.
+
+**Lo que hay que decidir:** ¿te deja tranquilo, o te deja con la duda de si te
+falta un paso? Si es lo segundo, la frase está mal y hay que reescribirla: es el
+caso NORMAL de un ICUC, no una degradación.
+
+⚠️ Y comprueba que las celdas de debajo dicen **«No consta ninguna»** y no «Sin
+consultar»: son dos cosas distintas y la aplicación las escribe distinto a
+propósito.
+
+### 19.2 · El informe, abierto en un lector de PDF de verdad
+
+El guion mide que baja y cuántas páginas trae. Lo que tienes que mirar tú:
+
+- **La ficha de partes**: ¿las plantas son las que declaraste? ¿Las partes de tipo
+  **Otra** (una piscina) salen con **`—`** en las dos columnas de plantas, y no con
+  un «0»? Un cero ahí sería mentira; el guion no sabe cuál de los dos es correcto.
+- **La nota al pie de la envolvente**: ¿se entiende por qué el sótano no cuenta?
+- **El nombre del documento en la portada**: con contraste tiene que decir «Informe
+  de contraste con la construcción catastral»; sin contrastar, «Informe de
+  construcción para la Sede Electrónica». Que cambie está medido; **que el nombre
+  sea el correcto para lo que vas a presentar es tu criterio**.
+- **El plano**: ¿se ven las DOS huellas —la tuya y la del Catastro— y se distinguen?
+
+### 19.3 · ⛔ El pie de firma: límite conocido de esta fase
+
+**En la rama Edificio no hay diálogo de firma.** El informe toma el pie que el
+navegador recuerde de haber marcado «Recordar mis datos» en el informe de
+**parcela** (F09); si no hay ninguno guardado, sale con **«No consta»** en los
+cuatro campos y la aplicación **lo dice** en el renglón y en el panel de avisos.
+
+**Lo que hay que decidir:** ¿te vale así, o hace falta capturar la firma desde esta
+rama? No es un olvido: está declarado en la ficha de F14 con sus tres motivos —el
+diálogo de F09 exige un lindero, ofrece un «Tipo de operación» que el ICUC no pide,
+y una segunda instancia colisionaría por selector con la primera—. Si lo quieres,
+es alcance de otra fase.
+
+### 19.4 · El resalte por parte, con tus ojos
+
+El guion comprueba que existe y que no cambia de color. Míralo tú con un edificio
+de verdad: **¿el trazo discontinuo rodea la parte de la que habla el aviso, y no
+otra?** Es literalmente lo que la ficha §16.1 pidió, y lo que no se puede afirmar
+sin mirar el mapa y el renglón a la vez.
+
+### 19.5 · Lo que NO es de esta lista
+
+El **ICUC no ve este informe**: es papel del colegiado. El GML sí pasó, y su CSV
+está en §18. Aquí no hay verdad externa que buscar — hay criterio profesional.

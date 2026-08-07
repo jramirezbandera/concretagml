@@ -83,6 +83,96 @@ export const SEVERIDAD = Object.freeze({
   ERROR: 'ERROR',
 })
 
+// ── ⭐ F14 · DE QUÉ HABLAN LOS MENSAJES DE ESTA CAPA ─────────────────────────
+//
+// ⛔ **La deuda que esto paga, medida.** Desde F11 el MISMO `importar()` lee el
+// volcado de una parcela y el de una construcción —`edificio/entrada.js` lo llama
+// para los `.dxf` y los `.txt` de la rama EDIFICIO—, y sus mensajes seguían
+// diciendo «la parcela» con trece partes de un edificio en pantalla. No es un
+// detalle de estilo: son avisos sobre fallos REALES del fichero, y contarlos sobre
+// el objeto equivocado hace que el técnico busque el problema donde no está. La
+// fase 5 de F11 lo dejó anotado con dueño; F14 es la fase que lo cierra.
+//
+// ── POR QUÉ TRES FORMAS Y NO UNA CADENA ─────────────────────────────────────
+// Se probó con un solo `sujeto` —el patrón que T1.5 estrenó en
+// `viewer/index.js#encuadrarSobreRecintos`— y no llega, porque las cuatro frases
+// tienen formas gramaticales distintas: «**La parcela** cae en el huso 30»,
+// «el centroide **de la parcela**», «no son geometría **de parcela**». Con una
+// sola cadena habría que concatenar artículos a mano en cada punto de uso, que es
+// como se escriben los «de la construcción» sin la preposición.
+//
+// Y la GUÍA no es una declinación: es un consejo distinto. A una parcela se le
+// dice «deja SOLO la polilínea»; a una construcción, no —tiene una por parte, y
+// dejar solo una perdería doce—.
+//
+// ⚠️ Los textos de PARCELA son los literales anteriores **byte a byte**, para que
+// esa rama diga exactamente lo que decía. Es la misma disciplina con la que
+// `SUJETO_POR_DEFECTO` conservó el de F03.
+
+/**
+ * Las tres declinaciones y la guía, por sujeto. Se recorre en las pruebas, así que
+ * un sujeto nuevo sin alguna de las cuatro claves sale rojo en vez de imprimir
+ * `undefined` en un aviso.
+ *
+ * @readonly
+ */
+export const SUJETO = Object.freeze({
+  PARCELA: Object.freeze({
+    /** Sujeto de la frase: «___ cae en el huso 30». */
+    nominativo: 'La parcela',
+    /** Complemento con artículo: «el centroide ___». */
+    genitivo: 'de la parcela',
+    /** Complemento sin artículo: «no son geometría ___». */
+    escueto: 'de parcela',
+    /** Qué hacer en el CAD para que el fichero entre entero. */
+    guia:
+      'Deja solo la polilínea de la parcela en la capa 0 y ejecuta LIMPIA (PURGE); ' +
+      'no se importan bloques, INSERT, xref ni splines.',
+  }),
+  CONSTRUCCION: Object.freeze({
+    nominativo: 'La construcción',
+    genitivo: 'de la construcción',
+    escueto: 'de construcción',
+    // ⚠️ **No es la de parcela con otro sustantivo**: una construcción tiene UNA
+    // POLILÍNEA POR PARTE —trece en el edificio de referencia—, así que «deja solo
+    // la polilínea» le haría perder doce. Lo que sí vale igual es el PURGE y la
+    // lista de lo que no se importa.
+    guia:
+      'Deja en la capa las polilíneas de las partes de la construcción —una por parte— y ejecuta ' +
+      'LIMPIA (PURGE); no se importan bloques, INSERT, xref ni splines.',
+  }),
+})
+
+/** Las claves de {@link SUJETO}, para validar y para que los tests las recorran. */
+export const SUJETOS = Object.freeze(Object.keys(SUJETO))
+
+/**
+ * El sujeto por defecto. **PARCELA**, y es lo correcto: es de lo que hablaban
+ * estos mensajes durante trece fases, y quien no pase nada tiene que seguir
+ * leyendo exactamente lo mismo.
+ */
+export const SUJETO_POR_DEFECTO = 'PARCELA'
+
+/**
+ * La clave de la construcción, para que `edificio/entrada.js` no la escriba a
+ * mano. Un literal mal tecleado allí **no se quejaría** —`declinar` se cae al
+ * defecto— y los avisos volverían a decir «la parcela» en silencio. Hay una prueba
+ * que exige que esta constante siga estando en {@link SUJETOS}.
+ */
+export const SUJETO_CONSTRUCCION = 'CONSTRUCCION'
+
+/**
+ * Las declinaciones de un sujeto. Un valor desconocido **no lanza**: se cae al
+ * defecto. Esta función se llama desde dentro de un parser, en mitad de un
+ * fichero que el usuario acaba de soltar, y reventar ahí cambiaría un aviso sobre
+ * el dato por un fallo del programa. El tipo del parámetro sí lo valida el
+ * llamante público (`importar`), que es donde el error es del programador.
+ *
+ * @param {string} [clave]
+ * @returns {{nominativo: string, genitivo: string, escueto: string, guia: string}}
+ */
+export const declinar = (clave) => SUJETO[clave] ?? SUJETO[SUJETO_POR_DEFECTO]
+
 // ── Factory de detecciones ────────────────────────────────────────────────────
 
 /**

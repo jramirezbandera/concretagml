@@ -25,15 +25,17 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 
-import { PASO, PASOS, crearNavegacion } from '../../app/navegacion.js'
+import { PASO, PASOS, RAMA, crearNavegacion } from '../../app/navegacion.js'
 import {
   ATRIBUTO_PANTALLA,
   ATRIBUTO_PASO,
   SELECTOR_APP,
   SELECTOR_TITULO,
+  TITULO_EN_EDIFICIO,
   TITULO_PANTALLA,
   cablearPantalla,
   pasosConTitulo,
+  tituloDe,
 } from '../../app/pantalla.js'
 import { SELECTOR_RAIL } from '../../app/rail.js'
 
@@ -210,11 +212,36 @@ describe('T6 · ⭐ marcado y CSS dicen lo mismo (el fallo mudo)', () => {
     expect(contraste).toEqual([PASO.DIAGNOSTICO])
     expect(vertices.filter((p) => contraste.includes(p))).toEqual([])
     // Y los dos declaran el reparto en el CSS, que es lo que los hace estiradores.
-    for (const clase of ['gml-bloque--vertices', 'gml-bloque--contraste']) {
+    //
+    // ⚠️ El patrón admite que la clase venga en una LISTA de selectores, y eso es
+    // una corrección de F14, no un aflojamiento: `.gml-bloque--contraste` comparte
+    // ahora regla con `.gml-bloque--contraste-edificio` —el mismo hueco de la misma
+    // pantalla en la otra rama—, y el patrón anterior (`\.clase\s*\{`) daba rojo
+    // sobre un CSS correcto. Lo que se exige sigue siendo lo mismo: que la clase
+    // esté en el selector de una regla que declara `flex: 1 1 auto`.
+    for (const clase of [
+      'gml-bloque--vertices',
+      'gml-bloque--contraste',
+      // F14 · el estirador de la MISMA pantalla en la rama EDIFICIO.
+      'gml-bloque--contraste-edificio',
+    ]) {
       expect(CSS, `.${clase} ha dejado de ser el estirador de su pantalla`).toMatch(
-        new RegExp(`\\.${clase}\\s*\\{[^}]*flex:\\s*1 1 auto`),
+        new RegExp(`\\.${clase}[^{}]*\\{[^}]*flex:\\s*1 1 auto`),
       )
     }
+  })
+
+  it('⭐ F14 · y en la rama EDIFICIO el estirador de Diagnóstico es el suyo', () => {
+    // El espejo de la prueba de arriba en la otra rama. No se puede montar contra
+    // `index.html` —esa sección la fabrica `app/panel-edificio.js`—, así que lo que
+    // se comprueba aquí es lo que sí vive en esta capa: que la hoja la viste igual
+    // que a su gemela y que la clase NO es la misma. Dos secciones con la misma
+    // clase confundirían a `querySelector` y a la cascada.
+    expect(CSS).toContain('.gml-bloque--contraste-edificio')
+    expect(
+      CSS,
+      'el cajón de edificio tiene que perder borde y sombra dentro del panel, igual que el de parcela',
+    ).toMatch(/\.gml-bloque--contraste-edificio\s+\.gml-cajon-contraste-edificio/)
   })
 
   it('⛔ los avisos siguen SIN declarar pantalla: solo se colapsan VACÍOS', () => {
@@ -306,6 +333,63 @@ describe('T6 · el atributo y el título', () => {
     // cosa, la pantalla parpadearía con un título que no es el suyo.
     montarCascara()
     expect(titulo().textContent.trim()).toBe(TITULO_PANTALLA[PASO.ENTRADA])
+  })
+
+  // ── ⭐ F14 · el título depende de la RAMA, no solo del paso ────────────────
+
+  it('⛔ F14 · en EDIFICIO, Informe NO dice «Informe de contraste»', () => {
+    // MEDIDO en Chrome en la fase 4a, con los peldaños recién abiertos:
+    // `#/edificio/informe` ponía el título de la PARCELA sobre un informe de
+    // construcción, y `#/edificio/edicion` decía «Edición del recinto» sobre trece
+    // partes. Un `<h1>` que nombra otra cosa de la que hay debajo es la clase de
+    // error que nadie reporta y todo el mundo nota.
+    expect(tituloDe(PASO.INFORME, RAMA.EDIFICIO)).toBe('Informe de construcción')
+    expect(tituloDe(PASO.INFORME, RAMA.EDIFICIO)).not.toBe(TITULO_PANTALLA[PASO.INFORME])
+    expect(tituloDe(PASO.EDICION, RAMA.EDIFICIO)).toBe('Edición de las partes')
+    expect(tituloDe(PASO.DIAGNOSTICO, RAMA.EDIFICIO)).toContain('construcción catastral')
+  })
+
+  it('⭐ F14 · es una tabla de EXCEPCIONES: lo no declarado cae en el título común', () => {
+    // Esa forma es lo que impide que un paso nuevo tenga título en una rama y no en
+    // la otra. Entrada y Validación valen igual para las dos: una construcción
+    // también son recintos, y darles un título propio sería ruido.
+    for (const paso of PASOS) {
+      const esperado = TITULO_EN_EDIFICIO[paso] ?? TITULO_PANTALLA[paso]
+      expect(tituloDe(paso, RAMA.EDIFICIO)).toBe(esperado)
+      // Y la rama PARCELA no cambia por nada de esto.
+      expect(tituloDe(paso, RAMA.PARCELA)).toBe(TITULO_PANTALLA[paso])
+      expect(tituloDe(paso)).toBe(TITULO_PANTALLA[paso])
+    }
+    expect(Object.keys(TITULO_EN_EDIFICIO)).toHaveLength(3)
+    expect(Object.keys(TITULO_EN_EDIFICIO)).not.toContain(PASO.ENTRADA)
+    expect(Object.keys(TITULO_EN_EDIFICIO)).not.toContain(PASO.VALIDACION)
+  })
+
+  it('⭐ F14 · los CINCO pasos por las DOS ramas tienen título, y ninguno se repite mal', () => {
+    for (const rama of Object.values(RAMA)) {
+      for (const paso of PASOS) {
+        expect(typeof tituloDe(paso, rama), `«${paso}» en «${rama}» no tiene título`).toBe('string')
+      }
+      // Dentro de una rama, dos pantallas con el mismo `<h1>` no se distinguirían.
+      const titulos = PASOS.map((p) => tituloDe(p, rama))
+      expect(new Set(titulos).size).toBe(PASOS.length)
+    }
+  })
+
+  it('⭐ F14 · el `<h1>` sigue a la RAMA en vivo, no solo al paso', () => {
+    // Los hechos de LAS DOS ramas: sin los de EDIFICIO, `cambiarRama` recorta a
+    // Entrada —lo hizo en la primera corrida— y la prueba mediría otra cosa.
+    const { navegacion } = cablear({
+      hechos: { [RAMA.PARCELA]: TODO, [RAMA.EDIFICIO]: TODO },
+    })
+    navegacion.navegarAPaso(PASO.INFORME)
+    expect(titulo().textContent).toBe(TITULO_PANTALLA[PASO.INFORME])
+    // Conmutar de rama tiene que reescribirlo: es el caso que un `aplicar({paso})`
+    // a secas se dejaba fuera, y el que dejaba «Informe de contraste» sobre un
+    // informe de construcción.
+    navegacion.cambiarRama(RAMA.EDIFICIO)
+    navegacion.navegarAPaso(PASO.INFORME)
+    expect(titulo().textContent).toBe(TITULO_EN_EDIFICIO[PASO.INFORME])
   })
 
   it('sin `<h1>` no revienta: es una respuesta prevista', () => {

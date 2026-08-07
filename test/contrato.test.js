@@ -522,6 +522,35 @@ describe('contrato F09 · la capa del informe sale por el barrel; el plano y el 
       ).toContain(nombre)
     }
   })
+
+  it('F14 · el MOTOR DE MAQUETA tampoco sale, por la misma decisión 3', () => {
+    // `report/maqueta.js` nace en F14 sacando de `pdf-parcela.js` lo que los DOS
+    // informes comparten: el cursor que salta de página, las tablas que repiten
+    // cabecera, los formateadores en español y el pie con «Página N de M».
+    //
+    // Le vale letra por letra el argumento de `crearDocumentoPdf`: publicarlo
+    // invita a componer informes a mano por fuera de las dos funciones que guardan
+    // el nombre legal del documento y la regla de oro 9. Y hay un motivo NUEVO y
+    // propio de F14: `portada` y `estamparPies` reciben el NOMBRE del documento por
+    // parámetro, así que desde el barrel cualquiera podría estampar un papel con el
+    // nombre legal del informe de parcela sobre un contenido que no lo es.
+    for (const nombre of [
+      'crearMaqueta',
+      'crearNumerador',
+      'epigrafe',
+      'subepigrafe',
+      'portada',
+      'seccionPlano',
+      'seccionFirma',
+      'estamparPies',
+      'bloqueSustituciones',
+    ]) {
+      expect(
+        Object.keys(barrel.report),
+        `'${nombre}' es del motor de maqueta y no puede salir por el barrel`,
+      ).not.toContain(nombre)
+    }
+  })
 })
 
 // ── Test-guardián del barrel raíz tras F10 (T4.2) ────────────────────────────

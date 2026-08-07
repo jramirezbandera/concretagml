@@ -163,17 +163,32 @@ describe('T5 · los tres estados, y ninguno en silencio', () => {
     expect(motivoDe(PASO.INFORME)).toBe(MOTIVO_DATO.diagnostico)
   })
 
-  it('en la rama EDIFICIO el motivo es el de RAMA, que es otro texto', () => {
+  it('⭐ F14 · en la rama EDIFICIO el rail ya no apaga NADA por rama', () => {
+    // ⛔ **Hasta el 2026-08-07 este `it` esperaba los dos motivos de RAMA** en
+    // Diagnóstico e Informe. F14 los retira —y con ellos la última compuerta de
+    // rama viva—, así que con un edificio cargado el recorrido está entero.
+    //
+    // Es el tercer peldaño que esta rama recupera: Validación en F11, Edición en
+    // F12, y ahora los dos últimos.
     cablear({ rama: RAMA.EDIFICIO, hechos: { [RAMA.EDIFICIO]: { geometria: true } } })
-    expect(motivoDe(PASO.DIAGNOSTICO)).toBe(MOTIVO_RAMA[PASO.DIAGNOSTICO])
-    expect(motivoDe(PASO.INFORME)).toBe(MOTIVO_RAMA[PASO.INFORME])
-    // Y Validación SÍ está: un edificio cargado se puede mirar.
-    expect(estadoDe(PASO.VALIDACION)).toBe(ESTADO.LIBRE)
-    // ⭐ Y Edición TAMBIÉN, desde F12: con un edificio cargado se edita. Hasta el
-    // 2026-08-06 este peldaño estaba apagado en esta rama, y con él apagado todo
-    // el motor de edición de la parte activa era inalcanzable.
-    expect(estadoDe(PASO.EDICION)).toBe(ESTADO.LIBRE)
-    expect(motivoDe(PASO.EDICION)).toBe('')
+    for (const paso of PASOS) {
+      expect(motivoDe(paso), `el motivo de ${paso}`).toBe('')
+      if (paso !== PASO.ENTRADA) {
+        expect(estadoDe(paso), `el estado de ${paso}`).toBe(ESTADO.LIBRE)
+      }
+    }
+  })
+
+  it('⛔ F14 · y sin edificio los cuatro se apagan por DATO, no por rama', () => {
+    // El otro lado: que ya no haya compuerta de rama no significa que el recorrido
+    // esté abierto de par en par. Con la rama vacía, los cuatro peldaños
+    // posteriores a Entrada siguen bloqueados —por el DATO— y el motivo que se lee
+    // es el de EDIFICIO («trae antes un edificio»), no el de parcela.
+    cablear({ rama: RAMA.EDIFICIO, hechos: { [RAMA.EDIFICIO]: { geometria: false } } })
+    for (const paso of [PASO.VALIDACION, PASO.EDICION, PASO.DIAGNOSTICO, PASO.INFORME]) {
+      expect(estadoDe(paso), `el estado de ${paso}`).toBe(ESTADO.BLOQUEADO)
+      expect(motivoDe(paso), `el motivo de ${paso}`).toMatch(/edificio/i)
+    }
   })
 
   it('un paso disponible no arrastra motivo, y su hueco está oculto', () => {

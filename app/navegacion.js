@@ -246,8 +246,28 @@ export const HECHOS_VACIOS = Object.freeze({ geometria: false, oficial: false, d
  * @readonly
  */
 export const MOTIVO_RAMA = Object.freeze({
-  [PASO.DIAGNOSTICO]: 'El diagnóstico contrasta parcelas; aún no sabe con un edificio.',
-  [PASO.INFORME]: 'El informe firma un diagnóstico, y el diagnóstico es de parcela.',
+  // ⛔ **F14 · VACÍO, Y ESO ES EL ENTREGABLE DE LA FASE.**
+  //
+  // Aquí vivían los dos últimos motivos de rama, y hasta el 2026-08-07 eran
+  // verdad:
+  //
+  //   DIAGNOSTICO: «El diagnóstico contrasta parcelas; aún no sabe con un edificio.»
+  //   INFORME:     «El informe firma un diagnóstico, y el diagnóstico es de parcela.»
+  //
+  // F14 es exactamente la fase que los vuelve falsos: trae
+  // `diagnostico/edificio.js` —el contraste con la construcción registrada— y
+  // `report/pdf-edificio.js` —el informe de construcción firmable—. Se retiran en
+  // vez de dejarlos envejecer, por el mismo criterio con el que F12 retiró el de
+  // EDICIÓN: un motivo que sobrevive a la limitación que explicaba no se enseña
+  // nunca (el paso está disponible) pero convence al siguiente que lea este objeto
+  // de que la limitación sigue.
+  //
+  // ⚠️ **La compuerta se queda, aunque hoy no la use ningún paso.** `CAUSA.RAMA` y
+  // su rama en {@link evaluarPaso} siguen ahí: son el mecanismo con el que se
+  // declara «esta versión no sabe hacer esto en esta rama», y el día que haga falta
+  // otra vez tiene que estar. Lo que no puede quedarse es una FRASE falsa. Hay un
+  // test que afirma que esta tabla está vacía **a propósito**, para que nadie la
+  // lea como un olvido y la rellene por simetría.
 })
 
 /**
@@ -396,17 +416,63 @@ const REGLA = Object.freeze({
     enComprobacion: false,
     requiere: Object.freeze(['geometria']),
   },
+  // ⭐ **F14 · DIAGNÓSTICO E INFORME PASAN A EXISTIR TAMBIÉN EN LA RAMA EDIFICIO**,
+  // y con ellos `requiere` deja de ser una lista para poder ser un MAPA POR RAMA.
+  //
+  // No es una generalización preventiva: sin ella los dos peldaños quedarían
+  // abiertos y **inalcanzables**, que es la trampa de F13 repetida.
+  //
+  //   · DIAGNÓSTICO en PARCELA exige el parcelario (`oficial`) porque sin él no hay
+  //     nada que contrastar. En EDIFICIO **no**: el contraste es OPCIONAL y su caso
+  //     estrella —la obra nueva, «no consta construcción registrada»— es
+  //     precisamente aquel en el que NO hay huella oficial. Exigirla dejaría la
+  //     pantalla honesta escrita, probada y sin forma de llegar a ella, que es
+  //     literalmente lo que le pasó a `MOTIVO_SIN_EDIFICIO` en F13.
+  //   · INFORME en PARCELA exige el diagnóstico porque es lo que firma. En EDIFICIO
+  //     **no**: la ficha §17 dice «*si no [hubo contraste], informe solo
+  //     declarativo, sin sección de contraste*», así que el informe de construcción
+  //     se sostiene con la construcción y nada más.
   [PASO.DIAGNOSTICO]: {
-    ramas: Object.freeze([RAMA.PARCELA]),
+    ramas: RAMAS,
     enComprobacion: true,
-    requiere: Object.freeze(['geometria', 'oficial']),
+    requiere: Object.freeze({
+      [RAMA.PARCELA]: Object.freeze(['geometria', 'oficial']),
+      [RAMA.EDIFICIO]: Object.freeze(['geometria']),
+    }),
   },
   [PASO.INFORME]: {
-    ramas: Object.freeze([RAMA.PARCELA]),
+    ramas: RAMAS,
     enComprobacion: true,
-    requiere: Object.freeze(['diagnostico']),
+    requiere: Object.freeze({
+      [RAMA.PARCELA]: Object.freeze(['diagnostico']),
+      [RAMA.EDIFICIO]: Object.freeze(['geometria']),
+    }),
   },
 })
+
+/**
+ * Los hechos que un paso exige EN ESTA RAMA.
+ *
+ * `requiere` admite dos formas y la razón es que la mayoría de los pasos piden lo
+ * mismo en las dos ramas, y escribirlo dos veces sería dos sitios que pueden
+ * divergir sin que nada lo diga. Un array = «lo mismo en todas»; un objeto = «esto
+ * en cada una». La tabla se sigue leyendo de un vistazo, que es para lo que existe.
+ *
+ * @param {{requiere: readonly string[]|Record<string, readonly string[]>}} regla
+ * @param {string} rama
+ * @returns {readonly string[]}
+ */
+function hechosQueExige(regla, rama) {
+  const { requiere } = regla
+  if (Array.isArray(requiere)) return requiere
+  // Un paso con mapa por rama y una rama sin entrada NO exige nada, y es la
+  // respuesta correcta: la compuerta de RAMA ya ha dejado pasar, así que el paso
+  // existe ahí; si además nadie declaró qué dato necesita, no necesita ninguno.
+  return requiere[rama] ?? EMPTY
+}
+
+/** Lista vacía compartida, para no crear una por consulta en el camino caliente. */
+const EMPTY = Object.freeze([])
 
 /**
  * ¿Está disponible este paso, y si no, por qué? La ÚNICA función que decide, y
@@ -433,7 +499,7 @@ export function evaluarPaso(paso, { rama, modo, hechos }) {
     return { disponible: false, causa: CAUSA.MODO, motivo: MOTIVO_MODO[paso] ?? null }
   }
   // 3 · DATO — lo único que se resuelve solo según se avanza.
-  for (const hecho of regla.requiere) {
+  for (const hecho of hechosQueExige(regla, rama)) {
     if (hechos[hecho] !== true) {
       // El de la rama manda cuando lo hay: ver {@link MOTIVO_DATO_EDIFICIO}.
       const propio = rama === RAMA.EDIFICIO ? MOTIVO_DATO_EDIFICIO[hecho] : undefined

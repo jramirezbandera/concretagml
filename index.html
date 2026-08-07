@@ -522,10 +522,19 @@
            `viewer/contraste.js` sobre el dibujo—, y flotando en la esquina tapaba
            justo lo que sus cifras señalan.
 
-           ⚠️ Sin `data-rama-panel`: la rama EDIFICIO no llega nunca a esta
-           pantalla (`MOTIVO_RAMA[PASO.DIAGNOSTICO]` de `app/navegacion.js` la
-           bloquea), así que el eje PASO ya la deja fuera y marcarla además sería
-           un segundo dueño de la misma visibilidad. -->
+           ⛔ AQUÍ PONÍA «Sin `data-rama-panel`: la rama EDIFICIO no llega nunca a
+           esta pantalla», y fue verdad hasta el 2026-08-07. **F14 lo vuelve
+           falso**: abre los peldaños Diagnóstico e Informe en la rama de edificio,
+           y con ellos esta sección pasaba a verse en `#/edificio/diagnostico`.
+           MEDIDO en Chrome antes de corregirlo: el cajón de PARCELA, 367 × 413 px,
+           montado encima de una construcción.
+
+           Sigue sin llevar el atributo escrito aquí, pero ya NO porque no haga
+           falta: lo escribe `app/rama.js`, que es el único sitio del proyecto
+           autorizado a ponerlo (ver su `SECCIONES_PARCELA`, donde está el porqué
+           largo y esta misma rectificación). En la rama de edificio ocupa este
+           hueco la sección anfitriona que fabrica `app/panel-edificio.js` y sella
+           `app/cableado-edificio.js`. -->
       <section
         class="gml-bloque gml-bloque--contraste"
         data-pantalla="diagnostico"

@@ -619,7 +619,12 @@ body {
  * avisara. 12 + 12 = los 24 (`--space-6`) que gastan los demás bloques del panel.
  * La cuenta está también en `ESTILO_EN_EL_PANEL` de aquel módulo, que es el otro
  * extremo de este acuerdo. */
-.gml-bloque--contraste {
+/* Las DOS anfitrionas —la de parcela, que declara `index.html`, y la de edificio,
+   que fabrica `app/panel-edificio.js` (F14)— se visten igual y de una vez: son el
+   mismo hueco de la misma pantalla en las dos ramas, y nunca están las dos
+   visibles a la vez (la rama es única, y `app/rama.js` esconde la que no toca). */
+.gml-bloque--contraste,
+.gml-bloque--contraste-edificio {
   flex: 1 1 auto;
   padding: var(--space-4) 12px 0;
 }
@@ -633,7 +638,8 @@ body {
  * `min-width` importa más de lo que parece: `min(300px,42vw)` es el suelo que la
  * tabla de cruces necesita sobre el mapa, y dentro de un panel de 392 px obligaría
  * a scroll horizontal en cuanto la ventana bajara de ~715 px de ancho. */
-.gml-app .gml-bloque--contraste .gml-cajon-diagnostico {
+.gml-app .gml-bloque--contraste .gml-cajon-diagnostico,
+.gml-app .gml-bloque--contraste-edificio .gml-cajon-contraste-edificio {
   min-width: 0;
   border: 0;
   box-shadow: none;
@@ -2552,11 +2558,32 @@ body {
 /* El contenedor. Solo lo que el módulo NO fija en línea — las mismas dos
    propiedades que `.gml-barra-edicion` y `.leaflet-control-layers`, para que el
    cajón se lea como cromo del mapa y no como una ventana ajena. */
-.gml-app .gml-cajon-diagnostico {
+/* ⭐ F14 · `.gml-cajon-contraste-edificio` entra en ESTA regla y en la de los
+   botones, y en ninguna más. Son las DOS únicas del cajón que van acotadas al
+   contenedor; las otras seis apuntan a los HIJOS (`.gml-app .gml-cajon-titular`,
+   `…-cifra`, `…-seccion dt`, `…-invasion`…), que el cajón de edificio reutiliza
+   tal cual, así que le cuestan CERO.
+
+   Y lleva clase PROPIA en vez de reutilizar `gml-cajon-diagnostico`, que habría
+   costado 0 bytes: dos nodos con esa clase en el mismo documento romperían los
+   cinco guiones de humo que la resuelven con `document.querySelector` (09, 10,
+   11, 14 y 15), que se queda con el PRIMERO. Es la trampa M8 de F07, ya pagada
+   dos veces; estos bytes son el precio de no pagarla una tercera. */
+.gml-app .gml-cajon-diagnostico,
+.gml-app .gml-cajon-contraste-edificio {
   min-width: min(300px, 42vw);
   border: 1px solid var(--color-border-main);
   box-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
   background-clip: padding-box;
+}
+
+/* El renglón del registro (F14): la «pantalla honesta». El módulo le fija tamaño
+   y gris; falta la familia y que no se estire más de lo legible — es prosa, no
+   una cifra, y una línea de 46ch es lo que el ojo sigue sin perderse. Mismo
+   tratamiento, y mismo número, que `.gml-cajon-margen`. */
+.gml-app .gml-cajon-registro {
+  font-family: var(--font-sans);
+  max-width: 46ch;
 }
 
 /* El titular. El módulo le fija tamaño, peso y color; lo que falta es la familia
@@ -2694,7 +2721,8 @@ body {
    elemento y lo cubre solo—, y ése es justo el motivo de que la regla no enumere
    botones: una lista de nombres se habría quedado corta en silencio. */
 .gml-app .gml-cajon-diagnostico button,
-.gml-app .gml-cajon-comprobacion button {
+.gml-app .gml-cajon-comprobacion button,
+.gml-app .gml-cajon-contraste-edificio button {
   font-family: var(--font-sans);
 }
 

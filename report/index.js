@@ -228,6 +228,38 @@ export {
   informePdfParcela,
 } from './pdf-parcela.js'
 
+// ── El informe de CONSTRUCCIÓN (F14) ─────────────────────────────────────────
+// El segundo documento firmable de la capa. Sale con el mismo criterio que el de
+// parcela —por nombre, uno a uno— y con dos diferencias que conviene ver aquí:
+//
+//   · **Tiene DOS nombres legales**, y cuál le toca lo decide `nombreDelInforme`
+//     según se haya contrastado o no (criterio de aceptación 4 de la ficha). Los
+//     dos salen para que la interfaz pueda anunciar el mismo que dice el papel, y
+//     `hayContrasteReal` sale con ellos porque es la condición que los separa:
+//     `contraste !== null` NO basta —el objeto existe también cuando el Catastro
+//     dice que no hay nada registrado—, y confundirlo titularía «de contraste» un
+//     documento que no contrasta.
+//   · **`NOTA_ENVOLVENTE` y `NO_APLICA`** son texto impreso que la interfaz
+//     necesita poder repetir sin redactarlo otra vez: la nota, para explicar en
+//     pantalla lo mismo que el papel; el «—», porque es el único «no aplica» del
+//     proyecto y la lista de partes lo pinta igual que la tabla del PDF.
+//
+// ⚠️ Sus `AVISO_NO_OFICIAL`, `AVISO_REGLA_9` y `PRODUCTOR` **no salen**: chocarían
+// por nombre con los del informe de parcela, que ya están arriba. Es exactamente el
+// choque que la decisión 2 de este fichero predijo, y aquí se resuelve como allí se
+// dijo —nombrando— en vez de dejar que un `export *` descartara uno de los dos en
+// silencio. Quien los necesite importa `report/pdf-edificio.js` directamente.
+
+export {
+  NOMBRE_INFORME_EDIFICIO,
+  NOMBRE_INFORME_EDIFICIO_CONTRASTE,
+  NOTA_ENVOLVENTE,
+  NO_APLICA,
+  hayContrasteReal,
+  informePdfEdificio,
+  nombreDelInforme,
+} from './pdf-edificio.js'
+
 // ── El informe en TEXTO (F08) ────────────────────────────────────────────────
 // El que ya salía por el barrel raíz cuando el espacio `report` era este fichero.
 // Sigue siendo la salida del caso «Comprobar un GML» y no lo sustituye el PDF:

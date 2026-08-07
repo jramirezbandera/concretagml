@@ -13,9 +13,18 @@
 //
 //   · `PASO.ENTRADA`     → el de COMPROBACIÓN. Es lo que sale al soltar un `.gml`:
 //                          «esto es lo que traes». Pertenece a la tercera vía de
-//                          Entrada, no a una pantalla propia.
-//   · `PASO.DIAGNOSTICO` → el de DIAGNÓSTICO. Es la pantalla de contraste.
+//                          Entrada, no a una pantalla propia. **Solo en PARCELA.**
+//   · `PASO.DIAGNOSTICO` → el de DIAGNÓSTICO en la rama PARCELA, y el de
+//                          CONTRASTE DE EDIFICIO en la rama EDIFICIO (F14).
 //   · cualquier otro     → ninguno.
+//
+// ⭐ **F14 añade el segundo eje.** Hasta el 2026-08-07 bastaba con el paso, porque
+// la rama EDIFICIO no llegaba a Diagnóstico. Al abrir ese peldaño, la pregunta de
+// una sola variable dio el defecto que la fase 4a midió en Chrome: en
+// `#/edificio/diagnostico` se montaba el cajón de PARCELA (367 × 413 px) encima de
+// una construcción. El peldaño estaba abierto y enseñaba la pantalla equivocada.
+// La corrección mantiene lo que T9 ganó: **sigue siendo UNA función pura del
+// estado** ({@link cajonDe}), no una bandera repartida por la cáscara.
 //
 // ── ⛔ EL DEFECTO QUE T9 ARREGLA, MEDIDO ───────────────────────────────────
 // Hasta el 2026-08-04, «Contrastar con el parcelario» metía la parcela en el
@@ -61,7 +70,7 @@
 // Su test es `test/app/contraste.test.js` (proyecto `node`: no hace falta DOM).
 
 import { ORIGEN_PARCELA } from '../model/parcela.js'
-import { MODO, PASO } from './navegacion.js'
+import { MODO, PASO, RAMA } from './navegacion.js'
 
 // ── El vocabulario ───────────────────────────────────────────────────────────
 
@@ -76,24 +85,47 @@ export const CAJON = Object.freeze({
   NINGUNO: 'NINGUNO',
   COMPROBACION: 'COMPROBACION',
   DIAGNOSTICO: 'DIAGNOSTICO',
+  /**
+   * F14 · El contraste de la CONSTRUCCIÓN. Mismo paso que `DIAGNOSTICO` y otra
+   * rama: ver {@link cajonDe}, donde está el porqué de que ahora haga falta el
+   * segundo eje.
+   */
+  CONTRASTE_EDIFICIO: 'CONTRASTE_EDIFICIO',
 })
 
 /**
- * Qué cajón permite un paso. **FUNCIÓN PURA, y es el corazón de T9**: la
- * exclusión mutua de la esquina `bottomleft` deja de ser un acuerdo entre dos
- * módulos y pasa a ser una consecuencia del estado de navegación.
+ * Qué cajón permite una situación. **FUNCIÓN PURA, y es el corazón de T9**: la
+ * exclusión mutua de la esquina `bottomleft` deja de ser un acuerdo entre módulos
+ * y pasa a ser una consecuencia del estado de navegación.
  *
- * Un paso desconocido devuelve `NINGUNO` y no lanza: esta función se llama desde
- * un suscriptor, y reventar ahí dejaría la aplicación con la esquina en el estado
- * anterior y sin nadie que lo cuente. Quien valida los pasos es
- * `app/navegacion.js`, que lanza al recibir uno que no existe.
+ * ── ⭐ F14 · POR QUÉ AHORA MIRA TAMBIÉN LA RAMA ─────────────────────────────
+ * Hasta hoy bastaba el paso, porque la rama EDIFICIO **no llegaba a
+ * Diagnóstico**. F14 abre ese peldaño, y con una sola pregunta el resultado fue
+ * el defecto que la fase 4a midió en Chrome: en `#/edificio/diagnostico` se
+ * montaba `.gml-cajon-diagnostico` —el cajón de PARCELA, 367 × 413 px— encima de
+ * una construcción. El peldaño estaba abierto y enseñaba la pantalla equivocada.
+ *
+ * El segundo eje se añade aquí y no en el llamante a propósito: **cuál de los
+ * tres cajones toca sigue siendo UNA función pura del estado**, que es lo que T9
+ * ganó y lo que no se puede perder por una bandera repartida por la cáscara.
+ *
+ * Ni un paso ni una rama desconocidos lanzan: esta función se llama desde un
+ * suscriptor, y reventar ahí dejaría la esquina en el estado anterior y sin nadie
+ * que lo cuente. Quien valida los dos ejes es `app/navegacion.js`. Una rama que
+ * no sea EDIFICIO se trata como PARCELA, que es el defecto de la aplicación.
  *
  * @param {string} paso
- * @returns {'NINGUNO'|'COMPROBACION'|'DIAGNOSTICO'}
+ * @param {string} [rama=RAMA.PARCELA]
+ * @returns {'NINGUNO'|'COMPROBACION'|'DIAGNOSTICO'|'CONTRASTE_EDIFICIO'}
  */
-export function cajonDe(paso) {
-  if (paso === PASO.DIAGNOSTICO) return CAJON.DIAGNOSTICO
-  if (paso === PASO.ENTRADA) return CAJON.COMPROBACION
+export function cajonDe(paso, rama = RAMA.PARCELA) {
+  if (paso === PASO.DIAGNOSTICO) {
+    return rama === RAMA.EDIFICIO ? CAJON.CONTRASTE_EDIFICIO : CAJON.DIAGNOSTICO
+  }
+  // La comprobación es de PARCELA y solo de parcela: se entra soltando un `.gml`
+  // de parcela en Entrada, y `viewer/cajon-comprobacion.js` lee `ParcelaGml`. En
+  // la rama de edificio esa esquina se queda vacía, que es la verdad.
+  if (paso === PASO.ENTRADA && rama !== RAMA.EDIFICIO) return CAJON.COMPROBACION
   return CAJON.NINGUNO
 }
 
@@ -226,6 +258,14 @@ const oNada = (fn) => (typeof fn === 'function' ? fn : () => {})
  * @param {(fn: () => void) => (() => void)} [opciones.suscribirSalida]  Cómo
  *   escuchar el ✕ del cajón cuando es pantalla: entonces ese botón no cierra
  *   nada, PIDE SALIR, y a dónde se sale se decide aquí.
+ * @param {() => void} [opciones.abrirContrasteEdificio]  F14 · El gemelo de
+ *   `abrirDiagnostico` en la rama EDIFICIO. Opcional como todos los demás: una
+ *   pantalla montada sin él sigue navegando.
+ * @param {() => void} [opciones.cerrarContrasteEdificio]
+ * @param {(esPantalla: boolean) => void} [opciones.fijarContrasteEdificioComoPantalla]
+ * @param {(fn: () => void) => (() => void)} [opciones.suscribirSalidaEdificio]
+ *   El ✕ del cajón de edificio. Se escucha APARTE del de parcela porque los dos
+ *   son nodos distintos con oyentes distintos; a dónde se sale se decide igual.
  * @returns {Contraste}
  * @throws {TypeError}  Contrato del programador.
  */
@@ -240,6 +280,10 @@ export function cablearContraste({
   suscribirPuerta,
   fijarDiagnosticoComoPantalla,
   suscribirSalida,
+  abrirContrasteEdificio,
+  cerrarContrasteEdificio,
+  fijarContrasteEdificioComoPantalla,
+  suscribirSalidaEdificio,
 } = {}) {
   if (!esNavegacion(navegacion)) {
     throw new TypeError(
@@ -261,6 +305,10 @@ export function cablearContraste({
   const declarar = oNada(declararProcedencia)
   const puerta = oNada(mostrarPuerta)
   const comoPantalla = oNada(fijarDiagnosticoComoPantalla)
+  // F14 · Los tres gemelos de la rama EDIFICIO.
+  const abrirE = oNada(abrirContrasteEdificio)
+  const cerrarE = oNada(cerrarContrasteEdificio)
+  const comoPantallaE = oNada(fijarContrasteEdificioComoPantalla)
 
   let destruido = false
   /** El último cajón aplicado. `null` = todavía no se ha aplicado ninguno. */
@@ -289,10 +337,10 @@ export function cablearContraste({
     puerta(modo === MODO.COMPROBACION && texto !== '')
   }
 
-  /** @param {{paso: string}} situacion */
-  function aplicar({ paso }) {
+  /** @param {{paso: string, rama: string}} situacion */
+  function aplicar({ paso, rama }) {
     if (destruido) return
-    const toca = cajonDe(paso)
+    const toca = cajonDe(paso, rama)
     if (toca !== aplicado) {
       aplicado = toca
       // ── ⛔ ESTA LÍNEA VA ANTES DE ABRIR, Y NO ES ORDEN LIBRE (rebanada 4) ──
@@ -307,11 +355,19 @@ export function cablearContraste({
       // deja el de comprobación como estaba: aquél sí es un cajón, es la respuesta
       // pasajera a soltar un `.gml` en Entrada, y descartarlo es lo correcto.
       comoPantalla(toca === CAJON.DIAGNOSTICO)
-      // Cerrar SIEMPRE va antes de abrir: los dos cajones comparten esquina, y
+      // F14 · Y lo mismo para el de edificio, por el mismo motivo y en el mismo
+      // sitio: declararlo pantalla ANTES de abrirlo. Si se abriera primero,
+      // quedaría un instante descartable — y ese instante es exactamente el que
+      // dura el clic del rail que acaba de abrirlo, que sigue burbujeando hacia el
+      // `document`. En la otra rama eso ya costó una pantalla vacía y muda.
+      comoPantallaE(toca === CAJON.CONTRASTE_EDIFICIO)
+      // Cerrar SIEMPRE va antes de abrir: los TRES cajones comparten esquina, y
       // abrir primero los apilaría en vertical durante un fotograma.
       if (toca !== CAJON.COMPROBACION) cerrarC()
+      if (toca !== CAJON.CONTRASTE_EDIFICIO) cerrarE()
       if (toca === CAJON.DIAGNOSTICO) abrirD()
       else cerrarD()
+      if (toca === CAJON.CONTRASTE_EDIFICIO) abrirE()
     }
     declararEstado()
   }
@@ -341,14 +397,22 @@ export function cablearContraste({
   // que eso, así que desde aquí NUNCA puede fallar. Se comprueba igualmente y se
   // cae a Entrada si algún día deja de ser verdad: un ✕ que no hace nada es
   // exactamente el fallo silencioso que esta rebanada existe para quitar.
+  function salir() {
+    if (destruido) return
+    if (navegacion.navegarAPaso(PASO.VALIDACION).ok) return
+    navegacion.navegarAPaso(PASO.ENTRADA)
+  }
+
   const bajaSalida =
-    typeof suscribirSalida === 'function'
-      ? suscribirSalida(() => {
-          if (destruido) return
-          if (navegacion.navegarAPaso(PASO.VALIDACION).ok) return
-          navegacion.navegarAPaso(PASO.ENTRADA)
-        })
-      : () => {}
+    typeof suscribirSalida === 'function' ? suscribirSalida(salir) : () => {}
+  // F14 · El ✕ del cajón de edificio sale al MISMO sitio, y con el mismo
+  // razonamiento: Validación es el paso anterior del recorrido y enseña la misma
+  // construcción con sus partes, así que salirse del contraste no tira el trabajo
+  // hecho. Su guardián pide `geometria`, y estar en Diagnóstico exige eso mismo,
+  // así que desde aquí no puede fallar; se comprueba igual y se cae a Entrada por
+  // si algún día deja de ser verdad.
+  const bajaSalidaEdificio =
+    typeof suscribirSalidaEdificio === 'function' ? suscribirSalidaEdificio(salir) : () => {}
 
   // `subscribe` no notifica al suscribirse (contrato de `crearEstadoVista`), así
   // que la primera aplicación va a mano. Es también la que deja la esquina
@@ -357,7 +421,10 @@ export function cablearContraste({
   aplicar(navegacion.get())
 
   return {
-    get: () => cajonDe(navegacion.get().paso),
+    get: () => {
+      const { paso, rama } = navegacion.get()
+      return cajonDe(paso, rama)
+    },
 
     procedencia: () => dicho,
 
@@ -372,6 +439,7 @@ export function cablearContraste({
       bajaEstado()
       if (typeof bajaPuerta === 'function') bajaPuerta()
       if (typeof bajaSalida === 'function') bajaSalida()
+      if (typeof bajaSalidaEdificio === 'function') bajaSalidaEdificio()
     },
   }
 }

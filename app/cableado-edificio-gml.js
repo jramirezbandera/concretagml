@@ -236,6 +236,33 @@ export function cablearGeneracionGmlEdificio({
     nodoRenglon.classList.toggle(CLASE_ESTADO_ERROR, esError)
   }
 
+  // ── ⭐ F14 · La validación, PUBLICADA ──────────────────────────────────────
+  //
+  // Un `Set` y no un `= fn`, como todos los `alAlgo` de la casa: un asignador
+  // desengancharía al primer oyente en silencio.
+
+  /** @type {Set<(v: object|null) => void>} */
+  const oyentesValidacion = new Set()
+  /** La última calculada. `null` = no hay (sin partes, o el cálculo reventó). */
+  let ultimaValidacion = null
+
+  /**
+   * Guarda la validación y avisa. Un oyente roto se cuenta y no interrumpe: quien
+   * avisa ya ha hecho su trabajo, y esto corre desde un suscriptor del store.
+   *
+   * @param {object|null} validacion
+   */
+  function publicarValidacion(validacion) {
+    ultimaValidacion = validacion ?? null
+    for (const fn of [...oyentesValidacion]) {
+      try {
+        fn(ultimaValidacion)
+      } catch (causa) {
+        console.error('[gml-bu] un oyente de alValidacion ha reventado', causa)
+      }
+    }
+  }
+
   /**
    * Lo que hay que saber del edificio que haya en el store, en un solo sitio.
    *
@@ -278,6 +305,9 @@ export function cablearGeneracionGmlEdificio({
     let examen
     try {
       examen = examinar(estadoEdificio?.get() ?? null)
+      // ⭐ F14 · La validación se PUBLICA, y por eso este `refrescar` deja de ser
+      // solo el gate del botón. Ver {@link alValidacion}.
+      publicarValidacion(examen.validacion ?? null)
     } catch (causa) {
       // Misma red que el cableado de parcela y por el mismo camino medido: el
       // store admite cualquier POJO, así que una coordenada no finita puede
@@ -286,6 +316,9 @@ export function cablearGeneracionGmlEdificio({
       nodoBoton.disabled = true
       decir(MENSAJE_FALLO_INESPERADO, true)
       console.error('[gml-bu] no se ha podido evaluar si la construcción puede generarse:', causa)
+      // Y el resalte del mapa se RETIRA: unas huellas señaladas por una validación
+      // que acaba de reventar señalarían lo que ya no se sabe.
+      publicarValidacion(null)
       return
     }
     if (examen.motivo === null) {
@@ -409,9 +442,75 @@ export function cablearGeneracionGmlEdificio({
   return {
     generar,
     refrescar,
+
+    /**
+     * La ÚLTIMA validación calculada, o `null`. Es una lectura, no una puerta.
+     *
+     * @returns {object|null}
+     */
+    ultimaValidacion: () => ultimaValidacion,
+
+    /**
+     * ⭐ **F14 · Se suscribe a la validación. Devuelve la BAJA.**
+     *
+     * ── POR QUÉ ESTE CANAL EXISTE ──────────────────────────────────────────
+     * `validation/edificio.js#porParte` se construyó en F13 para que «el resalte
+     * del aviso rodee la parte que se sale, no otra» (ficha §16.1) y **no tuvo ni
+     * un llamante fuera de sus pruebas**. Tercera vez que este proyecto escribe el
+     * canal y no lo enchufa. Lo que faltaba no era el cálculo: era **una forma de
+     * enterarse**, porque hasta F14 la validación se hacía aquí dentro y moría
+     * aquí dentro.
+     *
+     * ⚠️ Y no bastaba con validar al pulsar «Generar GML», que es lo que la ficha
+     * de F13 anotó como pendiente: para que el resalte esté vivo hay que validar
+     * **al cambiar el modelo**. Ya se hacía —{@link refrescar} corre en cada `set`
+     * del store para gobernar el botón—, así que el canal no añade ni una
+     * validación de más: publica la que ya se estaba calculando. De rebote, el
+     * recuento del renglón deja de poder estar rancio.
+     *
+     * Se le pasa la validación entera —no solo los índices— porque quien escuche
+     * decide qué hacer con ella; hoy es el resalte del mapa y mañana puede ser una
+     * lista en el panel. `null` significa «no hay validación»: sin partes, o
+     * porque acaba de reventar.
+     *
+     * @param {(validacion: object|null) => void} fn
+     * @returns {() => void}
+     */
+    alValidacion(fn) {
+      if (typeof fn !== 'function') {
+        throw new TypeError(`alValidacion: 'fn' debe ser una función; recibido ${typeof fn}.`)
+      }
+      oyentesValidacion.add(fn)
+      return () => oyentesValidacion.delete(fn)
+    },
+
     destruir() {
       nodoBoton.removeEventListener('click', generar)
       desuscribir()
+      oyentesValidacion.clear()
     },
   }
+}
+
+/**
+ * ⭐ **Los índices de las partes a las que apunta algún hallazgo.** FUNCIÓN PURA,
+ * y exportada porque es la traducción entre `validation/edificio.js#porParte` y
+ * `viewer/partes.js#pintar({senaladas})` — la juntura que F13 dejó sin construir.
+ *
+ * ⚠️ **Errores y avisos entran los DOS**, y no se distinguen en el mapa. En la
+ * lista sí están separados —son categorías distintas y el recuento se hace sobre
+ * ellas—, pero el resalte contesta una sola pregunta: «¿de qué parte habla lo que
+ * estoy leyendo?». Dos trazos distintos ahí obligarían a mirar dos veces, y el
+ * segundo estaría además a un paso de leerse como un semáforo (regla de oro 9).
+ *
+ * @param {object|null} validacion  Lo que devuelve `validarEdificio`, o `null`.
+ * @returns {number[]}  Índices, en orden y sin repetir. `[]` si no hay ninguno.
+ */
+export function partesSenaladas(validacion) {
+  const porParte = validacion?.porParte
+  if (!Array.isArray(porParte)) return []
+  return porParte
+    .filter((p) => (p?.errores?.length ?? 0) + (p?.avisos?.length ?? 0) > 0)
+    .map((p) => p.indice)
+    .filter((i) => Number.isInteger(i))
 }

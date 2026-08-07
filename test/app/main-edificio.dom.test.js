@@ -389,24 +389,28 @@ describe('app/main · F11 · el paso 13 monta la segunda rama', () => {
     expect(botonRama(RAMA.EDIFICIO).getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('⭐ las TRES secciones de edificio están SELLADAS y ocultas al arrancar', () => {
+  it('⭐ las CUATRO secciones de edificio están SELLADAS y ocultas al arrancar', () => {
     const secciones = [...document.querySelectorAll(`[${ATRIBUTO_PANEL}="${RAMA.EDIFICIO}"]`)]
 
     // Sin la marca, `app/rama.js` no las descubre y la rama EDIFICIO no se
     // enseñaría NUNCA: es la costura que la fase 2 dejó rota y la 3 cosió, y esta
     // es la única prueba que la ejercita con el arranque de verdad.
     //
-    // ⚠️ Eran dos hasta F12; la tercera es «Parte activa» (T4.1). Y el número se
-    // escribe a mano A PROPÓSITO —aquí no se le pregunta al panel—: esta prueba
-    // arranca `app/main.js` de verdad, así que es el único sitio donde se ve si
-    // el cableado se dejó una sección sin sellar en el arranque real. Preguntarle
-    // al panel cuántas tiene haría que las dos mitades se pusieran de acuerdo
-    // solas, que es justo lo que no se quiere comprobar aquí.
-    expect(secciones).toHaveLength(3)
+    // ⚠️ Eran dos hasta F12; la tercera es «Parte activa» (T4.1) y **la cuarta es
+    // «Contraste» (F14)**. Y el número se escribe a mano A PROPÓSITO —aquí no se le
+    // pregunta al panel—: esta prueba arranca `app/main.js` de verdad, así que es
+    // el único sitio donde se ve si el cableado se dejó una sección sin sellar en
+    // el arranque real. Preguntarle al panel cuántas tiene haría que las dos
+    // mitades se pusieran de acuerdo solas, que es justo lo que no se quiere
+    // comprobar aquí.
+    expect(secciones).toHaveLength(4)
     expect(secciones.every((s) => s.hidden)).toBe(true)
-    // Y las de parcela, marcadas y a la vista.
+    // Y las de parcela, marcadas y a la vista. **Tres desde F14**: entra
+    // `.gml-bloque--contraste`, la anfitriona del diagnóstico, porque desde esta
+    // fase la rama EDIFICIO sí llega a esa pantalla y el eje PASO ya no basta para
+    // dejarla fuera. Ver `app/rama.js#SECCIONES_PARCELA`.
     const deParcela = [...document.querySelectorAll(`[${ATRIBUTO_PANEL}="${RAMA.PARCELA}"]`)]
-    expect(deParcela).toHaveLength(2)
+    expect(deParcela).toHaveLength(3)
     expect(deParcela.some((s) => s.hidden)).toBe(false)
   })
 

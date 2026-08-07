@@ -412,16 +412,27 @@ describe('⛔⛔ el sellado de data-rama-panel — la costura que ningún contra
 
   it('DE PUNTA A PUNTA con app/rama.js: conmutar a EDIFICIO enseña el panel, y volver lo esconde', () => {
     const { rama, panelEdificio } = montar({ conRama: true })
+    // ⚠️ Las DOS listas se le preguntan a quien las tiene, y no se escriben a mano:
+    // `SECCIONES_PARCELA` pasó de dos a tres en F14 (entra `.gml-bloque--contraste`,
+    // porque desde esta fase la rama EDIFICIO sí llega a Diagnóstico) y las de
+    // edificio de tres a cuatro. Un recuento literal aquí habría dado rojo sobre un
+    // cambio correcto, y —peor— habría seguido en VERDE si una sección nueva se
+    // quedara fuera del intercambio, que es el defecto que T4.1 midió.
     const dePar = SECCIONES_PARCELA.map((s) => document.querySelector(s))
-    const deEdi = [panelEdificio.seccionOrigen, panelEdificio.seccionPartes]
+    const deEdi = panelEdificio.secciones()
+    expect(dePar.length).toBeGreaterThanOrEqual(3)
+    expect(deEdi.length).toBeGreaterThanOrEqual(4)
+
+    const ocultas = (lista) => lista.every((s) => s.hidden === true)
+    const visibles = (lista) => lista.every((s) => s.hidden === false)
 
     rama.set(RAMA.EDIFICIO)
-    expect(deEdi.map((s) => s.hidden)).toEqual([false, false])
-    expect(dePar.map((s) => s.hidden)).toEqual([true, true])
+    expect(visibles(deEdi), 'con la rama EDIFICIO puesta, TODAS sus secciones se ven').toBe(true)
+    expect(ocultas(dePar), 'y TODAS las de parcela se esconden').toBe(true)
 
     rama.set(RAMA.PARCELA)
-    expect(deEdi.map((s) => s.hidden)).toEqual([true, true])
-    expect(dePar.map((s) => s.hidden)).toEqual([false, false])
+    expect(ocultas(deEdi)).toBe(true)
+    expect(visibles(dePar)).toBe(true)
   })
 
   it('sin el sellado la rama edificio no se mostraría: rama.js lo denuncia con MENSAJE_SIN_PANEL_EDIFICIO', () => {

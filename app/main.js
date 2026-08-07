@@ -537,6 +537,12 @@ import { crearExpedientes } from '../storage/expedientes.js'
 import { crearPieDeFirmaGuardado } from '../storage/pie-firma.js'
 import { validarParcela } from '../validation/parcela.js'
 import { crearEstadoVista, NIVEL } from '../viewer/_comun.js'
+// F14 · No sale por `viewer/index.js`, y es a propósito: `crearVisor` monta el
+// cajón de diagnóstico porque **las dos ramas comparten mapa** y aquél existe
+// desde F07 con su opción `diagnostico`. Éste se monta aparte porque solo tiene
+// sentido con la rama EDIFICIO puesta, y meterlo en el visor obligaría a que el
+// visor supiera qué es una rama —que es exactamente lo que no sabe—.
+import { crearCajonContrasteEdificio } from '../viewer/cajon-contraste-edificio.js'
 import { crearVisor } from '../viewer/index.js'
 import { crearPanelAvisos } from './avisos.js'
 import {
@@ -547,6 +553,11 @@ import {
   cablearCatastro,
 } from './cableado-catastro.js'
 import { cablearComprobacion } from './cableado-comprobacion.js'
+// F14 · El contraste de la CONSTRUCCIÓN y su informe. Son los gemelos de los pasos
+// 8 y 11 en la rama EDIFICIO, y entran aquí —y no dentro de `cablearEdificio`—
+// por lo mismo que aquéllos: el que sabe qué cajón hay, qué cliente hay y qué
+// reloj hay es esta costura.
+import { cablearContrasteEdificio } from './cableado-contraste-edificio.js'
 import { cablearDerivacion } from './cableado-derivacion.js'
 import { cablearDiagnostico } from './cableado-diagnostico.js'
 // ⚠️ **El alias dice `DIBUJO` y no `EDIFICIO` desde F18, y es una corrección de
@@ -559,7 +570,7 @@ import { cablearDiagnostico } from './cableado-diagnostico.js'
 import { EXTENSIONES as EXTENSIONES_DIBUJO, cablearEdificio } from './cableado-edificio.js'
 // F13 · el segundo dueño de «Generar GML»: la rama EDIFICIO ya sabe escribir su
 // fichero (el del ICUC), así que el botón deja de estar apagado por ser edificio.
-import { cablearGeneracionGmlEdificio } from './cableado-edificio-gml.js'
+import { cablearGeneracionGmlEdificio, partesSenaladas } from './cableado-edificio-gml.js'
 import {
   EXTENSIONES_PROYECTO,
   MENSAJE_SIN_EXPEDIENTE,
@@ -568,6 +579,7 @@ import {
   hayGeometria,
 } from './cableado-expediente.js'
 import { cablearInforme } from './cableado-informe.js'
+import { cablearInformeEdificio } from './cableado-informe-edificio.js'
 import { cablearMedicion } from './cableado-medicion.js'
 import { NOMBRE_PEGADO, crearDialogoPegado } from './dialogo-pegado.js'
 import {
@@ -1028,6 +1040,17 @@ export const SELECTOR_ESTADO_EDICION = '[data-estado="edicion"]'
  * panel. Y `[data-estado="diagnosticar"]` ya existe en el pie para otra cosa.
  */
 export const SELECTOR_ANFITRION_DIAGNOSTICO = '[data-anfitrion="diagnostico"]'
+
+/**
+ * F14 · La misma idea en la rama EDIFICIO: la `<section>` vacía donde se cuelga el
+ * contraste de la construcción cuando es la pantalla.
+ *
+ * ⚠️ **Esta NO está en `index.html`**: la fabrica `app/panel-edificio.js` junto con
+ * las otras tres de su rama, así que **no se puede resolver antes del paso 13** —
+ * hasta que `cablearEdificio` monta el panel, este selector devuelve `null`—. Por
+ * eso el cajón se cuelga ahí abajo y no aquí arriba con el de parcela.
+ */
+export const SELECTOR_ANFITRION_CONTRASTE_EDIFICIO = '[data-anfitrion="contraste-edificio"]'
 
 /**
  * La conversión que `index.html` pide expresamente que haga esta capa: el campo
@@ -2661,6 +2684,22 @@ let expedienteCableado = null
 let edificioCableado = null
 
 /**
+ * F14 · El contraste de la construcción, o `null` mientras el paso 13b no haya
+ * corrido. **Referencia adelantada, y esta sí es necesaria y no un accidente de
+ * orden**: `hechosDeEdificio` lo lee para saber si se ha llegado a contrastar, y
+ * los hechos iniciales del rail se derivan al crear la navegación, que ocurre
+ * después del 13b pero cuya FUNCIÓN se escribe antes.
+ *
+ * `null` significa exactamente lo mismo que un contraste a `null`: no se ha
+ * contrastado. No bloquea ningún peldaño —el informe de construcción se sostiene
+ * sin contraste, ficha §17—, así que una cáscara a la que el 13b se le cayera
+ * seguiría navegando entera y diciendo la verdad.
+ *
+ * @type {ReturnType<typeof cablearContrasteEdificio>|null}
+ */
+let contrasteEdificioCableado = null
+
+/**
  * El conmutador de rama del paso 13, o `null` mientras no exista. Tercera referencia
  * adelantada del fichero, y la lee el desvío `alGmlDeEdificio` que el paso 9 le
  * entrega a la zona de fichero: encaminar un GML de construcción implica **conmutar
@@ -3433,6 +3472,25 @@ const gmlDeParcela = cablearGeneracionGml({
 // `app/dialogo-informe.js` —igual que `app/zona-fichero.js` fabrica su
 // `<input type="file">`— y los dos botones del pie los fabrica
 // `viewer/cajon-diagnostico.js`.
+/**
+ * El pie de firma recordado. `abrirBd` MEMOIZA su conexión, así que esta llamada
+ * reutiliza la que abrió la caché del Catastro en el paso 7 en vez de abrir una
+ * segunda; y va sin `await` por lo mismo que allí: preparar un informe no puede
+ * quedarse esperando a IndexedDB, y sin base el almacén se comporta como si no
+ * hubiera nada recordado (y lo dice por el panel).
+ *
+ * ⭐ **F14 lo saca a una constante propia porque ahora lo comparten DOS informes**,
+ * el de parcela y el de construcción. Y compartirlo es el requisito, no un ahorro:
+ * el pie de firma es de la PERSONA que firma, no del documento, y dos almacenes
+ * sobre la misma base harían que marcar «Recordar» en un informe no se notara en
+ * el otro — el usuario tendría que teclear sus datos dos veces sin entender por
+ * qué. Ver `app/cableado-informe-edificio.js`, que solo LEE de aquí.
+ */
+const pieFirmaGuardado = crearPieDeFirmaGuardado({
+  bd: abrirBd({ alAvisar: panel.avisar }),
+  alAvisar: panel.avisar,
+})
+
 const informeCableado = cablearInforme({
   // El MISMO store que el mapa, la tabla, la ficha, el diagnóstico, la comprobación
   // y el botón del GML. No escribe en él: un informe mide y maqueta, no edita.
@@ -3472,10 +3530,7 @@ const informeCableado = cablearInforme({
   // segunda; y va sin `await` por lo mismo que allí: preparar un informe no puede
   // quedarse esperando a IndexedDB, y sin base el almacén se comporta como si no
   // hubiera nada recordado (y lo dice por el panel).
-  pieFirma: crearPieDeFirmaGuardado({
-    bd: abrirBd({ alAvisar: panel.avisar }),
-    alAvisar: panel.avisar,
-  }),
+  pieFirma: pieFirmaGuardado,
   // El MISMO envoltorio que el paso 8, y por la misma razón escrita allí: la
   // comprobación cambia con el tiempo —entra al soltar un GML y se va al
   // descartarlo—, así que se resuelve tarde. Aquí, además, `comprobacionCableada`
@@ -3575,6 +3630,86 @@ edificioCableado = cablearEdificio({
   // distintas y la segunda no implica la primera (medido por T1.5 de F11).
   barraEdicion: visor.barraEdicion,
 })
+
+// ── 13b · El CONTRASTE de la construcción y su informe (F14) ─────────────────
+//
+// Los gemelos de los pasos 8 y 11 en la rama EDIFICIO, y van AQUÍ —después del 13
+// y no dentro de él— por una razón dura: su sección anfitriona **la fabrica
+// `app/panel-edificio.js`**, así que hasta que `cablearEdificio` ha montado el
+// panel, `SELECTOR_ANFITRION_CONTRASTE_EDIFICIO` no existe en el documento y
+// `nodo()` lanzaría. Con el de parcela no pasa: aquél viene en `index.html`.
+//
+// ⚠️ Y van antes de `crearNavegacion` porque `hechosDeEdificio` lee
+// `contrasteEdificioCableado`: los hechos iniciales del rail se derivan en el
+// arranque, y con la variable todavía en `null` el peldaño Informe nacería
+// diciendo que no se ha contrastado aunque hubiera un contraste hecho. Hoy no lo
+// hay nunca en el arranque —el contraste se hace pulsando—, pero la dependencia es
+// real y el orden la respeta en vez de apoyarse en que hoy dé igual.
+
+/**
+ * El cajón del contraste de construcción. Se monta SIEMPRE, aunque la pantalla
+ * nazca en la rama de parcela: nace cerrado y `display:none`, así que no cuesta ni
+ * un píxel, y montarlo tarde obligaría a montar y desmontar controles de Leaflet
+ * en cada conmutación de rama — con sus oyentes del `document` yendo y viniendo,
+ * que es de donde salen las fugas.
+ */
+const cajonContrasteEdificio = crearCajonContrasteEdificio({
+  mapa: visor.mapa,
+  alAvisar: panel.avisar,
+})
+// Su sitio en el panel, exactamente como el de parcela y por lo mismo. `nodo()`
+// lanza nombrando el selector si el panel no lo ha traído, que es lo correcto: es
+// un contrato entre dos módulos de esta misma capa.
+cajonContrasteEdificio.anfitrion(nodo(SELECTOR_ANFITRION_CONTRASTE_EDIFICIO))
+
+contrasteEdificioCableado = cablearContrasteEdificio({
+  cajon: cajonContrasteEdificio,
+  estadoEdificio,
+  panel,
+  // Solo se LEE, y solo para medir cuánto de la construcción cae DENTRO de la
+  // parcela: es la pregunta propia de esta rama, y la que en la de parcela no
+  // existe. Nunca se escribe en él.
+  estadoParcela: estado,
+  // El cliente de EDIFICIOS del paso 7. `null` si aquel bloque se cayó, y `null`
+  // ahí es una respuesta prevista: el contraste se monta igual y dice que no hay
+  // servicio con el que consultar.
+  cliente: clienteEdificio,
+  // El CABLEADO de parcelas, y solo para las vecinas de la invasión. Se comprueba
+  // la FORMA en vez de pasarlo a ciegas, por el mismo criterio que el `catastro:`
+  // del paso 11.
+  catastro:
+    catastroCableado !== null && typeof catastroCableado.colindantes === 'function'
+      ? catastroCableado
+      : null,
+  srs: SRS_DEMO,
+  // ⭐ **La MISMA capa de contraste que la rama de parcela**, sin una línea nueva.
+  // `viewer/contraste.js` recibe recintos y le da igual de qué son: sombrea la
+  // diferencia simétrica con un `fillRule:'evenodd'`. Las dos ramas no la usan a la
+  // vez —la rama es única y `app/contraste.js` cierra el cajón que no toca—, así
+  // que compartirla no las pisa.
+  contrasteMapa: visor.diagnostico.contraste,
+})
+
+const informeEdificioCableado = cablearInformeEdificio({
+  cajon: cajonContrasteEdificio,
+  estadoEdificio,
+  panel,
+  // SIN invocar: el contraste cambia con cada edición de las partes, y un valor
+  // congelado en el montaje sería siempre `null`. Igual que F09 con el diagnóstico.
+  contraste: contrasteEdificioCableado.ultimoContraste,
+  // Y aparte, los CONTORNOS: el objeto del contraste trae cifras, no geometría, y
+  // el plano tiene que dibujar las dos huellas. Ver el JSDoc de esa función.
+  huellaOficial: contrasteEdificioCableado.huellaOficial,
+  srs: SRS_DEMO,
+  // El MISMO almacén que el informe de parcela: la firma es de quien firma, no del
+  // documento. Ver {@link pieFirmaGuardado}.
+  pieFirma: pieFirmaGuardado,
+})
+
+// El rail depende de que haya contraste (o de que no lo haya) para decir la verdad
+// del peldaño «Informe», así que se le avisa por el canal en vez de con un
+// temporizador — que es el apaño que T9 borró en la otra rama.
+contrasteEdificioCableado.alContraste(() => refrescarHechos())
 
 // ── 12 · Persistencia y exportación (F10 · T5.1) ─────────────────────────────
 
@@ -3702,15 +3837,66 @@ function hechosDeParcela(parcela) {
 }
 
 /**
- * Los hechos de la rama EDIFICIO. Solo el primero puede ser cierto en esta
- * versión: el diagnóstico y el informe son de parcela, y el rail ya los apaga por
- * RAMA —con su motivo— antes de mirar ningún dato.
+ * Los hechos de la rama EDIFICIO.
+ *
+ * ⛔ **Hasta F14 esto devolvía `oficial: false, diagnostico: false` a pelo**, y su
+ * comentario decía «solo el primero puede ser cierto en esta versión: el
+ * diagnóstico y el informe son de parcela». Era verdad y F14 lo vuelve falso: los
+ * dos peldaños existen ya en esta rama. Se calculan de verdad.
+ *
+ * ⚠️ Y significan **otra cosa** que en la rama de parcela, que es justo por lo que
+ * `app/navegacion.js` tuvo que admitir un `requiere` por rama:
+ *
+ *   · `geometria`   — hay construcción con la que trabajar. Un edificio con CERO
+ *                     partes SÍ cuenta: es el punto de partida de la obra nueva.
+ *   · `oficial`     — hay huella publicada por el Catastro con la que contrastar.
+ *                     **No abre ningún peldaño** —el contraste es opcional y su
+ *                     caso estrella es que no la haya—: se calcula para que el rail
+ *                     pueda decir la verdad de lo que hay, no para bloquear.
+ *   · `diagnostico` — se ha llegado a contrastar. Tampoco abre ningún peldaño, por
+ *                     lo mismo: el informe de construcción se sostiene sin él y sale
+ *                     entonces «solo declarativo» (ficha §17).
  *
  * @param {object|null} edificio
  * @returns {{geometria: boolean, oficial: boolean, diagnostico: boolean}}
  */
 function hechosDeEdificio(edificio) {
-  return { geometria: hayEdificio(edificio), oficial: false, diagnostico: false }
+  return {
+    geometria: hayEdificio(edificio),
+    oficial: hayHuellaOficial(edificio),
+    // ⭐ **Ya está cableado (paso 13b), y se lee por la misma puerta que el
+    // informe.** Aquí ponía `false` con un «⏳ pendiente de su cableado» honrado
+    // mientras `diagnostico/edificio.js` no tuvo llamante; F14 lo enchufa y el
+    // comentario se retira con el mismo cuidado con el que se puso.
+    //
+    // Es una LECTURA, no una segunda verdad: si se recalculara aquí, el rail
+    // podría decir una cosa y el PDF salir con otra. Y el `?.` no es defensa
+    // supersticiosa —`contrasteEdificioCableado` es `null` de verdad si el paso 13b
+    // se cayó, y entonces la respuesta correcta es «no se ha contrastado»—.
+    //
+    // **No bloquea nada**: ningún paso de la rama EDIFICIO exige este hecho (ver
+    // `app/navegacion.js#REGLA`), así que el informe se alcanza igual sin contraste
+    // y sale «solo declarativo», que es el caso que la ficha §17 describe.
+    diagnostico: (contrasteEdificioCableado?.ultimoContraste() ?? null) !== null,
+  }
+}
+
+/**
+ * ¿Hay huella publicada por el Catastro para esta construcción?
+ *
+ * ⚠️ **No es `edificio.construccionOficial !== null` y ya está.** Ese campo lleva
+ * las PARTES que vinieron del Catastro cuando el edificio se trajo de allí, y puede
+ * ser una lista vacía; lo que el contraste necesita es que haya al menos una con
+ * contorno. Se pregunta por lo que se va a usar.
+ *
+ * @param {object|null} edificio
+ */
+function hayHuellaOficial(edificio) {
+  const oficial = edificio?.construccionOficial
+  return (
+    Array.isArray(oficial) &&
+    oficial.some((p) => Array.isArray(p?.recinto?.vertices) && p.recinto.vertices.length >= 3)
+  )
 }
 
 /**
@@ -3850,6 +4036,28 @@ const contrasteCableado = cablearContraste({
   // paso); esto es el cable, igual que el aplicador de la edición de más abajo.
   fijarDiagnosticoComoPantalla: (esPantalla) => visor.diagnostico.cajon.comoPantalla(esPantalla),
   suscribirSalida: (fn) => visor.diagnostico.cajon.alSalir(fn),
+
+  // ── F14 · Los cuatro gemelos de la rama EDIFICIO ─────────────────────────
+  // Mismo reparto, mismo orden y mismas trampas esquivadas que arriba. Y el
+  // MISMO `abrir()` del CABLEADO y no el del cajón: aquél recalcula y pide las
+  // vecinas, mientras que abrir el cajón a pelo enseñaría las cifras del
+  // contraste anterior.
+  //
+  // ⛔ Sin guarda de «no reabrir lo que ya está abierto», al revés que en la
+  // rama de parcela, y la asimetría tiene motivo: allí el CTA «Diagnosticar
+  // encaje» del pie abre el cajón por su cuenta antes de que el rail navegue, y
+  // sin guarda cada clic costaba dos consultas al Catastro. Aquí no hay CTA que
+  // se adelante —el único camino a esta pantalla es el rail—, y `abrir()` es
+  // idempotente en lo caro: `pedirVecinas` no pide nada si ya las tiene.
+  abrirContrasteEdificio: () => {
+    contrasteEdificioCableado?.abrir().catch((causa) => {
+      console.error('[main] la apertura del contraste de edificio ha fallado:', causa)
+    })
+  },
+  cerrarContrasteEdificio: () => contrasteEdificioCableado?.cerrar(),
+  fijarContrasteEdificioComoPantalla: (esPantalla) =>
+    cajonContrasteEdificio.comoPantalla(esPantalla),
+  suscribirSalidaEdificio: (fn) => cajonContrasteEdificio.alSalir(fn),
 })
 
 /**
@@ -4106,6 +4314,24 @@ const gmlDeEdificio = cablearGeneracionGmlEdificio({
 ramaCableada?.subscribe(() => {
   gmlDeParcela.refrescar()
   gmlDeEdificio.refrescar()
+})
+
+// ── ⭐ F14 · EL RESALTE POR PARTE: `porParte` ESTRENA LLAMANTE ────────────────
+//
+// `validation/edificio.js#porParte` se construyó en la fase 1 de F13 para que «el
+// resalte del aviso rodee LA PARTE QUE SE SALE, no otra» (ficha §16.1), se probó,
+// y **no tuvo ni un llamante fuera de sus pruebas**. Es la tercera vez que este
+// proyecto escribe el canal y no lo enchufa —F11 `parsers/dxf.js`, F12
+// `edificio.edicion`, F13 esto—, y ésta es la línea que lo cierra.
+//
+// ⚠️ **No añade ni una validación.** `cablearGeneracionGmlEdificio` ya validaba en
+// cada cambio del modelo para gobernar «Generar GML»; lo único que faltaba era una
+// forma de enterarse. Por eso el cable va del canal de aquél al `resaltar` del
+// otro, y no hay un tercer `validarEdificio` en ninguna parte: dos validaciones
+// serían dos verdades sobre el mismo edificio, y el día que una divergiera el mapa
+// señalaría una parte mientras el renglón habla de otra.
+gmlDeEdificio.alValidacion((validacion) => {
+  edificioCableado?.resaltar(partesSenaladas(validacion))
 })
 
 // ── F12 · T4.2 · «Dibujar recinto», la sexta palabra de la barra ─────────────

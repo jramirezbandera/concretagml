@@ -101,6 +101,32 @@ export const CLASE_ROTULO_PLANTAS = 'gml-huella-plantas'
 /** F12. Clase de la huella de la parte ACTIVA (la que se está editando). */
 export const CLASE_HUELLA_ACTIVA = 'gml-huella--activa'
 
+/**
+ * ⭐ **F14 · Clase de la huella SEÑALADA por un hallazgo de la validación.**
+ *
+ * `validation/edificio.js#porParte` se escribió en F13 para que «el resalte del
+ * aviso rodee la parte que se sale, no otra» (ficha §16.1) y **no tuvo ni un
+ * llamante fuera de sus pruebas**. Es la tercera vez que este proyecto escribe el
+ * canal y no lo enchufa (F11 `parsers/dxf.js`, F12 `edificio.edicion`, F13 esto);
+ * F14 es la fase que lo cierra.
+ *
+ * ⛔ **Se distingue por TRAZO y GROSOR, nunca por color**, y esto es la regla de
+ * oro 9 aplicada a la cartografía. `COLOR_HUELLA` está elegido por descarte
+ * precisamente para que no signifique nada: un rojo aquí diría «esta parte está
+ * mal», que es el dictamen que no nos toca. Lo que se dice es «el aviso que estás
+ * leyendo habla de ÉSTA», que es un hecho de la interfaz — exactamente el mismo
+ * criterio con el que `CLASE_HUELLA_ACTIVA` se distingue por grosor.
+ */
+export const CLASE_HUELLA_SENALADA = 'gml-huella--senalada'
+
+/**
+ * El patrón de trazo de una huella señalada, en píxeles de pantalla. Discontinuo,
+ * que es lo único que queda libre: el grosor ya lo gasta la parte ACTIVA, y una
+ * parte puede ser las dos cosas a la vez (se está editando **y** tiene un aviso).
+ * Con trazo + grosor las dos marcas se leen juntas sin pelearse.
+ */
+export const TRAZO_SENALADA = '6 4'
+
 /** F12. Clase de la línea de la envolvente derivada. */
 export const CLASE_ENVOLVENTE = 'gml-envolvente'
 
@@ -446,10 +472,21 @@ export function crearCapaPartes({ mapa, zona, alAvisar } = {}) {
    *
    * @param {object[]|null} partes  `Array<ParteConstruccion>` del modelo
    *   (`model/edificio.js`). `null`/`undefined` ⇒ solo limpia.
+   * @param {object} [opciones]
+   * @param {number|null} [opciones.activa=null]  Índice de la parte que se está
+   *   editando. Se distingue por GROSOR.
+   * @param {Array|null} [opciones.envolvente=null]  La envolvente derivada.
+   * @param {number[]|null} [opciones.senaladas=null]  **F14.** Índices de las
+   *   partes a las que apunta algún hallazgo de `validation/edificio.js#porParte`.
+   *   Se distinguen por TRAZO DISCONTINUO —nunca por color: ver
+   *   {@link CLASE_HUELLA_SENALADA}—, así que una parte puede estar a la vez activa
+   *   y señalada sin que las dos marcas se pisen. `null` o `[]` ⇒ ninguna, y son lo
+   *   mismo aquí: esta capa no distingue «no se ha validado» de «no hay hallazgos»
+   *   porque no dibuja esa diferencia; quien la dice con palabras es el panel.
    * @returns {void}
    * @throws {TypeError} Si `partes` no es un array ni `null`.
    */
-  function pintar(partes, { activa = null, envolvente = null } = {}) {
+  function pintar(partes, { activa = null, envolvente = null, senaladas = null } = {}) {
     // Tras `destruir()` esto es un no-op y no un throw: el desmontaje del visor va
     // en orden inverso y una respuesta del WFS de edificio en vuelo puede llegar
     // después. Mismo criterio que `colindantes.pintar` y `contraste.pintar`.
@@ -473,6 +510,10 @@ export function crearCapaPartes({ mapa, zona, alAvisar } = {}) {
       pintarEnvolvente(envolvente)
     }
 
+    // Un `Set` y no un `includes` dentro del bucle: con trece partes da igual, pero
+    // el bucle es el que corre en cada `set` del store durante la edición.
+    const marcadas = new Set(Array.isArray(senaladas) ? senaladas : [])
+
     let saltadas = 0
     for (const [indice, parte] of partes.entries()) {
       const anillo = anilloLatLng(parte && parte.recinto)
@@ -482,9 +523,15 @@ export function crearCapaPartes({ mapa, zona, alAvisar } = {}) {
       }
 
       const esActiva = indice === activa
+      // F14 · ¿apunta algún hallazgo a esta parte? Ver {@link CLASE_HUELLA_SENALADA}.
+      const esSenalada = marcadas.has(indice)
       const poligono = L.polygon(anillo, {
         pane: PANE.PARTES,
-        className: esActiva ? `${CLASE_HUELLA} ${CLASE_HUELLA_ACTIVA}` : CLASE_HUELLA,
+        // Las dos marcas son INDEPENDIENTES y se acumulan: una parte puede estar
+        // señalada por un aviso y ser además la que se está editando.
+        className: [CLASE_HUELLA, esActiva && CLASE_HUELLA_ACTIVA, esSenalada && CLASE_HUELLA_SENALADA]
+          .filter(Boolean)
+          .join(' '),
         // Interactiva a propósito, por el emergente. El porqué —y por qué no le
         // roba el clic al mapa— está en la cabecera.
         interactive: true,
@@ -494,6 +541,10 @@ export function crearCapaPartes({ mapa, zona, alAvisar } = {}) {
         // así que un segundo color pediría un segundo descarte y además diría
         // «esta parte es distinta» en vez de «ésta es la que estás tocando».
         weight: esActiva ? GROSOR_HUELLA * 2 : GROSOR_HUELLA,
+        // F14 · El trazo discontinuo de la parte señalada. `undefined` y no `null`:
+        // Leaflet solo aplica `dashArray` si viene, y un `null` explícito acabaría
+        // en el atributo SVG como la cadena «null».
+        dashArray: esSenalada ? TRAZO_SENALADA : undefined,
         opacity: OPACIDAD_TRAZO,
         // Con relleno VISIBLE, al revés que en `colindantes.js`: aquí la huella es
         // el asunto. Ver {@link OPACIDAD_RELLENO} para por qué es bajo.

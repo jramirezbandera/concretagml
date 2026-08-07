@@ -312,20 +312,30 @@ describe('T2 · apagado son DOS afirmaciones: oculto Y deshabilitado', () => {
     )
   })
 
-  it('⭐ F13 · el CTA que SÍ se restaura es el que este módulo apaga', () => {
-    // El control del cambio: con «Diagnosticar encaje» encendido antes de
-    // conmutar, volver tiene que devolverlo encendido —no dejarlo apagado ni
-    // forzarlo—, que es la propiedad que la prueba de arriba defendía con los dos.
+  it('⭐ F14 · ya no queda NINGÚN CTA que este módulo apague al conmutar', () => {
+    // ⛔ **Este `it` era de F13 y afirmaba que «Diagnosticar encaje» sí se apagaba
+    // al pasar a EDIFICIO**, porque era el único que quedaba. F14 retira también
+    // ese apagado: el contraste de construcción existe, así que el motivo era
+    // falso.
+    //
+    // Lo que se conserva es la propiedad que de verdad importaba y que ahora se
+    // cumple sola: **conmutar de rama y volver deja los dos CTA como estaban**.
+    // Se mide sobre los dos, y con estados DISTINTOS, para que una implementación
+    // que los pusiera a los dos en el mismo valor no pasara por casualidad.
     montarCascara()
     const { rama } = cablear()
     const diagnosticar = document.querySelector(SELECTOR.CTA_DIAGNOSTICAR)
+    const generar = document.querySelector(SELECTOR.CTA_GENERAR)
     diagnosticar.disabled = false
+    generar.disabled = true
 
     rama.set(RAMA.EDIFICIO)
-    expect(diagnosticar.disabled).toBe(true)
+    expect(diagnosticar.disabled).toBe(false)
+    expect(generar.disabled).toBe(true)
 
     rama.set(RAMA.PARCELA)
     expect(diagnosticar.disabled).toBe(false)
+    expect(generar.disabled).toBe(true)
   })
 })
 

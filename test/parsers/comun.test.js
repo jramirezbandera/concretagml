@@ -13,8 +13,13 @@ import { describe, it, expect } from 'vitest'
 import {
   TIPO_DETECCION,
   SEVERIDAD,
+  SUJETO,
+  SUJETOS,
+  SUJETO_CONSTRUCCION,
+  SUJETO_POR_DEFECTO,
   crearDeteccion,
   autodetectarSeparadorDecimal,
+  declinar,
   extraerPares,
 } from '../../parsers/_comun.js'
 
@@ -233,5 +238,73 @@ describe('parsers/_comun — extraerPares', () => {
     const { anillos, detecciones } = extraerPares(['cabecera', 'sin numeros aqui'])
     expect(anillos).toEqual([])
     expect(detecciones.some((d) => d.tipo === TIPO_DETECCION.SEPARADOR_DECIMAL)).toBe(true)
+  })
+})
+
+// ── ⭐ F14 · DE QUÉ HABLAN LOS MENSAJES DE ESTA CAPA ─────────────────────────
+
+describe('parsers/_comun — el SUJETO de los mensajes (F14)', () => {
+  it('los dos sujetos traen LAS CUATRO formas, y se recorre el objeto', () => {
+    // Un sujeto nuevo al que le falte una clave imprimiría `undefined` dentro de un
+    // aviso. Se recorre el catálogo en vez de nombrar los dos a mano.
+    expect(SUJETOS.length).toBeGreaterThan(1)
+    for (const clave of SUJETOS) {
+      for (const forma of ['nominativo', 'genitivo', 'escueto', 'guia']) {
+        expect(typeof SUJETO[clave][forma], `${clave}.${forma}`).toBe('string')
+        expect(SUJETO[clave][forma].length, `${clave}.${forma} está vacío`).toBeGreaterThan(0)
+      }
+      expect(Object.isFrozen(SUJETO[clave])).toBe(true)
+    }
+    expect(Object.isFrozen(SUJETO)).toBe(true)
+  })
+
+  it('⛔ los textos de PARCELA son los de siempre, byte a byte', () => {
+    // La disciplina de T1.5: la rama que no cambia tiene que decir EXACTAMENTE lo
+    // que decía. Estos tres literales son los que estaban en `importar.js` y en
+    // `dxf.js` antes de F14.
+    expect(SUJETO.PARCELA.nominativo).toBe('La parcela')
+    expect(SUJETO.PARCELA.genitivo).toBe('de la parcela')
+    expect(SUJETO.PARCELA.escueto).toBe('de parcela')
+    expect(SUJETO.PARCELA.guia).toBe(
+      'Deja solo la polilínea de la parcela en la capa 0 y ejecuta LIMPIA (PURGE); ' +
+        'no se importan bloques, INSERT, xref ni splines.',
+    )
+  })
+
+  it('⭐ la GUÍA de la construcción NO es la de parcela con otro sustantivo', () => {
+    // Una construcción tiene una polilínea POR PARTE —trece en el edificio real—,
+    // así que «deja SOLO la polilínea» le haría perder doce. Es el único de los
+    // cuatro textos que no es una declinación sino otro consejo.
+    expect(SUJETO.CONSTRUCCION.guia).not.toContain('Deja solo la polilínea')
+    expect(SUJETO.CONSTRUCCION.guia).toContain('una por parte')
+    // Y lo que SÍ vale igual sigue estando: el PURGE y la lista de lo que no entra.
+    expect(SUJETO.CONSTRUCCION.guia).toContain('LIMPIA (PURGE)')
+    expect(SUJETO.CONSTRUCCION.guia).toContain('splines')
+  })
+
+  it('ninguna forma de CONSTRUCCION dice «parcela»', () => {
+    for (const forma of Object.values(SUJETO.CONSTRUCCION)) {
+      expect(forma.toLowerCase()).not.toContain('parcela')
+    }
+  })
+
+  it('el defecto y la clave de construcción están EN el catálogo', () => {
+    // Si alguien renombra una clave, esto sale rojo en vez de dejar a `declinar`
+    // cayéndose al defecto en silencio.
+    expect(SUJETOS).toContain(SUJETO_POR_DEFECTO)
+    expect(SUJETOS).toContain(SUJETO_CONSTRUCCION)
+    expect(SUJETO_POR_DEFECTO).toBe('PARCELA')
+  })
+
+  it('⛔ `declinar` con basura NO lanza: se cae al defecto', () => {
+    // Se llama desde DENTRO de un parser, en mitad de un fichero que el usuario
+    // acaba de soltar: reventar ahí cambiaría un aviso sobre el dato por un fallo
+    // del programa. Quien sí lanza es `importar`, que es donde el error es del
+    // programador.
+    for (const basura of [undefined, null, '', 'PARCELITA', 42, {}]) {
+      expect(() => declinar(basura)).not.toThrow()
+      expect(declinar(basura)).toBe(SUJETO[SUJETO_POR_DEFECTO])
+    }
+    expect(declinar(SUJETO_CONSTRUCCION)).toBe(SUJETO.CONSTRUCCION)
   })
 })

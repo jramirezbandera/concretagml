@@ -107,6 +107,12 @@ import {
 // un renombrado allí salga en rojo aquí y no en un `throw` de `superficie`.
 import { TIPO_RECINTO } from '../model/parcela.js'
 import { BLOQUEOS_SOLO_PARCELA, importar, sinDeteccionesDeParcela } from '../parsers/importar.js'
+// F14 · El sujeto de los avisos del importador. Se importa la CLAVE y no se
+// escribe `'CONSTRUCCION'` a mano: un literal mal escrito no se quejaría —
+// `declinar` se cae al defecto— y los avisos volverían a decir «la parcela» sin
+// que nada lo dijera. `importar` sí lanza con una clave desconocida, y esta
+// constante es lo que garantiza que nunca llegue una.
+import { SUJETO_CONSTRUCCION } from '../parsers/_comun.js'
 import {
   MOTIVO_ENTRADA,
   SEVERIDAD,
@@ -196,6 +202,13 @@ const ORIGEN_POR_FORMATO = Object.freeze({
  *   construyó). Valores de {@link MOTIVO_ENTRADA}, **nunca** de
  *   `BLOQUEOS_SOLO_PARCELA`.
  * @property {boolean} construido  Espejo de `ResumenImportacion.construida`.
+ * @property {object|null} superficie  **F14.** Cotejo de la superficie que ha
+ *   entrado contra el «Área:» que declara el volcado, con la MISMA forma que
+ *   `ResumenImportacion.superficie` —para que `avisoDeSuperficie` lo lea sin
+ *   cambiar—. `null` cuando no hay nada que cotejar: en las vías de GML y WFS (no
+ *   hay volcado que declare), sin «Área:» en el texto, y **con más de una parte**,
+ *   porque entonces el número declarado no habla del conjunto. Ver
+ *   `cotejoDeConstruccion`.
  * @property {{total:number, porTipo:object, porSeveridad:object}} detecciones  Recuentos.
  */
 
@@ -290,6 +303,65 @@ function husoDeSrs(srs, partes) {
     : { zona: caida.zona, srs: caida.srs, lon: caida.lon, lat: caida.lat, ambiguo: caida.ambiguo }
 }
 
+/**
+ * ⭐ **F14 · EL COTEJO DE SUPERFICIE EN LA RAMA EDIFICIO** (deuda de F19).
+ *
+ * ── LO QUE SE MIDIÓ ANTES DE ESCRIBIRLO (M7) ────────────────────────────────
+ * La deuda estaba mal enunciada: no era «el cotejo no se propaga». Medido el
+ * 2026-08-07 sobre una LISTA real pasada por las dos vías:
+ *
+ *     importar(...).resumen.superficie      → {calculada, reportada, coincide…}
+ *     entradaDesdeTexto(...).resumen        → 10 claves, y `superficie` NO está
+ *
+ * O sea que `importar` **sí** lo calcula y esta capa lo tiraba. Pero reenviarlo
+ * tal cual habría sido peor que no tenerlo: el `calculada` de allí es
+ * `superficie(recintos)` sobre el reparto de PARCELA —el primer anillo menos los
+ * demás, tratados como huecos—, y en una construcción los anillos son **partes
+ * disjuntas**. Con dos partes de 100 m² aquel número daría ~0 en vez de 200.
+ *
+ * ── LO QUE SE HACE, Y DÓNDE SE PARA ─────────────────────────────────────────
+ * Se recalcula aquí con la suma de las partes, que es la superficie que de verdad
+ * ha entrado, **y solo cuando hay UNA parte**. Con varias no se cuenta nada y se
+ * dice por qué: `parsers/list.js#extraerMetadatosLIST` se queda con **la ÚLTIMA**
+ * línea «Área:» del volcado, así que con tres polilíneas ese número es el área de
+ * una de ellas y no la del conjunto. Cotejar la suma contra el área de la última
+ * daría siempre «no cuadra», que es la peor clase de aviso: uno que salta siempre
+ * y al que se deja de hacer caso.
+ *
+ * El resultado tiene **la MISMA forma** que el de `importar`, y eso es el
+ * requisito: `app/cableado-medicion.js#avisoDeSuperficie` lo lee sin una línea
+ * nueva y las dos ramas dicen lo mismo con las mismas palabras.
+ *
+ * @param {object[]} partes  Las creadas.
+ * @param {object|null} cotejoDeParcela  El `resumen.superficie` de `importar`.
+ * @returns {object|null}  `null` si no hay nada que cotejar o no es comparable.
+ */
+function cotejoDeConstruccion(partes, cotejoDeParcela) {
+  // Sin área declarada no hay cotejo: es un dato del volcado, no algo que se mida.
+  if (!cotejoDeParcela || typeof cotejoDeParcela.reportada !== 'number') return null
+  // ⛔ Con varias partes, el «Área:» del volcado no habla del conjunto. Ver arriba.
+  if (partes.length !== 1) return null
+  const recinto = partes[0]?.recinto
+  if (!recinto || !Array.isArray(recinto.vertices) || recinto.vertices.length < 3) return null
+
+  // La parte entera como su propio EXTERIOR: una parte no tiene huecos en este
+  // modelo, y `superficie` quiere la lista de recintos.
+  const calculada = superficie([{ tipo: TIPO_RECINTO.EXTERIOR, vertices: recinto.vertices }])
+  const reportada = cotejoDeParcela.reportada
+  const umbral = cotejoDeParcela.umbral
+  const diferencia = Math.abs(calculada - reportada)
+  const diferenciaRelativa =
+    reportada !== 0 ? diferencia / Math.abs(reportada) : calculada === 0 ? 0 : Infinity
+  return {
+    calculada,
+    reportada,
+    diferencia,
+    diferenciaRelativa,
+    umbral,
+    coincide: diferenciaRelativa <= umbral,
+  }
+}
+
 /** Arma el `resumen` del contrato D. Único sitio que lo construye, en las 3 vías. */
 function armarResumen({
   via,
@@ -301,6 +373,7 @@ function armarResumen({
   bloqueos,
   construido,
   detecciones,
+  superficie: cotejo = null,
 }) {
   return {
     via,
@@ -312,6 +385,14 @@ function armarResumen({
     huso,
     bloqueos,
     construido,
+    /**
+     * F14 · El cotejo contra el «Área:» que declara el volcado, o `null`. Misma
+     * forma que el de `parsers/importar.js`, para que
+     * `app/cableado-medicion.js#avisoDeSuperficie` lo lea sin cambiar. `null` en
+     * las vías de GML y de WFS: allí no hay volcado que declare nada, y también
+     * con varias partes — ver {@link cotejoDeConstruccion}.
+     */
+    superficie: cotejo,
     detecciones: resumirDetecciones(detecciones),
   }
 }
@@ -413,7 +494,21 @@ function decirCapasDescartadas(deteccionesImportar, capaElegida, detecciones) {
 export function entradaDesdeTexto(texto, opts = {}) {
   const modelo = exigirModelo(opts.modelo ?? MODELO_EDIFICIO.SIMPLIFICADO, 'entradaDesdeTexto')
 
-  const res = importar(texto, opts)
+  // ⭐ **F14 · DE QUÉ HABLAN LOS AVISOS DEL IMPORTADOR** (deuda de F11 · fase 5).
+  //
+  // `importar()` dice «la parcela» por defecto —lleva diciéndolo desde F00 y es lo
+  // correcto en su rama—, pero aquí se está leyendo una CONSTRUCCIÓN, y sus avisos
+  // son sobre fallos REALES del fichero: «el centroide de la parcela no cae en
+  // España», «se ignoraron 8 anotaciones: no son geometría de parcela», «deja solo
+  // la polilínea de la parcela en la capa 0». Contarlos sobre el objeto equivocado
+  // hace que el técnico busque el problema donde no está — y el último, además, es
+  // un consejo MALO aquí: una construcción tiene una polilínea POR PARTE.
+  //
+  // Se fija aquí y no se deja al llamante: quien llame a `entradaDesdeTexto` está
+  // leyendo una construcción por definición, y un defecto que hubiera que recordar
+  // pasar es un defecto que algún día no se pasa. Un `opts.sujeto` explícito del
+  // llamante gana igualmente, que es lo que permite probar los dos caminos.
+  const res = importar(texto, { sujeto: SUJETO_CONSTRUCCION, ...opts })
 
   // ⛔ EL FILTRO, Y SON DOS MITADES. La de abajo —los bloqueos— estaba desde T2.1:
   // sin ella el caso NORMAL de la fase sale bloqueado (ver la cabecera). La de
@@ -497,6 +592,10 @@ export function entradaDesdeTexto(texto, opts = {}) {
       bloqueos,
       construido: edificio !== null,
       detecciones,
+      // ⭐ F14 · El cotejo contra el «Área:» del volcado. Se RECALCULA sobre las
+      // partes y no se reenvía el de `importar`: aquél mide el reparto de una
+      // parcela y aquí los anillos son cuerpos disjuntos. Ver la función.
+      superficie: cotejoDeConstruccion(partes, res.resumen.superficie),
     }),
   }
 }

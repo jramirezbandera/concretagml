@@ -48,6 +48,8 @@ import {
   crearEdificio,
   crearParteConstruccion,
 } from '../../model/edificio.js'
+import { avisoDeSuperficie } from '../../app/cableado-medicion.js'
+import { SUJETO_CONSTRUCCION } from '../../parsers/_comun.js'
 import { BLOQUEOS_SOLO_PARCELA, importar } from '../../parsers/importar.js'
 
 // ── Arnés ─────────────────────────────────────────────────────────────────────
@@ -284,7 +286,15 @@ describe('entradaDesdeTexto — el DXF de edificio real', () => {
   // detección deja fuera la mitad que el usuario LEE.** El filtro tiene dos mitades
   // y las dos usan la misma lista publicada (`BLOQUEOS_SOLO_PARCELA`).
   it('arrastra las detecciones de importar SALVO las que hablan del reparto de parcela', () => {
-    const crudo = importar(DXF_EDIFICIO)
+    // ⚠️ **Con el MISMO sujeto**, y es una corrección de F14 y no un aflojamiento.
+    // Lo que este `it` defiende es que no se PIERDA ninguna detección por el
+    // camino; desde F14 `entradaDesdeTexto` le pide a `importar` que hable de una
+    // CONSTRUCCIÓN, así que tres de sus mensajes cambian de sujeto a propósito.
+    // Comparar contra el defecto («la parcela») haría fallar este guardián sobre un
+    // cambio correcto —y, peor, tapa el otro: sin igualar el sujeto no se sabría si
+    // la detección se perdió o si solo cambió de palabras—. Que el sujeto cambie de
+    // verdad lo afirma el `it` de más abajo.
+    const crudo = importar(DXF_EDIFICIO, { sujeto: SUJETO_CONSTRUCCION })
     const delReparto = crudo.detecciones.filter((d) => d?.datos?.bloqueo !== undefined)
     // El fixture real las produce: si dejara de hacerlo, este `it` estaría
     // afirmando un filtro sobre un conjunto vacío.
@@ -300,6 +310,36 @@ describe('entradaDesdeTexto — el DXF de edificio real', () => {
       ).toBe(esperada)
     }
     expect(entrada.resumen.detecciones.total).toBe(entrada.detecciones.length)
+  })
+
+  it('⭐ F14 · los avisos del importador hablan de la CONSTRUCCIÓN, no de la parcela', () => {
+    // La deuda de F11 · fase 5, pagada. Son avisos sobre fallos REALES del fichero
+    // —«el centroide de la parcela no cae en España», «no son geometría de
+    // parcela», «deja solo la polilínea de la parcela en la capa 0»— y contarlos
+    // sobre el objeto equivocado hace buscar el problema donde no está.
+    //
+    // Se compara contra el MISMO fichero leído como parcela, que es el oráculo
+    // independiente: si `entradaDesdeTexto` dejara de fijar el sujeto, los dos
+    // conjuntos volverían a ser idénticos y esto saldría rojo.
+    const comoParcela = importar(DXF_EDIFICIO)
+    const textos = entrada.detecciones.map((d) => d.mensaje).join('\n')
+    const textosParcela = comoParcela.detecciones.map((d) => d.mensaje).join('\n')
+
+    expect(textos, 'los avisos de la rama EDIFICIO siguen hablando de «la parcela»').not.toMatch(
+      /\bla parcela\b|geometría de parcela/i,
+    )
+    // Y el oráculo dice que ese fichero SÍ los produce cuando se lee como parcela:
+    // sin esto, la afirmación de arriba se cumpliría también con cero avisos.
+    expect(textosParcela).toMatch(/\bla parcela\b|geometría de parcela/i)
+    expect(textos).toMatch(/construcción/i)
+
+    // ⛔ Y la guía del CAD no es la de parcela con otro sustantivo: a una parcela
+    // se le dice «deja SOLO la polilínea», y aquí eso perdería una parte por cada
+    // polilínea de más.
+    if (textos.includes('LIMPIA (PURGE)')) {
+      expect(textos).not.toContain('Deja solo la polilínea')
+      expect(textos).toContain('una por parte')
+    }
   })
 
   it('⛔ y la contradicción concreta que se vio en pantalla no vuelve', () => {
@@ -1015,6 +1055,11 @@ describe('contrato D — el espejo de ResumenImportacion', () => {
       'bloqueos',
       'construido',
       'detecciones',
+      // F14 · El cotejo contra el «Área:» del volcado. Está en las CINCO vías —es
+      // parte de la forma—, y vale `null` en las que no tienen volcado que declare
+      // nada. Que la clave exista siempre es lo que impide que un llamante tenga
+      // que preguntar antes de mirar.
+      'superficie',
     ]
     for (const [nombre, entrada] of CASOS()) {
       expect(Object.keys(entrada).sort(), nombre).toEqual(['detecciones', 'edificio', 'resumen'])
@@ -1030,12 +1075,19 @@ describe('contrato D — el espejo de ResumenImportacion', () => {
   it('es el espejo de ResumenImportacion, con las dos renombradas y ni una clave suelta', () => {
     const deImportar = Object.keys(importar(DXF_EDIFICIO).resumen)
     const deEntrada = Object.keys(entradaDesdeTexto(DXF_EDIFICIO).resumen)
-    // `formato → via`, `nAnillos → nPartes`, `construida → construido`; y
-    // `superficie` (el cotejo contra el Área que reporta la LISTA de AutoCAD) no
-    // tiene sentido para un edificio de N huellas, así que no viaja.
-    const traducido = deImportar
-      .map((k) => ({ formato: 'via', nAnillos: 'nPartes', construida: 'construido' })[k] ?? k)
-      .filter((k) => k !== 'superficie')
+    // `formato → via`, `nAnillos → nPartes`, `construida → construido`.
+    //
+    // ⭐ **F14 · `superficie` YA VIAJA, y con el mismo nombre.** Aquí ponía que «no
+    // tiene sentido para un edificio de N huellas, así que no viaja», y la primera
+    // mitad sigue siendo verdad: el `calculada` de `importar` mide el reparto de
+    // una PARCELA (primer anillo menos los demás) y sobre cuerpos disjuntos da un
+    // número que no significa nada. Lo que era falso es la conclusión: lo que no
+    // sirve es AQUEL número, no el cotejo. Se recalcula sobre las partes, se llama
+    // igual y tiene la misma forma —para que `avisoDeSuperficie` lo lea sin
+    // cambiar—, y vale `null` cuando no es comparable. Ver `cotejoDeConstruccion`.
+    const traducido = deImportar.map(
+      (k) => ({ formato: 'via', nAnillos: 'nPartes', construida: 'construido' })[k] ?? k,
+    )
     expect(deEntrada.sort()).toEqual(traducido.sort())
   })
 
@@ -1093,5 +1145,93 @@ describe('contrato D — el espejo de ResumenImportacion', () => {
         expect(d.mensaje, `${nombre} · ${d.tipo}`).not.toMatch(PROHIBIDAS)
       }
     }
+  })
+})
+
+// ══ ⭐ F14 · EL COTEJO DE SUPERFICIE EN LA RAMA EDIFICIO (deuda de F19) ═══════
+
+describe('F14 · entradaDesdeTexto · el cotejo contra el «Área:» del volcado', () => {
+  /**
+   * Una LISTA de AutoCAD con N polilíneas cuadradas de 10 m de lado, disjuntas.
+   *
+   * ⚠️ Las separa la palabra `separador`, que es la convención de
+   * `parsers/_comun.js#extraerPares`. Sin ella el parser las lee como UN anillo de
+   * 4·N vértices —lo destapó la primera corrida de estas pruebas, que daban
+   * `nPartes: 1` donde se esperaban tres—, y entonces no se estaría midiendo el
+   * caso multiparte sino otro.
+   */
+  const listaCon = (areas) =>
+    areas
+      .map((area, i) => {
+        const x = 440000 + i * 100
+        const y = 4480000
+        return [
+          '        LWPOLYLINE  Capa: "0"',
+          '          Cerrado',
+          `          Área: ${area.toFixed(4)}`,
+          `   en punto  X= ${x}.0000  Y= ${y}.0000  Z= 0.0000`,
+          `   en punto  X= ${x + 10}.0000  Y= ${y}.0000  Z= 0.0000`,
+          `   en punto  X= ${x + 10}.0000  Y= ${y + 10}.0000  Z= 0.0000`,
+          `   en punto  X= ${x}.0000  Y= ${y + 10}.0000  Z= 0.0000`,
+        ].join('\n')
+      })
+      .join('\nseparador\n')
+
+  it('⭐ UNA parte: se cuenta, y la cifra es la de la parte', () => {
+    const { resumen } = entradaDesdeTexto(listaCon([100]))
+    expect(resumen.nPartes).toBe(1)
+    expect(resumen.superficie).not.toBeNull()
+    expect(resumen.superficie.calculada).toBe(100)
+    expect(resumen.superficie.reportada).toBe(100)
+    expect(resumen.superficie.coincide).toBe(true)
+  })
+
+  it('⭐ y cuando NO cuadra se nota, que es para lo que existe', () => {
+    // El caso real del 2026-08-06 trasladado a esta rama: el dibujo declara más de
+    // lo que ha entrado porque la LISTA se copió a medias.
+    const { resumen } = entradaDesdeTexto(listaCon([276.5018]))
+    expect(resumen.superficie.coincide).toBe(false)
+    expect(resumen.superficie.calculada).toBe(100)
+    expect(resumen.superficie.reportada).toBe(276.5018)
+    // Y `avisoDeSuperficie` de la otra rama lo lee SIN una línea nueva: es el
+    // requisito del plan, y lo que impide dos redacciones del mismo aviso.
+    const texto = avisoDeSuperficie(resumen.superficie)
+    expect(texto).not.toBeNull()
+    expect(texto).toContain('276,50')
+    expect(texto).toContain('100,00')
+  })
+
+  it('⛔ con VARIAS partes NO se cuenta, y es lo correcto', () => {
+    // MEDIDO: `parsers/list.js#extraerMetadatosLIST` se queda con la ÚLTIMA línea
+    // «Área:» del volcado, así que con tres polilíneas ese número es el área de UNA
+    // y no la del conjunto. Cotejar la suma (300) contra la última (100) daría
+    // siempre «no cuadra» — la peor clase de aviso: el que salta siempre.
+    const { resumen } = entradaDesdeTexto(listaCon([100, 100, 100]))
+    expect(resumen.nPartes).toBe(3)
+    expect(resumen.superficie).toBeNull()
+    expect(avisoDeSuperficie(resumen.superficie)).toBeNull()
+  })
+
+  it('sin «Área:» en el volcado no hay nada que cotejar', () => {
+    const sinArea = listaCon([100]).replace(/\s*Área:.*\n/, '\n')
+    const { resumen } = entradaDesdeTexto(sinArea)
+    expect(resumen.superficie).toBeNull()
+  })
+
+  it('la vía del GML no trae cotejo: allí no hay volcado que declare nada', () => {
+    const porGml = entradaDesdeGmlBu(GML_PARTES)
+    expect(porGml.resumen.superficie).toBeNull()
+  })
+
+  it('⛔ y NO se reenvía el de `importar`: aquel mide un reparto de PARCELA', () => {
+    // MEDIDO: el de allí es `superficie(recintos)` con el primer anillo como
+    // exterior y los demás como HUECOS. Con tres cuerpos disjuntos de 100 m² da
+    // **−100 m²**, no 300. Reenviarlo habría sido peor que no tener cotejo: una
+    // cifra con aspecto de medida que no mide nada.
+    const texto = listaCon([100, 100, 100])
+    const deParcela = importar(texto).resumen.superficie
+    expect(deParcela).not.toBeNull()
+    expect(deParcela.calculada).toBe(-100)
+    expect(entradaDesdeTexto(texto).resumen.superficie).toBeNull()
   })
 })

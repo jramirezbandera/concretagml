@@ -32,6 +32,7 @@ import {
   cablearGeneracionGmlEdificio,
   identidadDe,
   otrasDe,
+  partesSenaladas,
   plantasDelEdificio,
 } from '../../app/cableado-edificio-gml.js'
 import { crearEdificio, crearParteConstruccion, TIPO_PARTE } from '../../model/edificio.js'
@@ -446,5 +447,99 @@ describe('cablearGeneracionGmlEdificio · las trece partes del Catastro', () => 
     expect(xml).toContain('<bu-ext2d:numberOfFloorsAboveGround>7<')
     // Sin `BuildingPart`: el ICUC no los procesa.
     expect(xml).not.toContain('BuildingPart')
+  })
+})
+
+// ── ⭐ F14 · LA VALIDACIÓN SE PUBLICA, Y `porParte` ESTRENA LLAMANTE ──────────
+
+describe('cablearGeneracionGmlEdificio · F14 · el canal de la validación', () => {
+  it('`partesSenaladas` traduce `porParte` a índices, sin repetir y en orden', () => {
+    const validacion = {
+      porParte: [
+        { indice: 0, errores: [], avisos: [] },
+        { indice: 1, errores: [{ x: 1 }], avisos: [] },
+        { indice: 2, errores: [], avisos: [{ y: 2 }] },
+        { indice: 3, errores: [{ x: 1 }], avisos: [{ y: 2 }] },
+      ],
+    }
+    // ⚠️ Errores y avisos entran los DOS, y el mapa no los distingue: el resalte
+    // contesta «¿de qué parte habla lo que estoy leyendo?», no «¿es grave?».
+    // Dos trazos distintos ahí estarían a un paso de leerse como un semáforo.
+    expect(partesSenaladas(validacion)).toEqual([1, 2, 3])
+  })
+
+  it('sin validación —o con una rota— devuelve `[]` y NO lanza', () => {
+    // Se llama desde un suscriptor del store: reventar ahí tumbaría a los demás.
+    for (const basura of [null, undefined, {}, { porParte: null }, { porParte: 'x' }]) {
+      expect(() => partesSenaladas(basura)).not.toThrow()
+      expect(partesSenaladas(basura)).toEqual([])
+    }
+    expect(partesSenaladas({ porParte: [{ indice: null, errores: [{}], avisos: [] }] })).toEqual([])
+  })
+
+  it('⭐ publica en CADA cambio del modelo, no solo al pulsar «Generar GML»', () => {
+    // Es la mitad que F13 dejó anotada como pendiente: para que el resalte esté
+    // vivo hay que validar al cambiar el modelo. Ya se hacía —`refrescar` gobierna
+    // el botón—, así que el canal no añade ni una validación: publica la que ya se
+    // estaba calculando.
+    const { cable, estadoEdificio } = cablear()
+    const vistas = []
+    cable.alValidacion((v) => vistas.push(v))
+
+    estadoEdificio.set(edificioBueno())
+    estadoEdificio.set(edificioBueno({ idLocal: 'otra.dxf' }))
+    expect(vistas).toHaveLength(2)
+    expect(vistas.every((v) => Array.isArray(v?.porParte))).toBe(true)
+    // Y la última queda leíble sin volver a preguntar.
+    expect(cable.ultimaValidacion()).toBe(vistas.at(-1))
+  })
+
+  it('sin partes publica `null`: no hay nada que validar, y no es «cero hallazgos»', () => {
+    const { cable, estadoEdificio } = cablear()
+    const vistas = []
+    cable.alValidacion((v) => vistas.push(v))
+    estadoEdificio.set(edificioBueno())
+    estadoEdificio.set(null)
+    expect(vistas.at(-1)).toBeNull()
+    expect(partesSenaladas(vistas.at(-1))).toEqual([])
+  })
+
+  it('⛔ una parte que se sale de la parcela SE SEÑALA, y es la que se sale', () => {
+    // El criterio de la ficha §16.1, con datos: dos partes, una dentro de la
+    // parcela declarada y otra fuera. Lo que se afirma es CUÁL se señala.
+    const dentro = parte('Dentro', rect(0, 0, 10, 10))
+    const fuera = parte('Fuera', rect(400, 400, 10, 10))
+    const { cable, estadoEdificio } = cablear()
+    const vistas = []
+    cable.alValidacion((v) => vistas.push(v))
+    estadoEdificio.set(
+      crearEdificio({
+        idLocal: 'dos.dxf',
+        partes: [dentro, fuera],
+        parcelaContexto: [{ tipo: 'EXTERIOR', vertices: rect(-5, -5, 30, 30).vertices }],
+      }),
+    )
+    const senaladas = partesSenaladas(vistas.at(-1))
+    expect(senaladas, 'la parte que se sale es la 1, no la 0').toContain(1)
+    expect(senaladas).not.toContain(0)
+  })
+
+  it('varios oyentes conviven, uno roto no interrumpe, y `destruir` los suelta', () => {
+    const { cable, estadoEdificio } = cablear()
+    const buenos = []
+    cable.alValidacion(() => {
+      throw new Error('oyente roto')
+    })
+    const baja = cable.alValidacion(() => buenos.push(1))
+    // Quien avisa ya ha hecho su trabajo: un oyente roto se cuenta y no corta.
+    expect(() => estadoEdificio.set(edificioBueno())).not.toThrow()
+    expect(buenos).toHaveLength(1)
+
+    baja()
+    estadoEdificio.set(edificioBueno({ idLocal: 'otra.dxf' }))
+    expect(buenos).toHaveLength(1)
+
+    expect(() => cable.alValidacion('no soy función')).toThrow(TypeError)
+    cable.destruir()
   })
 })

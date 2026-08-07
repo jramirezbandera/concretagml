@@ -208,16 +208,50 @@ describe('app/panel-edificio · el marcado que el cableado espera', () => {
     // sería fabricar un `<dialog open hidden>` en la primera conmutación de rama:
     // un diálogo que se abre y no se ve.
     panel.fijar({ edificio: EDIFICIO_COMPLETO })
-    expect(panel.secciones()).toEqual([panel.seccionOrigen, panel.seccionPartes, panel.seccionActiva])
+    expect(panel.secciones()).toEqual([
+      panel.seccionOrigen,
+      panel.seccionPartes,
+      panel.seccionActiva,
+      // F14 · la cuarta. Entra en la lista y por eso entra en el sellado sola, que
+      // es literalmente la lección que T4.1 dejó escrita cuando la tercera se quedó
+      // fuera y la suite siguió en verde.
+      panel.seccionContraste,
+    ])
     for (const seccion of panel.secciones()) expect(seccion.tagName).toBe('SECTION')
   })
 
-  it('las tres secciones llevan `.gml-bloque` y su modificador', () => {
+  it('las CUATRO secciones llevan `.gml-bloque` y su modificador', () => {
     // `.gml-bloque` es lo que les da `flex:none`, `min-height:0` y el `padding`
     // del panel; sin él, el modificador solo no maqueta nada.
     expect(panel.seccionOrigen.className).toBe(`gml-bloque ${CLASE.BLOQUE}`)
     expect(panel.seccionPartes.className).toBe(`gml-bloque ${CLASE.BLOQUE_PARTES}`)
     expect(panel.seccionActiva.className).toBe(`gml-bloque ${CLASE.BLOQUE_ACTIVA}`)
+    expect(panel.seccionContraste.className).toBe(`gml-bloque ${CLASE.BLOQUE_CONTRASTE}`)
+  })
+
+  it('⭐ F14 · la anfitriona del contraste nace VACÍA, y solo en Diagnóstico', () => {
+    panel.fijar({ edificio: EDIFICIO_COMPLETO })
+    // VACÍA: su contenido lo muda `viewer/cajon-contraste-edificio.js` desde la
+    // esquina del mapa. Fabricar aquí sus nodos pondría un segundo
+    // `[data-contraste="titular"]` en el documento y `querySelector` se quedaría
+    // con el primero, dejando uno de los dos juegos mudo y sin síntoma.
+    expect(panel.seccionContraste.children).toHaveLength(0)
+    expect(panel.seccionContraste.getAttribute('data-anfitrion')).toBe('contraste-edificio')
+    // Y en UNA sola pantalla: es el estirador de Diagnóstico, y dos estiradores a
+    // la vez descosen el reparto del panel.
+    expect(panel.seccionContraste.getAttribute('data-pantalla')).toBe('diagnostico')
+    // Ninguna otra sección de esta rama declara esa pantalla, que es lo que lo
+    // impide de verdad.
+    for (const otra of [panel.seccionOrigen, panel.seccionPartes, panel.seccionActiva]) {
+      expect(otra.getAttribute('data-pantalla').split(/\s+/)).not.toContain('diagnostico')
+    }
+  })
+
+  it('⛔ F14 · la anfitriona NO escribe `data-rama-panel`: lo sella el cableado', () => {
+    // El reparto de F11, y no se toca: `app/rama.js` DESCUBRE las secciones de
+    // edificio por ese atributo y quien las fabrica no lo escribe. Ponerlo aquí
+    // haría que este módulo tuviera opinión sobre un intercambio que no gobierna.
+    expect(panel.seccionContraste.hasAttribute('data-rama-panel')).toBe(false)
   })
 
   it('TODOS los selectores de SELECTOR existen desde el primer momento', () => {

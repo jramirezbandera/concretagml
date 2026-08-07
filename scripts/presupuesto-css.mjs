@@ -237,6 +237,28 @@ export const ASIENTOS = Object.freeze(
         'hay nada que repartir. El asiento se anota igual, por lo mismo que el de F17 fase 4: un ' +
         'hito sin fila deja de contar la historia, y aquí la historia es que la fase con más ' +
         'código nuevo desde F09 costó 0 px de hoja. Sobran 10.175 sobre el techo, los mismos.' },
+    // ⚠️ `rebanada: null`, y NO `'informe'`. Se puso `'informe'` al escribir este
+    // asiento y el guardián se puso rojo con razón: cerrar la quinta hace exigible
+    // el techo del criterio 10, y **esa decisión no es de esta fase**. El asiento
+    // «Rework rebanada 5» la dejó abierta a propósito, con la medición hecha («el
+    // techo solo se cumple quitando producto vivo») y la elección —bajar la hoja o
+    // revisar el techo— reservada al autor. F14 añade producto a esa pantalla; no
+    // la cierra ni resuelve aquello.
+    { hito: 'F14 · edificio: contraste e informe', commit: '(sin commitear)', total: 67595, nuestro: 52500, rebanada: null,
+      nota:
+        '**+261 B, y el plan los daba por CERO.** La idea era que el cajón de contraste de ' +
+        'edificio reutilizara la clase del de parcela y no costara ni un byte. Se descartó al ' +
+        'medir el riesgo: `gml-cajon-diagnostico` la resuelven CINCO guiones de humo (09, 10, 11, ' +
+        '14 y 15) con `document.querySelector`, que se queda con el PRIMERO del documento — y los ' +
+        'dos cajones se montan a la vez y se turnan por rama. Es la trampa M8 de F07, ya pagada ' +
+        'dos veces; estos 261 B son el precio de no pagarla una tercera. El reparto: la clase ' +
+        'propia `.gml-cajon-contraste-edificio` entra en las DOS únicas reglas del cajón que van ' +
+        'acotadas al contenedor (el cromo de ventana y la familia de los botones); la sección ' +
+        'anfitriona `.gml-bloque--contraste-edificio` comparte regla con su gemela de parcela; y ' +
+        'entra `.gml-cajon-registro`, el renglón de la pantalla honesta, con la familia y los ' +
+        '46ch de `.gml-cajon-margen`. **Las clases de los HIJOS cuestan CERO**: sus reglas son ' +
+        '`.gml-app .gml-cajon-titular`, `…-cifra`, `…-seccion dt`, `…-invasion` — sin contenedor ' +
+        'delante—, así que alcanzan a los dos cajones sin tocarlas. Sobran 10.436 sobre el techo.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

@@ -223,6 +223,11 @@ import { encuadrarSobreRecintos } from '../viewer/index.js'
 import { crearCapaPartes } from '../viewer/partes.js'
 import { sincronizar } from '../viewer/sincronizacion.js'
 import { textoProcedencia } from './cableado-catastro.js'
+// F14 · El aviso del cotejo de superficie, REUTILIZADO de la rama de parcela y no
+// reescrito: nació de un caso real (una LISTA copiada a medias) y lleva dentro la
+// sospecha por el signo de la diferencia. Dos redacciones del mismo aviso acabarían
+// divergiendo, y la de esta rama sería la peor porque se usa menos.
+import { avisoDeSuperficie } from './cableado-medicion.js'
 import { ACCION, DIALOGO, SIN_MEDIDA } from './panel-edificio.js'
 import { ATRIBUTO_PANEL, ATRIBUTO_RAMA, RAMA } from './rama.js'
 
@@ -989,6 +994,22 @@ export function cablearEdificio({
    */
   let mandoMio = false
 
+  /**
+   * ⭐ **F14 · Los índices de las partes SEÑALADAS por la validación.**
+   *
+   * Vive aquí y no se recalcula en cada repintado a propósito: quien valida es
+   * `app/cableado-edificio-gml.js` —**una sola validación por cambio del modelo**,
+   * la misma que gobierna el botón «Generar GML»— y este módulo solo la pinta. Dos
+   * validaciones serían dos verdades sobre el mismo edificio, y el día que una
+   * divergiera el mapa señalaría una parte y el renglón hablaría de otra.
+   *
+   * Nace VACÍO, que es lo correcto: hasta que alguien valide no hay nada que
+   * señalar, y `[]` dice exactamente eso.
+   *
+   * @type {number[]}
+   */
+  let senaladas = []
+
   // ── El panel: montar, SELLAR y dejarlo con la visibilidad correcta ──────────
   //
   // Ver el apartado ⛔⛔ de la cabecera. Se anota qué marcas ha puesto ESTE módulo
@@ -1243,6 +1264,9 @@ export function cablearEdificio({
     capa?.pintar(edificio === null ? null : partes, {
       activa,
       envolvente: derivada === null ? null : derivada.recintos,
+      // ⭐ F14 · El resalte por parte. Ver {@link resaltar}, donde está por qué el
+      // índice se filtra contra la lista de AHORA.
+      senaladas,
     })
     avisarSaltadas(derivada?.saltados?.length ?? 0)
 
@@ -1527,6 +1551,22 @@ export function cablearEdificio({
       `Cargad${n === 1 ? 'a' : 'as'} ${n} parte${n === 1 ? '' : 's'} de ${rotulo}: ` +
         `${vertices} vértices en total.${cola}`,
     )
+
+    // ── ⭐ F14 · EL COTEJO DE SUPERFICIE, TAMBIÉN EN ESTA RAMA (deuda de F19) ──
+    //
+    // **EL ÚLTIMO EN EMITIRSE PARA QUEDAR EL PRIMERO EN LEERSE.** El panel ordena
+    // el más reciente arriba y enseña 12 tarjetas como mucho (regla de diseño 6),
+    // así que si el dibujo declara una superficie y no es la que ha entrado, eso es
+    // LA cosa que hay que leer. Es literalmente el mismo razonamiento —y el mismo
+    // sitio dentro de la función— que `app/cableado-medicion.js` en la otra rama.
+    //
+    // ⚠️ **Se REUTILIZA `avisoDeSuperficie` y no se reescribe.** Aquel texto nació
+    // de un caso real del 2026-08-06 (una LISTA copiada a medias: 168,59 m² donde
+    // el dibujo decía 276,50) y lleva dentro la sospecha por el signo de la
+    // diferencia. Dos redacciones del mismo aviso divergirían, y la de aquí sería
+    // la peor porque este camino se usa menos.
+    const cotejo = avisoDeSuperficie(entrada.resumen?.superficie ?? null)
+    if (cotejo !== null) panel.avisar(cotejo, { nivel: NIVEL.AVISO })
     return true
   }
 
@@ -2108,6 +2148,46 @@ export function cablearEdificio({
       if (!mandoMio) dibujoActivo?.cancelar()
       refrescarBarra()
       return mandoMio
+    },
+
+    /**
+     * ⭐ **F14 · Señala en el mapa las partes de las que habla la validación.**
+     *
+     * Es el llamante que `validation/edificio.js#porParte` llevaba sin tener desde
+     * F13: la ficha pedía que «el resalte del aviso rodee **la parte que se sale**,
+     * no otra» (§16.1), el canal se construyó, se probó… y nadie lo enchufó. Es la
+     * tercera vez en este proyecto (F11, F12, F13), y por eso este método existe
+     * en la API pública y no como un detalle interno: lo que no se puede llamar
+     * desde fuera no está entregado.
+     *
+     * ⚠️ **Los índices se FILTRAN contra la lista de ahora.** Eliminar la parte 2
+     * de tres deja el índice 2 fuera de rango, y `viewer/partes.js` simplemente no
+     * lo encontraría —el resalte desaparecería sin decir nada—. Se filtra aquí, que
+     * es donde se sabe cuántas partes hay, y no en la vista, que solo dibuja.
+     *
+     * ⚠️ **Repinta SOLO la capa**, no el panel. Un repintado entero volvería a
+     * llamar a `panelEdificio.fijar`, y este método puede correr en mitad de la
+     * edición: no es sitio para tocar campos que el usuario está rellenando.
+     *
+     * @param {number[]|null} indices  Los de
+     *   `app/cableado-edificio-gml.js#partesSenaladas`. `null` o `[]` retiran el
+     *   resalte, que es lo correcto cuando no hay validación: unas huellas
+     *   señaladas por una validación que ya no está señalan lo que no se sabe.
+     * @returns {number[]}  Los que se han aplicado de verdad, ya filtrados.
+     */
+    resaltar(indices) {
+      if (destruido) return []
+      const partes = Array.isArray(estado.get()?.partes) ? estado.get().partes : []
+      senaladas = (Array.isArray(indices) ? indices : []).filter(
+        (i) => Number.isInteger(i) && i >= 0 && i < partes.length,
+      )
+      const derivada = partes.length === 0 ? null : envolventeDe(partes)
+      capa?.pintar(partes.length === 0 ? null : partes, {
+        activa,
+        envolvente: derivada === null ? null : derivada.recintos,
+        senaladas,
+      })
+      return senaladas
     },
 
     /** Empieza a dibujar el recinto de la parte activa, o lo cancela si ya iba. */

@@ -767,14 +767,29 @@ if (enEdificio.ariaPressed.edificio !== 'true' || enEdificio.ariaPressed.parcela
     )
   }
 }
-// ⭐ **«Diagnosticar encaje» sigue apagado en esta rama, y eso NO cambia hasta
-// F14.** Un botón encendido aquí ofrecería contrastar un edificio contra el
-// parcelario, que es justo lo que el diagnóstico todavía no sabe hacer.
-if (enEdificio.ctaDiagnosticarApagado !== true) {
+// ⭐ **F14 · «Diagnosticar encaje» YA NO SE APAGA POR LA RAMA.**
+//
+// Aquí ponía lo contrario —«sigue apagado en esta rama, y eso NO cambia hasta
+// F14»— y era verdad hasta el 2026-08-07. **F14 es la fase que lo vuelve falso**:
+// la rama EDIFICIO tiene su propio contraste (`diagnostico/edificio.js`) y su
+// propia pantalla (`viewer/cajon-contraste-edificio.js`), así que apagar el botón
+// por ser edificio sería negar lo que la aplicación ya sabe hacer.
+//
+// Se corrige con la misma forma con la que F13 corrigió el gemelo de «Generar
+// GML» tres párrafos más abajo, y por el mismo motivo: lo que se exige ahora no es
+// que esté apagado, sino que **si lo está, el motivo sea de esta rama**. Un
+// renglón que hable de parcelas con una construcción en pantalla significa que
+// está contestando el cableado equivocado.
+if (
+  enEdificio.motivoDiagnosticar &&
+  /(^|\s)parcela\b/i.test(enEdificio.motivoDiagnosticar) &&
+  !/rama Parcela/i.test(enEdificio.motivoDiagnosticar)
+) {
   problemas.push(
-    `«Diagnosticar encaje» tenía que quedar APAGADO en la rama EDIFICIO y está en ` +
-      `disabled=${enEdificio.ctaDiagnosticarApagado}: el diagnóstico contrasta una parcela medida ` +
-      'contra el parcelario del Catastro y todavía no sabe hacerlo con una construcción (es F14).',
+    'Con la rama EDIFICIO puesta, el renglón de «Diagnosticar encaje» habla de una parcela: ' +
+      JSON.stringify(enEdificio.motivoDiagnosticar) +
+      '. Desde F14 esta rama tiene su propio contraste, y ese renglón tiene que hablar de la ' +
+      'construcción o callarse.',
   )
 }
 // ⭐ **Y «Generar GML» ya NO se apaga por la rama: lo decide el DATO (F13).** El
@@ -795,16 +810,20 @@ if (
       'el otro, quien lo pulse se lleva el fichero de la otra rama.',
   )
 }
-// ⭐ El botón que SÍ sigue apagado no puede quedar mudo. Desde F13 su motivo va
-// ENTERO en su propio renglón: es el único apagado, así que cabe —y por eso ya no
-// hace falta el reparto con `aria-describedby` que hubo mientras eran dos—.
-if (!enEdificio.motivoDiagnosticar) {
+// ⭐ Un botón apagado no puede quedar mudo — y desde F14 **el «si» importa**:
+// esta rama ya no apaga NINGÚN CTA por serlo, así que el renglón vacío con el
+// botón encendido es lo normal y no un fallo. Lo que sigue siendo inadmisible es
+// la otra combinación: apagado y sin decir por qué.
+if (enEdificio.ctaDiagnosticarApagado === true && !enEdificio.motivoDiagnosticar) {
   problemas.push(
     '«Diagnosticar encaje» está apagado y su renglón está VACÍO: es un botón muerto sin ' +
-      'explicación, que es lo que la regla de la casa prohíbe. Desde F13 es el único CTA que esta ' +
-      'rama apaga, así que su motivo cabe entero al lado y no hay excusa de píxeles.',
+      'explicación, que es lo que la regla de la casa prohíbe. Desde F14 esta rama no lo apaga por ' +
+      'ser edificio, así que si está gris es por el DATO y eso hay que decirlo.',
   )
-} else if (!/Diagnosticar encaje/i.test(enEdificio.motivoDiagnosticar)) {
+} else if (
+  enEdificio.motivoDiagnosticar &&
+  !/Diagnosticar encaje/i.test(enEdificio.motivoDiagnosticar)
+) {
   problemas.push(
     'El motivo de «Diagnosticar encaje» no nombra al botón del que habla: ' +
       JSON.stringify(enEdificio.motivoDiagnosticar) +

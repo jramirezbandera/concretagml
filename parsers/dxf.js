@@ -55,7 +55,7 @@
 // reparto, y así este parser sigue siendo estrictamente aditivo: mismos anillos,
 // mismas detecciones, un campo más.
 
-import { crearDeteccion, TIPO_DETECCION, SEVERIDAD } from './_comun.js'
+import { crearDeteccion, declinar, TIPO_DETECCION, SEVERIDAD } from './_comun.js'
 import { discretizarBulge } from '../geo/arco.js'
 
 /** Procedencia fijada por este parser (uno de ORIGEN_PARCELA en model/parcela.js). */
@@ -81,10 +81,11 @@ const ENT_ANOTACION = new Set([
   'ATTDEF', 'ATTRIB', 'TOLERANCE',
 ])
 
-/** Guía única que acompaña a cada aviso de entidad no soportada (feature §Alcance). */
-const GUIA_NO_SOPORTADA =
-  'Deja solo la polilínea de la parcela en la capa 0 y ejecuta LIMPIA (PURGE); ' +
-  'no se importan bloques, INSERT, xref ni splines.'
+// La guía única que acompaña a cada aviso de entidad no soportada (feature
+// §Alcance) vive desde F14 en `parsers/_comun.js#SUJETO`, junto a las tres
+// declinaciones del sujeto: **no es la misma para una parcela y para una
+// construcción**, y no por el sustantivo. A una parcela se le dice «deja SOLO la
+// polilínea»; a una construcción eso le haría perder doce de las trece partes.
 
 // ── Lector genérico de pares (código, valor) ──────────────────────────────────
 
@@ -146,6 +147,9 @@ export function parseDXF(texto, opts = {}) {
     )
   }
   const flechaMax = opts.flechaMax
+  // ⭐ F14 · De QUÉ hablan los mensajes. El defecto es «la parcela», así que un
+  // llamante que no diga nada lee exactamente lo de siempre.
+  const sujeto = declinar(opts.sujeto)
   const pares = leerPares(texto)
 
   // ── Acumuladores del resultado ──────────────────────────────────────────────
@@ -283,7 +287,7 @@ export function parseDXF(texto, opts = {}) {
           detecciones.push(
             crearDeteccion(
               TIPO_DETECCION.ENTIDAD_NO_SOPORTADA,
-              `Entidad DXF no soportada: ${tipo}. ${GUIA_NO_SOPORTADA}`,
+              `Entidad DXF no soportada: ${tipo}. ${sujeto.guia}`,
               SEVERIDAD.AVISO,
               { tipo },
             ),
@@ -369,7 +373,7 @@ export function parseDXF(texto, opts = {}) {
       crearDeteccion(
         TIPO_DETECCION.ENTIDAD_NO_SOPORTADA,
         `Se ignoraron ${total} anotación(es) (${[...anotaciones.keys()].join(', ')}): ` +
-          `no son geometría de parcela.`,
+          `no son geometría ${sujeto.escueto}.`,
         SEVERIDAD.INFO,
         { tipos, total },
       ),
