@@ -1279,16 +1279,37 @@ describe('app/main · las colindantes llegan APLANADAS a las dianas del enganche
 
 describe('app/main · los dos ganchos que el arranque le entrega al Catastro', () => {
   const original = estadoDelArranque.get()
+
+  /**
+   * Lo que hace el cableado real por la **puerta 1** («Empezar desde el Catastro»):
+   * un `set` y después LOS DOS ganchos, el del documento primero. Se imita aquí en
+   * vez de llamar a `alCargarParcela` a secas porque desde el 2026-08-08 ese gancho
+   * ya no lo hace todo: es la mitad del documento.
+   */
+  const traerSustituyendo = (parcela) => {
+    estadoDelArranque.set(parcela)
+    arranque.catastro.alCargarParcela(parcela)
+    arranque.catastro.alCambiarOficial(parcela)
+  }
+
+  /** Y por la **puerta 2** («Traer el parcelario de fondo»): solo el del parcelario. */
+  const traerSoloElFondo = (parcela) => {
+    estadoDelArranque.set(parcela)
+    arranque.catastro.alCambiarOficial(parcela)
+  }
+
   afterEach(() => {
     // Se deja el ensamblaje como estaba: su store, su pila y su ficha. El propio
     // gancho de «parcela nueva» es lo que devuelve las tres cosas a cero.
-    estadoDelArranque.set(original)
-    arranque.catastro.alCargarParcela(original)
+    traerSustituyendo(original)
     estadoDelArranque.set(original)
   })
 
-  it('el arranque le pasa `alCargarParcela` y le registra los oyentes de colindantes', () => {
+  it('el arranque le pasa LOS DOS ganchos y le registra los oyentes de colindantes', () => {
     expect(typeof arranque.catastro.alCargarParcela).toBe('function')
+    // ⭐ El segundo es el de la puerta de contexto. Sin él, traer el parcelario de
+    // fondo dejaría colgadas las dianas de snap de la parcela anterior.
+    expect(typeof arranque.catastro.alCambiarOficial).toBe('function')
     // CUATRO suscriptores: el snap de F06, el diagnóstico de F07, la CAPA que las
     // dibuja (desde el arreglo del check visual) y —desde F09— el INFORME, que
     // necesita las vecinas para atribuir cada lindero en la descripción literaria
@@ -1306,9 +1327,7 @@ describe('app/main · los dos ganchos que el arranque le entrega al Catastro', (
 
   it('traer una parcela REINICIA la pila del arranque (deshacer no la devuelve)', () => {
     const traida = parcelaCuadrada({ superficieCatastral: 100 })
-    // Lo que hace el cableado real: un `set` y después el gancho.
-    estadoDelArranque.set(traida)
-    arranque.catastro.alCargarParcela(traida)
+    traerSustituyendo(traida)
 
     expect(historialDelArranque.pila).toHaveLength(1)
     expect(historialDelArranque.indice).toBe(0)
@@ -1336,12 +1355,75 @@ describe('app/main · los dos ganchos que el arranque le entrega al Catastro', (
     publicarColindantes({ ok: true, datos: { colindantes: [parcelaCuadrada()] } })
     expect(DEL_ARRANQUE.colindantes.textContent).toBe('1')
 
-    const traida = parcelaCuadrada({ lado: 30 })
-    estadoDelArranque.set(traida)
-    arranque.catastro.alCargarParcela(traida)
+    traerSustituyendo(parcelaCuadrada({ lado: 30 }))
 
     expect(DEL_ARRANQUE.colindantes.textContent).toBe('Sin consultar')
     expect(arranque.registro.colindantes.at(-1)).toEqual([])
+  })
+
+  // ── LA PUERTA 2: fondo nuevo bajo la misma parcela (2026-08-08) ────────────
+
+  it('⭐ el fondo NO reinicia la pila: el «deshacer» del usuario sobrevive', () => {
+    // Es el agravante 1 del defecto original: `alCargarParcela` reiniciaba el
+    // historial, así que la medición borrada tampoco volvía con Ctrl+Z.
+    const medida = parcelaCuadrada({ lado: 12 })
+    traerSustituyendo(medida)
+    commit(historialDelArranque, parcelaCuadrada({ lado: 14 })) // una edición
+    expect(puedeDeshacer(historialDelArranque)).toBe(true)
+
+    traerSoloElFondo(parcelaCuadrada({ lado: 14, superficieCatastral: 196 }))
+
+    expect(historialDelArranque.pila).toHaveLength(2)
+    expect(puedeDeshacer(historialDelArranque)).toBe(true)
+  })
+
+  it('⭐ y REENCUADRA la pila: el primer Ctrl+Z no hace desaparecer el fondo', () => {
+    // Sin `reencuadrar`, deshacer devolvería un snapshot anterior SIN oficial y el
+    // parcelario se iría de la pantalla sin que nada lo explicara.
+    const medida = parcelaCuadrada({ lado: 12 })
+    traerSustituyendo(medida)
+    commit(historialDelArranque, parcelaCuadrada({ lado: 14 }))
+
+    const conFondo = crearParcela({
+      idLocal: 'prueba-cuadrada',
+      origen: ORIGEN_PARCELA.LIST,
+      recintos: parcelaCuadrada({ lado: 14 }).recintos,
+      geometriaOficial: parcelaCuadrada({ lado: 20 }).recintos,
+    })
+    traerSoloElFondo(conFondo)
+
+    // Todos los snapshots llevan ya el fondo, el presente y el pasado.
+    for (const instantanea of historialDelArranque.pila) {
+      expect(instantanea.geometriaOficial).not.toBeNull()
+      expect(instantanea.geometriaOficial).toHaveLength(1)
+    }
+  })
+
+  it('⭐ pero SÍ suelta las dianas y el recuento: son las vecinas de otra parcela', () => {
+    // Criterio 3 del diseño: cargar A, traer sus colindantes, traer el fondo de B, y
+    // comprobar que no queda ni una diana de A. Es la regresión que introduciría el
+    // cambio si el gancho se hubiera partido mal.
+    traerSustituyendo(parcelaCuadrada({ lado: 12 }))
+    publicarColindantes({ ok: true, datos: { colindantes: [parcelaCuadrada()] } })
+    expect(DEL_ARRANQUE.colindantes.textContent).toBe('1')
+
+    traerSoloElFondo(parcelaCuadrada({ lado: 12, superficieCatastral: 144 }))
+
+    expect(arranque.registro.colindantes.at(-1)).toEqual([])
+    expect(DEL_ARRANQUE.colindantes.textContent).toBe('Sin consultar')
+  })
+
+  it('⭐ y borra del MAPA los contornos de las vecinas del fondo anterior', () => {
+    // `viewer/index.js` los suelta en el cambio de IDENTIDAD, y aquí la identidad no
+    // se mueve: la parcela de trabajo sigue siendo la misma. Sin la llamada explícita
+    // quedarían contornos fantasma diciendo «esto linda con lo tuyo».
+    traerSustituyendo(parcelaCuadrada({ lado: 12 }))
+    publicarColindantes({ ok: true, datos: { colindantes: [parcelaCuadrada()] } })
+    const antes = arranque.registro.limpiezas
+
+    traerSoloElFondo(parcelaCuadrada({ lado: 12, superficieCatastral: 144 }))
+
+    expect(arranque.registro.limpiezas).toBeGreaterThan(antes)
   })
 
   // ── Las vecinas, DIBUJADAS (el defecto del check visual) ──────────────────

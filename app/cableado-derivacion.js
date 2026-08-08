@@ -62,6 +62,7 @@ import {
   MOTIVO_NINGUNA_INCLUIDA,
   MOTIVO_SIN_DERIVAR,
 } from '../viewer/lista-sobrante.js'
+import { INSTRUCCION_PARCELARIO } from './navegacion.js'
 
 // ── Selectores de la cáscara (contrato con `index.html`) ─────────────────────
 
@@ -77,10 +78,15 @@ export const SELECTOR_ANFITRION = '[data-anfitrion="sobrante"]'
 /**
  * Por qué «Derivar sobrante» está apagado. Se escribe en el renglón **en el mismo
  * instante** en que se apaga: un botón gris y mudo es un error silencioso.
+ *
+ * ⛔ **La instrucción decía «Trae la parcela del Catastro (o un GML con su
+ * geometría) y vuelve», y era la trampa**: hasta el 2026-08-08 traer la parcela del
+ * Catastro BORRABA la medición del usuario, o sea justo la geometría cuyo sobrante
+ * este botón existe para derivar. Ahora sale de {@link INSTRUCCION_PARCELARIO}.
  */
 export const MOTIVO_SIN_OFICIAL =
   'No hay contorno oficial con el que comparar, así que no se puede saber qué parte de la ' +
-  'parcela se suelta. Trae la parcela del Catastro (o un GML con su geometría) y vuelve.'
+  `parcela se suelta. ${INSTRUCCION_PARCELARIO}`
 
 /** Y cuando lo que falta es la geometría del usuario. */
 export const MOTIVO_SIN_GEOMETRIA =

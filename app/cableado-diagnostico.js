@@ -117,6 +117,7 @@ import { informeContrasteTexto } from '../report/contraste-texto.js'
 // escribe ese renglón cuando el botón está apagado es el propio cajón, en el mismo
 // instante en que lo apaga. Ver la guarda de `descargarInforme`.
 import { NIVEL } from '../viewer/_comun.js'
+import { INSTRUCCION_PARCELARIO } from './navegacion.js'
 
 // ── Los selectores del contrato con `index.html` ─────────────────────────────
 
@@ -141,6 +142,31 @@ export const SELECTOR_BOTON_DIAGNOSTICAR = '[data-accion="diagnosticar"]'
  */
 export const SELECTOR_ESTADO_DIAGNOSTICO = '[data-estado="diagnosticar"]'
 
+/**
+ * ⭐ «Traer el parcelario de fondo» — **la puerta 2** (2026-08-08). **Nace
+ * `disabled` en `index.html`** y lo enciende el ESTADO, como sus tres hermanos.
+ *
+ * ⚠️ **El `data-accion` es DISTINTO del de Entrada a propósito, y es la parte más
+ * frágil de esta tarea.** Entrada tiene `cargar-catastro`, que sustituye el
+ * documento; éste conserva la medición. Con las dos pantallas montadas a la vez
+ * —que es como funciona esta app— `querySelector` devuelve **la primera en orden de
+ * documento aunque esté `hidden`** (contrato K.1), así que dos botones con el mismo
+ * valor dejarían a éste huérfano y sus clics irían a parar al que borra la medición:
+ * exactamente el defecto que esta feature viene a cerrar, servido por el arreglo.
+ */
+export const SELECTOR_BOTON_FONDO = '[data-accion="traer-fondo-catastral"]'
+
+/**
+ * Su `role="status"`, con la misma cadena que su `data-accion` (convención del pie).
+ *
+ * **Tiene renglón propio y no comparte el de «Diagnosticar encaje»**, aunque vivan
+ * en el mismo bloque: los dos escriben motivo cuando nacen apagados, y con un solo
+ * renglón el último en refrescar borraría al otro en cada `set` del store. Son dos
+ * acciones con dos desenlaces distintos; el de arriba dice qué falta y el de abajo,
+ * qué ha pasado al intentar traerlo.
+ */
+export const SELECTOR_ESTADO_FONDO = '[data-estado="traer-fondo-catastral"]'
+
 // ── Constantes de presentación ───────────────────────────────────────────────
 
 /** Modificador de `.gml-accion-estado` para el desenlace que NO trae el dato. */
@@ -154,11 +180,15 @@ const CLASE_ESTADO_ERROR = 'gml-accion-estado--error'
  * parcela» a secas dejaría al usuario mirando una parcela cargada sin entender por
  * qué no le vale (la suya es un DXF: tiene geometría, pero no tiene contra qué
  * contrastarla).
+ *
+ * ⛔ **El «cómo conseguirlo» decía «Tráela del Catastro y se enciende», y era la
+ * trampa**: hacerlo borraba su medición. Ahora sale de {@link INSTRUCCION_PARCELARIO},
+ * que lo dice UNA vez para los cuatro sitios que lo decían de cuatro maneras.
  */
 export const MOTIVO_SIN_OFICIAL =
   '«Diagnosticar encaje» está apagado: el diagnóstico contrasta la geometría medida contra el ' +
   'contorno OFICIAL del Catastro, y esta parcela no lo trae (se ha cargado de un fichero o se ' +
-  'ha dibujado). Tráela del Catastro y se enciende.'
+  `ha dibujado). ${INSTRUCCION_PARCELARIO}`
 
 /**
  * Lo que se dice cuando no hay a quién pedirle las vecinas. No es un fallo: es un
@@ -176,6 +206,77 @@ export const MOTIVO_SIN_CATASTRO =
  */
 export const COLA_SIN_VECINAS =
   'El resto del diagnóstico está calculado; solo falta la invasión a colindantes.'
+
+// ── La puerta 2 · «Traer el parcelario de fondo» ─────────────────────────────
+
+/**
+ * Por qué la puerta 2 está apagada cuando esta pantalla **no tiene con qué
+ * consultar** al Catastro. Es el caso de un visor montado sin `cablearCatastro`, o
+ * con un cableado que no expone `cargar`: legítimo, pero hay que decirlo.
+ *
+ * ⚠️ Y por eso la comprobación es `typeof catastro.cargar === 'function'` y **no se
+ * amplía `esCatastro`** (decisión 3A): aquel contrato lo firmó F07 para pedir
+ * vecinas, lo cumplen dobles de prueba de dos métodos y ampliarlo tumbaría el
+ * cableado entero —incluidas las ocho medidas que no dependen de la red— por una
+ * función que solo hace falta para un botón. Cada puerta comprueba lo suyo.
+ */
+export const MOTIVO_FONDO_SIN_CATASTRO =
+  '«Traer el parcelario de fondo» está apagado: esta pantalla no tiene conectado el cliente del ' +
+  'Catastro, así que no hay a quién pedirle el parcelario. El resto del diagnóstico no depende ' +
+  'de él.'
+
+/**
+ * Por qué está apagada cuando no hay nada que conservar. Sin geometría propia, «de
+ * fondo» no significa nada: lo que hace falta es EMPEZAR, y eso se hace en Entrada.
+ */
+export const MOTIVO_FONDO_SIN_GEOMETRIA =
+  '«Traer el parcelario de fondo» está apagado: el fondo se trae para contrastarlo con algo, y ' +
+  'todavía no hay ninguna geometría cargada. Carga tu levantamiento —o empieza desde el ' +
+  'Catastro, en Entrada— y se enciende.'
+
+/** Lo que se dice mientras la consulta viaja. Un botón apagado no se queda mudo. */
+export const MENSAJE_FONDO_EN_CURSO = 'Pidiéndole el parcelario al Catastro…'
+
+/**
+ * No hay referencia catastral en el modelo **y esta pantalla no puede deducirla**
+ * (cableado sin `deducir`). Se dice en vez de dejar el botón encendido y que no pase
+ * nada al pulsarlo.
+ */
+export const MOTIVO_FONDO_SIN_DEDUCIR =
+  'No se ha traído el parcelario: esta parcela no tiene referencia catastral y esta pantalla no ' +
+  'puede deducirla del mapa. Escribe la referencia en Entrada.'
+
+/**
+ * El Catastro dice que en ese punto hay VARIAS parcelas.
+ *
+ * No se elige ninguna a ciegas —es la regla de la spec §7.3 y aquí pesa más que
+ * nunca: elegir mal metería en el expediente el parcelario del vecino como término
+ * de comparación de un lindero—. Se nombran las candidatas para que el usuario sepa
+ * cuáles son.
+ *
+ * ⚠️ **Límite conocido, y se declara en vez de disimularse.** Desde aquí no se puede
+ * elegir todavía: la lista de candidatos la pinta el bloque de Entrada. Es un caso
+ * raro —el OVC no devolvió dos en ninguna de las 8 capturas reales del proyecto— y
+ * su salida natural es que la parcela ya traiga referencia catastral.
+ *
+ * @param {Array<{refcat: string}>} candidatos
+ * @returns {string}
+ */
+/**
+ * Un fallo INESPERADO al traer el fondo (un contrato roto, no un motivo del catálogo
+ * del Catastro). F05 ya lo ha contado por sus tres canales; esto solo cierra el
+ * renglón para que no se quede un «pidiendo…» eterno al lado de un botón encendido.
+ */
+export const MENSAJE_FONDO_ROTO =
+  'No se ha podido traer el parcelario: la consulta se ha interrumpido por un fallo interno de ' +
+  'la aplicación. No se ha cambiado nada de lo que hay en pantalla.'
+
+export const motivoFondoVariasParcelas = (candidatos) =>
+  `No se ha traído el parcelario: en el punto interior de tu geometría el Catastro dice que hay ` +
+  `${candidatos.length} parcelas (${candidatos.map((c) => c.refcat).join(', ')}), y esta ` +
+  `aplicación no elige ninguna a ciegas — meter el parcelario del vecino como término de ` +
+  `comparación de un lindero es justo el error que no se puede cometer. Escribe en Entrada la ` +
+  `referencia que sea la tuya.`
 
 /**
  * Lo que se le dice al usuario cuando el diagnóstico revienta por un defecto de
@@ -485,6 +586,10 @@ const esCatastro = (v) =>
  *   ({@link MOTIVO_SIN_CATASTRO}): es un uso legítimo, no una degradación callada.
  * @param {HTMLElement} [opciones.boton]  El CTA. Por defecto, el de la cáscara.
  * @param {HTMLElement} [opciones.renglon]  Su `role="status"`.
+ * @param {HTMLElement} [opciones.botonFondo]  «Traer el parcelario de fondo» (la
+ *   puerta 2). Por defecto {@link SELECTOR_BOTON_FONDO}.
+ * @param {HTMLElement} [opciones.renglonFondo]  Su `role="status"` PROPIO; ver
+ *   {@link SELECTOR_ESTADO_FONDO} sobre por qué no comparte el del CTA.
  * @param {() => (object|null)} [opciones.comprobacion]  De dónde sale la
  *   `Comprobacion` de `comprobacion/gml.js` que va en la cabecera del informe.
  *   **Es una función y su defecto devuelve `null`**, que es la vía de F05: quien
@@ -499,8 +604,9 @@ const esCatastro = (v) =>
  *   que `cablearGeneracionGml`.
  * @param {typeof descargarTexto} [opciones.descargar]  La entrega del fichero.
  * @returns {{abrir: (evento?: Event|null) => Promise<void>, recalcular: () => void,
- *   descargarInforme: () => (object|null), ultimoDiagnostico: () => (object|null),
- *   destruir: () => void}}
+ *   descargarInforme: () => (object|null), traerFondo: () => Promise<void>,
+ *   ultimoDiagnostico: () => (object|null),
+ *   olvidarPorFondoNuevo: () => void, destruir: () => void}}
  * @throws {TypeError}  Contrato del programador.
  * @throws {Error}  Si la cáscara no trae los dos nodos del contrato.
  */
@@ -512,6 +618,8 @@ export function cablearDiagnostico({
   catastro = null,
   boton = nodo(SELECTOR_BOTON_DIAGNOSTICAR),
   renglon = nodo(SELECTOR_ESTADO_DIAGNOSTICO),
+  botonFondo = nodo(SELECTOR_BOTON_FONDO),
+  renglonFondo = nodo(SELECTOR_ESTADO_FONDO),
   comprobacion = () => null,
   ahora = () => new Date(),
   descargar = descargarTexto,
@@ -585,6 +693,14 @@ export function cablearDiagnostico({
   let pidiendo = false
 
   /**
+   * Una petición de parcelario de fondo en vuelo. **Una pulsación, una petición**: el
+   * botón queda `disabled` en este mismo tick, antes del primer `await`, así que una
+   * doble pulsación no llega a disparar la segunda. Misma doctrina que
+   * `cableado-catastro.js#operar`.
+   */
+  let trayendoFondo = false
+
+  /**
    * El ÚLTIMO diagnóstico que se pintó en el cajón, que es el que el informe
    * recoge. `null` = no hay ninguno, y entonces el botón del pie está apagado con
    * su motivo escrito.
@@ -644,6 +760,168 @@ export function cablearDiagnostico({
     const sinOficial = !puedeDiagnosticar(parcelaActual)
     boton.disabled = sinOficial
     if (sinOficial && renglon.textContent === '') decir(MOTIVO_SIN_OFICIAL, false)
+  }
+
+  // ── La puerta 2: «Traer el parcelario de fondo» ────────────────────────────
+
+  /**
+   * Escribe el renglón propio de la puerta 2. Gemelo de {@link decir} sobre el otro
+   * nodo; ver {@link SELECTOR_ESTADO_FONDO} sobre por qué son dos y no uno.
+   *
+   * @param {string} texto
+   * @param {boolean} fallo
+   */
+  function decirFondo(texto, fallo) {
+    renglonFondo.textContent = texto
+    renglonFondo.classList.toggle(CLASE_ESTADO_ERROR, fallo)
+  }
+
+  /**
+   * ¿Puede esta pantalla traer un parcelario de fondo? **Dos condiciones, y ninguna
+   * mira si ya hay oficial**: traer OTRO fondo sobre uno que ya está es legítimo (el
+   * caso de haberse equivocado de referencia).
+   *
+   * @param {object|null} parcelaActual
+   * @returns {string|null}  El motivo por el que NO, o `null` si sí.
+   */
+  function porQueNoSePuedeTraerFondo(parcelaActual) {
+    if (typeof catastro?.cargar !== 'function') return MOTIVO_FONDO_SIN_CATASTRO
+    if (recintosDe(parcelaActual).length === 0) return MOTIVO_FONDO_SIN_GEOMETRIA
+    return null
+  }
+
+  /**
+   * Estado del botón de la puerta 2. Mismo criterio de escritura que
+   * {@link refrescarBoton} —el motivo solo con el renglón vacío—, y por lo mismo:
+   * esto corre en cada `set` del store.
+   *
+   * ── ⛔ CON PARCELARIO YA TRAÍDO, EL BOTÓN SE ESCONDE. ES UNA DECISIÓN MEDIDA ──
+   * El pie de Validación tenía tres CTA y éste es el cuarto. **Medido con el guion
+   * 16 el 2026-08-08, a 1280×720 y con un sobrante de 2 piezas**: el botón cuesta
+   * 40,39 px (con su hueco) y deja la caja de vértices en 103,42 px, por debajo del
+   * suelo de 124,57 que aquel guion defiende. Y el panel **no desborda**, así que
+   * el síntoma es el peor posible: la tabla encoge en silencio.
+   *
+   * Se esconde justo donde sobra. Este botón existe para TRAER el parcelario; con
+   * uno ya puesto su utilidad es marginal —volver a traerlo si te equivocaste de
+   * referencia— y ése es exactamente el estado que el guion 16 mide, porque derivar
+   * el sobrante EXIGE contorno oficial. Coste devuelto: los 40,39 px enteros, y cero
+   * en el estado que motiva la feature.
+   *
+   * ⚠️ **Se oculta con `hidden`, no se retira del DOM** (contrato K.1): este mismo
+   * cableado guarda la referencia en su cierre y un nodo huérfano seguiría siendo
+   * escribible y mudo. Y lleva `disabled` ADEMÁS de `hidden`, que son dos
+   * afirmaciones: un botón oculto pero habilitado lo sigue alcanzando el tabulador.
+   *
+   * ⚠️ **`traerFondo()` sigue en la API y sigue funcionando**: lo que se esconde es
+   * el control, no la capacidad. Un guion de humo o un control futuro pueden traer
+   * otro fondo sin que este módulo cambie.
+   *
+   * @param {object|null} parcelaActual
+   */
+  function refrescarBotonFondo(parcelaActual) {
+    const yaHayParcelario = oficialDe(parcelaActual) !== null
+    const motivo = yaHayParcelario ? null : porQueNoSePuedeTraerFondo(parcelaActual)
+
+    botonFondo.hidden = yaHayParcelario
+    renglonFondo.hidden = yaHayParcelario
+    botonFondo.disabled = yaHayParcelario || motivo !== null || trayendoFondo
+
+    if (yaHayParcelario) {
+      // Un motivo escrito debajo de un botón invisible es ruido, y encima ocupa.
+      if (renglonFondo.textContent !== '') decirFondo('', false)
+      return
+    }
+    if (motivo !== null && renglonFondo.textContent === '') decirFondo(motivo, false)
+  }
+
+  /**
+   * La referencia catastral con la que pedir el fondo, o `null` si no hay forma de
+   * saberla (y entonces ya se ha dicho por qué).
+   *
+   * ── PRIMERO EL MODELO, DESPUÉS EL MAPA. NUNCA UN CAMPO ──
+   * El campo `[data-campo="refcat"]` vive en Entrada y por el contrato K.1 leerlo
+   * desde aquí devolvería el `<input>` de otra pantalla —la primera del documento,
+   * aunque esté `hidden`—: se traería la parcela de una referencia que el usuario no
+   * ha escrito aquí. Así que la referencia sale del MODELO, que es la misma regla con
+   * la que F05 enciende «Traer colindantes».
+   *
+   * Y cuando el modelo no la trae —el caso normal y el que motiva toda la feature: un
+   * DXF recién importado— se **deduce del mapa**. `catastro.deducir()` ya existe desde
+   * F05, coge un punto INTERIOR de la geometría del store (no el centroide, que en una
+   * parcela en L cae fuera), se lo pregunta al Catastro y **nunca escribe en el
+   * modelo**. Encadenarlo aquí es lo que convierte «tengo un DXF y quiero ver el
+   * parcelario debajo» en una sola pulsación.
+   *
+   * @param {object|null} parcelaActual
+   * @returns {Promise<string|null>}
+   */
+  async function referenciaParaElFondo(parcelaActual) {
+    const delModelo = referenciaDe(parcelaActual)
+    if (delModelo !== null) return delModelo
+
+    if (typeof catastro.deducir !== 'function') {
+      decirFondo(MOTIVO_FONDO_SIN_DEDUCIR, true)
+      return null
+    }
+    const resultado = await catastro.deducir()
+    if (destruido) return null
+    // `null` (sin geometría, sin punto interior) y `ok:false` ya los ha contado F05
+    // por su renglón y por el panel, con su motivo. Repetirlo aquí sería decirlo dos
+    // veces con dos redacciones.
+    if (resultado === null || resultado.ok !== true || !resultado.datos) return null
+
+    const { candidatos, unico } = resultado.datos
+    if (unico !== true) {
+      decirFondo(motivoFondoVariasParcelas(candidatos), true)
+      return null
+    }
+    return candidatos[0].refcat
+  }
+
+  /**
+   * ⭐ **«Traer el parcelario de fondo».** La acción que el aviso ofrece EN SITIO, en
+   * vez de mandar al usuario a Entrada — donde el único botón que hay es el que
+   * sustituye su medición por la del Catastro.
+   *
+   * Todo el trabajo lo hace `cablearCatastro`: aquí solo se decide **con qué
+   * referencia** y **con qué intención** (`sustituir: false`). Este módulo sigue sin
+   * escribir en el store ni una vez, que es su invariante desde F07: el diagnóstico
+   * mide, no edita.
+   *
+   * @returns {Promise<void>}
+   */
+  async function traerFondo() {
+    if (destruido || trayendoFondo) return
+    const parcelaActual = estado.get()
+    const motivo = porQueNoSePuedeTraerFondo(parcelaActual)
+    if (motivo !== null) {
+      decirFondo(motivo, false)
+      return
+    }
+
+    trayendoFondo = true
+    refrescarBotonFondo(parcelaActual)
+    decirFondo(MENSAJE_FONDO_EN_CURSO, false)
+    try {
+      const refcat = await referenciaParaElFondo(parcelaActual)
+      if (destruido) return
+      if (refcat === null) return // ya se ha dicho por qué, arriba o en F05
+      // Y el desenlace lo cuenta el renglón de F05, que es el que sabe si el dato
+      // vino de la red o de la copia local. Aquí se limpia el «pidiendo…» para no
+      // dejar dos renglones contando la misma consulta con distinto tiempo verbal.
+      await catastro.cargar({ refcat, sustituir: false })
+      if (!destruido) decirFondo('', false)
+    } catch (causa) {
+      // `cargar` y `deducir` propagan los fallos INESPERADOS (los del catálogo salen
+      // por `ok:false`). F05 ya los ha contado por tres canales; aquí solo se cierra
+      // el renglón para que el usuario no se quede mirando un «pidiendo…» eterno.
+      decirFondo(MENSAJE_FONDO_ROTO, true)
+      console.error('cablearDiagnostico: fallo al traer el parcelario de fondo', causa)
+    } finally {
+      trayendoFondo = false
+      if (!destruido) refrescarBotonFondo(estado.get())
+    }
   }
 
   // ── El cálculo ─────────────────────────────────────────────────────────────
@@ -928,6 +1206,32 @@ export function cablearDiagnostico({
    *
    * @param {object|null} parcelaActual
    */
+  /**
+   * Tira TODO lo que estaba medido contra el parcelario anterior: las vecinas
+   * consultadas, el cajón, el diagnóstico guardado y las manchas del mapa.
+   *
+   * Vive en una función con nombre porque tiene DOS disparadores que no se parecen
+   * en nada, y sólo uno de los dos puede detectarse desde aquí:
+   *   · **otra parcela** — lo ve {@link alCambiarElStore} por la clave de identidad;
+   *   · **otro parcelario bajo la MISMA parcela** — la puerta de contexto del
+   *     Catastro. La identidad no se mueve, así que este módulo no puede verlo:
+   *     se lo dice `app/main.js` por {@link olvidarPorFondoNuevo}.
+   *
+   * El diagnóstico se OLVIDA y no se recalcula. El cajón queda cerrado, así que
+   * `recalcular()` sale por arriba y no lo repintaría: sin esto el botón del informe
+   * se quedaría encendido, y el fichero que bajara hablaría de un parcelario que ya
+   * no está — con su referencia catastral en el nombre. Es el fallo más caro que
+   * este pie podría cometer, y es silencioso.
+   */
+  function olvidarLoMedidoContraElFondo() {
+    vecinas = null
+    cajon.reiniciarExpediente()
+    cajon.cerrar()
+    olvidarDiagnostico()
+    contraste.pintar(null)
+    decir('', false)
+  }
+
   function alCambiarElStore(parcelaActual) {
     if (destruido) return
     const nueva = claveDeExpediente(parcelaActual)
@@ -935,23 +1239,20 @@ export function cablearDiagnostico({
       clave = nueva
       // Otra parcela: otro expediente, otras vecinas, otro diagnóstico. Ver la
       // cabecera sobre por qué se cierra en vez de recalcular.
-      vecinas = null
-      cajon.reiniciarExpediente()
-      cajon.cerrar()
-      // Y el diagnóstico de la anterior se OLVIDA. El cajón está cerrado, así que
-      // `recalcular()` sale por arriba y no lo repintaría: sin esta línea el botón
-      // del informe se quedaría encendido, y el fichero que bajara hablaría de la
-      // parcela que ya no está — con su referencia catastral en el nombre. Es el
-      // fallo más caro que este pie podría cometer, y es silencioso.
-      olvidarDiagnostico()
-      contraste.pintar(null)
-      decir('', false)
+      olvidarLoMedidoContraElFondo()
     }
     refrescarBoton(parcelaActual)
+    refrescarBotonFondo(parcelaActual)
     recalcular()
   }
 
+  /** Suelta la promesa igual que {@link alPulsar}, y por lo mismo. */
+  const alPulsarFondo = () => {
+    traerFondo().catch(() => {})
+  }
+
   boton.addEventListener('click', alPulsar)
+  botonFondo.addEventListener('click', alPulsarFondo)
   const desuscribirStore = estado.subscribe(alCambiarElStore)
   const bajaCambio = cajon.alCambiar(recalcular)
   // Al cerrar el cajón se limpia el mapa: las manchas y la cota son la MITAD del
@@ -967,11 +1268,44 @@ export function cablearDiagnostico({
   // quien abra la app con una parcela ya cargada vería gris justo el botón que le
   // hace falta.
   refrescarBoton(estado.get())
+  refrescarBotonFondo(estado.get())
 
   return {
     abrir,
     recalcular,
     descargarInforme,
+    traerFondo,
+
+    /**
+     * ⭐ **Ha entrado otro parcelario bajo la MISMA parcela** (la puerta de contexto
+     * del Catastro, 2026-08-08). Todo lo que este cableado tenía medido se refiere al
+     * fondo anterior y hay que tirarlo.
+     *
+     * ── POR QUÉ HACE FALTA QUE ALGUIEN LO DIGA ──
+     * Este módulo se entera solo de que «ha entrado otra parcela», y lo detecta por
+     * IDENTIDAD ({@link claveDeExpediente}: referencia catastral o `idLocal`). Es la
+     * clave correcta para lo que fue diseñada, y **no se cambia a una clave de
+     * contenido**: `referenciaDe` documenta unas líneas más arriba por qué son dos
+     * claves distintas, y una clave que mirara la geometría se recalcularía en cada
+     * arrastre de un vértice.
+     *
+     * Pero traer el parcelario de fondo **no mueve la identidad**: la parcela de
+     * trabajo sigue siendo la del usuario, con su `idLocal`, y si ya tenía referencia
+     * catastral la clave es exactamente la misma que antes. Sin este canal el cajón
+     * se quedaría enseñando un solape, una desviación y una invasión medidos contra
+     * un contorno oficial que ya no está en el modelo, con el botón del informe
+     * encendido encima. Silencioso y firmable: la peor combinación.
+     *
+     * Es idempotente y barato: llamarlo sin nada que olvidar deja todo igual.
+     *
+     * @returns {void}
+     */
+    olvidarPorFondoNuevo() {
+      if (destruido) return
+      olvidarLoMedidoContraElFondo()
+      // El renglón se acaba de vaciar; si el botón queda apagado, su motivo vuelve.
+      refrescarBoton(estado.get())
+    },
 
     /**
      * El ÚLTIMO diagnóstico que se PINTÓ en el cajón, o `null` si no hay ninguno.
@@ -1035,6 +1369,7 @@ export function cablearDiagnostico({
       if (destruido) return
       destruido = true
       boton.removeEventListener('click', alPulsar)
+      botonFondo.removeEventListener('click', alPulsarFondo)
       desuscribirStore()
       bajaCambio()
       bajaCierre()

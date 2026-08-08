@@ -472,10 +472,14 @@ describe('T6 · las tres vías de Entrada (criterio 7)', () => {
       expect(via.querySelector('h2')?.textContent.trim().length ?? 0).toBeGreaterThan(0)
       expect(via.querySelector('.gml-via-apunte')?.textContent.trim().length ?? 0).toBeGreaterThan(0)
     }
+    // ⭐ La tercera se llamaba «Comprobar un GML existente» hasta el 2026-08-07, y
+    // su apunte decía «sin generar uno nuevo». Era verdad mientras el GML entrara en
+    // modo comprobación y de solo lectura; retirado ese modo, se abre y se edita
+    // como cualquier otro fichero, y el rótulo lo dice.
     expect(vias.map((v) => v.querySelector('h2').textContent.trim())).toEqual([
       'Referencia catastral',
       'Medición propia',
-      'Comprobar un GML existente',
+      'Abrir un GML',
     ])
   })
 
@@ -629,11 +633,32 @@ describe('rebanada 2 · el pie enseña lo de cada pantalla', () => {
     // solo existe después de haberlo pulsado. ⚠️ El tercero tiene un precio en
     // píxeles que este test no puede ver —el pie medía 209,47 px con dos— y lo
     // mide el guion de humo 16.
+    //
+    // ⭐ Y DESDE EL 2026-08-08 SON CUATRO. «Traer el parcelario de fondo» va
+    // ANTES de «Diagnosticar encaje» porque es su requisito: sin contorno oficial
+    // el encaje no se puede medir, y éste es el botón que lo trae. El ORDEN se
+    // afirma, no solo el conjunto: leído de arriba abajo el pie cuenta la
+    // secuencia real del trabajo, y una reordenación accidental lo rompería sin
+    // que nada más se pusiera rojo.
     expect([...acciones.querySelectorAll('[data-accion]')].map((b) => b.dataset.accion)).toEqual([
       'generar-gml',
+      'traer-fondo-catastral',
       'diagnosticar',
       'derivar-sobrante',
     ])
+  })
+
+  it('⛔ el `data-accion` del fondo NO es el de Entrada (contrato K.1)', () => {
+    // Con las dos pantallas montadas a la vez `querySelector` devuelve la PRIMERA
+    // del documento aunque esté `hidden`. Si estos dos valores coincidieran, los
+    // clics del botón de Validación —el que CONSERVA la medición— irían a parar al
+    // de Entrada, que la SUSTITUYE: el defecto que la feature cierra, servido por
+    // el propio arreglo. Y sería mudo: ninguna otra prueba lo vería.
+    montarCascara()
+    const acciones = [...document.querySelectorAll('[data-accion]')].map((b) => b.dataset.accion)
+    expect(acciones).toContain('cargar-catastro')
+    expect(acciones).toContain('traer-fondo-catastral')
+    expect(new Set(acciones).size, `hay data-accion repetidos: ${acciones}`).toBe(acciones.length)
   })
 
   it('⛔ cada renglón de acuse se ve en las MISMAS pantallas que su botón', () => {

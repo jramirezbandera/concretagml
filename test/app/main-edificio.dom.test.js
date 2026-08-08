@@ -904,13 +904,17 @@ describe('app/main · F11 · un GML de edificio CONMUTA la rama y se carga', () 
     expect(q('#avisos').textContent).toMatch(/construcci[oó]n/i)
   })
 
-  it('un GML de PARCELA sigue yendo a su cajón y NO conmuta nada', async () => {
+  it('un GML de PARCELA sigue a su rama y NO conmuta nada', async () => {
+    // ⚠️ Desde el 2026-08-07 el cajón de comprobación **no se abre** con un GML de
+    // una sola parcela: el fichero se carga solo. Lo que este `it` vigila —que el
+    // desvío por contenido no se lleve un GML de parcela a la rama EDIFICIO— no
+    // cambia, y se afirma sobre los dos stores, que es donde se ve de verdad.
     await soltarYEsperar(ficheroDeBytes(GML_CP, 'parcela.gml'))
 
     expect(cuerpo.getAttribute(ATRIBUTO_RAMA)).toBe(RAMA.PARCELA)
-    expect(comprobacionViva.abierto()).toBe(true)
+    expect(comprobacionViva.abierto()).toBe(false)
     expect(storeEdificio().get()).toBeNull()
-    comprobacionViva.cerrar()
+    expect(storeParcela().get()).not.toBeNull()
   })
 })
 
@@ -1213,7 +1217,15 @@ describe('app/main · F19 · el pegado de coordenadas', () => {
     expect(storeParcela().get()).toBe(antes)
   })
 
-  it('⛔ y no toca la red: leer lo que el técnico pega no consulta a nadie', () => {
-    expect(arranque.peticiones).toHaveLength(0)
+  it('⛔ y no toca la red: leer lo que el técnico pega no consulta a nadie', async () => {
+    // ⚠️ Se mide el DELTA y no el total desde el arranque. Hasta el 2026-08-07 el
+    // total valía, porque nada de lo anterior en este fichero pedía nada; hoy soltar
+    // un GML de parcela con referencia catastral trae su parcelario en el acto, así
+    // que el contador global ya no arranca en cero cuando se llega aquí. Lo que este
+    // `it` afirma —que PEGAR no consulta— se afirma igual, y sin depender de lo que
+    // hayan hecho las pruebas de más arriba.
+    const antes = arranque.peticiones.length
+    await pegarYUsar(LIST_TEXTO)
+    expect(arranque.peticiones.length - antes).toBe(0)
   })
 })

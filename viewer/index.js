@@ -1528,6 +1528,20 @@ export function crearVisor(contenedor, opciones = {}) {
       //     suyas. Es el mismo hecho que el reencuadre, no una coincidencia.
       //   · `viewer/` es quien tiene la capa. `app/` tendría que ir a buscarla.
       //
+      // ⚠️ **Y HAY EXACTAMENTE UNA EXCEPCIÓN, desde el 2026-08-08.** «Traer el
+      // parcelario de fondo» cambia la `geometriaOficial` **sin mover la identidad**:
+      // la parcela de trabajo sigue siendo la del usuario, con su `idLocal` y —si ya
+      // la tenía— con su misma referencia catastral. Ese `set` entra por aquí como
+      // «la MISMA parcela, editada» y no suelta nada, así que los contornos de las
+      // vecinas del fondo anterior se quedarían dibujados. Lo limpia `app/main.js`
+      // desde `alCambiarOficial`, llamando a `visor.colindantes.limpiar()`.
+      //
+      // No se arregla ampliando esta clave a una de CONTENIDO: la clave se consulta
+      // en cada `set` —o sea, en cada vértice que se arrastra— y mirar la geometría
+      // haría reencuadrar el mapa a media edición, que es justo lo que el bloque «EL
+      // MAPA SIGUE A LA PARCELA» existe para impedir. Un caso que este módulo no
+      // puede distinguir se dice desde fuera; no se adivina desde dentro.
+      //
       // ANTES del encuadre a propósito: la vista se mueve a la parcela nueva con el
       // mapa YA limpio, así que ningún repintado intermedio puede enseñar los
       // contornos viejos sobre ella. Y se limpia también cuando la parcela nueva no

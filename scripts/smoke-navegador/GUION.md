@@ -37,12 +37,12 @@ para que el resultado no dependa de interpretar prosa. Diecinueve son de aceptac
 | `07-catastro-vivo.js` | F05 · T5C | **contra el servicio REAL**: CORS, IndexedDB de verdad y el recorrido entero (traer parcela · 2.ª consulta sin red · deducir la referencia) | `ok:true` |
 | `08-edicion.js` | F06 · 1 a 5 | la edición con `L.Draggable` real: snap a vértice y a lindero, `Alt`, cotas contra el zoom, offset, insertar/eliminar, undo/redo y su inhibición | `ok:true` |
 | `09-diagnostico.js` | F07 · 1 a 4 | el diagnóstico con SVG y layout reales: la diferencia sombreada por `fill-rule: evenodd`, el cajón que flota sin quitarle NI UN PÍXEL a la caja de vértices al abrirse, la banda del margen que conserva sus metros con el zoom y el tiempo del recálculo completo | `ok:true` |
-| `10-comprobar-gml.js` | F08 · 1 a 4 · **+ los tres arreglos del check visual** | **soltar un fichero de verdad** de punta a punta (bytes reales, velo con `opacity` calculada, `File.arrayBuffer()`), el cajón que no tapa ninguno de los cinco controles del mapa, los dos cajones que no coinciden, el informe que baja con BYTES, el invariante de los ~267 px, la tipografía real de los botones de los dos cajones y —desde el 2026-08-02— **el REENCUADRE** (viaja con otra parcela, no se mueve al editar), **las COLINDANTES dibujadas** y **el CAMPO de la referencia** | ⚠️ **`ok:false` desde el 2026-08-04 y PENDIENTE DE REVISIÓN: conduce el flujo anterior al rework, no hay defecto de producto detrás** — ver §16 |
+| `10-comprobar-gml.js` | F08 · 1 a 4 · **+ los tres arreglos del check visual** | **soltar un fichero de verdad** de punta a punta (bytes reales, velo con `opacity` calculada, `File.arrayBuffer()`), el cajón que no tapa ninguno de los cinco controles del mapa, los dos cajones que no coinciden, el informe que baja con BYTES, el invariante de los ~267 px, la tipografía real de los botones de los dos cajones y —desde el 2026-08-02— **el REENCUADRE** (viaja con otra parcela, no se mueve al editar), **las COLINDANTES dibujadas** y **el CAMPO de la referencia** | ✅ `ok:true` desde el **2026-08-07**, tras la revisión que el §16 dejó pendiente el 2026-08-04. Conducía el flujo anterior al rework Y el peaje de F08; los dos se han retirado. Ver §16 |
 | `11-informe-pdf.js` | F09 · **1** a 5 | ⭐ **el CRITERIO 1, que solo se puede medir aquí**: `toDataURL` sobre un lienzo con una tesela REAL del WMS, **con control negativo** (sin `crossOrigin` tiene que lanzar); el PDF que baja con BYTES de verdad (`%PDF`, páginas declaradas, el plano `/DCTDecode` dentro); que componer **no cierre nada por debajo** (tercera aparición del mismo defecto); el `<dialog>` como modal DE VERDAD (capa superior, fondo inerte, `Escape`), el encaje del modal en la ventana, el invariante de la caja de vértices y la tipografía de los cuatro botones nuevos | `ok:true` — ver §17 |
 | `12-expedientes.js` | F10 · 1 a 6 · **+ F20** | ⭐ **que los bytes están en una base de VERDAD** (la suite entera de F10 corre sobre `fake-indexeddb`, que no es una base de datos): supervivencia a la recarga contrastada contra `performance.timeOrigin`, segunda conexión a IndexedDB, `persist()`/`estimate()` reales, **las CUATRO exportaciones** con sus BYTES, el `<dialog>` como modal y el invariante de los 267 px. **Desde F20 (2026-08-06)** mide además el `.xlsx` sobre sus bytes —firma `PK`, EOCD, las seis partes de OOXML, sin comprimir y ⭐ **que la coordenada sea una celda NUMÉRICA y no una cadena con la coma dentro**, que es el criterio que justifica la fase entera— y **que los CINCO botones del pie de exportaciones quepan**, que es la medida que la suite no puede dar porque jsdom no maqueta | `ok:true` — ver §18 |
 | `13-edificio.js` | F11 · 1 a 4 | ⭐ **el guardián de ANCHO del conmutador, que solo existe aquí** (sustituye al `flex-wrap: nowrap` que el plan pedía por error); **M10 ida y vuelta en un navegador real** —mismo nodo, mismo valor, oyentes vivos—; el invariante de los 267 px y las tres cifras de M8; que las huellas del DXF **se ven y ENCIMA de la parcela** (orden real de los panes, no solo que existan los `<path>`); soltar un `.dxf` de verdad en las DOS ramas, con su diálogo de reparto por capas; la ficha del pie que cambia de cara; y ⭐ **el reparto de altura del panel, en vacío y con datos, con el recorte a CERO EXACTO y el déficit en píxeles cuando no llega** | ✅ **`ok:true` desde el 2026-08-04**: los dos defectos de F11 cerrados, el segundo **por el rework** — ver §19 |
 | `14-shell.js` | Rework · 1 a 4 | la cáscara de tres columnas y su coste en píxeles, en **las DOS pasadas de D5** (1280×720 y 1440×900): ancho del rail, desborde del panel, el invariante de `#tabla-vertices`, cuántas tarjetas de aviso caben enteras y cuánto queda escondido tras el pliegue; **se detecta solo** en cuál de los dos mundos está (`LINEA_BASE` sin rail / `SHELL` con él); y desde la rebanada 4, **si el diagnóstico sigue en pantalla después de tocar el mapa** | `ok:true` en las dos — ver §20 |
-| `15-contraste.js` | Rework · T9 | ⭐ **la RUTA CRÍTICA 2 entera** (soltar el GML de otro → contrastarlo → cruzar la puerta), que hasta T9 no se podía andar; y sobre todo **que la puerta de D4 SE VE**: dentro del cajón, dentro de la ventana y con `elementFromPoint` devolviéndola —las tres patas, porque con una sola el defecto salía verde—; más la procedencia que cambia al cruzar y el invariante de la caja de vértices | ⛔ **encontró un defecto real el 2026-08-04, ya corregido; hoy `ok:true` en las dos** — ver §22 |
+| `15-contraste.js` | Rework · T9, **reescrito 2026-08-07** | ⭐ **la RUTA CRÍTICA 2 entera**, que hoy es *soltar un GML → está cargado, dibujado y EDITABLE*, en un solo gesto: el cajón que NO sale, «Edición» abierta, la procedencia que dice de dónde salió sin atribuírselo al Catastro, la barra de edición que de verdad se ve (las tres patas de `elementFromPoint`), y **el caso que el guion viejo no montaba: un GML SIN referencia catastral**, que es donde el recorrido se moría | ⛔ **encontró un defecto real el 2026-08-04 (la puerta invisible) y NO pudo ver el de fondo: su pantalla era inalcanzable sin parcelario.** Hoy `ok:true` — ver §22 |
 | `16-derivar-cesion.js` | F17 · 1 a 4 · **+ el criterio 6** | ⭐ **EL PRECIO EN PÍXELES, que es lo único de F17 que la suite no puede ver**: F17 rompe a propósito la racha de «0 px en el panel» de cinco fases, y ⛔ **cuando se pasa, el panel NO desborda — la tabla de vértices encoge en silencio**. Mide el recorrido entero sin tocar la red (mover el lindero hacia dentro → derivar → revisar y nombrar → descargar), la PUERTA explicando con cifras al crecer, la correspondencia fila↔mancha en los dos sentidos, los BYTES del expediente (N `featureMember`, los `localId` de O19 y **que el nombre escrito NO viaja al fichero**), y la invalidación de la foto al editar | ✅ **`ok:true` en las DOS** desde el 2026-08-05, tras encontrar **un defecto real a 1280×720** y corregirlo — ver §25 |
 | `17-medicion-propia.js` | F18 · 1 a 4 | ⭐ **QUE EL `<dialog>` DE REVISIÓN SEA UN MODAL DE VERDAD**, que la suite **no puede** ver: en jsdom `HTMLDialogElement.prototype` tiene exactamente `constructor` y `open` —ni `showModal()`, ni `::backdrop`, ni capa superior—, así que las 6.339 pruebas ejercitan el camino DEGRADADO; más soltar `UTM.dxf` de verdad con la rama PARCELA (bytes reales, cinco capas, el botón apagado con su motivo), que la geometría **se pinte** en sus panes, el **coste en píxeles** de la tabla de vértices, y que **nuestro propio listado de replanteo se rechace por su nombre y NO con el diagnóstico falso del huso** | ⛔ **su primera corrida salió `ok:false` y destapó UN DEFECTO REAL que la suite no veía**: la cabecera decía **«Parcela del Catastro» sobre el levantamiento del propio técnico**. Corregido con guardián; hoy **`ok:true`** — ver §26 |
 | `19-partes-plantas.js` | F12 · 1 a 4 | ⭐ **EL TRABAJO SOBRE UN EDIFICIO, andado entero**: traer 13 partes → elegir una → ponerle plantas → verlas en el mapa → añadir una piscina → dibujarle el recinto a mano. Mide lo que en jsdom sale verde pase lo que pase: que el **bloque de parte activa quepa** con 14 partes a 1280×720 (y que el síntoma no sea mudo), que los **rótulos romanos se lean**, que la **envolvente se repinte** al poner a 0 las plantas de una parte, que **dibujar con clics de verdad** cierre un recinto, que «Dibujar recinto» aparezca **solo donde sirve**, que el **eje PASO toque a esta rama** (defecto M2 de la fase 0), y —lo único que no es de píxeles— que el **borrador de edificio se escriba en IndexedDB de VERDAD y no pise el de parcela** | ⛔ **su primera corrida salió `ok:false` con TRES defectos reales**, uno de ellos que **las plantas del GML nunca llegaban al modelo** —F11 las tiraba por alcance y F12 llegó a la fase 5 sin recogerlas, con la suite en verde—. Hoy **`ok:true` en las dos ventanas** — ver §28 |
@@ -3978,6 +3978,32 @@ las 16:18 y un `estilos/app.css` de las 14:53 parecían coherentes y no lo eran.
 
 ## 22. `15-contraste.js` — la ruta crítica 2 (Rework de UI · T9)
 
+> ⛔ **AVISO DE 2026-08-07, Y ES LA PARTE QUE MÁS IMPORTA DE ESTA SECCIÓN.**
+> Todo lo que sigue describe el recorrido *soltar → contrastar → cruzar la
+> puerta*, **que ya no existe**: el modo COMPROBACIÓN se ha retirado entero (ver
+> la cabecera de `app/navegacion.js`) y un `.gml` se carga al soltarlo, editable,
+> como un `.dxf`. El guion está reescrito para medir eso.
+>
+> El relato de abajo se conserva porque **enseña dos cosas, y la segunda no se
+> aprendió entonces**:
+>
+> 1. Lo que este guion sí cazó: la puerta nacía 314 px por debajo del pliegue, y
+>    siete pruebas de jsdom la daban por visible porque allí no hay maquetación.
+>    Ése es el valor de medir en un navegador, y sigue en pie.
+> 2. ⭐ **Lo que NO cazó, con el botón ya bien colocado: su pantalla era
+>    inalcanzable.** La puerta vivía en el cajón de DIAGNÓSTICO, y ese paso exige
+>    el parcelario del Catastro. Este guion montaba el único fixture del repo con
+>    referencia catastral de verdad, así que aquí SIEMPRE había parcelario y la
+>    puerta SIEMPRE se alcanzaba. Con un GML sin referencia —un alta, una pérgola,
+>    el fichero corriente— el paso quedaba apagado y con él la única pantalla que
+>    contenía el botón: **el rail mandaba a pulsar algo que no existía en ninguna
+>    parte de la aplicación**, y lo descubrió un usuario, no esta carpeta.
+>
+> **La lección, que es de método: un guion de humo que monta el caso favorable
+> mide el caso favorable.** El guion reescrito suelta los dos ficheros —con y sin
+> referencia— justamente por esto.
+
+
 El cuarto guion de esta carpeta que **encuentra un defecto de producción** (el
 `10` encontró dos, el `12` uno, el `13` otros dos), y el primero que encuentra
 uno que **la suite defendía en verde con siete pruebas escritas a propósito para
@@ -4158,11 +4184,11 @@ producto**.
 | Guion | Veredicto | Qué pasa |
 |---|---|---|
 | `09-diagnostico.js` | ✅ `ok:true` | Sin tocar. Red dentro del régimen (1 GetParcel + 1 GetNeighbour). |
-| `10-comprobar-gml.js` | ⚠️ **`ok:false`** | **Conduce el flujo anterior a T9.** Pendiente de revisión — abajo. |
+| `10-comprobar-gml.js` | ⚠️ **`ok:false`** *(entonces)* | **Conducía el flujo anterior a T9.** Revisado y en verde el 2026-08-07 — abajo. |
 | `12-expedientes.js` | ✅ `ok:true` | Sin tocar. Queda su advertencia de foco, que es anterior al rework. |
 | `13-edificio.js` | ✅ `ok:true` | Rojo por dos cosas suyas, las dos corregidas — abajo. |
 | `14-shell.js` | ✅ `ok:true` ×2 | Las dos pasadas de D5, cifras clavadas al registro de T5–T6. |
-| `15-contraste.js` | ✅ `ok:true` ×2 | Nuevo. Encontró y cerró el defecto de la puerta (§22). |
+| `15-contraste.js` | ✅ `ok:true` ×2 *(entonces)* | Nuevo. Encontró y cerró el defecto de la puerta (§22). **Reescrito el 2026-08-07**, cuando la puerta que vigilaba se retiró. |
 
 ⚠️ **Y una consecuencia práctica del rework que afecta a TODOS los runbooks de
 arriba:** la aplicación arranca en **Entrada**, donde `#tabla-vertices` está
@@ -4204,43 +4230,84 @@ construcción **tras la rebanada de Edificio**». Se cumple **antes**, y sin hab
 hecho: se lo llevaron por delante los +118 px que T6 le devolvió al panel al dejar
 de enseñar a la vez dos cosas que nunca se usan a la vez.
 
-### ⚠️ `10-comprobar-gml.js` — PENDIENTE DE REVISIÓN, y por qué no se ha parcheado
+### ✅ `10-comprobar-gml.js` — REVISADO Y EN VERDE (2026-08-07)
 
-Sale `ok:false` con tres problemas y dos plazos agotados. **Los cinco tienen una
+> **Lo que sigue, hasta la línea de corte, es el dictamen del 2026-08-04 y se
+> conserva porque explica de qué se venía.** La revisión que pedía está hecha: al
+> final de la sección, qué se cambió y por qué.
+
+Salía `ok:false` con tres problemas y dos plazos agotados. **Los cinco tenían una
 sola causa raíz**: T9 cambió dónde te deja soltar un fichero. Antes te quedabas en
-la pantalla única; ahora **traer un fichero es empezar otro expediente**, así que
-la aplicación vuelve a **Entrada** — y este guion, escrito para lo anterior, sigue
+la pantalla única; después **traer un fichero es empezar otro expediente**, así que
+la aplicación vuelve a **Entrada** — y este guion, escrito para lo anterior, seguía
 midiendo el panel de Validación y pulsando un CTA que en Entrada no está.
 
-Lo que reporta, y lo que se midió para saber si había defecto detrás:
+Lo que reportaba, y lo que se midió para saber si había defecto detrás:
 
-| Lo que dice el guion | Lo que se midió | Veredicto |
+| Lo que decía el guion | Lo que se midió | Veredicto |
 |---|---|---|
 | «"Abrir un GML…" no está en `.gml-rotulo-fila`» | La fila del rótulo **murió en T6**; el botón vive en la tercera vía de Entrada, y el guion 14 lo mide entero y visible | **superado, no roto** |
 | «Soltar le ha quitado altura a la caja de vértices (386 → 0)» | En Entrada la caja **no se enseña**: es otra pantalla, no una pérdida | **superado** |
 | «Los botones derivados no cuadran (colindantes apagado)» | Medido en los cuatro instantes del recorrido: **«Traer colindantes» está ENCENDIDO siempre** | **artefacto**: el guion llega ahí con la app en un estado que no pretendía |
 | Plazos agotados (cajón de diagnóstico, colindantes) | El CTA «Diagnosticar» del pie **sí abre el cajón** (guion 09, `ok:true`), y la ruta de comprobación entera funciona (guion 15, `ok:true` ×2) | **artefacto de la misma causa** |
 
-**No se ha parcheado a propósito.** Son 1.990 líneas escritas alrededor de un
-recorrido que ya no existe, y media docena de sus invariantes ya no se pueden
-medir porque **el cajón de comprobación y la caja de vértices ya no coexisten**:
-viven en pantallas distintas. Un parche que lo pusiera en verde lo pondría verde
-**por el motivo equivocado**, que en este repositorio es el peor resultado
-posible. Necesita una revisión propia, y lo que hay que replantear es esto:
+No se parcheó entonces a propósito: son ~2.000 líneas escritas alrededor de un
+recorrido que ya no existía, y un parche que lo pusiera en verde lo habría puesto
+verde **por el motivo equivocado**, que en este repositorio es el peor resultado
+posible.
 
-1. La **Decisión 5 de F08** («el botón en la fila del rótulo, para que cueste
-   0 px») está **disuelta**, no incumplida: ya no hay fila del rótulo y el botón
-   no compite por la altura de nada.
-2. El invariante «abrir el cajón no le quita altura a la caja de vértices» es hoy
-   **inmedible**, por la misma razón.
-3. Todo lo que el guion mide **después de soltar** —el reencuadre, las
-   colindantes dibujadas, el campo de la referencia, los bytes del informe— sigue
-   siendo válido y valioso; lo único que hay que rehacer es **cómo llega hasta
-   ahí**: por «Contrastar con el parcelario» del cajón, como hace el `15`.
+────────────────────────────────────────────────────────────────────────────────
 
-Mientras tanto, la cobertura no se ha perdido: el `09` cubre el cajón de
-diagnóstico y su red, el `15` cubre la ruta de comprobación entera con la puerta,
-y el `12` cubre la persistencia.
+### La revisión, hecha el 2026-08-07
+
+Llegó con el cambio que **retiró el modo COMPROBACIÓN entero** (ver la cabecera de
+`app/navegacion.js`): un `.gml` ya no se comprueba y luego se acepta, sino que se
+**carga al soltarlo**, como un `.dxf`. Eso deja el guion sin su peaje —«Contrastar
+con el parcelario»— y sin su puerta, y obliga a la revisión que estaba pendiente.
+
+**Lo que se cambió, y por qué cada cosa:**
+
+1. **El orden se invierte.** Primero se suelta un GML de **VARIAS parcelas**
+   (`derivados/cp_multiparcela_entrega.gml`, fixture nuevo en este guion), que es
+   el único caso que sigue abriendo el cajón; con él delante se miden **§5** (que
+   no tape ninguno de los cuatro controles del mapa) y **§6** (la tipografía real
+   de sus botones), que sin cajón abierto no tienen sujeto. Después se descarta y
+   se suelta el fichero real, que lleva el recorrido hasta el parcelario, el store
+   y F07 (**§7** en adelante).
+2. **§10 cambia de canal, no de pregunta.** El riesgo que el plan de F08 mandó
+   aquí —«una tanda larga de hallazgos empuja el panel»— se medía dentro del
+   cajón; las notas viven ahora en el **panel de avisos**, así que se mide que ese
+   canal ni se quede mudo (cero tarjetas nuevas con un fichero que trae notas de
+   sobra) ni se coma la tabla de vértices.
+3. **§17.2 deja de pulsar nada.** `UTM_1.gml` —alta real en formato 3.0, **sin
+   referencia catastral**— entra solo. Es exactamente el fichero con el que el
+   recorrido viejo se moría, y ahora es un caso más.
+4. **§17.4 cambia lo que deja en pantalla para la captura del §9:** el panel de
+   avisos con su lista abierta, en vez del cajón. Ahí es donde hoy se leen las
+   frases que el checklist manda juzgar (regla de oro 9).
+5. **Se RETIRA un guardián, con su motivo escrito en el código:** el de la
+   `.gml-rotulo-fila`. La Decisión 5 de F08 no se ha incumplido, se ha
+   **disuelto** — no hay fila del rótulo y el botón no compite por la altura de
+   nada—. Un guardián que sobrevive a la decisión que defendía acusa de un
+   incumplimiento imposible y esconde los que sí importan.
+6. **Se ARREGLA un guardián que acusaba en falso**, y es el hallazgo de método de
+   la revisión: el del **robo del clic por la capa de colindantes** exigía que
+   pinchar cerca de un lindero lo SELECCIONARA… y `gml-lado-seleccionado` lo pone
+   `viewer/edicion.js`, o sea que solo hay selección con la **edición armada**.
+   Cuando se escribió, la aplicación entera cabía en una pantalla; el rework las
+   separó, y desde entonces el guardián llegaba a Diagnóstico, no encontraba
+   selección posible y acusaba a la capa. Ahora comprueba primero si la selección
+   está armada y, si no lo está, **dice que no lo ha medido** en vez de inventarse
+   un culpable. ⚠️ Queda un hueco declarado: **ningún guion trae las vecinas y
+   está en Edición a la vez**, así que ese riesgo hoy no se mide en ninguna parte.
+
+**Y dos falsas alarmas que escribió la propia revisión**, las dos de la misma
+familia y por eso van juntas: con `?demo=real` la parcela de demostración **es
+exactamente la del fixture**, así que esperar a que cambie
+`[data-ficha="refcat"]` —o comparar el número de vértices— vuelve en 0 ms y todo
+lo que se lee después se lee antes de que haya pasado nada. La señal buena es el
+**renglón de procedencia nombrando el fichero**, que solo puede escribirlo este
+recorrido. Le pasó igual al guion 15 el mismo día.
 
 ### La segunda pasada, con F17 dentro (2026-08-05)
 
@@ -5250,3 +5317,148 @@ pasada para que la decisión no se olvide.
 - **Que la cartografía sea la CORRECTA.** Se cuentan teselas pintadas, no se mira
   qué hay en ellas: un PNOA de otra zona daría la misma cifra. El encuadre fino es
   del guion 02.
+
+---
+
+## 33. `23-fondo-catastral.js` — las DOS PUERTAS del Catastro (2026-08-08)
+
+El guion de la feature que arregla el defecto más caro que ha tenido este
+proyecto: **cargar una medición propia y después traer el Catastro destruía la
+medición**, y como el gancho de carga reiniciaba el historial, tampoco volvía con
+Ctrl+Z. Irreversible dentro de la sesión.
+
+⛔ **Y ochenta y tres pruebas pasaron por delante sin verlo.**
+`test/app/catastro.dom.test.js` usaba una parcela DXF como `parcelaInicial` en
+unas veinte pruebas —una de ellas llamando a `cargar()`— y **ninguna afirmaba
+sobre la geometría resultante**: afirmaban sobre botones, oyentes y transporte.
+
+### Cómo se lanza
+
+```
+$B viewport 1280x720
+$B goto http://localhost:PUERTO/concretagml/?demo=hueco   # ⛔ hueco, NO real
+$B wait ".gml-rail-pasos"
+$B console --clear
+$B network --clear
+$B eval scripts/smoke-navegador/23-fondo-catastral.js
+$B console --errors
+```
+
+⛔ **`?demo=hueco` y no `real`, y la diferencia lo es todo.** El estado del que
+parte la feature es «hay geometría de trabajo y NO hay parcelario», y el dataset
+`hueco` es exactamente eso: parcela sintética con exterior y hueco, **sin
+`geometriaOficial` y sin referencia catastral**. Y sus coordenadas no son un
+detalle: el rectángulo cae a ~20 m de la parcela real 9398516VK3799G, o sea **en
+una manzana de verdad**, que es lo que permite que la deducción encadenada tenga
+a quién preguntarle. El guion **aborta** con cualquier otra query.
+
+⚠️ Toca la red de verdad (OVC + WFS), como el 07. Distingue «no se ha podido
+preguntar» de «la respuesta fue mala»: un servicio caído sale como advertencia,
+no como problema.
+
+### Los tres flujos que mide
+
+| # | Flujo | Por qué aquí y no en la suite |
+|---|---|---|
+| 1 | **El que rompía, de punta a punta.** Pulsar «Traer el parcelario de fondo» y comparar la tabla vértice a vértice | En jsdom la geometría se compara en memoria; aquí se cuenta lo que el usuario ve. Y la **deducción encadenada** (`.dxf` sin refcat → OVC → WFS) toca dos servicios reales |
+| 2 | **El aviso ya no manda a la trampa** | Se lee el texto **renderizado**, no la constante: lo que importa es lo que el usuario tiene delante |
+| 3 | **Se enciende lo ya construido** | «Diagnosticar encaje» y «Derivar sobrante» son F07 y F17, cerradas hace semanas e **inalcanzables** desde el flujo «medición primero» |
+
+### Cifras de referencia (2026-08-08, Chrome, `npm run dev`, 1280×720)
+
+| Medida | Valor |
+|---|---|
+| Veredicto | **`ok: true`** · 4.206 ms |
+| Vértices antes / después del fondo | **8 / 8**, contenido idéntico |
+| Referencia deducida del mapa | **9398515VK3799G** (la vecina de la real, correcto) |
+| Peticiones OVC / WFS | 3 / 1 |
+| Indicadores tras el fondo | levantamiento **sí** · parcelario **sí** |
+| «Diagnosticar» / «Derivar» | **encendidos los dos** |
+| Botones apagados y mudos | **0 de 3** |
+| `data-accion` repetidos | **0** |
+| Consola | limpia |
+
+El rótulo de procedencia sale: *«Geometría de trabajo: Recinto leído de un
+listado de coordenadas. Es la que se edita y la que se genera. Parcelario
+oficial, sólo de fondo para contrastar: Del Catastro, traído del servicio a las
+14:05.»* — nunca «Del Catastro» a secas, que es el criterio 6 del diseño.
+
+### ⭐ Y sabe fallar, medido
+
+Con el defecto original restaurado a mano (`conservaLaMedicion` fija en `false`),
+recargar y relanzar da `ok:false` con **dos** problemas, y son el síntoma exacto
+de las capturas del autor:
+
+- «TRAER EL PARCELARIO HA CAMBIADO LA MEDICIÓN. La tabla tenía **8** vértices y
+  ahora tiene **37**» — los 8 del levantamiento sustituidos por los 37 de la
+  parcela catastral;
+- «El rótulo de procedencia dice "Del Catastro…" sobre una geometría que NO es
+  del Catastro» — el defecto vuelto firmable.
+
+⚠️ **Y el resto del guion sigue VERDE con el defecto puesto**: el botón existe,
+se enciende, los textos no mandan a Entrada y el diagnóstico se activa. Ésa es la
+razón de que la comparación vértice a vértice sea la afirmación central y no una
+comprobación más de la lista.
+
+### ⛔ Dos cosas que la primera corrida hizo mal, y valen como aviso
+
+1. **Un formato de fichero inventado en el propio guion.** La primera versión
+   soltaba un `.txt` con columnas «Nº X Y» escritas a mano. El parser leyó el
+   número de vértice como la coordenada Este, el panel avisó de que «el centroide
+   (8.00, 439244.38) no cae en la España peninsular» y entraron **cero** vértices
+   — el guion habría acusado en falso al arreglo. Es la lección que el §17 ya
+   tenía escrita: *un listado escrito a mano en un guion es un segundo formato, y
+   los segundos formatos divergen*.
+2. **Y usar el serializador REAL tampoco valía.** `esListadoDeReplanteo` rechaza
+   a propósito el `.txt` que la propia aplicación exporta («su primera columna es
+   el número de vértice, no la X»): es una guarda de F18, no un fallo. De ahí que
+   este guion entre por el dataset y no por fichero — la entrada por fichero ya
+   tiene su guion, el 17.
+
+### ⛔ El defecto que encontró, y era de altura de panel
+
+La primera corrida verde de este guion dejó el guion **16 en `ok:false`**: el
+cuarto CTA del pie de Validación bajaba la caja de vértices a **103,42 px**, por
+debajo del suelo de 124,57 que aquel guion defiende, **y el panel NO desborda** —
+la tabla encogía en silencio, que es la frase que el propio §16 usa.
+
+Se aisló pieza por pieza ocultándolas desde el navegador, sin tocar ficheros:
+
+| Estado | Caja de vértices | Guion 16 |
+|---|---|---|
+| Todo puesto | **103,42 px** | ⛔ `ok:false` |
+| Sin los dos indicadores (−19,94 px) | 123,36 px | ⛔ `ok:false`, corto por **1,21 px** |
+| Sin el botón nuevo (−40,39 px con su hueco) | ≥ 124,57 px | ✅ `ok:true` |
+
+**Decisión del autor (2026-08-08): el botón se esconde con `hidden` + `disabled`
+en cuanto hay parcelario.** Se esconde justo donde sobra —existe para TRAER el
+parcelario, y el estado que el §16 mide EXIGE contorno oficial para derivar el
+sobrante—, así que devuelve los 40,39 px enteros y cuesta **cero** en el estado
+que motiva la feature. `traerFondo()` sigue en la API: lo que se esconde es el
+control, no la capacidad. Con el cambio, **§16 vuelve a `ok:true`** y §09 sigue
+`ok:true`.
+
+⚠️ Y `hidden` **sí funciona aquí**, comprobado en Chrome (`display:none`, caja de
+0 px): la trampa de F12 era de `.gml-barra-herramienta`, que fija
+`display:inline-flex` con especificidad (0,2,0). Estos botones no.
+
+### ⛔ Y un defecto en el propio guion, que se cazó solo
+
+Al esconder el botón, la sección 6 lo acusó de **«apagado y MUDO»**: veía
+`disabled` con el renglón vacío. Pero un botón **oculto** no puede ser gris y
+mudo — la regla de oro 1 habla de lo que el usuario VE, y un motivo escrito bajo
+un nodo invisible no lo lee nadie (y encima ocuparía el sitio que se acaba de
+recuperar). La comprobación distingue ahora **oculto** de **mudo**, y los ocultos
+salen como advertencia con su nombre, que es distinto de callarlos.
+
+
+### Lo que NO cubre
+
+- **La puerta 1.** Que «Traer del Catastro» siga SUSTITUYENDO el documento es el
+  guion 07, que ya existe y sigue en verde.
+- **Que el diagnóstico ACIERTE.** Se mide que el botón se enciende y nada más;
+  las nueve métricas son del guion 09.
+- **El deshacer con una edición por medio.** Exige un arrastre; lo cubre la suite
+  (`main-edicion.dom.test.js`) y el guion 08.
+- **Si el reparto de las dos puertas se ENTIENDE.** Que un colegiado sepa cuál
+  pulsar sin que nadie se lo explique no tiene número → `CHECKLIST-HUMANO.md`.

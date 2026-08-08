@@ -1,4 +1,4 @@
-// app/navegacion.js — Rework de UI · T1. EL DUEÑO ÚNICO DE {rama, paso, modo}.
+// app/navegacion.js — Rework de UI · T1. EL DUEÑO ÚNICO DE {rama, paso}.
 //
 // ── POR QUÉ EXISTE ESTE FICHERO, Y ES UNA MEDICIÓN, NO UNA OPINIÓN ──────────
 // Once fases después, esta aplicación **no tenía autoridad de navegación**. Un
@@ -20,7 +20,7 @@
 //
 // ── QUÉ HACE, Y SOBRE TODO QUÉ NO HACE ─────────────────────────────────────
 // Hace tres cosas y ninguna más:
-//   1. Guarda `{rama, paso, modo}` y notifica a quien se suscriba.
+//   1. Guarda `{rama, paso}` y notifica a quien se suscriba.
 //   2. Decide si un paso está DISPONIBLE, y cuando no lo está **entrega el
 //      motivo escrito en español**. Regla de la casa: *paso apagado con motivo,
 //      jamás paso muerto*.
@@ -53,25 +53,42 @@
 // (aplicador → dueño) y no haya que invertir un import con siete llamantes.
 //
 // ── EL ORDEN DE LAS CAUSAS, QUE NO ES CAPRICHO ─────────────────────────────
-// Un paso puede estar bloqueado por tres cosas a la vez. Se dice SIEMPRE la más
+// Un paso puede estar bloqueado por dos cosas a la vez. Se dice SIEMPRE la más
 // estructural primero, porque es la que el usuario no puede resolver trabajando:
 //
 //   1. RAMA  — «esta versión no sabe hacer eso con un edificio». No se arregla
 //              trayendo datos: se arregla volviendo a la rama Parcela.
-//   2. MODO  — «estás comprobando el GML de otro». Se arregla con LA PUERTA.
-//   3. DATO  — «trae antes una parcela». Se arregla trabajando, y es el único de
-//              los tres que se resuelve solo según avanzas.
+//   2. DATO  — «trae antes una parcela». Se arregla trabajando, y es el único de
+//              los dos que se resuelve solo según avanzas.
 //
 // Decirlo al revés sería mentir por omisión: «trae antes una parcela» en la rama
 // Edificio manda al usuario a hacer un trabajo que no le va a desbloquear nada.
 //
-// ── LA PUERTA (decisión D4 de la revisión de diseño) ───────────────────────
-// **Comprobación es una PUERTA, no una cárcel.** Abres el GML ajeno, contrastas,
-// y hay un CTA con nombre —«Tomar esta geometría y editarla»— que llama a
-// {@link Navegacion#abrirPuerta}. Hasta pulsarlo, Edición no está. Al pulsarlo,
-// el rail se completa y sigues por el recorrido normal. Eso rescata dentro de la
-// aplicación el recorrido caro —GML con IVG negativo → verlo → corregirlo →
-// regenerar— sin fingir en ningún momento que el fichero de otro es tuyo.
+// ── ⛔ AQUÍ HUBO UN TERCER EJE —EL MODO— Y SE RETIRÓ EL 2026-08-07 ──────────
+// Este módulo llevaba un `modo` con dos valores (`NORMAL` y `COMPROBACION`) y una
+// tercera causa de bloqueo entre RAMA y DATO: mientras la geometría viniera del
+// GML de otro técnico, Edición estaba apagada y solo se abría cruzando «LA
+// PUERTA» —un CTA llamado «Tomar esta geometría y editarla»—. La idea era
+// «comprobación es una puerta, no una cárcel».
+//
+// **En producción era una cárcel, y está medido.** El CTA vivía dentro del cajón
+// de DIAGNÓSTICO (`viewer/cajon-diagnostico.js`), y ese cajón solo se abre en el
+// paso Diagnóstico, que en la rama PARCELA **exige el parcelario del Catastro**.
+// Un GML sin referencia catastral utilizable —el caso corriente: un alta, una
+// pérgola, cualquier fichero que todavía no tiene refcat— no trae parcelario, así
+// que Diagnóstico se quedaba apagado… y con él la única pantalla que contenía la
+// puerta. El rail mandaba a pulsar un botón que en ese recorrido **no existía en
+// ninguna parte de la aplicación**.
+//
+// Y la premisa de fondo tampoco se sostenía: el GML que se abre es, la mayoría de
+// las veces, **el tuyo** —el que generaste ayer y quieres retocar—. Tratar todo
+// fichero `.gml` como trabajo ajeno y de solo lectura le cobraba un peaje al caso
+// normal para proteger uno raro.
+//
+// Lo que sí se conserva es lo único que de verdad protegía: **de dónde salió la
+// geometría se sigue diciendo** —`parcela.origen` no cambia, la cabecera rotula
+// «GML importado · no del Catastro» y el renglón de procedencia lo repite—. Lo
+// que se ha ido es el bloqueo, no la verdad.
 //
 // ── LA URL (decisión D3): HASH, Y EL DATO MANDA SOBRE LA URL ───────────────
 // `#/parcela/validacion`. El hash no necesita nada del servidor, así que GitHub
@@ -157,30 +174,18 @@ export const ROTULO_PASO = Object.freeze({
 })
 
 /**
- * Los dos modos de la sesión. **NO son las banderas de montaje de `crearVisor`**
- * (`comprobacion: true` / `diagnostico: true`): aquéllas dicen qué cajón se
- * construye, éste dice de quién es la geometría que estás mirando.
- *
- * · `NORMAL` — la geometría es del expediente: se edita y se genera GML.
- * · `COMPROBACION` — la geometría viene del GML de otro y es de SOLO LECTURA
- *   hasta que se cruza la puerta ({@link Navegacion#abrirPuerta}).
- *
- * @readonly
- */
-export const MODO = Object.freeze({ NORMAL: 'NORMAL', COMPROBACION: 'COMPROBACION' })
-
-/** Los modos, para los mensajes de error y para el test. @readonly */
-export const MODOS = Object.freeze([MODO.NORMAL, MODO.COMPROBACION])
-
-/**
  * Por qué está bloqueado un paso, como DATO y no como texto. El aplicador puede
- * necesitar distinguirlos —un bloqueo por MODO lleva la puerta al lado y los
- * otros dos no— y el test puede afirmar la causa sin copiar el literal del
- * motivo, que es la regla de la casa desde `MOTIVO_SIN_OFICIAL` (F07).
+ * necesitar distinguirlos y el test puede afirmar la causa sin copiar el literal
+ * del motivo, que es la regla de la casa desde `MOTIVO_SIN_OFICIAL` (F07).
+ *
+ * ⛔ **Aquí hubo un tercer valor, `MODO`, y se retiró el 2026-08-07** junto con el
+ * eje entero. El porqué está en la cabecera; el resumen es que la puerta que
+ * levantaba ese bloqueo vivía en una pantalla a la que el propio bloqueo impedía
+ * llegar.
  *
  * @readonly
  */
-export const CAUSA = Object.freeze({ RAMA: 'RAMA', MODO: 'MODO', DATO: 'DATO' })
+export const CAUSA = Object.freeze({ RAMA: 'RAMA', DATO: 'DATO' })
 
 // ── Los hechos: lo único que entra de fuera ─────────────────────────────────
 
@@ -271,25 +276,56 @@ export const MOTIVO_RAMA = Object.freeze({
 })
 
 /**
- * Por qué un paso no está en modo COMPROBACIÓN. **Nombra la puerta**, porque un
- * bloqueo del que no se dice la salida es una cárcel (decisión D4).
- *
- * @readonly
- */
-export const MOTIVO_MODO = Object.freeze({
-  [PASO.EDICION]: 'Estás comprobando el GML de otro. Pulsa «Tomar esta geometría y editarla».',
-})
-
-/**
  * Qué DATO falta. Va indexado por el hecho que falta y **no por el paso**, a
  * propósito: la causa es la misma se mire desde donde se mire, y un texto por
  * paso serían cinco frases que hay que mantener diciendo lo mismo.
  *
  * @readonly
  */
+/**
+ * ⭐ **Cómo se consigue el parcelario oficial. UNA frase, en UN sitio (2026-08-08).**
+ *
+ * ── POR QUÉ EXISTE ──
+ * Cuatro sitios distintos de la aplicación le decían al usuario que le faltaba el
+ * parcelario, y **los cuatro le mandaban a la trampa**: «tráelo desde Entrada»,
+ * «tráela del Catastro y se enciende», «trae la parcela del Catastro y vuelve»,
+ * «tráelo con la referencia catastral». Hasta el 2026-08-08 hacer eso **borraba su
+ * medición** — el Catastro entraba en `recintos` y en `geometriaOficial` a la vez—,
+ * así que la aplicación estaba empujando activamente hacia su peor defecto, con
+ * cuatro redacciones distintas de la misma instrucción equivocada.
+ *
+ * Arreglado el defecto, la instrucción correcta es otra y hay que decirla en los
+ * cuatro. Se escribe una vez: cuatro copias de una frase que hay que mantener
+ * diciendo lo mismo son cuatro sitios donde volver a equivocarse, y ya pasó.
+ *
+ * ── QUÉ DICE, Y POR QUÉ ASÍ ──
+ * Nombra **el botón**, que es lo que el usuario tiene que encontrar, y dice **lo que
+ * NO pasa** —que su medición sigue—, que es exactamente el miedo que la frase
+ * anterior confirmaba. No nombra la pantalla a propósito: dos de los cuatro sitios
+ * la enseñan a unos píxeles del botón, y «ve a Validación» leído al lado del botón
+ * es la clase de instrucción que enseña a desconfiar del texto.
+ *
+ * ⚠️ **Vive aquí, en `navegacion.js`, y no en el cableado del botón**, por lo mismo
+ * que {@link MOTIVO_DATO}: este módulo no importa ningún `app/cableado-*.js`, así que
+ * los cuatro pueden traérsela sin ciclo. Al revés no se podía.
+ *
+ * ⛔ **SU LONGITUD ES CARGA ESTRUCTURAL, no estilo.** Uno de los cuatro sitios es
+ * {@link MOTIVO_DATO}`.oficial`, que se pinta en el chip del RAIL: 210 px medidos, con
+ * un tope de 90 caracteres para el motivo entero. Con 24 del enunciado de estado,
+ * esta frase no puede pasar de 66. Alargarla pone rojo el guardián de los motivos —
+ * que es donde hay que enterarse, y no en la pantalla del usuario con la ficha del
+ * pie del rail empujada fuera.
+ */
+export const INSTRUCCION_PARCELARIO =
+  'Tráelo con «Traer el parcelario de fondo»: tu medición sigue.'
+
 export const MOTIVO_DATO = Object.freeze({
   geometria: 'Trae antes una parcela: por referencia catastral o desde tu medición.',
-  oficial: 'Falta el parcelario del Catastro: tráelo desde Entrada.',
+  // ⛔ Decía «tráelo desde Entrada», y ahí el único botón que había era el que
+  // SUSTITUÍA la medición del usuario por la del Catastro: el rail empujaba a la
+  // trampa. El enunciado es corto porque este motivo vive en el chip del rail; ver
+  // el tope en {@link INSTRUCCION_PARCELARIO}.
+  oficial: `Sin parcelario oficial. ${INSTRUCCION_PARCELARIO}`,
   diagnostico: 'Haz antes el diagnóstico de encaje: el informe firma su resultado.',
 })
 
@@ -313,16 +349,6 @@ export const MOTIVO_DATO = Object.freeze({
 export const MOTIVO_DATO_EDIFICIO = Object.freeze({
   geometria: 'Trae antes un edificio, o añade una parte y dibuja su recinto.',
 })
-
-/** El rótulo del CTA que cruza la puerta. Lo pinta el aplicador; el nombre es de
- *  aquí para que el motivo de arriba y el botón digan la MISMA cadena. */
-export const ROTULO_PUERTA = 'Tomar esta geometría y editarla'
-
-/** Por qué no se puede cruzar una puerta que no está abierta. Es un fallo de
- *  programación (el CTA no debería existir fuera de COMPROBACIÓN), pero se cuenta
- *  en español porque el aplicador puede enseñarlo. */
-export const MOTIVO_SIN_PUERTA =
-  'No estás comprobando ningún GML ajeno, así que no hay ninguna geometría de otro que tomar.'
 
 /**
  * Lo que se le dice a quien aterriza desde un enlace que pide un paso que sus
@@ -377,7 +403,6 @@ export const TOPE_RECONCILIACION = 8
  * no se podía hacer cuando esto vivía repartido en doce ficheros.
  *
  * · `ramas`         — en qué ramas existe el paso.
- * · `enComprobacion`— si el paso está disponible con el GML de otro delante.
  * · `requiere`      — qué hechos hacen falta, **en el orden en que se nombran**:
  *                     si faltan dos, se dice el primero de la lista. Para el
  *                     diagnóstico eso significa «trae antes una parcela» antes
@@ -394,8 +419,8 @@ export const TOPE_RECONCILIACION = 8
  * @readonly
  */
 const REGLA = Object.freeze({
-  [PASO.ENTRADA]: { ramas: RAMAS, enComprobacion: true, requiere: Object.freeze([]) },
-  [PASO.VALIDACION]: { ramas: RAMAS, enComprobacion: true, requiere: Object.freeze(['geometria']) },
+  [PASO.ENTRADA]: { ramas: RAMAS, requiere: Object.freeze([]) },
+  [PASO.VALIDACION]: { ramas: RAMAS, requiere: Object.freeze(['geometria']) },
   // ⛔ **F12 · T4.2 · EDICIÓN PASA A EXISTIR TAMBIÉN EN LA RAMA EDIFICIO.**
   //
   // Hasta el 2026-08-06 este paso era `[RAMA.PARCELA]` y su motivo decía «esta
@@ -409,11 +434,11 @@ const REGLA = Object.freeze({
   // y F12 sería código que solo existe en los tests, que es lo que le pasó a F11
   // hasta su T4.1—. Lo destapó una prueba de T4.2 al intentar navegar hasta aquí.
   //
-  // `enComprobacion: false` NO cambia: comprobar el GML de otro sigue siendo un
-  // modo de la rama de parcela, y ahí la puerta se cruza con su CTA.
+  // ⛔ **Y el 2026-08-07 pierde su `enComprobacion: false`**, que era el único
+  // `false` de toda la tabla: era lo que apagaba Edición mientras hubiera un GML
+  // ajeno delante. El porqué de la retirada está en la cabecera.
   [PASO.EDICION]: {
     ramas: RAMAS,
-    enComprobacion: false,
     requiere: Object.freeze(['geometria']),
   },
   // ⭐ **F14 · DIAGNÓSTICO E INFORME PASAN A EXISTIR TAMBIÉN EN LA RAMA EDIFICIO**,
@@ -434,7 +459,6 @@ const REGLA = Object.freeze({
   //     se sostiene con la construcción y nada más.
   [PASO.DIAGNOSTICO]: {
     ramas: RAMAS,
-    enComprobacion: true,
     requiere: Object.freeze({
       [RAMA.PARCELA]: Object.freeze(['geometria', 'oficial']),
       [RAMA.EDIFICIO]: Object.freeze(['geometria']),
@@ -442,7 +466,6 @@ const REGLA = Object.freeze({
   },
   [PASO.INFORME]: {
     ramas: RAMAS,
-    enComprobacion: true,
     requiere: Object.freeze({
       [RAMA.PARCELA]: Object.freeze(['diagnostico']),
       [RAMA.EDIFICIO]: Object.freeze(['geometria']),
@@ -480,10 +503,10 @@ const EMPTY = Object.freeze([])
  * este módulo la llama.
  *
  * @param {string} paso
- * @param {{rama: string, modo: string, hechos: object}} situacion
+ * @param {{rama: string, hechos: object}} situacion
  * @returns {{disponible: boolean, causa: string|null, motivo: string|null}}
  */
-export function evaluarPaso(paso, { rama, modo, hechos }) {
+export function evaluarPaso(paso, { rama, hechos }) {
   const regla = REGLA[paso]
   if (regla === undefined) {
     throw new RangeError(
@@ -494,11 +517,7 @@ export function evaluarPaso(paso, { rama, modo, hechos }) {
   if (!regla.ramas.includes(rama)) {
     return { disponible: false, causa: CAUSA.RAMA, motivo: MOTIVO_RAMA[paso] ?? null }
   }
-  // 2 · MODO — la geometría es de otro. Se arregla cruzando la puerta.
-  if (modo === MODO.COMPROBACION && !regla.enComprobacion) {
-    return { disponible: false, causa: CAUSA.MODO, motivo: MOTIVO_MODO[paso] ?? null }
-  }
-  // 3 · DATO — lo único que se resuelve solo según se avanza.
+  // 2 · DATO — lo único que se resuelve solo según se avanza.
   for (const hecho of hechosQueExige(regla, rama)) {
     if (hechos[hecho] !== true) {
       // El de la rama manda cuando lo hay: ver {@link MOTIVO_DATO_EDIFICIO}.
@@ -513,9 +532,8 @@ export function evaluarPaso(paso, { rama, modo, hechos }) {
 
 /**
  * El estado, escrito como hash. `{rama: 'PARCELA', paso: 'validacion'}` →
- * `#/parcela/validacion`. **El modo no viaja en la URL**: la comprobación empieza
- * al soltar el fichero de otro, y un enlace nunca lleva ese fichero, así que
- * escribirlo prometería un estado imposible de restaurar.
+ * `#/parcela/validacion`. Los dos ejes caben enteros, que es lo que hace que
+ * atrás/adelante y un enlace pegado se comporten igual.
  *
  * @param {{rama: string, paso: string}} estado
  * @returns {string}
@@ -627,7 +645,6 @@ function fundirHechos(parciales, base, quien) {
  * @typedef {Object} Situacion
  * @property {'PARCELA'|'EDIFICIO'} rama
  * @property {string} paso
- * @property {'NORMAL'|'COMPROBACION'} modo
  * @property {{geometria: boolean, oficial: boolean, diagnostico: boolean}} hechos
  *   Los hechos **de la rama activa**. Los de la otra siguen guardados: ver
  *   {@link Navegacion#hechosDe}.
@@ -667,7 +684,6 @@ function fundirHechos(parciales, base, quien) {
  * @param {Object} [opciones]
  * @param {'PARCELA'|'EDIFICIO'} [opciones.rama=RAMA.PARCELA]
  * @param {string} [opciones.paso=PASO.ENTRADA]
- * @param {'NORMAL'|'COMPROBACION'} [opciones.modo=MODO.NORMAL]
  * @param {object} [opciones.hechos]  Hechos de la rama inicial, o un registro por
  *   rama (`{PARCELA: {...}, EDIFICIO: {...}}`) si ya se conocen los dos.
  * @param {((mensaje: string, opciones?: object) => void)|null} [opciones.avisar]
@@ -678,19 +694,12 @@ function fundirHechos(parciales, base, quien) {
 export function crearNavegacion({
   rama = RAMA.PARCELA,
   paso = PASO.ENTRADA,
-  modo = MODO.NORMAL,
   hechos = {},
   avisar = null,
 } = {}) {
   const contarlo = resolverAvisar(avisar)
   exigirRama(rama, 'crearNavegacion')
   exigirPaso(paso, 'crearNavegacion')
-  if (!MODOS.includes(modo)) {
-    throw new RangeError(
-      `crearNavegacion: modo desconocido ${JSON.stringify(modo)}. Los únicos son ` +
-        `${MODOS.map((m) => `MODO.${m}`).join(' y ')}.`,
-    )
-  }
 
   // Los hechos van POR RAMA, y no es un lujo: si fueran uno solo habría una
   // ventana —entre conmutar y refrescar— en la que la rama diría EDIFICIO y los
@@ -721,9 +730,9 @@ export function crearNavegacion({
     notificado = situacion
   })
 
-  /** @param {string} r @returns {Situacion} */
-  const situacionCon = (r, p, m) =>
-    Object.freeze({ rama: r, paso: p, modo: m, hechos: Object.freeze({ ...porRama[r] }) })
+  /** @param {string} r @param {string} p @returns {Situacion} */
+  const situacionCon = (r, p) =>
+    Object.freeze({ rama: r, paso: p, hechos: Object.freeze({ ...porRama[r] }) })
 
   /**
    * Publica un estado nuevo y **reconcilia la guarda anti-reentrada de
@@ -791,18 +800,18 @@ export function crearNavegacion({
    * cuenta**. Un usuario al que la pantalla le cambia debajo sin explicación cree
    * que ha hecho algo mal.
    *
-   * @param {{rama: string, paso: string, modo: string}} pretendida
+   * @param {{rama: string, paso: string}} pretendida
    * @returns {Desenlace}
    */
-  function asentar({ rama: r, paso: p, modo: m }) {
-    const tentativa = situacionCon(r, p, m)
+  function asentar({ rama: r, paso: p }) {
+    const tentativa = situacionCon(r, p)
     const veredicto = evaluarPaso(p, tentativa)
     if (veredicto.disponible) {
       publicar(tentativa)
       return { ok: true, paso: p, causa: null, motivo: null }
     }
     const destino = ultimoSostenible(tentativa)
-    publicar(situacionCon(r, destino, m))
+    publicar(situacionCon(r, destino))
     const aviso = mensajeCaida(p, destino, veredicto.motivo ?? '')
     contarlo(aviso, { nivel: NIVEL.AVISO })
     return { ok: false, paso: destino, causa: veredicto.causa, motivo: aviso }
@@ -812,9 +821,9 @@ export function crearNavegacion({
   // publicar por el canal de avisos durante el montaje llenaría el panel antes de
   // que el usuario haya hecho nada.
   {
-    const tentativa = situacionCon(rama, paso, modo)
+    const tentativa = situacionCon(rama, paso)
     const pisoFirme = evaluarPaso(paso, tentativa).disponible ? paso : ultimoSostenible(tentativa)
-    publicar(situacionCon(rama, pisoFirme, modo))
+    publicar(situacionCon(rama, pisoFirme))
   }
 
   /**
@@ -825,8 +834,6 @@ export function crearNavegacion({
    * @property {(rama: string) => Desenlace} cambiarRama
    * @property {(parciales: object, rama?: string) => Desenlace} actualizarHechos
    * @property {(rama: string) => object} hechosDe
-   * @property {() => Desenlace} entrarEnComprobacion
-   * @property {() => Desenlace} abrirPuerta
    * @property {() => PeldañoDelRail[]} rail
    * @property {() => string} ruta
    * @property {(hash: string) => Desenlace} irARuta
@@ -859,7 +866,7 @@ export function crearNavegacion({
       if (!veredicto.disponible) {
         return { ok: false, paso: actual.paso, causa: veredicto.causa, motivo: veredicto.motivo }
       }
-      publicar(situacionCon(actual.rama, destino, actual.modo))
+      publicar(situacionCon(actual.rama, destino))
       return { ok: true, paso: destino, causa: null, motivo: null }
     },
 
@@ -868,10 +875,6 @@ export function crearNavegacion({
      * que el paso se reevalúa **contra los suyos** y no contra los de la rama de
      * la que se viene; si no se sostiene, se cae y se cuenta.
      *
-     * ⚠️ El modo NO se toca. En la rama EDIFICIO la comprobación no añade ningún
-     * bloqueo que la rama no ponga ya, y borrarlo al conmutar significaría que ir
-     * y volver te saca del modo sin pedírtelo.
-     *
      * @param {string} destino
      * @returns {Desenlace}
      */
@@ -879,7 +882,7 @@ export function crearNavegacion({
       exigirRama(destino, 'cambiarRama')
       const actual = store.get()
       if (destino === actual.rama) return { ok: true, paso: actual.paso, causa: null, motivo: null }
-      return asentar({ rama: destino, paso: actual.paso, modo: actual.modo })
+      return asentar({ rama: destino, paso: actual.paso })
     },
 
     /**
@@ -894,7 +897,7 @@ export function crearNavegacion({
       exigirRama(rama, 'actualizarHechos')
       porRama[rama] = fundirHechos(parciales, porRama[rama], 'actualizarHechos')
       const actual = store.get()
-      return asentar({ rama: actual.rama, paso: actual.paso, modo: actual.modo })
+      return asentar({ rama: actual.rama, paso: actual.paso })
     },
 
     /**
@@ -908,35 +911,6 @@ export function crearNavegacion({
     hechosDe(rama) {
       exigirRama(rama, 'hechosDe')
       return Object.freeze({ ...porRama[rama] })
-    },
-
-    /**
-     * Entra en comprobación: la geometría que hay delante es de otro. Fuerza la
-     * rama PARCELA —se comprueba el GML de una parcela, no de un edificio— y
-     * reevalúa el paso.
-     *
-     * @returns {Desenlace}
-     */
-    entrarEnComprobacion() {
-      const actual = store.get()
-      return asentar({ rama: RAMA.PARCELA, paso: actual.paso, modo: MODO.COMPROBACION })
-    },
-
-    /**
-     * **La puerta** (D4). Toma la geometría del GML ajeno como propia: el modo
-     * pasa a NORMAL y el rail se completa. Se queda en el paso en el que estaba,
-     * que es lo que espera quien acaba de decir «y ahora quiero editar esto»:
-     * el rail se enciende delante de sus ojos en vez de teletransportarle.
-     *
-     * @returns {Desenlace}
-     */
-    abrirPuerta() {
-      const actual = store.get()
-      if (actual.modo !== MODO.COMPROBACION) {
-        return { ok: false, paso: actual.paso, causa: CAUSA.MODO, motivo: MOTIVO_SIN_PUERTA }
-      }
-      publicar(situacionCon(actual.rama, actual.paso, MODO.NORMAL))
-      return { ok: true, paso: actual.paso, causa: null, motivo: null }
     },
 
     /**
@@ -994,14 +968,14 @@ export function crearNavegacion({
       if (pedido === null) {
         return { ok: false, paso: actual.paso, causa: null, motivo: null }
       }
-      const tentativa = situacionCon(pedido.rama, pedido.paso, actual.modo)
+      const tentativa = situacionCon(pedido.rama, pedido.paso)
       const veredicto = evaluarPaso(pedido.paso, tentativa)
       if (veredicto.disponible) {
         publicar(tentativa)
         return { ok: true, paso: pedido.paso, causa: null, motivo: null }
       }
       const destino = ultimoSostenible(tentativa)
-      publicar(situacionCon(pedido.rama, destino, actual.modo))
+      publicar(situacionCon(pedido.rama, destino))
       const aviso = mensajeAterrizaje(pedido.paso, destino)
       contarlo(aviso, { nivel: NIVEL.AVISO })
       return { ok: false, paso: destino, causa: veredicto.causa, motivo: aviso }

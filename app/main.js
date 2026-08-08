@@ -510,6 +510,7 @@ import {
   puedeDeshacer,
   puedeRehacer,
   redo,
+  reencuadrar,
   reiniciar,
   undo,
 } from '../edit/historial.js'
@@ -594,7 +595,7 @@ import {
   parcelaDemoConHueco,
 } from './demo-datos.js'
 import { cablearContraste } from './contraste.js'
-import { MODO, PASO, crearNavegacion } from './navegacion.js'
+import { PASO, crearNavegacion } from './navegacion.js'
 import { crearPanelEdificio } from './panel-edificio.js'
 import { cablearPantalla } from './pantalla.js'
 import { cablearRail } from './rail.js'
@@ -704,17 +705,17 @@ const EYEBROW_MEDICION = 'Tu medición · no del Catastro'
  * Contraste y reescribe `data-procedencia`, y cambiarlo de refilón en la última
  * tarea de otra fase es como se rompe lo que nadie está mirando—. F19 es su casa.
  *
- * ⭐ **Y son DOS, porque este rótulo sí cambia con el MODO.** Mientras estás
- * comprobando, la geometría es de otro; al cruzar la puerta de F08 («Tomar esta
- * geometría y editarla») pasa a ser tuya **sin que el origen cambie** — el origen
- * dice de dónde salió el dibujo y eso no cambia nunca (`app/contraste.js`). Seguir
- * diciendo «de otro técnico» sobre algo que llevas media hora editando sería tan
- * falso como decir «del Catastro»; y decir «tu medición» sería peor todavía,
- * porque no la mediste tú. Es la misma distinción que `textoProcedencia` hace en
- * el renglón de procedencia desde F08, aplicada por fin a la cabecera.
+ * ⭐ **Y es UNO desde el 2026-08-07, cuando era dos.** Había un segundo rótulo
+ * —«GML de otro técnico · tomado como tuyo»— para después de cruzar la puerta de
+ * F08; retirado el modo COMPROBACIÓN, no hay dos estados que distinguir.
+ *
+ * ⚠️ **Y ya no dice «de otro técnico», que era una afirmación sin respaldo.** El
+ * GML que se abre es, la mayoría de las veces, **el tuyo** —el que generaste ayer y
+ * vienes a retocar—, y esta aplicación no tiene forma de saber quién lo escribió.
+ * Lo que sí sabe, y es lo único que de verdad protegía aquel rótulo, es que **no lo
+ * emite el Catastro**: eso es lo que se dice.
  */
-const EYEBROW_GML_AJENO = 'GML de otro técnico · no del Catastro'
-const EYEBROW_GML_TOMADO = 'GML de otro técnico · tomado como tuyo'
+const EYEBROW_GML_IMPORTADO = 'GML importado · no del Catastro'
 
 /**
  * Los orígenes de `ORIGEN_PARCELA` que significan «lo ha medido el técnico». Se
@@ -1254,6 +1255,12 @@ const ID_LOCAL_DEMO = parcela?.idLocal ?? null
 // arranque. Ver {@link rotuloDelDato} y la decisión 4 de la cabecera.
 const eyebrow = nodo('[data-eyebrow]')
 
+// Los dos indicadores de qué geometrías hay cargadas. Se resuelven aquí, una vez y
+// al montar, como todos los nodos del contrato con `index.html`; los escribe
+// {@link pintarCapasCargadas} desde el mismo suscriptor que el eyebrow.
+const capaMedicion = nodo('[data-capa="medicion"]')
+const capaOficial = nodo('[data-capa="oficial"]')
+
 // ── 2 · Estado e historial ───────────────────────────────────────────────────
 
 // UN solo store para las TRES vistas: el dibujo del mapa, la tabla de vértices
@@ -1393,24 +1400,6 @@ let colindantesTraidas = null
 let ramaEnPantalla = RAMA.PARCELA
 
 /**
- * El MODO que hay en pantalla, y el **espejo** de `app/navegacion.js`, que es su
- * dueño. Existe por el mismo motivo estructural que {@link ramaEnPantalla} y con
- * una razón medida encima (F19):
- *
- * ⛔ **`navegacion` se declara en el paso 14 y la ficha se pinta en el paso 4.**
- * `repintarFicha()` se llama a mano al montar —si no, la cabecera se quedaría con
- * los guiones del HTML hasta la primera edición—, así que leer `navegacion` desde
- * {@link rotuloDelDato} es un `ReferenceError` de zona muerta **al cargar el
- * módulo**: no fallaría el rótulo, no arrancaría la aplicación.
- *
- * Nace en NORMAL porque es con lo que arranca la pantalla: a Comprobación se entra
- * soltando el GML de otro, que es un gesto del usuario y siempre posterior.
- *
- * @type {'NORMAL'|'COMPROBACION'}
- */
-let modoEnPantalla = MODO.NORMAL
-
-/**
  * El rótulo de PROCEDENCIA de la cabecera (`data-eyebrow`): qué es, exactamente,
  * lo que hay en pantalla. Tres estados, que son los tres que la app distingue:
  *
@@ -1437,12 +1426,11 @@ let modoEnPantalla = MODO.NORMAL
  * cierto mientras el Catastro fuera la única puerta. Hoy hay cuatro orígenes en
  * `ORIGEN_PARCELA` y tres de ellos NO son la Sede.
  *
- *   · **{@link EYEBROW_GML_AJENO}** / **{@link EYEBROW_GML_TOMADO}** — ⚠️ **el
- *     quinto y el sexto, y los estrena F19**: la geometría viene del GML de otro
- *     técnico. Son dos porque este caso —y solo este— **cambia al cruzar la
- *     puerta** de F08: el origen sigue diciendo `GML_EXISTENTE`, que es la verdad,
- *     pero ya la has tomado como tuya. Hasta F19 los dos decían «del Catastro»;
- *     F18 lo midió al pasar y lo dejó dicho con su fecha, sin tocarlo.
+ *   · **{@link EYEBROW_GML_IMPORTADO}** — ⚠️ **el quinto, y lo estrena F19**: la
+ *     geometría viene de un GML que se ha abierto desde un fichero. Hasta F19 este
+ *     caso decía «del Catastro»; F18 lo midió al pasar y lo dejó dicho con su
+ *     fecha, sin tocarlo. Eran DOS rótulos hasta el 2026-08-07, uno a cada lado de
+ *     la puerta de F08; retirada la puerta, hay un solo estado que rotular.
  *
  * Sin parcela (`null`, que el store admite) se cae al lado conservador: el de la
  * demostración. Nunca se afirma «del Catastro» sin una parcela que lo respalde.
@@ -1451,14 +1439,6 @@ let modoEnPantalla = MODO.NORMAL
  * hasta F18. Aquel criterio decía «si no es la demo, la trajo el Catastro», y era
  * cierto mientras el Catastro fuera la única puerta. Hoy hay cuatro orígenes en
  * `ORIGEN_PARCELA` y tres de ellos NO son la Sede.
- *
- * ⛔ **Y el modo NO se lee de `navegacion`, aunque sea quien manda: se lee del
- * espejo {@link modoEnPantalla}.** Medido antes de escribirlo: la ficha se pinta a
- * mano al montar (`repintarFicha()`, paso 4) y `crearNavegacion` es **el paso
- * 14**, así que tocar `navegacion` desde aquí es un `ReferenceError` de zona
- * muerta que **impide arrancar la aplicación entera**, no un fallo del rótulo. El
- * patrón —una variable de módulo que el suscriptor mantiene al día— es el mismo
- * que `ramaEnPantalla` de F11, y por el mismo motivo.
  *
  * @param {object|null} parcelaActual  POJO de parcela del store (o `null`).
  * @returns {string}
@@ -1475,9 +1455,7 @@ function rotuloDelDato(parcelaActual) {
   if (ID_LOCAL_DEMO !== null && parcelaActual.idLocal === ID_LOCAL_DEMO) {
     return esSintetica ? EYEBROW_SINTETICA : EYEBROW_DEMOSTRACION
   }
-  if (parcelaActual.origen === ORIGEN_PARCELA.GML_EXISTENTE) {
-    return modoEnPantalla === MODO.COMPROBACION ? EYEBROW_GML_AJENO : EYEBROW_GML_TOMADO
-  }
+  if (parcelaActual.origen === ORIGEN_PARCELA.GML_EXISTENTE) return EYEBROW_GML_IMPORTADO
   return ORIGENES_MEDIDOS.has(parcelaActual.origen) ? EYEBROW_MEDICION : EYEBROW_CATASTRO
 }
 
@@ -1634,6 +1612,7 @@ function actualizarFicha(parcelaActual) {
   const declarada = declaradaDe(parcelaActual)
 
   eyebrow.textContent = rotuloDelDato(parcelaActual)
+  pintarCapasCargadas(parcelaActual)
 
   fichaSrs.textContent = SRS_DEMO
   // `refcat` es `null` en el dataset sintético, y se DICE («Sin referencia») en
@@ -1655,6 +1634,39 @@ function actualizarFicha(parcelaActual) {
   // dueño. Mientras nadie pregunte, el texto dice que no se ha preguntado.
   fichaColindantes.textContent =
     colindantesTraidas === null ? SIN_COLINDANTES : FORMATO_ENTERO.format(colindantesTraidas)
+}
+
+/**
+ * Los dos indicadores de qué geometrías hay cargadas (2026-08-08).
+ *
+ * ── POR QUÉ EXISTEN ──
+ * Desde que traer el Catastro tiene dos puertas, el modelo puede estar en cuatro
+ * estados y no en dos: sin nada, solo con levantamiento, solo con parcelario, o con
+ * los dos. Hasta ahora la única forma de saber en cuál estabas era mirar el mapa y
+ * adivinar de quién era cada trazo — y de eso depende qué se va a generar y si el
+ * diagnóstico tiene contra qué medir.
+ *
+ * ⛔ **INFORMAN, NO CONTROLAN.** No son botones, no llevan `data-accion` y no
+ * seleccionan capa activa. El día que se conviertan en selectores, esta feature se
+ * ha desbordado hacia el sistema general de capas, que está fuera del alcance a
+ * propósito.
+ *
+ * ⚠️ El estado se dice con PALABRAS además de con color, y no es celo: el color es
+ * el único canal que un daltónico no tiene, y lo que estos dos indicadores comunican
+ * es qué se va a firmar.
+ *
+ * @param {object|null} parcelaActual
+ * @returns {void}
+ */
+function pintarCapasCargadas(parcelaActual) {
+  const hayMedicion = recintosDe(parcelaActual).length > 0
+  const oficial = parcelaActual === null ? null : parcelaActual?.geometriaOficial
+  const hayOficial = Array.isArray(oficial) && oficial.length > 0
+
+  capaMedicion.dataset.presente = String(hayMedicion)
+  capaMedicion.textContent = hayMedicion ? 'Levantamiento' : 'Sin levantamiento'
+  capaOficial.dataset.presente = String(hayOficial)
+  capaOficial.textContent = hayOficial ? 'Parcelario del Catastro' : 'Sin parcelario'
 }
 
 // ── F11 · la otra cara de la misma ficha ─────────────────────────────────────
@@ -2083,6 +2095,8 @@ function numeroTecleado(texto) {
  *   deshacer: () => boolean,
  *   rehacer: () => boolean,
  *   alCargarParcela: (parcelaNueva: object) => void,
+ *   alCambiarDocumento: (parcelaNueva: object) => void,
+ *   alCambiarOficial: (parcela: object) => void,
  *   alColindantes: (resultado: object) => void,
  *   destruir: () => void,
  * }}
@@ -2302,10 +2316,27 @@ export function cablearEdicion({
     )
   }
 
-  // ── Los dos ganchos del Catastro ──────────────────────────────────────────
+  // ── Los ganchos del Catastro ──────────────────────────────────────────────
+  //
+  // ⛔ **ESTO ERA UN GANCHO QUE HACÍA CINCO COSAS, Y HUBO QUE PARTIRLO (2026-08-08).**
+  // Desde que traer el Catastro tiene DOS puertas —«empezar desde el Catastro», que
+  // sustituye el documento, y «traer el parcelario de fondo», que solo aporta la
+  // geometría oficial—, las cinco responsabilidades ya no caen del mismo lado:
+  //
+  //   | Efecto                  | ¿Solo fondo? | Por qué |
+  //   |-------------------------|--------------|---------|
+  //   | reiniciar el historial  | **NO** | la geometría de trabajo no ha cambiado, y reiniciar es lo que te roba el «deshacer» |
+  //   | «parcela nueva»         | **NO** | no hay parcela nueva: hay fondo nuevo, y necesita su propio mensaje |
+  //   | soltar las colindantes  | SÍ | son las vecinas de OTRA parcela: dejarlas engancha el snap a geometría de otro sitio |
+  //   | contador de vecinas     | SÍ | mismo motivo |
+  //   | reencuadrar el historial| SÍ | ver {@link alCambiarOficial}: sin esto el primer Ctrl+Z borra el fondo |
+  //
+  // Se parten en dos con nombre propio, y {@link alCargarParcela} se queda como la
+  // COMPOSICIÓN de los dos para los tres llamantes a los que sí les cambia el
+  // documento entero (fichero, pegado, proyecto). Ninguno de ellos cambia.
 
   /**
-   * Ha entrado una parcela NUEVA en el store (la ha traído `cablearCatastro`).
+   * Ha entrado un DOCUMENTO nuevo en el store.
    *
    * REINICIA el historial en vez de commitear encima, y esa es la decisión 2 de
    * F06: deshacer revierte ediciones de la geometría, nunca «la parcela que
@@ -2314,20 +2345,65 @@ export function cablearEdicion({
    * generaría— sin que nada lo anunciase; el usuario creería estar deshaciendo un
    * arrastre y estaría cambiando de expediente.
    *
-   * Y se sueltan las COLINDANTES, por lo mismo: son las vecinas de la parcela
-   * anterior. Dejarlas puestas mantendría como dianas de enganche unos linderos
-   * que ya no lindan con nada, y el snap engancharía a geometría de otro sitio
-   * sin que nada lo explicara.
-   *
    * @param {object} parcelaNueva  La que acaba de entrar en el store.
    * @returns {void}
    */
-  function alCargarParcela(parcelaNueva) {
+  function alCambiarDocumento(parcelaNueva) {
     reiniciar(historial, parcelaNueva)
+    refrescar()
+    decir(MENSAJE_PARCELA_NUEVA)
+  }
+
+  /**
+   * Ha entrado un PARCELARIO OFICIAL nuevo, con o sin documento nuevo detrás.
+   *
+   * ── POR QUÉ SE REENCUADRA EL HISTORIAL ──
+   * Con la puerta de contexto el `estado.set` mete un POJO nuevo con
+   * `geometriaOficial` rellena y la pila **no se toca**, así que el primer Ctrl+Z
+   * devolvería un *snapshot* anterior SIN oficial y el fondo desaparecería sin que
+   * nada lo explicara. `reencuadrar` reescribe la oficial en TODA la historia
+   * dejando `recintos` y el puntero de undo intactos: el fondo pasa a ser propiedad
+   * del documento, no de un paso que el usuario haya dado. Es lo coherente con la
+   * regla de oro 2 —la oficial no es algo que el usuario «hizo»— y es atómico, así
+   * que si algo falla a mitad la pila se queda como estaba.
+   *
+   * ── Y POR QUÉ SE SUELTAN LAS COLINDANTES ──
+   * Son las vecinas de la parcela ANTERIOR. Dejarlas puestas mantendría como dianas
+   * de enganche unos linderos que ya no lindan con nada, y el snap engancharía a
+   * geometría de otro sitio sin que nada lo explicara. **Esto sí vale para las dos
+   * puertas**, y es la mitad que se perdería si el gancho se hubiera partido mal.
+   *
+   * Lo que NO cabe aquí es lo que vive fuera de la edición —el diagnóstico ya
+   * calculado y los contornos de las vecinas dibujados en el mapa—: los invalida
+   * quien tiene esas piezas, en el paso 7. Ver allí.
+   *
+   * @param {object} parcela  La que acaba de entrar en el store, con su oficial.
+   * @returns {void}
+   */
+  function alCambiarOficial(parcela) {
+    reencuadrar(historial, (instantanea) => ({
+      ...instantanea,
+      geometriaOficial: parcela.geometriaOficial,
+    }))
     edicion.fijarColindantes([])
     alContarColindantes(null)
     refrescar()
-    decir(MENSAJE_PARCELA_NUEVA)
+  }
+
+  /**
+   * Los dos a la vez, en este orden. Es lo que necesita quien abre un documento
+   * ENTERO —un fichero, un pegado, un proyecto—, que trae a la vez geometría de
+   * trabajo y (a veces) parcelario.
+   *
+   * El orden importa: el documento SIEMBRA la pila y el parcelario la reencuadra
+   * sobre lo sembrado. Al revés, el reencuadre se perdería en el `reiniciar`.
+   *
+   * @param {object} parcelaNueva
+   * @returns {void}
+   */
+  function alCargarParcela(parcelaNueva) {
+    alCambiarDocumento(parcelaNueva)
+    alCambiarOficial(parcelaNueva)
   }
 
   /**
@@ -2431,6 +2507,8 @@ export function cablearEdicion({
     deshacer,
     rehacer,
     alCargarParcela,
+    alCambiarDocumento,
+    alCambiarOficial,
     alColindantes,
 
     /**
@@ -2609,12 +2687,42 @@ try {
     // typing (`on`/`off`) y solo actúa cuando tiene sentido deducir, así que un
     // clic normal del mapa no consulta nada.
     mapa: visor.mapa,
-    // ── F06 · abrir un documento nuevo ────────────────────────────────────
-    // Se llama tras cada `estado.set` de una parcela TRAÍDA, y aquí eso
-    // significa una sola cosa: REINICIAR el historial. Deshacer revierte
-    // ediciones de la geometría, nunca «la parcela que traje» (decisión 2 de
-    // F06). Ver {@link cablearEdicion}#alCargarParcela.
-    alCargarParcela: edicionCableada.alCargarParcela,
+    // ── LOS DOS GANCHOS, UNO POR PUERTA (2026-08-08) ──────────────────────
+    // Éste es el ÚNICO llamante que recibe los dos por separado, y es el motivo
+    // por el que hubo que partirlos: es el único que tiene dos puertas.
+    //
+    // · «Empezar desde el Catastro» dispara los dos: documento nuevo.
+    // · «Traer el parcelario de fondo» dispara solo el segundo: la geometría de
+    //   trabajo es la del usuario y se queda donde está.
+    //
+    // Deshacer revierte ediciones de la geometría, nunca «la parcela que traje»
+    // (decisión 2 de F06). Ver {@link cablearEdicion}#alCambiarDocumento.
+    alCargarParcela: edicionCableada.alCambiarDocumento,
+    alCambiarOficial: (parcela) => {
+      edicionCableada.alCambiarOficial(parcela)
+      // ── Y AQUÍ SE INVALIDA LO QUE LA EDICIÓN NO TIENE EN LA MANO ────────
+      // Las dos piezas que quedan hablan del fondo ANTERIOR, y las dos fallarían
+      // en silencio: siguen en pantalla, con aspecto de dato bueno.
+      //
+      //   · El DIAGNÓSTICO ya calculado. `cablearDiagnostico` lo olvida solo
+      //     cuando entra otra parcela, y lo detecta por IDENTIDAD
+      //     (`claveDeExpediente`: refcat o idLocal). Con la puerta de contexto la
+      //     identidad puede no moverse —una medición que ya traía referencia—, así
+      //     que hay que decírselo: si no, el botón del informe se queda encendido
+      //     y el PDF que baje mide contra un parcelario que ya no está.
+      //   · Los CONTORNOS de las vecinas dibujados en el mapa. `viewer/index.js`
+      //     los suelta en el mismo cambio de identidad, y por lo mismo aquí no se
+      //     entera. Un contorno gris junto a un fondo nuevo sigue diciendo «esto
+      //     linda con lo tuyo» sobre una parcela que ya no es la de al lado.
+      //
+      // Se comprueba la FORMA antes de llamar, misma doctrina que el resto de este
+      // paso: un cableado que no publique el canal no puede tumbar la carga, que ha
+      // ido bien.
+      if (typeof diagnosticoCableado?.olvidarPorFondoNuevo === 'function') {
+        diagnosticoCableado.olvidarPorFondoNuevo()
+      }
+      if (visor.colindantes !== null) visor.colindantes.limpiar()
+    },
     // Los seis nodos del bloque los localiza él con los selectores de su
     // contrato, y LANZA nombrándolos si `index.html` ha dejado de traerlos.
   })
@@ -2924,24 +3032,24 @@ comprobacionCableada = cablearComprobacion({
   // cubre el instante exacto del `drop`, que ocurre antes de que nadie navegue — dos
   // redes contra el mismo fallo, y la de aquí es la de dentro.
   cajonDiagnostico: visor.diagnostico.cajon,
-  // ── Rework de UI · T9 · el GML ajeno enciende el modo COMPROBACIÓN ────────
-  // Desde el instante en que se abre el cajón con el GML de otro, el rail apaga
-  // «Edición» **con el motivo escrito** («Estás comprobando el GML de otro. Pulsa
-  // "Tomar esta geometría y editarla"»). Antes de T9 no había nada que lo dijera: se
-  // podía editar el trabajo de otro técnico creyendo que era el propio.
+  // ── El GML de VARIAS parcelas para el recorrido, y hay que estar en Entrada ─
   //
-  // ⚠️ **Y VUELVE A ENTRADA, que no es un detalle: lo destapó una prueba.** El
-  // cajón de comprobación pertenece a la tercera vía de Entrada
-  // (`app/contraste.js#cajonDe`), así que soltar un fichero estando en Diagnóstico
-  // dejaba el rail diciendo «Diagnóstico» y la esquina del mapa enseñando el cajón
-  // de otra pantalla. Además es lo que el gesto significa: traer un fichero nuevo
-  // es empezar otro expediente, no seguir con el que había.
+  // ⛔ **Aquí estaba el `alComprobar` de T9, que encendía el modo COMPROBACIÓN**, y
+  // se fue con el modo el 2026-08-07 (ver la cabecera de `app/navegacion.js`). Lo
+  // que se queda es la otra mitad de aquel gancho, que sigue haciendo falta y que
+  // **lo destapó una prueba**: el cajón de comprobación pertenece a la tercera vía
+  // de Entrada (`app/contraste.js#cajonDe`), así que soltar un fichero estando en
+  // Diagnóstico dejaría el rail diciendo «Diagnóstico» y al dueño de la esquina
+  // cerrando el cajón que acaba de hacer una pregunta. Además es lo que el gesto
+  // significa: traer un fichero nuevo es empezar otro expediente.
+  //
+  // ⚠️ **Ahora solo se llama cuando hay algo que preguntar** —un fichero con más de
+  // un `featureMember`—. Un GML normal ya no abre ningún cajón: entra y se dibuja.
   //
   // ⚠️ `navegacion` se declara en el paso 14 y esto es el 9. No es un problema: la
   // flecha se CREA aquí y se LLAMA cuando el usuario suelta un fichero, que es
   // siempre después de que el módulo entero se haya evaluado.
-  alComprobar: () => {
-    navegacion.entrarEnComprobacion()
+  alPedirEleccion: () => {
     navegacion.navegarAPaso(PASO.ENTRADA)
   },
   // ── F06 · abrir un documento nuevo ────────────────────────────────────────
@@ -4126,8 +4234,9 @@ const contrasteCableado = cablearContraste({
   cerrarDiagnostico: () => visor.diagnostico.cajon.cerrar(),
   cerrarComprobacion: () => comprobacionCableada?.cerrar(),
   declararProcedencia: (texto) => visor.diagnostico.cajon.procedencia(texto),
-  mostrarPuerta: (visible) => visor.diagnostico.cajon.puerta(visible),
-  suscribirPuerta: (fn) => visor.diagnostico.cajon.alPuerta(fn),
+  // ⛔ Aquí iban `mostrarPuerta` y `suscribirPuerta`, los dos cables de «Tomar esta
+  // geometría y editarla». El botón y el modo que levantaba se retiraron el
+  // 2026-08-07: ver la cabecera de `app/navegacion.js`.
   // ── Rework de UI · rebanada 4 ────────────────────────────────────────────
   // El cajón de diagnóstico deja de ser descartable cuando ES la pantalla. La
   // decisión de cuándo lo es la toma `app/contraste.js` (es quien conoce el
@@ -4215,23 +4324,12 @@ ramaCableada.subscribe((rama) => {
   refrescarHechos()
 })
 
-// F19 · El espejo del MODO, y el único sitio que lo escribe.
+// ⛔ **AQUÍ VIVÍA EL ESPEJO DEL MODO (F19), Y SE FUE CON ÉL EL 2026-08-07.**
+// Repintaba la cabecera al cruzar la puerta de F08, porque «Tomar esta geometría y
+// editarla» no tocaba el store —la parcela era la misma— y ningún suscriptor de
+// `estado` se enteraba. Retirado el modo, el rótulo del GML importado es uno solo y
+// lo pinta el suscriptor del store como los otros cuatro.
 //
-// ⛔ **Sin esto, cruzar la puerta de F08 no cambiaría la cabecera**, y ese es el
-// caso entero: «Tomar esta geometría y editarla» no toca el store —la parcela es
-// la misma, el origen sigue siendo `GML_EXISTENTE`—, así que ningún suscriptor de
-// `estado` se entera. Lo que cambia es el MODO, y lo publica la navegación.
-//
-// El repintado va DESPUÉS de escribir el espejo y solo si el modo ha cambiado de
-// verdad: la navegación notifica también por paso y por rama, y repintar la ficha
-// entera en cada peldaño del rail sería trabajo de sobra en el camino caliente.
-navegacion.subscribe(({ modo }) => {
-  const nuevo = modo === MODO.COMPROBACION ? MODO.COMPROBACION : MODO.NORMAL
-  if (nuevo === modoEnPantalla) return
-  modoEnPantalla = nuevo
-  repintarFicha()
-})
-
 // ⭐ **AQUÍ ESTUVO EL APAÑO DE T5, Y T9 LO HA BORRADO.** Ponía esto:
 //
 //     ctaDiagnosticar.addEventListener('click', () => {

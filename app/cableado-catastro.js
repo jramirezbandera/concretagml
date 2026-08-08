@@ -30,18 +30,39 @@
 //     PUBLICA además a quien se haya suscrito con `alColindantes`— para que quien
 //     cablee decida qué hacer con él. Ni una vecina entra en el modelo.
 //
-// ── F06 · LOS DOS GANCHOS HACIA AFUERA, Y POR QUÉ SON DOS Y NO UNO ──────────
+// ── LAS DOS PUERTAS: «EMPEZAR DESDE EL CATASTRO» Y «TRAER EL FONDO» ─────────
+// `cargar({sustituir})` hace DOS cosas distintas según qué botón se haya pulsado, y
+// desde 2026-08-08 la distinción es un argumento y no una deducción:
+//
+//   · **`sustituir: true`** (por defecto, el botón de siempre) — documento nuevo. La
+//     geometría del WFS ocupa `recintos` **y** `geometriaOficial`.
+//   · **`sustituir: false`** — sólo el fondo. `recintos`, `origen` y el historial del
+//     usuario **no se tocan**; entra `geometriaOficial` y se adopta la `refcat`.
+//
+// Antes no había puerta 2 y `aplicar` construía la parcela desde cero: traer el
+// Catastro sobre una medición propia **la borraba**, y como el gancho de carga
+// reinicia el historial, tampoco volvía con Ctrl+Z. El reparto vive en
+// {@link componerParcelaConOficial}, y quién decide es el llamante — nunca el store.
+//
+// ── F06 · LOS GANCHOS HACIA AFUERA, Y POR QUÉ SON VARIOS Y NO UNO ──────────
 // Hasta F05 este módulo no llamaba a nadie: escribía en el store, en la cáscara y
-// devolvía resultados. F06 necesita dos avisos que el store NO puede dar, y por eso
-// son dos ganchos y no un suscriptor más de `estado.subscribe`:
+// devolvía resultados. F06 necesita avisos que el store NO puede dar, y por eso son
+// ganchos y no un suscriptor más de `estado.subscribe`:
 //
 //   · **`alCargarParcela(parcela)`** — se dispara tras el `estado.set` de una
-//     parcela **TRAÍDA del Catastro**, y sólo ahí. El store notifica TODOS los
-//     `set`, y desde fuera «parcela recién traída» y «parcela con un vértice
-//     movido» son indistinguibles: quien reinicia el historial de edición
-//     (`edit/historial.js`) necesita justo esa diferencia, porque reiniciarlo en
-//     cada arrastre borraría el «deshacer» del usuario. `deducir()` **no** lo
-//     dispara: rellena el campo, no mete geometría.
+//     parcela **TRAÍDA del Catastro que sustituye a la anterior**, y sólo ahí. El
+//     store notifica TODOS los `set`, y desde fuera «parcela recién traída» y
+//     «parcela con un vértice movido» son indistinguibles: quien reinicia el
+//     historial de edición (`edit/historial.js`) necesita justo esa diferencia,
+//     porque reiniciarlo en cada arrastre borraría el «deshacer» del usuario.
+//     `deducir()` **no** lo dispara: rellena el campo, no mete geometría. Y la
+//     puerta 2 **tampoco**: ahí no hay documento nuevo que sembrar.
+//   · **`alCambiarOficial(parcela)`** — se dispara por las DOS puertas, porque por
+//     las dos entra parcelario nuevo. Es de quien tiene que invalidar lo que dependía
+//     del fondo anterior: las dianas del snap, el contador de vecinas, el diagnóstico
+//     ya calculado y la capa que lo pinta. Sin este reparto, la puerta 2 dejaría
+//     colgadas las dianas de otra parcela y el snap engancharía a geometría de otro
+//     sitio sin que nada lo explicara.
 //   · **`alColindantes(resultado)`** — SUSCRIPCIÓN (varios oyentes, con baja), no
 //     un callback único, calcada de `crearEstadoVista#subscribe`. Recibe el
 //     {@link ResultadoCatastro} de una consulta de vecinas que ha ido BIEN: los
@@ -55,7 +76,7 @@
 // snap convirtiera una consulta correcta en una excepción del Catastro, que es
 // mentir sobre de quién es el fallo.
 //
-// ⚠️ Los dos son **opcionales**. Sin ellos el módulo se comporta exactamente como
+// ⚠️ Los tres son **opcionales**. Sin ellos el módulo se comporta exactamente como
 // en F05, y eso no es cortesía: `app/main.js` los enchufa cuando existe quien los
 // consume, y ningún test de F05 tuvo que cambiar para que existieran.
 //
@@ -147,6 +168,7 @@
 //
 // Su test es `test/app/catastro.dom.test.js`, **con sufijo `.dom`**: toca el DOM.
 
+import { solape } from '../diagnostico/topologia.js'
 import { husoPorSrs } from '../geo/huso.js'
 import { puntoInterior } from '../gml/anillos.js'
 import { ORIGEN_PARCELA, crearParcela } from '../model/parcela.js'
@@ -157,6 +179,7 @@ import {
   normalizarRefcat,
 } from '../services/catastro.js'
 import { NIVEL, latLngAUTM } from '../viewer/_comun.js'
+import { PROCEDENCIA, mensajeOrigenDesconocido } from './contraste.js'
 
 // ── Los selectores del contrato con `index.html` ─────────────────────────────
 //
@@ -252,6 +275,55 @@ export const MENSAJE_SUSCRIPTOR_ROTO =
 export const MOTIVO_COLINDANTES_APAGADO =
   '«Traer colindantes» está apagado: las vecinas lo son de una parcela concreta, y todavía no ' +
   'hay ninguna cargada con referencia catastral. Trae una parcela del Catastro y se enciende.'
+
+/**
+ * Lo que se dice cuando alguien llama a `cargar({refcat})` con una referencia que no
+ * es utilizable. **Es un defecto de programación, no un dato malo**, y por eso sale
+ * con nivel `ERROR` y además a la consola: el usuario no ha escrito nada que pueda
+ * corregir.
+ *
+ * La alternativa —caer al campo— sería peor que no consultar: por el contrato K.1
+ * ese campo puede ser el de otra pantalla, y traería la parcela de una referencia que
+ * el usuario no ha pedido desde donde está.
+ *
+ * Se exporta para que su test lo afirme sin copiar el literal.
+ */
+export const MENSAJE_SIN_REFCAT_PEDIDA =
+  'No se ha consultado al Catastro: quien ha pedido la parcela no ha dicho cuál. Es un fallo ' +
+  'interno de la aplicación; no se ha cambiado nada. Escribe la referencia catastral y pulsa ' +
+  '«Traer del Catastro».'
+
+/**
+ * El fondo que se acaba de traer **no toca** la medición del usuario: cero metros
+ * cuadrados en común.
+ *
+ * ── POR QUÉ AVISO Y NO BLOQUEO ──
+ * Porque puede ser lo que el usuario quiere. Un levantamiento de una finca y el
+ * parcelario de la de al lado es un contraste legítimo, y hay expedientes en los que
+ * la parcela oficial se ha movido entera. Bloquear aquí sería decidir por él sobre un
+ * dato que él ha pedido a propósito. Pero **callarse sería peor**: sin solape, todo
+ * lo que viene después —el diagnóstico de encaje, el sobrante, el informe— compara
+ * dos polígonos sin relación y da cifras enormes, ciertas y sin ningún sentido.
+ *
+ * Las dos causas realistas se nombran porque son las que el usuario puede corregir:
+ * la referencia catastral equivocada y el huso equivocado.
+ */
+export const MENSAJE_FONDO_SIN_SOLAPE =
+  'El parcelario que has traído NO se solapa con tu medición: no comparten ni un metro cuadrado. ' +
+  'Se ha cargado igual, por si es lo que buscabas, pero conviene mirarlo: casi siempre significa ' +
+  'que la referencia catastral es de otra parcela, o que la medición está en un huso distinto. ' +
+  'Mientras tanto, el diagnóstico de encaje comparará tu geometría contra ESE fondo.'
+
+/**
+ * No se ha podido comprobar el solape. **Es distinto de «no se solapan»** y por eso
+ * tiene mensaje propio: `diagnostico/topologia.js` separa los dos casos a propósito
+ * (`saltados` dice POR QUÉ no se midió), y fundirlos convertiría un «no lo sé» en una
+ * afirmación sobre la geometría del usuario. Regla de oro 1.
+ */
+export const MENSAJE_SOLAPE_NO_MEDIDO =
+  'El parcelario ha entrado bien, pero no se ha podido comprobar si cae encima de tu medición. ' +
+  'Eso no quiere decir que no encaje: quiere decir que no se ha podido medir. Míralo en el mapa ' +
+  'antes de diagnosticar el encaje.'
 
 /** Cola del renglón cuando el mensaje ÍNTEGRO acaba de entrar en el panel. */
 const COLA_DETALLE = 'El detalle está en el panel de avisos.'
@@ -419,6 +491,10 @@ function recintosDe(parcelaActual) {
   return Array.isArray(recintos) ? recintos : []
 }
 
+/** Cuántos vértices suman unos recintos. Para los renglones, que los cuentan. */
+const vertices = (recintos) =>
+  (Array.isArray(recintos) ? recintos : []).reduce((n, r) => n + r.vertices.length, 0)
+
 /**
  * ¿Tiene sentido ofrecer «Deducir del mapa»? **Hay geometría en el store Y `refcat`
  * es `null`.** Las dos mitades importan:
@@ -464,6 +540,134 @@ function puedeDeducirDe(parcelaActual) {
  */
 function puedePedirColindantesDe(parcelaActual) {
   return referenciaDe(parcelaActual) !== null
+}
+
+// ── La composición contra lo que YA HAY ──────────────────────────────────────
+
+/**
+ * Lo que sobrevive a CUALQUIERA de las dos composiciones contra el store: los campos
+ * que no son de ninguno de los dos ejes.
+ *
+ * Los dos compositores del proyecto —{@link componerParcelaConOficial} aquí y
+ * `componerParcelaMedida` en `app/cableado-medicion.js`— son duales: cada uno pisa lo
+ * que el otro conserva (uno trae `recintos`, el otro `geometriaOficial`). Pero estos
+ * dos campos no los toca ninguno, y por eso son el único trozo compartido:
+ *
+ *   · **`idLocal`** — la identidad del documento abierto. Cambiarlo aquí crearía un
+ *     expediente distinto por traer un fondo, y el almacén de F10 lo guardaría como
+ *     otra cosa.
+ *   · **`superficieRegistral`** — la del Registro de la Propiedad. No la emite ni el
+ *     Catastro ni el fichero del usuario: **la teclea una persona**, y es el dato más
+ *     caro de recuperar de los tres. Es exactamente el que se perdía en silencio
+ *     cuando este cableado construía la parcela desde cero.
+ *
+ * ⚠️ **`refcat`, `superficieCatastral`, `geometriaOficial`, `recintos` y `origen` NO
+ * están aquí a propósito.** Cada compositor decide qué hace con ellos, y meterlos en
+ * este helper sería justo la unificación que la decisión 4A descarta: los
+ * compositores siguen separados porque son duales, no gemelos.
+ *
+ * @param {object} actual  El POJO del store. Se asume no nulo (lo garantiza el
+ *   llamante, que sólo llega aquí con algo que conservar).
+ * @returns {{idLocal: string, superficieRegistral: number|null}}
+ */
+export function camposInvariantes(actual) {
+  return {
+    idLocal: actual.idLocal,
+    superficieRegistral: actual.superficieRegistral ?? null,
+  }
+}
+
+/**
+ * ¿Esta carga va a CONSERVAR la medición que ya hay? Es el predicado de la puerta 2,
+ * y vive aparte por un motivo concreto: {@link componerParcelaConOficial} lo necesita
+ * para componer y `aplicar` lo necesita para **contar lo que realmente ha pasado** —
+ * el renglón, el renglón de procedencia y los ganchos hacia `main.js` tienen que
+ * decir lo mismo que hizo el compositor. Dos copias del predicado divergirían, y la
+ * divergencia sería un rótulo que miente sobre la geometría que hay en pantalla.
+ *
+ * Pedir la puerta 2 sin nada que conservar **no es un error**: los dos caminos
+ * coinciden de hecho y el resultado es un documento nuevo. Por eso esto se pregunta,
+ * en vez de exigirse.
+ *
+ * @param {object|null} actual
+ * @param {boolean} sustituir
+ * @returns {boolean}
+ */
+function conservaLaMedicion(actual, sustituir) {
+  return sustituir === false && recintosDe(actual).length > 0
+}
+
+/**
+ * ⭐ **La parcela que entra en el store cuando el Catastro contesta.** Es la pieza
+ * que arregla el defecto de las dos puertas, y su historia importa para no
+ * reintroducirlo: hasta 2026-08-08 este cableado construía la parcela DESDE CERO,
+ * metiendo la geometría del WFS en `recintos` **y** en `geometriaOficial`. Con una
+ * medición propia cargada —un DXF, un TXT, un GML ajeno— eso la borraba, y como el
+ * gancho de carga reinicia el historial, tampoco se recuperaba con Ctrl+Z.
+ *
+ * Las dos puertas son:
+ *
+ * | `sustituir` | Qué es | Qué hace |
+ * |---|---|---|
+ * | `true`  | «Empezar desde el Catastro» | Lo de siempre: el WFS ocupa `recintos` **y** `geometriaOficial`. Documento nuevo. |
+ * | `false` | «Traer el parcelario de fondo» | El WFS entra **solo** en `geometriaOficial`. `recintos` intactos. |
+ *
+ * La distinción **no se deduce del store**: sale de qué botón se pulsó. Adivinarla
+ * mirando si hay geometría es exactamente el estado oculto que causó el defecto.
+ *
+ * ── DUAL DE `componerParcelaMedida`, NO GEMELA ──
+ * `app/cableado-medicion.js` compone el caso contrario —entra geometría de trabajo y
+ * la oficial no se toca— y las dos comparten sólo {@link camposInvariantes}. No se
+ * unifican: cada una conserva lo que la otra pisa, así que una función con un
+ * interruptor tendría dos mitades sin nada en común salvo la llamada a
+ * `crearParcela`.
+ *
+ * ── LA GUARDA DEL STORE VACÍO ──
+ * Con `sustituir: false` pero sin nada que conservar (store en `null`, o una parcela
+ * sin recintos) **los dos caminos coinciden de hecho**, y está bien que coincidan:
+ * la puerta de contexto sigue siendo segura porque no hay medición que perder. Se
+ * escribe como guarda explícita y no como `actual.idLocal` a pelo, que lanzaría.
+ *
+ * ── QUÉ SE ADOPTA Y QUÉ NO (decisión 12A) ──
+ * La parcela de trabajo **adopta la `refcat`** del fondo: a partir de aquí el
+ * expediente afirma ser esa parcela catastral, que es lo que hace falta para pedir
+ * colindantes, diagnosticar el encaje y emitir el GML. `idLocal` y `origen` **no se
+ * tocan**: la geometría sigue siendo la medida por el usuario y su procedencia sigue
+ * siendo la que era. Un `origen: WFS` sobre unos vértices de DXF sería una mentira
+ * en el campo que existe para no contarla. Si el fondo llega sin referencia
+ * utilizable, la anterior se conserva: adoptar `null` sería borrar un dato cierto.
+ *
+ * @param {object|null} actual  Lo que hay en el store, o `null`.
+ * @param {import('../gml/parse.js').ParcelaGml} traida  Lo que ha contestado el WFS.
+ * @param {object} args
+ * @param {string|null} args.refcat  La referencia ya normalizada, o `null`.
+ * @param {boolean} [args.sustituir=true]  `false` = puerta de contexto (solo fondo).
+ * @returns {object} Parcela
+ */
+export function componerParcelaConOficial(actual, traida, { refcat, sustituir = true } = {}) {
+  if (!conservaLaMedicion(actual, sustituir)) {
+    return crearParcela({
+      idLocal: textoNoVacio(traida.localId) ?? refcat,
+      refcat,
+      recintos: traida.recintos,
+      geometriaOficial: traida.recintos,
+      // `areaValue` es la superficie que el Catastro DECLARA, y se guarda tal cual:
+      // la medida se calcula aparte con `geo/area.js` y las dos no tienen por qué
+      // coincidir. La diferencia ES el dato (ver `model/parcela.js`).
+      superficieCatastral: traida.areaValue,
+      origen: ORIGEN_PARCELA.WFS,
+    })
+  }
+
+  return crearParcela({
+    ...camposInvariantes(actual),
+    // ⛔ INTACTOS. Es toda la decisión de la puerta 2 en una línea.
+    recintos: actual.recintos,
+    origen: actual.origen,
+    refcat: refcat ?? actual.refcat ?? null,
+    geometriaOficial: traida.recintos,
+    superficieCatastral: traida.areaValue,
+  })
 }
 
 // ── Procedencia ──────────────────────────────────────────────────────────────
@@ -535,6 +739,49 @@ export function textoProcedencia(procedencia, instante) {
   return ''
 }
 
+/**
+ * ⭐ El renglón `[data-procedencia="parcela"]` cuando el Catastro **sólo ha traído el
+ * fondo**. Es la pieza de la puerta 2 que más importa que esté bien redactada, y su
+ * regla es una sola: **nunca «Del Catastro» a secas.**
+ *
+ * En este estado hay DOS geometrías en pantalla con dueños distintos, y confundirlas
+ * es el error de producto de toda la feature: la de trabajo la midió (o la editó) el
+ * usuario y es la que se va a serializar; la oficial la emite el Catastro y sólo está
+ * para contrastar. Un renglón que dijera «Del Catastro» —que es exactamente lo que se
+ * escribe cuando la parcela sí viene del servicio— convertiría el levantamiento
+ * propio en un dato oficial, y a partir de ahí el usuario firma sobre él.
+ *
+ * Por eso el orden es el que es: **primero de dónde viene la geometría de trabajo**,
+ * que es la que se dibuja y la que se va a generar, y después el parcelario, rotulado
+ * como lo que es. Mismo criterio que `textoProcedenciaDoble` en
+ * `app/cableado-comprobacion.js`, del que esto es el tercer caso.
+ *
+ * Ninguna de las dos mitades se redacta aquí:
+ *   · la de la geometría sale de `PROCEDENCIA` (`app/contraste.js`), que es el ÚNICO
+ *     sitio del proyecto donde se dice de dónde salió un dibujo y tiene una prueba
+ *     que exige una entrada por cada `ORIGEN_PARCELA`. Y por eso el rótulo es
+ *     correcto también cuando la geometría de trabajo vino del WFS —traer un fondo
+ *     sobre una parcela ya cargada— en vez de suponer que siempre es una medición;
+ *   · la del Catastro es {@link textoProcedencia} **tal cual**, con su hora y con la
+ *     edad de la copia local.
+ *
+ * Dos redacciones del mismo hecho divergen, y la que se queda vieja siempre es la
+ * nueva.
+ *
+ * @param {object} args
+ * @param {string} args.origen  `parcela.origen` de la geometría de TRABAJO.
+ * @param {import('../services/catastro.js').ProcedenciaCatastro} args.procedencia
+ * @param {Date} args.instante  El «ahora» del cableado (inyectable).
+ * @returns {string}
+ */
+export function textoProcedenciaFondo({ origen, procedencia, instante }) {
+  const trabajo = PROCEDENCIA[origen] ?? mensajeOrigenDesconocido(origen)
+  return (
+    `Geometría de trabajo: ${trabajo} Es la que se edita y la que se genera. ` +
+    `Parcelario oficial, sólo de fondo para contrastar: ${textoProcedencia(procedencia, instante)}`
+  )
+}
+
 // ── Duck typing de las dependencias inyectadas ───────────────────────────────
 
 /** ¿Sirve como cliente del Catastro? Sólo lo que este módulo le pide, y nada más. */
@@ -571,14 +818,15 @@ function esEmisor(m) {
  * que el usuario llega a ver.
  *
  * ── LAS TRES ACCIONES ──
- *   · **`cargar()`** — `cliente.parcelaPorRefcat(lo que hay en el campo)` y, si trae
- *     dato, `estado.set(crearParcela(...))`. Es la ÚNICA de las tres que escribe en
- *     el modelo, y hace **un solo `set`**. Es también la única que dispara
- *     `alCargarParcela`, y siempre DESPUÉS del `set`.
+ *   · **`cargar({refcat, sustituir})`** — `cliente.parcelaPorRefcat` y, si trae dato,
+ *     `estado.set` de lo que componga {@link componerParcelaConOficial}. Es la ÚNICA
+ *     de las tres que escribe en el modelo, y hace **un solo `set`**. Sin argumentos
+ *     se comporta como siempre: la referencia del campo y documento nuevo. Es también
+ *     la única que dispara los ganchos, y siempre DESPUÉS del `set`.
  *   · **`deducir()`** — punto interior de la geometría del store →
  *     `cliente.refcatPorCoordenada` → rellena el CAMPO (nunca el modelo). Con
  *     varios candidatos no rellena nada: los lista con su domicilio y deja elegir.
- *     **No dispara `alCargarParcela`**: no mete geometría en ninguna parte.
+ *     **No dispara ningún gancho**: no mete geometría en ninguna parte.
  *   · **`colindantes()`** — `cliente.parcelaYColindantes` de la parcela cargada.
  *     Desde F06 tiene su BOTÓN («Traer colindantes»), y sigue sin escribir en el
  *     modelo: `model/parcela.js` no tiene dónde guardar unas vecinas, y meterlas
@@ -620,12 +868,20 @@ function esEmisor(m) {
  *   la pantalla, no media hora después.
  * @param {{on: Function, off: Function}|null} [opciones.mapa=null]  Emisor de clics
  *   del mapa (el `L.Map`). Por DUCK TYPING; ver {@link esEmisor}.
- * @param {((parcela: object) => void)|null} [opciones.alCargarParcela=null]  Se
- *   llama DESPUÉS de cada `estado.set` de una parcela **traída del Catastro**, con
- *   el POJO que ha entrado en el store. **OPCIONAL**: sin él, el módulo se comporta
- *   igual que en F05. No se llama en `deducir()` (que no mete geometría), ni cuando
- *   la respuesta llega superada por otra más nueva, ni después de `destruir()`. Ver
- *   la sección de los dos ganchos en la cabecera.
+ * @param {((parcela: object) => void)|null} [opciones.alCargarParcela=null]  **El
+ *   gancho del DOCUMENTO NUEVO.** Se llama DESPUÉS del `estado.set` de una parcela
+ *   traída del Catastro **que ha sustituido a la anterior**, con el POJO que ha
+ *   entrado en el store. **OPCIONAL**: sin él, el módulo se comporta igual que en
+ *   F05. No se llama en `deducir()` (que no mete geometría), ni cuando la respuesta
+ *   llega superada por otra más nueva, ni después de `destruir()`, **ni cuando el
+ *   Catastro sólo ha aportado el fondo** (`cargar({sustituir: false})`): ahí el
+ *   documento del usuario sigue siendo el suyo. Ver {@link notificarCarga}.
+ * @param {((parcela: object) => void)|null} [opciones.alCambiarOficial=null]  **El
+ *   gancho del PARCELARIO NUEVO.** Se llama DESPUÉS del `estado.set` **por las dos
+ *   puertas**, porque por las dos entra `geometriaOficial` nueva: lo que dependa del
+ *   fondo (las dianas del snap de la parcela anterior, el contador de vecinas, el
+ *   diagnóstico ya calculado, la capa que lo pinta) hay que invalidarlo en los dos
+ *   casos. Con la puerta 1 se llama DESPUÉS de `alCargarParcela`.
  * @param {HTMLElement} [opciones.campo]  Por defecto {@link SELECTOR_CAMPO_REFCAT}.
  * @param {HTMLElement} [opciones.botonCargar]  Ídem {@link SELECTOR_BOTON_CARGAR}.
  * @param {HTMLElement} [opciones.botonDeducir]  Ídem {@link SELECTOR_BOTON_DEDUCIR}.
@@ -637,14 +893,15 @@ function esEmisor(m) {
  * @param {() => Date} [opciones.ahora]  De dónde sale «ahora». Se inyecta porque la
  *   hora sale POR PANTALLA en el renglón de procedencia, y un módulo que lee el
  *   reloj del sistema no es reproducible.
- * @returns {{cargar: () => Promise<ResultadoCatastro|null>,
+ * @returns {{cargar: (opciones?: {refcat?: string, sustituir?: boolean})
+ *              => Promise<ResultadoCatastro|null>,
  *            deducir: () => Promise<ResultadoCatastro|null>,
  *            colindantes: () => Promise<ResultadoCatastro|null>,
  *            alColindantes: (fn: (resultado: ResultadoCatastro) => void) => (() => void),
  *            destruir: () => void}}
  * @throws {Error|TypeError|RangeError}  Si falta un nodo del contrato (vía
  *   {@link nodo}, nombrando el selector), si el `cliente` no lo es, si el `mapa` no
- *   emite, si `alCargarParcela` no es función, o si el `srs` no es un huso
+ *   emite, si `alCargarParcela` o `alCambiarOficial` no son función, o si el `srs` no es un huso
  *   soportado.
  */
 export function cablearCatastro({
@@ -654,6 +911,7 @@ export function cablearCatastro({
   srs,
   mapa = null,
   alCargarParcela = null,
+  alCambiarOficial = null,
   campo = nodo(SELECTOR_CAMPO_REFCAT),
   botonCargar = nodo(SELECTOR_BOTON_CARGAR),
   botonDeducir = nodo(SELECTOR_BOTON_DEDUCIR),
@@ -683,6 +941,13 @@ export function cablearCatastro({
         `que acaba de entrar en el store) o null si no hace falta; recibido ` +
         `${typeof alCargarParcela}. Se rechaza al cablear y no en la primera carga: un gancho ` +
         `mal pasado tiene que descubrirse al montar la pantalla, no media hora después.`,
+    )
+  }
+  if (alCambiarOficial !== null && typeof alCambiarOficial !== 'function') {
+    throw new TypeError(
+      `cablearCatastro: 'alCambiarOficial' debe ser una función (se le pasa el POJO de la parcela ` +
+        `cuyo parcelario oficial acaba de cambiar) o null si no hace falta; recibido ` +
+        `${typeof alCambiarOficial}. Mismo momento y mismo motivo que 'alCargarParcela'.`,
     )
   }
   // Delegado: `husoPorSrs` es el único sitio del proyecto que sabe qué husos están
@@ -820,14 +1085,48 @@ export function cablearCatastro({
    * Avisa de que ha entrado en el store una parcela TRAÍDA del Catastro. Se llama
    * desde {@link aplicar} y desde ningún otro sitio.
    *
+   * ── POR QUÉ SON DOS GANCHOS Y NO UNO CON UNA BANDERA ──
+   * Lo que hay que hacer al otro lado **no cae todo del mismo lado** de la puerta.
+   * `main.js` reiniciaba el historial, vaciaba las dianas del snap, reseteaba el
+   * contador de vecinas, repintaba y decía «parcela nueva» — cinco cosas en un solo
+   * gancho indivisible. Por la puerta 2 sólo tres de las cinco son ciertas: **no hay
+   * parcela nueva** (así que ni reinicio de historial ni ese mensaje), pero **sí hay
+   * fondo nuevo** (así que las dianas de la parcela anterior hay que tirarlas — si
+   * no, el snap engancha a geometría de otro sitio sin que nada lo explique).
+   *
+   * Pasar una bandera a un solo gancho dejaría ese reparto escrito en `main.js`, que
+   * es donde ya estaba mal. Con dos ganchos, cada efecto se registra en el que le
+   * toca y el reparto es la propia firma.
+   *
+   * Por la puerta 1 se llaman **los dos**, y en este orden: el documento primero
+   * (siembra el historial) y el fondo después (lo reencuadra sobre lo sembrado).
+   *
    * @param {object} parcela  El POJO que acaba de entrar en el store.
+   * @param {boolean} soloFondo  `true` si la medición del usuario se ha conservado.
    */
-  function notificarCarga(parcela) {
-    if (alCargarParcela === null || destruido) return
+  function notificarCarga(parcela, soloFondo) {
+    if (destruido) return
+    if (!soloFondo) {
+      llamarGancho(alCargarParcela, 'el aviso de parcela cargada (alCargarParcela)', parcela)
+    }
+    llamarGancho(alCambiarOficial, 'el aviso de parcelario nuevo (alCambiarOficial)', parcela)
+  }
+
+  /**
+   * Un gancho hacia afuera, con su red. Cada uno en su propio `try`: **uno que
+   * revienta no puede impedir que se llame al otro**, por el mismo motivo que
+   * {@link publicarColindantes} itera con `try` por suscriptor.
+   *
+   * @param {((parcela: object) => void)|null} gancho
+   * @param {string} quien  Cómo se llama, para la consola.
+   * @param {object} parcela
+   */
+  function llamarGancho(gancho, quien, parcela) {
+    if (gancho === null) return
     try {
-      alCargarParcela(parcela)
+      gancho(parcela)
     } catch (causa) {
-      contarOyenteRoto('el aviso de parcela cargada (alCargarParcela)', causa)
+      contarOyenteRoto(quien, causa)
     }
   }
 
@@ -973,18 +1272,55 @@ export function cablearCatastro({
   }
 
   /**
+   * Comprueba que el fondo recién traído CAE ENCIMA de la medición del usuario, y
+   * avisa si no. **No bloquea nada**: ver {@link MENSAJE_FONDO_SIN_SOLAPE}.
+   *
+   * Sólo tiene sentido por la puerta 2. Por la puerta 1 `recintos` y
+   * `geometriaOficial` son la misma geometría, así que el solape sería del 100 % por
+   * construcción y medirlo sería gastar una booleana para confirmar una tautología.
+   *
+   * `solape` puede lanzar (contrato del llamante) y eso **no puede tumbar una carga
+   * que ya ha ido bien**: el dato del Catastro es correcto y está en el store. Se
+   * cuenta como lo que es —«no se ha podido medir»— y se sigue.
+   *
+   * @param {object} parcela  La que acaba de entrar en el store.
+   */
+  function avisarSiElFondoNoCuadra(parcela) {
+    let comun
+    try {
+      comun = solape(parcela.recintos, parcela.geometriaOficial)
+    } catch (causa) {
+      panel.avisar(MENSAJE_SOLAPE_NO_MEDIDO, { nivel: NIVEL.AVISO, causa })
+      console.error('[catastro] no se ha podido comprobar el solape del fondo traído:', causa)
+      return
+    }
+    // Un recinto saltado deja el área INCOMPLETA, así que un 0 con saltados no
+    // afirma «no se solapan»: afirma «no lo sé». Los dos casos se dicen distinto.
+    if (comun.saltados.length > 0) {
+      panel.avisar(MENSAJE_SOLAPE_NO_MEDIDO, { nivel: NIVEL.AVISO })
+      return
+    }
+    if (comun.area > 0) return
+    panel.avisar(MENSAJE_FONDO_SIN_SOLAPE, { nivel: NIVEL.AVISO })
+  }
+
+  /**
    * Mete en el store la parcela traída. **Un solo `estado.set`.**
    *
-   * `geometriaOficial` se rellena con la MISMA geometría que se acaba de traer, y
-   * eso no es redundancia: es el término de comparación del diagnóstico (regla de
-   * oro 2). A partir de aquí el usuario puede mover vértices en `recintos` y
-   * `geometriaOficial` sigue siendo, congelada, lo que dijo el Catastro. El visor
-   * **ya la pinta** en su pane `parcelaOficial` sin tocar `viewer/`.
+   * Qué ocupa qué lo decide {@link componerParcelaConOficial} a partir de
+   * `sustituir`, que sale de qué botón se pulsó y **nunca de mirar el store**. Con la
+   * puerta de entrada (`sustituir: true`) `geometriaOficial` se rellena con la MISMA
+   * geometría que se acaba de traer, y eso no es redundancia: es el término de
+   * comparación del diagnóstico (regla de oro 2). A partir de ahí el usuario puede
+   * mover vértices en `recintos` y `geometriaOficial` sigue siendo, congelada, lo que
+   * dijo el Catastro. El visor **ya la pinta** en su pane `parcelaOficial` sin tocar
+   * `viewer/`.
    *
    * @param {ResultadoCatastro} resultado
    * @param {string} pedida  Lo que el usuario tenía escrito en el campo.
+   * @param {boolean} sustituir  `false` = solo fondo; ver el compositor.
    */
-  function aplicar(resultado, pedida) {
+  function aplicar(resultado, pedida, sustituir) {
     const p = resultado.datos
     const estorbo = porQueNoSirve(p)
     if (estorbo !== null) {
@@ -994,17 +1330,12 @@ export function cablearCatastro({
     }
 
     const refcat = normalizarRefcat(p.refcat) ?? normalizarRefcat(pedida)
-    const parcela = crearParcela({
-      idLocal: textoNoVacio(p.localId) ?? refcat,
-      refcat,
-      recintos: p.recintos,
-      geometriaOficial: p.recintos,
-      // `areaValue` es la superficie que el Catastro DECLARA, y se guarda tal cual:
-      // la medida se calcula aparte con `geo/area.js` y las dos no tienen por qué
-      // coincidir. La diferencia ES el dato (ver `model/parcela.js`).
-      superficieCatastral: p.areaValue,
-      origen: ORIGEN_PARCELA.WFS,
-    })
+    const anterior = estado.get()
+    // Lo que REALMENTE va a pasar, no lo que se pidió: pedir la puerta 2 sin nada que
+    // conservar acaba en documento nuevo, y desde aquí abajo mandan los hechos — el
+    // renglón, la procedencia y los ganchos tienen que contar todos lo mismo.
+    const soloFondo = conservaLaMedicion(anterior, sustituir)
+    const parcela = componerParcelaConOficial(anterior, p, { refcat, sustituir })
 
     estado.set(parcela)
 
@@ -1013,8 +1344,16 @@ export function cablearCatastro({
     // parcela, y dejar en pantalla una forma distinta de la que hay en el modelo
     // invita a dudar de cuál de las dos se ha cargado.
     if (parcela.refcat !== null) campo.value = parcela.refcat
-    procedencia.textContent = textoProcedencia(resultado.procedencia, ahora())
+    procedencia.textContent = soloFondo
+      ? textoProcedenciaFondo({
+          origen: parcela.origen,
+          procedencia: resultado.procedencia,
+          instante: ahora(),
+        })
+      : textoProcedencia(resultado.procedencia, ahora())
     ocultarCandidatos()
+
+    if (soloFondo) avisarSiElFondoNoCuadra(parcela)
 
     if (resultado.procedencia.origen === ORIGEN.CACHE) {
       // Al panel además del renglón de procedencia: ese renglón es gris de 11 px y
@@ -1028,9 +1367,17 @@ export function cablearCatastro({
       )
     }
 
+    // El renglón cuenta lo que ha entrado, y por la puerta 2 lo que ha entrado NO es
+    // una parcela: es un fondo. Contar «Cargada la parcela X: 12 vértices» sobre unos
+    // vértices que son los del levantamiento del usuario sería atribuirle al Catastro
+    // una geometría que no ha emitido, justo en la línea que dice qué ha pasado.
     decir(
-      `Cargada la parcela ${parcela.refcat} del Catastro: ` +
-        `${parcela.recintos.reduce((n, r) => n + r.vertices.length, 0)} vértices.`,
+      soloFondo
+        ? `Traído el parcelario oficial de ${parcela.refcat} como fondo: ` +
+            `${vertices(parcela.geometriaOficial)} vértices. Tu medición sigue en pantalla, ` +
+            `intacta (${vertices(parcela.recintos)} vértices).`
+        : `Cargada la parcela ${parcela.refcat} del Catastro: ` +
+            `${vertices(parcela.recintos)} vértices.`,
       false,
     )
 
@@ -1038,20 +1385,48 @@ export function cablearCatastro({
     // edición) se encuentra la pantalla ya coherente —store, campo, procedencia y
     // renglón—, en vez de a mitad de escribirse. Y si revienta, lo de arriba ya
     // está hecho: una parcela cargada no se deshace porque falle un oyente.
-    notificarCarga(parcela)
+    notificarCarga(parcela, soloFondo)
   }
 
   /**
-   * Trae la parcela de la referencia que haya escrita en el campo y la mete en el
-   * store. La referencia se lee **antes del `await`**: si el usuario cambia el
-   * campo mientras la consulta viaja, esta consulta sigue siendo la de la
-   * referencia que pidió.
+   * Trae una parcela del Catastro y la mete en el store. La referencia se lee
+   * **antes del `await`**: si el usuario cambia el campo mientras la consulta viaja,
+   * esta consulta sigue siendo la de la referencia que pidió.
    *
+   * ── LA INTENCIÓN SE PASA, NO SE DEDUCE ──
+   * `sustituir` dice cuál de las dos puertas se ha abierto (ver
+   * {@link componerParcelaConOficial}) y **por defecto es `true`**, que es el
+   * comportamiento de siempre: `alPulsarCargar` sigue invocando `cargar()` sin
+   * argumentos y no cambia ni una línea. Quien quiera el fondo sin perder la
+   * medición lo pide explícitamente.
+   *
+   * ── Y LA REFERENCIA TAMBIÉN, CUANDO QUIEN LLAMA NO ES ESTA PANTALLA ──
+   * Sin `refcat` se lee `campo.value`, como siempre. Con `refcat` **no se mira el
+   * campo**, y eso es lo que permite que otro cableado (el aviso accionable del
+   * Diagnóstico) pida una parcela concreta: por el contrato K.1 hay varias pantallas
+   * montadas a la vez y `campo` es el `<input>` de la PRIMERA en orden de documento
+   * —aunque esté `hidden`—, así que caer al campo desde otra pantalla traería la
+   * parcela de una referencia que el usuario no ha pedido desde ahí.
+   *
+   * Por eso una `refcat` pasada pero inservible **no cae al campo: no consulta**, y
+   * escribe el motivo. Es un defecto de programación, no un dato malo del usuario.
+   *
+   * @param {object} [opciones]
+   * @param {string} [opciones.refcat]  La referencia a traer. Omitida = la del campo.
+   * @param {boolean} [opciones.sustituir=true]  `false` = traer solo el parcelario
+   *   de fondo, conservando `recintos`, `origen` y el historial.
    * @returns {Promise<ResultadoCatastro|null>}
    */
-  async function cargar() {
+  async function cargar({ refcat, sustituir = true } = {}) {
     if (destruido) return null
-    const pedida = campo.value
+    const delCampo = refcat === undefined
+    const pedida = delCampo ? campo.value : refcat
+    if (!delCampo && textoNoVacio(pedida) === null) {
+      panel.avisar(MENSAJE_SIN_REFCAT_PEDIDA, { nivel: NIVEL.ERROR })
+      decir(`No se ha consultado al Catastro. ${COLA_DETALLE}`, true)
+      console.error('[catastro] cargar({refcat}) con una referencia inservible:', refcat)
+      return null
+    }
     try {
       const { resultado, vigente } = await operar((senal) =>
         cliente.parcelaPorRefcat(pedida, { srs, senal }),
@@ -1063,7 +1438,7 @@ export function cablearCatastro({
         contarFallo(resultado)
         return resultado
       }
-      aplicar(resultado, pedida)
+      aplicar(resultado, pedida, sustituir)
       return resultado
     } catch (causa) {
       reventar(causa)

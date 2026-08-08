@@ -72,7 +72,8 @@ import { ORIGEN_PARCELA, crearParcela } from '../model/parcela.js'
 import { SEVERIDAD } from '../parsers/_comun.js'
 import { importar } from '../parsers/importar.js'
 import { NIVEL } from '../viewer/_comun.js'
-import { SELECTOR_PROCEDENCIA } from './cableado-catastro.js'
+import { SELECTOR_PROCEDENCIA, camposInvariantes } from './cableado-catastro.js'
+import { INSTRUCCION_PARCELARIO } from './navegacion.js'
 import {
   MENSAJE_ES_LISTADO_PROPIO,
   crearDialogoImportacion,
@@ -282,7 +283,11 @@ export function inspeccionarTexto(texto) {
  *   1. **de dónde sale la geometría** —del fichero, NO del Catastro—, que es lo que
  *      impide que un levantamiento propio se lea como dato oficial;
  *   2. **qué pasa con el parcelario**, que es distinto según se haya conservado o
- *      no (ver {@link componerParcelaMedida});
+ *      no (ver {@link componerParcelaMedida}). ⛔ Cuando NO lo hay decía «tráelo con
+ *      la referencia catastral», y era la trampa: hasta el 2026-08-08 hacerlo
+ *      borraba la medición que este mismo renglón acaba de anunciar. La instrucción
+ *      sale ahora de `INSTRUCCION_PARCELARIO`, compartida por los cuatro sitios que
+ *      la decían de cuatro maneras distintas;
  *   3. **dónde cae la parcela**, que es la exigencia de F01 §detecciones
  *      defensivas: «desproyectar el centroide, mostrar dónde ha caído la parcela
  *      antes de continuar». Sin esto, una medición en el huso equivocado entra sin
@@ -323,7 +328,7 @@ export function textoProcedenciaMedicion({
   const geometria = `Geometría medida por ti, ${origen}${deCapa} — NO del Catastro.`
   const parcelario = conParcelario
     ? ' Se conserva el parcelario que ya estaba en pantalla, solo para contrastar.'
-    : ' Sin parcelario con el que contrastarla: tráelo con la referencia catastral.'
+    : ` Sin parcelario con el que contrastarla. ${INSTRUCCION_PARCELARIO}`
   const donde = huso === null ? '' : ` Cae en el huso ${huso.zona} (${huso.srs}).`
   return `${geometria}${parcelario}${donde}`
 }
@@ -396,13 +401,17 @@ export function componerParcelaMedida(actual, recintos, { origen, idLocalDemo, n
   }
 
   return crearParcela({
-    idLocal: actual.idLocal,
+    // `idLocal` y `superficieRegistral`, los dos campos que no son de ninguno de los
+    // dos ejes. Los comparte con su DUAL `componerParcelaConOficial` —el compositor
+    // del Catastro, que conserva lo que éste pisa y pisa lo que éste conserva— y por
+    // eso salen de un helper y no de dos listas paralelas: `superficieRegistral` la
+    // teclea una persona, y era el campo que el otro compositor perdía en silencio.
+    ...camposInvariantes(actual),
     refcat: actual.refcat ?? null,
     recintos,
     // ⛔ INTACTA. Es toda la decisión de la fase en una línea.
     geometriaOficial: actual.geometriaOficial ?? null,
     superficieCatastral: actual.superficieCatastral ?? null,
-    superficieRegistral: actual.superficieRegistral ?? null,
     origen,
   })
 }

@@ -8,11 +8,54 @@
 // el Catastro y con la ficha del pie. Mientras no existiera, F08 entera era código
 // muerto.
 //
-// El recorrido, entero:
+// ── ⭐ EL RECORRIDO CAMBIÓ EL 2026-08-07: EL FICHERO ENTRA SOLO ─────────────
+// Hasta ese día un `.gml` no se cargaba: se ENSEÑABA. El cajón salía sobre el mapa
+// con lo que traía el fichero y había que pulsar «Contrastar con el parcelario»
+// para que la geometría llegara al store; después, el modo COMPROBACIÓN apagaba
+// Edición hasta cruzar una segunda puerta. **Dos confirmaciones para abrir un
+// fichero**, cuando un `.dxf` entra de una vez y editable.
 //
-//   File → ArrayBuffer → decodificarGml → comprobarGml → cajón → («Contrastar»)
-//        → cliente.parcelaPorRefcat → UN SOLO estado.set → cajón cerrado
+// Y la segunda de las dos no se podía cruzar en el caso corriente: el botón vivía
+// en el cajón de Diagnóstico, y Diagnóstico exige el parcelario del Catastro, que
+// un GML sin referencia catastral utilizable no puede traer. El porqué largo está
+// en la cabecera de `app/navegacion.js`; aquí basta la consecuencia.
+//
+// El recorrido de hoy, entero:
+//
+//   File → ArrayBuffer → decodificarGml → comprobarGml
+//        ├─ dialecto BU ................ → la rama de EDIFICIO (ver «F11»)
+//        ├─ VARIAS parcelas dentro ..... → cajón, para elegir cuál (única parada)
+//        └─ una sola, o ninguna ........ → derecho a `cargar()`
+//   cargar() → cliente.parcelaPorRefcat → UN SOLO estado.set → cajón cerrado
 //        → y F07 se enciende sola, sin una línea de código nuevo.
+//
+// **El cajón deja de ser el paso obligatorio y pasa a ser la excepción**: solo se
+// abre cuando hay una decisión de verdad que tomar, que es un fichero con más de un
+// `featureMember`. Es el mismo criterio que ya usaba el `.dxf`
+// (`app/dialogo-importacion.js`): se pregunta cuando hay algo que preguntar, no por
+// costumbre.
+//
+// Lo que el cajón contaba no se pierde: **las notas y los bloqueos del fichero
+// salen ahora por el panel de avisos** ({@link publicarHallazgosDelFichero}), y la
+// comprobación entera se sigue calculando y guardando, porque es lo que el informe
+// de F09 imprime como «lo que se leyó del fichero».
+//
+// ── ⚠️ ESTE CAMBIO TOCA EL OVERRIDE O8, Y LA CUENTA SALE IGUAL ──────────────
+// `spec/feature-08-comprobar-gml.md` fijaba que **el parcelario se pide solo al
+// aceptar la comprobación, disparado por una pulsación**, «que es el régimen del
+// override O8» (denegación ~10 días por abuso del servicio). Al cargar el fichero
+// solo, la petición pasa a dispararla el `drop`.
+//
+// **El número de peticiones no sube: sigue siendo UNA por fichero abierto.** Antes
+// eran dos gestos (soltar + pulsar) y una petición; ahora es un gesto y una
+// petición. Lo que O8 prohíbe es la petición que NADIE ha pedido —el disparo
+// automático desde un suscriptor, que es lo que F06 y F07 evitaron con
+// «Traer colindantes»—, y abrir un fichero es un gesto tan explícito como teclear
+// una referencia y pulsar «Traer del Catastro».
+//
+// Lo que sí cambia, y se declara en vez de esconderse: **quien suelta un fichero
+// para mirarlo y no seguir ya gasta su petición.** Antes ése no gastaba ninguna. Es
+// el precio de que el caso normal —abrir para trabajar— deje de costar dos gestos.
 //
 // Su anatomía es la de `app/cableado-diagnostico.js` y la de
 // `app/cableado-catastro.js` a propósito —selectores exportados, motivos como
@@ -31,8 +74,11 @@
 //      `geometriaOficial: null` y se dice por qué.
 //   4. **LA EXCLUSIÓN MUTUA DE LOS DOS CAJONES**, que comparten `bottomleft`.
 //   5. **LA ELECCIÓN DE PARCELA** de un fichero multiparcela: se recomprueba con
-//      el índice elegido y entra ÉSA, nunca la unión.
+//      el índice elegido y entra ÉSA, nunca la unión. **Es la única parada que le
+//      queda al recorrido**, y por eso el cajón solo se abre en ese caso.
 //   6. **CADA FALLO SE CUENTA DONDE OCURRE.** Ver la sección siguiente.
+//   7. **LO QUE EL FICHERO TRAE SE CUENTA POR EL PANEL**, ahora que el cajón ya no
+//      se abre solo. Ver {@link publicarHallazgosDelFichero}.
 //
 // ── ⚠️ UNA EXCEPCIÓN DENTRO DE UN OYENTE DEL DOM NO LLEGA A NINGUNA PARTE ───
 // MEDIDO en T3.2, y gobierna cómo está escrito todo este fichero: una excepción
@@ -46,7 +92,7 @@
 // oro 1). El `throw` se reserva —como en toda la casa— al contrato roto por el
 // PROGRAMADOR: un nodo que falta en `index.html`, un cajón que no es el de F08.
 //
-// ── POR QUÉ «CONTRASTAR» NO CIERRA EL CAJÓN, Y QUIÉN LO CIERRA ──────────────
+// ── POR QUÉ EL BOTÓN DEL CAJÓN NO CIERRA EL CAJÓN, Y QUIÉN LO CIERRA ────────
 // El cajón no se cierra solo al pulsar el primario, y está razonado en
 // `viewer/cajon-comprobacion.js#_alPulsarContrastar`: detrás de esa pulsación hay
 // una petición al Catastro, y su renglón `role="status"` es la única superficie
@@ -180,10 +226,39 @@ export const EXTENSIONES = Object.freeze(['.gml', '.xml'])
 
 /**
  * Lo que se escribe en el renglón del cajón mientras la petición viaja. Es el
- * motivo de que «Contrastar» no cierre el cajón: sin esta superficie, el usuario
+ * motivo de que el primario no cierre el cajón: sin esta superficie, el usuario
  * pulsaría un botón y no pasaría nada visible durante segundos.
  */
 export const ESPERANDO_PARCELARIO = 'Trayendo el parcelario del Catastro…'
+
+/**
+ * Lo que se le dice al usuario cuando el fichero trae **más de una parcela**, que
+ * es la única razón por la que el cajón sigue abriéndose solo (2026-08-07).
+ *
+ * Se redacta aquí y no en la vista porque es un AVISO del panel: quien suelta un
+ * fichero espera verlo cargado, y si en vez de eso le sale un cajón hace falta una
+ * frase que diga por qué se ha parado el recorrido. El cajón lo explica también,
+ * pero el cajón está sobre el mapa y el usuario puede estar mirando el panel.
+ *
+ * @param {number} cuantas
+ * @returns {string}
+ */
+export const mensajeElegirParcela = (cuantas) =>
+  `Ese GML trae ${cuantas} parcelas dentro y un expediente lleva una. Elige cuál cargas en el ` +
+  'cuadro que ha salido sobre el mapa; las demás se quedan en el fichero.'
+
+/**
+ * Lo que se le dice cuando el fichero se ha leído y **la aplicación no puede
+ * trabajar con él**. El motivo lo redacta `comprobacion/gml.js`, que promete no
+ * dejarlo nunca vacío cuando `puedeContinuar` es `false`, y aquí se arrastra
+ * ÍNTEGRO: reescribirlo sería una segunda redacción del mismo hecho.
+ *
+ * @param {string} nombre
+ * @param {string} motivo
+ * @returns {string}
+ */
+export const mensajeNoSePuedeCargar = (nombre, motivo) =>
+  `No se ha podido cargar «${nombre}»: ${motivo}`
 
 /**
  * Cola común de todos los motivos por los que la parcela entra SIN parcelario. Se
@@ -445,6 +520,60 @@ function idLocalDe(miembro, refcat, nombreFichero) {
   return textoNoVacio(miembro.localId) ?? refcat ?? textoNoVacio(nombreFichero) ?? 'parcela-de-fichero'
 }
 
+// ── Lo que el fichero trae, contado por el panel ─────────────────────────────
+
+/**
+ * Publica por el panel de avisos lo que `comprobarGml` haya encontrado en el
+ * fichero. **Existe desde el 2026-08-07**, cuando el cajón dejó de abrirse solo:
+ * hasta entonces este módulo no publicaba nada a propósito —«ya están en el cajón,
+ * que es donde se leen»— y esa frase dejó de ser verdad el día que el cajón dejó de
+ * salir.
+ *
+ * ── QUÉ SE PUBLICA Y QUÉ NO, QUE ES LA DECISIÓN ────────────────────────────
+ * `NIVEL` solo tiene dos valores (`ERROR` y `AVISO`) y las detecciones tienen
+ * tres. El reparto:
+ *
+ *   · `ERROR` → `NIVEL.ERROR`. Son los `bloqueos`: lo que impide leer el fichero
+ *     como es debido. Si además `puedeContinuar` es `false`, lo cuenta el llamante
+ *     con {@link mensajeNoSePuedeCargar} y **la parcela no entra**.
+ *   · `AVISO` → `NIVEL.AVISO`. Lo que hay que saber antes de firmar.
+ *   · `INFO`  → **no se publica.** Son las notas de contexto («el prólogo declara
+ *     `encoding="utf-8"`», «el `localId` es tal»), y hay ficheros que traen varias.
+ *     Meterlas en el panel convertiría abrir un GML en siete avisos que hay que
+ *     descartar antes de trabajar, que es exactamente la fricción que este cambio
+ *     viene a quitar. **No se pierden**: siguen dentro de la comprobación, que es
+ *     lo que el informe de F09 imprime bajo «lo que se leyó del fichero».
+ *
+ * No lanza: se llama desde el camino del `drop`, donde una excepción no llegaría a
+ * nadie (ver la cabecera). Una comprobación sin listas —o con listas que no lo
+ * son— sencillamente no publica nada.
+ *
+ * @param {import('./avisos.js').PanelAvisos} panel
+ * @param {object|null} comprobacion  Lo que devolvió `comprobarGml`.
+ * @returns {number}  Cuántos avisos se han publicado. Para el test, y para que el
+ *   llamante pueda decidir sin volver a recorrer las listas.
+ */
+export function publicarHallazgosDelFichero(panel, comprobacion) {
+  if (comprobacion === null || comprobacion === undefined) return 0
+  const bloqueos = Array.isArray(comprobacion.bloqueos) ? comprobacion.bloqueos : []
+  const notas = Array.isArray(comprobacion.notas) ? comprobacion.notas : []
+  let publicados = 0
+  for (const d of bloqueos) {
+    if (typeof d?.mensaje !== 'string' || d.mensaje === '') continue
+    panel.avisar(d.mensaje, { nivel: NIVEL.ERROR })
+    publicados += 1
+  }
+  for (const d of notas) {
+    // `notas` mezcla INFO y AVISO (contrato de `comprobacion/gml.js`); aquí solo
+    // pasan las segundas. Ver el reparto de arriba.
+    if (d?.severidad !== 'AVISO') continue
+    if (typeof d.mensaje !== 'string' || d.mensaje === '') continue
+    panel.avisar(d.mensaje, { nivel: NIVEL.AVISO })
+    publicados += 1
+  }
+  return publicados
+}
+
 // ── Contratos de las dependencias ────────────────────────────────────────────
 
 /** ¿Sirve como store? DUCK TYPING, igual que en `viewer/index.js#esStore`. */
@@ -518,16 +647,18 @@ const esCliente = (v) => !!v && typeof v.parcelaPorRefcat === 'function'
  *   gancho que el de `cablearCatastro`: cargar una parcela de un fichero es abrir un
  *   documento nuevo, así que el historial de edición se REINICIA en vez de commitear
  *   encima (ver `app/main.js#cablearEdicion`). Sin él, el módulo funciona igual.
- * @param {((comprobacion: object|null) => void)|null} [opciones.alComprobar=null]
- *   **Rework de UI · T9.** Se llama justo DESPUÉS de abrir el cajón con un GML de
- *   parcela, con la comprobación que se acaba de pintar. Existe para que
- *   `app/main.js` entre en **modo COMPROBACIÓN**: a partir de ese instante el rail
- *   apaga «Edición» con el motivo escrito, en vez de dejar que alguien edite el
- *   trabajo de otro creyendo que es suyo (decisión D4).
+ * @param {(() => void)|null} [opciones.alPedirEleccion=null]  Se llama justo DESPUÉS
+ *   de abrir el cajón porque el fichero trae **varias parcelas** y hay que elegir
+ *   una. Existe para que `app/main.js` lleve al usuario a **Entrada**, que es la
+ *   pantalla a la que pertenece este cajón (`app/contraste.js#cajonDe`): soltar un
+ *   fichero estando en Diagnóstico dejaría el rail diciendo «Diagnóstico» y la
+ *   esquina del mapa enseñando el cajón de otra pantalla — o, peor, con el cajón
+ *   cerrado por el dueño de la esquina y la pregunta sin hacer.
  *
- *   ⚠️ **No se llama cuando el fichero se deriva a la rama de edificio**: allí no
- *   hay ninguna parcela ajena que comprobar, y el recorrido termina en otra pantalla.
- *   Sin este gancho el módulo se comporta EXACTAMENTE como en F08.
+ *   ⚠️ **Solo se llama en ese caso.** Un fichero de una sola parcela ya no abre
+ *   ningún cajón: entra en el store y el recorrido sigue solo. Es el sucesor
+ *   directo del `alComprobar` de T9, que se llamaba SIEMPRE y además encendía el
+ *   modo COMPROBACIÓN; ese modo ya no existe.
  * @param {ReadonlyArray<{extensiones: readonly string[], alFichero: (f: File) => void}>}
  *   [opciones.entradasExtra=[]]  **F10 · T5.1.** Otras familias de fichero que ESTA
  *   MISMA zona acepta y que NO son un GML. Cada entrada declara sus extensiones y
@@ -576,7 +707,7 @@ export function cablearComprobacion({
   cliente = null,
   cajonDiagnostico = null,
   alCargarParcela = null,
-  alComprobar = null,
+  alPedirEleccion = null,
   entradasExtra = [],
   alGmlDeEdificio = null,
   ventana = globalThis,
@@ -623,10 +754,11 @@ export function cablearComprobacion({
         `${typeof alCargarParcela}.`,
     )
   }
-  if (alComprobar !== null && typeof alComprobar !== 'function') {
+  if (alPedirEleccion !== null && typeof alPedirEleccion !== 'function') {
     throw new TypeError(
-      `cablearComprobacion: 'alComprobar' debe ser una función (se le pasa la comprobación recién ` +
-        `pintada) o null si a nadie le interesa; recibido ${typeof alComprobar}.`,
+      `cablearComprobacion: 'alPedirEleccion' debe ser una función (se llama al abrir el cajón ` +
+        `para elegir entre varias parcelas) o null si a nadie le interesa; recibido ` +
+        `${typeof alPedirEleccion}.`,
     )
   }
   if (alGmlDeEdificio !== null && typeof alGmlDeEdificio !== 'function') {
@@ -739,9 +871,13 @@ export function cablearComprobacion({
   // ── 1 · Del fichero al cajón ───────────────────────────────────────────────
 
   /**
-   * Comprueba un `File` y enseña el resultado. **No lanza nunca**: cada tramo del
-   * recorrido tiene su propio `catch` con su mensaje, porque «no ha pasado nada» es
-   * lo único que el usuario no puede interpretar.
+   * Lee un `File`, y **lo carga**. **No lanza nunca**: cada tramo del recorrido
+   * tiene su propio `catch` con su mensaje, porque «no ha pasado nada» es lo único
+   * que el usuario no puede interpretar.
+   *
+   * Se para en el cajón en un solo caso —el fichero trae varias parcelas y hay que
+   * elegir—; en todos los demás termina con la parcela en el store. Ver el mapa del
+   * recorrido en la cabecera.
    *
    * @param {File} fichero
    * @returns {Promise<void>}
@@ -779,7 +915,32 @@ export function cablearComprobacion({
         derivarAEdificio(fichero, nombre)
         return
       }
-      cajon.pintar(primera)
+      // ── ⭐ LA BIFURCACIÓN DEL 2026-08-07 ─────────────────────────────────
+      // **Solo un fichero con varias parcelas para el recorrido.** En todo lo
+      // demás el cajón no llega ni a pintarse: se publica lo que haya que contar y
+      // la parcela entra sola, que es lo que hace un `.dxf` desde F18.
+      if (primera.miembros.length > 1) {
+        cajon.pintar(primera)
+        // El de diagnóstico comparte esquina con éste (ver la cabecera). Se cierra
+        // ANTES de abrir: soltar un fichero no es un clic, así que su guardián de
+        // clic-fuera no se entera y se quedarían los dos apilados.
+        if (cajonDiagnostico !== null) cajonDiagnostico.cerrar()
+        cajon.abrir()
+        panel.avisar(mensajeElegirParcela(primera.miembros.length), { nivel: NIVEL.AVISO })
+        // Envuelto, igual que {@link notificarCarga}: un oyente roto no puede
+        // deshacer un cajón que ya está en pantalla con la pregunta hecha.
+        if (alPedirEleccion !== null) {
+          try {
+            alPedirEleccion()
+          } catch (causa) {
+            reventar('el aviso de elección pendiente (alPedirEleccion) ha fallado', causa, MENSAJE_SUSCRIPTOR_ROTO)
+          }
+        }
+        return
+      }
+      // Puede venir abierto de un fichero anterior con varias parcelas, y lo que
+      // enseña sería de aquél.
+      cajon.cerrar()
     } catch (causa) {
       fuente = null
       comprobacion = null
@@ -787,32 +948,22 @@ export function cablearComprobacion({
       return
     }
 
-    // El de diagnóstico comparte esquina con éste (ver la cabecera). Se cierra ANTES
-    // de abrir: soltar un fichero no es un clic, así que su guardián de clic-fuera
-    // no se entera y se quedarían los dos apilados.
-    if (cajonDiagnostico !== null) cajonDiagnostico.cerrar()
-    cajon.abrir()
+    // ── Lo que trae el fichero, por el panel ─────────────────────────────────
+    // Va ANTES de cargar y no después: describe el fichero, no el resultado, y si
+    // `puedeContinuar` es `false` es lo único que se va a publicar.
+    publicarHallazgosDelFichero(panel, comprobacion)
 
-    // ── Rework de UI · T9 · AQUÍ EMPIEZA EL MODO COMPROBACIÓN ────────────────
-    // Se avisa DESPUÉS de abrir el cajón y no antes, para que el aviso describa
-    // algo que ya está en pantalla. Quien escucha (`app/main.js`) entra en modo
-    // COMPROBACIÓN, y a partir de ese instante el rail apaga «Edición» **con el
-    // motivo escrito** en vez de dejar que el usuario edite el trabajo de otro
-    // creyendo que es suyo.
-    //
-    // ⚠️ Es un aviso OPCIONAL y este módulo no sabe qué hace quien lo escucha: no
-    // conoce `app/navegacion.js` ni tiene por qué. Sin él, F08 se comporta
-    // exactamente como antes — misma regla que `cajonDiagnostico` y `cliente`.
-    //
-    // Y va envuelto, igual que {@link notificarCarga}: un oyente roto no puede
-    // deshacer una comprobación que ya está en pantalla.
-    if (alComprobar !== null) {
-      try {
-        alComprobar(comprobacion)
-      } catch (causa) {
-        reventar('el aviso de comprobación abierta (alComprobar) ha fallado', causa, MENSAJE_SUSCRIPTOR_ROTO)
-      }
+    // Sin capacidad para trabajar con él, no hay nada que meter en el store. El
+    // motivo lo redacta `comprobacion/gml.js` y se arrastra íntegro: es el mismo
+    // que el cajón escribía al lado del botón apagado.
+    if (comprobacion !== null && !comprobacion.puedeContinuar) {
+      panel.avisar(mensajeNoSePuedeCargar(nombre, comprobacion.motivoNoContinua ?? ''), {
+        nivel: NIVEL.ERROR,
+      })
+      return
     }
+
+    await contrastar()
   }
 
   /**
@@ -977,9 +1128,16 @@ export function cablearComprobacion({
     const c = comprobacion
     if (c === null) return
     if (!c.puedeContinuar || c.geometria === null || c.elegido === null) {
-      // El cajón ya tiene el botón apagado con este mismo motivo escrito; llegar
-      // aquí solo es posible desde la API. Se repite el motivo y no se inventa otro.
-      cajon.estado(c.motivoNoContinua ?? '')
+      // Se repite el motivo y no se inventa otro, **y se dice por el canal que esté
+      // a la vista**: con el cajón abierto (fichero de varias parcelas) su renglón
+      // ya lleva este texto al lado del botón apagado; con el cajón cerrado —que
+      // desde el 2026-08-07 es lo normal— escribir ahí sería hablarle a un nodo
+      // invisible, y el usuario habría soltado un fichero para que no pasara nada.
+      const motivo = c.motivoNoContinua ?? ''
+      if (typeof cajon.abierto === 'function' && cajon.abierto()) cajon.estado(motivo)
+      else panel.avisar(mensajeNoSePuedeCargar(c.fichero?.nombre ?? 'el fichero', motivo), {
+        nivel: NIVEL.ERROR,
+      })
       return
     }
 

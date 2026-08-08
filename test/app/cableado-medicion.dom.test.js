@@ -30,6 +30,7 @@ import {
   componerParcelaMedida,
   textoProcedenciaMedicion,
 } from '../../app/cableado-medicion.js'
+import { INSTRUCCION_PARCELARIO } from '../../app/navegacion.js'
 import { serializarCoordenadasTxt } from '../../export/coordenadas.js'
 import { superficie } from '../../geo/area.js'
 import { ORIGEN_PARCELA, crearParcela, crearRecinto } from '../../model/parcela.js'
@@ -181,6 +182,25 @@ describe('cableado-medicion · componerParcelaMedida', () => {
     expect(componerParcelaMedida(null, nuevos, args).geometriaOficial).toBeNull()
   })
 
+  it('⭐ `superficieRegistral` sobrevive a la composición (contrato del helper 4A)', () => {
+    // Desde el 2026-08-08 este compositor y su DUAL del Catastro comparten
+    // `camposInvariantes`. Sin esta prueba, quitar un campo del helper sólo se ponía
+    // rojo por el lado del Catastro y esta vía se quedaba silenciosamente sin la
+    // superficie registral — que no la emite nadie: la teclea una persona.
+    const antes = crearParcela({
+      idLocal: 'con-registral',
+      refcat: '29041A00800099',
+      recintos: [crearRecinto(ANILLO_OFICIAL)],
+      geometriaOficial: [crearRecinto(ANILLO_OFICIAL)],
+      superficieRegistral: 1499.5,
+      origen: ORIGEN_PARCELA.WFS,
+    })
+    const despues = componerParcelaMedida(antes, nuevos, args)
+
+    expect(despues.superficieRegistral).toBe(1499.5)
+    expect(despues.idLocal).toBe('con-registral')
+  })
+
   it('⚠️ el detector es el `idLocal`, no el origen ni la referencia', () => {
     // La demo YA viene con `origen: WFS` y con la referencia de una parcela real,
     // así que cualquiera de los dos como detector daría un falso positivo. Se
@@ -209,10 +229,14 @@ describe('cableado-medicion · textoProcedenciaMedicion', () => {
     expect(texto).toMatch(/parcelario que ya estaba/i)
   })
 
-  it('sin parcelario lo dice, y señala por dónde traerlo', () => {
+  it('sin parcelario lo dice, y señala la acción SEGURA (no la que borra)', () => {
+    // ⛔ Decía «tráelo con la referencia catastral», y hasta el 2026-08-08 hacerlo
+    // borraba la medición que este mismo renglón acaba de anunciar. La instrucción
+    // es ahora una sola constante compartida por los cuatro sitios que la decían de
+    // cuatro maneras: se afirma ÉSA, no su forma, para que no vuelva a divergir.
     const texto = textoProcedenciaMedicion({ nombreFichero: 'mio.txt', conParcelario: false })
     expect(texto).toMatch(/Sin parcelario/i)
-    expect(texto).toMatch(/referencia catastral/i)
+    expect(texto).toContain(INSTRUCCION_PARCELARIO)
   })
 
   it('⭐ dice DÓNDE CAE la parcela, que es la exigencia de F01', () => {

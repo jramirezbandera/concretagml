@@ -22,6 +22,7 @@
 //   crearHistorial({ limite })                -> historial
 //   commit(historial, estado)                 -> void
 //   reiniciar(historial, estado)              -> void
+//   reencuadrar(historial, fn)                -> void
 //   undo(historial, estadoActual?)            -> estado | null
 //   redo(historial, estadoActual?)            -> estado | null
 //   puedeDeshacer(historial)                  -> boolean
@@ -111,6 +112,71 @@ export function reiniciar(historial, estado) {
   historial.pila.length = 0
   historial.pila.push(structuredClone(estado))
   historial.indice = 0
+}
+
+/**
+ * Reencuadra el historial: reescribe TODOS los snapshots pasándolos por `fn`,
+ * dejando el puntero de undo (`indice`) y la longitud de la pila intactos.
+ *
+ * Es la operación de "ha cambiado el fondo, no el documento". El caso que la
+ * estrena es traer el parcelario oficial del Catastro SIN sustituir la medición
+ * propia: el `estado.set` mete un POJO nuevo con `geometriaOficial` rellena, y si
+ * la pila no se tocara, el primer Ctrl+Z devolvería a un snapshot ANTERIOR —sin
+ * oficial— y el fondo desaparecería sin que nada lo explicara. La `geometriaOficial`
+ * es propiedad del DOCUMENTO, no de un paso que el usuario haya dado, así que se
+ * reescribe en toda la historia en vez de vivir solo en el presente.
+ *
+ * Notas de contrato:
+ *   · **Atómico.** Se construye la pila nueva ENTERA antes de tocar nada, y se
+ *     sustituye al final. Si `fn` lanza a mitad —o no es una función—, `historial`
+ *     se queda exactamente como estaba: nunca hay una pila mixta, con unos
+ *     snapshots reencuadrados y otros no. Ese fallo sería SILENCIOSO (la pila
+ *     queda coherente en forma, incoherente en contenido) y por eso se paga la
+ *     lista intermedia.
+ *   · **NO clona lo que devuelve `fn`.** Si `fn` mete el mismo objeto en los N
+ *     snapshots —el caso normal: una sola `geometriaOficial` para toda la pila—,
+ *     los N COMPARTEN esa referencia en vez de guardar N copias profundas.
+ *   · `indice` no se toca y `fn` se aplica 1 a 1, así que el presente sigue siendo
+ *     el mismo paso y las capacidades de deshacer/rehacer no cambian.
+ *   · La pila se rellena EN SITIO, por el mismo motivo que en `reiniciar`: quien
+ *     tenga una referencia a `historial.pila` no se queda con la vieja.
+ *
+ * ── POR QUÉ COMPARTIR LA REFERENCIA ES SEGURO ───────────────────────────────
+ * **Por la disciplina de clonar en las fronteras, NO por el `deepFreeze` de
+ * `model/parcela.js`.** Esa era la justificación fácil y es FALSA: `structuredClone`
+ * **no preserva `Object.freeze`** —medido en la fase 0 de F10, documentado en
+ * `storage/expedientes.js` y con prueba en `test/storage/aceptacion-f10.test.js:221`—,
+ * así que los snapshots de esta pila, que llegaron por `structuredClone`, ya vienen
+ * DESCONGELADOS. El congelado no es aquí ninguna barrera.
+ *
+ * La barrera real es que **nadie muta las entradas de la pila en sitio**: `commit` y
+ * `reiniciar` clonan a la ENTRADA, `undo` y `redo` clonan a la SALIDA. Lo que sale de
+ * este módulo es siempre una copia fresca, y el llamante puede machacarla sin tocar
+ * la historia. Mientras esa disciplina se mantenga, compartir un objeto entre N
+ * snapshots no puede contaminar a ninguno. Si algún día un método devolviera un
+ * snapshot sin clonar, esta decisión deja de ser segura — y hay que revisarla aquí.
+ *
+ * @param {Historial} historial
+ * @param {(estado: any, indice: number) => any} fn  Recibe cada snapshot (el objeto
+ *   REAL de la pila, no un clon) y devuelve el que lo sustituye. No debe mutar el
+ *   que recibe: se espera un objeto nuevo (`{ ...estado, geometriaOficial }`).
+ * @returns {void}
+ */
+export function reencuadrar(historial, fn) {
+  // Pila nueva completa PRIMERO: si `fn` lanza, el `map` lanza y abajo no se llega.
+  const nueva = historial.pila.map((estado, i) => fn(estado, i))
+  // Un `fn` que no devuelve nada dejaría la pila llena de `undefined` y el fallo
+  // saldría mucho después, en el undo del usuario. Se detecta aquí, aún atómico.
+  const roto = nueva.findIndex((estado) => estado === null || typeof estado !== 'object')
+  if (roto !== -1) {
+    const devuelto = nueva[roto] === null ? 'null' : typeof nueva[roto]
+    throw new TypeError(
+      `reencuadrar: 'fn' debe devolver un estado (objeto); devolvió ${devuelto} en el snapshot ${roto}.`,
+    )
+  }
+  // Sustitución al final y en sitio. `map` conserva la longitud, así que no hay
+  // que recortar la pila ni recolocar `indice`.
+  for (let i = 0; i < nueva.length; i++) historial.pila[i] = nueva[i]
 }
 
 /**

@@ -1,18 +1,18 @@
 /* -------------------------------------------------------------------------- *
  * test/app/navegacion.test.js — Rework de UI · T1 · autoridad de navegación    *
  *                                                                              *
- * `app/navegacion.js` es el dueño único de `{rama, paso, modo}` y **no toca el  *
- * DOM**. Este fichero vive en el proyecto Vitest `node` justamente por eso: si  *
- * el módulo consultara `document` o `window` en algún camino, aquí no habría    *
+ * `app/navegacion.js` es el dueño único de `{rama, paso}` y **no toca el DOM**. *
+ * Este fichero vive en el proyecto Vitest `node` justamente por eso: si el     *
+ * módulo consultara `document` o `window` en algún camino, aquí no habría      *
  * ninguno que consultar y la prueba saldría roja. Es el guardián más barato que *
  * tiene la regla, y por eso el fichero NO se llama `.dom.test.js`.              *
  *                                                                              *
  * Lo que de verdad se vigila aquí son tres cosas, y solo la primera es obvia:   *
  *                                                                              *
  *   1. Que las guardas digan que sí y que no donde toca.                        *
- *   2. **Que ningún paso se apague en silencio.** Se recorren las 32            *
- *      situaciones posibles (2 ramas × 2 modos × 8 combinaciones de hechos) por *
- *      los 5 pasos —160 veredictos— y se exige que TODO bloqueo traiga causa y  *
+ *   2. **Que ningún paso se apague en silencio.** Se recorren las 16            *
+ *      situaciones posibles (2 ramas × 8 combinaciones de hechos) por los 5      *
+ *      pasos —80 veredictos— y se exige que TODO bloqueo traiga causa y         *
  *      motivo en español. Es el criterio 3 del plan, y es la mitad del producto *
  *      de este módulo: el rail no es una lista de botones, es una lista de      *
  *      explicaciones.                                                           *
@@ -30,20 +30,16 @@ import {
   CAUSA,
   CLAVES_HECHOS,
   HECHOS_VACIOS,
+  INSTRUCCION_PARCELARIO,
   MENSAJE_SIN_CONVERGER,
-  MODO,
-  MODOS,
   MOTIVO_DATO,
   MOTIVO_DATO_EDIFICIO,
-  MOTIVO_MODO,
   MOTIVO_RAMA,
-  MOTIVO_SIN_PUERTA,
   PASO,
   PASOS,
   RAMA,
   RAMAS,
   ROTULO_PASO,
-  ROTULO_PUERTA,
   TOPE_RECONCILIACION,
   crearNavegacion,
   evaluarPaso,
@@ -61,9 +57,10 @@ const COMBINACIONES_DE_HECHOS = Array.from({ length: 2 ** CLAVES_HECHOS.length }
   Object.fromEntries(CLAVES_HECHOS.map((clave, i) => [clave, Boolean(mascara & (1 << i))])),
 )
 
-/** Las 32 situaciones posibles. */
+/** Las 16 situaciones posibles. Eran 32 hasta el 2026-08-07, cuando el eje MODO
+ *  se retiró: ver la cabecera de `app/navegacion.js`. */
 const SITUACIONES = RAMAS.flatMap((rama) =>
-  MODOS.flatMap((modo) => COMBINACIONES_DE_HECHOS.map((hechos) => ({ rama, modo, hechos }))),
+  COMBINACIONES_DE_HECHOS.map((hechos) => ({ rama, hechos })),
 )
 
 /** Una navegación con todo desbloqueado, para las pruebas que no van de guardas.
@@ -110,7 +107,7 @@ describe('T1 · el vocabulario se declara UNA vez', () => {
   })
 
   it('el vocabulario está congelado (nadie le añade una rama por la puerta de atrás)', () => {
-    for (const congelado of [RAMA, RAMAS, PASO, PASOS, MODO, MODOS, CAUSA, HECHOS_VACIOS]) {
+    for (const congelado of [RAMA, RAMAS, PASO, PASOS, CAUSA, HECHOS_VACIOS]) {
       expect(Object.isFrozen(congelado)).toBe(true)
     }
   })
@@ -130,8 +127,9 @@ describe('T1 · el módulo no toca el DOM', () => {
     expect(nav.irARuta('#/parcela/validacion').ok).toBe(true)
     expect(nav.cambiarRama(RAMA.EDIFICIO).ok).toBe(false)
     expect(nav.hechosDe(RAMA.EDIFICIO)).toEqual(HECHOS_VACIOS)
-    expect(nav.entrarEnComprobacion().ok).toBe(true)
-    expect(nav.abrirPuerta().ok).toBe(true)
+    // De vuelta a PARCELA, que es donde esta navegación tiene los hechos: la línea
+    // de arriba dejó la rama en EDIFICIO (el paso se cayó, pero la rama cambió).
+    expect(nav.cambiarRama(RAMA.PARCELA).ok).toBe(true)
     expect(nav.puedeIrA(PASO.EDICION).disponible).toBe(true)
     // Entrada no tiene guardas, así que perder el dato no la tira: `ok` es true.
     expect(nav.actualizarHechos({ geometria: false }).ok).toBe(true)
@@ -189,7 +187,6 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     // que es el defecto que este rework viene a arreglar.
     const todos = [
       ...Object.values(MOTIVO_RAMA),
-      ...Object.values(MOTIVO_MODO),
       ...Object.values(MOTIVO_DATO),
       ...Object.values(MOTIVO_DATO_EDIFICIO),
     ]
@@ -197,36 +194,50 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     for (const motivo of todos) expect(motivo.length).toBeLessThanOrEqual(90)
   })
 
-  it('el orden de las causas es RAMA → MODO → DATO, y se ve con las dos que quedan', () => {
-    // ⛔ **Este `it` ha perdido su primer escalón, y hay que decirlo.** Se probaba
-    // con DIAGNÓSTICO porque era el paso que aún se apagaba por RAMA; **F14 abre
-    // los cinco peldaños en las dos ramas**, así que ya NO HAY ningún paso con el
-    // que enseñar la causa RAMA sobre datos reales, y `MOTIVO_RAMA` está vacío.
+  it('⛔ y por eso `INSTRUCCION_PARCELARIO` tiene un tope propio, dicho aquí', () => {
+    // El de arriba se pone rojo si alguien alarga la instrucción compartida, pero
+    // señalando `MOTIVO_DATO.oficial` — que no es donde está el cambio. La frase la
+    // comparten CUATRO sitios y tres de ellos tienen todo el ancho del panel; quien
+    // la alargue estará mirando esos tres. Esto dice, en el sitio donde se busca,
+    // que el cuarto es un chip de 210 px.
+    const enunciado = MOTIVO_DATO.oficial.replace(INSTRUCCION_PARCELARIO, '')
+    expect(MOTIVO_DATO.oficial).toContain(INSTRUCCION_PARCELARIO)
+    expect(
+      INSTRUCCION_PARCELARIO.length,
+      `la instrucción no cabe en el rail: ${enunciado.length} del enunciado + ` +
+        `${INSTRUCCION_PARCELARIO.length} de la instrucción pasan de 90`,
+    ).toBeLessThanOrEqual(90 - enunciado.length)
+  })
+
+  it('⛔ y NINGUNO de los cuatro manda ya a Entrada (era el empujón a la trampa)', () => {
+    // Hasta el 2026-08-08 los cuatro textos que hablan del parcelario decían, cada
+    // uno a su manera, «tráelo del Catastro» — y hacerlo BORRABA la medición del
+    // usuario. El rail era el más directo: «tráelo desde Entrada», que es la
+    // pantalla donde el único botón que había era el que la borra.
+    expect(MOTIVO_DATO.oficial).not.toMatch(/desde Entrada/i)
+    expect(INSTRUCCION_PARCELARIO).toContain('Traer el parcelario de fondo')
+  })
+
+  it('⛔ el orden de las causas es RAMA → DATO, y hoy solo se ve el segundo escalón', () => {
+    // ⛔ **Este `it` ha perdido sus dos primeros escalones, y hay que decirlo.**
+    // Se probaba con DIAGNÓSTICO porque era el paso que aún se apagaba por RAMA;
+    // **F14 abre los cinco peldaños en las dos ramas**, así que ya NO HAY ningún
+    // paso con el que enseñar la causa RAMA sobre datos reales, y `MOTIVO_RAMA`
+    // está vacío. Y el 2026-08-07 se retiró el eje MODO entero, que era el
+    // segundo escalón (ver la cabecera de `app/navegacion.js`).
     //
-    // La compuerta sigue en el código y sigue siendo la primera: lo que se prueba
-    // aquí es el orden de las dos que quedan vivas, y el de la primera se prueba
-    // en `evaluarPaso` con una regla FABRICADA, más abajo. Aflojar esto a «MODO →
-    // DATO» sin decir por qué dejaría la impresión de que el orden cambió.
-    const todoEnContra = {
-      rama: RAMA.PARCELA,
-      modo: MODO.COMPROBACION,
-      hechos: { ...HECHOS_VACIOS },
-    }
+    // La compuerta de RAMA sigue en el código y sigue siendo la primera: se
+    // prueba en `evaluarPaso` con una regla FABRICADA, más abajo. Lo que queda
+    // aquí es que sin ella manda el DATO.
+    const todoEnContra = { rama: RAMA.PARCELA, hechos: { ...HECHOS_VACIOS } }
 
-    // El escalón del MODO se ve en Edición, que es el paso que lo tiene.
-    expect(evaluarPaso(PASO.EDICION, todoEnContra).causa).toBe(CAUSA.MODO)
-
-    // Quitado el modo, manda el dato.
-    expect(evaluarPaso(PASO.EDICION, { ...todoEnContra, modo: MODO.NORMAL }).causa).toBe(
-      CAUSA.DATO,
-    )
+    expect(evaluarPaso(PASO.EDICION, todoEnContra).causa).toBe(CAUSA.DATO)
 
     // Y con la rama EDIFICIO —donde ya no hay compuerta de rama— el diagnóstico
     // cae por DATO y no por RAMA, que es justo el cambio de F14.
     expect(
       evaluarPaso(PASO.DIAGNOSTICO, {
         rama: RAMA.EDIFICIO,
-        modo: MODO.NORMAL,
         hechos: { ...HECHOS_VACIOS },
       }).causa,
     ).toBe(CAUSA.DATO)
@@ -235,7 +246,6 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
   it('cuando faltan dos hechos se nombra el primero que el usuario puede resolver', () => {
     const veredicto = evaluarPaso(PASO.DIAGNOSTICO, {
       rama: RAMA.PARCELA,
-      modo: MODO.NORMAL,
       hechos: { ...HECHOS_VACIOS },
     })
     // Faltan `geometria` Y `oficial`; se dice «trae antes una parcela», no
@@ -248,7 +258,6 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     // estar devolviendo `puedeGenerar: false`. Editar es lo que lo arregla.
     const veredicto = evaluarPaso(PASO.EDICION, {
       rama: RAMA.PARCELA,
-      modo: MODO.NORMAL,
       hechos: { ...HECHOS_VACIOS, geometria: true },
     })
     expect(veredicto.disponible).toBe(true)
@@ -262,7 +271,6 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     // no se «arregla» aflojando la aserción.
     const enEdificio = {
       rama: RAMA.EDIFICIO,
-      modo: MODO.NORMAL,
       hechos: { geometria: true, oficial: false, diagnostico: false },
     }
     for (const paso of PASOS) {
@@ -282,7 +290,6 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     expect(
       evaluarPaso(PASO.DIAGNOSTICO, {
         rama: RAMA.EDIFICIO,
-        modo: MODO.NORMAL,
         hechos: soloGeometria,
       }).disponible,
     ).toBe(true)
@@ -290,7 +297,6 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     // Y en PARCELA, con los mismos hechos, sigue exigiéndolo.
     const enParcela = evaluarPaso(PASO.DIAGNOSTICO, {
       rama: RAMA.PARCELA,
-      modo: MODO.NORMAL,
       hechos: soloGeometria,
     })
     expect(enParcela.disponible).toBe(false)
@@ -305,7 +311,6 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     expect(
       evaluarPaso(PASO.INFORME, {
         rama: RAMA.EDIFICIO,
-        modo: MODO.NORMAL,
         hechos: sinDiagnostico,
       }).disponible,
     ).toBe(true)
@@ -314,7 +319,6 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     expect(
       evaluarPaso(PASO.INFORME, {
         rama: RAMA.PARCELA,
-        modo: MODO.NORMAL,
         hechos: sinDiagnostico,
       }).disponible,
     ).toBe(false)
@@ -338,7 +342,6 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     // intentar navegar hasta aquí.
     const enEdificio = {
       rama: RAMA.EDIFICIO,
-      modo: MODO.NORMAL,
       hechos: { geometria: true, oficial: false, diagnostico: false },
     }
     expect(evaluarPaso(PASO.EDICION, enEdificio).disponible).toBe(true)
@@ -351,7 +354,6 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     // —«trae antes una parcela»— mandaría a hacer algo que no desbloquea nada.
     const sinNada = {
       rama: RAMA.EDIFICIO,
-      modo: MODO.NORMAL,
       hechos: { ...HECHOS_VACIOS },
     }
     const veredicto = evaluarPaso(PASO.EDICION, sinNada)
@@ -366,7 +368,7 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
   })
 
   it('un paso que no existe LANZA nombrando los que sí', () => {
-    const situacion = { rama: RAMA.PARCELA, modo: MODO.NORMAL, hechos: { ...HECHOS_VACIOS } }
+    const situacion = { rama: RAMA.PARCELA, hechos: { ...HECHOS_VACIOS } }
     expect(() => evaluarPaso('generar', situacion)).toThrow(RangeError)
     expect(() => evaluarPaso('generar', situacion)).toThrow(/entrada, validacion/)
   })
@@ -491,10 +493,9 @@ describe('T1 · navegar', () => {
     expect(nav.get().paso).toBe(PASO.DIAGNOSTICO)
   })
 
-  it('rama, paso o modo inventados en el constructor LANZAN', () => {
+  it('rama o paso inventados en el constructor LANZAN', () => {
     expect(() => crearNavegacion({ rama: 'SOLAR' })).toThrow(RangeError)
     expect(() => crearNavegacion({ paso: 'generar' })).toThrow(RangeError)
-    expect(() => crearNavegacion({ modo: 'LECTURA' })).toThrow(RangeError)
   })
 })
 
@@ -520,14 +521,6 @@ describe('T1 · los hechos van POR RAMA', () => {
     const nav = crearNavegacion({ hechos: { PARCELA: { geometria: true }, EDIFICIO: { geometria: true } } })
     expect(nav.get().rama).toBe(RAMA.PARCELA)
     expect(nav.hechosDe(RAMA.EDIFICIO).geometria).toBe(true)
-  })
-
-  it('conmutar NO toca el modo: ir y volver no te saca de la comprobación', () => {
-    const nav = crearNavegacion({ hechos: { PARCELA: { geometria: true } } })
-    nav.entrarEnComprobacion()
-    nav.cambiarRama(RAMA.EDIFICIO)
-    nav.cambiarRama(RAMA.PARCELA)
-    expect(nav.get().modo).toBe(MODO.COMPROBACION)
   })
 
   it('conmutar a la rama en la que ya se está no notifica', () => {
@@ -578,54 +571,21 @@ describe('T1 · los hechos van POR RAMA', () => {
   })
 })
 
-describe('T1 · la puerta (D4: comprobación es una puerta, no una cárcel)', () => {
-  it('en comprobación Edición se apaga con un motivo que NOMBRA la salida', () => {
-    const nav = crearNavegacion({ hechos: { geometria: true } })
-    nav.entrarEnComprobacion()
-
-    const veredicto = nav.puedeIrA(PASO.EDICION)
-    expect(veredicto.disponible).toBe(false)
-    expect(veredicto.causa).toBe(CAUSA.MODO)
-    expect(veredicto.motivo).toBe(MOTIVO_MODO[PASO.EDICION])
-    // El motivo y el botón dicen la MISMA cadena, o el usuario busca un botón
-    // que no existe con ese nombre.
-    expect(veredicto.motivo).toContain(ROTULO_PUERTA)
-  })
-
-  it('comprobar NO apaga el diagnóstico ni el informe: ése es el recorrido entero', () => {
-    const nav = crearNavegacion({ hechos: { geometria: true, oficial: true, diagnostico: true } })
-    nav.entrarEnComprobacion()
-    expect(nav.puedeIrA(PASO.DIAGNOSTICO).disponible).toBe(true)
-    expect(nav.puedeIrA(PASO.INFORME).disponible).toBe(true)
-  })
-
-  it('cruzar la puerta completa el rail sin mover al usuario de sitio', () => {
-    const nav = crearNavegacion({ hechos: { geometria: true, oficial: true, diagnostico: true } })
-    nav.entrarEnComprobacion()
-    nav.navegarAPaso(PASO.DIAGNOSTICO)
-
-    const desenlace = nav.abrirPuerta()
-
-    expect(desenlace.ok).toBe(true)
-    expect(nav.get().modo).toBe(MODO.NORMAL)
-    expect(nav.get().paso).toBe(PASO.DIAGNOSTICO) // no le teletransporta
-    expect(nav.rail().every((p) => p.disponible)).toBe(true)
-  })
-
-  it('entrar en comprobación fuerza la rama PARCELA (no se comprueba el GML de un edificio)', () => {
-    const nav = crearNavegacion({ rama: RAMA.EDIFICIO })
-    nav.entrarEnComprobacion()
-    expect(nav.get().rama).toBe(RAMA.PARCELA)
-  })
-
-  it('cruzar una puerta que no está abierta no lanza: lo dice', () => {
-    const nav = navegacionCompleta()
-    const desenlace = nav.abrirPuerta()
-    expect(desenlace.ok).toBe(false)
-    expect(desenlace.motivo).toBe(MOTIVO_SIN_PUERTA)
-    expect(nav.get().modo).toBe(MODO.NORMAL)
-  })
-})
+/* ⛔ **AQUÍ VIVÍA `describe('T1 · la puerta (D4…)')`, CON SUS CINCO PRUEBAS, Y SE
+ * RETIRÓ EL 2026-08-07 CON EL EJE QUE PROBABA.**
+ *
+ * Probaban que en modo COMPROBACIÓN Edición se apagaba nombrando la salida, que el
+ * diagnóstico y el informe seguían abiertos, y que `abrirPuerta()` completaba el
+ * rail sin mover al usuario de sitio. **Las cinco pasaban**, y la aplicación
+ * estaba rota igualmente: el botón que llamaba a `abrirPuerta()` vivía en el cajón
+ * de Diagnóstico, y en el caso corriente —un GML sin referencia catastral— ese paso
+ * estaba apagado por falta de parcelario. Este módulo no toca el DOM y no sabe
+ * dónde se pinta su CTA, así que ninguna prueba de aquí podía verlo.
+ *
+ * Es la lección que se queda escrita: **una API de navegación en verde no dice que
+ * el recorrido se pueda andar.** Lo que lo dice es un guion de humo en el
+ * navegador, y el 15 lo daba por bueno porque montaba el caso CON parcelario.
+ */
 
 describe('T1 · la URL (D3: hash, y el dato manda sobre la URL)', () => {
   it('ida y vuelta para las diez combinaciones de rama × paso', () => {
@@ -656,13 +616,6 @@ describe('T1 · la URL (D3: hash, y el dato manda sobre la URL)', () => {
     for (const ajeno of ['', '#', '#seccion', '#/parcela', '#/parcela/validacion/extra', '#/solar/entrada', '#/parcela/generar', null, 42]) {
       expect(leerRuta(ajeno)).toBeNull()
     }
-  })
-
-  it('el modo NO viaja en la URL: un enlace no puede llevar el fichero de otro', () => {
-    const nav = crearNavegacion({ hechos: { geometria: true } })
-    nav.entrarEnComprobacion()
-    expect(nav.ruta()).toBe('#/parcela/entrada')
-    expect(nav.ruta()).not.toContain('comprob')
   })
 
   it('⭐ el DATO manda: un enlace a un paso sin dato aterriza donde se sostiene y lo DICE', () => {

@@ -45,8 +45,12 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 
+import { MOTIVO_SIN_OFICIAL as MOTIVO_DERIVACION } from '../../app/cableado-derivacion.js'
+import { MOTIVO_SIN_OFICIAL as MOTIVO_DIAGNOSTICO } from '../../app/cableado-diagnostico.js'
+import { textoProcedenciaMedicion } from '../../app/cableado-medicion.js'
 import {
-  MODO,
+  INSTRUCCION_PARCELARIO,
+  MOTIVO_DATO,
   PASOS,
   RAMAS,
   crearNavegacion,
@@ -414,9 +418,7 @@ describe('T2 · la autoridad de navegación no pinta (complemento del test `node
       avisar: () => {},
     })
     for (const paso of PASOS) nav.navegarAPaso(paso)
-    nav.entrarEnComprobacion()
     nav.rail()
-    nav.abrirPuerta()
     for (const rama of RAMAS) nav.cambiarRama(rama)
     nav.irARuta('#/edificio/validacion')
     nav.irARuta('#/parcela/informe')
@@ -433,10 +435,64 @@ describe('T2 · la autoridad de navegación no pinta (complemento del test `node
     // Anti-vacuidad del `it` de arriba: si la navegación no hiciera nada, el DOM
     // también seguiría intacto y la prueba pasaría sin haber medido nada.
     const nav = crearNavegacion({ hechos: { geometria: true }, avisar: () => {} })
-    expect(nav.get().modo).toBe(MODO.NORMAL)
-    nav.entrarEnComprobacion()
-    expect(nav.get().modo).toBe(MODO.COMPROBACION)
+    expect(nav.get().paso).toBe(PASOS[0])
     expect(nav.navegarAPaso(PASOS[1]).ok).toBe(true)
     expect(nav.get().paso).toBe(PASOS[1])
+    // Y un paso que el dato no sostiene se queda donde está, DICIENDO por qué.
+    const bloqueado = nav.navegarAPaso(PASOS[4])
+    expect(bloqueado.ok).toBe(false)
+    expect(bloqueado.motivo).toMatch(/\S/)
+  })
+})
+
+// ── LOS CUATRO TEXTOS DEL PARCELARIO, UNA SOLA INSTRUCCIÓN (2026-08-08) ──────
+//
+// Va en un test `.dom` y no en `navegacion.test.js` por una razón mecánica: aquí se
+// importan los TRES cableados que comparten la frase, y esos módulos resuelven nodos
+// del documento. Bajo `node` no se pueden ni cargar.
+
+describe('los cuatro textos del parcelario comparten UNA instrucción', () => {
+  /** Los cuatro sitios que le dicen al usuario que le falta el parcelario. */
+  const LOS_CUATRO = () => [
+    ['navegacion · MOTIVO_DATO.oficial', MOTIVO_DATO.oficial],
+    ['cableado-diagnostico · MOTIVO_SIN_OFICIAL', MOTIVO_DIAGNOSTICO],
+    ['cableado-derivacion · MOTIVO_SIN_OFICIAL', MOTIVO_DERIVACION],
+    [
+      'cableado-medicion · textoProcedenciaMedicion',
+      textoProcedenciaMedicion({ nombreFichero: 'mio.dxf', conParcelario: false }),
+    ],
+  ]
+
+  it('⭐ los CUATRO llevan la frase compartida, palabra por palabra', () => {
+    // Es el contrato de la decisión 2A y no es burocracia: eran cuatro redacciones
+    // distintas de la misma instrucción y las cuatro estaban mal. Cuatro copias de
+    // una frase que hay que mantener diciendo lo mismo son cuatro sitios donde
+    // volver a equivocarse, y ya pasó una vez.
+    for (const [donde, texto] of LOS_CUATRO()) {
+      expect(texto, `«${donde}» ya no usa la constante compartida`).toContain(
+        INSTRUCCION_PARCELARIO,
+      )
+    }
+  })
+
+  it('⛔ y NINGUNO manda ya a la trampa: ni a Entrada ni a «traer la parcela»', () => {
+    // El defecto de producto que esta feature cierra. Hasta el 2026-08-08 los cuatro
+    // empujaban a la acción que BORRA la medición del usuario, cada uno con su
+    // redacción: «tráelo desde Entrada», «Tráela del Catastro y se enciende», «Trae
+    // la parcela del Catastro y vuelve», «tráelo con la referencia catastral».
+    for (const [donde, texto] of LOS_CUATRO()) {
+      expect(texto, `«${donde}» sigue mandando a Entrada`).not.toMatch(/desde Entrada/i)
+      expect(texto, `«${donde}» sigue mandando a traer la PARCELA`).not.toMatch(
+        /tr[aá]e(?:la|r)?\s+(?:la\s+)?parcela/i,
+      )
+    }
+  })
+
+  it('⛔ ANTI-VACUIDAD: la frase compartida nombra el botón que conserva la medición', () => {
+    // Sin esto, los dos `it` de arriba pasarían con una constante vacía o con una
+    // que dijera cualquier otra cosa: afirmarían que las cuatro dicen LO MISMO, no
+    // que digan lo CORRECTO.
+    expect(INSTRUCCION_PARCELARIO).toContain('Traer el parcelario de fondo')
+    expect(INSTRUCCION_PARCELARIO).toMatch(/medici[oó]n/i)
   })
 })

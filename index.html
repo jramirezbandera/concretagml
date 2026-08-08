@@ -150,6 +150,38 @@
              falso hasta que el usuario traiga algo — y es la primera línea que se
              lee de la pantalla. Ahora dice lo que hay. -->
         <p class="gml-eyebrow" data-eyebrow>Sin parcela</p>
+
+        <!-- ── QUÉ GEOMETRÍAS HAY CARGADAS (2026-08-08) ────────────────────
+             Dos indicadores, uno por geometría del modelo: la de TRABAJO
+             (`recintos`, lo que se edita y se serializa) y la OFICIAL
+             (`geometriaOficial`, el parcelario del Catastro que solo sirve para
+             contrastar). Cada uno lleva el color con el que su geometría se
+             dibuja en el mapa, para que la relación entre el panel y el lienzo
+             no haya que deducirla.
+
+             Existen porque desde que hay dos puertas hay dos geometrías que
+             pueden estar o no estar de forma independiente, y hasta ahora la
+             única pista era mirar el mapa y adivinar de quién era cada trazo.
+
+             ⛔ **INFORMAN, NO CONTROLAN, y esa es la línea del alcance.** No son
+             botones, no llevan `data-accion` y no seleccionan capa activa. El día
+             que se conviertan en selectores, esta feature se ha desbordado hacia
+             el sistema general de capas, que está explícitamente fuera.
+
+             ⚠️ El estado se dice CON PALABRAS y no solo con color: «Sin
+             levantamiento» / «Levantamiento». Un indicador que solo cambia de
+             color es invisible para quien no distingue esos dos colores, y aquí
+             lo que se comunica es qué se va a generar. Lo escribe
+             `app/main.js#actualizarFicha`, el mismo suscriptor del store que ya
+             mantiene el rótulo de encima. -->
+        <p class="gml-capas">
+          <span class="gml-capa" data-capa="medicion" data-presente="false">
+            Sin levantamiento
+          </span>
+          <span class="gml-capa" data-capa="oficial" data-presente="false">
+            Sin parcelario
+          </span>
+        </p>
         <!-- El título CAMBIA con la pantalla y lo escribe `app/pantalla.js`
              (`TITULO_PANTALLA`). Lo que hay aquí es lo que se ve durante el
              instante anterior al montaje, así que es el de la pantalla con la que
@@ -467,9 +499,18 @@
         <p class="gml-obien"><span>O bien</span></p>
 
         <div class="gml-via">
-          <h2 class="gml-rotulo">Comprobar un GML existente</h2>
+          <!-- ⭐ 2026-08-07 · ESTA VÍA DECÍA LO CONTRARIO DE LO QUE HACE AHORA.
+               Rezaba «Comprobar un GML existente / Contrasta un GML ya hecho contra
+               el parcelario, SIN GENERAR UNO NUEVO», y era verdad mientras el GML
+               entrara en modo comprobación y de solo lectura. Retirado ese modo, un
+               `.gml` se abre como se abre un `.dxf`: se carga, se dibuja y se
+               edita. Dejar el rótulo viejo habría anunciado un peaje que ya no
+               existe — y a quien viniera a retocar su propio fichero le habría
+               dicho que ahí no podía. -->
+          <h2 class="gml-rotulo">Abrir un GML</h2>
           <p class="gml-via-apunte">
-            Contrasta un GML ya hecho contra el parcelario, sin generar uno nuevo.
+            Un GML ya hecho —el tuyo o el de otro—. Se carga con su geometría y su
+            referencia, y se puede editar y volver a generar.
           </p>
           <button
             type="button"
@@ -877,6 +918,48 @@
                mapa tiene ADEMÁS el suyo propio, y se llama `cajon-diagnostico`
                justamente para que no se confundan: `querySelector` se quedaría
                con el de este `<aside>`, que va antes en el documento. -->
+          <!-- ── LA PUERTA 2 · «Traer el parcelario de fondo» (2026-08-08) ──
+               VA ANTES DE «Diagnosticar encaje» porque es su requisito: sin
+               contorno oficial el diagnóstico no se puede medir, y éste es el
+               botón que lo trae. Leído de arriba abajo, el pie de Validación
+               cuenta ahora el orden real del trabajo.
+
+               ⛔ **`data-accion` DISTINTO del de Entrada, y es lo más frágil de
+               todo este bloque.** Entrada tiene `cargar-catastro`, que SUSTITUYE
+               la geometría de trabajo por la del Catastro; éste la CONSERVA y
+               solo rellena el parcelario oficial. Con las dos pantallas montadas
+               a la vez —que es como funciona esta app— `querySelector` devuelve
+               la PRIMERA del documento aunque esté `hidden` (contrato K.1), así
+               que repetir el valor dejaría este botón huérfano y sus clics irían
+               al que borra la medición: el defecto que esta feature cierra,
+               servido por el propio arreglo. Los `data-accion` de este fichero
+               son únicos, y esto es de las pocas cosas que hay que comprobar a
+               mano al añadir uno.
+
+               NACE DESHABILITADO como sus tres hermanos. Quien lo enciende —y
+               quien escribe el motivo mientras no lo enciende— es
+               `app/cableado-diagnostico.js`, que además encadena la deducción de
+               la referencia cuando la parcela todavía no tiene ninguna (el caso
+               de un .dxf recién importado, que es el que motiva la feature).
+
+               ⚠️ Y tiene renglón PROPIO en vez de compartir el de
+               «Diagnosticar encaje»: los dos escriben motivo cuando nacen
+               apagados, y con un solo `role="status"` el último en refrescarse
+               borraría al otro en cada cambio del store. -->
+          <button
+            type="button"
+            class="gml-boton gml-boton--secundario"
+            data-accion="traer-fondo-catastral"
+            disabled
+          >
+            Traer el parcelario de fondo
+          </button>
+          <p
+            class="gml-accion-estado"
+            data-estado="traer-fondo-catastral"
+            role="status"
+          ></p>
+
           <button
             type="button"
             class="gml-boton gml-boton--secundario"

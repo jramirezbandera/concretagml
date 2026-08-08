@@ -78,7 +78,7 @@
 // llena. Confundir las dos cosas convertiría el gate en una calificación.
 //
 // ── UN BOTÓN GRIS Y MUDO ES UN ERROR SILENCIOSO (regla de oro 1) ────────────
-// «Contrastar con el parcelario» nace `disabled` ⟺ `!puedeContinuar`, y en ese
+// El primario nace `disabled` ⟺ `!puedeContinuar`, y en ese
 // mismo instante {@link crearCajonComprobacion} escribe `motivoNoContinua` en el
 // renglón de estado. Nunca hay un botón apagado sin su porqué a la vista: el
 // contrato de `comprobacion/gml.js` garantiza que ese motivo no puede ser `null`
@@ -499,7 +499,16 @@ const CajonComprobacion = L.Control.extend({
     const pie = crear(doc, 'div')
     estilar(pie, { display: 'flex', gap: '8px', alignItems: 'center', marginTop: '12px' })
 
-    const contrastar = crear(doc, 'button', null, 'Contrastar con el parcelario')
+    // ⭐ **«Cargar la parcela elegida», y no «Contrastar con el parcelario»**
+    // desde el 2026-08-07. El rótulo viejo describía el recorrido viejo, en el que
+    // este cajón salía con CUALQUIER `.gml` y era el peaje obligatorio para que la
+    // geometría llegara al store. Hoy el fichero entra solo y **este cajón solo se
+    // abre cuando trae varias parcelas**, o sea cuando hay que elegir una: el botón
+    // confirma la elección, y contrastar con el parcelario es lo que pasa después,
+    // no lo que se pide. El `data-accion` NO cambia — es contrato con
+    // `app/cableado-comprobacion.js` y con los guiones de humo, y renombrarlo de
+    // paso sería romper por cosmética.
+    const contrastar = crear(doc, 'button', null, 'Cargar la parcela elegida')
     contrastar.type = 'button'
     contrastar.dataset.accion = 'contrastar-parcelario'
     // El renglón de estado es donde se escribe POR QUÉ está apagado, así que se

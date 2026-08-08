@@ -535,6 +535,66 @@ body {
   color: var(--color-text-disabled);
 }
 
+/* ── Qué geometrías hay cargadas ───────────────────────────────────────────
+ * Dos indicadores INFORMATIVOS bajo el rótulo del dato, uno por geometría del
+ * modelo. Cada uno lleva un punto del color con el que su geometría se dibuja
+ * en el mapa: ámbar el levantamiento (`COLOR_USUARIO`, en su versión legible
+ * sobre fondo claro) y el neutro del parcelario (`COLOR_OFICIAL`, que ya es
+ * legible sobre blanco).
+ *
+ * El estado APAGADO no se dice solo con el color —el texto cambia («Sin
+ * levantamiento»)—; el color y la opacidad son refuerzo, nunca el único canal.
+ * Son 4 px de alto extra en la cabecera, medidos.
+ */
+/* ⛔ El alto de esta línea es CARGA ESTRUCTURAL, y está medido. Los dos
+ * indicadores viven en la cabecera del panel, que comparte columna con la tabla
+ * de vértices, y esa tabla tiene DOS suelos que la vigilan desde los guiones de
+ * humo: 120 px (§10, con una tanda de 12 avisos) y 124,57 px (§16, con sobrante
+ * de 2 piezas). Con `margin-top:4px` y el interlineado por defecto ocupaban
+ * 19,94 px y dejaban la tabla en 117 px: TRES por debajo del suelo del §10, y
+ * el panel no desborda, así que el síntoma habría sido mudo.
+ * `line-height` ceñido + 2 px de margen bajan el bloque a ~13 px. No se retiran
+ * los indicadores —son la única señal en pantalla de qué se va a generar—: se
+ * aprietan. */
+.gml-capas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 2px 0 0;
+  font-size: var(--text-11);
+  line-height: 1.2;
+  color: var(--color-text-disabled);
+}
+
+.gml-capa {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.gml-capa::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.45;
+}
+
+.gml-capa[data-presente='true'] {
+  color: var(--color-text-secondary);
+}
+
+.gml-capa[data-capa='medicion'][data-presente='true']::before {
+  background: var(--gml-color-usuario-sobre-claro);
+  opacity: 1;
+}
+
+.gml-capa[data-capa='oficial'][data-presente='true']::before {
+  background: #6b7280;
+  opacity: 1;
+}
+
 .gml-titulo {
   margin: 6px 0 var(--space-3);
   font-size: var(--gml-titulo-tam);

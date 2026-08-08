@@ -3,6 +3,7 @@ import {
   crearHistorial,
   commit,
   reiniciar,
+  reencuadrar,
   undo,
   redo,
   puedeDeshacer,
@@ -290,5 +291,229 @@ describe('edit/historial.js — reiniciar (documento nuevo)', () => {
     expect(h.pila[0]).toEqual(estadoRecintos('HUECO', [3, 3]))
     expect(puedeDeshacer(h)).toBe(false)
     expect(puedeRehacer(h)).toBe(false)
+  })
+})
+
+describe('edit/historial.js — reencuadrar (cambia el fondo, no el documento)', () => {
+  // Fondo oficial con la forma real: recintos de vértices [x,y]. Es lo que el
+  // llamante mete en TODOS los snapshots con una sola referencia.
+  const oficialPrueba = () => [
+    { vertices: [[0, 0], [10, 0], [10, 10], [0, 0]], tipo: 'EXTERIOR' },
+  ]
+
+  // Congelado en profundidad, como el que hace `model/parcela.js` con
+  // `geometriaOficial`. Local al test: aquí se usa para REFUTAR que el congelado
+  // sea la barrera, no para depender de él.
+  const congelarHondo = (valor) => {
+    if (valor !== null && typeof valor === 'object') {
+      for (const k of Object.keys(valor)) congelarHondo(valor[k])
+      Object.freeze(valor)
+    }
+    return valor
+  }
+
+  // Historial con tres pasos de edición y el presente deshecho una vez: hay
+  // pasado, presente y rama de redo. Es el caso que más partes puede romper.
+  const historialConTresPasos = () => {
+    const h = crearHistorial()
+    commit(h, estadoRecintos('EXTERIOR', [1, 1]))
+    commit(h, estadoRecintos('EXTERIOR', [2, 2]))
+    commit(h, estadoRecintos('EXTERIOR', [3, 3]))
+    undo(h) // presente en medio, con rama de redo por delante
+    return h
+  }
+
+  it('el fondo entra en TODA la historia: deshacer ya no lo borra', () => {
+    const h = historialConTresPasos()
+    const oficial = oficialPrueba()
+
+    // Antes: ningún snapshot tiene fondo. Es el defecto que esto viene a evitar
+    // — sin reencuadrar, el primer Ctrl+Z devolvía un estado SIN geometría oficial
+    // y el parcelario desaparecía sin que nada lo explicara.
+    expect(h.pila.every((e) => e.geometriaOficial === undefined)).toBe(true)
+
+    reencuadrar(h, (estado) => ({ ...estado, geometriaOficial: oficial }))
+
+    // El pasado, el presente y la rama de redo llevan el fondo.
+    expect(undo(h).geometriaOficial).toEqual(oficial)
+    expect(redo(h).geometriaOficial).toEqual(oficial)
+    expect(redo(h).geometriaOficial).toEqual(oficial)
+  })
+
+  it('deja intactos los recintos, la longitud de la pila y el puntero de undo', () => {
+    const h = historialConTresPasos()
+    const indiceAntes = h.indice
+    const recintosAntes = h.pila.map((e) => structuredClone(e.recintos))
+
+    reencuadrar(h, (estado) => ({ ...estado, geometriaOficial: oficialPrueba() }))
+
+    expect(h.pila).toHaveLength(3)
+    expect(h.indice).toBe(indiceAntes)
+    expect(h.pila.map((e) => e.recintos)).toEqual(recintosAntes)
+    // Las capacidades no cambian: sigue siendo el mismo paso del mismo documento.
+    expect(puedeDeshacer(h)).toBe(true)
+    expect(puedeRehacer(h)).toBe(true)
+  })
+
+  it('devuelve void y rellena la pila EN SITIO (quien tenga la referencia ve el cambio)', () => {
+    const h = historialConTresPasos()
+    const pilaAntes = h.pila
+
+    expect(reencuadrar(h, (estado) => ({ ...estado, fondo: 1 }))).toBe(undefined)
+
+    expect(h.pila).toBe(pilaAntes) // mismo array, no uno nuevo
+    expect(pilaAntes.every((e) => e.fondo === 1)).toBe(true)
+  })
+
+  it('`fn` recibe la entrada REAL de la pila y su índice, en orden', () => {
+    const h = historialConTresPasos()
+    const originales = [...h.pila]
+    const recibidos = []
+    const indices = []
+
+    reencuadrar(h, (estado, i) => {
+      recibidos.push(estado)
+      indices.push(i)
+      return { ...estado }
+    })
+
+    expect(indices).toEqual([0, 1, 2])
+    expect(recibidos[0]).toBe(originales[0]) // la entrada, no un clon
+    expect(recibidos[2]).toBe(originales[2])
+  })
+
+  it('ATÓMICO: si `fn` lanza en el último snapshot, no se ha escrito ni el primero', () => {
+    const h = historialConTresPasos()
+    const antes = structuredClone(h.pila)
+    const indiceAntes = h.indice
+
+    expect(() =>
+      reencuadrar(h, (estado, i) => {
+        if (i === 2) throw new Error('el fondo no se pudo componer')
+        return { ...estado, geometriaOficial: oficialPrueba() }
+      }),
+    ).toThrow('el fondo no se pudo componer')
+
+    // Ni pila mixta ni puntero movido: el historial no se enteró.
+    expect(h.pila).toEqual(antes)
+    expect(h.pila.every((e) => e.geometriaOficial === undefined)).toBe(true)
+    expect(h.indice).toBe(indiceAntes)
+  })
+
+  it('ATÓMICO también con un `fn` que no es función: la pila no se toca', () => {
+    const h = historialConTresPasos()
+    const antes = structuredClone(h.pila)
+
+    expect(() => reencuadrar(h, null)).toThrow(TypeError)
+    expect(h.pila).toEqual(antes)
+  })
+
+  it('un `fn` que no devuelve estado se detecta AQUÍ, no en el undo del usuario', () => {
+    // El error realista: llaves en la flecha y olvidar el `return`. Sin la guarda,
+    // la pila quedaría llena de `undefined` y el fallo saldría mucho después.
+    for (const malo of [undefined, null, 42, 'estado']) {
+      const h = historialConTresPasos()
+      const antes = structuredClone(h.pila)
+      expect(() => reencuadrar(h, () => malo)).toThrow(TypeError)
+      expect(h.pila).toEqual(antes) // sigue siendo atómico
+    }
+
+    const h = historialConTresPasos()
+    expect(() => reencuadrar(h, (estado, i) => (i === 1 ? undefined : estado))).toThrow(
+      /snapshot 1/,
+    )
+  })
+
+  it('COMPARTE la referencia: N snapshots, un solo objeto de fondo (no N copias)', () => {
+    const h = historialConTresPasos()
+    const oficial = oficialPrueba()
+
+    reencuadrar(h, (estado) => ({ ...estado, geometriaOficial: oficial }))
+
+    expect(h.pila[0].geometriaOficial).toBe(oficial)
+    expect(h.pila[1].geometriaOficial).toBe(oficial)
+    expect(h.pila[2].geometriaOficial).toBe(oficial)
+  })
+
+  it('compartir es seguro porque `undo`/`redo` clonan a la salida (esa es la barrera real)', () => {
+    const h = historialConTresPasos()
+    const oficial = oficialPrueba()
+    reencuadrar(h, (estado) => ({ ...estado, geometriaOficial: oficial }))
+
+    const devuelto = undo(h)
+    // Lo que sale del módulo es copia fresca, aunque dentro se comparta.
+    expect(devuelto.geometriaOficial).toEqual(oficial)
+    expect(devuelto.geometriaOficial).not.toBe(oficial)
+
+    // Machacar lo devuelto no contamina ni la fuente ni ningún snapshot.
+    devuelto.geometriaOficial[0].vertices[0][0] = 999
+    devuelto.geometriaOficial.push({ vertices: [[7, 8]], tipo: 'HUECO' })
+    expect(oficial[0].vertices[0][0]).toBe(0)
+    expect(oficial).toHaveLength(1)
+    expect(redo(h).geometriaOficial).toEqual(oficialPrueba())
+  })
+
+  it('el motivo NO es el `deepFreeze`: `structuredClone` lo descarta y los snapshots llegan DESCONGELADOS', () => {
+    // Refuta la justificación fácil de compartir la referencia. `model/parcela.js`
+    // congela `geometriaOficial` en profundidad, pero ese congelado NO sobrevive al
+    // `structuredClone` de `commit` — el mismo hecho medido en la fase 0 de F10
+    // (`test/storage/aceptacion-f10.test.js:221`). Si el congelado fuera la barrera,
+    // aquí ya no habría ninguna.
+    const h = crearHistorial()
+    const oficial = congelarHondo(oficialPrueba())
+    expect(Object.isFrozen(oficial)).toBe(true)
+
+    commit(h, { ...estadoRecintos('EXTERIOR', [1, 1]), geometriaOficial: oficial })
+    expect(Object.isFrozen(h.pila[0].geometriaOficial)).toBe(false)
+    expect(Object.isFrozen(h.pila[0].geometriaOficial[0].vertices)).toBe(false)
+
+    // Y aun descongelado, el snapshot sigue a salvo: lo que sale es un clon.
+    const devuelto = undo(h)
+    expect(devuelto).toBe(null) // un solo snapshot: no hay a dónde volver
+    commit(h, estadoRecintos('EXTERIOR', [2, 2]))
+    const anterior = undo(h)
+    anterior.geometriaOficial[0].tipo = 'MUTADO'
+    expect(h.pila[0].geometriaOficial[0].tipo).toBe('EXTERIOR')
+  })
+
+  it('sobre un historial vacío no hace nada (ni lanza)', () => {
+    const h = crearHistorial()
+    let llamadas = 0
+    expect(() =>
+      reencuadrar(h, (estado) => {
+        llamadas++
+        return estado
+      }),
+    ).not.toThrow()
+    expect(llamadas).toBe(0)
+    expect(h.pila).toHaveLength(0)
+    expect(h.indice).toBe(-1)
+  })
+
+  it('reencuadrar no consume el límite: la pila sigue acotada y `commit` sigue funcionando', () => {
+    const h = crearHistorial({ limite: 3 })
+    for (let i = 0; i < 5; i++) commit(h, estadoRecintos('EXTERIOR', [i, i]))
+    expect(h.pila).toHaveLength(3)
+
+    reencuadrar(h, (estado) => ({ ...estado, geometriaOficial: oficialPrueba() }))
+    expect(h.pila).toHaveLength(3)
+    expect(h.limite).toBe(3)
+
+    // Un commit posterior sigue acotando y descartando el más antiguo.
+    commit(h, estadoRecintos('HUECO', [9, 9]))
+    expect(h.pila).toHaveLength(3)
+    expect(h.indice).toBe(2)
+    expect(undo(h).geometriaOficial).toEqual(oficialPrueba())
+  })
+
+  it('un commit posterior al reencuadre no arrastra el fondo por su cuenta', () => {
+    // Anti-vacuidad: el fondo lo mete el llamante en el estado que commitea, no
+    // `reencuadrar`. Si esto empezara a pasar, es que alguien mutó en sitio.
+    const h = historialConTresPasos()
+    reencuadrar(h, (estado) => ({ ...estado, geometriaOficial: oficialPrueba() }))
+
+    commit(h, estadoRecintos('HUECO', [7, 7])) // sin geometriaOficial
+    expect(h.pila[h.indice].geometriaOficial).toBe(undefined)
+    expect(undo(h).geometriaOficial).toEqual(oficialPrueba()) // el pasado sí lo tiene
   })
 })

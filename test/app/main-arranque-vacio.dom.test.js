@@ -43,6 +43,7 @@ import { SRS_DEMO } from '../../app/demo-datos.js'
 import { PASO } from '../../app/navegacion.js'
 import { RAMA } from '../../app/rama.js'
 import { husoPorSrs } from '../../geo/huso.js'
+import { ORIGEN_PARCELA, TIPO_RECINTO, crearParcela, crearRecinto } from '../../model/parcela.js'
 import { crearBarraEdicion } from '../../viewer/barra-edicion.js'
 import { crearCajonComprobacion } from '../../viewer/cajon-comprobacion.js'
 import { crearCajonDiagnostico } from '../../viewer/cajon-diagnostico.js'
@@ -255,6 +256,75 @@ describe('app/main · arranca SIN NADA precargado', () => {
     expect(eyebrow).not.toMatch(/demostraci[oó]n/i)
     expect(eyebrow).not.toMatch(/Catastro/i)
     expect(eyebrow.length, 'un rótulo vacío no dice nada; tiene que DECIR que no hay').toBeGreaterThan(0)
+  })
+
+  // ── Los dos indicadores de qué hay cargado (2026-08-08) ───────────────────
+
+  it('⭐ los dos indicadores dicen que NO hay nada, con palabras y no solo con color', () => {
+    // Existen porque desde que hay dos puertas hay dos geometrías que pueden estar
+    // o no estar por separado, y de eso depende qué se va a generar. Un indicador
+    // que solo cambiara de COLOR sería invisible para quien no distingue esos dos
+    // colores, justo sobre el dato que se acaba firmando.
+    const medicion = q('[data-capa="medicion"]')
+    const oficial = q('[data-capa="oficial"]')
+
+    expect(medicion.dataset.presente).toBe('false')
+    expect(oficial.dataset.presente).toBe('false')
+    expect(medicion.textContent.trim()).toBe('Sin levantamiento')
+    expect(oficial.textContent.trim()).toBe('Sin parcelario')
+  })
+
+  it('⭐ y se encienden por SEPARADO: cuatro estados, no dos', () => {
+    const estado = arranque.opciones.estado
+    const medicion = q('[data-capa="medicion"]')
+    const oficial = q('[data-capa="oficial"]')
+    const anillo = [
+      [439300, 4479650],
+      [439310, 4479650],
+      [439310, 4479660],
+      [439300, 4479660],
+    ]
+    const conGeometria = (conOficial) =>
+      crearParcela({
+        idLocal: 'mi-levantamiento',
+        origen: ORIGEN_PARCELA.DXF,
+        recintos: [crearRecinto(anillo, TIPO_RECINTO.EXTERIOR)],
+        geometriaOficial: conOficial ? [crearRecinto(anillo, TIPO_RECINTO.EXTERIOR)] : null,
+      })
+
+    // El store de este fichero es del ARRANQUE REAL y lo comparten todas las
+    // pruebas: se devuelve a `null` pase lo que pase, o un fallo aquí pondría rojas
+    // a las de después por un motivo que no es el suyo.
+    try {
+      // Solo levantamiento: el estado del .dxf recién importado.
+      estado.set(conGeometria(false))
+      expect(medicion.dataset.presente).toBe('true')
+      expect(medicion.textContent.trim()).toBe('Levantamiento')
+      expect(oficial.dataset.presente).toBe('false')
+
+      // Y con el parcelario de fondo encima: los dos, que es lo que deja la puerta 2.
+      estado.set(conGeometria(true))
+      expect(medicion.dataset.presente).toBe('true')
+      expect(oficial.dataset.presente).toBe('true')
+      expect(oficial.textContent.trim()).toBe('Parcelario del Catastro')
+    } finally {
+      estado.set(null)
+    }
+
+    expect(medicion.dataset.presente).toBe('false')
+    expect(oficial.dataset.presente).toBe('false')
+  })
+
+  it('⛔ INFORMAN, no controlan: no son botones ni llevan `data-accion`', () => {
+    // Es la línea del alcance. El día que se conviertan en selectores de capa
+    // activa, esta feature se ha desbordado hacia el sistema general de capas —que
+    // está fuera a propósito— y esta prueba es donde se entera.
+    for (const sel of ['[data-capa="medicion"]', '[data-capa="oficial"]']) {
+      const nodo = q(sel)
+      expect(nodo.tagName).toBe('SPAN')
+      expect(nodo.dataset.accion).toBeUndefined()
+      expect(nodo.closest('button')).toBeNull()
+    }
   })
 
   it('el marcado de `index.html` tampoco miente durante el instante previo', () => {

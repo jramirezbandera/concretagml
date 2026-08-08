@@ -384,6 +384,11 @@ function montar({ responder, conVecinas = true } = {}) {
   vi.spyOn(estado, 'set')
 
   const panel = crearDialogoAvisos({ documento: document })
+  // ⭐ Espiado desde el 2026-08-07 y **sin doblarlo**: `vi.spyOn` llama al original,
+  // así que el diálogo real sigue pintando. Hace falta porque las notas y los
+  // bloqueos del fichero salen ahora por aquí en vez de por el cajón, y varios `it`
+  // de esta suite tienen que poder leer lo que se publicó.
+  vi.spyOn(panel, 'avisar')
 
   const transporte = crearTransporteDoble(responder)
   const cliente = crearClienteCatastro({ transporte, srs: SRS })
@@ -548,24 +553,28 @@ describe('F08 · aceptación · los ficheros sobre los que se acepta traen su ca
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe('F08 · AC1 · un .gml de parcela válido se parsea y llega al diagnóstico sin pasar por edición ni generación', () => {
-  it('«se parsea»: soltarlo sobre la ventana abre el cajón y dice QUÉ es ese fichero', async () => {
+  it('⭐ «se parsea»: soltarlo sobre la ventana lo CARGA, sin cajón y sin confirmar', async () => {
+    // ⛔ **ESTE `it` AFIRMABA LO CONTRARIO HASTA EL 2026-08-07.** Exigía
+    // `cajonComprobacion.abierto() === true`, las cifras pintadas en el cajón y
+    // `transporte.peticiones` VACÍO, porque el parcelario esperaba a una pulsación.
+    // El fichero entra ahora como un `.dxf`: la comprobación se sigue calculando
+    // —se afirma sobre el objeto, que es donde vive— y el cajón no aparece.
     const banco = montar()
 
     await soltarFixture(WFS)
 
-    expect(banco.cajonComprobacion.abierto()).toBe(true)
-    expect(texto(banco.raizComp, SELECTOR_COMP.TITULAR)).toMatch(/^Comprobación del fichero/)
-    expect(texto(banco.raizComp, SELECTOR_COMP.FICHERO)).toContain(WFS)
-    // Lo que es, en castellano de persona y sin adjetivar el trabajo de nadie.
-    expect(texto(banco.raizComp, SELECTOR_COMP.QUE_SIGNIFICA)).toBe(
-      comprobarFixture(WFS).dialecto.queSignifica,
-    )
+    expect(banco.cajonComprobacion.abierto()).toBe(false)
+    const c = banco.comprobacion.comprobacion()
+    expect(c.fichero.nombre).toContain(WFS)
+    expect(c.dialecto.queSignifica).toBe(comprobarFixture(WFS).dialecto.queSignifica)
     // Y las cifras del fichero, leídas de sus propias coordenadas.
-    expect(texto(banco.raizComp, SELECTOR_COMP.VERTICES)).toBe('15')
-    expect(texto(banco.raizComp, SELECTOR_COMP.SRS)).toBe(SRS)
-    // Régimen del override O8: soltar un fichero NO habla con el Catastro. La
-    // petición la dispara una pulsación del usuario, nunca la carga.
-    expect(banco.transporte.peticiones).toEqual([])
+    expect(c.miembros[c.elegido].nVertices).toBe(15)
+    expect(c.geometria.srs).toBe(SRS)
+    // Régimen del override O8: **UNA** petición por fichero abierto, ni una más.
+    // Antes eran dos gestos (soltar + pulsar) y esta misma petición; el número no
+    // sube, baja el número de gestos que le cuesta al usuario.
+    expect(banco.transporte.peticiones).toHaveLength(1)
+    expect(banco.estado.get().origen).toBe(ORIGEN_PARCELA.GML_EXISTENTE)
   })
 
   it('«llega al diagnóstico»: al pulsar «Contrastar», el CTA de F07 se enciende SOLO', async () => {
@@ -681,11 +690,10 @@ describe('F08 · AC1 · un .gml de parcela válido se parsea y llega al diagnós
     await soltarFixture(TRESCERO)
 
     expect(comprobarFixture(TRESCERO).bloqueos.map((d) => d.tipo)).toContain('DIALECTO_RECHAZADO')
-    expect(banco.botonContrastar.disabled).toBe(false)
-    expect(texto(banco.raizComp, SELECTOR_COMP.ESTADO)).toBe('')
-
-    banco.botonContrastar.click()
-    await cederTurno()
+    // El ERROR del fichero sale por el PANEL —el cajón ya no se abre— y el
+    // recorrido sigue: la parcela entra igual. Ésa es la distinción que este `it`
+    // existe para atestar, y no ha cambiado.
+    expect(banco.comprobacion.comprobacion().puedeContinuar).toBe(true)
 
     // Sin referencia catastral no hay parcelario que pedir: se dice y se carga igual.
     expect(banco.transporte.peticiones).toEqual([])
@@ -751,14 +759,13 @@ describe('F08 · AC2 · un GML con varias parcelas ofrece elegir; uno con SRS in
     expect(nota.severidad).toBe('AVISO')
     expect(c.bloqueos).toEqual([])
     expect(c.puedeContinuar).toBe(true)
-    // Pintada en la sección de notas, con su texto y sin color de alarma.
-    const seccion = texto(banco.raizComp, SELECTOR_COMP.NOTAS)
-    expect(seccion).toContain('15 de los 15 vértices caen FUERA del huso 29')
-    expect(seccion).toContain('Es una nota, no un fallo')
-    // Y el recorrido continúa: el botón está encendido y la parcela entra.
-    expect(banco.botonContrastar.disabled).toBe(false)
-    banco.botonContrastar.click()
-    await cederTurno()
+    // ⭐ Y se PUBLICA por el panel de avisos, que es donde se leen las notas desde
+    // el 2026-08-07: antes se pintaban en la sección de notas del cajón, y el cajón
+    // ya no se abre. La nota conserva su texto entero y su nivel de AVISO.
+    const avisos = banco.panel.avisar.mock.calls.map(([m]) => m).join(' | ')
+    expect(avisos).toContain('15 de los 15 vértices caen FUERA del huso 29')
+    expect(avisos).toContain('Es una nota, no un fallo')
+    // Y el recorrido continúa: la parcela entra sola.
     expect(banco.estado.get().origen).toBe(ORIGEN_PARCELA.GML_EXISTENTE)
   })
 
@@ -770,8 +777,6 @@ describe('F08 · AC2 · un GML con varias parcelas ofrece elegir; uno con SRS in
     // de medida).
     const banco = montar()
     await soltarFixture(HUSO_MALO)
-    banco.botonContrastar.click()
-    await cederTurno()
 
     expect(banco.transporte.peticiones).toEqual([])
     expect(banco.estado.get().geometriaOficial).toBeNull()
@@ -791,12 +796,13 @@ describe('F08 · AC2 · un GML con varias parcelas ofrece elegir; uno con SRS in
 
     const c = banco.comprobacion.comprobacion()
     expect(c.puedeContinuar).toBe(false)
-    expect(banco.botonContrastar.disabled).toBe(true)
-    // El motivo, en castellano, en el renglón `role="status"` del cajón. Nunca vacío.
-    const motivo = texto(banco.raizComp, SELECTOR_COMP.ESTADO)
-    expect(motivo).toBe(c.motivoNoContinua)
-    expect(motivo).toContain('EPSG:25829, 25830 o 25831')
-    expect(motivo).toContain('Reproyéctalo')
+    // El motivo, en castellano, POR EL PANEL desde el 2026-08-07 —antes iba al
+    // renglón `role="status"` del cajón, que ya no se abre—. Nunca vacío, y con el
+    // nombre del fichero delante para que se sepa de cuál habla.
+    const avisos = banco.panel.avisar.mock.calls.map(([m]) => m).join(' | ')
+    expect(avisos).toContain(c.motivoNoContinua)
+    expect(avisos).toContain('EPSG:25829, 25830 o 25831')
+    expect(avisos).toContain('Reproyéctalo')
     // Y la nota que sí es nota: no se ha podido cotejar el huso, y se dice.
     expect(c.notas.map((d) => d.tipo)).toContain('HUSO_NO_COTEJABLE')
     // No se ha metido nada en el expediente a medias.
@@ -872,22 +878,16 @@ describe('F08 · AC3 · la acción principal del diagnóstico por esta vía es �
     // RED y sin plano. Lo que AC3 pedía de verdad —que la acción que consume el
     // diagnóstico esté en el cajón y no en el pie de la app, que no cueste píxeles
     // del panel y que sirva a las dos vías de entrada— sigue cumpliéndose entero.
-    // ⚠️ ACTUALIZADO OTRA VEZ EN EL REWORK DE UI (T9). El cajón estrena un cuarto
-    // botón —«Tomar esta geometría y editarla», la puerta de la decisión D4— que
-    // nace OCULTO y solo se enseña cuando la geometría es de otro. No toca AC3: no
-    // produce ningún documento, no comparte fila con los dos del informe y por lo
-    // tanto no le cuesta un píxel al panel.
+    // ⚠️ ACTUALIZADO OTRA VEZ EN EL REWORK DE UI (T9) Y DESHECHO EL 2026-08-07. El
+    // cajón estrenó entonces un cuarto botón —«Tomar esta geometría y editarla», la
+    // puerta de D4— y se ha retirado con el modo COMPROBACIÓN entero: ver la
+    // cabecera de `app/navegacion.js`. AC3 no se movió ni al ponerlo ni al quitarlo.
     const botones = [...banco.raizDiag.querySelectorAll('button')]
     expect(botones.map((b) => b.dataset.accion).sort()).toEqual([
       'cerrar-diagnostico',
       'descargar-informe',
       'preparar-informe',
-      'tomar-geometria',
     ])
-    // Y nace escondido, que es lo que hace que AC3 siga midiendo lo mismo.
-    expect(banco.raizDiag.querySelector('[data-accion="tomar-geometria"]').style.display).toBe(
-      'none',
-    )
     // Y los dos del informe comparten fila, así que el cajón no ha crecido de alto:
     // la razón 2 (un CTA más cuesta ~36 px del panel) sigue en pie.
     const preparar = banco.raizDiag.querySelector('[data-accion="preparar-informe"]')
@@ -1034,16 +1034,16 @@ describe('F08 · AC3 · la acción principal del diagnóstico por esta vía es �
 // `comprobacion/edificio.js` no existe se cae solo, que es como debe caerse.
 
 describe('F08 · AC4 · un GML de edificio se encamina al contraste de construcción (F14), no al de lindero', () => {
-  it('SE CUMPLE · «no al de lindero»: el botón está apagado y no entra nada en el expediente', async () => {
+  it('SE CUMPLE · «no al de lindero»: se para en seco y no entra nada en el expediente', async () => {
     const banco = montar()
     await soltarFixture(EDIFICIO)
 
-    expect(banco.cajonComprobacion.abierto()).toBe(true)
-    expect(banco.botonContrastar.disabled).toBe(true)
-    expect(banco.cajonComprobacion.puedeContrastar()).toBe(false)
+    // El cajón ya no se abre (2026-08-07): el gate sigue viviendo donde vivía
+    // —`puedeContinuar`, de `comprobacion/gml.js`— y el motivo sale por el panel.
+    expect(banco.cajonComprobacion.abierto()).toBe(false)
+    expect(banco.comprobacion.comprobacion().puedeContinuar).toBe(false)
 
     // Ni siquiera forzándolo desde la API: el gate no es la cortesía del `disabled`.
-    banco.botonContrastar.click()
     banco.comprobacion.contrastar()
     await cederTurno()
 
@@ -1059,15 +1059,17 @@ describe('F08 · AC4 · un GML de edificio se encamina al contraste de construcc
     const banco = montar()
     await soltarFixture(EDIFICIO)
 
-    expect(texto(banco.raizComp, SELECTOR_COMP.QUE_SIGNIFICA)).toContain(
+    expect(banco.comprobacion.comprobacion().dialecto.queSignifica).toContain(
       'habla de la CONSTRUCCIÓN, no del lindero de la parcela',
     )
-    const motivo = texto(banco.raizComp, SELECTOR_COMP.ESTADO)
-    expect(motivo).toBe(comprobarFixture(EDIFICIO).motivoNoContinua)
-    expect(motivo).toContain('describe una CONSTRUCCIÓN, no una parcela')
-    expect(motivo).toContain('todavía no existe en esta aplicación')
+    // ⭐ El motivo sale por el PANEL desde el 2026-08-07, con el nombre del fichero
+    // delante: antes lo escribía el renglón del cajón al lado del botón apagado.
+    const avisos = banco.panel.avisar.mock.calls.map(([m]) => m).join(' | ')
+    expect(avisos).toContain(comprobarFixture(EDIFICIO).motivoNoContinua)
+    expect(avisos).toContain('describe una CONSTRUCCIÓN, no una parcela')
+    expect(avisos).toContain('todavía no existe en esta aplicación')
     // Sin parcelas y sin geometría validada: `null` («no se ha mirado») y no `[]`.
-    expect(texto(banco.raizComp, SELECTOR_COMP.MIEMBROS)).toContain('no trae ninguna parcela')
+    expect(banco.comprobacion.comprobacion().miembros).toEqual([])
     expect(comprobarFixture(EDIFICIO).hallazgos).toBeNull()
   })
 
@@ -1116,19 +1118,17 @@ describe('F08 · los dos cajones de bottomleft nunca coinciden', () => {
     const banco = await conDiagnosticoDeFichero(montar())
     expect(banco.cajonDiagnostico.abierto()).toBe(true)
 
-    await soltarFixture(HUSO_MALO)
+    // Con VARIAS parcelas, que es lo único que abre el cajón desde el 2026-08-07:
+    // es el único estado en el que los dos podrían apilarse en la misma esquina.
+    await soltarFixture(MULTI)
 
     expect(banco.cajonComprobacion.abierto()).toBe(true)
     expect(banco.cajonDiagnostico.abierto()).toBe(false)
   })
 
-  it('«Contrastar» cierra el de comprobación antes de que llegue nada al diagnóstico', async () => {
+  it('cargar el fichero deja cerrado el de comprobación antes de llegar al diagnóstico', async () => {
     const banco = montar()
     await soltarFixture(WFS)
-    expect(banco.cajonComprobacion.abierto()).toBe(true)
-
-    banco.botonContrastar.click()
-    await cederTurno()
 
     expect(banco.cajonComprobacion.abierto()).toBe(false)
     banco.ctaDiagnosticar.click()

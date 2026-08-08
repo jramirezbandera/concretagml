@@ -86,6 +86,28 @@
  *        superada y respuesta posterior a `destruir()`).                         *
  *  M15 · quitar la rama de CERO colindantes → 1 rojo, «NO se cuenta como fallo,  *
  *        y se dice DISTINTO».                                                    *
+ *                                                                              *
+ * ── LAS DOS PUERTAS (2026-08-08) · MUTACIONES ──                                *
+ * Mismo método: aplicada, `npm run test:dom -- catastro`, revertida con el       *
+ * editor. Las cinco son el defecto original, o uno de sus trozos.                *
+ *  M16 · `conservaLaMedicion` fija en `false` (o sea: `aplicar` vuelve a         *
+ *        construir la parcela desde cero, que ES el defecto) → **9 rojos**, en   *
+ *        cascada por las cuatro secciones nuevas. Es la prueba de que el         *
+ *        defecto que 83 pruebas no vieron ahora se ve nueve veces.                *
+ *  M17 · llamar SIEMPRE a `alCargarParcela`, también por la puerta 2 → 1 rojo.   *
+ *        Sin él, el gancho reiniciaría el historial y traer el fondo volvería a  *
+ *        robar el «deshacer», que es el agravante 1 del diseño.                   *
+ *  M18 · quitar la guarda de `cargar({refcat})` inservible (caer al campo) → 1   *
+ *        rojo: se consulta la referencia de OTRA pantalla (contrato K.1).         *
+ *  M19 · saltarse `avisarSiElFondoNoCuadra` → 1 rojo: un parcelario a 5 km de la *
+ *        medición entra sin que nada lo diga.                                     *
+ *  M20 · escribir siempre `textoProcedencia` en el renglón de procedencia → 2    *
+ *        rojos: el rótulo diría «Del Catastro» sobre una geometría que no es del *
+ *        Catastro, que es el error de producto que el criterio 6 persigue.        *
+ *  M21 · `camposInvariantes` sin `superficieRegistral` → 2 rojos aquí… y CERO en *
+ *        `test/app/cableado-medicion.dom.test.js`, que es el otro consumidor del  *
+ *        helper. Ese hueco se tapó con una prueba nueva allí; sin ella, tocar el  *
+ *        helper compartido sólo se ponía rojo por un lado.                        *
  * -------------------------------------------------------------------------- */
 
 import { readFileSync } from 'node:fs'
@@ -95,6 +117,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 import {
   MENSAJE_FALLO_INESPERADO,
+  MENSAJE_FONDO_SIN_SOLAPE,
+  MENSAJE_SIN_REFCAT_PEDIDA,
   MENSAJE_SUSCRIPTOR_ROTO,
   MOTIVO_COLINDANTES_APAGADO,
   ROTULO_DEDUCIDA,
@@ -106,7 +130,12 @@ import {
   SELECTOR_ESTADO_CATASTRO,
   SELECTOR_PROCEDENCIA,
   cablearCatastro,
+  camposInvariantes,
+  componerParcelaConOficial,
+  textoProcedencia,
 } from '../../app/cableado-catastro.js'
+import { componerParcelaMedida } from '../../app/cableado-medicion.js'
+import { PROCEDENCIA } from '../../app/contraste.js'
 import { crearDialogoAvisos } from '../../app/dialogo-avisos.js'
 import { ORIGEN_PUNTO, puntoInterior } from '../../gml/anillos.js'
 import { parsearGml } from '../../gml/parse.js'
@@ -1787,5 +1816,451 @@ describe('cableado-catastro · alCargarParcela', () => {
     expect(resultado.ok).toBe(true)
     expect(montado.sets).toHaveLength(1)
     await expect(montado.cableado.colindantes()).resolves.toMatchObject({ ok: true })
+  })
+})
+
+// ── 19 · LAS DOS PUERTAS (2026-08-08) ───────────────────────────────────────
+//
+// El defecto que cierra esta sección: traer el Catastro sobre una medición propia
+// la BORRABA, porque `aplicar` construía la parcela desde cero y metía la geometría
+// del WFS en `recintos` y en `geometriaOficial` a la vez. Ochenta y tres pruebas
+// pasaron por delante sin verlo —afirmaban sobre botones, oyentes y transporte, no
+// sobre la geometría resultante—, así que aquí se afirma sobre LA GEOMETRÍA.
+
+/** Traslada unos recintos. Deriva del fixture en vez de escribir coordenadas. */
+const desplazar = (recintos, dx, dy) =>
+  recintos.map((r) =>
+    crearRecinto(
+      r.vertices.map(([x, y]) => [x + dx, y + dy]),
+      r.tipo,
+    ),
+  )
+
+/**
+ * Una medición propia del usuario, derivada de la parcela real del fixture y movida
+ * `dx` metros al este. Con `dx` pequeño solapa el parcelario; con `dx` grande, no.
+ * Nada escrito a mano: si mañana se recaptura el fixture, esto le sigue solo.
+ */
+const parcelaMedida = (dx = 2, extra = {}) =>
+  crearParcela({
+    idLocal: 'mi-levantamiento',
+    origen: ORIGEN_PARCELA.DXF,
+    recintos: desplazar(PARCELA_FIXTURE.recintos, dx, 0),
+    ...extra,
+  })
+
+/** Los vértices de unos recintos, para comparar geometrías sin depender del POJO. */
+const puntos = (recintos) => recintos.map((r) => r.vertices)
+
+describe('cableado-catastro · puerta 2 · «traer el parcelario de fondo»', () => {
+  it('⭐ NO borra la medición: `recintos` intactos y el Catastro solo en `geometriaOficial`', async () => {
+    const medida = parcelaMedida()
+    const montado = cablear({ parcelaInicial: medida })
+
+    await montado.cableado.cargar({ refcat: REFCAT, sustituir: false })
+
+    // Sigue siendo UN SOLO `set`.
+    expect(montado.sets).toHaveLength(1)
+    const parcela = montado.sets[0]
+    // La geometría de trabajo es la del usuario, vértice a vértice.
+    expect(puntos(parcela.recintos)).toEqual(puntos(medida.recintos))
+    // Y la del Catastro está, aparte, donde tiene que estar.
+    expect(puntos(parcela.geometriaOficial)).toEqual(puntos(PARCELA_FIXTURE.recintos))
+    expect(parcela.superficieCatastral).toBe(PARCELA_FIXTURE.areaValue)
+  })
+
+  it('`idLocal` y `origen` NO se tocan; la `refcat` sí se adopta (decisión 12A)', async () => {
+    const montado = cablear({ parcelaInicial: parcelaMedida() })
+    await montado.cableado.cargar({ refcat: REFCAT, sustituir: false })
+
+    const parcela = montado.sets[0]
+    // Un `origen: WFS` sobre unos vértices de DXF sería una mentira en el campo que
+    // existe para no contarla.
+    expect(parcela.origen).toBe(ORIGEN_PARCELA.DXF)
+    expect(parcela.idLocal).toBe('mi-levantamiento')
+    // Pero el expediente ya afirma ser esa parcela catastral: es lo que enciende
+    // «Traer colindantes» y lo que hace falta para emitir su GML.
+    expect(parcela.refcat).toBe(REFCAT)
+  })
+
+  it('⭐ `superficieRegistral` sobrevive: es la que teclea una persona (helper 4A)', async () => {
+    // Era el campo que se perdía en SILENCIO cuando la parcela se construía desde
+    // cero. No lo emite ni el Catastro ni el fichero: no hay de dónde recuperarlo.
+    const montado = cablear({ parcelaInicial: parcelaMedida(2, { superficieRegistral: 1499.5 }) })
+    await montado.cableado.cargar({ refcat: REFCAT, sustituir: false })
+
+    expect(montado.sets[0].superficieRegistral).toBe(1499.5)
+  })
+
+  it('la puerta 1 (`cargar()` sin argumentos) sigue haciendo lo de SIEMPRE', async () => {
+    // Regresión del defecto al revés: el comportamiento por defecto no cambia ni una
+    // línea, porque `alPulsarCargar` sigue invocando `cargar()` a secas.
+    const montado = cablear({ parcelaInicial: parcelaMedida() })
+    montado.campo.value = REFCAT
+    await montado.cableado.cargar()
+
+    const parcela = montado.sets[0]
+    expect(parcela.origen).toBe(ORIGEN_PARCELA.WFS)
+    expect(puntos(parcela.recintos)).toEqual(puntos(PARCELA_FIXTURE.recintos))
+    expect(puntos(parcela.geometriaOficial)).toEqual(puntos(PARCELA_FIXTURE.recintos))
+  })
+
+  it('con el store VACÍO las dos puertas coinciden, y no lanza (guarda explícita)', async () => {
+    // Sin nada que conservar, pedir la puerta 2 acaba en documento nuevo. Es correcto
+    // —no hay medición que perder— y por eso es una guarda y no un `throw`.
+    const montado = cablear({ parcelaInicial: null })
+    await expect(montado.cableado.cargar({ refcat: REFCAT, sustituir: false })).resolves
+      .toMatchObject({ ok: true })
+
+    const parcela = montado.sets[0]
+    expect(parcela.origen).toBe(ORIGEN_PARCELA.WFS)
+    expect(puntos(parcela.recintos)).toEqual(puntos(PARCELA_FIXTURE.recintos))
+  })
+
+  it('una parcela SIN recintos tampoco tiene nada que conservar', async () => {
+    const vacia = crearParcela({ idLocal: 'sin-geometria', origen: ORIGEN_PARCELA.DXF })
+    const montado = cablear({ parcelaInicial: vacia })
+    await montado.cableado.cargar({ refcat: REFCAT, sustituir: false })
+
+    expect(montado.sets[0].origen).toBe(ORIGEN_PARCELA.WFS)
+    expect(montado.sets[0].idLocal).not.toBe('sin-geometria')
+  })
+
+  it('el renglón cuenta un FONDO, no una parcela cargada, y los dos recuentos', async () => {
+    const medida = parcelaMedida()
+    const montado = cablear({ parcelaInicial: medida })
+    await montado.cableado.cargar({ refcat: REFCAT, sustituir: false })
+
+    const texto = montado.renglon.textContent
+    expect(renglonEnFallo(montado.renglon)).toBe(false)
+    expect(texto).toContain('parcelario oficial')
+    expect(texto).toContain('Tu medición sigue en pantalla')
+    // Y NO afirma haber cargado la parcela: eso atribuiría al Catastro una geometría
+    // que no ha emitido, justo en la línea que dice qué ha pasado.
+    expect(texto).not.toContain('Cargada la parcela')
+  })
+})
+
+describe('cableado-catastro · los dos ganchos (documento y parcelario)', () => {
+  /** Cablea apuntando el ORDEN en que se llaman los dos ganchos. */
+  function conDosGanchos(opciones = {}) {
+    const llamadas = []
+    const montado = cablear({
+      alCargarParcela: (parcela) => llamadas.push({ gancho: 'documento', parcela }),
+      alCambiarOficial: (parcela) => llamadas.push({ gancho: 'oficial', parcela }),
+      ...opciones,
+    })
+    return { ...montado, llamadas }
+  }
+
+  it('⭐ la puerta 2 NO dispara el del documento, y SÍ el del parcelario', async () => {
+    // Es el reparto entero de la feature: sin el primero no se reinicia el historial
+    // (que es lo que te roba el undo), y con el segundo sí se tiran las dianas de
+    // snap de la parcela anterior (que si no, enganchan a geometría de otro sitio).
+    const montado = conDosGanchos({ parcelaInicial: parcelaMedida() })
+    await montado.cableado.cargar({ refcat: REFCAT, sustituir: false })
+
+    expect(montado.llamadas.map((l) => l.gancho)).toEqual(['oficial'])
+    expect(montado.llamadas[0].parcela).toBe(montado.sets[0])
+  })
+
+  it('la puerta 1 dispara los DOS, y el del documento primero', async () => {
+    // El orden importa: el documento siembra el historial y el parcelario lo
+    // reencuadra sobre lo sembrado. Al revés, el reencuadre se perdería.
+    const montado = conDosGanchos()
+    montado.campo.value = REFCAT
+    await montado.cableado.cargar()
+
+    expect(montado.llamadas.map((l) => l.gancho)).toEqual(['documento', 'oficial'])
+  })
+
+  it('un gancho que revienta NO impide que se llame al otro', async () => {
+    const consola = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const vistos = []
+    const montado = cablear({
+      alCargarParcela: () => {
+        throw new Error('el historial se ha roto')
+      },
+      alCambiarOficial: (parcela) => vistos.push(parcela),
+    })
+    montado.campo.value = REFCAT
+
+    const resultado = await montado.cableado.cargar()
+
+    expect(resultado.ok).toBe(true)
+    expect(vistos).toHaveLength(1) // el segundo se llamó igual
+    expect(textosDelPanel()).toContain(MENSAJE_SUSCRIPTOR_ROTO)
+    expect(consola).toHaveBeenCalled()
+    consola.mockRestore()
+  })
+
+  it('`alCambiarOficial` que no es función se rechaza AL CABLEAR', () => {
+    expect(() => cablear({ alCambiarOficial: 'sí, gracias' })).toThrow(TypeError)
+  })
+
+  it('sin ninguno de los dos, el módulo sigue comportándose como en F05', async () => {
+    const montado = cablear({ parcelaInicial: parcelaMedida() })
+    await expect(montado.cableado.cargar({ refcat: REFCAT, sustituir: false })).resolves
+      .toMatchObject({ ok: true })
+    expect(montado.sets).toHaveLength(1)
+  })
+})
+
+describe('cableado-catastro · `cargar({refcat})`: la referencia se pasa, no se lee', () => {
+  it('con `refcat` NO mira el campo (contrato K.1: puede ser el de otra pantalla)', async () => {
+    const montado = cablear()
+    // El campo tiene una referencia distinta de la que se pide por API.
+    montado.campo.value = VECINA.refcat
+
+    await montado.cableado.cargar({ refcat: REFCAT })
+
+    expect(montado.transporte.peticiones[0].url).toContain(REFCAT)
+    expect(montado.sets[0].refcat).toBe(REFCAT)
+  })
+
+  it('sin `refcat` sigue leyendo el campo, exactamente como siempre', async () => {
+    const montado = cablear()
+    montado.campo.value = REFCAT
+    await montado.cableado.cargar()
+    expect(montado.transporte.peticiones[0].url).toContain(REFCAT)
+  })
+
+  it('⭐ una `refcat` pasada pero inservible NO consulta, y escribe el motivo', async () => {
+    // Caer al campo sería peor que no consultar: traería la parcela de una referencia
+    // que el usuario no ha pedido desde donde está.
+    const consola = vi.spyOn(console, 'error').mockImplementation(() => {})
+    for (const malo of ['', '   ', null]) {
+      montarCascara()
+      const montado = cablear()
+      montado.campo.value = REFCAT // el campo SÍ tiene una referencia buena
+
+      const devuelto = await montado.cableado.cargar({ refcat: malo })
+
+      expect(devuelto).toBe(null)
+      expect(montado.transporte.emitidas).toBe(0) // ni una petición
+      expect(montado.sets).toHaveLength(0)
+      expect(textosDelPanel()).toContain(MENSAJE_SIN_REFCAT_PEDIDA)
+      expect(renglonEnFallo(montado.renglon)).toBe(true)
+    }
+    expect(consola).toHaveBeenCalled()
+    consola.mockRestore()
+  })
+
+  it('el campo VACÍO por la vía de siempre sigue consultando (lo resuelve el cliente)', async () => {
+    // Anti-vacuidad de la guarda de arriba: no se ha apagado el camino del usuario.
+    // Un campo vacío lo contesta el cliente con ENTRADA_INVALIDA y sin tocar la red.
+    const montado = cablear()
+    montado.campo.value = ''
+    const devuelto = await montado.cableado.cargar()
+    expect(devuelto).not.toBe(null)
+    expect(devuelto.ok).toBe(false)
+    expect(textosDelPanel()).not.toContain(MENSAJE_SIN_REFCAT_PEDIDA)
+  })
+})
+
+describe('cableado-catastro · el fondo que no cuadra (decisión 5A)', () => {
+  it('⭐ un fondo que NO toca la medición avisa, pero NO bloquea', async () => {
+    // Cinco kilómetros al este: disjuntas del todo. Casi siempre significa que la
+    // referencia es de otra parcela o que la medición está en otro huso.
+    const montado = cablear({ parcelaInicial: parcelaMedida(5000) })
+
+    await montado.cableado.cargar({ refcat: REFCAT, sustituir: false })
+
+    expect(textosDelPanel()).toContain(MENSAJE_FONDO_SIN_SOLAPE)
+    // Y ha entrado igual: el aviso no decide por el usuario.
+    expect(montado.sets).toHaveLength(1)
+    expect(montado.sets[0].geometriaOficial).not.toBeNull()
+    expect(renglonEnFallo(montado.renglon)).toBe(false)
+  })
+
+  it('un fondo que SÍ solapa no dice nada', async () => {
+    const montado = cablear({ parcelaInicial: parcelaMedida(2) })
+    await montado.cableado.cargar({ refcat: REFCAT, sustituir: false })
+    expect(textosDelPanel()).not.toContain(MENSAJE_FONDO_SIN_SOLAPE)
+  })
+
+  it('por la puerta 1 no se comprueba: sería medir una tautología', async () => {
+    // Ahí `recintos` y `geometriaOficial` son la MISMA geometría por construcción.
+    const montado = cablear({ parcelaInicial: parcelaMedida(5000) })
+    montado.campo.value = REFCAT
+    await montado.cableado.cargar()
+    expect(textosDelPanel()).not.toContain(MENSAJE_FONDO_SIN_SOLAPE)
+  })
+})
+
+describe('cableado-catastro · la procedencia no miente (criterio 6)', () => {
+  it('⭐ por la puerta 2 el rótulo NO dice «Del Catastro» a secas', async () => {
+    const montado = cablear({ parcelaInicial: parcelaMedida() })
+    await montado.cableado.cargar({ refcat: REFCAT, sustituir: false })
+
+    const texto = montado.procedencia.textContent
+    // Dice las dos cosas, y en este orden: primero de dónde sale lo que se va a
+    // generar, después el parcelario rotulado como lo que es.
+    expect(texto).toContain(PROCEDENCIA[ORIGEN_PARCELA.DXF])
+    expect(texto).toContain('sólo de fondo para contrastar')
+    // Y la mitad del Catastro es la de siempre, no una segunda redacción.
+    expect(texto).toContain(textoProcedencia({ origen: ORIGEN.RED }, INSTANTE))
+    expect(texto.indexOf(PROCEDENCIA[ORIGEN_PARCELA.DXF])).toBeLessThan(
+      texto.indexOf('sólo de fondo'),
+    )
+  })
+
+  it('por la puerta 1 el rótulo sigue siendo el de siempre, tal cual', async () => {
+    const montado = cablear()
+    montado.campo.value = REFCAT
+    await montado.cableado.cargar()
+    expect(montado.procedencia.textContent).toBe(textoProcedencia({ origen: ORIGEN.RED }, INSTANTE))
+  })
+
+  it('no supone que la geometría de trabajo sea una medición: la lee del `origen`', async () => {
+    // Traer un fondo sobre una parcela que YA venía del WFS (cargar, y luego traer
+    // otro parcelario). Decir «medida por ti» ahí sería falso.
+    const montado = cablear({ parcelaInicial: parcelaConReferencia() })
+    await montado.cableado.cargar({ refcat: REFCAT, sustituir: false })
+
+    expect(montado.procedencia.textContent).toContain(PROCEDENCIA[ORIGEN_PARCELA.WFS])
+    expect(montado.procedencia.textContent).not.toContain('.dxf')
+  })
+})
+
+// ── 20 · ⛔ REGRESIÓN · LA ASIMETRÍA, CERRADA POR LOS DOS LADOS ─────────────
+//
+// El defecto tenía toda su gracia en ser ASIMÉTRICO, y por eso ninguna prueba lo
+// vio: **Catastro → medición funcionaba** desde F18 (`componerParcelaMedida`
+// conserva la oficial) y **medición → Catastro borraba el levantamiento**. Una
+// prueba por lado no lo habría cazado nunca: la del lado bueno pasaba, y la del
+// lado malo no existía porque nadie pensó que hicieran falta las dos.
+//
+// Lo que sí lo caza es ejercitar **los dos órdenes** y exigirles el **mismo estado
+// final**. Es el criterio 1 del diseño, escrito como una sola simetría en vez de
+// como dos afirmaciones sueltas.
+//
+// ⭐ **MEDIDO al escribir esto (M30):** con el defecto original restaurado a mano,
+// el ORDEN B sigue saliendo **VERDE** y solo caen el A y la simetría. O sea: la
+// asimetría no es una teoría sobre por qué nadie lo vio — se puede reproducir, y el
+// lado que funcionaba sigue funcionando mientras el otro está roto. Ésa es
+// exactamente la razón por la que hace falta el tercer `it`.
+
+describe('⛔ REGRESIÓN · los dos órdenes acaban en el MISMO sitio', () => {
+  /** Lo que contesta el WFS, con la forma real de `gml/parse.js`. */
+  const delWfs = () => ({
+    localId: REFCAT,
+    recintos: PARCELA_FIXTURE.recintos,
+    areaValue: PARCELA_FIXTURE.areaValue,
+  })
+
+  /** El levantamiento del usuario: la parcela real corrida 2 m al este. */
+  const recintosMedidos = () => desplazar(PARCELA_FIXTURE.recintos, 2, 0)
+
+  const argsMedicion = {
+    origen: ORIGEN_PARCELA.DXF,
+    idLocalDemo: 'demo-que-no-es-esta',
+    nombreFichero: 'mi-levantamiento.dxf',
+  }
+
+  it('⭐ ORDEN A · medición primero, parcelario de fondo después', () => {
+    // El orden que ROMPÍA. Antes del 2026-08-08 esto devolvía la geometría del WFS
+    // en `recintos` y el levantamiento desaparecía sin dejar rastro ni undo.
+    const medida = crearParcela({
+      idLocal: 'mi-levantamiento.dxf',
+      origen: ORIGEN_PARCELA.DXF,
+      recintos: recintosMedidos(),
+    })
+
+    const final = componerParcelaConOficial(medida, delWfs(), {
+      refcat: REFCAT,
+      sustituir: false,
+    })
+
+    expect(puntos(final.recintos)).toEqual(puntos(recintosMedidos()))
+    expect(puntos(final.geometriaOficial)).toEqual(puntos(PARCELA_FIXTURE.recintos))
+  })
+
+  it('⭐ ORDEN B · Catastro primero, medición encima después', () => {
+    // El orden que YA funcionaba, blindado para que no se rompa al revés el día que
+    // alguien toque el otro compositor. `componerParcelaMedida` es su DUAL.
+    const traida = componerParcelaConOficial(null, delWfs(), { refcat: REFCAT })
+    expect(traida.origen).toBe(ORIGEN_PARCELA.WFS)
+
+    const final = componerParcelaMedida(traida, recintosMedidos(), argsMedicion)
+
+    expect(puntos(final.recintos)).toEqual(puntos(recintosMedidos()))
+    expect(puntos(final.geometriaOficial)).toEqual(puntos(PARCELA_FIXTURE.recintos))
+  })
+
+  it('⭐ Y LAS DOS GEOMETRÍAS COINCIDEN VENGAN COMO VENGAN: ésa es la simetría', () => {
+    // La afirmación que de verdad cierra el defecto. Los dos `it` de arriba podrían
+    // pasar con dos definiciones distintas de «lo mismo»; esto exige que el usuario
+    // acabe con EL MISMO expediente haya trabajado en el orden que haya trabajado,
+    // que es lo que significa «sin orden secreto».
+    const medida = crearParcela({
+      idLocal: 'mi-levantamiento.dxf',
+      origen: ORIGEN_PARCELA.DXF,
+      recintos: recintosMedidos(),
+    })
+    const porA = componerParcelaConOficial(medida, delWfs(), { refcat: REFCAT, sustituir: false })
+    const porB = componerParcelaMedida(
+      componerParcelaConOficial(null, delWfs(), { refcat: REFCAT }),
+      recintosMedidos(),
+      argsMedicion,
+    )
+
+    expect(puntos(porA.recintos)).toEqual(puntos(porB.recintos))
+    expect(puntos(porA.geometriaOficial)).toEqual(puntos(porB.geometriaOficial))
+    expect(porA.refcat).toBe(porB.refcat)
+    expect(porA.superficieCatastral).toBe(porB.superficieCatastral)
+    // ⚠️ `origen` e `idLocal` SÍ difieren, y es correcto: cuentan de dónde salió cada
+    // documento, no qué hay dentro. Se dice en vez de fingir que todo coincide.
+    expect(porA.origen).toBe(ORIGEN_PARCELA.DXF)
+    expect(porB.origen).toBe(ORIGEN_PARCELA.DXF)
+    expect(porA.idLocal).toBe('mi-levantamiento.dxf')
+    expect(porB.idLocal).toBe(REFCAT)
+  })
+
+  it('⛔ ANTI-VACUIDAD: las dos geometrías son DISTINTAS, o no se contrasta nada', () => {
+    // Si el levantamiento y el parcelario coincidieran, los tres `it` de arriba
+    // pasarían aunque uno de los dos compositores pisara al otro. Los 2 m de
+    // desplazamiento son lo que hace que la prueba mida algo.
+    const porA = componerParcelaConOficial(
+      crearParcela({
+        idLocal: 'x',
+        origen: ORIGEN_PARCELA.DXF,
+        recintos: recintosMedidos(),
+      }),
+      delWfs(),
+      { refcat: REFCAT, sustituir: false },
+    )
+    expect(puntos(porA.recintos)).not.toEqual(puntos(porA.geometriaOficial))
+  })
+})
+
+describe('cableado-catastro · componerParcelaConOficial (la función pura)', () => {
+  const traida = { localId: 'del-wfs', recintos: PARCELA_FIXTURE.recintos, areaValue: 1536 }
+
+  it('sin `sustituir` compone documento nuevo (el defecto por defecto es el de antes)', () => {
+    const parcela = componerParcelaConOficial(parcelaMedida(), traida, { refcat: REFCAT })
+    expect(parcela.origen).toBe(ORIGEN_PARCELA.WFS)
+    expect(puntos(parcela.recintos)).toEqual(puntos(PARCELA_FIXTURE.recintos))
+  })
+
+  it('con `actual` a null y `sustituir: false` no lanza: compone desde cero', () => {
+    expect(() =>
+      componerParcelaConOficial(null, traida, { refcat: REFCAT, sustituir: false }),
+    ).not.toThrow()
+  })
+
+  it('si el fondo llega SIN referencia, la anterior se conserva (no se borra un dato cierto)', () => {
+    const actual = parcelaMedida(2, { refcat: REFCAT })
+    const parcela = componerParcelaConOficial(actual, traida, { refcat: null, sustituir: false })
+    expect(parcela.refcat).toBe(REFCAT)
+  })
+
+  it('`camposInvariantes` son los dos que ningún compositor toca', () => {
+    // El contrato de 4A: si esto crece, es que alguien ha unificado los compositores
+    // duales, y entonces uno de los dos ejes se está pisando.
+    expect(camposInvariantes(parcelaMedida(2, { superficieRegistral: 7 }))).toEqual({
+      idLocal: 'mi-levantamiento',
+      superficieRegistral: 7,
+    })
   })
 })

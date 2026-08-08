@@ -296,7 +296,6 @@ export const SELECTOR = Object.freeze({
   // en el documento montado. Dicen además cosas distintas: aquél cuenta de qué
   // consulta salió el dato y su antigüedad; éste, **de quién es la geometría**.
   PROCEDENCIA: '[data-procedencia="contraste"]',
-  PUERTA: '[data-accion="tomar-geometria"]',
   REGISTRAL: '[data-campo="superficie-registral"]',
   CLASE_PARCELA: '[data-campo="clase-parcela"]',
   ESTADO: '[data-estado="cajon-diagnostico"]',
@@ -523,9 +522,6 @@ const CajonDiagnostico = L.Control.extend({
       cambiar: new Set(),
       descargar: new Set(),
       preparar: new Set(),
-      // Rework de UI · T9. La puerta (D4): quien escucha es el cableado, que es
-      // quien conoce la autoridad de navegación. Esta vista no sabe qué es un modo.
-      puerta: new Set(),
     }
   },
 
@@ -610,8 +606,8 @@ const CajonDiagnostico = L.Control.extend({
     // cajón que declara `maxHeight: 52vh`, y no decir nada tiene que costar cero.
     const procedencia = crear(doc, 'p')
     procedencia.dataset.procedencia = 'contraste'
-    // `role="status"`, igual que los otros dos renglones del cajón: cruzar la
-    // puerta lo reescribe, y un lector de pantalla tiene que enterarse sin que le
+    // `role="status"`, igual que los otros dos renglones del cajón: cambiar de
+    // parcela lo reescribe, y un lector de pantalla tiene que enterarse sin que le
     // roben el foco de donde lo tenga.
     procedencia.setAttribute('role', 'status')
     estilar(procedencia, {
@@ -872,86 +868,18 @@ const CajonDiagnostico = L.Control.extend({
     estadoInforme.textContent = MOTIVO_INFORME_SIN_DIAGNOSTICO
     this._estadoInforme = estadoInforme
 
-    // ── Rework de UI · T9 · LA PUERTA (decisión D4) ────────────────────────
-    // «Comprobación es una PUERTA, no una cárcel»: abres el GML ajeno, contrastas,
-    // y este botón te deja seguir con el recorrido normal. Hasta pulsarlo, Edición
-    // y «Generar GML» no están —lo decide `app/navegacion.js`, no este módulo—.
-    // Rescata dentro de la aplicación el recorrido caro: GML con IVG negativo →
-    // verlo → corregirlo → regenerar, sin fingir que el fichero de otro es tuyo.
+    // ── ⛔ AQUÍ VIVÍA «LA PUERTA» (D4), Y SE RETIRÓ EL 2026-08-07 ───────────
+    // Este cajón tenía un tercer botón —«Tomar esta geometría y editarla»— que
+    // levantaba el bloqueo del modo COMPROBACIÓN. El eje entero se ha ido; el
+    // porqué está en la cabecera de `app/navegacion.js`.
     //
-    // Va en su PROPIA fila y separado por una línea fina, y no al lado de los dos
-    // del informe, porque no es la misma clase de acción: aquéllos producen un
-    // documento con lo que hay; éste **cambia lo que se puede hacer a partir de
-    // ahora**. Mezclarlos invitaría a pulsarlo por inercia.
-    //
-    // Nace OCULTO: solo tiene sentido en modo comprobación, y quien lo enciende es
-    // {@link crearCajonDiagnostico}`#puerta`. Un botón que no aplica no se apaga —
-    // se quita, porque un «tomar esta geometría» gris sobre tu propia parcela no
-    // tiene ningún motivo que escribir al lado.
-    //
-    // ── ⛔ POR QUÉ ES HERMANO DEL PIE Y NO HIJO SUYO (corregido el 2026-08-04) ──
-    // La primera versión de T9 lo metió DENTRO del `<footer>`, al final. En jsdom
-    // eso sale verde —no hay maquetación— y las siete pruebas de la ruta 2 lo
-    // daban por visible. En Chrome, medido:
-    //
-    //     1280×720  el cajón enseña 372 px de 686 → la puerta cae 314 px por debajo
-    //     1440×900  el cajón enseña 466 px de 744 → la puerta cae 267 px por debajo
-    //
-    // O sea: **el botón que es toda la razón de ser del modo comprobación nacía
-    // fuera de la vista**, al final de un scroll interno que arranca en 0, y nada
-    // decía que estuviera ahí. El renglón de procedencia llegaba a nombrarlo
-    // («pulsa «Tomar esta geometría y editarla»») señalando a algo invisible, que
-    // es peor que no tener botón.
-    //
-    // Se arregla con `position: sticky`, y por eso tiene que ser **hijo directo
-    // del contenedor**: `sticky` se pega dentro del bloque contenedor del
-    // elemento, y estando dentro del `<footer>` —que vive al final del contenido—
-    // solo se pegaría cuando el pie ya estuviera a la vista, o sea nunca. Como
-    // hijo del contenedor —que ES el que scrollea (`maxHeight: 52vh` +
-    // `overflowY: auto`)— queda clavado abajo en cualquier posición del scroll.
-    //
-    // Los márgenes negativos con su relleno del mismo tamaño no son un apaño:
-    // llevan el fondo blanco hasta los bordes del cajón (que tiene
-    // `padding: 10px 12px`), y sin eso el contenido se vería pasar por debajo del
-    // botón por los cuatro costados.
-    const puerta = crear(doc, 'button', null, 'Tomar esta geometría y editarla')
-    puerta.type = 'button'
-    puerta.dataset.accion = 'tomar-geometria'
-    // ⚠️ Ni `font: 'inherit'` ni `fontFamily`, por lo mismo que los otros dos
-    // botones de este pie (defecto medido en el guion 10 el 2026-07-30): el estilo
-    // en línea ganaría a `estilos/app.css` y el botón saldría en `system-ui`.
-    estilar(puerta, {
-      display: 'none',
-      position: 'sticky',
-      bottom: '0',
-      zIndex: '1',
-      marginTop: '12px',
-      marginLeft: '-12px',
-      marginRight: '-12px',
-      marginBottom: '-10px',
-      padding: '10px 12px',
-      borderTop: '1px solid #E2E8F0',
-      borderLeft: '0',
-      borderRight: '0',
-      borderBottom: '0',
-      background: '#fff',
-      color: '#0F172A',
-      cursor: 'pointer',
-      fontSize: 'inherit',
-      lineHeight: 'inherit',
-      fontWeight: '600',
-      textAlign: 'left',
-      // ⚠️ `width: auto` NO vale, y costó una medición: un `<button>` con
-      // `display: block` **sigue dimensionándose por su contenido** (shrink to
-      // fit), así que la barra salía de 220,83 px en un cajón de 420 y el texto
-      // que scrollea por detrás asomaba por la derecha del botón. `100%` sería el
-      // ancho del CONTENIDO del cajón (394 px), que deja fuera sus dos rellenos de
-      // 12 px: de ahí el `+ 24px`, que es justo lo que compensan los márgenes
-      // negativos de arriba. Con `border-box` el relleno propio va incluido.
-      boxSizing: 'border-box',
-      width: 'calc(100% + 24px)',
-    })
-    this._puerta = puerta
+    // ⭐ **La medición que costó vale para el resto del cajón y por eso se queda
+    // escrita**: aquel botón nacía 314 px por debajo del pliegue a 1280×720 y 267
+    // a 1440×900, o sea fuera de la vista, y de ahí salió la receta del bloque
+    // anclado de abajo. El defecto de fondo era peor y es la lección: **el botón
+    // que era toda la razón de ser de un modo vivía en una pantalla a la que ese
+    // mismo modo impedía llegar**, y ninguna de las pruebas de jsdom podía verlo
+    // porque en jsdom no hay maquetación ni hay rail.
 
     acciones.append(preparar, descargar)
     pie.append(acciones, estadoInforme)
@@ -967,20 +895,15 @@ const CajonDiagnostico = L.Control.extend({
     //
     // O sea: **la pantalla enseñaba el titular y las bandas, y escondía todo lo
     // accionable y el canal por el que el cajón habla.** Es el mismo defecto que
-    // T9 le encontró a la puerta el 2026-08-04 —y por el que la puerta se pegó
-    // abajo—, solo que a los otros tres nadie los midió entonces.
+    // T9 le encontró a la desaparecida puerta de D4 el 2026-08-04 —y por el que
+    // aquélla se pegó abajo—, solo que a los otros tres nadie los midió entonces.
     //
     // La corrección es la MISMA receta, aplicada al grupo entero en vez de a un
     // botón: un bloque `sticky` pegado abajo, **hijo directo del contenedor** (que
     // es el que scrollea), con márgenes negativos y su relleno para que el fondo
     // llegue a los bordes del cajón y el contenido no se vea pasar por debajo. Lo
     // que se ancla es exactamente lo que no puede esconderse: lo que HABLA (los
-    // dos renglones de estado) y lo que se PULSA (los dos del informe y la puerta).
-    //
-    // ⚠️ La puerta conserva su propio `position: sticky` aunque ya no lo necesite
-    // estando aquí dentro. No es descuido: es el cinturón además de los tirantes, y
-    // lo prueban dos guardianes distintos —uno mira la puerta y otro este bloque—,
-    // así que quitar uno no deja el defecto sin red.
+    // dos renglones de estado) y lo que se PULSA (los dos botones del informe).
     const anclado = crear(doc, 'div')
     anclado.dataset.diag = 'anclado'
     estilar(anclado, {
@@ -1000,7 +923,7 @@ const CajonDiagnostico = L.Control.extend({
     this._anclado = anclado
     // El pie ya no pone su propio margen superior: lo pone el bloque.
     estilar(pie, { marginTop: '0' })
-    anclado.append(estado, pie, puerta)
+    anclado.append(estado, pie)
 
     contenedor.append(
       cabecera,
@@ -1009,8 +932,6 @@ const CajonDiagnostico = L.Control.extend({
       metricas,
       invasion,
       bloqueMargen,
-      // La puerta sigue siendo lo ÚLTIMO del cajón, ahora dentro del bloque
-      // anclado que la mantiene a la vista junto con el resto de lo accionable.
       anclado,
     )
 
@@ -1022,7 +943,6 @@ const CajonDiagnostico = L.Control.extend({
     L.DomEvent.on(cerrar, 'click', this._alPulsarCerrar, this)
     L.DomEvent.on(preparar, 'click', this._alPulsarPreparar, this)
     L.DomEvent.on(descargar, 'click', this._alPulsarDescargar, this)
-    L.DomEvent.on(puerta, 'click', this._alPulsarPuerta, this)
     L.DomEvent.on(registral, 'change', this._alCambiar, this)
     L.DomEvent.on(registral, 'input', this._alCambiar, this)
     L.DomEvent.on(selectorClase, 'change', this._alCambiar, this)
@@ -1036,7 +956,6 @@ const CajonDiagnostico = L.Control.extend({
     L.DomEvent.off(this._botonCerrar, 'click', this._alPulsarCerrar, this)
     L.DomEvent.off(this._preparar, 'click', this._alPulsarPreparar, this)
     L.DomEvent.off(this._descargar, 'click', this._alPulsarDescargar, this)
-    L.DomEvent.off(this._puerta, 'click', this._alPulsarPuerta, this)
     L.DomEvent.off(this._registral, 'change', this._alCambiar, this)
     L.DomEvent.off(this._registral, 'input', this._alCambiar, this)
     L.DomEvent.off(this._clase, 'change', this._alCambiar, this)
@@ -1118,7 +1037,6 @@ const CajonDiagnostico = L.Control.extend({
    * de la única forma que tiene sentido en una pantalla: **avisando de que quieren
    * salir**. A dónde se sale lo decide `app/contraste.js`, que es quien conoce la
    * autoridad de navegación; esta vista no sabe qué es un paso y no va a empezar.
-   * Es el mismo reparto que la puerta de D4.
    */
   _alPulsarCerrar(evento) {
     L.DomEvent.stop(evento)
@@ -1226,18 +1144,6 @@ const CajonDiagnostico = L.Control.extend({
    */
   _alPulsarDescargar(evento) {
     for (const fn of this._oyentes.descargar) fn(evento)
-  },
-
-  /**
-   * La puerta (T9). **Se para la propagación**, y aquí importa más que en los
-   * otros dos: este botón está DENTRO del cajón, y el guardián de clic-fuera vive
-   * en el `document`. Sin parar, el mismo gesto que cruza la puerta cerraría el
-   * cajón que acaba de reescribir su renglón de procedencia, y el usuario no
-   * llegaría a leer que la geometría ya es suya.
-   */
-  _alPulsarPuerta(evento) {
-    L.DomEvent.stop(evento)
-    for (const fn of this._oyentes.puerta) fn(evento)
   },
 
   /**
@@ -1840,26 +1746,6 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
     },
 
     /**
-     * Enseña o esconde la PUERTA —«Tomar esta geometría y editarla»— (D4).
-     *
-     * ⚠️ **Se ESCONDE, no se apaga**, y es lo contrario de lo que hace este módulo
-     * con los dos botones del informe. La diferencia tiene motivo: aquéllos son
-     * acciones que siempre aplican y a veces no se pueden hacer todavía, así que se
-     * apagan **con el motivo escrito al lado** (regla de la casa). Éste no aplica en
-     * absoluto cuando la geometría ya es tuya, y un «tomar esta geometría» gris
-     * sobre tu propia parcela no tiene ningún motivo que escribir: solo confunde.
-     *
-     * @param {boolean} visible
-     */
-    puerta(visible) {
-      if (destruido || !control._puerta) return
-      // `block` explícito y no `''`: un `<button>` sin `display` vuelve a
-      // `inline-block`, y `position: sticky` sobre un elemento en línea no se
-      // pega — el arreglo del 2026-08-04 se deshace sin que nada lo diga.
-      control._puerta.style.display = visible === true ? 'block' : 'none'
-    },
-
-    /**
      * Escribe el renglón del PIE del informe (`role="status"`), que es un nodo
      * DISTINTO del de arriba: aquel cuenta lo que le pasa a lo que se está
      * enseñando (las vecinas que no llegaron, un fallo del cálculo) y este, el
@@ -1923,22 +1809,6 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       return () => control._oyentes.preparar.delete(fn)
     },
 
-    /**
-     * Se suscribe a la pulsación de la PUERTA (D4). Devuelve la BAJA. Varios
-     * oyentes, igual que los otros tres.
-     *
-     * El cajón **no sabe qué es un modo ni qué es la navegación**: solo avisa de
-     * que han pulsado. Quien llama a `app/navegacion.js#abrirPuerta` es
-     * `app/cableado-diagnostico.js`, que es de la capa de aplicación.
-     */
-    alPuerta(fn) {
-      if (typeof fn !== 'function') {
-        throw new TypeError(`alPuerta: 'fn' debe ser una función; recibido ${typeof fn}.`)
-      }
-      control._oyentes.puerta.add(fn)
-      return () => control._oyentes.puerta.delete(fn)
-    },
-
     /** Se suscribe al cierre (botón, clic fuera o Escape). Devuelve la BAJA. */
     alCerrar(fn) {
       if (typeof fn !== 'function') {
@@ -1959,7 +1829,6 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       control._oyentes.cambiar.clear()
       control._oyentes.descargar.clear()
       control._oyentes.preparar.clear()
-      control._oyentes.puerta.clear()
       control._oyentes.salir.clear()
       control.remove()
     },

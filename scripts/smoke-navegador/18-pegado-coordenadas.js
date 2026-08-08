@@ -611,8 +611,26 @@ if ($(SEL.BOTON_PEGAR) && !$(SEL.BOTON_PEGAR).disabled) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 3 · ⭐ El rótulo del GML AJENO (la tercera deuda de F18)
+// 3 · ⭐ El rótulo del GML IMPORTADO (la tercera deuda de F18)
 // ═════════════════════════════════════════════════════════════════════════════
+//
+// ⛔ **ESTE BLOQUE CONDUCÍA EL RECORRIDO VIEJO HASTA EL 2026-08-07.** Soltaba el
+// GML, pulsaba «Contrastar con el parcelario» —porque hasta ese día soltar NO
+// escribía el store— y después cruzaba LA PUERTA para ver si la cabecera cambiaba
+// de «de otro técnico» a «tomado como tuyo». Los dos peajes se han retirado con el
+// modo COMPROBACIÓN entero (ver la cabecera de `app/navegacion.js`), así que:
+//
+//   · el fichero entra al soltarlo, sin pulsar nada;
+//   · la puerta no existe, y con ella se ha ido el segundo rótulo;
+//   · y el que queda **ya no afirma de quién es el fichero**, porque el GML que se
+//     abre suele ser el del propio usuario y esta aplicación no puede saberlo.
+//
+// Lo que F18 midió y dejó dicho —«la aplicación afirmando que la Sede respalda una
+// geometría que ha traído alguien en un fichero»— **sigue siendo lo que se vigila
+// aquí**, y es lo único que de verdad protegía el rótulo viejo. La anti-vacuidad
+// también se conserva, con otro testigo: antes era la puerta visible (lo único que
+// probaba que la geometría ajena estaba en el store) y hoy es que la cabecera haya
+// CAMBIADO respecto a la de antes de soltar.
 
 let ajeno = null
 
@@ -628,68 +646,53 @@ if (!gml.file) {
   const eyebrowPrevio = eyebrow()
   soltar(gml.file)
 
-  // ⛔ **Soltar el GML NO escribe el store, y la primera corrida lo aprendió aquí.**
-  // El `drop` abre el cajón de Comprobación con el fichero dentro; la parcela ajena
-  // no entra hasta pulsar «Contrastar con el parcelario» (diseño de F08). Sin este
-  // clic, el rótulo seguía diciendo lo de antes y el bloque entero pasaba en verde
-  // **sin haber medido nada**.
-  const contrastar = await esperarA(() => {
-    const b = $(SEL.CONTRASTAR)
-    return b && !b.disabled ? b : null
-  }, 3000)
-  if (contrastar) {
-    contrastar.click()
-    await dormir(900)
-  }
+  // Un solo gesto. Se espera a que la cabecera lo diga, que es la señal de que la
+  // parcela del fichero está en el store: `rotuloDelDato` solo escribe ese rótulo
+  // con `ORIGEN_PARCELA.GML_EXISTENTE` delante.
+  const cambio = await esperarA(() => eyebrow() !== eyebrowPrevio, 12000)
 
   const antes = eyebrow()
-  const puerta = $(SEL.PUERTA)
-  const puertaVisible = Boolean(puerta) && puerta.offsetParent !== null
-  let despues = antes
-  if (puertaVisible) {
-    puerta.click()
-    await dormir(400)
-    despues = eyebrow()
-  }
   ajeno = {
     eyebrowPrevio,
-    huboContrastar: Boolean(contrastar),
+    cargoSoloAlSoltarlo: Boolean(cambio),
     antes,
-    despues,
-    puertaVisible,
+    puertaEnElDom: $(SEL.PUERTA) !== null,
   }
 
-  // ⛔ **LA ANTI-VACUIDAD, y el primer intento estaba MAL.** Ponía
-  // `cargo: antes !== eyebrowPrevio || Boolean(puerta)`, y `Boolean(puerta)` es
-  // CIERTO aunque la puerta esté oculta —el nodo vive en `index.html` desde el
-  // arranque—, así que el guardián que existía para detectar «no ha pasado nada»
-  // decía que sí había pasado. Se exige lo que de verdad prueba que la geometría
-  // ajena está en el store: que la PUERTA se vea, que es lo que solo aparece en
-  // modo Comprobación.
-  if (!puertaVisible) {
+  // ── La anti-vacuidad ──────────────────────────────────────────────────────
+  // Un guardián que pasa porque no ha pasado nada es peor que no tenerlo.
+  if (!cambio) {
     problemas.push(
-      '⛔ El GML de otro técnico no ha llegado al store —no se ve la puerta «Tomar esta ' +
-        'geometría»—, así que el rótulo del GML ajeno NO SE HA MEDIDO. Un guardián que pasa ' +
-        'porque no ha pasado nada es peor que no tenerlo.',
+      '⛔ El GML no ha llegado al store al soltarlo —la cabecera no ha cambiado—, así que el ' +
+        'rótulo del GML importado NO SE HA MEDIDO. Desde el 2026-08-07 no hay ninguna ' +
+        'confirmación que pulsar: si el recorrido se para, se para en silencio.',
     )
   }
+  // ⭐ LA DEUDA DE F18, que es la razón de ser de este bloque y no ha cambiado.
   if (/parcela del catastro/i.test(antes ?? '')) {
     problemas.push(
-      `⛔ La cabecera dice «${antes}» sobre el GML de OTRO TÉCNICO. Es la inconsistencia que F18 ` +
-        'midió al pasar y dejó dicha: la aplicación afirmando que la Sede respalda un fichero ' +
-        'que ha traído alguien.',
+      `⛔ La cabecera dice «${antes}» sobre un GML que ha traído alguien en un fichero. Es la ` +
+        'inconsistencia que F18 midió al pasar y dejó dicha: la aplicación afirmando que la Sede ' +
+        'respalda un dibujo que no emite.',
     )
   }
-  if (!/otro t[eé]cnico/i.test(antes ?? '')) {
+  if (!/no del catastro/i.test(antes ?? '')) {
     problemas.push(
-      `Con el GML ajeno en pantalla la cabecera dice «${antes}» y no nombra de quién es la ` +
-        'geometría. Es lo que F19 viene a arreglar.',
+      `Con el GML en pantalla la cabecera dice «${antes}» y no advierte de que esto NO lo emite el ` +
+        'Catastro. Es lo único que impide firmarlo creyéndolo oficial.',
     )
   }
-  if (puertaVisible && antes === despues) {
+  // Y no afirma una autoría que no consta, ni en un sentido ni en el otro.
+  if (/otro t[eé]cnico/i.test(antes ?? '') || /tu medici[óo]n/i.test(antes ?? '')) {
     problemas.push(
-      'Cruzar la puerta no cambia la cabecera: sigue diciendo que la geometría es de otro cuando ' +
-        'ya la has tomado como tuya.',
+      `La cabecera dice «${antes}»: está afirmando de quién es el fichero, y eso la aplicación no ` +
+        'lo sabe. El GML que se abre suele ser el del propio usuario.',
+    )
+  }
+  if (ajeno.puertaEnElDom) {
+    problemas.push(
+      'Sigue existiendo el botón «Tomar esta geometría y editarla» en el DOM. La puerta se retiró ' +
+        'con el modo COMPROBACIÓN el 2026-08-07.',
     )
   }
 }

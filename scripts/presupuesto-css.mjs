@@ -316,6 +316,41 @@ export const ASIENTOS = Object.freeze(
         'es la misma decisión que la barra de edición tomó con `aria-expanded`, y aquí además ' +
         'ahorra el atributo `class` que habría que escribir en cada `<tr>`. Sobran 12.242 sobre ' +
         'el techo.' },
+    { hito: 'Dos indicadores de qué geometrías hay cargadas (puerta 2)', commit: '(sin commitear)',
+      total: 69956, nuestro: 54861, rebanada: null,
+      nota:
+        '**+555 B, y es lo ÚNICO que la feature de las dos puertas le cuesta a esta hoja.** El ' +
+        'resto —el compositor, los dos ganchos, el reencuadre del historial, el aviso del fondo ' +
+        'sin solape y el botón «Traer el parcelario de fondo»— no toca CSS: el botón nuevo ' +
+        'reutiliza `.gml-boton--secundario` y su renglón `.gml-accion-estado`, los dos con tres ' +
+        'llamantes ya. ── QUÉ SE PAGA ── `.gml-capas` (el contenedor flex bajo el rótulo del ' +
+        'dato) y `.gml-capa` con su punto `::before`, más las tres reglas de estado ' +
+        '(`[data-presente=\'true\']` y las dos que le ponen al punto el color de SU geometría). ' +
+        'Son 4 px de alto extra en la cabecera del panel, medidos. ── POR QUÉ NO SALE MÁS ' +
+        'BARATO ── El ámbar es `--gml-color-usuario-sobre-claro`, el token que ya pinta el nº de ' +
+        'vértice: no entra ni un color nuevo por ese lado. El neutro del parcelario (#6b7280) SÍ ' +
+        'es un literal y no un token, y es deliberado: es el `COLOR_OFICIAL` de ' +
+        '`viewer/sincronizacion.js`, que vive en JS porque el visor no puede importar CSS. ' +
+        'Promoverlo a token obligaría a mantener el mismo valor en dos sitios sin nadie que lo ' +
+        'atara; el comentario de la regla nombra su origen, que es lo que sí ata. ── Y NO SE ' +
+        'PAGA UN ESTADO OCULTO ── El indicador apagado cambia el TEXTO («Sin levantamiento»), ' +
+        'así que no hace falta ninguna utilidad de texto solo para lectores: el color es ' +
+        'refuerzo, nunca el único canal. Sobran 12.797 sobre el techo.' },
+    { hito: 'Los indicadores se aprietan: 3 px por debajo de un suelo medido', commit: '(sin commitear)',
+      total: 69972, nuestro: 54877, rebanada: null,
+      nota:
+        '**+16 B —un `line-height` y un margen— y es el asiento más barato del proyecto, pero no ' +
+        'es cosmético: es el que devuelve un guion de humo a verde.** Los dos indicadores del ' +
+        'asiento anterior ocupaban 19,94 px en la cabecera del panel, que comparte columna con la ' +
+        'tabla de vértices. Esa tabla tiene DOS suelos vigilados desde los guiones: 120 px (§10, ' +
+        'con una tanda de 12 avisos) y 124,57 px (§16, con sobrante de 2 piezas). Medido en Chrome ' +
+        'el 2026-08-08: la dejaban en **117 px**, TRES por debajo del suelo del §10 — y el panel ' +
+        'no desborda, así que el síntoma habría sido mudo. ── QUÉ SE CAMBIA ── `line-height:1.2` ' +
+        '(el bloque baja de 15,94 a 13,19 px) y `margin-top` de 4 a 2 px: **19,94 → 15,19 px**. ── ' +
+        'Y QUÉ NO ── **no se retiran los indicadores**, se aprietan: son la única señal en pantalla ' +
+        'de qué geometría se va a generar, y quitarlos habría sido pagar producto por píxeles. Con ' +
+        'el cambio, §10 pierde ese problema, y §16, §09 y §23 quedan en `ok:true`. Sobran 12.781 ' +
+        'sobre el techo.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

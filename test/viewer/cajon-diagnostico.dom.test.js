@@ -826,18 +826,18 @@ describe('viewer/cajon-diagnostico.js · el pie del informe (F08)', () => {
     // de nombres distintos y cruzarlos es exactamente lo que costó M8.
     const acciones = [...raiz.querySelectorAll('[data-accion]')].map((el) => el.dataset.accion)
     // La lista es EXHAUSTIVA a propósito: una acción nueva en el cajón tiene que
-    // pasar por aquí y por la comprobación de colisión de abajo. `tomar-geometria`
-    // la trae el rework de UI · T9 —la puerta de D4— y entró justamente así.
+    // pasar por aquí y por la comprobación de colisión de abajo. Fueron CUATRO
+    // hasta el 2026-08-07: `tomar-geometria` —la puerta de D4, que entró justamente
+    // por aquí— se retiró con el modo COMPROBACIÓN entero.
     expect(acciones.sort()).toEqual([
       'cerrar-diagnostico',
       'descargar-informe',
       'preparar-informe',
-      'tomar-geometria',
     ])
     for (const valor of valores) expect(acciones).not.toContain(valor)
   })
 
-  it('⭐ T9 · la procedencia y la puerta no chocan con nada del resto de la aplicación', () => {
+  it('⭐ T9 · la procedencia no choca con nada del resto de la aplicación', () => {
     // El contrato K.1 (ningún par atributo/valor repetido en el documento montado)
     // lo vigila `test/app/main-edificio.dom.test.js` sobre la app entera. Aquí se
     // afirma la mitad que es de ESTE módulo: los dos valores que estrena T9 son los
@@ -851,7 +851,10 @@ describe('viewer/cajon-diagnostico.js · el pie del informe (F08)', () => {
     // documento — el de aquí quedaría mudo y sin síntoma. Es M8 otra vez.
     expect(procedencias).toEqual(['contraste'])
     expect(nodo(raiz, SELECTOR.PROCEDENCIA)).not.toBeNull()
-    expect(nodo(raiz, SELECTOR.PUERTA)).not.toBeNull()
+    // ⛔ Aquí se afirmaba también `SELECTOR.PUERTA` (`[data-accion="tomar-geometria"]`).
+    // El botón se retiró el 2026-08-07 con el modo COMPROBACIÓN entero: ver la
+    // cabecera de `app/navegacion.js`.
+    expect(raiz.querySelector('[data-accion="tomar-geometria"]')).toBeNull()
   })
 
   it('los selectores exportados apuntan a UN nodo cada uno', () => {
@@ -1137,92 +1140,21 @@ describe('viewer/cajon-diagnostico.js · «Preparar informe (PDF)» (F09)', () =
     expect(acciones).toEqual(['preparar-informe', 'descargar-informe'])
   })
 
-  // ── ⛔ La puerta se pega abajo, y esto no es estética ──────────────────────
-  // El guion de humo del 2026-08-04 midió que la puerta, metida al final del
-  // `<footer>`, NACÍA FUERA DE LA VISTA: el cajón enseña 372 px de 686 a 1280×720
-  // (466 de 744 a 1440×900) y el botón caía 314 px (267 px) por debajo del borde
-  // visible, con el scroll en 0 y sin nada que dijera que estaba ahí. El renglón
-  // de procedencia llegaba a NOMBRARLO, señalando a algo invisible.
-  //
-  // Las siete pruebas de la ruta 2 lo daban por visible **en verde**, porque jsdom
-  // no calcula maquetación. Aquí no se puede medir el píxel, así que se afirma la
-  // ESTRUCTURA que lo garantiza — que es lo que se rompería si alguien deshace el
-  // arreglo sin querer.
-  describe('viewer/cajon-diagnostico.js · la puerta se pega abajo (T9, corregido 2026-08-04)', () => {
-    // ⚠️ ESTA PRUEBA CAMBIÓ DE FORMA EL 2026-08-05 (rebanada 4) Y NO DE FONDO.
-    // Hasta entonces exigía que la puerta fuera hija DIRECTA del contenedor que
-    // scrollea, porque era el único elemento anclado. La rebanada 4 midió que los
-    // otros tres —los dos botones del informe y el renglón de estado— sufrían el
-    // MISMO defecto (207,53 px, 248,38 px y 164,69 px por debajo del borde), así
-    // que el anclaje pasó a ser de todo el grupo. Lo que hay que garantizar sigue
-    // siendo lo mismo: **entre la puerta y el elemento que scrollea hay un bloque
-    // `sticky` pegado abajo, y ese bloque es lo último del cajón**. Escrito así, la
-    // prueba habría pasado ANTES del cambio y pasa DESPUÉS: lo que no pasa es el
-    // defecto que las dos versiones vigilan.
-    it('cuelga de un bloque ANCLADO que es lo último del contenedor que scrollea', () => {
-      const { raiz } = conCajon()
-      const puerta = nodo(raiz, SELECTOR.PUERTA)
+  /* ⛔ **AQUÍ VIVÍA `describe('…la puerta se pega abajo…')`, CON SUS CUATRO
+   * PRUEBAS, Y SE FUE CON EL BOTÓN EL 2026-08-07.**
+   *
+   * Vigilaban la estructura que mantenía «Tomar esta geometría y editarla» a la
+   * vista: `sticky`, `bottom: 0`, `display: block` al enseñarla y fondo opaco. La
+   * medición que las motivó (el botón nacía 314 px por debajo del pliegue a
+   * 1280×720 y 267 a 1440×900) **no se pierde**: de ella salió el bloque anclado
+   * que sigue vivo unas líneas más abajo, y que hoy sujeta los dos botones del
+   * informe y el renglón de estado.
+   *
+   * Y la lección de método tampoco: aquellas cuatro pruebas pasaban en verde
+   * mientras el botón era inalcanzable en producción, porque jsdom no maqueta y
+   * porque este módulo no sabe en qué paso del rail se le pinta.
+   */
 
-      // El que scrollea se busca SUBIENDO desde la puerta, no se supone.
-      let contenedor = null
-      for (let el = puerta.parentElement; el !== null && contenedor === null; el = el.parentElement) {
-        if (el.style?.overflowY === 'auto') contenedor = el
-      }
-      expect(contenedor, 'entre la puerta y la raíz nadie scrollea').not.toBe(null)
-      expect(
-        contenedor.classList.contains(CLASE.CONTENEDOR),
-        'el que scrollea tiene que ser el contenedor del cajón',
-      ).toBe(true)
-      expect(contenedor.style.maxHeight, 'y el que tiene tope de alto').not.toBe('')
-
-      // El ancla: la puerta o alguno de sus ancestros por debajo del que scrollea.
-      let ancla = null
-      for (let el = puerta; el !== null && el !== contenedor; el = el.parentElement) {
-        if (el.style.position === 'sticky' && el.style.bottom === '0px') ancla = el
-      }
-      expect(ancla, 'nada entre la puerta y el scroller está pegado abajo').not.toBe(null)
-
-      // Y ese bloque es lo ÚLTIMO: si algo se cuela detrás, el `sticky` se despega
-      // en cuanto ese algo asoma, que es exactamente cómo nació el defecto.
-      const ultimoDirecto = contenedor.lastElementChild
-      expect(
-        ultimoDirecto === ancla || ultimoDirecto.contains(ancla),
-        'el bloque anclado tiene que ser lo último del cajón',
-      ).toBe(true)
-
-      // La decisión de T9 sigue viva: la puerta no se mezcla con los entregables.
-      expect(puerta.closest('footer')).toBe(null)
-      expect(puerta.parentElement.lastElementChild).toBe(puerta)
-    })
-
-    it('declara `sticky` y `bottom: 0`, que es lo que la mantiene a la vista', () => {
-      const { raiz } = conCajon()
-      const puerta = nodo(raiz, SELECTOR.PUERTA)
-      expect(puerta.style.position).toBe('sticky')
-      expect(puerta.style.bottom).toBe('0px')
-    })
-
-    it('al enseñarla se pone `block`, porque `sticky` no se pega sobre un elemento en línea', () => {
-      const { cajon, raiz } = conCajon()
-      const puerta = nodo(raiz, SELECTOR.PUERTA)
-      expect(puerta.style.display).toBe('none')
-      cajon.puerta(true)
-      // `''` dejaría el `<button>` en `inline-block` y el arreglo se deshace sin
-      // que nada lo diga: por eso se afirma el valor y no «distinto de none».
-      expect(puerta.style.display).toBe('block')
-      cajon.puerta(false)
-      expect(puerta.style.display).toBe('none')
-    })
-
-    it('lleva fondo opaco, o el contenido se vería pasar por debajo', () => {
-      const { raiz } = conCajon()
-      const puerta = nodo(raiz, SELECTOR.PUERTA)
-      // Un sticky transparente deja ver el texto que scrollea detrás, y el botón se
-      // vuelve ilegible justo cuando más falta hace.
-      expect(puerta.style.background).not.toBe('transparent')
-      expect(puerta.style.background).not.toBe('')
-    })
-  })
 
   it('los dos botones comparten FILA: el segundo cuesta 0 px de alto', () => {
     // La razón 2 de F08 —el panel no pierde ni un píxel— sigue en pie porque el
@@ -1515,12 +1447,12 @@ describe('viewer/cajon-diagnostico.js · `comoPantalla` (rebanada 4)', () => {
   // se afirma la ESTRUCTURA que lo impide.
   it('⭐ los dos botones del informe y el renglón de estado van DENTRO del bloque anclado', () => {
     const { raiz } = conCajon()
-    const puerta = nodo(raiz, SELECTOR.PUERTA)
-
-    // El ancla se busca desde la puerta, que ya tiene su propio guardián: así los
-    // dos hablan del MISMO bloque y no de dos cosas que se llaman igual.
+    // ⚠️ El ancla se busca SUBIENDO desde el renglón de estado y no se supone.
+    // Hasta el 2026-08-07 se buscaba desde la puerta de D4, que tenía su propio
+    // guardián; retirada aquélla, el punto de partida es uno de los tres nodos que
+    // este `it` existe para proteger.
     let ancla = null
-    for (let el = puerta; el !== null && el !== raiz; el = el.parentElement) {
+    for (let el = nodo(raiz, SELECTOR.ESTADO); el !== null && el !== raiz; el = el.parentElement) {
       if (el.style.position === 'sticky' && el.style.bottom === '0px') ancla = el
     }
     expect(ancla, 'no hay bloque anclado del que colgar lo accionable').not.toBe(null)

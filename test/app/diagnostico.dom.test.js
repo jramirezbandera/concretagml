@@ -45,14 +45,20 @@ import {
   COLA_SIN_VECINAS,
   EXTENSION_INFORME,
   MENSAJE_FALLO_INESPERADO,
+  MENSAJE_FONDO_ROTO,
   MENSAJE_INFORME_NO_COMPUESTO,
   MENSAJE_INFORME_NO_ENTREGADO,
+  MOTIVO_FONDO_SIN_CATASTRO,
+  MOTIVO_FONDO_SIN_GEOMETRIA,
   MOTIVO_SIN_CATASTRO,
   MOTIVO_SIN_OFICIAL,
   PREFIJO_INFORME,
   SELECTOR_BOTON_DIAGNOSTICAR,
+  SELECTOR_BOTON_FONDO,
   SELECTOR_ESTADO_DIAGNOSTICO,
+  SELECTOR_ESTADO_FONDO,
   cablearDiagnostico,
+  motivoFondoVariasParcelas,
   nombreFicheroInforme,
 } from '../../app/cableado-diagnostico.js'
 import { cablearCatastro } from '../../app/cableado-catastro.js'
@@ -163,6 +169,21 @@ const parcelaSinOficial = () =>
     origen: ORIGEN_PARCELA.DXF,
   })
 
+/**
+ * Con referencia catastral pero SIN contorno oficial: el GML de otro técnico, o un
+ * `.dxf` al que ya se le dedujo la referencia. **Es el estado en el que vive la
+ * puerta 2**, y por eso casi todas sus pruebas parten de aquí y no de
+ * {@link parcelaDelCatastro}: con parcelario ya traído el botón se ESCONDE, así que
+ * un `click()` sobre él no dispararía nada y la prueba mediría el vacío.
+ */
+const parcelaConRefcatSinOficial = () =>
+  crearParcela({
+    idLocal: REFCAT,
+    refcat: REFCAT,
+    recintos: PARCELA_FIXTURE.recintos,
+    origen: ORIGEN_PARCELA.GML_EXISTENTE,
+  })
+
 /** OTRA parcela distinta, para el caso «ha entrado un expediente nuevo». */
 const otraParcela = () => {
   const vecina = VECINDAD_FIXTURE.find((p) => p.refcat !== REFCAT)
@@ -214,6 +235,54 @@ function crearCatastroDoble({ parcelas = VECINDAD_FIXTURE.filter((p) => p.refcat
     alColindantes(fn) {
       suscriptores.add(fn)
       return () => suscriptores.delete(fn)
+    },
+  }
+}
+
+/**
+ * El doble de `cablearCatastro` con **las dos funciones de la puerta 2** encima:
+ * `cargar` y `deducir`. Va aparte de {@link crearCatastroDoble} a propósito y ése es
+ * el contrato de la decisión 3A: `esCatastro` NO se amplió, así que un cableado con
+ * solo `colindantes`/`alColindantes` sigue siendo válido y el botón nuevo nace
+ * apagado con su motivo en vez de tumbar el módulo entero.
+ *
+ * @param {object} [opciones]
+ * @param {Array<{refcat: string, domicilio: string|null}>} [opciones.candidatos]  Lo
+ *   que contesta `deducir()`. Con más de uno, `unico` es `false`.
+ * @param {boolean} [opciones.deducirRevienta]  Para el camino del fallo inesperado.
+ */
+function crearCatastroConFondo({
+  candidatos = [{ refcat: REFCAT, domicilio: 'CL PRUEBA 1' }],
+  deducirRevienta = false,
+} = {}) {
+  const base = crearCatastroDoble()
+  const cargas = []
+  const deducciones = []
+  return {
+    ...base,
+    get llamadas() {
+      return base.llamadas
+    },
+    /** Cada `cargar()`, con sus argumentos tal cual. */
+    cargas,
+    /** Cuántas veces se ha deducido. */
+    deducciones,
+    async cargar(opciones) {
+      cargas.push(opciones)
+      await Promise.resolve()
+      return { ok: true, datos: {}, motivo: null, mensaje: null, procedencia: {} }
+    },
+    async deducir() {
+      deducciones.push(true)
+      await Promise.resolve()
+      if (deducirRevienta) throw new Error('el punto interior ha reventado')
+      return {
+        ok: true,
+        datos: { candidatos, unico: candidatos.length === 1 },
+        motivo: null,
+        mensaje: null,
+        procedencia: {},
+      }
     },
   }
 }
@@ -398,6 +467,8 @@ function montar({
     raizCajon,
     boton: document.querySelector(SELECTOR_BOTON_DIAGNOSTICAR),
     renglon: document.querySelector(SELECTOR_ESTADO_DIAGNOSTICO),
+    botonFondo: document.querySelector(SELECTOR_BOTON_FONDO),
+    renglonFondo: document.querySelector(SELECTOR_ESTADO_FONDO),
     botonInforme: raizCajon.querySelector(SELECTOR_CAJON.DESCARGAR),
     renglonInforme: raizCajon.querySelector(SELECTOR_CAJON.ESTADO_INFORME),
   }
@@ -762,6 +833,324 @@ describe('cableado-diagnostico · el expediente sobrevive a las ediciones', () =
 
     expect(cajon.abierto()).toBe(true)
     expect(cajon.registral()).toBe(1500)
+  })
+})
+
+// ── 6b · Otro PARCELARIO bajo la misma parcela (la puerta 2, 2026-08-08) ─────
+
+describe('cableado-diagnostico · `olvidarPorFondoNuevo`', () => {
+  /** La misma parcela con OTRO contorno oficial: lo que deja la puerta 2. */
+  const conOtroFondo = () => {
+    const base = parcelaDelCatastro()
+    const corrido = base.geometriaOficial[0].vertices.map(([x, y]) => [x + 3, y])
+    return crearParcela({
+      idLocal: base.idLocal,
+      refcat: base.refcat,
+      recintos: base.recintos,
+      geometriaOficial: [{ vertices: corrido, tipo: base.geometriaOficial[0].tipo }],
+      superficieCatastral: base.superficieCatastral,
+      origen: base.origen,
+    })
+  }
+
+  it('⛔ ANTI-VACUIDAD: el store SOLO no se entera, y por eso hace falta el canal', async () => {
+    // Es el motivo entero de que este método exista. `claveDeExpediente` es de
+    // IDENTIDAD (refcat o idLocal) y la puerta 2 no la mueve: la parcela de trabajo
+    // sigue siendo la del usuario. Si esto empezara a fallar —si el módulo se
+    // enterase solo— el método sobra y hay que quitarlo.
+    const { boton, estado, cajon, raizCajon } = montar({ parcelaInicial: parcelaDelCatastro() })
+    boton.click()
+    await cederTurno()
+    raizCajon.querySelector(SELECTOR_CAJON.REGISTRAL).value = '1500'
+
+    estado.set(conOtroFondo())
+
+    expect(cajon.abierto()).toBe(true) // no se ha enterado
+  })
+
+  it('⭐ olvida el diagnóstico, cierra el cajón, limpia el mapa y tira las vecinas', async () => {
+    const { boton, estado, cajon, mapa, cableado, catastro } = montar({
+      parcelaInicial: parcelaDelCatastro(),
+    })
+    boton.click()
+    await cederTurno()
+    expect(cableado.ultimoDiagnostico()).not.toBeNull()
+    expect(catastro.llamadas).toBe(1)
+
+    // Lo que hace `app/main.js` desde `alCambiarOficial`: primero el `set`, y
+    // después el aviso, porque el store no puede distinguir este caso.
+    estado.set(conOtroFondo())
+    cableado.olvidarPorFondoNuevo()
+
+    // El diagnóstico guardado se va: si no, el PDF que bajara mediría contra un
+    // parcelario que ya no está en el modelo. Silencioso y firmable.
+    expect(cableado.ultimoDiagnostico()).toBeNull()
+    expect(cajon.abierto()).toBe(false)
+    expect(cajon.registral()).toBeNull()
+    expect(capasDeDiagnostico(mapa)).toHaveLength(0)
+
+    // Y las vecinas se vuelven a preguntar en la siguiente apertura: las de antes
+    // lindaban con el fondo anterior.
+    boton.click()
+    await cederTurno()
+    expect(catastro.llamadas).toBe(2)
+  })
+
+  it('es idempotente y no revienta sin nada que olvidar', () => {
+    const { cableado } = montar({ parcelaInicial: parcelaDelCatastro() })
+    expect(() => {
+      cableado.olvidarPorFondoNuevo()
+      cableado.olvidarPorFondoNuevo()
+    }).not.toThrow()
+  })
+
+  it('después de `destruir()` no hace nada (misma doctrina que el resto)', () => {
+    const { cableado } = montar({ parcelaInicial: parcelaDelCatastro() })
+    cableado.destruir()
+    expect(() => cableado.olvidarPorFondoNuevo()).not.toThrow()
+  })
+
+  it('deja el botón con su motivo escrito si queda apagado', () => {
+    // `olvidarLoMedidoContraElFondo` vacía el renglón; sin el `refrescarBoton` de
+    // después, el botón se quedaría gris y MUDO, que es la regla de oro 1.
+    const { estado, cableado, renglon, boton } = montar({ parcelaInicial: parcelaDelCatastro() })
+    estado.set(parcelaSinOficial())
+    cableado.olvidarPorFondoNuevo()
+
+    expect(boton.disabled).toBe(true)
+    expect(renglon.textContent).toBe(MOTIVO_SIN_OFICIAL)
+  })
+})
+
+// ── 6c · LA PUERTA 2 · «Traer el parcelario de fondo» (2026-08-08) ───────────
+//
+// El botón que ofrece la acción SEGURA en la pantalla donde el usuario ve el aviso,
+// en vez de mandarle a Entrada — donde el único botón que hay es el que sustituye
+// su medición por la del Catastro. Es la mitad de interfaz de la feature.
+
+describe('cableado-diagnostico · la puerta 2 · el botón', () => {
+  it('⭐ nace APAGADO y con motivo si el cableado del Catastro no trae `cargar`', () => {
+    // Decisión 3A: `esCatastro` no se amplía, así que un cableado de solo vecinas
+    // sigue montando el módulo entero. Lo que no se hace es dejar el botón gris y
+    // mudo (regla de oro 1).
+    const { botonFondo, renglonFondo } = montar({
+      parcelaInicial: parcelaConRefcatSinOficial(),
+      catastro: crearCatastroDoble(),
+    })
+    expect(botonFondo.disabled).toBe(true)
+    expect(renglonFondo.textContent).toBe(MOTIVO_FONDO_SIN_CATASTRO)
+  })
+
+  it('⛔ y el módulo sigue funcionando entero: las ocho medidas no dependen del botón', async () => {
+    // Anti-vacuidad de lo anterior. Si ampliar `esCatastro` hubiera sido la vía, un
+    // cableado sin `cargar` habría lanzado y se habría llevado por delante esto.
+    const { boton, cableado } = montar({
+      parcelaInicial: parcelaDelCatastro(),
+      catastro: crearCatastroDoble(),
+    })
+    boton.click()
+    await cederTurno()
+    expect(cableado.ultimoDiagnostico()).not.toBeNull()
+  })
+
+  it('nace APAGADO y con motivo sin geometría: no hay nada que contrastar', () => {
+    const { botonFondo, renglonFondo } = montar({
+      parcelaInicial: null,
+      catastro: crearCatastroConFondo(),
+    })
+    expect(botonFondo.disabled).toBe(true)
+    expect(renglonFondo.textContent).toBe(MOTIVO_FONDO_SIN_GEOMETRIA)
+  })
+
+  it('se ENCIENDE con geometría propia, aunque no haya parcelario todavía', () => {
+    // Es el estado que motiva la feature: un .dxf recién importado.
+    const { botonFondo } = montar({
+      parcelaInicial: parcelaSinOficial(),
+      catastro: crearCatastroConFondo(),
+    })
+    expect(botonFondo.disabled).toBe(false)
+  })
+
+  it('⭐ y CON parcelario ya traído se ESCONDE: el pie no tiene sitio para los cuatro', () => {
+    // Medido con el guion 16 el 2026-08-08 a 1280×720: el cuarto CTA cuesta 40,39 px
+    // y deja la caja de vértices en 103,42 px, bajo el suelo de 124,57 que aquel
+    // guion defiende. Y el panel NO desborda, así que la tabla encogía en silencio.
+    // Se esconde justo donde sobra: este botón existe para TRAER el parcelario.
+    const { botonFondo, renglonFondo } = montar({
+      parcelaInicial: parcelaDelCatastro(),
+      catastro: crearCatastroConFondo(),
+    })
+    expect(botonFondo.hidden).toBe(true)
+    // ⚠️ DOS afirmaciones y no una: oculto pero habilitado lo sigue alcanzando el
+    // tabulador. Es la regla que `navegacion.dom.test.js` defiende para los pasos.
+    expect(botonFondo.disabled).toBe(true)
+    // Y su renglón se va con él: un motivo bajo un botón invisible es ruido que ocupa.
+    expect(renglonFondo.hidden).toBe(true)
+    expect(renglonFondo.textContent).toBe('')
+  })
+
+  it('⛔ pero NO se retira del DOM, y `traerFondo()` sigue en la API', () => {
+    // Contrato K.1: este mismo cableado guarda el nodo en su cierre, así que
+    // retirarlo lo dejaría huérfano, escribible y mudo. Lo que se esconde es el
+    // CONTROL, no la capacidad.
+    const catastro = crearCatastroConFondo()
+    const { botonFondo, cableado } = montar({ parcelaInicial: parcelaDelCatastro(), catastro })
+    expect(botonFondo.isConnected).toBe(true)
+    expect(typeof cableado.traerFondo).toBe('function')
+  })
+
+  it('vuelve a aparecer si el parcelario se va (el store se vacía o entra otra)', () => {
+    const { botonFondo, estado } = montar({
+      parcelaInicial: parcelaDelCatastro(),
+      catastro: crearCatastroConFondo(),
+    })
+    expect(botonFondo.hidden).toBe(true)
+
+    estado.set(parcelaSinOficial())
+
+    expect(botonFondo.hidden).toBe(false)
+    expect(botonFondo.disabled).toBe(false)
+  })
+})
+
+describe('cableado-diagnostico · la puerta 2 · de dónde sale la referencia', () => {
+  it('⭐ pide el fondo con `sustituir: false`: eso es TODA la feature', async () => {
+    const catastro = crearCatastroConFondo()
+    const { botonFondo } = montar({ parcelaInicial: parcelaConRefcatSinOficial(), catastro })
+
+    botonFondo.click()
+    await cederTurno()
+
+    expect(catastro.cargas).toHaveLength(1)
+    expect(catastro.cargas[0].sustituir).toBe(false)
+  })
+
+  it('con referencia en el MODELO no deduce nada y usa ésa', async () => {
+    // La referencia sale del modelo y NUNCA de `[data-campo="refcat"]`: ese campo
+    // vive en Entrada y por el contrato K.1 leerlo desde aquí traería la parcela de
+    // una referencia que el usuario no ha escrito en esta pantalla.
+    const catastro = crearCatastroConFondo()
+    const { botonFondo } = montar({ parcelaInicial: parcelaConRefcatSinOficial(), catastro })
+
+    botonFondo.click()
+    await cederTurno()
+
+    expect(catastro.deducciones).toHaveLength(0)
+    expect(catastro.cargas[0].refcat).toBe(parcelaDelCatastro().refcat)
+  })
+
+  it('⭐ SIN referencia la DEDUCE del mapa y encadena: el caso del .dxf, en un gesto', async () => {
+    // Es la respuesta a la pregunta abierta 4 del diseño. `deducir()` coge un punto
+    // INTERIOR de la geometría del store, se lo pregunta al Catastro y no escribe en
+    // el modelo; encadenarlo aquí es lo que hace que el usuario con un levantamiento
+    // y sin referencia obtenga su parcelario sin pasar por la pantalla peligrosa.
+    const catastro = crearCatastroConFondo({
+      candidatos: [{ refcat: '9398516VK3799G', domicilio: 'CL PRUEBA 1' }],
+    })
+    const { botonFondo } = montar({ parcelaInicial: parcelaSinOficial(), catastro })
+
+    botonFondo.click()
+    await cederTurno()
+
+    expect(catastro.deducciones).toHaveLength(1)
+    expect(catastro.cargas).toHaveLength(1)
+    expect(catastro.cargas[0]).toEqual({ refcat: '9398516VK3799G', sustituir: false })
+  })
+
+  it('⛔ con VARIAS candidatas NO carga ninguna, y las nombra', async () => {
+    // Meter el parcelario del vecino como término de comparación de un lindero es
+    // justo el error que esta herramienta existe para no cometer.
+    const candidatos = [
+      { refcat: '9398516VK3799G', domicilio: 'CL PRUEBA 1' },
+      { refcat: '9398517VK3799G', domicilio: 'CL PRUEBA 3' },
+    ]
+    const catastro = crearCatastroConFondo({ candidatos })
+    const { botonFondo, renglonFondo } = montar({ parcelaInicial: parcelaSinOficial(), catastro })
+
+    botonFondo.click()
+    await cederTurno()
+
+    expect(catastro.cargas).toHaveLength(0)
+    expect(renglonFondo.textContent).toBe(motivoFondoVariasParcelas(candidatos))
+    // Y nombra las dos, que es lo único que le permite al usuario resolverlo.
+    expect(renglonFondo.textContent).toContain('9398516VK3799G')
+    expect(renglonFondo.textContent).toContain('9398517VK3799G')
+  })
+
+  it('sin `deducir` en el cableado lo DICE, en vez de no hacer nada al pulsar', async () => {
+    const catastro = { ...crearCatastroConFondo(), deducir: undefined }
+    const { botonFondo, renglonFondo } = montar({ parcelaInicial: parcelaSinOficial(), catastro })
+
+    botonFondo.click()
+    await cederTurno()
+
+    expect(catastro.cargas).toHaveLength(0)
+    expect(renglonFondo.textContent).toContain('no puede deducirla del mapa')
+  })
+})
+
+describe('cableado-diagnostico · la puerta 2 · defensas', () => {
+  it('una pulsación, UNA petición: el botón se apaga en el mismo tick', async () => {
+    const catastro = crearCatastroConFondo()
+    const { botonFondo } = montar({ parcelaInicial: parcelaConRefcatSinOficial(), catastro })
+
+    botonFondo.click()
+    expect(botonFondo.disabled).toBe(true) // síncrono, antes del primer await
+    botonFondo.click() // la doble pulsación no llega a disparar nada
+    await cederTurno()
+
+    expect(catastro.cargas).toHaveLength(1)
+    expect(botonFondo.disabled).toBe(false) // y vuelve
+  })
+
+  it('un fallo INESPERADO no deja el «pidiendo…» eterno ni el botón apagado', async () => {
+    const consola = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const catastro = crearCatastroConFondo({ deducirRevienta: true })
+    const { botonFondo, renglonFondo } = montar({ parcelaInicial: parcelaSinOficial(), catastro })
+
+    botonFondo.click()
+    await cederTurno()
+
+    expect(renglonFondo.textContent).toBe(MENSAJE_FONDO_ROTO)
+    expect(botonFondo.disabled).toBe(false)
+    expect(consola).toHaveBeenCalled()
+    consola.mockRestore()
+  })
+
+  it('`destruir()` retira también SU oyente', async () => {
+    const catastro = crearCatastroConFondo()
+    const { botonFondo, cableado } = montar({ parcelaInicial: parcelaDelCatastro(), catastro })
+    cableado.destruir()
+
+    botonFondo.click()
+    await cederTurno()
+
+    expect(catastro.cargas).toHaveLength(0)
+  })
+
+  it('el renglón del fondo es OTRO nodo que el de «Diagnosticar encaje»', () => {
+    // Con uno solo, el último en refrescarse borraría el motivo del otro en cada
+    // `set` del store: dos botones apagados y un solo motivo visible.
+    const { renglon, renglonFondo } = montar({
+      parcelaInicial: null,
+      catastro: crearCatastroDoble(),
+    })
+    expect(renglon).not.toBe(renglonFondo)
+    expect(renglon.textContent).toBe(MOTIVO_SIN_OFICIAL)
+    expect(renglonFondo.textContent).toBe(MOTIVO_FONDO_SIN_CATASTRO)
+  })
+})
+
+describe('cableado-diagnostico · el olvido por fondo nuevo (cont.)', () => {
+  it('deja el botón con su motivo escrito si queda apagado', () => {
+    // `olvidarLoMedidoContraElFondo` vacía el renglón; sin el `refrescarBoton` de
+    // después, el botón se quedaría gris y MUDO, que es la regla de oro 1.
+    const { estado, cableado, renglon, boton } = montar({ parcelaInicial: parcelaDelCatastro() })
+    estado.set(parcelaSinOficial())
+    cableado.olvidarPorFondoNuevo()
+
+    expect(boton.disabled).toBe(true)
+    expect(renglon.textContent).toBe(MOTIVO_SIN_OFICIAL)
   })
 })
 

@@ -905,14 +905,19 @@ soltado:
 
 ### 9.3 · Las notas sobre el GML de otro técnico: ¿informan o regañan?
 
-**Por qué está aquí.** El guion cuenta las notas (8 con el fichero del WFS, 8
-notas y 4 hallazgos con el del huso incoherente) y comprueba que el recorrido
+**Por qué está aquí.** El guion cuenta las notas y comprueba que el recorrido
 CONTINÚA. No puede leerlas. Y esa tanda es larga: es lo que un GML ajeno produce
 en cuanto se le pasa la validación completa de F02.
 
-- [ ] Suelta `cp_huso_incoherente.gml` y **lee las notas en voz alta**, en el
-      papel del técnico que hizo ese fichero. ¿Suenan a «esto es lo que he
-      medido» o a «lo has hecho mal»?
+> ⚠️ **DÓNDE SE LEEN, DESDE EL 2026-08-07.** Estas notas se pintaban dentro del
+> cajón de comprobación. Ese cajón ya no se abre con un fichero de una sola
+> parcela —el GML se carga solo, como un `.dxf`—, así que **las notas salen ahora
+> por el panel de avisos**: abre la lista con el chip de la cabecera. La pregunta
+> no ha cambiado ni un ápice; el sitio donde mirarla, sí.
+
+- [ ] Suelta `cp_huso_incoherente.gml`, abre la lista de avisos y **lee las notas
+      en voz alta**, en el papel del técnico que hizo ese fichero. ¿Suenan a «esto
+      es lo que he medido» o a «lo has hecho mal»?
 - [ ] La nota de los **15 vértices fuera del huso declarado** es la más dura que
       la app puede escribir. ¿Dice qué ha pasado sin decidir de quién es la culpa?
       ¿Y se entiende que el recorrido **sigue** —que el fichero se puede cargar
@@ -923,6 +928,11 @@ en cuanto se le pasa la validación completa de F02.
 - [ ] El bloque «Es lo que devuelve el servicio de descarga del Catastro […] tal
       cual NO se puede presentar en la Sede» es un hecho que costó un rechazo real.
       ¿Se entiende que el problema es la **envoltura** y no la geometría?
+- [ ] ⭐ **Y una pregunta nueva del 2026-08-07, que solo se puede contestar
+      mirando:** con las notas en el panel en vez de en el cajón, ¿te ENTERAS de
+      que están? Un fichero que entra solo y en silencio es cómodo; uno que entra
+      solo y esconde lo que traía, no. Cuenta cuántos gestos te separan de leer la
+      primera.
 - [ ] Con `UTM_1.gml` (formato 3.0): dice que es de una versión que la Sede ya no
       admite **y enseña la parcela igualmente**. ¿Se percibe esa doble cosa, o el
       usuario cree que no puede hacer nada?
@@ -2235,15 +2245,26 @@ como advertencia. **El gesto real está sin medir por definición.**
       números cuadran en un test, pero que el polígono se superponga al parcelario
       real solo lo ves tú.)
 
-### 15.3 · El rótulo del GML ajeno
+### 15.3 · El rótulo del GML importado
 
-- [ ] Con el GML de otro técnico cargado, la cabecera dice que es **de otro técnico**
-      y **no del Catastro**, y eso se entiende de un vistazo.
-- [ ] Al pulsar «Tomar esta geometría y editarla», el rótulo cambia a **«tomado como
-      tuyo»** — y esa frase **no se lee como si tú la hubieras medido**, porque no la
-      mediste.
-- [ ] Ninguna de las dos frases se lee como un **juicio sobre el trabajo del otro
-      técnico** (heredado de §9).
+> ⚠️ **REESCRITO EL 2026-08-07.** Este bloque pedía comprobar dos rótulos —«de otro
+> técnico» antes de la puerta de F08 y «tomado como tuyo» después— y **los dos han
+> desaparecido con el modo COMPROBACIÓN**. Hoy hay uno solo, porque no hay dos
+> estados que distinguir; y ya no afirma de quién es el fichero, porque el GML que
+> se abre suele ser **el tuyo** y la aplicación no tiene forma de saberlo. Lo que
+> el rótulo sí sigue diciendo —y es lo único que de verdad protegía— es que **no lo
+> emite el Catastro**.
+
+- [ ] Con un GML cargado, la cabecera dice **«GML importado · no del Catastro»**, y
+      eso se entiende de un vistazo: que la geometría viene de un fichero y que la
+      Sede no la respalda.
+- [ ] Esa frase **no se lee como si tú la hubieras medido** (no la mediste: la leyó
+      de un fichero) ni como si viniera de la Sede.
+- [ ] Y **no afirma de quién es el fichero**. Abre uno tuyo, generado por esta misma
+      aplicación hace un rato: ¿el rótulo te trata como al dueño del documento, o
+      te suena a que la app cree que es de otra persona?
+- [ ] La frase no se lee como un **juicio sobre quien hizo el fichero** (heredado
+      de §9).
 
 ---
 

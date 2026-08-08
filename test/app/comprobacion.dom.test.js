@@ -398,21 +398,21 @@ describe('cableado-comprobacion · el marcado de index.html es CONTRATO', () => 
 // ── 2 · El recorrido completo con la plantilla oficial ───────────────────────
 
 describe('cableado-comprobacion · soltar la plantilla oficial de alta', () => {
-  it('la abre, la comprueba y ENSEÑA el cajón', async () => {
-    const { cajon, raizCajon } = montar()
+  it('⭐ 2026-08-07 · la CARGA sola, sin cajón y sin confirmar nada', async () => {
+    // Hasta ese día este `it` se llamaba «la abre, la comprueba y ENSEÑA el cajón»,
+    // y exigía justo lo contrario: `cajon.abierto() === true` y el store todavía
+    // vacío hasta pulsar «Contrastar». El fichero entra ahora como un `.dxf`.
+    const { cajon, estado } = montar()
     await soltarYEsperar(ficheroDeBytes(leerBytes(...GML('cp_ejemplo_explicativo.gml')), 'cp_ejemplo_explicativo.gml'))
 
-    expect(cajon.abierto()).toBe(true)
-    expect(raizCajon.querySelector(SELECTOR_CAJON.FICHERO).textContent).toContain(
-      'cp_ejemplo_explicativo.gml',
-    )
-    expect(botonContrastar(raizCajon).disabled).toBe(false)
+    expect(cajon.abierto()).toBe(false)
+    expect(estado.set).toHaveBeenCalledTimes(1)
+    expect(estado.get().origen).toBe(ORIGEN_PARCELA.GML_EXISTENTE)
   })
 
-  it('«Contrastar» mete la parcela con UN SOLO estado.set, origen GML_EXISTENTE y la geometría del FICHERO', async () => {
+  it('mete la parcela con UN SOLO estado.set, origen GML_EXISTENTE y la geometría del FICHERO', async () => {
     const { estado, cajon, raizCajon } = montar()
     await soltarYEsperar(ficheroDeBytes(leerBytes(...GML('cp_ejemplo_explicativo.gml')), 'cp_ejemplo_explicativo.gml'))
-    await contrastar(raizCajon)
 
     expect(estado.set).toHaveBeenCalledTimes(1)
     const parcela = estado.get()
@@ -431,7 +431,6 @@ describe('cableado-comprobacion · soltar la plantilla oficial de alta', () => {
     // elemento presente y vacío (`''`), igual que `UTM_1.gml`: no hay referencia.
     const { estado, transporte, procedencia, raizCajon } = montar()
     await soltarYEsperar(ficheroDeBytes(leerBytes(...GML('cp_ejemplo_explicativo.gml')), 'cp_ejemplo_explicativo.gml'))
-    await contrastar(raizCajon)
 
     expect(transporte.peticiones).toHaveLength(0)
     expect(estado.get().geometriaOficial).toBeNull()
@@ -446,7 +445,6 @@ describe('cableado-comprobacion · la geometría del fichero NO se sustituye por
   it('compone las dos: `recintos` del fichero y `geometriaOficial` del Catastro', async () => {
     const { estado, transporte, raizCajon } = montar()
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
-    await contrastar(raizCajon)
 
     expect(transporte.peticiones).toHaveLength(1)
     expect(transporte.peticiones[0]).toContain(REFCAT)
@@ -474,7 +472,6 @@ describe('cableado-comprobacion · la geometría del fichero NO se sustituye por
   it('la superficie catastral es la que declara el PARCELARIO, no la del fichero', async () => {
     const { estado, raizCajon } = montar()
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
-    await contrastar(raizCajon)
 
     expect(estado.get().superficieCatastral).toBe(PARCELA_WFS.areaValue)
   })
@@ -482,7 +479,6 @@ describe('cableado-comprobacion · la geometría del fichero NO se sustituye por
   it('un solo `estado.set`, y el cajón cerrado al terminar', async () => {
     const { estado, cajon, raizCajon } = montar()
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
-    await contrastar(raizCajon)
 
     expect(estado.set).toHaveBeenCalledTimes(1)
     expect(cajon.abierto()).toBe(false)
@@ -495,7 +491,6 @@ describe('cableado-comprobacion · la procedencia es DOBLE y lo dice', () => {
   it('nombra el fichero como origen de la geometría Y el Catastro como origen del parcelario', async () => {
     const { procedencia, raizCajon } = montar()
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
-    await contrastar(raizCajon)
 
     const texto = procedencia.textContent
     expect(texto).toContain('de-otro-despacho.gml')
@@ -508,7 +503,6 @@ describe('cableado-comprobacion · la procedencia es DOBLE y lo dice', () => {
     // Es el error de producto de toda la fase, y el renglón es donde ocurriría.
     const { procedencia, raizCajon } = montar()
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
-    await contrastar(raizCajon)
 
     expect(procedencia.textContent.startsWith('Del Catastro')).toBe(false)
     expect(procedencia.textContent).toMatch(/NO del Catastro/)
@@ -517,7 +511,6 @@ describe('cableado-comprobacion · la procedencia es DOBLE y lo dice', () => {
   it('sin parcelario, lo dice en el mismo renglón en vez de dejarlo en blanco', async () => {
     const { procedencia, raizCajon } = montar()
     await soltarYEsperar(ficheroDeBytes(leerBytes(...GML('UTM_1.gml')), 'UTM_1.gml'))
-    await contrastar(raizCajon)
 
     expect(procedencia.textContent).toMatch(/geometría del fichero/i)
     expect(procedencia.textContent).toContain('Sin parcelario')
@@ -531,7 +524,6 @@ describe('cableado-comprobacion · un GML sin referencia catastral', () => {
   it('UTM_1.gml (referencia VACÍA) no pide NADA a la red, y lo dice', async () => {
     const { estado, transporte, panel, raizCajon } = montar()
     await soltarYEsperar(ficheroDeBytes(leerBytes(...GML('UTM_1.gml')), 'UTM_1.gml'))
-    await contrastar(raizCajon)
 
     expect(transporte.peticiones).toHaveLength(0)
     expect(estado.get().geometriaOficial).toBeNull()
@@ -541,11 +533,10 @@ describe('cableado-comprobacion · un GML sin referencia catastral', () => {
 
   it('el 3.0 se carga IGUAL: `puedeContinuar` es capacidad, no mérito', async () => {
     // `UTM_1.gml` trae un `DIALECTO_RECHAZADO` de nivel ERROR y el recorrido sigue.
-    const { estado, raizCajon } = montar()
+    const { estado } = montar()
     await soltarYEsperar(ficheroDeBytes(leerBytes(...GML('UTM_1.gml')), 'UTM_1.gml'))
 
-    expect(botonContrastar(raizCajon).disabled).toBe(false)
-    await contrastar(raizCajon)
+    expect(estado.set).toHaveBeenCalledTimes(1)
     expect(estado.get().recintos[0].vertices).toHaveLength(11)
   })
 
@@ -556,7 +547,6 @@ describe('cableado-comprobacion · un GML sin referencia catastral', () => {
     // sea ésta, y su contorno entraría como término de comparación.
     const { estado, transporte, raizCajon } = montar()
     await soltarYEsperar(ficheroDeBytes(leerBytes(...GML('UTM_1.gml')), 'UTM_1.gml'))
-    await contrastar(raizCajon)
 
     expect(transporte.peticiones).toHaveLength(0)
     expect(estado.get().refcat).toBeNull()
@@ -567,7 +557,6 @@ describe('cableado-comprobacion · un GML sin referencia catastral', () => {
   it('sin cliente del Catastro tampoco se cae: se carga y se DICE', async () => {
     const { estado, panel, raizCajon } = montar({ responder: null })
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
-    await contrastar(raizCajon)
 
     expect(estado.get().geometriaOficial).toBeNull()
     expect(mensajes(panel)).toContain(MOTIVO_SIN_CLIENTE)
@@ -582,7 +571,6 @@ describe('cableado-comprobacion · el Catastro no entrega el parcelario', () => 
       responder: (url) => http200(url, TEXTO_EXCEPCION),
     })
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
-    await contrastar(raizCajon)
 
     // Se pidió de verdad, y la respuesta fue un 200 «correcto» con un error dentro.
     expect(transporte.peticiones).toHaveLength(1)
@@ -604,7 +592,6 @@ describe('cableado-comprobacion · el Catastro no entrega el parcelario', () => 
     // sitio no es estética, es lo que hace que el contador signifique algo.
     const { panel, raizCajon } = montar({ responder: (url) => http200(url, TEXTO_EXCEPCION) })
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
-    await contrastar(raizCajon)
 
     expect(mensajes(panel).filter((m) => m.includes(COLA_SIN_PARCELARIO))).toHaveLength(1)
   })
@@ -624,7 +611,6 @@ describe('cableado-comprobacion · el Catastro no entrega el parcelario', () => 
   it('la red caída tampoco tumba nada', async () => {
     const { estado, panel, raizCajon } = montar({ responder: (url) => sinRed(url) })
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
-    await contrastar(raizCajon)
 
     expect(estado.get().geometriaOficial).toBeNull()
     expect(estado.get().recintos[0].vertices).toHaveLength(15)
@@ -643,7 +629,6 @@ describe('cableado-comprobacion · el Catastro no entrega el parcelario', () => 
       },
     })
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
-    await contrastar(raizCajon)
 
     // La parcela entra IGUAL, con la geometría del fichero y sin parcelario.
     expect(estado.set).toHaveBeenCalledTimes(1)
@@ -661,7 +646,6 @@ describe('cableado-comprobacion · el Catastro no entrega el parcelario', () => 
     await soltarYEsperar(
       ficheroDeBytes(leerBytes(...DERIVADO('cp_huso_incoherente.gml')), 'cp_huso_incoherente.gml'),
     )
-    await contrastar(raizCajon)
 
     expect(transporte.peticiones).toHaveLength(0)
     expect(estado.get().geometriaOficial).toBeNull()
@@ -711,14 +695,17 @@ describe('cableado-comprobacion · un fichero con tres parcelas', () => {
 // ── 8 · Un GML de edificio se detiene con honradez ───────────────────────────
 
 describe('cableado-comprobacion · un GML de edificio', () => {
-  it('deja «Contrastar» apagado CON su motivo escrito, y no entra nada en el store', async () => {
-    const { estado, raizCajon } = montar()
+  it('⭐ 2026-08-07 · lo dice por el PANEL y no entra nada en el store', async () => {
+    // Antes lo decía el renglón del cajón, al lado del botón apagado. Retirado el
+    // cajón del camino normal, ese renglón sería un nodo invisible: el motivo sale
+    // por el panel de avisos, con el nombre del fichero delante.
+    const { estado, panel } = montar()
     await soltarYEsperar(
       ficheroDeBytes(leerBytes(...GML('bu_building_9398516VK3799G.gml')), 'edificio.gml'),
     )
 
-    expect(botonContrastar(raizCajon).disabled).toBe(true)
-    expect(estadoCajon(raizCajon)).toMatch(/CONSTRUCCIÓN/)
+    expect(mensajes(panel).join(' | ')).toMatch(/CONSTRUCCIÓN/)
+    expect(mensajes(panel).join(' | ')).toMatch(/edificio\.gml/)
     expect(estado.set).not.toHaveBeenCalled()
     expect(estado.get()).toBeNull()
   })
@@ -770,8 +757,11 @@ describe('cableado-comprobacion · F11 · el GML de edificio se ENCAMINA', () =>
     const destino = vi.fn()
     const { cajon } = montar({ alGmlDeEdificio: destino })
 
-    // Primero una parcela de verdad: el cajón se abre y dice lo suyo.
-    await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
+    // Primero un fichero de VARIAS parcelas, que es lo único que abre el cajón
+    // desde el 2026-08-07: sale la pregunta y se queda esperando respuesta.
+    await soltarYEsperar(
+      ficheroDeBytes(leerBytes(...DERIVADO('cp_multiparcela_entrega.gml')), 'tres.gml'),
+    )
     expect(cajon.abierto()).toBe(true)
 
     // Y ahora el de edificio, que se va a otra rama.
@@ -799,12 +789,14 @@ describe('cableado-comprobacion · F11 · el GML de edificio se ENCAMINA', () =>
 
   it('un GML de PARCELA no se desvía aunque el desvío esté puesto', async () => {
     const destino = vi.fn()
-    const { cajon, cableado } = montar({ alGmlDeEdificio: destino })
+    const { estado, cableado } = montar({ alGmlDeEdificio: destino })
 
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
 
     expect(destino).not.toHaveBeenCalled()
-    expect(cajon.abierto()).toBe(true)
+    // Hace el recorrido de parcela ENTERO: entra en el store y la comprobación se
+    // conserva, que es lo que el informe de F09 imprime como fuente.
+    expect(estado.set).toHaveBeenCalledTimes(1)
     expect(cableado.comprobacion()).not.toBeNull()
   })
 
@@ -838,7 +830,11 @@ describe('cableado-comprobacion · F11 · el GML de edificio se ENCAMINA', () =>
 describe('cableado-comprobacion · exclusión mutua de los dos cajones', () => {
   it('cualquier `estado.set` cierra el de comprobación, venga de donde venga', async () => {
     const { estado, cajon } = montar()
-    await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
+    // Con VARIAS parcelas dentro, que es lo único que abre el cajón desde el
+    // 2026-08-07: es el estado en el que esta guarda tiene algo que cerrar.
+    await soltarYEsperar(
+      ficheroDeBytes(leerBytes(...DERIVADO('cp_multiparcela_entrega.gml')), 'tres.gml'),
+    )
     expect(cajon.abierto()).toBe(true)
 
     // Un `set` que NO viene de este cableado (una parcela del Catastro, un `undo`).
@@ -851,7 +847,9 @@ describe('cableado-comprobacion · exclusión mutua de los dos cajones', () => {
     cajonDiagnostico.abrir()
     expect(cajonDiagnostico.abierto()).toBe(true)
 
-    await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
+    await soltarYEsperar(
+      ficheroDeBytes(leerBytes(...DERIVADO('cp_multiparcela_entrega.gml')), 'tres.gml'),
+    )
 
     expect(cajon.abierto()).toBe(true)
     expect(cajonDiagnostico.abierto()).toBe(false)
@@ -898,13 +896,14 @@ describe('cableado-comprobacion · las salidas', () => {
 // ── 11 · Lo que no es un GML ─────────────────────────────────────────────────
 
 describe('cableado-comprobacion · entradas que no son un GML de parcela', () => {
-  it('un fichero vacío no lanza: se comprueba, se dice y no entra nada en el store', async () => {
-    const { estado, cajon, raizCajon } = montar()
+  it('un fichero vacío no lanza: se comprueba, se dice POR EL PANEL y no entra nada', async () => {
+    const { estado, cajon, panel } = montar()
     await soltarYEsperar(ficheroDeTexto('', 'vacio.gml'))
 
-    expect(cajon.abierto()).toBe(true)
-    expect(botonContrastar(raizCajon).disabled).toBe(true)
-    expect(estadoCajon(raizCajon).length).toBeGreaterThan(0)
+    // Sin cajón que abrir, el motivo tiene que salir por el único canal a la vista.
+    expect(cajon.abierto()).toBe(false)
+    expect(mensajes(panel).join(' | ')).toMatch(/vacio\.gml/)
+    expect(mensajes(panel).join(' | ').length).toBeGreaterThan(20)
     expect(estado.set).not.toHaveBeenCalled()
   })
 
@@ -925,19 +924,19 @@ describe('cableado-comprobacion · entradas que no son un GML de parcela', () =>
 
   it('un fallo INESPERADO de la composición se cuenta con su mensaje, sin dejar la pantalla muda', async () => {
     const consola = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const { estado, panel, cajon, raizCajon } = montar()
-    await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
+    const { estado, panel } = montar()
 
-    // Se rompe el store justo antes de escribir: es el hueco por el que puede
-    // colarse un defecto de programación después de una consulta correcta.
+    // Se rompe el store ANTES de soltar —el fichero ya se carga solo— y es el hueco
+    // por el que puede colarse un defecto de programación tras una consulta
+    // correcta. Hasta el 2026-08-07 se rompía DESPUÉS del `drop`, porque entonces
+    // escribir en el store exigía todavía una pulsación.
     estado.set.mockImplementation(() => {
       throw new Error('el store ha reventado')
     })
-    await contrastar(raizCajon)
+
+    await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
 
     expect(mensajes(panel)).toContain(MENSAJE_FALLO_INESPERADO)
-    expect(estadoCajon(raizCajon)).toMatch(/panel de avisos/i)
-    expect(cajon.abierto()).toBe(true)
     expect(consola).toHaveBeenCalled()
   })
 })
@@ -975,7 +974,6 @@ describe('cableado-comprobacion · el campo de la referencia catastral', () => {
   it('un GML con referencia deja el campo con la forma CANÓNICA, no con la del fichero', async () => {
     const { estado, campo, raizCajon } = montar()
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_REFCAT_CRUDA, 'con-refcat-cruda.gml'))
-    await contrastar(raizCajon)
 
     // La que ha entrado en el MODELO, letra por letra.
     expect(estado.get().refcat).toBe(REFCAT)
@@ -1005,7 +1003,6 @@ describe('cableado-comprobacion · el campo de la referencia catastral', () => {
       campo.value = 'DE LA PARCELA ANTERIOR'
 
       await soltarYEsperar(ficheroDeBytes(leerBytes(...GML(fixture)), fixture))
-      await contrastar(raizCajon)
 
       expect(estado.get().refcat).toBeNull()
       expect(campo.value).toBe('')
@@ -1016,11 +1013,9 @@ describe('cableado-comprobacion · el campo de la referencia catastral', () => {
     const { estado, campo, raizCajon } = montar()
 
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'primera.gml'))
-    await contrastar(raizCajon)
     expect(campo.value).toBe(REFCAT)
 
     await soltarYEsperar(ficheroDeBytes(leerBytes(...GML('UTM_1.gml')), 'UTM_1.gml'))
-    await contrastar(raizCajon)
 
     // La parcela de pantalla es OTRA: la del alta, que no tiene referencia.
     expect(estado.get().idLocal).toBe('8703362TF9980S0001SH')
@@ -1034,13 +1029,11 @@ describe('cableado-comprobacion · el campo de la referencia catastral', () => {
 
     // Una carga CON referencia: una sola consulta, la del parcelario.
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'primera.gml'))
-    await contrastar(raizCajon)
     expect(campo.value).toBe(REFCAT)
     expect(espia).toHaveBeenCalledTimes(1)
 
     // Y otra SIN: el campo se REESCRIBE (se vacía) y nadie vuelve a preguntar nada.
     await soltarYEsperar(ficheroDeBytes(leerBytes(...GML('UTM_1.gml')), 'UTM_1.gml'))
-    await contrastar(raizCajon)
 
     expect(campo.value).toBe('')
     expect(espia).toHaveBeenCalledTimes(1)
@@ -1058,7 +1051,6 @@ describe('cableado-comprobacion · el campo de la referencia catastral', () => {
     expect(botonColindantes.disabled).toBe(true)
 
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
-    await contrastar(raizCajon)
 
     expect(estado.get().refcat).toBe(REFCAT)
     // Las tres superficies afirman lo mismo: hay referencia.
@@ -1077,7 +1069,6 @@ describe('cableado-comprobacion · el campo de la referencia catastral', () => {
       conCatastro: true,
     })
     await soltarYEsperar(ficheroDeBytes(leerBytes(...GML('UTM_1.gml')), 'UTM_1.gml'))
-    await contrastar(raizCajon)
 
     expect(estado.get().refcat).toBeNull()
     expect(campo.value).toBe('')
@@ -1118,14 +1109,14 @@ describe('F08 · T5.1 (ampliado en F10) · entradas ajenas por extensión', () =
 
   it('…y un `.gml` sigue yendo al recorrido de siempre', async () => {
     const { recibidos, entrada } = entradaEspia()
-    const { cajon } = montar({ entradasExtra: [entrada] })
-    const pintar = vi.spyOn(cajon, 'pintar')
+    const { estado, cableado } = montar({ entradasExtra: [entrada] })
 
     await soltarYEsperar(ficheroDeBytes(leerBytes(...GML('UTM_1.gml')), 'UTM_1.gml'))
 
     expect(recibidos).toEqual([])
-    // El cajón de comprobación SÍ se pinta: el fichero ha hecho el recorrido entero.
-    expect(pintar).toHaveBeenCalled()
+    // Ha hecho el recorrido del GML entero: se ha comprobado y ha entrado.
+    expect(cableado.comprobacion()).not.toBeNull()
+    expect(estado.set).toHaveBeenCalledTimes(1)
   })
 
   it('el enrutado NO distingue mayúsculas, como el resto de la zona', async () => {

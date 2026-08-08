@@ -10,7 +10,7 @@
  *      de T9: la exclusión mutua de la esquina `bottomleft` deja de ser un      *
  *      acuerdo entre dos módulos y pasa a derivarse del estado.                 *
  *   2. **La procedencia declarada**, compuesta de `parcela.origen` (el modelo)  *
- *      y del modo (la navegación). También pura.                                *
+ *      (el modelo). También pura.                                              *
  *                                                                              *
  * Y el comportamiento del cable, con la navegación DE VERDAD y no un doble —la  *
  * misma doctrina que el resto de `test/app/`: lo que se prueba es el CABLE—.    *
@@ -21,15 +21,14 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   CAJON,
-  COLA_EN_COMPROBACION,
-  COLA_TOMADA,
+  COLA_GML_EXISTENTE,
   PROCEDENCIA,
   cablearContraste,
   cajonDe,
   mensajeOrigenDesconocido,
   textoProcedencia,
 } from '../../app/contraste.js'
-import { MODO, PASO, PASOS, RAMA, crearNavegacion } from '../../app/navegacion.js'
+import { PASO, PASOS, RAMA, crearNavegacion } from '../../app/navegacion.js'
 import { ORIGEN_PARCELA } from '../../model/parcela.js'
 import { crearEstadoVista } from '../../viewer/_comun.js'
 
@@ -49,9 +48,9 @@ function acciones() {
 const navegacionCompleta = (paso = PASO.ENTRADA) =>
   crearNavegacion({ rama: RAMA.PARCELA, paso, hechos: { [RAMA.PARCELA]: TODO } })
 
-/** Los espías de arriba MÁS los dos de la procedencia y la puerta. */
+/** Los espías de arriba MÁS el de la procedencia. */
 function accionesConTextos() {
-  return { ...acciones(), declararProcedencia: vi.fn(), mostrarPuerta: vi.fn() }
+  return { ...acciones(), declararProcedencia: vi.fn() }
 }
 
 /**
@@ -168,35 +167,30 @@ describe('T9 · 2 · la procedencia, declarada', () => {
     expect(new Set(Object.values(PROCEDENCIA)).size).toBe(Object.keys(PROCEDENCIA).length)
   })
 
-  it('⛔ en modo COMPROBACIÓN dice que no es tuyo, y nombra la puerta con las palabras del botón', () => {
-    const texto = textoProcedencia({ origen: ORIGEN_PARCELA.GML_EXISTENTE, modo: MODO.COMPROBACION })
+  it('⭐ un GML importado arrastra su cola: no es del Catastro y el fichero no se toca', () => {
+    const texto = textoProcedencia({ origen: ORIGEN_PARCELA.GML_EXISTENTE })
     expect(texto).toContain(PROCEDENCIA[ORIGEN_PARCELA.GML_EXISTENTE])
-    expect(texto).toContain(COLA_EN_COMPROBACION)
-    // El nombre de la acción es el MISMO en los tres sitios donde aparece.
-    expect(texto).toContain('Tomar esta geometría y editarla')
+    expect(texto).toContain(COLA_GML_EXISTENTE)
+    // Las dos afirmaciones que la cola existe para hacer.
+    expect(texto).toContain('Catastro')
+    expect(texto).toContain('no se modifica')
   })
 
-  it('⭐ y DESPUÉS de cruzar la puerta no reescribe la historia: sigue diciendo de dónde salió', () => {
-    // El origen no cambia al cruzar la puerta, y es lo correcto: el dibujo vino de
-    // un fichero ajeno y eso no deja de ser verdad porque lo hayas tomado.
-    const texto = textoProcedencia({ origen: ORIGEN_PARCELA.GML_EXISTENTE, modo: MODO.NORMAL })
-    expect(texto).toContain(PROCEDENCIA[ORIGEN_PARCELA.GML_EXISTENTE])
-    expect(texto).toContain(COLA_TOMADA)
-    expect(texto).not.toContain(COLA_EN_COMPROBACION)
+  it('⛔ y NO dice de quién es el fichero, que es lo que esta aplicación no sabe', () => {
+    // Hasta el 2026-08-07 decía «del GML de otro técnico», y era una afirmación
+    // sobre la autoría que no hay forma de comprobar: el fichero que se abre es,
+    // la mayoría de las veces, el que generó aquí el propio usuario.
+    const texto = textoProcedencia({ origen: ORIGEN_PARCELA.GML_EXISTENTE })
+    expect(texto).not.toContain('otro técnico')
+    expect(texto).not.toContain('ajeno')
   })
 
-  it('una geometría propia en modo normal no arrastra ninguna cola', () => {
-    const texto = textoProcedencia({ origen: ORIGEN_PARCELA.WFS })
-    expect(texto).toBe(PROCEDENCIA[ORIGEN_PARCELA.WFS])
-    expect(texto).not.toContain(COLA_TOMADA)
-    expect(texto).not.toContain(COLA_EN_COMPROBACION)
-  })
-
-  it('…pero comprobar una geometría de CUALQUIER origen lo dice igual', () => {
-    // El modo manda sobre el origen: se puede entrar en comprobación con una
-    // parcela que vino del Catastro, y callarlo sería peor que repetirlo.
+  it('una geometría de cualquier otro origen no arrastra ninguna cola', () => {
     for (const origen of Object.values(ORIGEN_PARCELA)) {
-      expect(textoProcedencia({ origen, modo: MODO.COMPROBACION })).toContain(COLA_EN_COMPROBACION)
+      if (origen === ORIGEN_PARCELA.GML_EXISTENTE) continue
+      const texto = textoProcedencia({ origen })
+      expect(texto).toBe(PROCEDENCIA[origen])
+      expect(texto).not.toContain(COLA_GML_EXISTENTE)
     }
   })
 
@@ -214,8 +208,7 @@ describe('T9 · 2 · la procedencia, declarada', () => {
     const prohibidas = /\b(correcta|correcto|perfecto|válida|válido|aprobado|conforme|apto)\b/i
     const textos = [
       ...Object.values(PROCEDENCIA),
-      COLA_EN_COMPROBACION,
-      COLA_TOMADA,
+      COLA_GML_EXISTENTE,
       mensajeOrigenDesconocido('X'),
     ].join('\n')
     expect(textos).not.toMatch(prohibidas)
@@ -308,19 +301,6 @@ describe('T9 · 3 · el cable con la navegación', () => {
     c.destruir()
   })
 
-  it('cruzar la puerta no toca la esquina: el modo no mueve el paso', () => {
-    const a = acciones()
-    const nav = navegacionCompleta(PASO.DIAGNOSTICO)
-    nav.entrarEnComprobacion()
-    const c = cablearContraste({ navegacion: nav, ...a })
-    a.abrirDiagnostico.mockClear()
-
-    expect(nav.abrirPuerta().ok).toBe(true)
-    expect(a.abrirDiagnostico).not.toHaveBeenCalled()
-    expect(c.get()).toBe(CAJON.DIAGNOSTICO)
-    c.destruir()
-  })
-
   it('`destruir()` da de baja y es IDEMPOTENTE', () => {
     const a = acciones()
     const nav = navegacionCompleta(PASO.DIAGNOSTICO)
@@ -354,7 +334,7 @@ describe('T9 · 3 · el cable con la navegación', () => {
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
-describe('T9 · 4 · la procedencia y la puerta, cableadas', () => {
+describe('T9 · 4 · la procedencia, cableada', () => {
   it('⛔ declara de quién es la geometría en cuanto se monta', () => {
     const a = accionesConTextos()
     const c = cablearContraste({
@@ -398,70 +378,20 @@ describe('T9 · 4 · la procedencia y la puerta, cableadas', () => {
     c.destruir()
   })
 
-  it('⛔ la puerta SOLO se enseña en modo comprobación y con geometría delante', () => {
-    const a = accionesConTextos()
-    const store = storeCon(ORIGEN_PARCELA.GML_EXISTENTE)
-    const nav = navegacionCompleta(PASO.DIAGNOSTICO)
-    const c = cablearContraste({ navegacion: nav, estado: store, ...a })
+  /* ⛔ **AQUÍ VIVÍAN LAS TRES PRUEBAS DE LA PUERTA, Y SE FUERON CON ELLA EL
+   * 2026-08-07.** Probaban que «Tomar esta geometría y editarla» se enseñaba solo
+   * en modo comprobación y con geometría delante, que pulsarla cruzaba el modo de
+   * verdad y que `destruir()` daba de baja su oyente. **Las tres pasaban.** Lo que
+   * ninguna podía ver es que el botón vivía en el cajón de Diagnóstico, y que en el
+   * caso corriente ese paso estaba apagado por falta de parcelario: el CTA existía,
+   * respondía y no había forma de llegar a él. Ver la cabecera de
+   * `app/navegacion.js`. */
 
-    // Modo normal: no aplica, y no se apaga — se esconde.
-    expect(a.mostrarPuerta).toHaveBeenLastCalledWith(false)
-
-    nav.entrarEnComprobacion()
-    expect(a.mostrarPuerta).toHaveBeenLastCalledWith(true)
-
-    // Sin geometría no hay nada que tomar, aunque el modo lo pida.
-    store.set(null)
-    expect(a.mostrarPuerta).toHaveBeenLastCalledWith(false)
-    c.destruir()
-  })
-
-  it('⭐ pulsar la puerta cruza el modo de verdad, y el renglón lo dice al instante', () => {
-    let alPulsar = null
-    const a = accionesConTextos()
-    const nav = navegacionCompleta(PASO.DIAGNOSTICO)
-    nav.entrarEnComprobacion()
-    const c = cablearContraste({
-      navegacion: nav,
-      estado: storeCon(ORIGEN_PARCELA.GML_EXISTENTE),
-      ...a,
-      suscribirPuerta: (fn) => {
-        alPulsar = fn
-        return () => {
-          alPulsar = null
-        }
-      },
-    })
-    expect(c.procedencia()).toContain(COLA_EN_COMPROBACION)
-
-    alPulsar()
-
-    expect(nav.get().modo).toBe(MODO.NORMAL)
-    // Y no se queda diciendo lo de antes: el renglón es de `role="status"` y lo
-    // que anuncia tiene que ser lo que acaba de pasar.
-    expect(c.procedencia()).toContain(COLA_TOMADA)
-    expect(c.procedencia()).not.toContain(COLA_EN_COMPROBACION)
-    expect(a.mostrarPuerta).toHaveBeenLastCalledWith(false)
-    c.destruir()
-  })
-
-  it('`destruir()` se da de baja de las TRES: navegación, store y puerta', () => {
-    let alPulsar = null
-    let dadoDeBaja = false
+  it('`destruir()` se da de baja de las DOS: navegación y store', () => {
     const a = accionesConTextos()
     const store = storeCon(ORIGEN_PARCELA.WFS)
     const nav = navegacionCompleta(PASO.DIAGNOSTICO)
-    const c = cablearContraste({
-      navegacion: nav,
-      estado: store,
-      ...a,
-      suscribirPuerta: (fn) => {
-        alPulsar = fn
-        return () => {
-          dadoDeBaja = true
-        }
-      },
-    })
+    const c = cablearContraste({ navegacion: nav, estado: store, ...a })
 
     c.destruir()
     a.declararProcedencia.mockClear()
@@ -469,18 +399,13 @@ describe('T9 · 4 · la procedencia y la puerta, cableadas', () => {
     nav.navegarAPaso(PASO.VALIDACION)
 
     expect(a.declararProcedencia).not.toHaveBeenCalled()
-    expect(dadoDeBaja).toBe(true)
-    // Y el manejador de la puerta, si llegara tarde, no mueve nada.
-    nav.entrarEnComprobacion()
-    alPulsar()
-    expect(nav.get().modo).toBe(MODO.COMPROBACION)
   })
 
   it('sin store no lanza y declara vacío: montar sin parcela es un montaje válido', () => {
     const a = accionesConTextos()
     const c = cablearContraste({ navegacion: navegacionCompleta(PASO.DIAGNOSTICO), ...a })
     expect(c.procedencia()).toBe('')
-    expect(a.mostrarPuerta).toHaveBeenLastCalledWith(false)
+    expect(a.declararProcedencia).toHaveBeenLastCalledWith('')
     c.destruir()
   })
 })
@@ -530,7 +455,6 @@ describe('app/contraste.js · el cajón de diagnóstico es la PANTALLA (rebanada
     const c = cablearContraste({
       navegacion: nav,
       declararProcedencia: vi.fn(),
-      mostrarPuerta: vi.fn(),
       cerrarDiagnostico: () => orden.push('cerrar'),
       cerrarComprobacion: vi.fn(),
       abrirDiagnostico: () => orden.push('abrir'),

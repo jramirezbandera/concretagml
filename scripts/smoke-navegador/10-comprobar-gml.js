@@ -418,6 +418,11 @@ function distanciaAlLinderoMasCercano(p, lados) {
 /** ¿Hay un lindero SELECCIONADO? (`viewer/edicion.js#CLASE_EDICION.RESALTE`.) */
 const hayLinderoSeleccionado = () => $('.gml-lado-seleccionado') !== null
 
+/** El paso del rail que está activo, tal y como lo escribe `app/pantalla.js` en la
+ *  raíz. Hace falta desde el rework de UI: hay guardianes de este guion que solo
+ *  significan algo en una pantalla concreta, y hasta 2026-08-07 no lo miraban. */
+const paso = () => document.body.getAttribute('data-paso')
+
 /**
  * Un clic REAL sobre el punto `(x, y)` de la pantalla, despachado sobre el
  * elemento que de verdad está encima ahí (`elementFromPoint`). Sigue sin ser un
@@ -567,11 +572,23 @@ if (arranque.tarjetasDeAvisos === 0 && arranque.altoCajaVerticesPx !== null && a
       'entrado en el panel, y la Decisión 5 de F08 era que el botón del rótulo costara 0 px.',
   )
 }
+// ⛔ **ESTE GUARDIÁN SE RETIRA, Y NO PORQUE MOLESTE (2026-08-07).** Acusaba de
+// que «Abrir un GML…» no estuviera dentro de un `.gml-rotulo-fila`, que era la
+// Decisión 5 de F08: el botón iba en la fila del rótulo para no quitarle altura a
+// la tabla de vértices. **Esa fila murió en T6**, cuando la Entrada pasó a ser una
+// pantalla propia con sus tres vías, y el botón vive desde entonces en la tercera
+// —donde el guion 14 lo mide entero y visible—. El §16 de GUION.md ya lo dejó
+// dictaminado el 2026-08-04 como «superado, no roto» y decidió no parchearlo
+// entonces porque el guion iba a revisarse. Esta es la revisión.
+//
+// La Decisión 5 no se ha incumplido: se ha **disuelto**. No hay fila del rótulo y
+// el botón no compite por la altura de nada. Un guardián que sobrevive a la
+// decisión que defendía acusa de un incumplimiento imposible, y esconde los que sí
+// importan detrás de un `ok:false` que se lee siempre igual.
 if (!arranque.boton.enLaFilaDelRotulo || !arranque.boton.conRotuloAlLado) {
-  problemas.push(
-    'El botón «Abrir un GML…» no está dentro de un `.gml-rotulo-fila` con su `<h2>` al lado: la ' +
-      'Decisión 5 de F08 es que vaya en la fila del rótulo, que es lo que hace que no le quite ' +
-      'altura a la tabla de vértices.',
+  advertencias.push(
+    'El botón «Abrir un GML…» no está en una `.gml-rotulo-fila`. Es lo ESPERADO desde T6: esa fila ' +
+      'ya no existe y el botón vive en la tercera vía de Entrada. Se deja anotado y no como fallo.',
   )
 }
 if (arranque.boton.etiqueta !== 'button') {
@@ -605,10 +622,26 @@ const traidoHuso = await traerFixture(
 // otros dos son la misma parcela `9398516VK3799G` que la de arranque, así que con
 // ellos el mapa NO debe moverse (y esa mitad se mide en el §7 bis).
 const traidoOtra = await traerFixture('test/fixtures/gml/UTM_1.gml', 'UTM_1.gml')
+// ⭐ **EL CUARTO, Y LO ESTRENA EL 2026-08-07: el ÚNICO que sigue abriendo el
+// cajón.** Desde ese día un `.gml` de una sola parcela se carga solo, como un
+// `.dxf`, y el cajón de comprobación solo aparece cuando el fichero trae VARIAS y
+// hay que elegir una. Todo lo que este guion mide DEL CAJÓN —que no tape los
+// cuatro controles del mapa (§5), la tipografía de sus botones (§6)— necesita
+// tenerlo abierto, así que se abre con éste. Sin este fixture, media docena de
+// mediciones de maquetación se quedarían sin sujeto.
+const traidoVarias = await traerFixture(
+  'test/fixtures/gml/derivados/cp_multiparcela_entrega.gml',
+  'cp_multiparcela_entrega.gml',
+)
 const material = {
   real: { url: traidoReal.url, estado: traidoReal.estado, bytes: traidoReal.bytes ?? null },
   husoIncoherente: { url: traidoHuso.url, estado: traidoHuso.estado, bytes: traidoHuso.bytes ?? null },
   otraParcela: { url: traidoOtra.url, estado: traidoOtra.estado, bytes: traidoOtra.bytes ?? null },
+  variasParcelas: {
+    url: traidoVarias.url,
+    estado: traidoVarias.estado,
+    bytes: traidoVarias.bytes ?? null,
+  },
 }
 if (traidoReal.file === null) {
   window.removeEventListener('error', alError)
@@ -700,14 +733,25 @@ if (arrastre.veloDespues.marcaEnElBody !== null || arrastre.veloDespues.opacidad
   problemas.push('Al salir el arrastre de la ventana el velo se queda puesto.')
 }
 
-// ── 4 · Soltar el fichero de verdad, y el invariante en el MISMO TICK ───────
+// ── 4 · Soltar un GML de VARIAS parcelas: el único caso que abre el cajón ───
+//
+// ⛔ **ESTA SECCIÓN SOLTABA EL FICHERO REAL Y EXIGÍA QUE SE ABRIERA EL CAJÓN,
+// HASTA EL 2026-08-07.** Ese día el recorrido cambió: un `.gml` de una sola
+// parcela entra solo —se lee, se pide su parcelario y se dibuja, como hace un
+// `.dxf` desde F18— y el cajón queda reservado a la única decisión que sigue
+// habiendo, que es «este fichero trae tres parcelas, elige cuál».
+//
+// El orden de este guion se invierte en consecuencia: **primero el fichero que
+// abre el cajón**, porque todo lo que se mide DEL CAJÓN (§5 los solapes, §6 la
+// tipografía) necesita tenerlo delante; y **después el fichero real**, que es el
+// que lleva el recorrido hasta el parcelario, el store y F07 (§7 en adelante).
 
 const mapaEl = document.getElementById('mapa')
 const mapaAntes = { ancho: mapaEl.clientWidth, alto: mapaEl.clientHeight }
 const cajaAntesDeSoltar = altoCajaVertices()
 const tarjetasAntesDeSoltar = tarjetasDeAvisos()
 
-soltar(traidoReal.file)
+soltar(traidoVarias.file)
 
 // El recorrido `File → arrayBuffer → decodificar → comprobar → abrir` es
 // asíncrono (una lectura de disco de por medio), así que «el mismo tick» aquí es
@@ -720,7 +764,17 @@ const cajaTrasAbrir = altoCajaVertices()
 const tarjetasTrasAbrir = tarjetasDeAvisos()
 
 if (!abrio) {
-  problemas.push('Soltar el fichero no ha abierto el cajón de comprobación.')
+  problemas.push(
+    'Soltar un GML con VARIAS parcelas no ha abierto el cajón de comprobación. Es el único caso ' +
+      'que debe abrirlo desde el 2026-08-07, y sin él no hay dónde elegir cuál entra.',
+  )
+}
+const radiosDeMiembro = $$('[data-comp="miembro"]').length
+if (radiosDeMiembro !== 3) {
+  problemas.push(
+    `El cajón enseña ${radiosDeMiembro} botones de radio para un fichero de 3 parcelas: sin ellos ` +
+      'no hay elección que hacer y el cajón no tiene razón de estar abierto.',
+  )
 }
 
 const rectCajon = rect(cajonComp)
@@ -759,7 +813,7 @@ if (!cajon.mapaIntacto) {
       'quitarle un píxel.',
   )
 }
-if (cajon.fichero === null || !cajon.fichero.includes('cp_parcela_9398516VK3799G.gml')) {
+if (cajon.fichero === null || !cajon.fichero.includes('cp_multiparcela_entrega.gml')) {
   problemas.push(
     `El rótulo del cajón no nombra el fichero soltado: ${JSON.stringify(cajon.fichero)}. Es lo ` +
       'primero que un usuario coteja contra lo que tiene en el escritorio.',
@@ -767,8 +821,8 @@ if (cajon.fichero === null || !cajon.fichero.includes('cp_parcela_9398516VK3799G
 }
 if (!cajon.contrastarHabilitado) {
   problemas.push(
-    `«Contrastar con el parcelario» está apagado con el fichero real del WFS. Motivo escrito: ` +
-      `${JSON.stringify(cajon.renglon)}.`,
+    `El primario del cajón («Cargar la parcela elegida») está apagado con un fichero legible. ` +
+      `Motivo escrito: ${JSON.stringify(cajon.renglon)}.`,
   )
 }
 
@@ -874,7 +928,19 @@ for (const [nombre, el] of botonesDeCajon) {
   }
 }
 
-// ── 7 · «Contrastar»: el parcelario, el store y F07 encendiéndose sola ──────
+// ── 7 · Soltar el fichero REAL: el parcelario, el store y F07 encendiéndose ─
+//
+// ⛔ **AQUÍ SE PULSABA «Contrastar con el parcelario» HASTA EL 2026-08-07**, que
+// era el peaje sin el cual la geometría del fichero no llegaba al modelo. Ya no
+// existe: el fichero entra al soltarlo. Lo que se mide es lo mismo —una petición
+// de parcelario, un solo `estado.set`, la procedencia DOBLE, el CTA de F07
+// encendiéndose solo— con un gesto menos por medio.
+//
+// Antes se descarta el cajón que dejó abierto el §4: aquél trae otro fichero y
+// otra pregunta, y dejarlo puesto mezclaría las dos mediciones.
+
+cajonComp.querySelector('[data-accion="descartar-comprobacion"]')?.click()
+await esperar(() => !visible(cajonComp), 3000, 'que el cajón del fichero multiparcela se descarte')
 
 const antesDeContrastar = peticionesDeDatos()
 const cajaAntesDeContrastar = altoCajaVertices()
@@ -893,14 +959,21 @@ const campoAntesDeContrastar = campoRefcatEl === null ? null : campoRefcatEl.val
 // importante como la otra.
 const vistaAntesDeContrastar = centroDelMapaLonLat()
 
-cajonComp.querySelector('[data-accion="contrastar-parcelario"]').click()
-// El renglón del cajón es la única superficie donde contar la espera, y por eso
-// «Contrastar» NO cierra el cajón en el clic: se lee en el acto.
+soltar(traidoReal.file)
+// El renglón del cajón era la superficie donde se contaba la espera cuando el
+// recorrido pasaba por él. Ya no pasa: se lee igual, y tiene que estar callado.
 const renglonDurante = texto('[data-estado="cajon-comprobacion"]')
+// ⚠️ **La señal de que el recorrido ha terminado es el RENGLÓN DE PROCEDENCIA
+// nombrando el fichero, y no la referencia catastral de la ficha.** Costó una
+// falsa alarma al escribir esto (2026-08-07): con `?demo=real` la parcela de
+// demostración es EXACTAMENTE la del fixture, así que `[data-ficha="refcat"]` ya
+// decía `9398516VK3799G` antes de soltar nada y la espera volvía en 0 ms — con
+// todo lo de después leído antes de que hubiera pasado nada. El nombre del
+// fichero, en cambio, solo puede escribirlo este recorrido.
 const cerroSolo = await esperar(
-  () => !visible(cajonComp),
+  () => !visible(cajonComp) && /cp_parcela_9398516VK3799G\.gml/.test(texto('[data-procedencia="parcela"]') || ''),
   20000,
-  'que el recorrido termine y el cajón se cierre (¿hay red?)',
+  'que el fichero entre en el expediente (¿hay red?)',
 )
 const trasContrastar = peticionesDeDatos()
 const cajaTrasContrastar = altoCajaVertices()
@@ -927,8 +1000,9 @@ const contraste = {
 }
 if (!contraste.cerroSolo) {
   problemas.push(
-    'El cajón de comprobación no se ha cerrado al terminar el recorrido: con la parcela ya en el ' +
-      'store no tiene nada que decir, y lo que hay que mirar es el mapa.',
+    'Soltar el fichero real no ha dejado su parcela en el expediente (o el cajón se ha abierto ' +
+      'con un GML de UNA sola parcela, que desde el 2026-08-07 no debe abrirlo). Si el Catastro no ' +
+      'ha contestado, mira la red antes de acusar a la aplicación.',
   )
 }
 if (!contraste.nombraElFichero || !contraste.diceQueNoEsDelCatastro || !contraste.nombraElParcelario) {
@@ -1327,7 +1401,30 @@ if (puntoCerca === null || puntoLejos === null) {
       'La deducción de F05 no se puede ejercitar A LA VEZ que esto: se arma solo con una parcela ' +
       'SIN referencia catastral, y sin referencia no hay vecinas que pedir. Ver el §17.',
   }
-  if (!colindantes.clicAlMapa.elClicLlegaAlMapa) {
+  // ⛔ **LA SELECCIÓN DE LINDERO ES DE EDICIÓN, Y AQUÍ ESTAMOS EN DIAGNÓSTICO.**
+  // Medido el 2026-08-07: `gml-lado-seleccionado` lo pone `viewer/edicion.js`, o
+  // sea que solo hay lindero que seleccionar con la edición armada. Cuando se
+  // escribió este bloque (F08) toda la aplicación cabía en una pantalla y la
+  // edición estaba siempre viva; **el rework de UI las separó en dos pantallas** y
+  // desde entonces este guardián llegaba aquí, no encontraba selección posible y
+  // acusaba a la capa de colindantes de robarle el clic al mapa. Es el mismo
+  // «artefacto: el guion llega con la app en un estado que no pretendía» que el
+  // §16 de GUION.md ya dictaminó para los botones derivados.
+  //
+  // Se conserva el guardián —el riesgo del robo del clic es real y sigue sin
+  // medirse en ninguna otra parte— y se le pone la condición que le faltaba: solo
+  // acusa cuando de verdad HABÍA algo que seleccionar. Si no lo hay, se dice que
+  // no se ha medido, que es lo honrado y lo que deja el hueco a la vista.
+  const laSeleccionEstaArmada = paso() === 'edicion'
+  colindantes.clicAlMapa.laSeleccionDeLinderoEstaArmada = laSeleccionEstaArmada
+  if (!laSeleccionEstaArmada) {
+    advertencias.push(
+      `El robo del clic por la capa de colindantes NO se ha medido: la selección de lindero es de ` +
+        `EDICIÓN (\`viewer/edicion.js\`) y este tramo del guion corre en «${paso()}», donde no hay ` +
+        'lindero que seleccionar. Hace falta un recorrido que traiga las vecinas Y esté en Edición ' +
+        'a la vez; hoy no lo tiene ningún guion.',
+    )
+  } else if (!colindantes.clicAlMapa.elClicLlegaAlMapa) {
     problemas.push(
       'Un clic sobre el contorno de una parcela vecina NO llega al mapa con la coordenada del ' +
         `puntero (selecciona cerca: ${seleccionaAlPincharCerca}, deselecciona lejos: ` +
@@ -1554,10 +1651,19 @@ if (informe.diagnosticoAbiertoAntesDeDescargar && !informe.diagnosticoSigueAbier
 //
 // El riesgo que el plan de F08 mandó expresamente a este guion: «`validarParcela`
 // sobre un GML ajeno escupe una tanda larga de hallazgos y empuja el panel […]
-// hay que mirarlo con un fichero malo de verdad: va al guion 10». Y de paso el
-// camino 2 de la exclusión mutua: soltar un fichero NO es un clic, así que el
-// guardián de clic-fuera de F07 no se entera y su cajón se quedaría abierto
-// debajo si nadie lo cerrara.
+// hay que mirarlo con un fichero malo de verdad: va al guion 10».
+//
+// ⭐ **LA PREGUNTA SIGUE VIVA Y HA CAMBIADO DE SITIO (2026-08-07).** Hasta ese día
+// las notas se pintaban DENTRO del cajón de comprobación, y lo que se medía era
+// que el cajón no reventara de alto ni escondiera sus dos botones. El cajón ya no
+// se abre con un fichero de una sola parcela: **las notas y los bloqueos salen por
+// el panel de avisos**, así que lo que hay que medir es que ese canal no se coma
+// la pantalla ni se quede mudo. Es la misma pregunta —«¿una tanda larga de
+// hallazgos empuja el panel?»— sobre el canal que hoy la responde.
+//
+// Y de paso lo que este fichero siempre midió y sigue valiendo: coordenadas fuera
+// del huso son una NOTA y el recorrido CONTINÚA (criterio 2 de la spec, regla de
+// oro 9). Con el recorrido nuevo eso se ve mejor que antes: la parcela entra sola.
 
 const ficheroLargo = { medido: false }
 if (traidoHuso.file === null) {
@@ -1566,108 +1672,102 @@ if (traidoHuso.file === null) {
       'una tanda larga de notas queda sin medir en esta corrida.',
   )
 } else {
-  // El cajón de diagnóstico tiene que estar ABIERTO para medir el camino 2. Si el
-  // defecto de la descarga lo cerró, se reabre — y se dice, porque reabrirlo no
-  // cuesta ninguna petición (las vecinas ya están adoptadas).
-  const huboQueReabrir = !visible(cajonDiag)
-  if (huboQueReabrir) {
-    ctaDiag.click()
-    await esperar(() => visible(cajonDiag), 5000, 'reabrir el cajón de diagnóstico')
-  }
   const antesDelSegundo = peticionesDeDatos()
-  const diagnosticoAbiertoAntes = visible(cajonDiag)
-
+  const tarjetasAntesDelSegundo = tarjetasDeAvisos()
+  const cajaAntesDelSegundo = altoCajaVertices()
   soltar(traidoHuso.file)
-  await esperar(() => visible(cajonComp), 10000, 'que el cajón se abra con el segundo fichero', 0)
-
-  const rectLargo = rect(cajonComp)
-  const b1 = cajonComp.querySelector('[data-accion="contrastar-parcelario"]')
-  const b2 = cajonComp.querySelector('[data-accion="descartar-comprobacion"]')
-  const scrollPrevio = cajonComp.scrollTop
-  cajonComp.scrollTop = cajonComp.scrollHeight
-  const dentroDelCajon = (el) => {
-    const r = el.getBoundingClientRect()
-    return r.top >= rectLargo.y - 1 && r.bottom <= rectLargo.abajo + 1
-  }
-  const botonesAlcanzables = dentroDelCajon(b1) && dentroDelCajon(b2)
-  cajonComp.scrollTop = scrollPrevio
+  // Igual que en el §7: la señal es el renglón de procedencia nombrando ESTE
+  // fichero. La referencia de la ficha no sirve — el fixture está derivado del
+  // mismo parcela, así que no cambia — y esperar a que cambie agota el plazo
+  // acusando a la aplicación de no cargar algo que sí ha cargado.
+  const entro = await esperar(
+    () => /cp_huso_incoherente\.gml/.test(texto('[data-procedencia="parcela"]') || ''),
+    12000,
+    'que el GML de huso incoherente entre en el expediente',
+  )
 
   ficheroLargo.medido = true
-  ficheroLargo.huboQueReabrirElDiagnostico = huboQueReabrir
-  ficheroLargo.diagnosticoAbiertoAntes = diagnosticoAbiertoAntes
-  ficheroLargo.diagnosticoSeCerroAlAbrirLaComprobacion = diagnosticoAbiertoAntes && !visible(cajonDiag)
-  ficheroLargo.notas = $$('[data-comp="notas"] li').length
-  ficheroLargo.hallazgos = $$('[data-comp="hallazgos"] tbody tr').length
-  ficheroLargo.bloqueos = $$('[data-comp="bloqueos"] li').length
-  ficheroLargo.srs = texto('[data-comp="srs"]')
-  ficheroLargo.rect = rectLargo
-  ficheroLargo.mismoTamanoQueConElLimpio = rectLargo !== null && rectCajon !== null && rectLargo.h === rectCajon.h
-  ficheroLargo.dentroDelMapa =
-    rectLargo !== null &&
-    rectLargo.x >= rectMapa.x - 1 &&
-    rectLargo.derecha <= rectMapa.derecha + 1 &&
-    rectLargo.y >= rectMapa.y - 1 &&
-    rectLargo.abajo <= rectMapa.abajo + 1
-  ficheroLargo.cajonHaceScroll = cajonComp.scrollHeight > cajonComp.clientHeight + 1
-  ficheroLargo.botonesAlcanzables = botonesAlcanzables
-  // Fuera de huso es una NOTA, no un fallo: el recorrido CONTINÚA (regla de oro
-  // 9 y criterio 2 de la spec).
-  ficheroLargo.contrastarSigueHabilitado = !b1.disabled
+  ficheroLargo.entroSolo = entro
+  ficheroLargo.abrioElCajon = visible(cajonComp)
+  ficheroLargo.tarjetasAntes = tarjetasAntesDelSegundo
   ficheroLargo.tarjetasDeAvisos = tarjetasDeAvisos()
+  ficheroLargo.tarjetasNuevas = ficheroLargo.tarjetasDeAvisos - tarjetasAntesDelSegundo
   ficheroLargo.altoCajaVerticesPx = altoCajaVertices()
+  ficheroLargo.cajaAntes = cajaAntesDelSegundo
+  ficheroLargo.filas = filasDeTabla()
   ficheroLargo.peticionesGastadas =
     peticionesDeDatos().getParcel - antesDelSegundo.getParcel +
     (peticionesDeDatos().getNeighbour - antesDelSegundo.getNeighbour)
 
-  if (diagnosticoAbiertoAntes && visible(cajonDiag)) {
+  if (!ficheroLargo.entroSolo) {
     problemas.push(
-      'Soltar un fichero con el cajón de diagnóstico abierto deja los DOS abiertos: soltar no es un ' +
-        'clic, así que el guardián de clic-fuera de F07 no se entera y el cierre tiene que hacerlo ' +
-        'el cableado de F08.',
+      'Un GML de una sola parcela con notas largas no ha entrado solo en el expediente. Desde el ' +
+        '2026-08-07 no hay ninguna confirmación que pulsar: si el recorrido se para, se para en ' +
+        'silencio.',
     )
   }
-  if (!ficheroLargo.dentroDelMapa) {
+  if (ficheroLargo.abrioElCajon) {
     problemas.push(
-      'Con un GML de notas largas el cajón se sale del lienzo del mapa: el tope de alto no está ' +
-        'sujetándolo.',
+      'Un GML de UNA sola parcela ha abierto el cajón de comprobación. Solo debe abrirlo el que ' +
+        'trae varias, que es la única decisión que le queda al usuario.',
     )
   }
-  if (!ficheroLargo.botonesAlcanzables) {
+  // ⭐ EL RIESGO DEL PLAN, MEDIDO DONDE HOY VIVE: las notas tienen que CONTARSE.
+  // Cero tarjetas nuevas con un fichero que trae hallazgos sería el canal mudo.
+  if (ficheroLargo.tarjetasNuevas <= 0) {
     problemas.push(
-      'Con un GML de notas largas los botones «Contrastar» y «Descartar» no se alcanzan ni haciendo ' +
-        'scroll dentro del cajón: el usuario ve el problema y no la salida.',
+      `Soltar un GML con notas de sobra no ha puesto ni una tarjeta nueva en el panel de avisos ` +
+        `(${tarjetasAntesDelSegundo} → ${ficheroLargo.tarjetasDeAvisos}). El cajón ya no se abre, ` +
+        'así que si el panel tampoco habla el fichero entra en silencio y sus notas se pierden.',
     )
   }
-  if (!ficheroLargo.contrastarSigueHabilitado) {
+  // Y la otra mitad: contarlas no puede costarle la pantalla al panel. La caja de
+  // vértices es el nodo que se comen los avisos cuando crecen.
+  if (
+    ficheroLargo.altoCajaVerticesPx !== null &&
+    cajaAntesDelSegundo !== null &&
+    ficheroLargo.altoCajaVerticesPx < 120
+  ) {
     problemas.push(
-      'Con coordenadas fuera del huso declarado el recorrido se DETIENE: el criterio 2 dice que eso ' +
-        'sale como nota, no como fallo, y `puedeContinuar` es capacidad y no mérito.',
+      `La tanda de notas ha dejado la caja de vértices en ${ficheroLargo.altoCajaVerticesPx} px ` +
+        `(venía de ${cajaAntesDelSegundo}): el panel se ha comido la tabla que el usuario está ` +
+        'mirando. Es el riesgo que el plan de F08 mandó a este guion.',
     )
   }
-  if (ficheroLargo.peticionesGastadas > 0) {
+  if (ficheroLargo.peticionesGastadas > 1) {
     problemas.push(
-      `Soltar el segundo fichero ha gastado ${ficheroLargo.peticionesGastadas} petición(es) sin que ` +
-        'nadie pulse «Contrastar»: la consulta al Catastro la dispara el usuario (override O8).',
+      `Soltar el segundo fichero ha gastado ${ficheroLargo.peticionesGastadas} peticiones. Abrir un ` +
+        'fichero cuesta UNA como mucho (override O8), y este declara otro huso: no debería costar ' +
+        'ninguna.',
     )
   }
 }
 
-// ── 11 · La tercera vía, DECLARADA y no resuelta ────────────────────────────
+// ── 11 · La tercera vía: DECLARADA, no resuelta, y hoy CASI IMPOSIBLE ──────
 //
-// T4.1 blindó dos de los tres caminos y dejó el tercero por escrito: pulsar
-// «Diagnosticar encaje» en el pie con el cajón de comprobación abierto abre el de
-// F07 sin tocar el store, así que los dos quedan apilados en vertical. No se
-// resuelve porque la única forma sería escuchar el clic del CTA de otra feature,
-// y ese cable se rompe en silencio. Aquí NO se convierte en un fallo: se MIDE, se
-// publica con su alto apilado, y quien decide si molesta es el checklist §9.
+// T4.1 blindó dos de los tres caminos de la exclusión mutua y dejó el tercero por
+// escrito: pulsar «Diagnosticar encaje» en el pie con el cajón de comprobación
+// abierto abre el de F07 sin tocar el store, así que los dos quedan apilados en
+// vertical. No se resolvió porque la única forma sería escuchar el clic del CTA de
+// otra feature, y ese cable se rompe en silencio.
+//
+// ⭐ **El 2026-08-07 el hueco se estrechó casi hasta cerrarse, y por un efecto
+// lateral que conviene tener escrito**: el cajón de comprobación solo se abre con
+// un GML de VARIAS parcelas, y en ese estado no hay ninguna parcela nueva en el
+// store todavía — así que el CTA de diagnóstico habla de la parcela ANTERIOR. La
+// coincidencia sigue siendo posible; lo que ha dejado de ser es el camino normal.
+//
+// Aquí NO se convierte en un fallo: se MIDE si se da, se publica con su alto
+// apilado, y quien decide si molesta es el checklist §9.
 
-const terceraVia = { medida: false }
+const terceraVia = { medida: false, sePudoProvocar: false }
 if (visible(cajonComp) && !ctaDiag.disabled) {
   ctaDiag.click()
   await esperar(() => visible(cajonDiag), 5000, 'el cajón de diagnóstico de la tercera vía')
   const rc = rect(cajonComp)
   const rd = rect(cajonDiag)
   terceraVia.medida = true
+  terceraVia.sePudoProvocar = true
   terceraVia.losDosAbiertos = visible(cajonComp) && visible(cajonDiag)
   terceraVia.comprobacion = rc
   terceraVia.diagnostico = rd
@@ -1679,10 +1779,14 @@ if (visible(cajonComp) && !ctaDiag.disabled) {
     'DECLARADO Y NO RESUELTO por T4.1: es el tercero de los tres caminos y el único sin blindar. ' +
     'No cuenta como fallo aquí (ver la cabecera y el §9 del checklist humano); se mide para que ' +
     'quien lo juzgue tenga la cifra delante.'
-  // Se deja SOLO el de comprobación abierto: es lo que tiene que enseñar la
-  // captura del §9 (la tanda larga de notas sobre un GML ajeno).
   const cerrarDiag = cajonDiag.querySelector('[data-accion="cerrar-diagnostico"]')
   if (cerrarDiag !== null) cerrarDiag.click()
+} else {
+  terceraVia.nota =
+    'NO SE HA PODIDO PROVOCAR en esta corrida, y es lo esperable desde el 2026-08-07: hace falta el ' +
+    'cajón de comprobación abierto (o sea, un GML de varias parcelas sin resolver) Y el CTA de ' +
+    'diagnóstico encendido a la vez. El hueco sigue en el código; el camino para llegar a él ya no ' +
+    'es el normal.'
 }
 
 // ── 17 · EL MAPA SIGUE A LA PARCELA, Y NO PERSIGUE AL EDITOR (§17) ──────────
@@ -1785,25 +1889,30 @@ if (traidoOtra.file === null) {
   const contornosAntes = $$('.gml-colindante').length
   const antesDeLaTercera = peticionesDeDatos()
 
+  const filasAntesDeLaTercera = filasDeTabla()
+
   soltar(traidoOtra.file)
-  const abrioTercero = await esperar(() => visible(cajonComp), 8000, 'el cajón con UTM_1.gml', 0)
-  const botonContrastar = cajonComp.querySelector('[data-accion="contrastar-parcelario"]')
-  const contrastarHabilitado = botonContrastar !== null && !botonContrastar.disabled
+  // ⭐ Sin pulsar nada: `UTM_1.gml` es un alta real en formato 3.0, sin referencia
+  // catastral, y es EXACTAMENTE el fichero con el que el recorrido viejo se moría
+  // —sin refcat no hay parcelario, sin parcelario Diagnóstico se apaga, y la
+  // puerta vivía dentro de Diagnóstico—. Hoy entra solo, como los otros dos.
+  const entroLaTercera = await esperar(
+    () => !visible(cajonComp) && filasDeTabla() !== filasAntesDeLaTercera,
+    12000,
+    'que UTM_1.gml entre en el expediente',
+  )
 
-  reencuadreOtra.abrioElCajon = abrioTercero
-  reencuadreOtra.fichero = texto('[data-comp="fichero"]')
-  reencuadreOtra.contrastarHabilitado = contrastarHabilitado
-  reencuadreOtra.renglon = texto('[data-estado="cajon-comprobacion"]')
+  reencuadreOtra.abrioElCajon = visible(cajonComp)
+  reencuadreOtra.entroSolo = entroLaTercera
 
-  if (!contrastarHabilitado) {
+  if (!entroLaTercera) {
     problemas.push(
-      `Con \`UTM_1.gml\` (formato 3.0, alta real sin referencia catastral) el recorrido se DETIENE: ` +
-        `${JSON.stringify(reencuadreOtra.renglon)}. Que la Sede ya no admita el 3.0 es una NOTA; la ` +
-        'parcela se enseña igual (criterio 2).',
+      'Con `UTM_1.gml` (formato 3.0, alta real SIN referencia catastral) el recorrido se DETIENE. ' +
+        'Que la Sede ya no admita el 3.0 es una NOTA; la parcela se enseña igual (criterio 2). Y es ' +
+        'el fichero corriente: el caso en el que el usuario se quedaba encerrado antes del ' +
+        '2026-08-07.',
     )
   } else {
-    botonContrastar.click()
-    await esperar(() => !visible(cajonComp), 12000, 'que UTM_1.gml entre en el expediente')
     // El encuadre se lee del `src` del WMS, que se reescribe en el `moveend` del
     // reencuadre. Se espera a que CAMBIE, no un plazo fijo.
     const cambio = await esperar(
@@ -1902,26 +2011,40 @@ if (traidoOtra.file === null) {
 }
 
 // ── 17.4 · Se restaura el estado que la captura del §9 necesita ─────────────
-// El guion tiene que TERMINAR con el cajón de comprobación abierto sobre el GML
-// ajeno de notas largas: es lo que el §9 del checklist humano manda leer en voz
-// alta. Soltar otra vez ese fichero no cuesta ninguna petición (no se pulsa
-// «Contrastar»), y se DECLARA en vez de dejarlo implícito.
+//
+// ⭐ **Y LO QUE HAY QUE DEJAR EN PANTALLA CAMBIÓ EL 2026-08-07.** El guion
+// terminaba reabriendo el cajón de comprobación sobre el GML ajeno de notas
+// largas, porque era ahí donde el §9 del checklist humano manda leer las notas en
+// voz alta buscando veredictos sobre el trabajo de otro. **Ese cajón ya no se abre
+// con un fichero de una sola parcela**: las notas viven ahora en el panel de
+// avisos, así que la captura tiene que enseñar el panel con la lista abierta.
+//
+// Se cambia el sujeto y NO la pregunta: sigue siendo «¿alguna de estas frases se
+// lee como un juicio sobre quien hizo el fichero?» (regla de oro 9), y sigue
+// siendo humana.
 const estadoFinal = { restaurado: false }
 if (traidoHuso.file !== null) {
   soltar(traidoHuso.file)
   estadoFinal.restaurado = await esperar(
-    () => visible(cajonComp),
+    () => tarjetasDeAvisos() > 0,
     8000,
-    'reabrir el cajón con el GML ajeno para la captura',
+    'que las notas del GML ajeno lleguen al panel de avisos para la captura',
   )
-  estadoFinal.fichero = texto('[data-comp="fichero"]')
-  estadoFinal.notas = $$('[data-comp="notas"] li').length
+  // Y se ABRE la lista: cerrada, la captura enseñaría un chip con un número y el
+  // §9 pide leer las frases.
+  const chipAvisos = $('[data-chip="avisos"]') ?? $('[data-accion="abrir-avisos"]')
+  chipAvisos?.click()
+  await new Promise((r) => setTimeout(r, 250))
+  estadoFinal.dondeSeLeenLasNotas = 'el panel de avisos (#avisos), no el cajón de comprobación'
+  estadoFinal.listaAbierta = $('#avisos')?.open ?? null
+  estadoFinal.tarjetasDeAvisos = tarjetasDeAvisos()
   estadoFinal.parcelaEnPantalla = {
     filas: filasDeTabla(),
     refcat: texto('[data-ficha="refcat"]'),
     nota:
       'Desde el §17 la parcela cargada es la de `UTM_1.gml` y la geometría está EDITADA a propósito ' +
-      '(un vértice movido): la captura enseña el cajón, no el dataset de arranque.',
+      '(un vértice movido); encima se ha soltado el GML de huso incoherente, que es el de las notas ' +
+      'largas. La captura enseña el PANEL con sus tarjetas, no el dataset de arranque.',
   }
 }
 

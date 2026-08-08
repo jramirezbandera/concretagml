@@ -37,40 +37,34 @@
 // Informe»— no se podía andar.
 //
 // ── LA PROCEDENCIA SE DECLARA, Y SALE DEL MODELO ───────────────────────────
-// No hay un estado paralelo que diga de quién es la geometría: ya lo dice
-// `parcela.origen` (`model/parcela.js`, lista cerrada y validada al construir) y
-// lo completa el MODO de la navegación. {@link textoProcedencia} los junta, y es
-// una función PURA — el texto se compone aquí y se le pasa hecho a la vista,
-// porque `viewer/cajon-diagnostico.js` no importa `model/` ni debe empezar ahora.
+// No hay un estado paralelo que diga de dónde salió la geometría: ya lo dice
+// `parcela.origen` (`model/parcela.js`, lista cerrada y validada al construir).
+// {@link textoProcedencia} lo redacta, y es una función PURA — el texto se compone
+// aquí y se le pasa hecho a la vista, porque `viewer/cajon-diagnostico.js` no
+// importa `model/` ni debe empezar ahora.
 //
-// Los dos ejes dicen cosas distintas y por eso hacen falta los dos:
-//   · `origen` — **de dónde salió** el dibujo. No cambia nunca.
-//   · `modo`   — **si ya es tuyo**. Cambia al cruzar la puerta (D4), y entonces el
-//                origen sigue diciendo GML_EXISTENTE, que es la verdad: lo trajiste
-//                de un fichero ajeno y lo has tomado como tuyo.
+// **El origen no cambia nunca**: dice de dónde salió el dibujo, no de quién es. Un
+// recinto leído de un GML existente sigue diciendo `GML_EXISTENTE` después de que
+// lo hayas editado media hora, porque eso es lo que pasó.
 //
-// ── LA PUERTA (decisión D4) SE ENCHUFA AQUÍ ────────────────────────────────
-// «Comprobación es una PUERTA, no una cárcel»: el CTA «Tomar esta geometría y
-// editarla» llama a `app/navegacion.js#abrirPuerta`, y quien los une es este
-// módulo. No lo hace la vista —`viewer/cajon-diagnostico.js` no sabe qué es un
-// modo, y no va a empezar— ni `app/cableado-diagnostico.js`, que es de F07 y no
-// tiene por qué enterarse de que existe una autoridad de navegación.
-//
-// El botón se ESCONDE cuando no aplica, en vez de apagarse con un motivo, y es la
-// única excepción a la regla de la casa en toda la pantalla: un «tomar esta
-// geometría» gris sobre tu propia parcela no tiene ningún motivo que escribir al
-// lado. El porqué largo está en `viewer/cajon-diagnostico.js#puerta`.
+// ── ⛔ AQUÍ SE ENCHUFABA «LA PUERTA», Y SE RETIRÓ EL 2026-08-07 ─────────────
+// Este módulo unía el CTA «Tomar esta geometría y editarla» con
+// `app/navegacion.js#abrirPuerta`, y escondía o enseñaba el botón según el MODO.
+// El eje entero se ha ido: el porqué está en la cabecera de `app/navegacion.js`
+// (resumen: el botón vivía en una pantalla a la que el propio bloqueo impedía
+// llegar, y la premisa —«el GML que abres es de otro»— era falsa la mayoría de las
+// veces). Un GML entra hoy como cualquier otro fichero: cargado y editable.
 //
 // ── ESTE MÓDULO NO TOCA EL DOM ─────────────────────────────────────────────
 // Recibe funciones —abrir esto, cerrar aquello, declarar este texto— y llama a las
-// que tocan cuando cambia el paso, el modo o la parcela. No conoce Leaflet, ni los
+// que tocan cuando cambia el paso, la rama o la parcela. No conoce Leaflet, ni los
 // cajones, ni un selector. Quién sabe qué función es cuál es `app/main.js`, que es
 // la costura y ya lo sabía.
 //
 // Su test es `test/app/contraste.test.js` (proyecto `node`: no hace falta DOM).
 
 import { ORIGEN_PARCELA } from '../model/parcela.js'
-import { MODO, PASO, RAMA } from './navegacion.js'
+import { PASO, RAMA } from './navegacion.js'
 
 // ── El vocabulario ───────────────────────────────────────────────────────────
 
@@ -148,27 +142,24 @@ export const PROCEDENCIA = Object.freeze({
   [ORIGEN_PARCELA.LIST]: 'Recinto leído de un listado de coordenadas.',
   [ORIGEN_PARCELA.TXT]: 'Recinto leído de tu medición en .txt.',
   [ORIGEN_PARCELA.DXF]: 'Recinto leído de tu medición en .dxf.',
-  [ORIGEN_PARCELA.GML_EXISTENTE]: 'Recinto leído del GML de otro técnico.',
+  // ⚠️ **«De un GML existente» y no «del GML de otro técnico»** desde el
+  // 2026-08-07. El fichero que se abre es, la mayoría de las veces, **el tuyo**
+  // —el que generaste ayer y quieres retocar—, y llamarlo «de otro» era una
+  // afirmación sobre su autoría que esta aplicación no tiene forma de comprobar.
+  // Lo que sí se sigue diciendo, porque sí es verdad y sí importa, es que **no lo
+  // emite el Catastro** (ver {@link COLA_GML_EXISTENTE} y el rótulo de la ficha).
+  [ORIGEN_PARCELA.GML_EXISTENTE]: 'Recinto leído de un GML existente.',
 })
 
 /**
- * Lo que se añade mientras la geometría es de otro y **todavía no se ha tomado**.
- * Nombra la puerta con las MISMAS palabras que el botón y que
- * `MOTIVO_MODO[PASO.EDICION]` de `app/navegacion.js`: tres textos distintos para
- * la misma acción obligan a adivinar que hablan de lo mismo.
+ * Lo que se añade cuando el recinto viene de un GML. Dice las dos cosas que quien
+ * lo acaba de abrir se pregunta: que el dibujo **no es del Catastro** (así que no
+ * es el contorno oficial aunque venga en el mismo formato) y que **el fichero de
+ * origen no se toca** — lo que se edita aquí es una copia en el expediente.
  */
-export const COLA_EN_COMPROBACION =
-  'Lo estás comprobando: no se edita ni se genera GML hasta que pulses «Tomar esta geometría y ' +
-  'editarla».'
-
-/**
- * Y lo que se añade DESPUÉS de cruzar la puerta. No se calla que el dibujo vino
- * de fuera —el origen no cambia, y fingir que sí sería reescribir la historia del
- * documento—, pero sí dice que el fichero de origen no se ha tocado, que es la
- * duda inmediata de quien acaba de pulsar «tomar».
- */
-export const COLA_TOMADA =
-  'Lo has tomado como tuyo para editarlo; el fichero del que salió no se modifica.'
+export const COLA_GML_EXISTENTE =
+  'No lo emite el Catastro. Se ha cargado para editarlo aquí; el fichero del que salió no se ' +
+  'modifica.'
 
 /**
  * Cuando el origen no está en la tabla. **Nombra el valor en vez de callarse**:
@@ -190,13 +181,11 @@ export const mensajeOrigenDesconocido = (origen) =>
  *
  * @param {Object} args
  * @param {string|null} args.origen  `parcela.origen`, tal cual está en el POJO.
- * @param {string} [args.modo=MODO.NORMAL]  El de `app/navegacion.js`.
  * @returns {string}
  */
-export function textoProcedencia({ origen, modo = MODO.NORMAL } = {}) {
+export function textoProcedencia({ origen } = {}) {
   const base = PROCEDENCIA[origen] ?? mensajeOrigenDesconocido(origen)
-  if (modo === MODO.COMPROBACION) return `${base} ${COLA_EN_COMPROBACION}`
-  if (origen === ORIGEN_PARCELA.GML_EXISTENTE) return `${base} ${COLA_TOMADA}`
+  if (origen === ORIGEN_PARCELA.GML_EXISTENTE) return `${base} ${COLA_GML_EXISTENTE}`
   return base
 }
 
@@ -228,8 +217,7 @@ const oNada = (fn) => (typeof fn === 'function' ? fn : () => {})
  */
 
 /**
- * Cablea la pantalla de contraste: la esquina del mapa, el renglón de procedencia
- * y la puerta.
+ * Cablea la pantalla de contraste: la esquina del mapa y el renglón de procedencia.
  *
  * ⚠️ **El cajón se abre por TRANSICIÓN y no en cada notificación.**
  * `abrirDiagnostico` pide las parcelas colindantes por RED
@@ -237,9 +225,8 @@ const oNada = (fn) => (typeof fn === 'function' ? fn : () => {})
  * del store dispararía una petición por tecla pulsada durante la edición. Solo se
  * llama cuando el cajón que toca CAMBIA.
  *
- * La procedencia y la puerta, en cambio, se aplican SIEMPRE: son idempotentes
- * —escriben un texto y una visibilidad— y equivocarse por defecto ahí cuesta un
- * renglón que habla de la parcela anterior.
+ * La procedencia, en cambio, se aplica SIEMPRE: es idempotente —escribe un texto—
+ * y equivocarse por defecto ahí cuesta un renglón que habla de la parcela anterior.
  *
  * @param {Object} opciones
  * @param {object} opciones.navegacion  La de `app/navegacion.js`.
@@ -249,9 +236,6 @@ const oNada = (fn) => (typeof fn === 'function' ? fn : () => {})
  * @param {() => void} [opciones.cerrarDiagnostico]
  * @param {() => void} [opciones.cerrarComprobacion]
  * @param {(texto: string) => void} [opciones.declararProcedencia]
- * @param {(visible: boolean) => void} [opciones.mostrarPuerta]
- * @param {(fn: () => void) => (() => void)} [opciones.suscribirPuerta]  Cómo
- *   escuchar el CTA. Se le devuelve la baja, igual que `alCambiar` y compañía.
  * @param {(esPantalla: boolean) => void} [opciones.fijarDiagnosticoComoPantalla]
  *   Rework de UI · rebanada 4. Se le dice al cajón de diagnóstico si en este paso
  *   **es la pantalla** o es un cajón flotante. Ver el bloque de abajo.
@@ -276,8 +260,6 @@ export function cablearContraste({
   cerrarDiagnostico,
   cerrarComprobacion,
   declararProcedencia,
-  mostrarPuerta,
-  suscribirPuerta,
   fijarDiagnosticoComoPantalla,
   suscribirSalida,
   abrirContrasteEdificio,
@@ -303,7 +285,6 @@ export function cablearContraste({
   const cerrarD = oNada(cerrarDiagnostico)
   const cerrarC = oNada(cerrarComprobacion)
   const declarar = oNada(declararProcedencia)
-  const puerta = oNada(mostrarPuerta)
   const comoPantalla = oNada(fijarDiagnosticoComoPantalla)
   // F14 · Los tres gemelos de la rama EDIFICIO.
   const abrirE = oNada(abrirContrasteEdificio)
@@ -317,24 +298,20 @@ export function cablearContraste({
   let dicho = ''
 
   /**
-   * Escribe la procedencia y enseña o esconde la puerta.
+   * Escribe la procedencia.
    *
    * **Sin parcela en el store el renglón se VACÍA**, y es deliberado: decir de
    * dónde viene una geometría que no está sería peor que no decir nada. La vista
    * oculta el renglón cuando recibe cadena vacía, así que no cuesta ni un píxel.
    */
   function declararEstado() {
-    const { modo } = navegacion.get()
     const parcela = estado === null ? null : estado.get()
     const texto =
       parcela === null || parcela === undefined
         ? ''
-        : textoProcedencia({ origen: parcela.origen ?? null, modo })
+        : textoProcedencia({ origen: parcela.origen ?? null })
     dicho = texto
     declarar(texto)
-    // La puerta solo tiene sentido mientras la geometría es de otro. Y solo si hay
-    // geometría: un «tomar esta geometría» sobre la nada no toma nada.
-    puerta(modo === MODO.COMPROBACION && texto !== '')
   }
 
   /** @param {{paso: string, rama: string}} situacion */
@@ -377,14 +354,6 @@ export function cablearContraste({
   // cambia de quién es la geometría. Sin esto, contrastar el GML de otro dejaría
   // en pantalla la procedencia de la parcela anterior.
   const bajaEstado = estado === null ? () => {} : estado.subscribe(() => declararEstado())
-  // Y la puerta. Quien la cruza es la autoridad; este módulo solo la enchufa —el
-  // cajón no sabe qué es un modo—.
-  const bajaPuerta =
-    typeof suscribirPuerta === 'function'
-      ? suscribirPuerta(() => {
-          if (!destruido) navegacion.abrirPuerta()
-        })
-      : () => {}
 
   // ── La SALIDA del diagnóstico (rework de UI · rebanada 4) ──────────────────
   //
@@ -437,7 +406,6 @@ export function cablearContraste({
       destruido = true
       bajaNavegacion()
       bajaEstado()
-      if (typeof bajaPuerta === 'function') bajaPuerta()
       if (typeof bajaSalida === 'function') bajaSalida()
       if (typeof bajaSalidaEdificio === 'function') bajaSalidaEdificio()
     },

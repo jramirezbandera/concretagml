@@ -529,26 +529,20 @@ describe('app/main · F08 · las dos features, enlazadas', () => {
     expect(texto).not.toContain('QUÉ SE LEYÓ DEL FICHERO')
   })
 
-  it('soltar un GML abre SU cajón y cierra el de F07 (comparten esquina)', async () => {
-    // Los dos viven en `bottomleft`. Soltar un fichero no es un clic, así que el
-    // guardián de clic-fuera de F07 no se entera: quien lo cierra es el paso 9.
-    expect(diagnosticoVivo.cajon.abierto()).toBe(true) // lo dejó abierto la prueba anterior
+  it('⭐ 2026-08-07 · soltar un GML lo CARGA, sin cajón y sin confirmar', async () => {
+    // ⛔ Este `it` se llamaba «soltar un GML abre SU cajón y cierra el de F07» y
+    // exigía `comprobacionViva.abierto() === true`. El fichero entra ahora como un
+    // `.dxf`: el cajón solo aparece si el GML trae VARIAS parcelas.
+    arranque.peticiones.length = 0
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
 
-    expect(comprobacionViva.abierto()).toBe(true)
-    expect(diagnosticoVivo.cajon.abierto()).toBe(false)
-    expect(raizComprobacion().querySelector(SELECTOR_COMP.FICHERO).textContent).toContain(
-      'de-otro-despacho.gml',
-    )
+    expect(comprobacionViva.abierto()).toBe(false)
     // Ya hay comprobación viva, y el envoltorio la ve: es tardío, no un snapshot.
     expect(arranque.diagnostico.comprobacion()).not.toBeNull()
     expect(arranque.diagnostico.comprobacion().fichero.nombre).toBe('de-otro-despacho.gml')
   })
 
-  it('«Contrastar» compone las DOS geometrías y el informe ya lleva la del fichero', async () => {
-    arranque.peticiones.length = 0
-    pulsar(raizComprobacion().querySelector(SELECTOR_COMP.CONTRASTAR))
-    await cederTurno()
+  it('compone las DOS geometrías y el informe ya lleva la del fichero', async () => {
 
     // El parcelario se ha pedido UNA vez, con la referencia leída del fichero.
     expect(arranque.peticiones.filter((u) => !u.includes('Neighbour'))).toHaveLength(1)
@@ -612,122 +606,84 @@ const pasoActivo = () => document.body.getAttribute('data-paso')
 /** El renglón de procedencia del cajón de diagnóstico (T9). */
 const procedenciaDelCajon = () =>
   raizDiagnostico().querySelector('[data-procedencia="contraste"]')
-/** La puerta (D4). */
-const puerta = () => raizDiagnostico().querySelector('[data-accion="tomar-geometria"]')
-
-describe('app/main · T9 · la ruta crítica 2, de principio a fin', () => {
-  it('⛔ soltar un GML ajeno entra en modo COMPROBACIÓN: Edición se apaga CON motivo', async () => {
+describe('app/main · la ruta crítica 2, de principio a fin', () => {
+  it('⭐ 2026-08-07 · soltar un GML lo carga y ATERRIZA, sin peaje ninguno', async () => {
+    // ⛔ **ESTE BLOQUE PROBABA LO CONTRARIO, Y ERA EL CASO ENTERO DE T9.** Hasta
+    // ese día soltar un GML entraba en modo COMPROBACIÓN: el peldaño «Edición»
+    // salía apagado con el motivo «Estás comprobando el GML de otro. Pulsa "Tomar
+    // esta geometría y editarla"», y había que pulsar «Contrastar» primero y la
+    // puerta después. Nueve pruebas de aquí lo vigilaban **y todas pasaban**.
+    //
+    // Lo que ninguna podía ver: la puerta vivía en el cajón de DIAGNÓSTICO, y ese
+    // paso exige el parcelario. Estas pruebas montaban el único fixture que SÍ trae
+    // referencia catastral, así que aquí siempre había parcelario y la puerta
+    // siempre era alcanzable. Con un GML sin referencia —el caso corriente— el
+    // rail mandaba a pulsar un botón que no existía en ninguna pantalla.
+    //
     // ⚠️ **PUNTO DE PARTIDA LIMPIO, y no es ceremonia: lo obligó una mutación.** Los
     // bloques de arriba dejan un diagnóstico calculado, así que «Informe» ya está
-    // encendido y la prueba del final salía VERDE aunque se quitara la suscripción
-    // que la sostiene. Vaciar el store lo olvida y deja el rail donde de verdad
-    // empieza esta ruta.
+    // encendido y la última prueba salía VERDE aunque se quitara la suscripción que
+    // la sostiene.
     estadoDelArranque.set(null)
     await cederTurno()
     expect(botonPeldano('informe').disabled).toBe(true)
 
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'del-vecino.gml'))
 
-    expect(comprobacionViva.abierto()).toBe(true)
-    // ⭐ **Y vuelve a ENTRADA, que es donde vive este cajón.** Lo destapó esta misma
-    // prueba: la anterior había dejado la app en Diagnóstico (por el CTA del pie),
-    // y sin esto el rail decía «Diagnóstico» mientras la esquina del mapa enseñaba
-    // el cajón de otra pantalla. Traer un fichero nuevo es empezar otro expediente.
-    expect(pasoActivo()).toBe('entrada')
-    // El rail lo dice ya, antes de contrastar: la geometría que vas a mirar es de
-    // otro y editarla no es lo que crees.
-    expect(botonPeldano('edicion').disabled).toBe(true)
-    expect(botonPeldano('edicion').textContent).toContain('Tomar esta geometría y editarla')
-    // Y el motivo NO es el de siempre («trae una parcela primero»): decir eso aquí
-    // mandaría al usuario a hacer un trabajo que ya ha hecho.
-    expect(botonPeldano('edicion').textContent).not.toMatch(/trae una parcela/i)
-  })
-
-  it('⭐ «Contrastar» ATERRIZA en Diagnóstico: antes de T9 se quedaba en Entrada', async () => {
-    expect(pasoActivo()).toBe('entrada')
-
-    pulsar(raizComprobacion().querySelector(SELECTOR_COMP.CONTRASTAR))
-    await cederTurno()
-
-    expect(pasoActivo()).toBe('diagnostico')
-    // Y la esquina del mapa la manda el paso: uno abierto, el otro cerrado, sin que
-    // los dos módulos se hayan puesto de acuerdo entre ellos.
-    expect(diagnosticoVivo.cajon.abierto()).toBe(true)
+    // Un solo gesto, y la parcela está dentro.
+    expect(estadoDelArranque.get()).not.toBeNull()
+    expect(estadoDelArranque.get().origen).toBe(ORIGEN_PARCELA.GML_EXISTENTE)
     expect(comprobacionViva.abierto()).toBe(false)
+    // Y ATERRIZA donde aterriza un `.dxf`: Diagnóstico si hay parcelario con el que
+    // contrastar, Validación si no. Este fixture trae referencia, así que hay.
+    expect(pasoActivo()).toBe('diagnostico')
   })
 
-  it('⭐ y la PROCEDENCIA está declarada: dice que es de otro y nombra la puerta', async () => {
+  it('⛔ EDICIÓN ESTÁ ABIERTA: era el peaje, y ya no lo hay', () => {
+    // El defecto que abrió este cambio, del derecho: el rail mandaba a pulsar
+    // «Tomar esta geometría y editarla» y ese botón no estaba en ninguna parte.
+    expect(botonPeldano('edicion').disabled).toBe(false)
+    expect(botonPeldano('edicion').textContent).not.toContain('Tomar esta geometría')
+    expect(botonPeldano('edicion').textContent).not.toMatch(/comprobando/i)
+    // Y no queda ni un botón que la nombre en toda la aplicación.
+    expect(document.querySelector('[data-accion="tomar-geometria"]')).toBeNull()
+  })
+
+  it('⭐ la PROCEDENCIA está declarada: de dónde salió, y que no es del Catastro', () => {
     const renglon = procedenciaDelCajon()
     expect(renglon).not.toBeNull()
     // Se ve: la vista oculta el renglón solo cuando no hay nada que decir.
     expect(renglon.style.display).not.toBe('none')
-    expect(renglon.textContent).toContain('otro técnico')
-    expect(renglon.textContent).toContain('Tomar esta geometría y editarla')
+    expect(renglon.textContent).toContain('GML existente')
+    expect(renglon.textContent).toContain('no se modifica')
+    // ⛔ Y NO afirma de quién es el fichero, que es lo que la aplicación no sabe.
+    expect(renglon.textContent).not.toContain('otro técnico')
     // El contrato K.1 en acción: este renglón NO es el de la vía del Catastro.
     expect(renglon.dataset.procedencia).toBe('contraste')
     expect(document.querySelectorAll('[data-procedencia="contraste"]')).toHaveLength(1)
   })
 
-  it('la puerta se ENSEÑA, y no está apagada: no aplica o no está', () => {
-    expect(puerta().style.display).not.toBe('none')
-    expect(puerta().disabled).toBe(false)
-  })
-
   it('⛔ F19 · y LA CABECERA tampoco dice que esto venga del Catastro', () => {
     // Este guardián es la deuda que F18 midió al pasar y dejó dicha sin tocar: el
-    // renglón de procedencia del cajón sabía distinguir desde F08 —lo prueban las
-    // cuatro de arriba— y **la cabecera no**, porque `rotuloDelDato` solo tenía
-    // «demo / medición / Catastro» y un GML ajeno caía en el último.
+    // renglón de procedencia del cajón sabía distinguir desde F08 y **la cabecera
+    // no**, porque `rotuloDelDato` solo tenía «demo / medición / Catastro» y un GML
+    // de fichero caía en el último. Es el mismo error caro que F18 cerró para la
+    // medición propia: la aplicación afirmando que la Sede respalda una geometría
+    // que ha traído alguien en un fichero. La afirmación no estaba mal, NO EXISTÍA.
     //
-    // Es el mismo error caro que F18 cerró para la medición propia, con la misma
-    // forma: la aplicación afirmando que la Sede respalda una geometría que ha
-    // traído alguien en un fichero. La afirmación no estaba mal, NO EXISTÍA.
+    // ⚠️ Eran DOS rótulos hasta el 2026-08-07 —uno a cada lado de la puerta— y hoy
+    // es uno, porque no hay dos estados que distinguir.
     const eyebrow = document.querySelector('[data-eyebrow]').textContent.trim()
     expect(eyebrow).not.toMatch(/parcela del catastro/i)
-    expect(eyebrow).toMatch(/otro t[ée]cnico/i)
-    // Y mientras no se cruce la puerta, no dice que sea tuya.
+    expect(eyebrow).not.toMatch(/tu medici[óo]n/i)
+    expect(eyebrow).toMatch(/gml/i)
+    expect(eyebrow).toMatch(/no del catastro/i)
+    // Y no afirma autoría, ni en un sentido ni en el otro.
+    expect(eyebrow).not.toMatch(/otro t[ée]cnico/i)
     expect(eyebrow).not.toMatch(/tuyo/i)
   })
 
-  it('⭐ cruzarla cambia el modo de verdad: el rail se completa y el renglón se reescribe', async () => {
-    // F19 · La cabecera ANTES de cruzar, para poder exigir que CAMBIE. Sin esta
-    // foto, la prueba de abajo pasaría aunque el rótulo hubiera dicho «tomado como
-    // tuyo» desde el principio — que es exactamente lo que hace la aplicación si
-    // se le quita el espejo del modo. Verificado por mutación el 2026-08-06.
-    const eyebrowAntes = document.querySelector('[data-eyebrow]').textContent.trim()
-
-    pulsar(puerta())
-    await cederTurno()
-
-    expect(document.querySelector('[data-eyebrow]').textContent.trim()).not.toBe(eyebrowAntes)
-
-    // Edición ya está, y sin motivo colgando.
-    expect(botonPeldano('edicion').disabled).toBe(false)
-    expect(botonPeldano('edicion').textContent).not.toContain('Tomar esta geometría')
-    // La puerta se retira: ya se ha cruzado.
-    expect(puerta().style.display).toBe('none')
-    // Y el renglón no reescribe la historia — sigue diciendo de dónde salió el
-    // dibujo— pero ya no dice que sea de solo lectura.
-    expect(procedenciaDelCajon().textContent).toContain('otro técnico')
-    expect(procedenciaDelCajon().textContent).toContain('Lo has tomado como tuyo')
-    expect(procedenciaDelCajon().textContent).not.toContain('no se edita ni se genera GML')
-  })
-
-  it('⭐ F19 · y la CABECERA cruza con ella: deja de ser «de otro» y sigue sin ser del Catastro', () => {
-    // ⛔ El caso entero de este rótulo, y por qué no bastaba con suscribirse al
-    // store: **cruzar la puerta no toca la parcela**. El POJO es el mismo y su
-    // origen sigue diciendo `GML_EXISTENTE`, que es la verdad. Lo único que cambia
-    // es el MODO, así que sin el suscriptor de la navegación esta línea seguiría
-    // diciendo «de otro técnico» sobre algo que ya estás editando como tuyo.
-    const eyebrow = document.querySelector('[data-eyebrow]').textContent.trim()
-    expect(eyebrow).toMatch(/tomado como tuyo/i)
-    // Y no reescribe la historia por el otro lado: no se convierte en «tu
-    // medición» —no la mediste tú— ni en una parcela del Catastro.
-    expect(eyebrow).not.toMatch(/parcela del catastro/i)
-    expect(eyebrow).not.toMatch(/tu medici[óo]n/i)
-  })
-
-  it('⭐ el paso «Informe» se enciende SIN el apaño del temporizador que T9 borró', async () => {
+  it('⭐ el paso «Informe» se enciende SIN el apaño del temporizador que T9 borró', () => {
     // T5 refrescaba los hechos del rail con `queueMicrotask` + `setTimeout(…, 500)`
     // porque `app/cableado-diagnostico.js` no notificaba a nadie: `ultimoDiagnostico()`
     // era una lectura, no un canal. Un temporizador de medio segundo es una apuesta —
@@ -741,15 +697,14 @@ describe('app/main · T9 · la ruta crítica 2, de principio a fin', () => {
     expect(botonPeldano('informe').disabled).toBe(false)
   })
 
-  it('⭐ y con una parcela PROPIA la pantalla no habla de nadie: la procedencia distingue', async () => {
-    // Anti-vacuidad. Sin esta prueba, un renglón que dijera siempre «de otro
-    // técnico» pasaría las cinco de arriba.
+  it('⭐ y con una parcela del CATASTRO la procedencia dice otra cosa', async () => {
+    // Anti-vacuidad. Sin esta prueba, un renglón que dijera siempre lo mismo pasaría
+    // las de arriba.
     estadoDelArranque.set({ ...estadoDelArranque.get(), origen: ORIGEN_PARCELA.WFS })
     await cederTurno()
 
     expect(procedenciaDelCajon().textContent).toContain('del Catastro')
-    expect(procedenciaDelCajon().textContent).not.toContain('otro técnico')
-    expect(puerta().style.display).toBe('none')
+    expect(procedenciaDelCajon().textContent).not.toContain('GML existente')
   })
 })
 
@@ -826,17 +781,14 @@ describe('app/main · F08 · la app arranca IGUAL sin cliente del Catastro', () 
     expect(arranque.comprobacion.cliente).toBeNull()
   })
 
-  it('comprobar un fichero SIGUE funcionando: se abre el cajón y se lee la parcela', async () => {
+  it('comprobar un fichero SIGUE funcionando: se lee y se carga sola', async () => {
     await soltarYEsperar(ficheroDeBytes(leerBytes(...RUTA_WFS), 'cp_parcela_9398516VK3799G.gml'))
 
-    expect(comprobacionViva.abierto()).toBe(true)
-    expect(raizComprobacion().querySelector(SELECTOR_COMP.CONTRASTAR).disabled).toBe(false)
+    expect(comprobacionViva.abierto()).toBe(false)
+    expect(arranque.comprobacion.cliente).toBeNull()
   })
 
-  it('y al contrastar entra la parcela SIN parcelario, sin tocar la red y DICIÉNDOLO', async () => {
-    pulsar(raizComprobacion().querySelector(SELECTOR_COMP.CONTRASTAR))
-    await cederTurno()
-
+  it('y entra la parcela SIN parcelario, sin tocar la red y DICIÉNDOLO', async () => {
     // Ni una petición: no hay a quién pedírsela, y eso no es un fallo de red.
     expect(arranque.peticiones).toEqual([])
 
