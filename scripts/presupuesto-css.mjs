@@ -316,7 +316,7 @@ export const ASIENTOS = Object.freeze(
         'es la misma decisión que la barra de edición tomó con `aria-expanded`, y aquí además ' +
         'ahorra el atributo `class` que habría que escribir en cada `<tr>`. Sobran 12.242 sobre ' +
         'el techo.' },
-    { hito: 'Dos indicadores de qué geometrías hay cargadas (puerta 2)', commit: '(sin commitear)',
+    { hito: 'Dos indicadores de qué geometrías hay cargadas (puerta 2)', commit: '0097b57',
       total: 69956, nuestro: 54861, rebanada: null,
       nota:
         '**+555 B, y es lo ÚNICO que la feature de las dos puertas le cuesta a esta hoja.** El ' +
@@ -336,7 +336,7 @@ export const ASIENTOS = Object.freeze(
         'PAGA UN ESTADO OCULTO ── El indicador apagado cambia el TEXTO («Sin levantamiento»), ' +
         'así que no hace falta ninguna utilidad de texto solo para lectores: el color es ' +
         'refuerzo, nunca el único canal. Sobran 12.797 sobre el techo.' },
-    { hito: 'Los indicadores se aprietan: 3 px por debajo de un suelo medido', commit: '(sin commitear)',
+    { hito: 'Los indicadores se aprietan: 3 px por debajo de un suelo medido', commit: '0097b57',
       total: 69972, nuestro: 54877, rebanada: null,
       nota:
         '**+16 B —un `line-height` y un margen— y es el asiento más barato del proyecto, pero no ' +
