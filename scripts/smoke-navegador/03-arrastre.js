@@ -69,7 +69,21 @@
 // ── NOTAS DE EJECUCIÓN ──────────────────────────────────────────────────────
 //   · `browse` envuelve el fichero en `(async()=>{ … })()` porque contiene
 //     `await` real; de ahí que el `return` de nivel superior sea legal.
-//   · Ejecución: `$B eval scripts/smoke-navegador/03-arrastre.js`.
+//   · Ejecución: `$B goto …/concretagml/?demo=real#/parcela/edicion` (⚠️ con el
+//     hash EN EL `goto`: cambiar solo el hash no recarga el documento) y después
+//     `$B eval scripts/smoke-navegador/03-arrastre.js`.
+//
+// ── ⛔ LA GUARDA DE PASO, Y POR QUÉ LLEVABA MESES HACIENDO FALTA ────────────
+// Este guion salía `ok:false` con TRES problemas —«la tabla no refleja el
+// gesto», «el `d` del polígono no cambia», «la superficie no cambia»— y los tres
+// eran FALSOS: describían un arrastre que la aplicación tenía apagado a
+// propósito en la pantalla en la que el guion aterrizaba. La rebanada 3 del
+// rework ató los cuatro gestos a la pantalla de Edición y `08-edicion.js` se
+// puso su guarda entonces; éste no, y desde entonces acusaba a la aplicación de
+// un defecto suyo.
+//
+// La guarda va AQUÍ y no en una nota del GUION por la lección de T10: las notas
+// del GUION no se leen cuando el guion ya está corriendo.
 
 /** Recinto y vértice que se arrastra (0-based, como `RefVertice`). */
 const REF = { recinto: 0, indice: 0 }
@@ -86,6 +100,25 @@ const TOPE_ESPERA_MS = 2000
 const t0 = performance.now()
 /** @type {string[]} */
 const problemas = []
+
+const pasoActivo = document.querySelector('[data-paso]')?.dataset.paso ?? null
+if (pasoActivo !== null && pasoActivo !== 'edicion') {
+  return {
+    guion: '03-arrastre',
+    feature: 'F03',
+    tarea: '4D.1',
+    ok: false,
+    url: location.href,
+    pasoActivo,
+    problemas: [
+      `Este guion arrastra un vértice y la aplicación está en «${pasoActivo}». Desde la rebanada 3 ` +
+        'del rework los gestos de edición del mapa solo viven en la pantalla de Edición, así que ' +
+        'aquí no hay nada que medir y los tres fallos que reportaría serían falsos. Relánzalo ' +
+        'sobre `#/parcela/edicion` (con el hash en el `goto`: cambiar solo el hash NO recarga).',
+    ],
+    advertencias: [],
+  }
+}
 
 const dormir = (ms) => new Promise((resolver) => setTimeout(resolver, ms))
 

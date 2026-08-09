@@ -420,8 +420,33 @@ describe('dialogo-importacion · la elección produce la parcela correcta', () =
   it('⚠️ elegir mal la capa NO se disimula: «PARCELA» sigue sin construir, y lo dice', () => {
     // Anti-vacuidad de la prueba anterior y del apunte de la pantalla: el nombre de
     // la capa no garantiza nada. Con «PARCELA» quedan tres anillos disjuntos.
+    //
+    // ⭐ **F22 · y ahora el motivo es el que este comentario decía desde F11.** Era
+    // `SUPERFICIE_NO_POSITIVA` —la consecuencia de leer tres fincas como un
+    // contorno con huecos— y es `VARIOS_RECINTOS_DISJUNTOS`, que es la causa.
     const mal = importar(UTM_DXF, { capa: 'PARCELA' })
     expect(mal.resumen.construida).toBe(false)
-    expect(mal.resumen.bloqueos).toContain(BLOQUEOS.SUPERFICIE_NO_POSITIVA)
+    expect(mal.resumen.bloqueos).toContain(BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS)
+
+    // Y la pantalla NO se queda muda: el bloqueo tiene su texto y dice el hecho.
+    const { bloqueos, decisiones } = decisionesDe(mal)
+    expect(decisiones).toEqual([])
+    expect(bloqueos.map((b) => b.codigo)).toEqual([BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS])
+    expect(bloqueos[0].mensaje).toContain('fincas separadas')
+  })
+
+  it('⛔ y el texto de ese bloqueo NO puede seguir diciendo que la elección no existe', () => {
+    // **Este guardián existe porque el texto se quedó caduco.** La fase 1 lo
+    // escribió declarándolo provisional —«todavía no se puede elegir cuál desde
+    // aquí»— para que la pantalla no se quedara muda antes de que la elección
+    // existiera, y las fases 3 y 4 la construyeron sin que nadie volviera aquí.
+    // Un texto con fecha de caducidad declarada y sin guardián caduca en silencio.
+    const mensaje = decisionesDe(importar(UTM_DXF, { capa: 'PARCELA' })).bloqueos[0].mensaje
+
+    // Se acusa por la AFIRMACIÓN y no por la palabra: lo prohibido es negar que se
+    // pueda elegir, en cualquiera de sus formas.
+    expect(/no se puede elegir|no puedes elegir|todav[íi]a no/i.test(mensaje)).toBe(false)
+    // Y lo exigido es que diga dónde se elige, que es lo que la fase 3 construyó.
+    expect(/caj[óo]n/i.test(mensaje)).toBe(true)
   })
 })

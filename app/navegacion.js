@@ -24,7 +24,7 @@
 //   2. Decide si un paso está DISPONIBLE, y cuando no lo está **entrega el
 //      motivo escrito en español**. Regla de la casa: *paso apagado con motivo,
 //      jamás paso muerto*.
-//   3. Traduce ese estado a la URL y de vuelta (`#/parcela/validacion`).
+//   3. Traduce ese estado a la URL y de vuelta (`#/parcela/edicion`).
 //
 // **⛔ NO TOCA EL DOM. Ni una línea.** No importa nada de `viewer/` que necesite
 // `window`, no consulta `document`, no lee `location` ni escribe `location.hash`
@@ -91,7 +91,7 @@
 // que se ha ido es el bloqueo, no la verdad.
 //
 // ── LA URL (decisión D3): HASH, Y EL DATO MANDA SOBRE LA URL ───────────────
-// `#/parcela/validacion`. El hash no necesita nada del servidor, así que GitHub
+// `#/parcela/edicion`. El hash no necesita nada del servidor, así que GitHub
 // Pages lo sirve tal cual y atrás/adelante/recargar funcionan. Al aterrizar se
 // valida el paso pedido contra los hechos que HAY: si no se sostiene, se cae al
 // último que sí **y se dice por qué** ({@link mensajeAterrizaje}). Un enlace
@@ -125,20 +125,51 @@ export const RAMA = Object.freeze({ PARCELA: 'PARCELA', EDIFICIO: 'EDIFICIO' })
 export const RAMAS = Object.freeze([RAMA.PARCELA, RAMA.EDIFICIO])
 
 /**
- * Los cinco pasos del recorrido. **En minúscula a propósito**: son lo que se
- * escribe en la URL (`#/parcela/validacion`) y una cadena que se enseña en la
- * barra de direcciones no se grita. Las ramas, en cambio, siguen en MAYÚSCULA
- * porque son el contrato G con el `data-rama` del marcado; {@link rutaDe} y
+ * Los pasos del recorrido. **En minúscula a propósito**: son lo que se escribe
+ * en la URL (`#/parcela/edicion`) y una cadena que se enseña en la barra de
+ * direcciones no se grita. Las ramas, en cambio, siguen en MAYÚSCULA porque son
+ * el contrato G con el `data-rama` del marcado; {@link rutaDe} y
  * {@link leerRuta} son los únicos sitios donde se traduce entre las dos formas.
+ *
+ * ── ⭐ ERAN CINCO HASTA EL 2026-08-08, Y AHORA SON TRES ─────────────────────
+ * Se retiran `VALIDACION` e `INFORME`. Los dos por el mismo motivo —el rail
+ * prometía cinco estados y el panel solo tenía tres caras— pero con dos
+ * historias distintas, y las dos MEDIDAS en Chrome antes de tocar nada:
+ *
+ *   · **VALIDACIÓN y EDICIÓN eran la misma pantalla.** Literalmente la misma
+ *     `<section>`: el marcado decía `data-pantalla="validacion edicion informe"`
+ *     en el bloque de vértices. Lo único que las separaba era que en una el
+ *     arrastre estaba apagado y había un pie con tres CTA, y en la otra el
+ *     arrastre estaba encendido y los CTA no existían. Y sus dos compuertas de
+ *     acceso pedían EXACTAMENTE lo mismo (`ramas: RAMAS`,
+ *     `requiere: ['geometria']`), así que fusionarlas no cambia quién puede
+ *     entrar: el `REGLA` de abajo lo demuestra por ausencia.
+ *     ⚠️ Desde que los avisos se mudaron a su diálogo (2026-08-07), «Validación»
+ *     además ya no enseñaba ninguna validación: el nombre apuntaba a una
+ *     superficie que se había ido a otro sitio.
+ *
+ *   · **INFORME no estaba vacío —eso se midió mal la primera vez— pero tampoco
+ *     necesitaba ser un paso.** Pulsarlo abría el formulario del informe a
+ *     pantalla completa (820 px medidos). Eso lo arregló la rebanada 5 del
+ *     rework el 2026-08-05, y arreglaba un defecto real: hasta ese día el
+ *     peldaño no participaba en producir el informe. Lo que la rebanada 5 no
+ *     miró es que había una segunda salida al mismo defecto —**quitar el
+ *     peldaño**— que no obliga al rail a tener un estado para cada `<dialog>`
+ *     de la aplicación. El informe se sigue presentando a pantalla completa;
+ *     lo que deja de existir es el peldaño (ver `app/main.js`).
+ *
+ * ⛔ **NO se dejan alias.** Sería tentador conservar `PASO.VALIDACION` apuntando
+ * a `'edicion'` para no tocar a los llamantes. Eso es exactamente la segunda
+ * fuente de verdad que este fichero lleva doce fases evitando: quien siga
+ * escribiendo `PASO.VALIDACION` tiene que romperse ahora, no dentro de un año.
+ * Las URL de fuera SÍ se respetan, y para eso está {@link RUTA_RETIRADA}.
  *
  * @readonly
  */
 export const PASO = Object.freeze({
   ENTRADA: 'entrada',
-  VALIDACION: 'validacion',
   EDICION: 'edicion',
   DIAGNOSTICO: 'diagnostico',
-  INFORME: 'informe',
 })
 
 /**
@@ -150,13 +181,30 @@ export const PASO = Object.freeze({
  * @readonly
  * @type {readonly string[]}
  */
-export const PASOS = Object.freeze([
-  PASO.ENTRADA,
-  PASO.VALIDACION,
-  PASO.EDICION,
-  PASO.DIAGNOSTICO,
-  PASO.INFORME,
-])
+export const PASOS = Object.freeze([PASO.ENTRADA, PASO.EDICION, PASO.DIAGNOSTICO])
+
+/**
+ * Los pasos que EXISTIERON y a dónde va hoy quien llega con su URL.
+ *
+ * Un marcador guardado, un enlace pegado en un correo o el botón «atrás» del
+ * navegador pueden traer todavía `#/parcela/validacion` o `#/parcela/informe`.
+ * Sin esta tabla, {@link leerRuta} los declararía «no es una ruta nuestra» y el
+ * usuario aterrizaría donde le tocara sin enterarse de por qué.
+ *
+ * A dónde va cada uno no es arbitrario: **al peldaño que se quedó su contenido**.
+ * Validación se fusionó con Edición, e Informe se abre desde Diagnóstico.
+ *
+ * ⚠️ Esta tabla CRECE, no se limpia. El día que se retire otro paso se añade
+ * aquí; borrar una entrada es romper enlaces que llevan años funcionando, y no
+ * cuesta nada mantenerlas.
+ *
+ * @readonly
+ * @type {Readonly<Record<string, string>>}
+ */
+export const RUTA_RETIRADA = Object.freeze({
+  validacion: PASO.EDICION,
+  informe: PASO.DIAGNOSTICO,
+})
 
 /**
  * Lo que se lee en cada paso del rail. Vive aquí y no en el aplicador porque el
@@ -167,10 +215,8 @@ export const PASOS = Object.freeze([
  */
 export const ROTULO_PASO = Object.freeze({
   [PASO.ENTRADA]: 'Entrada',
-  [PASO.VALIDACION]: 'Validación',
   [PASO.EDICION]: 'Edición',
   [PASO.DIAGNOSTICO]: 'Diagnóstico',
-  [PASO.INFORME]: 'Informe',
 })
 
 /**
@@ -190,7 +236,7 @@ export const CAUSA = Object.freeze({ RAMA: 'RAMA', DATO: 'DATO' })
 // ── Los hechos: lo único que entra de fuera ─────────────────────────────────
 
 /**
- * Las tres cosas que este módulo necesita saber del expediente, y **las únicas**.
+ * Las dos cosas que este módulo necesita saber del expediente, y **las únicas**.
  * Son booleanos ya resueltos por quien sí conoce el modelo; aquí no se abre ni un
  * POJO. Quién los calcula, para que no haya que adivinarlo:
  *
@@ -203,13 +249,25 @@ export const CAUSA = Object.freeze({ RAMA: 'RAMA', DATO: 'DATO' })
  * · `oficial`     — ¿hay contorno del Catastro contra el que contrastar?
  *                   Es la primera mitad de `puedeDiagnosticar`
  *                   (`app/cableado-diagnostico.js:346`).
- * · `diagnostico` — ¿se ha llegado a hacer un diagnóstico de encaje? Es lo que
- *                   el informe firma; sin él, el informe no tiene qué decir.
+ *
+ * ── ⛔ ERAN TRES, Y EL TERCERO SE VA CON EL PELDAÑO QUE LO LEÍA (2026-08-08) ──
+ * Había un `diagnostico` — «¿se ha llegado a hacer un diagnóstico de encaje?»— y
+ * su ÚNICO consumidor era `REGLA[PASO.INFORME]` en la rama PARCELA. Retirado ese
+ * peldaño, el hecho se quedaba **de solo escritura**: `app/main.js` lo calculaba
+ * en cada refresco, `MOTIVO_DATO` tenía una frase para él que ya no podía
+ * enseñarse en ninguna pantalla, y `alDiagnostico(refrescarHechos)` —el canal que
+ * T9 construyó para sustituir un `setTimeout(…, 500)`— existía solo para
+ * encenderlo a tiempo.
+ *
+ * Un dato que se calcula y nadie lee no es inocuo aquí: es lo que hace que dentro
+ * de un año alguien lo use creyendo que gobierna algo. Se retira entero, y
+ * `fundirHechos` lanza nombrando la clave si alguien vuelve a pasarlo — que es la
+ * forma de que esta retirada no se pueda deshacer a medias en silencio.
  *
  * @readonly
  * @type {readonly string[]}
  */
-export const CLAVES_HECHOS = Object.freeze(['geometria', 'oficial', 'diagnostico'])
+export const CLAVES_HECHOS = Object.freeze(['geometria', 'oficial'])
 
 /**
  * Cómo arranca una rama: sin nada. Se congela y se COPIA en cada uso; devolver
@@ -217,7 +275,7 @@ export const CLAVES_HECHOS = Object.freeze(['geometria', 'oficial', 'diagnostico
  *
  * @readonly
  */
-export const HECHOS_VACIOS = Object.freeze({ geometria: false, oficial: false, diagnostico: false })
+export const HECHOS_VACIOS = Object.freeze({ geometria: false, oficial: false })
 
 // ── Los motivos, que son el producto de este módulo tanto como el estado ────
 //
@@ -326,7 +384,9 @@ export const MOTIVO_DATO = Object.freeze({
   // trampa. El enunciado es corto porque este motivo vive en el chip del rail; ver
   // el tope en {@link INSTRUCCION_PARCELARIO}.
   oficial: `Sin parcelario oficial. ${INSTRUCCION_PARCELARIO}`,
-  diagnostico: 'Haz antes el diagnóstico de encaje: el informe firma su resultado.',
+  // ⛔ Aquí había un `diagnostico: 'Haz antes el diagnóstico de encaje: el informe
+  // firma su resultado.'` y se retiró el 2026-08-08 con el peldaño «Informe», que
+  // era la única pantalla capaz de enseñarlo. Ver {@link CLAVES_HECHOS}.
 })
 
 /**
@@ -416,11 +476,21 @@ export const TOPE_RECONCILIACION = 8
  * problema. La maqueta de julio rotulaba «Necesita el recinto validado»; esa
  * frase no llegó al código a propósito.
  *
+ * ── ⭐ LA PRUEBA DE QUE LA FUSIÓN DEL 2026-08-08 NO CAMBIA QUIÉN ENTRA ───────
+ * Aquí había una línea más, y decía **exactamente esto**:
+ *
+ *     [PASO.VALIDACION]: { ramas: RAMAS, requiere: Object.freeze(['geometria']) },
+ *
+ * O sea: la misma `ramas` y el mismo `requiere` que `EDICION` de aquí abajo,
+ * carácter por carácter. Dos peldaños con la misma compuerta y la misma
+ * `<section>` de panel no eran dos estados de la aplicación, eran uno escrito
+ * dos veces. Que la fusión salga gratis en materia de acceso no es una promesa
+ * de esta nota: se ve en que esta tabla es la misma quitando esa línea.
+ *
  * @readonly
  */
 const REGLA = Object.freeze({
   [PASO.ENTRADA]: { ramas: RAMAS, requiere: Object.freeze([]) },
-  [PASO.VALIDACION]: { ramas: RAMAS, requiere: Object.freeze(['geometria']) },
   // ⛔ **F12 · T4.2 · EDICIÓN PASA A EXISTIR TAMBIÉN EN LA RAMA EDIFICIO.**
   //
   // Hasta el 2026-08-06 este paso era `[RAMA.PARCELA]` y su motivo decía «esta
@@ -453,21 +523,23 @@ const REGLA = Object.freeze({
   //     precisamente aquel en el que NO hay huella oficial. Exigirla dejaría la
   //     pantalla honesta escrita, probada y sin forma de llegar a ella, que es
   //     literalmente lo que le pasó a `MOTIVO_SIN_EDIFICIO` en F13.
-  //   · INFORME en PARCELA exige el diagnóstico porque es lo que firma. En EDIFICIO
-  //     **no**: la ficha §17 dice «*si no [hubo contraste], informe solo
+  //   · INFORME en PARCELA exigía el diagnóstico porque es lo que firma. En
+  //     EDIFICIO **no**: la ficha §17 dice «*si no [hubo contraste], informe solo
   //     declarativo, sin sección de contraste*», así que el informe de construcción
   //     se sostiene con la construcción y nada más.
+  //
+  // ⭐ **Y ESE SEGUNDO PUNTO YA NO DESCRIBE NINGUNA LÍNEA DE ESTA TABLA**
+  // (2026-08-08): retirado el peldaño «Informe», su regla se va con él. La
+  // condición NO desaparece, cambia de naturaleza: **pasa de compuerta de rail a
+  // hecho de la estructura**. «Preparar informe (PDF)» vive DENTRO del cajón de
+  // diagnóstico, y ese cajón no existe hasta que se ha diagnosticado, así que no
+  // hay forma de pedir un informe sin diagnóstico ni habiéndolo querido. Una
+  // guarda que el marcado ya impone no hace falta declararla otra vez aquí: eso
+  // son dos sitios que pueden divergir.
   [PASO.DIAGNOSTICO]: {
     ramas: RAMAS,
     requiere: Object.freeze({
       [RAMA.PARCELA]: Object.freeze(['geometria', 'oficial']),
-      [RAMA.EDIFICIO]: Object.freeze(['geometria']),
-    }),
-  },
-  [PASO.INFORME]: {
-    ramas: RAMAS,
-    requiere: Object.freeze({
-      [RAMA.PARCELA]: Object.freeze(['diagnostico']),
       [RAMA.EDIFICIO]: Object.freeze(['geometria']),
     }),
   },
@@ -531,9 +603,14 @@ export function evaluarPaso(paso, { rama, hechos }) {
 // ── La URL (decisión D3) ────────────────────────────────────────────────────
 
 /**
- * El estado, escrito como hash. `{rama: 'PARCELA', paso: 'validacion'}` →
- * `#/parcela/validacion`. Los dos ejes caben enteros, que es lo que hace que
+ * El estado, escrito como hash. `{rama: 'PARCELA', paso: 'edicion'}` →
+ * `#/parcela/edicion`. Los dos ejes caben enteros, que es lo que hace que
  * atrás/adelante y un enlace pegado se comporten igual.
+ *
+ * ⚠️ **Este traductor NO conoce {@link RUTA_RETIRADA}, y es correcto**: escribe
+ * la URL de un estado que existe HOY, y los estados retirados ya no son un
+ * estado. La traducción va en el otro sentido, en {@link leerRuta}, que es donde
+ * llega lo que un usuario pudo guardar hace meses.
  *
  * @param {{rama: string, paso: string}} estado
  * @returns {string}
@@ -563,8 +640,13 @@ export function leerRuta(hash) {
   const trozos = limpio.split('/')
   if (trozos.length !== 2) return null
   const rama = trozos[0].toUpperCase()
-  const paso = trozos[1].toLowerCase()
+  const pedido = trozos[1].toLowerCase()
   if (!RAMAS.includes(rama)) return null
+  // Un paso RETIRADO no es un hash ajeno: es una URL nuestra de antes. Se
+  // traduce al peldaño que se quedó su contenido en vez de devolver `null`, que
+  // habría mandado al usuario a la pantalla por omisión sin decirle nada. Ver
+  // {@link RUTA_RETIRADA}.
+  const paso = RUTA_RETIRADA[pedido] ?? pedido
   if (!PASOS.includes(paso)) return null
   return { rama, paso }
 }
@@ -615,7 +697,7 @@ function exigirPaso(paso, quien) {
  * @param {object} parciales
  * @param {object} base
  * @param {string} quien
- * @returns {{geometria: boolean, oficial: boolean, diagnostico: boolean}}
+ * @returns {{geometria: boolean, oficial: boolean}}
  */
 function fundirHechos(parciales, base, quien) {
   if (parciales === null || typeof parciales !== 'object' || Array.isArray(parciales)) {
@@ -645,7 +727,7 @@ function fundirHechos(parciales, base, quien) {
  * @typedef {Object} Situacion
  * @property {'PARCELA'|'EDIFICIO'} rama
  * @property {string} paso
- * @property {{geometria: boolean, oficial: boolean, diagnostico: boolean}} hechos
+ * @property {{geometria: boolean, oficial: boolean}} hechos
  *   Los hechos **de la rama activa**. Los de la otra siguen guardados: ver
  *   {@link Navegacion#hechosDe}.
  */
@@ -906,7 +988,7 @@ export function crearNavegacion({
      * fichero.
      *
      * @param {string} rama
-     * @returns {{geometria: boolean, oficial: boolean, diagnostico: boolean}}
+     * @returns {{geometria: boolean, oficial: boolean}}
      */
     hechosDe(rama) {
       exigirRama(rama, 'hechosDe')

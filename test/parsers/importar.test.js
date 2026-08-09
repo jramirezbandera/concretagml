@@ -572,20 +572,33 @@ describe('parsers/importar — ⛔ el defecto: superficies NEGATIVAS en silencio
     })
   })
 
-  it('⛔ elegir capa NO basta: «PARCELA» son 3 anillos disjuntos y dan −29,06 m²', () => {
-    // Por esto hacen falta los DOS guardas. La capa literalmente llamada
-    // «PARCELA» no contiene la parcela: contiene tres lindes sueltos, y el
-    // reparto «uno exterior + N huecos» sigue sin sostenerse dentro de una capa.
+  it('⛔ elegir capa NO basta: «PARCELA» son 3 anillos disjuntos, y F22 los NOMBRA así', () => {
+    // Por esto hacen falta los guardas. La capa literalmente llamada «PARCELA» no
+    // contiene la parcela: contiene tres lindes sueltos, y el reparto «uno
+    // exterior + N huecos» sigue sin sostenerse dentro de una capa.
+    //
+    // ⭐ **El título de este test decía «disjuntos» desde F11 y el código no sabía
+    // decirlo**: solo sabía que la resta daba −29,06 m². Desde F22 la causa tiene
+    // nombre —`VARIOS_RECINTOS_DISJUNTOS`— y la salida deja de ser un callejón:
+    // hay tres recintos y se puede preguntar cuál es la parcela.
     const { parcela, resumen, detecciones } = importar(DXF_REAL, { capa: 'PARCELA' })
     expect(parcela).toBeNull()
-    expect(resumen.bloqueos).toEqual([BLOQUEOS.SUPERFICIE_NO_POSITIVA])
+    expect(resumen.bloqueos).toEqual([BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS])
     expect(resumen.bloqueos).not.toContain(BLOQUEOS.ANILLOS_EN_VARIAS_CAPAS) // ya es una sola
+    // ⚠️ Y `SUPERFICIE_NO_POSITIVA` NO acompaña: los −29,06 m² eran el resultado de
+    // leer tres fincas como un contorno con huecos, no un hecho sobre el fichero.
+    // Enseñar las dos cosas es la contradicción que F11 pagó con el guion 13.
+    expect(resumen.bloqueos).not.toContain(BLOQUEOS.SUPERFICIE_NO_POSITIVA)
+
     const aviso = porTipo(detecciones, TIPO_DETECCION.SEPARADOR_POLIGONO).find(
-      (d) => d.datos && typeof d.datos.superficie === 'number',
+      (d) => d.datos && d.datos.bloqueo === BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS,
     )
     expect(aviso.severidad).toBe(SEVERIDAD.AVISO)
-    expect(aviso.datos.superficie).toBeCloseTo(-29.06, 1)
-    expect(aviso.mensaje).toContain('-29.06 m²') // la cifra, no un adjetivo
+    expect(aviso.datos.nRecintos).toBe(3)
+    // La cifra de cada recinto, no un adjetivo: es lo que hace falta para poder
+    // rotularlos cuando se pregunte cuál es la parcela, y se mide UNA vez.
+    expect(aviso.datos.recintos.map((r) => Math.round(r.superficie))).toEqual([108, 66, 71])
+    expect(aviso.mensaje).toContain('3 recintos SEPARADOS')
   })
 
   it('el DXF de dos capas que escribe export/dxf.js ya NO da −100,00 m²', () => {
@@ -688,18 +701,20 @@ describe('parsers/importar — opts.capa: la oferta que resuelve el reparto', ()
 })
 
 describe('parsers/importar — el catálogo BLOQUEOS', () => {
-  it('clave === valor, congelado, y son los cinco', () => {
+  it('clave === valor, congelado, y son los SEIS', () => {
     expect(BLOQUEOS).toEqual({
       SIN_GEOMETRIA: 'SIN_GEOMETRIA',
       COORDENADAS_EN_GRADOS: 'COORDENADAS_EN_GRADOS',
       HUSO_NO_RESUELTO: 'HUSO_NO_RESUELTO',
       ANILLOS_EN_VARIAS_CAPAS: 'ANILLOS_EN_VARIAS_CAPAS',
       SUPERFICIE_NO_POSITIVA: 'SUPERFICIE_NO_POSITIVA',
+      // F22 · Los anillos son N fincas separadas, no un contorno con huecos.
+      VARIOS_RECINTOS_DISJUNTOS: 'VARIOS_RECINTOS_DISJUNTOS',
     })
     expect(Object.isFrozen(BLOQUEOS)).toBe(true)
   })
 
-  it('los cinco se emiten LITERALES en el fichero (el catálogo no puede desincronizarse)', () => {
+  it('los seis se emiten LITERALES en el fichero (el catálogo no puede desincronizarse)', () => {
     // Mitad estática del pacto: `parsers/importar.js` escribe los códigos a mano
     // en sus `bloqueos.push(...)` porque hay guardas de OTRAS capas que buscan
     // exactamente ese texto (`test/edificio/comun.test.js`). Este test ata las
@@ -713,14 +728,19 @@ describe('parsers/importar — el catálogo BLOQUEOS', () => {
     }
   })
 
-  it('BLOQUEOS_SOLO_PARCELA son los DOS de F11, y ninguno de los tres heredados', () => {
-    // La rama EDIFICIO arrastra los bloqueos sin traducir: estos dos hablan del
+  it('BLOQUEOS_SOLO_PARCELA son los dos de F11 y el de F22, y ninguno de los tres heredados', () => {
+    // La rama EDIFICIO arrastra los bloqueos sin traducir: estos tres hablan del
     // reparto exterior/huecos, que allí no aplica, y hay que filtrarlos. Un DXF de
     // edificio SIEMPRE trae varias capas, así que sin el filtro quedaría bloqueado
     // justo en su caso normal.
+    //
+    // ⚠️ Y el de F22 es el que MÁS falta hace que se filtre: las huellas de un
+    // edificio son disjuntas POR DEFINICIÓN, así que sin él la rama EDIFICIO se
+    // bloquearía en el 100 % de sus ficheros y no solo en los de varias capas.
     expect(BLOQUEOS_SOLO_PARCELA).toEqual([
       BLOQUEOS.ANILLOS_EN_VARIAS_CAPAS,
       BLOQUEOS.SUPERFICIE_NO_POSITIVA,
+      BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS,
     ])
     expect(BLOQUEOS_SOLO_PARCELA).not.toContain(BLOQUEOS.SIN_GEOMETRIA)
     expect(BLOQUEOS_SOLO_PARCELA).not.toContain(BLOQUEOS.COORDENADAS_EN_GRADOS)
@@ -806,5 +826,157 @@ describe('parsers/importar — el catálogo BLOQUEOS', () => {
   it('`sinDeteccionesDeParcela` con una lista sin marcas la devuelve entera', () => {
     const { detecciones } = importar(LIST_REAL)
     expect(sinDeteccionesDeParcela(detecciones)).toHaveLength(detecciones.length)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// F22 · EL DXF DE «CONSULTA MASIVA»: UNA MANZANA ENTERA
+// ═══════════════════════════════════════════════════════════════════════════
+
+const DXF_MANZANA = leer('../fixtures/parsers/manzana_consulta_masiva_6346726UF8664N.dxf')
+
+describe('parsers/importar — F22 · N fincas separadas, no un contorno con huecos', () => {
+  it('⛔ el defecto de partida: la capa «Parcela» son OCHO fincas y no entraba ninguna', () => {
+    const { parcela, resumen, detecciones } = importar(DXF_MANZANA, { capa: 'Parcela' })
+    expect(parcela).toBeNull()
+    expect(resumen.nAnillos).toBe(8)
+
+    // La causa se NOMBRA, y ya no se acusa al fichero de un defecto que no tiene.
+    expect(resumen.bloqueos).toEqual([BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS])
+    expect(resumen.bloqueos).not.toContain(BLOQUEOS.SUPERFICIE_NO_POSITIVA)
+
+    const aviso = porTipo(detecciones, TIPO_DETECCION.SEPARADOR_POLIGONO).find(
+      (d) => d.datos && d.datos.bloqueo === BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS,
+    )
+    expect(aviso.severidad).toBe(SEVERIDAD.AVISO)
+    expect(aviso.datos.nRecintos).toBe(8)
+    expect(aviso.datos.saltados).toEqual([])
+    // Las ocho superficies medidas UNA vez, para poder rotularlas al preguntar
+    // cuál es la parcela sin volver a medir (y sin arriesgarse a enseñar un
+    // número distinto del que se guarda).
+    expect(aviso.datos.recintos.map((r) => Math.round(r.superficie))).toEqual([
+      548, 444, 656, 1099, 863, 5165, 646, 542,
+    ])
+    // Y todas dicen de qué capa vienen: es lo que hace falta para nombrarlas.
+    expect(new Set(aviso.datos.recintos.map((r) => r.capa))).toEqual(new Set(['Parcela']))
+  })
+
+  it('⛔⛔ el caso que era SILENCIOSO: con el anillo mayor primero se construía una finca falsa', () => {
+    // El fichero real bloqueaba por CASUALIDAD: su finca más pequeña viene la
+    // primera, así que la resta salía negativa. Reordenados los MISMOS ocho
+    // anillos con el mayor delante, `superficie` da +368,22 m² y hasta F22 esto
+    // devolvía `bloqueos: []`, `construida: true` — una parcela que no existe,
+    // con siete «huecos» que son las parcelas de los vecinos, lista para firmarse.
+    //
+    // Es el guardián de la regresión más cara de esta fase, y por eso reordena de
+    // verdad en vez de dar por bueno el orden del fichero.
+    const { anillos } = importar(DXF_MANZANA, { capa: 'Parcela' })
+    const porArea = [...anillos].sort(
+      (a, b) =>
+        superficie([{ vertices: b, tipo: TIPO_RECINTO.EXTERIOR }]) -
+        superficie([{ vertices: a, tipo: TIPO_RECINTO.EXTERIOR }]),
+    )
+    const comoTxt = porArea.map((a) => a.map(([x, y]) => `${x} ${y}`).join('\n')).join('\nseparador\n')
+
+    // La lectura vieja daba un número POSITIVO y plausible: de ahí el silencio.
+    const recintosViejos = porArea.map((v, i) => ({
+      vertices: v,
+      tipo: i === 0 ? TIPO_RECINTO.EXTERIOR : TIPO_RECINTO.HUECO,
+    }))
+    expect(superficie(recintosViejos)).toBeCloseTo(368.22, 1)
+
+    const { parcela, resumen } = importar(comoTxt, { formato: 'TXT' })
+    expect(resumen.bloqueos).toContain(BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS)
+    expect(parcela).toBeNull()
+  })
+
+  it('el bloqueo es SOLO DE PARCELA: la rama EDIFICIO no lo ve, ni a él ni a su detección', () => {
+    // Las huellas de un edificio son disjuntas por definición: sin este filtro,
+    // esa rama quedaría bloqueada en TODOS sus ficheros.
+    const { detecciones } = importar(DXF_MANZANA, { capa: 'Parcela' })
+    expect(BLOQUEOS_SOLO_PARCELA).toContain(BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS)
+    expect(
+      sinDeteccionesDeParcela(detecciones).some(
+        (d) => d?.datos?.bloqueo === BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS,
+      ),
+    ).toBe(false)
+  })
+
+  it('⭐ una parcela CON sus construcciones dentro NO es «N fincas»: eso es contención', () => {
+    // El otro DXF de Consulta Masiva del repo trae UNA parcela y 7 huellas dentro.
+    // Sin elegir capa son 8 anillos, igual que la manzana — y la respuesta tiene
+    // que ser la contraria, porque están anidados y no separados. Es la prueba de
+    // que el detector distingue las dos cosas y no cuenta anillos.
+    const { resumen } = importar(DXF_EDIFICIO)
+    expect(resumen.nAnillos).toBe(8)
+    expect(resumen.bloqueos).not.toContain(BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS)
+    expect(resumen.bloqueos).toContain(BLOQUEOS.SUPERFICIE_NO_POSITIVA)
+  })
+
+  it('y con su capa `Parcela` (un solo anillo) entra sin un solo bloqueo', () => {
+    const { parcela, resumen } = importar(DXF_EDIFICIO, { capa: 'Parcela' })
+    expect(resumen.bloqueos).toEqual([])
+    expect(parcela).not.toBeNull()
+  })
+})
+
+describe('parsers/importar — F22 · los rótulos que el fichero trae dentro', () => {
+  it('⭐ el fichero NOMBRA sus ocho fincas, y la capa se elige MIDIENDO', () => {
+    // ⛔ No se elige por el nombre de la capa, y no es purismo: F11 midió que en
+    // `UTM.dxf` la parcela buena está en la capa «0» y NO en la llamada «PARCELA».
+    // Aquí compiten `txtConstru` (153 rótulos de planta) y `RefCatastral` (8
+    // referencias), y gana la que empareja 1:1 con los recintos.
+    const { resumen } = importar(DXF_MANZANA, { capa: 'Parcela' })
+    expect(resumen.rotulos.capa).toBe('RefCatastral')
+    expect(resumen.rotulos.nombres).toEqual([
+      '6346726UF8664N',
+      '6346725UF8664N',
+      '6346714UF8664N',
+      '6346713UF8664N',
+      '6145925UF8664N',
+      '6346306UF8664N',
+      '6247108UF8664N',
+      '6145924UF8664N',
+    ])
+  })
+
+  it('y los nombres viajan en la detección, junto a la superficie de cada recinto', () => {
+    // Es lo que el cajón de la fase 3 va a pintar. Que vaya en la MISMA detección
+    // que las superficies es lo que impide medir dos veces y enseñar dos cifras.
+    const { detecciones } = importar(DXF_MANZANA, { capa: 'Parcela' })
+    const aviso = detecciones.find(
+      (d) => d?.datos?.bloqueo === BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS,
+    )
+    expect(aviso.datos.rotulos).toEqual({ capa: 'RefCatastral' })
+    expect(aviso.datos.recintos[0]).toMatchObject({ indice: 0, nombre: '6346726UF8664N' })
+    expect(aviso.datos.recintos.map((r) => r.nombre).filter(Boolean)).toHaveLength(8)
+    // Y el mensaje los dice, para que el aviso valga por sí solo.
+    expect(aviso.mensaje).toContain('«RefCatastral»')
+    expect(aviso.mensaje).toContain('6346726UF8664N')
+  })
+
+  it('⛔ la capa que NO empareja se rechaza, aunque se pida a mano', () => {
+    // `txtConstru` mete varias plantas dentro de cada finca ⇒ 7 recintos ambiguos.
+    // Pedirla no la hace válida: se prefiere no nombrar nada a nombrar mal.
+    const { resumen } = importar(DXF_MANZANA, { capa: 'Parcela', capaRotulos: 'txtConstru' })
+    expect(resumen.rotulos).toBeNull()
+  })
+
+  it('LIST y TXT no tienen rótulos, y no se les inventan', () => {
+    expect(importar(LIST_REAL).resumen.rotulos).toBeNull()
+    expect(importar(PARCELA_REAL).resumen.rotulos).toBeNull()
+  })
+
+  it('⭐ y en el DXF de edificio los rótulos son las PLANTAS que F12 hace teclear', () => {
+    // No lo usa nadie todavía (la decisión 4 de F22 deja las construcciones
+    // fuera), pero el dato deja de tirarse y la deuda de F11 tiene suministro.
+    const { resumen } = importar(DXF_EDIFICIO, { capa: 'Construccion' })
+    expect(resumen.rotulos.capa).toBe('txtConstru')
+    expect(resumen.rotulos.nombres).toEqual(['II', 'III', 'III', 'II', 'I', 'P', 'I'])
+    // Y con la capa de parcela, su referencia catastral.
+    expect(importar(DXF_EDIFICIO, { capa: 'Parcela' }).resumen.rotulos).toEqual({
+      capa: 'RefCatastral',
+      nombres: ['3515508VF0831N'],
+    })
   })
 })

@@ -931,7 +931,19 @@ if (dialogoEl !== null && dialogoEl.open) {
   // `.focus()` sobre un control del panel **no se lleva el foco**. `dialogo-informe.js`
   // declara expresamente que NO reimplementa el atrape («en el navegador lo da la
   // capa superior gratis»), o sea que esto mide justo lo que aquel módulo delegó.
-  const controlDeDetras = $('[data-campo="refcat"]') || $('[data-accion="generar-gml"]')
+  // ⛔ **EL CONTROL SONDEADO TIENE QUE ESTAR VISIBLE, Y EL DE ANTES NO LO
+  // ESTABA.** Aquí ponía `[data-campo="refcat"] || [data-accion="generar-gml"]`:
+  // el primero vive en la sección de Entrada y el segundo en la de Edición, y con
+  // el informe abierto se está en Diagnóstico, donde `app/pantalla.js` los tiene
+  // OCULTOS. Un elemento oculto no acepta el foco **por estar oculto**, así que
+  // esta medida daba «fondo inerte» pasara lo que pasara — y con el veredicto en
+  // el sentido de F09 eso salía verde y confirmaba un modal que no existía.
+  //
+  // El botón del rail es el sondeo correcto por dos razones: se ve en las tres
+  // pantallas, y es EXACTAMENTE lo que la rebanada 5 quería que siguiera
+  // alcanzable cuando eligió `show()` en vez de `showModal()`.
+  const controlDeDetras =
+    $('.gml-rail-pasos button:not([disabled])') || $('[data-conmutador="rama"] button')
   if (controlDeDetras !== null) {
     const focoPrevio = document.activeElement
     controlDeDetras.focus()
@@ -945,27 +957,50 @@ if (dialogoEl !== null && dialogoEl.open) {
     }
   }
 
-  if (modal.enLaCapaSuperior === false) {
+  // ── ⛔ ESTE VEREDICTO ESTUVO AL REVÉS DESDE EL 2026-08-05, Y NADIE VOLVIÓ ──
+  //
+  // Se escribió en F09, cuando el informe era un MODAL: exigía capa superior,
+  // foco dentro y fondo inerte, y las tres cosas las daba `showModal()`.
+  //
+  // La rebanada 5 del rework convirtió el informe en una PANTALLA COMPLETA y lo
+  // hizo a propósito con `show()` y no con `showModal()` —un modal deja inerte el
+  // rail, o sea la navegación, y convertiría el informe en una ratonera de la que
+  // solo se sale por Escape—. Este guion no se actualizó, así que llevaba desde
+  // entonces acusando a la aplicación de hacer justo lo que se le pidió que
+  // hiciera. Es el mismo modo de fallo que el `03-arrastre.js` sin guarda de paso.
+  //
+  // ⭐ 2026-08-08 · Hoy la presentación es INCONDICIONAL —el informe ya no depende
+  // de ningún peldaño— así que el veredicto se puede escribir sin ambigüedad y en
+  // el sentido bueno: **NO puede ser modal**, y lo de detrás **tiene que seguir
+  // alcanzable**. La afirmación es más fuerte que la anterior, no más débil.
+  if (modal.enLaCapaSuperior === true) {
     problemas.push(
-      'El diálogo está abierto pero NO en la capa superior (`:modal` no casa): se ha abierto con el ' +
-        'atributo `open` de respaldo en vez de con `showModal()`. Esa vía existe para poder probar el ' +
-        'módulo en jsdom, no para producción: sin capa superior no hay velo, ni atrape de foco, ni ' +
-        'nada que impida seguir editando la parcela por debajo del formulario que la describe.',
+      'El informe está en la CAPA SUPERIOR (`:modal` casa): se ha abierto con `showModal()`. Se ' +
+        'presenta a pantalla completa a propósito y con `show()`, porque un modal deja inerte todo ' +
+        'lo de detrás — y detrás está el RAIL. Con `showModal()` el informe se convierte en una ' +
+        'ratonera de la que solo se sale por Escape.',
+    )
+  }
+  if (modal.ariaModal !== 'false') {
+    problemas.push(
+      `El informe declara \`aria-modal="${modal.ariaModal}"\` y no lo es: lo de detrás sigue en ` +
+        'juego. Un lector de pantalla que se crea ese atributo deja de anunciar el rail, que es la ' +
+        'única salida.',
     )
   }
   if (!modal.focoDentroAlAbrir) {
     problemas.push(
-      `Al abrir el diálogo el foco se ha quedado fuera (${JSON.stringify(modal.elementoEnfocado)}): ` +
-        'sin foco dentro, `Escape` no llega y quien navegue con teclado sigue tabulando por la ' +
-        'aplicación de detrás como si el modal no existiera.',
+      `Al abrir el informe el foco se ha quedado fuera (${JSON.stringify(modal.elementoEnfocado)}): ` +
+        'quien navegue con teclado tiene que tabular a ciegas por la aplicación de detrás hasta ' +
+        'llegar al formulario que se le acaba de abrir.',
     )
   }
-  if (modal.fondoInerte === false) {
+  if (modal.fondoInerte === true) {
     problemas.push(
-      `Con el diálogo abierto, un \`.focus()\` sobre «${modal.controlDeDetrasProbado}» del panel SÍ ` +
-        'se lleva el foco: el fondo no está inerte. Con `showModal()` la capa superior lo da gratis, ' +
-        'y `app/dialogo-informe.js` declaró a propósito que no reimplementa el atrape porque contaba ' +
-        'con ella.',
+      `Con el informe abierto, un \`.focus()\` sobre «${modal.controlDeDetrasProbado}» del panel NO ` +
+        'se lleva el foco: el fondo está INERTE. Eso es lo que hace `showModal()`, y es justo lo ' +
+        'que la rebanada 5 evitó: con el fondo inerte el rail no se puede pulsar y el informe pasa ' +
+        'a ser una pantalla sin salida.',
     )
   }
 }

@@ -326,9 +326,9 @@ if (tarjetasAlArrancar > 0) {
 
 // El recorrido de F17 vive en VALIDACIÓN. Se llega por la ruta, no pulsando el
 // rail: lo que se mide aquí es el sobrante, no la navegación (eso es del 14).
-location.hash = '#/parcela/validacion'
-await esperarA(() => paso() === 'validacion', 3000)
-if (paso() !== 'validacion') {
+location.hash = '#/parcela/edicion'
+await esperarA(() => paso() === 'edicion', 3000)
+if (paso() !== 'edicion') {
   return {
     guion: '16-derivar-cesion',
     ok: false,

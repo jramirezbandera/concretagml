@@ -380,12 +380,18 @@ describe('entradaDesdeTexto — la elección de capa (decisión 5: ofrecer, no i
   })
 
   it('⛔ elegir capa NO basta: en UTM.dxf la capa «PARCELA» deja 3 anillos disjuntos', () => {
-    // Medido por T1.1: con `{capa:'PARCELA'}` la superficie sale NEGATIVA y la
-    // rama parcela lo bloquea. Para un EDIFICIO no hay nada que bloquear —tres
-    // anillos disjuntos son tres partes— y por eso ese código está en
-    // BLOQUEOS_SOLO_PARCELA y aquí se filtra.
+    // Medido por T1.1: con `{capa:'PARCELA'}` la rama parcela lo bloquea. Para un
+    // EDIFICIO no hay nada que bloquear —tres anillos disjuntos son tres partes— y
+    // por eso ese código está en BLOQUEOS_SOLO_PARCELA y aquí se filtra.
+    //
+    // ⭐ **Desde F22 el código dice literalmente lo que este test se llama.** Antes
+    // era `SUPERFICIE_NO_POSITIVA` —la consecuencia aritmética de leer tres fincas
+    // como un contorno con huecos—; ahora es `VARIOS_RECINTOS_DISJUNTOS`, que es la
+    // causa. Para esta rama no cambia nada, y ése es justo el punto: la frase «tres
+    // anillos disjuntos son tres partes» ya la decía el comentario y ahora la dice
+    // también el dato.
     const crudo = importar(DXF_UTM, { capa: 'PARCELA' })
-    expect(crudo.resumen.bloqueos).toContain('SUPERFICIE_NO_POSITIVA')
+    expect(crudo.resumen.bloqueos).toContain('VARIOS_RECINTOS_DISJUNTOS')
 
     const entrada = entradaDesdeTexto(DXF_UTM, { capa: 'PARCELA' })
     expect(entrada.resumen.bloqueos).toEqual([])
@@ -1154,6 +1160,11 @@ describe('contrato D — el espejo de ResumenImportacion', () => {
       // nada. Que la clave exista siempre es lo que impide que un llamante tenga
       // que preguntar antes de mirar.
       'superficie',
+      // ⭐ F22 · Los rótulos que el dibujo le pone a cada parte. Mismo criterio que
+      // `superficie`: está en las CINCO vías y vale `null` donde no hay fichero que
+      // los traiga. F22 **no los usa en esta rama** —no cambia ni un
+      // comportamiento—; lo que hace es dejar de tirarlos.
+      'rotulos',
     ]
     for (const [nombre, entrada] of CASOS()) {
       expect(Object.keys(entrada).sort(), nombre).toEqual(['detecciones', 'edificio', 'resumen'])

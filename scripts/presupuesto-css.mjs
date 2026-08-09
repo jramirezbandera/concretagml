@@ -77,15 +77,41 @@ export const MARCA_VENDOR = '.leaflet-pane,'
 export const MARCA_NUESTRA = '.gml-'
 
 /**
- * Las cinco rebanadas del rework son **las cinco pantallas del rail**, en su
- * orden. El techo del criterio 10 solo se exige cuando las cinco están
- * anotadas.
+ * Las CINCO rebanadas del rework de UI, en su orden. El techo del criterio 10
+ * solo se exige cuando las cinco están anotadas.
+ *
+ * ── ⭐ ESTO ES HISTORIA CONGELADA, NO EL RAIL DE HOY (2026-08-08) ────────────
+ * Hasta hoy esta lista y `app/navegacion.js#PASOS` eran idénticas, y una prueba
+ * lo exigía. Coincidían porque **el rework se organizó por pantallas**, no porque
+ * fueran la misma cosa: `REBANADAS` es el troceado de un proyecto de migración
+ * que terminó, y `PASOS` es el recorrido vivo de la aplicación.
+ *
+ * El día que el rail bajó a tres peldaños —«Validación» se fusionó con Edición e
+ * «Informe» dejó de ser un paso— la prueba de no-divergencia forzaba a reescribir
+ * esta lista, y eso tenía **dos consecuencias, las dos malas**:
+ *
+ *   1. **Falseaba el registro.** Las rebanadas 1 a 4 se cerraron de verdad, en su
+ *      día, con su commit y su medición. Reescribir la lista para que cuadre con
+ *      el rail de hoy convierte un registro de lo que se hizo en un reflejo de lo
+ *      que hay, que es justo lo que este fichero existe para no ser.
+ *   2. **Resolvía por accidente una deuda declarada.** La quinta rebanada
+ *      —«informe»— **está sin cerrar A PROPÓSITO** desde `3e9c8b0`: su producto
+ *      está hecho, y no se declara cerrada porque hacerlo hace exigible el techo
+ *      del criterio 10 y la hoja no llega. Con la lista recortada a tres, las
+ *      tres quedaban cerradas y el techo empezaba a morder **por un cambio de
+ *      navegación**, no porque nadie hubiera decidido nada sobre bytes. Medido
+ *      ese día: 55.018 B nuestros contra 42.064 B exigidos, 12.954 B de más.
+ *
+ * Así que las dos listas se separan y **la deuda se queda donde estaba, visible**.
+ * Lo que se pierde es el guardián de no-divergencia; lo que lo sustituye es la
+ * prueba de que cada `rebanada` de un asiento es una de éstas, que es la parte de
+ * aquel guardián que seguía teniendo sentido (cazar una errata).
  *
  * ⚠️ Esta lista está a mano A PROPÓSITO y NO importa `app/navegacion.js`: un
  * script de tooling que importa código de la app se lleva por delante media
- * aplicación (`navegacion.js` cuelga de `viewer/_comun.js`). Que no diverja lo
- * garantiza `test/scripts/presupuesto-css.test.js`, que sí importa las dos y
- * exige que sean idénticas.
+ * aplicación (`navegacion.js` cuelga de `viewer/_comun.js`). Hoy además **no
+ * podría** importarlo aunque quisiera: dos de estos cinco nombres ya no existen
+ * allí, y ésa es exactamente la razón por la que son cosas distintas.
  */
 export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'diagnostico', 'informe'])
 
@@ -351,6 +377,35 @@ export const ASIENTOS = Object.freeze(
         'de qué geometría se va a generar, y quitarlos habría sido pagar producto por píxeles. Con ' +
         'el cambio, §10 pierde ese problema, y §16, §09 y §23 quedan en `ok:true`. Sobran 12.781 ' +
         'sobre el techo.' },
+    { hito: 'Los botones de Entrada dejan de tocarse (y de robarse el clic)', commit: '(sin commitear)',
+      total: 70113, nuestro: 55018, rebanada: null,
+      nota:
+        '**+141 B por TRES declaraciones, y las tres arreglan defectos MEDIDOS, no gusto.** El ' +
+        'autor reportó que los botones de la barra de Entrada estaban «sin margen entre ellos y ' +
+        'se solapan», y al medir en Chrome a 1440×900 las dos cosas eran literales. ── (1) y (2) ' +
+        'LOS DOS APILADOS A CERO ── `.gml-via` es un bloque normal y lo único que separaba a sus ' +
+        'hijos era el `margin: 4px 0 10px` del apunte, así que todo lo que cuelga por DEBAJO del ' +
+        'apunte se apilaba a **0,00 px**: «Traer del Catastro» acababa en 284,53 y «Deducir del ' +
+        'mapa» empezaba en 284,53; «Elegir un fichero de medición…» acababa en 472,53 y «Pegar ' +
+        'coordenadas…» empezaba en 472,53. Los bordes de 1 px se fundían en una sola línea. Se ' +
+        'pagan `.gml-via-boton + .gml-via-boton { margin-top }` y `.gml-boton-par { margin-top }`, ' +
+        'los dos a `--space-2` porque 8 px es ya el `gap` de `.gml-campo-fila`, `.gml-boton-par` y ' +
+        '`.gml-bloque`: la columna respira igual que la fila. ⚠️ **Y NO se hace con ' +
+        '`display:flex` + `gap` en `.gml-via`**, que habría sido una declaración en vez de dos: ' +
+        'dentro de un flex los márgenes del rótulo y del apunte NO se colapsan y se SUMARÍAN al ' +
+        'gap — medido, 22 px de columna en vez de 16. ── (3) EL SOLAPE DE VERDAD ── ' +
+        '`.gml-boton--menudo::after` agranda el objetivo 6 px por lado, y está escrito para un ' +
+        'botón SOLO en su fila (F08, F10). En el conmutador de rama hay dos a 4 px: los objetivos ' +
+        'se solapaban 8 px y cada uno se metía 2 px dentro de la caja VISIBLE del otro. Medido con ' +
+        '`elementFromPoint`, con «Parcela» en 234 → 290,73 px: **en x = 289 y x = 290 el clic lo ' +
+        'recibía EDIFICIO**. Se apaga con `content: none` acotado al conmutador (0,2,0), y no se ' +
+        'pierde accesibilidad: el `align-items: stretch` de K.1 ya deja esos botones en 25,39 px, ' +
+        'por encima de los 24 que pide WCAG 2.5.8. ── EL PRECIO EN PÍXELES ── **+16 px de columna ' +
+        'en Entrada**, y hay que decir dónde caen: a 1280×720 la quinta vía («Abrirlo», el ' +
+        'expediente guardado) ya se veía recortada ANTES de este cambio —bottom 737,20 sobre 720, ' +
+        'guion 22 en `ok:false`— y ahora queda en 753,20. El defecto es previo y sigue abierto; ' +
+        'este asiento no lo crea, lo empeora en 16 px y lo deja anotado. Sobran 12.938 sobre el ' +
+        'techo.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 
@@ -478,7 +533,7 @@ export function informe(medido, veredicto, { techo = TECHO } = {}) {
       : `  Hoy hay holgura de  ${bytes(-veredicto.delta.nuestro)}  (${pct(medido.nuestro, techo.nuestro)} por debajo)`,
     '',
     `  Último asiento      ${veredicto.ultimo.hito} — ${bytes(veredicto.ultimo.total)}`,
-    `  Rebanadas cerradas  ${veredicto.cerradas.length}/5${
+    `  Rebanadas cerradas  ${veredicto.cerradas.length}/${veredicto.cerradas.length + veredicto.pendientes.length}${
       veredicto.pendientes.length > 0 ? ` (faltan: ${veredicto.pendientes.join(', ')})` : ''
     }`,
   ]

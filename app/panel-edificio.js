@@ -1026,9 +1026,14 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
   // `.gml-bloque--contraste` de `index.html` en la otra rama, y por el mismo
   // motivo: hasta F14 la rama EDIFICIO no llegaba a esa pantalla y no tenía nada
   // que enseñar en ella.
+  // ⭐ 2026-08-08 · `PARTES` decía `'validacion edicion informe'` y ahora dice
+  // `'edicion'`. No es que la lista de partes se enseñe en menos sitios: es que
+  // esos tres pasos eran UNO —la misma `<section>` del panel con el arrastre
+  // apagado o encendido— y el rail bajó a tres peldaños. La lista se sigue viendo
+  // exactamente donde se veía. Ver `app/navegacion.js#PASO`.
   const PANTALLA = Object.freeze({
     ORIGEN: 'entrada',
-    PARTES: 'validacion edicion informe',
+    PARTES: 'edicion',
     ACTIVA: 'edicion',
     CONTRASTE: 'diagnostico',
   })

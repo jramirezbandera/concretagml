@@ -169,11 +169,11 @@ const verticesEnTabla = () => $$(SEL.VERTICE).length
 
 /** A la pantalla donde el pie de acciones EXISTE. Ver la cabecera. */
 async function irAValidacion() {
-  const peldano = $(SEL.IR_A_PASO('validacion'))
+  const peldano = $(SEL.IR_A_PASO('edicion'))
   if (!peldano || peldano.disabled) return false
   peldano.click()
   await dormir(280)
-  return $(SEL.APP)?.dataset.paso === 'validacion'
+  return $(SEL.APP)?.dataset.paso === 'edicion'
 }
 
 /**
@@ -371,7 +371,7 @@ if (vacio.rama !== 'EDIFICIO') {
 // No es una mentira —el botón está apagado y tiene motivo— pero es un motivo al
 // que ningún usuario llega. No se acusa a F13 por ello: la puerta la cierra el eje
 // PASO del rework, que es anterior. Se anota, con su dueño, en §30.
-vacio.pasosAlcanzables = ['entrada', 'validacion', 'edicion', 'diagnostico', 'informe'].filter(
+vacio.pasosAlcanzables = ['entrada', 'edicion', 'diagnostico'].filter(
   (p) => {
     const b = $(SEL.IR_A_PASO(p))
     return b !== null && !b.disabled

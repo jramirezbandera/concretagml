@@ -33,7 +33,7 @@ import { ORIGEN_PARCELA } from '../../model/parcela.js'
 import { crearEstadoVista } from '../../viewer/_comun.js'
 
 /** Hechos con los que los cinco pasos de la rama PARCELA se sostienen. */
-const TODO = Object.freeze({ geometria: true, oficial: true, diagnostico: true })
+const TODO = Object.freeze({ geometria: true, oficial: true })
 
 /** Los tres espías que el aplicador recibe, con la cuenta de cada uno. */
 function acciones() {
@@ -65,15 +65,19 @@ describe('T9 · 1 · qué cajón permite cada paso', () => {
   it('Diagnóstico trae el suyo, Entrada el de comprobación y los demás ninguno', () => {
     expect(cajonDe(PASO.DIAGNOSTICO)).toBe(CAJON.DIAGNOSTICO)
     expect(cajonDe(PASO.ENTRADA)).toBe(CAJON.COMPROBACION)
-    expect(cajonDe(PASO.VALIDACION)).toBe(CAJON.NINGUNO)
+    expect(cajonDe(PASO.EDICION)).toBe(CAJON.NINGUNO)
     expect(cajonDe(PASO.EDICION)).toBe(CAJON.NINGUNO)
     expect(cajonDe(PASO.INFORME)).toBe(CAJON.NINGUNO)
   })
 
-  it('⭐ los CINCO pasos del modelo tienen respuesta: se recorre `PASOS`, no una lista a mano', () => {
+  it('⭐ TODOS los pasos del modelo tienen respuesta: se recorre `PASOS`, no una lista a mano', () => {
     // Un paso nuevo en `app/navegacion.js` sin decidir qué hace con la esquina
     // saldría aquí, y no en producción con un cajón que se queda como estaba.
-    expect(PASOS).toHaveLength(5)
+    // ⭐ Decía CINCO y dice TRES desde el 2026-08-08: el rail perdió «Validación»
+    // e «Informe». La cifra se afirma igualmente —y no se sustituye por
+    // `PASOS.length`— porque su trabajo es que un paso nuevo obligue a pasar por
+    // aquí a decidir qué hace con la esquina del mapa.
+    expect(PASOS).toHaveLength(3)
     for (const paso of PASOS) {
       expect(Object.values(CAJON), `el paso «${paso}» no tiene cajón decidido`).toContain(
         cajonDe(paso),
@@ -295,7 +299,7 @@ describe('T9 · 3 · el cable con la navegación', () => {
     const nav = navegacionCompleta(PASO.DIAGNOSTICO)
     const c = cablearContraste({ navegacion: nav, ...a })
 
-    nav.navegarAPaso(PASO.VALIDACION)
+    nav.navegarAPaso(PASO.EDICION)
     nav.navegarAPaso(PASO.DIAGNOSTICO)
     expect(a.abrirDiagnostico).toHaveBeenCalledTimes(2)
     c.destruir()
@@ -308,7 +312,7 @@ describe('T9 · 3 · el cable con la navegación', () => {
     a.cerrarDiagnostico.mockClear()
 
     c.destruir()
-    nav.navegarAPaso(PASO.VALIDACION)
+    nav.navegarAPaso(PASO.EDICION)
     expect(a.cerrarDiagnostico).not.toHaveBeenCalled()
     expect(() => c.destruir()).not.toThrow()
   })
@@ -396,7 +400,7 @@ describe('T9 · 4 · la procedencia, cableada', () => {
     c.destruir()
     a.declararProcedencia.mockClear()
     store.set({ origen: ORIGEN_PARCELA.DXF })
-    nav.navegarAPaso(PASO.VALIDACION)
+    nav.navegarAPaso(PASO.EDICION)
 
     expect(a.declararProcedencia).not.toHaveBeenCalled()
   })
@@ -427,7 +431,7 @@ describe('app/contraste.js · el cajón de diagnóstico es la PANTALLA (rebanada
   it('declara pantalla al entrar en Diagnóstico y cajón al salir', () => {
     const a = accionesConTextos()
     const fijar = vi.fn()
-    const nav = navegacionCompleta(PASO.VALIDACION)
+    const nav = navegacionCompleta(PASO.EDICION)
     const c = cablearContraste({
       navegacion: nav,
       ...a,
@@ -441,7 +445,7 @@ describe('app/contraste.js · el cajón de diagnóstico es la PANTALLA (rebanada
     nav.navegarAPaso(PASO.DIAGNOSTICO)
     expect(fijar).toHaveBeenLastCalledWith(true)
 
-    nav.navegarAPaso(PASO.VALIDACION)
+    nav.navegarAPaso(PASO.EDICION)
     expect(fijar).toHaveBeenLastCalledWith(false)
     c.destruir()
   })
@@ -451,7 +455,7 @@ describe('app/contraste.js · el cajón de diagnóstico es la PANTALLA (rebanada
     // descartable exactamente durante el gesto que lo abrió —el clic del rail, que
     // sigue burbujeando hacia el `document`— y se cerraría solo.
     const orden = []
-    const nav = navegacionCompleta(PASO.VALIDACION)
+    const nav = navegacionCompleta(PASO.EDICION)
     const c = cablearContraste({
       navegacion: nav,
       declararProcedencia: vi.fn(),
@@ -507,7 +511,7 @@ describe('app/contraste.js · el cajón de diagnóstico es la PANTALLA (rebanada
 
     alSalir()
 
-    expect(nav.get().paso).toBe(PASO.VALIDACION)
+    expect(nav.get().paso).toBe(PASO.EDICION)
     // Y el cajón se cierra por el camino de siempre, el de la transición.
     expect(a.cerrarDiagnostico).toHaveBeenCalled()
     c.destruir()
@@ -525,8 +529,8 @@ describe('app/contraste.js · el cajón de diagnóstico es la PANTALLA (rebanada
     // Se recorren todos los conjuntos de hechos con los que Diagnóstico se aguanta
     // —sin escribir la lista: sale del modelo— y en todos tiene que poderse volver.
     const combinaciones = [
-      { geometria: true, oficial: true, diagnostico: true },
-      { geometria: true, oficial: true, diagnostico: false },
+      { geometria: true, oficial: true },
+      { geometria: true, oficial: true },
     ]
     let probadas = 0
     for (const hechos of combinaciones) {
@@ -538,7 +542,7 @@ describe('app/contraste.js · el cajón de diagnóstico es la PANTALLA (rebanada
       if (!nav.navegarAPaso(PASO.DIAGNOSTICO).ok) continue
       probadas += 1
       expect(
-        nav.puedeIrA(PASO.VALIDACION).disponible,
+        nav.puedeIrA(PASO.EDICION).disponible,
         `estando en Diagnóstico con ${JSON.stringify(hechos)} hay que poder volver a Validación`,
       ).toBe(true)
     }
@@ -574,7 +578,7 @@ describe('app/contraste.js · el cajón de diagnóstico es la PANTALLA (rebanada
 
   it('sin los dos cables nuevos no lanza: montar sin ellos es un montaje válido', () => {
     // `viewer/` puede quedarse atrás y esto no puede reventar la aplicación entera.
-    const nav = navegacionCompleta(PASO.VALIDACION)
+    const nav = navegacionCompleta(PASO.EDICION)
     const c = cablearContraste({ navegacion: nav, ...accionesConTextos() })
     expect(() => nav.navegarAPaso(PASO.DIAGNOSTICO)).not.toThrow()
     c.destruir()

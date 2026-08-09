@@ -68,9 +68,9 @@
 
 import { esListadoDeReplanteo } from '../export/coordenadas.js'
 import { decodificarGml } from '../gml/decodificar.js'
-import { ORIGEN_PARCELA, crearParcela } from '../model/parcela.js'
+import { ORIGEN_PARCELA, TIPO_RECINTO, crearParcela, crearRecinto } from '../model/parcela.js'
 import { SEVERIDAD } from '../parsers/_comun.js'
-import { importar } from '../parsers/importar.js'
+import { BLOQUEOS, importar } from '../parsers/importar.js'
 import { NIVEL } from '../viewer/_comun.js'
 import { SELECTOR_PROCEDENCIA, camposInvariantes } from './cableado-catastro.js'
 import { INSTRUCCION_PARCELARIO } from './navegacion.js'
@@ -416,6 +416,122 @@ export function componerParcelaMedida(actual, recintos, { origen, idLocalDemo, n
   })
 }
 
+// ── F22 · CUANDO EL DIBUJO TRAE VARIAS FINCAS ────────────────────────────────
+
+/**
+ * El renglón de procedencia de una finca elegida **que el dibujo nombra**.
+ *
+ * ⛔ **Existe porque el guion 24 midió a la aplicación diciendo dos cosas
+ * contrarias sobre la misma geometría, con dos centímetros de separación.** La
+ * cabecera ponía «Cartografía del Catastro · del dibujo» —correcto, y es lo que
+ * M25 costó— y el renglón de debajo, que reutilizaba
+ * {@link textoProcedenciaMedicion} tal cual, ponía «Geometría **medida por ti** …
+ * **NO del Catastro**». Las dos frases no pueden ser verdad a la vez, y la que se
+ * lee al firmar es la de abajo.
+ *
+ * ⚠️ **Solo para la rama con nombres.** Sin rótulos que respalden la referencia la
+ * finca entra como MEDICIÓN (decisión 2), y entonces el renglón de F18 dice lo
+ * único que consta: que la geometría sale de un fichero y que el Catastro no la
+ * ha confirmado.
+ *
+ * @param {object} args
+ * @param {string} args.nombreFichero
+ * @param {string|null} [args.capa=null]
+ * @param {string} args.refcat  La referencia que el dibujo trae escrita dentro.
+ * @param {{zona: number, srs: string}|null} [args.huso=null]
+ * @returns {string}
+ */
+export function textoProcedenciaFincaElegida({ nombreFichero, capa = null, refcat, huso = null }) {
+  const deCapa = esTexto(capa) ? ` (capa «${capa}»)` : ''
+  const donde = huso === null ? '' : ` Cae en el huso ${huso.zona} (${huso.srs}).`
+  return (
+    `Cartografía del Catastro, leída del fichero «${nombreFichero}»${deCapa} — no de una consulta ` +
+    `al servicio. La referencia ${refcat} viene escrita en el propio dibujo. Sirve a la vez de ` +
+    `contorno oficial: mientras no muevas un vértice, el encaje vale cero porque son la misma ` +
+    `geometría.${donde}`
+  )
+}
+
+/** Lo que se dice en el panel al abrir el cajón de elección. */
+export const mensajeElegirFinca = (cuantas) =>
+  `El dibujo trae ${cuantas} fincas separadas y un expediente lleva una sola. ` +
+  `Elige la tuya en el cajón del mapa: al marcarla se resalta sobre la cartografía.`
+
+/** Y lo que se dice al descartar el dibujo entero. */
+export const MENSAJE_FINCAS_DESCARTADAS =
+  'Se ha descartado el dibujo. No ha entrado ninguna finca ni se ha dibujado nada.'
+
+/**
+ * Lo que se dice de las fincas que NO se han elegido.
+ *
+ * ⚠️ Dice **«del dibujo»** y no «del Catastro», aunque el dibujo venga de la Sede:
+ * son dos afirmaciones distintas y la ficha del panel ya cuenta las que trae el
+ * WFS. Confundirlas sería el mismo error que F18 cometió con la cabecera, un piso
+ * más abajo.
+ */
+export const mensajeVecinasDelDibujo = (cuantas) =>
+  cuantas === 0
+    ? 'El dibujo no traía ninguna otra finca alrededor.'
+    : `Las otras ${cuantas} fincas del dibujo se quedan dibujadas como parcelario de ` +
+      `contexto. Son del fichero, no una consulta al Catastro.`
+
+/**
+ * Lo que se cuenta cuando el dibujo trae además construcciones. **No entran**
+ * (decisión 4 de F22) pero se NOMBRAN: 168 polilíneas que el usuario ve en su CAD
+ * y que la aplicación ignora sin decir nada son 168 motivos para desconfiar de lo
+ * que sí ha entrado.
+ */
+export const mensajeConstruccionesFuera = (cuantas, capa) =>
+  `El dibujo trae además ${cuantas} polilínea(s) en la capa «${capa}» que no son parcelas ` +
+  `y no entran aquí. Para meter un edificio, cambia a la rama Edificio y suelta el mismo ` +
+  `fichero: allí sí se leen.`
+
+/**
+ * Compone la parcela a partir de la finca ELEGIDA de un dibujo de varias.
+ *
+ * ⭐ **La decisión 2 de F22 vive aquí, y es la que separa este compositor de
+ * {@link componerParcelaMedida}.** Un DXF de «Consulta Masiva» **no es el
+ * levantamiento del técnico**: es cartografía DEL Catastro que el técnico ha
+ * descargado. Tratarla como medición propia sería rotularle «Tu medición · no del
+ * Catastro» a un polígono que el usuario no ha medido — el error caro de esta
+ * aplicación, con el signo cambiado.
+ *
+ * **El criterio sale del DATO, no de un fingerprint del fichero**: si el dibujo
+ * trae rótulos que nombran las fincas 1:1 —en la práctica, la capa `RefCatastral`
+ * de la descarga del Catastro— la geometría entra como OFICIAL: ocupa `recintos`
+ * **y** `geometriaOficial`, y el rótulo da la `refcat`. Sin esos nombres no hay
+ * nada que respalde llamarla oficial, y entra como MEDICIÓN, que es lo que decidió
+ * F18.
+ *
+ * ⚠️ **`geometriaOficial === recintos` hace que el Diagnóstico salga en CERO hasta
+ * que el técnico edite, y eso es correcto**: todavía no ha medido nada. Es la misma
+ * tautología que F21 dejó escrita para el contraste de edificio, y se dice para que
+ * nadie lea ese cero como una verificación.
+ *
+ * @param {Array<[number,number]>} anillo  El anillo ABIERTO de la finca elegida.
+ * @param {{nombre: string|null}} candidata  Su ficha, de la detección de `importar`.
+ * @param {object} args
+ * @param {string} args.origen  Uno de `ORIGEN_PARCELA`.
+ * @param {string} args.nombreFichero  Último recurso para el `idLocal`.
+ * @returns {object}  Parcela del modelo.
+ */
+export function componerParcelaElegida(anillo, candidata, { origen, nombreFichero }) {
+  const recintos = [crearRecinto(anillo, TIPO_RECINTO.EXTERIOR)]
+  const nombre = esTexto(candidata?.nombre) ? candidata.nombre : null
+
+  return crearParcela({
+    // La referencia sirve de `idLocal` cuando la hay: es lo que identifica la finca
+    // en todas las demás pantallas. Sin ella, el nombre del fichero, que es el
+    // mismo último recurso que usa `componerParcelaMedida`.
+    idLocal: nombre ?? (esTexto(nombreFichero) ? nombreFichero : 'finca-elegida'),
+    refcat: nombre,
+    recintos,
+    // ⛔ Toda la decisión 2 en una línea, y su condición en la de arriba.
+    geometriaOficial: nombre === null ? null : recintos,
+    origen,
+  })
+}
+
 /**
  * Los mensajes que hay que publicar en el panel tras una importación, sin repetir.
  *
@@ -478,6 +594,10 @@ export function cablearMedicion({
   documento = document,
   procedencia = nodo(SELECTOR_PROCEDENCIA),
   dialogo = null,
+  parcelas = null,
+  colindantes = null,
+  alPedirEleccion = null,
+  cajonesQueCerrar = [],
 } = {}) {
   // ── Contratos del programador, ANTES de tocar un solo nodo ────────────────
   if (!estado || typeof estado.get !== 'function' || typeof estado.set !== 'function') {
@@ -488,6 +608,16 @@ export function cablearMedicion({
   }
   if (alCargarParcela !== null && typeof alCargarParcela !== 'function') {
     throw new TypeError("cablearMedicion: 'alCargarParcela' debe ser una función o null.")
+  }
+  if (alPedirEleccion !== null && typeof alPedirEleccion !== 'function') {
+    throw new TypeError("cablearMedicion: 'alPedirEleccion' debe ser una función o null.")
+  }
+  if (parcelas !== null && (!parcelas.cajon || !parcelas.capa)) {
+    // Se comprueba la FORMA y no cada método: es `visor.parcelas` tal cual, y un
+    // `{cajon}` a medias es un error de cableado que reventaría más tarde y lejos.
+    throw new TypeError(
+      "cablearMedicion: 'parcelas' debe ser `visor.parcelas` ({cajon, capa}) o null.",
+    )
   }
 
   let destruido = false
@@ -572,6 +702,239 @@ export function cablearMedicion({
       } catch (causa) {
         reventar('el aviso de parcela cargada (alCargarParcela) ha fallado', causa)
       }
+    }
+  }
+
+  // ── F22 · La elección de finca ──────────────────────────────────────────────
+  //
+  // ⚠️ **Las suscripciones se hacen UNA vez, aquí, y no al abrir el cajón.** El
+  // cajón se abre una vez por fichero soltado, así que suscribirse ahí acumularía
+  // un oyente por fichero y el segundo dibujo cargaría dos parcelas. Lo que cambia
+  // entre ficheros es el DATO, y ese vive en `pendiente`.
+
+  /** El dibujo que está esperando a que se elija una finca, o `null`. */
+  let pendiente = null
+
+  /** Suelta lo pintado y olvida el dibujo. No toca el store. */
+  function olvidarEleccion() {
+    pendiente = null
+    if (parcelas === null) return
+    parcelas.capa.pintar(null)
+    parcelas.cajon.pintar(null)
+    parcelas.cajon.cerrar()
+  }
+
+  if (parcelas !== null) {
+    // Marcar en la lista ⇒ resaltar en el mapa. Es la mitad que la decisión 3
+    // compró: ocho referencias que comparten los once primeros caracteres no se
+    // distinguen leyendo.
+    parcelas.cajon.alElegir((i) => {
+      if (!destruido) parcelas.capa.resaltar(i)
+    })
+    // Y señalar en el mapa ⇒ marcar en la lista. `marcar` NO reemite, así que el
+    // bucle mapa → cajón → mapa no se cierra sobre sí mismo.
+    parcelas.capa.alSenalar((i) => {
+      if (destruido) return
+      parcelas.cajon.marcar(i)
+      parcelas.capa.resaltar(i)
+    })
+    parcelas.cajon.alConfirmar((i) => {
+      if (!destruido) confirmarFinca(i)
+    })
+    parcelas.cajon.alDescartar(() => {
+      if (destruido) return
+      olvidarEleccion()
+      avisar(MENSAJE_FINCAS_DESCARTADAS, NIVEL.INFO)
+    })
+  }
+
+  /**
+   * **T4.5 · Las construcciones se NOMBRAN, aunque no entren.**
+   *
+   * El DXF de «Consulta Masiva» trae 168 huellas de edificio además de las fincas,
+   * y la decisión 4 de F22 las deja fuera: la rama EDIFICIO tiene su propia entrada
+   * y su propia regla de partes. Lo que no puede pasar es que se caigan en
+   * silencio — 168 polilíneas que el usuario ve en su CAD y la aplicación ignora
+   * sin decir nada son 168 motivos para desconfiar de lo que sí ha entrado.
+   *
+   * El reparto por capas lo publica `parsers/importar.js` en `datos.capas` de su
+   * detección de reparto, que es un contrato ya publicado (lo lee también
+   * `edificio/entrada.js`): se lee de ahí y no se vuelve a contar.
+   */
+  function avisarConstruccionesFuera(resultado, opts) {
+    const elegida = esTexto(opts.capa) ? opts.capa : null
+    if (elegida === null) return
+    const reparto = resultado.detecciones.find(
+      (d) => d?.datos?.aplicado === 'FILTRADO' && d?.datos?.capas,
+    )
+    if (!reparto) return
+    for (const [capa, cuantos] of Object.entries(reparto.datos.capas)) {
+      if (capa !== elegida && cuantos > 0) avisar(mensajeConstruccionesFuera(cuantos, capa), NIVEL.INFO)
+    }
+  }
+
+  /**
+   * El dibujo trae N fincas separadas: se pintan, se enumeran y se pregunta.
+   *
+   * **No mete nada en el store.** Lo único que hace es poner la pregunta delante,
+   * que es exactamente lo que a esta aplicación le faltaba: hasta F22 el recorrido
+   * moría en «No ha entrado ninguna parcela de ese fichero» después de haber
+   * pedido —y obtenido— una decisión que no arreglaba nada.
+   *
+   * @param {object} resultado  El de `importar()`, con el bloqueo puesto.
+   * @param {object} aviso  La detección `VARIOS_RECINTOS_DISJUNTOS`.
+   * @param {string} nombre
+   * @param {boolean} deFichero
+   */
+  function ofrecerEleccion(resultado, aviso, nombre, deFichero) {
+    const candidatas = aviso.datos.recintos
+    pendiente = { resultado, candidatas, nombre, deFichero }
+
+    parcelas.capa.pintar(
+      candidatas.map((c, i) => ({
+        vertices: resultado.anillos[i],
+        nombre: c.nombre ?? null,
+        superficie: c.superficie,
+      })),
+    )
+    parcelas.cajon.pintar({
+      nombre,
+      candidatas,
+      capaRotulos: aviso.datos.rotulos?.capa ?? null,
+    })
+
+    // (el encuadre va después de abrir el cajón; ver más abajo)
+
+    // Los cajones de esta esquina son caras del mismo hueco. Se cierran ANTES de
+    // abrir el nuestro y NO por su guardián de clic-fuera: soltar un fichero no es
+    // un clic, así que ese guardián no se entera y quedarían dos apilados. Es el
+    // mismo gesto, y por el mismo motivo, que hace `cableado-comprobacion.js`.
+    for (const otro of cajonesQueCerrar) {
+      try {
+        otro.cerrar()
+      } catch (causa) {
+        reventar('cerrar un cajón vecino ha fallado', causa)
+      }
+    }
+    parcelas.cajon.abrir()
+
+    // ⛔ **Y SE LLEVA EL MAPA HASTA ELLAS, que el guion 24 midió a 0 × 0 px.** Las
+    // candidatas no pasan por el store, y el store es quien reencuadra: con la
+    // aplicación recién abierta —mirando a España entera— una manzana de cien
+    // metros ocupa menos de un píxel. El cajón decía «marca la tuya, se resalta en
+    // el mapa» y en el mapa no había nada que mirar. La suite no podía verlo: en
+    // jsdom `getBoundingClientRect()` devuelve ceros.
+    //
+    // ⛔ **Y DESPUÉS DE `abrir()`, esquivando el cajón**, que es la segunda mitad
+    // del mismo hallazgo: con las ocho dentro del mapa, el cajón tapaba CINCO al
+    // 100 %. Se pide su caja —que solo tiene sentido con el cajón ya abierto— y el
+    // encuadre deja ese trozo libre.
+    parcelas.capa.encuadrar({ evitar: parcelas.cajon.caja() })
+
+    avisar(mensajeElegirFinca(candidatas.length))
+
+    // Llevar al usuario a la pantalla a la que pertenece este cajón. Sin esto,
+    // soltar el fichero desde Diagnóstico dejaría el rail diciendo «Diagnóstico»
+    // con la pregunta de Entrada en la esquina del mapa — o, peor, con el cajón
+    // cerrado por el dueño de la esquina y la pregunta sin hacer. Mismo gancho y
+    // mismo porqué que `alPedirEleccion` en `cableado-comprobacion.js`.
+    if (alPedirEleccion !== null) {
+      try {
+        alPedirEleccion()
+      } catch (causa) {
+        reventar('el aviso de elección pendiente (alPedirEleccion) ha fallado', causa)
+      }
+    }
+  }
+
+  /**
+   * El usuario ha elegido. La finca `i` entra en el store; **las demás se quedan
+   * como parcelario de contexto**, que es la decisión 1 de F22 y lo que convierte
+   * un arreglo en una vía nueva: el DXF hace sin red lo que hoy solo hace el WFS.
+   *
+   * @param {number} i  Índice en la lista de candidatas.
+   */
+  function confirmarFinca(i) {
+    if (pendiente === null) return
+    const { resultado, candidatas, nombre, deFichero } = pendiente
+    const anillo = resultado.anillos[i]
+    if (!Array.isArray(anillo)) return
+
+    try {
+      const parcela = componerParcelaElegida(anillo, candidatas[i], {
+        origen: ORIGEN_POR_FORMATO[resultado.resumen.formato],
+        nombreFichero: nombre,
+      })
+
+      // ⚠️ Las vecinas se calculan ANTES del `set`, porque el `set` dispara el
+      // reencuadre del visor y ése LIMPIA las colindantes (es una parcela nueva).
+      // Pintarlas antes las borraría el propio store.
+      const vecinas = candidatas
+        .map((c, j) => ({ c, j }))
+        .filter(({ j }) => j !== i && Array.isArray(resultado.anillos[j]))
+        .map(({ c, j }) => ({
+          refcat: c.nombre ?? null,
+          recintos: [crearRecinto(resultado.anillos[j], TIPO_RECINTO.EXTERIOR)],
+        }))
+
+      estado.set(parcela)
+      olvidarEleccion()
+
+      if (procedencia) {
+        // ⛔ **DOS renglones y no uno, y el guion 24 dijo por qué.** Con nombre, la
+        // geometría es cartografía DEL Catastro y el texto de F18 —«medida por ti
+        // — NO del Catastro»— contradecía a la cabecera dos centímetros más
+        // arriba. Sin nombre no hay nada que respalde llamarla oficial y vale el
+        // renglón de siempre.
+        procedencia.textContent =
+          parcela.refcat === null
+            ? textoProcedenciaMedicion({
+                nombreFichero: nombre,
+                capa: candidatas[i]?.capa ?? null,
+                conParcelario: parcela.geometriaOficial !== null,
+                huso: resultado.resumen.huso,
+                deFichero,
+              })
+            : textoProcedenciaFincaElegida({
+                nombreFichero: nombre,
+                capa: candidatas[i]?.capa ?? null,
+                refcat: parcela.refcat,
+                huso: resultado.resumen.huso,
+              })
+      }
+
+      for (const { mensaje, nivel } of avisosDe(resultado.detecciones)) avisar(mensaje, nivel)
+      if (parcela.refcat === null) avisar(MENSAJE_SIN_REFERENCIA)
+
+      if (alCargarParcela !== null && !destruido) {
+        try {
+          alCargarParcela(parcela)
+        } catch (causa) {
+          reventar('el aviso de parcela cargada (alCargarParcela) ha fallado', causa)
+        }
+      }
+
+      // ⛔ **LAS VECINAS VAN LAS ÚLTIMAS, DESPUÉS DE `alCargarParcela`, Y ESO SE
+      // DESCUBRIÓ CON UN TEST EN ROJO.** Estaban justo detrás del `set`, que es
+      // donde parecía que tocaban, y la ficha del panel seguía diciendo «Sin
+      // consultar» con siete vecinas dibujadas en el mapa.
+      //
+      // El motivo: `alCargarParcela` significa «documento nuevo», y por eso
+      // `cablearEdicion#alCambiarOficial` llama a `alContarColindantes(null)` —
+      // unas vecinas traídas para OTRA parcela ya no valen, que es correcto para
+      // la vía del Catastro—. Aquí las vecinas vienen del MISMO fichero que la
+      // parcela, así que no caducan con ella: se ponen cuando ya nadie las va a
+      // borrar.
+      //
+      // ⚠️ Y las candidatas se leen de `pendiente` ANTES —arriba, en `vecinas`—
+      // porque `olvidarEleccion()` ya lo ha vaciado a estas alturas.
+      if (colindantes !== null && vecinas.length > 0) colindantes.pintar(vecinas)
+      avisar(mensajeVecinasDelDibujo(vecinas.length), NIVEL.INFO)
+    } catch (causa) {
+      // `crearParcela` lanza si la geometría rompe un invariante del modelo, y ese
+      // camino no puede acabar en un cajón mudo.
+      parcelas.cajon.estado('La finca no se ha cargado. El motivo está en el panel de avisos.')
+      reventar('la carga de la finca elegida ha fallado', causa)
     }
   }
 
@@ -669,6 +1032,30 @@ export function cablearMedicion({
         resultado = importar(texto, opts)
       }
 
+      // ── 2 bis · ⭐ F22 · ¿Es que el dibujo trae VARIAS fincas? ────────────
+      // Va ANTES del paso 3 porque no es un fallo: es una pregunta que la
+      // aplicación sabe hacer. Hasta F22 esto caía en «No ha entrado ninguna
+      // parcela de ese fichero» **después** de haber pedido y obtenido una
+      // decisión —la capa— que no arreglaba nada, que es peor que no ofrecer
+      // ninguna salida.
+      //
+      // Sin `parcelas` cableado (un test, un uso como librería) NO se desvía y el
+      // recorrido sigue al paso 3, donde el bloqueo se cuenta con palabras. Se
+      // degrada, no se rompe.
+      const disjuntas =
+        parcelas !== null &&
+        resultado.resumen.bloqueos.includes(BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS)
+          ? resultado.detecciones.find(
+              (d) => d?.datos?.bloqueo === BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS,
+            )
+          : null
+
+      if (disjuntas) {
+        avisarConstruccionesFuera(resultado, opts)
+        ofrecerEleccion(resultado, disjuntas, nombre, deFichero)
+        return
+      }
+
       // ── 3 · ¿Ha salido una parcela? ──────────────────────────────────────
       if (!resultado.resumen.construida || resultado.parcela === null) {
         // El motivo lo da `importar()`, que es quien sabe. Aquí solo se antepone
@@ -693,6 +1080,9 @@ export function cablearMedicion({
     destruir() {
       if (destruido) return
       destruido = true
+      // F22 · Un dibujo a medio elegir no sobrevive al desmontaje: sus fincas
+      // dibujadas se quedarían en el mapa sin cajón desde el que elegirlas.
+      olvidarEleccion()
       // Solo se destruye el diálogo si lo hemos fabricado nosotros: uno inyectado
       // es de quien lo inyectó, y destruirlo sería tirar de un cable ajeno.
       if (dialogo === null) revision.destruir()

@@ -358,24 +358,28 @@ export function cablearContraste({
   // ── La SALIDA del diagnóstico (rework de UI · rebanada 4) ──────────────────
   //
   // El ✕ de un cajón que no se descarta tiene que significar algo, y lo que
-  // significa es «sácame de aquí». Se sale a **Validación** y no a Entrada: es el
+  // significa es «sácame de aquí». Se sale a **Edición** y no a Entrada: es el
   // paso anterior en el recorrido y el que enseña la misma geometría con sus
   // vértices, así que salirse del diagnóstico no tira el trabajo hecho.
   //
-  // El guardián de Validación pide `geometria`, y estar en Diagnóstico exige más
+  // ⭐ Decía «Validación» hasta el 2026-08-08. El destino no se ha movido: esa
+  // pantalla se fusionó con Edición, que es la que se quedó la tabla de vértices
+  // y los CTA. La frase de arriba sigue describiendo el mismo sitio.
+  //
+  // El guardián de Edición pide `geometria`, y estar en Diagnóstico exige más
   // que eso, así que desde aquí NUNCA puede fallar. Se comprueba igualmente y se
   // cae a Entrada si algún día deja de ser verdad: un ✕ que no hace nada es
   // exactamente el fallo silencioso que esta rebanada existe para quitar.
   function salir() {
     if (destruido) return
-    if (navegacion.navegarAPaso(PASO.VALIDACION).ok) return
+    if (navegacion.navegarAPaso(PASO.EDICION).ok) return
     navegacion.navegarAPaso(PASO.ENTRADA)
   }
 
   const bajaSalida =
     typeof suscribirSalida === 'function' ? suscribirSalida(salir) : () => {}
   // F14 · El ✕ del cajón de edificio sale al MISMO sitio, y con el mismo
-  // razonamiento: Validación es el paso anterior del recorrido y enseña la misma
+  // razonamiento: Edición es el paso anterior del recorrido y enseña la misma
   // construcción con sus partes, así que salirse del contraste no tira el trabajo
   // hecho. Su guardián pide `geometria`, y estar en Diagnóstico exige eso mismo,
   // así que desde aquí no puede fallar; se comprueba igual y se cae a Entrada por

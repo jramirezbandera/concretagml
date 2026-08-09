@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 
-import { PASOS } from '../../app/navegacion.js'
 import {
   ASIENTOS,
   MARCA_NUESTRA,
@@ -111,12 +110,36 @@ describe('scripts/presupuesto-css · el registro y el techo', () => {
     expect(porDebajo.problemas).toEqual([])
   })
 
-  it('las rebanadas son EXACTAMENTE los pasos del rail, sin segunda lista', () => {
-    // `scripts/` no puede importar `app/navegacion.js` (se llevaría media
-    // aplicación a un script de tooling), así que la lista está escrita dos
-    // veces. Esta prueba es lo que impide que diverjan: si mañana el rail gana
-    // o pierde un paso, el presupuesto se entera aquí y no tres fases después.
-    expect(REBANADAS).toEqual([...PASOS])
+  // ── ⛔ AQUÍ HUBO UN GUARDIÁN DE NO-DIVERGENCIA Y SE RETIRÓ EL 2026-08-08 ────
+  //
+  // Decía `expect(REBANADAS).toEqual([...PASOS])`, y existía porque las dos listas
+  // están escritas a mano en dos ficheros (`scripts/` no puede importar
+  // `app/navegacion.js` sin llevarse media aplicación a un script de tooling).
+  //
+  // **Se retira porque su premisa dejó de ser cierta, no para poner algo en
+  // verde.** `REBANADAS` es el troceado del rework de UI —un proyecto de migración
+  // que terminó, con su quinta rebanada SIN CERRAR a propósito— y `PASOS` es el
+  // recorrido vivo de la aplicación. Coincidían porque el rework se organizó por
+  // pantallas; el día que el rail bajó de cinco peldaños a tres, esta prueba
+  // obligaba a reescribir el registro histórico **y**, de paso, cerraba las cinco
+  // rebanadas y hacía exigible el techo del criterio 10 por un cambio de
+  // navegación. El razonamiento entero está en `scripts/presupuesto-css.mjs`.
+  //
+  // Lo que SÍ seguía teniendo sentido de aquel guardián —cazar una errata en el
+  // campo `rebanada` de un asiento— se conserva aquí abajo.
+  it('cada asiento apunta a una rebanada que EXISTE, y la quinta sigue abierta', () => {
+    for (const a of ASIENTOS) {
+      if (a.rebanada === null) continue
+      expect(REBANADAS, `el asiento «${a.hito}» cierra una rebanada que no existe`).toContain(
+        a.rebanada,
+      )
+    }
+    // ⚠️ Y la deuda declarada sigue declarada. Si algún día alguien cierra la
+    // quinta, que sea porque ha bajado la hoja del techo y no de rebote: esta
+    // línea le obliga a venir aquí a borrarla, y el `comparar` de al lado le va a
+    // pedir los bytes.
+    const cerradas = new Set(ASIENTOS.map((a) => a.rebanada).filter(Boolean))
+    expect(cerradas.has('informe'), 'la quinta rebanada se ha cerrado sin anotarlo').toBe(false)
   })
 
   it('el techo ES la medición de F11, no un número aparte', () => {

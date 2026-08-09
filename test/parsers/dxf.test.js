@@ -482,3 +482,80 @@ describe('parseDXF · F01 intacto (huella exacta de los anillos, tomada antes de
     })
   }
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// F22 · `rotulos[]` — las anotaciones dejan de tirarse
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('parseDXF — F22 · los rótulos', () => {
+  const MANZANA = readFileSync(fixture('manzana_consulta_masiva_6346726UF8664N.dxf'), 'latin1')
+
+  it('devuelve las 161 anotaciones con texto y sitio, con su capa LITERAL', () => {
+    const { rotulos } = parseDXF(MANZANA)
+    expect(rotulos).toHaveLength(161)
+    const porCapa = {}
+    for (const r of rotulos) porCapa[r.capa] = (porCapa[r.capa] ?? 0) + 1
+    expect(porCapa).toEqual({ txtConstru: 153, RefCatastral: 8 })
+    expect(rotulos.find((r) => r.capa === 'RefCatastral')).toMatchObject({
+      tipo: 'TEXT',
+      texto: '6346726UF8664N',
+    })
+  })
+
+  it('⚠️ el mensaje ya NO dice «se ignoraron»: dejó de ser cierto', () => {
+    const { detecciones } = parseDXF(MANZANA)
+    const anot = detecciones.find((d) => d.datos && typeof d.datos.conRotulo === 'number')
+    expect(anot.datos).toMatchObject({ total: 161, conRotulo: 161 })
+    expect(anot.mensaje).not.toContain('Se ignoraron')
+    expect(anot.mensaje).toContain('no son geometría')
+    expect(anot.mensaje).toContain('rótulos')
+  })
+
+  it('⚠️ la trampa del 11/21: con justificación manda el punto de alineación', () => {
+    // En un TEXT el 10/20 solo es la posición real si NO hay justificación
+    // (códigos 72/73). El fichero real trae 72=1 y 73=1 y DUPLICA el punto en
+    // 10/20 y 11/21, así que no distingue las dos ramas: aquí se separan a mano,
+    // porque el siguiente fichero puede no ser tan amable y el fallo sería mudo.
+    const conJustificacion = [
+      '0', 'SECTION', '2', 'ENTITIES',
+      '0', 'TEXT', '8', 'R', '10', '0.0', '20', '0.0',
+      '11', '386100.0', '21', '4064400.0', '72', '1', '73', '1', '1', 'BUENO',
+      '0', 'TEXT', '8', 'R', '10', '386200.0', '20', '4064500.0',
+      '72', '0', '73', '0', '1', 'IZQUIERDA',
+      '0', 'ENDSEC', '0', 'EOF',
+    ].join('\n')
+    const { rotulos } = parseDXF(conJustificacion)
+    expect(rotulos).toEqual([
+      { tipo: 'TEXT', capa: 'R', texto: 'BUENO', x: 386100, y: 4064400 },
+      { tipo: 'TEXT', capa: 'R', texto: 'IZQUIERDA', x: 386200, y: 4064500 },
+    ])
+  })
+
+  it('una anotación sin texto, o sin sitio, NO es un rótulo', () => {
+    const crudo = [
+      '0', 'SECTION', '2', 'ENTITIES',
+      '0', 'TEXT', '8', 'R', '10', '386100.0', '20', '4064400.0', '1', '   ',
+      '0', 'TEXT', '8', 'R', '1', 'SIN SITIO',
+      '0', 'ENDSEC', '0', 'EOF',
+    ].join('\n')
+    const { rotulos, detecciones } = parseDXF(crudo)
+    expect(rotulos).toEqual([])
+    // Pero el recuento de anotaciones NO cambia: siguen siendo dos.
+    const anot = detecciones.find((d) => d.datos && typeof d.datos.conRotulo === 'number')
+    expect(anot.datos).toMatchObject({ total: 2, conRotulo: 0 })
+  })
+
+  it('un MTEXT junta sus trozos (códigos 3) con el final (código 1)', () => {
+    const crudo = [
+      '0', 'SECTION', '2', 'ENTITIES',
+      '0', 'MTEXT', '8', 'R', '10', '386100.0', '20', '4064400.0',
+      '3', 'PRIMERO', '3', '-SEGUNDO', '1', '-FINAL',
+      '0', 'ENDSEC', '0', 'EOF',
+    ].join('\n')
+    expect(parseDXF(crudo).rotulos[0].texto).toBe('PRIMERO-SEGUNDO-FINAL')
+  })
+
+  it('un DXF sin anotaciones devuelve `rotulos: []`, nunca undefined', () => {
+    expect(parseDXF(POLY_CLASICA).rotulos).toEqual([])
+  })
+})

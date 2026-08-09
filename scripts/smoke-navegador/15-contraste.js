@@ -242,7 +242,7 @@ if (!entrega1.ok) {
 // El aterrizaje es la señal de que el recorrido ha terminado: la parcela está en
 // el store, el rail se ha recalculado y la navegación ha movido al usuario.
 const msCarga = await esperarA(
-  () => paso() === 'diagnostico' || paso() === 'validacion',
+  () => paso() === 'diagnostico' || paso() === 'edicion',
   ESPERA_CARGA,
 )
 const trasSoltar = foto('1 · tras soltar el .gml (un solo gesto)')
@@ -377,7 +377,7 @@ if (!entrega2.ok) {
     `El fixture sin referencia no se sirve (HTTP ${entrega2.status}): el paso 3 no se ha medido.`,
   )
 } else {
-  const msSinRefcat = await esperarA(() => paso() === 'validacion', 8000)
+  const msSinRefcat = await esperarA(() => paso() === 'edicion', 8000)
   trasSinRefcat = foto('3 · tras soltar un GML SIN referencia catastral')
 
   if (msSinRefcat === null) {

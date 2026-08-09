@@ -718,6 +718,42 @@ const EYEBROW_MEDICION = 'Tu medición · no del Catastro'
 const EYEBROW_GML_IMPORTADO = 'GML importado · no del Catastro'
 
 /**
+ * ⛔ **EL SEXTO (F22), Y EXISTE PORQUE SIN ÉL ESTA FASE MENTÍA AL REVÉS.**
+ *
+ * Un DXF de «Consulta Masiva» del Catastro **no es el levantamiento del técnico**:
+ * es cartografía DE la Sede que el técnico ha descargado. Con los cinco rótulos de
+ * antes caía en {@link EYEBROW_MEDICION} —«Tu medición · no del Catastro»— por
+ * venir con `origen: DXF`, y eso es exactamente el error caro de esta aplicación
+ * **con el signo cambiado**: atribuirle al usuario una geometría que no ha medido.
+ * A partir de ahí se corrige un lindero creyendo que es propio, y se firma.
+ *
+ * ⚠️ **Y no vale con decir «Parcela del Catastro» a secas**, que es lo que dice la
+ * vía del WFS. El técnico tiene que poder distinguir lo que la aplicación acaba de
+ * pedirle al servicio de lo que él trajo en un fichero que puede llevar meses en su
+ * disco: la Sede actualiza su cartografía, y un dibujo de junio no es lo que el WFS
+ * contestaría hoy. Eso es lo que dice «del dibujo».
+ *
+ * ⛔ **Y el criterio NO puede ser `origen`, ni «`origen` de fichero + hay
+ * `geometriaOficial`». Esa segunda condición se escribió, y habría reintroducido el
+ * defecto de F18 con otro disfraz**: `componerParcelaMedida` **CONSERVA** la
+ * `geometriaOficial` que hubiera —es toda la decisión de F18, la que hace que el
+ * Diagnóstico funcione sin traer nada más—, así que el flujo normal del perito
+ * (traigo la oficial, meto MI levantamiento) habría acabado rotulado «Cartografía
+ * del Catastro» sobre el dibujo del técnico.
+ *
+ * El criterio es {@link dibujoEsLaOficial}: que lo que se está dibujando **SEA**
+ * la geometría oficial, no que exista una. Es literalmente lo que la frase afirma.
+ *
+ * ⚠️ **Consecuencia buscada: en cuanto el técnico mueve un vértice, el rótulo pasa
+ * a {@link EYEBROW_MEDICION}.** Y es correcto — lo que hay en pantalla ya es su
+ * propuesta, no la cartografía de la Sede—; `geometriaOficial` sigue intacta como
+ * referencia del Diagnóstico. ⚠️ La vía del WFS **no** se comporta así (sigue
+ * diciendo «Parcela del Catastro» tras editar): es una incoherencia que F22
+ * hereda, no que estrena, y queda declarada como deuda.
+ */
+const EYEBROW_DIBUJO_CATASTRO = 'Cartografía del Catastro · del dibujo'
+
+/**
  * Los orígenes de `ORIGEN_PARCELA` que significan «lo ha medido el técnico». Se
  * derivan del catálogo del modelo y **no se escriben a mano**: el día que
  * `model/parcela.js` estrene un origen, esto se entera o se rompe, que es
@@ -761,6 +797,14 @@ const SIN_SUPERFICIE_CATASTRAL = 'No consta'
  * escribe (ver {@link actualizarFicha}).
  */
 const SIN_COLINDANTES = 'Sin consultar'
+
+/**
+ * **F22.** La coletilla del recuento cuando las vecinas salen de un DIBUJO y no de
+ * una consulta al Catastro. Es corta a propósito: el renglón de la ficha es
+ * estrecho y lo que hay que distinguir cabe en dos palabras. Ver
+ * {@link colindantesDeDibujo}.
+ */
+const SUFIJO_COLINDANTES_DIBUJO = ' · del dibujo'
 
 /**
  * Ficha: no hay superficie declarada, así que la diferencia con ella **no
@@ -1456,7 +1500,42 @@ function rotuloDelDato(parcelaActual) {
     return esSintetica ? EYEBROW_SINTETICA : EYEBROW_DEMOSTRACION
   }
   if (parcelaActual.origen === ORIGEN_PARCELA.GML_EXISTENTE) return EYEBROW_GML_IMPORTADO
-  return ORIGENES_MEDIDOS.has(parcelaActual.origen) ? EYEBROW_MEDICION : EYEBROW_CATASTRO
+  // ⛔ F22 · Un dibujo que ES la geometría oficial es cartografía del Catastro, no
+  // una medición. Ver {@link EYEBROW_DIBUJO_CATASTRO} y {@link dibujoEsLaOficial},
+  // donde está escrito el criterio que se probó primero y por qué era falso.
+  if (ORIGENES_MEDIDOS.has(parcelaActual.origen)) {
+    return dibujoEsLaOficial(parcelaActual) ? EYEBROW_DIBUJO_CATASTRO : EYEBROW_MEDICION
+  }
+  return EYEBROW_CATASTRO
+}
+
+/**
+ * ¿Lo que se está dibujando **ES** la geometría oficial, vértice a vértice?
+ *
+ * No «¿hay una geometría oficial?» —eso es cierto en todo el flujo normal de F18 y
+ * no distingue nada—, sino si las dos son la MISMA. Es la afirmación que hace
+ * {@link EYEBROW_DIBUJO_CATASTRO}, comprobada en vez de supuesta.
+ *
+ * Compara con salida temprana y sin serializar: se llama desde `repintarFicha`, o
+ * sea en cada vértice que se arrastra, y una parcela real son decenas de vértices.
+ *
+ * @param {object} parcelaActual
+ * @returns {boolean}
+ */
+function dibujoEsLaOficial(parcelaActual) {
+  const oficial = parcelaActual.geometriaOficial
+  const recintos = parcelaActual.recintos
+  if (!Array.isArray(oficial) || !Array.isArray(recintos)) return false
+  if (oficial.length === 0 || oficial.length !== recintos.length) return false
+  for (let r = 0; r < recintos.length; r++) {
+    const a = recintos[r]?.vertices
+    const b = oficial[r]?.vertices
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false
+    for (let v = 0; v < a.length; v++) {
+      if (a[v][0] !== b[v][0] || a[v][1] !== b[v][1]) return false
+    }
+  }
+  return true
 }
 
 /**
@@ -1632,8 +1711,15 @@ function actualizarFicha(parcelaActual) {
   // {@link cablearEdicion}#alColindantes. Se sigue escribiendo DESDE AQUÍ, y no
   // desde el cableado del Catastro, que es lo que mantiene la ficha con un solo
   // dueño. Mientras nadie pregunte, el texto dice que no se ha preguntado.
+  //
+  // ⛔ **F22 · y desde hoy dice de DÓNDE salieron.** Son dos fuentes: la consulta
+  // al Catastro de siempre y las fincas que sobran de un dibujo de varias. El
+  // número solo no distingue una cosa de la otra, y confundirlas es afirmar una
+  // procedencia que la pantalla no respalda. Ver {@link colindantesDeDibujo}.
   fichaColindantes.textContent =
-    colindantesTraidas === null ? SIN_COLINDANTES : FORMATO_ENTERO.format(colindantesTraidas)
+    colindantesTraidas === null
+      ? SIN_COLINDANTES
+      : `${FORMATO_ENTERO.format(colindantesTraidas)}${colindantesDeDibujo ? SUFIJO_COLINDANTES_DIBUJO : ''}`
 }
 
 /**
@@ -1792,10 +1878,45 @@ function aplicarRamaALaFicha(ramaNueva) {
  * @param {number|null} cuantas
  * @returns {void}
  */
-function fijarRecuentoColindantes(cuantas) {
+function fijarRecuentoColindantes(cuantas, deDibujo = false) {
+  // ⛔ **QUE UNA CONSULTA SUSTITUYA EL PARCELARIO DEL DIBUJO NO PUEDE SER MUDO.**
+  // Lo destapó el guion 24: cargada una finca del DXF, las siete fincas vecinas
+  // del fichero se cambiaban por las que contesta el WFS —7 → 3 medido— sin una
+  // sola frase. No es geometría de trabajo, así que no es el defecto de agosto;
+  // pero es contexto que el usuario ha visto aparecer y desaparecer, y en pantalla
+  // las dos cosas se llaman igual: «colindantes». Regla de oro 1.
+  if (colindantesDeDibujo && cuantas !== null && deDibujo !== true) {
+    panel.avisar(
+      `Las ${FORMATO_ENTERO.format(colindantesTraidas)} fincas vecinas que traía el dibujo se ` +
+        `sustituyen por las ${FORMATO_ENTERO.format(cuantas)} que ha devuelto el Catastro para ` +
+        `esta parcela. Son dos parcelarios distintos y el que manda a partir de ahora es el del ` +
+        `servicio.`,
+      { nivel: NIVEL.AVISO },
+    )
+  }
   colindantesTraidas = cuantas
+  colindantesDeDibujo = cuantas !== null && deDibujo === true
   repintarFicha()
 }
+
+/**
+ * ⛔ **F22 · De DÓNDE salieron las vecinas que hay dibujadas, que desde hoy son
+ * dos sitios y antes era uno.**
+ *
+ * Hasta F22 la única forma de tener colindantes era pulsar «Traer colindantes», y
+ * el renglón de la ficha podía decir «12» sin más porque no había otra lectura.
+ * Ahora un DXF de «Consulta Masiva» trae la manzana entera y las siete fincas que
+ * no eliges se quedan dibujadas: son parcelario de contexto **del fichero**, no
+ * una consulta a la Sede.
+ *
+ * Que el número no diga cuál de las dos cosas es sería exactamente el error que
+ * F18 cometió un piso más arriba —una afirmación de procedencia que la pantalla
+ * no respalda—, así que se distingue. `false` cuando vienen del Catastro, que es
+ * lo de siempre y por tanto el defecto.
+ *
+ * @type {boolean}
+ */
+let colindantesDeDibujo = false
 
 /**
  * El canal EN VIVO del arrastre (criterio de aceptación 4 de F06): los anillos
@@ -1929,6 +2050,17 @@ const visor = crearVisor(nodo('#mapa'), {
   // El cajón nace CERRADO y en blanco: montarlo no comprueba nada. Quien lo abre
   // y le da contenido es el paso 9, cuando el usuario suelta un `.gml`.
   comprobacion: true,
+  // ── F22 · El cajón para ELEGIR FINCA y la capa que las dibuja ────────────
+  // El DXF de «Consulta Masiva» del Catastro trae la MANZANA ENTERA —ocho fincas
+  // disjuntas, cada una con su referencia rotulada dentro— y hay que decir cuál es
+  // la del expediente. Ocho referencias que comparten los once primeros caracteres
+  // no se distinguen leyendo: por eso son DOS piezas y no solo una lista.
+  //
+  // ⚠️ **Tercer cajón en `bottomleft`**, y el mismo reparto que los dos de arriba:
+  // montarlos los tres es lo normal —son caras del mismo hueco— y abrir dos a la
+  // vez no. De esa exclusión responde el paso que abre cada uno, que es quien sabe
+  // en qué punto del recorrido está el usuario; aquí solo se montan, inertes.
+  parcelas: true,
   // ── Las PARCELAS VECINAS, dibujadas (deuda de F05) ───────────────────────
   // `true` y no un objeto porque esta opción es BOOLEANA por contrato: la capa no
   // tiene ni una opción de montaje (`crearVisor` LANZA si se le pasa un objeto, y
@@ -4027,18 +4159,22 @@ expedienteCableado = cablearExpediente({
  * respeta. Lo que se lee aquí es el CAMPO del POJO (`model/parcela.js`), no su
  * regla: hay contorno oficial cuando `geometriaOficial` trae al menos un recinto.
  *
+ * ⛔ **AQUÍ SE DEVOLVÍA UN TERCER HECHO, `diagnostico`, Y SE RETIRA EL
+ * 2026-08-08.** Decía «el último diagnóstico que se pintó en el cajón» y su único
+ * consumidor era la compuerta del peldaño «Informe». Retirado el peldaño, este
+ * booleano no lo leía nadie: se calculaba en cada refresco y se tiraba. Quien
+ * quiera saber si hay diagnóstico sigue teniendo la puerta de siempre
+ * (`diagnosticoCableado.ultimoDiagnostico()`), que es de donde salía este valor —
+ * lo que desaparece es la COPIA que viajaba al rail. Ver
+ * `app/navegacion.js#CLAVES_HECHOS`.
+ *
  * @param {object|null} parcela
- * @returns {{geometria: boolean, oficial: boolean, diagnostico: boolean}}
+ * @returns {{geometria: boolean, oficial: boolean}}
  */
 function hechosDeParcela(parcela) {
   return {
     geometria: hayGeometria(parcela),
     oficial: Array.isArray(parcela?.geometriaOficial) && parcela.geometriaOficial.length > 0,
-    // El ÚLTIMO diagnóstico que se pintó en el cajón, leído por la misma puerta
-    // que usa el informe de F09 (`cablearDiagnostico#ultimoDiagnostico`). Es una
-    // lectura, no una segunda verdad: si se recalculara aquí, el rail podría
-    // ofrecer «Informe» sobre unas cifras y el PDF salir con otras.
-    diagnostico: diagnosticoCableado.ultimoDiagnostico() !== null,
   }
 }
 
@@ -4059,31 +4195,22 @@ function hechosDeParcela(parcela) {
  *                     **No abre ningún peldaño** —el contraste es opcional y su
  *                     caso estrella es que no la haya—: se calcula para que el rail
  *                     pueda decir la verdad de lo que hay, no para bloquear.
- *   · `diagnostico` — se ha llegado a contrastar. Tampoco abre ningún peldaño, por
- *                     lo mismo: el informe de construcción se sostiene sin él y sale
- *                     entonces «solo declarativo» (ficha §17).
+ *
+ * ⛔ **Y AQUÍ TAMBIÉN SE VA `diagnostico` (2026-08-08).** Su propio comentario ya
+ * decía, desde F14, que **no bloqueaba nada en esta rama**: ningún paso de
+ * EDIFICIO lo exigía. Vivía porque en PARCELA sí abría «Informe», y `fundirHechos`
+ * obliga a que las dos ramas hablen el mismo vocabulario. Retirado aquel peldaño,
+ * se queda sin ninguna de las dos razones. `contrasteEdificioCableado
+ * .ultimoContraste()` sigue estando para quien lo necesite; lo que se retira es la
+ * copia que viajaba al rail para que nadie la mirase.
  *
  * @param {object|null} edificio
- * @returns {{geometria: boolean, oficial: boolean, diagnostico: boolean}}
+ * @returns {{geometria: boolean, oficial: boolean}}
  */
 function hechosDeEdificio(edificio) {
   return {
     geometria: hayEdificio(edificio),
     oficial: hayHuellaOficial(edificio),
-    // ⭐ **Ya está cableado (paso 13b), y se lee por la misma puerta que el
-    // informe.** Aquí ponía `false` con un «⏳ pendiente de su cableado» honrado
-    // mientras `diagnostico/edificio.js` no tuvo llamante; F14 lo enchufa y el
-    // comentario se retira con el mismo cuidado con el que se puso.
-    //
-    // Es una LECTURA, no una segunda verdad: si se recalculara aquí, el rail
-    // podría decir una cosa y el PDF salir con otra. Y el `?.` no es defensa
-    // supersticiosa —`contrasteEdificioCableado` es `null` de verdad si el paso 13b
-    // se cayó, y entonces la respuesta correcta es «no se ha contrastado»—.
-    //
-    // **No bloquea nada**: ningún paso de la rama EDIFICIO exige este hecho (ver
-    // `app/navegacion.js#REGLA`), así que el informe se alcanza igual sin contraste
-    // y sale «solo declarativo», que es el caso que la ficha §17 describe.
-    diagnostico: (contrasteEdificioCableado?.ultimoContraste() ?? null) !== null,
   }
 }
 
@@ -4275,8 +4402,12 @@ const contrasteCableado = cablearContraste({
  * Se intenta Diagnóstico, que es a lo que se venía. Si no se sostiene —el caso
  * real y previsto: el Catastro no ha dado parcelario, así que no hay contorno
  * oficial contra el que contrastar (degradación declarada de F08)— se cae a
- * Validación **y se dice por qué**, en vez de dejar al usuario donde estaba
+ * **Edición y se dice por qué**, en vez de dejar al usuario donde estaba
  * preguntándose si el botón ha hecho algo.
+ *
+ * ⭐ Esa caída era a «Validación» hasta el 2026-08-08; el destino no ha cambiado
+ * de sitio, ha cambiado de nombre: Edición es la pantalla que se quedó la tabla
+ * de vértices y los CTA que antes vivían allí.
  *
  * @returns {void}
  */
@@ -4286,7 +4417,7 @@ function aterrizarTrasContrastar() {
   refrescarHechos()
   const aDiagnostico = navegacion.navegarAPaso(PASO.DIAGNOSTICO)
   if (aDiagnostico.ok) return
-  navegacion.navegarAPaso(PASO.VALIDACION)
+  navegacion.navegarAPaso(PASO.EDICION)
   if (typeof aDiagnostico.motivo === 'string' && aDiagnostico.motivo !== '') {
     panel.avisar(aDiagnostico.motivo, { nivel: NIVEL.AVISO })
   }
@@ -4330,7 +4461,8 @@ ramaCableada.subscribe((rama) => {
 // `estado` se enteraba. Retirado el modo, el rótulo del GML importado es uno solo y
 // lo pinta el suscriptor del store como los otros cuatro.
 //
-// ⭐ **AQUÍ ESTUVO EL APAÑO DE T5, Y T9 LO HA BORRADO.** Ponía esto:
+// ⭐ **AQUÍ ESTUVO EL APAÑO DE T5, Y T9 LO BORRÓ. Y EL 2026-08-08 SE VA TAMBIÉN
+// LO QUE T9 PUSO EN SU SITIO.** El apaño ponía esto:
 //
 //     ctaDiagnosticar.addEventListener('click', () => {
 //       queueMicrotask(refrescarHechos)
@@ -4339,15 +4471,23 @@ ramaCableada.subscribe((rama) => {
 //
 // Existía porque `app/cableado-diagnostico.js` **no notificaba a nadie**:
 // `ultimoDiagnostico()` era una lectura, no un canal. Como el paso «Informe» del
-// rail depende de que haya diagnóstico, la única forma de enterarse era mirar dos
-// veces y esperar que la segunda llegara tarde. Un temporizador de 500 ms es una
-// apuesta: con la red lenta, el rail se quedaba sin encender «Informe» y nada lo
-// decía. Ahora hay suscripción de verdad ({@link cablearDiagnostico}`#alDiagnostico`).
+// rail dependía de que hubiera diagnóstico, la única forma de enterarse era mirar
+// dos veces y esperar que la segunda llegara tarde. T9 lo sustituyó por una
+// suscripción de verdad: `diagnosticoCableado.alDiagnostico(refrescarHechos)`.
+//
+// ⛔ Y esa línea ya no está, porque **retirado el peldaño «Informe» no hay ningún
+// paso del rail que dependa de que haya diagnóstico**. Refrescar los hechos al
+// diagnosticar no encendía nada: `geometria` y `oficial` —los dos que quedan— no
+// cambian por diagnosticar. Era una suscripción viva cuyo trabajo se había
+// quedado sin destinatario.
+//
+// ⚠️ **`alDiagnostico` NO se retira de `cablearDiagnostico`**: sigue teniendo
+// llamante (el cajón y el informe se enteran por ahí). Lo que se retira es ESTE
+// suscriptor.
 //
 // Y el CTA del pie NAVEGA, que es la otra mitad de T9: pulsar «Diagnosticar encaje»
 // era la única acción de la aplicación que producía una pantalla entera sin mover
 // el rail de sitio.
-diagnosticoCableado.alDiagnostico(refrescarHechos)
 
 // ── Rework de UI · rebanada 5 · EL INFORME ES UNA PANTALLA, NO UN MODAL ────
 //
@@ -4364,68 +4504,61 @@ diagnosticoCableado.alDiagnostico(refrescarHechos)
 // síntoma de la rebanada 3 (un peldaño decorativo) y de la 4 (una pantalla vacía),
 // y aquí estaban los dos a la vez.
 //
-// La corrección es la que el plan pedía —«Informe sale del `<dialog>` a página
-// completa»— hecha con el mismo interruptor que las dos rebanadas anteriores:
-// `app/dialogo-informe.js#comoPantalla`. La vista no sabe qué es un paso; esto es
-// el cable.
+// La corrección de la rebanada 5 fue —«Informe sale del `<dialog>` a página
+// completa»— con el interruptor `app/dialogo-informe.js#comoPantalla`.
+//
+// ── ⭐ Y EL 2026-08-08 SE LE QUITA EL PELDAÑO, QUE ES LA OTRA SALIDA AL MISMO
+//      DEFECTO ────────────────────────────────────────────────────────────────
+// La rebanada 5 diagnosticó bien —«el peldaño no participaba»— y eligió una de
+// las dos correcciones posibles: **hacer que participara**. La otra era
+// **quitarlo**, y es la que se aplica ahora, porque la primera obliga al rail a
+// tener un estado por cada `<dialog>` de la aplicación y esta aplicación tiene
+// siete. El informe **sigue presentándose a pantalla completa** —eso no se
+// toca—; lo que desaparece es el peldaño y, con él, tres cables:
+//
+//   · el suscriptor que conmutaba `comoPantalla` según el paso,
+//   · el `preparar()` de rescate que existía porque al peldaño se podía llegar
+//     desde el rail sin haber pulsado el CTA que prepara el contenido,
+//   · y la navegación del propio CTA.
+//
+// ⚠️ **Y la guarda de «no hay informe sin diagnóstico» NO se pierde**: pasa de
+// compuerta declarada a hecho de la estructura. «Preparar informe (PDF)» vive
+// DENTRO del cajón de diagnóstico, y ese cajón no existe hasta que se ha
+// diagnosticado. Ver la nota en `app/navegacion.js#REGLA`.
 if (
   informeCableado.dialogo !== null &&
   typeof informeCableado.dialogo.comoPantalla === 'function'
 ) {
   const dialogoInforme = informeCableado.dialogo
 
-  const aplicarInforme = ({ paso } = navegacion.get()) => {
-    const esSuPantalla = paso === PASO.INFORME
-    // ⚠️ El interruptor va ANTES de cerrar, y por lo mismo que en la rebanada 4:
-    // la presentación tiene que estar decidida cuando el diálogo se enseñe. El
-    // caso peor es el CTA, que abre y navega en el MISMO gesto; `comoPantalla`
-    // sabe volver a presentar un diálogo ya abierto justamente para que el orden
-    // de esos dos oyentes deje de importar.
-    dialogoInforme.comoPantalla(esSuPantalla)
-    if (!esSuPantalla) {
-      dialogoInforme.cerrar()
-      return
-    }
-    // ⛔ **Y LLEGAR AQUÍ TIENE QUE PRODUCIR LA PANTALLA.** Medido el 2026-08-05
-    // con la mitad de arriba ya puesta: el peldaño «Informe» del rail dejaba
-    // `data-paso="informe"` y **el diálogo cerrado** — la pantalla vacía otra
-    // vez, porque quien prepara el contenido es el CTA del cajón y desde el rail
-    // no lo pulsa nadie. Es exactamente el defecto que la rebanada 4 encontró en
-    // Diagnóstico, y aquí habría entrado por la puerta de al lado.
-    //
-    // ⚠️ Llamar a `preparar()` con una preparación ya en vuelo es SEGURO:
-    // `cablearInforme` lleva su propia guarda (`preparando`) desde F09 y lo dice
-    // por el renglón del cajón. Eso es justo lo que pasa en el camino del CTA, que
-    // prepara y navega en el mismo gesto: la segunda llamada se descarta sola. La
-    // guarda vive allí y no aquí a propósito — es una propiedad de preparar un
-    // informe, no de navegar.
-    if (!dialogoInforme.abierto()) informeCableado.preparar()
-  }
-  aplicarInforme(navegacion.get())
-  navegacion.subscribe(aplicarInforme)
+  // SIEMPRE pantalla, y ahora se puede decir de una vez porque ya no depende de
+  // dónde esté el rail. Se fija al cablear —no al abrir— porque `presentar()` lee
+  // esta bandera en el momento de enseñarse: dejarla para el oyente del CTA sería
+  // volver a hacer que el orden de dos oyentes importe, que es exactamente lo que
+  // la rebanada 5 tuvo que blindar.
+  dialogoInforme.comoPantalla(true)
 
-  // «Cancelar» y `Escape` en su propia pantalla no cierran: PIDEN SALIR (ver
-  // `dialogo-informe.js#pedirCierre`). Se sale a **Diagnóstico**, que es de donde
-  // viene el informe y donde están las cifras que firma; si no se sostuviera —hoy
-  // no puede: Informe exige `diagnostico` y Diagnóstico exige menos— se cae a
-  // Validación en vez de tragarse el gesto.
+  // En modo pantalla, «Cancelar» y `Escape` NO cierran: PIDEN salir (ver
+  // `dialogo-informe.js#pedirCierre`), porque cerrar estando en su propio paso
+  // dejaba la pantalla vacía. Sin peldaño propio ya no hay pantalla que vaciar:
+  // detrás está Diagnóstico, con su cajón y sus cifras, que es de donde se vino.
+  // Así que salir es, literalmente, cerrar.
+  //
+  // ⛔ El gesto sigue pasando por `alCancelar` y no se le devuelve a `pedirCierre`
+  // la capacidad de cerrar solo: quien decide qué significa «sácame de aquí» es la
+  // aplicación, no la vista. Hoy significa cerrar; el día que signifique otra cosa
+  // se cambia aquí, en una línea, y la vista no se entera.
   dialogoInforme.alCancelar(() => {
-    if (navegacion.get().paso !== PASO.INFORME) return
-    if (navegacion.navegarAPaso(PASO.DIAGNOSTICO).ok) return
-    navegacion.navegarAPaso(PASO.VALIDACION)
+    dialogoInforme.cerrar()
   })
 }
 
-// Y «Preparar informe (PDF)» NAVEGA, igual que «Diagnosticar encaje» desde T9: era
-// la otra acción de la aplicación que producía una pantalla entera sin mover el
-// rail de sitio. El oyente del cableado (que prepara el contenido y abre) sigue
-// donde estaba; éste solo dice dónde estamos.
-const ctaPrepararInforme = document.querySelector('[data-accion="preparar-informe"]')
-if (ctaPrepararInforme !== null) {
-  ctaPrepararInforme.addEventListener('click', () => {
-    navegacion.navegarAPaso(PASO.INFORME)
-  })
-}
+// ⛔ **AQUÍ ESTABA LA NAVEGACIÓN DE «Preparar informe (PDF)», Y SE HA IDO
+// (2026-08-08).** Ponía `navegacion.navegarAPaso(PASO.INFORME)` y era la mitad
+// de T9 que emparejaba este CTA con «Diagnosticar encaje». Sin peldaño «Informe»
+// no hay a dónde navegar, y el botón vuelve a hacer UNA sola cosa: el oyente de
+// `cablearInforme` prepara el contenido y abre el diálogo, que es lo que hacía
+// desde F09 y no ha dejado de hacer ni un día.
 
 const ctaDiagnosticar = document.querySelector('[data-accion="diagnosticar"]')
 if (ctaDiagnosticar !== null) {
@@ -4654,9 +4787,58 @@ const medicion = cablearMedicion({
   // {@link aterrizarTrasContrastar} intenta Diagnóstico y se cae a Validación
   // diciendo por qué: con la parcela oficial delante el encaje se puede medir, y
   // sin ella —el caso de empezar un expediente desde cero— no, y se dice.
+  //
+  // ⛔ **F22 · Y NO SE ATERRIZA EN DIAGNÓSTICO CUANDO LO DIBUJADO *ES* LA
+  // OFICIAL, que lo destapó el guion 24.** Un DXF de «Consulta Masiva» entra con
+  // `recintos === geometriaOficial`, así que el encaje vale CERO **por
+  // construcción**: la ficha de F22 ya lo dice —«que nadie lea ese cero como una
+  // verificación»— y aterrizar ahí es enseñar un dictamen tautológico como si
+  // fuera un resultado.
+  //
+  // Y tenía una segunda mitad, peor y silenciosa: abrir el Diagnóstico dispara
+  // `pedirVecinas()`, que **sustituía las siete fincas del dibujo por las que
+  // conteste el WFS** —medido: 7 → 3, y el renglón de la ficha perdía el «· del
+  // dibujo»— cincuenta milisegundos después de haberlas cargado. Es el mismo
+  // patrón que «traer el Catastro machaca la medición» (2026-08-08), un piso más
+  // abajo y con las vecinas en vez de con la parcela.
+  //
+  // El criterio es {@link dibujoEsLaOficial}, el mismo que M25 midió para la
+  // cabecera: **que lo dibujado SEA la oficial**, no que exista una. El destino es
+  // Edición, que es donde están la tabla de vértices y los CTA.
   alCargarParcela: (parcela) => {
     edicionCableada.alCargarParcela(parcela)
+    if (dibujoEsLaOficial(parcela)) {
+      refrescarHechos()
+      navegacion.navegarAPaso(PASO.EDICION)
+      return
+    }
     aterrizarTrasContrastar()
+  },
+  // ── F22 · el dibujo trae VARIAS fincas ────────────────────────────────────
+  // Las dos piezas del visor y la capa de vecinas. Van desde aquí y no se buscan
+  // desde el cableado por lo mismo que todo lo demás del visor: `app/main.js` es
+  // el único módulo que compone, y `cablearMedicion` sigue funcionando sin ellas
+  // —se degrada a contar el bloqueo con palabras— para poder usarse en un test.
+  parcelas: visor.parcelas,
+  // ⚠️ **NO se le pasa `visor.colindantes` a pelo**, y no es ceremonia: la ficha
+  // del panel tiene UN dueño —este módulo—, que es lo que impide que dos sitios
+  // escriban el mismo renglón con criterios distintos. El cableado pinta; quién
+  // lleva la cuenta, y de dónde dice que salieron, se decide aquí.
+  colindantes: {
+    pintar: (vecinas) => {
+      visor.colindantes.pintar(vecinas)
+      fijarRecuentoColindantes(vecinas.length, true)
+    },
+  },
+  // Los otros dos inquilinos de `bottomleft`. Se cierran ANTES de abrir el de
+  // fincas: soltar un fichero no es un clic, así que su guardián de clic-fuera no
+  // se entera y quedarían apilados. Mismo gesto que el paso 9 con el de F07.
+  cajonesQueCerrar: [visor.diagnostico.cajon, visor.comprobacion],
+  // El MISMO gancho y el MISMO porqué que en el paso 9: este cajón pertenece a
+  // Entrada, y soltar el fichero desde Diagnóstico dejaría el rail diciendo una
+  // cosa y la esquina del mapa enseñando otra.
+  alPedirEleccion: () => {
+    navegacion.navegarAPaso(PASO.ENTRADA)
   },
 })
 medicionCableada = medicion

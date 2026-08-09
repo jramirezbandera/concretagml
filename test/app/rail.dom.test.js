@@ -86,7 +86,7 @@ const motivoDe = (paso) => li(paso).querySelector(`.${CLASE.MOTIVO}`).textConten
 const estadoDe = (paso) => li(paso).getAttribute(ATRIBUTO_ESTADO)
 
 /** Con todo cargado: los cinco pasos disponibles. */
-const TODO = { geometria: true, oficial: true, diagnostico: true }
+const TODO = { geometria: true, oficial: true }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -159,8 +159,10 @@ describe('T5 · los tres estados, y ninguno en silencio', () => {
     // Se compara contra la constante exportada por `app/navegacion.js`, no contra
     // un literal copiado aquí. Si el rail empezara a redactar sus propios textos,
     // este `it` sale rojo.
-    expect(motivoDe(PASO.VALIDACION)).toBe(MOTIVO_DATO.geometria)
-    expect(motivoDe(PASO.INFORME)).toBe(MOTIVO_DATO.diagnostico)
+    expect(motivoDe(PASO.EDICION)).toBe(MOTIVO_DATO.geometria)
+    // Diagnóstico pide DOS hechos y falta el primero: se dice el primero de la
+    // lista, que es el que el usuario puede resolver antes.
+    expect(motivoDe(PASO.DIAGNOSTICO)).toBe(MOTIVO_DATO.geometria)
   })
 
   it('⭐ F14 · en la rama EDIFICIO el rail ya no apaga NADA por rama', () => {
@@ -185,7 +187,7 @@ describe('T5 · los tres estados, y ninguno en silencio', () => {
     // posteriores a Entrada siguen bloqueados —por el DATO— y el motivo que se lee
     // es el de EDIFICIO («trae antes un edificio»), no el de parcela.
     cablear({ rama: RAMA.EDIFICIO, hechos: { [RAMA.EDIFICIO]: { geometria: false } } })
-    for (const paso of [PASO.VALIDACION, PASO.EDICION, PASO.DIAGNOSTICO, PASO.INFORME]) {
+    for (const paso of [PASO.EDICION, PASO.DIAGNOSTICO]) {
       expect(estadoDe(paso), `el estado de ${paso}`).toBe(ESTADO.BLOQUEADO)
       expect(motivoDe(paso), `el motivo de ${paso}`).toMatch(/edificio/i)
     }
@@ -215,9 +217,8 @@ describe('T5 · los tres estados, y ninguno en silencio', () => {
 
   it('`disabled` es lo que impide que el tabulador se pare donde no se puede ir', () => {
     cablear({ hechos: { geometria: true } })
-    expect(boton(PASO.VALIDACION).disabled).toBe(false)
+    expect(boton(PASO.EDICION).disabled).toBe(false)
     expect(boton(PASO.DIAGNOSTICO).disabled).toBe(true)
-    expect(boton(PASO.INFORME).disabled).toBe(true)
   })
 })
 
@@ -232,16 +233,16 @@ describe('T5 · pulsar', () => {
   it('avisa al llamante con el paso, que es por donde entra el `invalidateSize`', () => {
     const alNavegar = vi.fn()
     cablear({ hechos: TODO, alNavegar })
-    boton(PASO.VALIDACION).click()
+    boton(PASO.EDICION).click()
     expect(alNavegar).toHaveBeenCalledTimes(1)
-    expect(alNavegar).toHaveBeenCalledWith(PASO.VALIDACION)
+    expect(alNavegar).toHaveBeenCalledWith(PASO.EDICION)
   })
 
   it('un paso bloqueado no navega ni aunque se le despache el suceso a mano', () => {
     const { navegacion } = cablear({ hechos: { geometria: true } })
     // `.click()` sobre un `disabled` no dispara; se fuerza el suceso para probar
     // que la guarda no depende solo del atributo.
-    boton(PASO.INFORME).dispatchEvent(new Event('click', { bubbles: true }))
+    boton(PASO.DIAGNOSTICO).dispatchEvent(new Event('click', { bubbles: true }))
     expect(navegacion.get().paso).toBe(PASO.ENTRADA)
   })
 
@@ -263,7 +264,7 @@ describe('T5 · pulsar', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     vivo = cablearRail({ documento: document, navegacion: navegacionRota, panel })
 
-    expect(() => boton(PASO.VALIDACION).click()).not.toThrow()
+    expect(() => boton(PASO.EDICION).click()).not.toThrow()
 
     expect(panel.avisar).toHaveBeenCalledWith(MENSAJE_NAVEGAR_ROTO, expect.objectContaining({ causa }))
     expect(error).toHaveBeenCalled()
@@ -315,13 +316,13 @@ describe('T5 · ⛔ los peldaños NUNCA salen del documento', () => {
 describe('T5 · el rail se entera de los hechos aunque no cambie el paso', () => {
   it('cargar una parcela abre pasos sin moverte de sitio (tras `repintar`)', () => {
     const { navegacion, rail } = cablear()
-    expect(estadoDe(PASO.VALIDACION)).toBe(ESTADO.BLOQUEADO)
+    expect(estadoDe(PASO.EDICION)).toBe(ESTADO.BLOQUEADO)
 
     navegacion.actualizarHechos({ geometria: true })
     rail.repintar()
 
-    expect(estadoDe(PASO.VALIDACION)).toBe(ESTADO.LIBRE)
-    expect(motivoDe(PASO.VALIDACION)).toBe('')
+    expect(estadoDe(PASO.EDICION)).toBe(ESTADO.LIBRE)
+    expect(motivoDe(PASO.EDICION)).toBe('')
     // Y el usuario sigue donde estaba: abrir un paso no te empuja a él.
     expect(navegacion.get().paso).toBe(PASO.ENTRADA)
   })
@@ -338,7 +339,7 @@ describe('T5 · destruir', () => {
 
     expect(document.querySelector(SELECTOR_PASOS).children).toHaveLength(0)
     // Y no se queda escuchando: navegar después no revienta ni repinta nada.
-    expect(() => navegacion.navegarAPaso(PASO.VALIDACION)).not.toThrow()
+    expect(() => navegacion.navegarAPaso(PASO.EDICION)).not.toThrow()
     expect(peldanos()).toHaveLength(0)
   })
 })

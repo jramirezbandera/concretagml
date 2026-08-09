@@ -2666,3 +2666,95 @@ sin mirar el mapa y el renglón a la vez.
 
 El **ICUC no ve este informe**: es papel del colegiado. El GML sí pasó, y su CSV
 está en §18. Aquí no hay verdad externa que buscar — hay criterio profesional.
+
+## §20 · F22 · El DXF de «Consulta Masiva»: elegir la finca entre las ocho
+
+**Qué está medido ya y no hace falta que repitas:** que el fichero real de la Sede
+entra (176 polilíneas, dos capas, 161 textos), que el cajón ofrece las **ocho**
+fincas **con su referencia catastral sacada del propio dibujo**, que ninguna nace
+marcada, que marcar en la lista resalta en el mapa y pinchar en el mapa marca en la
+lista, que la elegida entra con su referencia y su superficie (548,05 m²), que las
+otras **siete** se quedan de parcelario y la ficha dice «7 · del dibujo», que la
+cabecera y el renglón de procedencia dicen **lo mismo**, que no se consulta ningún
+servicio de datos y que la fase cuesta **0 px** del panel. Todo eso lo firma
+`24-parcelario-dxf.js`, `ok:true` a 1280×720.
+
+Lo que sigue **no lo puede firmar ninguna máquina de esta carpeta**.
+
+### 20.1 · ⛔ BLOQUEANTE · ¿Reconoces TU parcela entre las ocho, sin que te lo expliquen?
+
+Es la razón de ser de la decisión 3 de la fase, y lo único que ninguna aserción
+puede contestar. **Ocho referencias catastrales que comparten los once primeros
+caracteres** —`6346726UF8664N`, `6346725UF8664N`, `6346714UF8664N`…— no se
+distinguen leyendo: se distinguen viendo.
+
+1. Abre la aplicación **en limpio** (sin `?demo=`) y suelta un DXF de Consulta
+   Masiva **de un encargo tuyo**, no el del repositorio.
+2. Elige la capa de parcelas.
+3. **Sin leer nada más**, señala en el cajón la que crees que es la tuya.
+4. Comprueba en el mapa —con el resalte azul— si acertaste.
+
+**Lo que hay que decidir:** ¿acertaste a la primera? ¿Y lo hiciste por la
+referencia, por la superficie o por dónde está? Si la respuesta es «tuve que
+probar dos o tres», la lista está ordenando mal el trabajo y hay que decirlo: el
+orden es el del fichero, no el del sentido común.
+
+⚠️ Y una pregunta que solo tú puedes contestar: **¿la superficie que enseña la
+lista es la que tú esperabas para esa finca?** La aplicación mide el polígono con
+su propia fórmula; si difiere de la que tienes en la ficha catastral, es un dato
+que hay que anotar, no una errata.
+
+### 20.2 · El encuadre y el sitio, con tus ojos
+
+El guion mide que las ocho caen dentro del mapa, que ninguna baja de 6 px de lado y
+que el cajón no tapa más de la mitad de ninguna. Eso es geometría. Lo que tienes
+que mirar tú:
+
+- **¿Se ven las ocho A LA VEZ y con holgura**, o hay que adivinar dónde acaba una y
+  empieza la siguiente? En una manzana **todas comparten lindero**.
+- **El gris de las candidatas contra la cartografía catastral encendida** (las
+  líneas rojas del WMS): ¿se distinguen, o se mezclan? Prueba a bajar la opacidad
+  de la cartografía con la barra de abajo a la derecha.
+- **El resalte azul**: ¿se ve que es *esa* y no la de al lado?
+
+### 20.3 · ⛔ El parcelario del dibujo se puede perder, y es límite conocido
+
+Cargada la finca, las otras siete quedan dibujadas y la ficha dice «7 · del
+dibujo». **Si después pulsas «Diagnosticar encaje»**, la aplicación pide las
+colindantes al Catastro y **las del servicio sustituyen a las del dibujo** —en el
+fichero del repositorio, 7 pasan a 3—. Desde la fase 5 **lo dice** con un aviso en
+el panel, y ya no pasa solo.
+
+**Lo que hay que decidir:** ¿el aviso basta, o quieres poder quedarte con las del
+dibujo? Es una decisión de producto, no un defecto pendiente: son dos parcelarios
+distintos y el del servicio es el que manda para medir invasión.
+
+⚠️ **Y por qué no aterrizas en Diagnóstico al cargar la finca**: entra con
+`recintos === geometriaOficial`, así que el encaje vale **cero por construcción**.
+Ese cero no verifica nada, y enseñarlo como resultado sería lo mismo que firmar
+una comprobación que nadie ha hecho. Se aterriza en Edición a propósito.
+
+### 20.4 · Las 168 construcciones que no entran
+
+El dibujo trae además la capa `Construccion` con **168 polilíneas**, que son las
+huellas de los edificios de la manzana. **No entran** (decisión 4) y la aplicación
+lo dice en el panel, remitiendo a la rama Edificio.
+
+**Lo que hay que decidir:** ¿el aviso se entiende, o parece que algo ha fallado?
+Son 168 polilíneas que tú ves en tu CAD y que aquí desaparecen; si el mensaje no
+convence, el usuario va a desconfiar también de lo que **sí** ha entrado.
+
+### 20.5 · El huso, que sale ambiguo y no debería
+
+El panel avisa de que hay **dos interpretaciones viables (30, 31)** y ofrece la 30.
+El centroide cae en 386.115 / 4.064.386, que es huso 30 sin discusión. **Es
+cosmético y está declarado en la ficha**: no es de esta fase porque toca
+`geo/huso.js` y su suite. Míralo y decide si molesta lo bastante como para abrir
+una fase corta.
+
+### 20.6 · Lo que NO es de esta lista
+
+**Que el siguiente fichero de Consulta Masiva se parezca a éste.** Un solo fichero
+no es la especificación del formato: lo que la fase promete es lo que este fichero
+demuestra. Si te llega uno que no entra, **guárdalo**: es el material de la
+siguiente fase, igual que éste lo fue de ésta.

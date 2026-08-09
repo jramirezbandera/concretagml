@@ -43,7 +43,11 @@
 // —`edificio_consulta_masiva_3515508VF0831N.dxf`, 7 anillos en «Construccion» y 1
 // en «Parcela»— dispara **los dos**: reenviarlos a ciegas dejaría la rama EDIFICIO
 // bloqueada en su caso NORMAL, porque un DXF de edificio viene por definición de
-// varias capas. Por eso `resumen.bloqueos` se filtra con `BLOQUEOS_SOLO_PARCELA`,
+// varias capas. ⭐ **Y desde F22 son TRES de SEIS**: `VARIOS_RECINTOS_DISJUNTOS`
+// se les une, y es el más peligroso de arrastrar — vivienda, porche y piscina SON
+// tres recintos disjuntos, así que sin filtrarlo esta rama quedaría bloqueada en
+// TODOS sus ficheros, también en los de una sola capa.
+// Por eso `resumen.bloqueos` se filtra con `BLOQUEOS_SOLO_PARCELA`,
 // que `parsers/importar.js` publica ya agrupado justo para esto.
 //
 // ── LO QUE SE TIRA, Y DÓNDE SE DICE ─────────────────────────────────────────
@@ -375,6 +379,7 @@ function armarResumen({
   construido,
   detecciones,
   superficie: cotejo = null,
+  rotulos = null,
 }) {
   return {
     via,
@@ -386,6 +391,25 @@ function armarResumen({
     huso,
     bloqueos,
     construido,
+    /**
+     * ⭐ **F22 · Los rótulos que el dibujo le pone a cada parte, y que hasta ahora
+     * se tiraban.** `{capa, nombres}` con `nombres[i]` 1:1 con las partes, o
+     * `null` si el fichero no las nombra limpiamente. Viaja por el mismo motivo
+     * que `capas`: es un dato del fichero que esta capa ha medido, y esconderlo
+     * obligaría a volver a leerlo.
+     *
+     * ⚠️ **F22 no lo USA en esta rama, y no cambia ni un comportamiento**: la
+     * decisión 4 de la fase deja las construcciones fuera. Lo que hace es dejar de
+     * tirarlo — y lo que aparece al medirlo es la deuda que F11 declaró y F12 no
+     * cobró: sobre el fixture real de edificio, `{capa:'Construccion'}` da
+     * **`['II','III','III','II','I','P','I']`**, que son las PLANTAS por parte que
+     * hoy el técnico teclea a mano.
+     *
+     * ⛔ Y al medirlo apareció además un error en la tabla de `PROCEDENCIA.md`:
+     * decía que la parte 0 lleva `I`, y el fichero tiene **dos** `I` y **dos**
+     * `II`, no tres `I`. Corregido allí.
+     */
+    rotulos,
     /**
      * F14 · El cotejo contra el «Área:» que declara el volcado, o `null`. Misma
      * forma que el de `parsers/importar.js`, para que
@@ -597,6 +621,9 @@ export function entradaDesdeTexto(texto, opts = {}) {
       // partes y no se reenvía el de `importar`: aquél mide el reparto de una
       // parcela y aquí los anillos son cuerpos disjuntos. Ver la función.
       superficie: cotejoDeConstruccion(partes, res.resumen.superficie),
+      // F22 · Se reenvía TAL CUAL: `importar` lo ha medido sobre estos mismos
+      // anillos —los de la capa elegida—, así que ya son las partes.
+      rotulos: res.resumen.rotulos,
     }),
   }
 }

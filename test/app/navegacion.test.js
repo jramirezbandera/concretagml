@@ -40,6 +40,7 @@ import {
   RAMA,
   RAMAS,
   ROTULO_PASO,
+  RUTA_RETIRADA,
   TOPE_RECONCILIACION,
   crearNavegacion,
   evaluarPaso,
@@ -70,7 +71,7 @@ const SITUACIONES = RAMAS.flatMap((rama) =>
  *  aparte que sí comprueba ese canal por defecto. */
 const navegacionCompleta = (extra = {}) =>
   crearNavegacion({
-    hechos: { geometria: true, oficial: true, diagnostico: true },
+    hechos: { geometria: true, oficial: true },
     avisar: () => {},
     ...extra,
   })
@@ -98,10 +99,10 @@ describe('T1 · el vocabulario se declara UNA vez', () => {
 
   it('los pasos van en minúscula porque se escriben en la URL', () => {
     for (const paso of PASOS) expect(paso).toBe(paso.toLowerCase())
-    expect(PASOS).toEqual(['entrada', 'validacion', 'edicion', 'diagnostico', 'informe'])
+    expect(PASOS).toEqual(['entrada', 'edicion', 'diagnostico'])
   })
 
-  it('los cinco pasos tienen rótulo, y ninguno sobra', () => {
+  it('los tres pasos tienen rótulo, y ninguno sobra', () => {
     expect(Object.keys(ROTULO_PASO).sort()).toEqual([...PASOS].sort())
     for (const paso of PASOS) expect(ROTULO_PASO[paso]).toMatch(/\S/)
   })
@@ -271,7 +272,7 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     // no se «arregla» aflojando la aserción.
     const enEdificio = {
       rama: RAMA.EDIFICIO,
-      hechos: { geometria: true, oficial: false, diagnostico: false },
+      hechos: { geometria: true, oficial: false },
     }
     for (const paso of PASOS) {
       expect(evaluarPaso(paso, enEdificio).disponible, `el paso ${paso}`).toBe(true)
@@ -285,7 +286,7 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     // consta construcción registrada»— es precisamente aquel en el que no hay
     // huella oficial. Exigirla dejaría esa pantalla escrita, probada y sin forma
     // de llegar a ella: la trampa de `MOTIVO_SIN_EDIFICIO` en F13.
-    const soloGeometria = { geometria: true, oficial: false, diagnostico: false }
+    const soloGeometria = { geometria: true, oficial: false }
 
     expect(
       evaluarPaso(PASO.DIAGNOSTICO, {
@@ -303,21 +304,28 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     expect(enParcela.causa).toBe(CAUSA.DATO)
   })
 
-  it('⭐ F14 · el Informe de EDIFICIO no exige diagnóstico: sale «solo declarativo»', () => {
+  it('⭐ F14 · el Diagnóstico de EDIFICIO no exige huella oficial: la obra nueva no la tiene', () => {
     // Ficha §17: «si no [hubo contraste], informe solo declarativo, sin sección de
-    // contraste». El informe de construcción se sostiene con la construcción.
-    const sinDiagnostico = { geometria: true, oficial: false, diagnostico: false }
+    // contraste». El caso estrella de esta rama —la obra nueva— es precisamente
+    // aquel en el que el Catastro NO publica huella.
+    //
+    // ⭐ Esta prueba miraba `PASO.INFORME` hasta el 2026-08-08. Retirado aquel
+    // peldaño, lo que queda de F14 en la tabla de guardas es esto: que llegar a
+    // contrastar una construcción no exija tener con qué contrastarla.
+    const sinDiagnostico = { geometria: true, oficial: false }
 
     expect(
-      evaluarPaso(PASO.INFORME, {
+      evaluarPaso(PASO.DIAGNOSTICO, {
         rama: RAMA.EDIFICIO,
         hechos: sinDiagnostico,
       }).disponible,
     ).toBe(true)
 
-    // En PARCELA el informe firma un diagnóstico, y sin él no hay qué firmar.
+    // Y en PARCELA el MISMO paso sí la exige: sin contorno del Catastro no hay
+    // encaje que diagnosticar. Es la asimetría que `requiere` como mapa por rama
+    // existe para poder declarar.
     expect(
-      evaluarPaso(PASO.INFORME, {
+      evaluarPaso(PASO.DIAGNOSTICO, {
         rama: RAMA.PARCELA,
         hechos: sinDiagnostico,
       }).disponible,
@@ -342,7 +350,7 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     // intentar navegar hasta aquí.
     const enEdificio = {
       rama: RAMA.EDIFICIO,
-      hechos: { geometria: true, oficial: false, diagnostico: false },
+      hechos: { geometria: true, oficial: false },
     }
     expect(evaluarPaso(PASO.EDICION, enEdificio).disponible).toBe(true)
     // Y la frase caducada NO se queda a envejecer en el objeto de motivos.
@@ -370,7 +378,7 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
   it('un paso que no existe LANZA nombrando los que sí', () => {
     const situacion = { rama: RAMA.PARCELA, hechos: { ...HECHOS_VACIOS } }
     expect(() => evaluarPaso('generar', situacion)).toThrow(RangeError)
-    expect(() => evaluarPaso('generar', situacion)).toThrow(/entrada, validacion/)
+    expect(() => evaluarPaso('generar', situacion)).toThrow(/entrada, edicion/)
   })
 })
 
@@ -381,7 +389,7 @@ describe('T1 · el store', () => {
     const baja = nav.subscribe(visto)
     expect(visto).not.toHaveBeenCalled()
 
-    nav.navegarAPaso(PASO.VALIDACION)
+    nav.navegarAPaso(PASO.EDICION)
     expect(visto).toHaveBeenCalledTimes(1)
 
     baja()
@@ -392,12 +400,12 @@ describe('T1 · el store', () => {
   it('sin avisador, la caída sale por el canal por defecto de la casa', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const nav = crearNavegacion({ hechos: { geometria: true } }) // sin `avisar`
-    nav.navegarAPaso(PASO.VALIDACION)
+    nav.navegarAPaso(PASO.EDICION)
 
     nav.actualizarHechos({ geometria: false })
 
     expect(warn).toHaveBeenCalledTimes(1)
-    expect(warn.mock.calls[0][0]).toContain(ROTULO_PASO[PASO.VALIDACION])
+    expect(warn.mock.calls[0][0]).toContain(ROTULO_PASO[PASO.EDICION])
     warn.mockRestore()
   })
 
@@ -425,10 +433,10 @@ describe('T1 · el store', () => {
     const visto = []
     nav.subscribe((situacion) => {
       visto.push(situacion.paso)
-      if (situacion.paso === PASO.VALIDACION) nav.navegarAPaso(PASO.EDICION)
+      if (situacion.paso === PASO.EDICION) nav.navegarAPaso(PASO.EDICION)
     })
 
-    nav.navegarAPaso(PASO.VALIDACION)
+    nav.navegarAPaso(PASO.EDICION)
 
     expect(nav.get().paso).toBe(PASO.EDICION)
     expect(visto.at(-1)).toBe(PASO.EDICION)
@@ -439,12 +447,14 @@ describe('T1 · el store', () => {
     const avisos = []
     const nav = navegacionCompleta({ avisar: (mensaje) => avisos.push(mensaje) })
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
-    // Conmuta en cada notificación: nunca converge.
+    // Conmuta en cada notificación: nunca converge. ⚠️ Los DOS pasos tienen que
+    // ser distintos y los dos alcanzables con los hechos de `navegacionCompleta`;
+    // si no, el bucle converge a la primera y esta prueba pasa sin probar nada.
     nav.subscribe((situacion) => {
-      nav.navegarAPaso(situacion.paso === PASO.VALIDACION ? PASO.EDICION : PASO.VALIDACION)
+      nav.navegarAPaso(situacion.paso === PASO.EDICION ? PASO.DIAGNOSTICO : PASO.EDICION)
     })
 
-    nav.navegarAPaso(PASO.VALIDACION)
+    nav.navegarAPaso(PASO.EDICION)
 
     expect(avisos).toContain(MENSAJE_SIN_CONVERGER)
     expect(error).toHaveBeenCalled()
@@ -455,11 +465,13 @@ describe('T1 · el store', () => {
 describe('T1 · navegar', () => {
   it('un paso bloqueado NO lanza, no mueve, y devuelve el motivo', () => {
     const nav = crearNavegacion() // sin ningún hecho
-    const desenlace = nav.navegarAPaso(PASO.INFORME)
+    const desenlace = nav.navegarAPaso(PASO.DIAGNOSTICO)
     expect(desenlace.ok).toBe(false)
     expect(desenlace.paso).toBe(PASO.ENTRADA)
     expect(desenlace.causa).toBe(CAUSA.DATO)
-    expect(desenlace.motivo).toBe(MOTIVO_DATO.diagnostico)
+    // El PRIMERO de los que faltan, que es el que el usuario puede resolver
+    // antes: sin parcela no tiene sentido pedirle el parcelario.
+    expect(desenlace.motivo).toBe(MOTIVO_DATO.geometria)
     expect(nav.get().paso).toBe(PASO.ENTRADA)
   })
 
@@ -468,7 +480,7 @@ describe('T1 · navegar', () => {
     expect(() => nav.navegarAPaso('generar')).toThrow(RangeError)
   })
 
-  it('el rail devuelve los CINCO pasos siempre, aunque cuatro estén apagados', () => {
+  it('el rail devuelve los TRES pasos siempre, aunque dos estén apagados', () => {
     const nav = crearNavegacion()
     const rail = nav.rail()
     expect(rail.map((p) => p.paso)).toEqual([...PASOS])
@@ -482,15 +494,17 @@ describe('T1 · navegar', () => {
 
   it('el estado inicial se recorta al último paso que se sostiene, y EN SILENCIO', () => {
     const avisos = []
-    const nav = crearNavegacion({ paso: PASO.INFORME, avisar: (m) => avisos.push(m) })
+    const nav = crearNavegacion({ paso: PASO.DIAGNOSTICO, avisar: (m) => avisos.push(m) })
     expect(nav.get().paso).toBe(PASO.ENTRADA)
     // Montar la pantalla no es un recorrido del usuario: no se le cuenta nada.
     expect(avisos).toEqual([])
   })
 
   it('el recorte inicial cae al MÁS AVANZADO que se sostiene, no siempre a Entrada', () => {
-    const nav = crearNavegacion({ paso: PASO.INFORME, hechos: { geometria: true, oficial: true } })
-    expect(nav.get().paso).toBe(PASO.DIAGNOSTICO)
+    // Se pide Diagnóstico con geometría pero SIN parcelario: no se sostiene, y el
+    // recorte no cae a Entrada sino a Edición, que es el más avanzado que sí.
+    const nav = crearNavegacion({ paso: PASO.DIAGNOSTICO, hechos: { geometria: true } })
+    expect(nav.get().paso).toBe(PASO.EDICION)
   })
 
   it('rama o paso inventados en el constructor LANZAN', () => {
@@ -504,17 +518,17 @@ describe('T1 · los hechos van POR RAMA', () => {
     const nav = crearNavegacion({
       hechos: { PARCELA: { geometria: true }, EDIFICIO: {} },
     })
-    expect(nav.navegarAPaso(PASO.VALIDACION).ok).toBe(true)
+    expect(nav.navegarAPaso(PASO.EDICION).ok).toBe(true)
 
     // En EDIFICIO no hay nada cargado: Validación deja de sostenerse y se cae.
     const desenlace = nav.cambiarRama(RAMA.EDIFICIO)
     expect(desenlace.ok).toBe(false)
     expect(nav.get().paso).toBe(PASO.ENTRADA)
-    expect(desenlace.motivo).toContain(ROTULO_PASO[PASO.VALIDACION])
+    expect(desenlace.motivo).toContain(ROTULO_PASO[PASO.EDICION])
 
     // Y volver la recupera: los hechos de parcela nunca se perdieron.
     expect(nav.cambiarRama(RAMA.PARCELA).ok).toBe(true)
-    expect(nav.navegarAPaso(PASO.VALIDACION).ok).toBe(true)
+    expect(nav.navegarAPaso(PASO.EDICION).ok).toBe(true)
   })
 
   it('`hechosDe` lee la rama que NO está activa (lo que necesita T7 para avisar)', () => {
@@ -542,31 +556,33 @@ describe('T1 · los hechos van POR RAMA', () => {
 
   it('un hecho AUSENTE es `false` y no lanza: lo que no afirmas, no lo tienes', () => {
     const nav = crearNavegacion({ hechos: { geometria: true } })
-    expect(nav.get().hechos).toEqual({ geometria: true, oficial: false, diagnostico: false })
+    expect(nav.get().hechos).toEqual({ geometria: true, oficial: false })
   })
 
   it('perder el dato tira del paso hacia atrás, y lo CUENTA', () => {
     const avisos = []
     const nav = crearNavegacion({
-      hechos: { geometria: true, oficial: true, diagnostico: true },
+      hechos: { geometria: true, oficial: true },
       avisar: (m) => avisos.push(m),
     })
-    nav.navegarAPaso(PASO.INFORME)
+    nav.navegarAPaso(PASO.DIAGNOSTICO)
 
-    const desenlace = nav.actualizarHechos({ diagnostico: false })
+    // Se pierde el parcelario del Catastro estando ya en Diagnóstico: ahí no queda
+    // nada contra lo que contrastar, así que el paso no se sostiene.
+    const desenlace = nav.actualizarHechos({ oficial: false })
 
     expect(desenlace.ok).toBe(false)
-    expect(nav.get().paso).toBe(PASO.DIAGNOSTICO)
+    expect(nav.get().paso).toBe(PASO.EDICION)
     expect(avisos).toHaveLength(1)
-    expect(avisos[0]).toContain(ROTULO_PASO[PASO.INFORME])
-    expect(avisos[0]).toContain(MOTIVO_DATO.diagnostico)
+    expect(avisos[0]).toContain(ROTULO_PASO[PASO.DIAGNOSTICO])
+    expect(avisos[0]).toContain(MOTIVO_DATO.oficial)
   })
 
   it('actualizar los hechos de la rama INACTIVA no mueve el paso', () => {
     const nav = crearNavegacion({ hechos: { PARCELA: { geometria: true } } })
-    nav.navegarAPaso(PASO.VALIDACION)
+    nav.navegarAPaso(PASO.EDICION)
     nav.actualizarHechos({ geometria: true }, RAMA.EDIFICIO)
-    expect(nav.get().paso).toBe(PASO.VALIDACION)
+    expect(nav.get().paso).toBe(PASO.EDICION)
     expect(nav.hechosDe(RAMA.EDIFICIO).geometria).toBe(true)
   })
 })
@@ -599,17 +615,31 @@ describe('T1 · la URL (D3: hash, y el dato manda sobre la URL)', () => {
   })
 
   it('lee lo que un humano puede pegar mal', () => {
-    const esperado = { rama: RAMA.PARCELA, paso: PASO.VALIDACION }
+    const esperado = { rama: RAMA.PARCELA, paso: PASO.EDICION }
     for (const variante of [
-      '#/parcela/validacion',
-      '/parcela/validacion',
-      'parcela/validacion',
-      '#parcela/validacion',
-      '  #/PARCELA/Validacion/  ',
-      '#//parcela/validacion//',
+      '#/parcela/edicion',
+      '/parcela/edicion',
+      'parcela/edicion',
+      '#parcela/edicion',
+      '  #/PARCELA/Edicion/  ',
+      '#//parcela/edicion//',
     ]) {
       expect(leerRuta(variante)).toEqual(esperado)
     }
+  })
+
+  it('⭐ una ruta RETIRADA no es un hash ajeno: lleva al peldaño que se quedó su contenido', () => {
+    // 2026-08-08. Un marcador guardado, un enlace en un correo o el botón «atrás»
+    // pueden traer todavía los dos pasos que el rail perdió. Devolver `null` los
+    // trataría como «esto no es nuestro» y el usuario aterrizaría donde tocara sin
+    // enterarse. Cada uno va a donde se fue su contenido.
+    expect(RUTA_RETIRADA).toEqual({ validacion: PASO.EDICION, informe: PASO.DIAGNOSTICO })
+    expect(leerRuta('#/parcela/validacion')).toEqual({ rama: RAMA.PARCELA, paso: PASO.EDICION })
+    expect(leerRuta('#/parcela/informe')).toEqual({ rama: RAMA.PARCELA, paso: PASO.DIAGNOSTICO })
+    // Y en la otra rama igual: la traducción es del PASO, no del recorrido.
+    expect(leerRuta('#/edificio/informe')).toEqual({ rama: RAMA.EDIFICIO, paso: PASO.DIAGNOSTICO })
+    // ⛔ Pero `rutaDe` NO las vuelve a escribir: son historia, no un estado.
+    expect(rutaDe({ rama: RAMA.PARCELA, paso: PASO.EDICION })).toBe('#/parcela/edicion')
   })
 
   it('un hash que no es nuestro devuelve `null`, que no es lo mismo que un error', () => {
@@ -622,16 +652,16 @@ describe('T1 · la URL (D3: hash, y el dato manda sobre la URL)', () => {
     const avisos = []
     const nav = crearNavegacion({ avisar: (m) => avisos.push(m) })
 
-    const desenlace = nav.irARuta('#/parcela/informe')
+    const desenlace = nav.irARuta('#/parcela/diagnostico')
 
     expect(desenlace.ok).toBe(false)
     expect(desenlace.paso).toBe(PASO.ENTRADA)
     expect(nav.get().paso).toBe(PASO.ENTRADA)
     // El mensaje de ATERRIZAJE, no el de caída: aquí nadie ha perdido nada, es
     // que un enlace lleva el paso y no el expediente.
-    expect(desenlace.motivo).toBe(mensajeAterrizaje(PASO.INFORME, PASO.ENTRADA))
+    expect(desenlace.motivo).toBe(mensajeAterrizaje(PASO.DIAGNOSTICO, PASO.ENTRADA))
     expect(avisos).toEqual([desenlace.motivo])
-    expect(desenlace.motivo).toContain(ROTULO_PASO[PASO.INFORME])
+    expect(desenlace.motivo).toContain(ROTULO_PASO[PASO.DIAGNOSTICO])
     expect(desenlace.motivo).toContain(ROTULO_PASO[PASO.ENTRADA])
   })
 
@@ -639,7 +669,7 @@ describe('T1 · la URL (D3: hash, y el dato manda sobre la URL)', () => {
     const avisos = []
     const nav = crearNavegacion({ hechos: { geometria: true }, avisar: (m) => avisos.push(m) })
     expect(nav.irARuta('#/parcela/validacion').ok).toBe(true)
-    expect(nav.get().paso).toBe(PASO.VALIDACION)
+    expect(nav.get().paso).toBe(PASO.EDICION)
     expect(avisos).toEqual([])
   })
 
@@ -647,17 +677,17 @@ describe('T1 · la URL (D3: hash, y el dato manda sobre la URL)', () => {
     const nav = crearNavegacion({ hechos: { PARCELA: { geometria: true }, EDIFICIO: { geometria: true } } })
     expect(nav.irARuta('#/edificio/validacion').ok).toBe(true)
     expect(nav.get().rama).toBe(RAMA.EDIFICIO)
-    expect(nav.get().paso).toBe(PASO.VALIDACION)
+    expect(nav.get().paso).toBe(PASO.EDICION)
   })
 
   it('un hash ajeno no mueve nada y no cuenta nada', () => {
     const avisos = []
     const nav = crearNavegacion({ hechos: { geometria: true }, avisar: (m) => avisos.push(m) })
-    nav.navegarAPaso(PASO.VALIDACION)
+    nav.navegarAPaso(PASO.EDICION)
     const desenlace = nav.irARuta('#seccion-cualquiera')
     expect(desenlace.ok).toBe(false)
     expect(desenlace.motivo).toBeNull()
-    expect(nav.get().paso).toBe(PASO.VALIDACION)
+    expect(nav.get().paso).toBe(PASO.EDICION)
     expect(avisos).toEqual([])
   })
 })

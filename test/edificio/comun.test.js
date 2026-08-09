@@ -264,14 +264,19 @@ describe('edificio/_comun — MOTIVO_ENTRADA', () => {
     expect(resumen.bloqueos).toContain(MOTIVO_ENTRADA.SIN_GEOMETRIA)
   })
 
-  it('⛔ los DOS bloqueos de parcela de T1.1 NO están aquí, y es deliberado', () => {
+  it('⛔ los TRES bloqueos de parcela NO están aquí, y es deliberado', () => {
     // MEDIDO el 2026-08-03: `importar()` ya no emite tres bloqueos, emite CINCO.
     // `ANILLOS_EN_VARIAS_CAPAS` y `SUPERFICIE_NO_POSITIVA` dicen que el reparto
     // «un exterior + N huecos» no se sostiene — y en la rama EDIFICIO cada anillo
     // es su propio exterior, así que no aplican. T2.1 tiene que FILTRARLOS al
     // reenviar `resumen.bloqueos`, o un DXF de vivienda + porche + piscina (el
     // caso normal de esta fase) saldría bloqueado por venir de más de una capa.
-    expect(BLOQUEOS_SOLO_PARCELA.length).toBe(2)
+    //
+    // ⛔ **F22 añade el sexto, `VARIOS_RECINTOS_DISJUNTOS`, y es el que más falta
+    // hace que se filtre**: vivienda, porche y piscina SON tres recintos
+    // disjuntos, así que sin el filtro esta rama quedaría bloqueada en TODOS sus
+    // ficheros y no solo en los de varias capas.
+    expect(BLOQUEOS_SOLO_PARCELA.length).toBe(3)
     for (const codigo of BLOQUEOS_SOLO_PARCELA) {
       expect(codigo in MOTIVO_ENTRADA, `${codigo} no debe estar en MOTIVO_ENTRADA`).toBe(false)
     }

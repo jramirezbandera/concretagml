@@ -175,11 +175,14 @@ export { puntoDeReferencia } from './entrada.js'
 // (regla de oro 1).
 //
 // `MOTIVO_ENTRADA` es además el catálogo que hace comprobable una de las
-// mediciones caras de esta fase: son CINCO y CERRADOS, y **`ANILLOS_EN_VARIAS_CAPAS`
-// y `SUPERFICIE_NO_POSITIVA` no están** — esos dos son de PARCELA, los emite
-// `parsers/importar.js` y `entradaDesdeTexto` los filtra, porque un DXF de
-// vivienda + porche + piscina (el caso NORMAL de esta rama) viene por definición de
-// varias capas y saldría bloqueado por el arreglo que protege a la otra rama.
+// mediciones caras de esta fase: son CINCO y CERRADOS, y **`ANILLOS_EN_VARIAS_CAPAS`,
+// `SUPERFICIE_NO_POSITIVA` y `VARIOS_RECINTOS_DISJUNTOS` no están** — esos tres son
+// de PARCELA, los emite `parsers/importar.js` y `entradaDesdeTexto` los filtra,
+// porque un DXF de vivienda + porche + piscina (el caso NORMAL de esta rama) viene
+// por definición de varias capas y saldría bloqueado por el arreglo que protege a
+// la otra rama. ⭐ El tercero lo añadió F22 y agrava el caso: esas tres piezas son
+// además **disjuntas entre sí**, así que sin el filtro ni siquiera haría falta que
+// el DXF trajera varias capas para que la rama quedara muerta.
 
 export { MOTIVO_ENTRADA } from './_comun.js'
 export { VIA } from './entrada.js'

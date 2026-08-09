@@ -80,7 +80,7 @@ const raiz = () => document.querySelector(SELECTOR_APP)
 const titulo = () => document.querySelector(SELECTOR_TITULO)
 const secciones = () => Array.from(document.querySelectorAll(`[${ATRIBUTO_PANTALLA}]`))
 
-const TODO = { geometria: true, oficial: true, diagnostico: true }
+const TODO = { geometria: true, oficial: true }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -208,7 +208,7 @@ describe('T6 · ⭐ marcado y CSS dicen lo mismo (el fallo mudo)', () => {
     const vertices = document.querySelector('.gml-bloque--vertices').getAttribute(ATRIBUTO_PANTALLA)
     expect(entrada.split(/\s+/)).toContain(PASO.ENTRADA)
     expect(vertices.split(/\s+/)).not.toContain(PASO.ENTRADA)
-    expect(vertices.split(/\s+/)).toContain(PASO.VALIDACION)
+    expect(vertices.split(/\s+/)).toContain(PASO.EDICION)
   })
 
   // ── ⭐ EL DIAGNÓSTICO EN LA COLUMNA (2026-08-05) ──────────────────────────
@@ -330,7 +330,7 @@ describe('T6 · ⭐ marcado y CSS dicen lo mismo (el fallo mudo)', () => {
       expect(dd, `falta [data-ficha="${ficha}"] en index.html`).not.toBeNull()
       const declara = dd.getAttribute(ATRIBUTO_PANTALLA).split(/\s+/)
       expect(declara, `«${ficha}» sigue declarando una pantalla donde su pie no está`).toEqual([
-        PASO.INFORME,
+        PASO.EDICION,
       ])
       // El `<dt>` hermano tiene que decir LO MISMO: son dos celdas de un grid, y
       // ocultar solo una descoloca la rejilla.
@@ -380,22 +380,24 @@ describe('T6 · el atributo y el título', () => {
 
   // ── ⭐ F14 · el título depende de la RAMA, no solo del paso ────────────────
 
-  it('⛔ F14 · en EDIFICIO, Informe NO dice «Informe de contraste»', () => {
+  it('⛔ F14 · en EDIFICIO, Edición NO dice «Edición del recinto»', () => {
     // MEDIDO en Chrome en la fase 4a, con los peldaños recién abiertos:
+    // `#/edificio/edicion` decía «Edición del recinto» sobre trece partes, y
     // `#/edificio/informe` ponía el título de la PARCELA sobre un informe de
-    // construcción, y `#/edificio/edicion` decía «Edición del recinto» sobre trece
-    // partes. Un `<h1>` que nombra otra cosa de la que hay debajo es la clase de
-    // error que nadie reporta y todo el mundo nota.
-    expect(tituloDe(PASO.INFORME, RAMA.EDIFICIO)).toBe('Informe de construcción')
-    expect(tituloDe(PASO.INFORME, RAMA.EDIFICIO)).not.toBe(TITULO_PANTALLA[PASO.INFORME])
+    // construcción. Un `<h1>` que nombra otra cosa de la que hay debajo es la
+    // clase de error que nadie reporta y todo el mundo nota.
+    //
+    // ⭐ La tercera excepción —la del Informe— se retiró el 2026-08-08 con su
+    // peldaño. El nombre legal del documento no se pierde: lo escribe el propio
+    // `<dialog>`, que es quien sabe si hubo contraste.
     expect(tituloDe(PASO.EDICION, RAMA.EDIFICIO)).toBe('Edición de las partes')
+    expect(tituloDe(PASO.EDICION, RAMA.EDIFICIO)).not.toBe(TITULO_PANTALLA[PASO.EDICION])
     expect(tituloDe(PASO.DIAGNOSTICO, RAMA.EDIFICIO)).toContain('construcción catastral')
   })
 
   it('⭐ F14 · es una tabla de EXCEPCIONES: lo no declarado cae en el título común', () => {
     // Esa forma es lo que impide que un paso nuevo tenga título en una rama y no en
-    // la otra. Entrada y Validación valen igual para las dos: una construcción
-    // también son recintos, y darles un título propio sería ruido.
+    // la otra. Entrada vale igual para las dos: darle un título propio sería ruido.
     for (const paso of PASOS) {
       const esperado = TITULO_EN_EDIFICIO[paso] ?? TITULO_PANTALLA[paso]
       expect(tituloDe(paso, RAMA.EDIFICIO)).toBe(esperado)
@@ -403,9 +405,9 @@ describe('T6 · el atributo y el título', () => {
       expect(tituloDe(paso, RAMA.PARCELA)).toBe(TITULO_PANTALLA[paso])
       expect(tituloDe(paso)).toBe(TITULO_PANTALLA[paso])
     }
-    expect(Object.keys(TITULO_EN_EDIFICIO)).toHaveLength(3)
+    // Eran TRES hasta el 2026-08-08; la del Informe se fue con su peldaño.
+    expect(Object.keys(TITULO_EN_EDIFICIO)).toHaveLength(2)
     expect(Object.keys(TITULO_EN_EDIFICIO)).not.toContain(PASO.ENTRADA)
-    expect(Object.keys(TITULO_EN_EDIFICIO)).not.toContain(PASO.VALIDACION)
   })
 
   it('⭐ F14 · los CINCO pasos por las DOS ramas tienen título, y ninguno se repite mal', () => {
@@ -425,14 +427,14 @@ describe('T6 · el atributo y el título', () => {
     const { navegacion } = cablear({
       hechos: { [RAMA.PARCELA]: TODO, [RAMA.EDIFICIO]: TODO },
     })
-    navegacion.navegarAPaso(PASO.INFORME)
-    expect(titulo().textContent).toBe(TITULO_PANTALLA[PASO.INFORME])
+    navegacion.navegarAPaso(PASO.EDICION)
+    expect(titulo().textContent).toBe(TITULO_PANTALLA[PASO.EDICION])
     // Conmutar de rama tiene que reescribirlo: es el caso que un `aplicar({paso})`
-    // a secas se dejaba fuera, y el que dejaba «Informe de contraste» sobre un
-    // informe de construcción.
+    // a secas se dejaba fuera, y el que dejaba «Edición del recinto» sobre trece
+    // partes de una construcción.
     navegacion.cambiarRama(RAMA.EDIFICIO)
-    navegacion.navegarAPaso(PASO.INFORME)
-    expect(titulo().textContent).toBe(TITULO_EN_EDIFICIO[PASO.INFORME])
+    navegacion.navegarAPaso(PASO.EDICION)
+    expect(titulo().textContent).toBe(TITULO_EN_EDIFICIO[PASO.EDICION])
   })
 
   it('sin `<h1>` no revienta: es una respuesta prevista', () => {
@@ -448,8 +450,8 @@ describe('T6 · el atributo y el título', () => {
 describe('T6 · destruir', () => {
   it('quita el atributo, repone el título y es IDEMPOTENTE', () => {
     const { pantalla, navegacion } = cablear({ hechos: TODO })
-    navegacion.navegarAPaso(PASO.INFORME)
-    expect(titulo().textContent).toBe(TITULO_PANTALLA[PASO.INFORME])
+    navegacion.navegarAPaso(PASO.DIAGNOSTICO)
+    expect(titulo().textContent).toBe(TITULO_PANTALLA[PASO.DIAGNOSTICO])
 
     pantalla.destruir()
     pantalla.destruir()
@@ -458,7 +460,7 @@ describe('T6 · destruir', () => {
     expect(raiz().hasAttribute(ATRIBUTO_PASO)).toBe(false)
     expect(titulo().textContent).toBe(TITULO_PANTALLA[PASO.ENTRADA])
     // Y no se queda escuchando.
-    navegacion.navegarAPaso(PASO.VALIDACION)
+    navegacion.navegarAPaso(PASO.EDICION)
     expect(raiz().hasAttribute(ATRIBUTO_PASO)).toBe(false)
   })
 })
@@ -591,12 +593,12 @@ describe('rebanada 2 · el pie enseña lo de cada pantalla', () => {
     // declarado: son datos de identidad, están en las otras tres pantallas.
     montarCascara()
     const donde = Object.fromEntries(paresDeLaFicha().map(({ campo, dd }) => [campo, visibleEn(dd)]))
+    // ⭐ 2026-08-08 · Eran TRES pantallas (Validación, Edición e Informe) y ahora
+    // es UNA. No es que el pie se vea en menos sitios: es que aquellas tres eran
+    // la misma —el mismo `<footer>`, el mismo contenido— y el rail bajó a tres
+    // peldaños. Se sigue viendo exactamente donde se veía.
     for (const campo of ['srs', 'refcat', 'vertices', 'superficie', 'perimetro']) {
-      expect(donde[campo], `«${campo}» es un hecho de la geometría`).toEqual([
-        PASO.VALIDACION,
-        PASO.EDICION,
-        PASO.INFORME,
-      ])
+      expect(donde[campo], `«${campo}» es un hecho de la geometría`).toEqual([PASO.EDICION])
     }
   })
 
@@ -610,12 +612,20 @@ describe('rebanada 2 · el pie enseña lo de cada pantalla', () => {
     // vivir. No por sitio, por REPETICIÓN: el bloque de contraste dice las tres
     // cosas arriba y mejor —«Parcelario vigente», la fila «Medición − Catastro»
     // con su diferencia relativa, y «Invasión a colindantes» nombrando cuáles en
-    // vez de contarlas—. Queda Informe, que es la única pantalla donde la ficha
-    // es lo que las dice.
+    // vez de contarlas—. Quedaba Informe.
+    //
+    // ⭐ **Y EL 2026-08-08 SE MUDAN A EDICIÓN, porque Informe dejó de ser un
+    // peldaño.** No se retiran: quedarse sin pantalla habría sido perderlas en
+    // silencio, y son datos que el usuario ha traído. El motivo por el que en su
+    // día salieron de Validación —«tres renglones reservando sitio para un
+    // silencio»— ya no aplica: hoy dicen «No consta», «No hay con qué comparar» y
+    // «4», que es información y no un hueco. Coste medido en Chrome: la caja de
+    // vértices de Edición pasa de 475,89 a 405,08 px a 1440×900 y a 225,08 px a
+    // 1280×720, las dos por encima de los suelos vigilados (120 y 124,57 px).
     montarCascara()
     const donde = Object.fromEntries(paresDeLaFicha().map(({ campo, dd }) => [campo, visibleEn(dd)]))
     for (const campo of ['superficie-catastral', 'delta-catastral', 'colindantes']) {
-      expect(donde[campo], `«${campo}» no se ve donde debe`).toEqual([PASO.INFORME])
+      expect(donde[campo], `«${campo}» no se ve donde debe`).toEqual([PASO.EDICION])
     }
   })
 
@@ -623,7 +633,7 @@ describe('rebanada 2 · el pie enseña lo de cada pantalla', () => {
     montarCascara()
     const acciones = document.querySelector('.gml-acciones')
     expect(acciones).not.toBeNull()
-    expect(visibleEn(acciones)).toEqual([PASO.VALIDACION])
+    expect(visibleEn(acciones)).toEqual([PASO.EDICION])
     // «Generar GML» se queda aquí por decisión del autor (el camino corto de una
     // Subsanación no pasa por el diagnóstico).
     //

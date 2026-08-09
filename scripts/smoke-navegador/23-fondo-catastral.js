@@ -267,7 +267,7 @@ if ((trasMedicion.refcatEnElCampo ?? '') !== '') {
 // FLUJO 2. Es el defecto de producto, y se lee el texto RENDERIZADO y no la
 // constante: lo que importa es lo que el usuario tiene delante.
 
-irAPaso('validacion')
+irAPaso('edicion')
 await dormir(200)
 
 const aviso = {

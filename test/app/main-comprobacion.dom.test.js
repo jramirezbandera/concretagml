@@ -621,12 +621,16 @@ describe('app/main · la ruta crítica 2, de principio a fin', () => {
     // rail mandaba a pulsar un botón que no existía en ninguna pantalla.
     //
     // ⚠️ **PUNTO DE PARTIDA LIMPIO, y no es ceremonia: lo obligó una mutación.** Los
-    // bloques de arriba dejan un diagnóstico calculado, así que «Informe» ya está
-    // encendido y la última prueba salía VERDE aunque se quitara la suscripción que
-    // la sostiene.
+    // bloques de arriba dejan una parcela puesta, así que el recorrido ya está
+    // abierto y las pruebas de abajo saldrían VERDES sin haber soltado nada.
+    //
+    // ⭐ 2026-08-08 · Aquí se afirmaba que el peldaño «Informe» nacía apagado. Ese
+    // peldaño ya no existe; el punto de partida limpio sigue haciendo la misma
+    // falta, y quien lo declara ahora es «Diagnóstico», que es el último del
+    // recorrido y el que la parcela abre.
     estadoDelArranque.set(null)
     await cederTurno()
-    expect(botonPeldano('informe').disabled).toBe(true)
+    expect(botonPeldano('diagnostico').disabled).toBe(true)
 
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'del-vecino.gml'))
 
@@ -635,7 +639,7 @@ describe('app/main · la ruta crítica 2, de principio a fin', () => {
     expect(estadoDelArranque.get().origen).toBe(ORIGEN_PARCELA.GML_EXISTENTE)
     expect(comprobacionViva.abierto()).toBe(false)
     // Y ATERRIZA donde aterriza un `.dxf`: Diagnóstico si hay parcelario con el que
-    // contrastar, Validación si no. Este fixture trae referencia, así que hay.
+    // contrastar, Edición si no. Este fixture trae referencia, así que hay.
     expect(pasoActivo()).toBe('diagnostico')
   })
 
@@ -683,18 +687,27 @@ describe('app/main · la ruta crítica 2, de principio a fin', () => {
     expect(eyebrow).not.toMatch(/tuyo/i)
   })
 
-  it('⭐ el paso «Informe» se enciende SIN el apaño del temporizador que T9 borró', () => {
-    // T5 refrescaba los hechos del rail con `queueMicrotask` + `setTimeout(…, 500)`
-    // porque `app/cableado-diagnostico.js` no notificaba a nadie: `ultimoDiagnostico()`
-    // era una lectura, no un canal. Un temporizador de medio segundo es una apuesta —
-    // con la red lenta, «Informe» se quedaba apagado y nada lo decía—. Ahora hay
-    // suscripción de verdad y es cierto en el mismo turno.
+  it('⛔ 2026-08-08 · el informe ya no depende de que un peldaño se encienda a tiempo', () => {
+    // ── QUÉ PROBABA ESTE `it` Y POR QUÉ CAMBIA ────────────────────────────────
+    // Probaba que el peldaño «Informe» del rail se encendía en el MISMO turno tras
+    // diagnosticar, sin el `setTimeout(…, 500)` que T5 usaba como apuesta. Estaba
+    // verificado por mutación: quitando `alDiagnostico(refrescarHechos)` de
+    // `app/main.js`, salía rojo.
     //
-    // ⛔ **VERIFICADO POR MUTACIÓN:** quitando `alDiagnostico(refrescarHechos)` de
-    // `app/main.js`, esta prueba sale ROJA. La primera versión NO lo hacía, porque
-    // medía un «Informe» que ya venía encendido de otro bloque. De ahí el vaciado
-    // del store en la primera prueba de este describe.
-    expect(botonPeldano('informe').disabled).toBe(false)
+    // Retirado el peldaño «Informe», esa carrera **deja de existir en vez de
+    // ganarse**: no hay nada que encender a tiempo. `alDiagnostico(refrescarHechos)`
+    // se ha ido con él, y por eso este `it` no se puede limitar a cambiar de paso.
+    //
+    // Lo que se conserva es la propiedad que de verdad importaba, y que ahora es
+    // ESTRUCTURAL: **la única puerta al informe vive dentro del cajón de
+    // diagnóstico**, así que no se puede pedir un informe sin haber diagnosticado
+    // ni queriendo. Eso es lo que se afirma aquí.
+    const dentroDelCajon = raizDiagnostico().querySelector('[data-accion="preparar-informe"]')
+    expect(dentroDelCajon, 'la puerta al informe tiene que vivir DENTRO del cajón').not.toBeNull()
+    // Y no hay una segunda puerta suelta por la aplicación que se salte esa guarda.
+    expect(document.querySelectorAll('[data-accion="preparar-informe"]')).toHaveLength(1)
+    // Ni queda peldaño que la prometa.
+    expect(peldano('informe')).toBeNull()
   })
 
   it('⭐ y con una parcela del CATASTRO la procedencia dice otra cosa', async () => {

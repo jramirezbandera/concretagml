@@ -955,6 +955,28 @@ body {
   width: 100%;
 }
 
+/* ⛔ DOS BOTONES DE VÍA APILADOS NO SE TOCAN (2026-08-08) ────────────────────
+   `.gml-via` es un bloque normal, y lo ÚNICO que separaba verticalmente a sus
+   hijos era el `margin: 4px 0 10px` del apunte. Consecuencia: todo lo que va
+   por DEBAJO del apunte se apilaba a 0 px. Medido en Chrome a 1440×900:
+   «Elegir un fichero de medición…» terminaba en 472,53 px y «Pegar
+   coordenadas…» empezaba en 472,53 px — los dos bordes de 1 px se fundían en
+   una sola línea y la vía se leía como una caja partida por la mitad, no como
+   dos acciones.
+
+   8 px y no otra cifra: es el `gap` de `.gml-campo-fila`, el de `.gml-boton-par`
+   y el de `.gml-bloque`. La columna respira igual que la fila.
+
+   ⚠️ Y es un `+` y no un `gap` en `.gml-via`, a propósito. Poner
+   `display: flex` en la vía metería el hueco TAMBIÉN entre el rótulo, el apunte
+   y el campo —que ya se separan con sus propios márgenes, y que dentro de un
+   flex NO se colapsan (misma trampa anotada en `.gml-entrada-pie`)—: medido,
+   costaría 22 px de columna en vez de 16, y la pantalla de Entrada ya no cabe
+   entera a 1280×720. */
+.gml-via-boton + .gml-via-boton {
+  margin-top: var(--space-2);
+}
+
 /* El separador entre vías. La línea a los lados es lo que dice «son alternativas»
    sin gastar una frase en decirlo. */
 .gml-obien {
@@ -1684,6 +1706,19 @@ body {
 .gml-boton-par {
   display: flex;
   gap: var(--space-2);
+  /* ⛔ Y SEPARADA DE LO QUE VENGA ENCIMA (2026-08-08). El mismo defecto que
+     `.gml-via-boton + .gml-via-boton` arriba, y por la misma causa: la pareja
+     cuelga de `.gml-via`, que es un bloque normal, y va justo debajo de
+     `.gml-campo-fila`. Medido a 1440×900: «Traer del Catastro» terminaba en
+     284,53 px y «Deducir del mapa» empezaba en 284,53 px — cero. El botón
+     primario, que es oscuro y macizo, quedaba apoyado sobre el borde del
+     secundario y los dos se leían como un solo control roto.
+     Los 8 px son los mismos que separan a los dos botones ENTRE SÍ: así la
+     pareja se lee como una fila propia y no como el pie del campo de arriba.
+     `margin-top` en la clase y no en un `+`: `.gml-boton-par` tiene un único
+     uso en todo el proyecto (`index.html`, el bloque de la referencia
+     catastral), así que no hay ningún sitio donde este margen sobre. */
+  margin-top: var(--space-2);
 }
 
 .gml-boton-par .gml-boton {
@@ -3928,6 +3963,39 @@ body {
   /* No crece ni encoge: tiene que medir lo que miden sus dos rótulos. Si algún
      día no cabe, que salte de línea (y se vea), no que se aplaste. */
   flex: none;
+}
+
+/* ── ⛔ AQUÍ SE APAGA EL ÁREA DE PULSACIÓN AMPLIADA (2026-08-08) ─────────────
+ *
+ * `.gml-boton--menudo::after` agranda el objetivo 6 px por cada lado, y está
+ * escrito para un botón que vive SOLO en su fila (F08 y F10, en un
+ * `.gml-rotulo-fila`, sin nada al lado). Aquí hay DOS a 4 px, así que los dos
+ * objetivos se solapaban 8 px y cada uno se metía **2 px dentro de la caja
+ * VISIBLE del otro**.
+ *
+ * No es teoría. Medido con `document.elementFromPoint` en Chrome a 1440×900,
+ * con «Parcela» ocupando 234 → 290,73 px:
+ *
+ *     x = 288 .......... recibe PARCELA
+ *     x = 289 .......... recibe EDIFICIO   ← todavía se ve «Parcela»
+ *     x = 290 .......... recibe EDIFICIO   ← todavía se ve «Parcela»
+ *
+ * Y por el otro lado el `::after` de «Edificio» llegaba hasta 356,17 px, o sea
+ * 6 px de los 8 que lo separan del chip «0 errores». Apuntar al borde de un
+ * botón y activar el de al lado es peor defecto que un objetivo pequeño: el
+ * usuario ve que ha pulsado donde quería y la aplicación cambia de rama.
+ *
+ * Y aquí el `::after` no hacía falta para nada: el `align-items: stretch` de
+ * arriba ya estira estos dos botones a los 25,39 px de la fila de chips, por
+ * encima de los 24 px que pide WCAG 2.5.8. La nota de K.1 decía que los dos
+ * mecanismos «se suman: ~37 px reales de objetivo» — y esa suma era justamente
+ * el defecto, porque la única dirección en la que quedaba sitio para sumar era
+ * la horizontal, que es donde está el vecino.
+ *
+ * (0,2,0) contra el (0,1,0) de `.gml-boton--menudo::after`: gana por
+ * ESPECIFICIDAD y no por orden, el criterio de todo el fichero. */
+.gml-conmutador-rama .gml-boton--menudo::after {
+  content: none;
 }
 
 /* El estado ACTIVO, gobernado desde `body[data-rama]` y NO desde `aria-pressed`.

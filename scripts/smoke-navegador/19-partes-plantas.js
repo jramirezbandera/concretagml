@@ -407,7 +407,7 @@ if (pliegue.hayPuerta && pliegue.sePuedeDesplegar === false) {
 // encendidos y una sola pantalla. T4.1 les puso `data-pantalla`.
 
 const porPantalla = {}
-for (const paso of ['entrada', 'validacion', 'edicion']) {
+for (const paso of ['entrada', 'edicion']) {
   const boton = $(SEL.IR_A_PASO(paso))
   if (!boton || boton.disabled) {
     porPantalla[paso] = { alcanzable: false, motivo: boton ? 'apagado' : 'no existe' }

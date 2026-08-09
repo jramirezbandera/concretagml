@@ -545,3 +545,220 @@ describe('app/cableado-medicion · F19 · avisoDeSuperficie (la función pura)',
     expect(aviso).not.toMatch(/pagina/i) // la sospecha del otro signo, aquí no
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// F22 · EL DIBUJO TRAE VARIAS FINCAS
+// ═══════════════════════════════════════════════════════════════════════════
+
+const MANZANA = readFileSync(
+  join(process.cwd(), 'test/fixtures/parsers/manzana_consulta_masiva_6346726UF8664N.dxf'),
+  'latin1',
+)
+
+/** Dobles del cajón y de la capa, con la MISMA forma que `visor.parcelas`. */
+function parcelasFalsas() {
+  const oyentes = { elegir: [], confirmar: [], descartar: [], senalar: [] }
+  const registro = {
+    pintadoCajon: [],
+    pintadoCapa: [],
+    resaltes: [],
+    marcas: [],
+    abierto: false,
+    encuadres: [],
+  }
+  return {
+    registro,
+    oyentes,
+    cajon: {
+      pintar: (d) => registro.pintadoCajon.push(d),
+      marcar: (i) => registro.marcas.push(i),
+      abrir: () => (registro.abierto = true),
+      cerrar: () => (registro.abierto = false),
+      estado: (t) => registro.pintadoCajon.push({ estado: t }),
+      alElegir: (fn) => oyentes.elegir.push(fn),
+      alConfirmar: (fn) => oyentes.confirmar.push(fn),
+      alDescartar: (fn) => oyentes.descartar.push(fn),
+      caja: () => (registro.abierto ? { left: 0, top: 0, right: 10, bottom: 10 } : null),
+    },
+    capa: {
+      pintar: (c) => registro.pintadoCapa.push(c),
+      resaltar: (i) => registro.resaltes.push(i),
+      encuadrar: (o) => registro.encuadres.push(o ?? null),
+      alSenalar: (fn) => oyentes.senalar.push(fn),
+    },
+  }
+}
+
+/** Suelta la manzana eligiendo la capa «Parcela» en el diálogo. */
+async function soltarManzana(extra = {}) {
+  const parcelas = parcelasFalsas()
+  const colindantes = { pintar: vi.fn() }
+  const medicion = cablear({
+    dialogo: dialogoQueResponde({ capa: 'Parcela' }),
+    parcelas,
+    colindantes,
+    ...extra,
+  })
+  await medicion.alTexto(MANZANA, 'ConsultaMasiva_ (90).dxf', true)
+  return { parcelas, colindantes, medicion }
+}
+
+describe('cablearMedicion · F22 — el dibujo trae varias fincas', () => {
+  it('NO muere en «no ha entrado ninguna parcela»: pinta, abre y pregunta', async () => {
+    // Es todo el defecto de F22 en una prueba: hasta hoy el recorrido acababa en
+    // ese encabezado DESPUES de haber pedido y obtenido una decision —la capa— que
+    // no arreglaba nada.
+    const { parcelas } = await soltarManzana()
+    expect(dijo(ENCABEZADO_NO_CONSTRUIDA)).toBe(false)
+    expect(parcelas.registro.abierto).toBe(true)
+    expect(parcelas.registro.pintadoCajon[0].candidatas).toHaveLength(8)
+    expect(parcelas.registro.pintadoCajon[0].capaRotulos).toBe('RefCatastral')
+    expect(parcelas.registro.pintadoCapa[0]).toHaveLength(8)
+    expect(store.set).not.toHaveBeenCalled() // preguntar no es cargar
+    expect(dijo('8 fincas separadas')).toBe(true)
+  })
+
+  it('⛔ y lleva el MAPA hasta las fincas: sin eso son ocho manchas de un pixel', async () => {
+    // Lo destapo el guion 24 midiendo en Chrome: las ocho salian a 0 x 0 px. Las
+    // candidatas no pasan por el store, que es quien reencuadra, asi que con la
+    // aplicacion recien abierta —mirando a Espana entera— la manzana no se ve.
+    // ⚠️ En jsdom `getBoundingClientRect()` devuelve ceros, o sea que aqui solo se
+    // puede afirmar que se PIDE el encuadre; que sirva lo mide el guion.
+    const { parcelas } = await soltarManzana()
+    expect(parcelas.registro.encuadres).toHaveLength(1)
+    // Y con la caja del cajon: encuadrarlas y ponerles el panel encima es pedir
+    // que se elija a ciegas (el guion midio CINCO de ocho tapadas al 100 %).
+    expect(parcelas.registro.encuadres[0].evitar).not.toBeNull()
+  })
+
+  it('lleva al usuario a Entrada, que es la pantalla de este cajon', async () => {
+    const alPedirEleccion = vi.fn()
+    await soltarManzana({ alPedirEleccion })
+    expect(alPedirEleccion).toHaveBeenCalledTimes(1)
+  })
+
+  it('cierra los otros cajones de la esquina ANTES de abrir el suyo', async () => {
+    // Soltar un fichero no es un clic, asi que el guardian de clic-fuera de los
+    // otros no se entera y quedarian apilados.
+    const vecino = { cerrar: vi.fn() }
+    const otro = { cerrar: vi.fn() }
+    await soltarManzana({ cajonesQueCerrar: [vecino, otro] })
+    expect(vecino.cerrar).toHaveBeenCalled()
+    expect(otro.cerrar).toHaveBeenCalled()
+  })
+
+  it('las candidatas llevan su NOMBRE del fichero, no un «Recinto 3»', async () => {
+    const { parcelas } = await soltarManzana()
+    expect(parcelas.registro.pintadoCajon[0].candidatas.map((c) => c.nombre)).toEqual([
+      '6346726UF8664N',
+      '6346725UF8664N',
+      '6346714UF8664N',
+      '6346713UF8664N',
+      '6145925UF8664N',
+      '6346306UF8664N',
+      '6247108UF8664N',
+      '6145924UF8664N',
+    ])
+  })
+
+  it('marcar en la lista resalta en el mapa, y senalar en el mapa marca en la lista', async () => {
+    const { parcelas } = await soltarManzana()
+    parcelas.oyentes.elegir[0](3)
+    expect(parcelas.registro.resaltes).toContain(3)
+    parcelas.oyentes.senalar[0](5)
+    expect(parcelas.registro.marcas).toContain(5)
+    expect(parcelas.registro.resaltes).toContain(5)
+  })
+
+  it('las construcciones NO entran, pero se NOMBRAN', async () => {
+    // 168 polilineas que el usuario ve en su CAD y la aplicacion ignora sin decir
+    // nada son 168 motivos para desconfiar de lo que si ha entrado.
+    await soltarManzana()
+    expect(dijo('168 polilínea(s) en la capa «Construccion»')).toBe(true)
+    expect(dijo('rama Edificio')).toBe(true)
+  })
+})
+
+describe('cablearMedicion · F22 — confirmar la finca elegida', () => {
+  it('entra la elegida como OFICIAL, con su referencia del rotulo', async () => {
+    const { parcelas } = await soltarManzana()
+    parcelas.oyentes.confirmar[0](0)
+
+    expect(store.set).toHaveBeenCalledTimes(1)
+    const parcela = store.set.mock.calls[0][0]
+    expect(parcela.refcat).toBe('6346726UF8664N')
+    expect(parcela.recintos).toHaveLength(1)
+    expect(superficie(parcela.recintos)).toBeCloseTo(548.05, 2)
+    // La decision 2 de F22: es cartografia DEL Catastro, asi que ocupa las dos.
+    expect(parcela.geometriaOficial).not.toBeNull()
+  })
+
+  it('y las otras SIETE se quedan como parcelario de contexto', async () => {
+    const { parcelas, colindantes } = await soltarManzana()
+    parcelas.oyentes.confirmar[0](0)
+
+    expect(colindantes.pintar).toHaveBeenCalledTimes(1)
+    const vecinas = colindantes.pintar.mock.calls[0][0]
+    expect(vecinas).toHaveLength(7)
+    expect(vecinas.map((v) => v.refcat)).not.toContain('6346726UF8664N')
+    expect(vecinas[0].recintos[0].vertices.length).toBeGreaterThan(2)
+    // Y se dice que son DEL DIBUJO, no una consulta al Catastro.
+    expect(dijo('Son del fichero, no una consulta al Catastro')).toBe(true)
+  })
+
+  it('⛔ las vecinas se pintan las ÚLTIMAS, DESPUÉS de `alCargarParcela`', async () => {
+    // Esto lo encontró un test en rojo, no el razonamiento. Estaban justo detrás
+    // del `set` —que es donde parecía que tocaban— y la ficha del panel seguía
+    // diciendo «Sin consultar» con siete vecinas dibujadas en el mapa.
+    //
+    // `alCargarParcela` significa «documento nuevo», y por eso
+    // `cablearEdicion#alCambiarOficial` resetea el recuento de colindantes: unas
+    // vecinas traídas para OTRA parcela ya no valen. Aquí vienen del MISMO fichero
+    // que la parcela, así que no caducan con ella — pero hay que ponerlas cuando ya
+    // nadie las va a borrar.
+    const orden = []
+    const alCargarParcela = () => orden.push('alCargarParcela')
+    const { parcelas, colindantes } = await soltarManzana({ alCargarParcela })
+    store.set.mockImplementation(() => orden.push('set'))
+    colindantes.pintar.mockImplementation(() => orden.push('pintar'))
+    parcelas.oyentes.confirmar[0](0)
+    expect(orden).toEqual(['set', 'alCargarParcela', 'pintar'])
+  })
+
+  it('el cajon y las candidatas se sueltan al confirmar', async () => {
+    const { parcelas } = await soltarManzana()
+    parcelas.oyentes.confirmar[0](1)
+    expect(parcelas.registro.abierto).toBe(false)
+    expect(parcelas.registro.pintadoCapa.at(-1)).toBeNull()
+  })
+
+  it('«Descartar» no mete nada en el store y lo dice', async () => {
+    const { parcelas } = await soltarManzana()
+    parcelas.oyentes.descartar[0]()
+    expect(store.set).not.toHaveBeenCalled()
+    expect(parcelas.registro.abierto).toBe(false)
+    expect(dijo('Se ha descartado el dibujo')).toBe(true)
+  })
+
+  it('confirmar sin nada pendiente es un no-op', async () => {
+    const { parcelas } = await soltarManzana()
+    parcelas.oyentes.descartar[0]()
+    parcelas.oyentes.confirmar[0](0)
+    expect(store.set).not.toHaveBeenCalled()
+  })
+})
+
+describe('cablearMedicion · F22 — sin cajon se DEGRADA, no se rompe', () => {
+  it('sin `parcelas` el recorrido sigue y el bloqueo se cuenta con palabras', async () => {
+    const medicion = cablear({ dialogo: dialogoQueResponde({ capa: 'Parcela' }) })
+    await medicion.alTexto(MANZANA, 'm.dxf', true)
+    expect(store.set).not.toHaveBeenCalled()
+    expect(dijo(ENCABEZADO_NO_CONSTRUIDA)).toBe(true)
+    expect(dijo('8 recintos SEPARADOS')).toBe(true)
+  })
+
+  it('un `parcelas` a medias LANZA: es un error de cableado, no un dato', () => {
+    expect(() => cablear({ parcelas: { cajon: {} } })).toThrow(TypeError)
+    expect(() => cablear({ alPedirEleccion: 42 })).toThrow(TypeError)
+  })
+})

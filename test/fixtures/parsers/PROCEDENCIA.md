@@ -64,13 +64,23 @@ Las siete partes, con el rótulo de plantas que les corresponde en `txtConstru`:
 
 | # | Vértices | Superficie | Rótulo |
 |---|---|---|---|
-| 0 | 25 | 76,3 m² | `I` |
+| 0 | 25 | 76,3 m² | `II` ⛔ **corregido, ver abajo** |
 | 1 | 5 | 4,6 m² | `III` |
 | 2 | 5 | 6,1 m² | `III` |
 | 3 | 9 | 32,1 m² | `II` |
 | 4 | 7 | 9,4 m² | `I` |
 | 5 | 13 | 27,6 m² | **`P`** (porche) |
 | 6 | 5 | 10,0 m² | `I` |
+
+> ⛔ **La fila 0 decía `I` y estaba MAL. Corregida el 2026-08-09 (F22 · fase 2), al
+> medirla.** Esta tabla se escribió en F11 emparejando a ojo, y el error se ve sin
+> geometría: el fichero trae **siete** rótulos en `txtConstru` y son
+> **`I I II II III III P`** —dos `I` y dos `II`—, mientras que la tabla repartía
+> **tres `I` y un `II`**. Con punto-en-polígono el emparejamiento sale **1:1 y sin
+> sobras** (`rotularRecintos(...).limpia === true`) y la parte 0 contiene el `II`.
+> ⚠️ Vale la pena tener escrito **por qué nadie lo vio**: la tabla no la usaba
+> ningún test —era documentación—, y F12 acabó haciendo teclear las plantas a mano,
+> así que ni siquiera había un consumidor al que le cuadrara o no.
 
 **Por qué este fixture y no otro.** Cuatro razones, y las cuatro medidas:
 
@@ -99,6 +109,84 @@ Las siete partes, con el rótulo de plantas que les corresponde en `txtConstru`:
   del repo contra la descarga original byte a byte, pero **no permite reproducir la descarga**.
   Sin esa URL, este fichero es verificable pero no re-obtenible.
 - **No se ha comprobado si el servicio sigue sirviendo el mismo fichero** para esa referencia.
+
+---
+
+## `manzana_consulta_masiva_6346726UF8664N.dxf` — LA MANZANA ENTERA (F22)
+
+Descarga real del **mismo servicio** que el anterior, y su contrapunto: aquel trae **una**
+parcela y éste trae **ocho**. Es la verdad externa de F22, cuyo defecto de partida es que la
+aplicación no sabía qué hacer con un fichero así.
+
+| | |
+|---|---|
+| Origen | Servicio de Consulta Masiva de la Sede Electrónica del Catastro |
+| URL exacta | ⚠️ **HUECO DECLARADO** — ver abajo |
+| Descargado | 2026-06-24 (fecha del fichero en disco: 16:48) |
+| Nombre original | `ConsultaMasiva_ (90).dxf` |
+| Referencias catastrales | **ocho**, en la capa `RefCatastral` como `TEXT` (tabla abajo) |
+| SHA-256 | `eaf01488835545a1a01a4692c46d61952dabac1cd789edb247139b59ba132b2f` |
+| Tamaño | 158.834 B |
+| Finales de línea | **CRLF** (20.526 CRLF, 0 LF sueltos). Fijado por `.gitattributes` (4bis) |
+| Codificación | ASCII puro (0 bytes > 127) |
+| Versión DXF | **sin `$ACADVER`** — la sección `HEADER` viene vacía, igual que su hermano |
+| Huso | UTM 30N (lon −4,275 · lat 36,719 — provincia de Málaga) |
+
+**Contenido medido** (F22 · fase 1, con `parseDXF` de producción):
+
+| Capa | Entidades | Qué es |
+|---|---|---|
+| `Construccion` | **168** anillos | las huellas de edificio de toda la manzana |
+| `Parcela` | **8** anillos | **ocho fincas distintas**, no una con huecos |
+| `txtConstru` | 153 `TEXT` | rótulos de planta (`II`, `-I+I+EPT`, `POR`, `TZA+I`, `JD`…) |
+| `RefCatastral` | 8 `TEXT` | **la referencia de cada finca, dentro de ella** |
+
+Ni un `INSERT`, ni un `HATCH`, ni un `SPLINE`: **ninguna entidad no soportada**. Entidades de
+`ENTITIES`: 176 `POLYLINE` + 1.888 `VERTEX` + 176 `SEQEND` + 161 `TEXT`.
+
+Las ocho fincas, con el rótulo que les cae dentro:
+
+| # | Vértices | Superficie | Referencia |
+|---|---|---|---|
+| 0 | 17 | 548,05 m² | `6346726UF8664N` |
+| 1 | 11 | 444,11 m² | `6346725UF8664N` |
+| 2 | 14 | 655,70 m² | `6346714UF8664N` |
+| 3 | 17 | 1.098,85 m² | `6346713UF8664N` |
+| 4 | 27 | 862,78 m² | `6145925UF8664N` |
+| 5 | 70 | 5.165,36 m² | `6346306UF8664N` |
+| 6 | 30 | 645,85 m² | `6247108UF8664N` |
+| 7 | 26 | 541,79 m² | `6145924UF8664N` |
+
+**Por qué este fixture.** Tres razones, las tres medidas:
+
+1. ⛔ **Destapó que `SUPERFICIE_NO_POSITIVA` solo probaba una mitad.** Con la capa `Parcela`, el
+   reparto «el primero es el contorno y los demás son huecos» da **−8.866,39 m²** y bloquea. El
+   número cuadra al céntimo (`548,05 − los otros siete`) **porque la finca más pequeña viene la
+   primera en el fichero**. Reordenando esos MISMOS ocho anillos con el mayor delante, la resta
+   da **+368,22 m²** y hasta F22 la parcela **se construía**: una finca que no existe, cuyos
+   siete huecos son las parcelas de los vecinos, con `bloqueos: []` y `construida: true`. Lo
+   único que separaba al proyecto de entregar geometría falsa era el orden en que un fichero
+   ajeno lista sus polilíneas.
+2. ⭐ **Los ocho rótulos de `RefCatastral` identifican las ocho fincas 1:1.** Verificado con
+   punto-en-polígono: **8 coincidencias, cero ambigüedad, cero rótulos huérfanos**. Es el dato
+   que permite preguntar «¿cuál de estas ocho es la tuya?» con las referencias delante, y hasta
+   F22 se tiraba dentro del «Se ignoraron 161 anotación(es)».
+3. ⭐ **Es el peor caso de coste del detector, y en el mismo fichero.** La capa `Construccion`
+   son 168 anillos ⇒ **14.028 pares**. Con el prefiltro por caja envolvente bajan a **599**
+   (95,7 % ahorrado) y el barrido cuesta **~215 ms**; la capa `Parcela` son 8 de 28 pares y
+   **~18 ms**. ⚠️ Y da `disjuntos: false` **por contención entre pares** (hay huellas dentro de
+   otras), no por solape — que es la respuesta correcta: no son fincas separadas.
+
+### ⚠️ Huecos declarados
+
+- **La URL exacta del servicio.** Mismo hueco que su hermano y por el mismo motivo: el fichero
+  se conserva desde junio de 2026 con el nombre que le puso el navegador (`ConsultaMasiva_
+  (90).dxf`, el nonagésimo de una tanda) y nadie anotó la petición. **Verificable, no
+  re-obtenible.**
+- **De qué municipio y polígono es la manzana.** Se deduce de las referencias (`6346…`/`6145…`,
+  Málaga) pero **no se ha comprobado** contra la Sede.
+- ⚠️ **Un solo fichero no es la especificación del formato.** Lo que este fixture demuestra es
+  lo que este fichero trae; el segundo DXF de Consulta Masiva que llegue puede añadir casos.
 
 ---
 

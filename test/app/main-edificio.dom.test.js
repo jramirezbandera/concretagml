@@ -598,13 +598,18 @@ describe('app/main · F12 · las dos ediciones no pueden estar encendidas a la v
     // Es la rebanada 3 del rework, que hizo que «Edición» significara algo: los
     // cuatro gestos estaban vivos en las CINCO pantallas (15 de 15 marcadores
     // arrastrables en Validación, medido). La rama nueva no puede reabrir eso.
-    // ⚠️ Se prueba con Validación y Entrada, **no con Diagnóstico**: entrar en
-    // Diagnóstico pide las colindantes al Catastro, y este fichero afirma más
-    // abajo que las vías por fichero no tocan la red. Una prueba que ensucia el
-    // espía de otra es una prueba que rompe a distancia.
+    //
+    // ⚠️ Se prueba con Entrada, **no con Diagnóstico**: entrar en Diagnóstico pide
+    // las colindantes al Catastro, y este fichero afirma más abajo que las vías por
+    // fichero no tocan la red. Una prueba que ensucia el espía de otra es una
+    // prueba que rompe a distancia.
+    //
+    // ⭐ 2026-08-08 · Aquí se probaba TAMBIÉN con Validación, y ese paso ya no
+    // existe: se fusionó con Edición. Queda un solo sitio donde comprobarlo, y hay
+    // que decirlo en vez de dejar la lista corta sin explicación. Lo que la
+    // rebanada 3 ganó no se pierde —los gestos siguen atados a UN paso— pero este
+    // guardián vigila la mitad de superficie que vigilaba.
     irA(RAMA.PARCELA)
-    irAPaso(PASO.VALIDACION)
-    expect(ultimoParcela()).toBe(false)
     irAPaso(PASO.ENTRADA)
     expect(ultimoParcela()).toBe(false)
   })

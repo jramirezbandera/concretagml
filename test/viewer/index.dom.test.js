@@ -98,6 +98,11 @@ import {
   CLASE as CLASE_COMPROBACION,
   SELECTOR as SELECTOR_COMPROBACION,
 } from '../../viewer/cajon-comprobacion.js'
+import {
+  CLASE as CLASE_PARCELAS,
+  SELECTOR as SELECTOR_PARCELAS,
+} from '../../viewer/cajon-parcelas.js'
+import { CLASE_CANDIDATA } from '../../viewer/candidatas.js'
 import { MENSAJES } from '../../viewer/wms-catastro.js'
 import { sincronizar } from '../../viewer/sincronizacion.js'
 import { OPERATIVOS } from '../../config/operativos.js'
@@ -2806,5 +2811,98 @@ describe('crearVisor · `barraEdicion` en el objeto devuelto (F11)', () => {
 
     expect(barraEnDom(contenedor)).toBeNull()
     expect(() => visor.destruir()).not.toThrow()
+  })
+})
+
+// ── F22 · T3.1/T3.2 — la opción `parcelas` ───────────────────────────────────
+//
+// Mismo reparto que las tres de arriba: lo que las PIEZAS hacen vive en
+// `test/viewer/cajon-parcelas.dom.test.js` y `test/viewer/candidatas.dom.test.js`;
+// aquí solo lo que existe cuando están ENSAMBLADAS.
+
+/** El nodo del cajón de PARCELAS dentro del contenedor del mapa, o `null`. */
+const cajonParcelasDe = (contenedor) =>
+  contenedor.querySelector(`.${CLASE_PARCELAS.CONTENEDOR}`)
+
+describe('crearVisor · parcelas:false (el DEFECTO) no cuesta un nodo', () => {
+  it('visor.parcelas vale null, NO undefined, y no hay cajón', () => {
+    const { visor, contenedor } = abrirVisor()
+    expect(visor.parcelas).toBeNull()
+    expect('parcelas' in visor).toBe(true)
+    expect(cajonParcelasDe(contenedor)).toBeNull()
+  })
+
+  it('`parcelas: false` explícito se comporta igual que no pasarlo', () => {
+    const { visor, contenedor } = abrirVisor({ parcelas: false })
+    expect(visor.parcelas).toBeNull()
+    expect(cajonParcelasDe(contenedor)).toBeNull()
+  })
+})
+
+describe('crearVisor · parcelas:true monta las DOS piezas, inertes', () => {
+  it('devuelve `{cajon, capa}` juntas, y no sueltas', () => {
+    // Al revés que `comprobacion` y como `diagnostico`: elegir entre ocho
+    // referencias que comparten los once primeros caracteres SIN ver el mapa no es
+    // elegir, es adivinar. Las dos piezas son inseparables.
+    const { visor } = abrirVisor({ parcelas: true })
+    expect(visor.parcelas).not.toBeNull()
+    expect(Object.keys(visor.parcelas).sort()).toEqual(['cajon', 'capa'])
+    for (const metodo of ['pintar', 'marcar', 'elegida', 'abrir', 'cerrar', 'estado',
+      'alElegir', 'alConfirmar', 'alDescartar', 'destruir']) {
+      expect(typeof visor.parcelas.cajon[metodo], `falta cajon.${metodo}`).toBe('function')
+    }
+    for (const metodo of ['pintar', 'resaltar', 'limpiar', 'alSenalar', 'resaltada', 'destruir']) {
+      expect(typeof visor.parcelas.capa[metodo], `falta capa.${metodo}`).toBe('function')
+    }
+  })
+
+  it('el cajón está en el DOM, CERRADO, y con todos los nodos del contrato', () => {
+    const { visor, contenedor } = abrirVisor({ parcelas: true })
+    const cajon = cajonParcelasDe(contenedor)
+    expect(cajon).not.toBeNull()
+    for (const selector of Object.values(SELECTOR_PARCELAS)) {
+      expect(cajon.querySelector(selector), `falta ${selector}`).not.toBeNull()
+    }
+    expect(cajon.style.display).toBe('none')
+    expect(visor.parcelas.cajon.elegida()).toBeNull()
+  })
+
+  it('la capa nace VACÍA: montar no dibuja ninguna finca', () => {
+    const { visor, contenedor } = abrirVisor({ parcelas: true })
+    expect(visor.parcelas.capa.resaltada()).toBeNull()
+    expect(contenedor.querySelectorAll(`.${CLASE_CANDIDATA}`)).toHaveLength(0)
+  })
+
+  it('⚠️ TERCER cajón en `bottomleft`, y los tres conviven cerrados', () => {
+    // Son caras del mismo hueco y son mutuamente excluyentes POR RECORRIDO, no por
+    // montaje: montarlos los tres es lo normal, abrir dos a la vez no — y de eso
+    // responde el cableado, que es quien sabe en qué punto del recorrido está.
+    const { contenedor } = abrirVisor({ diagnostico: true, comprobacion: true, parcelas: true })
+    const esquina = contenedor.querySelector('.leaflet-bottom.leaflet-left')
+    expect(esquina.querySelectorAll(`.${CLASE_CAJON.CONTENEDOR}`)).toHaveLength(1)
+    expect(esquina.querySelectorAll(`.${CLASE_COMPROBACION.CONTENEDOR}`)).toHaveLength(1)
+    expect(esquina.querySelectorAll(`.${CLASE_PARCELAS.CONTENEDOR}`)).toHaveLength(1)
+    for (const caja of esquina.querySelectorAll('section')) {
+      expect(caja.style.display).toBe('none')
+    }
+  })
+
+  it('`{posicion}` llega a su destinatario, y una clave desconocida LANZA', () => {
+    const { contenedor } = abrirVisor({ parcelas: { posicion: 'topright' } })
+    const esquina = contenedor.querySelector('.leaflet-top.leaflet-right')
+    expect(esquina.querySelector(`.${CLASE_PARCELAS.CONTENEDOR}`)).not.toBeNull()
+    expect(() => abrirVisor({ parcelas: { candidatas: [] } })).toThrow(TypeError)
+    expect(() => abrirVisor({ parcelas: 'sí' })).toThrow(TypeError)
+    expect(() => abrirVisor({ parcelas: [] })).toThrow(TypeError)
+  })
+
+  it('el desmontaje se lleva las dos piezas', () => {
+    const { visor, contenedor } = abrirVisor({ parcelas: true })
+    visor.parcelas.capa.pintar([
+      { vertices: parcelaConHueco().recintos[0].vertices, nombre: 'X', superficie: 1 },
+    ])
+    visor.destruir()
+    expect(cajonParcelasDe(contenedor)).toBeNull()
+    expect(contenedor.querySelectorAll(`.${CLASE_CANDIDATA}`)).toHaveLength(0)
   })
 })

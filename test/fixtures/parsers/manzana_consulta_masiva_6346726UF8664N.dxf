@@ -1,0 +1,20526 @@
+  0
+SECTION
+  2
+HEADER
+  0
+ENDSEC
+  0
+SECTION
+  2
+TABLES
+  0
+TABLE
+  2
+LTYPE
+ 70
+     1
+  0
+LTYPE
+  2
+CONTINUOUS
+ 70
+    64
+  3
+Solid line
+ 72
+    65
+ 73
+     0
+ 40
+0.0
+  0
+ENDTAB
+  0
+TABLE
+  2
+LAYER
+ 70
+     4
+  0
+LAYER
+  2
+txtSubpa
+ 70
+64
+ 62
+ 3
+  6
+CONTINUOUS
+  0
+LAYER
+  2
+Subparcela
+ 70
+64
+ 62
+ 3
+  6
+CONTINUOUS
+  0
+LAYER
+  2
+txtConstru
+ 70
+64
+ 62
+ 6
+  6
+CONTINUOUS
+  0
+LAYER
+  2
+Construccion
+ 70
+64
+ 62
+ 6
+  6
+CONTINUOUS
+  0
+LAYER
+  2
+RefCatastral
+ 70
+64
+ 62
+ 7
+  6
+CONTINUOUS
+  0
+LAYER
+  2
+Parcela
+ 70
+64
+ 62
+ 7
+  6
+CONTINUOUS
+  0
+LAYER
+  2
+Busqueda
+ 70
+64
+ 62
+ 1
+  6
+CONTINUOUS
+  0
+ENDTAB
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+TEXT
+  8
+txtConstru
+ 10
+386126.04
+ 20
+4064406.9
+ 40
+2.0
+ 50
+0.0
+  1
+II
+ 72
+1
+ 73
+1
+ 11
+386126.04
+ 21
+4064406.9
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.5605
+ 20
+4064402.9075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.6905
+ 20
+4064405.5275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.0805
+ 20
+4064405.6075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.1105
+ 20
+4064406.1475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.2905
+ 20
+4064409.7075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.901
+ 20
+4064409.6175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.081
+ 20
+4064413.0375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386129.191
+ 20
+4064412.7775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386129.071
+ 20
+4064410.3475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386130.321
+ 20
+4064410.2775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386130.091
+ 20
+4064405.7575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386130.521
+ 20
+4064405.7275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386130.321
+ 20
+4064401.6775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386129.761
+ 20
+4064401.7175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.801
+ 20
+4064401.8375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.541
+ 20
+4064402.2275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.331
+ 20
+4064402.4575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.101
+ 20
+4064402.6675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386126.851
+ 20
+4064402.8575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386126.581
+ 20
+4064403.0175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386126.161
+ 20
+4064403.1975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.861
+ 20
+4064403.2875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.5505
+ 20
+4064403.3475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.0805
+ 20
+4064403.3675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.7705
+ 20
+4064403.3375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.3205
+ 20
+4064403.2475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.0205
+ 20
+4064403.1475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.5605
+ 20
+4064402.9075
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386124.07
+ 20
+4064399.58
+ 40
+2.0
+ 50
+0.0
+  1
+III
+ 72
+1
+ 73
+1
+ 11
+386124.07
+ 21
+4064399.58
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.801
+ 20
+4064401.8375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386128.061
+ 20
+4064401.2575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386128.161
+ 20
+4064400.8075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386128.201
+ 20
+4064400.4975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386128.191
+ 20
+4064400.0275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386128.101
+ 20
+4064399.5675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.951
+ 20
+4064399.1275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.811
+ 20
+4064398.8475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.5505
+ 20
+4064398.4575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.3505
+ 20
+4064398.2175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.1205
+ 20
+4064398.0075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386126.8705
+ 20
+4064397.8175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386126.4705
+ 20
+4064397.5875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386126.1805
+ 20
+4064397.4675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.7305
+ 20
+4064397.3475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.2705
+ 20
+4064397.2975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.8005
+ 20
+4064397.3175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.4905
+ 20
+4064397.3675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.0505
+ 20
+4064397.5075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.6305
+ 20
+4064397.7175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.2405
+ 20
+4064397.9775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.0105
+ 20
+4064398.1875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.8005
+ 20
+4064398.4175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.5405
+ 20
+4064398.8075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.3405
+ 20
+4064399.2275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.2405
+ 20
+4064399.5275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.1505
+ 20
+4064399.9775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.1305
+ 20
+4064400.4475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.1605
+ 20
+4064400.7575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.2205
+ 20
+4064401.0675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.3105
+ 20
+4064401.3675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.5005
+ 20
+4064401.7875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.7605
+ 20
+4064402.1775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.9605
+ 20
+4064402.4175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.3005
+ 20
+4064402.7275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.5605
+ 20
+4064402.9075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.0205
+ 20
+4064403.1475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.3205
+ 20
+4064403.2475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.7705
+ 20
+4064403.3375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.0805
+ 20
+4064403.3675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.5505
+ 20
+4064403.3475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.861
+ 20
+4064403.2875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386126.161
+ 20
+4064403.1975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386126.581
+ 20
+4064403.0175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386126.851
+ 20
+4064402.8575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.101
+ 20
+4064402.6675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.331
+ 20
+4064402.4575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.541
+ 20
+4064402.2275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.801
+ 20
+4064401.8375
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386133.54
+ 20
+4064401.25
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386133.54
+ 21
+4064401.25
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.6905
+ 20
+4064388.2475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386115.9405
+ 20
+4064390.5575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386116.9705
+ 20
+4064396.2775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386118.8205
+ 20
+4064406.4675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386120.4305
+ 20
+4064414.8775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386120.901
+ 20
+4064415.8375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386121.681
+ 20
+4064416.4875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.721
+ 20
+4064417.0575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.891
+ 20
+4064417.3775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.271
+ 20
+4064417.4675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386129.041
+ 20
+4064416.4875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.881
+ 20
+4064414.047
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386135.201
+ 20
+4064390.8075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.751
+ 20
+4064389.997
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.191
+ 20
+4064386.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.061
+ 20
+4064386.007
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.6905
+ 20
+4064388.2475
+  0
+SEQEND
+  8
+0
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.801
+ 20
+4064401.8375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386129.761
+ 20
+4064401.7175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386130.321
+ 20
+4064401.6775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386130.521
+ 20
+4064405.7275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386130.091
+ 20
+4064405.7575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386130.321
+ 20
+4064410.2775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386129.071
+ 20
+4064410.3475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386129.191
+ 20
+4064412.7775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.081
+ 20
+4064413.0375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.901
+ 20
+4064409.6175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.2905
+ 20
+4064409.7075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.1105
+ 20
+4064406.1475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.0805
+ 20
+4064405.6075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.6905
+ 20
+4064405.5275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.5605
+ 20
+4064402.9075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.3005
+ 20
+4064402.7275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.9605
+ 20
+4064402.4175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.7605
+ 20
+4064402.1775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.5005
+ 20
+4064401.7875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.3105
+ 20
+4064401.3675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.2205
+ 20
+4064401.0675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.1605
+ 20
+4064400.7575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.1305
+ 20
+4064400.4475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.1505
+ 20
+4064399.9775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.2405
+ 20
+4064399.5275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.3405
+ 20
+4064399.2275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.5405
+ 20
+4064398.8075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.8005
+ 20
+4064398.4175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.0105
+ 20
+4064398.1875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.2405
+ 20
+4064397.9775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.6305
+ 20
+4064397.7175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.0505
+ 20
+4064397.5075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.4905
+ 20
+4064397.3675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.8005
+ 20
+4064397.3175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.2705
+ 20
+4064397.2975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.7305
+ 20
+4064397.3475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386126.1805
+ 20
+4064397.4675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386126.4705
+ 20
+4064397.5875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386126.8705
+ 20
+4064397.8175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.1205
+ 20
+4064398.0075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.3505
+ 20
+4064398.2175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.5505
+ 20
+4064398.4575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.811
+ 20
+4064398.8475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.951
+ 20
+4064399.1275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386128.101
+ 20
+4064399.5675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386128.191
+ 20
+4064400.0275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386128.201
+ 20
+4064400.4975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386128.161
+ 20
+4064400.8075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386128.061
+ 20
+4064401.2575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.801
+ 20
+4064401.8375
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386153.81
+ 20
+4064400.63
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386153.81
+ 21
+4064400.63
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386135.201
+ 20
+4064390.8075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.881
+ 20
+4064414.047
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.871
+ 20
+4064413.587
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.611
+ 20
+4064413.477
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386154.341
+ 20
+4064413.717
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.451
+ 20
+4064387.047
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386154.891
+ 20
+4064387.327
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386153.701
+ 20
+4064387.537
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386144.121
+ 20
+4064389.227
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.751
+ 20
+4064389.997
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386135.201
+ 20
+4064390.8075
+  0
+SEQEND
+  8
+0
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.141
+ 20
+4064401.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386140.141
+ 20
+4064401.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386140.141
+ 20
+4064394.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.641
+ 20
+4064394.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.641
+ 20
+4064396.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.241
+ 20
+4064396.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.241
+ 20
+4064403.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.241
+ 20
+4064408.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.141
+ 20
+4064408.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.141
+ 20
+4064410.397
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.141
+ 20
+4064410.397
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.141
+ 20
+4064408.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.141
+ 20
+4064403.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.141
+ 20
+4064401.597
+  0
+SEQEND
+  8
+0
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.891
+ 20
+4064395.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.891
+ 20
+4064390.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.891
+ 20
+4064390.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.891
+ 20
+4064395.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.891
+ 20
+4064395.777
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386141.14
+ 20
+4064398.12
+ 40
+2.0
+ 50
+0.0
+  1
+POR
+ 72
+1
+ 73
+1
+ 11
+386141.14
+ 21
+4064398.12
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.641
+ 20
+4064396.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.641
+ 20
+4064394.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386140.141
+ 20
+4064394.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386140.141
+ 20
+4064401.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.141
+ 20
+4064401.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.141
+ 20
+4064396.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.641
+ 20
+4064396.597
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386146.14
+ 20
+4064409.3
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386146.14
+ 21
+4064409.3
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.141
+ 20
+4064408.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.141
+ 20
+4064410.397
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.141
+ 20
+4064410.397
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.141
+ 20
+4064408.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.141
+ 20
+4064408.197
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386147.19
+ 20
+4064405.71
+ 40
+2.0
+ 50
+0.0
+  1
+-I+I
+ 72
+1
+ 73
+1
+ 11
+386147.19
+ 21
+4064405.71
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.141
+ 20
+4064408.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.141
+ 20
+4064408.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.241
+ 20
+4064408.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.241
+ 20
+4064403.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.141
+ 20
+4064403.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.141
+ 20
+4064408.197
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386147.19
+ 20
+4064399.92
+ 40
+2.0
+ 50
+0.0
+  1
+-I+I+EPT
+ 72
+1
+ 73
+1
+ 11
+386147.19
+ 21
+4064399.92
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.141
+ 20
+4064403.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.241
+ 20
+4064403.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.241
+ 20
+4064396.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.641
+ 20
+4064396.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.141
+ 20
+4064396.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.141
+ 20
+4064401.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.141
+ 20
+4064403.197
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386149.89
+ 20
+4064393.29
+ 40
+2.0
+ 50
+0.0
+  1
+PI
+ 72
+1
+ 73
+1
+ 11
+386149.89
+ 21
+4064393.29
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.891
+ 20
+4064395.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.891
+ 20
+4064395.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.891
+ 20
+4064390.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.891
+ 20
+4064390.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.891
+ 20
+4064395.777
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386117.82
+ 20
+4064371.36
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386117.82
+ 21
+4064371.36
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.6905
+ 20
+4064388.2475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.061
+ 20
+4064386.007
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386134.3105
+ 20
+4064358.6375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386132.7805
+ 20
+4064358.9075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386131.2305
+ 20
+4064359.1775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.0405
+ 20
+4064360.6275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386113.9105
+ 20
+4064362.5275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386113.0005
+ 20
+4064363.3375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386112.3605
+ 20
+4064364.5075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386112.0105
+ 20
+4064365.9675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386111.9405
+ 20
+4064368.1975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386112.6305
+ 20
+4064372.3275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386115.9405
+ 20
+4064390.5575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.6905
+ 20
+4064388.2475
+  0
+SEQEND
+  8
+0
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.45
+ 20
+4064379.9
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.9
+ 20
+4064380.16
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.12
+ 20
+4064386.2
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.86
+ 20
+4064386.65
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386120.19
+ 20
+4064387.39
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386119.73
+ 20
+4064386.97
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386118.6
+ 20
+4064381.39
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386118.92
+ 20
+4064380.61
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.45
+ 20
+4064379.9
+  0
+SEQEND
+  8
+0
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.04
+ 20
+4064377.94
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.68
+ 20
+4064378.2
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386120.82
+ 20
+4064368.62
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386129.58
+ 20
+4064366.92
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386129.81
+ 20
+4064368.11
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386132.6
+ 20
+4064367.57
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386134.74
+ 20
+4064378.59
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386131.71
+ 20
+4064379.21
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386132.91
+ 20
+4064385.39
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.75
+ 20
+4064386.78
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.04
+ 20
+4064377.94
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386121.72
+ 20
+4064385.48
+ 40
+2.0
+ 50
+0.0
+  1
+PI
+ 72
+1
+ 73
+1
+ 11
+386121.72
+ 21
+4064385.48
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.45
+ 20
+4064379.9
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386118.92
+ 20
+4064380.61
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386118.6
+ 20
+4064381.39
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386119.73
+ 20
+4064386.97
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386120.19
+ 20
+4064387.39
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.86
+ 20
+4064386.65
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.12
+ 20
+4064386.2
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.9
+ 20
+4064380.16
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.45
+ 20
+4064379.9
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386122.5
+ 20
+4064371.94
+ 40
+2.0
+ 50
+0.0
+  1
+POR
+ 72
+1
+ 73
+1
+ 11
+386122.5
+ 21
+4064371.94
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386129.81
+ 20
+4064368.11
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386129.58
+ 20
+4064366.92
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386120.82
+ 20
+4064368.62
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.68
+ 20
+4064378.2
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.04
+ 20
+4064377.94
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.02
+ 20
+4064377.75
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.59
+ 20
+4064370.33
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386130.0
+ 20
+4064369.09
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386129.81
+ 20
+4064368.11
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386129.0
+ 20
+4064375.81
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386129.0
+ 21
+4064375.81
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386129.81
+ 20
+4064368.11
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386130.0
+ 20
+4064369.09
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.59
+ 20
+4064370.33
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.02
+ 20
+4064377.75
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.04
+ 20
+4064377.94
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.75
+ 20
+4064386.78
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386132.91
+ 20
+4064385.39
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386131.71
+ 20
+4064379.21
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386134.74
+ 20
+4064378.59
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386132.6
+ 20
+4064367.57
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386129.81
+ 20
+4064368.11
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386140.54
+ 20
+4064359.4
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386140.54
+ 21
+4064359.4
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.1305
+ 20
+4064356.5415
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386134.3105
+ 20
+4064358.6375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386134.9375
+ 20
+4064362.2505
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.77
+ 20
+4064360.16
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.1305
+ 20
+4064356.5415
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386153.39
+ 20
+4064371.01
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386153.39
+ 21
+4064371.01
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.1305
+ 20
+4064356.5415
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.77
+ 20
+4064360.16
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386134.9375
+ 20
+4064362.2505
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.061
+ 20
+4064386.007
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.191
+ 20
+4064386.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.751
+ 20
+4064389.997
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386144.121
+ 20
+4064389.227
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386153.701
+ 20
+4064387.537
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386151.91
+ 20
+4064377.51
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.52
+ 20
+4064377.4
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386154.66
+ 20
+4064377.02
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.451
+ 20
+4064387.047
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386172.321
+ 20
+4064384.237
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386173.851
+ 20
+4064383.967
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386169.691
+ 20
+4064360.957
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.191
+ 20
+4064352.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386165.581
+ 20
+4064353.097
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.851
+ 20
+4064355.707
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386147.981
+ 20
+4064356.217
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.551
+ 20
+4064356.467
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.1305
+ 20
+4064356.5415
+  0
+SEQEND
+  8
+0
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386149.79
+ 20
+4064369.15
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.97
+ 20
+4064371.14
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.07
+ 20
+4064366.73
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386148.88
+ 20
+4064364.73
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386149.79
+ 20
+4064369.15
+  0
+SEQEND
+  8
+0
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386157.83
+ 20
+4064373.46
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.84
+ 20
+4064373.63
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.18
+ 20
+4064369.68
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.09
+ 20
+4064368.52
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386162.92
+ 20
+4064367.54
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386165.88
+ 20
+4064367.04
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386165.96
+ 20
+4064367.54
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386167.44
+ 20
+4064367.29
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.35
+ 20
+4064372.71
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386169.34
+ 20
+4064372.55
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.25
+ 20
+4064377.97
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386169.26
+ 20
+4064378.14
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386169.92
+ 20
+4064382.08
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.54
+ 20
+4064383.49
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.04
+ 20
+4064380.53
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386159.07
+ 20
+4064380.86
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386157.83
+ 20
+4064373.46
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386144.43
+ 20
+4064367.94
+ 40
+2.0
+ 50
+0.0
+  1
+PI
+ 72
+1
+ 73
+1
+ 11
+386144.43
+ 21
+4064367.94
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386149.79
+ 20
+4064369.15
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386148.88
+ 20
+4064364.73
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.07
+ 20
+4064366.73
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.97
+ 20
+4064371.14
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386149.79
+ 20
+4064369.15
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386154.18
+ 20
+4064382.28
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386154.18
+ 21
+4064382.28
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.451
+ 20
+4064387.047
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386154.66
+ 20
+4064377.02
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.52
+ 20
+4064377.4
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386151.91
+ 20
+4064377.51
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386153.701
+ 20
+4064387.537
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386154.891
+ 20
+4064387.327
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.451
+ 20
+4064387.047
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386159.97
+ 20
+4064371.07
+ 40
+2.0
+ 50
+0.0
+  1
+POR
+ 72
+1
+ 73
+1
+ 11
+386159.97
+ 21
+4064371.07
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.09
+ 20
+4064368.52
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.18
+ 20
+4064369.68
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.84
+ 20
+4064373.63
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386157.83
+ 20
+4064373.46
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.75
+ 20
+4064372.47
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.09
+ 20
+4064368.52
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386164.54
+ 20
+4064376.14
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386164.54
+ 21
+4064376.14
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.09
+ 20
+4064368.52
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.75
+ 20
+4064372.47
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386157.83
+ 20
+4064373.46
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386159.07
+ 20
+4064380.86
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.04
+ 20
+4064380.53
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.54
+ 20
+4064383.49
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386169.92
+ 20
+4064382.08
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386169.26
+ 20
+4064378.14
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.25
+ 20
+4064377.97
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386169.34
+ 20
+4064372.55
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.35
+ 20
+4064372.71
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386167.44
+ 20
+4064367.29
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386165.96
+ 20
+4064367.54
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386165.88
+ 20
+4064367.04
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386162.92
+ 20
+4064367.54
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.09
+ 20
+4064368.52
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386085.83
+ 20
+4064399.57
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386085.83
+ 21
+4064399.57
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386083.7378
+ 20
+4064396.5767
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386086.4983
+ 20
+4064409.1484
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386087.59
+ 20
+4064414.12
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386088.44
+ 20
+4064418.06
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386089.85685
+ 20
+4064424.66885
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386089.9
+ 20
+4064424.87
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386089.94
+ 20
+4064425.05
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386099.27
+ 20
+4064422.98
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386102.49
+ 20
+4064422.29
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386107.42
+ 20
+4064421.19
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386109.75
+ 20
+4064420.31
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386109.935
+ 20
+4064420.11005
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386109.9405
+ 20
+4064420.1075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386111.36575
+ 20
+4064418.5727
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386111.7218
+ 20
+4064417.4733
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386112.0
+ 20
+4064416.63
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386111.96
+ 20
+4064415.33
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386111.7502
+ 20
+4064414.1619
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386109.6005
+ 20
+4064402.1675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386109.3605
+ 20
+4064400.8575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386109.17895
+ 20
+4064399.8719
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386106.46
+ 20
+4064384.56
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386106.36205
+ 20
+4064384.5808
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386082.34
+ 20
+4064389.68
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386083.54
+ 20
+4064396.49
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386083.71
+ 20
+4064396.45
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386083.7378
+ 20
+4064396.5767
+  0
+SEQEND
+  8
+0
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386090.7205
+ 20
+4064396.4475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386092.5805
+ 20
+4064405.2575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386088.5505
+ 20
+4064406.1075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386086.6905
+ 20
+4064397.2975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386090.7205
+ 20
+4064396.4475
+  0
+SEQEND
+  8
+0
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386105.0705
+ 20
+4064400.9475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386105.4405
+ 20
+4064400.8675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386106.1505
+ 20
+4064404.2475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386106.7105
+ 20
+4064406.9075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386108.2305
+ 20
+4064414.0875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386097.4605
+ 20
+4064416.3575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386095.5305
+ 20
+4064407.3875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386099.7805
+ 20
+4064406.4975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386099.1505
+ 20
+4064403.5375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386097.5505
+ 20
+4064403.8675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386096.1205
+ 20
+4064397.0475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386102.3105
+ 20
+4064395.7475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386102.5205
+ 20
+4064396.7375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386104.1105
+ 20
+4064396.3975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386105.0705
+ 20
+4064400.9475
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386101.46
+ 20
+4064409.54
+ 40
+2.0
+ 50
+0.0
+  1
+II
+ 72
+1
+ 73
+1
+ 11
+386101.46
+ 21
+4064409.54
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386106.7105
+ 20
+4064406.9075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386106.1505
+ 20
+4064404.2475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386105.4405
+ 20
+4064400.8675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386105.0705
+ 20
+4064400.9475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386103.4705
+ 20
+4064401.2875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386098.8805
+ 20
+4064402.2475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386099.1505
+ 20
+4064403.5375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386099.7805
+ 20
+4064406.4975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386095.5305
+ 20
+4064407.3875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386097.4605
+ 20
+4064416.3575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386108.2305
+ 20
+4064414.0875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386106.7105
+ 20
+4064406.9075
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386088.57
+ 20
+4064401.01
+ 40
+2.0
+ 50
+0.0
+  1
+PI
+ 72
+1
+ 73
+1
+ 11
+386088.57
+ 21
+4064401.01
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386090.7205
+ 20
+4064396.4475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386086.6905
+ 20
+4064397.2975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386088.5505
+ 20
+4064406.1075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386092.5805
+ 20
+4064405.2575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386090.7205
+ 20
+4064396.4475
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386097.56
+ 20
+4064398.43
+ 40
+2.0
+ 50
+0.0
+  1
+POR+I
+ 72
+1
+ 73
+1
+ 11
+386097.56
+ 21
+4064398.43
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386103.4705
+ 20
+4064401.2875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386102.5205
+ 20
+4064396.7375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386102.3105
+ 20
+4064395.7475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386096.1205
+ 20
+4064397.0475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386097.5505
+ 20
+4064403.8675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386099.1505
+ 20
+4064403.5375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386098.8805
+ 20
+4064402.2475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386103.4705
+ 20
+4064401.2875
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386103.42
+ 20
+4064398.43
+ 40
+2.0
+ 50
+0.0
+  1
+TZA+I
+ 72
+1
+ 73
+1
+ 11
+386103.42
+ 21
+4064398.43
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386105.0705
+ 20
+4064400.9475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386104.1105
+ 20
+4064396.3975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386102.5205
+ 20
+4064396.7375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386103.4705
+ 20
+4064401.2875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386105.0705
+ 20
+4064400.9475
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386152.63
+ 20
+4064441.57
+ 40
+2.0
+ 50
+0.0
+  1
+JD
+ 72
+1
+ 73
+1
+ 11
+386152.63
+ 21
+4064441.57
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.221
+ 20
+4064423.717
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386157.211
+ 20
+4064422.937
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.691
+ 20
+4064422.267
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386148.151
+ 20
+4064422.097
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386144.261
+ 20
+4064422.337
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386143.691
+ 20
+4064422.367
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386141.211
+ 20
+4064422.947
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386138.461
+ 20
+4064423.5175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386135.201
+ 20
+4064424.2075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386133.981
+ 20
+4064424.4775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386131.291
+ 20
+4064425.0475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386128.501
+ 20
+4064425.5975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386126.091
+ 20
+4064426.3075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.051
+ 20
+4064426.9775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.271
+ 20
+4064428.1575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.891
+ 20
+4064429.3175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386123.981
+ 20
+4064430.6475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386124.971
+ 20
+4064437.8375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.321
+ 20
+4064438.9375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386131.581
+ 20
+4064436.5775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386131.431
+ 20
+4064436.1575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386130.211
+ 20
+4064432.8075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386131.271
+ 20
+4064432.4275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386130.681
+ 20
+4064430.8075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386140.011
+ 20
+4064427.3575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386141.211
+ 20
+4064426.907
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.341
+ 20
+4064430.007
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386141.151
+ 20
+4064430.437
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386141.831
+ 20
+4064432.307
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.731
+ 20
+4064434.767
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386143.921
+ 20
+4064434.327
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386144.801
+ 20
+4064436.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386145.911
+ 20
+4064439.797
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386144.721
+ 20
+4064440.227
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386145.511
+ 20
+4064442.377
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.351
+ 20
+4064444.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386147.541
+ 20
+4064444.267
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386148.611
+ 20
+4064447.177
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386147.431
+ 20
+4064447.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386148.151
+ 20
+4064449.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386149.341
+ 20
+4064449.207
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.441
+ 20
+4064452.217
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386149.221
+ 20
+4064452.647
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.831
+ 20
+4064455.9975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386138.771
+ 20
+4064456.3775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386133.971
+ 20
+4064457.8675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386135.691
+ 20
+4064462.1875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.531
+ 20
+4064456.997
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386153.891
+ 20
+4064454.737
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386154.641
+ 20
+4064453.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386155.4915
+ 20
+4064453.337
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.8115
+ 20
+4064452.997
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.1215
+ 20
+4064453.137
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.5115
+ 20
+4064453.097
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.7315
+ 20
+4064453.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.0415
+ 20
+4064453.047
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.5115
+ 20
+4064452.987
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386184.4915
+ 20
+4064452.957
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.4815
+ 20
+4064453.247
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.3015
+ 20
+4064462.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.5115
+ 20
+4064462.787
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386192.8515
+ 20
+4064462.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386192.8615
+ 20
+4064461.607
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.9015
+ 20
+4064461.567
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.9215
+ 20
+4064454.007
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.1615
+ 20
+4064455.487
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.1615
+ 20
+4064454.547
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.712
+ 20
+4064454.587
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.962
+ 20
+4064454.6265
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.992
+ 20
+4064453.7565
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.492
+ 20
+4064453.7265
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.502
+ 20
+4064451.0765
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386216.072
+ 20
+4064451.0865
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.712
+ 20
+4064451.1965
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.572
+ 20
+4064451.247
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.562
+ 20
+4064452.707
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.1915
+ 20
+4064452.807
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386200.6915
+ 20
+4064452.717
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386199.9215
+ 20
+4064452.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386199.1515
+ 20
+4064452.337
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386198.6615
+ 20
+4064452.097
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386198.0315
+ 20
+4064451.647
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386197.4715
+ 20
+4064451.107
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386197.0115
+ 20
+4064450.487
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.6615
+ 20
+4064449.797
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.4415
+ 20
+4064449.127
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386184.1715
+ 20
+4064449.247
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386183.2915
+ 20
+4064449.037
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386182.8615
+ 20
+4064448.877
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386182.4415
+ 20
+4064448.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.6515
+ 20
+4064448.247
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386180.9215
+ 20
+4064447.687
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386180.2915
+ 20
+4064447.037
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.9815
+ 20
+4064446.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.7915
+ 20
+4064446.677
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386167.5115
+ 20
+4064446.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386166.0115
+ 20
+4064446.397
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386164.4615
+ 20
+4064445.627
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.1115
+ 20
+4064444.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386162.2515
+ 20
+4064443.627
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.6515
+ 20
+4064442.407
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.3815
+ 20
+4064440.837
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.221
+ 20
+4064423.717
+  0
+SEQEND
+  8
+0
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.211
+ 20
+4064425.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.011
+ 20
+4064435.027
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386157.891
+ 20
+4064435.677
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386157.501
+ 20
+4064435.907
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386157.011
+ 20
+4064436.327
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.751
+ 20
+4064436.787
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.411
+ 20
+4064437.267
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.011
+ 20
+4064437.527
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386155.561
+ 20
+4064437.677
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386154.901
+ 20
+4064437.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386154.371
+ 20
+4064437.437
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386153.841
+ 20
+4064437.087
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386153.301
+ 20
+4064436.787
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.711
+ 20
+4064436.667
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.311
+ 20
+4064436.397
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.601
+ 20
+4064426.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.211
+ 20
+4064425.597
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386129.29
+ 20
+4064439.12
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386129.29
+ 21
+4064439.12
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386131.581
+ 20
+4064436.5775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386125.321
+ 20
+4064438.9375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386126.401
+ 20
+4064442.2775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386126.771
+ 20
+4064443.2575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386134.261
+ 20
+4064440.6575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386133.861
+ 20
+4064439.5475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386132.801
+ 20
+4064439.9375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386131.581
+ 20
+4064436.5775
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386130.88
+ 20
+4064444.23
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386130.88
+ 21
+4064444.23
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386134.261
+ 20
+4064440.6575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386126.771
+ 20
+4064443.2575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386126.951
+ 20
+4064443.7275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386127.921
+ 20
+4064446.2675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386128.931
+ 20
+4064448.4775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386135.091
+ 20
+4064446.2375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386133.871
+ 20
+4064442.8875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386134.931
+ 20
+4064442.5075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386134.261
+ 20
+4064440.6575
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386132.79
+ 20
+4064448.69
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386132.79
+ 21
+4064448.69
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386135.091
+ 20
+4064446.2375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386128.931
+ 20
+4064448.4775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386129.991
+ 20
+4064450.7875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386131.541
+ 20
+4064453.5375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386137.081
+ 20
+4064451.7175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386136.901
+ 20
+4064451.2375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386138.051
+ 20
+4064451.0875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386137.421
+ 20
+4064449.3775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386136.361
+ 20
+4064449.7575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386135.091
+ 20
+4064446.2375
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386131.05
+ 20
+4064434.27
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386131.05
+ 21
+4064434.27
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386131.271
+ 20
+4064432.4275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386130.211
+ 20
+4064432.8075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386131.431
+ 20
+4064436.1575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386132.481
+ 20
+4064435.7675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386131.271
+ 20
+4064432.4275
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386133.98
+ 20
+4064430.73
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386133.98
+ 21
+4064430.73
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386140.011
+ 20
+4064427.3575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386130.681
+ 20
+4064430.8075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386131.271
+ 20
+4064432.4275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386132.481
+ 20
+4064435.7675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386141.831
+ 20
+4064432.307
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386141.151
+ 20
+4064430.437
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386140.011
+ 20
+4064427.3575
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386132.37
+ 20
+4064437.42
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386132.37
+ 21
+4064437.42
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386132.481
+ 20
+4064435.7675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386131.431
+ 20
+4064436.1575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386131.581
+ 20
+4064436.5775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386132.801
+ 20
+4064439.9375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386133.861
+ 20
+4064439.5475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386132.481
+ 20
+4064435.7675
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386134.98
+ 20
+4064453.96
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386134.98
+ 21
+4064453.96
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386137.081
+ 20
+4064451.7175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386131.541
+ 20
+4064453.5375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386133.971
+ 20
+4064457.8675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386138.771
+ 20
+4064456.3775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386137.081
+ 20
+4064451.7175
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386137.42
+ 20
+4064435.36
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386137.42
+ 21
+4064435.36
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386141.831
+ 20
+4064432.307
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386132.481
+ 20
+4064435.7675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386133.861
+ 20
+4064439.5475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386134.261
+ 20
+4064440.6575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386143.611
+ 20
+4064437.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.731
+ 20
+4064434.767
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386141.831
+ 20
+4064432.307
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386134.72
+ 20
+4064444.01
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386134.72
+ 21
+4064444.01
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386134.931
+ 20
+4064442.5075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386133.871
+ 20
+4064442.8875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386135.091
+ 20
+4064446.2375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386136.141
+ 20
+4064445.8475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386134.931
+ 20
+4064442.5075
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386137.96
+ 20
+4064440.74
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386137.96
+ 21
+4064440.74
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386143.611
+ 20
+4064437.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386134.261
+ 20
+4064440.6575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386134.931
+ 20
+4064442.5075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386136.141
+ 20
+4064445.8475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.641
+ 20
+4064444.5475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386145.511
+ 20
+4064442.377
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386144.721
+ 20
+4064440.227
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386143.611
+ 20
+4064437.197
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386135.98
+ 20
+4064447.27
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386135.98
+ 21
+4064447.27
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386136.141
+ 20
+4064445.8475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386135.091
+ 20
+4064446.2375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386136.361
+ 20
+4064449.7575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386137.421
+ 20
+4064449.3775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386136.781
+ 20
+4064447.6175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386136.141
+ 20
+4064445.8475
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386143.96
+ 20
+4064468.41
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386143.96
+ 21
+4064468.41
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.531
+ 20
+4064456.997
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386135.691
+ 20
+4064462.1875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386138.921
+ 20
+4064468.1575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.901
+ 20
+4064469.9575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386144.881
+ 20
+4064479.157
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.7615
+ 20
+4064479.137
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.7115
+ 20
+4064474.427
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.7015
+ 20
+4064473.297
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.2015
+ 20
+4064473.297
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.2215
+ 20
+4064474.457
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386147.0815
+ 20
+4064474.457
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386147.101
+ 20
+4064473.247
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386147.251
+ 20
+4064462.887
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386148.821
+ 20
+4064462.877
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386148.811
+ 20
+4064461.677
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.5815
+ 20
+4064461.657
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.531
+ 20
+4064456.997
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386137.74
+ 20
+4064446.12
+ 40
+2.0
+ 50
+0.0
+  1
+-I+I
+ 72
+1
+ 73
+1
+ 11
+386137.74
+ 21
+4064446.12
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.641
+ 20
+4064444.5475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386136.141
+ 20
+4064445.8475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386136.781
+ 20
+4064447.6175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386140.281
+ 20
+4064446.3375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.641
+ 20
+4064444.5475
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386140.97
+ 20
+4064444.83
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386140.97
+ 21
+4064444.83
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.641
+ 20
+4064444.5475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386140.281
+ 20
+4064446.3375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386136.781
+ 20
+4064447.6175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386137.421
+ 20
+4064449.3775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386138.051
+ 20
+4064451.0875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386141.591
+ 20
+4064449.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386147.431
+ 20
+4064447.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.351
+ 20
+4064444.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386145.511
+ 20
+4064442.377
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.641
+ 20
+4064444.5475
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386138.27
+ 20
+4064453.06
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386138.27
+ 21
+4064453.06
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386138.051
+ 20
+4064451.0875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386136.901
+ 20
+4064451.2375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386137.081
+ 20
+4064451.7175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386138.771
+ 20
+4064456.3775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.831
+ 20
+4064455.9975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386138.621
+ 20
+4064452.6675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386138.051
+ 20
+4064451.0875
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386139.08
+ 20
+4064451.68
+ 40
+2.0
+ 50
+0.0
+  1
+-I+I
+ 72
+1
+ 73
+1
+ 11
+386139.08
+ 21
+4064451.68
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386141.591
+ 20
+4064449.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386138.051
+ 20
+4064451.0875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386138.621
+ 20
+4064452.6675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.171
+ 20
+4064451.377
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386141.591
+ 20
+4064449.777
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386143.03
+ 20
+4064450.45
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386143.03
+ 21
+4064450.45
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386141.591
+ 20
+4064449.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.171
+ 20
+4064451.377
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386138.621
+ 20
+4064452.6675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386139.831
+ 20
+4064455.9975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386149.221
+ 20
+4064452.647
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386148.151
+ 20
+4064449.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386147.431
+ 20
+4064447.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386141.591
+ 20
+4064449.777
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386140.99
+ 20
+4064428.16
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386140.99
+ 21
+4064428.16
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386141.151
+ 20
+4064430.437
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.341
+ 20
+4064430.007
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386141.211
+ 20
+4064426.907
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386140.011
+ 20
+4064427.3575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386141.151
+ 20
+4064430.437
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386143.47
+ 20
+4064435.15
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386143.47
+ 21
+4064435.15
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386144.801
+ 20
+4064436.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386143.921
+ 20
+4064434.327
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386142.731
+ 20
+4064434.767
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386143.611
+ 20
+4064437.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386144.801
+ 20
+4064436.757
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386144.54
+ 20
+4064437.84
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386144.54
+ 21
+4064437.84
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386144.801
+ 20
+4064436.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386143.611
+ 20
+4064437.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386144.721
+ 20
+4064440.227
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386145.911
+ 20
+4064439.797
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386144.801
+ 20
+4064436.757
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386188.02
+ 20
+4064479.11
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386188.02
+ 21
+4064479.11
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.7615
+ 20
+4064479.137
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386144.881
+ 20
+4064479.157
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386147.1215
+ 20
+4064483.437
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386149.7515
+ 20
+4064483.427
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.1515
+ 20
+4064483.297
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386165.0715
+ 20
+4064483.347
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.3115
+ 20
+4064483.327
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386169.5915
+ 20
+4064483.327
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.2215
+ 20
+4064483.297
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386175.5715
+ 20
+4064483.287
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386186.3415
+ 20
+4064483.237
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386187.5515
+ 20
+4064483.227
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.132
+ 20
+4064483.157
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386203.802
+ 20
+4064483.147
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.892
+ 20
+4064483.137
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.142
+ 20
+4064483.127
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.392
+ 20
+4064483.107
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.232
+ 20
+4064483.0965
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386222.992
+ 20
+4064483.0565
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386224.282
+ 20
+4064483.0465
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386237.662
+ 20
+4064482.9765
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386235.232
+ 20
+4064478.8865
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.432
+ 20
+4064478.9365
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.902
+ 20
+4064478.9465
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.652
+ 20
+4064478.957
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.132
+ 20
+4064478.967
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.862
+ 20
+4064478.977
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.5215
+ 20
+4064478.997
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.5215
+ 20
+4064474.307
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.5215
+ 20
+4064473.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.1515
+ 20
+4064473.117
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.1315
+ 20
+4064474.267
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.0715
+ 20
+4064479.027
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.5815
+ 20
+4064479.047
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.0815
+ 20
+4064479.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.8515
+ 20
+4064479.087
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.7815
+ 20
+4064479.107
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.2415
+ 20
+4064479.117
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.7615
+ 20
+4064479.137
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386147.23
+ 20
+4064445.32
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386147.23
+ 21
+4064445.32
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386147.431
+ 20
+4064447.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386148.611
+ 20
+4064447.177
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386147.541
+ 20
+4064444.267
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386146.351
+ 20
+4064444.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386147.431
+ 20
+4064447.617
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386148.01
+ 20
+4064473.74
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386148.01
+ 21
+4064473.74
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386147.101
+ 20
+4064473.247
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386147.0815
+ 20
+4064474.457
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.2215
+ 20
+4064474.457
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.2015
+ 20
+4064473.297
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386147.101
+ 20
+4064473.247
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386147.86
+ 20
+4064469.23
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386147.86
+ 21
+4064469.23
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386148.821
+ 20
+4064462.877
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386147.251
+ 20
+4064462.887
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386147.101
+ 20
+4064473.247
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.2015
+ 20
+4064473.297
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.7015
+ 20
+4064473.297
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.6315
+ 20
+4064466.827
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.9015
+ 20
+4064466.837
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.951
+ 20
+4064462.867
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386148.821
+ 20
+4064462.877
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386149.09
+ 20
+4064450.34
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386149.09
+ 21
+4064450.34
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386149.221
+ 20
+4064452.647
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.441
+ 20
+4064452.217
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386149.341
+ 20
+4064449.207
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386148.151
+ 20
+4064449.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386149.221
+ 20
+4064452.647
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386149.66
+ 20
+4064462.08
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386149.66
+ 21
+4064462.08
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.5815
+ 20
+4064461.657
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386148.811
+ 20
+4064461.677
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386148.821
+ 20
+4064462.877
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.951
+ 20
+4064462.867
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.5915
+ 20
+4064462.857
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.5815
+ 20
+4064461.657
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386153.75
+ 20
+4064431.37
+ 40
+2.0
+ 50
+0.0
+  1
+PI
+ 72
+1
+ 73
+1
+ 11
+386153.75
+ 21
+4064431.37
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.211
+ 20
+4064425.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.601
+ 20
+4064426.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.311
+ 20
+4064436.397
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.711
+ 20
+4064436.667
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386153.301
+ 20
+4064436.787
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386153.841
+ 20
+4064437.087
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386154.371
+ 20
+4064437.437
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386154.901
+ 20
+4064437.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386155.561
+ 20
+4064437.677
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.011
+ 20
+4064437.527
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.411
+ 20
+4064437.267
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.751
+ 20
+4064436.787
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386157.011
+ 20
+4064436.327
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386157.501
+ 20
+4064435.907
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386157.891
+ 20
+4064435.677
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.011
+ 20
+4064435.027
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.211
+ 20
+4064425.597
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386151.62
+ 20
+4064465.47
+ 40
+2.0
+ 50
+0.0
+  1
+-I+I
+ 72
+1
+ 73
+1
+ 11
+386151.62
+ 21
+4064465.47
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.951
+ 20
+4064462.867
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.9015
+ 20
+4064466.837
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.6315
+ 20
+4064466.827
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.5915
+ 20
+4064462.857
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386150.951
+ 20
+4064462.867
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386155.18
+ 20
+4064457.92
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386155.18
+ 21
+4064457.92
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.1215
+ 20
+4064453.137
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.8115
+ 20
+4064452.997
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386155.4915
+ 20
+4064453.337
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386154.641
+ 20
+4064453.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386153.891
+ 20
+4064454.737
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.531
+ 20
+4064456.997
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.5815
+ 20
+4064461.657
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.5915
+ 20
+4064462.857
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386154.0915
+ 20
+4064462.847
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386154.0815
+ 20
+4064461.657
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.0515
+ 20
+4064461.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.1215
+ 20
+4064453.137
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386152.82
+ 20
+4064468.25
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386152.82
+ 21
+4064468.25
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386154.0915
+ 20
+4064462.847
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.5915
+ 20
+4064462.857
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.6315
+ 20
+4064466.827
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.7015
+ 20
+4064473.297
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386155.7415
+ 20
+4064473.137
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.1715
+ 20
+4064473.157
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.1115
+ 20
+4064466.947
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.3215
+ 20
+4064466.957
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.3015
+ 20
+4064462.837
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386154.0915
+ 20
+4064462.847
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386153.95
+ 20
+4064473.59
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386153.95
+ 21
+4064473.59
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386155.7415
+ 20
+4064473.137
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.7015
+ 20
+4064473.297
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.7115
+ 20
+4064474.427
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386155.7415
+ 20
+4064474.417
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386155.7415
+ 20
+4064473.137
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386154.9
+ 20
+4064476.79
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386154.9
+ 21
+4064476.79
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386155.7415
+ 20
+4064473.137
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386155.7415
+ 20
+4064474.417
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.7115
+ 20
+4064474.427
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386152.7615
+ 20
+4064479.137
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.2415
+ 20
+4064479.117
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.1715
+ 20
+4064473.157
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386155.7415
+ 20
+4064473.137
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386154.47
+ 20
+4064462.23
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386154.47
+ 21
+4064462.23
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.0515
+ 20
+4064461.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386154.0815
+ 20
+4064461.657
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386154.0915
+ 20
+4064462.847
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.3015
+ 20
+4064462.837
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.0615
+ 20
+4064462.827
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.0515
+ 20
+4064461.637
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386157.25
+ 20
+4064466.14
+ 40
+2.0
+ 50
+0.0
+  1
+-I+I
+ 72
+1
+ 73
+1
+ 11
+386157.25
+ 21
+4064466.14
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.0615
+ 20
+4064462.827
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.3015
+ 20
+4064462.837
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386156.3215
+ 20
+4064466.957
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.1115
+ 20
+4064466.947
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.0615
+ 20
+4064462.827
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386160.41
+ 20
+4064462.15
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386160.41
+ 21
+4064462.15
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.8615
+ 20
+4064462.807
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.8615
+ 20
+4064461.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.0515
+ 20
+4064461.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.0615
+ 20
+4064462.827
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386159.6515
+ 20
+4064462.817
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.8615
+ 20
+4064462.807
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386160.47
+ 20
+4064457.26
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386160.47
+ 21
+4064457.26
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.0515
+ 20
+4064461.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.8615
+ 20
+4064461.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.8615
+ 20
+4064462.807
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.6115
+ 20
+4064462.797
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.5115
+ 20
+4064453.097
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.1215
+ 20
+4064453.137
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.0515
+ 20
+4064461.637
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386158.76
+ 20
+4064463.89
+ 40
+2.0
+ 50
+0.0
+  1
+-I+I
+ 72
+1
+ 73
+1
+ 11
+386158.76
+ 21
+4064463.89
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386159.6515
+ 20
+4064462.817
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.0615
+ 20
+4064462.827
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.1115
+ 20
+4064466.947
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386159.6715
+ 20
+4064466.937
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386159.6515
+ 20
+4064462.817
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386158.83
+ 20
+4064470.28
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386158.83
+ 21
+4064470.28
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386159.6515
+ 20
+4064462.817
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386159.6715
+ 20
+4064466.937
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.1115
+ 20
+4064466.947
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.1715
+ 20
+4064473.157
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386160.4215
+ 20
+4064473.177
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.7215
+ 20
+4064473.177
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.6115
+ 20
+4064462.797
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.8615
+ 20
+4064462.807
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386159.6515
+ 20
+4064462.817
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386160.28
+ 20
+4064476.51
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386160.28
+ 21
+4064476.51
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.1715
+ 20
+4064473.157
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.2415
+ 20
+4064479.117
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.7815
+ 20
+4064479.107
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.7315
+ 20
+4064474.377
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386160.3915
+ 20
+4064474.387
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386160.4215
+ 20
+4064473.177
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386158.1715
+ 20
+4064473.157
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386162.06
+ 20
+4064473.74
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386162.06
+ 21
+4064473.74
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386160.4215
+ 20
+4064473.177
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386160.3915
+ 20
+4064474.387
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.7315
+ 20
+4064474.377
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.7215
+ 20
+4064473.177
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386160.4215
+ 20
+4064473.177
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386162.63
+ 20
+4064434.98
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386162.63
+ 21
+4064434.98
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.221
+ 20
+4064423.717
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.3815
+ 20
+4064440.837
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.6515
+ 20
+4064442.407
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386162.2515
+ 20
+4064443.627
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.1115
+ 20
+4064444.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386164.4615
+ 20
+4064445.627
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386166.0115
+ 20
+4064446.397
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386167.5115
+ 20
+4064446.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.7915
+ 20
+4064446.677
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.9815
+ 20
+4064446.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.5215
+ 20
+4064445.907
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.1415
+ 20
+4064445.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386178.8915
+ 20
+4064444.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386178.8115
+ 20
+4064443.747
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386178.7615
+ 20
+4064427.127
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.9515
+ 20
+4064426.387
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.1115
+ 20
+4064425.447
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386165.451
+ 20
+4064424.537
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386161.221
+ 20
+4064423.717
+  0
+SEQEND
+  8
+0
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386164.7315
+ 20
+4064441.467
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386164.6915
+ 20
+4064431.117
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386166.2415
+ 20
+4064431.107
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386166.2315
+ 20
+4064429.857
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.0515
+ 20
+4064429.847
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.0915
+ 20
+4064429.827
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.0915
+ 20
+4064431.087
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386175.9015
+ 20
+4064431.077
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386175.9415
+ 20
+4064441.437
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386175.9415
+ 20
+4064442.497
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386173.1615
+ 20
+4064442.507
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386172.5115
+ 20
+4064442.507
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386172.5215
+ 20
+4064441.447
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386169.9515
+ 20
+4064441.457
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386167.8015
+ 20
+4064441.457
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386167.8015
+ 20
+4064442.527
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386164.7315
+ 20
+4064442.537
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386164.7315
+ 20
+4064441.467
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386165.66
+ 20
+4064457.17
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386165.66
+ 21
+4064457.17
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.7315
+ 20
+4064453.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.5115
+ 20
+4064453.097
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.6115
+ 20
+4064462.797
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386164.9315
+ 20
+4064462.797
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386164.9315
+ 20
+4064461.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.6715
+ 20
+4064461.577
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.7315
+ 20
+4064453.067
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386164.02
+ 20
+4064468.25
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386164.02
+ 21
+4064468.25
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.6115
+ 20
+4064462.797
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.7215
+ 20
+4064473.177
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386166.4815
+ 20
+4064473.177
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.7915
+ 20
+4064473.187
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.7215
+ 20
+4064466.897
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386167.1315
+ 20
+4064466.907
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386167.1115
+ 20
+4064462.787
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386164.9315
+ 20
+4064462.797
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.6115
+ 20
+4064462.797
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386164.54
+ 20
+4064473.52
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386164.54
+ 21
+4064473.52
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.7215
+ 20
+4064473.177
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.7315
+ 20
+4064474.377
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386166.5015
+ 20
+4064474.357
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386166.4815
+ 20
+4064473.177
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.7215
+ 20
+4064473.177
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386165.75
+ 20
+4064476.41
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386165.75
+ 21
+4064476.41
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386166.4815
+ 20
+4064473.177
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386166.5015
+ 20
+4064474.357
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.7315
+ 20
+4064474.377
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386163.7815
+ 20
+4064479.107
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.8515
+ 20
+4064479.087
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.7915
+ 20
+4064473.187
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386166.4815
+ 20
+4064473.177
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386166.7
+ 20
+4064437.21
+ 40
+2.0
+ 50
+0.0
+  1
+II
+ 72
+1
+ 73
+1
+ 11
+386166.7
+ 21
+4064437.21
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386166.2415
+ 20
+4064431.107
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386164.6915
+ 20
+4064431.117
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386164.7315
+ 20
+4064441.467
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386167.8015
+ 20
+4064441.457
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386169.9515
+ 20
+4064441.457
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.0015
+ 20
+4064435.017
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.4215
+ 20
+4064435.017
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.4115
+ 20
+4064431.107
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386166.2415
+ 20
+4064431.107
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386165.94
+ 20
+4064442.0
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386165.94
+ 21
+4064442.0
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386167.8015
+ 20
+4064441.457
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386164.7315
+ 20
+4064441.467
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386164.7315
+ 20
+4064442.537
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386167.8015
+ 20
+4064442.527
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386167.8015
+ 20
+4064441.457
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386165.67
+ 20
+4064462.15
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386165.67
+ 21
+4064462.15
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386164.9315
+ 20
+4064462.797
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386167.1115
+ 20
+4064462.787
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.6815
+ 20
+4064462.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.6715
+ 20
+4064461.577
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386164.9315
+ 20
+4064461.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386164.9315
+ 20
+4064462.797
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386168.93
+ 20
+4064432.06
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386168.93
+ 21
+4064432.06
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.0515
+ 20
+4064429.847
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386166.2315
+ 20
+4064429.857
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386166.2415
+ 20
+4064431.107
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.4115
+ 20
+4064431.107
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.4215
+ 20
+4064435.017
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.0015
+ 20
+4064435.017
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.0515
+ 20
+4064429.847
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386167.77
+ 20
+4064465.99
+ 40
+2.0
+ 50
+0.0
+  1
+-I+I
+ 72
+1
+ 73
+1
+ 11
+386167.77
+ 21
+4064465.99
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.6815
+ 20
+4064462.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386167.1115
+ 20
+4064462.787
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386167.1315
+ 20
+4064466.907
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.7215
+ 20
+4064466.897
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.6815
+ 20
+4064462.777
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386171.53
+ 20
+4064462.08
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386171.53
+ 21
+4064462.08
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386172.7215
+ 20
+4064462.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386172.7215
+ 20
+4064461.557
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.6715
+ 20
+4064461.577
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.6815
+ 20
+4064462.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.4615
+ 20
+4064462.767
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386172.7215
+ 20
+4064462.757
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386170.47
+ 20
+4064457.26
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386170.47
+ 21
+4064457.26
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.6715
+ 20
+4064461.577
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386172.7215
+ 20
+4064461.557
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386172.7215
+ 20
+4064462.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.1415
+ 20
+4064462.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.0415
+ 20
+4064453.047
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.7315
+ 20
+4064453.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.6715
+ 20
+4064461.577
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386169.43
+ 20
+4064463.89
+ 40
+2.0
+ 50
+0.0
+  1
+-I+I
+ 72
+1
+ 73
+1
+ 11
+386169.43
+ 21
+4064463.89
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.4615
+ 20
+4064462.767
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.6815
+ 20
+4064462.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.7215
+ 20
+4064466.897
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.4815
+ 20
+4064466.887
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.4615
+ 20
+4064462.767
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386169.43
+ 20
+4064470.13
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386169.43
+ 21
+4064470.13
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.4615
+ 20
+4064462.767
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.4815
+ 20
+4064466.887
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.7215
+ 20
+4064466.897
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.7915
+ 20
+4064473.187
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386171.2315
+ 20
+4064473.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.2515
+ 20
+4064473.157
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.1415
+ 20
+4064462.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386172.7215
+ 20
+4064462.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.4615
+ 20
+4064462.767
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386170.18
+ 20
+4064476.41
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386170.18
+ 21
+4064476.41
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.7915
+ 20
+4064473.187
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.8515
+ 20
+4064479.087
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.0815
+ 20
+4064479.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.0315
+ 20
+4064474.327
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386171.2115
+ 20
+4064474.337
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386171.2315
+ 20
+4064473.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386168.7915
+ 20
+4064473.187
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386172.82
+ 20
+4064437.6
+ 40
+2.0
+ 50
+0.0
+  1
+II
+ 72
+1
+ 73
+1
+ 11
+386172.82
+ 21
+4064437.6
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386169.9515
+ 20
+4064441.457
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386172.5215
+ 20
+4064441.447
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386175.9415
+ 20
+4064441.437
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386175.9015
+ 20
+4064431.077
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.0915
+ 20
+4064431.087
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386171.8915
+ 20
+4064431.087
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386171.9115
+ 20
+4064435.007
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.0015
+ 20
+4064435.017
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386169.9515
+ 20
+4064441.457
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386170.78
+ 20
+4064432.06
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386170.78
+ 21
+4064432.06
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.0015
+ 20
+4064435.017
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386171.9115
+ 20
+4064435.007
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386171.8915
+ 20
+4064431.087
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.0915
+ 20
+4064431.087
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.0915
+ 20
+4064429.827
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.0515
+ 20
+4064429.847
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386170.0015
+ 20
+4064435.017
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386172.8
+ 20
+4064473.82
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386172.8
+ 21
+4064473.82
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386171.2315
+ 20
+4064473.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386171.2115
+ 20
+4064474.337
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.0315
+ 20
+4064474.327
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.2515
+ 20
+4064473.157
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386171.2315
+ 20
+4064473.197
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386174.2
+ 20
+4064441.87
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386174.2
+ 21
+4064441.87
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386172.5215
+ 20
+4064441.447
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386172.5115
+ 20
+4064442.507
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386173.1615
+ 20
+4064442.507
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386175.9415
+ 20
+4064442.497
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386175.9415
+ 20
+4064441.437
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386172.5215
+ 20
+4064441.447
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386175.13
+ 20
+4064473.74
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386175.13
+ 21
+4064473.74
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.0315
+ 20
+4064474.327
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386177.2215
+ 20
+4064474.307
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386177.2215
+ 20
+4064473.127
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.2515
+ 20
+4064473.157
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.0315
+ 20
+4064474.327
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386176.03
+ 20
+4064476.69
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386176.03
+ 21
+4064476.69
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386177.2215
+ 20
+4064473.127
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386177.2215
+ 20
+4064474.307
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.0315
+ 20
+4064474.327
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.0815
+ 20
+4064479.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.5815
+ 20
+4064479.047
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.5215
+ 20
+4064473.097
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386177.2215
+ 20
+4064473.127
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386175.94
+ 20
+4064457.07
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386175.94
+ 21
+4064457.07
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.5115
+ 20
+4064452.987
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.0415
+ 20
+4064453.047
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.1415
+ 20
+4064462.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386175.7315
+ 20
+4064462.747
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386175.7315
+ 20
+4064461.547
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.4015
+ 20
+4064461.527
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.5115
+ 20
+4064452.987
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386174.69
+ 20
+4064468.02
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386174.69
+ 21
+4064468.02
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386175.7315
+ 20
+4064462.747
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.1415
+ 20
+4064462.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386174.2515
+ 20
+4064473.157
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386177.2215
+ 20
+4064473.127
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.5215
+ 20
+4064473.097
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.4515
+ 20
+4064466.847
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386177.8715
+ 20
+4064466.857
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386177.8515
+ 20
+4064462.737
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386175.7315
+ 20
+4064462.747
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386176.34
+ 20
+4064462.15
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386176.34
+ 21
+4064462.15
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386175.7315
+ 20
+4064462.747
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386177.8515
+ 20
+4064462.737
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.4115
+ 20
+4064462.727
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.4015
+ 20
+4064461.527
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386175.7315
+ 20
+4064461.547
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386175.7315
+ 20
+4064462.747
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386178.37
+ 20
+4064466.14
+ 40
+2.0
+ 50
+0.0
+  1
+-I+I
+ 72
+1
+ 73
+1
+ 11
+386178.37
+ 21
+4064466.14
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.4115
+ 20
+4064462.727
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386177.8515
+ 20
+4064462.737
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386177.8715
+ 20
+4064466.857
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.4515
+ 20
+4064466.847
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.4115
+ 20
+4064462.727
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386180.09
+ 20
+4064439.04
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386180.09
+ 21
+4064439.04
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386178.7615
+ 20
+4064427.127
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386178.8115
+ 20
+4064443.747
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386178.8915
+ 20
+4064444.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.1415
+ 20
+4064445.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.5215
+ 20
+4064445.907
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.9815
+ 20
+4064446.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386180.2915
+ 20
+4064447.037
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386180.9215
+ 20
+4064447.687
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.6515
+ 20
+4064448.247
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386182.4415
+ 20
+4064448.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386182.8615
+ 20
+4064448.877
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386183.2915
+ 20
+4064449.037
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386184.1715
+ 20
+4064449.247
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.4415
+ 20
+4064449.127
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.3315
+ 20
+4064448.477
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.1815
+ 20
+4064430.517
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386192.4415
+ 20
+4064429.797
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386187.7815
+ 20
+4064428.897
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386182.9815
+ 20
+4064427.957
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386178.7615
+ 20
+4064427.127
+  0
+SEQEND
+  8
+0
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386182.0515
+ 20
+4064444.817
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.8615
+ 20
+4064434.807
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386183.7915
+ 20
+4064434.767
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386183.7615
+ 20
+4064433.407
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386187.7215
+ 20
+4064433.327
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.6615
+ 20
+4064433.257
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.6915
+ 20
+4064434.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386193.1315
+ 20
+4064434.587
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386193.3215
+ 20
+4064444.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386193.3515
+ 20
+4064445.917
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386189.8915
+ 20
+4064445.987
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386189.9015
+ 20
+4064444.687
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386187.6215
+ 20
+4064444.717
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.3215
+ 20
+4064444.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.3415
+ 20
+4064446.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386182.0815
+ 20
+4064446.137
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386182.0515
+ 20
+4064444.817
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386182.43
+ 20
+4064462.08
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386182.43
+ 21
+4064462.08
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386183.5015
+ 20
+4064462.707
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386183.4915
+ 20
+4064461.507
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.4015
+ 20
+4064461.527
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.4115
+ 20
+4064462.727
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.2015
+ 20
+4064462.717
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386183.5015
+ 20
+4064462.707
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386181.32
+ 20
+4064457.07
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386181.32
+ 21
+4064457.07
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.4015
+ 20
+4064461.527
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386183.4915
+ 20
+4064461.507
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386183.5015
+ 20
+4064462.707
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.3015
+ 20
+4064462.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.4815
+ 20
+4064453.247
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386184.4915
+ 20
+4064452.957
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.5115
+ 20
+4064452.987
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.4015
+ 20
+4064461.527
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386180.47
+ 20
+4064463.66
+ 40
+2.0
+ 50
+0.0
+  1
+-I+I
+ 72
+1
+ 73
+1
+ 11
+386180.47
+ 21
+4064463.66
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.2015
+ 20
+4064462.717
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.4115
+ 20
+4064462.727
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.4515
+ 20
+4064466.847
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.2215
+ 20
+4064466.837
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.2015
+ 20
+4064462.717
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386180.17
+ 20
+4064470.21
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386180.17
+ 21
+4064470.21
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.2015
+ 20
+4064462.717
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.2215
+ 20
+4064466.837
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.4515
+ 20
+4064466.847
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.5215
+ 20
+4064473.097
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.9915
+ 20
+4064473.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.1515
+ 20
+4064473.117
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.3015
+ 20
+4064462.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386183.5015
+ 20
+4064462.707
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.2015
+ 20
+4064462.717
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386181.69
+ 20
+4064476.41
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386181.69
+ 21
+4064476.41
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.9915
+ 20
+4064473.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.5215
+ 20
+4064473.097
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386179.5815
+ 20
+4064479.047
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.0715
+ 20
+4064479.027
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.1315
+ 20
+4064474.267
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.9515
+ 20
+4064474.277
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.9915
+ 20
+4064473.067
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386183.72
+ 20
+4064440.11
+ 40
+2.0
+ 50
+0.0
+  1
+II
+ 72
+1
+ 73
+1
+ 11
+386183.72
+ 21
+4064440.11
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386183.7915
+ 20
+4064434.767
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.8615
+ 20
+4064434.807
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386182.0515
+ 20
+4064444.817
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.3215
+ 20
+4064444.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386187.6215
+ 20
+4064444.717
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386187.6815
+ 20
+4064438.277
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386186.0615
+ 20
+4064438.307
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.9915
+ 20
+4064434.727
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386183.7915
+ 20
+4064434.767
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386183.55
+ 20
+4064473.59
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386183.55
+ 21
+4064473.59
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.9915
+ 20
+4064473.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.9515
+ 20
+4064474.277
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.1315
+ 20
+4064474.267
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.1515
+ 20
+4064473.117
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386181.9915
+ 20
+4064473.067
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386183.56
+ 20
+4064445.43
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386183.56
+ 21
+4064445.43
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.3215
+ 20
+4064444.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386182.0515
+ 20
+4064444.817
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386182.0815
+ 20
+4064446.137
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.3415
+ 20
+4064446.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.3215
+ 20
+4064444.757
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386186.74
+ 20
+4064435.58
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386186.74
+ 21
+4064435.58
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386187.7215
+ 20
+4064433.327
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386183.7615
+ 20
+4064433.407
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386183.7915
+ 20
+4064434.767
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.9915
+ 20
+4064434.727
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386186.0615
+ 20
+4064438.307
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386187.6815
+ 20
+4064438.277
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386187.7215
+ 20
+4064433.327
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386187.23
+ 20
+4064467.41
+ 40
+2.0
+ 50
+0.0
+  1
+-I
+ 72
+1
+ 73
+1
+ 11
+386187.23
+ 21
+4064467.41
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.1515
+ 20
+4064473.117
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.5215
+ 20
+4064473.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.5115
+ 20
+4064462.787
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.3015
+ 20
+4064462.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386185.1515
+ 20
+4064473.117
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386189.99
+ 20
+4064440.79
+ 40
+2.0
+ 50
+0.0
+  1
+II
+ 72
+1
+ 73
+1
+ 11
+386189.99
+ 21
+4064440.79
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386187.6215
+ 20
+4064444.717
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386189.9015
+ 20
+4064444.687
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386193.3215
+ 20
+4064444.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386193.1315
+ 20
+4064434.587
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.6915
+ 20
+4064434.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386189.3215
+ 20
+4064434.657
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386189.3915
+ 20
+4064438.247
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386187.6815
+ 20
+4064438.277
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386187.6215
+ 20
+4064444.717
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386188.48
+ 20
+4064435.58
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386188.48
+ 21
+4064435.58
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386187.6815
+ 20
+4064438.277
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386189.3915
+ 20
+4064438.247
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386189.3215
+ 20
+4064434.657
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.6915
+ 20
+4064434.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.6615
+ 20
+4064433.257
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386187.7215
+ 20
+4064433.327
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386187.6815
+ 20
+4064438.277
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386191.85
+ 20
+4064445.14
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386191.85
+ 21
+4064445.14
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386189.9015
+ 20
+4064444.687
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386189.8915
+ 20
+4064445.987
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386193.3515
+ 20
+4064445.917
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386193.3215
+ 20
+4064444.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386189.9015
+ 20
+4064444.687
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386191.91
+ 20
+4064469.7
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386191.91
+ 21
+4064469.7
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386192.8515
+ 20
+4064462.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.5115
+ 20
+4064462.787
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.5215
+ 20
+4064473.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386194.5315
+ 20
+4064473.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.8715
+ 20
+4064473.077
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.8915
+ 20
+4064466.797
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386195.0615
+ 20
+4064466.817
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386195.2115
+ 20
+4064462.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386192.8515
+ 20
+4064462.777
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386193.31
+ 20
+4064473.55
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386193.31
+ 21
+4064473.55
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.5215
+ 20
+4064474.307
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386194.5215
+ 20
+4064474.277
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386194.5315
+ 20
+4064473.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.5215
+ 20
+4064473.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.5215
+ 20
+4064474.307
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386193.87
+ 20
+4064476.25
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386193.87
+ 21
+4064476.25
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386194.5315
+ 20
+4064473.067
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386194.5215
+ 20
+4064474.277
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.5215
+ 20
+4064474.307
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386191.5215
+ 20
+4064478.997
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.862
+ 20
+4064478.977
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.8715
+ 20
+4064473.077
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386194.5315
+ 20
+4064473.067
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386193.63
+ 20
+4064462.07
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386193.63
+ 21
+4064462.07
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386192.8515
+ 20
+4064462.777
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386195.2115
+ 20
+4064462.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.9015
+ 20
+4064462.737
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.9015
+ 20
+4064461.567
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386192.8615
+ 20
+4064461.607
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386192.8515
+ 20
+4064462.777
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386195.68
+ 20
+4064465.76
+ 40
+2.0
+ 50
+0.0
+  1
+-I+I
+ 72
+1
+ 73
+1
+ 11
+386195.68
+ 21
+4064465.76
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386195.2115
+ 20
+4064462.757
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386195.0615
+ 20
+4064466.817
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.8915
+ 20
+4064466.797
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.9015
+ 20
+4064462.737
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386195.2115
+ 20
+4064462.757
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386209.83
+ 20
+4064457.56
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386209.83
+ 21
+4064457.56
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.692
+ 20
+4064461.467
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386211.642
+ 20
+4064461.437
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386211.652
+ 20
+4064462.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.942
+ 20
+4064462.6065
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.962
+ 20
+4064454.6265
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.712
+ 20
+4064454.587
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.692
+ 20
+4064461.467
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386208.99
+ 20
+4064449.41
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386208.99
+ 21
+4064449.41
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386210.892
+ 20
+4064448.997
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.622
+ 20
+4064449.027
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.622
+ 20
+4064450.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386210.902
+ 20
+4064450.157
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386210.892
+ 20
+4064448.997
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386208.79
+ 20
+4064463.38
+ 40
+2.0
+ 50
+0.0
+  1
+-I+I
+ 72
+1
+ 73
+1
+ 11
+386208.79
+ 21
+4064463.38
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.692
+ 20
+4064462.647
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.652
+ 20
+4064466.837
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.442
+ 20
+4064466.857
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.352
+ 20
+4064462.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.692
+ 20
+4064462.647
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386210.59
+ 20
+4064461.91
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386210.59
+ 21
+4064461.91
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.692
+ 20
+4064462.647
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.352
+ 20
+4064462.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386211.652
+ 20
+4064462.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386211.642
+ 20
+4064461.437
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.692
+ 20
+4064461.467
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.692
+ 20
+4064462.647
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386211.57
+ 20
+4064473.63
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386211.57
+ 21
+4064473.63
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.912
+ 20
+4064472.9465
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.982
+ 20
+4064472.947
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.982
+ 20
+4064474.117
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.882
+ 20
+4064474.0865
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.912
+ 20
+4064472.9465
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386213.95
+ 20
+4064473.63
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386213.95
+ 21
+4064473.63
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.882
+ 20
+4064474.0865
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386216.172
+ 20
+4064474.0465
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386216.212
+ 20
+4064472.9365
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.912
+ 20
+4064472.9465
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.882
+ 20
+4064474.0865
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386215.11
+ 20
+4064476.0
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386215.11
+ 21
+4064476.0
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386216.212
+ 20
+4064472.9365
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386216.172
+ 20
+4064474.0465
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.882
+ 20
+4064474.0865
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.902
+ 20
+4064478.9465
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.432
+ 20
+4064478.9365
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.442
+ 20
+4064474.9265
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.252
+ 20
+4064472.9065
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386216.212
+ 20
+4064472.9365
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386213.46
+ 20
+4064470.44
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386213.46
+ 21
+4064470.44
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.912
+ 20
+4064472.9465
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386216.212
+ 20
+4064472.9365
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.252
+ 20
+4064472.9065
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.462
+ 20
+4064466.6265
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386216.612
+ 20
+4064466.6365
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386216.782
+ 20
+4064462.5665
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.612
+ 20
+4064462.5865
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.942
+ 20
+4064462.6065
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.912
+ 20
+4064472.9465
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386215.36
+ 20
+4064457.07
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386215.36
+ 21
+4064457.07
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.942
+ 20
+4064462.6065
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.612
+ 20
+4064462.5865
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.602
+ 20
+4064461.4065
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.472
+ 20
+4064461.3665
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.492
+ 20
+4064453.7265
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.992
+ 20
+4064453.7565
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.962
+ 20
+4064454.6265
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.942
+ 20
+4064462.6065
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386218.83
+ 20
+4064449.3
+ 40
+2.0
+ 50
+0.0
+  1
+PI
+ 72
+1
+ 73
+1
+ 11
+386218.83
+ 21
+4064449.3
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386221.8295
+ 20
+4064447.733
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386215.7265
+ 20
+4064447.733
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386215.7265
+ 20
+4064447.9975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386215.4005
+ 20
+4064448.0895
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386215.098
+ 20
+4064448.266
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.852
+ 20
+4064448.5145
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.678
+ 20
+4064448.8185
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.589
+ 20
+4064449.157
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.5905
+ 20
+4064449.507
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.683
+ 20
+4064449.8445
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.859
+ 20
+4064450.147
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386215.108
+ 20
+4064450.393
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386215.4115
+ 20
+4064450.567
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386215.7265
+ 20
+4064450.6495
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386215.7265
+ 20
+4064450.859
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386221.9345
+ 20
+4064450.859
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386221.9345
+ 20
+4064447.976
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386221.8295
+ 20
+4064447.733
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386215.5
+ 20
+4064461.74
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386215.5
+ 21
+4064461.74
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.472
+ 20
+4064461.3665
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.602
+ 20
+4064461.4065
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.612
+ 20
+4064462.5865
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386216.782
+ 20
+4064462.5665
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.472
+ 20
+4064462.5565
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.472
+ 20
+4064461.3665
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386217.39
+ 20
+4064465.68
+ 40
+2.0
+ 50
+0.0
+  1
+-I+I
+ 72
+1
+ 73
+1
+ 11
+386217.39
+ 21
+4064465.68
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386216.782
+ 20
+4064462.5665
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386216.612
+ 20
+4064466.6365
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.462
+ 20
+4064466.6265
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.472
+ 20
+4064462.5565
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386216.782
+ 20
+4064462.5665
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386227.51
+ 20
+4064469.73
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386227.51
+ 21
+4064469.73
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386220.742
+ 20
+4064472.8665
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.252
+ 20
+4064472.9065
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.442
+ 20
+4064474.9265
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.432
+ 20
+4064478.9365
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386235.232
+ 20
+4064478.8865
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386223.262
+ 20
+4064451.0565
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.502
+ 20
+4064451.0765
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.492
+ 20
+4064453.7265
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.472
+ 20
+4064461.3665
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386222.312
+ 20
+4064461.4565
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386222.292
+ 20
+4064462.5265
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386224.262
+ 20
+4064462.5065
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386224.042
+ 20
+4064472.9365
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386224.022
+ 20
+4064473.9565
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386220.702
+ 20
+4064473.9965
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386220.742
+ 20
+4064472.8665
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386219.19
+ 20
+4064468.39
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386219.19
+ 21
+4064468.39
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.252
+ 20
+4064472.9065
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386220.742
+ 20
+4064472.8665
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386224.042
+ 20
+4064472.9365
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386224.262
+ 20
+4064462.5065
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386222.292
+ 20
+4064462.5265
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386220.172
+ 20
+4064462.5365
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386220.312
+ 20
+4064466.6165
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.462
+ 20
+4064466.6265
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.252
+ 20
+4064472.9065
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386219.44
+ 20
+4064463.22
+ 40
+2.0
+ 50
+0.0
+  1
+-I+I
+ 72
+1
+ 73
+1
+ 11
+386219.44
+ 21
+4064463.22
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.462
+ 20
+4064466.6265
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386220.312
+ 20
+4064466.6165
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386220.172
+ 20
+4064462.5365
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.472
+ 20
+4064462.5565
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.462
+ 20
+4064466.6265
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386221.24
+ 20
+4064461.82
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386221.24
+ 21
+4064461.82
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.472
+ 20
+4064462.5565
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386220.172
+ 20
+4064462.5365
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386222.292
+ 20
+4064462.5265
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386222.312
+ 20
+4064461.4565
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.472
+ 20
+4064461.3665
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.472
+ 20
+4064462.5565
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386222.79
+ 20
+4064473.39
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386222.79
+ 21
+4064473.39
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386220.742
+ 20
+4064472.8665
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386220.702
+ 20
+4064473.9965
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386224.022
+ 20
+4064473.9565
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386224.042
+ 20
+4064472.9365
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386220.742
+ 20
+4064472.8665
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386197.89
+ 20
+4064463.46
+ 40
+2.0
+ 50
+0.0
+  1
+-I+I
+ 72
+1
+ 73
+1
+ 11
+386197.89
+ 21
+4064463.46
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.8915
+ 20
+4064466.797
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386198.7415
+ 20
+4064466.767
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386198.6215
+ 20
+4064462.727
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.9015
+ 20
+4064462.737
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.8915
+ 20
+4064466.797
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386201.63
+ 20
+4064451.48
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386201.63
+ 21
+4064451.48
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.1815
+ 20
+4064430.517
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.3315
+ 20
+4064448.477
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.4415
+ 20
+4064449.127
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.6615
+ 20
+4064449.797
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386197.0115
+ 20
+4064450.487
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386197.4715
+ 20
+4064451.107
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386198.0315
+ 20
+4064451.647
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386198.6615
+ 20
+4064452.097
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386199.1515
+ 20
+4064452.337
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386199.9215
+ 20
+4064452.597
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386200.6915
+ 20
+4064452.717
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.1915
+ 20
+4064452.807
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.562
+ 20
+4064452.707
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.572
+ 20
+4064451.247
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.712
+ 20
+4064451.1965
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386216.072
+ 20
+4064451.0865
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.502
+ 20
+4064451.0765
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386223.262
+ 20
+4064451.0565
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386221.9345
+ 20
+4064447.976
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386221.9345
+ 20
+4064450.859
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386215.7265
+ 20
+4064450.859
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386215.7265
+ 20
+4064450.6495
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386215.4115
+ 20
+4064450.567
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386215.108
+ 20
+4064450.393
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.859
+ 20
+4064450.147
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.683
+ 20
+4064449.8445
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.5905
+ 20
+4064449.507
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.589
+ 20
+4064449.157
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.678
+ 20
+4064448.8185
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.852
+ 20
+4064448.5145
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386215.098
+ 20
+4064448.266
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386215.4005
+ 20
+4064448.0895
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386215.7265
+ 20
+4064447.9975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386215.7265
+ 20
+4064447.733
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386221.8295
+ 20
+4064447.733
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386220.672
+ 20
+4064445.0465
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386220.502
+ 20
+4064444.7565
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386218.972
+ 20
+4064442.1965
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386216.912
+ 20
+4064439.3865
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386214.732
+ 20
+4064437.0265
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.0815
+ 20
+4064435.0065
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.0615
+ 20
+4064433.527
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.0515
+ 20
+4064432.217
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386200.3615
+ 20
+4064431.317
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.1815
+ 20
+4064430.517
+  0
+SEQEND
+  8
+0
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386199.7015
+ 20
+4064449.077
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386199.6015
+ 20
+4064438.787
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386201.2615
+ 20
+4064438.767
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386201.2415
+ 20
+4064437.447
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.2615
+ 20
+4064437.407
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.0515
+ 20
+4064437.367
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.0615
+ 20
+4064438.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386210.7915
+ 20
+4064438.6765
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386210.892
+ 20
+4064448.997
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386210.902
+ 20
+4064450.157
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.622
+ 20
+4064450.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.622
+ 20
+4064449.027
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.1615
+ 20
+4064449.037
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.7715
+ 20
+4064449.047
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.7615
+ 20
+4064450.237
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.0715
+ 20
+4064450.247
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386199.7115
+ 20
+4064450.267
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386199.7015
+ 20
+4064449.077
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386198.41
+ 20
+4064476.25
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386198.41
+ 21
+4064476.25
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.862
+ 20
+4064478.977
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.132
+ 20
+4064478.967
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.112
+ 20
+4064474.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386199.172
+ 20
+4064474.227
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386199.162
+ 20
+4064473.077
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.8715
+ 20
+4064473.077
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.862
+ 20
+4064478.977
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386197.4
+ 20
+4064468.71
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386197.4
+ 21
+4064468.71
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.8915
+ 20
+4064466.797
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.8715
+ 20
+4064473.077
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386199.162
+ 20
+4064473.077
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.112
+ 20
+4064473.017
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.142
+ 20
+4064462.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386200.8615
+ 20
+4064462.707
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386198.6215
+ 20
+4064462.727
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386198.7415
+ 20
+4064466.767
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.8915
+ 20
+4064466.797
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386199.37
+ 20
+4064462.07
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386199.37
+ 21
+4064462.07
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.9015
+ 20
+4064462.737
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386198.6215
+ 20
+4064462.727
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386200.8615
+ 20
+4064462.707
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386200.8515
+ 20
+4064461.537
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.9015
+ 20
+4064461.567
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.9015
+ 20
+4064462.737
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386198.9
+ 20
+4064457.56
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386198.9
+ 21
+4064457.56
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.9015
+ 20
+4064461.567
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386200.8515
+ 20
+4064461.537
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386200.8615
+ 20
+4064462.707
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.142
+ 20
+4064462.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.1615
+ 20
+4064455.487
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.9215
+ 20
+4064454.007
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386196.9015
+ 20
+4064461.567
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386200.84
+ 20
+4064473.55
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386200.84
+ 21
+4064473.55
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.112
+ 20
+4064473.017
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386199.162
+ 20
+4064473.077
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386199.172
+ 20
+4064474.227
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.112
+ 20
+4064474.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.112
+ 20
+4064473.017
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386201.15
+ 20
+4064444.66
+ 40
+2.0
+ 50
+0.0
+  1
+II
+ 72
+1
+ 73
+1
+ 11
+386201.15
+ 21
+4064444.66
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386201.2615
+ 20
+4064438.767
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386199.6015
+ 20
+4064438.787
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386199.7015
+ 20
+4064449.077
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.7715
+ 20
+4064449.047
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.1615
+ 20
+4064449.037
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.2115
+ 20
+4064442.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386203.4615
+ 20
+4064442.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386203.4215
+ 20
+4064438.747
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386201.2615
+ 20
+4064438.767
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386200.86
+ 20
+4064449.55
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386200.86
+ 21
+4064449.55
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.7715
+ 20
+4064449.047
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386199.7015
+ 20
+4064449.077
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386199.7115
+ 20
+4064450.267
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.0715
+ 20
+4064450.247
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.7615
+ 20
+4064450.237
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.7715
+ 20
+4064449.047
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386204.17
+ 20
+4064439.48
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386204.17
+ 21
+4064439.48
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.2615
+ 20
+4064437.407
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386201.2415
+ 20
+4064437.447
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386201.2615
+ 20
+4064438.767
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386203.4215
+ 20
+4064438.747
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386203.4615
+ 20
+4064442.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.2115
+ 20
+4064442.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.2615
+ 20
+4064437.407
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386203.3
+ 20
+4064473.55
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386203.3
+ 21
+4064473.55
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.112
+ 20
+4064474.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.332
+ 20
+4064474.157
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.322
+ 20
+4064472.947
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.112
+ 20
+4064473.017
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.112
+ 20
+4064474.197
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386204.31
+ 20
+4064476.37
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386204.31
+ 21
+4064476.37
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.322
+ 20
+4064472.947
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.332
+ 20
+4064474.157
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.112
+ 20
+4064474.197
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.132
+ 20
+4064478.967
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.652
+ 20
+4064478.957
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.662
+ 20
+4064475.077
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.602
+ 20
+4064472.947
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.322
+ 20
+4064472.947
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386202.48
+ 20
+4064470.35
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386202.48
+ 21
+4064470.35
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.112
+ 20
+4064473.017
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.322
+ 20
+4064472.947
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.602
+ 20
+4064472.947
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.652
+ 20
+4064466.837
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.832
+ 20
+4064466.817
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.892
+ 20
+4064462.667
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386203.712
+ 20
+4064462.687
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.142
+ 20
+4064462.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.112
+ 20
+4064473.017
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386204.92
+ 20
+4064457.93
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386204.92
+ 21
+4064457.93
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.142
+ 20
+4064462.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386203.712
+ 20
+4064462.687
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386203.702
+ 20
+4064461.507
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.692
+ 20
+4064461.467
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.712
+ 20
+4064454.587
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.1615
+ 20
+4064454.547
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.1615
+ 20
+4064455.487
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386202.142
+ 20
+4064462.697
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386204.36
+ 20
+4064462.15
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386204.36
+ 21
+4064462.15
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.692
+ 20
+4064461.467
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386203.702
+ 20
+4064461.507
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386203.712
+ 20
+4064462.687
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.892
+ 20
+4064462.667
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.692
+ 20
+4064462.647
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.692
+ 20
+4064461.467
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386207.49
+ 20
+4064444.59
+ 40
+2.0
+ 50
+0.0
+  1
+II
+ 72
+1
+ 73
+1
+ 11
+386207.49
+ 21
+4064444.59
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.1615
+ 20
+4064449.037
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.622
+ 20
+4064449.027
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386210.892
+ 20
+4064448.997
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386210.7915
+ 20
+4064438.6765
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.0615
+ 20
+4064438.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386206.8315
+ 20
+4064438.717
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386206.8715
+ 20
+4064442.607
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.2115
+ 20
+4064442.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.1615
+ 20
+4064449.037
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386205.89
+ 20
+4064439.41
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386205.89
+ 21
+4064439.41
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.2115
+ 20
+4064442.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386206.8715
+ 20
+4064442.607
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386206.8315
+ 20
+4064438.717
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.0615
+ 20
+4064438.697
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.0515
+ 20
+4064437.367
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.2615
+ 20
+4064437.407
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.2115
+ 20
+4064442.617
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386206.58
+ 20
+4064466.01
+ 40
+2.0
+ 50
+0.0
+  1
+-I+I
+ 72
+1
+ 73
+1
+ 11
+386206.58
+ 21
+4064466.01
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.892
+ 20
+4064462.667
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.832
+ 20
+4064466.817
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.652
+ 20
+4064466.837
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.692
+ 20
+4064462.647
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386205.892
+ 20
+4064462.667
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386208.3
+ 20
+4064468.22
+ 40
+2.0
+ 50
+0.0
+  1
+-I+II
+ 72
+1
+ 73
+1
+ 11
+386208.3
+ 21
+4064468.22
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.652
+ 20
+4064466.837
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.602
+ 20
+4064472.947
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.982
+ 20
+4064472.947
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.912
+ 20
+4064472.9465
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.942
+ 20
+4064462.6065
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386211.652
+ 20
+4064462.617
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.352
+ 20
+4064462.637
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.442
+ 20
+4064466.857
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.652
+ 20
+4064466.837
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386209.83
+ 20
+4064476.37
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386209.83
+ 21
+4064476.37
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.602
+ 20
+4064472.947
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.662
+ 20
+4064475.077
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.652
+ 20
+4064478.957
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.902
+ 20
+4064478.9465
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386212.882
+ 20
+4064474.0865
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.982
+ 20
+4064474.117
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386209.982
+ 20
+4064472.947
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386207.602
+ 20
+4064472.947
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386107.1
+ 20
+4064453.63
+ 40
+2.0
+ 50
+0.0
+  1
+P
+ 72
+1
+ 73
+1
+ 11
+386107.1
+ 21
+4064453.63
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386092.2267
+ 20
+4064433.60575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386097.86295
+ 20
+4064459.909
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386098.1205
+ 20
+4064459.8575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386118.471
+ 20
+4064455.6875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386122.171
+ 20
+4064454.7375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386120.401
+ 20
+4064451.2075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386119.381
+ 20
+4064448.5375
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386118.431
+ 20
+4064445.4275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386117.181
+ 20
+4064440.2975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386116.361
+ 20
+4064434.6675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386115.271
+ 20
+4064431.3475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386115.051
+ 20
+4064431.0975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386114.741
+ 20
+4064430.7675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386114.4005
+ 20
+4064430.4675
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386114.0405
+ 20
+4064430.1975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386113.6705
+ 20
+4064429.9475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386113.2805
+ 20
+4064429.7175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386112.8705
+ 20
+4064429.5275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386112.4505
+ 20
+4064429.3575
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386112.0205
+ 20
+4064429.2275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386111.5805
+ 20
+4064429.1175
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386111.1305
+ 20
+4064429.0475
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386110.6805
+ 20
+4064429.0075
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386110.2305
+ 20
+4064428.9975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386101.1605
+ 20
+4064430.7275
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386100.0105
+ 20
+4064430.9775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386096.7105
+ 20
+4064431.6775
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386094.3205
+ 20
+4064432.1975
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386092.0205
+ 20
+4064432.6875
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386092.2267
+ 20
+4064433.60575
+  0
+SEQEND
+  8
+0
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386097.95
+ 20
+4064445.34
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386097.45
+ 20
+4064443.11
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386107.37
+ 20
+4064441.09
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386112.12
+ 20
+4064440.12
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386113.58
+ 20
+4064446.65
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386114.2
+ 20
+4064449.4
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386110.6
+ 20
+4064450.21
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386104.57
+ 20
+4064451.56
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386099.59
+ 20
+4064452.67
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386097.95
+ 20
+4064445.34
+  0
+SEQEND
+  8
+0
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386110.99
+ 20
+4064436.75
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386110.44
+ 20
+4064436.98
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386109.83
+ 20
+4064436.98
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386109.13
+ 20
+4064436.72
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386108.53
+ 20
+4064436.16
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386108.09
+ 20
+4064435.69
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386107.59
+ 20
+4064435.25
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386107.07
+ 20
+4064434.68
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386106.8
+ 20
+4064433.75
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386106.95
+ 20
+4064432.89
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386107.38
+ 20
+4064431.89
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386108.02
+ 20
+4064431.34
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386108.75
+ 20
+4064431.2
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386109.41
+ 20
+4064431.27
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386110.1
+ 20
+4064431.66
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386110.72
+ 20
+4064432.23
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386111.18
+ 20
+4064432.98
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386111.66
+ 20
+4064434.74
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386111.72
+ 20
+4064435.66
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386111.4
+ 20
+4064436.32
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386110.99
+ 20
+4064436.75
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386100.18
+ 20
+4064443.17
+ 40
+2.0
+ 50
+0.0
+  1
+POR+I
+ 72
+1
+ 73
+1
+ 11
+386100.18
+ 21
+4064443.17
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386107.37
+ 20
+4064441.09
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386097.45
+ 20
+4064443.11
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386097.95
+ 20
+4064445.34
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386102.93
+ 20
+4064444.22
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386107.82
+ 20
+4064443.12
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386107.37
+ 20
+4064441.09
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386101.06
+ 20
+4064447.42
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386101.06
+ 21
+4064447.42
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386102.93
+ 20
+4064444.22
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386097.95
+ 20
+4064445.34
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386099.59
+ 20
+4064452.67
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386104.57
+ 20
+4064451.56
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386102.93
+ 20
+4064444.22
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386107.18
+ 20
+4064445.44
+ 40
+2.0
+ 50
+0.0
+  1
+II
+ 72
+1
+ 73
+1
+ 11
+386107.18
+ 21
+4064445.44
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386107.37
+ 20
+4064441.09
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386107.82
+ 20
+4064443.12
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386102.93
+ 20
+4064444.22
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386104.57
+ 20
+4064451.56
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386110.6
+ 20
+4064450.21
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386109.98
+ 20
+4064447.46
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386113.58
+ 20
+4064446.65
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386112.12
+ 20
+4064440.12
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386107.37
+ 20
+4064441.09
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386109.86
+ 20
+4064435.96
+ 40
+2.0
+ 50
+0.0
+  1
+PI
+ 72
+1
+ 73
+1
+ 11
+386109.86
+ 21
+4064435.96
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386110.99
+ 20
+4064436.75
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386111.4
+ 20
+4064436.32
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386111.72
+ 20
+4064435.66
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386111.66
+ 20
+4064434.74
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386111.18
+ 20
+4064432.98
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386110.72
+ 20
+4064432.23
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386110.1
+ 20
+4064431.66
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386109.41
+ 20
+4064431.27
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386108.75
+ 20
+4064431.2
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386108.02
+ 20
+4064431.34
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386107.38
+ 20
+4064431.89
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386106.95
+ 20
+4064432.89
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386106.8
+ 20
+4064433.75
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386107.07
+ 20
+4064434.68
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386107.59
+ 20
+4064435.25
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386108.09
+ 20
+4064435.69
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386108.53
+ 20
+4064436.16
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386109.13
+ 20
+4064436.72
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386109.83
+ 20
+4064436.98
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386110.44
+ 20
+4064436.98
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386110.99
+ 20
+4064436.75
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386111.42
+ 20
+4064447.81
+ 40
+2.0
+ 50
+0.0
+  1
+I
+ 72
+1
+ 73
+1
+ 11
+386111.42
+ 21
+4064447.81
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386113.58
+ 20
+4064446.65
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386109.98
+ 20
+4064447.46
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386110.6
+ 20
+4064450.21
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386114.2
+ 20
+4064449.4
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386113.58
+ 20
+4064446.65
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+txtConstru
+ 10
+386093.32
+ 20
+4064375.92
+ 40
+2.0
+ 50
+0.0
+  1
+SUELO
+ 72
+1
+ 73
+1
+ 11
+386093.32
+ 21
+4064375.92
+  0
+POLYLINE
+  8
+Construccion
+ 66
+1
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386101.51655
+ 20
+4064358.2669
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386098.85765
+ 20
+4064358.82025
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386098.09
+ 20
+4064358.98
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386097.96
+ 20
+4064359.01
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386097.85
+ 20
+4064359.03
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386096.76
+ 20
+4064359.3
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386093.28
+ 20
+4064360.16
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386093.0885
+ 20
+4064360.20595
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386093.03
+ 20
+4064360.22
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386093.27
+ 20
+4064361.35
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386093.9
+ 20
+4064364.81
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386093.09
+ 20
+4064367.03
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386090.7
+ 20
+4064368.45
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386087.7634
+ 20
+4064369.0718
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386085.93
+ 20
+4064369.46
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386083.63
+ 20
+4064369.96
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386080.72
+ 20
+4064370.54
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386079.02
+ 20
+4064370.76
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386079.07
+ 20
+4064371.04
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386081.24
+ 20
+4064383.86
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386081.72
+ 20
+4064386.16
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386082.34
+ 20
+4064389.68
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386106.36205
+ 20
+4064384.5808
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386106.46
+ 20
+4064384.56
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386101.79
+ 20
+4064358.21
+  0
+VERTEX
+ 8
+Construccion
+ 10
+386101.51655
+ 20
+4064358.2669
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+RefCatastral
+ 10
+386118.87
+ 20
+4064401.77
+ 40
+2.0
+ 50
+0.0
+  1
+6346726UF8664N
+ 72
+1
+ 73
+1
+ 11
+386118.87
+ 21
+4064401.77
+  0
+POLYLINE
+  8
+Parcela
+ 66
+1
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386115.9405
+ 20
+4064390.5575
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386116.9705
+ 20
+4064396.2775
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386118.8205
+ 20
+4064406.4675
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386120.4305
+ 20
+4064414.8775
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386120.901
+ 20
+4064415.8375
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386121.681
+ 20
+4064416.4875
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386122.721
+ 20
+4064417.0575
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386123.891
+ 20
+4064417.3775
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386125.271
+ 20
+4064417.4675
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386129.041
+ 20
+4064416.4875
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386139.881
+ 20
+4064414.047
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386135.201
+ 20
+4064390.8075
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386139.751
+ 20
+4064389.997
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386139.191
+ 20
+4064386.757
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386139.061
+ 20
+4064386.007
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386127.6905
+ 20
+4064388.2475
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386115.9405
+ 20
+4064390.5575
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+RefCatastral
+ 10
+386147.44
+ 20
+4064410.12
+ 40
+2.0
+ 50
+0.0
+  1
+6346725UF8664N
+ 72
+1
+ 73
+1
+ 11
+386147.44
+ 21
+4064410.12
+  0
+POLYLINE
+  8
+Parcela
+ 66
+1
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386135.201
+ 20
+4064390.8075
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386139.881
+ 20
+4064414.047
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386142.871
+ 20
+4064413.587
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386152.611
+ 20
+4064413.477
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386154.341
+ 20
+4064413.717
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386156.451
+ 20
+4064387.047
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386154.891
+ 20
+4064387.327
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386153.701
+ 20
+4064387.537
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386144.121
+ 20
+4064389.227
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386139.751
+ 20
+4064389.997
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386135.201
+ 20
+4064390.8075
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+RefCatastral
+ 10
+386118.16
+ 20
+4064363.43
+ 40
+2.0
+ 50
+0.0
+  1
+6346714UF8664N
+ 72
+1
+ 73
+1
+ 11
+386118.16
+ 21
+4064363.43
+  0
+POLYLINE
+  8
+Parcela
+ 66
+1
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386127.6905
+ 20
+4064388.2475
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386139.061
+ 20
+4064386.007
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386134.3105
+ 20
+4064358.6375
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386132.7805
+ 20
+4064358.9075
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386131.2305
+ 20
+4064359.1775
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386123.0405
+ 20
+4064360.6275
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386113.9105
+ 20
+4064362.5275
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386113.0005
+ 20
+4064363.3375
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386112.3605
+ 20
+4064364.5075
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386112.0105
+ 20
+4064365.9675
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386111.9405
+ 20
+4064368.1975
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386112.6305
+ 20
+4064372.3275
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386115.9405
+ 20
+4064390.5575
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386127.6905
+ 20
+4064388.2475
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+RefCatastral
+ 10
+386156.14
+ 20
+4064356.63
+ 40
+2.0
+ 50
+0.0
+  1
+6346713UF8664N
+ 72
+1
+ 73
+1
+ 11
+386156.14
+ 21
+4064356.63
+  0
+POLYLINE
+  8
+Parcela
+ 66
+1
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386156.451
+ 20
+4064387.047
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386172.321
+ 20
+4064384.237
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386173.851
+ 20
+4064383.967
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386169.691
+ 20
+4064360.957
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386168.191
+ 20
+4064352.637
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386165.581
+ 20
+4064353.097
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386150.851
+ 20
+4064355.707
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386147.981
+ 20
+4064356.217
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386146.551
+ 20
+4064356.467
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386134.3105
+ 20
+4064358.6375
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386139.061
+ 20
+4064386.007
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386139.191
+ 20
+4064386.757
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386139.751
+ 20
+4064389.997
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386144.121
+ 20
+4064389.227
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386153.701
+ 20
+4064387.537
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386154.891
+ 20
+4064387.327
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386156.451
+ 20
+4064387.047
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+RefCatastral
+ 10
+386097.71
+ 20
+4064402.93
+ 40
+2.0
+ 50
+0.0
+  1
+6145925UF8664N
+ 72
+1
+ 73
+1
+ 11
+386097.71
+ 21
+4064402.93
+  0
+POLYLINE
+  8
+Parcela
+ 66
+1
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386083.7378
+ 20
+4064396.5767
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386086.4983
+ 20
+4064409.1484
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386087.59
+ 20
+4064414.12
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386088.44
+ 20
+4064418.06
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386089.85685
+ 20
+4064424.66885
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386089.9
+ 20
+4064424.87
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386089.94
+ 20
+4064425.05
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386099.27
+ 20
+4064422.98
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386102.49
+ 20
+4064422.29
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386107.42
+ 20
+4064421.19
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386109.75
+ 20
+4064420.31
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386109.935
+ 20
+4064420.11005
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386109.9405
+ 20
+4064420.1075
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386111.36575
+ 20
+4064418.5727
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386111.7218
+ 20
+4064417.4733
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386112.0
+ 20
+4064416.63
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386111.96
+ 20
+4064415.33
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386111.7502
+ 20
+4064414.1619
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386109.6005
+ 20
+4064402.1675
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386109.3605
+ 20
+4064400.8575
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386109.17895
+ 20
+4064399.8719
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386106.46
+ 20
+4064384.56
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386106.36205
+ 20
+4064384.5808
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386082.34
+ 20
+4064389.68
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386083.54
+ 20
+4064396.49
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386083.71
+ 20
+4064396.45
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386083.7378
+ 20
+4064396.5767
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+RefCatastral
+ 10
+386226.97
+ 20
+4064475.12
+ 40
+2.0
+ 50
+0.0
+  1
+6346306UF8664N
+ 72
+1
+ 73
+1
+ 11
+386226.97
+ 21
+4064475.12
+  0
+POLYLINE
+  8
+Parcela
+ 66
+1
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386133.981
+ 20
+4064424.4775
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386131.291
+ 20
+4064425.0475
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386128.501
+ 20
+4064425.5975
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386126.091
+ 20
+4064426.3075
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386125.051
+ 20
+4064426.9775
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386124.271
+ 20
+4064428.1575
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386123.891
+ 20
+4064429.3175
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386123.981
+ 20
+4064430.6475
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386124.971
+ 20
+4064437.8375
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386125.321
+ 20
+4064438.9375
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386126.401
+ 20
+4064442.2775
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386126.771
+ 20
+4064443.2575
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386126.951
+ 20
+4064443.7275
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386127.921
+ 20
+4064446.2675
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386128.931
+ 20
+4064448.4775
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386129.991
+ 20
+4064450.7875
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386131.541
+ 20
+4064453.5375
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386133.971
+ 20
+4064457.8675
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386135.691
+ 20
+4064462.1875
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386138.921
+ 20
+4064468.1575
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386139.901
+ 20
+4064469.9575
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386144.881
+ 20
+4064479.157
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386147.1215
+ 20
+4064483.437
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386149.7515
+ 20
+4064483.427
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386163.1515
+ 20
+4064483.297
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386165.0715
+ 20
+4064483.347
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386168.3115
+ 20
+4064483.327
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386169.5915
+ 20
+4064483.327
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386174.2215
+ 20
+4064483.297
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386175.5715
+ 20
+4064483.287
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386186.3415
+ 20
+4064483.237
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386187.5515
+ 20
+4064483.227
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386202.132
+ 20
+4064483.157
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386203.802
+ 20
+4064483.147
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386205.892
+ 20
+4064483.137
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386207.142
+ 20
+4064483.127
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386212.392
+ 20
+4064483.107
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386214.232
+ 20
+4064483.0965
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386222.992
+ 20
+4064483.0565
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386224.282
+ 20
+4064483.0465
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386237.662
+ 20
+4064482.9765
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386235.232
+ 20
+4064478.8865
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386223.262
+ 20
+4064451.0565
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386220.672
+ 20
+4064445.0465
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386220.502
+ 20
+4064444.7565
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386218.972
+ 20
+4064442.1965
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386216.912
+ 20
+4064439.3865
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386214.732
+ 20
+4064437.0265
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386212.0815
+ 20
+4064435.0065
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386209.0615
+ 20
+4064433.527
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386205.0515
+ 20
+4064432.217
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386200.3615
+ 20
+4064431.317
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386196.1815
+ 20
+4064430.517
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386192.4415
+ 20
+4064429.797
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386187.7815
+ 20
+4064428.897
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386182.9815
+ 20
+4064427.957
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386178.7615
+ 20
+4064427.127
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386174.9515
+ 20
+4064426.387
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386170.1115
+ 20
+4064425.447
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386165.451
+ 20
+4064424.537
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386161.221
+ 20
+4064423.717
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386157.211
+ 20
+4064422.937
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386152.691
+ 20
+4064422.267
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386148.151
+ 20
+4064422.097
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386144.261
+ 20
+4064422.337
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386143.691
+ 20
+4064422.367
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386141.211
+ 20
+4064422.947
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386138.461
+ 20
+4064423.5175
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386135.201
+ 20
+4064424.2075
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386133.981
+ 20
+4064424.4775
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+RefCatastral
+ 10
+386101.95
+ 20
+4064431.03
+ 40
+2.0
+ 50
+0.0
+  1
+6247108UF8664N
+ 72
+1
+ 73
+1
+ 11
+386101.95
+ 21
+4064431.03
+  0
+POLYLINE
+  8
+Parcela
+ 66
+1
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386092.2267
+ 20
+4064433.60575
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386097.86295
+ 20
+4064459.909
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386098.1205
+ 20
+4064459.8575
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386118.471
+ 20
+4064455.6875
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386122.171
+ 20
+4064454.7375
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386120.401
+ 20
+4064451.2075
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386119.381
+ 20
+4064448.5375
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386118.431
+ 20
+4064445.4275
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386117.181
+ 20
+4064440.2975
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386116.361
+ 20
+4064434.6675
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386115.271
+ 20
+4064431.3475
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386115.051
+ 20
+4064431.0975
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386114.741
+ 20
+4064430.7675
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386114.4005
+ 20
+4064430.4675
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386114.0405
+ 20
+4064430.1975
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386113.6705
+ 20
+4064429.9475
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386113.2805
+ 20
+4064429.7175
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386112.8705
+ 20
+4064429.5275
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386112.4505
+ 20
+4064429.3575
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386112.0205
+ 20
+4064429.2275
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386111.5805
+ 20
+4064429.1175
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386111.1305
+ 20
+4064429.0475
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386110.6805
+ 20
+4064429.0075
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386110.2305
+ 20
+4064428.9975
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386101.1605
+ 20
+4064430.7275
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386100.0105
+ 20
+4064430.9775
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386096.7105
+ 20
+4064431.6775
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386094.3205
+ 20
+4064432.1975
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386092.0205
+ 20
+4064432.6875
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386092.2267
+ 20
+4064433.60575
+  0
+SEQEND
+  8
+0
+  0
+TEXT
+  8
+RefCatastral
+ 10
+386093.32
+ 20
+4064374.42
+ 40
+2.0
+ 50
+0.0
+  1
+6145924UF8664N
+ 72
+1
+ 73
+1
+ 11
+386093.32
+ 21
+4064374.42
+  0
+POLYLINE
+  8
+Parcela
+ 66
+1
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386101.51655
+ 20
+4064358.2669
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386098.85765
+ 20
+4064358.82025
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386098.09
+ 20
+4064358.98
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386097.96
+ 20
+4064359.01
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386097.85
+ 20
+4064359.03
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386096.76
+ 20
+4064359.3
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386093.28
+ 20
+4064360.16
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386093.0885
+ 20
+4064360.20595
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386093.03
+ 20
+4064360.22
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386093.27
+ 20
+4064361.35
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386093.9
+ 20
+4064364.81
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386093.09
+ 20
+4064367.03
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386090.7
+ 20
+4064368.45
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386087.7634
+ 20
+4064369.0718
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386085.93
+ 20
+4064369.46
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386083.63
+ 20
+4064369.96
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386080.72
+ 20
+4064370.54
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386079.02
+ 20
+4064370.76
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386079.07
+ 20
+4064371.04
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386081.24
+ 20
+4064383.86
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386081.72
+ 20
+4064386.16
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386082.34
+ 20
+4064389.68
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386106.36205
+ 20
+4064384.5808
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386106.46
+ 20
+4064384.56
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386101.79
+ 20
+4064358.21
+  0
+VERTEX
+ 8
+Parcela
+ 10
+386101.51655
+ 20
+4064358.2669
+  0
+SEQEND
+  8
+0
+  0
+ENDSEC
+  0
+EOF

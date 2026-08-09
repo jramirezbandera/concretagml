@@ -84,10 +84,13 @@ export const ATRIBUTO_PANTALLA = 'data-pantalla'
  */
 export const TITULO_PANTALLA = Object.freeze({
   [PASO.ENTRADA]: 'Empieza tu expediente',
-  [PASO.VALIDACION]: 'Validación del recinto',
+  // ⭐ 2026-08-08 · Esta pantalla se comió a «Validación del recinto», que hasta
+  // hoy tenía su propio peldaño y enseñaba EXACTAMENTE la misma `<section>` con
+  // el arrastre apagado. El título no se fusiona —sigue diciendo «Edición»—
+  // porque lo que se hace aquí es editar; lo que se ha ganado es que además se
+  // pueda generar, diagnosticar, derivar y entregar sin cambiar de pantalla.
   [PASO.EDICION]: 'Edición del recinto',
   [PASO.DIAGNOSTICO]: 'Diagnóstico de encaje',
-  [PASO.INFORME]: 'Informe de contraste',
 })
 
 /**
@@ -105,25 +108,27 @@ export const TITULO_PANTALLA = Object.freeze({
  * de la que hay debajo es la clase de error que nadie reporta y todo el mundo
  * nota.
  *
- * Las tres que cambian, y por qué:
+ * Las dos que cambian, y por qué:
  *   · **Edición** — no se edita «el recinto»: se editan las PARTES, cada una con
  *     su tabla de coordenadas y sus plantas.
  *   · **Diagnóstico** — no se encaja con el parcelario: se contrasta con la
  *     construcción que el Catastro publica, que es otra pregunta.
- *   · **Informe** — el nombre legal del documento **cambia según haya habido
- *     contraste o no** (criterio de aceptación 4), así que el `<h1>` dice lo que
- *     los dos tienen en común y no promete el que no toque.
  *
- * `Entrada` y `Validación` NO cambian: «Empieza tu expediente» y «Validación del
- * recinto» valen igual para las dos ramas —una construcción también son recintos—
- * y darles un título propio sería ruido.
+ * `Entrada` NO cambia: «Empieza tu expediente» vale igual para las dos ramas, y
+ * darle un título propio sería ruido.
+ *
+ * ⛔ **ERAN TRES HASTA EL 2026-08-08**: había un `[PASO.INFORME]: 'Informe de
+ * construcción'` que resolvía el mismo defecto en aquel peldaño. Se va con él.
+ * El nombre legal del documento —que cambia según haya habido contraste o no,
+ * criterio de aceptación 4 de F14— **no se pierde**: lo escribe el propio
+ * `<dialog>` del informe, que es quien sabe si hubo contraste. Aquí solo estaba
+ * el `<h1>` de una pantalla que ya no existe.
  *
  * @readonly
  */
 export const TITULO_EN_EDIFICIO = Object.freeze({
   [PASO.EDICION]: 'Edición de las partes',
   [PASO.DIAGNOSTICO]: 'Contraste con la construcción catastral',
-  [PASO.INFORME]: 'Informe de construcción',
 })
 
 /**

@@ -351,7 +351,7 @@ describe('app/main · arranca SIN NADA precargado', () => {
     // Regla de oro 1 aplicada al rail: un peldaño apagado y mudo deja al usuario
     // pulsando algo que no responde. Con la app arrancando vacía esto pasa de ser
     // un caso raro a ser lo primero que se ve.
-    for (const paso of [PASO.VALIDACION, PASO.EDICION, PASO.DIAGNOSTICO, PASO.INFORME]) {
+    for (const paso of [PASO.EDICION, PASO.DIAGNOSTICO]) {
       const li = q(`[data-paso="${paso}"]`)
       const boton = li?.querySelector('button')
       expect(boton, `el rail no tiene el peldaño «${paso}»`).not.toBeNull()

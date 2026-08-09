@@ -399,7 +399,7 @@ const superficieArranque = (() => {
 // umbral —bajarlo a 0 sería apagar el guardián para que deje de avisar—.
 const irAValidacion = () => {
   const paso = document.querySelector('[data-paso]')
-  if (paso === null || paso.dataset.paso === 'validacion') return paso?.dataset.paso ?? null
+  if (paso === null || paso.dataset.paso === 'edicion') return paso?.dataset.paso ?? null
   const boton = [...document.querySelectorAll('button, a')].find(
     (e) => e.textContent.trim() === 'Validación',
   )

@@ -111,6 +111,80 @@ function leerPares(texto) {
 
 // ── Parser público ────────────────────────────────────────────────────────────
 
+// ── F22 · LOS RÓTULOS, QUE HASTA AHORA SE TIRABAN ────────────────────────────
+//
+// F01 contaba las anotaciones y las resumía en una detección. Es correcto para la
+// GEOMETRÍA —un `TEXT` no es un anillo— y era una pérdida para todo lo demás: el
+// DXF de «Consulta Masiva» del Catastro trae **la referencia catastral de cada
+// finca rotulada dentro de ella**, en una capa propia (`RefCatastral`), y con eso
+// se puede preguntar «¿cuál de estas ocho es la tuya?» con los códigos delante en
+// vez de con «Recinto 3». Medido: los 8 rótulos caen 1:1 en los 8 recintos.
+//
+// Se devuelven CRUDOS y sin interpretar: este parser no sabe qué es una
+// referencia catastral ni qué capa las contiene. Quien empareja rótulo y recinto
+// es `parsers/topologia.js`, y quien decide qué capa nombra las fincas es
+// `parsers/importar.js` — y lo decide MIDIENDO, no por el nombre de la capa (F11
+// ya pagó que en `UTM.dxf` la parcela buena está en la capa «0» y no en la que se
+// llama «PARCELA»).
+//
+// ⚠️ **La trampa del punto de inserción, que es de manual y muerde en silencio.**
+// En un `TEXT`, el 10/20 es el «primer punto de alineación» y **solo es la
+// posición real si el texto está alineado a la izquierda**. Con justificación
+// (códigos 72/73 distintos de 0) la posición de verdad es el **11/21**, y el
+// 10/20 puede ser cualquier cosa. Los ocho rótulos del fichero real traen
+// **72=1 y 73=1** —centrado— así que la regla APLICA; lo que pasa es que ese
+// escritor duplica el punto en los dos sitios y **10/20 y 11/21 coinciden
+// exactamente**. O sea: el fixture NO ejercita esta rama, y se dice en vez de
+// dejar que parezca probada. Se implementa igual porque el siguiente fichero
+// puede no ser tan amable, y el fallo sería mudo (rótulos en 0,0 que no caen en
+// ningún recinto).
+//
+// ⚠️ El texto va LITERAL, sin quitar los códigos de formato de un `MTEXT`
+// (`\A1;`, `{\f…}`). Los rótulos que interesan son `TEXT` planos; limpiar MTEXT
+// es un problema propio y no se resuelve de refilón.
+
+/** Entidades con estructura de texto: el 11/21 manda si hay justificación. */
+const ENT_CON_ALINEACION = new Set(['TEXT', 'ATTRIB', 'ATTDEF'])
+
+/**
+ * Extrae el rótulo de una entidad de anotación, o `null` si no lo tiene.
+ *
+ * @param {string} tipo
+ * @param {Array<[string, string]>} grupos
+ * @returns {{tipo: string, capa: string, texto: string, x: number, y: number}|null}
+ */
+function rotuloDe(tipo, grupos) {
+  let texto = ''
+  const chunks = [] // MTEXT parte el texto largo en códigos 3 + un 1 final.
+  let x = NaN
+  let y = NaN
+  let xAlt = NaN
+  let yAlt = NaN
+  let justificado = false
+  for (const [code, val] of grupos) {
+    if (code === '1') texto = val
+    else if (code === '3') chunks.push(val)
+    else if (code === '10') x = parseFloat(val)
+    else if (code === '20') y = parseFloat(val)
+    else if (code === '11') xAlt = parseFloat(val)
+    else if (code === '21') yAlt = parseFloat(val)
+    else if (code === '72' || code === '73') {
+      if (parseInt(val, 10) !== 0) justificado = true
+    }
+  }
+  const contenido = (chunks.join('') + texto).trim()
+  if (contenido === '') return null
+
+  // Ver la cabecera: con justificación manda el 11/21, y solo si de verdad viene.
+  const usarAlt =
+    justificado && ENT_CON_ALINEACION.has(tipo) && Number.isFinite(xAlt) && Number.isFinite(yAlt)
+  const px = usarAlt ? xAlt : x
+  const py = usarAlt ? yAlt : y
+  if (!Number.isFinite(px) || !Number.isFinite(py)) return null
+
+  return { tipo, capa: capaDe(grupos), texto: contenido, x: px, y: py }
+}
+
 /**
  * Lee la CAPA (código de grupo 8) de los pares de una entidad.
  *
@@ -135,9 +209,13 @@ function capaDe(grupos) {
  * @param {number} [opts.flechaMax=0.01]  Flecha máx. (m) para discretizar arcos
  *   (se pasa tal cual a geo/arco.js#discretizarBulge).
  * @returns {{ anillos: number[][][], capas: string[],
+ *   rotulos: Array<{tipo: string, capa: string, texto: string, x: number, y: number}>,
  *   detecciones: import('./_comun.js').Deteccion[], origen: 'DXF' }}
  *   `capas[i]` es la capa de `anillos[i]` (LITERAL, `''` si no había código 8);
  *   los dos arrays tienen SIEMPRE la misma longitud.
+ *   `rotulos` (F22) son las anotaciones con texto y posición, en el orden del
+ *   fichero. ⚠️ **NO va 1:1 con `anillos`** —hay planos con 153 rótulos y 8
+ *   recintos, y otros sin ninguno—: emparejarlos es de `parsers/topologia.js`.
  * @throws {TypeError}  Si `texto` no es un string (regla de oro 1: no se adivina).
  */
 export function parseDXF(texto, opts = {}) {
@@ -155,6 +233,7 @@ export function parseDXF(texto, opts = {}) {
   // ── Acumuladores del resultado ──────────────────────────────────────────────
   const anillos = []
   const capas = [] // capas[i] ↔ anillos[i]; se empujan SIEMPRE a la vez.
+  const rotulos = [] // F22 · anotaciones con texto y sitio; NO va 1:1 con anillos.
   const detecciones = []
   let zCount = 0 // vértices con código 30 (Z) descartada.
   const anotaciones = new Map() // tipo → nº (resumen INFO).
@@ -293,7 +372,11 @@ export function parseDXF(texto, opts = {}) {
             ),
           )
         } else if (ENT_ANOTACION.has(tipo)) {
+          // El recuento NO cambia (sigue contando TODAS, como desde F01); lo que
+          // F22 añade es quedarse con las que traen texto y sitio.
           anotaciones.set(tipo, (anotaciones.get(tipo) || 0) + 1)
+          const rot = rotuloDe(tipo, grupos)
+          if (rot !== null) rotulos.push(rot)
         } else {
           // LINE/POINT/IMAGE/…: no forman anillo por sí solas → resumen.
           otras.set(tipo, (otras.get(tipo) || 0) + 1)
@@ -369,13 +452,23 @@ export function parseDXF(texto, opts = {}) {
   if (anotaciones.size > 0) {
     const tipos = Object.fromEntries(anotaciones)
     const total = [...anotaciones.values()].reduce((a, b) => a + b, 0)
+    // ⚠️ **F22 · Este mensaje decía «Se ignoraron N anotación(es)» y dejó de ser
+    // cierto.** No son geometría —eso sigue igual— pero ya no se ignoran: las que
+    // traen texto y sitio se devuelven como `rotulos[]` y pueden acabar nombrando
+    // los recintos. Dejarlo como estaba sería la clase de frase que enseña a
+    // desconfiar de lo que la aplicación dice de sí misma.
+    const conRotulo = rotulos.length
     detecciones.push(
       crearDeteccion(
         TIPO_DETECCION.ENTIDAD_NO_SOPORTADA,
-        `Se ignoraron ${total} anotación(es) (${[...anotaciones.keys()].join(', ')}): ` +
-          `no son geometría ${sujeto.escueto}.`,
+        `${total} anotación(es) (${[...anotaciones.keys()].join(', ')}): no son geometría ` +
+          `${sujeto.escueto} y no forman ningún anillo` +
+          (conRotulo > 0
+            ? `. ${conRotulo} de ellas traen texto y posición, así que se leen como ` +
+              `rótulos y pueden servir para nombrar los recintos.`
+            : `.`),
         SEVERIDAD.INFO,
-        { tipos, total },
+        { tipos, total, conRotulo },
       ),
     )
   }
@@ -393,7 +486,7 @@ export function parseDXF(texto, opts = {}) {
     )
   }
 
-  return { anillos, capas, detecciones, origen: ORIGEN }
+  return { anillos, capas, rotulos, detecciones, origen: ORIGEN }
 }
 
 export default parseDXF

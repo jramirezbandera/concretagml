@@ -229,6 +229,8 @@ import { resolverAvisar, validarVistaInicial, vertUTMaLatLng, NIVEL } from './_c
 import { crearAcotaciones } from './acotaciones.js'
 import { crearBarraEdicion } from './barra-edicion.js'
 import { crearCajonComprobacion } from './cajon-comprobacion.js'
+import { crearCajonParcelas } from './cajon-parcelas.js'
+import { crearCapaCandidatas } from './candidatas.js'
 import { crearCajonDiagnostico } from './cajon-diagnostico.js'
 import { crearCapaColindantes } from './colindantes.js'
 import { crearContraste } from './contraste.js'
@@ -486,6 +488,50 @@ function normalizarComprobacion(comprobacion) {
     )
   }
   return { ...comprobacion }
+}
+
+/**
+ * Claves que admite `opciones.parcelas` cuando viene como objeto (F22). **Lista
+ * cerrada**, cuarto gemelo de las tres de arriba.
+ *
+ * Solo hay una, y por el mismo motivo que en comprobación: el cajón de elección no
+ * tiene ningún otro parámetro de MONTAJE. Cuántas fincas hay, cómo se llaman y qué
+ * miden son DATOS que no existen cuando el visor se monta —llegan cuando el
+ * usuario suelta un `.dxf` con la manzana entera— y su camino es
+ * `visor.parcelas.cajon.pintar({...})` + `visor.parcelas.capa.pintar([...])`.
+ */
+const CLAVES_PARCELAS = Object.freeze(['posicion'])
+
+/**
+ * Normaliza `opciones.parcelas` a «no montar» (`null`) o al objeto de opciones con
+ * el que se montan las dos piezas de F22.
+ *
+ * @param {*} parcelas
+ * @returns {{posicion?: string}|null}
+ * @throws {TypeError}  Contrato del programador.
+ */
+function normalizarParcelas(parcelas) {
+  if (parcelas === undefined || parcelas === false) return null
+  if (parcelas === true) return {}
+
+  if (parcelas === null || typeof parcelas !== 'object' || Array.isArray(parcelas)) {
+    throw new TypeError(
+      `crearVisor: 'opciones.parcelas' debe ser un booleano, un objeto de opciones ` +
+        `{${CLAVES_PARCELAS.join(', ')}} o undefined; recibido ` +
+        `${Array.isArray(parcelas) ? 'un array' : JSON.stringify(parcelas) || typeof parcelas}.`,
+    )
+  }
+
+  const desconocidas = Object.keys(parcelas).filter((clave) => !CLAVES_PARCELAS.includes(clave))
+  if (desconocidas.length > 0) {
+    throw new TypeError(
+      `crearVisor: 'opciones.parcelas' no conoce ${desconocidas.map((c) => `'${c}'`).join(', ')}. ` +
+        `La única clave admitida es: ${CLAVES_PARCELAS.join(', ')}. Las fincas del dibujo, sus ` +
+        `nombres y sus superficies no se pasan aquí: no existen cuando se monta el visor. Se ` +
+        `pintan con visor.parcelas.cajon.pintar({...}) y visor.parcelas.capa.pintar([...]).`,
+    )
+  }
+  return { ...parcelas }
 }
 
 /**
@@ -944,6 +990,15 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  *   capa las señala en el mapa), mientras que F08 es UNA. Envolverla en
  *   `{cajon}` para que se pareciera obligaría a todos sus llamantes a escribir
  *   `visor.comprobacion.cajon` por una simetría que no existe.
+ * @property {{cajon: ReturnType<typeof crearCajonParcelas>,
+ *   capa: ReturnType<typeof crearCapaCandidatas>}|null} parcelas  **F22.** Las dos
+ *   piezas de la elección de finca, o **`null`** si el visor se montó sin ellas.
+ *
+ *   Van JUNTAS en un objeto —como `diagnostico` y `sobrante`, y al revés que
+ *   `comprobacion`— porque aquí la asimetría de arriba **no aplica**: son dos
+ *   piezas inseparables, el cajón dice los nombres y la capa enseña dónde cae cada
+ *   uno. Elegir entre ocho referencias que comparten los once primeros caracteres
+ *   sin ver el mapa no es elegir, es adivinar.
  * @property {{lista: ReturnType<typeof crearListaSobrante>,
  *   capa: ReturnType<typeof crearCapaPiezas>}|null} sobrante  Las dos piezas de
  *   F17, o **`null`** si el visor se montó sin ellas. Van JUNTAS en un objeto, como
@@ -1148,6 +1203,29 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  *
  *   El cajón nace CERRADO y en blanco: montarlo no comprueba nada. Quien lo abre y
  *   le da el contenido es el cableado de F08, cuando el usuario suelta un fichero.
+ * @param {boolean|{posicion?: string}} [opciones.parcelas=false]  **F22.** Monta las
+ *   DOS piezas de la elección de finca: el cajón (`viewer/cajon-parcelas.js`) y la
+ *   capa que dibuja las candidatas y resalta la marcada (`viewer/candidatas.js`).
+ *
+ *   Existe porque el DXF de «Consulta Masiva» del Catastro trae **la manzana
+ *   entera** —ocho fincas disjuntas, cada una con su referencia— y hay que decir
+ *   cuál es la del expediente. Ocho referencias que comparten los once primeros
+ *   caracteres no se distinguen leyendo: por eso hay una capa y no solo una lista.
+ *
+ *   · **`false` (el DEFECTO)** ⇒ `visor.parcelas` vale `null` y no se monta ni un
+ *     nodo de más. Mismo criterio que F08: una fase no le cobra nada a quien no la
+ *     ha pedido.
+ *   · **`true`** ⇒ las dos piezas, con sus defectos.
+ *   · **objeto** ⇒ igual, con esta ÚNICA clave (ver {@link CLAVES_PARCELAS}):
+ *       - `posicion` → esquina del cajón (defecto `'bottomleft'`).
+ *
+ *   ⚠️ **Tercer cajón en `bottomleft`**, con el mismo razonamiento que el segundo:
+ *   son caras del mismo hueco y son mutuamente excluyentes por recorrido. Montar
+ *   los tres es lo normal; abrir dos a la vez no, y de eso responde el cableado.
+ *
+ *   Nacen inertes: el cajón cerrado y con su motivo escrito, la capa sin un
+ *   polígono. Quien las llena es `app/`, cuando `parsers/importar.js` bloquea con
+ *   `VARIOS_RECINTOS_DISJUNTOS`.
  * @param {boolean} [opciones.colindantes=false]  Monta la capa de PARCELAS VECINAS
  *   (`viewer/colindantes.js`): un contorno gris fino por colindante, con su
  *   referencia catastral en un título emergente.
@@ -1214,6 +1292,7 @@ export function crearVisor(contenedor, opciones = {}) {
     edicion: opcionEdicion = false,
     diagnostico: opcionDiagnostico = false,
     comprobacion: opcionComprobacion = false,
+    parcelas: opcionParcelas = false,
     colindantes: opcionColindantes = false,
     sobrante: opcionSobrante = false,
     alPrevisualizar,
@@ -1241,6 +1320,7 @@ export function crearVisor(contenedor, opciones = {}) {
   const opcionesEdicion = normalizarEdicion(opcionEdicion)
   const opcionesDiagnostico = normalizarDiagnostico(opcionDiagnostico)
   const opcionesComprobacion = normalizarComprobacion(opcionComprobacion)
+  const opcionesParcelas = normalizarParcelas(opcionParcelas)
   const montarColindantes = normalizarColindantes(opcionColindantes)
   const montarSobrante = normalizarSobrante(opcionSobrante)
   // Misma política que `resolverAvisar` y que los tres ganchos de `sincronizar`:
@@ -1442,6 +1522,36 @@ export function crearVisor(contenedor, opciones = {}) {
       deshacer.push(() => comprobacion.destruir())
     }
 
+    // 5 quater · Las dos piezas de F22: el CAJÓN donde se elige cuál de las N
+    // fincas de un dibujo es la del expediente, y la CAPA que las dibuja y resalta
+    // la que se está mirando. Van juntas porque son una sola función partida por
+    // el patrón de la casa —un control es DOM y una capa es geometría—, igual que
+    // `diagnostico` es `{cajon, contraste}` y `sobrante` es `{lista, capa}`.
+    //
+    // ⚠️ El cajón va DESPUÉS del de comprobación, y no da igual: los tres cajones
+    // comparten `bottomleft`, y Leaflet apila por orden de alta dentro de una
+    // esquina. Con dos abiertos a la vez —que no debería pasar nunca, y de eso se
+    // ocupa el cableado— el último dado de alta queda debajo. Éste es el más
+    // reciente del recorrido, así que ahí es donde toca.
+    //
+    // Las dos nacen inertes: el cajón cerrado y con su motivo escrito, la capa sin
+    // un polígono puesto. No se suscriben a nada del mapa ni tocan el store.
+    /** @type {{cajon: object, capa: object}|null} */
+    let parcelas = null
+    if (opcionesParcelas !== null) {
+      const cajonParcelas = crearCajonParcelas({
+        mapa,
+        posicion: opcionesParcelas.posicion,
+        alAvisar: avisar,
+      })
+      const capaCandidatas = crearCapaCandidatas({ mapa, zona, alAvisar: avisar })
+      parcelas = { cajon: cajonParcelas, capa: capaCandidatas }
+      deshacer.push(() => {
+        capaCandidatas.destruir()
+        cajonParcelas.destruir()
+      })
+    }
+
     // 5 ter · Las dos piezas de F17: la LISTA del sobrante y sus MANCHAS. Nacen
     // las dos vacías —la lista con el botón apagado y su motivo escrito, la capa
     // sin un polígono puesto—, así que aquí son tan inertes como los dos cajones
@@ -1577,6 +1687,7 @@ export function crearVisor(contenedor, opciones = {}) {
       barraEdicion,
       diagnostico,
       comprobacion,
+      parcelas,
       colindantes,
       sobrante,
 

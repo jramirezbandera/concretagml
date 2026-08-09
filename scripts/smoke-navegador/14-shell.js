@@ -714,7 +714,7 @@ const informe = (() => {
 
   // ¿Sigue vivo el rail con el informe delante? Con `showModal()` estaría inerte,
   // y la pantalla sería una ratonera de la que solo se sale por Escape.
-  const botonRail = $('.gml-rail-paso[data-paso="validacion"] .gml-rail-boton')
+  const botonRail = $('.gml-rail-paso[data-paso="edicion"] .gml-rail-boton')
   let railAlcanzable = null
   if (botonRail !== null) {
     const r = botonRail.getBoundingClientRect()
@@ -747,17 +747,23 @@ const informe = (() => {
 
 pantalla.informe = informe
 
-// 1 · El informe se enseña exactamente en su pantalla, y en ninguna otra.
-if (informe.hayDialogo && informe.abierto !== (pasoActivo === 'informe')) {
+// 1 · ⭐ 2026-08-08 · EL INFORME YA NO TIENE PANTALLA PROPIA, y esta comprobación
+// cambia de forma con él. Antes exigía «abierto si y solo si `pasoActivo` es
+// "informe"». Retirado aquel peldaño, lo que queda por exigir es que **no se abra
+// solo**: el informe se abre pulsando «Preparar informe (PDF)» dentro del cajón de
+// diagnóstico, y este guion no lo pulsa. Un informe abierto aquí sería un diálogo
+// que se enseña sin que nadie lo haya pedido.
+if (informe.hayDialogo && informe.abierto) {
   problemas.push(
-    `El informe ${informe.abierto ? 'ESTÁ ABIERTO' : 'está CERRADO'} en «${pasoActivo}». Tiene ` +
-      'que enseñarse en «informe» y solo ahí: es el contenido de esa pantalla, no un modal que ' +
-      'se abre desde otra.',
+    `El informe ESTÁ ABIERTO en «${pasoActivo}» sin que nadie lo haya pedido. La única puerta es ` +
+      '«Preparar informe (PDF)», dentro del cajón de diagnóstico, y este guion no la pulsa.',
   )
 }
 
-// 2 · En su pantalla no puede ser modal: dejaría inerte el rail, o sea la navegación.
-if (informe.hayDialogo && informe.abierto && pasoActivo === 'informe') {
+// 2 · Y si estuviera abierto, no puede ser modal: dejaría inerte el rail, o sea la
+// navegación. Se conserva porque la presentación a pantalla completa NO se ha
+// tocado: lo que se retiró es el peldaño, no el `comoPantalla`.
+if (informe.hayDialogo && informe.abierto) {
   if (informe.ariaModal !== 'false') {
     problemas.push(
       `El informe se presenta con \`aria-modal="${informe.ariaModal}"\` siendo la pantalla. Un ` +

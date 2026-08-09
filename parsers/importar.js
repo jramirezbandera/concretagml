@@ -69,6 +69,39 @@
 // rama EDIFICIO —donde cada anillo es su propio exterior— **no aplican**; ver el
 // catálogo `BLOQUEOS` más abajo, que lo declara uno a uno.
 //
+// ── F22 · Y LA PRUEBA DE F11 SOLO PROBABA UNA MITAD ──────────────────────────
+//
+// ⛔ Lo de arriba llama a `SUPERFICIE_NO_POSITIVA` «la prueba, no la causa».
+// MEDIDO el 2026-08-09: **prueba la mitad, y la otra mitad era silenciosa.** El
+// DXF de «Consulta Masiva» del Catastro trae la MANZANA ENTERA —su capa
+// «Parcela» son 8 fincas disjuntas, cada una con su referencia rotulada dentro— y
+// la resta da −8.866,39 m². El bloqueo salta y todo parece funcionar.
+//
+// **Salta porque la finca más pequeña viene la primera en el fichero.** Con los
+// mismos ocho anillos y el mayor delante, la resta da **+368,22 m²** y la parcela
+// se CONSTRUYE: una finca que no existe, cuyos siete «huecos» son las parcelas de
+// los vecinos, `bloqueos: []`, `construida: true` y lista para firmarse. Lo único
+// que separaba a este módulo de entregar geometría falsa era **el orden en que un
+// fichero ajeno lista sus polilíneas**.
+//
+// Por eso F22 mira el reparto POR TOPOLOGÍA (`parsers/topologia.js`) y no por su
+// resultado aritmético, y lo mira SIEMPRE que hay más de un anillo:
+//
+//   · `VARIOS_RECINTOS_DISJUNTOS` (bloqueo) — ningún anillo está dentro de otro y
+//     ninguno se solapa con otro ⇒ **no son un contorno con huecos, son N fincas**.
+//     La salida no es corregir nada: es ELEGIR cuál de ellas es la del expediente,
+//     y ésa es la decisión que F22 le pone delante al usuario.
+//   · `SUPERFICIE_NO_POSITIVA` se queda **intacto** para su caso —anillos que se
+//     solapan de verdad, o sea un dato roto— y deja de contestar cuando la causa
+//     es la otra. Los dos son excluyentes: decir a la vez «son ocho, elige una» y
+//     «revisa qué anillos son de verdad la parcela» son dos frases ciertas que
+//     juntas se leen como una contradicción, y esa factura ya se pagó en F11 con
+//     el guion 13.
+//
+// ⚠️ El bloqueo nuevo entra en {@link BLOQUEOS_SOLO_PARCELA}, y ahí es donde más
+// falta hace: las huellas de un edificio son disjuntas POR DEFINICIÓN, así que sin
+// el filtro la rama EDIFICIO se habría bloqueado en el 100 % de sus ficheros.
+//
 // ⚠️ El tipo de las detecciones de reparto es `SEPARADOR_POLIGONO`, que es el
 // único hueco del léxico CONGELADO de `parsers/_comun.js` que habla de cómo se
 // reparten los anillos en polígonos (allí, la palabra `separador` de LIST/TXT;
@@ -78,6 +111,7 @@
 import { parseLIST } from './list.js'
 import { parseTXT } from './txt.js'
 import { parseDXF } from './dxf.js'
+import { analizarReparto, rotularRecintos } from './topologia.js'
 import { crearDeteccion, declinar, SUJETOS, TIPO_DETECCION, SEVERIDAD } from './_comun.js'
 import {
   detectarHuso,
@@ -88,7 +122,7 @@ import {
 } from '../geo/huso.js'
 import { forward } from '../geo/utm.js'
 import { errorCierre, compensarCierre } from '../geo/cierre.js'
-import { superficie } from '../geo/area.js'
+import { area, superficie } from '../geo/area.js'
 import { crearParcela, crearRecinto, TIPO_RECINTO, ORIGEN_PARCELA } from '../model/parcela.js'
 
 // ── Umbrales (todos parametrizables por opts) ─────────────────────────────────
@@ -130,10 +164,13 @@ const FORMATOS = Object.freeze({ LIST: 'LIST', TXT: 'TXT', DXF: 'DXF' })
  * este orquestador para otra rama tiene que FILTRARLOS, no arrastrarlos:
  *   · `ANILLOS_EN_VARIAS_CAPAS` — los anillos vienen de más de una capa del DXF.
  *   · `SUPERFICIE_NO_POSITIVA`  — exterior menos huecos da ≤ 0 m².
+ *   · `VARIOS_RECINTOS_DISJUNTOS` (F22) — los anillos son N fincas separadas.
  * El filtro es una línea, {@link BLOQUEOS_SOLO_PARCELA}, y hace falta: un DXF de
  * edificio SIEMPRE trae varias capas (el fixture real son «Construccion» ⇢ 7 y
  * «Parcela» ⇢ 1), así que arrastrarlos dejaría la rama de edificio bloqueada
- * justo en su caso normal.
+ * justo en su caso normal. ⚠️ El de F22 es el que MÁS falta hace que se filtre:
+ * las huellas de un edificio son disjuntas **por definición**, así que sin el
+ * filtro la rama EDIFICIO se bloquearía en el 100 % de sus ficheros.
  *
  * @readonly
  */
@@ -143,12 +180,14 @@ export const BLOQUEOS = Object.freeze({
   HUSO_NO_RESUELTO: 'HUSO_NO_RESUELTO',
   ANILLOS_EN_VARIAS_CAPAS: 'ANILLOS_EN_VARIAS_CAPAS',
   SUPERFICIE_NO_POSITIVA: 'SUPERFICIE_NO_POSITIVA',
+  VARIOS_RECINTOS_DISJUNTOS: 'VARIOS_RECINTOS_DISJUNTOS',
 })
 
-/** Los dos bloqueos que hablan del reparto de parcela y NO del fichero. */
+/** Los bloqueos que hablan del reparto de parcela y NO del fichero. */
 export const BLOQUEOS_SOLO_PARCELA = Object.freeze([
   BLOQUEOS.ANILLOS_EN_VARIAS_CAPAS,
   BLOQUEOS.SUPERFICIE_NO_POSITIVA,
+  BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS,
 ])
 
 /**
@@ -554,6 +593,55 @@ function husoDeGrados(situacion) {
 // elegido una, y deja constancia del reparto ENTERO (regla 1: el usuario tiene
 // que poder ver las 5 capas de su plano aunque solo importemos una).
 
+// ── F22 · QUÉ CAPA DE RÓTULOS NOMBRA LAS FINCAS ──────────────────────────────
+//
+// Un DXF del Catastro trae los rótulos repartidos en capas: en el fichero real,
+// 153 en `txtConstru` (plantas: `II`, `POR`, `TZA+I`…) y 8 en `RefCatastral` (las
+// referencias). Solo una de las dos NOMBRA los recintos.
+//
+// ⛔ **No se elige por el nombre de la capa, y no es purismo: F11 ya pagó ese
+// atajo.** En `UTM.dxf` la parcela de verdad está en la capa «0» y NO en la que
+// se llama «PARCELA» — «elegir por el nombre habría fallado en el único plano
+// real que tenemos». Aquí `RefCatastral` es un nombre igual de tentador y de
+// frágil: lo pone el escritor del DXF, no el formato.
+//
+// Se elige MIDIENDO: se prueba cada capa de rótulos y se acepta la que empareja
+// **1:1 y sin sobras** con los recintos (`rotularRecintos(...).limpia`). Sobre el
+// fichero real, `txtConstru` sale con 7 recintos ambiguos —varias plantas dentro
+// de cada finca— y `RefCatastral` sale limpia con las ocho referencias. La
+// decisión la toma el dato.
+//
+// ⚠️ Y si empatan DOS capas limpias no se desempata: no se nombra nada y se dice.
+// Dos formas distintas de llamar a la misma finca es justo lo que no puede pasar
+// en la pantalla donde el usuario reconoce su parcela.
+
+/**
+ * Elige la capa de rótulos que nombra los recintos, o `null` si ninguna lo hace.
+ *
+ * @param {number[][][]} anillos
+ * @param {ReadonlyArray<{capa: string}>} rotulos
+ * @param {string|undefined} capaPedida  `opts.capaRotulos`: si viene, se usa ESA
+ *   y no se prueba ninguna otra (misma forma que `opts.capa`: ofrecer y aplicar).
+ * @returns {{capa: string, nombres: Array<string|null>}|null}
+ */
+function elegirCapaDeRotulos(anillos, rotulos, capaPedida) {
+  if (!Array.isArray(rotulos) || rotulos.length === 0 || anillos.length === 0) return null
+
+  const capas = [...new Set(rotulos.map((r) => r.capa))]
+  const candidatas = capaPedida === undefined ? capas : capas.filter((c) => c === capaPedida)
+
+  const limpias = []
+  for (const capa of candidatas) {
+    const r = rotularRecintos(
+      anillos,
+      rotulos.filter((x) => x.capa === capa),
+    )
+    if (r.limpia) limpias.push({ capa, nombres: r.nombres })
+  }
+  // Ninguna limpia, o varias: en los dos casos no se nombra. Ver la cabecera.
+  return limpias.length === 1 ? limpias[0] : null
+}
+
 /** Reparto {capa: nºAnillos}, ordenado de más a menos anillos (empates: orden
  *  de aparición). Es el orden en que la interfaz debe ofrecerlo: primero el
  *  grupo grande, que es el que suele ser mobiliario de dibujo o el bueno. */
@@ -665,6 +753,12 @@ function contarDetecciones(detecciones) {
  * @property {string[]} capas                Capa de cada anillo, 1:1 con `nVertices`
  *   y con `anillos`. LITERAL (F11). Solo el DXF trae capas: en LIST y TXT todas
  *   son `''`, porque esos formatos no tienen el concepto y NO se inventa.
+ * @property {{capa: string, nombres: Array<string|null>}|null} rotulos  **F22.**
+ *   Los nombres que el fichero le da a sus recintos, si los trae: `nombres[i]`
+ *   nombra a `anillos[i]`. `null` cuando ninguna capa de rótulos empareja 1:1 con
+ *   los recintos —o cuando empatan varias, que tampoco se desempata—. Solo el DXF
+ *   puede traerlos. ⚠️ Que valga `null` significa «el fichero no los nombra», NO
+ *   «no se ha mirado».
  * @property {{zona:number,srs:string,lon:number,lat:number,ambiguo:boolean}|null} huso
  *   Punto de caída (dónde cae la parcela) del huso deducido; null si no se resolvió.
  * @property {object|null} superficie        Cotejo calculada vs reportada (solo LIST con meta).
@@ -700,6 +794,18 @@ function contarDetecciones(detecciones) {
  * @param {','|'.'} [opts.separadorDecimal]  Reenviado a los parsers LIST/TXT.
  * @param {string} [opts.palabraSeparador]  Reenviado a los parsers LIST/TXT.
  * @param {number} [opts.flechaMax]  Reenviado al parser DXF (discretización de arcos).
+ * @param {number} [opts.tolerancia]  **F22.** Reenviado a `parsers/topologia.js`:
+ *   suelo ABSOLUTO (m²) por debajo del cual dos anillos que se pisan se dan por
+ *   disjuntos. Es ruido de coma flotante, no tolerancia de dibujo.
+ * @param {string} [opts.capaRotulos]  **F22.** Usar SOLO esta capa de rótulos para
+ *   nombrar los recintos, en vez de probarlas todas y quedarse con la que empareja
+ *   1:1. Mismo patrón que `opts.capa`: la aplicación ofrece lo que ha medido y el
+ *   llamante puede imponer otra cosa. Si la capa pedida no empareja limpiamente,
+ *   **no se nombra nada** — pedirla no la hace válida.
+ * @param {number} [opts.fraccion]  **F22.** La otra mitad de ese umbral: fracción
+ *   del MENOR de los dos anillos. Existe porque el suelo absoluto solo **no
+ *   bastaba** contra cartografía real (dos medianeras que comparten muro se pisan
+ *   0,0012 m² medidos). Ver `parsers/topologia.js#FRACCION_SOLAPE`.
  * @param {'PARCELA'|'CONSTRUCCION'} [opts.sujeto='PARCELA']  **F14.** De QUÉ hablan
  *   los mensajes de esta capa. Desde F11 el MISMO importador lee el volcado de una
  *   parcela y el de una construcción (`edificio/entrada.js`), y decirle al usuario
@@ -875,7 +981,88 @@ export function importar(texto, opts = {}) {
   //   construye. No es lo mismo que el cotejo de arriba, que compara contra el
   //   Área que reporta la LISTA de AutoCAD y solo existe en el formato LIST.
   const superficieReparto = recintos && recintos.length > 0 ? superficie(recintos) : null
-  if (superficieReparto !== null && superficieReparto <= 0) {
+
+  // 6ter) ⛔ **F22 · Y la superficie NO BASTA como prueba, que es lo que este
+  //   módulo llevaba creyendo desde F11.** `SUPERFICIE_NO_POSITIVA` se escribió
+  //   como «la prueba, no la causa», y se midió el 2026-08-09 que solo prueba una
+  //   MITAD: el DXF de «Consulta Masiva» del Catastro trae la manzana entera —8
+  //   fincas disjuntas en la capa «Parcela»— y da −8.866,39 m² **porque la más
+  //   pequeña viene la primera en el fichero**.
+  //
+  //   ⛔ **Con el orden al revés no había bloqueo ninguno.** Medido sobre esos
+  //   MISMOS ocho anillos, poniendo el mayor el primero: `superficie` da
+  //   **+368,22 m²** y la parcela se CONSTRUYE — una finca que no existe, con
+  //   siete huecos que son las parcelas de los vecinos, sin un solo aviso y lista
+  //   para firmarse. Es la regla de oro 1 en su forma más cara, y lo único que nos
+  //   separaba de ella era el orden en que un fichero ajeno lista sus polilíneas.
+  //
+  //   Por eso el reparto se analiza SIEMPRE que hay más de un anillo, y no solo
+  //   cuando la resta sale negativa. `parsers/topologia.js` contesta con hechos
+  //   —quién está dentro de quién, qué pares se solapan y cuánto— y aquí se decide.
+  const analisis =
+    anillos.length > 1 && !gradosCualquiera ? analizarReparto(anillos, opts) : null
+  const sonDisjuntos = analisis !== null && analisis.disjuntos
+
+  // 6quater) F22 · ¿Trae el fichero los NOMBRES de sus recintos? Va aquí, y no en
+  //   el resumen del final, porque la detección de abajo los necesita: quien
+  //   pregunte «¿cuál de estas ocho es la tuya?» tiene que poder poner
+  //   `6346726UF8664N` en el renglón, y no «Recinto 3».
+  const rotulacion = gradosCualquiera
+    ? null
+    : elegirCapaDeRotulos(anillos, res.rotulos, opts.capaRotulos)
+
+  if (sonDisjuntos) {
+    detecciones.push(
+      crearDeteccion(
+        TIPO_DETECCION.SEPARADOR_POLIGONO,
+        `El fichero trae ${anillos.length} recintos SEPARADOS, no uno con huecos: ninguno está ` +
+          `dentro de otro y ninguno se solapa con otro. Un expediente lleva UNA parcela, así que ` +
+          `hay que decir cuál de los ${anillos.length} lo es; los demás son fincas distintas y no ` +
+          `huecos de ésta. No se construye la parcela mientras no se elija.` +
+          (rotulacion === null
+            ? ''
+            : ` El propio fichero los nombra, en la capa «${rotulacion.capa}»: ` +
+              `${rotulacion.nombres.join(', ')}.`),
+        SEVERIDAD.AVISO,
+        {
+          // El detalle de cada recinto, para que quien pregunte «¿cuál es la tuya?»
+          // pueda rotularlos sin volver a medir: dos medidas del mismo anillo es como
+          // se acaba enseñando un número distinto del que se guarda.
+          //
+          // ⚠️ Se mide sobre `recintos`, que es lo que el modelo tendría, y NO sobre
+          // `anillos`: el paso 5 ya los ha construido con `crearRecinto`, que puede
+          // haber retirado un vértice de cierre. Medir el crudo daría una cifra de un
+          // anillo que no es el que se va a guardar. Y `area()` —el módulo del
+          // anillo— y no `superficie()`, que restaría los que vienen como HUECO:
+          // aquí cada recinto se mide POR SÍ MISMO, que es justo lo que se ha
+          // demostrado que son.
+          recintos: recintos.map((r, i) => ({
+            indice: i,
+            superficie: area(r.vertices),
+            nVertices: r.vertices.length,
+            capa: capas[i] ?? '',
+            // F22 · El nombre que el fichero le da, si lo trae. `null` cuando no
+            // hay rótulos que nombren limpiamente: no se rellena con «Recinto i»
+            // aquí, porque inventar un nombre en la capa que produce el dato es
+            // como se acaba enseñando un rótulo que el fichero nunca dijo.
+            nombre: rotulacion === null ? null : (rotulacion.nombres[i] ?? null),
+          })),
+          nRecintos: anillos.length,
+          saltados: analisis.saltados,
+          rotulos: rotulacion === null ? null : { capa: rotulacion.capa },
+          bloqueo: BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS,
+        },
+      ),
+    )
+  }
+
+  // ⚠️ `SUPERFICIE_NO_POSITIVA` NO se retira ni se relaja: sigue siendo la guarda
+  // buena para su caso —anillos que se solapan de verdad, un dato roto—, que es
+  // distinto del de arriba. Lo que cambia es que deja de ser quien CONTESTA cuando
+  // la causa es otra: decir a la vez «son ocho fincas, elige una» y «revisa qué
+  // anillos son de verdad la parcela» son dos frases ciertas que juntas se leen
+  // como una contradicción, y este módulo ya pagó esa factura en F11 (guion 13).
+  if (!sonDisjuntos && superficieReparto !== null && superficieReparto <= 0) {
     detecciones.push(
       crearDeteccion(
         TIPO_DETECCION.SEPARADOR_POLIGONO,
@@ -921,11 +1108,17 @@ export function importar(texto, opts = {}) {
     if (gradosCualquiera) bloqueos.push('COORDENADAS_EN_GRADOS')
     if (huso === null) bloqueos.push('HUSO_NO_RESUELTO')
     // Los dos de F11 van AL FINAL, detrás de los tres de F01, para que un
-    // `bloqueos[0]` de F01 siga significando lo mismo que significaba.
+    // `bloqueos[0]` de F01 siga significando lo mismo que significaba. Y el de
+    // F22 detrás de ellos, por lo mismo.
     if (reparto.nCapas > 1) bloqueos.push('ANILLOS_EN_VARIAS_CAPAS')
-    if (superficieReparto !== null && superficieReparto <= 0) {
+    // ⚠️ Excluyentes, y en este orden: cuando los anillos son N fincas separadas
+    // la superficie negativa es una CONSECUENCIA de haberlas leído como huecos, no
+    // un hecho sobre el fichero. Emitir los dos haría que la pantalla dijera a la
+    // vez «elige una de las ocho» y «revisa qué anillos son de verdad la parcela».
+    if (!sonDisjuntos && superficieReparto !== null && superficieReparto <= 0) {
       bloqueos.push('SUPERFICIE_NO_POSITIVA')
     }
+    if (sonDisjuntos) bloqueos.push('VARIOS_RECINTOS_DISJUNTOS')
   }
   const parcela =
     bloqueos.length === 0 && recintos
@@ -940,6 +1133,7 @@ export function importar(texto, opts = {}) {
     nAnillos: anillos.length,
     nVertices: anillos.map((r) => r.length),
     capas,
+    rotulos: rotulacion,
     huso: huso ? { zona: huso.zona, srs: huso.srs, lon: huso.lon, lat: huso.lat, ambiguo: huso.ambiguo } : null,
     superficie: cotejo,
     bloqueos,

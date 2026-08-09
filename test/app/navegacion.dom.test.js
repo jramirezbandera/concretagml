@@ -412,7 +412,7 @@ describe('T2 · la autoridad de navegación no pinta (complemento del test `node
 
     const nav = crearNavegacion({
       hechos: {
-        PARCELA: { geometria: true, oficial: true, diagnostico: true },
+        PARCELA: { geometria: true, oficial: true },
         EDIFICIO: { geometria: true },
       },
       avisar: () => {},
@@ -439,7 +439,9 @@ describe('T2 · la autoridad de navegación no pinta (complemento del test `node
     expect(nav.navegarAPaso(PASOS[1]).ok).toBe(true)
     expect(nav.get().paso).toBe(PASOS[1])
     // Y un paso que el dato no sostiene se queda donde está, DICIENDO por qué.
-    const bloqueado = nav.navegarAPaso(PASOS[4])
+    // El ÚLTIMO del recorrido, sea cual sea: la lista bajó de cinco a tres el
+    // 2026-08-08 y un índice a pelo se quedaba fuera del array en silencio.
+    const bloqueado = nav.navegarAPaso(PASOS[PASOS.length - 1])
     expect(bloqueado.ok).toBe(false)
     expect(bloqueado.motivo).toMatch(/\S/)
   })

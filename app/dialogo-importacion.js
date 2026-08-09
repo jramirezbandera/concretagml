@@ -119,7 +119,55 @@ const SIN_CORRECCION = Object.freeze({
     'Con los anillos que trae, el contorno menos los huecos no da una superficie positiva, así ' +
     'que no se puede decir cuál es el contorno y cuáles los huecos. Si el dibujo tiene varias ' +
     'capas, elegir una sola suele resolverlo.',
+  // ── F22 · UN TEXTO PROVISIONAL QUE SE QUEDÓ CADUCO, Y SE CUENTA ───────────
+  //
+  // La fase 1 escribió aquí un texto **declarado provisional** para que la
+  // pantalla no se quedara muda antes de que existiera la elección: el bloqueo se
+  // emite desde `parsers/importar.js` y sin una entrada en esta tabla
+  // `decisionesDe` lo filtraría, dejando al usuario con un fichero que no entra y
+  // ni una frase que lo explique. Decía, literalmente:
+  //
+  //     «…Un expediente lleva una sola, y **todavía no se puede elegir cuál desde
+  //     aquí**: deja en el dibujo la polilínea de tu parcela, o elige una capa que
+  //     solo la contenga a ella.»
+  //
+  // ⛔ **Y siguió diciéndolo después de que las fases 3 y 4 construyeran justo
+  // eso.** Se queda citado arriba en vez de borrarse (regla de oro 8): es la
+  // tercera vez que este proyecto paga lo mismo —un texto correcto el día que se
+  // escribió, con fecha de caducidad declarada y sin nadie que volviera—, y las
+  // otras dos son el §11 del `GUION.md` (tres meses acusando a la aplicación de
+  // hacer lo que se le pidió) y el rótulo del guion 17.
+  //
+  // ⚠️ **Por qué se puede prometer el cajón desde aquí.** Este módulo es de
+  // `app/`, y el único que lo monta es `app/main.js`, que cablea SIEMPRE
+  // `parcelas: visor.parcelas`. O sea que para todo usuario de esta pantalla la
+  // elección existe. La degradación sin cajón —tests, uso como librería— no pasa
+  // por este `<dialog>`: allí el motivo lo cuenta la detección de `importar()`.
+  [BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS]:
+    'El dibujo trae varias fincas separadas —ninguna está dentro de otra ni se solapa con ' +
+    'otra—, así que no es una parcela con sus patios: son parcelas distintas. Un expediente ' +
+    'lleva una sola: al cerrar esta ventana se abre sobre el mapa el cajón donde elegir cuál ' +
+    'es la tuya, con la referencia de cada finca si el dibujo las nombra. Las demás se quedan ' +
+    'dibujadas alrededor como parcelario de contexto.',
 })
+
+/**
+ * Los bloqueos que hablan de CÓMO SE REPARTEN los anillos y no del fichero.
+ *
+ * Con varias capas por delante, ninguno de ellos se enseña como bloqueo suelto:
+ * la salida es elegir capa —una decisión que sí existe— y su motivo viaja como
+ * `nota` dentro de ese grupo. Son excluyentes entre sí porque `importar()` los
+ * emite así, y aquí solo se toma el que venga.
+ *
+ * ⚠️ NO es lo mismo que `BLOQUEOS_SOLO_PARCELA` de `parsers/importar.js`, aunque
+ * hoy tengan los mismos miembros: aquél dice qué NO hereda la rama EDIFICIO,
+ * éste dice qué se dobla dentro del grupo de capas de ESTA pantalla. Compartir la
+ * constante ataría dos decisiones que no tienen por qué moverse juntas.
+ */
+const REPARTO = Object.freeze([
+  BLOQUEOS.SUPERFICIE_NO_POSITIVA,
+  BLOQUEOS.VARIOS_RECINTOS_DISJUNTOS,
+])
 
 /**
  * Qué se le dice al usuario cuando el fichero viene en grados y **no se puede
@@ -292,8 +340,10 @@ export function decisionesDe(resultado) {
   const codigos = Array.isArray(resumen.bloqueos) ? resumen.bloqueos : []
 
   // ── Los bloqueos sin corrección que ofrecer ────────────────────────────────
-  // `SUPERFICIE_NO_POSITIVA` con varias capas NO entra aquí: su salida es elegir
-  // capa, y esa decisión sí existe. Se cuela como texto dentro del grupo de capas.
+  // Los bloqueos DE REPARTO no entran aquí cuando hay varias capas: su salida es
+  // elegir capa, y esa decisión sí existe. Se cuelan como texto dentro del grupo
+  // de capas. ⚠️ Son DOS desde F22 y se listan una sola vez: escribirlos a mano en
+  // los tres sitios donde hacen falta es como se olvida el tercero.
   const bloqueos = codigos
     .filter((c) => c in SIN_CORRECCION)
     .map((codigo) => ({ codigo, mensaje: SIN_CORRECCION[codigo] }))
@@ -303,19 +353,20 @@ export function decisionesDe(resultado) {
   // ── 1 · El reparto por capas, que si está es lo ÚNICO que se pregunta ──────
   const reparto = repartoDeCapas(resumen.capas)
   if (reparto.length > 1) {
+    // El motivo por el que no ha entrado nada todavía se arrastra a la misma
+    // pantalla, pero UNO solo: `importar()` los emite excluyentes a propósito, y
+    // enseñar dos explicaciones distintas del mismo hecho es la contradicción que
+    // este proyecto ya pagó dos veces.
+    const deReparto = codigos.find((c) => REPARTO.includes(c) && c in SIN_CORRECCION) ?? null
     return {
       decisiones: [
         {
           tipo: TIPO_DECISION.CAPA,
           opciones: reparto,
-          // Se arrastra el motivo del bloqueo de superficie para poder decir, en la
-          // misma pantalla, por qué no ha entrado nada todavía.
-          nota: codigos.includes(BLOQUEOS.SUPERFICIE_NO_POSITIVA)
-            ? SIN_CORRECCION[BLOQUEOS.SUPERFICIE_NO_POSITIVA]
-            : null,
+          nota: deReparto === null ? null : SIN_CORRECCION[deReparto],
         },
       ],
-      bloqueos: bloqueos.filter((b) => b.codigo !== BLOQUEOS.SUPERFICIE_NO_POSITIVA),
+      bloqueos: bloqueos.filter((b) => !REPARTO.includes(b.codigo)),
       informativas: informativasDe(detecciones),
     }
   }

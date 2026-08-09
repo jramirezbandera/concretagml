@@ -85,6 +85,12 @@
 #      índice guarda LF —como todo— y el árbol de trabajo recibe CRLF **en todas
 #      las plataformas**, que es lo único que hace que el SHA-256 publicado se
 #      pueda comprobar contra la descarga original desde cualquier clon.
+#      ⭐ **F22 le añade el hermano**: `manzana_consulta_masiva_*.dxf`, el mismo
+#      servicio y el mismo caso —descarga literal, SHA-256 publicado, CRLF
+#      medido (20.526 CRLF, 0 LF sueltos)—, pero de una MANZANA entera en vez de
+#      una parcela. Va en su propia línea y no en un comodín `*consulta_masiva*`
+#      a propósito: dos líneas explícitas dicen qué ficheros hay, y un comodín
+#      sobre esta carpeta es justo lo que el párrafo de abajo prohíbe.
 #      ⚠️ Los otros cuatro `.dxf`/`.txt` de esa carpeta siguen SIN regla a
 #      propósito: sus SHA-256 no están publicados (su procedencia es de F01 y
 #      quedó sin escribir), así que no hay nada que estabilizar todavía y una
@@ -113,3 +119,4 @@ test/fixtures/catastro/derivados/*.json  text eol=lf
 test/export/__snapshots__/*.dxf text eol=crlf
 test/export/__snapshots__/*.txt text eol=lf
 test/fixtures/parsers/edificio_consulta_masiva_*.dxf text eol=crlf
+test/fixtures/parsers/manzana_consulta_masiva_*.dxf text eol=crlf

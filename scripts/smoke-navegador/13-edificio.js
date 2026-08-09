@@ -204,8 +204,24 @@ const SUELO_HOLGURA = 24
  * Se sube la referencia en vez de bajarla porque el invariante sigue siéndolo:
  * lo que se vigila es que nadie se lo coma otra vez. Quien vea este guion en rojo
  * por esta línea, que mire primero el §20 del GUION antes de tocar nada.
+ *
+ * ── ⭐ Y VUELVE A CAMBIAR EL 2026-08-08: 386 → 405 ──────────────────────────
+ * Segunda vez en nueve fases, y por la misma clase de motivo que la primera: no
+ * se ha optimizado nada, ha cambiado QUÉ PANTALLA es ésta. El rail bajó de cinco
+ * peldaños a tres y «Validación» se fusionó con «Edición», así que esta caja
+ * comparte ahora columna con lo que antes vivía en la otra: el pie de acciones
+ * (113,17 px con «Generar GML», «Diagnosticar encaje» y «Derivar sobrante») y
+ * tres pares más de ficha («Superficie catastral», «Δ catastral» y
+ * «Colindantes», que venían del peldaño «Informe»).
+ *
+ * ⚠️ **Y aun así SUBE, no baja**, que es lo que hay que mirar dos veces antes de
+ * creérselo: la Edición de antes no tenía pie de acciones pero sí toda la altura,
+ * y la Validación de antes tenía el pie pero arrancaba más arriba. El neto,
+ * MEDIDO en Chrome a 1440×900 sobre `#/parcela/edicion` con la lista de avisos
+ * vacía, es **405,08 px** (y 225,08 px a 1280×720, muy por encima de los suelos
+ * de 120 y 124,57 px que vigilan los §10 y §16).
  */
-const CAJA_VERTICES_REFERENCIA = 386
+const CAJA_VERTICES_REFERENCIA = 405
 
 /** El violeta claro de la huella (`viewer/partes.js#COLOR_HUELLA`), en `rgb()`. */
 const COLOR_HUELLA_RGB = 'rgb(167, 139, 250)'

@@ -328,6 +328,12 @@ export function resumirDetecciones(detecciones) {
  * que el fichero esté mal. En esta rama **cada anillo es su propio exterior**, así
  * que ninguno de los dos aplica y por eso NO están en este catálogo.
  *
+ * ⭐ **F22 los deja en TRES** (`importar()` emite SEIS) con
+ * `VARIOS_RECINTOS_DISJUNTOS`, y es el que más falta hace que se quede fuera: las
+ * huellas de un edificio son disjuntas **por definición**, así que arrastrarlo
+ * bloquearía esta rama en el 100 % de sus ficheros y no solo en los de varias
+ * capas. Lo que sigue vale palabra por palabra para el tercero.
+ *
  * ⚠️ Consecuencia directa para T2.1: `entradaDesdeTexto` **no puede reenviar
  * `resumen.bloqueos` a ciegas**. Los dos códigos de parcela hay que filtrarlos
  * —`parsers/importar.js` los publica ya agrupados en `BLOQUEOS_SOLO_PARCELA`,
