@@ -4299,6 +4299,33 @@ const barra = cablearBarra({
   alNavegar: () => {
     if (visor?.mapa) visor.mapa.invalidateSize()
   },
+
+  /**
+   * ⭐ **LOS DOS PRODUCTORES DE LA BARRA (topbar · rebanadas 2 y 3).** Se
+   * inyectan como FUNCIONES y se leen en cada pintada: una foto guardada aquí se
+   * quedaría rancia en el primer cambio del expediente, que es exactamente el
+   * fallo mudo que la decisión A1 existe para impedir.
+   *
+   * `expediente` es el `estado()` que `app/cableado-expediente.js` ya publicaba
+   * para el guion 12; la barra no reconstruye nada.
+   */
+  expediente: () => expedienteCableado?.estado() ?? null,
+
+  /**
+   * ⚠️ **LEE DEL DOM, Y ESTÁ DECIDIDO ASÍ EN EL DISEÑO** («un solo módulo lee de
+   * los dos, aplica la prioridad y escribe»). `[data-estado="generar-gml"]` es el
+   * nodo donde los cableados de GML —el de parcela y el de edificio— llevan
+   * escribiendo su motivo desde F04, y **se queda en el pie del panel**: mudarlo
+   * habría convertido a la barra en su segundo escritor, y dos escritores del
+   * mismo nodo es una carrera que gana el último.
+   *
+   * Así que aquí hay un solo escritor (los cableados) y un solo lector (la
+   * barra). El nodo se resuelve en cada llamada y no al montar: en Entrada el pie
+   * está oculto por el eje PASO, pero **sigue en el documento y sigue escrito**,
+   * que es justo lo que hace que el motivo se pueda enseñar arriba en los tres
+   * pasos (decisión A2).
+   */
+  motivoDeEntrega: () => document.querySelector('[data-estado="generar-gml"]')?.textContent ?? '',
 })
 
 // El eje PASO de la cáscara (T6): escribe `data-paso` en el `<body>` y pone el

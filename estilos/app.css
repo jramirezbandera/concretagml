@@ -444,16 +444,183 @@ body {
    los cuatro hijos —marca, grupo, `<ol>` y renglón— se colocan **sin un solo
    `<div>` envolvente**. El renglón cruza las tres columnas y cae a la segunda
    fila; los otros tres se colocan solos en la primera, en el orden del DOM. */
+/* ── ⭐ CINCO ZONAS DESDE EL 2026-08-10 (topbar · rebanadas 2 y 3) ──────────
+ *
+ *   marca │ expediente │ ──── recorrido (1fr, CENTRADO) ──── │ rama+avisos │ entrega
+ *
+ * Las columnas de los extremos son `auto`: miden lo que miden sus contenidos. La
+ * del medio es la única elástica, y su contenido va centrado — **es lo que hace
+ * que la barra se lea como una barra y no como una fila de cosas apiladas a la
+ * izquierda**. Con solo el extremo izquierdo puesto (rebanada 1) sobraban 1.381,7
+ * px medidos a 1917 px de ancho, y se notaba.
+ *
+ * `overflow: hidden` sigue puesto, así que si un día las cinco zonas no caben, lo
+ * que sobra se recorta EN SILENCIO. Quien lo vigila es el guion 14, que mide el
+ * desborde de este nodo en las dos direcciones. */
 .gml-rail {
   grid-area: barra;
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
   grid-template-rows: var(--gml-barra-alto) var(--gml-renglon-alto);
   align-items: center;
+  gap: 0 var(--space-3);
   min-width: 0;
   overflow: hidden;
   background: var(--color-bg-surface);
   border-bottom: var(--gml-cabecera-borde) solid var(--color-border-main);
+}
+
+/* Una zona de la barra. `position: relative` porque de ella cuelga su menú, que
+   es `absolute`: así el desplegable se ancla a SU zona y no a la ventana. */
+.gml-barra-zona {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* ── Zona 2 · el expediente ─────────────────────────────────────────────── */
+
+.gml-barra-expediente {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  max-width: 240px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.gml-barra-expediente:hover,
+.gml-barra-expediente[aria-expanded='true'] {
+  border-color: var(--color-border-main);
+  background: var(--color-bg-elevated);
+}
+
+.gml-barra-expediente-nombre {
+  max-width: 100%;
+  font-size: var(--text-13);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* El apunte va en monoespaciada cuando es una referencia catastral, y el que la
+   escribe es `app/barra.js`: aquí solo se declara el tamaño y el gris. */
+.gml-barra-expediente-apunte {
+  max-width: 100%;
+  font-size: var(--text-10);
+  color: var(--color-text-disabled);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Los menús desplegables de la barra ─────────────────────────────────── */
+/*
+ * ⚠️ **ABREN HACIA ABAJO**, al revés que los de `viewer/barra-edicion.js`. No es
+ * incoherencia: aquéllos viven pegados al borde INFERIOR del mapa y hacia abajo
+ * no tienen sitio (se midió en su día). Éstos cuelgan del borde superior de la
+ * ventana y hacia abajo tienen la pantalla entera.
+ *
+ * ⛔ Sin `display` en la regla base: el atributo `hidden` lo oculta con
+ * `.gml-app [hidden]` (0,2,0), y declarar aquí un `display` de clase (0,1,0)
+ * NO lo pisaría… pero declararlo en `.gml-barra-menu[hidden]` sí, que es la
+ * trampa que el guion 19 midió en `.gml-barra-herramienta`. Se usa `flex` en el
+ * estado visible y punto.
+ */
+.gml-barra-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border-main);
+  border-radius: var(--radius);
+  background: var(--color-bg-primary);
+  box-shadow: 0 8px 24px rgb(15 23 42 / 12%);
+}
+
+/* El de la entrega se alinea por la DERECHA: nace pegado al borde de la ventana
+   y abriéndolo hacia la izquierda no se sale. */
+.gml-barra-menu--derecha {
+  left: auto;
+  right: 0;
+}
+
+.gml-barra-menu-opcion {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-12);
+  text-align: left;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.gml-barra-menu-opcion:hover:not(:disabled) {
+  background: var(--color-bg-elevated);
+}
+
+/* Vaciar es irreversible en pantalla. El color NO califica un dato ni un
+   trabajo: califica una acción de esta aplicación, que es la misma doctrina con
+   la que el bloque de la presunción del informe lleva `--color-state-warn`. */
+.gml-barra-menu-opcion--riesgo {
+  color: var(--color-state-error, var(--color-text-primary));
+}
+
+.gml-barra-menu-apunte {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-10);
+  color: var(--color-text-disabled);
+}
+
+/* La confirmación de «Vaciarlo» se pide AQUÍ desde la mudanza, y no en un
+   renglón del panel que ya no se está mirando. Vacío no ocupa alto. */
+.gml-barra-menu-estado {
+  margin: var(--space-1) 0 0;
+  padding: 0 var(--space-3);
+  font-size: var(--text-10);
+  line-height: 1.35;
+  color: var(--color-text-secondary);
+}
+
+.gml-barra-menu-estado:empty {
+  display: none;
+}
+
+/* ── Zona 5 · la entrega ────────────────────────────────────────────────── */
+
+.gml-barra-entregar {
+  white-space: nowrap;
+}
+
+/* El primario de la barra es más bajo que el del pie del panel: allí es el final
+   de una columna y aquí es un control de una fila de 52 px. */
+.gml-app .gml-barra-entregar,
+.gml-app .gml-barra-entregar-flecha {
+  width: auto;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-12);
 }
 
 .gml-rail-marca {
@@ -486,23 +653,14 @@ body {
   color: var(--color-text-disabled);
 }
 
-/* El rótulo del grupo. Sigue siendo el `aria-labelledby` del `<ol>`, y sigue
-   VIÉNDOSE: en horizontal, el diagrama de flujo necesita que algo diga qué es
-   ese diagrama. En vertical era una cabecera de sección; aquí es una etiqueta
-   de barra de herramientas, que es el mismo papel con otra forma. */
-.gml-rail-grupo {
-  margin: 0;
-  /* El relleno vertical no es holgura: es lo que le da ALTO al filo de la
-     izquierda. Sin él, `align-items:center` deja el elemento a la altura de su
-     texto (14 px) y el separador sale como una muesca. */
-  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
-  border-left: 1px solid var(--color-border-sub);
-  font-size: var(--text-10);
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-disabled);
-}
+/* ⛔ AQUÍ VIVÍA `.gml-rail-grupo`, EL RÓTULO «RECORRIDO», Y SE FUE CON SU NODO
+   (2026-08-10). En columna era la cabecera de una sección y tenía sentido; en una
+   barra horizontal de cinco zonas era una palabra compitiendo por el ancho con
+   las otras cuatro y sin decir nada que los tres peldaños no dijeran. Su papel
+   accesible lo hace ahora un `aria-label` en el `<ol>`, que no necesita nodo.
+   Se anota en vez de borrarse en silencio porque el `id="gml-rail-grupo"` era el
+   `aria-labelledby` de la lista: quien vea ese atributo desaparecido en un diff
+   tiene que poder encontrar aquí por qué. */
 
 /* La lista de pasos, en fila. **No scrollea, y es deliberado**: en vertical
    tenía `overflow-y:auto` porque cinco motivos largos podían empujar el rail
@@ -512,6 +670,11 @@ body {
 .gml-rail-pasos {
   display: flex;
   align-items: stretch;
+  /* ⭐ CENTRADO desde las rebanadas 2 y 3: es la única columna elástica de la
+     barra, y su contenido en el medio es lo que ancla ópticamente los cuatro
+     extremos. Con el recorrido pegado a la izquierda, la barra se leía como una
+     fila de cosas apiladas y 1.381,7 px de nada. */
+  justify-content: center;
   min-width: 0;
   height: 100%;
   margin: 0;
@@ -1170,50 +1333,19 @@ body {
   background: var(--color-border-sub);
 }
 
-/* La cuarta vía —abrir un expediente guardado— va aquí abajo y en voz baja: no es
-   empezar, y quien la necesita ya sabe que existe. */
-.gml-entrada-pie {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  margin: var(--space-2) 0 0;
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--color-border-sub);
-  font-size: var(--text-12);
-  color: var(--color-text-disabled);
-}
+/* ⛔ AQUÍ VIVÍAN LAS TRES REGLAS DE `.gml-entrada-pie`, Y SE FUERON CON SUS DOS
+   NODOS (2026-08-10). Eran «¿Ya tenías un expediente? Abrirlo» y «¿Quieres
+   empezar de cero? Vaciarlo», más el renglón del armado que colgaba del segundo.
+   Los tres están ahora en el menú de EXPEDIENTE de la barra de arriba, con sus
+   propias reglas (`.gml-barra-menu-*`).
 
-/* ⭐ 2026-08-09 · EL PIE PASA A TENER DOS RENGLONES: «¿Ya tenías un expediente?»
-   y «¿Quieres empezar de cero?». El segundo repite la clase para heredar la
-   tipografía, el color y la fila con el botón a la derecha, y aquí se le quitan
-   las tres propiedades que lo separarían del primero: son **un** bloque de
-   preguntas en voz baja, no dos zonas distintas. Con la línea y los 12 px de
-   `padding-top` heredados, el pie enseñaba dos hairlines a 20 px de distancia y
-   el bloque se leía como el final de la pantalla dos veces.
-
-   4 px y no 8: dos renglones de la MISMA cosa van más juntos entre sí que el
-   bloque respecto a lo que tiene encima, que es la misma escala con la que ya se
-   separan la etiqueta y su campo unas líneas más abajo.
-
-   ⚠️ El segundo renglón nace `hidden` y lo oculta `.gml-app [hidden]` (0,2,0),
-   que gana al `display:flex` de arriba (0,1,0). Aquí NO se declara `display`, y
-   por eso sigue ganando: la trampa que el guion 19 midió en
-   `.gml-barra-herramienta` es exactamente ésta. */
-.gml-entrada-pie + .gml-entrada-pie {
-  margin-top: var(--space-1);
-  padding-top: 0;
-  border-top: 0;
-}
-
-/* Y el renglón del armado («vuelve a pulsar para confirmarlo») cuelga del pie sin
-   pegarse a él. Va con `+` sobre `.gml-accion-estado` —que ya trae su
-   `:empty{display:none}`— para que el hueco solo exista cuando hay texto: vacío
-   no separa nada de nada, y un margen incondicional dejaría 8 px de aire muerto
-   bajo el pie durante toda la vida de la pantalla. */
-.gml-entrada-pie + .gml-accion-estado {
-  margin-top: var(--space-2);
-}
+   Se borran en vez de dejarse: una regla que no puede casar es exactamente lo
+   que la rebanada 0 de este mismo rework tuvo que ir a limpiar —y una de
+   aquellas tres SÍ hacía daño—. Lo que se conserva es esta nota, que es lo
+   barato y lo que de verdad falta cuando uno busca «¿dónde está el pie de
+   Entrada?». Lo cazaría además `test/estilos/cascara.test.js`, que ahora vigila
+   que toda clase de `CLASE` tenga reglas… pero no al revés: reglas sin clase no
+   las ve nadie, así que esto se hace a mano y con cuidado. */
 
 /* Los márgenes NO se colapsan dentro de un contenedor flex: sin esto, el margen
    inferior de `.gml-rotulo` se SUMARÍA al `gap` del bloque y el rótulo quedaría

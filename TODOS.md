@@ -101,7 +101,11 @@ interfaz, el motivo por el que la tabla exportada se descartó).
 **Bloqueado por.** Nada técnico: es una decisión de producto sobre qué se recorta.
 
 **Qué.** En la pantalla Entrada, a 1280×720 —el suelo declarado del proyecto— la tercera vía
-(«Abrir un GML») nace **59,42 px por debajo** del borde visible de su sección. Hay que
+(«Abrir un GML») nace por debajo del borde visible de su sección.
+
+⭐ **ACTUALIZADO 2026-08-10 (rebanada 2): de 59,42 px a 35.** Subir el pie de Entrada a la
+barra le devolvió 104 px al panel, y subir los chips y el conmutador vaciaron parte de la
+cabecera. La salida 1 de las tres de abajo **ya se aplicó** y no bastó: quedan 35 px. Hay que
 scrollear dentro del panel para verla. Las otras dos se ven enteras.
 
 **Por qué pasa, con los números.**

@@ -488,6 +488,31 @@ export const ASIENTOS = Object.freeze(
         'hoy **no tenía ninguna**. Cazan las 7 mutaciones con las que se probaron, incluida la que ' +
         'reproduce el defecto de la rebanada 0 (una regla que cita un paso retirado). Sobran 14.144 ' +
         'sobre el techo.' },
+
+    { hito: 'Topbar · rebanada 2 · el expediente, los avisos y la entrega suben a la barra',
+      commit: '(sin commitear)',
+      total: 72839, nuestro: 57744, rebanada: null,
+      nota:
+        '**+1.536 B.** La barra pasa de tres zonas a CINCO —marca · expediente · recorrido · ' +
+        'rama+avisos · entrega— y el recorrido se centra, que es lo que la hace leerse como una ' +
+        'barra: a 1917 px sobraban **1.381,7 px medidos** a la derecha, el 72 %. ── QUÉ SUBE, Y ' +
+        'TODO SON MUDANZAS ── Ni un `data-accion` nuevo: `abrir-expediente` y `empezar-de-nuevo` ' +
+        'vienen del pie de Entrada, `generar-gml` del pie del panel, y los dos chips de la ' +
+        'cabecera. El conmutador «Parcela/Edificio» subió **sin tocar una línea de JavaScript**: ' +
+        '`app/rama.js` lo inserta dentro de `.gml-chips`, así que mudar ese `<div>` movió las dos ' +
+        'cosas. La regla que decide qué sube: **arriba lo que sale de la app hacia fuera, abajo lo ' +
+        'que transforma el expediente** — por eso «Diagnosticar encaje» y «Derivar sobrante» se ' +
+        'quedan. ── ⭐ Y EL PIE DE ENTRADA DEVUELVE 104 px MEDIDOS ── La tercera vía («Abrir un ' +
+        'GML») caía **139 px** bajo el pliegue a 1280×720 tras la rebanada 1; ahora caen **35**. No ' +
+        'está cerrado y no se disimula: el guion 14 lo sigue reportando y sale `ok:false` por eso y ' +
+        'por nada más. ── ⛔ LO QUE NO ENTRA, Y POR QUÉ ── El desplegable `[▾]` de salidas. Sus ' +
+        'cinco `data-accion` los fabrica hoy `app/dialogo-expediente.js` DENTRO de su `<dialog>`, y ' +
+        'repetirlos arriba es la trampa K.1 exacta: `querySelector` se queda con el primero del ' +
+        'documento. Hace falta sacarlos del diálogo y abrir `atender()` en el cableado; el hueco y ' +
+        'los tres pasos están escritos en `index.html` donde irá. ── DE DÓNDE SALEN LOS BYTES ── ' +
+        'Dos menús desplegables con su sombra y su teclado, la zona de expediente con sus dos ' +
+        'renglones, y el botón partido. A cambio se van las tres reglas de `.gml-entrada-pie` y la ' +
+        'de `.gml-rail-grupo`, que se quedaron sin nodo. Sobran 15.680 sobre el techo.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

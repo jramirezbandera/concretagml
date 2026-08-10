@@ -120,13 +120,26 @@ describe('el marcado de index.html', () => {
     expect(fila.hidden).toBe(true)
   })
 
-  it('el botón vive DENTRO de la pantalla de Entrada', () => {
+  it('⭐ el botón vive en el MENÚ DE EXPEDIENTE de la barra, no en una pantalla', () => {
     document.body.innerHTML = CUERPO
-    const seccion = document.querySelector(SELECTOR_FILA).closest('[data-pantalla]')
-    expect(seccion).not.toBeNull()
-    // Decisión del autor (2026-08-09): Entrada **es** el principio. Si algún día se
-    // muda, que sea a mano y no por arrastre de una refactorización.
-    expect(seccion.getAttribute('data-pantalla')).toContain('entrada')
+    const fila = document.querySelector(SELECTOR_FILA)
+
+    // ⛔ **ESTE `it` DECÍA LO CONTRARIO HASTA EL 2026-08-10**, y decía esto:
+    //
+    //     const seccion = fila.closest('[data-pantalla]')
+    //     expect(seccion.getAttribute('data-pantalla')).toContain('entrada')
+    //
+    // Era la decisión del autor del 2026-08-09 —«Entrada **es** el principio»— y
+    // aguantó un día. Lo que la tumbó no es un capricho: **«Vaciarlo» solo existía
+    // en Entrada**, así que quien estaba en Edición no tenía forma de vaciar sin
+    // volver atrás; y desde que hay barra, volver atrás es un clic que no tendría
+    // por qué existir. Se muda al menú de expediente, que se ve en los tres pasos.
+    //
+    // Lo que se afirma ahora es lo que de verdad protege: que **NO** cuelgue de
+    // ninguna pantalla. Si un día vuelve a hacerlo, deja de verse en dos de los
+    // tres pasos y el eje PASO lo esconde sin que nada se queje.
+    expect(fila.closest('[data-pantalla]')).toBeNull()
+    expect(fila.closest('[data-menu="expediente"]')).not.toBeNull()
   })
 
   it('el renglón del armado es `role="status"`', () => {
@@ -141,19 +154,33 @@ describe('el marcado de index.html', () => {
 // ── El CSS, que es donde vive el fallo mudo nº 3 ────────────────────────────
 
 describe('la hoja de estilo', () => {
-  it('declara la regla que junta los DOS renglones del pie', () => {
-    expect(CSS).toMatch(/\.gml-entrada-pie \+ \.gml-entrada-pie/)
+  // ⛔ **AQUÍ HABÍA DOS `it` SOBRE `.gml-entrada-pie` Y SE VAN CON SU CLASE**
+  // (2026-08-10). Vigilaban la regla que juntaba los dos renglones del pie de
+  // Entrada y que a aquélla no se le declarara `display` — porque un `display` de
+  // clase (0,1,0) posterior habría vencido al `hidden` y el botón «Vaciarlo»
+  // saldría visible con la aplicación recién abierta. La trampa es real y ya la
+  // pagó `.gml-barra-herramienta` en F12.
+  //
+  // **La trampa no ha desaparecido, se ha mudado**: el nodo con `hidden` es ahora
+  // el envoltorio del menú, y lo que lo oculta sigue siendo `.gml-app [hidden]`.
+  // Así que el `it` no se borra, se REESCRIBE contra el sitio nuevo.
+  it('⛔ NO hay ningún `display` de clase que pueda vencer al `hidden` de la fila', () => {
+    // La fila de «Vaciarlo» no lleva clase propia a propósito (es un `<div
+    // role="none">` con solo `data-pie`), justamente para que no exista una regla
+    // de clase que pueda pisarle el `hidden`. Se comprueba que sigue siendo así.
+    document.body.innerHTML = CUERPO
+    const fila = document.querySelector(SELECTOR_FILA)
+    expect(fila.className).toBe('')
+    expect(fila.hidden).toBe(true)
+    // Y que nadie le ha escrito una regla por atributo, que sería el otro camino.
+    expect(CSS).not.toMatch(/\[data-pie=['"]empezar-de-nuevo['"]\][^{]*\{[^}]*display/)
   })
 
-  it('⛔ NO le declara `display` al segundo renglón (si no, `hidden` deja de ocultar)', () => {
-    // `.gml-app [hidden]` es (0,2,0) y `.gml-entrada-pie` es (0,1,0), así que el
-    // `hidden` gana. Una regla más específica —o igual de específica y posterior—
-    // que declare `display` lo rompe, y el síntoma es un botón «Vaciarlo» visible
-    // con la aplicación recién abierta. Es exactamente lo que le pasó a
-    // `.gml-barra-herramienta` en F12 y lo destapó el guion 19, no la suite.
-    const bloque = /\.gml-entrada-pie \+ \.gml-entrada-pie\s*\{([^}]*)\}/.exec(CSS)
-    expect(bloque).not.toBeNull()
-    expect(bloque[1]).not.toMatch(/display\s*:/)
+  it('la opción del menú tiene reglas propias, y su renglón se colapsa vacío', () => {
+    // `:empty{display:none}` es lo que hace que la confirmación no deje un hueco
+    // muerto en el menú durante toda la vida de la pantalla.
+    expect(CSS).toMatch(/\.gml-barra-menu-opcion/)
+    expect(CSS).toMatch(/\.gml-barra-menu-estado:empty\s*\{\s*display:\s*none/)
   })
 })
 

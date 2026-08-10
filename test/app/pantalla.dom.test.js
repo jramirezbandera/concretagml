@@ -177,11 +177,19 @@ describe('T6 · ⭐ marcado y CSS dicen lo mismo (el fallo mudo)', () => {
     // de ser botones, o si alguien les cuelga un `data-pantalla`, el canal de
     // errores desaparece en cuatro de las cinco pantallas sin que nada lo diga.
     montarCascara()
-    const cabecera = document.querySelector('.gml-panel-cabecera')
+    // ⭐ **HASTA EL 2026-08-10 ESTO EXIGÍA `.gml-panel-cabecera`.** Los chips se
+    // mudaron a la BARRA, y con ellos el conmutador de rama, que `app/rama.js`
+    // inserta dentro de `.gml-chips` — así que la mudanza del `<div>` movió las
+    // dos cosas sin tocar JavaScript. Lo que este `it` protege no ha cambiado y es
+    // lo que se sigue afirmando: que los chips **no cuelguen de ninguna pantalla**.
+    // Colgados, el canal de errores desaparecería en dos de los tres pasos sin que
+    // nada lo dijera. Fuera del panel eso es todavía más importante: la barra se ve
+    // siempre, y por eso es mejor sitio que la cabecera.
+    const barra = document.querySelector('[data-rail="cascara"]')
     for (const nivel of ['ERROR', 'AVISO']) {
       const chip = document.querySelector(`.gml-chip[data-contador="${nivel}"]`)
       expect(chip, `falta el chip de ${nivel} en index.html`).not.toBeNull()
-      expect(cabecera.contains(chip), `el chip de ${nivel} se ha salido de la cabecera`).toBe(true)
+      expect(barra.contains(chip), `el chip de ${nivel} se ha salido de la barra`).toBe(true)
       expect(chip.tagName, `el chip de ${nivel} tiene que poder pincharse`).toBe('BUTTON')
       expect(chip.getAttribute('type'), 'un <button> sin type envía el formulario').toBe('button')
       expect(chip.hasAttribute(ATRIBUTO_PANTALLA)).toBe(false)
@@ -308,8 +316,15 @@ describe('T6 · ⭐ marcado y CSS dicen lo mismo (el fallo mudo)', () => {
     expect(pie.getAttribute(ATRIBUTO_PANTALLA).split(/\s+/)).not.toContain(PASO.ENTRADA)
     // Y sigue CONECTADO con todo su cableado: se oculta, no se quita.
     expect(pie.isConnected).toBe(true)
-    expect(pie.querySelector('[data-accion="generar-gml"]')).not.toBeNull()
     expect(pie.querySelectorAll('[data-ficha]').length).toBeGreaterThan(0)
+    // ⭐ **«Generar GML» YA NO ESTÁ AQUÍ (2026-08-10).** Se fue a la zona de
+    // entrega de la barra, que es la decisión A2 del diseño: el botón se ve en los
+    // TRES pasos, apagado con motivo, en vez de existir solo en Edición. Su
+    // renglón de acuse, en cambio, SE QUEDA —lo escriben los cableados de GML y
+    // `app/barra.js` lo lee para el renglón de la barra—, así que aquí se afirma
+    // justo eso: el botón fuera, el acuse dentro.
+    expect(pie.querySelector('[data-accion="generar-gml"]')).toBeNull()
+    expect(pie.querySelector('[data-estado="generar-gml"]')).not.toBeNull()
   })
 
   it('⛔ ni en Diagnóstico: repetía debajo lo que el contraste dice arriba', () => {
@@ -511,12 +526,22 @@ describe('T6 · las tres vías de Entrada (criterio 7)', () => {
     }
   })
 
-  it('la cuarta vía existe y va aparte: recuperar no es empezar', () => {
+  it('⭐ la cuarta vía ya no es una vía: vive en el menú de expediente', () => {
     montarCascara()
-    const pie = document.querySelector('.gml-entrada-pie')
-    expect(pie).not.toBeNull()
-    expect(pie.querySelector('[data-accion="abrir-expediente"]')).not.toBeNull()
-    expect(pie.closest('.gml-via')).toBeNull()
+    // ⛔ **HASTA EL 2026-08-10 ESTO EXIGÍA UN `.gml-entrada-pie`**, el renglón en
+    // voz baja del final de Entrada. La razón por la que iba «aparte y más abajo»
+    // sigue siendo buena —recuperar no es empezar, y anunciarlo al nivel de las
+    // tres vías le daría a un recién llegado una cuarta cosa que descartar—, pero
+    // el sitio dejó de serlo: **solo existía en Entrada**, y abrir un expediente es
+    // algo que se quiere hacer desde cualquier paso.
+    //
+    // Lo que se afirma ahora es lo mismo dicho en el sitio nuevo: que exista, que
+    // NO compita con las tres vías, y que no cuelgue de ninguna pantalla.
+    const abrir = document.querySelector('[data-accion="abrir-expediente"]')
+    expect(abrir).not.toBeNull()
+    expect(abrir.closest('.gml-via')).toBeNull()
+    expect(abrir.closest('[data-pantalla]')).toBeNull()
+    expect(abrir.closest('[data-menu="expediente"]')).not.toBeNull()
   })
 })
 
@@ -650,8 +675,18 @@ describe('rebanada 2 · el pie enseña lo de cada pantalla', () => {
     // afirma, no solo el conjunto: leído de arriba abajo el pie cuenta la
     // secuencia real del trabajo, y una reordenación accidental lo rompería sin
     // que nada más se pusiera rojo.
+    //
+    // ⭐ **Y EL 2026-08-10 VUELVEN A SER TRES: «Generar GML» SE VA A LA BARRA.**
+    // No es una vuelta atrás, es la decisión A2: el botón pasa a verse en los TRES
+    // pasos, apagado con motivo, en vez de existir solo aquí. Y libera una plaza en
+    // un pie cuyo techo el proyecto midió en TRES el 2026-08-08, al meter la
+    // segunda puerta del Catastro — una plaza que conviene no gastarse sin pensar.
+    //
+    // La regla que decide qué sube y qué se queda, en una frase: **arriba lo que
+    // sale de la app hacia fuera, abajo lo que transforma el expediente.** Las tres
+    // que quedan producen geometría o parcelario DENTRO del expediente; el GML es
+    // un fichero que se entrega.
     expect([...acciones.querySelectorAll('[data-accion]')].map((b) => b.dataset.accion)).toEqual([
-      'generar-gml',
       'traer-fondo-catastral',
       'diagnosticar',
       'derivar-sobrante',
@@ -677,13 +712,43 @@ describe('rebanada 2 · el pie enseña lo de cada pantalla', () => {
     // y el guion 10 ya la cazó una vez en F08 (el acuse de la descarga del
     // informe, escrito en un renglón invisible).
     montarCascara()
+
+    // ⭐ **UNA EXCEPCIÓN, NOMBRADA Y CON MOTIVO: `generar-gml` (2026-08-10).**
+    // Su botón se fue a la barra —o sea que se ve en los TRES pasos— y su acuse se
+    // quedó en el pie, que solo se ve en Edición. Eso rompe la letra de esta regla
+    // y **no rompe su espíritu**, que es «un `role="status"` oculto es un mensaje
+    // que nadie lee»: lo que ese acuse dice se lee en los tres pasos, en el renglón
+    // de la barra, porque `app/barra.js` lo LEE de aquí y lo escribe allí con
+    // prioridad sobre el motivo del recorrido.
+    //
+    // ⛔ Se declara como excepción con nombre en vez de relajar la regla, que es lo
+    // que convertiría este guardián en una intención. Cualquier OTRO acuse que se
+    // separe de su botón sigue saliendo rojo.
+    const CON_RENGLON_EN_LA_BARRA = new Set(['generar-gml'])
+
     for (const boton of document.querySelectorAll('[data-accion]')) {
       const renglon = document.querySelector(`[data-estado="${boton.dataset.accion}"]`)
       if (renglon === null) continue
+      if (CON_RENGLON_EN_LA_BARRA.has(boton.dataset.accion)) continue
       expect(
         visibleEn(renglon),
         `el acuse de «${boton.dataset.accion}» se ve en otras pantallas que su botón`,
       ).toEqual(visibleEn(boton))
+    }
+
+    // Y la excepción tiene que sostenerse: el acuse existe, sigue siendo el nodo
+    // que escriben los cableados, y el botón está fuera de toda pantalla. Si
+    // alguien devolviera el botón al pie, esto sale rojo y la excepción sobra.
+    for (const accion of CON_RENGLON_EN_LA_BARRA) {
+      const boton = document.querySelector(`[data-accion="${accion}"]`)
+      const renglon = document.querySelector(`[data-estado="${accion}"]`)
+      expect(boton, `falta el botón de «${accion}»`).not.toBeNull()
+      expect(renglon, `falta el acuse de «${accion}»`).not.toBeNull()
+      expect(
+        boton.closest(`[${ATRIBUTO_PANTALLA}]`),
+        `«${accion}» ha vuelto a colgar de una pantalla: la excepción ya no hace falta`,
+      ).toBeNull()
+      expect(boton.closest('[data-rail="cascara"]')).not.toBeNull()
     }
   })
 

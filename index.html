@@ -144,17 +144,167 @@
          El panel paga 72 px de alto y no gana nada, y se los come enteros su
          único estirador: la caja de vértices. Las dos cifras las vigila
          `scripts/smoke-navegador/14-shell.js`. -->
-    <nav class="gml-rail" data-rail="cascara" aria-label="Recorrido del expediente">
+    <!-- ══ LAS SEIS ZONAS DE LA BARRA, Y EL PORQUÉ DE CADA UNA ═══════════════
+         De izquierda a derecha:
+
+           1 MARCA        quién es esta aplicación.
+           2 EXPEDIENTE   qué documento tienes abierto, y las tres cosas que se
+                          le hacen a un documento: abrirlo, guardarlo, vaciarlo.
+           3 RECORRIDO    en qué paso vas. **Centrado**, porque es el eje.
+           4 RAMA+AVISOS  sobre qué trabajas (parcela o edificio) y qué te dice
+                          la aplicación. Mudados de la cabecera del panel.
+           5 ENTREGA      lo que sale de aquí hacia fuera.
+
+         ⛔ **ARRIBA LO QUE SALE DE LA APP, ABAJO LO QUE TRANSFORMA EL
+         EXPEDIENTE.** Es la regla que decide qué sube y qué no, y por eso
+         «Diagnosticar encaje» y «Derivar sobrante» se quedan en el pie del
+         panel: producen geometría dentro del expediente, no un fichero.
+
+         ⚠️ **NINGÚN `data-accion` DE AQUÍ SE REPITE, Y ES LO MÁS FRÁGIL DEL
+         FICHERO.** `app/cableado-*.js` resuelve sus nodos como valores por
+         defecto de parámetro —una vez, al montar— y `querySelector` devuelve el
+         PRIMERO del documento **aunque esté `hidden`**. Un valor repetido deja un
+         nodo huérfano, escribible y MUDO. Los que se ven aquí no son nuevos: son
+         MUDANZAS, y en cada una se retiró el original. Quién venía de dónde:
+           · `abrir-expediente`   ← el pie de Entrada («¿Ya tenías un expediente?»)
+           · `empezar-de-nuevo`   ← el pie de Entrada («Vaciarlo»)
+           · `abrir-proyecto` y las cuatro `exportar-*` ← las fabricaba
+             `app/dialogo-expediente.js` DENTRO de su `<dialog>`; ahora las pone
+             este fichero y aquél deja de fabricarlas. Una sola por acción.
+           · `generar-gml`        ← `.gml-acciones`, el pie del panel.
+         El renglón `[data-estado="generar-gml"]` **NO se muda**: se queda en el
+         pie, que es donde lo escriben los cableados, y `app/barra.js` lo LEE para
+         el renglón de motivo. Un escritor, un lector, una superficie visible. -->
+    <nav class="gml-rail" data-rail="cascara" aria-label="Barra del expediente">
       <div class="gml-rail-marca">
         <p class="gml-rail-nombre">Concreta<sup>GML</sup></p>
         <p class="gml-rail-apunte">Contraste catastral</p>
       </div>
-      <p class="gml-rail-grupo" id="gml-rail-grupo">Recorrido</p>
-      <!-- Vacío A PROPÓSITO: lo rellena `app/barra.js`. Un `<ol>` con peldaños
+
+      <!-- ── ZONA 2 · EL EXPEDIENTE ────────────────────────────────────────
+           ⭐ Hasta el 2026-08-10 esto no existía y sus dos salidas vivían en el
+           pie de la pantalla Entrada, en voz baja y **solo ahí**: quien estaba en
+           Edición no tenía forma de guardar sin volver atrás. El rótulo y el
+           apunte los escribe `app/barra.js` desde `cablearExpediente().estado()`,
+           que ya publicaba `nombreAbierto` y `puedeGuardar` para el guion 12. -->
+      <div class="gml-barra-zona" data-zona="expediente">
+        <button
+          type="button"
+          class="gml-barra-expediente"
+          data-menu-disparador="expediente"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          aria-controls="gml-menu-expediente"
+        >
+          <span class="gml-barra-expediente-nombre" data-barra="expediente-nombre">
+            Sin expediente
+          </span>
+          <span class="gml-barra-expediente-apunte" data-barra="expediente-apunte">
+            Nada que guardar todavía
+          </span>
+        </button>
+        <div class="gml-barra-menu" id="gml-menu-expediente" role="menu" data-menu="expediente" hidden>
+          <button type="button" role="menuitem" class="gml-barra-menu-opcion" data-accion="abrir-expediente">
+            Expedientes guardados<span class="gml-barra-menu-apunte">en este navegador</span>
+          </button>
+          <!-- ⚠️ «Vaciarlo» conserva su doble pulsación —vaciar es irreversible en
+               pantalla— y desde la mudanza la confirmación se pide EN EL PROPIO
+               MENÚ (decisión Q3 de la revisión): pedirla en un renglón del panel
+               que ya no se está mirando era pedirla donde nadie la lee. El
+               `data-estado` es el mismo nodo de siempre, mudado con el botón:
+               `app/empezar-de-nuevo.js` los resuelve por selector, no por sitio. -->
+          <!-- ⚠️ El envoltorio con `data-pie` NO es decorativo: es el
+               `SELECTOR_FILA` de `app/empezar-de-nuevo.js`, el nodo que aquel
+               módulo enseña y esconde. En el pie de Entrada envolvía además la
+               pregunta «¿Quieres empezar de cero?»; aquí solo envuelve la opción,
+               pero sigue haciendo falta un nodo propio: ocultar el `<button>`
+               directamente funcionaría hoy y se rompería el día que la opción
+               tenga un apunte al lado. `role="none"` porque un `<div>` suelto
+               dentro de un `role="menu"` rompe el árbol de accesibilidad. -->
+          <div role="none" data-pie="empezar-de-nuevo" hidden>
+            <button type="button" role="menuitem" class="gml-barra-menu-opcion gml-barra-menu-opcion--riesgo" data-accion="empezar-de-nuevo">
+              Vaciarlo<span class="gml-barra-menu-apunte">y empezar de cero</span>
+            </button>
+          </div>
+          <p class="gml-barra-menu-estado" data-estado="empezar-de-nuevo" role="status"></p>
+        </div>
+      </div>
+
+      <!-- ── ZONA 3 · EL RECORRIDO ─────────────────────────────────────────
+           Vacío A PROPÓSITO: lo rellena `app/barra.js`. Un `<ol>` con peldaños
            escritos aquí saldría en la pantalla del usuario durante el instante
            anterior al montaje, y con los rótulos que tuviera este fichero en vez
-           de los que tenga el código. -->
-      <ol class="gml-rail-pasos" data-rail="pasos" aria-labelledby="gml-rail-grupo"></ol>
+           de los que tenga el código.
+
+           ⛔ **AQUÍ HABÍA UN `<p class="gml-rail-grupo">Recorrido</p>` Y SE
+           RETIRÓ.** Era el `aria-labelledby` del `<ol>` y, en columna, la cabecera
+           de una sección. En una barra horizontal con seis zonas es una palabra
+           que compite por el ancho con las cinco demás y no dice nada que los tres
+           peldaños no digan. Su papel accesible lo hace ahora `aria-label`, que no
+           necesita un `id` ni un nodo. -->
+      <ol class="gml-rail-pasos" data-rail="pasos" aria-label="Recorrido del expediente"></ol>
+
+      <!-- ── ZONA 4 · SOBRE QUÉ TRABAJAS, Y QUÉ TE DICE LA APLICACIÓN ──────
+           ⭐ MUDADO DE `.gml-panel-cabecera` EL 2026-08-10, y el nodo es EL MISMO:
+           `app/rama.js` inserta el conmutador «Parcela/Edificio» DENTRO de
+           `.gml-chips` (su `SELECTOR.CHIPS`), así que mudar este `<div>` muda las
+           dos cosas de una vez y **sin tocar ni una línea de JavaScript**.
+
+           POR QUÉ SUBEN. La rama y los avisos son de la SESIÓN, no de la pantalla:
+           valen lo mismo en Entrada, en Edición y en Diagnóstico, y estaban
+           pagando 25,39 px de la cabecera del panel — que es el sitio más caro de
+           la aplicación y el que la barra acababa de encarecer 72 px más. -->
+      <div class="gml-chips">
+        <!-- ⭐ SON BOTONES DESDE EL 2026-08-07: cada uno abre `app/dialogo-avisos.js`
+             con SU pestaña puesta. El `type="button"` no es adorno: sin él, un
+             `<button>` dentro de un formulario envía. `aria-haspopup="dialog"` lo
+             pone aquel módulo al cablear, no está escrito aquí, para que el
+             atributo y el oyente sean el mismo acto. -->
+        <button type="button" class="gml-chip" data-contador="ERROR">0 errores</button>
+        <button type="button" class="gml-chip" data-contador="AVISO">0 avisos</button>
+      </div>
+
+      <!-- ── ZONA 5 · LA ENTREGA ───────────────────────────────────────────
+           ⭐ **`generar-gml` SE VE AHORA EN LOS TRES PASOS** (decisión A2). Vivía
+           en `.gml-acciones[data-pantalla="edicion"]`, así que el eje PASO lo
+           escondía fuera de Edición y nadie había tenido que calcular su estado en
+           Entrada. Ahora sí, y por eso el motivo importa más que nunca.
+
+           ⛔ **UN SOLO NODO, DOS CONSUMIDORES.** En la rama PARCELA emite el GML
+           de parcela y lo gobierna `app/main.js`; en EDIFICIO emite el de
+           construcción para el ICUC y lo gobierna `app/cableado-edificio-gml.js`.
+           Quien arbitra sigue siendo `mandoDeParcela` (`app/main.js`), sin cambios:
+           la barra no sabe que hay dos ramas.
+
+           ⚠️ **DOS `<button>` HERMANOS, no uno dentro de otro** — anidar botones es
+           HTML inválido y el navegador reescribe el árbol por su cuenta. Y el
+           desplegable **NO se apaga con el primario**: «Guardar proyecto» sirve
+           justo cuando no se puede generar el GML, que es cuando más falta hace. -->
+      <div class="gml-barra-zona gml-barra-partido-entrega" data-zona="entrega">
+        <button type="button" class="gml-boton gml-boton--primario gml-barra-entregar" data-accion="generar-gml" disabled>
+          Generar GML
+        </button>
+        <!-- ⏳ AQUÍ VA EL DESPLEGABLE DE SALIDAS, Y TODAVÍA NO ESTÁ.
+             `[▾]` con `exportar-dxf`, `exportar-coordenadas`, `exportar-excel`,
+             `exportar-proyecto` y «Abrir un proyecto…». **No se ha puesto porque
+             esos cinco `data-accion` los fabrica hoy `app/dialogo-expediente.js`
+             DENTRO de su `<dialog>`** (su `BOTONES_FICHERO`), y repetirlos aquí
+             es exactamente la trampa K.1: `querySelector` se quedaría con el de
+             este fichero —va antes en el documento— y los clics del diálogo se
+             irían a un nodo que no es el suyo.
+
+             Para ponerlo hacen falta tres cosas, en este orden:
+               1. que `app/dialogo-expediente.js` deje de fabricar esos cinco
+                  botones (su bloque `grupoFicheros`), de modo que quede UNO por
+                  acción y viva aquí;
+               2. que `app/cableado-expediente.js` abra su embudo `alAccion` como
+                  método público —`atender(accion)`—, que hoy es interno; el
+                  embudo YA existe, solo le falta la puerta;
+               3. un módulo que abra y cierre los dos menús con teclado
+                  (`↓` abre, `↑`/`↓` recorren, `Esc` cierra y devuelve el foco).
+
+             El primario de al lado sí está mudado y funciona. -->
+      </div>
     </nav>
 
     <aside class="gml-panel">
@@ -225,10 +375,6 @@
              no está escrito aquí: así el atributo y el oyente son el mismo acto.
              Si el chip no lo tiene en pantalla, es que nadie lo cableó — y eso
              es un fallo que se quiere ver. -->
-        <div class="gml-chips">
-          <button type="button" class="gml-chip" data-contador="ERROR">0 errores</button>
-          <button type="button" class="gml-chip" data-contador="AVISO">0 avisos</button>
-        </div>
       </header>
 
       <!-- ── DOS DE ESTAS `<section>` PUEDEN QUEDAR `hidden` (F11, 2026-08-04) ──
@@ -544,56 +690,27 @@
           </button>
         </div>
 
-        <!-- LA CUARTA VÍA, Y VA MÁS BAJA A PROPÓSITO. Recuperar un expediente
-             guardado es una ruta crítica del plan de pruebas (la 4), pero **no es
-             empezar**: quien la necesita ya sabe que existe, y anunciarla al mismo
-             nivel que las tres de arriba le daría a un recién llegado una cuarta
-             cosa que descartar antes de poder empezar. Se dice, en voz baja. -->
-        <p class="gml-entrada-pie">
-          ¿Ya tenías un expediente?
-          <button type="button" class="gml-boton gml-boton--menudo" data-accion="abrir-expediente">
-            Abrirlo
-          </button>
-        </p>
+        <!-- ══ AQUÍ ESTABA EL PIE DE ENTRADA, Y SE FUE ARRIBA EL 2026-08-10 ═══
+             Vivían aquí dos renglones en voz baja —«¿Ya tenías un expediente?
+             Abrirlo» y «¿Quieres empezar de cero? Vaciarlo»— con su
+             `data-estado="empezar-de-nuevo"`. Los tres nodos están ahora en el
+             menú de EXPEDIENTE de la barra de arriba, con los mismos
+             `data-accion`/`data-estado`: `app/cableado-expediente.js` y
+             `app/empezar-de-nuevo.js` los resuelven por SELECTOR, no por sitio,
+             así que la mudanza no les costó una línea.
 
-        <!-- ⭐ 2026-08-09 · LA SALIDA, Y HASTA HOY NO HABÍA NINGUNA. Petición del
-             autor: *«me gustaría que hubiera un botón para poder eliminar la
-             geometría actual y empezar desde el principio»*. La aplicación sabía
-             META datos por cuatro vías y no sabía SACARLOS: quien soltaba el `.dxf`
-             equivocado, elegía la finca que no era o traía la referencia de al lado
-             se quedaba con ella hasta recargar la página a mano — y recargar a mano
-             tampoco vale, porque el `?demo=` y el `#/parcela/edicion` de la barra
-             de direcciones vuelven a entrar con ella.
+             POR QUÉ SE FUERON, y son dos razones distintas:
+               · **Solo existían en Entrada.** Quien estaba en Edición no tenía
+                 forma de guardar ni de vaciar sin volver atrás; y volver atrás,
+                 desde que hay barra, es un clic que no tendría por qué existir.
+               · **Costaban 47,78 px MEDIDOS** del sitio más caro de la
+                 aplicación, y justo en la pantalla donde las tres vías ya no
+                 caben a 1280×720. Ver el asiento de la rebanada 1 en
+                 `scripts/presupuesto-css.mjs`.
 
-             VA AQUÍ Y NO EN LA CABECERA, y es la decisión del autor (2026-08-09):
-             Entrada **es** el principio, está a un clic desde cualquier paso por el
-             rail, y así no se gasta ni un píxel del sitio más caro de la pantalla.
-
-             ⚠️ **NACE `hidden` Y SOLO SALE CUANDO HAY ALGO QUE VACIAR.** Con la app
-             recién abierta —que desde el 2026-08-07 es el caso normal— este renglón
-             ofrecería tirar lo que no existe, y sería la quinta cosa que descartar
-             antes de poder empezar. Quien lo enseña y lo esconde es
-             `app/empezar-de-nuevo.js`, suscrito a los DOS stores.
-
-             Lo oculta `.gml-app [hidden]` (0,2,0), que gana al `display:flex` de
-             `.gml-entrada-pie` (0,1,0) sin necesitar una regla propia. NO se le
-             añada un `display` a este nodo por clase: revive la trampa que el guion
-             19 midió en `.gml-barra-herramienta`. -->
-        <p class="gml-entrada-pie" data-pie="empezar-de-nuevo" hidden>
-          ¿Quieres empezar de cero?
-          <button type="button" class="gml-boton gml-boton--menudo" data-accion="empezar-de-nuevo">
-            Vaciarlo
-          </button>
-        </p>
-
-        <!-- El renglón del ARMADO: «vuelve a pulsar para confirmarlo». Vaciar es
-             irreversible en pantalla, así que se pide dos veces, con el mismo patrón
-             en dos tiempos que `app/cableado-expediente.js` ya usa para «Borrar» un
-             expediente guardado (`MS_CONFIRMAR_BORRADO`). `role="status"` para que
-             el lector de pantalla lo anuncie SIN robar el foco: el usuario tiene que
-             poder volver a pulsar el mismo botón. Vacío no ocupa alto
-             (`.gml-accion-estado:empty`). -->
-        <p class="gml-accion-estado" data-estado="empezar-de-nuevo" role="status"></p>
+             ⚠️ Lo que NO se ha ido es la regla: «Vaciarlo» nace `hidden` y solo
+             sale cuando hay algo que vaciar, y conserva su doble pulsación. Lo
+             decide `app/empezar-de-nuevo.js`, suscrito a los dos stores. -->
       </section>
 
       <!-- ══ AQUÍ ESTABA EL BLOQUE «AVISOS», Y SE FUE EL 2026-08-07 ═══════════
@@ -950,14 +1067,6 @@
              rail es cromo de navegación; esto es el «y ahora qué» de la
              pantalla. No es la misma frase dicha dos veces. -->
         <div class="gml-acciones" data-pantalla="edicion">
-          <button
-            type="button"
-            class="gml-boton gml-boton--primario"
-            data-accion="generar-gml"
-            disabled
-          >
-            Generar GML
-          </button>
           <p class="gml-accion-estado" data-estado="generar-gml" role="status"></p>
 
           <!-- ── F07 · «Diagnosticar» ──────────────────────────────────────

@@ -150,6 +150,46 @@ export const CLASE = Object.freeze({
 /** Selector de un peldaño concreto. @param {string} paso */
 export const selectorPaso = (paso) => `[${ATRIBUTO_IR_A_PASO}="${paso}"]`
 
+// ── Los menús de la barra (topbar · rebanadas 2 y 3) ────────────────────────
+//
+// ⚠️ **NO se exportan como `SELECTOR_*` a propósito.** G16 exige que todo
+// `SELECTOR_*` de `app/` case EXACTAMENTE UN nodo, y estos casan uno POR MENÚ:
+// hay dos y va a haber más. Se exportan como ATRIBUTO, que es lo que son.
+
+/** `data-menu-disparador="expediente"` en el botón que abre. */
+export const ATRIBUTO_DISPARADOR = 'data-menu-disparador'
+
+/** `data-menu="expediente"` en el desplegable. El valor casa con el de arriba. */
+export const ATRIBUTO_MENU = 'data-menu'
+
+/**
+ * Dónde se escribe el nombre del expediente abierto y su apunte. Los pone
+ * `index.html`; este módulo los rellena desde `estado()` del cableado.
+ */
+export const ATRIBUTO_BARRA = 'data-barra'
+
+/**
+ * Lo que se lee en la zona de expediente cuando no hay ninguno archivado, que es
+ * el caso normal al abrir la aplicación. Se exporta para que el test lo afirme
+ * sin copiar el literal, igual que los motivos de `app/navegacion.js`.
+ *
+ * ⚠️ Dice «Sin expediente» y no «Expediente», porque la zona tiene que decir un
+ * ESTADO y no un rótulo: un cajón que pone «Expediente» y no dice cuál es la
+ * clase de interfaz que obliga a abrirlo para saber si hay algo dentro.
+ *
+ * @readonly
+ */
+export const EXPEDIENTE_VACIO = Object.freeze({
+  nombre: 'Sin expediente',
+  apunte: 'Nada que guardar todavía',
+})
+
+/** Y cuando hay trabajo en pantalla que todavía no se ha archivado con nombre. */
+export const EXPEDIENTE_SIN_NOMBRE = Object.freeze({
+  nombre: 'Sin guardar',
+  apunte: 'Se autoguarda; archívalo para conservarlo',
+})
+
 /**
  * Lo que se le dice al usuario si revienta algo colgado del cambio de paso.
  * Gemelo de `MENSAJE_CONMUTAR_ROTO` de `app/rama.js` y por el mismo motivo
@@ -250,6 +290,7 @@ export function cablearBarra({
   panel = null,
   alNavegar = null,
   motivoDeEntrega = null,
+  expediente = null,
 } = {}) {
   if (!esDocumento(documento)) {
     throw new TypeError(
@@ -265,6 +306,13 @@ export function cablearBarra({
   }
   if (alNavegar !== null && typeof alNavegar !== 'function') {
     throw new TypeError(`cablearBarra: 'alNavegar' debe ser una función o null; recibido ${typeof alNavegar}.`)
+  }
+  if (expediente !== null && typeof expediente !== 'function') {
+    throw new TypeError(
+      `cablearBarra: 'expediente' debe ser una función o null; recibido ${typeof expediente}. Es ` +
+        `el \`estado()\` de app/cableado-expediente.js, y se lee en CADA pintada por lo mismo ` +
+        `que el motivo de entrega: una foto guardada se queda rancia.`,
+    )
   }
   if (motivoDeEntrega !== null && typeof motivoDeEntrega !== 'function') {
     throw new TypeError(
@@ -376,6 +424,7 @@ export function cablearBarra({
    */
   function pintar() {
     if (destruido) return
+    pintarExpediente()
 
     /** El motivo LARGO del primer paso bloqueado, que es el obstáculo más cercano. */
     let masCercano = ''
@@ -447,6 +496,121 @@ export function cablearBarra({
     }
   }
 
+  // ── Los menús desplegables ────────────────────────────────────────────────
+  //
+  // Viven aquí y no en un módulo propio por la MISMA decisión A1 que junta los
+  // peldaños y el renglón: la barra tiene un dueño. Un `app/barra-menus.js`
+  // aparte sería un segundo módulo con oyentes sobre los mismos nodos, y el día
+  // que uno se destruya y el otro no, los oyentes huérfanos siguen disparando.
+  //
+  // ⚠️ **Solo uno abierto a la vez.** Dos menús abiertos sobre una barra de 52 px
+  // se tapan entre ellos, y el de la derecha nace pegado al borde de la ventana.
+
+  /** @type {Element|null} El disparador del menú abierto, o `null`. */
+  let menuAbierto = null
+
+  /** @param {string} nombre @returns {Element|null} */
+  const menuDe = (nombre) => documento.querySelector(`[${ATRIBUTO_MENU}="${nombre}"]`)
+
+  /** Cierra el que haya, si lo hay. **Idempotente y sin devolver el foco**: quien
+   *  quiera devolverlo lo pide, porque cerrar por clic fuera no debe robar foco.
+   *  @param {{devolverFoco?: boolean}} [opciones] */
+  function cerrarMenus({ devolverFoco = false } = {}) {
+    if (menuAbierto === null) return
+    const nombre = menuAbierto.getAttribute(ATRIBUTO_DISPARADOR)
+    const panelMenu = menuDe(nombre)
+    if (panelMenu !== null) panelMenu.hidden = true
+    menuAbierto.setAttribute('aria-expanded', 'false')
+    const disparador = menuAbierto
+    menuAbierto = null
+    if (devolverFoco && typeof disparador.focus === 'function') disparador.focus()
+  }
+
+  /** @param {Element} disparador */
+  function abrirMenu(disparador) {
+    const nombre = disparador.getAttribute(ATRIBUTO_DISPARADOR)
+    const panelMenu = menuDe(nombre)
+    // Un disparador sin su menú es contrato de marcado roto. No se lanza —el
+    // usuario ha pulsado un botón, no ha programado nada— pero se dice donde lo
+    // ve quien programa, que si no es un botón que no hace nada y no se sabe.
+    if (panelMenu === null) {
+      console.error(`[barra] el disparador «${nombre}» no tiene menú «[${ATRIBUTO_MENU}=…]».`)
+      return
+    }
+    cerrarMenus()
+    panelMenu.hidden = false
+    disparador.setAttribute('aria-expanded', 'true')
+    menuAbierto = disparador
+    const primera = panelMenu.querySelector('[role="menuitem"]:not([disabled])')
+    if (primera !== null && typeof primera.focus === 'function') primera.focus()
+  }
+
+  for (const disparador of documento.querySelectorAll(`[${ATRIBUTO_DISPARADOR}]`)) {
+    escuchar(disparador, 'click', (evento) => {
+      evento.preventDefault()
+      evento.stopPropagation()
+      if (menuAbierto === disparador) cerrarMenus({ devolverFoco: true })
+      else abrirMenu(disparador)
+    })
+  }
+
+  // Un clic en cualquier otro sitio cierra. `capture: false` y en el `document`:
+  // así las acciones de dentro del menú llegan a su propio oyente ANTES de que
+  // esto lo cierre, que es lo que permite que pulsar una opción funcione.
+  escuchar(documento, 'click', (evento) => {
+    if (menuAbierto === null) return
+    const panelMenu = menuDe(menuAbierto.getAttribute(ATRIBUTO_DISPARADOR))
+    if (panelMenu !== null && panelMenu.contains(evento.target)) return
+    if (menuAbierto.contains(evento.target)) return
+    cerrarMenus()
+  })
+
+  // `Escape` cierra Y devuelve el foco: quien lo pulsa está en el menú, y dejarle
+  // el foco en el `<body>` le obliga a tabular desde el principio de la página.
+  escuchar(documento, 'keydown', (evento) => {
+    if (evento.key !== 'Escape' || menuAbierto === null) return
+    evento.stopPropagation()
+    cerrarMenus({ devolverFoco: true })
+  })
+
+  // ── La zona de expediente ─────────────────────────────────────────────────
+
+  const nodoNombre = documento.querySelector(`[${ATRIBUTO_BARRA}="expediente-nombre"]`)
+  const nodoApunte = documento.querySelector(`[${ATRIBUTO_BARRA}="expediente-apunte"]`)
+
+  /**
+   * Lleva el estado del expediente a la barra. Se llama desde `pintar()`, o sea
+   * desde el ÚNICO `repintar()` de la barra (decisión A1).
+   *
+   * ⚠️ **Lee de `estado()` y no del store**: quien sabe qué expediente hay abierto
+   * es `app/cableado-expediente.js`, que ya publicaba `nombreAbierto` y
+   * `puedeGuardar` para el guion 12. Reconstruirlo aquí desde el modelo sería una
+   * segunda definición de «qué expediente tengo», y las segundas definiciones
+   * divergen.
+   */
+  function pintarExpediente() {
+    if (nodoNombre === null || nodoApunte === null) return
+    const foto = expediente === null ? null : expediente()
+    if (foto === null || typeof foto !== 'object') {
+      nodoNombre.textContent = EXPEDIENTE_VACIO.nombre
+      nodoApunte.textContent = EXPEDIENTE_VACIO.apunte
+      return
+    }
+    const nombre = typeof foto.nombreAbierto === 'string' ? foto.nombreAbierto.trim() : ''
+    if (nombre !== '') {
+      nodoNombre.textContent = nombre
+      nodoApunte.textContent = foto.puedeGuardar === true ? 'Guardado en este navegador' : ''
+      return
+    }
+    // Sin nombre hay dos casos y **no dicen lo mismo**: o no hay nada (la app
+    // recién abierta) o hay trabajo sin archivar. Confundirlos le diría a quien
+    // lleva media hora midiendo que no tiene nada.
+    const hayTrabajo = foto.puedeGuardar === true
+    const cual = hayTrabajo ? EXPEDIENTE_SIN_NOMBRE : EXPEDIENTE_VACIO
+    nodoNombre.textContent = cual.nombre
+    nodoApunte.textContent = cual.apunte
+  }
+
   // El DOM, antes que nadie de fuera. `subscribe` no notifica al suscribirse
   // (contrato de `crearEstadoVista`), así que la primera pintada va a mano.
   const baja = navegacion.subscribe(pintar)
@@ -464,6 +628,7 @@ export function cablearBarra({
       // Aquí SÍ se vacía la lista, y no contradice la regla dura: estos nodos los
       // fabricó este módulo y nadie de fuera guarda una referencia a ellos. Es la
       // misma simetría que `app/rama.js` con su conmutador: lo que pone, lo quita.
+      cerrarMenus()
       for (const { li } of peldanos.values()) li.remove()
       peldanos.clear()
       renglon?.remove()
