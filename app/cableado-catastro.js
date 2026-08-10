@@ -233,6 +233,30 @@ const CLASE_ESTADO_ERROR = 'gml-accion-estado--error'
 export const ROTULO_DEDUCIDA = 'Parcela deducida de la ubicación · puedes corregirla'
 
 /**
+ * Lo que se dice al PANEL cuando lo traído se ha pedido con una referencia que
+ * dedujo la aplicación, no una que haya afirmado nadie.
+ *
+ * ── POR QUÉ TAMBIÉN AL PANEL, Y NO SOLO AL RENGLÓN ──
+ * Es el mismo argumento que este módulo ya usa unas líneas más abajo para la
+ * copia local: el renglón de procedencia «es gris de 11 px y sólo se lee cuando
+ * se duda del dato». Una referencia deducida es MÁS consecuente que una caché
+ * vieja —de ella cuelgan el parcelario de fondo, los linderos y la derivación de
+ * sobrante—, así que si aquélla merece saltar a la vista, ésta también.
+ *
+ * ⛔ **No dice si la deducción es buena ni la califica** (regla de oro 9): dice
+ * de dónde salió y cómo cambiarla. Quien sabe cuál es su parcela es quien firma.
+ *
+ * @param {string} refcat
+ * @returns {string}
+ */
+export const avisoReferenciaDeducida = (refcat) =>
+  `La referencia ${refcat} no la has escrito tú: la ha deducido esta aplicación mirando un ` +
+  `punto dentro de tu medición. Si tu medición no coincide con el parcelario —que es lo ` +
+  `normal, y el motivo de esta herramienta— el punto puede caer en la parcela vecina y la ` +
+  `referencia sería de otra finca. Compruébala sobre el mapa; si no es ésa, corrígela en el ` +
+  `campo «Referencia catastral» y vuelve a traer el parcelario.`
+
+/**
  * Lo que se le dice al usuario cuando la consulta revienta por un defecto de
  * programación (un contrato roto en `services/`, en `model/` o aquí). No intenta
  * explicar la causa técnica —no le sirve de nada— pero tampoco la esconde: dice qué
@@ -514,6 +538,37 @@ const vertices = (recintos) =>
  */
 function puedeDeducirDe(parcelaActual) {
   return recintosDe(parcelaActual).length > 0 && referenciaDe(parcelaActual) === null
+}
+
+/**
+ * ¿Tiene sentido deducir la referencia con un CLIC EN EL MAPA? **Sólo que el modelo
+ * no tenga ya una referencia.** Sin geometría, y ésa es toda la diferencia con
+ * {@link puedeDeducirDe}.
+ *
+ * ── POR QUÉ SON DOS PREGUNTAS Y NO UNA (2026-08-11) ──
+ * Hasta hoy el clic reusaba `puedeDeducirDe`, y con ella heredaba **una condición
+ * que no es suya**: la de que haya geometría cargada. Esa condición existe por el
+ * BOTÓN, que saca el punto de un `puntoInterior` de la parcela — sin parcela no hay
+ * punto y el botón no puede prometer nada. **El clic trae su propio punto**: es
+ * exactamente el sitio donde el usuario ha pinchado. Exigirle geometría era pedirle
+ * un dato que no necesita, y el precio lo pagaba el caso más frecuente de todos —
+ * la aplicación recién abierta, vacía, con el mapa delante y catorce caracteres que
+ * teclear a mano.
+ *
+ * Lo que SÍ se conserva es la otra mitad, y por su motivo original: con una
+ * referencia ya en el modelo, un clic en el mapa **no la pisa**. Ahí el mapa es la
+ * parcela del expediente y el clic es como se deselecciona, se centra o se falla un
+ * arrastre; sustituir en silencio una referencia buena por la de donde cayó el dedo
+ * sería el error silencioso de siempre.
+ *
+ * No se exporta, por lo mismo que {@link puedeDeducirDe}: es una regla INTERNA de
+ * esta pantalla. Se comprueba desde fuera por su efecto (que el clic consulte o no).
+ *
+ * @param {object|null} parcelaActual
+ * @returns {boolean}
+ */
+function puedeDeducirClicando(parcelaActual) {
+  return referenciaDe(parcelaActual) === null
 }
 
 /**
@@ -867,7 +922,11 @@ function esEmisor(m) {
  *   cablear, no en la primera consulta: un huso mal escrito se descubre al montar
  *   la pantalla, no media hora después.
  * @param {{on: Function, off: Function}|null} [opciones.mapa=null]  Emisor de clics
- *   del mapa (el `L.Map`). Por DUCK TYPING; ver {@link esEmisor}.
+ *   del mapa (el `L.Map`). Por DUCK TYPING; ver {@link esEmisor}. Un clic deduce la
+ *   referencia del punto pinchado **mientras el modelo no tenga ya una**
+ *   ({@link puedeDeducirClicando}), y eso incluye la aplicación recién abierta y
+ *   vacía: el punto lo trae el clic, así que no hace falta geometría cargada —
+ *   ésa es condición del BOTÓN, que saca el punto de la parcela.
  * @param {((parcela: object) => void)|null} [opciones.alCargarParcela=null]  **El
  *   gancho del DOCUMENTO NUEVO.** Se llama DESPUÉS del `estado.set` de una parcela
  *   traída del Catastro **que ha sustituido a la anterior**, con el POJO que ha
@@ -968,6 +1027,36 @@ export function cablearCatastro({
   let enVuelo = null
 
   let destruido = false
+
+  /**
+   * La referencia que ESTA aplicación dedujo de la ubicación, o `null` si la que
+   * hay en el campo la ha puesto una persona (tecleada, elegida de la lista de
+   * candidatos, o traída del modelo).
+   *
+   * ── ⛔ EL DEFECTO QUE ESTO CIERRA, CON SU CASO REAL (2026-08-10) ───────────
+   * `rellenarCampo` marcaba la deducción con {@link ROTULO_DEDUCIDA} —«Parcela
+   * deducida de la ubicación · puedes corregirla»— y acto seguido `cargar()`
+   * **pisaba esa marca** al escribir en el mismo nodo la procedencia de la
+   * GEOMETRÍA. O sea: la aplicación se ponía el aviso y ella misma lo borraba
+   * medio segundo después, dejando en pantalla un texto que solo hablaba de la
+   * copia local del parcelario y que se leía como si la referencia estuviese
+   * confirmada.
+   *
+   * Se descubrió con una parcela mal grafiada en el Catastro: la medición era
+   * mayor que el parcelario y asomaba sobre la vecina, el punto interior cayó
+   * dentro de la 146 y la aplicación dedujo `29050A01000146` cuando la parcela
+   * era la 44. El Catastro responde a «¿qué parcela hay en este punto?» con toda
+   * confianza (`unico: true`), así que no había ni ambigüedad que detectar: la
+   * pregunta era otra, «¿de qué parcela es esta medición?», y esa **solo la puede
+   * contestar quien firma**. De ahí que esto NO intente adivinar mejor —midiendo
+   * solape con las vecinas, por ejemplo—: propone y se declara conjetura.
+   *
+   * Se guarda la referencia y no un booleano para que la marca muera sola cuando
+   * deje de ser cierta: si el usuario teclea otra, o carga otra parcela, lo que
+   * hay en pantalla ya no es lo que dedujimos y comparar cadenas lo dice sin
+   * tener que acordarse de apagar una bandera en cada camino.
+   */
+  let refcatDeducida = null
 
   /**
    * Los suscriptores de `alColindantes`. Un `Set` y no un solo callback, calcado de
@@ -1344,16 +1433,34 @@ export function cablearCatastro({
     // parcela, y dejar en pantalla una forma distinta de la que hay en el modelo
     // invita a dudar de cuál de las dos se ha cargado.
     if (parcela.refcat !== null) campo.value = parcela.refcat
-    procedencia.textContent = soloFondo
+
+    // ⭐ ¿Se ha traído esto con una referencia que DEDUJIMOS nosotros, o con una
+    // que ha afirmado una persona? Hasta el 2026-08-10 esta línea no lo
+    // distinguía y borraba la marca de la conjetura; el porqué largo, con su caso
+    // real, está en {@link refcatDeducida}.
+    const conConjetura = refcatDeducida !== null && parcela.refcat === refcatDeducida
+    const deLaGeometria = soloFondo
       ? textoProcedenciaFondo({
           origen: parcela.origen,
           procedencia: resultado.procedencia,
           instante: ahora(),
         })
       : textoProcedencia(resultado.procedencia, ahora())
+    // La conjetura va DELANTE: es lo que decide si todo lo que viene detrás vale
+    // para algo, y en un renglón largo lo último se lee la mitad de las veces.
+    procedencia.textContent = conConjetura
+      ? `${ROTULO_DEDUCIDA}. ${deLaGeometria}`
+      : deLaGeometria
     ocultarCandidatos()
 
     if (soloFondo) avisarSiElFondoNoCuadra(parcela)
+
+    // La conjetura, al panel. Va ANTES del aviso de la caché a propósito: si las
+    // dos cosas pasan a la vez, «puede que esta ni sea tu parcela» manda sobre
+    // «esta parcela es de una copia de hace ocho horas».
+    if (conConjetura) {
+      panel.avisar(avisoReferenciaDeducida(parcela.refcat), { nivel: NIVEL.AVISO })
+    }
 
     if (resultado.procedencia.origen === ORIGEN.CACHE) {
       // Al panel además del renglón de procedencia: ese renglón es gris de 11 px y
@@ -1449,9 +1556,25 @@ export function cablearCatastro({
   // ── 2 · Deducir la referencia ──────────────────────────────────────────────
 
   /** Rellena el CAMPO (nunca el modelo) con la referencia de un candidato. */
-  function rellenarCampo(refcat) {
+  /**
+   * @param {string} refcat
+   * @param {{sinConfirmar: boolean}} quien  `true` cuando la puso la aplicación
+   *   ella sola (el servicio devolvió UN candidato y nadie lo miró); `false`
+   *   cuando una persona la ha elegido de la lista.
+   *   **Sin valor por defecto a propósito**: los dos casos escriben el mismo
+   *   campo y se distinguen solo aquí, así que un defecto silencioso marcaría
+   *   como conjetura una elección humana, o al revés, sin que nada avisara.
+   */
+  function rellenarCampo(refcat, { sinConfirmar }) {
     campo.value = refcat
+    // El rótulo es el mismo para los dos: las dos salieron de la UBICACIÓN, y en
+    // las dos «puedes corregirla» sigue siendo verdad.
     procedencia.textContent = ROTULO_DEDUCIDA
+    // Lo que NO es igual es si alguien la ha mirado. Elegir de la lista es una
+    // decisión humana —la lista sale de una ambigüedad real y quien decide, por
+    // el domicilio, es una persona—, así que ésa no arrastra el aviso del panel
+    // ni sobrevive a la carga como conjetura. La que nadie miró, sí.
+    refcatDeducida = sinConfirmar ? refcat : null
   }
 
   /**
@@ -1496,7 +1619,7 @@ export function cablearCatastro({
     const { candidatos: lista, unico } = resultado.datos
     if (unico) {
       ocultarCandidatos()
-      rellenarCampo(lista[0].refcat)
+      rellenarCampo(lista[0].refcat, { sinConfirmar: true })
       decir(
         `Referencia deducida de la ubicación: ${lista[0].refcat}. Compruébala y pulsa «Traer ` +
           `del Catastro» para cargar esa parcela.`,
@@ -1675,7 +1798,7 @@ export function cablearCatastro({
     if (!destino || typeof destino.closest !== 'function') return
     const boton = destino.closest('button[data-refcat]')
     if (boton === null) return
-    rellenarCampo(boton.dataset.refcat)
+    rellenarCampo(boton.dataset.refcat, { sinConfirmar: false })
     ocultarCandidatos()
     decir(
       `Referencia elegida: ${boton.dataset.refcat}. Pulsa «Traer del Catastro» para cargar esa ` +
@@ -1686,24 +1809,47 @@ export function cablearCatastro({
   }
 
   /**
-   * Clic en el mapa → geocodificación inversa del punto pinchado.
+   * Clic en el mapa → geocodificación inversa del punto pinchado. Es la vía de
+   * entrada de quien tiene la parcela delante y no tiene los catorce caracteres:
+   * se pincha encima y el campo se rellena, marcado como conjetura (nunca el
+   * modelo — ver la cabecera).
    *
    * Se ignora en dos situaciones, y las dos son deliberadas:
-   *   · **Si no {@link puedeDeducirDe}.** Un clic en el mapa es también como se
-   *     deselecciona, se centra o simplemente se falla un arrastre: consultar al
-   *     Catastro en cada uno de ellos sería tráfico que nadie ha pedido, y encima
-   *     sobreescribiría un campo que ya tiene la referencia buena. El clic es una
-   *     SEGUNDA vía para la misma acción del botón, no una acción nueva.
+   *   · **Si no {@link puedeDeducirClicando}.** O sea: si el modelo ya tiene
+   *     referencia. Entonces el mapa es la parcela del expediente y el clic es
+   *     también como se deselecciona, se centra o se falla un arrastre; pisar en
+   *     silencio una referencia buena con la de donde cayó el dedo sería un error
+   *     silencioso. **No se exige geometría**: el punto lo trae el propio clic.
    *   · **Si hay algo en vuelo.** Es la versión del mapa del `disabled` de los
-   *     botones: sin ella, un clic accidental durante una carga la abortaría.
+   *     botones: sin ella, un clic accidental durante una carga la abortaría. Y de
+   *     paso es lo que hace que el doble clic de zoom —que en Leaflet emite DOS
+   *     `click` antes del `dblclick`— cueste una sola consulta y no dos.
    */
   const alPulsarMapa = (evento) => {
     if (destruido || enVuelo !== null) return
-    if (!puedeDeducirDe(estado.get())) return
+    if (!puedeDeducirClicando(estado.get())) return
     const [x, y] = latLngAUTM(evento.latlng, huso)
     deducirEn(x, y).catch(yaContado)
   }
 
+  /**
+   * Teclear en el campo retira la marca de conjetura: a partir de la primera
+   * pulsación lo que hay ahí lo afirma una persona, no lo dedujo nadie.
+   *
+   * Es el único oyente que ha tenido nunca este campo —hasta el 2026-08-10 solo
+   * se leía al pulsar un botón—, y no dispara ninguna consulta: cambiar la
+   * referencia no puede costar una petición al Catastro por tecla (override O8).
+   * Traer con la nueva sigue siendo una pulsación deliberada del usuario.
+   */
+  const alEscribirRefcat = () => {
+    if (refcatDeducida === null) return
+    refcatDeducida = null
+    // Y la marca se va de la pantalla en el acto: dejar «deducida de la
+    // ubicación» sobre algo que acabas de teclear tú sería mentir al revés.
+    if (procedencia.textContent === ROTULO_DEDUCIDA) procedencia.textContent = ''
+  }
+
+  campo.addEventListener('input', alEscribirRefcat)
   botonCargar.addEventListener('click', alPulsarCargar)
   botonDeducir.addEventListener('click', alPulsarDeducir)
   botonColindantes.addEventListener('click', alPulsarColindantes)
@@ -1771,6 +1917,7 @@ export function cablearCatastro({
         enVuelo.abort()
         enVuelo = null
       }
+      campo.removeEventListener('input', alEscribirRefcat)
       botonCargar.removeEventListener('click', alPulsarCargar)
       botonDeducir.removeEventListener('click', alPulsarDeducir)
       botonColindantes.removeEventListener('click', alPulsarColindantes)

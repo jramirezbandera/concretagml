@@ -157,6 +157,7 @@ export function prepararEntrega(entrada) {
     parcela,
     srs,
     cesion: cesionDada = null,
+    recorte = null,
     incluidas = null,
     nombres = null,
     comentario = null,
@@ -186,10 +187,47 @@ export function prepararEntrega(entrada) {
     })
   detecciones.push(...cesion.detecciones)
 
+  // ── ⛔ LA PUERTA `CRECE_FUERA`, Y CUÁNDO DEJA DE SER UNA PUERTA ───────────
+  //
+  // `derivacion/cesion.js` marca `CRECE_FUERA` como ERROR, y hace bien: mirando SOLO
+  // la parcela propia, que se salga del contorno oficial significa que hay vecinos
+  // afectados que no están en el fichero, y eso es un expediente incompleto emitido
+  // con total confianza.
+  //
+  // Pero `recortarVecinos` puede haber contestado justo esa pregunta. Con las
+  // colindantes consultadas, cada metro que la medición se sale está o bien
+  // atribuido a un vecino —que entra recortado unas líneas más abajo— o bien
+  // declarado en `sobreNadie` (vial, dominio público, hueco del parcelario), que el
+  // autor decidió el 2026-08-10 que es un caso legítimo: un vial mal
+  // georreferenciado se pisa para colocar bien la finca.
+  //
+  // ⚠️ **La condición es `consultado`, no `vecinos.length > 0`.** Con las vecinas
+  // traídas y CERO afectadas, el exceso entero es `sobreNadie` y sigue estando
+  // explicado. Sin traerlas no se sabe nada y la puerta se queda cerrada — que es la
+  // diferencia entre «no le quito a nadie» y «no he mirado».
+  const recorteResuelve = recorte !== null && recorte.consultado === true
+
+  /**
+   * ⛔ **Qué cuenta como BLOQUEO, en UN solo sitio.**
+   *
+   * Una detección ERROR bloquea, salvo `CRECE_FUERA` cuando el recorte lo ha
+   * explicado. La detección NO se borra —sigue en la lista y el usuario tiene
+   * derecho a leer que su medición se sale— pero deja de impedir la entrega, porque
+   * el fichero que se va a escribir SÍ incluye a quien pierde ese terreno.
+   *
+   * ⚠️ Está escrito UNA vez porque la primera versión lo repartió en tres, y el
+   * tercero se olvidó: la puerta se abría, los cuatro miembros se componían… y el
+   * `if` previo al cierre seguía mirando `severidad === ERROR` en crudo, así que
+   * devolvía antes de comprobar nada y `xml` salía `null` con `puedeEntregarse:
+   * true`. Un expediente que se declara entregable y no trae fichero es peor que uno
+   * bloqueado. Cazado midiendo sobre el expediente real, no razonando.
+   */
+  const esBloqueo = (d) =>
+    d.severidad === SEVERIDAD.ERROR &&
+    !(recorteResuelve && d.tipo === TIPO_DERIVACION.CRECE_FUERA)
+
   const cerrar = (extra) => {
-    const bloqueos = [
-      ...new Set(detecciones.filter((d) => d.severidad === SEVERIDAD.ERROR).map((d) => d.tipo)),
-    ]
+    const bloqueos = [...new Set(detecciones.filter(esBloqueo).map((d) => d.tipo))]
     return {
       puedeEntregarse: bloqueos.length === 0,
       bloqueos,
@@ -207,10 +245,28 @@ export function prepararEntrega(entrada) {
     }
   }
 
+  // ── ⛔ LA PUERTA `CRECE_FUERA`, Y CUÁNDO DEJA DE SER UNA PUERTA ───────────
+  //
+  // `derivacion/cesion.js` marca `CRECE_FUERA` como ERROR, y hace bien: mirando
+  // SOLO la parcela propia, que se salga del contorno oficial significa que hay
+  // vecinos afectados que no están en el fichero, y eso es un expediente incompleto
+  // emitido con total confianza.
+  //
+  // Pero `recortarVecinos` puede haber contestado justo esa pregunta. Si se han
+  // consultado las colindantes, cada metro que la medición se sale está o bien
+  // atribuido a un vecino —que entra en el expediente recortado, unas líneas más
+  // abajo— o bien declarado en `sobreNadie` (vial, dominio público, hueco del
+  // parcelario), que el autor decidió el 2026-08-10 que es un caso legítimo: un vial
+  // mal georreferenciado se pisa para colocar bien la finca.
+  //
+  // ⚠️ **La condición es `consultado`, no `vecinos.length > 0`.** Con las vecinas
+  // traídas y CERO afectadas, el exceso entero es `sobreNadie` y sigue estando
+  // explicado. Sin traerlas, no se sabe nada y la puerta se queda cerrada — que es
+  // la diferencia entre «no le quito a nadie» y «no he mirado».
   // Si la derivación no se pudo hacer, todo lo de abajo mentiría: el cierre se
   // mediría contra un sobrante que no existe y el tipo de operación se deduciría
   // de un fichero que no se va a escribir.
-  if (!cesion.puedeEntregarse) return cerrar({})
+  if (cesion.detecciones.some(esBloqueo)) return cerrar({})
 
   // ── 2 · Qué piezas entran ─────────────────────────────────────────────────
   const porOrden = new Map(cesion.piezas.map((p) => [p.orden, p]))
@@ -224,10 +280,50 @@ export function prepararEntrega(entrada) {
         'editar la parcela invalida el sobrante entero).',
     )
   }
-  const entran = pedidas.slice().sort((a, b) => a - b).map((o) => porOrden.get(o))
+  // ── ⛔ LO QUE NO SE PUEDE ESCRIBIR NO ENTRA, LO PIDA QUIEN LO PIDA ─────────
+  // Una pieza con `emitible: false` deja de encerrar superficie al redondearla a los
+  // 2 decimales del fichero (ver la cabecera de `cesion.js`), así que el serializador
+  // se negaría a emitir **el documento entero**: `xml === null` y el expediente
+  // completo caído por una astilla del enganche de linderos. Medido el 2026-08-10
+  // sobre `6346726UF8664N`, con el conjunto CERRANDO.
+  //
+  // Se filtra aquí y no solo en la pantalla porque esta función es pública y la
+  // llaman los tests y podría llamarla otro cable: la misma doctrina que le hace a
+  // `app/cableado-derivacion.js` repetir la puerta dentro de `entregar()`.
+  //
+  // ⚠️ `=== false` y no `!p.emitible`: una `Cesion` armada a mano —un doble de
+  // prueba, un POJO guardado por una versión anterior— no trae el campo, y tratar
+  // `undefined` como «no emitible» vaciaría expedientes correctos en silencio.
+  const noEmitibles = pedidas.filter((o) => porOrden.get(o).emitible === false)
+  const entran = pedidas
+    .filter((o) => porOrden.get(o).emitible !== false)
+    .sort((a, b) => a - b)
+    .map((o) => porOrden.get(o))
+
+  // Solo si ALGUIEN la pidió expresamente. Con `incluidas === null` no la ha pedido
+  // nadie y `cesion.js` ya emitió su `PIEZA_NO_EMITIBLE` al derivar —y esas
+  // detecciones están en esta misma lista, unas líneas más arriba—, así que
+  // repetirlo llenaría el panel de avisos con el mismo hecho dos veces.
+  if (incluidas !== null) {
+    for (const orden of noEmitibles) {
+      const p = porOrden.get(orden)
+      detecciones.push(
+        crearDeteccionDerivacion(
+          TIPO_DERIVACION.PIEZA_NO_EMITIBLE,
+          `La pieza nº ${p.orden} (${numero(p.area, 4)} m²) se ha pedido para el expediente, pero ` +
+            'no entra: escrita con los 2 decimales del fichero deja de ser un recinto, así que no ' +
+            'puede declararse como parcela. El resto del expediente sale igual.',
+          SEVERIDAD.AVISO,
+          { orden: p.orden, area: p.area, grosor: p.grosor },
+        ),
+      )
+    }
+  }
 
   for (const p of cesion.piezas) {
-    if (pedidas.includes(p.orden)) continue
+    // Las no emitibles ya han dicho lo suyo: llamarlas «excluidas» diría que el
+    // usuario las dejó fuera, y no las dejó fuera nadie — no cabían.
+    if (pedidas.includes(p.orden) || p.emitible === false) continue
     detecciones.push(
       crearDeteccionDerivacion(
         TIPO_DERIVACION.PIEZA_EXCLUIDA,
@@ -245,6 +341,40 @@ export function prepararEntrega(entrada) {
   const idLocal = textoONulo(parcela.idLocal)
   const nombreDe = (orden) => (nombres === null ? null : textoONulo(nombres[orden]))
 
+  // ── Los VECINOS RECORTADOS (F23) ──────────────────────────────────────────
+  // Cada trozo en que queda un colindante es un miembro más del fichero. La regla
+  // de identidad la fijó el autor el 2026-08-10 y cae sobre terreno YA MEDIDO:
+  //
+  //   · el trozo MAYOR conserva la referencia catastral real → `ES.SDGC.CP`
+  //   · los demás llevan el sufijo del padre (`…145.1`)      → `ES.LOCAL.CP`
+  //
+  // Lo segundo es exactamente el patrón del override O19, presentado y aceptado con
+  // IVG positivo (CSV XMWPXCN9J8DB9J89). Aquí no se inventa nada: se reutilizan las
+  // dos funciones de `derivacion/identidad.js` que ya existían para la matriz y para
+  // sus cesiones, porque la pregunta es la misma.
+  //
+  // ⚠️ El sufijo NO colisiona con el de las cesiones propias aunque los dos empiecen
+  // en 1: los PADRES son distintos (`…144.1` es una cesión mía y `…145.1` un trozo
+  // del vecino), y el `gml:id` se compone sobre el localId entero.
+  const deVecinos =
+    recorte === null
+      ? []
+      : recorte.vecinos.flatMap((v) =>
+          v.trozos.map((t, i) => ({
+            orden: 0,
+            esCesion: false,
+            esVecino: true,
+            // ⛔ Sin nombre de usuario: la finca de otro titular no se bautiza. El
+            // campo de nombre de la lista es para las piezas del sobrante propio.
+            nombre: null,
+            identidad:
+              i === 0
+                ? identidadDeParcela({ refcat: v.refcat, idLocal: v.refcat })
+                : identidadDeCesion({ refcatPadre: v.refcat, idLocalPadre: v.refcat, orden: i }),
+            recintos: t.recintos,
+          })),
+        )
+
   const miembros = [
     {
       orden: 0,
@@ -260,6 +390,7 @@ export function prepararEntrega(entrada) {
       identidad: identidadDeCesion({ refcatPadre: refcat, idLocalPadre: idLocal, orden: p.orden }),
       recintos: p.recintos,
     })),
+    ...deVecinos,
   ].map((m) => {
     const validacion = validarParcela(m.recintos, { srs })
     return { ...m, validacion, etiqueta: m.nombre ?? m.identidad.refcat }
@@ -285,7 +416,7 @@ export function prepararEntrega(entrada) {
   const operacion = tipoDeOperacion(miembros.map((m) => m.identidad))
 
   const salida = { nMiembros: miembros.length, refcat, miembros, operacion, cesion }
-  if (detecciones.some((d) => d.severidad === SEVERIDAD.ERROR)) return cerrar(salida)
+  if (detecciones.some(esBloqueo)) return cerrar(salida)
 
   // ── 4 · ¿CIERRA el conjunto? ──────────────────────────────────────────────
   // Sobre las coordenadas YA REDONDEADAS, que es lo que juzga el IVG. Se hace
@@ -295,6 +426,22 @@ export function prepararEntrega(entrada) {
       ? null
       : comprobarConjunto({
           geometriaOficial: parcela.geometriaOficial,
+          // ⭐ LA DIANA CAMBIA (F23). Si el expediente recorta a un colindante, lo
+          // que tiene que cubrir no es «mi contorno oficial» sino **todo lo oficial
+          // que este expediente modifica**. Sin esta línea, un vecino recortado
+          // saldría como 1.670 m² de superficie que sobra y la suma no cuadraría
+          // jamás: el expediente correcto se bloquearía a sí mismo.
+          oficialesExtra:
+            recorte === null
+              ? []
+              : recorte.vecinos.map((v) => ({
+                  etiqueta: v.refcat ?? 'colindante sin referencia',
+                  recintos: v.recintosOficiales,
+                })),
+          // Y lo que se reclama FUERA de todo contorno oficial —el vial mal
+          // georreferenciado— se declara aquí en vez de salir como discrepancia.
+          // Está medido por `derivacion/vecino.js`, no estimado.
+          residuoEsperadoM2: recorte === null ? 0 : recorte.sobreNadie,
           miembros: miembros.map((m) => ({ etiqueta: m.etiqueta, recintos: m.recintos })),
         })
 

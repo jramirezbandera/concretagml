@@ -192,7 +192,7 @@ export const ALTO_COMO_PANTALLA = 'calc(100vh - 112px)'
 export const ESTILO_SOBRE_EL_MAPA = Object.freeze({
   background: '#fff',
   padding: '10px 12px',
-  borderRadius: '8px',
+  borderRadius: '6px',
   boxShadow: '0 2px 10px rgba(15,23,42,.25)',
   maxWidth: 'min(420px,42vw)',
   maxHeight: ALTO_COMO_CAJON,
@@ -423,14 +423,34 @@ export const MOTIVO_INFORME_SIN_DIAGNOSTICO =
  */
 const BOTON_INFORME = Object.freeze({
   PRIMARIO: Object.freeze({
-    ENCENDIDO: Object.freeze({ background: '#0F172A', color: '#fff', cursor: 'pointer' }),
+    // ⭐ `#0F172A` (casi negro) hasta la revisión de diseño del 2026-08-10. El
+    // encargo del autor pide que «la acción principal de cada bloque lleve un solo
+    // botón relleno con COLOR DE ACENTO», y el acento de la aplicación es el azul
+    // del design system: `#0369A1` es `--color-btn-primary-bg`, el MISMO relleno que
+    // usa `.gml-boton--primario` en el panel. Antes el pie de este cajón era la
+    // única acción principal de la aplicación que no se veía como las demás.
+    // ⚠️ Y NO es `#0284C7` (`--color-accent`): el design system separa a propósito
+    // el acento de ENLACE del relleno de BOTÓN porque blanco sobre sky-600 no llega
+    // a AA (4,10:1). Sobre `#0369A1` da 5,93:1.
+    // ⚠️ Literal y no `var(--color-btn-primary-bg)` A PROPÓSITO: este módulo tiene
+    // que verse bien SIN la hoja cargada (se monta en jsdom y sobre un mapa pelado),
+    // y una variable sin declarar deja la propiedad en su valor inicial. Quien
+    // cambie el acento tiene que cambiarlo aquí también; el guardián es el ojo y el
+    // guion de humo, no la cascada.
+    ENCENDIDO: Object.freeze({ background: '#0369A1', color: '#fff', cursor: 'pointer' }),
     APAGADO: Object.freeze({ background: '#E2E8F0', color: '#64748B', cursor: 'default' }),
   }),
   SECUNDARIO: Object.freeze({
+    // ⭐ Era `transparent` + filo `#CBD5E1`. La misma revisión bajó el peso óptico
+    // del secundario en el panel (`.gml-boton--secundario` pasó de blanco con
+    // borde firme a fondo gris muy claro con filo suave) porque un contorno fuerte
+    // pesa casi lo mismo que un relleno y los dos botones «gritaban por igual».
+    // Se replica aquí con los literales equivalentes a `--color-bg-elevated`,
+    // `--color-text-primary` y `--color-border-sub`, por lo mismo que arriba.
     ENCENDIDO: Object.freeze({
-      background: 'transparent',
-      color: '#334155',
-      border: '1px solid #CBD5E1',
+      background: '#F1F5F9',
+      color: '#0F172A',
+      border: '1px solid #E2E8F0',
       cursor: 'pointer',
     }),
     APAGADO: Object.freeze({
@@ -758,7 +778,7 @@ const CajonDiagnostico = L.Control.extend({
       width: '9em',
       padding: '3px 6px',
       border: '1px solid #CBD5E1',
-      borderRadius: '4px',
+      borderRadius: '6px',
     })
     this._registral = registral
 
@@ -832,7 +852,7 @@ const CajonDiagnostico = L.Control.extend({
     estilar(selectorClase, {
       padding: '3px 6px',
       border: '1px solid #CBD5E1',
-      borderRadius: '4px',
+      borderRadius: '6px',
     })
     for (const [valor, texto] of [
       ['', '(elegir)'],
@@ -919,7 +939,7 @@ const CajonDiagnostico = L.Control.extend({
     // la regla `.gml-cajon-diagnostico button` de `estilos/app.css`.
     estilar(preparar, {
       border: '0',
-      borderRadius: '4px',
+      borderRadius: '6px',
       padding: '6px 12px',
       fontSize: 'inherit',
       lineHeight: 'inherit',
@@ -948,7 +968,7 @@ const CajonDiagnostico = L.Control.extend({
     // hoja); **la FAMILIA la pone la hoja**. Mismo reparto que en
     // `viewer/cajon-comprobacion.js`, y por eso los dos cajones se arreglan juntos.
     estilar(descargar, {
-      borderRadius: '4px',
+      borderRadius: '6px',
       padding: '6px 12px',
       fontSize: 'inherit',
       lineHeight: 'inherit',
@@ -1527,8 +1547,9 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
         doc,
         'p',
         null,
-        `Se han descartado ${descartadas.length} solape(s) de ${m2(total)} por ser más ` +
-          `finos que un milímetro: son el redondeo del lindero compartido, no superficie.`,
+        `Se han descartado ${descartadas.length} solape(s) de ${m2(total)} por caber dentro ` +
+          `del redondeo al centímetro con el que el Catastro publica sus coordenadas: son el ` +
+          `mismo lindero escrito dos veces, no superficie.`,
       )
       estilar(p, {
         margin: '4px 0 0',

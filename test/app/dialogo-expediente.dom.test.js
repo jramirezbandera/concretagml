@@ -107,12 +107,25 @@ describe('app/dialogo-expediente · el marcado que el cableado espera', () => {
     for (const selector of Object.values(SELECTOR)) nodo(selector)
   })
 
-  it('las diez acciones tienen su botón, y ningún botón tiene una acción inventada', () => {
+  it('las siete acciones DE ESTE DIÁLOGO tienen su botón, y ninguno una acción inventada', () => {
+    // ⭐ **ERAN LAS DIEZ HASTA EL 2026-08-11.** Las tres exportaciones de geometría
+    // se mudaron al desplegable de salidas de la barra, así que ya no se ofrecen
+    // aquí —y no pueden ofrecerse también aquí: dos nodos con el mismo `data-accion`
+    // es la trampa K.1, y `querySelector` se quedaría con el de `index.html`—.
+    // `ACCION` sigue teniendo las diez porque es el vocabulario del EMBUDO, que no
+    // ha cambiado; lo que cambia es quién las emite.
     fijarTodo()
     const enPantalla = new Set(
       [...dialogo.nodo.querySelectorAll('[data-accion]')].map((b) => b.dataset.accion),
     )
+    const MUDADAS = [ACCION.EXPORTAR_DXF, ACCION.EXPORTAR_COORDENADAS, ACCION.EXPORTAR_EXCEL]
     for (const accion of Object.values(ACCION)) {
+      if (MUDADAS.includes(accion)) {
+        expect(enPantalla, `${accion} se mudó a la barra y no debe seguir aquí`).not.toContain(
+          accion,
+        )
+        continue
+      }
       expect(enPantalla, `nadie ofrece la acción ${accion}`).toContain(accion)
     }
     // Y al revés: solo las del vocabulario más el cierre, que no es una intención
@@ -382,8 +395,12 @@ describe('app/dialogo-expediente · alAccion', () => {
     fijarTodo()
     const visto = []
     dialogo.alAccion((a) => visto.push(a))
-    nodo(SELECTOR.EXPORTAR_DXF).click()
-    expect(visto[0]).toEqual({ accion: ACCION.EXPORTAR_DXF, id: null, nombre: null })
+    // ⭐ Era `EXPORTAR_DXF` hasta el 2026-08-11, cuando esa acción se mudó al
+    // desplegable de salidas de la barra. Lo que esta prueba afirma —que una acción
+    // GLOBAL viaja con `id: null`, frente a las de fila, que llevan el suyo— no
+    // depende de cuál sea: se usa la global que sigue viviendo aquí.
+    nodo(SELECTOR.EXPORTAR_PROYECTO).click()
+    expect(visto[0]).toEqual({ accion: ACCION.EXPORTAR_PROYECTO, id: null, nombre: null })
   })
 
   it('el nombre tecleado viaja CON la acción, recortado', () => {
@@ -580,7 +597,7 @@ describe('app/dialogo-expediente · un clic aquí dentro no es un clic en el map
 
     fijarTodo()
     dialogo.abrir()
-    const dentro = nodo(SELECTOR.EXPORTAR_DXF)
+    const dentro = nodo(SELECTOR.EXPORTAR_PROYECTO)
     expect(dentro.closest('dialog')).toBe(dialogo.nodo)
 
     // Y con el diálogo CERRADO sigue reconociéndose, que es el caso que el `[open]`
@@ -596,7 +613,7 @@ describe('app/dialogo-expediente · un clic aquí dentro no es un clic en el map
     const vistos = []
     const oyente = (e) => vistos.push(e.target)
     document.addEventListener('click', oyente)
-    nodo(SELECTOR.EXPORTAR_COORDENADAS).click()
+    nodo(SELECTOR.EXPORTAR_PROYECTO).click()
     document.removeEventListener('click', oyente)
     expect(vistos).toHaveLength(1)
     expect(vistos[0].closest('dialog')).toBe(dialogo.nodo)

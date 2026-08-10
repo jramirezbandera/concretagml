@@ -123,6 +123,7 @@ import {
   MOTIVO_COLINDANTES_APAGADO,
   ROTULO_DEDUCIDA,
   SELECTOR_BOTON_CARGAR,
+  avisoReferenciaDeducida,
   SELECTOR_BOTON_COLINDANTES,
   SELECTOR_BOTON_DEDUCIR,
   SELECTOR_CAMPO_REFCAT,
@@ -1141,6 +1142,80 @@ describe('cableado-catastro · deducción con UN candidato', () => {
   })
 })
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ⛔ REGRESIÓN · LA APLICACIÓN SE PONÍA EL AVISO Y ELLA MISMA LO BORRABA
+// ═══════════════════════════════════════════════════════════════════════════
+// `rellenarCampo` marcaba la deducción con ROTULO_DEDUCIDA y medio segundo
+// después `cargar()` escribía en el MISMO nodo la procedencia de la geometría,
+// borrando la marca. En pantalla quedaba un texto que solo hablaba de la copia
+// local del parcelario y que se leía como si la referencia estuviese confirmada.
+//
+// El caso real (2026-08-10): parcela mal grafiada en el Catastro, medición mayor
+// que el parcelario asomando sobre la vecina; el punto interior cayó dentro de la
+// 146 y la aplicación dedujo `29050A01000146` cuando la parcela era la 44. De esa
+// referencia cuelgan el parcelario de fondo, los linderos y la derivación de
+// sobrante, así que el error se propagaba entero y en silencio.
+describe('cableado-catastro · la conjetura sobrevive a la carga', () => {
+  it('⛔ traer el fondo NO borra el rótulo de «deducida»', async () => {
+    const montado = cablear({ parcelaInicial: parcelaSinReferencia() })
+    await montado.cableado.deducir()
+    expect(montado.procedencia.textContent).toBe(ROTULO_DEDUCIDA)
+
+    await montado.cableado.cargar()
+
+    // Sigue estando, y DELANTE: es lo que decide si lo que viene detrás vale.
+    expect(montado.procedencia.textContent).toContain(ROTULO_DEDUCIDA)
+    expect(montado.procedencia.textContent.startsWith(ROTULO_DEDUCIDA)).toBe(true)
+    // Y sin perder lo que ya contaba: de dónde salió la geometría.
+    expect(montado.procedencia.textContent.length).toBeGreaterThan(ROTULO_DEDUCIDA.length)
+  })
+
+  it('lo dice también en el PANEL, que es lo que se ve', async () => {
+    // El renglón de procedencia «es gris de 11 px y solo se lee cuando se duda del
+    // dato» —argumento del propio módulo para la copia local—. Una referencia que
+    // nadie ha confirmado pesa más que una caché vieja.
+    const montado = cablear({ parcelaInicial: parcelaSinReferencia() })
+    await montado.cableado.deducir()
+    await montado.cableado.cargar()
+
+    expect(textosDelPanel()).toContain(avisoReferenciaDeducida(REFCAT))
+  })
+
+  it('si la referencia la ha escrito el usuario, NO hay conjetura que avisar', async () => {
+    const montado = cablear({ parcelaInicial: parcelaSinReferencia() })
+    montado.campo.value = REFCAT
+    await montado.cableado.cargar()
+
+    expect(montado.procedencia.textContent).not.toContain(ROTULO_DEDUCIDA)
+    expect(textosDelPanel()).not.toContain(avisoReferenciaDeducida(REFCAT))
+  })
+
+  it('teclear en el campo retira la marca en el acto', async () => {
+    // A partir de la primera pulsación lo que hay ahí lo afirma una persona.
+    const montado = cablear({ parcelaInicial: parcelaSinReferencia() })
+    await montado.cableado.deducir()
+    expect(montado.procedencia.textContent).toBe(ROTULO_DEDUCIDA)
+
+    montado.campo.value = `${REFCAT}X`
+    montado.campo.dispatchEvent(new Event('input', { bubbles: true }))
+
+    expect(montado.procedencia.textContent).toBe('')
+  })
+
+  it('y si el usuario la corrige, cargar ya no la trata como conjetura', async () => {
+    const montado = cablear({ parcelaInicial: parcelaSinReferencia() })
+    await montado.cableado.deducir()
+
+    // El usuario dice cuál es de verdad su parcela.
+    montado.campo.value = REFCAT
+    montado.campo.dispatchEvent(new Event('input', { bubbles: true }))
+    await montado.cableado.cargar()
+
+    expect(montado.procedencia.textContent).not.toContain(ROTULO_DEDUCIDA)
+    expect(textosDelPanel()).not.toContain(avisoReferenciaDeducida(REFCAT))
+  })
+})
+
 describe('cableado-catastro · deducción con VARIOS candidatos', () => {
   const varios = () =>
     cablear({
@@ -1268,6 +1343,69 @@ describe('cableado-catastro · deducir con un clic en el mapa', () => {
     await Promise.resolve()
 
     expect(montado.transporte.emitidas).toBe(0)
+  })
+
+  // ── ⭐ EL CASO DE LA APLICACIÓN VACÍA (2026-08-11) ──────────────────────────
+  // Es el estado en el que la app SE ABRE desde 2026-08-07, y era justo donde el
+  // clic no hacía nada: heredaba de `puedeDeducirDe` la exigencia de que hubiera
+  // geometría cargada, que es condición del BOTÓN (saca el punto de un
+  // `puntoInterior`) y no del clic, que trae su propio punto.
+
+  it('⭐ con el store VACÍO también deduce: el punto lo trae el clic, no la geometría', async () => {
+    const mapa = crearMapaDoble()
+    const montado = cablear({ mapa, parcelaInicial: null })
+
+    mapa.emitir('click', { latlng: latlngDentro })
+    await cederTurno()
+
+    expect(montado.transporte.emitidas).toBe(1)
+    expect(montado.transporte.peticiones[0].url).toContain('Consulta_RCCOOR')
+    // Y el desenlace es el que el usuario ve: la referencia, en el campo.
+    const uno = JSON.parse(TEXTO_RCCOOR_OK)[CLAVE_RCCOOR].coordenadas.coord[0]
+    expect(montado.campo.value).toBe(`${uno.pc.pc1}${uno.pc.pc2}`)
+  })
+
+  it('⚠️ y con el store vacío sigue SIN tocar el modelo: rellena el campo y para', async () => {
+    const mapa = crearMapaDoble()
+    const montado = cablear({ mapa, parcelaInicial: null })
+
+    mapa.emitir('click', { latlng: latlngDentro })
+    await cederTurno()
+
+    // Pinchar en el mapa NO abre expediente. La referencia no entra hasta que el
+    // usuario pulsa «Traer del Catastro»: `parcela.refcat` significa siempre «esto
+    // lo afirma quien firma», nunca «esto lo adivinó un servicio».
+    expect(montado.sets).toHaveLength(0)
+    expect(montado.estado.get()).toBeNull()
+    expect(montado.procedencia.textContent).toBe(ROTULO_DEDUCIDA)
+  })
+
+  it('el botón «Deducir del mapa» NO se enciende por esto: sin geometría no puede', () => {
+    const mapa = crearMapaDoble()
+    const montado = cablear({ mapa, parcelaInicial: null })
+    // Las dos preguntas son distintas y siguen siéndolo. El botón deduce del
+    // `puntoInterior` de la parcela; sin parcela no tiene punto que ofrecer, y
+    // encenderlo prometería lo que no puede dar.
+    expect(montado.botonDeducir.disabled).toBe(true)
+  })
+
+  it('un segundo clic en otro sitio vuelve a deducir: el campo sigue siendo del usuario', async () => {
+    const mapa = crearMapaDoble()
+    const montado = cablear({ mapa, parcelaInicial: null })
+
+    mapa.emitir('click', { latlng: latlngDentro })
+    await cederTurno()
+    mapa.emitir('click', { latlng: { lat: 40.41, lng: -3.71 } })
+    await cederTurno()
+
+    // Dos puntos distintos, dos consultas: la caché de `services/catastro.js` es
+    // por PUNTO, así que un clic en otro sitio es otra pregunta.
+    expect(montado.transporte.emitidas).toBe(2)
+    const punto = (i) => {
+      const { searchParams } = new URL(montado.transporte.peticiones[i].url)
+      return [searchParams.get('CoorX'), searchParams.get('CoorY')]
+    }
+    expect(punto(0)).not.toEqual(punto(1))
   })
 
   it('se ignora mientras hay una consulta en vuelo: un clic no puede abortar la carga', async () => {

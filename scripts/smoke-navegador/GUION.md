@@ -73,7 +73,7 @@ para que el resultado no dependa de interpretar prosa. Diecinueve son de aceptac
 | `05-salto-zoom.js` | — | **diagnóstico**, no aceptación: mide frame a frame la transición de la imagen WMS al hacer zoom | ver §11 |
 | `06-generar-gml.js` | F04 · T7.2 | la cadena Blob → descarga: bytes UTF-8, `posList`, `areaValue` y estructura del GML que baja | `ok:true` |
 | `07-catastro-vivo.js` | F05 · T5C | **contra el servicio REAL**: CORS, IndexedDB de verdad y el recorrido entero (traer parcela · 2.ª consulta sin red · deducir la referencia) | `ok:true` |
-| `08-edicion.js` | F06 · 1 a 5 | la edición con `L.Draggable` real: snap a vértice y a lindero, `Alt`, cotas contra el zoom, offset, insertar/eliminar, undo/redo y su inhibición | `ok:true` |
+| `08-edicion.js` | F06 · 1 a 5 | la edición con `L.Draggable` real: snap a vértice y a lindero, `Alt`, cotas contra el zoom, offset, insertar/eliminar, undo/redo y su inhibición. **Desde el 2026-08-10 mide además la barra de ICONOS**: que ninguna herramienta pinte texto, que la PISTA salga y no se salga del mapa, que el panel de ayuda quede centrado (el defecto del «margen a la derecha»), y las dos vías de borrado —el modo del mapa con su cursor y la × de cada fila | `ok:true` |
 | `09-diagnostico.js` | F07 · 1 a 4 | el diagnóstico con SVG y layout reales: la diferencia sombreada por `fill-rule: evenodd`, el cajón que flota sin quitarle NI UN PÍXEL a la caja de vértices al abrirse, la banda del margen que conserva sus metros con el zoom y el tiempo del recálculo completo | `ok:true` |
 | `10-comprobar-gml.js` | F08 · 1 a 4 · **+ los tres arreglos del check visual** | **soltar un fichero de verdad** de punta a punta (bytes reales, velo con `opacity` calculada, `File.arrayBuffer()`), el cajón que no tapa ninguno de los cinco controles del mapa, los dos cajones que no coinciden, el informe que baja con BYTES, el invariante de los ~267 px, la tipografía real de los botones de los dos cajones y —desde el 2026-08-02— **el REENCUADRE** (viaja con otra parcela, no se mueve al editar), **las COLINDANTES dibujadas** y **el CAMPO de la referencia** | ✅ `ok:true` desde el **2026-08-07**, tras la revisión que el §16 dejó pendiente el 2026-08-04. Conducía el flujo anterior al rework Y el peaje de F08; los dos se han retirado. Ver §16 |
 | `11-informe-pdf.js` | F09 · **1** a 5 | ⭐ **el CRITERIO 1, que solo se puede medir aquí**: `toDataURL` sobre un lienzo con una tesela REAL del WMS, **con control negativo** (sin `crossOrigin` tiene que lanzar); el PDF que baja con BYTES de verdad (`%PDF`, páginas declaradas, el plano `/DCTDecode` dentro); que componer **no cierre nada por debajo** (tercera aparición del mismo defecto); el `<dialog>` con la presentación que le toca y el encaje en la ventana, el invariante de la caja de vértices y la tipografía de los cuatro botones nuevos. ⛔ **Su veredicto sobre el `<dialog>` está INVERTIDO desde el 2026-08-08 y ésa es la corrección**: exigía modal DE VERDAD (capa superior, fondo inerte) porque en F09 lo era; la rebanada 5 lo convirtió en PANTALLA con `show()` el 2026-08-05 y nadie volvió aquí, así que llevaba tres meses acusando a la aplicación de hacer lo que se le pidió. Hoy exige lo contrario —**que NO sea modal y que el rail siga alcanzable**— y de paso se corrigió su sonda, que probaba el fondo contra un control OCULTO y por eso daba «inerte» pasara lo que pasara | `ok:true` — ver §17 |
@@ -1315,6 +1315,24 @@ que solo existe con un navegador delante:
    contrastan contra un shoelace y una suma de lados calculados dentro de la
    página — segunda implementación independiente de `geo/area.js` y
    `geo/metrica.js`, igual que hace `06` con el `areaValue`.
+7. **⭐ La barra de ICONOS, la PISTA y las dos vías de borrado** (bloques 8 y 9,
+   añadidos el 2026-08-10). Los cuatro encargos de ese día son **todos de píxeles o
+   de eventos del navegador**, o sea invisibles para la suite:
+   · que **ninguna herramienta pinte texto** (un `<span>` de nombre que se colara
+     visible ensancharía la fila y devolvería el defecto del margen);
+   · que la **pista salga con el ratón**, diga el nombre de la herramienta señalada
+     y **no se salga del mapa** — es más ancha que la fila (314 px medidos contra
+     255), así que desbordarla es normal y salirse del mapa no;
+   · que el **panel de ayuda quede centrado**: se miden los DOS huecos y se exige
+     que se parezcan (⛔ es el defecto que el autor reportó como «margen excesivo a
+     la derecha» y que en jsdom no se ve, porque ahí las dos cajas miden 0), y que
+     **abrirlo no desplace la fila**;
+   · que el **modo borrar** arme, **cambie el cursor** —sobre el mapa Y sobre los
+     vértices, que es el único sitio donde el clic va a borrar algo—, que un clic
+     quite exactamente un vértice, que **no se apague solo** tras el primero, y que
+     `Escape` lo desarme devolviendo el cursor;
+   · que la **× de cada fila** exista en todas, mida su diana (22 × 22 px), borre
+     exactamente uno y **no haga desbordar la tabla a lo ancho**.
 
 Y dos **hit-tests reales** con `document.elementFromPoint`, que es lo más cerca que
 se puede estar de un puntero sin tenerlo: sobre el centro de un vértice responde su

@@ -36,12 +36,13 @@
 
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import {
   CENTRO_ABAJO,
   CLASE_BARRA,
   CLASE_ESQUINA_CENTRO_ABAJO,
   GESTOS,
+  RETARDO_PISTA_MS,
   crearBarraEdicion,
 } from '../../viewer/barra-edicion.js'
 import { UMBRAL_PUNTERIA_PX } from '../../viewer/edicion.js'
@@ -73,6 +74,7 @@ const CONTRATO = Object.freeze([
   { constante: 'SELECTOR_CAMPO_TOLERANCIA', etiqueta: 'INPUT', tipo: 'number' },
   { constante: 'SELECTOR_CAMPO_OFFSET', etiqueta: 'INPUT', tipo: 'number' },
   { constante: 'SELECTOR_BOTON_OFFSET', etiqueta: 'BUTTON' },
+  { constante: 'SELECTOR_BOTON_BORRAR', etiqueta: 'BUTTON' },
   { constante: 'SELECTOR_ESTADO_EDICION', etiqueta: 'P' },
 ])
 
@@ -89,14 +91,14 @@ function selectorDeMain(nombre) {
   if (encontrado === null) {
     throw new Error(
       `test/viewer/barra-edicion.dom.test.js: 'app/main.js' ya no exporta ${nombre}. ` +
-        `Los siete selectores de cablearEdicion son el CONTRATO de viewer/barra-edicion.js: ` +
+        `Los ocho selectores de cablearEdicion son el CONTRATO de viewer/barra-edicion.js: ` +
         `si se han renombrado, hay que actualizar la barra y esta lista a la vez.`,
     )
   }
   return encontrado[1]
 }
 
-/** Los siete selectores, ya resueltos, indexados por nombre de constante. */
+/** Los ocho selectores, ya resueltos, indexados por nombre de constante. */
 const SELECTOR = Object.fromEntries(
   CONTRATO.map(({ constante }) => [constante, selectorDeMain(constante)]),
 )
@@ -149,8 +151,8 @@ const panel = (nombre) => nodo(`[data-panel="${nombre}"]`)
 
 // ── 1 · El contrato con `app/main.js#cablearEdicion` ─────────────────────────
 
-describe('barra de edición · los SIETE nodos del contrato de app/main.js', () => {
-  it('los siete selectores de cablearEdicion encuentran EXACTAMENTE un nodo', () => {
+describe('barra de edición · los OCHO nodos del contrato de app/main.js', () => {
+  it('los ocho selectores de cablearEdicion encuentran EXACTAMENTE un nodo', () => {
     montarBarra()
     for (const { constante } of CONTRATO) {
       const selector = SELECTOR[constante]
@@ -213,14 +215,28 @@ describe('barra de edición · los SIETE nodos del contrato de app/main.js', () 
     expect(renglon.classList.contains(CLASE_BARRA.ESTADO)).toBe(true)
   })
 
-  it('los botones del historial llevan su <kbd> dentro (nadie les toca el textContent)', () => {
+  it('los botones del historial dicen su atajo en la PISTA y en aria-keyshortcuts', () => {
     montarBarra()
     const deshacer = nodo(SELECTOR.SELECTOR_BOTON_DESHACER)
     const rehacer = nodo(SELECTOR.SELECTOR_BOTON_REHACER)
-    expect(deshacer.querySelector('kbd').textContent).toBe('Ctrl+Z')
-    expect(rehacer.querySelector('kbd').textContent).toBe('Ctrl+Y')
+    // ⚠️ El `<kbd>` visible se fue con las palabras el 2026-08-10 (la barra volvió
+    // a los iconos). El atajo NO se perdió: sale por las dos vías que cubren a los
+    // dos públicos —la pista para el ratón, `aria-keyshortcuts` para el lector de
+    // pantalla— y además sigue en la tabla del panel de ayuda.
+    expect(deshacer.dataset.pista).toBe('Deshacer · Ctrl+Z')
+    expect(rehacer.dataset.pista).toBe('Rehacer · Ctrl+Y')
     expect(deshacer.getAttribute('aria-keyshortcuts')).toBe('Control+Z')
     expect(rehacer.getAttribute('aria-keyshortcuts')).toBe('Control+Y')
+  })
+
+  it('«Borrar vértices» nace armable y sin armar: `aria-pressed="false"`, sin `disabled`', () => {
+    montarBarra()
+    const boton = nodo(SELECTOR.SELECTOR_BOTON_BORRAR)
+    // El atributo tiene que ESTAR desde el arranque, no estrenarse al pulsarlo:
+    // hasta entonces el botón se anunciaría como un disparador cualquiera y quien
+    // va por lector de pantalla no sabría que ARMA un modo en vez de ejecutarlo.
+    expect(boton.getAttribute('aria-pressed')).toBe('false')
+    expect(boton.disabled).toBe(false)
   })
 })
 
@@ -452,16 +468,17 @@ describe('barra de edición · el panel de ayuda cuenta los OCHO gestos', () => 
     expect(document.activeElement).toBe(ayuda)
   })
 
-  it('la tabla nombra los doce gestos, en el orden de la spec', () => {
+  it('la tabla nombra los dieciséis gestos, en el orden de la spec', () => {
     montarBarra()
     clic(nodo('[data-accion="ayuda"]'))
     const filas = [...panel('ayuda').querySelectorAll('tbody tr')]
-    expect(filas.length).toBe(12)
+    expect(filas.length).toBe(16)
 
     // Escritos A MANO a propósito: si se derivaran de `GESTOS` este test no diría
-    // nada. Los ocho primeros son los de la tabla «El mapa de gestos» de
-    // `spec/feature-06-edicion-parcela.md`; los cuatro últimos, los del dibujo de
-    // F12 (`viewer/dibujo.js`), que hasta la fase 5 no salían en la ayuda.
+    // nada. Los de la tabla «El mapa de gestos» de
+    // `spec/feature-06-edicion-parcela.md` primero; luego los del dibujo de F12
+    // (`viewer/dibujo.js`), que hasta la fase 5 no salían en la ayuda; y al final
+    // los tres del modo borrar (2026-08-10).
     expect(filas.map((fila) => fila.cells[0].textContent.trim())).toEqual([
       'Clic',
       'Doble clic',
@@ -469,7 +486,11 @@ describe('barra de edición · el panel de ayuda cuenta los OCHO gestos', () => 
       'Alt sostenida',
       'Arrastrar un vértice',
       'Teclear una coordenada',
+      'Borrar la fila',
       'Desplazar lindero',
+      'Borrar vértices',
+      'Clic',
+      'Escape',
       'Ctrl+Z / Ctrl+Y',
       'Clic',
       'Doble clic o Enter',
@@ -478,24 +499,26 @@ describe('barra de edición · el panel de ayuda cuenta los OCHO gestos', () => 
     ])
   })
 
-  it('⛔ el «Clic» aparece DOS veces, y la columna «dónde» es lo que los distingue', () => {
-    // No es un duplicado: el mismo gesto hace dos cosas distintas según si hay un
-    // trazo abierto. Una tabla que lo dijera una sola vez estaría mintiendo en el
-    // caso que más se usa. Si alguien «limpia» el repetido, esto se pone rojo.
+  it('⛔ el «Clic» aparece TRES veces, y la columna «dónde» es lo que los distingue', () => {
+    // No es un duplicado: el mismo gesto hace tres cosas distintas según si hay un
+    // trazo abierto, si el modo borrar está armado, o ninguna de las dos. Una tabla
+    // que lo dijera una sola vez estaría mintiendo en el caso que más se usa. Si
+    // alguien «limpia» los repetidos, esto se pone rojo.
     montarBarra()
     clic(nodo('[data-accion="ayuda"]'))
     const filas = [...panel('ayuda').querySelectorAll('tbody tr')]
     const clics = filas.filter((f) => f.cells[0].textContent.trim() === 'Clic')
-    expect(clics).toHaveLength(2)
+    expect(clics).toHaveLength(3)
     expect(clics.map((f) => f.cells[1].textContent.trim())).toEqual([
       'mapa',
+      'en modo borrar',
       'dibujando un recinto',
     ])
   })
 
-  it('GESTOS son doce y el umbral de puntería se DERIVA de viewer/edicion.js', () => {
+  it('GESTOS son dieciséis y el umbral de puntería se DERIVA de viewer/edicion.js', () => {
     montarBarra()
-    expect(GESTOS.length).toBe(12)
+    expect(GESTOS.length).toBe(16)
     clic(nodo('[data-accion="ayuda"]'))
     // Si alguien ajusta `UMBRAL_PUNTERIA_PX`, la ayuda lo dice sola.
     expect(panel('ayuda').textContent).toContain(`${UMBRAL_PUNTERIA_PX} px`)
@@ -521,6 +544,9 @@ describe('barra de edición · el panel de ayuda cuenta los OCHO gestos', () => 
     const teclas = [...panel('ayuda').querySelectorAll('tbody kbd')].map((k) => k.textContent)
     expect(teclas).toEqual([
       'Alt',
+      // El `Escape` del modo borrar cae aquí, entre los gestos de esa herramienta
+      // y el atajo del historial: la lista sigue el orden de `GESTOS`.
+      'Escape',
       'Ctrl+Z',
       'Ctrl+Y',
       'Enter',
@@ -573,28 +599,70 @@ describe('barra de edición · accesibilidad', () => {
     // visible o del de 1×1 px. Lo que se exige aquí es que exista: una herramienta
     // muda es la trampa que el diseño de solo-iconos hacía fácil de dejar.
     const herramientas = [...contenedor.querySelectorAll(`.${CLASE_BARRA.HERRAMIENTA}`)]
-    // Seis desde F12: la sexta es «Dibujar recinto», que nace escondida pero está
-    // en el marcado y por tanto tiene que llevar nombre igual que las demás. Una
-    // herramienta que aparece muda al enseñarla es peor que una muda desde el
-    // principio: nadie la mira dos veces.
-    expect(herramientas.length).toBe(6)
+    // Siete desde el 2026-08-10: las cinco de siempre («Deshacer», «Rehacer», la
+    // flecha del ajuste, «Desplazar lindero» y «Ayuda»), «Dibujar recinto» de F12
+    // —que nace escondida pero está en el marcado, y una herramienta que aparece
+    // muda al enseñarla es peor que una muda desde el principio— y «Borrar
+    // vértices». La casilla del ajuste se cuenta aparte, abajo: su piel es el
+    // `<label for>`, no un botón con esta clase.
+    expect(herramientas.length).toBe(7)
     for (const herramienta of herramientas) {
       const nombre = herramienta.textContent.trim()
       expect(nombre.length, `herramienta sin nombre: ${herramienta.outerHTML}`).toBeGreaterThan(0)
     }
-    // La sexta herramienta es la casilla, que se nombra por su `<label for>`.
     const rotuloAjuste = nodo(`.${CLASE_BARRA.CONMUTADOR_ROTULO}`)
     expect(rotuloAjuste.textContent.trim()).toBe('Ajuste al parcelario')
   })
 
-  it('los iconos que queden van aria-hidden (el nombre no lo pone un dibujo)', () => {
+  it('cada herramienta dice su nombre POR LOS DOS CANALES, y con el mismo texto', () => {
+    // ⭐ El invariante que sostiene toda la barra de iconos: el `<span>` oculto (lo
+    // que oye un lector de pantalla) y el `data-pista` (lo que ve el ratón) salen
+    // de la MISMA llamada a `nombrar`. Dos textos escritos aparte para el mismo
+    // botón divergen, y el que se queda viejo es siempre el que no se ve.
+    const { contenedor } = montarBarra()
+    const conNombre = [
+      ...contenedor.querySelectorAll(`.${CLASE_BARRA.HERRAMIENTA}, .${CLASE_BARRA.CONMUTADOR_ROTULO}`),
+    ]
+    expect(conNombre.length).toBe(8)
+    for (const herramienta of conNombre) {
+      const oculto = herramienta.querySelector(`.${CLASE_BARRA.ROTULO}`)
+      expect(oculto, `sin nombre accesible: ${herramienta.outerHTML}`).not.toBeNull()
+      expect(herramienta.dataset.pista, `sin pista: ${herramienta.outerHTML}`).toBeTruthy()
+      // La pista puede AMPLIAR el nombre con el atajo («Deshacer · Ctrl+Z»), pero
+      // nunca decir otra cosa.
+      expect(herramienta.dataset.pista.startsWith(oculto.textContent)).toBe(true)
+    }
+  })
+
+  it('⛔ ninguna herramienta lleva `title`: dos globos sobre el mismo botón', () => {
+    // El `title` nativo tarda entre 500 y 1.000 ms y se pinta con el estilo del
+    // sistema operativo. Dejarlo puesto además de la pista propia significa que a
+    // los 120 ms sale el nuestro y medio segundo después el del navegador, encima.
+    // Es el descuido clásico de quien se fabrica un tooltip y se olvida del nativo.
+    montarBarra()
+    // Con raíz en la BARRA y no en el contenedor del mapa: ahí dentro viven además
+    // los controles de Leaflet, y el `title="Zoom in"` de su botón de zoom no es
+    // asunto de este módulo.
+    const barra = nodo(`.${CLASE_BARRA.CONTENEDOR}`)
+    for (const nodoConTitulo of barra.querySelectorAll('[title]')) {
+      expect.fail(`lleva title además de la pista: ${nodoConTitulo.outerHTML}`)
+    }
+  })
+
+  it('los iconos van aria-hidden (el nombre no lo pone un dibujo)', () => {
     const { contenedor } = montarBarra()
     const iconos = [...contenedor.querySelectorAll(`.${CLASE_BARRA.ICONO}`)]
-    // Exactamente dos: las puntas de flecha de las dos herramientas que despliegan.
-    expect(iconos.length).toBe(2)
+    // Siete dibujos de herramienta —incluido el imán del ajuste— más las dos
+    // puntas de flecha de lo que despliega.
+    expect(iconos.length).toBe(9)
     for (const icono of iconos) {
       expect(icono.getAttribute('aria-hidden')).toBe('true')
       expect(icono.getAttribute('focusable')).toBe('false')
+      // Con medidas propias: el módulo no importa ninguna hoja, y un `<svg>` sin
+      // `width`/`height` cae al 300×150 por defecto del navegador. En una barra
+      // que ya SOLO son iconos, eso no es un desperfecto: es la barra rota.
+      expect(Number(icono.getAttribute('width')), 'el icono sin medida').toBeGreaterThan(0)
+      expect(icono.querySelector('path'), 'un icono sin trazo no se ve').not.toBeNull()
     }
   })
 
@@ -859,69 +927,60 @@ describe('barra de edición · la quinta esquina (centrada abajo)', () => {
   })
 })
 
-describe('barra de edición · las herramientas se llaman por su nombre', () => {
-  it('las seis herramientas llevan su nombre ESCRITO, en el orden de la barra', () => {
+describe('barra de edición · las herramientas se dibujan y se nombran en la pista', () => {
+  it('cada herramienta lleva su icono y su nombre, en el orden de la barra', () => {
     const { contenedor } = montarBarra()
-    const nombres = [...contenedor.querySelectorAll(`.${CLASE_BARRA.TEXTO}`)].map((n) =>
-      n.textContent.trim(),
-    )
-    // Seis palabras visibles. La punta de flecha del ajuste es la única
-    // herramienta que sigue sin texto, y por eso no aparece aquí: es la mitad
-    // estrecha de un botón partido y su nombre va oculto + en el `title`.
-    //
+    const nombres = [
+      ...contenedor.querySelectorAll(`.${CLASE_BARRA.HERRAMIENTA}, .${CLASE_BARRA.CONMUTADOR_ROTULO}`),
+    ].map((n) => n.querySelector(`.${CLASE_BARRA.ROTULO}`).textContent.trim())
+
     // ⚠️ «Dibujar recinto» (F12) SÍ está en el marcado desde el montaje, pero nace
     // con `hidden`: en la rama PARCELA no hay ninguna parte que dibujar. Se cuenta
-    // aquí porque este guardián mira el MARCADO —que la herramienta lleve su
-    // nombre escrito—, no lo que se ve; que nazca escondida lo defiende su propia
-    // prueba, más abajo.
+    // aquí porque este guardián mira el MARCADO —que la herramienta esté nombrada—,
+    // no lo que se ve; que nazca escondida lo defiende su propia prueba, más abajo.
     expect(nombres).toEqual([
       'Deshacer',
       'Rehacer',
-      'Ajuste',
+      'Ajuste al parcelario',
+      'Tolerancia del ajuste',
       'Desplazar lindero',
-      'Dibujar recinto',
-      'Ayuda',
+      'Borrar vértices: enciende el modo y pincha los que sobren',
+      'Dibujar el recinto de la parte activa, vértice a vértice',
+      'Ayuda sobre los gestos de edición',
     ])
-    expect(nodo('[data-desplegable="snap"]').title).toBe('Tolerancia del ajuste')
   })
 
-  it('el nombre accesible COMPLETA al visible, no lo pisa', () => {
+  it('el nombre accesible NO lo pisa un `aria-label`: sale del contenido', () => {
     montarBarra()
-    // Se ve «Ayuda»; se oye «Ayuda sobre los gestos de edición». Con `aria-label`
-    // se habría oído solo lo segundo y la palabra de la pantalla no la diría
-    // nadie: ese es el fallo del rótulo doble, y aquí no se comete.
+    // Con `aria-label` habría dos textos para el mismo botón —el del atributo y el
+    // del `<span>` oculto— y nada garantizaría que dijeran lo mismo. Aquí el nombre
+    // accesible ES el contenido, así que la pista (que sale del mismo sitio) y lo
+    // que oye un lector de pantalla no pueden separarse.
     const ayuda = nodo('[data-accion="ayuda"]')
     expect(ayuda.hasAttribute('aria-label')).toBe(false)
-    expect(ayuda.textContent.replace(/\s+/g, ' ').trim()).toBe(
-      'Ayuda sobre los gestos de edición',
-    )
-    expect(ayuda.querySelector(`.${CLASE_BARRA.TEXTO}`).textContent).toBe('Ayuda')
+    expect(ayuda.textContent.replace(/\s+/g, ' ').trim()).toBe('Ayuda sobre los gestos de edición')
   })
 
-  it('quedan CINCO iconos menos: solo las dos puntas de flecha de lo que despliega', () => {
+  it('las dos puntas de flecha son de las herramientas que DESPLIEGAN, y solo de ellas', () => {
     const { contenedor } = montarBarra()
-    const conCaret = [...contenedor.querySelectorAll(`.${CLASE_BARRA.ICONO}`)].map(
-      (i) => i.parentElement,
+    // Se distinguen del icono de la herramienta por el tamaño: la flecha es más
+    // pequeña a propósito (es un apéndice, no una herramienta). Es lo que se mide
+    // aquí porque es lo que se ve.
+    const flechas = [...contenedor.querySelectorAll(`.${CLASE_BARRA.ICONO}`)].filter(
+      (i) => Number(i.getAttribute('width')) < 16,
     )
-    expect(conCaret).toEqual([nodo('[data-desplegable="snap"]'), nodo('[data-desplegable="offset"]')])
-    // Y ninguna de las que NO despliegan lleva dibujo. Los dos primeros selectores
-    // salen de `app/main.js`, como todo el contrato: escribirlos aquí a mano es lo
-    // que `test/services/contrato-catastro.test.js` prohíbe, y con razón.
-    for (const selector of [
-      SELECTOR.SELECTOR_BOTON_DESHACER,
-      SELECTOR.SELECTOR_BOTON_REHACER,
-      '[data-accion="ayuda"]',
-    ]) {
-      expect(nodo(selector).querySelector('svg'), selector).toBeNull()
-    }
+    expect(flechas.map((i) => i.parentElement)).toEqual([
+      nodo('[data-desplegable="snap"]'),
+      nodo('[data-desplegable="offset"]'),
+    ])
   })
 
   it('los grupos van separados por un `role="separator"` de verdad', () => {
     const { contenedor } = montarBarra()
     const separadores = [...contenedor.querySelectorAll(`.${CLASE_BARRA.SEPARADOR}`)]
-    // Historial · ajuste · desplazamiento · dibujo · ayuda ⇒ cuatro filetes. El
-    // del dibujo nace escondido con su botón: un separador que no separa nada es
-    // una raya suelta.
+    // Historial · ajuste · geometría (desplazar + borrar) · dibujo · ayuda ⇒ cuatro
+    // filetes. El del dibujo nace escondido con su botón: un separador que no
+    // separa nada es una raya suelta.
     expect(separadores).toHaveLength(4)
     for (const separador of separadores) {
       expect(separador.getAttribute('role')).toBe('separator')
@@ -931,14 +990,218 @@ describe('barra de edición · las herramientas se llaman por su nombre', () => 
 
   it('los separadores NO son paradas de las flechas del teclado', () => {
     montarBarra()
-    // Las flechas recorren `_herramientas`, que son los seis controles. Si un
-    // filete se colara ahí, el foco caería en un `<span>` que no hace nada.
+    // Las flechas recorren `_herramientas`, que son los controles. Si un filete se
+    // colara ahí, el foco caería en un `<span>` que no hace nada.
     const casilla = nodo(SELECTOR.SELECTOR_CAMPO_SNAP)
     casilla.focus()
     tecla(casilla, 'ArrowRight')
     expect(document.activeElement).toBe(nodo('[data-desplegable="snap"]'))
     tecla(document.activeElement, 'ArrowRight')
     expect(document.activeElement).toBe(nodo('[data-desplegable="offset"]'))
+  })
+
+  it('⛔ las flechas SALTAN lo oculto además de lo apagado', () => {
+    // Hasta el 2026-08-10 `_vecinaHabilitada` solo miraba `disabled`, y «Dibujar
+    // recinto» ni siquiera estaba en la lista de paradas. Al meterlo, un recorrido
+    // en la rama PARCELA habría llevado el foco a un botón INVISIBLE: el usuario
+    // pulsa `Enter` y no sabe qué acaba de hacer. Peor que la parada que faltaba.
+    montarBarra()
+    const borrar = nodo(SELECTOR.SELECTOR_BOTON_BORRAR)
+    expect(nodo('[data-accion="dibujar-recinto"]').hidden, 'el supuesto de partida').toBe(true)
+
+    borrar.focus()
+    tecla(borrar, 'ArrowRight')
+    expect(document.activeElement).toBe(nodo('[data-accion="ayuda"]'))
+  })
+
+  it('…y la alcanzan en cuanto `dibujoVisible(true)` la enseña', () => {
+    const { barra } = montarBarra()
+    barra.dibujoVisible(true)
+    const borrar = nodo(SELECTOR.SELECTOR_BOTON_BORRAR)
+
+    borrar.focus()
+    tecla(borrar, 'ArrowRight')
+    expect(document.activeElement).toBe(nodo('[data-accion="dibujar-recinto"]'))
+  })
+})
+
+// ── 11 · La PISTA (el globo que sustituye al `title` nativo) ─────────────────
+
+describe('barra de edición · la pista', () => {
+  /** `mouseover` delegado, que es como llega de verdad (burbujea; `mouseenter` no). */
+  const senalar = (elemento) => elemento.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+  const dejarDeSenalar = (elemento, hacia = null) =>
+    elemento.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: hacia }))
+
+  const pista = () => nodo(`.${CLASE_BARRA.PISTA}`)
+
+  it('nace escondida y con `role="tooltip"` + `aria-hidden`', () => {
+    montarBarra()
+    expect(pista().hidden).toBe(true)
+    expect(pista().getAttribute('role')).toBe('tooltip')
+    // `aria-hidden` porque el nombre accesible del botón ya dice lo mismo:
+    // anunciarlo otra vez sería el rótulo dicho dos veces.
+    expect(pista().getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('con el RATÓN espera; con el TECLADO sale al instante', () => {
+    vi.useFakeTimers()
+    try {
+      montarBarra()
+      const ayuda = nodo('[data-accion="ayuda"]')
+
+      senalar(ayuda)
+      expect(pista().hidden, 'no puede salir antes del retardo').toBe(true)
+      vi.advanceTimersByTime(RETARDO_PISTA_MS)
+      expect(pista().hidden).toBe(false)
+      expect(pista().textContent).toBe('Ayuda sobre los gestos de edición')
+
+      dejarDeSenalar(ayuda)
+      expect(pista().hidden).toBe(true)
+
+      // El foco no espera: quien tabula ya ha decidido pararse ahí, y hacerle
+      // esperar sería castigar el camino accesible.
+      ayuda.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+      expect(pista().hidden).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('⛔ señalar y salir ANTES del retardo no deja el globo encendido', () => {
+    // El fallo clásico del tooltip con temporizador: cruzar la barra de camino al
+    // mapa encendería seis globos, cada uno 120 ms después de que el ratón ya no
+    // esté encima.
+    vi.useFakeTimers()
+    try {
+      montarBarra()
+      const ayuda = nodo('[data-accion="ayuda"]')
+      senalar(ayuda)
+      dejarDeSenalar(ayuda)
+      vi.advanceTimersByTime(RETARDO_PISTA_MS * 4)
+      expect(pista().hidden).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('pasar de una herramienta a otra reescribe el globo SIN esperar', () => {
+    vi.useFakeTimers()
+    try {
+      montarBarra()
+      const deshacer = nodo(SELECTOR.SELECTOR_BOTON_DESHACER)
+      const borrar = nodo(SELECTOR.SELECTOR_BOTON_BORRAR)
+
+      senalar(deshacer)
+      vi.advanceTimersByTime(RETARDO_PISTA_MS)
+      expect(pista().textContent).toBe('Deshacer · Ctrl+Z')
+
+      // `relatedTarget` apunta a la herramienta siguiente: sin la guarda, el
+      // `mouseout` apagaría el globo que el `mouseover` acaba de encender.
+      dejarDeSenalar(deshacer, borrar)
+      senalar(borrar)
+      expect(pista().hidden, 'la ventana caliente: ya no espera').toBe(false)
+      expect(
+        pista().textContent,
+        'sin repintar al instante, el globo miente 120 ms sobre qué hay debajo',
+      ).toBe('Borrar vértices: enciende el modo y pincha los que sobren')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('mover el ratón DENTRO del mismo botón no apaga el globo', () => {
+    vi.useFakeTimers()
+    try {
+      montarBarra()
+      const ayuda = nodo('[data-accion="ayuda"]')
+      senalar(ayuda)
+      vi.advanceTimersByTime(RETARDO_PISTA_MS)
+
+      // Del `<button>` a su `<svg>`: son dos nodos, así que `mouseout` salta. Sin
+      // mirar el destino, la pista parpadearía al mover el ratón un píxel.
+      dejarDeSenalar(ayuda, ayuda.querySelector('svg'))
+      expect(pista().hidden).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('con un panel abierto NO hay pista: se abre justo donde ella se dibuja', () => {
+    vi.useFakeTimers()
+    try {
+      montarBarra()
+      clic(nodo('[data-accion="ayuda"]'))
+      senalar(nodo(SELECTOR.SELECTOR_BOTON_BORRAR))
+      vi.advanceTimersByTime(RETARDO_PISTA_MS * 4)
+      expect(pista().hidden).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('⛔ `destruir()` cancela el temporizador pendiente', () => {
+    // Sin esto, el `setTimeout` sobrevive al desmontaje y su callback escribe en un
+    // nodo que ya no está en el documento. Es el mismo fallo que un oyente sin
+    // baja, con la diferencia de que este no se ve.
+    vi.useFakeTimers()
+    try {
+      const { barra } = montarBarra()
+      senalar(nodo('[data-accion="ayuda"]'))
+      barra.destruir()
+      expect(() => vi.advanceTimersByTime(RETARDO_PISTA_MS * 4)).not.toThrow()
+      expect(document.querySelector(`.${CLASE_BARRA.PISTA}`)).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+// ── 12 · «Borrar vértices» ──────────────────────────────────────────────────
+
+describe('barra de edición · el conmutador del modo borrar', () => {
+  it('`borrarActivo(true)` lo hunde y le cambia el NOMBRE, no solo el color', () => {
+    const { barra } = montarBarra()
+    const boton = nodo(SELECTOR.SELECTOR_BOTON_BORRAR)
+
+    barra.borrarActivo(true)
+    expect(boton.getAttribute('aria-pressed')).toBe('true')
+    // Un botón que hace una cosa distinta tiene que decirlo con palabras, no solo
+    // con un fondo: armado, pulsarlo SALE del modo.
+    expect(boton.dataset.pista).toMatch(/salir del modo borrar/i)
+    expect(boton.querySelector(`.${CLASE_BARRA.ROTULO}`).textContent).toBe(boton.dataset.pista)
+
+    barra.borrarActivo(false)
+    expect(boton.getAttribute('aria-pressed')).toBe('false')
+    expect(boton.dataset.pista).toMatch(/^Borrar vértices/)
+  })
+
+  it('si la pista de ESE botón está a la vista, se reescribe en el acto', () => {
+    vi.useFakeTimers()
+    try {
+      const { barra } = montarBarra()
+      const boton = nodo(SELECTOR.SELECTOR_BOTON_BORRAR)
+      boton.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      vi.advanceTimersByTime(RETARDO_PISTA_MS)
+
+      barra.borrarActivo(true)
+      // Apagar o encender el modo con el ratón encima dejaba si no el globo
+      // diciendo lo contrario de lo que el botón va a hacer.
+      expect(nodo(`.${CLASE_BARRA.PISTA}`).textContent).toMatch(/salir del modo borrar/i)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('lleva el modificador de herramienta DESTRUCTIVA (de él cuelga el rojo)', () => {
+    montarBarra()
+    const boton = nodo(SELECTOR.SELECTOR_BOTON_BORRAR)
+    expect(boton.classList.contains(CLASE_BARRA.HERRAMIENTA_DESTRUCTIVA)).toBe(true)
+    // Y «Dibujar recinto», que también es un modo, NO lo lleva: uno añade geometría
+    // y el otro la destruye al primer clic.
+    expect(
+      nodo('[data-accion="dibujar-recinto"]').classList.contains(CLASE_BARRA.HERRAMIENTA_DESTRUCTIVA),
+    ).toBe(false)
   })
 })
 
@@ -978,22 +1241,29 @@ describe('F12 · la herramienta de dibujo', () => {
     expect(escondidos).toHaveLength(1)
   })
 
-  it('mientras se dibuja, el botón CAMBIA DE PALABRA: lo que hace es cancelar', () => {
+  it('mientras se dibuja, el botón CAMBIA DE NOMBRE: lo que hace es cancelar', () => {
     const { barra } = montarBarra()
     const boton = nodo('[data-accion="dibujar-recinto"]')
-    const texto = () => boton.querySelector(`.${CLASE_BARRA.TEXTO}`).textContent
-    expect(texto()).toBe('Dibujar recinto')
+    // Desde que la barra es de iconos, el nombre vive en el `<span>` oculto y en el
+    // `data-pista`, y los dos tienen que moverse a la vez: son las dos salidas del
+    // mismo texto (ver `_renombrar`).
+    const nombre = () => boton.querySelector(`.${CLASE_BARRA.ROTULO}`).textContent
+    expect(nombre()).toMatch(/^Dibujar el recinto/)
     barra.dibujoEnCurso(true)
-    expect(texto()).toBe('Cancelar dibujo')
+    expect(nombre()).toMatch(/^Cancelar el dibujo/)
+    expect(boton.dataset.pista).toBe(nombre())
     expect(boton.getAttribute('aria-pressed')).toBe('true')
     barra.dibujoEnCurso(false)
-    expect(texto()).toBe('Dibujar recinto')
+    expect(nombre()).toMatch(/^Dibujar el recinto/)
+    expect(boton.dataset.pista).toBe(nombre())
     expect(boton.getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('lleva palabras y no un dibujo, como el resto desde el rediseño', () => {
+  it('lleva un dibujo, como el resto desde que la barra volvió a los iconos', () => {
     montarBarra()
-    expect(nodo('[data-accion="dibujar-recinto"]').querySelector('svg')).toBeNull()
+    // Un RECINTO cerrado y no un lápiz: un lápiz querría decir «dibujar» y también
+    // «editar», que es lo que hacen las otras seis herramientas de la barra.
+    expect(nodo('[data-accion="dibujar-recinto"]').querySelector('svg')).not.toBeNull()
   })
 
   it('`dibujoVisible` con algo que no es booleano LANZA, y leer no escribe', () => {

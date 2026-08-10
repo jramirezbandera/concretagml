@@ -82,7 +82,7 @@
 // SOLO-NAVEGADOR de hecho aunque no importe Leaflet: toca el DOM. Su test lleva el
 // sufijo `.dom` y no entra en el barrel raíz `index.js`.
 
-import { NIVEL, resolverAvisar } from './_comun.js'
+import { NIVEL, PREFIJO_FUERA, resolverAvisar, textoNumeroPieza } from './_comun.js'
 
 // ── Contrato de nodos: los `data-*` que este módulo produce ──────────────────
 
@@ -114,11 +114,28 @@ export const SELECTOR = Object.freeze({
   NOMBRE: '[data-sobrante="nombre"]',
   MEDIDAS: '[data-sobrante="medidas"]',
   ESTRECHA: '[data-sobrante="estrecha"]',
+  /** La marca de la pieza que NO sobrevive al fichero (F23, 2026-08-10). */
+  NO_EMITIBLE: '[data-sobrante="no-emitible"]',
   NOTA: '[data-sobrante="nota"]',
   VACIO: '[data-sobrante="vacio"]',
   ENTREGAR: '[data-accion="entregar-expediente"]',
   ESTADO_ENTREGA: '[data-estado="entregar-expediente"]',
+  // ── Lo que se SALE del contorno oficial ────────────────────────────────────
+  FUERA: '[data-sobrante="fuera"]',
+  FUERA_ROTULO: '[data-sobrante="fuera-rotulo"]',
+  FUERA_LISTA: '[data-sobrante="fuera-lista"]',
+  FUERA_FILA: '[data-sobrante="fuera-fila"]',
+  /** El desplegable de DESTINO de una pieza del sobrante (F23). */
+  DESTINO: '[data-sobrante="destino"]',
 })
+
+/**
+ * El valor del destino «finca nueva», que es el defecto.
+ *
+ * Va como cadena y no como `''` para que un desplegable sin elegir y uno elegido a
+ * «finca nueva» no se lean igual: el primero sería un fallo del pintado.
+ */
+export const DESTINO_ALTA = 'ALTA'
 
 // ── Números: cuántas filas caben y cuánto mide una ───────────────────────────
 
@@ -194,6 +211,44 @@ export const MOTIVO_FOTO_CADUCA =
 
 /** Marca de la pieza que cae por debajo del umbral de grosor. */
 export const ROTULO_ESTRECHA = 'estrecha'
+
+/**
+ * Marca de la pieza que NO se puede escribir en el fichero.
+ *
+ * ⛔ **Es una marca distinta de {@link ROTULO_ESTRECHA} y tiene que serlo.**
+ * «Estrecha» invita a decidir —la casilla sigue viva y el `title` dice que decidirlo
+ * es de quien firma—; ésta dice que no hay nada que decidir, porque la pieza deja de
+ * encerrar superficie al redondearla a los 2 decimales del fichero. Enseñarlas con
+ * la misma palabra habría dejado al usuario marcando una casilla que no podía
+ * funcionar, que es como se perdió una tarde el 2026-08-10.
+ */
+export const ROTULO_NO_EMITIBLE = 'no se puede emitir'
+
+/** El rótulo de la sección de lo que se sale del contorno oficial. */
+export const ROTULO_FUERA = 'Fuera del contorno oficial'
+
+/**
+ * Lo que se lee bajo ese rótulo, y es la frase que esta fase existe para poder
+ * escribir.
+ *
+ * ⛔ **Hasta hoy este bloque NO se enseñaba.** Cuando la geometría medida se salía
+ * por algún sitio, `app/cableado-derivacion.js` escondía la lista entera y el
+ * sobrante —que estaba medido, correcto y era de la misma foto— se tiraba sin que
+ * el usuario lo viera nunca. Y el caso no es raro: rectificar un lindero es
+ * retranquearse por un lado y salirse por otro, medido sobre el expediente real
+ * `29050A01000144` (36,46 m² de sobrante y 25,49 m² de exceso a la vez).
+ *
+ * Lo que sigue siendo cierto es que **no se puede ENTREGAR** así: esos metros son
+ * de un colindante, y un expediente sin él vuelve con IVG negativo. Por eso lo que
+ * se separa es VER de ENTREGAR, y no se levanta la puerta.
+ *
+ * No lleva cifras dentro: las cifras van en las filas, junto al trozo que
+ * describen, que es donde se pueden auditar.
+ */
+export const NOTA_FUERA =
+  'Estos trozos de la geometría medida caen fuera de la parcela oficial. Los que caen sobre un ' +
+  'colindante se le recortan a él, y su parcela entra en el expediente; los que no caen sobre ' +
+  'ninguna (un vial, o un hueco del parcelario) se declaran tal cual.'
 
 /**
  * Formato de una superficie y de una longitud. Local a este módulo, como el
@@ -473,6 +528,36 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
   vacio.dataset.sobrante = 'vacio'
   estilar(vacio, ESTILO_NOTA)
 
+  // ── La sección de lo que se SALE, que nace escondida ──────────────────────
+  // ⚠️ **Cuesta CERO píxeles en el caso normal**, y no es un detalle menor en esta
+  // pantalla: el panel mide ~344 px útiles y cada renglón que se añade se lo quita
+  // a la tabla de vértices (medido por el guion 16 en la fase 4 de F17). Esta
+  // sección sólo aparece cuando hay exceso — que es exactamente el caso en el que
+  // hasta hoy no se veía NADA, así que no le quita sitio a nada que existiera.
+  const fuera = doc.createElement('div')
+  fuera.dataset.sobrante = 'fuera'
+  fuera.hidden = true
+
+  const fueraFilaRotulo = doc.createElement('div')
+  fueraFilaRotulo.className = 'gml-rotulo-fila'
+  const fueraRotulo = doc.createElement('h2')
+  fueraRotulo.className = 'gml-rotulo'
+  fueraRotulo.textContent = ROTULO_FUERA
+  const fueraContador = doc.createElement('span')
+  fueraContador.dataset.sobrante = 'fuera-rotulo'
+  fueraContador.setAttribute('role', 'status')
+  fueraFilaRotulo.append(fueraRotulo, fueraContador)
+
+  const fueraLista = doc.createElement('ul')
+  fueraLista.dataset.sobrante = 'fuera-lista'
+  estilar(fueraLista, ESTILO_LISTA)
+
+  const fueraNota = doc.createElement('p')
+  estilar(fueraNota, ESTILO_NOTA)
+  fueraNota.textContent = NOTA_FUERA
+
+  fuera.append(fueraFilaRotulo, fueraLista, fueraNota)
+
   const boton = doc.createElement('button')
   boton.type = 'button'
   boton.className = 'gml-boton gml-boton--primario'
@@ -490,18 +575,60 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
   renglon.id = 'gml-estado-entregar-expediente'
   boton.setAttribute('aria-describedby', renglon.id)
 
-  bloque.append(filaRotulo, nota, lista, vacio, boton, renglon)
+  // El exceso va DESPUÉS de la lista del sobrante y ANTES del botón: se lee de
+  // arriba abajo como «esto sueltas · esto invades · esto puedes hacer», y así el
+  // motivo por el que el botón está apagado queda justo encima del botón.
+  bloque.append(filaRotulo, nota, lista, vacio, fuera, boton, renglon)
 
   // ── Pintado ───────────────────────────────────────────────────────────────
 
-  /** Los `orden` marcados ahora mismo, en el orden de la lista. */
+  /** El destino elegido para una pieza, o {@link DESTINO_ALTA} si no hay desplegable. */
+  function destinoDe(entrada) {
+    const sel = entrada.fila.querySelector(SELECTOR.DESTINO)
+    return sel === null ? DESTINO_ALTA : sel.value
+  }
+
+  /**
+   * Los `orden` que entran como PARCELA PROPIA del expediente.
+   *
+   * ⛔ Una pieza asignada a un colindante **no está aquí**, y no es una omisión: esa
+   * superficie se funde con la parcela del vecino y viaja dentro de ella. Contarla
+   * además como miembro suelto la metería DOS veces en el fichero, el conjunto
+   * saldría con solape y el IVG lo devolvería.
+   */
   function seleccionadas() {
     const marcadas = []
     for (const pieza of piezasPintadas) {
+      // ⛔ Una pieza que no sobrevive al fichero NUNCA es un alta, marque el usuario
+      // lo que marque: escrita con 2 decimales deja de encerrar superficie y el
+      // serializador se niega a emitir el documento ENTERO. Lo que sí puede es pasar
+      // a un colindante —al fundirse con su parcela deja de ser un recinto propio—,
+      // y eso viaja por `asignaciones()`, no por aquí.
+      if (pieza.emitible === false) continue
       const entrada = filasPorOrden.get(pieza.orden)
-      if (entrada && entrada.casilla.checked) marcadas.push(pieza.orden)
+      if (entrada && entrada.casilla.checked && destinoDe(entrada) === DESTINO_ALTA) {
+        marcadas.push(pieza.orden)
+      }
     }
     return marcadas
+  }
+
+  /**
+   * Lo que el usuario ha decidido repartir: `{orden: refcat}`.
+   *
+   * Solo las piezas MARCADAS: desmarcar es sacarla del expediente entero, y una
+   * pieza fuera no se le da a nadie.
+   */
+  function asignaciones() {
+    /** @type {Object<number,string>} */
+    const reparto = {}
+    for (const pieza of piezasPintadas) {
+      const entrada = filasPorOrden.get(pieza.orden)
+      if (!entrada || !entrada.casilla.checked) continue
+      const destino = destinoDe(entrada)
+      if (destino !== DESTINO_ALTA && destino !== '') reparto[pieza.orden] = destino
+    }
+    return reparto
   }
 
   /** Los nombres escritos, sin los vacíos. */
@@ -520,8 +647,120 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
     contador.textContent = textoContador(seleccionadas().length, piezasPintadas.length)
   }
 
-  /** Fabrica la fila de una pieza. */
-  function crearFila(pieza) {
+  /**
+   * Fabrica la fila de un trozo que se SALE del contorno oficial.
+   *
+   * ⛔ **Sin casilla y sin campo de nombre, y es la diferencia que importa.** Una
+   * pieza del sobrante es una finca que puedes incluir, excluir y bautizar; un
+   * trozo de fuera **no es tuyo**: es terreno de un colindante, y ofrecer sobre él
+   * los mismos controles diría que se puede entregar. Aquí solo se mide y se
+   * enseña — que es justo lo que hasta hoy no se hacía.
+   *
+   * @param {{orden:number, area:number, grosor:number}} pieza
+   * @param {number} indice  Posición en SU lista, para el filete separador.
+   */
+  function crearFilaFuera(pieza, indice, atribucion) {
+    const fila = doc.createElement('li')
+    fila.dataset.sobrante = 'fuera-fila'
+    fila.dataset.orden = String(pieza.orden)
+    estilar(fila, ESTILO_FILA)
+    if (indice > 0) fila.style.borderTop = '1px solid rgba(100,116,139,.28)'
+
+    const numero = doc.createElement('span')
+    // El MISMO rótulo que la mancha ámbar del mapa: `F1`, `F2`… Ver `_comun.js`.
+    numero.textContent = textoNumeroPieza(pieza.orden, PREFIJO_FUERA)
+    estilar(numero, ESTILO_NUMERO)
+
+    const medidas = doc.createElement('span')
+    medidas.className = 'gml-mono'
+    medidas.dataset.sobrante = 'medidas'
+    medidas.textContent = textoMedidas(pieza)
+    estilar(medidas, ESTILO_MEDIDAS)
+
+    // El hueco flexible va en medio para que las medidas queden alineadas a la
+    // derecha igual que en las filas del sobrante, sin repetir su maquetación: allí
+    // ese papel lo hace el campo de nombre, que aquí no existe.
+    const hueco = doc.createElement('span')
+    estilar(hueco, { flex: '1 1 auto' })
+
+    fila.append(numero, hueco, medidas)
+
+    // ── SOBRE QUIÉN CAE ───────────────────────────────────────────────────────
+    // Es el dato que convierte «te sales 25,49 m²» en algo accionable: sin él, el
+    // usuario ve una cifra y no sabe a quién tiene que ir a buscar. Va en un
+    // segundo renglón porque el primero ya lleva número y medidas y el panel mide
+    // ~344 px; y **solo aparece si se ha consultado**, porque no haberlo preguntado
+    // y no caer sobre nadie son cosas opuestas.
+    if (atribucion !== null && atribucion !== undefined) {
+      const dueños = doc.createElement('span')
+      dueños.dataset.sobrante = 'fuera-sobre'
+      estilar(dueños, { flex: '1 1 100%', fontSize: '11px', paddingLeft: '2px' })
+      const trozos = atribucion.porVecino.map(
+        (v) => `${v.refcat ?? 'parcela sin referencia'} (${FORMATO_AREA.format(v.area)} m²)`,
+      )
+      if (atribucion.sobreNadie > 0.005) {
+        // ⚠️ **No se llama «vial» aquí.** Que no solape ninguna colindante es lo
+        // MEDIDO; que sea un vial, dominio público o un hueco del parcelario es una
+        // interpretación, y este proyecto no dictamina (regla de oro 9). El aviso
+        // de `derivacion/vecino.js` sí enumera las tres posibilidades, con su
+        // superficie, que es donde cabe explicarlo.
+        // ⚠️ Con la MISMA forma que las demás entradas —«quién (cuánto)»— porque
+        // todas se concatenan detrás de un solo «sobre». La primera versión decía
+        // «56,37 m² sobre ninguna parcela» y salía «sobre 56,37 m² sobre ninguna
+        // parcela»: lo cazó el guion 25 en su primera corrida, no la suite.
+        trozos.push(`ninguna parcela (${FORMATO_AREA.format(atribucion.sobreNadie)} m²)`)
+      }
+      dueños.textContent = trozos.length === 0 ? '' : `sobre ${trozos.join(' · ')}`
+      if (dueños.textContent !== '') fila.append(dueños)
+    }
+
+    return fila
+  }
+
+  /**
+   * Pinta la sección del exceso a partir de la PUERTA de la cesión.
+   *
+   * Se alimenta de `cesion.puerta.piezas`, que ya viene medida, ordenada y
+   * renumerada 1…M por `derivacion/cesion.js`. Esta vista **no calcula nada**.
+   *
+   * @param {{contenida: boolean|null, piezas: Array, area: number}|null} puerta
+   */
+  function pintarFuera(puerta, recorte = null) {
+    fueraLista.replaceChildren()
+    const piezas =
+      puerta !== null && puerta !== undefined && Array.isArray(puerta.piezas) ? puerta.piezas : []
+    // La atribución, indexada por el `orden` del trozo. `null` si no se han
+    // consultado las colindantes: entonces las filas no dicen sobre quién caen, que
+    // es la verdad, en vez de decir «sobre nadie», que sería lo tranquilizador.
+    const porOrden =
+      recorte !== null && recorte !== undefined && recorte.consultado === true
+        ? new Map(recorte.atribucion.map((a) => [a.orden, a]))
+        : null
+
+    // `contenida === null` (no se ha podido medir) NO enseña sección: no hay nada
+    // que enseñar, y una sección vacía con su rótulo se leería como «no hay
+    // exceso», que es la lectura tranquilizadora y falsa de siempre. Quien lo dice
+    // en ese caso es el renglón del pie, con su motivo.
+    if (piezas.length === 0) {
+      fuera.hidden = true
+      fueraContador.textContent = ''
+      return
+    }
+
+    piezas.forEach((pieza, i) =>
+      fueraLista.append(
+        crearFilaFuera(pieza, i, porOrden === null ? null : (porOrden.get(pieza.orden) ?? null)),
+      ),
+    )
+    const total = piezas.reduce((s, p) => s + (Number.isFinite(p.area) ? p.area : 0), 0)
+    fueraContador.textContent =
+      `${piezas.length} ${piezas.length === 1 ? 'trozo' : 'trozos'} · ` +
+      `${FORMATO_AREA.format(total)} m²`
+    fuera.hidden = false
+  }
+
+  /** Fabrica la fila de una pieza. `candidatos` son los refcat con los que LINDA. */
+  function crearFila(pieza, candidatos = []) {
     const fila = doc.createElement('li')
     fila.dataset.sobrante = 'fila'
     fila.dataset.orden = String(pieza.orden)
@@ -546,7 +785,11 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
     casilla.setAttribute('aria-label', `Incluir la pieza ${pieza.orden} en el expediente`)
 
     const numero = doc.createElement('span')
-    numero.textContent = String(pieza.orden)
+    // Por `textoNumeroPieza` y no por `String(orden)`: es la MISMA función que
+    // rotula la mancha del mapa (`viewer/_comun.js`), y pasar los dos por ella es
+    // lo que impide que un cambio de formato deje una de las dos vistas hablando
+    // otro idioma. Hoy las dos dan «1»; el valor está en que sigan dándolo.
+    numero.textContent = textoNumeroPieza(pieza.orden)
     estilar(numero, ESTILO_NUMERO)
     etiqueta.append(casilla, numero)
 
@@ -566,6 +809,69 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
     estilar(medidas, ESTILO_MEDIDAS)
 
     fila.append(etiqueta, campo, medidas)
+
+    // ── EL DESTINO (F23) ─────────────────────────────────────────────────────
+    // Solo aparece si el trozo LINDA con alguna colindante. Sin candidatos no hay
+    // nada que preguntar —solo puede ser finca nueva— y un desplegable de una sola
+    // opción es un control que no decide nada ocupando una fila que el panel no
+    // tiene: ~344 px útiles, medidos.
+    //
+    // ⛔ La lista de candidatos NO es «todas las colindantes»: la calcula
+    // `derivacion/vecino.js` UNIENDO, y deja fuera a las que solo tocan en un punto.
+    // Medido sobre el expediente real: `…146` está a 0,000000 m del trozo y aun así
+    // no linda con él. Ofrecerla habría dejado crear una finca unida por un vértice.
+    if (candidatos.length > 0) {
+      const destino = doc.createElement('select')
+      destino.dataset.sobrante = 'destino'
+      destino.dataset.orden = String(pieza.orden)
+      destino.setAttribute('aria-label', `Destino de la pieza ${pieza.orden}`)
+      estilar(destino, { flex: '1 1 100%', fontSize: '11px', marginTop: '2px' })
+
+      const alta = doc.createElement('option')
+      alta.value = DESTINO_ALTA
+      alta.textContent = 'Finca nueva (alta)'
+      destino.append(alta)
+
+      for (const rc of candidatos) {
+        const opcion = doc.createElement('option')
+        opcion.value = rc ?? ''
+        opcion.textContent = `Pasa a ${rc ?? 'la parcela sin referencia'}`
+        destino.append(opcion)
+      }
+      destino.value = DESTINO_ALTA
+
+      destino.addEventListener('change', () => {
+        // El nombre solo tiene sentido para un alta: una finca que pasa al vecino se
+        // funde con la suya y no se bautiza. Se apaga el campo en vez de esconderlo
+        // para que la fila no cambie de alto al elegir.
+        campo.disabled = destino.value !== DESTINO_ALTA
+        emitir(oyentesSeleccion, 'destino', seleccionadas())
+      })
+
+      fila.append(destino)
+    }
+
+    // ── LA QUE NO SE PUEDE EMITIR ────────────────────────────────────────────
+    // Nace DESMARCADA, y la casilla solo sigue viva si el trozo linda con alguien:
+    // dársela a un colindante sí funciona (se funde con su parcela y deja de ser un
+    // recinto propio), quedársela como finca no. Sin candidatos no hay nada que la
+    // casilla pueda hacer, así que se apaga en vez de quedarse como un control que
+    // no cambia nada.
+    if (pieza.emitible === false) {
+      casilla.checked = false
+      casilla.disabled = candidatos.length === 0
+      campo.disabled = true
+      const marca = doc.createElement('span')
+      marca.dataset.sobrante = 'no-emitible'
+      marca.textContent = ROTULO_NO_EMITIBLE
+      marca.title =
+        'Escrita con los 2 decimales del fichero, esta pieza deja de encerrar superficie: sus ' +
+        'dos bordes caen sobre las mismas coordenadas y no hay punto de referencia que ' +
+        'declarar. Es la astilla que queda al enganchar tu medición al lindero oficial, no ' +
+        'terreno. Puede pasar a una colindante, pero no ser una finca.'
+      estilar(marca, { flex: 'none', fontSize: '11px', fontStyle: 'italic' })
+      fila.append(marca)
+    }
 
     if (pieza.estrecha === true) {
       // ⚠️ **La marca es la PALABRA, no un emoji.** El vocabulario de aviso de este
@@ -643,6 +949,7 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
       contador.textContent = ''
       boton.disabled = true
       renglon.textContent = MOTIVO_SIN_DERIVAR
+      pintarFuera(null)
       return
     }
 
@@ -653,8 +960,15 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
       )
     }
 
+    // Los candidatos de reparto salen del RECORTE, que viaja dentro de la misma
+    // foto. Sin colindantes consultadas no hay ninguno y las filas no traen
+    // desplegable, que es lo correcto: no se puede ofrecer dárselo a alguien de
+    // quien no se sabe si existe.
+    const candidatosPorOrden = new Map(
+      (cesion.recorte?.lindes ?? []).map((l) => [l.orden, l.refcats]),
+    )
     for (const pieza of cesion.piezas) {
-      const fila = crearFila(pieza)
+      const fila = crearFila(pieza, candidatosPorOrden.get(pieza.orden) ?? [])
       piezasPintadas.push(pieza)
       lista.append(fila)
     }
@@ -664,6 +978,11 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
     vacio.hidden = hayPiezas
     vacio.textContent = hayPiezas ? '' : SIN_PIEZAS
     repintarContador()
+
+    // La otra mitad de la foto. Sale de `cesion.puerta`, que esta vista ya recibía
+    // dentro del mismo POJO y hasta hoy ignoraba: el cableado escondía el bloque
+    // entero antes de llegar aquí, así que la mitad medida no tenía dónde verse.
+    pintarFuera(cesion.puerta ?? null, cesion.recorte ?? null)
 
     // La nota junta los dos hechos que la lista sola no cuenta y que NO pueden
     // quedarse en consola: cuántas piezas son estrechas (para que el usuario sepa
@@ -676,6 +995,22 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
       trozos.push(
         `${cesion.nEstrechas} de ${piezasPintadas.length} por debajo del umbral de grosor ` +
           `(${FORMATO_GROSOR.format(cesion.umbralGrosorM)} m).`,
+      )
+    }
+    // Aparte del recuento de estrechas, y no dentro: son dos hechos distintos —uno
+    // invita a decidir y el otro dice que no se puede— y juntarlos en una cifra
+    // haría creer que la casilla desmarcada es una elección de la aplicación.
+    // ⚠️ La frase concuerda ENTERA, no solo el verbo. La primera versión decía «1 no
+    // se puede emitir como finca: al escribirLAS … dejan de encerrar superficie», y
+    // lo cazó mirar la pantalla, no la suite. Un renglón que no concuerda se lee
+    // como un renglón de máquina, igual que «Las 1 parcelas» en `conjunto.js`.
+    if (cesion.nNoEmitibles > 0) {
+      const una = cesion.nNoEmitibles === 1
+      trozos.push(
+        `${cesion.nNoEmitibles} ${una ? 'no se puede' : 'no se pueden'} emitir como finca: al ` +
+          `${una ? 'escribirla' : 'escribirlas'} con los 2 decimales del fichero ` +
+          `${una ? 'deja' : 'dejan'} de encerrar superficie. ` +
+          `${una ? 'Se queda fuera' : 'Se quedan fuera'} del expediente.`,
       )
     }
     if (Array.isArray(cesion.saltados) && cesion.saltados.length > 0) {
@@ -745,6 +1080,7 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
 
     piezas: () => piezasPintadas.slice(),
     seleccionadas,
+    asignaciones,
     nombres,
 
     entrega({ habilitado, motivo } = {}) {

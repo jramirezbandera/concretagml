@@ -3,6 +3,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { OPERATIVOS } from '../../config/operativos.js'
+import { GROSOR_REDONDEO_M } from '../../comprobacion/conjunto.js'
 import * as comunValidacion from '../../validation/_comun.js'
 
 // F06 · T1.2 — `config/operativos.js` es el cargador ÚNICO de las tolerancias
@@ -131,7 +132,7 @@ describe('config/operativos.json · contenido y regla de oro 9', () => {
 
   it('añade las tres tolerancias de F07 con sus valores especificados', () => {
     expect(OPERATIVOS.pasoDesviacionMetros).toBe(0.3)
-    expect(OPERATIVOS.grosorInvasionMinimoM).toBe(0.001)
+    expect(OPERATIVOS.grosorInvasionMinimoM).toBe(0.0071)
     expect(OPERATIVOS.cotaDiagnosticoMinimaPx).toBe(12)
   })
 
@@ -183,22 +184,41 @@ describe('config/operativos.json · contenido y regla de oro 9', () => {
     expect(OPERATIVOS.duplicadoMetros ** 2).toBeCloseTo(OPERATIVOS.areaNulaM2, 12)
   })
 
-  it('`grosorInvasionMinimoM` ES `duplicadoMetros`, y no por casualidad', () => {
-    // ⛔ ESTA CLAVE SUSTITUYE A `areaInvasionMinimaM2` (10⁻⁴ m²), que vivió medio
-    // día y la medición refutó (2026-07-29). Aquella se calibró elevando al cuadrado
-    // el paso de cuantización del WFS —(10⁻² m)² = 10⁻⁴ m²—, lo que supone la
-    // astilla CUADRADA. Medida sobre el fixture real, la astilla es una AGUJA: área
-    // ≈ ½·L·δ, que crece con la LONGITUD del lindero compartido. Resultado: las dos
-    // astillas reales (1,23 y 3,77 cm²) SUPERABAN el umbral y la parcela oficial
-    // «invadía» a dos colindantes oficiales sin que nadie tocara un vértice.
+  it('`grosorInvasionMinimoM` sale de la REJILLA del WFS, no de `duplicadoMetros`', () => {
+    // ⛔ DOS CALIBRACIONES REFUTADAS POR MEDICIÓN, y este test fija la tercera.
     //
-    // El grosor no depende de L, y su valor no se inventa: una pieza más delgada que
-    // la distancia a la que consideramos dos puntos el mismo punto está entre dos
-    // linderos que consideramos el mismo lindero.
-    expect(OPERATIVOS.grosorInvasionMinimoM).toBe(OPERATIVOS.duplicadoMetros)
+    //   1. `areaInvasionMinimaM2` (10⁻⁴ m², 2026-07-29): suponía la astilla CUADRADA
+    //      y es una AGUJA, con área ≈ ½·L·δ que crece con la longitud del lindero.
+    //   2. `grosorInvasionMinimoM = duplicadoMetros` (10⁻³ m, 2026-08-10): copiaba un
+    //      número que describe NUESTRO modelo («dos puntos más juntos que esto son el
+    //      mismo punto») para absorber el ruido de OTRO (el redondeo del WFS). Medido
+    //      sobre 554 parcelas oficiales de diez provincias: 34 agujas de redondeo de
+    //      entre 1 y 5 mm de grosor salían anunciadas como INVASIÓN A COLINDANTES.
+    //
+    // El valor vigente es aritmética de la rejilla de publicación, no un percentil:
+    // celda de 1 cm ⇒ un vértice se mueve al redondear como mucho MEDIA DIAGONAL
+    // (√2/2 cm); las dos parcelas se redondean por separado ⇒ las dos versiones del
+    // mismo lindero se separan hasta √2 cm; y `geo/grosor.js` mide una aguja como
+    // `2A/P ≈ h/2`, así que el techo del ruido —en la misma unidad con la que se
+    // compara— es √2/2 cm.
+    // Y no se comprueba contra un literal: contra la constante que F17 ya DERIVÓ de
+    // `gml/anillos.js#DECIMALES_COORD` (`½·10⁻²·√2 = 7,0711 mm`). Si el Catastro
+    // admitiera otro día tres decimales, ese número baja solo y este test cae
+    // señalando el JSON, que es lo único del proyecto que no sabe multiplicar.
+    //
+    // Las dos comprobaciones son las dos mitades del criterio, y por eso son dos:
+    //   · CUBRE la cota — si no, vuelven los 34 falsos positivos medidos;
+    //   · y no se va MUY por encima — un umbral holgado se traga invasiones reales,
+    //     que es el error caro en la dirección contraria.
+    expect(OPERATIVOS.grosorInvasionMinimoM).toBeGreaterThanOrEqual(GROSOR_REDONDEO_M)
+    expect(OPERATIVOS.grosorInvasionMinimoM).toBeLessThan(GROSOR_REDONDEO_M * 1.1)
 
-    // Y queda muy por debajo de cualquier invasión que un técnico revisaría: una
-    // franja de 5 cm de fondo tiene mil veces este grosor.
+    // Y NO es `duplicadoMetros`. Que coincidieran fue el accidente que ocultó el
+    // error durante un año: son afirmaciones sobre cosas distintas.
+    expect(OPERATIVOS.grosorInvasionMinimoM).not.toBe(OPERATIVOS.duplicadoMetros)
+
+    // Por arriba sigue muy por debajo de cualquier invasión que un técnico revisaría:
+    // una franja de 5 cm de fondo tiene siete veces este grosor.
     expect(OPERATIVOS.grosorInvasionMinimoM).toBeLessThan(0.05)
   })
 

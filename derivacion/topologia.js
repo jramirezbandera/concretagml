@@ -65,6 +65,7 @@
 
 import difference from '@turf/difference'
 import { featureCollection, polygon } from '@turf/helpers'
+import union from '@turf/union'
 
 import { coordsRegion, recintosDeGeometriaTurf } from '../geo/poligono.js'
 import { MOTIVO_RESTA, SEVERIDAD, TIPO_DERIVACION, crearDeteccionDerivacion } from './_comun.js'
@@ -193,4 +194,92 @@ export function restar(recintosA, recintosB) {
   }
 
   return { piezas, saltados, detecciones }
+}
+
+/**
+ * **A unida con B**: una sola región con todo lo que cubren las dos.
+ *
+ * Es la operación que estrena el REPARTO del sobrante (F23): cuando el usuario
+ * decide que un trozo que su parcela suelta se lo queda un colindante, la parcela
+ * nueva de ese colindante es `(V_of − P_new) ∪ trozo`. Sin esto habría que
+ * modelarlo como dos fincas pegadas, que es exactamente lo que no es.
+ *
+ * ⚠️ **`@turf/union` NO añade un byte al paquete**: ya entró con
+ * `edificio/envolvente.js` (F11) y corre sobre el mismo `polyclip-ts` que
+ * `difference`. Medido el 2026-08-10 antes de escribir esto, porque la alternativa
+ * —encadenar restas para simular una unión— habría sido peor código por un ahorro
+ * que no existía.
+ *
+ * ⛔ **Puede devolver VARIAS piezas, y eso significa algo.** Si A y B no se tocan,
+ * la unión es un `MultiPolygon` y aquí salen dos piezas. Quien la llame tiene que
+ * mirarlo: dos piezas al unir un trozo con un vecino significa que ese trozo **no
+ * linda con él**, y asignárselo crearía una finca en dos pedazos separados.
+ *
+ * @param {Recinto[]} recintosA  No se muta.
+ * @param {Recinto[]} recintosB  No se muta.
+ * @returns {{piezas: Array<Recinto[]>, saltados: RecintoSaltado[], detecciones: import('./_comun.js').DeteccionDerivacion[]}}
+ * @throws {TypeError} Si alguno no es un array (bug del llamante).
+ */
+export function unir(recintosA, recintosB) {
+  const saltados = []
+  const detecciones = []
+
+  const polA = poligonoDeRegion(recintosA, 'recintosA', saltados)
+  const polB = poligonoDeRegion(recintosB, 'recintosB', saltados)
+
+  // Aquí, al revés que en `restar`, una región que falta NO es fatal: unir algo con
+  // nada da ese algo. Pero se DICE, porque si el llamante creía estar uniendo dos
+  // cosas y solo se ha unido una, el resultado es correcto y la expectativa no.
+  if (polA === null && polB === null) {
+    detecciones.push(
+      crearDeteccionDerivacion(
+        TIPO_DERIVACION.REGION_NO_APTA,
+        'No se ha podido construir ninguna de las dos geometrías que había que unir, así que ' +
+          'no hay unión. No es que el resultado esté vacío: es que no se ha podido calcular.',
+        SEVERIDAD.ERROR,
+        { saltados },
+      ),
+    )
+    return { piezas: [], saltados, detecciones }
+  }
+  if (polA === null || polB === null) {
+    detecciones.push(
+      crearDeteccionDerivacion(
+        TIPO_DERIVACION.REGION_NO_APTA,
+        'Una de las dos geometrías que había que unir no se ha podido construir, así que la ' +
+          'unión es solo la otra. Revisa el resultado antes de darlo por bueno.',
+        SEVERIDAD.AVISO,
+        { donde: polA === null ? 'recintosA' : 'recintosB', saltados },
+      ),
+    )
+    return {
+      piezas: recintosDeGeometriaTurf(polA === null ? polB : polA),
+      saltados,
+      detecciones,
+    }
+  }
+
+  let resultado
+  try {
+    resultado = union(featureCollection([polA, polB]))
+  } catch (e) {
+    saltados.push({
+      donde: 'unir',
+      indice: null,
+      nVertices: 0,
+      motivo: MOTIVO_RESTA.MOTOR_BOOLEANO,
+    })
+    detecciones.push(
+      crearDeteccionDerivacion(
+        TIPO_DERIVACION.RESTA_FALLIDA,
+        'El motor geométrico no ha podido unir estas dos geometrías. Suele ser un contorno que ' +
+          'se cruza consigo mismo: revisa la parcela en el mapa.',
+        SEVERIDAD.ERROR,
+        { error: String(e && e.message ? e.message : e) },
+      ),
+    )
+    return { piezas: [], saltados, detecciones }
+  }
+
+  return { piezas: recintosDeGeometriaTurf(resultado), saltados, detecciones }
 }

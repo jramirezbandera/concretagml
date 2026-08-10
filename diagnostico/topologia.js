@@ -160,13 +160,45 @@
 // compartido, así que ningún umbral de área vale para todos los linderos.
 //
 // **Cerrado el 2026-07-29 sustituyendo el filtro de ÁREA por uno de GROSOR**
-// (`OPERATIVOS.grosorInvasionMinimoM` = 1 mm = `duplicadoMetros`: una pieza más
-// delgada que la distancia a la que dos puntos son el mismo punto está entre dos
-// linderos que son el mismo lindero). El grosor no depende de `L`, y sobre las
-// piezas medidas separa las dos poblaciones por tres órdenes de magnitud. La
-// estimación vive en **`geo/grosor.js#medirPieza`** desde F17 (aquí era privada), y
-// el JSDoc de `config/operativos.js` explica por qué un umbral de área se acercaba
-// a un veredicto y uno de grosor no.
+// (`OPERATIVOS.grosorInvasionMinimoM`). El grosor no depende de `L`, que es lo que
+// ningún umbral de área puede prometer. La estimación vive en
+// **`geo/grosor.js#medirPieza`** desde F17 (aquí era privada), y el JSDoc de
+// `config/operativos.js` explica por qué un umbral de área se acercaba a un
+// veredicto y uno de grosor no.
+//
+// ── ⛔ EL CRITERIO ERA BUENO Y EL VALOR ESTABA MAL (MEDIDO 2026-08-10) ────────
+// Aquel umbral se fijó en **1 mm** copiando `duplicadoMetros`, y la cabecera lo
+// defendía así: «una pieza más delgada que la distancia a la que dos puntos son el
+// mismo punto está entre dos linderos que son el mismo lindero». Suena bien y mezcla
+// dos cosas que no tienen nada que ver: `duplicadoMetros` describe **nuestro
+// modelo**, y lo que aquí hay que absorber es el ruido de **otro** —el redondeo al
+// centímetro con el que el WFS publica—. Que los dos números coincidieran fue el
+// accidente que impidió ver el error durante un año.
+//
+// La calibración venía además de UNA muestra: la aguja de 0,14 mm de altura del
+// fixture de arriba. Remedido sobre **554 parcelas oficiales de diez provincias
+// (15.501 pares, sin editar un vértice)**: 64 piezas de solape, de las cuales 41 son
+// agujas de redondeo de entre 0,071 mm y 5 mm de grosor. **34 de ellas superaban el
+// milímetro y salían anunciadas como «Invasión a colindantes».**
+//
+// La aguja no aparece solo cuando las dos parcelas discrepan: aparece cuando **la
+// vecina SUBDIVIDE el lindero compartido con un vértice que la propia no tiene**.
+// Los dos extremos del tramo son el mismo punto en las dos —medido: idénticos—, pero
+// el vértice de en medio, redondeado a la celda de 1 cm, cae fuera de la recta que
+// esos extremos definen. Ejemplo real (29050A01000124 × 29050A01000142): extremos
+// `388656.22 4082370.60` y `388675.83 4082373.66` en las dos; la segunda añade
+// `388669.14 4082372.62`, que sobre la recta valdría `4082372.61607`. **3,93 mm
+// fuera** —dentro del medio centímetro que el redondeo permite—, y una aguja de
+// 0,0385 m² y 1,94 mm de grosor. Está fijado en `test/diagnostico/topologia.test.js`
+// con esas coordenadas, que no son un ejemplo: son las que publica el servicio.
+//
+// El techo del fenómeno no es una observación, es aritmética: redondear a la celda
+// de 1 cm mueve un punto hasta media diagonal (√2/2 cm = 7,07 mm), las dos parcelas
+// se redondean por separado ⇒ hasta 1,41 cm entre las dos versiones del lindero, y
+// `2A/P` de una aguja vale `≈ h/2` ⇒ **7,07 mm de techo en la unidad con la que se
+// compara**. Que es, exactamente, el `comprobacion/conjunto.js#GROSOR_REDONDEO_M`
+// que F17 ya había derivado para el mismo redondeo, y que aquella cabecera declaró
+// —por escrito y sin medirlo— que aquí no aplicaba. Sí aplicaba.
 //
 // ⛔ **Y el límite conocido que esta cabecera declaraba estaba AL REVÉS**, medido al
 // extraer la función (F17): decía que una pieza anular se subestima y podría

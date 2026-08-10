@@ -565,6 +565,7 @@ import { cablearComprobacion } from './cableado-comprobacion.js'
 // reloj hay es esta costura.
 import { cablearContrasteEdificio } from './cableado-contraste-edificio.js'
 import { cablearDerivacion } from './cableado-derivacion.js'
+import { crearRegistroColindantes } from './colindantes.js'
 import { cablearDiagnostico } from './cableado-diagnostico.js'
 // ⚠️ **El alias dice `DIBUJO` y no `EDIFICIO` desde F18, y es una corrección de
 // vocabulario, no un capricho.** Esa lista (`.dxf`, `.txt`) la sigue publicando el
@@ -1155,6 +1156,16 @@ export const SELECTOR_CAMPO_TOLERANCIA = '[data-campo="snap-tolerancia"]'
 export const SELECTOR_CAMPO_OFFSET = '[data-campo="offset-distancia"]'
 /** «Desplazar lindero». Nace `disabled`: sin lado seleccionado no hay qué mover. */
 export const SELECTOR_BOTON_OFFSET = '[data-accion="offset"]'
+/**
+ * «Borrar vértices» (2026-08-10). **Es un CONMUTADOR**, no un disparador: arma el
+ * modo borrar de `viewer/edicion.js` y se queda pulsado hasta que se apaga.
+ *
+ * ⚠️ Nace ENCENDIDO y en `aria-pressed="false"`, y no se deshabilita nunca: armar
+ * el modo se puede hacer siempre —incluso sin geometría cargada, donde el primer
+ * clic simplemente dirá que no hay ningún vértice cerca—, y un botón gris obligaría
+ * a explicar un motivo que no existe.
+ */
+export const SELECTOR_BOTON_BORRAR = '[data-accion="borrar"]'
 /** Renglón `role="status"` del bloque, gemelo del de «Generar GML». */
 export const SELECTOR_ESTADO_EDICION = '[data-estado="edicion"]'
 
@@ -1228,6 +1239,31 @@ const MENSAJE_PARCELA_NUEVA =
 const MENSAJE_SIN_LADO = 'Sin lindero seleccionado: pincha uno en el mapa para poder desplazarlo.'
 /** …y cuando sí lo hay. */
 const MENSAJE_CON_LADO = 'Lindero seleccionado: ya puedes desplazarlo.'
+
+/**
+ * Los dos desenlaces del modo borrar.
+ *
+ * ── Por qué el modo armado SÍ escribe en el renglón, si el arranque de la barra
+ * dejó de hacerlo ───────────────────────────────────────────────────────────
+ * El comentario del final de {@link cablearEdicion} explica por qué se quitó el
+ * cartel permanente sobre la ortofoto: era un texto de tres líneas que no se iba
+ * hasta la primera edición y tapaba justo la parcela. Este es el caso contrario, y
+ * la diferencia es la que decide:
+ *
+ *   · aquél describía un estado PASIVO (tres botones apagados) que el usuario no
+ *     había pedido y que duraba indefinidamente;
+ *   · este describe un modo que el usuario acaba de ARMAR con una pulsación, que
+ *     cambia lo que hace su próximo clic, y que se va en cuanto lo apaga.
+ *
+ * Un modo destructivo sin confirmación en pantalla es la definición de trampa
+ * silenciosa, y el `role="status"` es exactamente el canal para esto: lo anuncia
+ * el lector de pantalla sin robar el foco, y quien mira ve una línea, no un
+ * párrafo. El botón pulsado y el cursor lo dicen a la vez por vía visual.
+ */
+const MENSAJE_BORRAR_ARMADO =
+  'Modo borrar: cada clic sobre un vértice lo elimina. Escape para salir.'
+/** …y al desarmarlo, por cualquiera de sus tres caminos. */
+const MENSAJE_BORRAR_APAGADO = 'Modo borrar apagado: el clic vuelve a seleccionar linderos.'
 
 /**
  * El offset no se ha aplicado. NO se repite aquí el motivo: `viewer/edicion.js`
@@ -2236,7 +2272,15 @@ function numeroTecleado(texto) {
  * @param {HTMLInputElement} [opciones.campoTolerancia]
  * @param {HTMLInputElement} [opciones.campoOffset]
  * @param {HTMLElement} [opciones.botonOffset]
+ * @param {HTMLElement} [opciones.botonBorrar]
  * @param {HTMLElement} [opciones.renglon]
+ * @param {import('../viewer/barra-edicion.js').BarraMontada|null} [opciones.barra=null]
+ *   `visor.barraEdicion`. **Opcional a propósito**: lo único que se le pide es
+ *   `borrarActivo(bool)`, o sea el NOMBRE y la PISTA del botón del modo borrar, que
+ *   son adorno informativo. El estado que de verdad importa —el `aria-pressed` y el
+ *   renglón— sale del nodo y del renglón, que se resuelven por selector como los
+ *   demás. Sin barra el cableado funciona entero; con ella, además el botón dice
+ *   «Salir del modo borrar» mientras está armado.
  * @param {Document} [opciones.documento]  Dónde se escuchan los atajos. Se
  *   escuchan en el DOCUMENTO y no en el panel porque el usuario tiene las manos
  *   en el mapa cuando quiere deshacer.
@@ -2264,7 +2308,9 @@ export function cablearEdicion({
   campoTolerancia = nodo(SELECTOR_CAMPO_TOLERANCIA),
   campoOffset = nodo(SELECTOR_CAMPO_OFFSET),
   botonOffset = nodo(SELECTOR_BOTON_OFFSET),
+  botonBorrar = nodo(SELECTOR_BOTON_BORRAR),
   renglon = nodo(SELECTOR_ESTADO_EDICION),
+  barra = null,
   documento = document,
 } = {}) {
   // ── Contratos del programador, ANTES de tocar un solo nodo ────────────────
@@ -2435,6 +2481,23 @@ export function cablearEdicion({
     }
   }
 
+  // ── El modo borrar ────────────────────────────────────────────────────────
+
+  /**
+   * Pulsar «Borrar vértices» CONMUTA el modo. Se lee el estado vigente del visor
+   * —no una copia local— y se le pide el contrario: así dos pulsaciones seguidas
+   * dejan lo mismo que ninguna, y una pulsación después de un `Escape` vuelve a
+   * encender en vez de intentar apagar lo que ya está apagado.
+   *
+   * No escribe en el renglón ni toca el `aria-pressed`: de las dos cosas se
+   * encarga la suscripción a `alCambiarModoBorrar` (ver el arranque). Hacerlo aquí
+   * además sería contarlo dos veces por el camino del botón y una sola por los
+   * otros tres.
+   */
+  const alPulsarBorrar = () => {
+    edicion.modoBorrar(!edicion.modoBorrar())
+  }
+
   // ── El offset ─────────────────────────────────────────────────────────────
 
   const alPulsarOffset = () => {
@@ -2603,6 +2666,7 @@ export function cablearEdicion({
   casillaSnap.addEventListener('change', alCambiarSnap)
   campoTolerancia.addEventListener('change', alCambiarTolerancia)
   botonOffset.addEventListener('click', alPulsarOffset)
+  botonBorrar.addEventListener('click', alPulsarBorrar)
 
   // El botón del offset sigue a la SELECCIÓN, que vive en `viewer/edicion.js` y
   // cambia con los clics del mapa: sin lado elegido no hay nada que desplazar.
@@ -2611,6 +2675,24 @@ export function cablearEdicion({
     decir(ref === null ? MENSAJE_SIN_LADO : MENSAJE_CON_LADO)
   })
   botonOffset.disabled = edicion.ladoSeleccionado() === null
+
+  // ── El modo borrar: UN solo sentido de propagación ─────────────────────────
+  // El botón PIDE (`alPulsarBorrar` → `edicion.modoBorrar(...)`) y la suscripción
+  // PINTA lo que haya quedado. Nunca al revés, y por eso `alPulsarBorrar` no toca
+  // el `aria-pressed`: `viewer/edicion.js` apaga el modo por tres caminos que este
+  // cableado no ve (`Escape`, salir de Edición, `destruir`), así que si el botón se
+  // pintara a sí mismo al pulsarse habría dos verdades del mismo booleano y la de
+  // la pantalla se quedaría vieja en cuanto se usara cualquiera de esos tres. Con
+  // el lazo cerrado por la suscripción, los cuatro caminos acaban en la misma línea.
+  const bajaModoBorrar = edicion.alCambiarModoBorrar((activo) => {
+    botonBorrar.setAttribute('aria-pressed', activo ? 'true' : 'false')
+    // La barra es opcional: sin ella el `aria-pressed` de arriba ya deja el botón
+    // correcto, y lo que se pierde es solo el cambio de nombre y de pista. Se pasa
+    // por parámetro —y no se busca por selector— porque `borrarActivo` es un método
+    // del control de Leaflet, no un nodo.
+    barra?.borrarActivo?.(activo)
+    decir(activo ? MENSAJE_BORRAR_ARMADO : MENSAJE_BORRAR_APAGADO)
+  })
 
   // ⚠️ EL ARRANQUE DEL ENGANCHE LO MANDA EL HTML, y esto es lo que ata las dos
   // cifras POR CONSTRUCCIÓN en vez de por casualidad: `index.html` nace con la
@@ -2662,8 +2744,9 @@ export function cablearEdicion({
     alColindantes,
 
     /**
-     * Retira los seis oyentes, la baja de la selección y la del store. IDEMPOTENTE.
-     * No toca el historial ni el estado: los dos son del llamante.
+     * Retira los siete oyentes, las dos bajas del visor (selección y modo borrar)
+     * y la del store. IDEMPOTENTE. No toca el historial ni el estado: los dos son
+     * del llamante.
      */
     destruir() {
       botonDeshacer.removeEventListener('click', deshacer)
@@ -2672,7 +2755,9 @@ export function cablearEdicion({
       casillaSnap.removeEventListener('change', alCambiarSnap)
       campoTolerancia.removeEventListener('change', alCambiarTolerancia)
       botonOffset.removeEventListener('click', alPulsarOffset)
+      botonBorrar.removeEventListener('click', alPulsarBorrar)
       bajaSeleccion()
+      bajaModoBorrar()
       bajaDelStore()
     },
   }
@@ -2687,6 +2772,10 @@ const edicionCableada = cablearEdicion({
   historial,
   edicion: visor.edicion,
   panel,
+  // Para que «Borrar vértices» diga «Salir del modo borrar» mientras está armado.
+  // Puede ser `null` (visor montado con `edicion:{barra:false}`) y el cableado lo
+  // admite: ver el JSDoc de `opciones.barra`.
+  barra: visor.barraEdicion,
   // La ficha tiene un solo dueño (el paso 4); el cableado de la edición le pasa
   // el recuento en vez de escribir en el `<dd>`.
   alContarColindantes: fijarRecuentoColindantes,
@@ -3779,6 +3868,26 @@ export function cablearGeneracionGml({
 
   return {
     generar,
+
+    /**
+     * ⭐ **EL RENGLÓN DE ACUSE, ABIERTO A UN SEGUNDO LLAMANTE (2026-08-11).**
+     *
+     * `[data-estado="generar-gml"]` es el acuse de la ZONA DE ENTREGA de la barra, y
+     * hasta hoy esa zona tenía un solo botón. Con el desplegable de salidas puesto
+     * tiene cuatro, y los otros tres los gobierna `app/cableado-expediente.js`.
+     *
+     * ⛔ **Se expone el método en vez de dejar que aquel módulo escriba el nodo.**
+     * El renglón y sus dos modificadores mutuamente excluyentes
+     * (`--error`/`--exito`) son de este cableado desde F04; dos módulos escribiendo
+     * las mismas clases sobre el mismo nodo acaban dejando el rojo encendido bajo un
+     * mensaje verde. Un dueño, dos llamantes.
+     *
+     * @param {string} texto
+     * @param {boolean} esError
+     * @param {boolean} [esExito]
+     */
+    acusar: decir,
+
     // ⭐ F13 · lo publica para que el reparto del mando pueda REPINTAR al cambiar
     // de rama. Sin esto, conmutar dejaría el botón como lo hubiera dejado el otro
     // dueño hasta que su store cambiara: un botón encendido sin motivo, o apagado
@@ -4115,6 +4224,13 @@ expedienteCableado = cablearExpediente({
   // El MISMO store que las otras seis vistas.
   estado,
   panel,
+  // ⭐ 2026-08-11 · el acuse de las tres exportaciones, que desde hoy se piden desde
+  // el desplegable de la barra y ya no desde dentro del `<dialog>`. Sin este cable,
+  // su desenlace se escribiría en el renglón del diálogo —que está cerrado— y
+  // «no hay nada que exportar» no lo leería nadie: fallo silencioso de manual.
+  // Se pasa el método del dueño del nodo, no el nodo. Ver `acusar` en
+  // `cablearGeneracionGml` y `acusar` en `cablearExpediente`.
+  acuse: (t, e, x) => gmlDeParcela.acusar(t, e, x),
   // El SRS del expediente: el mismo que reciben el visor, el cliente, F08 y F09. Aquí
   // deja de ser un dato suelto y pasa a ser lo que siempre debió ser — un campo del
   // Expediente—, que es literalmente lo que `./demo-datos.js` lleva pidiendo desde F03.
@@ -4802,10 +4918,19 @@ window.addEventListener('hashchange', () => {
 // ⚠️ SIN `try` propio, igual que los pasos 6, 8, 9, 11, 12 y 13: lo único que
 // puede lanzar aquí es un contrato del programador (o que la cáscara haya dejado
 // de traer los tres nodos, y entonces hay que arreglar `index.html`).
+// El registro de vecinas (F23). Se suscribe al canal de F05 y **no pide nada**: se
+// puebla con las colindantes que traiga cualquier otra parte de la aplicación —abrir
+// el Diagnóstico, o «Traer colindantes»—, así que no gasta ni una petición de más
+// (override O8). Sin cliente del Catastro se queda en `null`, que es «no se han
+// consultado» y NO «no hay ninguna»: la derivación lo dice en vez de inventarlo.
+const registroColindantes = crearRegistroColindantes({ catastro: catastroCableado })
+
 const derivacionCableada = cablearDerivacion({
   estado,
   lista: visor.sobrante.lista,
   capa: visor.sobrante.capa,
+  capaFuera: visor.sobrante.capaFuera,
+  colindantes: registroColindantes,
   panel,
   srs: SRS_DEMO,
 })

@@ -36,6 +36,7 @@ import {
   toleranciaCierre,
 } from '../../comprobacion/conjunto.js'
 import { TIPO_COMPROBACION } from '../../comprobacion/_comun.js'
+import { OPERATIVOS } from '../../config/operativos.js'
 import { derivarCesion } from '../../derivacion/cesion.js'
 import { prepararRecintos } from '../../gml/anillos.js'
 import { parsearGml } from '../../gml/parse.js'
@@ -304,11 +305,20 @@ describe('comprobarConjunto · la tolerancia es una COTA, no un ajuste', () => {
     expect(toleranciaCierre(0)).toBe(0)
   })
 
-  it('⛔ y es SIETE veces el umbral de F07, por un motivo escrito', () => {
-    // No es un aflojamiento: allí las dos fronteras vienen ya en la retícula y la
-    // discrepancia es de décimas de milímetro; aquí una de las dos es un punto
-    // creado sobre un lado y luego redondeado FUERA de él.
-    expect(GROSOR_REDONDEO_M / 0.001).toBeGreaterThan(7)
+  it('⛔ y F07 acabó midiendo LO MISMO: era el mismo fenómeno', () => {
+    // Este test decía «es SIETE veces el umbral de F07, por un motivo escrito»: allí
+    // las dos fronteras vendrían ya en la retícula y su discrepancia sería de décimas
+    // de milímetro. Medido el 2026-08-10 sobre 554 parcelas oficiales, era falso —
+    // cuando la vecina subdivide el lindero con un vértice que la propia no tiene, ese
+    // vértice es «un punto sobre un lado, redondeado», que es este caso exacto—, y por
+    // eso `grosorInvasionMinimoM` subió de 1 mm a este mismo número.
+    //
+    // El test se queda, invertido: el día que alguien vuelva a separarlos, que sea a
+    // propósito y aquí.
+    // Redondeado hacia ARRIBA en el JSON (0,0071 frente a 0,0070711): un número que
+    // una persona puede teclear, y por el lado que no reabre el defecto.
+    expect(OPERATIVOS.grosorInvasionMinimoM).toBeGreaterThanOrEqual(GROSOR_REDONDEO_M)
+    expect(OPERATIVOS.grosorInvasionMinimoM).toBeCloseTo(GROSOR_REDONDEO_M, 4)
   })
 
   it('la tolerancia usada y su perímetro salen en el resultado, para auditarla', () => {

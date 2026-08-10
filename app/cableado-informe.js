@@ -126,6 +126,7 @@ import {
 import { describirLindero } from '../report/literal.js'
 import { informePdfParcela } from '../report/pdf-parcela.js'
 import { NIVEL } from '../viewer/_comun.js'
+import { traducirColindantes } from './colindantes.js'
 import { crearDialogoInforme } from './dialogo-informe.js'
 
 // ── El tamaño del plano en el papel ──────────────────────────────────────────
@@ -358,14 +359,12 @@ function claveDeExpediente(parcelaActual) {
  * @param {Array<object>} parcelas
  * @returns {Array<{refcat: string|null, label: string|null, recintos: Array}>}
  */
-function aVecinasLiteral(parcelas) {
-  if (!Array.isArray(parcelas)) return []
-  return parcelas.map((p) => ({
-    refcat: typeof p.refcat === 'string' && p.refcat.trim() !== '' ? p.refcat : null,
-    label: typeof p.label === 'string' && p.label.trim() !== '' ? p.label : null,
-    recintos: Array.isArray(p.recintos) ? p.recintos : [],
-  }))
-}
+// ⚠️ **Ya no se traduce aquí.** Tenía una gemela en `app/cableado-diagnostico.js`
+// que discrepaba en el recorte del `refcat`. La única vive en
+// `app/colindantes.js#traducirColindantes`, y emite exactamente los tres campos que
+// este módulo necesitaba —`label` entre ellos—, así que el cambio es de sitio y no
+// de forma.
+const aVecinasLiteral = traducirColindantes
 
 /**
  * Parte el texto del `<textarea>` en párrafos. Un párrafo es lo que hay entre dos

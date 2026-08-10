@@ -58,7 +58,24 @@ modo de fallo habitual de toda ayuda escrita a mano.
 | **`Alt`** sostenida | cualquier gesto | Apaga el snap mientras dura | No |
 | **Arrastrar** un vértice | mapa | Lo mueve, con enganche si el snap está activo. **Un `set` y un `commit`, en el `dragend`** | Sí, al soltar |
 | **Teclear** una coordenada | tabla de vértices (panel) | Mueve el vértice | Sí |
+| **La ×** de la fila | tabla de vértices (panel) | Elimina ese vértice. La vía **sin puntería**: la de usar cuando el que sobra está encima de otro y no hay dónde pinchar | Sí |
 | **«Desplazar lindero»** + distancia (m) | **barra**, en su desplegable | Offset del lado seleccionado | Sí |
+| **«Borrar vértices»** | **barra** | ⭐ **ARMA un modo y se queda pulsada**: no borra nada por sí misma | No |
+| **Clic** | **en modo borrar** | Elimina el vértice a ≤ **12 px** del punto pinchado, uno por clic y **sin salir del modo**. Ni selecciona linderos ni el doble clic inserta mientras dura | Sí |
+| **`Escape`** | **en modo borrar** | Sale del modo. También se sale al cambiar de pantalla | No |
+
+⛔ **El modo borrar (2026-08-10) es la ÚNICA excepción a «un clic sencillo no
+escribe nunca en el modelo»**, que era la garantía con la que se cerró F06. Se
+acepta porque las tres condiciones que la hacían valiosa se conservan por otra vía:
+hay que **armarlo a propósito** (una pulsación deliberada), **se ve mientras dura**
+(el botón en rojo, el cursor en cruz sobre el mapa Y sobre los vértices, y el
+renglón `role="status"`), y **se apaga solo por tres caminos** — `Escape`, salir de
+Edición y destruir el visor—, de modo que no puede sobrevivir a irse y volver.
+
+**Por qué un modo y no un botón «borra el seleccionado»**: limpiar un levantamiento
+importado son ocho o diez vértices seguidos. Con un botón cada borrado cuesta dos
+gestos en dos sitios distintos de la pantalla; con el modo cuesta uno, y siempre en
+el mismo sitio — encima del vértice.
 | **`Ctrl+Z` / `Ctrl+Y`** | app | Deshacer / rehacer. **Se callan dentro de un `<input>`**: ahí ese atajo es el del navegador sobre el texto que se escribe, y las celdas de coordenada son inputs | Sí |
 
 Dos consecuencias que conviene tener escritas:

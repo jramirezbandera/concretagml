@@ -187,9 +187,13 @@ export const SELECTOR = Object.freeze({
   VACIO: '[data-expediente="vacio"]',
   GUARDAR: `[data-accion="${ACCION.GUARDAR}"]`,
   ABRIR_PROYECTO: `[data-accion="${ACCION.ABRIR_PROYECTO}"]`,
-  EXPORTAR_DXF: `[data-accion="${ACCION.EXPORTAR_DXF}"]`,
-  EXPORTAR_COORDENADAS: `[data-accion="${ACCION.EXPORTAR_COORDENADAS}"]`,
-  EXPORTAR_EXCEL: `[data-accion="${ACCION.EXPORTAR_EXCEL}"]`,
+  // ⛔ **AQUÍ HABÍA TRES MÁS —`EXPORTAR_DXF`, `EXPORTAR_COORDENADAS` y
+  // `EXPORTAR_EXCEL`— Y SE FUERON EL 2026-08-11 CON SUS BOTONES**, al desplegable
+  // de salidas de la barra. Este mapa es el contrato de MARCADO de ESTE diálogo:
+  // dejar aquí un selector que ya no casa ningún nodo suyo es exactamente la clase
+  // de regla muerta que la rebanada 0 del topbar tuvo que ir a limpiar. Sus
+  // `ACCION` siguen intactos —son el vocabulario del embudo, no del marcado— y sus
+  // selectores viven ahora en `app/cableado-expediente.js#SELECTORES_SALIDA`.
   EXPORTAR_PROYECTO: `[data-accion="${ACCION.EXPORTAR_PROYECTO}"]`,
   CERRAR: '[data-accion="cerrar-expediente"]',
   ESTADO: '[data-estado="dialogo-expediente"]',
@@ -564,33 +568,40 @@ export function crearDialogoExpediente({ documento, alAvisar } = {}) {
   // ── Grupo 3 · entrar y salir por fichero ──────────────────────────────────
   const grupoFicheros = crear('fieldset', CLASE.GRUPO)
   grupoFicheros.dataset.expediente = 'ficheros'
-  grupoFicheros.append(crear('legend', CLASE.LEYENDA, 'Llevarse el trabajo a un fichero'))
+  grupoFicheros.append(crear('legend', CLASE.LEYENDA, 'Guardar el expediente en un fichero'))
   grupoFicheros.append(
     crear(
       'p',
       CLASE.APUNTE,
-      'El fichero de proyecto es el único de los cuatro que se puede volver a abrir aquí: guarda ' +
-        'el expediente entero. El DXF y los dos listados de coordenadas son para llevar la ' +
-        'geometría a otro programa.',
+      'El fichero de proyecto guarda el expediente entero y es el único que se puede volver a ' +
+        'abrir aquí. Para llevar la geometría a otro programa —DXF o listado de coordenadas— ' +
+        'usa el desplegable que hay junto a «Generar GML», arriba.',
     ),
   )
   const pieFicheros = crear('div', CLASE.PIE)
   /**
-   * Los botones de exportación, en el orden en el que se ofrecen.
+   * Los botones de fichero, en el orden en el que se ofrecen.
    *
-   * ⚠️ **Los dos listados de coordenadas van juntos y con su extensión a la vista.**
-   * Son el MISMO documento en dos envases (F20), así que lo único que los distingue
-   * es para qué se van a usar: el `.txt` se lleva al campo o se pega en una libreta,
-   * y el `.xlsx` se abre en una hoja de cálculo para sumar y ordenar. Con los rótulos
-   * pegados y las extensiones visibles, esa elección se hace de un vistazo; separados
-   * o sin extensión, parecerían dos cosas distintas.
+   * ⛔ **ERAN CINCO HASTA EL 2026-08-11 Y AHORA SON DOS.** Las tres exportaciones de
+   * geometría —`EXPORTAR_DXF`, `EXPORTAR_COORDENADAS` y `EXPORTAR_EXCEL`— se han
+   * mudado al desplegable de salidas de la barra de arriba, por petición del autor:
+   * «no tiene sentido que la exportación esté dentro del menú de expediente».
+   *
+   * ⚠️ **Se RETIRAN de aquí en vez de repetirse arriba, y eso es obligatorio, no
+   * una preferencia**: `app/cableado-expediente.js` y los guiones de humo resuelven
+   * esos `data-accion` con `document.querySelector`, que se queda con el PRIMERO del
+   * documento. Con un botón en `index.html` y otro fabricado aquí, el diálogo
+   * quedaría cableado a un nodo que no es el suyo. Es la trampa K.1, y estaba
+   * anticipada por escrito en el hueco de `index.html` desde la rebanada 2 del topbar.
+   *
+   * Las dos que se quedan no son exportaciones: son **el expediente entrando y
+   * saliendo de la propia aplicación**, que es de lo que va este diálogo. El
+   * `ACCION` de las tres mudadas NO se toca —sigue siendo el vocabulario del
+   * embudo, y quien las emite ahora es la barra—.
    */
   const BOTONES_FICHERO = [
     [ACCION.EXPORTAR_PROYECTO, 'Guardar proyecto (.json)'],
     [ACCION.ABRIR_PROYECTO, 'Abrir un proyecto…'],
-    [ACCION.EXPORTAR_DXF, 'Exportar DXF para CAD'],
-    [ACCION.EXPORTAR_COORDENADAS, 'Exportar coordenadas (.txt)'],
-    [ACCION.EXPORTAR_EXCEL, 'Exportar coordenadas (.xlsx)'],
   ]
   for (const [accion, rotulo] of BOTONES_FICHERO) {
     const boton = crear('button', 'gml-boton gml-boton--secundario', rotulo)

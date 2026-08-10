@@ -102,7 +102,7 @@ import { crearCajonComprobacion } from '../../viewer/cajon-comprobacion.js'
 import { crearCajonDiagnostico } from '../../viewer/cajon-diagnostico.js'
 import { crearContraste } from '../../viewer/contraste.js'
 import { crearListaSobrante } from '../../viewer/lista-sobrante.js'
-import { crearCapaPiezas } from '../../viewer/piezas.js'
+import { VARIANTE, crearCapaPiezas } from '../../viewer/piezas.js'
 import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
 
 // ── EL CROMO DEL MAPA: el segundo efecto de `crearVisor` sobre el documento ──
@@ -160,6 +160,11 @@ function montarCromoDelMapa() {
   // F17: las dos piezas del sobrante, DE VERDAD (ver el doble).
   const listaSobrante = crearListaSobrante({ documento: document })
   const capaPiezas = crearCapaPiezas({ mapa, zona: husoPorSrs(SRS_DEMO) })
+  const capaFuera = crearCapaPiezas({
+    mapa,
+    zona: husoPorSrs(SRS_DEMO),
+    variante: VARIANTE.FUERA,
+  })
   // ⚠️ F11: el `L.Map` DE VERDAD se guarda y va al doble. Hasta aquí el
   // `visor.mapa` era `{on, off}` —lo justo que consume `cablearCatastro` por duck
   // typing—, y desde F11 hay un segundo consumidor, `viewer/partes.js`, que
@@ -167,7 +172,7 @@ function montarCromoDelMapa() {
   mapaVivo = mapa
   diagnosticoVivo = { cajon, contraste }
   comprobacionViva = cajonComprobacion
-  sobranteVivo = { lista: listaSobrante, capa: capaPiezas }
+  sobranteVivo = { lista: listaSobrante, capa: capaPiezas, capaFuera }
   desmontarCromoVivo = () => {
     capaPiezas.destruir()
     listaSobrante.destruir()
@@ -257,6 +262,8 @@ vi.mock('../../viewer/index.js', async (importarOriginal) => ({
         },
         ladoSeleccionado: () => null,
         alCambiarSeleccion: () => () => {},
+        modoBorrar: () => false,
+        alCambiarModoBorrar: () => () => {},
         fijarColindantes(recintos) {
           arranque.registro.colindantes.push(recintos)
         },
@@ -423,6 +430,7 @@ const {
   SELECTOR_CAMPO_TOLERANCIA,
   SELECTOR_CAMPO_OFFSET,
   SELECTOR_BOTON_OFFSET,
+  SELECTOR_BOTON_BORRAR,
   SELECTOR_ESTADO_EDICION,
   SELECTOR_BOTON_GML,
 } = await import('../../app/main.js')
@@ -540,13 +548,40 @@ function crearEdicionFalsa({ desplazamiento = { aplicado: true, modo: 'MITER', d
   let tau = OPERATIVOS.snapMetros
   let seleccion = null
   const oyentes = new Set()
+  // El modo borrar, con su propio juego de oyentes: `cablearEdicion` cierra el
+  // lazo por la suscripción (pulsar pide, la suscripción pinta), así que un doble
+  // que no notificara dejaría el botón sin `aria-pressed` y la prueba en verde
+  // sobre nada.
+  let borrando = false
+  const oyentesBorrar = new Set()
 
   return {
-    llamadas: { snapActivo: [], tolerancia: [], colindantes: [], desplazar: [] },
+    llamadas: { snapActivo: [], tolerancia: [], colindantes: [], desplazar: [], modoBorrar: [] },
     /** Simula un clic del mapa que selecciona (o suelta) un lindero. */
     seleccionar(ref) {
       seleccion = ref
       for (const fn of oyentes) fn(ref)
+    },
+    modoBorrar(valor) {
+      if (valor !== undefined) {
+        this.llamadas.modoBorrar.push(valor)
+        // Como el real: solo se anuncia si CAMBIA de verdad.
+        if (valor !== borrando) {
+          borrando = valor
+          for (const fn of oyentesBorrar) fn(borrando)
+        }
+      }
+      return borrando
+    },
+    alCambiarModoBorrar(fn) {
+      oyentesBorrar.add(fn)
+      return () => oyentesBorrar.delete(fn)
+    },
+    /** Apaga el modo POR FUERA, como hacen `Escape` y salir de Edición. */
+    apagarModoBorrarDesdeElVisor() {
+      if (!borrando) return
+      borrando = false
+      for (const fn of oyentesBorrar) fn(false)
     },
     snapActivo(valor) {
       if (valor !== undefined) {
@@ -620,6 +655,7 @@ function cablear(parcelaInicial, extra = {}) {
     tolerancia: document.querySelector(SELECTOR_CAMPO_TOLERANCIA),
     offsetCampo: document.querySelector(SELECTOR_CAMPO_OFFSET),
     offsetBoton: document.querySelector(SELECTOR_BOTON_OFFSET),
+    borrar: document.querySelector(SELECTOR_BOTON_BORRAR),
     renglon: document.querySelector(SELECTOR_ESTADO_EDICION),
   }
   return montado
@@ -939,13 +975,23 @@ describe('app/main · deshacer y rehacer (criterio 5)', () => {
     expect(rehacer.disabled).toBe(true)
   })
 
-  it('los botones NUNCA pierden su `<kbd>`: se les toca el `disabled`, no el texto', async () => {
+  it('los botones NUNCA pierden su marcado: se les toca el `disabled`, no el texto', async () => {
     const { estado, historial, deshacer, rehacer } = cablear(parcelaCuadrada())
     await editar(estado, historial, parcelaCuadrada({ lado: 20 }))
     deshacer.click()
 
+    // ⚠️ **Lo que hay dentro cambió el 2026-08-10 y lo que se vigila NO.** Hasta
+    // ese día era un `<kbd>` con el atajo; desde que la barra es de iconos son el
+    // `<svg>` del dibujo y el `<span>` con el nombre accesible. En las dos épocas
+    // el peligro es el mismo y por eso la prueba sigue aquí: un `textContent = …`
+    // sobre estos dos botones —la forma natural de escribir «Deshacer (3)»— se
+    // llevaría por delante el marcado y dejaría dos botones VACÍOS, invisibles y
+    // sin nombre, sin que nada avise.
     for (const boton of [deshacer, rehacer]) {
-      expect(boton.querySelector('kbd'), 'el atajo escrito dentro del botón').not.toBeNull()
+      expect(boton.querySelector('svg'), 'el icono dibujado dentro del botón').not.toBeNull()
+      const nombre = boton.querySelector('.gml-barra-rotulo')
+      expect(nombre, 'el nombre accesible dentro del botón').not.toBeNull()
+      expect(nombre.textContent.trim().length, 'y no vacío').toBeGreaterThan(0)
     }
   })
 })
@@ -1179,6 +1225,59 @@ describe('app/main · el desplazamiento de lindero (offset)', () => {
   })
 })
 
+// ── 5 bis · El conmutador del modo borrar (2026-08-10) ───────────────────────
+//
+// Lo que se prueba aquí es EL SENTIDO DEL LAZO, que es donde está el fallo fácil:
+// el botón PIDE y la suscripción PINTA. Un cableado que pintara el `aria-pressed`
+// al pulsar pasaría los dos primeros tests y fallaría el tercero, que es el que
+// importa — porque los tres caminos por los que el modo se apaga solo (`Escape`,
+// salir de Edición, `destruir`) van por ahí y por ningún otro sitio.
+
+describe('app/main · el botón «Borrar vértices» conmuta el modo del visor', () => {
+  it('nace apagado, encendido y sin motivo que dar', () => {
+    const { borrar } = cablear(parcelaCuadrada())
+    expect(borrar.getAttribute('aria-pressed')).toBe('false')
+    expect(borrar.disabled, 'armar el modo se puede hacer siempre').toBe(false)
+  })
+
+  it('pulsarlo ARMA el modo, y volver a pulsarlo lo desarma', () => {
+    const { borrar, edicion } = cablear(parcelaCuadrada())
+
+    borrar.click()
+    expect(edicion.llamadas.modoBorrar).toEqual([true])
+    expect(edicion.modoBorrar()).toBe(true)
+
+    borrar.click()
+    expect(edicion.llamadas.modoBorrar).toEqual([true, false])
+    expect(edicion.modoBorrar()).toBe(false)
+  })
+
+  it('el `aria-pressed` y el renglón siguen al VISOR, no a la pulsación', () => {
+    const { borrar, edicion, renglon } = cablear(parcelaCuadrada())
+
+    borrar.click()
+    expect(borrar.getAttribute('aria-pressed')).toBe('true')
+    expect(renglon.textContent, 'un modo destructivo se anuncia').toMatch(/modo borrar/i)
+
+    // ⭐ EL CASO QUE DECIDE: el modo se apaga por un camino que el botón no ve
+    // (`Escape`, o salir de la pantalla de Edición). Si el cableado pintara el
+    // botón al pulsarlo en vez de al ser notificado, aquí se quedaría hundido
+    // sobre un modo que ya no está armado — y el usuario pincharía en el mapa
+    // esperando borrar.
+    edicion.apagarModoBorrarDesdeElVisor()
+    expect(borrar.getAttribute('aria-pressed')).toBe('false')
+    expect(renglon.textContent).toMatch(/apagado/i)
+  })
+
+  it('`destruir()` retira el oyente del botón y la baja del modo', () => {
+    const { borrar, edicion, cableado } = cablear(parcelaCuadrada())
+    cableado.destruir()
+
+    borrar.click()
+    expect(edicion.llamadas.modoBorrar, 'el botón ya no pide nada').toEqual([])
+  })
+})
+
 // ── 6 · Los dos ganchos que se le entregan al Catastro ───────────────────────
 
 describe('app/main · una parcela nueva REINICIA el historial (decisión 2 de F06)', () => {
@@ -1310,19 +1409,25 @@ describe('app/main · los dos ganchos que el arranque le entrega al Catastro', (
     // ⭐ El segundo es el de la puerta de contexto. Sin él, traer el parcelario de
     // fondo dejaría colgadas las dianas de snap de la parcela anterior.
     expect(typeof arranque.catastro.alCambiarOficial).toBe('function')
-    // CUATRO suscriptores: el snap de F06, el diagnóstico de F07, la CAPA que las
-    // dibuja (desde el arreglo del check visual) y —desde F09— el INFORME, que
-    // necesita las vecinas para atribuir cada lindero en la descripción literaria
-    // y que **no dispara ninguna consulta propia**: se cuelga de la que hace el
-    // cajón del diagnóstico al abrirse (el presupuesto de red de F09 es +1
-    // petición, y se la gasta en el servicio descriptivo).
+    // CINCO suscriptores: el snap de F06, el diagnóstico de F07, la CAPA que las
+    // dibuja (desde el arreglo del check visual), el INFORME de F09 —que necesita
+    // las vecinas para atribuir cada lindero en la descripción literaria— y, desde
+    // el 2026-08-10, el REGISTRO de `app/colindantes.js`, que las guarda para que la
+    // derivación pueda decir a quién le quita terreno la geometría medida.
     //
-    // Que sean cuatro y no uno es exactamente el contrato del cableado del Catastro
+    // ⭐ Ninguno de los cinco **dispara una consulta propia**: todos se cuelgan de la
+    // que hace el cajón del diagnóstico al abrirse. Por eso el quinto costó CERO
+    // peticiones, que es lo que el override O8 exige («una apertura, una petición»)
+    // y lo que hizo que la fase 2 de F23 fuera barata: la ficha de F17 la había
+    // estimado cara suponiendo que había que sacar las vecinas de una clausura, y
+    // resultó que su fuente ya era este canal público.
+    //
+    // Que sean cinco y no uno es exactamente el contrato del cableado del Catastro
     // (un `Set`, no un callback: «el segundo en llegar no puede desalojar al
     // primero»), y este número es lo que lo afirma desde el arranque real. Eran dos
-    // hasta que las vecinas se pintaron y tres hasta F09; si alguna vez BAJA,
-    // alguien ha desenchufado a uno.
-    expect(arranque.oyentesColindantes.size, 'el puente del arranque').toBe(4)
+    // hasta que las vecinas se pintaron, tres hasta F09 y cuatro hasta F23; si
+    // alguna vez BAJA, alguien ha desenchufado a uno.
+    expect(arranque.oyentesColindantes.size, 'el puente del arranque').toBe(5)
   })
 
   it('traer una parcela REINICIA la pila del arranque (deshacer no la devuelve)', () => {

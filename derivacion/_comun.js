@@ -56,6 +56,18 @@ export const TIPO_DERIVACION = Object.freeze({
   SIN_SOBRANTE: 'SIN_SOBRANTE',
   /** Una pieza cae por debajo del umbral de grosor: se LISTA, no se descarta sola. */
   PIEZA_ESTRECHA: 'PIEZA_ESTRECHA',
+  /**
+   * Una pieza NO SOBREVIVE al fichero: escrita con 2 decimales deja de encerrar
+   * superficie, así que no puede ser una parcela.
+   *
+   * ⛔ **No es lo mismo que `PIEZA_ESTRECHA` y por eso no lo reutiliza.** «Estrecha»
+   * es un juicio con umbral —quien firma decide si esa franja es finca o ruido— y
+   * `cesion.js` la lista a propósito para que decida. Esto de aquí no es un juicio:
+   * es que el `cp:referencePoint` no existe, y sin él la Sede rechaza el fichero.
+   * Mezclarlos habría dejado al usuario «decidiendo» sobre algo que no se puede
+   * hacer.
+   */
+  PIEZA_NO_EMITIBLE: 'PIEZA_NO_EMITIBLE',
   /** La parcela editada NO está contenida en la oficial: la puerta de la fase 1. */
   CRECE_FUERA: 'CRECE_FUERA',
   /** No hay `geometriaOficial` contra la que restar (dibujo a mano, DXF, TXT). */
@@ -77,6 +89,33 @@ export const TIPO_DERIVACION = Object.freeze({
   PIEZA_EXCLUIDA: 'PIEZA_EXCLUIDA',
   /** Lo que se va a entregar NO cubre el contorno oficial: el IVG saldría negativo. */
   CONJUNTO_NO_CIERRA: 'CONJUNTO_NO_CIERRA',
+  // ── Los del COLINDANTE RECORTADO (F23), que las fases 2 y 3 no podían prever ──
+  // Nacen con `derivacion/vecino.js` y son de una pregunta nueva: no «qué suelta mi
+  // parcela» ni «qué entra en el fichero», sino **a quién le quita terreno la
+  // medición**. Reinterpretar `CRECE_FUERA` para esto sería perder la distinción
+  // que hace útil al aviso: aquél dice que la parcela se sale, y éstos dicen de
+  // quién y cuánto.
+  /** No se han traído las colindantes: no se puede afirmar a quién se le quita. */
+  VECINAS_SIN_CONSULTAR: 'VECINAS_SIN_CONSULTAR',
+  /** El motor no pudo recortar a un colindante concreto. Falta una medición. */
+  RECORTE_FALLIDO: 'RECORTE_FALLIDO',
+  /** La medición corta a un colindante en piezas disjuntas: la mayor se queda la RC. */
+  VECINO_PARTIDO: 'VECINO_PARTIDO',
+  /** Exceso que no solapa NINGUNA colindante: vial o dominio público. Se declara. */
+  FUERA_SOBRE_NADIE: 'FUERA_SOBRE_NADIE',
+  /** Se ha asignado un trozo del sobrante a un vecino con el que NO linda. */
+  ASIGNACION_IMPOSIBLE: 'ASIGNACION_IMPOSIBLE',
+  /**
+   * A un colindante solo se le quita una franja más fina que el redondeo del
+   * fichero: **no se le recorta y NO entra en el expediente**, pero se dice.
+   *
+   * El parcelario del Catastro no es topológicamente limpio (medido: hasta 5 mm de
+   * solape entre vecinas oficiales), así que enganchar un lindero deja franjas de
+   * milímetros contra parcelas que nadie ha tocado. Meterlas en el expediente sería
+   * **modificar la finca de un tercero por el ruido del redondeo**, que es
+   * exactamente lo que no se le puede mandar a la Sede.
+   */
+  VECINO_SOLO_REDONDEO: 'VECINO_SOLO_REDONDEO',
 })
 
 /**

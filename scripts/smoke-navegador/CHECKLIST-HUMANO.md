@@ -595,10 +595,11 @@ arreglo sirve de verdad, no que exista.
 ### 7.6 bis · La barra sobre el mapa ⟨juicio — nuevo el 2026-07-29⟩
 
 Lo que ganó la tabla de vértices lo paga el mapa: la barra flota **encima de la
-ortofoto**, y eso no lo puede juzgar ningún guion. Mide 285 × 36 px arriba a la
-izquierda; el panel de ayuda abierto mide 460 × 558 px, o sea el **27 % del lienzo**
-(1048 × 900 al viewport de referencia). Nada de esto es un defecto por sí solo — la
-pregunta es si molesta cuando se está trabajando.
+ortofoto**, y eso no lo puede juzgar ningún guion. Mide **255 × 57 px** centrada
+abajo (medido el 2026-08-10, con la barra ya en iconos: eran ~530 de ancho cuando
+cada herramienta llevaba su palabra); el panel de ayuda abierto mide 460 × 558 px,
+o sea el **27 % del lienzo** (1048 × 900 al viewport de referencia). Nada de esto es
+un defecto por sí solo — la pregunta es si molesta cuando se está trabajando.
 
 - [ ] **¿Estorba sobre la parcela?** La geometría se encuadra centrada y la barra
       vive **centrada en el borde inferior** (desde el 2026-08-05; hasta entonces
@@ -624,15 +625,18 @@ pregunta es si molesta cuando se está trabajando.
       solo un cambio de fondo. Apágalo y enciéndelo mirando a otra parte entre medias:
       ¿sabrías decir en qué estado está **sin** pulsarlo? Si no, es un error
       silencioso de manual y **bloquea**, porque el usuario no puede saber si lo que
-      acaba de arrastrar enganchó o no. ⚠️ Desde el 2026-08-05 el botón dice
-      «Ajuste», así que ahora hay dos preguntas y no una: si se ve el estado, y si se
-      lee QUÉ es lo que está encendido.
+      acaba de arrastrar enganchó o no. ⚠️ **El 2026-08-10 volvió a ser un icono** (un
+      imán en herradura, que es el símbolo del «snap» en todo editor de dibujo), así
+      que la palabra «Ajuste» ya no está ahí para desempatar: encendido es un bloque
+      azul macizo y apagado una superficie clara. Esta casilla es la que más se
+      consulta de toda la barra — si el estado no se lee de lejos, bloquea.
 - [ ] **¿Se descubren los desplegables?** La tolerancia y la distancia del offset ya
       no están a la vista: se abren desde su herramienta. El ajuste es un **botón
-      partido** («Ajuste» + flecha) y «Desplazar lindero» abre siempre y lleva su
-      flecha al lado. ¿Se entiende que la flecha abre algo? ¿Alguien encuentra la
-      tolerancia sin que se la enseñen? La flecha del ajuste es la única herramienta
-      de la barra que sigue sin palabra, y es la que más cuesta encontrar.
+      partido** (imán + flecha) y «Desplazar lindero» abre siempre y lleva su flecha
+      al lado. ¿Se entiende que la flecha abre algo? ¿Alguien encuentra la tolerancia
+      sin que se la enseñen? La flecha va dibujada más pequeña que los iconos a
+      propósito —es un apéndice, no una herramienta—, y es lo que más cuesta
+      encontrar de la barra.
 - [ ] **«Desplazar lindero» no se apaga nunca** — el que se apaga es el botón de
       dentro, y su motivo («Elige antes un lindero en el mapa: basta un clic sobre
       él.») está en el desplegable. Ábrelo sin haber elegido lindero: ¿se lee el
@@ -651,6 +655,73 @@ pregunta es si molesta cuando se está trabajando.
       ortofoto era un cartel de tres líneas. ¿Se echa de menos, o el motivo se
       encuentra donde ahora vive (el desplegable del offset y la primera línea de la
       ayuda)?
+
+#### 7.6 ter · La barra de ICONOS y su pista ⟨2026-08-10⟩
+
+> ⚠️ **Esto revierte el rediseño del 2026-08-05, que fue una decisión del autor.**
+> Aquel día se rechazaron los iconos, y la objeción no era estética: *«un `title`
+> aparece al segundo de pasar el ratón, o sea después de haber dudado»*. La barra
+> vuelve a los iconos con esa objeción atacada de frente — una PISTA propia que sale
+> a **120 ms** (una quinta parte del `title` nativo) y **al instante** con el foco
+> del teclado. **Si la duda vuelve, esto se rechaza otra vez, y el sitio de la
+> decisión es este apartado.** El guion mide que la pista sale, qué dice y que no se
+> sale del mapa; lo que no puede medir es si 120 ms bastan para una mano humana.
+
+- [ ] ⭐ **¿Se aprenden los siete dibujos, o hay que esperar al globo cada vez?**
+      Recorre la fila con el ratón sin prisa: deshacer ↶, rehacer ↷, imán, dos
+      linderos con flecha (desplazar), papelera (borrar), recinto de cinco lados
+      (dibujar, solo en la rama EDIFICIO) e interrogación. **La pregunta de verdad
+      es la de la segunda sesión**: mañana, ¿los reconoces sin pasar el ratón? Si a
+      la tercera vez sigues esperando el globo, los iconos no están sirviendo y hay
+      que volver a las palabras — que es exactamente lo que ya pasó una vez.
+- [ ] **La pista, ¿llega a tiempo?** Cruza la barra deprisa de camino al mapa: no
+      debería encenderse ni un globo. Párate sobre una herramienta: tiene que salir
+      casi al instante. Y recorriendo la fila sin levantar el ratón, el globo
+      **sigue** al cursor y se reescribe sin volver a esperar. Si parpadea, o si se
+      queda un momento diciendo el nombre de la herramienta anterior, es un defecto.
+- [ ] **Por teclado la pista NO espera.** Tabula hasta la barra: el globo sale a la
+      vez que el anillo de foco. ¿Se lee bien, o tapa la herramienta siguiente?
+- [ ] **El hueco del panel de ayuda.** Ábrelo y mira los dos lados: tiene que quedar
+      **igual de aire a izquierda y a derecha** (5 px y 5 px medidos el 2026-08-10).
+      Hasta ese día sobraban ~70 px a la derecha, que es lo que el autor reportó como
+      «margen excesivo», y era un flex en columna sin `align-items:center`. Si vuelve
+      a verse descentrado, es esa línea.
+
+#### 7.6 quater · BORRAR vértices, por las dos vías ⟨2026-08-10⟩
+
+**Por qué dos vías.** El modo del mapa es la principal —limpiar un levantamiento
+importado son ocho o diez vértices seguidos, y con el modo cada uno cuesta UN clic—
+y la × de la tabla es la de precisión, para el caso que el mapa no resuelve: **el
+vértice que sobra está encima de otro y no hay dónde pinchar**. El guion mide que
+las dos borran exactamente uno; lo que no mide es si se entienden.
+
+- [ ] ⛔ **¿Se nota que el modo está ARMADO?** Púlsalo y **mira al mapa, no al
+      botón**: el cursor pasa a cruz (también encima de los vértices) y el renglón
+      lo dice. El botón pulsado vive abajo del todo, a cientos de píxeles de donde
+      está tu mano. **Si con el modo armado se te olvida y pinchas para mirar algo,
+      has borrado un vértice: eso es lo que hay que juzgar aquí, y si pasa una sola
+      vez, bloquea.**
+- [ ] **El rojo del modo armado.** «Borrar» armado se pinta en ROJO y «Dibujar
+      recinto» armado en azul, a propósito: uno destruye geometría al primer clic y
+      el otro la añade. ¿Se distinguen de un vistazo?
+- [ ] **Borra ocho seguidos.** Es el caso de uso. ¿El modo aguanta sin apagarse?
+      ¿Sigue siendo cómodo al octavo, o pide otra cosa (un rectángulo de selección,
+      por ejemplo)? Y **deshaz los ocho con `Ctrl+Z`**: cada borrado es una operación
+      del historial, así que hacen falta ocho pulsaciones. ¿Es lo esperable, o se
+      querría deshacer la tanda entera?
+- [ ] **`Escape` sale del modo**, y también salir de Edición. Comprueba lo segundo:
+      arma el modo, vete a Diagnóstico, vuelve. Tiene que estar apagado — un modo que
+      borra no puede sobrevivir a irse y volver.
+- [ ] **La × de la tabla: ¿se ve, y se acierta?** Mide **22 × 22 px** en una fila de
+      22, que es la diana más pequeña de la app y está por debajo de los 24 px que
+      pide la guía. Se aceptó a sabiendas para que quince vértices sigan cabiendo.
+      Recorre la tabla y bórrale tres filas: ¿aciertas al primer intento? Si fallas,
+      la salida NO es agrandar el botón (ensancharía la fila) sino apoyarse más en el
+      modo del mapa.
+- [ ] **¿Se borra la que se quiere?** La × está al final de la fila, a 141 px de la
+      coordenada Y. Con quince filas de 22 px, ¿se sigue el renglón con la vista sin
+      saltar de fila? Si borras el vértice de al lado alguna vez, el problema es el
+      rayado de la tabla, no el botón.
 
 ### 7.7 · El enganche a las COLINDANTES ⟨cuesta 1 petición al Catastro⟩
 
@@ -2758,3 +2829,97 @@ una fase corta.
 no es la especificación del formato: lo que la fase promete es lo que este fichero
 demuestra. Si te llega uno que no entra, **guárdalo**: es el material de la
 siguiente fase, igual que éste lo fue de ésta.
+
+---
+
+## 21 · F23 · El colindante recortado — ⛔ LO ÚNICO QUE FALTA ES TUYO
+
+El guion `25-colindante-recortado.js` sale `ok:true` y la suite entera está en
+verde. **Eso no cierra la fase**, y conviene que quede escrito por qué.
+
+### 21.1 · ⛔ EL IVG. Nada de esto se ha presentado nunca
+
+La aplicación produce ahora un expediente con una forma que **la Sede no ha visto**:
+la parcela propia, sus cesiones de alta, y **una o más parcelas de OTRO TITULAR
+recortadas**, cada una conservando su referencia catastral real bajo `ES.SDGC.CP`.
+
+Lo que sí está medido (2026-08-10, expediente `29050A01000144`): el conjunto
+**cierra** con residuo `0,0026 m²` sobre 4.518,92 m², y el `.gml` **valida contra
+`cp/4.0`** con `npm run validar:xsd --estricto`.
+
+⚠️ Y eso no garantiza nada. La red es asimétrica: **que falle sí garantiza que hay
+un problema; que pase, no garantiza nada.** El precedente está escrito en este mismo
+proyecto — el fichero de edificio que validaba aquí y el ICUC rechazaba por no
+declarar `xmlns:xlink`.
+
+**Lo que hay que hacer:** subir uno a la Sede y mirar el IVG.
+
+**Lo que hay que mirar, por orden de gravedad:**
+
+1. **¿Admite que modifiquemos la parcela de un tercero sin su consentimiento?** Es
+   el riesgo de producto de la fase entera, y es jurídico, no geométrico. Si la
+   respuesta es no, F23 sirve para VER (fases 1 y 2) y no para ENTREGAR.
+2. **¿Cómo computa `AFECTADAS`?** Con dos vecinos dentro, la cifra debería ser la
+   suma de los contornos oficiales tocados (4.518,92 m² en el caso medido) y no
+   solo la de tu finca. Es el número que delataría que la diana del cierre está
+   bien elegida.
+3. 🆕 **«Tipo de operación» con una forma que O20 no midió.** El desplegable tiene
+   DOS opciones y la aplicación propone **SEGREGACIÓN** porque hay un alta. Pero
+   este expediente además modifica fincas existentes de otros. Las dos formas
+   medidas eran «1 miembro `ES.SDGC.CP`» → Subsanación y «N miembros con alta» →
+   Segregación; **ésta es una tercera**. Prueba las dos y anota cuál acepta.
+
+### 21.2 · El caso del VIAL, que el guion sí ejercitó
+
+Sobre `?demo=real` el exceso cae **sobre ninguna parcela** (56,37 m²) y la
+aplicación **deja descargar igual**, declarándolo. Es tu decisión del 2026-08-10
+(«a veces el vial puede estar mal y necesitas georreferenciarlo pisándolo»).
+
+**Lo que hay que decidir:** ¿el IVG lo tolera, o lo devuelve negativo por reclamar
+superficie fuera de todo contorno oficial? Si lo devuelve, esa decisión hay que
+revisarla — y entonces `FUERA_SOBRE_NADIE` tendría que volver a ser ERROR.
+
+### 21.3 · Lo que el guion NO puede mirar y tú sí
+
+- **Si «Finca nueva (alta)» vs «Pasa a 9398515VK3799G» se entiende sin explicación.**
+  Todo el reparto pieza a pieza se apoya en que esa elección sea obvia, y eso no lo
+  firma ningún test.
+- **Si el ámbar se distingue del cian sobre TU ortofoto.** El guion comprueba el
+  hex; que se lean como dos cosas distintas sobre un borde arbolado, no.
+
+---
+
+## 22 · La ASTILLA DEL ENGANCHE — lo que se deja de declarar
+
+**Origen:** el defecto que reportaste el 2026-08-10 con tres capturas sobre
+`6346726UF8664N`. Al enganchar tu medición a los linderos oficiales quedan astillas
+de milímetros entre las dos líneas. La aplicación las ofrecía como fincas, el
+escritor de GML no les encontraba punto de referencia y se negaba a emitir **el
+fichero entero** — contándotelo, además, como «el expediente NO cierra sobre el
+contorno oficial» con el conjunto **cerrando**.
+
+Ya no: una pieza que al escribirse con 2 decimales deja de encerrar superficie sale
+marcada «no se puede emitir», nace desmarcada y **no entra en el expediente**.
+Medido en Chrome (guion 25): pieza de 0,01 m² · 0,0002 m, contador «Se emitirán 2 de
+3 piezas», entrega ENCENDIDA, tabla de vértices 413,81 px, desborde 0.
+
+### 22.1 · ⛔ Lo que solo puede decir la Sede
+
+**El expediente ya no cubre el contorno oficial al 100 %: le faltan esos 0,01 m².**
+La comprobación de cierre los descarta por grosor —son más finos que el redondeo del
+propio fichero, 7,07 mm— y por eso `cierra: true`. Es la misma tolerancia que este
+proyecto viene aplicando desde F17.
+
+**Lo que hay que ver:** que el IVG haga lo mismo. Si su cobertura fuera exacta al
+milímetro, devolvería un hueco de 0,01 m². Al presentar el expediente de §21, mira
+si el informe menciona superficie sin cubrir.
+
+### 22.2 · Y el colindante que YA NO se recorta
+
+Por el mismo enganche, a los vecinos les rozas franjas de 1–2 mm. Antes entraban en
+el expediente **recortados** —o sea, modificabas la finca de otro titular por el
+ruido del redondeo—; ahora se quedan fuera y sale un aviso con sus cifras.
+
+**Lo que hay que ver:** que en el IVG no aparezcan esos colindantes como
+«afectadas». Si aparecieran, la superficie AFECTADAS no cuadraría con la que la
+aplicación anuncia.

@@ -117,6 +117,7 @@ import { informeContrasteTexto } from '../report/contraste-texto.js'
 // escribe ese renglón cuando el botón está apagado es el propio cajón, en el mismo
 // instante en que lo apaga. Ver la guarda de `descargarInforme`.
 import { NIVEL } from '../viewer/_comun.js'
+import { traducirColindantes } from './colindantes.js'
 import { INSTRUCCION_PARCELARIO } from './navegacion.js'
 
 // ── Los selectores del contrato con `index.html` ─────────────────────────────
@@ -500,13 +501,13 @@ function referenciaDe(parcelaActual) {
  * @param {Array<{refcat: string|null, recintos: Array}>} parcelas
  * @returns {Array<{refcat: string|null, recintos: Array}>}
  */
-function aVecinas(parcelas) {
-  if (!Array.isArray(parcelas)) return []
-  return parcelas.map((p) => ({
-    refcat: typeof p.refcat === 'string' && p.refcat !== '' ? p.refcat : null,
-    recintos: Array.isArray(p.recintos) ? p.recintos : [],
-  }))
-}
+// ⚠️ **Ya no se traduce aquí.** Esta función existía con una gemela casi idéntica
+// en `app/cableado-informe.js`, y las dos discrepaban en un detalle real: aquélla
+// recortaba el `refcat` antes de decidir si estaba vacío y ésta no, así que una
+// referencia de solo espacios llegaba aquí como cadena y allí como `null`. La
+// traducción vive ahora en `app/colindantes.js#traducirColindantes`, una vez y con
+// el superconjunto de campos (`label` incluido, que lo usa el informe).
+const aVecinas = traducirColindantes
 
 // ── Contratos de las dependencias ────────────────────────────────────────────
 

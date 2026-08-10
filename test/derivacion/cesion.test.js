@@ -143,7 +143,21 @@ describe('derivarCesion · los ocho caminos', () => {
     expect(c.piezas).toHaveLength(1)
     expect(c.nEstrechas).toBe(1)
     expect(c.piezas[0].estrecha).toBe(true)
-    expect(tipos(c.detecciones)).toEqual([TIPO_DERIVACION.PIEZA_ESTRECHA])
+    // ⛔ **Y ADEMÁS no se puede emitir, que es otra cosa.** Los dos bordes de esta
+    // franja son `x = 19,9995` y `x = 20`: redondeados a los 2 decimales del fichero
+    // caen los DOS en `20,00`, así que la pieza deja de encerrar superficie y
+    // `gml/serialize-cp.js` no le encuentra punto de referencia. Este test afirmaba
+    // hasta el 2026-08-10 que la única detección era `PIEZA_ESTRECHA`, y con eso el
+    // caso real del autor —una astilla de 0,0251 m² del enganche de linderos—
+    // tumbaba el expediente ENTERO con el conjunto cerrando. La segunda detección no
+    // es ruido: es la que impide ofrecerla como finca.
+    expect(c.piezas[0].emitible).toBe(false)
+    expect(c.nNoEmitibles).toBe(1)
+    expect(tipos(c.detecciones)).toEqual([
+      TIPO_DERIVACION.PIEZA_ESTRECHA,
+      TIPO_DERIVACION.PIEZA_NO_EMITIBLE,
+    ])
+    expect(c.detecciones[1].severidad).toBe(SEVERIDAD.AVISO)
     expect(c.detecciones[0].severidad).toBe(SEVERIDAD.AVISO)
     // ⛔ AVISO y no ERROR: una astilla no impide entregar, sólo pide mirarla.
     expect(c.puedeEntregarse).toBe(true)
@@ -153,6 +167,53 @@ describe('derivarCesion · los ocho caminos', () => {
     expect(c.detecciones[0].datos.umbralGrosorM).toBe(OPERATIVOS.grosorInvasionMinimoM)
     // ⛔ Y el área NO se imprime como «0 m²», que es lo que daría con 2 decimales.
     expect(c.detecciones[0].mensaje).toMatch(/0,005 m²/)
+  })
+
+  it('⭐ 6b · `emitible` y `estrecha` NO están anidados: hay franjas ANCHAS que no caben', () => {
+    // ⛔ **La suposición con la que se escribió este test era falsa, y la refutó
+    // medirla el mismo día (2026-08-10).** Se esperaba encontrar el par «estrecha
+    // pero emitible» —una franja bajo el umbral de astilla que aun así sobrevive al
+    // fichero— para probar que los dos campos no son el mismo con dos nombres. Ese
+    // par NO EXISTE para una franja recta, y lo que existe es el contrario, que es
+    // peor:
+    //
+    //   ancho de la franja   estrecha   emitible      (barrido de 0,5 mm a 3 cm
+    //     0,5 mm …  7 mm       true      false         sobre rect(0,0,20−w,10))
+    //       8 mm … 14 mm       FALSE     false        ← el hueco que nadie vigilaba
+    //      15 mm en adelante   false      true
+    //
+    // El corte de `emitible` está **entre 14 y 15 mm** y no en el umbral de astilla,
+    // porque el `cp:referencePoint` también se escribe con 2 decimales: en una
+    // franja más fina que eso no queda ni un punto de la retícula ESTRICTAMENTE
+    // dentro, y `gml/anillos.js#puntoInterior` los rechaza todos por caer en el
+    // borde. Son ~2 × el desplazamiento máximo del redondeo (7,07 mm), o sea media
+    // unidad a cada lado.
+    //
+    // ⭐ Lo que eso significa: entre 8 y 14 mm hay piezas que **no llevaban ni la
+    // marca de estrechas** —o sea que ni el usuario ni la nota del bloque decían
+    // nada de ellas— y tumbaban el fichero entero igual que la astilla del autor.
+    // El campo `emitible` no es un sinónimo caro de `estrecha`: cubre un caso que
+    // `estrecha` no veía.
+    const ancha = derivarCesion({
+      recintos: rect(0, 0, 19.99, 10),
+      geometriaOficial: rect(0, 0, 20, 10),
+    })
+    expect(ancha.piezas[0].grosor).toBeGreaterThan(OPERATIVOS.grosorInvasionMinimoM)
+    expect(ancha.piezas[0].estrecha).toBe(false)
+    expect(ancha.piezas[0].emitible).toBe(false)
+    expect(ancha.nEstrechas).toBe(0)
+    expect(ancha.nNoEmitibles).toBe(1)
+    expect(tipos(ancha.detecciones)).toEqual([TIPO_DERIVACION.PIEZA_NO_EMITIBLE])
+
+    // Y el control del otro lado del corte: 2 cm de ancho, ni estrecha ni imposible.
+    const cabe = derivarCesion({
+      recintos: rect(0, 0, 19.98, 10),
+      geometriaOficial: rect(0, 0, 20, 10),
+    })
+    expect(cabe.piezas[0].estrecha).toBe(false)
+    expect(cabe.piezas[0].emitible).toBe(true)
+    expect(cabe.nNoEmitibles).toBe(0)
+    expect(tipos(cabe.detecciones)).toEqual([])
   })
 
   it('7 · 40 m² y 4 cm² en la misma corrida: el filtro es por GROSOR, no por área', () => {
@@ -283,6 +344,31 @@ describe('derivarCesion · el orden es determinista por construcción', () => {
     }
   })
 
+  /**
+   * Doble de `@turf/difference` que **distingue las dos restas**, como la de verdad.
+   *
+   * ⛔ `derivarCesion` llama a `restar` DOS veces con los argumentos cambiados de
+   * sitio: el sobrante es `oficial − editada` y la puerta es `editada − oficial`. Un
+   * doble que devuelve lo mismo a las dos hace que la puerta afirme que una parcela
+   * de 1 m² se sale 200 m², que es aritméticamente imposible — y desde el guardián
+   * de `cesion.js` ya no pasa desapercibido, sino que lanza.
+   *
+   * Estas pruebas van del ORDEN de las piezas y sus afirmaciones no cambian: lo
+   * único que se afina es el doble, para que en la dirección de la puerta devuelva
+   * lo que Turf devuelve de verdad cuando el minuendo cabe entero dentro del
+   * sustraendo, que es `null`.
+   *
+   * @param {Array} piezas  Las coordenadas del `MultiPolygon` falso del sobrante.
+   * @param {number} anchoEditada  Ancho en X de la geometría EDITADA, que es la que
+   *   va de minuendo en la puerta y es cómo se reconoce la dirección.
+   */
+  const dobleDifference = (piezas, anchoEditada) => (coleccion) => {
+    const anillo0 = coleccion.features[0].geometry.coordinates[0]
+    const xs = anillo0.map(([x]) => x)
+    const esLaEditada = Math.max(...xs) - Math.min(...xs) <= anchoEditada
+    return esLaEditada ? null : { type: 'MultiPolygon', coordinates: piezas }
+  }
+
   it('⛔ NO depende del orden en que Turf devuelva las piezas', async () => {
     // La prueba que de verdad importa, y la única forma de hacerla es doblar el
     // motor: `restar` devuelve lo que le da `@turf/difference`, y el orden de un
@@ -294,7 +380,7 @@ describe('derivarCesion · el orden es determinista por construcción', () => {
     const conOrden = async (anillos) => {
       vi.resetModules()
       vi.doMock('@turf/difference', () => ({
-        default: () => ({ type: 'MultiPolygon', coordinates: anillos.map((a) => [a]) }),
+        default: dobleDifference(anillos.map((a) => [a]), 1),
       }))
       const { derivarCesion: derivar } = await import('../../derivacion/cesion.js')
       const c = derivar({ recintos: rect(0, 0, 1, 1), geometriaOficial: rect(0, 0, 30, 30) })
@@ -324,7 +410,7 @@ describe('derivarCesion · el orden es determinista por construcción', () => {
     const conOrden = async (piezas) => {
       vi.resetModules()
       vi.doMock('@turf/difference', () => ({
-        default: () => ({ type: 'MultiPolygon', coordinates: piezas }),
+        default: dobleDifference(piezas, 1),
       }))
       const { derivarCesion: derivar } = await import('../../derivacion/cesion.js')
       const c = derivar({ recintos: rect(0, 0, 1, 1), geometriaOficial: rect(-20, -20, 20, 20) })
@@ -354,9 +440,14 @@ describe('derivarCesion · el orden es determinista por construcción', () => {
       recintos: rect(0, 0, 18, 10),
       geometriaOficial: rect(0, 0, 20, 10),
     })
+    // `emitible` se añade el 2026-08-10 y es un HECHO MEDIDO de la pieza, como
+    // `estrecha`: dice si sobrevive a escribirla con 2 decimales. No reabre lo que
+    // este test defiende —la firma sigue sin salir— porque no identifica nada: dos
+    // piezas distintas pueden ser las dos emitibles.
     expect(Object.keys(c.piezas[0]).sort()).toEqual([
       'area',
       'centroide',
+      'emitible',
       'estrecha',
       'grosor',
       'orden',

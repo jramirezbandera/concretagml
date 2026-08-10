@@ -54,8 +54,10 @@
 // eso es peor que tener dos botones. Lo que sí hace este módulo es DECIRLO en el
 // renglón del sobrante cuando el usuario excluye todas las piezas.
 
+import { TIPO_DERIVACION } from '../derivacion/_comun.js'
 import { derivarCesion } from '../derivacion/cesion.js'
 import { prepararEntrega } from '../derivacion/entrega.js'
+import { recortarVecinos } from '../derivacion/vecino.js'
 import { descargarGml } from '../gml/descargar.js'
 import { NIVEL } from '../viewer/_comun.js'
 import {
@@ -114,8 +116,36 @@ export const MOTIVO_SIN_GEOMETRIA =
 export function motivoPuerta(puerta, formatear) {
   const cuantas = puerta.piezas.length
   return (
-    `La geometría medida SE SALE del contorno oficial: ${formatear(puerta.area)} m² en ` +
-    `${cuantas} sitio(s). Corrige el lindero hacia dentro y vuelve a derivar.`
+    `Se sale del contorno oficial: ${formatear(puerta.area)} m² en ${cuantas} sitio(s). ` +
+    'Los tienes abajo; el expediente no se puede descargar así.'
+  )
+}
+
+/**
+ * ⛔ Por qué «Descargar expediente» está apagado cuando la geometría se sale.
+ *
+ * Es el motivo que sustituye al bloque escondido. Hasta hoy este caso **no tenía
+ * renglón porque no tenía bloque**: la puerta llamaba a `invalidar(null)`, la lista
+ * desaparecía y con ella el sobrante ya medido. Ahora el sobrante se ve, el exceso
+ * se ve, y lo único que sigue cerrado es la descarga — que es lo que de verdad
+ * había que cerrar.
+ *
+ * Dice la cifra y dice el porqué en una frase, porque este renglón vive DENTRO del
+ * bloque (tiene su propio sitio y su scroll) y no en el pie del panel, que es donde
+ * los píxeles están contados.
+ *
+ * @param {import('../derivacion/cesion.js').PuertaCesion} puerta
+ * @param {(n:number, d?:number) => string} formatear
+ * @returns {string}
+ */
+export function motivoEntregaFuera(puerta, formatear) {
+  const cuantas = puerta.piezas.length
+  return (
+    `El expediente no se puede descargar todavía: ${formatear(puerta.area)} m² de la geometría ` +
+    `medida caen fuera de la parcela oficial, en ${cuantas} ${cuantas === 1 ? 'sitio' : 'sitios'}, ` +
+    'y no se sabe de quién es esa superficie. **Trae las parcelas colindantes del Catastro** y ' +
+    'vuelve a derivar: con ellas, la aplicación recorta a quien le toque y el expediente sale ' +
+    'completo. El sobrante de arriba ya está bien medido.'
   )
 }
 
@@ -153,6 +183,59 @@ export const MOTIVO_NO_CIERRA =
   'El expediente NO cierra sobre el contorno oficial, así que no se descarga: un fichero que ' +
   'no cubre la finca de partida sale con IVG negativo aunque cada parcela suya sea impecable. ' +
   'Mira el panel de avisos.'
+
+/**
+ * Qué decir cuando el expediente se ha compuesto y no puede salir.
+ *
+ * ⛔ **Hasta el 2026-08-10 este renglón decía SIEMPRE {@link MOTIVO_NO_CIERRA}**, y
+ * eso era mentir en la mitad de los casos. Medido sobre la parcela `6346726UF8664N`
+ * del autor: el conjunto cerraba —`cierra: true`, suma, solape y cobertura las
+ * tres— y lo que impedía la descarga era que el escritor de GML se negaba a emitir
+ * una astilla de 0,0251 m². El usuario leyó «no cierra sobre el contorno oficial»,
+ * se fue a buscar un problema de cierre que no existía, y concluyó que la
+ * aplicación ya no dejaba hacer el caso. Un mensaje falso cuesta más que un botón
+ * apagado.
+ *
+ * Así que el motivo sale de `entrega.bloqueos`, que es la lista de tipos que de
+ * verdad han bloqueado. Los tipos sin frase propia caen en el genérico: es
+ * preferible «no se puede entregar, mira los avisos» a una frase concreta y
+ * equivocada.
+ *
+ * @param {import('../derivacion/entrega.js').Entrega} entrega
+ * @returns {string}
+ */
+export function motivoEntregaBloqueada(entrega) {
+  const bloqueos = Array.isArray(entrega?.bloqueos) ? entrega.bloqueos : []
+  if (bloqueos.includes(TIPO_DERIVACION.CONJUNTO_NO_CIERRA)) return MOTIVO_NO_CIERRA
+
+  /** Una frase por bloqueo, en el orden en que conviene leerlas. */
+  const FRASES = {
+    [TIPO_DERIVACION.CRECE_FUERA]:
+      'la geometría medida se sale del contorno oficial y no se sabe de quién es esa superficie',
+    [TIPO_DERIVACION.PIEZA_INVALIDA]:
+      'una de las parcelas del expediente no se puede escribir en el fichero',
+    [TIPO_DERIVACION.RECORTE_FALLIDO]:
+      'no se ha podido recortar a alguno de los colindantes afectados',
+    [TIPO_DERIVACION.ASIGNACION_IMPOSIBLE]:
+      'un trozo del sobrante se ha asignado a un colindante con el que no linda',
+    [TIPO_DERIVACION.SIN_GEOMETRIA_OFICIAL]:
+      'esta parcela no trae la geometría del Catastro contra la que derivar',
+    [TIPO_DERIVACION.RESTA_FALLIDA]: 'el motor geométrico ha fallado al calcular el sobrante',
+    [TIPO_DERIVACION.REGION_NO_APTA]: 'alguna geometría no forma un recinto medible',
+  }
+  const dichas = bloqueos.map((t) => FRASES[t]).filter((f) => f !== undefined)
+
+  if (dichas.length === 0) {
+    return (
+      'El expediente no se puede descargar. El detalle está en el panel de avisos: ahí sale qué ' +
+      'lo impide, con sus cifras.'
+    )
+  }
+  return (
+    `El expediente no se puede descargar porque ${dichas.join('; y ')}. El detalle, con las ` +
+    'cifras, está en el panel de avisos.'
+  )
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -239,6 +322,7 @@ const esLista = (v) =>
   typeof v.pintar === 'function' &&
   typeof v.invalidar === 'function' &&
   typeof v.seleccionadas === 'function' &&
+  typeof v.asignaciones === 'function' &&
   typeof v.nombres === 'function' &&
   typeof v.entrega === 'function' &&
   typeof v.estado === 'function' &&
@@ -304,8 +388,10 @@ export function cablearDerivacion({
   estado,
   lista,
   capa,
+  capaFuera,
   panel,
   srs,
+  colindantes = null,
   documento = globalThis.document,
   boton,
   renglon,
@@ -332,6 +418,15 @@ export function cablearDerivacion({
         `recibido ${describir(capa)}.`,
     )
   }
+  if (!esCapa(capaFuera)) {
+    throw new TypeError(
+      `cablearDerivacion: 'capaFuera' debe ser la SEGUNDA capa de viewer/piezas.js ` +
+        `(visor.sobrante.capaFuera, la de variante 'FUERA'); recibido ${describir(capaFuera)}. ` +
+        `Si vale undefined, el visor es de antes de que la puerta dejara de esconder el ` +
+        `sobrante: sin ella, lo que se sale del contorno oficial no se pintaría en ninguna ` +
+        `parte y el usuario vería un botón apagado sin ver por qué.`,
+    )
+  }
   if (!esPanel(panel)) {
     throw new TypeError(
       `cablearDerivacion: 'panel' debe ser el de app/avisos.js ({avisar}); recibido ` +
@@ -343,6 +438,13 @@ export function cablearDerivacion({
     throw new TypeError(
       `cablearDerivacion: 'srs' debe ser la forma corta del sistema de referencia ` +
         `(p. ej. 'EPSG:25830'); recibido ${describir(srs)}.`,
+    )
+  }
+  if (colindantes !== null && typeof colindantes.get !== 'function') {
+    throw new TypeError(
+      `cablearDerivacion: 'colindantes' debe ser el registro de app/colindantes.js (el que ` +
+        `publica get()), o null para no atribuir el exceso a nadie; recibido ` +
+        `${describir(colindantes)}.`,
     )
   }
   if (typeof ahora !== 'function' || typeof descargar !== 'function') {
@@ -367,6 +469,15 @@ export function cablearDerivacion({
   let cesion = null
   /** La clave de la parcela sobre la que se derivó esa foto. */
   let claveDerivada = null
+  /**
+   * Lo que el usuario ha decidido repartir: `{orden: refcat}`.
+   *
+   * Vive AQUÍ y no dentro de la foto porque sobrevive al recálculo del recorte: al
+   * cambiar un destino hay que volver a recortar a los vecinos con la asignación
+   * nueva, y si el reparto viviera dentro de lo que se recalcula se perdería en el
+   * mismo paso que lo usa. Caduca con la foto, como todo lo demás (3C).
+   */
+  let reparto = {}
 
   /** Escribe el renglón del CTA del pie. */
   function decir(texto, esError = false) {
@@ -394,7 +505,13 @@ export function cablearDerivacion({
   function invalidar(motivo) {
     cesion = null
     claveDerivada = null
+    reparto = {}
     capa.limpiar()
+    // Las DOS capas, siempre juntas: dejar las manchas ámbar de una foto caducada
+    // sobre una geometría que ya ha cambiado sería enseñar una invasión que puede
+    // que ya no exista, en el color que este proyecto reserva para el único hecho
+    // al que le pone carga.
+    capaFuera.limpiar()
     if (motivo === null) {
       lista.pintar(null)
       mostrarBloque(false)
@@ -451,6 +568,11 @@ export function cablearDerivacion({
       return null
     }
 
+    // Otra pulsación es otra FOTO, así que el reparto anterior no le corresponde
+    // (3C). Se limpia ANTES de derivar para que `fotografiar` no arrastre una
+    // asignación a una pieza que ya es otro trozo de terreno con el mismo número.
+    reparto = {}
+
     let derivada
     try {
       derivada = derivarCesion({
@@ -471,14 +593,36 @@ export function cablearDerivacion({
     // Regla de oro 1: TODO lo que decidió la derivación, al panel.
     publicar(derivada.detecciones)
 
-    // ── LA PUERTA ───────────────────────────────────────────────────────────
+    // ── LA PUERTA: AHORA SEPARA **VER** DE **ENTREGAR** ─────────────────────
+    //
+    // ⛔ Hasta el 2026-08-10 esto era `invalidar(null)`: se escondía el bloque
+    // entero y el sobrante —ya restado, medido, ordenado y numerado tres líneas más
+    // arriba— se tiraba sin que el usuario lo viera nunca. Y el caso no es
+    // excepcional: rectificar un lindero es retranquearse por un lado y salirse por
+    // otro. Medido sobre el expediente real 29050A01000144 (2026-08-10): 36,46 m²
+    // de sobrante y 25,49 m² de exceso **a la vez**, y lo que se enseñaba eran cero
+    // de los dos.
+    //
+    // Lo que NO cambia es la entrega. Esos metros son de un colindante y un
+    // expediente sin él vuelve con IVG negativo, así que «Descargar expediente»
+    // sigue apagado —con su motivo escrito, que es la otra mitad—. Quien lo apaga
+    // es `refrescarEntrega`, que ahora mira la puerta.
     if (derivada.puerta.contenida === false) {
-      invalidar(null)
-      // Lo accionable al renglón, el porqué al panel. La partición está medida:
-      // ver {@link motivoPuerta}.
       panel.avisar(explicacionPuerta(derivada.puerta, formatearNumero), { nivel: NIVEL.AVISO })
+      const foto = fotografiar(derivada, parcela)
+      // Con el exceso ya atribuido a sus dueños, el renglón del pie se calla y deja
+      // hablar al bloque: el expediente se puede descargar y repetir en rojo que «se
+      // sale» sería alarmar por un hecho que la propia pantalla acaba de resolver.
+      if (excesoExplicado()) return foto
+      // ⚠️ **Y aquí el renglón del pie SÍ habla**, en contra de la regla de los
+      // 22,84 px que `fotografiar` acaba de aplicar. La regla dice que se calle
+      // cuando el bloque ya cuenta lo mismo, y su premisa es que lo que hay que
+      // contar es *bueno*: cuántas piezas y cuánto miden. Aquí lo que hay que
+      // contar es que **la acción que el usuario acaba de pulsar no ha desbloqueado
+      // nada**, y eso no lo dice el bloque, que está más abajo y puede estar fuera
+      // de la vista. Una línea corta, con la cifra y con el sitio donde mirar.
       decir(motivoPuerta(derivada.puerta, formatearNumero), true)
-      return null
+      return foto
     }
     if (derivada.puerta.contenida === null) {
       invalidar(null)
@@ -491,39 +635,180 @@ export function cablearDerivacion({
       return null
     }
 
+    return fotografiar(derivada, parcela)
+  }
+
+  /**
+   * Guarda la FOTO y la pinta en sus tres sitios: la lista, las manchas del
+   * sobrante y las manchas de lo que se sale.
+   *
+   * Es el único camino por el que `cesion` deja de ser `null`, y lo comparten las
+   * DOS salidas buenas de `derivar()` —la que cabe dentro y la que se sale—, que es
+   * justo lo que hace que la segunda enseñe lo mismo que la primera. Encender o
+   * apagar la descarga NO se decide aquí: es de `refrescarEntrega`, que mira la
+   * puerta.
+   *
+   * @param {object} derivada  La `Cesion`.
+   * @param {object} parcela   La parcela sobre la que se derivó, para la clave.
+   * @returns {object}  La misma `Cesion`, para que `derivar()` la devuelva.
+   */
+  function fotografiar(derivada, parcela) {
     cesion = derivada
     claveDerivada = claveDeParcela(parcela)
+
+    // ── A QUIÉN LE ESTAMOS QUITANDO TERRENO ─────────────────────────────────
+    // Solo si hay algo que atribuir: sin exceso no hay a quién, y `recortarVecinos`
+    // haría una resta booleana por cada colindante para no decir nada. La
+    // atribución viaja DENTRO de la foto para que la lista no tenga que ir a
+    // buscarla a otro sitio, y para que caduque con ella (decisión 3C).
+    derivada.recorte =
+      derivada.puerta.piezas.length === 0
+        ? null
+        : recortarVecinos({
+            recintos: recintosDe(parcela),
+            // El sobrante entra para poder decir con QUIÉN linda cada trozo, que es
+            // lo que decide qué destinos se le ofrecen al usuario.
+            sobrante: derivada.piezas,
+            asignadas: reparto,
+            // ⛔ `?? null` y no `?? []`: sin registro NO se ha consultado, y `[]`
+            // afirmaría que la parcela está aislada y que el exceso cae sobre un
+            // vial. Ver la cabecera de `app/colindantes.js`.
+            vecinas: colindantes === null ? null : colindantes.get(),
+            fuera: derivada.puerta.piezas,
+          })
+    if (derivada.recorte !== null) publicar(derivada.recorte.detecciones)
+
     lista.pintar(derivada)
     capa.pintar(derivada.piezas)
+    capaFuera.pintar(derivada.puerta.piezas)
     mostrarBloque(true)
-    // ⛔ **CON PIEZAS, EL RENGLÓN DEL PIE SE CALLA**, y no es un descuido de la
-    // regla de oro 1: lo que tendría que decir —cuántas piezas y cuánto miden— lo
-    // dice ya el BLOQUE, con su contador y una fila por pieza, y lo dice mejor
-    // porque cada cifra está junto a la pieza que describe. Repetirlo aquí es una
-    // segunda redacción del mismo hecho que además CUESTA: medido por el guion 16,
-    // el renglón le quita **22,84 px** a la tabla de vértices, que a 1280×720 son
-    // casi tres cuartos de fila de las quince. `.gml-accion-estado:empty` lo
+
+    // ⛔ **CON ALGO QUE ENSEÑAR, EL RENGLÓN DEL PIE SE CALLA**, y no es un descuido
+    // de la regla de oro 1: lo que tendría que decir —cuántas piezas y cuánto
+    // miden— lo dice ya el BLOQUE, con su contador y una fila por pieza, y lo dice
+    // mejor porque cada cifra está junto a la pieza que describe. Repetirlo aquí es
+    // una segunda redacción del mismo hecho que además CUESTA: medido por el guion
+    // 16, el renglón le quita **22,84 px** a la tabla de vértices, que a 1280×720
+    // son casi tres cuartos de fila de las quince. `.gml-accion-estado:empty` lo
     // colapsa a 0 px, así que el hueco se devuelve entero.
     //
-    // Sin piezas SÍ habla, y ahí es imprescindible: no aparece ningún bloque, así
-    // que si el renglón callara el usuario habría pulsado un botón que no hace
-    // nada visible.
+    // ⚠️ La condición es «el bloque enseña algo», no «hay sobrante». Desde que la
+    // puerta dejó de esconder, el bloque puede estar poblado **solo** con la
+    // sección del exceso —cero piezas de sobrante y tres trozos fuera es un
+    // resultado legítimo: la parcela solo ha crecido—. Preguntar por
+    // `piezas.length` a secas volvería a escribir el renglón encima de un bloque
+    // que ya habla, y pagaría los 22,84 px por nada.
+    const bloqueHabla = derivada.piezas.length > 0 || derivada.puerta.piezas.length > 0
     decir(
-      derivada.piezas.length === 0
-        ? 'No hay sobrante: la geometría medida cubre el contorno oficial entero.'
-        : '',
+      bloqueHabla ? '' : 'No hay sobrante: la geometría medida cubre el contorno oficial entero.',
     )
     refrescarEntrega()
     return derivada
   }
 
-  /** Enciende o apaga «Descargar expediente», SIEMPRE con su motivo. */
+  /**
+   * ¿Está EXPLICADO todo lo que la geometría medida se sale?
+   *
+   * Lo está cuando se han consultado las colindantes: entonces cada metro de más
+   * está atribuido a un vecino concreto —que entra en el expediente con su parcela
+   * recortada— o declarado en `sobreNadie` (vial, dominio público, hueco del
+   * parcelario), que es un caso legítimo y no un fallo.
+   *
+   * ⛔ Mira `consultado` y no `vecinos.length`: con las vecinas traídas y ninguna
+   * afectada, el exceso entero es vial y sigue estando explicado. Sin traerlas no se
+   * sabe nada, y «no le quito a nadie» y «no he mirado» son afirmaciones opuestas.
+   */
+  function excesoExplicado() {
+    return cesion !== null && cesion.recorte != null && cesion.recorte.consultado === true
+  }
+
+  /**
+   * El usuario ha cambiado el DESTINO de una pieza: hay que volver a recortar.
+   *
+   * ⛔ **No se repinta la lista**, y es deliberado: repintar reconstruye los
+   * desplegables y perdería la elección que el usuario acaba de hacer, además de las
+   * de las demás filas y los nombres escritos. Lo que cambia al asignar un trozo no
+   * es el sobrante —esas piezas siguen siendo las mismas— sino los VECINOS, que no
+   * se pintan en esta lista. Así que se recalcula el recorte en silencio y se
+   * refresca lo único que sí cambia: si la entrega puede salir.
+   */
+  function repartir() {
+    if (!vivo || cesion === null) return
+    reparto = lista.asignaciones()
+    const parcela = estado.get()
+    try {
+      cesion.recorte = recortarVecinos({
+        recintos: recintosDe(parcela),
+        vecinas: colindantes === null ? null : colindantes.get(),
+        fuera: cesion.puerta.piezas,
+        sobrante: cesion.piezas,
+        asignadas: reparto,
+      })
+    } catch (causa) {
+      panel.avisar(`No se ha podido repartir el sobrante: ${causa?.message ?? causa}`, {
+        nivel: NIVEL.ERROR,
+      })
+      return
+    }
+    // Solo las de ERROR: las informativas del recorte ya se publicaron al derivar, y
+    // repetirlas en cada cambio de desplegable llenaría el panel de duplicados.
+    publicar(cesion.recorte.detecciones.filter((d) => d.severidad === 'ERROR'))
+    refrescarEntrega()
+  }
+
+  /**
+   * Enciende o apaga «Descargar expediente», SIEMPRE con su motivo.
+   *
+   * ⛔ **Aquí es donde vive ahora la puerta.** Antes bastaba con que hubiera foto,
+   * porque una foto con exceso no llegaba nunca a existir: el bloque se escondía y
+   * `cesion` se quedaba en `null`. Desde que VER y ENTREGAR se separaron, hay fotos
+   * perfectamente pintadas que **no se pueden descargar**, y el sitio donde se dice
+   * es éste — el renglón que cuelga del propio botón por `aria-describedby`.
+   *
+   * El orden de las tres preguntas importa: primero si hay foto, luego si la foto
+   * cabe dentro de lo oficial, y solo al final si el usuario ha dejado alguna pieza
+   * marcada. Al revés, una foto que se sale con todo desmarcado diría «marca al
+   * menos una pieza» — un consejo que no arregla nada, porque marcarlas todas
+   * seguiría sin poder descargar.
+   */
   function refrescarEntrega() {
     if (cesion === null) {
       lista.entrega({ habilitado: false, motivo: MOTIVO_SIN_DERIVAR })
       return
     }
-    if (lista.seleccionadas().length === 0) {
+    // ⛔ La puerta solo sigue cerrada si el exceso NO está explicado. Con las
+    // colindantes traídas, cada metro que la medición se sale está atribuido a un
+    // vecino —que entra recortado en el fichero— o declarado sobre vial, y entonces
+    // el expediente SÍ se puede presentar. Ver `derivacion/entrega.js`, que aplica
+    // la misma regla sobre el bloqueo real.
+    if (cesion.puerta.contenida === false && !excesoExplicado()) {
+      lista.entrega({
+        habilitado: false,
+        motivo: motivoEntregaFuera(cesion.puerta, formatearNumero),
+      })
+      return
+    }
+    // ⛔ Cero piezas propias NO es cero expediente desde que existe el reparto: si
+    // todos los trozos se los quedan colindantes, el fichero sale con la parcela y
+    // los vecinos y **no lleva ningún alta**, que es un expediente perfectamente
+    // válido —medido sobre el real: 4 miembros, ninguno de alta, cierra—. Lo que no
+    // vale es que no quede NADA que declarar.
+    //
+    // ⛔ Y «los vecinos» son DOS casos, no uno. El del reparto —alguien recibe un
+    // trozo— y el del RECORTE: la medición invade a un colindante y su parcela entra
+    // corregida sin que nadie le dé nada. El segundo faltaba, y con él se caía justo
+    // el caso que F23 existe para resolver: medido el 2026-08-10 sobre
+    // `6346726UF8664N`, cuyo único trozo de sobrante es una astilla del enganche que
+    // no se puede emitir. Cero altas, cero reparto, y aun así **dos parcelas que
+    // declarar**.
+    const hayReparto = Object.keys(lista.asignaciones()).length > 0
+    const hayVecinos = (cesion.recorte?.vecinos?.length ?? 0) > 0
+    if (
+      lista.seleccionadas().length === 0 &&
+      !hayReparto &&
+      !hayVecinos &&
+      cesion.piezas.length > 0
+    ) {
       lista.entrega({ habilitado: false, motivo: MOTIVO_NINGUNA_INCLUIDA })
       return
     }
@@ -540,6 +825,20 @@ export function cablearDerivacion({
    */
   function entregar() {
     if (!vivo || cesion === null) return null
+
+    // ⛔ **La puerta, otra vez y aquí dentro.** No es redundancia con
+    // `refrescarEntrega`: aquél apaga un BOTÓN, y `entregar()` es una función
+    // pública del cableado que llaman también los tests y podría llamar otro cable.
+    // Fiar la única defensa a un `disabled` del DOM es fiarla a la interfaz, y lo
+    // que hay al otro lado es un fichero que alguien firma. `prepararEntrega`
+    // también lo pararía —`cesion.puedeEntregarse` es `false` con `CRECE_FUERA`—,
+    // pero lo diría con el motivo de «no cierra», que es otro hecho: aquí el
+    // conjunto no es que no cierre, es que le falta un titular.
+    if (cesion.puerta.contenida === false && !excesoExplicado()) {
+      lista.estado(motivoEntregaFuera(cesion.puerta, formatearNumero), { error: true })
+      return null
+    }
+
     const parcela = estado.get()
     const fecha = ahora()
 
@@ -549,6 +848,11 @@ export function cablearDerivacion({
         parcela,
         srs,
         cesion,
+        // El recorte viaja con la FOTO, así que lo que se entrega es exactamente lo
+        // que el usuario tiene delante: los mismos vecinos, con las mismas cifras.
+        // Volver a calcularlo aquí podría dar otro resultado si algo hubiera
+        // cambiado, y eso es lo que la decisión 3C prohíbe.
+        recorte: cesion.recorte ?? null,
         incluidas: lista.seleccionadas(),
         nombres: lista.nombres(),
       })
@@ -570,7 +874,7 @@ export function cablearDerivacion({
     // mirar, y lo dice `derivacion/entrega.js` tras las TRES afirmaciones del
     // cierre (suma, cero solape, cobertura).
     if (!entrega.puedeEntregarse || entrega.xml === null) {
-      lista.estado(MOTIVO_NO_CIERRA, { error: true })
+      lista.estado(motivoEntregaBloqueada(entrega), { error: true })
       return null
     }
 
@@ -596,7 +900,7 @@ export function cablearDerivacion({
 
   elBoton.addEventListener('click', derivar)
   const bajaEntrega = lista.alEntregar(entregar)
-  const bajaSeleccion = lista.alCambiarSeleccion(refrescarEntrega)
+  const bajaSeleccion = lista.alCambiarSeleccion(repartir)
 
   // El resaltado RECÍPROCO, que es media razón de ser de esta pantalla. Ni la
   // lista conoce el mapa ni el mapa la lista: los une este módulo, y en los dos

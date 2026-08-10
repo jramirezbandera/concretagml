@@ -24,6 +24,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 import {
   cablearDerivacion,
+  motivoEntregaBloqueada,
   MOTIVO_NO_CIERRA,
   MOTIVO_SIN_GEOMETRIA,
   MOTIVO_SIN_OFICIAL,
@@ -39,7 +40,13 @@ import {
   MOTIVO_SIN_DERIVAR,
   SELECTOR,
 } from '../../viewer/lista-sobrante.js'
-import { CLASE_NUMERO, CLASE_PIEZA, crearCapaPiezas } from '../../viewer/piezas.js'
+import {
+  CLASE_NUMERO,
+  CLASE_PIEZA,
+  CLASE_PIEZA_FUERA,
+  VARIANTE,
+  crearCapaPiezas,
+} from '../../viewer/piezas.js'
 import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
 
 const SRS = 'EPSG:25830'
@@ -81,6 +88,7 @@ let entorno = null
 let estado = null
 let lista = null
 let capa = null
+let capaFuera = null
 let avisos = []
 let descargas = []
 let cableado = null
@@ -108,6 +116,7 @@ function cablear(extra = {}) {
     estado,
     lista,
     capa,
+    capaFuera,
     panel: { avisar: (mensaje, detalle) => avisos.push({ mensaje, nivel: detalle?.nivel }) },
     srs: SRS,
     documento: document,
@@ -134,6 +143,7 @@ afterEach(() => {
   cableado = null
   lista?.destruir()
   capa?.destruir()
+  capaFuera?.destruir()
   entorno.destruir()
   document.body.innerHTML = ''
 })
@@ -156,13 +166,22 @@ describe('cablearDerivacion', () => {
     estado = crearEstadoVista(null)
     lista = crearListaSobrante({ documento: document })
     capa = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO })
+    capaFuera = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.FUERA })
   })
 
   // ── 1 · Contratos ─────────────────────────────────────────────────────────
 
   describe('contratos', () => {
     it('sin store, sin lista, sin capa, sin panel o sin srs, LANZA nombrando cuál', () => {
-      const base = { estado, lista, capa, panel: { avisar() {} }, srs: SRS, documento: document }
+      const base = {
+        estado,
+        lista,
+        capa,
+        capaFuera,
+        panel: { avisar() {} },
+        srs: SRS,
+        documento: document,
+      }
       expect(() => cablearDerivacion({ ...base, estado: null })).toThrow(/'estado'/)
       expect(() => cablearDerivacion({ ...base, lista: {} })).toThrow(/sobrante: true/)
       expect(() => cablearDerivacion({ ...base, capa: {} })).toThrow(/viewer\/piezas\.js/)
@@ -266,17 +285,35 @@ describe('cablearDerivacion', () => {
       expect(renglonEntrega().textContent).toBe(MOTIVO_NINGUNA_INCLUIDA)
     })
 
-    it('⛔ LA PUERTA: si la parcela CRECIÓ no se deriva nada y se explica con cifras', () => {
-      // El sobrante saldría VACÍO mientras hay vecinos afectados, y la aplicación
-      // exportaría un expediente incompleto con total confianza.
+    it('⛔ LA PUERTA: si la parcela CRECIÓ se ENSEÑA lo que se sale, y no se entrega', () => {
+      // ⛔ **Este test afirmaba lo contrario hasta el 2026-08-10**: que no se
+      // derivaba nada, que el bloque quedaba escondido y que las manchas eran cero.
+      // Era el comportamiento, y era un defecto — el sobrante estaba restado,
+      // medido, ordenado y numerado, y se tiraba antes de enseñarlo.
+      //
+      // Lo que NO ha cambiado, y por eso sigue siendo la misma prueba: **no se
+      // puede ENTREGAR**. Esos metros son de un colindante y un expediente sin él
+      // vuelve con IVG negativo. Lo que se ha separado es VER de ENTREGAR.
       cablear()
       estado.set(parcela({ mengua: -10 }))
       boton().click()
 
-      expect(filas()).toHaveLength(0)
-      expect(manchas()).toHaveLength(0)
-      expect(seccion().hidden).toBe(true)
-      expect(renglon().textContent).toMatch(/SE SALE del contorno oficial/)
+      // El bloque se ve, y dentro está la sección del exceso con su trozo.
+      expect(seccion().hidden).toBe(false)
+      const fuera = document.querySelector(SELECTOR.FUERA)
+      expect(fuera.hidden).toBe(false)
+      expect(document.querySelectorAll(SELECTOR.FUERA_FILA)).toHaveLength(1)
+      expect(document.querySelector(SELECTOR.FUERA_ROTULO).textContent).toMatch(/400,00 m²/)
+      // Y la mancha está pintada, en la capa ÁMBAR y no en la del sobrante.
+      expect(entorno.contenedor.querySelectorAll(`.${CLASE_PIEZA_FUERA}`)).toHaveLength(1)
+
+      // La descarga, cerrada CON SU MOTIVO. Un botón gris y mudo es lo que no vale.
+      expect(botonEntregar().disabled).toBe(true)
+      expect(renglonEntrega().textContent).toMatch(/no se puede descargar/)
+      expect(renglonEntrega().textContent).toMatch(/400,00 m²/)
+
+      // El renglón del pie apunta al bloque, corto y en rojo.
+      expect(renglon().textContent).toMatch(/Se sale del contorno oficial/)
       expect(renglon().textContent).toMatch(/400,00 m²/)
       expect(renglon().classList.contains('gml-accion-estado--error')).toBe(true)
       // ⚠️ Y el PORQUÉ va al panel de avisos, no al renglón. La partición está
@@ -284,9 +321,52 @@ describe('cablearDerivacion', () => {
       // ancho, le comían 74,96 px a la tabla de vértices — un tercio de lo que le
       // queda a 1280×720. Lo accionable con su cifra arriba; el porqué, abajo.
       expect(renglon().textContent.length, 'el renglón del pie no puede ser un párrafo').toBeLessThan(150)
-      expect(avisos.map((a) => a.mensaje).join(' ')).toMatch(
-        /es terreno de alguien.*fase 2 de esta feature/s,
+      expect(avisos.map((a) => a.mensaje).join(' ')).toMatch(/es terreno de alguien/s)
+    })
+
+    it('⛔ EL CASO MIXTO: se retranquea por un lado y se sale por otro, y se ven LOS DOS', () => {
+      // El caso que de verdad estrena esta fase, y el que el usuario tenía delante
+      // cuando lo reportó. Medido sobre su expediente real 29050A01000144
+      // (2026-08-10): 36,46 m² de sobrante y 25,49 m² de exceso **a la vez**, y la
+      // aplicación no le enseñaba ninguno de los dos.
+      //
+      // Aquí, sobre el rectángulo del arnés: la geometría se corre 10 m al este, así
+      // que suelta una franja de 10×40 por el oeste y se come otra igual por el este.
+      cablear()
+      estado.set(
+        crearParcela({
+          idLocal: 'P-1',
+          refcat: '7136910UF1473N',
+          recintos: [crearRecinto(anilloRect(X0 + 10, Y0, X0 + 50, Y0 + 40))],
+          geometriaOficial: oficial(),
+          origen: ORIGEN_PARCELA.WFS,
+        }),
       )
+      boton().click()
+
+      // ⭐ Las DOS mitades a la vista, que es la frase entera de esta fase.
+      expect(filas(), 'el sobrante del oeste tiene que listarse').toHaveLength(1)
+      expect(document.querySelectorAll(SELECTOR.FUERA_FILA)).toHaveLength(1)
+      expect(seccion().hidden).toBe(false)
+
+      // Cada trozo en su capa y con su color: 400 m² a cada lado.
+      expect(entorno.contenedor.querySelectorAll(`.${CLASE_PIEZA_FUERA}`)).toHaveLength(1)
+      expect(manchas(), 'una mancha por trozo, las dos capas sobre el mismo mapa').toHaveLength(2)
+
+      // Y la descarga sigue cerrada: el sobrante es bueno, pero falta el titular
+      // de lo de fuera.
+      expect(botonEntregar().disabled).toBe(true)
+      expect(renglonEntrega().textContent).toMatch(/no se puede descargar/)
+    })
+
+    it('⛔ y `entregar()` NO descarga aunque lo llamen a pelo con la puerta cerrada', () => {
+      // La defensa no puede ser el `disabled` de un botón: `entregar()` es API
+      // pública del cableado. Al otro lado hay un fichero que alguien firma.
+      cablear()
+      estado.set(parcela({ mengua: -10 }))
+      boton().click()
+      expect(cableado.entregar()).toBeNull()
+      expect(descargas, 'no puede haberse descargado nada').toHaveLength(0)
     })
 
     it('y no se llama error: no haber sobrante es un resultado legítimo', () => {
@@ -468,5 +548,144 @@ describe('cablearDerivacion', () => {
       expect(() => cableado.destruir()).not.toThrow()
       cableado = null
     })
+  })
+})
+
+// ── ⛔ El renglón decía SIEMPRE «no cierra», y en la mitad de los casos mentía ──
+
+describe('motivoEntregaBloqueada · decir lo que de verdad bloquea', () => {
+  // ⭐ EL DEFECTO (2026-08-10). `entregar()` escribía `MOTIVO_NO_CIERRA` ante
+  // CUALQUIER bloqueo. Medido sobre `6346726UF8664N`: el conjunto cerraba —suma,
+  // cero solape y cobertura, las tres— y lo que impedía la descarga era que el
+  // escritor de GML no podía emitir una astilla de 0,0251 m². El autor leyó «el
+  // expediente NO cierra sobre el contorno oficial», se fue a buscar un problema de
+  // cierre inexistente y concluyó que la aplicación había perdido la función.
+  //
+  // Un botón apagado con un motivo FALSO cuesta más que uno apagado y mudo: el mudo
+  // te deja mirar, el falso te manda a otro sitio.
+
+  it('⛔ con el conjunto cerrando NO dice «no cierra»', () => {
+    const texto = motivoEntregaBloqueada({ bloqueos: ['PIEZA_INVALIDA'], xml: null })
+    expect(texto).not.toBe(MOTIVO_NO_CIERRA)
+    expect(texto).not.toMatch(/cierra/i)
+    expect(texto).toMatch(/no se puede escribir en el fichero/)
+  })
+
+  it('y cuando SÍ es el cierre, sigue diciendo exactamente lo de siempre', () => {
+    // El caso que este renglón sí describía bien no se toca: es el que devuelve IVG
+    // negativo y el que más falta hace explicar.
+    expect(motivoEntregaBloqueada({ bloqueos: ['CONJUNTO_NO_CIERRA'], xml: null })).toBe(
+      MOTIVO_NO_CIERRA,
+    )
+    // Y manda sobre los demás: si el conjunto no cierra, eso es lo que hay que leer.
+    expect(
+      motivoEntregaBloqueada({ bloqueos: ['PIEZA_INVALIDA', 'CONJUNTO_NO_CIERRA'], xml: null }),
+    ).toBe(MOTIVO_NO_CIERRA)
+  })
+
+  it('junta varios bloqueos en una frase, sin repetir el «porque»', () => {
+    const texto = motivoEntregaBloqueada({
+      bloqueos: ['CRECE_FUERA', 'RECORTE_FALLIDO'],
+      xml: null,
+    })
+    expect(texto).toMatch(/se sale del contorno oficial/)
+    expect(texto).toMatch(/no se ha podido recortar/)
+    expect(texto.match(/porque/g)).toHaveLength(1)
+  })
+
+  it('⛔ un bloqueo sin frase propia cae en el genérico, no inventa una', () => {
+    // Preferible «mira los avisos» a una frase concreta y equivocada: es el mismo
+    // error que este bloque arregla, cometido de otra manera.
+    const texto = motivoEntregaBloqueada({ bloqueos: ['UN_TIPO_QUE_NO_EXISTE'], xml: null })
+    expect(texto).toMatch(/panel de avisos/)
+    expect(texto).not.toMatch(/porque/)
+  })
+
+  it('sin bloqueos —xml nulo por otra causa— tampoco afirma nada falso', () => {
+    expect(motivoEntregaBloqueada({ bloqueos: [], xml: null })).toMatch(/panel de avisos/)
+    expect(motivoEntregaBloqueada(null)).toMatch(/panel de avisos/)
+  })
+})
+
+// ── ⭐ EL CASO DEL AUTOR, DE PUNTA A PUNTA ──────────────────────────────────
+
+describe('cablearDerivacion · ⭐ retranqueo de milímetros + invasión de metros', () => {
+  // El caso que F23 existe para resolver, con la forma exacta con la que llegó
+  // roto el 2026-08-10 (`6346726UF8664N`): la medición se ENGANCHA al lindero
+  // oficial por un lado —y deja una astilla de milímetros que no puede ser finca— y
+  // se mete METROS en el colindante por el otro.
+  //
+  // Se caía por DOS sitios a la vez, y los dos están aquí:
+  //   1. la astilla se ofrecía como finca y tumbaba el fichero entero;
+  //   2. al no quedar ninguna pieza propia que declarar, el cableado apagaba el
+  //      botón con «no hay expediente que entregar» — ignorando que el vecino
+  //      recortado ES una parcela más del expediente.
+  beforeEach(() => {
+    const centro = latLngAUTM(entorno.mapa.getCenter(), HUSO)
+    X0 = centro[0] - 20
+    Y0 = centro[1] - 20
+    estado = crearEstadoVista(null)
+    lista = crearListaSobrante({ documento: document })
+    capa = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO })
+    capaFuera = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.FUERA })
+  })
+
+  /** Enganchada al oeste por 0,5 mm y metida 5 m en el vecino por el este. */
+  const medida = () =>
+    crearParcela({
+      idLocal: 'P-1',
+      refcat: '7136910UF1473N',
+      recintos: [crearRecinto(anilloRect(X0 + 0.0005, Y0, X0 + 45, Y0 + 40))],
+      geometriaOficial: oficial(),
+      origen: ORIGEN_PARCELA.WFS,
+    })
+
+  /** El registro de `app/colindantes.js`, reducido a lo que este cable le pide. */
+  const registro = () => ({
+    get: () => [{ refcat: 'V-1', recintos: [crearRecinto(anilloRect(X0 + 40, Y0, X0 + 80, Y0 + 40))] }],
+  })
+
+  it('⛔ la única pieza del sobrante NO se ofrece como finca, y se dice por qué', () => {
+    cablear({ colindantes: registro() })
+    estado.set(medida())
+    boton().click()
+    expect(filas()).toHaveLength(1)
+    expect(document.querySelector(SELECTOR.NO_EMITIBLE)).not.toBeNull()
+    expect(document.querySelector(SELECTOR.INCLUIR).checked).toBe(false)
+    expect(nota().textContent).toMatch(/no se puede emitir/)
+  })
+
+  it('⭐ y el botón se ENCIENDE igual: el vecino recortado es una parcela del expediente', () => {
+    // Cero altas, cero reparto… y dos parcelas que declarar. Antes aquí se leía
+    // «No hay ninguna pieza incluida, así que no hay expediente que entregar», que
+    // era falso.
+    cablear({ colindantes: registro() })
+    estado.set(medida())
+    boton().click()
+    expect(renglonEntrega().textContent).not.toBe(MOTIVO_NINGUNA_INCLUIDA)
+    expect(botonEntregar().disabled).toBe(false)
+  })
+
+  it('⭐ y descarga: dos miembros, la parcela medida y el colindante recortado', () => {
+    cablear({ colindantes: registro() })
+    estado.set(medida())
+    boton().click()
+    botonEntregar().click()
+    expect(descargas).toHaveLength(1)
+    expect(descargas[0].miembros).toBe(2)
+    expect(descargas[0].xml).toMatch(/7136910UF1473N/)
+    expect(descargas[0].xml).toMatch(/V-1/)
+    expect(renglonEntrega().classList.contains('gml-accion-estado--error')).toBe(false)
+  })
+
+  it('⛔ SIN colindantes sigue cerrado, y el motivo NO habla de cierre', () => {
+    // La puerta original no se ha aflojado: sin haber traído las vecinas no se sabe
+    // de quién es la superficie invadida. Y el renglón dice ESO, no «no cierra».
+    cablear()
+    estado.set(medida())
+    boton().click()
+    expect(botonEntregar().disabled).toBe(true)
+    expect(renglonEntrega().textContent).toMatch(/Trae las parcelas colindantes/)
+    expect(renglonEntrega().textContent).not.toBe(MOTIVO_NO_CIERRA)
   })
 })

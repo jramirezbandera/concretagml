@@ -289,26 +289,61 @@
         <button type="button" class="gml-boton gml-boton--primario gml-barra-entregar" data-accion="generar-gml" disabled>
           Generar GML
         </button>
-        <!-- ⏳ AQUÍ VA EL DESPLEGABLE DE SALIDAS, Y TODAVÍA NO ESTÁ.
-             `[▾]` con `exportar-dxf`, `exportar-coordenadas`, `exportar-excel`,
-             `exportar-proyecto` y «Abrir un proyecto…». **No se ha puesto porque
-             esos cinco `data-accion` los fabrica hoy `app/dialogo-expediente.js`
-             DENTRO de su `<dialog>`** (su `BOTONES_FICHERO`), y repetirlos aquí
-             es exactamente la trampa K.1: `querySelector` se quedaría con el de
-             este fichero —va antes en el documento— y los clics del diálogo se
-             irían a un nodo que no es el suyo.
+        <!-- ⭐ **EL DESPLEGABLE DE SALIDAS, PUESTO EL 2026-08-11.** Llevaba desde la
+             rebanada 2 del topbar declarado como hueco con sus tres pasos escritos;
+             lo destrabó el autor: «no tiene sentido que la exportación esté dentro
+             del menú de expediente; mejor que "Generar GML" tenga un dropdown donde
+             puedas seleccionar exportar en xlsx, txt, dxf».
 
-             Para ponerlo hacen falta tres cosas, en este orden:
-               1. que `app/dialogo-expediente.js` deje de fabricar esos cinco
-                  botones (su bloque `grupoFicheros`), de modo que quede UNO por
-                  acción y viva aquí;
-               2. que `app/cableado-expediente.js` abra su embudo `alAccion` como
-                  método público —`atender(accion)`—, que hoy es interno; el
-                  embudo YA existe, solo le falta la puerta;
-               3. un módulo que abra y cierre los dos menús con teclado
-                  (`↓` abre, `↑`/`↓` recorren, `Esc` cierra y devuelve el foco).
+             ⚠️ **SOLO LAS TRES EXPORTACIONES DE GEOMETRÍA.** `exportar-proyecto` y
+             `abrir-proyecto` NO suben, y no es un olvido: el `.json` de proyecto no
+             es una salida, es **el expediente entero guardado para volver a
+             abrirlo**, o sea lo mismo que hace la lista de expedientes del diálogo.
+             Suben las tres que sacan la geometría a otro programa y se quedan las
+             dos que entran y salen de la propia aplicación. La regla es la misma
+             que ya repartió la barra en la rebanada 2: arriba lo que sale de la app
+             hacia fuera, abajo lo que transforma el expediente.
 
-             El primario de al lado sí está mudado y funciona. -->
+             ⛔ **UN NODO POR ACCIÓN, Y ESO ES LO QUE HUBO QUE ARREGLAR PRIMERO.**
+             Estos tres `data-accion` los fabricaba `app/dialogo-expediente.js`
+             dentro de su `<dialog>` (`BOTONES_FICHERO`); si se dejaran allí y se
+             repitieran aquí sería la trampa K.1 exacta —`querySelector` se queda
+             con el primero del documento, que es éste— y los clics del diálogo se
+             irían a un nodo que no es el suyo. Así que se han RETIRADO de allí.
+
+             ⚠️ **NO se apagan con el primario.** «Generar GML» está `disabled` hasta
+             que la parcela valida; exportar el DXF o el listado de coordenadas
+             sirve JUSTO cuando el GML todavía no sale, que es cuando el técnico se
+             lleva lo que tiene al CAD. Cuando no hay nada que exportar, la acción
+             lo DICE en el renglón de acuse —no es un botón que no hace nada—.
+
+             El teclado (`Esc`, clic fuera, foco a la primera opción) lo da
+             `app/barra.js` sin una línea nueva: su mecanismo de menús es genérico
+             sobre `[data-menu-disparador]` / `[data-menu]`. -->
+        <button
+          type="button"
+          class="gml-boton gml-boton--primario gml-barra-entregar-flecha"
+          data-menu-disparador="salidas"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          aria-label="Otras salidas del expediente"
+        >
+          <span aria-hidden="true">▾</span>
+        </button>
+        <div class="gml-barra-menu gml-barra-menu--derecha" data-menu="salidas" role="menu" hidden>
+          <button type="button" role="menuitem" class="gml-barra-menu-opcion" data-accion="exportar-dxf">
+            Exportar para CAD
+            <span class="gml-barra-menu-apunte">.dxf</span>
+          </button>
+          <button type="button" role="menuitem" class="gml-barra-menu-opcion" data-accion="exportar-coordenadas">
+            Exportar coordenadas
+            <span class="gml-barra-menu-apunte">.txt</span>
+          </button>
+          <button type="button" role="menuitem" class="gml-barra-menu-opcion" data-accion="exportar-excel">
+            Exportar coordenadas
+            <span class="gml-barra-menu-apunte">.xlsx</span>
+          </button>
+        </div>
       </div>
     </nav>
 
@@ -547,8 +582,26 @@
             <h2 class="gml-rotulo">Referencia catastral</h2>
             <span class="gml-via-marca">Vía principal</span>
           </div>
+          <!-- ⚠️ LA SEGUNDA FRASE ES UN CAMINO, NO UN ADORNO (2026-08-11). Un clic
+               en el mapa rellena este campo con la referencia de la parcela
+               pinchada (`app/cableado-catastro.js#alPulsarMapa`), y ese gesto no
+               tiene ningún control que lo anuncie: no hay botón que pulsar ni
+               nada que se encienda. Sin esta línea sería exactamente lo que dice
+               el comentario de arriba sobre el arrastre del DXF — «un camino que
+               solo conoce quien escribió el código no es un camino: es un
+               secreto». Va en el apunte y no en un renglón propio porque este
+               párrafo ya existe y ya ocupa su caja: contarlo aquí cuesta una
+               línea de texto, y un nodo nuevo costaría su alto entero en la
+               pantalla más apretada de la aplicación.
+
+               ⛔ NO dice «y trae la parcela»: el clic rellena el CAMPO y nada
+               más. La referencia no entra en el expediente hasta que se pulsa
+               «Traer del Catastro», que es lo que hace que `parcela.refcat`
+               signifique siempre «esto lo afirma quien firma». -->
           <p class="gml-via-apunte">
-            Trae el recinto oficial del Catastro y edítalo sobre la cartografía.
+            Trae el recinto oficial del Catastro y edítalo sobre la cartografía. También puedes
+            pinchar la parcela en el mapa: la referencia se rellena sola y la revisas antes de
+            traerla.
           </p>
 
           <div class="gml-campo">
@@ -650,7 +703,7 @@
           </p>
           <button
             type="button"
-            class="gml-boton gml-boton--secundario gml-via-boton"
+            class="gml-boton gml-boton--primario gml-via-boton"
             data-accion="abrir-medicion"
           >
             Elegir un fichero de medición…
@@ -688,7 +741,7 @@
           </p>
           <button
             type="button"
-            class="gml-boton gml-boton--secundario gml-via-boton"
+            class="gml-boton gml-boton--primario gml-via-boton"
             data-accion="abrir-gml"
           >
             Abrir un GML…

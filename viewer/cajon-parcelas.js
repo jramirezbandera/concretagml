@@ -167,7 +167,21 @@ const ESTILO_SECCION = { margin: '10px 0 0' }
  * pulsar ahora», no «esto está mal» (regla de oro 9).
  */
 const PRIMARIO = Object.freeze({
-  ENCENDIDO: Object.freeze({ background: '#0F172A', color: '#fff', cursor: 'pointer' }),
+  // ⭐ `#0F172A` (casi negro) hasta la revisión de diseño del 2026-08-10. El
+  // encargo del autor pide que «la acción principal de cada bloque lleve un solo
+  // botón relleno con COLOR DE ACENTO», y el acento de la aplicación es el azul
+  // del design system: `#0369A1` es `--color-btn-primary-bg`, el MISMO relleno que
+  // usa `.gml-boton--primario` en el panel. Antes el pie de este cajón era la
+  // única acción principal de la aplicación que no se veía como las demás.
+  // ⚠️ Y NO es `#0284C7` (`--color-accent`): el design system separa a propósito
+  // el acento de ENLACE del relleno de BOTÓN porque blanco sobre sky-600 no llega
+  // a AA (4,10:1). Sobre `#0369A1` da 5,93:1.
+  // ⚠️ Literal y no `var(--color-btn-primary-bg)` A PROPÓSITO: este módulo tiene
+  // que verse bien SIN la hoja cargada (se monta en jsdom y sobre un mapa pelado),
+  // y una variable sin declarar deja la propiedad en su valor inicial. Quien
+  // cambie el acento tiene que cambiarlo aquí también; el guardián es el ojo y el
+  // guion de humo, no la cascada.
+  ENCENDIDO: Object.freeze({ background: '#0369A1', color: '#fff', cursor: 'pointer' }),
   APAGADO: Object.freeze({ background: '#E2E8F0', color: '#64748B', cursor: 'default' }),
 })
 
@@ -224,7 +238,7 @@ const CajonParcelas = L.Control.extend({
     estilar(contenedor, {
       background: '#fff',
       padding: '10px 12px',
-      borderRadius: '8px',
+      borderRadius: '6px',
       boxShadow: '0 2px 10px rgba(15,23,42,.25)',
       font: '13px/1.45 system-ui,sans-serif',
       color: '#334155',
@@ -283,7 +297,7 @@ const CajonParcelas = L.Control.extend({
     // reparto es: el módulo fija tamaño y grosor, la HOJA pone la familia.
     estilar(confirmar, {
       border: '0',
-      borderRadius: '4px',
+      borderRadius: '6px',
       padding: '6px 12px',
       fontSize: 'inherit',
       lineHeight: 'inherit',
@@ -296,10 +310,10 @@ const CajonParcelas = L.Control.extend({
     descartar.type = 'button'
     descartar.dataset.accion = 'descartar-parcelas'
     estilar(descartar, {
-      border: '1px solid #CBD5E1',
-      background: '#fff',
-      color: '#334155',
-      borderRadius: '4px',
+      border: '1px solid #E2E8F0',
+      background: '#F1F5F9',
+      color: '#0F172A',
+      borderRadius: '6px',
       padding: '6px 12px',
       fontSize: 'inherit',
       lineHeight: 'inherit',

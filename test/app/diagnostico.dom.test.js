@@ -1188,7 +1188,15 @@ describe('cableado-diagnostico · una vez por operación, nunca por frame', () =
     expect(Array.isArray(entrada.vecinas)).toBe(true)
     expect(entrada.vecinas.length).toBeGreaterThan(0)
     for (const vecina of entrada.vecinas) {
-      expect(Object.keys(vecina).sort()).toEqual(['recintos', 'refcat'])
+      // ⚠️ TRES claves desde el 2026-08-10, y el guardián sigue sirviendo para lo
+      // mismo: que aquí NO llegue la parcela cruda del Catastro, que trae quince
+      // campos (`gmlId`, `beginLifespanVersion`, `srsName`, `nSurfaceMembers`…).
+      // `label` entra porque la traducción es ahora una sola —
+      // `app/colindantes.js#traducirColindantes`, compartida con el informe de F09,
+      // que sí lo usa para escribir «linda con la parcela rotulada “16”»— y tener
+      // dos formas de lo mismo salía más caro que un campo que este consumidor
+      // ignora. `diagnostico/parcela.js` solo lee `refcat` y `recintos`.
+      expect(Object.keys(vecina).sort()).toEqual(['label', 'recintos', 'refcat'])
     }
   })
 })

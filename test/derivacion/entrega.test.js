@@ -33,6 +33,7 @@ import { SEVERIDAD, TIPO_DERIVACION } from '../../derivacion/_comun.js'
 import { NAMESPACE_CATASTRO, NAMESPACE_LOCAL } from '../../derivacion/identidad.js'
 import { TIPO_OPERACION } from '../../derivacion/operacion.js'
 import { derivarCesion } from '../../derivacion/cesion.js'
+import { recortarVecinos } from '../../derivacion/vecino.js'
 import { parsearGml } from '../../gml/parse.js'
 import { nombreFicheroGml } from '../../gml/descargar.js'
 
@@ -311,5 +312,166 @@ describe('prepararEntrega · lo que LANZA es contrato roto', () => {
     const e = prepararEntrega({ parcela, ...ARGS, cesion })
     expect(e.cesion).toBe(cesion)
     expect(e.puedeEntregarse).toBe(true)
+  })
+})
+
+// ── F23 · el colindante recortado entra en el expediente ─────────────────────
+
+describe('prepararEntrega · ⛔ CRECE_FUERA deja de bloquear cuando el recorte lo explica', () => {
+  // ⚠️ Sobre coordenadas UTM REALES (huso 30, junto al expediente 29050A01000144).
+  // Con rectángulos en el origen la validación de huso los rechaza —y hace bien: la
+  // desproyección cae fuera de España—, así que un test escrito en 0..10 mediría el
+  // guardián de huso en vez de lo que dice medir.
+  const X0 = 388590
+  const Y0 = 4082390
+  const caja = (a, b, c, d) => rect(X0 + a, Y0 + b, X0 + c, Y0 + d)
+
+  // El contorno oficial ocupa 0..10; la medición se corre 2 m al este, así que
+  // suelta 0..2 por el oeste (20 m²) y se come 10..12 del vecino (20 m²).
+  const OFICIAL = caja(0, 0, 10, 10)
+  const MEDIDA = caja(2, 0, 12, 10)
+  const VECINA = { refcat: 'V1', recintos: caja(10, 0, 20, 10) }
+  const parcela = { idLocal: 'P-1', refcat: 'RC1', recintos: MEDIDA, geometriaOficial: OFICIAL }
+
+  const cesionDe = () => derivarCesion({ recintos: MEDIDA, geometriaOficial: OFICIAL })
+  const recorteDe = (vecinas) =>
+    recortarVecinos({ recintos: MEDIDA, vecinas, fuera: cesionDe().puerta.piezas })
+
+  it('SIN recorte sigue bloqueando: es el guardián original y no se ha aflojado', () => {
+    const e = prepararEntrega({ parcela, srs: ARGS.srs, cesion: cesionDe() })
+    expect(e.puedeEntregarse).toBe(false)
+    expect(e.bloqueos).toContain('CRECE_FUERA')
+    expect(e.xml).toBeNull()
+  })
+
+  it('⛔ con las vecinas SIN consultar (null) TAMPOCO se abre', () => {
+    // «No le quito a nadie» y «no he mirado» son afirmaciones opuestas, y la
+    // segunda no puede abrir una puerta.
+    const e = prepararEntrega({ parcela, srs: ARGS.srs, cesion: cesionDe(), recorte: recorteDe(null) })
+    expect(e.puedeEntregarse).toBe(false)
+    expect(e.bloqueos).toContain('CRECE_FUERA')
+  })
+
+  it('⭐ CON el recorte se abre, el vecino entra como miembro y el conjunto CIERRA', () => {
+    const e = prepararEntrega({
+      parcela,
+      srs: ARGS.srs,
+      cesion: cesionDe(),
+      recorte: recorteDe([VECINA]),
+    })
+
+    expect(e.puedeEntregarse).toBe(true)
+    expect(e.bloqueos).toEqual([])
+    // La parcela, su cesión del oeste, y el vecino recortado.
+    expect(e.nMiembros).toBe(3)
+    const porRc = e.miembros.map((m) => m.identidad.refcat)
+    expect(porRc).toContain('V1')
+    // El vecino conserva su referencia REAL bajo el namespace del Catastro: no es
+    // un alta, es la misma finca con otro lindero.
+    const vecino = e.miembros.find((m) => m.identidad.refcat === 'V1')
+    expect(vecino.identidad.namespaceInspire).toBe('ES.SDGC.CP')
+    expect(vecino.esVecino).toBe(true)
+
+    // ⭐ Y el cierre, que es lo que decide si el IVG saldrá positivo. La diana ya
+    // no es «mi contorno» sino los DOS oficiales que el expediente modifica.
+    expect(e.cierre.cierra).toBe(true)
+    expect(e.cierre.suma.areaOficial).toBeCloseTo(200, 6) // 100 mía + 100 del vecino
+    expect(e.cierre.cobertura.cumple).toBe(true)
+    expect(e.cierre.solapes.cumple).toBe(true)
+    expect(e.xml).not.toBeNull()
+  })
+
+  it('⛔ la detección CRECE_FUERA SIGUE en la lista: deja de bloquear, no se borra', () => {
+    // El usuario tiene derecho a leer que su medición se sale, aunque el expediente
+    // ya explique a quién. Borrarla sería entregar en silencio.
+    const e = prepararEntrega({
+      parcela,
+      srs: ARGS.srs,
+      cesion: cesionDe(),
+      recorte: recorteDe([VECINA]),
+    })
+    expect(e.detecciones.map((d) => d.tipo)).toContain('CRECE_FUERA')
+  })
+
+  it('⛔ un expediente entregable TIENE que traer fichero', () => {
+    // El defecto que apareció al medir sobre el expediente real: la puerta se abría,
+    // los miembros se componían, y un `if` intermedio que seguía mirando ERROR en
+    // crudo devolvía antes del cierre. Salía `puedeEntregarse: true` con `xml: null`,
+    // que es peor que quedarse bloqueado.
+    const e = prepararEntrega({
+      parcela,
+      srs: ARGS.srs,
+      cesion: cesionDe(),
+      recorte: recorteDe([VECINA]),
+    })
+    expect(e.puedeEntregarse).toBe(true)
+    expect(e.xml, 'entregable y sin xml es la peor combinación posible').not.toBeNull()
+    expect(e.cierre, 'entregable sin haber comprobado el cierre').not.toBeNull()
+  })
+})
+
+// ── ⛔ La astilla del ENGANCHE tumbaba el fichero entero ─────────────────────
+
+describe('prepararEntrega · ⛔ una pieza que no se puede escribir NO tumba el expediente', () => {
+  // ⭐ EL DEFECTO, TAL COMO LO ENCONTRÓ EL AUTOR (2026-08-10, `6346726UF8664N`).
+  // Al enganchar la medición a los linderos oficiales, entre las dos líneas queda
+  // una astilla de milímetros. La aplicación la ofrecía como finca, el escritor de
+  // GML no le encontraba punto de referencia y devolvía `xml: null`… **para el
+  // documento entero**. La pantalla lo contaba como «el expediente NO cierra sobre
+  // el contorno oficial» cuando el conjunto cerraba: suma, cero solape y cobertura,
+  // las tres. El autor se fue a buscar un problema de cierre que no existía y
+  // concluyó que la aplicación ya no dejaba hacer el caso.
+  //
+  // Aquí el lindero este se mueve medio milímetro: los dos bordes de la astilla
+  // caen en la misma coordenada al redondear a 2 decimales.
+  const parcela = parcelaRecortada(0.0005)
+  const cesion = derivarCesion({
+    recintos: parcela.recintos,
+    geometriaOficial: parcela.geometriaOficial,
+  })
+
+  it('la cesión la marca `emitible: false` en vez de callársela', () => {
+    expect(cesion.piezas.length).toBeGreaterThan(0)
+    expect(cesion.piezas.every((p) => p.emitible === false)).toBe(true)
+    expect(cesion.nNoEmitibles).toBe(cesion.piezas.length)
+    expect(tipos(cesion)).toContain(TIPO_DERIVACION.PIEZA_NO_EMITIBLE)
+    // AVISO y no ERROR: bloquear aquí sería el defecto otra vez, con otro nombre.
+    const d = cesion.detecciones.find((x) => x.tipo === TIPO_DERIVACION.PIEZA_NO_EMITIBLE)
+    expect(d.severidad).toBe(SEVERIDAD.AVISO)
+    expect(cesion.puedeEntregarse).toBe(true)
+  })
+
+  it('⭐ el expediente SALE, con su fichero, y la astilla no va dentro', () => {
+    const e = prepararEntrega({ parcela, ...ARGS })
+    expect(e.puedeEntregarse, `bloqueos: ${e.bloqueos.join(', ')}`).toBe(true)
+    expect(e.xml).not.toBeNull()
+    // Un solo miembro: la parcela. Ninguna astilla se ha colado como finca.
+    expect(e.nMiembros).toBe(1)
+    expect(e.miembros.every((m) => m.esCesion !== true)).toBe(true)
+  })
+
+  it('⛔ y el conjunto CIERRA: la astilla no era superficie que faltara', () => {
+    // La otra mitad del hecho. Si dejar fuera la astilla abriera un hueco real, el
+    // arreglo habría cambiado un bloqueo honesto por un fichero malo.
+    const e = prepararEntrega({ parcela, ...ARGS })
+    expect(e.cierre.cierra).toBe(true)
+    expect(e.cierre.suma.cumple).toBe(true)
+    expect(e.cierre.cobertura.cumple).toBe(true)
+  })
+
+  it('⛔ pedirla EXPRESAMENTE tampoco la mete: no es una preferencia, es imposible', () => {
+    // `incluidas` es lo que manda la pantalla. Fiar la defensa a que la casilla esté
+    // desmarcada sería fiarla a la interfaz, y al otro lado hay un fichero que
+    // alguien firma — la misma doctrina que hace a `entregar()` repetir la puerta.
+    const e = prepararEntrega({
+      parcela,
+      ...ARGS,
+      incluidas: cesion.piezas.map((p) => p.orden),
+    })
+    expect(e.puedeEntregarse).toBe(true)
+    expect(e.xml).not.toBeNull()
+    expect(e.nMiembros).toBe(1)
+    // Y se DICE que se ha pedido y no ha entrado, que es distinto de callarlo.
+    expect(tipos(e)).toContain(TIPO_DERIVACION.PIEZA_NO_EMITIBLE)
   })
 })

@@ -197,6 +197,40 @@ import { RAMA } from './rama.js'
  */
 export const SELECTOR_BOTON_EXPEDIENTE = '[data-accion="abrir-expediente"]'
 
+/**
+ * El desplegable de SALIDAS de la barra de arriba, puesto el 2026-08-11 a petición
+ * del autor («no tiene sentido que la exportación esté dentro del menú de
+ * expediente»). Dentro viven los tres `[data-accion]` de exportación de geometría,
+ * que hasta ese día los fabricaba `app/dialogo-expediente.js`.
+ *
+ * ⚠️ **Se apunta al MENÚ y no a cada botón**: el oyente es uno solo y por
+ * delegación, igual que el del diálogo, para que añadir o quitar una salida sea
+ * tocar `index.html` y nada más.
+ *
+ * ⚠️ **Y es OPCIONAL.** Una cáscara sin este menú —las pruebas de F10, que montan
+ * un DOM mínimo— sigue montando el cableado: lo que falta es una puerta de entrada,
+ * no una pieza. El botón de expediente sí es obligatorio y sigue siéndolo, porque
+ * sin él el diálogo no se puede abrir de ninguna manera.
+ */
+export const SELECTOR_MENU_SALIDAS = '[data-menu="salidas"]'
+
+/**
+ * Los tres botones de dentro de ese menú, por si alguien los necesita nombrar
+ * (las pruebas los pulsan). Se derivan de {@link ACCION}, que sigue siendo el
+ * vocabulario único; aquí no se copia ningún literal.
+ *
+ * ⚠️ **Se llama `SELECTORES_` y no `SELECTOR_` a propósito.** El guardían G16
+ * (`test/services/contrato-catastro.test.js`) recoge todo export de `app/` cuyo
+ * nombre empiece por `SELECTOR_` y exige que sea una CADENA que case exactamente
+ * un nodo de `index.html`. Esto es un objeto de tres, así que con aquel prefijo
+ * lo pondría rojo por la forma y no por el fondo.
+ */
+export const SELECTORES_SALIDA = Object.freeze({
+  DXF: `[data-accion="${ACCION.EXPORTAR_DXF}"]`,
+  COORDENADAS: `[data-accion="${ACCION.EXPORTAR_COORDENADAS}"]`,
+  EXCEL: `[data-accion="${ACCION.EXPORTAR_EXCEL}"]`,
+})
+
 // ── Nombres de los cuatro ficheros ───────────────────────────────────────────
 
 /**
@@ -768,6 +802,8 @@ function nodoDe(doc, selector) {
 export function cablearExpediente({
   estado,
   panel,
+  acuse = null,
+  menuSalidas,
   srs,
   expedientes,
   cuota,
@@ -965,8 +1001,58 @@ export function cablearExpediente({
   // ── Utilidades de dicción ─────────────────────────────────────────────────
 
   /** Al renglón del diálogo. Lo que se escriba aquí vale hasta el siguiente `fijar`. */
-  const decir = (texto) => {
-    if (!destruido) dialogo.estado(texto)
+  /**
+   * Lo que este cableado tiene que decir, dicho **donde se pueda leer**.
+   *
+   * Siempre va al renglón `role="status"` del `<dialog>`, que es donde ha vivido
+   * desde F10. Y desde el 2026-08-11, **si el diálogo está cerrado va también al
+   * acuse de la barra**, porque ese día las tres exportaciones de geometría se
+   * mudaron al desplegable de salidas y se piden con el diálogo cerrado.
+   *
+   * ⛔ **Sin esto la mudanza habría creado un fallo silencioso de manual**, y no en
+   * el camino feliz sino en el que más importa: pedir un DXF sin parcela cargada
+   * responde «no hay nada que guardar ni que exportar», y ese mensaje se habría
+   * escrito en un renglón que nadie está mirando. Un menú que se pulsa y no pasa
+   * nada. Es exactamente la regla de oro 1.
+   *
+   * ⚠️ **Se enruta aquí y no en cada llamante** a propósito: hay siete sitios que
+   * dicen algo antes de exportar (los tres «sin parcela», el de la rama edificio y
+   * los dos desenlaces de la entrega), y repartir el `if` por todos ellos es
+   * garantizar que el octavo se olvide. Con la condición aquí, cualquier camino
+   * futuro que hable con el diálogo cerrado se ve solo.
+   *
+   * @param {string} texto
+   * @param {{error?: boolean, exito?: boolean}} [tono]  Solo lo usa el acuse: el
+   *   renglón del diálogo no tiene modificadores de color.
+   */
+  const decir = (texto, { error = false, exito = false } = {}) => {
+    if (destruido) return
+    dialogo.estado(texto)
+    if (!dialogo.abierto()) acusar(texto, error, exito)
+  }
+
+  /**
+   * El desenlace de una ENTREGA, dicho donde se ve **cuando el diálogo está
+   * cerrado** — que desde el 2026-08-11 es el caso normal de las tres exportaciones
+   * de geometría, porque se piden desde el desplegable de la barra.
+   *
+   * ⛔ **Sin esto la mudanza habría creado un fallo silencioso de manual.**
+   * {@link decir} escribe en el renglón `role="status"` del `<dialog>`; con el
+   * diálogo cerrado ese renglón no lo ve nadie, así que exportar un DXF sin parcela
+   * cargada —que responde «no hay nada que exportar»— habría sido un menú que se
+   * pulsa y no pasa nada. Es exactamente la regla de oro 1.
+   *
+   * ⚠️ **No escribe el nodo: se lo pide a su dueño.** El renglón
+   * `[data-estado="generar-gml"]` y sus dos modificadores (rojo/verde) son de
+   * `cablearGeneracionGml`, que lo expone como `acusar`. Dos módulos escribiendo
+   * las mismas clases sobre el mismo nodo es la divergencia que esta casa lleva
+   * evitando desde F04; un método público deja UN dueño y dos llamantes.
+   *
+   * Es el renglón correcto y no uno prestado: acusa lo que sale de la ZONA DE
+   * ENTREGA de la barra, y las tres exportaciones viven ahora en esa zona.
+   */
+  const acusar = (texto, esError, esExito = false) => {
+    if (!destruido && acuse !== null) acuse(texto, esError, esExito)
   }
 
   /** Al panel, que es donde queda constancia de lo que le pasa al DATO. */
@@ -1414,7 +1500,7 @@ export function cablearExpediente({
     }
     const exp = expedienteActual()
     if (exp === null) {
-      decir(MENSAJE_SIN_PARCELA)
+      decir(MENSAJE_SIN_PARCELA, { error: true })
       return
     }
     const opts = {
@@ -1721,11 +1807,14 @@ export function cablearExpediente({
     // El desenlace se dice SIEMPRE, salga bien o mal. Cuando falla, los dos primitivos
     // traen un `mensaje` en castellano ya presentable.
     if (!entrega.descargado) {
-      decir(entrega.mensaje)
+      decir(entrega.mensaje, { error: true })
       avisar(entrega.mensaje, NIVEL.ERROR)
       return
     }
-    decir(`Descargado ${queEs}: «${entrega.nombre}».${coletilla === null ? '' : ` ${coletilla}`}`)
+    decir(
+      `Descargado ${queEs}: «${entrega.nombre}».${coletilla === null ? '' : ` ${coletilla}`}`,
+      { exito: true },
+    )
     // Al panel por el mismo motivo que {@link publicarDetecciones}: el fichero que baja
     // no dice todo lo que el usuario tiene en pantalla, y eso es del DATO.
     if (coletilla !== null) avisar(coletilla)
@@ -1738,7 +1827,7 @@ export function cablearExpediente({
    */
   function bloqueaLaRamaEdificio() {
     if (!enEdificio()) return false
-    decir(MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO)
+    decir(MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO, { error: true })
     return true
   }
 
@@ -1747,7 +1836,7 @@ export function cablearExpediente({
     if (bloqueaLaRamaEdificio()) return
     const parcela = estado.get()
     if (!hayGeometria(parcela)) {
-      decir(MENSAJE_SIN_PARCELA)
+      decir(MENSAJE_SIN_PARCELA, { error: true })
       return
     }
     const { dxf, detecciones } = serializarParcelaDxf({
@@ -1765,7 +1854,7 @@ export function cablearExpediente({
     if (bloqueaLaRamaEdificio()) return
     const parcela = estado.get()
     if (!hayGeometria(parcela)) {
-      decir(MENSAJE_SIN_PARCELA)
+      decir(MENSAJE_SIN_PARCELA, { error: true })
       return
     }
     const fecha = ahora()
@@ -1792,7 +1881,7 @@ export function cablearExpediente({
     if (bloqueaLaRamaEdificio()) return
     const parcela = estado.get()
     if (!hayGeometria(parcela)) {
-      decir(MENSAJE_SIN_PARCELA)
+      decir(MENSAJE_SIN_PARCELA, { error: true })
       return
     }
     const fecha = ahora()
@@ -1990,6 +2079,13 @@ export function cablearExpediente({
    *
    * @param {{accion: string, id: string|null, nombre: string|null}} suceso
    */
+  /**
+   * El vocabulario del embudo, para que el menú de la barra pueda filtrar sin
+   * copiar la lista. Gemelo del `ACCIONES` de `app/dialogo-expediente.js`, y son
+   * dos a propósito: cada puerta valida lo suyo antes de dejar entrar.
+   */
+  const ACCIONES_VALIDAS = new Set(Object.values(ACCION))
+
   function alAccion({ accion, id, nombre }) {
     if (destruido) return
     // Cualquier acción que no sea otro «Borrar» desarma el borrado pendiente: quien se
@@ -2242,6 +2338,29 @@ export function cablearExpediente({
 
   escuchar(botonAbrir, 'click', abrir)
   escuchar(doc, 'visibilitychange', alOcultarse)
+
+  // ── El desplegable de SALIDAS de la barra (2026-08-11) ──────────────────────
+  //
+  // UN oyente por DELEGACIÓN sobre el menú, por el mismo motivo que el del diálogo:
+  // así añadir o quitar una salida es tocar `index.html` y nada más.
+  //
+  // ⚠️ **No cierra el menú, y es correcto**: quien lo abre y lo cierra es
+  // `app/barra.js` (su oyente de `click` en el `document` ya lo hace, y a propósito
+  // corre DESPUÉS que éste). Cerrarlo también desde aquí serían dos dueños del
+  // mismo estado visible.
+  //
+  // ⚠️ **Y solo atiende lo que sea `ACCION`**: el menú podría llevar mañana una
+  // opción de otro dueño, y tragarse un `data-accion` ajeno la dejaría muerta sin
+  // que lo dijera nadie. La guarda es la misma que la del diálogo.
+  const menuDeSalidas = menuSalidas ?? doc.querySelector(SELECTOR_MENU_SALIDAS)
+  if (menuDeSalidas !== null && menuDeSalidas !== undefined) {
+    escuchar(menuDeSalidas, 'click', (evento) => {
+      const boton = evento.target?.closest?.('[data-accion]')
+      if (!boton || !menuDeSalidas.contains(boton) || boton.disabled) return
+      if (!ACCIONES_VALIDAS.has(boton.dataset.accion)) return
+      alAccion({ accion: boton.dataset.accion, id: null, nombre: null })
+    })
+  }
   const bajaAccion = dialogo.alAccion(alAccion)
   const desuscribirStore = estado.subscribe(alCambiarElStore)
   // Sin conmutador cableado no hay a qué suscribirse, y la baja es un no-op: así
@@ -2260,6 +2379,26 @@ export function cablearExpediente({
   return {
     /** Abre el diálogo sin pasar por el botón. */
     abrir,
+
+    /**
+     * El embudo de acciones, abierto como método público el 2026-08-11.
+     *
+     * Hasta ese día `alAccion` era interno y su única puerta era el `<dialog>`. El
+     * desplegable de salidas de la barra es la SEGUNDA puerta a las mismas acciones,
+     * y el hueco de `index.html` ya tenía escrito desde la rebanada 2 del topbar que
+     * hacía falta esto: «el embudo YA existe, solo le falta la puerta».
+     *
+     * ⚠️ Ignora en silencio lo que no sea una {@link ACCION}: es una puerta, no un
+     * validador de contrato del programador. Quien pase una cadena inventada no ha
+     * roto nada — no hay nada que romper.
+     *
+     * @param {string} accion  Una de {@link ACCION}.
+     * @param {{id?: string|null, nombre?: string|null}} [contexto]
+     */
+    atender(accion, { id = null, nombre = null } = {}) {
+      if (!ACCIONES_VALIDAS.has(accion)) return
+      alAccion({ accion, id, nombre })
+    },
 
     /** Abre un fichero de proyecto. Es lo que enruta la zona de fichero. No lanza. */
     abrirProyecto,

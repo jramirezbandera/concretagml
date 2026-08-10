@@ -119,16 +119,25 @@ import OPERATIVOS_RAW from './operativos.json' with { type: 'json' }
  *   operación («Diagnosticar»), no en cada fotograma de pan/zoom — la misma
  *   distinción que ya hace `viewer/acotaciones.js` entre medir en vivo y
  *   medir bajo demanda.
- * @property {number} grosorInvasionMinimoM  **0,001 m (1 mm).** Por debajo de
- *   este GROSOR, una pieza de intersección de la parcela con una colindante NO
- *   se trata como invasión: es astilla de ruido de redondeo en un lindero
- *   compartido. Dos parcelas vecinas declaran, cada una por su lado, la MISMA
- *   línea de lindero, pero el GML del WFS serializa coordenadas a 2 decimales
- *   (regla de oro 11, `gml/xml.js#elem`) — un paso de cuantización de 0,01 m.
- *   Cuando `turf.intersect()` cruza los dos polígonos, esa línea nominalmente
- *   única aparece como dos casi-paralelas separadas por ese paso de redondeo, y
- *   el hueco entre ellas es una tira de área que no representa NINGÚN solape
- *   real sobre el terreno.
+ * @property {number} grosorInvasionMinimoM  **0,0071 m (7,1 mm = √2/2 cm).** Por
+ *   debajo de este GROSOR, una pieza de intersección de la parcela con una
+ *   colindante NO se trata como invasión: es astilla de ruido de redondeo en un
+ *   lindero compartido. Dos parcelas vecinas declaran, cada una por su lado, la
+ *   MISMA línea de lindero, pero el GML del WFS serializa coordenadas a 2
+ *   decimales (regla de oro 11, `gml/xml.js#elem`) — un paso de cuantización de
+ *   0,01 m. Cuando `turf.intersect()` cruza los dos polígonos, esa línea
+ *   nominalmente única aparece como dos casi-paralelas separadas por ese paso de
+ *   redondeo, y el hueco entre ellas es una tira de área que no representa
+ *   NINGÚN solape real sobre el terreno.
+ *
+ *   ⛔ **EL VALOR ERA 1 mm HASTA EL 2026-08-10, Y LA MEDICIÓN LO REFUTÓ POR
+ *   SEGUNDA VEZ.** Ver más abajo «de dónde sale el 7,1»: aquel 1 mm se copió de
+ *   `duplicadoMetros` —una propiedad de NUESTRO modelo— cuando lo que hay que
+ *   absorber lo fija la REJILLA DE PUBLICACIÓN del Catastro, y se calibró contra
+ *   un único fixture cuya aguja medía 0,071 mm. Sobre 554 parcelas oficiales de
+ *   diez provincias (15.501 pares, sin editar un vértice) salieron 64 piezas de
+ *   solape: **34 de ellas caían entre 1 mm y 5 mm de grosor y se estaban
+ *   anunciando como INVASIÓN A COLINDANTES**. Todas eran agujas de redondeo.
  *
  *   ⛔ **ESTA CLAVE SUSTITUYE A `areaInvasionMinimaM2` (10⁻⁴ m²), QUE VIVIÓ
  *   MEDIO DÍA Y LA MEDICIÓN REFUTÓ** (2026-07-29). Aquella se calibró por
@@ -145,23 +154,48 @@ import OPERATIVOS_RAW from './operativos.json' with { type: 'json' }
  *   existía para evitar, y en el único sitio donde la regla de oro 9 admite
  *   ámbar.
  *
- *   **Por qué el GROSOR y no un área más grande.** El área de la aguja crece
- *   con `L`, que es la longitud del lindero: cualquier umbral de área hay que
- *   recalibrarlo según lo largo que sea el lindero, y subirlo hasta cubrir el
- *   peor caso (7,5·10⁻² m² con L = 30 m) se tragaría invasiones pequeñas de
- *   verdad. El grosor **no depende de `L`**: una aguja de redondeo mide
- *   décimas de milímetro de ancho por larga que sea, y una invasión real mide
- *   centímetros. Sobre las piezas medidas la separación es de tres órdenes de
- *   magnitud (0,071 mm la astilla real; 4,9 cm una franja invadida de 2 m ×
- *   5 cm), así que la cifra no está apretada por ningún lado.
+ *   **Por qué el GROSOR y no un área más grande.** Ésta es la parte que SIGUE
+ *   siendo cierta, y la que hace que el arreglo del 2026-08-10 sea un cambio de
+ *   valor y no de criterio. El área de la aguja crece con `L`, que es la
+ *   longitud del lindero: cualquier umbral de área hay que recalibrarlo según lo
+ *   largo que sea el lindero, y subirlo hasta cubrir el peor caso se tragaría
+ *   invasiones pequeñas de verdad. El grosor **no depende de `L`** — está
+ *   acotado por la celda de publicación, que es la misma tenga el lindero 2 m o
+ *   200 —. Sobre la muestra de 554 parcelas: agujas de 0,071 mm a 5 mm de grosor
+ *   con áreas de 1,2 cm² a 0,055 m², o sea **áreas que abarcan casi tres órdenes
+ *   de magnitud para un mismo fenómeno**. Ningún umbral de área las separa; el de
+ *   grosor sí.
  *
- *   **Y el valor no se inventa: es `duplicadoMetros`.** Ese 1 mm ya significa
- *   en este fichero «dos puntos más juntos que esto son el mismo punto». Una
- *   pieza más delgada que la distancia a la que consideramos dos puntos
- *   idénticos es, por definición, una pieza entre dos linderos que
- *   consideramos idénticos. Se declara como clave propia y no se lee
- *   `duplicadoMetros` directamente porque son dos decisiones distintas que hoy
- *   coinciden, y el día que una cambie no debe arrastrar a la otra.
+ *   **De dónde sale el 7,1 mm, que es lo único que hay que entender de esta
+ *   clave.** No es un ajuste a ojo ni un percentil de una muestra: es la
+ *   aritmética de la rejilla de publicación.
+ *
+ *     1. El WFS publica con 2 decimales ⇒ celda de 1 cm.
+ *     2. Redondear un punto a esa celda lo mueve, como mucho, MEDIA DIAGONAL:
+ *        √(0,5² + 0,5²) = **0,707 cm**. Ése es el desvío máximo de un vértice
+ *        intermedio respecto de la recta que sus dos extremos definen.
+ *     3. Las dos parcelas se redondean POR SEPARADO, así que las dos versiones
+ *        del mismo lindero pueden separarse hasta **1,41 cm** (h).
+ *     4. `geo/grosor.js` estima el grosor como `2A/P`, que para una AGUJA vale
+ *        `≈ h/2` (está en su cabecera). Luego el techo del ruido, medido con la
+ *        misma regla con la que se compara, es `1,41 / 2 = **0,707 cm**`.
+ *
+ *   ⚠️ **Lo que esto cuesta, dicho sin adornos:** una invasión REAL más estrecha
+ *   que ~1,4 cm deja de distinguirse. No es una tolerancia que este proyecto
+ *   conceda: es la RESOLUCIÓN del dato con el que se compara. Con coordenadas
+ *   publicadas al centímetro y cada parcela redondeada por su cuenta, «solapan
+ *   1 cm» y «es el mismo lindero escrito dos veces» son la misma cadena de
+ *   caracteres. Bajar el umbral no recupera esa sensibilidad: solo devuelve los
+ *   34 falsos positivos medidos. Quien necesite resolver por debajo de eso
+ *   necesita otro dato de partida (un levantamiento de las dos fincas), no otro
+ *   umbral — y para eso está el propio contraste de F07.
+ *
+ *   **Por qué NO se lee `duplicadoMetros`.** Porque ya se hizo y estaba mal.
+ *   Aquel 1 mm significa «dos puntos más juntos que esto son el mismo punto»,
+ *   que es una afirmación sobre el modelo de esta aplicación; lo que aquí hay
+ *   que absorber es el ruido de OTRO (el redondeo del WFS). Que las dos cifras
+ *   fueran iguales durante un año fue una coincidencia sin sentido físico, y la
+ *   coincidencia es exactamente lo que impidió ver el error.
  *
  *   **Por qué NO viola la regla de oro 9:** no decide si una invasión es
  *   aceptable —eso es indelegablemente del colegiado que firma—, decide si lo

@@ -1508,3 +1508,151 @@ describe('viewer/sincronizacion · selección de vértice (mapa ↔ tabla)', () 
     ctx.limpiar()
   })
 })
+
+
+// ── La cuarta columna: la × que borra la fila (2026-08-10) ───────────────────
+//
+// El gancho `alBorrar` es lo que enciende la columna entera. Sin él la tabla es
+// exactamente la de F03 —tres columnas, ningún botón—, y eso también se prueba:
+// el visor se monta sin edición en más de un sitio (la rama EDIFICIO, una pantalla
+// de solo lectura), y ahí un botón de borrar sería un mando muerto.
+
+describe('viewer/sincronizacion · la columna de borrado', () => {
+  const botonesBorrar = (ctx) => [...ctx.tablaEl.querySelectorAll('[data-accion="borrar-vertice"]')]
+
+  const clicEnBoton = (boton) =>
+    boton.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }))
+
+  it('SIN el gancho la tabla es la de F03: tres columnas y ningún botón', () => {
+    const ctx = montar()
+    expect(botonesBorrar(ctx)).toHaveLength(0)
+    expect(ctx.tablaEl.querySelectorAll('thead th')).toHaveLength(3)
+    // Y los dos `colspan` del módulo siguen cruzando la tabla entera.
+    expect(ctx.tablaEl.querySelector('.gml-fila-recinto th').colSpan).toBe(3)
+    ctx.limpiar()
+  })
+
+  it('CON el gancho, cada fila de vértice estrena su × y la cabecera su columna', () => {
+    const ctx = montar({ alBorrar: vi.fn() })
+    const filas = [...ctx.tablaEl.querySelectorAll('tr[data-indice]')]
+    expect(filas.length).toBeGreaterThan(0)
+    expect(botonesBorrar(ctx)).toHaveLength(filas.length)
+    expect(ctx.tablaEl.querySelectorAll('thead th')).toHaveLength(4)
+    // ⚠️ El `colspan` NO está escrito a mano: sale de `columnas()`. Sin eso, la fila
+    // del recinto dejaría de cruzar la tabla al estrenarse la cuarta columna, que
+    // es el desperfecto que nadie mira porque «solo es un colspan».
+    expect(ctx.tablaEl.querySelector('.gml-fila-recinto th').colSpan).toBe(4)
+    ctx.limpiar()
+  })
+
+  it('la × es un `<button>` de verdad, con nombre accesible propio de su fila', () => {
+    const ctx = montar({ alBorrar: vi.fn() })
+    const boton = botonesBorrar(ctx)[0]
+    // `<button>` y no un `<span>` clicable: así entra en el orden de tabulación,
+    // responde a Enter y a Espacio sin programarlo, y se anuncia como botón.
+    expect(boton.tagName).toBe('BUTTON')
+    expect(boton.type).toBe('button')
+    // Quince botones llamados «×» son quince botones indistinguibles para quien
+    // recorre la página por botones.
+    expect(boton.getAttribute('aria-label')).toBe('Borrar el vértice 1 de EXTERIOR')
+    ctx.limpiar()
+  })
+
+  it('pulsarla llama al gancho con la RefVertice de su fila', () => {
+    const alBorrar = vi.fn()
+    const ctx = montar({ alBorrar })
+
+    clicEnBoton(botonesBorrar(ctx)[2])
+
+    expect(alBorrar).toHaveBeenCalledTimes(1)
+    expect(alBorrar).toHaveBeenCalledWith({ recinto: 0, indice: 2 })
+    ctx.limpiar()
+  })
+
+  it('⚠️ NO borra por su cuenta: la operación es del gancho', () => {
+    // `sincronizacion.js` pinta y arrastra; insertar y eliminar son de
+    // `viewer/edicion.js`, que sabe negarse cuando el anillo quedaría con menos de
+    // tres vértices. Un borrado hecho aquí se saltaría esa regla.
+    const ctx = montar({ alBorrar: vi.fn() })
+    const antes = ctx.store.get().recintos[0].vertices.length
+
+    clicEnBoton(botonesBorrar(ctx)[0])
+
+    expect(ctx.store.get().recintos[0].vertices).toHaveLength(antes)
+    ctx.limpiar()
+  })
+
+  it('la × del HUECO señala a su propio recinto, no al exterior', () => {
+    const alBorrar = vi.fn()
+    const ctx = montar({ alBorrar })
+    const delHueco = [...ctx.tablaEl.querySelectorAll('tr[data-recinto="1"]')].filter((f) =>
+      f.hasAttribute('data-indice'),
+    )
+    expect(delHueco.length).toBeGreaterThan(0)
+
+    clicEnBoton(delHueco[0].querySelector('[data-accion="borrar-vertice"]'))
+
+    expect(alBorrar).toHaveBeenCalledWith({ recinto: 1, indice: 0 })
+    ctx.limpiar()
+  })
+
+  it('⛔ sobrevive a la RECONSTRUCCIÓN de la tabla (el oyente va delegado)', () => {
+    // Borrar un vértice cambia la FORMA, y un cambio de forma rehace la tabla
+    // entera. Con un oyente por botón, el primer borrado se llevaría por delante
+    // todos los demás y el segundo clic no haría nada.
+    const alBorrar = vi.fn()
+    const ctx = montar({ alBorrar })
+    const antes = botonesBorrar(ctx)[0]
+
+    // Una parcela con OTRA forma: el módulo reconstruye la tabla entera, así que
+    // los botones de después son nodos nuevos y los de antes, huérfanos.
+    const otra = parcelaConHueco()
+    otra.recintos[0].vertices = otra.recintos[0].vertices.slice(0, 3)
+    ctx.store.set(otra)
+    expect(botonesBorrar(ctx)[0], 'la tabla no se ha reconstruido').not.toBe(antes)
+
+    clicEnBoton(botonesBorrar(ctx)[1])
+
+    expect(alBorrar).toHaveBeenCalledWith({ recinto: 0, indice: 1 })
+    ctx.limpiar()
+  })
+
+  it('una fila que ya no señala ningún vértice avisa en vez de llamar al gancho', () => {
+    const alBorrar = vi.fn()
+    const ctx = montar({ alBorrar })
+    const boton = botonesBorrar(ctx).at(-1)
+    const fila = boton.closest('tr')
+    // Se envejece la fila a mano: es lo que pasa cuando otra vista carga otra
+    // parcela entre el pintado y el clic.
+    fila.dataset.indice = '99'
+
+    clicEnBoton(boton)
+
+    expect(alBorrar).not.toHaveBeenCalled()
+    expect(ctx.alAvisar).toHaveBeenCalled()
+    ctx.limpiar()
+  })
+
+  it('`destruir()` retira también este oyente', () => {
+    const alBorrar = vi.fn()
+    const ctx = montar({ alBorrar })
+    const boton = botonesBorrar(ctx)[0]
+
+    ctx.sinc.destruir()
+    clicEnBoton(boton)
+
+    expect(alBorrar).not.toHaveBeenCalled()
+    ctx.limpiar()
+  })
+
+  it('un `alBorrar` que no es función es contrato roto → throw', () => {
+    const { mapa, destruir: destruirMapa } = montarMapa()
+    const panes = crearPanes(mapa)
+    const tablaEl = document.createElement('table')
+    const estado = crearEstadoVista(parcelaConHueco())
+    expect(() =>
+      sincronizar({ mapa, panes, estado, tablaEl, zona: 30, alBorrar: 'sí' }),
+    ).toThrow(TypeError)
+    destruirMapa()
+  })
+})

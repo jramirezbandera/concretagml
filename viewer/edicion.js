@@ -41,6 +41,14 @@
 //     {@link crearEdicion} → `alCrearMarcador`, y se llama a
 //     `L.DomEvent.preventDefault` para que no salga además el menú del navegador.
 //   · **`Alt`** ..................... mientras está pulsada, el snap NO engancha.
+//   · **MODO BORRAR** (`modoBorrar(true)`) ... mientras está encendido, el CLIC
+//     del mapa **borra** el vértice que tenga a menos de {@link UMBRAL_PUNTERIA_PX}
+//     px en vez de seleccionar el lindero, y el doble clic **no inserta**. Es el
+//     único modo de este módulo y el único sitio donde un clic sencillo escribe en
+//     el modelo, o sea la única excepción a la garantía de dos puntos más arriba —
+//     por eso hay que ARMARLO a propósito, se ve en el cursor, y se apaga con
+//     `Escape`, al salir de Edición y al destruir. Todo el razonamiento está junto
+//     a la variable `borrando` de {@link crearEdicion}.
 //
 // ── POR QUÉ `Alt` Y NO `Ctrl` NI `Shift` ────────────────────────────────────
 // `Ctrl` colisiona con el zoom por rueda y con el pan de Leaflet; `Shift`, con su
@@ -185,6 +193,17 @@ export const CLASE_EDICION = Object.freeze({
   INDICADOR_LINDERO: 'gml-snap--lindero',
   /** Resalte del lado seleccionado. */
   RESALTE: 'gml-lado-seleccionado',
+  /**
+   * En el CONTENEDOR del mapa mientras el modo borrar está encendido. De ella
+   * cuelga el único aviso permanente que ese modo tiene: el cursor. Un modo que
+   * cambia lo que hace el clic y no cambia nada de lo que se ve es la definición
+   * de trampa silenciosa — y aquí el clic pasa de «resaltar» a «destruir».
+   *
+   * Va en el contenedor y no en cada marcador a propósito: el gesto se atiende
+   * en el `click` del MAPA (ver {@link crearEdicion}#alClicMapa), así que el modo
+   * es del mapa entero, no de quince iconos.
+   */
+  MODO_BORRAR: 'gml-modo-borrar',
 })
 
 /**
@@ -333,6 +352,20 @@ const MSG_SIN_LADOS =
 const MSG_SIN_SELECCION =
   'No se ha desplazado ningún lindero: no hay ningún lado seleccionado. Pincha primero sobre el ' +
   'lindero que quieras mover y vuelve a intentarlo.'
+
+/**
+ * Clic en el vacío estando en modo borrar.
+ *
+ * ── Por qué ESTE gesto sí avisa y el clic en el vacío de la selección NO ─────
+ * Fuera del modo borrar, pinchar lejos de todo DESELECCIONA: es una acción con
+ * un efecto visible y deliberado, así que no hay nada que contar. En modo borrar
+ * el mismo clic **no hace absolutamente nada**, y un modo armado que se traga un
+ * clic en silencio es indistinguible de un modo que se ha apagado solo. Se dice
+ * en qué radio hay que pinchar, que es la información que falta.
+ */
+const MSG_BORRAR_LEJOS =
+  `No se ha borrado ningún vértice: no hay ninguno a menos de ${UMBRAL_PUNTERIA_PX} px del punto ` +
+  `que has pinchado. En modo borrar hay que pinchar sobre el vértice, no sobre el lindero.`
 
 // ── Helpers de módulo (puros) ────────────────────────────────────────────────
 
@@ -514,6 +547,8 @@ function exigirTolerancia(valor, fn) {
  *   eliminar: (refVertice: RefVertice) => {aplicado: boolean, motivo: string|null},
  *   fijarColindantes: (recintos: Array<object>) => void,
  *   alCambiarSeleccion: (fn: (ref: RefVertice|null) => void) => (() => void),
+ *   modoBorrar: (valor?: boolean) => boolean,
+ *   alCambiarModoBorrar: (fn: (activo: boolean) => void) => (() => void),
  *   destruir: () => void,
  * }}
  * @throws {TypeError|RangeError}
@@ -611,6 +646,32 @@ export function crearEdicion({
   let seleccion = null
   const oyentesSeleccion = new Set()
 
+  /**
+   * ── EL MODO BORRAR ────────────────────────────────────────────────────────
+   * Si está encendido, el clic del mapa **borra el vértice más cercano** en vez
+   * de seleccionar el lindero más cercano. Es el único MODO de este módulo, y
+   * conviene tener claro por qué existe y qué reglas se le aplican.
+   *
+   * **Por qué un modo y no un botón de «borra el seleccionado»**: borrar puntos
+   * de un levantamiento es una tarea a granel —se importa un DXF con vértices de
+   * más y se limpian ocho o diez seguidos—, y con un botón cada borrado cuesta
+   * dos gestos (elegir, pulsar) en dos sitios distintos de la pantalla. Con el
+   * modo cuesta uno, y siempre en el mismo sitio: encima del vértice.
+   *
+   * **Es EXCLUYENTE con lo que el clic hacía antes, y por eso al encenderlo se
+   * suelta la selección de lindero.** Dejar el resalte pintado sobre un lado que
+   * ya no se puede cambiar —porque el clic ya no selecciona— sería un mando que
+   * miente sobre lo que va a pasar.
+   *
+   * **Y se apaga solo en tres sitios**: `Escape`, `activa(false)` (o sea, salir
+   * de la pantalla de Edición) y `destruir()`. Un modo destructivo que sobreviva
+   * a un cambio de pantalla es exactamente el accidente que no se puede permitir:
+   * el usuario vuelve media hora después, pincha para mirar algo y borra un
+   * vértice.
+   */
+  let borrando = false
+  const oyentesModoBorrar = new Set()
+
   let indicador = null
   /** Tipo del indicador VIVO, para no recrearlo en cada fotograma. */
   let tipoIndicador = null
@@ -703,6 +764,17 @@ export function crearEdicion({
    */
   const alTeclear = (evento) => {
     altPulsado = !!(evento && evento.altKey === true)
+    // `Escape` apaga el modo borrar. Va aquí y no en un oyente propio porque este
+    // ya está montado sobre el `document` por el seguimiento de `Alt`, y son la
+    // misma clase de hecho: teclas que cambian lo que va a hacer el siguiente clic.
+    //
+    // ⚠️ Solo en `keydown` y solo si el modo está encendido: así `Escape` sigue
+    // siendo de quien lo escuche (el panel de la barra, un diálogo) cuando aquí no
+    // hay nada que cancelar. Y NO se llama a `preventDefault`: cancelar un modo
+    // propio no puede robarle la tecla al navegador ni a nadie más.
+    if (borrando && evento && evento.type === 'keydown' && evento.key === 'Escape') {
+      fijarModoBorrar(false)
+    }
   }
 
   /**
@@ -858,6 +930,35 @@ export function crearEdicion({
     for (const fn of oyentesSeleccion) fn(copia)
   }
 
+  function anunciarModoBorrar() {
+    for (const fn of oyentesModoBorrar) fn(borrando)
+  }
+
+  /**
+   * Enciende o apaga el modo borrar, repinta el cursor y anuncia SOLO si ha
+   * cambiado de verdad (mismo criterio que {@link fijarSeleccion}: un anuncio por
+   * cambio real, nunca uno por llamada).
+   *
+   * La clase va en el CONTENEDOR del mapa. Es lo único que este módulo escribe en
+   * el DOM fuera de sus dos capas, y es deliberado: el cursor pertenece a la
+   * superficie sobre la que se pincha, no a un icono.
+   *
+   * @param {boolean} valor
+   * @returns {boolean}  Lo que ha quedado.
+   */
+  function fijarModoBorrar(valor) {
+    if (valor === borrando) return borrando
+    borrando = valor
+    if (contenedor && contenedor.classList) {
+      contenedor.classList.toggle(CLASE_EDICION.MODO_BORRAR, borrando)
+    }
+    // Al ENCENDER se suelta el lindero: el clic ya no lo va a poder cambiar y el
+    // resalte estaría prometiendo algo que no se cumple (ver `borrando`).
+    if (borrando) fijarSeleccion(null)
+    anunciarModoBorrar()
+    return borrando
+  }
+
   /** Fija la selección, repinta y anuncia SOLO si ha cambiado de verdad. */
   function fijarSeleccion(ref) {
     if (mismaRef(seleccion, ref)) {
@@ -953,6 +1054,39 @@ export function crearEdicion({
         const proy = proyectarEnSegmento([P[0], P[1]], [A[0], A[1]], [B[0], B[1]])
         if (mejor === null || proy.distancia < mejor.proy.distancia) {
           mejor = { recinto: r, indice: i, proy }
+        }
+      }
+    }
+    return mejor
+  }
+
+  /**
+   * El VÉRTICE más cercano al punto UTM `P`, mirando todos los recintos. Gemelo de
+   * {@link ladoMasCercano} —misma forma de recorrido, misma tolerancia con el dato
+   * malo, misma medida en metros— pero sobre puntos en vez de sobre segmentos.
+   *
+   * Se compara en METROS y el llamante convierte solo al ganador a píxeles, por la
+   * razón que ya está escrita en {@link pixelesEntre}: el orden de los dos
+   * criterios coincide a la escala de una parcela y convertir n vértices sería
+   * pagar n desproyecciones para obtener el mismo ganador.
+   *
+   * @param {object|null} parcela
+   * @param {[number, number]} P
+   * @returns {{recinto: number, indice: number, punto: [number, number], distancia: number}|null}
+   */
+  function verticeMasCercano(parcela, P) {
+    const anillos = anillosDe(parcela)
+    let mejor = null
+    for (let r = 0; r < anillos.length; r++) {
+      const anillo = anillos[r]
+      for (let i = 0; i < anillo.length; i++) {
+        const V = anillo[i]
+        // Vértice no finito: dato posible del usuario (lo señala F02), no una
+        // diana. Se salta sin lanzar, igual que en `ladoMasCercano`.
+        if (!esPar(V)) continue
+        const distancia = distanciaEntre([P[0], P[1]], [V[0], V[1]])
+        if (mejor === null || distancia < mejor.distancia) {
+          mejor = { recinto: r, indice: i, punto: [V[0], V[1]], distancia }
         }
       }
     }
@@ -1352,6 +1486,27 @@ export function crearEdicion({
   const alClicMapa = (evento) => {
     if (!vivo || !edicionActiva || !evento || !evento.latlng) return
     const parcela = estado.get()
+
+    // ── El modo borrar se lleva el clic entero ────────────────────────────────
+    // Antes que nada, y sin caer luego en la selección de lindero: en este modo el
+    // clic tiene UN significado. Funciona igual pinchando el cuadradito del
+    // vértice que dos píxeles al lado, porque `sincronizacion.js` REEMITE al mapa
+    // el clic de sus marcadores (ver el comentario largo de su `marcador.on(
+    // 'click')`), así que aquí llega el mismo evento en los dos casos.
+    if (borrando) {
+      const cerca = verticeMasCercano(parcela, latLngAUTM(evento.latlng, zona))
+      if (cerca === null || pixelesEntre(latLngAUTM(evento.latlng, zona), cerca.punto) > UMBRAL_PUNTERIA_PX) {
+        avisar(MSG_BORRAR_LEJOS, { nivel: NIVEL.ERROR })
+        return
+      }
+      // `eliminar` ya cuenta por qué cuando el modelo se niega (el mínimo de
+      // vértices de un anillo), y ya reubica la selección. El modo NO se apaga: es
+      // lo que lo distingue de un botón, y borrar ocho vértices seguidos es su
+      // caso de uso.
+      eliminar({ recinto: cerca.recinto, indice: cerca.indice })
+      return
+    }
+
     const mejor = ladoMasCercano(parcela, latLngAUTM(evento.latlng, zona))
     if (mejor === null) {
       fijarSeleccion(null)
@@ -1369,6 +1524,13 @@ export function crearEdicion({
     if (!vivo || !edicionActiva || !evento || !evento.latlng) return
     const dom = evento.originalEvent
     if (dom && typeof dom.preventDefault === 'function') L.DomEvent.preventDefault(dom)
+    // ⚠️ En modo borrar NO se inserta, y no es una omisión defensiva: un doble clic
+    // contiene dos clics, así que sin esta guarda el gesto sería «borra el vértice,
+    // borra otro, y ahora inserta uno nuevo» — tres escrituras en el modelo, dos de
+    // ellas contradictorias, con un solo gesto del usuario. Se consume el
+    // `preventDefault` igual (el zoom por doble clic sigue apagado y devolverlo
+    // aquí sería un salto de escala en mitad de una limpieza de vértices).
+    if (borrando) return
     insertarEn(evento.latlng)
   }
 
@@ -1448,6 +1610,9 @@ export function crearEdicion({
       edicionActiva = valor
       for (const marcador of marcadoresDeVertice()) aplicarArrastre(marcador)
       if (!edicionActiva) {
+        // El modo borrar PRIMERO: es el único estado de este módulo que sobrevivir
+        // a un cambio de pantalla convertiría en un accidente (ver `borrando`).
+        fijarModoBorrar(false)
         fijarSeleccion(null)
         ocultarIndicador()
       }
@@ -1562,6 +1727,51 @@ export function crearEdicion({
     },
 
     /**
+     * Getter/setter del MODO BORRAR. Sin argumento lee; con un booleano escribe y
+     * devuelve el valor ya escrito, igual que {@link snapActivo} y `activa`.
+     *
+     * Encendido, el clic del mapa borra el vértice que tenga a menos de
+     * {@link UMBRAL_PUNTERIA_PX} px en vez de seleccionar el lindero más cercano, y
+     * el doble clic deja de insertar. El porqué de las tres cosas —y de las tres
+     * formas de apagarlo— está junto a la variable `borrando`.
+     *
+     * @param {boolean} [valor]
+     * @returns {boolean}
+     */
+    modoBorrar(valor) {
+      if (valor === undefined) return borrando
+      if (typeof valor !== 'boolean') {
+        throw new TypeError(
+          `modoBorrar: 'valor' debe ser un booleano (o nada, para leer); recibido ${describir(valor)}.`,
+        )
+      }
+      // Tras `destruir()` no se enciende: el oyente del clic ya no está y el modo
+      // quedaría armado sobre un mapa que no lo atiende. Mismo criterio que las
+      // demás operaciones, que empiezan por `if (!vivo)`.
+      if (!vivo) return borrando
+      return fijarModoBorrar(valor)
+    },
+
+    /**
+     * Se suscribe a los cambios del modo borrar. Devuelve la función de BAJA.
+     * Gemela de {@link alCambiarSeleccion} y por el mismo motivo: quien pinta el
+     * botón de la barra no puede sondear un booleano, y el modo se apaga TAMBIÉN
+     * por caminos que ese botón no ve (`Escape`, salir de la pantalla).
+     *
+     * @param {(activo: boolean) => void} fn
+     * @returns {() => void}
+     */
+    alCambiarModoBorrar(fn) {
+      if (typeof fn !== 'function') {
+        throw new TypeError(
+          `alCambiarModoBorrar: 'fn' debe ser una función; recibido ${describir(fn)}.`,
+        )
+      }
+      oyentesModoBorrar.add(fn)
+      return () => oyentesModoBorrar.delete(fn)
+    },
+
+    /**
      * Deja el módulo inerte y el mapa como estaba: capas fuera, oyentes del mapa, del
      * documento y de la ventana retirados, baja del store y `doubleClickZoom`
      * restaurado. IDEMPOTENTE.
@@ -1575,6 +1785,13 @@ export function crearEdicion({
      */
     destruir() {
       if (!vivo) return
+      // ANTES de bajar la bandera: `fijarModoBorrar` tiene que poder quitar la
+      // clase del contenedor, o el mapa se quedaría con el cursor de borrar puesto
+      // y sin nadie que atendiera el clic — un modo fantasma, que es peor que uno
+      // encendido. Se apaga en silencio para los oyentes que quedaran (el mismo
+      // criterio que la selección, aquí abajo: no se notifica a quien se desmonta).
+      oyentesModoBorrar.clear()
+      fijarModoBorrar(false)
       vivo = false
       bajaDelStore()
       mapa.off('click', alClicMapa)

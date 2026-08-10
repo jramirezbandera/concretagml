@@ -601,6 +601,209 @@ export const ASIENTOS = Object.freeze(
         'profundiza, y ese es el canje que se acepta a cambio de que el dato titular se lea desde ' +
         'lejos. Si algún día aprieta, lo primero que debe plegarse es el párrafo del margen de ' +
         'identidad, que son cinco líneas de 12 px que casi nadie lee. Sobran 15.685 sobre el techo.' },
+
+    { hito: 'La barra de edición vuelve a los iconos, con pista propia y una herramienta de borrar',
+      commit: '(sin commitear)',
+      total: 74250, nuestro: 59155, rebanada: null,
+      nota:
+        '**+1.406 B, y una línea de las 1.406 es la que arregla el defecto que se reportó.** El ' +
+        'autor pidió tres cosas el 2026-08-10: poder borrar puntos desde la tabla de coordenadas, ' +
+        'una herramienta de borrar en la barra, y la barra en iconos con texto al pasar el ratón — ' +
+        'más «el botón de ayuda abre una ventana con margen excesivo a la derecha». ── ⭐ EL ' +
+        'MARGEN NO ERA UN MARGEN ── `.gml-esquina-centro-abajo .gml-barra-edicion` es `flex-' +
+        'direction:column` sin `align-items`, o sea `stretch`, que **no estira a los hijos con ancho ' +
+        'propio: los deja a la izquierda**. La fila de herramientas medía ~530 px con las palabras y ' +
+        'el panel de ayuda mide 460 fijos, así que esos ~70 px de diferencia quedaban en blanco a su ' +
+        'derecha. Una caja de 460 alineada a la izquierda dentro de otra de 530, no un padding. Se ' +
+        'cierra con `align-items:center`, que además hace que abrir un panel ya no desplace las ' +
+        'herramientas (la caja crece desde su centro, que es donde el `translateX(-50%)` la ancla). ' +
+        '── ⚠️ ESTO REVIERTE EL REDISEÑO DEL 2026-08-05 ── aquel día el autor RECHAZÓ los iconos, y ' +
+        'su objeción no era estética: era que `title` aparece al segundo de pasar el ratón, o sea ' +
+        '**después de haber dudado**. Por eso la barra no vuelve con `title` sino con una PISTA ' +
+        'propia a 120 ms (e instantánea con el foco del teclado), y un guardián prohíbe que ninguna ' +
+        'herramienta lleve además el `title` nativo — dos globos sobre el mismo botón es el descuido ' +
+        'clásico de quien se fabrica un tooltip. ── QUÉ ENTRA EN BYTES ── el estado `aria-pressed` de ' +
+        'los conmutadores (uno azul, y ROJO el destructivo: armar «Borrar» y armar «Dibujar» no ' +
+        'pueden verse igual), la tipografía y la sombra de la pista (lo que la hace FLOTAR va en ' +
+        'línea, o sería un renglón que empuja la fila al pasar el ratón), la cuarta columna de la ' +
+        'tabla de vértices con su ×, el cursor `crosshair` del modo borrar y una `.gml-rotulo-oculto` ' +
+        'genérica. ── ⛔ LA TRAMPA DEL CURSOR ── `crearMapa` hace `L.map()` sobre el propio `<main ' +
+        'class="gml-mapa">`, así que la clase del modo cae en ESE MISMO elemento y un selector de ' +
+        'descendencia `.gml-mapa .gml-modo-borrar` no habría casado nunca. ── QUÉ SE VA ── la regla ' +
+        'de las palabras y `.gml-barra-texto`, que se queda sin nodos. La fila baja de ~530 px a ' +
+        '~200, con lo que el panel de ayuda pasa a ser el hijo más ancho de la barra. Sobran 17.091 ' +
+        'sobre el techo.' },
+
+    { hito: 'El cromo se despega del mapa: elevación, tres niveles de texto y una sola forma',
+      commit: '(sin commitear)',
+      total: 77020, nuestro: 61925, rebanada: null,
+      nota:
+        '**+2.770 B**, y es la revisión de diseño de sistema que pidió el autor el 2026-08-10 en ' +
+        'una frase: «el cromo (panel, cabecera, selectores) vive en el mismo plano visual que el ' +
+        'mapa y compite con él, en vez de flotar por encima con autoridad». ── ⭐ EL REPARTO, ' +
+        'MEDIDO Y NO ESTIMADO ── Se construyó la hoja CUATRO veces, quitando un bloque cada vez, ' +
+        'porque a ojo habría salido al revés: **selector de capas +1.699 · caja de aviso +764 · ' +
+        'elevar panel y barra +160 · todo lo demás +147**. Lo caro NO es la elevación (seis ' +
+        'declaraciones) sino el selector de capas, y el motivo es el prefijo: sus reglas nuevas ' +
+        'arrastran `.gml-app .gml-mapa .leaflet-control-layers-*` (~45 caracteres antes de la ' +
+        'primera llave) porque la convención de la sección del mapa exige (0,3,0) para ganarle a ' +
+        'las reglas que Leaflet duplica bajo `.leaflet-touch`. Se comprobó que (0,2,0) bastaría ' +
+        'para éstas y **no se hizo**: media sección con un prefijo y media con otro es peor que ' +
+        '300 B. ── QUÉ SE COMPRA ── (1) **Elevación.** Panel y barra pasan a `position:relative` ' +
+        '+ `z-index` + sombra direccional, y el `z-index` no es opcional: son HERMANOS del mapa ' +
+        'en la rejilla, así que sin él la sombra la tapa el mapa, y por debajo de 1000 la tapa el ' +
+        'botón de zoom, que nace a 10 px del borde. Lo que flota DENTRO del mapa (capas, ' +
+        'opacidad, zoom, barra de edición, los dos cajones) pasa a un halo común. ── ⚠️ **LAS ' +
+        'SOMBRAS SE CALIBRARON SOBRE LA CAPA «BLANCO», NO SOBRE LA ORTOFOTO**, y esa decisión ' +
+        'ahorró una equivocación: una sombra oscura sobre el mar es invisible por física, así que ' +
+        'ajustarla ahí lleva a subirla hasta que se vea y entonces sale una banda gris sobre el ' +
+        'parcelario blanco del Catastro. La primera tanda (20 %, desenfoque 16, estrechamiento ' +
+        '−8) no se veía ni sobre blanco: 6 px de extensión útil. ── (2) **El selector de capas ' +
+        'deja de mezclar bases y superpuesta**: rótulo de grupo por `::before` y divisor a ' +
+        'sangre. Los rótulos NO son nodos a propósito —ese DOM lo fabrica `L.control.layers` y ' +
+        'hurgarlo tras `addControl` se rompe en una subida menor de la dependencia sin que lo ' +
+        'diga nadie—. ⛔ **Y aquí estaba el único trozo de interfaz que NO iba en Geist**: ' +
+        '`leaflet.css` le pone Helvetica/Arial a `.leaflet-container`, que es ancestro de todo lo ' +
+        'del mapa, y la primera versión de este bloque dio tamaño y color pero NO familia. El ' +
+        'autor lo reportó como «la tipografía de capa base es muy fina y no se entiende bien»; se ' +
+        'corrige con `font-family` donde toca (un `<label>` no la hereda), 13/500 en las filas y ' +
+        '11 px con menos interletra en los rótulos de grupo. ── (3) **La caja del aviso de ' +
+        'error.** Era texto rojo suelto al fondo de la columna y el autor lo describió exacto: ' +
+        '«parece un fallo de la app». ⛔ Y destapó un defecto de cascada al mirarlo en el ' +
+        'navegador: `--panel` y `--error` caen en el MISMO `<p>` y los dos querían `padding`, así ' +
+        'que el aviso salía **a sangre de borde a borde del panel**; se reparte con la ' +
+        'combinación de las dos clases (margen para la sangría, relleno para la caja). En jsdom ' +
+        'no hay cascada que resolver. ── (4) **Un radio y una altura de control, re-punteando ' +
+        'tokens del design system en vez de reescribir reglas.** `--radius`, `--radius-md` y ' +
+        '`--radius-sm` se REDECLARAN en el `:root` de esta hoja (no se toca `tokens/spacing.css`, ' +
+        'que es copia fiel): los ~40 radios pasan a 6 px **sin tocar ni una regla**. De ahí que ' +
+        '«todo lo demás» sean 147 B para un cambio que se ve en toda la pantalla. ── ⛔ **LO QUE ' +
+        'SE PROBÓ Y EL AUTOR RECHAZÓ EL MISMO DÍA** ── El encargo pedía reservar la saturación ' +
+        'para «la geometría del usuario (violeta #7C3AED)», así que el acento pasó a ese violeta ' +
+        're-punteando cuatro tokens más del DS. Se revirtió entero («no me gusta el morado, creo ' +
+        'que es mejor el azul de antes») y son los −126 B de diferencia con la primera medición. ' +
+        'Queda anotado en la hoja porque **el encargo daba por hecho que la geometría del usuario ' +
+        'era ese violeta y no lo es desde F03 fase 5**: `viewer/_comun.js#COLOR_USUARIO` lo ' +
+        'retiró porque desaparece sobre las sombras de la ortofoto. Probado y descartado dos ' +
+        'veces, en el mapa y en el cromo. ── (5) **El recorrido de la barra**, también reportado ' +
+        '(«los textos no coinciden con el punto, se ve mal y feo cuando está señalado»). El punto ' +
+        'y la línea de unión se centraban en el alto del peldaño, pero el texto es una rejilla de ' +
+        'DOS filas (rótulo + la reserva del motivo), así que su centro cae ENTRE las dos líneas. ' +
+        'El desfase es exactamente media pista —`(H−R−M)/2 + R/2 = H/2 − M/2`—, o sea que se ' +
+        'corrige con dos `margin-bottom: var(--gml-motivo-alto)` y sin escribir ni una cifra a ' +
+        'mano. Y el relleno de color del peldaño activo se retira: era un rectángulo de 56 px de ' +
+        'alto detrás de una palabra. El filo de 2 px se muda del peldaño al botón, porque en el ' +
+        'peldaño incluía la línea de unión y la pestaña arrancaba a mitad del guion. ── ⭐ **Y DE ' +
+        'PASO SE CIERRAN DOS VARIABLES MUERTAS QUE NADIE VEÍA**: `.gml-barra-menu-opcion` pedía ' +
+        '`var(--radius-sm)` y `.gml-rail-marca` pedía `var(--space-5)`, y **ninguna de las dos ' +
+        'existe en `tokens/`** — una variable sin declarar deja la propiedad en su valor inicial, ' +
+        'así que aquella opción de menú llevaba meses a 0 px de radio y aquel relleno izquierdo a ' +
+        '0. ── ⭐ **EL PRECIO EN PÍXELES ES CERO EN LA COLUMNA, Y ESO SE MIDIÓ** ── La ' +
+        'unificación de altura de campo y botón se puso primero en 34 px y crecía la pantalla de ' +
+        'Entrada 10 px (`scrollHeight` del bloque 575 → 585 en Chrome a 1280×720), empujando ' +
+        '«Abrir un GML» de ~2 a 12 px bajo el pliegue. El encargo lo prohíbe («no añadas aire ' +
+        'decorativo que reduzca lo que cabe en pantalla») y además 34 no está en la rejilla de 8 ' +
+        'que el mismo encargo pide. Con **32** el bloque vuelve a medir **575 exactos**, y la ' +
+        'respiración nueva de los separadores «O bien» (+16) queda pagada por el relleno de las ' +
+        'vías (13/14 → 12/16) y el margen del apunte (10 → 8). Lo único que paga alto es el MAPA: ' +
+        'la barra sube de 52 a 56 px porque el encargo la pedía menos apretada, y el mapa baja de ' +
+        '888×667 a 888×663. ── GUARDIÁN ── `test/estilos/cascara.test.js` cazó una variable ' +
+        'huérfana antes de que llegara al build, y `test/viewer/cajon-diagnostico.dom.test.js` ' +
+        'cazó el radio de 8 px del cajón flotante que la unificación dejaba fuera. 7.516 pruebas ' +
+        'en verde. Sobran 19.861 sobre el techo.' },
+
+    { hito: 'El selector de capas baja la voz: reposo, fila activa y el rótulo de la casa',
+      commit: '(sin commitear)',
+      total: 76993, nuestro: 61898, rebanada: null,
+      nota:
+        '**+158 B MÍOS, y la hoja marca −27 respecto del asiento anterior: los otros −185 B no ' +
+        'son de este cambio.** El árbol lo comparte otra sesión (`estilos/app.css` cambió en disco ' +
+        'entre la lectura y la edición), así que la cifra propia se midió construyendo la hoja DOS ' +
+        'veces, con los tres retoques y sin ellos: 76.835 → 76.993. Es el mismo método —y el mismo ' +
+        'motivo— que el asiento «F18 y F19, sin asiento propio»: lo que no se puede atribuir, no se ' +
+        'atribuye. ── EL ENCARGO ── El autor, sobre el control de capas: «el texto resalta ' +
+        'demasiado y parece como que este modal no encaja con el resto del diseño de la página». ── ' +
+        '⭐ LAS DOS DIVERGENCIAS, MEDIDAS EN CHROME A 1440×900 ANTES DE TOCAR NADA ── (1) las seis ' +
+        'filas iban a **13 px / peso 500 / `--color-text-primary`**, y **ningún otro texto de 13 px ' +
+        'de la aplicación pesa 500**: `.gml-via`, los peldaños de la barra y la ficha van a 13/400. ' +
+        'Eran el único sitio donde el sistema hablaba más alto, y para enunciar opciones que el 99 % ' +
+        'del tiempo están en reposo. (2) los rótulos de grupo iban a **0,44 px de interletra** y el ' +
+        '`.gml-rotulo` del panel —la MISMA versalita de 11/600, en la misma pantalla y a 40 cm— va a ' +
+        '**1,1 px**. ── QUÉ ENTRA ── Las filas bajan a 13/400 en `--color-text-secondary` (8,6:1 ' +
+        'sobre el blanco de la tarjeta: baja el énfasis, no el contraste), la interletra de los dos ' +
+        'rótulos pasa a la de la casa, y entra UNA regla nueva: la fila marcada recupera 500 y el ' +
+        'primario. Eso es lo que se COMPRA al bajar el resto — hasta hoy las seis se veían igual y ' +
+        'lo único que decía cuál está puesta era el punto del radio. ── ⛔ NO DESHACE EL ARREGLO DEL ' +
+        'DÍA 10 ── aquella queja («muy fina y no se entiende bien») la causaba la FAMILIA (Arial de ' +
+        '`leaflet.css`), no el peso; la familia y los 13 px se quedan. ── ⚠️ POR QUÉ `:has()` Y NO ' +
+        'UNA CLASE ── el DOM lo fabrica `L.control.layers` y no hay dónde poner una clase sin hurgar ' +
+        'en su interior tras `addControl`, que es la trampa que los rótulos `::before` ya evitan. Si ' +
+        'un navegador no lo soporta, se descarta la regla y las seis filas quedan en reposo: se ' +
+        'pierde el resalte, no el control. Verificado en Chrome que el resalte SIGUE al radio ' +
+        '(clic en «Catastro» → 500 en Catastro, 400 en las otras cuatro). ── EL PRECIO EN PÍXELES ── ' +
+        'la tarjeta ENCOGE 3,17 px de ancho (187,30 → 184,13) y no cambia de alto (263,00): el mapa ' +
+        'no paga nada. Sobran 19.834 sobre el techo.' },
+
+    { hito: 'La barra adelgaza: fuera el motivo y las salidas suben al partido de entrega',
+      commit: '(sin commitear)',
+      total: 77553, nuestro: 62458, rebanada: null,
+      nota:
+        '**+560 B**, y salen de dos peticiones del autor del 2026-08-11 que se resuelven en la ' +
+        'misma barra. ── (1) **FUERA EL SUB-RENGLÓN DE MOTIVO** («no me gusta el texto debajo de ' +
+        'Edición y Diagnóstico de que falta parcela, hace que el topbar sea muy ancho y queda ' +
+        'desproporcionado»). ⛔ **El nodo NO se borra, y esa es toda la decisión**: la regla dura ' +
+        'de `app/barra.js` dice que un paso apagado lleva el motivo escrito al lado, y borrar el ' +
+        '`<span>` dejaría un botón deshabilitado cuyo nombre accesible es «Edición» a secas. Con ' +
+        'la receta de texto oculto (1×1 px + `clip-path`, la misma de `.gml-rotulo-oculto`) el ' +
+        'nombre accesible sigue siendo «Edición Falta la parcela» —medido en el navegador— y lo ' +
+        'que se pierde son píxeles. ⚠️ Lo que SÍ se pierde, dicho sin maquillar: quien ve la ' +
+        'pantalla y no usa lector ya solo tiene la forma LARGA en el `title`, o sea a un segundo ' +
+        'de pasar el ratón. Se acepta porque hay un tercer canal que la barra de edición no ' +
+        'tenía: el aviso del pie del panel lo dice con todas las letras. ── ⭐ **Y ARRASTRA TRES ' +
+        'COSAS QUE NO SE VEN EN EL DIFF** ── (a) `--gml-motivo-alto` se retira: sin segunda línea ' +
+        'no hay pista que reservar, y `.gml-rail-texto` deja de ser una rejilla de dos filas; ' +
+        '(b) **la corrección de media pista de ayer se retira con ella** —los dos `margin-bottom` ' +
+        'que subían el punto y la línea de unión para que coincidieran con el rótulo— porque con ' +
+        'una sola línea `align-items: center` ya los alinea solo (medido: punto 23,0 / rótulo ' +
+        '22,1 px); (c) la barra baja de **56 a 48 px**. Y 48 no es marcha atrás sobre el «dale ' +
+        'algo más de alto» de ayer: el peldaño pasa de 32,85 px de contenido a 18,85, así que la ' +
+        'holgura sube a ~14,6 px por lado, MÁS que los 9,6 que tenía con 52. Las dos peticiones ' +
+        'no pedían lo mismo: una era holgura, la otra volumen. El mapa recupera 8 px de alto ' +
+        '(888×663 → **888×671**, medido). ── (2) **LAS TRES EXPORTACIONES SUBEN A UN DESPLEGABLE ' +
+        'JUNTO A «GENERAR GML»** («no tiene sentido que la exportación esté dentro del menú de ' +
+        'expediente»). El hueco llevaba declarado desde la rebanada 2 del topbar con sus tres ' +
+        'pasos escritos en `index.html`, y los tres se han hecho: el diálogo deja de fabricar ' +
+        'esos botones (queda UNO por acción, la trampa K.1 evitada), `cablearExpediente` abre su ' +
+        'embudo como `atender()` público, y el teclado sale gratis porque el mecanismo de menús ' +
+        'de `app/barra.js` ya era genérico sobre `[data-menu-disparador]`. ⚠️ **Suben SOLO las ' +
+        'tres de geometría**: `exportar-proyecto` y `abrir-proyecto` se quedan, porque el `.json` ' +
+        'no es una salida sino el expediente guardado para volver a abrirlo. Misma regla que ' +
+        'repartió la barra en la rebanada 2: arriba lo que sale de la app hacia fuera. ── ⛔ **LOS ' +
+        'DOS DEFECTOS QUE DESTAPÓ MIRARLO EN EL NAVEGADOR** ── (a) **el acuse se perdía**: ' +
+        '`decir()` escribe en el `role="status"` del `<dialog>`, y con el diálogo cerrado pedir ' +
+        'un DXF sin parcela respondía «no hay nada que exportar» donde no lo lee nadie — un menú ' +
+        'que se pulsa y no pasa nada, regla de oro 1. Se enruta EN `decir()` y no en cada ' +
+        'llamante (son siete) al renglón `[data-estado="generar-gml"]`, que es el acuse de la ' +
+        'zona de entrega y por tanto el sitio correcto; y se pide por el método público `acusar` ' +
+        'de su dueño en vez de escribirle el nodo, para no tener dos módulos peleándose por los ' +
+        'modificadores rojo/verde. (b) **el menú no se cerraba al elegir**: el oyente de ' +
+        '`app/barra.js` salía por su primera guarda con cualquier clic de dentro. No se notaba ' +
+        'porque las dos opciones que había abrían un `<dialog>` encima; exportar no tapa nada y ' +
+        'el menú se quedaba colgando sobre el mapa. Ahora cierra si el clic fue en un ' +
+        '`[role="menuitem"]`, que además es lo que dice el patrón ARIA. ── DE DÓNDE SALEN LOS ' +
+        'BYTES ── el botón partido (cuatro reglas: radios de la costura, el filete translúcido y ' +
+        'su variante para el primario apagado) y la receta de texto oculto del motivo. Se ' +
+        'DEVUELVEN la rejilla de dos filas de `.gml-rail-texto` y los dos `margin-bottom` de la ' +
+        'corrección; los 560 B son ya el neto. ── ⛔ **EL PARTIDO SE VE MITAD GRIS Y MITAD AZUL, Y ' +
+        'ES A PROPÓSITO**: «Generar GML» nace apagado hasta que la parcela valida, y exportar el ' +
+        'DXF sirve JUSTO mientras eso no pasa. Apagar la flecha escondería la única salida que ' +
+        'funciona en ese momento; pintarla de gris dejándola pulsable sería un control que miente ' +
+        'sobre sí mismo. ── ⚠️ **LA COLUMNA DE ENTRADA CRECIÓ, Y NO ES DE ESTE ASIENTO**: el ' +
+        'bloque mide ahora 610 px de `scrollHeight` contra los 575 de ayer, y los 35 px son las ' +
+        'dos líneas que otra sesión le añadió al apunte de la vía principal mientras esto se ' +
+        'escribía («También puedes pinchar la parcela en el mapa…»). Se anota para que el ' +
+        'siguiente que mida no se lo cargue a la barra. 7.521 pruebas en verde. Sobran 20.394 ' +
+        'sobre el techo.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

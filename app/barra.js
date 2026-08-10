@@ -505,10 +505,27 @@ export function cablearBarra({
   // Un clic en cualquier otro sitio cierra. `capture: false` y en el `document`:
   // así las acciones de dentro del menú llegan a su propio oyente ANTES de que
   // esto lo cierre, que es lo que permite que pulsar una opción funcione.
+  //
+  // ⭐ **Y ELEGIR UNA OPCIÓN TAMBIÉN CIERRA, desde el 2026-08-11.** Antes no: un clic
+  // dentro del panel salía por la primera guarda y el menú se quedaba abierto. No se
+  // notaba porque las dos opciones que había abrían un `<dialog>` encima; con el
+  // desplegable de salidas sí, porque exportar un fichero no tapa nada y el menú se
+  // quedaba colgando sobre el mapa. `role="menu"` dice además que activar un
+  // `menuitem` cierra: era una desviación del patrón, no una decisión.
+  //
+  // ⚠️ Se cierra **solo si el clic ha sido en un `menuitem`**, no en cualquier sitio
+  // del panel: el relleno del menú y su renglón de estado no son opciones, y
+  // cerrarlo al rozarlos sería perder el menú por un clic fallido.
+  //
+  // ⚠️ Y **sin devolver el foco**: la opción recién pulsada puede abrir un diálogo
+  // que se lo lleve, y peleárselo dejaría el foco donde no está la atención.
   escuchar(documento, 'click', (evento) => {
     if (menuAbierto === null) return
     const panelMenu = menuDe(menuAbierto.getAttribute(ATRIBUTO_DISPARADOR))
-    if (panelMenu !== null && panelMenu.contains(evento.target)) return
+    if (panelMenu !== null && panelMenu.contains(evento.target)) {
+      if (evento.target?.closest?.('[role="menuitem"]')) cerrarMenus()
+      return
+    }
     if (menuAbierto.contains(evento.target)) return
     cerrarMenus()
   })

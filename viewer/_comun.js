@@ -129,6 +129,37 @@ export const COLOR_USUARIO = '#FFD600'
 /** Densidad tipográfica base del cromo del visor, en px. */
 export const DENSIDAD_BASE_PX = 13
 
+/**
+ * Lo que precede al número de un trozo que se sale del contorno oficial.
+ *
+ * ⚠️ **Vive aquí, y no en `viewer/piezas.js`, por una razón de dependencias, no de
+ * gusto.** Lo escriben DOS módulos —el rótulo del mapa (`piezas.js`) y la fila de
+ * la lista (`lista-sobrante.js`)— y `lista-sobrante.js` **no puede importar de
+ * `piezas.js`**: aquél trae Leaflet y ésta la carga el proyecto Vitest `node`, que
+ * no tiene `window`. Hay un guardián en `test/contrato.test.js` que lo vigila.
+ *
+ * Duplicar la letra en los dos sitios sería la alternativa, y es justo la que crea
+ * el fallo que nadie ve: el mapa diciendo `F1` y la lista `E1` sobre el mismo trozo
+ * de terreno.
+ */
+export const PREFIJO_FUERA = 'F'
+
+/**
+ * El número con el que se rotula una pieza, en el mapa Y en la lista.
+ *
+ * Existe para que los dos escriban **la misma cadena**: es la única forma de que un
+ * cambio de formato no deje una de las dos vistas hablando otro idioma. Los tests
+ * comparan contra esta función, nunca contra una copia del formato.
+ *
+ * @param {number} orden  El `orden` de la pieza (1…N) dentro de SU lista.
+ * @param {string} [prefijo='']  {@link PREFIJO_FUERA} para un trozo que se sale;
+ *   nada para uno del sobrante. Son dos listas y las dos empiezan en 1.
+ * @returns {string}
+ */
+export function textoNumeroPieza(orden, prefijo = '') {
+  return `${prefijo}${orden}`
+}
+
 /** Nombres canónicos de los panes del visor. */
 export const PANE = Object.freeze({
   COLINDANTES: 'colindantes',

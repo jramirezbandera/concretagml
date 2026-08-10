@@ -1618,6 +1618,266 @@ if (abortadoPorTiempo) {
   )
 }
 
+// ── 8 · LA BARRA DE ICONOS, LA PISTA Y EL MODO BORRAR (2026-08-10) ──────────
+//
+// Los cuatro encargos del 2026-08-10, y **los cuatro son de píxeles y de eventos
+// del navegador, o sea invisibles para la suite**:
+//
+//   1. **El margen de la ayuda.** El autor lo describió como «margen excesivo a la
+//      derecha». No era un margen: `.gml-esquina-centro-abajo .gml-barra-edicion` es
+//      un flex en columna cuyo `stretch` por defecto NO estira a los hijos con ancho
+//      propio —los deja a la izquierda—, así que el panel de 460 px quedaba pegado
+//      al borde izquierdo de una barra de ~530 y sobraban ~70 a la derecha. En jsdom
+//      no hay layout y las dos cajas miden 0: la suite aprobaba esto en verde. Aquí
+//      se miden los DOS huecos y se exige que se parezcan.
+//   2. **La barra en iconos.** Que ninguna herramienta pinte texto. Un `<span>` de
+//      nombre que se colara visible ensancharía la fila y devolvería el defecto 1.
+//   3. **La PISTA.** Es la razón entera de que los iconos sean aceptables esta vez
+//      (ver la cabecera de `viewer/barra-edicion.js`): sale a 120 ms en vez de a los
+//      500-1.000 del `title` nativo. Se comprueba que aparece con el ratón, que dice
+//      el nombre de la herramienta señalada y que **no se sale del mapa**.
+//   4. **El modo borrar.** Que arme, que cambie el CURSOR —el único aviso que viaja
+//      con la mano—, que el clic borre, y que `Escape` lo desarme.
+
+const barraIconos = await (async () => {
+  const fila = document.querySelector('.gml-barra-edicion-fila')
+  const pistaEl = document.querySelector('.gml-barra-pista')
+  if (fila === null || pistaEl === null) {
+    problemas.push(
+      'No hay `.gml-barra-edicion-fila` o `.gml-barra-pista`. La barra de iconos del 2026-08-10 no ' +
+        'se ha montado: sin la pista, los iconos no tienen quien los nombre para el ratón, que es ' +
+        'exactamente por lo que el autor rechazó la primera barra de iconos el 2026-08-05.',
+    )
+    return null
+  }
+
+  // ── 8.1 · Ninguna herramienta pinta texto ─────────────────────────────────
+  // Los nombres viven en `<span>` de 1×1 px + `clip-path` (para el lector de
+  // pantalla) y en `data-pista` (para el globo). Uno visible se detecta por su
+  // ancho: la receta de ocultación deja exactamente 1 px.
+  const conTexto = [...fila.querySelectorAll('button, label')]
+    .flatMap((h) => [...h.querySelectorAll('.gml-barra-rotulo')])
+    .filter((n) => n.getBoundingClientRect().width > 2)
+  if (conTexto.length > 0) {
+    problemas.push(
+      `${conTexto.length} nombre(s) de herramienta se están PINTANDO en vez de quedar ocultos ` +
+        `(«${conTexto[0].textContent.trim()}»). La barra vuelve a ensancharse y con ella regresa el ` +
+        `hueco muerto a la derecha del panel de ayuda.`,
+    )
+  }
+
+  // ── 8.2 · La pista, con el ratón ──────────────────────────────────────────
+  const senalada = fila.querySelector('[data-accion="borrar"]')
+  senalada.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+  // El doble del retardo: si con eso no ha salido, no es una carrera, es que no sale.
+  await dormir(300)
+  const rectPista = pistaEl.getBoundingClientRect()
+  const mapaRect = document.querySelector('.gml-mapa').getBoundingClientRect()
+  const pista = {
+    sale: !pistaEl.hidden,
+    texto: pistaEl.textContent,
+    anchoPx: Math.round(rectPista.width),
+    // ⚠️ La pista más ancha (~314 px medidos) es MÁS ANCHA QUE LA FILA (~250), así
+    // que desbordarla es normal y esperado; lo que no puede es salirse del mapa.
+    dentroDelMapa: rectPista.left >= mapaRect.left - 1 && rectPista.right <= mapaRect.right + 1,
+    // Por encima de la fila, no encima de ella: la barra vive abajo del todo.
+    holguraSobreLaFilaPx: Math.round(fila.getBoundingClientRect().top - rectPista.bottom),
+  }
+  if (!pista.sale) {
+    problemas.push(
+      'La pista NO sale al señalar una herramienta. Sin ella la barra es siete dibujos sin nombre: ' +
+        'es la mitad del encargo del 2026-08-10 y la objeción exacta del rechazo del 2026-08-05.',
+    )
+  } else if (!pista.dentroDelMapa) {
+    problemas.push(
+      `La pista se sale del mapa (${Math.round(rectPista.left)}–${Math.round(rectPista.right)} px ` +
+        `contra ${Math.round(mapaRect.left)}–${Math.round(mapaRect.right)}). Queda recortada o ` +
+        `tapando el panel.`,
+    )
+  }
+  if (pista.sale && !pista.texto.toLowerCase().includes('borrar')) {
+    problemas.push(
+      `La pista dice «${pista.texto}» sobre la herramienta de borrar: está nombrando a otra. Es el ` +
+        `fallo que la «ventana caliente» del globo hace fácil de dejar.`,
+    )
+  }
+  senalada.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: null }))
+
+  // ── 8.3 · El panel de ayuda y sus DOS huecos ──────────────────────────────
+  const disparadorAyuda = fila.querySelector('[data-accion="ayuda"]')
+  const filaAntes = fila.getBoundingClientRect().left
+  disparadorAyuda.click()
+  await dormir(60)
+  const contenedorBarra = document.querySelector('.gml-barra-edicion')
+  const rectBarra2 = contenedorBarra.getBoundingClientRect()
+  const rectAyuda = document.querySelector('.gml-barra-ayuda').getBoundingClientRect()
+  const ayuda = {
+    huecoIzquierdaPx: Math.round(rectAyuda.left - rectBarra2.left),
+    huecoDerechaPx: Math.round(rectBarra2.right - rectAyuda.right),
+    // Abrir el panel ensancha la caja; con los hijos centrados, la fila NO se mueve.
+    laFilaSeMueveAlAbrirPx: Math.round(Math.abs(fila.getBoundingClientRect().left - filaAntes)),
+  }
+  // 4 px de asimetría es el ruido del redondeo de un `translateX(-50%)` sobre un
+  // ancho impar; 70 era el defecto reportado.
+  const asimetria = Math.abs(ayuda.huecoIzquierdaPx - ayuda.huecoDerechaPx)
+  if (asimetria > 4) {
+    problemas.push(
+      `⛔ EL DEFECTO DEL 2026-08-10 HA VUELTO: el panel de ayuda tiene ${ayuda.huecoIzquierdaPx} px ` +
+        `de hueco a la izquierda y ${ayuda.huecoDerechaPx} a la derecha (${asimetria} de ` +
+        `diferencia). Es lo que el autor describió como «margen excesivo a la derecha», y la causa ` +
+        `es un flex en columna sin \`align-items:center\`: los hijos con ancho propio se quedan a ` +
+        `la izquierda de la caja en vez de centrarse.`,
+    )
+  }
+  if (ayuda.laFilaSeMueveAlAbrirPx > 2) {
+    problemas.push(
+      `Abrir el panel de ayuda desplaza la fila de herramientas ${ayuda.laFilaSeMueveAlAbrirPx} px. ` +
+        `La herramienta que acabas de pulsar se va de debajo del cursor.`,
+    )
+  }
+  disparadorAyuda.click()
+  await dormir(40)
+
+  // ── 8.4 · El modo borrar ──────────────────────────────────────────────────
+  const botonBorrar = fila.querySelector('[data-accion="borrar"]')
+  const contenedorMapa = document.querySelector('.gml-mapa')
+  const cuantosVertices = () => document.querySelectorAll('#tabla-vertices tr[data-indice]').length
+  const antesDeArmar = cuantosVertices()
+
+  botonBorrar.click()
+  await dormir(40)
+  const armado = {
+    ariaPressed: botonBorrar.getAttribute('aria-pressed'),
+    // ⚠️ El cursor es el ÚNICO aviso del modo que viaja con la mano: el botón
+    // pulsado vive abajo del todo, a cientos de píxeles de donde está el ratón.
+    cursorDelMapa: getComputedStyle(contenedorMapa).cursor,
+    cursorDelVertice: (() => {
+      const v = document.querySelector('.gml-vertice')
+      return v === null ? null : getComputedStyle(v).cursor
+    })(),
+    renglon: (document.querySelector('[data-estado="edicion"]') || {}).textContent || '',
+  }
+  if (armado.ariaPressed !== 'true') {
+    problemas.push('Pulsar «Borrar vértices» no lo deja pulsado: el modo no se arma o no se pinta.')
+  }
+  if (armado.cursorDelMapa !== 'crosshair') {
+    problemas.push(
+      `Con el modo borrar armado el cursor del mapa es «${armado.cursorDelMapa}» y no «crosshair». ` +
+        `El clic ha cambiado de significado y nada lo dice donde el usuario está mirando.`,
+    )
+  }
+  if (armado.cursorDelVertice !== null && armado.cursorDelVertice !== 'crosshair') {
+    problemas.push(
+      `El cursor cambia sobre el mapa pero NO sobre los vértices (es «${armado.cursorDelVertice}»), ` +
+        `que es el único sitio donde el clic va a borrar algo. Falta pisar el cursor propio de ` +
+        `\`.leaflet-marker-draggable\`.`,
+    )
+  }
+
+  // El clic que borra. Sintético como todos los de este guion (ver el aviso del
+  // veredicto), pero sobre el marcador REAL y con hit-testing real.
+  const victima = document.querySelector('.gml-vertice')
+  let borrados = null
+  if (victima !== null) {
+    const r = victima.getBoundingClientRect()
+    const opciones = {
+      bubbles: true,
+      cancelable: true,
+      clientX: r.left + r.width / 2,
+      clientY: r.top + r.height / 2,
+      view: window,
+    }
+    for (const tipo of ['mousedown', 'mouseup', 'click']) {
+      victima.dispatchEvent(new MouseEvent(tipo, opciones))
+    }
+    await dormir(60)
+    borrados = antesDeArmar - cuantosVertices()
+    if (borrados !== 1) {
+      problemas.push(
+        `Un clic sobre un vértice con el modo borrar armado ha quitado ${borrados} vértice(s) de la ` +
+          `tabla, y tenía que quitar exactamente 1.`,
+      )
+    }
+    if (botonBorrar.getAttribute('aria-pressed') !== 'true') {
+      problemas.push(
+        'El modo borrar se ha APAGADO SOLO tras el primer borrado. Es un modo, no un disparador: ' +
+          'limpiar ocho vértices de un levantamiento son ocho clics, no ocho pares de clics.',
+      )
+    }
+  }
+
+  // Y `Escape` lo desarma, devolviendo el cursor.
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  await dormir(40)
+  const desarmado = {
+    ariaPressed: botonBorrar.getAttribute('aria-pressed'),
+    cursorDelMapa: getComputedStyle(contenedorMapa).cursor,
+  }
+  if (desarmado.ariaPressed !== 'false' || desarmado.cursorDelMapa === 'crosshair') {
+    problemas.push(
+      '`Escape` no apaga el modo borrar (o no devuelve el cursor). Un modo destructivo del que no ' +
+        'se puede salir con la tecla de cancelar es una trampa.',
+    )
+  }
+
+  return { pista, ayuda, armado, borrados, desarmado }
+})()
+
+// ── 9 · LA × DE CADA FILA DE LA TABLA (2026-08-10) ──────────────────────────
+//
+// La segunda vía de borrado, y la que existe para el caso en que la primera no
+// sirve: el vértice que sobra está encima de otro y no hay dónde pinchar.
+
+const columnaBorrar = (() => {
+  const botones = [...document.querySelectorAll('#tabla-vertices [data-accion="borrar-vertice"]')]
+  const filasVertice = document.querySelectorAll('#tabla-vertices tr[data-indice]').length
+  if (botones.length === 0) {
+    problemas.push(
+      'Ninguna fila de la tabla de vértices trae su ×. La tabla es la única vía de borrado que no ' +
+        'exige puntería sobre el mapa; sin ella, un vértice duplicado encima de otro no hay forma ' +
+        'de quitarlo.',
+    )
+    return null
+  }
+  if (botones.length !== filasVertice) {
+    problemas.push(
+      `Hay ${botones.length} botones × para ${filasVertice} filas de vértice: alguna fila se ha ` +
+        `quedado sin el suyo.`,
+    )
+  }
+
+  const caja = document.querySelector('#tabla-vertices')
+  const r = botones[0].getBoundingClientRect()
+  const antes = filasVertice
+  botones[0].click()
+  const medida = {
+    cuantos: botones.length,
+    dianaPx: { ancho: Math.round(r.width), alto: Math.round(r.height) },
+    // La columna se lleva ancho del panel, que es el recurso escaso de esta
+    // pantalla: se mide para que el checklist humano mire un número.
+    anchoColumnaPx: (() => {
+      const th = document.querySelector('#tabla-vertices thead th:last-child')
+      return th === null ? null : Math.round(th.getBoundingClientRect().width)
+    })(),
+    // ⚠️ Que la tabla no desborde a lo ancho por culpa de la cuarta columna: si lo
+    // hiciera, las coordenadas se cortarían y este guion es el único que lo ve.
+    desbordaALoAncho: caja !== null && caja.scrollWidth > caja.clientWidth + 1,
+    borrados: antes - document.querySelectorAll('#tabla-vertices tr[data-indice]').length,
+  }
+  if (medida.borrados !== 1) {
+    problemas.push(
+      `Pulsar la × de una fila ha quitado ${medida.borrados} vértice(s) en vez de 1.`,
+    )
+  }
+  if (medida.desbordaALoAncho) {
+    problemas.push(
+      'La tabla de vértices DESBORDA a lo ancho desde que tiene la cuarta columna: las coordenadas ' +
+        'se están cortando.',
+    )
+  }
+  return medida
+})()
+
 // ── Veredicto ───────────────────────────────────────────────────────────────
 
 return {
@@ -1636,6 +1896,8 @@ return {
     'estorba sobre la parcela son del CHECKLIST HUMANO §7.',
   tocaServiciosDelCatastro: false,
   arranque,
+  barraIconos,
+  columnaBorrar,
   paginaRecienCargada,
   coherenciaArranque,
   hitTest,

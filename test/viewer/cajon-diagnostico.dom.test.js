@@ -494,7 +494,10 @@ describe('viewer/cajon-diagnostico.js · «no hay» y «no se sabe» se escriben
     cajon.pintar(COMPLETO())
     const texto = nodo(raiz, SELECTOR.INVASION).textContent
     expect(texto).toMatch(/descartado 1 solape/)
-    expect(texto).toMatch(/milímetro/)
+    // El MOTIVO, no solo el conteo: lo descartado tiene que poder discutirse, y el
+    // renglón decía «más finos que un milímetro» cuando el umbral real es el
+    // redondeo al centímetro del propio Catastro (2026-08-10).
+    expect(texto).toMatch(/redondeo al centímetro/)
   })
 })
 
@@ -1587,7 +1590,12 @@ describe('viewer/cajon-diagnostico.js · `anfitrion` (2026-08-05)', () => {
     expect(raiz.style.boxShadow).not.toBe('none')
     expect(raiz.style.maxWidth).not.toBe('none')
     expect(raiz.style.maxHeight).toBe(ALTO_COMO_CAJON)
-    expect(raiz.style.borderRadius).toBe('8px')
+    // ⭐ Era '8px' hasta la revisión de diseño del 2026-08-10, que unificó el radio
+    // de TODA la interfaz en 6 px (`--gml-radio` en `estilos/app.css`; el encargo
+    // del autor decía «un solo valor, p. ej. 6px»). Lo que esta prueba vigila no es
+    // la cifra sino que `comoPantalla(false)` devuelva el juego de estilos ENTERO,
+    // así que se actualiza la cifra y el guardián sigue haciendo su trabajo.
+    expect(raiz.style.borderRadius).toBe('6px')
     expect(raiz.style.flex, 'el reparto flex es del panel y ahí no aplica').toBe('')
     expect(raiz.style.minHeight).toBe('')
   })

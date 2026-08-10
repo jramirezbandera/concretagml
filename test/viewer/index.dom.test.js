@@ -2906,3 +2906,52 @@ describe('crearVisor · parcelas:true monta las DOS piezas, inertes', () => {
     expect(contenedor.querySelectorAll(`.${CLASE_CANDIDATA}`)).toHaveLength(0)
   })
 })
+
+
+// ── La × de la tabla, enchufada de verdad (2026-08-10) ───────────────────────
+//
+// `sincronizacion.js` fabrica el botón y `edicion.js` sabe borrar; lo que se
+// prueba aquí es LA SOLDADURA, que es la que ningún test de módulo ve: que
+// `crearVisor` le pasa `edicion.eliminar` como `alBorrar`, y que sin edición no le
+// pasa nada.
+
+describe('crearVisor · la × de cada fila borra de VERDAD (soldadura de F06)', () => {
+  const botonesBorrar = (tablaEl) => [
+    ...tablaEl.querySelectorAll('[data-accion="borrar-vertice"]'),
+  ]
+
+  it('con edición, pulsar la × elimina el vértice del modelo y commitea', () => {
+    const historial = crearHistorial()
+    const { tablaEl, store } = abrirVisor({ historial, edicion: true })
+    const antes = store.get().recintos[0].vertices.length
+
+    botonesBorrar(tablaEl)[0].dispatchEvent(
+      new window.MouseEvent('click', { bubbles: true, cancelable: true }),
+    )
+
+    expect(store.get().recintos[0].vertices).toHaveLength(antes - 1)
+    expect(historial.pila, 'una operación acabada, un commit').toHaveLength(1)
+  })
+
+  it('el modelo se NIEGA por debajo de tres vértices, y el botón no se salta la regla', () => {
+    // La razón entera de que la × delegue en `edicion.eliminar` en vez de borrar
+    // por su cuenta: `edit/vertices.js` es quien sabe que un anillo de dos puntos
+    // no encierra superficie, y su negativa tiene que valer venga de donde venga.
+    const triangulo = parcelaConHueco()
+    triangulo.recintos = [{ ...triangulo.recintos[0] }]
+    triangulo.recintos[0].vertices = triangulo.recintos[0].vertices.slice(0, 3)
+    const { tablaEl, store } = abrirVisor({ parcela: triangulo, edicion: true })
+
+    botonesBorrar(tablaEl)[0].dispatchEvent(
+      new window.MouseEvent('click', { bubbles: true, cancelable: true }),
+    )
+
+    expect(store.get().recintos[0].vertices, 'no ha borrado nada').toHaveLength(3)
+  })
+
+  it('SIN edición no hay columna: un mando muerto no se apaga, no se pone', () => {
+    const { tablaEl } = abrirVisor({ edicion: false })
+    expect(botonesBorrar(tablaEl)).toHaveLength(0)
+    expect(tablaEl.querySelectorAll('thead th')).toHaveLength(3)
+  })
+})

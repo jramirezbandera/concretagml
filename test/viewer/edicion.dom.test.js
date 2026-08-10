@@ -1019,6 +1019,190 @@ describe('viewer/edicion · mapa de gestos (clic ≠ doble clic ≠ contextmenu)
   })
 })
 
+// ── El MODO BORRAR (2026-08-10) ──────────────────────────────────────────────
+//
+// La única excepción a la garantía «un clic sencillo NUNCA escribe en el modelo»,
+// y por eso su bloque de pruebas es el más desconfiado del fichero: lo que se
+// vigila no es tanto que borre —eso es `eliminar`, que ya tiene su bloque— como
+// que **no se quede armado sin que nadie se entere**.
+
+describe('viewer/edicion · el modo borrar', () => {
+  /** El punto del vértice 0 del exterior de `parcelaConHueco`, en latlng. */
+  const enElVertice = (utm) => ({ latlng: L.latLng(aLatLng(utm)) })
+
+  it('nace apagado y `modoBorrar(true)` lo enciende, avisando a quien se suscriba', () => {
+    const ctx = montar()
+    const visto = []
+    ctx.edicion.alCambiarModoBorrar((activo) => visto.push(activo))
+
+    expect(ctx.edicion.modoBorrar()).toBe(false)
+    expect(ctx.edicion.modoBorrar(true)).toBe(true)
+    expect(visto).toEqual([true])
+
+    // Un anuncio por CAMBIO real, no por llamada: quien pinta un botón con esto no
+    // puede recibir «true» dos veces seguidas por lo mismo.
+    ctx.edicion.modoBorrar(true)
+    expect(visto).toEqual([true])
+    ctx.limpiar()
+  })
+
+  it('⭐ armado, el CLIC borra el vértice más cercano en vez de seleccionar lindero', () => {
+    const historial = crearHistorial()
+    const ctx = montar({ historial })
+    const antes = anilloDe(ctx.store).length
+    ctx.edicion.modoBorrar(true)
+
+    ctx.mapa.fire('click', enElVertice(V.A))
+
+    expect(anilloDe(ctx.store)).toHaveLength(antes - 1)
+    expect(historial.pila, 'borrar es una operación acabada: un commit').toHaveLength(1)
+    expect(ctx.edicion.ladoSeleccionado(), 'el clic ya no selecciona linderos').toBeNull()
+    ctx.limpiar()
+  })
+
+  it('NO se apaga solo tras borrar: borrar ocho seguidos es su caso de uso', () => {
+    const ctx = montar()
+    ctx.edicion.modoBorrar(true)
+    ctx.mapa.fire('click', enElVertice(V.A))
+    expect(ctx.edicion.modoBorrar()).toBe(true)
+    ctx.limpiar()
+  })
+
+  it('el clic LEJOS de todo vértice no borra nada, y lo dice', () => {
+    const ctx = montar()
+    const antes = anilloDe(ctx.store).length
+    ctx.edicion.modoBorrar(true)
+
+    ctx.mapa.fire('click', { latlng: L.latLng(aLatLng([439280, 4479690])) })
+
+    expect(anilloDe(ctx.store)).toHaveLength(antes)
+    // ⚠️ Aquí SÍ se avisa, al revés que el clic en el vacío con el modo apagado
+    // (aquél DESELECCIONA, que es un efecto visible; este no hace nada). Un modo
+    // armado que se traga un clic en silencio es indistinguible de uno apagado.
+    expect(mensajesDe(ctx.alAvisar).join(' ')).toMatch(/no se ha borrado/i)
+    ctx.limpiar()
+  })
+
+  it('⛔ el DOBLE CLIC no inserta mientras el modo está armado', () => {
+    // Un doble clic contiene dos clics: sin la guarda el gesto sería «borra, borra,
+    // e inserta uno nuevo» — tres escrituras contradictorias con un solo gesto.
+    const ctx = montar()
+    ctx.edicion.modoBorrar(true)
+    const antes = anilloDe(ctx.store).length
+
+    ctx.mapa.fire('dblclick', {
+      latlng: L.latLng(aLatLng([439250, 4479655.3])),
+      originalEvent: { preventDefault: vi.fn() },
+    })
+
+    expect(anilloDe(ctx.store).length, 'no ha insertado').toBeLessThanOrEqual(antes)
+    expect(
+      anilloDe(ctx.store).some((v) => Math.abs(v[0] - 439250) < 1 && Math.abs(v[1] - 4479655.3) < 1),
+      'el vértice del doble clic NO está en el anillo',
+    ).toBe(false)
+    ctx.limpiar()
+  })
+
+  it('encenderlo SUELTA la selección de lindero (el clic ya no la puede cambiar)', () => {
+    const ctx = montar()
+    ctx.edicion.seleccionarLado({ recinto: 0, indice: 0 })
+    expect(resalteDe(ctx.mapa)).not.toBeNull()
+
+    ctx.edicion.modoBorrar(true)
+
+    expect(ctx.edicion.ladoSeleccionado()).toBeNull()
+    expect(resalteDe(ctx.mapa), 'un resalte que ya no promete nada').toBeNull()
+    ctx.limpiar()
+  })
+
+  it('`Escape` lo apaga, y sin robarle la tecla a nadie', () => {
+    const ctx = montar()
+    ctx.edicion.modoBorrar(true)
+
+    const evento = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    document.dispatchEvent(evento)
+
+    expect(ctx.edicion.modoBorrar()).toBe(false)
+    // Sin `preventDefault`: cancelar un modo propio no puede consumir `Escape` para
+    // el diálogo que hubiera abierto encima.
+    expect(evento.defaultPrevented).toBe(false)
+    ctx.limpiar()
+  })
+
+  it('`Escape` con el modo apagado no hace nada (la tecla sigue siendo de otros)', () => {
+    const ctx = montar()
+    const visto = []
+    ctx.edicion.alCambiarModoBorrar((activo) => visto.push(activo))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(visto).toEqual([])
+    ctx.limpiar()
+  })
+
+  it('⛔ `activa(false)` lo apaga: un modo destructivo NO sobrevive al cambio de pantalla', () => {
+    // El accidente que esto impide: el usuario arma el modo, se va a Diagnóstico,
+    // vuelve media hora después, pincha para mirar algo y borra un vértice.
+    const ctx = montar()
+    const visto = []
+    ctx.edicion.alCambiarModoBorrar((activo) => visto.push(activo))
+    ctx.edicion.modoBorrar(true)
+
+    ctx.edicion.activa(false)
+
+    expect(ctx.edicion.modoBorrar()).toBe(false)
+    expect(visto, 'y se anuncia, para que el botón de la barra se levante').toEqual([true, false])
+    ctx.limpiar()
+  })
+
+  it('pone y quita la clase del CURSOR en el contenedor del mapa', () => {
+    const ctx = montar()
+    const contenedor = ctx.mapa.getContainer()
+
+    ctx.edicion.modoBorrar(true)
+    expect(contenedor.classList.contains(CLASE_EDICION.MODO_BORRAR)).toBe(true)
+    ctx.edicion.modoBorrar(false)
+    expect(contenedor.classList.contains(CLASE_EDICION.MODO_BORRAR)).toBe(false)
+    ctx.limpiar()
+  })
+
+  it('⛔ `destruir()` quita la clase: si no, queda un modo FANTASMA', () => {
+    // Cursor de borrar puesto y nadie atendiendo el clic. Peor que dejarlo armado,
+    // porque no hay forma de apagarlo.
+    const ctx = montar()
+    const contenedor = ctx.mapa.getContainer()
+    ctx.edicion.modoBorrar(true)
+
+    ctx.edicion.destruir()
+
+    expect(contenedor.classList.contains(CLASE_EDICION.MODO_BORRAR)).toBe(false)
+    expect(ctx.edicion.modoBorrar()).toBe(false)
+  })
+
+  it('tras `destruir()` no se puede volver a armar', () => {
+    const ctx = montar()
+    ctx.edicion.destruir()
+    expect(ctx.edicion.modoBorrar(true)).toBe(false)
+  })
+
+  it('contrato roto por el programador → throw', () => {
+    const ctx = montar()
+    expect(() => ctx.edicion.modoBorrar('sí')).toThrow(TypeError)
+    expect(() => ctx.edicion.alCambiarModoBorrar('no soy una función')).toThrow(TypeError)
+    // Y leer no escribe.
+    expect(ctx.edicion.modoBorrar()).toBe(false)
+    ctx.limpiar()
+  })
+
+  it('la baja del suscriptor lo desengancha', () => {
+    const ctx = montar()
+    const visto = []
+    const baja = ctx.edicion.alCambiarModoBorrar((activo) => visto.push(activo))
+    baja()
+    ctx.edicion.modoBorrar(true)
+    expect(visto).toEqual([])
+    ctx.limpiar()
+  })
+})
+
 // ── Panes ────────────────────────────────────────────────────────────────────
 
 describe('viewer/edicion · panes', () => {

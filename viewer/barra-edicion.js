@@ -16,9 +16,10 @@
 //     [data-accion="deshacer"]        [data-campo="snap"]              (checkbox)
 //     [data-accion="rehacer"]         [data-campo="snap-tolerancia"]   (cm)
 //     [data-accion="offset"]          [data-campo="offset-distancia"]  (m)
+//     [data-accion="borrar"]          (conmutador del modo borrar, 2026-08-10)
 //     [data-estado="edicion"]         (role="status")
 //
-// **Este módulo produce EXACTAMENTE esos siete nodos, con esos mismos `data-*` y
+// **Este módulo produce EXACTAMENTE esos ocho nodos, con esos mismos `data-*` y
 // esos mismos tipos de elemento.** Esa es la razón de ser de media cabecera: si
 // se cumple, `app/main.js` NO hay que tocarlo —ni él, ni sus pruebas, ni el
 // guion de navegador `08-edicion.js`—, y el traslado del panel al mapa es un
@@ -36,7 +37,7 @@
 //     tolerancia SIN abrir nada— dejaría de funcionar.
 //   · Los `data-*` propios de este módulo (`data-desplegable`, `data-panel`, y
 //     los valores `ayuda`/`cerrar-ayuda` de `data-accion`) no colisionan con los
-//     siete de arriba: los selectores del contrato son de VALOR EXACTO.
+//     ocho de arriba: los selectores del contrato son de VALOR EXACTO.
 //
 // ── ESTE MÓDULO ES UNA VISTA, Y NADA MÁS ────────────────────────────────────
 // No conoce el modelo, ni el store, ni el historial, ni la interacción de
@@ -93,35 +94,66 @@
 // con un `MutationObserver` sería devolverle a la vista un conocimiento que
 // acabamos de quitarle.
 //
-// Así que las seis herramientas conservan su orden de tabulación natural —lo
+// Así que las herramientas conservan su orden de tabulación natural —lo
 // mismo que haría un grupo de botones sin nada— y las flechas se añaden ENCIMA
 // como acelerador, saltando las deshabilitadas en el momento de la pulsación, que
 // es el único instante en el que hace falta saberlo.
 //
-// ── LAS HERRAMIENTAS SE LLAMAN POR SU NOMBRE, NO POR UN DIBUJO ──────────────
-// Rework de UI, 2026-08-05. Hasta hoy las seis herramientas eran iconos SVG de
-// 18 px con el nombre escondido en un `<span>` para el lector de pantalla. El
-// autor lo rechazó, y la objeción es la de siempre con una barra de iconos: un
-// imán en herradura, dos linderos con una flecha y una interrogación son tres
-// símbolos que hay que APRENDERSE, y aquí no se usan lo bastante a menudo como
-// para aprendérselos. Un `title` no arregla eso: aparece al segundo de pasar el
-// ratón, o sea después de haber dudado.
+// ── ICONOS CON PISTA PROPIA (y por qué esto no repite el error de 2026-08-05) ─
+// Esta barra ha tenido las dos formas, y la historia importa para no volver atrás
+// por tercera vez:
 //
-// Así que las herramientas llevan su nombre ESCRITO. Consecuencias:
-//   · La barra se ensancha (~470 px medidos frente a ~200), y por eso vive
-//     centrada abajo, donde hay ancho de sobra — ver la sección siguiente.
-//   · **Queda un solo tipo de icono**: la punta de flecha (`ICONOS.CARET`) de las
-//     dos herramientas que abren un desplegable, que no nombra nada — dice «esto
-//     despliega», que es justo lo que una palabra no dice. Sigue siendo SVG en
-//     línea, por el mismo motivo que `viewer/sincronizacion.js` usa `L.divIcon` y
-//     no `L.Icon` (hallazgo C8): los assets con URL se rompen entre dev, build y
-//     jsdom, y una fuente de iconos añade una descarga que puede fallar para
-//     dibujar una flecha.
-//   · `crearRotulo` (el `<span>` de 1×1 px) NO desaparece: ahora sirve para
-//     COMPLETAR el nombre accesible cuando el texto visible se abrevia — «Ajuste»
-//     se lee «Ajuste al parcelario», «Ayuda» se lee «Ayuda sobre los gestos de
-//     edición»— y para nombrar la única herramienta que sigue sin texto, la punta
-//     de flecha del ajuste.
+//   · **Hasta el 2026-08-05**: seis iconos SVG de 18 px con el nombre escondido en
+//     un `<span>` para el lector de pantalla, y `title` nativo para el ratón. El
+//     autor lo RECHAZÓ, y la objeción no era «no me gustan los iconos»: era que un
+//     imán en herradura, dos linderos con una flecha y una interrogación son
+//     símbolos que hay que aprenderse, y **`title` no los enseña porque aparece al
+//     segundo de pasar el ratón, o sea después de haber dudado**.
+//   · **Del 2026-08-05 al 2026-08-10**: cada herramienta con su nombre ESCRITO.
+//     Arreglaba la duda y trajo su propia factura: la fila medía ~530 px, y el
+//     panel de ayuda —460 px— quedaba más estrecho que ella, dejando **~70 px de
+//     blanco muerto a su derecha** que el autor leyó como un margen roto (lo era:
+//     una caja de 460 alineada a la izquierda dentro de otra de 530).
+//   · **Desde el 2026-08-10 (esto)**: iconos otra vez, **pero la objeción de
+//     entonces se ataca de frente en vez de ignorarse**. La barra NO usa `title`:
+//     lleva una PISTA propia ({@link CLASE_BARRA.PISTA}) que aparece a los
+//     {@link RETARDO_PISTA_MS} ms del ratón —una quinta parte de lo que tarda el
+//     nativo— y **al instante** con el foco del teclado. Un icono con respuesta a
+//     120 ms se explora; con respuesta a 600 ms se sufre. Esa es toda la
+//     diferencia entre las dos versiones, y es la que decide si esto vuelve a
+//     rechazarse.
+//
+// Consecuencias de la forma de hoy:
+//   · La fila mide ~200 px en vez de ~530, así que el panel de ayuda pasa a ser el
+//     hijo MÁS ANCHO de la barra y el blanco muerto desaparece por construcción.
+//     (`estilos/app.css` lo remata centrando los hijos: sin eso, la fila estrecha
+//     se quedaría pegada a la izquierda de un panel abierto de 460 px.)
+//   · Los iconos son SVG EN LÍNEA, por el mismo motivo que `viewer/sincronizacion.js`
+//     usa `L.divIcon` y no `L.Icon` (hallazgo C8): los assets con URL se rompen
+//     entre dev, build y jsdom, y una fuente de iconos añade una descarga que puede
+//     fallar para dibujar una papelera.
+//   · `crearRotulo` (el `<span>` de 1×1 px) es ahora quien pone el NOMBRE ACCESIBLE
+//     ENTERO de cada herramienta —«Deshacer», «Ajuste al parcelario», «Borrar
+//     vértices»—, que es lo que oye un lector de pantalla. La pista visual dice ese
+//     mismo texto: **una sola fuente, dos salidas**, para que no puedan divergir.
+//   · Los `<kbd>` VISIBLES de deshacer y rehacer se van con las palabras. El atajo
+//     no se pierde: se dice en la pista y sigue en `aria-keyshortcuts`.
+//
+// ── EL MODO BORRAR ES LA ÚNICA HERRAMIENTA CON ESTADO ───────────────────────
+// «Borrar vértices» (`[data-accion="borrar"]`) no ejecuta: ARMA. Queda pulsada y
+// cada clic del mapa borra un vértice hasta que se apaga. Eso obliga a tres cosas
+// que las demás herramientas no necesitan, y las tres están aquí y no en el CSS:
+//   1. **`aria-pressed`**, porque es un conmutador y no un disparador. Lo conmuta
+//      {@link BarraEdicion#borrarActivo}, al que llama el cableado.
+//   2. **La pista CAMBIA con el estado** («Borrar vértices» ↔ «Salir del modo
+//      borrar»): un botón que hace una cosa distinta tiene que decirlo, igual que
+//      «Dibujar recinto» pasa a «Cancelar dibujo».
+//   3. **El botón NO se apaga solo.** Quien manda es `viewer/edicion.js`, que
+//      apaga el modo por tres caminos que este módulo no ve (`Escape`, salir de
+//      Edición, `destruir`). Por eso el cableado se suscribe a `alCambiarModoBorrar`
+//      y empuja el estado hacia aquí, en vez de que la barra lleve su propia copia
+//      — dos verdades del mismo booleano divergen, y la que se queda vieja es
+//      siempre la de la UI.
 //
 // ── POR QUÉ LA POSICIÓN POR DEFECTO ES `bottomcenter` Y NO UNA ESQUINA ───────
 // La barra estaba en `topleft`, donde Leaflet la APILA justo debajo del control
@@ -186,8 +218,17 @@ export const CLASE_BARRA = Object.freeze({
   HERRAMIENTA: 'gml-barra-herramienta',
   /** Modificador de la herramienta que abre un desplegable (la punta de flecha). */
   HERRAMIENTA_FLECHA: 'gml-barra-herramienta--flecha',
-  /** El `<span>` con el nombre VISIBLE de una herramienta. */
-  TEXTO: 'gml-barra-texto',
+  /**
+   * Modificador de la herramienta DESTRUCTIVA (hoy solo «Borrar vértices»). Lo que
+   * cuelga de ella en la hoja es el rojo de su estado pulsado: un modo que borra
+   * geometría al primer clic no puede verse igual que el que la dibuja.
+   */
+  HERRAMIENTA_DESTRUCTIVA: 'gml-barra-herramienta--destructiva',
+  /**
+   * La PISTA: el globo con el nombre de la herramienta señalada. Sustituye al
+   * `title` nativo por la razón que abre la cabecera (aparece a 120 ms, no a 600).
+   */
+  PISTA: 'gml-barra-pista',
   /** Filete vertical que separa los grupos de herramientas. */
   SEPARADOR: 'gml-barra-separador',
   /** El «botón partido»: la casilla del ajuste + su desplegable. */
@@ -288,6 +329,23 @@ const POSICION_DE_RESERVA = 'bottomleft'
 const CENTIMETROS_POR_METRO = 100
 
 /**
+ * Lo que tarda la PISTA en aparecer con el ratón, en milisegundos.
+ *
+ * ── Por qué 120, y por qué este número es la tarea entera ───────────────────
+ * El `title` nativo tarda entre 500 y 1.000 ms según el navegador, y ese retardo
+ * es exactamente lo que hizo que el autor rechazara la barra de iconos el
+ * 2026-08-05: la ayuda llegaba después de la duda, así que no ayudaba. 120 ms es
+ * el orden del retardo de los tooltips de un editor de escritorio: lo bastante
+ * corto para que pasar el ratón por la fila SIRVA para aprendérsela, y lo bastante
+ * largo para que cruzar la barra de camino al mapa no encienda seis globos.
+ *
+ * Con el TECLADO no hay retardo (ver {@link BarraEdicion#_mostrarPista}): quien
+ * tabula ya ha decidido pararse en ese botón, así que no hay ninguna intención que
+ * adivinar, y esperar sería castigar el camino accesible.
+ */
+export const RETARDO_PISTA_MS = 120
+
+/**
  * Valor inicial del campo de tolerancia, **en centímetros**, DERIVADO de
  * `config/operativos.json` y no escrito a mano.
  *
@@ -331,6 +389,29 @@ const TOLERANCIA_INICIAL_CM = String(
 const MOTIVO_SIN_LADO = 'Elige antes un lindero en el mapa: basta un clic sobre él.'
 
 /**
+ * Los dos nombres de «Borrar vértices», según esté armado o no.
+ *
+ * Un conmutador tiene que decir **qué va a pasar si lo pulsas**, no cómo se llama
+ * la herramienta: encendido, pulsarlo SALE del modo. Es el mismo criterio —y el
+ * mismo par de textos— que {@link PISTA_DIBUJAR} tiene desde F12.
+ *
+ * Y el texto del estado apagado explica el gesto completo («…y pincha»), porque un
+ * icono de papelera en una barra promete «borra lo seleccionado» y aquí lo que
+ * hace es ARMAR. Esa diferencia, sin escribirla, se descubre borrando algo que no
+ * se quería.
+ */
+const PISTA_BORRAR = Object.freeze({
+  apagado: 'Borrar vértices: enciende el modo y pincha los que sobren',
+  encendido: 'Salir del modo borrar (Escape)',
+})
+
+/** Los dos nombres de «Dibujar recinto», por el mismo criterio (F12). */
+const PISTA_DIBUJAR = Object.freeze({
+  parado: 'Dibujar el recinto de la parte activa, vértice a vértice',
+  dibujando: 'Cancelar el dibujo en curso (Escape)',
+})
+
+/**
  * Los gestos de edición, tal y como los fija la tabla «El mapa de gestos» de
  * `spec/feature-06-edicion-parcela.md` (que a su vez recoge lo que implementa
  * `viewer/edicion.js`). **Es la única copia**: el panel de ayuda se genera de
@@ -347,6 +428,12 @@ const MOTIVO_SIN_LADO = 'Elige antes un lindero en el mapa: basta un clic sobre 
  * Los cuatro llevan `donde: 'dibujando un recinto'`, que es lo que los distingue
  * de los de arriba: **el mismo clic hace dos cosas distintas** según si hay un
  * trazo abierto o no, y la tabla tiene que poder decirlo sin ambigüedad.
+ *
+ * **2026-08-10 · son DIECISÉIS**, por la misma razón y con el mismo criterio: el
+ * modo borrar añade una TERCERA lectura del clic (`donde: 'en modo borrar'`), y la
+ * × de la tabla de vértices añade una vía de borrado que no está en el mapa. Con
+ * tres significados vivos del mismo gesto, la columna «Dónde» deja de ser un
+ * adorno y pasa a ser lo único que distingue una fila de otra.
  *
  * `gesto` es una lista de SEGMENTOS para poder marcar las teclas con `<kbd>` sin
  * inventarse un mini-lenguaje: una cadena es texto, un `{kbd}` es una tecla.
@@ -395,9 +482,40 @@ export const GESTOS = Object.freeze([
     hace: 'Mueve el vértice a lo tecleado.',
   }),
   Object.freeze({
+    gesto: Object.freeze(['Borrar la fila']),
+    donde: 'tabla de vértices',
+    hace:
+      'La × del final de cada fila elimina ese vértice. Es la vía sin puntería: la de usar cuando ' +
+      'el que sobra está encima de otro y no hay dónde pinchar.',
+  }),
+  Object.freeze({
     gesto: Object.freeze(['Desplazar lindero']),
     donde: 'esta barra',
     hace: 'Desplaza el lado seleccionado la distancia en metros que se teclee.',
+  }),
+
+  // ── Los tres del modo borrar, que solo valen con la herramienta armada ──────
+  Object.freeze({
+    gesto: Object.freeze(['Borrar vértices']),
+    donde: 'esta barra',
+    hace:
+      'ARMA el modo borrar y se queda pulsada: no borra nada por sí misma. Mientras está armada, ' +
+      'el resto de la barra sigue funcionando igual.',
+  }),
+  Object.freeze({
+    gesto: Object.freeze(['Clic']),
+    donde: 'en modo borrar',
+    hace:
+      `Elimina el vértice que esté a ${UMBRAL_PUNTERIA_PX} px o menos del punto pinchado, uno por ` +
+      `clic y sin salir del modo. Ni selecciona linderos ni el doble clic inserta: mientras el ` +
+      `modo dura, el clic solo borra.`,
+  }),
+  Object.freeze({
+    gesto: Object.freeze([{ kbd: 'Escape' }]),
+    donde: 'en modo borrar',
+    hace:
+      'Sale del modo. También se sale al cambiar de pantalla: un modo que borra no sobrevive a ' +
+      'irse y volver.',
   }),
   Object.freeze({
     gesto: Object.freeze([{ kbd: 'Ctrl+Z' }, ' / ', { kbd: 'Ctrl+Y' }]),
@@ -440,17 +558,62 @@ export const GESTOS = Object.freeze([
 
 const NS_SVG = 'http://www.w3.org/2000/svg'
 
+/** Lado del icono de una herramienta, en píxeles. Ver {@link ICONOS}. */
+const LADO_ICONO_PX = 16
+
 /**
- * Trazos del icono, en un lienzo de 24×24 y solo con `<path>`: un único tipo de
- * nodo hace que {@link crearIcono} no tenga ramas.
+ * Lado de la punta de flecha del botón partido. Más pequeña que las demás **a
+ * propósito**: no es una herramienta, es el apéndice de la que tiene al lado, y su
+ * tamaño es lo que lo dice sin escribirlo.
+ */
+const LADO_CARET_PX = 12
+
+/**
+ * Trazos de cada icono, en un lienzo de 24×24 y solo con `<path>`: un único tipo
+ * de nodo hace que {@link crearIcono} no tenga ramas.
  *
- * Aquí había seis iconos hasta el 2026-08-05 —deshacer, rehacer, imán, offset,
- * interrogación y punta de flecha—. Los cinco primeros los sustituye el NOMBRE
- * escrito de su herramienta (ver la cabecera). Sobrevive la punta de flecha
- * porque no nombra nada: es la señal de «esto despliega», y esa sí es más clara
- * dibujada que escrita.
+ * **Todos son de TRAZO, ninguno de relleno** (`fill:none` + `stroke:currentColor`,
+ * ver {@link crearIcono}), y eso no es un capricho de estilo: así heredan el color
+ * del botón y los cuatro estados —normal, señalado, pulsado, apagado— salen gratis
+ * de una sola declaración de `color` en la hoja, sin repintar ninguna forma.
+ *
+ * Se dibujan a 16 px sobre un botón de 28: los trazos de 2 unidades del lienzo de
+ * 24 caen en ~1,33 px reales, que es lo que hace que se lean como cromo de mapa y
+ * no como clipart.
  */
 const ICONOS = Object.freeze({
+  /** Flecha que vuelve sobre sus pasos hacia la izquierda. */
+  DESHACER: Object.freeze(['M9 14l-4-4 4-4', 'M5 10h9a5 5 0 0 1 0 10h-4']),
+  /** La misma, espejada: es la pareja obvia y se lee como tal. */
+  REHACER: Object.freeze(['M15 14l4-4-4-4', 'M19 10h-9a5 5 0 0 0 0 10h4']),
+  /**
+   * Imán en herradura: el ajuste al parcelario. Es el símbolo universal del
+   * «snap» en todo editor de dibujo, así que aquí sí hay convención que
+   * aprovechar — y por eso este es el único de los seis que no se inventa nada.
+   */
+  IMAN: Object.freeze(['M5 4h4v8a3 3 0 0 0 6 0V4h4v8a7 7 0 0 1-14 0Z', 'M5 10h4', 'M15 10h4']),
+  /**
+   * Dos linderos paralelos y una flecha de doble punta entre ellos: desplazar un
+   * lado en paralelo a sí mismo, que es literalmente lo que hace la herramienta.
+   */
+  OFFSET: Object.freeze(['M3 5h18', 'M3 19h18', 'M12 8v8', 'M9.5 10.5 12 8l2.5 2.5', 'M9.5 13.5 12 16l2.5-2.5']),
+  /** Papelera: borrar vértices. */
+  BORRAR: Object.freeze([
+    'M4 7h16',
+    'M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2',
+    'M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12',
+    'M10 11v6',
+    'M14 11v6',
+  ]),
+  /**
+   * Un recinto cerrado de cinco lados. NO un lápiz: un lápiz querría decir
+   * «dibujar» y también «editar», que es justo lo que hacen las otras cinco
+   * herramientas de esta barra (el mismo argumento que ya estaba escrito cuando
+   * este botón llevaba palabras).
+   */
+  DIBUJAR: Object.freeze(['M12 3l8 6-3 10H7L4 9Z']),
+  /** Interrogación: la ayuda. */
+  AYUDA: Object.freeze(['M9.2 9a2.8 2.8 0 1 1 3.3 2.75c-.9.2-1.5.9-1.5 1.8v.45', 'M12 17.5h.01']),
   /** Punta de flecha hacia abajo: «esto abre algo». */
   CARET: Object.freeze(['M7 10l5 5 5-5']),
 })
@@ -483,18 +646,20 @@ function crear(doc, etiqueta, clase, padre) {
  *
  * @param {Document} doc
  * @param {ReadonlyArray<string>} trazos  Atributos `d` de los `<path>`.
+ * @param {number} [lado=LADO_ICONO_PX]  Píxeles del `<svg>`.
  * @returns {SVGElement}
  */
-function crearIcono(doc, trazos) {
+function crearIcono(doc, trazos, lado = LADO_ICONO_PX) {
   const svg = doc.createElementNS(NS_SVG, 'svg')
   svg.setAttribute('class', CLASE_BARRA.ICONO)
   svg.setAttribute('viewBox', '0 0 24 24')
-  // 14 px, y el tamaño se fija AQUÍ y no en la hoja: queda un solo icono —la
-  // punta de flecha— y tiene que verse igual de pequeña al lado de una palabra
-  // aunque `estilos/app.css` no llegue. Eran 18 cuando cada herramienta era un
-  // dibujo y el dibujo era todo lo que había que ver.
-  svg.setAttribute('width', '14')
-  svg.setAttribute('height', '14')
+  // El tamaño se fija AQUÍ y no en la hoja, por lo mismo que el fondo del
+  // contenedor: este módulo no importa ninguna hoja y un icono sin medidas
+  // colapsaría a 0×0 (o al tamaño por defecto del navegador, que son 300×150)
+  // el día que `estilos/app.css` no llegue. Y ahora que la barra es SOLO
+  // iconos, eso no sería un desperfecto: sería una barra invisible.
+  svg.setAttribute('width', String(lado))
+  svg.setAttribute('height', String(lado))
   svg.setAttribute('fill', 'none')
   // `currentColor` para que el icono herede el color del botón y no haya que
   // repintarlo en cada estado (hover, deshabilitado, foco).
@@ -515,14 +680,15 @@ function crearIcono(doc, trazos) {
 }
 
 /**
- * Texto accesible VISUALMENTE OCULTO. Desde que las herramientas llevan su
- * nombre escrito tiene dos usos, y los dos siguen siendo necesarios:
+ * Texto accesible VISUALMENTE OCULTO: el NOMBRE de una herramienta que solo se ve
+ * como dibujo. Desde que la barra volvió a los iconos (2026-08-10) es quien pone
+ * el nombre accesible de LAS SIETE, y por tanto lo único que un lector de pantalla
+ * tiene para distinguirlas.
  *
- *   1. **Completar un nombre que se abrevia en pantalla.** «Ajuste» cabe en la
- *      barra; «Ajuste al parcelario» es lo que hay que oír. El trozo que falta va
- *      aquí, detrás del texto visible, y el nombre accesible sale de la suma.
- *   2. **Nombrar lo que sigue sin texto**: la punta de flecha del ajuste, que es
- *      un botón entero («Tolerancia del ajuste») dibujado con 14 px de flecha.
+ * **El mismo texto alimenta la PISTA visual** ({@link BarraEdicion#_mostrarPista}),
+ * y eso es deliberado: una sola fuente para las dos salidas. Un `aria-label` por un
+ * lado y un `title` por otro son dos textos del mismo botón que acaban diciendo
+ * cosas distintas — el modo de fallo clásico del icono rotulado dos veces.
  *
  * Se oculta con estilo EN LÍNEA, no solo con la clase, por la misma razón que
  * `viewer/capas.js` inlinea el mínimo de su control: este módulo no importa
@@ -554,36 +720,56 @@ function crearRotulo(doc, texto) {
 }
 
 /**
- * Botón de la barra. `type="button"` SIEMPRE (un `<button>` sin tipo envía
- * formularios; aquí no hay ninguno, pero el día que la barra viva dentro de uno
- * sería un recargue de página sin explicación).
+ * Pone el NOMBRE de una herramienta: el `<span>` oculto que la nombra para el
+ * lector de pantalla y el `data-pista` del que sale el globo visual.
  *
- * El nombre accesible se compone en el ORDEN en que se cuelgan los hijos:
- * `texto` visible + `resto` oculto. Por eso «Ayuda» + «&nbsp;sobre los gestos de
- * edición» se lee entero y se ve corto, sin `aria-label` — que además habría
- * PISADO el texto visible en vez de completarlo, y dejaría a la vista una palabra
- * que el lector de pantalla no dice (el fallo clásico del rótulo doble).
+ * ⚠️ **Un solo argumento para los dos sitios**, y por eso esto es una función y no
+ * dos líneas escritas siete veces: el día que alguien renombre una herramienta,
+ * renombra las dos salidas o ninguna. La pista puede llevar ADEMÁS el atajo
+ * (`pista`), que es información del ratón; el nombre accesible no lo repite porque
+ * `aria-keyshortcuts` ya lo dice por el canal que corresponde.
+ *
+ * ⛔ **Aquí NO se pone `title`.** Tenerlo además de la pista propia significa dos
+ * globos sobre el mismo botón: el nuestro a los 120 ms y el del navegador medio
+ * segundo después, encima y con otro estilo. Es el fallo que se ve en media web
+ * que se fabrica un tooltip y se olvida de quitar el nativo.
+ *
+ * @param {Document} doc
+ * @param {HTMLElement} boton
+ * @param {string} nombre  Nombre accesible, y base de la pista.
+ * @param {string} [pista=nombre]  Texto de la pista, si difiere (p. ej. con atajo).
+ * @returns {void}
+ */
+function nombrar(doc, boton, nombre, pista = nombre) {
+  boton.appendChild(crearRotulo(doc, nombre))
+  boton.dataset.pista = pista
+}
+
+/**
+ * Botón de la barra: un icono, su nombre oculto y su pista. `type="button"`
+ * SIEMPRE (un `<button>` sin tipo envía formularios; aquí no hay ninguno, pero el
+ * día que la barra viva dentro de uno sería un recargue de página sin explicación).
+ *
+ * `icono` es opcional por un solo caso —la punta de flecha del botón partido, que
+ * es `caret` y nada más—, no porque haya botones mudos: sin icono y sin caret el
+ * botón no se vería, y eso lo detecta la primera mirada.
  *
  * @param {Document} doc
  * @param {object} opciones
  * @param {Element} opciones.padre
- * @param {string} [opciones.texto]   Nombre VISIBLE. Sin él, el botón es solo icono.
- * @param {string} [opciones.resto]   Cola del nombre accesible, oculta a la vista.
- * @param {string} [opciones.titulo]  `title`. Solo donde el texto visible no basta.
+ * @param {ReadonlyArray<string>} [opciones.icono]  Trazos de {@link ICONOS}.
+ * @param {string} opciones.nombre    Nombre accesible (oculto a la vista).
+ * @param {string} [opciones.pista]   Texto del globo, si difiere del nombre.
  * @param {boolean} [opciones.caret]  Añade la punta de flecha de «esto despliega».
  * @param {string} [opciones.clase]
  * @returns {HTMLButtonElement}
  */
-function crearBoton(doc, { padre, texto, resto, titulo, caret = false, clase = CLASE_BARRA.HERRAMIENTA }) {
+function crearBoton(doc, { padre, icono, nombre, pista, caret = false, clase = CLASE_BARRA.HERRAMIENTA }) {
   const boton = /** @type {HTMLButtonElement} */ (crear(doc, 'button', clase, padre))
   boton.type = 'button'
-  if (titulo) boton.title = titulo
-  if (texto) {
-    const etiqueta = crear(doc, 'span', CLASE_BARRA.TEXTO, boton)
-    etiqueta.textContent = texto
-  }
-  if (resto) boton.appendChild(crearRotulo(doc, resto))
-  if (caret) boton.appendChild(crearIcono(doc, ICONOS.CARET))
+  if (icono) boton.appendChild(crearIcono(doc, icono))
+  if (caret) boton.appendChild(crearIcono(doc, ICONOS.CARET, LADO_CARET_PX))
+  nombrar(doc, boton, nombre, pista)
   return boton
 }
 
@@ -786,7 +972,7 @@ const BarraEdicion = L.Control.extend({
     // misma sobre cualquier cartografía. El resto lo viste `estilos/app.css`.
     contenedor.style.background = 'rgba(255,255,255,0.94)'
     contenedor.style.padding = '4px'
-    contenedor.style.borderRadius = '4px'
+    contenedor.style.borderRadius = '6px'
     contenedor.style.font = `${DENSIDAD_BASE_PX}px system-ui, sans-serif`
 
     // ── La fila de herramientas ──────────────────────────────────────────────
@@ -794,20 +980,22 @@ const BarraEdicion = L.Control.extend({
     fila.setAttribute('role', 'toolbar')
     fila.setAttribute('aria-label', this.options.etiqueta)
 
-    // Deshacer y rehacer. ⚠️ Llevan MARCADO dentro (el `<span>` del nombre y el
-    // `<kbd>` del atajo): quien los cablea enciende y apaga su `disabled`, y NUNCA
-    // les reescribe el `textContent` — se llevaría por delante las dos cosas. Lo
-    // decía `index.html` junto a ellos y sigue valiendo aquí.
+    // Deshacer y rehacer. ⚠️ Llevan MARCADO dentro (el `<svg>` del icono y el
+    // `<span>` del nombre accesible): quien los cablea enciende y apaga su
+    // `disabled`, y NUNCA les reescribe el `textContent` — se llevaría por delante
+    // las dos cosas. Lo decía `index.html` junto a ellos y sigue valiendo aquí.
     this._botonDeshacer = this._crearBotonHistorial(doc, fila, {
       accion: 'deshacer',
-      texto: 'Deshacer',
+      icono: ICONOS.DESHACER,
+      nombre: 'Deshacer',
       tecla: 'Ctrl+Z',
       // `aria-keyshortcuts` usa los nombres de tecla de UI Events, no el rótulo.
       atajo: 'Control+Z',
     })
     this._botonRehacer = this._crearBotonHistorial(doc, fila, {
       accion: 'rehacer',
-      texto: 'Rehacer',
+      icono: ICONOS.REHACER,
+      nombre: 'Rehacer',
       tecla: 'Ctrl+Y',
       atajo: 'Control+Y',
     })
@@ -839,23 +1027,19 @@ const BarraEdicion = L.Control.extend({
     // `checked` escrito en el HTML habría hecho.
     casilla.defaultChecked = true
 
-    // El `<label>` es la PIEL del conmutador y por tanto quien lleva su nombre.
-    // Visible dice «Ajuste» —que es lo que cabe en una barra—; el nombre accesible
-    // completo sale de sumarle el `<span>` oculto de detrás.
+    // El `<label>` es la PIEL del conmutador y por tanto quien lleva su icono y su
+    // nombre. Es el único rótulo de la barra que no es un `<button>`, así que la
+    // pista se le pone a mano: {@link nombrar} sirve igual, porque lo único que
+    // hace es colgar un `<span>` y escribir un `data-pista`.
     const rotuloCasilla = crear(doc, 'label', CLASE_BARRA.CONMUTADOR_ROTULO, partido)
     rotuloCasilla.setAttribute('for', ID.snap)
-    rotuloCasilla.title = 'Ajustar al parcelario'
-    const textoAjuste = crear(doc, 'span', CLASE_BARRA.TEXTO, rotuloCasilla)
-    textoAjuste.textContent = 'Ajuste'
-    rotuloCasilla.appendChild(crearRotulo(doc, ' al parcelario'))
+    rotuloCasilla.appendChild(crearIcono(doc, ICONOS.IMAN))
+    nombrar(doc, rotuloCasilla, 'Ajuste al parcelario')
 
-    // La única herramienta que sigue SIN texto: es la mitad estrecha de un botón
-    // partido y una palabra ahí duplicaría el ancho del ajuste entero. Su nombre
-    // va oculto, y además en el `title` porque es lo que el ratón encuentra.
+    // La mitad estrecha del botón partido: no es una herramienta, es su apéndice.
     this._dispSnap = crearBoton(doc, {
       padre: partido,
-      resto: 'Tolerancia del ajuste',
-      titulo: 'Tolerancia del ajuste',
+      nombre: 'Tolerancia del ajuste',
       caret: true,
       clase: `${CLASE_BARRA.HERRAMIENTA} ${CLASE_BARRA.HERRAMIENTA_FLECHA}`,
     })
@@ -868,10 +1052,29 @@ const BarraEdicion = L.Control.extend({
     // {@link MOTIVO_SIN_LADO}.
     this._dispOffset = crearBoton(doc, {
       padre: fila,
-      texto: 'Desplazar lindero',
+      icono: ICONOS.OFFSET,
+      nombre: 'Desplazar lindero',
       caret: true,
     })
     this._dispOffset.dataset.desplegable = 'offset'
+
+    // ── Borrar vértices (2026-08-10) ─────────────────────────────────────────
+    // El modo destructivo. Va JUNTO a «Desplazar lindero» y no al lado de la
+    // ayuda porque las dos son lo mismo —herramientas que cambian la geometría del
+    // recinto— y el separador de después las agrupa como tales.
+    //
+    // ⚠️ `aria-pressed` desde el arranque, y en `'false'`, no ausente: un
+    // conmutador que solo estrena el atributo al pulsarse por primera vez se
+    // anuncia como un botón normal hasta entonces, y quien va por lector de
+    // pantalla no puede saber que va a ARMAR algo en vez de ejecutarlo.
+    this._botonBorrar = crearBoton(doc, {
+      padre: fila,
+      icono: ICONOS.BORRAR,
+      nombre: PISTA_BORRAR.apagado,
+      clase: `${CLASE_BARRA.HERRAMIENTA} ${CLASE_BARRA.HERRAMIENTA_DESTRUCTIVA}`,
+    })
+    this._botonBorrar.dataset.accion = 'borrar'
+    this._botonBorrar.setAttribute('aria-pressed', 'false')
 
     crearSeparador(doc, fila)
 
@@ -884,14 +1087,10 @@ const BarraEdicion = L.Control.extend({
     // rama sería peor que no tenerlo. Lo enseña `dibujoVisible(true)`, que llama
     // el cableado del edificio. Es la única herramienta de esta barra que se
     // esconde, y por eso se dice aquí en vez de dejarlo al `display` de la hoja.
-    //
-    // Lleva PALABRAS y no un icono, como las demás desde el rediseño del
-    // 2026-08-05: un lápiz querría decir «dibujar» y también «editar», que es
-    // justo lo que hace el botón de al lado.
     this._botonDibujar = crearBoton(doc, {
       padre: fila,
-      texto: 'Dibujar recinto',
-      titulo: 'Dibujar el recinto de la parte activa, vértice a vértice',
+      icono: ICONOS.DIBUJAR,
+      nombre: PISTA_DIBUJAR.parado,
     })
     this._botonDibujar.dataset.accion = 'dibujar-recinto'
     this._botonDibujar.hidden = true
@@ -899,12 +1098,12 @@ const BarraEdicion = L.Control.extend({
     this._separadorDibujar.hidden = true
 
     // ── Ayuda ────────────────────────────────────────────────────────────────
-    // «Ayuda» a la vista, «Ayuda sobre los gestos de edición» al oído: la palabra
-    // sola no dice ayuda DE QUÉ, y en una app con cuatro pantallas eso importa.
+    // «Ayuda sobre los gestos de edición», entero: una interrogación sola no dice
+    // ayuda DE QUÉ, y en una app con tres pantallas eso importa.
     this._botonAyuda = crearBoton(doc, {
       padre: fila,
-      texto: 'Ayuda',
-      resto: ' sobre los gestos de edición',
+      icono: ICONOS.AYUDA,
+      nombre: 'Ayuda sobre los gestos de edición',
     })
     this._botonAyuda.dataset.accion = 'ayuda'
 
@@ -992,15 +1191,69 @@ const BarraEdicion = L.Control.extend({
     }
     this._abierto = null
 
-    /** Las herramientas de la fila, en orden, para las flechas del teclado. */
+    /**
+     * Las herramientas de la fila, EN ORDEN VISUAL, para las flechas del teclado.
+     *
+     * ⛔ **Aquí faltaban «Dibujar recinto» desde F12 y el rótulo del ajuste desde
+     * siempre**, y no era inofensivo: las flechas los SALTABAN, así que la barra
+     * tenía dos herramientas alcanzables con `Tab` y no con las flechas que la
+     * propia barra anuncia al ponerse `role="toolbar"`. Se arregla al pasar por
+     * aquí, y {@link BarraEdicion#_vecinaHabilitada} aprende a la vez a saltar lo
+     * OCULTO además de lo apagado — sin eso, añadir «Dibujar recinto» a esta lista
+     * habría mandado el foco a un botón invisible en la rama PARCELA, que es un
+     * error peor que el que se estaba corrigiendo.
+     *
+     * La casilla y su `<label>` cuentan como UNA parada: el `<label>` es la piel
+     * del conmutador y no es focusable, así que quien entra en la lista es la
+     * casilla.
+     */
     this._herramientas = [
       this._botonDeshacer,
       this._botonRehacer,
       casilla,
       this._dispSnap,
       this._dispOffset,
+      this._botonBorrar,
+      this._botonDibujar,
       this._botonAyuda,
     ]
+
+    // ── La PISTA ─────────────────────────────────────────────────────────────
+    // Un solo globo para las ocho herramientas, creado UNA vez y movido: ocho
+    // nodos vivos serían ocho sitios donde equivocarse de texto, y crearlo al
+    // señalar metería un reflow en el gesto que tiene que ser instantáneo.
+    //
+    // `role="tooltip"` + `aria-hidden`: los dos, y no es contradictorio. El `role`
+    // dice QUÉ es para quien inspeccione el árbol; el `aria-hidden` impide que se
+    // ANUNCIE, porque el nombre accesible del botón ya dice exactamente lo mismo
+    // (ver {@link nombrar}) y anunciarlo otra vez sería el rótulo dicho dos veces.
+    const pista = crear(doc, 'div', CLASE_BARRA.PISTA, fila)
+    pista.setAttribute('role', 'tooltip')
+    pista.setAttribute('aria-hidden', 'true')
+    pista.hidden = true
+    this._pista = pista
+    this._temporizadorPista = null
+    // Los estilos que la hacen FLOTAR van en línea, no en la hoja, por lo mismo
+    // que el fondo del contenedor: sin ellos la pista no sería un globo, sería un
+    // renglón metido en la fila que empujaría las ocho herramientas a un lado cada
+    // vez que el ratón pasa por encima. Eso no es «se ve peor», es «la barra se
+    // mueve sola». Lo que sí es del CSS —tipografía, color, sombra— se queda allí.
+    fila.style.position = 'relative'
+    pista.style.position = 'absolute'
+    pista.style.zIndex = '1'
+    // Arriba si la barra está abajo (el caso normal), y abajo si está en una
+    // esquina superior de Leaflet: pegada al techo del mapa, un globo por encima
+    // quedaría recortado por el contenedor.
+    if (String(this.options.position).startsWith('top')) pista.style.top = 'calc(100% + 6px)'
+    else pista.style.bottom = 'calc(100% + 6px)'
+    pista.style.whiteSpace = 'nowrap'
+    // No captura el ratón: si lo hiciera, el globo que aparece bajo el cursor
+    // dispararía el `mouseout` del botón y la pista parpadearía sin fin.
+    pista.style.pointerEvents = 'none'
+    pista.style.background = 'rgba(15,23,42,0.94)'
+    pista.style.color = '#fff'
+    pista.style.padding = '3px 7px'
+    pista.style.borderRadius = '6px'
 
     // ── Oyentes ──────────────────────────────────────────────────────────────
     // Sin esto, pulsar un botón de la barra SELECCIONARÍA UN LINDERO por debajo
@@ -1014,6 +1267,17 @@ const BarraEdicion = L.Control.extend({
     L.DomEvent.on(this._botonAyuda, 'click', this._alPulsarAyuda, this)
     L.DomEvent.on(this._botonCerrarAyuda, 'click', this._alPulsarCerrarAyuda, this)
     L.DomEvent.on(contenedor, 'keydown', this._alTeclaEnBarra, this)
+
+    // La pista, por DELEGACIÓN en la fila: cuatro oyentes en total en vez de
+    // cuatro por herramienta, y —lo que de verdad importa— siguen valiendo si
+    // algún día nace una herramienta más, sin que nadie tenga que acordarse.
+    // `mouseover`/`mouseout` y no `mouseenter`/`mouseleave` porque solo los
+    // primeros BURBUJEAN, que es lo que hace posible la delegación.
+    L.DomEvent.on(fila, 'mouseover', this._alSenalar, this)
+    L.DomEvent.on(fila, 'mouseout', this._alDejarDeSenalar, this)
+    L.DomEvent.on(fila, 'focusin', this._alEnfocarHerramienta, this)
+    L.DomEvent.on(fila, 'focusout', this._alDejarDeSenalar, this)
+    this._fila = fila
 
     // En el DOCUMENTO, no en el contenedor: `Escape` tiene que cerrar aunque el
     // foco esté en el mapa, y el clic de fuera ocurre por definición fuera.
@@ -1029,10 +1293,20 @@ const BarraEdicion = L.Control.extend({
     L.DomEvent.off(this._botonAyuda, 'click', this._alPulsarAyuda, this)
     L.DomEvent.off(this._botonCerrarAyuda, 'click', this._alPulsarCerrarAyuda, this)
     L.DomEvent.off(this._contenedor, 'keydown', this._alTeclaEnBarra, this)
+    if (this._fila) {
+      L.DomEvent.off(this._fila, 'mouseover', this._alSenalar, this)
+      L.DomEvent.off(this._fila, 'mouseout', this._alDejarDeSenalar, this)
+      L.DomEvent.off(this._fila, 'focusin', this._alEnfocarHerramienta, this)
+      L.DomEvent.off(this._fila, 'focusout', this._alDejarDeSenalar, this)
+    }
     if (this._doc) {
       this._doc.removeEventListener('click', this._alClicFuera)
       this._doc.removeEventListener('keydown', this._alEscape)
     }
+    // El temporizador de la pista SOBREVIVE al desmontaje si no se cancela, y su
+    // callback escribiría en un nodo que ya no está en el documento. Es el mismo
+    // fallo que los oyentes sin baja, con la diferencia de que este no se ve.
+    this._ocultarPista()
     this._abierto = null
   },
 
@@ -1069,7 +1343,7 @@ const BarraEdicion = L.Control.extend({
   /**
    * Pone el botón en «dibujando» o lo devuelve a su estado normal.
    *
-   * Cambia el RÓTULO, no solo un color: mientras se dibuja, lo que hace el botón
+   * Cambia el NOMBRE, no solo un color: mientras se dibuja, lo que hace el botón
    * es *cancelar*, y un botón que hace una cosa distinta tiene que decirlo con
    * palabras. `aria-pressed` lo dice además en el árbol de accesibilidad.
    *
@@ -1078,37 +1352,187 @@ const BarraEdicion = L.Control.extend({
    */
   dibujoEnCurso(dibujando) {
     if (!this._botonDibujar) return
-    const texto = this._botonDibujar.querySelector(`.${CLASE_BARRA.TEXTO}`)
-    if (texto) texto.textContent = dibujando ? 'Cancelar dibujo' : 'Dibujar recinto'
+    this._renombrar(this._botonDibujar, dibujando ? PISTA_DIBUJAR.dibujando : PISTA_DIBUJAR.parado)
     this._botonDibujar.setAttribute('aria-pressed', dibujando ? 'true' : 'false')
-    this._botonDibujar.title = dibujando
-      ? 'Cancelar el dibujo en curso (Escape)'
-      : 'Dibujar el recinto de la parte activa, vértice a vértice'
+  },
+
+  /**
+   * Pone «Borrar vértices» en armado o lo devuelve a su estado normal.
+   *
+   * ⚠️ **Esto NO enciende el modo: lo REFLEJA.** Quien manda es
+   * `viewer/edicion.js#modoBorrar`, y el cableado empuja hacia aquí lo que aquél
+   * diga (ver la sección del modo borrar en la cabecera). Llamar a esto sin haber
+   * cambiado el modo deja el botón mintiendo, que es exactamente el estado que la
+   * suscripción a `alCambiarModoBorrar` existe para hacer imposible.
+   *
+   * @param {boolean} activo
+   * @returns {void}
+   */
+  borrarActivo(activo) {
+    if (!this._botonBorrar) return
+    this._renombrar(this._botonBorrar, activo ? PISTA_BORRAR.encendido : PISTA_BORRAR.apagado)
+    this._botonBorrar.setAttribute('aria-pressed', activo ? 'true' : 'false')
+    // Si la pista de ESE botón está a la vista, se reescribe en el acto: apagar el
+    // modo con el ratón encima dejaba si no el globo diciendo «Salir del modo
+    // borrar» sobre un botón que ya no está en ese modo.
+    if (this._pista && !this._pista.hidden && this._pistaDe === this._botonBorrar) {
+      this._pista.textContent = this._botonBorrar.dataset.pista
+    }
+  },
+
+  /**
+   * Cambia el nombre de una herramienta en LOS DOS SITIOS a la vez: el `<span>`
+   * oculto que la nombra y el `data-pista` del globo. Es la mitad de escritura de
+   * {@link nombrar}, y existe por lo mismo: que no puedan divergir.
+   *
+   * @param {HTMLElement} boton
+   * @param {string} nombre
+   */
+  _renombrar(boton, nombre) {
+    const rotulo = boton.querySelector(`.${CLASE_BARRA.ROTULO}`)
+    if (rotulo) rotulo.textContent = nombre
+    boton.dataset.pista = nombre
   },
 
   // ── Construcción de piezas ─────────────────────────────────────────────────
 
   /**
-   * Un botón del historial: su nombre + el `<kbd>` VISIBLE del atajo. El `<kbd>`
-   * no es decoración y no va en un `title`: un atajo que solo aparece al pasar el
-   * ratón no lo descubre quien va por teclado. Y `aria-keyshortcuts` lo dice
-   * además en el árbol de accesibilidad, que es donde un lector de pantalla lo
-   * busca.
+   * Un botón del historial: su icono, su nombre y su atajo.
    *
-   * Sin `title`, a diferencia de los demás: el nombre y el atajo ya están los dos
-   * escritos en el propio botón, y un tooltip que repita lo que se está leyendo
-   * es ruido que además tapa la parcela al segundo de pasar por encima.
+   * El atajo va en TRES sitios y ninguno sobra: en la PISTA (`Deshacer · Ctrl+Z`),
+   * que es como lo descubre quien usa el ratón; en `aria-keyshortcuts`, que es
+   * donde lo busca un lector de pantalla; y en la tabla del panel de ayuda, que es
+   * donde se vuelve cuando ya no se acuerda uno. Lo que ya NO hay es un `<kbd>`
+   * visible dentro del botón: con la barra en iconos no cabe, y las otras dos
+   * salidas cubren a los dos públicos que aquella tenía.
    */
-  _crearBotonHistorial(doc, padre, { accion, texto, tecla, atajo }) {
-    const boton = crearBoton(doc, { padre, texto })
+  _crearBotonHistorial(doc, padre, { accion, icono, nombre, tecla, atajo }) {
+    const boton = crearBoton(doc, { padre, icono, nombre, pista: `${nombre} · ${tecla}` })
     boton.dataset.accion = accion
     boton.setAttribute('aria-keyshortcuts', atajo)
-    const kbd = crear(doc, 'kbd', CLASE_BARRA.TECLA, boton)
-    kbd.textContent = tecla
     // Nacen apagados: con la pila vacía no hay nada que deshacer ni que rehacer.
     // A partir de aquí manda `app/main.js#refrescar`.
     boton.disabled = true
     return boton
+  },
+
+  // ── La pista ───────────────────────────────────────────────────────────────
+
+  /**
+   * La herramienta a la que pertenece un evento delegado, o `null`. Sube por los
+   * ancestros porque el destino real suele ser el `<svg>` o un `<path>` de dentro,
+   * y se para en la fila para no salirse de la barra.
+   *
+   * Vale también para el `<label>` del ajuste, que no es un `<button>`: lo que
+   * define a una «herramienta» aquí es tener `data-pista`, no ser de un elemento
+   * concreto.
+   */
+  _herramientaDe(destino) {
+    let nodo = destino
+    while (nodo && nodo !== this._fila) {
+      if (nodo.dataset && typeof nodo.dataset.pista === 'string') return nodo
+      nodo = nodo.parentNode
+    }
+    return null
+  },
+
+  /**
+   * Enseña la pista de una herramienta.
+   *
+   * @param {HTMLElement} boton
+   * @param {boolean} [inmediata=false]  Sin retardo. Lo usa el TECLADO: ver
+   *   {@link RETARDO_PISTA_MS}.
+   */
+  _mostrarPista(boton, inmediata = false) {
+    if (!this._pista || !boton) return
+    // Con un desplegable abierto NO hay pista, y no es un descuido: los tres
+    // paneles se abren justo donde la pista se dibuja (encima de la fila), así que
+    // el globo caería sobre el panel. Y quien tiene un panel abierto ya no está
+    // explorando la barra: está leyendo.
+    if (this._abierto !== null) return
+    this._cancelarTemporizador()
+    const pintar = () => {
+      this._temporizadorPista = null
+      this._pista.textContent = boton.dataset.pista || ''
+      this._pistaDe = boton
+      this._pista.hidden = false
+      this._colocarPista(boton)
+    }
+    // Sin espera en dos casos: con el teclado (ver {@link RETARDO_PISTA_MS}) y
+    // cuando ya hay una pista a la vista. Lo segundo es la «ventana caliente» de
+    // toda barra de herramientas: recorriéndolas con el ratón, el globo SIGUE al
+    // cursor en vez de apagarse y volver 120 ms después por cada icono. Y no es
+    // solo comodidad: sin ello el globo se quedaría 120 ms enseñando el nombre de
+    // la herramienta ANTERIOR, o sea mintiendo sobre la que está debajo del ratón.
+    if (inmediata || this._pista.hidden === false) {
+      pintar()
+      return
+    }
+    const ventana = this._doc && this._doc.defaultView
+    this._temporizadorPista = (ventana || globalThis).setTimeout(pintar, RETARDO_PISTA_MS)
+  },
+
+  /**
+   * Centra la pista sobre su herramienta, sin dejar que se salga de la fila por
+   * ninguno de los dos lados.
+   *
+   * Todo en coordenadas de OFFSET (relativas a la fila, que es `position:relative`)
+   * y no con `getBoundingClientRect`: así no hay que descontar el desplazamiento
+   * del mapa ni el de la página, que son justo las dos cosas que se olvidan y
+   * hacen que un tooltip aparezca a diez píxeles de donde debía.
+   */
+  _colocarPista(boton) {
+    const anchoFila = this._fila ? this._fila.offsetWidth : 0
+    const anchoPista = this._pista.offsetWidth
+    const centro = boton.offsetLeft + boton.offsetWidth / 2
+    let izquierda = centro - anchoPista / 2
+    // El tope por la derecha se aplica ANTES que el de la izquierda: con una pista
+    // más ancha que la fila entera —que pasa, «Borrar vértices: enciende el modo y
+    // pincha los que sobren» mide más que la barra— el orden inverso la dejaría
+    // colgando por la derecha en vez de alineada a la izquierda.
+    if (izquierda + anchoPista > anchoFila) izquierda = anchoFila - anchoPista
+    if (izquierda < 0) izquierda = 0
+    this._pista.style.left = `${Math.round(izquierda)}px`
+  },
+
+  _cancelarTemporizador() {
+    if (this._temporizadorPista === null) return
+    const ventana = this._doc && this._doc.defaultView
+    ;(ventana || globalThis).clearTimeout(this._temporizadorPista)
+    this._temporizadorPista = null
+  },
+
+  /** Esconde la pista y cancela la que estuviera a punto de salir. IDEMPOTENTE. */
+  _ocultarPista() {
+    this._cancelarTemporizador()
+    if (!this._pista) return
+    this._pista.hidden = true
+    this._pistaDe = null
+  },
+
+  _alSenalar(evento) {
+    const boton = this._herramientaDe(evento && evento.target)
+    if (boton === null) return
+    this._mostrarPista(boton)
+  },
+
+  _alEnfocarHerramienta(evento) {
+    const boton = this._herramientaDe(evento && evento.target)
+    if (boton === null) return
+    this._mostrarPista(boton, true)
+  },
+
+  /**
+   * Sale el ratón (o el foco) de una herramienta.
+   *
+   * ⚠️ Se comprueba a DÓNDE va: `mouseout` salta también al pasar del `<svg>` al
+   * `<button>` que lo contiene —son dos nodos distintos— y sin esta guarda la
+   * pista parpadearía al mover el ratón un píxel dentro del mismo botón.
+   */
+  _alDejarDeSenalar(evento) {
+    const hacia = evento && (evento.relatedTarget || evento.toElement)
+    if (hacia && this._herramientaDe(hacia) !== null) return
+    this._ocultarPista()
   },
 
   /** La tabla de {@link GESTOS} y el botón de cierre del panel de ayuda. */
@@ -1189,6 +1613,11 @@ const BarraEdicion = L.Control.extend({
       return
     }
     this._cerrar()
+    // El panel se abre justo donde vive la pista, así que la pista se va: ver la
+    // guarda de `_mostrarPista`. Se apaga aquí ADEMÁS de allí porque el ratón puede
+    // estar quieto sobre el botón que acaba de abrir el panel, y entonces no habrá
+    // ningún `mouseout` que lo cuente.
+    this._ocultarPista()
     const { panel, disparador, foco } = this._registro[nombre]
     // Se DESOCULTA antes de mover el foco: un elemento `hidden` no lo admite.
     panel.hidden = false
@@ -1277,12 +1706,19 @@ const BarraEdicion = L.Control.extend({
   },
 
   /**
-   * La siguiente herramienta HABILITADA en el sentido `paso`, con vuelta al
-   * principio. `null` si no hay ninguna (todas apagadas): entonces no se mueve el
-   * foco, en vez de tirarlo a un botón que no responde.
+   * La siguiente herramienta ALCANZABLE en el sentido `paso`, con vuelta al
+   * principio. `null` si no hay ninguna: entonces no se mueve el foco, en vez de
+   * tirarlo a un botón que no responde.
    *
-   * El `disabled` se consulta AQUÍ, en el instante de la pulsación, y no se
-   * cachea: lo gobierna `app/main.js` y cambia sin avisar (ver la cabecera).
+   * «Alcanzable» son DOS condiciones y las dos se consultan AQUÍ, en el instante
+   * de la pulsación, sin cachear nada:
+   *   · **no `disabled`** — lo gobierna `app/main.js`, que lo enciende y lo apaga
+   *     con la pila del historial y con la selección de lado, sin avisar (ver la
+   *     cabecera);
+   *   · **no `hidden`** — lo gobierna `dibujoVisible`, y sin esta mitad las
+   *     flechas mandarían el foco a «Dibujar recinto» en la rama PARCELA, donde el
+   *     botón no se ve. Un foco invisible es peor que una parada que falta: el
+   *     usuario pulsa `Enter` y no sabe qué acaba de hacer.
    *
    * @param {number} desde  Índice de partida (puede estar fuera del array: así
    *   `Home` y `End` reutilizan esta misma función).
@@ -1295,7 +1731,7 @@ const BarraEdicion = L.Control.extend({
     for (let k = 0; k < total; k += 1) {
       i = (((i + paso) % total) + total) % total
       const candidata = this._herramientas[i]
-      if (!candidata.disabled) return candidata
+      if (!candidata.disabled && !candidata.hidden) return candidata
     }
     return null
   },
@@ -1315,7 +1751,7 @@ const BarraEdicion = L.Control.extend({
 /**
  * Monta la barra flotante de edición sobre un mapa YA creado.
  *
- * Al volver, los SIETE nodos del contrato de `app/main.js#cablearEdicion` ya
+ * Al volver, los OCHO nodos del contrato de `app/main.js#cablearEdicion` ya
  * están en el documento y son localizables con `document.querySelector`: el
  * montaje del control de Leaflet es síncrono. Ese es el orden que hay que
  * respetar en la entrada de la app —barra primero, cableado después—, igual que
@@ -1395,12 +1831,23 @@ export function crearBarraEdicion({ mapa, posicion = CENTRO_ABAJO, alAvisar } = 
     dibujoVisible: (visible) => control.dibujoVisible(visible),
 
     /**
-     * F12. Pone el botón en «dibujando» (rótulo «Cancelar dibujo») o lo devuelve.
+     * F12. Pone el botón en «dibujando» (nombre «Cancelar dibujo») o lo devuelve.
      *
      * @param {boolean} dibujando
      * @returns {void}
      */
     dibujoEnCurso: (dibujando) => control.dibujoEnCurso(dibujando),
+
+    /**
+     * REFLEJA el modo borrar en su botón (`aria-pressed` + el nombre y la pista).
+     * No enciende nada: el dueño del modo es `viewer/edicion.js#modoBorrar` y quien
+     * empuja es el cableado, suscrito a `alCambiarModoBorrar`. Ver la sección del
+     * modo borrar en la cabecera.
+     *
+     * @param {boolean} activo
+     * @returns {void}
+     */
+    borrarActivo: (activo) => control.borrarActivo(activo),
 
     /**
      * Quita el control del mapa —lo que dispara `onRemove` y con él la retirada de

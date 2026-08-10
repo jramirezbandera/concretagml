@@ -171,6 +171,19 @@ const COLOR_OFICIAL = '#6B7280'
  */
 const ARIA_SELECCION = 'aria-current'
 
+/**
+ * Clase del texto VISUALMENTE OCULTO pero legible por un lector de pantalla (la
+ * receta de 1×1 px + `clip-path`, NUNCA `display:none`).
+ *
+ * Vive en `estilos/app.css` y no en línea, al revés que su gemela de
+ * `viewer/barra-edicion.js#crearRotulo`, y la diferencia tiene motivo: aquella
+ * barra flota sobre la ortofoto y tiene que ser correcta aunque la hoja no
+ * cargue; esta tabla vive DENTRO del panel y ya depende de la hoja para todo lo
+ * demás —columnas, tipografía, alineación—, así que inlinear solo esto no la
+ * salvaría de nada y duplicaría una regla que ya existe.
+ */
+const CLASE_ROTULO_OCULTO = 'gml-rotulo-oculto'
+
 /** Clases CSS del cromo de la tabla (estables: Fase 3 y F06 estilan sobre ellas). */
 const CLASE = Object.freeze({
   TABLA: 'gml-tabla-vertices',
@@ -181,6 +194,10 @@ const CLASE = Object.freeze({
   CELDA_INDICE: 'gml-celda-indice',
   CELDA_X: 'gml-celda-x',
   CELDA_Y: 'gml-celda-y',
+  /** La celda de la × que borra la fila. Solo existe con `alBorrar` (ver abajo). */
+  CELDA_BORRAR: 'gml-celda-borrar',
+  /** El botón × de esa celda. */
+  BOTON_BORRAR: 'gml-boton-borrar-vertice',
   INPUT: 'gml-input-coordenada',
   VERTICE: 'gml-vertice',
   VERTICE_SELECCIONADO: 'gml-vertice-seleccionado',
@@ -453,6 +470,9 @@ function esHistorialUsable(h) {
  *       <th class="gml-celda-indice" scope="row">1</th>
  *       <td class="gml-celda-x"><input type="text" data-eje="x" …></td>
  *       <td class="gml-celda-y"><input type="text" data-eje="y" …></td>
+ *       <td class="gml-celda-borrar">          <!-- SOLO con el gancho `alBorrar` -->
+ *         <button data-accion="borrar-vertice" aria-label="Borrar el vértice 1 de EXTERIOR">×</button>
+ *       </td>
  *     </tr>
  *     …
  *   </tbody>
@@ -462,11 +482,15 @@ function esHistorialUsable(h) {
  * </table>
  * ```
  *
+ * ⚠️ Los `colspan` valen **3 sin `alBorrar` y 4 con él**, y no se escriben a mano:
+ * salen de `columnas()`. Los `<th colspan="3">` de arriba son el caso sin gancho.
+ *
  * Selectores que el resto del proyecto debe usar (SIEMPRE con raíz en `tablaEl`,
  * así da igual que `tablaEl` sea el `<table>` o un contenedor):
  *   · grupos por recinto ....... `tbody[data-recinto]`
  *   · filas de vértice ......... `tr[data-indice]`  (o `tr[data-recinto][data-indice]`)
  *   · celda X / Y de una fila .. `input[data-eje="x"]` / `input[data-eje="y"]`
+ *   · × de borrado de una fila . `button[data-accion="borrar-vertice"]`
  *
  * Y una sola marca de ESTADO, que no es del modelo: la fila del vértice
  * seleccionado lleva `aria-current="true"` (`tr[data-indice][aria-current]`), y
@@ -508,6 +532,16 @@ function esHistorialUsable(h) {
  *   vivo (F06). Ver {@link AlPrevisualizar}.
  * @param {AlCrearMarcador|null} [args.alCrearMarcador=null]  Gancho de creación
  *   de marcador (F06). Ver {@link AlCrearMarcador}.
+ * @param {((ref: RefVertice) => void)|null} [args.alBorrar=null]  Gancho de
+ *   BORRADO POR FILA (2026-08-10). Con él, cada fila estrena una cuarta columna
+ *   con una × que lo llama; sin él la tabla tiene tres columnas y ningún botón,
+ *   que es lo que sigue viendo la rama EDIFICIO y cualquier montaje sin edición.
+ *
+ *   ⚠️ **Es un gancho y no una operación** por la misma frontera que `ajustar`:
+ *   este módulo no inserta ni elimina (ver «Qué es de F06 y NO está aquí» en la
+ *   cabecera). Lo natural es enchufarle `edicion.eliminar`, que es quien sabe
+ *   negarse, reubicar la selección y contarlo — y eso lo hace `viewer/index.js`,
+ *   no el llamante.
  * @returns {{
  *   destruir: () => void,
  *   refrescar: () => void,
@@ -526,6 +560,7 @@ export function sincronizar({
   ajustar = null,
   alPrevisualizar = null,
   alCrearMarcador = null,
+  alBorrar = null,
 } = {}) {
   // ── Contratos del programador: throw, nunca corrección callada ────────────
   if (!mapa || typeof mapa.addLayer !== 'function' || typeof mapa.removeLayer !== 'function') {
@@ -590,6 +625,7 @@ export function sincronizar({
     ['ajustar', ajustar],
     ['alPrevisualizar', alPrevisualizar],
     ['alCrearMarcador', alCrearMarcador],
+    ['alBorrar', alBorrar],
   ]) {
     if (gancho !== null && typeof gancho !== 'function') {
       throw new TypeError(
@@ -601,6 +637,15 @@ export function sincronizar({
 
   const avisar = resolverAvisar(alAvisar)
   const doc = tablaEl.ownerDocument || document
+
+  /**
+   * ¿Lleva la tabla su columna de borrado? Se resuelve UNA VEZ, aquí, y no en cada
+   * render: la tabla no puede estrenar ni perder una columna a mitad de una sesión
+   * —el ancho de las otras tres cambiaría bajo el cursor de quien está tecleando
+   * una coordenada—, y una tabla con la cuarta columna en unas filas sí y en otras
+   * no sería directamente una tabla rota.
+   */
+  const puedeBorrar = typeof alBorrar === 'function'
 
   // ── Estilos (una instancia por sincronización) ────────────────────────────
   const estiloEditada = {
@@ -923,6 +968,17 @@ export function sincronizar({
     return tabla
   }
 
+  /**
+   * Cuántas columnas tiene la tabla: tres, o cuatro si hay `alBorrar`.
+   *
+   * Existe para que los DOS `colSpan` del módulo —el de la fila de recinto y el
+   * del «Sin vértices.»— salgan del mismo sitio que la cabecera. Escritos a mano,
+   * el día que se añadiera la cuarta columna uno de los dos se quedaría en 3 y su
+   * fila dejaría de cruzar la tabla: el clásico desperfecto que nadie mira porque
+   * «solo es un colspan».
+   */
+  const columnas = () => (puedeBorrar ? 4 : 3)
+
   /** Cabecera de la tabla. Es de esta función, como el resto del interior. */
   function construirCabecera(tabla) {
     const thead = doc.createElement('thead')
@@ -938,8 +994,60 @@ export function sincronizar({
       th.textContent = texto
       tr.appendChild(th)
     }
+    if (puedeBorrar) {
+      const th = doc.createElement('th')
+      th.scope = 'col'
+      th.className = CLASE.CELDA_BORRAR
+      // Cabecera VACÍA a la vista y con nombre para quien no ve: una columna de
+      // acciones no lleva rótulo visible (la × ya se explica sola y una palabra
+      // ahí ensancharía la columna hasta comerse la de coordenadas), pero una
+      // columna sin nombre en el árbol de accesibilidad deja al lector de
+      // pantalla anunciando «columna 4» sin decir de qué.
+      const oculto = doc.createElement('span')
+      oculto.className = CLASE_ROTULO_OCULTO
+      oculto.textContent = 'Borrar'
+      th.appendChild(oculto)
+      tr.appendChild(th)
+    }
     thead.appendChild(tr)
     tabla.appendChild(thead)
+  }
+
+  /**
+   * La celda con la × que borra un vértice.
+   *
+   * ── Por qué un `<button>` de verdad y no un `<span>` con un `click` ─────────
+   * Porque tiene que estar en el orden de tabulación entre las dos coordenadas de
+   * su fila y las de la siguiente, responder a `Enter` y a `Espacio` sin que nadie
+   * lo programe, y anunciarse como botón. Un `<span>` clicable habría que dotarlo
+   * de `role`, `tabindex` y dos teclas a mano, y es exactamente el sitio donde una
+   * de las tres se olvida.
+   *
+   * El nombre accesible es completo («Borrar el vértice 4 de EXTERIOR») porque un
+   * lector de pantalla recorre botones sueltos: quince botones llamados «×» son
+   * quince botones indistinguibles. Va en `aria-label` y no en un `<span>` oculto
+   * porque aquí sí SUSTITUYE al contenido visible, que es un signo sin palabras —
+   * es el caso para el que `aria-label` existe.
+   *
+   * @param {number} r
+   * @param {number} i
+   * @param {string} rotulo  Rótulo del recinto, ya calculado por el llamante.
+   * @returns {HTMLElement}
+   */
+  function construirCeldaBorrar(r, i, rotulo) {
+    const celda = doc.createElement('td')
+    celda.className = CLASE.CELDA_BORRAR
+    const boton = doc.createElement('button')
+    boton.type = 'button'
+    boton.className = CLASE.BOTON_BORRAR
+    boton.dataset.accion = 'borrar-vertice'
+    boton.setAttribute('aria-label', `Borrar el vértice ${i + 1} de ${rotulo}`)
+    // `×` (U+00D7, signo de multiplicación), NO la letra x ni `✕`: es el glifo que
+    // toda tipografía trae, se centra por sí solo en la caja y no se lee como una
+    // letra si el lector de pantalla llegara a él (no llega: manda el `aria-label`).
+    boton.textContent = '×'
+    celda.appendChild(boton)
+    return celda
   }
 
   /**
@@ -984,7 +1092,7 @@ export function sincronizar({
       const tr = doc.createElement('tr')
       tr.className = CLASE.FILA_VACIA
       const td = doc.createElement('td')
-      td.colSpan = 3
+      td.colSpan = columnas()
       td.textContent = 'Sin vértices.'
       tr.appendChild(td)
       tbody.appendChild(tr)
@@ -1004,7 +1112,7 @@ export function sincronizar({
       filaRecinto.className = CLASE.FILA_RECINTO
       const thRecinto = doc.createElement('th')
       thRecinto.scope = 'colgroup'
-      thRecinto.colSpan = 3
+      thRecinto.colSpan = columnas()
       thRecinto.textContent = rotulo
       filaRecinto.appendChild(thRecinto)
       tbody.appendChild(filaRecinto)
@@ -1027,6 +1135,7 @@ export function sincronizar({
         const y = construirCelda('y', vertice[1], `Y del vértice ${i + 1} de ${rotulo}`)
         tr.appendChild(x.celda)
         tr.appendChild(y.celda)
+        if (puedeBorrar) tr.appendChild(construirCeldaBorrar(r, i, rotulo))
 
         tbody.appendChild(tr)
         filas[r][i] = { fila: tr, inputX: x.input, inputY: y.input }
@@ -1545,9 +1654,58 @@ export function sincronizar({
     aplicarVertice(recinto, indice, /** @type {[number, number]} */ (utm))
   }
 
+  /**
+   * Handler DELEGADO del clic en la × de una fila.
+   *
+   * Delegado por lo mismo que {@link alCambiarCelda}: la tabla se RECONSTRUYE
+   * entera en cada cambio de forma —y borrar un vértice cambia la forma—, así que
+   * un oyente por botón moriría con el primer borrado y el segundo clic no haría
+   * nada. Con la delegación hay un oyente que instalar y uno que quitar.
+   *
+   * ⚠️ **No borra: DELEGA en `alBorrar`.** Este módulo pinta y arrastra; quitar un
+   * vértice es una de las tres operaciones que escriben en el modelo y su dueño es
+   * `viewer/edicion.js#eliminar`, que además sabe negarse cuando el anillo se
+   * quedaría con menos de tres, reubicar la selección de lindero y contarlo. Que
+   * `sincronizacion.js` no inserta ni elimina lleva escrito en su cabecera desde
+   * F03 («Qué es de F06 y NO está aquí»), y esto no lo cambia: añade el BOTÓN, no
+   * la operación.
+   *
+   * @param {Event} evento
+   */
+  function alPulsarBorrar(evento) {
+    if (!vivo || !puedeBorrar) return
+    const destino = evento && evento.target
+    const boton =
+      destino && typeof destino.closest === 'function'
+        ? destino.closest(`.${CLASE.BOTON_BORRAR}`)
+        : null
+    if (!boton) return
+    const fila = boton.closest('tr[data-indice]')
+    if (!fila) return
+    const recinto = Number(fila.dataset.recinto)
+    const indice = Number(fila.dataset.indice)
+    // La misma guarda que `alCambiarCelda`: la fila puede haberse quedado vieja
+    // (otra vista ha cargado otra parcela entre el pintado y el clic). Se dice y
+    // no se llama al gancho con una referencia que no señala nada.
+    if (!verticeDelModelo(recinto, indice)) {
+      avisar(
+        `No se ha borrado nada: la fila pulsada ya no corresponde a ningún vértice de la parcela ` +
+          `(${rotuloRecinto(recinto)}, vértice ${indice + 1}).`,
+        { nivel: NIVEL.ERROR },
+      )
+      return
+    }
+    alBorrar({ recinto, indice })
+  }
+
   // ── Arranque ─────────────────────────────────────────────────────────────
 
   tablaEl.addEventListener('change', alCambiarCelda)
+  // El clic de la × va ANTES que `alSeñalarFila` en el orden de registro, y por
+  // tanto corre antes: así el borrado no deja de paso seleccionada la fila que
+  // acaba de desaparecer. Los dos escuchan `click` en el mismo nodo, que es
+  // legítimo — hacen cosas distintas y ninguno consume el evento.
+  if (puedeBorrar) tablaEl.addEventListener('click', alPulsarBorrar)
   // Los dos de la selección por tabla, delegados en el mismo nodo y por el mismo
   // motivo que el de `change`. `focusin` y no `focus`: `focus` NO burbujea, así
   // que delegado no llegaría nunca.
@@ -1620,6 +1778,7 @@ export function sincronizar({
       vivo = false
       bajaDelStore()
       tablaEl.removeEventListener('change', alCambiarCelda)
+      if (puedeBorrar) tablaEl.removeEventListener('click', alPulsarBorrar)
       tablaEl.removeEventListener('click', alSeñalarFila)
       tablaEl.removeEventListener('focusin', alSeñalarFila)
       mapa.off('click', alClicarMapa)

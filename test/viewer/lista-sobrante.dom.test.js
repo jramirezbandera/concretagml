@@ -27,6 +27,7 @@ import {
   MOTIVO_NINGUNA_INCLUIDA,
   MOTIVO_SIN_DERIVAR,
   ROTULO_ESTRECHA,
+  ROTULO_NO_EMITIBLE,
   SELECTOR,
   SIN_PIEZAS,
   textoContador,
@@ -36,13 +37,14 @@ import {
 const UMBRAL = 0.00707
 
 /** Una `PiezaSobrante` de mentira con lo que la lista lee de verdad. */
-function pieza(orden, { area = 12.4, grosor = 0.4231, estrecha = false } = {}) {
+function pieza(orden, { area = 12.4, grosor = 0.4231, estrecha = false, emitible = true } = {}) {
   return {
     orden,
     recintos: [{ tipo: 'EXTERIOR', vertices: [[0, 0], [1, 0], [1, 1]] }],
     area,
     grosor,
     estrecha,
+    emitible,
     centroide: [0.5, 0.4],
   }
 }
@@ -53,6 +55,7 @@ function cesion(piezas, { saltados = [], nEstrechas = null } = {}) {
     piezas,
     areaTotal: piezas.reduce((s, p) => s + p.area, 0),
     nEstrechas: nEstrechas ?? piezas.filter((p) => p.estrecha).length,
+    nNoEmitibles: piezas.filter((p) => p.emitible === false).length,
     umbralGrosorM: UMBRAL,
     saltados,
   }
@@ -397,5 +400,88 @@ describe('crearListaSobrante · destruir', () => {
     expect(() => lista.destruir()).not.toThrow()
     expect(() => lista.pintar(cesion([pieza(1)]))).not.toThrow()
     expect(vistos).toEqual([])
+  })
+})
+
+// ── ⛔ La pieza que NO se puede escribir en el fichero ───────────────────────
+
+describe('crearListaSobrante · una pieza que no se puede emitir', () => {
+  // ⭐ EL DEFECTO (2026-08-10, `6346726UF8664N`). Al enganchar la medición a los
+  // linderos oficiales queda una astilla de milímetros. La lista la ofrecía MARCADA
+  // como una finca cualquiera, `seleccionadas()` la devolvía, y el escritor de GML
+  // se negaba a emitir el documento ENTERO por no encontrarle punto de referencia.
+  // El autor veía «Se emitirán 1 de 1 pieza» y un botón que no descargaba nada.
+  const astilla = pieza(1, { area: 0.0251, grosor: 0.0011, estrecha: true, emitible: false })
+
+  it('⛔ nace DESMARCADA y `seleccionadas()` no la devuelve', () => {
+    lista.pintar(cesion([astilla]))
+    expect(casillas()[0].checked).toBe(false)
+    expect(lista.seleccionadas()).toEqual([])
+  })
+
+  it('⛔ y marcarla A MANO tampoco la mete: no es una preferencia, es imposible', () => {
+    // La casilla es del DOM y el DOM se puede tocar. Lo que no puede es cambiar que
+    // la pieza deje de encerrar superficie al escribirla.
+    lista.pintar(cesion([astilla]))
+    casillas()[0].checked = true
+    tocar(casillas()[0], 'change')
+    expect(lista.seleccionadas()).toEqual([])
+  })
+
+  it('lleva su propia marca, distinta de «estrecha», y dice por qué', () => {
+    lista.pintar(cesion([astilla]))
+    const marca = q(SELECTOR.NO_EMITIBLE)
+    expect(marca).not.toBeNull()
+    expect(marca.textContent).toBe(ROTULO_NO_EMITIBLE)
+    expect(marca.title).toMatch(/deja de encerrar superficie/)
+    // ⛔ Y la de estrecha SIGUE ahí: son dos hechos, y el segundo no tapa al primero.
+    expect(q(SELECTOR.ESTRECHA)).not.toBeNull()
+  })
+
+  it('sin colindantes con quien lindar, la casilla se APAGA en vez de no hacer nada', () => {
+    lista.pintar(cesion([astilla]))
+    expect(casillas()[0].disabled).toBe(true)
+  })
+
+  it('⭐ pero si linda con alguien la casilla sigue viva: dársela al vecino SÍ funciona', () => {
+    // Al fundirse con la parcela del colindante deja de ser un recinto propio, así
+    // que el problema del punto de referencia desaparece. Apagar la casilla también
+    // aquí habría quitado la única salida buena que tiene esa superficie.
+    const foto = cesion([astilla])
+    foto.recorte = { consultado: true, lindes: [{ orden: 1, refcats: ['V-1'] }], atribucion: [] }
+    lista.pintar(foto)
+    expect(casillas()[0].disabled).toBe(false)
+    expect(q(SELECTOR.DESTINO)).not.toBeNull()
+  })
+
+  it('el contador dice 0 de 1, y la nota explica el porqué en vez de dejar el hueco', () => {
+    lista.pintar(cesion([astilla]))
+    expect(q(SELECTOR.CONTADOR).textContent).toBe(textoContador(0, 1))
+    expect(q(SELECTOR.NOTA).hidden).toBe(false)
+    // ⚠️ Y CONCUERDA ENTERA. La primera versión decía «1 no se puede emitir como
+    // finca: al escribirLAS … DEJAN de encerrar superficie»: lo cazó mirar la
+    // pantalla en Chrome, no esta suite. Es la misma exigencia que «Las 1 parcelas»
+    // en `comprobacion/conjunto.js`.
+    expect(q(SELECTOR.NOTA).textContent).toMatch(
+      /1 no se puede emitir como finca: al escribirla con los 2 decimales del fichero deja de encerrar superficie\. Se queda fuera del expediente\./,
+    )
+    expect(q(SELECTOR.NOTA).textContent).not.toMatch(/escribirlas|dejan|quedan/)
+  })
+
+  it('…y en plural también concuerda', () => {
+    lista.pintar(
+      cesion([astilla, pieza(2, { area: 0.02, grosor: 0.001, estrecha: true, emitible: false })]),
+    )
+    expect(q(SELECTOR.NOTA).textContent).toMatch(
+      /2 no se pueden emitir como finca: al escribirlas con los 2 decimales del fichero dejan de encerrar superficie\. Se quedan fuera del expediente\./,
+    )
+  })
+
+  it('⛔ una pieza normal en la misma foto no se contagia', () => {
+    lista.pintar(cesion([astilla, pieza(2, { area: 30 })]))
+    expect(casillas()[0].checked).toBe(false)
+    expect(casillas()[1].checked).toBe(true)
+    expect(lista.seleccionadas()).toEqual([2])
+    expect(qq(SELECTOR.NO_EMITIBLE)).toHaveLength(1)
   })
 })

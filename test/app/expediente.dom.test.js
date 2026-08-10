@@ -79,6 +79,7 @@ import {
   MENSAJE_SIN_SELECTOR,
   MOTIVO_GUARDAR_EN_EDIFICIO,
   MS_CONFIRMAR_BORRADO,
+  SELECTORES_SALIDA,
   SELECTOR_BOTON_EXPEDIENTE,
   cablearExpediente,
   mensajeEdificioFuera,
@@ -930,7 +931,7 @@ describe('F10 · T5.1 · 6 · las tres exportaciones', () => {
   it('el DXF baja con su nombre y con la cabecera del formato', async () => {
     const m = await montar()
     await abrir(m)
-    pulsar(SELECTOR.EXPORTAR_DXF)
+    pulsar(SELECTORES_SALIDA.DXF)
     await reposar()
 
     expect(m.url.blobs).toHaveLength(1)
@@ -943,7 +944,7 @@ describe('F10 · T5.1 · 6 · las tres exportaciones', () => {
   it('el listado de coordenadas baja con prefijo propio', async () => {
     const m = await montar()
     await abrir(m)
-    pulsar(SELECTOR.EXPORTAR_COORDENADAS)
+    pulsar(SELECTORES_SALIDA.COORDENADAS)
     await reposar()
 
     expect(m.renglon()).toContain(`${FICHERO.COORDENADAS.prefijo}_${REFCAT_DEMO}`)
@@ -961,7 +962,7 @@ describe('F10 · T5.1 · 6 · las tres exportaciones', () => {
   it('⭐ el Excel baja como BYTES, y llegan intactos hasta el Blob', async () => {
     const m = await montar()
     await abrir(m)
-    pulsar(SELECTOR.EXPORTAR_EXCEL)
+    pulsar(SELECTORES_SALIDA.EXCEL)
     await reposar()
 
     expect(m.url.blobs).toHaveLength(1)
@@ -980,7 +981,7 @@ describe('F10 · T5.1 · 6 · las tres exportaciones', () => {
   it('el Excel baja con el MISMO prefijo que el .txt y otra extensión', async () => {
     const m = await montar()
     await abrir(m)
-    pulsar(SELECTOR.EXPORTAR_EXCEL)
+    pulsar(SELECTORES_SALIDA.EXCEL)
     await reposar()
 
     expect(m.renglon()).toContain(`${FICHERO.EXCEL.prefijo}_${REFCAT_DEMO}`)
@@ -992,7 +993,7 @@ describe('F10 · T5.1 · 6 · las tres exportaciones', () => {
   it('declara el MIME registrado del .xlsx, y no el del .xls de antes de 2007', async () => {
     const m = await montar()
     await abrir(m)
-    pulsar(SELECTOR.EXPORTAR_EXCEL)
+    pulsar(SELECTORES_SALIDA.EXCEL)
     await reposar()
 
     expect(m.url.blobs[0].type).toBe(TIPO_MIME_XLSX)
@@ -1006,9 +1007,9 @@ describe('F10 · T5.1 · 6 · las tres exportaciones', () => {
     // vigila el guardián cruzado de `test/export/excel-coordenadas.test.js`.
     const m = await montar()
     await abrir(m)
-    pulsar(SELECTOR.EXPORTAR_COORDENADAS)
+    pulsar(SELECTORES_SALIDA.COORDENADAS)
     await reposar()
-    pulsar(SELECTOR.EXPORTAR_EXCEL)
+    pulsar(SELECTORES_SALIDA.EXCEL)
     await reposar()
 
     expect(m.url.blobs).toHaveLength(2)
@@ -1022,7 +1023,7 @@ describe('F10 · T5.1 · 6 · las tres exportaciones', () => {
   it('sin parcela no baja nada y se dice', async () => {
     const m = await montar({ parcela: null })
     await abrir(m)
-    pulsar(SELECTOR.EXPORTAR_EXCEL)
+    pulsar(SELECTORES_SALIDA.EXCEL)
     await reposar()
 
     expect(m.url.blobs).toHaveLength(0)
@@ -1081,7 +1082,7 @@ describe('F10 · T5.1 · 6 · las tres exportaciones', () => {
   it('una parcela sin geometría oficial exporta UNA capa y lo DICE (regla de oro 1)', async () => {
     const m = await montar({ parcela: parcelaDemoConHueco() })
     await abrir(m)
-    pulsar(SELECTOR.EXPORTAR_DXF)
+    pulsar(SELECTORES_SALIDA.DXF)
     await reposar()
 
     expect(m.url.blobs).toHaveLength(1)
@@ -1092,7 +1093,7 @@ describe('F10 · T5.1 · 6 · las tres exportaciones', () => {
   it('sin parcela no baja nada y se dice', async () => {
     const m = await montar({ parcela: null })
     await abrir(m)
-    document.querySelector(SELECTOR.EXPORTAR_DXF).dispatchEvent(
+    document.querySelector(SELECTORES_SALIDA.DXF).dispatchEvent(
       new window.MouseEvent('click', { bubbles: true }),
     )
     await reposar()
@@ -1653,9 +1654,9 @@ describe('F11 · T3.3 · 13 · (b) F11 no guarda expedientes de edificio, y lo d
     await abrir(m)
 
     for (const selector of [
-      SELECTOR.EXPORTAR_DXF,
-      SELECTOR.EXPORTAR_COORDENADAS,
-      SELECTOR.EXPORTAR_EXCEL,
+      SELECTORES_SALIDA.DXF,
+      SELECTORES_SALIDA.COORDENADAS,
+      SELECTORES_SALIDA.EXCEL,
     ]) {
       document
         .querySelector(selector)
@@ -2293,11 +2294,11 @@ describe('Rework de UI · T7 · 16 · qué rama se guarda y cuál NO va en el fi
   it('el DXF y el listado quedan fuera de T7 a propósito: no descartan ninguna rama', async () => {
     const m = await montar({ conRama: true, edificio: edificioDemo() })
     await abrir(m)
-    pulsar(SELECTOR.EXPORTAR_DXF)
+    pulsar(SELECTORES_SALIDA.DXF)
     await reposar()
     for (const t of TEXTOS_T7) expect(m.renglon()).not.toContain(t)
 
-    pulsar(SELECTOR.EXPORTAR_COORDENADAS)
+    pulsar(SELECTORES_SALIDA.COORDENADAS)
     await reposar()
     for (const t of TEXTOS_T7) expect(m.renglon()).not.toContain(t)
     m.desmontar()

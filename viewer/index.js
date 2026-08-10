@@ -237,7 +237,7 @@ import { crearContraste } from './contraste.js'
 import { crearEdicion } from './edicion.js'
 import { crearListaSobrante } from './lista-sobrante.js'
 import { crearMapa } from './mapa.js'
-import { crearCapaPiezas } from './piezas.js'
+import { VARIANTE, crearCapaPiezas } from './piezas.js'
 import { montarCapas } from './capas.js'
 import { sincronizar } from './sincronizacion.js'
 
@@ -1000,11 +1000,16 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  *   uno. Elegir entre ocho referencias que comparten los once primeros caracteres
  *   sin ver el mapa no es elegir, es adivinar.
  * @property {{lista: ReturnType<typeof crearListaSobrante>,
- *   capa: ReturnType<typeof crearCapaPiezas>}|null} sobrante  Las dos piezas de
- *   F17, o **`null`** si el visor se montó sin ellas. Van JUNTAS en un objeto, como
- *   `diagnostico` y por lo mismo: se usan siempre a la vez —la lista enseña las
- *   cifras y la capa las manchas del mismo sobrante— y así `if (visor.sobrante)` es
- *   una sola pregunta.
+ *   capa: ReturnType<typeof crearCapaPiezas>,
+ *   capaFuera: ReturnType<typeof crearCapaPiezas>}|null} sobrante  Las TRES piezas
+ *   de F17, o **`null`** si el visor se montó sin ellas. Van JUNTAS en un objeto,
+ *   como `diagnostico` y por lo mismo: se usan siempre a la vez —la lista enseña
+ *   las cifras y las capas las manchas de la misma foto— y así `if (visor.sobrante)`
+ *   es una sola pregunta.
+ *   · `capa` pinta lo que la parcela SUELTA (cian, `P_of − P_new`).
+ *   · `capaFuera` pinta lo que se SALE del contorno oficial (ámbar, `P_new − P_of`).
+ *     Existe desde que la puerta dejó de esconder el sobrante cuando las dos cosas
+ *     pasan a la vez, que es el caso normal de un lindero rectificado.
  *   ⚠️ **`lista.nodo` NO está en el documento**: `crearVisor` la fabrica y la
  *   devuelve, y quien la cuelga de la sección anfitriona del panel es `app/main.js`.
  * @property {import('./colindantes.js').CapaColindantes|null} colindantes  La capa
@@ -1458,7 +1463,7 @@ export function crearVisor(contenedor, opciones = {}) {
           }
 
     // 4 · Tabla ↔ dibujo, ambos vistas del mismo estado. Con los ganchos del
-    // paso 3, o con los TRES en `null` (el visor de F03, byte a byte).
+    // paso 3, o con los CUATRO en `null` (el visor de F03, byte a byte).
     const sincronizacion = sincronizar({
       mapa,
       panes,
@@ -1470,6 +1475,12 @@ export function crearVisor(contenedor, opciones = {}) {
       ajustar: edicion === null ? null : edicion.ajustar,
       alPrevisualizar: puentePrevisualizacion,
       alCrearMarcador: edicion === null ? null : edicion.alCrearMarcador,
+      // La × de cada fila (2026-08-10). Va atada a que HAYA edición, y por eso el
+      // ternario y no una función siempre: montado sin edición —el visor de F03, o
+      // una pantalla de solo lectura— la tabla no estrena la cuarta columna, que es
+      // lo correcto. Un botón de borrar en una tabla que no se puede editar sería
+      // un mando muerto, y esos no se apagan: no se ponen.
+      alBorrar: edicion === null ? null : (ref) => edicion.eliminar(ref),
     })
     deshacer.push(() => sincronizacion.destruir())
 
@@ -1564,11 +1575,22 @@ export function crearVisor(contenedor, opciones = {}) {
     // diferencia: aquél nace en una esquina del mapa y SE MUDA; éste nunca ha
     // estado en el mapa, así que hasta que alguien lo cuelgue no está en el
     // documento — y por eso `crearVisor` lo devuelve en vez de darlo por puesto.
-    /** @type {{lista: object, capa: object}|null} */
+    /** @type {{lista: object, capa: object, capaFuera: object}|null} */
     let sobrante = null
     if (montarSobrante) {
       const capaPiezas = crearCapaPiezas({ mapa, zona, alAvisar: avisar })
       deshacer.push(() => capaPiezas.destruir())
+
+      // La SEGUNDA capa: lo que la geometría medida se sale del contorno oficial.
+      //
+      // ⛔ Son dos capas y no una con dos modos, y la razón es que **se pintan a la
+      // vez**: el caso que las estrena es justo el mixto —la parcela se retranquea
+      // por un lado y se sale por otro—, así que una sola capa tendría que llevar
+      // dos listas, dos resaltados y dos paletas dentro. Cada una con su foto y su
+      // resaltado recíproco es lo mismo que el visor ya hace con `contraste` y
+      // `partes`, y cuesta un objeto más en el retorno.
+      const capaFuera = crearCapaPiezas({ mapa, zona, alAvisar: avisar, variante: VARIANTE.FUERA })
+      deshacer.push(() => capaFuera.destruir())
 
       const listaSobrante = crearListaSobrante({
         documento: contenedor.ownerDocument ?? undefined,
@@ -1576,7 +1598,7 @@ export function crearVisor(contenedor, opciones = {}) {
       })
       deshacer.push(() => listaSobrante.destruir())
 
-      sobrante = { lista: listaSobrante, capa: capaPiezas }
+      sobrante = { lista: listaSobrante, capa: capaPiezas, capaFuera }
     }
 
     // 6 · El encuadre, lo ÚLTIMO del MONTAJE (ver cabecera: así la capa WMS del

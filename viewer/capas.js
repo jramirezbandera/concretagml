@@ -511,9 +511,27 @@ const ControlOpacidad = L.Control.extend({
     // la entrada demo de la Fase 4), así que el control tiene que ser legible por
     // sí mismo. Lo justo para que se lea sobre cualquier cartografía; el resto
     // del cromo lo viste la Fase 4.
-    contenedor.style.background = 'rgba(255,255,255,0.92)'
-    contenedor.style.padding = '4px 8px'
-    contenedor.style.borderRadius = '4px'
+    //
+    // ⭐ LOS TRES VALORES CAMBIARON EL 2026-08-10 (revisión de diseño del autor:
+    // «el control de opacidad flota sin peso sobre un fondo ruidoso y se pierde»).
+    // Y tienen que cambiarse AQUÍ y no en `estilos/app.css`, porque un estilo en
+    // línea gana a cualquier regla sin marca de prioridad —que aquella hoja tiene
+    // prohibida— : es el acuerdo escrito en su bloque `.gml-control-opacidad`.
+    //   · el fondo pasa de `rgba(255,255,255,0.92)` a BLANCO OPACO. El 8 % de
+    //     ortofoto que se colaba era justo lo que impedía leerlo como una tarjeta
+    //     que está delante del mapa, que es el encargo entero;
+    //   · el relleno pasa de `4px 8px` a `8px 12px` — la rejilla de 8 de
+    //     `estilos/tokens/spacing.css`, que este control era el único cromo de la
+    //     aplicación en no seguir;
+    //   · el radio pasa de 4 a 6 px, que es `--gml-radio`, el ÚNICO radio de la
+    //     interfaz desde esa misma revisión.
+    // ⚠️ Los 6 px están escritos como literal y no como `var(--gml-radio)` a
+    // propósito: este módulo tiene que verse bien SIN la hoja cargada, y una
+    // variable sin declarar deja la propiedad en su valor inicial (0). El
+    // comentario es lo que ata los dos sitios; ver `.gml-control-opacidad`.
+    contenedor.style.background = '#ffffff'
+    contenedor.style.padding = '8px 12px'
+    contenedor.style.borderRadius = '6px'
     contenedor.style.font = `${DENSIDAD_BASE_PX}px system-ui, sans-serif`
 
     const id = `gml-opacidad-${L.Util.stamp(this)}`

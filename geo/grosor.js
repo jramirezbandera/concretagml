@@ -24,11 +24,18 @@
 // grosor no.
 //
 // NO es el grosor exacto de nadie (para un cuadrado de lado `s` da `s/2`, no `s`),
-// y no hace falta que lo sea: lo que se le pide es separar por órdenes de magnitud
-// dos poblaciones que están a tres de distancia —0,071 mm la astilla real medida
-// sobre el fixture, 4,9 cm una franja invadida de 2 m × 5 cm—. Un ancho mínimo
+// y no hace falta que lo sea: lo que se le pide es separar dos poblaciones que no
+// se solapan. Remedidas el 2026-08-10 sobre 554 parcelas oficiales: las agujas de
+// redondeo llegan a 5 mm de grosor y tienen un techo ARITMÉTICO en 7,07 mm (media
+// diagonal de la celda de 1 cm del WFS, dividida por 2 porque `2A/P ≈ h/2` en una
+// aguja); una invasión que un técnico revisaría mide centímetros. Un ancho mínimo
 // exacto (la anchura del rectángulo de área mínima que la contiene) costaría una
 // envolvente convexa y calipers rotatorios para decidir lo mismo.
+//
+// ⚠️ **Ese factor `h/2` es de la AGUJA, no de esta función**, y confundirlos costó
+// un defecto: quien calibre un umbral contra esta cifra tiene que saber qué forma
+// tiene la pieza que va a medir. Para un anillo uniforme la misma fórmula da `h`
+// exacto (punto 1 de abajo), o sea el DOBLE, para el mismo grosor real.
 //
 // ── ⛔ EL LÍMITE CONOCIDO, REMEDIDO EN F17: F07 LO TENÍA AL REVÉS ────────────
 // La cabecera de `diagnostico/topologia.js` decía —y era una conjetura, no una

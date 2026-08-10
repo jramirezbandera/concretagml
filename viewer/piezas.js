@@ -61,7 +61,20 @@
 import L from 'leaflet'
 
 import { HUSOS_VALIDOS } from '../geo/huso.js'
-import { NIVEL, PANE, resolverAvisar, vertUTMaLatLng } from './_comun.js'
+import {
+  NIVEL,
+  PANE,
+  PREFIJO_FUERA,
+  resolverAvisar,
+  textoNumeroPieza,
+  vertUTMaLatLng,
+} from './_comun.js'
+
+// El rótulo se REEXPORTA y no se redefine: lo escriben esta capa y la lista del
+// panel, y la lista no puede importar de aquí (Leaflet). Vive en `_comun.js`, que
+// es el único sitio que las dos alcanzan. Se reexporta para no romper a quien ya lo
+// importaba de este módulo — que es donde nació.
+export { PREFIJO_FUERA, textoNumeroPieza }
 
 // ── Constantes ───────────────────────────────────────────────────────────────
 
@@ -104,6 +117,55 @@ export const CLASE_NUMERO = 'gml-pieza-numero'
  */
 const COLOR_PIEZA = '#22D3EE'
 
+/**
+ * Clase CSS de la mancha que cae **FUERA** del contorno oficial. Se pone ADEMÁS
+ * de {@link CLASE_PIEZA}, no en su lugar: las dos son manchas medidas de esta
+ * capa y quien quiera contarlas todas sigue teniendo un solo selector.
+ */
+export const CLASE_PIEZA_FUERA = 'gml-pieza--fuera'
+
+/**
+ * Color de un trozo que se sale del contorno oficial.
+ *
+ * ⚠️ **Es EL MISMO ámbar que `viewer/contraste.js#COLOR_INVASION`, y no por
+ * casualidad: significa exactamente lo mismo.** Un trozo de la geometría medida
+ * que cae fuera de la parcela oficial ES terreno de un colindante, que es el
+ * único hecho al que este proyecto autoriza ponerle color con carga —la excepción
+ * declarada a la regla de oro 9, ya escrita en la cabecera de este mismo fichero
+ * cuando se eligió el cian por descarte—.
+ *
+ * Repetir el literal en vez de importarlo de `contraste.js` es la convención que
+ * ya siguen los tres módulos que lo nombran (`contraste.js`, `partes.js` y éste):
+ * cada capa declara su paleta con el porqué al lado, porque el porqué es distinto
+ * en cada una aunque el hex coincida. Lo que NO puede pasar es que diverjan, y de
+ * eso se encarga la prueba que compara los dos.
+ */
+const COLOR_FUERA = '#D97706'
+
+/**
+ * Las dos variantes de la capa: qué pinta y con qué aspecto.
+ *
+ * Van como UN valor y no como tres opciones sueltas (color, clase, prefijo) para
+ * que no se puedan combinar en algo que no signifique nada — una mancha ámbar con
+ * número sin prefijo sería un desborde disfrazado de sobrante.
+ */
+export const VARIANTE = Object.freeze({
+  /** Lo que la parcela SUELTA: `P_of − P_new`. Es el defecto. */
+  SOBRANTE: 'SOBRANTE',
+  /** Lo que la parcela INVADE: `P_new − P_of`. */
+  FUERA: 'FUERA',
+})
+
+/** El aspecto de cada variante, en un solo sitio. */
+const ASPECTO = Object.freeze({
+  [VARIANTE.SOBRANTE]: { color: COLOR_PIEZA, clase: CLASE_PIEZA, prefijo: '' },
+  [VARIANTE.FUERA]: {
+    color: COLOR_FUERA,
+    clase: `${CLASE_PIEZA} ${CLASE_PIEZA_FUERA}`,
+    prefijo: PREFIJO_FUERA,
+  },
+})
+
 /** Grosor del contorno, en píxeles. */
 const GROSOR_TRAZO = 2
 
@@ -138,11 +200,11 @@ const OPACIDAD_RELLENO_RESALTADO = 0.6
  * resuelto. `pointer-events:none` para que el número no le robe el puntero a la
  * mancha que rotula: quien recoge el ratón es el polígono.
  */
-const ESTILO_NUMERO =
+const estiloNumero = (color) =>
   'display:inline-block;transform:translate(-50%,-50%);' +
   'white-space:nowrap;pointer-events:none;' +
   'font:700 12px/1.35 ui-sans-serif,system-ui,sans-serif;font-variant-numeric:tabular-nums;' +
-  `color:${COLOR_PIEZA};background:rgba(17,24,39,.82);` +
+  `color:${color};background:rgba(17,24,39,.82);` +
   'padding:1px 6px;border-radius:999px;'
 
 // ── Helpers de módulo (puros) ────────────────────────────────────────────────
@@ -157,18 +219,6 @@ function describir(valor) {
 /** ¿Es un par UTM `[x,y]` utilizable (finito en las dos componentes)? */
 function esParUTM(v) {
   return Array.isArray(v) && v.length >= 2 && Number.isFinite(v[0]) && Number.isFinite(v[1])
-}
-
-/**
- * El número con el que se rotula una pieza. Exportado para que los tests —y la
- * lista del panel, que tiene que escribir EL MISMO— comparen contra esta función y
- * no contra una copia del formato.
- *
- * @param {number} orden  El `orden` de la `PiezaSobrante` (1…N).
- * @returns {string}
- */
-export function textoNumeroPieza(orden) {
-  return String(orden)
 }
 
 // ── API ──────────────────────────────────────────────────────────────────────
@@ -225,10 +275,15 @@ export function textoNumeroPieza(orden) {
  *   `PANE.PIEZAS` montado (lo crea `crearMapa` iterando `PANES`).
  * @param {number} args.zona  Huso UTM (29, 30 o 31). Ver `geo/huso.js`.
  * @param {import('./_comun.js').Avisar} [args.alAvisar]  Canal de aviso.
+ * @param {'SOBRANTE'|'FUERA'} [args.variante='SOBRANTE']  Qué está pintando esta
+ *   capa: lo que la parcela SUELTA (cian, sin prefijo) o lo que se SALE del
+ *   contorno oficial (ámbar, prefijo `F`). Ver {@link VARIANTE}. Son dos capas
+ *   distintas y no una con dos modos: se pintan a la vez, cada una con su foto, y
+ *   cada una tiene su propio resaltado recíproco con su mitad de la lista.
  * @returns {CapaPiezas}
  * @throws {TypeError|RangeError} Contrato del programador.
  */
-export function crearCapaPiezas({ mapa, zona, alAvisar } = {}) {
+export function crearCapaPiezas({ mapa, zona, alAvisar, variante = VARIANTE.SOBRANTE } = {}) {
   // ── Contratos del programador: throw, nunca corrección callada ─────────────
   // Se comprueba lo que este módulo USA de verdad, igual que `crearCapaPartes`:
   // un guardián que solo mira `addLayer` deja pasar dobles que revientan por
@@ -260,6 +315,16 @@ export function crearCapaPiezas({ mapa, zona, alAvisar } = {}) {
         `editada: una pieza no es una anotación sobre ella, es otra finca).`,
     )
   }
+
+  if (!Object.hasOwn(ASPECTO, variante)) {
+    throw new RangeError(
+      `crearCapaPiezas: 'variante' inválida: ${JSON.stringify(variante)}. ` +
+        `Válidas: ${Object.keys(ASPECTO).join(', ')} (viewer/piezas.js#VARIANTE). ` +
+        `Un valor desconocido no puede caer al defecto: pintaría de CIAN —el color de lo que ` +
+        `la parcela suelta— un trozo que a lo mejor es de un colindante.`,
+    )
+  }
+  const aspecto = ASPECTO[variante]
 
   const avisar = resolverAvisar(alAvisar)
 
@@ -399,17 +464,17 @@ export function crearCapaPiezas({ mapa, zona, alAvisar } = {}) {
       const orden = pieza && Number.isFinite(pieza.orden) ? pieza.orden : null
       const poligono = L.polygon(anillos, {
         pane: PANE.PIEZAS,
-        className: CLASE_PIEZA,
+        className: aspecto.clase,
         // Interactiva a propósito: sin puntero no hay resaltado recíproco, que es
         // media razón de ser de esta capa. No le roba el clic al mapa porque
         // `L.Path` trae `bubblingMouseEvents: true` — el mismo hecho medido que
         // sostiene a `colindantes.js` y a `partes.js`.
         interactive: true,
-        color: COLOR_PIEZA,
+        color: aspecto.color,
         weight: GROSOR_TRAZO,
         opacity: 1,
         fill: true,
-        fillColor: COLOR_PIEZA,
+        fillColor: aspecto.color,
         fillOpacity: OPACIDAD_RELLENO,
       })
       poligono.addTo(mapa)
@@ -436,7 +501,9 @@ export function crearCapaPiezas({ mapa, zona, alAvisar } = {}) {
             // fijo. Con `null`, la caja queda en 0×0 sobre el punto, que es el
             // ancla que queremos (el `translate(-50%,-50%)` hace el resto).
             iconSize: null,
-            html: `<span style="${ESTILO_NUMERO}">${textoNumeroPieza(orden)}</span>`,
+            html:
+              `<span style="${estiloNumero(aspecto.color)}">` +
+              `${textoNumeroPieza(orden, aspecto.prefijo)}</span>`,
           }),
           // No interactivo y fuera del tabulador: al número se llega por la fila
           // de la lista, que sí es accionable. Un rótulo no accionable en el orden

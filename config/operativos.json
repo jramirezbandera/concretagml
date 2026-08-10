@@ -11,7 +11,7 @@
   "miterLimiteFactor": 4,
   "acotacionMinimaPx": 44,
   "pasoDesviacionMetros": 0.3,
-  "grosorInvasionMinimoM": 0.001,
+  "grosorInvasionMinimoM": 0.0071,
   "cotaDiagnosticoMinimaPx": 12,
   "epsilonColindanteMetros": 0.3,
   "rumboSimilarGrados": 22.5

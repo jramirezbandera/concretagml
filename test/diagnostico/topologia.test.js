@@ -542,6 +542,109 @@ describe('diagnostico/topologia.js · invasiones(): la astilla y el grosor míni
   })
 })
 
+describe('diagnostico/topologia.js · 🔻 el VÉRTICE QUE SUBDIVIDE (medido 2026-08-10)', () => {
+  /* ------------------------------------------------------------------------ *
+   * ⛔ ESTE ES EL CASO QUE LA SUITE NO VEÍA, Y QUE LA APP ANUNCIABA COMO      *
+   *    «INVASIÓN A COLINDANTES» SOBRE PARCELAS OFICIALES SIN EDITAR.         *
+   *                                                                          *
+   * El fixture de arriba (9398516VK3799G) trae agujas de 0,071 mm, y con     *
+   * ellas el umbral de 1 mm parecía holgadísimo. Remedido sobre 554 parcelas *
+   * oficiales de diez provincias: 34 agujas de entre 1 mm y 5 mm de grosor   *
+   * salían como invasión. El fixture era una muestra de UNO.                 *
+   *                                                                          *
+   * La aguja no nace de que las dos parcelas discrepen, sino de que **la     *
+   * vecina SUBDIVIDE el lindero con un vértice que la propia no tiene**: los *
+   * dos extremos del tramo son idénticos en las dos, y el de en medio,       *
+   * redondeado a la celda de 1 cm, cae fuera de la recta que ellos definen.  *
+   *                                                                          *
+   * Los tres puntos de abajo NO son inventados: son los de                   *
+   * 29050A01000124 × 29050A01000142, tal cual los publica el WFS.            *
+   * ------------------------------------------------------------------------ */
+
+  // El tramo compartido: los dos extremos vienen IDÉNTICOS en las dos parcelas.
+  const OESTE = [388656.22, 4082370.6]
+  const ESTE = [388675.83, 4082373.66]
+  // El vértice que solo tiene la vecina. Sobre la recta OESTE→ESTE valdría
+  // y = 4082372.61607; publicado al centímetro sale …62, o sea 3,93 mm fuera.
+  const MEDIO = [388669.14, 4082372.62]
+
+  /** La propia: ocupa el NORTE, y su lindero sur es la recta OESTE→ESTE. */
+  const propia = () => [ext([OESTE, ESTE, [ESTE[0], ESTE[1] + 20], [OESTE[0], OESTE[1] + 20]])]
+
+  /** La vecina: ocupa el SUR, y su lindero norte pasa por los TRES puntos. */
+  const vecina = () => ({
+    refcat: '29050A01000142',
+    recintos: [ext([ESTE, MEDIO, OESTE, [OESTE[0], OESTE[1] - 20], [ESTE[0], ESTE[1] - 20]])],
+  })
+
+  it('el desvío del vértice cabe en el redondeo al centímetro (no es un dato malo)', () => {
+    // Se comprueba la PREMISA antes que la conclusión: si esto fallara, el resto del
+    // bloque estaría midiendo otra cosa. La recta OESTE→ESTE evaluada en x = MEDIO.
+    const t = (MEDIO[0] - OESTE[0]) / (ESTE[0] - OESTE[0])
+    const yEnLaRecta = OESTE[1] + t * (ESTE[1] - OESTE[1])
+    const desvio = Math.abs(MEDIO[1] - yEnLaRecta)
+
+    expect(desvio).toBeCloseTo(0.00393, 5)
+    // Media unidad del último decimal: lo que puede moverse una coordenada al
+    // escribirla con 2 decimales. El vértice es correcto; la recta es la que no
+    // sobrevive al redondeo.
+    expect(desvio).toBeLessThan(0.005)
+  })
+
+  it('⛔ NO es una invasión: es el mismo lindero escrito dos veces', () => {
+    const r = invasiones(propia(), [vecina()])
+
+    expect(r.invasiones).toEqual([])
+    expect(r.descartadas).toHaveLength(1)
+    expect(r.saltados).toEqual([])
+  })
+
+  it('…y sale en `descartadas` con las cifras MEDIDAS sobre el servicio', () => {
+    // Las dos cifras salen del triángulo de los tres puntos y de nada más, así que
+    // este test contradice al código en vez de repetirlo: área por shoelace
+    // (½·|x₂y₃ − x₃y₂| con origen en OESTE) y grosor 2A/P.
+    const [d] = invasiones(propia(), [vecina()]).descartadas
+
+    expect(d.refcat).toBe('29050A01000142')
+    expect(d.area).toBeCloseTo(0.0385, 9) // 385 cm² de «invasión» que no existe
+    expect(d.grosor).toBeCloseTo(0.00194, 5) // 1,94 mm
+    expect(d.nPiezas).toBe(1)
+
+    // ⛔ LA LÍNEA QUE JUSTIFICA EL CAMBIO DE VALOR: con el umbral de 1 mm que esta
+    // clave tuvo hasta el 2026-08-10, esta pieza superaba el filtro y la app decía
+    // que una parcela oficial del Catastro invade a su colindante oficial.
+    expect(d.grosor).toBeGreaterThan(0.001)
+    expect(d.grosor).toBeLessThan(OPERATIVOS.grosorInvasionMinimoM)
+  })
+
+  it('una invasión de VERDAD de la MISMA área sí se dice', () => {
+    // El filtro no se ha aflojado hasta volverse mudo. La misma superficie exacta
+    // —385 cm²— puesta como un rectángulo de 2 m × 1,925 cm, que es el fondo de un
+    // muro mal replanteado, da un grosor de 1,9 cm: casi TRES veces el umbral. La
+    // pieza va entera dentro de la propia, así que el solape es el rectángulo y su
+    // área no depende de dónde caiga el lindero.
+    // 5 m al norte del lindero: el lindero sube 3,06 m en todo su recorrido, así que
+    // ahí el rectángulo está dentro de la propia en toda su longitud.
+    const y0 = OESTE[1] + 5
+    const bloque = {
+      refcat: '29050A01000142',
+      recintos: [
+        ext([
+          [OESTE[0] + 5, y0],
+          [OESTE[0] + 7, y0],
+          [OESTE[0] + 7, y0 + 0.01925],
+          [OESTE[0] + 5, y0 + 0.01925],
+        ]),
+      ],
+    }
+    const r = invasiones(propia(), [bloque])
+
+    expect(r.descartadas).toEqual([])
+    expect(r.invasiones).toHaveLength(1)
+    expect(r.invasiones[0].area).toBeCloseTo(0.0385, 6)
+  })
+})
+
 describe('diagnostico/topologia.js · regla de oro 2: nada de lo que entra se toca', () => {
   it('solape() no muta `recintosA` ni `recintosB`', () => {
     // MEDIDO en la fase 1: `polygon()` de Turf guarda el array de coordenadas POR

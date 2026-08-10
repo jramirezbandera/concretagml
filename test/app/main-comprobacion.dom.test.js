@@ -101,7 +101,7 @@ import { SELECTOR as SELECTOR_COMP, crearCajonComprobacion } from '../../viewer/
 import { SELECTOR as SELECTOR_DIAG, crearCajonDiagnostico } from '../../viewer/cajon-diagnostico.js'
 import { crearContraste } from '../../viewer/contraste.js'
 import { crearListaSobrante } from '../../viewer/lista-sobrante.js'
-import { crearCapaPiezas } from '../../viewer/piezas.js'
+import { VARIANTE, crearCapaPiezas } from '../../viewer/piezas.js'
 import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
 
 // ── Fixtures REALES ──────────────────────────────────────────────────────────
@@ -211,6 +211,11 @@ function montarCromoDelMapa() {
   sobranteVivo = {
     lista: crearListaSobrante({ documento: document }),
     capa: crearCapaPiezas({ mapa, zona: husoPorSrs(SRS_DEMO) }),
+    capaFuera: crearCapaPiezas({
+      mapa,
+      zona: husoPorSrs(SRS_DEMO),
+      variante: VARIANTE.FUERA,
+    }),
   }
 }
 
@@ -237,6 +242,10 @@ vi.mock('../../viewer/index.js', async (importarOriginal) => ({
         tolerancia: () => 0.2,
         ladoSeleccionado: () => null,
         alCambiarSeleccion: () => () => {},
+        // El modo borrar (2026-08-10): el doble solo tiene que existir. Lo que
+        // `cablearEdicion` le pide es leerlo, escribirlo y suscribirse.
+        modoBorrar: () => false,
+        alCambiarModoBorrar: () => () => {},
         fijarColindantes() {},
         desplazarSeleccion: () => ({ aplicado: false, modo: null, detecciones: [] }),
       },

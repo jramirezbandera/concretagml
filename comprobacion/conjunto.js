@@ -84,25 +84,37 @@
 // dentro de `P_of` por construcción—, pero el día que esta función coma un fichero
 // ajeno (la entrada por fichero del comprobador, diferida) habrá que medirlo.
 //
-// ── EL UMBRAL DE ASTILLA, Y POR QUÉ **NO** ES EL DE F07 ─────────────────────
-// Tanto (b) como (c) filtran por GROSOR, igual que F07, y con un número **siete
-// veces mayor**. No es un aflojamiento: es que el fenómeno es otro.
+// ── EL UMBRAL DE ASTILLA, Y CÓMO F07 ACABÓ EN EL MISMO NÚMERO ───────────────
+// Tanto (b) como (c) filtran por GROSOR, igual que F07. Este módulo nació con un
+// número **siete veces mayor** que el de allí y con este razonamiento escrito:
 //
 //   · F07 mide el solape de dos parcelas VECINAS que declaran, cada una por su
 //     lado, la misma línea de lindero. Las dos vienen ya en la retícula de 2
 //     decimales, así que la discrepancia entre ellas es de décimas de milímetro
 //     (0,071 mm medido sobre el fixture real). Con 1 mm sobra.
 //   · Aquí una de las dos fronteras es un punto **creado sobre un lado** y luego
-//     redondeado: se sale de ese lado hasta `½·10⁻² ·√2 = 7,07 mm`. Un milímetro
-//     dejaría pasar por «hueco real» una cuña que sólo existe porque el fichero
-//     lleva centímetros.
+//     redondeado: se sale de ese lado hasta `½·10⁻²·√2 = 7,07 mm`.
 //
-// Por eso {@link GROSOR_REDONDEO_M} no se lee de `config/operativos.js` **y es
-// deliberado**: el plan de F17 preveía abrir allí una clave propia si el 1 mm no se
-// sostenía. No se sostiene, y la clave sigue sin abrirse porque esto **no es una
-// decisión operativa que alguien pueda querer ajustar**: es una consecuencia
-// aritmética del número de decimales del fichero. Ponerlo entre los números que sí
-// se ajustan diría que es una preferencia.
+// ⛔ **La primera mitad era falsa, y se midió el 2026-08-10.** Que las dos vengan
+// ya en la retícula no las hace coincidir: cuando la vecina SUBDIVIDE el lindero
+// compartido con un vértice que la propia no tiene, ese vértice es exactamente
+// «un punto sobre un lado, redondeado» — el caso de abajo, no el de arriba. Sobre
+// 554 parcelas oficiales de diez provincias salieron agujas de hasta 5 mm de
+// grosor, y las 34 que pasaban de 1 mm se anunciaban como INVASIÓN A COLINDANTES
+// sin que nadie hubiera tocado un vértice. El 0,071 mm del fixture no era el techo
+// del fenómeno: era una muestra de uno.
+//
+// Así que `OPERATIVOS.grosorInvasionMinimoM` subió a este mismo 7,07 mm (redondeado
+// a 0,0071 en el JSON, que no sabe multiplicar). **Los dos umbrales miden ahora lo
+// mismo porque el fenómeno era el mismo desde el principio**, y hay un test en
+// `test/config/operativos.test.js` que ata el uno al otro para que no se separen
+// otra vez en silencio.
+//
+// {@link GROSOR_REDONDEO_M} sigue sin leerse de `config/operativos.js` **y es
+// deliberado**: allí viven los números que alguien puede querer ajustar, y éste es
+// una consecuencia aritmética del número de decimales del fichero. Que la clave de
+// F07 exista igualmente es deuda declarada, no un desacuerdo: es contrato público
+// desde F07 y la usan tres módulos.
 //
 // Lo descartado **no se pierde**: sale con su área y su grosor para que quien
 // desconfíe del umbral lo audite (regla de oro 1).
@@ -151,8 +163,8 @@ export const DESPLAZAMIENTO_MAXIMO_COORD_M = 0.5 * 10 ** -DECIMALES_COORD * Math
 /**
  * Grosor por debajo del cual una cuña entre dos miembros —o entre los miembros y el
  * contorno oficial— **no es superficie, es el redondeo del fichero**. Es el
- * desplazamiento máximo de un vértice, y la cabecera explica por qué no es el
- * milímetro de F07.
+ * desplazamiento máximo de un vértice, y la cabecera cuenta cómo el umbral de F07
+ * —que nació siete veces más fino— acabó midiendo esto mismo.
  *
  * MEDIDO sobre `7136910UF1473N` con doce recortes distintos: la cuña más gruesa que
  * produjo el redondeo fue de **2,49 mm**, así que este umbral la filtra con un
@@ -281,16 +293,40 @@ export function comprobarConjunto(entrada) {
 
   const {
     geometriaOficial,
-    miembros,
+    oficialesExtra = [],
+    residuoEsperadoM2 = 0,
     toleranciaM2 = null,
     umbralGrosorM = GROSOR_REDONDEO_M,
   } = entrada
+  const { miembros } = entrada
 
   if (!Array.isArray(geometriaOficial)) {
     throw new TypeError(
       `comprobarConjunto: 'geometriaOficial' debe ser un array de recintos; recibido ` +
         `${describir(geometriaOficial)}. Es el contorno contra el que se comprueba el cierre: ` +
         'sin él no hay nada que cerrar.',
+    )
+  }
+  if (!Array.isArray(oficialesExtra)) {
+    throw new TypeError(
+      `comprobarConjunto: 'oficialesExtra' debe ser un array de {etiqueta?, recintos}; recibido ` +
+        `${describir(oficialesExtra)}. Son los contornos oficiales de las parcelas COLINDANTES ` +
+        `que el expediente también modifica: sin ellos la diana sería solo la finca propia y un ` +
+        `vecino recortado saldría como superficie que sobra.`,
+    )
+  }
+  oficialesExtra.forEach((o, i) => {
+    if (o === null || typeof o !== 'object' || !Array.isArray(o.recintos)) {
+      throw new TypeError(
+        `comprobarConjunto: 'oficialesExtra[${i}]' debe ser {recintos, etiqueta?} con 'recintos' ` +
+          `array; recibido ${describir(o)}.`,
+      )
+    }
+  })
+  if (!Number.isFinite(residuoEsperadoM2) || residuoEsperadoM2 < 0) {
+    throw new RangeError(
+      `comprobarConjunto: 'residuoEsperadoM2' debe ser un número finito ≥ 0 (m²); recibido ` +
+        `${describir(residuoEsperadoM2)}.`,
     )
   }
   if (!Array.isArray(miembros) || miembros.length === 0) {
@@ -329,6 +365,17 @@ export function comprobarConjunto(entrada) {
   // Incluida la oficial: comparar lo redondeado contra un contorno sin redondear
   // metería en el residuo la diferencia del propio redondeo, que no es un hueco.
   const oficial = prepararRecintos(geometriaOficial)
+  // Los contornos oficiales de las COLINDANTES que el expediente también modifica.
+  // La diana del cierre deja de ser «mi parcela» y pasa a ser «todo lo oficial que
+  // este expediente toca» (F23), que es lo que permite que un vecino recortado entre
+  // sin que su superficie salga como sobrante inexplicado.
+  const oficialesMas = oficialesExtra.map((o, i) => ({
+    etiqueta:
+      typeof o.etiqueta === 'string' && o.etiqueta.trim() !== ''
+        ? o.etiqueta
+        : `colindante ${i + 1}`,
+    ...prepararRecintos(o.recintos),
+  }))
   const preparados = miembros.map((m, i) => ({
     etiqueta: typeof m.etiqueta === 'string' && m.etiqueta.trim() !== '' ? m.etiqueta : etiquetaPorDefecto(i),
     ...prepararRecintos(m.recintos),
@@ -341,7 +388,22 @@ export function comprobarConjunto(entrada) {
       ? 'La única parcela del envío suma'
       : `Las ${preparados.length} parcelas del envío suman`
 
-  const areaOficial = oficial.superficieRedondeada
+  // Y cómo se llama la DIANA. Con una sola es «el contorno oficial», que es lo que
+  // decía siempre; con varias hay que nombrarlas o el mensaje afirma algo falso —el
+  // usuario leería que su parcela mide 4.518 m² cuando esa cifra incluye a dos
+  // vecinos—. Es la misma razón por la que `cuantas` concuerda en número.
+  const nOficiales = 1 + oficialesMas.length
+  const diana =
+    nOficiales === 1
+      ? 'del contorno oficial'
+      : `de los ${nOficiales} contornos oficiales que este expediente modifica`
+
+  // ⚠️ La suma de los oficiales presupone que NO se pisan entre sí. En un
+  // parcelario catastral no lo hacen —comparten lindero—, y si lo hicieran la
+  // afirmación (a) lo delataría: `areaOficial` saldría inflada y el residuo se
+  // saldría de la tolerancia. Es decir, el error se ve; no se traga.
+  const areaOficial =
+    oficial.superficieRedondeada + oficialesMas.reduce((s, o) => s + o.superficieRedondeada, 0)
   const areaMiembros = preparados.reduce((s, p) => s + p.superficieRedondeada, 0)
 
   // ── 0b · ⛔ ¿HAY GEOMETRÍA QUE MEDIR, EN TODAS? ────────────────────────────
@@ -352,7 +414,11 @@ export function comprobarConjunto(entrada) {
   // miembro ya cubría el oficial la cobertura también saldría bien. Verde por
   // ausencia de datos, que es el fallo silencioso que esta capa persigue.
   const inaptos = []
-  for (const g of [{ etiqueta: 'la geometría oficial', recintos: oficial.recintos }, ...preparados]) {
+  for (const g of [
+    { etiqueta: 'la geometría oficial', recintos: oficial.recintos },
+    ...oficialesMas,
+    ...preparados,
+  ]) {
     const { anillos, saltados: propios } = coordsRegion(g.recintos, g.etiqueta)
     if (anillos === null) {
       inaptos.push(g.etiqueta)
@@ -404,30 +470,62 @@ export function comprobarConjunto(entrada) {
   // no un ajuste, y por eso no puede dar falso positivo.
   const perimetroTotal =
     perimetro(oficial.recintos).total +
+    oficialesMas.reduce((s, o) => s + perimetro(o.recintos).total, 0) +
     preparados.reduce((s, p) => s + perimetro(p.recintos).total, 0)
   const tolerancia = toleranciaM2 === null ? toleranciaCierre(perimetroTotal) : toleranciaM2
   const residuo = areaMiembros - areaOficial
-  const sumaCumple = Math.abs(residuo) <= tolerancia
+  // ⛔ **El sobrante ESPERADO se descuenta antes de juzgar, y solo si lo han
+  // declarado.** Es la superficie que el expediente reclama legítimamente fuera de
+  // todo lo oficial: un trozo de vial mal georreferenciado que hay que pisar para
+  // colocar bien la finca (decisión del autor, 2026-08-10). Sin descontarlo, ese
+  // caso —que es válido— saldría como suma discrepante y bloquearía la entrega.
+  //
+  // ⚠️ Que sea un PARÁMETRO y no una holgura calculada aquí es lo que impide que se
+  // convierta en una manga ancha: quien lo pasa ha tenido que MEDIRLO
+  // (`derivacion/vecino.js#sobreNadie`) y responde de él, y viaja al mensaje para
+  // que se pueda auditar.
+  const residuoNeto = residuo - residuoEsperadoM2
+  const sumaCumple = Math.abs(residuoNeto) <= tolerancia
   detecciones.push(
     sumaCumple
       ? crearDeteccionComprobacion(
           TIPO_COMPROBACION.SUMA_COTEJADA,
           `${cuantas} ${numero(areaMiembros)} m² sobre ` +
-            `los ${numero(areaOficial)} m² del contorno oficial: ` +
-            `${numero(Math.abs(residuo), 4)} m² de diferencia, dentro de los ` +
-            `${numero(tolerancia, 4)} m² que se admiten por el redondeo a 2 decimales.`,
+            `los ${numero(areaOficial)} m² ${diana}: ` +
+            `${numero(Math.abs(residuoNeto), 4)} m² de diferencia, dentro de los ` +
+            `${numero(tolerancia, 4)} m² que se admiten por el redondeo a 2 decimales.` +
+            (residuoEsperadoM2 > 0
+              ? ` (Descontados ${numero(residuoEsperadoM2, 4)} m² declarados fuera de todo ` +
+                'contorno oficial.)'
+              : ''),
           SEVERIDAD.INFO,
-          { areaOficial, areaMiembros, residuo, toleranciaM2: tolerancia, perimetroTotal },
+          {
+            areaOficial,
+            areaMiembros,
+            residuo,
+            residuoEsperadoM2,
+            residuoNeto,
+            toleranciaM2: tolerancia,
+            perimetroTotal,
+          },
         )
       : crearDeteccionComprobacion(
           TIPO_COMPROBACION.SUMA_DISCREPANTE,
-          `${cuantas} ${numero(areaMiembros)} m² y el ` +
-            `contorno oficial mide ${numero(areaOficial)} m²: ` +
-            `${residuo > 0 ? 'sobran' : 'faltan'} ${numero(Math.abs(residuo), 4)} m², muy por ` +
+          `${cuantas} ${numero(areaMiembros)} m² y ${diana} mide${nOficiales > 1 ? 'n' : ''} ` +
+            `${numero(areaOficial)} m²: ` +
+            `${residuoNeto > 0 ? 'sobran' : 'faltan'} ${numero(Math.abs(residuoNeto), 4)} m², muy por ` +
             `encima de los ${numero(tolerancia, 4)} m² del redondeo. Con esta diferencia el ` +
             'conjunto no cubre lo que dice cubrir.',
           SEVERIDAD.ERROR,
-          { areaOficial, areaMiembros, residuo, toleranciaM2: tolerancia, perimetroTotal },
+          {
+            areaOficial,
+            areaMiembros,
+            residuo,
+            residuoEsperadoM2,
+            residuoNeto,
+            toleranciaM2: tolerancia,
+            perimetroTotal,
+          },
         ),
   )
 
@@ -502,7 +600,13 @@ export function comprobarConjunto(entrada) {
   // con sus huecos— ya no puede recibirlo entero. Quedarse con el trozo mayor
   // sería perder huecos en silencio, que es el error que `geo/poligono.js`
   // documenta en su cabecera (12 m² presentados como 7).
-  let restos = [oficial.recintos]
+  //
+  // ⭐ La semilla son TODOS los contornos oficiales que el expediente toca, no solo
+  // el propio (F23). Y no hace falta unirlos: `restos` ya era una LISTA de regiones
+  // —lo tenía que ser porque una resta parte el contorno en trozos—, así que
+  // arrancar con N en vez de con 1 es cambiar la semilla y nada más. Ésa es la
+  // razón por la que esta fase no necesitó `@turf/union` ni un byte de bundle nuevo.
+  let restos = [oficial.recintos, ...oficialesMas.map((o) => o.recintos)]
   let coberturaMedible = true
   for (const m of preparados) {
     if (restos.length === 0) break // ya no queda nada que descontar: está cubierto

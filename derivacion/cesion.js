@@ -54,6 +54,40 @@
 // marca `estrecha`, y una detección AVISO con las cifras al lado. Quien decide es
 // el colegiado (regla de oro 9); esta función mide y enseña.
 //
+// ── ⛔ …PERO «DECIDIR» NO PUEDE INCLUIR LO QUE NO SE PUEDE ESCRIBIR ──────────
+// Lo de arriba se escribió pensando en franjas ESTRECHAS, y hay un caso que no es
+// una franja estrecha sino una imposibilidad, medido el 2026-08-10 sobre la parcela
+// `6346726UF8664N` del autor: al **enganchar** la medición a los linderos oficiales,
+// entre las dos líneas quedan astillas de milímetros. Una de 0,0251 m² y 1,1 mm de
+// grosor, escrita con los 2 decimales del fichero, sale así:
+//
+//     …[386139.19,4064386.76],[386139.75,4064390],[386139.19,4064386.76]…
+//     superficie redondeada = 1,78e-15 m²   ·   areaValue = 0
+//
+// o sea un camino de IDA Y VUELTA por los mismos puntos: ya no encierra nada, no
+// tiene punto interior, y `gml/serialize-cp.js` se niega a emitir el fichero ENTERO
+// con `PUNTO_REFERENCIA_RECALCULADO`. El expediente entero se caía —con el conjunto
+// **cerrando perfectamente**— por una astilla que el usuario ni había pedido.
+//
+// Así que cada pieza se pregunta si SOBREVIVE al fichero, y se pregunta con la
+// función que lo decidirá de verdad (`gml/anillos.js#puntoInterior`), no con un
+// umbral que la imite: un umbral es otra respuesta posible a la misma pregunta, y
+// dos respuestas posibles es exactamente lo que este proyecto no se permite. Ver
+// {@link PiezaSobrante.emitible}.
+//
+// ⛔ **Y NO BASTABA con mirar `estrecha`, que es lo que parecía.** Barrido sobre
+// `rect(0,0,20−w,10)` con w de 0,5 mm a 3 cm (test 6b de `cesion.test.js`):
+//
+//     0,5 … 7 mm    estrecha  ·  no emitible
+//     8 … 14 mm     **NO estrecha**  ·  no emitible   ← el hueco que nadie veía
+//     15 mm →       no estrecha  ·  emitible
+//
+// El corte de `emitible` cae entre 14 y 15 mm porque el `cp:referencePoint` también
+// se escribe con 2 decimales: en una franja más fina no queda ni un punto de la
+// retícula ESTRICTAMENTE dentro. Son ~2 × el desplazamiento máximo del redondeo
+// (7,07 mm), media unidad a cada lado. O sea que entre 8 y 14 mm había piezas que
+// ni siquiera llevaban la marca de estrechas y tumbaban el fichero igual.
+//
 // ── EL ORDEN ES DETERMINISTA POR CONSTRUCCIÓN, Y HACE FALTA QUE LO SEA ──────
 // El número de orden de una pieza acaba siendo su `idLocal` en un fichero que se
 // firma. Si dos corridas sobre la MISMA parcela dieran órdenes distintos, el
@@ -93,6 +127,7 @@ import { OPERATIVOS } from '../config/operativos.js'
 import { superficie } from '../geo/area.js'
 import { centroide } from '../geo/centroide.js'
 import { medirPieza } from '../geo/grosor.js'
+import { puntoInterior } from '../gml/anillos.js'
 
 import {
   SEVERIDAD,
@@ -123,6 +158,16 @@ import { restar } from './topologia.js'
  *   ancho mínimo: ver la cabecera de ese módulo.
  * @property {boolean} estrecha  `grosor < umbralGrosorM`. **No se descarta**: se
  *   marca, se lista y se avisa.
+ * @property {boolean} emitible  `true` si la pieza SIGUE SIENDO un recinto después
+ *   de escribirla con los 2 decimales del fichero. Lo contesta
+ *   `gml/anillos.js#puntoInterior`, que es la misma función que usa el serializador,
+ *   así que no hay dos criterios.
+ *
+ *   ⛔ **`emitible: false` NO es `estrecha: true` con otro nombre.** Una pieza
+ *   estrecha es una decisión de quien firma; una no emitible no se puede escribir, y
+ *   ofrecerla como si se pudiera es lo que tumbaba el expediente entero (ver la
+ *   cabecera). Casi todas las no emitibles son además estrechas, pero al revés no:
+ *   una franja de 5 mm bien larga sobrevive de sobra al redondeo.
  * @property {[number,number]|null} centroide  Centroide del ÁREA, o `null` si la
  *   pieza es degenerada (`geo/centroide.js`).
  */
@@ -148,6 +193,9 @@ import { restar } from './topologia.js'
  * @property {PiezaSobrante[]} piezas  El sobrante, en orden determinista.
  * @property {number} areaTotal  Suma de `piezas[].area`, en m².
  * @property {number} nEstrechas  Cuántas piezas caen bajo el umbral.
+ * @property {number} nNoEmitibles  Cuántas no sobreviven al fichero. Sale aparte de
+ *   `nEstrechas` porque son dos hechos distintos y la interfaz los cuenta por
+ *   separado: uno es «decide tú» y el otro «esto no se puede».
  * @property {PuertaCesion} puerta
  * @property {boolean} puedeEntregarse  `false` en cuanto hay una detección ERROR.
  *   **Es lo que hay que mirar**, no `piezas.length`.
@@ -212,6 +260,32 @@ function compararPiezas(a, b) {
 }
 
 /**
+ * ¿Esta pieza sigue siendo un recinto DESPUÉS de escribirla en el fichero?
+ *
+ * Se le pregunta a `gml/anillos.js#puntoInterior`, que es literalmente la función
+ * que `gml/serialize-cp.js` usará para el `cp:referencePoint`: si aquí devuelve un
+ * punto, allí lo devolverá también, porque es la misma llamada sobre la misma
+ * geometría. Escribir aquí un umbral propio («área redondeada mayor que…») habría
+ * sido una SEGUNDA respuesta a la misma pregunta, y las dos podrían discrepar el día
+ * que una de ellas cambie.
+ *
+ * ⚠️ El `catch` no se traga nada: `puntoInterior` lanza cuando la geometría no es
+ * ni siquiera publicable (coordenada fuera de rango, invariante roto), y eso es un
+ * «no» aún más rotundo que `punto: null`. Quien llama emite la detección con las
+ * cifras de la pieza, así que el hecho no se pierde — solo la excepción.
+ *
+ * @param {Recinto[]} recintos
+ * @returns {boolean}
+ */
+function sobreviveAlFichero(recintos) {
+  try {
+    return puntoInterior(recintos).punto !== null
+  } catch {
+    return false
+  }
+}
+
+/**
  * Mide, ordena y numera una lista de piezas crudas de `restar()`.
  *
  * @param {Array<Recinto[]>} crudas
@@ -227,6 +301,7 @@ function medirYOrdenar(crudas, umbralGrosorM) {
         area,
         grosor,
         estrecha: grosor < umbralGrosorM,
+        emitible: sobreviveAlFichero(pieza),
         centroide: centroide(pieza),
         firma: firmaCanonica(pieza),
       }
@@ -299,6 +374,7 @@ export function derivarCesion(entrada) {
       piezas,
       areaTotal: piezas.reduce((s, p) => s + p.area, 0),
       nEstrechas: piezas.filter((p) => p.estrecha).length,
+      nNoEmitibles: piezas.filter((p) => p.emitible === false).length,
       puerta,
       puedeEntregarse: bloqueos.length === 0,
       bloqueos,
@@ -367,6 +443,29 @@ export function derivarCesion(entrada) {
     )
   }
 
+  // ── 1b · LAS QUE NO SOBREVIVEN AL FICHERO ─────────────────────────────────
+  // AVISO y no ERROR **a propósito**: que una astilla del enganche no pueda ser
+  // finca no es un problema del expediente, es una pieza menos. Marcarlo ERROR
+  // bloquearía la entrega, que es justo el defecto del 2026-08-10: el fichero se
+  // caía entero por 0,0251 m² que nadie quería declarar. Quien lo impide de verdad
+  // es `entrega.js`, que no la hace miembro.
+  for (const p of piezas) {
+    if (p.emitible !== false) continue
+    detecciones.push(
+      crearDeteccionDerivacion(
+        TIPO_DERIVACION.PIEZA_NO_EMITIBLE,
+        `La pieza nº ${p.orden} (${numero(p.area, 4)} m², ${numero(p.grosor * 1000, 1)} mm de ` +
+          'ancho) NO puede ser una parcela: escrita con los 2 decimales del fichero deja de ' +
+          'encerrar superficie —sus dos bordes caen sobre las mismas coordenadas— y sin recinto ' +
+          'no hay punto de referencia que declarar. Es la astilla que queda al enganchar tu ' +
+          'medición al lindero oficial, no terreno. Se queda FUERA del expediente; si de verdad ' +
+          'es superficie que cambia de manos, dásela a la colindante con la que linda.',
+        SEVERIDAD.AVISO,
+        { orden: p.orden, area: p.area, grosor: p.grosor },
+      ),
+    )
+  }
+
   // ── 2 · LA PUERTA: ¿de verdad se ha encogido? ─────────────────────────────
   // Restando AL REVÉS. Ver la cabecera: `booleanContains` compara vértices y esta
   // parcela es cóncava.
@@ -397,6 +496,33 @@ export function derivarCesion(entrada) {
   const fuera = desbordes.map((p, i) => ({ ...p, orden: i + 1 }))
   const areaFuera = fuera.reduce((s, p) => s + p.area, 0)
   const grosorMaximo = Math.max(...fuera.map((p) => p.grosor))
+
+  // ── EL INVARIANTE QUE CIERRA UNA DUDA CARA ────────────────────────────────
+  // `exceso` es `P_new − P_of`, o sea un TROZO de `P_new`. Su área no puede pasar
+  // del área de `P_new`, y no por convenio: por definición de la resta.
+  //
+  // Se afirma aquí porque el 2026-08-10 apareció en el diálogo de avisos un
+  // «se sale por 1 sitio, 520,0447 m²» sobre una parcela de 287,59 m². Costó una
+  // medición entera decidir si era un defecto nuestro o un estado anterior de la
+  // sesión —lo segundo: el diálogo es acumulativo—, y sin este guardián la
+  // siguiente vez costaría lo mismo. Un número imposible tiene que sonar en el
+  // momento en que se calcula, no semanas después en una captura de pantalla.
+  //
+  // ⚠️ `throw` y no detección, a propósito: una detección la lee el usuario, y
+  // esto no es un hecho sobre SU parcela sino sobre nuestro código. Si salta, el
+  // motor booleano ha devuelto algo que no es la resta que le pedimos, y seguir
+  // adelante publicaría cifras inventadas con toda la confianza del mundo.
+  // El margen es el mismo que ya tolera la fase para el redondeo de coordenadas.
+  const margenM2 = Math.max(1e-6, areaEditada * 1e-9)
+  if (areaFuera > areaEditada + margenM2) {
+    throw new RangeError(
+      `derivarCesion: el exceso mide ${numero(areaFuera, 4)} m² y la geometría editada entera ` +
+        `mide ${numero(areaEditada, 4)} m². Es imposible: el exceso es P_new − P_of, o sea un ` +
+        `TROZO de P_new. Esto no es un dato de la parcela, es un fallo del motor booleano o de ` +
+        `lo que se le ha pasado — revisa que 'recintos' sea de verdad la geometría editada y no ` +
+        `otra cosa más grande (un parcelario, un DXF de varias fincas).`,
+    )
+  }
 
   detecciones.push(
     crearDeteccionDerivacion(

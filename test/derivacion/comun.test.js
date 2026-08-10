@@ -31,18 +31,47 @@ describe('derivacion/_comun · el léxico de la capa', () => {
     // añadieron en vez de estirar los otros: `REGION_NO_APTA` significa «no se pudo
     // construir la geometría», y usarlo para «la pieza no valida» dejaría a la
     // interfaz sin distinguir un fallo del motor de un lindero que se cruza solo.
+    //
+    // ⚠️ Y los CUATRO últimos (2026-08-10) son de una TERCERA pregunta, que ninguna
+    // de las dos anteriores podía formular: **a quién le quita terreno la medición**.
+    // Nacen con `derivacion/vecino.js`, cuando la aplicación deja de tratar el
+    // contorno del Catastro como árbitro y pasa a tratar el levantamiento como la
+    // referencia. `CRECE_FUERA` dice que la parcela se sale; éstos dicen de quién,
+    // cuánto, y qué parte no cae sobre nadie. Estirar aquél habría dejado a la
+    // interfaz sin poder nombrar al colindante, que es el dato accionable.
+    //
+    // ⚠️ Y los DOS de 2026-08-10 por la tarde salen de un defecto real, no de una
+    // fase planeada: al enganchar la medición a los linderos oficiales quedan
+    // astillas de MILÍMETROS a los dos lados, y las dos las trataba mal.
+    //
+    //   · `PIEZA_NO_EMITIBLE` — la astilla del lado de ACÁ se ofrecía como finca, y
+    //     escrita con 2 decimales deja de encerrar superficie, así que el
+    //     serializador tumbaba el fichero ENTERO. No vale reusar `PIEZA_ESTRECHA`:
+    //     aquélla invita a decidir y ésta dice que no hay nada que decidir.
+    //   · `VECINO_SOLO_REDONDEO` — la astilla del lado de ALLÁ metía al colindante
+    //     en el expediente recortado, o sea **modificando la finca de un tercero por
+    //     el ruido del redondeo**. No vale reusar `RECORTE_FALLIDO`: aquél es «no se
+    //     ha podido medir» y éste «se ha medido y no llega».
+    //
     // Clave === valor para que una detección se lea sola en un volcado.
     expect(Object.keys(TIPO_DERIVACION).sort()).toEqual([
+      'ASIGNACION_IMPOSIBLE',
       'CONJUNTO_NO_CIERRA',
       'CRECE_FUERA',
       'ENTREGA_LISTA',
+      'FUERA_SOBRE_NADIE',
       'PIEZA_ESTRECHA',
       'PIEZA_EXCLUIDA',
       'PIEZA_INVALIDA',
+      'PIEZA_NO_EMITIBLE',
+      'RECORTE_FALLIDO',
       'REGION_NO_APTA',
       'RESTA_FALLIDA',
       'SIN_GEOMETRIA_OFICIAL',
       'SIN_SOBRANTE',
+      'VECINAS_SIN_CONSULTAR',
+      'VECINO_PARTIDO',
+      'VECINO_SOLO_REDONDEO',
     ])
     for (const [k, v] of Object.entries(TIPO_DERIVACION)) expect(v).toBe(k)
     expect(Object.isFrozen(TIPO_DERIVACION)).toBe(true)

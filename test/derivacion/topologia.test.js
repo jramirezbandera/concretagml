@@ -251,8 +251,23 @@ describe('derivacion/topologia.js · guardián: de Turf, SOLO lo topológico (re
     ...new Set([...texto.matchAll(/from\s+'(@turf\/[\w-]+|turf)'/g)].map((m) => m[1])),
   ]
 
-  it('importa EXACTAMENTE `@turf/difference` y `@turf/helpers`, por subpaquete', () => {
-    expect(turfImportado(FUENTE).sort()).toEqual(['@turf/difference', '@turf/helpers'])
+  it('importa EXACTAMENTE `difference`, `helpers` y `union`, por subpaquete', () => {
+    // ⚠️ `@turf/union` entró el 2026-08-10 con el REPARTO del sobrante (F23): cuando
+    // el usuario decide que un trozo que su parcela suelta se lo queda un colindante,
+    // la parcela nueva de ése es `(V_of − P_new) ∪ trozo`. No hay forma de escribir
+    // eso restando, y simularlo con restas encadenadas habría sido peor código.
+    //
+    // ⭐ Y **no costó un byte de paquete**: `@turf/union` ya era dependencia
+    // declarada y ya estaba dentro por `edificio/envolvente.js` (F11), sobre el mismo
+    // `polyclip-ts` que `difference`. Medido ANTES de escribirlo.
+    //
+    // Lo que este guardián sigue prohibiendo es lo de siempre: el meta-paquete
+    // `turf`, y cualquier subpaquete que MIDA (ver el test de la regla de oro 5).
+    expect(turfImportado(FUENTE).sort()).toEqual([
+      '@turf/difference',
+      '@turf/helpers',
+      '@turf/union',
+    ])
   })
 
   it('el detector SÍ dispara (mitad anti-vacuidad del guardián)', () => {
