@@ -377,7 +377,7 @@ export const ASIENTOS = Object.freeze(
         'de qué geometría se va a generar, y quitarlos habría sido pagar producto por píxeles. Con ' +
         'el cambio, §10 pierde ese problema, y §16, §09 y §23 quedan en `ok:true`. Sobran 12.781 ' +
         'sobre el techo.' },
-    { hito: 'Los botones de Entrada dejan de tocarse (y de robarse el clic)', commit: '(sin commitear)',
+    { hito: 'Los botones de Entrada dejan de tocarse (y de robarse el clic)', commit: '771c8b3',
       total: 70113, nuestro: 55018, rebanada: null,
       nota:
         '**+141 B por TRES declaraciones, y las tres arreglan defectos MEDIDOS, no gusto.** El ' +
@@ -406,7 +406,7 @@ export const ASIENTOS = Object.freeze(
         'guion 22 en `ok:false`— y ahora queda en 753,20. El defecto es previo y sigue abierto; ' +
         'este asiento no lo crea, lo empeora en 16 px y lo deja anotado. Sobran 12.938 sobre el ' +
         'techo.' },
-    { hito: '«Vaciarlo»: el pie de Entrada estrena un segundo renglón', commit: '(sin commitear)',
+    { hito: '«Vaciarlo»: el pie de Entrada estrena un segundo renglón', commit: '0c28e6f',
       total: 70262, nuestro: 55167, rebanada: null,
       nota:
         '**+149 B por DOS reglas de tres declaraciones**, y las dos son de composición, no de ' +
@@ -431,7 +431,7 @@ export const ASIENTOS = Object.freeze(
         '(`elementFromPoint` sobre `[data-accion="empezar-de-nuevo"]`, con el `::after` de ' +
         '`--menudo` a -6 px por lado). Sobran 13.103 sobre el techo.' },
     { hito: 'Topbar · rebanada 0 · las reglas muertas, y el informe recupera su pantalla',
-      commit: '(sin commitear)',
+      commit: '0c28e6f',
       total: 70117, nuestro: 55022, rebanada: null,
       nota:
         '**−145 B, y es el primer asiento en negativo que no es una reescritura.** Trabajo ' +
@@ -462,7 +462,7 @@ export const ASIENTOS = Object.freeze(
         'campos al formulario mientras nadie miraba. Sobran 12.958 sobre el techo.' },
 
     { hito: 'Topbar · rebanada 1 · el rail gira 90°, la cáscara pasa a rejilla',
-      commit: '(sin commitear)',
+      commit: '0c28e6f',
       total: 71303, nuestro: 56208, rebanada: null,
       nota:
         '**+1.186 B.** El rail vertical de 210 px se convierte en la barra de arriba, y la cáscara ' +
