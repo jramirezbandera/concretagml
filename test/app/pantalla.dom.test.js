@@ -317,14 +317,20 @@ describe('T6 · ⭐ marcado y CSS dicen lo mismo (el fallo mudo)', () => {
     // Y sigue CONECTADO con todo su cableado: se oculta, no se quita.
     expect(pie.isConnected).toBe(true)
     expect(pie.querySelectorAll('[data-ficha]').length).toBeGreaterThan(0)
-    // ⭐ **«Generar GML» YA NO ESTÁ AQUÍ (2026-08-10).** Se fue a la zona de
-    // entrega de la barra, que es la decisión A2 del diseño: el botón se ve en los
-    // TRES pasos, apagado con motivo, en vez de existir solo en Edición. Su
-    // renglón de acuse, en cambio, SE QUEDA —lo escriben los cableados de GML y
-    // `app/barra.js` lo lee para el renglón de la barra—, así que aquí se afirma
-    // justo eso: el botón fuera, el acuse dentro.
+    // ⭐ **«Generar GML» YA NO ESTÁ AQUÍ, NI SU BOTÓN NI SU ACUSE (2026-08-10).**
+    // El botón se fue a la zona de entrega de la barra (decisión A2: se ve en los
+    // TRES pasos, apagado con motivo, en vez de existir solo en Edición), y el
+    // acuse tuvo que seguirle FUERA de este `<footer>` por una razón que costó dos
+    // intentos: el `<footer>` entero es `data-pantalla="edicion"`, así que un acuse
+    // dentro es un acuse que solo se lee en uno de los tres pasos. El primer
+    // intento fue copiar su texto a un renglón bajo la barra; se retiró al día
+    // siguiente porque la misma frase se veía dos veces a la vez. El segundo, y el
+    // que queda, es mudar el nodo al `<aside>`: **un solo escritor, un solo sitio.**
     expect(pie.querySelector('[data-accion="generar-gml"]')).toBeNull()
-    expect(pie.querySelector('[data-estado="generar-gml"]')).not.toBeNull()
+    expect(pie.querySelector('[data-estado="generar-gml"]')).toBeNull()
+    const acuse = document.querySelector('[data-estado="generar-gml"]')
+    expect(acuse, 'el acuse de «generar-gml» tiene que seguir existiendo').not.toBeNull()
+    expect(acuse.closest(`[${ATRIBUTO_PANTALLA}]`), 'ha vuelto a colgar de una pantalla').toBeNull()
   })
 
   it('⛔ ni en Diagnóstico: repetía debajo lo que el contraste dice arriba', () => {
@@ -713,43 +719,37 @@ describe('rebanada 2 · el pie enseña lo de cada pantalla', () => {
     // informe, escrito en un renglón invisible).
     montarCascara()
 
-    // ⭐ **UNA EXCEPCIÓN, NOMBRADA Y CON MOTIVO: `generar-gml` (2026-08-10).**
-    // Su botón se fue a la barra —o sea que se ve en los TRES pasos— y su acuse se
-    // quedó en el pie, que solo se ve en Edición. Eso rompe la letra de esta regla
-    // y **no rompe su espíritu**, que es «un `role="status"` oculto es un mensaje
-    // que nadie lee»: lo que ese acuse dice se lee en los tres pasos, en el renglón
-    // de la barra, porque `app/barra.js` lo LEE de aquí y lo escribe allí con
-    // prioridad sobre el motivo del recorrido.
-    //
-    // ⛔ Se declara como excepción con nombre en vez de relajar la regla, que es lo
-    // que convertiría este guardián en una intención. Cualquier OTRO acuse que se
-    // separe de su botón sigue saliendo rojo.
-    const CON_RENGLON_EN_LA_BARRA = new Set(['generar-gml'])
+    // ⚠️ **`generar-gml` estuvo aquí como EXCEPCIÓN con nombre durante un día, y
+    // se retiró el 2026-08-10 porque dejó de hacer falta.** Su botón se había ido a
+    // la barra —o sea que se ve en los TRES pasos— y su acuse se quedó en
+    // `.gml-acciones[data-pantalla="edicion"]`, que solo se ve en uno. El parche de
+    // entonces fue copiar el texto arriba, en el renglón de la barra; el arreglo de
+    // ahora es mudar el NODO, que cuelga del `<footer>` y no de la pantalla. Así la
+    // regla general vuelve a cubrirlo sin excepción ninguna, que es donde tenía que
+    // haber estado desde el principio.
 
     for (const boton of document.querySelectorAll('[data-accion]')) {
       const renglon = document.querySelector(`[data-estado="${boton.dataset.accion}"]`)
       if (renglon === null) continue
-      if (CON_RENGLON_EN_LA_BARRA.has(boton.dataset.accion)) continue
       expect(
         visibleEn(renglon),
         `el acuse de «${boton.dataset.accion}» se ve en otras pantallas que su botón`,
       ).toEqual(visibleEn(boton))
     }
 
-    // Y la excepción tiene que sostenerse: el acuse existe, sigue siendo el nodo
-    // que escriben los cableados, y el botón está fuera de toda pantalla. Si
-    // alguien devolviera el botón al pie, esto sale rojo y la excepción sobra.
-    for (const accion of CON_RENGLON_EN_LA_BARRA) {
-      const boton = document.querySelector(`[data-accion="${accion}"]`)
-      const renglon = document.querySelector(`[data-estado="${accion}"]`)
-      expect(boton, `falta el botón de «${accion}»`).not.toBeNull()
-      expect(renglon, `falta el acuse de «${accion}»`).not.toBeNull()
-      expect(
-        boton.closest(`[${ATRIBUTO_PANTALLA}]`),
-        `«${accion}» ha vuelto a colgar de una pantalla: la excepción ya no hace falta`,
-      ).toBeNull()
-      expect(boton.closest('[data-rail="cascara"]')).not.toBeNull()
-    }
+    // Y una comprobación dirigida al caso que motivó todo esto: el botón vive en la
+    // barra y su acuse **fuera de toda pantalla**, que es lo único que hace que
+    // pulsarlo desde Entrada o Diagnóstico diga algo en alguna parte.
+    const botonGml = document.querySelector('[data-accion="generar-gml"]')
+    const acuseGml = document.querySelector('[data-estado="generar-gml"]')
+    expect(botonGml, 'falta el botón de «generar-gml»').not.toBeNull()
+    expect(acuseGml, 'falta el acuse de «generar-gml»').not.toBeNull()
+    expect(botonGml.closest('[data-rail="cascara"]')).not.toBeNull()
+    expect(
+      acuseGml.closest(`[${ATRIBUTO_PANTALLA}]`),
+      'el acuse de «generar-gml» ha vuelto a colgar de una pantalla: desde Entrada no se leerá',
+    ).toBeNull()
+    expect(visibleEn(acuseGml)).toEqual([...PASOS])
   })
 
   it('las CINCO pantallas conservan el canal de avisos y la cabecera', () => {

@@ -70,8 +70,10 @@ import {
   ALTO_COMO_CAJON,
   ALTO_COMO_PANTALLA,
   CLASE as CLASE_CAJON,
+  ESCALA,
   ESTILO_EN_EL_PANEL,
   ESTILO_SOBRE_EL_MAPA,
+  rotuloDeGrupo,
 } from './cajon-diagnostico.js'
 import { resolverAvisar } from './_comun.js'
 
@@ -356,7 +358,7 @@ const CajonContrasteEdificio = L.Control.extend({
     })
     const titular = crear(doc, 'h2', CLASE.TITULAR, TITULO)
     titular.dataset.contraste = 'titular'
-    estilar(titular, { margin: '0', fontSize: '13px', fontWeight: '600', color: '#0F172A' })
+    estilar(titular, { margin: '0', fontSize: ESCALA.CUERPO, fontWeight: '600', color: '#0F172A' })
     this._titular = titular
 
     const cerrar = crear(doc, 'button', null, '✕')
@@ -393,7 +395,7 @@ const CajonContrasteEdificio = L.Control.extend({
     registro.setAttribute('role', 'status')
     estilar(registro, {
       margin: '8px 0 0',
-      fontSize: '12px',
+      fontSize: ESCALA.APUNTE,
       color: '#475569',
       display: 'none',
     })
@@ -406,6 +408,7 @@ const CajonContrasteEdificio = L.Control.extend({
       gridTemplateColumns: 'auto 1fr',
       gap: '2px 10px',
       margin: '10px 0 0',
+      fontSize: ESCALA.CUERPO,
     })
     this._medida = crear(doc, 'dd', CLASE.CIFRA)
     this._medida.dataset.contraste = 'huella-medida'
@@ -429,6 +432,7 @@ const CajonContrasteEdificio = L.Control.extend({
       gridTemplateColumns: 'auto 1fr',
       gap: '2px 10px',
       margin: '10px 0 0',
+      fontSize: ESCALA.CUERPO,
     })
     this._solape = crear(doc, 'dd', CLASE.CIFRA)
     this._solape.dataset.contraste = 'solape'
@@ -452,6 +456,7 @@ const CajonContrasteEdificio = L.Control.extend({
       gridTemplateColumns: 'auto 1fr',
       gap: '2px 10px',
       margin: '10px 0 0',
+      fontSize: ESCALA.CUERPO,
     })
     this._enParcela = crear(doc, 'dd', CLASE.CIFRA)
     this._enParcela.dataset.contraste = 'en-parcela'
@@ -474,7 +479,7 @@ const CajonContrasteEdificio = L.Control.extend({
     const estado = crear(doc, 'p')
     estado.dataset.estado = 'cajon-contraste-edificio'
     estado.setAttribute('role', 'status')
-    estilar(estado, { margin: '8px 0 0', fontSize: '12px', color: '#64748B', minHeight: '1em' })
+    estilar(estado, { margin: '8px 0 0', fontSize: ESCALA.APUNTE, color: '#64748B', minHeight: '1em' })
     this._estado = estado
 
     // ── El PIE: las dos acciones ───────────────────────────────────────────
@@ -533,7 +538,7 @@ const CajonContrasteEdificio = L.Control.extend({
     estadoInforme.setAttribute('role', 'status')
     estilar(estadoInforme, {
       margin: '6px 0 0',
-      fontSize: '12px',
+      fontSize: ESCALA.APUNTE,
       color: '#64748B',
       minHeight: '1em',
     })
@@ -576,7 +581,41 @@ const CajonContrasteEdificio = L.Control.extend({
     this._anclado = anclado
     anclado.append(estado, pie)
 
-    contenedor.append(cabecera, registro, huella, encaje, enParcela, invasion, anclado)
+    // ── ⭐ LA ESCALA COMPARTIDA Y LOS RÓTULOS (2026-08-10) ─────────────────
+    // Las ocho cifras a DATO contra etiquetas en CUERPO: el salto que hace que la
+    // vista caiga en el número y no en su nombre. Antes ninguna declaraba tamaño y
+    // heredaban 12 px de Leaflet sobre el mapa y otro distinto dentro del panel.
+    for (const dd of [
+      this._medida, this._oficial, this._difHuella,
+      this._solape, this._diferencia, this._centroides,
+      this._enParcela, this._fuera,
+    ]) {
+      estilar(dd, { fontSize: ESCALA.DATO })
+    }
+
+    // Tres rótulos, con el vocabulario que este cajón ya usaba en sus etiquetas.
+    //
+    // ⛔ **Y aquí NO hay dato titular a `ESCALA.DATO_XL`, al contrario que en el
+    // cajón de parcela.** No es un olvido: allí la cifra titular es un número
+    // solo («40,04 m²»), y aquí `pintarHuella` compone «322,13 m² · 25 piezas».
+    // A 30 px ese compuesto no cabe en los 392 px del panel y parte en dos
+    // líneas, que es peor que no destacarlo. Los dos cajones dicen cosas
+    // distintas y la jerarquía lo respeta.
+    //
+    // La invasión tampoco lleva rótulo, por lo mismo que en el hermano: se anuncia
+    // ella sola con tres textos distintos (ver `CLASE.ROTULO` allí).
+    contenedor.append(
+      cabecera,
+      registro,
+      rotuloDeGrupo(doc, 'Huella'),
+      huella,
+      rotuloDeGrupo(doc, 'Encaje'),
+      encaje,
+      rotuloDeGrupo(doc, 'En la parcela'),
+      enParcela,
+      invasion,
+      anclado,
+    )
 
     // OBLIGATORIOS: sin ellos, pulsar dentro seleccionaría una parte por debajo y la
     // rueda sobre las cifras haría zoom al mapa.
@@ -844,14 +883,14 @@ export function crearCajonContrasteEdificio({ mapa, posicion = 'bottomleft', alA
         'Invasión a parcelas vecinas: no se ha consultado. Hay que traer las parcelas colindantes ' +
           'del Catastro.',
       )
-      estilar(p, { margin: '0', fontSize: '12px', color: '#64748B' })
+      estilar(p, { margin: '0', fontSize: ESCALA.APUNTE, color: '#64748B' })
       caja.append(p)
       return
     }
 
     if (invasiones.length === 0) {
       const p = crear(doc, 'p', null, 'Invasión a parcelas vecinas: ninguna.')
-      estilar(p, { margin: '0', fontSize: '12px', color: '#64748B' })
+      estilar(p, { margin: '0', fontSize: ESCALA.APUNTE, color: '#64748B' })
       caja.append(p)
     } else {
       const titulo = crear(doc, 'p', null, 'Invasión a parcelas vecinas')
@@ -886,7 +925,9 @@ export function crearCajonContrasteEdificio({ mapa, posicion = 'bottomleft', alA
           `${plural(descartadas.length, 'solape', 'solapes')} de ${m2(total)} por ser más finos ` +
           `que un milímetro: son el redondeo del lindero compartido, no superficie.`,
       )
-      estilar(p, { margin: '4px 0 0', fontSize: '11px', color: '#94A3B8' })
+      // Mismo arreglo que en el cajón hermano (2026-08-10): 11 px suelto fuera de
+      // la escala, y `#94A3B8` daba 2,6:1 sobre blanco. Ahora APUNTE y 4,55:1.
+      estilar(p, { margin: '4px 0 0', fontSize: ESCALA.APUNTE, color: '#64748B' })
       caja.append(p)
     }
   }

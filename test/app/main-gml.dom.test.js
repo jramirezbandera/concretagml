@@ -468,6 +468,17 @@ const tarjetaDe = (mensaje) =>
 const renglonEnError = (renglon) => renglon.classList.contains('gml-accion-estado--error')
 
 /**
+ * ¿Está el renglón en estado de ÉXITO (el modificador verde, 2026-08-10)?
+ *
+ * Existe por lo mismo que `renglonEnError`: la clase es contrato con
+ * `estilos/app.css`, y un literal mal escrito aquí pasaría en verde para
+ * siempre. Es el único verde de toda la aplicación y NO es una excepción a la
+ * regla de oro 9 — habla de la puerta de la app, no del levantamiento; el
+ * porqué está escrito en `.gml-accion-estado--exito`.
+ */
+const renglonEnExito = (renglon) => renglon.classList.contains('gml-accion-estado--exito')
+
+/**
  * Serializa la misma parcela POR SEPARADO, con las mismas opciones que usa el
  * cableado, para poder derivar de ahí lo que el panel DEBERÍA mostrar en vez de
  * copiar los mensajes a mano. Si el serializador cambia un texto, estas pruebas
@@ -529,6 +540,40 @@ describe('app/main · generar el GML de la parcela demo (válida, con referencia
     boton.click()
     expect(renglon.textContent).toContain(entrega.anclas[0].download)
     expect(renglonEnError(renglon)).toBe(false)
+  })
+
+  // ── ⭐ EL ÚNICO VERDE DE LA APLICACIÓN (2026-08-10) ────────────────────────
+  // `--color-state-ok` llevaba definido desde la copia del design system del
+  // 2026-07-26 con CERO usos: la app contaba errores en rojo y avisos en ámbar,
+  // y cuando la acción salía bien lo decía en el mismo gris que «no hay
+  // parcela». Estos dos `it` son su guardián.
+  it('la descarga completada marca el renglón en ÉXITO, y solo entonces', () => {
+    const { boton, renglon } = cablear(parcelaDemo())
+    // Antes de pulsar no hay nada que celebrar: el renglón nace vacío.
+    expect(renglonEnExito(renglon)).toBe(false)
+
+    boton.click()
+    expect(renglonEnExito(renglon)).toBe(true)
+    // Y los dos modificadores son mutuamente excluyentes: verde Y rojo a la vez
+    // dejaría el color al azar del orden de la hoja.
+    expect(renglonEnError(renglon)).toBe(false)
+  })
+
+  it('si la descarga FALLA no hay verde, aunque el GML se haya generado', () => {
+    // El caso que separa «tu dato no se puede escribir» de «el fichero está bien
+    // pero no ha bajado»: el segundo es un fallo de ENTREGA, y sigue sin ser un
+    // éxito por mucho que el XML exista. Se fuerza sustituyendo `descargar`, que
+    // es lo que `extra` permite sobrescribir.
+    const { boton, renglon } = cablear(parcelaDemo(), {
+      descargar: () => ({
+        descargado: false,
+        nombre: null,
+        mensaje: 'El navegador no ha podido guardar el fichero.',
+      }),
+    })
+    boton.click()
+    expect(renglonEnExito(renglon)).toBe(false)
+    expect(renglonEnError(renglon)).toBe(true)
   })
 
   it('los bytes que bajarían son EXACTAMENTE el GML generado', async () => {

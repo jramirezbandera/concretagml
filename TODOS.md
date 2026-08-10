@@ -103,10 +103,22 @@ interfaz, el motivo por el que la tabla exportada se descartó).
 **Qué.** En la pantalla Entrada, a 1280×720 —el suelo declarado del proyecto— la tercera vía
 («Abrir un GML») nace por debajo del borde visible de su sección.
 
-⭐ **ACTUALIZADO 2026-08-10 (rebanada 2): de 59,42 px a 35.** Subir el pie de Entrada a la
-barra le devolvió 104 px al panel, y subir los chips y el conmutador vaciaron parte de la
-cabecera. La salida 1 de las tres de abajo **ya se aplicó** y no bastó: quedan 35 px. Hay que
-scrollear dentro del panel para verla. Las otras dos se ven enteras.
+⭐ **ACTUALIZADO DOS VECES EL 2026-08-10. De 139 px a 35, y de 35 a 16.**
+
+1. *Rebanada 2.* Subir el pie de Entrada a la barra le devolvió 104 px al panel, y subir los
+   chips y el conmutador vaciaron parte de la cabecera. La salida 1 de las tres de abajo **ya
+   se aplicó** y no bastó: quedaron 35 px.
+2. *Retirada del renglón de motivo.* La barra bajó de 72 px de alto a 53, y los 19 px fueron
+   enteros aquí: **quedan 16 px.** Medido con el guion 14 en `#/parcela/entrada`.
+
+Hay que scrollear dentro del panel para ver la tercera vía. Las otras dos se ven enteras.
+
+⚠️ **Los 16 que faltan ya NO salen de mudar nada: salen de recortar aire.** La cabecera del
+panel mide 106,9 px de los que 34 son relleno (20 arriba, 14 abajo) y 72,9 contenido real
+—MEDIDO—, así que dejarla en 12+12 y bajar el margen del `<h1>` a 8 px daría los 16 justos. No
+se ha hecho, y el motivo es del día: el autor acababa de decir que los espaciados de la
+aplicación están mal repartidos, y apretar el panel para ganar 16 px es exactamente la
+decisión que hay que tomar mirando, no calculando.
 
 **Por qué pasa, con los números.**
 
@@ -124,9 +136,12 @@ vías, MEDIDOS. Para que las tres cupieran, el panel necesitaría 707,92 px, o s
 12 px como mucho — que no es una barra.
 
 **Lo que ya se descartó, y por qué.**
-- *Encoger la barra.* Su mínimo honrado es ~61 px (peldaño de dos renglones 32,85 + renglón 19
-  + filo 1 + holgura). Recupera 11 de los 60 que faltan. Degradar el diseño para no arreglar
-  nada no es un arreglo.
+- ~~*Encoger la barra.* Su mínimo honrado es ~61 px (peldaño de dos renglones 32,85 + renglón
+  19 + filo 1 + holgura). Recupera 11 de los 60 que faltan.~~ ⛔ **Este descarte era CORRECTO
+  con los datos de entonces y quedó obsoleto el mismo día:** el renglón de 19 px que entraba en
+  esa cuenta se retiró, así que la barra bajó a **53 px** sin degradar nada. Se anota en vez de
+  borrarse porque la lección es sobre el método: un mínimo calculado sobre una pieza que puede
+  desaparecer no es un mínimo, es una foto.
 - *Relajar el umbral del guion 14.* Es el guardián que se salta solo. El criterio —«una vía
   que hay que buscar no es una opción, es un secreto»— sigue siendo el correcto.
 
@@ -181,3 +196,55 @@ una rebanada que se cerró estrecha a propósito.
 selector de capas, o la barra de edición deja de centrarse sobre el mapa entero y se centra
 sobre el hueco que le queda libre. Lo primero es una línea; lo segundo es correcto pero pide
 saber el ancho del vecino.
+
+---
+
+## El sistema de diseño es el de otra app, y no hay DESIGN.md
+
+**Estado.** Abierto. Preexistente desde la copia del 2026-07-26. Anotado el 2026-08-10 tras
+`/plan-design-review`.
+
+**Qué.** `estilos/tokens/` es copia literal de
+`prototipo/_ds/concreta-design-system-.../tokens/`, que es el sistema de una **calculadora de
+hormigón**. Los ficheros lo dicen ellos mismos en su cabecera de procedencia, y se copiaron
+bien: el problema no es la copia, es que nadie volvió a adaptarla a ESTE producto.
+
+**Cuánto, medido sobre `estilos/tokens/colors.css` y todo `app/` + `viewer/`:**
+
+| | cuenta |
+|---|---|
+| Tokens `--color-*` definidos | 58 |
+| **Sin un solo uso en el producto** | **37** |
+| — de sección de hormigón (`--color-chart-*`: armadura, cercos, tensiones) | 14 |
+| — de estratos geotécnicos (`--color-geo-*`) | 13 |
+| — de casos de carga (`--color-fem-q/w/s/e`: sobrecarga, viento, nieve, sismo) | 4 |
+| — varios (`bg-canvas`, `dot-grid`, tintes sueltos) | 6 |
+| Tokens del tema oscuro `html[data-theme="dark"]`, **nunca cableados** | ~45 |
+
+`data-theme` **no aparece en ningún `.js`, `.html` ni en `app.css`**: el tema oscuro está
+completo y muerto. Y al revés, los colores que esta app SÍ usa no están en la paleta:
+`#FFD600` vive en `viewer/_comun.js` y el ámbar del panel en `app.css` (`--gml-color-usuario*`).
+
+**El hallazgo que más pesa no es el sobrante, es la ausencia.** `--color-state-ok` (#15803d)
+está definido y tiene **CERO usos**; ni `#15803d` ni `#22c55e` aparecen fuera del fichero de
+tokens. La app cuenta errores en rojo, avisos en ámbar y, cuando no hay ninguno, apaga el punto
+a gris. Se puede recorrer las tres pantallas, generar un GML válido y no ver un solo verde. El
+producto entero existe para que la Sede te acepte un fichero y nunca dice que algo esté bien.
+
+**Por qué no se arregló en la revisión.** Se propuso y se aplazó a propósito: el primer frente
+elegido fue la jerarquía del panel, que es lo que se ve. Esto no mueve un píxel.
+
+**Cuándo caduca.** No caduca solo. Es el patrón que este mismo repo documenta en la cabecera de
+`estilos/app.css`: el rail se quitó en F03 por un motivo que dejó de ser cierto en F04 y nadie
+volvió hasta agosto. Una decisión de alcance necesita fecha de revisión, no solo motivo.
+
+**Por dónde empezar.** Tres pasos, en orden y separables:
+1. Borrar los 37 tokens sin uso de `estilos/tokens/colors.css` (riesgo nulo, y baja el peso
+   construido contra el presupuesto del criterio 10).
+2. Decidir por escrito el tema oscuro: cablearlo o retirar sus ~45 tokens. Hoy no es ni una
+   cosa ni la otra.
+3. Escribir `DESIGN.md` con lo que ES de esta app: la escala tipográfica propia, la paleta
+   podada, `#FFD600` y el ámbar subidos a token, y el verde estrenado.
+
+**Depende de.** Nada. El paso 1 se puede hacer hoy. El paso 3 gana si se hace DESPUÉS del
+rediseño del panel, porque entonces el documento registra decisiones ya probadas en pantalla.

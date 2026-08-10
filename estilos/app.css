@@ -115,24 +115,25 @@
      y abajo. Fijo y no `auto` para que un motivo largo no pueda empujar el mapa. */
   --gml-barra-alto: 52px;
 
-  /* El renglón de motivo, debajo. UNA línea de `--text-11` y su holgura.
-     ⛔ Ocupa su alto SIEMPRE, con o sin texto (`app/barra.js` lo deja vacío en
-     vez de ocultarlo). Si algún día se oculta, la barra encoge, el mapa cambia
-     de alto y hay que llamar a `invalidateSize()` desde un sitio nuevo. */
-  --gml-renglon-alto: 19px;
+  /* ⛔ **AQUÍ VIVÍA `--gml-renglon-alto: 19px`, el sub-renglón de mensajes que
+     cruzaba la barra entera, y se RETIRÓ el 2026-08-10 a petición del autor.**
+     Se anota en vez de borrarse porque la reserva de alto era deliberada y quien
+     la reponga tiene que saber lo que costó: el renglón decía la forma LARGA del
+     motivo más cercano y el acuse de la entrega, y las dos cosas se decían YA en
+     otro sitio —el motivo breve va pegado a su peldaño con la frase entera en el
+     `title`, y el acuse de «Generar GML» vive en el pie del panel—, así que era
+     un segundo sitio para lo mismo cobrando 19 px de alto a la ventana entera.
+     Lo único que se perdió al quitarlo está anotado en `app/barra.js`. */
 
   /* El filo que separa la barra del contenido. Se declara como variable y **entra
      en la cuenta de abajo** porque `box-sizing: border-box` es global: sin
-     sumarlo, las dos filas de dentro del `<nav>` valían 1 px más que su caja y la
-     barra —que es `overflow:hidden`— se recortaba en silencio. Medido: 1 px de
-     desborde hasta que esta variable existió. */
+     sumarlo, la fila de dentro del `<nav>` valía 1 px más que su caja. */
   --gml-cabecera-borde: 1px;
 
-  /* Lo que la cáscara le quita al alto de la ventana: 72 px. Es UNA cuenta en UN
-     sitio, y de ella cuelga también el diálogo del informe a pantalla completa. */
-  --gml-cabecera-alto: calc(
-    var(--gml-barra-alto) + var(--gml-renglon-alto) + var(--gml-cabecera-borde)
-  );
+  /* Lo que la cáscara le quita al alto de la ventana: 53 px (eran 72 con el
+     renglón). Es UNA cuenta en UN sitio, y de ella cuelga también el diálogo del
+     informe a pantalla completa. */
+  --gml-cabecera-alto: calc(var(--gml-barra-alto) + var(--gml-cabecera-borde));
 
   /* El renglón que el peldaño le RESERVA a su motivo breve, lo tenga o no.
      ⚠️ No es decorativo: sin reserva, un peldaño bloqueado sería 14 px más alto
@@ -454,18 +455,36 @@ body {
  * izquierda**. Con solo el extremo izquierdo puesto (rebanada 1) sobraban 1.381,7
  * px medidos a 1917 px de ancho, y se notaba.
  *
- * `overflow: hidden` sigue puesto, así que si un día las cinco zonas no caben, lo
- * que sobra se recorta EN SILENCIO. Quien lo vigila es el guion 14, que mide el
- * desborde de este nodo en las dos direcciones. */
+ * ⛔ **`overflow` TIENE QUE SER `visible`, y costó un defecto averiguarlo.** Aquí
+ * hubo `overflow: hidden` —puesto para que una zona de más se recortara en vez de
+ * empujar el mapa— y rompía los desplegables de la barra por DOS caminos a la vez,
+ * los dos medidos el 2026-08-10:
+ *
+ *   1. El menú del expediente mide 94,2 px y cuelga de una zona de 44,3: sus
+ *      **37,3 px de abajo quedaban cortados**, o sea que «Vaciarlo» existía, se
+ *      pintaba y era inalcanzable.
+ *   2. Peor: `overflow: hidden` NO impide el scroll, solo la barra de scroll. Al
+ *      abrir el menú, el `focus()` de su primera opción hacía scroll de ESTE nodo
+ *      para meterla en vista, **`scrollTop: 37`**, y la barra entera se iba hacia
+ *      arriba fuera de la pantalla. Con la marca, el recorrido y «Generar GML»
+ *      dentro.
+ *
+ * Lo que aquel `hidden` protegía —que una zona de más no empuje— lo dan ahora
+ * `minmax(0, 1fr)` en la columna elástica y el `text-overflow` de cada zona, que
+ * recortan TEXTO sin recortar CAJA. Y el desborde lo sigue midiendo el guion 14.
+ *
+ * El `padding` lateral no es cosmética: sin él la marca nacía en `x: 0` y el botón
+ * de entrega terminaba en el borde exacto de la ventana (medido: `right: 0`). */
 .gml-rail {
   grid-area: barra;
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr) auto auto;
-  grid-template-rows: var(--gml-barra-alto) var(--gml-renglon-alto);
+  grid-template-rows: var(--gml-barra-alto);
   align-items: center;
   gap: 0 var(--space-3);
   min-width: 0;
-  overflow: hidden;
+  padding: 0 var(--space-4);
+  overflow: visible;
   background: var(--color-bg-surface);
   border-bottom: var(--gml-cabecera-borde) solid var(--color-border-main);
 }
@@ -545,6 +564,8 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 220px;
+  width: max-content;
+  max-width: 340px;
   padding: var(--space-1);
   border: 1px solid var(--color-border-main);
   border-radius: var(--radius);
@@ -562,11 +583,16 @@ body {
 .gml-barra-menu-opcion {
   display: flex;
   align-items: baseline;
-  gap: var(--space-2);
+  gap: var(--space-4);
   width: 100%;
   padding: var(--space-2) var(--space-3);
   border: 0;
   border-radius: var(--radius-sm);
+  /* ⛔ **Sin esto la opción se parte en dos líneas y se lee fatal**, medido el
+     2026-08-10: con los 220 px de ancho mínimo de antes, «Expedientes guardados»
+     y su apunte se envolvían A LA VEZ y salían cuatro renglones apilados donde
+     hay dos frases. El rótulo manda el ancho del menú; el apunte no envuelve. */
+  white-space: nowrap;
   background: transparent;
   font: inherit;
   font-size: var(--text-12);
@@ -589,6 +615,7 @@ body {
 
 .gml-barra-menu-apunte {
   margin-left: auto;
+  white-space: nowrap;
   font-family: var(--font-mono);
   font-size: var(--text-10);
   color: var(--color-text-disabled);
@@ -778,36 +805,16 @@ body {
   text-overflow: ellipsis;
 }
 
-/* ── El renglón de motivo (topbar · rebanada 1) ─────────────────────────────
+/* ⛔ **AQUÍ VIVÍA `.gml-rail-renglon`, retirado el 2026-08-10.** Era el sub-renglón
+ * que cruzaba la barra entera diciendo la forma LARGA del obstáculo más cercano, o
+ * el acuse de la entrega cuando lo había. Se fue por petición del autor y con un
+ * motivo que se sostiene solo: **las dos cosas que decía se decían ya en otro
+ * sitio.** El motivo largo está en el `title` del peldaño, con su forma breve
+ * pegada debajo del rótulo; el acuse de «Generar GML» está en el pie del panel, y
+ * se le veía DUPLICADO —la misma frase dos veces en pantalla— en cuanto se
+ * descargaba un GML. Cobraba 19 px de alto a la ventana entera por repetirse.
  *
- * La forma LARGA del obstáculo más cercano, o el motivo de entrega cuando lo
- * haya (rebanada 3). Cruza la barra entera y **ocupa su alto siempre**, con o sin
- * texto: ver `--gml-renglon-alto`.
- */
-.gml-rail-renglon {
-  grid-column: 1 / -1;
-  /* ⛔ **`stretch` Y NO EL `center` DE LA BARRA, y lo destapó medir.** Un `<p>`
-     vacío no genera línea, así que sin esto medía **1 px** (solo su filo) y
-     `align-items:center` lo dejaba flotando en mitad de su pista: el separador
-     aparecía y desaparecía de sitio según hubiera motivo o no. El alto de la
-     BARRA no saltaba —la pista es fija—, pero el filo sí, que es un temblor a
-     cambio de nada. */
-  align-self: stretch;
-  margin: 0;
-  padding: 0 var(--space-5);
-  border-top: 1px solid var(--color-border-sub);
-  font-size: var(--text-11);
-  /* La pista mide `--gml-renglon-alto` CON el filo (`box-sizing:border-box` es
-     global), así que la línea de texto tiene ese alto menos el filo. Escribirlo
-     así en vez de a ojo es lo que deja el renglón sin desbordar: con
-     `line-height: var(--gml-renglon-alto)` la barra se sobresuscribía 2 px, y
-     como es `overflow:hidden`, se recortaba en silencio. */
-  line-height: calc(var(--gml-renglon-alto) - 1px);
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+ * Ver `--gml-cabecera-alto`, que bajó de 72 px a 53. */
 
 /* ── Los tres estados, desde el único atributo que los declara ─────────────── */
 
@@ -2312,8 +2319,49 @@ body {
   display: none;
 }
 
+/* El acuse de «Generar GML», que es el ÚNICO que no vive dentro del `<footer>`:
+   su botón está en la barra y se ve en los tres pasos, así que él también tiene
+   que verse en los tres, y el `<footer>` entero es `data-pantalla="edicion"`.
+   Cuelga del `<aside>` y por eso se paga aquí la sangría y el filo que el pie le
+   daba gratis. `:empty` lo sigue quitando de en medio cuando no hay nada que
+   decir, así que en reposo no cuesta ni un píxel. */
+.gml-accion-estado--panel {
+  flex: none;
+  padding: var(--space-2) var(--space-6) var(--space-3);
+  border-top: 1px solid var(--color-border-sub);
+  background: var(--color-bg-primary);
+}
+
 .gml-accion-estado--error {
   color: var(--color-state-fail);
+}
+
+/* ── ✅ EL SIMÉTRICO DEL ROJO (2026-08-10) ───────────────────────────────────
+ * Verde para «hecho», exactamente igual que `--error` es rojo para «no puedes».
+ * Estrena `--color-state-ok`, que llevaba definido desde la copia del design
+ * system del 2026-07-26 con CERO usos en todo el producto: la app contaba
+ * errores en rojo y avisos en ámbar, y cuando la acción salía bien lo decía en
+ * el mismo gris que cualquier otra cosa.
+ *
+ * ── POR QUÉ ESTO **NO** VIOLA LA REGLA DE ORO 9 (léelo antes de extenderlo) ──
+ * La regla («la app mide; el colegiado interpreta y firma») prohíbe el color de
+ * MÉRITO: nada de verde para «poco» y rojo para «mucho» sobre una cifra del
+ * diagnóstico, porque el umbral depende del expediente, del municipio y del
+ * criterio de quien firma. El razonamiento largo está en
+ * `viewer/cajon-diagnostico.js`, cabecera, y tiene 76 aserciones detrás.
+ *
+ * Este renglón no es una cifra ni un juicio sobre el levantamiento: es la
+ * MÁQUINA DE ESTADOS DE LA PROPIA APP diciendo si te deja seguir. Que `--error`
+ * (rojo) exista ahí desde F04 y nunca se haya discutido es la prueba: informa de
+ * su puerta, no de tu medición. El verde dice «la acción que pediste se
+ * completó», que es un hecho de la app sobre sí misma.
+ *
+ * ⛔ **DÓNDE NO PONERLO.** En ninguna cifra, en ningún renglón del cajón de
+ * diagnóstico, y en ninguna clase que califique una geometría. Si alguna vez
+ * quieres teñir de verde un «dentro de tolerancia», eso es reabrir la regla de
+ * oro 9 y es una decisión de producto, no un cambio de CSS. */
+.gml-accion-estado--exito {
+  color: var(--color-state-ok);
 }
 
 /* Todo valor numérico o normativo va en mono con cifras tabulares: es la regla
@@ -3202,6 +3250,16 @@ body {
 .gml-app .gml-cajon-seccion dt {
   font-family: var(--font-sans);
   color: var(--color-text-secondary);
+}
+
+/* Los rótulos de grupo del cajón («Superficie», «Encaje»), nuevos el 2026-08-10.
+   Mismo reparto que el resto de este bloque: el módulo pone tamaño, peso,
+   versalitas, interletraje y gris —los necesita para leerse sobre la ortofoto
+   aunque esta hoja no cargue—, y aquí solo se completa la familia. Que sean
+   `<h3>` es del módulo también: cuelgan del `<h2>` de la cabecera y dan salto de
+   grupo a un lector de pantalla. */
+.gml-app .gml-cajon-rotulo {
+  font-family: var(--font-sans);
 }
 
 /* ── TODA cifra en mono con cifras tabulares ─────────────────────────────────

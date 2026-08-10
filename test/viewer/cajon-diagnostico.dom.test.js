@@ -29,6 +29,7 @@ import {
   ALTO_COMO_CAJON,
   ALTO_COMO_PANTALLA,
   CLASE,
+  ESCALA,
   ESTILO_EN_EL_PANEL,
   ESTILO_SOBRE_EL_MAPA,
   MOTIVO_INFORME_SIN_DIAGNOSTICO,
@@ -1649,5 +1650,88 @@ describe('viewer/cajon-diagnostico.js · `anfitrion` (2026-08-05)', () => {
     expect(cajon.anfitrion()).toBe(null)
     expect(cajon.anfitrion(panel)).toBe(null)
     expect(mapa).toBeTruthy()
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ⭐ LA JERARQUÍA TIPOGRÁFICA (revisión de diseño del 2026-08-10)
+// ═════════════════════════════════════════════════════════════════════════════
+// El cajón era «una columna indiferenciada»: seis bloques seguidos sin una pista
+// de dónde acababa uno, y con la mitad de las filas SIN declarar tamaño —o sea
+// heredando 12 px de Leaflet sobre el mapa y otro distinto dentro del panel—.
+// Estos `it` vigilan las tres decisiones que lo arreglaron.
+describe('viewer/cajon-diagnostico · la escala y los rótulos de grupo', () => {
+  it('salen los DOS rótulos de grupo, en orden y como <h3>', () => {
+    const { raiz } = conCajon()
+    const rotulos = [...raiz.querySelectorAll(`.${CLASE.ROTULO}`)]
+    expect(rotulos.map((r) => r.textContent)).toEqual(['Superficie', 'Encaje'])
+    // `<h3>` y no `<p>`: cuelgan del `<h2>` de la cabecera, así que un lector de
+    // pantalla puede saltar de grupo en grupo. En versalitas se verían igual.
+    expect(rotulos.map((r) => r.tagName)).toEqual(['H3', 'H3'])
+  })
+
+  it('la invasión NO lleva rótulo de grupo, y es a propósito', () => {
+    // Esa sección se anuncia con TRES textos distintos («…: no se ha
+    // consultado», «…: ninguna», y el título a secas), y esa diferencia es media
+    // razón de ser de F07. Un rótulo fijo encima las aplanaría en una.
+    const { raiz, cajon } = conCajon()
+    cajon.pintar(COMPLETO())
+    expect(nodo(raiz, SELECTOR.INVASION).querySelector(`.${CLASE.ROTULO}`)).toBe(null)
+    const dicenInvasion = [...raiz.querySelectorAll(`.${CLASE.ROTULO}`)].filter((r) =>
+      /invasi/i.test(r.textContent),
+    )
+    expect(dicenInvasion, 'ningún rótulo de grupo debe nombrar la invasión').toEqual([])
+  })
+
+  it('la superficie medida se destaca SOLO cuando hay cifra que destacar', () => {
+    // «No consta» a 30 px grita una ausencia: un cajón sin nada que decir no debe
+    // decirlo más alto que uno que sí.
+    const { raiz, cajon } = conCajon()
+    const medida = nodo(raiz, SELECTOR.MEDIDA)
+
+    cajon.pintar(COMPLETO())
+    expect(medida.style.fontSize).toBe(ESCALA.DATO_XL)
+    expect(medida.textContent).toBe(m2(1538.99))
+
+    cajon.pintar(null)
+    expect(medida.style.fontSize).toBe(ESCALA.DATO)
+  })
+
+  it('las etiquetas y las cifras NO miden lo mismo: el salto es real', () => {
+    // Es el hallazgo que originó todo esto: 92 de las 105 declaraciones de tamaño
+    // de la aplicación valían 10, 11 o 12 px, así que el dato y su nombre se leían
+    // igual de fuerte. Aquí se afirma el salto, no los números concretos.
+    const { raiz, cajon } = conCajon()
+    cajon.pintar(COMPLETO())
+    const px = (v) => Number.parseFloat(v)
+    expect(px(ESCALA.DATO)).toBeGreaterThan(px(ESCALA.CUERPO))
+    expect(px(ESCALA.DATO_XL)).toBeGreaterThan(px(ESCALA.DATO))
+    expect(px(ESCALA.CUERPO)).toBeGreaterThan(px(ESCALA.APUNTE))
+    expect(px(ESCALA.APUNTE)).toBeGreaterThan(px(ESCALA.ROTULO))
+    // Y el salto se ve en el DOM, no solo en la constante.
+    expect(nodo(raiz, SELECTOR.SOLAPE).style.fontSize).toBe(ESCALA.DATO)
+  })
+
+  it('ningún tamaño se escribe a mano fuera de ESCALA', () => {
+    // El guardián anti-deriva: mientras este módulo vista EN LÍNEA, la hoja no
+    // gobierna nada de lo que se lee aquí, así que el único sitio donde puede
+    // vivir la escala es la constante. Un `fontSize: '11px'` de conveniencia en
+    // el siguiente cambio no rompería ninguna otra prueba.
+    const { raiz, cajon } = conCajon()
+    cajon.pintar(COMPLETO())
+
+    // DOS excepciones autorizadas, y ninguna es una decisión de tamaño:
+    //   · `14px` — el glifo ✕ de cerrar. No es texto: es un icono dibujado con una
+    //     fuente, y lo manda su caja de 1 em, no la jerarquía de lectura.
+    //   · `inherit` — los dos botones del informe. Un control de formulario trae
+    //     la fuente que le da el navegador (en Windows, otra familia y otro
+    //     tamaño); `inherit` lo devuelve a la del cajón. Declara que NO decide.
+    const permitidos = new Set([...Object.values(ESCALA), '14px', 'inherit'])
+    const intrusos = [raiz, ...raiz.querySelectorAll('*')]
+      .filter((el) => el.style.fontSize !== '')
+      .map((el) => el.style.fontSize)
+      .filter((tam) => !permitidos.has(tam))
+
+    expect(intrusos, `tamaños fuera de ESCALA: ${intrusos.join(', ')}`).toEqual([])
   })
 })

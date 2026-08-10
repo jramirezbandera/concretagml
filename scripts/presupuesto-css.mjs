@@ -513,6 +513,94 @@ export const ASIENTOS = Object.freeze(
         'Dos menús desplegables con su sombra y su teclado, la zona de expediente con sus dos ' +
         'renglones, y el botón partido. A cambio se van las tres reglas de `.gml-entrada-pie` y la ' +
         'de `.gml-rail-grupo`, que se quedaron sin nodo. Sobran 15.680 sobre el techo.' },
+
+    { hito: 'Topbar · la barra deja de recortarse a sí misma y se va el renglón',
+      // Era `null` y el guardián de asientos salía ROJO por eso: el test exige
+      // un hash o la cadena literal «(sin commitear)», y `typeof null` es
+      // 'object', así que `toMatch()` ni siquiera llegaba a comparar. Corregido
+      // el 2026-08-10; queda por commitear igual que estaba.
+      commit: '(sin commitear)',
+      total: 72734, nuestro: 57639, rebanada: null,
+      nota:
+        '**−105 B, y es el primer asiento de este rework que DEVUELVE bytes.** Tres arreglos que ' +
+        'salen de mirar la aplicación publicada, no de leer el plan. ── ⛔ 1 · LA BARRA SE ' +
+        'RECORTABA A SÍ MISMA ── `.gml-rail` era `overflow:hidden` y eso rompía sus propios menús ' +
+        'por DOS caminos, los dos medidos: el menú del expediente mide 94,2 px y colgaba de una ' +
+        'zona de 44,3, así que sus **37,3 px de abajo quedaban cortados** —«Vaciarlo» se pintaba y ' +
+        'era inalcanzable—; y `overflow:hidden` **no impide el scroll, solo su barra**, así que el ' +
+        '`focus()` de la primera opción arrastraba el contenedor entero (**`scrollTop: 37`**) y se ' +
+        'llevaba la marca, el recorrido y «Generar GML» fuera de la pantalla. Lo que aquel ' +
+        '`hidden` protegía lo dan `minmax(0,1fr)` y el `text-overflow` de cada zona, que recortan ' +
+        'TEXTO sin recortar CAJA. ── 2 · SE VA EL RENGLÓN DE MOTIVO (−19 px de alto) ── Lo pidió ' +
+        'fuera el autor y el motivo se sostiene solo: **las dos cosas que decía se decían ya en ' +
+        'otro sitio** —el motivo largo en el `title` del peldaño, el acuse de la entrega en el pie ' +
+        'del panel— y con un GML descargado la misma frase se veía DOS VECES a la vez. ' +
+        '`--gml-cabecera-alto` baja de 72 px a 53 y el mapa pasa de 888×648 a **888×667**. Lo ' +
+        'único que costó: el acuse de «Generar GML» tuvo que salir del `<footer>` —que es entero ' +
+        '`data-pantalla="edicion"`— al `<aside>`, o pulsar desde Entrada no diría nada en ninguna ' +
+        'parte. ── 3 · LA BARRA TENÍA `padding: 0` ── La marca nacía en `x: 0` y la entrega ' +
+        'terminaba en el borde exacto de la ventana (`right: 0`, medido). ── QUÉ VIGILA AHORA EL ' +
+        'GUION 14 ── Su sección del renglón se sustituye por la que mide los menús: abre, mide ' +
+        '`scrollTop` de la barra y comprueba que cada opción cae dentro de la ventana. **Cazó la ' +
+        'mutación**: con `overflow:hidden` devuelto sale `ok:false` nombrando la causa. Sobran ' +
+        '15.575 sobre el techo.' },
+
+    { hito: 'La aplicación estrena el verde: acción completada',
+      commit: '(sin commitear)',
+      total: 72788, nuestro: 57693, rebanada: null,
+      nota:
+        '**+54 B por UNA regla de dos líneas, y es el primer uso de `--color-state-ok` en todo el ' +
+        'proyecto.** Sale de `/plan-design-review` del 2026-08-10, que midió esto: la hoja definía ' +
+        'el verde del design system desde la copia del 2026-07-26 y **no lo usaba ni una vez** —ni ' +
+        '`#15803d` ni `#22c55e` aparecían fuera del fichero de tokens—. La aplicación contaba ' +
+        'errores en rojo y avisos en ámbar, y cuando la acción salía bien lo decía en el mismo gris ' +
+        'que «no hay parcela»: se podía recorrer las tres pantallas, generar un GML válido y no ver ' +
+        'un solo verde. ── QUÉ ENTRA ── `.gml-accion-estado--exito`, el simétrico exacto de ' +
+        '`--error`, que `app/main.js` conmuta en el ÚNICO desenlace en el que la acción pedida se ' +
+        'completa: `entrega.descargado`. ── ⛔ POR QUÉ NO ES UNA GRIETA EN LA REGLA DE ORO 9 ── La ' +
+        'revisión propuso primero un VEREDICTO de encaje en el cajón de diagnóstico («fuera del ' +
+        'margen de identidad», en rojo) y **se descartó por incumplirla**: la cabecera de ' +
+        '`viewer/cajon-diagnostico.js` prohíbe las tres cosas que ese diseño hacía —color de mérito ' +
+        'sobre una cifra, texto que dictamina, y el margen como veredicto en vez de enunciado—, y ' +
+        'la regla tiene 76 aserciones en 10 ficheros de test y se ha re-decidido al menos tres ' +
+        'veces. Lo que entra no es una cifra ni un juicio sobre el levantamiento: es la máquina de ' +
+        'estados de la propia app diciendo si te deja seguir, que es exactamente lo que ya hacía el ' +
+        'rojo desde F04 sin que nadie lo discutiera. ── GUARDIÁN ── Dos `it` nuevos en ' +
+        '`test/app/main-gml.dom.test.js`: que la descarga completada marca el verde y NO el rojo ' +
+        '(mutuamente excluyentes), y que una descarga fallida no lo marca aunque el GML exista. ' +
+        'Sobran 15.629 sobre el techo.' },
+
+    { hito: 'El cajón de diagnóstico estrena jerarquía: escala de 5 pasos y rótulos de grupo',
+      commit: '(sin commitear)',
+      total: 72844, nuestro: 57749, rebanada: null,
+      nota:
+        '**+56 B, y el trabajo de verdad NO está en esta hoja.** Es la segunda mitad de la revisión ' +
+        'de diseño del 2026-08-10 (T1 y T2), y el hallazgo que la reordenó fue este: **la ' +
+        'tipografía del cajón no la gobierna este fichero**. `viewer/cajon-diagnostico.js` viste EN ' +
+        'LÍNEA —por el mismo acuerdo que `viewer/capas.js`: tiene que leerse sobre una ortofoto ' +
+        'aunque la hoja no cargue—, y un estilo en línea gana a cualquier selector. Así que la ' +
+        'escala vive allí, en `ESCALA`, y de aquí solo salen los 56 B de `.gml-cajon-rotulo` ' +
+        '(familia, que es lo único que el módulo no fija). ── QUÉ MEDÍA ANTES ── 92 de las 105 ' +
+        'declaraciones de tamaño de la aplicación valían 10, 11 o 12 px: el dato y su nombre se ' +
+        'leían igual de fuerte. Y varias filas del cajón **no declaraban tamaño**, así que heredaban ' +
+        'los 12 px de Leaflet sobre el mapa y otro distinto dentro del panel — el mismo cajón se veía ' +
+        'de dos tamaños según dónde estuviera. ── QUÉ ENTRA ── Cinco pasos con papel asignado ' +
+        '(DATO_XL 30 / DATO 15 / CUERPO 13 / APUNTE 12 / RÓTULO 10), dos rótulos de grupo ' +
+        '(«Superficie», «Encaje») como `<h3>` para que un lector de pantalla salte de grupo, y la ' +
+        'superficie medida a 30 px **solo cuando hay cifra**: «No consta» a 30 px grita una ' +
+        'ausencia. ── ⛔ LO QUE NO ENTRA, Y POR QUÉ ── Un rótulo para la invasión: esa sección se ' +
+        'anuncia con TRES textos distintos («no se ha consultado» / «ninguna» / el título a secas) y ' +
+        'esa diferencia es media razón de ser de F07. Y ningún color ni palabra de mérito: la regla ' +
+        'de oro 9 sigue intacta, esto es jerarquía de lectura, no juicio. ── GUARDIÁN ── Cinco `it` ' +
+        'en `test/viewer/cajon-diagnostico.dom.test.js`, y uno es anti-deriva: recorre el DOM y ' +
+        'exige que TODO `fontSize` en línea salga de `ESCALA`. Cazó un `11px` suelto en la nota de ' +
+        'astillas descartadas nada más escribirse. ── ⚠️ LO QUE CUESTA, MEDIDO Y NO ESTIMADO ── ' +
+        '**+107 px de alto** en el cajón a 1280×720 con el diagnóstico completo (`scrollHeight` 717 ' +
+        '→ 824), contra 544 px visibles. NO introduce scroll: con 717 ya scrolleaba, porque el cajón ' +
+        'es el estirador de esta pantalla y scrollear por dentro es su trabajo desde F07. Lo ' +
+        'profundiza, y ese es el canje que se acepta a cambio de que el dato titular se lea desde ' +
+        'lejos. Si algún día aprieta, lo primero que debe plegarse es el párrafo del margen de ' +
+        'identidad, que son cinco líneas de 12 px que casi nadie lee. Sobran 15.685 sobre el techo.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

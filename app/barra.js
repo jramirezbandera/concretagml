@@ -67,7 +67,7 @@
 // obligatorios: son lo que oye el lector de pantalla y lo que impide que el
 // tabulador se pare en un paso al que no se puede ir.
 //
-// ── ⭐ EL MOTIVO SE DICE EN TRES SITIOS Y EN TRES LARGOS ───────────────────
+// ── ⭐ EL MOTIVO SE DICE EN DOS SITIOS Y EN DOS LARGOS ───────────────
 // El giro a horizontal le quitó al motivo los tres renglones de 210 px que tenía
 // (**40,5 px medidos** el 2026-08-09 con la aplicación vacía). La salida NO es
 // recortar la frase —«Trae antes una parcela: por refe…» no es un motivo—, y
@@ -77,28 +77,20 @@
 //
 //   1. **Pegado al peldaño, la forma BREVE** («Falta la parcela»). Todos a la vez,
 //      que es lo que se salvó. La redacta `navegacion.js#MOTIVO_BREVE`.
-//   2. **En el renglón de debajo, la forma LARGA** del obstáculo más cercano —el
-//      primer paso bloqueado en el orden de `PASOS`—, que es la que dice CÓMO se
-//      resuelve. El primero y no «todos» porque es el único que se puede atacar
-//      ahora; los de más allá se abren solos al resolverlo.
-//   3. **En el `title` del botón, la forma LARGA de ESE peldaño.** Es el único de
-//      los tres que responde «¿y este otro, por qué?» sin cambiar de paso, y sale
-//      gratis: `title` ya es un mecanismo del navegador y del lector de pantalla,
-//      sin inventar un patrón de texto oculto ni un `id` que colisione entre
-//      pantallas.
+//   2. **En el `title` del botón, la forma LARGA de ESE peldaño**, que es la que
+//      dice CÓMO se resuelve. Responde «¿y este otro, por qué?» sin cambiar de
+//      paso, y sale gratis: `title` ya es un mecanismo del navegador y del lector
+//      de pantalla, sin inventar un patrón de texto oculto ni un `id` que
+//      colisione entre pantallas.
 //
-// ── PRIORIDAD DEL RENGLÓN: GANA LA ENTREGA ────────────────────────────────
-// Tiene DOS fuentes posibles y hay que ordenarlas. Si el usuario ve «Generar GML» y
-// no puede pulsarlo, **ésa** es la frase que necesita; que un paso esté bloqueado se
-// lo dice además el propio peldaño apagado, que es la escalera de arriba. Cuando no
-// hay motivo de entrega se enseña el del recorrido; cuando no hay ninguno, el
-// renglón se queda vacío **pero ocupa su alto**, para que la barra no salte.
-//
-// ⚠️ El productor del motivo de entrega **se inyecta** ({@link cablearBarra}) y por
-// omisión no existe: el botón de entrega llega en la rebanada 3. Se deja el gancho
-// puesto —una función opcional, sin maquinaria— porque el punto entero de la
-// decisión A1 es que haya UN escritor de este nodo; añadir el segundo productor más
-// tarde no puede obligar a añadir un segundo escritor.
+// ⚠️ **Hubo un tercer peldaño en esta escalera y se retiró el 2026-08-10**: un
+// renglón que cruzaba la barra entera con la forma LARGA del obstáculo más
+// cercano. Lo pidió fuera el autor, y al revisarlo el motivo se sostenía solo: la
+// forma larga ya estaba en el `title`, el acuse de la entrega ya estaba en el pie
+// del panel —se veía DUPLICADO en pantalla en cuanto se descargaba un GML— y por
+// repetirse cobraba 19 px de alto a la ventana entera. La decisión A1 no cambia:
+// esta barra sigue teniendo UN solo `repintar()`.
+
 
 import { NIVEL, resolverAvisar } from '../viewer/_comun.js'
 import { PASOS, ROTULO_PASO } from './navegacion.js'
@@ -144,7 +136,6 @@ export const CLASE = Object.freeze({
   TEXTO: 'gml-rail-texto',
   ROTULO: 'gml-rail-rotulo',
   MOTIVO: 'gml-rail-motivo',
-  RENGLON: 'gml-rail-renglon',
 })
 
 /** Selector de un peldaño concreto. @param {string} paso */
@@ -269,17 +260,14 @@ const textoDe = (valor) => (typeof valor === 'string' ? valor.trim() : '')
  *   así el test lo mide y así funciona dentro de un iframe.
  * @param {object} opciones.navegacion  La de `app/navegacion.js`.
  * @param {Element} [opciones.contenedor]  El `<ol>`; se busca si no se da.
- * @param {Element} [opciones.cascara]  El `<nav>` donde cuelga el renglón; se
- *   busca si no se da. Se admite que no esté: entonces el renglón cuelga del
- *   padre del `<ol>`, y si tampoco lo hay, no hay renglón y **se dice en consola**
- *   en vez de perder los motivos largos en silencio.
+ * @param {Element} [opciones.cascara]  El `<nav>` de la barra; se busca si no se
+ *   da. Desde que el renglón de motivo se retiró (2026-08-10) este módulo no
+ *   cuelga nada de él, pero se sigue admitiendo porque es el ancla de los menús y
+ *   el nodo que `destruir()` tiene que dejar como lo encontró.
  * @param {object|null} [opciones.panel]  El de `app/avisos.js`, o `null`.
  * @param {((paso: string) => void)|null} [opciones.alNavegar]  Se llama DESPUÉS
  *   de pintar, con el paso ya activo. Es por donde `app/main.js` mete el
  *   `invalidateSize()` del mapa sin que este módulo sepa que hay un mapa.
- * @param {(() => string|null)|null} [opciones.motivoDeEntrega]  Qué impide hoy
- *   generar el fichero, ya redactado por quien lo sabe. **Gana al motivo del
- *   recorrido** en el renglón; ver la cabecera. Llega en la rebanada 3.
  * @returns {Barra}
  */
 export function cablearBarra({
@@ -289,7 +277,6 @@ export function cablearBarra({
   cascara,
   panel = null,
   alNavegar = null,
-  motivoDeEntrega = null,
   expediente = null,
 } = {}) {
   if (!esDocumento(documento)) {
@@ -312,13 +299,6 @@ export function cablearBarra({
       `cablearBarra: 'expediente' debe ser una función o null; recibido ${typeof expediente}. Es ` +
         `el \`estado()\` de app/cableado-expediente.js, y se lee en CADA pintada por lo mismo ` +
         `que el motivo de entrega: una foto guardada se queda rancia.`,
-    )
-  }
-  if (motivoDeEntrega !== null && typeof motivoDeEntrega !== 'function') {
-    throw new TypeError(
-      `cablearBarra: 'motivoDeEntrega' debe ser una función o null; recibido ` +
-        `${typeof motivoDeEntrega}. Es un PRODUCTOR, no un texto: el motivo cambia con el estado y ` +
-        `una cadena fija se quedaría rancia en la primera pintada.`,
     )
   }
 
@@ -386,34 +366,19 @@ export function cablearBarra({
     escuchar(boton, 'click', alPulsar)
   }
 
-  // ── Fabricar el renglón, una sola vez ─────────────────────────────────────
+  // ⛔ **AQUÍ SE FABRICABA EL RENGLÓN DE MOTIVO, y se retiró el 2026-08-10.**
+  // Era un `<p aria-live="polite">` colgado del `<nav>` que decía la forma LARGA
+  // del obstáculo más cercano, o el acuse de la entrega cuando lo había. Lo pidió
+  // fuera el autor, y al revisarlo el motivo se sostenía solo: **las dos cosas que
+  // decía tenían ya otra superficie** —el `title` del peldaño para la larga, el
+  // pie del panel para el acuse—, así que era un segundo sitio para lo mismo
+  // cobrando 19 px de alto a la ventana entera. Con un GML descargado la misma
+  // frase se veía dos veces a la vez.
   //
-  // Cuelga del `<nav>` y no del `<ol>`: es de la barra entera, no de la lista de
-  // pasos, y meterlo dentro del `<ol>` lo convertiría en un `<li>` fantasma que
-  // el lector de pantalla contaría como un cuarto peldaño.
-
-  const anfitrion = cascara ?? documento.querySelector(SELECTOR_BARRA) ?? lista.parentElement
-  /** @type {Element|null} */
-  let renglon = null
-  if (esElementoDOM(anfitrion)) {
-    renglon = documento.createElement('p')
-    renglon.className = CLASE.RENGLON
-    // `polite` y no `assertive`: es un texto que acompaña a lo que el usuario
-    // acaba de hacer, no una alarma. `atomic` porque se reescribe entero y leer
-    // solo la diferencia produciría frases a medias.
-    renglon.setAttribute('aria-live', 'polite')
-    renglon.setAttribute('aria-atomic', 'true')
-    anfitrion.append(renglon)
-  } else {
-    // No se lanza: sin renglón la barra sigue navegando y los motivos breves
-    // siguen viéndose. Pero callarlo dejaría los motivos LARGOS sin ninguna
-    // superficie y con la suite en verde, que es el fallo que este proyecto
-    // persigue. Se dice donde lo ve quien programa, no donde lo sufre el usuario.
-    console.warn(
-      `[barra] no hay dónde colgar el renglón de motivo (ni «${SELECTOR_BARRA}» ni un padre del ` +
-        `<ol>). Los motivos largos no se van a ver; los breves de cada peldaño sí.`,
-    )
-  }
+  // Lo ÚNICO que se perdió, y se anota para que quien lo eche en falta sepa qué
+  // buscar: el acuse de «Generar GML» solo se ve donde vive su pie. Por eso el
+  // mismo cambio lo sacó de `.gml-acciones[data-pantalla="edicion"]` y lo dejó
+  // colgando del `<footer>`, visible en los tres pasos igual que su botón.
 
   // ── Pintar ────────────────────────────────────────────────────────────────
 
@@ -425,9 +390,6 @@ export function cablearBarra({
   function pintar() {
     if (destruido) return
     pintarExpediente()
-
-    /** El motivo LARGO del primer paso bloqueado, que es el obstáculo más cercano. */
-    let masCercano = ''
 
     for (const peldano of navegacion.rail()) {
       const nodos = peldanos.get(peldano.paso)
@@ -461,21 +423,7 @@ export function cablearBarra({
       nodos.motivo.hidden = breve === ''
       if (largo === '') nodos.boton.removeAttribute('title')
       else nodos.boton.title = largo
-
-      if (masCercano === '' && largo !== '') masCercano = largo
     }
-
-    if (renglon === null) return
-    // La prioridad de la cabecera, en una línea: gana la entrega. Se lee del
-    // productor en CADA pintada —no se cachea— porque su respuesta cambia con el
-    // estado del expediente y un valor guardado sería justo el motivo rancio que
-    // la decisión A1 existe para impedir.
-    const entrega = motivoDeEntrega === null ? '' : textoDe(motivoDeEntrega())
-    const texto = entrega !== '' ? entrega : masCercano
-    // `textContent` y no `hidden`: el renglón ocupa su alto SIEMPRE. Ocultarlo
-    // haría saltar la barra —y con ella el mapa— cada vez que se resuelve un
-    // motivo, que es un temblor de maquetación a cambio de nada.
-    if (renglon.textContent !== texto) renglon.textContent = texto
   }
 
   /** @param {Event} evento */
@@ -631,8 +579,6 @@ export function cablearBarra({
       cerrarMenus()
       for (const { li } of peldanos.values()) li.remove()
       peldanos.clear()
-      renglon?.remove()
-      renglon = null
     },
   }
 }

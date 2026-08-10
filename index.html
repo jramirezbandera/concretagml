@@ -172,9 +172,14 @@
              `app/dialogo-expediente.js` DENTRO de su `<dialog>`; ahora las pone
              este fichero y aquél deja de fabricarlas. Una sola por acción.
            · `generar-gml`        ← `.gml-acciones`, el pie del panel.
-         El renglón `[data-estado="generar-gml"]` **NO se muda**: se queda en el
-         pie, que es donde lo escriben los cableados, y `app/barra.js` lo LEE para
-         el renglón de motivo. Un escritor, un lector, una superficie visible. -->
+         El acuse `[data-estado="generar-gml"]` **se muda con él, pero al `<aside>`
+         y no a la barra**: sigue siendo el nodo que escriben los cableados (un solo
+         escritor), y sale del `<footer>` porque el `<footer>` entero es
+         `data-pantalla="edicion"` y su botón se ve en los tres pasos. -->
+    <!-- ⛔ Aquí decía que el acuse NO se mudaba y que `app/barra.js` lo LEERÍA para
+         un renglón bajo la barra. Ese renglón existió un día y se retiró el
+         2026-08-10: copiaba arriba una frase que ya estaba abajo, y con un GML
+         descargado se veía dos veces a la vez. -->
     <nav class="gml-rail" data-rail="cascara" aria-label="Barra del expediente">
       <div class="gml-rail-marca">
         <p class="gml-rail-nombre">Concreta<sup>GML</sup></p>
@@ -1066,8 +1071,8 @@
              devolverían en la pantalla donde el bloque vive de todos modos. El
              rail es cromo de navegación; esto es el «y ahora qué» de la
              pantalla. No es la misma frase dicha dos veces. -->
+
         <div class="gml-acciones" data-pantalla="edicion">
-          <p class="gml-accion-estado" data-estado="generar-gml" role="status"></p>
 
           <!-- ── F07 · «Diagnosticar» ──────────────────────────────────────
                SECUNDARIO y DEBAJO del primario, no al lado: son dos acciones de
@@ -1184,6 +1189,22 @@
           <p class="gml-accion-estado" data-estado="derivar-sobrante" role="status"></p>
         </div>
       </footer>
+
+      <!-- ⭐ **EL ACUSE DE «GENERAR GML» CUELGA DEL `<aside>` Y FUERA DEL
+           `<footer>`, y eso es deliberado desde el 2026-08-10.** Su BOTÓN está
+           arriba en la barra y se ve en los tres pasos (decisión A2); el `<footer>`
+           entero es `data-pantalla="edicion"`, así que dejarlo dentro —donde vivió
+           hasta hoy— significaba que pulsar desde Entrada o Diagnóstico no decía
+           nada en ninguna parte.
+
+           Hubo una segunda solución y duró un día: un renglón bajo la barra que
+           COPIABA este texto arriba. Se retiró —la misma frase se veía dos veces a
+           la vez en cuanto se descargaba un GML— y se sustituyó por mudar el NODO,
+           que es más barato y deja UN solo escritor.
+
+           ⚠️ Sigue siendo `data-estado="generar-gml"`, la cadena que buscan los dos
+           cableados de GML desde F04. Moverlo de sitio no lo renombra. -->
+      <p class="gml-accion-estado gml-accion-estado--panel" data-estado="generar-gml" role="status"></p>
     </aside>
 
     <!-- Caja VACÍA: `crearVisor` monta aquí el `L.Map`. `.gml-mapa` y

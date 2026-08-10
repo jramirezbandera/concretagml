@@ -29,6 +29,7 @@ import {
   ALTO_COMO_CAJON,
   ALTO_COMO_PANTALLA,
   CLASE as CLASE_PARCELA,
+  ESCALA,
   ESTILO_EN_EL_PANEL,
   ESTILO_SOBRE_EL_MAPA,
   SELECTOR as SELECTOR_PARCELA,
@@ -556,5 +557,65 @@ describe('F14 · cajón sobre el mapa vs. pantalla en el panel', () => {
     cajon.abrir()
     dentro.click()
     expect(cajon.abierto()).toBe(true)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ⭐ LA ESCALA COMPARTIDA CON EL CAJÓN HERMANO (2026-08-10)
+// ═════════════════════════════════════════════════════════════════════════════
+// Los dos cajones son la misma pieza en las dos ramas, y hasta hoy escribían sus
+// tamaños a mano cada uno por su lado. Estos `it` son lo que impide que vuelvan a
+// separarse: la escala es UNA, importada de `viewer/cajon-diagnostico.js`.
+describe('viewer/cajon-contraste-edificio · la escala y los rótulos', () => {
+  it('salen los TRES rótulos de grupo, en orden y como <h3>', () => {
+    const { cajon } = montar()
+    const raiz = cajon.control.getContainer()
+    const rotulos = [...raiz.querySelectorAll(`.${CLASE_PARCELA.ROTULO}`)]
+    expect(rotulos.map((r) => r.textContent)).toEqual(['Huella', 'Encaje', 'En la parcela'])
+    expect(rotulos.map((r) => r.tagName)).toEqual(['H3', 'H3', 'H3'])
+  })
+
+  it('las ocho cifras miden DATO y sus etiquetas CUERPO', () => {
+    const { cajon } = montar()
+    const raiz = cajon.control.getContainer()
+    cajon.pintar(COMPLETO())
+    const cifras = [...raiz.querySelectorAll(`.${CLASE_PARCELA.CIFRA}`)]
+    expect(cifras).toHaveLength(8)
+    expect(cifras.every((c) => c.style.fontSize === ESCALA.DATO)).toBe(true)
+    for (const dl of raiz.querySelectorAll(`dl.${CLASE_PARCELA.SECCION}`)) {
+      expect(dl.style.fontSize).toBe(ESCALA.CUERPO)
+    }
+  })
+
+  it('NO hay dato titular a 30 px, y es a propósito', () => {
+    // La cifra titular de este cajón no es un número solo: `pintarHuella` compone
+    // «322,13 m² · 25 piezas». A 30 px ese compuesto no cabe en los 392 px del
+    // panel y parte en dos líneas, que es peor que no destacarlo.
+    const { cajon } = montar()
+    const raiz = cajon.control.getContainer()
+    cajon.pintar(COMPLETO())
+    const grandes = [...raiz.querySelectorAll('*')].filter(
+      (el) => el.style.fontSize === ESCALA.DATO_XL,
+    )
+    expect(grandes, 'este cajón no destaca ninguna cifra a DATO_XL').toEqual([])
+  })
+
+  it('ningún tamaño se escribe a mano fuera de ESCALA', () => {
+    // El mismo guardián anti-deriva que el cajón hermano, y por el mismo motivo:
+    // mientras estos módulos vistan EN LÍNEA, la hoja no gobierna nada de lo que
+    // se lee aquí, así que el único sitio donde puede vivir la escala es la
+    // constante. Las dos excepciones son las mismas: el glifo ✕ y el `inherit`
+    // de los botones, que declara que NO deciden tamaño.
+    const { cajon } = montar()
+    const raiz = cajon.control.getContainer()
+    cajon.pintar(COMPLETO())
+
+    const permitidos = new Set([...Object.values(ESCALA), '14px', 'inherit'])
+    const intrusos = [raiz, ...raiz.querySelectorAll('*')]
+      .filter((el) => el.style.fontSize !== '')
+      .map((el) => el.style.fontSize)
+      .filter((tam) => !permitidos.has(tam))
+
+    expect(intrusos, `tamaños fuera de ESCALA: ${intrusos.join(', ')}`).toEqual([])
   })
 })

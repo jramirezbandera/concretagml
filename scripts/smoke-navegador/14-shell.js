@@ -135,9 +135,15 @@ const AVISOS_A_PROVOCAR = 5
 const REFERENCIA = Object.freeze({
   // Antes: rail vertical. El mapa pagaba 210 px de ANCHO.
   columna: Object.freeze({ railAncho: 210, mapa: '678×720', verticesPx: 225.08 }),
-  // Después: barra horizontal. El mapa recupera el ancho y paga 72 px de ALTO;
-  // el panel paga los mismos 72 sin ganar nada, y se los come su único estirador.
-  barra: Object.freeze({ barraAlto: 72, mapa: '888×648', verticesPx: 153.08 }),
+  // Después: barra horizontal. El mapa recupera el ancho y paga el ALTO de la
+  // barra; el panel paga lo mismo sin ganar nada, y se lo come su único estirador.
+  //
+  // ⚠️ **53 y no 72, desde el 2026-08-10.** La barra nació con un renglón de
+  // mensajes debajo que cobraba 19 px de alto a la ventana entera; se retiró por
+  // repetir lo que ya decían el `title` del peldaño y el acuse del pie. Los 19 px
+  // volvieron al mapa y al panel, así que las cifras de esta fila son las de
+  // después de esa devolución.
+  barra: Object.freeze({ barraAlto: 53, mapa: '888×667', verticesPx: 172.08 }),
 })
 
 /** Alto de la barra de recorrido. Es `--gml-cabecera-alto` de `estilos/app.css`. */
@@ -315,7 +321,10 @@ if (modo === 'SHELL' && cajaRail) {
             'o se está midiendo una versión anterior, o la rejilla de `.gml-app` no se ha aplicado.',
         }
 
-  // La barra es `overflow:hidden`: lo que no le cabe se recorta sin decir nada.
+  // ⚠️ La barra dejó de ser `overflow:hidden` el 2026-08-10 (rompía sus propios
+  // menús), así que lo que no le quepa ya no se recorta: **se desborda encima del
+  // panel y del mapa**. Sigue midiéndose, y sigue siendo un problema; lo que ha
+  // cambiado es el síntoma, de mudo a feo.
   if (orientacion === 'BARRA') {
     const desbordeBarra = {
       x: railNodo.scrollWidth - railNodo.clientWidth,
@@ -325,57 +334,79 @@ if (modo === 'SHELL' && cajaRail) {
     if (desbordeBarra.x > DESBORDE_TOLERADO || desbordeBarra.y > DESBORDE_TOLERADO) {
       problemas.push(
         `La barra de recorrido se sobresuscribe ${desbordeBarra.x} px en horizontal y ` +
-          `${desbordeBarra.y} en vertical. Es \`overflow:hidden\`: eso es marca, peldaños o ` +
-          `renglón recortados en silencio.`,
+          `${desbordeBarra.y} en vertical: la marca, los peldaños o la entrega se salen de su ` +
+          `caja y se pintan encima del panel y del mapa.`,
       )
     }
   }
 }
 
-// ── 1 bis · ⭐ EL RENGLÓN DE MOTIVO (topbar · rebanada 1) ───────────────────
+// ── 1 bis · ⭐ LOS MENÚS DE LA BARRA NO PUEDEN QUEDAR RECORTADOS ───────
 //
-// Es donde vive la forma LARGA del motivo desde que el peldaño solo tiene sitio
-// para la breve. Dos cosas que jsdom no puede ver y que, si fallan, fallan
-// calladas: que **ocupe su alto aunque esté vacío** (si colapsa, la barra encoge,
-// el mapa cambia de alto y nadie llama a `invalidateSize()`), y que **no se
-// recorte** (un motivo a media frase se lee como una frase entera).
-const renglonNodo = $('.gml-rail-renglon')
-const renglon = {
-  existe: renglonNodo !== null,
-  caja: caja(renglonNodo),
-  texto: renglonNodo === null ? null : renglonNodo.textContent,
-  vacio: renglonNodo === null ? null : renglonNodo.textContent.trim() === '',
-  recortado: recortado(renglonNodo),
-  /** Los peldaños enseñan la forma BREVE; el renglón, la LARGA del más cercano. */
-  brevesEnPantalla: $$('.gml-rail-motivo')
-    .filter((n) => n.getBoundingClientRect().height > 0)
-    .map((n) => n.textContent),
+// ⛔ **Esta sección sustituye a la del renglón de motivo, retirado el 2026-08-10,
+// y la sustituye por lo que aquel `overflow:hidden` de la barra rompía.** El menú
+// del expediente mide más que la barra de la que cuelga; con la barra recortando,
+// «Vaciarlo» se pintaba y era inalcanzable, y peor: el `focus()` de la primera
+// opción hacía scroll de la propia barra (`scrollTop: 37` medido) y se llevaba la
+// marca, el recorrido y «Generar GML» fuera de la pantalla.
+//
+// Las dos cosas son invisibles para jsdom, que no compone cajas. Por eso se miden
+// aquí y no en la suite: aquello estuvo VERDE en 7.397 pruebas.
+
+const disparador = $('[data-menu-disparador]')
+const menus = { disparadorExiste: disparador !== null }
+
+if (disparador !== null) {
+  disparador.click()
+  const panel = $('[data-menu]')
+  const rBarra = railNodo?.getBoundingClientRect() ?? null
+  menus.panelExiste = panel !== null
+  menus.railScrollTop = railNodo?.scrollTop ?? null
+  menus.opciones =
+    panel === null
+      ? []
+      : [...panel.querySelectorAll('[role="menuitem"]')].map((n) => {
+          const r = n.getBoundingClientRect()
+          return {
+            texto: n.textContent.trim(),
+            alto: Math.round(r.height * 100) / 100,
+            dentroDeLaVentana: r.top >= 0 && r.bottom <= innerHeight,
+            dentroDeLaBarra: rBarra === null ? null : r.bottom <= rBarra.bottom,
+          }
+        })
+
+  if (panel === null) {
+    problemas.push(
+      'El disparador del menú del expediente no tiene panel `[data-menu]`. Es la única vía a ' +
+        'los expedientes guardados y a «Vaciarlo» desde que el pie de Entrada se mudó a la barra.',
+    )
+  }
+  // ⛔ El fallo de verdad: la barra NO puede haberse movido al abrir el menú.
+  if (menus.railScrollTop > 0) {
+    problemas.push(
+      `Abrir el menú ha hecho scroll de la barra (\`scrollTop: ${menus.railScrollTop}\`). Eso se ` +
+        'lleva la marca, el recorrido y «Generar GML» fuera de la pantalla. La causa conocida es ' +
+        '`overflow` distinto de `visible` en `.gml-rail`: el `focus()` de la primera opción ' +
+        'arrastra el contenedor recortante.',
+    )
+  }
+  for (const op of menus.opciones) {
+    if (op.dentroDeLaVentana !== true) {
+      problemas.push(
+        `La opción «${op.texto}» del menú del expediente se sale de la ventana. Se pinta y no se ` +
+          'puede pulsar, que es la peor de las dos maneras de faltar.',
+      )
+    }
+  }
+  disparador.click()
 }
 
-if (modo === 'SHELL' && !renglon.existe) {
-  problemas.push(
-    'No hay `.gml-rail-renglon` en la página. Es la única superficie donde se lee CÓMO se ' +
-      'resuelve un paso bloqueado: sin él, el usuario ve «Falta la parcela» y ni una instrucción.',
-  )
-}
-if (renglon.caja !== null && renglon.caja.alto < 1) {
-  problemas.push(
-    `El renglón de motivo mide ${renglon.caja.alto} px de alto. Tiene que ocupar su sitio SIEMPRE, ` +
-      'con o sin texto: si colapsa al resolverse un motivo, la barra encoge, el mapa cambia de ' +
-      'alto y no hay ningún `invalidateSize()` detrás de ese cambio.',
-  )
-}
-if (renglon.recortado?.porAncho === true) {
-  problemas.push(
-    `El motivo del renglón se recorta por ancho: «${renglon.texto}». Una instrucción a media ` +
-      'frase se lee como una instrucción entera, que es peor que no darla.',
-  )
-}
-for (const breve of renglon.brevesEnPantalla) {
-  const nodo = $$('.gml-rail-motivo').find((n) => n.textContent === breve)
-  if (nodo && nodo.scrollWidth - nodo.clientWidth > 1) {
+// Los motivos breves de los peldaños siguen midiéndose: el tope está en
+// `app/navegacion.js#TOPE_MOTIVO_BREVE` y la frase se acorta allí, no aquí.
+for (const nodo of $$('.gml-rail-motivo')) {
+  if (nodo.getBoundingClientRect().height > 0 && nodo.scrollWidth - nodo.clientWidth > 1) {
     problemas.push(
-      `El motivo breve «${breve}» no cabe en su peldaño y se recorta. El tope está en ` +
+      `El motivo breve «${nodo.textContent}» no cabe en su peldaño y se recorta. El tope está en ` +
         '`app/navegacion.js#TOPE_MOTIVO_BREVE`: la frase se acorta allí, no aquí.',
     )
   }
@@ -1245,6 +1276,7 @@ return {
   noCubierto,
   arranque,
   columnas,
+  menus,
   mapa,
   panel,
   pantalla,

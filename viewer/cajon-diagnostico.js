@@ -239,10 +239,63 @@ export const ESTILO_EN_EL_PANEL = Object.freeze({
   minHeight: '0',
 })
 
+/**
+ * ── LA ESCALA TIPOGRÁFICA DEL CAJÓN (2026-08-10) ───────────────────────────
+ *
+ * **Vive AQUÍ y no en `estilos/app.css` porque este módulo viste en línea**, y un
+ * estilo en línea gana a cualquier selector: mientras estos números estén
+ * escritos a mano en cada nodo, la hoja no gobierna nada de lo que se lee en este
+ * cajón. Es el mismo acuerdo que `viewer/capas.js` (el cajón tiene que leerse
+ * sobre una ortofoto aunque la hoja no cargue), así que no se «arregla» moviendo
+ * los tamaños al CSS: se arregla teniéndolos en UN sitio, que es esto.
+ *
+ * ── QUÉ MEDÍA ANTES, Y POR QUÉ SE CAMBIÓ ────────────────────────────────────
+ * `/plan-design-review` del 2026-08-10 contó las declaraciones de tamaño de toda
+ * la aplicación: **92 de 105 valían 10, 11 o 12 px**. Aquí eso se traducía en que
+ * la superficie medida —la cifra por la que existe la pantalla— se leía
+ * exactamente igual de fuerte que el descargo de tres líneas que hay encima, y
+ * que varias filas ni siquiera declaraban tamaño: heredaban el 12 px que pone
+ * Leaflet sobre el mapa y otro distinto dentro del panel, así que **el mismo
+ * cajón se veía de dos tamaños según dónde estuviera**.
+ *
+ * Cinco pasos, y cada uno tiene un trabajo. No hay un sexto «título de pantalla»
+ * porque este cajón no tiene título de pantalla: su `<h2>` es la frase de
+ * entrada, y va en CUERPO con peso 600.
+ *
+ * ⚠️ `DATO_XL` es SOLO para la superficie medida, y solo cuando hay una cifra:
+ * «No consta» a 30 px grita una ausencia. Lo conmuta `pintar` (ver
+ * `destacarMedida`), no se pega aquí de una vez.
+ */
+export const ESCALA = Object.freeze({
+  /** El dato titular: la superficie medida, y nada más. */
+  DATO_XL: '30px',
+  /** Toda cifra de la ficha (superficies, solape, centroides, desviación). */
+  DATO: '15px',
+  /** Prosa y etiquetas de dato. Sube desde el 11-12 px heredado. */
+  CUERPO: '13px',
+  /** Notas al pie: procedencia, margen, renglón de estado, tabla de cruces. */
+  APUNTE: '12px',
+  /** Rótulo de grupo, en versalitas. */
+  ROTULO: '10px',
+})
+
 export const CLASE = Object.freeze({
   CONTENEDOR: 'gml-cajon-diagnostico',
   TITULAR: 'gml-cajon-titular',
   SECCION: 'gml-cajon-seccion',
+  /**
+   * Rótulo de grupo («Superficie», «Encaje»). Nace con la revisión de diseño del
+   * 2026-08-10, que midió que el cajón era una columna indiferenciada: seis
+   * bloques distintos sin una sola pista de dónde acaba uno y empieza el
+   * siguiente.
+   *
+   * ⛔ **La invasión NO lleva uno**, y es a propósito: esa sección se anuncia
+   * ella misma con tres textos DISTINTOS («…: no se ha consultado», «…:
+   * ninguna», y el título a secas cuando las hay), y esa diferencia es media
+   * razón de ser de F07. Un rótulo fijo encima aplanaría las tres en una y
+   * duplicaría la palabra.
+   */
+  ROTULO: 'gml-cajon-rotulo',
   CIFRA: 'gml-cajon-cifra',
   TABLA: 'gml-cajon-tabla',
   // No hay `OMISION`. La había, y no la llevaba ningún nodo: los motivos de
@@ -450,6 +503,42 @@ function estilar(el, estilos) {
   return el
 }
 
+/**
+ * Un rótulo de grupo del cajón. Ver {@link CLASE.ROTULO} para por qué existen y
+ * por qué la invasión no lleva.
+ *
+ * **Se EXPORTA, al contrario que `estilar` o `enDialogo`, que el cajón de
+ * edificio duplica.** La diferencia es qué son: aquellas son utilidades
+ * genéricas de tres líneas, y duplicarlas no puede desalinear nada; esto fabrica
+ * un nodo con una clase, un tamaño, un interletraje y un gris CONCRETOS que los
+ * dos cajones hermanos tienen que compartir. Duplicarlo sería sembrar
+ * exactamente la deriva que la escala viene a cerrar — y ya pasó una vez: hasta
+ * el 2026-08-10 los dos módulos escribían sus tamaños a mano y acabaron con
+ * ficheros distintos para las mismas filas.
+ *
+ * Es `<h3>` y no `<p>`: la cabecera del cajón es un `<h2>`, así que estos son sus
+ * hijos en el esquema del documento y un lector de pantalla puede saltar de grupo
+ * en grupo. Un `<p>` en versalitas se vería igual y no navegaría.
+ *
+ * El gris es `#475569` y no el `#64748B` del cromo menudo: a 10 px, `#64748B`
+ * sobre blanco da 4,55:1 —pasa AA por los pelos y sin margen—, y este rótulo es
+ * justo el texto más pequeño del cajón. `#475569` da ~7,5:1.
+ *
+ * @param {Document} doc
+ * @param {string} texto
+ * @returns {HTMLElement}
+ */
+export function rotuloDeGrupo(doc, texto) {
+  return estilar(crear(doc, 'h3', CLASE.ROTULO, texto), {
+    margin: '12px 0 4px',
+    fontSize: ESCALA.ROTULO,
+    fontWeight: '500',
+    letterSpacing: '0.09em',
+    textTransform: 'uppercase',
+    color: '#475569',
+  })
+}
+
 const esMapa = (m) =>
   !!m &&
   typeof m.addControl === 'function' &&
@@ -562,7 +651,7 @@ const CajonDiagnostico = L.Control.extend({
     titular.dataset.diag = 'titular'
     estilar(titular, {
       margin: '0',
-      fontSize: '13px',
+      fontSize: ESCALA.CUERPO,
       fontWeight: '600',
       color: '#0F172A',
     })
@@ -612,7 +701,7 @@ const CajonDiagnostico = L.Control.extend({
     procedencia.setAttribute('role', 'status')
     estilar(procedencia, {
       margin: '6px 0 0',
-      fontSize: '12px',
+      fontSize: ESCALA.APUNTE,
       color: '#475569',
       display: 'none',
     })
@@ -628,6 +717,12 @@ const CajonDiagnostico = L.Control.extend({
     medida.dataset.diag = 'superficie-medida'
     const catastral = crear(doc, 'dd', CLASE.CIFRA)
     catastral.dataset.diag = 'superficie-catastral'
+    // Las cifras declaran su tamaño; el `dl` de abajo declara el de las etiquetas.
+    // Antes ninguno de los dos lo hacía y las cuatro celdas heredaban lo que
+    // pusiera el anfitrión: 12 px de Leaflet sobre el mapa, otro dentro del panel.
+    // `medida` lo vuelve a escribir `pintar` cuando hay cifra (ver `destacarMedida`).
+    estilar(medida, { fontSize: ESCALA.DATO })
+    estilar(catastral, { fontSize: ESCALA.DATO })
     this._medida = medida
     this._catastral = catastral
 
@@ -637,6 +732,7 @@ const CajonDiagnostico = L.Control.extend({
       gridTemplateColumns: 'auto 1fr',
       gap: '2px 10px',
       margin: '8px 0 0',
+      fontSize: ESCALA.CUERPO,
     })
     lista.append(
       crear(doc, 'dt', null, 'Medición'),
@@ -682,7 +778,7 @@ const CajonDiagnostico = L.Control.extend({
       borderCollapse: 'collapse',
       marginTop: '8px',
       width: '100%',
-      fontSize: '12px',
+      fontSize: ESCALA.APUNTE,
     })
     this._cruces = cruces
 
@@ -695,6 +791,7 @@ const CajonDiagnostico = L.Control.extend({
       gridTemplateColumns: 'auto 1fr',
       gap: '2px 10px',
       margin: '10px 0 0',
+      fontSize: ESCALA.CUERPO,
     })
     this._solape = crear(doc, 'dd', CLASE.CIFRA)
     this._solape.dataset.diag = 'solape'
@@ -702,6 +799,14 @@ const CajonDiagnostico = L.Control.extend({
     this._centroides.dataset.diag = 'centroides'
     this._desviacion = crear(doc, 'dd', CLASE.CIFRA)
     this._desviacion.dataset.diag = 'desviacion'
+    // Las tres pueden traer una CIFRA o el motivo de su omisión, que es prosa y a
+    // veces larga. 15 px sirve a las dos: es el salto sobre la etiqueta de 13 que
+    // hace que la vista caiga en el número, y no tanto como para que un motivo de
+    // dos líneas se coma el cajón. Por eso el tamaño grande de verdad (`DATO_XL`)
+    // se reserva a `medida`, que nunca lleva prosa.
+    for (const dd of [this._solape, this._centroides, this._desviacion]) {
+      estilar(dd, { fontSize: ESCALA.DATO })
+    }
     metricas.append(
       crear(doc, 'dt', null, 'Solape'),
       this._solape,
@@ -715,6 +820,7 @@ const CajonDiagnostico = L.Control.extend({
     const invasion = crear(doc, 'div', CLASE.INVASION)
     invasion.dataset.diag = 'invasion'
     invasion.style.marginTop = '10px'
+    invasion.style.fontSize = ESCALA.CUERPO
     this._invasion = invasion
 
     // ── Margen de identidad, con su selector de clase ──────────────────────
@@ -743,7 +849,7 @@ const CajonDiagnostico = L.Control.extend({
     margen.dataset.diag = 'margen'
     estilar(margen, {
       margin: '6px 0 0',
-      fontSize: '12px',
+      fontSize: ESCALA.APUNTE,
       color: '#64748B',
     })
     this._margen = margen
@@ -769,7 +875,7 @@ const CajonDiagnostico = L.Control.extend({
     estado.setAttribute('role', 'status')
     estilar(estado, {
       margin: '8px 0 0',
-      fontSize: '12px',
+      fontSize: ESCALA.APUNTE,
       color: '#64748B',
       minHeight: '1em',
     })
@@ -925,10 +1031,18 @@ const CajonDiagnostico = L.Control.extend({
     estilar(pie, { marginTop: '0' })
     anclado.append(estado, pie)
 
+    // Los DOS rótulos de grupo (2026-08-10). Sin ellos esto son seis bloques
+    // seguidos sin una sola pista de dónde acaba uno y empieza el siguiente: la
+    // revisión de diseño lo llamó «una columna indiferenciada» y tenía razón.
+    // Por qué la invasión no lleva el suyo, en {@link CLASE.ROTULO}; el bloque del
+    // margen tampoco, porque es un campo que se rellena y su nota, no una ficha de
+    // cifras, y rotularlo lo ascendería a sección que no es.
     contenedor.append(
       cabecera,
       procedencia,
+      rotuloDeGrupo(doc, 'Superficie'),
       bandas,
+      rotuloDeGrupo(doc, 'Encaje'),
       metricas,
       invasion,
       bloqueMargen,
@@ -1224,6 +1338,26 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
 
   let destruido = false
 
+  /**
+   * Conmuta el tamaño de la superficie medida entre {@link ESCALA.DATO_XL} y
+   * {@link ESCALA.DATO}.
+   *
+   * Existe porque el dato titular no puede ser incondicional: `_medida` recibe o
+   * bien una cifra («40,04 m²») o bien `NO_CONSTA`, y **«No consta» a 30 px grita
+   * una ausencia**. Un cajón que no tiene nada que decir no debe decirlo más alto
+   * que uno que sí.
+   *
+   * ⚠️ No conmuta color, peso ni texto: solo el tamaño. Destacar la cifra por la
+   * que existe la pantalla es JERARQUÍA, no juicio — la regla de oro 9 prohíbe
+   * decir si el encaje es bueno, no prohíbe que el número más importante se lea
+   * primero.
+   *
+   * @param {boolean} hayCifra
+   */
+  function destacarMedida(hayCifra) {
+    control._medida.style.fontSize = hayCifra ? ESCALA.DATO_XL : ESCALA.DATO
+  }
+
   /** Escribe el titular DESCRIPTIVO de §10.5. Ni «apta» ni «correcta». */
   function pintarTitular(d) {
     const medida = m2(d.superficie.medida)
@@ -1398,8 +1532,15 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       )
       estilar(p, {
         margin: '4px 0 0',
-        fontSize: '11px',
-        color: '#94A3B8',
+        // Era 11 px suelto y lo cazó el guardián de la escala (2026-08-10). Sube a
+        // APUNTE: es una nota al pie, del mismo rango que la del margen de
+        // identidad, y no había ninguna razón para que midiera un píxel menos.
+        fontSize: ESCALA.APUNTE,
+        // Era `#94A3B8`: **2,6:1 sobre blanco**, o sea que no pasa AA por bastante.
+        // Que la nota esté deliberadamente apagada no autoriza a hacerla ilegible —
+        // y menos ésta, que existe por la regla de oro 1 (lo descartado se puede
+        // ver). `#64748B` da 4,55:1 y sigue leyéndose como apunte menudo.
+        color: '#64748B',
       })
       caja.append(p)
     }
@@ -1506,6 +1647,7 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       if (destruido || !control._contenedor) return
       if (d === null || d === undefined) {
         control._titular.textContent = 'Sin diagnóstico.'
+        destacarMedida(false)
         for (const el of [control._medida, control._catastral, control._solape,
           control._centroides, control._desviacion]) {
           el.textContent = NO_CONSTA
@@ -1519,6 +1661,7 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       }
 
       pintarTitular(d)
+      destacarMedida(d.superficie.medida !== null && d.superficie.medida !== undefined)
       control._medida.textContent = m2(d.superficie.medida)
       control._catastral.textContent = m2Entero(d.superficie.catastral)
       // El campo de la registral NO se sobrescribe si el usuario está escribiendo en

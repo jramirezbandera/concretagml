@@ -1013,6 +1013,23 @@ export const SELECTOR_ESTADO_GML = '[data-estado="generar-gml"]'
 const CLASE_ESTADO_ERROR = 'gml-accion-estado--error'
 
 /**
+ * Modificador de `.gml-accion-estado` para la acción COMPLETADA (verde).
+ *
+ * Es el simétrico exacto de {@link CLASE_ESTADO_ERROR} y se estrenó el
+ * 2026-08-10: hasta entonces `--color-state-ok` llevaba definido desde la copia
+ * del design system sin un solo uso, y la app decía «Descargado «X».» en el
+ * mismo gris con el que dice cualquier otra cosa.
+ *
+ * ⚠️ **No es una excepción a la regla de oro 9**, y conviene no leerlo como
+ * permiso para teñir cifras. Este renglón habla de la puerta de la aplicación
+ * («¿te dejo generar?», «¿bajó el fichero?»), no del levantamiento. El rojo vive
+ * aquí desde F04 sin que nadie lo haya discutido por el mismo motivo. El
+ * razonamiento completo, y dónde está prohibido, en `estilos/app.css`
+ * (`.gml-accion-estado--exito`) y en la cabecera de `viewer/cajon-diagnostico.js`.
+ */
+const CLASE_ESTADO_EXITO = 'gml-accion-estado--exito'
+
+/**
  * Cuántos motivos DISTINTOS caben en el renglón antes de resumir el resto. El
  * renglón es una línea de 11 px debajo del botón, no un panel: con más de dos
  * mensajes deja de leerse. No es un tope de información —el recuento completo va
@@ -3522,12 +3539,19 @@ export function cablearGeneracionGml({
    * Escribe el renglón `role="status"`. Vacío + sin modificador es el estado
    * «todo en orden»: el CSS lo colapsa y el pie no da un salto de layout.
    *
+   * `esExito` es opcional y por defecto `false`, así que las cinco llamadas que
+   * solo distinguen error de reposo siguen limpiando el verde sin decir nada:
+   * los dos modificadores son mutuamente excluyentes y quien escribe el renglón
+   * no debería tener que acordarse de apagar el otro.
+   *
    * @param {string} texto
    * @param {boolean} esError
+   * @param {boolean} [esExito]  La acción se completó. Ver {@link CLASE_ESTADO_EXITO}.
    */
-  function decir(texto, esError) {
+  function decir(texto, esError, esExito = false) {
     renglon.textContent = texto
     renglon.classList.toggle(CLASE_ESTADO_ERROR, esError)
+    renglon.classList.toggle(CLASE_ESTADO_EXITO, esExito)
   }
 
   /**
@@ -3732,9 +3756,15 @@ export function cablearGeneracionGml({
     // trae un `mensaje` en castellano ya presentable: se muestra tal cual y no se
     // duplica en el panel, porque el panel es para lo que le pasa al DATO y esto
     // es lo que le ha pasado a la ENTREGA.
+    // El tercer argumento es el estreno del verde (2026-08-10): es el único
+    // desenlace de todo este cableado en el que la acción que el usuario pidió se
+    // completó de verdad, y hasta hoy se decía en el mismo gris que «no hay
+    // parcela». No califica el GML —eso sería la regla de oro 9—: dice que el
+    // fichero bajó.
     decir(
       entrega.descargado ? `Descargado «${entrega.nombre}».` : entrega.mensaje,
       !entrega.descargado,
+      entrega.descargado,
     )
     return entrega
   }
@@ -4301,31 +4331,22 @@ const barra = cablearBarra({
   },
 
   /**
-   * ⭐ **LOS DOS PRODUCTORES DE LA BARRA (topbar · rebanadas 2 y 3).** Se
-   * inyectan como FUNCIONES y se leen en cada pintada: una foto guardada aquí se
-   * quedaría rancia en el primer cambio del expediente, que es exactamente el
-   * fallo mudo que la decisión A1 existe para impedir.
+   * ⭐ **EL PRODUCTOR DEL EXPEDIENTE (topbar · rebanada 2).** Se inyecta como
+   * FUNCIÓN y se lee en cada pintada: una foto guardada aquí se quedaría rancia en
+   * el primer cambio del expediente, que es exactamente el fallo mudo que la
+   * decisión A1 existe para impedir. Es el `estado()` que
+   * `app/cableado-expediente.js` ya publicaba para el guion 12; la barra no
+   * reconstruye nada.
    *
-   * `expediente` es el `estado()` que `app/cableado-expediente.js` ya publicaba
-   * para el guion 12; la barra no reconstruye nada.
+   * ⚠️ **Aquí hubo un segundo productor, `motivoDeEntrega`, y se fue con el
+   * renglón el 2026-08-10.** Leía `[data-estado="generar-gml"]` del DOM para poder
+   * repetir arriba el acuse de la entrega. Al retirar el renglón dejó de tener
+   * lector, y el acuse se resolvió mudando el NODO en vez de copiando su texto:
+   * ahora cuelga del `<footer>` en vez de `.gml-acciones[data-pantalla="edicion"]`,
+   * así que se ve en los tres pasos igual que su botón (decisión A2) y sigue
+   * habiendo **un solo escritor**, que son los cableados de GML.
    */
   expediente: () => expedienteCableado?.estado() ?? null,
-
-  /**
-   * ⚠️ **LEE DEL DOM, Y ESTÁ DECIDIDO ASÍ EN EL DISEÑO** («un solo módulo lee de
-   * los dos, aplica la prioridad y escribe»). `[data-estado="generar-gml"]` es el
-   * nodo donde los cableados de GML —el de parcela y el de edificio— llevan
-   * escribiendo su motivo desde F04, y **se queda en el pie del panel**: mudarlo
-   * habría convertido a la barra en su segundo escritor, y dos escritores del
-   * mismo nodo es una carrera que gana el último.
-   *
-   * Así que aquí hay un solo escritor (los cableados) y un solo lector (la
-   * barra). El nodo se resuelve en cada llamada y no al montar: en Entrada el pie
-   * está oculto por el eje PASO, pero **sigue en el documento y sigue escrito**,
-   * que es justo lo que hace que el motivo se pueda enseñar arriba en los tres
-   * pasos (decisión A2).
-   */
-  motivoDeEntrega: () => document.querySelector('[data-estado="generar-gml"]')?.textContent ?? '',
 })
 
 // El eje PASO de la cáscara (T6): escribe `data-paso` en el `<body>` y pone el
