@@ -490,7 +490,7 @@ export const ASIENTOS = Object.freeze(
         'sobre el techo.' },
 
     { hito: 'Topbar · rebanada 2 · el expediente, los avisos y la entrega suben a la barra',
-      commit: '(sin commitear)',
+      commit: 'eb39919',
       total: 72839, nuestro: 57744, rebanada: null,
       nota:
         '**+1.536 B.** La barra pasa de tres zonas a CINCO —marca · expediente · recorrido · ' +
