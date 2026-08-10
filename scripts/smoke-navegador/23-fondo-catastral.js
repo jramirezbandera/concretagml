@@ -162,7 +162,7 @@ const SEL = {
   FILAS: '.gml-fila-vertice',
   RAIL: '.gml-rail-pasos',
   // ⚠️ El `data-paso` está en el `<li>`; el que se PULSA es el `<button>` de
-  // dentro, y lleva `data-ir-a-paso` (`app/rail.js:79`).
+  // dentro, y lleva `data-ir-a-paso` (`app/barra.js#ATRIBUTO_IR_A_PASO`).
   PELDANOS: '.gml-rail-pasos [data-ir-a-paso]',
 }
 

@@ -33,11 +33,71 @@ export { meridianoCentral }
 // ---------------------------------------------------------------------------
 
 // Bounding box Península + Baleares. Canarias queda FUERA a propósito (O13).
+// Es la UNIÓN de los tres husos: sirve para «¿esto es España?» a secas (lo usa
+// `situarGrados`, que parte de una longitud y no tiene nada que discriminar),
+// NO para decidir en qué huso cae un punto. Para eso está {@link BBOX_POR_HUSO},
+// y el porqué está escrito ahí.
 export const BBOX_ESPANA = Object.freeze({
   lonMin: -9.5,
   lonMax: 4.5,
   latMin: 35.5,
   latMax: 44.5,
+})
+
+// ---------------------------------------------------------------------------
+// ⭐ QUÉ TERRITORIO ESPAÑOL HAY EN CADA HUSO (2026-08-09)
+//
+// ⛔ Hasta hoy, `detectarHuso` validaba los tres candidatos contra el MISMO
+// rectángulo ({@link BBOX_ESPANA}), y ese rectángulo se traga medio Mediterráneo
+// y un trozo de Argelia. MEDIDO sobre 42 municipios reales, uno por uno,
+// llevados a su huso verdadero y devueltos por este módulo: **42 de 42 salían
+// ambiguos y en 22 de 42 el prioritario era el huso EQUIVOCADO** — Galicia,
+// Extremadura, Huelva y Cádiz (huso 29) y Cataluña y Baleares (huso 31)
+// entraban TODAS como huso 30, que es el primero de la lista de prioridad.
+//
+// El caso que lo destapó: una parcela de Málaga (386.132, 4.064.410). Leída como
+// huso 30 cae en lon −4,275 · lat 36,719, que es Málaga. Leída como huso 31 cae
+// en lon +1,725 · lat 36,719, que es **mar abierto frente a la costa argelina**
+// — y pasaba el filtro, porque el rectángulo único llega hasta lon 4,5.
+//
+// La clave está en que **la latitud es IDÉNTICA en todos los candidatos**: leer
+// el mismo par de metros con el huso vecino mueve la longitud exactamente ±6° y
+// deja la latitud donde estaba. Así que la longitud NO discrimina nunca (por eso
+// la ventana CM±3° «casi nunca discrimina», como dice el hallazgo A1 de la
+// auditoría F00: los ±6° caen justo en la banda del vecino), y la latitud SÍ, a
+// cambio de saber qué latitudes tiene territorio cada banda:
+//
+//   · Huso 29 (lon −12…−6): Galicia, oeste de Castilla, Extremadura oeste,
+//     Huelva y Cádiz. Del Cabo de Trafalgar (36,18) a Estaca de Bares (43,79).
+//   · Huso 30 (lon −6…0): el grueso de la Península. De Punta de Tarifa (36,00)
+//     —y Ceuta, 35,88— al Cabo de Peñas (43,66).
+//   · Huso 31 (lon 0…6): Cataluña, el norte de Castellón y las Baleares. De
+//     **Formentera (38,63)** al Valle de Arán (42,84). **Ahí abajo no hay nada
+//     español**, y por eso el 31 deja de ser una lectura viable de una parcela
+//     andaluza o murciana.
+//
+// ⚠️ Los límites son GENEROSOS a propósito (margen de ~0,2° sobre el extremo
+// real): esto decide si una parcela legítima entra o se rechaza, y equivocarse
+// por estrecho es peor que quedarse largo. Lo que se recorta es mar, no suelo.
+//
+// ⚠️ Y NO cierra la ambigüedad: quedan pares donde las dos lecturas caen sobre
+// suelo español de verdad —una parcela de Barcelona leída como huso 30 aterriza
+// en Guadalajara; una de Valencia leída como 29 aterriza en Cáceres—. Ésas no
+// las resuelve ninguna geometría: las decide el usuario, y por eso desde hoy la
+// ambigüedad ABRE la pantalla de revisión (`app/dialogo-importacion.js`).
+// ---------------------------------------------------------------------------
+
+/**
+ * Ventana geográfica del territorio español dentro de cada huso. El `lon` repite
+ * la banda del huso (lo mismo que ya impone la ventana CM±3°) recortada por
+ * España; el `lat` es lo que de verdad discrimina. Ver el bloque de arriba.
+ *
+ * @type {Readonly<Record<number, {lonMin:number, lonMax:number, latMin:number, latMax:number}>>}
+ */
+export const BBOX_POR_HUSO = Object.freeze({
+  29: Object.freeze({ lonMin: -9.5, lonMax: -6.0, latMin: 36.0, latMax: 44.0 }),
+  30: Object.freeze({ lonMin: -6.0, lonMax: 0.0, latMin: 35.5, latMax: 44.0 }),
+  31: Object.freeze({ lonMin: 0.0, lonMax: 4.5, latMin: 38.5, latMax: 43.0 }),
 })
 
 // Rangos UTM plausibles (Península). Se usan para verificar el resultado tras un
@@ -215,10 +275,22 @@ function enBboxEspana(lon, lat) {
 }
 
 /**
+ * ¿(lon,lat) cae sobre territorio español del huso `zona`? Es {@link enBboxEspana}
+ * afinado por huso ({@link BBOX_POR_HUSO}). Un huso sin ventana propia —no lo hay
+ * hoy, pero Canarias entrará algún día— cae al rectángulo único, que es el
+ * comportamiento de antes: se degrada a lo de siempre, no se rompe.
+ */
+function enTerritorioDelHuso(lon, lat, zona) {
+  return enBbox(lon, lat, BBOX_POR_HUSO[zona] ?? BBOX_ESPANA)
+}
+
+/**
  * Detecta el huso UTM de una coordenada [x,y] por desproyección del centroide.
  *
  * Para cada candidato `z`: desproyecta (x,y) con utm.inverse y acepta `z` si
- * `lon ∈ [CM(z)−3°, CM(z)+3°]` Y `(lon,lat) ∈ bbox España`. Devuelve TODOS los
+ * `lon ∈ [CM(z)−3°, CM(z)+3°]` Y `(lon,lat)` cae en el territorio español de ESE
+ * huso ({@link BBOX_POR_HUSO}, y no el rectángulo único de {@link BBOX_ESPANA}:
+ * ver el bloque «QUÉ TERRITORIO ESPAÑOL HAY EN CADA HUSO»). Devuelve TODOS los
  * candidatos viables; la interpretación PRIORITARIA (el primero del orden) va
  * aplanada en la raíz del resultado por comodidad.
  *
@@ -232,6 +304,12 @@ function enBboxEspana(lon, lat) {
  * interpretación y dejar decidir al usuario (PLAN §5.5), no dar el primero por
  * bueno. Si el dato ya trae huso, pásalo como único candidato (`[huso]`) para
  * solo VERIFICAR (modo que acepta 168/168 en el barrido).
+ *
+ * ⭐ El 2026-08-09 la ventana por huso recorta buena parte de esa ambigüedad
+ * —MEDIDO sobre 42 municipios reales, ver el bloque de arriba—, pero NO la
+ * elimina: donde las dos lecturas caen sobre suelo español, `ambiguo` sigue
+ * siendo `true` y la decisión sigue siendo del usuario. Es exactamente el aviso
+ * del párrafo anterior, ahora con menos falsos positivos.
  *
  * @param {[number, number]} coord  Coordenada UTM [x=Este, y=Norte] (metros).
  * @param {number[]} [candidatos=CANDIDATOS_DEFECTO]  Husos a probar, en orden de prioridad.
@@ -255,7 +333,7 @@ export function detectarHuso(coord, candidatos = CANDIDATOS_DEFECTO) {
     const { lat, lon } = inverse(x, y, zona)
     const cm = meridianoCentral(zona)
     const enVentanaCM = lon >= cm - 3 && lon <= cm + 3
-    if (enVentanaCM && enBboxEspana(lon, lat)) {
+    if (enVentanaCM && enTerritorioDelHuso(lon, lat, zona)) {
       viables.push({ zona, srs: srsPorHuso(zona), lon, lat })
     }
   }

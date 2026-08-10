@@ -1,7 +1,7 @@
 /* -------------------------------------------------------------------------- *
- * test/app/rail.dom.test.js — Rework de UI · T5 · el rail de navegación        *
+ * test/app/barra.dom.test.js — Rework de UI · T5 · el rail de navegación        *
  *                                                                              *
- * `app/rail.js` es un APLICADOR: se suscribe a `app/navegacion.js` y pinta. No  *
+ * `app/barra.js` es un APLICADOR: se suscribe a `app/navegacion.js` y pinta. No  *
  * decide nada, y la mitad de lo que se vigila aquí es justamente eso — que no   *
  * decida. El motivo que sale en un paso apagado se compara contra la constante  *
  * de la AUTORIDAD, no contra un literal escrito aquí: si un día este módulo     *
@@ -21,7 +21,10 @@ import { join } from 'node:path'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 
 import {
+  MOTIVO_BREVE,
+  MOTIVO_BREVE_EDIFICIO,
   MOTIVO_DATO,
+  MOTIVO_DATO_EDIFICIO,
   MOTIVO_RAMA,
   PASO,
   PASOS,
@@ -36,10 +39,10 @@ import {
   ESTADO,
   MENSAJE_NAVEGAR_ROTO,
   SELECTOR_PASOS,
-  SELECTOR_RAIL,
-  cablearRail,
+  SELECTOR_BARRA,
+  cablearBarra,
   selectorPaso,
-} from '../../app/rail.js'
+} from '../../app/barra.js'
 
 const RAIZ = join(import.meta.dirname, '..', '..')
 
@@ -48,7 +51,7 @@ const INDEX = (() => {
   const encontrado = /<body([^>]*)>([\s\S]*)<\/body>/i.exec(html)
   if (encontrado === null) {
     throw new Error(
-      'test/app/rail.dom.test.js: no se ha encontrado el <body> de index.html. La cáscara de ' +
+      'test/app/barra.dom.test.js: no se ha encontrado el <body> de index.html. La cáscara de ' +
         'estas pruebas se lee del fichero real a propósito (no se copia).',
     )
   }
@@ -70,13 +73,18 @@ afterEach(() => {
   vivo = null
 })
 
-/** Monta la cáscara real y cablea el rail sobre una navegación de verdad. */
-function cablear({ hechos = {}, rama = RAMA.PARCELA, alNavegar = null } = {}) {
+/** Monta la cáscara real y cablea la barra sobre una navegación de verdad. */
+function cablear({
+  hechos = {},
+  rama = RAMA.PARCELA,
+  alNavegar = null,
+  motivoDeEntrega = null,
+} = {}) {
   montarCascara()
   const panel = doblePanel()
   const navegacion = crearNavegacion({ rama, hechos, avisar: () => {} })
-  vivo = cablearRail({ documento: document, navegacion, panel, alNavegar })
-  return { rail: vivo, navegacion, panel }
+  vivo = cablearBarra({ documento: document, navegacion, panel, alNavegar, motivoDeEntrega })
+  return { rail: vivo, barra: vivo, navegacion, panel }
 }
 
 const peldanos = () => Array.from(document.querySelectorAll(`.${CLASE.PASO}`))
@@ -84,6 +92,7 @@ const boton = (paso) => document.querySelector(selectorPaso(paso))
 const li = (paso) => boton(paso).closest(`.${CLASE.PASO}`)
 const motivoDe = (paso) => li(paso).querySelector(`.${CLASE.MOTIVO}`).textContent
 const estadoDe = (paso) => li(paso).getAttribute(ATRIBUTO_ESTADO)
+const renglon = () => document.querySelector(`.${CLASE.RENGLON}`)
 
 /** Con todo cargado: los cinco pasos disponibles. */
 const TODO = { geometria: true, oficial: true }
@@ -93,7 +102,7 @@ const TODO = { geometria: true, oficial: true }
 describe('T5 · el contrato de marcado con index.html', () => {
   it('`index.html` trae la cáscara del rail, y el `<ol>` nace VACÍO', () => {
     montarCascara()
-    expect(document.querySelector(SELECTOR_RAIL)).not.toBeNull()
+    expect(document.querySelector(SELECTOR_BARRA)).not.toBeNull()
     const lista = document.querySelector(SELECTOR_PASOS)
     expect(lista).not.toBeNull()
     // Vacío a propósito: un `<ol>` con peldaños escritos en el HTML saldría en
@@ -104,7 +113,7 @@ describe('T5 · el contrato de marcado con index.html', () => {
 
   it('los dos selectores del contrato casan exactamente un nodo', () => {
     montarCascara()
-    for (const selector of [SELECTOR_RAIL, SELECTOR_PASOS]) {
+    for (const selector of [SELECTOR_BARRA, SELECTOR_PASOS]) {
       expect(document.querySelectorAll(selector)).toHaveLength(1)
     }
   })
@@ -113,15 +122,15 @@ describe('T5 · el contrato de marcado con index.html', () => {
     montarCascara()
     document.querySelector(SELECTOR_PASOS).remove()
     const navegacion = crearNavegacion({ avisar: () => {} })
-    expect(() => cablearRail({ documento: document, navegacion })).toThrow(/data-rail="pasos"/)
+    expect(() => cablearBarra({ documento: document, navegacion })).toThrow(/data-rail="pasos"/)
   })
 
   it('sin documento o sin navegación, cablear LANZA', () => {
     montarCascara()
     const navegacion = crearNavegacion({ avisar: () => {} })
-    expect(() => cablearRail({ navegacion })).toThrow(TypeError)
-    expect(() => cablearRail({ documento: document })).toThrow(TypeError)
-    expect(() => cablearRail({ documento: document, navegacion, alNavegar: 'no' })).toThrow(TypeError)
+    expect(() => cablearBarra({ navegacion })).toThrow(TypeError)
+    expect(() => cablearBarra({ documento: document })).toThrow(TypeError)
+    expect(() => cablearBarra({ documento: document, navegacion, alNavegar: 'no' })).toThrow(TypeError)
   })
 })
 
@@ -156,13 +165,20 @@ describe('T5 · los tres estados, y ninguno en silencio', () => {
 
   it('⭐ el motivo lo REDACTA la autoridad: este módulo no escribe ni una palabra', () => {
     cablear() // sin datos
-    // Se compara contra la constante exportada por `app/navegacion.js`, no contra
-    // un literal copiado aquí. Si el rail empezara a redactar sus propios textos,
-    // este `it` sale rojo.
-    expect(motivoDe(PASO.EDICION)).toBe(MOTIVO_DATO.geometria)
+    // Se compara contra las constantes exportadas por `app/navegacion.js`, no
+    // contra literales copiados aquí. Si la barra empezara a redactar sus propios
+    // textos —o a RECORTAR los ajenos, que es la tentación desde que el hueco es
+    // estrecho— este `it` sale rojo.
+    //
+    // ⭐ **Y desde el 2026-08-10 son DOS redacciones en DOS sitios**: en el peldaño
+    // la breve (qué falta), en el `title` del mismo botón la larga (cómo se
+    // consigue). Ver la escalera de tres de la cabecera de `app/barra.js`.
+    expect(motivoDe(PASO.EDICION)).toBe(MOTIVO_BREVE.geometria)
+    expect(boton(PASO.EDICION).getAttribute('title')).toBe(MOTIVO_DATO.geometria)
     // Diagnóstico pide DOS hechos y falta el primero: se dice el primero de la
     // lista, que es el que el usuario puede resolver antes.
-    expect(motivoDe(PASO.DIAGNOSTICO)).toBe(MOTIVO_DATO.geometria)
+    expect(motivoDe(PASO.DIAGNOSTICO)).toBe(MOTIVO_BREVE.geometria)
+    expect(boton(PASO.DIAGNOSTICO).getAttribute('title')).toBe(MOTIVO_DATO.geometria)
   })
 
   it('⭐ F14 · en la rama EDIFICIO el rail ya no apaga NADA por rama', () => {
@@ -262,7 +278,7 @@ describe('T5 · pulsar', () => {
       },
     }
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
-    vivo = cablearRail({ documento: document, navegacion: navegacionRota, panel })
+    vivo = cablearBarra({ documento: document, navegacion: navegacionRota, panel })
 
     expect(() => boton(PASO.EDICION).click()).not.toThrow()
 
@@ -332,6 +348,7 @@ describe('T5 · destruir', () => {
   it('vacía el `<ol>`, se da de baja y es IDEMPOTENTE', () => {
     const { rail, navegacion } = cablear({ hechos: TODO })
     expect(peldanos()).toHaveLength(PASOS.length)
+    expect(renglon()).not.toBeNull()
 
     rail.destruir()
     rail.destruir()
@@ -341,5 +358,113 @@ describe('T5 · destruir', () => {
     // Y no se queda escuchando: navegar después no revienta ni repinta nada.
     expect(() => navegacion.navegarAPaso(PASO.EDICION)).not.toThrow()
     expect(peldanos()).toHaveLength(0)
+    // Lo que pone, lo quita: el renglón también es suyo.
+    expect(renglon()).toBeNull()
+  })
+})
+
+/* ══════════════════════════════════════════════════════════════════════════ *
+ * Topbar · rebanada 1 · EL RENGLÓN DE MOTIVO                                 *
+ *                                                                            *
+ * El giro a horizontal le quitó al motivo los tres renglones de 210 px que    *
+ * tenía (40,5 px MEDIDOS el 2026-08-09 con la aplicación vacía). Lo que       *
+ * queda en el peldaño es la forma breve; la larga baja aquí.                  *
+ *                                                                            *
+ * ⛔ Lo que se vigila con más ganas NO es que pinte: es la PRIORIDAD y el     *
+ * hecho de que haya UN SOLO escritor (decisión A1). Dos módulos escribiendo   *
+ * este nodo serían una carrera que gana el último, y el síntoma sería un      *
+ * motivo rancio — que no lanza, no se ve en los tests y solo lo sufre quien   *
+ * está delante de la pantalla.                                               *
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+describe('Topbar · el renglón de motivo', () => {
+  it('lo fabrica la barra, cuelga del `<nav>` y NUNCA del `<ol>`', () => {
+    cablear({ hechos: TODO })
+    const nodo = renglon()
+    expect(nodo).not.toBeNull()
+    // Dentro del `<ol>` sería un `<li>` fantasma que el lector de pantalla
+    // contaría como un cuarto peldaño.
+    expect(document.querySelector(SELECTOR_PASOS).contains(nodo)).toBe(false)
+    expect(document.querySelector(SELECTOR_BARRA).contains(nodo)).toBe(true)
+  })
+
+  it('⛔ ocupa su sitio aunque esté vacío: `textContent` sí, `hidden` NO', () => {
+    // Ocultarlo haría saltar la barra —y con ella el alto del mapa— cada vez que
+    // se resuelve un motivo. Un temblor de maquetación a cambio de nada, y encima
+    // uno que obligaría a llamar a `invalidateSize()` desde un sitio nuevo.
+    cablear({ hechos: TODO })
+    expect(renglon().textContent).toBe('')
+    expect(renglon().hidden).toBe(false)
+  })
+
+  it('enseña el motivo LARGO del primer paso bloqueado, no el breve', () => {
+    cablear() // sin datos: Edición y Diagnóstico bloqueados por `geometria`
+    expect(renglon().textContent).toBe(MOTIVO_DATO.geometria)
+    // Y el peldaño sigue diciendo la forma corta: son dos huecos, dos redacciones.
+    expect(motivoDe(PASO.EDICION)).toBe(MOTIVO_BREVE.geometria)
+  })
+
+  it('⭐ el obstáculo MÁS CERCANO, que es el primero en el orden de PASOS', () => {
+    // Con geometría pero sin parcelario, Edición se abre y Diagnóstico no. El
+    // renglón tiene que hablar del que queda, no del que ya se resolvió.
+    cablear({ hechos: { geometria: true } })
+    expect(estadoDe(PASO.EDICION)).toBe(ESTADO.LIBRE)
+    expect(estadoDe(PASO.DIAGNOSTICO)).toBe(ESTADO.BLOQUEADO)
+    expect(renglon().textContent).toBe(MOTIVO_DATO.oficial)
+  })
+
+  it('en la rama EDIFICIO dice el motivo de EDIFICIO, no el de parcela', () => {
+    cablear({ rama: RAMA.EDIFICIO, hechos: { [RAMA.EDIFICIO]: { geometria: false } } })
+    expect(renglon().textContent).toBe(MOTIVO_DATO_EDIFICIO.geometria)
+    expect(motivoDe(PASO.EDICION)).toBe(MOTIVO_BREVE_EDIFICIO.geometria)
+  })
+
+  it('⭐ GANA LA ENTREGA, y por eso el motivo del recorrido se calla', () => {
+    // La razón, del diseño: si el usuario ve «Generar GML» y no puede pulsarlo,
+    // ÉSA es la frase que necesita. Que un paso esté bloqueado se lo dice además
+    // el propio peldaño apagado, con su breve y su `title`.
+    cablear({ motivoDeEntrega: () => 'No se puede generar: falta el municipio.' })
+    expect(renglon().textContent).toBe('No se puede generar: falta el municipio.')
+    // Y el del recorrido sigue existiendo donde siempre: no se ha perdido, se ha
+    // cedido el renglón.
+    expect(motivoDe(PASO.EDICION)).toBe(MOTIVO_BREVE.geometria)
+    expect(boton(PASO.EDICION).getAttribute('title')).toBe(MOTIVO_DATO.geometria)
+  })
+
+  it('sin motivo de entrega vuelve el del recorrido, sin repintar de más', () => {
+    let entrega = 'Ahora mismo no.'
+    const { barra } = cablear({ motivoDeEntrega: () => entrega })
+    expect(renglon().textContent).toBe('Ahora mismo no.')
+    entrega = ''
+    barra.repintar()
+    expect(renglon().textContent).toBe(MOTIVO_DATO.geometria)
+  })
+
+  it('⛔ el productor se lee en CADA pintada: un valor cacheado sería el motivo rancio', () => {
+    const productor = vi.fn(() => '')
+    const { barra } = cablear({ motivoDeEntrega: productor })
+    const primeras = productor.mock.calls.length
+    expect(primeras).toBeGreaterThan(0)
+    barra.repintar()
+    expect(productor.mock.calls.length).toBeGreaterThan(primeras)
+  })
+
+  it('un productor que devuelve basura no escribe «undefined» en la barra', () => {
+    // El productor es de OTRO módulo. `undefined`, `null` y un objeto se tratan
+    // como «no hay motivo de entrega», no como texto.
+    for (const basura of [undefined, null, 42, {}]) {
+      cablear({ hechos: TODO, motivoDeEntrega: () => basura })
+      expect(renglon().textContent).toBe('')
+      vivo.destruir()
+      vivo = null
+    }
+  })
+
+  it('`motivoDeEntrega` que no es función LANZA: es contrato de programador', () => {
+    montarCascara()
+    const navegacion = crearNavegacion({ avisar: () => {} })
+    expect(() =>
+      cablearBarra({ documento: document, navegacion, motivoDeEntrega: 'un texto' }),
+    ).toThrow(TypeError)
   })
 })

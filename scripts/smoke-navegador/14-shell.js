@@ -124,9 +124,24 @@ const DESBORDE_TOLERADO = 1
  *  recortan y pelean con las coordenadas». */
 const AVISOS_A_PROVOCAR = 5
 
-/** Ancho del rail en la maqueta medida (`designs/entrada-rail-20260804/`). Solo
- *  se compara cuando `modo === 'SHELL'`. */
-const RAIL_ANCHO_MAQUETA = 210
+/**
+ * ⭐ **LA CÁSCARA DE REFERENCIA, MEDIDA LAS DOS VECES A 1280×720.**
+ *
+ * El rail dejó de ser una COLUMNA el 2026-08-10 y pasó a ser una BARRA de arriba
+ * (topbar · rebanada 1). Este guion conserva las dos cifras porque su trabajo es
+ * atribuir píxeles: sin la de antes, una pérdida futura no se puede achacar a
+ * nadie. Todas están MEDIDAS en Chrome con `?demo=real`, no calculadas.
+ */
+const REFERENCIA = Object.freeze({
+  // Antes: rail vertical. El mapa pagaba 210 px de ANCHO.
+  columna: Object.freeze({ railAncho: 210, mapa: '678×720', verticesPx: 225.08 }),
+  // Después: barra horizontal. El mapa recupera el ancho y paga 72 px de ALTO;
+  // el panel paga los mismos 72 sin ganar nada, y se los come su único estirador.
+  barra: Object.freeze({ barraAlto: 72, mapa: '888×648', verticesPx: 153.08 }),
+})
+
+/** Alto de la barra de recorrido. Es `--gml-cabecera-alto` de `estilos/app.css`. */
+const BARRA_ALTO_ESPERADO = REFERENCIA.barra.barraAlto
 
 // ── Utilidades ──────────────────────────────────────────────────────────────
 
@@ -180,6 +195,14 @@ const textosDeAvisos = () => $$('#avisos .gml-aviso-texto')
 const app = $('.gml-app') ?? document.body
 const railNodo = $('.gml-rail, [data-rail], [data-navegacion="rail"]')
 const modo = railNodo === null ? 'LINEA_BASE' : 'SHELL'
+/** ¿Está el rail ARRIBA (barra) o a la IZQUIERDA (columna)? Se deduce de su caja,
+ *  no de una bandera: lo que importa es lo que se ve, no lo que se cree. */
+const orientacion =
+  railNodo === null
+    ? null
+    : railNodo.getBoundingClientRect().width > railNodo.getBoundingClientRect().height
+      ? 'BARRA'
+      : 'COLUMNA'
 
 const panelNodo = $('.gml-panel')
 const mapaNodo = $('#mapa') ?? $('.gml-mapa') ?? $('.leaflet-container')
@@ -192,12 +215,16 @@ const arranque = {
     modo === 'LINEA_BASE'
       ? 'No hay rail: esta pasada mide la cáscara de HOY, para que la rebanada 2 tenga contra qué ' +
         'compararse. Los umbrales son los mismos que se le exigirán al shell.'
-      : 'Hay rail: esta pasada mide el shell de tres columnas y publica su coste en píxeles.',
+      : orientacion === 'BARRA'
+        ? 'Hay barra de recorrido ARRIBA (topbar · rebanada 1, 2026-08-10): esta pasada mide la ' +
+          'cáscara de rejilla y publica lo que cuesta en ALTO.'
+        : 'Hay rail en COLUMNA: la cáscara anterior al 2026-08-10. Publica su coste en ANCHO.',
   viewport: { ancho: window.innerWidth, alto: window.innerHeight },
   dpr: window.devicePixelRatio,
   url: location.href,
   tarjetasDeAvisos: tarjetas().length,
   rama: app.getAttribute('data-rama'),
+  orientacionDelRail: orientacion,
   nodosEncontrados: {
     // ⚠️ `.gml-app` **ES el `<body>`**, así que aquí no vale comparar contra
     // `document.body`: la primera versión de este guion publicaba `app:false`
@@ -261,14 +288,96 @@ const columnas = {
    * el precio lo está pagando otro —siete controles flotando sobre el mapa y un
    * panel de altura fija sin holgura—, y eso no se mide en píxeles de ancho.
    */
-  costeDelRailPx: cajaRail ? cajaRail.ancho : 0,
+  costeDelRailPx: cajaRail && orientacion === 'COLUMNA' ? cajaRail.ancho : 0,
+  /** ⭐ Y lo que cuesta la BARRA, que se paga en ALTO y no en ancho. Desde el
+   *  2026-08-10 ésta es la cifra viva; la de arriba se queda en 0 y eso es
+   *  correcto: la columna ya no existe. */
+  costeDeLaBarraPx: cajaRail && orientacion === 'BARRA' ? cajaRail.alto : 0,
+  orientacion,
 }
 
 if (modo === 'SHELL' && cajaRail) {
-  columnas.railContraMaqueta = {
-    medido: cajaRail.ancho,
-    maqueta: RAIL_ANCHO_MAQUETA,
-    diferencia: redondear(cajaRail.ancho - RAIL_ANCHO_MAQUETA),
+  columnas.contraLaReferencia =
+    orientacion === 'BARRA'
+      ? {
+          barraAltoMedido: cajaRail.alto,
+          barraAltoEsperado: BARRA_ALTO_ESPERADO,
+          diferencia: redondear(cajaRail.alto - BARRA_ALTO_ESPERADO),
+          antes: REFERENCIA.columna,
+          ahora: REFERENCIA.barra,
+        }
+      : {
+          railAnchoMedido: cajaRail.ancho,
+          railAnchoEsperado: REFERENCIA.columna.railAncho,
+          diferencia: redondear(cajaRail.ancho - REFERENCIA.columna.railAncho),
+          aviso:
+            'Esta pasada ve un rail en COLUMNA. La cáscara pasó a barra horizontal el 2026-08-10: ' +
+            'o se está midiendo una versión anterior, o la rejilla de `.gml-app` no se ha aplicado.',
+        }
+
+  // La barra es `overflow:hidden`: lo que no le cabe se recorta sin decir nada.
+  if (orientacion === 'BARRA') {
+    const desbordeBarra = {
+      x: railNodo.scrollWidth - railNodo.clientWidth,
+      y: railNodo.scrollHeight - railNodo.clientHeight,
+    }
+    columnas.barraDesbordaPx = desbordeBarra
+    if (desbordeBarra.x > DESBORDE_TOLERADO || desbordeBarra.y > DESBORDE_TOLERADO) {
+      problemas.push(
+        `La barra de recorrido se sobresuscribe ${desbordeBarra.x} px en horizontal y ` +
+          `${desbordeBarra.y} en vertical. Es \`overflow:hidden\`: eso es marca, peldaños o ` +
+          `renglón recortados en silencio.`,
+      )
+    }
+  }
+}
+
+// ── 1 bis · ⭐ EL RENGLÓN DE MOTIVO (topbar · rebanada 1) ───────────────────
+//
+// Es donde vive la forma LARGA del motivo desde que el peldaño solo tiene sitio
+// para la breve. Dos cosas que jsdom no puede ver y que, si fallan, fallan
+// calladas: que **ocupe su alto aunque esté vacío** (si colapsa, la barra encoge,
+// el mapa cambia de alto y nadie llama a `invalidateSize()`), y que **no se
+// recorte** (un motivo a media frase se lee como una frase entera).
+const renglonNodo = $('.gml-rail-renglon')
+const renglon = {
+  existe: renglonNodo !== null,
+  caja: caja(renglonNodo),
+  texto: renglonNodo === null ? null : renglonNodo.textContent,
+  vacio: renglonNodo === null ? null : renglonNodo.textContent.trim() === '',
+  recortado: recortado(renglonNodo),
+  /** Los peldaños enseñan la forma BREVE; el renglón, la LARGA del más cercano. */
+  brevesEnPantalla: $$('.gml-rail-motivo')
+    .filter((n) => n.getBoundingClientRect().height > 0)
+    .map((n) => n.textContent),
+}
+
+if (modo === 'SHELL' && !renglon.existe) {
+  problemas.push(
+    'No hay `.gml-rail-renglon` en la página. Es la única superficie donde se lee CÓMO se ' +
+      'resuelve un paso bloqueado: sin él, el usuario ve «Falta la parcela» y ni una instrucción.',
+  )
+}
+if (renglon.caja !== null && renglon.caja.alto < 1) {
+  problemas.push(
+    `El renglón de motivo mide ${renglon.caja.alto} px de alto. Tiene que ocupar su sitio SIEMPRE, ` +
+      'con o sin texto: si colapsa al resolverse un motivo, la barra encoge, el mapa cambia de ' +
+      'alto y no hay ningún `invalidateSize()` detrás de ese cambio.',
+  )
+}
+if (renglon.recortado?.porAncho === true) {
+  problemas.push(
+    `El motivo del renglón se recorta por ancho: «${renglon.texto}». Una instrucción a media ` +
+      'frase se lee como una instrucción entera, que es peor que no darla.',
+  )
+}
+for (const breve of renglon.brevesEnPantalla) {
+  const nodo = $$('.gml-rail-motivo').find((n) => n.textContent === breve)
+  if (nodo && nodo.scrollWidth - nodo.clientWidth > 1) {
+    problemas.push(
+      `El motivo breve «${breve}» no cabe en su peldaño y se recorta. El tope está en ` +
+        '`app/navegacion.js#TOPE_MOTIVO_BREVE`: la frase se acorta allí, no aquí.',
+    )
   }
 }
 

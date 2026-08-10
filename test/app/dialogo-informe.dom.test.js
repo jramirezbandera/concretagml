@@ -41,6 +41,8 @@ import {
   MOTIVO_PRESUNCION_SIN_ACUSE,
   SIN_DATOS,
   MENSAJE_OYENTE_ROTO,
+  ATRIBUTO_PRESENTACION,
+  PRESENTACION,
 } from '../../app/dialogo-informe.js'
 import {
   CAMPOS_FIRMA,
@@ -875,6 +877,68 @@ describe('app/dialogo-informe · el pie de firma', () => {
 // ═════════════════════════════════════════════════════════════════════════════
 // 8 · Apertura, cierre, foco y `Escape`
 // ═════════════════════════════════════════════════════════════════════════════
+
+// ── El gancho de CSS del modo de presentación ───────────────────────────────
+//
+// ⛔ ESTE BLOQUE NACE DE UN DEFECTO QUE VIVIÓ MESES EN VERDE (2026-08-09).
+// La pantalla completa del diálogo colgaba de `.gml-app[data-paso='informe']` en
+// `estilos/app.css`, y `PASO.INFORME` se había retirado del enum de
+// `app/navegacion.js`. El selector no podía casar nunca, así que el diálogo salía
+// como tarjeta centrada con **934 px de 1.566 (59,6 %) tras un scroll interno**,
+// medido en Chrome a 1280×720. `comoPantalla(true)` seguía activo por dentro, de
+// modo que ni el comportamiento ni ninguna prueba delataban nada: lo único que
+// faltaba era la geometría, y la geometría no la miraba nadie.
+//
+// Lo que se prueba aquí es la ÚNICA pieza que puede volver a romperse en silencio:
+// que el atributo se escriba, y que diga lo mismo que el modo. Que el CSS lo use
+// bien es del guion de humo; que exista es de aquí.
+describe('app/dialogo-informe · `data-presentacion`, el gancho de CSS del modo', () => {
+  it('en modo pantalla el `<dialog>` se marca como «pantalla»', () => {
+    const { dialogo, raiz } = conInforme()
+    dialogo.comoPantalla(true)
+    dialogo.abrir()
+    expect(raiz.getAttribute(ATRIBUTO_PRESENTACION)).toBe(PRESENTACION.PANTALLA)
+  })
+
+  it('en modo tarjeta se marca como «tarjeta», y no se queda el valor de antes', () => {
+    const { dialogo, raiz } = conInforme()
+    dialogo.comoPantalla(true)
+    dialogo.abrir()
+    expect(raiz.getAttribute(ATRIBUTO_PRESENTACION)).toBe(PRESENTACION.PANTALLA)
+
+    // Conmutar con el diálogo ABIERTO: `comoPantalla` cierra mudo y reabre, así que
+    // vuelve a pasar por `presentar()`. Si el atributo se escribiera en otro sitio
+    // —al cablear, al construir— este caso lo dejaría mintiendo.
+    dialogo.comoPantalla(false)
+    expect(raiz.getAttribute(ATRIBUTO_PRESENTACION)).toBe(PRESENTACION.TARJETA)
+  })
+
+  it('⛔ el marcador acompaña a `aria-modal` y NO lo sustituye', () => {
+    // Los dos existen a propósito y dicen cosas distintas: `aria-modal` es lo que
+    // oye el lector de pantalla, `data-presentacion` es de dónde saca el CSS su
+    // geometría. La regla está escrita en `app/barra.js, «el estado se pinta desde data-rail-estado»`: dos fuentes para el
+    // mismo estado visible acaban divergiendo, así que cada una tiene su trabajo.
+    const { dialogo, raiz } = conInforme()
+
+    dialogo.comoPantalla(true)
+    dialogo.abrir()
+    expect(raiz.getAttribute('aria-modal')).toBe('false')
+    expect(raiz.getAttribute(ATRIBUTO_PRESENTACION)).toBe(PRESENTACION.PANTALLA)
+
+    dialogo.comoPantalla(false)
+    expect(raiz.getAttribute('aria-modal')).toBe('true')
+    expect(raiz.getAttribute(ATRIBUTO_PRESENTACION)).toBe(PRESENTACION.TARJETA)
+  })
+
+  it('los dos valores son los que el CSS cita, letra por letra', () => {
+    // Guardián barato contra el renombrado silencioso: `estilos/app.css` escribe
+    // `[data-presentacion='pantalla']` a mano, y un cambio aquí lo dejaría muerto
+    // exactamente igual que murió `[data-paso='informe']`.
+    expect(ATRIBUTO_PRESENTACION).toBe('data-presentacion')
+    expect(PRESENTACION.PANTALLA).toBe('pantalla')
+    expect(PRESENTACION.TARJETA).toBe('tarjeta')
+  })
+})
 
 describe('app/dialogo-informe · apertura, cierre y foco', () => {
   it('`abrir()` abre y lleva el foco al primer campo', () => {

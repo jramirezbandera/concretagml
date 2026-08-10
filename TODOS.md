@@ -44,3 +44,136 @@ o basta con una lista corta. Sigue sin respuesta desde el 2026-08-02.
 
 **Por dónde empezar.** `app/cableado-diagnostico.js` — la clausura donde hoy viven
 `vecinas`. Y leer antes el design doc de agosto: la mitad del trabajo de diseño está hecha.
+
+---
+
+## Las salidas no saben decir si se pueden
+
+**Estado:** aplazado · **Bloqueado por:** la rebanada 3 del topbar (antes no hay menú que se
+beneficie) · **Anotado el:** 2026-08-09
+
+**Qué.** Exponer, para cada salida —DXF, listado de coordenadas, hoja de cálculo, proyecto
+`.json`—, un predicado de «¿se puede ahora mismo?» con su motivo ya redactado, en vez del
+comportamiento imperativo de hoy, que es decirlo al pulsar.
+
+**Por qué.** Es lo único que separa el menú de salidas de ser coherente con el resto de la
+aplicación. Los peldaños del recorrido se apagan CON MOTIVO. El botón «Generar GML» se apaga
+CON MOTIVO. Las cuatro salidas no pueden, porque su disponibilidad **no existe como dato**:
+solo existe como el error que sale al intentarlo.
+
+**Pros.**
+- Cierra la última incoherencia del contrato «apagado con motivo, jamás apagado y mudo».
+- Ese estado serviría en cualquier otro sitio que quiera declarar qué se puede entregar, no
+  solo en el menú de la barra.
+- Convierte cuatro errores reactivos en cuatro avisos preventivos, que para un usuario que
+  entra dos tardes al año es la diferencia entre entender y no entender.
+
+**Contras.**
+- Toca `app/cableado-expediente.js`, 2.324 líneas.
+- Es **extracción de estado de dominio**, no maquetación: el coste real está lejos del que
+  parece si se mira solo la interfaz.
+- Hoy no molesta a nadie, porque el menú todavía no existe.
+
+**Contexto.** Las cuatro exportaciones viven en `app/cableado-expediente.js` (sus guardas,
+hacia `:1746` y `:1819`) y son imperativas. La lista de salidas vive **dentro** de
+`crearDialogoExpediente` (`app/dialogo-expediente.js:589`) y no está exportada, así que
+tampoco hay una tabla que reutilizar. Se descartó el 2026-08-09 en la revisión de ingeniería
+del topbar (tensión cross-model X2, planteada por la voz externa): la propuesta inicial era
+«el menú se fabrica desde una tabla exportada» y resultó que ni la tabla existe ni el estado
+que la haría útil. Se eligió que el menú NOMBRE las salidas y que el motivo se siga diciendo
+al pulsar.
+
+**Cuándo caduca este aplazamiento.** En cuanto el menú exista y alguien pulse una entrada que
+no podía pulsar. Ese es el síntoma; si aparece, esto deja de ser un TODO.
+
+**Por dónde empezar.** `app/cableado-expediente.js`, las guardas de las cuatro `exportar*`.
+La pregunta de diseño previa es dónde vive el predicado: junto a la acción, o en un módulo
+neutro que ni el diálogo ni la barra posean (que es lo que evita acoplar dos superficies de
+interfaz, el motivo por el que la tabla exportada se descartó).
+
+---
+
+## La tercera vía de Entrada cae bajo el pliegue a 1280×720
+
+**Estado.** Abierto. Defecto **introducido** por la rebanada 1 del topbar (2026-08-10) y
+**medido**, no estimado. El guion 14 lo reporta y por eso sale `ok:false`.
+
+**Bloqueado por.** Nada técnico: es una decisión de producto sobre qué se recorta.
+
+**Qué.** En la pantalla Entrada, a 1280×720 —el suelo declarado del proyecto— la tercera vía
+(«Abrir un GML») nace **59,42 px por debajo** del borde visible de su sección. Hay que
+scrollear dentro del panel para verla. Las otras dos se ven enteras.
+
+**Por qué pasa, con los números.**
+
+| | antes | después |
+|---|---|---|
+| Alto del panel | 720 | 648 |
+| Caja de la sección de Entrada | 587,69 | 515,69 |
+| Contenido de las tres vías + separadores | 575,61 | 575,61 |
+| Holgura | **+12,08 px** | **−59,42 px** |
+
+La barra se lleva 72 px de alto y la holgura que había era de 12,08. **La aplicación estaba a
+doce píxeles de este acantilado antes del topbar**; el topbar no lo creó, lo cruzó. Y no hay
+hueco muerto que recuperar: la sección tiene 16 px de relleno arriba y 8 de separación entre
+vías, MEDIDOS. Para que las tres cupieran, el panel necesitaría 707,92 px, o sea una barra de
+12 px como mucho — que no es una barra.
+
+**Lo que ya se descartó, y por qué.**
+- *Encoger la barra.* Su mínimo honrado es ~61 px (peldaño de dos renglones 32,85 + renglón 19
+  + filo 1 + holgura). Recupera 11 de los 60 que faltan. Degradar el diseño para no arreglar
+  nada no es un arreglo.
+- *Relajar el umbral del guion 14.* Es el guardián que se salta solo. El criterio —«una vía
+  que hay que buscar no es una opción, es un secreto»— sigue siendo el correcto.
+
+**Pros de arreglarlo.** Es el criterio 7 del rework, y la Entrada es la primera pantalla que
+ve alguien que abre la aplicación por primera vez — que es literalmente el usuario que este
+rework persigue.
+
+**Contras.** Cualquier salida real toca la maqueta de Entrada o la cabecera del panel, y eso
+es alcance que la revisión de ingeniería dejó fuera de la rebanada 1 a propósito.
+
+**Las tres salidas candidatas, sin elegir.**
+1. **La cabecera del panel** (132,31 px medidos: `gml-eyebrow` 15,94 + `gml-capas` 13,19 +
+   `gml-titulo` 22,80 + `gml-chips` 25,39, más 34 de relleno). Parte de eso son ciudadanos
+   naturales de la barra —los chips de aviso y el conmutador de rama— y subirlos es
+   **exactamente la rebanada 2/3**. Es la salida que no inventa nada.
+2. **Compactar las tres vías.** 190,61 / 165,50 / 142,50 px. Son tarjetas con título,
+   párrafo y botones; hay grasa. Es un rediseño de Entrada, con su propio criterio de
+   aceptación.
+3. **Aceptarlo y decirlo.** La sección scrollea de verdad (`overflow-y: auto`), así que la
+   vía es alcanzable. Lo que falla es que no se ve que haya más abajo.
+
+**Cuándo caduca.** Si el suelo declarado sube de 1280×720, esto desaparece solo: a 1280×792
+ya caben las tres (medido). No parece que vaya a subir.
+
+**Por dónde empezar.** `estilos/app.css`, `.gml-panel-cabecera`, y la conversación de la
+rebanada 2 sobre qué sube a la barra. Volver a lanzar el guion 14 a 1280×720 después.
+
+---
+
+## La barra de edición del mapa se solapa con el control de opacidad
+
+**Estado.** Abierto. **Preexistente**, no de la rebanada 1 — y la rebanada 1 lo **mejora**.
+
+**Qué.** En Edición, `.gml-barra-edicion` (esquina `bottomcenter`, 547,8 px de ancho) y el
+control de opacidad de `viewer/capas.js` (esquina `bottomright`, 255,9 px) se pisan.
+
+**Cuánto, medido a 1280×720:**
+
+| | mapa | solape |
+|---|---|---|
+| Antes de la rebanada 1 | 678 px de ancho | **200,8 px** |
+| Después | 888 px | **95,8 px** |
+
+La barra se centra sobre el mapa; cuanto más estrecho es el mapa, más se mete en la esquina
+derecha. Ensanchar el mapa 210 px se llevó por delante 105 px de solape sin proponérselo.
+
+**Por qué no se arregla aquí.** Es de `viewer/barra-edicion.js` y del reparto de esquinas de
+Leaflet, no de la cáscara. Arreglarlo dentro de la rebanada 1 sería ensanchar el alcance de
+una rebanada que se cerró estrecha a propósito.
+
+**Por dónde empezar.** Las dos esquinas: o el control de opacidad se va a `topright` bajo el
+selector de capas, o la barra de edición deja de centrarse sobre el mapa entero y se centra
+sobre el hueco que le queda libre. Lo primero es una línea; lo segundo es correcto pero pide
+saber el ancho del vecino.

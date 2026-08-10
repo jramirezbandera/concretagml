@@ -31,7 +31,7 @@
 // —recibe y devuelve CADENAS—, y por eso su prueba vive en el proyecto Vitest
 // `node` (el bucle rápido) y no en `dom`. Quien pinta el rail, quien pone
 // `hidden`, quien escribe el hash del navegador y quien apaga un botón es el
-// APLICADOR (`app/rama.js` y, desde la rebanada 2, la cáscara de tres columnas):
+// APLICADOR (`app/rama.js` y `app/barra.js`, la barra de recorrido):
 // se suscribe aquí y obedece. **Un solo dueño de la verdad, muchos pintores.**
 //
 // **Tampoco decide qué cuenta como dato.** Los hechos entran de fuera ya
@@ -43,8 +43,8 @@
 //
 // ── ⚠️ ESTE MÓDULO NACE SIN LLAMANTE, Y ES DELIBERADO ──────────────────────
 // El plan del rework lo ordena así: «la autoridad de navegación, sola y con
-// pruebas propias, ANTES de tocar una línea de CSS». Su primer llamante llega en
-// T5 (la cáscara de tres columnas). Hasta entonces `app/rama.js` sigue llevando
+// pruebas propias, ANTES de tocar una línea de CSS». Su primer llamante llegó en
+// T5 (entonces el rail vertical; desde 2026-08-10, `app/barra.js`). Hasta entonces `app/rama.js` sigue llevando
 // la rama por su cuenta: son **dos dueños a la vez durante una rebanada**, y está
 // contado a propósito para que nadie lo descubra como sorpresa. Lo que sí se hace
 // hoy es dejar UNA sola definición del vocabulario de rama: {@link RAMA} y
@@ -286,12 +286,20 @@ export const HECHOS_VACIOS = Object.freeze({ geometria: false, oficial: false })
 //
 // ⚠️ **SON CORTOS, Y ESO ESTÁ MEDIDO.** Los motivos de la casa hasta hoy viven
 // bajo un CTA a lo ancho del panel y andan por los 180–240 caracteres. Éstos
-// viven en un rail de **210 px** y se leen los cinco a la vez: la maqueta con las
-// fuentes reales del repo los midió en **14 / 14 / 27 / 14 px** de alto (uno
-// envuelve a dos líneas) a 1280×720, que es el suelo declarado. Alargarlos
-// empujaría la ficha del pie del rail fuera de la pantalla, que es literalmente
-// el defecto que este rework viene a arreglar. La regla —qué no se puede, por qué
-// y cómo volver a poder— se cumple igual, en una frase en vez de en tres.
+// tienen que caber en la barra de recorrido, y la regla —qué no se puede, por qué
+// y cómo volver a poder— se cumple igual en una frase que en tres.
+//
+// ⭐ **DÓNDE VIVEN CAMBIÓ EL 2026-08-10, y con ello a qué aprieta el tope.**
+// Hasta esa fecha vivían en un rail vertical de 210 px y se leían los tres a la
+// vez, envolviendo a tres renglones (**40,5 px medidos** a 1280×720). Alargarlos
+// empujaba la ficha del pie del rail fuera de la pantalla. Girada la barra:
+//
+//   · la forma LARGA de aquí baja al RENGLÓN, de ancho completo y **una línea de
+//     alto fija**. Ya no empuja nada: se RECORTA, que se ve menos. Tope 90.
+//   · la forma BREVE ({@link MOTIVO_BREVE}) se queda pegada al peldaño, que es un
+//     hueco mucho más pequeño. Tope 22.
+//
+// Los dos topes los vigila `test/app/navegacion.test.js`.
 
 /**
  * Por qué un paso no está en esta RAMA. Bloqueo estructural: no se desbloquea
@@ -336,7 +344,7 @@ export const MOTIVO_RAMA = Object.freeze({
 /**
  * Qué DATO falta. Va indexado por el hecho que falta y **no por el paso**, a
  * propósito: la causa es la misma se mire desde donde se mire, y un texto por
- * paso serían cinco frases que hay que mantener diciendo lo mismo.
+ * paso serían tres frases que hay que mantener diciendo lo mismo.
  *
  * @readonly
  */
@@ -368,11 +376,15 @@ export const MOTIVO_RAMA = Object.freeze({
  * los cuatro pueden traérsela sin ciclo. Al revés no se podía.
  *
  * ⛔ **SU LONGITUD ES CARGA ESTRUCTURAL, no estilo.** Uno de los cuatro sitios es
- * {@link MOTIVO_DATO}`.oficial`, que se pinta en el chip del RAIL: 210 px medidos, con
- * un tope de 90 caracteres para el motivo entero. Con 24 del enunciado de estado,
- * esta frase no puede pasar de 66. Alargarla pone rojo el guardián de los motivos —
- * que es donde hay que enterarse, y no en la pantalla del usuario con la ficha del
- * pie del rail empujada fuera.
+ * {@link MOTIVO_DATO}`.oficial`, y ése se pinta en el RENGLÓN de la barra de
+ * recorrido: **una línea de alto fija**, con un tope de 90 caracteres para el motivo
+ * entero. Con 24 del enunciado de estado, esta frase no puede pasar de 66. Alargarla
+ * pone rojo el guardián de los motivos — que es donde hay que enterarse, y no en la
+ * pantalla del usuario con la frase recortada a media palabra.
+ *
+ * ⚠️ **Y el chip del peldaño ya no la enseña**: desde el 2026-08-10 ahí va la forma
+ * BREVE ({@link MOTIVO_BREVE}), que tiene su propio tope de 22. Hasta entonces esto
+ * decía «el chip del RAIL: 210 px medidos», y el rail vertical ya no existe.
  */
 export const INSTRUCCION_PARCELARIO =
   'Tráelo con «Traer el parcelario de fondo»: tu medición sigue.'
@@ -409,6 +421,57 @@ export const MOTIVO_DATO = Object.freeze({
 export const MOTIVO_DATO_EDIFICIO = Object.freeze({
   geometria: 'Trae antes un edificio, o añade una parte y dibuja su recinto.',
 })
+
+/**
+ * ⭐ **EL MISMO MOTIVO EN TRES PALABRAS (rebanada 1 del topbar, 2026-08-10).**
+ *
+ * ── POR QUÉ LO REDACTA ESTE MÓDULO Y NO EL QUE PINTA ───────────────────────
+ * El rail giró de vertical a horizontal, y con el giro el motivo dejó de tener
+ * 210 px de ancho por tres renglones —**40,5 px medidos**— para tener el hueco de
+ * un peldaño en una barra. La salida fácil era que el aplicador recortara el
+ * texto: eso produce «Trae antes una parcela: por refe…», que no es un motivo, es
+ * un motivo roto.
+ *
+ * La regla de la casa es la de {@link MOTIVO_DATO} y no cambia: **quien decide
+ * redacta, quien pinta no escribe ni una palabra** (`app/barra.js` no tiene un
+ * solo literal en español para el usuario, y hay un test que lo afirma). Así que
+ * la forma corta se escribe aquí, al lado de la larga, donde no puede divergir de
+ * ella sin que se vea en el mismo diff.
+ *
+ * ── LAS DOS FORMAS NO SON LA MISMA FRASE, Y ESO ES EL PUNTO ────────────────
+ * La breve dice **QUÉ falta**; la larga dice **CÓMO conseguirlo**. Se leen a la
+ * vez y en sitios distintos: la breve pegada a cada peldaño bloqueado (todos a la
+ * vez, que es lo que la revisión externa salvó al revocar la decisión D9 del
+ * diseño: con la aplicación vacía se ve simultáneamente por qué no puedes editar y
+ * por qué no puedes diagnosticar), y la larga en el renglón de debajo, para el
+ * obstáculo más cercano.
+ *
+ * ⛔ **TOPE: 22 caracteres.** No es estética. Tres peldaños con su punto, su
+ * rótulo y su breve tienen que caber en la barra junto a la marca, el grupo y —
+ * desde las rebanadas 2 y 3— el expediente y la entrega. Hay un guardián que
+ * mide esta tabla; si sale rojo, la frase no cabe, y enterarse ahí es enterarse
+ * antes que el usuario.
+ *
+ * ⚠️ **Indexada por el HECHO, igual que {@link MOTIVO_DATO}**, y por lo mismo: la
+ * causa es la misma se mire desde el paso que se mire.
+ *
+ * @readonly
+ */
+export const MOTIVO_BREVE = Object.freeze({
+  geometria: 'Falta la parcela',
+  oficial: 'Falta el parcelario',
+})
+
+/** Igual, cuando la rama es EDIFICIO. Ver {@link MOTIVO_DATO_EDIFICIO}. @readonly */
+export const MOTIVO_BREVE_EDIFICIO = Object.freeze({
+  geometria: 'Falta el edificio',
+})
+
+/**
+ * Cuántos caracteres puede tener una forma breve. Ver el tope de
+ * {@link MOTIVO_BREVE}: es sitio en una barra horizontal, no gusto.
+ */
+export const TOPE_MOTIVO_BREVE = 22
 
 /**
  * Lo que se le dice a quien aterriza desde un enlace que pide un paso que sus
@@ -574,9 +637,17 @@ const EMPTY = Object.freeze([])
  * pura: mismas entradas, misma respuesta, sin store y sin DOM. Todo lo demás de
  * este módulo la llama.
  *
+ * ⭐ **Devuelve DOS redacciones del mismo motivo desde 2026-08-10**: `motivo` (cómo
+ * se consigue) y `breve` (qué falta). Ver {@link MOTIVO_BREVE} para el porqué de
+ * las dos y quién enseña cada una. `breve` **cae al largo** cuando no hay forma
+ * corta escrita: así el aplicador tiene una sola regla —pinta `breve`— y un motivo
+ * nuevo sin abreviar sale largo en la barra, que se ve, en vez de salir vacío, que
+ * no se ve. Hoy el único caso posible es un motivo de {@link CAUSA.RAMA}, y esa
+ * tabla está vacía a propósito.
+ *
  * @param {string} paso
  * @param {{rama: string, hechos: object}} situacion
- * @returns {{disponible: boolean, causa: string|null, motivo: string|null}}
+ * @returns {{disponible: boolean, causa: string|null, motivo: string|null, breve: string|null}}
  */
 export function evaluarPaso(paso, { rama, hechos }) {
   const regla = REGLA[paso]
@@ -587,17 +658,26 @@ export function evaluarPaso(paso, { rama, hechos }) {
   }
   // 1 · RAMA — lo que esta versión no sabe hacer. No se arregla trabajando.
   if (!regla.ramas.includes(rama)) {
-    return { disponible: false, causa: CAUSA.RAMA, motivo: MOTIVO_RAMA[paso] ?? null }
+    const motivo = MOTIVO_RAMA[paso] ?? null
+    return { disponible: false, causa: CAUSA.RAMA, motivo, breve: motivo }
   }
   // 2 · DATO — lo único que se resuelve solo según se avanza.
   for (const hecho of hechosQueExige(regla, rama)) {
     if (hechos[hecho] !== true) {
       // El de la rama manda cuando lo hay: ver {@link MOTIVO_DATO_EDIFICIO}.
-      const propio = rama === RAMA.EDIFICIO ? MOTIVO_DATO_EDIFICIO[hecho] : undefined
-      return { disponible: false, causa: CAUSA.DATO, motivo: propio ?? MOTIVO_DATO[hecho] ?? null }
+      const enEdificio = rama === RAMA.EDIFICIO
+      const propio = enEdificio ? MOTIVO_DATO_EDIFICIO[hecho] : undefined
+      const propioBreve = enEdificio ? MOTIVO_BREVE_EDIFICIO[hecho] : undefined
+      const motivo = propio ?? MOTIVO_DATO[hecho] ?? null
+      return {
+        disponible: false,
+        causa: CAUSA.DATO,
+        motivo,
+        breve: propioBreve ?? MOTIVO_BREVE[hecho] ?? motivo,
+      }
     }
   }
-  return { disponible: true, causa: null, motivo: null }
+  return { disponible: true, causa: null, motivo: null, breve: null }
 }
 
 // ── La URL (decisión D3) ────────────────────────────────────────────────────
@@ -689,7 +769,7 @@ function exigirPaso(paso, quien) {
  *
  * ⛔ **Una clave desconocida LANZA, y ése es el punto.** Si `geomtria` (con la
  * errata) se aceptara en silencio, `geometria` seguiría en `false` y el usuario
- * vería CUATRO pasos apagados sin ninguna razón visible, con la suite en verde.
+ * vería DOS pasos apagados sin ninguna razón visible, con la suite en verde.
  * Es el mismo fallo mudo que la regla de `hidden` evita en el DOM, pero en los
  * datos. Una clave AUSENTE, en cambio, es `false` y no lanza: un hecho que no
  * afirmas es un hecho que no tienes.
@@ -749,9 +829,12 @@ function fundirHechos(parciales, base, quien) {
  * @property {boolean} disponible  Si se puede ir.
  * @property {string|null} causa   Por qué no, como dato.
  * @property {string|null} motivo  Por qué no, en español. **Cuando `disponible`
- *   es `false` esto NO es null**, y hay una prueba que recorre los cinco pasos en
+ *   es `false` esto NO es null**, y hay una prueba que recorre los tres pasos en
  *   todas las combinaciones para atestarlo: es el criterio «cero pasos apagados
  *   en silencio», y es la mitad del producto de este módulo.
+ * @property {string|null} breve   Lo mismo en tres palabras, para el hueco de un
+ *   peldaño en la barra horizontal. **Tampoco es null cuando `disponible` es
+ *   `false`**, y la misma prueba lo recorre. Ver {@link MOTIVO_BREVE}.
  */
 
 /**
@@ -862,7 +945,7 @@ export function crearNavegacion({
   /**
    * El paso más avanzado que se sostiene con la situación dada. Se recorre
    * {@link PASOS} de atrás adelante, así que un enlace roto no cae siempre a
-   * Entrada: si el usuario tiene la parcela cargada, cae en Validación, que es
+   * Entrada: si el usuario tiene la parcela cargada, cae en Edición, que es
    * donde estaría de haber llegado andando.
    *
    * @param {Situacion} situacion
@@ -996,7 +1079,7 @@ export function crearNavegacion({
     },
 
     /**
-     * El rail entero, listo para pintar. **Los cinco pasos, siempre**: uno que no
+     * El rail entero, listo para pintar. **Los tres pasos, siempre**: uno que no
      * está disponible se apaga y se explica, nunca desaparece. Un rail que
      * encoge y crece no deja aprender el recorrido, y aprenderlo es el punto.
      *
@@ -1013,6 +1096,7 @@ export function crearNavegacion({
           disponible: veredicto.disponible,
           causa: veredicto.causa,
           motivo: veredicto.motivo,
+          breve: veredicto.breve,
         }
       })
     },

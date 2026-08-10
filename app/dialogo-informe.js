@@ -252,6 +252,49 @@ export const SELECTOR = Object.freeze({
 })
 
 /**
+ * `data-presentacion="pantalla|tarjeta"` en el propio `<dialog>`. **Es el único
+ * gancho de CSS del modo de presentación**, molde exacto del `data-rail-estado`
+ * de `app/barra.js` y del `data-rama` de `app/rama.js`: un atributo, un dueño.
+ *
+ * ── ⛔ POR QUÉ NACE ESTE ATRIBUTO EL 2026-08-09, Y NO ANTES ─────────────────
+ * Porque hasta hoy la geometría de pantalla completa colgaba de
+ * `.gml-app[data-paso='informe']`, y **`PASO.INFORME` se retiró del enum** en el
+ * rework (`app/navegacion.js:135` y `:161`, «NO se dejan alias»). Desde entonces
+ * `app/pantalla.js` solo escribe uno de los tres pasos vivos, así que aquella
+ * regla no podía casar nunca y el diálogo llevaba meses saliendo como tarjeta
+ * centrada **sin que nada se pusiera rojo**. `comoPantalla(true)` seguía activo
+ * por dentro —`show()` en vez de `showModal()`, `Escape` que pide salir en vez de
+ * cerrar— pero no tenía por dónde pedir su tamaño.
+ *
+ * MEDIDO EN CHROME EL 2026-08-09, a 1280×720, con el diálogo recién abierto:
+ * formulario **1.566 px**, ventana visible **632**, o sea **934 px (59,6 %) tras
+ * un scroll interno**, en un viewport que tiene 720 de alto y 1.280 de ancho
+ * libres. Y el pie del propio diálogo dice «Repáselos arriba», mandando al
+ * usuario a un scroll que puede no saber que existe.
+ *
+ * ── ⚠️ Y NO SE ESTILA DESDE `aria-modal`, QUE ERA LO BARATO ────────────────
+ * `presentar()` ya escribe `aria-modal="false"` en modo pantalla y habría servido
+ * de gancho sin tocar una línea de JS. Se descartó por la regla que
+ * `app/barra.js, «el estado se pinta desde data-rail-estado»` deja escrita: **el aspecto sale de un `data-*` y no de
+ * ARIA**, porque dos fuentes para el mismo estado visible acaban divergiendo.
+ * ARIA dice lo que oye el lector de pantalla; el `data-*` dice cómo se ve.
+ */
+export const ATRIBUTO_PRESENTACION = 'data-presentacion'
+
+/**
+ * Los dos modos, como DATO. El aplicador es {@link presentar}, que lo escribe en
+ * el mismo sitio donde ya decidía entre `show()` y `showModal()`: un solo fork,
+ * una sola verdad.
+ * @readonly
+ */
+export const PRESENTACION = Object.freeze({
+  /** Ocupa el área de contenido entera. Lo que pide `comoPantalla(true)`. */
+  PANTALLA: 'pantalla',
+  /** Tarjeta centrada con velo. El modal de F09. */
+  TARJETA: 'tarjeta',
+})
+
+/**
  * El selector de una fila del encabezado. **Fuera de {@link SELECTOR} a
  * propósito**, igual que `SELECTOR_MIEMBRO` en el cajón de F08: los de ahí existen
  * siempre y éstos no. En una finca **urbana** no se pintan `paraje`, `poligono` ni
@@ -1225,6 +1268,14 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
    * pantalla es peor que no decir nada.
    */
   function presentar() {
+    // El gancho de CSS del modo, en el MISMO fork que ya decidía `show()` contra
+    // `showModal()`. Ver {@link ATRIBUTO_PRESENTACION}: escribirlo en otro sitio
+    // sería una segunda fuente del mismo estado, y por ahí es por donde el modo
+    // pantalla se quedó sin geometría durante meses.
+    dialogo.setAttribute(
+      ATRIBUTO_PRESENTACION,
+      comoPantallaActivo ? PRESENTACION.PANTALLA : PRESENTACION.TARJETA,
+    )
     if (comoPantallaActivo) {
       dialogo.setAttribute('aria-modal', 'false')
       if (typeof dialogo.show === 'function') {

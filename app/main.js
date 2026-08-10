@@ -595,10 +595,11 @@ import {
   parcelaDemoConHueco,
 } from './demo-datos.js'
 import { cablearContraste } from './contraste.js'
+import { cablearEmpezarDeNuevo } from './empezar-de-nuevo.js'
 import { PASO, crearNavegacion } from './navegacion.js'
 import { crearPanelEdificio } from './panel-edificio.js'
 import { cablearPantalla } from './pantalla.js'
-import { cablearRail } from './rail.js'
+import { cablearBarra } from './barra.js'
 import { RAMA, cablearRama } from './rama.js'
 
 // ── Constantes de presentación ───────────────────────────────────────────────
@@ -2022,7 +2023,7 @@ const visor = crearVisor(nodo('#mapa'), {
   // leyó como si fueran el modo activo y dio por hecho que la navegación ya
   // existía; costó una revisión cruzada descubrir que no. Quien sabe el paso, la
   // rama y el modo es `app/navegacion.js`, desde T1 — y el rail que lo pinta,
-  // `app/rail.js`. Si buscas «en qué pantalla estamos», no es esto.
+  // `app/barra.js`. Si buscas «en qué pantalla estamos», no es esto.
   //
   // ── F07 · el diagnóstico, montado (que no es lo mismo que abierto) ───────
   // `true` y no un objeto: las dos claves que admite —`posicion` y `minimoPx`—
@@ -4141,7 +4142,7 @@ expedienteCableado = cablearExpediente({
 //
 // ⚠️ **NO decide nada.** Aquí solo se DERIVAN los hechos y se enchufan los cables.
 // Qué paso está disponible y por qué no lo está lo dice `app/navegacion.js`, que
-// no toca el DOM; quién lo pinta es `app/rail.js`, que no conoce ni una regla.
+// no toca el DOM; quién lo pinta es `app/barra.js`, que no conoce ni una regla.
 // Este bloque es la costura, y la costura no opina.
 
 /**
@@ -4270,23 +4271,29 @@ function refrescarHechos() {
   // Los hechos pueden cambiar SIN que cambie `{rama, paso, modo}` —cargar una
   // parcela no te mueve de paso, pero abre tres—, y en ese caso el store de la
   // navegación no notifica. Por eso el repintado va a mano aquí.
-  rail.repintar()
+  barra.repintar()
 }
 
-const rail = cablearRail({
+const barra = cablearBarra({
   documento: document,
   navegacion,
   panel,
   /**
    * ⚠️ **`invalidateSize()` NO ES DECORATIVO, y es una de las cuatro decisiones
    * que la revisión de ingeniería dejó abiertas.** Leaflet cachea el tamaño del
-   * contenedor y solo lo remide cuando se lo dicen. Mientras el rail no cambie de
-   * ancho, un cambio de paso no mueve el mapa; pero el día que una pantalla
-   * reparta el ancho de otra forma —Diagnóstico trae el mapa al centro—, sin esta
+   * contenedor y solo lo remide cuando se lo dicen. Mientras la barra no cambie de
+   * alto, un cambio de paso no mueve el mapa; pero el día que una pantalla
+   * reparta el hueco de otra forma —Diagnóstico trae el mapa al centro—, sin esta
    * línea el mapa se quedaría dibujando sobre un tamaño que ya no tiene: teselas
    * en el sitio equivocado, clics desplazados y **ningún error en consola**.
    *
-   * Va aquí y no dentro de `app/rail.js` porque aquel módulo no sabe que existe
+   * ⚠️ Y desde que la barra es horizontal hay un caso NUEVO que sí ocurre: el
+   * renglón de motivo aparece y desaparece con los hechos. Ocupa su alto siempre
+   * —`app/barra.js` lo deja vacío en vez de ocultarlo, justo para que esto no
+   * pase—, pero si alguien lo «optimiza» a `hidden`, el mapa cambiará de alto sin
+   * que nadie llame aquí.
+   *
+   * Va aquí y no dentro de `app/barra.js` porque aquel módulo no sabe que existe
    * un mapa, y no tiene por qué saberlo.
    */
   alNavegar: () => {
@@ -4296,7 +4303,7 @@ const rail = cablearRail({
 
 // El eje PASO de la cáscara (T6): escribe `data-paso` en el `<body>` y pone el
 // título de la pantalla. **No oculta nada por JavaScript**: quien esconde las
-// secciones que no tocan son las cinco reglas de `estilos/app.css`, y el porqué
+// secciones que no tocan son las tres reglas de `estilos/app.css`, y el porqué
 // —dos ejes escribiendo `hidden` serían dos dueños de la misma propiedad— está
 // en la cabecera de `app/pantalla.js`.
 cablearPantalla({ documento: document, navegacion })
@@ -4335,7 +4342,7 @@ cablearPantalla({ documento: document, navegacion })
 // así que invertir el orden no rompería nada; simplemente se vería el salto.
 //
 // Un cambio de sitio no cambia el tamaño del MAPA (el panel mide lo mismo en las
-// cinco pantallas), así que no hace falta `invalidateSize` aquí: quien lo llama en
+// tres pantallas), así que no hace falta `invalidateSize` aquí: quien lo llama en
 // cada navegación es `alNavegar`, más arriba.
 visor.diagnostico.cajon.anfitrion(nodo(SELECTOR_ANFITRION_DIAGNOSTICO))
 
@@ -4588,7 +4595,7 @@ if (ctaDiagnosticar !== null) {
 // dos, y por eso está aquí y no allí.
 //
 // ⚠️ La barra de herramientas se esconde por OTRO camino —`data-pantalla` en
-// `viewer/barra-edicion.js` y las cinco reglas del CSS—, y es deliberado: son
+// `viewer/barra-edicion.js` y las tres reglas del CSS—, y es deliberado: son
 // dos ejes distintos (lo que se VE y lo que se PUEDE), y hacerlos pasar por el
 // mismo sitio los ataría de una forma que costaría deshacer el día que una
 // pantalla quiera enseñar la barra apagada con su motivo al lado.
@@ -4877,6 +4884,68 @@ if (botonPegado !== null) {
     await destino.alTexto(texto, NOMBRE_PEGADO)
   })
 }
+
+// ── Paso 19 · «VACIARLO»: LA SALIDA DEL EXPEDIENTE EN CURSO ─────────────────
+//
+// Petición del autor (2026-08-09). Va EL ÚLTIMO por lo mismo que el rail: para
+// vaciar hay que tenerlo todo montado. El renglón y sus dos tiempos los pone
+// `app/empezar-de-nuevo.js`; lo que se decide aquí es **qué significa vaciar**, y
+// ésa es una decisión de esta costura y de nadie más.
+//
+// ── ⛔ POR QUÉ SE RECARGA EL DOCUMENTO Y NO SE «LIMPIA EL ESTADO» ───────────
+// La tentación es `estado.set(null)`, `estadoEdificio.set(null)`, `reiniciar(
+// historial, null)` y listo. Los dos stores lo aguantarían —desde el 2026-08-07
+// nacen vacíos, así que todos sus suscriptores ya saben tratar el `null`—, y aun
+// así estaría MAL, porque el estado de esta pantalla no vive solo en los stores:
+//
+//   · `colindantesTraidas` y `colindantesDeDibujo`, aquí mismo (paso 4): la ficha
+//     seguiría diciendo «3 colindantes» sobre una pantalla vacía;
+//   · `ramaEnPantalla`, aquí mismo, y el `data-rama` del `<body>`;
+//   · el último diagnóstico de `cableado-diagnostico.js` y su cajón;
+//   · el sobrante derivado y su lista (paso 16);
+//   · la elección de finca pendiente de `cableado-medicion.js` (F22);
+//   · la identidad del expediente abierto en las DOS ramas
+//     (`identidades` en `cableado-expediente.js`), que decide si el siguiente
+//     «Guardar» crea un registro o pisa uno;
+//   · el pie de firma del informe, los renglones de procedencia, la caché de la
+//     capa WMS, el encuadre del mapa…
+//
+// O sea que un vaciado «a mano» son dieciocho módulos que hay que acordarse de
+// tocar, y la penalización por olvidar uno no es un error: es una pantalla que
+// dice algo que ya no es verdad, en verde y sin ruido. Este repositorio lleva
+// quince fases anotando exactamente ese modo de fallo.
+//
+// Recargar es lo contrario: **no hay nada que acordarse de limpiar**, porque el
+// arranque vacío es un camino que la aplicación ya recorre en producción todos los
+// días y que tiene suite propia (`test/app/main-arranque-vacio.dom.test.js`).
+// Cuesta lo que cuesta abrir la aplicación —es estática, sin servidor— y lo que se
+// pierde es exactamente lo que se ha pedido perder: lo guardado sigue en IndexedDB.
+//
+// ── ⚠️ LA QUERY Y EL HASH HAY QUE QUITARLOS, Y ANTES DE RECARGAR ───────────
+// `location.reload()` a secas recargaría **la misma URL**, y la misma URL es
+// `?demo=real#/parcela/edicion`: volvería a entrar el dataset de demostración y el
+// aterrizaje intentaría un paso que ya no se sostiene. Por eso se reescribe la
+// barra de direcciones primero.
+//
+// ⛔ Y se reescribe con `replaceState` y NO con `location.replace(limpia)`: cuando
+// lo único que cambia es el hash —el caso normal, porque el `?demo=` solo lo lleva
+// quien lo ha escrito—, `location.replace` **no recarga nada**, solo mueve el
+// fragmento. Sería un botón que borra la barra de direcciones y deja la pantalla
+// igual. `replaceState` cambia la URL del documento sin navegar y sin dejar
+// entrada en el historial (un «atrás» a un estado que ya no existe no ayuda a
+// nadie), y el `reload()` de la línea siguiente ya recarga la URL nueva.
+cablearEmpezarDeNuevo({
+  documento: document,
+  estado,
+  estadoEdificio,
+  alVaciar: () => {
+    const limpia = new URL(location.href)
+    limpia.search = ''
+    limpia.hash = ''
+    history.replaceState(null, '', limpia)
+    location.reload()
+  },
+})
 
 // Y una última remedida del mapa cuando el navegador ya ha maquetado el rail. En
 // el arranque la cáscara entera existe antes de que corra este fichero, así que

@@ -768,7 +768,7 @@ const BarraEdicion = L.Control.extend({
     this._contenedor = contenedor
     // ── Rework de UI · rebanada 3 (Edición), 2026-08-04 ──────────────────────
     // Esta barra es de la pantalla de Edición y de ninguna otra. Se DECLARA aquí,
-    // con el mismo atributo que usa `index.html`, y la ocultan las cinco reglas
+    // con el mismo atributo que usa `index.html`, y la ocultan las tres reglas
     // de `estilos/app.css` — que son de descendencia desde `.gml-app`, así que
     // alcanzan también a lo que Leaflet cuelga dentro del mapa.
     //

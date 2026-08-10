@@ -1,9 +1,11 @@
 /* estilos/app.css — F03 · Fase 4 (4A.3) · rework de UI T5. LA CÁSCARA DE LA APP.
  *
  * Hoja de estilo de la cáscara. Viste TRES cosas y nada más:
- *   1. la cáscara de TRES COLUMNAS — rail de 210 px, panel de 392 px (avisos +
- *      tabla de vértices + ficha del expediente) y mapa ocupando el resto;
- *   2. el rail de navegación, cuyos peldaños fabrica `app/rail.js`;
+ *   1. la cáscara de BARRA + DOS COLUMNAS — barra de 72 px de alto arriba, panel
+ *      de 392 px (tabla de vértices + ficha del expediente) y mapa ocupando el
+ *      resto. **Fueron tres columnas hasta el 2026-08-10**: el rail de 210 px de
+ *      ancho giró a barra horizontal y le devolvió esos píxeles al mapa;
+ *   2. la barra de recorrido, cuyos peldaños fabrica `app/barra.js`;
  *   3. el cromo que ya generan `viewer/sincronizacion.js` (la tabla) y
  *      `viewer/capas.js` (el control de opacidad), más los retoques mínimos
  *      sobre las clases `.leaflet-*` que Leaflet crea por su cuenta.
@@ -63,11 +65,14 @@
  * null`: ni petición, ni aviso, ni error en consola. Mapa en blanco y todo
  * aparentemente correcto — el fallo silencioso perfecto. La cadena de altura
  * que lo impide es, de arriba abajo:
- *     html, body → 100 %  ·  .gml-app → 100vh  ·  .gml-mapa → estirado por el
- *     flex de fila (align-items:stretch es el valor por defecto)
- * y `min-height:0` en cada hijo flex que scrollea, porque un `flex:1` NO encoge
- * por debajo del tamaño de su contenido mientras `min-height` valga `auto`: sin
- * eso, una tabla de 200 vértices empuja el pie del panel fuera de la pantalla.
+ *     html, body → 100 %  ·  .gml-app → 100vh  ·  la fila `minmax(0, 1fr)` de la
+ *     rejilla  ·  .gml-mapa → estirado por ella (`stretch` es el valor por
+ *     defecto de `align-self`)
+ * y `min-height:0` en cada hijo que scrollea, porque ni un `flex:1` ni una pista
+ * de rejilla encogen por debajo del tamaño de su contenido mientras `min-height`
+ * valga `auto`: sin eso, una tabla de 200 vértices empuja el pie del panel fuera
+ * de la pantalla. El `minmax(0, …)` de las pistas hace lo propio para la PISTA;
+ * son dos mecanismos distintos y hacen falta los dos.
  *
  * @see viewer/sincronizacion.js  Contrato del HTML de la tabla (constante CLASE).
  * @see viewer/capas.js           Control de opacidad y sus estilos en línea.
@@ -87,18 +92,54 @@
  * verificación visual (tarea 4B.1) tenga una sola perilla que girar.
  */
 :root {
-  /* Ancho del RAIL de navegación (rework de UI · T5). Los 210 px salen de la
-     maqueta medida con las fuentes reales del repo, renderizada a 1280×720:
-     con ese ancho ningún motivo de bloqueo desborda y los cinco caben en
-     14/14/27/14 px de alto (uno envuelve a dos líneas).
+  /* ═══ LA BARRA DE ARRIBA (topbar · rebanada 1, 2026-08-10) ═════════════════
+     ⛔ AQUÍ HABÍA UN `--gml-rail-ancho: 210px` Y SE HA RETIRADO. El rail era una
+     COLUMNA a la izquierda; ahora es una BARRA arriba, así que la medida que
+     gobierna la cáscara ya no es un ancho, es un alto. Se retira en vez de
+     dejarse: una variable de columna en una cáscara sin esa columna es lo que
+     mantuvo viva durante meses la regla muerta del diálogo del informe.
 
-     ⚠️ EL RAIL SE LO QUITA AL MAPA, NO AL PANEL, y es a propósito: el panel es
-     el que lleva ocho fases peleándose por píxeles (la caja de vértices costó
-     recuperar hasta 303 px sacando la edición al mapa en F06), así que quitarle
-     210 px más sería empezar el rework rompiendo lo que viene a arreglar. A
-     1280×720 el mapa se queda en 678 px, por encima del suelo de 400 px que
-     vigila `scripts/smoke-navegador/14-shell.js`. */
-  --gml-rail-ancho: 210px;
+     ── EL CANJE, MEDIDO Y NO CALCULADO (1280×720) ──
+       ANTES  rail 210 · panel 392 · mapa 678×720
+       AHORA  barra 1280×72 · panel 392 · mapa 888×648
+     O sea: **el mapa gana 210 px de ancho y paga 72 de alto** (+17,9 % de
+     superficie), y **el panel paga 72 px de alto sin ganar nada**. Ese segundo
+     apunte es la parte cara y está dicho a propósito: el panel lleva ocho fases
+     peleándose por píxeles, y los 72 px se los come ENTEROS su único estirador,
+     la caja de vértices. La cifra de después está en el guion 14 y en el asiento
+     del presupuesto; si esta variable crece, crece a costa de esa caja. */
+
+  /* La fila de la barra: marca · grupo · peldaños (y, desde las rebanadas 2 y 3,
+     expediente y entrega). 52 px es lo que pide su contenido más alto —un
+     peldaño de dos renglones, 18,85 + 14 = 32,85 px— con holgura de 8 px arriba
+     y abajo. Fijo y no `auto` para que un motivo largo no pueda empujar el mapa. */
+  --gml-barra-alto: 52px;
+
+  /* El renglón de motivo, debajo. UNA línea de `--text-11` y su holgura.
+     ⛔ Ocupa su alto SIEMPRE, con o sin texto (`app/barra.js` lo deja vacío en
+     vez de ocultarlo). Si algún día se oculta, la barra encoge, el mapa cambia
+     de alto y hay que llamar a `invalidateSize()` desde un sitio nuevo. */
+  --gml-renglon-alto: 19px;
+
+  /* El filo que separa la barra del contenido. Se declara como variable y **entra
+     en la cuenta de abajo** porque `box-sizing: border-box` es global: sin
+     sumarlo, las dos filas de dentro del `<nav>` valían 1 px más que su caja y la
+     barra —que es `overflow:hidden`— se recortaba en silencio. Medido: 1 px de
+     desborde hasta que esta variable existió. */
+  --gml-cabecera-borde: 1px;
+
+  /* Lo que la cáscara le quita al alto de la ventana: 72 px. Es UNA cuenta en UN
+     sitio, y de ella cuelga también el diálogo del informe a pantalla completa. */
+  --gml-cabecera-alto: calc(
+    var(--gml-barra-alto) + var(--gml-renglon-alto) + var(--gml-cabecera-borde)
+  );
+
+  /* El renglón que el peldaño le RESERVA a su motivo breve, lo tenga o no.
+     ⚠️ No es decorativo: sin reserva, un peldaño bloqueado sería 14 px más alto
+     que uno libre y los rótulos de los tres quedarían a alturas distintas. Se
+     reserva con una pista de `grid-template-rows`, que existe aunque su ítem
+     esté en `display:none` — que es como `app/barra.js` oculta el motivo. */
+  --gml-motivo-alto: 14px;
 
   /* Ancho del panel izquierdo. La maqueta usa 392 px en «Validación». */
   --gml-panel-ancho: 392px;
@@ -224,10 +265,37 @@ body {
   margin: 0;
 }
 
-/* ═══ Cáscara: panel izquierdo + mapa ════════════════════════════════════════ */
+/* ═══ Cáscara: barra arriba + panel izquierdo + mapa ═════════════════════════
+ *
+ * ── ⭐ ERA UN `display:flex` DE TRES COLUMNAS HASTA EL 2026-08-10 ───────────
+ * Rail · panel · mapa, en fila. La barra de arriba lo convierte en una rejilla de
+ * dos filas por dos columnas, y **sin añadir ni un nodo a `index.html`**: los tres
+ * hijos que ya había se colocan por área. Cero superficie nueva es cero superficie
+ * nueva para las dos trampas de esta casa —el contrato K.1 (`app/cableado-*.js`
+ * resuelve sus nodos UNA vez, al montar) y el guardián G16 de los `SELECTOR_*`—,
+ * y por eso la rebanada 1 pudo ir sin puerta de parada.
+ *
+ * ── POR QUÉ ÁREAS Y NO `grid-template-columns` A SECAS ─────────────────────
+ * Porque la barra CRUZA las dos columnas, y decirlo con `grid-column: 1 / -1` en
+ * el hijo repartiría la forma de la cáscara entre tres reglas distintas. Con
+ * áreas, la cáscara se lee entera en estas cuatro líneas y cada hijo solo declara
+ * en cuál vive.
+ *
+ * ── ⚠️ LOS `<dialog>` TAMBIÉN SON HIJOS DEL `<body>`, Y NO LLEVAN ÁREA ─────
+ * Y es correcto: cerrado, un `<dialog>` es `display:none` y no es ítem de la
+ * rejilla; abierto, es `position:absolute` (o está en la capa superior si es
+ * modal), y un ítem posicionado en absoluto tampoco participa del flujo de la
+ * rejilla. Ninguno crea una fila implícita. Se comprueba en el navegador, no de
+ * memoria: el guion 14 mide las cajas reales.
+ */
 
 .gml-app {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--gml-panel-ancho) minmax(0, 1fr);
+  grid-template-rows: var(--gml-cabecera-alto) minmax(0, 1fr);
+  grid-template-areas:
+    'barra barra'
+    'panel mapa';
   /* 100vh explícito (no `100%`) para que la cáscara no dependa de que nadie
      rompa la cadena html/body. `100dvh` corrige la barra del navegador móvil;
      en escritorio los dos valen lo mismo. */
@@ -259,8 +327,17 @@ body {
 
 /* ═══ El eje PASO: qué sección se ve en cada pantalla (rework de UI · T6) ═════
  *
- * `app/pantalla.js` escribe `data-paso` en el `<body>`; estas cinco reglas hacen
+ * `app/pantalla.js` escribe `data-paso` en el `<body>`; estas tres reglas hacen
  * el resto. **Ni una línea de JavaScript oculta una sección del panel.**
+ *
+ * ── ⛔ AQUÍ HABÍA CINCO, Y DOS ERAN CÓDIGO MUERTO (retiradas el 2026-08-09) ──
+ * Sobraban `validacion` e `informe`. Los dos pasos **se retiraron del enum** en el
+ * rework (`app/navegacion.js:135` y `:161`: «NO se dejan alias»), y desde entonces
+ * `app/pantalla.js` solo puede escribir uno de los tres vivos, así que aquellas dos
+ * líneas no podían casar nunca. No hacían daño —una regla que no casa no pinta—,
+ * pero mentían sobre cuántas pantallas tiene esta aplicación, que es justo el error
+ * que este fichero lleva evitando a base de comentarios. Su gemela de más abajo, la
+ * del diálogo del informe, SÍ hacía daño: ver el bloque de `.gml-dialogo-informe`.
  *
  * ── ⛔ POR QUÉ ESTO ES CSS Y EL EJE RAMA ES `hidden` ──────────────────────
  * Porque son DOS ejes que pueden querer ocultar la MISMA sección, y si los dos
@@ -271,25 +348,23 @@ body {
  * los dos lo dice— y ninguno pisa al otro. El razonamiento largo está en la
  * cabecera de `app/pantalla.js`.
  *
- * ── POR QUÉ CINCO REGLAS Y NO UNA ────────────────────────────────────────
+ * ── POR QUÉ UNA REGLA POR PASO Y NO UNA SOLA ─────────────────────────────
  * CSS no puede comparar el atributo de un ANCESTRO con el de un descendiente:
- * no existe `[data-pantalla~=attr(data-paso)]`. Cinco reglas mecánicas y
- * explícitas es la forma honesta de escribirlo; cualquier alternativa «lista»
- * acabaría en JavaScript ocultando nodos, que es lo que se está evitando.
+ * no existe `[data-pantalla~=attr(data-paso)]`. Una regla mecánica y explícita por
+ * paso es la forma honesta de escribirlo; cualquier alternativa «lista» acabaría
+ * en JavaScript ocultando nodos, que es lo que se está evitando.
  *
  * ⚠️ `[data-pantalla]` y NO `[data-paso]`: `app/rail.js` usa `data-paso` en cada
  * peldaño del rail, y como estas reglas son de DESCENDENCIA, escribirlas sobre
- * ese atributo ocultaría cuatro de los cinco peldaños. Se probó, y pasa.
+ * ese atributo ocultaría dos de los tres peldaños. Se probó, y pasa.
  *
- * Una sección SIN `data-pantalla` se ve en las cinco: los avisos y el pie son de
+ * Una sección SIN `data-pantalla` se ve en las tres: los avisos y el pie son de
  * todas las pantallas, y desaparecer el canal de errores al cambiar de paso sería
  * el peor fallo silencioso que esta cáscara puede tener.
  */
 .gml-app[data-paso='entrada'] [data-pantalla]:not([data-pantalla~='entrada']),
-.gml-app[data-paso='validacion'] [data-pantalla]:not([data-pantalla~='validacion']),
 .gml-app[data-paso='edicion'] [data-pantalla]:not([data-pantalla~='edicion']),
-.gml-app[data-paso='diagnostico'] [data-pantalla]:not([data-pantalla~='diagnostico']),
-.gml-app[data-paso='informe'] [data-pantalla]:not([data-pantalla~='informe']) {
+.gml-app[data-paso='diagnostico'] [data-pantalla]:not([data-pantalla~='diagnostico']) {
   display: none;
 }
 
@@ -321,18 +396,30 @@ body {
   background-color: var(--color-scrollbar-hover);
 }
 
-/* ═══ El rail de navegación (rework de UI · T5) ══════════════════════════════
+/* ═══ La barra de recorrido (topbar · rebanada 1) ════════════════════════════
  *
- * PRIMERA columna de la cáscara. Su marcado se parte en dos y está razonado en
- * `index.html`: la cáscara (`<nav>`, marca, `<ol>` vacío) es de allí; los cinco
- * peldaños los fabrica `app/rail.js` desde `PASOS`.
+ * ── ⭐ ERA LA PRIMERA COLUMNA HASTA EL 2026-08-10; AHORA ES LA FILA DE ARRIBA ─
+ * Mismo marcado, mismo módulo, 90° de giro. Lo que el autor pidió —«como si fuera
+ * una especie de diagrama de flujo que indica en qué paso vas»— se lee de
+ * izquierda a derecha, que es como se lee un flujo; y de paso le devuelve al mapa
+ * los 210 px de ancho que la columna le había quitado. El canje completo, con sus
+ * dos lados, está en `--gml-barra-alto` arriba.
  *
- * ── LAS CADENAS DE ESTE BLOQUE SON CONTRATO CON `app/rail.js` ──────────────
+ * Su marcado se parte en dos y está razonado en `index.html`: la cáscara
+ * (`<nav>`, marca, rótulo de grupo, `<ol>` vacío) es de allí; los tres peldaños
+ * **y el renglón de motivo** los fabrica `app/barra.js` desde `PASOS`.
+ *
+ * ── LAS CADENAS DE ESTE BLOQUE SON CONTRATO CON `app/barra.js` ─────────────
  * `.gml-rail-paso`, `.gml-rail-boton`, `.gml-rail-punto`, `.gml-rail-rotulo`,
- * `.gml-rail-motivo` y `[data-rail-estado]` los EXPORTA aquel módulo (`CLASE` y
- * `ATRIBUTO_ESTADO`). Aquí se CITAN, no se copian de oído: si un nombre cambia
- * allí, estas reglas quedan muertas y no lo dice nadie. El guardián es el guion
- * de humo 14, que mide el rail en un navegador de verdad.
+ * `.gml-rail-motivo`, `.gml-rail-renglon` y `[data-rail-estado]` los EXPORTA aquel
+ * módulo (`CLASE` y `ATRIBUTO_ESTADO`). Aquí se CITAN, no se copian de oído: si un
+ * nombre cambia allí, estas reglas quedan muertas y no lo dice nadie. El guardián
+ * es el guion de humo 14, que mide la barra en un navegador de verdad.
+ *
+ * ⚠️ **SIGUEN SIENDO `gml-rail-*` Y NO `gml-barra-*` A PROPÓSITO**: ese prefijo ya
+ * es de `viewer/barra-edicion.js` (`.gml-barra-herramienta`, `.gml-barra-partido`,
+ * `.gml-barra-conmutador`…), que vive sobre el mapa. Dos componentes bajo el mismo
+ * espacio de nombres colisionan un día sin avisar.
  *
  * ── ⛔ EL ESTADO SE PINTA DESDE `data-rail-estado` Y DE NINGÚN OTRO SITIO ──
  * Ni desde `aria-current`, ni desde `:disabled`, ni desde una clase modificadora.
@@ -345,29 +432,35 @@ body {
  * por debajo del 4,5:1 de AA**. `--color-text-disabled` (#64748b) da **4,55:1** y
  * pasa; el token ya existía en `tokens/colors.css`, comentado «inactive modules,
  * group labels, version». Un motivo que no se lee es un paso apagado en silencio,
- * que es exactamente lo que este rail existe para evitar.
+ * que es exactamente lo que esta barra existe para evitar.
  *
  * ── MOVIMIENTO: 150 ms EN HOVER Y FOCO, CERO EN EL CAMBIO DE PASO ──────────
  * Lo dice `tokens/motion.css` y corrige al plan del rework, que pedía «sin
- * animaciones»: sin las primeras el rail se siente muerto al tocarlo; con lo
+ * animaciones»: sin las primeras la barra se siente muerta al tocarla; con lo
  * segundo, el cambio de paso se siente lento. Es una transición de página.
  */
 
+/* La barra es a su vez una rejilla, y por el mismo motivo que la cáscara: así
+   los cuatro hijos —marca, grupo, `<ol>` y renglón— se colocan **sin un solo
+   `<div>` envolvente**. El renglón cruza las tres columnas y cae a la segunda
+   fila; los otros tres se colocan solos en la primera, en el orden del DOM. */
 .gml-rail {
-  width: var(--gml-rail-ancho);
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  grid-area: barra;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-rows: var(--gml-barra-alto) var(--gml-renglon-alto);
+  align-items: center;
+  min-width: 0;
   overflow: hidden;
-  padding: var(--space-4) 0;
   background: var(--color-bg-surface);
-  border-right: 1px solid var(--color-border-main);
+  border-bottom: var(--gml-cabecera-borde) solid var(--color-border-main);
 }
 
 .gml-rail-marca {
-  flex: none;
-  padding: 0 var(--space-4) var(--space-3);
+  padding: 0 var(--space-4) 0 var(--space-5);
+  /* La marca es lo único que no se alinea al centro óptico: sus dos renglones
+     tienen que leerse como un bloque, no como dos líneas sueltas. */
+  line-height: 1.25;
 }
 
 .gml-rail-nombre {
@@ -393,10 +486,17 @@ body {
   color: var(--color-text-disabled);
 }
 
+/* El rótulo del grupo. Sigue siendo el `aria-labelledby` del `<ol>`, y sigue
+   VIÉNDOSE: en horizontal, el diagrama de flujo necesita que algo diga qué es
+   ese diagrama. En vertical era una cabecera de sección; aquí es una etiqueta
+   de barra de herramientas, que es el mismo papel con otra forma. */
 .gml-rail-grupo {
-  flex: none;
   margin: 0;
-  padding: 0 var(--space-4) var(--space-2);
+  /* El relleno vertical no es holgura: es lo que le da ALTO al filo de la
+     izquierda. Sin él, `align-items:center` deja el elemento a la altura de su
+     texto (14 px) y el separador sale como una muesca. */
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  border-left: 1px solid var(--color-border-sub);
   font-size: var(--text-10);
   font-weight: 500;
   letter-spacing: 0.06em;
@@ -404,31 +504,61 @@ body {
   color: var(--color-text-disabled);
 }
 
-/* `min-height: 0` porque scrollea: sin él, cinco motivos largos empujarían el
-   rail entero y su contenido se saldría por abajo sin forma de alcanzarlo — el
-   mismo fallo que `.gml-panel` lleva ocho fases evitando. */
+/* La lista de pasos, en fila. **No scrollea, y es deliberado**: en vertical
+   tenía `overflow-y:auto` porque cinco motivos largos podían empujar el rail
+   entero; aquí los motivos son la forma BREVE (22 caracteres de tope, vigilado
+   en `app/navegacion.js`) y lo que no cabe se resuelve acortando la frase, no
+   escondiéndola detrás de un scroll horizontal que nadie va a encontrar. */
 .gml-rail-pasos {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  height: 100%;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .gml-rail-paso {
-  /* El filo de la izquierda marca el paso activo. Se declara SIEMPRE, en
-     transparente, para que encenderlo no mueva el texto ni un píxel. */
-  border-left: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  /* El filo de ABAJO marca el paso activo (en vertical era el de la izquierda).
+     Se declara SIEMPRE, en transparente, para que encenderlo no mueva el texto
+     ni un píxel. */
+  border-bottom: 2px solid transparent;
   transition: var(--transition);
+}
+
+/* ── La unión entre peldaños: el «diagrama de flujo» ────────────────────────
+ *
+ * Continua entre pasos que se pueden andar, PUNTEADA donde hay un corte. **La
+ * unión la dibuja el peldaño de la DERECHA**, como su `::before`: el primero no
+ * tiene entrada, de ahí el `+ .gml-rail-paso`. Así no hace falta ningún selector
+ * que mire al hermano siguiente, que en CSS no existe.
+ *
+ * Los dos selectores de abajo apuntan al MISMO pseudoelemento y no es
+ * redundancia: un tramo está cortado si **cualquiera de sus dos extremos** lo
+ * está. El primero mira al peldaño de la izquierda; el segundo, al que dibuja.
+ */
+.gml-rail-paso + .gml-rail-paso::before {
+  content: '';
+  flex: none;
+  width: var(--space-4);
+  border-top: 1px solid var(--color-border-main);
+}
+
+.gml-rail-paso[data-rail-estado='bloqueado'] + .gml-rail-paso::before,
+.gml-rail-paso[data-rail-estado='bloqueado']::before {
+  border-top-style: dashed;
 }
 
 .gml-rail-boton {
   display: flex;
   gap: var(--space-2);
-  align-items: flex-start;
-  width: 100%;
-  padding: 7px var(--space-4);
+  align-items: center;
+  height: 100%;
+  padding: 0 var(--space-3);
   border: 0;
   background: transparent;
   font: inherit;
@@ -447,33 +577,73 @@ body {
   flex: none;
   width: 9px;
   height: 9px;
-  margin-top: 4px;
   border: 1.5px solid var(--color-border-main);
   border-radius: 50%;
   background: transparent;
   transition: var(--transition);
 }
 
+/* ⛔ **LA SEGUNDA PISTA EXISTE AUNQUE EL MOTIVO NO**, y ése es todo el truco:
+   `grid-template-rows` declara las dos filas siempre, así que un peldaño libre
+   —cuyo `.gml-rail-motivo` está en `display:none` por el atributo `hidden`—
+   mide EXACTAMENTE lo mismo que uno bloqueado, y los tres rótulos quedan a la
+   misma altura. Con un `display:block` y el motivo apareciendo y desapareciendo,
+   los rótulos bailaban 14 px al cargar una parcela. */
 .gml-rail-texto {
-  display: block;
+  display: grid;
+  grid-template-rows: auto var(--gml-motivo-alto);
+  align-content: center;
   min-width: 0;
 }
 
 .gml-rail-rotulo {
-  display: block;
   font-size: var(--text-13);
   color: var(--color-text-disabled);
   transition: var(--transition);
+  white-space: nowrap;
 }
 
-/* El motivo, cuando lo hay. Lo redacta `app/navegacion.js`; aquí solo se le da
-   sitio y el gris que SÍ pasa AA. */
+/* El motivo BREVE, cuando lo hay. Lo redacta `app/navegacion.js#MOTIVO_BREVE`;
+   aquí solo se le da sitio y el gris que SÍ pasa AA. Una línea y sin envolver:
+   la frase se acorta en la autoridad, no se parte aquí. */
 .gml-rail-motivo {
-  display: block;
-  margin-top: 1px;
   font-size: var(--text-10);
   line-height: 1.35;
   color: var(--color-text-disabled);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── El renglón de motivo (topbar · rebanada 1) ─────────────────────────────
+ *
+ * La forma LARGA del obstáculo más cercano, o el motivo de entrega cuando lo
+ * haya (rebanada 3). Cruza la barra entera y **ocupa su alto siempre**, con o sin
+ * texto: ver `--gml-renglon-alto`.
+ */
+.gml-rail-renglon {
+  grid-column: 1 / -1;
+  /* ⛔ **`stretch` Y NO EL `center` DE LA BARRA, y lo destapó medir.** Un `<p>`
+     vacío no genera línea, así que sin esto medía **1 px** (solo su filo) y
+     `align-items:center` lo dejaba flotando en mitad de su pista: el separador
+     aparecía y desaparecía de sitio según hubiera motivo o no. El alto de la
+     BARRA no saltaba —la pista es fija—, pero el filo sí, que es un temblor a
+     cambio de nada. */
+  align-self: stretch;
+  margin: 0;
+  padding: 0 var(--space-5);
+  border-top: 1px solid var(--color-border-sub);
+  font-size: var(--text-11);
+  /* La pista mide `--gml-renglon-alto` CON el filo (`box-sizing:border-box` es
+     global), así que la línea de texto tiene ese alto menos el filo. Escribirlo
+     así en vez de a ojo es lo que deja el renglón sin desbordar: con
+     `line-height: var(--gml-renglon-alto)` la barra se sobresuscribía 2 px, y
+     como es `overflow:hidden`, se recortaba en silencio. */
+  line-height: calc(var(--gml-renglon-alto) - 1px);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Los tres estados, desde el único atributo que los declara ─────────────── */
@@ -492,7 +662,7 @@ body {
 }
 
 .gml-rail-paso[data-rail-estado='activo'] {
-  border-left-color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
   background: var(--color-bg-primary);
 }
 
@@ -507,11 +677,13 @@ body {
 }
 
 .gml-panel {
-  width: var(--gml-panel-ancho);
-  flex: none;
+  grid-area: panel;
   display: flex;
   flex-direction: column;
-  /* Sin esto, el panel crecería con su contenido en vez de repartirlo. */
+  /* Sin esto, el panel crecería con su contenido en vez de repartirlo. Se
+     conserva aunque la fila de la rejilla ya sea `minmax(0, 1fr)`: son dos
+     mecanismos distintos —uno limita la PISTA, éste limita al ítem— y quitarlo
+     dejaría que una tabla de 200 vértices empujara el pie fuera de la pantalla. */
   min-height: 0;
   overflow: hidden;
   background: var(--color-bg-primary);
@@ -807,7 +979,7 @@ body {
  * La regla se ha borrado porque el bloque ya no existe: la lista se fue a
  * `app/dialogo-avisos.js` y en Diagnóstico la columna es del contraste sin
  * competencia. El canal no se ha perdido —los chips siguen en la cabecera, en
- * las cinco pantallas—, así que lo que aquella regla equilibraba ya no hay que
+ * las tres pantallas—, así que lo que aquella regla equilibraba ya no hay que
  * equilibrarlo. */
 
 .gml-rotulo {
@@ -1010,6 +1182,37 @@ body {
   border-top: 1px solid var(--color-border-sub);
   font-size: var(--text-12);
   color: var(--color-text-disabled);
+}
+
+/* ⭐ 2026-08-09 · EL PIE PASA A TENER DOS RENGLONES: «¿Ya tenías un expediente?»
+   y «¿Quieres empezar de cero?». El segundo repite la clase para heredar la
+   tipografía, el color y la fila con el botón a la derecha, y aquí se le quitan
+   las tres propiedades que lo separarían del primero: son **un** bloque de
+   preguntas en voz baja, no dos zonas distintas. Con la línea y los 12 px de
+   `padding-top` heredados, el pie enseñaba dos hairlines a 20 px de distancia y
+   el bloque se leía como el final de la pantalla dos veces.
+
+   4 px y no 8: dos renglones de la MISMA cosa van más juntos entre sí que el
+   bloque respecto a lo que tiene encima, que es la misma escala con la que ya se
+   separan la etiqueta y su campo unas líneas más abajo.
+
+   ⚠️ El segundo renglón nace `hidden` y lo oculta `.gml-app [hidden]` (0,2,0),
+   que gana al `display:flex` de arriba (0,1,0). Aquí NO se declara `display`, y
+   por eso sigue ganando: la trampa que el guion 19 midió en
+   `.gml-barra-herramienta` es exactamente ésta. */
+.gml-entrada-pie + .gml-entrada-pie {
+  margin-top: var(--space-1);
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* Y el renglón del armado («vuelve a pulsar para confirmarlo») cuelga del pie sin
+   pegarse a él. Va con `+` sobre `.gml-accion-estado` —que ya trae su
+   `:empty{display:none}`— para que el hueco solo exista cuando hay texto: vacío
+   no separa nada de nada, y un margen incondicional dejaría 8 px de aire muerto
+   bajo el pie durante toda la vida de la pantalla. */
+.gml-entrada-pie + .gml-accion-estado {
+  margin-top: var(--space-2);
 }
 
 /* Los márgenes NO se colapsan dentro de un contenedor flex: sin esto, el margen
@@ -1290,7 +1493,7 @@ body {
    Cinco fases seguidas esquivando este presupuesto, y ninguna lo tocó. T6 sí,
    y no metiendo ni sacando bloques: **partiendo el panel por PANTALLA**. Los
    bloques ya no se enseñan todos a la vez; cada `<section>` declara en qué
-   pasos existe (`data-pantalla` en `index.html`) y las cinco reglas de
+   pasos existe (`data-pantalla` en `index.html`) y las tres reglas de
    `display:none` de este mismo fichero apagan las demás. Medido por el guion
    14, misma lista de avisos vacía:
 
@@ -2010,10 +2213,10 @@ body {
  * desaparece bajo ellas en cuanto llegan.
  */
 .gml-app .gml-mapa {
-  flex: 1 1 auto;
+  grid-area: mapa;
   min-width: 0;
   min-height: 0;
-  /* Lo estira `align-items:stretch` (el defecto del flex de fila); el 100 % es
+  /* Lo estira la rejilla (`stretch` es el `align-self` por omisión); el 100 % es
      cinturón y tirantes sobre el riesgo nº 1 de la fase (ver cabecera). */
   height: 100%;
   position: relative;
@@ -3314,24 +3517,51 @@ body {
    desde 2023 en los tres motores. En un navegador anterior el `var()` no
    resolvería y el velo saldría transparente: se pierde el oscurecido, no la
    función. */
-/* ══ El informe A PÁGINA COMPLETA en su propio paso (rework · rebanada 5) ═══
+/* ══ El informe A PÁGINA COMPLETA en modo pantalla (rework · rebanada 5) ═══
  *
- * ⛔ MEDIDO EN CHROME EL 2026-08-05, a 1280×720, con el diálogo recién abierto:
- * el formulario mide **1.336 px** y la caja de arriba enseña **632**, o sea que
- * **704 px (52,7 %) nacen bajo el pliegue** — más de la mitad del documento que
- * se va a firmar, incluidos «Componer PDF» y «Cancelar». Es el mismo defecto que
- * la rebanada 4 midió en el cajón de diagnóstico, y aquí es mayor.
+ * ⛔ **ESTA REGLA ESTUVO MUERTA, Y NADIE SE ENTERÓ. Resucitada el 2026-08-09.**
+ * Colgaba de `.gml-app[data-paso='informe']`, y `PASO.INFORME` se retiró del enum
+ * en el propio rework (`app/navegacion.js:135` y `:161`: «NO se dejan alias»).
+ * Desde entonces `app/pantalla.js` solo escribe uno de los tres pasos vivos: el
+ * selector no podía casar **nunca**. El diálogo seguía en modo pantalla por dentro
+ * —`show()` en vez de `showModal()`, `Escape` que pide salir— pero salía dibujado
+ * como la tarjeta centrada de F09. Ninguna prueba lo vio: el CSS de esta cáscara
+ * no tenía ni una.
  *
- * En su propio paso el diálogo deja de ser una tarjeta centrada y ocupa el área
- * de contenido entera. **El rail se queda fuera a propósito**: es la navegación,
- * y taparlo convertiría la pantalla en una ratonera (por lo mismo que allí se
- * presenta con `show()` y no con `showModal()`).
+ * Ahora cuelga de `data-presentacion="pantalla"`, que escribe `presentar()` en el
+ * mismo sitio donde ya decidía `show()` contra `showModal()`. Ver
+ * `app/dialogo-informe.js#ATRIBUTO_PRESENTACION`, que explica por qué NO se usó
+ * `aria-modal="false"` pese a estar ahí y ser gratis.
+ *
+ * ── LO QUE COSTABA, MEDIDO LAS DOS VECES ───────────────────────────────────
+ *   2026-08-05: formulario 1.336 px · visible 632 · **704 bajo el pliegue (52,7 %)**
+ *   2026-08-09: formulario 1.566 px · visible 632 · **934 bajo el pliegue (59,6 %)**
+ * Creció porque el formulario creció (F19 le metió «Tipo de operación» y F21 la
+ * precisión declarada): un defecto de maquetación que nadie vigila **empeora solo**.
+ *
+ * ⚠️ **CORRIGE A LA NOTA DE AGOSTO**, que decía «incluidos "Componer PDF" y
+ * "Cancelar"». Ya no: esos dos viven en un pie pegajoso dentro de la tarjeta y se
+ * ven siempre. Lo que queda enterrado es el CONTENIDO — el documento que se firma—,
+ * y el propio pie remata diciendo «Repáselos arriba», que manda al usuario a un
+ * scroll interno que puede no saber que existe.
+ *
+ * En modo pantalla el diálogo deja de ser una tarjeta centrada y ocupa el área de
+ * contenido entera. **La navegación se queda fuera a propósito**: taparla
+ * convertiría la pantalla en una ratonera (por lo mismo que allí se presenta con
+ * `show()` y no con `showModal()`).
+ *
+ * ⏳→✅ **LA MUDANZA ANUNCIADA EN LA REBANADA 0 YA ESTÁ HECHA (2026-08-10).** Esta
+ * regla decía `left: var(--gml-rail-ancho)` y era lo que la ataba al rail
+ * vertical; girada la barra, la navegación está ARRIBA y lo que hay que respetar
+ * es `--gml-cabecera-alto`. Se anota en vez de borrarse porque es la prueba de que
+ * la rebanada 0 no fue un arreglo suelto: dejó la regla anclada a una variable que
+ * la rebanada 1 podía cambiar en un sitio.
  *
  * No hay `display` aquí, y no es olvido: lo prohíbe el bloque de arriba.
  */
-.gml-app[data-paso='informe'] .gml-dialogo-informe {
-  top: 0;
-  left: var(--gml-rail-ancho);
+.gml-app .gml-dialogo-informe[data-presentacion='pantalla'] {
+  top: var(--gml-cabecera-alto);
+  left: 0;
   transform: none;
   width: auto;
   right: 0;
@@ -3345,7 +3575,7 @@ body {
   height: auto;
   max-height: none;
   border-radius: 0;
-  border-width: 0 0 0 1px;
+  border-width: 1px 0 0;
   box-shadow: none;
 }
 .gml-app .gml-dialogo-informe::backdrop {

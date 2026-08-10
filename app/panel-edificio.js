@@ -151,10 +151,10 @@
 // a qué pantallas pertenece una sección es una propiedad de LO QUE LA SECCIÓN
 // ES, y `index.html` lo declara en línea en cada una de las suyas. Quien fabrica
 // la sección declara sus pantallas; si no, este módulo tendría secciones que se
-// ven en las cinco pantallas hasta que alguien, en otro fichero, se acuerde.
+// ven en las tres pantallas hasta que alguien, en otro fichero, se acuerde.
 // **Eso era exactamente el defecto M2 que la fase 0 midió** (2026-08-06): los
 // dos bloques de edificio medían 314,97 / 157,06 px IDÉNTICOS en los cinco
-// pasos, o sea cinco peldaños encendidos sobre una sola pantalla.
+// pasos, o sea tres peldaños encendidos sobre una sola pantalla.
 //
 // ── EL BLOQUE NO ENSEÑA CONTADORES DE PLANTAS EN UNA PISCINA ────────────────
 // ⭐ Criterio de aceptación 1, y con la MISMA forma comprobable que F11 estrenó

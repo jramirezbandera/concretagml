@@ -40,8 +40,19 @@ const fixture = (n) => readFileSync(join(RAIZ, 'test', 'fixtures', 'parsers', n)
 
 const UTM_DXF = fixture('UTM.dxf')
 
+// ⭐ **El cuadrado «limpio» se mudó a MÁLAGA el 2026-08-09**, y no es cosmética:
+// estaba en (440123, 4470987) —Madrid— y desde que `geo/huso.js` afina la ventana
+// por huso, un punto de Madrid SIGUE siendo ambiguo (leído como huso 31 aterriza
+// en el Mediterráneo frente a Tarragona, que el rectángulo no distingue de tierra)
+// y la ambigüedad ABRE la pantalla. O sea: ya no era un fichero limpio, y las
+// pruebas del camino feliz de este archivo dependen de que lo sea.
+//
+// Aquí (386130, 4064400) las otras dos lecturas mueren solas: como huso 29 la
+// longitud se va a −10,27 (fuera de España) y como huso 31 la latitud 36,72 no
+// tiene territorio español —lo más al sur del huso 31 es Formentera, 38,63—.
+// Es el entorno de `icuc-pruebas/PERGOLA.gml`, o sea un sitio de trabajo real.
 const CUADRADO =
-  '440123.45 4470987.65\n440133.45 4470987.65\n440133.45 4470997.65\n440123.45 4470997.65'
+  '386130.00 4064400.00\n386140.00 4064400.00\n386140.00 4064410.00\n386130.00 4064410.00'
 
 const ficheroDeTexto = (texto, nombre) =>
   new File([new TextEncoder().encode(texto)], nombre, { type: '' })
@@ -397,7 +408,7 @@ describe('cableado-medicion · alFichero', () => {
     // Si el usuario elige DEJAR, `importar()` se comporta igual y vuelve a emitir la
     // misma detección. Sin la cuenta de tipos resueltos, esto sería un modal que se
     // reabre solo. El doble devuelve `{}` siempre: si hubiera bucle, no pararía.
-    const cierreAmbiguo = `${CUADRADO}\n440123.48 4470987.68`
+    const cierreAmbiguo = `${CUADRADO}\n386130.03 4064400.03`
     const dialogo = dialogoQueResponde()
     const medicion = cablear({ dialogo })
     await medicion.alFichero(ficheroDeTexto(cierreAmbiguo, 'cierre.txt'))

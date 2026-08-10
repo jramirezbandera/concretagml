@@ -406,6 +406,88 @@ export const ASIENTOS = Object.freeze(
         'guion 22 en `ok:false`— y ahora queda en 753,20. El defecto es previo y sigue abierto; ' +
         'este asiento no lo crea, lo empeora en 16 px y lo deja anotado. Sobran 12.938 sobre el ' +
         'techo.' },
+    { hito: '«Vaciarlo»: el pie de Entrada estrena un segundo renglón', commit: '(sin commitear)',
+      total: 70262, nuestro: 55167, rebanada: null,
+      nota:
+        '**+149 B por DOS reglas de tres declaraciones**, y las dos son de composición, no de ' +
+        'aspecto. Petición del autor (2026-08-09): la aplicación tenía cuatro puertas de entrada y ' +
+        'ninguna de salida — quien soltaba el `.dxf` equivocado se quedaba con él, y ni recargar a ' +
+        'mano valía, porque el `?demo=` y el `#/parcela/edicion` vuelven a entrar con la página. ' +
+        '── (1) `.gml-entrada-pie + .gml-entrada-pie` ── El pie pasa a tener DOS preguntas en voz ' +
+        'baja («¿Ya tenías un expediente?» y «¿Quieres empezar de cero?»), así que al segundo se ' +
+        'le quitan `border-top`, `padding-top` y el margen de 8 px, y se le pone `--space-1`. Sin ' +
+        'esas tres, el bloque enseñaba DOS hairlines a 20 px una de otra y se leía como el final ' +
+        'de la pantalla dos veces. ── (2) `.gml-entrada-pie + .gml-accion-estado` ── 8 px para el ' +
+        'renglón del armado («vuelve a pulsar para confirmarlo»), y va en el `+` y no en la clase ' +
+        'para heredar el `:empty{display:none}` que ya tiene: sin texto no hay hueco, así que la ' +
+        'columna no paga nada el 99 % del tiempo. ── ⭐ EL PRECIO EN PÍXELES ES **CERO** EN EL ' +
+        'ARRANQUE, Y ESO SE MIDIÓ ── El segundo renglón nace `hidden` y solo sale cuando hay algo ' +
+        'que vaciar. Medido en Chrome a 1280×720 con la app VACÍA (que es el arranque de ' +
+        'producción desde el 2026-08-07): `display:none`, alto 0,00 px y «Abrirlo» sigue acabando ' +
+        'en **753,20 px** — exactamente donde lo dejó el asiento anterior. O sea que el defecto de ' +
+        'desbordamiento que aquél anotó **no se empeora**. Con una parcela cargada (`?demo=real`) ' +
+        'el pie crece **+30,50 px** (753,20 → 783,70) y cae detrás del scroll del panel; se ' +
+        'comprobó que se alcanza scrolleando y que el objetivo del botón lo recibe el botón ' +
+        '(`elementFromPoint` sobre `[data-accion="empezar-de-nuevo"]`, con el `::after` de ' +
+        '`--menudo` a -6 px por lado). Sobran 13.103 sobre el techo.' },
+    { hito: 'Topbar · rebanada 0 · las reglas muertas, y el informe recupera su pantalla',
+      commit: '(sin commitear)',
+      total: 70117, nuestro: 55022, rebanada: null,
+      nota:
+        '**−145 B, y es el primer asiento en negativo que no es una reescritura.** Trabajo ' +
+        'preparatorio del topbar: la mudanza a barra horizontal retira `--gml-rail-ancho`, y antes ' +
+        'de tocar la cáscara había que resolver lo que colgaba de él. ── (1) SE VAN DOS SELECTORES ' +
+        'DEL EJE PASO ── La regla llevaba CINCO —`entrada`, `validacion`, `edicion`, `diagnostico`, ' +
+        '`informe`— y dos eran código muerto: `PASO.VALIDACION` y `PASO.INFORME` se retiraron del ' +
+        'enum en el propio rework (`app/navegacion.js:135` y `:161`, «NO se dejan alias»), así que ' +
+        '`app/pantalla.js` no puede escribirlos y aquellos dos selectores no casaban NUNCA. No ' +
+        'hacían daño, pero mentían sobre cuántas pantallas tiene la aplicación. ── (2) LA TERCERA ' +
+        'REGLA MUERTA SÍ HACÍA DAÑO ── `.gml-app[data-paso=\'informe\'] .gml-dialogo-informe` daba al ' +
+        'diálogo del informe la pantalla completa, y por el mismo motivo estaba muerta desde el ' +
+        'rework. **El diálogo llevaba meses saliendo como la tarjeta centrada de F09 y ninguna ' +
+        'prueba lo veía**, porque el CSS de esta cáscara no tenía ni una. Ahora cuelga de ' +
+        '`[data-presentacion=\'pantalla\']`, que escribe `presentar()` en el mismo fork donde ya ' +
+        'decidía `show()` contra `showModal()`. No se usó `aria-modal="false"`, que estaba ahí y ' +
+        'era gratis, por la regla de `app/barra.js` («el estado se pinta desde `data-rail-estado`»): ' +
+        'el aspecto sale de un `data-*` y no de ' +
+        'ARIA. ── ⭐ EL PRECIO EN PÍXELES, MEDIDO EN CHROME A 1280×720 ── ANTES: caja 760×633,60 en ' +
+        '(260, 43,20), formulario 1.566 px, visible 632, **934 px (59,6 %) tras un scroll interno**. ' +
+        'DESPUÉS: caja **1.070×720 en (210, 0)**, formulario 1.378 (reflujo: más ancho, menos alto), ' +
+        'visible 720, **658 px (47,8 %)**. Se recuperan 276 px de documento leído sin scrollear, y ' +
+        'el rail sigue visible a la izquierda, que era la condición escrita («taparlo convertiría la ' +
+        'pantalla en una ratonera»). **NO se elimina el scroll y no se pretende**: 1.378 px no caben ' +
+        'en 720. ── ⚠️ CORRIGE A LA NOTA DEL 2026-08-05, que decía que «Componer PDF» y «Cancelar» ' +
+        'nacían bajo el pliegue: ya no, tienen pie pegajoso y se ven siempre. Lo enterrado es el ' +
+        'CONTENIDO. Y el defecto había EMPEORADO solo, de 704 px a 934, porque F19 y F21 le metieron ' +
+        'campos al formulario mientras nadie miraba. Sobran 12.958 sobre el techo.' },
+
+    { hito: 'Topbar · rebanada 1 · el rail gira 90°, la cáscara pasa a rejilla',
+      commit: '(sin commitear)',
+      total: 71303, nuestro: 56208, rebanada: null,
+      nota:
+        '**+1.186 B.** El rail vertical de 210 px se convierte en la barra de arriba, y la cáscara ' +
+        'deja de ser un `display:flex` de tres columnas para ser una rejilla de 2×2 con áreas ' +
+        '(`barra barra / panel mapa`). **Cero nodos nuevos en `index.html`** —el `<nav>` es a su vez ' +
+        'una rejilla, así que sus cuatro hijos se colocan sin un solo `<div>` envolvente—, que es lo ' +
+        'que dejó esta rebanada fuera del alcance del contrato K.1 y del guardián G16. ── ⭐ EL ' +
+        'CANJE, MEDIDO EN CHROME A 1280×720 CON `?demo=real` ── ANTES: rail 210×720, panel 392×720, ' +
+        'mapa **678×720**. DESPUÉS: barra **1280×72**, panel 392×648, mapa **888×648**. El mapa gana ' +
+        '210 px de ancho y paga 72 de alto: **+17,9 % de superficie** (488.160 → 575.424 px²). ── ⛔ ' +
+        'LO QUE CUESTA, Y NO SE MAQUILLA ── El panel paga los mismos 72 px de alto **y no gana nada**, ' +
+        'y se los come ENTEROS su único estirador: `#tabla-vertices` pasa de **225,08 a 153,08 px** ' +
+        '(−32 %) en Edición con datos. Y en Entrada rompe un criterio: la tercera vía («Abrir un ' +
+        'GML») cae **59,42 px bajo el pliegue**, que el guion 14 reporta. No hay hueco muerto que ' +
+        'recuperar —la sección tiene 16 px de relleno y 8 de separación, medidos—: el contenido de ' +
+        'Entrada mide 575,61 px y el panel solo tiene 707,92 px si la barra vale 12. **La aplicación ' +
+        'estaba a 12,08 px de ese acantilado antes del topbar**; el topbar no lo creó, lo cruzó. ── ' +
+        'DE DÓNDE SALEN LOS BYTES ── La rejilla y sus áreas son baratas; lo caro es que la barra ' +
+        'horizontal necesita reglas que la columna no tenía: la unión punteada entre peldaños ' +
+        '(`::before` con el estado de sus dos extremos), la pista reservada del motivo breve, y el ' +
+        'renglón de motivo entero, que es un componente nuevo. ── ⭐ Y ESTRENA GUARDIÁN ── ' +
+        '`test/estilos/cascara.test.js`: 11 pruebas que corren en `npm test` sobre una hoja que hasta ' +
+        'hoy **no tenía ninguna**. Cazan las 7 mutaciones con las que se probaron, incluida la que ' +
+        'reproduce el defecto de la rebanada 0 (una regla que cita un paso retirado). Sobran 14.144 ' +
+        'sobre el techo.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

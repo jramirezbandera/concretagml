@@ -12,7 +12,8 @@
  *   · un botón apagado sin decir por qué;                                    *
  *   · preguntar por el cierre de anillos que el usuario está a punto de       *
  *     descartar al elegir capa;                                              *
- *   · obligar a elegir huso, que es justo lo que F01 prohíbe;                *
+ *   · preguntar el huso cuando NO hay duda —o callárselo cuando sí la hay,   *
+ *     que es peor: el huso equivocado coloca la parcela a cientos de km;     *
  *   · y un diálogo que se abre sin nada que decidir, o que no se abre         *
  *     cuando sí lo hay.                                                       *
  *                                                                            *
@@ -48,8 +49,23 @@ const leerFixture = (n) => readFileSync(join(RAIZ, 'test', 'fixtures', 'parsers'
 const UTM_DXF = leerFixture('UTM.dxf')
 const PARCELA_TXT = leerFixture('PARCELA.txt')
 
-/** Un anillo cuadrado en UTM 30N realista, ABIERTO. */
+/**
+ * Un anillo cuadrado en UTM 30N realista, ABIERTO. Está en Madrid, y **sigue
+ * siendo AMBIGUO** aun con la ventana por huso del 2026-08-09: leído como huso 31
+ * aterriza en el Mediterráneo frente a Tarragona, y un rectángulo no distingue eso
+ * de tierra firme. Se conserva justo por eso: es el caso irreducible, el que ahora
+ * abre la pantalla.
+ */
 const CUADRADO = '440123.45 4470987.65\n440133.45 4470987.65\n440133.45 4470997.65\n440123.45 4470997.65'
+
+/**
+ * El mismo cuadrado en MÁLAGA, donde el huso NO admite discusión: como huso 29 la
+ * longitud se va a −10,27 (fuera de España) y como huso 31 la latitud 36,72 no
+ * tiene territorio español —lo más al sur del huso 31 es Formentera, 38,63—.
+ * Es lo que hoy significa «un volcado limpio»: sin nada que preguntar, ni el huso.
+ */
+const CUADRADO_SIN_DUDA =
+  '386130.00 4064400.00\n386140.00 4064400.00\n386140.00 4064410.00\n386130.00 4064410.00'
 
 /** El mismo cuadrado con el último vértice a 4 cm del primero: banda ambigua. */
 const CIERRE_AMBIGUO = `${CUADRADO}\n440123.48 4470987.68`
@@ -114,8 +130,14 @@ describe('dialogo-importacion · decisionesDe', () => {
   })
 
   it('un volcado limpio no tiene NADA que decidir: entra directo', () => {
-    expect(hayQueDecidir(txt(CUADRADO))).toBe(false)
-    expect(decisionesDe(txt(CUADRADO)).decisiones).toEqual([])
+    const limpio = txt(CUADRADO_SIN_DUDA)
+    // Anti-vacuidad: «limpio» incluye que el huso NO sea ambiguo. Sin esta línea la
+    // prueba pasaría igual el día que la ventana por huso se relaje y vuelvan a
+    // colarse lecturas imposibles, y nadie se enteraría hasta ver el modal.
+    expect(limpio.resumen.huso.ambiguo).toBe(false)
+    expect(limpio.resumen.huso.zona).toBe(30)
+    expect(hayQueDecidir(limpio)).toBe(false)
+    expect(decisionesDe(limpio).decisiones).toEqual([])
   })
 
   it('X/Y invertidas y cierre ambiguo SÍ abren pantalla', () => {
@@ -130,25 +152,68 @@ describe('dialogo-importacion · decisionesDe', () => {
     expect(cierre.errorMaximo).toBeCloseTo(0.0424, 3)
   })
 
-  it('⛔ el huso NO dispara la pantalla por sí solo — es la regla de F01', () => {
-    // «Nunca obligar a elegirlo en un desplegable […]; el desplegable queda como
-    // anulación» (spec/feature-01-entrada-parcela.md:29). `importar()` ya resuelve
-    // el prioritario y CONSTRUYE la parcela: parar el recorrido para preguntar sería
-    // desobedecer la ficha y estorbar en el camino feliz.
+  it('⭐ el huso AMBIGUO dispara la pantalla por sí solo (2026-08-09)', () => {
+    // ⛔ **ESTA PRUEBA AFIRMABA LO CONTRARIO**, y citaba la ficha: «nunca obligar a
+    // elegirlo en un desplegable […]; el desplegable queda como anulación»
+    // (spec/feature-01-entrada-parcela.md:29). La regla daba por hecho que la
+    // deducción acierta. MEDIDO sobre 42 municipios reales llevados a su huso
+    // verdadero: 42 de 42 salían ambiguos y **en 22 de 42 el prioritario era el
+    // huso EQUIVOCADO** (Galicia y Cataluña enteras entraban como huso 30).
+    // Errar el huso coloca la parcela a cientos de kilómetros sin dar ningún
+    // error, y un aviso en el panel no es respuesta porque no hay dónde
+    // contestarlo. Ver la cabecera de `app/dialogo-importacion.js`.
     const limpio = txt(CUADRADO)
     const ambiguo = limpio.detecciones.some((d) => d.tipo === 'HUSO_AMBIGUO')
 
     expect(ambiguo).toBe(true) // el fixture SÍ es ambiguo: la prueba no es vacua
-    expect(limpio.resumen.construida).toBe(true) // y aun así entra
-    expect(hayQueDecidir(limpio)).toBe(false) // y no se pregunta
+    expect(limpio.resumen.construida).toBe(true) // entra igual, con el prioritario
+    expect(hayQueDecidir(limpio)).toBe(true) // …pero AHORA se pregunta
+
+    const huso = decisionesDe(limpio).decisiones.find((d) => d.tipo === TIPO_DECISION.HUSO)
+    expect(huso.candidatos.map((c) => c.zona)).toEqual([30, 31])
+    expect(huso.prioritario).toBe(30) // llega marcado: el caso normal es un Enter
   })
 
-  it('…pero si la pantalla ya está abierta, el huso aparece como ANULACIÓN', () => {
+  it('con la pantalla abierta por otro motivo, el huso sigue apareciendo', () => {
     const conCierre = decisionesDe(txt(CIERRE_AMBIGUO)).decisiones
     const huso = conCierre.find((d) => d.tipo === TIPO_DECISION.HUSO)
     expect(huso).toBeDefined()
     expect(huso.prioritario).toBe(30)
     expect(huso.candidatos.map((c) => c.zona)).toEqual([30, 31])
+  })
+
+  it('⛔ preguntando el huso, la pantalla NO se contesta sola en las informativas', () => {
+    // Visto en el navegador el 2026-08-09, recién escrita la pregunta: bajo «marca
+    // dónde está de verdad la parcela» salía «La parcela cae en el huso 30
+    // (EPSG:25830): lon=−3,826…». Preguntar y contestarse tres líneas más abajo es
+    // la lección M28 de F11, y aquí encima empuja al prioritario, que es lo que se
+    // está poniendo en duda.
+    const { decisiones, informativas } = decisionesDe(txt(CUADRADO))
+    expect(decisiones.some((d) => d.tipo === TIPO_DECISION.HUSO)).toBe(true)
+    expect(informativas.some((t) => /cae en el huso/i.test(t))).toBe(false)
+  })
+
+  it('…pero sin pregunta del huso, el punto de caída SÍ se dice (regla de F01)', () => {
+    // «Mostrar dónde ha caído la parcela antes de continuar»
+    // (spec/feature-01-entrada-parcela.md:29). Esa mitad de la regla sigue viva:
+    // lo que se retira es la frase que compite con una pregunta abierta, no la
+    // información. Se mira sobre un fichero que SÍ abre pantalla por otro motivo.
+    // El cuadrado de Málaga con el último vértice a 4 cm del primero: abre
+    // pantalla por el CIERRE, y su huso no admite discusión.
+    const cierreSinDuda = `${CUADRADO_SIN_DUDA}\n386130.03 4064400.03`
+    const { decisiones, informativas } = decisionesDe(txt(cierreSinDuda))
+    expect(decisiones.some((d) => d.tipo === TIPO_DECISION.CIERRE)).toBe(true)
+    expect(decisiones.some((d) => d.tipo === TIPO_DECISION.HUSO)).toBe(false)
+    expect(informativas.some((t) => /cae en el huso 30/i.test(t))).toBe(true)
+  })
+
+  it('⭐ y un huso SIN duda no pregunta nada: la ventana por huso mata las lecturas imposibles', () => {
+    // El caso que lo destapó: `icuc-pruebas/PERGOLA.gml` y su DXF de la misma
+    // manzana, en Málaga. Antes del 2026-08-09 esto ofrecía «huso 30 o huso 31»,
+    // y el 31 caía en mar abierto frente a la costa argelina.
+    const malaga = txt(CUADRADO_SIN_DUDA)
+    expect(malaga.detecciones.some((d) => d.tipo === 'HUSO_AMBIGUO')).toBe(false)
+    expect(decisionesDe(malaga).decisiones.map((d) => d.tipo)).not.toContain(TIPO_DECISION.HUSO)
   })
 
   it('los bloqueos sin corrección se dicen con su salida, no con un botón muerto', () => {
@@ -357,7 +422,9 @@ describe('dialogo-importacion · la pantalla', () => {
 
     // Resuelve con `{}` —el fichero entra igual, no se castiga al usuario por un
     // fallo nuestro— pero lo cuenta por el panel y por la consola.
-    await expect(dialogo.abrir({ nombre: 'x.txt', resultado: txt(CUADRADO) })).resolves.toEqual({})
+    await expect(
+      dialogo.abrir({ nombre: 'x.txt', resultado: txt(CUADRADO_SIN_DUDA) }),
+    ).resolves.toEqual({})
     expect(alAvisar).toHaveBeenCalledTimes(1)
     expect(console.error).toHaveBeenCalled()
   })

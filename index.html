@@ -9,15 +9,15 @@
   (rectificado el 2026-08-04, rework de UI · T8). Ya no: la cáscara tiene TRES
   columnas —rail · panel · mapa— y **CINCO pantallas** que se turnan en el panel
   (Entrada, Validación, Edición, Diagnóstico e Informe). Ninguna `<section>` se
-  saca del DOM: se apagan con `data-pantalla` y cinco reglas de `display:none` de
+  saca del DOM: se apagan con `data-pantalla` y tres reglas de `display:none` de
   `estilos/app.css`. Quien decide en cuál estamos es `app/navegacion.js`; quien
-  pinta el rail, `app/rail.js`; quien apaga las secciones, `app/pantalla.js`.
+  pinta el rail, `app/barra.js`; quien apaga las secciones, `app/pantalla.js`.
 
   ── QUÉ ES ESTE FICHERO, EXACTAMENTE ────────────────────────────────────────
   Un ESQUELETO DE CAJAS VACÍAS, y nada más. No pinta contenido dinámico: el
   interior de `#avisos` es de `app/avisos.js`, el de `#tabla-vertices` y el de
   `#mapa` es de `viewer/` (`sincronizar` y `crearVisor`), los peldaños del rail
-  son de `app/rail.js` y los textos de la ficha del pie los escribe
+  son de `app/barra.js` y los textos de la ficha del pie los escribe
   `app/main.js` desde el store. Lo único que este HTML aporta son los NODOS y
   sus clases.
 
@@ -86,8 +86,18 @@
        atributo `data-*` con valor, y por buen motivo (las clases son del CSS, los
        `data-*` son del contrato). -->
   <body class="gml-app" data-app="cascara">
-    <!-- ══ EL RAIL DE NAVEGACIÓN (rework de UI · T5, 2026-08-04) ═══════════════
-         La cáscara pasa de DOS columnas a TRES: rail · panel · mapa.
+    <!-- ══ LA BARRA DE RECORRIDO (topbar · rebanada 1, 2026-08-10) ════════════
+         ⭐ **ERA UN RAIL VERTICAL DE 210 px HASTA EL 2026-08-10.** Nació así en
+         el rework de UI (T5, 2026-08-04), cuando la cáscara pasó de dos columnas
+         a tres. Ahora la cáscara es BARRA + dos columnas: el `<nav>` cruza
+         arriba, y panel y mapa se reparten lo de debajo.
+
+         POR QUÉ EL GIRO. Petición del autor: «como si fuera una especie de
+         diagrama de flujo que indica en qué paso vas». Un flujo se lee de
+         izquierda a derecha. Y de propina, los 210 px de la columna vuelven al
+         mapa. El canje completo —con lo que CUESTA, que son 72 px de alto al
+         panel y a su caja de vértices— está en `estilos/app.css`, en el
+         comentario de `--gml-barra-alto`.
 
          ⚠️ ESTO REVIERTE UNA DECISIÓN DE F03, Y CONVIENE SABER CUÁL.
          `estilos/app.css:10-12` decía: «es la mitad viva de la pantalla
@@ -98,36 +108,49 @@
          en el mismo panel de 392 px y altura fija, con siete controles flotando
          sobre el mapa porque abajo ya no cabían.
 
-         QUÉ HAY AQUÍ Y QUÉ NO. Aquí está la CÁSCARA: el `<nav>`, la marca y un
-         `<ol>` VACÍO. Los cinco peldaños los fabrica `app/rail.js` a partir de
-         `PASOS` y `ROTULO_PASO` de `app/navegacion.js`, porque escribirlos aquí
-         a mano sería una segunda lista que hay que acordarse de mantener a la
-         par — y las segundas listas divergen. Mismo reparto que `app/rama.js`
-         con su conmutador y que `app/zona-fichero.js` con su `<input file>`.
+         QUÉ HAY AQUÍ Y QUÉ NO. Aquí está la CÁSCARA: el `<nav>`, la marca, el
+         rótulo del grupo y un `<ol>` VACÍO. Los tres peldaños **y el renglón de
+         motivo** los fabrica `app/barra.js` a partir de `PASOS` y `ROTULO_PASO`
+         de `app/navegacion.js`, porque escribirlos aquí a mano sería una segunda
+         lista que hay que acordarse de mantener a la par — y las segundas listas
+         divergen. Mismo reparto que `app/rama.js` con su conmutador y que
+         `app/zona-fichero.js` con su `<input file>`.
+
+         ⚠️ **CERO NODOS NUEVOS EN ESTE FICHERO, y es la razón por la que la
+         rebanada 1 fue sin puerta de parada.** El `<nav>` es a su vez una rejilla,
+         así que sus cuatro hijos se colocan sin un solo `<div>` envolvente. Cero
+         superficie nueva es cero superficie nueva para las dos trampas de esta
+         casa: el contrato K.1 (`app/cableado-*.js` resuelve sus nodos UNA vez, al
+         montar) y el guardián G16 de los `SELECTOR_*`.
 
          QUIÉN MANDA. `app/navegacion.js` es el dueño único de `{rama, paso,
          modo}`: decide qué paso está disponible y REDACTA el motivo cuando no lo
-         está. `app/rail.js` solo pinta. Si un paso sale apagado y quieres saber
+         está. `app/barra.js` solo pinta. Si un paso sale apagado y quieres saber
          por qué, la respuesta está en la tabla de guardas de aquel módulo, no
          aquí ni en el CSS.
 
          ⛔ UN PASO NO DISPONIBLE SE APAGA (`disabled` + el motivo escrito al
-         lado), NUNCA se saca del `<ol>`. Un rail que encoge y crece no deja
-         aprender el recorrido; y sacar nodos del documento es lo que huerfaniza
+         lado), NUNCA se saca del `<ol>`. Una barra que encoge y crece no deja
+         aprender el recorrido —y en horizontal es peor: sacar un peldaño MUEVE a
+         los demás de sitio—; y sacar nodos del documento es lo que huerfaniza
          las referencias que `app/cableado-*.js` resuelve una sola vez al montar
          (ver el aviso largo de más abajo, que es el mismo problema con otra
          cara).
 
-         COSTE MEDIDO: 210 px de ancho, que salen del mapa y no del panel. A
-         1280×720 —el suelo declarado— el mapa se queda en 678 px, por encima del
-         suelo de 400 que vigila `scripts/smoke-navegador/14-shell.js`. -->
+         COSTE MEDIDO A 1280×720, el suelo declarado, y con sus dos lados:
+           ANTES  rail 210 · panel 392 · mapa 678×720
+           AHORA  barra 1280×72 · panel 392 · mapa 888×648
+         El mapa gana 210 px de ancho y paga 72 de alto (+17,9 % de superficie).
+         El panel paga 72 px de alto y no gana nada, y se los come enteros su
+         único estirador: la caja de vértices. Las dos cifras las vigila
+         `scripts/smoke-navegador/14-shell.js`. -->
     <nav class="gml-rail" data-rail="cascara" aria-label="Recorrido del expediente">
       <div class="gml-rail-marca">
         <p class="gml-rail-nombre">Concreta<sup>GML</sup></p>
         <p class="gml-rail-apunte">Contraste catastral</p>
       </div>
       <p class="gml-rail-grupo" id="gml-rail-grupo">Recorrido</p>
-      <!-- Vacío A PROPÓSITO: lo rellena `app/rail.js`. Un `<ol>` con peldaños
+      <!-- Vacío A PROPÓSITO: lo rellena `app/barra.js`. Un `<ol>` con peldaños
            escritos aquí saldría en la pantalla del usuario durante el instante
            anterior al montaje, y con los rótulos que tuviera este fichero en vez
            de los que tenga el código. -->
@@ -185,9 +208,9 @@
         <!-- El título CAMBIA con la pantalla y lo escribe `app/pantalla.js`
              (`TITULO_PANTALLA`). Lo que hay aquí es lo que se ve durante el
              instante anterior al montaje, así que es el de la pantalla con la que
-             se arranca. **No es el rótulo del rail**: aquél dice «Entrada» porque
-             tiene 210 px, y éste dice «Empieza tu expediente», que es la respuesta
-             directa a «no sé por dónde empezar». -->
+             se arranca. **No es el rótulo de la barra**: aquél dice «Entrada»
+             porque es un peldaño en fila, y éste dice «Empieza tu expediente», que
+             es la respuesta directa a «no sé por dónde empezar». -->
         <h1 class="gml-titulo" data-titulo="pantalla">Empieza tu expediente</h1>
         <!-- ⭐ SON BOTONES DESDE EL 2026-08-07, y ése es todo el cambio de la
              mudanza de los avisos. Cada uno abre `app/dialogo-avisos.js` con SU
@@ -274,12 +297,12 @@
            distinta de que todavía no se haya deducido. -->
       <!-- `data-pantalla` es el eje PASO del panel, y lo aplica el CSS a partir
            del `data-paso` que `app/pantalla.js` escribe en el `<body>`. Una
-           sección SIN este atributo se ve en las cinco pantallas — es lo que hace
+           sección SIN este atributo se ve en las tres pantallas — es lo que hace
            que los avisos y el pie no desaparezcan al cambiar de paso.
 
-           ⚠️ ES `data-pantalla` Y NO `data-paso` A PROPÓSITO: `app/rail.js` ya
+           ⚠️ ES `data-pantalla` Y NO `data-paso` A PROPÓSITO: `app/barra.js` ya
            usa `data-paso` en cada peldaño del rail, y una regla de descendencia
-           sobre ese atributo ocultaría cuatro de los cinco peldaños. Además éste
+           sobre ese atributo ocultaría dos de los tres peldaños. Además éste
            admite VARIAS pantallas separadas por espacios (selector `~=`), que es
            lo que necesita la caja de vértices.
 
@@ -314,7 +337,7 @@
                  con sus dos hijos.
                · **La escasez no se ha acabado.** Dentro de UNA pantalla el panel
                  sigue repartiendo altura fija entre bloques fijos. Lo que el
-                 rework quitó es que las cinco pantallas compitieran ENTRE SÍ.
+                 rework quitó es que las cinco pantallas de entonces compitieran ENTRE SÍ.
 
              LO QUE DEJÓ DE SER VERDAD, con su cifra: la caja de vértices ya no
              mide 267 px. Con Entrada fuera de su camino mide **385,67 px a
@@ -532,6 +555,45 @@
             Abrirlo
           </button>
         </p>
+
+        <!-- ⭐ 2026-08-09 · LA SALIDA, Y HASTA HOY NO HABÍA NINGUNA. Petición del
+             autor: *«me gustaría que hubiera un botón para poder eliminar la
+             geometría actual y empezar desde el principio»*. La aplicación sabía
+             META datos por cuatro vías y no sabía SACARLOS: quien soltaba el `.dxf`
+             equivocado, elegía la finca que no era o traía la referencia de al lado
+             se quedaba con ella hasta recargar la página a mano — y recargar a mano
+             tampoco vale, porque el `?demo=` y el `#/parcela/edicion` de la barra
+             de direcciones vuelven a entrar con ella.
+
+             VA AQUÍ Y NO EN LA CABECERA, y es la decisión del autor (2026-08-09):
+             Entrada **es** el principio, está a un clic desde cualquier paso por el
+             rail, y así no se gasta ni un píxel del sitio más caro de la pantalla.
+
+             ⚠️ **NACE `hidden` Y SOLO SALE CUANDO HAY ALGO QUE VACIAR.** Con la app
+             recién abierta —que desde el 2026-08-07 es el caso normal— este renglón
+             ofrecería tirar lo que no existe, y sería la quinta cosa que descartar
+             antes de poder empezar. Quien lo enseña y lo esconde es
+             `app/empezar-de-nuevo.js`, suscrito a los DOS stores.
+
+             Lo oculta `.gml-app [hidden]` (0,2,0), que gana al `display:flex` de
+             `.gml-entrada-pie` (0,1,0) sin necesitar una regla propia. NO se le
+             añada un `display` a este nodo por clase: revive la trampa que el guion
+             19 midió en `.gml-barra-herramienta`. -->
+        <p class="gml-entrada-pie" data-pie="empezar-de-nuevo" hidden>
+          ¿Quieres empezar de cero?
+          <button type="button" class="gml-boton gml-boton--menudo" data-accion="empezar-de-nuevo">
+            Vaciarlo
+          </button>
+        </p>
+
+        <!-- El renglón del ARMADO: «vuelve a pulsar para confirmarlo». Vaciar es
+             irreversible en pantalla, así que se pide dos veces, con el mismo patrón
+             en dos tiempos que `app/cableado-expediente.js` ya usa para «Borrar» un
+             expediente guardado (`MS_CONFIRMAR_BORRADO`). `role="status"` para que
+             el lector de pantalla lo anuncie SIN robar el foco: el usuario tiene que
+             poder volver a pulsar el mismo botón. Vacío no ocupa alto
+             (`.gml-accion-estado:empty`). -->
+        <p class="gml-accion-estado" data-estado="empezar-de-nuevo" role="status"></p>
       </section>
 
       <!-- ══ AQUÍ ESTABA EL BLOQUE «AVISOS», Y SE FUE EL 2026-08-07 ═══════════
@@ -713,7 +775,7 @@
            del dato declarada. El segundo motivo —un diagnóstico se lee mirando el
            mapa— sobrevive a ese cambio y hay que conservarlo; el primero —«el
            presupuesto no da para otro bloque fijo»— es el que T9 tiene que volver
-           a medir, porque desde T6 el panel ya no enseña las cinco pantallas a la
+           a medir, porque desde T6 el panel ya no enseña todas las pantallas a la
            vez. Que la razón siga escrita no la hace vigente: ésta es exactamente
            la clase de motivo que caducó en F04 y nadie volvió a leer. -->
 

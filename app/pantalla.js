@@ -30,9 +30,9 @@
 // paso está la aplicación; lo demás es cascada.
 //
 // ── ⚠️ `data-pantalla` Y NO `data-paso` EN LAS SECCIONES, Y HAY MOTIVO ────
-// `app/rail.js` ya pone `data-paso` en cada `<li>` del rail. Si las secciones del
+// `app/barra.js` ya pone `data-paso` en cada `<li>` del rail. Si las secciones del
 // panel llevaran ese mismo atributo, la regla de arriba —que es un descendiente
-// de `.gml-app`— **ocultaría cuatro de los cinco peldaños del rail**. Se probó, y
+// de `.gml-app`— **ocultaría dos de los tres peldaños de la barra**. Se probó, y
 // pasa. Los dos atributos dicen cosas distintas y por eso se llaman distinto:
 // `data-paso` identifica UN paso; `data-pantalla` dice a qué pantallas pertenece
 // una sección, y admite VARIAS separadas por espacios (de ahí el `~=`).
@@ -75,10 +75,10 @@ export const ATRIBUTO_PANTALLA = 'data-pantalla'
 
 /**
  * El título de cada pantalla. **No es `ROTULO_PASO`**: aquél es lo que se lee en
- * el rail (una palabra, porque hay 210 px) y esto es el `<h1>` del panel, que
- * puede decir una frase. Separarlos permite que el rail diga «Entrada» y la
- * pantalla diga «Empieza tu expediente», que es la respuesta directa a «no sé por
- * dónde empezar».
+ * el peldaño de la barra (una palabra, porque tres peldaños tienen que caber en
+ * fila junto a la marca) y esto es el `<h1>` del panel, que puede decir una frase.
+ * Separarlos permite que la barra diga «Entrada» y la pantalla diga «Empieza tu
+ * expediente», que es la respuesta directa a «no sé por dónde empezar».
  *
  * @readonly
  */
@@ -133,7 +133,7 @@ export const TITULO_EN_EDIFICIO = Object.freeze({
 
 /**
  * El título que le toca a una situación. **FUNCIÓN PURA**, y exportada para que
- * el test recorra los cinco pasos por las dos ramas sin escribir la lista.
+ * el test recorra los tres pasos por las dos ramas sin escribir la lista.
  *
  * Devuelve `undefined` —y no una cadena inventada— cuando el paso no tiene título
  * declarado: quien la usa deja entonces el que hubiera, porque inventar uno sería
@@ -152,7 +152,7 @@ export function tituloDe(paso, rama = RAMA.PARCELA) {
 
 // ── Utilidades ──────────────────────────────────────────────────────────────
 
-/** ¿Sirve como documento? DUCK TYPING, igual que `app/rama.js` y `app/rail.js`. */
+/** ¿Sirve como documento? DUCK TYPING, igual que `app/rama.js` y `app/barra.js`. */
 const esDocumento = (d) =>
   !!d && typeof d === 'object' && typeof d.querySelector === 'function'
 
@@ -203,7 +203,7 @@ export function cablearPantalla({ documento, navegacion, app, titulo } = {}) {
     throw new Error(
       `cablearPantalla: no se encuentra «${SELECTOR_APP}» en el documento. Es parte del contrato ` +
         `de marcado con index.html; sin él ninguna regla de pantalla del CSS dispara y el panel ` +
-        `enseñaría las cinco a la vez.`,
+        `enseñaría las tres a la vez.`,
     )
   }
 
@@ -231,7 +231,7 @@ export function cablearPantalla({ documento, navegacion, app, titulo } = {}) {
   const baja = navegacion.subscribe(aplicar)
   // `subscribe` no notifica al suscribirse (contrato de `crearEstadoVista`), así
   // que la primera aplicación va a mano. Es también la que deja `data-paso`
-  // escrito desde el arranque, para que el CSS no enseñe las cinco pantallas
+  // escrito desde el arranque, para que el CSS no enseñe las tres pantallas
   // durante el primer fotograma.
   aplicar(navegacion.get())
 
@@ -252,7 +252,7 @@ export function cablearPantalla({ documento, navegacion, app, titulo } = {}) {
 
 /**
  * Los pasos que este módulo sabe titular. Se exporta para que el test recorra los
- * cinco sin escribir la lista, y para que un paso nuevo sin título salga rojo en
+ * tres sin escribir la lista, y para que un paso nuevo sin título salga rojo en
  * vez de aparecer con el título del anterior.
  *
  * @returns {readonly string[]}

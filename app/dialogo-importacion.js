@@ -31,14 +31,41 @@
 // informativo va a los avisos del panel: un modal obligatorio en el camino feliz
 // —y el camino feliz del perito es un volcado de coordenadas— es fricción pura.
 //
-// Disparan: **el reparto por capas**, **X/Y invertidas** y **el cierre ambiguo**.
+// Disparan: **el reparto por capas**, **X/Y invertidas**, **el cierre ambiguo** y
+// —desde el 2026-08-09— **el huso cuando de verdad es ambiguo**.
 //
-// ⛔ **EL HUSO NO DISPARA, Y ES UNA REGLA DE F01 AL PIE DE LA LETRA:** «nunca
-// obligar a elegirlo en un desplegable […]; el desplegable queda como anulación»
-// (`spec/feature-01-entrada-parcela.md:29`). `importar()` ya resuelve el huso
-// prioritario y CONSTRUYE la parcela con él; lo que hay que hacer es decir **dónde
-// ha caído**, no parar el recorrido. Así que el huso aparece como anulación cuando
-// la pantalla ya está abierta por otro motivo, y como aviso cuando no.
+// ── ⭐ EL HUSO PASÓ DE «NO DISPARA» A DISPARAR, Y LO DECIDIÓ UNA MEDICIÓN ─────
+//
+// La regla original de F01 es literal: «nunca obligar a elegirlo en un desplegable
+// […]; el desplegable queda como anulación» (`spec/feature-01-entrada-parcela.md:29`).
+// Se escribió dando por hecho que la deducción acierta y que lo único que falta es
+// decir **dónde ha caído**. Ese supuesto es falso, y así se midió el 2026-08-09
+// sobre 42 municipios reales llevados a su huso verdadero y devueltos por
+// `geo/huso.js#detectarHuso` con los candidatos por defecto:
+//
+//   · **42 de 42 salían ambiguos.**
+//   · **En 22 de 42 el prioritario era el huso EQUIVOCADO** — Galicia, Extremadura,
+//     Huelva y Cádiz (huso 29) y Cataluña y Baleares (huso 31) entraban TODAS como
+//     huso 30, que es el primero de la lista de prioridad.
+//
+// Errar el huso no descoloca la parcela un poco: la coloca a **cientos de
+// kilómetros**, con la geometría intacta y sin un solo error. Un aviso en el panel
+// no es respuesta a eso, porque no hay dónde contestarlo. Así que la ambigüedad
+// abre la pantalla —con el prioritario ya marcado, o sea un Enter en el caso
+// normal— y el usuario dice dónde está su parcela.
+//
+// ⚠️ **Solo cuando es ambigua de verdad.** El mismo día, `geo/huso.js` estrenó
+// ventana por huso (`BBOX_POR_HUSO`): antes los tres candidatos se validaban
+// contra un rectángulo único que incluía medio Mediterráneo, y una parcela de
+// Málaga se leía como «huso 31» cayendo en mar abierto frente a Argelia. Con la
+// ventana afinada, esas lecturas imposibles ya no llegan aquí (42 → 36 ambiguos
+// en el mismo barrido). Lo que queda son las de verdad: las que caen sobre suelo
+// español en las dos lecturas, y ésas no las cierra ninguna geometría.
+//
+// ⚠️ Y **un fichero que declara su huso no pregunta nada**: un `.gml` trae
+// `srsName` y no pasa por aquí (lo lee `comprobacion/gml.js`, que VERIFICA contra
+// el huso declarado); y `resolverHuso` en modo verificar —`opts.huso` puesto—
+// devuelve `ambiguo: false`, así que la segunda ronda no vuelve a preguntar.
 //
 // ── ⛔ CON REPARTO POR CAPAS SE PREGUNTA ESO Y NADA MÁS ──────────────────────
 // Medido sobre `UTM.dxf` el 2026-08-06: sin elegir capa salen **27 detecciones**
@@ -229,7 +256,10 @@ const ROTULO_CIERRE = 'El contorno no cierra del todo'
 const ROTULO_HUSO = 'Huso'
 
 const APUNTE_HUSO =
-  'Se ha deducido del propio dibujo. Cámbialo solo si sabes que la parcela cae en otro sitio.'
+  'El fichero no dice en qué huso está, y estos mismos metros se leen como una posición ' +
+  'válida en más de uno: el Este vale ~500.000 en todos los husos, así que las coordenadas ' +
+  'solas no lo deciden. Marca dónde está de verdad la parcela — errar el huso la coloca a ' +
+  'cientos de kilómetros sin dar ningún error.'
 
 const ETIQUETA_CIERRE = Object.freeze({
   [LECTURA_CIERRE.DEJAR]: 'Dejarlo como está (es una arista corta real)',
@@ -426,21 +456,27 @@ export function decisionesDe(resultado) {
     })
   }
 
-  // ── 4 · El huso, que NO dispara: solo aparece si ya hay pantalla ──────────
-  // Ver la cabecera y `spec/feature-01-entrada-parcela.md:29`.
-  if (decisiones.length > 0) {
-    const ambiguo = porTipo(detecciones, TIPO_DETECCION.HUSO_AMBIGUO)[0]
-    const candidatos = ambiguo?.datos?.candidatos
-    if (Array.isArray(candidatos) && candidatos.length > 1) {
-      decisiones.push({
-        tipo: TIPO_DECISION.HUSO,
-        candidatos,
-        prioritario: ambiguo.datos?.prioritario ?? candidatos[0]?.zona ?? null,
-      })
-    }
+  // ── 4 · El huso AMBIGUO, que desde el 2026-08-09 SÍ dispara ───────────────
+  // Ver la cabecera: hasta hoy esto iba dentro de un `if (decisiones.length > 0)`
+  // y la ambigüedad del huso solo se podía contestar cuando la pantalla ya
+  // estaba abierta por otro motivo. En un fichero limpio se resolvía sola al
+  // huso 30 y lo único que recibía el usuario era un aviso en el panel.
+  const ambiguo = porTipo(detecciones, TIPO_DETECCION.HUSO_AMBIGUO)[0]
+  const candidatos = ambiguo?.datos?.candidatos
+  const preguntamosElHuso = Array.isArray(candidatos) && candidatos.length > 1
+  if (preguntamosElHuso) {
+    decisiones.push({
+      tipo: TIPO_DECISION.HUSO,
+      candidatos,
+      prioritario: ambiguo.datos?.prioritario ?? candidatos[0]?.zona ?? null,
+    })
   }
 
-  return { decisiones, bloqueos, informativas: informativasDe(detecciones) }
+  return {
+    decisiones,
+    bloqueos,
+    informativas: informativasDe(detecciones, { preguntamosElHuso }),
+  }
 }
 
 /**
@@ -449,11 +485,23 @@ export function decisionesDe(resultado) {
  * es ruido que tapa lo que sí importa.
  *
  * @param {Array<object>} detecciones
+ * @param {object} [opciones]
+ * @param {boolean} [opciones.preguntamosElHuso=false]  Si la pantalla lleva la
+ *   pregunta del huso, se calla el «cae en el huso 30» informativo. Ver abajo.
  * @returns {string[]}
  */
-function informativasDe(detecciones) {
+function informativasDe(detecciones, { preguntamosElHuso = false } = {}) {
   const vistas = new Set()
   const fuera = new Set([TIPO_DETECCION.SWAP_XY, TIPO_DETECCION.HUSO_AMBIGUO])
+  // ⛔ **Y el punto de caída, cuando estamos PREGUNTANDO por él.** Se vio en el
+  // navegador el mismo día que se escribió la pregunta: bajo «marca dónde está de
+  // verdad la parcela» aparecía «La parcela cae en el huso 30 (EPSG:25830):
+  // lon=−3,826…», o sea la pantalla preguntando y contestándose sola tres líneas
+  // más abajo. Es la lección M28 de F11 —dos frases ciertas que juntas se leen
+  // como una contradicción— y aquí además empuja a la respuesta equivocada: ese
+  // «cae en» es el prioritario, que es justo lo que se está poniendo en duda.
+  // Sin pregunta del huso la frase se queda: es el «decir dónde ha caído» de F01.
+  if (preguntamosElHuso) fuera.add(TIPO_DETECCION.HUSO_DETECTADO)
   for (const d of detecciones) {
     if (!esTexto(d?.mensaje) || fuera.has(d.tipo)) continue
     // Las que acompañan a un bloqueo NO se repiten aquí: ya se dicen arriba, con su

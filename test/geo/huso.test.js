@@ -27,6 +27,7 @@ import {
   HUSOS_VALIDOS,
   BBOX_ESPANA,
   BBOX_CANARIAS,
+  BBOX_POR_HUSO,
   UMBRAL_GRADOS,
 } from '../../geo/huso.js'
 import { forward } from '../../geo/utm.js'
@@ -250,6 +251,79 @@ describe('geo/huso — sanear', () => {
     expect(correcciones[0].tipo).toBe('SWAP_XY')
     // Tras el swap el Norte=1.000.001 queda fuera de [3.93M, 4.93M]: se avisa.
     expect(correcciones[0].rangoPlausible).toBe(false)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ⭐ BBOX_POR_HUSO — qué territorio español hay en cada huso (2026-08-09)
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Antes, los tres candidatos se validaban contra el MISMO rectángulo, que incluye
+// medio Mediterráneo. Estas pruebas fijan las dos mitades del arreglo: que las
+// lecturas imposibles mueran, y que las de verdad sigan vivas.
+
+describe('geo/huso — BBOX_POR_HUSO', () => {
+  it('cada ventana por huso está DENTRO del rectángulo de España: afina, no amplía', () => {
+    for (const zona of HUSOS_VALIDOS) {
+      const b = BBOX_POR_HUSO[zona]
+      expect(b, `falta la ventana del huso ${zona}`).toBeDefined()
+      expect(b.lonMin).toBeGreaterThanOrEqual(BBOX_ESPANA.lonMin)
+      expect(b.lonMax).toBeLessThanOrEqual(BBOX_ESPANA.lonMax)
+      expect(b.latMin).toBeGreaterThanOrEqual(BBOX_ESPANA.latMin)
+      expect(b.latMax).toBeLessThanOrEqual(BBOX_ESPANA.latMax)
+    }
+  })
+
+  it('la ventana de cada huso cubre su banda de longitud recortada por España', () => {
+    // La banda del huso z es [CM(z)−3, CM(z)+3]. La ventana no puede ser más
+    // ancha que eso (sería territorio de otro huso) ni dejar fuera la parte de
+    // España que le toca.
+    for (const zona of HUSOS_VALIDOS) {
+      const b = BBOX_POR_HUSO[zona]
+      const cm = meridianoCentral(zona)
+      expect(b.lonMin).toBeGreaterThanOrEqual(cm - 3)
+      expect(b.lonMax).toBeLessThanOrEqual(cm + 3)
+    }
+  })
+
+  it('⭐ los extremos REALES del territorio caben en su ventana', () => {
+    // Los sitios que fijan cada límite, y que por tanto no se pueden rechazar.
+    const EXTREMOS = [
+      ['Estaca de Bares (norte, h29)', 29, -7.69, 43.79],
+      ['Cabo Touriñán (oeste, h29)', 29, -9.29, 43.05],
+      ['Cabo Trafalgar (sur, h29)', 29, -6.03, 36.18],
+      ['Punta de Tarifa (sur, h30)', 30, -5.61, 36.0],
+      ['Cabo de Peñas (norte, h30)', 30, -5.85, 43.66],
+      ['Formentera (sur, h31)', 31, 1.43, 38.63],
+      ["Illa de l'Aire (este, h31)", 31, 4.29, 39.8],
+      ['Valle de Arán (norte, h31)', 31, 0.75, 42.84],
+    ]
+    for (const [donde, zona, lon, lat] of EXTREMOS) {
+      const b = BBOX_POR_HUSO[zona]
+      expect(lon >= b.lonMin && lon <= b.lonMax, `${donde}: lon ${lon} fuera`).toBe(true)
+      expect(lat >= b.latMin && lat <= b.latMax, `${donde}: lat ${lat} fuera`).toBe(true)
+    }
+  })
+
+  it('⭐ una parcela de MÁLAGA deja de ser ambigua: como huso 31 caería en el mar', () => {
+    // El caso real que lo destapó (`icuc-pruebas/PERGOLA.gml`). Con el rectángulo
+    // único, la lectura h31 daba lon +1,725 · lat 36,719 —frente a la costa
+    // argelina— y se ofrecía como alternativa válida.
+    const r = detectarHuso([386132, 4064410])
+    expect(r.zona).toBe(30)
+    expect(r.ambiguo).toBe(false)
+    expect(r.candidatos.map((c) => c.zona)).toEqual([30])
+    // Y que la latitud es la que lo decide, no la longitud: la misma para todos.
+    expect(r.lat).toBeLessThan(BBOX_POR_HUSO[31].latMin)
+  })
+
+  it('⚠️ pero la ambigüedad REAL sobrevive: no se ha comprado silencio a cambio de mentir', () => {
+    // Barcelona leída como huso 30 aterriza en Guadalajara: suelo español las dos
+    // veces. Ninguna geometría cierra esto — lo decide el usuario.
+    const { x, y } = forward(41.39, 2.17, 31)
+    const r = detectarHuso([x, y])
+    expect(r.ambiguo).toBe(true)
+    expect(r.candidatos.map((c) => c.zona)).toEqual([30, 31])
   })
 })
 

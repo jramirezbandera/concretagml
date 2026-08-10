@@ -78,8 +78,26 @@ describe('parsers/importar — fixtures REALES (LIST / PARCELA)', () => {
     expect(info.datos.lat).toBeCloseTo(36.9351, 3)
   })
 
-  it('LIST: huso ambiguo por defecto (30 vs 31) → AVISO extra con los candidatos', () => {
+  it('⭐ LIST: el huso DEJÓ de ser ambiguo el 2026-08-09 (la lectura h31 caía en el mar)', () => {
+    // ⛔ **Esta prueba exigía `ambiguo: true` con candidatos [30, 31]**, y era cierto
+    // mientras los tres husos se validaban contra un rectángulo único. Este fixture
+    // real cae en lon −5,26 · lat 36,94 (provincia de Sevilla); leído como huso 31
+    // daba lon +0,74 con la MISMA latitud, o sea Mediterráneo abierto al sur de
+    // Valencia — y pasaba el filtro porque el rectángulo llegaba a lon 4,5.
+    // Con `BBOX_POR_HUSO` (huso 31: lat 38,5…43,0, de Formentera al Valle de Arán)
+    // esa lectura muere y queda una sola. Ver `geo/huso.js`.
     const { detecciones, resumen } = importar(LIST_REAL)
+    expect(resumen.huso.ambiguo).toBe(false)
+    expect(resumen.huso.zona).toBe(30)
+    expect(resumen.huso.lat).toBeLessThan(38.5) // el porqué, medido: por debajo de Formentera
+    expect(porTipo(detecciones, TIPO_DETECCION.HUSO_AMBIGUO)).toHaveLength(0)
+  })
+
+  it('LIST: donde la ambigüedad es REAL sigue saliendo el AVISO con los candidatos', () => {
+    // Un cuadrado de Madrid: leído como huso 31 cae frente a Tarragona, y eso un
+    // rectángulo no lo distingue de tierra. La ambigüedad que queda es la de verdad.
+    const madrid = '440123.45 4470987.65\n440133.45 4470987.65\n440133.45 4470997.65\n440123.45 4470997.65'
+    const { detecciones, resumen } = importar(madrid)
     expect(resumen.huso.ambiguo).toBe(true)
     const aviso = detecciones.find(
       (d) => d.tipo === TIPO_DETECCION.HUSO_AMBIGUO && d.severidad === SEVERIDAD.AVISO,

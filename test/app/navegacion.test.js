@@ -33,8 +33,11 @@ import {
   INSTRUCCION_PARCELARIO,
   MENSAJE_SIN_CONVERGER,
   MOTIVO_DATO,
+  MOTIVO_BREVE,
+  MOTIVO_BREVE_EDIFICIO,
   MOTIVO_DATO_EDIFICIO,
   MOTIVO_RAMA,
+  TOPE_MOTIVO_BREVE,
   PASO,
   PASOS,
   RAMA,
@@ -157,6 +160,11 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
         disponible: true,
         causa: null,
         motivo: null,
+        // ⭐ `breve` desde el topbar (2026-08-10). Se afirma con `toEqual` y no
+        // con `toMatchObject` A PROPÓSITO: un campo nuevo en el veredicto tiene
+        // que romper este `it`, porque quien lo añada tiene que decidir aquí qué
+        // vale cuando el paso SÍ está disponible.
+        breve: null,
       })
     }
   })
@@ -169,12 +177,19 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
         if (veredicto.disponible) {
           expect(veredicto.causa).toBeNull()
           expect(veredicto.motivo).toBeNull()
+          expect(veredicto.breve).toBeNull()
           continue
         }
         bloqueos += 1
         expect(Object.values(CAUSA)).toContain(veredicto.causa)
         expect(typeof veredicto.motivo).toBe('string')
         expect(veredicto.motivo.trim().length).toBeGreaterThan(0)
+        // ⭐ **Y LA FORMA BREVE TAMPOCO PUEDE FALTAR (2026-08-10).** Es la que se
+        // pega al peldaño en la barra horizontal, o sea la ÚNICA que el usuario ve
+        // sin hacer nada. Un `breve` vacío sería un paso apagado en silencio con
+        // el motivo largo escondido en un renglón que puede estar ocupado por otro.
+        expect(typeof veredicto.breve).toBe('string')
+        expect(veredicto.breve.trim().length).toBeGreaterThan(0)
       }
     }
     // No es un `expect` decorativo: si un día la tabla se relajara y no bloqueara
@@ -182,10 +197,14 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     expect(bloqueos).toBeGreaterThan(0)
   })
 
-  it('los motivos caben en un rail de 210 px (ninguno pasa de 90 caracteres)', () => {
-    // La maqueta midió estos motivos en 14–27 px de alto a 1280×720. El tope no
-    // es estético: alargarlos empuja la ficha del pie del rail fuera de pantalla,
-    // que es el defecto que este rework viene a arreglar.
+  it('los motivos caben en el renglón de la barra (ninguno pasa de 90 caracteres)', () => {
+    // ⭐ **EL PORQUÉ DE ESTE TOPE CAMBIÓ EL 2026-08-10, aunque el número no.**
+    // Decía «caben en un rail de 210 px»: el motivo vivía en una columna estrecha
+    // y alargarlo empujaba la ficha del pie fuera de la pantalla. Girada la barra,
+    // el motivo largo vive en el RENGLÓN, que es de ancho completo y de **UNA
+    // línea de alto fija** — o sea que el fallo cambió de forma: ya no empuja
+    // nada, se recorta. Un motivo recortado a media frase es peor que uno que
+    // desborda, porque no se ve que falte.
     const todos = [
       ...Object.values(MOTIVO_RAMA),
       ...Object.values(MOTIVO_DATO),
@@ -193,6 +212,36 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     ]
     expect(todos.length).toBeGreaterThan(0)
     for (const motivo of todos) expect(motivo.length).toBeLessThanOrEqual(90)
+  })
+
+  it('⭐ y la forma BREVE cabe pegada al peldaño (tope propio, 22 caracteres)', () => {
+    // El de arriba protege el renglón; éste protege el peldaño, que es otro hueco
+    // y mucho más pequeño: tres peldaños con punto, rótulo y breve tienen que
+    // caber en la barra junto a la marca, el grupo y —desde las rebanadas 2 y 3—
+    // el expediente y la entrega.
+    const breves = [...Object.values(MOTIVO_BREVE), ...Object.values(MOTIVO_BREVE_EDIFICIO)]
+    expect(breves.length).toBeGreaterThan(0)
+    for (const breve of breves) {
+      expect(breve.length, `«${breve}» no cabe en un peldaño`).toBeLessThanOrEqual(
+        TOPE_MOTIVO_BREVE,
+      )
+    }
+  })
+
+  it('⛔ cada hecho que tiene motivo largo tiene también su forma breve', () => {
+    // Sin esto, añadir un hecho nuevo a `MOTIVO_DATO` y olvidarse del breve NO
+    // daría rojo: `evaluarPaso` cae al largo, y el largo entra igual en el
+    // peldaño… recortado por el CSS y sin que nadie se entere. El respaldo existe
+    // para que un motivo nuevo se VEA, no para que se pueda no escribirlo.
+    for (const hecho of Object.keys(MOTIVO_DATO)) {
+      expect(MOTIVO_BREVE[hecho], `falta la forma breve de «${hecho}»`).toBeTypeOf('string')
+    }
+    for (const hecho of Object.keys(MOTIVO_DATO_EDIFICIO)) {
+      expect(
+        MOTIVO_BREVE_EDIFICIO[hecho],
+        `falta la forma breve de «${hecho}» en la rama EDIFICIO`,
+      ).toBeTypeOf('string')
+    }
   })
 
   it('⛔ y por eso `INSTRUCCION_PARCELARIO` tiene un tope propio, dicho aquí', () => {

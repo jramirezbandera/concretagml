@@ -37,7 +37,7 @@ import {
   pasosConTitulo,
   tituloDe,
 } from '../../app/pantalla.js'
-import { SELECTOR_RAIL } from '../../app/rail.js'
+import { SELECTOR_BARRA } from '../../app/barra.js'
 
 const RAIZ = join(import.meta.dirname, '..', '..')
 const CSS = readFileSync(join(RAIZ, 'estilos', 'app.css'), 'utf8')
@@ -145,7 +145,7 @@ describe('T6 · ⭐ marcado y CSS dicen lo mismo (el fallo mudo)', () => {
     // haría que los peldaños se ocultaran entre ellos. Es el motivo por el que el
     // rail usa `data-paso` y el panel `data-pantalla`, y no al revés.
     montarCascara()
-    const rail = document.querySelector(SELECTOR_RAIL)
+    const rail = document.querySelector(SELECTOR_BARRA)
     expect(rail).not.toBeNull()
     expect(rail.querySelectorAll(`[${ATRIBUTO_PANTALLA}]`)).toHaveLength(0)
   })
