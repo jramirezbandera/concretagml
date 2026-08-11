@@ -220,7 +220,12 @@ minuendos ya están en memoria.
 
 ## Estado
 
-⏳ **EN CURSO.**
+✅ **CERRADA el 2026-08-11 con IVG POSITIVO** sobre un fichero de varias parcelas
+generado por la app. El detalle —y la diferencia con la aceptación del 2026-08-03,
+que no es la misma cosa— está al final de esta ficha. Lo anterior a esa línea es el
+registro de las seis fases, y se lee como historia.
+
+*(Estuvo ⏳ EN CURSO desde el 2026-08-05.)*
 
 **Fase 0 · abrir la fase — hecha el 2026-08-05** (6.011 / 133): el expediente de
 oro entra como fixture con guardián, las justificaciones caducadas dejan de
@@ -328,6 +333,24 @@ existe.
 ⏳ **F17 NO se cierra aquí.** Queda el criterio 4, que es el único que la máquina no
 puede firmar: **el IVG positivo sobre un expediente real**. Hasta entonces lo que
 hay es una aplicación que hace el recorrido entero y un guion que lo demuestra.
+
+### ✅ CERRADA EL 2026-08-11 — el criterio 4 se cumplió
+
+El autor subió al IVG un `.gml` de **varias parcelas generado por esta
+aplicación**, la Sede **cargó todas las parcelas** y **emitió informe POSITIVO**.
+
+⭐ **Por qué esto no es lo mismo que la aceptación del 2026-08-03**, y conviene que
+quede escrito porque las dos se parecen y solo una cierra la fase: aquella (CSV
+`XMWPXCN9J8DB9J89`) demostró que **la Sede admite el formato** de N
+`gml:featureMember`. Ésta demuestra que **nuestro serializador lo produce bien** —
+que es lo que el criterio 4 pedía y lo que ninguna prueba de este repositorio
+podía firmar. Entre las dos hay ocho miembros de spec, un rechazo por
+`xmlns:xlink` en F13 y toda la fase 3.
+
+⏳ **Falta anotar el CSV de ESTE informe** en `SPEC.md` §7.1, junto a los otros
+dos. Sin él la verificación es un testimonio y no una comprobación repetible, que
+es exactamente la distinción que §7 existe para sostener. Es lo único que le queda
+a esta ficha.
 
 ## Referencias
 
