@@ -212,6 +212,19 @@
           <button type="button" role="menuitem" class="gml-barra-menu-opcion" data-accion="abrir-expediente">
             Expedientes guardados<span class="gml-barra-menu-apunte">en este navegador</span>
           </button>
+          <!-- F15 · EL DICCIONARIO DE ERRORES. Abre el `<dialog>` que fabrica
+               `app/dialogo-diccionario.js`, donde se pega el mensaje del IVG o del
+               ICUC y sale qué significa. El nodo vive AQUÍ y no lo fabrica el
+               módulo por lo mismo que los dos de al lado: es la única forma de
+               llegar a la pantalla, y G16 exige que un `SELECTOR_*` exportado
+               desde `app/` case exactamente un nodo de la cáscara.
+
+               ⚠️ Va en el menú de Expediente y no en el de salidas: un rechazo es
+               un episodio del expediente, y el de la derecha exporta ficheros. El
+               coste en píxeles de la barra es CERO — el menú crece hacia abajo. -->
+          <button type="button" role="menuitem" class="gml-barra-menu-opcion" data-accion="consultar-rechazo">
+            Me han rechazado el fichero<span class="gml-barra-menu-apunte">traducir el mensaje de la Sede</span>
+          </button>
           <!-- ⚠️ «Vaciarlo» conserva su doble pulsación —vaciar es irreversible en
                pantalla— y desde la mudanza la confirmación se pide EN EL PROPIO
                MENÚ (decisión Q3 de la revisión): pedirla en un renglón del panel

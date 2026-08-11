@@ -1,222 +1,102 @@
-/* ── Procedencia ──────────────────────────────────────────────────────────
+/* ── Procedencia, y por qué esto ya NO es una copia ───────────────────────
    Copiado el 2026-07-26 desde:
    prototipo/_ds/concreta-design-system-bac861fa-544f-4139-9311-ec68119deaa4/tokens/colors.css
 
-   A partir de esta copia, `prototipo/` es referencia de diseño, NO
-   dependencia del producto: esta app no importa nada de `prototipo/` en
-   tiempo de build ni de ejecución. Si el design system evoluciona en
-   `prototipo/_ds/...`, el cambio hay que propagarlo aquí A MANO y de forma
-   deliberada — no hay ningún mecanismo de sincronización automática.
+   `prototipo/` es referencia de diseño, NO dependencia del producto: esta app no
+   importa nada de allí en tiempo de build ni de ejecución.
 
-   Copia fiel: **ningún VALOR se ha modificado**. Lo único propio son dos
-   anotaciones junto a `--color-chart-envelope` (:root y el bloque oscuro), que
-   dejan escrito que F03 dejó de reutilizar ese token en la Fase 5.
+   ⭐ **PODADO EL 2026-08-11, Y AQUÍ SE ROMPE LA COPIA FIEL A PROPÓSITO.** Hasta
+   hoy la cabecera decía «copia fiel: ningún VALOR se ha modificado», y era
+   verdad — el problema es que era lo único que era verdad. El fichero era el
+   sistema de color de una **calculadora de hormigón**: de sus 77 variables, 55
+   no tenían un solo uso en este producto (armaduras, estratos geotécnicos,
+   casos de carga, y los alias cortos de un sitio de marketing que no existe).
+   MEDIDO, no estimado. Y el tema oscuro estaba completo y muerto: `data-theme`
+   no aparecía en ningún `.js`, `.html` ni en `app.css`.
+
+   Se poda porque una paleta que nombra cosas que este producto no tiene **miente
+   sobre de qué va el producto**, y porque los bytes se pagan: la poda entera de
+   `estilos/tokens/` devolvió **4.605 B** de hoja construida, medidos con
+   `npm run presupuesto` (ver el asiento de esa fecha en
+   `scripts/presupuesto-css.mjs`).
+
+   ⛔ **A partir de hoy este fichero NO se sincroniza con `prototipo/`.** No es que
+   no haya mecanismo automático —nunca lo hubo—: es que ya no debe haberlo. Lo que
+   queda aquí son los 22 valores que esta aplicación usa. Si el DS de la
+   calculadora evoluciona, traer un valor es una decisión de ESTE producto, una a
+   una, y quien la tome tiene que dejarla escrita.
+
+   ⚠️ **Y NO es la paleta completa de la app.** Los colores propios de Concreta GML
+   —el amarillo de la geometría del usuario y su variante legible sobre claro—
+   viven en `estilos/app.css` (`--gml-color-usuario*`), y el color del mapa vive en
+   JavaScript (`viewer/_comun.js#COLOR_USUARIO`, `#COLOR_OFICIAL`) porque `viewer/*`
+   tiene que leerse sobre una ortofoto aunque esta hoja no cargue. Ver `DESIGN.md`,
+   que es donde está el reparto entero y sus motivos.
+
+   ⚠️ **Lo que se fue y merece rastro:** `--color-chart-envelope` (#7c3aed) era el
+   violeta del DS que F03 reutilizó para la geometría del usuario, y la Fase 5 lo
+   sustituyó por amarillo al medir que el violeta desaparece sobre las sombras de la
+   ortofoto. Esa historia sigue contada donde importa —`estilos/app.css`, junto a
+   `--gml-color-usuario`, y `test/viewer/comun.dom.test.js`—; el token no, porque
+   llevaba desde entonces sin un solo llamante.
    ──────────────────────────────────────────────────────────────────────── */
 
-/* colors.css — Concreta color system.
-   Ported verbatim from the app's src/index.css @theme + dark block.
-   Light values are the DEFAULT (:root); dark is the signature, applied under
-   html[data-theme="dark"]. Every value is an exact hex from the source — do not
-   round or snap. Two naming layers ship:
-     • --color-*   the source-of-truth tokens the app uses
-     • shorthand   --accent / --bg-surface / … aliases used by the marketing site
-   plus tint tokens resolved from the themed accent/state at use time. */
+/* colors.css — la paleta de Concreta GML.
+   Los valores son los originales del DS, sin redondear ni ajustar: lo que cambia
+   respecto al 2026-07-26 es CUÁLES están, no cuánto valen. */
 
 :root {
+  /* ⚠️ Declarado, y ya no como pareja de nada: el bloque oscuro se retiró el
+     2026-08-11 (ver la cabecera). Esto le dice al navegador con qué esquema
+     pintar los controles de formulario y las barras de scroll nativas, y sin él
+     un sistema en modo oscuro pinta los `<input>` oscuros dentro de un panel
+     blanco. O sea que sigue haciendo falta: es lo que declara que esta
+     aplicación es de tema CLARO, no un resto del tema que se fue. */
   color-scheme: light;
 
-  /* ── Surfaces ── */
-  --color-bg-primary: #ffffff;   /* page, inputs, canvas */
-  --color-bg-surface: #f8fafc;   /* panels, sidebar, topbar, result blocks */
-  --color-bg-elevated: #f1f5f9;  /* hover states, unit suffixes, cards */
-  --color-bg-canvas: #ffffff;    /* central SVG work area */
+  /* ── Superficies ── */
+  --color-bg-primary: #ffffff;   /* página, campos */
+  --color-bg-surface: #f8fafc;   /* panel, barra de arriba, bloques de resultado */
+  --color-bg-elevated: #f1f5f9;  /* hover, tarjetas */
 
-  /* ── Borders ── */
-  --color-border-main: #cbd5e1;  /* primary borders (columns, panels, topbar) */
-  --color-border-sub: #e2e8f0;   /* row dividers inside panels (softer) */
+  /* ── Filos ── */
+  --color-border-main: #cbd5e1;  /* bordes principales (panel, barra) */
+  --color-border-sub: #e2e8f0;   /* separadores de fila dentro del panel */
 
-  /* ── Text ── */
-  --color-text-primary: #0f172a;   /* values, titles, high-importance text */
-  --color-text-secondary: #475569; /* field labels, section headers, nav */
-  --color-text-disabled: #64748b;  /* inactive modules, group labels, version */
+  /* ── Texto ── */
+  --color-text-primary: #0f172a;   /* cifras, títulos, texto de peso */
+  --color-text-secondary: #475569; /* rótulos de campo, cabeceras de sección */
+  --color-text-disabled: #64748b;  /* apagado, apuntes, versión */
 
-  /* ── Interactive + accent ── */
-  --color-accent: #0284c7;         /* sky-600 — focus ring, active nav, SVG annotations */
+  /* ── Interacción y acento ── */
+  --color-accent: #0284c7;         /* sky-600 — anillo de foco, enlaces */
   --color-accent-hover: #0369a1;   /* sky-700 */
-  /* Primary-button surface decoupled from the link accent so button text stays
-     AA in light (white on #0369a1 ≈ 5.7:1). */
+  /* La superficie del botón primario va desacoplada del acento de enlace para
+     que el texto del botón siga siendo AA en claro (blanco sobre #0369a1 ≈ 5,7:1). */
   --color-btn-primary-bg: #0369a1;
   --color-btn-primary-bg-hover: #075985;
   --color-btn-primary-fg: #ffffff;
 
-  /* ── Semantic states ── */
-  --color-state-ok: #15803d;    /* green-700 — utilization η < 95% */
-  --color-state-warn: #b45309;  /* amber-700 — 95% ≤ η < 100% + advisory notes */
-  --color-state-fail: #dc2626;  /* red-600 — η ≥ 100% */
+  /* ── Estados ──
+     ⚠️ Los cuatro tienen llamante, y el verde lo estrenó el 2026-08-10: hasta ese
+     día `--color-state-ok` llevaba definido desde la copia y con CERO usos, así
+     que se podía recorrer las tres pantallas, generar un GML válido y no ver un
+     solo verde. Lo usa `.gml-accion-estado--exito`, en el único desenlace en el
+     que la acción pedida se completa. */
+  --color-state-ok: #15803d;    /* green-700 — la acción se completó */
+  --color-state-warn: #b45309;  /* amber-700 — avisos */
+  --color-state-fail: #dc2626;  /* red-600 — errores */
   --color-state-neutral: #64748b;
 
-  /* ── SVG chart palette (screen; PDF stays grayscale, untouched) ── */
-  --color-chart-section: #475569;
-  --color-chart-section-fill: #f1f5f9;
-  --color-chart-rebar: #0284c7;
-  --color-chart-rebar-dim: #94a3b8;
-  --color-chart-stirrup: #64748b;
-  --color-chart-stress: #0284c7;
-  --color-chart-axis: #0284c7;
-  --color-chart-dim: #64748b;
-  --color-chart-dim-text: #475569;
-  /* Token del design system, conservado tal cual vino. HISTÓRICO, para que
-     nadie vuelva a atar cabos mal: hasta la Fase 5 de F03 este valor se
-     reutilizaba como COLOR_USUARIO (`viewer/_comun.js`) para dibujar la
-     geometría del usuario, como excepción declarada a "No violet, no
-     blue-to-purple" del readme del DS. **Ya NO.** La revisión visual sobre la
-     ortofoto real demostró que el violeta desaparece sobre las sombras
-     oscuras, y el visor pasó a amarillo `#FFD600`; el panel usa un ámbar
-     legible. Los dos valores viven ahora en `estilos/app.css`
-     (`--gml-color-usuario*`), NO aquí: este fichero es copia del DS y no debe
-     divergir de él. Ningún módulo del proyecto depende ya de este token. */
-  --color-chart-envelope: #7c3aed;
-  --color-chart-label: #0f172a;
-  --color-chart-rebar-faint: #64748b;
-  --color-chart-profile: #cbd5e1;
-  --color-dot-grid: #e2e8f0;
-
-  /* ── Geotechnical material fills (light = white-paper tones) — shared by
-     retaining-wall + micropiles soil rendering. ── */
-  --color-geo-soil-top: #d6c1a0;
-  --color-geo-soil-bot: #b89876;
-  --color-geo-soil-line: #8b6e3a;
-  --color-geo-soil-dot: #7a5a3a;
-  --color-geo-ground: #5d4630;
-  --color-geo-earth: #6b7280;
-  --color-geo-granular-dot: #5c4520;
-  --color-geo-cohesive-line: #3d2e1a;
-  --color-geo-s1a: #e0c89a; --color-geo-s1b: #b89968;
-  --color-geo-s2a: #c4bb88; --color-geo-s2b: #9a9162;
-  --color-geo-s3a: #d49774; --color-geo-s3b: #a96b48;
-  --color-geo-s4a: #b09480; --color-geo-s4b: #84685a;
-  --color-geo-s5a: #cdb872; --color-geo-s5b: #a39150;
-  --color-geo-s6a: #c08868; --color-geo-s6b: #946248;
-
-  /* ── FEM load-case series ── */
-  --color-fem-q: #16a34a;  /* sobrecarga (live) */
-  --color-fem-w: #2563eb;  /* viento (wind) */
-  --color-fem-s: #475569;  /* nieve (snow) */
-  --color-fem-e: #dc2626;  /* sismo (seismic) */
-
-  /* ── Scrollbar ── */
+  /* ── Barra de scroll ── */
   --color-scrollbar: #94a3b8;
   --color-scrollbar-hover: #64748b;
 
-  /* ── Translucent tints — resolved from themed tokens, track theme with no
-     dark override. ── */
+  /* ── Tintes translúcidos, resueltos de los tokens de arriba ──
+     Se quedan los tres que tienen llamante. Los otros tres del DS
+     (`-accent-soft`, `-ok`, `-neutral`) no lo tenían y se fueron: un tinte se
+     escribe en una línea el día que haga falta. */
   --color-tint-accent: color-mix(in srgb, var(--color-accent) 8%, transparent);
-  --color-tint-accent-soft: color-mix(in srgb, var(--color-accent) 4%, transparent);
-  --color-tint-ok: color-mix(in srgb, var(--color-state-ok) 10%, transparent);
   --color-tint-warn: color-mix(in srgb, var(--color-state-warn) 10%, transparent);
   --color-tint-fail: color-mix(in srgb, var(--color-state-fail) 10%, transparent);
-  --color-tint-neutral: color-mix(in srgb, var(--color-state-neutral) 10%, transparent);
-
-  /* ── Shorthand aliases (used by marketing-site chrome) ── */
-  --accent: var(--color-accent);
-  --accent-hover: var(--color-accent-hover);
-  --bg-primary: var(--color-bg-primary);
-  --bg-surface: var(--color-bg-surface);
-  --bg-elevated: var(--color-bg-elevated);
-  --bg-canvas: var(--color-bg-canvas);
-  --border-main: var(--color-border-main);
-  --border-sub: var(--color-border-sub);
-  --text-primary: var(--color-text-primary);
-  --text-secondary: var(--color-text-secondary);
-  --text-disabled: var(--color-text-disabled);
-  --state-ok: var(--color-state-ok);
-  --state-warn: var(--color-state-warn);
-  --state-fail: var(--color-state-fail);
-
-  /* ── Marketing chrome (light) ── */
-  --nav-bg: rgba(255, 255, 255, 0.82);
-  --shadow-frame: 0 1px 2px rgba(15, 23, 42, 0.05), 0 12px 32px -16px rgba(15, 23, 42, 0.18);
-  --shadow-pdf: 0 2px 6px rgba(15, 23, 42, 0.08), 0 18px 40px -20px rgba(15, 23, 42, 0.25);
-  --glow-dot: none; /* @kind shadow */
-  --glow-play: 0 10px 28px -10px color-mix(in srgb, var(--accent) 35%, transparent);
-}
-
-/* ── Dark — the signature. Neutral slate base (slate-900/800/700). ── */
-html[data-theme="dark"] {
-  color-scheme: dark;
-
-  --color-bg-primary: #0f172a;   /* slate-900 — page + inputs + canvas */
-  --color-bg-surface: #1e293b;   /* slate-800 — panels, sidebar, results */
-  --color-bg-elevated: #2a3a52;  /* cards / raised blocks */
-  --color-bg-canvas: #0f172a;
-
-  --color-border-main: #41546f;
-  --color-border-sub: #384a66;
-
-  --color-text-primary: #f8fafc;
-  --color-text-secondary: #94a3b8;
-  --color-text-disabled: #7a8ba6;
-
-  --color-accent: #38bdf8;       /* sky-400 */
-  --color-accent-hover: #0ea5e9;
-  --color-btn-primary-bg: #38bdf8;
-  --color-btn-primary-bg-hover: #0ea5e9;
-  --color-btn-primary-fg: #052238;
-
-  --color-state-ok: #22c55e;
-  --color-state-warn: #f59e0b;
-  --color-state-fail: #f56565;
-  --color-state-neutral: #64748b;
-
-  --color-chart-section: #334155;
-  --color-chart-section-fill: #1e293b;
-  --color-chart-rebar: #38bdf8;
-  --color-chart-rebar-dim: #475569;
-  --color-chart-stirrup: #94a3b8;
-  --color-chart-stress: #38bdf8;
-  --color-chart-axis: #38bdf8;
-  --color-chart-dim: #94a3b8;
-  --color-chart-dim-text: #94a3b8;
-  /* Variante oscura del mismo token del DS — ver la nota histórica junto a
-     --color-chart-envelope más arriba: F03 ya NO lo usa. */
-  --color-chart-envelope: #a78bfa;
-  --color-chart-label: #e2e8f0;
-  --color-chart-rebar-faint: #64748b;
-  --color-chart-profile: #0f172a;
-  --color-dot-grid: #28364d;
-
-  --color-geo-soil-top: #4a3522;
-  --color-geo-soil-bot: #2a1d12;
-  --color-geo-soil-line: #a8825a;
-  --color-geo-soil-dot: #7a5a3a;
-  --color-geo-ground: #8a6a44;
-  --color-geo-earth: #a8a29e;
-  --color-geo-granular-dot: #e0c089;
-  --color-geo-cohesive-line: #d8b886;
-  --color-geo-s1a: #7a5a35; --color-geo-s1b: #4f3a20;
-  --color-geo-s2a: #5d5a2c; --color-geo-s2b: #3d3a1c;
-  --color-geo-s3a: #8a4628; --color-geo-s3b: #5e2f1a;
-  --color-geo-s4a: #4a3528; --color-geo-s4b: #2c1f16;
-  --color-geo-s5a: #6a5c2e; --color-geo-s5b: #46401e;
-  --color-geo-s6a: #7d3f25; --color-geo-s6b: #542811;
-
-  --color-fem-q: #4ade80;
-  --color-fem-w: #60a5fa;
-  --color-fem-s: #cbd5e1;
-  --color-fem-e: #f87171;
-
-  --color-scrollbar: #334155;
-  --color-scrollbar-hover: #475569;
-
-  /* Marketing chrome (dark) */
-  --nav-bg: rgba(15, 23, 42, 0.82);
-  --shadow-frame:
-    0 1px 0 rgba(255, 255, 255, 0.02) inset,
-    0 24px 60px -20px rgba(0, 0, 0, 0.6),
-    0 8px 24px -12px rgba(0, 0, 0, 0.4);
-  --shadow-pdf:
-    0 28px 64px -28px rgba(0, 0, 0, 0.8),
-    0 12px 28px -12px rgba(0, 0, 0, 0.5);
-  --glow-dot: 0 0 8px var(--accent);
-  --glow-play: 0 12px 32px rgba(56, 189, 248, 0.35);
 }

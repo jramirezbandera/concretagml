@@ -8,26 +8,33 @@
    `prototipo/_ds/...`, el cambio hay que propagarlo aquí A MANO y de forma
    deliberada — no hay ningún mecanismo de sincronización automática.
 
-   Copia fiel: ningún token modificado.
+   ⭐ **PODADO EL 2026-08-11** (ver la cabecera de `colors.css`, que cuenta el
+   porqué entero): de las siete variables, cuatro no tenían un solo llamante.
+   Ya no es copia fiel, y a partir de hoy no se sincroniza con `prototipo/`.
    ──────────────────────────────────────────────────────────────────────── */
 
-/* motion.css — Concreta motion.
-   CSS transitions only. No animation library. 150ms ease-in-out is the house
-   transition for hover, focus, and state-color changes. Never animate layout
-   shifts, SVG content updates, or page transitions. */
+/* motion.css — el movimiento de Concreta GML.
+   Solo transiciones de CSS, ninguna librería de animación. 150 ms ease-in-out es
+   la transición de la casa para hover, foco y cambios de color de estado. Nunca
+   se anima un reflujo de maqueta ni un cambio de pantalla. */
 
 :root {
-  --transition: all 150ms ease-in-out;               /* @kind other */
-  --transition-color: color 150ms ease-in-out;       /* @kind other */
-  --transition-border: border-color 150ms ease-in-out; /* @kind other */
-  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);  /* @kind other */
-  --duration-fast: 120ms;   /* @kind other */
-  --duration: 150ms;        /* @kind other */
-  --duration-slow: 200ms;   /* @kind other */
+  --transition: all 150ms ease-in-out;
+  --transition-border: border-color 150ms ease-in-out;
+  --duration: 150ms;
 }
 
-/* dot-grid canvas surface — apply .canvas-dot-grid to any SVG work-area wrapper */
-.canvas-dot-grid {
-  background-image: radial-gradient(circle, var(--color-dot-grid) 1px, transparent 1px);
-  background-size: var(--dot-grid-size) var(--dot-grid-size);
-}
+/* ⛔ **AQUÍ VIVÍA `.canvas-dot-grid`, LA ÚNICA REGLA MUERTA DE LOS TOKENS.**
+   Pintaba la retícula de puntos del lienzo SVG de la calculadora, y en esta
+   aplicación no había ni un nodo con esa clase — pero se construía igual, porque
+   el minificador se come los comentarios y no las reglas.
+
+   ⚠️ Y no es que este producto no tenga retícula de puntos: la tiene, de telón
+   detrás del mapa mientras cargan las teselas, y la pinta
+   `.gml-app .gml-mapa` en `estilos/app.css`. Con **otro color a propósito**: el
+   `--color-dot-grid` del sistema (#e2e8f0) está calibrado para lienzo blanco y
+   sobre el #f1f5f9 del mapa es invisible, así que aquella regla usa
+   `--color-border-main`. O sea que la regla del DS no solo no se usaba: si se
+   hubiera usado, no se habría visto. `--color-dot-grid` se fue con ella;
+   `--dot-grid-size` se queda, porque es el que gobierna el paso de la nuestra. */
+

@@ -804,9 +804,23 @@ body {
 
 /* Vaciar es irreversible en pantalla. El color NO califica un dato ni un
    trabajo: califica una acción de esta aplicación, que es la misma doctrina con
-   la que el bloque de la presunción del informe lleva `--color-state-warn`. */
+   la que el bloque de la presunción del informe lleva `--color-state-warn`.
+
+   ⛔ CORREGIDO EL 2026-08-11 (F15), y de los tres de su especie éste era el caro.
+   Decía `var(--color-state-error, …)` y **ese token no existe**: el rojo del
+   sistema es `--color-state-fail` (`estilos/tokens/colors.css`, red-600). O sea
+   que «Vaciarlo» —la única acción irreversible del menú, la que borra el
+   expediente entero— se pintaba del color del texto normal y era
+   TIPOGRÁFICAMENTE INDISTINGUIBLE de «Expedientes guardados», que está justo
+   encima. La doble pulsación seguía protegiendo; lo que faltaba era el aviso que
+   se ve ANTES de pulsar la primera vez.
+
+   Un `var()` con fallback no se queja de que su primer argumento no exista, así
+   que esto llevaba meses en verde. Lo custodia ahora
+   `test/estilos/tokens-definidos.test.js`, que sale rojo con cualquier propiedad
+   usada y nunca definida. */
 .gml-barra-menu-opcion--riesgo {
-  color: var(--color-state-error, var(--color-text-primary));
+  color: var(--color-state-fail);
 }
 
 .gml-barra-menu-apunte {
@@ -5793,6 +5807,7 @@ button.gml-parte-nombre {
 .gml-app .gml-dialogo-importacion,
 .gml-app .gml-dialogo-pegado,
 .gml-app .gml-dialogo-avisos,
+.gml-app .gml-dialogo-diccionario,
 .gml-app dialog[data-bloque='atributos-edificio'] {
   position: fixed;
   top: 50%;
@@ -5825,6 +5840,7 @@ button.gml-parte-nombre {
 .gml-app .gml-dialogo-importacion::backdrop,
 .gml-app .gml-dialogo-pegado::backdrop,
 .gml-app .gml-dialogo-avisos::backdrop,
+.gml-app .gml-dialogo-diccionario::backdrop,
 .gml-app dialog[data-bloque='atributos-edificio']::backdrop {
   background: color-mix(in srgb, var(--color-text-primary) 45%, transparent);
 }
@@ -5834,6 +5850,7 @@ button.gml-parte-nombre {
 .gml-dialogo-atributos-cuerpo,
 .gml-dialogo-pegado-cuerpo,
 .gml-dialogo-avisos-cuerpo,
+.gml-dialogo-diccionario-cuerpo,
 .gml-dialogo-importacion-cuerpo {
   display: flex;
   flex-direction: column;
@@ -5851,6 +5868,7 @@ button.gml-parte-nombre {
 .gml-dialogo-atributos-titulo,
 .gml-dialogo-pegado-titulo,
 .gml-dialogo-avisos-titulo,
+.gml-dialogo-diccionario-titulo,
 .gml-dialogo-importacion-titulo {
   margin: 0;
   font-size: var(--gml-titulo-tam);
@@ -5861,12 +5879,9 @@ button.gml-parte-nombre {
 
 .gml-dialogo-capas-intro,
 .gml-dialogo-atributos-intro,
-.gml-dialogo-importacion-intro {
-  margin: 0;
-  max-width: 68ch;
-  font-size: var(--text-12);
-  color: var(--color-text-secondary);
-}
+.gml-dialogo-diccionario-intro,
+.gml-dialogo-importacion-intro,
+.gml-diccionario-cuenta,
 
 /* ── El reparto por capas ──────────────────────────────────────────────────── */
 
@@ -5975,6 +5990,7 @@ button.gml-parte-nombre {
 .gml-dialogo-atributos-pie,
 .gml-dialogo-pegado-pie,
 .gml-dialogo-avisos-pie,
+.gml-dialogo-diccionario-pie,
 .gml-dialogo-importacion-pie {
   display: flex;
   flex-wrap: wrap;
@@ -5990,6 +6006,7 @@ button.gml-parte-nombre {
 .gml-app .gml-dialogo-atributos-pie .gml-boton,
 .gml-app .gml-dialogo-pegado-pie .gml-boton,
 .gml-app .gml-dialogo-avisos-pie .gml-boton,
+.gml-app .gml-dialogo-diccionario-pie .gml-boton,
 .gml-app .gml-dialogo-importacion-pie .gml-boton {
   width: auto;
   flex: none;
@@ -6133,14 +6150,39 @@ button.gml-parte-nombre {
 
 /* El motivo por el que algo no ha entrado. Va en el color de aviso y NO en rojo:
    un reparto por capas sin resolver no es un error del usuario ni de la
-   aplicación — es una pregunta sin contestar. */
-.gml-dialogo-importacion-bloqueo {
+   aplicación — es una pregunta sin contestar.
+
+   ⛔ CORREGIDO EL 2026-08-11 (F15). Esta regla decía
+   `var(--color-aviso, var(--color-border-main))` y **`--color-aviso` NO EXISTE**:
+   no está definido en `estilos/tokens/` ni en ninguna otra parte del repositorio.
+   O sea que durante meses el comentario de arriba prometía el color de aviso y lo
+   que se pintaba era el borde gris de siempre, sin que nada se quejara — un
+   `var()` con fallback no avisa de que su primer argumento no existe, que es
+   exactamente el fallo silencioso que este proyecto persigue. El token real es
+   `--color-state-warn` (`estilos/tokens/colors.css`, amber-700), el mismo que ya
+   usaba la presunción del informe. Lo destapó F15 al ir a reutilizar el patrón.
+   El hermano de `.gml-dialogo-pegado-motivo` tenía el mismo defecto y va igual.
+
+   ── ⭐ LAS TRES SON LA MISMA PIEZA, Y DESDE HOY UNA SOLA REGLA ──────────────
+   `.gml-dialogo-pegado-motivo` (F19) y `.gml-diccionario-correccion` (F15) tenían
+   estas OCHO declaraciones, byte a byte, cada una por su lado. Es el mismo bloque
+   —párrafo con filete ámbar a la izquierda que dice «esto no está roto, es una
+   pregunta sin contestar»— dibujado tres veces, y la prueba de que divergen está
+   en esta misma cabecera: las tres arrastraban `--color-aviso` y **las tres se
+   arreglaron el mismo día porque por fin alguien las miró juntas**.
+
+   El `:not(:empty)` de la de F19 se conserva: aquel párrafo vive siempre en el
+   DOM y se vacía, así que sin la guarda pintaría un filete sobre la nada. Las
+   otras dos se crean cuando hay algo que decir. */
+.gml-dialogo-importacion-bloqueo,
+.gml-dialogo-pegado-motivo:not(:empty),
+.gml-diccionario-correccion {
   margin: 0;
   max-width: 68ch;
   padding: var(--space-2);
   border-radius: var(--radius);
   background: var(--color-bg-surface);
-  border-left: 3px solid var(--color-aviso, var(--color-border-main));
+  border-left: 3px solid var(--color-state-warn);
   font-size: var(--text-12);
   color: var(--color-text-primary);
 }
@@ -6274,18 +6316,161 @@ button.gml-parte-nombre {
   color: var(--color-text-secondary);
 }
 
-/* Por qué no se puede usar lo pegado. Mismo tratamiento que el bloqueo de F18 —
-   color de aviso y no rojo—: pegar media LISTA no es un error, es una pregunta
-   sin contestar, y la pantalla se queda abierta para poder contestarla. */
-.gml-dialogo-pegado-motivo:not(:empty) {
-  margin: 0;
-  max-width: 68ch;
+/* Por qué no se puede usar lo pegado: pegar media LISTA no es un error, es una
+   pregunta sin contestar, y la pantalla se queda abierta para poder contestarla.
+   ⛔ Su regla se FUNDIÓ el 2026-08-11 con las de F18 y F15 — ver allí el porqué. */
+
+/* ── F15 · El diccionario de errores de la Sede ───────────────────────────────
+ *
+ * Solo lo PROPIO. La caja, el backdrop, el cuerpo, el título, la intro y el pie
+ * están añadidos a las listas de selectores de los diálogos de F11/F18, arriba,
+ * porque son exactamente la misma pieza: mismo reparto que hicieron F21 con el
+ * `<dialog>` de trabajo y F14 con el cajón de contraste. Lo que esta pantalla
+ * tiene y aquéllas no es UNA LISTA LARGA de fichas plegables con insignias.
+ *
+ * ⭐ La lista scrollea DENTRO, no el diálogo. El contenedor compartido ya trae
+ * `overflow-y:auto`, pero dejar que scrollee la caja entera se lleva el campo de
+ * búsqueda fuera de la vista en cuanto se baja: en una pantalla donde se teclea y
+ * se mira el resultado a la vez, el campo tiene que quedarse quieto. Por eso la
+ * lista lleva su propio tope y su propio scroll, y `overscroll-behavior:contain`
+ * para que la rueda no se escape al mapa que hay debajo. */
+
+.gml-diccionario-busqueda {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.gml-diccionario-rotulo {
+  font-size: var(--text-12);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text-primary);
+}
+
+.gml-app .gml-diccionario-campo {
+  width: 100%;
+  box-sizing: border-box;
   padding: var(--space-2);
+  border: 1px solid var(--color-border-main);
+  border-radius: var(--radius);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-12);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+/* La cuenta («23 entradas · sin filtrar»), el «detalle:» de cada ficha y el
+   renglón de «nada casa» comparten regla con las intro de los diálogos: son el
+   mismo texto secundario a 68ch. La cuenta habla SIEMPRE, así que no lleva
+   `:not(:empty)`: reservar su alto evita que la lista salte al teclear. */
+
+.gml-diccionario-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.gml-diccionario-entrada {
+  border: 1px solid var(--color-border-sub);
   border-radius: var(--radius);
   background: var(--color-bg-surface);
-  border-left: 3px solid var(--color-aviso, var(--color-border-main));
+}
+
+/* La ficha abierta se separa del montón: es la que se está leyendo. */
+.gml-diccionario-entrada[open] {
+  border-color: var(--color-border-main);
+  background: var(--color-bg-primary);
+}
+
+.gml-app .gml-diccionario-resumen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.gml-diccionario-clave {
   font-size: var(--text-12);
+  font-weight: var(--fw-semibold);
   color: var(--color-text-primary);
+}
+
+/* Las insignias se van a la derecha del renglón: la columna que se ojea es la de
+   claves, y con ellas intercaladas cada fila empieza en un sitio distinto. */
+.gml-diccionario-insignias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+.gml-diccionario-insignia {
+  padding: 0 var(--space-1);
+  border-radius: var(--radius);
+  background: var(--color-bg-elevated);
+  font-size: var(--text-11, var(--text-12));
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/* ⭐ MEDIDO se ve distinto, y es lo único de esta pantalla que se pinta con
+   color. Un diccionario donde «lo hemos comprobado contra la Sede» y «lo dice un
+   foro» se leen igual invita a fiarse de lo segundo. */
+.gml-diccionario-entrada[data-diccionario-procedencia='MEDIDO'] .gml-diccionario-insignia--procedencia {
+  background: color-mix(in srgb, var(--color-state-ok) 14%, transparent);
+  color: var(--color-text-primary);
+}
+
+.gml-diccionario-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-2) var(--space-2);
+}
+
+.gml-diccionario-apartado {
+  margin: 0;
+  max-width: 68ch;
+  font-size: var(--text-12);
+  line-height: 1.55;
+  color: var(--color-text-primary);
+}
+
+/* «Casa con el mensaje literal» — la afirmación fuerte de la pantalla. */
+.gml-diccionario-literal {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--color-state-ok) 12%, transparent);
+  font-size: var(--text-12);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text-primary);
+}
+
+/* Las tres entradas que enmiendan un catálogo ajeno. Color de aviso y no rojo:
+   no hay nada roto, hay algo que mucha gente cree y no es cierto. Su regla vive
+   fundida con las de F18 y F19: es la misma pieza. */
+
+.gml-diccionario-vermas,
+.gml-diccionario-vacio {
+  margin: 0;
+  max-width: 68ch;
+  font-size: var(--text-12);
+  color: var(--color-text-secondary);
+}
+
+/* «Cerrar» a la derecha del todo, como en el pie del diálogo de avisos. */
+.gml-dialogo-diccionario-pie [data-accion='cerrar-diccionario'] {
+  margin-left: auto;
 }
 
 /* ═══ Movimiento reducido ════════════════════════════════════════════════════

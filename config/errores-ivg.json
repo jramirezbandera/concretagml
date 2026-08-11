@@ -1,0 +1,264 @@
+{
+  "_nota": "F15 · DICCIONARIO DE ERRORES de los validadores de la Sede Electrónica del Catastro: el IVG (informe de validación gráfica, parcela) y el ICUC (informe catastral de ubicación de construcciones, edificio). Traduce el mensaje que devuelve la Sede a lenguaje accionable. ⛔ NO es un validador ni un veredicto: es DOCUMENTACIÓN. La app no decide aquí si un fichero está bien —eso lo hacen `validation/` y `comprobacion/`—, solo explica qué ha querido decir la Sede. Regla de oro 9 (SPEC §2) intacta: la app mide y señala; el colegiado interpreta y firma. Cada entrada declara su `procedencia`, y esa palabra es la parte más importante del fichero: MEDIDO = este proyecto lo comprobó contra el servicio real y tiene la fecha; DOCUMENTADO = lo dice una publicación del Catastro; OBSERVADO = se ha visto en un fichero o en un mensaje real; COMUNIDAD = lo dicen otros generadores o foros y NADIE aquí lo ha comprobado; INFERIDO = se deduce de la norma XML o del XSD y NADIE lo ha visto rechazar. ⚠️ Las entradas con `correccion` avisan de que el catálogo de partida (dossier §1.5) daba por causa de rechazo algo que este proyecto REFUTÓ midiendo: se conservan A PROPÓSITO, porque el técnico que llega aquí probablemente ha leído esa misma lista en otro sitio y necesita saber que no es cierta. Se llena con el uso: cada rechazo real que se resuelve se anota aquí, a mano, con su fecha y su procedencia. El cargador no conoce ninguna clave, así que añadir una entrada NO toca código (criterio 2 de la ficha). El porqué de la estructura está en el JSDoc de `config/errores-ivg.js` (el JSON no admite comentarios).",
+
+  "wfs:FeatureCollection en la raíz": {
+    "traduccion": "El fichero muere en la primera línea: el validador carga el esquema de parcela y la raíz que le has puesto no está declarada ahí. Ni siquiera llega a mirar la geometría.",
+    "causaProbable": "Has subido el fichero tal cual lo devuelve el WFS del Catastro, o un generador que lo copia. `wfs:FeatureCollection` es el sobre de la DESCARGA —lo que el servicio contesta—, no el de la ENTREGA —lo que se sube—. Son dos direcciones del mismo formato y el sobre es distinto.",
+    "comoCorregir": "La raíz de la entrega es `gml:FeatureCollection` con su `gml:id`, y cada parcela va dentro de un `gml:featureMember`. El `xsi:schemaLocation` declara SOLO `cp/4.0` (sin `wfs/2.0`), el `srsName` va en forma URN, y no se emiten `timeStamp`, `numberMatched`, `numberReturned`, `endLifespanVersion` ni `referencePoint`. Esta aplicación lo hace así por defecto (`PERFIL.ENTREGA`).",
+    "fecha": "2026-07-27",
+    "validador": "IVG",
+    "procedencia": "MEDIDO",
+    "mensajes": [
+      "El archivo no cumple el esquema Inspire GML",
+      "Element '{http://www.opengis.net/wfs/2.0}FeatureCollection': No matching global declaration available for the validation root."
+    ],
+    "verMas": "spec/SPEC.md §3.1 · override O3"
+  },
+
+  "falta xmlns:xlink en la raíz": {
+    "traduccion": "El ICUC no carga el fichero y no dice por qué. La causa puede ser que a la raíz le falte una declaración de namespace que ningún elemento del documento usa.",
+    "causaProbable": "Al escribir el GML se declararon solo los prefijos que los elementos necesitan, que es lo razonable. El ICUC exige además `xlink` en la raíz aunque esté sin usar: el XSD no lo pide, la ayuda oficial no lo menciona, y sin él el servicio rechaza cualquier GML de edificio incluido el que publica el propio Catastro.",
+    "comoCorregir": "Añade `xmlns:xlink=\"http://www.w3.org/1999/xlink\"` al elemento raíz. Esta aplicación lo emite desde el 2026-08-06. ⚠️ Y no te fíes de una validación contra el XSD para descartar esto: el fichero rechazado validaba contra el esquema oficial.",
+    "fecha": "2026-08-06",
+    "validador": "ICUC",
+    "procedencia": "MEDIDO",
+    "mensajes": [
+      "Los siguientes ficheros no se han cargado al no ser válidos:"
+    ],
+    "verMas": "spec/feature-13-edificio-gml.md · «El rechazo del ICUC»"
+  },
+
+  "gml:id repetido en el documento": {
+    "traduccion": "Dos elementos del fichero llevan el mismo `gml:id`. Eso invalida el documento entero, no solo el elemento repetido.",
+    "causaProbable": "`gml:id` es de tipo `xs:ID` en XML: tiene que ser único en TODO el documento, no dentro de su elemento. Es fácil repetirlo cuando el identificador se construye a partir de la referencia catastral y se usa a la vez en la raíz y en la parcela.",
+    "comoCorregir": "Dale a cada elemento un `gml:id` distinto. En la plantilla oficial la raíz lleva el namespace INSPIRE (`ES.SDGC.CP`) y la parcela su propio identificador. ⚠️ `UTM_1.gml` —un alta real de un generador de terceros— repite el mismo valor en raíz y parcela: ese fichero NO valida y no sirve de plantilla.",
+    "fecha": "2026-07-27",
+    "validador": "AMBOS",
+    "procedencia": "MEDIDO",
+    "mensajes": [],
+    "verMas": "spec/SPEC.md §3.1 · trampa 1"
+  },
+
+  "orden de los elementos de cp:CadastralParcel": {
+    "traduccion": "Los hijos de la parcela están en un orden que el esquema no admite. El XSD fija una secuencia, no un conjunto.",
+    "causaProbable": "Se han escrito los elementos en el orden en que resultaba cómodo generarlos, o copiando otro fichero que llevaba un orden distinto.",
+    "comoCorregir": "El orden que exige el validador es: `areaValue` → `beginLifespanVersion` → `endLifespanVersion` → `geometry` → `inspireId` → `label` → `nationalCadastralReference` → `referencePoint`. Es alfabético, no lógico.",
+    "fecha": "2026-07-27",
+    "validador": "IVG",
+    "procedencia": "OBSERVADO",
+    "mensajes": [],
+    "verMas": "spec/SPEC.md · override O5 · gml/_comun.js#ORDEN_CADASTRAL_PARCEL"
+  },
+
+  "localId y namespace incoherentes": {
+    "traduccion": "El `inspireId` está diciendo dos cosas que se contradicen: que ese identificador es la referencia catastral, y que la parcela no está en el Catastro.",
+    "causaProbable": "Se ha tratado el `localId` y el `namespace` como dos ajustes independientes. Son UNA sola afirmación: el par dice de dónde sale el identificador.",
+    "comoCorregir": "Si el `localId` es la referencia catastral, el namespace debe ser `ES.SDGC.CP`. Si la parcela no existe todavía en el Catastro, va `ES.LOCAL.CP` con un identificador propio. Emitir la referencia real bajo `ES.LOCAL.CP` es afirmar las dos cosas a la vez.",
+    "fecha": "2026-07-27",
+    "validador": "IVG",
+    "procedencia": "DOCUMENTADO",
+    "mensajes": [],
+    "verMas": "spec/SPEC.md §3.1 · trampa 2 (FAQ del Catastro)"
+  },
+
+  "nationalCadastralReference de una parcela segregada": {
+    "traduccion": "No es un rechazo: es la duda de qué referencia poner en una parcela que todavía no existe.",
+    "causaProbable": "La parcela resultante de una segregación no tiene referencia catastral propia, y dejarla vacía o inventarla parecen las dos únicas salidas.",
+    "comoCorregir": "MEDIDO: la referencia del padre con sufijo SÍ se acepta. `localId` = `nationalCadastralReference` = `7136910UF1473N.1` bajo namespace `ES.LOCAL.CP` obtuvo IVG positivo. La Sede además distingue las dos parcelas del envío: marca la matriz con una insignia `RC` y la segregada no. ⚠️ Que la forma con sufijo valga NO dice que la vacía falle: eso sigue sin medirse.",
+    "fecha": "2026-08-03",
+    "validador": "IVG",
+    "procedencia": "MEDIDO",
+    "mensajes": [],
+    "verMas": "spec/SPEC.md · override O19"
+  },
+
+  "Tipo de operación": {
+    "traduccion": "No es un error del fichero: es un campo del formulario. La Sede exige declarar el tipo de operación en un desplegable antes de emitir el IVG, y el informe lo imprime.",
+    "causaProbable": "El campo se rellena en la web de la Sede, no en el GML, así que es fácil pasarlo por alto o elegir el primero de la lista.",
+    "comoCorregir": "Tiene exactamente dos opciones: **Segregación** y **Subsanación**. No es una taxonomía de alteraciones catastrales —no hay agrupación, ni división, ni rectificación de linderos—: cada una se corresponde con una de las dos formas de fichero. ⛔ Es DECLARATIVO, no verificativo: nadie comprueba que el valor case con el contenido, así que un valor equivocado produce un IVG POSITIVO con la etiqueta equivocada, que es peor que un rechazo.",
+    "fecha": "2026-08-03",
+    "validador": "IVG",
+    "procedencia": "MEDIDO",
+    "mensajes": [],
+    "verMas": "spec/SPEC.md · override O20 · derivacion/operacion.js"
+  },
+
+  "el expediente no cubre la finca de partida": {
+    "traduccion": "IVG negativo aunque cada parcela del envío sea impecable por separado. Lo que falla es el conjunto.",
+    "causaProbable": "Las N parcelas que se entregan no cubren exactamente el trozo de suelo del que se parte: queda un hueco sin dueño, o un solape entre dos de ellas. El IVG no juzga las parcelas de una en una, juzga si el mosaico cierra.",
+    "comoCorregir": "Toda superficie que se quita a una parcela tiene que aparecer en otra del mismo expediente. Si mueves un lindero compartido, la parcela del vecino queda recortada y también tiene que ir en el envío. Esta aplicación lo comprueba antes de dejar descargar y nombra el hueco con sus m².",
+    "fecha": "2026-08-03",
+    "validador": "IVG",
+    "procedencia": "MEDIDO",
+    "mensajes": [],
+    "verMas": "derivacion/entrega.js · comprobacion/conjunto.js"
+  },
+
+  "areaValue no coincide con las coordenadas": {
+    "traduccion": "La superficie declarada en el fichero no cuadra con la que sale de calcular el área con las coordenadas que lleva el propio fichero.",
+    "causaProbable": "La superficie se ha copiado de la ficha catastral, del proyecto o de una medición anterior, en vez de calcularse sobre los vértices que se están entregando.",
+    "comoCorregir": "`cp:areaValue` va en metros cuadrados con `uom=\"m2\"` y ENTERO (informativo). Tiene que salir de las mismas coordenadas que van en el `posList`. La plantilla oficial del Catastro lo dice con todas las letras en un comentario: «Superficie de la parcela en metros cuadrados. Tiene que coincidir con la calculada con las coordenadas.»",
+    "fecha": "2026-07-27",
+    "validador": "IVG",
+    "procedencia": "DOCUMENTADO",
+    "mensajes": [],
+    "verMas": "spec/SPEC.md · override O6 · test/fixtures/gml/cp_ejemplo_explicativo.gml"
+  },
+
+  "srsName en forma corta o en la forma del otro perfil": {
+    "traduccion": "El sistema de referencia está escrito de una forma que el esquema no admite, o en la forma que corresponde al otro sentido del intercambio.",
+    "causaProbable": "`EPSG:25830` a secas es la forma corta y no es una URI. Y hay DOS formas largas legítimas, una por perfil, así que copiar la del fichero equivocado es fácil.",
+    "comoCorregir": "En lo que se SUBE (parcela y edificio) va la URN: `urn:ogc:def:crs:EPSG::25830`. En lo que DEVUELVE el WFS va la URI OGC: `http://www.opengis.net/def/crs/EPSG/0/25830`. Las dos son `xsd:anyURI` y las dos validan; lo que no vale es la forma corta. Cambia el 25830 por tu huso (25829 / 25831; Canarias 32628).",
+    "fecha": "2026-07-27",
+    "validador": "AMBOS",
+    "procedencia": "MEDIDO",
+    "mensajes": [],
+    "verMas": "spec/SPEC.md · overrides O2 y O10"
+  },
+
+  "gml:FeatureCollection en parcela": {
+    "traduccion": "⚠️ ESTO NO ES UN ERROR. Si has leído en algún sitio que `gml:FeatureCollection` y `gml:featureMember` en una parcela son cosa del formato 3.0 y provocan rechazo, esa lista está equivocada.",
+    "causaProbable": "Es un error de catálogo que circula, y este proyecto lo tenía copiado en su propio dossier hasta el 2026-08-11.",
+    "comoCorregir": "No corrijas nada. `gml:FeatureCollection` + `gml:featureMember` es EXACTAMENTE la raíz de la entrega en CP 4.0: es la que trae la plantilla que publica la D.G. del Catastro (`gml:id=\"ES.SDGC.CP\"`), la que valida contra `cp/4.0` sin necesidad de ningún otro esquema, y la que la Sede ha aceptado con IVG positivo en este proyecto. Lo que sí provoca rechazo es `wfs:FeatureCollection` — busca esa entrada.",
+    "fecha": "2026-08-11",
+    "validador": "IVG",
+    "procedencia": "MEDIDO",
+    "correccion": "Enmienda la entrada 1 del catálogo del dossier §1.5, que la daba por causa de rechazo. Está invertida: nombra como rechazada la raíz que hace que el fichero se acepte.",
+    "mensajes": [],
+    "verMas": "spec/SPEC.md §3.1 · override O3 · test/fixtures/gml/cp_ejemplo_explicativo.gml"
+  },
+
+  "orientación de los anillos": {
+    "traduccion": "⚠️ ESTO NO ES CAUSA DE RECHAZO. Que el anillo exterior vaya en sentido horario o antihorario no hace que la Sede rechace el fichero.",
+    "causaProbable": "Los catálogos de errores lo listan porque el WFS del Catastro emite el exterior horario (al revés que la convención OGC) y de ahí se dedujo que era un requisito.",
+    "comoCorregir": "Nada que corregir. MEDIDO: la plantilla oficial del Catastro trae el exterior ANTIHORARIO (+236,05 m²) y es el fichero que ellos publican como válido. Es una convención, no un requisito. Esta aplicación emite horario por fidelidad al dato del WFS, y al LEER un GML ajeno rotula la orientación como nota informativa y jamás como error. ⚠️ Lo que sí importa es no autointersecar y cerrar el anillo.",
+    "fecha": "2026-07-27",
+    "validador": "AMBOS",
+    "procedencia": "MEDIDO",
+    "correccion": "Enmienda la entrada 3 del catálogo del dossier §1.5, que la daba por causa de rechazo.",
+    "mensajes": [],
+    "verMas": "spec/SPEC.md · override O1"
+  },
+
+  "base: en el inspireId": {
+    "traduccion": "⚠️ MATIZADO. El prefijo `base:` en el `inspireId` de una parcela 4.0 no es, por sí solo, un error.",
+    "causaProbable": "Se ha leído que hay que quitar el prefijo `base:`. Lo que de verdad cuenta es a qué namespace apunta ese prefijo: un prefijo no es información en XML, es una etiqueta local del documento.",
+    "comoCorregir": "Comprueba el NAMESPACE, no el prefijo: en CP 4.0 el `inspireId` va sobre INSPIRE base **3.3**, no 3.2. La plantilla oficial del Catastro usa el prefijo `base:` sobre 3.3 y valida perfectamente.",
+    "fecha": "2026-07-27",
+    "validador": "IVG",
+    "procedencia": "MEDIDO",
+    "correccion": "Matiza la entrada 8 del catálogo del dossier §1.5, que culpaba al prefijo en vez de a la versión del namespace.",
+    "mensajes": [],
+    "verMas": "spec/SPEC.md · override O4"
+  },
+
+  "gml:id que empieza por dígito": {
+    "traduccion": "El identificador no es un nombre XML válido, así que el documento no llega ni a parsearse contra el esquema.",
+    "causaProbable": "Se ha usado la referencia catastral cruda como `gml:id`, y muchas referencias empiezan por un número.",
+    "comoCorregir": "`gml:id` es de tipo `xs:ID`, que es un `xs:NCName`: no puede empezar por un dígito. Antepón el namespace, como hace la plantilla oficial (`ES.LOCAL.CP.<referencia>`).",
+    "fecha": "2026-08-11",
+    "validador": "AMBOS",
+    "procedencia": "INFERIDO",
+    "mensajes": [],
+    "verMas": "dossier §1.5 · entrada 4 (deducida de la norma XML; nadie la ha visto rechazar aquí)"
+  },
+
+  "anillo no cerrado o con menos de 4 puntos": {
+    "traduccion": "Un recinto del fichero no es un polígono cerrado válido. Rechazo directo.",
+    "causaProbable": "El último vértice no repite al primero, o el recinto tiene tan pocos puntos que no encierra superficie. También puede pasar al redondear a 2 decimales: dos vértices que estaban a 4 mm se funden en uno y el anillo pierde un punto sin que nadie lo note.",
+    "comoCorregir": "Cada `gml:LinearRing` necesita al menos 4 posiciones, con la última idéntica a la primera. Esta aplicación lo comprueba sobre las coordenadas YA REDONDEADAS, que son las que va a leer la Sede, y no sobre las del modelo.",
+    "fecha": "2026-08-11",
+    "validador": "AMBOS",
+    "procedencia": "DOCUMENTADO",
+    "mensajes": [],
+    "verMas": "dossier §1.5 · entrada 5 · gml/anillos.js"
+  },
+
+  "referencePoint fuera del polígono": {
+    "traduccion": "El punto de referencia declarado cae fuera de la parcela que dice representar.",
+    "causaProbable": "Se ha calculado como centroide (media de los vértices), que en una parcela cóncava o con huecos puede caer fuera de la superficie.",
+    "comoCorregir": "Usa un punto garantizado dentro del polígono, no el centroide. ⚠️ En una entrega de parcela lo más simple es no emitirlo: `cp:referencePoint` es opcional y la plantilla oficial no lo trae, así que esta aplicación no lo escribe (lo calcula y lo enseña en pantalla, pero no lo mete en el fichero).",
+    "fecha": "2026-08-11",
+    "validador": "IVG",
+    "procedencia": "INFERIDO",
+    "mensajes": [],
+    "verMas": "dossier §1.5 · entrada 6 (deducida; nadie la ha visto rechazar aquí)"
+  },
+
+  "encoding declarado distinto de los bytes reales": {
+    "traduccion": "La cabecera XML declara una codificación y el fichero está guardado en otra. El parser se atraganta, normalmente en la primera letra acentuada.",
+    "causaProbable": "El fichero se ha editado con una herramienta que guarda en otra codificación sin tocar la declaración, o se ha copiado la cabecera de otro fichero.",
+    "comoCorregir": "Que `<?xml version=\"1.0\" encoding=\"...\"?>` diga lo que el fichero es de verdad. Lo más seguro es UTF-8 sin BOM, que es lo que emite esta aplicación.",
+    "fecha": "2026-08-11",
+    "validador": "AMBOS",
+    "procedencia": "INFERIDO",
+    "mensajes": [],
+    "verMas": "dossier §1.5 · entrada 7 (deducida; nadie la ha visto rechazar aquí)"
+  },
+
+  "boundedBy, validFrom, validTo o zoning en la parcela": {
+    "traduccion": "El fichero lleva elementos que sobran en una entrega de parcela 4.0.",
+    "causaProbable": "Se ha partido de la descarga del WFS o de un fichero 3.0, que sí los traen.",
+    "comoCorregir": "Quítalos: la plantilla oficial de entrega no los lleva. ⚠️ Y aquí conviene la prudencia por la que esta aplicación tampoco emite `endLifespanVersion` ni `referencePoint`: no es que se haya medido que sobrar estorbe, es que añadir al fichero de subida cosas que la plantilla no tiene es un riesgo sin contrapartida.",
+    "fecha": "2026-08-11",
+    "validador": "IVG",
+    "procedencia": "DOCUMENTADO",
+    "mensajes": [],
+    "verMas": "dossier §1.5 · entrada 9"
+  },
+
+  "MultiPolygon o varias caras exteriores en una parcela": {
+    "traduccion": "Una sola parcela declara varias superficies exteriores desconectadas.",
+    "causaProbable": "El dibujo trae la parcela partida en trozos, o se ha exportado como multipolígono desde un SIG.",
+    "comoCorregir": "Una parcela, un exterior (con los huecos que haga falta dentro). ⭐ NO lo confundas con meter varias PARCELAS en un fichero, que es otra cosa y sí se acepta: un `.gml` con N `gml:featureMember` obtuvo IVG positivo en este proyecto, y la propia plantilla oficial lo instruye en su línea 42.",
+    "fecha": "2026-08-11",
+    "validador": "IVG",
+    "procedencia": "COMUNIDAD",
+    "mensajes": [],
+    "verMas": "dossier §1.5 · entrada 10 · override O18 (lo segundo SÍ está medido)"
+  },
+
+  "voladizos, terrazas y balcones en el edificio": {
+    "traduccion": "Se han declarado como construcción partes que no tienen volumen propio sobre rasante.",
+    "causaProbable": "Se ha entregado la huella dibujada en el proyecto tal cual, que incluye vuelos y elementos salientes.",
+    "comoCorregir": "Solo entra la huella con volumen sobre rasante. Es una regla de negocio que hay que aplicar ANTES de serializar: INSPIRE no representa divisiones horizontales, solo huella más `numberOfFloorsAboveGround`. ⚠️ Una piscina sí entra, pero NO como cuerpo del edificio: va como `bu-ext2d:OtherConstruction` con `constructionNature=openAirPool`.",
+    "fecha": "2026-08-11",
+    "validador": "ICUC",
+    "procedencia": "DOCUMENTADO",
+    "mensajes": [],
+    "verMas": "dossier §1.5 · entrada 11 · spec/feature-21-piscina-precision.md"
+  },
+
+  "solapes entre recintos": {
+    "traduccion": "Dos superficies del envío pisan la misma porción de suelo.",
+    "causaProbable": "Dos construcciones dibujadas por separado comparten pared y se han digitalizado con el muro contado dos veces; o dos parcelas del expediente se solapan en el lindero común.",
+    "comoCorregir": "Que cada punto del suelo tenga un solo dueño dentro del envío. ⚠️ MEDIDO en este proyecto: el parcelario oficial del Catastro NO es topológicamente limpio —las parcelas vecinas oficiales llegan a solaparse 5 mm entre sí—, así que un solape de orden milimétrico contra una vecina descargada es ruido del dato de referencia y no un defecto tuyo.",
+    "fecha": "2026-08-10",
+    "validador": "AMBOS",
+    "procedencia": "DOCUMENTADO",
+    "mensajes": [],
+    "verMas": "dossier §1.5 · entrada 12 · comprobacion/conjunto.js"
+  },
+
+  "construcción a más de 100 m de la parcela": {
+    "traduccion": "El ICUC rechaza una construcción que queda demasiado lejos de la parcela que declara.",
+    "causaProbable": "Casi siempre es un error de georreferenciación: huso equivocado, coordenadas locales en vez de UTM, o un origen desplazado. A esa distancia rara vez es un problema real de la construcción.",
+    "comoCorregir": "Comprueba primero el huso y el sistema de referencia del dibujo antes de tocar la geometría. Si el edificio aparece a cientos de metros o a kilómetros, el fichero está en otro CRS.",
+    "fecha": "2026-08-11",
+    "validador": "ICUC",
+    "procedencia": "DOCUMENTADO",
+    "mensajes": [],
+    "verMas": "dossier §1.5 · entrada 12 · validation/edificio.js"
+  },
+
+  "funtional": {
+    "traduccion": "El valor del estado de la construcción está mal escrito y no pertenece a la lista cerrada del esquema.",
+    "causaProbable": "⭐ El PDF oficial del Catastro lo escribe mal —«funtional»— y quien copia del PDF hereda la errata.",
+    "comoCorregir": "Se escribe `functional`, con dos «c». La lista completa de `conditionOfConstruction` es: `declined`, `demolished`, `functional`, `projected`, `ruin`, `underConstruction`.",
+    "fecha": "2026-08-11",
+    "validador": "ICUC",
+    "procedencia": "OBSERVADO",
+    "mensajes": ["funtional"],
+    "verMas": "dossier §1.5 · entrada 13"
+  }
+}

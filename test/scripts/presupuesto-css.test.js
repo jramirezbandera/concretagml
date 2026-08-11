@@ -76,38 +76,78 @@ describe('scripts/presupuesto-css · el registro y el techo', () => {
     expect(v.problemas[0]).toContain('+1 B')
   })
 
+  /**
+   * Un registro de mentira con las rebanadas que se le pidan cerradas y el último
+   * asiento en la cifra que se le pase.
+   *
+   * ⚠️ **Existe desde el 2026-08-11 porque el registro de VERDAD ya tiene las cinco
+   * cerradas**, y las dos pruebas de abajo necesitan los dos lados de esa frontera.
+   * Antes bastaba con leer `ASIENTOS` para el caso «quedan rebanadas» y fabricar solo
+   * el caso «están todas»; hoy es al revés, y fabricar los dos es lo que impide que
+   * estas pruebas cambien de significado la próxima vez que el registro se mueva.
+   *
+   * @param {string[]} cerradas  Qué rebanadas cierran los asientos de mentira.
+   * @param {number} nuestro  La cifra del ÚLTIMO asiento.
+   */
+  const registroDeMentira = (cerradas, nuestro) =>
+    cerradas.map((r, i) => {
+      const suyo = i === cerradas.length - 1 ? nuestro : TECHO.nuestro
+      return {
+        hito: `hito ${i}`,
+        commit: '0000000',
+        rebanada: r,
+        nota: 'de mentira',
+        total: suyo + 15095,
+        nuestro: suyo,
+        vendor: 15095,
+      }
+    })
+
   it('NO exige el techo mientras queden rebanadas por cerrar (criterio 10)', () => {
-    // El criterio dice literalmente que durante la migración puede subir. Hoy
-    // la hoja está 3.949 B por encima del techo y eso NO es un fallo todavía.
-    const v = comparar(medir(TECHO.nuestro + 10_000))
+    // El criterio dice literalmente que durante la migración puede subir: 10.000 B
+    // por encima NO es un fallo mientras el rework siga abierto. Es el estado en el
+    // que vivió el proyecto entre el 2026-08-03 y el 2026-08-11.
+    const abierto = REBANADAS.slice(0, -1)
+    const v = comparar(medir(TECHO.nuestro + 10_000), {
+      asientos: registroDeMentira(abierto, TECHO.nuestro + 10_000),
+    })
     expect(v.pendientes.length).toBeGreaterThan(0)
     expect(v.problemas.join(' ')).not.toContain('techo')
   })
 
-  it('SÍ exige el techo en cuanto las cinco rebanadas están anotadas', () => {
-    const cerradasTodas = REBANADAS.map((r, i) => ({
-      hito: `hito ${i}`,
-      commit: '0000000',
-      rebanada: r,
-      nota: 'de mentira',
-      total: TECHO.total,
-      nuestro: TECHO.nuestro,
-      vendor: TECHO.total - TECHO.nuestro,
-    }))
-    const conUltimo = (nuestro) => [
-      ...cerradasTodas.slice(0, -1),
-      { ...cerradasTodas[cerradasTodas.length - 1], nuestro, total: nuestro + 15095 },
-    ]
+  it('⭐ con las cinco cerradas, clavado en el techo es VERDE y un byte más es ROJO', () => {
+    // ═══ EL CAMBIO DE FORMA DEL 2026-08-11 ═══
+    // Esta prueba decía lo contrario —«justo EN el techo es rojo: el criterio dice
+    // "menos de", no "como mucho"»— y era correcta mientras el techo fue la medición
+    // de F11, o sea una META POR DEBAJO: quedarse clavado en la línea de salida no es
+    // haber bajado de ella.
+    //
+    // El techo pasó a ser la medición de HOY, y con eso «clavado» dejó de significar
+    // «no he llegado» para significar «no he subido», que es exactamente lo que se
+    // exige. Con la forma anterior el guardián nacía rojo el mismo segundo de
+    // rebasarlo, sin que nada estuviera mal — y un guardián que nace rojo se apaga.
+    //
+    // ⛔ Lo que NO se relaja es la pendiente, y por eso las dos aserciones van juntas
+    // en el mismo `it`: separarlas dejaría pasar un «>=» cambiado a «>=» de vuelta
+    // con solo una de las dos en verde.
+    const cerradasTodas = [...REBANADAS]
 
-    // Justo EN el techo es rojo: el criterio dice «menos de», no «como mucho».
-    const enElTecho = comparar(medir(TECHO.nuestro), { asientos: conUltimo(TECHO.nuestro) })
+    const enElTecho = comparar(medir(TECHO.nuestro), {
+      asientos: registroDeMentira(cerradasTodas, TECHO.nuestro),
+    })
     expect(enElTecho.pendientes).toEqual([])
-    expect(enElTecho.ok).toBe(false)
-    expect(enElTecho.problemas.join(' ')).toContain('techo')
+    expect(enElTecho.problemas).toEqual([])
+    expect(enElTecho.ok).toBe(true)
 
-    // Un byte por debajo, verde.
-    const porDebajo = comparar(medir(TECHO.nuestro - 1), { asientos: conUltimo(TECHO.nuestro - 1) })
-    expect(porDebajo.problemas).toEqual([])
+    // UN byte por encima, rojo, y el mensaje tiene que decir cuántos sobran y las dos
+    // salidas (devolver bytes o subir el techo a mano).
+    const porEncima = comparar(medir(TECHO.nuestro + 1), {
+      asientos: registroDeMentira(cerradasTodas, TECHO.nuestro + 1),
+    })
+    expect(porEncima.ok).toBe(false)
+    expect(porEncima.problemas.join(' ')).toContain('techo')
+    expect(porEncima.problemas.join(' ')).toContain('1 B')
+    expect(porEncima.problemas.join(' ')).toMatch(/sube el techo A MANO/)
   })
 
   // ── ⛔ AQUÍ HUBO UN GUARDIÁN DE NO-DIVERGENCIA Y SE RETIRÓ EL 2026-08-08 ────
@@ -127,29 +167,47 @@ describe('scripts/presupuesto-css · el registro y el techo', () => {
   //
   // Lo que SÍ seguía teniendo sentido de aquel guardián —cazar una errata en el
   // campo `rebanada` de un asiento— se conserva aquí abajo.
-  it('cada asiento apunta a una rebanada que EXISTE, y la quinta sigue abierta', () => {
+  it('cada asiento apunta a una rebanada que EXISTE, y las cinco están cerradas', () => {
     for (const a of ASIENTOS) {
       if (a.rebanada === null) continue
       expect(REBANADAS, `el asiento «${a.hito}» cierra una rebanada que no existe`).toContain(
         a.rebanada,
       )
     }
-    // ⚠️ Y la deuda declarada sigue declarada. Si algún día alguien cierra la
-    // quinta, que sea porque ha bajado la hoja del techo y no de rebote: esta
-    // línea le obliga a venir aquí a borrarla, y el `comparar` de al lado le va a
-    // pedir los bytes.
+    // ⭐ ESTA LÍNEA ESTABA AL REVÉS HASTA EL 2026-08-11, y decía: «la deuda declarada
+    // sigue declarada. Si algún día alguien cierra la quinta, que sea porque ha bajado
+    // la hoja del techo y no de rebote». Hizo su trabajo: el 2026-08-08 impidió que un
+    // cambio de navegación la cerrara de rebote (ver el comentario largo de arriba).
+    //
+    // La quinta se cerró **de frente**: el autor tomó la decisión que `3e9c8b0` le
+    // reservaba y eligió revisar el techo, con la poda del sistema de diseño medida
+    // antes. Así que la aserción se invierte y sigue siendo un guardián: ahora lo que
+    // vigila es que nadie REABRA la quinta para quitarse el techo de encima, que es el
+    // atajo simétrico al que aquella línea cerraba.
     const cerradas = new Set(ASIENTOS.map((a) => a.rebanada).filter(Boolean))
-    expect(cerradas.has('informe'), 'la quinta rebanada se ha cerrado sin anotarlo').toBe(false)
+    for (const r of REBANADAS) {
+      expect(cerradas.has(r), `la rebanada «${r}» ha dejado de estar cerrada`).toBe(true)
+    }
   })
 
-  it('el techo ES la medición de F11, no un número aparte', () => {
-    // La línea base del rework es el commit de F11: el criterio 10 pide acabar
-    // por debajo de donde se empezó. Si alguien retoca el techo sin tocar el
-    // asiento (o al revés), el presupuesto pasaría a medirse contra una cifra
-    // que no corresponde a ninguna build.
-    const f11 = ASIENTOS.find((a) => a.hito === 'F11')
-    expect(f11).toBeDefined()
-    expect({ total: f11.total, nuestro: f11.nuestro }).toEqual({ ...TECHO })
+  it('el techo ES un asiento medido de verdad, no un número aparte', () => {
+    // El techo tiene que corresponder a una build que alguien pueda reconstruir; si
+    // no, el presupuesto se mide contra una cifra inventada y deja de significar nada.
+    //
+    // ⚠️ **Hasta el 2026-08-11 este `it` afirmaba que el techo ERA la medición de F11**
+    // (`960bb7a`), porque el criterio 10 pedía acabar por debajo de donde se empezó.
+    // El techo se rebasó a la medición de hoy —el razonamiento está en `TECHO`—, así
+    // que lo que se afirma es lo que sigue teniendo sentido: que el número sale de
+    // ALGÚN asiento del registro. Con eso, retocar el techo a mano sin tocar ningún
+    // asiento (o al revés) sigue siendo rojo, que es lo que este `it` protege.
+    const deAlgunAsiento = ASIENTOS.some(
+      (a) => a.total === TECHO.total && a.nuestro === TECHO.nuestro,
+    )
+    expect(deAlgunAsiento, 'el techo no coincide con ningún asiento del registro').toBe(true)
+
+    // Y es el ÚLTIMO: un techo que coincide con un asiento viejo significaría que la
+    // hoja se movió después sin que nadie revisara el presupuesto.
+    expect({ total: ultimo.total, nuestro: ultimo.nuestro }).toEqual({ ...TECHO })
   })
 
   it('cada asiento cuadra y lleva su causa escrita', () => {
@@ -189,7 +247,43 @@ describe('scripts/presupuesto-css · lo que se imprime', () => {
     expect(texto).toContain(bytes(medido.nuestro))
     expect(texto).toContain(bytes(medido.vendor))
     expect(texto).toContain('Leaflet')
-    expect(texto).toContain('El techo NO se exige')
+  })
+
+  it('avisa de que el techo no se exige SOLO mientras queden rebanadas abiertas', () => {
+    // ⚠️ Este `it` se separó del de arriba el 2026-08-11. Aquél afirmaba la frase «El
+    // techo NO se exige» sobre el registro REAL, y funcionaba por un accidente: la
+    // quinta rebanada estaba abierta. Al cerrarla, la frase desapareció con razón y la
+    // prueba se puso roja sin que el informe tuviera ni un defecto.
+    //
+    // Ahora se afirman los DOS lados con registros de mentira, que es lo que hace que
+    // la prueba siga midiendo el comportamiento y no el estado del proyecto.
+    const medido = { total: 61108, nuestro: 46013, vendor: 15095 }
+    const asientoDe = (rebanada) => ({
+      hito: 'de mentira', commit: '0000000', rebanada, nota: 'de mentira',
+      total: medido.total, nuestro: medido.nuestro, vendor: medido.vendor,
+    })
+
+    const abierto = REBANADAS.slice(0, -1).map(asientoDe)
+    expect(informe(medido, comparar(medido, { asientos: abierto }))).toContain(
+      'El techo NO se exige',
+    )
+
+    const cerrado = REBANADAS.map(asientoDe)
+    expect(informe(medido, comparar(medido, { asientos: cerrado }))).not.toContain(
+      'El techo NO se exige',
+    )
+  })
+
+  it('⭐ clavado en el techo no dice «sobran 0 B», dice que está clavado', () => {
+    // Desde que el techo es la medición de hoy, la holgura 0 es el estado NORMAL. La
+    // rama de `>= 0` imprimía «Hoy SOBRAN 0 B (0,0 % por encima)», que se lee como una
+    // falta y es exactamente lo contrario: es cumplirlo justo.
+    const medido = { total: TECHO.total, nuestro: TECHO.nuestro, vendor: TECHO.total - TECHO.nuestro }
+    const texto = informe(medido, comparar(medido))
+
+    expect(texto).toContain('CLAVADO')
+    expect(texto).not.toContain('SOBRAN')
+    expect(texto).not.toContain('holgura de')
   })
 
   it('escribe los millares como el resto del repositorio, también a cuatro cifras', () => {

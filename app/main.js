@@ -551,6 +551,9 @@ import { crearVisor } from '../viewer/index.js'
 // iba el panel: los quince `panel.avisar(...)` de este fichero y los `typeof
 // panel?.avisar === 'function'` de los cableados no se han tocado.
 import { crearDialogoAvisos } from './dialogo-avisos.js'
+// F15 · El diccionario de errores de la Sede. NO se le pasa `alAvisar` ni nada
+// del estado: es una pantalla de consulta que no mira el fichero de nadie.
+import { crearDialogoDiccionario } from './dialogo-diccionario.js'
 import {
   SELECTOR_BOTON_CARGAR,
   SELECTOR_BOTON_COLINDANTES,
@@ -1409,6 +1412,17 @@ commit(historial, estado.get())
 // Aquí no se pasan a mano porque el diálogo los busca por el mismo selector y
 // lanza con su propio mensaje si faltan.
 const panel = crearDialogoAvisos({ documento: document })
+
+// F15 · «Me han rechazado el fichero». Se monta AQUÍ, al lado del de avisos, y no
+// en un cableado: no tiene nada que cablear. No lee el store, no escribe en él, no
+// depende de la rama activa ni del paso, y por eso tampoco se guarda la referencia
+// —nadie más de esta aplicación tiene por qué abrirlo—. El diálogo se cablea solo
+// con su `menuitem` de `index.html` y vive de `config/errores-ivg.json`.
+//
+// ⛔ Y no es opcional que esté: sin esta línea el diccionario existe en el
+// repositorio, sus 43 pruebas dan verde y **el usuario no tiene ninguna forma de
+// llegar a él**. Es el modo de fallo que este proyecto ha pagado tres veces.
+crearDialogoDiccionario({ documento: document })
 
 // El dataset sintético lo dice también EN LA LISTA de avisos, no solo en el
 // eyebrow: el eyebrow se lee una vez al abrir y la lista queda.

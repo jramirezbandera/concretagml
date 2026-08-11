@@ -88,7 +88,13 @@ import {
   nombreFicheroExport,
 } from '../../app/cableado-expediente.js'
 import { parcelaDemo, parcelaDemoConHueco, REFCAT_DEMO } from '../../app/demo-datos.js'
-import { SELECTOR, motivoOtroHuso, selectorFila } from '../../app/dialogo-expediente.js'
+import {
+  ACCION as ACCION_EXPEDIENTE,
+  SELECTOR,
+  motivoOtroHuso,
+  selectorFila,
+} from '../../app/dialogo-expediente.js'
+import { MOTIVO_BREVE, SALIDA } from '../../app/salidas.js'
 import { ATRIBUTO_PANEL, RAMA, cablearRama } from '../../app/rama.js'
 import { ACADVER } from '../../export/dxf.js'
 import { deProyecto } from '../../export/proyecto.js'
@@ -1020,14 +1026,45 @@ describe('F10 · T5.1 · 6 · las tres exportaciones', () => {
     m.cableado.destruir()
   })
 
-  it('sin parcela no baja nada y se dice', async () => {
+  it('⭐ sin parcela las TRES se apagan con motivo, y siguen rechazando si se piden', async () => {
+    // ⭐ **ESTA PRUEBA CAMBIÓ DE FORMA EL 2026-08-11, y el cambio ES la feature.**
+    // Decía `pulsar(EXCEL)` y luego `expect(renglon()).toBe(MENSAJE_SIN_PARCELA)`, o
+    // sea afirmaba el comportamiento IMPERATIVO: la salida estaba encendida y contaba
+    // el problema cuando ya la habías pulsado. Eso era la deuda «las salidas no saben
+    // decir si se pueden» (`TODOS.md`, 2026-08-09), y `pulsar()` la delató sola: su
+    // primera aserción es que el botón no esté apagado.
+    //
+    // Ahora se afirman los DOS canales, y hacen falta los dos:
+    //   · el PREVENTIVO — la opción nace apagada con su motivo puesto;
+    //   · la RED — pedir la acción por `atender()` sigue rechazándola y diciéndolo,
+    //     porque un `disabled` es cortesía del DOM y el guion de humo entra por ahí.
+    // ⚠️ **Cubre las TRES y sustituye a dos pruebas gemelas.** Había una para el
+    // `.xlsx` y otra para el `.dxf`, con el mismo cuerpo y el mismo nombre —hasta el
+    // título estaba duplicado en el fichero—, y ninguna de las dos miraba el `.txt`.
+    // Recorrerlas es más barato y cubre más.
     const m = await montar({ parcela: null })
     await abrir(m)
-    pulsar(SELECTORES_SALIDA.EXCEL)
-    await reposar()
+
+    const tresDeLaParcela = [
+      [SELECTORES_SALIDA.DXF, ACCION_EXPEDIENTE.EXPORTAR_DXF],
+      [SELECTORES_SALIDA.COORDENADAS, ACCION_EXPEDIENTE.EXPORTAR_COORDENADAS],
+      [SELECTORES_SALIDA.EXCEL, ACCION_EXPEDIENTE.EXPORTAR_EXCEL],
+    ]
+    for (const [selector, accion] of tresDeLaParcela) {
+      const boton = document.querySelector(selector)
+      expect(boton.disabled, `sin parcela, ${selector} tiene que estar apagado`).toBe(true)
+      expect(boton.title, 'apagado y mudo es la regla de oro 1 al revés').toBe(MENSAJE_SIN_PARCELA)
+      // Y el nombre accesible lleva la forma breve, que es lo único que oye un lector
+      // de pantalla al pasar por una opción apagada.
+      expect(boton.textContent).toContain(MOTIVO_BREVE.parcela)
+
+      // La red: por el embudo, con el botón apagado, sigue contestando con su motivo.
+      m.cableado.atender(accion)
+      await reposar()
+      expect(m.renglon()).toBe(MENSAJE_SIN_PARCELA)
+    }
 
     expect(m.url.blobs).toHaveLength(0)
-    expect(m.renglon()).toBe(MENSAJE_SIN_PARCELA)
     m.cableado.destruir()
   })
 
@@ -1090,18 +1127,13 @@ describe('F10 · T5.1 · 6 · las tres exportaciones', () => {
     m.cableado.destruir()
   })
 
-  it('sin parcela no baja nada y se dice', async () => {
-    const m = await montar({ parcela: null })
-    await abrir(m)
-    document.querySelector(SELECTORES_SALIDA.DXF).dispatchEvent(
-      new window.MouseEvent('click', { bubbles: true }),
-    )
-    await reposar()
-
-    expect(m.url.blobs).toHaveLength(0)
-    expect(m.renglon()).toBe(MENSAJE_SIN_PARCELA)
-    m.cableado.destruir()
-  })
+  /* ⛔ AQUÍ HABÍA UNA SEGUNDA «sin parcela no baja nada y se dice», con el MISMO
+     nombre que la de arriba y el mismo cuerpo cambiando el `.xlsx` por el `.dxf`.
+     Se retira el 2026-08-11 porque la de arriba recorre las TRES salidas —incluido
+     el `.txt`, que ninguna de las dos gemelas miraba— y comprueba además el canal
+     preventivo. Dos pruebas con el mismo título en el mismo `describe` son además
+     un problema de por sí: el informe de vitest las lista igual y quien ve una en
+     rojo no sabe cuál ha fallado. */
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1650,17 +1682,36 @@ describe('F11 · T3.3 · 13 · (b) F11 no guarda expedientes de edificio, y lo d
   })
 
   it('⛔ el DXF y los dos listados se apagan con motivo, no bajan la parcela', async () => {
+    // ⭐ **EL TÍTULO DE ESTA PRUEBA YA DECÍA «se apagan con motivo» Y NO ERA VERDAD**
+    // hasta el 2026-08-11: lo que comprobaba era que, con la rama EDIFICIO puesta, las
+    // tres opciones estaban ENCENDIDAS y contestaban al pulsarlas. El nombre iba por
+    // delante de la implementación desde F11, y nadie lo notó porque el cuerpo pasaba.
+    // Ahora se apagan de verdad, y se comprueban las dos mitades.
     const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: edificioDemo() })
     await abrir(m)
 
-    for (const selector of [
-      SELECTORES_SALIDA.DXF,
-      SELECTORES_SALIDA.COORDENADAS,
-      SELECTORES_SALIDA.EXCEL,
-    ]) {
-      document
-        .querySelector(selector)
-        .dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
+    const accionDe = {
+      [SELECTORES_SALIDA.DXF]: SALIDA.DXF,
+      [SELECTORES_SALIDA.COORDENADAS]: SALIDA.COORDENADAS,
+      [SELECTORES_SALIDA.EXCEL]: SALIDA.EXCEL,
+    }
+    for (const [selector, accion] of Object.entries(accionDe)) {
+      const boton = document.querySelector(selector)
+      // 1 · PREVENTIVO: apagada, con la forma larga en el `title` y la breve dentro.
+      expect(boton.disabled, `${selector} tenía que estar apagado en la rama EDIFICIO`).toBe(true)
+      expect(boton.title).toBe(MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO)
+      expect(boton.textContent).toContain(MOTIVO_BREVE.rama)
+
+      // 2 · Y EL CLIC NO HACE NADA, que es lo que `disabled` compra: ni baja fichero
+      // ni escribe renglón. Se comprueba que el renglón NO cambia, porque un menú que
+      // contesta a una opción apagada es un menú que miente sobre su propio estado.
+      const antes = m.renglon()
+      boton.dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
+      await reposar()
+      expect(m.renglon()).toBe(antes)
+
+      // 3 · LA RED: por el embudo sí contesta, con su motivo.
+      m.cableado.atender(accion)
       await reposar()
       expect(m.renglon()).toBe(MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO)
     }
@@ -1688,9 +1739,21 @@ describe('F11 · T3.3 · 13 · (b) F11 no guarda expedientes de edificio, y lo d
   })
 
   it('sin edificio, exportar el proyecto lo dice hablando de EDIFICIOS', async () => {
+    // ⚠️ Lo que esta prueba defiende no es el apagado, es **de qué habla el motivo**:
+    // decirle «no hay ninguna parcela» a quien está mirando la rama Edificio le manda a
+    // arreglar lo que no le desbloquea nada. Es el mismo error que `MOTIVO_DATO_EDIFICIO`
+    // corrigió en el rail, y desde el 2026-08-11 la regla vive en un solo sitio
+    // (`app/salidas.js`), así que las dos superficies no pueden divergir.
     const m = await montar({ conRama: true, ramaInicial: RAMA.EDIFICIO, edificio: null })
     await abrir(m)
-    pulsar(SELECTOR.EXPORTAR_PROYECTO)
+
+    const boton = document.querySelector(SELECTOR.EXPORTAR_PROYECTO)
+    expect(boton.disabled, 'sin edificio, «Guardar proyecto» tiene que estar apagado').toBe(true)
+    expect(boton.title).toBe(MENSAJE_SIN_EDIFICIO)
+    expect(boton.title).not.toBe(MENSAJE_SIN_PARCELA)
+    expect(boton.textContent).toContain(MOTIVO_BREVE.edificio)
+
+    m.cableado.atender(ACCION_EXPEDIENTE.EXPORTAR_PROYECTO)
     await reposar()
     expect(m.renglon()).toBe(MENSAJE_SIN_EDIFICIO)
     expect(m.renglon()).not.toBe(MENSAJE_SIN_PARCELA)

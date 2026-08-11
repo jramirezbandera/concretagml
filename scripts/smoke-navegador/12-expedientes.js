@@ -893,20 +893,83 @@ if (dialogoEl.open) {
   // `Blob → createObjectURL → <a download> → click() → revoke`. Un guion propio
   // habría duplicado cien líneas de envoltorios para medir un botón más — y, peor,
   // habría dejado a ÉSTE midiendo tres de cuatro salidas y diciendo «✅».
+  //
+  // ⛔ **CORREGIDO EL 2026-08-11: TRES DE LAS CUATRO YA NO ESTÁN EN EL DIÁLOGO.**
+  // Se resolvían con `dialogoEl.querySelector(...)`, y el 2026-08-11 el desplegable
+  // de salidas de la barra se llevó `exportar-dxf`, `exportar-coordenadas` y
+  // `exportar-excel` —se RETIRARON del `<dialog>` a propósito, para que hubiera un
+  // nodo por acción y no cayera la trampa K.1—. Así que este bucle llevaba
+  // reportando tres problemas de los que ninguno era un defecto del producto: era el
+  // guion mirando donde ya no había nada.
+  //
+  // Se resuelven ahora **desde el DOCUMENTO**, que es lo que las hace independientes
+  // de en qué superficie viva cada una. Sigue siendo seguro contra la trampa K.1 por
+  // lo mismo que en `app/cableado-expediente.js`: hay UN nodo por acción, y es
+  // comprobable —la retirada del diálogo se hizo exactamente para eso—.
+  //
+  // ⚠️ Y hay que ABRIR el menú antes de pulsar: sus opciones nacen dentro de un
+  // `[data-menu]` con `hidden`, y un `click()` sobre un nodo de un ancestro oculto no
+  // llega al oyente por delegación.
   const ACCIONES = [
     ['exportar-dxf', 'dxf'],
     ['exportar-coordenadas', 'coordenadas'],
     ['exportar-excel', 'excel'],
     ['exportar-proyecto', 'proyecto'],
   ]
+  const menuSalidas = document.querySelector('[data-menu="salidas"]')
+  const disparadorSalidas = document.querySelector('[data-menu-disparador="salidas"]')
+  exportaciones.menuDeLaBarra = {
+    existe: menuSalidas !== null,
+    disparador: disparadorSalidas !== null,
+  }
+  if (menuSalidas === null || disparadorSalidas === null) {
+    problemas.push(
+      'No hay desplegable de salidas en la barra (`[data-menu="salidas"]` / su disparador). ' +
+        'Las tres exportaciones de geometría viven ahí desde el 2026-08-11.',
+    )
+  }
   const renglones = {}
   let excepcionAlExportar = null
   try {
     for (const [accion, clave] of ACCIONES) {
-      const boton = dialogoEl.querySelector(`[data-accion="${accion}"]`)
-      if (boton === null || boton.disabled) {
-        problemas.push(`El botón «${accion}» no está o está apagado en el diálogo.`)
+      const boton = document.querySelector(`[data-accion="${accion}"]`)
+      if (boton === null) {
+        problemas.push(`El botón «${accion}» no existe en ninguna parte del documento.`)
         continue
+      }
+      // Si vive en el menú de la barra, hay que abrirlo para poder pulsarlo.
+      const suMenu = boton.closest('[data-menu]')
+      if (suMenu !== null && suMenu.hidden && disparadorSalidas !== null) {
+        disparadorSalidas.click()
+        await esperar(() => !suMenu.hidden, 2000, `que se abra el menú de «${accion}»`, 50)
+      }
+      if (boton.disabled) {
+        // ⚠️ Con una parcela cargada las cuatro tienen que poder. Apagada aquí es un
+        // defecto, y el motivo se incluye porque desde el 2026-08-11 lo lleva puesto
+        // (`app/salidas.js`) y es lo que dice QUÉ cree la aplicación que le falta.
+        problemas.push(
+          `El botón «${accion}» está apagado teniendo parcela cargada. Su motivo dice: ` +
+            `${JSON.stringify(boton.title || '(sin motivo, que es peor)')}`,
+        )
+        continue
+      }
+      // ⭐ Y LO SIMÉTRICO, que es lo que un `disabled` mal repintado deja atrás: una
+      // salida que SÍ se puede no puede seguir llevando el motivo de cuando no se
+      // podía. Un `title` rancio sobre un botón encendido dice al pasar el ratón que
+      // falta la parcela mientras la parcela está delante, y no lo ve ninguna prueba
+      // de jsdom porque el nodo existe y el atributo también.
+      if ((boton.title || '') !== '') {
+        problemas.push(
+          `El botón «${accion}» está ENCENDIDO y conserva un motivo rancio en su title: ` +
+            `${JSON.stringify(boton.title)}. El repintado no lo limpia.`,
+        )
+      }
+      const motivoOculto = boton.querySelector('.gml-rotulo-oculto')
+      if (motivoOculto !== null && motivoOculto.textContent.trim() !== '') {
+        problemas.push(
+          `El botón «${accion}» está ENCENDIDO y su nombre accesible sigue diciendo ` +
+            `${JSON.stringify(motivoOculto.textContent.trim())}. Un lector de pantalla lo recita.`,
+        )
       }
       const antes = blobs.length
       boton.click()
@@ -1236,7 +1299,12 @@ const tipografia = { token: tokenSans, esperada, botones: [] }
 const dianasTipograficas = [
   ['«Expediente» (fila del rótulo)', botonExpediente],
   ['«Guardar» (diálogo)', dialogoEl.querySelector('[data-accion="guardar-expediente"]')],
-  ['«Exportar DXF» (diálogo)', dialogoEl.querySelector('[data-accion="exportar-dxf"]')],
+  // ⛔ Decía `dialogoEl.querySelector('[data-accion="exportar-dxf"]')` y **se había
+  // quedado MUDA** desde que el 2026-08-11 esa salida subió a la barra: devolvía
+  // `null` y el bucle de abajo la salta con un `continue`, así que la comprobación
+  // tipográfica de un botón de exportación llevaba sin hacerse sin decirlo. Es el
+  // fallo más caro que puede tener un guardián — pasar en verde sin mirar.
+  ['«Exportar para CAD» (menú de la barra)', document.querySelector('[data-accion="exportar-dxf"]')],
   ['«Abrir un proyecto…» (diálogo)', dialogoEl.querySelector('[data-accion="abrir-proyecto"]')],
 ]
 for (const [queEs, el] of dianasTipograficas) {

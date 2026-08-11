@@ -95,12 +95,20 @@ export const MARCA_NUESTRA = '.gml-'
  *      el rail de hoy convierte un registro de lo que se hizo en un reflejo de lo
  *      que hay, que es justo lo que este fichero existe para no ser.
  *   2. **Resolvía por accidente una deuda declarada.** La quinta rebanada
- *      —«informe»— **está sin cerrar A PROPÓSITO** desde `3e9c8b0`: su producto
- *      está hecho, y no se declara cerrada porque hacerlo hace exigible el techo
- *      del criterio 10 y la hoja no llega. Con la lista recortada a tres, las
+ *      —«informe»— **estaba sin cerrar A PROPÓSITO** desde `3e9c8b0`: su producto
+ *      está hecho, y no se declaraba cerrada porque hacerlo hace exigible el techo
+ *      del criterio 10 y la hoja no llegaba. Con la lista recortada a tres, las
  *      tres quedaban cerradas y el techo empezaba a morder **por un cambio de
  *      navegación**, no porque nadie hubiera decidido nada sobre bytes. Medido
  *      ese día: 55.018 B nuestros contra 42.064 B exigidos, 12.954 B de más.
+ *
+ *      ⭐ **CERRADA EL 2026-08-11, y por la vía que faltaba: DECIDIENDO.** El autor
+ *      resolvió la elección que `3e9c8b0` le reservó —bajar la hoja o revisar el
+ *      techo— y eligió revisar el techo, con la poda del sistema de diseño hecha
+ *      primero y medida. Ver {@link TECHO}, que cuenta el razonamiento entero, y el
+ *      asiento «El sistema de diseño deja de ser el de otra app». Lo que este punto
+ *      2 defendía era que la quinta no se cerrara **de rebote**; se ha cerrado de
+ *      frente, así que el argumento queda satisfecho y no revocado.
  *
  * Así que las dos listas se separan y **la deuda se queda donde estaba, visible**.
  * Lo que se pierde es el guardián de no-divergencia; lo que lo sustituye es la
@@ -119,11 +127,86 @@ export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'dia
  * El techo del criterio 10, en las dos unidades, para que nadie tenga que
  * hacer la resta de cabeza ni se le olvide que hay vendor dentro.
  *
- * Los dos números son **la medición exacta de `960bb7a` (F11)**, que es la
- * línea base declarada del rework: el criterio pide acabar por debajo de donde
- * se empezó.
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **REBASADO EL 2026-08-11, Y LA DECISIÓN LLEVABA OCHO DÍAS ESPERANDO**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * Hasta hoy estos dos números eran **la medición de `960bb7a` (F11)**: 57.159 B
+ * / 42.064 nuestros. Eran la línea base del rework de UI, y el criterio 10 pedía
+ * literalmente «acabar pesando menos de» ella — o sea, acabar por debajo de donde
+ * se empezó. Con esa forma, el techo era el presupuesto de UNA MIGRACIÓN: mover
+ * pantallas de sitio no debería dejar la hoja más gorda que antes de moverlas.
+ *
+ * ⛔ **Y dejó de medir eso.** El asiento «Rework rebanada 5» (`3e9c8b0`) declaró
+ * la quinta rebanada SIN CERRAR a propósito, precisamente para no hacer exigible un
+ * techo al que la hoja no llegaba, y dejó la elección escrita —«bajar la hoja o
+ * revisar el techo»— reservada al autor. Eso fue el **2026-08-03**. Entre aquel día
+ * y hoy, contra los 42.064 B de una migración se han medido: F12 (edificio: partes
+ * y plantas), F13, F14, F17 fase 4, F18, F19, F20, F21, F22, F23, los avisos a un
+ * diálogo, las dos puertas del Catastro, el vértice sincronizado, y el topbar
+ * entero en cuatro rebanadas. **Once features y una cáscara nueva.** El número
+ * seguía ahí, pero ya no era el presupuesto de una migración: era el tamaño que
+ * tenía otra aplicación, la de F11, usado para juzgar a ésta.
+ *
+ * ── QUÉ SE MIDIÓ ANTES DE DECIDIR (2026-08-11) ──────────────────────────────
+ * Se comprobó primero si el hueco se cerraba limpiando, porque si se cerraba no
+ * había nada que decidir. **No se cierra.** La hoja iba 20.394 B por encima; la
+ * poda ENTERA del sistema de diseño —71 variables sin un solo llamante en cinco
+ * ficheros de tokens, la regla muerta `.canvas-dot-grid` y el bloque del tema
+ * oscuro completo— devolvió **4.552 B medidos**, el 22 % del hueco. Los 15.842 B
+ * restantes son producto vivo, y eso ya estaba medido en `3e9c8b0` con otro método
+ * (0 clases y 0 pares `data-*` huérfanos sobre 178 y 22; ninguna regla pasa de
+ * 527 B). O sea: el techo de F11 **solo se cumplía quitando pantallas**.
+ *
+ * ── LO QUE ESTOS DOS NÚMEROS SON AHORA ──────────────────────────────────────
+ * La hoja medida HOY, con la poda ya dentro, y nada más. No es un objetivo al que
+ * llegar: es **la línea de la que no se sube sin decidirlo**. Sale del asiento
+ * «El sistema de diseño deja de ser el de otra app», que es una build de verdad y
+ * cualquiera puede reconstruir.
+ *
+ * ⚠️ **Y CON ESO EL TECHO CAMBIA DE FORMA, NO SOLO DE VALOR.** El de F11 era «menos
+ * de», porque era una meta por debajo. Éste es **«no más de»**, porque es el sitio
+ * donde estamos: exigir «menos de» la propia medición dejaría la hoja en falta el
+ * mismo segundo de rebasarla, que no significa nada. La consecuencia práctica es la
+ * que se buscaba y hay que decirla clara: **a partir de hoy, con las cinco
+ * rebanadas cerradas, cualquier asiento que suba la cifra pone este script ROJO.**
+ * Subir el techo sigue siendo posible —esto es un presupuesto, no una prohibición—
+ * pero pasa a ser una línea que alguien escribe a mano con su motivo al lado, y no
+ * un byte que se cuela mientras nadie mira. Que era, palabra por palabra, el modo
+ * de fallo que este fichero existe para cerrar.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **SUBIDO A MANO EL 2026-08-11 (F15), Y ES EL PRIMER USO DEL MECANISMO**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 57.906 a **60.213 B nuestros** (73.001 → 75.308 con vendor). **+2.307 B**, y
+ * los pone enteros el diccionario de errores de la Sede: la hoja sin él vuelve a
+ * medir 57.906 B **clavados**, comprobado construyendo las dos versiones el mismo
+ * día. O sea que el asiento anterior era exacto y este delta no arrastra nada.
+ *
+ * ── POR QUÉ VALE LA PENA, QUE ES LO QUE ESTA LÍNEA OBLIGA A ESCRIBIR ────────
+ * F15 no es un bloque más dentro de una pantalla que ya existe: es una PANTALLA
+ * NUEVA cuyo interior no tiene precedente en esta aplicación —una lista buscable
+ * de 23 fichas plegables, cada una con dos insignias, y un tinte que separa lo
+ * MEDIDO contra la Sede de lo que solo dice un foro—. Los diálogos anteriores se
+ * colgaron del interior del de capas y pagaron entre 0 y 70 B (F21); aquí la
+ * cáscara se reutiliza igual —caja, velo, cuerpo, título, intro y pie entran en
+ * las listas de selectores que ya existían, sin una declaración nueva— y lo que
+ * se paga es exclusivamente el componente que nadie tenía.
+ *
+ * ── LO QUE SE DEVOLVIÓ ANTES DE PEDIR LA SUBIDA ─────────────────────────────
+ * La primera medición fue **+2.884 B**. Se devolvieron **577** fundiendo cinco
+ * reglas que eran la misma escrita varias veces, y ⛔ **dos de ellas ya estaban
+ * duplicadas antes de F15**: `.gml-dialogo-importacion-bloqueo` (F18) y
+ * `.gml-dialogo-pegado-motivo` (F19) tenían las mismas ocho declaraciones byte a
+ * byte. La prueba de que las descripciones repetidas divergen está en esa misma
+ * pareja: las dos arrastraban `var(--color-aviso, …)` —un token que NO EXISTE— y
+ * **se arreglaron el mismo día, cuando por fin alguien las miró juntas**.
+ *
+ * ── LA FORMA NO CAMBIA ──────────────────────────────────────────────────────
+ * Sigue siendo «no más de», y sigue con **holgura 0**: la siguiente subida vuelve
+ * a salir roja y vuelve a tener que decidirse a mano. Eso es lo que se buscaba —
+ * el techo no es una prohibición, es el sitio donde estamos.
  */
-export const TECHO = Object.freeze({ total: 57159, nuestro: 42064 })
+export const TECHO = Object.freeze({ total: 75308, nuestro: 60213 })
 
 /**
  * EL REGISTRO. Un asiento por hito, con la hoja construida medida de verdad.
@@ -804,6 +887,92 @@ export const ASIENTOS = Object.freeze(
         'escribía («También puedes pinchar la parcela en el mapa…»). Se anota para que el ' +
         'siguiente que mida no se lo cargue a la barra. 7.521 pruebas en verde. Sobran 20.394 ' +
         'sobre el techo.' },
+
+    // ⭐ EL ASIENTO QUE CIERRA LA QUINTA REBANADA. Es el único de los treinta que
+    // lleva `rebanada` distinto de `null` sin ser una pantalla nueva, y el motivo
+    // está en {@link TECHO}: la quinta no se cierra porque se haya terminado un
+    // producto —su producto estaba hecho desde `3e9c8b0`—, se cierra porque la
+    // decisión que la mantenía abierta ya está tomada.
+    { hito: 'El sistema de diseño deja de ser el de otra app (y el techo pasa a ser el de ésta)',
+      commit: '(sin commitear)',
+      total: 73001, nuestro: 57906, rebanada: 'informe',
+      nota:
+        '⭐ **−4.552 B, el asiento en negativo más grande del registro, y el ÚNICO que no cambia ' +
+        'un píxel de la pantalla.** `estilos/tokens/` era copia literal del sistema de diseño de ' +
+        'una **calculadora de hormigón** (`prototipo/_ds/concreta-design-system-…`), y el problema ' +
+        'nunca fue la copia —está bien hecha y su procedencia estaba escrita—: es que nadie volvió ' +
+        'a adaptarla a ESTE producto en dieciséis fases. ── QUÉ SE MIDIÓ ── De las **120 variables ' +
+        'declaradas en los cinco ficheros de tokens, 71 no tenían un solo `var()` que las llamara** ' +
+        'en todo el producto: 52 en `colors.css` (14 de sección de hormigón —armaduras, cercos, ' +
+        'tensiones—, 13 de estratos geotécnicos, 4 de casos de carga —sobrecarga, viento, nieve, ' +
+        'sismo—, y los 19 alias cortos «usados por el sitio de marketing» que este proyecto no ' +
+        'tiene), 10 en `spacing.css` (**ocho eran las dimensiones de la cáscara de la ' +
+        'calculadora**: `--topbar-h`, `--sidebar-w`, `--inputs-w`, `--results-w`, y las cuatro de ' +
+        'su portada), 5 en `typography.css` (la rampa de display con `clamp()` hasta 68 px, cuando ' +
+        'esta app no pasa de 30) y 4 en `motion.css`. ── ⛔ Y UNA REGLA MUERTA DE VERDAD ── ' +
+        '`.canvas-dot-grid`, la retícula del lienzo SVG de la calculadora. No había un solo nodo ' +
+        'con esa clase, pero se construía igual: **el minificador se come los comentarios y no las ' +
+        'reglas**, que es exactamente por lo que este presupuesto mide la hoja construida y no el ' +
+        'fuente. Lo más elocuente es que esta app SÍ tiene retícula de puntos —de telón detrás del ' +
+        'mapa— y la pinta con otro color a propósito, porque el `--color-dot-grid` del sistema ' +
+        'está calibrado para lienzo blanco y sobre el #f1f5f9 del mapa es invisible: si aquella ' +
+        'regla se hubiera usado, no se habría visto. ── ⛔ EL TEMA OSCURO ESTABA COMPLETO Y MUERTO ' +
+        '── ~45 tokens bajo `html[data-theme="dark"]`, y `data-theme` **no aparecía en ningún ' +
+        '`.js`, `.html` ni en `app.css`**: solo en el selector que lo declaraba. Se RETIRA, y el ' +
+        'motivo se midió antes de decidir: la app tiene ~150 hex literales cableados en 15 ' +
+        'ficheros de `viewer/`, `report/` y `export/`, porque `viewer/*` no puede importar CSS por ' +
+        'contrato —tiene que leerse sobre una ortofoto aunque la hoja no cargue—. Un tema que no ' +
+        'llega al mapa, ni a los cuatro cajones, ni al PDF, ni al DXF es medio tema; y la paleta ' +
+        'oscura que había se diseñó para leerse sobre un lienzo, no sobre una ortofoto. Queda en ' +
+        'el git y `DESIGN.md` declara la app como de tema CLARO, con este motivo. ── EL REPARTO DE ' +
+        'LOS 4.552 B ── 3.961 los 71 tokens y la regla muerta; 591 el bloque oscuro. Es poco por ' +
+        'variable (~56 B) y es la lección del asiento: **los tokens muertos no engordan la hoja, ' +
+        'la ensucian.** Lo que se compra aquí no son bytes, son los 37 nombres que hablaban de ' +
+        'otro producto. ── ⚠️ LO QUE CASI SALIÓ MAL ── `--dot-grid-size` entró en la lista de ' +
+        'muertos al preparar la medición y **está vivo**: lo usa `.gml-app .gml-mapa` para el paso ' +
+        'de la retícula del telón. Lo cazó verificar los 72 candidatos uno a uno con `grep` antes ' +
+        'de borrar, en vez de fiarse del barrido que los encontró — el barrido acertaba (nunca lo ' +
+        'listó), la mano al copiar la lista no. Se anota porque la primera medición de esta poda ' +
+        'salió a −4.605 B, sobre un árbol donde una `var()` viva apuntaba a la nada. ── ⭐ Y CIERRA ' +
+        'LA QUINTA REBANADA ── El techo pasa de los 42.064 B de F11 a estos 57.906, o sea a la ' +
+        'medición de hoy, y cambia de forma («no más de» en vez de «menos de»). El razonamiento ' +
+        'entero está en {@link TECHO}: contra aquel número, que era el tamaño de la aplicación de ' +
+        'F11, se han medido después once features y una cáscara nueva. La consecuencia buscada es ' +
+        'que **desde este asiento cualquier subida pone el script rojo** y hay que decidirla. La ' +
+        'deuda dejó de ser deuda: 4.394 pruebas del proyecto `node` en verde. Holgura: 0 B, en el ' +
+        'techo exacto.' },
+    { hito: 'F15 · el diccionario de errores de la Sede (y tres tokens que no existían)',
+      commit: '(sin commitear)',
+      total: 75308, nuestro: 60213, rebanada: null,
+      nota:
+        '**+2.307 B, y es el PRIMER asiento que sube el techo con el mecanismo del asiento ' +
+        'anterior**, que dejó holgura 0 justamente para que esto tuviera que decidirse a mano. La ' +
+        'atribución no es una estimación: se construyeron **las dos versiones el mismo día** y la ' +
+        'hoja sin F15 mide **57.906 B clavados**, o sea el asiento anterior exacto. El delta es ' +
+        'entero de esta fase y no arrastra nada de nadie. ── QUÉ SE PAGA ── Una PANTALLA NUEVA ' +
+        'cuyo interior no existía en esta aplicación: lista buscable de 23 fichas plegables, dos ' +
+        'insignias por ficha, y un tinte que separa lo MEDIDO contra la Sede de lo que solo dice ' +
+        'un foro. La CÁSCARA no cuesta un byte —caja, velo, cuerpo, título, intro y pie entran en ' +
+        'las listas de selectores que ya existían, mismo reparto que F21 y F14—, así que estos ' +
+        '2.307 B son el componente y nada más. ── ⭐ SE DEVOLVIERON 577 B ANTES DE PEDIR LA SUBIDA ' +
+        '── La primera medición fue +2.884. Se fundieron cinco reglas que eran la misma escrita ' +
+        'varias veces, y ⛔ **dos ya estaban duplicadas ANTES de F15**: ' +
+        '`.gml-dialogo-importacion-bloqueo` (F18) y `.gml-dialogo-pegado-motivo` (F19) llevaban ' +
+        'las mismas ocho declaraciones byte a byte. Se funden con la de F15 en una sola regla de ' +
+        'tres selectores. ── ⛔ Y AHÍ SALIÓ EL HALLAZGO DE LA FASE EN ESTA HOJA ── Las dos ' +
+        'arrastraban `var(--color-aviso, var(--color-border-main))` y **`--color-aviso` no está ' +
+        'definido en ninguna parte**: durante meses sus comentarios prometían «el color de aviso y ' +
+        'NO rojo» y lo que se pintaba era el gris del fallback. Un barrido de las cinco hojas ' +
+        'destapó **tres** propiedades usadas y nunca definidas sobre 72 declaradas y 67 usadas, y ' +
+        'la tercera era la cara: `--color-state-error` en `.gml-barra-menu-opcion--riesgo`, que es ' +
+        '**«Vaciarlo»** —la única acción irreversible del menú de expediente—, pintada del color ' +
+        'del texto normal y **tipográficamente indistinguible de «Expedientes guardados»**, que ' +
+        'está justo encima. Las tres corregidas (`--color-state-warn` ×2, `--color-state-fail` ' +
+        '×1) y custodiadas por `test/estilos/tokens-definidos.test.js`, nuevo. `var()` con ' +
+        'fallback degrada EN SILENCIO y jsdom no resuelve `var()`: esto solo se ve leyendo el CSS ' +
+        'como texto, que es por lo que el guardián es de disco y no de componente. ── ⚠️ NO CIERRA ' +
+        'REBANADA (`rebanada: null`): el diccionario cuelga del menú de Expediente y no es una ' +
+        'pantalla del rail. Las cinco siguen cerradas, así que el techo se sigue exigiendo.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 
@@ -878,12 +1047,31 @@ export function comparar(medido, { asientos = ASIENTOS, techo = TECHO, rebanadas
 
   // El techo NO se exige durante la migración: el criterio 10 dice literalmente
   // que puede subir mientras dure. Solo muerde cuando las cinco pantallas están
-  // anotadas, que es el momento en que el rework se declara terminado.
-  if (pendientes.length === 0 && medido.nuestro >= techo.nuestro) {
+  // anotadas, que es el momento en que el rework se declara terminado — y desde el
+  // 2026-08-11 lo están.
+  //
+  // ⭐ **`>` Y NO `>=`, Y EL CAMBIO ES DELIBERADO (2026-08-11).** Hasta hoy esto era
+  // `>=` y una prueba lo afirmaba con estas palabras: «justo EN el techo es rojo: el
+  // criterio dice "menos de", no "como mucho"». Era correcto mientras el techo fue
+  // la medición de F11, o sea una META POR DEBAJO: quedarse clavado en la línea de
+  // salida no es haber bajado de ella.
+  //
+  // Con el techo rebasado a la medición de HOY (ver {@link TECHO}) el sentido se da
+  // la vuelta: el techo ya no es una meta, es el sitio donde estamos, y la regla es
+  // «no subas de aquí». Con `>=`, rebasarlo dejaría la hoja en falta el mismo
+  // segundo de hacerlo —la medición sería exactamente el techo— y el guardián
+  // nacería rojo sin que nada estuviera mal, que es la forma más rápida de que
+  // alguien lo apague.
+  //
+  // ⛔ Lo que NO cambia es la dirección: un solo byte por encima sigue siendo rojo.
+  // El operador se ha relajado en el punto de igualdad, no en la pendiente.
+  if (pendientes.length === 0 && medido.nuestro > techo.nuestro) {
     problemas.push(
-      `Las cinco rebanadas están cerradas y la hoja NO ha bajado del techo del criterio 10: ` +
-        `${bytes(medido.nuestro)} nuestros frente a los ${bytes(techo.nuestro)} exigidos ` +
-        `(${bytes(techo.total)} con Leaflet dentro). Sobran ${bytes(medido.nuestro - techo.nuestro)}.`,
+      `Las cinco rebanadas están cerradas y la hoja ha SUBIDO del techo del criterio 10: ` +
+        `${bytes(medido.nuestro)} nuestros frente a los ${bytes(techo.nuestro)} de la línea ` +
+        `declarada (${bytes(techo.total)} con Leaflet dentro). Sobran ` +
+        `${bytes(medido.nuestro - techo.nuestro)}. Devuelve los bytes, o sube el techo A MANO ` +
+        'en scripts/presupuesto-css.mjs escribiendo al lado por qué vale la pena.',
     )
   }
 
@@ -926,9 +1114,15 @@ export function informe(medido, veredicto, { techo = TECHO } = {}) {
     `  · de Leaflet       ${bytes(medido.vendor)}   (vendor: no lo escribimos ni lo podemos encoger)`,
     '',
     `  Techo (criterio 10) ${bytes(techo.nuestro)} nuestros / ${bytes(techo.total)} con vendor`,
-    veredicto.delta.nuestro >= 0
-      ? `  Hoy SOBRAN          ${bytes(veredicto.delta.nuestro)}  (${pct(medido.nuestro, techo.nuestro)} por encima)`
-      : `  Hoy hay holgura de  ${bytes(-veredicto.delta.nuestro)}  (${pct(medido.nuestro, techo.nuestro)} por debajo)`,
+    // ⚠️ Los TRES casos, y el de en medio se estrenó el 2026-08-11: desde que el
+    // techo es la medición de hoy, «clavado en el techo» es el estado NORMAL y no
+    // una casualidad. Con dos ramas decía «SOBRAN 0 B (0,0 % por encima)», que
+    // suena a falta y es lo contrario: es exactamente cumplirlo.
+    veredicto.delta.nuestro === 0
+      ? '  Hoy está CLAVADO   en el techo: 0 B de holgura, y un byte más es rojo.'
+      : veredicto.delta.nuestro > 0
+        ? `  Hoy SOBRAN          ${bytes(veredicto.delta.nuestro)}  (${pct(medido.nuestro, techo.nuestro)} por encima)`
+        : `  Hoy hay holgura de  ${bytes(-veredicto.delta.nuestro)}  (${pct(medido.nuestro, techo.nuestro)} por debajo)`,
     '',
     `  Último asiento      ${veredicto.ultimo.hito} — ${bytes(veredicto.ultimo.total)}`,
     `  Rebanadas cerradas  ${veredicto.cerradas.length}/${veredicto.cerradas.length + veredicto.pendientes.length}${

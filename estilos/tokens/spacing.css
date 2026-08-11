@@ -8,40 +8,40 @@
    `prototipo/_ds/...`, el cambio hay que propagarlo aquí A MANO y de forma
    deliberada — no hay ningún mecanismo de sincronización automática.
 
-   Copia fiel: ningún token modificado.
+   ⭐ **PODADO EL 2026-08-11** (ver la cabecera de `colors.css`, que cuenta el
+   porqué entero): de las dieciocho variables, diez no tenían un solo llamante —y
+   ocho de esas diez eran **las dimensiones de la cáscara de la calculadora**
+   (`--topbar-h`, `--sidebar-w`, `--inputs-w`, `--results-w`) y de su sitio de
+   marketing (`--container-max`, `--nav-h`, `--sec-pad`, `--hero-pad`). Esta
+   aplicación no tiene ninguna de esas columnas: su cáscara es una rejilla de 2×2
+   y sus dos medidas propias (`--gml-cabecera-alto`, `--gml-panel-ancho`) viven en
+   `estilos/app.css`, que es donde se decide la maqueta.
+   Ya no es copia fiel, y a partir de hoy no se sincroniza con `prototipo/`.
    ──────────────────────────────────────────────────────────────────────── */
 
-/* spacing.css — Concreta spacing, radius, and layout dimensions.
-   Base unit is 8px. Radius has exactly three intentional levels; nothing larger
-   than rounded-md (6px) appears in the app. Layout dims are the real fixed
-   panel widths from the calculator shell. */
+/* spacing.css — espaciado y radios de Concreta GML.
+   La unidad base es 8 px. El radio tiene dos niveles y el tope duro sigue siendo
+   6 px: nada más redondeado que eso aparece en la aplicación. */
 
 :root {
-  /* ── Spacing scale (8px base) ── */
+  /* ── Escala de espaciado (base 8 px) ── */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
-  --space-3-5: 14px;  /* inputs column padding */
-  --space-4: 16px;    /* results panel padding */
-  --space-6: 24px;    /* SVG canvas padding */
+  --space-4: 16px;    /* relleno del panel */
+  --space-6: 24px;    /* relleno holgado de bloque */
 
-  /* ── Border radius — three levels, hard cap at 6px ── */
-  --radius-none: 0px;   /* SVG canvas — the calc IS the content */
-  --radius: 4px;        /* inputs, unit chips, tags, badges, buttons */
-  --radius-md: 6px;     /* mockup wrappers, preview frames */
+  /* ── Radios — tope duro en 6 px ──
+     Se fue `--radius-none: 0px`, que en la calculadora significaba «el lienzo
+     SVG es el contenido»: aquí el lienzo es el mapa y su radio lo pone la
+     tarjeta flotante del cromo, no un token. */
+  --radius: 4px;        /* campos, chips, etiquetas, botones */
+  --radius-md: 6px;     /* diálogos, cajones, marcos */
 
-  /* ── Layout dimensions (calculator shell) ── */
-  --topbar-h: 48px;
-  --sidebar-w: 204px;
-  --inputs-w: 240px;
-  --results-w: 280px;
-
-  /* ── Marketing layout ── */
-  --container-max: 1240px;
-  --nav-h: 56px;
-  --sec-pad: 84px;
-  --hero-pad: 112px;
-
-  /* ── Dot-grid ("mesa de trabajo del ingeniero") ── */
+  /* ── El paso de la retícula de puntos ──
+     ⚠️ Tiene llamante y no es el del sistema de diseño: lo usa
+     `.gml-app .gml-mapa` para el telón que se ve mientras cargan las teselas.
+     La regla `.canvas-dot-grid` que venía en `motion.css` se retiró por muerta;
+     esta variable NO, porque es la que gobierna el paso de la retícula de aquí. */
   --dot-grid-size: 22px;
 }

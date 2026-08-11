@@ -44,49 +44,26 @@ por eso el reparto se pregunta **pieza a pieza** en vez de con una lista corta.
 
 ---
 
-## Las salidas no saben decir si se pueden
+## ✅ CERRADA · Las salidas no saben decir si se pueden
 
-**Estado:** aplazado · **Bloqueado por:** la rebanada 3 del topbar (antes no hay menú que se
-beneficie) · **Anotado el:** 2026-08-09
+**Anotada el 2026-08-09 · cerrada el 2026-08-11.** Estuvo bloqueada por «la rebanada 3 del
+topbar (antes no hay menú que se beneficie)», y el aplazamiento caducó el mismo día en que el
+menú de salidas subió a la barra.
 
-**Qué.** Exponer, para cada salida —DXF, listado de coordenadas, hoja de cálculo, proyecto
-`.json`—, un predicado de «¿se puede ahora mismo?» con su motivo ya redactado, en vez del
-comportamiento imperativo de hoy, que es decirlo al pulsar.
+**Dónde vive ahora.** `app/salidas.js` — módulo neutro y puro, con `evaluarSalida`, y el
+predicado tiene DOS llamantes en `app/cableado-expediente.js`: la guarda de la acción y el
+pintado del menú. La pregunta de diseño que esta nota dejaba abierta —«junto a la acción, o
+en un módulo neutro»— se resolvió por lo segundo, con la anatomía de
+`app/navegacion.js#evaluarPaso`: los hechos entran como booleanos, los motivos se redactan en
+el módulo que decide, y hay dos formas de cada motivo (larga al `title`, breve al nombre
+accesible). Guardián: `test/app/salidas.test.js`.
 
-**Por qué.** Es lo único que separa el menú de salidas de ser coherente con el resto de la
-aplicación. Los peldaños del recorrido se apagan CON MOTIVO. El botón «Generar GML» se apaga
-CON MOTIVO. Las cuatro salidas no pueden, porque su disponibilidad **no existe como dato**:
-solo existe como el error que sale al intentarlo.
-
-**Pros.**
-- Cierra la última incoherencia del contrato «apagado con motivo, jamás apagado y mudo».
-- Ese estado serviría en cualquier otro sitio que quiera declarar qué se puede entregar, no
-  solo en el menú de la barra.
-- Convierte cuatro errores reactivos en cuatro avisos preventivos, que para un usuario que
-  entra dos tardes al año es la diferencia entre entender y no entender.
-
-**Contras.**
-- Toca `app/cableado-expediente.js`, 2.324 líneas.
-- Es **extracción de estado de dominio**, no maquetación: el coste real está lejos del que
-  parece si se mira solo la interfaz.
-- Hoy no molesta a nadie, porque el menú todavía no existe.
-
-**Contexto.** Las cuatro exportaciones viven en `app/cableado-expediente.js` (sus guardas,
-hacia `:1746` y `:1819`) y son imperativas. La lista de salidas vive **dentro** de
-`crearDialogoExpediente` (`app/dialogo-expediente.js:589`) y no está exportada, así que
-tampoco hay una tabla que reutilizar. Se descartó el 2026-08-09 en la revisión de ingeniería
-del topbar (tensión cross-model X2, planteada por la voz externa): la propuesta inicial era
-«el menú se fabrica desde una tabla exportada» y resultó que ni la tabla existe ni el estado
-que la haría útil. Se eligió que el menú NOMBRE las salidas y que el motivo se siga diciendo
-al pulsar.
-
-**Cuándo caduca este aplazamiento.** En cuanto el menú exista y alguien pulse una entrada que
-no podía pulsar. Ese es el síntoma; si aparece, esto deja de ser un TODO.
-
-**Por dónde empezar.** `app/cableado-expediente.js`, las guardas de las cuatro `exportar*`.
-La pregunta de diseño previa es dónde vive el predicado: junto a la acción, o en un módulo
-neutro que ni el diálogo ni la barra posean (que es lo que evita acoplar dos superficies de
-interfaz, el motivo por el que la tabla exportada se descartó).
+**Lo que se aprendió, que no estaba en la nota.** Una prueba se llamaba «⛔ el DXF y los dos
+listados **se apagan con motivo**, no bajan la parcela» **desde F11, y el cuerpo comprobaba lo
+contrario**: que estaban encendidas y contestaban al pulsarlas. El nombre iba por delante de
+la implementación y pasaba en verde. Y había dos pruebas distintas con el mismo título en el
+mismo `describe`, ninguna de las dos mirando el `.txt`. Coste en hoja: **0 B** — la forma
+breve reutiliza `.gml-rotulo-oculto`, que ya existía y su propio bloque declara reutilizable.
 
 ---
 
@@ -239,7 +216,54 @@ saber el ancho del vecino.
 
 ---
 
-## El sistema de diseño es el de otra app, y no hay DESIGN.md
+## ✅ CERRADA · El sistema de diseño es el de otra app, y no hay DESIGN.md
+
+**Anotada el 2026-08-10 tras `/plan-design-review` · cerrada el 2026-08-11.** Se hicieron los
+tres pasos que esta nota dejaba escritos, y las dos decisiones que reservaba al autor están
+tomadas y escritas.
+
+**Qué se hizo.**
+1. **Poda.** No eran 37 tokens de 58: eran **71 de 120**, porque esta nota solo contó los
+   `--color-*` de `colors.css` y el barrido de los cinco ficheros encontró 10 más en
+   `spacing.css` (ocho de ellos **las dimensiones de la cáscara de la calculadora**), 5 en
+   `typography.css` (la rampa de display con `clamp()` hasta 68 px) y 4 en `motion.css`. Más
+   **una regla CSS muerta**, `.canvas-dot-grid`, que la nota no vio: sin un solo nodo con esa
+   clase y construyéndose igual, porque el minificador se come los comentarios y no las reglas.
+   Devolvió **4.552 B medidos** de hoja construida.
+2. **El tema oscuro: RETIRADO**, y el motivo se midió antes de decidir. La app tiene **152
+   literales de color hexadecimal en 16 ficheros de JavaScript** (`viewer/*` no puede importar
+   CSS por contrato: tiene que leerse sobre una ortofoto aunque la hoja no cargue), así que un
+   tema no habría llegado al mapa, ni a los cuatro cajones, ni al PDF, ni al DXF. `DESIGN.md`
+   declara la aplicación como de tema CLARO y escribe qué haría falta para cambiarlo.
+3. **`DESIGN.md` escrito.** Once apartados, con el reparto de las tres zonas donde vive el
+   aspecto —tokens / `app.css` / estilo en línea— que es lo que esta nota no llegó a nombrar y
+   es la clave de todo lo demás.
+
+**Y la decisión del techo, que llevaba desde el 2026-08-03 esperando.** Resuelta el mismo día:
+el techo del criterio 10 se rebasó de los 42.064 B de F11 a la medición de hoy y cambió de
+forma («no más de» en vez de «menos de»), y **se cerró la quinta rebanada**, así que ahora
+muerde. El razonamiento está en `scripts/presupuesto-css.mjs#TECHO`. Lo que decidió fue medir
+que la poda entera devolvía 4.552 de los 20.394 B que sobraban: **el techo de F11 solo se
+cumplía quitando pantallas**, porque contra aquel número se habían medido después once
+features y una cáscara nueva.
+
+**Dos correcciones a esta nota, para que no se citen sus cifras.**
+- ⛔ **«`--color-state-ok` tiene CERO usos» ya no era verdad al retomarla**: el verde se
+  estrenó el 2026-08-10, el día siguiente a anotar esto, en `.gml-accion-estado--exito`. El
+  hallazgo que la nota llamaba «el que más pesa» estaba resuelto.
+- ⛔ **«`#FFD600` y el ámbar subidos a token» ya estaba hecho**: los dos son
+  `--gml-color-usuario*` en `estilos/app.css` desde antes, y `--gml-color-usuario` tiene
+  guardián que lo ata a su gemelo de JavaScript. Lo que faltaba no era promoverlos, era
+  escribir dónde viven y por qué están en dos sitios.
+
+**Y el guardián, que es lo que impide que vuelva.** `test/estilos/cascara.test.js` exige ahora
+que **toda** variable de `estilos/tokens/` tenga llamante, y que `data-theme` no reaparezca sin
+cablearse. Antes vigilaba solo las `--gml-*`, y esa asimetría era el agujero entero: un
+guardián que cubre media categoría no cubre medio riesgo, cubre la mitad que ya te preocupaba.
+Se comprobó por mutación (`--space-99`) que caza.
+
+<details>
+<summary>La nota original, como se anotó el 2026-08-10</summary>
 
 **Estado.** Abierto. Preexistente desde la copia del 2026-07-26. Anotado el 2026-08-10 tras
 `/plan-design-review`.
@@ -288,3 +312,5 @@ volvió hasta agosto. Una decisión de alcance necesita fecha de revisión, no s
 
 **Depende de.** Nada. El paso 1 se puede hacer hoy. El paso 3 gana si se hace DESPUÉS del
 rediseño del panel, porque entonces el documento registra decisiones ya probadas en pantalla.
+
+</details>

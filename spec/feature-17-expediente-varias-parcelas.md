@@ -70,7 +70,10 @@ minuendos ya están en memoria.
   astillas se listan **con su aviso y sus cifras**; ninguna se descarta sola.
 - ⛔ **La puerta `P_new ⊆ P_of`**: si la parcela CRECE, el sobrante sale vacío
   mientras hay vecinos afectados, y emitir ahí un expediente incompleto con total
-  confianza sería el peor fallo de la fase. Se dice, y se remite a la fase 2.
+  confianza sería el peor fallo de la fase. Se dice, y se remite a la fase 2
+  —que desde el 2026-08-11 **existe y se llama
+  [F23](feature-23-colindante-recortado.md)**: ahí la puerta deja de ser un callejón
+  y el exceso se resta del vecino.
 - Comprobar el **cierre del conjunto** sobre coordenadas ya redondeadas a 2
   decimales, con **tres** afirmaciones: suma con tolerancia declarada, cero solape,
   y cobertura contra el contorno oficial.
@@ -84,7 +87,7 @@ minuendos ya están en memoria.
 
 | Se aparta | Por qué |
 |---|---|
-| **La fase 2 · el colindante recortado** | Necesita sacar `vecinas` de la clausura de `app/cableado-diagnostico.js` al modelo y una UI de asignación de trozos. Y `asignado_i` **no es derivable**: que un trozo liberado pase al vecino o se convierta en cesión es **jurídico**, no geométrico |
+| ~~**La fase 2 · el colindante recortado**~~ ⛔ **ENTREGADA el 2026-08-11 como [F23](feature-23-colindante-recortado.md)** | El motivo escrito era: «necesita sacar `vecinas` de la clausura de `app/cableado-diagnostico.js` al modelo y una UI de asignación de trozos. Y `asignado_i` **no es derivable**: que un trozo liberado pase al vecino o se convierta en cesión es **jurídico**, no geométrico». **La segunda mitad sigue siendo cierta** —F23 pregunta pieza a pieza exactamente por eso—. ⛔ **La primera la refutó medir**: las vecinas nunca estuvieron en ninguna clausura. Su fuente es `app/cableado-catastro.js#alColindantes`, una suscripción pública con `Set` de oyentes y baja, **de la que ya colgaban TRES consumidores** (F07, F09 y el snap de F06); `cableado-diagnostico.js` era **un suscriptor más que se guardaba una copia**. No hizo falta tocar `model/parcela.js`. La lección no es que la estimación fallara, es **por qué**: se estimó leyendo el sitio donde el dato se guardaba en vez de aquél de donde venía |
 | **Una parcela con varias superficies disjuntas** (`nSurfaces > 1`) | Descartado a favor de una parcela por componente. `gml/ids.js` ya lo parametriza, así que la puerta queda abierta |
 | **El informe que abarque las N parcelas** | Es F09 otra vez: encuadre para N geometrías, paginación, N literales y N tablas. Se entrega **el alcance declarado** —el papel dice cuántas parcelas hay y cuál describe— por una fracción del coste |
 | **Medir 3 o más parcelas contra la Sede** | Lo medido son **dos**. Tres es plausible y no está probado; esta ficha promete lo medido |

@@ -21,7 +21,7 @@
  * miente hay que verla en el primer `npm run test:node`, no en el último.      *
  * -------------------------------------------------------------------------- */
 
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 
@@ -147,6 +147,78 @@ describe('T5 · las variables locales: usadas y declaradas, sin huérfanas', () 
     const LEIDAS_DESDE_JS = new Set(['--gml-color-usuario'])
     const huerfanas = [...declaradas].filter((v) => !usadas.has(v) && !LEIDAS_DESDE_JS.has(v))
     expect(huerfanas).toEqual([])
+  })
+})
+
+describe('los tokens del sistema de diseño: ninguno declarado sin llamante', () => {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ⛔ **ÉSTE ES EL GUARDIÁN QUE FALTABA, Y SU AUSENCIA COSTÓ 71 VARIABLES.**
+  // ═══════════════════════════════════════════════════════════════════════════
+  // El bloque de arriba vigila las huérfanas `--gml-*`, o sea las que escribe este
+  // proyecto. **Los tokens de `estilos/tokens/` no los vigilaba nadie**, y esa
+  // asimetría es exactamente el agujero por el que `estilos/tokens/` se pasó
+  // dieciséis fases siendo el sistema de color de una calculadora de hormigón: de
+  // sus 120 variables, 71 no tenían un solo `var()` en todo el producto — catorce
+  // de armaduras y tensiones, trece de estratos geotécnicos, cuatro de casos de
+  // carga, las ocho dimensiones de una cáscara que esta app no tiene, y los
+  // diecinueve alias cortos de un sitio de marketing que no existe.
+  //
+  // Se podaron el 2026-08-11 (ver la cabecera de `estilos/tokens/colors.css` y el
+  // asiento de esa fecha en `scripts/presupuesto-css.mjs`), y esta prueba es la
+  // parte que impide que vuelva a pasar. **La deuda no se cierra borrando: se
+  // cierra borrando y poniendo quien avise.**
+  //
+  // ⚠️ Y no basta con mirar `app.css`: hay tokens que se leen desde JavaScript
+  // —`--color-btn-primary-bg` lo usan los cuatro cajones de `viewer/`, que se
+  // visten EN LÍNEA porque no pueden importar CSS—, así que el barrido tiene que
+  // pasar por el código. Mirar solo la hoja daría cuatro falsos positivos y la
+  // primera reacción de quien los viera sería añadir una lista de excepciones.
+  const FUENTES_JS = ['app', 'viewer', 'edificio', 'edit', 'report', 'export', 'config']
+
+  /** Todo el texto donde una `var(--token)` puede aparecer. */
+  const CONSUMIDORES = (() => {
+    const trozos = [VIVO, TOKENS, readFileSync(join(RAIZ, 'index.html'), 'utf8')]
+    for (const dir of FUENTES_JS) {
+      for (const rel of readdirSync(join(RAIZ, dir), { recursive: true })) {
+        const nombre = String(rel)
+        if (nombre.endsWith('.js')) trozos.push(readFileSync(join(RAIZ, dir, nombre), 'utf8'))
+      }
+    }
+    return trozos.join('\n')
+  })()
+
+  const declarados = todos(/^\s*(--[a-z0-9-]+)\s*:/gim, TOKENS)
+
+  it('⭐ cada variable de `estilos/tokens/` tiene al menos un `var()` que la use', () => {
+    // Anti-vacuidad: si el barrido dejara de encontrar declaraciones, el `for` de
+    // abajo pasaría sobre una lista vacía y la prueba sería verde y muda.
+    expect(declarados.length).toBeGreaterThan(40)
+
+    const huerfanos = declarados.filter((v) => !CONSUMIDORES.includes(`var(${v})`))
+    expect(
+      huerfanos,
+      `tokens declarados que nadie usa: si son producto que llega mañana, el sitio para ` +
+        `dejarlo escrito es el comentario de su bloque, no este fichero`,
+    ).toEqual([])
+  })
+
+  it('⛔ y el tema oscuro sigue RETIRADO: `data-theme` no vuelve sin cablearse', () => {
+    // El bloque `html[data-theme="dark"]` estaba completo y muerto: ~45 tokens y
+    // `data-theme` sin aparecer en ningún `.js`, `.html` ni en `app.css`. Se retiró
+    // el 2026-08-11 con el motivo medido (la app tiene ~150 hex literales en
+    // `viewer/`, `report/` y `export/`, que ningún tema alcanza), y `DESIGN.md`
+    // declara esta aplicación como de tema CLARO.
+    //
+    // ⚠️ Lo que esta prueba prohíbe **no es el tema oscuro**: es que vuelva a
+    // aparecer una hoja de tema que nadie enciende. Si algún día se cablea de
+    // verdad, `data-theme` estará en el código y esta aserción hay que cambiarla
+    // conscientemente — que es justo lo que se quiere que pase.
+    expect(TOKENS).not.toContain('data-theme')
+    expect(VIVO).not.toContain('data-theme')
+
+    // Y la declaración que SÍ se queda, porque no es un resto: sin ella un sistema
+    // en modo oscuro pinta los `<input>` oscuros dentro de un panel blanco.
+    expect(TOKENS).toMatch(/color-scheme:\s*light/)
   })
 })
 

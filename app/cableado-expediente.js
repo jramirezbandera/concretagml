@@ -187,6 +187,31 @@ import {
   motivoOtroHuso,
 } from './dialogo-expediente.js'
 import { RAMA } from './rama.js'
+import {
+  MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO,
+  MENSAJE_SIN_EDIFICIO,
+  MENSAJE_SIN_PARCELA,
+  SALIDA,
+  evaluarSalida,
+  evaluarSalidas,
+} from './salidas.js'
+
+/**
+ * ⭐ **LOS TRES MOTIVOS DE LAS SALIDAS SE MUDARON A `app/salidas.js` EL 2026-08-11**,
+ * y se re-exportan desde aquí porque sus importadores (las pruebas de esta pantalla)
+ * los piden a este módulo desde F11 y F20, y cambiarles la puerta no aporta nada.
+ *
+ * La mudanza es la mitad del trabajo de aquel día, no un movimiento de ficheros:
+ * mientras el motivo viviera pegado a la acción, cualquier superficie que quisiera
+ * decirlo ANTES de pulsar —el desplegable de la barra, el `<dialog>`— tenía que
+ * importar este cableado de 2.400 líneas, y dos superficies habrían acabado con dos
+ * redacciones del mismo obstáculo. Ver la cabecera de `app/salidas.js`.
+ */
+export {
+  MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO,
+  MENSAJE_SIN_EDIFICIO,
+  MENSAJE_SIN_PARCELA,
+} from './salidas.js'
 
 // ── El contrato con `index.html` ─────────────────────────────────────────────
 
@@ -230,6 +255,23 @@ export const SELECTORES_SALIDA = Object.freeze({
   COORDENADAS: `[data-accion="${ACCION.EXPORTAR_COORDENADAS}"]`,
   EXCEL: `[data-accion="${ACCION.EXPORTAR_EXCEL}"]`,
 })
+
+/**
+ * La clase del `<span>` de texto oculto que lleva la forma BREVE del motivo dentro
+ * de una salida apagada (2026-08-11).
+ *
+ * ⚠️ **No es una clase nueva: es `.gml-rotulo-oculto`, la genérica que ya existe** y
+ * que su propio bloque en `estilos/app.css` declara reutilizable («hoy la usa la
+ * cabecera de la columna de borrado y mañana la usará el siguiente rótulo que haya
+ * que decir sin escribir»). Se nombra aquí como constante para que las pruebas la
+ * afirmen sin copiar el literal, no porque haya que declararla en ninguna parte.
+ *
+ * ⭐ Que se reutilice es lo que hace que cerrar esta deuda cueste **0 B de hoja**, y
+ * desde hoy eso importa: el techo del criterio 10 quedó clavado en la medición de
+ * esta misma fecha (`scripts/presupuesto-css.mjs#TECHO`), así que una clase nueva
+ * habría puesto rojo el presupuesto por decir en voz baja lo que ya se sabía decir.
+ */
+export const CLASE_MOTIVO_SALIDA = 'gml-rotulo-oculto'
 
 // ── Nombres de los cuatro ficheros ───────────────────────────────────────────
 
@@ -397,9 +439,9 @@ export const MENSAJE_AUTOGUARDADO_EN_ESPERA =
   'y guardar encima lo borraría. Abre «Expediente» y recupéralo o descártalo; a partir de ahí el ' +
   'trabajo en curso se guarda solo.'
 
-/** Cuando no hay ninguna parcela en pantalla y se pide guardar o exportar. */
-export const MENSAJE_SIN_PARCELA =
-  'No hay ninguna parcela en pantalla: no hay nada que guardar ni que exportar.'
+/* ⛔ AQUÍ VIVÍA `MENSAJE_SIN_PARCELA` («no hay nada que guardar ni que exportar»),
+   mudado a `app/salidas.js` el 2026-08-11 con los otros dos motivos de salida y
+   re-exportado desde la cabecera de este fichero. Ver allí el porqué. */
 
 /**
  * Con qué nombre entra un edificio que llega en un fichero de proyecto **sin
@@ -451,30 +493,11 @@ export const MOTIVO_GUARDAR_EN_EDIFICIO =
   'archivarlo con nombre, usa «Guardar proyecto (.json)»: ese fichero se lleva el edificio ' +
   'entero y se vuelve a abrir aquí.'
 
-/**
- * Por qué el DXF y los dos listados de coordenadas no bajan con la rama EDIFICIO
- * activa.
- *
- * Los tres escritores son de PARCELA —`serializarParcelaDxf`,
- * `serializarCoordenadasTxt` y `serializarCoordenadasExcel` hablan de recintos, y el
- * nombre del fichero saldría con la referencia catastral de la parcela—, así que
- * dejarlos correr entregaría **el documento de la otra rama, en silencio**, que es
- * exactamente lo que F11 no puede publicar (regla de oro 1).
- *
- * ⚠️ **Este texto ENUMERA las salidas, así que caduca cada vez que se añade una.** Ya
- * pasó con el Excel de F20: decía «El DXF y el listado de coordenadas» cuando ya eran
- * tres. Un mensaje que enumera hay que revisarlo al ampliar {@link FICHERO}, y por eso
- * su prueba lo comprueba contra el catálogo y no contra una cadena escrita a mano.
- */
-export const MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO =
-  'El DXF y los listados de coordenadas (.txt y .xlsx) son de la parcela, y ahora mismo estás en ' +
-  'la rama Edificio: no se ha descargado nada para no entregarte el dibujo de otra cosa. Vuelve a ' +
-  'la rama Parcela para exportarlos, o usa «Guardar proyecto (.json)», que sí se lleva el edificio.'
-
-/** Cuando se pide exportar el proyecto y el store de edificio está vacío. */
-export const MENSAJE_SIN_EDIFICIO =
-  'No hay ningún edificio en pantalla: no hay nada que exportar. Carga uno desde un fichero o ' +
-  'desde el Catastro, en la rama Edificio.'
+/* ⛔ AQUÍ VIVÍAN `MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO` y `MENSAJE_SIN_EDIFICIO`,
+   mudados a `app/salidas.js` el 2026-08-11 y re-exportados desde la cabecera de este
+   fichero. El primero llevaba escrito un aviso que sigue vigente allí: **enumera las
+   salidas, así que caduca cada vez que se añade una** —ya pasó con el `.xlsx` de F20,
+   que lo dejó diciendo «El DXF y el listado» cuando ya eran tres—. */
 
 /**
  * Cuando llega un `.json` con un expediente de EDIFICIO y esta pantalla no tiene
@@ -1820,25 +1843,137 @@ export function cablearExpediente({
     if (coletilla !== null) avisar(coletilla)
   }
 
+  // ── El predicado de las salidas, y sus dos usos ────────────────────────────
+  //
+  // ⭐ **HASTA EL 2026-08-11 ESTO NO EXISTÍA COMO DATO.** Cada `exportar*` repetía
+  // su regla a mano con dos `if` seguidos —la rama y el dato— y el motivo se decía
+  // AL PULSAR. Eso dejaba la aplicación con una incoherencia que se veía: los tres
+  // peldaños del recorrido se apagan con motivo, «Generar GML» se apaga con motivo,
+  // y las cuatro salidas no podían porque su disponibilidad solo vivía dentro de
+  // aquellos `if`. Ver `app/salidas.js`, donde vive ahora la regla, y `TODOS.md`,
+  // donde esto estuvo aplazado desde el 2026-08-09 esperando a que el menú existiera.
+  //
+  // ⚠️ **Y el predicado tiene DOS llamantes, que es todo el punto**: la guarda de la
+  // acción (aquí abajo) y el pintado del menú ({@link refrescarSalidas}). Si fueran
+  // dos reglas, el día que una cambiara el menú ofrecería lo que la acción rechaza.
+
   /**
-   * ¿Se puede entregar un fichero DE LA PARCELA? Con la rama EDIFICIO no: los tres
-   * escritores hablan de recintos y el nombre del fichero saldría con otra referencia.
-   * Ver {@link MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO}.
+   * Los dos hechos que `app/salidas.js` necesita, resueltos aquí porque es quien
+   * conoce los dos stores. Los MISMOS predicados que alimentan el rail de
+   * navegación ({@link hayGeometria}, {@link hayEdificio}), y no una tercera copia.
    */
-  function bloqueaLaRamaEdificio() {
-    if (!enEdificio()) return false
-    decir(MENSAJE_EXPORTAR_PARCELA_EN_EDIFICIO, { error: true })
+  const hechosDeSalida = () => ({
+    parcela: hayGeometria(estado.get()),
+    edificio: hayEdificio(edificioActual()),
+  })
+
+  /** La situación completa, que es lo único que el predicado recibe. */
+  const situacionDeSalida = () => ({ rama: ramaActual(), hechos: hechosDeSalida() })
+
+  /**
+   * La guarda de una salida. Si no se puede, lo DICE y devuelve `true`.
+   *
+   * ⚠️ Sigue diciéndolo al pulsar, y eso no es el trabajo a medias: es la red. El
+   * menú ya lo apaga con su motivo antes de pulsar, pero las cuatro acciones también
+   * entran por `atender()` —el guion de humo las llama, y mañana un atajo de teclado
+   * podría— y una acción que se fía de que su botón estuviera apagado es una acción
+   * sin guarda. Lo que se ha ido es la DUPLICACIÓN de la regla, no la comprobación.
+   *
+   * @param {string} salida  Una de `SALIDA`.
+   * @returns {boolean} `true` si NO se puede (y ya se ha dicho por qué).
+   */
+  function bloqueada(salida) {
+    const veredicto = evaluarSalida(salida, situacionDeSalida())
+    if (veredicto.disponible) return false
+    decir(veredicto.motivo, { error: true })
     return true
+  }
+
+  /**
+   * Los nodos de las cuatro salidas, resueltos UNA vez al montar.
+   *
+   * ⚠️ **`doc.querySelector` se queda con el PRIMERO del documento**, que es la trampa
+   * K.1 de esta casa. Aquí es seguro y por una razón comprobable, no por suerte: las
+   * tres exportaciones de geometría se RETIRARON de `app/dialogo-expediente.js` el
+   * 2026-08-11 justamente para que hubiera un nodo por acción, y `exportar-proyecto`
+   * sigue existiendo solo dentro del `<dialog>`. Un nodo cada una.
+   *
+   * Se resuelven una vez y no en cada repintado porque **ninguno se reconstruye**: los
+   * tres de la barra son marcado de `index.html` y el del diálogo se fabrica en su
+   * constructor y vive en `pieFicheros`, que `fijar()` no toca (lo que `fijar()`
+   * reemplaza es la LISTA de registros).
+   */
+  const nodosDeSalida = new Map()
+
+  /**
+   * El `<span>` de texto oculto de una opción, creándolo la primera vez.
+   *
+   * ⛔ **Por qué hace falta si nunca se ve.** Una opción `disabled` cuyo nombre
+   * accesible es «Exportar para CAD .dxf» a secas le dice a quien va por lector de
+   * pantalla que no puede, y nada más — que es la definición de apagado y mudo, o sea
+   * la regla de oro 1 al revés. Con esto el nombre pasa a ser «Exportar para CAD .dxf
+   * · Falta la parcela». Es la MISMA receta que el rail volvió a decidir el
+   * 2026-08-10 para su motivo breve.
+   *
+   * ⚠️ **Reutiliza `.gml-rotulo-oculto`, que ya existe y es genérica a propósito**
+   * («hoy la usa la cabecera de la columna de borrado y mañana la usará el siguiente
+   * rótulo que haya que decir sin escribir», dice su bloque en `estilos/app.css`). Así
+   * esta feature cuesta **0 B de hoja**, que desde hoy no es un detalle: el techo del
+   * criterio 10 quedó clavado en la medición de esta misma fecha.
+   *
+   * ⚠️ Y va DENTRO del botón, no en un `aria-describedby` aparte: la forma breve es
+   * parte de qué es este control ahora mismo, y un `describedby` en un `<button>`
+   * `disabled` no lo anuncian todos los lectores.
+   */
+  function motivoOculto(nodo) {
+    const puesto = nodo.querySelector(`.${CLASE_MOTIVO_SALIDA}`)
+    if (puesto !== null) return puesto
+    const span = doc.createElement('span')
+    span.className = CLASE_MOTIVO_SALIDA
+    nodo.append(span)
+    return span
+  }
+
+  /**
+   * Apaga o enciende las cuatro salidas, **con su motivo puesto en el mismo paso**.
+   *
+   * ⭐ Esto es lo que cierra «Las salidas no saben decir si se pueden». Antes del
+   * 2026-08-11 las cuatro estaban siempre encendidas y contestaban al pulsarlas;
+   * ahora son lo mismo que un peldaño del recorrido o que «Generar GML»: apagadas
+   * cuando no se puede, con la forma LARGA en el `title` y la BREVE en el nombre
+   * accesible.
+   *
+   * ⛔ **Se APAGAN, jamás se retiran del menú**, que es la regla dura del rail escrita
+   * en `app/barra.js`: una opción que desaparece deja al usuario preguntándose si la
+   * recordaba mal, y un menú que cambia de tamaño según el estado no se aprende nunca.
+   *
+   * ⚠️ **Y no hay que enseñarle nada a `app/barra.js`**: su mecanismo de menús ya
+   * pone el foco en `[role="menuitem"]:not([disabled])`, así que abrir el desplegable
+   * con la primera opción apagada aterriza en la primera que sí se puede. Estaba
+   * escrito antes de que hubiera una sola opción que se apagara.
+   */
+  function refrescarSalidas() {
+    if (destruido) return
+    for (const v of evaluarSalidas(situacionDeSalida())) {
+      const nodo = nodosDeSalida.get(v.salida)
+      if (nodo === undefined) continue
+      nodo.disabled = !v.disponible
+      if (v.disponible) {
+        nodo.removeAttribute('title')
+        motivoOculto(nodo).textContent = ''
+      } else {
+        nodo.title = v.motivo
+        // El separador va aquí y no en la tabla de motivos: es cosa de cómo se
+        // concatena un nombre accesible, no del motivo.
+        motivoOculto(nodo).textContent = ` · ${v.breve}`
+      }
+    }
   }
 
   /** «Exportar DXF para CAD». */
   function exportarDxf() {
-    if (bloqueaLaRamaEdificio()) return
+    if (bloqueada(SALIDA.DXF)) return
     const parcela = estado.get()
-    if (!hayGeometria(parcela)) {
-      decir(MENSAJE_SIN_PARCELA, { error: true })
-      return
-    }
     const { dxf, detecciones } = serializarParcelaDxf({
       recintosEditados: parcela.recintos,
       // La geometría OFICIAL va tal cual está (regla de oro 2). `null` cuando la
@@ -1851,12 +1986,8 @@ export function cablearExpediente({
 
   /** «Exportar coordenadas (.txt)». */
   function exportarCoordenadas() {
-    if (bloqueaLaRamaEdificio()) return
+    if (bloqueada(SALIDA.COORDENADAS)) return
     const parcela = estado.get()
-    if (!hayGeometria(parcela)) {
-      decir(MENSAJE_SIN_PARCELA, { error: true })
-      return
-    }
     const fecha = ahora()
     const { texto, detecciones } = serializarCoordenadasTxt({
       recintos: parcela.recintos,
@@ -1878,12 +2009,8 @@ export function cablearExpediente({
    * único que cambia es el escritor y que lo que baja son bytes.
    */
   function exportarExcel() {
-    if (bloqueaLaRamaEdificio()) return
+    if (bloqueada(SALIDA.EXCEL)) return
     const parcela = estado.get()
-    if (!hayGeometria(parcela)) {
-      decir(MENSAJE_SIN_PARCELA, { error: true })
-      return
-    }
     const fecha = ahora()
     const { bytes, detecciones } = serializarCoordenadasExcel({
       recintos: parcela.recintos,
@@ -1904,13 +2031,24 @@ export function cablearExpediente({
    * edificio (desviación 6), este fichero es el único sitio donde un edificio se
    * conserva. `expedienteActual()` ya devuelve la rama que toca, así que aquí no hay
    * ni un `if`: lo que cambia es el mensaje de cuando no hay nada.
+   *
+   * ⚠️ **La guarda pasó a ser {@link bloqueada} el 2026-08-11 y NO comprueba
+   * `exp === null` detrás**, que parecería lo prudente. No lo es: sería código
+   * imposible de alcanzar, y por un motivo comprobable, no por confianza.
+   * `expedienteActual()` devuelve `null` en exactamente dos casos —`!hayEdificio()` en
+   * la rama EDIFICIO y `!hayGeometria()` en PARCELA— que son **los dos hechos que el
+   * predicado acaba de exigir**, calculados con las mismas dos funciones. Las dos
+   * ramas no pueden discrepar porque leen lo mismo. Lo que `expedienteActual()` sí
+   * puede hacer es LANZAR, si el store tiene una parcela estructuralmente rota, y de
+   * eso se sigue encargando el `try` de `alAccion`.
+   *
+   * ⭐ Y con el cambio, este motivo **pasa a decirse en rojo como los otros tres**.
+   * Era la única de las cuatro salidas que llamaba a `decir()` sin `{error: true}`:
+   * el renglón salía en gris, indistinguible de un acuse normal.
    */
   function exportarProyecto(nombre) {
+    if (bloqueada(SALIDA.PROYECTO)) return
     const exp = expedienteActual()
-    if (exp === null) {
-      decir(enEdificio() ? MENSAJE_SIN_EDIFICIO : MENSAJE_SIN_PARCELA)
-      return
-    }
     const fecha = ahora()
     const proyecto = aProyecto(exp, { fecha, nombre: nombre ?? identidadActual().nombre })
     // Con sangría de 2: un fichero de proyecto se abre a mano más veces de las que
@@ -2207,6 +2345,12 @@ export function cablearExpediente({
   function alCambiarElStore(parcela) {
     if (destruido) return
     refrescarIdentidad(RAMA.PARCELA, parcela)
+    // ⚠️ Antes de la guarda del autoguardado A PROPÓSITO: lo que hay en pantalla ha
+    // cambiado, y si las salidas se pueden o no depende de eso y no de si el borrador
+    // está en condiciones de escribirse. Puesto debajo, traer la primera parcela con
+    // una oferta de borrador sin resolver dejaría las cuatro salidas apagadas
+    // teniendo geometría delante.
+    refrescarSalidas()
     if (!autoguardadoArmado(RAMA.PARCELA)) return
     auto.cambiado(parcela)
 
@@ -2228,6 +2372,10 @@ export function cablearExpediente({
   function alCambiarElEdificio(edificio) {
     if (destruido) return
     refrescarIdentidad(RAMA.EDIFICIO, edificio)
+    // Por el mismo motivo que en su gemelo de PARCELA: antes de la guarda del
+    // autoguardado. Aquí además importa más, porque `exportar-proyecto` es la ÚNICA
+    // salida que un edificio habilita y es la única forma de sacarlo de la aplicación.
+    refrescarSalidas()
     if (!autoguardadoArmado(RAMA.EDIFICIO)) return
     // ⚠️ **Un edificio sin identidad no se autoguarda**, y se calla a propósito: es el
     // estado de un `Edificio` construido a mano fuera de las vías de entrada (los
@@ -2263,6 +2411,10 @@ export function cablearExpediente({
    */
   function alCambiarLaRama(_ramaNueva) {
     if (destruido) return
+    // ⭐ El tercer llamante, y el que más se nota: conmutar a Edificio apaga las tres
+    // exportaciones de geometría en el acto, con el motivo puesto, en vez de dejarlas
+    // encendidas para contestar «eso es de la parcela» cuando ya has pulsado.
+    refrescarSalidas()
     if (arrancado && ofrecido === null && hayEnEspera()) volcarLoPendiente()
     if (dialogo.abierto()) {
       refrescar().catch((causa) => reventar('refrescar', causa))
@@ -2361,6 +2513,20 @@ export function cablearExpediente({
       alAccion({ accion: boton.dataset.accion, id: null, nombre: null })
     })
   }
+  // ── Las cuatro salidas nacen sabiendo si se pueden (2026-08-11) ─────────────
+  //
+  // ⚠️ **Va DESPUÉS de crear el diálogo**, y no es casual: `exportar-proyecto` es un
+  // nodo que fabrica su constructor, así que localizarlo antes lo dejaría fuera del
+  // mapa y esa opción sería la única de las cuatro que no se apaga nunca — el defecto
+  // más difícil de ver de los posibles aquí, porque las otras tres funcionarían.
+  for (const { salida } of evaluarSalidas(situacionDeSalida())) {
+    const nodo = doc.querySelector(`[data-accion="${salida}"]`)
+    if (nodo !== null) nodosDeSalida.set(salida, nodo)
+  }
+  // Y el primer pintado, sin esperar a que cambie nada: la aplicación arranca VACÍA
+  // desde el 2026-08-07, así que el estado inicial de las cuatro es «no se puede».
+  refrescarSalidas()
+
   const bajaAccion = dialogo.alAccion(alAccion)
   const desuscribirStore = estado.subscribe(alCambiarElStore)
   // Sin conmutador cableado no hay a qué suscribirse, y la baja es un no-op: así

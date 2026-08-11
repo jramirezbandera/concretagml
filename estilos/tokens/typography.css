@@ -8,41 +8,45 @@
    `prototipo/_ds/...`, el cambio hay que propagarlo aquí A MANO y de forma
    deliberada — no hay ningún mecanismo de sincronización automática.
 
-   Copia fiel: ningún token modificado.
+   ⭐ **PODADO EL 2026-08-11** (ver la cabecera de `colors.css`, que cuenta el
+   porqué entero): de las dieciocho variables, cinco no tenían un solo llamante, y
+   las tres primeras eran **la escala de display de un sitio de marketing** que
+   este producto no tiene (`--text-hero` y `--text-h2` con `clamp()` hasta 68 px,
+   `--text-lead` a 17 px). La aplicación no pasa de 30 px, y ese 30 no es un token
+   de aquí: es la cifra titular del cajón de diagnóstico, que se viste EN LÍNEA
+   desde `viewer/cajon-diagnostico.js#ESCALA` porque tiene que leerse sobre una
+   ortofoto aunque esta hoja no cargue. Ver `DESIGN.md`.
+   Ya no es copia fiel, y a partir de hoy no se sincroniza con `prototipo/`.
    ──────────────────────────────────────────────────────────────────────── */
 
-/* typography.css — Concreta type system.
-   Geist Sans for labels/titles/UI; Geist Mono for ALL numeric values, units,
-   and CE references (always with tabular-nums). The scale is pixel-literal —
-   this is a dense desk instrument, not a marketing type ramp. */
+/* typography.css — el sistema tipográfico de Concreta GML.
+   Geist Sans para rótulos, títulos e interfaz; Geist Mono para TODO valor
+   numérico, unidad y referencia catastral (siempre con `tabular-nums`). La escala
+   es literal en píxeles: esto es un instrumento de mesa denso, no una rampa
+   tipográfica de portada. */
 
 :root {
   --font-sans: "Geist Sans", system-ui, -apple-system, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
-  /* UI text scale — exact px values from the app */
-  --text-10: 10px;  /* section headers (CAPS), nav group labels */
-  --text-11: 11px;  /* CE notes, check-row values, app version */
-  --text-12: 12px;  /* input values (mono), check-row names */
-  --text-13: 13px;  /* field labels, nav items, topbar module title */
-  --text-14: 14px;  /* sidebar logo, module title */
-  --text-15: 15px;  /* topbar brand "Concreta" */
+  /* Escala de interfaz — valores exactos en píxeles */
+  --text-10: 10px;  /* cabeceras de sección (VERSALES), rótulos de grupo */
+  --text-11: 11px;  /* apuntes, valores de fila, versión */
+  --text-12: 12px;  /* valores de campo (mono), nombres de fila */
+  --text-13: 13px;  /* rótulos de campo, peldaños del recorrido */
+  --text-14: 14px;  /* título de módulo */
+  --text-15: 15px;  /* marca de la barra */
 
-  /* Marketing display scale (landing hero + section headings) */
-  --text-hero: clamp(40px, 5.6vw, 68px);
-  --text-h2: clamp(28px, 3.4vw, 42px);
-  --text-lead: 17px;
+  /* Pesos */
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
 
-  /* Weights */
-  --fw-regular: 400;   /* @kind font */
-  --fw-medium: 500;    /* @kind font */
-  --fw-semibold: 600;  /* @kind font */
+  /* Espaciado entre letras. Se fueron `--tracking-group` (rótulos de la barra
+     lateral de la calculadora, que aquí no existe) y `--tracking-tight` (del
+     display de portada, que tampoco). */
+  --tracking-caps: 0.07em;   /* cabeceras de sección */
 
-  /* Tracking */
-  --tracking-caps: 0.07em;   /* section headers */
-  --tracking-group: 0.11em;  /* sidebar nav group labels */
-  --tracking-tight: -0.035em;/* hero display */
-
-  /* Font features — stylistic sets used across the product */
+  /* Conjuntos estilísticos de la fuente, usados en todo el producto */
   --font-features: "ss01", "cv11";
 }

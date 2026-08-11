@@ -2832,7 +2832,7 @@ siguiente fase, igual que éste lo fue de ésta.
 
 ---
 
-## 21 · F23 · El colindante recortado — ⛔ LO ÚNICO QUE FALTA ES TUYO
+## §21 · F23 · El colindante recortado — ⛔ LO ÚNICO QUE FALTA ES TUYO
 
 El guion `25-colindante-recortado.js` sale `ok:true` y la suite entera está en
 verde. **Eso no cierra la fase**, y conviene que quede escrito por qué.
@@ -2889,7 +2889,7 @@ revisarla — y entonces `FUERA_SOBRE_NADIE` tendría que volver a ser ERROR.
 
 ---
 
-## 22 · La ASTILLA DEL ENGANCHE — lo que se deja de declarar
+## §22 · La ASTILLA DEL ENGANCHE — lo que se deja de declarar
 
 **Origen:** el defecto que reportaste el 2026-08-10 con tres capturas sobre
 `6346726UF8664N`. Al enganchar tu medición a los linderos oficiales quedan astillas
