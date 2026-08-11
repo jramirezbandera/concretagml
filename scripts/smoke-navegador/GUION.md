@@ -78,7 +78,7 @@ para que el resultado no dependa de interpretar prosa. Diecinueve son de aceptac
 | `10-comprobar-gml.js` | F08 · 1 a 4 · **+ los tres arreglos del check visual** | **soltar un fichero de verdad** de punta a punta (bytes reales, velo con `opacity` calculada, `File.arrayBuffer()`), el cajón que no tapa ninguno de los cinco controles del mapa, los dos cajones que no coinciden, el informe que baja con BYTES, el invariante de los ~267 px, la tipografía real de los botones de los dos cajones y —desde el 2026-08-02— **el REENCUADRE** (viaja con otra parcela, no se mueve al editar), **las COLINDANTES dibujadas** y **el CAMPO de la referencia** | ✅ `ok:true` desde el **2026-08-07**, tras la revisión que el §16 dejó pendiente el 2026-08-04. Conducía el flujo anterior al rework Y el peaje de F08; los dos se han retirado. Ver §16 |
 | `11-informe-pdf.js` | F09 · **1** a 5 | ⭐ **el CRITERIO 1, que solo se puede medir aquí**: `toDataURL` sobre un lienzo con una tesela REAL del WMS, **con control negativo** (sin `crossOrigin` tiene que lanzar); el PDF que baja con BYTES de verdad (`%PDF`, páginas declaradas, el plano `/DCTDecode` dentro); que componer **no cierre nada por debajo** (tercera aparición del mismo defecto); el `<dialog>` con la presentación que le toca y el encaje en la ventana, el invariante de la caja de vértices y la tipografía de los cuatro botones nuevos. ⛔ **Su veredicto sobre el `<dialog>` está INVERTIDO desde el 2026-08-08 y ésa es la corrección**: exigía modal DE VERDAD (capa superior, fondo inerte) porque en F09 lo era; la rebanada 5 lo convirtió en PANTALLA con `show()` el 2026-08-05 y nadie volvió aquí, así que llevaba tres meses acusando a la aplicación de hacer lo que se le pidió. Hoy exige lo contrario —**que NO sea modal y que el rail siga alcanzable**— y de paso se corrigió su sonda, que probaba el fondo contra un control OCULTO y por eso daba «inerte» pasara lo que pasara | `ok:true` — ver §17 |
 | `12-expedientes.js` | F10 · 1 a 6 · **+ F20** | ⭐ **que los bytes están en una base de VERDAD** (la suite entera de F10 corre sobre `fake-indexeddb`, que no es una base de datos): supervivencia a la recarga contrastada contra `performance.timeOrigin`, segunda conexión a IndexedDB, `persist()`/`estimate()` reales, **las CUATRO exportaciones** con sus BYTES, el `<dialog>` como modal y el invariante de los 267 px. **Desde F20 (2026-08-06)** mide además el `.xlsx` sobre sus bytes —firma `PK`, EOCD, las seis partes de OOXML, sin comprimir y ⭐ **que la coordenada sea una celda NUMÉRICA y no una cadena con la coma dentro**, que es el criterio que justifica la fase entera— y **que los CINCO botones del pie de exportaciones quepan**, que es la medida que la suite no puede dar porque jsdom no maqueta | `ok:true` — ver §18 |
-| `13-edificio.js` | F11 · 1 a 4 | ⭐ **el guardián de ANCHO del conmutador, que solo existe aquí** (sustituye al `flex-wrap: nowrap` que el plan pedía por error); **M10 ida y vuelta en un navegador real** —mismo nodo, mismo valor, oyentes vivos—; el invariante de los 267 px y las tres cifras de M8; que las huellas del DXF **se ven y ENCIMA de la parcela** (orden real de los panes, no solo que existan los `<path>`); soltar un `.dxf` de verdad en las DOS ramas, con su diálogo de reparto por capas; la ficha del pie que cambia de cara; y ⭐ **el reparto de altura del panel, en vacío y con datos, con el recorte a CERO EXACTO y el déficit en píxeles cuando no llega** | ✅ **`ok:true` desde el 2026-08-04**: los dos defectos de F11 cerrados, el segundo **por el rework** — ver §19 |
+| `13-edificio.js` | F11 · 1 a 4 | ⭐ **el guardián de ANCHO del conmutador, que solo existe aquí** (sustituye al `flex-wrap: nowrap` que el plan pedía por error); **M10 ida y vuelta en un navegador real** —mismo nodo, mismo valor, oyentes vivos—; el invariante de los 267 px y las tres cifras de M8; que las huellas del DXF **se ven y ENCIMA de la parcela** (orden real de los panes, no solo que existan los `<path>`); soltar un `.dxf` de verdad en las DOS ramas, con su diálogo de reparto por capas; la ficha del pie que cambia de cara; y ⭐ **el reparto de altura del panel, en vacío y con datos, con el recorte a CERO EXACTO y el déficit en píxeles cuando no llega** | ⭐ **`ok:true` otra vez el 2026-08-11, y esta vez costó rehabilitarlo**: llevaba desde agosto acusando en falso porque **CINCO de sus premisas murieron y nadie volvió a él** —los avisos se mudaron a un `<dialog>` (2026-08-07), los chips y el conmutador subieron a la barra (2026-08-10), y F18 le dio a la rama PARCELA la entrada por `.dxf` que este guion exigía que NO existiera—. Ocho problemas: **siete eran suyos y uno era real** (el panel recortaba 13 px a 1280×720 y lo que se caía era el renglón que dice por qué no puedes generar el GML). Ver §19 |
 | `14-shell.js` | Rework · 1 a 4 | la cáscara de tres columnas y su coste en píxeles, en **las DOS pasadas de D5** (1280×720 y 1440×900): ancho del rail, desborde del panel, el invariante de `#tabla-vertices`, cuántas tarjetas de aviso caben enteras y cuánto queda escondido tras el pliegue; **se detecta solo** en cuál de los dos mundos está (`LINEA_BASE` sin rail / `SHELL` con él); y desde la rebanada 4, **si el diagnóstico sigue en pantalla después de tocar el mapa** | `ok:true` en las dos — ver §20 |
 | `15-contraste.js` | Rework · T9, **reescrito 2026-08-07** | ⭐ **la RUTA CRÍTICA 2 entera**, que hoy es *soltar un GML → está cargado, dibujado y EDITABLE*, en un solo gesto: el cajón que NO sale, «Edición» abierta, la procedencia que dice de dónde salió sin atribuírselo al Catastro, la barra de edición que de verdad se ve (las tres patas de `elementFromPoint`), y **el caso que el guion viejo no montaba: un GML SIN referencia catastral**, que es donde el recorrido se moría | ⛔ **encontró un defecto real el 2026-08-04 (la puerta invisible) y NO pudo ver el de fondo: su pantalla era inalcanzable sin parcelario.** Hoy `ok:true` — ver §22 |
 | `16-derivar-cesion.js` | F17 · 1 a 4 · **+ el criterio 6** | ⭐ **EL PRECIO EN PÍXELES, que es lo único de F17 que la suite no puede ver**: F17 rompe a propósito la racha de «0 px en el panel» de cinco fases, y ⛔ **cuando se pasa, el panel NO desborda — la tabla de vértices encoge en silencio**. Mide el recorrido entero sin tocar la red (mover el lindero hacia dentro → derivar → revisar y nombrar → descargar), la PUERTA explicando con cifras al crecer, la correspondencia fila↔mancha en los dos sentidos, los BYTES del expediente (N `featureMember`, los `localId` de O19 y **que el nombre escrito NO viaja al fichero**), y la invalidación de la foto al editar | ✅ **`ok:true` en las DOS** desde el 2026-08-05, tras encontrar **un defecto real a 1280×720** y corregirlo — ver §25 |
@@ -89,6 +89,10 @@ para que el resultado no dependa de interpretar prosa. Diecinueve son de aceptac
 | `21-contraste-edificio.js` | F14 · 1 a 4 | ⭐ **LOS DOS PELDAÑOS QUE F14 ABRE**, andados enteros: rama Edificio → soltar el GML de las 13 partes → Diagnóstico → **qué cajón se monta** → las cifras → Informe → **el PDF baja** (304.026 B, «Informe de contraste con la construcción catastral») → y con un DXF, los sabores de «no hay». Lo que la suite no puede ver: que la pantalla sea **la de esta rama** y no la de parcela (el defecto que la fase 4a midió: 367 × 413 px del cajón equivocado), que **ni un selector se duplique** con los dos cajones vivos, que lo accionable esté **sobre el pliegue**, que el **resalte por parte** exista y se distinga por trazo y **no por color**, y que «sin consultar» no se lea como «no consta ninguna» | `ok:true` en las dos ventanas — ver §31. ⚠️ Su primera corrida pulsaba un botón `disabled` y daba el DXF por cargado mirando el dato equivocado |
 | `24-parcelario-dxf.js` | F22 · 1 a 12 | ⭐ **EL DXF DE «CONSULTA MASIVA» DEL CATASTRO, andado entero y con el fichero REAL**: soltar la manzana → elegir la capa → ver las OCHO fincas → marcar la tuya → cargarla → las otras siete de parcelario. Lo que jsdom no puede decir: ⛔ **que las ocho SE VEAN** (en jsdom `getBoundingClientRect()` devuelve ceros, así que una capa a un zoom donde la manzana mide un píxel sale verde en las 7.338 pruebas), que el **resalte** exista de verdad en Chrome —la mitad que M7 midió que NO existía—, que el `<dialog>` y el cajón no se pisen, el **coste en píxeles**, y que la cabecera y el renglón de procedencia **no se contradigan**. Régimen de red: **ninguna** — ese fichero ES el parcelario del entorno | ⛔ **su primera corrida salió `ok:false` con CUATRO defectos reales**, y el primero era la fase entera: las ocho fincas salían a **0 × 0 px** porque nada movía el encuadre. Hoy **`ok:true`** — ver §34 |
 | `22-arranque-vacio.js` | 2026-08-07 · 1 a 5 | ⭐ **EL ARRANQUE QUE VE EL USUARIO, y es el único guion que se lanza SIN `?demo=`.** Desde que la aplicación empieza sin nada precargado, los veintiún guiones anteriores llevan `?demo=real` — o sea que **el arranque real dejaría de ejercitarlo nadie**. Mide lo que jsdom no puede: que el mapa **pinta cartografía de verdad** con el encuadre en vacío (`vistaInicial`, España entera) —si esa rama fallara, el usuario vería una cuadrícula gris y **nada se quejaría**: no es un error, es un mapa mirando a la nada—; que **se puede EMPEZAR** (las cinco vías de Entrada existen, se ven ENTERAS a 1280×720 y se pueden pulsar); que **lo apagado dice por qué** (con la app vacía casi todo está apagado, y ahí la regla de oro 1 se juega en el primer minuto de uso); que **no se consulta ningún servicio ajeno**; y que el rótulo de procedencia **no dice «de demostración» ni «del Catastro» sobre un store vacío** | ✅ `ok:true` a 1280×720 el 2026-08-07. ⚠️ Con **una advertencia abierta**: a zoom 6 se pide el WMS del Catastro con un BBOX de **1.658 km de ancho** — la capa nace encendida y no tiene zoom mínimo. No rompe nada; la decisión es del autor |
+| `23-fondo-catastral.js` | 2026-08-08 · 1 a 3 | las **DOS PUERTAS** del Catastro: traer el fondo sin que se coma el levantamiento. Ver §33. ⛔ *Esta fila faltaba y se añade el 2026-08-11: el guion existía desde el 2026-08-08 y su §33 también; lo que no existía era su entrada en esta tabla, que es lo que se lee primero* | `ok:true` |
+| `25-colindante-recortado.js` | F23 · 1 a 8 | ⭐ **EL VECINO QUE SE RECORTA, andado entero**: traer las colindantes → sacar la medición fuera del contorno oficial → ver a quién le quita terreno y cuánto → asignar el sobrante **pieza a pieza** → emitir el expediente con el vecino dentro. Mide lo que la suite no puede: que la **sección nueva del sobrante quepa** sobre lo que F17 ya gastaba (suelo de la tabla de vértices, desborde), que el **ámbar de lo que cae fuera** sea el hex declarado, y el caso del **VIAL** —exceso sobre ninguna parcela con la entrega **abierta igual**, que es la decisión 2 del autor ejercitada de verdad—. ⚠️ **NO va en CI y no se corre en bucle**: gasta una petición real al Catastro (override **O8**). ⛔ *Fila añadida el 2026-08-11: el guion se escribió y se corrió el 2026-08-10 y **nunca llegó a este registro**, que es el mismo hueco que dejó a F23 sin ficha en `spec/`* | ✅ `ok:true` en Chrome real (`?demo=real`, 1440×900), cero problemas. Destapó **tres defectos que la suite aprobaba en verde**, uno de ellos **del propio guion**: mentía en la segunda corrida porque las colindantes se quedan en el registro mientras viva la página |
+| `26-diccionario-errores.js` | F15 | *(de otra sesión, en curso el 2026-08-11)* | — |
+| `27-piscina-precision.js` | F21 · fase 3 · T3.1 | **LO QUE F21 DEJÓ SIN MEDIR EN NAVEGADOR**, que es lo que su ficha declaraba como motivo de no cerrarse: que el botón «Trabajo» **quepa en la fila del rótulo** sin partirla (el hueco de coste 0 px de F08), que el `<dialog>` de las especificaciones **se lea entero a 1280×720** con su campo y sus dos botones dentro, que el campo **rechace fuera del rango del ICUC con un gesto real** (teclear + pulsar, no asignar `.value`), que la precisión declarada **sobreviva a una mutación**, y que una parte de tipo «Otra» **no enseñe contadores de plantas**. ⛔ **Se llama 27 y no 22**: la ficha de F21 reservó el 22 y se lo quedó `22-arranque-vacio.js` tres días después; el 26 se lo llevó el diccionario de errores mientras éste se escribía. ⚠️ **La vía del SERVICIO —la piscina real por `wfsBU.aspx`— sigue sin medida**: su único fixture es una respuesta WFS que la app no acepta soltar, y medirla exige red | ✅ `ok:true` en Chrome a 1280×720. **Su primera corrida destapó un defecto REAL**: declarar la precisión sin edificio cargado la tiraba en silencio —`aplicarMutacion` se iba con un `return` mudo— y el diálogo se cerraba como si hubiera guardado |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
 spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
@@ -5658,3 +5662,93 @@ cómo afirmar el resalte desde fuera del módulo.
   `drop` sobre la ventana.
 - **Las 168 construcciones.** Por la decisión 4 no entran; se comprueba que se
   **nombran**, no que se lean. Leerlas es deuda declarada con dueño en la ficha.
+
+## 35. `25-colindante-recortado.js` — el vecino que se recorta (F23 · fase 7)
+
+⛔ **Esta sección se escribe el 2026-08-11, y el guion es del 2026-08-10.** Se corrió,
+salió `ok:true`, encontró tres defectos y **nunca llegó a este fichero** — igual que
+F23 no llegó a `spec/`. Se anota porque el hueco es el mismo: *lo que no está en el
+registro no tiene quién lo desactualice*, y durante un día el registro de guiones
+decía que el último era el 24.
+
+**EL CASO MIXTO, ANDADO ENTERO** sobre la aplicación real: mover unos vértices hacia
+**dentro** y uno hacia **fuera** —o sea, la parcela suelta terreno **e** invade a la
+vez— → derivar → traer colindantes → asignar el sobrante pieza a pieza → emitir.
+
+Es el recorrido que el defecto original hacía imposible: hasta el 2026-08-10, en
+cuanto la geometría se salía por un sitio, `app/cableado-derivacion.js` **escondía el
+bloque entero y tiraba un sobrante ya medido, restado y numerado**.
+
+### Cómo se lanza
+
+```
+$B viewport 1440x900
+$B goto http://localhost:PUERTO/concretagml/?demo=real
+$B wait ".gml-rail-pasos"
+$B console --clear
+$B network --clear
+$B eval scripts/smoke-navegador/25-colindante-recortado.js
+$B console --errors
+```
+
+⚠️ **Necesita `npm run dev`** y el base `/concretagml/`.
+
+⛔ **GASTA UNA PETICIÓN AL CATASTRO, y es a propósito.** «Traer colindantes» es una
+llamada a `GetNeighbourParcel`. El override **O8** avisa de denegación de servicio por
+uso abusivo, así que **este guion no entra en CI y no se corre en bucle** — misma
+condición que la sonda del §1. Una corrida = una petición, que es exactamente lo que
+hace un usuario al abrir el diagnóstico.
+
+### Las cuatro cosas que mide, y por qué ninguna la puede dar la suite
+
+| # | Qué | Por qué aquí |
+|---|---|---|
+| 1 | **Que el bloque se VEA** | En jsdom `getBoundingClientRect()` devuelve **ceros**: un bloque presente en el DOM y con 0 px de alto sale VERDE. Es exactamente el defecto que el guion 16 cazó en F17 (la tabla a 119 px, **muda**) |
+| 2 | **El precio en píxeles de la sección nueva** | F23 añade «Fuera del contorno oficial» y un `<select>` por fila sobre lo que F17 ya gastaba. ⛔ **El panel NO desborda cuando esto crece: la tabla de vértices ENCOGE EN SILENCIO.** Sin síntoma visible, este guion es el único guardián (suelo `124,57 px`, heredado y **medido** en el 16) |
+| 3 | **Que las dos capas se pinten a la vez** — cian el sobrante, **ámbar** lo que se sale | Son dos `crearCapaPiezas` sobre el mismo mapa y el mismo pane. Que una tape a la otra, o que la segunda no llegue a montarse, no lo ve ningún test: en jsdom no hay Leaflet pintando |
+| 4 | **Que el Catastro conteste de verdad** | El registro de colindantes se puebla por `alColindantes`, y la suite lo prueba con un **doble**. Aquí se pulsa el botón y se espera al servicio real |
+
+### Cifras de referencia (2026-08-10, Chrome, `npm run dev`, 1440×900)
+
+| Medida | Valor |
+|---|---|
+| Veredicto | **`ok: true`** · cero problemas |
+| Exceso del caso andado | **sobre ninguna parcela** (vial, 56,37 m²) · ⭐ **la entrega se abre igual** |
+| Astilla del enganche | pieza de **0,01 m² · 0,0002 m** · «Se emitirán **2 de 3** piezas» · entrega **encendida** |
+| Tabla de vértices | **413,81 px** (suelo 124,57) |
+| Desborde del panel | **0 / 0** |
+| Ámbar de lo que cae fuera | `#d97706`, el mismo de `viewer/contraste.js#COLOR_INVASION` |
+
+⭐ El punto del vial **no es un detalle del guion: es la decisión 2 del autor
+ejercitada de verdad** —«a veces el vial puede estar mal y necesitas
+georreferenciarlo pisándolo»—, y hasta esta corrida solo existía como código.
+
+### ⛔ Los TRES defectos que destapó, y uno es del propio guion
+
+**1 · «sobre 56,37 m² *sobre* ninguna parcela».** «Sobre» duplicado, en la frase que
+existe para decir dónde cae el exceso.
+
+**2 · La nota decía que el expediente no se podía descargar… con el botón encendido.**
+Se escribió en la fase 1, cuando el bloque siempre significaba bloqueado; las fases
+posteriores lo volvieron falso y nadie fue a mirar. ⚠️ **Lo vio la CAPTURA, no el
+guion** — que es la misma lección que F09 dejó escrita: hay defectos que solo se ven
+abriendo el resultado y mirándolo.
+
+**3 · ⛔ EL GUION MENTÍA EN LA SEGUNDA CORRIDA, y esto es de método.** Las colindantes
+se quedan en el registro **mientras viva la página**, así que la mitad «sin consultar»
+medía un estado **ya calentado** y acusaba **dos defectos inexistentes**. Es la
+tercera vez que este proyecto paga lo mismo (§16 y §22): *un guion que monta su propio
+estado inicial tiene que comprobar que el estado inicial es el que cree*. Ahora lo
+detecta y **lo dice** en vez de acusar.
+
+### Lo que NO cubre
+
+- ⛔ **Si la Sede acepta el fichero.** Ningún XSD expresa las reglas del IVG, y este
+  expediente estrena una forma que **O20 no midió**: dos miembros `ES.SDGC.CP` de
+  **otro titular** más un alta. Que valide contra `cp/4.0` no garantiza nada —la red
+  es asimétrica—. Va a `CHECKLIST-HUMANO.md` **§21** y **§22**.
+- **Si «Finca nueva (alta)» vs «Pasa a 9398515VK3799G» se entiende sin explicación.**
+  Todo el reparto pieza a pieza se apoya en que esa elección sea obvia, y eso no lo
+  firma ningún test.
+- **Si el ámbar se distingue del cian sobre una ortofoto real.** Aquí se comprueba el
+  hex; que se lean como dos cosas distintas sobre un borde arbolado, no.

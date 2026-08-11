@@ -242,7 +242,7 @@ presupuesto anotado (+70 B); paquete **1.075,38 kB**.
 | 4 | `test/edificio/comun.test.js` — el miembro no existe y el léxico sigue lleno |
 | 5 | `test/app/panel-edificio.dom.test.js` (el diálogo en SIMPLIFICADO) + `test/app/edificio-gml.dom.test.js` (que el número **llega al XML**, y que sin declarar sigue saliendo `xsi:nil`) |
 | 6 | `test/app/panel-edificio.dom.test.js` — fuera de rango se rechaza **diciendo que el rango es del ICUC**, y el máximo exacto sí entra |
-| 7 | ⏳ suite y `validar:xsd` ✅; **el guion 22 no está escrito** |
+| 7 | ✅ suite y `validar:xsd` ✅; **el guion existe desde el 2026-08-11 y sale `ok:true`** — se llama `27-piscina-precision.js` y no `22`: ver abajo |
 
 ## ⛔⛔ M2 se quedó corta, y el enunciado bueno es el de la tabla
 
@@ -293,9 +293,32 @@ que alguien lea ese 100 % como una verificación.
 
 ## Lo que queda, dicho
 
-- **El guion de humo `22` no está escrito.** Sin él no hay medida en navegador de
-  que el botón «Trabajo» quepa en la fila del rótulo ni de que el diálogo se lea a
-  1280×720. La fase **no se cierra**.
+- ~~**El guion de humo `22` no está escrito.**~~ ✅ **ESCRITO Y EN VERDE EL 2026-08-11**,
+  con el nombre `27-piscina-precision.js`. ⛔ **El número cambió dos veces y por el
+  mismo motivo**: esta ficha reservó el `22` y se lo quedó `22-arranque-vacio.js`
+  tres días después; al ir a escribirlo, el `26` ya se lo había llevado el
+  diccionario de errores desde otra sesión. Los números de esa carpeta son
+  posiciones en una lista, no identificadores de fase — el §32 es el guion 22 y es
+  de otra cosa. Mide las cinco cosas que jsdom no puede dar: el botón «Trabajo» en
+  la fila del rótulo (sin partirla, sin estirarla), el diálogo entero a 1280×720
+  con su campo y sus dos botones dentro (caja medida: **318,03 px** sobre 720, cero
+  recorte), el rechazo fuera del rango del ICUC **con un gesto real**, que la
+  precisión sobreviva a una mutación, y que una parte «Otra» no enseñe contadores
+  de plantas.
+
+  ⭐ **Y su PRIMERA corrida destapó un defecto real que la suite no veía**, que es
+  exactamente para lo que se escriben estos guiones: **declarar la precisión sin
+  edificio cargado la tiraba en silencio**. `app/cableado-edificio.js#aplicarMutacion`
+  se iba con un `return` mudo cuando el store estaba vacío —correcto para renombrar
+  o cambiar el modelo, que son mutaciones de algo que tiene que existir— y F21 metió
+  por ahí la única que **sí** se puede pedir con el store vacío, porque su diálogo
+  existe a propósito desde el primer momento (es el recorrido de la obra nueva).
+  Medido: se teclea 9,999, se pulsa aplicar, **el diálogo se cierra como si hubiera
+  guardado** y al reabrirlo el campo está vacío. Arreglado con `creaSiNoHay`, que es
+  la misma doctrina que «Añadir parte» ya aplicaba sesenta líneas más abajo. ⚠️ Y
+  conviene decir lo que **no** era: la mitad de `reconstruir` que esta fase tapó
+  **funciona** — con un edificio cargado la precisión sobrevive a añadir partes,
+  medido en el mismo recorrido.
 - **Ninguna de las dos mitades ha pasado por el ICUC.** El fichero que la Sede
   aceptó es el de F13, por la vía de fichero y sin piscina; que un GML **con**
   `OtherConstruction` y **con** precisión declarada cargue allí está sin medir.

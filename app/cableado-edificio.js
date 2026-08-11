@@ -1901,11 +1901,36 @@ export function cablearEdificio({
    * detecciones son justo lo que hay que enseñar: `conModelo` lleva la lista de
    * los siete atributos que se pierden al pasar a SIMPLIFICADO.
    *
+   * ── ⛔ EL `return` MUDO DE SIN-EDIFICIO, Y POR QUÉ AHORA TIENE UNA PUERTA ───
+   * Con el store vacío esta función se iba **sin decir nada**, y para las cuatro
+   * mutaciones de arriba eso es correcto: renombrar una parte, cambiar el modelo o
+   * escribir los atributos de un edificio que no existe no es una acción del
+   * usuario, es un botón que no debería haber estado ahí.
+   *
+   * Pero F21 metió por aquí una que **sí** se puede pedir con el store vacío: la
+   * precisión del trabajo profesional, cuyo diálogo existe A PROPÓSITO en los dos
+   * modelos y desde el primer momento (es el recorrido de una obra nueva, que
+   * empieza sin nada cargado). Medido en Chrome el 2026-08-11 con el guion 26: se
+   * teclea 9,999, se pulsa aplicar, **el diálogo se cierra como si hubiera
+   * guardado** y al reabrirlo el campo está vacío. El dato se tiraba en silencio,
+   * que es la regla de oro 1 rota en su forma más cara — la precisión acaba siendo
+   * `xsi:nil` en un documento que se firma.
+   *
+   * `creaSiNoHay` es la misma doctrina que «Añadir parte» ya aplicaba sesenta
+   * líneas más abajo, con su mismo literal de identidad: hay acciones que EMPIEZAN
+   * un edificio en vez de exigir uno. No se generaliza a las otras cuatro, porque
+   * para ellas el `return` sigue siendo la respuesta correcta.
+   *
    * @param {(edificio: object) => {edificio: object, detecciones: Array}} mutacion
    * @param {string} donde  Para la consola.
+   * @param {{creaSiNoHay?: boolean}} [opciones]
    */
-  function aplicarMutacion(mutacion, donde) {
-    const edificio = estado.get()
+  function aplicarMutacion(mutacion, donde, { creaSiNoHay = false } = {}) {
+    const edificio =
+      estado.get() ??
+      (creaSiNoHay
+        ? crearEdificio({ modelo: panelEdificio.valores().modelo, idLocal: IDENTIDAD_DIBUJADO })
+        : null)
     if (edificio === null) return
     try {
       const { edificio: nuevo, detecciones } = mutacion(edificio)
@@ -1976,9 +2001,13 @@ export function cablearEdificio({
       // declaro», que el GML dice con `xsi:nil`. Borrarla es una decisión del
       // técnico tan válida como ponerla, así que la mutación se aplica igual. El
       // panel ya ha rechazado lo ilegible y lo que se sale del rango del ICUC.
+      // `creaSiNoHay`: ver la cabecera de `aplicarMutacion`. Este diálogo se puede
+      // pedir con el store vacío —es el recorrido de la obra nueva— y hasta el
+      // 2026-08-11 el valor se tiraba en silencio ahí.
       aplicarMutacion(
         (e) => conPrecision(e, precision),
         'la escritura de la precisión del trabajo ha fallado',
+        { creaSiNoHay: true },
       )
       panelEdificio.cerrarTrabajo()
       return

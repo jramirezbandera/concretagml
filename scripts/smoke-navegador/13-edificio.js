@@ -221,7 +221,14 @@ const SUELO_HOLGURA = 24
  * vacía, es **405,08 px** (y 225,08 px a 1280×720, muy por encima de los suelos
  * de 120 y 124,57 px que vigilan los §10 y §16).
  */
-const CAJA_VERTICES_REFERENCIA = 405
+// ⭐ RE-MEDIDA EL 2026-08-11: **416 px**, y el 405 de arriba pasa a ser historia.
+// Chrome 1440×900, `#/parcela/edicion`, estado LIMPIO (IndexedDB borrada) y lista
+// de avisos vacía. Entre las dos medidas la aplicación cambió tres veces de forma
+// —los avisos salieron de la columna a un `<dialog>` (2026-08-07), el rail vertical
+// se convirtió en la barra de arriba (2026-08-10) y el renglón de motivo se retiró—,
+// así que **no se atribuyen los +11 px a ninguna**: atribuir sin haber construido
+// las variantes sería inventar. Lo que sí se afirma es lo que se midió hoy.
+const CAJA_VERTICES_REFERENCIA = 416
 
 /** El violeta claro de la huella (`viewer/partes.js#COLOR_HUELLA`), en `rgb()`. */
 const COLOR_HUELLA_RGB = 'rgb(167, 139, 250)'
@@ -547,6 +554,15 @@ const conmutadorAncho = (() => {
     // La cifra de la fase 0 (169,28 px): lo que quedaba libre ANTES de meter el
     // conmutador. Se DERIVA de lo medido en vez de copiarse.
     anchoLibreSinConmutadorPx: redondear(holguraPx + anchoConmutadorPx + gapPx),
+    // ⭐ EL SUELO DE VERDAD DESDE EL TOPBAR (2026-08-10). Ver la nota junto a la
+    // comprobación: la holgura INTERIOR de `.gml-chips` es ~0 por construcción
+    // desde que la fila vive en la barra y su caja se dimensiona por contenido.
+    // Lo que queda por apretar es lo que la zona tiene libre a su alrededor.
+    anchoLibreEnLaBarraPx:
+      chips.parentElement === null
+        ? null
+        : redondear(chips.parentElement.clientWidth - chips.getBoundingClientRect().width),
+    zonaDeLaFila: chips.parentElement === null ? null : chips.parentElement.className,
     // Lo que el `nowrap` habría escondido. Con `wrap` tiene que ser 0: si sale
     // positivo, algo se está recortando en silencio de todos modos.
     desbordeDelPanelPx:
@@ -586,12 +602,32 @@ if (conmutadorAncho.saltoDeLinea) {
       'Los rótulos «Parcela» y «Edificio» no pueden crecer: acórtalos.',
   )
 }
-if (conmutadorAncho.holguraPx !== null && conmutadorAncho.holguraPx <= SUELO_HOLGURA) {
+// ⛔ **EL SUELO SE MUDÓ DE SITIO EL 2026-08-10 Y ESTA COMPROBACIÓN NO SE ENTERÓ.**
+// `.gml-chips` vivía en la cabecera del PANEL, una caja de ancho FIJO (343 px de
+// contenido): ahí «holgura» era lo que quedaba antes de que la fila se partiera, y
+// 24 px era un suelo con sentido. Desde la rebanada 2 del topbar los chips y el
+// conmutador viven en la BARRA, cuya zona se dimensiona por CONTENIDO — así que la
+// holgura interior es ~0 **por construcción**, no por apuro. Medido el 2026-08-11 a
+// 1280×720 y a 1440×900: caja 288,80 px, ocupado 288,80, holgura **0,20 px** en las
+// dos, sin salto de línea y sin desborde. El guardián llevaba desde entonces
+// acusando a la barra de estar a punto de romperse por un número que ya solo
+// describe cómo encajan las cajas.
+//
+// Lo que lo sustituye mide lo MISMO en el sitio nuevo: cuánto ancho libre le queda
+// a la fila dentro de la barra antes de que la rejilla la apriete. Hoy son 991,20 px
+// a 1280×720 (y 1.151,20 a 1440×900), así que el suelo de 24 sigue siendo el umbral
+// correcto y ahora vuelve a significar algo. Las dos afirmaciones duras del guardián
+// —que la fila NO se parte y que nadie recorta en silencio— no se tocan: son las de
+// arriba y abajo, y ésas sí siguen valiendo palabra por palabra.
+if (
+  conmutadorAncho.anchoLibreEnLaBarraPx !== null &&
+  conmutadorAncho.anchoLibreEnLaBarraPx <= SUELO_HOLGURA
+) {
   problemas.push(
-    `Solo quedan ${conmutadorAncho.holguraPx} px de holgura en \`.gml-chips\` y el suelo es ` +
-      `${SUELO_HOLGURA} px (la fase 0 midió 46,11). Todavía no ha saltado de línea, pero el ` +
-      'siguiente carácter que alguien le añada a un rótulo o a un chip la parte, y eso cuesta ' +
-      '~20–29 px de la caja de vértices sin que nada avise.',
+    `Solo quedan ${conmutadorAncho.anchoLibreEnLaBarraPx} px libres en la zona de la barra donde ` +
+      `viven el conmutador y los chips, y el suelo es ${SUELO_HOLGURA} px (medido el 2026-08-11: ` +
+      '991,20 px a 1280×720). Todavía no ha saltado de línea, pero el siguiente rótulo que crezca ' +
+      '—o la siguiente zona de la barra que se ensanche— la parte, y eso cuesta ~20–29 px medidos.',
   )
 }
 if (conmutadorAncho.desbordeDelPanelPx !== null && conmutadorAncho.desbordeDelPanelPx > 0) {
@@ -954,6 +990,11 @@ const repartoDeAltura = (() => {
             contenidoPx: avisosCaja.scrollHeight,
             tarjetas: tarjetasDeAvisos(),
           },
+    // ⭐ Dónde vive la lista de avisos, que desde el 2026-08-07 es la pregunta que
+    // decide si este presupuesto tiene uno o dos encogibles. Un `0 px` de la caja
+    // significa cosas OPUESTAS según la respuesta: dentro del diálogo cerrado es lo
+    // normal; dentro de la columna es un aplastamiento.
+    avisosEnLaColumna: avisosCaja === null ? null : avisosCaja.closest('dialog') === null,
     // El pie crece en esta rama: la ficha libera, pero los DOS renglones
     // `role="status"` con los motivos de los CTA apagados son párrafos enteros.
     piePx: pie === null ? null : redondear(pie.getBoundingClientRect().height),
@@ -1021,15 +1062,23 @@ if (repartoDeAltura.medido) {
         `${repartoDeAltura.origenSegunT16Px}.`,
     )
   }
-  if (avisosCaja !== null && avisosCaja.altoPx !== null && avisosCaja.altoPx < 16) {
+  // ⛔ **LA CAJA DE AVISOS DEJÓ DE SER INQUILINA DEL PANEL EL 2026-08-07**, y esta
+  // comprobación acusaba por eso. `#avisos` vive HOY dentro del `<dialog>` de
+  // avisos: medido el 2026-08-11, `#avisos.closest('dialog')` no es `null` y su
+  // caja mide 0 px **porque el diálogo está cerrado**, que es lo correcto. El
+  // guardián leía ese 0 y lo denunciaba como «un aviso que el usuario no puede
+  // leer» — la acusación exactamente contraria a la verdad, porque la mudanza a
+  // diálogo se hizo para que los avisos dejaran de competir por la columna.
+  //
+  // Lo que la sustituye es la afirmación que hoy protege algo: que **no ha vuelto**
+  // a la columna. Si alguien la devuelve al panel, los dos encogibles vuelven a ser
+  // dos y todo el presupuesto de altura de este bloque cambia de forma.
+  if (avisosCaja !== null && repartoDeAltura.avisosEnLaColumna === true) {
     problemas.push(
-      `LA CAJA DE AVISOS MIDE ${avisosCaja.altoPx} px en la rama EDIFICIO **con el panel vacío** (para ` +
-        `${avisosCaja.contenidoPx} px de contenido y ${avisosCaja.tarjetas} tarjeta(s)): no cabe ni una ` +
-        'línea de 16 px. Es la SEGUNDA víctima del mismo reparto, y un aviso que la aplicación escribe ' +
-        'y el usuario no puede leer es un error silencioso (regla de oro 1). ⚠️ El panel CABE ' +
-        `(sobresuscripción ${repartoDeAltura.sobresuscripcionPx} px, recorte ` +
-        `${repartoDeAltura.recorteDelPanelPx}): lo que falta es holgura para los dos encogibles, no ` +
-        `sitio para el panel. Faltan ${redondear(16 - avisosCaja.altoPx)} px.`,
+      'La lista de avisos ha VUELTO a la columna del panel (`#avisos` ya no cuelga de un `<dialog>`). ' +
+        'Salió de ahí el 2026-08-07 precisamente porque se comía hasta 34vh que se reparten la tabla ' +
+        'de vértices y el pie; con ella dentro, el presupuesto de altura de esta rama tiene DOS ' +
+        'encogibles otra vez y las cifras de este bloque dejan de valer.',
     )
   }
   // ⭐⭐ EL GUARDIÁN QUE HABRÍA CAZADO EL DEFECTO A EN LA PRIMERA CORRIDA, y por eso
@@ -1263,12 +1312,31 @@ const tope = (() => {
   }
 })()
 
-// ── 7 · Soltar un `.dxf` con la rama PARCELA: no carga, y lo DICE ──────────
+// ── 7 · Soltar un `.dxf` con la rama PARCELA: va a MEDICIÓN, y lo DICE ─────
 //
 // El destino de un dibujo se resuelve por la RAMA ACTIVA (`app/main.js`, paso 9,
-// resolución tardía). Con la rama PARCELA no hay a quién dárselo —la entrada por
-// DXF de la parcela es la otra mitad de la asimetría que dejó F10— y «no ha pasado
-// nada» es lo único que el usuario no puede interpretar.
+// resolución tardía).
+//
+// ⛔ **ESTE BLOQUE CAMBIÓ DE CONTRATO EL 2026-08-11, y lo que cambió es la
+// aplicación, no el criterio.** Decía: «con la rama PARCELA no hay a quién dárselo
+// —la entrada por DXF de la parcela es la otra mitad de la asimetría que dejó
+// F10—», y exigía que la app RECHAZARA el dibujo diciendo «entra por la rama
+// Edificio». Esa asimetría **la cerró F18** (2026-08-06): desde entonces un `.dxf`
+// soltado en PARCELA entra por el recorrido de MEDICIÓN PROPIA, y F22 le añadió la
+// elección cuando el dibujo trae varias fincas. O sea que las dos aserciones de
+// aquel día —«no puede cargar nada» y «tiene que nombrar la rama Edificio»— hoy
+// acusan a la aplicación de hacer bien lo que se construyó después.
+//
+// Lo que SÍ se conserva, porque sigue siendo cierto y es lo que de verdad
+// protegía este bloque:
+//   · **la app no puede quedarse muda** (regla de oro 1), y
+//   · **no puede escribir en el store de la OTRA rama** mientras el usuario mira
+//     ésta — que es la contaminación cruzada que F11 estrenó al haber dos stores.
+//
+// Medido hoy con `poly_clasica.dxf` y estado limpio: el recorrido de medición lo
+// atiende y responde «No ha entrado ninguna parcela de ese fichero.», con la tabla
+// de vértices intacta y CERO huellas. Que ese fixture concreto no produzca parcela
+// es un resultado legítimo del recorrido, no un rechazo por rama.
 
 botonParcela.click()
 await esperar(() => app.getAttribute('data-rama') === 'PARCELA', 3000, 'que se vuelva a PARCELA')
@@ -1325,18 +1393,24 @@ if (clasica.file === null) {
         '(regla de oro 1). Tenía que avisar y decir POR DÓNDE sí entra.',
     )
   }
-  if (dxfEnParcela.diceLaViaQueSiExiste === false) {
+  // ⛔ Las dos aserciones que vivían aquí —«tiene que nombrar la rama Edificio» y
+  // «no puede cambiar la tabla de vértices»— se RETIRAN el 2026-08-11: F18 hizo
+  // que el `.dxf` entre por MEDICIÓN PROPIA en esta rama, así que las dos acusaban
+  // a la aplicación de cumplir un requisito posterior (ver la cabecera del §7). Se
+  // dejan escritas y no borradas por lo mismo que el resto del fichero conserva sus
+  // descartes: el criterio de entonces era correcto con la aplicación de entonces.
+  //
+  // Lo que las sustituye es la afirmación que hoy sí distingue lo bueno de lo malo:
+  // que el dibujo lo haya atendido el recorrido de MEDICIÓN y no el de edificio.
+  dxfEnParcela.loAtiendeMedicion =
+    dxfEnParcela.textoDelAviso !== null &&
+    /parcela|medición|medicion|finca|recinto/i.test(dxfEnParcela.textoDelAviso)
+  if (dxfEnParcela.loAtiendeMedicion === false) {
     problemas.push(
-      'El aviso de «ese dibujo no entra en la rama Parcela» no dice por dónde sí entra: ' +
+      'Un `.dxf` soltado con la rama PARCELA lo ha contestado algo que no habla de parcelas: ' +
         JSON.stringify(dxfEnParcela.textoDelAviso) +
-        '. Decir «no» sin decir «por dónde» es la mitad de un mensaje.',
-    )
-  }
-  if (dxfEnParcela.filasDespues !== filasAntes) {
-    problemas.push(
-      `Soltar un \`.dxf\` con la rama PARCELA ha cambiado la tabla de vértices (${filasAntes} → ` +
-        `${dxfEnParcela.filasDespues} filas): reabrir un dibujo como parcela NO entra en F11 y aquí se ` +
-        'ha cargado algo.',
+        '. Desde F18 esta rama tiene entrada por fichero y el dibujo va al recorrido de MEDICIÓN ' +
+        'PROPIA; si el mensaje no habla de eso, el enrutado por rama activa se ha movido.',
     )
   }
   if (dxfEnParcela.huellasEnElMapa > 0 || dxfEnParcela.partesEnElPanel > 0) {
@@ -1352,6 +1426,20 @@ if (clasica.file === null) {
         'DATOS del Catastro. Leer un fichero local no consulta nada.',
     )
   }
+}
+
+// ⭐ LA LÍNEA BASE DEL §11, TOMADA AQUÍ Y NO EN EL ARRANQUE (2026-08-11). Es el
+// último instante en el que la rama PARCELA está puesta y ya ha pasado todo lo que
+// este guion le hace por el camino —en concreto el `.dxf` del §7, que desde F18 la
+// aplicación carga como MEDICIÓN PROPIA y cambia legítimamente la tabla y los CTA—.
+// Con la base en el arranque, el §11 acusaba a `cablearRama` de perder una geometría
+// que había sustituido el propio guion. Lo que M10 afirma no cambia: que la IDA Y
+// VUELTA de rama no se lleve por delante el nodo, su valor, sus oyentes ni el pie.
+const antesDeLaVuelta = {
+  filas: filasDeTabla(),
+  ctaGenerarApagado: ctaGenerar === null ? null : ctaGenerar.disabled,
+  ctaDiagnosticarApagado: ctaDiagnosticar === null ? null : ctaDiagnosticar.disabled,
+  renglonGenerar: renglonGenerar === null ? null : renglonGenerar.textContent.trim(),
 }
 
 // ── 8 · Soltar el mismo `.dxf` con la rama EDIFICIO: partes y huellas ──────
@@ -1955,6 +2043,12 @@ const topeConPartes = (() => {
             tarjetas: tarjetasDeAvisos(),
           }
     })(),
+    // Ver la nota del §3bis: desde el 2026-08-07 esto es lo que decide si un
+    // `0 px` de la caja es normal (diálogo cerrado) o un aplastamiento (columna).
+    avisosEnLaColumna: (() => {
+      const caja = $('#avisos')
+      return caja === null ? null : caja.closest('dialog') === null
+    })(),
     // ⭐ **CUÁNTOS PÍXELES FALTAN, que es la pregunta que hay que contestar cuando
     // el panel ya CABE pero los encogibles siguen sin sitio.** «Cabe» es un
     // booleano y no dice nada accionable; esto es una resta con dos umbrales
@@ -2034,24 +2128,41 @@ if (topeConPartes.medido && topeConPartes.filasEnterasQueCaben === 0) {
       '`topeConPartes.hijos` / `origenDesglose` / `pieDesglose`.',
   )
 }
+// ⛔ RETIRADA EL 2026-08-11, por el mismo motivo que su gemela de arriba: con la
+// lista de avisos dentro de un `<dialog>` cerrado, su caja mide 0 px SIEMPRE y esta
+// comprobación salía roja en cada corrida acusando al panel de aplastar algo que ya
+// no vive en el panel. La afirmación que sí protege —«no ha vuelto a la columna»—
+// se hace una sola vez, arriba; repetirla aquí no añade nada.
+//
+// Lo que este bloque SÍ tiene que seguir vigilando con datos cargados es el recorte
+// del panel, y ése está justo debajo, exigido a CERO EXACTO.
 if (
   topeConPartes.medido &&
   topeConPartes.avisos !== null &&
-  topeConPartes.avisos.tarjetas > 0 &&
-  topeConPartes.avisos.altoPx < 16
+  topeConPartes.avisosEnLaColumna === true
 ) {
   problemas.push(
-    `Con datos cargados la caja de avisos mide ${topeConPartes.avisos.altoPx} px y lleva ` +
-      `${topeConPartes.avisos.tarjetas} tarjeta(s) que necesitan ${topeConPartes.avisos.contenidoPx} px: ` +
-      'no cabe ni una línea. Es la segunda víctima del mismo reparto, y en el peor momento — justo ' +
-      'cuando la aplicación tiene algo que decir sobre lo que se acaba de cargar. Faltan ' +
-      `${topeConPartes.deficit.paraUnaLineaDeAvisosPx} px para una línea y ` +
-      `${topeConPartes.deficit.paraTodosLosAvisosPx} px para las tarjetas enteras.`,
+    'Con datos cargados, la lista de avisos ha vuelto a la columna del panel: el presupuesto de ' +
+      'altura de esta rama vuelve a tener DOS encogibles y las cifras de este bloque dejan de valer.',
   )
 }
 
 // ── 11 · ⭐ LA VUELTA: el panel de parcela sigue vivo (M10) ────────────────
-
+//
+// ⛔ **LA LÍNEA BASE DE ESTE BLOQUE SE TOMA AQUÍ, NO EN EL ARRANQUE (2026-08-11).**
+// Comparaba contra `arranque.*`, y eso era correcto mientras NADA de lo que el
+// guion hace por el camino pudiera tocar la parcela. Desde F18 sí puede: el §7
+// suelta un `.dxf` que la aplicación —ya en «Entrada», adonde la llevó su propia
+// autoridad de navegación— carga como MEDICIÓN PROPIA, así que la tabla pasa
+// legítimamente de 15 filas a las del dibujo y con ella cambian los CTA que
+// dependen del dato. Comparar contra el arranque hacía que el guion acusara a
+// `cablearRama` de «perder la geometría por el camino» y de no restaurar unos CTA
+// que **no tenía que restaurar a ese valor**: el estado había cambiado por una
+// acción del propio guion, no por la conmutación.
+//
+// Lo que M10 afirma es acotado y no cambia: que **la conmutación de rama** no se
+// lleva por delante el nodo, su valor, sus oyentes ni el estado del pie. Eso se
+// mide contra el instante ANTERIOR a la ida y vuelta, que es lo que hay aquí.
 botonParcela.click()
 await esperar(() => app.getAttribute('data-rama') === 'PARCELA', 3000, 'que se vuelva a la rama PARCELA')
 await asentarPanel(altoCajaVertices)
@@ -2091,11 +2202,14 @@ const idaYVuelta = {
   ctaDiagnosticarApagado: ctaDiagnosticar === null ? null : ctaDiagnosticar.disabled,
   renglonGenerar: renglonGenerar === null ? null : renglonGenerar.textContent.trim(),
   renglonDiagnosticar: renglonDiagnosticar === null ? null : renglonDiagnosticar.textContent.trim(),
-  ctaGenerarRestaurado: ctaGenerar === null ? null : ctaGenerar.disabled === arranque.ctaGenerarApagado,
+  ctaGenerarRestaurado:
+    ctaGenerar === null ? null : ctaGenerar.disabled === antesDeLaVuelta.ctaGenerarApagado,
   ctaDiagnosticarRestaurado:
-    ctaDiagnosticar === null ? null : ctaDiagnosticar.disabled === arranque.ctaDiagnosticarApagado,
+    ctaDiagnosticar === null
+      ? null
+      : ctaDiagnosticar.disabled === antesDeLaVuelta.ctaDiagnosticarApagado,
   renglonGenerarRestaurado:
-    renglonGenerar === null ? null : renglonGenerar.textContent.trim() === arranque.renglonGenerar,
+    renglonGenerar === null ? null : renglonGenerar.textContent.trim() === antesDeLaVuelta.renglonGenerar,
   // ⭐ Y las DOS marcas que `cablearRama` pone SOLO mientras la rama EDIFICIO está
   // puesta tienen que irse con ella. Un `aria-describedby` superviviente apuntaría,
   // en la rama PARCELA, a un renglón vacío o —peor— al que el cableado del GML use
@@ -2163,16 +2277,17 @@ if (idaYVuelta.querySelectorDevuelveElDeParcela === false) {
       'el contrato K.1 prohíbe repetir un `data-*` entre ramas.',
   )
 }
-if (idaYVuelta.filas !== 15) {
+if (idaYVuelta.filas !== antesDeLaVuelta.filas) {
   problemas.push(
-    `Al volver a la rama PARCELA la tabla tiene ${idaYVuelta.filas} filas y tenía 15: la geometría se ` +
-      'ha perdido por el camino.',
+    `Al volver a la rama PARCELA la tabla tiene ${idaYVuelta.filas} filas y antes de conmutar tenía ` +
+      `${antesDeLaVuelta.filas}: la geometría se ha perdido en la IDA Y VUELTA. (La línea base es la de ` +
+      'justo antes de conmutar, no la del arranque: ver la nota del §11.)',
   )
 }
 if (idaYVuelta.ctaGenerarRestaurado === false || idaYVuelta.ctaDiagnosticarRestaurado === false) {
   problemas.push(
-    `Los CTA del pie no han vuelto a como estaban (generar: ${arranque.ctaGenerarApagado} → ` +
-      `${idaYVuelta.ctaGenerarApagado}; diagnosticar: ${arranque.ctaDiagnosticarApagado} → ` +
+    `Los CTA del pie no han vuelto a como estaban (generar: ${antesDeLaVuelta.ctaGenerarApagado} → ` +
+      `${idaYVuelta.ctaGenerarApagado}; diagnosticar: ${antesDeLaVuelta.ctaDiagnosticarApagado} → ` +
       `${idaYVuelta.ctaDiagnosticarApagado}). \`cablearRama\` guarda lo que tenía cada uno antes de ` +
       'apagarlo justamente para poder devolverlo.',
   )
@@ -2180,7 +2295,7 @@ if (idaYVuelta.ctaGenerarRestaurado === false || idaYVuelta.ctaDiagnosticarResta
 if (idaYVuelta.renglonGenerarRestaurado === false) {
   problemas.push(
     'El renglón de «Generar GML» no ha vuelto a lo que decía antes de la conmutación: se ha quedado ' +
-      `con ${JSON.stringify(idaYVuelta.renglonGenerar)} y decía ${JSON.stringify(arranque.renglonGenerar)}.`,
+      `con ${JSON.stringify(idaYVuelta.renglonGenerar)} y decía ${JSON.stringify(antesDeLaVuelta.renglonGenerar)}.`,
   )
 }
 if (idaYVuelta.describedbyDelSegundoCta !== null) {

@@ -5,45 +5,42 @@ contexto y qué la bloquea, para que retomarla no cueste rediseñarla.
 
 ---
 
-## F17 fase 2 · El colindante recortado
+## ~~F17 fase 2 · El colindante recortado~~ ✅ ENTREGADO — se conserva como lección
 
-**Estado:** aplazado · **Bloqueado por:** la feature «dos puertas, no una» (fondo catastral
-estable) · **Anotado el:** 2026-08-07
+**Estado:** ⛔ **CERRADO COMO TODO el 2026-08-11.** Se entregó el 2026-08-10 y se publicó
+el 2026-08-11 en el commit `f1a8436`, como **[F23](spec/feature-23-colindante-recortado.md)**
+(fila **P13d** del índice por prioridad). Entran `derivacion/vecino.js`,
+`app/colindantes.js` y el guion `25-colindante-recortado.js`.
 
-**Qué.** Sacar las parcelas vecinas de la clausura de `app/cableado-diagnostico.js` al
-modelo, para poder editarlas y emitir sus GML junto al de la parcela propia.
+⛔ **Esta entrada estuvo diciendo «aplazado · semanas, no días» EL MISMO DÍA en que el
+código entraba en el árbol**, y por eso no se borra: el fallo de registro es el aprendizaje.
+F23 es la única fase de este proyecto construida **sin pasar por `spec/`** —nació de un
+defecto reportado con captura, se diseñó en la conversación y se ejecutó en la misma
+sesión—, así que ni `SPEC.md` §4, ni §5, ni este fichero se enteraron. **Lo que no tiene
+ficha no tiene quién lo desactualice.**
 
-**Por qué.** Es lo único que un CAD no puede hacer de ninguna manera, y es lo que convierte
-«he ajustado mi lindero» en «el IVG sale positivo porque el vecino también cuadra». Cuando
-mueves un lindero compartido, la parcela del vecino queda recortada y la Sede necesita ver
-las dos alteraciones en el mismo expediente.
+⭐ **Y los «contras» que justificaban el aplazamiento eran falsos, medido.** Decían que
+`model/parcela.js` «no tiene dónde guardar unas vecinas» y que había que sacarlas de la
+clausura de `app/cableado-diagnostico.js` al modelo, con colección de geometrías en el
+store, selección de geometría activa y undo por capa. **Las vecinas nunca estuvieron en
+ninguna clausura**: su fuente es `app/cableado-catastro.js#alColindantes`, una suscripción
+pública con `Set` de oyentes y baja, **de la que ya colgaban tres consumidores** (el
+diagnóstico de F07, el informe de F09 y el snap de F06). `cableado-diagnostico.js` era **un
+suscriptor más que se guardaba una copia**. `model/parcela.js` **no se tocó**, y el registro
+nuevo cuesta **cero peticiones**.
 
-**Pros.**
-- `colindantes()` (`app/cableado-catastro.js:1229`) ya descarga las vecinas del WFS y ya
-  tiene botón en la interfaz. Hoy solo alimenta `snap.dianas()`.
-- F17 ya entrega N parcelas en un solo sobre y la Sede lo aceptó con **IVG positivo real**
-  (CSV `XMWPXCN9J8DB9J89`, tipo Segregación).
-- `recintosDeGeometriaTurf` (`geo/poligono.js:292`) ya devuelve una entrada por pieza
-  disjunta, así que las componentes conexas tras una booleana ya están resueltas.
+La lección no es que la estimación fallara: es **dónde se miró para hacerla**. Se estimó
+sobre el sitio donde el dato se **guardaba** —una copia— en vez de sobre el sitio de donde
+**venía** —un canal con tres oyentes—. Antes de fechar «semanas», localizar la FUENTE.
 
-**Contras.**
-- `model/parcela.js` «no tiene dónde guardar unas vecinas» (`cableado-catastro.js:584`).
-  Exige colección de geometrías en el store, selección de geometría activa, undo por capa y
-  repensar quién es «la parcela» del informe y del expediente.
-- Semanas, no días.
+**Lo que sigue abierto de todo esto, y no es código:** la verdad externa. El IVG **nunca ha
+visto** un expediente que recorte la parcela de otro titular —`CHECKLIST-HUMANO.md` §21 y
+§22—, y ése es el riesgo real de la fase: es jurídico, no geométrico. Si la Sede no lo
+admite, F23 sirve para **ver** y no para **entregar**.
 
-**Contexto.** Diseñado y diferido en
-`~/.gstack/projects/GML/Javier-main-design-20260802-165651.md`, sección **«FASE 2 · El
-colindante recortado (diferida, no planificada aquí)»**. Aquel documento ya dice qué hace
-falta: sacar `vecinas` de la clausura al modelo, la interfaz de asignación de trozos, y el
-presupuesto de red conjunto.
-
-**Pregunta abierta que hay que medir ANTES de planificarlo.** ¿Cuántos colindantes se ven
-afectados en un expediente típico: uno, o varios? Decide si la interfaz necesita selección
-o basta con una lista corta. Sigue sin respuesta desde el 2026-08-02.
-
-**Por dónde empezar.** `app/cableado-diagnostico.js` — la clausura donde hoy viven
-`vecinas`. Y leer antes el design doc de agosto: la mitad del trabajo de diseño está hecha.
+**La pregunta abierta del 2026-08-02 quedó contestada de paso:** son **varios** colindantes,
+no uno (en el expediente real `29050A01000144` el exceso cae sobre dos, 20,29 y 5,19 m²), y
+por eso el reparto se pregunta **pieza a pieza** en vez de con una lista corta.
 
 ---
 
@@ -168,6 +165,49 @@ ya caben las tres (medido). No parece que vaya a subir.
 
 **Por dónde empezar.** `estilos/app.css`, `.gml-panel-cabecera`, y la conversación de la
 rebanada 2 sobre qué sube a la barra. Volver a lanzar el guion 14 a 1280×720 después.
+
+---
+
+## El chip dice «0 errores» mientras el panel dice «14 errores»
+
+**Estado.** Abierto. **Medido** el 2026-08-11 en Chrome, en las DOS ramas. Lo destapó
+rehabilitar el guion 13; no es de F11 ni de F21.
+
+**Qué.** La aplicación cuenta los errores que bloquean la generación **en dos sitios con
+dos fuentes distintas**, y en pantalla se contradicen:
+
+| | qué dice | de dónde sale |
+|---|---|---|
+| El renglón del panel | «14 errores bloquean la generación del GML: Parte 1 no tiene…» | la validación, **en vivo**, en cuanto entra el dato |
+| El chip de la barra | «0 errores» | el canal de avisos, que solo se puebla **al pulsar** «Generar GML» |
+| El filtro del diálogo | «Errores 0» | el mismo canal |
+
+Está en la captura que el autor mandó el 2026-08-11 con la app **vacía**: chip «0 errores»
+y caja roja diciendo «1 error bloquea la generación del GML: La parcela no tiene ningún
+recinto». Y con un edificio de 7 partes sin plantas: chip «0 errores», panel «14 errores».
+
+**Por qué importa más de lo que parece.** No es un contador desalineado: es que **los
+motivos que bloquean no llegan al diálogo de avisos**, que desde el 2026-08-07 es el sitio
+donde vive la lista larga. El renglón enumera dos de catorce y remata con «(…y 12 motivo(s)
+más.)» — y esos doce **no se pueden leer en ninguna parte**. Se comprobó antes de proponer
+nada: el diálogo tenía 6 tarjetas y ninguna era de los 14.
+
+**Lo que ya se hizo, y por qué no basta.** El renglón se acotó a `max-height: 96px` con
+scroll propio, porque a 1280×720 con 14 errores medía 136,75 px y el panel **recortaba
+13 px** — o sea que el texto que dice por qué no puedes generar caía por debajo del borde.
+Eso arregla el recorte y **no arregla la contradicción**.
+
+**Las dos salidas, sin elegir.**
+1. **Que los errores de validación entren en el canal de avisos** en cuanto se conocen. El
+   diálogo ya tiene filtro de errores y el chip ya sabe contarlos: los dos existen y están
+   vacíos. ⚠️ El riesgo a medir antes es la frecuencia — la validación corre a cada cambio,
+   y publicar catorce tarjetas por tecleo es peor que el problema.
+2. **Que el chip no cuente lo que no puede contar.** Si el canal solo se puebla al pulsar,
+   el rótulo «0 errores» está mintiendo por omisión y debería decir otra cosa.
+
+**Por dónde empezar.** `app/main.js#recorrido` (publica los errores **solo** al pulsar, con
+su comentario ya escrito), `app/avisos.js` (el chip y su recuento) y el gemelo de edificio
+en `app/cableado-edificio-gml.js#motivoDeBloqueo`.
 
 ---
 

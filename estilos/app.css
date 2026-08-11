@@ -2836,6 +2836,23 @@ body {
   padding: var(--space-3) var(--space-6);
   border-top: 1px solid var(--color-border-sub);
   background: var(--color-bg-primary);
+  /* ⛔ EL TOPE ARREGLA UN RECORTE MEDIDO, no es aire (2026-08-11). Este renglón es
+     el ÚNICO hijo del panel cuyo alto lo escribe el CONTENIDO: `motivoDeBloqueo`
+     enumera dos motivos, y los de edificio son de dos frases. Medido en Chrome a
+     1280×720 —el suelo declarado— con las 7 partes del DXF de consulta masiva y
+     14 errores de plantas: el renglón medía **136,75 px**, más que la cabecera
+     del panel (102,92), y `.gml-panel` —que es `overflow: hidden`— **recortaba
+     13 px**. Lo que se caía por abajo era este mismo renglón: el texto que dice
+     por qué no puedes generar el GML, ilegible por debajo del borde.
+     ⚠️ Y el tope NO esconde nada, que es la razón de que sea `max-height` y no
+     menos motivos en el mensaje: con `overflow-y: auto` el texto entero sigue
+     alcanzable dentro de su caja, y lo que se acota es lo que le quita a la
+     lista de partes. Recortar la enumeración habría dejado 13 de 14 motivos sin
+     ninguna forma de leerse — y ésos NO están en el diálogo de avisos (medido:
+     el chip dice «0 errores» con este renglón diciendo 14; ver TODOS.md).
+     96 px = 12 × 8 de la rejilla, unas cinco líneas a 11/1,35 con su relleno. */
+  max-height: 96px;
+  overflow-y: auto;
 }
 
 /* ── ⭐ EL ERROR DEJA DE SER TEXTO SUELTO (revisión de diseño, 2026-08-10) ────
