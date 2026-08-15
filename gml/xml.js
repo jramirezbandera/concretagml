@@ -26,6 +26,12 @@
 //      · cualquier entidad que no sea una de las cinco predefinidas o numérica.
 //      · secciones `<! … >` que no sean comentario ni CDATA.
 //      · anidamiento por encima de PROFUNDIDAD_MAXIMA.
+//      · caracteres que XML 1.0 §2.2 prohíbe (controles C0 salvo \t \n \r,
+//        mitades de par subrogado sueltas, U+FFFE/U+FFFF): al LEER se anotan
+//        como error de documento (un parser conforme rechaza el fichero entero
+//        por ellos); al ESCRIBIR, `escaparTexto`/`escaparAtributo` LANZAN,
+//        porque escaparlos no los salva —`&#11;` es tan ilegal como el 0x0B
+//        literal— y emitirlos sería un fichero mal formado en silencio.
 // Este es el precedente de `test/contrato.test.js` (su traductor glob→RegExp):
 // un subconjunto diminuto que REVIENTA CON MENSAJE ante lo que no soporta, en vez
 // de traducirlo mal calladamente. Si algún día hace falta más, se amplía aquí y
@@ -327,13 +333,48 @@ function leerReferencia(ctx) {
   return `&${cuerpo};`
 }
 
+/**
+ * Anota el PRIMER carácter ilegal de XML 1.0 (§2.2) de un trozo LITERAL del
+ * documento (texto de contenido, valor de atributo o CDATA). El lector no lo
+ * retira ni lo sustituye —es dato del usuario y tocarlo sería el cambio callado
+ * que prohíbe la regla de oro 1— pero tampoco lo calla: un parser conforme
+ * (jsdom, la Sede) rechaza el documento ENTERO por él, y hasta esta anotación
+ * los controles literales atravesaban la lectura sin dejar rastro mientras
+ * {@link esCaracterXml} solo juzgaba las referencias numéricas. UNO por trozo:
+ * localiza el problema sin sepultar el informe.
+ *
+ * @param {object} ctx
+ * @param {number} base   Índice del primer carácter de `trozo` en `ctx.t`.
+ * @param {string} trozo  Texto literal, tal cual está en el documento.
+ */
+function anotarCaracteresIlegales(ctx, base, trozo) {
+  if (!RE_SOSPECHA_CARACTER_ILEGAL.test(trozo)) return
+  let indice = 0
+  for (const c of trozo) {
+    const cp = c.codePointAt(0)
+    if (!esCaracterXml(cp)) {
+      const hex = cp.toString(16).toUpperCase().padStart(4, '0')
+      anotar(
+        ctx,
+        base + indice,
+        `el carácter U+${hex} no es válido en XML 1.0 (§2.2), ni literal ni como referencia ` +
+          'numérica: el documento está mal formado. Elimínalo del fichero.',
+      )
+      return
+    }
+    indice += c.length
+  }
+}
+
 /** Lee texto de contenido hasta el siguiente `<`, expandiendo referencias. */
 function leerTexto(ctx) {
   let salida = ''
   for (;;) {
     let j = ctx.i
     while (j < ctx.t.length && ctx.t[j] !== '<' && ctx.t[j] !== '&') j++
-    salida += ctx.t.slice(ctx.i, j)
+    const trozo = ctx.t.slice(ctx.i, j)
+    anotarCaracteresIlegales(ctx, ctx.i, trozo)
+    salida += trozo
     ctx.i = j
     if (j >= ctx.t.length || ctx.t[j] === '<') return salida
     salida += leerReferencia(ctx)
@@ -357,6 +398,11 @@ function leerValorAtributo(ctx, comilla, nombreAtr) {
     }
     const c = ctx.t[ctx.i]
     if (c === comilla) {
+      // Sobre el TROZO CRUDO del documento, no sobre `salida`: las referencias
+      // ya expandidas son texto legal (`&#11;` ilegal se queda sin expandir y ya
+      // está anotado por `leerReferencia`), y lo que se busca es el control que
+      // venía LITERAL en el fichero.
+      anotarCaracteresIlegales(ctx, inicio, ctx.t.slice(inicio, ctx.i))
       ctx.i++
       return salida
     }
@@ -402,6 +448,10 @@ function leerCdata(ctx) {
     abortar(ctx, inicio, 'una sección CDATA abierta con «<![CDATA[» no se cierra con «]]>».')
   }
   const contenido = ctx.t.slice(ctx.i + 9, fin)
+  // CDATA protege de la expansión de entidades, NO de los caracteres ilegales:
+  // un control C0 dentro de `<![CDATA[…]]>` sigue haciendo el documento mal
+  // formado (XML 1.0 §2.2), y jsdom lo rechaza igual.
+  anotarCaracteresIlegales(ctx, inicio + 9, contenido)
   ctx.i = fin + 3
   return contenido
 }
@@ -987,6 +1037,50 @@ const ESCAPES_ATRIBUTO = Object.freeze({
 })
 
 /**
+ * Patrón de SOSPECHA de carácter ilegal en XML 1.0 (§2.2): los controles C0
+ * salvo `\t \n \r`, las unidades de subrogado y los dos no-caracteres del BMP.
+ * Es un pre-filtro barato en O(n): puede casar con la mitad de un par subrogado
+ * VÁLIDO (un emoji es legal en XML), así que el veredicto lo da siempre
+ * {@link esCaracterXml} recorriendo PUNTOS DE CÓDIGO, no unidades UTF-16.
+ */
+const RE_SOSPECHA_CARACTER_ILEGAL =
+  /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uD800-\uDFFF\uFFFE\uFFFF]/
+
+/**
+ * ⛔ Última barrera del ESCRITOR contra los caracteres que XML 1.0 prohíbe
+ * INCLUSO como referencia numérica (§2.2): los controles C0 distintos de
+ * `\t \n \r` (0x00–0x08, 0x0B, 0x0C, 0x0E–0x1F), las mitades sueltas de par
+ * subrogado y U+FFFE/U+FFFF. Escaparlos no los salva —`&#11;` es tan ilegal
+ * como el 0x0B literal— así que aquí no hay escapado ni saneado posible: se
+ * LANZA, con el mismo criterio que `gml/anillos.js#redondearCoord` ante una
+ * coordenada impublicable (regla de oro 1: reventar con mensaje antes que
+ * escribir un fichero mudo y malo). Sanear tampoco sería neutro: en un `gml:id`
+ * o un `localId` cambiaría la IDENTIDAD del objeto, que es justo lo que
+ * `gml/ids.js` se niega a hacer con el `localId`.
+ *
+ * @param {string} s      Texto a comprobar.
+ * @param {string} quien  Nombre de la función llamante, para el mensaje.
+ * @throws {RangeError}  Si `s` contiene algún punto de código ilegal.
+ */
+function exigirCaracteresXml(s, quien) {
+  if (!RE_SOSPECHA_CARACTER_ILEGAL.test(s)) return
+  let indice = 0
+  for (const c of s) {
+    const cp = c.codePointAt(0)
+    if (!esCaracterXml(cp)) {
+      const hex = cp.toString(16).toUpperCase().padStart(4, '0')
+      throw new RangeError(
+        `${quien}: el texto contiene U+${hex} (índice ${indice}), que no es un carácter válido ` +
+          `en XML 1.0 (§2.2) ni siquiera escapado como referencia numérica. Un documento con él ` +
+          `está mal formado y ningún validador lo abre: límpialo en el origen del dato antes de ` +
+          `serializar, no aquí (cambiarlo en silencio es lo que prohíbe la regla de oro 1).`,
+      )
+    }
+    indice += c.length
+  }
+}
+
+/**
  * Escapa un texto de CONTENIDO.
  *
  * `&` y `<` son obligatorios. `>` no lo sería salvo tras `]]`, pero se escapa
@@ -997,12 +1091,15 @@ const ESCAPES_ATRIBUTO = Object.freeze({
  *
  * @param {string} s
  * @returns {string}
- * @throws {TypeError}  Si `s` no es un string.
+ * @throws {TypeError}   Si `s` no es un string.
+ * @throws {RangeError}  Si `s` contiene un carácter ilegal en XML 1.0 (§2.2),
+ *   que ningún escapado salvaría (ver {@link exigirCaracteresXml}).
  */
 export function escaparTexto(s) {
   if (typeof s !== 'string') {
     throw new TypeError(`escaparTexto: se esperaba un string; recibido ${typeof s}.`)
   }
+  exigirCaracteresXml(s, 'escaparTexto')
   return s.replace(/[&<>\r]/g, (c) => ESCAPES_TEXTO[c])
 }
 
@@ -1017,13 +1114,63 @@ export function escaparTexto(s) {
  *
  * @param {string} s
  * @returns {string}
- * @throws {TypeError}  Si `s` no es un string.
+ * @throws {TypeError}   Si `s` no es un string.
+ * @throws {RangeError}  Si `s` contiene un carácter ilegal en XML 1.0 (§2.2),
+ *   que ningún escapado salvaría (ver {@link exigirCaracteresXml}).
  */
 export function escaparAtributo(s) {
   if (typeof s !== 'string') {
     throw new TypeError(`escaparAtributo: se esperaba un string; recibido ${typeof s}.`)
   }
+  exigirCaracteresXml(s, 'escaparAtributo')
   return s.replace(/[&<>"\r\n\t]/g, (c) => ESCAPES_ATRIBUTO[c])
+}
+
+// ── Escritura · comentarios del prólogo ───────────────────────────────────────
+
+/**
+ * Normaliza el/los comentario(s) del PRÓLOGO a una lista de textos y comprueba
+ * que cada uno puede ir dentro de un `<!-- … -->`. XML 1.0 §2.5 prohíbe `--` en
+ * el cuerpo de un comentario y que termine en `-`; con cualquiera de las dos
+ * cosas el documento dejaría de estar bien formado — y como el prólogo es lo
+ * único que los serializadores escriben sin pasar por {@link render}, aquí no
+ * hay escapado que lo salve. Se LANZA en vez de recortar en silencio (regla de
+ * oro 1). También pasa cada comentario por {@link exigirCaracteresXml}: un
+ * control C0 dentro de un comentario rompe el documento exactamente igual.
+ *
+ * Vive AQUÍ y no en cada serializador porque la lección ya se pagó: la
+ * comprobación nació en `serialize-cp.js` y `serialize-bu.js` interpolaba su
+ * comentario SIN ella, así que un `'expediente 2024--03'` salía como fichero
+ * mal formado con `xml !== null` y cero detecciones. Una regla de XML 1.0 se
+ * escribe una vez, en el módulo que solo sabe XML.
+ *
+ * @param {string|string[]|null|undefined} comentario
+ * @param {string} [quien='normalizarComentarios']  Nombre de la función
+ *   llamante, para que el mensaje del error señale la API que se usó.
+ * @returns {string[]}
+ * @throws {TypeError}   Si algún comentario no es un string, contiene `--` o
+ *   termina en `-` (XML 1.0 §2.5).
+ * @throws {RangeError}  Si algún comentario contiene un carácter ilegal en
+ *   XML 1.0 (§2.2).
+ */
+export function normalizarComentarios(comentario, quien = 'normalizarComentarios') {
+  if (comentario === null || comentario === undefined) return []
+  const lista = Array.isArray(comentario) ? comentario : [comentario]
+  return lista.map((c, i) => {
+    if (typeof c !== 'string') {
+      throw new TypeError(
+        `${quien}: el comentario ${i} debe ser un string; recibido ${JSON.stringify(c)}.`,
+      )
+    }
+    if (c.includes('--') || c.endsWith('-')) {
+      throw new TypeError(
+        `${quien}: el comentario ${i} no puede contener «--» ni terminar en «-» ` +
+          `(XML 1.0 §2.5); recibido ${JSON.stringify(c)}.`,
+      )
+    }
+    exigirCaracteresXml(c, quien)
+    return c
+  })
 }
 
 // ── Escritura · árbol de salida ───────────────────────────────────────────────

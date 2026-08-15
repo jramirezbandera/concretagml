@@ -380,6 +380,27 @@ describe('serializarEdificioBu · el contrato', () => {
     expect(() => serializar({ modelo: 'MEDIO' })).toThrow(RangeError)
     expect(() => serializar({ estadoConservacion: 'ESTUPENDO' })).toThrow(RangeError)
   })
+
+  it('⛔ rechaza un comentario que rompería el XML, igual que el de parcela', () => {
+    // El prólogo es lo único que este módulo escribe sin pasar por `render`, y
+    // XML 1.0 §2.5 prohíbe `--` en el cuerpo de un comentario y terminar en «-».
+    // Antes de la corrección, `'expediente 2024--03'` salía interpolado tal
+    // cual: `xml !== null`, cero detecciones y un fichero MAL FORMADO que jsdom
+    // rechaza — el fallo mudo exacto que la regla de oro 1 prohíbe. La guarda es
+    // la MISMA que la de `serialize-cp.js` (`gml/xml.js#normalizarComentarios`).
+    for (const malo of ['expediente 2024--03', 'termina en -', ['bien', 'mal --'], [42]]) {
+      expect(() => serializar({ comentario: malo }), JSON.stringify(malo)).toThrow(TypeError)
+    }
+    // Y un control C0, que ningún escapado salvaría dentro de un comentario:
+    expect(() => serializar({ comentario: 'linea\u000Bpartida' })).toThrow(RangeError)
+  })
+
+  it('los comentarios BUENOS salen en el prólogo y el fichero se relee entero', () => {
+    const { xml } = serializar({ comentario: ['uno', 'dos'] })
+    expect(xml).toContain('<!--uno-->')
+    expect(xml).toContain('<!--dos-->')
+    expect(parsearGmlBu(xml).ok).toBe(true)
+  })
 })
 
 // ── 7 · SIMPLIFICADO frente a COMPLETO ───────────────────────────────────────

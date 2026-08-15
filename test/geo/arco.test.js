@@ -62,21 +62,27 @@ describe('geo/arco.js — semicírculo b=1 sobre P1=[0,0], P2=[10,0]', () => {
     expect(flechaMaxima(ring, res.centro, res.radio)).toBeLessThanOrEqual(EPS + 1e-12)
   })
 
-  it('ΔS reportado coincide con el cálculo analítico (S_arco − S_discreto)', () => {
-    const sArco = segArea(5, Math.PI) // = ½·25·π = 12.5π (semidisco = πR²/2).
-    expect(sArco).toBeCloseTo((Math.PI * 25) / 2, 9)
+  it('⛔ G2 · ΔS es la variación REAL de superficie (n_seg·segmentitos), no el segmento entero', () => {
+    // ⛔ REGRESIÓN del hallazgo G2 (auditoría 2026-08-15): la fórmula antigua
+    // (S_arco − S_discreto) medía contra la CUERDA y para ESTE semicírculo
+    // (R=5, ε=1cm) anunciaba ΔS=39,17 m² cuando el área entre la polilínea y el
+    // arco verdadero —lo que de verdad cambia la superficie al discretizar— es
+    // 0,103 m². La cifra correcta se calculaba internamente y se descartaba.
     const sDiscreto = res.nSeg * segArea(5, Math.PI / res.nSeg)
-    expect(res.deltaS).toBeCloseTo(sArco - sDiscreto, 9)
+    expect(res.deltaS).toBeCloseTo(sDiscreto, 9)
+    expect(res.deltaS).toBeCloseTo(0.10327, 4) // la cifra medida del hallazgo
+    expect(res.deltaS).toBeLessThan(1) // y NUNCA más los ~39 m² del defecto
   })
 
-  it('el polígono [P1, ...vertices, P2] tiene |área| = ΔS = S_arco − S_discreto', () => {
+  it('el polígono [P1, ...vertices, P2] (cerrado por la cuerda) tiene |área| = S_arco − ΔS', () => {
     const ring = [P1, ...res.vertices, P2]
-    const sArco = segArea(5, Math.PI)
-    const sDiscreto = res.nSeg * segArea(5, Math.PI / res.nSeg)
-    // "coherente con S_arco menos S_discreto": el área shoelace del polígono
-    // discretizado es exactamente ΔS (identidad ½R²[n·sin(Δθ/n) − sinΔθ]).
-    expect(area(ring)).toBeCloseTo(res.deltaS, 6)
-    expect(area(ring)).toBeCloseTo(sArco - sDiscreto, 6)
+    const sArco = segArea(5, Math.PI) // = ½·25·π = 12.5π (semidisco = πR²/2).
+    expect(sArco).toBeCloseTo((Math.PI * 25) / 2, 9)
+    // El shoelace de [P1, …, P2] cierra por la CUERDA: su área es el segmento
+    // circular entero MENOS lo que la discretización deja fuera (ΔS). Con la
+    // fórmula antigua esta identidad decía area(ring) = ΔS — que era el aviso
+    // de que ΔS medía contra la cuerda, no contra el arco (G2).
+    expect(area(ring)).toBeCloseTo(sArco - res.deltaS, 6)
     // El arco b=1 sale por debajo de la cuerda; el recorrido P1→(fondo)→P2 y
     // cierre por la cuerda es ANTIHORARIO ⇒ firmada > 0 (shoelace de
     // [0,0],[5,−5],[10,0] = +25). El signo lo fija la orientación del anillo.
@@ -107,13 +113,15 @@ describe('geo/arco.js — cuarto de círculo b=tan(π/8) sobre P1=[0,0], P2=[10,
     expect(flechaMaxima(ring, res.centro, res.radio)).toBeLessThanOrEqual(EPS + 1e-12)
   })
 
-  it('ΔS analítico y |área| del polígono coherente (regla 5: areaFirmada, no turf)', () => {
+  it('ΔS analítico (G2: n_seg·segmentitos) y |área| del polígono coherente (regla 5: areaFirmada, no turf)', () => {
     const R = 5 * Math.SQRT2
     const sArco = segArea(R, Math.PI / 2)
     const sDiscreto = res.nSeg * segArea(R, Math.PI / 2 / res.nSeg)
-    expect(res.deltaS).toBeCloseTo(sArco - sDiscreto, 9)
+    // G2 (2026-08-15): ΔS = área entre polilínea y arco = Σ segmentitos.
+    expect(res.deltaS).toBeCloseTo(sDiscreto, 9)
+    // El polígono cerrado por la cuerda mide el segmento entero MENOS ΔS.
     const ring = [P1, ...res.vertices, P2]
-    expect(area(ring)).toBeCloseTo(res.deltaS, 6)
+    expect(area(ring)).toBeCloseTo(sArco - res.deltaS, 6)
   })
 })
 
@@ -160,8 +168,9 @@ describe('geo/arco.js — casos límite y validación (regla de oro 1)', () => {
     const P2 = [439010, 4479000]
     const res = discretizarBulge(P1, P2, 1)
     expect(res.radio).toBeCloseTo(5, 9)
+    // G2: el polígono cerrado por la cuerda = segmento entero − ΔS.
     const ring = [P1, ...res.vertices, P2]
-    expect(area(ring)).toBeCloseTo(res.deltaS, 6)
+    expect(area(ring)).toBeCloseTo(segArea(5, Math.PI) - res.deltaS, 6)
   })
 
   it('coordenada no finita → TypeError', () => {

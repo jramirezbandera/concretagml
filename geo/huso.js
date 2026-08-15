@@ -32,15 +32,24 @@ export { meridianoCentral }
 // Constantes verificadas (dossier §3.2, VERBATIM)
 // ---------------------------------------------------------------------------
 
-// Bounding box Península + Baleares. Canarias queda FUERA a propósito (O13).
-// Es la UNIÓN de los tres husos: sirve para «¿esto es España?» a secas (lo usa
-// `situarGrados`, que parte de una longitud y no tiene nada que discriminar),
-// NO para decidir en qué huso cae un punto. Para eso está {@link BBOX_POR_HUSO},
-// y el porqué está escrito ahí.
+// Bounding box Península + Baleares (y las ciudades autónomas, ver abajo).
+// Canarias queda FUERA a propósito (O13). Es la UNIÓN de los tres husos: sirve
+// para «¿esto es España?» a secas (lo usa `situarGrados`, que parte de una
+// longitud y no tiene nada que discriminar), NO para decidir en qué huso cae un
+// punto. Para eso está {@link BBOX_POR_HUSO}, y el porqué está escrito ahí.
+//
+// ⛔ latMin (G1, auditoría 2026-08-15): estaba en 35,5 —bajado en su día para
+// capturar CEUTA (lat 35,88)— y dejaba fuera a MELILLA (lat 35,29, lon −2,94,
+// huso 30, con Catastro real en EPSG:25830): `detectarHuso` contestaba null
+// («no cae en España») y `situarGrados` decía FUERA sobre suelo español con
+// parcelario. Se baja a 35,1 con el mismo criterio generoso de siempre (~0,2°
+// de margen bajo el extremo real); lo que entra de más es mar de Alborán y
+// franja rifeña, igual que la ventana de Ceuta ya tragaba estrecho — la caja es
+// una criba de plausibilidad, no un mapa.
 export const BBOX_ESPANA = Object.freeze({
   lonMin: -9.5,
   lonMax: 4.5,
-  latMin: 35.5,
+  latMin: 35.1,
   latMax: 44.5,
 })
 
@@ -70,7 +79,7 @@ export const BBOX_ESPANA = Object.freeze({
 //   · Huso 29 (lon −12…−6): Galicia, oeste de Castilla, Extremadura oeste,
 //     Huelva y Cádiz. Del Cabo de Trafalgar (36,18) a Estaca de Bares (43,79).
 //   · Huso 30 (lon −6…0): el grueso de la Península. De Punta de Tarifa (36,00)
-//     —y Ceuta, 35,88— al Cabo de Peñas (43,66).
+//     —y Ceuta, 35,88, y Melilla, 35,29 (G1, 2026-08-15)— al Cabo de Peñas (43,66).
 //   · Huso 31 (lon 0…6): Cataluña, el norte de Castellón y las Baleares. De
 //     **Formentera (38,63)** al Valle de Arán (42,84). **Ahí abajo no hay nada
 //     español**, y por eso el 31 deja de ser una lectura viable de una parcela
@@ -96,15 +105,23 @@ export const BBOX_ESPANA = Object.freeze({
  */
 export const BBOX_POR_HUSO = Object.freeze({
   29: Object.freeze({ lonMin: -9.5, lonMax: -6.0, latMin: 36.0, latMax: 44.0 }),
-  30: Object.freeze({ lonMin: -6.0, lonMax: 0.0, latMin: 35.5, latMax: 44.0 }),
+  // latMin 35,1: el sur del huso 30 no acaba en Tarifa (36,0) ni en Ceuta
+  // (35,88): MELILLA está en 35,29 y su Catastro sirve EPSG:25830 (G1,
+  // 2026-08-15). Mismo margen generoso (~0,2°) que el resto de límites.
+  30: Object.freeze({ lonMin: -6.0, lonMax: 0.0, latMin: 35.1, latMax: 44.0 }),
   31: Object.freeze({ lonMin: 0.0, lonMax: 4.5, latMin: 38.5, latMax: 43.0 }),
 })
 
-// Rangos UTM plausibles (Península). Se usan para verificar el resultado tras un
-// swap de X/Y (dossier §3.2; PLAN §5.5 "X ronda las centenas de millar, Y los 4M").
+// Rangos UTM plausibles (Península y ciudades autónomas). Se usan para verificar
+// el resultado tras un swap de X/Y (dossier §3.2; PLAN §5.5 "X ronda las
+// centenas de millar, Y los 4M").
+// ⛔ NORTE_MIN (G1, 2026-08-15): 3.930.000 correspondía a lat ~35,5 y declaraba
+// «no plausible» el Norte de MELILLA (~3.905.000 m, lat 35,29). Se baja a
+// 3.880.000 (~lat 35,1), el mismo límite sur que BBOX_ESPANA/BBOX_POR_HUSO[30]
+// para que las dos cribas no se contradigan entre sí.
 const ESTE_MIN = 166000
 const ESTE_MAX = 834000
-const NORTE_MIN = 3930000
+const NORTE_MIN = 3880000
 const NORTE_MAX = 4930000
 
 // Candidatos por defecto para la autodetección. El orden es una PRIORIDAD: el
@@ -478,7 +495,9 @@ export function zonaPorLon(lon) {
  *   `null` si ninguna de las dos lecturas cae en territorio conocido.
  * @property {number|null} lon  Longitud YA en el orden bueno.
  * @property {number|null} lat  Latitud YA en el orden bueno.
- * @property {number|null} zona  Huso deducido de la longitud (28 en Canarias).
+ * @property {number|null} zona  Huso deducido de la longitud; en Canarias es 28
+ *   FIJO por región (todo el archipiélago va en EPSG:32628, no por longitud —
+ *   El Hierro caería en el 27; ver G3 abajo y el dossier S11/O13).
  * @property {string|null} srs   `srsPorHuso(zona)` si es proyectable; `null` si no.
  * @property {'PENINSULA_BALEARES'|'CANARIAS'|'FUERA'} region  Dónde ha caído.
  * @property {boolean} proyectable  Si esta versión sabe llevarlo a UTM.
@@ -520,7 +539,13 @@ export function situarGrados(coord) {
     const bbox = region === 'CANARIAS' ? BBOX_CANARIAS : BBOX_ESPANA
     for (const lectura of lecturas) {
       if (enBbox(lectura.lon, lectura.lat, bbox)) {
-        const zona = zonaPorLon(lectura.lon)
+        // ⛔ G3 (2026-08-15): en CANARIAS el huso se fija POR REGIÓN, no por la
+        // longitud. `zonaPorLon` puro daba huso 27 para El Hierro (lon −18,1) —
+        // geométricamente cierto y catastralmente falso: el Catastro codifica
+        // TODO el archipiélago en EPSG:32628 (huso 28 único, dossier S11 /
+        // override O13), El Hierro y La Palma incluidas. El JSDoc de `zona` ya
+        // prometía «28 en Canarias»; ahora es verdad también al oeste de −18°.
+        const zona = region === 'CANARIAS' ? 28 : zonaPorLon(lectura.lon)
         const proyectable = HUSOS_VALIDOS.includes(zona)
         return {
           ...lectura,

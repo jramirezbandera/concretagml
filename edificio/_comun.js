@@ -351,6 +351,13 @@ export const MOTIVO_ENTRADA = Object.freeze({
   /** No se pudo deducir el huso, así que no hay SRS con el que trabajar. Heredado. */
   HUSO_NO_RESUELTO: 'HUSO_NO_RESUELTO',
   /**
+   * El parser descartó líneas con números que no eran del formato soportado, así
+   * que parte del contorno NO ha entrado. Heredado, y **universal a propósito**:
+   * una huella de edificio a la que le faltan vértices está tan rota como una
+   * parcela, y aquí no hay reparto exterior/huecos que lo haga «de parcela».
+   */
+  LINEAS_NO_IMPORTADAS: 'LINEAS_NO_IMPORTADAS',
+  /**
    * El documento o el servicio contestaron bien y **no hay construcción**: cero
    * miembros. ⚠️ Medido en T0.1·5: el `wfsBU` devuelve `200 OK` +
    * `gml:FeatureCollection` con **cero `featureMember`**, y eso es el **punto de

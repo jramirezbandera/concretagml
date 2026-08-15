@@ -260,6 +260,11 @@ describe('oráculo · XML mal formado detectado por LOS DOS motores', () => {
     ['entidad desconocida', '<a>&noexiste;</a>'],
     ['valor de atributo sin comillas', '<a b=1/>'],
     ['contenido tras el elemento raíz', '<a/><b/>'],
+    // Un control C0 literal es ilegal en XML 1.0 §2.2 aunque nada más falle:
+    // hasta la corrección de `leerTexto`, gml/xml.js era el ÚNICO de los dos
+    // motores que no lo veía.
+    ['carácter de control literal en el texto', '<a>x\u0001y</a>'],
+    ['carácter de control literal en un atributo', '<a b="x\u000By"/>'],
   ]
 
   for (const [caso, xml] of MAL_FORMADOS) {

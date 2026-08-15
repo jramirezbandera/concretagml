@@ -808,6 +808,15 @@ function pedirImagen(CrearImagen, url, anchoPx, altoPx) {
  * @property {number} teselasDibujadas  *(aditivo)* Cuántas llevaron cartografía al lienzo.
  * @property {number} metrosBarra  *(aditivo)* Metros que representa la barra de escala.
  * @property {number} calidad  *(aditivo)* Calidad con la que se codificó el JPEG.
+ * @property {import('./encuadre.js').Bbox|null} bbox  *(aditivo, auditoría R4)* La
+ *   IDENTIDAD del encuadre con el que se compuso este plano: su trozo de mundo,
+ *   copiado tal cual. `report/maqueta.js#exigirPlanoEncajable` lo coteja contra el
+ *   encuadre con el que se maqueta —con igualdad exacta— para que un plano de OTRO
+ *   trabajo con las mismas dimensiones en píxeles no pueda acabar bajo una escala
+ *   que no es la suya. `null` solo si el encuadre no traía `bbox` (uno construido
+ *   a mano; `encuadrar` lo trae siempre).
+ * @property {number|null} escalaExacta  *(aditivo, auditoría R4)* La escala exacta
+ *   del encuadre con el que se compuso, por lo mismo.
  */
 
 /**
@@ -1068,6 +1077,14 @@ export async function componerPlano(entrada) {
     teselasDibujadas,
     metrosBarra,
     calidad,
+    // ⭐ La IDENTIDAD del encuadre con el que se compuso (auditoría R4): viaja
+    // CON el plano para que `report/maqueta.js#exigirPlanoEncajable` pueda
+    // cotejar que plano y encuadre son del mismo trabajo — la relación de
+    // aspecto no distingue dos encuadres con las mismas dimensiones en píxeles,
+    // y pegar el plano de otro rotularía una escala que no es la del mapa. Se
+    // COPIA (no se referencia) para que el plano siga siendo un POJO plano.
+    bbox: esObjeto(encuadre.bbox) ? { ...encuadre.bbox } : null,
+    escalaExacta: typeof encuadre.escalaExacta === 'number' ? encuadre.escalaExacta : null,
   }
 }
 

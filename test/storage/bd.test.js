@@ -46,20 +46,19 @@
  *                                                                              *
  * ── LÍMITES MEDIDOS DE `fake-indexeddb` FRENTE AL NAVEGADOR REAL ──            *
  *                                                                              *
- * · `blocked` REAL es INALCANZABLE AQUÍ, y no por culpa de `fake-indexeddb`:    *
- *   ese evento solo se dispara cuando una apertura pide una versión MAYOR que   *
- *   la instalada Y hay otra conexión abierta con la vieja. En este fichero cada *
- *   prueba estrena su propia `IDBFactory`, así que siempre se entra por         *
- *   `oldVersion === 0` y no hay nadie a quien bloquear. (Cuando se escribió     *
- *   esto había una razón adicional —`VERSION_BD` valía 1 y `abrirBd` no pedía   *
- *   ascenso nunca—; desde F09 la escalera tiene dos peldaños y el ascenso 1 → 2 *
- *   SÍ existe: lo ejercita `test/storage/pie-firma.test.js`, que fabrica a mano *
- *   una base de la versión 1 y la abre con la de hoy.) Lo que se prueba aquí es *
- *   EL CABLEADO —que el módulo escucha `blocked` y lo lleva al canal `Avisar`   *
- *   con `NIVEL.AVISO`—, despachando un `IDBVersionChangeEvent('blocked')` sobre *
- *   la petición real. El ciclo REAL de dos pestañas —dos contextos de           *
- *   navegación distintos compartiendo origen— no lo reproduce ningún proceso    *
- *   de Node: eso es materia del guion de humo en navegador.                     *
+ * · `blocked` se ejercita de DOS formas, y las dos hacen falta. La SINTÉTICA    *
+ *   (despachar un `IDBVersionChangeEvent('blocked')` sobre la petición real)    *
+ *   prueba el cableado del aviso sin depender de cómo `fake-indexeddb` ordena   *
+ *   sus eventos. La REAL —desde S1 (2026-08-15)— fabrica el escenario del       *
+ *   defecto dentro de UNA MISMA fábrica: una conexión abierta a mano con la     *
+ *   versión 1 que no escucha `versionchange` (o sea, que no va a cerrar) y      *
+ *   `abrirBd` pidiendo la de hoy. Antes de S1 esa apertura quedaba PENDIENTE    *
+ *   PARA SIEMPRE —y con ella la caché y todas las consultas al Catastro—; ahora *
+ *   RESUELVE `{disponible: false, motivo: BLOQUEADA}`, que es lo que estas      *
+ *   pruebas afirman. (Cuando se escribió la nota original, `VERSION_BD` valía 1 *
+ *   y no había ascenso que bloquear; desde F09 lo hay.) El ciclo REAL de dos    *
+ *   pestañas —dos contextos de navegación compartiendo origen— sigue siendo     *
+ *   materia del guion de humo en navegador.                                     *
  * · `blocking` (nuestro `versionchange`) y la terminación anormal (`close`, vía *
  *   `forceCloseDatabase`) SÍ son reproducibles y aquí se ejercitan DE VERDAD,   *
  *   con eventos que emite la propia implementación, no sintéticos.              *
@@ -499,12 +498,11 @@ describe('storage/bd · una sola conexión por proceso (criterio 5)', () => {
 // ── El ciclo multipestaña, por el canal Avisar ───────────────────────────────
 
 describe('storage/bd · blocked/blocking/terminated van al canal Avisar (criterio 6)', () => {
-  it('`blocked` llega al avisador con NIVEL.AVISO y un mensaje presentable', async () => {
-    // Ver el bloque de límites de la cabecera: el evento se despacha a mano sobre
-    // la petición REAL porque aquí la fábrica se estrena en cada prueba, así que
-    // se entra por `oldVersion === 0` y no hay ninguna conexión vieja que nos
-    // pueda bloquear. Lo que se comprueba es el CABLEADO: que el módulo escucha
-    // `blocked` y lo cuenta, en vez de esperar en silencio.
+  it('`blocked` llega al avisador con NIVEL.AVISO y la apertura RESUELVE degradada (S1)', async () => {
+    // El evento se despacha a mano sobre la petición REAL (ver la cabecera): lo
+    // que se comprueba es el CABLEADO —que el módulo escucha `blocked`, lo
+    // cuenta, y desde S1 además da la apertura por perdida— sin depender de cómo
+    // ordena sus eventos `fake-indexeddb`. El escenario real está más abajo.
     const modulo = await moduloFresco()
     const fabrica = fabricaEspia(new IDBFactory())
     const avisos = vi.fn()
@@ -521,8 +519,78 @@ describe('storage/bd · blocked/blocking/terminated van al canal Avisar (criteri
     // El aviso tiene que ACCIONAR: nombra la otra pestaña y qué hacer con ella.
     expect(mensaje).toMatch(/pestaña/i)
 
-    const { bd } = await promesa
-    bd.close()
+    // S1: la apertura no se queda pendiente — resuelve SIN base y con su motivo,
+    // que es lo que deja a la caché degradar a CACHE_NULA en vez de colgarse.
+    const resultado = await promesa
+    expect(resultado.disponible).toBe(false)
+    expect(resultado.bd).toBeNull()
+    expect(resultado.motivo).toBe(MOTIVO_SIN_BD.BLOQUEADA)
+    expect(resultado.mensaje).toMatch(/pestaña/i)
+  })
+
+  it('⭐ S1 · un `blocked` REAL (pestaña vieja que no suelta la base) resuelve en vez de colgar', async () => {
+    // EL DEFECTO: `abrirBd` devolvía una promesa que con `blocked` no resolvía
+    // JAMÁS. `cache-catastro#obtenerBase` la esperaba sin plazo, y como el
+    // cliente consulta la caché ANTES que la red (trampa 6 de
+    // `services/catastro.js`), «Cargar por RC», colindantes, revgeo y
+    // descriptivos no resolvían nunca — ni llegaban a la red. Antes de la
+    // corrección, esta prueba se quedaba aquí hasta el timeout de Vitest.
+    const modulo = await moduloFresco()
+    const fabrica = new IDBFactory()
+
+    // La «pestaña vieja»: una conexión REAL con versión anterior que no escucha
+    // `versionchange`, o sea que no va a cerrar nunca por su cuenta. La base se
+    // fabrica TAL COMO ERA en F05 (mismo patrón que `pie-firma.test.js`).
+    const peticionVieja = fabrica.open(NOMBRE_BD, 1)
+    peticionVieja.onupgradeneeded = () => {
+      peticionVieja.result.createObjectStore('catastroCache', { keyPath: 'refcat' })
+      peticionVieja.result.createObjectStore('revgeo', { keyPath: 'clave' })
+    }
+    const vieja = await new Promise((resolver, rechazar) => {
+      peticionVieja.onsuccess = () => resolver(peticionVieja.result)
+      peticionVieja.onerror = () => rechazar(peticionVieja.error)
+    })
+
+    const avisos = vi.fn()
+    const resultado = await modulo.abrirBd({ indexedDB: fabrica, alAvisar: avisos })
+
+    expect(resultado.disponible).toBe(false)
+    expect(resultado.bd).toBeNull()
+    expect(resultado.motivo).toBe(MOTIVO_SIN_BD.BLOQUEADA)
+    expect(avisos).toHaveBeenCalledTimes(1)
+    expect(avisos.mock.calls[0][0]).toMatch(/pestaña/i)
+    expect(avisos.mock.calls[0][1].nivel).toBe(NIVEL.AVISO)
+
+    vieja.close()
+  })
+
+  it('S1 · el bloqueo NO se memoiza: cerrada la pestaña vieja, la siguiente llamada abre', async () => {
+    // Es la misma política que ya tenía cualquier fallo de apertura («solo se
+    // memoiza el éxito»): la causa —la otra pestaña— se resuelve sola con el
+    // tiempo, y memoizar el bloqueo lo volvería permanente.
+    const modulo = await moduloFresco()
+    const fabrica = new IDBFactory()
+    const peticionVieja = fabrica.open(NOMBRE_BD, 1)
+    peticionVieja.onupgradeneeded = () => {
+      peticionVieja.result.createObjectStore('catastroCache', { keyPath: 'refcat' })
+      peticionVieja.result.createObjectStore('revgeo', { keyPath: 'clave' })
+    }
+    const vieja = await new Promise((resolver, rechazar) => {
+      peticionVieja.onsuccess = () => resolver(peticionVieja.result)
+      peticionVieja.onerror = () => rechazar(peticionVieja.error)
+    })
+
+    const bloqueada = await modulo.abrirBd({ indexedDB: fabrica, alAvisar: () => {} })
+    expect(bloqueada.disponible).toBe(false)
+    expect(bloqueada.motivo).toBe(MOTIVO_SIN_BD.BLOQUEADA)
+
+    vieja.close()
+    const reintento = await modulo.abrirBd({ indexedDB: fabrica, alAvisar: () => {} })
+    expect(reintento.disponible).toBe(true)
+    // Y la base está ENTERA: la escalera se aplicó pese al primer intento
+    // bloqueado (la conexión tardía de aquel intento se cierra sola; esta es nueva).
+    expect(new Set([...reintento.bd.objectStoreNames])).toEqual(new Set(Object.values(ALMACENES)))
+    reintento.bd.close()
   })
 
   it('`blocking` (otra pestaña quiere actualizar y se lo impedimos) llega al avisador', async () => {
@@ -639,8 +707,10 @@ describe('storage/bd · blocked/blocking/terminated van al canal Avisar (criteri
         new IDBVersionChangeEvent('blocked', { oldVersion: 1, newVersion: 2 }),
       )
       expect(warn).toHaveBeenCalledTimes(1)
-      const { bd } = await promesa
-      bd.close()
+      // S1: el `blocked` (aunque aquí sea sintético) degrada la apertura.
+      const resultado = await promesa
+      expect(resultado.disponible).toBe(false)
+      expect(resultado.motivo).toBe(MOTIVO_SIN_BD.BLOQUEADA)
     } finally {
       warn.mockRestore()
     }

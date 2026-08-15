@@ -1071,6 +1071,19 @@ describe('report/canvas · el contrato B, completo', () => {
     expect(typeof plano.atribucion).toBe('string')
   })
 
+  it('R4 · el plano TRANSPORTA la identidad de su encuadre: bbox y escalaExacta, copiados', async () => {
+    // Auditoría R4: la relación de aspecto no distingue dos encuadres con las
+    // mismas dimensiones en píxeles, así que `report/maqueta.js#exigirPlanoEncajable`
+    // coteja la identidad que el plano trae de aquí. Igualdad EXACTA: son los
+    // mismos números del encuadre, sin segunda aritmética.
+    const encuadre = encuadreNormal()
+    const { plano } = await componer({ encuadre })
+    expect(plano.bbox).toEqual(encuadre.bbox)
+    expect(plano.escalaExacta).toBe(encuadre.escalaExacta)
+    // COPIA, no referencia: el plano es un POJO y mutarlo no puede tocar el encuadre.
+    expect(plano.bbox).not.toBe(encuadre.bbox)
+  })
+
   it('la atribución sale de viewer/atribucion.js, no escrita a mano', async () => {
     const { plano } = await componer()
     expect(plano.atribucion).toBe(ATRIBUCION.CATASTRO)

@@ -104,7 +104,9 @@ guion 13 destapó en F11. LIST es el único formato que declara **superficie Y
 cierre**; F19 contrasta los dos o ninguno.
 
 **M7 · ⭐ El orden lon/lat NO es ambiguo dentro de España, y es un hecho de rangos,
-no una heurística.** `BBOX_ESPANA` es `lon ∈ [−9,5 · 4,5]` y `lat ∈ [35,5 · 44,5]`:
+no una heurística.** `BBOX_ESPANA` es `lon ∈ [−9,5 · 4,5]` y `lat ∈ [35,1 · 44,5]`
+(latMin bajado de 35,5 el 2026-08-15 para que Melilla dejara de caer «fuera de
+España», hallazgo G1; los rangos siguen disjuntos):
 **disjuntos** (medido: `lonMax >= latMin` → `false`). Ninguna pareja puede leerse
 como válida en los dos órdenes ⇒ **como mucho una lectura cae en España**, y por
 eso «deducir y enseñar dónde ha caído» (decisión 8) es seguro sin preguntar el

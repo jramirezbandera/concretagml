@@ -118,17 +118,37 @@ const ENT_ANOTACION = new Set([
  * un BOM inicial. NO recorta el valor (una coord con espacios la absorbe parseFloat;
  * los nombres de tipo/sección se recortan en el punto de uso).
  *
+ * ⛔ H3 (auditoría 2026-08-15) · Emparejar por POSICIÓN ABSOLUTA de línea era
+ * frágil: con UNA línea en blanco inicial todos los pares quedaban corridos uno
+ * —cada «valor» se leía como «código» y viceversa— y el parser devolvía
+ * `anillos: []` con `detecciones: []`, la violación exacta de la regla 1 que la
+ * cabecera de este fichero promete no cometer. La resincronización es
+ * CONSERVADORA a propósito: un código de grupo es SIEMPRE un entero, pero un
+ * VALOR puede ser cualquier texto (incluso uno que parece un entero), así que
+ * solo se descartan líneas INICIALES hasta la primera que parsea como código;
+ * a partir de ahí la alternancia manda, como siempre. Lo descartado se cuenta
+ * y `parseDXF` lo materializa como detección (nada se corrige callado).
+ *
  * @param {string} texto
- * @returns {Array<[string, string]>}
+ * @returns {{ pares: Array<[string, string]>, lineasDescartadas: number,
+ *   descartadasNoVacias: boolean }}  `lineasDescartadas` = nº de líneas
+ *   iniciales saltadas para realinear; `descartadasNoVacias` = alguna tenía
+ *   contenido (no era solo una línea en blanco).
  */
 function leerPares(texto) {
   if (texto.charCodeAt(0) === 0xfeff) texto = texto.slice(1) // BOM
   const lineas = texto.split(/\r?\n/)
+  let inicio = 0
+  let descartadasNoVacias = false
+  while (inicio < lineas.length && !/^\s*\d+\s*$/.test(lineas[inicio])) {
+    if (lineas[inicio].trim() !== '') descartadasNoVacias = true
+    inicio++
+  }
   const pares = []
-  for (let i = 0; i + 1 < lineas.length; i += 2) {
+  for (let i = inicio; i + 1 < lineas.length; i += 2) {
     pares.push([lineas[i].trim(), lineas[i + 1]])
   }
-  return pares
+  return { pares, lineasDescartadas: inicio, descartadasNoVacias }
 }
 
 // ── Parser público ────────────────────────────────────────────────────────────
@@ -254,7 +274,7 @@ export function parseDXF(texto, opts = {}) {
   // ⭐ F14 · De QUÉ hablan los mensajes. El defecto es «la parcela», así que un
   // llamante que no diga nada lee exactamente lo de siempre.
   const sujeto = declinar(opts.sujeto)
-  const pares = leerPares(texto)
+  const { pares, lineasDescartadas, descartadasNoVacias } = leerPares(texto)
 
   // ── Acumuladores del resultado ──────────────────────────────────────────────
   const anillos = []
@@ -263,8 +283,26 @@ export function parseDXF(texto, opts = {}) {
   const rotulos = [] // F22 · anotaciones con texto y sitio; NO va 1:1 con anillos.
   const detecciones = []
   let zCount = 0 // vértices con código 30 (Z) descartada.
+  let elevacionesLW = 0 // H7 · LWPOLYLINE con elevación (código 38) NO nula, descartada.
   const anotaciones = new Map() // tipo → nº (resumen INFO).
   const otras = new Map() // LINE/POINT/IMAGE/… → nº (resumen INFO).
+  const contornosSueltos = new Map() // H8 · ARC/CIRCLE: pueden SER la geometría (AVISO propio).
+
+  // H3 · Fichero desalineado: se descartaron líneas iniciales para que la
+  // alternancia código/valor volviera a casar (ver leerPares). Se calla solo el
+  // caso trivial de un texto vacío sin nada que alinear.
+  if (lineasDescartadas > 0 && (pares.length > 0 || descartadasNoVacias)) {
+    detecciones.push(
+      crearDeteccion(
+        TIPO_DETECCION.FORMATO_NO_SOPORTADO,
+        `El DXF no empieza por un código de grupo (línea(s) en blanco o texto ajeno al ` +
+          `principio): se descartaron ${lineasDescartadas} línea(s) iniciales para realinear ` +
+          `los pares código/valor.`,
+        SEVERIDAD.AVISO,
+        { lineasDescartadas, descartadasNoVacias },
+      ),
+    )
+  }
   // Arcos discretizados: una Deteccion por arco + un resumen total (regla 1).
   let arcosN = 0
   let arcoSegTotal = 0
@@ -339,7 +377,12 @@ export function parseDXF(texto, opts = {}) {
       } else if (code === '20') {
         if (cur) cur.y = parseFloat(val)
       } else if (code === '30') zCount++ // atípico en LWPOLYLINE (2D), pero por si acaso.
-      else if (code === '42') {
+      else if (code === '38') {
+        // H7 · Elevación de la LWPOLYLINE entera (no de un vértice). Se descarta
+        // —el modelo es 2D— pero se CUENTA para materializarlo (regla 1): antes
+        // se tiraba sin Z_DESCARTADA. Una elevación 0 no descarta nada.
+        if (parseFloat(val) !== 0) elevacionesLW++
+      } else if (code === '42') {
         if (cur) cur.b = parseFloat(val)
       }
     }
@@ -361,19 +404,70 @@ export function parseDXF(texto, opts = {}) {
     // SEQEND: es la trampa medida en el fixture real de edificio (ver cabecera).
     polyAbierto.capa = capaDe(grupos)
   }
+  // ⛔ H4 (auditoría 2026-08-15) · EL FLAG 70 DEL VERTEX, QUE SE IGNORABA.
+  // Una POLYLINE pasada por PEDIT>Spline lleva DOS familias de VERTEX: los del
+  // MARCO DE CONTROL (70 bit 16 = 16), que son los puntos que el usuario clicó y
+  // NO están sobre la curva, y los de la CURVA AJUSTADA (70 bit 8 = 8), que sí.
+  // Ignorar el flag metía los puntos de control DENTRO del anillo (geometría por
+  // la que la curva ni pasa) sin una sola detección. Y una malla polifacética
+  // (POLYFACE MESH) usa VERTEX con bit 128 como REGISTROS DE CARA —sus 10/20 son
+  // 0.0 y sus 71..74 son índices, no coordenadas— que entraban como vértices
+  // [0,0]. Desde hoy: bit 16 y bit 128 se EXCLUYEN (contándolos), bit 8 se
+  // CONSERVA, y `cerrarPoly` materializa qué se hizo (VERTICE_EXCLUIDO).
   const agregarVertice = (grupos) => {
     let x = NaN
     let y = NaN
     let b = 0
+    let flags = 0
     for (const [code, val] of grupos) {
       if (code === '10') x = parseFloat(val)
       else if (code === '20') y = parseFloat(val)
       else if (code === '30') zCount++
       else if (code === '42') b = parseFloat(val)
+      else if (code === '70') flags = parseInt(val, 10) || 0
     }
+    if (flags & 16) {
+      polyAbierto.nControl = (polyAbierto.nControl || 0) + 1
+      return // vértice de marco de control de spline: NO es geometría del anillo
+    }
+    if (flags & 128) {
+      polyAbierto.nCara = (polyAbierto.nCara || 0) + 1
+      return // registro de cara / vértice de malla polifacética: NO es un anillo
+    }
+    if (flags & 8) polyAbierto.nCurva = (polyAbierto.nCurva || 0) + 1
     polyAbierto.push({ x, y, b })
   }
   const cerrarPoly = () => {
+    const nControl = polyAbierto.nControl || 0
+    const nCara = polyAbierto.nCara || 0
+    const nCurva = polyAbierto.nCurva || 0
+    if (nControl > 0) {
+      detecciones.push(
+        crearDeteccion(
+          TIPO_DETECCION.VERTICE_EXCLUIDO,
+          `POLYLINE ajustada a spline (PEDIT>Spline): se excluyen ${nControl} vértice(s) del ` +
+            `marco de control (código 70, bit 16), que no están sobre la curva` +
+            (polyAbierto.length > 0
+              ? `; el anillo usa los ${polyAbierto.length} vértice(s) restantes` +
+                (nCurva > 0 ? ` (${nCurva} de la curva ajustada, bit 8)` : '') +
+                `.`
+              : `. La polilínea no trae vértices de curva: no aporta ningún anillo.`),
+          polyAbierto.length > 0 ? SEVERIDAD.INFO : SEVERIDAD.AVISO,
+          { control: nControl, curva: nCurva, conservados: polyAbierto.length },
+        ),
+      )
+    }
+    if (nCara > 0) {
+      detecciones.push(
+        crearDeteccion(
+          TIPO_DETECCION.VERTICE_EXCLUIDO,
+          `POLYLINE de malla polifacética: se excluyen ${nCara} registro(s) de cara/vértice(s) ` +
+            `de malla (código 70, bit 128) — una malla no es geometría ${sujeto.escueto}.`,
+          SEVERIDAD.AVISO,
+          { caras: nCara, conservados: polyAbierto.length },
+        ),
+      )
+    }
     ensamblarAnillo(polyAbierto, polyAbierto.capa)
     polyAbierto = null
   }
@@ -410,6 +504,12 @@ export function parseDXF(texto, opts = {}) {
           anotaciones.set(tipo, (anotaciones.get(tipo) || 0) + 1)
           const rot = rotuloDe(tipo, grupos)
           if (rot !== null) rotulos.push(rot)
+        } else if (tipo === 'ARC' || tipo === 'CIRCLE') {
+          // H8 (2026-08-15) · Un ARC o un CIRCLE no forman anillo por sí solos,
+          // pero un contorno LINE+ARC es habitual en topografía: pueden SER la
+          // geometría que el usuario busca. Van a un AVISO propio con guía (abajo),
+          // no al resumen INFO de «entidades que no forman anillo».
+          contornosSueltos.set(tipo, (contornosSueltos.get(tipo) || 0) + 1)
         } else {
           // LINE/POINT/IMAGE/…: no forman anillo por sí solas → resumen.
           otras.set(tipo, (otras.get(tipo) || 0) + 1)
@@ -479,6 +579,40 @@ export function parseDXF(texto, opts = {}) {
         `Se descartó la coordenada Z en ${zCount} vértice(s) (el modelo es 2D en UTM).`,
         SEVERIDAD.INFO,
         { vertices: zCount },
+      ),
+    )
+  }
+  if (elevacionesLW > 0) {
+    // H7 · La elevación (código 38) es la «Z» de la LWPOLYLINE entera: se
+    // descarta igual que la Z por vértice, y desde hoy se DICE igual que ella.
+    detecciones.push(
+      crearDeteccion(
+        TIPO_DETECCION.Z_DESCARTADA,
+        `Se descartó la elevación (código 38) de ${elevacionesLW} polilínea(s) LWPOLYLINE ` +
+          `(el modelo es 2D en UTM).`,
+        SEVERIDAD.INFO,
+        { polilineas: elevacionesLW, codigo: 38 },
+      ),
+    )
+  }
+  if (contornosSueltos.size > 0) {
+    // H8 · ARC/CIRCLE sueltos: hasta hoy se resumían como «entidades que no
+    // forman anillo» (INFO), que es cierto y a la vez inútil — un contorno de
+    // LINE+ARC puede SER la parcela. El aviso dice cómo proceder.
+    const tipos = Object.fromEntries(contornosSueltos)
+    const total = [...contornosSueltos.values()].reduce((a, b) => a + b, 0)
+    const nLineas = otras.get('LINE') || 0
+    detecciones.push(
+      crearDeteccion(
+        TIPO_DETECCION.ENTIDAD_NO_SOPORTADA,
+        `${total} arco(s)/círculo(s) sueltos (${[...contornosSueltos.keys()].join(', ')})` +
+          (nLineas > 0 ? ` junto a ${nLineas} LINE` : '') +
+          `: no forman anillo por sí solos, pero un contorno dibujado con LINE+ARC (o un ` +
+          `CIRCLE) puede SER la geometría ${sujeto.escueto}. Esta versión no ensambla ` +
+          `entidades sueltas: en el CAD, únelas en UNA polilínea (EDITPOL/PEDIT → Juntar, ` +
+          `o redibuja el contorno con POLILINEA) y vuelve a importar.`,
+        SEVERIDAD.AVISO,
+        { tipos, total, lineas: nLineas },
       ),
     )
   }

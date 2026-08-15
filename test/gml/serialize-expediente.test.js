@@ -185,6 +185,31 @@ describe('serializarExpedienteCp · ⛔ ningún `gml:id` repetido entre miembros
     expect(error.message).toContain('7136910UF1473N')
   })
 
+  it('⛔ el `gml:id` de la RAÍZ también compite: un miembro que lo repita se atrapa', () => {
+    // La guarda vigilaba solo los ids de los MIEMBROS y omitía el de la
+    // COLECCIÓN (el gml:id de la raíz, que es el namespace de parcelas[0]).
+    // El choque es componible: la raíz se llama `ES.SDGC.CP`, y una parcela
+    // bajo namespace `ES.SDGC` con refcat `CP` compone EXACTAMENTE ese id
+    // (`base = namespace + '.' + refcat`). Antes salía un documento con el
+    // `xs:ID` duplicado sin una sola queja local.
+    const colisiona = {
+      ...CESION,
+      refcat: 'CP',
+      namespaceInspire: 'ES.SDGC',
+      nationalCadastralReference: '',
+    }
+    expect(() => serializarExpedienteCp({ parcelas: [MATRIZ, colisiona] })).toThrow(TypeError)
+    let error = null
+    try {
+      serializarExpedienteCp({ parcelas: [MATRIZ, colisiona] })
+    } catch (e) {
+      error = e
+    }
+    expect(error.message).toContain('ES.SDGC.CP')
+    expect(error.message).toContain('la raíz del documento')
+    expect(error.message).toContain('parcelas[1]')
+  })
+
   it('⭐ pero la MISMA refcat bajo OTRO namespace no choca, y eso es correcto', () => {
     // Medido al escribir la prueba, y la primera versión de este test lo daba por
     // colisión: la base del id es `namespace + refcat`, así que `ES.SDGC.CP` y

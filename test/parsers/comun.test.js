@@ -129,9 +129,29 @@ describe('parsers/_comun — extraerPares', () => {
       '439250.35 4479664.55',
       '', // línea en blanco → se salta
       '439260.10   4479670.20',
-      'Total: 2 vertices', // 2 números (2 y 2) — ojo: SÍ se leería…
     ]
-    const { anillos } = extraerPares(lineas.slice(0, 5))
+    const { anillos } = extraerPares(lineas)
+    expect(anillos).toEqual([
+      [
+        [439250.35, 4479664.55],
+        [439260.1, 4479670.2],
+      ],
+    ])
+  })
+
+  it('⛔ H1 · en salida de LIST, un rótulo con números («Total: 2 vertices») NO es un vértice', () => {
+    // ⛔ Este test ESQUIVABA el problema con un slice(0,5) que dejaba fuera la
+    // línea del rótulo (auditoría 2026-08-15, H1). Ahora entra entera: con el
+    // texto claramente en formato LIST (líneas X=/Y=), SOLO esas líneas son
+    // vértices; el rótulo con dos números se salta.
+    const lineas = [
+      'LWPOLYLINE   Layer: "0"',
+      'Ubicación:  X= 439250.35  Y= 4479664.55  Z= 0.0000',
+      '',
+      'Ubicación:  X= 439260.10  Y= 4479670.20  Z= 0.0000',
+      'Total: 2 vertices', // 2 números — la versión anterior lo leía como [2, 2]
+    ]
+    const { anillos } = extraerPares(lineas)
     expect(anillos).toEqual([
       [
         [439250.35, 4479664.55],
@@ -238,6 +258,143 @@ describe('parsers/_comun — extraerPares', () => {
     const { anillos, detecciones } = extraerPares(['cabecera', 'sin numeros aqui'])
     expect(anillos).toEqual([])
     expect(detecciones.some((d) => d.tipo === TIPO_DETECCION.SEPARADOR_DECIMAL)).toBe(true)
+  })
+})
+
+// ── ⛔ H1 · Los metadatos de arco de la LISTA (auditoría 2026-08-15) ──────────
+
+describe('parsers/_comun — extraerPares · arcos de la LISTA (H1)', () => {
+  // La salida real de LISTA sobre una polilínea con un arco: por cada arco,
+  // líneas Curvatura/Centro/Radio ADEMÁS del vértice. La línea `Centro:` trae
+  // 3 números y entraba como VÉRTICE (el centro del arco dentro del anillo,
+  // con bloqueos: [] y cero avisos).
+  const LISTA_CON_ARCO = [
+    'Ubicación:  X= 0.0000  Y= 0.0000  Z= 0.0000',
+    'Curvatura: 1.0000',
+    'Centro: X= 5.0000  Y= 0.0000  Z= 0.0000',
+    'Radio: 5.0000',
+    'Ubicación:  X= 10.0000  Y= 0.0000  Z= 0.0000',
+  ]
+
+  it('⛔ la línea «Centro:» NO entra como vértice fantasma', () => {
+    const { anillos } = extraerPares(LISTA_CON_ARCO)
+    expect(anillos).toEqual([
+      [
+        [0, 0],
+        [10, 0],
+      ],
+    ])
+    // Y en concreto el centro [5, 0] no está en ningún anillo.
+    expect(anillos[0]).not.toContainEqual([5, 0])
+  })
+
+  it('la Curvatura (bulge) NO se tira: se devuelve en `curvaturas` con su vértice', () => {
+    const { curvaturas } = extraerPares(LISTA_CON_ARCO)
+    expect(curvaturas).toEqual([{ anillo: 0, vertice: 0, b: 1 }])
+  })
+
+  it('en un volcado TXT puro (sin X=/Y=) `curvaturas` es [] y nada cambia', () => {
+    const { anillos, curvaturas } = extraerPares(['439250.35 4479664.55', '439260.10 4479670.20'])
+    expect(curvaturas).toEqual([])
+    expect(anillos[0]).toHaveLength(2)
+  })
+
+  it('una «Curvatura» sin vértice previo se AVISA, no se ignora en silencio', () => {
+    const { curvaturas, detecciones } = extraerPares([
+      'Curvatura: 0.5', // antes de cualquier vértice: no hay tramo al que atarla
+      'Ubicación:  X= 10.0  Y= 20.0  Z= 0.0',
+    ])
+    expect(curvaturas).toEqual([])
+    const aviso = detecciones.find((d) => d.tipo === TIPO_DETECCION.FORMATO_NO_SOPORTADO)
+    expect(aviso).toBeTruthy()
+    expect(aviso.severidad).toBe(SEVERIDAD.AVISO)
+  })
+})
+
+// ── ⛔ H2 · Líneas con 4 o más números (auditoría 2026-08-15) ─────────────────
+
+describe('parsers/_comun — extraerPares · líneas con ≥4 números (H2)', () => {
+  it('⛔ un volcado «x1 y1 x2 y2» NO se traga la mitad de los pares con el cuento de la Z', () => {
+    // Antes: nums.length >= 3 → zCount++ y se quedaba con los DOS primeros: la
+    // mitad de los vértices perdidos con el mensaje FALSO «Se descartó la
+    // coordenada Z». Ahora: la línea se omite ENTERA y se dice la verdad (ERROR).
+    const { anillos, detecciones } = extraerPares([
+      '439250.35 4479664.55 439260.10 4479670.20',
+      '439270.00 4479680.00 439280.00 4479690.00',
+    ])
+    expect(anillos).toEqual([]) // nada importado a medias
+    expect(detecciones.some((d) => d.tipo === TIPO_DETECCION.Z_DESCARTADA)).toBe(false) // sin mentira
+    const err = detecciones.find((d) => d.tipo === TIPO_DETECCION.FORMATO_NO_SOPORTADO)
+    expect(err).toBeTruthy()
+    expect(err.severidad).toBe(SEVERIDAD.ERROR)
+    expect(err.datos.lineas).toBe(2)
+    expect(err.mensaje).toMatch(/4 o más números/)
+  })
+
+  it('3 números siguen siendo un par + Z plausible (comportamiento intacto)', () => {
+    const { anillos, detecciones } = extraerPares(['439250.35 4479664.55 0.00'])
+    expect(anillos).toEqual([[[439250.35, 4479664.55]]])
+    expect(detecciones.some((d) => d.tipo === TIPO_DETECCION.Z_DESCARTADA)).toBe(true)
+    expect(detecciones.some((d) => d.tipo === TIPO_DETECCION.FORMATO_NO_SOPORTADO)).toBe(false)
+  })
+
+  it('mezcla: las líneas buenas entran y las de ≥4 números se declaran', () => {
+    const { anillos, detecciones } = extraerPares([
+      '439250.35 4479664.55',
+      '1 439260.10 4479670.20 0.00', // índice + X + Y + Z: no soportado
+      '439270.00 4479680.00',
+    ])
+    expect(anillos).toEqual([
+      [
+        [439250.35, 4479664.55],
+        [439270.0, 4479680.0],
+      ],
+    ])
+    expect(detecciones.find((d) => d.tipo === TIPO_DETECCION.FORMATO_NO_SOPORTADO).datos.lineas).toBe(1)
+  })
+})
+
+// ── ⛔ H5/H6 · Separador decimal: enteros con coma, miles, científica ─────────
+
+describe('parsers/_comun — autodetección: enteros con coma de columna (H5) y notación científica (H6)', () => {
+  it('⛔ H5 · «439250,4479664» (enteros, coma de columna) → gana "." y salen pares', () => {
+    // Antes: la coma contaba como decimal (\d,\d → 1 a 0), cada línea se fundía
+    // en UN número, TODAS se saltaban y el fichero moría en SIN_GEOMETRIA.
+    expect(autodetectarSeparadorDecimal('439250,4479664\n439260,4479670')).toBe('.')
+    const { anillos, detecciones } = extraerPares(['439250,4479664', '439260,4479670'])
+    expect(anillos).toEqual([
+      [
+        [439250, 4479664],
+        [439260, 4479670],
+      ],
+    ])
+    // La decisión no trivial queda contada en la propia detección (regla 1).
+    const sep = detecciones.find((d) => d.tipo === TIPO_DETECCION.SEPARADOR_DECIMAL)
+    expect(sep.datos.separador).toBe('.')
+    expect(sep.datos.motivo).toBe('PARES_SOBRE_COMA')
+  })
+
+  it('H5 · el formato español con miles «4.479.664,55» ya no se destroza', () => {
+    // Antes: los puntos de millar «ganaban» el recuento (3 a 2) → '.' → cada
+    // número se partía en pedazos (439.25, 35, 4.479, 664.55…).
+    expect(autodetectarSeparadorDecimal('439.250,35 4.479.664,55')).toBe(',')
+    const { anillos, detecciones } = extraerPares(['439.250,35 4.479.664,55'])
+    expect(anillos).toEqual([[[439250.35, 4479664.55]]])
+    expect(detecciones.find((d) => d.tipo === TIPO_DETECCION.SEPARADOR_DECIMAL).datos.motivo).toBe(
+      'MILES_ES',
+    )
+  })
+
+  it('H5 · la coma decimal DE VERDAD (con decimales) sigue ganando como siempre', () => {
+    expect(autodetectarSeparadorDecimal('439250,35 4479664,55')).toBe(',')
+    const { anillos } = extraerPares(['439250,35 4479664,55'])
+    expect(anillos).toEqual([[[439250.35, 4479664.55]]])
+  })
+
+  it('H6 · notación científica: «4.3925e5» es UN número, no dos', () => {
+    // Antes tokenizaba como 4.3925 y 5 → un vértice [4.3925, 5] inventado.
+    const { anillos } = extraerPares(['4.3925e5 4.4796645e6'])
+    expect(anillos).toEqual([[[439250, 4479664.5]]])
   })
 })
 

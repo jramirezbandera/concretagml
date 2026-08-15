@@ -2963,7 +2963,31 @@ try {
   // un navegador que niega el almacenamiento—, y la caché es una optimización:
   // sin base, se comporta como `CACHE_NULA` y la app funciona igual.
   const cache = crearCacheCatastro({
-    bd: abrirBd({ alAvisar: panel.avisar }),
+    bd: abrirBd({
+      alAvisar: panel.avisar,
+      // S1 (2026-08-15) · El gancho que F10 dejó preparado en `storage/bd.js` y
+      // que NADIE cableaba. Sin él, cuando ESTA pestaña es la vieja, la nueva
+      // recibe `blocked`, degrada a trabajar sin caché y avisa — pero se queda
+      // sin almacén hasta que esta suelte la conexión. La decisión de cerrar se
+      // toma aquí y no en `storage/bd.js`, como su cabecera pedía: esta es la
+      // capa que tiene el panel delante para contarlo. Cerrar es irreversible
+      // para esta conexión (toda lectura y escritura posteriores fallan con
+      // `InvalidStateError`, que la caché degrada a «no estaba» avisando), y por
+      // eso el aviso dice qué queda parado y qué lo recupera: recargar.
+      // ⚠️ `abrirBd` MEMOIZA sus opciones en la PRIMERA llamada, así que este
+      // cableado tiene que vivir aquí, en el arranque — las llamadas posteriores
+      // (pie de firma, expedientes) reutilizan esta conexión y este gancho.
+      alVersionChange: ({ cerrar }) => {
+        cerrar()
+        panel.avisar(
+          'Otra pestaña de esta aplicación necesitaba actualizar el almacén local, así que ' +
+            'esta pestaña ha cerrado su conexión para dejarla continuar. Puedes seguir ' +
+            'trabajando y generar el GML con normalidad, pero la caché del Catastro y el ' +
+            'guardado de expedientes quedan parados en esta pestaña hasta que la recargues.',
+          { nivel: NIVEL.AVISO },
+        )
+      },
+    }),
     alAvisar: panel.avisar,
   })
   // Antes de construir el cliente, por el mismo motivo escrito en {@link clienteCatastro}:

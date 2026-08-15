@@ -115,6 +115,53 @@ describe('parsers/txt — autodetección coma-decimal + swap de separador de col
     expect(sep.datos).toEqual({ separador: ',', autodetectado: false })
   })
 
+  it('⛔ H5 (2026-08-15) · ENTEROS con coma de columna: «439250,4479664» parsea, no muere en SIN_GEOMETRIA', () => {
+    // Antes, la coma «ganaba» como decimal (1 a 0), cada línea se fundía en UN
+    // número (439250.4479664), todas se saltaban (<2 números) y el resultado era
+    // anillos: [] → SIN_GEOMETRIA con un motivo falso. La doc del propio
+    // _comun.js afirmaba que este caso daba «dos enteros» — ahora es verdad.
+    const { anillos, detecciones } = parseTXT('439250,4479664\n439260,4479670\n439270,4479680')
+    expect(anillos).toEqual([
+      [
+        [439250, 4479664],
+        [439260, 4479670],
+        [439270, 4479680],
+      ],
+    ])
+    const sep = detecciones.find((d) => d.tipo === TIPO_DETECCION.SEPARADOR_DECIMAL)
+    expect(sep.datos.separador).toBe('.')
+  })
+
+  it('⛔ H5 · formato español con miles: «439.250,35 4.479.664,55» → un par, no confeti', () => {
+    const { anillos } = parseTXT('439.250,35 4.479.664,55')
+    expect(anillos).toEqual([[[439250.35, 4479664.55]]])
+  })
+
+  it('H1 · una LISTA con arcos que entra por la vía TXT AVISA de que el arco queda como cuerda', () => {
+    // parseTXT no discretiza (eso es de parseLIST con geo/arco.js), pero tragarse
+    // la Curvatura en silencio era el defecto: ahora al menos se dice.
+    const lista = [
+      'Ubicación:  X= 0.0  Y= 0.0  Z= 0.0',
+      'Curvatura: 1.0000',
+      'Centro: X= 5.0  Y= 0.0  Z= 0.0',
+      'Radio: 5.0',
+      'Ubicación:  X= 10.0  Y= 0.0  Z= 0.0',
+    ].join('\n')
+    const { anillos, detecciones } = parseTXT(lista)
+    expect(anillos).toEqual([
+      [
+        [0, 0],
+        [10, 0],
+      ],
+    ]) // sin vértice fantasma del Centro
+    const aviso = detecciones.find(
+      (d) => d.tipo === TIPO_DETECCION.ARCO_DISCRETIZADO && d.severidad === SEVERIDAD.AVISO,
+    )
+    expect(aviso).toBeTruthy()
+    expect(aviso.mensaje).toMatch(/cuerda/)
+    expect(aviso.datos).toEqual({ arcos: 1, aplicado: false })
+  })
+
   it('la palabra `separador` en línea propia divide en dos anillos', () => {
     const { anillos, detecciones } = parseTXT('10.0 20.0\nseparador\n30.0 40.0')
     expect(anillos).toEqual([[[10, 20]], [[30, 40]]])

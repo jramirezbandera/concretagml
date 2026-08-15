@@ -832,17 +832,23 @@ describe('contrato F11 · `edificio/` sale por el barrel; el visor, el servicio 
       'GML_EXISTENTE',
       'WFS',
     ])
-    // ⛔ MOTIVO_ENTRADA son CINCO y son de EDIFICIO. Los dos bloqueos que T1.1
+    // ⛔ MOTIVO_ENTRADA son SEIS y son de EDIFICIO. Los dos bloqueos que T1.1
     // añadió a `parsers/importar.js` —`ANILLOS_EN_VARIAS_CAPAS` y
     // `SUPERFICIE_NO_POSITIVA`— hablan del reparto «un exterior + N huecos», que
     // es una regla de la rama PARCELA: en ésta cada anillo es su propio exterior.
     // Que no estén aquí es lo que permite que el caso normal de la fase —un DXF
     // de vivienda + porche + piscina, que viene por definición de varias capas—
     // no salga bloqueado.
+    //
+    // ⭐ El sexto, `LINEAS_NO_IMPORTADAS`, lo añade la auditoría de 2026-08 y SÍ
+    // se hereda: dice que el parser descartó líneas del fichero, así que a los
+    // contornos les faltan vértices. Eso rompe una huella de edificio igual que
+    // una parcela — no depende de ningún reparto.
     expect(Object.keys(barrel.entradaEdificio.MOTIVO_ENTRADA)).toEqual([
       'SIN_GEOMETRIA',
       'COORDENADAS_EN_GRADOS',
       'HUSO_NO_RESUELTO',
+      'LINEAS_NO_IMPORTADAS',
       'SIN_CONSTRUCCION',
       'DIALECTO_NO_BU',
     ])

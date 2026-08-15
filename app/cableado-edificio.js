@@ -571,6 +571,9 @@ const RESUMEN_POR_BLOQUEO = Object.freeze({
     'Las coordenadas vienen en grados y aquí se esperan metros UTM.',
   [MOTIVO_ENTRADA.HUSO_NO_RESUELTO]:
     'No se ha podido saber en qué huso están las coordenadas, así que no se sitúan.',
+  [MOTIVO_ENTRADA.LINEAS_NO_IMPORTADAS]:
+    'El fichero trae líneas de cuatro o más números que no se han importado: a los contornos les ' +
+    'faltarían vértices. Vuelve a exportarlo con una coordenada por línea.',
   [MOTIVO_ENTRADA.SIN_CONSTRUCCION]:
     'No hay ninguna construcción registrada: ese es el punto de partida de una obra nueva.',
   [MOTIVO_ENTRADA.DIALECTO_NO_BU]: 'Ese GML no es de edificio; esta rama solo lee los de edificio.',

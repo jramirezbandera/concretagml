@@ -718,8 +718,77 @@ describe('parsers/importar — opts.capa: la oferta que resuelve el reparto', ()
   })
 })
 
+// ═════════════════════════════════════════════════════════════════════════════
+// Auditoría 2026-08 · Una línea que NO entra no puede dejar construir la parcela
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// La auditoría midió que `extraerPares` se tragaba una línea de cuatro números
+// como si fuera un vértice con Z, perdiendo la mitad de los pares con el mensaje
+// FALSO de «Z descartada». El arreglo lo convirtió en una detección ERROR
+// honesta… y ahí se quedó corto: una detección no impide construir. Medido
+// entonces sobre el caso de abajo: `construida: true`, `bloqueos: []` y una
+// parcela de CUATRO vértices —en vez de seis— lista para firmarse.
+
+describe('parsers/importar — líneas descartadas y el bloqueo que faltaba', () => {
+  /** Parcela en L de SEIS vértices donde UNA línea trae dos vértices juntos. */
+  const L_CON_LINEA_DE_CUATRO = [
+    '440000.00 4470000.00',
+    '440100.00 4470000.00',
+    '440100.00 4470040.00 440060.00 4470040.00', // ← los dos que se pierden
+    '440060.00 4470100.00',
+    '440000.00 4470100.00',
+  ].join('\n')
+
+  it('⭐ pierde dos vértices y YA NO se construye: bloquea con LINEAS_NO_IMPORTADAS', () => {
+    const { parcela, resumen } = importar(L_CON_LINEA_DE_CUATRO, { formato: 'TXT' })
+    expect(resumen.bloqueos).toContain(BLOQUEOS.LINEAS_NO_IMPORTADAS)
+    expect(resumen.construida).toBe(false)
+    expect(parcela).toBeNull()
+    // Anti-vacuidad: el destrozo que se evita estaba MEDIDO — cuatro de seis.
+    expect(resumen.nVertices).toEqual([4])
+  })
+
+  it('y la detección que lo acompaña nombra la línea, en ERROR', () => {
+    const { detecciones } = importar(L_CON_LINEA_DE_CUATRO, { formato: 'TXT' })
+    const det = porTipo(detecciones, TIPO_DETECCION.FORMATO_NO_SOPORTADO)[0]
+    expect(det.severidad).toBe(SEVERIDAD.ERROR)
+    expect(det.mensaje).toContain('440100.00 4470040.00 440060.00 4470040.00')
+  })
+
+  it('sin líneas perdidas la MISMA parcela entra entera: el bloqueo no sobra', () => {
+    // Anti-vacuidad del bloqueo: si dijera que sí a todo, esto también fallaría.
+    const entera = L_CON_LINEA_DE_CUATRO.replace(
+      '440100.00 4470040.00 440060.00 4470040.00',
+      '440100.00 4470040.00\n440060.00 4470040.00',
+    )
+    const { parcela, resumen } = importar(entera, { formato: 'TXT' })
+    expect(resumen.bloqueos).not.toContain(BLOQUEOS.LINEAS_NO_IMPORTADAS)
+    expect(resumen.nVertices).toEqual([6])
+    expect(parcela).not.toBeNull()
+  })
+
+  it('⛔ cuando NO entra ni un anillo, sustituye a SIN_GEOMETRIA y no se suman', () => {
+    // El diagnóstico falso que se evita: «el fichero no trae ni una polilínea»
+    // dicho sobre un volcado que es TODO coordenadas manda al técnico a buscar el
+    // problema donde no está.
+    const todoDeCuatro = ['440000.00 4470000.00 440100.00 4470000.00', '440100.00 4470040.00 440060.00 4470040.00'].join('\n')
+    const { resumen } = importar(todoDeCuatro, { formato: 'TXT' })
+    expect(resumen.bloqueos).toEqual([BLOQUEOS.LINEAS_NO_IMPORTADAS])
+    expect(resumen.bloqueos).not.toContain(BLOQUEOS.SIN_GEOMETRIA)
+  })
+
+  it('la «Curvatura» huérfana es AVISO y NO bloquea: no pierde ningún vértice', () => {
+    // El mismo TIPO en dos severidades. Se distingue por SEVERIDAD y no por el
+    // texto, y esta prueba es la que lo ata.
+    const { resumen } = importar('Curvatura: 0.4142\n440000.00 4470000.00\n440100.00 4470000.00\n440100.00 4470100.00', {
+      formato: 'LIST',
+    })
+    expect(resumen.bloqueos).not.toContain(BLOQUEOS.LINEAS_NO_IMPORTADAS)
+  })
+})
+
 describe('parsers/importar — el catálogo BLOQUEOS', () => {
-  it('clave === valor, congelado, y son los SEIS', () => {
+  it('clave === valor, congelado, y son los SIETE', () => {
     expect(BLOQUEOS).toEqual({
       SIN_GEOMETRIA: 'SIN_GEOMETRIA',
       COORDENADAS_EN_GRADOS: 'COORDENADAS_EN_GRADOS',
@@ -728,11 +797,13 @@ describe('parsers/importar — el catálogo BLOQUEOS', () => {
       SUPERFICIE_NO_POSITIVA: 'SUPERFICIE_NO_POSITIVA',
       // F22 · Los anillos son N fincas separadas, no un contorno con huecos.
       VARIOS_RECINTOS_DISJUNTOS: 'VARIOS_RECINTOS_DISJUNTOS',
+      // Auditoría 2026-08 · El parser descartó líneas: al contorno le faltan vértices.
+      LINEAS_NO_IMPORTADAS: 'LINEAS_NO_IMPORTADAS',
     })
     expect(Object.isFrozen(BLOQUEOS)).toBe(true)
   })
 
-  it('los seis se emiten LITERALES en el fichero (el catálogo no puede desincronizarse)', () => {
+  it('los siete se emiten LITERALES en el fichero (el catálogo no puede desincronizarse)', () => {
     // Mitad estática del pacto: `parsers/importar.js` escribe los códigos a mano
     // en sus `bloqueos.push(...)` porque hay guardas de OTRAS capas que buscan
     // exactamente ese texto (`test/edificio/comun.test.js`). Este test ata las

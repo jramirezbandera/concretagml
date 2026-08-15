@@ -2239,7 +2239,7 @@ Q
 endstream
 endobj
 12 0 obj
-<< /Title (Informe de contraste con el parcelario catastral «b7» CG-9398516VK3799G-20260802-170453Z) /Producer (Concreta GML) /CreationDate (D:20260802170453Z00'00') >>
+<< /Title («fe»«ff»«00»I«00»n«00»f«00»o«00»r«00»m«00»e«00» «00»d«00»e«00» «00»c«00»o«00»n«00»t«00»r«00»a«00»s«00»t«00»e«00» «00»c«00»o«00»n«00» «00»e«00»l«00» «00»p«00»a«00»r«00»c«00»e«00»l«00»a«00»r«00»i«00»o«00» «00»c«00»a«00»t«00»a«00»s«00»t«00»r«00»a«00»l«00» «00»«b7»«00» «00»C«00»G«00»-«00»9«00»3«00»9«00»8«00»5«00»1«00»6«00»V«00»K«00»3«00»7«00»9«00»9«00»G«00»-«00»2«00»0«00»2«00»6«00»0«00»8«00»0«00»2«00»-«00»1«00»7«00»0«00»4«00»5«00»3«00»Z) /Producer («fe»«ff»«00»C«00»o«00»n«00»c«00»r«00»e«00»t«00»a«00» «00»G«00»M«00»L) /CreationDate (D:20260802170453Z00'00') >>
 endobj
 xref
 0 13
@@ -2259,14 +2259,14 @@ xref
 trailer
 << /Size 13 /Root 1 0 R /Info 12 0 R >>
 startxref
-23779
+23880
 %%EOF
 "
 `;
 
 exports[`report/pdf-parcela · snapshot > y las medidas del informe COMPLETO sobre la parcela real 1`] = `
 {
-  "bytes": 35771,
+  "bytes": 35896,
   "paginas": 5,
 }
 `;

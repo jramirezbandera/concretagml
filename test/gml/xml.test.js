@@ -479,6 +479,33 @@ describe('parsearXml · XML mal formado → errores con línea y columna', () =>
       expect(e.columna).toBeGreaterThanOrEqual(1)
     }
   })
+
+  it('⛔ un carácter de control LITERAL se anota en texto, atributo y CDATA', () => {
+    // XML 1.0 §2.2 los prohíbe y jsdom rechaza el documento entero por ellos
+    // (comprobado como los MAL_FORMADOS del oráculo). Antes, `leerTexto` los
+    // aceptaba sin dejar rastro mientras `esCaracterXml` solo juzgaba las
+    // referencias numéricas: el mismo documento era «mal formado» escrito como
+    // `&#1;` y «perfecto» escrito con el 0x01 literal.
+    const casos = [
+      ['texto', '<a>x\u0001y</a>'],
+      ['atributo', '<a b="x\u000By"/>'],
+      ['CDATA', '<a><![CDATA[x\u0000y]]></a>'],
+    ]
+    for (const [donde, xml] of casos) {
+      const { errores } = parsearXml(xml)
+      expect(errores.length, donde).toBeGreaterThan(0)
+      expect(errores[0].mensaje, donde).toMatch(/U\+00/)
+      expect(errores[0].mensaje, donde).toMatch(/XML 1\.0/)
+      expect(errores[0].linea, donde).toBeGreaterThanOrEqual(1)
+    }
+    // El dato NO se toca: se anota, y el texto sale tal cual venía (regla 1).
+    expect(parsearXml('<a>x\u0001y</a>').raiz.texto).toBe('x\u0001y')
+  })
+
+  it('y los blancos legales (\\t \\n \\r) NO se anotan: son XML corriente', () => {
+    const { errores } = parsearXml('<a b="x\ty">linea1\nlinea2\r\n</a>')
+    expect(errores).toEqual([])
+  })
 })
 
 // ── Lo que queda FUERA del subconjunto, con error explícito ───────────────────
@@ -637,6 +664,35 @@ describe('escaparTexto y escaparAtributo', () => {
   it('ambas lanzan TypeError si no reciben un string', () => {
     expect(() => escaparTexto(42)).toThrow(TypeError)
     expect(() => escaparAtributo(null)).toThrow(TypeError)
+  })
+
+  it('⛔ ambas LANZAN ante los caracteres que XML 1.0 prohíbe INCLUSO escapados (§2.2)', () => {
+    // Los controles C0 salvo \t \n \r son ilegales aunque se escriban como
+    // `&#11;`: antes de esta barrera atravesaban elem/render tal cual y el
+    // fichero salía MAL FORMADO con cero detecciones (jsdom lo rechaza entero).
+    // Es la última barrera del escritor, estilo `redondearCoord` ante 1e21.
+    for (const ilegal of ['\u0000', '\u0001', '\u0008', '\u000B', '\u000C', '\u000E', '\u001F', '\uFFFE', '\uFFFF']) {
+      expect(() => escaparTexto(`x${ilegal}y`), JSON.stringify(ilegal)).toThrow(RangeError)
+      expect(() => escaparAtributo(`x${ilegal}y`), JSON.stringify(ilegal)).toThrow(RangeError)
+    }
+    // El mensaje nombra el punto de código y dónde está, que es lo accionable.
+    expect(() => escaparTexto('ABC\u000BDEF')).toThrow(/U\+000B/)
+    expect(() => escaparTexto('ABC\u000BDEF')).toThrow(/índice 3/)
+  })
+
+  it('los legales del borde NO lanzan: \\t \\n \\r, los límites del BMP y los astrales', () => {
+    for (const legal of ['\t', '\n', '\r', ' ', '퟿', '', '�', '\uD83D\uDE00', 'café']) {
+      expect(() => escaparTexto(legal), JSON.stringify(legal)).not.toThrow()
+      expect(() => escaparAtributo(legal), JSON.stringify(legal)).not.toThrow()
+    }
+  })
+
+  it('una mitad de par subrogado SUELTA lanza; el par completo (emoji) no', () => {
+    // El pre-filtro casa con las unidades de subrogado, pero el veredicto se da
+    // por PUNTOS DE CÓDIGO: un emoji válido pasa, una mitad huérfana no.
+    expect(() => escaparTexto('\uD83D')).toThrow(RangeError)
+    expect(() => escaparAtributo('\uDE00')).toThrow(RangeError)
+    expect(() => escaparTexto('\uD83D\uDE00')).not.toThrow()
   })
 })
 

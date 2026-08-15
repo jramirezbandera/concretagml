@@ -1287,7 +1287,20 @@ describe('F09 · AC5 · …y el nombre correcto', () => {
 
     expect(r.titulo).toBe(NOMBRE_INFORME)
     expect(leerPdf(r.bytes).lineas).toContain(NOMBRE_INFORME.toUpperCase())
-    expect(aLatin1(r.bytes)).toContain(`/Title (${NOMBRE_INFORME} · ${r.idDocumento})`)
+    // El /Title del /Info va en UTF-16BE con BOM (auditoría R1: fuera de los
+    // content streams el estándar exige PDFDocEncoding o UTF-16BE, y CP1252
+    // diverge de PDFDocEncoding en 0x80–0x9F). En latin-1, cada carácter es
+    // «byte alto + byte bajo».
+    const utf16 = (s) =>
+      '\xfe\xff' +
+      [...s]
+        .map(
+          (c) =>
+            String.fromCharCode(c.charCodeAt(0) >> 8) +
+            String.fromCharCode(c.charCodeAt(0) & 0xff),
+        )
+        .join('')
+    expect(aLatin1(r.bytes)).toContain(`/Title (${utf16(`${NOMBRE_INFORME} · ${r.idDocumento}`)})`)
     expect(r.nombreFichero).toBe(`informe-contraste-${r.idDocumento}.pdf`)
     expect(r.nombreFichero.endsWith('.pdf')).toBe(true)
   })

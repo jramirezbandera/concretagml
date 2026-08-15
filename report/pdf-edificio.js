@@ -625,13 +625,18 @@ export function informePdfEdificio(entrada) {
       `Un trozo del plano ha quedado sin cartografía de fondo: ${textoONulo(t?.motivo) ?? NO_CONSTA}`,
     )
   }
-  incidencias.push(...bloqueSustituciones(maqueta, doc))
-
-  const nPaginas = estamparPies(doc, {
+  // ⭐ El MISMO objeto `pie` va a la nota de composición y a los pies (R3): la
+  // nota se imprime ANTES de estampar los pies —que necesitan el total de
+  // páginas— y pre-escanea sus textos para que una sustitución ocurrida en el
+  // pie quede enumerada en el papel. Ver report/maqueta.js#bloqueSustituciones.
+  const pie = {
     nombre: titulo,
     idDocumento,
     atribucion: textoONulo(plano?.atribucion) ?? '',
-  })
+  }
+  incidencias.push(...bloqueSustituciones(maqueta, doc, pie))
+
+  const nPaginas = estamparPies(doc, pie)
 
   return {
     bytes: doc.bytes(),

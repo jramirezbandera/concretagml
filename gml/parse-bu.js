@@ -420,9 +420,15 @@ function valorNumero(ctx, ref, nodo, nils, cualificado) {
  * piscina, y recortarlo por longitud —14 o 20 caracteres— acierta unas veces y
  * otras no. La procedencia del fixture lo deja escrito con todas las letras.
  *
+ * El valor del `refcat=` viene porcentaje-escapado (es un parámetro de URL) y se
+ * decodifica — pero `decodeURIComponent` LANZA `URIError` ante un porcentaje mal
+ * formado (`%E9` suelto, `%GG`), y este módulo NO lanza por el contenido del
+ * fichero (SPEC §2.1, cabecera). Ante eso se devuelve el valor tal cual venía y
+ * se deja constancia con una detección de nivel AVISO.
+ *
  * @returns {string|null}
  */
-function leerRefcat(feature) {
+function leerRefcat(ctx, ref, feature) {
   const externa = hijo(feature, NS_BU.core2d, 'externalReference')
   const bloque = externa === null ? null : hijo(externa, NS_BU.core2d, 'ExternalReference')
   const referencia = bloque === null ? null : hijo(bloque, NS_BU.core2d, 'reference')
@@ -435,7 +441,26 @@ function leerRefcat(feature) {
     if (enlace === null) continue
     const href = atributo(enlace, NS.xlink, 'href')
     const m = href === null ? null : RE_REFCAT_HREF.exec(href)
-    if (m !== null) return decodeURIComponent(m[1])
+    if (m === null) continue
+    try {
+      return decodeURIComponent(m[1])
+    } catch {
+      // El tipo es el mismo apaño documentado en `valorNumero`: «un valor
+      // declarado que no se puede interpretar» no tiene tipo propio fuera del
+      // área, y el mensaje nombra el elemento exacto, que es lo que importa.
+      anotaEn(
+        ctx,
+        ref,
+        TIPO_GML.AREA_DECLARADA_DISCREPANTE,
+        `el «refcat=» del xlink:href de «bu-core2d:${local}» declara ` +
+          `${JSON.stringify(m[1])}, que no es un porcentaje-escapado válido de URL y no se ` +
+          'puede decodificar. Se usa tal cual venía; el dato original está en el fichero, ' +
+          'sin tocar.',
+        SEVERIDAD.AVISO,
+        { elemento: `bu-core2d:${local}`, crudo: m[1] },
+      )
+      return m[1]
+    }
   }
   return null
 }
@@ -912,7 +937,7 @@ function leerComun(ctx, ref, feature) {
   return {
     gmlId: atributo(feature, NS.gml, 'id'),
     localId: leerLocalId(feature),
-    refcat: leerRefcat(feature),
+    refcat: leerRefcat(ctx, ref, feature),
     ...leerGeometria(ctx, ref, feature),
     nils,
   }

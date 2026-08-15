@@ -908,7 +908,11 @@ export function crearClienteCatastro(opciones = {}) {
     return {
       valor: entrada.valor,
       // Sin `guardadoEn` utilizable no se inventa una edad: `null` significa «no
-      // sé cuándo se guardó», que es distinto de «se guardó hace 0 ms».
+      // sé cuándo se guardó», que es distinto de «se guardó hace 0 ms». El
+      // `Math.max(0, …)` solo recorta el desfase de milisegundos entre el reloj
+      // de quien guardó y el de quien lee: una marca de verdad FUTURA (reloj del
+      // sistema retrocedido) no llega hasta aquí, porque la caché real la trata
+      // como caducada (S3, `storage/cache-catastro.js#leer`) y devuelve `null`.
       edadMs: Number.isFinite(entrada.guardadoEn)
         ? Math.max(0, ahora() - entrada.guardadoEn)
         : null,
@@ -1360,6 +1364,12 @@ export function crearClienteCatastro(opciones = {}) {
    * en el sitio equivocado no puede reventar la app. Una coordenada que no es un
    * número finito sí lanza: eso lo construye código.
    *
+   * **Se cachea el TEXTO CRUDO del OVC, no el objeto interpretado**, por las tres
+   * razones de {@link leerColeccionDeCache} y siguiendo la decisión 1 de
+   * `storage/cache-catastro.js` (S2). Un registro viejo con el POJO —lo que se
+   * guardó antes de esta corrección— se trata como fallo de caché y se va a la
+   * red, nunca como acierto.
+   *
    * @param {number} x  Este, en metros del SRS.
    * @param {number} y  Norte, en metros.
    * @param {object} [opciones]  Como en {@link parcelaPorRefcat}.
@@ -1395,14 +1405,28 @@ export function crearClienteCatastro(opciones = {}) {
 
     const clave = clavePunto(x, y, srs)
     const enCache = await leerDeCache(clave)
-    if (enCache !== null) {
-      return crearResultado({
-        ok: true,
-        datos: enCache.valor,
-        origen: ORIGEN.CACHE,
-        edadMs: enCache.edadMs,
-        inicio,
-      })
+    // Se cachea el CUERPO CRUDO del OVC y aquí se REINTERPRETA con el lector de
+    // hoy, igual que `leerColeccionDeCache` y que `descriptivosPorRefcat`
+    // (decisión 1 de `storage/cache-catastro.js`: los bytes son la verdad
+    // externa; una corrección futura de `leerRccoor` arregla lo ya guardado).
+    // S2 (2026-08-15): durante un tiempo se guardó el POJO ya interpretado
+    // `{candidatos, cuantos, unico}` y se servía verbatim, congelado con la
+    // lectura del día en que se guardó. Esos registros viejos no son cadenas,
+    // así que caen por el `typeof` a «no estaba» —fallo de caché, no acierto—,
+    // se van a la red y el `guardarEnCache` de abajo los pisa con el crudo.
+    if (enCache !== null && typeof enCache.valor === 'string') {
+      const ovc = leerRccoor(enCache.valor)
+      if (ovc.tipo === TIPO_RCCOOR.CANDIDATOS) {
+        return crearResultado({
+          ok: true,
+          datos: { candidatos: ovc.candidatos, cuantos: ovc.cuantos, unico: ovc.unico },
+          origen: ORIGEN.CACHE,
+          edadMs: enCache.edadMs,
+          inicio,
+        })
+      }
+      // Un cuerpo cacheado que ya no se puede leer NO es un error: se trata como
+      // si no estuviera y se va a la red (misma regla que `leerColeccionDeCache`).
     }
 
     const http = await transporte.pedirTexto(url, { senal })
@@ -1430,7 +1454,8 @@ export function crearClienteCatastro(opciones = {}) {
     }
 
     const datos = { candidatos: ovc.candidatos, cuantos: ovc.cuantos, unico: ovc.unico }
-    await guardarEnCache(clave, datos)
+    // El TEXTO CRUDO, no `datos`: ver el comentario de la lectura (S2).
+    await guardarEnCache(clave, http.texto)
     return crearResultado({
       ok: true,
       datos,

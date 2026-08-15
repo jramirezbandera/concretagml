@@ -158,8 +158,10 @@ export function anilloCerrado(anillo) {
  * Es un anillo por polígono a propósito: un recinto del modelo ES un anillo. Los
  * huecos NO se meten aquí como anillos interiores del exterior, porque las reglas
  * y las métricas que consumen esto los tratan por separado —el hueco se comprueba
- * CONTRA el exterior (`booleanContains`) y contra los otros huecos— y un polígono
- * con agujeros no permitiría nombrar cuál de ellos falla.
+ * CONTRA el exterior (`difference` + medición del área que queda fuera, más el
+ * solape de frontera de la regla «hueco apoyado en el lindero», con aritmética
+ * propia) y contra los otros huecos— y un polígono con agujeros no permitiría
+ * nombrar cuál de ellos falla.
  *
  * @param {{vertices: Array<[number,number]>}} recinto  Recinto del modelo (anillo ABIERTO).
  * @returns {Array<Array<[number,number]>>}  `coordinates` de un `Polygon` GeoJSON.

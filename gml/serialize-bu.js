@@ -83,7 +83,7 @@ import {
 import { DECIMALES_COORD, cerrarAnillo, prepararRecintos } from './anillos.js'
 import { NAMESPACE_BU_CATASTRO, NAMESPACE_BU_DEFECTO, idsDeEdificio } from './ids.js'
 import { ordenarSegunXsd } from './serialize-cp.js'
-import { elem, render } from './xml.js'
+import { elem, normalizarComentarios, render } from './xml.js'
 
 // ── Constantes del dialecto ──────────────────────────────────────────────────
 
@@ -311,7 +311,9 @@ export const ORDEN_BUILDING_GEOMETRY = Object.freeze([
  * @property {number|null} [numeroViviendas=null]  Solo COMPLETO.
  * @property {number|null} [superficieConstruida=null]  Solo COMPLETO (m²).
  * @property {number|null} [anioConstruccion=null]  Solo COMPLETO.
- * @property {string|null} [comentario=null]  Comentario(s) del prólogo.
+ * @property {string|string[]|null} [comentario=null]  Comentario(s) del prólogo.
+ *   Sin `--` dentro y sin terminar en `-`, que es lo que XML prohíbe en un
+ *   comentario; lo comprueba `gml/xml.js#normalizarComentarios`, como en parcela.
  * @property {string} [indentacion='  ']
  */
 
@@ -470,6 +472,13 @@ export function serializarEdificioBu(opciones = {}) {
 
   const detecciones = []
   const srsName = srsNameUrn(srs)
+
+  // El prólogo es lo único que este módulo escribe sin pasar por `render`, así
+  // que se comprueba AQUÍ —antes de trabajar— lo que ningún escapado salvaría:
+  // un `--` o un `-` final dentro de `<!--…-->` deja el fichero mal formado sin
+  // que nada chille (XML 1.0 §2.5). Misma guarda, compartida, que
+  // `serialize-cp.js`; este módulo interpolaba el comentario sin ella.
+  const comentarios = normalizarComentarios(comentario, 'serializarEdificioBu')
 
   // ── 1 · Identidad ─────────────────────────────────────────────────────────
   const { ids, detecciones: detIds } = idsDeEdificio({
@@ -632,8 +641,7 @@ export function serializarEdificioBu(opciones = {}) {
   const miembros = [nodoEdificio, ...nodosOtras].map((n) => elem('gml:featureMember', [], [n]))
   const raiz = elem('gml:FeatureCollection', atributos, miembros)
 
-  const comentarios =
-    comentario === null ? [] : (Array.isArray(comentario) ? comentario : [comentario])
+  // Los comentarios ya vienen comprobados por `normalizarComentarios` (arriba).
   const lineas = [
     DECLARACION_XML_BU,
     ...comentarios.map((c) => `<!--${c}-->`),

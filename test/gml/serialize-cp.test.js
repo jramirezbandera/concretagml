@@ -730,6 +730,28 @@ describe('gml/serialize-cp · contrato del resto de opciones', () => {
     expect(parsear(xml, 'con comentarios').documentElement.localName).toBe('FeatureCollection')
   })
 
+  it('⛔ un carácter de control en refcat o label LANZA: ningún escapado lo salvaría', () => {
+    // XML 1.0 §2.2 prohíbe los controles C0 (salvo \t \n \r) INCLUSO como
+    // referencia numérica. Antes de la barrera de `gml/xml.js`, estos dos casos
+    // producían `xml !== null`, cero detecciones ERROR y un documento MAL
+    // FORMADO que jsdom rechaza entero — el fallo mudo que la regla de oro 1
+    // prohíbe. Se lanza (estilo `redondearCoord` ante 1e21) en vez de sanear:
+    // sanear un `gml:id`/`localId` cambiaría la IDENTIDAD de la parcela.
+    expect(() => serializarParcelaCp({ ...OPCIONES_FIXTURE, refcat: 'ABC\u000BDEF' })).toThrow(
+      RangeError,
+    )
+    expect(() => serializarParcelaCp({ ...OPCIONES_FIXTURE, refcat: 'ABC\u000BDEF' })).toThrow(
+      /U\+000B/,
+    )
+    expect(() => serializarParcelaCp({ ...OPCIONES_FIXTURE, label: 'finca\u0001' })).toThrow(
+      RangeError,
+    )
+    // Y el texto normal, acentos incluidos, sigue saliendo como siempre.
+    expect(serializarParcelaCp({ ...OPCIONES_FIXTURE, label: 'camino de la peña' }).xml).toContain(
+      'camino de la peña',
+    )
+  })
+
   it('lanza si no le dan un objeto de opciones', () => {
     for (const malo of [null, 'x', 42, [OPCIONES_FIXTURE]]) {
       expect(() => serializarParcelaCp(malo)).toThrow(TypeError)

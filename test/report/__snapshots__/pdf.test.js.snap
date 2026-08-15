@@ -51,7 +51,7 @@ Q
 endstream
 endobj
 8 0 obj
-<< /Title (Informe de contraste con el parcelario catastral) /Producer (Concreta GML) /CreationDate (D:20260802123015Z00'00') >>
+<< /Title («fe»«ff»«00»I«00»n«00»f«00»o«00»r«00»m«00»e«00» «00»d«00»e«00» «00»c«00»o«00»n«00»t«00»r«00»a«00»s«00»t«00»e«00» «00»c«00»o«00»n«00» «00»e«00»l«00» «00»p«00»a«00»r«00»c«00»e«00»l«00»a«00»r«00»i«00»o«00» «00»c«00»a«00»t«00»a«00»s«00»t«00»r«00»a«00»l) /Producer («fe»«ff»«00»C«00»o«00»n«00»c«00»r«00»e«00»t«00»a«00» «00»G«00»M«00»L) /CreationDate (D:20260802123015Z00'00') >>
 endobj
 xref
 0 9
@@ -67,9 +67,9 @@ xref
 trailer
 << /Size 9 /Root 1 0 R /Info 8 0 R >>
 startxref
-940
+1004
 %%EOF
 "
 `;
 
-exports[`report/pdf · snapshot de bytes de un documento mínimo > y su tamaño, que es el argumento de todo esto 1`] = `1195`;
+exports[`report/pdf · snapshot de bytes de un documento mínimo > y su tamaño, que es el argumento de todo esto 1`] = `1260`;

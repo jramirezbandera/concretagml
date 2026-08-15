@@ -238,18 +238,26 @@ describe('edificio/_comun — MOTIVO_ENTRADA', () => {
       SIN_GEOMETRIA: 'SIN_GEOMETRIA',
       COORDENADAS_EN_GRADOS: 'COORDENADAS_EN_GRADOS',
       HUSO_NO_RESUELTO: 'HUSO_NO_RESUELTO',
+      LINEAS_NO_IMPORTADAS: 'LINEAS_NO_IMPORTADAS',
       SIN_CONSTRUCCION: 'SIN_CONSTRUCCION',
       DIALECTO_NO_BU: 'DIALECTO_NO_BU',
     })
     expect(Object.isFrozen(MOTIVO_ENTRADA)).toBe(true)
   })
 
-  it('los TRES heredados son LITERALMENTE los de parsers/importar.js#BLOQUEOS', () => {
+  it('los CUATRO heredados son LITERALMENTE los de parsers/importar.js#BLOQUEOS', () => {
     // Test-guarda de coherencia: `entradaDesdeTexto` (T2.1) delega en `importar()`
     // y arrastra sus `bloqueos` SIN traducir. Si alguien renombra un código allí,
     // este test cae aquí en vez de que la interfaz deje de reconocer un bloqueo
     // en producción.
-    for (const codigo of ['SIN_GEOMETRIA', 'COORDENADAS_EN_GRADOS', 'HUSO_NO_RESUELTO']) {
+    for (const codigo of [
+      'SIN_GEOMETRIA',
+      'COORDENADAS_EN_GRADOS',
+      'HUSO_NO_RESUELTO',
+      // Auditoría 2026-08: universal a propósito — una huella a la que le faltan
+      // vértices está tan rota como una parcela.
+      'LINEAS_NO_IMPORTADAS',
+    ]) {
       expect(MOTIVO_ENTRADA[codigo], `divergencia con parsers/importar.js en ${codigo}`).toBe(
         BLOQUEOS[codigo],
       )

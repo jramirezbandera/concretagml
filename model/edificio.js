@@ -104,7 +104,18 @@ function deepFreeze(valor) {
   return valor
 }
 
-/** Valida (ligero) que un recinto recibido sea `{vertices: Array}` o null. */
+/**
+ * Valida que un recinto recibido sea `{vertices: [[x,y],...]}` o null, con CADA
+ * vértice como par de números FINITOS — la misma exigencia que
+ * `model/parcela.js#crearRecinto` en la rama PARCELA (las ramas del modelo no se
+ * importan entre sí, pero el contrato de un vértice es uno solo).
+ *
+ * ⚠️ Antes solo se comprobaba que `vertices` fuera array (auditoría 2026-08,
+ * V4): un `[NaN, y]` entraba al modelo sin ruido y estallaba lejos de su causa
+ * — `validation/reglas-huso.js` confía en esta garantía («detectarHuso ya valida
+ * coords finitas (el modelo las garantiza)») y LANZABA al validar. La garantía
+ * ahora se da donde se promete: en la factory (regla 1).
+ */
 function validarRecintoPlano(recinto, contexto) {
   if (recinto === null) return null
   if (!recinto || typeof recinto !== 'object' || !Array.isArray(recinto.vertices)) {
@@ -113,6 +124,14 @@ function validarRecintoPlano(recinto, contexto) {
         `recibido ${JSON.stringify(recinto)}.`,
     )
   }
+  recinto.vertices.forEach((v, i) => {
+    if (!Array.isArray(v) || v.length < 2 || !esNumeroFinito(v[0]) || !esNumeroFinito(v[1])) {
+      throw new TypeError(
+        `${contexto}: el vértice ${i} del recinto no es un par UTM [x,y] de números finitos: ` +
+          `${JSON.stringify(v)}.`,
+      )
+    }
+  })
   // Copia defensiva (POJO plano): el modelo no comparte referencias con la entrada.
   return structuredClone(recinto)
 }

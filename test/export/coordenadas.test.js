@@ -171,23 +171,39 @@ describe('export/coordenadas · la asimetría, medida y fijada', () => {
   it('⭐ `parseTXT` NO devuelve los anillos de vuelta: los lee mal, y así de mal', () => {
     // Medido el 2026-08-03. Se fija aquí con los VALORES EXACTOS —y no con un
     // `not.toEqual` genérico— para que la prueba diga QUÉ pasa y no solo que algo
-    // pasa. La parcela tiene 15 vértices y de aquí salen 18, por cuatro averías:
+    // pasa. La parcela tiene 15 vértices y de aquí salían 18, por cuatro averías.
+    //
+    // ⭐ **La auditoría de 2026-08 mató DOS de las cuatro, y aquí se cuenta cuáles**
+    // (regla de oro 8: la medida vieja se conserva citada, no se borra):
+    //
+    //   · ✅ **la FECHA** —`03/08/2026 09:45 (UTC)`, que entraba como el par
+    //     `[3, 8]`— ya no entra: `extraerPares` dejó de tragarse las líneas de
+    //     cuatro o más números, y ahora la nombra en una detección ERROR.
+    //   · ✅ **el separador de millar del pie** —`1.535,87 m²`, que entraba como
+    //     `[1, 535.87]`— ya no entra: el autodetector reconoce el formato español
+    //     con miles y lee `1535.87` como UN número, así que esa línea se queda en
+    //     un solo número y no en un par.
+    //
+    // Y quedan las dos que NO son de formato numérico sino de estructura, que este
+    // parser no puede resolver sin saltarse cabeceras (justo lo que la nota de
+    // arriba prohíbe): la referencia catastral y la columna de numeración.
     const { texto } = listadoReal()
     const { anillos } = parseTXT(texto)
     const leidos = anillos.flat()
     const esperados = redondearAnillo(DEL_WFS.recintos[0].vertices)
 
     expect(anillos.length).toBe(1)
-    expect(leidos.length).toBe(esperados.length + 3)
+    expect(leidos.length).toBe(esperados.length + 1)
 
-    expect(leidos[0]).toEqual([3, 8]) // 1 · la FECHA, `03/08/2026 09:45 (UTC)`
-    expect(leidos[1]).toEqual([9398516, 3799]) // 2 · la referencia catastral
-    // 3 · cada vértice, con su NÚMERO como X y su X como Y — la Y se pierde entera.
+    expect(leidos[0]).toEqual([9398516, 3799]) // 1 · la referencia catastral
+    // 2 · cada vértice, con su NÚMERO como X y su X como Y — la Y se pierde entera.
     esperados.forEach((v, i) => {
-      expect(leidos[i + 2]).toEqual([i + 1, v[0]])
+      expect(leidos[i + 1]).toEqual([i + 1, v[0]])
     })
-    // 4 · el separador de millar del pie: `1.535,87 m²` → `1` y `535,87`.
-    expect(leidos[leidos.length - 1]).toEqual([1, 535.87])
+
+    // Las dos muertas, afirmadas por su ausencia para que nadie las resucite.
+    expect(leidos).not.toContainEqual([3, 8])
+    expect(leidos).not.toContainEqual([1, 535.87])
 
     // Y ni un solo par bueno por ninguna parte.
     for (const v of esperados) expect(leidos).not.toContainEqual([v[0], v[1]])
@@ -302,13 +318,21 @@ describe('export/coordenadas · F18 · esListadoDeReplanteo', () => {
     // la cabecera envenenen la comprobación del huso. Si algún día `importar()`
     // aprendiera a saltarse la cabecera, esto se pondría rojo — y entonces el detector
     // sería lo ÚNICO que separa al usuario de una parcela inventada.
+    //
+    // ⭐ **Remedido tras la auditoría de 2026-08, y ya no es incidental.** La línea
+    // de la fecha tiene cuatro números, así que ahora `importar()` la nombra y
+    // BLOQUEA con `LINEAS_NO_IMPORTADAS` — que además va PRIMERO. El diagnóstico
+    // dejó de mandar al usuario a arreglar un huso sano: ahora la primera frase que
+    // lee dice que hay líneas del fichero que no han entrado, que es verdad. El
+    // detector de F18 sigue haciendo falta para decirlo con el nombre propio de
+    // este fichero, pero ya no es lo único que hay.
     const { texto } = listadoReal()
     const { resumen, parcela } = importar(texto, { formato: 'TXT' })
 
-    expect(resumen.nVertices).toEqual([18]) // la parcela real tiene 15
+    expect(resumen.nVertices).toEqual([16]) // la parcela real tiene 15
     expect(resumen.construida).toBe(false)
     expect(parcela).toBeNull()
-    expect(resumen.bloqueos).toEqual(['HUSO_NO_RESUELTO'])
+    expect(resumen.bloqueos).toEqual(['LINEAS_NO_IMPORTADAS', 'HUSO_NO_RESUELTO'])
 
     // Y forzar el huso tampoco lo salva: los pares parásitos caen fuera igual.
     expect(importar(texto, { formato: 'TXT', huso: 30 }).resumen.construida).toBe(false)

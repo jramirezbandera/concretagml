@@ -143,7 +143,7 @@
 //
 // Así que solo se van los registros que **ya no puede servir nadie**: los pasados de
 // TTL —que `leer` ya trata como ausentes— y los que tienen una marca de tiempo
-// inservible, que nunca podrán acertar. Un registro fresco no se toca aunque el disco
+// inservible o FUTURA (reloj retrocedido, S3), que nunca podrán acertar. Un registro fresco no se toca aunque el disco
 // esté lleno. Si después de purgar sigue sin caber, **se dice**; no se sigue borrando.
 //
 // El contador `caducados` de `estado()` sigue siendo el gancho informativo con el que
@@ -701,7 +701,17 @@ export function crearCacheCatastro(opciones = {}) {
     // Un registro cuya marca de tiempo no se puede usar NO puede pasar un TTL:
     // aprobarlo sería servir un dato de edad desconocida bajo la promesa de que
     // tiene menos de siete días. Se cuenta como caducado y se va a la red.
-    if (!Number.isFinite(guardadoEn) || ahora() - guardadoEn > MS_TTL) {
+    //
+    // S3 (2026-08-15): una edad NEGATIVA —`guardadoEn` en el futuro, o sea un
+    // reloj del sistema que retrocedió después de guardar— tampoco pasa. Con solo
+    // `edad > MS_TTL`, un registro futuro no caducaba NUNCA (su edad baja en vez
+    // de subir) y encima el cliente lo presentaba como recién traído (`edadMs`
+    // se recorta a 0 en `services/catastro.js#leerDeCache`). No se puede afirmar
+    // «tiene menos de siete días» de algo guardado en un tiempo que aún no ha
+    // llegado: se trata como caducado y se va a la red, que lo pisará con una
+    // marca sana.
+    const edad = ahora() - guardadoEn
+    if (!Number.isFinite(guardadoEn) || edad < 0 || edad > MS_TTL) {
       cuenta.caducados += 1
       // No se borra: ver la decisión 5. Lo pisará el siguiente `guardar`.
       return null
@@ -889,9 +899,13 @@ export function crearCacheCatastro(opciones = {}) {
           revisados += 1
           const marca = registro?.guardadoEn
           const rota = !Number.isFinite(marca)
+          const edad = t - marca
           // El MISMO criterio que `leer`, y con el mismo `>`: un registro de
-          // exactamente el TTL todavía acierta, así que todavía no se tira.
-          if (!rota && t - marca <= ttlMs) continue
+          // exactamente el TTL todavía acierta, así que todavía no se tira. Y una
+          // marca FUTURA (edad negativa: reloj retrocedido, S3) se tira también:
+          // `leer` ya no la sirve nunca, así que es peso muerto que además no
+          // caducaría jamás por antigüedad.
+          if (!rota && edad >= 0 && edad <= ttlMs) continue
 
           await db.delete(almacen, registro[campoClave])
           purgados += 1

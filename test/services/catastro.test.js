@@ -95,6 +95,7 @@ import {
   TIPO_RESPUESTA_WFS,
   leerColeccion,
 } from '../../services/_catastro-wfs.js'
+import { TIPO_RCCOOR, leerRccoor } from '../../services/_catastro-ovc.js'
 import { BACKOFF, crearTransporte } from '../../services/_red.js'
 import { NIVEL } from '../../viewer/_comun.js'
 import { HUSOS_VALIDOS, husoPorSrs, srsPorHuso } from '../../geo/huso.js'
@@ -947,6 +948,71 @@ describe('services/catastro · refcatPorCoordenada (geocodificación inversa)', 
     const r = await cliente.refcatPorCoordenada(mismoMetro(X_OK), mismoMetro(Y_OK))
     expect(r.procedencia.origen).toBe(ORIGEN.CACHE)
     expect(red.total - tras).toBe(0)
+    // Y el dato que sale de la caché es el REINTERPRETADO, entero: la política
+    // de cachear crudo no puede degradar lo que la primera consulta ya dio.
+    expect(r.datos.candidatos[0].refcat).toBe(RC_BUENA)
+    expect(r.datos.unico).toBe(true)
+  })
+
+  it('S2 · lo que se GUARDA en la caché es el CUERPO CRUDO del OVC, no el POJO interpretado', async () => {
+    // La misma garantía —y el mismo guardián— que ya tenía `parcelaPorRefcat`:
+    // el crudo se reinterpreta con el lector de HOY en cada acierto, así que una
+    // corrección futura de `leerRccoor` arregla retroactivamente lo ya cacheado.
+    // Con el POJO guardado (lo que hacía S2), cada registro quedaba congelado
+    // con la lectura del día en que se guardó, contra la decisión 1 de
+    // `storage/cache-catastro.js`.
+    const cache = crearCacheDoble()
+    const { cliente } = montar({ cache: cache.puerto })
+
+    await cliente.refcatPorCoordenada(X_OK, Y_OK)
+
+    const guardados = [...cache.almacen.values()]
+    expect(guardados).toHaveLength(1)
+    const guardado = guardados[0].valor
+    expect(typeof guardado).toBe('string')
+    // Y es el cuerpo de verdad: se relee con el mismo lector del módulo y
+    // produce el candidato medido. Derivado, no tecleado.
+    const releido = leerRccoor(guardado)
+    expect(releido.tipo).toBe(TIPO_RCCOOR.CANDIDATOS)
+    expect(releido.candidatos[0].refcat).toBe(RC_BUENA)
+  })
+
+  it('S2 · un registro VIEJO con el POJO cacheado es fallo de caché → red, nunca un acierto', async () => {
+    // Los registros guardados antes de la corrección llevan dentro el objeto
+    // interpretado. No se pueden servir —sería servir la interpretación de otro
+    // día como si fuera de hoy— ni pueden romper nada: se tratan como «no
+    // estaba», se va a la red, y el `guardar` posterior los pisa con el crudo.
+    const cache = crearCacheDoble()
+    const { cliente, red } = montar({ cache: cache.puerto })
+    await cliente.refcatPorCoordenada(X_OK, Y_OK) // llena la caché (con el crudo)
+    const clave = [...cache.almacen.keys()][0]
+    // El formato ANTIGUO, tal como lo dejaba el código de antes de S2.
+    cache.almacen.set(clave, {
+      valor: { candidatos: [{ refcat: RC_BUENA }], cuantos: 1, unico: true },
+      guardadoEn: 0,
+    })
+
+    const r = await cliente.refcatPorCoordenada(X_OK, Y_OK)
+    expect(r.ok).toBe(true)
+    expect(r.procedencia.origen).toBe(ORIGEN.RED)
+    expect(red.total).toBe(2)
+    // Y el registro viejo ha quedado PISADO por el crudo: la migración es sola.
+    expect(typeof cache.almacen.get(clave).valor).toBe('string')
+  })
+
+  it('S2 · un crudo cacheado que ya no se puede leer se ignora y se va a la red', async () => {
+    // La contrapartida honesta de cachear texto, igual que en las colecciones
+    // del WFS: degrada a «más lento», nunca a «roto».
+    const cache = crearCacheDoble()
+    const { cliente, red } = montar({ cache: cache.puerto })
+    await cliente.refcatPorCoordenada(X_OK, Y_OK)
+    const clave = [...cache.almacen.keys()][0]
+    cache.almacen.set(clave, { valor: '{"esto ya no es": "un RCCOOR"}', guardadoEn: 0 })
+
+    const r = await cliente.refcatPorCoordenada(X_OK, Y_OK)
+    expect(r.ok).toBe(true)
+    expect(r.procedencia.origen).toBe(ORIGEN.RED)
+    expect(red.total).toBe(2)
   })
 
   it('un `cod` de la tabla («no hay parcela ahí») es NO_ENCONTRADO: estado válido', async () => {

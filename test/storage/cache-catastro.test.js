@@ -395,8 +395,14 @@ describe('cache-catastro · guardar y leer devuelve el TEXTO IDÉNTICO (criterio
   })
 
   it('un `guardar` posterior con la misma clave PISA el anterior', async () => {
-    const cache = crearCacheCatastro({ bd: await baseNueva(), ahora: () => T0 })
+    // El reloj AVANZA con las escrituras: desde S3, una marca posterior al
+    // `ahora` de la lectura (reloj retrocedido) se trata como caducada, así que
+    // leer con el reloj clavado en T0 un registro guardado «en T0 + 1000» ya no
+    // es un acierto — y este test no va de eso, va del pisado.
+    const reloj = { t: T0 }
+    const cache = crearCacheCatastro({ bd: await baseNueva(), ahora: () => reloj.t })
     await cache.guardar(CLAVE_PARCELA, 'primero', { guardadoEn: T0 })
+    reloj.t = T0 + 1000
     await cache.guardar(CLAVE_PARCELA, 'segundo', { guardadoEn: T0 + 1000 })
 
     const leido = await cache.leer(CLAVE_PARCELA)
@@ -536,6 +542,28 @@ describe('cache-catastro · el TTL de 7 días, con el reloj INYECTADO (criterios
     await cache.guardar(CLAVE_PARCELA, 'nuevo', { guardadoEn: reloj.t })
     expect((await cache.leer(CLAVE_PARCELA)).valor).toBe('nuevo')
     apertura.bd.close()
+  })
+
+  it('S3 · una marca de tiempo FUTURA (reloj retrocedido) se comporta como caducada', async () => {
+    // El defecto: con solo `edad > MS_TTL`, un registro guardado «en el futuro»
+    // tenía edad NEGATIVA, no caducaba jamás, y el cliente lo presentaba encima
+    // como recién traído (`edadMs` se recorta a 0 en `services/catastro.js`). No
+    // se puede afirmar «tiene menos de siete días» de algo guardado en un tiempo
+    // que aún no ha llegado.
+    const { cache, reloj } = await conReloj()
+    reloj.t = T0 - 1 // el reloj retrocede 1 ms respecto del momento de guardado
+    expect(await cache.leer(CLAVE_PARCELA)).toBeNull()
+    expect(cache.estado().caducados).toBe(1)
+    expect(cache.estado().aciertos).toBe(0)
+  })
+
+  it('S3 · anti-vacuidad: con edad EXACTAMENTE 0 (guardado ahora mismo) sigue acertando', async () => {
+    // Es lo que separa `edad < 0` de `edad <= 0`: el registro recién guardado con
+    // el mismo reloj es el caso más común de todos y tiene que seguir sirviendo.
+    const { cache } = await conReloj() // reloj.t === T0 === guardadoEn
+    const leido = await cache.leer(CLAVE_PARCELA)
+    expect(leido).not.toBeNull()
+    expect(leido.valor).toBe(GML_PARCELA)
   })
 
   it('un registro sin marca de tiempo utilizable se comporta como caducado', async () => {
@@ -761,6 +789,76 @@ describe('cache-catastro · sin almacén disponible se comporta como CACHE_NULA 
   })
 })
 
+// ── S1 · una apertura BLOQUEADA no puede colgar las consultas ────────────────
+//
+// El defecto (S1, 2026-08-15): con otra pestaña sujetando la base en una versión
+// anterior, `abrirBd` recibía `blocked` y su promesa quedaba PENDIENTE PARA
+// SIEMPRE. `obtenerBase` la esperaba sin plazo, y como el cliente consulta la
+// caché ANTES que la red (trampa 6 de `services/catastro.js`), «Cargar por RC»,
+// colindantes, revgeo y descriptivos no resolvían NUNCA — ni llegaban a la red.
+// Desde S1, `abrirBd` resuelve `{disponible: false, motivo: BLOQUEADA}` al
+// recibir `blocked` y esta caché degrada a `CACHE_NULA`, que es lo que estas dos
+// pruebas afirman. Antes de la corrección, se quedaban en el timeout de Vitest.
+
+describe('cache-catastro · S1: la apertura bloqueada degrada a CACHE_NULA, no cuelga', () => {
+  /**
+   * El escenario del defecto, real y dentro de una misma fábrica: una conexión
+   * abierta a mano con la versión 1 —fabricada tal como era en F05, mismo patrón
+   * que `pie-firma.test.js`— que no escucha `versionchange`, o sea que no va a
+   * soltar la base nunca. `abrirBd` pide la versión de hoy y recibe `blocked`.
+   *
+   * La promesa de apertura se devuelve SIN esperar, que es como viaja en el
+   * cableado real (`bd: abrirBd(...)`, sin `await`).
+   */
+  async function aperturaBloqueada() {
+    vi.resetModules()
+    const { NOMBRE_BD, abrirBd } = await import('../../storage/bd.js')
+    const fabrica = new IDBFactory()
+    const peticionVieja = fabrica.open(NOMBRE_BD, 1)
+    peticionVieja.onupgradeneeded = () => {
+      peticionVieja.result.createObjectStore('catastroCache', { keyPath: 'refcat' })
+      peticionVieja.result.createObjectStore('revgeo', { keyPath: 'clave' })
+    }
+    const vieja = await new Promise((resolver, rechazar) => {
+      peticionVieja.onsuccess = () => resolver(peticionVieja.result)
+      peticionVieja.onerror = () => rechazar(peticionVieja.error)
+    })
+    return { promesa: abrirBd({ indexedDB: fabrica, alAvisar: () => {} }), vieja }
+  }
+
+  it('⭐ `leer` y `guardar` RESUELVEN (antes quedaban pendientes para siempre) y lo dicen una vez', async () => {
+    const { promesa, vieja } = await aperturaBloqueada()
+    const avisos = vi.fn()
+    const cache = crearCacheCatastro({ bd: promesa, ahora: () => T0, alAvisar: avisos })
+
+    expect(await cache.leer(CLAVE_PARCELA)).toBeNull()
+    await expect(
+      cache.guardar(CLAVE_PARCELA, GML_PARCELA, { guardadoEn: T0 }),
+    ).resolves.toBeUndefined()
+    expect(cache.estado().disponible).toBe(false)
+    // El aviso de la decisión 6, una sola vez: «no hay base» es un estado.
+    expect(avisos).toHaveBeenCalledTimes(1)
+    expect(avisos.mock.calls[0][1].nivel).toBe(NIVEL.AVISO)
+    vieja.close()
+  })
+
+  it('⭐ y el CLIENTE REAL llega a la RED: la caché bloqueada no impide traer el dato (trampa 6)', async () => {
+    // La formulación completa del defecto: `parcelaPorRefcat` consulta la caché
+    // ANTES que la red, así que con la lectura colgada no llegaba NI a la red.
+    const { promesa, vieja } = await aperturaBloqueada()
+    const cache = crearCacheCatastro({ bd: promesa, ahora: () => T0, alAvisar: () => {} })
+    const transporte = transporteQueContesta(conCuerpo(GML_PARCELA))
+    const cliente = crearClienteCatastro({ transporte, cache, ahora: () => T0 })
+
+    const r = await cliente.parcelaPorRefcat(RC_BUENA, { srs: SRS_FIXTURE })
+    expect(r.ok).toBe(true)
+    expect(r.datos.refcat).toBe(RC_BUENA)
+    expect(r.procedencia.origen).toBe(ORIGEN.RED)
+    expect(transporte.peticiones).toBe(1)
+    vieja.close()
+  })
+})
+
 // ── El ciclo completo, por el cliente de verdad ──────────────────────────────
 
 describe('cache-catastro · el ciclo real: red la primera vez, caché la segunda', () => {
@@ -924,6 +1022,25 @@ describe('cache-catastro · purgarCaducados (F10 · criterio 4)', () => {
     await sembrar(cache, [['JUSTA', T0 - MS_TTL]])
     expect((await cache.purgarCaducados()).purgados).toBe(0)
     expect(await cache.leer(`${PREFIJO.PARCELA}${SRS_FIXTURE}:JUSTA`)).not.toBeNull()
+  })
+
+  it('S3 · una marca FUTURA (reloj retrocedido) también se purga: `leer` ya no la sirve nunca', async () => {
+    // El gemelo de la corrección en `leer`: sin esto, el registro futuro sería
+    // peso muerto INMORTAL — jamás lo serviría `leer` y jamás lo tiraría la
+    // purga, porque su edad negativa nunca supera ningún TTL.
+    const cache = crearCacheCatastro({ bd: await baseNueva(), ahora: () => T0 })
+    await sembrar(cache, [
+      ['FUTURA', T0 + MS_TTL], // guardada «mañana»: edad negativa
+      ['FRESCA', T0 - 1000],
+    ])
+
+    const r = await cache.purgarCaducados()
+    expect(r.purgados).toBe(1)
+    // «Futura» no es «rota»: su marca es un número perfectamente finito, solo que
+    // imposible. `sinFecha` sigue contando únicamente las inservibles.
+    expect(r.sinFecha).toBe(0)
+    expect(await cache.leer(`${PREFIJO.PARCELA}${SRS_FIXTURE}:FUTURA`)).toBeNull()
+    expect(await cache.leer(`${PREFIJO.PARCELA}${SRS_FIXTURE}:FRESCA`)).not.toBeNull()
   })
 
   it('un registro con la marca de tiempo rota también se va, y se cuenta APARTE', async () => {

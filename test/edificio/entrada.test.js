@@ -1094,16 +1094,32 @@ describe('puntoDeReferencia — ⛔ NO es el centroide', () => {
     // `gml/anillos.js#redondearCoord` LANZA con un NaN o con |v| ≥ 1e15. Aquí se
     // filtra antes en vez de envolverlo en un `catch`, que se tragaría también
     // los errores de programación.
-    const edificio = crearEdificio({
-      partes: [
-        parteCon('rota', [
+    //
+    // ⚠️ La parte rota se INYECTA a mano, no vía factory: desde la auditoría
+    // 2026-08 (V4) `crearParteConstruccion` exige vértices de números finitos,
+    // igual que `crearRecinto` en la rama PARCELA. El caso sigue siendo real
+    // para `puntoDeReferencia` —partes montadas a mano saltándose la factory, o
+    // archivadas antes del arreglo— y por eso su filtro defensivo se conserva y
+    // se sigue probando.
+    const rota = {
+      nombre: 'rota',
+      tipo: 'PRINCIPAL',
+      recinto: {
+        tipo: 'EXTERIOR',
+        vertices: [
           [Number.NaN, 4100000],
           [440010, 4100000],
           [440010, 4100010],
-        ]),
-        parteCon('buena', cuadrado(440100, 4100100, 20)),
-      ],
+        ],
+      },
+      plantasSobreRasante: null,
+      plantasBajoRasante: null,
+      origen: 'DIBUJADA',
+    }
+    const edificio = crearEdificio({
+      partes: [parteCon('buena', cuadrado(440100, 4100100, 20))],
     })
+    edificio.partes.unshift(rota) // la factory ya no deja construirla (V4)
     const punto = puntoDeReferencia(edificio)
     expect(booleanPointInPolygon(punto, poligonoDe(edificio.partes[1]))).toBe(true)
   })

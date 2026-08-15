@@ -490,12 +490,25 @@ describe('report/pdf-parcela · el documento', () => {
 
   it('metadatos: título con el nombre legal, productor y fecha INYECTADA', () => {
     const texto = aLatin1(r.bytes)
-    // El `·` es el byte 0xB7 de CP1252 y va CRUDO dentro del literal (es legal y
-    // ahorra tres cuartas partes del espacio frente a un escape octal), así que en
-    // latin-1 se lee tal cual.
-    expect(texto).toContain(`(${NOMBRE_INFORME} · ${r.idDocumento})`)
-    expect(texto).toContain('/Producer (Concreta GML)')
+    // Las cadenas de TEXTO del /Info van en UTF-16BE con BOM (auditoría R1:
+    // fuera de los content streams el estándar exige PDFDocEncoding o UTF-16BE,
+    // y CP1252 diverge de PDFDocEncoding en 0x80–0x9F). En latin-1, cada
+    // carácter del título es «byte alto + byte bajo».
+    const utf16 = (s) =>
+      '\xfe\xff' +
+      [...s]
+        .map(
+          (c) =>
+            String.fromCharCode(c.charCodeAt(0) >> 8) +
+            String.fromCharCode(c.charCodeAt(0) & 0xff),
+        )
+        .join('')
+    expect(texto).toContain(`/Title (${utf16(`${NOMBRE_INFORME} · ${r.idDocumento}`)})`)
+    expect(texto).toContain(`/Producer (${utf16('Concreta GML')})`)
+    // La fecha sigue en ASCII: el formato `D:…` es una cadena de bytes.
     expect(texto).toContain("/CreationDate (D:20260802170453Z00'00')")
+    // Y el pie de página repite el título en CP1252, dentro del content stream.
+    expect(texto).toContain(`(${NOMBRE_INFORME} · ${r.idDocumento})`)
   })
 })
 
@@ -1040,6 +1053,28 @@ describe('report/pdf-parcela · las capas caídas se declaran', () => {
     expect(r.sustituciones.length).toBeGreaterThan(0)
     expect(r.incidencias.some((i) => /sustituido/.test(i))).toBe(true)
   })
+
+  it('R3 · una sustitución que ocurre en el PIE queda enumerada en la nota, aunque el pie se estampe después', () => {
+    // La atribución se imprime bajo el plano (cuerpo) Y en el pie de todas las
+    // páginas. Antes, la nota se imprimía con lo que había ANTES de estampar los
+    // pies: declaraba la del cuerpo y callaba las del pie — papel y dato
+    // divergían. Ahora el pie se pre-escanea y la nota lo dice.
+    const r = informe({ plano: planoDe({ atribucion: '© Catastro → IGN' }) })
+    const leido = leerInforme(r.bytes)
+    expect(leido.corrido).toContain('NOTA DE COMPOSICIÓN')
+    expect(leido.corrido).toContain('U+2192')
+    expect(leido.corrido).toContain('en el pie de página, que se repite en todas las páginas')
+    expect(r.incidencias.some((i) => /pie de página/.test(i))).toBe(true)
+    // El dato coincide con lo declarado: el U+2192 del pie se sustituyó en TODAS
+    // las páginas (más la aparición del cuerpo, bajo el plano).
+    const flechas = r.sustituciones.filter((s) => s.punto === 0x2192)
+    expect(flechas.length).toBe(r.nPaginas + 1)
+    // Y la paginación sigue exacta: todas las páginas llevan su «Página N de M».
+    const leidas = leerInforme(r.bytes).paginas
+    leidas.forEach((pagina, i) => {
+      expect(pagina.renglones.map((x) => x.texto)).toContain(`Página ${i + 1} de ${r.nPaginas}`)
+    })
+  })
 })
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1181,6 +1216,45 @@ describe('report/pdf-parcela · el contrato del programador', () => {
         encuadre: { ...encuadre, anchoMm: 180, altoMm: 60 },
       }),
     ).toThrow(/estirado/)
+  })
+
+  it('R4 · un plano compuesto con OTRO encuadre de idénticas dimensiones LANZA: la cuarta red', () => {
+    // El escenario que la relación de aspecto NO detecta: el cableado recompone
+    // el encuadre sobre otro trozo de mundo (misma caja de milímetros → los
+    // mismos píxeles) y pega el plano viejo. El plano transporta la identidad de
+    // su encuadre (bbox y escalaExacta, de report/canvas.js#componerPlano) y el
+    // maquetador la coteja.
+    const desplazada = () =>
+      editada().map((r) => ({
+        ...r,
+        vertices: r.vertices.map(([x, y]) => [x + 1000, y]),
+      }))
+    const otro = encuadrar({
+      recintos: desplazada(),
+      anchoMm: ANCHO_PLANO_MM,
+      altoMm: ALTO_PLANO_MM,
+    })
+    // Mismo papel → mismos píxeles: el aspecto no puede distinguirlos.
+    expect(otro.anchoPx).toBe(encuadre.anchoPx)
+    expect(otro.altoPx).toBe(encuadre.altoPx)
+
+    // El plano viejo (identidad del encuadre de OTRO trabajo) bajo el encuadre
+    // del fixture: lanza nombrando el problema.
+    expect(() =>
+      informe({ plano: planoDe({ bbox: { ...otro.bbox }, escalaExacta: otro.escalaExacta }) }),
+    ).toThrow(/mismo trabajo/)
+
+    // Con la identidad del encuadre BUENO, no lanza: es el caso normal del
+    // cableado real (el plano sale de componerPlano con el mismo encuadre).
+    expect(() =>
+      informe({
+        plano: planoDe({ bbox: { ...encuadre.bbox }, escalaExacta: encuadre.escalaExacta }),
+      }),
+    ).not.toThrow()
+
+    // Y un plano SIN identidad (fixture antiguo, llamante que aún no la pasa) no
+    // coteja: compatibilidad documentada en exigirPlanoEncajable.
+    expect(() => informe({ plano: planoDe() })).not.toThrow()
   })
 
   it('unos píxeles declarados que no cuadran con el JPEG lanzan (defensa de report/pdf.js)', () => {

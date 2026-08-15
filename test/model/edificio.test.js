@@ -330,6 +330,38 @@ describe('validación de dominio (regla 1: ningún error silencioso — auditor�
       crearParteConstruccion({ nombre: 'x', plantasBajoRasante: NaN, origen: ORIGEN_PARTE.DXF }),
     ).toThrow(TypeError)
   })
+
+  // ── Auditoría 2026-08, V4 ──────────────────────────────────────────────────
+  // Antes `validarRecintoPlano` solo comprobaba que `vertices` fuera array:
+  // un `[NaN, y]` entraba al modelo y hacía LANZAR a la validación
+  // (validation/reglas-huso.js confía en la garantía de la factory, igual que
+  // model/parcela.js#crearRecinto la da en la rama PARCELA).
+  it('un recinto con vértices no finitos LANZA, alineado con crearRecinto (auditoría V4)', () => {
+    const base = { nombre: 'x', origen: ORIGEN_PARTE.DIBUJADA }
+    const conVertices = (vertices) =>
+      crearParteConstruccion({ ...base, recinto: { tipo: 'EXTERIOR', vertices } })
+    // El escenario reproducido por la auditoría: [NaN, northing].
+    expect(() =>
+      conVertices([[NaN, 4470000], [440010, 4470000], [440010, 4470010]]),
+    ).toThrow(TypeError)
+    // Y el mensaje dice QUÉ vértice es (regla 1: el error nombra lo recibido).
+    expect(() =>
+      conVertices([[440000, 4470000], [440010, Infinity], [440010, 4470010]]),
+    ).toThrow(/vértice 1/)
+    // Mismo listón que crearRecinto: strings, pares cortos y no-arrays LANZAN.
+    expect(() => conVertices([['440000', 4470000]])).toThrow(TypeError)
+    expect(() => conVertices([[440000]])).toThrow(TypeError)
+    expect(() => conVertices([440000, 4470000])).toThrow(TypeError)
+  })
+
+  it('los vértices finitos válidos siguen pasando tal cual (sin renormalizar)', () => {
+    const parte = crearParteConstruccion({
+      nombre: 'x',
+      origen: ORIGEN_PARTE.DIBUJADA,
+      recinto: recintoEjemplo(),
+    })
+    expect(parte.recinto.vertices).toEqual(recintoEjemplo().vertices)
+  })
 })
 
 describe('el shape sobrevive a structuredClone (POJO plano, regla 4)', () => {

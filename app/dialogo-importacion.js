@@ -142,6 +142,10 @@ const SIN_CORRECCION = Object.freeze({
     'georreferenciado —coordenadas locales de obra— o que le falta un factor de escala.',
   [BLOQUEOS.SIN_GEOMETRIA]:
     'El fichero no trae ni una polilínea cerrada que pueda ser el contorno de una parcela.',
+  [BLOQUEOS.LINEAS_NO_IMPORTADAS]:
+    'El fichero trae líneas con cuatro o más números, que no son el formato que se lee aquí —una ' +
+    'coordenada por línea, X Y y como mucho Z—, y esas líneas NO se han importado: al contorno le ' +
+    'faltarían vértices. Vuelve a exportarlo con una coordenada por línea y suéltalo otra vez.',
   [BLOQUEOS.SUPERFICIE_NO_POSITIVA]:
     'Con los anillos que trae, el contorno menos los huecos no da una superficie positiva, así ' +
     'que no se puede decir cuál es el contorno y cuáles los huecos. Si el dibujo tiene varias ' +

@@ -19,7 +19,7 @@
 //   · Regla 1 — NADA silencioso. Cada regla materializa un {@link Hallazgo}; un
 //     dato malo del USUARIO produce Hallazgos, nunca una excepción. El `throw` se
 //     reserva para errores del PROGRAMADOR (contrato roto por el llamante).
-//   · Regla 6 — Turf SOLO para topología (kinks/booleanContains/intersect), y en
+//   · Regla 6 — Turf SOLO para topología (kinks/difference/intersect), y en
 //     otra tarea (reglas-topologia.js). Este módulo es aritmética PROPIA: no
 //     importa turf, ni directa ni indirectamente. Lo único que hace por Turf es
 //     preparar coordenadas (anillo abierto → cerrado GeoJSON), y eso ya vive en
@@ -222,8 +222,11 @@ export function anguloVertice(prev, v, next) {
  * `geo/poligono.js` añade además la dirección INVERSA
  * (`recintosDeGeometriaTurf`: la geometría que devuelve una booleana de Turf →
  * `recintos` del modelo, en LISTA porque la intersección puede salir en varias
- * piezas disjuntas). No se re-exporta aquí: F02 no la necesita y este módulo es
- * el contrato de la validación, no un barrel.
+ * piezas disjuntas). No se re-exporta aquí: este módulo es el contrato de la
+ * validación, no un barrel — quien la necesita (`reglas-topologia.js` la usa
+ * desde la auditoría 2026-08 para medir el área de un hueco fuera del exterior)
+ * la importa de su hogar en `geo/`, igual que `validation/edificio.js` importa
+ * `superficie` de `geo/area.js`.
  *
  * ⚠️ **`esRecintoApto` se une al re-export en F17** (tarea 1.1). Estaba escrita
  * TRES veces con el mismo razonamiento —aquí en `reglas-topologia.js`, en

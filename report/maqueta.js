@@ -53,7 +53,7 @@
 // año. Dos imports, los dos puros: `./pdf.js` y `./firma.js`.
 
 import { NO_CONSTA, TITULO_FIRMA, lineasFirma } from './firma.js'
-import { A4_ALTO_MM, A4_ANCHO_MM } from './pdf.js'
+import { A4_ALTO_MM, A4_ANCHO_MM, sustitucionesDe } from './pdf.js'
 
 // ── Medidas del papel, en milímetros ─────────────────────────────────────────
 //
@@ -393,12 +393,20 @@ export function crearMaqueta(doc) {
        * salto de página tiene que decidirse con el alto REAL en la mano: pintar
        * primero y reparar después dibujaría la fila dos veces, una de ellas debajo
        * de la cabecera repetida.
+       *
+       * ⭐ Y **se mide con la MISMA fuente con que se va a pintar** (auditoría R2):
+       * la cabecera se pinta en negrita, que es un 5–10 % más ancha que la normal.
+       * Medida en normal, un rótulo justo al límite cabía en una línea al medir y
+       * ya no al pintar: invadía la columna vecina o, alineado a la derecha,
+       * arrancaba a la izquierda de su columna. Medir una cosa y pintar otra es un
+       * desbordamiento garantizado (la misma doctrina que `report/pdf.js#milesimas`
+       * aplica al sustituto de CP1252).
        */
-      const medirFila = (valores) => {
+      const medirFila = (valores, fuente = 'normal') => {
         let xCol = xInicio
         const celdas = valores.map((v, c) => {
           const celda = {
-            lineas: doc.partirTexto(String(v ?? ''), anchos[c] - AIRE_COLUMNA, { tam }),
+            lineas: doc.partirTexto(String(v ?? ''), anchos[c] - AIRE_COLUMNA, { tam, fuente }),
             xCol,
           }
           xCol += anchos[c]
@@ -426,7 +434,7 @@ export function crearMaqueta(doc) {
         y = yFila + altoFila
       }
 
-      const cabecera = medirFila(cabeceras)
+      const cabecera = medirFila(cabeceras, 'negrita')
       const pintarCabecera = () => {
         pintarFila(cabecera, 'negrita')
         doc.linea(xInicio, y - alto * 0.15, xInicio + total, y - alto * 0.15, {
@@ -569,9 +577,23 @@ export function portada(maqueta, { nombre, avisos }) {
 // ── El plano de situación ────────────────────────────────────────────────────
 
 /**
- * Comprueba que el plano cabe en el papel **sin reescalarlo**, y que la imagen no
- * se va a estirar. Encoger el plano falsificaría la escala rotulada, que es la peor
- * avería posible de estos documentos.
+ * Comprueba que el plano cabe en el papel **sin reescalarlo**, que la imagen no
+ * se va a estirar y que **plano y encuadre son del mismo trabajo**. Encoger el
+ * plano falsificaría la escala rotulada, que es la peor avería posible de estos
+ * documentos.
+ *
+ * ⭐ **El cotejo de identidad (auditoría R4).** La relación de aspecto no
+ * distingue dos trabajos con las mismas dimensiones: si el cableado recompone el
+ * encuadre con otro bbox de la misma caja de píxeles pero pega el plano viejo, el
+ * aspecto cuadra y el papel rotularía la escala nueva bajo el mapa viejo. Por eso
+ * el plano TRANSPORTA la identidad de su encuadre —`bbox` y `escalaExacta`, que
+ * `report/canvas.js#componerPlano` copia del encuadre con el que se compuso— y
+ * aquí se cotejan con **igualdad exacta de coma flotante**: si son el mismo
+ * trabajo, son literalmente los mismos números (misma construcción, sin segunda
+ * aritmética), el mismo criterio con el que `report/encuadre.js` demuestra la
+ * costura de sus teselas. Si el plano no trae identidad —un llamante que aún lo
+ * compone a mano— el cotejo se omite: **la red solo es completa cuando el plano
+ * viene de `componerPlano`**, y eso es lo que hace el cableado de la aplicación.
  *
  * @param {number} anchoMm
  * @param {number} altoMm
@@ -579,9 +601,11 @@ export function portada(maqueta, { nombre, avisos }) {
  * @param {string} quien  Nombre de la función pública que lanza. Un mensaje que
  *   diga «informePdfParcela:» cuando ha fallado el informe de construcción manda a
  *   quien depura al fichero equivocado.
+ * @param {object|null} [encuadre=null]  El encuadre con el que se maqueta. Con
+ *   `null` (firma antigua) el cotejo de identidad no se hace.
  * @throws {RangeError}
  */
-export function exigirPlanoEncajable(anchoMm, altoMm, plano, quien) {
+export function exigirPlanoEncajable(anchoMm, altoMm, plano, quien, encuadre = null) {
   if (anchoMm > ANCHO_UTIL + 1e-9) {
     throw new RangeError(
       `${quien}: el plano mide ${anchoMm} mm de ancho y en A4 con márgenes de ` +
@@ -598,6 +622,39 @@ export function exigirPlanoEncajable(anchoMm, altoMm, plano, quien) {
         'plano: recomponga el encuadre con un alto menor.',
     )
   }
+  // ── Identidad del encuadre (R4): antes que el aspecto, porque es más precisa ─
+  // Un bbox distinto con las mismas dimensiones pasa el cotejo de aspecto; aquí
+  // no. Ver el JSDoc para por qué la igualdad es EXACTA y cuándo se omite.
+  if (esObjeto(encuadre)) {
+    const bboxTexto = (b) => `[${b.minX}, ${b.minY}, ${b.maxX}, ${b.maxY}]`
+    if (esObjeto(plano.bbox) && esObjeto(encuadre.bbox)) {
+      const difiere = ['minX', 'minY', 'maxX', 'maxY'].some(
+        (clave) => plano.bbox[clave] !== encuadre.bbox[clave],
+      )
+      if (difiere) {
+        throw new RangeError(
+          `${quien}: el plano y el encuadre no son del mismo trabajo. El plano se compuso con ` +
+            `el bbox ${bboxTexto(plano.bbox)} y el encuadre con el que se maqueta trae ` +
+            `${bboxTexto(encuadre.bbox)}: pegar ese plano rotularía la escala de un encuadre ` +
+            'bajo el mapa de otro, que es la peor avería posible de estos documentos. ' +
+            'Recomponga el plano con este encuadre (report/canvas.js#componerPlano).',
+        )
+      }
+    }
+    if (
+      esNumero(plano.escalaExacta) &&
+      esNumero(encuadre.escalaExacta) &&
+      plano.escalaExacta !== encuadre.escalaExacta
+    ) {
+      throw new RangeError(
+        `${quien}: el plano se compuso a escala exacta ${plano.escalaExacta} y el encuadre ` +
+          `con el que se maqueta declara ${encuadre.escalaExacta}: no son el mismo trabajo, y ` +
+          'el papel rotularía una escala que no es la del mapa. Recomponga el plano con este ' +
+          'encuadre (report/canvas.js#componerPlano).',
+      )
+    }
+  }
+
   // Relación de aspecto: milímetros contra píxeles. El encuadre los deja iguales
   // salvo el 0,03 % que el redondeo a píxeles enteros empuja al papel; una
   // diferencia mayor significa que el plano y el encuadre no son del mismo trabajo,
@@ -639,7 +696,7 @@ export function seccionPlano(maqueta, num, { plano, encuadre, srs, quien }) {
 
   const anchoMm = encuadre.anchoMm
   const altoMm = encuadre.altoMm
-  exigirPlanoEncajable(anchoMm, altoMm, plano, quien)
+  exigirPlanoEncajable(anchoMm, altoMm, plano, quien, encuadre)
 
   // El plano entero en una hoja: si no cabe donde estamos, se salta antes de pegar.
   maqueta.necesita(altoMm + TAM.MENOR * INTERLINEA * 2)
@@ -771,11 +828,30 @@ export function seccionFirma(maqueta, num, { firma }) {
  * Se enumeran por su PUNTO DE CÓDIGO y no reimprimiendo el carácter: el carácter
  * volvería a sustituirse y el aviso diría «se ha sustituido ? por ?».
  *
+ * ⭐ **El pie de página se PRE-ESCANEA (auditoría R3).** Los pies también
+ * escriben texto, pero se estampan DESPUÉS de esta nota —`estamparPies` necesita
+ * el total de páginas, y esta nota puede abrir una página más: estamparlos antes
+ * dejaría esa página sin pie y el «de M» equivocado en todas—. Sin el
+ * pre-escaneo, una sustitución ocurrida en el pie quedaba anotada en
+ * `sustituciones()` pero NO enumerada en el papel: papel y dato divergían. Por
+ * eso los dos informes pasan aquí el MISMO objeto `pie` que luego dan a
+ * `estamparPies`; sus textos se consultan con `report/pdf.js#sustitucionesDe`
+ * —el codificador real, ninguna segunda tabla— vía {@link textosDelPie}, que es
+ * también de donde `estamparPies` saca lo que estampa: una sola verdad sobre qué
+ * dice el pie. La numeración «Página N de M» no se escanea porque es CP1252 por
+ * construcción (dígitos y letras del español). Con `pie` a `null` (llamante
+ * antiguo) el pre-escaneo se omite y el comportamiento es el de siempre.
+ *
+ * @param {object} maqueta
+ * @param {object} doc
+ * @param {{nombre: string, idDocumento: string, atribucion: string}|null} [pie=null]
+ *   El mismo objeto que después recibe {@link estamparPies}.
  * @returns {string[]}  Las incidencias, en español, para el valor de retorno.
  */
-export function bloqueSustituciones(maqueta, doc) {
+export function bloqueSustituciones(maqueta, doc, pie = null) {
   const sustituciones = doc.sustituciones()
-  if (sustituciones.length === 0) return []
+  const delPie = pie === null ? [] : textosDelPie(pie).flatMap((t) => [...sustitucionesDe(t)])
+  if (sustituciones.length === 0 && delPie.length === 0) return []
 
   const porPunto = new Map()
   for (const s of sustituciones) {
@@ -786,12 +862,27 @@ export function bloqueSustituciones(maqueta, doc) {
     entrada.paginas.add(s.pagina)
   }
 
+  const hex = (punto) => `U+${punto.toString(16).toUpperCase().padStart(4, '0')}`
   const lineas = [...porPunto.values()].map(
     (e) =>
-      `· U+${e.punto.toString(16).toUpperCase().padStart(4, '0')}: ` +
+      `· ${hex(e.punto)}: ` +
       `${plural(e.veces, 'vez', 'veces')}, en ` +
       `${plural(e.paginas.size, 'página', 'páginas')} (${[...e.paginas].sort((a, b) => a - b).join(', ')}).`,
   )
+
+  // Las del pie, aparte y SIN lista de páginas: el pie aún no está estampado y
+  // esta nota puede abrir una página más, así que la única afirmación honrada
+  // —y además exacta— es «en todas».
+  const porPuntoPie = new Map()
+  for (const s of delPie) {
+    porPuntoPie.set(s.punto, (porPuntoPie.get(s.punto) ?? 0) + 1)
+  }
+  for (const [punto, veces] of porPuntoPie) {
+    lineas.push(
+      `· ${hex(punto)}: ${plural(veces, 'vez', 'veces')} en el pie de página, ` +
+        'que se repite en todas las páginas.',
+    )
+  }
 
   maqueta.hueco(AIRE.ANTES_SECCION)
   maqueta.necesita(TAM.SECCION * INTERLINEA * 3)
@@ -807,14 +898,44 @@ export function bloqueSustituciones(maqueta, doc) {
   maqueta.hueco(1.5)
   for (const linea of lineas) maqueta.parrafo(linea, { tam: TAM.MENOR, sangria: 4 })
 
-  return [
-    `Se han sustituido ${plural(sustituciones.length, 'carácter', 'caracteres')} sin ` +
-      'representación en la codificación del documento; el informe lo declara en su nota de ' +
-      'composición.',
-  ]
+  const incidencias = []
+  if (sustituciones.length > 0) {
+    incidencias.push(
+      `Se han sustituido ${plural(sustituciones.length, 'carácter', 'caracteres')} sin ` +
+        'representación en la codificación del documento; el informe lo declara en su nota de ' +
+        'composición.',
+    )
+  }
+  if (delPie.length > 0) {
+    incidencias.push(
+      'El pie de página contiene caracteres sin representación en la codificación del ' +
+        'documento; el informe los declara en su nota de composición.',
+    )
+  }
+  return incidencias
 }
 
 // ── El pie de página ─────────────────────────────────────────────────────────
+
+/**
+ * Los TEXTOS que el pie estampa en cada página, en orden: la línea de la
+ * izquierda (`nombre · idDocumento`) y, si la hay, la atribución.
+ *
+ * Es la única definición: la consumen {@link estamparPies} para estampar y
+ * {@link bloqueSustituciones} para pre-escanear (R3) — si cada uno compusiera su
+ * copia, la nota podría declarar un pie que no es el que se imprime. La
+ * numeración «Página N de M» queda fuera a propósito: se compone con dígitos y
+ * letras del alfabeto español, CP1252 por construcción, y su M no se sabe aún
+ * cuando la nota se imprime.
+ *
+ * @param {{nombre: string, idDocumento: string, atribucion: string}} pie
+ * @returns {string[]}  Uno o dos textos.
+ */
+function textosDelPie({ nombre, idDocumento, atribucion }) {
+  const textos = [`${nombre} · ${idDocumento}`]
+  if (typeof atribucion === 'string' && atribucion !== '') textos.push(atribucion)
+  return textos
+}
 
 /**
  * Estampa el pie en TODAS las páginas, ya sabiendo cuántas son.
@@ -826,9 +947,11 @@ export function bloqueSustituciones(maqueta, doc) {
  * @param {object} doc
  * @param {{nombre: string, idDocumento: string, atribucion: string}} pie  `nombre`
  *   es el nombre legal del documento — entra por parámetro por lo mismo que en
- *   {@link portada}.
+ *   {@link portada}. **El mismo objeto** debe haberse pasado antes a
+ *   {@link bloqueSustituciones}, que pre-escanea estos textos (R3).
  */
-export function estamparPies(doc, { nombre, idDocumento, atribucion }) {
+export function estamparPies(doc, pie) {
+  const [izquierda, atribucion = null] = textosDelPie(pie)
   const total = doc.nPaginas()
   for (let pagina = 1; pagina <= total; pagina++) {
     doc.irAPagina(pagina)
@@ -837,7 +960,6 @@ export function estamparPies(doc, { nombre, idDocumento, atribucion }) {
       gris: GRIS.FILETE,
     })
 
-    const izquierda = `${nombre} · ${idDocumento}`
     doc.texto(izquierda, {
       x: MARGEN.IZQUIERDA,
       y: Y_FILETE_PIE + 3.4,
@@ -854,7 +976,7 @@ export function estamparPies(doc, { nombre, idDocumento, atribucion }) {
       gris: GRIS.PIE,
     })
 
-    if (atribucion !== '') {
+    if (atribucion !== null) {
       doc.texto(atribucion, {
         x: MARGEN.IZQUIERDA,
         y: Y_FILETE_PIE + 7,

@@ -28,13 +28,23 @@
 //
 // Reporte de variación de superficie (regla de oro 1: ningún error silencioso;
 // el usuario debe saber cuánto varió la superficie al discretizar):
-//   S_arco     = ½·R²·(|Δθ| − sin|Δθ|)                (segmento circular real)
-//   S_discreto = Σ ½·R²·(δ − sin δ)  sobre los n_seg tramos, δ = |Δθ|/n_seg
-//   ΔS         = S_arco − S_discreto
-// ΔS es exactamente el área encerrada entre la polilínea discretizada y la
-// cuerda P1→P2 (identidad: |ΔS| = ½R²·|n·sin(Δθ/n) − sinΔθ| = área shoelace
-// del polígono [P1, …vertices, P2]). Es decir, el área que aporta el arco
-// sobre su cuerda; es la cifra a informar como "variación de superficie".
+//   δ  = |Δθ| / n_seg                    (ángulo de cada tramo)
+//   ΔS = n_seg · ½·R²·(δ − sin δ)        (Σ de los n_seg segmentitos residuales)
+// ΔS es exactamente el área encerrada entre la POLILÍNEA discretizada y el ARCO
+// VERDADERO: cada cuerda de la subdivisión deja fuera un segmento circular de
+// ½R²(δ−sinδ), y esa suma es lo único que la discretización le quita (o suma,
+// según el lado) a la superficie de la parcela. Es la cifra a informar como
+// «variación de superficie».
+//
+// ⛔ CORREGIDO el 2026-08-15 (hallazgo G2 de la auditoría, medido). La fórmula
+// anterior era ΔS = S_arco − S_discreto con S_arco = ½R²(|Δθ|−sin|Δθ|): eso
+// resta el área discretizada al SEGMENTO CIRCULAR ENTERO, así que mide el área
+// entre la polilínea y la CUERDA P1→P2 — casi todo el segmento, no el error de
+// discretizar. Para un semicírculo de R=5 m con ε=1 cm anunciaba ΔS=39,17 m²
+// cuando la variación real de superficie por discretizar es 0,103 m²; la cifra
+// correcta (S_discreto) se calculaba internamente… y se descartaba. La fórmula
+// venía VERBATIM de spec/feature-01-entrada-parcela.md §Discretización, que se
+// ha enmendado el mismo día (la spec documenta allí el porqué del error).
 
 const FLECHA_MAX_DEFECTO = 0.01 // metros (1 cm) — tolerancia de flecha por defecto.
 
@@ -76,7 +86,9 @@ function areaSegmentoCircular(R, theta) {
  *   radio: number,          // R del arco en metros; Infinity si b === 0.
  *   deltaTheta: number,     // Δθ barrido CON signo (rad); + = CCW, − = CW; 0 si recto.
  *   centro: [number, number] | null,  // centro del arco en UTM; null si b === 0.
- *   deltaS: number,         // ΔS = S_arco − S_discreto (m², ≥ 0); 0 si recto.
+ *   deltaS: number,         // ΔS = n_seg·½R²(δ−sinδ) (m², ≥ 0): área entre la
+ *                           // polilínea y el arco VERDADERO (la variación real
+ *                           // de superficie al discretizar); 0 si recto.
  * }}
  * @throws {TypeError} Si P1/P2 no son [x,y] finitos, b no es finito, flechaMax no
  *   es > 0, o P1 y P2 coinciden con b ≠ 0 (cuerda de longitud 0: arco degenerado).
@@ -153,11 +165,12 @@ export function discretizarBulge(P1, P2, b, { flechaMax = FLECHA_MAX_DEFECTO } =
     vertices.push([cx + R * Math.cos(phi), cy + R * Math.sin(phi)])
   }
 
-  // Reporte de variación de superficie (magnitudes, ΔS ≥ 0).
+  // Reporte de variación de superficie (magnitudes, ΔS ≥ 0): el área entre la
+  // polilínea y el arco verdadero = Σ de los n_seg segmentitos residuales.
+  // (⛔ NO restar esto al segmento entero: eso mediría contra la CUERDA — ver
+  // la corrección G2 en la cabecera.)
   const deltaPorTramo = absTheta / nSeg
-  const sArco = areaSegmentoCircular(R, absTheta)
-  const sDiscreto = nSeg * areaSegmentoCircular(R, deltaPorTramo)
-  const deltaS = sArco - sDiscreto
+  const deltaS = nSeg * areaSegmentoCircular(R, deltaPorTramo)
 
   return { vertices, nSeg, radio: R, deltaTheta, centro: [cx, cy], deltaS }
 }

@@ -84,7 +84,10 @@
 //     código y su página. Ese bloque va DESPUÉS del pie de firma porque solo
 //     entonces se sabe lo que hubo: `sustituciones()` no puede consultarse antes
 //     de escribir el último renglón, y componer el documento dos veces para
-//     adelantarlo sería peor.
+//     adelantarlo sería peor. Los pies de página se estampan DESPUÉS del bloque
+//     —necesitan el total de páginas—, así que sus textos se PRE-ESCANEAN y la
+//     nota los declara también (auditoría R3; ver
+//     `report/maqueta.js#bloqueSustituciones`).
 //
 // ── «PÁGINA N DE M»: SE COMPONE UNA VEZ Y SE VUELVE ─────────────────────────
 // «Página 1 de 5» no se puede escribir hasta saber que son cinco. `report/pdf.js`
@@ -1319,13 +1322,18 @@ export function informePdfParcela(entrada) {
       `Un trozo del plano ha quedado sin cartografía de fondo: ${textoONulo(t?.motivo) ?? NO_CONSTA}`,
     )
   }
-  incidencias.push(...bloqueSustituciones(maqueta, doc))
-
-  const nPaginas = estamparPies(doc, {
+  // ⭐ El MISMO objeto `pie` va a la nota de composición y a los pies (R3): la
+  // nota se imprime ANTES de estampar los pies —que necesitan el total de
+  // páginas— y pre-escanea sus textos para que una sustitución ocurrida en el
+  // pie quede enumerada en el papel. Ver report/maqueta.js#bloqueSustituciones.
+  const pie = {
     nombre: NOMBRE_INFORME,
     idDocumento,
     atribucion: textoONulo(plano?.atribucion) ?? '',
-  })
+  }
+  incidencias.push(...bloqueSustituciones(maqueta, doc, pie))
+
+  const nPaginas = estamparPies(doc, pie)
 
   return {
     bytes: doc.bytes(),

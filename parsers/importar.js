@@ -157,6 +157,25 @@ const FORMATOS = Object.freeze({ LIST: 'LIST', TXT: 'TXT', DXF: 'DXF' })
  *   · `SIN_GEOMETRIA`         — no llegó ni un anillo.
  *   · `COORDENADAS_EN_GRADOS` — algún anillo entero parece lat/lon, no UTM.
  *   · `HUSO_NO_RESUELTO`      — el punto no cae en la España peninsular ni Baleares.
+ *   · `LINEAS_NO_IMPORTADAS`  — el parser DESCARTÓ líneas con números que no eran
+ *     del formato soportado (auditoría 2026-08).
+ *
+ * ⛔ **`LINEAS_NO_IMPORTADAS` nace de medir el arreglo de la auditoría, no de
+ * suponerlo.** La corrección de aquel hallazgo enseñó a `extraerPares` a NO
+ * tragarse una línea de cuatro números como si fuera un vértice con Z —antes se
+ * quedaba con los dos primeros y perdía la mitad de los pares con el mensaje
+ * falso de «Z descartada»—, y la sustituyó por una detección ERROR honesta. Pero
+ * una detección **no cerraba la puerta**: medido sobre una parcela en L de seis
+ * vértices con UNA línea de cuatro números, salían `construida: true`,
+ * `bloqueos: []` y una parcela de CUATRO vértices lista para firmarse. Un ERROR
+ * del parser dice «parte del fichero no ha entrado», y con parte del contorno
+ * fuera la geometría no se puede sostener: por eso bloquea.
+ *
+ * ⚠️ Y va **por delante de `SIN_GEOMETRIA`, al que sustituye** cuando no entró
+ * ningún anillo: decirle «el fichero no trae ni una polilínea» a quien acaba de
+ * soltar un volcado lleno de coordenadas es exactamente el diagnóstico falso que
+ * esta casa persigue. El fichero traía geometría; no se ha sabido leer, que es
+ * otra cosa y manda al usuario a otro sitio.
  *
  * ⚠️ SOLO DE PARCELA (F11): hablan del reparto «recintos[0] EXTERIOR y el resto
  * HUECO», que es una regla de este módulo y NO del fichero. Un edificio no los
@@ -181,6 +200,7 @@ export const BLOQUEOS = Object.freeze({
   ANILLOS_EN_VARIAS_CAPAS: 'ANILLOS_EN_VARIAS_CAPAS',
   SUPERFICIE_NO_POSITIVA: 'SUPERFICIE_NO_POSITIVA',
   VARIOS_RECINTOS_DISJUNTOS: 'VARIOS_RECINTOS_DISJUNTOS',
+  LINEAS_NO_IMPORTADAS: 'LINEAS_NO_IMPORTADAS',
 })
 
 /** Los bloqueos que hablan del reparto de parcela y NO del fichero. */
@@ -1193,8 +1213,19 @@ export function importar(texto, opts = {}) {
   //    `test/contrato.test.js`). La coherencia con el catálogo la ata un test
   //    propio en `test/parsers/importar.test.js`, así que no puede desincronizarse.
   const bloqueos = []
-  if (anillos.length === 0) bloqueos.push('SIN_GEOMETRIA')
-  else {
+  // ⛔ Líneas que el parser NO importó (auditoría 2026-08). Va PRIMERO y sustituye
+  //    a `SIN_GEOMETRIA`: ver el porqué de las dos cosas en el catálogo `BLOQUEOS`.
+  //    Se reconoce por SEVERIDAD y no por el texto —lo único de una detección que
+  //    se puede reescribir sin avisar—, y `FORMATO_NO_SOPORTADO` también se emite
+  //    en AVISO (la «Curvatura» huérfana), que NO bloquea: aquella no pierde
+  //    vértices, solo la panza de un arco que ya se ha dicho.
+  const hayLineasPerdidas = detecciones.some(
+    (d) => d.tipo === TIPO_DETECCION.FORMATO_NO_SOPORTADO && d.severidad === SEVERIDAD.ERROR,
+  )
+  if (hayLineasPerdidas) bloqueos.push('LINEAS_NO_IMPORTADAS')
+  if (anillos.length === 0) {
+    if (!hayLineasPerdidas) bloqueos.push('SIN_GEOMETRIA')
+  } else {
     if (gradosCualquiera) bloqueos.push('COORDENADAS_EN_GRADOS')
     if (huso === null) bloqueos.push('HUSO_NO_RESUELTO')
     // Los dos de F11 van AL FINAL, detrás de los tres de F01, para que un

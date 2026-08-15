@@ -52,6 +52,7 @@ import {
   PUNTOS_POR_MM,
   SUSTITUTO_NO_REPRESENTABLE,
   crearDocumentoPdf,
+  sustitucionesDe,
 } from '../../report/pdf.js'
 
 const RAIZ = join(import.meta.dirname, '..', '..')
@@ -750,6 +751,153 @@ describe('report/pdf · el texto se codifica en CP1252 y se escapa', () => {
     const doc = conTexto('An\u0303o')
     expect(primerLiteral(doc.bytes()).desescapados).toEqual([0x41, 0xf1, 0x6f])
     expect(doc.sustituciones()).toEqual([])
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 4bis · El diccionario /Info va en UTF-16BE con BOM (auditoría R1)
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Fuera de los content streams el estándar solo admite PDFDocEncoding o UTF-16BE
+// con BOM. CP1252 coincide con PDFDocEncoding en 0xA0–0xFF pero diverge en
+// 0x80–0x9F: un «’» (U+2019) codificado 0x92 se mostraba con otro glifo en las
+// propiedades del documento. El escritor codifica Title/Author/Producer en
+// UTF-16BE; la fecha sigue en ASCII (el formato `D:…` es una cadena de bytes).
+
+/** Los bytes del literal `(...)` de una clave del /Info, con los escapes deshechos. */
+function literalDeInfo(bytes, clave) {
+  const texto = aLatin1(bytes)
+  const i = texto.indexOf(`/${clave} (`)
+  if (i < 0) return null
+  let j = i + clave.length + 3
+  const salida = []
+  while (j < bytes.length) {
+    const b = bytes[j]
+    if (b === 0x5c) {
+      const siguiente = bytes[j + 1]
+      salida.push(siguiente === 0x6e ? 0x0a : siguiente === 0x72 ? 0x0d : siguiente)
+      j += 2
+      continue
+    }
+    if (b === 0x29) break
+    salida.push(b)
+    j += 1
+  }
+  return { desescapados: salida, crudos: bytes.slice(i + clave.length + 3, j) }
+}
+
+/** UTF-16BE con BOM → string, afirmando el BOM por el camino. */
+function decodificarUtf16Be(bytes) {
+  expect(bytes.slice(0, 2), 'la cadena del /Info no empieza por el BOM FE FF').toEqual([0xfe, 0xff])
+  let salida = ''
+  for (let i = 2; i < bytes.length; i += 2) {
+    salida += String.fromCharCode((bytes[i] << 8) | bytes[i + 1])
+  }
+  return salida
+}
+
+describe('report/pdf · el /Info se codifica en UTF-16BE con BOM, no en CP1252', () => {
+  const docCon = (opciones) =>
+    crearDocumentoPdf({ anchoMm: 100, altoMm: 100, productor: null, ...opciones })
+
+  it('el caso de la auditoría: «José O’Hara» viaja con su U+2019, sin el byte 0x92 de CP1252', () => {
+    const autor = 'José O’Hara'
+    const bytes = docCon({ autor }).bytes()
+    const literal = literalDeInfo(bytes, 'Author')
+    expect(literal).not.toBeNull()
+    // Se decodifica ENTERO desde los bytes: BOM + UTF-16BE, y vuelve el original.
+    expect(decodificarUtf16Be(literal.desescapados)).toBe(autor)
+    // El apóstrofo tipográfico son los bytes 20 19, no el 92 de CP1252 que un
+    // lector interpretaría con otro glifo en PDFDocEncoding.
+    const sinBom = literal.desescapados.slice(2)
+    const pares = []
+    for (let i = 0; i < sinBom.length; i += 2) pares.push([sinBom[i], sinBom[i + 1]])
+    expect(pares).toContainEqual([0x20, 0x19])
+    expect(pares).not.toContainEqual([0x00, 0x92])
+  })
+
+  it('el español entero del título sobrevive al viaje de ida y vuelta', () => {
+    const titulo = 'Medición de la parcela nº 5 — año 2026 · ±0,50 m — ¿encaja?'
+    const bytes = docCon({ titulo }).bytes()
+    expect(decodificarUtf16Be(literalDeInfo(bytes, 'Title').desescapados)).toBe(titulo)
+  })
+
+  it('lo que CP1252 no puede escribir, el /Info sí: ł, → y un emoji, sin «?» y sin sustitución', () => {
+    const titulo = 'Załącznik → informe 🙂'
+    const doc = docCon({ titulo })
+    const bytes = doc.bytes()
+    const vuelto = decodificarUtf16Be(literalDeInfo(bytes, 'Title').desescapados)
+    // El par subrogado del emoji viaja como dos unidades UTF-16, que ES UTF-16.
+    expect(vuelto).toBe(titulo)
+    expect(vuelto).not.toContain('?')
+    expect(doc.sustituciones()).toEqual([])
+  })
+
+  it('paréntesis y barra invertida del título van escapados y se recuperan', () => {
+    const titulo = 'Informe (borrador) \\ v2'
+    const bytes = docCon({ titulo }).bytes()
+    expect(decodificarUtf16Be(literalDeInfo(bytes, 'Title').desescapados)).toBe(titulo)
+    expect(revisarPdf(bytes).problemas).toEqual([])
+  })
+
+  it('un punto de código con 0x0A o 0x0D entre sus bytes no mete un fin de línea crudo en el literal', () => {
+    // «Ċ» es U+010A: su byte bajo es un LF. Sin el escape de literalPdf, el lector
+    // lo normalizaría (tratamiento de EOL del PDF) y la cadena cambiaría. «ഠ» es
+    // U+0D20: su byte ALTO es un CR, el otro lado del mismo peligro.
+    const titulo = 'CĊDഠE'
+    const bytes = docCon({ titulo }).bytes()
+    const literal = literalDeInfo(bytes, 'Title')
+    expect([...literal.crudos]).not.toContain(0x0a)
+    expect([...literal.crudos]).not.toContain(0x0d)
+    expect(decodificarUtf16Be(literal.desescapados)).toBe(titulo)
+  })
+
+  it('la fecha de creación sigue en ASCII: el formato D:… es una cadena de bytes', () => {
+    const bytes = docCon({ titulo: 'x', fecha: FECHA }).bytes()
+    expect(aLatin1(bytes)).toContain("/CreationDate (D:20260802123015Z00'00')")
+  })
+
+  it('el CUERPO no cambia: las fuentes siguen en WinAnsi y el texto en CP1252', () => {
+    const doc = docCon({ titulo: 'Título con euro €' })
+    doc.texto('cuerpo con € y ñ', { x: 10, y: 10, tam: 3 })
+    const bytes = doc.bytes()
+    expect(aLatin1(bytes)).toContain('/Encoding /WinAnsiEncoding')
+    // En el content stream el € sigue siendo el byte 0x80 de CP1252…
+    expect(primerLiteral(bytes).desescapados).toContain(0x80)
+    // …y en el /Info son los bytes UTF-16 20 AC.
+    const sinBom = literalDeInfo(bytes, 'Title').desescapados.slice(2)
+    const pares = []
+    for (let i = 0; i < sinBom.length; i += 2) pares.push([sinBom[i], sinBom[i + 1]])
+    expect(pares).toContainEqual([0x20, 0xac])
+  })
+
+  it('el oráculo estructural sigue en paz con la metadata UTF-16', () => {
+    expect(revisarPdf(documentoDePrueba().bytes()).problemas).toEqual([])
+  })
+})
+
+describe('report/pdf · sustitucionesDe (la consulta pura que usa la nota de composición, R3)', () => {
+  it('devuelve lo que codificaría el escritor, sin escribir nada', () => {
+    expect(sustitucionesDe('todo en español: año, medición, ±0,50 m')).toEqual([])
+    const flecha = sustitucionesDe('ida → vuelta')
+    expect(flecha).toHaveLength(1)
+    expect(flecha[0].punto).toBe(0x2192)
+    expect(flecha[0].caracter).toBe('→')
+  })
+
+  it('coincide con lo que texto() declara al escribir de verdad (misma tabla, ninguna segunda verdad)', () => {
+    const cadena = 'pie con ł y 🙂'
+    const doc = crearDocumentoPdf({ anchoMm: 100, altoMm: 100 })
+    const escritas = doc.texto(cadena, { x: 10, y: 10, tam: 3 }).sustituciones
+    const consultadas = sustitucionesDe(cadena)
+    expect(consultadas.map((s) => [s.caracter, s.punto, s.indice])).toEqual(
+      escritas.map((s) => [s.caracter, s.punto, s.indice]),
+    )
+  })
+
+  it('exige un string, como todo el contrato del módulo', () => {
+    expect(() => sustitucionesDe(42)).toThrow(TypeError)
+    expect(() => sustitucionesDe(null)).toThrow(/se espera un string/)
   })
 })
 

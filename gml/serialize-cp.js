@@ -210,7 +210,7 @@ import {
   perfilPorId,
   srsNamePorForma,
 } from './_comun.js'
-import { elem, render } from './xml.js'
+import { elem, normalizarComentarios, render } from './xml.js'
 import { DECIMALES_COORD, cerrarAnillo, prepararRecintos, puntoInterior } from './anillos.js'
 import { NAMESPACE_INSPIRE_DEFECTO, idsDeParcela } from './ids.js'
 
@@ -491,37 +491,12 @@ function exigirDateTime(valor, nombre) {
   }
 }
 
-/**
- * Normaliza `comentario` a una lista de textos y comprueba que cada uno puede ir
- * dentro de un `<!-- … -->`. XML prohíbe `--` en el cuerpo del comentario y que
- * termine en `-`; con cualquiera de las dos cosas el documento dejaría de estar
- * bien formado — y como el prólogo es lo único que este módulo escribe sin pasar
- * por `render`, aquí no hay escapado que lo salve. Se lanza en vez de recortar
- * en silencio (regla de oro 1).
- *
- * @param {string|string[]|null|undefined} comentario
- * @returns {string[]}
- * @throws {TypeError}
- */
-function normalizarComentarios(comentario) {
-  if (comentario === null || comentario === undefined) return []
-  const lista = Array.isArray(comentario) ? comentario : [comentario]
-  return lista.map((c, i) => {
-    if (typeof c !== 'string') {
-      throw new TypeError(
-        `serializarParcelaCp: el comentario ${i} debe ser un string; ` +
-          `recibido ${JSON.stringify(c)}.`,
-      )
-    }
-    if (c.includes('--') || c.endsWith('-')) {
-      throw new TypeError(
-        `serializarParcelaCp: el comentario ${i} no puede contener «--» ni terminar en «-» ` +
-          `(XML 1.0 §2.5); recibido ${JSON.stringify(c)}.`,
-      )
-    }
-    return c
-  })
-}
+// La comprobación de los comentarios del prólogo (`--` interno, terminar en
+// `-`, controles ilegales) vivía aquí y ahora es `gml/xml.js#normalizarComentarios`,
+// COMPARTIDA con `serialize-bu.js`: nació en este módulo, el de edificio
+// interpolaba su comentario sin ella, y un `'expediente 2024--03'` salía de
+// allí como fichero mal formado con cero detecciones. Una regla de XML 1.0 se
+// escribe una vez, en el módulo que solo sabe XML.
 
 // ── Construcción de los nodos ────────────────────────────────────────────────
 
@@ -840,7 +815,7 @@ function prepararMiembroCp(opciones = {}, quien = 'serializarParcelaCp', miembro
   )
   exigirTexto(namespaceInspire, 'namespaceInspire')
 
-  const comentarios = normalizarComentarios(comentario)
+  const comentarios = normalizarComentarios(comentario, quien)
 
   // ── 2 · Identificadores ───────────────────────────────────────────────────
   // Una sola superficie: la parcela es UN exterior con huecos (los huecos son
@@ -1096,20 +1071,27 @@ export function serializarExpedienteCp(opciones = {}) {
   }
 
   // ── ⛔ `xs:ID` único en TODO el documento ──────────────────────────────────
-  const vistos = new Map()
+  // La RAÍZ también compite: su `gml:id` es el de la COLECCIÓN —el namespace de
+  // parcelas[0], ver `documentoCp`— y vive en el mismo espacio `xs:ID` que los
+  // de los miembros. Sin sembrarlo aquí, `'ES.SDGC.CP'` como namespace del
+  // primer miembro y `'ES.SDGC'` + refcat `'CP'` en otro componen el MISMO id
+  // (`ES.SDGC.CP`) y el duplicado salía sin una sola queja local.
+  const vistos = new Map([
+    [cabeza.ids.coleccion, 'la raíz del documento (el gml:id de la colección)'],
+  ])
   miembros.forEach((m, i) => {
     const suyos = [m.ids.parcela, m.ids.multiSurface, ...m.ids.surfaces, m.ids.puntoReferencia]
     for (const id of suyos) {
       if (vistos.has(id)) {
         throw new TypeError(
-          `serializarExpedienteCp: el gml:id «${id}» sale en parcelas[${vistos.get(id)}] y en ` +
+          `serializarExpedienteCp: el gml:id «${id}» sale en ${vistos.get(id)} y en ` +
             `parcelas[${i}]. \`xs:ID\` es único en el DOCUMENTO, así que esto invalidaría el ` +
             'fichero entero — y el IVG lo rechazaría semanas después sin decir dónde. Los ids se ' +
             'componen a partir de `refcat`: dos parcelas del mismo expediente necesitan ' +
             'identidades distintas (en la segregación medida, la cesión llevaba el sufijo `.1`).',
         )
       }
-      vistos.set(id, i)
+      vistos.set(id, `parcelas[${i}]`)
     }
   })
 

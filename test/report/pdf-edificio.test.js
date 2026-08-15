@@ -461,6 +461,30 @@ describe('report/pdf-edificio · lo que el papel garantiza', () => {
     expect(texto).toContain('No se ha podido componer el plano')
   })
 
+  it('R3 · una sustitución que ocurre en el PIE queda enumerada en la nota de composición', () => {
+    // El identificador va en el pie de TODAS las páginas y también en el cuerpo
+    // (sección de identificación). Antes, la nota se imprimía ANTES de estampar
+    // los pies y solo declaraba la aparición del cuerpo: el papel callaba las del
+    // pie. Ahora los textos del pie se pre-escanean y la nota los declara.
+    const r = informePdfEdificio({
+      edificio,
+      encabezado: encabezado({ idDocumento: 'CGML→EDIF01' }),
+    })
+    const texto = frases(r.bytes)
+    expect(texto).toContain('NOTA DE COMPOSICIÓN')
+    expect(texto).toContain('U+2192')
+    expect(texto).toContain('en el pie de página, que se repite en todas las páginas')
+    expect(r.incidencias.some((i) => /pie de página/.test(i))).toBe(true)
+    // Tras estampar, el dato acompaña a lo declarado: una sustitución del pie
+    // por página, además de la del cuerpo.
+    const delPie = r.sustituciones.filter((s) => s.punto === 0x2192)
+    expect(delPie.length).toBe(r.nPaginas + 1)
+    // Y la numeración sigue exacta en todas las páginas.
+    for (let p = 1; p <= r.nPaginas; p++) {
+      expect(textoDelPdf(r.bytes)).toContain(`Página ${p} de ${r.nPaginas}`)
+    }
+  })
+
   it('sin firma, los campos salen con «No consta» y no como huecos', () => {
     const texto = textoDelPdf(
       informePdfEdificio({ edificio, encabezado: encabezado(), firma: null }).bytes,

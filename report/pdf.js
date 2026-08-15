@@ -300,8 +300,10 @@ function exigirFuente(valor, quien) {
  * El `throw` no es paranoia: es la guarda que hace imposible el error caro de este
  * fichero. Todo lo que se escribe por aquí —nombres de objeto, diccionarios,
  * números, la propia tabla `xref`— es ASCII por construcción; el texto del usuario
- * pasa SIEMPRE por {@link codificarWinAnsi}. Si un día alguien mete una `ñ` en un
- * literal de este módulo, revienta aquí y no en una `xref` desplazada un byte.
+ * pasa SIEMPRE por {@link codificarWinAnsi} (content streams) o por
+ * {@link codificarUtf16Be} (las cadenas del diccionario `/Info`). Si un día
+ * alguien mete una `ñ` en un literal de este módulo, revienta aquí y no en una
+ * `xref` desplazada un byte.
  */
 function bytesAscii(texto) {
   const salida = new Uint8Array(texto.length)
@@ -319,6 +321,28 @@ function bytesAscii(texto) {
     salida[i] = codigo
   }
   return salida
+}
+
+/**
+ * Las sustituciones que PRODUCIRÍA un texto al codificarse a CP1252, **sin
+ * escribir nada**.
+ *
+ * Existe por la nota de composición (`report/maqueta.js#bloqueSustituciones`,
+ * auditoría R3): el pie de página se estampa el ÚLTIMO —necesita saber el total
+ * de páginas— y la nota se imprime antes, así que sin esta consulta una
+ * sustitución ocurrida en el pie quedaría anotada en `sustituciones()` pero no
+ * enumerada en el papel. Usa el MISMO codificador que `texto()`: no hay una
+ * segunda tabla CP1252 que pueda divergir.
+ *
+ * @param {string} texto
+ * @returns {ReadonlyArray<{caracter: string, punto: number, indice: number}>}
+ * @throws {TypeError} Si `texto` no es un string.
+ */
+export function sustitucionesDe(texto) {
+  if (typeof texto !== 'string') {
+    throw new TypeError(`sustitucionesDe: se espera un string; recibido ${describir(texto)}.`)
+  }
+  return Object.freeze(codificarWinAnsi(texto).sustituciones.map((s) => Object.freeze({ ...s })))
 }
 
 /**
@@ -394,20 +418,67 @@ function pdfNum(valor) {
 }
 
 /**
- * Los bytes de una cadena literal PDF `(...)`, con `\(`, `\)` y `\\` escapados.
+ * Los bytes de una cadena literal PDF `(...)`, con `\(`, `\)` y `\\` escapados,
+ * y los fines de línea (0x0A, 0x0D) como `\n` y `\r`.
  *
  * Un paréntesis sin escapar desequilibra la cadena, el lector se pierde y el
  * mensaje que da no señala dónde. Los bytes ≥ 0x80 van CRUDOS: son legales dentro
  * de un literal y ahorran tres cuartas partes del espacio frente a un escape octal.
+ *
+ * Los fines de línea se escapan porque un CR/LF CRUDO dentro de un literal lo
+ * normaliza el lector a LF (tratamiento de EOL del PDF) y cambiaría los bytes
+ * leídos. En los content streams no pueden aparecer —los controles no tienen
+ * glifo en CP1252 y {@link codificarWinAnsi} los sustituye—, pero en el `/Info`
+ * en UTF-16BE sí: cualquier punto de código `U+xx0A`/`U+0Axx` mete un 0x0A en
+ * mitad de la cadena. El escape es byte-neutral para todo lo que ya se escribía.
  */
 function literalPdf(bytesTexto) {
   const salida = [0x28] // '('
   for (const b of bytesTexto) {
+    if (b === 0x0a) {
+      salida.push(0x5c, 0x6e) // '\n'
+      continue
+    }
+    if (b === 0x0d) {
+      salida.push(0x5c, 0x72) // '\r'
+      continue
+    }
     if (b === 0x28 || b === 0x29 || b === 0x5c) salida.push(0x5c) // '\'
     salida.push(b)
   }
   salida.push(0x29) // ')'
   return Uint8Array.from(salida)
+}
+
+/**
+ * Un texto a bytes **UTF-16BE con BOM** (`FE FF` + unidades UTF-16 en big-endian),
+ * que es la codificación de las cadenas de texto del diccionario `/Info`.
+ *
+ * ⭐ **Por qué no CP1252 (auditoría R1).** Fuera de los content streams —donde
+ * mandan las fuentes y su `/WinAnsiEncoding`— el estándar solo admite
+ * PDFDocEncoding o UTF-16BE con BOM. CP1252 y PDFDocEncoding coinciden en
+ * 0xA0–0xFF (tildes, ñ, º…) pero DIVERGEN en 0x80–0x9F: un `’` (U+2019, byte
+ * 0x92 en CP1252) en el `/Author` se mostraba como `™` en las propiedades del
+ * documento. Se elige UTF-16BE y no «PDFDocEncoding real» por dos motivos de
+ * estilo de este escritor: (1) no necesita una SEGUNDA tabla de codificación que
+ * mantener junto a la de CP1252, y (2) representa CUALQUIER carácter, así que la
+ * metadata nunca degrada a `?` aunque el cuerpo sí tenga que sustituir. Las
+ * unidades UTF-16 del propio string de JavaScript YA SON la codificación: los
+ * pares subrogados viajan tal cual, que es exactamente UTF-16.
+ *
+ * El cuerpo del documento no cambia: las fuentes siguen con `/WinAnsiEncoding`.
+ *
+ * @param {string} texto
+ * @returns {number[]}  Bytes, BOM incluido.
+ */
+function codificarUtf16Be(texto) {
+  const bytes = [0xfe, 0xff]
+  const normalizado = String(texto).normalize('NFC')
+  for (let i = 0; i < normalizado.length; i++) {
+    const unidad = normalizado.charCodeAt(i)
+    bytes.push(unidad >> 8, unidad & 0xff)
+  }
+  return bytes
 }
 
 /**
@@ -1113,18 +1184,28 @@ export function crearDocumentoPdf(opciones) {
       }
 
       // ── Info ───────────────────────────────────────────────────────────────
+      // Las cadenas de TEXTO van en UTF-16BE con BOM y no en CP1252: fuera de los
+      // content streams el estándar exige PDFDocEncoding o UTF-16BE, y CP1252
+      // diverge de PDFDocEncoding justo en 0x80–0x9F (€, comillas tipográficas,
+      // – y —). Ver {@link codificarUtf16Be} para la decisión entera (R1).
+      // La fecha NO: `fechaPdf` produce ASCII puro y el formato `D:…` del PDF es
+      // una cadena de bytes, no de texto.
       if (hayInfo) {
         abrir(numInfo)
         buf.ascii('<< ')
         const campo = (clave, valor) => {
           buf.ascii(`/${clave} `)
-          buf.crudos(literalPdf(codificarWinAnsi(valor).bytes))
+          buf.crudos(literalPdf(codificarUtf16Be(valor)))
           buf.ascii(' ')
         }
         if (titulo !== null) campo('Title', titulo)
         if (autor !== null) campo('Author', autor)
         if (productor !== null) campo('Producer', productor)
-        if (fecha !== null) campo('CreationDate', fechaPdf(fecha))
+        if (fecha !== null) {
+          buf.ascii('/CreationDate ')
+          buf.crudos(literalPdf(bytesAscii(fechaPdf(fecha))))
+          buf.ascii(' ')
+        }
         buf.ascii('>>\n')
         cerrar()
       }

@@ -97,6 +97,16 @@
 // Es la regla de oro 1 aplicada a un caso que, si se calla, se le manifiesta al
 // usuario como «la aplicación no guarda nada y no dice por qué».
 //
+// Y desde S1 (2026-08-15), `blocked` además RESUELVE la apertura como
+// `{disponible: false, motivo: BLOQUEADA}` en vez de dejarla pendiente: una
+// petición bloqueada no falla nunca por sí sola, y la promesa colgada dejaba
+// colgadas la caché y —peor— TODAS las consultas al Catastro, que consultan la
+// caché ANTES que la red (trampa 6 de `services/catastro.js`). El aviso de
+// «puedes trabajar con normalidad, pero no se guardará nada en la caché» pasó de
+// promesa a hecho con este cambio. Si la pestaña vieja suelta la base más tarde,
+// esa conexión tardía se CIERRA (nadie la va a usar ya) y, como el bloqueo no se
+// memoiza, la siguiente llamada a `abrirBd` abre limpia.
+//
 // `NIVEL.AVISO` y no `NIVEL.ERROR`, derivado de la regla de clasificación escrita
 // en `viewer/_comun.js`: **ERROR es lo que impide generar el GML; AVISO lo que
 // no.** El almacén local es caché y comodidad — la geometría del usuario está en
@@ -560,6 +570,18 @@ export const MOTIVO_SIN_BD = Object.freeze({
   SIN_INDEXEDDB: 'SIN_INDEXEDDB',
   /** Hay IndexedDB, pero la apertura falló (cuota, `VersionError`, permisos…). */
   ERROR_APERTURA: 'ERROR_APERTURA',
+  /**
+   * S1 (2026-08-15) · Otra pestaña tiene la base abierta con una versión
+   * anterior y no la suelta. La apertura NO falla por sí sola en ese caso: la
+   * petición queda esperando indefinidamente, y con ella quedaban colgadas TODAS
+   * las consultas al Catastro (la caché se consulta ANTES que la red, y el
+   * cliente esperaba una promesa que no resolvía nunca — contra la trampa 6 de
+   * `services/catastro.js`). Desde S1, al llegar `blocked` la apertura se da por
+   * perdida y RESUELVE con este motivo: la app trabaja sin caché, que es
+   * exactamente lo que el aviso de `blocked` promete. No se memoiza (como
+   * cualquier fallo de apertura): cerrar la otra pestaña lo arregla.
+   */
+  BLOQUEADA: 'BLOQUEADA',
 })
 
 /**
@@ -672,21 +694,48 @@ function abrirConEscalera(fabrica, avisar, alVersionChange) {
     })
   })
 
+  // LA CARRERA (S1, 2026-08-15): lo que se devuelve no es la promesa de la
+  // petición a secas, sino una que resuelve ANTES si llega `blocked`. Sin esto,
+  // una pestaña vieja que no suelta la base dejaba esta promesa pendiente PARA
+  // SIEMPRE — y con ella la caché, y con la caché todas las consultas al
+  // Catastro, que la esperan antes de tocar la red.
+  let resolverCarrera
+  let rechazarCarrera
+  const carrera = new Promise((resolver, rechazar) => {
+    resolverCarrera = resolver
+    rechazarCarrera = rechazar
+  })
+  /** `true` desde que `blocked` dio la apertura por perdida. */
+  let bloqueada = false
+
   // OTRA PESTAÑA NOS BLOQUEA: tiene abierta una versión anterior y no la suelta.
-  // La apertura NO falla — se queda esperando indefinidamente a que esa pestaña
-  // cierre. Sin este aviso, el síntoma es «la aplicación se ha quedado pensando».
+  // La apertura NO falla — la petición se queda esperando indefinidamente a que
+  // esa pestaña cierre. Por eso aquí se hacen DOS cosas: avisar (sin el aviso, el
+  // síntoma es «la aplicación se ha quedado pensando») y dar la apertura por
+  // perdida resolviendo la carrera, que es lo que convierte el «no se guardará
+  // nada en la caché» del aviso en verdad en vez de en una promesa colgada.
   peticion.addEventListener('blocked', (evento) => {
-    avisar(
+    const mensaje =
       'No se ha podido preparar el almacén local: hay otra pestaña de esta aplicación ' +
-        `abierta con una versión anterior (${evento.oldVersion} → ${evento.newVersion}). ` +
-        'Cierra las demás pestañas y vuelve a cargar esta. Mientras tanto puedes trabajar y ' +
-        'generar el GML con normalidad, pero no se guardará nada en la caché.',
-      { nivel: NIVEL.AVISO, causa: evento },
-    )
+      `abierta con una versión anterior (${evento.oldVersion} → ${evento.newVersion}). ` +
+      'Cierra las demás pestañas y vuelve a cargar esta. Mientras tanto puedes trabajar y ' +
+      'generar el GML con normalidad, pero no se guardará nada en la caché.'
+    avisar(mensaje, { nivel: NIVEL.AVISO, causa: evento })
+    bloqueada = true
+    resolverCarrera({ bloqueada: true, mensaje })
   })
 
   promesa.then(
     (bd) => {
+      if (bloqueada) {
+        // La pestaña vieja soltó la base DESPUÉS de que esta apertura se diera
+        // por bloqueada: quien llamó ya trabaja sin caché y no va a usar esta
+        // conexión nunca. Quedársela abierta la convertiría en la próxima
+        // «pestaña que bloquea» de otra migración; se cierra y, si alguien
+        // vuelve a llamar a `abrirBd` (el bloqueo no se memoiza), abrirá limpia.
+        bd.close()
+        return
+      }
       // SOMOS NOSOTROS LOS QUE BLOQUEAMOS a otra pestaña que quiere actualizar.
       //
       // DECISIÓN (F05): NO se cierra la conexión aquí por nuestra cuenta, aunque
@@ -731,14 +780,14 @@ function abrirConEscalera(fabrica, avisar, alVersionChange) {
           { nivel: NIVEL.AVISO },
         )
       })
+
+      resolverCarrera(bd)
     },
-    () => {
-      // El fallo lo trata quien llamó (abrirBd): aquí solo se evita que esta rama
-      // cuente como rechazo no gestionado. No se traga nada.
-    },
+    // El fallo lo trata quien llamó (abrirBd). No se traga nada.
+    (error) => rechazarCarrera(error),
   )
 
-  return promesa
+  return carrera
 }
 
 /**
@@ -825,7 +874,22 @@ export function abrirBd({
   }
 
   const promesa = abrirConEscalera(indexedDB, avisar, alVersionChange).then(
-    (bd) => conBase(bd),
+    (abierta) => {
+      // S1 · `blocked`: la apertura se da por perdida en cuanto otra pestaña con
+      // versión anterior la bloquea (ver la carrera de `abrirConEscalera`). Se
+      // degrada como cualquier otro fallo de apertura —resultado, no rechazo— y
+      // NO se memoiza: cerrar la otra pestaña lo arregla, y memoizar el bloqueo
+      // lo volvería permanente. El aviso ya salió por el canal desde el propio
+      // evento; aquí solo se le da forma de `ResultadoApertura`.
+      if (abierta !== null && abierta.bloqueada === true) {
+        if (conexion === promesa) {
+          conexion = null
+          fabricaEnUso = null
+        }
+        return sinBase(MOTIVO_SIN_BD.BLOQUEADA, abierta.mensaje)
+      }
+      return conBase(abierta)
+    },
     (error) => {
       // Se olvida el memo para permitir reintentos (ver arriba). Se compara la
       // identidad por si otra llamada ya hubiera instalado una conexión buena.

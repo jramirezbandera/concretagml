@@ -41,8 +41,11 @@ const dxf = (...pares) => pares.join('\n') + '\n'
  * Área shoelace |Σ|/2 de un anillo, medida trasladando el origen al primer
  * vértice para EVITAR la cancelación catastrófica con coords UTM (~1e6·1e6).
  * Para el polígono [P1, ...vertices, P2] el shoelace cierra P2→P1 por la CUERDA,
- * así que su área es exactamente el ΔS (área entre polilínea y cuerda). Es una
- * comprobación 100% independiente de geo/arco.js: solo usa coordenadas de salida.
+ * así que su área es el SEGMENTO CIRCULAR entero menos ΔS (G2, 2026-08-15: ΔS
+ * es el área entre la polilínea y el arco VERDADERO — la fórmula antigua medía
+ * contra la cuerda y este mismo shoelace «coincidía» con ella, que era el
+ * síntoma). Es una comprobación 100% independiente de geo/arco.js: solo usa
+ * coordenadas de salida.
  */
 function shoelaceAbs(ring) {
   const [ox, oy] = ring[0]
@@ -125,10 +128,15 @@ describe('AC2 · LWPOLYLINE con bulge conocido → flecha ≤ 1 cm y ΔS analít
     const arcoParser = [V3, ...anillos[0].slice(4), V0] // el arco de cierre, geometría de SALIDA
     // "…con flecha ≤ 1 cm…" (medido sobre la salida del parser, no del motor).
     expect(flechaMaxima(arcoParser, eng.centro, eng.radio)).toBeLessThanOrEqual(0.01)
-    // "…el ΔS reportado coincide con el cálculo analítico…": shoelace independiente ≈ ΔS,
-    // y el ΔS de la detección del parser también.
-    expect(shoelaceAbs(arcoParser)).toBeCloseTo(eng.deltaS, 4)
+    // "…el ΔS reportado coincide con el cálculo analítico…" (G2, 2026-08-15):
+    // ΔS = n_seg·½R²(δ−sinδ) — el área entre polilínea y arco VERDADERO. El
+    // shoelace independiente (que cierra por la cuerda) mide el segmento entero
+    // MENOS ese ΔS; con la fórmula antigua coincidía con ΔS a secas, que era la
+    // prueba de que ΔS medía contra la cuerda (39,17 m² en vez de 0,103).
+    const segmentoEntero = 0.5 * eng.radio ** 2 * (Math.PI - Math.sin(Math.PI))
+    expect(shoelaceAbs(arcoParser)).toBeCloseTo(segmentoEntero - eng.deltaS, 4)
     expect(porTramo.datos.deltaS).toBeCloseTo(eng.deltaS, 6)
+    expect(eng.deltaS).toBeLessThan(1) // la variación real, no el segmento (~39 m²)
   })
 
   // Bulge CONOCIDO: semicírculo b=1 entre dos vértices UTM separados 20 m.
@@ -179,13 +187,16 @@ describe('AC2 · LWPOLYLINE con bulge conocido → flecha ≤ 1 cm y ΔS analít
     expect(porArco.datos.nSeg).toBe(eng.nSeg)
     const deltaSReportado = porArco.datos.deltaS
 
-    // "…coincide con el cálculo analítico (toBeCloseTo)": el ΔS reportado es el área
-    // entre la polilínea y la cuerda, calculada AQUÍ por shoelace independiente.
-    expect(deltaSReportado).toBeCloseTo(shoelaceAbs(ring), 5)
-    // Forma cerrada analítica del segmento (identidad del feature, sinΔθ=sin π=0):
-    //   ΔS = ½·R²·(nSeg·sin(Δθ/nSeg) − sinΔθ)
-    const deltaSAnalitico = 0.5 * eng.radio ** 2 * (eng.nSeg * Math.sin(Math.PI / eng.nSeg) - Math.sin(Math.PI))
+    // "…coincide con el cálculo analítico (toBeCloseTo)" (G2, 2026-08-15): el ΔS
+    // reportado es el área entre la polilínea y el ARCO VERDADERO:
+    //   ΔS = nSeg·½R²(δ−sinδ), δ = |Δθ|/nSeg
+    const delta = Math.PI / eng.nSeg
+    const deltaSAnalitico = eng.nSeg * 0.5 * eng.radio ** 2 * (delta - Math.sin(delta))
     expect(deltaSReportado).toBeCloseTo(deltaSAnalitico, 6)
+    // Y el shoelace independiente (cerrado por la cuerda) mide el segmento
+    // circular entero MENOS ese ΔS — la identidad que la fórmula antigua rompía.
+    const segmentoEntero = 0.5 * eng.radio ** 2 * (Math.PI - Math.sin(Math.PI))
+    expect(shoelaceAbs(ring)).toBeCloseTo(segmentoEntero - deltaSReportado, 5)
   })
 })
 

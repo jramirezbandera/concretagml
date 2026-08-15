@@ -25,7 +25,7 @@
 // separador de columnas (las columnas quedan partidas por espacio/tab/';'); si el
 // decimal es '.', la coma sí puede delimitar columnas. Aquí sólo se RESPETA.
 
-import { extraerPares } from './_comun.js'
+import { crearDeteccion, extraerPares, SEVERIDAD, TIPO_DETECCION } from './_comun.js'
 import { ORIGEN_PARCELA } from '../model/parcela.js'
 
 /**
@@ -50,7 +50,24 @@ export function parseTXT(texto, opts = {}) {
     )
   }
 
-  const { anillos, detecciones } = extraerPares(texto, opts)
+  const { anillos, detecciones, curvaturas } = extraerPares(texto, opts)
+
+  // H1 (2026-08-15) · Si el texto trae líneas «Curvatura» es salida de LISTA con
+  // arcos que ha entrado por la vía TXT. Esta vía NO discretiza (eso lo hace
+  // parsers/list.js con geo/arco.js); dejar el arco convertido en su cuerda sin
+  // decirlo sería exactamente el silencio que la regla 1 prohíbe.
+  if (curvaturas.length > 0) {
+    detecciones.push(
+      crearDeteccion(
+        TIPO_DETECCION.ARCO_DISCRETIZADO,
+        `El volcado declara ${curvaturas.length} arco(s) (líneas «Curvatura» de la LISTA de ` +
+          `AutoCAD), pero la vía TXT no los reconstruye: cada arco queda sustituido por su ` +
+          `cuerda. Importa el pegado como LISTA (o el DXF) para discretizarlos.`,
+        SEVERIDAD.AVISO,
+        { arcos: curvaturas.length, aplicado: false },
+      ),
+    )
+  }
 
   return { anillos, detecciones, origen: ORIGEN_PARCELA.TXT }
 }

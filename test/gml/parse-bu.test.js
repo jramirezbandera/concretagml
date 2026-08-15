@@ -908,6 +908,46 @@ describe('F11 · ningún contenido hace lanzar a `parsearGmlBu` (la lección de 
     expect(d[0].severidad).toBe(SEVERIDAD.AVISO)
   })
 
+  it('⛔ un `refcat=` porcentaje-mal-escapado en el xlink:href no lanza: se usa crudo y se DICE', () => {
+    // `decodeURIComponent('%E9')` lanza URIError, y `%E9` es exactamente lo que
+    // emite un servicio que escape en ISO-8859-1 una referencia con «é». Antes
+    // de la corrección, `leerRefcat` hacía reventar a `parsearGmlBu` con el
+    // fichero del usuario, violando su propia cabecera («NO LANZA por el
+    // contenido», SPEC §2.1). El número de sustituciones se LEE del fixture
+    // (regla de oro 8): 13 partes con `cadastralParcels` y `addresses`.
+    const veces = PARTES.texto.split('refcat=9398516VK3799G').length - 1
+    expect(veces).toBeGreaterThan(0)
+    const mutado = mutar(PARTES.texto, 'refcat=9398516VK3799G', 'refcat=%E9', veces)
+    let r
+    expect(() => {
+      r = parsearGmlBu(mutado)
+    }).not.toThrow()
+    expect(r.ok).toBe(true)
+    // El valor se usa TAL CUAL venía: decodificarlo es imposible y recortarlo
+    // sería inventar. Las trece partes lo leen del primer enlace que lo trae.
+    expect(r.partes.map((p) => p.refcat)).toEqual(Array(13).fill('%E9'))
+    // …y se deja constancia con un AVISO por parte, nombrando el enlace exacto.
+    const d = deTipo(r, TIPO_GML.AREA_DECLARADA_DISCREPANTE).filter((x) => x.datos?.crudo === '%E9')
+    expect(d).toHaveLength(13)
+    expect(d[0].severidad).toBe(SEVERIDAD.AVISO)
+    expect(d[0].mensaje).toContain('bu-core2d:cadastralParcels')
+    expect(d[0].mensaje).toContain('refcat')
+  })
+
+  it('y un `refcat=` BIEN escapado se sigue decodificando (la vía feliz no cambia)', () => {
+    const veces = PARTES.texto.split('refcat=9398516VK3799G').length - 1
+    const mutado = mutar(
+      PARTES.texto,
+      'refcat=9398516VK3799G',
+      'refcat=9398516VK3799G%C3%A9',
+      veces,
+    )
+    const r = parsearGmlBu(mutado)
+    expect(r.ok).toBe(true)
+    expect(r.partes.map((p) => p.refcat)).toEqual(Array(13).fill('9398516VK3799Gé'))
+    expect(deTipo(r, TIPO_GML.AREA_DECLARADA_DISCREPANTE)).toEqual([])
+  })
+
   it('un feature desconocido dentro del `featureMember` se deja fuera, con su ERROR', () => {
     // ⚠️ Los fixtures BU están en CRLF en el árbol de trabajo, así que ningún
     // patrón de este fichero puede llevar un `\n` literal: se recorta el bloque

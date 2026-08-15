@@ -20,7 +20,8 @@ Meter geometría al modelo desde las tres vías de fichero del técnico, más la
 El GML no admite arcos. Ignorar el 42 convierte cada arco en su cuerda (el comando CONTORNO que todos usan genera arcos). Discretizar:
 - `b = tan(Δθ/4)` → `Δθ = 4·atan(b)` (signo `b>0` = CCW); `c=|P2−P1|`; `R = c(1+b²)/(4|b|)`; `M=(P1+P2)/2`; `C = M + sign(b)·apo·n̂` con `apo=R·cos(Δθ/2)`, `n̂` perpendicular unitaria.
 - **Subdivisión por flecha ≤ 1 cm** (parametrizable): `δ_max = 2·acos(1−ε/R)` con ε=0.01; `n_seg = ceil(|Δθ|/δ_max)`. Por sagitta, no por nº fijo de tramos.
-- **Reportar Δsuperficie:** `S_arco = ½R²(Δθ−sinΔθ)`, `S_discreto = n_seg·½R²(δ−sinδ)`, `ΔS = S_arco − S_discreto`. Informar cuántos arcos, en cuántos tramos y cuánto varió la superficie (regla de oro 1).
+- **Reportar Δsuperficie:** `δ = |Δθ|/n_seg`, `ΔS = n_seg·½R²(δ−sinδ)` — el área entre la polilínea y el arco VERDADERO, que es lo que de verdad varía la superficie al discretizar. Informar cuántos arcos, en cuántos tramos y cuánto varió la superficie (regla de oro 1).
+  - ⛔ **ENMENDADA el 2026-08-15, y la enmienda la trajo una medición (hallazgo G2 de la auditoría).** La fórmula anterior de esta spec era `ΔS = S_arco − S_discreto` con `S_arco = ½R²(Δθ−sinΔθ)`: restar el área discretizada al SEGMENTO CIRCULAR ENTERO mide el área entre la polilínea y la **cuerda** P1→P2 — casi todo el segmento, no el error de discretizar. Medido: para un semicírculo de R=5 m con ε=1 cm anunciaba ΔS=39,17 m² cuando la variación real de superficie es **0,103 m²**; la cifra correcta (`S_discreto = n_seg·½R²(δ−sinδ)`) se calculaba en `geo/arco.js` y se descartaba. `geo/arco.js#deltaS` devuelve desde hoy la variación real; el mensaje de `parsers/dxf.js` («variación de superficie ΔS=…») no cambia de forma, solo pasa a ser verdad.
 
 No soportar bloques, INSERT, xrefs ni splines. Si aparecen: decirlo e indicar qué hacer (dejar solo la polilínea en capa 0 y ejecutar LIMPIA).
 

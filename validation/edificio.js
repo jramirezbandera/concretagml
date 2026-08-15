@@ -358,7 +358,16 @@ export function validarEdificio(partes, { srs, parcelaContexto = null } = {}) {
           NIVEL.ERROR,
           `${nombreDe(partes[i], i)} y ${nombreDe(partes[j], j)} se solapan en ${m2(comun)}. ` +
             'El ICUC rechaza las construcciones que se superponen.',
-          refsAnillo(0, ri.vertices.length),
+          // ⚠️ SIN `verticesAfectados`, y es una decisión (auditoría 2026-08, V5):
+          // este hallazgo es UNO y vive en el `porParte` de LAS DOS partes, y las
+          // refs se leen DENTRO de cada parte (recinto 0 = su propio anillo).
+          // Llevaba `refsAnillo(0, ri.vertices.length)` —el anillo de la parte
+          // i—, que leído desde la parte j son índices fuera de rango en cuanto
+          // j tiene menos vértices; y no existe un juego de refs válido para las
+          // dos a la vez. El resalte no pierde nada: `partesSenaladas`
+          // (app/cableado-edificio-gml.js) rodea la parte ENTERA vía `porParte`,
+          // sin mirar las refs.
+          [],
           'Separar las construcciones que se solapan',
         ),
         i,
@@ -393,9 +402,23 @@ export function validarEdificio(partes, { srs, parcelaContexto = null } = {}) {
       if (!esRecintoApto(recinto)) return
       const nombre = nombreDe(parte, indice)
       const propia = superficie([{ ...recinto, tipo: 'EXTERIOR' }])
-      const dentro = parcela.reduce(
-        (suma, r) => (r.tipo === 'HUECO' ? suma : suma + areaComun(recinto, r)),
+      // El área «dentro» es la común con el EXTERIOR de la parcela MENOS la común
+      // con sus HUECOS: un patio no es superficie de la parcela, así que una
+      // construcción metida en él está FUERA aunque el exterior la envuelva.
+      // (Auditoría 2026-08, V3: antes los huecos ni sumaban ni restaban, y una
+      // construcción en el patio pasaba con 0 avisos y `noComprobado` vacío — el
+      // silencio que la cabecera de este módulo declara inadmisible. De rebote,
+      // `fuera` ya no se infravalora en construcciones a caballo del patio.)
+      // El clamp a 0 cubre el caso degenerado de un hueco que se sale de su
+      // exterior: ese defecto es de la PARCELA (lo señala su validación), y aquí
+      // no debe dejar un `dentro` negativo que infle `fuera` más allá de `propia`.
+      const dentro = Math.max(
         0,
+        parcela.reduce(
+          (suma, r) =>
+            r.tipo === 'HUECO' ? suma - areaComun(recinto, r) : suma + areaComun(recinto, r),
+          0,
+        ),
       )
       const fuera = propia - dentro
 

@@ -666,3 +666,210 @@ describe('parseDXF · cerrados[] (el flag de cierre, código de grupo 70)', () =
     expect(repartoDe(parseDXF(UTM).capas)).toEqual({ FINO: 16, LINDE: 4, PARCELA: 3, BLANCO: 1, 0: 1 })
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ⛔ Auditoría 2026-08-15 · H3/H4/H7/H8 — regresiones del parser DXF
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── H3 · Una línea en blanco inicial desincronizaba TODO el fichero ──────────
+
+describe('parseDXF · H3 — resincronización del emparejado código/valor', () => {
+  const MINIMO = dxf(
+    '0', 'SECTION', '2', 'ENTITIES',
+    '0', 'LWPOLYLINE', '8', '0', '90', '2', '70', '0',
+    '10', '298750.0', '20', '4090050.0',
+    '10', '298760.0', '20', '4090050.0',
+    '0', 'ENDSEC', '0', 'EOF',
+  )
+
+  it('⛔ un `\\n` inicial ya NO devuelve anillos:[] con detecciones:[] (la violación de la regla 1)', () => {
+    // Antes: el emparejado por posición absoluta leía cada «valor» como «código»
+    // y el fichero entero se evaporaba SIN una sola detección.
+    const r = parseDXF('\n' + MINIMO)
+    expect(r.anillos).toEqual([
+      [
+        [298750, 4090050],
+        [298760, 4090050],
+      ],
+    ])
+    // Y la resincronización queda dicha (nada se corrige callado).
+    const det = r.detecciones.find((d) => d.tipo === TIPO_DETECCION.FORMATO_NO_SOPORTADO)
+    expect(det).toBeTruthy()
+    expect(det.severidad).toBe(SEVERIDAD.AVISO)
+    expect(det.datos.lineasDescartadas).toBe(1)
+  })
+
+  it('varias líneas de morralla inicial (en blanco o texto) también se saltan y se cuentan', () => {
+    const r = parseDXF('\nexportado por MiCAD\n\n' + MINIMO)
+    expect(r.anillos).toHaveLength(1)
+    expect(r.detecciones.find((d) => d.tipo === TIPO_DETECCION.FORMATO_NO_SOPORTADO).datos.lineasDescartadas).toBe(3)
+  })
+
+  it('un DXF bien alineado NO estrena ninguna detección (el arreglo es conservador)', () => {
+    expect(parseDXF(MINIMO).detecciones).toEqual([])
+    // …y los seis fixtures reales del repo tampoco (todos empiezan por un código).
+    for (const texto of [UTM, EDIFICIO, POLY_CLASICA, BULGE_FIXTURE, NO_SOPORTADO_FIXTURE, CIERRE_FLAG70]) {
+      expect(
+        parseDXF(texto).detecciones.filter((d) => d.tipo === TIPO_DETECCION.FORMATO_NO_SOPORTADO),
+      ).toEqual([])
+    }
+  })
+})
+
+// ── H4 · El flag 70 del VERTEX: splines ajustadas y mallas polifacéticas ─────
+
+describe('parseDXF · H4 — flag 70 del VERTEX (PEDIT>Spline y polyface mesh)', () => {
+  it('⛔ una POLYLINE spline-ajustada NO mete los vértices del marco de control en el anillo', () => {
+    // PEDIT>Spline guarda DOS familias de VERTEX: 70=16 (marco de control, los
+    // puntos clicados, FUERA de la curva) y 70=8 (la curva ajustada). Antes
+    // entraban TODOS: geometría por la que la curva ni pasa, sin detección.
+    const texto = dxf(
+      '0', 'SECTION', '2', 'ENTITIES',
+      '0', 'POLYLINE', '8', '0', '66', '1', '70', '4', // bit 4: spline-fit
+      '0', 'VERTEX', '8', '0', '10', '298700.0', '20', '4090100.0', '70', '16', // control
+      '0', 'VERTEX', '8', '0', '10', '298750.0', '20', '4090050.0', '70', '8', // curva
+      '0', 'VERTEX', '8', '0', '10', '298760.0', '20', '4090052.0', '70', '8', // curva
+      '0', 'VERTEX', '8', '0', '10', '298770.0', '20', '4090055.0', '70', '8', // curva
+      '0', 'VERTEX', '8', '0', '10', '298800.0', '20', '4090200.0', '70', '16', // control
+      '0', 'SEQEND',
+      '0', 'ENDSEC', '0', 'EOF',
+    )
+    const r = parseDXF(texto)
+    expect(r.anillos).toEqual([
+      [
+        [298750, 4090050],
+        [298760, 4090052],
+        [298770, 4090055],
+      ],
+    ])
+    // Y lo hecho queda MATERIALIZADO (regla 1): qué se excluyó y qué se conservó.
+    const det = r.detecciones.find((d) => d.tipo === TIPO_DETECCION.VERTICE_EXCLUIDO)
+    expect(det).toBeTruthy()
+    expect(det.severidad).toBe(SEVERIDAD.INFO)
+    expect(det.datos).toEqual({ control: 2, curva: 3, conservados: 3 })
+    expect(det.mensaje).toMatch(/marco de control/i)
+  })
+
+  it('los registros de cara de una malla polifacética (70=128) no fabrican vértices [0,0]', () => {
+    // En una POLYFACE MESH los VERTEX con bit 128 «a secas» son registros de
+    // cara (10/20 = 0.0; los índices van en 71..74) y los de 70=192 (64|128)
+    // son vértices de la malla: nada de eso es un anillo de parcela.
+    const texto = dxf(
+      '0', 'SECTION', '2', 'ENTITIES',
+      '0', 'POLYLINE', '8', '0', '66', '1', '70', '64', // polyface mesh
+      '0', 'VERTEX', '8', '0', '10', '298750.0', '20', '4090050.0', '70', '192',
+      '0', 'VERTEX', '8', '0', '10', '298760.0', '20', '4090050.0', '70', '192',
+      '0', 'VERTEX', '8', '0', '10', '298760.0', '20', '4090060.0', '70', '192',
+      '0', 'VERTEX', '8', '0', '10', '0.0', '20', '0.0', '70', '128', '71', '1', '72', '2', '73', '3',
+      '0', 'SEQEND',
+      '0', 'ENDSEC', '0', 'EOF',
+    )
+    const r = parseDXF(texto)
+    // Nada de la malla entra como anillo, y capas/cerrados siguen 1:1.
+    expect(r.anillos).toEqual([])
+    expect(r.capas).toEqual([])
+    expect(r.cerrados).toEqual([])
+    const det = r.detecciones.find((d) => d.tipo === TIPO_DETECCION.VERTICE_EXCLUIDO)
+    expect(det).toBeTruthy()
+    expect(det.severidad).toBe(SEVERIDAD.AVISO)
+    expect(det.datos.caras).toBe(4) // 3 vértices de malla + 1 registro de cara
+    expect(det.mensaje).toMatch(/malla polifacética/i)
+  })
+
+  it('un VERTEX normal (sin 70, o 70=0/32) sigue entrando igual que siempre', () => {
+    const texto = dxf(
+      '0', 'SECTION', '2', 'ENTITIES',
+      '0', 'POLYLINE', '8', '0', '66', '1', '70', '0',
+      '0', 'VERTEX', '8', '0', '10', '298750.0', '20', '4090050.0',
+      '0', 'VERTEX', '8', '0', '10', '298760.0', '20', '4090050.0', '70', '32',
+      '0', 'SEQEND',
+      '0', 'ENDSEC', '0', 'EOF',
+    )
+    const r = parseDXF(texto)
+    expect(r.anillos).toEqual([
+      [
+        [298750, 4090050],
+        [298760, 4090050],
+      ],
+    ])
+    expect(r.detecciones.filter((d) => d.tipo === TIPO_DETECCION.VERTICE_EXCLUIDO)).toEqual([])
+  })
+})
+
+// ── H7 · La elevación de la LWPOLYLINE (código 38) se descartaba en silencio ─
+
+describe('parseDXF · H7 — elevación (código 38) de LWPOLYLINE', () => {
+  const conElevacion = (elev) => dxf(
+    '0', 'SECTION', '2', 'ENTITIES',
+    '0', 'LWPOLYLINE', '8', '0', '90', '2', '70', '0', '38', elev,
+    '10', '298750.0', '20', '4090050.0',
+    '10', '298760.0', '20', '4090050.0',
+    '0', 'ENDSEC', '0', 'EOF',
+  )
+
+  it('⛔ una elevación no nula se descarta DICIÉNDOLO (antes: sin Z_DESCARTADA)', () => {
+    const r = parseDXF(conElevacion('650.0'))
+    expect(r.anillos[0]).toEqual([
+      [298750, 4090050],
+      [298760, 4090050],
+    ])
+    const det = r.detecciones.find(
+      (d) => d.tipo === TIPO_DETECCION.Z_DESCARTADA && d.datos && d.datos.codigo === 38,
+    )
+    expect(det).toBeTruthy()
+    expect(det.severidad).toBe(SEVERIDAD.INFO)
+    expect(det.datos.polilineas).toBe(1)
+    expect(det.mensaje).toMatch(/elevación/i)
+  })
+
+  it('elevación 0 (el valor por defecto) no descarta nada y no avisa', () => {
+    const r = parseDXF(conElevacion('0.0'))
+    expect(r.detecciones.filter((d) => d.tipo === TIPO_DETECCION.Z_DESCARTADA)).toEqual([])
+  })
+})
+
+// ── H8 · ARC/CIRCLE resumidos como «no forman anillo» era inútil ─────────────
+
+describe('parseDXF · H8 — ARC/CIRCLE pueden SER la parcela (aviso con guía)', () => {
+  it('⛔ un contorno LINE+ARC produce un AVISO que dice cómo proceder, no un INFO mudo', () => {
+    // Contorno habitual de topografía: lados rectos como LINE y esquinas como ARC.
+    const texto = dxf(
+      '0', 'SECTION', '2', 'ENTITIES',
+      '0', 'LINE', '8', '0', '10', '298750.0', '20', '4090050.0', '11', '298760.0', '21', '4090050.0',
+      '0', 'ARC', '8', '0', '10', '298760.0', '20', '4090055.0', '40', '5.0', '50', '270.0', '51', '90.0',
+      '0', 'LINE', '8', '0', '10', '298760.0', '20', '4090060.0', '11', '298750.0', '21', '4090060.0',
+      '0', 'CIRCLE', '8', '0', '10', '298755.0', '20', '4090055.0', '40', '2.0',
+      '0', 'ENDSEC', '0', 'EOF',
+    )
+    const r = parseDXF(texto)
+    const aviso = r.detecciones.find(
+      (d) =>
+        d.tipo === TIPO_DETECCION.ENTIDAD_NO_SOPORTADA &&
+        d.severidad === SEVERIDAD.AVISO &&
+        d.datos &&
+        d.datos.tipos &&
+        d.datos.tipos.ARC,
+    )
+    expect(aviso).toBeTruthy()
+    expect(aviso.datos.tipos).toEqual({ ARC: 1, CIRCLE: 1 })
+    expect(aviso.datos.lineas).toBe(2) // las LINE del contorno se nombran con él
+    // «…pueden SER la parcela y cómo proceder»: la guía concreta del CAD.
+    expect(aviso.mensaje).toMatch(/puede SER/i)
+    expect(aviso.mensaje).toMatch(/EDITPOL|PEDIT/)
+    expect(aviso.mensaje).toMatch(/polilínea/i)
+    // Y las LINE/otros siguen en su resumen INFO de siempre, sin duplicar ARC.
+    const resumen = r.detecciones.find(
+      (d) => d.severidad === SEVERIDAD.INFO && d.datos && d.datos.tipos && d.datos.tipos.LINE,
+    )
+    expect(resumen.datos.tipos).toEqual({ LINE: 2 })
+  })
+
+  it('sin ARC ni CIRCLE no hay aviso nuevo: UTM.dxf conserva sus detecciones de siempre', () => {
+    const r = parseDXF(UTM)
+    expect(
+      r.detecciones.filter(
+        (d) => d.datos && d.datos.tipos && (d.datos.tipos.ARC || d.datos.tipos.CIRCLE),
+      ),
+    ).toEqual([])
+  })
+})

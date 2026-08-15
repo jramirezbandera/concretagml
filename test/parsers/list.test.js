@@ -16,6 +16,7 @@ import { describe, it, expect } from 'vitest'
 import { parseLIST } from '../../parsers/list.js'
 import { TIPO_DETECCION, SEVERIDAD } from '../../parsers/_comun.js'
 import { ORIGEN_PARCELA } from '../../model/parcela.js'
+import { discretizarBulge } from '../../geo/arco.js'
 
 const LIST_REAL = readFileSync(
   fileURLToPath(new URL('../fixtures/parsers/LIST.txt', import.meta.url)),
@@ -143,5 +144,94 @@ describe('parsers/list — parseLIST · contrato y opciones', () => {
 
   it('separador decimal inválido en opts → RangeError (lo valida _comun.js)', () => {
     expect(() => parseLIST('X= 1 Y= 2', { separadorDecimal: ';' })).toThrow(RangeError)
+  })
+})
+
+// ── ⛔ H1 (auditoría 2026-08-15) · la LISTA con ARCOS ─────────────────────────
+//
+// La salida real de LISTA sobre una polilínea con arcos imprime, por cada arco,
+// `Curvatura` (el bulge), `Centro` (¡3 números!) y `Radio`. Antes: el centro
+// entraba como VÉRTICE fantasma y el bulge se tiraba — parcela construida con
+// bloqueos: [], cero avisos y el arco sustituido por su cuerda en silencio,
+// cuando la vía DXF materializa exactamente eso con ARCO_DISCRETIZADO.
+
+describe('parsers/list — parseLIST · arcos declarados por la LISTA (H1)', () => {
+  // b=1 entre [0,0] y [10,0]: semicírculo R=5 con centro [5,0] — el mismo caso
+  // analítico de test/geo/arco.test.js, aquí como pegado de LISTA.
+  const LISTA_ARCO = [
+    'LWPOLYLINE  Capa: "0"',
+    'Ubicación:  X= 0.0000  Y= 0.0000  Z= 0.0000',
+    'Curvatura: 1.0000',
+    'Centro: X= 5.0000  Y= 0.0000  Z= 0.0000',
+    'Radio: 5.0000',
+    'Ubicación:  X= 10.0000  Y= 0.0000  Z= 0.0000',
+  ].join('\n')
+
+  it('⛔ el centro del arco NO entra como vértice y el arco SE DISCRETIZA (como la vía DXF)', () => {
+    const { anillos } = parseLIST(LISTA_ARCO)
+    const arco = discretizarBulge([0, 0], [10, 0], 1)
+    // El tramo se reconstruye EXACTAMENTE como [P1, ...vertices, P2] — la misma
+    // convención que parsers/dxf.js#ensamblarAnillo.
+    expect(anillos).toEqual([[[0, 0], ...arco.vertices, [10, 0]]])
+    expect(anillos[0]).not.toContainEqual([5, 0]) // el vértice fantasma del hallazgo
+  })
+
+  it('materializa ARCO_DISCRETIZADO: una detección por arco + un resumen, como dxf.js', () => {
+    const { detecciones } = parseLIST(LISTA_ARCO)
+    const arco = discretizarBulge([0, 0], [10, 0], 1)
+    const arcos = detecciones.filter((d) => d.tipo === TIPO_DETECCION.ARCO_DISCRETIZADO)
+    const porArco = arcos.find((d) => d.datos && 'nSeg' in d.datos)
+    expect(porArco.severidad).toBe(SEVERIDAD.INFO)
+    expect(porArco.datos.nSeg).toBe(arco.nSeg)
+    expect(porArco.datos.deltaS).toBeCloseTo(arco.deltaS, 9)
+    expect(porArco.datos.radio).toBeCloseTo(arco.radio, 9)
+    const resumen = arcos.find((d) => d.datos && 'deltaSTotal' in d.datos)
+    expect(resumen.datos.arcos).toBe(1)
+  })
+
+  it('un arco en el ÚLTIMO vértice de una polilínea CERRADA envuelve hasta V0', () => {
+    // Cuadrado 10×10 declarado «Cerrado» con el arco en el tramo de cierre
+    // V3→V0 (el mismo caso que el fixture DXF 03_lwpolyline_bulge).
+    const lista = [
+      'Marcas de polilínea:  Cerrado',
+      'Ubicación:  X= 0.0  Y= 0.0  Z= 0.0',
+      'Ubicación:  X= 10.0  Y= 0.0  Z= 0.0',
+      'Ubicación:  X= 10.0  Y= 10.0  Z= 0.0',
+      'Ubicación:  X= 0.0  Y= 10.0  Z= 0.0',
+      'Curvatura: 1.0000',
+      'Centro: X= 0.0  Y= 5.0  Z= 0.0',
+      'Radio: 5.0000',
+    ].join('\n')
+    const { anillos, meta } = parseLIST(lista)
+    expect(meta.cerrado).toBe(true)
+    const cierre = discretizarBulge([0, 10], [0, 0], 1)
+    expect(anillos[0]).toEqual([[0, 0], [10, 0], [10, 10], [0, 10], ...cierre.vertices])
+  })
+
+  it('arco en el último vértice de una polilínea NO cerrada: no se inventa — AVISO de cuerda', () => {
+    const lista = [
+      'Ubicación:  X= 0.0  Y= 0.0  Z= 0.0',
+      'Ubicación:  X= 10.0  Y= 0.0  Z= 0.0',
+      'Curvatura: 1.0000',
+    ].join('\n')
+    const { anillos, detecciones } = parseLIST(lista)
+    expect(anillos).toEqual([
+      [
+        [0, 0],
+        [10, 0],
+      ],
+    ]) // la cuerda se queda tal cual
+    const aviso = detecciones.find(
+      (d) => d.tipo === TIPO_DETECCION.ARCO_DISCRETIZADO && d.severidad === SEVERIDAD.AVISO,
+    )
+    expect(aviso).toBeTruthy()
+    expect(aviso.mensaje).toMatch(/cuerda/i)
+    expect(aviso.datos.aplicado).toBe(false)
+  })
+
+  it('sin arcos, nada cambia: el fixture real sigue dando sus 11 vértices exactos', () => {
+    const { anillos, detecciones } = parseLIST(LIST_REAL)
+    expect(anillos[0]).toEqual(VERTICES_ESPERADOS)
+    expect(detecciones.some((d) => d.tipo === TIPO_DETECCION.ARCO_DISCRETIZADO)).toBe(false)
   })
 })
