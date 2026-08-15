@@ -154,6 +154,28 @@ export const ATRIBUTO_DISPARADOR = 'data-menu-disparador'
 export const ATRIBUTO_MENU = 'data-menu'
 
 /**
+ * `data-menu-conserva` en un `menuitem` que, al activarse, **NO cierra el menú**.
+ *
+ * ── ⛔ EL DEFECTO QUE ABRE ESTA PUERTA, MEDIDO (2026-08-15) ────────────────
+ * Desde el 2026-08-11 activar cualquier `menuitem` cierra el desplegable, y está
+ * bien: exportar un fichero no tapa nada y el menú se quedaba colgando sobre el
+ * mapa. Pero **«Vaciarlo» pide confirmación DENTRO de este menú**, y cerrarlo se
+ * llevaba por delante el renglón donde se acababa de escribir la pregunta. Medido
+ * montando barra y `app/empezar-de-nuevo.js` juntos: tras el primer clic el
+ * renglón tenía el texto y `panel.hidden` era `true`, o sea que la confirmación se
+ * escribía en un sitio que el usuario ya no estaba mirando. Lo que veía era un
+ * botón que se traga el clic; para confirmar tenía que reabrir el menú y volver a
+ * pulsar **dentro de los 5 s**, y si tardaba más el segundo clic solo volvía a
+ * armar. De ahí el «a veces se queda pillado» del autor.
+ *
+ * ⚠️ Es un atributo de PRESENCIA y lo pone quien lo necesita **mientras** lo
+ * necesita, no `index.html`: una opción que no cerrara nunca el menú sería otro
+ * defecto, el de siempre pero al revés. Ver `app/empezar-de-nuevo.js`, que lo pone
+ * al armar y lo quita al desarmar.
+ */
+export const ATRIBUTO_CONSERVA = 'data-menu-conserva'
+
+/**
  * Dónde se escribe el nombre del expediente abierto y su apunte. Los pone
  * `index.html`; este módulo los rellena desde `estado()` del cableado.
  */
@@ -519,11 +541,18 @@ export function cablearBarra({
   //
   // ⚠️ Y **sin devolver el foco**: la opción recién pulsada puede abrir un diálogo
   // que se lo lleve, y peleárselo dejaría el foco donde no está la atención.
+  //
+  // ⛔ **Salvo que la opción pida quedarse.** Ver {@link ATRIBUTO_CONSERVA}: una
+  // opción que pregunta algo en el propio menú necesita que el menú siga ahí para
+  // que la pregunta se lea. El atributo se consulta en el `menuitem` y no en el
+  // `evento.target` porque el clic cae en el `<span>` del apunte tantas veces como
+  // en el botón.
   escuchar(documento, 'click', (evento) => {
     if (menuAbierto === null) return
     const panelMenu = menuDe(menuAbierto.getAttribute(ATRIBUTO_DISPARADOR))
     if (panelMenu !== null && panelMenu.contains(evento.target)) {
-      if (evento.target?.closest?.('[role="menuitem"]')) cerrarMenus()
+      const opcion = evento.target?.closest?.('[role="menuitem"]')
+      if (opcion != null && !opcion.hasAttribute(ATRIBUTO_CONSERVA)) cerrarMenus()
       return
     }
     if (menuAbierto.contains(evento.target)) return

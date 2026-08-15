@@ -51,6 +51,10 @@ const EDIFICIO = readFileSync(fixture('edificio_consulta_masiva_3515508VF0831N.d
 // Los otros dos fixtures de F01, que hasta F11 solo leía test/parsers/aceptacion-f01.
 const BULGE_FIXTURE = readFileSync(fixture('03_lwpolyline_bulge.dxf'), 'latin1')
 const NO_SOPORTADO_FIXTURE = readFileSync(fixture('05_no_soportado_insert_spline.dxf'), 'latin1')
+// El fichero real que destapó que el flag de cierre (código 70) se estaba tirando:
+// una polilínea `70=1` cuyo tramo de cierre mide 0,1118 m y caía en la banda
+// ambigua de `importar.js`. Procedencia en fixtures/parsers/PROCEDENCIA.md.
+const CIERRE_FLAG70 = readFileSync(fixture('cierre_flag70_arco.dxf'), 'latin1')
 
 /** Reparto {capa: nºAnillos} a partir de `capas[]`. */
 const repartoDe = (capas) => {
@@ -557,5 +561,108 @@ describe('parseDXF — F22 · los rótulos', () => {
 
   it('un DXF sin anotaciones devuelve `rotulos: []`, nunca undefined', () => {
     expect(parseDXF(POLY_CLASICA).rotulos).toEqual([])
+  })
+})
+
+// ── 10 · `cerrados[]` · el flag de cierre (código 70, bit 0) ──────────────────
+//
+// El parser ya lo leía para decidir si dibujar el tramo Vn-1→V0, y después lo
+// TIRABA. Aguas abajo eso no se puede reconstruir: `parsers/importar.js` solo veía
+// una lista de vértices y, cuando el último caía cerca del primero, preguntaba por
+// un error de cierre que el fichero ya había contestado. El oráculo es
+// `cierre_flag70_arco.dxf` (fichero real, ver PROCEDENCIA.md).
+describe('parseDXF · cerrados[] (el flag de cierre, código de grupo 70)', () => {
+  it('el fichero real que destapó el defecto: UNA polilínea con 70=1 → `cerrados: [true]`', () => {
+    const r = parseDXF(CIERRE_FLAG70)
+    expect(r.anillos).toHaveLength(1)
+    expect(r.cerrados).toEqual([true])
+    // 21 vértices y NO se repite V0: el flag es lo único que dice que cierra.
+    expect(r.anillos[0]).toHaveLength(21)
+    expect(r.anillos[0][20]).not.toEqual(r.anillos[0][0])
+  })
+
+  it('el tramo de cierre mide 0,1118 m y encaja con el arco — la razón de todo esto', () => {
+    // Cuatro lados rectos (9–15 m) y un arco de 17 tramos de 0,11 a 0,25 m. El
+    // tramo Vúltimo→V0 mide 0,1118 m: cae en la banda ambigua de 0,5 m de
+    // `importar.js` y a la vez es el último tramo de la curva, no un misclosure.
+    const a = parseDXF(CIERRE_FLAG70).anillos[0]
+    const d = (p, q) => Math.hypot(q[0] - p[0], q[1] - p[1])
+    expect(d(a[20], a[0])).toBeCloseTo(0.1118, 4)
+    // El arco empieza en V4: sus tramos son V4→V5 … V19→V20 (i desde 5), NO V3→V4,
+    // que es el cuarto lado recto y mide 13,65 m.
+    const tramosDelArco = []
+    for (let i = 5; i < a.length; i++) tramosDelArco.push(d(a[i - 1], a[i]))
+    expect(Math.min(...tramosDelArco)).toBeGreaterThan(0.1) // el de cierre no es un outlier
+    expect(Math.max(...tramosDelArco)).toBeLessThan(0.25)
+    expect(d(a[0], a[1])).toBeGreaterThan(9) // …y los lados rectos son otro orden de magnitud
+  })
+
+  it('LWPOLYLINE: 70=0 → `false`, 70=1 → `true`, y sin código 70 → `false` (nunca undefined)', () => {
+    const texto = dxf(
+      '0', 'SECTION', '2', 'ENTITIES',
+      '0', 'LWPOLYLINE', '8', 'A', '90', '2', '70', '0',
+      '10', '298750.0', '20', '4090050.0',
+      '10', '298760.0', '20', '4090050.0',
+      '0', 'LWPOLYLINE', '8', 'B', '90', '2', '70', '1',
+      '10', '298750.0', '20', '4090060.0',
+      '10', '298760.0', '20', '4090060.0',
+      '0', 'LWPOLYLINE', '8', 'C', '90', '2', // ← sin código 70
+      '10', '298750.0', '20', '4090070.0',
+      '10', '298760.0', '20', '4090070.0',
+      '0', 'ENDSEC', '0', 'EOF',
+    )
+    const r = parseDXF(texto)
+    expect(r.cerrados).toEqual([false, true, false])
+    for (const c of r.cerrados) expect(typeof c).toBe('boolean')
+  })
+
+  it('el bit 0 manda: 70=129 (cerrada + spline-fit) es CERRADA; 70=128 no lo es', () => {
+    // El 70 es un mapa de bits, no un booleano: 128 = "polilínea generada por
+    // linetype". Leerlo con `=== 1` daría `false` en una polilínea cerrada real.
+    const conFlag = (n) => dxf(
+      '0', 'SECTION', '2', 'ENTITIES',
+      '0', 'LWPOLYLINE', '8', 'A', '90', '2', '70', String(n),
+      '10', '298750.0', '20', '4090050.0',
+      '10', '298760.0', '20', '4090050.0',
+      '0', 'ENDSEC', '0', 'EOF',
+    )
+    expect(parseDXF(conFlag(129)).cerrados).toEqual([true])
+    expect(parseDXF(conFlag(128)).cerrados).toEqual([false])
+  })
+
+  it('POLYLINE clásica: el 70 va en la CABECERA, igual que la capa', () => {
+    const texto = dxf(
+      '0', 'SECTION', '2', 'ENTITIES',
+      '0', 'POLYLINE', '8', 'CAB', '66', '1', '70', '1',
+      '0', 'VERTEX', '8', 'CAB', '10', '298750.0', '20', '4090050.0',
+      '0', 'VERTEX', '8', 'CAB', '10', '298760.0', '20', '4090050.0',
+      '0', 'VERTEX', '8', 'CAB', '10', '298760.0', '20', '4090060.0',
+      '0', 'SEQEND', '8', 'CAB',
+      '0', 'ENDSEC', '0', 'EOF',
+    )
+    expect(parseDXF(texto).cerrados).toEqual([true])
+    // Y el fixture sintético de la vía clásica, que su propia cabecera declara
+    // «UNA POLYLINE clasica cerrada»: el flag lo confirma, no lo contradice.
+    expect(parseDXF(POLY_CLASICA).cerrados).toEqual([true])
+  })
+
+  it('`cerrados` y `anillos` tienen la MISMA longitud en los seis DXF del repo', () => {
+    const todos = [UTM, EDIFICIO, POLY_CLASICA, BULGE_FIXTURE, NO_SOPORTADO_FIXTURE, CIERRE_FLAG70]
+    for (const texto of todos) {
+      const r = parseDXF(texto)
+      expect(r.cerrados).toHaveLength(r.anillos.length)
+      for (const c of r.cerrados) expect(typeof c).toBe('boolean')
+    }
+  })
+
+  it('F01/F11 INTACTOS: el cambio es aditivo — mismos anillos y mismas capas', () => {
+    // La misma guardia que F11 se puso a sí misma: un campo más no puede mover ni
+    // un vértice ni un nombre de capa de los fixtures que ya estaban.
+    for (const texto of [UTM, EDIFICIO, POLY_CLASICA, BULGE_FIXTURE, NO_SOPORTADO_FIXTURE]) {
+      const r = parseDXF(texto)
+      expect(r.anillos.length).toBeGreaterThan(0)
+      expect(r.capas).toHaveLength(r.anillos.length)
+    }
+    expect(repartoDe(parseDXF(UTM).capas)).toEqual({ FINO: 16, LINDE: 4, PARCELA: 3, BLANCO: 1, 0: 1 })
   })
 })

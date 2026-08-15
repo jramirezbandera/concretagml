@@ -419,17 +419,29 @@ const raizDiagnostico = () => diagnosticoVivo.cajon.control.getContainer()
 const pulsar = (el) => el.dispatchEvent(new MouseEvent('click', { bubbles: true }))
 
 /**
- * Abre el diagnóstico por el CTA del pie y descarga el informe con el botón del
- * cajón, que es el recorrido real, y devuelve el TEXTO que habría bajado.
+ * Abre el diagnóstico por el CTA del pie y compone el informe de contraste,
+ * devolviendo el TEXTO que habría bajado.
+ *
+ * ⛔ **PULSABA UN BOTÓN HASTA EL 2026-08-15.** «Descargar informe de contraste» se
+ * retiró del pie del cajón por encargo del autor —«solo necesito el pdf»— y el
+ * compositor se queda: `descargarInforme()` sigue en la API de
+ * `cablearDiagnostico`, que es donde su propia cabecera ya decía que estaba «por
+ * si alguna vez hace falta dispararlo desde fuera».
+ *
+ * Lo que este fichero prueba con él —que el informe de la vía de F05 salga SIN la
+ * sección del fichero y el de la vía de F08 CON ella, que es el enlace entre las
+ * dos features— no ha cambiado ni un ápice: lo que cambia es el gesto que lo
+ * dispara. Se sigue abriendo el diagnóstico por el CTA real, porque sin
+ * diagnóstico calculado no hay informe que componer, y eso sí es producto.
  */
 async function descargarInforme() {
   pulsar(document.querySelector(SELECTOR_BOTON_DIAGNOSTICAR))
   await cederTurno()
-  const boton = raizDiagnostico().querySelector(SELECTOR_DIAG.DESCARGAR)
-  expect(boton.disabled, 'el botón del informe está apagado: no hay diagnóstico calculado').toBe(
+  const boton = raizDiagnostico().querySelector(SELECTOR_DIAG.PREPARAR)
+  expect(boton.disabled, 'el pie del informe está apagado: no hay diagnóstico calculado').toBe(
     false,
   )
-  pulsar(boton)
+  arranque.apiDiagnostico.descargarInforme()
   await cederTurno()
   return arranque.informes[arranque.informes.length - 1]
 }

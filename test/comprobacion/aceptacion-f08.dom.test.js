@@ -449,7 +449,8 @@ function montar({ responder, conVecinas = true } = {}) {
     ctaDiagnosticar: document.querySelector(SELECTOR_BOTON_DIAGNOSTICAR),
     renglonDiagnosticar: document.querySelector(SELECTOR_ESTADO_DIAGNOSTICO),
     botonContrastar: raizComp.querySelector(SELECTOR_COMP.CONTRASTAR),
-    botonInforme: raizDiag.querySelector(SELECTOR_DIAG.DESCARGAR),
+    diagnostico,
+    botonInforme: raizDiag.querySelector(SELECTOR_DIAG.PREPARAR),
     renglonInforme: raizDiag.querySelector(SELECTOR_DIAG.ESTADO_INFORME),
   }
 }
@@ -854,6 +855,27 @@ describe('F08 · AC2 · un GML con varias parcelas ofrece elegir; uno con SRS in
 // tiene anchura y el pie no (un tercer CTA a lo ancho vuelve a costar ~36 px), y
 // sirve igual de bien a las DOS vías —quien llegó por referencia catastral también
 // quiere su informe—, así que la interfaz no se ramifica por procedencia.
+//
+// ── ⛔ EL BOTÓN QUE AC3 NOMBRABA YA NO EXISTE (2026-08-15) ───────────────────
+// «Descargar informe de contraste» se ha retirado del pie por encargo del autor:
+// «no hace falta lo de descargar informe de contraste que saca el txt, solo
+// necesito el pdf». Y este bloque **no se borra**, porque lo que AC3 pedía de
+// verdad no era ese botón:
+//
+//   · **«la acción principal del diagnóstico»** — sigue habiéndola, y sigue
+//     estando en el pie del cajón. Es «Preparar informe (PDF)», que desde F09 era
+//     ya el primario de los dos y hoy es el único.
+//   · **«por esta vía»** — que quien llega soltando un GML llegue al MISMO informe
+//     que quien llega por referencia catastral, sin que la interfaz se ramifique
+//     por procedencia. Eso es lo que de verdad se estaba afirmando, y sigue
+//     entero: el compositor del texto no se ha tocado.
+//
+// Lo que cambia es el GESTO que dispara el `.txt`: ya no hay botón, y se compone
+// llamando a `descargarInforme()` en la API de `cablearDiagnostico` — donde
+// siempre estuvo, y donde su propia cabecera decía que estaba «por si alguna vez
+// hace falta dispararlo desde fuera». Todo lo que este bloque prueba del DOCUMENTO
+// —los bytes, el nombre, la sección del fichero, el «No consta»— vale palabra por
+// palabra, porque de eso no se ha retirado nada.
 
 /** Deja la pantalla con el diagnóstico de un fichero ya calculado y visible. */
 async function conDiagnosticoDeFichero(banco, nombre = WFS) {
@@ -865,33 +887,43 @@ async function conDiagnosticoDeFichero(banco, nombre = WFS) {
   return banco
 }
 
-describe('F08 · AC3 · la acción principal del diagnóstico por esta vía es «Descargar informe de contraste»', () => {
-  it('el botón se llama EXACTAMENTE así, y está en el pie del cajón', () => {
+describe('F08 · AC3 · la acción principal del diagnóstico por esta vía sigue estando en el cajón', () => {
+  it('la acción principal es UNA, se llama «Preparar informe (PDF)» y vive en el pie del cajón', () => {
     const banco = montar()
 
-    expect(banco.botonInforme.textContent).toBe('Descargar informe de contraste')
-    // ⚠️ ACTUALIZADO EN F09 (T4.2). Cuando se escribió este criterio, el informe de
-    // contraste era el ÚNICO documento que la herramienta sabía emitir, así que era
-    // el primario del pie. F09 trae el documento FIRMABLE —«Preparar informe
-    // (PDF)»: plano a 300 ppp, descripción del lindero y pie de firma— y ése pasa a
-    // ser el primario; el de texto se queda como la alternativa que se compone SIN
-    // RED y sin plano. Lo que AC3 pedía de verdad —que la acción que consume el
-    // diagnóstico esté en el cajón y no en el pie de la app, que no cueste píxeles
-    // del panel y que sirva a las dos vías de entrada— sigue cumpliéndose entero.
-    // ⚠️ ACTUALIZADO OTRA VEZ EN EL REWORK DE UI (T9) Y DESHECHO EL 2026-08-07. El
-    // cajón estrenó entonces un cuarto botón —«Tomar esta geometría y editarla», la
-    // puerta de D4— y se ha retirado con el modo COMPROBACIÓN entero: ver la
-    // cabecera de `app/navegacion.js`. AC3 no se movió ni al ponerlo ni al quitarlo.
+    // ⚠️ HISTORIA DE ESTA AFIRMACIÓN, que es la mitad de su valor:
+    // · Cuando se escribió AC3, el informe de contraste era el ÚNICO documento que
+    //   la herramienta sabía emitir, así que era el primario del pie.
+    // · F09 (T4.2) trajo el documento FIRMABLE —plano a 300 ppp, descripción del
+    //   lindero y pie de firma— y ÉSE pasó a ser el primario; el de texto se quedó
+    //   como la alternativa que se compone SIN RED y sin plano.
+    // · El REWORK DE UI (T9) metió un cuarto botón —«Tomar esta geometría y
+    //   editarla», la puerta de D4— y el 2026-08-07 se retiró con el modo
+    //   COMPROBACIÓN entero.
+    // · El 2026-08-15 se retiró el de texto, por encargo del autor.
+    // AC3 no se ha movido en ninguno de los cuatro, y por la misma razón: lo que
+    // pide es que la acción que CONSUME el diagnóstico esté donde el diagnóstico se
+    // lee, no que se llame de una forma concreta.
+    expect(banco.botonInforme.textContent).toBe('Preparar informe (PDF)')
     const botones = [...banco.raizDiag.querySelectorAll('button')]
     expect(botones.map((b) => b.dataset.accion).sort()).toEqual([
       'cerrar-diagnostico',
-      'descargar-informe',
       'preparar-informe',
     ])
-    // Y los dos del informe comparten fila, así que el cajón no ha crecido de alto:
-    // la razón 2 (un CTA más cuesta ~36 px del panel) sigue en pie.
-    const preparar = banco.raizDiag.querySelector('[data-accion="preparar-informe"]')
-    expect(preparar.parentElement).toBe(banco.botonInforme.parentElement)
+    // Y cuelga del `<footer>` del cajón, no del pie de la aplicación: eso es lo que
+    // AC3 afirma de verdad, y es lo que no ha cambiado en un año de rediseños.
+    expect(banco.botonInforme.closest('footer')).not.toBeNull()
+    expect(banco.raizDiag.contains(banco.botonInforme)).toBe(true)
+  })
+
+  it('⛔ y el `.txt` sigue componiéndose: se ha retirado el botón, no el documento', () => {
+    // La distinción que este bloque existe para dejar escrita. Quitar un botón es
+    // cosa de la interfaz; borrar `report/contraste-texto.js` sería quitar la única
+    // salida que se compone SIN RED, que era la degradación declarada de F09 para
+    // el día que el plano no se pueda armar.
+    const banco = montar()
+    expect(typeof banco.diagnostico.descargarInforme).toBe('function')
+    expect(banco.raizDiag.querySelector('[data-accion="descargar-informe"]')).toBeNull()
   })
 
   it('nace APAGADO y con el motivo escrito: un botón gris y mudo es un error silencioso', () => {
@@ -912,7 +944,7 @@ describe('F08 · AC3 · la acción principal del diagnóstico por esta vía es �
   it('pulsarlo BAJA BYTES DE VERDAD: el Blob no está vacío y trae el informe entero', async () => {
     const banco = await conDiagnosticoDeFichero(montar())
 
-    banco.botonInforme.click()
+    banco.diagnostico.descargarInforme()
     await cederTurno()
 
     expect(banco.entrega.creados, 'no se ha entregado ningún Blob').toHaveLength(1)
@@ -945,7 +977,7 @@ describe('F08 · AC3 · la acción principal del diagnóstico por esta vía es �
   it('el fichero baja con su nombre compuesto, emparejable con el GML del mismo instante', async () => {
     const banco = await conDiagnosticoDeFichero(montar())
 
-    banco.botonInforme.click()
+    banco.diagnostico.descargarInforme()
     await cederTurno()
 
     // El nombre lo compone el módulo real y se afirma con SUS constantes: escribir
@@ -962,7 +994,7 @@ describe('F08 · AC3 · la acción principal del diagnóstico por esta vía es �
 
   it('«No consta» donde no hay dato, jamás un 0 que tranquilice en falso', async () => {
     const banco = await conDiagnosticoDeFichero(montar())
-    banco.botonInforme.click()
+    banco.diagnostico.descargarInforme()
     await cederTurno()
 
     const contenido = await banco.entrega.ultimoTexto()
@@ -977,7 +1009,7 @@ describe('F08 · AC3 · la acción principal del diagnóstico por esta vía es �
     // genérico: la cabecera dice de dónde salió la geometría —del fichero del
     // usuario, no del Catastro— y la sección 2 dice qué era ese fichero.
     const banco = await conDiagnosticoDeFichero(montar())
-    banco.botonInforme.click()
+    banco.diagnostico.descargarInforme()
     await cederTurno()
 
     const plano = aplanar(await banco.entrega.ultimoTexto())
@@ -1404,7 +1436,7 @@ describe('F08 · regla de oro 9 · 3/3 · el DOM del cajón pintado por el recor
 describe('F08 · regla de oro 9 · el texto de OTRAS capas atraviesa, y eso no es una infracción', () => {
   it('el informe de un recorrido real CONTIENE «inválida» y «correcto», y los dos son legítimos', async () => {
     const banco = await conDiagnosticoDeFichero(montar())
-    banco.botonInforme.click()
+    banco.diagnostico.descargarInforme()
     await cederTurno()
     // Se APLANA antes de buscar: el informe va justificado a 78 columnas y parte los
     // mensajes de las capas de abajo por donde le toca. Buscarlos literales daría un
@@ -1424,7 +1456,7 @@ describe('F08 · regla de oro 9 · el texto de OTRAS capas atraviesa, y eso no e
     // La otra mitad, que es la que convierte lo de arriba en un hecho y no en una
     // excusa: el veredicto venía del mensaje que atraviesa, no de la plantilla.
     const banco = await conDiagnosticoDeFichero(montar())
-    banco.botonInforme.click()
+    banco.diagnostico.descargarInforme()
     await cederTurno()
 
     const c = banco.comprobacion.comprobacion()

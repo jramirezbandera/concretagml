@@ -205,8 +205,43 @@ export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'dia
  * Sigue siendo «no más de», y sigue con **holgura 0**: la siguiente subida vuelve
  * a salir roja y vuelve a tener que decidirse a mano. Eso es lo que se buscaba —
  * el techo no es una prohibición, es el sitio donde estamos.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **SUBIDO A MANO EL 2026-08-15 (LA LEYENDA DEL MAPA), SEGUNDO USO**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 60.213 a **60.353 B nuestros** (75.308 → 75.448 con vendor). **+140 B**, y
+ * los pone enteros `viewer/leyenda.js`: la tarjeta que dice qué significa cada
+ * color y cada trazo de los que se ven sobre la ortofoto.
+ *
+ * ── POR QUÉ VALE LA PENA, QUE ES LO QUE ESTA LÍNEA OBLIGA A ESCRIBIR ────────
+ * Porque cierra un agujero que llevaba abierto desde F03 y que ninguna otra pieza
+ * puede cerrar: el visor dibuja **once grafismos distintos sobre la misma foto**
+ * —amarillo del levantamiento, gris discontinuo del parcelario vigente, gris claro
+ * de las vecinas, mancha fría de la diferencia, ámbar de la invasión, rosa de la
+ * desviación máxima, banda punteada del margen, cian del sobrante, violeta de las
+ * huellas— y **ninguno se presentaba en ninguna parte**. Cada uno está elegido por
+ * descarte y con su porqué escrito en el módulo que lo pinta, y ese porqué no
+ * llegaba a la pantalla: quien abría la aplicación veía una mancha gris sobre su
+ * parcela y no tenía dónde enterarse de si era un defecto, una advertencia o la
+ * explicación de una cifra. Es media regla de oro 1 —la aplicación decía algo y no
+ * decía qué— en el sitio donde más caro sale, porque **la mitad del diagnóstico se
+ * lee mirando el mapa**.
+ *
+ * ── LO QUE SE DEVOLVIÓ ANTES DE PEDIR LA SUBIDA ─────────────────────────────
+ * La primera medición fue **+184 B**: cuatro reglas, una por clase, repartiendo la
+ * MISMA propiedad. Se fundieron en una sola con los cuatro selectores en lista
+ * —el criterio de `.gml-cajon-diagnostico button`, que cubre de golpe los botones
+ * de los tres cajones— y se devolvieron **44 B**. Lo que queda es irreducible: es
+ * `font-family` y nada más. Todo lo demás que la leyenda necesita para verse
+ * —fondo, relleno, radio, sombra, tope de alto, las muestras de color, los
+ * `dashArray` reproducidos con degradados— lo pone el módulo EN LÍNEA, porque
+ * tiene que leerse sobre una ortofoto aunque esta hoja no cargue. La familia es lo
+ * ÚNICO que el módulo no puede saber, y por eso es lo único que se paga aquí.
+ *
+ * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
+ * «No más de», holgura 0, y la siguiente subida vuelve a salir roja.
  */
-export const TECHO = Object.freeze({ total: 75308, nuestro: 60213 })
+export const TECHO = Object.freeze({ total: 75448, nuestro: 60353 })
 
 /**
  * EL REGISTRO. Un asiento por hito, con la hoja construida medida de verdad.
@@ -973,6 +1008,33 @@ export const ASIENTOS = Object.freeze(
         'como texto, que es por lo que el guardián es de disco y no de componente. ── ⚠️ NO CIERRA ' +
         'REBANADA (`rebanada: null`): el diccionario cuelga del menú de Expediente y no es una ' +
         'pantalla del rail. Las cinco siguen cerradas, así que el techo se sigue exigiendo.' },
+    { hito: 'La leyenda de los grafismos del mapa (y el diagnóstico reestructurado)',
+      commit: '(sin commitear)',
+      total: 75448, nuestro: 60353, rebanada: null,
+      nota:
+        '**+140 B, y es el SEGUNDO asiento que sube el techo a mano.** Los pone enteros ' +
+        '`viewer/leyenda.js`: la tarjeta plegable que dice qué significa cada color y cada trazo ' +
+        'de los que se ven sobre la ortofoto. ── QUÉ SE PAGA ── **Una sola propiedad**: ' +
+        '`font-family` sobre cuatro clases, en una regla con los cuatro selectores en lista. Todo ' +
+        'lo demás que la leyenda necesita para verse —fondo, relleno, radio, sombra, tope de ' +
+        'alto, las muestras de color, y los `dashArray` de Leaflet reproducidos con ' +
+        '`repeating-linear-gradient` para que el parcelario vigente y el margen de identidad no ' +
+        'se confundan— lo pone el módulo EN LÍNEA, porque `viewer/*` no importa ninguna hoja y ' +
+        'tiene que ser legible en jsdom y sobre un mapa pelado. La familia es lo ÚNICO que el ' +
+        'módulo no puede saber, y es exactamente lo que se paga. ── ⭐ SE DEVOLVIERON 44 B ANTES ' +
+        'DE PEDIR LA SUBIDA ── La primera medición fue +184: cuatro reglas repartiendo la MISMA ' +
+        'propiedad. Se funden en una, con el criterio de `.gml-cajon-diagnostico button`. Lo que ' +
+        'queda es irreducible. ── ⛔ Y LA OTRA MITAD DEL TRABAJO CUESTA CERO ── La ' +
+        'reestructuración del panel de Diagnóstico —la rejilla invertida para que la cifra no se ' +
+        'parta, las celdas de dos pisos que bajan «90,31 % de la mayor» a su propio renglón, los ' +
+        'motivos de omisión vestidos de prosa en vez de de cifra, el margen partido en dos ' +
+        'párrafos y los filetes entre secciones— **no toca esta hoja ni un byte**, y es el mismo ' +
+        'hecho que la rebanada 4 dejó escrito: `viewer/cajon-diagnostico.js` se viste EN LÍNEA. ' +
+        'Ídem la retirada de «Descargar informe de contraste»: un botón menos no devuelve bytes ' +
+        'porque la regla que lo vestía era por elemento (`… button`) y sigue cubriendo al que ' +
+        'queda. ── ⚠️ NO CIERRA REBANADA (`rebanada: null`): la leyenda es cromo del mapa, no una ' +
+        'pantalla del rail. Las cinco siguen cerradas, así que el techo se sigue exigiendo, y ' +
+        'vuelve a quedar con holgura 0.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

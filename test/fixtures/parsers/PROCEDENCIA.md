@@ -242,6 +242,83 @@ Sus 3 bloques `LOGO` (`INSERT`) llevan `41`/`42`/`43` = 0.6011385410059346 (esca
 un `grep` de «42» confundiría con tres arcos inexistentes: es el ejemplar que justifica que
 `parsers/dxf.js` sea una máquina de estados y no un `grep` (ver su cabecera, líneas 10-15).
 
+---
+
+## `cierre_flag70_arco.dxf` — LA POLILÍNEA QUE SE DECLARA CERRADA
+
+Levantamiento real de un técnico, importado en la aplicación el **2026-08-15**. Es la verdad
+externa del **flag de cierre** (código de grupo 70, bit 0), que `parsers/dxf.js` leía y
+después tiraba.
+
+⚠️ **Se llama así y no `UTM.dxf` a propósito**: el usuario lo trajo con ese nombre, que ya está
+cogido en esta carpeta por el plano de 471 KB de F01. Son ficheros DISTINTOS y no tienen nada
+que ver; el nombre de aquí describe lo que este ejemplar aporta.
+
+| | |
+|---|---|
+| Origen | Levantamiento real de un técnico, aportado por el usuario del proyecto |
+| Aportado | 2026-08-15 (copiado de `icuc-pruebas/UTM.dxf`, que está en `.gitignore`) |
+| Hash de blob | `aace3033e571cc93d46ebed2be988741dd577325` |
+| Tamaño | 4.402 B |
+| Finales de línea | **LF** (0 CRLF, 982 LF). Sin regla en `.gitattributes`, como los de F01 |
+| Codificación | ASCII puro (0 bytes > 127) |
+| Versión DXF | **sin `$ACADVER`** — la `HEADER` solo trae `$PDMODE`/`$PDSIZE` |
+| Huso | UTM 30N (≈297.855 / 4.028.104 — provincia de Málaga) |
+| Referencia catastral | `8081401TF9288S`, rotulada dentro del recinto como `TEXT` |
+
+**Contenido medido** (con `parseDXF` de producción):
+
+| | |
+|---|---|
+| Entidades | 1 `POLYLINE` + 21 `VERTEX` + 1 `SEQEND` + 22 `TEXT` + 21 `POINT` |
+| Anillos | **1**, en la capa `0`, con **21 vértices** |
+| Flag 70 | **1** ⇒ `cerrados: [true]` — la polilínea se declara CERRADA |
+| Vértice de cierre | **NO se repite**: V20 ≠ V0 |
+
+⛔ **LA TRAMPA, y es el motivo de que este fichero esté aquí.** El anillo son **cuatro lados
+rectos** (9,14 · 15,44 · 10,54 · 13,65 m) y **un arco de 17 tramos** de 0,108 a 0,242 m. El
+tramo de cierre V20→V0 mide **0,1118 m**, que cae dentro de la banda ambigua de 0,5 m de
+`parsers/importar.js`. Resultado hasta el 2026-08-15: **AutoCAD dibujaba el contorno cerrado
+—porque el flag lo dice— y la aplicación abría una pantalla preguntando por un error de
+cierre**. Las dos cosas eran ciertas por separado; juntas se leen como una contradicción
+(lección M28 de F11).
+
+Y la pregunta empujaba a la respuesta equivocada. Las tres lecturas que se ofrecían:
+
+| Lectura | Qué le habría hecho a este fichero |
+|---|---|
+| Dejarlo como está | lo correcto — y era el defecto por suerte, no por criterio |
+| Retirar el vértice de cierre | **comerse el último vértice bueno del arco** |
+| Compensar (Bowditch) | repartir 11 cm por todo el perímetro sin motivo |
+
+Los 0,1118 m caen **en medio del rango de espaciado del propio arco** (0,108–0,242 m): es su
+último tramo, no un misclosure. Un error de cierre de levantamiento no reproduciría el paso de
+la curva con esa puntería. Pero eso es geometría interpretada por nosotros, y no hace falta:
+**el fichero ya lo dice con el flag 70**, que existe precisamente para no tener que repetir V0.
+
+✅ **ARREGLADO el 2026-08-15.** `parseDXF` devuelve `cerrados[]` en paralelo a `anillos[]` y
+`capas[]` —mismo patrón aditivo que estrenó F11 con la capa— y `resolverCierre` estrena una
+cuarta banda: con el flag a `true` la geometría se deja intacta, la detección baja de **AVISO a
+INFO** con el error medido publicado igual, y **la pantalla deja de preguntar**.
+
+⚠️ **Lo que este fichero NO demuestra, y queda declarado.** Que `70=1` implique siempre una
+arista real. Un operador puede clicar el último punto a ojo cerca del primero y rematar con la
+`C` de `PLINE`: ahí hay un misclosure de verdad bajo un `70=1`. Por eso el arreglo **no toca la
+geometría ni retira nada**, sigue publicando las dos lecturas como dato y sigue aplicándolas si
+el llamante las pide — lo único que se retira es la PREGUNTA.
+
+### ⚠️ Huecos declarados
+
+- **De qué técnico y de qué expediente es.** Llegó por la carpeta de pruebas del usuario y nadie
+  anotó el encargo. La referencia catastral rotulada (`8081401TF9288S`) permitiría situarlo, pero
+  **no se ha comprobado contra la Sede**.
+- **Con qué programa se escribió.** Sin `$ACADVER` no hay forma de saberlo desde el fichero, y
+  eso importa para lo de arriba: el rigor con que un escritor pone el flag 70 depende de él.
+- ⚠️ **Un solo fichero no es la especificación del formato.** Aquí el flag es de fiar; el
+  siguiente DXF que llegue puede traer un `70=1` puesto a la ligera.
+
+---
+
 ## `PARCELA.txt` — LA VERDAD NUMÉRICA DE `UTM.dxf` (F01)
 
 Volcado de coordenadas de la misma parcela que `UTM.dxf`. **Es el oráculo cruzado**: los 12

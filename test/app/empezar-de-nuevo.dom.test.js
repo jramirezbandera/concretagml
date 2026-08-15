@@ -33,6 +33,7 @@ import { join } from 'node:path'
 
 import { describe, it, expect, vi, afterEach } from 'vitest'
 
+import { ATRIBUTO_CONSERVA, ATRIBUTO_DISPARADOR, ATRIBUTO_MENU, cablearBarra } from '../../app/barra.js'
 import {
   MENSAJE_ARMADO,
   MS_CONFIRMAR,
@@ -41,6 +42,7 @@ import {
   SELECTOR_FILA,
   cablearEmpezarDeNuevo,
 } from '../../app/empezar-de-nuevo.js'
+import { crearNavegacion } from '../../app/navegacion.js'
 import { crearEstadoVista } from '../../viewer/_comun.js'
 
 const RAIZ = join(import.meta.dirname, '..', '..')
@@ -99,9 +101,37 @@ function montar({ parcela = null, edificio = null } = {}) {
 /** El `document` global de jsdom, nombrado para que las llamadas se lean. */
 const documento = globalThis.document
 
+let barraViva = null
+
+/**
+ * ⭐ **Monta la BARRA DE VERDAD además del cableado** (2026-08-15).
+ *
+ * `montar()` monta el DOM real pero deja los menús muertos, y ahí vivía el defecto
+ * «a veces se queda pillado»: el desplegable que se cerraba al armar no lo cerraba
+ * este módulo, lo cerraba `app/barra.js`, así que con la barra sin montar todo
+ * salía verde. Las pruebas de abajo lo montan todo y pulsan como pulsa el usuario:
+ * abriendo el menú primero.
+ *
+ * @param {{parcela?: object|null, edificio?: object|null}} [inicial]
+ */
+function montarConBarra(inicial = { parcela: UNA_PARCELA }) {
+  const piezas = montar(inicial)
+  barraViva = cablearBarra({
+    documento,
+    navegacion: crearNavegacion({ avisar: () => {} }),
+  })
+  return {
+    ...piezas,
+    disparador: document.querySelector(`[${ATRIBUTO_DISPARADOR}="expediente"]`),
+    panel: document.querySelector(`[${ATRIBUTO_MENU}="expediente"]`),
+  }
+}
+
 afterEach(() => {
   vivo?.destruir()
   vivo = null
+  barraViva?.destruir()
+  barraViva = null
   reloj = 1_000_000
   document.body.innerHTML = ''
 })
@@ -330,6 +360,111 @@ describe('la confirmación en dos tiempos', () => {
     boton.click()
     expect(alVaciar).not.toHaveBeenCalled()
     expect(renglon.textContent).toBe('')
+  })
+})
+
+// ── ⛔ EL DEFECTO DEL 2026-08-15, CON LA BARRA MONTADA ───────────────────────
+//
+// *«El botón vaciar expediente a veces se queda pillado y no funciona bien»* — el
+// autor. Y lo estaba: la confirmación se escribía dentro de un menú que el mismo
+// clic cerraba. Los cuatro `it` de abajo son el defecto medido, uno por tramo.
+
+describe('⭐ dentro del menú de expediente, con `app/barra.js` montado', () => {
+  it('⛔ el clic que ARMA deja el menú ABIERTO, o la pregunta no se lee', () => {
+    const { disparador, panel, boton, renglon } = montarConBarra()
+    disparador.click()
+    expect(panel.hidden).toBe(false)
+
+    boton.click()
+
+    // ANTES DEL ARREGLO: `panel.hidden` era `true` aquí. El renglón tenía el texto
+    // —por eso el test de más arriba pasaba— pero estaba dentro de un desplegable
+    // ya cerrado, así que el usuario no veía nada y el `role="status"` tampoco
+    // anunciaba: un `aria-live` en subárbol oculto no se anuncia.
+    expect(panel.hidden).toBe(false)
+    expect(renglon.textContent).toBe(MENSAJE_ARMADO)
+  })
+
+  it('el segundo clic vacía SIN reabrir el menú, y entonces sí se cierra', () => {
+    const { disparador, panel, boton, alVaciar } = montarConBarra()
+    disparador.click()
+    boton.click()
+    // Sin volver a tocar el disparador: el menú sigue ahí y el foco, en el botón.
+    boton.click()
+    expect(alVaciar).toHaveBeenCalledTimes(1)
+    // Confirmar es una opción como cualquier otra: cierra. (En producción el
+    // documento se recarga y esto da igual; en la prueba es lo que se puede ver.)
+    expect(panel.hidden).toBe(true)
+  })
+
+  it('el `data-menu-conserva` solo está puesto MIENTRAS se pregunta', () => {
+    // Una opción que no cerrara el menú NUNCA sería el mismo defecto al revés.
+    const { disparador, boton } = montarConBarra()
+    expect(boton.hasAttribute(ATRIBUTO_CONSERVA)).toBe(false)
+    disparador.click()
+    boton.click()
+    expect(boton.hasAttribute(ATRIBUTO_CONSERVA)).toBe(true)
+    boton.click()
+    expect(boton.hasAttribute(ATRIBUTO_CONSERVA)).toBe(false)
+  })
+
+  it('las demás opciones del menú siguen cerrándolo', () => {
+    // El atributo es de presencia y lo pone JavaScript: si alguien lo escribiera en
+    // `index.html`, o si la guarda de `barra.js` se invirtiera, el menú se quedaría
+    // colgado sobre el mapa — que es el defecto que el 2026-08-11 vino a cerrar.
+    const { disparador, panel } = montarConBarra()
+    disparador.click()
+    panel.querySelector('[data-accion="consultar-rechazo"]').click()
+    expect(panel.hidden).toBe(true)
+  })
+})
+
+// ── El olvido: que el renglón no se quede diciendo lo que ya no es ───────────
+
+describe('⛔ el armado se olvida EN PANTALLA, no solo en el reloj', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('pasado el plazo, el renglón se borra solo', () => {
+    // ANTES DEL ARREGLO el texto se quedaba puesto para siempre. A los diez minutos
+    // seguía leyéndose «Vuelve a pulsar «Vaciarlo» para confirmarlo» sobre un botón
+    // que ya solo volvía a armar: el usuario pulsaba, no pasaba nada, y la pantalla
+    // le decía que estaba haciendo lo correcto. Eso es «se queda pillado».
+    vi.useFakeTimers()
+    const { boton, renglon, cable } = montar({ parcela: UNA_PARCELA })
+    boton.click()
+    expect(renglon.textContent).toBe(MENSAJE_ARMADO)
+
+    vi.advanceTimersByTime(MS_CONFIRMAR + 1)
+
+    expect(renglon.textContent).toBe('')
+    expect(boton.hasAttribute(ATRIBUTO_CONSERVA)).toBe(false)
+    // El reloj inyectado no se ha movido, así que esto mide el TEMPORIZADOR y no
+    // la caducidad por reloj que ya había.
+    expect(cable.armado()).toBe(false)
+  })
+
+  it('confirmar a tiempo cancela el olvido: no repinta nada después', () => {
+    vi.useFakeTimers()
+    const { boton, renglon, alVaciar } = montar({ parcela: UNA_PARCELA })
+    boton.click()
+    boton.click()
+    expect(alVaciar).toHaveBeenCalledTimes(1)
+    renglon.textContent = 'algo que ha escrito otro'
+    vi.advanceTimersByTime(MS_CONFIRMAR * 3)
+    // Un temporizador huérfano borraría lo que escribió quien vino después.
+    expect(renglon.textContent).toBe('algo que ha escrito otro')
+  })
+
+  it('`destruir` se lleva el temporizador por delante', () => {
+    vi.useFakeTimers()
+    const { boton, renglon, cable } = montar({ parcela: UNA_PARCELA })
+    boton.click()
+    cable.destruir()
+    renglon.textContent = 'la pantalla de después'
+    vi.advanceTimersByTime(MS_CONFIRMAR * 3)
+    expect(renglon.textContent).toBe('la pantalla de después')
   })
 })
 

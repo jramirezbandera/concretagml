@@ -44,6 +44,28 @@
 //     la capa y `cerrarPoly` la usa: leerla del SEQEND daría `0` para las siete
 //     huellas del edificio, y el reparto saldría mal EN SILENCIO.
 //
+// ── EL FLAG DE CIERRE (código de grupo 70, bit 0) ────────────────────────────
+//
+// El parser YA lo leía —`verts.closed`— pero solo para decidir si dibujar el
+// tramo Vn-1→V0, y después lo TIRABA. Es un dato que el fichero afirma y que
+// aguas abajo no se puede reconstruir: `parsers/importar.js` solo ve una lista de
+// vértices y, cuando el último cae cerca del primero, no sabe si eso es un
+// vértice de cierre mal tecleado o una arista corta de verdad — así que pregunta.
+//
+// ⚠️ MEDIDO en `icuc-pruebas/UTM.dxf` (2026-08-15): una POLYLINE con `70=1` cuyos
+// 21 vértices son cuatro lados rectos (9–15 m) y un arco de 17 tramos de 0,11 a
+// 0,24 m. El tramo de cierre mide 0,1118 m —dentro de la banda ambigua de 0,5 m—
+// y AutoCAD lo dibuja cerrado, así que el usuario veía un anillo cerrado en
+// pantalla y la aplicación preguntándole por un error de cierre. Los dos tenían
+// razón: el fichero NO repite V0, y a la vez declara el anillo cerrado.
+//
+// Con `70=1` esa ambigüedad se estrecha: la lectura «Vúltimo es V0 repetido con
+// una errata» queda descartada —para eso está el flag, para NO tener que repetir
+// V0—, y el tramo de cierre es una arista que el CAD dibuja. Se devuelve como
+// `cerrados[]`, en paralelo a `anillos[]` y `capas[]` y con la misma longitud,
+// exactamente igual que hizo F11 con la capa. Quien lo INTERPRETA es
+// `parsers/importar.js#resolverCierre`; aquí solo se transporta.
+//
 // POR QUÉ ESTE MÓDULO NO EMITE NINGUNA DETECCIÓN NUEVA POR LA CAPA (decidido al
 // medirlo, F11·T1.1): `test/export/dxf.test.js` exige `detecciones` EXACTAMENTE
 // vacías al releer el DXF que escribe `export/dxf.js`, que tiene DOS capas
@@ -208,11 +230,15 @@ function capaDe(grupos) {
  * @param {object} [opts]
  * @param {number} [opts.flechaMax=0.01]  Flecha máx. (m) para discretizar arcos
  *   (se pasa tal cual a geo/arco.js#discretizarBulge).
- * @returns {{ anillos: number[][][], capas: string[],
+ * @returns {{ anillos: number[][][], capas: string[], cerrados: boolean[],
  *   rotulos: Array<{tipo: string, capa: string, texto: string, x: number, y: number}>,
  *   detecciones: import('./_comun.js').Deteccion[], origen: 'DXF' }}
  *   `capas[i]` es la capa de `anillos[i]` (LITERAL, `''` si no había código 8);
  *   los dos arrays tienen SIEMPRE la misma longitud.
+ *   `cerrados[i]` es el flag de cierre (código 70, bit 0) de la entidad de
+ *   `anillos[i]`: `true` = el fichero DECLARA el anillo cerrado, así que el tramo
+ *   Vn-1→V0 es una arista dibujada y NO hay vértice de cierre repetido. Mismo
+ *   largo que `anillos`, siempre booleano (nunca `undefined`).
  *   `rotulos` (F22) son las anotaciones con texto y posición, en el orden del
  *   fichero. ⚠️ **NO va 1:1 con `anillos`** —hay planos con 153 rótulos y 8
  *   recintos, y otros sin ninguno—: emparejarlos es de `parsers/topologia.js`.
@@ -233,6 +259,7 @@ export function parseDXF(texto, opts = {}) {
   // ── Acumuladores del resultado ──────────────────────────────────────────────
   const anillos = []
   const capas = [] // capas[i] ↔ anillos[i]; se empujan SIEMPRE a la vez.
+  const cerrados = [] // cerrados[i] ↔ anillos[i]; flag 70 bit 0. Ver la cabecera.
   const rotulos = [] // F22 · anotaciones con texto y sitio; NO va 1:1 con anillos.
   const detecciones = []
   let zCount = 0 // vértices con código 30 (Z) descartada.
@@ -256,9 +283,14 @@ export function parseDXF(texto, opts = {}) {
   const ensamblarAnillo = (verts, capa) => {
     const v = verts.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
     if (v.length === 0) return
+    // `verts.closed` puede no venir (una POLYLINE sin código 70): se normaliza a
+    // booleano aquí y no aguas abajo, para que `cerrados[i]` sea SIEMPRE `true` o
+    // `false` y nadie tenga que distinguir «abierto» de «no se sabe».
+    const cerrado = verts.closed === true
     if (v.length < 2) {
       anillos.push(v.map((p) => [p.x, p.y]))
       capas.push(capa)
+      cerrados.push(cerrado)
       return
     }
     const n = v.length
@@ -291,6 +323,7 @@ export function parseDXF(texto, opts = {}) {
     }
     anillos.push(out)
     capas.push(capa)
+    cerrados.push(cerrado)
   }
 
   // ── Parseo de las group codes de una LWPOLYLINE → anillo ──────────────────────
@@ -486,7 +519,7 @@ export function parseDXF(texto, opts = {}) {
     )
   }
 
-  return { anillos, capas, rotulos, detecciones, origen: ORIGEN }
+  return { anillos, capas, cerrados, rotulos, detecciones, origen: ORIGEN }
 }
 
 export default parseDXF

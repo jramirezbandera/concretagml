@@ -60,10 +60,21 @@
 // 2) **La propia parcela se separa por `refcat` NORMALIZADO, nunca por posición.**
 //    Medido: `GetNeighbourParcel` devuelve **5 miembros para 4 colindantes**, y la
 //    propia está en **2.ª posición**. Un `parcelas[0]` daría por «la parcela del
-//    usuario» a una vecina, y por colindante a la suya. Si ningún miembro casa con
-//    lo pedido, el resultado es `RESPUESTA_ILEGIBLE` — nunca un candidato elegido
-//    a dedo. De ahí el nombre {@link crearClienteCatastro}·`parcelaYColindantes`:
-//    dice lo que el servicio hace, no lo que uno esperaría que hiciera.
+//    usuario» a una vecina, y por colindante a la suya. De ahí el nombre
+//    {@link crearClienteCatastro}·`parcelaYColindantes`: dice lo que el servicio
+//    hace, no lo que uno esperaría que hiciera.
+//
+//    ⚠️ **Y el servicio no siempre se incluye a sí misma** (O15 corregido, medido
+//    el 2026-08-15): `8081402TF9288S` y `8081403TF9288S` vienen con la propia
+//    dentro, `8081401TF9288S` **no**. Así que «ningún miembro casa con lo pedido»
+//    significa una cosa distinta en cada consulta, y se tratan distinto:
+//      · en `parcelaPorRefcat` (`GetParcel`, se pide UNA) → `RESPUESTA_ILEGIBLE`:
+//        se pidió una parcela y llegó la de otro;
+//      · en `parcelaYColindantes` (`GetNeighbourParcel`) → **`propia: null` y todos
+//        los miembros son colindantes**. Fallar aquí tiraba las vecinas buenas que
+//        sí habían llegado y dejaba a esa parcela sin colindantes por sus tres
+//        puertas. Ver {@link separarVecindad}.
+//    En los dos casos sigue prohibido elegir un candidato a dedo.
 //
 // 3) **No existe la «colección vacía».** Medido: un BBOX sin parcelas devuelve un
 //    `ExceptionReport` con **el mismo `exceptionCode="OperationProcessingFailed"`**
@@ -1051,6 +1062,47 @@ export function crearClienteCatastro(opciones = {}) {
     return { propia: parcelas[i], colindantes: parcelas.filter((_, j) => j !== i) }
   }
 
+  /**
+   * Lo mismo que {@link separarPropia}, pero para `GetNeighbourParcel`, donde que
+   * la propia NO venga **no es una respuesta ilegible: es el servicio**.
+   *
+   * ── POR QUÉ ESTA FUNCIÓN EXISTE (override O15, corregido) ──
+   * El override O15 se midió sobre una parcela que sí se incluía a sí misma, y de
+   * ahí salió la regla «devuelve 5 miembros para 4 colindantes, la propia en 2.ª
+   * posición». **La regla no es universal.** Medido el 2026-08-15 sobre tres
+   * parcelas contiguas del mismo polígono:
+   *
+   *   · `8081402TF9288S` → 3 miembros, **se incluye a sí misma**;
+   *   · `8081403TF9288S` → 3 miembros, **se incluye a sí misma**;
+   *   · `8081401TF9288S` → 1 miembro (`8081402TF9288S`), y **ella NO está**.
+   *
+   * O sea: el servicio a veces omite la parcela consultada. Tratar esa omisión
+   * como `RESPUESTA_ILEGIBLE` tiraba la respuesta ENTERA —incluida la colindante
+   * buena que sí había llegado— y dejaba a esa parcela sin vecinas por CUALQUIERA
+   * de sus tres puertas: «Traer colindantes», el cajón de diagnóstico y el informe.
+   * Un fallo que además se contaba como avería de red, que es mentir sobre de quién
+   * es el problema.
+   *
+   * Aquí se separa lo que se puede y **no se inventa nada**:
+   *   · si la propia viene, `propia` es ella y `colindantes` el resto (O15 clásico);
+   *   · si no viene, `propia` es `null` y **todos** los miembros son colindantes.
+   *
+   * `propia: null` es honesto y no le duele a nadie: ningún consumidor de
+   * `parcelaYColindantes` lee `datos.propia` —la geometría oficial la trae
+   * `parcelaPorRefcat`, que es otra consulta—; los tres oyentes de `alColindantes`
+   * (dianas del snap, cajón de diagnóstico, informe) leen `datos.colindantes` y
+   * nada más. Lo que sigue sin poder pasar es elegir una propia **a dedo**: un
+   * `parcelas[0]` daría por parcela del usuario a una vecina, y eso es justo lo que
+   * la trampa 2 prohíbe. Por eso `propia` se queda en `null` y no en «la primera».
+   *
+   * @param {ParcelaGml[]} parcelas
+   * @param {string} refcat  Ya normalizada.
+   * @returns {{propia: ParcelaGml|null, colindantes: ParcelaGml[]}}
+   */
+  function separarVecindad(parcelas, refcat) {
+    return separarPropia(parcelas, refcat) ?? { propia: null, colindantes: parcelas }
+  }
+
   /** Mensaje del caso «vino una colección y la parcela pedida no está en ella». */
   const mensajeSinPropia = (refcat, parcelas) =>
     `El Catastro ha devuelto ${parcelas.length} parcela(s), pero ninguna de ellas es la ` +
@@ -1139,12 +1191,16 @@ export function crearClienteCatastro(opciones = {}) {
   /**
    * La parcela y sus COLINDANTES (*stored query* `GetNeighbourParcel`).
    *
-   * ⚠️ El nombre dice lo que el servicio hace: **devuelve también la propia
+   * ⚠️ El nombre dice lo que el servicio hace: **suele devolver también la propia
    * parcela**, y no la primera. Medido: 5 miembros para 4 colindantes, con la
    * propia en 2.ª posición. Aquí se separa por referencia catastral normalizada
-   * (trampa 2), así que `colindantes` son los colindantes de verdad. Si ningún
-   * miembro es la parcela pedida, el resultado es `RESPUESTA_ILEGIBLE` — nunca un
-   * `parcelas[0]` elegido a dedo.
+   * (trampa 2), así que `colindantes` son los colindantes de verdad.
+   *
+   * ⚠️ **Pero «suele» no es «siempre»**, y por eso `propia` puede venir `null`: hay
+   * parcelas para las que el servicio se omite a sí misma (medido el 2026-08-15 en
+   * `8081401TF9288S`). Eso **ya no es `RESPUESTA_ILEGIBLE`**: se aprovechan los
+   * miembros que hayan llegado y se deja `propia: null`. Lo que sigue prohibido es
+   * elegir una propia a dedo con `parcelas[0]`. Ver {@link separarVecindad}.
    *
    * **No usa la caché.** La consulta de vecindad se hace una vez por expediente,
    * al cargar; cachearla obligaría a decidir qué pasa cuando la caché tiene la
@@ -1180,7 +1236,7 @@ export function crearClienteCatastro(opciones = {}) {
     const enCache = await leerDeCache(clave)
     if (enCache !== null) {
       const wfs = leerColeccionDeCache(enCache)
-      const deCache = wfs === null ? null : separarPropia(wfs.parcelas, refcat)
+      const deCache = wfs === null ? null : separarVecindad(wfs.parcelas, refcat)
       if (deCache !== null) {
         return crearResultado({
           ok: true,
@@ -1196,15 +1252,9 @@ export function crearClienteCatastro(opciones = {}) {
     const traida = await traerColeccion(url, senal, inicio)
     if (traida.fallo !== undefined) return traida.fallo
 
-    const separada = separarPropia(traida.wfs.parcelas, refcat)
-    if (separada === null) {
-      return fallar(
-        MOTIVO_CATASTRO.RESPUESTA_ILEGIBLE,
-        mensajeSinPropia(refcat, traida.wfs.parcelas),
-        inicio,
-        traida.proc,
-      )
-    }
+    // Que la propia no venga NO es un fallo: es el servicio (ver `separarVecindad`).
+    // Lo que llegue se aprovecha; lo que falte se queda en `propia: null`.
+    const separada = separarVecindad(traida.wfs.parcelas, refcat)
 
     await guardarEnCache(clave, traida.texto)
     return crearResultado({

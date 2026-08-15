@@ -37,7 +37,32 @@
 // del margen— y ni una línea de `model/` o `edit/`. Es la misma doctrina, y por las
 // mismas razones, que `viewer/barra-edicion.js`.
 //
-// ── F08 · POR QUÉ «DESCARGAR INFORME DE CONTRASTE» VIVE AQUÍ Y NO EN EL PIE ──
+// ── ⛔ EL INFORME EN TEXTO SE FUE DEL PIE (2026-08-15) ──────────────────────
+// Este cajón tuvo DOS botones de informe entre F09 y hoy: «Preparar informe
+// (PDF)» —el documento firmable— y «Descargar informe de contraste», que bajaba
+// las mismas cifras en un `.txt`. **El segundo se ha retirado por encargo del
+// autor**: «no hace falta lo de descargar informe de contraste que saca el txt,
+// solo necesito el pdf».
+//
+// Lo que la retirada resuelve, y por lo que no es solo una limpieza: dos botones
+// lado a lado en un pie de 344 px son dos acciones compitiendo por la misma
+// mirada, y el pie del diagnóstico tiene UNA. La jerarquía primario/secundario que
+// F09 montó existía justamente para decir cuál de los dos era el entregable; con
+// uno solo, esa pregunta desaparece en vez de contestarse cada vez.
+//
+// ⚠️ **Lo que NO se ha ido es el COMPOSITOR.** `report/contraste-texto.js` sigue
+// entero, sigue probado y sigue llamable desde
+// `app/cableado-diagnostico.js#descargarInforme` — lo que se ha quitado es el
+// botón, no la capacidad. La distinción importa porque aquel documento se compone
+// SIN RED (no pide ni una tesela al WMS) y era la degradación declarada de F09
+// para el día que el plano no se pueda armar; borrarlo entero es otra decisión, y
+// es del autor.
+//
+// Lo de abajo es el razonamiento original de F08 sobre POR QUÉ la acción que
+// consume el diagnóstico vive en este cajón y no en el pie de la aplicación. Se
+// conserva palabra por palabra porque **sigue aplicando al que queda**.
+//
+// ── F08 · POR QUÉ EL INFORME VIVE AQUÍ Y NO EN EL PIE ───────────────────────
 // El pie de `index.html` ya tiene dos CTA —«Generar GML» (F04) y «Diagnosticar
 // encaje» (F07)— y el sitio natural de un tercero parecería ser ese. No lo es, y
 // las tres razones son las que el plan de F08 fijó, en este orden:
@@ -67,38 +92,24 @@
 // lee») y la 3 («sirve igual a las dos vías de entrada») valen palabra por palabra,
 // y ahora además sin obligar a leer a un palmo de distancia. Ver {@link anfitrion}.
 //
-// Lo que este módulo NO sabe es qué se escribe dentro del informe ni cómo baja:
-// solo enciende el botón, lo apaga y avisa de que lo han pulsado. Componer el
-// texto es de `report/contraste-texto.js` y entregarlo de
-// `gml/descargar.js#descargarTexto`; a los dos los llama
-// `app/cableado-diagnostico.js`, que es quien conoce el store y el reloj.
+// Lo que este módulo NO sabe es qué se escribe dentro del informe ni cómo se
+// entrega: solo enciende el botón, lo apaga y avisa de que lo han pulsado. Quien
+// lo compone y lo baja es `app/cableado-diagnostico.js`, que es el único que
+// conoce el store y el reloj.
 //
-// ── F09 · «PREPARAR INFORME (PDF)», Y POR QUÉ ES EL PRIMARIO DE LOS DOS ─────
-// El pie tiene desde F09 DOS botones, y cuál va primero no es aseo: es lo único
-// que dice cuál de los dos documentos es el entregable.
+// ── F09 · «PREPARAR INFORME (PDF)», EL ÚNICO BOTÓN DEL PIE ──────────────────
+// Es el documento firmable: plano de situación a 300 ppp, descripción literaria
+// del lindero y pie de firma. Es a lo que se viene, y desde el 2026-08-15 es
+// además lo único que hay que decidir en este pie.
 //
-//   · **«Preparar informe (PDF)»** — el PRIMARIO. Es el documento firmable de
-//     F09: plano de situación a 300 ppp, descripción literaria del lindero y pie
-//     de firma. Es a lo que se viene.
-//   · **«Descargar informe de contraste»** — el secundario, y no se jubila
-//     porque sigue sirviendo para lo que el otro no puede: es texto plano, se
-//     compone SIN RED —no pide una sola tesela al WMS— y baja igual el día que
-//     el plano no se pueda armar. Degradar no es quitar.
+// Se enciende y se apaga contra UNA condición —«el cajón está enseñando un
+// diagnóstico»— y su motivo se escribe en el renglón de al lado en el mismo
+// instante en que se apaga: un botón gris y mudo no se distingue de uno roto
+// (regla de oro 1).
 //
-// Los dos se encienden y se apagan JUNTOS, con el MISMO gate y contra la misma
-// condición —«el cajón está enseñando un diagnóstico»—, y comparten el renglón
-// del motivo: es un solo hecho el que los apaga, y dos renglones diciendo lo
-// mismo se desincronizan solos (y el segundo, además, tendría que ser único en
-// todo el documento — ver M8 en {@link SELECTOR}).
-//
-// Y sigue costando **0 px del panel izquierdo**, que era la razón 2 de F08: el
-// segundo botón va en la MISMA fila que el primero, así que el cajón no crece ni
-// un píxel y la caja de vértices conserva los 267,4 px medidos desde F07.
-//
-// Lo que este módulo tampoco sabe, otra vez, es qué lleva el PDF ni cómo se
-// compone: solo enciende, apaga y avisa. Armarlo es de `report/pdf-parcela.js` y
-// pedir el pie de firma, del diálogo de `app/dialogo-informe.js`; a los dos los
-// llama el cableado.
+// Lo que este módulo NO sabe es qué lleva el PDF ni cómo se compone: solo
+// enciende, apaga y avisa. Armarlo es de `report/pdf-parcela.js` y pedir el pie de
+// firma, del diálogo de `app/dialogo-informe.js`; a los dos los llama el cableado.
 //
 // ── LA REGLA DE ORO 9 ES EL REQUISITO PRINCIPAL DE ESTE FICHERO ─────────────
 // «La aplicación mide; el colegiado interpreta y firma.» En un cajón lleno de cifras
@@ -297,6 +308,21 @@ export const CLASE = Object.freeze({
    */
   ROTULO: 'gml-cajon-rotulo',
   CIFRA: 'gml-cajon-cifra',
+  /**
+   * El SEGUNDO PISO de una cifra: el matiz que la acompaña («90,31 % de la
+   * mayor», «lindero 1»). Nace con la reestructuración del 2026-08-15.
+   *
+   * ⛔ **El defecto que cierra, y era el peor de este panel**: esos matices iban
+   * pegados a la cifra en el MISMO nodo, separados por un `·`, dentro de una
+   * rejilla cuya segunda columna medía ~180 px. Resultado medido en el panel de
+   * 344 px: «Solape» se leía en CUATRO líneas —`146,87 m²` / `· 90,31 %` / `de
+   * la` / `mayor`— y «Desviación máxima de lindero», en tres. La cifra por la que
+   * existe la fila quedaba enterrada en un párrafo partido por la mitad.
+   *
+   * Separarlos en dos pisos arregla las dos cosas a la vez: la cifra recupera su
+   * línea entera y el matiz baja al tamaño de APUNTE, que es lo que es.
+   */
+  APUNTE: 'gml-cajon-apunte',
   TABLA: 'gml-cajon-tabla',
   // No hay `OMISION`. La había, y no la llevaba ningún nodo: los motivos de
   // omisión se escriben DENTRO de la cifra que falta (`textoOmitido`), que es lo
@@ -353,7 +379,9 @@ export const SELECTOR = Object.freeze({
   CLASE_PARCELA: '[data-campo="clase-parcela"]',
   ESTADO: '[data-estado="cajon-diagnostico"]',
   PREPARAR: '[data-accion="preparar-informe"]',
-  DESCARGAR: '[data-accion="descargar-informe"]',
+  // ⛔ Aquí vivía `DESCARGAR` (`[data-accion="descargar-informe"]`), el botón del
+  // informe en texto. Se retiró el 2026-08-15 por encargo del autor; el porqué —y
+  // qué NO se ha ido con él— está en la cabecera del módulo.
   ESTADO_INFORME: '[data-estado="informe-contraste"]',
   TITULAR: '[data-diag="titular"]',
   MEDIDA: '[data-diag="superficie-medida"]',
@@ -382,44 +410,40 @@ const ROTULO_BANDA = Object.freeze({
 const NO_CONSTA = 'No consta'
 
 /**
- * Por qué están apagados **los dos botones del informe**. Se escribe en el renglón
- * del pie **en el mismo instante** en que se apagan —al nacer y en cada
- * `pintar(null)`—, porque un botón gris y mudo es un error silencioso (regla de
- * oro 1): desde fuera no se distingue de uno roto.
- *
- * Es UNO para los dos, y no dos constantes, porque el hecho que los apaga es uno
- * solo: no hay diagnóstico. Los NOMBRA a los dos con todas las letras para que
- * quien lo oiga por `aria-describedby` —los dos botones apuntan al mismo renglón—
- * sepa de cuál le están hablando.
+ * Por qué está apagado el botón del informe. Se escribe en el renglón del pie **en
+ * el mismo instante** en que se apaga —al nacer y en cada `pintar(null)`—, porque
+ * un botón gris y mudo es un error silencioso (regla de oro 1): desde fuera no se
+ * distingue de uno roto.
  *
  * Dice las dos cosas que hacen falta: qué falta y qué hay que hacer para tenerlo.
  * Se exporta para que el cableado y los tests lo afirmen sin copiar el literal,
  * igual que {@link MOTIVO_SIN_OFICIAL} de `app/cableado-diagnostico.js`.
  *
+ * ⚠️ Hablaba de DOS botones hasta el 2026-08-15 («…y "Descargar informe de
+ * contraste" están apagados: los dos recogen…»). El de texto se retiró; ver la
+ * cabecera del módulo.
+ *
  * @readonly
  */
 export const MOTIVO_INFORME_SIN_DIAGNOSTICO =
-  '«Preparar informe (PDF)» y «Descargar informe de contraste» están apagados: los dos ' +
-  'recogen las medidas de este diagnóstico y todavía no hay ninguna calculada. Se encienden ' +
-  'en cuanto el cajón muestra un diagnóstico.'
+  '«Preparar informe (PDF)» está apagado: el informe recoge las medidas de este diagnóstico y ' +
+  'todavía no hay ninguna calculada. Se enciende en cuanto el cajón muestra un diagnóstico.'
 
 /**
- * Las vestimentas de los dos botones del informe, que viajan SIEMPRE con su
- * `disabled` (ver `gateInforme`). Un botón que parece pulsable y no lo es no se
- * distingue de uno roto; uno apagado que parece encendido, tampoco. Existen porque
- * un estilo EN LÍNEA no puede expresar `:disabled` y este módulo no escribe reglas.
+ * Las vestimentas del botón del informe, que viajan SIEMPRE con su `disabled` (ver
+ * `gateInforme`). Un botón que parece pulsable y no lo es no se distingue de uno
+ * roto; uno apagado que parece encendido, tampoco. Existen porque un estilo EN
+ * LÍNEA no puede expresar `:disabled` y este módulo no escribe reglas.
  *
- * Son DOS pares porque los botones no son iguales: el PRIMARIO —«Preparar informe
- * (PDF)», el documento firmable de F09— va en el fondo oscuro del cromo, y el
- * SECUNDARIO —el de texto— en contorno. La jerarquía es lo único que dice cuál de
- * los dos es el entregable, y dos fondos oscuros lado a lado no dicen nada.
+ * ⚠️ Hubo un par SECUNDARIO —contorno suave— para «Descargar informe de
+ * contraste». Se fue con el botón el 2026-08-15: una jerarquía primario/secundario
+ * con un solo botón no jerarquiza nada.
  *
  * El apagado va en el GRIS del cromo y **nunca en rojo**: lo que se comunica es
  * «esto no se puede pulsar ahora», no «esto está mal» (regla de oro 9). El porqué
- * se escribe con palabras en el renglón de al lado, que es donde se lee. El par
- * primario es el MISMO que usa `viewer/cajon-comprobacion.js`, y el secundario
- * viste como su «Descartar», para que los dos cajones —que comparten esquina y se
- * turnan— no parezcan dos apps.
+ * se escribe con palabras en el renglón de al lado, que es donde se lee. El par es
+ * el MISMO que usa `viewer/cajon-comprobacion.js`, para que los dos cajones —que
+ * comparten esquina y se turnan— no parezcan dos apps.
  */
 const BOTON_INFORME = Object.freeze({
   PRIMARIO: Object.freeze({
@@ -439,26 +463,6 @@ const BOTON_INFORME = Object.freeze({
     // guion de humo, no la cascada.
     ENCENDIDO: Object.freeze({ background: '#0369A1', color: '#fff', cursor: 'pointer' }),
     APAGADO: Object.freeze({ background: '#E2E8F0', color: '#64748B', cursor: 'default' }),
-  }),
-  SECUNDARIO: Object.freeze({
-    // ⭐ Era `transparent` + filo `#CBD5E1`. La misma revisión bajó el peso óptico
-    // del secundario en el panel (`.gml-boton--secundario` pasó de blanco con
-    // borde firme a fondo gris muy claro con filo suave) porque un contorno fuerte
-    // pesa casi lo mismo que un relleno y los dos botones «gritaban por igual».
-    // Se replica aquí con los literales equivalentes a `--color-bg-elevated`,
-    // `--color-text-primary` y `--color-border-sub`, por lo mismo que arriba.
-    ENCENDIDO: Object.freeze({
-      background: '#F1F5F9',
-      color: '#0F172A',
-      border: '1px solid #E2E8F0',
-      cursor: 'pointer',
-    }),
-    APAGADO: Object.freeze({
-      background: 'transparent',
-      color: '#94A3B8',
-      border: '1px solid #E2E8F0',
-      cursor: 'default',
-    }),
   }),
 })
 
@@ -559,6 +563,125 @@ export function rotuloDeGrupo(doc, texto) {
   })
 }
 
+/**
+ * ⭐ **LA REJILLA DE DATOS DEL PANEL** (reestructuración del 2026-08-15).
+ *
+ * ── QUÉ HABÍA, Y POR QUÉ NO SE LEÍA ─────────────────────────────────────────
+ * `gridTemplateColumns: 'auto 1fr'` con `gap: '2px 10px'`. Dicho de otra forma: la
+ * columna de la ETIQUETA se quedaba con todo el ancho que pidiera —«Desviación
+ * máxima de lindero» son 22 caracteres— y la del DATO con lo que sobrara. En el
+ * panel de 344 px eso dejaba ~150 px para cifras que miden hasta 30, y el
+ * resultado, medido sobre el diagnóstico real de la captura del autor, era que
+ * **tres de las seis filas se leían partidas**:
+ *
+ *     Solape                        146,87 m²
+ *                                   · 90,31 %
+ *                                   de la
+ *                                   mayor
+ *     Desviación máxima de lindero  0,52 m ·
+ *                                   lindero 1
+ *
+ * Y las 2 px de `rowGap` remataban: seis filas sin aire entre ellas se leen como
+ * un párrafo, no como una ficha.
+ *
+ * ── QUÉ HACE ESTA ──────────────────────────────────────────────────────────
+ *   · **La etiqueta ya no manda en el ancho.** `minmax(0,1fr) auto` invierte el
+ *     reparto: la que se encoge y parte, si hace falta, es la PROSA; la cifra se
+ *     queda entera. Es la inversión correcta porque la cifra es el dato y la
+ *     etiqueta es su nombre.
+ *   · **La cifra va a la derecha**, que es lo que hace comparables seis números de
+ *     anchos distintos leídos en columna — junto con las `tabular-nums` que ya
+ *     ponía `estilos/app.css`.
+ *   · **`alignItems: 'baseline'`**, y no `center`: en la fila de la superficie
+ *     medida conviven una etiqueta de 13 px y una cifra de 30, y centrarlas
+ *     verticalmente dejaría la etiqueta flotando a media altura del número.
+ *   · **6 px de aire entre filas** en vez de 2.
+ */
+const REJILLA = Object.freeze({
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0,1fr) auto',
+  columnGap: '12px',
+  rowGap: '6px',
+  alignItems: 'baseline',
+})
+
+/**
+ * La etiqueta de una fila de dato. `margin: 0` explícito porque un `<dt>` no lo
+ * trae y aquí el aire lo reparte la rejilla, no los márgenes.
+ *
+ * @param {Document} doc
+ * @param {string} texto
+ * @returns {HTMLElement}
+ */
+const etiquetaDato = (doc, texto) => estilar(crear(doc, 'dt', null, texto), { margin: '0' })
+
+/**
+ * Una celda de dato **de DOS PISOS**: la cifra arriba y su matiz debajo, en el
+ * tamaño de apunte. Ver {@link CLASE.APUNTE} para el defecto que esto cierra.
+ *
+ * Devuelve las tres piezas porque quien pinta necesita las dos de dentro y quien
+ * maqueta necesita la de fuera. El `<dd>` conserva su `data-diag`, que es contrato
+ * con el cableado, y sigue siendo el nodo cuyo `textContent` lo dice todo — los
+ * dos pisos concatenan, así que una prueba que pregunte por «lindero 1» lo sigue
+ * encontrando ahí.
+ *
+ * @param {Document} doc
+ * @param {string} diag  El valor de `data-diag`.
+ * @returns {{dd: HTMLElement, cifra: HTMLElement, matiz: HTMLElement}}
+ */
+function celdaDato(doc, diag) {
+  const dd = crear(doc, 'dd', CLASE.CIFRA)
+  dd.dataset.diag = diag
+  estilar(dd, { margin: '0', fontSize: ESCALA.DATO, textAlign: 'right' })
+  const cifra = crear(doc, 'span')
+  const matiz = crear(doc, 'span', CLASE.APUNTE)
+  estilar(matiz, {
+    display: 'none',
+    fontSize: ESCALA.APUNTE,
+    color: '#64748B',
+    fontWeight: '400',
+  })
+  dd.append(cifra, matiz)
+  return { dd, cifra, matiz }
+}
+
+/**
+ * Escribe una CIFRA en una celda de dos pisos, con su matiz o sin él.
+ *
+ * El matiz vacío **se oculta**, no se deja en blanco: un `<span>` de bloque vacío
+ * cuesta un renglón de alto por fila, y seis filas serían seis renglones de nada
+ * en un panel que scrollea.
+ *
+ * @param {{dd: HTMLElement, cifra: HTMLElement, matiz: HTMLElement}} celda
+ * @param {string} cifra
+ * @param {string} [matiz='']
+ */
+function ponerCifra(celda, cifra, matiz = '') {
+  estilar(celda.dd, { fontSize: ESCALA.DATO, textAlign: 'right' })
+  celda.cifra.textContent = cifra
+  celda.matiz.textContent = matiz
+  celda.matiz.style.display = matiz === '' ? 'none' : 'block'
+}
+
+/**
+ * Escribe el MOTIVO por el que esta fila no tiene cifra. **Se viste distinto que
+ * una cifra, y es deliberado**: un motivo es prosa ya redactada por el modelo
+ * («No hay geometría oficial contra la que medir…»), a veces de dos líneas, y
+ * heredaba el tamaño de dato (15 px) y la alineación a la derecha. Prosa de 15 px
+ * justificada a la derecha en una columna estrecha es exactamente lo que no se
+ * lee: baja a CUERPO, se alinea a la izquierda y toma el gris del cromo, que es lo
+ * que dice «esto es una explicación, no un número».
+ *
+ * @param {{dd: HTMLElement, cifra: HTMLElement, matiz: HTMLElement}} celda
+ * @param {string} texto
+ */
+function ponerMotivo(celda, texto) {
+  estilar(celda.dd, { fontSize: ESCALA.CUERPO, textAlign: 'left' })
+  celda.cifra.textContent = texto
+  celda.matiz.textContent = ''
+  celda.matiz.style.display = 'none'
+}
+
 const esMapa = (m) =>
   !!m &&
   typeof m.addControl === 'function' &&
@@ -629,7 +752,6 @@ const CajonDiagnostico = L.Control.extend({
       // navegación, y esta vista no sabe qué es un paso.
       salir: new Set(),
       cambiar: new Set(),
-      descargar: new Set(),
       preparar: new Set(),
     }
   },
@@ -741,23 +863,28 @@ const CajonDiagnostico = L.Control.extend({
     // Antes ninguno de los dos lo hacía y las cuatro celdas heredaban lo que
     // pusiera el anfitrión: 12 px de Leaflet sobre el mapa, otro dentro del panel.
     // `medida` lo vuelve a escribir `pintar` cuando hay cifra (ver `destacarMedida`).
-    estilar(medida, { fontSize: ESCALA.DATO })
-    estilar(catastral, { fontSize: ESCALA.DATO })
+    //
+    // ⚠️ Estas dos siguen siendo `<dd>` PELADOS y no {@link celdaDato} de dos
+    // pisos, a propósito: no llevan matiz —una superficie es una superficie— y
+    // `SELECTOR.MEDIDA` es el único nodo del cajón cuyo `textContent` tiene que
+    // ser EXACTAMENTE la cifra, porque es lo que se compara con la ficha del pie.
+    // Un segundo `<span>` dentro, aunque estuviera vacío, no cambiaría el texto
+    // pero sí invitaría a meterle algo.
+    estilar(medida, { margin: '0', fontSize: ESCALA.DATO, textAlign: 'right' })
+    estilar(catastral, { margin: '0', fontSize: ESCALA.DATO, textAlign: 'right' })
     this._medida = medida
     this._catastral = catastral
 
     const lista = crear(doc, 'dl')
     estilar(lista, {
-      display: 'grid',
-      gridTemplateColumns: 'auto 1fr',
-      gap: '2px 10px',
+      ...REJILLA,
       margin: '8px 0 0',
       fontSize: ESCALA.CUERPO,
     })
     lista.append(
-      crear(doc, 'dt', null, 'Medición'),
+      etiquetaDato(doc, 'Medición'),
       medida,
-      crear(doc, 'dt', null, 'Parcelario vigente'),
+      etiquetaDato(doc, 'Parcelario vigente'),
       catastral,
     )
 
@@ -782,13 +909,15 @@ const CajonDiagnostico = L.Control.extend({
     })
     this._registral = registral
 
+    // La fila del campo se maqueta con la MISMA rejilla que las dos de arriba —y
+    // no con el `flex` que traía—, que es lo que pone el campo en la columna de
+    // las cifras en vez de pegado a su etiqueta. Antes «Superficie registral (m²)»
+    // y su caja formaban una tercera fila con otra alineación justo debajo de dos
+    // que sí alineaban, y ese renglón torcido era lo primero que se veía del
+    // bloque.
     const filaRegistral = crear(doc, 'div')
-    estilar(filaRegistral, {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      marginTop: '8px',
-    })
+    estilar(filaRegistral, { ...REJILLA, marginTop: '6px' })
+    estilar(etiquetaRegistral, { margin: '0' })
     filaRegistral.append(etiquetaRegistral, registral)
 
     // La tabla de diferencias cruzadas. Caja VACÍA: la rellena `pintar`.
@@ -807,40 +936,52 @@ const CajonDiagnostico = L.Control.extend({
     // ── Las métricas de encaje ─────────────────────────────────────────────
     const metricas = crear(doc, 'dl', CLASE.SECCION)
     estilar(metricas, {
-      display: 'grid',
-      gridTemplateColumns: 'auto 1fr',
-      gap: '2px 10px',
-      margin: '10px 0 0',
+      ...REJILLA,
+      margin: '8px 0 0',
       fontSize: ESCALA.CUERPO,
     })
-    this._solape = crear(doc, 'dd', CLASE.CIFRA)
-    this._solape.dataset.diag = 'solape'
-    this._centroides = crear(doc, 'dd', CLASE.CIFRA)
-    this._centroides.dataset.diag = 'centroides'
-    this._desviacion = crear(doc, 'dd', CLASE.CIFRA)
-    this._desviacion.dataset.diag = 'desviacion'
-    // Las tres pueden traer una CIFRA o el motivo de su omisión, que es prosa y a
-    // veces larga. 15 px sirve a las dos: es el salto sobre la etiqueta de 13 que
-    // hace que la vista caiga en el número, y no tanto como para que un motivo de
-    // dos líneas se coma el cajón. Por eso el tamaño grande de verdad (`DATO_XL`)
-    // se reserva a `medida`, que nunca lleva prosa.
-    for (const dd of [this._solape, this._centroides, this._desviacion]) {
-      estilar(dd, { fontSize: ESCALA.DATO })
-    }
+    // Las tres son celdas de DOS PISOS ({@link celdaDato}): dos de ellas traen un
+    // matiz que antes iba pegado a la cifra con un `·` y la partía en cuatro
+    // líneas (el porqué largo, en {@link CLASE.APUNTE}). `centroides` no lleva
+    // matiz nunca y usa el mismo molde igualmente: que las tres filas de una
+    // sección se construyan igual es lo que impide que se vistan distinto sin que
+    // nadie lo decida.
+    //
+    // Las tres pueden traer, en vez de cifra, el MOTIVO de su omisión, que es
+    // prosa. Eso ya no se mezcla: lo escribe {@link ponerMotivo}, que baja el
+    // tamaño y alinea a la izquierda.
+    this._solape = celdaDato(doc, 'solape')
+    this._centroides = celdaDato(doc, 'centroides')
+    this._desviacion = celdaDato(doc, 'desviacion')
     metricas.append(
-      crear(doc, 'dt', null, 'Solape'),
-      this._solape,
-      crear(doc, 'dt', null, 'Desplazamiento de centroides'),
-      this._centroides,
-      crear(doc, 'dt', null, 'Desviación máxima de lindero'),
-      this._desviacion,
+      etiquetaDato(doc, 'Solape'),
+      this._solape.dd,
+      etiquetaDato(doc, 'Desplazamiento de centroides'),
+      this._centroides.dd,
+      etiquetaDato(doc, 'Desviación máxima de lindero'),
+      this._desviacion.dd,
     )
 
     // ── Invasión: la única sección que puede llevar ámbar ──────────────────
     const invasion = crear(doc, 'div', CLASE.INVASION)
     invasion.dataset.diag = 'invasion'
-    invasion.style.marginTop = '10px'
-    invasion.style.fontSize = ESCALA.CUERPO
+    // El filete y su respiro se declaran AQUÍ desde el 2026-08-15, además de en
+    // `.gml-app .gml-cajon-invasion` de `estilos/app.css`, que ya los ponía. No es
+    // un despiste ni una pelea: son los mismos dos valores, y esta capa tiene que
+    // separar sus secciones también sobre un mapa pelado —la doctrina de todo el
+    // fichero—. Sin esto, en el visor montado a pelo la invasión se pegaba al
+    // bloque de arriba mientras el del margen sí se separaba, que es peor que no
+    // separar ninguna.
+    // ⛔ Y aquí NO se declara `color`, exactamente por lo que la hoja explica en
+    // esa misma regla: el ámbar es de los nodos que REPORTAN una invasión, y
+    // pintar de alarma el «no se ha consultado» sería el juicio que la regla de
+    // oro 9 prohíbe.
+    estilar(invasion, {
+      marginTop: '10px',
+      paddingTop: '10px',
+      borderTop: '1px solid #E2E8F0',
+      fontSize: ESCALA.CUERPO,
+    })
     this._invasion = invasion
 
     // ── Margen de identidad, con su selector de clase ──────────────────────
@@ -865,23 +1006,58 @@ const CajonDiagnostico = L.Control.extend({
     }
     this._clase = selectorClase
 
-    const margen = crear(doc, 'p', CLASE.MARGEN)
+    // ── El renglón del margen, EN DOS FRASES Y NO EN UNA ────────────────────
+    // Llevaba las dos cosas concatenadas en un `textContent` suelto: las cifras
+    // del margen y, detrás, la explicación de por qué la aplicación cree que la
+    // parcela es urbana o rústica — que en el caso real de la captura del autor es
+    // un párrafo de tres líneas sobre el formato de la referencia catastral. Todo
+    // junto y a 12 px daba un bloque de cinco líneas de gris corrido que se leía
+    // como el descargo legal de una web, o sea que no se leía.
+    //
+    // Son DOS hechos distintos —lo que el Catastro tolera, y de dónde sale la
+    // clase con la que se ha calculado— y ahora son dos párrafos. El segundo,
+    // además, se marca como APUNTE: es una PROPUESTA de la aplicación, y bajarle
+    // el peso óptico es lo coherente con no meterla en el `<select>` (ver
+    // {@link pintarMargen}).
+    //
+    // ⚠️ El nodo `[data-diag="margen"]` SIGUE SIENDO UNO SOLO y sigue siendo el
+    // que lo dice todo: los dos párrafos cuelgan de él, así que su `textContent`
+    // concatena igual que antes y nada de lo que preguntaba por la etiqueta del
+    // margen ha cambiado de sitio.
+    const margen = crear(doc, 'div', CLASE.MARGEN)
     margen.dataset.diag = 'margen'
     estilar(margen, {
       margin: '6px 0 0',
       fontSize: ESCALA.APUNTE,
       color: '#64748B',
     })
+    const margenCifras = crear(doc, 'p')
+    estilar(margenCifras, { margin: '0' })
+    const margenClase = crear(doc, 'p', CLASE.APUNTE)
+    estilar(margenClase, { margin: '4px 0 0', display: 'none' })
+    margen.append(margenCifras, margenClase)
     this._margen = margen
+    this._margenCifras = margenCifras
+    this._margenClase = margenClase
 
     const bloqueMargen = crear(doc, 'div', CLASE.SECCION)
-    bloqueMargen.style.marginTop = '10px'
-    const filaClase = crear(doc, 'div')
-    estilar(filaClase, {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
+    // El filete de arriba es el mismo recurso, y por el mismo motivo, que el que
+    // `estilos/app.css` le pone a la invasión: sin él este bloque era el sexto
+    // párrafo seguido de una columna indiferenciada. Aquí va EN LÍNEA y no en la
+    // hoja porque el cajón tiene que separar sus secciones también cuando se monta
+    // sobre un mapa pelado, que es la doctrina de todo este fichero.
+    estilar(bloqueMargen, {
+      marginTop: '10px',
+      paddingTop: '10px',
+      borderTop: '1px solid #E2E8F0',
     })
+    // La fila de la clase se maqueta con la MISMA rejilla que las cifras: es un
+    // campo que se rellena, como la registral, y los dos tienen que caer en la
+    // misma columna. Con el `flex` de antes, el `<select>` quedaba pegado a su
+    // etiqueta y a media columna de distancia del campo de arriba.
+    const filaClase = crear(doc, 'div')
+    estilar(filaClase, { ...REJILLA })
+    estilar(etiquetaClase, { margin: '0' })
     filaClase.append(etiquetaClase, selectorClase)
     bloqueMargen.append(filaClase, margen)
 
@@ -901,8 +1077,8 @@ const CajonDiagnostico = L.Control.extend({
     })
     this._estado = estado
 
-    // ── El PIE: las acciones que consumen el diagnóstico (F08 y F09) ───────
-    // Por qué viven aquí y no en el pie de la app: ver la cabecera del módulo.
+    // ── El PIE: la acción que consume el diagnóstico ───────────────────────
+    // Por qué vive aquí y no en el pie de la app: ver la cabecera del módulo.
     // `<footer>` de verdad, hermano del `<header>` de la cabecera; no lleva clase
     // porque `estilos/app.css` no necesita engancharse a él, y una clase que nadie
     // viste es un gancho que invita a escribir la regla y a creer que se aplica
@@ -910,37 +1086,36 @@ const CajonDiagnostico = L.Control.extend({
     const pie = crear(doc, 'footer')
     estilar(pie, { marginTop: '12px' })
 
-    // Los dos botones en UNA fila, y el primario primero. Que compartan fila es lo
-    // que hace que el segundo cueste **0 px** de alto: el cajón no crece, y por lo
-    // tanto tampoco empuja nada del panel (ver la cabecera). `flexWrap` para que en
-    // un cajón estrecho el segundo caiga debajo en vez de desbordarse.
-    const acciones = crear(doc, 'div')
-    estilar(acciones, {
-      display: 'flex',
-      flexWrap: 'wrap',
-      gap: '8px',
-      alignItems: 'center',
-    })
-
-    // El PRIMARIO de F09: el documento firmable. Va antes que el de texto porque el
-    // orden es lo único que dice cuál de los dos es el entregable.
+    // ⛔ Aquí había una `<div>` con `display:flex` y `flexWrap` para repartir DOS
+    // botones en una fila. Con uno solo sobra: el botón se estira él mismo, que
+    // es lo que se hace con una acción única en una columna de 344 px — un botón
+    // de 168 px flotando a la izquierda de un pie vacío se lee como si hubiera
+    // otro que no ha cargado.
     const preparar = crear(doc, 'button', null, 'Preparar informe (PDF)')
     preparar.type = 'button'
     preparar.dataset.accion = 'preparar-informe'
-    // El MISMO renglón que el secundario: los dos se apagan por el mismo hecho y el
-    // motivo es uno solo. Ver {@link MOTIVO_INFORME_SIN_DIAGNOSTICO}.
+    // El renglón de debajo es donde se escribe POR QUÉ está apagado, así que se
+    // ENLAZA: un lector de pantalla que anuncie el botón anuncia también el
+    // motivo, sin que el usuario tenga que ir a buscarlo. Mismo recurso que el
+    // primario de `viewer/cajon-comprobacion.js`.
     preparar.setAttribute('aria-describedby', idInforme)
-    // NACE APAGADO, igual que el de texto y por lo mismo: sin diagnóstico calculado
-    // no hay medidas que llevar al documento. A partir de aquí lo gobierna `pintar`.
+    // NACE APAGADO: sin diagnóstico calculado no hay medidas que llevar al
+    // documento. A partir de aquí lo gobierna `pintar`, y NUNCA sin escribir el
+    // motivo (regla de oro 1).
     preparar.disabled = true
-    // ⚠️ NI `font: 'inherit'` NI NINGUNA `fontFamily`, exactamente por lo que se
-    // explica un poco más abajo para el secundario (defecto REAL medido en el
-    // guion 10 el 2026-07-30): el estilo en línea gana a la hoja y dejaría muerta
-    // la regla `.gml-cajon-diagnostico button` de `estilos/app.css`.
+    // ⚠️ NI `font: 'inherit'` NI NINGUNA `fontFamily`, y es deliberado (2026-07-30,
+    // corregido tras medirlo en el guion 10). El atajo `font: 'inherit'` hereda el
+    // `font` EN LÍNEA del contenedor —`system-ui`— y, por ser inline, **gana a la
+    // hoja**: la regla `.gml-cajon-diagnostico button` de `estilos/app.css` quedaba
+    // muerta y el botón salía en `system-ui` mientras el resto del cajón iba en
+    // Geist. El módulo fija tamaño y grosor (legible sin hoja); **la FAMILIA la
+    // pone la hoja**. Mismo reparto que en `viewer/cajon-comprobacion.js`.
     estilar(preparar, {
+      display: 'block',
+      width: '100%',
       border: '0',
       borderRadius: '6px',
-      padding: '6px 12px',
+      padding: '8px 12px',
       fontSize: 'inherit',
       lineHeight: 'inherit',
       fontWeight: '600',
@@ -948,49 +1123,20 @@ const CajonDiagnostico = L.Control.extend({
     })
     this._preparar = preparar
 
-    const descargar = crear(doc, 'button', null, 'Descargar informe de contraste')
-    descargar.type = 'button'
-    descargar.dataset.accion = 'descargar-informe'
-    // El renglón de debajo es donde se escribe POR QUÉ está apagado, así que se
-    // ENLAZA: un lector de pantalla que anuncie el botón anuncia también el
-    // motivo, sin que el usuario tenga que ir a buscarlo. Mismo recurso que el
-    // primario de `viewer/cajon-comprobacion.js`.
-    descargar.setAttribute('aria-describedby', idInforme)
-    // NACE APAGADO: sin diagnóstico calculado no hay cifras que llevarse. A partir
-    // de aquí lo gobierna `pintar`, y NUNCA sin escribir el motivo (regla 1).
-    descargar.disabled = true
-    // ⚠️ NI `font: 'inherit'` NI NINGUNA `fontFamily` AQUÍ, y es deliberado
-    // (2026-07-30, corregido tras medirlo en el guion 10). El atajo
-    // `font: 'inherit'` hereda el `font` EN LÍNEA del contenedor —`system-ui`— y,
-    // por ser inline, **gana a la hoja**: la regla `.gml-cajon-diagnostico button`
-    // de `estilos/app.css` quedaba muerta y el botón salía en `system-ui` mientras
-    // el resto del cajón iba en Geist. El módulo fija tamaño y grosor (legible sin
-    // hoja); **la FAMILIA la pone la hoja**. Mismo reparto que en
-    // `viewer/cajon-comprobacion.js`, y por eso los dos cajones se arreglan juntos.
-    estilar(descargar, {
-      borderRadius: '6px',
-      padding: '6px 12px',
-      fontSize: 'inherit',
-      lineHeight: 'inherit',
-      fontWeight: '600',
-      ...BOTON_INFORME.SECUNDARIO.APAGADO,
-    })
-    this._descargar = descargar
-
     const estadoInforme = crear(doc, 'p')
     estadoInforme.id = idInforme
-    // `informe-contraste`, no `descargar-informe`: ver el aviso de {@link SELECTOR}.
+    // `informe-contraste`, no `preparar-informe`: ver el aviso de {@link SELECTOR}.
     estadoInforme.dataset.estado = 'informe-contraste'
     estadoInforme.setAttribute('role', 'status')
     estilar(estadoInforme, {
       margin: '6px 0 0',
-      fontSize: '12px',
+      fontSize: ESCALA.APUNTE,
       color: '#64748B',
       minHeight: '1em',
     })
     // El motivo se escribe YA, no al primer repintado: el cajón puede abrirse sin
     // que nadie haya llamado a `pintar` todavía, y ese es justo el instante en que
-    // los dos botones están grises.
+    // el botón está gris.
     estadoInforme.textContent = MOTIVO_INFORME_SIN_DIAGNOSTICO
     this._estadoInforme = estadoInforme
 
@@ -1007,15 +1153,16 @@ const CajonDiagnostico = L.Control.extend({
     // mismo modo impedía llegar**, y ninguna de las pruebas de jsdom podía verlo
     // porque en jsdom no hay maquetación ni hay rail.
 
-    acciones.append(preparar, descargar)
-    pie.append(acciones, estadoInforme)
+    pie.append(preparar, estadoInforme)
 
     // ── ⛔ EL BLOQUE ANCLADO (rework de UI · rebanada 4, 2026-08-05) ──────────
     // MEDIDO en Chrome a 1280×720, con el cajón recién abierto en su pantalla:
     //
     //     contenido 650 px en un cajón de 374,39 → 278 px (42,77 %) BAJO EL PLIEGUE
     //     «Preparar informe (PDF)» ............ 207,53 px por debajo del borde
-    //     «Descargar informe de contraste» .... 248,38 px por debajo
+    //     «Descargar informe de contraste» .... 248,38 px por debajo (botón retirado
+    //                                           el 2026-08-15; la cifra se conserva
+    //                                           porque es la que midió el defecto)
     //     el renglón de estado (role=status) .. 164,69 px por debajo
     //     la invasión a colindantes ...........  15,73 px por debajo
     //
@@ -1029,12 +1176,27 @@ const CajonDiagnostico = L.Control.extend({
     // es el que scrollea), con márgenes negativos y su relleno para que el fondo
     // llegue a los bordes del cajón y el contenido no se vea pasar por debajo. Lo
     // que se ancla es exactamente lo que no puede esconderse: lo que HABLA (los
-    // dos renglones de estado) y lo que se PULSA (los dos botones del informe).
+    // dos renglones de estado) y lo que se PULSA (el botón del informe).
     const anclado = crear(doc, 'div')
     anclado.dataset.diag = 'anclado'
     estilar(anclado, {
       position: 'sticky',
-      bottom: '0',
+      // ⛔ **`-10px` Y NO `0`, MEDIDO EN CHROME EL 2026-08-15.** Con `bottom: 0` el
+      // borde inferior del bloque se ancla a la **caja de relleno** del contenedor
+      // que scrollea, no a su borde: se quedaba 10 px por encima del suelo —los 10
+      // del `padding-bottom`— y por esa rendija **seguía pasando texto**. Medido
+      // con el diagnóstico real de una parcela urbana: el renglón del margen de
+      // identidad (108 px de alto contra 92 del bloque) asomaba por debajo del
+      // botón, así que la última línea que leía el usuario era «…propia del
+      // parcelario URBANO.» IMPRESA DEBAJO de la acción principal, como si fuera su
+      // pie. El `marginBottom: -10px` de abajo no lo tapaba: ése quita el hueco al
+      // final del scroll, no mueve el ancla.
+      //
+      // Con `-10px` el bloque se ancla al borde de verdad y la rendija desaparece.
+      // El número es el mismo `padding-bottom` de los DOS juegos de estilos
+      // ({@link ESTILO_SOBRE_EL_MAPA} y {@link ESTILO_EN_EL_PANEL}), que lo llevan
+      // igual a propósito; quien cambie uno tiene que cambiar esto.
+      bottom: '-10px',
       zIndex: '1',
       marginTop: '12px',
       marginLeft: '-12px',
@@ -1057,6 +1219,13 @@ const CajonDiagnostico = L.Control.extend({
     // Por qué la invasión no lleva el suyo, en {@link CLASE.ROTULO}; el bloque del
     // margen tampoco, porque es un campo que se rellena y su nota, no una ficha de
     // cifras, y rotularlo lo ascendería a sección que no es.
+    //
+    // ⭐ **Siguen siendo DOS, y la reestructuración del 2026-08-15 lo respetó a
+    // sabiendas.** Lo que faltaba no eran más rótulos —dos secciones más en
+    // versalitas encima de tres párrafos grises no habrían separado nada— sino el
+    // FILETE que las secciones sin rótulo no tenían: la invasión ya lo llevaba
+    // desde `estilos/app.css` y el margen no llevaba ninguno, así que se leían
+    // pegados. Ahora los dos lo tienen y la columna se recorre de un vistazo.
     contenedor.append(
       cabecera,
       procedencia,
@@ -1076,7 +1245,6 @@ const CajonDiagnostico = L.Control.extend({
 
     L.DomEvent.on(cerrar, 'click', this._alPulsarCerrar, this)
     L.DomEvent.on(preparar, 'click', this._alPulsarPreparar, this)
-    L.DomEvent.on(descargar, 'click', this._alPulsarDescargar, this)
     L.DomEvent.on(registral, 'change', this._alCambiar, this)
     L.DomEvent.on(registral, 'input', this._alCambiar, this)
     L.DomEvent.on(selectorClase, 'change', this._alCambiar, this)
@@ -1089,7 +1257,6 @@ const CajonDiagnostico = L.Control.extend({
   onRemove() {
     L.DomEvent.off(this._botonCerrar, 'click', this._alPulsarCerrar, this)
     L.DomEvent.off(this._preparar, 'click', this._alPulsarPreparar, this)
-    L.DomEvent.off(this._descargar, 'click', this._alPulsarDescargar, this)
     L.DomEvent.off(this._registral, 'change', this._alCambiar, this)
     L.DomEvent.off(this._registral, 'input', this._alCambiar, this)
     L.DomEvent.off(this._clase, 'change', this._alCambiar, this)
@@ -1265,7 +1432,7 @@ const CajonDiagnostico = L.Control.extend({
   },
 
   /**
-   * Pulsación de «Descargar informe de contraste».
+   * Pulsación de «Preparar informe (PDF)».
    *
    * ⚠️ **No se llama a `L.DomEvent.stop`**, a diferencia del botón de cerrar, y es
    * la misma decisión que tomó `viewer/cajon-comprobacion.js`: parar la propagación
@@ -1275,16 +1442,6 @@ const CajonDiagnostico = L.Control.extend({
    * CajonDiagnostico._cerrarPorClicFuera}, que lo ve DENTRO del contenedor y no
    * cierra nada: `disableClickPropagation` no detiene el `click`, pero la
    * comprobación `contains` sí lo distingue.
-   */
-  _alPulsarDescargar(evento) {
-    for (const fn of this._oyentes.descargar) fn(evento)
-  },
-
-  /**
-   * Pulsación de «Preparar informe (PDF)». **Tampoco se llama a `L.DomEvent.stop`**,
-   * y por lo mismo que en {@link CajonDiagnostico._alPulsarDescargar}: parar la
-   * propagación dejaría sordo a cualquier otro oyente del `document` por un problema
-   * que no existe, porque el guardián de clic-fuera ve el clic DENTRO del contenedor.
    *
    * El evento se pasa al oyente porque quien escucha va a abrir un diálogo con él, y
    * un diálogo abierto por un clic quiere saber cuál fue.
@@ -1302,8 +1459,7 @@ const CajonDiagnostico = L.Control.extend({
  * cajon.abrir()
  * cajon.pintar(diagnostico)
  * cajon.alCambiar(() => recalcular(cajon.registral(), cajon.clase()))
- * cajon.alDescargar(() => bajarInforme())    // el secundario del pie (F08)
- * cajon.alPreparar(() => abrirDialogo())     // el primario del pie (F09)
+ * cajon.alPreparar(() => abrirDialogo())     // el botón del pie (F09)
  * ```
  *
  * @param {Object} opciones
@@ -1320,7 +1476,7 @@ const CajonDiagnostico = L.Control.extend({
  * @returns {{control: object, pintar: Function, abrir: Function, cerrar: Function,
  *   abierto: Function, registral: Function, clase: Function,
  *   reiniciarExpediente: Function, estado: Function, estadoInforme: Function,
- *   alCambiar: Function, alDescargar: Function, alPreparar: Function,
+ *   alCambiar: Function, alPreparar: Function,
  *   alCerrar: Function, comoPantalla: Function, anfitrion: Function,
  *   alSalir: Function, destruir: Function}}
  * @throws {TypeError|RangeError} Contrato del programador.
@@ -1453,22 +1609,44 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
     return omision ? omision.motivo : NO_CONSTA
   }
 
+  /**
+   * Las tres métricas de encaje, cada una en su celda de DOS PISOS.
+   *
+   * ⭐ **Lo que cambió el 2026-08-15 es DÓNDE se parte el texto, no el texto.** El
+   * solape decía «146,87 m² · 90,31 % de la mayor» en un solo nodo y el `·` lo
+   * partía el navegador donde le cabía —cuatro líneas medidas en el panel de
+   * 344 px—. Ahora la cifra manda una línea entera y el matiz baja al segundo
+   * piso, en APUNTE. Se lee lo mismo y se ve el número.
+   *
+   * El `·` se va con la partición: era un separador para dos cosas en una línea, y
+   * en dos líneas no separa nada.
+   */
   function pintarMetricas(d) {
-    control._solape.textContent =
-      d.solape === null
-        ? textoOmitido(d, 'solape')
-        : `${m2(d.solape.area)} · ${porcentaje(d.solape.relativo)} de la mayor`
+    if (d.solape === null) {
+      ponerMotivo(control._solape, textoOmitido(d, 'solape'))
+    } else {
+      ponerCifra(
+        control._solape,
+        m2(d.solape.area),
+        `${porcentaje(d.solape.relativo)} de la mayor`,
+      )
+    }
 
-    control._centroides.textContent =
-      d.centroides === null ? textoOmitido(d, 'centroides') : metros(d.centroides.distancia)
+    if (d.centroides === null) {
+      ponerMotivo(control._centroides, textoOmitido(d, 'centroides'))
+    } else {
+      ponerCifra(control._centroides, metros(d.centroides.distancia))
+    }
 
     if (d.desviacion === null || d.desviacion.maxima === null) {
-      control._desviacion.textContent = textoOmitido(d, 'desviacion')
+      ponerMotivo(control._desviacion, textoOmitido(d, 'desviacion'))
     } else {
       const max = d.desviacion.maxima
-      control._desviacion.textContent =
-        `${metros(max.maxima)} · lindero ${max.indice + 1}` +
-        (max.recinto > 0 ? ` del hueco ${max.recinto}` : '')
+      ponerCifra(
+        control._desviacion,
+        metros(max.maxima),
+        `lindero ${max.indice + 1}` + (max.recinto > 0 ? ` del hueco ${max.recinto}` : ''),
+      )
     }
   }
 
@@ -1588,43 +1766,55 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
    * cuando entra una parcela distinta.
    */
   function pintarMargen(d) {
+    // La propuesta de clase se apaga SIEMPRE antes de decidir si vuelve: es el
+    // renglón que sobrevive de un repintado al anterior si nadie lo borra, y
+    // dejarlo puesto diría que la aplicación propone una clase que ya no propone.
+    control._margenClase.textContent = ''
+    control._margenClase.style.display = 'none'
+
     if (d.margen === null) {
-      control._margen.textContent = textoOmitido(d, 'margen')
+      control._margenCifras.textContent = textoOmitido(d, 'margen')
       return
     }
 
-    const cifras =
+    control._margenCifras.textContent =
       `${ETIQUETA_MARGEN}: ±${metros(d.margen.perimetroM)} de perímetro y ` +
       `${porcentaje(d.margen.superficieRelativo)} de superficie.`
+
     // Si la clase la propuso la app y no una persona, se DICE. Presentar una
     // deducción como un dato sería colar un criterio nuestro en el expediente.
-    control._margen.textContent = d.margen.deducida
-      ? `${cifras} Clase propuesta por la aplicación: ${d.margen.criterio}`
-      : cifras
+    //
+    // Va en su PROPIO párrafo desde el 2026-08-15: son dos hechos distintos —lo
+    // que el Catastro tolera, y de dónde sale la clase con la que se ha calculado—
+    // y el segundo puede ser un párrafo largo (el criterio real de una referencia
+    // urbana son tres líneas). Concatenados eran un muro de gris de cinco líneas.
+    if (d.margen.deducida) {
+      control._margenClase.textContent = `Clase propuesta por la aplicación: ${d.margen.criterio}`
+      control._margenClase.style.display = 'block'
+    }
   }
 
   /**
-   * El `disabled` de LOS DOS botones del informe, sus vestimentas y su renglón: las
-   * tres cosas en una sola función, para que no puedan divergir. Es el mismo recurso
-   * —y por lo mismo— que `apagarPrimario` en `viewer/cajon-comprobacion.js`.
+   * El `disabled` del botón del informe, su vestimenta y su renglón: las tres cosas
+   * en una sola función, para que no puedan divergir. Es el mismo recurso —y por lo
+   * mismo— que `apagarPrimario` en `viewer/cajon-comprobacion.js`.
    *
    * La regla es una sola línea: **el informe se puede componer ⟺ el cajón está
    * enseñando un diagnóstico**. No hace falta que nadie se la cuente al cajón
    * desde fuera; la sabe él, porque es quien recibe el POJO en `pintar`.
    *
-   * ── POR QUÉ LOS DOS BOTONES PASAN POR AQUÍ Y NO POR DOS GATES ───────────────
-   * Porque la condición es LA MISMA —y el motivo también—, y dos gates paralelos
-   * son dos oportunidades de que uno se quede encendido con el otro apagado, sin
-   * síntoma: un botón encendido que compone un informe de cifras que ya no están
-   * es exactamente el error silencioso que este gate existe para impedir. El PDF
-   * lleva ADEMÁS un plano y un pie de firma, pero eso no cambia la condición: sin
-   * medidas no hay nada que maquetar.
+   * ⚠️ Gobernaba DOS botones hasta el 2026-08-15, y la cabecera de esta función
+   * explicaba por qué pasaban los dos por un solo gate («dos gates paralelos son
+   * dos oportunidades de que uno se quede encendido con el otro apagado, sin
+   * síntoma»). Ya no aplica —hay un botón— pero la conclusión de fondo sí: un
+   * botón encendido que compone un informe de cifras que ya no están es
+   * exactamente el error silencioso que esto existe para impedir.
    *
    * ── POR QUÉ AL ENCENDER SOLO SE BORRA EL MOTIVO, Y NO EL RENGLÓN ────────────
    * `pintar` corre en CADA operación acabada —o sea, en cada vértice que F06 mueva
    * con el cajón abierto—. Vaciar el renglón sin condición se llevaría por delante
-   * el «Descargado «contraste_….txt».» que el cableado acaba de escribir, un
-   * instante después de haberlo puesto. Es exactamente la regla que
+   * el acuse de recibo que el cableado acaba de escribir, un instante después de
+   * haberlo puesto. Es exactamente la regla que
    * `app/cableado-diagnostico.js#refrescarBoton` ya defiende para el renglón del
    * CTA, y aquí se aplica al revés: se reconoce el motivo por su texto y se borra
    * solo él.
@@ -1636,16 +1826,11 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
    * @param {boolean} hayDiagnostico
    */
   function gateInforme(hayDiagnostico) {
-    if (!control._descargar || !control._preparar || !control._estadoInforme) return
+    if (!control._preparar || !control._estadoInforme) return
     control._preparar.disabled = !hayDiagnostico
-    control._descargar.disabled = !hayDiagnostico
     estilar(
       control._preparar,
       hayDiagnostico ? BOTON_INFORME.PRIMARIO.ENCENDIDO : BOTON_INFORME.PRIMARIO.APAGADO,
-    )
-    estilar(
-      control._descargar,
-      hayDiagnostico ? BOTON_INFORME.SECUNDARIO.ENCENDIDO : BOTON_INFORME.SECUNDARIO.APAGADO,
     )
     if (!hayDiagnostico) {
       control._estadoInforme.textContent = MOTIVO_INFORME_SIN_DIAGNOSTICO
@@ -1669,13 +1854,20 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       if (d === null || d === undefined) {
         control._titular.textContent = 'Sin diagnóstico.'
         destacarMedida(false)
-        for (const el of [control._medida, control._catastral, control._solape,
-          control._centroides, control._desviacion]) {
-          el.textContent = NO_CONSTA
+        control._medida.textContent = NO_CONSTA
+        control._catastral.textContent = NO_CONSTA
+        // Las tres de encaje pasan por `ponerCifra` y no por un `textContent`
+        // directo: son celdas de dos pisos, y escribirles el texto encima les
+        // arrancaría los dos `<span>` de dentro — al siguiente `pintar(d)` no
+        // habría dónde poner el matiz y el cajón se quedaría mudo a mitad.
+        for (const celda of [control._solape, control._centroides, control._desviacion]) {
+          ponerCifra(celda, NO_CONSTA)
         }
         control._cruces.replaceChildren()
         control._invasion.replaceChildren()
-        control._margen.textContent = ''
+        control._margenCifras.textContent = ''
+        control._margenClase.textContent = ''
+        control._margenClase.style.display = 'none'
         // Sin cifras no hay informe que componer, y el botón lo dice.
         gateInforme(false)
         return
@@ -1939,25 +2131,9 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
     },
 
     /**
-     * Se suscribe a la pulsación de «Descargar informe de contraste». Devuelve la
-     * BAJA. Varios oyentes, igual que {@link alCambiar}: un `= fn` desengancharía
-     * al primero en silencio.
-     *
-     * El cajón **no compone ni entrega nada**: solo avisa. Quien escucha es
-     * `app/cableado-diagnostico.js`, que sabe qué diagnóstico se está enseñando,
-     * qué parcela hay en el store, qué hora es y cómo se baja un fichero.
-     */
-    alDescargar(fn) {
-      if (typeof fn !== 'function') {
-        throw new TypeError(`alDescargar: 'fn' debe ser una función; recibido ${typeof fn}.`)
-      }
-      control._oyentes.descargar.add(fn)
-      return () => control._oyentes.descargar.delete(fn)
-    },
-
-    /**
      * Se suscribe a la pulsación de «Preparar informe (PDF)» —el primario del pie—.
-     * Devuelve la BAJA. Varios oyentes, igual que {@link alDescargar}.
+     * Devuelve la BAJA. Varios oyentes, igual que {@link alCambiar}: un `= fn`
+     * desengancharía al primero en silencio.
      *
      * El cajón **no compone, no maqueta y no baja nada**: solo avisa, exactamente
      * igual que con el de texto. El PDF lo arma `report/pdf-parcela.js` con el plano
@@ -1991,7 +2167,6 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       destruido = true
       control._oyentes.cerrar.clear()
       control._oyentes.cambiar.clear()
-      control._oyentes.descargar.clear()
       control._oyentes.preparar.clear()
       control._oyentes.salir.clear()
       control.remove()

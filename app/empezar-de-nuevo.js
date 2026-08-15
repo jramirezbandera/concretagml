@@ -52,6 +52,47 @@
 // que el ACTO se le pide a quien lo tiene todo delante y este módulo se queda con
 // lo que sí es suyo: cuándo ofrecerlo y cuándo no.
 
+// ── ⛔ EL DEFECTO DEL 2026-08-15: «A VECES SE QUEDA PILLADO» ────────────────
+// Lo dijo el autor y era literal. Desde la mudanza al menú de expediente
+// (2026-08-10) los dos tiempos vivían DENTRO de un desplegable que, desde el
+// 2026-08-11, se cierra al activar cualquier opción. Sumadas, las dos decisiones
+// —cada una correcta por su lado— daban esto, medido con barra y este módulo
+// montados juntos:
+//
+//   1. Primer clic: se escribe la confirmación en el renglón… y el mismo clic
+//      cierra el menú, así que **el renglón se va con él sin haberse leído**.
+//   2. Para el segundo clic hay que reabrir el menú y volver a pulsar: tres
+//      gestos, y todos dentro de {@link MS_CONFIRMAR}.
+//   3. Si se tardaba más —lo normal, porque nadie corre contra un plazo que no
+//      sabe que existe—, el clic volvía a ARMAR. Pantalla idéntica, nada pasa.
+//      Un botón que se traga los clics.
+//   4. Y el `role="status"` tampoco salvaba a nadie: un `aria-live` dentro de un
+//      subárbol oculto no se anuncia, así que la pregunta no llegaba ni por ahí.
+//
+// Se cierra por los dos lados, y ninguno de los dos es el plazo (el plazo está
+// bien: ver {@link MS_CONFIRMAR}):
+//
+//   · **El menú se queda abierto mientras se pregunta.** El botón lleva el
+//     `data-menu-conserva` de `app/barra.js` SOLO mientras está armado, así que
+//     el clic que arma deja el menú puesto —con la pregunta debajo y el foco en
+//     el mismo botón— y el que confirma lo cierra como cualquier otra opción.
+//   · **El armado se olvida EN PANTALLA, no solo en el reloj.** Al caducar, un
+//     temporizador borra el renglón. Antes el texto se quedaba puesto para
+//     siempre: se leía «Vuelve a pulsar para confirmarlo» cuando pulsar ya solo
+//     volvía a armar, que es la definición de una pantalla que miente.
+//
+// ⚠️ Y el test de este módulo montaba el DOM real **sin la barra**, así que las
+// dos primeras estaban en verde. Desde hoy monta las dos piezas juntas.
+
+// ⚠️ **Única dependencia de este módulo, y es un contrato de verdad, no una
+// comodidad**: el atributo con el que se le pide al menú que no se cierre lo
+// define quien cierra el menú. Copiar aquí la cadena `'data-menu-conserva'`
+// habría sido la clase de duplicado que se desincroniza en silencio el día que
+// aquél la renombre —y el síntoma sería exactamente el defecto que esta línea
+// arregla—. No es el caso de {@link MS_CONFIRMAR}, que repite un NÚMERO porque lo
+// que comparte con `cableado-expediente.js` es el patrón, no un contrato.
+import { ATRIBUTO_CONSERVA } from './barra.js'
+
 // ── El contrato de marcado ──────────────────────────────────────────────────
 
 /**
@@ -91,6 +132,16 @@ export const MENSAJE_ARMADO =
 
 // ── Utilidades ──────────────────────────────────────────────────────────────
 
+/**
+ * El reloj de pared del documento, para el olvido del armado.
+ *
+ * ⚠️ NO se usa el `setTimeout` global a propósito, por lo mismo que no se toma el
+ * `document` global: en jsdom el del documento es el que la prueba puede parar al
+ * desmontar. Si el documento no trae ventana (un `Document` suelto), se cae al
+ * global — perder el olvido no puede costar una excepción.
+ */
+const relojDe = (documento) => documento.defaultView ?? globalThis
+
 /** ¿Sirve como documento? DUCK TYPING, igual que `app/pantalla.js` y `app/rama.js`. */
 const esDocumento = (d) => !!d && typeof d === 'object' && typeof d.querySelector === 'function'
 
@@ -126,8 +177,15 @@ const esStore = (s) =>
  *   LANZA, el error sube: es un fallo del programador y la regla de oro 1 lo quiere
  *   sonando, no tragado.
  * @param {() => Date} [opciones.ahora]     El reloj, inyectado como en
- *   `storage/cache-catastro.js` y `app/cableado-expediente.js`: este repositorio no
- *   tiene ni un `vi.useFakeTimers` y no va a estrenarlo aquí.
+ *   `storage/cache-catastro.js` y `app/cableado-expediente.js`. Es el que decide si
+ *   un clic CONFIRMA o vuelve a armar, y se mueve a mano en la prueba.
+ *
+ *   ⚠️ **El olvido del renglón NO usa este reloj y no puede usarlo**: repintar
+ *   solo hay que hacerlo, y para eso hace falta un temporizador de verdad (ver
+ *   `armar`). Su prueba estrena el `vi.useFakeTimers` que la línea anterior de este
+ *   comentario juraba que no haría falta, y lo estrena aquí porque el defecto que
+ *   cierra —un renglón que sigue diciendo «vuelve a pulsar» cuando pulsar ya no
+ *   confirma— no se puede medir sin dejar pasar el tiempo.
  * @returns {EmpezarDeNuevo}
  */
 export function cablearEmpezarDeNuevo({
@@ -171,6 +229,9 @@ export function cablearEmpezarDeNuevo({
   let destruido = false
   /** Hasta cuándo cuenta el primer clic, en ms de época. `null` = desarmado. */
   let armadoHasta = null
+  /** El temporizador del olvido. `null` = no hay ninguno en marcha. */
+  let olvido = null
+  const reloj = relojDe(documento)
 
   /**
    * ¿Hay algo que vaciar?
@@ -188,10 +249,38 @@ export function cablearEmpezarDeNuevo({
    */
   const hayAlgo = () => estado.get() !== null || estadoEdificio.get() !== null
 
-  /** Borra el renglón y olvida el primer clic. */
+  /**
+   * Borra el renglón y olvida el primer clic. **Idempotente**, y deja el botón
+   * como estaba: sin el `data-menu-conserva`, o sea volviendo a cerrar el menú al
+   * activarse, que es lo normal de una opción.
+   */
   function desarmar() {
     armadoHasta = null
     renglon.textContent = ''
+    boton.removeAttribute(ATRIBUTO_CONSERVA)
+    if (olvido !== null) {
+      reloj.clearTimeout(olvido)
+      olvido = null
+    }
+  }
+
+  /**
+   * Arma el primer clic: escribe la pregunta, pide que el menú NO se cierre y
+   * programa el olvido.
+   *
+   * ⚠️ El olvido borra el renglón **y solo eso importa de él**: `armado()` ya sabía
+   * caducar por reloj, pero el reloj no repinta. Sin este temporizador el renglón
+   * se quedaba diciendo «vuelve a pulsar» encima de un botón que ya solo re-armaba.
+   */
+  function armar(t) {
+    armadoHasta = t + MS_CONFIRMAR
+    renglon.textContent = MENSAJE_ARMADO
+    boton.setAttribute(ATRIBUTO_CONSERVA, '')
+    if (olvido !== null) reloj.clearTimeout(olvido)
+    olvido = reloj.setTimeout(() => {
+      olvido = null
+      if (!destruido) desarmar()
+    }, MS_CONFIRMAR)
   }
 
   /** Enseña o esconde el renglón según lo que haya. Idempotente. */
@@ -216,8 +305,9 @@ export function cablearEmpezarDeNuevo({
 
     const t = ahora().getTime()
     if (armadoHasta === null || t > armadoHasta) {
-      armadoHasta = t + MS_CONFIRMAR
-      renglon.textContent = MENSAJE_ARMADO
+      // El olvido de arriba ya suele haber pasado por aquí; esto es la red para el
+      // documento sin ventana y para el reloj inyectado que corre más que el real.
+      armar(t)
       return
     }
     // Confirmado. Se desarma ANTES de vaciar: `alVaciar` puede no volver nunca

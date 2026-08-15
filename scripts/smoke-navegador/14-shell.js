@@ -724,8 +724,12 @@ const diagnostico = (() => {
         : null,
     // Lo que NO puede esconderse: lo que se pulsa y lo que habla.
     prepararInforme: seVeDentro('[data-accion="preparar-informe"]'),
-    descargarInforme: seVeDentro('[data-accion="descargar-informe"]'),
+    // ⛔ Aquí iba `descargarInforme`, el botón del informe en texto. Se retiró del
+    // pie el 2026-08-15. La cifra que lo nombra en la referencia de abajo se deja
+    // escrita a propósito: es la MEDIDA que motivó el bloque anclado, y borrarla
+    // dejaría el porqué a medias.
     renglonDeEstado: seVeDentro('[data-estado="cajon-diagnostico"]'),
+    renglonDelInforme: seVeDentro('[data-estado="informe-contraste"]'),
     referencia:
       'Antes de la rebanada 4, 1280×720: cajón 420×374,39 con 650 px de contenido → 278 px ' +
       '(42,77 %) bajo el pliegue; preparar-informe a 207,53 px por debajo del borde, ' +
@@ -793,8 +797,8 @@ if (diagnostico.hayCajon && pasoActivo === 'diagnostico' && diagnostico.abierto)
 if (diagnostico.hayCajon && diagnostico.abierto) {
   for (const [nombre, quePasa] of [
     ['«Preparar informe (PDF)»', diagnostico.prepararInforme],
-    ['«Descargar informe de contraste»', diagnostico.descargarInforme],
     ['el renglón de estado del cajón', diagnostico.renglonDeEstado],
+    ['el renglón del informe', diagnostico.renglonDelInforme],
   ]) {
     if (quePasa.existe && quePasa.oculto !== true && quePasa.seVe !== true) {
       problemas.push(

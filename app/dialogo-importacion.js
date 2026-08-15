@@ -444,8 +444,16 @@ export function decisionesDe(resultado) {
   }
 
   // ── 3 · El cierre en la banda ambigua ─────────────────────────────────────
+  //
+  // ⚠️ `interpretacion: 'CERRADO_EN_EL_FICHERO'` NO se pregunta, y el filtro tiene
+  // que decirlo EXPRESAMENTE. Esa detección lleva `aplicado: 'NINGUNO'` como las
+  // de la banda ambigua —porque es verdad: no se ha tocado nada— así que filtrar
+  // solo por `aplicado` la colaba y la pantalla volvía a preguntar. Es una
+  // polilínea que el DXF marca como cerrada (código 70): el tramo de cierre es
+  // una arista dibujada y no hay decisión que tomar. Ver
+  // `parsers/importar.js#resolverCierre`, banda (c0), medida en `UTM.dxf`.
   const cierres = porTipo(detecciones, TIPO_DETECCION.CIERRE).filter(
-    (d) => d?.datos?.aplicado === 'NINGUNO',
+    (d) => d?.datos?.aplicado === 'NINGUNO' && d?.datos?.interpretacion !== 'CERRADO_EN_EL_FICHERO',
   )
   if (cierres.length > 0) {
     const errores = cierres.map((d) => Number(d.datos?.error)).filter(Number.isFinite)

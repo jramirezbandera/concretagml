@@ -3324,6 +3324,44 @@ body {
   cursor: crosshair;
 }
 
+/* ── La LEYENDA de los grafismos del mapa (`viewer/leyenda.js`, 2026-08-15) ──
+ *
+ * Mismo reparto, palabra por palabra, que el control de opacidad de aquí abajo y
+ * que los dos cajones: **el módulo fija EN LÍNEA lo que hace la tarjeta legible
+ * sin esta hoja** —fondo, relleno, radio, sombra, tamaño y tope de alto—, porque
+ * tiene que verse sobre una ortofoto aunque el CSS no llegue (en `npm run dev`
+ * sobre un mapa pelado, y en jsdom). Aquí no se pelea con eso —este fichero tiene
+ * prohibida la marca de prioridad—: se pone **la familia**, que es lo único que el
+ * módulo no puede saber.
+ *
+ * Y se pone en la PASTILLA y en los HIJOS, no solo en el contenedor: la pastilla
+ * es un `<button>`, y `font-family` **no se hereda en los controles de
+ * formulario** — es el mismo defecto que los botones de los cajones pagaron el
+ * 2026-07-30 y que está escrito con todas las letras en `.gml-cajon-diagnostico
+ * button`. Los renglones sí heredarían del contenedor, pero lo que heredan lo pisa
+ * cualquier regla que los apunte a ellos, así que se declaran igual.
+ *
+ * ⛔ **NINGÚN `display` en `.gml-leyenda-panel`**, y es la misma bomba de
+ * relojería que documentan los dos cajones: el panel se abre y se cierra
+ * conmutando su `style.display` EN LÍNEA entre `'none'` y `''`, y `''` significa
+ * «que decida la hoja». Un `display` aquí funcionaría hoy y el día que alguien
+ * escribiera una regla responsive para esconder la leyenda, el módulo la
+ * «abriría» dejando el inline en `''` y no aparecería nunca, sin que nada avisara.
+ *
+ * @see viewer/leyenda.js  CLASE y SELECTOR: los nombres son contrato.
+ */
+/* ⚠️ **UNA sola regla, con los cuatro selectores en lista, y no cuatro reglas.**
+   Es el mismo criterio con el que `.gml-cajon-diagnostico button` cubre de golpe
+   los botones de los tres cajones: aquí lo que se reparte es UNA propiedad, y
+   escribirla cuatro veces costaría el triple de bytes de la hoja construida —que
+   está presupuestada al byte (`scripts/presupuesto-css.mjs`)— sin decir nada más. */
+.gml-app .gml-leyenda,
+.gml-app .gml-leyenda-pastilla,
+.gml-app .gml-leyenda-grupo,
+.gml-app .gml-leyenda-entrada {
+  font-family: var(--font-sans);
+}
+
 /* ── Control de opacidad de la superpuesta (`viewer/capas.js`) ───────────────
  * El módulo fija EN LÍNEA `background`, `padding`, `border-radius` y `font` del
  * contenedor (a propósito: tiene que ser legible aunque nadie cargue esta hoja).

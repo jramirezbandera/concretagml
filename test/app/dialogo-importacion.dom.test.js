@@ -152,6 +152,45 @@ describe('dialogo-importacion · decisionesDe', () => {
     expect(cierre.errorMaximo).toBeCloseTo(0.0424, 3)
   })
 
+  it('⛔ …pero un DXF que se declara CERRADO (código 70) NO abre pantalla (2026-08-15)', () => {
+    // Defecto medido con `icuc-pruebas/UTM.dxf`: AutoCAD enseñaba el contorno
+    // cerrado y esta pantalla preguntaba por un error de cierre de 11 cm que el
+    // propio fichero ya había contestado. Y la pregunta empujaba a la respuesta
+    // equivocada: «retirar el vértice de cierre» se comía el último vértice bueno
+    // de un arco. Ver `parsers/importar.js#resolverCierre`, banda (c0).
+    //
+    // ⚠️ La trampa que este test protege: esa detección lleva `aplicado:
+    // 'NINGUNO'` —porque es verdad, no se ha tocado nada— igual que las de la
+    // banda ambigua. Filtrando solo por `aplicado` se colaba y la pantalla volvía
+    // a preguntar, así que el filtro nombra la interpretación EXPRESAMENTE.
+    const dxfCerrado = (flag) =>
+      [
+        '0', 'SECTION', '2', 'ENTITIES',
+        '0', 'LWPOLYLINE', '8', 'PARCELA', '90', '5', '70', String(flag),
+        '10', '386130.00', '20', '4064400.00',
+        '10', '386140.00', '20', '4064400.00',
+        '10', '386140.00', '20', '4064410.00',
+        '10', '386130.00', '20', '4064410.00',
+        '10', '386130.03', '20', '4064400.03', // a 4 cm del primero: banda ambigua
+        '0', 'ENDSEC', '0', 'EOF',
+      ].join('\n') + '\n'
+
+    // El A/B: la MISMA geometría, con y sin el flag. Sin él se pregunta…
+    const abierto = importar(dxfCerrado(0))
+    expect(decisionesDe(abierto).decisiones.map((d) => d.tipo)).toContain(TIPO_DECISION.CIERRE)
+
+    // …y con él no hay nada que decidir, ni por el cierre ni por nada más.
+    const cerrado = importar(dxfCerrado(1))
+    expect(decisionesDe(cerrado).decisiones.map((d) => d.tipo)).not.toContain(TIPO_DECISION.CIERRE)
+    expect(hayQueDecidir(cerrado)).toBe(false)
+    // Y la geometría entra entera: los cinco vértices, sin retirar ni compensar.
+    expect(cerrado.anillos[0]).toHaveLength(5)
+    // Pero NO en silencio: el error medido sigue estando, como informativa.
+    expect(decisionesDe(cerrado).informativas.some((t) => /marcada como CERRADA/i.test(t))).toBe(
+      true,
+    )
+  })
+
   it('⭐ el huso AMBIGUO dispara la pantalla por sí solo (2026-08-09)', () => {
     // ⛔ **ESTA PRUEBA AFIRMABA LO CONTRARIO**, y citaba la ficha: «nunca obligar a
     // elegirlo en un desplegable […]; el desplegable queda como anulación»

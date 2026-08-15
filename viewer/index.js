@@ -236,6 +236,7 @@ import { crearCapaColindantes } from './colindantes.js'
 import { crearContraste } from './contraste.js'
 import { crearEdicion } from './edicion.js'
 import { crearListaSobrante } from './lista-sobrante.js'
+import { crearLeyenda } from './leyenda.js'
 import { crearMapa } from './mapa.js'
 import { VARIANTE, crearCapaPiezas } from './piezas.js'
 import { montarCapas } from './capas.js'
@@ -587,6 +588,41 @@ function normalizarSobrante(sobrante) {
       `nada al montarse: la lista no es un control del mapa (la aloja app/main.js en la ` +
       `sección [data-anfitrion="sobrante"] del panel) y la capa de manchas no mide en ` +
       `píxeles. La foto se pinta con visor.sobrante.lista.pintar(derivarCesion({...})).`,
+  )
+}
+
+/**
+ * Normaliza `opciones.leyenda` (2026-08-15).
+ *
+ * ⚠️ **Admite OBJETO además de booleano**, al revés que `colindantes` y
+ * `sobrante`, y la asimetría tiene motivo: la leyenda sí elige dos cosas al
+ * montarse, y las dos son irreversibles desde fuera si no se pasan aquí. La
+ * ESQUINA, porque comparte `bottomleft` con el cajón de diagnóstico cuando el
+ * visor se monta a pelo y quien monte los dos flotando querrá separarlos; y los
+ * GRUPOS iniciales, porque la leyenda tiene que nacer diciendo la verdad —una que
+ * anuncia el ámbar de la invasión en una pantalla donde no se diagnostica nada
+ * está mintiendo desde el primer fotograma, y esperar al primer `grupos()` del
+ * cableado sería un fotograma de más—.
+ *
+ * `abierta` NO se puede fijar aquí a propósito: es un gesto del usuario, y el
+ * defecto (plegada) está razonado en la cabecera de `viewer/leyenda.js`. Quien la
+ * quiera abierta llama a `visor.leyenda.abrir()`, que es lo mismo pero se lee.
+ *
+ * @param {*} leyenda
+ * @returns {{posicion: string|undefined, grupos: string[]|undefined}|null}  `null`
+ *   ⇒ no montarla.
+ * @throws {TypeError}
+ */
+function normalizarLeyenda(leyenda) {
+  if (leyenda === undefined || leyenda === false) return null
+  if (leyenda === true) return { posicion: undefined, grupos: undefined }
+  if (leyenda !== null && typeof leyenda === 'object' && !Array.isArray(leyenda)) {
+    return { posicion: leyenda.posicion, grupos: leyenda.grupos }
+  }
+
+  throw new TypeError(
+    `crearVisor: 'opciones.leyenda' debe ser un booleano o un objeto ` +
+      `{posicion, grupos}; recibido ${describir(leyenda)}.`,
   )
 }
 
@@ -1012,6 +1048,15 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  *     pasan a la vez, que es el caso normal de un lindero rectificado.
  *   ⚠️ **`lista.nodo` NO está en el documento**: `crearVisor` la fabrica y la
  *   devuelve, y quien la cuelga de la sección anfitriona del panel es `app/main.js`.
+ * @property {ReturnType<typeof crearLeyenda>|null} leyenda  La LEYENDA de los
+ *   grafismos del mapa (`viewer/leyenda.js`), o **`null`** si el visor se montó sin
+ *   ella. Va SUELTA y no dentro de otro objeto —al contrario que `diagnostico` y
+ *   `sobrante`— porque no es la mitad de nada: es cromo del mapa, como el control
+ *   de capas, y no se usa junto a ninguna otra pieza.
+ *
+ *   Nace PLEGADA y enseñando los grupos con los que se montó. Quien la pone al día
+ *   es la aplicación, que es la única que sabe qué pantalla hay:
+ *   `visor.leyenda.grupos([GRUPO.LEVANTAMIENTO, GRUPO.CATASTRO, GRUPO.DIAGNOSTICO])`.
  * @property {import('./colindantes.js').CapaColindantes|null} colindantes  La capa
  *   de PARCELAS VECINAS (`viewer/colindantes.js`), o **`null`** si el visor se
  *   montó sin ella (mismo criterio que las anteriores: `null` es una respuesta,
@@ -1262,6 +1307,18 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  *
  *   **Es booleano y no admite objeto**, por lo mismo que `colindantes` (ver
  *   {@link normalizarSobrante}).
+ * @param {boolean|{posicion?: string, grupos?: string[]}} [opciones.leyenda=false]
+ *   Monta la LEYENDA de los grafismos (`viewer/leyenda.js`): la tarjeta que dice
+ *   qué significa cada color y cada trazo de los que se ven sobre la ortofoto.
+ *
+ *   · **`false` (el DEFECTO) ⇒ el visor de antes, sin un nodo de más.**
+ *     `visor.leyenda` vale `null`.
+ *   · **`true`** ⇒ la leyenda PLEGADA en `bottomleft`, con
+ *     `GRUPOS_POR_DEFECTO` (lo que siempre está dibujado: tu medición y el
+ *     Catastro).
+ *   · **`{posicion, grupos}`** ⇒ ídem eligiendo esquina y grupos iniciales. Sí
+ *     admite objeto, al revés que `colindantes` y `sobrante`: ver
+ *     {@link normalizarLeyenda}.
  * @returns {Visor}
  * @throws {TypeError}  Contrato del programador: `opciones` no es un objeto,
  *   `estado` no es el store, `vistaInicial` malformada, `srs` no es un string
@@ -1300,6 +1357,7 @@ export function crearVisor(contenedor, opciones = {}) {
     parcelas: opcionParcelas = false,
     colindantes: opcionColindantes = false,
     sobrante: opcionSobrante = false,
+    leyenda: opcionLeyenda = false,
     alPrevisualizar,
     ...opcionesMapa
   } = opciones
@@ -1328,6 +1386,7 @@ export function crearVisor(contenedor, opciones = {}) {
   const opcionesParcelas = normalizarParcelas(opcionParcelas)
   const montarColindantes = normalizarColindantes(opcionColindantes)
   const montarSobrante = normalizarSobrante(opcionSobrante)
+  const opcionesLeyenda = normalizarLeyenda(opcionLeyenda)
   // Misma política que `resolverAvisar` y que los tres ganchos de `sincronizar`:
   // "no me han pasado nada" es legítimo (cae a `null`); "me han pasado basura
   // donde iba una función" es contrato roto, y eso aquí es `throw`.
@@ -1381,6 +1440,23 @@ export function crearVisor(contenedor, opciones = {}) {
     if (montarColindantes) {
       colindantes = crearCapaColindantes({ mapa, zona, alAvisar: avisar })
       deshacer.push(() => colindantes.destruir())
+    }
+
+    // 2 ter · LA LEYENDA. Va aquí, pegada a las capas y antes de que se dibuje
+    // nada, por lo mismo que el control de capas: es cromo del mapa y no depende
+    // de que haya geometría. Nace PLEGADA —una pastilla de 90 px— y sin saber qué
+    // hay en pantalla: quién enciende y apaga grupos es la aplicación, con
+    // `visor.leyenda.grupos([...])`. Ver la cabecera de `viewer/leyenda.js`.
+    /** @type {ReturnType<typeof crearLeyenda>|null} */
+    let leyenda = null
+    if (opcionesLeyenda !== null) {
+      leyenda = crearLeyenda({
+        mapa,
+        alAvisar: avisar,
+        ...(opcionesLeyenda.posicion === undefined ? {} : { posicion: opcionesLeyenda.posicion }),
+        ...(opcionesLeyenda.grupos === undefined ? {} : { grupos: opcionesLeyenda.grupos }),
+      })
+      deshacer.push(() => leyenda.destruir())
     }
 
     // 3 · Las dos piezas de F06, ANTES de sincronizar porque `sincronizar`
@@ -1712,6 +1788,7 @@ export function crearVisor(contenedor, opciones = {}) {
       parcelas,
       colindantes,
       sobrante,
+      leyenda,
 
       /**
        * El encuadre EXPLÍCITO. Misma función que el paso 6 —cascada completa— y

@@ -1691,8 +1691,22 @@ describe('cableado-catastro · alColindantes()', () => {
     expect(() => baja()).not.toThrow()
   })
 
+  // ⭐ **O15 CORREGIDO (2026-08-15): este test pedía su fallo por donde ya no lo
+  // hay.** Antes bastaba pedir una referencia que no estuviera en la colección del
+  // fixture: el cliente no encontraba la propia y devolvía `RESPUESTA_ILEGIBLE`.
+  // Eso dejó de ser un fallo —medido en vivo, el servicio a veces se omite a sí
+  // misma y sus colindantes son buenas igual—, así que el resultado sin dato se
+  // pide ahora por donde SÍ lo hay: el `ExceptionReport` de una referencia que el
+  // Catastro no conoce, que es el mismo cuerpo real que sirve el transporte para
+  // cualquier otra consulta inexistente.
+  //
+  // Lo que el test afirma no ha cambiado ni un ápice: un resultado sin dato **no
+  // se publica**, porque quien se suscribe espera vecinas utilizables.
   it('⚠️ un resultado SIN dato no se publica: quien escucha espera vecinas usables', async () => {
-    const montado = cablear({ parcelaInicial: null })
+    const montado = cablear({
+      parcelaInicial: null,
+      transporte: crearTransporteDoble({ vecindad: TEXTO_INEXISTENTE }),
+    })
     montado.campo.value = '0000000XX0000X'
     const vistos = []
     montado.cableado.alColindantes((r) => vistos.push(r))
@@ -1700,6 +1714,7 @@ describe('cableado-catastro · alColindantes()', () => {
     const resultado = await montado.cableado.colindantes()
 
     expect(resultado.ok).toBe(false)
+    expect(resultado.motivo).toBe(MOTIVO_CATASTRO.NO_ENCONTRADO)
     expect(vistos).toHaveLength(0)
     // Pero no se calla: se cuenta por los dos canales de siempre.
     expect(textosDelPanel()).toContain(resultado.mensaje)

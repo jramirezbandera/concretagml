@@ -315,7 +315,34 @@ function proyectarAnillo(anillo, situacion) {
 //                                   LIST/TXT/DXF). No se toca; INFO dejando constancia de
 //                                   la interpretación (regla 1: nada se asume en silencio).
 // El usuario ELIGE la corrección vía opts.compensarCierre (Bowditch) o opts.retirarCierre.
-function resolverCierre(anilloCrudo, esGrados, opts, detecciones) {
+//
+// ── Y UNA CUARTA BANDA, QUE SOLO EXISTE CUANDO EL FICHERO SE MOJA ────────────
+//
+// La banda ambigua lo es porque nos llega una lista de vértices y nada más. Un DXF
+// dice bastante más que eso: `parsers/dxf.js` devuelve `cerrados[i]`, el flag 70
+// de la polilínea. Con ese flag a `true` la lectura «Vúltimo es V0 repetido con
+// una errata» queda DESCARTADA —el flag existe justamente para no tener que
+// repetir V0—, y el tramo Vúltimo→V0 es una arista que el CAD dibuja.
+//
+// ⛔ **Es un defecto medido, no una mejora especulativa.** `icuc-pruebas/UTM.dxf`
+// (2026-08-15): una polilínea con `70=1`, cuatro lados rectos de 9 a 15 m y un
+// arco de 17 tramos de 0,11 a 0,24 m. El tramo de cierre mide 0,1118 m, cae en la
+// banda ambigua y disparaba la pregunta. En pantalla AutoCAD enseñaba el anillo
+// CERRADO. O sea: el usuario viendo un contorno cerrado y la aplicación
+// preguntándole por un error de cierre que el propio fichero ya había resuelto.
+// Es la lección M28 otra vez —dos frases ciertas por separado que juntas se leen
+// como una contradicción—, y aquí además la pregunta empujaba a la respuesta
+// equivocada: «retirar el vértice de cierre» se habría comido el último vértice
+// bueno del arco, y Bowditch habría repartido 11 cm por todo el perímetro.
+//
+// ⚠️ Lo que el flag NO dice, y por eso esto es una banda propia y no un atajo: un
+// operador puede clicar el último punto a ojo cerca del primero y rematar con la
+// «C» de PLINE, y entonces hay un misclosure de verdad bajo un `70=1`. Por eso la
+// geometría se sigue sin tocar y se sigue emitiendo detección con el error MEDIDO
+// —quien quiera compensar lo pide y se aplica—: lo único que cambia es que se
+// deja de PREGUNTAR algo que el fichero ya ha contestado. Ofrecer, no tocar,
+// tampoco cuando el fichero se moja.
+function resolverCierre(anilloCrudo, esGrados, opts, detecciones, cerradoEnElFichero = false) {
   // Grados: el "error de cierre" en metros no tiene sentido (son grados). Se deja
   // el anillo tal cual; el bloque GRADOS lo señalará y bloqueará el modelo.
   if (esGrados || anilloCrudo.length < 2) return anilloCrudo
@@ -342,7 +369,9 @@ function resolverCierre(anilloCrudo, esGrados, opts, detecciones) {
     return anilloCrudo.map(([x, y]) => [x, y])
   }
 
-  // (c) BANDA AMBIGUA: se OFRECEN ambas lecturas; por defecto NO se altera la geometría.
+  // Las dos lecturas se calculan SIEMPRE, también en la banda (c0): se publican
+  // como dato aunque no se pregunte, para que una interfaz pueda ofrecerlas bajo
+  // demanda sin tener que reimplementar Bowditch.
   const comp = compensarCierre(anilloCrudo, { metodo: opts.metodoCierre })
   const sinCierre = anilloCrudo.slice(0, -1).map(([x, y]) => [x, y])
   let salida = anilloCrudo.map(([x, y]) => [x, y]) // por defecto: crudo, intacto
@@ -354,6 +383,43 @@ function resolverCierre(anilloCrudo, esGrados, opts, detecciones) {
     salida = sinCierre
     aplicado = 'RETIRADO'
   }
+  const ofertas = {
+    metodo: opts.metodoCierre ?? 'bowditch',
+    anilloSinCierre: sinCierre, // oferta A: retirar Vúltimo
+    anilloCompensado: comp.anillo, // oferta B: compensar el misclosure
+    toleranciaCierre: opts.toleranciaCierre,
+  }
+
+  // (c0) EL FICHERO YA LO HA CONTESTADO: polilínea marcada como CERRADA (DXF, 70).
+  //      No se pregunta —el tramo de cierre es una arista dibujada—, pero se deja
+  //      constancia con el error medido. Sube a AVISO si el llamante ha pedido una
+  //      corrección de todos modos: ahí SÍ se está alterando geometría contra lo
+  //      que el propio fichero afirma, y eso no puede irse en un INFO.
+  if (cerradoEnElFichero) {
+    detecciones.push(
+      crearDeteccion(
+        TIPO_DETECCION.CIERRE,
+        `El último vértice queda a ${error.toFixed(4)} m del primero, pero la polilínea viene marcada ` +
+          `como CERRADA en el propio fichero (DXF, código de grupo 70): el tramo del último vértice al ` +
+          `primero es una arista dibujada, no un vértice de cierre repetido con una errata. No hay nada ` +
+          `que decidir y la geometría se deja intacta. ` +
+          (aplicado === 'NINGUNO'
+            ? `Aplicado: NINGUNO.`
+            : `Aun así se ha aplicado ${aplicado} porque el llamante lo pidió expresamente.`),
+        aplicado === 'NINGUNO' ? SEVERIDAD.INFO : SEVERIDAD.AVISO,
+        {
+          error,
+          interpretacion: 'CERRADO_EN_EL_FICHERO',
+          cerradoEnElFichero: true,
+          aplicado, // 'NINGUNO' | 'COMPENSADO' | 'RETIRADO'
+          ...ofertas,
+        },
+      ),
+    )
+    return salida
+  }
+
+  // (c) BANDA AMBIGUA: se OFRECEN ambas lecturas; por defecto NO se altera la geometría.
   detecciones.push(
     crearDeteccion(
       TIPO_DETECCION.CIERRE,
@@ -364,11 +430,10 @@ function resolverCierre(anilloCrudo, esGrados, opts, detecciones) {
       SEVERIDAD.AVISO,
       {
         error,
+        interpretacion: 'AMBIGUO',
+        cerradoEnElFichero: false,
         aplicado, // 'NINGUNO' | 'COMPENSADO' | 'RETIRADO'
-        metodo: opts.metodoCierre ?? 'bowditch',
-        anilloSinCierre: sinCierre, // oferta A: retirar Vúltimo
-        anilloCompensado: comp.anillo, // oferta B: compensar el misclosure
-        toleranciaCierre: opts.toleranciaCierre,
+        ...ofertas,
       },
     ),
   )
@@ -663,11 +728,16 @@ function textoReparto(pares) {
  *
  * @param {number[][][]} anillos  Anillos crudos del parser.
  * @param {string[]} capas        `capas[i]` es la capa de `anillos[i]`.
+ * @param {boolean[]} cerrados    `cerrados[i]` es el flag de cierre de `anillos[i]`
+ *   (solo el DXF lo trae; el resto llega todo `false`). Viaja AQUÍ y no aparte
+ *   porque el filtrado por capa reordena y descarta anillos: un array paralelo que
+ *   no se filtre con los otros dos deja de estar alineado EN SILENCIO, que es
+ *   exactamente el fallo que este módulo existe para no cometer.
  * @param {string|undefined} capaElegida
  * @param {import('./_comun.js').Deteccion[]} detecciones  Se le empuja la detección.
- * @returns {{ anillos: number[][][], capas: string[], nCapas: number }}
+ * @returns {{ anillos: number[][][], capas: string[], cerrados: boolean[], nCapas: number }}
  */
-function resolverCapas(anillos, capas, capaElegida, detecciones) {
+function resolverCapas(anillos, capas, cerrados, capaElegida, detecciones) {
   const pares = contarCapas(capas)
   const nCapas = pares.length
   const reparto = Object.fromEntries(pares)
@@ -693,6 +763,7 @@ function resolverCapas(anillos, capas, capaElegida, detecciones) {
     return {
       anillos: indices.map(([, i]) => anillos[i]),
       capas: indices.map(([c]) => c),
+      cerrados: indices.map(([, i]) => cerrados[i]),
       nCapas: existe ? 1 : 0,
     }
   }
@@ -711,7 +782,7 @@ function resolverCapas(anillos, capas, capaElegida, detecciones) {
       { capas: reparto, nCapas, nAnillos: anillos.length, aplicado: 'NINGUNO', capaElegida: null },
     ),
   )
-  return { anillos, capas, nCapas }
+  return { anillos, capas, cerrados, nCapas }
 }
 
 // ── Cotejo de superficie (valor añadido; solo LIST con meta.areaReportada) ────
@@ -882,10 +953,20 @@ export function importar(texto, opts = {}) {
   //   y para que «más de una capa» sea trivialmente falso ahí.
   const traeCapas = Array.isArray(res.capas)
   const capasCrudas = traeCapas ? res.capas : res.anillos.map(() => '')
+  // Mismo criterio para el flag de cierre: solo el DXF lo trae (código 70). Un
+  // pegado LIST/TXT no tiene forma de declarar que el anillo cierra, así que ahí
+  // `false` no es «desconocido» sino la verdad —no lo declara nadie— y la banda
+  // ambigua sigue preguntando exactamente como hasta ahora.
+  const cerradosCrudos = Array.isArray(res.cerrados) ? res.cerrados : res.anillos.map(() => false)
   const reparto =
     traeCapas && res.anillos.length > 0
-      ? resolverCapas(res.anillos, capasCrudas, opts.capa, detecciones)
-      : { anillos: res.anillos, capas: capasCrudas, nCapas: capasCrudas.length > 0 ? 1 : 0 }
+      ? resolverCapas(res.anillos, capasCrudas, cerradosCrudos, opts.capa, detecciones)
+      : {
+          anillos: res.anillos,
+          capas: capasCrudas,
+          cerrados: cerradosCrudos,
+          nCapas: capasCrudas.length > 0 ? 1 : 0,
+        }
 
   // 2ter) F19 · ¿Está TODO el fichero en grados? Se decide y se sitúa ANTES del
   //   bucle, y sobre el anillo EXTERIOR, por dos motivos: el huso es uno solo para
@@ -919,13 +1000,22 @@ export function importar(texto, opts = {}) {
   const anillos = []
   const capas = [...reparto.capas]
   let gradosCualquiera = false
-  reparto.anillos.forEach((anilloCrudo) => {
+  reparto.anillos.forEach((anilloCrudo, i) => {
     // La proyección va la PRIMERA: de aquí abajo todo el mundo ve metros, y el
     // saneo deja de reconocer grados por sí solo (que es justo lo que queremos:
     // ya no los hay).
     const crudo = proyectando ? proyectarAnillo(anilloCrudo, situacionGrados) : anilloCrudo
     const esGrados = pareceGrados(crudo)
-    const abierto = resolverCierre(crudo, esGrados, conSituacion, detecciones)
+    // El flag de cierre es POR ANILLO: un DXF puede traer el contorno cerrado y un
+    // hueco dibujado abierto, y cada uno se interpreta con lo que dice el fichero
+    // de ÉL, no con lo que diga el primero.
+    const abierto = resolverCierre(
+      crudo,
+      esGrados,
+      conSituacion,
+      detecciones,
+      reparto.cerrados[i] === true,
+    )
     const { anillo, gradosAll } = resolverSaneo(abierto, conSituacion, detecciones)
     anillos.push(anillo)
     // Un anillo ENTERO en grados (exterior O hueco) contamina el modelo con unidades

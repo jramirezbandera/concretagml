@@ -526,20 +526,21 @@ const esCajon = (v) =>
   typeof v.clase === 'function' &&
   typeof v.reiniciarExpediente === 'function' &&
   typeof v.estado === 'function' &&
-  // Las TRES del pie del informe (F08 · T4.2 y F09 · T4.2). Se comprueba lo que se
-  // USA, así que entran en la misma lista: sin ellas el botón quedaría montado y
-  // mudo.
+  // Las DOS del pie del informe (F09 · T4.2). Se comprueba lo que se USA, así que
+  // entran en la misma lista: sin ellas el botón quedaría montado y mudo.
+  //
+  // ⚠️ **Eran TRES hasta el 2026-08-15**: `alDescargar` se fue con el botón del
+  // informe en texto (ver la cabecera de `viewer/cajon-diagnostico.js`). Ya no se
+  // exige, y no puede exigirse: un cajón que la trajera sería un cajón viejo.
   //
   // ⚠️ `alPreparar` lo consume `app/cableado-informe.js` (F09) y NO este módulo, y
-  // aun así se exige aquí. No es celo: el pie del cajón tiene DOS botones que el
-  // mismo `gateInforme` enciende y apaga a la vez, y este cableado es el primero de
-  // los dos que monta sobre él. Un cajón sin ese canal pasaría esta guarda,
-  // `cablearDiagnostico` seguiría funcionando entero, y el botón PRIMARIO —el del
-  // documento firmable, el que el usuario viene a pulsar— se quedaría montado y
-  // mudo, sin un solo síntoma. Un contrato que solo se comprueba cuando alguien lo
-  // usa es un contrato que se descubre roto en producción.
+  // aun así se exige aquí. No es celo: este cableado es el primero de los dos que
+  // monta sobre el pie del cajón. Un cajón sin ese canal pasaría esta guarda,
+  // `cablearDiagnostico` seguiría funcionando entero, y el botón del documento
+  // firmable —el que el usuario viene a pulsar— se quedaría montado y mudo, sin un
+  // solo síntoma. Un contrato que solo se comprueba cuando alguien lo usa es un
+  // contrato que se descubre roto en producción.
   typeof v.estadoInforme === 'function' &&
-  typeof v.alDescargar === 'function' &&
   typeof v.alPreparar === 'function' &&
   typeof v.alCambiar === 'function' &&
   typeof v.alCerrar === 'function'
@@ -723,7 +724,7 @@ export function cablearDiagnostico({
 
   /**
    * Quién quiere enterarse de que {@link ultimoDiagnostico} ha cambiado. Un `Set` y
-   * no un `= fn`, igual que los `alCambiar`/`alDescargar` del cajón: un asignador
+   * no un `= fn`, igual que los `alCambiar`/`alPreparar` del cajón: un asignador
    * desengancharía al primer oyente en silencio. Ver {@link notificarDiagnostico}.
    *
    * @type {Set<(d: object|null) => void>}
@@ -913,6 +914,30 @@ export function cablearDiagnostico({
       // dejar dos renglones contando la misma consulta con distinto tiempo verbal.
       await catastro.cargar({ refcat, sustituir: false })
       if (!destruido) decirFondo('', false)
+      // ── ⭐ Y ADEMÁS LAS VECINAS ────────────────────────────────────────────
+      // El botón se llama «traer el PARCELARIO», y pedir solo `GetParcel` no lo
+      // trae: quien suelta un .dxf y lo pulsa ve aparecer su parcela oficial SOLA
+      // en mitad del mapa, sin nada alrededor con lo que situarla — que es justo
+      // lo que se venía a mirar. Las vecinas ya se sabían pedir (`pedirVecinas`,
+      // desde F07) y ya se sabían pintar (F05); lo único que faltaba era que este
+      // botón las pidiera.
+      //
+      // ⚠️ **DESPUÉS de `cargar`, y el orden NO es estético.** `colindantes()` lee
+      // la referencia del MODELO, y con un .dxf el modelo no la tiene hasta que
+      // `cargar({sustituir:false})` la adopta: invertir las dos llamadas pediría
+      // las vecinas de `null`.
+      //
+      // ⚠️ **Un fallo aquí NO es una avería de este botón**, y por eso el renglón
+      // del fondo se limpia ANTES: cuando esto corre, el parcelario ya ha entrado.
+      // Que no lo cuente el `catch` de abajo no es suerte ni orden de líneas —está
+      // dentro del mismo `try`—: es que `pedirVecinas` **atrapa lo suyo** y no
+      // propaga nunca. Lo cuenta por el renglón del DIAGNÓSTICO y por la consola,
+      // que es de quien es el fallo. Contarlo además como «no se ha podido traer el
+      // parcelario» diría que ha fallado algo que ha ido bien.
+      //
+      // `pedirVecinas` es idempotente en lo caro (override O8): si ya las hay, no
+      // pide nada. Por eso abrir el diagnóstico después de esto no vuelve a la red.
+      if (!destruido) await pedirVecinas()
     } catch (causa) {
       // `cargar` y `deducir` propagan los fallos INESPERADOS (los del catálogo salen
       // por `ok:false`). F05 ya los ha contado por tres canales; aquí solo se cierra
@@ -1025,9 +1050,20 @@ export function cablearDiagnostico({
   }
 
   /**
-   * Compone el informe de contraste y lo entrega. Es lo que se llama al pulsar el
-   * botón del pie del cajón, y también está en la API por si alguna vez hace falta
-   * dispararlo desde fuera (un guion de humo, un atajo).
+   * Compone el informe de contraste EN TEXTO y lo entrega.
+   *
+   * ── ⛔ YA NO TIENE BOTÓN (2026-08-15) ──────────────────────────────────────
+   * Era lo que se llamaba al pulsar «Descargar informe de contraste» en el pie del
+   * cajón. **El botón se ha retirado por encargo del autor** —«solo necesito el
+   * pdf»— y esta función se queda: sigue en la API, sigue probada y sigue siendo
+   * la única salida que se compone SIN RED (no pide una tesela al WMS), que era la
+   * degradación declarada de F09 para el día que el plano no se pueda armar.
+   *
+   * Es una decisión consciente, no un olvido: quitar el botón es cosa de la
+   * interfaz, y borrar `report/contraste-texto.js` con sus ficheros de prueba es
+   * otra cosa, y es del autor. Mientras tanto, esto es exactamente lo que la
+   * cabecera de esta función ya decía que también era: algo que se puede disparar
+   * desde fuera (un guion de humo, un atajo, una consola).
    *
    * Los dos fallos posibles se cuentan por SEPARADO y con mensajes distintos —ver
    * {@link MENSAJE_INFORME_NO_COMPUESTO} y {@link MENSAJE_INFORME_NO_ENTREGADO}—,
@@ -1260,7 +1296,9 @@ export function cablearDiagnostico({
   // diagnóstico, y dejarlas pintadas sobre un cajón cerrado sería dejar una
   // anotación sin su explicación.
   const bajaCierre = cajon.alCerrar(() => contraste.pintar(null))
-  const bajaDescargar = cajon.alDescargar(descargarInforme)
+  // ⛔ Aquí iba `cajon.alDescargar(descargarInforme)`. El botón del informe en
+  // texto se retiró el 2026-08-15; `descargarInforme` sigue viva y sigue en la API
+  // de este cableado, sin botón que la dispare. Ver su cabecera.
   const bajaColindantes = catastro === null ? () => {} : catastro.alColindantes(adoptar)
 
   // `subscribe` NO notifica al suscribirse (ver `crearEstadoVista`): el primer
@@ -1374,7 +1412,6 @@ export function cablearDiagnostico({
       desuscribirStore()
       bajaCambio()
       bajaCierre()
-      bajaDescargar()
       bajaColindantes()
       oyentesDiagnostico.clear()
       contraste.pintar(null)

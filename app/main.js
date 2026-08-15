@@ -545,6 +545,13 @@ import { crearEstadoVista, NIVEL } from '../viewer/_comun.js'
 // visor supiera qué es una rama —que es exactamente lo que no sabe—.
 import { crearCajonContrasteEdificio } from '../viewer/cajon-contraste-edificio.js'
 import { crearVisor } from '../viewer/index.js'
+// La leyenda SÍ sale por `viewer/index.js` (el visor la monta), pero sus GRUPOS
+// son un enumerado y hay que nombrarlos para encender y apagar renglones. Se
+// importa el enumerado directamente, igual que `app/main.js` importa
+// `viewer/cajon-contraste-edificio.js`: sacar una constante por el barrel del
+// visor obligaría a que el barrel creciera cada vez que una vista estrena un
+// enumerado, y aquí no hay nada que montar — es una tabla de cadenas.
+import { GRUPO as GRUPO_LEYENDA } from '../viewer/leyenda.js'
 // F03 pasó por `./avisos.js` directo; desde el 2026-08-07 se entra por el
 // diálogo, que es quien fabrica el `<div id="avisos">` y cablea los dos chips.
 // Lo que devuelve trae `avisar` en la raíz, así que sirve tal cual donde antes
@@ -785,6 +792,20 @@ const EYEBROW_EDIFICIO = 'Edificio'
 
 /** Texto de la ficha cuando la parcela no tiene referencia catastral. */
 const SIN_REFCAT = 'Sin referencia'
+
+/**
+ * Coletilla de la ficha para una referencia que **la app ha deducido** de la
+ * ubicación, no que haya afirmado nadie.
+ *
+ * ── POR QUÉ NO SE PINTA A SECAS ──
+ * `parcela.refcat` significa SIEMPRE «esto lo afirma el usuario» y nunca «esto lo
+ * adivinó un servicio» (`cableado-catastro.js`, «por qué la deducción no escribe
+ * en el modelo»). La deducción automática de la importación no rompe esa regla
+ * —sigue sin tocar el modelo—, así que la ficha tampoco puede enseñar su resultado
+ * como si fuera lo mismo. Con la coletilla se lee lo que es: un dato de trabajo,
+ * bueno para pedir el parcelario y pendiente de que el usuario lo confirme.
+ */
+const SUFIJO_REFCAT_DEDUCIDA = ' · deducida, sin confirmar'
 
 /**
  * Ficha: el Catastro no ha declarado ninguna superficie para esta parcela. Es lo
@@ -1498,6 +1519,24 @@ const fichaPares = new Map(
 let colindantesTraidas = null
 
 /**
+ * La referencia catastral que la app ha **deducido** de la ubicación de la
+ * geometría, o `null` si no hay ninguna deducción vigente.
+ *
+ * Es un `let` de módulo por el mismo motivo que {@link colindantesTraidas}:
+ * `model/parcela.js` no tiene dónde guardar esto y **no debe tenerlo**. Una
+ * referencia deducida no es `parcela.refcat` —ese campo significa «lo afirma el
+ * usuario»— y meterla ahí convertiría una conjetura en una afirmación, que es
+ * justo lo que prohíbe la doctrina de la deducción.
+ *
+ * Lo escribe {@link fijarRefcatDeducida} y **se borra en cuanto entra parcela
+ * nueva**: una referencia deducida de la geometría ANTERIOR pintada sobre la
+ * actual sería una afirmación falsa sobre lo que hay en pantalla.
+ *
+ * @type {string|null}
+ */
+let refcatDeducida = null
+
+/**
  * Qué rama está en pantalla, **desde el punto de vista de la ficha del pie**. Es un
  * `let` de módulo y no una lectura de `ramaCableada.get()` por una razón de orden:
  * la ficha se monta en el paso 4 y el conmutador no existe hasta el 13, así que
@@ -1764,7 +1803,21 @@ function actualizarFicha(parcelaActual) {
   fichaSrs.textContent = SRS_DEMO
   // `refcat` es `null` en el dataset sintético, y se DICE («Sin referencia») en
   // vez de dejar un guion: un guion se lee como «esto no ha cargado».
-  fichaRefcat.textContent = (parcelaActual && parcelaActual.refcat) || SIN_REFCAT
+  //
+  // ⚠️ **Y hay un tercer estado desde la deducción automática de la importación**:
+  // el modelo no tiene referencia, pero la app ha deducido una de la ubicación.
+  // El orden importa y es el único posible: lo que AFIRMA el usuario manda sobre
+  // lo que CONJETURA la app, así que la deducida solo se pinta cuando no hay
+  // ninguna en el modelo, y siempre con su coletilla ({@link
+  // SUFIJO_REFCAT_DEDUCIDA}). Sin ella, una parcela importada de un DXF se leería
+  // en la ficha exactamente igual que una traída de la Sede.
+  const refcatModelo = (parcelaActual && parcelaActual.refcat) || null
+  fichaRefcat.textContent =
+    refcatModelo !== null
+      ? refcatModelo
+      : refcatDeducida !== null
+        ? `${refcatDeducida}${SUFIJO_REFCAT_DEDUCIDA}`
+        : SIN_REFCAT
   // La MEDIDA y el resto de cifras de la app, por el único camino que las pinta.
   pintarMedidas(recintosDe(parcelaActual), declarada)
   // Las dos líneas de F05. La superficie de arriba es la MEDIDA (la calcula la
@@ -1936,6 +1989,18 @@ function aplicarRamaALaFicha(ramaNueva) {
     par.rotulo.hidden = enEdificio
   }
 
+  repintarFicha()
+}
+
+/**
+ * Deja constancia de la referencia catastral DEDUCIDA (o de que ya no hay
+ * ninguna, con `null`) y repinta la ficha.
+ *
+ * @param {string|null} refcat
+ * @returns {void}
+ */
+function fijarRefcatDeducida(refcat) {
+  refcatDeducida = typeof refcat === 'string' && refcat !== '' ? refcat : null
   repintarFicha()
 }
 
@@ -2159,6 +2224,24 @@ const visor = crearVisor(nodo('#mapa'), {
   // Nacen las dos VACÍAS: montarlas no deriva nada. Derivar es una resta booleana
   // que cuesta lo que cuesta, y corre cuando el usuario pulsa el CTA (paso 16).
   sobrante: true,
+  // ── LA LEYENDA DE LOS GRAFISMOS (2026-08-15) ─────────────────────────────
+  // Encargo del autor: «que el visor tenga un pequeño cuadro de leyenda donde se
+  // dice qué significa cada grafismo». Y era un agujero real: el visor dibuja
+  // hasta once cosas distintas —amarillo, gris discontinuo, mancha fría, ámbar,
+  // rosa, banda punteada, cian, violeta— **cada una elegida por descarte y con su
+  // porqué escrito en el módulo que la pinta**, y ese porqué no llegaba a la
+  // pantalla. Ver la cabecera de `viewer/leyenda.js`.
+  //
+  // ⚠️ Se pasa `{grupos}` EXPLÍCITO aunque coincida con `GRUPOS_POR_DEFECTO`, por
+  // lo mismo que `baseInicial`: la app dice en voz alta con qué arranca. Y arranca
+  // con los dos grupos que están dibujados SIEMPRE que hay algo en el mapa; los
+  // otros tres los enciende el paso 8, que es quien sabe qué pantalla hay
+  // ({@link refrescarLeyenda}). Una leyenda que anuncia el ámbar de la invasión en
+  // una pantalla donde no se diagnostica nada está mintiendo, y una leyenda que
+  // miente es peor que no tenerla.
+  //
+  // Nace PLEGADA: el mapa es el asunto y esto es el pie de foto.
+  leyenda: { grupos: [GRUPO_LEYENDA.LEVANTAMIENTO, GRUPO_LEYENDA.CATASTRO] },
   // El canal EN VIVO de la ficha (criterio de aceptación 4). Es opción de PRIMER
   // NIVEL y no una clave de `edicion` porque medir mientras se arrastra no exige
   // poder insertar vértices ni enganchar al parcelario: son dos cosas distintas.
@@ -3318,6 +3401,10 @@ comprobacionCableada = cablearComprobacion({
   // que dijera de dónde había salido—. Ver {@link aterrizarTrasContrastar}.
   alCargarParcela: (parcela) => {
     edicionCableada.alCargarParcela(parcela)
+    // La parcela que entra por esta puerta trae su referencia AFIRMADA, así que
+    // una deducción vieja sobra: la ficha ya prefiere la del modelo, y dejarla
+    // colgada reaparecería en cuanto se cargara algo sin referencia.
+    fijarRefcatDeducida(null)
     aterrizarTrasContrastar()
   },
   // ── F10 · el `.json` entra por ESTA zona y no por una segunda ─────────────
@@ -4608,6 +4695,58 @@ function aterrizarTrasContrastar() {
   }
 }
 
+/**
+ * ⭐ **La deducción automática de la importación.** Un `.dxf`/`.txt` entra SIN
+ * referencia catastral —el fichero de un topógrafo trae coordenadas, no
+ * referencias— y hasta hoy la app se limitaba a decirlo y a mandar al usuario a
+ * «Deducir del mapa». El problema es DÓNDE lo dejaba: ese botón vive en **Entrada**
+ * y la importación aterriza en **Edición** ({@link aterrizarTrasContrastar}), así
+ * que el usuario caía en una pantalla desde la que la referencia no se podía sacar,
+ * mirando un «Sin referencia» sin remedio a la vista.
+ *
+ * ── LO QUE ESTO NO CAMBIA, Y ES LO IMPORTANTE ──
+ * **No escribe en el modelo.** `catastro.deducir()` rellena el CAMPO de Entrada y
+ * su rótulo de procedencia, y nada más; aquí solo se añade el eco en la ficha
+ * ({@link fijarRefcatDeducida}), con su coletilla. `parcela.refcat` sigue
+ * significando «esto lo afirma el usuario» y solo lo escribe «Traer del Catastro».
+ * Sin esa disciplina, un DXF importado acabaría generando un GML para la Sede
+ * contra una referencia que nadie ha confirmado — el error silencioso de siempre.
+ *
+ * ── UNA IMPORTACIÓN, UNA PETICIÓN (override O8) ──
+ * Se dispara **solo si el modelo no trae referencia**, que descarta de un tiro los
+ * tres casos que ya la tienen: un `.gml` con la suya, un DXF de «Consulta Masiva»
+ * y las fincas de F22, cuya referencia sale de los rótulos del propio dibujo. Y es
+ * una sola consulta `RCCOOR` por fichero soltado, que es el mismo coste que tenía
+ * el clic que el usuario iba a dar de todos modos.
+ *
+ * La promesa se suelta a propósito: todo lo que puede fallar dentro ya lo cuenta
+ * F05 por su renglón y por el panel, y un fallo de red aquí **no puede** estropear
+ * una importación que ha ido bien.
+ *
+ * @param {object|null} parcela  La que acaba de entrar en el store.
+ * @returns {void}
+ */
+function deducirRefcatTrasImportar(parcela) {
+  if (parcela && parcela.refcat) return
+  if (catastroCableado === null || typeof catastroCableado.deducir !== 'function') return
+
+  catastroCableado
+    .deducir()
+    .then((resultado) => {
+      if (!resultado || resultado.ok !== true || !resultado.datos) return
+      const { candidatos, unico } = resultado.datos
+      // `unico !== true` es el caso de la frontera: el punto interior cae donde el
+      // Catastro conoce varias parcelas. F05 ya ha pintado la lista de candidatos
+      // en Entrada; elegir una aquí sería exactamente el candidato «a dedo» que el
+      // cliente del servicio se niega a escoger.
+      if (unico !== true || !Array.isArray(candidatos) || candidatos.length === 0) return
+      fijarRefcatDeducida(candidatos[0].refcat)
+    })
+    .catch((causa) => {
+      console.error('[main] la deducción automática tras importar ha fallado:', causa)
+    })
+}
+
 // ── La vía de MEDICIÓN PROPIA estrena botón (T6) ────────────────────────────
 //
 // Hasta hoy la única forma de meter un DXF o un TXT era ARRASTRARLO sobre la
@@ -4949,6 +5088,63 @@ const derivacionCableada = cablearDerivacion({
   srs: SRS_DEMO,
 })
 
+// ── 16 bis · LA LEYENDA DICE LO QUE HAY DIBUJADO, Y NADA MÁS ─────────────────
+//
+// La leyenda se montó en el paso 5 con los dos grupos que están siempre —tu
+// medición y el Catastro—, y aquí se le enchufa lo que la pone al día. Va EL
+// ÚLTIMO de los suscriptores porque necesita a los tres que le dicen qué hay:
+//
+//   · la NAVEGACIÓN (paso 14), que sabe el paso y la rama;
+//   · la DERIVACIÓN (paso 16, justo arriba), que sabe si hay una foto del
+//     sobrante viva — sus manchas cian y ámbar están en el mapa exactamente
+//     mientras `ultimaCesion()` no sea `null`, porque su `invalidar()` limpia las
+//     dos capas en el mismo gesto en que la borra;
+//   · el STORE (paso 2), que es lo que hace caducar esa foto: sin oírlo, la
+//     leyenda seguiría anunciando un sobrante que se borró del mapa al mover un
+//     vértice.
+//
+// ⛔ **Por qué no basta con enseñarlo todo siempre**, que era lo cómodo: una
+// leyenda que anuncia el ámbar de la invasión en una pantalla donde no se
+// diagnostica nada le está diciendo al técnico que ese color puede aparecer —y
+// cuando de verdad aparezca, ya no significará lo mismo—. Una leyenda que miente
+// es peor que no tenerla, porque el usuario deja de mirar el mapa y se cree la
+// tarjeta. Es la misma doctrina con la que el diagnóstico distingue «no hay» de
+// «no se sabe».
+//
+// ⚠️ Los grupos se recalculan ENTEROS en cada aviso y se aplican tal cual:
+// `grupos()` repinta doce nodos, así que no hay nada que memorizar, y una
+// comparación de arrays aquí sería una segunda fuente de verdad que se
+// desincroniza sola.
+function gruposDeLeyenda() {
+  // Los dos que están dibujados siempre que hay algo en el mapa.
+  const grupos = [GRUPO_LEYENDA.LEVANTAMIENTO, GRUPO_LEYENDA.CATASTRO]
+  const enEdificio = ramaEnPantalla === RAMA.EDIFICIO
+  if (enEdificio) grupos.push(GRUPO_LEYENDA.EDIFICIO)
+  // El contraste de F07 —la mancha fría, el ámbar, el rosa y la banda del
+  // margen— lo pinta `viewer/contraste.js`, y SOLO en la pantalla de Diagnóstico
+  // de la rama PARCELA: en la de edificio ese cajón es otro y no dibuja nada de
+  // esto.
+  if (!enEdificio && navegacion.get().paso === PASO.DIAGNOSTICO) {
+    grupos.push(GRUPO_LEYENDA.DIAGNOSTICO)
+  }
+  if (derivacionCableada.ultimaCesion() !== null) grupos.push(GRUPO_LEYENDA.SOBRANTE)
+  return grupos
+}
+
+function refrescarLeyenda() {
+  // `?.` y no un `if`: `visor.leyenda` es `null` cuando el visor se monta sin
+  // ella, y este paso no es quien decide que eso sea un error — es la misma
+  // política de opcionalidad que el resto de piezas del visor.
+  visor.leyenda?.grupos(gruposDeLeyenda())
+}
+
+navegacion.subscribe(refrescarLeyenda)
+estado.subscribe(refrescarLeyenda)
+// Y una vez AHORA, para que la leyenda nazca coherente con la pantalla en la que
+// se aterriza (un hash `#/parcela/diagnostico` pegado en un correo entra
+// directamente en Diagnóstico y nadie habría navegado todavía).
+refrescarLeyenda()
+
 // ── 17 · LA MEDICIÓN PROPIA (F18) ────────────────────────────────────────────
 //
 // El paso que le da a `parsers/importar.js` su PRIMER LLAMANTE en producción para
@@ -5001,12 +5197,19 @@ const medicion = cablearMedicion({
   // Edición, que es donde están la tabla de vértices y los CTA.
   alCargarParcela: (parcela) => {
     edicionCableada.alCargarParcela(parcela)
+    // Entra geometría nueva: la deducción de la ANTERIOR deja de valer. Se borra
+    // ANTES de aterrizar para que la ficha no enseñe ni un fotograma la referencia
+    // de la parcela que se acaba de ir.
+    fijarRefcatDeducida(null)
     if (dibujoEsLaOficial(parcela)) {
       refrescarHechos()
       navegacion.navegarAPaso(PASO.EDICION)
-      return
+    } else {
+      aterrizarTrasContrastar()
     }
-    aterrizarTrasContrastar()
+    // Y DESPUÉS de aterrizar: la pantalla ya está donde tiene que estar, así que
+    // la respuesta del Catastro no llega a un rail que todavía se está moviendo.
+    deducirRefcatTrasImportar(parcela)
   },
   // ── F22 · el dibujo trae VARIAS fincas ────────────────────────────────────
   // Las dos piezas del visor y la capa de vecinas. Van desde aquí y no se buscan

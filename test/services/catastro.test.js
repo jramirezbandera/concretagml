@@ -771,10 +771,28 @@ describe('services/catastro · parcelaYColindantes (criterio 4)', () => {
     expect(red.total).toBe(0)
   })
 
-  it('si el servicio devuelve una colección sin la parcela pedida, sale ILEGIBLE', async () => {
+  // ⭐ **O15 CORREGIDO (2026-08-15).** Esto afirmaba lo contrario —que una vecindad
+  // sin la parcela pedida salía `RESPUESTA_ILEGIBLE`— y la corrección no es de
+  // gusto: es que el servicio **no siempre se incluye a sí misma**. Medido en vivo
+  // sobre tres parcelas contiguas del mismo polígono: `8081402TF9288S` y
+  // `8081403TF9288S` vienen con la propia dentro; `8081401TF9288S` devuelve UN
+  // miembro (`8081402TF9288S`) y ella no está.
+  //
+  // Con la regla vieja, esa parcela se quedaba sin colindantes por sus TRES puertas
+  // —«Traer colindantes», el cajón de diagnóstico y el informe—, porque la única
+  // vecina buena que sí había llegado se tiraba entera con la respuesta. Y encima
+  // se contaba como avería del servicio.
+  it('una vecindad sin la parcela pedida NO es ilegible: son todas colindantes', async () => {
     const { cliente } = montar({ plan: { estado: 200, texto: VECINDAD } })
     const r = await cliente.parcelaYColindantes(RC_INEXISTENTE)
-    expect(r.motivo).toBe(MOTIVO_CATASTRO.RESPUESTA_ILEGIBLE)
+
+    expect(r.ok, 'el servicio ha contestado con parcelas: eso no es un fallo').toBe(true)
+    // `propia` es `null` y NO `parcelas[0]`: elegir una a dedo daría por parcela del
+    // usuario a una vecina, que es justo lo que prohíbe la trampa 2.
+    expect(r.datos.propia, 'la pedida no vino, y no se elige una a dedo').toBeNull()
+    // Y NINGÚN miembro se pierde: los que llegaron son todos colindantes.
+    expect(r.datos.colindantes.length).toBe(miembrosDe(VECINDAD))
+    expect(r.datos.colindantes.map((p) => p.refcat)).toContain(RC_BUENA)
   })
 })
 

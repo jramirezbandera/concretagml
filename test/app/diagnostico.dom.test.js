@@ -469,8 +469,20 @@ function montar({
     renglon: document.querySelector(SELECTOR_ESTADO_DIAGNOSTICO),
     botonFondo: document.querySelector(SELECTOR_BOTON_FONDO),
     renglonFondo: document.querySelector(SELECTOR_ESTADO_FONDO),
-    botonInforme: raizCajon.querySelector(SELECTOR_CAJON.DESCARGAR),
+    // ⚠️ **Apunta a `PREPARAR` desde el 2026-08-15, no a `DESCARGAR`.** El botón
+    // del informe en texto se retiró (ver la cabecera de
+    // `viewer/cajon-diagnostico.js`) y el gate del pie no ha cambiado: es UNO y lo
+    // sigue gobernando `pintar`. Este nodo es el que dice si el pie está encendido,
+    // que es lo que la mitad de este fichero pregunta.
+    botonInforme: raizCajon.querySelector(SELECTOR_CAJON.PREPARAR),
     renglonInforme: raizCajon.querySelector(SELECTOR_CAJON.ESTADO_INFORME),
+    // ⛔ **EL INFORME EN TEXTO YA NO TIENE BOTÓN** (2026-08-15). Se dispara por la
+    // API del cableado, que es donde `descargarInforme` siempre estuvo — su propia
+    // cabecera ya decía que estaba ahí «por si alguna vez hace falta dispararlo
+    // desde fuera». Todo lo que este fichero prueba de ella —los bytes, el nombre,
+    // la fecha inyectada, los dos fallos, el gate— sigue siendo verdad y sigue
+    // siendo lo que corre en producción cuando alguien la llama.
+    bajarInforme: () => cableado.descargarInforme(),
   }
 }
 
@@ -1025,6 +1037,96 @@ describe('cableado-diagnostico · la puerta 2 · de dónde sale la referencia', 
     expect(catastro.cargas[0].sustituir).toBe(false)
   })
 
+  // ── ⭐ Y ADEMÁS TRAE LAS VECINAS (2026-08-15) ──────────────────────────────
+  //
+  // El botón se llama «traer el PARCELARIO», y hasta hoy pedía `GetParcel` y nada
+  // más: quien soltaba un .dxf y lo pulsaba veía aparecer su parcela oficial sola
+  // en mitad del mapa, sin nada alrededor con lo que situarla — que es justo lo que
+  // se venía a mirar. Las vecinas ya se sabían pedir y ya se sabían pintar; lo que
+  // faltaba era que ESTE botón las pidiera.
+
+  it('⭐ trae TAMBIÉN las colindantes: un parcelario de una parcela no es un parcelario', async () => {
+    const catastro = crearCatastroConFondo()
+    const { botonFondo } = montar({ parcelaInicial: parcelaConRefcatSinOficial(), catastro })
+
+    botonFondo.click()
+    await cederTurno()
+
+    expect(catastro.cargas, 'el fondo se sigue pidiendo igual').toHaveLength(1)
+    expect(catastro.llamadas, 'y las vecinas, en el mismo gesto').toBe(1)
+  })
+
+  it('⭐ el fondo se pide ANTES que las vecinas: la referencia sale de la carga', async () => {
+    // El orden no es estético. `colindantes()` lee la referencia del MODELO, y con
+    // un .dxf el modelo no la tiene hasta que `cargar({sustituir:false})` la adopta.
+    // Invertir las dos llamadas pediría las vecinas de `null`.
+    const orden = []
+    const base = crearCatastroConFondo()
+    const catastro = {
+      ...base,
+      cargar: async (o) => {
+        orden.push('fondo')
+        return base.cargar(o)
+      },
+      colindantes: async () => {
+        orden.push('vecinas')
+        return base.colindantes()
+      },
+    }
+    const { botonFondo } = montar({ parcelaInicial: parcelaConRefcatSinOficial(), catastro })
+
+    botonFondo.click()
+    await cederTurno()
+
+    expect(orden).toEqual(['fondo', 'vecinas'])
+  })
+
+  it('⛔ y abrir el cajón DESPUÉS no vuelve a la red: una pulsación, una petición', async () => {
+    // El override O8 con el botón nuevo encima. `pedirVecinas` no pide nada si ya
+    // las hay, y las que trajo el fondo llegaron por `alColindantes`, así que están.
+    const catastro = crearCatastroConFondo()
+    const { botonFondo, boton } = montar({
+      parcelaInicial: parcelaConRefcatSinOficial(),
+      catastro,
+    })
+
+    botonFondo.click()
+    await cederTurno()
+    expect(catastro.llamadas).toBe(1)
+
+    boton.click()
+    await cederTurno()
+
+    expect(catastro.llamadas, 'la segunda apertura NO repite la consulta').toBe(1)
+  })
+
+  it('⛔ si las vecinas fallan, el FONDO sigue traído: no se contagia el fallo', async () => {
+    // Lo que enciende el diagnóstico es el fondo, y ya ha entrado cuando se piden
+    // las vecinas. Contar esto como avería del botón diría que ha fallado algo que
+    // ha ido bien. `parcelas: null` es como el doble cuenta un fallo de red.
+    const base = crearCatastroConFondo()
+    const catastro = {
+      ...base,
+      colindantes: async () => {
+        throw new Error('la red se ha caído pidiendo las vecinas')
+      },
+    }
+    const consola = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { botonFondo, renglonFondo } = montar({
+      parcelaInicial: parcelaConRefcatSinOficial(),
+      catastro,
+    })
+
+    botonFondo.click()
+    await cederTurno()
+
+    expect(catastro.cargas).toHaveLength(1)
+    // El renglón queda LIMPIO: la puerta 2 ha hecho lo suyo.
+    expect(renglonFondo.textContent).toBe('')
+    expect(consola).toHaveBeenCalled()
+    consola.mockRestore()
+  })
+
   it('con referencia en el MODELO no deduce nada y usa ésa', async () => {
     // La referencia sale del modelo y NUNCA de `[data-campo="refcat"]`: ese campo
     // vive en Entrada y por el contrato K.1 leerlo desde aquí traería la parcela de
@@ -1291,11 +1393,11 @@ describe('cableado-diagnostico · el informe de contraste: el gate del botón', 
     // El `disabled` es cortesía; la garantía es la comprobación de dentro. Se llama
     // al manejador saltándose el atributo, que es lo que haría un atajo de teclado o
     // el inspector. Mismo criterio que el CTA del pie.
-    const { botonInforme, renglonInforme, entrega } = montar({
+    const { botonInforme, renglonInforme, entrega, bajarInforme } = montar({
       parcelaInicial: parcelaDelCatastro(),
     })
     botonInforme.disabled = false
-    pulsar(botonInforme)
+    bajarInforme()
 
     expect(entrega.creados).toHaveLength(0)
     expect(renglonInforme.textContent).toBe(MOTIVO_INFORME_SIN_DIAGNOSTICO)
@@ -1307,7 +1409,7 @@ describe('cableado-diagnostico · el informe de contraste: el gate del botón', 
     // repinta. Sin olvidar el diagnóstico anterior, el botón se quedaría encendido y
     // el fichero que bajara hablaría de la parcela anterior — con SU referencia
     // catastral en el nombre.
-    const { boton, estado, botonInforme, renglonInforme, entrega } = montar({
+    const { boton, estado, botonInforme, renglonInforme, entrega, bajarInforme } = montar({
       parcelaInicial: parcelaDelCatastro(),
     })
     boton.click()
@@ -1319,7 +1421,7 @@ describe('cableado-diagnostico · el informe de contraste: el gate del botón', 
     expect(botonInforme.disabled).toBe(true)
     expect(renglonInforme.textContent).toBe(MOTIVO_INFORME_SIN_DIAGNOSTICO)
     botonInforme.disabled = false
-    pulsar(botonInforme)
+    bajarInforme()
     expect(entrega.creados).toHaveLength(0)
   })
 
@@ -1348,7 +1450,7 @@ describe('cableado-diagnostico · el informe de contraste: el gate del botón', 
     montar({ parcelaInicial: parcelaDelCatastro() })
 
     expect(document.querySelectorAll(SELECTOR_CAJON.ESTADO_INFORME)).toHaveLength(1)
-    expect(document.querySelectorAll(SELECTOR_CAJON.DESCARGAR)).toHaveLength(1)
+    expect(document.querySelectorAll(SELECTOR_CAJON.PREPARAR)).toHaveLength(1)
     // Anti-vacuidad: la cáscara SÍ trae otros `data-estado`, así que el recuento no
     // está saliendo de un documento vacío.
     const estados = [...document.querySelectorAll('[data-estado]')].map((el) => el.dataset.estado)
@@ -1357,9 +1459,11 @@ describe('cableado-diagnostico · el informe de contraste: el gate del botón', 
     // Y el valor del renglón no es el de NINGUNA acción del documento: cruzar los dos
     // espacios de nombres es exactamente lo que costó M8.
     const acciones = [...document.querySelectorAll('[data-accion]')].map((el) => el.dataset.accion)
-    expect(acciones).toContain('descargar-informe')
+    // Era `descargar-informe` hasta el 2026-08-15: el botón del `.txt` se retiró y
+    // el que hereda el renglón —y por tanto la trampa M8— es el del PDF.
+    expect(acciones).toContain('preparar-informe')
     expect(acciones).not.toContain('informe-contraste')
-    expect(estados).not.toContain('descargar-informe')
+    expect(estados).not.toContain('preparar-informe')
     // ⚠️ Y NO se exige que estado y acción sean disjuntos en todo el documento: en el
     // PIE de la app la convención es justo la contraria (`cargar-catastro`/
     // `cargar-catastro`, `generar-gml`/`generar-gml`) y ahí es correcta, porque hay
@@ -1372,13 +1476,13 @@ describe('cableado-diagnostico · el informe de contraste: el gate del botón', 
 
 describe('cableado-diagnostico · el informe de contraste: bytes de verdad', () => {
   it('pulsar produce BYTES (no un fichero vacío) con el nombre y el MIME esperados', async () => {
-    const { boton, botonInforme, renglonInforme, entrega } = montar({
+    const { boton, botonInforme, renglonInforme, entrega, bajarInforme } = montar({
       parcelaInicial: parcelaDelCatastro(),
     })
     boton.click()
     await cederTurno()
 
-    pulsar(botonInforme)
+    bajarInforme()
 
     // (a) Se entregó UN fichero, y sus bytes son los del texto en UTF-8. Comprobar el
     // `charset` del MIME sería comprobar la ETIQUETA; aquí se decodifica el Blob.
@@ -1422,11 +1526,11 @@ describe('cableado-diagnostico · el informe de contraste: bytes de verdad', () 
     // Es la razón de que el botón viva en el cajón y no en el pie de la comprobación:
     // sirve a las DOS vías sin ramificar la interfaz. Quien llegó por RC no tiene
     // fichero, y su informe se emite sin la sección «Qué se leyó del fichero».
-    const { boton, botonInforme, entrega } = montar({ parcelaInicial: parcelaDelCatastro() })
+    const { boton, botonInforme, entrega, bajarInforme } = montar({ parcelaInicial: parcelaDelCatastro() })
     boton.click()
     await cederTurno()
 
-    pulsar(botonInforme)
+    bajarInforme()
 
     const texto = await entrega.ultimoTexto()
     expect(texto).toContain('INFORME DE CONTRASTE CON EL PARCELARIO CATASTRAL')
@@ -1438,14 +1542,14 @@ describe('cableado-diagnostico · el informe de contraste: bytes de verdad', () 
     // fichero real. Un doble aquí no demostraría nada: lo que se afirma es que el
     // cableado pasa lo que hay cuando lo hay.
     const NOMBRE = 'cp_parcela_9398516VK3799G.gml'
-    const { boton, botonInforme, entrega } = montar({
+    const { boton, botonInforme, entrega, bajarInforme } = montar({
       parcelaInicial: parcelaDelCatastro(),
       comprobacion: () => comprobarGml({ texto: TEXTO_PARCELA, nombreFichero: NOMBRE }),
     })
     boton.click()
     await cederTurno()
 
-    pulsar(botonInforme)
+    bajarInforme()
 
     const texto = await entrega.ultimoTexto()
     expect(texto).toContain('QUÉ SE LEYÓ DEL FICHERO')
@@ -1457,26 +1561,26 @@ describe('cableado-diagnostico · el informe de contraste: bytes de verdad', () 
     // grep sobre su fuente), y el nombre del fichero tampoco. El instante entra por
     // `ahora()`, igual que en `cablearCatastro` y en `cablearGeneracionGml`.
     const OTRO = new Date(Date.UTC(2019, 0, 2, 3, 4, 5))
-    const { boton, botonInforme, entrega } = montar({
+    const { boton, botonInforme, entrega, bajarInforme } = montar({
       parcelaInicial: parcelaDelCatastro(),
       ahora: () => OTRO,
     })
     boton.click()
     await cederTurno()
 
-    pulsar(botonInforme)
+    bajarInforme()
 
     expect(entrega.anclas[0].download).toBe(`contraste_${REFCAT}_2019-01-02T03-04-05.txt`)
     expect(await entrega.ultimoTexto()).toContain('02/01/2019 03:04 (UTC)')
   })
 
   it('descargar dos veces produce dos ficheros y no duplica anclas colgadas del DOM', async () => {
-    const { boton, botonInforme, entrega } = montar({ parcelaInicial: parcelaDelCatastro() })
+    const { boton, botonInforme, entrega, bajarInforme } = montar({ parcelaInicial: parcelaDelCatastro() })
     boton.click()
     await cederTurno()
 
-    pulsar(botonInforme)
-    pulsar(botonInforme)
+    bajarInforme()
+    bajarInforme()
 
     expect(entrega.creados).toHaveLength(2)
     expect(entrega.revocados).toHaveLength(2)
@@ -1528,7 +1632,7 @@ describe('cableado-diagnostico · el nombre del informe', () => {
   it('una parcela SIN refcat baja su informe con la marca, no con el `idLocal`', async () => {
     // `claveDeExpediente` mezcla `refcat` con `idLocal` y les pone prefijo: si el
     // nombre saliera de ahí, el fichero se llamaría `idLocal-de-un-dxf`.
-    const { boton, botonInforme, entrega, estado } = montar()
+    const { boton, botonInforme, entrega, estado, bajarInforme } = montar()
     estado.set(
       crearParcela({
         idLocal: 'de-un-dxf',
@@ -1540,7 +1644,7 @@ describe('cableado-diagnostico · el nombre del informe', () => {
     boton.click()
     await cederTurno()
 
-    pulsar(botonInforme)
+    bajarInforme()
 
     expect(entrega.anclas[0].download).toBe('contraste_sin-referencia_2026-07-30T11-45-30.txt')
     expect(entrega.anclas[0].download).not.toContain('de-un-dxf')
@@ -1553,7 +1657,7 @@ describe('cableado-diagnostico · el informe cuando algo falla', () => {
     // un contrato roto: `informeContrasteTexto` lanza. La excepción NO puede subir —
     // esto corre dentro de un oyente del DOM y una excepción lanzada ahí no sale por
     // `dispatchEvent` (medido en F08 · T3.2): el usuario vería que no pasa nada.
-    const { boton, botonInforme, renglonInforme, entrega } = montar({
+    const { boton, botonInforme, renglonInforme, entrega, bajarInforme } = montar({
       parcelaInicial: parcelaDelCatastro(),
       comprobacion: () => 42,
     })
@@ -1561,7 +1665,7 @@ describe('cableado-diagnostico · el informe cuando algo falla', () => {
     await cederTurno()
     const enConsola = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    expect(() => pulsar(botonInforme)).not.toThrow()
+    expect(() => bajarInforme()).not.toThrow()
 
     expect(entrega.creados).toHaveLength(0)
     expect(renglonInforme.textContent).toContain('no se ha podido componer')
@@ -1582,7 +1686,7 @@ describe('cableado-diagnostico · el informe cuando algo falla', () => {
         throw fallo
       },
     })
-    const { boton, botonInforme, renglonInforme } = montar({
+    const { boton, botonInforme, renglonInforme, bajarInforme } = montar({
       parcelaInicial: parcelaDelCatastro(),
       entrega,
     })
@@ -1590,7 +1694,7 @@ describe('cableado-diagnostico · el informe cuando algo falla', () => {
     await cederTurno()
     const enConsola = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    expect(() => pulsar(botonInforme)).not.toThrow()
+    expect(() => bajarInforme()).not.toThrow()
 
     // La limpieza de `descargarTexto` se hizo IGUAL, antes de propagar: el anchor no
     // se ha quedado colgado del DOM y el objeto-URL está revocado.
@@ -1605,14 +1709,14 @@ describe('cableado-diagnostico · el informe cuando algo falla', () => {
   })
 
   it('`destruir()` deja el botón del informe INERTE', async () => {
-    const { boton, botonInforme, cableado, entrega } = montar({
+    const { boton, botonInforme, cableado, entrega, bajarInforme } = montar({
       parcelaInicial: parcelaDelCatastro(),
     })
     boton.click()
     await cederTurno()
 
     cableado.destruir()
-    pulsar(botonInforme)
+    bajarInforme()
 
     expect(entrega.creados).toHaveLength(0)
     // Y por la API tampoco: el cableado está muerto.
@@ -1662,8 +1766,14 @@ describe('cableado-diagnostico · contratos del programador', () => {
   })
 
   it('exige del cajón las DOS piezas del pie del informe', () => {
-    // Se comprueba lo que se USA. Un cajón sin `alDescargar`/`estadoInforme` dejaría
+    // Se comprueba lo que se USA. Un cajón sin `alPreparar`/`estadoInforme` dejaría
     // el botón montado y mudo, que es exactamente el fallo que este pie no admite.
+    //
+    // ⚠️ `alDescargar` estaba en esta lista hasta el 2026-08-15 y se ha ido con el
+    // botón del `.txt`. `alPreparar` lo consume `app/cableado-informe.js` y NO este
+    // módulo, y aun así se exige: este cableado es el primero de los dos que monta
+    // sobre el pie, y un cajón sin ese canal dejaría el botón del documento firmable
+    // montado y mudo sin un solo síntoma.
     const { mapa } = montarMapa({ zoom: 19 })
     crearPanes(mapa)
     const cajon = crearCajonDiagnostico({ mapa })
@@ -1671,7 +1781,7 @@ describe('cableado-diagnostico · contratos del programador', () => {
     const panel = crearDialogoAvisos({ documento: document })
     const base = { estado: crearEstadoVista(null), contraste, panel }
 
-    for (const que of ['alDescargar', 'estadoInforme']) {
+    for (const que of ['alPreparar', 'estadoInforme']) {
       const mutilado = { ...cajon, [que]: undefined }
       expect(() => cablearDiagnostico({ ...base, cajon: mutilado }), que).toThrow(TypeError)
     }

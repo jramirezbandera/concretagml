@@ -998,3 +998,154 @@ describe('parsers/importar — F22 · los rótulos que el fichero trae dentro', 
     })
   })
 })
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// EL FLAG DE CIERRE DEL DXF (cÃ³digo 70) â€” la cuarta banda de `resolverCierre`
+//
+// â›” Defecto medido el 2026-08-15 con `cierre_flag70_arco.dxf`, un fichero real:
+// una polilÃ­nea marcada como CERRADA cuyo tramo de cierre mide 0,1118 m. AutoCAD
+// la dibujaba cerrada y la aplicaciÃ³n preguntaba por un error de cierre â€” dos
+// cosas ciertas que juntas se leen como una contradicciÃ³n (lecciÃ³n M28). Peor:
+// la pregunta empujaba a la respuesta equivocada, porque Â«retirar el vÃ©rtice de
+// cierreÂ» se habrÃ­a comido el Ãºltimo vÃ©rtice bueno de un arco de 17 tramos.
+//
+// La verdad externa estÃ¡ en el fichero: con `70=1` el DXF afirma que el tramo
+// VÃºltimoâ†’V0 es una arista dibujada y que NO hay vÃ©rtice de cierre repetido.
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+describe('parsers/importar â€” CIERRE declarado por el fichero (DXF, cÃ³digo 70)', () => {
+  const DXF_CERRADO = leer('../fixtures/parsers/cierre_flag70_arco.dxf')
+
+  /** El mismo anillo, con el flag de cierre que se le diga. Es el A/B del bloque:
+   *  geometrÃ­a IDÃ‰NTICA, lo Ãºnico que cambia es lo que el fichero declara. */
+  const conFlag = (flag, anillo) =>
+    [
+      '0', 'SECTION', '2', 'ENTITIES',
+      '0', 'LWPOLYLINE', '8', 'PARCELA', '90', String(anillo.length), '70', String(flag),
+      ...anillo.flatMap(([x, y]) => ['10', String(x), '20', String(y)]),
+      '0', 'ENDSEC', '0', 'EOF',
+    ].join('\n') + '\n'
+
+  /** Cuadrado 10Ã—10 cuyo Ãºltimo vÃ©rtice queda a ~0,10 m del primero: exactamente
+   *  el caso que hasta hoy caÃ­a siempre en la banda ambigua. */
+  const CASI_CERRADO = [
+    [500000, 4000000],
+    [500010, 4000000],
+    [500010, 4000010],
+    [500000, 4000010],
+    [500000.08, 4000000.06],
+  ]
+
+  it('el fichero REAL: INFO, no AVISO â€” y la geometrÃ­a, intacta', () => {
+    const { anillos, detecciones, parcela } = importar(DXF_CERRADO)
+    const cierre = porTipo(detecciones, TIPO_DETECCION.CIERRE)
+    expect(cierre).toHaveLength(1)
+    expect(cierre[0].severidad).toBe(SEVERIDAD.INFO)
+    expect(cierre[0].datos.interpretacion).toBe('CERRADO_EN_EL_FICHERO')
+    expect(cierre[0].datos.cerradoEnElFichero).toBe(true)
+    expect(cierre[0].datos.aplicado).toBe('NINGUNO')
+    // El error se sigue MIDIENDO y publicando: no se pregunta, pero no se oculta.
+    expect(cierre[0].datos.error).toBeCloseTo(0.1118, 4)
+    // Los 21 vÃ©rtices siguen ahÃ­: ni se retira el Ãºltimo ni se compensa nada.
+    expect(anillos[0]).toHaveLength(21)
+    expect(parcela).not.toBeNull()
+    expect(parcela.recintos[0].vertices).toHaveLength(21)
+  })
+
+  it('â­ el A/B que lo demuestra: MISMA geometrÃ­a, `70=1` calla y `70=0` pregunta', () => {
+    // Si el cambio dependiera de la geometrÃ­a serÃ­a una heurÃ­stica nuestra. AquÃ­
+    // los dos ficheros traen los MISMOS cinco vÃ©rtices y el mismo error de 0,10 m:
+    // lo Ãºnico distinto es lo que el fichero declara de sÃ­ mismo.
+    const cerrado = porTipo(
+      importar(conFlag(1, CASI_CERRADO)).detecciones,
+      TIPO_DETECCION.CIERRE,
+    )[0]
+    const abierto = porTipo(
+      importar(conFlag(0, CASI_CERRADO)).detecciones,
+      TIPO_DETECCION.CIERRE,
+    )[0]
+    expect(cerrado.datos.error).toBeCloseTo(abierto.datos.error, 12) // el MISMO error
+    expect(cerrado.severidad).toBe(SEVERIDAD.INFO)
+    expect(cerrado.datos.interpretacion).toBe('CERRADO_EN_EL_FICHERO')
+    expect(abierto.severidad).toBe(SEVERIDAD.AVISO)
+    expect(abierto.datos.interpretacion).toBe('AMBIGUO')
+    expect(abierto.datos.cerradoEnElFichero).toBe(false)
+  })
+
+  it('las dos lecturas se siguen publicando como dato, aunque no se pregunte', () => {
+    // Que no haya pregunta no puede significar que se pierda la capacidad: una
+    // interfaz que quiera ofrecer Â«compensarÂ» bajo demanda tiene aquÃ­ el anillo
+    // ya calculado, sin reimplementar Bowditch.
+    const d = porTipo(importar(conFlag(1, CASI_CERRADO)).detecciones, TIPO_DETECCION.CIERRE)[0]
+    expect(d.datos.anilloSinCierre).toHaveLength(4)
+    expect(d.datos.anilloCompensado).toHaveLength(4)
+    expect(d.datos.metodo).toBe('bowditch')
+    expect(d.datos.toleranciaCierre).toBe(0.5)
+  })
+
+  it('si el llamante PIDE la correcciÃ³n se aplica igual, y entonces sube a AVISO', () => {
+    // Â«Ofrecer, no tocarÂ» sigue en pie por los dos lados: el fichero no nos obliga
+    // a ignorar al usuario, pero alterar geometrÃ­a contra lo que el propio fichero
+    // afirma no puede irse en un INFO.
+    const { anillos, detecciones } = importar(conFlag(1, CASI_CERRADO), { retirarCierre: true })
+    const d = porTipo(detecciones, TIPO_DETECCION.CIERRE)[0]
+    expect(d.datos.aplicado).toBe('RETIRADO')
+    expect(d.severidad).toBe(SEVERIDAD.AVISO)
+    expect(d.datos.interpretacion).toBe('CERRADO_EN_EL_FICHERO')
+    expect(anillos[0]).toHaveLength(4)
+  })
+
+  it('el flag NO se cuela en las otras bandas: cierre exacto y arista larga, igual que siempre', () => {
+    // (a) VÃºltimo duplica V0 EXACTAMENTE, con `70=1`: se retira sin Deteccion, que
+    //     es normalizaciÃ³n trivial y lo era antes de este cambio.
+    const exacto = [...CASI_CERRADO.slice(0, 4), [500000, 4000000]]
+    const a = importar(conFlag(1, exacto))
+    expect(porTipo(a.detecciones, TIPO_DETECCION.CIERRE)).toHaveLength(0)
+    expect(a.anillos[0]).toHaveLength(4)
+
+    // (b) Arista de cierre REAL (> 0,5 m) con `70=1`: sigue siendo INFO 'ABIERTO'.
+    //     El flag solo desambigua DENTRO de la banda ambigua; fuera no hay nada
+    //     que desambiguar y el mensaje de siempre sigue siendo el correcto.
+    const b = importar(
+      conFlag(1, [
+        [500000, 4000000],
+        [500030, 4000000],
+        [500015, 4000030],
+      ]),
+    )
+    const d = porTipo(b.detecciones, TIPO_DETECCION.CIERRE)[0]
+    expect(d.severidad).toBe(SEVERIDAD.INFO)
+    expect(d.datos.interpretacion).toBe('ABIERTO')
+  })
+
+  it('LIST y TXT no declaran cierre, asÃ­ que su banda ambigua NO cambia', () => {
+    // El flag es del DXF. Un pegado de coordenadas no tiene forma de afirmar que
+    // el anillo cierra, y ahÃ­ `false` no es Â«no se sabeÂ»: es la verdad.
+    const d = porTipo(
+      importar(aTXT(CASI_CERRADO), { formato: 'TXT' }).detecciones,
+      TIPO_DETECCION.CIERRE,
+    )[0]
+    expect(d.severidad).toBe(SEVERIDAD.AVISO)
+    expect(d.datos.cerradoEnElFichero).toBe(false)
+    expect(d.datos.aplicado).toBe('NINGUNO')
+  })
+
+  it('el flag viaja POR ANILLO y sobrevive al filtrado por capa', () => {
+    // El filtro por capa reordena y descarta anillos: si `cerrados[]` no se
+    // filtrara con `anillos[]` y `capas[]`, el flag se leerÃ­a del anillo
+    // equivocado EN SILENCIO. AquÃ­ la capa elegida es la segunda del fichero.
+    const texto =
+      [
+        '0', 'SECTION', '2', 'ENTITIES',
+        '0', 'LWPOLYLINE', '8', 'OTRA', '90', '5', '70', '0',
+        ...CASI_CERRADO.flatMap(([x, y]) => ['10', String(x), '20', String(y)]),
+        '0', 'LWPOLYLINE', '8', 'BUENA', '90', '5', '70', '1',
+        ...CASI_CERRADO.flatMap(([x, y]) => ['10', String(x + 100), '20', String(y)]),
+        '0', 'ENDSEC', '0', 'EOF',
+      ].join('\n') + '\n'
+    const buena = porTipo(importar(texto, { capa: 'BUENA' }).detecciones, TIPO_DETECCION.CIERRE)
+    expect(buena).toHaveLength(1)
+    expect(buena[0].datos.cerradoEnElFichero).toBe(true) // el flag de la SEGUNDA
+    const otra = porTipo(importar(texto, { capa: 'OTRA' }).detecciones, TIPO_DETECCION.CIERRE)
+    expect(otra[0].datos.cerradoEnElFichero).toBe(false)
+  })
+})

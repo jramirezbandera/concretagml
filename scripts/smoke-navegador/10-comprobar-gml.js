@@ -894,10 +894,14 @@ const familiaEsperada = (fontSans.split(',')[0] || '').trim().replace(/^["']|["'
 const botonesDeCajon = [
   ['contrastar', cajonComp.querySelector('[data-accion="contrastar-parcelario"]')],
   ['descartar', cajonComp.querySelector('[data-accion="descartar-comprobacion"]')],
-  ['descargar-informe', cajonDiag.querySelector('[data-accion="descargar-informe"]')],
-  // El primario del pie de F09. Entra en la misma lista porque nació con el mismo
-  // reparto —el módulo pone tamaño y grosor, la hoja pone la familia— y se rompería
-  // igual: en silencio, y solo en navegador (en jsdom no hay cascada).
+  // ⛔ Aquí iba `descargar-informe`, que es el botón QUE TUVO el defecto que este
+  // bloque vigila (2026-07-30: `font: 'inherit'` en línea dejaba muerta la regla de
+  // `estilos/app.css` y salía en `system-ui`). Se retiró el 2026-08-15; el guardián
+  // no se va con él, porque lo que hay que vigilar es el REPARTO —el módulo pone
+  // tamaño y grosor, la hoja pone la familia— y quien lo hereda es el de abajo.
+  //
+  // El primario del pie de F09, hoy el único. Nació con el mismo reparto y se
+  // rompería igual: en silencio, y solo en navegador (en jsdom no hay cascada).
   ['preparar-informe', cajonDiag.querySelector('[data-accion="preparar-informe"]')],
 ]
 const tipografia = {
@@ -1456,194 +1460,65 @@ if (colindantes.cerroElCajonDeDiagnostico) {
   }
 }
 
-// ── 9 · El informe de contraste: BYTES, no una promesa ──────────────────────
+// ── 9 · ⛔ RETIRADA EL 2026-08-15: el informe de contraste ya no tiene botón ─
 //
-// Mismo patrón de captura que `06` (GUION.md §12) y con la misma promesa: los
-// tres envoltorios se restauran en un `finally` y el veredicto lo DECLARA. Un
-// guion que deja la página parcheada convierte en mentira todo lo que se mida
-// después de él.
+// Aquí vivían ~190 líneas que pulsaban «Descargar informe de contraste» con
+// `URL.createObjectURL`, `URL.revokeObjectURL` y `document.createElement`
+// envueltos, y comprobaban lo que de verdad bajaba: que el Blob no pesara 0, que
+// la URL creada se revocara, que el documento se titulara con su nombre LEGAL,
+// que desmintiera ser la VGA/IVG, que dijera que no lleva pie de firma y que
+// remitiera al firmable, y que pulsar no cerrara el cajón por debajo.
+//
+// **El botón se ha retirado del pie por encargo del autor** («no hace falta lo de
+// descargar informe de contraste que saca el txt, solo necesito el pdf»), así que
+// desde el navegador **ya no hay ningún gesto que dispare ese documento**:
+// `app/main.js` no expone el cableado, y sin botón no queda por dónde entrar.
+//
+// ⚠️ **QUÉ SE PIERDE, DICHO EN VOZ ALTA Y NO TAPADO.** Lo que este bloque medía
+// es lo único que jsdom no puede medir de aquel documento: la ENTREGA real —el
+// `<a download>`, el Blob y la revocación de su URL— en un navegador de verdad. El
+// CONTENIDO sigue vigilado, y con la misma exigencia, en
+// `test/comprobacion/aceptacion-f08.dom.test.js` y en
+// `test/app/diagnostico.dom.test.js`, que ahora lo disparan por
+// `cablearDiagnostico#descargarInforme` en vez de por el botón. Lo que ya no
+// tiene guardián en navegador es la entrega, y solo de ESTE documento: la del PDF
+// la mide el guion `11-informe-pdf.js`, y la del GML, el `03`.
+//
+// Lo que queda es la guarda de la retirada, que es barata y sí dice algo cierto
+// hoy: que el botón no ha vuelto y que el pie tiene la acción que le toca.
 
 const botonInforme = cajonDiag.querySelector('[data-accion="descargar-informe"]')
-const crearUrlOriginal = URL.createObjectURL
-const revocarUrlOriginal = URL.revokeObjectURL
-const crearElementoOriginal = document.createElement
-const teniaCreateElementPropio = Object.prototype.hasOwnProperty.call(document, 'createElement')
-
-const blobs = []
-const hrefsCreados = []
-const hrefsRevocados = []
-const anclas = []
-
-URL.createObjectURL = function (objeto) {
-  const href = crearUrlOriginal.call(URL, objeto)
-  blobs.push(objeto)
-  hrefsCreados.push(href)
-  return href
-}
-URL.revokeObjectURL = function (href) {
-  hrefsRevocados.push(href)
-  return revocarUrlOriginal.call(URL, href)
-}
-document.createElement = function (etiqueta, ...resto) {
-  const el = crearElementoOriginal.call(document, etiqueta, ...resto)
-  if (String(etiqueta).toLowerCase() === 'a') anclas.push(el)
-  return el
-}
-
-const informeHabilitadoAntes = !botonInforme.disabled
-const diagnosticoAbiertoAntesDeDescargar = visible(cajonDiag)
-let excepcionAlDescargar = null
-try {
-  botonInforme.click()
-} catch (error) {
-  excepcionAlDescargar = `${error.name}: ${error.message}`
-} finally {
-  URL.createObjectURL = crearUrlOriginal
-  URL.revokeObjectURL = revocarUrlOriginal
-  if (teniaCreateElementPropio) document.createElement = crearElementoOriginal
-  else delete document.createElement
-}
-await new Promise((r) => setTimeout(r, 200))
-
-const restaurado =
-  URL.createObjectURL === crearUrlOriginal &&
-  URL.revokeObjectURL === revocarUrlOriginal &&
-  document.createElement === crearElementoOriginal
-const ancla = anclas.find((a) => typeof a.download === 'string' && a.download.length > 0) || null
-const contenido = blobs.length > 0 ? await blobs[0].text() : null
-// EL título: la primera línea que no es en blanco ni una regla de `=`. Se busca
-// así y no «las primeras N líneas» porque la cabecera del informe trae, a dos
-// párrafos del título, el desmentido que NOMBRA la VGA y el IVG para negarlos —
-// y un umbral de líneas los metía en el mismo saco (medido: la primera versión
-// de este guion salió roja sobre un informe correcto).
-const lineasInforme = (contenido || '').split('\n')
-const tituloInforme = lineasInforme.find((l) => l.trim() !== '' && !/^=+$/.test(l.trim())) ?? null
-
+const botonPreparar = cajonDiag.querySelector('[data-accion="preparar-informe"]')
 const informe = {
-  habilitadoAntesDePulsar: informeHabilitadoAntes,
-  excepcionAlDescargar,
-  blobsCapturados: blobs.length,
-  bytes: blobs.length > 0 ? blobs[0].size : null,
-  tipo: blobs.length > 0 ? blobs[0].type : null,
-  revocaLaQueCreo:
-    hrefsCreados.length === hrefsRevocados.length && hrefsCreados.every((h, i) => h === hrefsRevocados[i]),
-  restaurado,
-  nombreDelAncla: ancla === null ? null : ancla.download,
-  anclaFueraDelDom: ancla === null ? null : !document.body.contains(ancla),
-  renglon: texto('[data-estado="informe-contraste"]'),
-  // El contenido, por AFIRMACIONES y no por snapshot: el snapshot es de la suite
-  // (test/report/), aquí lo que se comprueba es que los bytes que baja el
-  // navegador son ESE informe y no un fichero vacío.
-  titulo: tituloInforme === null ? null : tituloInforme.trim(),
-  titulaComoTocaLegalmente:
-    /^INFORME DE CONTRASTE CON EL PARCELARIO CATASTRAL$/i.test((tituloInforme || '').trim()),
-  // ⚠️ Aquí NO se puede buscar «validación gráfica» en todo el documento, y la
-  // primera versión de este guion lo hizo y salió ROJA sobre un informe
-  // CORRECTO. VGA/IVG son documentos oficiales con CSV y un nombre casi homónimo
-  // hace creer al cliente que ya presentó algo, así que
-  // `report/contraste-texto.js` los nombra tres veces A PROPÓSITO: dos para
-  // DESMENTIRLOS («Este documento NO es la validación gráfica alternativa
-  // (VGA)…», y otra vez en el pie) y una tercera en otro sentido («la validación
-  // completa» de la geometría, que es F02). Lo que hay que comprobar son las dos
-  // cosas de verdad: que el desmentido ESTÉ, y que el documento no se LLAME así.
-  desmienteSerLaValidacionGrafica:
-    /NO es la validaci[oó]n gr[aá]fica alternativa \(VGA\)/i.test(contenido || ''),
-  seLlamaValidacionGraficaEnElTitulo: /validaci[oó]n\s+gr[aá]fica/i.test(tituloInforme || ''),
-  // ⚠️ REESCRITO EN F09 (T4.2). Hasta el 2026-08-02 aquí se buscaba «provisional»,
-  // porque el informe se llamaba a sí mismo «VERSIÓN PROVISIONAL EN TEXTO» y decía
-  // que el firmable «todavía no existe». F09 lo trajo, así que el desmentido se
-  // reescribió: lo que hay que medir ahora son las DOS mitades que siguen siendo
-  // verdad —que este documento no lleva pie de firma, y que REMITE al que sí lo
-  // lleva por el nombre de su botón—. El `\s+` no es aseo: el párrafo va justificado
-  // a lo ancho y el rótulo se puede partir por un salto de línea.
-  diceQueNoLlevaPieDeFirma: /sin\s+pie\s+de\s+firma/i.test(contenido || ''),
-  remiteAlInformeFirmable: /«Preparar\s+informe\s+\(PDF\)»/i.test(contenido || ''),
-  // Y que la frase caducada no haya vuelto: un desmentido viejo se sigue leyendo con
-  // la misma cara de cierto que uno vigente.
-  siguePresumiendoDeQueElFirmableNoExiste: /todav[ií]a\s+no\s+existe/i.test(contenido || ''),
-  nombraElFicheroDeOrigen: (contenido || '').includes('cp_parcela_9398516VK3799G.gml'),
-  lineas: contenido === null ? null : contenido.split('\n').length,
-  // Y la mitad que solo se ve aquí: ¿sigue el cajón donde se acaba de escribir el
-  // desenlace?
-  diagnosticoAbiertoAntesDeDescargar,
-  diagnosticoSigueAbierto: visible(cajonDiag),
+  retirado: '2026-08-15 · el informe en texto ya no tiene botón; ver la cabecera de esta sección',
+  botonDeTextoQueNoDeberiaEstar: botonInforme !== null,
+  hayAccionPrincipalEnElPie: botonPreparar !== null,
+  rotuloDeLaAccionPrincipal: botonPreparar === null ? null : botonPreparar.textContent,
+  // El renglón sigue siendo el canal por el que el pie habla, y sigue siendo ÚNICO
+  // en todo el documento (lección M8 de F07).
+  renglonesDeInforme: document.querySelectorAll('[data-estado="informe-contraste"]').length,
 }
-if (excepcionAlDescargar !== null) {
-  problemas.push(`Pulsar «Descargar informe de contraste» ha LANZADO: ${excepcionAlDescargar}.`)
-}
-if (!restaurado) {
+
+if (informe.botonDeTextoQueNoDeberiaEstar) {
   problemas.push(
-    'El guion NO ha restaurado los envoltorios de `URL.createObjectURL` / `URL.revokeObjectURL` / ' +
-      '`document.createElement`: la página queda parcheada y cualquier medida posterior es sospechosa.',
+    'Ha vuelto «Descargar informe de contraste» al pie del cajón de diagnóstico. Se retiró el ' +
+      '2026-08-15 por encargo del autor. Si la vuelta es deliberada, hay que reponer también las ' +
+      '~190 líneas de este bloque que medían sus BYTES: sin ellas el botón baja un fichero que ' +
+      'nadie comprueba en navegador.',
   )
 }
-if (informe.blobsCapturados !== 1) {
+if (!informe.hayAccionPrincipalEnElPie) {
   problemas.push(
-    `Se esperaba EXACTAMENTE 1 llamada a URL.createObjectURL al pulsar «Descargar informe» y ha ` +
-      `habido ${informe.blobsCapturados}. Renglón: ${JSON.stringify(informe.renglon)}.`,
+    'El pie del cajón de diagnóstico se ha quedado SIN acción principal: no hay ' +
+      '[data-accion="preparar-informe"]. El criterio AC3 de F08 pide que la acción que consume el ' +
+      'diagnóstico esté donde el diagnóstico se lee, y ahora mismo no está en ninguna parte.',
   )
 }
-if (informe.bytes !== null && informe.bytes === 0) {
-  problemas.push('El informe ha bajado con 0 bytes: un fichero vacío es peor que ningún fichero.')
-}
-if (informe.blobsCapturados > 0 && !informe.revocaLaQueCreo) {
+if (informe.renglonesDeInforme !== 1) {
   problemas.push(
-    `La URL de blob del informe NO se ha revocado (o se ha revocado otra): creadas ` +
-      `${JSON.stringify(hrefsCreados)}, revocadas ${JSON.stringify(hrefsRevocados)}.`,
-  )
-}
-if (!informe.titulaComoTocaLegalmente) {
-  problemas.push(
-    `El informe descargado no se titula «Informe de contraste con el parcelario catastral» sino ` +
-      `${JSON.stringify(informe.titulo)}.`,
-  )
-}
-if (!informe.desmienteSerLaValidacionGrafica) {
-  problemas.push(
-    'El informe descargado NO desmiente ser la validación gráfica alternativa (VGA) ni el informe ' +
-      'de validación gráfica (IVG): son un procedimiento y un documento OFICIALES con código ' +
-      'seguro de verificación, y sin ese desmentido escrito el cliente puede creer que descargar ' +
-      'este fichero presenta algo ante la Sede.',
-  )
-}
-if (informe.seLlamaValidacionGraficaEnElTitulo) {
-  problemas.push(
-    'El bloque del título del informe se llama a sí mismo «validación gráfica»: ése es el nombre ' +
-      'de un documento oficial del Catastro y este no lo es.',
-  )
-}
-if (!informe.diceQueNoLlevaPieDeFirma) {
-  problemas.push(
-    'El informe descargado no dice que NO lleva pie de firma: sin eso, un texto con el nombre legal ' +
-      'del documento y todas las cifras dentro se puede presentar como si estuviera firmado.',
-  )
-}
-if (!informe.remiteAlInformeFirmable) {
-  problemas.push(
-    'El informe descargado no remite al documento firmable por el nombre de su botón («Preparar ' +
-      'informe (PDF)»): decir lo que falta sin decir dónde está es media regla de oro 1.',
-  )
-}
-if (informe.siguePresumiendoDeQueElFirmableNoExiste) {
-  problemas.push(
-    'El informe descargado sigue diciendo que el documento firmable «todavía no existe». Lo trajo ' +
-      'F09 el 2026-08-02: el aviso caducó y ahora es falso, pero se lee con la misma cara de cierto.',
-  )
-}
-if (!informe.nombraElFicheroDeOrigen) {
-  problemas.push(
-    'El informe descargado no nombra el fichero del que salió la geometría: sin eso, el documento ' +
-      'no dice de quién es la medición que contrasta.',
-  )
-}
-if (informe.diagnosticoAbiertoAntesDeDescargar && !informe.diagnosticoSigueAbierto) {
-  problemas.push(
-    'Pulsar «Descargar informe de contraste» CIERRA el cajón de diagnóstico, y el desenlace ' +
-      `(${JSON.stringify(informe.renglon)}) se escribe en un renglón que acaba de desaparecer: el ` +
-      'usuario no llega a leer que su fichero ha bajado, ni el motivo si no baja. La causa está ' +
-      'medida: `gml/descargar.js` cuelga el `<a download>` del `<body>` y su `click()` sintético ' +
-      'burbujea hasta `document`, donde el guardián de clic-fuera de F07 lo cuenta como un clic ' +
-      'fuera del cajón (`disableClickPropagation` no detiene el `click`).',
+    `Hay ${informe.renglonesDeInforme} nodos [data-estado="informe-contraste"] y tiene que haber ` +
+      'exactamente 1: `querySelector` se queda con el PRIMERO del documento y el resto quedaría ' +
+      'mudo SIN SÍNTOMA. Es la lección M8 de F07.',
   )
 }
 

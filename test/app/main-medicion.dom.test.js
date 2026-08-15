@@ -90,6 +90,64 @@ describe('main · paso 17 · el dibujo tiene DOS destinos', () => {
   })
 })
 
+// ── ⭐ La deducción automática al importar (2026-08-15) ──────────────────────
+//
+// Un `.dxf` entra SIN referencia catastral, y hasta hoy la app se limitaba a
+// decirlo y a mandar al usuario a «Deducir del mapa» — que vive en **Entrada**,
+// mientras que la importación aterriza en **Edición**. O sea: el remedio estaba en
+// la pantalla de la que el usuario acababa de salir.
+//
+// Estos son guardianes de FUENTE, como los tres de arriba, y por el mismo motivo:
+// lo que afirman es cómo está montada la costura, no lo que se ve al usarla. El
+// invariante que protegen es el caro — que la deducción NO escriba en el modelo —,
+// porque romperlo no se nota al probar la app: se nota meses después, en un GML
+// presentado a la Sede contra una referencia que nadie confirmó.
+
+/** El cuerpo de `deducirRefcatTrasImportar`, aislado para poder afirmarlo. */
+const CUERPO_DEDUCCION = (() => {
+  const desde = MAIN_CODIGO.indexOf('function deducirRefcatTrasImportar(')
+  if (desde === -1) return null
+  // Hasta la siguiente declaración de primer nivel, que es donde acaba la función.
+  const resto = MAIN_CODIGO.slice(desde + 1)
+  const hasta = resto.search(/\n(?:function|const|let|describe)\s/)
+  return hasta === -1 ? resto : resto.slice(0, hasta)
+})()
+
+describe('main · paso 17 · la deducción automática de la referencia', () => {
+  it('existe y la ENCADENA el gancho de la medición, no el del Catastro', () => {
+    expect(CUERPO_DEDUCCION, 'no está `deducirRefcatTrasImportar`').not.toBeNull()
+    expect(MAIN_CODIGO).toMatch(/deducirRefcatTrasImportar\(parcela\)/)
+    expect(MAIN_CODIGO).toContain('catastroCableado.deducir')
+  })
+
+  it('⭐ solo deduce si NO hay referencia ya: una importación, una petición (O8)', () => {
+    // Sin esta guarda, un `.gml` con su referencia, un DXF de «Consulta Masiva» y
+    // las fincas de F22 —que la sacan de los rótulos del propio dibujo— pagarían
+    // una consulta al Catastro que nadie necesita.
+    expect(CUERPO_DEDUCCION).toMatch(/if\s*\(parcela\s*&&\s*parcela\.refcat\)\s*return/)
+  })
+
+  it('⛔⛔ y NO escribe en el modelo: `refcat` sigue significando «lo afirma el usuario»', () => {
+    // El invariante de `cableado-catastro.js` («por qué la deducción no escribe en
+    // el modelo»), aplicado a la puerta nueva. Lo único que esta función toca es la
+    // ficha, y eso lleva su coletilla de «deducida, sin confirmar».
+    expect(CUERPO_DEDUCCION).not.toMatch(/estado\.set\(/)
+    expect(CUERPO_DEDUCCION).not.toMatch(/refcat:\s/)
+    expect(CUERPO_DEDUCCION).toContain('fijarRefcatDeducida')
+  })
+
+  it('⚠️ con VARIAS candidatas no elige ninguna: eso sería el candidato «a dedo»', () => {
+    expect(CUERPO_DEDUCCION).toMatch(/unico\s*!==\s*true/)
+  })
+
+  it('la ficha distingue la deducida de la afirmada, y el guardián no es vacuo', () => {
+    // Si algún día se pinta a secas, una parcela importada de un DXF se leería en la
+    // ficha exactamente igual que una traída de la Sede.
+    expect(MAIN_CODIGO).toContain('SUFIJO_REFCAT_DEDUCIDA')
+    expect(MAIN).toContain('deducida, sin confirmar')
+  })
+})
+
 describe('main · paso 17 · la lista de extensiones tiene UN dueño', () => {
   it('las dos ramas comparten `.dxf` y `.txt`', () => {
     expect([...EXTENSIONES_EDIFICIO]).toEqual(['.dxf', '.txt'])
