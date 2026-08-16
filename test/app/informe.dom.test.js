@@ -69,6 +69,7 @@ import {
   MENSAJE_PLANO_NO_COMPUESTO,
   MOTIVO_CIERRE_POR_CAMBIO,
   MOTIVO_DESCRIPTIVOS_SIN_DATO,
+  MOTIVO_PREPARACION_SUPERADA,
   MOTIVO_SIN_CLIENTE,
   MOTIVO_SIN_REFCAT,
   cablearInforme,
@@ -307,6 +308,20 @@ function crearCatastroDoble() {
       const resultado = {
         ok: true,
         datos: { propia: null, colindantes: parcelas },
+        motivo: null,
+        mensaje: null,
+      }
+      for (const fn of suscriptores) fn(resultado)
+    },
+    /**
+     * Lo mismo, pero DECLARANDO de qué parcela son estas colindantes — que es lo
+     * que el servicio real hace casi siempre: `GetNeighbourParcel` se incluye a sí
+     * mismo y `services/catastro.js` lo separa en `datos.propia` (override O15).
+     */
+    publicarDe(propia, parcelas) {
+      const resultado = {
+        ok: true,
+        datos: { propia, colindantes: parcelas },
         motivo: null,
         mensaje: null,
       }
@@ -1186,6 +1201,85 @@ describe('cablearInforme · el documento describe lo que hay en pantalla', () =>
     const m = montar()
     await prepararInforme(m)
     expect(enDialogo(m, SELECTOR_DIALOGO.ESTADO).textContent).toBe(ACUSE_DESCRIPTIVOS)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 8-bis · Las dos ventanas de la auditoría (2026-08-16)
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// La garantía de la cabecera —«si el store cambia, el diálogo se CIERRA»— solo
+// cubría lo que pasa DESPUÉS de abrirlo, y el canal de las vecinas no miraba de
+// qué parcela eran. Las dos ventanas acaban en lo mismo: un papel que se ofrece a
+// firmar describiendo una parcela que ya no está en pantalla.
+
+describe('cablearInforme · lo rancio no llega al papel', () => {
+  it('⛔ H1 · unas colindantes de OTRA parcela no se adoptan para redactar el lindero', async () => {
+    const m = montar()
+
+    // Entra otra parcela; el cableado se olvida de las vecinas, como debe.
+    m.estado.set(otraParcela())
+    await cederTurno()
+
+    // Y AHORA llega la publicación de la parcela anterior: una consulta que salió
+    // cuando ella estaba en pantalla. Sin cotejo, `vecinas` se repuebla con las
+    // suyas y el lindero de ésta se atribuye con las referencias catastrales de
+    // aquélla, en un documento que alguien firma.
+    m.catastro.publicarDe(PARCELA_FIXTURE, COLINDANTES)
+    await prepararInforme(m)
+
+    const cuadro = enDialogo(m, SELECTOR_DIALOGO.LITERAL)
+    expect(cuadro.value).toContain('No se han consultado las parcelas colindantes')
+    expect(COLINDANTES.some((c) => cuadro.value.includes(c.refcat))).toBe(false)
+  })
+
+  it('⭐ H1 · y las que SÍ son de la parcela de ahora se adoptan, como siempre', async () => {
+    // Anti-vacuidad: un cotejo que descartara TODO pasaría la prueba de arriba y
+    // dejaría el lindero sin atribuir para siempre.
+    const m = montar()
+    m.catastro.publicarDe(PARCELA_FIXTURE, COLINDANTES)
+    await prepararInforme(m)
+
+    const cuadro = enDialogo(m, SELECTOR_DIALOGO.LITERAL)
+    expect(COLINDANTES.some((c) => cuadro.value.includes(c.refcat))).toBe(true)
+  })
+
+  it('⛔ H4 · si el store cambia MIENTRAS se prepara, el diálogo no llega a abrirse', async () => {
+    // La ventana: entre el `estado.get()` del snapshot y `vista.abrir()` hay DOS
+    // `await` (la consulta DNPRC y el pie de firma). Un cambio del store ahí
+    // atraviesa `alCambiarElStore` sin efecto —`preparado` todavía es `null`— y el
+    // diálogo se abre DESPUÉS, ofreciendo firmar el encabezado, el lindero y el
+    // diagnóstico de la parcela ANTERIOR. Y el `<dialog>` en modo pantalla es
+    // `show()`, no modal: la ventana es alcanzable.
+    let alViajar = () => {}
+    const pedidas = []
+    const cliente = {
+      pedidas,
+      async descriptivosPorRefcat(refcat) {
+        pedidas.push(refcat)
+        await Promise.resolve()
+        alViajar()
+        return sobreOk(DNP_URBANA)
+      },
+    }
+    const m = montar({ cliente })
+    alViajar = () => m.estado.set(otraParcela())
+
+    await abrirDiagnostico(m)
+    await m.informe.preparar()
+    await cederTurno()
+
+    expect(m.dialogo.abierto()).toBe(false)
+    // Y se dice: un botón que se pulsa y no pasa nada es un error silencioso.
+    expect(m.renglonInforme.textContent).toBe(MOTIVO_PREPARACION_SUPERADA)
+  })
+
+  it('⭐ H4 · sin cambios por el camino, el diálogo se abre como siempre', async () => {
+    // Anti-vacuidad de la de arriba: el cotejo no puede cerrar la puerta normal.
+    const m = montar()
+    await prepararInforme(m)
+    expect(m.dialogo.abierto()).toBe(true)
+    expect(m.renglonInforme.textContent).not.toBe(MOTIVO_PREPARACION_SUPERADA)
   })
 })
 

@@ -33,10 +33,13 @@ import {
   crearNavegacion,
 } from '../../app/navegacion.js'
 import {
+  ATRIBUTO_BARRA,
   ATRIBUTO_ESTADO,
   ATRIBUTO_IR_A_PASO,
   CLASE,
   ESTADO,
+  EXPEDIENTE_SIN_NOMBRE,
+  EXPEDIENTE_VACIO,
   MENSAJE_NAVEGAR_ROTO,
   SELECTOR_PASOS,
   SELECTOR_BARRA,
@@ -74,11 +77,24 @@ afterEach(() => {
 })
 
 /** Monta la cáscara real y cablea la barra sobre una navegación de verdad. */
-function cablear({ hechos = {}, rama = RAMA.PARCELA, alNavegar = null } = {}) {
+function cablear({
+  hechos = {},
+  rama = RAMA.PARCELA,
+  alNavegar = null,
+  expediente = null,
+  suscribirExpediente = null,
+} = {}) {
   montarCascara()
   const panel = doblePanel()
   const navegacion = crearNavegacion({ rama, hechos, avisar: () => {} })
-  vivo = cablearBarra({ documento: document, navegacion, panel, alNavegar })
+  vivo = cablearBarra({
+    documento: document,
+    navegacion,
+    panel,
+    alNavegar,
+    expediente,
+    suscribirExpediente,
+  })
   return { rail: vivo, barra: vivo, navegacion, panel }
 }
 
@@ -335,6 +351,137 @@ describe('T5 · el rail se entera de los hechos aunque no cambie el paso', () =>
     expect(motivoDe(PASO.EDICION)).toBe('')
     // Y el usuario sigue donde estaba: abrir un paso no te empuja a él.
     expect(navegacion.get().paso).toBe(PASO.ENTRADA)
+  })
+})
+
+/* ══════════════════════════════════════════════════════════════════════════ *
+ * Topbar · rebanada 2 · LA ZONA DE EXPEDIENTE                                 *
+ *                                                                             *
+ * ⭐ EL DEFECTO, MEDIDO (auditoría del 2026-08-16). `pintarExpediente()` solo   *
+ * corre desde `pintar()`, y a `pintar()` solo lo disparan `navegacion.subscribe`*
+ * y `repintar()` —cuyo único llamante en producción es `refrescarHechos()`,     *
+ * colgado de los dos stores—. Pero **guardar, renombrar y borrar un expediente  *
+ * cambian la identidad SIN tocar ningún store ni la navegación**, así que la    *
+ * zona se quedaba rancia: tras archivar «X» la barra seguía diciendo «Sin       *
+ * guardar / Se autoguarda; archívalo para conservarlo», y tras borrar seguía    *
+ * enseñando el nombre de un expediente que ya no existe. El comentario del      *
+ * módulo («se lee en CADA pintada… una foto guardada se queda rancia») era      *
+ * cierto en la lectura y falso en la práctica: las pintadas no ocurrían.        *
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+describe('topbar · rebanada 2 · la zona de expediente', () => {
+  /**
+   * Un productor de `estado()` con su canal, que es lo que publica
+   * `app/cableado-expediente.js`. `ponerCallando` es el mundo de antes del canal:
+   * la identidad cambia y nadie se entera.
+   */
+  function productor(inicial = null) {
+    let foto = inicial
+    const oyentes = new Set()
+    return {
+      estado: () => foto,
+      suscribir(fn) {
+        oyentes.add(fn)
+        return () => oyentes.delete(fn)
+      },
+      cuantos: () => oyentes.size,
+      ponerCallando(nueva) {
+        foto = nueva
+      },
+      poner(nueva) {
+        foto = nueva
+        for (const fn of [...oyentes]) fn()
+      },
+    }
+  }
+
+  const zona = (cual) => document.querySelector(`[${ATRIBUTO_BARRA}="${cual}"]`).textContent.trim()
+  const nombre = () => zona('expediente-nombre')
+  const apunte = () => zona('expediente-apunte')
+
+  const SIN_ARCHIVAR = { idAbierto: null, nombreAbierto: null, puedeGuardar: true }
+  const ARCHIVADO = { idAbierto: 'e1', nombreAbierto: 'Linde norte', puedeGuardar: true }
+
+  it('sin productor no revienta y dice que no hay nada, que es la verdad', () => {
+    cablear({ hechos: TODO })
+    expect(nombre()).toBe(EXPEDIENTE_VACIO.nombre)
+    expect(apunte()).toBe(EXPEDIENTE_VACIO.apunte)
+  })
+
+  it('con trabajo sin archivar lo distingue de «no hay nada»', () => {
+    const p = productor(SIN_ARCHIVAR)
+    cablear({ hechos: TODO, expediente: p.estado, suscribirExpediente: p.suscribir })
+    expect(nombre()).toBe(EXPEDIENTE_SIN_NOMBRE.nombre)
+    expect(apunte()).toBe(EXPEDIENTE_SIN_NOMBRE.apunte)
+  })
+
+  it('⭐ ARCHIVAR se ve en la barra sin cambiar de paso ni tocar ningún store', () => {
+    const p = productor(SIN_ARCHIVAR)
+    cablear({ hechos: TODO, expediente: p.estado, suscribirExpediente: p.suscribir })
+    expect(nombre()).toBe(EXPEDIENTE_SIN_NOMBRE.nombre)
+
+    // Exactamente lo que hace «Guardar» del diálogo: cambia la identidad y avisa.
+    p.poner(ARCHIVADO)
+
+    expect(nombre()).toBe('Linde norte')
+    expect(apunte()).toBe('Guardado en este navegador')
+  })
+
+  it('⭐ RENOMBRAR también: el nombre de la barra es el del registro, no el de antes', () => {
+    const p = productor(ARCHIVADO)
+    cablear({ hechos: TODO, expediente: p.estado, suscribirExpediente: p.suscribir })
+    expect(nombre()).toBe('Linde norte')
+
+    p.poner({ ...ARCHIVADO, nombreAbierto: 'Linde norte (revisado)' })
+
+    expect(nombre()).toBe('Linde norte (revisado)')
+  })
+
+  it('⛔ BORRAR el expediente abierto no deja su nombre puesto en la barra', () => {
+    // Es el caso al revés y el más caro de los dos: la barra enseñando el nombre de
+    // un expediente que ya no existe le dice a quien firma que su trabajo sigue
+    // archivado.
+    const p = productor(ARCHIVADO)
+    cablear({ hechos: TODO, expediente: p.estado, suscribirExpediente: p.suscribir })
+    p.poner(SIN_ARCHIVAR)
+    expect(nombre()).toBe(EXPEDIENTE_SIN_NOMBRE.nombre)
+    expect(nombre()).not.toBe('Linde norte')
+  })
+
+  it('⛔ MITAD ANTI-VACUIDAD: sin el aviso del canal, la barra se queda rancia', () => {
+    // Si esto pasara igual, los cuatro `it` de arriba estarían midiendo el
+    // `expediente()` de cada pintada y no el canal.
+    const p = productor(SIN_ARCHIVAR)
+    cablear({ hechos: TODO, expediente: p.estado, suscribirExpediente: p.suscribir })
+    p.ponerCallando(ARCHIVADO)
+    expect(nombre()).toBe(EXPEDIENTE_SIN_NOMBRE.nombre)
+    // Y en cuanto algo repinta, se pone al día: el canal es un aviso, no una
+    // segunda fuente de verdad.
+    vivo.repintar()
+    expect(nombre()).toBe('Linde norte')
+  })
+
+  it('`destruir()` se da de baja del canal, y avisar después no repinta nada', () => {
+    const p = productor(SIN_ARCHIVAR)
+    const { barra } = cablear({
+      hechos: TODO,
+      expediente: p.estado,
+      suscribirExpediente: p.suscribir,
+    })
+    expect(p.cuantos()).toBe(1)
+    barra.destruir()
+    vivo = null
+    expect(p.cuantos()).toBe(0)
+    expect(() => p.poner(ARCHIVADO)).not.toThrow()
+    expect(nombre()).toBe(EXPEDIENTE_SIN_NOMBRE.nombre)
+  })
+
+  it('un `suscribirExpediente` que no es función es CONTRATO ROTO, y lanza', () => {
+    montarCascara()
+    const navegacion = crearNavegacion({ avisar: () => {} })
+    expect(() =>
+      cablearBarra({ documento: document, navegacion, suscribirExpediente: 'no' }),
+    ).toThrow(TypeError)
   })
 })
 

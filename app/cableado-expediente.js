@@ -945,6 +945,45 @@ export function cablearExpediente({
   /** La identidad de la rama que se está mirando. Nunca `undefined`. */
   const identidadActual = () => identidades[ramaActual()]
 
+  // ── ⭐ EL CANAL DE IDENTIDAD (auditoría del 2026-08-16) ────────────────────
+  //
+  // Quién más necesita enterarse de esto: la **zona de expediente de la barra**
+  // (`app/barra.js#pintarExpediente`), que lee `estado()` en cada pintada y aun así
+  // se quedaba rancia. Y no por leer mal, sino porque **no había pintada**: a
+  // `pintar()` solo lo disparan la navegación y `refrescarHechos()` de
+  // `app/main.js`, que cuelga de los dos STORES. Archivar, renombrar y borrar
+  // cambian `identidades[rama]` sin tocar un store y sin mover de paso, así que
+  // tras guardar «X» la barra seguía diciendo «Sin guardar» —con el diálogo
+  // acusando «Guardado «X»» al lado— y tras borrar seguía enseñando el nombre de un
+  // expediente que ya no existía. Lo segundo es lo caro: afirma que el trabajo está
+  // archivado cuando no lo está.
+  //
+  // ⚠️ **El aviso NO lleva carga, y es deliberado.** Quien escuche vuelve a leer
+  // `estado()`, que es la única definición de «qué expediente tengo». Mandar la foto
+  // por el canal crearía una segunda, y una foto que viaja es una foto que se puede
+  // quedar atrás — exactamente el defecto que esto viene a arreglar.
+  //
+  // ⚠️ Y se dispara **después** de haber puesto al día la identidad, nunca antes: un
+  // canal que dice «ha cambiado» y enseña lo de antes es peor que no avisar.
+
+  /** @type {Set<Function>} */
+  const oyentesIdentidad = new Set()
+
+  /**
+   * Reparte el aviso **atrapando lo que revienten**: uno roto no puede dejar sin
+   * enterarse a los demás, y una excepción que subiera desde aquí saldría dentro de
+   * un `click` —donde no la ve nadie— o dentro de un `await` de `guardar`.
+   */
+  function notificarIdentidad() {
+    for (const fn of [...oyentesIdentidad]) {
+      try {
+        fn()
+      } catch (causa) {
+        console.error('[expediente] un oyente del canal de identidad ha fallado:', causa)
+      }
+    }
+  }
+
   /**
    * El `idLocal` del documento abierto **en cada rama**. Es lo que distingue **una
    * edición** de **otro documento**, y no es una elección nueva: `app/main.js` ya
@@ -1548,6 +1587,10 @@ export function cablearExpediente({
       creado: r.registro.creado,
       modificado: r.registro.actualizado,
     }
+    // Archivar y renombrar salen los dos por aquí —renombrar es guardar el MISMO
+    // registro con otro nombre—, y ninguno de los dos toca un store: sin este aviso
+    // la barra sigue diciendo «Sin guardar» con el acuse al lado. Ver el canal.
+    notificarIdentidad()
     await refrescar({ nombre: r.registro.nombre })
     if (destruido) return
     // Rework de UI · T7: el acuse dice también lo que NO ha entrado. Va en la MISMA
@@ -1642,9 +1685,17 @@ export function cablearExpediente({
     // Se mira en las DOS ramas y no solo en la activa: el registro borrado puede ser
     // el que estaba abierto en la otra, y dejarle ahí el `id` haría que el siguiente
     // «Guardar» de aquella rama resucitara lo que se acaba de borrar.
+    let soltada = false
     for (const r of Object.keys(identidades)) {
-      if (identidades[r].id === id) identidades[r] = { ...identidades[r], id: null, nombre: null }
+      if (identidades[r].id === id) {
+        identidades[r] = { ...identidades[r], id: null, nombre: null }
+        soltada = true
+      }
     }
+    // Solo si de verdad se ha soltado alguna: borrar un registro que no era el
+    // abierto no cambia qué expediente tengo, y avisar igual convertiría el canal en
+    // ruido. Ver el canal de identidad.
+    if (soltada) notificarIdentidad()
     await refrescar()
     if (destruido) return
     decir('Borrado de este navegador.')
@@ -2579,6 +2630,35 @@ export function cablearExpediente({
      */
     guardarBorradorYa: () => escribirYa(),
 
+    /**
+     * ⭐ **El canal de identidad.** Avisa —sin carga— cuando cambia QUÉ expediente
+     * hay abierto: al archivarlo, al renombrarlo y al borrarlo. Quien escuche
+     * vuelve a leer {@link estado}, que sigue siendo la única definición.
+     *
+     * Existe porque esos tres gestos **no tocan ningún store ni la navegación**, y
+     * son lo único que mueve las pintadas de la aplicación: sin este aviso la zona
+     * de expediente de `app/barra.js` se queda rancia hasta el siguiente cambio de
+     * store, diciendo «Sin guardar» con el acuse de «Guardado «X»» al lado, o
+     * enseñando el nombre de un expediente ya borrado. El razonamiento entero está
+     * donde se implementa ({@link notificarIdentidad}).
+     *
+     * ⚠️ No notifica al suscribirse —mismo contrato que `crearEstadoVista`—: quien
+     * pinta al montar ya lee `estado()` por su cuenta.
+     *
+     * @param {() => void} fn
+     * @returns {() => void}  La baja. IDEMPOTENTE.
+     * @throws {TypeError}  Si `fn` no es una función.
+     */
+    alCambiarIdentidad(fn) {
+      if (typeof fn !== 'function') {
+        throw new TypeError(
+          `alCambiarIdentidad: 'fn' debe ser una función; recibido ${typeof fn}.`,
+        )
+      }
+      oyentesIdentidad.add(fn)
+      return () => oyentesIdentidad.delete(fn)
+    },
+
     /** Fotografía del estado interno: lo que el guion de humo necesita comprobar. */
     estado: () => ({
       idAbierto: identidadActual().id,
@@ -2619,6 +2699,11 @@ export function cablearExpediente({
       desuscribirStore()
       bajaRama()
       bajaEdificio()
+      // El canal de identidad se queda mudo con el resto. La guarda de `destruido`
+      // de `alAccion` ya impide que llegue un aviso después, pero vaciar el
+      // conjunto es lo que evita retener a quien se suscribió: un oyente de una
+      // barra ya desmontada escribiría en nodos que no gobierna nadie.
+      oyentesIdentidad.clear()
       auto.destruir()
       autoEdificio.destruir()
       dialogo.destruir()

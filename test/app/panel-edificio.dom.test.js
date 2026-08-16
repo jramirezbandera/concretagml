@@ -1011,6 +1011,65 @@ describe('app/panel-edificio · el diálogo de atributos (desviación 12)', () =
     ])
   })
 
+  // ── ⛔ CANCELAR NO PUEDE DEJAR RESIDUO (auditoría del 2026-08-16) ──────────
+  //
+  // ⭐ EL DEFECTO, MEDIDO. `ABRIR_ATRIBUTOS` abría **sin repintar**, al revés que
+  // el diálogo de TRABAJO, que llama a `pintarTrabajo()` al abrir «para que
+  // cancelar no deje residuo tecleado». Así que: teclear «mil novecientos» en el
+  // año → «Guardar» (rechazado, correcto) → «Cancelar» → reabrir, y el campo
+  // seguía enseñando «mil novecientos» con el store en `null`, y el renglón de
+  // estado seguía con el motivo de la vez anterior. El técnico ve un año puesto y
+  // asume que está guardado; el GML sale con el atributo a `null` sin que nada lo
+  // diga. Y `valores()` lee los `<input>` EN VIVO, así que devolvía el residuo
+  // cancelado como si fuera estado del panel.
+
+  it('⭐ cancelar NO guarda, y al reabrir no queda ni rastro de lo tecleado', () => {
+    const vistas = []
+    panel.alAccion((a) => vistas.push(a))
+    nodo(SELECTOR_COMPLETO.ABRIR_ATRIBUTOS).click()
+    nodo('[data-campo="anio-construccion"]').value = 'mil novecientos'
+    nodo(SELECTOR_COMPLETO.CANCELAR_ATRIBUTOS).click()
+    expect(vistas).toEqual([])
+    expect(panel.abiertoDialogo(DIALOGO.ATRIBUTOS)).toBe(false)
+
+    // Y ésta es la mitad que hace verdadera la promesa: al reabrir manda el store.
+    nodo(SELECTOR_COMPLETO.ABRIR_ATRIBUTOS).click()
+    expect(nodo('[data-campo="anio-construccion"]').value).toBe('1998')
+  })
+
+  it('⛔ y `valores()` deja de devolver el residuo cancelado como si fuera estado', () => {
+    // Es por donde el residuo se escapaba del panel: lo lee el cableado.
+    nodo(SELECTOR_COMPLETO.ABRIR_ATRIBUTOS).click()
+    nodo('[data-campo="anio-construccion"]').value = 'mil novecientos'
+    expect(panel.valores().atributosIlegibles).toEqual([ROTULO_ATRIBUTO.anioConstruccion])
+    nodo(SELECTOR_COMPLETO.CANCELAR_ATRIBUTOS).click()
+    nodo(SELECTOR_COMPLETO.ABRIR_ATRIBUTOS).click()
+    expect(panel.valores().atributosIlegibles).toEqual([])
+    expect(panel.valores().atributos.anioConstruccion).toBe(1998)
+  })
+
+  it('⛔ el renglón de estado NO reabre con el motivo rancio de la vez anterior', () => {
+    nodo(SELECTOR_COMPLETO.ABRIR_ATRIBUTOS).click()
+    nodo('[data-campo="anio-construccion"]').value = 'mil novecientos'
+    nodo(SELECTOR_COMPLETO.APLICAR_ATRIBUTOS).click()
+    // Anti-vacuidad: el motivo SÍ se escribe cuando toca, o el resto no dice nada.
+    expect(nodo(SELECTOR_COMPLETO.ESTADO_ATRIBUTOS).textContent).toContain('año de construcción')
+
+    nodo(SELECTOR_COMPLETO.CANCELAR_ATRIBUTOS).click()
+    nodo(SELECTOR_COMPLETO.ABRIR_ATRIBUTOS).click()
+    expect(nodo(SELECTOR_COMPLETO.ESTADO_ATRIBUTOS).textContent).toBe('')
+  })
+
+  it('⭐ `abrirAtributos()` repinta igual que el botón: son la misma puerta', () => {
+    // El cableado abre por aquí, no por el botón. Si solo se arreglara la rama de
+    // `alPulsar`, el residuo volvería por la puerta del programa.
+    panel.abrirAtributos()
+    nodo('[data-campo="anio-construccion"]').value = 'mil novecientos'
+    panel.cerrarAtributos()
+    panel.abrirAtributos()
+    expect(nodo('[data-campo="anio-construccion"]').value).toBe('1998')
+  })
+
   it('el `[data-bloque]` NO cuelga del propio `<dialog>` (la bomba de `dialog:not([open])`)', () => {
     // Si cayera ahí, cualquier `display` de la hoja sobre ese atributo dejaría el
     // diálogo plantado sobre la aplicación para siempre. `estilos/app.css` se

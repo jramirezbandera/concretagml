@@ -118,6 +118,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   MENSAJE_FALLO_INESPERADO,
   MENSAJE_FONDO_SIN_SOLAPE,
+  MENSAJE_OTRO_DOCUMENTO,
   MENSAJE_SIN_REFCAT_PEDIDA,
   MENSAJE_SUSCRIPTOR_ROTO,
   MOTIVO_COLINDANTES_APAGADO,
@@ -874,6 +875,113 @@ describe('cableado-catastro · dos consultas encabalgadas', () => {
     // Avisar de una consulta que el propio usuario ha sustituido es ruido sobre su
     // propia decisión (misma política que `viewer/wms-catastro.js`).
     expect(montado.panel.resumen()).toEqual({ [NIVEL.ERROR]: 0, [NIVEL.AVISO]: 0 })
+  })
+
+  // ── ⛔ AUDITORÍA 2026-08-16 · H1 · LA CARRERA QUE EL TOKEN NO CUBRE ────────
+  //
+  // El token de secuencia solo lo mueven `operar()` y `destruir()` de ESTE
+  // cableado, así que protege de otra consulta del mismo cableado y de nadie
+  // más. Durante el vuelo de «Traer del Catastro» —con reintentos, segundos— el
+  // usuario suelta un DXF, un GML o un `.json` de expediente: la comprobación,
+  // la medición y el expediente escriben el MISMO store sin pasar por el token,
+  // y la respuesta tardía seguía considerándose vigente y **pisaba el documento
+  // recién cargado**, con reinicio de historial por `alCargarParcela` — o sea que
+  // tampoco volvía con Ctrl+Z. Es el defecto original de las dos puertas, otra
+  // vez, entrando por la puerta de al lado.
+  //
+  // ── MUTACIONES ──
+  //  M22 · quitar el cotejo de identidad en el punto de escritura (o sea: el
+  //        módulo tal como estaba) ................. 🔴 3 rojos de los 5 nuevos
+  //        (los otros dos son los que vigilan que la guarda no se pase de celo)
+  //  M23 · cotejar por IDENTIDAD DEL OBJETO (`anterior === lo fotografiado`) en
+  //        vez de por identidad de expediente ............... 🔴 1 rojo: mover un
+  //        vértice mientras el Catastro contesta cancelaba la carga que el
+  //        usuario acababa de pedir. La cura, peor que la enfermedad.
+  describe('⛔ un documento entra por OTRA vía mientras el Catastro contesta', () => {
+    /** Deja una consulta de `REFCAT` en vuelo y devuelve el montaje. */
+    async function conConsultaEnVuelo(opciones = {}) {
+      const transporte = crearTransporteDoble({ manual: true })
+      const montado = cablear({ transporte, ...opciones })
+      montado.campo.value = REFCAT
+      const promesa = montado.cableado.cargar()
+      await hastaPeticion(transporte, 1)
+      return { ...montado, transporte, promesa }
+    }
+
+    it('⭐ la respuesta tardía NO pisa el documento recién entrado', async () => {
+      const montado = await conConsultaEnVuelo()
+
+      // El DXF que el usuario suelta a mitad de vuelo. Entra por su cableado, que
+      // no conoce el token de éste: es un `estado.set` y nada más.
+      const delFichero = parcelaSinReferencia()
+      montado.estado.set(delFichero)
+
+      montado.transporte.peticiones[0].responder()
+      await montado.promesa
+
+      expect(montado.estado.get(), 'el documento del usuario sigue intacto').toBe(delFichero)
+      // El único `set` es el del propio fichero: el cableado no ha escrito.
+      expect(montado.sets).toHaveLength(1)
+    })
+
+    it('⭐ y NO se calla: lo dice por el panel y por el renglón (regla de oro 1)', async () => {
+      const montado = await conConsultaEnVuelo()
+      montado.estado.set(parcelaSinReferencia())
+      montado.transporte.peticiones[0].responder()
+      await montado.promesa
+
+      expect(textosDelPanel()).toContain(MENSAJE_OTRO_DOCUMENTO)
+      expect(montado.renglon.textContent).not.toBe('')
+      expect(renglonEnFallo(montado.renglon)).toBe(true)
+      // Y la procedencia NO se toca: lo que hay en pantalla sigue viniendo de
+      // donde venía, y reescribirla diría que la trajo el Catastro.
+      expect(montado.procedencia.textContent).not.toContain('Del Catastro')
+    })
+
+    it('⭐ ningún gancho se dispara: nadie reinicia el historial del documento ajeno', async () => {
+      // Es el agravante: `alCargarParcela` siembra de nuevo `edit/historial.js`,
+      // así que sin esto el DXF pisado tampoco volvía con Ctrl+Z.
+      const alCargarParcela = vi.fn()
+      const alCambiarOficial = vi.fn()
+      const montado = await conConsultaEnVuelo({ alCargarParcela, alCambiarOficial })
+      montado.estado.set(parcelaSinReferencia())
+      montado.transporte.peticiones[0].responder()
+      await montado.promesa
+
+      expect(alCargarParcela).not.toHaveBeenCalled()
+      expect(alCambiarOficial).not.toHaveBeenCalled()
+    })
+
+    it('la guarda NO es vacua: sin que entre nada, esa misma respuesta SÍ carga', async () => {
+      const alCargarParcela = vi.fn()
+      const montado = await conConsultaEnVuelo({ alCargarParcela })
+      montado.transporte.peticiones[0].responder()
+      await montado.promesa
+
+      expect(montado.estado.get().refcat).toBe(REFCAT)
+      expect(montado.sets).toHaveLength(1)
+      expect(alCargarParcela).toHaveBeenCalledTimes(1)
+      expect(textosDelPanel()).not.toContain(MENSAJE_OTRO_DOCUMENTO)
+    })
+
+    it('⚠️ editar la geometría durante el vuelo NO cancela la carga que se pidió', async () => {
+      // La otra mitad, y la que fija el grano del cotejo: se compara la IDENTIDAD
+      // del expediente (referencia catastral o `idLocal`), no el POJO. `edit/`
+      // reconstruye el objeto en cada arrastre y no reetiqueta el expediente, así
+      // que comparar objetos habría cancelado la carga por mover un vértice
+      // mientras se esperaba — que es un uso normal, no una carrera.
+      const montado = await conConsultaEnVuelo({ parcelaInicial: parcelaSinReferencia() })
+      // Otro POJO, MISMO expediente: es lo que deja `edit/` tras un arrastre.
+      const editada = parcelaSinReferencia()
+      expect(editada).not.toBe(montado.estado.get())
+      expect(editada.idLocal).toBe(montado.estado.get().idLocal)
+      montado.estado.set(editada)
+
+      montado.transporte.peticiones[0].responder()
+      await montado.promesa
+
+      expect(montado.estado.get().refcat).toBe(REFCAT)
+    })
   })
 
   it('mientras hay algo en vuelo los dos botones están apagados, y luego vuelven', async () => {

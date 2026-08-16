@@ -38,6 +38,17 @@
 //      —otra parcela, o la misma editada— el diálogo se CIERRA y se dice por qué
 //      (ver {@link cablearInforme}, `alCambiarElStore`). Dejarlo abierto sería
 //      ofrecer firmar un papel que describe algo que ya no está en pantalla.
+//      ⚠️ **Y la garantía cubre las DOS mitades** (auditoría 2026-08-16): cerrar
+//      solo protege lo que pasa después de abrir, y entre la foto del store y
+//      `vista.abrir()` hay dos `await` —la consulta DNPRC y el pie de firma— por
+//      los que un cambio se colaba sin efecto, porque `alCambiarElStore` sale por
+//      arriba mientras no hay nada `preparado`. Esa ventana se cierra con un token
+//      de cambios del store: si se movió, **el diálogo no se abre** y se dice
+//      ({@link MOTIVO_PREPARACION_SUPERADA}).
+//      Lo mismo vale para las VECINAS, que entran por un canal asíncrono ajeno:
+//      se cotejan con la parcela que hay en pantalla antes de adoptarse (ver
+//      `adoptarVecinas`), o el lindero se atribuiría con las referencias
+//      catastrales de otra finca.
 //
 // ── ⚠️ LA PROCEDENCIA SE PROPAGA, O EL INFORME MIENTE ───────────────────────
 // `report/firma.js#lineasEncabezado` escribe TRES cosas distintas donde no hay
@@ -270,6 +281,16 @@ export const MOTIVO_CIERRE_POR_CAMBIO =
   'Se ha cerrado el diálogo «Preparar informe»: la parcela ha cambiado desde que se preparó, y ' +
   'el documento describía la anterior. Vuelva a pulsar «Preparar informe (PDF)».'
 
+/**
+ * El store ha cambiado **mientras se preparaba**, o sea antes de que el diálogo
+ * llegara a abrirse. Es el hermano de {@link MOTIVO_CIERRE_POR_CAMBIO} para la
+ * otra mitad de la garantía; ver la cabecera, dueño 4.
+ */
+export const MOTIVO_PREPARACION_SUPERADA =
+  'No se ha abierto el diálogo «Preparar informe»: la parcela ha cambiado mientras se preparaba ' +
+  'el documento, y lo que se había recogido describía la anterior. Vuelva a pulsar «Preparar ' +
+  'informe (PDF)».'
+
 /** «Regenerar» ha traído un borrador distinto porque llegaron datos nuevos. */
 export const AVISO_BORRADOR_ACTUALIZADO =
   'El borrador se ha vuelto a redactar con los datos que hay ahora: ha cambiado respecto al que ' +
@@ -337,9 +358,37 @@ function referenciaDe(parcelaActual) {
 function claveDeExpediente(parcelaActual) {
   if (parcelaActual === null || parcelaActual === undefined) return null
   const refcat = typeof parcelaActual.refcat === 'string' ? parcelaActual.refcat.trim() : ''
-  if (refcat !== '') return `refcat:${refcat}`
+  if (refcat !== '') return `refcat:${refcat.toUpperCase()}`
   const idLocal = typeof parcelaActual.idLocal === 'string' ? parcelaActual.idLocal : ''
   return idLocal === '' ? null : `idLocal:${idLocal}`
+}
+
+/**
+ * De qué expediente son las vecinas que trae un resultado del Catastro, **según
+ * el propio resultado**, o `null` si no lo declara. Gemelo del de
+ * `cableado-diagnostico.js`, y sigue siendo dos copias por lo mismo que
+ * {@link recintosDe}: son cinco líneas que ninguno de los dos cableados posee.
+ *
+ * `parcelaYColindantes` devuelve `{propia, colindantes}` y la `propia` es la
+ * parcela que se pidió, separada por referencia catastral normalizada (override
+ * O15). Es la única identidad que el resultado lleva encima.
+ *
+ * ⚠️ **Puede venir `null` y eso NO es un fallo**: hay parcelas para las que
+ * `GetNeighbourParcel` se omite a sí misma (medido el 2026-08-15 en
+ * `8081401TF9288S`). Cuando el resultado no declara identidad se adopta, que es
+ * lo que se venía haciendo: este cableado **no pide** las vecinas —se cuelga de
+ * la consulta que hace el cajón del diagnóstico— así que no tiene ninguna otra
+ * fuente con la que cotejar, y descartar por no poder comprobar dejaría el
+ * lindero sin atribuir para siempre y sin decir por qué.
+ *
+ * @param {object|null} resultado
+ * @returns {string|null}
+ */
+function claveDelResultado(resultado) {
+  const propia = resultado?.datos?.propia
+  if (propia === null || propia === undefined || typeof propia !== 'object') return null
+  const refcat = typeof propia.refcat === 'string' ? propia.refcat.trim() : ''
+  return refcat === '' ? null : `refcat:${refcat.toUpperCase()}`
 }
 
 /**
@@ -603,6 +652,20 @@ export function cablearInforme({
   let clave = claveDeExpediente(estado.get())
 
   /**
+   * Cuántas veces ha cambiado el store desde que se montó este cableado. Es un
+   * TOKEN de secuencia, igual que el de `app/cableado-catastro.js#operar`, y
+   * existe para la ventana de {@link preparar}: entre la foto del store y
+   * `vista.abrir()` hay dos `await`, y un cambio ahí atraviesa
+   * {@link alCambiarElStore} sin efecto porque todavía no hay nada `preparado`.
+   *
+   * Se cuenta el AVISO del store y no se compara el POJO: la garantía que promete
+   * la cabecera —«si el store cambia, el diálogo se cierra»— es la misma para otra
+   * parcela y para la misma editada, y `alCambiarElStore` cierra en los dos casos.
+   * Comparar identidades de objeto dejaría fuera un `set` que reemitiera el mismo.
+   */
+  let cambiosDelStore = 0
+
+  /**
    * Los descriptivos ya traídos, cacheados **por expediente**. Es la mitad del
    * presupuesto de red de F09: una petición por parcela y por sesión, aunque el
    * usuario prepare el informe cinco veces. La otra mitad la pone la caché de
@@ -804,6 +867,10 @@ export function cablearInforme({
     preparando = true
     decirEnCajon(MENSAJE_PREPARANDO)
     try {
+      // La foto del store y su TOKEN se toman juntos, y en este mismo tick: lo que
+      // se prepare a partir de aquí describe ESTE instante. Ver la guarda de más
+      // abajo, antes de abrir.
+      const marca = cambiosDelStore
       const parcelaActual = estado.get()
       const recintos = recintosDe(parcelaActual)
       const refcat = referenciaDe(parcelaActual)
@@ -833,6 +900,23 @@ export function cablearInforme({
 
       const { firma, recordado } = await recuperarFirma()
       if (destruido) return
+
+      // ── ⛔ LA VENTANA DE LOS DOS `await` (auditoría 2026-08-16) ──────────────
+      // Desde la foto de arriba hasta aquí hay una consulta a la red (DNPRC) y una
+      // lectura de IndexedDB (el pie de firma). Un cambio del store en ese hueco
+      // atraviesa `alCambiarElStore` **sin efecto** —`preparado` todavía es `null`,
+      // que es su condición de salida— y el diálogo se abriría DESPUÉS, ofreciendo
+      // firmar un encabezado, un lindero y un diagnóstico de la parcela ANTERIOR,
+      // con el diagnóstico del cajón ya recalculado y distinto. Y el `<dialog>` en
+      // modo pantalla es `show()`, no modal: la ventana es alcanzable.
+      //
+      // No se abre nada, y **se dice**: un botón que se pulsa y no pasa nada es la
+      // definición de error silencioso. La acción correcta —volver a pulsar— va en
+      // el mensaje, igual que en el cierre de {@link MOTIVO_CIERRE_POR_CAMBIO}.
+      if (cambiosDelStore !== marca) {
+        decirEnCajon(MOTIVO_PREPARACION_SUPERADA)
+        return
+      }
 
       // ⭐ F17 · T12 · EL ACTO JURÍDICO, QUE ESTA APLICACIÓN NO NOMBRABA.
       //
@@ -1171,11 +1255,33 @@ export function cablearInforme({
    * `vecinas` deja de ser `null`, y por eso este cableado **no pide nada**: se
    * cuelga de la consulta que ya hace el cajón del diagnóstico al abrirse.
    *
+   * ── ⛔ Y SE COTEJA DE QUÉ PARCELA SON (auditoría 2026-08-16) ────────────────
+   * El canal es público y ASÍNCRONO: lo que llega puede haberse pedido para la
+   * parcela de antes. Basta con que entre otra por una vía que no sea F05 —un
+   * fichero, un `.json` restaurado— mientras `colindantes()` viaja: la respuesta
+   * de la anterior llegaba después de que `alCambiarElStore` hubiera puesto
+   * `vecinas` a `null`, se adoptaba como vigente, y `report/literal.js` atribuía
+   * los linderos de ESTA parcela con las referencias catastrales de aquélla. En un
+   * papel que alguien firma, eso es una inexactitud silenciosa.
+   *
+   * Descartar no se anuncia al usuario y tampoco hace falta: el lindero se redacta
+   * entonces diciendo que las colindantes **no se han consultado**, que es
+   * exactamente lo que ha pasado con las de esta parcela, y «Regenerar» lo rehará
+   * en cuanto lleguen las suyas. El rastro técnico va a la consola.
+   *
    * @param {import('../services/catastro.js').ResultadoCatastro} resultado
    */
   function adoptarVecinas(resultado) {
     if (destruido) return
     if (!resultado || !resultado.ok || !resultado.datos) return
+    const declarada = claveDelResultado(resultado)
+    if (declarada !== null && declarada !== claveDeExpediente(estado.get())) {
+      console.warn(
+        'cablearInforme: se descartan unas colindantes que no son de la parcela que hay en ' +
+          `pantalla (llegaron las de ${declarada}).`,
+      )
+      return
+    }
     vecinas = aVecinasLiteral(resultado.datos.colindantes)
   }
 
@@ -1204,6 +1310,10 @@ export function cablearInforme({
    */
   function alCambiarElStore(parcelaActual) {
     if (destruido) return
+    // El token, ANTES de cualquier salida por arriba: lo que cuenta es que el store
+    // se ha movido, no lo que este suscriptor decida hacer con ello. Es lo que hace
+    // que una preparación en vuelo se entere (ver la guarda de `preparar`).
+    cambiosDelStore += 1
     const nueva = claveDeExpediente(parcelaActual)
     if (nueva !== clave) {
       clave = nueva

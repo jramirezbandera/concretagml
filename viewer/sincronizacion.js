@@ -29,6 +29,18 @@
 // a mitad. Además, reutilizar las filas conserva el foco y la selección de
 // texto de la celda que se está editando.
 //
+// ── Y por qué un arrastre puede RENUNCIAR (auditoría 2026-08-16) ────────────
+// Diferir el render durante el gesto tiene un precio: la vista no se entera de
+// que el anillo ha cambiado bajo sus pies. Y `dragend` escribe por el par
+// `(recinto, índice)` capturado al CREAR el marcador, que es una POSICIÓN, no una
+// identidad — el modelo son pares `[x,y]` planos. Si a mitad del gesto llega un
+// `set` que añade o quita vértices (`Ctrl+Z`/`Ctrl+Y`: su atajo se inhibe con el
+// foco en un campo de texto, NO durante un arrastre), ese índice pasa a señalar
+// otro vértice y soltar lo movía a la posición del cursor, sin aviso y con commit.
+// Desde el arreglo, el gesto se RENUNCIA entero, se dice con `NIVEL.ERROR` y se
+// repinta desde el estado. El detalle —y por qué no se puede re-derivar la
+// referencia en vez de renunciar— está en {@link formaCambiadaEnGesto}.
+//
 // ── Por qué `L.divIcon` y no `L.Icon` (hallazgo C8) ─────────────────────────
 // `L.Icon` depende de los PNG que Leaflet trae en `dist/images`; con Vite esas
 // URLs se rompen si no se configuran los assets a mano. Un `divIcon` con estilo
@@ -703,6 +715,38 @@ export function sincronizar({
    * lo peor que puede pasar es un repintado tardío, no una vista muerta.
    */
   let renderPendiente = false
+  /**
+   * Durante el gesto en curso ha llegado un `set` que CAMBIA LA FORMA.
+   *
+   * ── Por qué existe: el arrastre aplica POR ÍNDICE ────────────────────────────
+   * `dragend` escribe en el par `(r, i)` que se capturó AL CREAR el marcador, y
+   * ese par es una POSICIÓN en el anillo, no una identidad: el modelo son pares
+   * `[x,y]` planos, sin identificador propio (regla de oro 5: el modelo es un POJO
+   * y `structuredClone` no preserva nada más). Mientras la forma no cambie, el
+   * índice y el vértice son la misma cosa y aplicar por índice es exacto. En
+   * cuanto un `set` de media-gesto añade o quita vértices, deja de serlo.
+   *
+   * Y ese `set` LLEGA: el suscriptor DIFIERE el render mientras `arrastrando`
+   * (hallazgo 2.11), así que la vista no se entera de que el anillo ya es otro; el
+   * disparador realista es un `Ctrl+Z`/`Ctrl+Y`, cuyo atajo solo se inhibe con el
+   * foco en un campo de texto —no durante un arrastre—. Sin esta bandera, soltar
+   * escribía la coordenada arrastrada en el vértice que AHORA ocupa ese índice:
+   * uno que el usuario jamás tocó saltaba a la posición del cursor, en silencio, y
+   * el estado corrupto se commiteaba. Medido: exterior `[v0..v3]`, arrastre de
+   * `v2`, borrado de `v0` a mitad → el destino caía sobre el físico `v3`.
+   *
+   * ── Por qué RENUNCIAR y no re-derivar la referencia ─────────────────────────
+   * Porque no hay nada que re-derivar: sin identidad de vértice, «cuál de estos
+   * tres es el que tenía agarrado» solo se puede ADIVINAR (por proximidad, por
+   * orden), y adivinar mal es exactamente el defecto que se está cerrando, con la
+   * misma cara. Se renuncia al gesto entero, se DICE (regla de oro 1: renunciar en
+   * silencio es el mismo error con otro síntoma) y el dibujo vuelve al modelo.
+   *
+   * El guard de {@link aplicarVertice} no vale para esto y por eso no se toca:
+   * comprueba que el vértice EXISTA, y tras un borrado el índice sigue existiendo.
+   * Existencia no es identidad.
+   */
+  let formaCambiadaEnGesto = false
   /** Forma del último render (`null` = aún no se ha renderizado nada). */
   let forma = null
   /** Anillos en `[lat,lng]`, espejo de lo que hay pintado. Se muta punto a punto en `drag`. */
@@ -783,10 +827,21 @@ export function sincronizar({
     else avisar(mensaje, { nivel: NIVEL.AVISO, causa })
   }
 
-  /** Abre un episodio de avisos de gancho nuevo (uno por gesto de arrastre). */
+  /**
+   * Abre un GESTO de arrastre nuevo: su episodio de avisos de gancho y su bandera
+   * de cambio de forma.
+   *
+   * Es el único sitio donde {@link formaCambiadaEnGesto} baja, y es correcto
+   * porque esta función se llama EXACTAMENTE una vez por gesto nuevo: desde
+   * `dragstart` (sin condiciones, incluso tras un gesto huérfano) y desde
+   * `iniciarGesto` en el primer `drag` cuando `dragstart` no ha llegado (los
+   * tests, que simulan por API). Bajarla en `dragend` en vez de aquí dejaría un
+   * gesto que nunca recibe su `dragend` contaminando al siguiente.
+   */
   function abrirEpisodioDeGesto() {
     yaAvisado.ajustar = false
     yaAvisado.previsualizar = false
+    formaCambiadaEnGesto = false
   }
 
   /**
@@ -1440,6 +1495,27 @@ export function sincronizar({
     marcador.on('drag', alMover)
     marcador.on('dragend', (evento) => {
       arrastrando = false
+      // ⛔ RENUNCIA: durante el gesto llegó un `set` que CAMBIÓ LA FORMA, así que
+      // `(r, i)` ya no señala al vértice que el usuario tenía agarrado (ver
+      // {@link formaCambiadaEnGesto}). Aplicar aquí movería un vértice ajeno a la
+      // posición del cursor. No se escribe NADA, se dice, y el dibujo —que el
+      // gesto ha estado moviendo por su cuenta, sin pasar por el store— vuelve a
+      // reflejar el modelo con un render completo.
+      if (formaCambiadaEnGesto) {
+        formaCambiadaEnGesto = false
+        avisar(
+          `El arrastre no se ha aplicado: la parcela ha cambiado mientras movías el ` +
+            `vértice ${i + 1} de ${rotuloRecinto(r)} (un deshacer, un rehacer o un ` +
+            `cambio desde otra vista), y ese número de vértice ya no es el que tenías ` +
+            `agarrado. El dibujo vuelve a mostrar la parcela: repite el arrastre si ` +
+            `sigue haciendo falta.`,
+          // NIVEL.ERROR por la misma regla que `aplicarVertice`: lo que el usuario
+          // acaba de hacer NO se aplica (ver `_comun.js#Avisar`).
+          { nivel: NIVEL.ERROR },
+        )
+        render()
+        return
+      }
       const pos = marcador.getLatLng()
       const crudo = latLngAUTM(pos, zona)
       // Se ajusta TAMBIÉN aquí, y no por simetría: `dragend` recalcula el UTM
@@ -1721,6 +1797,14 @@ export function sincronizar({
   const bajaDelStore = estado.subscribe(() => {
     if (arrastrando) {
       renderPendiente = true
+      // Y se mira si lo diferido CAMBIA LA FORMA, aquí y no en `dragend`: al
+      // soltar solo se ve el estado FINAL, y un deshacer + rehacer dentro del
+      // mismo gesto acabaría en el mismo número de vértices ocultando que en medio
+      // el anillo fue otro. `forma` es la del último render y, como durante el
+      // gesto no se renderiza, es la que había al empezar el gesto. La bandera se
+      // ENGANCHA (no se recalcula): una vez que la referencia dejó de ser fiable,
+      // no vuelve a serlo por que el `set` siguiente restaure el conteo.
+      if (!mismaForma(forma, formaDe(estado.get()))) formaCambiadaEnGesto = true
       return
     }
     render()
@@ -1799,6 +1883,7 @@ export function sincronizar({
       reemitiendoClic = false
       arrastrando = false
       renderPendiente = false
+      formaCambiadaEnGesto = false
       tablaEl.replaceChildren()
     },
   }

@@ -1836,7 +1836,24 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
       .map((c) => c.value)
   }
 
-  /** Los siete campos, desde el edificio. Solo si el diálogo existe. */
+  /**
+   * Los siete campos, desde el edificio. Solo si el diálogo existe.
+   *
+   * ⛔ **Se llama también al ABRIR, y hasta el 2026-08-16 no**. Era la asimetría
+   * con el diálogo de TRABAJO, que sí repinta al abrir «para que cancelar no deje
+   * residuo tecleado», y costaba caro: teclear «mil novecientos» en el año →
+   * «Guardar» (rechazado, y bien) → «Cancelar» → reabrir, y el campo seguía
+   * enseñando «mil novecientos» con el store en `null`. El técnico ve el valor
+   * puesto y **asume que está guardado**; el GML sale con el atributo a `null` sin
+   * que nada lo diga, que es la regla de oro 1 al revés. Y {@link valores} lee los
+   * `<input>` EN VIVO, así que el residuo cancelado salía del panel como si fuera
+   * estado suyo.
+   *
+   * ⚠️ **El renglón de estado se limpia aquí**, gemelo de {@link pintarTrabajo}:
+   * hasta hoy solo se vaciaba en el guardado con éxito, así que el diálogo reabría
+   * con el motivo de un error que ya no existe. Un motivo rancio manda a corregir
+   * un campo que está bien.
+   */
   function pintarAtributos() {
     if (dialogoAtributos === null) return
     const valores = datos?.atributos ?? {}
@@ -1844,6 +1861,7 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
       const valor = valores[clave]
       control.value = valor === null || valor === undefined ? '' : String(valor)
     }
+    if (estadoAtributos) estadoAtributos.textContent = ''
   }
 
   // ── Oyentes ───────────────────────────────────────────────────────────────
@@ -2100,6 +2118,10 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
       return
     }
     if (accion === ACCION.ABRIR_ATRIBUTOS) {
+      // Se repinta al abrir, exactamente igual que ABRIR_TRABAJO y por el mismo
+      // motivo: cerrar NO guarda, y eso solo es cierto si al volver a abrir no
+      // sigue ahí lo tecleado la vez anterior. Ver `pintarAtributos`.
+      pintarAtributos()
       abrirDialogo(DIALOGO.ATRIBUTOS)
       return
     }
@@ -2713,8 +2735,14 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
     /**
      * Abre el diálogo de los siete atributos. **En SIMPLIFICADO no hace nada**: no
      * hay diálogo que abrir, y fabricarlo aquí al vuelo rompería el criterio 1.
+     *
+     * ⚠️ Repinta al abrir, igual que {@link abrirTrabajo} y que la rama
+     * `ABRIR_ATRIBUTOS` del botón: es la MISMA puerta vista desde el programa, y
+     * arreglar solo una de las dos habría dejado el residuo cancelado volviendo
+     * por la otra.
      */
     abrirAtributos() {
+      pintarAtributos()
       abrirDialogo(DIALOGO.ATRIBUTOS)
     },
 

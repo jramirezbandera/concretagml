@@ -92,6 +92,50 @@
 // oro 1). El `throw` se reserva —como en toda la casa— al contrato roto por el
 // PROGRAMADOR: un nodo que falta en `index.html`, un cajón que no es el de F08.
 //
+// ── ⛔ LA CARRERA DE LOS DOS FICHEROS (defecto medido el 2026-08-16) ─────────
+// El usuario suelta el GML A, la consulta del parcelario queda en vuelo, se da
+// cuenta de que era el fichero equivocado y suelta el GML B. **Medido con un repro
+// en jsdom, y era doblemente mudo:**
+//
+//   · `contrastar()` empezaba con `if (destruido || contrastando) return`, un
+//     `return` MUDO. `comprobar(B)` publicaba los hallazgos de B y al llegar a
+//     `await contrastar()` se iba sin cargar nada y **sin decirlo**: una sola
+//     consulta al Catastro, y B desaparecido.
+//   · Y la consulta de A viajaba SIN señal de aborto y SIN token de secuencia, así
+//     que al contestar el Catastro seguía con su snapshot (`const c = comprobacion`,
+//     capturado antes del `await`) y **cargaba A en el store**. El usuario acababa
+//     mirando el documento que acababa de sustituir, sin un solo aviso.
+//
+// Las dos mitades son la regla de oro 1 rota, así que se arreglan las dos, y con el
+// patrón que el equipo ya conoce —el de `cableado-catastro.js#operar` y el de
+// `cableado-edificio.js#operar`—, no con uno nuevo:
+//
+//   1. **`AbortController` por contraste.** Empezar uno aborta el anterior: la
+//      señal baja hasta el `fetch` (`services/catastro.js#parcelaPorRefcat` la
+//      acepta por llamada y `services/_red.js` la encadena), así que el servicio
+//      deja de trabajar para una pregunta que ya no interesa a nadie.
+//   2. **Token de secuencia monótono.** Hace falta ADEMÁS, porque abortar no impide
+//      que una respuesta ya en vuelo llegue igualmente y llegue TARDE: el contraste
+//      superado no escribe nada —ni store, ni campo, ni renglón, ni panel—.
+//      `destruir()` invalida la secuencia ANTES de abortar, por lo mismo.
+//   3. **El segundo fichero SE ATIENDE, no se espera ni se descarta.** Es lo que el
+//      usuario acaba de decir que quiere; hacerle cola detrás de una consulta que él
+//      mismo ha dejado obsoleta sería cargar dos ficheros seguidos para que se
+//      quede el bueno por casualidad de tiempos.
+//
+// ⚠️ **Lo que NO cambia: dos pulsaciones seguidas sobre el MISMO fichero siguen
+// siendo UNA petición.** `contrastando` guarda ahora la `comprobacion` en vuelo en
+// vez de un booleano, y la guarda compara identidad: la misma pregunta no se repite
+// (el override O8 castiga la petición de más, y la primera sigue viva contándose en
+// el renglón del cajón), y una pregunta distinta —otro fichero, u otra parcela
+// elegida del mismo fichero, que también produce una `comprobacion` nueva— siempre
+// pasa. El precio declarado: dos ficheros abiertos son dos peticiones, que es la
+// cuenta que la cabecera ya fija arriba («UNA por fichero abierto»).
+//
+// Su prueba es la sección «6 bis» de `test/app/comprobacion.dom.test.js`, con un
+// transporte que no contesta hasta que el test se lo dice — sin eso los dos ficheros
+// no llegan a encabalgarse y la carrera no se puede medir.
+//
 // ── POR QUÉ EL BOTÓN DEL CAJÓN NO CIERRA EL CAJÓN, Y QUIÉN LO CIERRA ────────
 // El cajón no se cierra solo al pulsar el primario, y está razonado en
 // `viewer/cajon-comprobacion.js#_alPulsarContrastar`: detrás de esa pulsación hay
@@ -832,8 +876,26 @@ export function cablearComprobacion({
   /** La última {@link import('../comprobacion/gml.js').Comprobacion}, o `null`. */
   let comprobacion = null
 
-  /** Una petición de parcelario en vuelo: la segunda pulsación no encabalga. */
-  let contrastando = false
+  /**
+   * La {@link comprobacion} cuyo contraste está EN VUELO, o `null` si no hay
+   * ninguno. Guarda el objeto y no un booleano, y ahí está toda la diferencia: dos
+   * pulsaciones sobre el MISMO fichero son la misma pregunta (no se encabalga, la
+   * primera sigue viva y su renglón lo está contando), mientras que un fichero
+   * NUEVO es otra pregunta y tiene que atenderse. Ver «LA CARRERA DE LOS DOS
+   * FICHEROS» en la cabecera.
+   */
+  let contrastando = null
+
+  /**
+   * Contador monótono de contrastes. Cada uno captura su número al empezar; al
+   * resolverse, si su número ya no es el último, está SUPERADO y no escribe nada.
+   * Calcado de `cableado-catastro.js#operar`: es la defensa que el `AbortController`
+   * no puede dar, porque abortar no impide que una respuesta ya en vuelo llegue.
+   */
+  let secuencia = 0
+
+  /** El `AbortController` del contraste en curso, o `null` si no hay ninguno. */
+  let enVuelo = null
 
   // ── Los fallos, cada uno contado donde ocurre ──────────────────────────────
 
@@ -1062,10 +1124,14 @@ export function cablearComprobacion({
    *
    * @param {import('../comprobacion/gml.js').MiembroComprobado} miembro
    * @param {string} srsFichero
+   * @param {AbortSignal} senal  La del contraste que la pide, para que soltar OTRO
+   *   fichero corte esta consulta en la red en vez de dejarla trabajando para una
+   *   pregunta que ya no interesa. Que llegue hasta el `fetch` es contrato de
+   *   `services/catastro.js#parcelaPorRefcat` (encadena por `_red.js`).
    * @returns {Promise<{oficial: Array|null, areaValue: number|null,
    *   procedencia: object|null, motivo: string|null}>}
    */
-  async function traerParcelario(miembro, srsFichero) {
+  async function traerParcelario(miembro, srsFichero, senal) {
     const sin = (motivo) => ({ oficial: null, areaValue: null, procedencia: null, motivo })
 
     const refcat = normalizarRefcat(miembro.refcat)
@@ -1077,7 +1143,7 @@ export function cablearComprobacion({
 
     let resultado
     try {
-      resultado = await cliente.parcelaPorRefcat(refcat, { srs })
+      resultado = await cliente.parcelaPorRefcat(refcat, { srs, senal })
     } catch (causa) {
       // Los motivos del catálogo salen por `ok:false`; lo que llega aquí es un fallo
       // INESPERADO del cliente. Ya se ha contado por consola; el recorrido sigue.
@@ -1121,10 +1187,14 @@ export function cablearComprobacion({
    * `estado.set` de allí metería la geometría del WFS en los dos sitios y borraría
    * la del fichero — justo lo que hay que contrastar.
    *
+   * Lleva las DOS defensas contra la carrera (`AbortController` + token de
+   * secuencia), calcadas de `cableado-catastro.js#operar`. Ver «LA CARRERA DE LOS
+   * DOS FICHEROS» en la cabecera, que es el defecto que las trajo.
+   *
    * @returns {Promise<void>}
    */
   async function contrastar() {
-    if (destruido || contrastando) return
+    if (destruido) return
     const c = comprobacion
     if (c === null) return
     if (!c.puedeContinuar || c.geometria === null || c.elegido === null) {
@@ -1141,15 +1211,38 @@ export function cablearComprobacion({
       return
     }
 
-    contrastando = true
+    // ── LA MISMA pregunta no se hace dos veces; otra pregunta SIEMPRE se atiende ─
+    // Dos pulsaciones seguidas sobre el cajón son la misma consulta y la primera
+    // sigue viva contándose en su renglón (`ESPERANDO_PARCELARIO`): repetirla sería
+    // una segunda petición al servicio por un gesto de más, que es justo lo que
+    // castiga el override O8. Un fichero NUEVO trae otra `comprobacion`, así que no
+    // entra por aquí: lo atiende el bloque de abajo y su consulta supera a la vieja.
+    if (contrastando === c) return
+
+    // Las dos defensas de la casa, en el orden de `cableado-catastro.js#operar`:
+    // abortar corta la RED (el servicio deja de trabajar para una pregunta que ya no
+    // interesa) y el token impide ESCRIBIR (abortar no evita que una respuesta ya en
+    // vuelo llegue igualmente, y llegue tarde).
+    if (enVuelo !== null) enVuelo.abort()
+    const controlador = new AbortController()
+    enVuelo = controlador
+    const token = ++secuencia
+    contrastando = c
     try {
       const miembro = c.miembros[c.elegido]
       const refcat = normalizarRefcat(miembro.refcat)
       const { oficial, areaValue, procedencia: deDonde, motivo } = await traerParcelario(
         miembro,
         c.geometria.srs,
+        controlador.signal,
       )
-      if (destruido) return
+      // SUPERADO: hay otro fichero más nuevo en marcha —o la pantalla se ha ido—, así
+      // que este contraste no escribe NADA (ni store, ni campo, ni procedencia, ni
+      // panel). Tampoco se anuncia, misma decisión que `cableado-catastro.js` y que
+      // `viewer/wms-catastro.js`: avisar de una consulta que el propio usuario ha
+      // sustituido es ruido sobre algo que él ya sabe, y el desenlace que va a leer
+      // es el del fichero que dejó en pantalla.
+      if (destruido || token !== secuencia) return
 
       const parcela = crearParcela({
         idLocal: idLocalDe(miembro, refcat, c.fichero.nombre),
@@ -1216,7 +1309,10 @@ export function cablearComprobacion({
       cajon.estado('La parcela no se ha cargado. El motivo está en el panel de avisos.')
       reventar('el contraste con el parcelario ha fallado', causa)
     } finally {
-      contrastando = false
+      // Solo se suelta lo que es de ESTE contraste: si ya hay otro más nuevo
+      // corriendo, borrarle su controlador o su marca dejaría la carrera sin árbitro.
+      if (enVuelo === controlador) enVuelo = null
+      if (contrastando === c) contrastando = null
     }
   }
 
@@ -1225,9 +1321,22 @@ export function cablearComprobacion({
    * instantánea y sin consecuencias que contar); lo que hace este módulo es SOLTAR
    * el fichero, para que no se quede un documento cargado en memoria al que ya no
    * se puede volver desde ninguna parte de la interfaz.
+   *
+   * **Y corta el contraste que estuviera en vuelo**, con las mismas dos defensas y
+   * en el mismo orden que {@link destruir}: es el tercer y último sitio donde una
+   * respuesta tardía podía pisar el estado vigente — pulsar «Contrastar» y
+   * arrepentirse (el cajón NO se cierra con el primario, a propósito) dejaba entrar
+   * en el store, segundos después, la parcela del fichero que se acababa de
+   * descartar. Mismo defecto que el de los dos ficheros; ver la cabecera.
    */
   function descartar() {
     if (destruido) return
+    secuencia += 1
+    if (enVuelo !== null) {
+      enVuelo.abort()
+      enVuelo = null
+    }
+    contrastando = null
     fuente = null
     comprobacion = null
     cajon.pintar(null)
@@ -1335,7 +1444,13 @@ export function cablearComprobacion({
     /**
      * Deja el cableado inerte: retira la zona de fichero (con sus oyentes de la
      * VENTANA, que sobrevivirían a la pantalla), las tres suscripciones del cajón y
-     * la del store, y cierra el cajón. IDEMPOTENTE.
+     * la del store, **aborta el contraste que esté en vuelo**, y cierra el cajón.
+     * IDEMPOTENTE.
+     *
+     * El orden importa, y es el mismo que en `cableado-catastro.js#destruir`:
+     * primero se invalida la secuencia y después se aborta, para que la respuesta
+     * que llegue tras esto no encuentre ningún camino por el que escribir en una
+     * pantalla que ya no está.
      *
      * No destruye el cajón: es del VISOR y lo desmonta `visor.destruir()`. Este
      * módulo desmonta lo que ha montado él, ni más ni menos — la misma regla que
@@ -1344,6 +1459,12 @@ export function cablearComprobacion({
     destruir() {
       if (destruido) return
       destruido = true
+      secuencia += 1
+      if (enVuelo !== null) {
+        enVuelo.abort()
+        enVuelo = null
+      }
+      contrastando = null
       zona.destruir()
       bajaElegir()
       bajaContrastar()

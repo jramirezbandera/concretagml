@@ -654,6 +654,134 @@ describe('viewer/sincronizacion · arrastre incremental (C8/T7)', () => {
 
     ctx.limpiar()
   })
+
+  it('⛔ un set que CAMBIA LA FORMA a media-drag: `dragend` RENUNCIA, lo dice y repinta', () => {
+    // ⭐ EL DEFECTO (auditoría 2026-08-16, MEDIA). El suscriptor DIFIERE el render
+    // mientras dura el gesto (hallazgo 2.11, arriba), pero `dragend` aplicaba por el
+    // par `(r,i)` CAPTURADO AL CREAR EL MARCADOR y el guard de `aplicarVertice` solo
+    // comprobaba que el vértice EXISTIERA, no que fuera EL MISMO. Si entre el
+    // `drag` y el `dragend` llegaba un `set` que cambiaba la forma —el disparador
+    // realista es un Ctrl+Z/Ctrl+Y, cuyo atajo solo se inhibe con el foco en un
+    // campo de texto, NO durante un arrastre—, el índice `(0,2)` pasaba a señalar
+    // OTRO vértice físico y la coordenada arrastrada se escribía encima de él: un
+    // vértice que el usuario jamás tocó saltaba a la posición del cursor, **sin un
+    // solo aviso**, y ese estado corrupto se commiteaba al historial.
+    //
+    // Medido antes del arreglo: exterior `[v0..v3]`, arrastre de `v2`, borrado de
+    // `v0` a mitad del gesto → el destino del arrastre acababa sobre el físico `v3`
+    // y el agarrado se quedaba quieto, con `AVISOS: []`.
+    //
+    // El contrato que fija este test: si hubo un cambio de FORMA durante el gesto,
+    // el arrastre NO se aplica (no hay forma de re-derivar la identidad de un
+    // vértice: el modelo son pares `[x,y]` sin identidad propia), el usuario SE
+    // ENTERA (regla de oro 1: renunciar en silencio sería el mismo defecto con otro
+    // síntoma) y el dibujo vuelve a reflejar el modelo.
+    const historial = historialReal()
+    const ctx = montar({ historial })
+    const antes = structuredClone(ctx.store.get())
+
+    // El usuario agarra el vértice (0,2) y lo lleva 3 m al noreste.
+    const marcador = marcadorDe(ctx.mapa, 0, 2)
+    marcador.setLatLng(destinoDe(antes, 0, 2, 3).latlng)
+    marcador.fire('drag')
+
+    // …y a MITAD del gesto, un deshacer borra el vértice (0,0). El índice 2 ya no
+    // es el vértice agarrado: ahora es el que era (0,3).
+    const otro = structuredClone(ctx.store.get())
+    otro.recintos[0].vertices.splice(0, 1) // 4 → 3 vértices: CAMBIA LA FORMA
+    ctx.store.set(otro)
+    const commitsPrevios = commitsDe(historial)
+    const esperado = otro.recintos[0].vertices.map((v) => [v[0], v[1]])
+
+    marcador.fire('dragend')
+
+    // 1) Ni un vértice se ha movido: el arrastre se ha RENUNCIADO entero.
+    const ahora = ctx.store.get()
+    expect(ahora.recintos[0].vertices).toEqual(esperado)
+    // Y en particular, el físico `v3` (hoy en el índice 2) sigue donde estaba: es
+    // EL vértice sobre el que caía la coordenada arrastrada antes del arreglo.
+    expect(ahora.recintos[0].vertices[2]).toEqual(antes.recintos[0].vertices[3])
+    exigirSinNaN(ahora)
+
+    // 2) …y NO se ha commiteado nada al historial: un estado corrupto commiteado
+    // sobrevive al deshacer siguiente.
+    expect(commitsDe(historial)).toBe(commitsPrevios)
+
+    // 3) El usuario SE ENTERA, y con NIVEL.ERROR: lo que acababa de hacer NO se ha
+    // aplicado (la regla de clasificación de `_comun.js#Avisar`).
+    const dichos = ctx.alAvisar.mock.calls.filter(([, d]) => d && d.nivel === NIVEL.ERROR)
+    expect(dichos, 'renunciar en silencio incumple la regla de oro 1').toHaveLength(1)
+    expect(dichos[0][0]).toMatch(/arrastre/i)
+
+    // 4) Y el mapa y la tabla vuelven a reflejar el MODELO (nada de un dibujo que
+    // enseña el arrastre que no se ha aplicado).
+    const [lat, lng] = vertUTMaLatLng(esperado[2], 30)
+    expect(marcadorDe(ctx.mapa, 0, 2).getLatLng().lat).toBeCloseTo(lat, 9)
+    expect(marcadorDe(ctx.mapa, 0, 2).getLatLng().lng).toBeCloseTo(lng, 9)
+    expect(Number(inputsDe(filaDe(ctx.tablaEl, 0, 2)).x.value)).toBeCloseTo(esperado[2][0], 3)
+    expect(Number(inputsDe(filaDe(ctx.tablaEl, 0, 2)).y.value)).toBeCloseTo(esperado[2][1], 3)
+    expect(filasDe(ctx.tablaEl), 'la tabla ya no tiene la fila borrada').toHaveLength(7)
+    expect(poligonoEnPane(ctx.mapa, PANE.PARCELA_EDITADA).getLatLngs()[0]).toHaveLength(3)
+
+    ctx.limpiar()
+  })
+
+  it('el gesto SIGUIENTE vuelve a aplicarse: la renuncia no deja la vista muerta', () => {
+    // La otra mitad del contrato, y la que impide "arreglarlo" con una bandera que
+    // no se baja: renunciar es de ESE gesto, no de la vista.
+    const historial = historialReal()
+    const ctx = montar({ historial })
+    const antes = structuredClone(ctx.store.get())
+
+    const marcador = marcadorDe(ctx.mapa, 0, 2)
+    marcador.setLatLng(destinoDe(antes, 0, 2, 3).latlng)
+    marcador.fire('drag')
+    const otro = structuredClone(ctx.store.get())
+    otro.recintos[0].vertices.splice(0, 1)
+    ctx.store.set(otro)
+    marcador.fire('dragend')
+
+    // Gesto nuevo, sin cambios de forma en medio: se aplica con normalidad.
+    const ahora = structuredClone(ctx.store.get())
+    const nuevo = marcadorDe(ctx.mapa, 0, 1)
+    const { latlng, utm } = destinoDe(ahora, 0, 1, 1)
+    nuevo.setLatLng(latlng)
+    nuevo.fire('dragstart')
+    nuevo.fire('drag')
+    nuevo.fire('dragend')
+
+    expect(ctx.store.get().recintos[0].vertices[1][0]).toBeCloseTo(utm[0], 2)
+    expect(ctx.store.get().recintos[0].vertices[1][1]).toBeCloseTo(utm[1], 2)
+    expect(commitsDe(historial)).toBe(1)
+
+    ctx.limpiar()
+  })
+
+  it('un set que NO cambia la forma a media-drag SÍ se aplica (no se renuncia de más)', () => {
+    // El caso del hallazgo 2.11 sigue comportándose igual: mismo nº de vértices =
+    // el índice sigue señalando al mismo vértice, así que el arrastre es válido.
+    const historial = historialReal()
+    const ctx = montar({ historial })
+    const antes = structuredClone(ctx.store.get())
+
+    const marcador = marcadorDe(ctx.mapa, 0, 2)
+    const { latlng, utm } = destinoDe(antes, 0, 2, 3)
+    marcador.setLatLng(latlng)
+    marcador.fire('drag')
+
+    const otro = structuredClone(ctx.store.get())
+    otro.recintos[1].vertices[0] = [439249.5, 4479661.5] // otro recinto, misma forma
+    ctx.store.set(otro)
+
+    marcador.fire('dragend')
+
+    expect(ctx.store.get().recintos[0].vertices[2][0]).toBeCloseTo(utm[0], 2)
+    expect(ctx.store.get().recintos[0].vertices[2][1]).toBeCloseTo(utm[1], 2)
+    expect(commitsDe(historial)).toBe(1)
+    expect(ctx.alAvisar).not.toHaveBeenCalled()
+
+    ctx.limpiar()
+  })
 })
 
 // ── Render idempotente ───────────────────────────────────────────────────────

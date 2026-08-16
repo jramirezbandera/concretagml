@@ -10,10 +10,32 @@
  *   3. `null` cuando no hay parte, `recintos: []` cuando la hay y no tiene      *
  *      contorno. Son dos cosas distintas y no se confunden.                     *
  *   4. El store del edificio sigue siendo el dueño: sus suscriptores viven.     *
+ *   5. ⛔ **El CORRIMIENTO** (auditoría 2026-08-16, hallazgo H2). Añadido en su  *
+ *      sección propia al final: la selección por índice no sobrevive a que      *
+ *      desaparezca una parte de índice MENOR, y hasta esta fecha no lo cubría   *
+ *      ninguna prueba —solo se probaba el fuera de rango, que es otra cosa.     *
+ *                                                                              *
+ * ── MUTACIONES EJECUTADAS SOBRE LA CORRECCIÓN DEL CORRIMIENTO ──               *
+ * Aplicada a `edificio/parte-activa.js`, `node scripts/vitest.mjs run           *
+ * --project node -- parte-activa`, y revertida con el editor (nunca con         *
+ * `git checkout`):                                                              *
+ *   M1 · el módulo TAL COMO ESTABA antes del arreglo (sin reconciliación) ..... *
+ *        🔴 3 rojos de los 6 nuevos: la proyección, la ESCRITURA y el borrado   *
+ *        de la parte elegida. Los otros tres (renombrar, añadir, eliminar una   *
+ *        de índice mayor) salen verdes con y sin arreglo, y a propósito: son    *
+ *        los que vigilan que la cura no sea peor que la enfermedad.             *
+ *   M2 · reconciliar SIEMPRE por nombre, sin la guarda de «la lista ha          *
+ *        encogido» ................................ 🔴 1 rojo: renombrar la     *
+ *        parte elegida la deseleccionaba, que es un arreglo peor que el defecto.*
  * -------------------------------------------------------------------------- */
 
 import { describe, expect, it, vi } from 'vitest'
 
+import {
+  conParteAnadida,
+  conParteEliminada,
+  conParteRenombrada,
+} from '../../edificio/mutaciones.js'
 import { crearVistaParteActiva } from '../../edificio/parte-activa.js'
 import { crearEstadoVista } from '../../viewer/_comun.js'
 import { ORIGEN_PARTE, crearEdificio, crearParteConstruccion } from '../../model/edificio.js'
@@ -287,5 +309,94 @@ describe('parte-activa · seleccionar', () => {
     expect(() => vista.seleccionar(-1)).toThrow(RangeError)
     expect(() => vista.seleccionar(1.5)).toThrow(TypeError)
     expect(() => vista.seleccionar('0')).toThrow(TypeError)
+  })
+})
+
+// ── ⛔ EL CORRIMIENTO (auditoría 2026-08-16 · H2) ────────────────────────────
+//
+// Lo que estas pruebas defienden NO es el fuera de rango —eso ya estaba cubierto
+// y además lo tapaba el guard de `app/cableado-edificio.js`— sino el caso en que
+// el índice SIGUE SIENDO VÁLIDO y ha dejado de apuntar a la misma parte: se
+// elige «porche» (índice 1) y desaparece «cuerpo» (índice 0). El índice 1 sigue
+// existiendo, pero ahora es «por dibujar», y un `set()` posterior —el drop de un
+// arrastre en vuelo— escribía la geometría del porche en la parte equivocada,
+// sin un solo error por ninguna parte.
+
+describe('⛔ parte-activa · una parte de índice MENOR desaparece', () => {
+  /** El edificio de siempre, con «cuerpo» (0) ya eliminado. */
+  const sinElCuerpo = (store) => conParteEliminada(store.get(), 0).edificio
+
+  const nuevos = [
+    {
+      tipo: 'EXTERIOR',
+      vertices: [
+        [999, 0],
+        [999, 9],
+        [990, 9],
+      ],
+    },
+  ]
+
+  it('⭐ la proyección SIGUE a la parte elegida, no al índice', () => {
+    const { store, vista } = montar()
+    vista.seleccionar(1)
+    expect(vista.get().parteDeEdificio).toEqual({ indice: 1, nombre: 'porche' })
+
+    store.set(sinElCuerpo(store))
+
+    expect(vista.seleccionada()).toBe(0)
+    expect(vista.get().parteDeEdificio).toEqual({ indice: 0, nombre: 'porche' })
+    expect(vista.get().recintos[0].vertices).toEqual(recinto(50).vertices)
+  })
+
+  it('⭐⭐ y `set()` escribe en «porche», NO en la parte que ocupó su índice', () => {
+    // Es el defecto medido: sin corrección, estos vértices acababan en «por
+    // dibujar» (medido: `C:999,0`), que es la parte equivocada — y en silencio.
+    const { store, vista } = montar()
+    vista.seleccionar(1)
+    store.set(sinElCuerpo(store))
+
+    vista.set({ ...vista.get(), recintos: nuevos })
+
+    const partes = store.get().partes
+    expect(partes.map((p) => p.nombre)).toEqual(['porche', 'por dibujar'])
+    expect(partes[0].recinto.vertices).toHaveLength(3)
+    expect(partes[1].recinto, '«por dibujar» sigue sin contorno').toBeNull()
+  })
+
+  it('eliminar la parte ELEGIDA deselecciona: no se hereda la que ocupa su hueco', () => {
+    const { store, vista } = montar()
+    vista.seleccionar(1)
+    store.set(conParteEliminada(store.get(), 1).edificio)
+    expect(vista.seleccionada()).toBeNull()
+    expect(vista.get()).toBeNull()
+  })
+
+  it('una parte de índice MAYOR que desaparece no mueve la elegida', () => {
+    const { store, vista } = montar()
+    vista.seleccionar(0)
+    store.set(conParteEliminada(store.get(), 2).edificio)
+    expect(vista.seleccionada()).toBe(0)
+    expect(vista.get().parteDeEdificio).toEqual({ indice: 0, nombre: 'cuerpo' })
+  })
+
+  it('⚠️ RENOMBRAR la parte elegida NO la deselecciona: la lista no ha encogido', () => {
+    // La otra mitad del arreglo, y la que impide que la cura sea peor: la
+    // identidad de trabajo es el NOMBRE, así que una corrección incondicional
+    // por nombre habría soltado la parte cada vez que se la renombra —justo
+    // mientras se la está editando.
+    const { store, vista } = montar()
+    vista.seleccionar(1)
+    store.set(conParteRenombrada(store.get(), 1, 'ala sur').edificio)
+    expect(vista.seleccionada()).toBe(1)
+    expect(vista.get().parteDeEdificio).toEqual({ indice: 1, nombre: 'ala sur' })
+  })
+
+  it('añadir una parte (va al final) no mueve la elegida', () => {
+    const { store, vista } = montar()
+    vista.seleccionar(1)
+    store.set(conParteAnadida(store.get()).edificio)
+    expect(vista.seleccionada()).toBe(1)
+    expect(vista.get().parteDeEdificio.nombre).toBe('porche')
   })
 })

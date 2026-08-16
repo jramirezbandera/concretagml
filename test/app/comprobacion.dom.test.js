@@ -655,6 +655,162 @@ describe('cableado-comprobacion · el Catastro no entrega el parcelario', () => 
   })
 })
 
+/* ── 6 bis · DOS FICHEROS SEGUIDOS, EL SEGUNDO MIENTRAS EL PRIMERO VIAJA ──────
+ *
+ * EL DEFECTO que esta sección ata, reproducido antes de arreglarlo: el usuario
+ * suelta el GML A (la consulta del parcelario queda en vuelo), se da cuenta de que
+ * era el fichero equivocado y suelta el GML B. `comprobar(B)` publicaba los
+ * hallazgos de B y al llegar a `await contrastar()` **retornaba en silencio** por el
+ * guard `if (destruido || contrastando) return`; cuando el Catastro contestaba a A,
+ * el contraste de A seguía con su snapshot y **cargaba A en el store**. Medido: una
+ * sola consulta, ningún aviso que dijera que B no se cargó, y en pantalla el
+ * documento que el usuario acababa de sustituir. Doble violación de la regla de oro 1.
+ *
+ * El transporte de aquí NO responde solo: cada petición queda pendiente hasta que el
+ * test la contesta a mano, que es la única forma de tener dos ficheros encabalgados
+ * de verdad (con el doble que responde al vuelo, el primero termina antes de que el
+ * segundo llegue y no hay carrera que medir).
+ * ------------------------------------------------------------------------- */
+
+/** El primer vértice del SEGUNDO fichero: 5 m al noreste del del WFS. */
+const VERTICE_FICHERO_B = [439288.23, 4479676.27]
+
+/**
+ * El segundo fichero del usuario — «el bueno»—, con la MISMA referencia catastral
+ * que el primero (es la misma parcela: lo que el usuario ha corregido es de qué
+ * exportación la toma) y el primer vértice en otro sitio, para que las dos versiones
+ * sean distinguibles vértice a vértice.
+ */
+const TEXTO_FICHERO_B = TEXTO_WFS.replaceAll(
+  `${VERTICE_WFS[0]} ${VERTICE_WFS[1]}`,
+  `${VERTICE_FICHERO_B[0]} ${VERTICE_FICHERO_B[1]}`,
+)
+
+/**
+ * Transporte doble que **no contesta hasta que el test se lo dice**. Cada petición
+ * anotada guarda su `senal`, que es la mitad de la defensa que se prueba aquí (la
+ * otra es el token de secuencia, y solo se ve cuando la respuesta llega TARDE).
+ */
+function crearTransporteControlado() {
+  const peticiones = []
+  return {
+    peticiones,
+    pedirTexto(url, opciones = {}) {
+      let cumplir
+      const promesa = new Promise((resolver) => {
+        cumplir = resolver
+      })
+      peticiones.push({
+        url,
+        senal: opciones.senal ?? null,
+        responder: (texto) => cumplir(http200(url, texto)),
+      })
+      return promesa
+    },
+    estado: () => ({ peticiones: peticiones.length }),
+    destruir() {},
+  }
+}
+
+describe('cableado-comprobacion · el segundo fichero llega con el primero en vuelo', () => {
+  /** Monta con el transporte que hay que contestar a mano. */
+  function montarConCatastroLento() {
+    const transporte = crearTransporteControlado()
+    const cliente = crearClienteCatastro({ transporte, srs: SRS })
+    // El `transporte` va DESPUÉS del volcado: `montar` devuelve el suyo —el doble
+    // corriente, que aquí no se usa— y el bueno es éste.
+    return { ...montar({ cliente }), transporte }
+  }
+
+  it('la prueba NO es vacua: las dos versiones del fichero son distinguibles', () => {
+    expect(TEXTO_FICHERO_B).not.toBe(TEXTO_FICHERO_MOVIDO)
+    expect(parsearGml(TEXTO_FICHERO_B).parcelas[0].recintos[0].vertices[0]).toEqual(
+      VERTICE_FICHERO_B,
+    )
+  })
+
+  it('⛔ el segundo NO se traga: entra ÉL, y la respuesta tardía del primero no lo pisa', async () => {
+    const { estado, transporte, procedencia } = montarConCatastroLento()
+
+    soltar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'el-equivocado.gml'))
+    await cederTurno()
+    // El primero está en vuelo: se ha pedido el parcelario y no ha entrado nada.
+    expect(transporte.peticiones).toHaveLength(1)
+    expect(estado.set).not.toHaveBeenCalled()
+
+    soltar(ficheroDeTexto(TEXTO_FICHERO_B, 'el-bueno.gml'))
+    await cederTurno()
+    // El segundo NO se ha quedado esperando a que el primero termine: tiene su
+    // propia consulta. Una por fichero abierto, que es lo que fija el override O8.
+    expect(transporte.peticiones).toHaveLength(2)
+
+    // El Catastro contesta al segundo…
+    transporte.peticiones[1].responder(TEXTO_WFS)
+    await cederTurno()
+    // …y DESPUÉS al primero, que es el orden que produce el defecto.
+    transporte.peticiones[0].responder(TEXTO_WFS)
+    await cederTurno()
+
+    // Un solo `set`, y es el del fichero que el usuario dejó en pantalla.
+    expect(estado.set).toHaveBeenCalledTimes(1)
+    expect(estado.get().recintos[0].vertices[0]).toEqual(VERTICE_FICHERO_B)
+    expect(procedencia.textContent).toContain('el-bueno.gml')
+    expect(procedencia.textContent).not.toContain('el-equivocado.gml')
+  })
+
+  it('la consulta del primero se ABORTA en cuanto llega el segundo', async () => {
+    // La otra mitad de la defensa: el servicio deja de trabajar para una pregunta
+    // que ya no interesa a nadie, que es lo que de verdad protege del bloqueo (O8).
+    const { transporte } = montarConCatastroLento()
+
+    soltar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'el-equivocado.gml'))
+    await cederTurno()
+    expect(transporte.peticiones[0].senal.aborted).toBe(false)
+
+    soltar(ficheroDeTexto(TEXTO_FICHERO_B, 'el-bueno.gml'))
+    await cederTurno()
+
+    expect(transporte.peticiones[0].senal.aborted).toBe(true)
+    expect(transporte.peticiones[1].senal.aborted).toBe(false)
+  })
+
+  it('«Descartar» con la consulta en vuelo la corta: lo que llegue después no entra en el store', async () => {
+    // El tercer sitio de la misma familia: el primario NO cierra el cajón (está
+    // razonado en `viewer/cajon-comprobacion.js`), así que arrepentirse con la
+    // consulta viajando dejaba entrar segundos después la parcela recién descartada.
+    const { estado, cableado, transporte, raizCajon } = montarConCatastroLento()
+
+    soltar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'el-equivocado.gml'))
+    await cederTurno()
+    expect(transporte.peticiones).toHaveLength(1)
+
+    raizCajon.querySelector(SELECTOR_CAJON.DESCARTAR).click()
+    expect(transporte.peticiones[0].senal.aborted).toBe(true)
+    expect(cableado.comprobacion()).toBeNull()
+
+    transporte.peticiones[0].responder(TEXTO_WFS)
+    await cederTurno()
+
+    expect(estado.set).not.toHaveBeenCalled()
+  })
+
+  it('`destruir()` con la consulta en vuelo la aborta, y lo que llegue tarde no escribe nada', async () => {
+    const { estado, cableado, transporte } = montarConCatastroLento()
+
+    soltar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'el-equivocado.gml'))
+    await cederTurno()
+    expect(transporte.peticiones).toHaveLength(1)
+
+    cableado.destruir()
+    expect(transporte.peticiones[0].senal.aborted).toBe(true)
+
+    transporte.peticiones[0].responder(TEXTO_WFS)
+    await cederTurno()
+
+    expect(estado.set).not.toHaveBeenCalled()
+  })
+})
+
 // ── 7 · Multiparcela: se elige UNA, y entra ÉSA ──────────────────────────────
 
 describe('cableado-comprobacion · un fichero con tres parcelas', () => {

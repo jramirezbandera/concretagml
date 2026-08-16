@@ -101,6 +101,7 @@ import {
   selectorPanel,
 } from '../../app/rama.js'
 import { entradaDesdeTexto } from '../../edificio/entrada.js'
+import { conParteAnadida, conParteEliminada } from '../../edificio/mutaciones.js'
 import { MODELO_EDIFICIO, crearEdificio } from '../../model/edificio.js'
 import { parsearGmlBu } from '../../gml/parse-bu.js'
 import { MOTIVO_CATASTRO, ORIGEN } from '../../services/catastro.js'
@@ -1497,6 +1498,146 @@ describe('F12 · T4.2 · añadir, elegir y eliminar partes', () => {
     expect(dicho).toContain('Cuerpo principal')
     expect(dicho).toContain('4 vértices')
     expect(dicho).toContain('Deshacer la devuelve')
+  })
+})
+
+// ══ 11 bis · AUDITORÍA 2026-08-16 · LA SELECCIÓN NO SE QUEDA COLGADA ═════════
+//
+// Dos hallazgos de la misma familia, y los dos silenciosos: la parte activa es un
+// índice, y un índice miente en cuanto la lista de partes deja de ser la misma.
+//
+//   · **H2 · el CORRIMIENTO.** El guard de `repintar` solo cubría el
+//     ENCOGIMIENTO (`activa >= partes.length`). Con A, B, C y «B» elegida,
+//     eliminar «A» deja el índice 1 apuntando a **C**: sigue siendo válido, así
+//     que el guard no lo ve, y el panel, el mapa y —lo caro— el store adaptador
+//     pasan a hablar de otra parte.
+//   · **H3 · el DOCUMENTO NUEVO.** Entrar otro edificio no reiniciaba la
+//     selección: editando la parte 3 de A, traer B dejaba la parte 3 de B
+//     elegida y editable sin ningún gesto del usuario.
+//
+// ── MUTACIONES (aplicadas a `app/cableado-edificio.js`, revertidas a mano) ──
+//   M12 · volver al guard viejo (solo `activa >= partes.length`, en vez de
+//          preguntarle la elegida al adaptador) ........... 🔴 1 rojo (el de H2)
+//   M13 · quitar el reinicio por documento nuevo ........... 🔴 1 rojo (el de H3)
+
+describe('⛔ auditoría · la parte activa no se queda apuntando a otra', () => {
+  const elegir = (i) =>
+    document.querySelector(`[data-parte-indice="${i}"] [data-accion="seleccionar-parte"]`).click()
+
+  /** «Cuerpo principal», «Sótano» y una tercera añadida por la mutación real. */
+  const edificioTresPartes = () => conParteAnadida(edificioDosPartes()).edificio
+
+  it('⭐ H2 · desaparecer una parte de índice MENOR arrastra la selección, no la deja en la vecina', () => {
+    // La eliminación llega por `estado.set`, que es como llega de verdad cuando
+    // no la pide el panel: un `Ctrl+Z`, el borrador que se restaura, un
+    // expediente que se abre. El panel solo sabe borrar la parte ACTIVA.
+    const ctx = montar()
+    ctx.estado.set(edificioTresPartes())
+    elegir(1)
+    expect(ctx.estado.get().partes[1].nombre).toBe('Sótano')
+
+    ctx.estado.set(conParteEliminada(ctx.estado.get(), 0).edificio)
+
+    expect(ctx.estado.get().partes.map((p) => p.nombre)).toEqual(['Sótano', 'Parte 3'])
+    expect(ctx.cableado.parteActiva(), 'el cableado sigue al «Sótano»').toBe(0)
+    expect(ctx.panelEdificio.parteActiva(), 'y el panel señala la misma fila').toBe(0)
+    expect(ultimoPintado(ctx).activa, 'y el mapa resalta la misma huella').toBe(0)
+  })
+
+  it('H2 · una parte de índice MAYOR que desaparece no mueve la elegida', () => {
+    const ctx = montar()
+    ctx.estado.set(edificioTresPartes())
+    elegir(0)
+    ctx.estado.set(conParteEliminada(ctx.estado.get(), 2).edificio)
+    expect(ctx.cableado.parteActiva()).toBe(0)
+  })
+
+  it('⭐ H3 · entrar OTRO edificio deselecciona: nadie edita la parte 3 de un documento que no ha abierto', async () => {
+    const ctx = montar()
+    await soltar(ctx.cableado, ficheroDe(RUTA_LIST, 'LIST.txt'))
+    elegir(0)
+    expect(ctx.cableado.parteActiva()).toBe(0)
+
+    await soltar(ctx.cableado, ficheroDe(RUTA_TXT, 'PARCELA.txt'))
+
+    expect(ctx.estado.get().idLocal).toBe('PARCELA.txt')
+    expect(ctx.cableado.parteActiva()).toBeNull()
+    expect(ctx.panelEdificio.parteActiva()).toBeNull()
+    expect(ultimoPintado(ctx).activa).toBeNull()
+  })
+
+  it('H3 · la guarda NO es vacua: una mutación del MISMO edificio conserva la elegida', () => {
+    // Sin esta mitad, «deseleccionar al entrar otro documento» podría estar
+    // deseleccionando en CADA repintado y las dos pruebas de arriba pasarían.
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+    elegir(1)
+    document.querySelector('[data-campo="plantas-sobre"]').value = '4'
+    document
+      .querySelector('[data-campo="plantas-sobre"]')
+      .dispatchEvent(new Event('change', { bubbles: true }))
+    expect(ctx.estado.get().partes[1].plantasSobreRasante).toBe(4)
+    expect(ctx.cableado.parteActiva()).toBe(1)
+  })
+
+  // ── Y lo que la reconciliación obliga a afinar en el aplicador del historial ──
+  //
+  // `aplicarDelHistorial` nació comparando el índice Y el nombre de la parte. Con
+  // la reconciliación puesta eso se quedó demasiado estrecho: al desaparecer una
+  // parte anterior, la elegida se renumera —sigue siendo la misma, el usuario la
+  // tiene delante— y un `Ctrl+Z` legítimo se negaba a aplicarse. Se compara por
+  // NOMBRE, que es la identidad que el modelo conserva; el índice nunca lo fue.
+
+  it('⭐ un deshacer sobre la MISMA parte se aplica aunque se haya renumerado', () => {
+    const ctx = montar()
+    ctx.estado.set(edificioTresPartes())
+    elegir(1) // «Sótano», en el índice 1
+    ctx.estado.set(conParteEliminada(ctx.estado.get(), 0).edificio) // pasa al 0
+
+    // La instantánea se tomó cuando «Sótano» estaba en el índice 1.
+    const instantanea = {
+      recintos: [{ vertices: [[440000, 4470000], [440020, 4470000], [440020, 4470020]] }],
+      idLocal: ctx.estado.get().idLocal ?? null,
+      origen: 'DXF',
+      parteDeEdificio: { indice: 1, nombre: 'Sótano' },
+    }
+
+    expect(ctx.cableado.esInstantaneaDeEdificio(instantanea)).toBe(true)
+    expect(ctx.cableado.aplicarDelHistorial(instantanea), 'es la misma parte').toBe(true)
+    expect(ctx.estado.get().partes[0].nombre).toBe('Sótano')
+    expect(ctx.estado.get().partes[0].recinto.vertices[1]).toEqual([440020, 4470000])
+  })
+
+  it('pero una instantánea de OTRA parte se sigue rechazando sin escribir nada', () => {
+    // La puerta que este método cerró sigue cerrada: aflojar la comparación no
+    // puede llegar a permitir que la geometría de una parte caiga en otra.
+    const ctx = montar()
+    ctx.estado.set(edificioTresPartes())
+    elegir(1)
+    const antes = ctx.estado.get()
+
+    const deOtra = {
+      recintos: [{ vertices: [[1, 1], [2, 1], [2, 2]] }],
+      idLocal: null,
+      origen: 'DXF',
+      parteDeEdificio: { indice: 1, nombre: 'Parte 3' },
+    }
+
+    expect(ctx.cableado.aplicarDelHistorial(deOtra)).toBe(false)
+    expect(ctx.estado.get()).toEqual(antes) // ni un vértice tocado
+  })
+
+  it('y sin parte elegida no se aplica nada', () => {
+    const ctx = montar()
+    ctx.estado.set(edificioTresPartes())
+    const antes = ctx.estado.get()
+    expect(
+      ctx.cableado.aplicarDelHistorial({
+        recintos: [],
+        parteDeEdificio: { indice: 0, nombre: 'Sótano' },
+      }),
+    ).toBe(false)
+    expect(ctx.estado.get()).toEqual(antes)
   })
 })
 

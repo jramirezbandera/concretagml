@@ -22,6 +22,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import {
   ALTO_FILA_PX,
   crearListaSobrante,
+  DESTINO_ALTA,
   FILAS_VISIBLES,
   MOTIVO_FOTO_CADUCA,
   MOTIVO_NINGUNA_INCLUIDA,
@@ -400,6 +401,88 @@ describe('crearListaSobrante · destruir', () => {
     expect(() => lista.destruir()).not.toThrow()
     expect(() => lista.pintar(cesion([pieza(1)]))).not.toThrow()
     expect(vistos).toEqual([])
+  })
+})
+
+// ── ⛔ El DESTINO de una pieza (F23) y la cifra que se firma ─────────────────
+
+describe('crearListaSobrante · el destino de una pieza', () => {
+  // ⭐ EL DEFECTO (auditoría 2026-08-16, MEDIA). El oyente `change` del desplegable
+  // de destino apagaba el campo de nombre y avisaba a `alCambiarSeleccion`, pero
+  // **no repintaba el contador**: solo lo hacían el `change` de la casilla y
+  // `pintar`. Con 2 piezas marcadas, asignar la 1 a la colindante dejaba
+  // `seleccionadas()` en `[2]` y el botón de entrega refrescado, pero el renglón
+  // seguía diciendo «Se emitirán 2 de 2 piezas, más la parcela» hasta que se tocaba
+  // cualquier casilla. **Es una cifra sobre la que se firma**, y decir de más es
+  // exactamente lo que la regla de oro 1 prohíbe.
+
+  /** Una foto cuyas piezas lindan todas con la misma colindante: todas con desplegable. */
+  function conVecino(piezas, refcat = 'V-1') {
+    const foto = cesion(piezas)
+    foto.recorte = {
+      consultado: true,
+      lindes: piezas.map((p) => ({ orden: p.orden, refcats: [refcat] })),
+      atribucion: [],
+    }
+    return foto
+  }
+
+  const destinos = () => qq(SELECTOR.DESTINO)
+
+  it('⛔ mandar una pieza a la colindante REPINTA el contador, no lo deja rancio', () => {
+    lista.pintar(conVecino([pieza(1), pieza(2)]))
+    expect(destinos()).toHaveLength(2)
+    expect(q(SELECTOR.CONTADOR).textContent).toBe(textoContador(2, 2))
+
+    destinos()[0].value = 'V-1'
+    tocar(destinos()[0], 'change')
+
+    // La selección efectiva ya solo tiene la 2 (la 1 viaja DENTRO de la parcela del
+    // vecino, no como miembro suelto del fichero)…
+    expect(lista.seleccionadas()).toEqual([2])
+    // …y la cifra que se lee lo dice, sin tener que tocar nada más.
+    expect(q(SELECTOR.CONTADOR).textContent).toBe(textoContador(1, 2))
+    expect(q(SELECTOR.CONTADOR).textContent).toMatch(/Se emitirán 1 de 2 piezas/)
+  })
+
+  it('y devolverla a «finca nueva» la vuelve a contar', () => {
+    lista.pintar(conVecino([pieza(1), pieza(2)]))
+    destinos()[0].value = 'V-1'
+    tocar(destinos()[0], 'change')
+    expect(q(SELECTOR.CONTADOR).textContent).toBe(textoContador(1, 2))
+
+    destinos()[0].value = DESTINO_ALTA
+    tocar(destinos()[0], 'change')
+    expect(lista.seleccionadas()).toEqual([1, 2])
+    expect(q(SELECTOR.CONTADOR).textContent).toBe(textoContador(2, 2))
+  })
+
+  it('desmarcar Y asignar se acumulan en la misma cifra', () => {
+    // Los dos caminos que cambian la selección efectiva, a la vez: si solo uno
+    // repintara, el contador quedaría con la mitad de la verdad.
+    lista.pintar(conVecino([pieza(1), pieza(2), pieza(3)]))
+    destinos()[0].value = 'V-1'
+    tocar(destinos()[0], 'change')
+    casillas()[1].checked = false
+    tocar(casillas()[1], 'change')
+
+    expect(lista.seleccionadas()).toEqual([3])
+    expect(q(SELECTOR.CONTADOR).textContent).toBe(textoContador(1, 3))
+  })
+
+  it('el reparto y los oyentes siguen igual: el arreglo solo añade el repintado', () => {
+    const vistos = []
+    lista.alCambiarSeleccion((s) => vistos.push(s))
+    lista.pintar(conVecino([pieza(1), pieza(2)]))
+
+    destinos()[0].value = 'V-1'
+    tocar(destinos()[0], 'change')
+
+    expect(lista.asignaciones()).toEqual({ 1: 'V-1' })
+    expect(vistos).toEqual([[2]])
+    // Y el nombre se apaga: una finca que se funde con la del vecino no se bautiza.
+    expect(campos()[0].disabled).toBe(true)
+    expect(campos()[1].disabled).toBe(false)
   })
 })
 

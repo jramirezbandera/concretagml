@@ -410,6 +410,84 @@ describe('prepararEntrega · ⛔ CRECE_FUERA deja de bloquear cuando el recorte 
   })
 })
 
+// ── F23 · ⛔ el colindante SIN referencia catastral ──────────────────────────
+
+describe('prepararEntrega · ⛔ un colindante SIN referencia NO tumba la entrega', () => {
+  // ⭐ EL DEFECTO, MEDIDO (auditoría del 2026-08-16). `Vecina.refcat` es
+  // `string|null` por contrato y `app/colindantes.js` produce `null` A PROPÓSITO
+  // cuando el WFS no devuelve la referencia («no se inventa nada»), o sea que el
+  // estado es LEGÍTIMO y alcanzable. `prepararEntrega` lo componía con
+  // `identidadDeParcela({refcat: v.refcat, idLocal: v.refcat})` —el MISMO campo
+  // dos veces, así que sin referencia no hay respaldo— y LANZABA un `TypeError`
+  // de contrato interno. La pantalla lo enseñaba tal cual: «No se ha podido
+  // componer el expediente: identidadDeParcela: hace falta refcat o idLocal…»,
+  // que no dice ni qué pasa ni qué hacer, y el expediente no salía nunca.
+  //
+  // Mismo terreno UTM real que el bloque de arriba, y por el mismo motivo: con
+  // rectángulos en el origen la validación de huso los rechaza (y hace bien).
+  const X0 = 388590
+  const Y0 = 4082390
+  const caja = (a, b, c, d) => rect(X0 + a, Y0 + b, X0 + c, Y0 + d)
+
+  const OFICIAL = caja(0, 0, 10, 10)
+  const MEDIDA = caja(2, 0, 12, 10)
+  const parcela = { idLocal: 'P-1', refcat: 'RC1', recintos: MEDIDA, geometriaOficial: OFICIAL }
+
+  /** La colindante a la que la medición le come 10..12 × 0..10 = 20 m². */
+  const SIN_REFERENCIA = { refcat: null, recintos: caja(10, 0, 20, 10) }
+  const CON_REFERENCIA = { refcat: 'V1', recintos: caja(10, 0, 20, 10) }
+
+  const cesionDe = () => derivarCesion({ recintos: MEDIDA, geometriaOficial: OFICIAL })
+  const recorteDe = (vecinas) =>
+    recortarVecinos({ recintos: MEDIDA, vecinas, fuera: cesionDe().puerta.piezas })
+  const entregaCon = (vecinas) =>
+    prepararEntrega({ parcela, srs: ARGS.srs, cesion: cesionDe(), recorte: recorteDe(vecinas) })
+
+  it('⭐ NO lanza: el `refcat: null` de una vecina es un estado del CONTRATO', () => {
+    expect(() => entregaCon([SIN_REFERENCIA])).not.toThrow()
+  })
+
+  it('⛔ y tampoco sale: no se le quita terreno a quien el fichero no puede nombrar', () => {
+    const e = entregaCon([SIN_REFERENCIA])
+    expect(e.puedeEntregarse).toBe(false)
+    expect(e.bloqueos).toContain(TIPO_DERIVACION.PIEZA_INVALIDA)
+    expect(e.xml).toBeNull()
+    // Sus trozos NO se han colado como miembros con una identidad inventada.
+    expect(e.miembros.some((m) => m.esVecino === true)).toBe(false)
+  })
+
+  it('⭐ la detección la puede leer un técnico: nombra la superficie y qué hacer', () => {
+    const e = entregaCon([SIN_REFERENCIA])
+    const d = e.detecciones.find((x) => x.datos?.sinReferencia !== undefined)
+    expect(d, 'no hay ninguna detección del colindante sin referencia').toBeDefined()
+    expect(d.severidad).toBe(SEVERIDAD.ERROR)
+    expect(d.datos.sinReferencia).toBe(1)
+    expect(d.datos.area).toBeCloseTo(20, 6)
+    expect(d.mensaje).toMatch(/referencia catastral/)
+    expect(d.mensaje).toMatch(/colindantes/)
+  })
+
+  it('⛔ y NINGUNA detección le enseña al usuario el contrato interno del módulo', () => {
+    // Lo que se veía antes en pantalla. Un mensaje que cita una función de
+    // `derivacion/identidad.js` es un fallo del programa disfrazado de aviso.
+    const e = entregaCon([SIN_REFERENCIA])
+    for (const d of e.detecciones) {
+      expect(d.mensaje, `«${d.mensaje}»`).not.toMatch(/identidadDe(Parcela|Cesion)/)
+    }
+  })
+
+  it('⛔ `CRECE_FUERA` vuelve a bloquear: el exceso ya no está explicado', () => {
+    // La puerta se abre porque cada metro que la medición se sale está atribuido a
+    // un vecino «que entra recortado unas líneas más abajo». Un vecino que no
+    // puede entrar rompe esa premisa, así que la puerta se cierra otra vez.
+    expect(entregaCon([SIN_REFERENCIA]).bloqueos).toContain(TIPO_DERIVACION.CRECE_FUERA)
+    // ANTI-VACUIDAD: con la MISMA geometría y la referencia puesta, sale entero.
+    const buena = entregaCon([CON_REFERENCIA])
+    expect(buena.puedeEntregarse).toBe(true)
+    expect(buena.xml).not.toBeNull()
+  })
+})
+
 // ── ⛔ La astilla del ENGANCHE tumbaba el fichero entero ─────────────────────
 
 describe('prepararEntrega · ⛔ una pieza que no se puede escribir NO tumba el expediente', () => {

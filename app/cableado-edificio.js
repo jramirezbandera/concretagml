@@ -661,6 +661,36 @@ function tieneGeometria(edificio) {
 }
 
 /**
+ * ⭐ **Qué DOCUMENTO es este, a efectos de «¿ha entrado otro?»** (auditoría
+ * 2026-08-16 · hallazgo H3). La identidad del OBJETO no vale: cada mutación
+ * reconstruye el `Edificio` entero, así que compararla diría «otro documento» al
+ * renombrar una parte.
+ *
+ * ── Es primo de `claveDeExpediente` (`app/cableado-diagnostico.js`), NO su gemelo ──
+ * Aquella toma la referencia catastral **o** el `idLocal`; ésta toma **los dos
+ * juntos**, y la diferencia es del caso real de esta rama: un DXF sobre el que se
+ * ha tecleado una referencia y el edificio que después se trae del Catastro con
+ * esa MISMA referencia son dos documentos distintos —trece partes contra siete— y
+ * comparten `refcat`. Con la clave de allí serían el mismo y la parte elegida
+ * sobreviviría, que es exactamente el defecto que esto cierra. Lo que los separa
+ * siempre es el `idLocal`, que desde F12 · T4.3 es LA identidad de esta rama (la
+ * que usa el autoguardado para saber qué borrador es cuál).
+ *
+ * No se importa de allí: es privada de aquel módulo y además tiene otro criterio.
+ * El proyecto ya tolera esta duplicación —`cableado-informe.js` lleva la suya—,
+ * así que se declara en vez de disimularse.
+ *
+ * @param {object|null} edificio
+ * @returns {string|null}  `null` solo cuando no hay documento ninguno.
+ */
+function claveDeEdificio(edificio) {
+  if (edificio === null || edificio === undefined) return null
+  const refcat = typeof edificio.refcat === 'string' ? edificio.refcat.trim() : ''
+  const idLocal = typeof edificio.idLocal === 'string' ? edificio.idLocal.trim() : ''
+  return `refcat:${refcat}|idLocal:${idLocal}`
+}
+
+/**
  * El reparto `{capa: nºanillos}` de un DXF, a partir de la lista de capas 1:1 con
  * las partes que publica el contrato D (`resumen.capas`). Conserva el ORDEN DE
  * APARICIÓN: el usuario coteja la lista del diálogo contra su CAD, y reordenarla
@@ -982,8 +1012,21 @@ export function cablearEdificio({
   /** El aviso de «esta rama no se guarda» se da UNA vez, y cuando toca. */
   let dichoAutoguardado = false
 
-  /** Qué parte se está editando, por su índice. `null` = ninguna. F12 · T4.2. */
+  /**
+   * Qué parte se está editando, por su índice. `null` = ninguna. F12 · T4.2.
+   *
+   * ⚠️ **No es la fuente de la verdad, es la copia que pinta.** La de verdad la
+   * lleva `edificio/parte-activa.js`, que es quien escribe en la parte; aquí se
+   * re-sincroniza en cada repintado (ver {@link repintar}). Dos números que
+   * pueden discrepar es lo que hizo falta arreglar en la auditoría 2026-08-16.
+   */
   let activa = null
+
+  /**
+   * Qué documento hay abierto, para ver que ha entrado OTRO (hallazgo H3). Nace
+   * de lo que ya hubiera en el store: montar la pantalla no es «entrar otro».
+   */
+  let claveDocumento = claveDeEdificio(estado.get())
 
   /**
    * Cuántos contornos se quedaron fuera de la envolvente la última vez que se
@@ -1249,12 +1292,38 @@ export function cablearEdificio({
     }
 
     // ── F12 · T4.2 · La parte activa, la envolvente y las dos medidas ────────
-    //
-    // ⚠️ El índice se REVALIDA contra la lista de ahora antes de nada: eliminar
-    // la parte 2 de tres deja el índice 2 fuera de rango, y un adaptador
-    // apuntando a una parte que ya no existe editaría el aire.
     const partes = edificio === null || !Array.isArray(edificio.partes) ? [] : edificio.partes
-    if (activa !== null && activa >= partes.length) seleccionarParte(null)
+
+    // ── ⛔ H3 (auditoría 2026-08-16) · UN DOCUMENTO NUEVO NO HEREDA LA ELEGIDA ─
+    // Hasta esta fecha la selección solo se anulaba por LONGITUD, así que
+    // editando la parte 3 del edificio A y trayendo del Catastro el edificio B
+    // —trece partes— la parte 3 de B quedaba elegida y editable sin un solo
+    // gesto del usuario: el mapa resaltaba una huella que él no había tocado y
+    // el siguiente arrastre entraba ahí. Se mira por IDENTIDAD del documento
+    // ({@link claveDeEdificio}) y no por longitud, que es lo único que distingue
+    // «otro edificio» de «el mismo con una parte más».
+    const clave = claveDeEdificio(edificio)
+    if (clave !== claveDocumento) {
+      claveDocumento = clave
+      seleccionarParte(null)
+    }
+
+    // ── ⛔ H2 (misma auditoría) · Y LA ELEGIDA SE LEE, NO SE DA POR SUPUESTA ──
+    // El guard de antes era `activa >= partes.length`, o sea que solo cubría el
+    // ENCOGIMIENTO. El CORRIMIENTO —eliminar una parte de índice MENOR— deja el
+    // índice dentro de rango apuntando a la parte de al lado, y así se quedaba.
+    // Quien lo corrige es `edificio/parte-activa.js` (ahí está el porqué entero,
+    // y ahí está el punto de escritura que importa); aquí se le PREGUNTA, que es
+    // lo que impide que el panel y el mapa señalen una parte y el motor de
+    // edición escriba en otra.
+    const elegida = vistaActiva.seleccionada()
+    if (elegida !== activa) {
+      activa = elegida
+      // Un dibujo en curso era de la parte de antes: seguir dibujándolo sobre
+      // otra —o sobre ninguna— es como acabar los vértices en la que no era.
+      if (dibujoActivo?.dibujando()) cancelarDibujo()
+      refrescarBarra()
+    }
     entrada.activa = activa
 
     panelEdificio.fijar(entrada)
@@ -1365,6 +1434,11 @@ export function cablearEdificio({
    *
    * Un índice que no cae dentro de la lista se trata como `null` **sin lanzar**:
    * es lo que pasa al eliminar la parte que estaba puesta, y eso es un uso normal.
+   *
+   * ⚠️ Esto es la elección que hace el USUARIO. Lo que ocurre cuando la lista se
+   * mueve **debajo** de una elección ya hecha no se decide aquí: lo corrige
+   * `edificio/parte-activa.js` y {@link repintar} lo recoge (auditoría
+   * 2026-08-16, hallazgo H2).
    *
    * @param {number|null} i
    * @returns {number|null}  Lo que ha quedado elegido de verdad.
@@ -2163,6 +2237,85 @@ export function cablearEdificio({
 
     /** Las `<section>` que este módulo ha sellado. Para el test y para T4.1. */
     secciones: () => [...secciones],
+
+    /**
+     * Aplica a la parte activa una instantánea del historial que sea SUYA.
+     *
+     * ⛔ **Nace de un defecto medido (auditoría 2026-08-16), y el defecto era de
+     * quien aplicaba, no de la pila.** `main.js` decidió a propósito que las dos
+     * ramas compartieran historial —«`Ctrl+Z` es UNA tecla y el usuario no lleva
+     * la cuenta de en qué rama la pulsa»— y esa decisión sigue en pie. Lo que
+     * faltaba era que el aplicador MIRARA qué había sacado: `moverse` hacía
+     * `estado.set(instantanea)` contra el store de PARCELA fuera cual fuera la
+     * instantánea, así que editar el vértice de una huella y pulsar `Ctrl+Z`
+     * metía la proyección de la parte —`{recintos, idLocal, origen,
+     * parteDeEdificio}`— dentro de la parcela del expediente. No se veía mientras
+     * durara la rama (la ficha, el mando de GML y el autoguardado son los del
+     * edificio) y al volver a Parcela esa huella se validaba, se serializaba y se
+     * firmaba como si fuera la finca.
+     *
+     * La marca `parteDeEdificio` que `edificio/parte-activa.js` pone en la
+     * proyección ya decía de quién era cada instantánea —está escrito allí: «esto
+     * NO es una Parcela del modelo y no debe acabar en `crearParcela` ni en un
+     * expediente»—; sencillamente nadie la leía. Esto es quien la lee.
+     *
+     * ⚠️ **Y se exige que la parte sea la MISMA**, no solo que haya una: aplicar
+     * la geometría de la parte 2 sobre la 5 porque el índice coincide sería
+     * cambiar una corrupción por otra. Si la elegida es otra (o se ha renombrado,
+     * o no hay ninguna), se dice que no y `main.js` lo cuenta en el renglón: la
+     * operación se queda sin deshacer, que es reversible y visible, en vez de
+     * escribirse en el sitio equivocado, que no lo es.
+     *
+     * ⚠️ **La comparación se afinó al reconciliar la parte activa** (misma
+     * auditoría, unas horas después). La primera versión exigía que coincidieran
+     * el índice Y el nombre, y con la reconciliación puesta eso se volvió
+     * demasiado estrecho: `vistaActiva.get()` devuelve ahora el índice ya
+     * reconciliado, así que borrar una parte anterior renumeraba a la elegida y
+     * un `Ctrl+Z` legítimo —sobre la MISMA parte, con el usuario mirándola— se
+     * negaba a aplicarse. Se compara por NOMBRE, que es la identidad que el
+     * modelo conserva y la que usa la propia reconciliación; el índice se deja
+     * caer porque nunca fue una identidad. Lo que este método impide sigue
+     * impedido: escribir la geometría de una parte sobre OTRA distinta.
+     *
+     * @param {object|null} instantanea  La que acaba de sacar el historial.
+     * @returns {boolean}  `true` si se ha aplicado; `false` si no era suya o no
+     *   había dónde ponerla — y entonces NADIE la ha escrito.
+     */
+    aplicarDelHistorial(instantanea) {
+      if (destruido) return false
+      const marca = instantanea?.parteDeEdificio
+      if (!marca || typeof marca !== 'object') return false
+
+      const vigente = vistaActiva.get()?.parteDeEdificio
+      if (!vigente) return false
+      // ⛔ Se compara el NOMBRE y **no el índice**, y esa asimetría es deliberada
+      // (2026-08-16, al reconciliar la parte activa). Un índice es una POSICIÓN,
+      // no una identidad: eliminar una parte anterior renumera a todas las que
+      // van detrás sin que ninguna haya dejado de ser la que era, y comparar por
+      // índice hacía entonces que un `Ctrl+Z` legítimo se negara a aplicarse
+      // sobre la parte que el usuario tiene delante. La identidad de una parte es
+      // su nombre —es lo único que el modelo conserva, porque `crearEdificio`
+      // reconstruye los objetos en cada mutación— y es la misma que usa la
+      // reconciliación de `edificio/parte-activa.js`. Es, además, la misma
+      // lección que costó el arrastre del visor: allí `(recinto, índice)` también
+      // parecía una identidad y era una posición.
+      if (vigente.nombre !== marca.nombre) return false
+
+      vistaActiva.set(instantanea)
+      return true
+    },
+
+    /**
+     * ¿Esta instantánea del historial es de la rama EDIFICIO?
+     *
+     * Se pregunta por la marca y no por el tipo: el POJO de una parte y el de una
+     * parcela se parecen demasiado (los dos llevan `recintos` e `idLocal`) y
+     * distinguirlos por su forma sería adivinar. Ver {@link aplicarDelHistorial}.
+     *
+     * @param {object|null} instantanea
+     * @returns {boolean}
+     */
+    esInstantaneaDeEdificio: (instantanea) => instantanea?.parteDeEdificio != null,
 
     /**
      * Enciende o apaga la edición de la parte activa (F12 · T4.2).

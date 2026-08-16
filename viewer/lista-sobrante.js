@@ -845,6 +845,18 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
         // funde con la suya y no se bautiza. Se apaga el campo en vez de esconderlo
         // para que la fila no cambie de alto al elegir.
         campo.disabled = destino.value !== DESTINO_ALTA
+        // ⛔ **Y SE REPINTA EL CONTADOR, igual que en la casilla** (auditoría
+        // 2026-08-16). Elegir destino cambia la SELECCIÓN EFECTIVA tanto como
+        // desmarcar: `seleccionadas()` deja fuera lo que va a un colindante (viaja
+        // dentro de la parcela del vecino, no como miembro suelto). Sin esta línea
+        // el cableado refrescaba el botón de entrega pero el renglón seguía
+        // diciendo «Se emitirán 2 de 2 piezas» hasta que se tocara cualquier
+        // casilla — **una cifra sobre la que se firma**, y de más.
+        // La regla, para que no vuelva a faltar: *todo camino que pueda cambiar lo
+        // que devuelve `seleccionadas()` repinta el contador ANTES de emitir*. Hoy
+        // son exactamente tres —esta, el `change` de la casilla y `pintar`— y no
+        // hay ninguna API pública que toque casilla o destino desde fuera.
+        repintarContador()
         emitir(oyentesSeleccion, 'destino', seleccionadas())
       })
 

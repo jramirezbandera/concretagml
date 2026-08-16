@@ -287,6 +287,11 @@ const textoDe = (valor) => (typeof valor === 'string' ? valor.trim() : '')
  *   cuelga nada de él, pero se sigue admitiendo porque es el ancla de los menús y
  *   el nodo que `destruir()` tiene que dejar como lo encontró.
  * @param {object|null} [opciones.panel]  El de `app/avisos.js`, o `null`.
+ * @param {((fn: () => void) => (() => void))|null} [opciones.suscribirExpediente]
+ *   El canal `alCambiarIdentidad` de `app/cableado-expediente.js`: avisa —sin
+ *   carga— cuando el expediente abierto cambia de identidad. Devuelve su baja.
+ *   `null` = nadie lo enchufa, y entonces la zona de expediente solo se pone al día
+ *   en la siguiente pintada. Ver {@link pintarExpediente}.
  * @param {((paso: string) => void)|null} [opciones.alNavegar]  Se llama DESPUÉS
  *   de pintar, con el paso ya activo. Es por donde `app/main.js` mete el
  *   `invalidateSize()` del mapa sin que este módulo sepa que hay un mapa.
@@ -300,6 +305,7 @@ export function cablearBarra({
   panel = null,
   alNavegar = null,
   expediente = null,
+  suscribirExpediente = null,
 } = {}) {
   if (!esDocumento(documento)) {
     throw new TypeError(
@@ -321,6 +327,13 @@ export function cablearBarra({
       `cablearBarra: 'expediente' debe ser una función o null; recibido ${typeof expediente}. Es ` +
         `el \`estado()\` de app/cableado-expediente.js, y se lee en CADA pintada por lo mismo ` +
         `que el motivo de entrega: una foto guardada se queda rancia.`,
+    )
+  }
+  if (suscribirExpediente !== null && typeof suscribirExpediente !== 'function') {
+    throw new TypeError(
+      `cablearBarra: 'suscribirExpediente' debe ser una función o null; recibido ` +
+        `${typeof suscribirExpediente}. Es el \`alCambiarIdentidad(fn)\` de ` +
+        `app/cableado-expediente.js, y tiene que devolver su baja.`,
     )
   }
 
@@ -581,6 +594,24 @@ export function cablearBarra({
    * `puedeGuardar` para el guion 12. Reconstruirlo aquí desde el modelo sería una
    * segunda definición de «qué expediente tengo», y las segundas definiciones
    * divergen.
+   *
+   * ── ⛔ «SE LEE EN CADA PINTADA» ERA CIERTO Y NO BASTABA (2026-08-16) ──────
+   * Leerlo en cada pintada evita la foto rancia **si hay pintada**, y ahí estaba el
+   * defecto: `pintar()` solo lo disparan `navegacion.subscribe` y `repintar()`,
+   * cuyo único llamante en producción es `refrescarHechos()` de `app/main.js`,
+   * colgado de los dos STORES. Y archivar, renombrar o borrar un expediente cambia
+   * la identidad **sin tocar ningún store y sin mover de paso**: el diálogo acusaba
+   * «Guardado «X»» y la barra seguía diciendo «Sin guardar» hasta el siguiente
+   * cambio de store; con «Borrar», al revés, se quedaba enseñando el nombre de un
+   * expediente que ya no existía — que es lo caro de los dos, porque afirma que el
+   * trabajo está archivado.
+   *
+   * Por eso el productor trae ahora un CANAL ({@link suscribirExpediente}) que
+   * avisa cuando esa identidad cambia. **El canal no lleva carga a propósito**: la
+   * verdad se sigue leyendo de `estado()` aquí, así que no hay una segunda
+   * definición de «qué expediente tengo» ni una foto que pueda quedarse atrás.
+   * Sigue habiendo un solo `repintar()` público (decisión A1): esto no es un
+   * segundo repintado de la barra, es la zona que se pone al día sola.
    */
   function pintarExpediente() {
     if (nodoNombre === null || nodoApunte === null) return
@@ -605,6 +636,30 @@ export function cablearBarra({
     nodoApunte.textContent = cual.apunte
   }
 
+  // El canal del expediente. Repinta SOLO su zona: el resto de la barra depende de
+  // la navegación y de los hechos, y archivar un expediente no mueve ninguno de los
+  // dos. Un `pintar()` entero aquí sería trabajo de más en cada guardado.
+  //
+  // ⚠️ La guarda de `destruido` va dentro y no fuera: entre `destruir()` y la baja
+  // efectiva no puede colarse una escritura sobre nodos que este módulo ya no
+  // gobierna. Es la misma cautela que `alPulsar`.
+  const bajaExpediente =
+    suscribirExpediente === null
+      ? () => {}
+      : suscribirExpediente(() => {
+          if (destruido) return
+          pintarExpediente()
+        })
+  if (typeof bajaExpediente !== 'function') {
+    // Sin baja no hay `destruir()` completo, y un oyente huérfano sobre una barra
+    // desmontada escribe en nodos que ya no gobierna nadie. Se dice al MONTAR, que
+    // es cuando todavía se puede arreglar.
+    throw new TypeError(
+      `cablearBarra: 'suscribirExpediente' tiene que devolver su función de baja; ha devuelto ` +
+        `${typeof bajaExpediente}.`,
+    )
+  }
+
   // El DOM, antes que nadie de fuera. `subscribe` no notifica al suscribirse
   // (contrato de `crearEstadoVista`), así que la primera pintada va a mano.
   const baja = navegacion.subscribe(pintar)
@@ -617,6 +672,7 @@ export function cablearBarra({
       if (destruido) return
       destruido = true
       baja()
+      bajaExpediente()
       for (const quitar of oyentes) quitar()
       oyentes.length = 0
       // Aquí SÍ se vacía la lista, y no contradice la regla dura: estos nodos los

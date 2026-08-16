@@ -823,6 +823,139 @@ describe('F10 · T5.1 · 4 · recuperar, duplicar y borrar', () => {
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
+describe('F10 · T5.1 · 4bis · ⭐ el canal de identidad (auditoría del 2026-08-16)', () => {
+  // ⭐ EL DEFECTO, MEDIDO. La zona de expediente de `app/barra.js` se lee de
+  // `estado()` en CADA pintada, y aun así se quedaba rancia: archivar, renombrar y
+  // borrar cambian `identidades[rama]` **sin tocar ningún store ni la navegación**,
+  // que son las dos únicas cosas que provocan una pintada. El diálogo acusaba
+  // «Guardado «X»» y la barra seguía diciendo «Sin guardar»; tras borrar seguía
+  // enseñando el nombre de un expediente que ya no existe.
+  //
+  // Este cableado es el único que sabe cuándo pasa eso, así que es el que lo dice.
+
+  /** Deja uno guardado y devuelve su registro. Gemelo del del bloque 4. */
+  async function conUnoGuardado(m, nombre = 'Guardado') {
+    await abrir(m)
+    escribirNombre(nombre)
+    pulsar(SELECTOR.GUARDAR)
+    await reposar()
+    return (await m.expedientes.listar()).registros[0]
+  }
+
+  it('publica `alCambiarIdentidad`, y exige una función', async () => {
+    const m = await montar()
+    expect(typeof m.cableado.alCambiarIdentidad).toBe('function')
+    expect(() => m.cableado.alCambiarIdentidad('no')).toThrow(TypeError)
+    m.cableado.destruir()
+  })
+
+  it('⭐ ARCHIVAR avisa, y quien escucha ya lee el nombre nuevo', async () => {
+    const m = await montar()
+    // ⚠️ La foto se toma DENTRO del oyente: avisar antes de haber puesto al día la
+    // identidad sería un canal que dice «ha cambiado» y enseña lo de antes.
+    const vistas = []
+    m.cableado.alCambiarIdentidad(() => vistas.push(m.cableado.estado().nombreAbierto))
+
+    await abrir(m)
+    escribirNombre('Linde norte')
+    pulsar(SELECTOR.GUARDAR)
+    await reposar()
+
+    expect(vistas).toContain('Linde norte')
+    m.cableado.destruir()
+  })
+
+  it('⭐ RENOMBRAR avisa también: es guardar el MISMO registro con otro nombre', async () => {
+    const m = await montar()
+    await conUnoGuardado(m, 'Linde norte')
+    const vistas = []
+    m.cableado.alCambiarIdentidad(() => vistas.push(m.cableado.estado().nombreAbierto))
+
+    escribirNombre('Linde norte (revisado)')
+    pulsar(SELECTOR.GUARDAR)
+    await reposar()
+
+    expect(vistas).toEqual(['Linde norte (revisado)'])
+    expect((await m.expedientes.listar()).registros).toHaveLength(1)
+    m.cableado.destruir()
+  })
+
+  it('⛔ BORRAR el expediente abierto avisa, y ya no hay nombre que enseñar', async () => {
+    const m = await montar()
+    const registro = await conUnoGuardado(m, 'Se va')
+    const vistas = []
+    m.cableado.alCambiarIdentidad(() =>
+      vistas.push({
+        id: m.cableado.estado().idAbierto,
+        nombre: m.cableado.estado().nombreAbierto,
+      }),
+    )
+
+    const selector = `${selectorFila(registro.id)} [data-accion="borrar-expediente"]`
+    pulsar(selector)
+    await reposar()
+    pulsar(selector)
+    await reposar()
+
+    expect(vistas).toEqual([{ id: null, nombre: null }])
+    m.cableado.destruir()
+  })
+
+  it('⛔ ANTI-VACUIDAD: lo que NO cambia la identidad no avisa', async () => {
+    // `duplicar` crea otro registro y deja abierto el mismo: si esto también
+    // avisara, el canal estaría diciendo «ha cambiado» cada vez que pasa algo, y
+    // no es un canal, es ruido.
+    const m = await montar()
+    const registro = await conUnoGuardado(m, 'Original')
+    const vistas = []
+    m.cableado.alCambiarIdentidad(() => vistas.push(m.cableado.estado().nombreAbierto))
+
+    pulsar(`${selectorFila(registro.id)} [data-accion="duplicar-expediente"]`)
+    await reposar()
+
+    expect(vistas).toEqual([])
+    m.cableado.destruir()
+  })
+
+  it('la baja funciona, y `destruir()` deja el canal mudo', async () => {
+    const m = await montar()
+    const vistas = []
+    const baja = m.cableado.alCambiarIdentidad(() => vistas.push(1))
+    baja()
+    await conUnoGuardado(m, 'Uno')
+    expect(vistas).toEqual([])
+
+    // Y tras `destruir()` el canal se queda mudo: la orden llega por el embudo
+    // público —el diálogo ya no está— y no despierta a nadie.
+    m.cableado.alCambiarIdentidad(() => vistas.push(2))
+    m.cableado.destruir()
+    m.cableado.atender(ACCION_EXPEDIENTE.GUARDAR, { nombre: 'Dos' })
+    await reposar()
+    expect(vistas).toEqual([])
+    expect((await m.expedientes.listar()).registros).toHaveLength(1)
+  })
+
+  it('⛔ un oyente que revienta no deja sin enterarse a los demás', async () => {
+    // Misma doctrina que el resto de canales de la casa: el `try` alcanza a CADA
+    // oyente por separado. Y no se propaga, que dentro de un `click` sería mudo.
+    const m = await montar()
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const vistas = []
+    m.cableado.alCambiarIdentidad(() => {
+      throw new Error('boom')
+    })
+    m.cableado.alCambiarIdentidad(() => vistas.push(m.cableado.estado().nombreAbierto))
+
+    await conUnoGuardado(m, 'Pese a todo')
+
+    expect(vistas).toEqual(['Pese a todo'])
+    expect(error).toHaveBeenCalled()
+    error.mockRestore()
+    m.cableado.destruir()
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
 describe('F10 · T5.1 · 5 · ⭐ el autoguardado y su espera', () => {
   /** Deja un borrador escrito en la base y devuelve la apertura para reutilizarla. */
   async function conBorrador() {

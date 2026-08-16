@@ -175,7 +175,10 @@ export { puntoDeReferencia } from './entrada.js'
 // (regla de oro 1).
 //
 // `MOTIVO_ENTRADA` es además el catálogo que hace comprobable una de las
-// mediciones caras de esta fase: son CINCO y CERRADOS, y **`ANILLOS_EN_VARIAS_CAPAS`,
+// mediciones caras de esta fase: son SEIS y CERRADOS —eran cinco hasta que la
+// auditoría del 2026-08-15 añadió `LINEAS_NO_IMPORTADAS`, que SÍ se hereda porque
+// una huella a la que le faltan vértices está tan rota como una parcela—, y
+// **`ANILLOS_EN_VARIAS_CAPAS`,
 // `SUPERFICIE_NO_POSITIVA` y `VARIOS_RECINTOS_DISJUNTOS` no están** — esos tres son
 // de PARCELA, los emite `parsers/importar.js` y `entradaDesdeTexto` los filtra,
 // porque un DXF de vivienda + porche + piscina (el caso NORMAL de esta rama) viene

@@ -392,11 +392,21 @@
 //      commitea; `aplicarVertice` y `aplicarRecintos` commitean por su cuenta
 //      DESPUÉS de escribir, y ninguno de los dos pasa por aquí).
 //
-//   4. LOS ATAJOS SE CALLAN DENTRO DE UN CAMPO. `Ctrl+Z` sobre un `<input>` es el
-//      deshacer del NAVEGADOR sobre el texto que se está escribiendo, y las
-//      celdas de coordenada de la tabla de vértices SON inputs. Robárselo para
-//      revertir la geometría mientras el usuario corrige un dígito sería un fallo
-//      grave y difícil de contar. Ver {@link esCampoDeTexto}.
+//   4. LOS ATAJOS SE CALLAN EN TRES SITIOS, Y CALLARSE NO ES CALLARLO.
+//      · **Dentro de un campo** — `Ctrl+Z` sobre un `<input>` es el deshacer del
+//        NAVEGADOR sobre el texto que se está escribiendo, y las celdas de
+//        coordenada de la tabla de vértices SON inputs. Robárselo para revertir la
+//        geometría mientras el usuario corrige un dígito sería un fallo grave y
+//        difícil de contar. Ver {@link esCampoDeTexto}. Éste NO se dice: el usuario
+//        obtiene lo que esperaba (el deshacer del texto), así que no hay nada que
+//        contarle.
+//      · **Bajo una ventana MODAL** (auditoría 2026-08-16) — ver
+//        {@link hayDialogoModalAbierto} y {@link MENSAJE_ATAJO_CON_DIALOGO}.
+//      · **Durante un arrastre de vértice** (misma auditoría) — ver
+//        {@link arrastrandoVertice} y {@link MENSAJE_ATAJO_ARRASTRANDO}.
+//      Los dos últimos SÍ se dicen, y por lo mismo: en ellos el usuario pulsa
+//      esperando que pase algo, no pasa, y no tiene delante ningún botón gris que
+//      se lo explique. Un atajo que no responde y no explica es un atajo roto.
 //
 //   5. LA TOLERANCIA SE TECLEA EN CENTÍMETROS Y EL MODELO ESTÁ EN METROS. La
 //      conversión es de ESTA capa (`index.html` lo dice y pide expresamente que
@@ -1251,6 +1261,63 @@ const MENSAJE_NADA_QUE_DESHACER = 'No hay ninguna edición que deshacer.'
 const MENSAJE_NADA_QUE_REHACER = 'No hay ninguna edición que rehacer.'
 
 /**
+ * ⛔ **El atajo, INHIBIDO con una ventana modal abierta (auditoría 2026-08-16).**
+ *
+ * `esCampoDeTexto` era el único filtro, y cubre el caso de ESCRIBIR. No cubría el
+ * de MIRAR: los diálogos de esta aplicación son modales de verdad —los abren con
+ * `showModal()` `app/dialogo-expediente.js`, `app/dialogo-avisos.js` y
+ * `app/dialogo-diccionario.js`— y dentro de ellos se navega por BOTONES, no por
+ * campos. Escenario medido: se abre «Expediente», se recorre la lista de proyectos
+ * guardados —el foco queda en un botón de fila— y se pulsa `Ctrl+Z`, que ahí es el
+ * gesto natural. La geometría de detrás se deshacía; el mapa y el renglón están
+ * TAPADOS POR EL VELO, así que nada lo decía, y el autoguardado persistía la
+ * geometría ya revertida.
+ *
+ * ── POR QUÉ ESTE TEXTO VA TAMBIÉN AL PANEL Y NO SOLO AL RENGLÓN ─────────────
+ * Porque el renglón está detrás del velo. El panel de avisos CONSERVA lo dicho, así
+ * que el usuario lo lee al cerrar la ventana —que es cuando la pregunta «¿ha hecho
+ * algo mi Ctrl+Z?» se puede contestar mirando el mapa—, y agrupa las repeticiones
+ * con su `×N`, así que insistir con el atajo no llena el panel de tarjetas iguales.
+ * Es la excepción al reparto de siempre (renglón = desenlace del atajo), y la
+ * excepción la impone el velo, no el gusto.
+ */
+const MENSAJE_ATAJO_CON_DIALOGO =
+  'Hay una ventana abierta encima, así que «Deshacer» y «Rehacer» se quedan quietos: lo que ' +
+  'cambiarían está detrás del velo y no lo verías. Cierra la ventana y vuelve a pulsar.'
+
+/**
+ * ⛔ **Y el atajo, inhibido TAMBIÉN mientras se arrastra un vértice.**
+ *
+ * Es la otra mitad del defecto que `viewer/sincronizacion.js` cerró por su lado
+ * (auditoría 2026-08-16): un `Ctrl+Z` a mitad de arrastre cambia la forma del
+ * anillo bajo los pies del gesto, y el `dragend` escribía la coordenada en el
+ * vértice equivocado. Aquel módulo ya no lo escribe —RENUNCIA al gesto, lo dice con
+ * `NIVEL.ERROR` y repinta desde el modelo—, pero entonces el usuario pierde el
+ * arrastre: suelta el ratón y le dicen «no se ha aplicado, repítelo». Esta mitad es
+ * no llegar ahí. Ver {@link arrastrandoVertice}.
+ *
+ * Éste sí se queda SOLO en el renglón, y la diferencia con el de arriba es la que
+ * decide: aquí no hay velo. El renglón está a la vista, el estado dura lo que dura
+ * el gesto y una tarjeta en el panel por cada tecla pulsada durante un arrastre
+ * sería ruido sobre algo que se resuelve soltando el ratón.
+ */
+const MENSAJE_ATAJO_ARRASTRANDO =
+  'Estás arrastrando un vértice: «Deshacer» y «Rehacer» esperan a que lo sueltes. Deshacer a ' +
+  'media faena cambiaría la parcela bajo el vértice que tienes agarrado.'
+/**
+ * Los dos de la pila COMPARTIDA entre ramas (auditoría 2026-08-16, ver
+ * {@link moverse}). La pila lleva las operaciones de las dos ramas en el orden en
+ * que se hicieron, así que un `Ctrl+Z` puede tocarle a la otra: eso no se impide
+ * —es la decisión de F12, y una tecla no debería significar dos cosas— pero sí se
+ * DICE, porque deshacer algo que no se está mirando y callarlo es la definición de
+ * cambio silencioso.
+ */
+const COLA_ERA_DEL_EDIFICIO = 'Era una edición del edificio.'
+const MENSAJE_OTRA_PARTE =
+  'Esa operación es de otra parte del edificio, así que no se ha deshecho: elige esa parte en el ' +
+  'panel y vuelve a intentarlo. No se ha cambiado nada.'
+
+/**
  * Al entrar una parcela nueva. Dice las dos cosas que el usuario necesita saber y
  * que, calladas, se leerían como un fallo: que «Deshacer» se ha apagado, y por
  * qué. Es la cara visible de la decisión 2 de F06.
@@ -1532,9 +1599,61 @@ let colindantesTraidas = null
  * nueva**: una referencia deducida de la geometría ANTERIOR pintada sobre la
  * actual sería una afirmación falsa sobre lo que hay en pantalla.
  *
+ * ⛔ **Esa última frase era MENTIRA en dos de las cuatro puertas (auditoría
+ * 2026-08-16).** Borraban la medición (paso 17) y la comprobación (paso 9); NO
+ * borraban el Catastro (paso 7) ni el expediente (paso 13). Escenario verificado:
+ * se importa un `.dxf` sin referencia —la app deduce una y la ficha pinta «…VK ·
+ * deducida, sin confirmar»—, se abre después un proyecto guardado cuya parcela
+ * tampoco trae referencia, y la ficha sigue enseñando la referencia de la parcela
+ * ANTERIOR sobre la nueva ({@link actualizarFicha} sólo cae a la deducida cuando
+ * el modelo no tiene). La vía del Catastro estaba enmascarada —su parcela siempre
+ * trae `refcat`— pero el agujero era el mismo. Desde el arreglo, las CUATRO pasan
+ * por {@link entraDocumentoNuevo}, que es el único sitio donde vive la regla.
+ *
  * @type {string|null}
  */
 let refcatDeducida = null
+
+/**
+ * El SELLO del documento que hay en pantalla: un contador monótono que sube una vez
+ * por cada documento nuevo que entra, venga por la puerta que venga.
+ *
+ * ── POR QUÉ HACE FALTA, Y POR QUÉ NO ES UN `AbortController` ──
+ * {@link deducirRefcatTrasImportar} lanza una consulta al Catastro y escribe su
+ * respuesta en la ficha. Era una promesa suelta **sin ninguna guarda de vigencia**
+ * (auditoría 2026-08-16): soltados dos dibujos sin referencia seguidos, la
+ * respuesta del PRIMERO acababa pintada sobre la ficha del segundo. El patrón que
+ * este proyecto ya tiene resuelto es el de `app/cableado-catastro.js#operar`
+ * —abortador + token de secuencia monótono—, y aquí se usa **sólo su mitad del
+ * token**: `catastroCableado.deducir()` no admite `AbortSignal`, así que un
+ * `AbortController` en esta capa sería decorado. Lo que sí se puede garantizar, y
+ * es lo que importa, es que **una respuesta superada no escriba**.
+ *
+ * @type {number}
+ */
+let selloDocumento = 0
+
+/**
+ * Ha entrado un DOCUMENTO NUEVO en la rama de parcela: se olvida la referencia
+ * deducida del anterior y se invalida cualquier deducción que siga en el aire.
+ *
+ * Es la regla de {@link refcatDeducida} en un solo sitio. Las cuatro puertas la
+ * llaman —Catastro (paso 7), comprobación (paso 9), expediente (paso 13) y medición
+ * (paso 17)—, y tenerla escrita cuatro veces es justo cómo se perdió en dos de
+ * ellas. Una puerta nueva que se olvide de esto vuelve a poder mentir, y por eso
+ * `test/app/main-refcat-deducida.dom.test.js` la vigila sobre la app viva.
+ *
+ * **No avisa por el panel**, y es deliberado: lo que se borra es una CONJETURA de
+ * la aplicación, no trabajo del usuario, y la ficha pasa a decir «Sin referencia»,
+ * que es la verdad sobre el documento que acaba de entrar. Callar aquí no esconde
+ * ningún cambio: lo que se esconde es lo contrario, dejarla puesta.
+ *
+ * @returns {void}
+ */
+function entraDocumentoNuevo() {
+  selloDocumento += 1
+  fijarRefcatDeducida(null)
+}
 
 /**
  * Qué rama está en pantalla, **desde el punto de vista de la ficha del pie**. Es un
@@ -2052,6 +2171,20 @@ function fijarRecuentoColindantes(cuantas, deDibujo = false) {
 let colindantesDeDibujo = false
 
 /**
+ * ¿Hay un ARRASTRE DE VÉRTICE en curso? Lo escribe {@link previsualizarMedidas} y lo
+ * lee el atajo del historial, que mientras dure el gesto se calla y lo dice. El
+ * porqué completo —de dónde sale el dato, por qué no de un predicado del visor y
+ * cuál es su red de seguridad— está en {@link MENSAJE_ATAJO_ARRASTRANDO} y en el
+ * bloque de {@link cablearEdicion} que lo consulta.
+ *
+ * Vive AQUÍ, y no en la sección 6 con el resto del atajo, por la zona muerta del
+ * `let`: el paso 5 (`crearVisor`) llama al canal en vivo durante su construcción.
+ *
+ * @type {boolean}
+ */
+let arrastrandoVertice = false
+
+/**
  * El canal EN VIVO del arrastre (criterio de aceptación 4 de F06): los anillos
  * que aún NO han pasado por el store, medidos y pintados en cada fotograma.
  *
@@ -2064,14 +2197,22 @@ let colindantesDeDibujo = false
  * —el invariante EXTERIOR/HUECO que `geo/area.js` y `geo/metrica.js` exigen— se
  * toma del estado por posición, que es de donde `sincronizar` copió los anillos.
  *
- * El segundo argumento (`refVertice`) se ignora aquí a propósito: señala QUÉ
- * vértice se está moviendo y eso solo le sirve al otro consumidor del canal, la
- * capa de acotaciones, que resalta la cota del lado en curso.
+ * El segundo argumento (`refVertice`) le sirve al otro consumidor del canal —la
+ * capa de acotaciones, que resalta la cota del lado en curso— y, desde la auditoría
+ * del 2026-08-16, también a {@link arrastrandoVertice}: es el ÚNICO sitio desde el
+ * que esta capa puede saber que hay un gesto de arrastre abierto.
  *
  * @param {Array<Array<[number, number]>>} anillosUTM
+ * @param {{recinto: number, indice: number}|null} [refVertice=null]  El vértice que
+ *   se está moviendo, o `null` si esto es el render de la verdad (ver
+ *   `viewer/sincronizacion.js`, typedef `AlPrevisualizar`).
  * @returns {void}
  */
-function previsualizarMedidas(anillosUTM) {
+function previsualizarMedidas(anillosUTM, refVertice = null) {
+  // ⛔ **LO PRIMERO, Y ANTES DE LA GUARDA DE RAMA.** Los vértices de la parcela se
+  // pueden arrastrar TAMBIÉN con la rama EDIFICIO puesta (lo dice la guarda de
+  // abajo), así que salir antes dejaría la bandera contando una verdad a medias.
+  arrastrandoVertice = refVertice !== null && refVertice !== undefined
   // ⚠️ F11: con la rama EDIFICIO puesta este canal NO pinta. La parcela sigue en el
   // mapa como CONTEXTO y sus vértices se pueden arrastrar —la barra de edición está
   // oculta, los marcadores no—, así que sin esta guarda un arrastre escribiría la
@@ -2280,6 +2421,80 @@ function esCampoDeTexto(destino) {
 }
 
 /**
+ * ¿Hay una VENTANA MODAL abierta encima? Si la hay, los atajos de esta capa se
+ * callan y lo dicen: ver {@link MENSAJE_ATAJO_CON_DIALOGO}.
+ *
+ * ── POR QUÉ NO BASTA `dialog[open]` ────────────────────────────────────────
+ * Porque `open` no distingue las dos formas de enseñar un `<dialog>`, y esta
+ * aplicación usa las dos a propósito. `showModal()` deja INERTE todo lo de detrás
+ * y pinta un velo —ésos son los que hay que atender—; `show()` no, y
+ * `app/dialogo-informe.js#presentar` lo usa deliberadamente en modo PANTALLA para
+ * que el rail siga navegando y el mapa se siga viendo. Apagar el undo ahí sería
+ * romper una pantalla de trabajo por arreglar otra cosa.
+ *
+ * ── LAS DOS PREGUNTAS, Y POR QUÉ HACEN FALTA LAS DOS ───────────────────────
+ *   · **`:modal`** es la respuesta exacta y la da el navegador. Es la que manda
+ *     donde existe, porque no depende de que nadie se acuerde de nada.
+ *   · **`aria-modal`** es la de respaldo, y no es una imitación pobre: en jsdom
+ *     `showModal` NO EXISTE (medido: `el.showModal is not a function`, jsdom
+ *     29.1.1), así que los seis diálogos caen a su vía de respaldo —el atributo
+ *     `open` a pelo— y `:modal` no casaría jamás. O sea: sin esta segunda
+ *     pregunta, este guardián estaría apagado justo donde se prueba. Y el atributo
+ *     no se inventa aquí: los seis lo escriben ya, y el ÚNICO que escribe
+ *     `aria-modal="false"` es el informe en modo pantalla, que es exactamente el
+ *     caso que hay que dejar pasar. Se lee «no es modal» solo con ese `false`
+ *     explícito: un `<dialog open>` de un tercero sin `aria-modal` se trata como
+ *     modal, que es el lado conservador (peor es deshacer a ciegas).
+ *
+ * @param {Document} documento  Dónde buscar.
+ * @returns {boolean}
+ */
+function hayDialogoModalAbierto(documento) {
+  for (const dialogo of documento.querySelectorAll('dialog[open]')) {
+    // `try` porque `:modal` es un selector reciente: un motor que no lo conozca
+    // lanza `SyntaxError` al parsearlo, y eso no puede tumbar un `keydown`.
+    try {
+      if (dialogo.matches(':modal')) return true
+    } catch {
+      /* sin `:modal`: decide la pregunta de abajo */
+    }
+    if (dialogo.getAttribute('aria-modal') !== 'false') return true
+  }
+  return false
+}
+
+/**
+ * ¿Hay un ARRASTRE DE VÉRTICE en curso? Mientras lo haya, los atajos del historial
+ * se callan y lo dicen: ver {@link MENSAJE_ATAJO_ARRASTRANDO}.
+ *
+ * ── DE DÓNDE SALE ESTE DATO, Y POR QUÉ NO DE UN PREDICADO DEL VISOR ────────
+ * Porque no hay ninguno: la bandera `arrastrando` de `viewer/sincronizacion.js` es
+ * un `let` privado y `crearVisor` no devuelve esa pieza. Lo que SÍ hay es el
+ * segundo parámetro del canal en vivo que este módulo ya recibe: `AlPrevisualizar`
+ * define `refVertice` como «el vértice que se está moviendo» en cada `drag` y
+ * `null` «al final de cada `render()`, con los anillos DEL ESTADO». O sea: el
+ * estado del gesto viaja por un contrato que ya está publicado y cableado, y aquí
+ * solo se lee un argumento que hasta hoy se tiraba. No se toca `viewer/`.
+ *
+ * ── LA RED DE SEGURIDAD, Y POR QUÉ ES OBLIGATORIA ─────────────────────────
+ * Un gesto que nunca recibe su `dragend` —el puntero sale de la ventana— no
+ * emitiría el render final que baja esta bandera, y el `Ctrl+Z` se quedaría MUERTO
+ * EN SILENCIO: es el hallazgo 2.11 que `viewer/sincronizacion.js` ya se encontró
+ * con su propio render diferido, con esta cara. Un arrastre no puede sobrevivir a
+ * que se suelte el botón del ratón, así que {@link cablearEdicion} escucha el
+ * `mouseup`/`pointerup` del documento y la baja ahí. Con eso, lo peor que puede
+ * pasar es que el atajo espere a que el usuario levante el dedo.
+ *
+ * ⚠️ **Se DECLARA quince pasos más arriba, junto a {@link previsualizarMedidas}**, y
+ * no aquí, que es donde se lee. No es orden estético: el paso 5 llama a
+ * `crearVisor` y `crearVisor` LLAMA al canal en vivo durante su propia construcción
+ * (ver la cabecera del módulo, apartado 4), así que un `let` declarado en esta
+ * sección quedaría en la zona muerta y el arranque reventaría con
+ * «Cannot access 'arrastrandoVertice' before initialization». Es exactamente la
+ * trampa que la ficha ya pagó en F06.
+ */
+
+/**
  * Un número tecleado por el usuario, o `null` si lo que hay no es uno.
  *
  * Misma frontera que `viewer/celda.js#parsearCoordenada` y por el mismo motivo:
@@ -2311,8 +2526,11 @@ function numeroTecleado(texto) {
  *     `puedeDeshacer`/`puedeRehacer` y re-evaluado tras cada cambio; nunca se les
  *     toca el texto (llevan su `<kbd>` dentro).
  *   · **`Ctrl+Z` / `Ctrl+Y` / `Ctrl+Shift+Z`** (y sus gemelos con `Meta`, para
- *     macOS) → lo mismo, sobre `document`. **Inhibidos dentro de un campo de
- *     texto**: ver {@link esCampoDeTexto}.
+ *     macOS) → lo mismo, sobre `document`. **Inhibidos en tres situaciones** —
+ *     dentro de un campo de texto ({@link esCampoDeTexto}), bajo una ventana modal
+ *     ({@link hayDialogoModalAbierto}) y durante un arrastre de vértice
+ *     ({@link arrastrandoVertice})—; ver la decisión 4 de la cabecera para cuál de
+ *     las tres se DICE y por qué.
  *   · **Casilla del snap** → `visor.edicion.snapActivo(v)`.
  *   · **Tolerancia (cm)** → `visor.edicion.tolerancia(m)`, dividiendo por
  *     {@link CENTIMETROS_POR_METRO}.
@@ -2361,6 +2579,20 @@ function numeroTecleado(texto) {
  * @param {(cuantas: number|null) => void} [opciones.alContarColindantes]  Dónde
  *   dejar el recuento de vecinas. Es un callback y no el `<dd>` de la ficha
  *   porque la ficha tiene un solo dueño (ver {@link actualizarFicha}).
+ * @param {() => void} [opciones.alSoltarColindantes]  Para soltar el REGISTRO de
+ *   vecinas (`app/colindantes.js`) cuando entra parcelario nuevo. Es un callback
+ *   por lo mismo que {@link opciones.alContarColindantes}: este cableado no
+ *   conoce al registro, y el registro se monta doce pasos más tarde. Por defecto
+ *   no hace nada, que es la verdad en una pantalla montada sin él.
+ * @param {(instantanea: object) => boolean} [opciones.esDeEdificio]  ¿Esta
+ *   instantánea del historial es de la rama EDIFICIO? Por defecto «no», que es lo
+ *   correcto para quien monte este cableado sin la otra rama (tests, uso como
+ *   librería): sin edificio no hay instantáneas de edificio.
+ * @param {(instantanea: object) => boolean} [opciones.aplicarDeEdificio]  Quien
+ *   sabe escribir una instantánea de EDIFICIO donde le toca. Devuelve `false` si
+ *   no ha podido, y entonces **nadie la ha escrito**. Ver la decisión de
+ *   {@link moverse}: sin esto, una instantánea de una huella acababa dentro de la
+ *   parcela del expediente.
  * @param {HTMLElement} [opciones.botonDeshacer]  Por defecto, el nodo
  *   {@link SELECTOR_BOTON_DESHACER}; si falta, `nodo` LANZA. Ídem los seis
  *   siguientes con sus selectores.
@@ -2399,6 +2631,9 @@ export function cablearEdicion({
   edicion,
   panel,
   alContarColindantes = () => {},
+  alSoltarColindantes = () => {},
+  aplicarDeEdificio = () => false,
+  esDeEdificio = () => false,
   botonDeshacer = nodo(SELECTOR_BOTON_DESHACER),
   botonRehacer = nodo(SELECTOR_BOTON_REHACER),
   casillaSnap = nodo(SELECTOR_CAMPO_SNAP),
@@ -2463,12 +2698,37 @@ export function cablearEdicion({
    * suite—: ningún suscriptor del store commitea, y los dos módulos que sí lo
    * hacen commitean por su cuenta después de escribir, sin pasar por aquí.
    *
+   * ⛔ **A CADA INSTANTÁNEA, SU STORE (auditoría 2026-08-16).** Este `moverse`
+   * hacía `estado.set(instantanea)` a secas, y `estado` es el store de PARCELA.
+   * Pero la pila es de las DOS ramas a propósito (ver la decisión en el montaje
+   * de `cablearEdificio`: «`Ctrl+Z` es UNA tecla y el usuario no lleva la cuenta
+   * de en qué rama la pulsa»), así que por ella pasan también las proyecciones de
+   * la parte activa del edificio. Medido: editar dos veces el vértice de una
+   * huella y pulsar `Ctrl+Z` dejaba `{recintos, idLocal, origen, parteDeEdificio}`
+   * DENTRO del store de la parcela; y como en esa rama la ficha, el mando de GML
+   * y el autoguardado son los del edificio, no se veía hasta volver a Parcela —
+   * donde esa huella ya se validaba, se serializaba y se firmaba como si fuera la
+   * finca. La variante con el botón a la vista era aún más fácil: editar la
+   * parcela, ir a Edificio, mover un vértice, volver, y pulsar «Deshacer».
+   *
+   * La pila NO se parte —esa decisión estaba bien tomada—: lo que se arregla es
+   * que aquí se MIRE de quién es lo que se acaba de sacar. La marca la pone
+   * `edificio/parte-activa.js` en la propia proyección y dice literalmente que
+   * esto «no debe acabar en `crearParcela` ni en un expediente»; nadie la leía.
+   *
+   * ⚠️ **Si la instantánea es de edificio y no se puede colocar** (no hay parte
+   * elegida, o la elegida es otra), se DESHACE la navegación y se cuenta. Dejar
+   * el índice movido habría descuadrado la pila respecto a lo que hay en
+   * pantalla, que es la avería que vino a arreglar esto.
+   *
    * @param {(h: object) => (object|null)} navegar  `undo` o `redo`.
+   * @param {(h: object) => (object|null)} desnavegar  La inversa, para volver
+   *   atrás si la instantánea no se puede aplicar.
    * @param {string} exito  Renglón cuando se ha navegado.
    * @param {string} vacio  Renglón cuando no había a dónde ir.
    * @returns {boolean}
    */
-  function moverse(navegar, exito, vacio) {
+  function moverse(navegar, desnavegar, exito, vacio) {
     const instantanea = navegar(historial)
     // `null` = no hay a dónde ir. El botón ya estaba apagado, así que esto solo
     // se alcanza por el atajo de teclado: no se revienta y se dice por qué no ha
@@ -2478,14 +2738,28 @@ export function cablearEdicion({
       decir(vacio)
       return false
     }
+
+    if (esDeEdificio(instantanea) === true) {
+      if (aplicarDeEdificio(instantanea) !== true) {
+        // Se devuelve el índice a donde estaba: la operación NO se ha deshecho.
+        desnavegar(historial)
+        refrescar()
+        decir(MENSAJE_OTRA_PARTE, true)
+        return false
+      }
+      refrescar()
+      decir(`${exito} ${COLA_ERA_DEL_EDIFICIO}`)
+      return true
+    }
+
     estado.set(instantanea)
     refrescar()
     decir(exito)
     return true
   }
 
-  const deshacer = () => moverse(undo, MENSAJE_DESHECHO, MENSAJE_NADA_QUE_DESHACER)
-  const rehacer = () => moverse(redo, MENSAJE_REHECHO, MENSAJE_NADA_QUE_REHACER)
+  const deshacer = () => moverse(undo, redo, MENSAJE_DESHECHO, MENSAJE_NADA_QUE_DESHACER)
+  const rehacer = () => moverse(redo, undo, MENSAJE_REHECHO, MENSAJE_NADA_QUE_REHACER)
 
   /**
    * Los atajos. `Ctrl+Z` deshace; `Ctrl+Y` y `Ctrl+Shift+Z` rehacen (las dos
@@ -2509,6 +2783,29 @@ export function cablearEdicion({
 
     const tecla = typeof evento.key === 'string' ? evento.key.toLowerCase() : ''
     if (tecla !== 'z' && tecla !== 'y') return
+
+    // ── ⛔ LAS DOS INHIBICIONES DE LA AUDITORÍA 2026-08-16 ──────────────────
+    // Van DESPUÉS de reconocer la tecla y no antes, para no hablar por un
+    // `Ctrl+S` o un `Ctrl+P` que no son nuestros; y NO llaman a
+    // `preventDefault()`, igual que la rama del campo de texto y por lo mismo:
+    // aquí el atajo no es nuestro, así que se devuelve al navegador entero.
+    //
+    // Las dos DICEN lo que pasa. Un atajo que no responde y no explica es un
+    // atajo roto, y los dos casos son justo aquellos en los que el usuario no
+    // tiene delante el botón gris que se lo contaría.
+    if (hayDialogoModalAbierto(documento)) {
+      decir(MENSAJE_ATAJO_CON_DIALOGO, true)
+      // Y al panel además, porque el renglón está detrás del velo. Ver el bloque
+      // de {@link MENSAJE_ATAJO_CON_DIALOGO}.
+      panel.avisar(MENSAJE_ATAJO_CON_DIALOGO, { nivel: NIVEL.AVISO })
+      return
+    }
+    if (arrastrandoVertice) {
+      // Sin panel: aquí no hay velo, el renglón se lee y el estado dura lo que
+      // dura el gesto. Ver {@link MENSAJE_ATAJO_ARRASTRANDO}.
+      decir(MENSAJE_ATAJO_ARRASTRANDO, true)
+      return
+    }
 
     // Se consume SIEMPRE que el atajo es nuestro, también cuando no hay nada que
     // deshacer: dejar que el navegador lo procese además revertiría texto en
@@ -2697,6 +2994,20 @@ export function cablearEdicion({
     }))
     edicion.fijarColindantes([])
     alContarColindantes(null)
+    // ⛔ Y EL REGISTRO, que es la TERCERA pieza y se quedó fuera hasta que la
+    // auditoría del 2026-08-16 lo midió. Las dianas del enganche y el recuento de
+    // la ficha se soltaban aquí desde F06; el registro de `app/colindantes.js`
+    // —el que LEE `cablearDerivacion` para repartir el exceso entre los
+    // vecinos— no lo soltaba nadie: su `olvidar()` no tenía un solo llamante en
+    // toda la aplicación. Consecuencia medida: traídas las vecinas de A y cargada
+    // B, «Derivar sobrante» repartía el exceso de B contra las fincas de A y,
+    // como el registro seguía diciendo «ya se ha consultado», NO se emitía el
+    // aviso de vecinas sin consultar: el exceso —que no toca nada de A— se
+    // declaraba entero sobre VIAL, y eso abría la puerta de «Descargar
+    // expediente». Es palabra por palabra el fallo que la cabecera de
+    // `app/colindantes.js` declara inaceptable, alcanzado por el otro lado: no
+    // por colapsar `null` a `[]`, sino por no volver nunca a `null`.
+    alSoltarColindantes()
     refrescar()
   }
 
@@ -2757,9 +3068,25 @@ export function cablearEdicion({
 
   // ── Arranque ──────────────────────────────────────────────────────────────
 
+  /**
+   * La RED DE SEGURIDAD de {@link arrastrandoVertice}: se ha soltado el botón del
+   * ratón, así que no hay arrastre que valga. Existe porque un gesto que nunca
+   * recibe su `dragend` —el puntero sale de la ventana— no emitiría el render final
+   * que baja la bandera, y el atajo se quedaría muerto EN SILENCIO. Se escucha en
+   * el DOCUMENTO, que es donde Leaflet escucha el suyo.
+   *
+   * Los dos eventos y no uno: Leaflet usa punteros donde los hay y ratón donde no,
+   * y bajar una bandera dos veces no cuesta nada.
+   */
+  const alSoltarElRaton = () => {
+    arrastrandoVertice = false
+  }
+
   botonDeshacer.addEventListener('click', deshacer)
   botonRehacer.addEventListener('click', rehacer)
   documento.addEventListener('keydown', alPulsarTecla)
+  documento.addEventListener('mouseup', alSoltarElRaton)
+  documento.addEventListener('pointerup', alSoltarElRaton)
   casillaSnap.addEventListener('change', alCambiarSnap)
   campoTolerancia.addEventListener('change', alCambiarTolerancia)
   botonOffset.addEventListener('click', alPulsarOffset)
@@ -2841,14 +3168,17 @@ export function cablearEdicion({
     alColindantes,
 
     /**
-     * Retira los siete oyentes, las dos bajas del visor (selección y modo borrar)
-     * y la del store. IDEMPOTENTE. No toca el historial ni el estado: los dos son
-     * del llamante.
+     * Retira los NUEVE oyentes —los siete de siempre más los dos del `mouseup`/
+     * `pointerup` que cierran un arrastre huérfano (ver {@link arrastrandoVertice})—,
+     * las dos bajas del visor (selección y modo borrar) y la del store. IDEMPOTENTE.
+     * No toca el historial ni el estado: los dos son del llamante.
      */
     destruir() {
       botonDeshacer.removeEventListener('click', deshacer)
       botonRehacer.removeEventListener('click', rehacer)
       documento.removeEventListener('keydown', alPulsarTecla)
+      documento.removeEventListener('mouseup', alSoltarElRaton)
+      documento.removeEventListener('pointerup', alSoltarElRaton)
       casillaSnap.removeEventListener('change', alCambiarSnap)
       campoTolerancia.removeEventListener('change', alCambiarTolerancia)
       botonOffset.removeEventListener('click', alPulsarOffset)
@@ -2876,6 +3206,17 @@ const edicionCableada = cablearEdicion({
   // La ficha tiene un solo dueño (el paso 4); el cableado de la edición le pasa
   // el recuento en vez de escribir en el `<dd>`.
   alContarColindantes: fijarRecuentoColindantes,
+  // El registro se monta en el paso 12, así que se lee PEREZOSAMENTE igual que
+  // los dos de abajo. Ver el porqué en `alCambiarOficial`.
+  alSoltarColindantes: () => registroColindantes?.olvidar(),
+  // ── A cada instantánea, su store (auditoría 2026-08-16) ───────────────────
+  // Los dos se leen PEREZOSAMENTE: `edificioCableado` se monta en el paso 13 y
+  // esto es el 6, así que aquí todavía vale `null` — y tiene que seguir
+  // valiendo, porque la edición no depende de que la otra rama llegue a montarse.
+  // Con `null` la respuesta es «no es de edificio» y «no hay quien lo aplique»,
+  // que es exactamente la verdad en una pantalla sin rama de edificio.
+  esDeEdificio: (i) => edificioCableado?.esInstantaneaDeEdificio(i) === true,
+  aplicarDeEdificio: (i) => edificioCableado?.aplicarDelHistorial(i) === true,
 })
 
 // ── 7 · El Catastro en vivo (F05 · T4A) ──────────────────────────────────────
@@ -3057,7 +3398,17 @@ try {
     //
     // Deshacer revierte ediciones de la geometría, nunca «la parcela que traje»
     // (decisión 2 de F06). Ver {@link cablearEdicion}#alCambiarDocumento.
-    alCargarParcela: edicionCableada.alCambiarDocumento,
+    //
+    // ⛔ **VA ENVUELTO DESDE LA AUDITORÍA DEL 2026-08-16.** Era el gancho a pelo, y
+    // ésta era una de las dos puertas que NO borraban la referencia deducida. El
+    // defecto quedaba enmascarado —la parcela del Catastro siempre trae `refcat` y
+    // la ficha la prefiere—, pero la conjetura se quedaba colgada y reaparecía
+    // sobre el siguiente documento que entrara sin referencia. Ver
+    // {@link entraDocumentoNuevo}.
+    alCargarParcela: (parcela) => {
+      edicionCableada.alCambiarDocumento(parcela)
+      entraDocumentoNuevo()
+    },
     alCambiarOficial: (parcela) => {
       edicionCableada.alCambiarOficial(parcela)
       // ── Y AQUÍ SE INVALIDA LO QUE LA EDICIÓN NO TIENE EN LA MANO ────────
@@ -3428,7 +3779,7 @@ comprobacionCableada = cablearComprobacion({
     // La parcela que entra por esta puerta trae su referencia AFIRMADA, así que
     // una deducción vieja sobra: la ficha ya prefiere la del modelo, y dejarla
     // colgada reaparecería en cuanto se cargara algo sin referencia.
-    fijarRefcatDeducida(null)
+    entraDocumentoNuevo()
     aterrizarTrasContrastar()
   },
   // ── F10 · el `.json` entra por ESTA zona y no por una segunda ─────────────
@@ -4390,7 +4741,16 @@ expedienteCableado = cablearExpediente({
   rama: ramaCableada,
   estadoEdificio,
   // El MISMO gancho que reciben el Catastro (paso 7) y la comprobación (paso 9).
-  alCargarParcela: edicionCableada.alCargarParcela,
+  //
+  // ⛔ **Y ENVUELTO COMO ELLOS DESDE LA AUDITORÍA DEL 2026-08-16.** Ésta era la otra
+  // puerta que no borraba la referencia deducida, y aquí el defecto NO estaba
+  // enmascarado: un proyecto guardado cuya parcela no trae referencia dejaba en la
+  // ficha la que se dedujo del dibujo anterior, sobre una geometría que no es la
+  // suya. Ver {@link entraDocumentoNuevo}.
+  alCargarParcela: (parcela) => {
+    edicionCableada.alCargarParcela(parcela)
+    entraDocumentoNuevo()
+  },
   // Se comprueba la FORMA en vez de pasarlo a ciegas, mismo criterio que el `catastro:`
   // del paso 11: sin este canal, «Abrir un proyecto…» lo DICE en lugar de ser un botón
   // que no hace nada, y el arrastre sobre la ventana sigue funcionando igual.
@@ -4588,6 +4948,26 @@ const barra = cablearBarra({
    * habiendo **un solo escritor**, que son los cableados de GML.
    */
   expediente: () => expedienteCableado?.estado() ?? null,
+
+  /**
+   * Y el CANAL por el que se entera de que ese estado ha cambiado (auditoría
+   * 2026-08-16).
+   *
+   * ⛔ El productor de arriba se lee «en CADA pintada» —y es cierto—, pero las
+   * pintadas de la barra solo las disparan la navegación y `refrescarHechos`,
+   * que cuelga de los dos stores. **Archivar, renombrar y borrar un expediente no
+   * tocan ningún store ni la navegación**: cambian `identidades[rama]` dentro de
+   * `cablearExpediente` y nada más. Medido: guardar con nombre y cerrar el
+   * diálogo dejaba la barra diciendo «Sin guardar · Se autoguarda; archívalo para
+   * conservarlo» hasta el siguiente cambio de store o de paso; y al borrar, al
+   * revés, la barra seguía enseñando el nombre de un expediente que ya no existía.
+   *
+   * El canal avisa sin cargar nada: la verdad se sigue leyendo del productor, para
+   * no crear una segunda definición de «qué expediente tengo». `cablearBarra`
+   * repinta solo su zona, así que la decisión A1 del `repintar()` único sigue en
+   * pie.
+   */
+  suscribirExpediente: (fn) => expedienteCableado.alCambiarIdentidad(fn),
 })
 
 // El eje PASO de la cáscara (T6): escribe `data-paso` en el `<body>` y pone el
@@ -4747,6 +5127,21 @@ function aterrizarTrasContrastar() {
  * F05 por su renglón y por el panel, y un fallo de red aquí **no puede** estropear
  * una importación que ha ido bien.
  *
+ * ── ⛔ SUELTA SÍ; SIN GUARDA DE VIGENCIA, NO (auditoría 2026-08-16) ──────────
+ * Hasta hoy nada comparaba la respuesta con el documento que hubiera en pantalla
+ * al llegar. Escenario medido: se sueltan dos dibujos sin referencia seguidos y la
+ * respuesta del PRIMERO escribe su `refcat` en la ficha del SEGUNDO — la misma
+ * afirmación falsa que {@link refcatDeducida} declara impedir, alcanzada por el
+ * otro lado (por el tiempo, no por la puerta). Se sigue el patrón que el proyecto
+ * ya tiene resuelto en `app/cableado-catastro.js#operar`: se captura el
+ * {@link selloDocumento} al empezar y, al resolverse, **la consulta superada no
+ * escribe nada**. Del abortador se prescinde con motivo: `deducir()` no admite
+ * señal, así que aquí sería decorado (y el cableado ya aborta lo suyo por dentro).
+ *
+ * Una deducción descartada NO se avisa: nunca llegó a pintarse, y lo que la ficha
+ * dice del documento nuevo —«Sin referencia»— es verdad. Ver
+ * {@link entraDocumentoNuevo}.
+ *
  * @param {object|null} parcela  La que acaba de entrar en el store.
  * @returns {void}
  */
@@ -4754,9 +5149,16 @@ function deducirRefcatTrasImportar(parcela) {
   if (parcela && parcela.refcat) return
   if (catastroCableado === null || typeof catastroCableado.deducir !== 'function') return
 
+  // El sello de ESTE documento. Se lee ahora y no dentro del `then`: leerlo allí
+  // sería leer el del documento que hubiera al contestar, o sea no comprobar nada.
+  const sello = selloDocumento
+
   catastroCableado
     .deducir()
     .then((resultado) => {
+      // ⛔ Consulta SUPERADA: mientras se preguntaba entró otro documento. Su
+      // referencia es cierta, pero no de lo que hay en pantalla.
+      if (sello !== selloDocumento) return
       if (!resultado || resultado.ok !== true || !resultado.datos) return
       const { candidatos, unico } = resultado.datos
       // `unico !== true` es el caso de la frontera: el punto interior cae donde el
@@ -4801,6 +5203,34 @@ estadoEdificio.subscribe(refrescarHechos)
 ramaCableada.subscribe((rama) => {
   navegacion.cambiarRama(rama)
   refrescarHechos()
+})
+
+// ⛔ **Y EL SENTIDO CONTRARIO, QUE FALTABA (auditoría 2026-08-16).** El cable de
+// arriba lleva la rama del conmutador a la navegación, pero NADIE hacía el viaje
+// de vuelta: `navegacion.irARuta(...)` publica una rama —la escribe el hash, y el
+// hash lo escribe esta misma aplicación en cada conmutación (ver
+// {@link escribirRuta})— y `ramaCableada.set(...)` solo lo llamaba el GML de
+// edificio. Resultado medido: con una parcela cargada, pulsar ATRÁS en el
+// navegador dejaba la navegación en EDIFICIO y el conmutador, el panel, la ficha,
+// `<body data-rama>` y el mando de «Generar GML» en PARCELA. El rail evaluaba
+// entonces los hechos de la otra rama y bloqueaba Edición y Diagnóstico con
+// «Falta el edificio» **encima del panel de parcela**, y de ahí no se salía sin
+// pulsar «Edificio» y volver. Un enlace `#/edificio/…` pegado en frío hacía lo
+// mismo desde el arranque.
+//
+// La cabecera de `app/rama.js` ya declaraba los «dos dueños durante una rebanada»
+// como algo transitorio; la rebanada que lo cerraba no llegó nunca.
+//
+// ⚠️ **No hay bucle**, y por construcción: `set` solo se llama cuando la rama
+// pedida DIFIERE de la puesta, y para cuando corren los suscriptores el store de
+// `rama.js` ya devuelve la nueva —así que la vuelta por el cable de arriba
+// encuentra `pedida === get()` y se para en seco. Es la misma guarda por
+// comparación con la que {@link escribirRuta} corta el bucle hash ↔ navegación.
+navegacion.subscribe((ruta) => {
+  const pedida = ruta?.rama
+  if (pedida === undefined || pedida === null) return
+  if (pedida === ramaCableada.get()) return
+  ramaCableada.set(pedida)
 })
 
 // ⛔ **AQUÍ VIVÍA EL ESPEJO DEL MODO (F19), Y SE FUE CON ÉL EL 2026-08-07.**
@@ -5223,8 +5653,9 @@ const medicion = cablearMedicion({
     edicionCableada.alCargarParcela(parcela)
     // Entra geometría nueva: la deducción de la ANTERIOR deja de valer. Se borra
     // ANTES de aterrizar para que la ficha no enseñe ni un fotograma la referencia
-    // de la parcela que se acaba de ir.
-    fijarRefcatDeducida(null)
+    // de la parcela que se acaba de ir. Y sube el sello, que es lo que deja
+    // superada la consulta que aquella importación pudiera tener en el aire.
+    entraDocumentoNuevo()
     if (dibujoEsLaOficial(parcela)) {
       refrescarHechos()
       navegacion.navegarAPaso(PASO.EDICION)

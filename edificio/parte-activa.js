@@ -45,7 +45,52 @@
 // Lo mismo con una parte **pendiente de dibujar** (`recinto: null`): ahí sí hay
 // parte, pero no hay contorno, y se proyecta `recintos: []`.
 //
-// ── 4 · LOS SUSCRIPTORES DE ARRIBA SIGUEN VIVOS ─────────────────────────────
+// ── 4 · LA SELECCIÓN SIGUE A LA PARTE, NO AL ÍNDICE ─────────────────────────
+// ⛔ **Auditoría 2026-08-16 · hallazgo H2, MEDIA.** Hasta esa fecha la parte
+// elegida era un ÍNDICE y nada más, y eso aguanta mientras la lista no se mueva.
+// Se mueve: `conParteEliminada` quita un elemento y **corre hacia arriba todo lo
+// que venía detrás**. Con partes A, B, C y «B» elegida (índice 1), eliminar «A»
+// deja el índice 1 apuntando a **C**. El índice sigue siendo VÁLIDO —por eso el
+// guard de `app/cableado-edificio.js`, que solo miraba `activa >= partes.length`,
+// no lo veía— y `get()` pasa a proyectar otra parte: un `set()` posterior (el
+// drop de un arrastre que estaba en vuelo) escribe la geometría de B **en C**.
+// Medido: `C:999,0`. Sin un solo error por ninguna parte, que es la regla de oro
+// 1 rota en el sitio más caro: la huella que después se serializa y se firma.
+//
+// Se corrige aquí y no en el cableado porque **aquí está el punto de escritura**:
+// el cableado tiene su propio `activa` para pintar, pero quien mete vértices en
+// una parte es esta fachada. Un arreglo que solo corrigiera el índice del panel
+// dejaría el store adaptador escribiendo donde no era.
+//
+// ── Qué se usa como identidad, y por qué el NOMBRE ──
+// El modelo NO da identificador de parte: `crearEdificio` reconstruye cada parte
+// con `crearParteConstruccion`, así que **la identidad del objeto no sobrevive a
+// ninguna mutación** y no sirve para nada. Lo único que identifica una parte para
+// una persona —y lo que este proyecto YA usa como tal— es su `nombre`: es lo que
+// `parteDeEdificio` publica y lo que `app/cableado-edificio.js#aplicarDelHistorial`
+// compara para no aplicar la instantánea de una parte sobre otra. Duplicar ese
+// criterio habría sido inventar un segundo.
+//
+// ── Y por qué solo se reconcilia cuando la lista ha ENCOGIDO ──
+// Porque es la única forma de distinguir «se han llevado una parte de delante»
+// de «han renombrado la que tengo elegida», que por nombre son indistinguibles.
+// En el modelo solo hay una operación que quite partes (`conParteEliminada`) y
+// una que las añada, y esa las pone AL FINAL: mientras la lista no encoja, el
+// índice sigue apuntando a la misma parte y lo único que puede haber cambiado es
+// su nombre — que se re-anota y ya está. Reconciliar por nombre sin esa guarda
+// habría sido una cura peor que la enfermedad: renombrar la parte que estás
+// editando la habría soltado.
+//
+// Si la lista ha encogido y la parte elegida ya no está en ninguna posición, es
+// que era la eliminada: se DESELECCIONA. Heredar en silencio la parte que ocupa
+// su hueco es exactamente el defecto de arriba.
+//
+// ⚠️ Lo que esta reconciliación **no** cubre es que entre otro DOCUMENTO con
+// tantas partes o más: ahí no hay corrimiento que detectar y el nombre puede
+// coincidir por casualidad. Ese es el hallazgo H3 y lo cierra
+// `app/cableado-edificio.js`, que es quien sabe qué documento hay abierto.
+//
+// ── 5 · LOS SUSCRIPTORES DE ARRIBA SIGUEN VIVOS ─────────────────────────────
 // Esta fachada **se suscribe al store del edificio** y reemite hacia los suyos. Lo
 // que NO hace es sustituirlo: el panel, el mapa y el autoguardado siguen colgando
 // del store de verdad. Un adaptador que se quedara los suscriptores sería un
@@ -100,6 +145,17 @@ export function crearVistaParteActiva(estadoEdificio, { alDetectar } = {}) {
 
   /** Índice de la parte elegida, o `null`. */
   let indice = null
+  /**
+   * El NOMBRE de la parte elegida la última vez que se comprobó, o `null`. Es la
+   * identidad de trabajo de la decisión 4 de la cabecera: el modelo no da otra.
+   */
+  let nombreElegido = null
+  /**
+   * Cuántas partes tenía el edificio la última vez que se comprobó. Es lo que
+   * distingue «se han llevado una parte» de «han renombrado la mía»; ver la
+   * decisión 4.
+   */
+  let cuantasHabia = 0
   /** Suscriptores de ESTA fachada (el mapa y la tabla de la parte activa). */
   const suscriptores = new Set()
 
@@ -111,6 +167,51 @@ export function crearVistaParteActiva(estadoEdificio, { alDetectar } = {}) {
   let cacheParte = null
   let cacheProyeccion = null
 
+  /** Las partes del edificio que hay ahora en el store, o `[]`. */
+  function partesDeAhora() {
+    const partes = estadoEdificio.get()?.partes
+    return Array.isArray(partes) ? partes : []
+  }
+
+  /**
+   * ⭐ Vuelve a poner el índice sobre la parte que se eligió, si la lista se ha
+   * movido debajo. **Es el arreglo del hallazgo H2** y su porqué entero está en
+   * la decisión 4 de la cabecera; aquí solo va la mecánica.
+   *
+   * Se llama en TODOS los sitios que leen o escriben la selección, no solo desde
+   * el suscriptor del store: el `set` del store de arriba **no notifica si ocurre
+   * dentro de otra notificación** (guarda anti-reentrada de `crearEstadoVista`),
+   * así que fiarlo todo al aviso dejaría una ventana en la que el índice está
+   * viejo. Reconciliar es comparar dos números en el caso normal.
+   *
+   * @returns {void}
+   */
+  function reconciliar() {
+    if (indice === null) return
+    const partes = partesDeAhora()
+
+    // La lista NO ha encogido ⇒ nadie ha corrido hacia arriba: el índice sigue
+    // apuntando a la misma parte y lo único que puede haber cambiado es su
+    // nombre (renombrarla, o rehacer su contorno). Se re-anota y se sale.
+    if (partes.length >= cuantasHabia) {
+      cuantasHabia = partes.length
+      nombreElegido = partes[indice]?.nombre ?? nombreElegido
+      return
+    }
+
+    cuantasHabia = partes.length
+    const donde = partes.findIndex((p) => p?.nombre === nombreElegido)
+    if (donde !== -1) {
+      // Se la han movido: se la sigue. La caché cae sola, porque mira el índice.
+      indice = donde
+      return
+    }
+    // No está en ninguna posición ⇒ la elegida ERA la que se han llevado. Se
+    // deselecciona: heredar la parte que ocupa su hueco es el defecto entero.
+    indice = null
+    nombreElegido = null
+  }
+
   /**
    * La parte `i` con forma de parcela. Es lo único que `viewer/edicion.js` mira:
    * `recintos`, y de ahí para abajo. Se añaden `idLocal` y `origen` porque
@@ -118,6 +219,7 @@ export function crearVistaParteActiva(estadoEdificio, { alDetectar } = {}) {
    * documento sin identidad ninguna es más raro de depurar que uno con ella.
    */
   function proyectar() {
+    reconciliar()
     const edificio = estadoEdificio.get()
     if (edificio === null || indice === null) return null
     const parte = edificio.partes?.[indice]
@@ -156,6 +258,10 @@ export function crearVistaParteActiva(estadoEdificio, { alDetectar } = {}) {
   // Cuando el edificio cambia por CUALQUIER vía —otra mutación, un fichero nuevo,
   // un undo— la proyección cambia con él y hay que decirlo. Sin esto, mover un
   // vértice desde el panel no repintaría el mapa de la parte.
+  //
+  // ⚠️ `notificar()` proyecta, y proyectar RECONCILIA (decisión 4): quien reciba
+  // este aviso ya se encuentra el índice puesto sobre la parte que eligió, no
+  // sobre la que haya heredado su hueco.
   const bajaDelEdificio = estadoEdificio.subscribe(() => notificar())
 
   return {
@@ -174,6 +280,10 @@ export function crearVistaParteActiva(estadoEdificio, { alDetectar } = {}) {
      * suceso normal de una interfaz, no un contrato roto.
      */
     set(documento) {
+      // ⭐ ANTES de mirar nada: si la lista se ha movido desde que se eligió, el
+      // índice de este `set` es el de otra parte. Ver la decisión 4 — este es EL
+      // punto de escritura que el hallazgo H2 protege.
+      reconciliar()
       const edificio = estadoEdificio.get()
       if (edificio === null || indice === null) return
       if (indice >= (edificio.partes?.length ?? 0)) return
@@ -210,25 +320,39 @@ export function crearVistaParteActiva(estadoEdificio, { alDetectar } = {}) {
       if (i === null) {
         if (indice === null) return
         indice = null
+        nombreElegido = null
         notificar()
         return
       }
       if (!Number.isInteger(i)) {
         throw new TypeError(`seleccionar: 'i' debe ser un entero o null; recibido ${typeof i}.`)
       }
-      const edificio = estadoEdificio.get()
-      const n = edificio?.partes?.length ?? 0
+      const partes = partesDeAhora()
+      const n = partes.length
       if (i < 0 || i >= n) {
         throw new RangeError(
           `seleccionar: 'i' fuera de rango: ${i}. El edificio tiene ${n} parte(s).`,
         )
       }
+      // Se anotan las DOS cosas de las que depende la reconciliación, y siempre:
+      // también cuando el índice no cambia, porque la lista de debajo sí puede
+      // haber cambiado entre una elección y la siguiente.
+      cuantasHabia = n
+      nombreElegido = partes[i]?.nombre ?? null
       if (i === indice) return
       indice = i
       notificar()
     },
 
-    seleccionada: () => indice,
+    /**
+     * Qué parte está elegida, **ya reconciliada**: si la lista se ha movido, el
+     * número que sale de aquí es el de AHORA. Quien lo use para pintar (el panel,
+     * la capa de huellas) señala así la parte que de verdad se está editando.
+     */
+    seleccionada() {
+      reconciliar()
+      return indice
+    },
 
     destruir() {
       bajaDelEdificio()

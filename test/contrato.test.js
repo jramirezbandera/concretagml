@@ -1641,3 +1641,68 @@ describe('contrato F17 · `comprobacion/` entra por su barrel, y `derivacion/` c
     expect(cierre.cierra).toBe(true)
   })
 })
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Guarda transversal · LOS CANALES PUBLICADOS TIENEN QUE ESTAR ENCHUFADOS
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// ⛔ Este proyecto ya ha pagado CUATRO veces el mismo error: escribir un canal,
+// probarlo, y no enchufarlo nunca. Están contados en el código: `parsers/dxf.js`
+// (F11), `edificio.edicion` (F12), `validation/edificio.js#porParte` (F13) y
+// `storage/bd.js#alVersionChange` (F10, que encontró la auditoría del 2026-08-15).
+//
+// La quinta la encontró la auditoría del 2026-08-16: `app/colindantes.js#olvidar()`
+// no tenía un solo llamante, y por eso las vecinas de una parcela se usaban para
+// repartir el exceso de otra en un expediente firmable.
+//
+// Un canal sin enchufar no lo caza ninguna prueba de unidad —las dos mitades
+// pasan, cada una por su lado—, así que se vigila aquí, sobre el TEXTO de quien
+// tiene que enchufarlo. Es la misma fórmula que el grep de `proj4` y que el de
+// `bloqueos.push('CÓDIGO')`.
+
+describe('guarda transversal · los canales que `app/main.js` tiene que enchufar', () => {
+  const FUENTE_MAIN = readFileSync(fileURLToPath(new URL('../app/main.js', import.meta.url)), 'utf8')
+
+  /**
+   * Cada entrada es un canal que alguien PUBLICA y que se quedaría mudo si
+   * `app/main.js` no lo consumiera, con lo que costó descubrirlo.
+   */
+  const CANALES = [
+    {
+      llamada: 'alCambiarIdentidad',
+      quien: 'app/cableado-expediente.js',
+      porque:
+        'archivar, renombrar y borrar no tocan ningún store ni la navegación, así que sin este ' +
+        'canal la zona de expediente de la barra se queda rancia (auditoría 2026-08-16).',
+    },
+    {
+      llamada: 'alVersionChange',
+      quien: 'storage/bd.js',
+      porque:
+        'sin él, la pestaña vieja no suelta la base y la pestaña nueva se queda bloqueada para ' +
+        'siempre (auditoría 2026-08-15).',
+    },
+    {
+      llamada: 'olvidar',
+      quien: 'app/colindantes.js',
+      porque:
+        'sin él, las vecinas de la parcela anterior se usan para repartir el exceso de la nueva, ' +
+        'y el expediente declara sobre vial un exceso que cae sobre la finca de un vecino ' +
+        '(auditoría 2026-08-16).',
+    },
+  ]
+
+  for (const { llamada, quien, porque } of CANALES) {
+    it(`enchufa \`${llamada}\` de ${quien}`, () => {
+      expect(
+        FUENTE_MAIN.includes(llamada),
+        `app/main.js no menciona '${llamada}'. ${porque}`,
+      ).toBe(true)
+    })
+  }
+
+  it('la guarda NO es vacua: un canal inventado no aparece', () => {
+    // Sin esta mitad, la prueba de arriba pasaría con cualquier cadena.
+    expect(FUENTE_MAIN.includes('alCanalQueNadieHaEscrito')).toBe(false)
+  })
+})

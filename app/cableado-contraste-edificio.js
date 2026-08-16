@@ -73,6 +73,37 @@
 // (override O8), con guarda para no encabalgar dos.
 //
 // ═════════════════════════════════════════════════════════════════════════════
+// ⛔ LO QUE LLEGA TARDE NO PISA AL EDIFICIO DE AHORA (auditoría 2026-08-16)
+// ═════════════════════════════════════════════════════════════════════════════
+// Las tres consultas de este módulo —la construcción registrada y las vecinas—
+// tardan, y mientras tardan el usuario puede cargar OTRO edificio. Los tres
+// defectos que eso producía eran de la misma familia y ninguno dejaba síntoma:
+// las cifras salían, el cajón las pintaba y el informe las firmaba.
+//
+//   1. **La construcción registrada** viajaba sin ninguna de las dos defensas de
+//      la casa. El suscriptor del store reseteaba `consultado` al entrar otro
+//      edificio y la respuesta tardía —la de la referencia ANTERIOR— lo volvía a
+//      poblar: `recalcular()` pintaba entonces la envolvente NUEVA contra la
+//      huella oficial VIEJA, que es literalmente el peor contraste posible y el
+//      que la cabecera de este módulo declara evitar. Se copian con fidelidad las
+//      dos defensas de `app/cableado-catastro.js#operar` y de
+//      `app/cableado-edificio.js#operar`: **`AbortController`** (corta la red, que
+//      es lo que de verdad libera al servicio) y **token de secuencia** (impide
+//      ESCRIBIR, porque abortar no impide que una respuesta ya en vuelo llegue).
+//      Hacen falta las dos. Y encima, la guarda de una pulsación / una petición.
+//   2. **Las vecinas** se adoptaban sin mirar para qué edificio se habían pedido.
+//      Se coteja la identidad ({@link claveDe}) entre el momento de pedirlas y el
+//      de adoptarlas: lo que no sea del edificio vigente se descarta y `vecinas`
+//      se queda en `null`, o sea «no se han consultado» — que es la verdad, y es
+//      lo que hace que la siguiente apertura vuelva a pedirlas.
+//   3. **El contraste caduca**, y no basta con dejar de repintarlo. Con el cajón
+//      CERRADO, `recalcular()` sale por arriba sin tocar nada: `ultimoContraste()`
+//      seguía devolviendo las cifras del edificio anterior y los oyentes de
+//      `alContraste` no se enteraban. Entrar otro edificio llama ahora a
+//      {@link olvidar}, igual que su gemelo de F07
+//      (`cableado-diagnostico.js#olvidarLoMedidoContraElFondo`).
+//
+// ═════════════════════════════════════════════════════════════════════════════
 // LO QUE ESTE MÓDULO NO HACE
 // ═════════════════════════════════════════════════════════════════════════════
 // No compone el PDF (es de `app/cableado-informe-edificio.js`), no navega (es de
@@ -126,6 +157,26 @@ export const SIN_BUILDING =
 
 /** Lo que se dice cuando la consulta acaba bien y hay con qué contrastar. */
 export const CONSULTA_HECHA = 'Construcción registrada traída del Catastro.'
+
+/**
+ * Segunda pulsación con una consulta ya en vuelo. **No se encolan dos**: una
+ * pulsación, una petición (override O8). Se dice, porque un botón que parece no
+ * hacer nada es peor que un botón que explica por qué no hace nada.
+ */
+export const CONSULTA_EN_CURSO =
+  'La construcción registrada ya se está consultando; espera a que conteste el Catastro.'
+
+/**
+ * Una consulta que quedó SUPERADA —se destruyó la pantalla, o entró otro
+ * edificio— y cuya respuesta se descarta sin usarla. Es la misma decisión, y casi
+ * el mismo texto, que `cableado-catastro.js`: **no se anuncia al usuario**, porque
+ * avisar de una consulta que él mismo ha sustituido es ruido sobre algo que ya
+ * sabe. Se devuelve como `motivo` para que las pruebas y el guion de humo puedan
+ * afirmarlo sin leer el DOM.
+ */
+export const CONSULTA_SUPERADA =
+  'Esta consulta de la construcción registrada quedó superada porque entró otro edificio, así ' +
+  'que su respuesta se ha descartado sin usarla.'
 
 /** Y el desenlace de una consulta que no ha traído nada. Nunca «no hay». */
 export const COLA_DETALLE = 'Mira el panel de avisos para el detalle.'
@@ -316,6 +367,24 @@ export function cablearContrasteEdificio({
   let pidiendoVecinas = false
 
   /**
+   * Contador monótono de consultas de la construcción registrada. Cada una captura
+   * su número al empezar; al resolverse, si su número ya no es el último, la
+   * consulta está SUPERADA y **no escribe nada**. Es la defensa que el
+   * `AbortController` no puede dar: abortar corta la red, pero una respuesta ya en
+   * vuelo llega igual. Ver el apartado 1 de la cabecera.
+   */
+  let secuencia = 0
+
+  /** El `AbortController` de la consulta en curso, o `null` si no hay ninguna. */
+  let enVuelo = null
+
+  /**
+   * Una consulta de la construcción registrada en vuelo. **Una pulsación, una
+   * petición** (override O8): la segunda no llega a salir y se dice por qué.
+   */
+  let consultandoRegistrada = false
+
+  /**
    * El ÚLTIMO contraste que se pintó, que es el que el informe recoge. Se GUARDA
    * en vez de recalcularse al pulsar, y por lo mismo que en F09: recalcular podría
    * dar cifras distintas de las que el usuario tiene delante, y un informe que no
@@ -358,10 +427,28 @@ export function cablearContrasteEdificio({
    * sostiene la guarda del botón no dependa de acordarse.
    */
   function olvidar() {
+    // Sin este `if`, olvidar dos veces seguidas —que pasa: cada `set` del store con
+    // la construcción vacía pasa por aquí— despertaría al rail para decirle lo
+    // mismo. Calcado de `cableado-diagnostico.js#olvidarDiagnostico`.
+    const habia = ultimo !== null
     ultimo = null
     cajon.pintar(null)
     if (contrasteMapa) contrasteMapa.pintar(null)
-    notificar()
+    if (habia) notificar()
+  }
+
+  /**
+   * Deja SUPERADA la consulta que hubiera en vuelo y corta su red. **El orden
+   * importa**, y es el mismo que el de `cableado-catastro.js#destruir`: primero se
+   * invalida la secuencia y luego se aborta, para que la respuesta que llegue
+   * después no encuentre ningún camino por el que escribir.
+   */
+  function invalidarConsulta() {
+    secuencia += 1
+    if (enVuelo !== null) {
+      enVuelo.abort()
+      enVuelo = null
+    }
   }
 
   /**
@@ -436,10 +523,24 @@ export function cablearContrasteEdificio({
   async function pedirVecinas() {
     if (destruido || vecinas !== null || pidiendoVecinas) return
     if (catastro === null || typeof catastro.colindantes !== 'function') return
+    // ⛔ PARA QUÉ EDIFICIO se piden. Ver el apartado 2 de la cabecera: sin esto, las
+    // vecinas de la parcela anterior se adoptan como si fueran las de ésta y
+    // `pedirVecinas` no vuelve a consultar nunca, porque `vecinas` ya no es `null`.
+    const claveAlPedir = claveDe(estadoEdificio.get())
     pidiendoVecinas = true
     try {
       const resultado = await catastro.colindantes()
       if (destruido) return
+      if (claveDe(estadoEdificio.get()) !== claveAlPedir) {
+        // No se avisa al usuario: el cajón sigue diciendo «no se ha consultado», que
+        // es exactamente lo que ha pasado con las de ESTE edificio, y la siguiente
+        // apertura las pedirá. Queda el rastro técnico, que es de quien es.
+        console.warn(
+          'cablearContrasteEdificio: se descartan unas colindantes que se pidieron para otro ' +
+            'edificio; entró uno nuevo mientras la consulta viajaba.',
+        )
+        return
+      }
       if (resultado?.ok && resultado.datos) {
         vecinas = aVecinas(resultado.datos.colindantes)
         recalcular()
@@ -464,6 +565,13 @@ export function cablearContrasteEdificio({
    */
   async function consultar() {
     if (destruido) return { clave: consultado.clave, motivo: null }
+    if (consultandoRegistrada) {
+      // El `consultando(true)` del cajón apaga el botón, pero eso es PRESENTACIÓN:
+      // se puede quitar desde el inspector y `consultar()` está en la API pública.
+      // La garantía es esta guarda. Misma doctrina que `cablearCatastro`.
+      cajon.estado(CONSULTA_EN_CURSO)
+      return { clave: consultado.clave, motivo: CONSULTA_EN_CURSO }
+    }
 
     const edificio = estadoEdificio.get()
     // Ya la tenemos en casa: pedirla otra vez sería una petición para traerse lo
@@ -483,10 +591,27 @@ export function cablearContrasteEdificio({
       return { clave: consultado.clave, motivo: SIN_REFCAT }
     }
 
+    // ── Las DOS defensas, antes del primer `await` ─────────────────────────────
+    // Copiadas con fidelidad de `cableado-catastro.js#operar` y de
+    // `cableado-edificio.js#operar`. Ver el apartado 1 de la cabecera.
+    if (enVuelo !== null) enVuelo.abort()
+    const controlador = new AbortController()
+    enVuelo = controlador
+    const token = ++secuencia
+    consultandoRegistrada = true
+
     cajon.consultando(true)
     try {
-      const resultado = await cliente.edificioPorRefcat(refcat, { srs })
-      if (destruido) return { clave: consultado.clave, motivo: null }
+      const resultado = await cliente.edificioPorRefcat(refcat, {
+        srs,
+        senal: controlador.signal,
+      })
+      // ⛔ EL COTEJO, Y VA ANTES QUE CUALQUIER RAMA. Una consulta superada no
+      // escribe NADA: ni `consultado`, ni el cajón, ni el panel. Ponerlo después de
+      // la rama del `!ok` contaría como avería del Catastro un aborto nuestro.
+      if (destruido || token !== secuencia) {
+        return { clave: consultado.clave, motivo: CONSULTA_SUPERADA }
+      }
 
       if (!resultado?.ok) {
         // ⛔ Un fallo de la consulta NO es «no consta»: son los dos sabores que
@@ -546,6 +671,12 @@ export function cablearContrasteEdificio({
       recalcular()
       return { clave: consultado.clave, motivo: null }
     } catch (causa) {
+      // Mismo cotejo que arriba, y por lo mismo: un cliente que PROPAGUE el aborto
+      // en vez de traducirlo a `ok:false` no puede acabar contando al usuario una
+      // avería del Catastro que no ha existido.
+      if (destruido || token !== secuencia) {
+        return { clave: consultado.clave, motivo: CONSULTA_SUPERADA }
+      }
       consultado = { piezas: null, clave: REGISTRO.NO_SE_HA_PODIDO }
       panel.avisar('La consulta de la construcción registrada ha fallado.', {
         nivel: NIVEL.ERROR,
@@ -555,8 +686,15 @@ export function cablearContrasteEdificio({
       recalcular()
       return { clave: consultado.clave, motivo: null }
     } finally {
+      if (enVuelo === controlador) enVuelo = null
+      consultandoRegistrada = false
       // `consultando(false)` solo borra su propio aviso, así que el desenlace que
       // se acaba de escribir sobrevive. Ver el JSDoc de la vista.
+      //
+      // ⚠️ Se apaga TAMBIÉN si la consulta quedó superada, y no es descuido: aquí
+      // no puede haber dos en vuelo (la guarda de arriba lo impide), así que si
+      // ésta no apagara el aviso no lo apagaría nadie y el cajón se quedaría
+      // «consultando…» para siempre.
       if (!destruido) cajon.consultando(false)
     }
   }
@@ -587,8 +725,17 @@ export function cablearContrasteEdificio({
       // No conservar nada es lo correcto — enseñar la huella oficial de la parcela
       // anterior junto a la envolvente de ésta sería el peor contraste posible.
       identidad = nueva
+      // ⛔ Y lo que viaja también deja de valer: sin esto, la respuesta de la
+      // referencia ANTERIOR llegaría después de este reseteo y volvería a poblar
+      // `consultado` (apartado 1 de la cabecera).
+      invalidarConsulta()
       consultado = { piezas: null, clave: REGISTRO.NO_CONSULTADO }
       vecinas = null
+      // ⛔ Y el contraste que hubiera CADUCA aquí, no en `recalcular()`: con el
+      // cajón cerrado aquél sale por arriba sin tocar nada, y `ultimoContraste()`
+      // —que es de donde el informe firmable saca las cifras— seguiría devolviendo
+      // las del edificio anterior sin que nadie se enterara (apartado 3).
+      olvidar()
     }
     recalcular()
   })
@@ -660,10 +807,16 @@ export function cablearContrasteEdificio({
      *
      * No destruye el cajón —es del visor— ni los clientes —son de quien los creó—:
      * este módulo desmonta lo que ha montado él, ni más ni menos.
+     *
+     * **Aborta lo que esté en vuelo**, y el orden importa: primero se invalida la
+     * secuencia y luego se aborta, para que la respuesta que llegue después de esto
+     * no encuentre ningún camino por el que escribir en una pantalla que ya no
+     * está. Mismo orden —y por lo mismo— que `cableado-catastro.js#destruir`.
      */
     destruir() {
       if (destruido) return
       destruido = true
+      invalidarConsulta()
       desuscribir()
       bajaConsultar()
       bajaCerrar()

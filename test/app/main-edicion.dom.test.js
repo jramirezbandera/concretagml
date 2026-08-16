@@ -715,6 +715,16 @@ afterEach(() => {
   // seguiría escuchando en la siguiente.
   if (montado !== null) montado.cableado.destruir()
   montado = null
+  // ⚠️ **Y se CIERRA cualquier gesto de arrastre simulado** (auditoría
+  // 2026-08-16). Varias pruebas de este fichero llaman al canal en vivo con un
+  // `refVertice` —o sea, simulan un fotograma de `drag`— y ninguna simulaba el
+  // `dragend`; desde que `app/main.js` inhibe el atajo durante el arrastre, ese
+  // gesto a medias se colaba en la prueba siguiente y le apagaba el `Ctrl+Z`.
+  // Se cierra soltando el ratón —el oyente lo tiene el cableado del ARRANQUE,
+  // que en este fichero nunca se destruye— y no repintando la ficha con anillos
+  // vacíos: eso borraría las cifras que `DEL_ARRANQUE` conserva y que la
+  // siguiente sección afirma.
+  document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
 })
 
 // ── 1 · El ENSAMBLAJE: lo que solo se puede comprobar arrancando ─────────────
@@ -998,6 +1008,109 @@ describe('app/main · deshacer y rehacer (criterio 5)', () => {
 
 // ── 4 · Los atajos de teclado ────────────────────────────────────────────────
 
+// ═════════════════════════════════════════════════════════════════════════════
+// Auditoría 2026-08-16 · A cada instantánea, su store
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// La pila es de las DOS ramas a propósito (decisión de F12: «`Ctrl+Z` es UNA
+// tecla y el usuario no lleva la cuenta de en qué rama la pulsa»), pero el
+// aplicador escribía SIEMPRE en el store de parcela. Medido: editar el vértice de
+// una huella de edificio y pulsar `Ctrl+Z` metía la proyección de la parte
+// —`{recintos, idLocal, origen, parteDeEdificio}`— dentro de la parcela del
+// expediente, invisible mientras durara la rama y firmable al volver.
+//
+// La marca `parteDeEdificio` la pone `edificio/parte-activa.js` diciendo
+// literalmente que «no debe acabar en `crearParcela` ni en un expediente». Estas
+// pruebas son las que exigen que alguien la lea.
+
+describe('app/main · el historial compartido no cruza las ramas', () => {
+  /** Una proyección de parte activa, como la que commitea la rama EDIFICIO. */
+  const huella = (indice = 0, nombre = 'cuerpo principal') => ({
+    recintos: [{ vertices: [[440000, 4470000], [440010, 4470000], [440010, 4470010]] }],
+    idLocal: 'ES.SDGC.BU.EJEMPLO',
+    origen: 'DXF',
+    parteDeEdificio: { indice, nombre },
+  })
+
+  /**
+   * Una edición de la rama EDIFICIO: commitea en la pila COMPARTIDA y **no toca
+   * el store de parcela**, que es exactamente lo que hace la rama real (escribe
+   * en `vistaParteActiva` y commitea aquí). Usar el `editar` de arriba metería la
+   * huella en la parcela como parte del montaje y la prueba se probaría a sí
+   * misma.
+   *
+   * ⚠️ Por eso mismo el gesto de estas pruebas es el ATAJO y no el botón: sin
+   * `estado.set` no corre ningún suscriptor del store de parcela, así que nadie
+   * refresca los botones y «Deshacer» sigue apagado. Es fiel a la pantalla real
+   * —donde el usuario en la rama de edificio tiene la barra oculta y la tecla a
+   * mano— y es el camino por el que se midió el defecto.
+   */
+  async function editarEdificio(historial, proyeccion) {
+    commit(historial, proyeccion)
+    await cederMicrotarea()
+  }
+
+  it('⭐ una instantánea de EDIFICIO no entra jamás en el store de parcela', async () => {
+    const inicial = parcelaCuadrada()
+    const aplicadas = []
+    const { estado, historial, renglon } = cablear(inicial, {
+      esDeEdificio: (i) => i?.parteDeEdificio != null,
+      aplicarDeEdificio: (i) => {
+        aplicadas.push(i)
+        return true
+      },
+    })
+
+    // DOS ediciones de la huella, que es el gesto medido: `undo` devuelve la
+    // instantánea ANTERIOR, así que con una sola lo que sale es la parcela de
+    // partida —y esa sí es de la parcela—. Es a partir de la segunda cuando lo
+    // que se saca de la pila es una huella.
+    await editarEdificio(historial, huella())
+    await editarEdificio(historial, huella())
+    teclear('z')
+
+    // Lo que se deshace va a su dueño, y la parcela queda INTACTA.
+    expect(aplicadas.length, 'la instantánea tenía que ir a la rama de edificio').toBe(1)
+    expect(aplicadas[0].parteDeEdificio).toEqual({ indice: 0, nombre: 'cuerpo principal' })
+    expect(estado.get().parteDeEdificio, 'la huella NO puede acabar en la parcela').toBeUndefined()
+    expect(estado.get().recintos[0].vertices).toEqual(inicial.recintos[0].vertices)
+    // Y no se hace en silencio: el renglón dice de quién era.
+    expect(renglon.textContent).toContain('Era una edición del edificio')
+  })
+
+  it('si la parte elegida es OTRA, no se escribe nada y la pila no se descuadra', async () => {
+    // Aplicar la geometría de una parte sobre otra sería cambiar una corrupción
+    // por otra. Se prefiere no deshacer —reversible y visible— y contarlo.
+    const { estado, historial, renglon } = cablear(parcelaCuadrada(), {
+      esDeEdificio: (i) => i?.parteDeEdificio != null,
+      aplicarDeEdificio: () => false, // la rama dice que esa parte no es la suya
+    })
+
+    await editarEdificio(historial, huella(3, 'porche'))
+    await editarEdificio(historial, huella(3, 'porche'))
+    const indiceAntes = historial.indice
+    teclear('z')
+
+    expect(historial.indice, 'el índice tiene que volver a donde estaba').toBe(indiceAntes)
+    expect(estado.get().parteDeEdificio).toBeUndefined()
+    expect(renglon.textContent).toContain('otra parte del edificio')
+    // Sigue habiendo algo que deshacer: la operación NO se ha consumido.
+    expect(puedeDeshacer(historial)).toBe(true)
+  })
+
+  it('sin rama de edificio montada, deshacer una parcela funciona como siempre', async () => {
+    // Anti-vacuidad: los valores por defecto de las dos opciones dicen «no hay
+    // edificio», que es la verdad en una pantalla que solo monta la parcela.
+    const inicial = parcelaCuadrada()
+    const { estado, historial, deshacer } = cablear(inicial)
+
+    await editar(estado, historial, parcelaCuadrada({ lado: 20 }))
+    deshacer.click()
+
+    expect(estado.get().recintos[0].vertices).toEqual(inicial.recintos[0].vertices)
+  })
+})
+
 describe('app/main · atajos de deshacer/rehacer', () => {
   /** Deja la pila con una edición hecha, lista para deshacerse. */
   async function conHistoria() {
@@ -1073,6 +1186,173 @@ describe('app/main · atajos de deshacer/rehacer', () => {
     cableado.destruir()
     teclear('z')
     expect(historial.indice).toBe(1)
+  })
+
+  // ── ⛔ Auditoría 2026-08-16 · H3 · el atajo bajo un `<dialog>` MODAL ────────
+  //
+  // `esCampoDeTexto` era el ÚNICO filtro del atajo, y cubre el caso de escribir.
+  // No cubre el de mirar: los diálogos de la aplicación son modales de verdad
+  // (`dialogo-expediente.js`, `dialogo-avisos.js`, `dialogo-diccionario.js` los
+  // abren con `showModal()`), y dentro de ellos se navega con el teclado por
+  // BOTONES, no por campos. Escenario medido: se abre «Expediente», se recorre la
+  // lista de proyectos guardados —el foco queda en un botón de fila— y se pulsa
+  // `Ctrl+Z`, que es el gesto natural ahí. La geometría de detrás se deshacía; el
+  // mapa y el renglón están tapados por el velo, así que NADA lo decía, y el
+  // autoguardado persistía la geometría ya revertida.
+  //
+  // El diálogo de estas pruebas es el REAL (`crearDialogoAvisos`, el mismo panel
+  // que el cableado recibe): no se fabrica un `<dialog>` a mano, que sería una
+  // segunda redacción de cómo abre un modal esta aplicación.
+  //
+  // MUTACIÓN MEDIDA (aplicada a `app/main.js`, corrida `npm run test:dom -- main-edicion`
+  // y revertida con el editor): anular la guarda `hayDialogoModalAbierto(documento)`
+  // → **4 rojos**, los cuatro de aquí. El quinto —el `<dialog>` NO modal— sigue
+  // verde, que es lo que prueba que la guarda distingue y no apaga por `open`.
+
+  describe('⛔ con un `<dialog>` MODAL abierto', () => {
+    it('`Ctrl+Z` NO deshace, y el navegador conserva su atajo', async () => {
+      const { historial, panel } = await conHistoria()
+      panel.abrir()
+
+      const evento = teclear('z')
+
+      expect(historial.indice, 'la geometría de detrás del velo se ha deshecho').toBe(1)
+      expect(evento.defaultPrevented, 'el atajo no es nuestro aquí').toBe(false)
+    })
+
+    it('`Ctrl+Y` tampoco rehace: son el mismo atajo y el mismo motivo', async () => {
+      const { historial, panel } = await conHistoria()
+      // Deshacer ANTES de abrir, para que haya algo que rehacer.
+      teclear('z')
+      expect(historial.indice).toBe(0)
+
+      panel.abrir()
+      teclear('y')
+      expect(historial.indice).toBe(0)
+    })
+
+    it('⚠️ y NO se inhibe en silencio: lo dice en el renglón y en el panel', async () => {
+      // Regla de oro 1 con una vuelta de tuerca: el renglón está DETRÁS del velo,
+      // así que el usuario no lo lee hasta cerrar. Por eso va además al panel de
+      // avisos, que conserva lo dicho (y agrupa las repeticiones con su `×N`, así
+      // que insistir con el atajo no lo llena de tarjetas iguales).
+      const { panel, renglon } = await conHistoria()
+      panel.abrir()
+
+      teclear('z')
+      teclear('z')
+
+      expect(renglon.textContent).toMatch(/ventana/i)
+      const tarjetas = textosDelPanel().filter((t) => /ventana/i.test(t))
+      expect(tarjetas, 'el panel no ha recogido nada').toHaveLength(1)
+    })
+
+    it('⚠️ cerrado el diálogo, el atajo vuelve (el guardián no es una inhibición fija)', async () => {
+      const { historial, panel } = await conHistoria()
+      panel.abrir()
+      teclear('z')
+      expect(historial.indice).toBe(1)
+
+      panel.cerrar()
+      teclear('z')
+      expect(historial.indice).toBe(0)
+    })
+
+    it('⛔⛔ un `<dialog>` abierto que NO es modal no inhibe nada', async () => {
+      // **El guardián que impide el arreglo fácil.** `document.querySelector(
+      // 'dialog[open]')` a secas daría también con el informe presentado COMO
+      // PANTALLA, que `app/dialogo-informe.js#presentar` abre con `show()` —no con
+      // `showModal()`— justamente para que lo de detrás siga vivo: allí el rail
+      // navega, el mapa se ve y `aria-modal` dice «false» para no mentirle al
+      // lector de pantalla. Apagar el undo ahí sería romper una pantalla de
+      // trabajo por arreglar otra cosa.
+      const { historial } = await conHistoria()
+      const comoPantalla = document.createElement('dialog')
+      comoPantalla.setAttribute('open', '')
+      comoPantalla.setAttribute('aria-modal', 'false')
+      document.body.appendChild(comoPantalla)
+
+      teclear('z')
+      expect(historial.indice).toBe(0)
+    })
+  })
+
+  // ── ⛔ Auditoría 2026-08-16 · H4 · el atajo DURANTE un arrastre ─────────────
+  //
+  // La otra mitad del defecto que `viewer/sincronizacion.js` cerró por su lado.
+  // Allí, un `Ctrl+Z` a mitad de arrastre cambiaba la forma del anillo bajo los
+  // pies del gesto y el `dragend` escribía la coordenada en el vértice
+  // equivocado; ahora el arrastre RENUNCIA, lo dice con `NIVEL.ERROR` y repinta.
+  // Eso cierra el daño, pero el usuario pierde el gesto: suelta el ratón y le
+  // dicen «no se ha aplicado, repítelo». La mitad de esta capa es no llegar ahí:
+  // mientras haya un arrastre en curso, el atajo NO deshace.
+  //
+  // El arrastre se detecta por el `refVertice` del canal en vivo, que es el
+  // parámetro que `AlPrevisualizar` (viewer/sincronizacion.js) define justo para
+  // esto: no `null` en cada `drag`, `null` al final de cada `render()`.
+  //
+  // MUTACIONES MEDIDAS (mismo método que arriba):
+  //   · anular la guarda `arrastrandoVertice` del atajo → **4 rojos**, los cuatro
+  //     de aquí, y ninguno de los del diálogo: son dos piezas independientes.
+  //   · quitar los dos oyentes de `mouseup`/`pointerup` (la red de seguridad) →
+  //     **9 rojos**: el de «el puntero se va» y OCHO por contagio, porque sin ella
+  //     un gesto simulado y no cerrado apaga el `Ctrl+Z` de las pruebas
+  //     siguientes. Es el mismo síntoma que tendría el usuario, medido por
+  //     accidente: la bandera alta deja el atajo muerto hasta que algo la baje.
+
+  describe('⛔ mientras se ARRASTRA un vértice', () => {
+    /** Un fotograma de arrastre, como los que emite `sincronizacion.js`. */
+    const fotogramaDeArrastre = () =>
+      previsualizarDelArranque(anillosDe(parcelaCuadrada()), { recinto: 0, indice: 2 })
+    /** El render del final del gesto: los anillos DEL ESTADO y `refVertice: null`. */
+    const renderDelEstado = () => previsualizarDelArranque(anillosDe(parcelaCuadrada()), null)
+
+    it('`Ctrl+Z` no deshace: el gesto no se pierde, en vez de perderse con aviso', async () => {
+      const { historial } = await conHistoria()
+      fotogramaDeArrastre()
+
+      const evento = teclear('z')
+
+      expect(historial.indice, 'la forma ha cambiado bajo los pies del arrastre').toBe(1)
+      expect(evento.defaultPrevented).toBe(false)
+      renderDelEstado()
+    })
+
+    it('⚠️ y lo dice: un atajo que no responde y no explica es un atajo roto', async () => {
+      const { renglon } = await conHistoria()
+      fotogramaDeArrastre()
+      teclear('z')
+      expect(renglon.textContent).toMatch(/arrastr/i)
+      renderDelEstado()
+    })
+
+    it('⚠️ soltado el vértice, el atajo vuelve', async () => {
+      const { historial } = await conHistoria()
+      fotogramaDeArrastre()
+      teclear('z')
+      expect(historial.indice).toBe(1)
+
+      // El `render()` del final del gesto, que es lo que devuelve la verdad.
+      renderDelEstado()
+      teclear('z')
+      expect(historial.indice).toBe(0)
+    })
+
+    it('⛔ y vuelve TAMBIÉN si el gesto no llega a su `dragend` (el puntero se va)', async () => {
+      // Red de seguridad, y no es celo: un arrastre que nunca recibe `dragend`
+      // —el puntero sale de la ventana— dejaría la bandera alta y el `Ctrl+Z`
+      // MUERTO en silencio, que es el mismo hallazgo 2.11 que `sincronizacion.js`
+      // ya se encontró con su propio render diferido. Un arrastre no puede
+      // sobrevivir a que se suelte el botón del ratón, así que ahí se baja.
+      const { historial } = await conHistoria()
+      fotogramaDeArrastre()
+      teclear('z')
+      expect(historial.indice).toBe(1)
+
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+      teclear('z')
+      expect(historial.indice).toBe(0)
+    })
   })
 })
 
@@ -1309,6 +1589,39 @@ describe('app/main · una parcela nueva REINICIA el historial (decisión 2 de F0
     cableado.alCargarParcela(parcelaCuadrada({ lado: 30 }))
 
     expect(edicion.llamadas.colindantes.at(-1)).toEqual([])
+    expect(colindantesContadas.at(-1)).toBeNull()
+  })
+
+  it('⭐ y suelta también el REGISTRO, que es la tercera pieza (auditoría 2026-08-16)', () => {
+    // Las dianas del enganche y el recuento se soltaban desde F06; el registro de
+    // `app/colindantes.js` —el que lee `cablearDerivacion` para repartir el exceso
+    // entre los vecinos— no lo soltaba NADIE: su `olvidar()` no tenía un solo
+    // llamante en la aplicación. Medido: con las vecinas de A y la parcela B
+    // cargada, el exceso de B se repartía contra las fincas de A y, como el
+    // registro seguía diciendo «consultado», se declaraba entero sobre VIAL sin
+    // emitir el aviso de vecinas sin consultar — y eso abre «Descargar expediente».
+    let soltadas = 0
+    const { cableado } = cablear(parcelaCuadrada(), {
+      alSoltarColindantes: () => {
+        soltadas += 1
+      },
+    })
+
+    cableado.alCargarParcela(parcelaCuadrada({ lado: 30 }))
+    expect(soltadas, 'el registro tenía que olvidar al entrar otra parcela').toBe(1)
+
+    // Y por la SEGUNDA puerta también: «Traer el parcelario de fondo» no cambia la
+    // geometría de trabajo, pero las vecinas siguen siendo las de antes. Es la
+    // misma razón por la que esta función ya soltaba las dianas y el recuento.
+    cableado.alCambiarOficial(parcelaCuadrada({ lado: 30 }))
+    expect(soltadas).toBe(2)
+  })
+
+  it('sin registro montado, soltar las colindantes no revienta', () => {
+    // Anti-vacuidad del valor por defecto: una pantalla sin registro (tests, uso
+    // como librería) tiene que seguir cargando parcelas.
+    const { cableado, colindantesContadas } = cablear(parcelaCuadrada())
+    expect(() => cableado.alCargarParcela(parcelaCuadrada({ lado: 30 }))).not.toThrow()
     expect(colindantesContadas.at(-1)).toBeNull()
   })
 

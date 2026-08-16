@@ -387,3 +387,196 @@ describe('F14 · cablearContrasteEdificio', () => {
     expect(cliente.edificioPorRefcat).not.toHaveBeenCalled()
   })
 })
+
+// ── 4 · Las tres carreras (auditoría 2026-08-16) ─────────────────────────────
+//
+// Las tres son la MISMA familia de defecto: algo que se pidió para el edificio de
+// antes llega —o se queda— cuando ya hay otro delante. Ninguna deja síntoma: las
+// cifras salen, el cajón las pinta y el informe las firma.
+
+describe('F14 · lo que llega TARDE no puede pisar al edificio de ahora', () => {
+  let cajon
+  let panel
+  let estadoEdificio
+
+  beforeEach(() => {
+    cajon = cajonDoble()
+    panel = panelDoble()
+    estadoEdificio = crearEstadoVista(null)
+  })
+
+  const cablear = (extra = {}) =>
+    cablearContrasteEdificio({ cajon, estadoEdificio, panel, srs: 'EPSG:25830', ...extra })
+
+  /** El edificio de la parcela real, sin la construcción oficial en el modelo. */
+  const edificioBase = () => {
+    const { edificio } = entradaDesdeGmlBu(fixture('bu_buildingpart_9398516VK3799G.gml'))
+    return { ...edificio, construccionOficial: null, refcat: '9398516VK3799G' }
+  }
+
+  /** Un `Building` del Catastro, el de la MISMA parcela real. */
+  const buildingReal = () => parsearGmlBu(fixture('bu_building_9398516VK3799G.gml')).edificio
+
+  // ── H1 · las vecinas ───────────────────────────────────────────────────────
+
+  it('⛔ H1 · unas vecinas pedidas para OTRO edificio NO se adoptan', async () => {
+    // Cajón abierto sobre A y `colindantes()` en vuelo; entra B (otro expediente),
+    // que pone `vecinas` a `null`. Si la respuesta de A se adoptara, la invasión de
+    // B se mediría contra las vecinas de A —con las refcat de A— y `pedirVecinas`
+    // no volvería a consultar nunca, porque `vecinas` ya no sería `null`.
+    estadoEdificio.set(edificioBase())
+    let contestar = null
+    const catastro = {
+      colindantes: () =>
+        new Promise((resolver) => {
+          contestar = resolver
+        }),
+    }
+    const c = cablear({ catastro })
+    const abriendo = c.abrir()
+
+    estadoEdificio.set({ ...edificioBase(), refcat: '0000001VK0000A' })
+    contestar({ ok: true, datos: { colindantes: [] } })
+    await abriendo
+
+    // `[]` diría «se consultó y no hay ninguna invasión»: la afirmación
+    // tranquilizadora y falsa. La verdad es que las de ESTE edificio no se han
+    // mirado.
+    expect(c.ultimoContraste().invasion.consultado).toBe(false)
+  })
+
+  // ── H2 · la consulta de la construcción registrada ─────────────────────────
+
+  it('⛔ H2 · la respuesta tardía del `wfsBU` no repuebla la huella del edificio anterior', async () => {
+    estadoEdificio.set(edificioBase())
+    let contestar = null
+    const cliente = {
+      edificioPorRefcat: vi.fn(
+        () =>
+          new Promise((resolver) => {
+            contestar = resolver
+          }),
+      ),
+    }
+    const c = cablear({ cliente })
+    const consultando = c.consultar()
+
+    // Entra OTRO edificio mientras la consulta viaja: el suscriptor resetea
+    // `consultado`, y sin token de secuencia la respuesta de la referencia ANTERIOR
+    // lo repuebla — y `recalcular()` pinta la envolvente nueva contra la huella
+    // oficial vieja, que es el peor contraste posible.
+    estadoEdificio.set({ ...edificioBase(), refcat: '0000001VK0000A' })
+    contestar({
+      ok: true,
+      datos: { srs: 'EPSG:25830', edificio: buildingReal(), sinConstrucciones: false },
+    })
+    await consultando
+
+    expect(c.huellaOficial()).toBeNull()
+    expect(c.ultimoContraste().registro.clave).toBe(REGISTRO.NO_CONSULTADO)
+  })
+
+  it('⛔ H2 · la consulta viaja con `senal`, y otro edificio la ABORTA', async () => {
+    estadoEdificio.set(edificioBase())
+    let contestar = null
+    const cliente = {
+      edificioPorRefcat: vi.fn(
+        () =>
+          new Promise((resolver) => {
+            contestar = resolver
+          }),
+      ),
+    }
+    const c = cablear({ cliente })
+    const consultando = c.consultar()
+
+    const senal = cliente.edificioPorRefcat.mock.calls[0][1].senal
+    expect(senal, 'la consulta tiene que poder cortarse').toBeInstanceOf(AbortSignal)
+    expect(senal.aborted).toBe(false)
+
+    estadoEdificio.set({ ...edificioBase(), refcat: '0000001VK0000A' })
+    expect(senal.aborted, 'el servicio deja de trabajar para una pregunta que ya no interesa')
+      .toBe(true)
+
+    contestar({ ok: false, motivo: 'CANCELADA', mensaje: 'cancelada' })
+    await consultando
+    // Y una consulta abortada por nosotros NO se cuenta como avería del Catastro:
+    // el panel se queda callado y el registro no cambia de estado.
+    expect(panel.avisos).toHaveLength(0)
+    expect(c.ultimoContraste().registro.clave).toBe(REGISTRO.NO_CONSULTADO)
+  })
+
+  it('⛔ H2 · dos pulsaciones seguidas cuestan UNA petición (override O8)', async () => {
+    estadoEdificio.set(edificioBase())
+    let contestar = null
+    const cliente = {
+      edificioPorRefcat: vi.fn(
+        () =>
+          new Promise((resolver) => {
+            contestar = resolver
+          }),
+      ),
+    }
+    const c = cablear({ cliente })
+    const primera = c.consultar()
+    const segunda = c.consultar()
+
+    expect(cliente.edificioPorRefcat).toHaveBeenCalledTimes(1)
+    contestar({
+      ok: true,
+      datos: { srs: 'EPSG:25830', edificio: buildingReal(), sinConstrucciones: false },
+    })
+    await Promise.all([primera, segunda])
+    expect(c.huellaOficial()).toHaveLength(2)
+  })
+
+  it('⛔ H2 · `destruir` invalida la secuencia ANTES de abortar', async () => {
+    estadoEdificio.set(edificioBase())
+    let contestar = null
+    const cliente = {
+      edificioPorRefcat: vi.fn(
+        () =>
+          new Promise((resolver) => {
+            contestar = resolver
+          }),
+      ),
+    }
+    const c = cablear({ cliente })
+    const consultando = c.consultar()
+    const senal = cliente.edificioPorRefcat.mock.calls[0][1].senal
+
+    c.destruir()
+    expect(senal.aborted).toBe(true)
+
+    contestar({
+      ok: true,
+      datos: { srs: 'EPSG:25830', edificio: buildingReal(), sinConstrucciones: false },
+    })
+    await consultando
+    // Nada escribe en una pantalla que ya no está.
+    expect(c.huellaOficial()).toBeNull()
+  })
+
+  // ── H3 · el último contraste con el cajón cerrado ──────────────────────────
+
+  it('⛔ H3 · con el cajón CERRADO, otro edificio CADUCA el último contraste', async () => {
+    const { edificio } = entradaDesdeGmlBu(fixture('bu_buildingpart_9398516VK3799G.gml'))
+    estadoEdificio.set(edificio)
+    const c = cablear()
+    const avisados = []
+    c.alContraste((x) => avisados.push(x))
+    c.recalcular()
+    expect(c.ultimoContraste()).not.toBeNull()
+
+    // El usuario cierra el cajón y carga OTRO edificio. `recalcular()` sale por
+    // `!cajon.abierto()`, así que sin olvidar nada `ultimoContraste()` seguiría
+    // devolviendo las cifras del edificio ANTERIOR — y el informe firmable las
+    // recoge de ahí.
+    cajon.cerrar()
+    estadoEdificio.set({ ...edificio, idLocal: 'otro-edificio', refcat: '0000001VK0000A' })
+
+    expect(c.ultimoContraste()).toBeNull()
+    // Y los oyentes se enteran: el rail de `app/main.js` cuelga de este canal.
+    expect(avisados.at(-1)).toBeNull()
+  })
+})

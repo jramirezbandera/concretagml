@@ -15,7 +15,9 @@
 //      apagado se ESCRIBE EL MOTIVO: un botón gris y mudo es un error silencioso
 //      (regla de oro 1). Ver {@link MOTIVO_SIN_OFICIAL}.
 //   2. **LAS COLINDANTES.** Al abrir, si no hay vecinas, UNA llamada a
-//      `catastro.colindantes()`. Una apertura, una petición (override O8).
+//      `catastro.colindantes()`. Una apertura, una petición (override O8). Y lo
+//      que llega por ese canal **se coteja con la parcela que hay en pantalla**
+//      antes de adoptarse: ver {@link cablearDiagnostico}`#adoptar`.
 //   3. **LA TRADUCCIÓN** `ParcelaGml[] → [{refcat, recintos}]`, que es lo que come
 //      `diagnostico/parcela.js`.
 //   4. **EL ESTADO DEL EXPEDIENTE**: la superficie registral y la clase de suelo
@@ -462,9 +464,36 @@ function puedeDiagnosticar(parcelaActual) {
 function claveDeExpediente(parcelaActual) {
   if (parcelaActual === null || parcelaActual === undefined) return null
   const refcat = typeof parcelaActual.refcat === 'string' ? parcelaActual.refcat.trim() : ''
-  if (refcat !== '') return `refcat:${refcat}`
+  if (refcat !== '') return `refcat:${refcat.toUpperCase()}`
   const idLocal = typeof parcelaActual.idLocal === 'string' ? parcelaActual.idLocal : ''
   return idLocal === '' ? null : `idLocal:${idLocal}`
+}
+
+/**
+ * De qué expediente son las vecinas que trae un resultado del Catastro, **según
+ * el propio resultado**, o `null` si no lo declara.
+ *
+ * `parcelaYColindantes` devuelve `{propia, colindantes}` y la `propia` es la
+ * parcela que se pidió, separada por referencia catastral normalizada (override
+ * O15). Ésa es la única identidad que el resultado lleva encima, y es lo que
+ * permite descartar unas vecinas que se pidieron para otra finca.
+ *
+ * ⚠️ **Puede venir `null`, y eso NO es un fallo**: hay parcelas para las que
+ * `GetNeighbourParcel` se omite a sí misma (medido el 2026-08-15 en
+ * `8081401TF9288S`). Cuando pasa, el resultado no declara identidad y el cotejo
+ * cae en la que apuntó {@link cablearDiagnostico}`#pedirVecinas` al pedirlas. Y
+ * si tampoco la hay —una publicación de F05 sobre un servicio que se omite— se
+ * adopta, que es lo que se venía haciendo: descartar por no poder comprobar
+ * dejaría el diagnóstico sin invasión para siempre y sin decir por qué.
+ *
+ * @param {object|null} resultado
+ * @returns {string|null}
+ */
+function claveDelResultado(resultado) {
+  const propia = resultado?.datos?.propia
+  if (propia === null || propia === undefined || typeof propia !== 'object') return null
+  const refcat = typeof propia.refcat === 'string' ? propia.refcat.trim() : ''
+  return refcat === '' ? null : `refcat:${refcat.toUpperCase()}`
 }
 
 /**
@@ -693,6 +722,17 @@ export function cablearDiagnostico({
 
   /** Una consulta de vecinas en vuelo, para no encabalgar dos aperturas. */
   let pidiendo = false
+
+  /**
+   * Para qué expediente se pidieron las vecinas que están en vuelo, o `null` si
+   * este módulo no ha pedido ninguna. Es la segunda mitad del cotejo de
+   * {@link adoptar}: sirve para los resultados que no declaran identidad (ver
+   * {@link claveDelResultado}), que son justo los de la consulta que este módulo
+   * acaba de disparar.
+   *
+   * @type {string|null}
+   */
+  let clavePedida = null
 
   /**
    * Una petición de parcelario de fondo en vuelo. **Una pulsación, una petición**: el
@@ -1148,11 +1188,36 @@ export function cablearDiagnostico({
    * se llega a él tanto desde la petición propia como desde el botón «Traer
    * colindantes» de F05: quien ya las trajo no tiene que traerlas otra vez.
    *
+   * ── ⛔ Y SE COTEJA DE QUÉ PARCELA SON (auditoría 2026-08-16) ────────────────
+   * Este canal es público y ASÍNCRONO: lo que llega puede haberse pedido para la
+   * parcela de antes. El caso medido: cajón abierto sobre A con `colindantes(A)`
+   * en vuelo, entra B por una vía que **no es F05** (un fichero, un `.json`
+   * restaurado) —así que nadie invalida aquella consulta—, llega la respuesta de A
+   * y se adopta como vigente. A partir de ahí `vecinas` ya no es `null`, o sea que
+   * {@link pedirVecinas} **no vuelve a consultar nunca**, y la invasión de B se
+   * mide contra las vecinas de A, con las referencias catastrales de A. De ahí
+   * pasa al PDF firmable por `ultimoDiagnostico`.
+   *
+   * Lo que se descarta no se anuncia al usuario, y es la misma decisión que toma
+   * `cableado-catastro.js` con una consulta superada: el cajón sigue diciendo «no
+   * se han consultado», que es **exactamente** lo que ha pasado con las de esta
+   * parcela, y la siguiente apertura las pedirá. El rastro técnico va a la consola.
+   *
    * @param {import('../services/catastro.js').ResultadoCatastro} resultado
    */
   function adoptar(resultado) {
     if (destruido) return
     if (!resultado || !resultado.ok || !resultado.datos) return
+    // La que declara el resultado manda; la que apuntó `pedirVecinas` es el
+    // respaldo para los servicios que se omiten a sí mismos. Ver `claveDelResultado`.
+    const declarada = claveDelResultado(resultado) ?? clavePedida
+    if (declarada !== null && declarada !== claveDeExpediente(estado.get())) {
+      console.warn(
+        'cablearDiagnostico: se descartan unas colindantes que no son de la parcela que hay en ' +
+          `pantalla (llegaron las de ${declarada}).`,
+      )
+      return
+    }
     vecinas = aVecinas(resultado.datos.colindantes)
     recalcular()
   }
@@ -1173,6 +1238,9 @@ export function cablearDiagnostico({
       return
     }
     pidiendo = true
+    // PARA QUÉ parcela se piden. `adoptar` lo necesita para poder descartar lo que
+    // llegue tarde cuando el resultado no declara identidad; ver su cabecera.
+    clavePedida = claveDeExpediente(estado.get())
     try {
       // La adopción y el repintado llegan por `alColindantes` (el cableado de F05
       // publica ANTES de devolver), así que aquí solo queda contar el desenlace. Un
@@ -1197,6 +1265,7 @@ export function cablearDiagnostico({
       console.error('cablearDiagnostico: fallo al pedir las colindantes', causa)
     } finally {
       pidiendo = false
+      clavePedida = null
     }
   }
 

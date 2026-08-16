@@ -728,6 +728,133 @@ describe('cableado-diagnostico · las colindantes', () => {
   })
 })
 
+// ── 4-bis · Las vecinas RANCIAS (auditoría 2026-08-16) ───────────────────────
+//
+// `adoptar` aceptaba cualquier cosa que publicara `alColindantes`, sin mirar de
+// qué parcela era. Basta con que entre otra parcela por una vía que no sea F05
+// —un fichero, un `.json` restaurado— mientras `colindantes()` viaja: la respuesta
+// de la ANTERIOR llega, se adopta como vigente, y `pedirVecinas` ya nunca vuelve a
+// consultar porque `vecinas` deja de ser `null`. La invasión de la parcela que hay
+// en pantalla se mide entonces contra las vecinas de otra —con SUS referencias
+// catastrales— y eso llega hasta el PDF firmable por `ultimoDiagnostico`.
+
+describe('cableado-diagnostico · las vecinas son de UNA parcela, y se coteja', () => {
+  /**
+   * Doble de F05 con la contestación EN LA MANO: publica y resuelve cuando el test
+   * lo diga, que es lo único que permite meter otra parcela por en medio.
+   */
+  function crearCatastroConGrifo() {
+    const suscriptores = new Set()
+    let contestar = null
+    let llamadas = 0
+    return {
+      get llamadas() {
+        return llamadas
+      },
+      colindantes() {
+        llamadas += 1
+        return new Promise((resolver) => {
+          contestar = (resultado) => {
+            // El real publica ANTES de devolver, y por ahí es por donde entra la
+            // adopción. Se reproduce igual.
+            if (resultado.ok) for (const fn of suscriptores) fn(resultado)
+            resolver(resultado)
+          }
+        })
+      },
+      alColindantes(fn) {
+        suscriptores.add(fn)
+        return () => suscriptores.delete(fn)
+      },
+      /** Contesta la consulta en vuelo. */
+      contestar: (resultado) => contestar(resultado),
+      /** Publica sin que nadie haya pedido nada: el botón «Traer colindantes». */
+      publicar(resultado) {
+        for (const fn of suscriptores) fn(resultado)
+      },
+    }
+  }
+
+  const COLINDANTES_DE_LA_FIXTURE = VECINDAD_FIXTURE.filter((p) => p.refcat !== REFCAT)
+
+  it('⛔ la respuesta que llega DESPUÉS de que entre otra parcela no se adopta', async () => {
+    const catastro = crearCatastroConGrifo()
+    const { boton, cajon, estado } = montar({ parcelaInicial: parcelaDelCatastro(), catastro })
+
+    boton.click() // abre el diagnóstico de A y pide SUS vecinas
+    await cederTurno()
+    expect(catastro.llamadas).toBe(1)
+
+    // Entra OTRA parcela por una vía que no es F05 (un fichero, una restauración):
+    // nadie incrementa la secuencia de F05 y la consulta de A sigue en vuelo.
+    estado.set(otraParcela())
+    await cederTurno()
+
+    // …y ahora contesta la del Catastro. Sin cotejo, estas cuatro vecinas —las de
+    // A— se adoptan como si fueran las de B.
+    catastro.contestar({
+      ok: true,
+      // El servicio se incluye a sí mismo (override O15): aquí es lo que DECLARA
+      // de qué parcela son estas colindantes.
+      datos: { propia: PARCELA_FIXTURE, colindantes: COLINDANTES_DE_LA_FIXTURE },
+      motivo: null,
+      mensaje: null,
+      procedencia: {},
+    })
+    await cederTurno()
+
+    // La prueba de que no se adoptaron: al abrir el diagnóstico de B hay que volver
+    // a la red. Si se hubieran adoptado, `vecinas` no sería `null` y `pedirVecinas`
+    // saldría por arriba — con la invasión de B medida contra las vecinas de A.
+    cajon.cerrar()
+    boton.click()
+    await cederTurno()
+    expect(catastro.llamadas).toBe(2)
+  })
+
+  it('⛔ y tampoco se adopta lo que PUBLICA F05 de una parcela que ya no está', async () => {
+    // Aquí este módulo no ha pedido nada: la publicación viene del botón «Traer
+    // colindantes», que es el otro camino de `adoptar`. Lo que la descarta es la
+    // identidad que el propio resultado declara.
+    const catastro = crearCatastroConGrifo()
+    const { boton, estado } = montar({ parcelaInicial: parcelaDelCatastro(), catastro })
+
+    estado.set(otraParcela())
+    await cederTurno()
+    catastro.publicar({
+      ok: true,
+      datos: { propia: PARCELA_FIXTURE, colindantes: COLINDANTES_DE_LA_FIXTURE },
+      motivo: null,
+      mensaje: null,
+      procedencia: {},
+    })
+
+    boton.click()
+    await cederTurno()
+    expect(catastro.llamadas).toBe(1)
+  })
+
+  it('⭐ y las que SÍ son de la parcela de ahora se adoptan, como siempre', async () => {
+    // Anti-vacuidad: sin esto, un cotejo que descartara TODO pasaría las dos
+    // pruebas de arriba y dejaría el diagnóstico sin invasión para siempre.
+    const catastro = crearCatastroConGrifo()
+    const { boton, raizCajon } = montar({ parcelaInicial: parcelaDelCatastro(), catastro })
+
+    boton.click()
+    await cederTurno()
+    catastro.contestar({
+      ok: true,
+      datos: { propia: PARCELA_FIXTURE, colindantes: COLINDANTES_DE_LA_FIXTURE },
+      motivo: null,
+      mensaje: null,
+      procedencia: {},
+    })
+    await cederTurno()
+
+    expect(textoDe(raizCajon, SELECTOR_CAJON.INVASION)).not.toContain('no se ha consultado')
+  })
+})
+
 // ── 5 · Override O15, por el camino REAL ─────────────────────────────────────
 
 describe('cableado-diagnostico · la parcela propia NO se cuela entre las colindantes (O15)', () => {

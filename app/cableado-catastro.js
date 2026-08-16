@@ -111,6 +111,35 @@
 // misma decisión que `wms-catastro.js`: avisar de una consulta que el propio
 // usuario ha sustituido es ruido sobre algo que él ya sabe.
 //
+// ── ⛔ Y HAY UNA TERCERA, PORQUE LAS DOS DE ARRIBA NO LLEGAN (2026-08-16) ────
+// **Auditoría, hallazgo H1.** El token lo mueven `operar()` y `destruir()` de
+// ESTE cableado y nadie más: protege de otra consulta del mismo cableado, no de
+// los otros caminos que escriben el MISMO store. Y hay tres, todos alcanzables
+// con un gesto de arrastrar y soltar: `app/cableado-comprobacion.js` (un GML o un
+// DXF), `app/cableado-medicion.js` (una medición) y `app/cableado-expediente.js`
+// (un `.json` de proyecto). Ninguno pasa por el token.
+//
+// El caso real: se pulsa «Traer del Catastro», la consulta se va de viaje —con
+// sus reintentos, segundos— y mientras tanto el usuario suelta su levantamiento.
+// La respuesta llega, el token dice que sigue vigente (nadie lo ha movido) y
+// **pisa el documento recién cargado**. Con el agravante de siempre: `aplicar`
+// dispara `alCargarParcela`, que **reinicia el historial de edición**, así que el
+// levantamiento pisado tampoco vuelve con Ctrl+Z. Es el defecto de las dos
+// puertas otra vez, entrando por la puerta de al lado.
+//
+//   3. **Cotejo de IDENTIDAD en el punto de escritura** — al lanzar la consulta se
+//      fotografía QUÉ EXPEDIENTE hay abierto ({@link claveDeExpediente}) y, justo
+//      antes del `estado.set`, se comprueba que sigue siendo el mismo. Si no, no
+//      se escribe nada y **se dice** ({@link MENSAJE_OTRO_DOCUMENTO}), porque aquí
+//      —al revés que en la consulta superada— el usuario NO sabe que su gesto ha
+//      cancelado una carga: los dos gestos son suyos, pero él no sabe que el
+//      segundo llegó en mitad del primero.
+//
+// ⚠️ Se cotejan la referencia catastral y el `idLocal`, **no el POJO**: `edit/`
+// reconstruye el objeto en cada arrastre sin reetiquetar el expediente, así que
+// comparar objetos cancelaría la carga por mover un vértice mientras se espera —
+// que es un uso normal y no una carrera. Hay un `it` que lo mide.
+//
 // ⚠️ Que los botones se apaguen mientras hay algo en vuelo **no es una de las dos
 // defensas**: `disabled` es estado de PRESENTACIÓN, lo escribe este mismo módulo y
 // se puede quitar desde el inspector, desde un atajo de teclado que mañana dispare
@@ -349,6 +378,28 @@ export const MENSAJE_SOLAPE_NO_MEDIDO =
   'Eso no quiere decir que no encaje: quiere decir que no se ha podido medir. Míralo en el mapa ' +
   'antes de diagnosticar el encaje.'
 
+/**
+ * ⭐ **La respuesta del Catastro ha llegado tarde y, mientras viajaba, ha entrado
+ * OTRO documento en el expediente** (auditoría 2026-08-16 · H1). No se ha escrito
+ * nada, y eso es lo primero que se dice.
+ *
+ * ── POR QUÉ ESTO SÍ SE ANUNCIA Y LA CONSULTA SUPERADA NO ──
+ * Una consulta superada la sustituye el usuario pulsando otra vez el mismo botón:
+ * sabe perfectamente que ha pedido otra cosa, y contárselo sería ruido sobre su
+ * propia decisión. Aquí los dos gestos son suyos igualmente, pero **el segundo no
+ * lo hizo para cancelar el primero**: soltó un fichero sin saber que había una
+ * consulta a medio camino. Callarlo dejaría en pantalla un botón que se pulsó, un
+ * parcelario que no aparece y ninguna explicación — que es la definición exacta
+ * de error silencioso.
+ *
+ * Dice además qué hacer, porque tiene arreglo de un clic: volver a pulsar.
+ */
+export const MENSAJE_OTRO_DOCUMENTO =
+  'No se ha cargado nada del Catastro: mientras el servicio contestaba ha entrado otro documento ' +
+  'en el expediente (un fichero soltado, un pegado o un proyecto abierto), y la respuesta habría ' +
+  'pisado justo lo que acabas de cargar. Lo que hay en pantalla es lo tuyo y está intacto. Si ' +
+  'querías el parcelario, vuelve a pulsar «Traer del Catastro».'
+
 /** Cola del renglón cuando el mensaje ÍNTEGRO acaba de entrar en el panel. */
 const COLA_DETALLE = 'El detalle está en el panel de avisos.'
 
@@ -500,6 +551,37 @@ function referenciaDe(parcelaActual) {
   return parcelaActual === null || parcelaActual === undefined
     ? null
     : textoNoVacio(parcelaActual.refcat)
+}
+
+/**
+ * ⭐ **Qué EXPEDIENTE hay abierto**, a efectos de «¿ha entrado otro documento
+ * mientras el Catastro contestaba?» (auditoría 2026-08-16 · H1). La referencia
+ * catastral primero y el `idLocal` de respaldo.
+ *
+ * ⛔ **La identidad del OBJETO no vale, y es la mitad que importa**: cada
+ * operación de edición produce un POJO nuevo (`edit/` reconstruye, no muta), así
+ * que comparar objetos diría «ha entrado otro documento» por mover un vértice
+ * mientras se espera al servicio — y cancelaría la carga que el usuario acaba de
+ * pedir. `refcat` e `idLocal`, en cambio, sobreviven a las ediciones y **solo
+ * cambian cuando entra otro documento**, que es exactamente la propiedad que hace
+ * falta. Hay un `it` por cada mitad.
+ *
+ * ── Es una COPIA de `claveDeExpediente` de `app/cableado-diagnostico.js` ──
+ * Con el mismo criterio y el mismo formato, palabra por palabra. Allí es privada
+ * —«es una regla INTERNA de esta pantalla»— y sacarla a un módulo común para dos
+ * llamantes crearía una dependencia entre dos cableados que hoy no se conocen. El
+ * proyecto ya tolera esta duplicación: `app/cableado-informe.js` lleva la suya, y
+ * también la declara en vez de disimularla.
+ *
+ * @param {object|null} parcelaActual
+ * @returns {string|null}  `null` solo cuando no hay documento ninguno.
+ */
+function claveDeExpediente(parcelaActual) {
+  if (parcelaActual === null || parcelaActual === undefined) return null
+  const refcat = typeof parcelaActual.refcat === 'string' ? parcelaActual.refcat.trim() : ''
+  if (refcat !== '') return `refcat:${refcat}`
+  const idLocal = typeof parcelaActual.idLocal === 'string' ? parcelaActual.idLocal : ''
+  return idLocal === '' ? null : `idLocal:${idLocal}`
 }
 
 /**
@@ -1405,11 +1487,32 @@ export function cablearCatastro({
    * dijo el Catastro. El visor **ya la pinta** en su pane `parcelaOficial` sin tocar
    * `viewer/`.
    *
+   * ── ⛔ LA TERCERA DEFENSA VIVE AQUÍ, Y AQUÍ ES EL ÚNICO SITIO ──
+   * Es el PUNTO DE ESCRITURA, o sea el último instante en el que todavía se puede
+   * no pisar nada. Comprobarlo antes —al recibir la respuesta, o dentro de
+   * `operar`— dejaría una ventana entre la comprobación y el `set`; comprobarlo
+   * después no serviría de nada. Ver la tercera defensa en la cabecera.
+   *
    * @param {ResultadoCatastro} resultado
    * @param {string} pedida  Lo que el usuario tenía escrito en el campo.
    * @param {boolean} sustituir  `false` = solo fondo; ver el compositor.
+   * @param {string|null} alLanzar  Qué expediente había abierto cuando se lanzó
+   *   la consulta ({@link claveDeExpediente}). Si ya no es el mismo, **no se
+   *   escribe**: por el camino ha entrado otro documento.
    */
-  function aplicar(resultado, pedida, sustituir) {
+  function aplicar(resultado, pedida, sustituir, alLanzar) {
+    const anterior = estado.get()
+
+    // ⭐ H1 · Lo PRIMERO, antes incluso de mirar si el dato sirve: si el
+    // expediente ya no es el que se fotografió al lanzar, este resultado no tiene
+    // a quién aplicarse. Quejarse aquí de la geometría que ha traído el Catastro
+    // sería hablar de un dato que ya no le importa a nadie.
+    if (claveDeExpediente(anterior) !== alLanzar) {
+      panel.avisar(MENSAJE_OTRO_DOCUMENTO, { nivel: NIVEL.AVISO })
+      decir(`No se ha cargado la parcela: ha entrado otro documento. ${COLA_DETALLE}`, true)
+      return
+    }
+
     const p = resultado.datos
     const estorbo = porQueNoSirve(p)
     if (estorbo !== null) {
@@ -1419,7 +1522,6 @@ export function cablearCatastro({
     }
 
     const refcat = normalizarRefcat(p.refcat) ?? normalizarRefcat(pedida)
-    const anterior = estado.get()
     // Lo que REALMENTE va a pasar, no lo que se pidió: pedir la puerta 2 sin nada que
     // conservar acaba en documento nuevo, y desde aquí abajo mandan los hechos — el
     // renglón, la procedencia y los ganchos tienen que contar todos lo mismo.
@@ -1534,6 +1636,11 @@ export function cablearCatastro({
       console.error('[catastro] cargar({refcat}) con una referencia inservible:', refcat)
       return null
     }
+    // ⭐ H1 · La FOTO del expediente, tomada antes del primer `await`: a partir de
+    // aquí el store puede cambiarlo cualquiera de los otros cableados y este no se
+    // entera. Ver la tercera defensa en la cabecera.
+    const alLanzar = claveDeExpediente(estado.get())
+
     try {
       const { resultado, vigente } = await operar((senal) =>
         cliente.parcelaPorRefcat(pedida, { srs, senal }),
@@ -1545,7 +1652,7 @@ export function cablearCatastro({
         contarFallo(resultado)
         return resultado
       }
-      aplicar(resultado, pedida, sustituir)
+      aplicar(resultado, pedida, sustituir, alLanzar)
       return resultado
     } catch (causa) {
       reventar(causa)

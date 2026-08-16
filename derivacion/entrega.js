@@ -44,6 +44,17 @@
 // dejarlo salir «porque el usuario lo ha pedido» sería el error silencioso más caro
 // de la aplicación.
 //
+// ── ⛔ UN COLINDANTE SIN REFERENCIA CATASTRAL NO ENTRA, Y SE DICE ───────────
+// `Vecina.refcat` es `string|null` por contrato y `app/colindantes.js` produce el
+// `null` A PROPÓSITO cuando el WFS no trae la referencia. Hasta el 2026-08-16 ese
+// estado legítimo hacía LANZAR a esta función —`identidadDeParcela` recibía el
+// mismo campo como referencia y como respaldo— y la pantalla enseñaba el contrato
+// interno («identidadDeParcela: hace falta refcat o idLocal…»). Ahora ese vecino se
+// queda fuera del fichero y de la diana del cierre, y la entrega se bloquea con una
+// detección `PIEZA_INVALIDA` que dice la superficie, el porqué y qué hacer. El
+// razonamiento completo —y por qué la identidad NO se puede derivar de otra cosa—
+// está donde se implementa, en el paso 1.
+//
 // ── EL NOMBRE QUE EL USUARIO LE PONE A UNA PIEZA **NO** VA AL `.gml` ────────
 // ⚠️ Otra desviación del plan, y ésta importa. El plan mandaba que «el nombre
 // escrito llegue al `localId` del fichero». No puede: el `localId` de una cesión
@@ -187,6 +198,63 @@ export function prepararEntrega(entrada) {
     })
   detecciones.push(...cesion.detecciones)
 
+  // ── ⛔ EL COLINDANTE QUE NO SE PUEDE NOMBRAR (auditoría del 2026-08-16) ────
+  //
+  // `Vecina.refcat` es `string|null` por CONTRATO de la capa, y el `null` no es un
+  // descuido: `app/colindantes.js` lo produce a propósito cuando el WFS no devuelve
+  // la referencia («no se inventa nada»). O sea que es un estado legítimo y
+  // alcanzable — y hasta hoy **tumbaba esta función**: la identidad del primer trozo
+  // se componía con `identidadDeParcela({refcat: v.refcat, idLocal: v.refcat})`, los
+  // dos argumentos del MISMO campo, así que sin referencia no había respaldo posible
+  // y `derivacion/identidad.js` lanzaba. La pantalla enseñaba el `TypeError` tal
+  // cual —«identidadDeParcela: hace falta refcat o idLocal…»—, que es un contrato
+  // interno y no le dice al técnico ni qué pasa ni qué hacer, y ese expediente no
+  // podía salir NUNCA.
+  //
+  // ⛔ **La identidad no se puede derivar de otra cosa, y se buscó.** El `<localId>`
+  // del `inspireId` no admite vacío (el XSD lo rechaza, y además es la base de los
+  // cuatro `gml:id`); el `label` del parcelario es el número de orden de la parcela
+  // dentro del polígono —se repite y no identifica una finca—; y el `idLocal` es del
+  // modelo de ESTA aplicación, así que estamparlo en la finca de otro titular sería
+  // decir «se llama así» de un identificador recién inventado aquí. Nombrar mal la
+  // finca de un tercero en un documento que se firma es peor que no entregarlo.
+  //
+  // Así que el vecino **se queda fuera y se DICE**: sus trozos no entran como
+  // miembros, su contorno oficial no entra en la diana del cierre, y la entrega se
+  // bloquea con una detección que se lee. No es un bloqueo nuevo escondido: es
+  // exactamente lo que ya impedía entregar, contado con palabras del usuario.
+  //
+  // ⚠️ **Reutiliza `PIEZA_INVALIDA` en vez de estrenar `VECINO_SIN_REFERENCIA`.** Su
+  // definición —«una pieza incluida NO puede ir al fichero»— es literalmente lo que
+  // pasa, y la frase que `app/cableado-derivacion.js` ya le tiene puesta a ese tipo
+  // («una de las parcelas del expediente no se puede escribir en el fichero») es la
+  // correcta aquí. Un tipo propio habría que darlo de alta en `derivacion/_comun.js`
+  // y darle su frase en aquel mapa, dos ficheros que este cambio no toca.
+  const vecinosDelRecorte = recorte === null ? [] : recorte.vecinos
+  const sinReferencia = vecinosDelRecorte.filter((v) => textoONulo(v.refcat) === null)
+  const nombrables = vecinosDelRecorte.filter((v) => textoONulo(v.refcat) !== null)
+
+  if (sinReferencia.length > 0) {
+    const perdida = sinReferencia.reduce((s, v) => s + (Number.isFinite(v.pierde) ? v.pierde : 0), 0)
+    const una = sinReferencia.length === 1
+    detecciones.push(
+      crearDeteccionDerivacion(
+        TIPO_DERIVACION.PIEZA_INVALIDA,
+        `La geometría medida le quita ${numero(perdida, 4)} m² a ` +
+          `${una ? 'una parcela colindante' : `${sinReferencia.length} parcelas colindantes`} de ` +
+          `${una ? 'la que' : 'las que'} el Catastro no ha devuelto la referencia catastral. Sin ` +
+          `ella no se ${una ? 'la' : 'las'} puede nombrar en el fichero —el «localId» del ` +
+          'inspireId no admite quedarse vacío y esta aplicación no se inventa el identificador de ' +
+          `la finca de otro titular—, así que no ${una ? 'entra' : 'entran'} en el expediente y el ` +
+          'expediente no sale: presentarlo así dejaría un solape con parcela inscrita y el informe ' +
+          'de validación volvería negativo. Vuelve a traer las colindantes del Catastro; si la ' +
+          'referencia sigue sin llegar, esa finca no se puede modificar desde aquí.',
+        SEVERIDAD.ERROR,
+        { sinReferencia: sinReferencia.length, area: perdida },
+      ),
+    )
+  }
+
   // ── ⛔ LA PUERTA `CRECE_FUERA`, Y CUÁNDO DEJA DE SER UNA PUERTA ───────────
   //
   // `derivacion/cesion.js` marca `CRECE_FUERA` como ERROR, y hace bien: mirando SOLO
@@ -205,7 +273,13 @@ export function prepararEntrega(entrada) {
   // traídas y CERO afectadas, el exceso entero es `sobreNadie` y sigue estando
   // explicado. Sin traerlas no se sabe nada y la puerta se queda cerrada — que es la
   // diferencia entre «no le quito a nadie» y «no he mirado».
-  const recorteResuelve = recorte !== null && recorte.consultado === true
+  //
+  // ⚠️ **Y un vecino SIN REFERENCIA la vuelve a cerrar**, porque rompe la premisa:
+  // «atribuido a un vecino que entra recortado unas líneas más abajo» deja de ser
+  // cierto en cuanto uno de ellos no puede entrar. Ese exceso vuelve a ser
+  // superficie que se le quita a alguien que el fichero no declara.
+  const recorteResuelve =
+    recorte !== null && recorte.consultado === true && sinReferencia.length === 0
 
   /**
    * ⛔ **Qué cuenta como BLOQUEO, en UN solo sitio.**
@@ -356,24 +430,26 @@ export function prepararEntrega(entrada) {
   // ⚠️ El sufijo NO colisiona con el de las cesiones propias aunque los dos empiecen
   // en 1: los PADRES son distintos (`…144.1` es una cesión mía y `…145.1` un trozo
   // del vecino), y el `gml:id` se compone sobre el localId entero.
-  const deVecinos =
-    recorte === null
-      ? []
-      : recorte.vecinos.flatMap((v) =>
-          v.trozos.map((t, i) => ({
-            orden: 0,
-            esCesion: false,
-            esVecino: true,
-            // ⛔ Sin nombre de usuario: la finca de otro titular no se bautiza. El
-            // campo de nombre de la lista es para las piezas del sobrante propio.
-            nombre: null,
-            identidad:
-              i === 0
-                ? identidadDeParcela({ refcat: v.refcat, idLocal: v.refcat })
-                : identidadDeCesion({ refcatPadre: v.refcat, idLocalPadre: v.refcat, orden: i }),
-            recintos: t.recintos,
-          })),
-        )
+  //
+  // ⛔ **Solo los NOMBRABLES.** Los que no traen referencia catastral ya han dicho lo
+  // suyo con severidad ERROR unas líneas más arriba y no llegan aquí: componerles una
+  // identidad exigiría inventarla, que es justo lo que aquella detección explica que
+  // no se hace.
+  const deVecinos = nombrables.flatMap((v) =>
+    v.trozos.map((t, i) => ({
+      orden: 0,
+      esCesion: false,
+      esVecino: true,
+      // ⛔ Sin nombre de usuario: la finca de otro titular no se bautiza. El campo
+      // de nombre de la lista es para las piezas del sobrante propio.
+      nombre: null,
+      identidad:
+        i === 0
+          ? identidadDeParcela({ refcat: v.refcat, idLocal: v.refcat })
+          : identidadDeCesion({ refcatPadre: v.refcat, idLocalPadre: v.refcat, orden: i }),
+      recintos: t.recintos,
+    })),
+  )
 
   const miembros = [
     {
@@ -431,13 +507,17 @@ export function prepararEntrega(entrada) {
           // que este expediente modifica**. Sin esta línea, un vecino recortado
           // saldría como 1.670 m² de superficie que sobra y la suma no cuadraría
           // jamás: el expediente correcto se bloquearía a sí mismo.
-          oficialesExtra:
-            recorte === null
-              ? []
-              : recorte.vecinos.map((v) => ({
-                  etiqueta: v.refcat ?? 'colindante sin referencia',
-                  recintos: v.recintosOficiales,
-                })),
+          //
+          // ⚠️ Los NOMBRABLES, los mismos que están en `miembros`. Meter aquí el
+          // contorno de un colindante que no ha podido entrar en el fichero pondría
+          // en la diana una superficie que ningún miembro cubre, y el cierre saldría
+          // culpando a la geometría de un hueco que en realidad es una identidad que
+          // falta. (Hoy no se llega aquí con ninguno —su detección bloquea antes—,
+          // pero las dos listas tienen que decir lo mismo o divergen.)
+          oficialesExtra: nombrables.map((v) => ({
+            etiqueta: v.refcat,
+            recintos: v.recintosOficiales,
+          })),
           // Y lo que se reclama FUERA de todo contorno oficial —el vial mal
           // georreferenciado— se declara aquí en vez de salir como discrepancia.
           // Está medido por `derivacion/vecino.js`, no estimado.
