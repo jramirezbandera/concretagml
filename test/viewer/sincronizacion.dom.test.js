@@ -1761,6 +1761,81 @@ describe('viewer/sincronizacion · la columna de borrado', () => {
     ctx.limpiar()
   })
 
+  // ── ⛔ LA SELECCIÓN DESPUÉS DE BORRAR (auditoría V6, 2026-08-16) ────────────
+  // El comentario del propio módulo afirmaba que el orden de registro de los dos
+  // oyentes de `click` evita que «el borrado deje de paso seleccionada la fila que
+  // acaba de desaparecer», y era MENTIRA: `alSeñalarFila` corre después de la
+  // reconstrucción, leyendo el `dataset` VIEJO de una fila ya desprendida, y
+  // `fijarSeleccion` solo comprueba que el par `(recinto, indice)` exista — y
+  // existe, porque es OTRO vértice: el que ha heredado el índice al correrse.
+  // Reproducido: borrar `(0,1)` de un exterior de 4 dejaba seleccionado el antiguo
+  // `v2`, con su `aria-current` en la fila y su marcador grande en el mapa.
+  // Y al borrar la ÚLTIMA fila no pasaba (no hay quien herede el índice), así que
+  // además era incoherente.
+
+  /** Un `alBorrar` que BORRA de verdad, como hace `viewer/edicion.js#eliminar`. */
+  const borradoReal = (ctx) => ({ recinto, indice }) => {
+    const parcela = structuredClone(ctx.store.get())
+    parcela.recintos[recinto].vertices.splice(indice, 1)
+    ctx.store.set(parcela)
+  }
+
+  it('⛔ borrar una fila NO deja seleccionado el vértice que HEREDA su índice', () => {
+    const ctx = montar({ alBorrar: (ref) => borradoReal(ctx)(ref) })
+    const v2Antes = ctx.store.get().recintos[0].vertices[2]
+
+    clicEnBoton(botonesBorrar(ctx)[1]) // la × de (0,1)
+
+    // El borrado ocurre…
+    expect(ctx.store.get().recintos[0].vertices[1]).toEqual(v2Antes)
+    // …y NO deja seleccionado a nadie. El vértice que ahora ocupa el índice 1 es
+    // otro trozo de terreno: seleccionarlo «porque el par existe» es señalar algo
+    // que el usuario no ha tocado.
+    expect(ctx.sinc.verticeSeleccionado()).toBeNull()
+    expect(ctx.tablaEl.querySelectorAll('[aria-current]')).toHaveLength(0)
+    ctx.limpiar()
+  })
+
+  it('y tampoco si la fila estaba seleccionada ANTES de pulsar su ×', () => {
+    // El otro camino al mismo sitio: la selección ya apuntaba al vértice borrado y
+    // `sincronizarSeleccion` la daba por buena porque el par seguía existiendo.
+    const ctx = montar({ alBorrar: (ref) => borradoReal(ctx)(ref) })
+
+    ctx.sinc.seleccionarVertice({ recinto: 0, indice: 1 })
+    expect(ctx.sinc.verticeSeleccionado()).toEqual({ recinto: 0, indice: 1 })
+
+    clicEnBoton(botonesBorrar(ctx)[1])
+
+    expect(ctx.sinc.verticeSeleccionado()).toBeNull()
+    ctx.limpiar()
+  })
+
+  it('borrar la ÚLTIMA fila se comporta IGUAL (era el caso que sí funcionaba)', () => {
+    // La incoherencia era el otro síntoma: sin nadie que heredara el índice, la
+    // selección salía limpia. Ahora los dos casos son el mismo caso.
+    const ctx = montar({ alBorrar: (ref) => borradoReal(ctx)(ref) })
+    const n = ctx.store.get().recintos[0].vertices.length
+
+    clicEnBoton(botonesBorrar(ctx).filter((b) => b.closest('tr').dataset.recinto === '0').at(-1))
+
+    expect(ctx.store.get().recintos[0].vertices).toHaveLength(n - 1)
+    expect(ctx.sinc.verticeSeleccionado()).toBeNull()
+    ctx.limpiar()
+  })
+
+  it('un clic en la fila (sin ×) SIGUE seleccionando: no se ha apagado la selección por tabla', () => {
+    // El control negativo del arreglo: si esto se pusiera rojo, el remedio habría
+    // matado la selección por tabla, que es una feature viva.
+    const ctx = montar({ alBorrar: vi.fn() })
+    const fila = ctx.tablaEl.querySelector('tr[data-recinto="0"][data-indice="1"]')
+
+    fila.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }))
+
+    expect(ctx.sinc.verticeSeleccionado()).toEqual({ recinto: 0, indice: 1 })
+    expect(fila.getAttribute('aria-current')).toBe('true')
+    ctx.limpiar()
+  })
+
   it('`destruir()` retira también este oyente', () => {
     const alBorrar = vi.fn()
     const ctx = montar({ alBorrar })

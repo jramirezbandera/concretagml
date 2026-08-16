@@ -806,3 +806,107 @@ describe('crearCapaWMSCatastro · fundido de la imagen (Fase 5)', () => {
     expect(opacidadVisible(capa)).toBeCloseTo(1, 5)
   })
 })
+
+// ── ⛔ EL LIENZO POR ENCIMA DEL TECHO DEL SERVICIO (auditoría V3, 2026-08-16) ──
+// `_solicitar` promete en su JSDoc «nunca lanza (corre dentro de handlers de
+// eventos de Leaflet)» y la promesa era falsa: le pasaba a `getMapUrl` el tamaño
+// del lienzo TAL CUAL, y `validarTamano` lanza `RangeError` por encima de
+// MAX_PIXELES_WMS. En un lienzo de más de 4000 px CSS —un monitor 8K, un mapa
+// embebido muy ancho— cada `moveend` reventaba DENTRO del `fire()` de Leaflet: la
+// capa dejaba de pedir para siempre y el canal `alAvisar` no se enteraba, que es
+// exactamente el error silencioso que la regla de oro 1 prohíbe.
+describe('crearCapaWMSCatastro · un lienzo más grande que el techo del WMS', () => {
+  let arnes
+  let espia
+  let avisos
+
+  const alAvisar = (mensaje, detalle) => avisos.push({ mensaje, detalle })
+
+  beforeEach(() => {
+    // 5000 × 3000: por encima de los 4000 px por eje medidos el 2026-07-26. No es
+    // un tamaño de laboratorio — un 8K son 7680 px de ancho.
+    arnes = montarMapa({ ancho: 5000, alto: 3000 })
+    espia = espiarPeticiones()
+    avisos = []
+  })
+
+  afterEach(() => {
+    espia.restaurar()
+    arnes.destruir()
+  })
+
+  it('⛔ NI al añadirse NI en cada moveend lanza: la capa sigue viva y pidiendo', () => {
+    let capa = null
+    expect(() => {
+      capa = crearCapaWMSCatastro({ alAvisar }).addTo(arnes.mapa)
+    }).not.toThrow()
+    expect(espia.total).toBe(1)
+    dispararCarga(espia.ultima())
+
+    // El defecto se manifestaba en el `fire()` de Leaflet: un `moveend` que lanza
+    // deja al resto de oyentes sin correr y a la capa muda para siempre.
+    expect(() => mover(arnes.mapa)).not.toThrow()
+    expect(espia.total).toBe(2)
+    dispararCarga(espia.ultima())
+    expect(capa.estado().hayCartografia).toBe(true)
+  })
+
+  it('pide RECORTADO al techo y sin deformar: mismo encuadre, menos resolución', () => {
+    crearCapaWMSCatastro({ alAvisar }).addTo(arnes.mapa)
+    const url = espia.urls()[0]
+    const ancho = Number(parametro(url, 'WIDTH'))
+    const alto = Number(parametro(url, 'HEIGHT'))
+
+    expect(ancho).toBeLessThanOrEqual(MAX_PIXELES_WMS)
+    expect(alto).toBeLessThanOrEqual(MAX_PIXELES_WMS)
+    // Un eje llega al techo: se pide TODO lo que el servicio sabe dar.
+    expect(Math.max(ancho, alto)).toBe(MAX_PIXELES_WMS)
+    // Y la proporción se conserva (±1 px de redondeo). Recortar un solo eje
+    // deformaría la cartografía al estirarla sobre el encuadre, que es justo lo
+    // que haría deshonesto pedir recortado.
+    const lienzo = arnes.mapa.getSize()
+    expect(ancho / alto).toBeCloseTo(lienzo.x / lienzo.y, 2)
+    // El BBOX sigue siendo el del encuadre COMPLETO: la imagen se estira sobre él,
+    // así que encaja con la geometría; lo único que se pierde es nitidez.
+    expect(parametro(url, 'BBOX')).toBe(bboxEsperado(arnes.mapa))
+  })
+
+  it('lo DICE por el canal de avisos, y UNA sola vez (no en cada moveend)', () => {
+    crearCapaWMSCatastro({ alAvisar }).addTo(arnes.mapa)
+
+    expect(avisos).toHaveLength(1)
+    expect(avisos[0].mensaje).toBe(MENSAJES.LIENZO_SOBRE_EL_TECHO)
+    // AVISO y no ERROR: la cartografía de fondo no bloquea generar el GML, y aquí
+    // ni siquiera falta — se ve, solo que menos nítida.
+    expect(avisos[0].detalle.nivel).toBe(NIVEL.AVISO)
+    expect(avisos[0].detalle).toMatchObject({
+      lienzo: { ancho: 5000, alto: 3000 },
+      techo: MAX_PIXELES_WMS,
+    })
+
+    dispararCarga(espia.ultima())
+    for (let i = 0; i < 3; i++) {
+      mover(arnes.mapa)
+      dispararCarga(espia.ultima())
+    }
+    // Tres encuadres más, tres peticiones más… y NI UN aviso más: repetirlo en
+    // cada `moveend` sería ruido que enterraría los avisos que sí importan.
+    expect(espia.total).toBe(4)
+    expect(avisos).toHaveLength(1)
+  })
+
+  it('un lienzo que CABE no dice nada y pide el tamaño exacto del mapa', () => {
+    // El control negativo: sin él, un aviso disparado siempre pasaría esta suite.
+    const otro = montarMapa({ ancho: 800, alto: 600 })
+    const espiaOtro = espiarPeticiones()
+    try {
+      crearCapaWMSCatastro({ alAvisar }).addTo(otro.mapa)
+      expect(parametro(espiaOtro.urls()[0], 'WIDTH')).toBe('800')
+      expect(parametro(espiaOtro.urls()[0], 'HEIGHT')).toBe('600')
+      expect(avisos).toHaveLength(0)
+    } finally {
+      espiaOtro.restaurar()
+      otro.destruir()
+    }
+  })
+})

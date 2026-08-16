@@ -91,7 +91,7 @@ import { NIVEL, PANE, PANES, crearEstadoVista, vertUTMaLatLng } from '../../view
 import { BASE_POR_DEFECTO, ID_CAPA, maxZoomNativo, CAPAS } from '../../viewer/capas.js'
 import { ATRIBUCION } from '../../viewer/atribucion.js'
 import { CLASE_ACOTACION, textoDeLongitud } from '../../viewer/acotaciones.js'
-import { CLASE_BARRA } from '../../viewer/barra-edicion.js'
+import { CLASE_BARRA, crearBarraEdicion } from '../../viewer/barra-edicion.js'
 import { CLASE_COLINDANTE } from '../../viewer/colindantes.js'
 import { CLASE as CLASE_CAJON, SELECTOR as SELECTOR_CAJON } from '../../viewer/cajon-diagnostico.js'
 import {
@@ -124,6 +124,16 @@ import {
 vi.mock('../../viewer/sincronizacion.js', async (importarOriginal) => {
   const real = await importarOriginal()
   return { ...real, sincronizar: vi.fn(real.sincronizar) }
+})
+
+// Y `crearBarraEdicion`, por el mismo patrón y por el mismo motivo: su ÚNICO
+// aviso (la caída a `bottomleft` cuando el mapa no expone `_controlCorners`) no se
+// puede provocar sobre el mapa real que fabrica `crearVisor`, así que la única
+// forma de demostrar que el canal llega —o que faltaba— es leer con qué se
+// construyó la pieza. Envuelve al ORIGINAL: el visor se comporta igual.
+vi.mock('../../viewer/barra-edicion.js', async (importarOriginal) => {
+  const real = await importarOriginal()
+  return { ...real, crearBarraEdicion: vi.fn(real.crearBarraEdicion) }
 })
 
 // ── Utilidades del test ──────────────────────────────────────────────────────
@@ -692,6 +702,28 @@ describe('crearVisor · propaga alAvisar a las DOS mitades (regla de oro 1)', ()
 
     expect(aviso).toHaveBeenCalled()
     expect(String(aviso.mock.calls[0][0])).toContain('[visor]')
+  })
+
+  it('⛔ la BARRA DE EDICIÓN también recibe el canal (era la única pieza sin él)', () => {
+    // Auditoría V7: `crearBarraEdicion({ mapa, posicion })` omitía `alAvisar`
+    // mientras las otras ~12 piezas del ensamblaje recibían el `avisar` resuelto.
+    // Su único aviso —la caída a `bottomleft` cuando el mapa no expone
+    // `_controlCorners`— se iba al `console.warn` del suelo mínimo en vez de a la
+    // UI, o sea que la barra aparecía en otro sitio y NADIE lo contaba (regla de
+    // oro 1). El JSDoc de `crearBarraEdicion` declara que pasar el canal «es el
+    // patrón obligatorio del visor».
+    const alAvisar = vi.fn()
+    abrirVisor({ edicion: true, alAvisar })
+
+    const llamadas = vi.mocked(crearBarraEdicion).mock.calls
+    expect(llamadas.length, 'no se ha montado la barra de edición').toBeGreaterThan(0)
+    const opciones = llamadas[llamadas.length - 1][0]
+    expect(typeof opciones.alAvisar, 'la barra se monta sin canal de avisos').toBe('function')
+
+    // Y es el canal DEL VISOR, no una función cualquiera: lo que la barra diga
+    // tiene que salir por el mismo sitio que lo que dicen las demás piezas.
+    opciones.alAvisar('mensaje de la barra', { nivel: NIVEL.AVISO })
+    expect(alAvisar).toHaveBeenCalledWith('mensaje de la barra', { nivel: NIVEL.AVISO })
   })
 
   it('un alAvisar que no es función es contrato roto → TypeError, sin montar nada', () => {

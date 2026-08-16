@@ -415,7 +415,35 @@ export const MENSAJE_SIN_AUTOGUARDADO_BREVE =
  */
 export const MENSAJE_FICHERO_NO_LEIDO =
   'No se ha podido leer el contenido del fichero. Suele pasar cuando se ha movido, renombrado o ' +
-  'desconectado la unidad desde que se eligió: vuelve a abrirlo. No se ha cambiado nada.'
+  'desconectado la unidad desde que se eligió, o cuando se arrastra desde el correo o una unidad ' +
+  'de red: guárdalo primero en el disco y vuelve a abrirlo. No se ha cambiado nada.'
+
+/**
+ * ⛔ **Un fichero SUPERADO por otro que se soltó después** (auditoría 2026-08-16,
+ * hallazgo B2).
+ *
+ * Se dice, y no es opcional: un fichero que el usuario suelta y que no entra sin
+ * que nadie lo cuente es exactamente la regla de oro 1 rota. Y aquí el usuario **no
+ * puede deducirlo**: los dos gestos son suyos, pero él no sabe que la lectura del
+ * primero seguía en vuelo cuando soltó el segundo — lo que ve es que uno de los dos
+ * ficheros «no ha hecho nada».
+ *
+ * Misma redacción y mismo criterio que la de `app/cableado-medicion.js`: es el
+ * mismo hecho en la otra rama, como ya pasa con {@link MENSAJE_FICHERO_NO_LEIDO}.
+ *
+ * ⚠️ **No afirma que el otro haya entrado**, solo que llegó después: el segundo
+ * fichero puede haber fallado por su cuenta (y entonces lo dice su propio mensaje),
+ * y esta frase seguiría siendo verdad. Decir aquí «es ése el que ha entrado» sería
+ * afirmar algo que este punto del recorrido no sabe.
+ *
+ * @param {string} nombre   El que se descarta.
+ * @param {string} vigente  El que llegó después.
+ * @returns {string}
+ */
+export const mensajeFicheroSuperado = (nombre, vigente) =>
+  `No se ha cargado «${nombre}»: mientras se leía soltaste «${vigente}». Entre dos ficheros manda ` +
+  `el ÚLTIMO que sueltas, no el que termine de leerse antes. Si el que querías era «${nombre}», ` +
+  `suéltalo otra vez.`
 
 /**
  * Lo que se le dice al usuario cuando algo revienta por un defecto de
@@ -999,6 +1027,27 @@ export function cablearEdificio({
   let secuencia = 0
   /** El `AbortController` de la consulta en curso, o `null`. */
   let enVuelo = null
+
+  // ── ⛔ EL TOKEN DE LA PUERTA: ENTRE DOS FICHEROS MANDA EL ÚLTIMO SOLTADO ────
+  //
+  // **Auditoría 2026-08-16, hallazgo B2.** {@link alFichero} lee los bytes con un
+  // `await` y nada ordenaba las dos lecturas: soltar dos ficheros casi a la vez —o
+  // uno mientras el anterior todavía se leía— dejaba ganar al que RESUELVE último,
+  // que con un fichero grande y otro pequeño es el que se soltó PRIMERO. El usuario
+  // veía entrar lo que acababa de soltar y, un instante después, otra cosa.
+  //
+  // Es el mismo token que ya defiende la puerta del Catastro aquí al lado
+  // ({@link operar}), aplicado a la otra puerta por la que entra geometría — y con
+  // AVISO, al revés que la consulta superada: quien pulsa dos veces «Traer del
+  // Catastro» sabe que ha sustituido su consulta, y quien suelta un segundo fichero
+  // no sabe que el primero seguía leyéndose. Ver {@link mensajeFicheroSuperado}.
+  //
+  // ⚠️ Es un contador APARTE de `secuencia`, que es el de la red. Compartirlo haría
+  // que traer del Catastro cancelara un fichero a medio leer y al revés, que es una
+  // regla distinta y que nadie ha pedido.
+  let secuenciaFichero = 0
+  /** El nombre del último fichero aceptado, para poder decir quién ganó. */
+  let ficheroVigente = null
 
   /** El DXF que espera a que el usuario elija capas. `null` = no hay ninguno. */
   let pendiente = null
@@ -1666,6 +1715,11 @@ export function cablearEdificio({
     if (destruido) return
     const nombre = textoNoVacio(fichero?.name) ?? 'fichero sin nombre'
 
+    // El token se coge al ACEPTAR el fichero, no al terminar de leerlo: es el orden
+    // en que el usuario los soltó, que es el único que él conoce. Ver el token.
+    const token = ++secuenciaFichero
+    ficheroVigente = nombre
+
     /** @type {ArrayBuffer} */
     let crudo
     try {
@@ -1676,6 +1730,14 @@ export function cablearEdificio({
       return
     }
     if (destruido) return
+    if (token !== secuenciaFichero) {
+      // Superado mientras se leía. No se decodifica siquiera —ese trabajo ya no le
+      // sirve a nadie— y se cuenta con los dos nombres.
+      panel.avisar(mensajeFicheroSuperado(nombre, ficheroVigente ?? 'otro fichero'), {
+        nivel: NIVEL.AVISO,
+      })
+      return
+    }
 
     let texto
     let deteccionesTexto = []

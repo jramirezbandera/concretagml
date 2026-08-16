@@ -385,6 +385,38 @@ describe('cablearGeneracionGmlEdificio · sin mando no toca nada', () => {
     boton().click()
     expect(descargas).toHaveLength(0)
   })
+
+  it('⛔ tras `destruir()`, `refrescar()` y `generar()` NO escriben nada por su cuenta', () => {
+    // ⭐ **Auditoría 2026-08-16, hallazgo B3.** Éste era el ÚNICO cableado sin
+    // bandera `destruido`: soltar los cables deja de recibir eventos, pero no
+    // impide que quien conserve la referencia siga LLAMANDO. Y hay quien la
+    // conserva: `app/main.js` llama a `refrescar()` en cada conmutación de rama, y
+    // el botón y el renglón son los MISMOS nodos que usa la rama de parcela — así
+    // que un cable muerto podía escribirle encima el motivo de un edificio, y
+    // publicar validaciones de un documento que ya no está en pantalla.
+    const { cable, estadoEdificio } = cablear()
+    estadoEdificio.set(edificioBueno())
+    expect(boton().disabled).toBe(false)
+
+    cable.destruir()
+    // La cáscara sigue viva y ahora es de otro: el pie no se intercambia.
+    boton().disabled = true
+    renglon().textContent = 'GML de la parcela preparado.'
+
+    // Se suscribe DESPUÉS de destruir a propósito: `destruir()` ya vacía el `Set`,
+    // así que suscribirse antes probaría la baja y no la bandera.
+    const validaciones = []
+    cable.alValidacion((v) => validaciones.push(v))
+
+    cable.refrescar()
+    expect(boton().disabled, 'un cable muerto no vuelve a encender el botón').toBe(true)
+    expect(renglon().textContent).toBe('GML de la parcela preparado.')
+    expect(validaciones, 'ni publica validaciones de un documento que ya no se ve').toHaveLength(0)
+
+    expect(cable.generar()).toBeNull()
+    expect(descargas).toHaveLength(0)
+    expect(renglon().textContent).toBe('GML de la parcela preparado.')
+  })
 })
 
 // ── 5 · La red de la regla de oro 1 ──────────────────────────────────────────

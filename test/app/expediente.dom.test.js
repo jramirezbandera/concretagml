@@ -83,6 +83,7 @@ import {
   SELECTOR_BOTON_EXPEDIENTE,
   cablearExpediente,
   mensajeEdificioFuera,
+  mensajeFicheroSuperado,
   mensajeParcelaDeContexto,
   mensajeParcelaFuera,
   nombreFicheroExport,
@@ -2509,5 +2510,275 @@ describe('Rework de UI · T7 · 16 · qué rama se guarda y cuál NO va en el fi
     // Ninguno se queda en el diagnóstico: los tres dicen a qué rama ir y qué pulsar.
     for (const t of TEXTOS_T7) expect(t).toMatch(/rama (Parcela|Edificio)/)
     for (const t of TEXTOS_T7) expect(t).toMatch(/fichero de proyecto|\.json/)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Auditoría del 2026-08-16 · hallazgos BAJA E1–E4 · carreras e IndexedDB en vuelo
+//
+// Los cuatro defectos viven en la MISMA ventana: los milisegundos que tarda una
+// operación de IndexedDB. Para medirlos sin intermitencia, la latencia se hace
+// CONTROLABLE envolviendo el almacén real con una puerta que la prueba abre
+// cuando quiere — el mismo recurso que `almacenSinEspacio`, que dobla el fallo
+// de cuota en vez de llenar 1,82 GB de verdad.
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Envuelve un almacén real reteniendo `guardar` hasta que la prueba lo libere.
+ * Todo lo demás pasa tal cual: lo que se controla es la LATENCIA, no el resultado.
+ */
+function almacenConPuerta(real) {
+  let abrirPuerta
+  const puerta = new Promise((r) => {
+    abrirPuerta = r
+  })
+  return {
+    ...real,
+    liberar: () => abrirPuerta(),
+    async guardar(...args) {
+      await puerta
+      return real.guardar(...args)
+    },
+  }
+}
+
+/**
+ * Envuelve un almacén real reteniendo las RESPUESTAS de `listar`: la foto del
+ * almacén se toma AL LLAMAR (como en la realidad) y se entrega cuando la prueba
+ * lo decide, que es lo que permite invertir el orden de llegada de dos lecturas.
+ */
+function almacenListarRetenido(real) {
+  const retenidas = []
+  const control = { activo: false }
+  return {
+    control,
+    retenidas,
+    almacen: {
+      ...real,
+      async listar(...args) {
+        const resultado = await real.listar(...args)
+        if (!control.activo) return resultado
+        return new Promise((resolver) => retenidas.push(() => resolver(resultado)))
+      },
+    },
+  }
+}
+
+describe('Auditoría 2026-08-16 · E1 · doble «Guardar» dentro de la latencia', () => {
+  it('⛔ dos clics con la escritura aún en vuelo crean UN registro, no dos', async () => {
+    // El diálogo emite GUARDAR en cada clic y la identidad (`id`) se fijaba
+    // DESPUÉS del `await` de IndexedDB: los dos clics veían `id === null` y cada
+    // uno creaba su registro. Contrástese con «Componer PDF», que sí tiene guarda
+    // `componiendo` (`app/cableado-informe.js`).
+    const apertura = await baseNueva()
+    const real = crearExpedientes({ bd: apertura, ahora: () => Date.UTC(2026, 7, 3) })
+    const almacen = almacenConPuerta(real)
+    const m = await montar({ bd: apertura, almacen })
+
+    await abrir(m)
+    escribirNombre('Solo uno')
+    pulsar(SELECTOR.GUARDAR)
+    // El doble clic: la escritura del primero todavía no ha vuelto de IndexedDB.
+    pulsar(SELECTOR.GUARDAR)
+    almacen.liberar()
+    await reposar()
+
+    const { registros } = await real.listar()
+    expect(registros, 'el doble clic ha creado dos expedientes duplicados').toHaveLength(1)
+    expect(registros[0].nombre).toBe('Solo uno')
+    m.cableado.destruir()
+  })
+})
+
+describe('Auditoría 2026-08-16 · E2 · conmutar de rama durante la escritura', () => {
+  it('⛔ la identidad del registro guardado va a la rama que PULSÓ, no a la del instante del retorno', async () => {
+    // `guardar()` evaluaba `identidades[ramaActual()]` DESPUÉS del `await`: una
+    // conmutación a EDIFICIO durante la escritura apuntaba el registro de la
+    // parcela a la identidad del edificio — y la parcela quedaba «sin guardar».
+    const apertura = await baseNueva()
+    const real = crearExpedientes({ bd: apertura, ahora: () => Date.UTC(2026, 7, 3) })
+    const almacen = almacenConPuerta(real)
+    const m = await montar({ bd: apertura, almacen, conRama: true, edificio: null })
+
+    await abrir(m)
+    escribirNombre('De la parcela')
+    pulsar(SELECTOR.GUARDAR)
+    // La conmutación cae DENTRO de la ventana del `await` de IndexedDB.
+    m.rama.set(RAMA.EDIFICIO)
+    almacen.liberar()
+    await reposar()
+
+    const { registros } = await real.listar()
+    expect(registros).toHaveLength(1)
+    // La identidad del EDIFICIO sigue virgen: ese registro no es suyo…
+    expect(m.cableado.estado().rama).toBe(RAMA.EDIFICIO)
+    expect(m.cableado.estado().idAbierto).toBeNull()
+    // …y la de la PARCELA apunta al registro recién guardado: el siguiente
+    // «Guardar» lo pone al día en vez de crear un duplicado.
+    m.rama.set(RAMA.PARCELA)
+    await reposar()
+    expect(m.cableado.estado().idAbierto).toBe(registros[0].id)
+    expect(m.cableado.estado().nombreAbierto).toBe('De la parcela')
+    m.desmontar()
+  })
+})
+
+describe('Auditoría 2026-08-16 · E3 · dos `listar()` cruzados', () => {
+  it('⛔ si las respuestas se invierten, NO se pinta la lista vieja encima de la nueva', async () => {
+    // `refrescar()` no serializaba dos `listar()` concurrentes: con `duplicar` y
+    // un cambio de store con el diálogo abierto, la respuesta VIEJA podía llegar
+    // la última y `fijar` pintaba una lista sin el duplicado recién creado.
+    const apertura = await baseNueva()
+    const real = crearExpedientes({ bd: apertura, ahora: () => Date.UTC(2026, 7, 3) })
+    const { almacen, retenidas, control } = almacenListarRetenido(real)
+    const m = await montar({ bd: apertura, almacen })
+
+    await abrir(m)
+    escribirNombre('Original')
+    pulsar(SELECTOR.GUARDAR)
+    await reposar()
+    const registro = (await real.listar()).registros[0]
+
+    control.activo = true
+    // Refresco A: una edición con el diálogo abierto. Su `listar` fotografía el
+    // almacén con UN registro y se queda retenido.
+    const parcela = m.estado.get()
+    m.estado.set({
+      ...parcela,
+      recintos: [
+        { ...parcela.recintos[0], vertices: parcela.recintos[0].vertices.map(([x, y]) => [x + 1, y]) },
+      ],
+    })
+    await reposar()
+    // Refresco B: «Duplicar». Su `listar` fotografía DOS registros.
+    pulsar(`${selectorFila(registro.id)} [data-accion="duplicar-expediente"]`)
+    await reposar()
+    expect(retenidas, 'el arnés no ha retenido las dos lecturas').toHaveLength(2)
+
+    // Las respuestas se INVIERTEN: llega antes la nueva y después la vieja.
+    retenidas[1]()
+    await reposar()
+    retenidas[0]()
+    await reposar()
+    control.activo = false
+
+    expect(
+      document.querySelectorAll(`${SELECTOR.LISTA} li`),
+      'la respuesta vieja ha pintado encima de la nueva',
+    ).toHaveLength(2)
+    // Anti-vacuidad: en el almacén hay DOS de verdad.
+    expect((await real.listar()).registros).toHaveLength(2)
+    m.cableado.destruir()
+  })
+})
+
+describe('Auditoría 2026-08-16 · E4 · el gate del diálogo con la oferta pendiente', () => {
+  it('⛔ una parcela que llega por vía asíncrona pone al día «Guardar» aunque la oferta siga en pie', async () => {
+    // El suscriptor del store retornaba en la guarda del autoguardado (oferta de
+    // borrador pendiente) ANTES del `refrescar()` del diálogo: con el diálogo
+    // abierto, la parcela llegaba y el gate «Guardar» se quedaba rancio —apagado
+    // con un motivo ya falso— hasta reabrir. Las salidas del menú sí se
+    // refrescaban antes de esa guarda, a propósito; el diálogo quedó detrás.
+    const apertura = await baseNueva()
+    const almacen = crearExpedientes({ bd: apertura, ahora: () => Date.UTC(2026, 7, 2, 9, 0, 0) })
+    await almacen.guardarBorrador(crearExpediente({ srs: SRS, parcela: parcelaDemo() }))
+
+    const m = await montar({ bd: apertura, parcela: null })
+    expect(m.cableado.estado().ofreciendoBorrador, 'el arnés no ha dejado la oferta en pie').toBe(true)
+
+    await abrir(m)
+    expect(document.querySelector(SELECTOR.GUARDAR).disabled).toBe(true)
+
+    // La parcela llega por una vía asíncrona (Catastro, zona de fichero…) con la
+    // oferta todavía sin resolver y el diálogo abierto.
+    m.estado.set(parcelaDemo())
+    await reposar()
+
+    expect(
+      document.querySelector(SELECTOR.GUARDAR).disabled,
+      'el gate «Guardar» se ha quedado rancio detrás de la guarda del autoguardado',
+    ).toBe(false)
+    // Y la oferta NO se ha resuelto por el camino: el refresco no toca la espera.
+    expect(m.cableado.estado().ofreciendoBorrador).toBe(true)
+    m.cableado.destruir()
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Auditoría 2026-08-16 · Abrir proyecto también es una puerta de UNO a la vez
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// `await fichero.text()` no garantiza orden: entre dos `.json` soltados mandaba el
+// que TERMINABA de leerse antes y no el ÚLTIMO que se soltaba. Y aquí abrir un
+// proyecto CONMUTA la rama y escribe el store, así que un proyecto grande podía
+// pisar segundos después al pequeño que el usuario acababa de abrir.
+//
+// Tercera de las cuatro puertas de la misma familia (medición, edificio,
+// comprobación y ésta); un guarda de `test/contrato.test.js` ata su mensaje.
+
+describe('cableado-expediente · dos proyectos encabalgados: manda el ÚLTIMO', () => {
+  /** El sobre de un proyecto de parcela válido, con el nombre que se le pida. */
+  const sobreDe = (nombre) =>
+    JSON.stringify({
+      formato: 'concreta-gml/proyecto',
+      version: 1,
+      generado: '2026-08-03T09:00:00.000Z',
+      nombre,
+      expediente: {
+        tipo: 'PARCELA',
+        srs: SRS,
+        metadatos: {},
+        parcela: parcelaDemo(),
+        edificio: null,
+      },
+    })
+
+  /** Un `.json` cuyo `text()` no resuelve hasta que el test lo permite. */
+  function ficheroLento(nombre, contenido) {
+    let soltarLectura
+    const espera = new Promise((cumplir) => {
+      soltarLectura = cumplir
+    })
+    return {
+      fichero: {
+        name: nombre,
+        async text() {
+          await espera
+          return contenido
+        },
+      },
+      contestar: () => soltarLectura(),
+    }
+  }
+
+  it('⭐ el proyecto que se soltó primero NO pisa al segundo cuando contesta tarde', async () => {
+    const m = await montar()
+    const lento = ficheroLento('primero.json', sobreDe('primero'))
+
+    const enVuelo = m.cableado.abrirProyecto(lento.fichero) // queda leyéndose
+    await m.cableado.abrirProyecto(ficheroDeTexto('segundo.json', sobreDe('segundo')))
+    const trasElSegundo = m.estado.get()
+
+    lento.contestar()
+    await enVuelo
+
+    expect(m.estado.get(), 'el primero no puede pisar al segundo').toBe(trasElSegundo)
+    expect(m.avisos().join('\n')).toContain(
+      mensajeFicheroSuperado('primero.json', 'segundo.json'),
+    )
+    m.desmontar()
+  })
+
+  it('un solo proyecto, aunque tarde, se abre con normalidad', async () => {
+    // Anti-vacuidad: una guarda que dijera «superado» a todo cerraría la puerta.
+    const m = await montar()
+    const lento = ficheroLento('unico.json', sobreDe('unico'))
+
+    const enVuelo = m.cableado.abrirProyecto(lento.fichero)
+    lento.contestar()
+    await enVuelo
+
+    expect(m.avisos().join('\n')).not.toContain('No se ha cargado')
+    m.desmontar()
   })
 })

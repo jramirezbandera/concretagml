@@ -20,7 +20,7 @@
  * Proyecto Vitest `dom` (jsdom + Leaflet real para la capa de manchas).         *
  * -------------------------------------------------------------------------- */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 import {
   cablearDerivacion,
@@ -531,6 +531,64 @@ describe('cablearDerivacion', () => {
       boton().click()
       manchas()[0].dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true }))
       expect(filas()[0].dataset.resaltada).toBe('si')
+    })
+  })
+
+  // ── 6 bis · ⭐ El canal del sobrante (auditoría 2026-08-16, hallazgo B1) ───
+
+  describe('alCambiarSobrante · el canal que la leyenda escucha', () => {
+    it('⛔ avisa al FOTOGRAFIAR y al INVALIDAR, sin carga, y la baja funciona', () => {
+      // El defecto verificado por traza: «Derivar sobrante» pintaba las manchas
+      // cian y ámbar SIN tocar el store y sin publicar nada, así que la leyenda
+      // no las anunciaba hasta la siguiente navegación o edición — el reverso
+      // exacto de la doctrina escrita junto a `refrescarLeyenda` en app/main.js.
+      cablear()
+      estado.set(parcela())
+      const vistos = []
+      // El aviso NO lleva carga (patrón `alCambiarIdentidad` del expediente):
+      // quien escuche vuelve a leer `ultimaCesion()`, y por eso lo que se apunta
+      // aquí es esa lectura — que además prueba que el aviso llega DESPUÉS de
+      // guardar la foto, nunca antes.
+      const baja = cableado.alCambiarSobrante(() =>
+        vistos.push(cableado.ultimaCesion() !== null),
+      )
+
+      boton().click() // deriva → hay foto
+      expect(vistos).toEqual([true])
+
+      estado.set(parcela({ mengua: 12 })) // cualquier cambio caduca la foto (3C)
+      expect(vistos).toEqual([true, false])
+
+      baja()
+      boton().click()
+      expect(vistos, 'después de la baja no llega nada').toHaveLength(2)
+    })
+
+    it('con algo que no es una función, LANZA (contrato del programador)', () => {
+      cablear()
+      // ⚠️ La comprobación del tipo va PRIMERO y no sobra: sin el canal, llamar a
+      // `cableado.alCambiarSobrante(null)` lanza igual un `TypeError` («no es una
+      // función»), así que este test pasaría en verde sobre un cableado que no
+      // publica nada. Es la misma trampa que la mitad «la guarda NO es vacua» de
+      // `test/contrato.test.js`.
+      expect(typeof cableado.alCambiarSobrante).toBe('function')
+      expect(() => cableado.alCambiarSobrante(null)).toThrow(TypeError)
+    })
+
+    it('un oyente roto no interrumpe ni la derivación ni a los demás', () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+      cablear()
+      estado.set(parcela())
+      const vistos = []
+      cableado.alCambiarSobrante(() => {
+        throw new Error('oyente roto')
+      })
+      cableado.alCambiarSobrante(() => vistos.push('ok'))
+
+      expect(cableado.derivar()).not.toBeNull()
+      expect(vistos).toEqual(['ok'])
+      expect(error).toHaveBeenCalled()
+      error.mockRestore()
     })
   })
 

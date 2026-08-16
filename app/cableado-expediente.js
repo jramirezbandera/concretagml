@@ -510,6 +510,30 @@ export const MENSAJE_SIN_RAMA_EDIFICIO =
   'así que no hay dónde abrirlo. No se ha cambiado nada de lo que tenías. Si esto pasa siempre, es ' +
   'un fallo de montaje de la aplicación.'
 
+/**
+ * Cuando se suelta un `.json` de proyecto mientras el anterior todavía se leía
+ * (auditoría 2026-08-16, tercera puerta de la misma familia).
+ *
+ * ⛔ `await fichero.text()` no garantiza orden: entre dos ficheros mandaba el que
+ * TERMINABA de leerse antes y no el ÚLTIMO que se soltaba, así que un proyecto
+ * grande podía pisar segundos después al pequeño que el usuario acababa de abrir
+ * — y aquí abrir un proyecto CONMUTA la rama y escribe el store.
+ *
+ * ⚠️ No afirma que el otro haya entrado, solo que llegó después: el segundo puede
+ * haber fallado por su cuenta.
+ *
+ * Texto duplicado a propósito en las cuatro puertas, con un test-guarda que las
+ * ata (`test/contrato.test.js`). Misma disciplina que `MENSAJE_FICHERO_NO_LEIDO`.
+ *
+ * @param {string} nombre  El que NO se ha cargado.
+ * @param {string} vigente  El que sí manda.
+ * @returns {string}
+ */
+export const mensajeFicheroSuperado = (nombre, vigente) =>
+  `No se ha cargado «${nombre}»: mientras se leía soltaste «${vigente}». Entre dos ficheros manda ` +
+  `el ÚLTIMO que sueltas, no el que termine de leerse antes. Si el que querías era «${nombre}», ` +
+  `suéltalo otra vez.`
+
 /** Cuando el `.json` dice ser de EDIFICIO y no trae edificio dentro. */
 export const MENSAJE_GUARDADO_SIN_EDIFICIO =
   'Ese fichero de proyecto dice llevar un edificio, pero no trae ninguno dentro, así que no hay ' +
@@ -625,6 +649,18 @@ export const MENSAJE_AUTOGUARDADO_ROTO =
   'El trabajo en curso no se está pudiendo autoguardar en este navegador. Lo que hay en pantalla ' +
   'no corre peligro mientras la pestaña siga abierta, pero una recarga se lo llevaría: exporta el ' +
   'expediente a un fichero de proyecto.'
+
+/**
+ * ⛔ E1 (auditoría del 2026-08-16): segunda pulsación de «Guardar» con la primera
+ * todavía escribiendo en IndexedDB. Sin la guarda de reentrada de {@link guardar},
+ * los dos clics veían `id === null` —la identidad se fija al VOLVER la escritura—
+ * y cada uno creaba su registro: un doble clic dejaba dos expedientes duplicados.
+ * Mismo patrón que `componiendo` en `app/cableado-informe.js`, y regla de oro 1:
+ * la pulsación que no hace nada lo dice, no se traga en silencio.
+ */
+export const MENSAJE_YA_GUARDANDO =
+  'El expediente ya se está guardando: esta segunda pulsación no hace nada, para no crear dos ' +
+  'registros iguales. El acuse dirá cuándo ha terminado.'
 
 /** Cuando alguien suelta un `.json` y este cableado no llegó a montarse. */
 export const MENSAJE_SIN_EXPEDIENTE =
@@ -912,6 +948,13 @@ export function cablearExpediente({
   const botonAbrir = boton ?? nodoDe(doc, SELECTOR_BOTON_EXPEDIENTE)
 
   let destruido = false
+
+  // ── La puerta de fichero, que es de UNO a la vez (auditoría 2026-08-16) ─────
+  // Cuenta FICHEROS SOLTADOS, no consultas ni refrescos. Ver
+  // {@link mensajeFicheroSuperado}.
+  let secuenciaFichero = 0
+  /** El nombre del último fichero aceptado, para poder decir quién ganó. */
+  let ficheroVigente = null
 
   // ── La identidad del expediente abierto, UNA POR RAMA ─────────────────────
   //
@@ -1253,10 +1296,15 @@ export function cablearExpediente({
    * acuse que faltaba.
    *
    * @param {string} donde  Uno de {@link DOCUMENTO}.
+   * @param {string} [r=ramaActual()]  ⛔ E2 (auditoría del 2026-08-16): `guardar`
+   *   pasa su FOTO de la rama, tomada antes del primer `await`. Se describe el
+   *   documento que se ESCRIBIÓ; leer la rama del instante del acuse mentiría si
+   *   hubo una conmutación durante la escritura. `exportarProyecto` es síncrono y
+   *   usa el defecto.
    * @returns {string|null}
    */
-  function loQueSeQuedaFuera(donde) {
-    if (!enEdificio()) {
+  function loQueSeQuedaFuera(donde, r = ramaActual()) {
+    if (r !== RAMA.EDIFICIO) {
       return hayEdificio(edificioActual()) ? mensajeEdificioFuera(donde) : null
     }
     if (!hayGeometria(estado.get())) return null
@@ -1412,6 +1460,15 @@ export function cablearExpediente({
   const dialogo = crearDialogoExpediente({ documento: doc, alAvisar: panel.avisar })
 
   /**
+   * ⛔ E3 (auditoría del 2026-08-16): el turno del último `refrescar` lanzado. Es el
+   * patrón de la casa —contador monótono: se captura al lanzar y se coteja antes de
+   * pintar—. Dos `listar()` concurrentes (p. ej. `duplicar` y un cambio de store con
+   * el diálogo abierto) podían volver INVERTIDOS, y `fijar` pintaba la lista vieja
+   * encima de la nueva: un duplicado recién creado desaparecía de pantalla.
+   */
+  let turnoRefresco = 0
+
+  /**
    * Repinta el diálogo con lo que hay guardado ahora mismo.
    *
    * `nombre` se pasa SOLO cuando hay que cambiarlo: `fijar` sin esa clave no toca el
@@ -1421,8 +1478,12 @@ export function cablearExpediente({
    * @param {{nombre?: string}} [opciones]
    */
   async function refrescar({ nombre } = {}) {
+    const turno = (turnoRefresco += 1)
     const listado = await expedientes.listar()
     if (destruido) return
+    // ⛔ E3: si mientras se leía el almacén alguien lanzó OTRO refresco, lo de este
+    // turno ya es viejo y no se pinta — el que manda es siempre el último lanzado.
+    if (turno !== turnoRefresco) return
     dialogo.fijar({
       registros: listado.registros.map((r) => ({ ...r, edad: edadDe(r.actualizado) })),
       borrador: ofrecido,
@@ -1549,8 +1610,27 @@ export function cablearExpediente({
 
   // ── Las acciones del diálogo ──────────────────────────────────────────────
 
+  /**
+   * ⛔ E1 (auditoría del 2026-08-16): ¿hay un «Guardar» en vuelo? El diálogo emite
+   * la acción en cada clic sin apagarse mientras dura la operación, así que la
+   * guarda vive aquí. Ver {@link MENSAJE_YA_GUARDANDO}.
+   */
+  let guardando = false
+
   /** «Guardar». Crea el expediente o pone al día el que esté abierto. */
   async function guardar(nombre) {
+    // ⛔ E1 · GUARDA DE REENTRADA (auditoría del 2026-08-16). La identidad se fija
+    // DESPUÉS del `await` de la escritura: dos clics dentro de la latencia de
+    // IndexedDB veían los dos `id === null` y creaban DOS registros duplicados.
+    // Mismo patrón que `componiendo` en `app/cableado-informe.js`. El botón NO se
+    // apaga desde aquí a propósito: su gate lo gobierna `fijar` con `puedeGuardar`
+    // —un segundo dueño del `disabled` es la divergencia que esta casa evita— y la
+    // ventana son milisegundos; lo que hace falta es que la segunda pulsación no
+    // escriba y LO DIGA (regla de oro 1), no un parpadeo del botón.
+    if (guardando) {
+      decir(MENSAJE_YA_GUARDANDO)
+      return
+    }
     // ⛔ F11 · la guarda que NO depende del `disabled` del botón. El diálogo lo apaga
     // —`refrescar` le pasa `puedeGuardar: false`— pero un `disabled` es cortesía:
     // exactamente el mismo argumento que ya escribió `recuperar` para el huso. Y aquí
@@ -1565,47 +1645,61 @@ export function cablearExpediente({
       decir(MENSAJE_SIN_PARCELA, { error: true })
       return
     }
-    const opts = {
-      ...(nombre === null ? {} : { nombre }),
-      ...(identidadActual().id === null ? {} : { id: identidadActual().id }),
-    }
-    let r = await expedientes.guardar(exp, opts)
-    if (destruido) return
-    if (!r.ok && r.esCuota) {
-      r = await purgarYReintentar(() => expedientes.guardar(exp, opts))
+    // ⛔ E2 · LA RAMA SE FOTOGRAFÍA ANTES DEL PRIMER `await` (auditoría del
+    // 2026-08-16) y la foto se usa en todo el recorrido. Se leía `ramaActual()`
+    // DESPUÉS de la escritura, con la rama de ESE instante: una conmutación durante
+    // los milisegundos de IndexedDB apuntaba el registro guardado a la identidad de
+    // la OTRA rama — la parcela quedaba «sin guardar» y el edificio con un `id` que
+    // no es suyo. El expediente (`exp`) ya era una foto; la rama también tiene que serlo.
+    const ramaFoto = ramaActual()
+    guardando = true
+    try {
+      const opts = {
+        ...(nombre === null ? {} : { nombre }),
+        ...(identidades[ramaFoto].id === null ? {} : { id: identidades[ramaFoto].id }),
+      }
+      let r = await expedientes.guardar(exp, opts)
       if (destruido) return
+      if (!r.ok && r.esCuota) {
+        r = await purgarYReintentar(() => expedientes.guardar(exp, opts))
+        if (destruido) return
+      }
+      if (!r.ok) {
+        // El almacén ya ha avisado por el panel con su motivo técnico; aquí se escribe
+        // en el renglón, que es donde está mirando quien acaba de pulsar.
+        decir(r.mensaje ?? 'No se ha podido guardar el expediente.')
+        return
+      }
+      identidades[ramaFoto] = {
+        id: r.registro.id,
+        nombre: r.registro.nombre,
+        creado: r.registro.creado,
+        modificado: r.registro.actualizado,
+      }
+      // Archivar y renombrar salen los dos por aquí —renombrar es guardar el MISMO
+      // registro con otro nombre—, y ninguno de los dos toca un store: sin este aviso
+      // la barra sigue diciendo «Sin guardar» con el acuse al lado. Ver el canal.
+      notificarIdentidad()
+      await refrescar({ nombre: r.registro.nombre })
+      if (destruido) return
+      // Rework de UI · T7: el acuse dice también lo que NO ha entrado. Va en la MISMA
+      // llamada a `decir` porque el renglón es uno solo y la segunda borraría la primera.
+      // ⚠️ Con la FOTO de la rama (E2): el acuse describe el documento que se acaba de
+      // escribir, no lo que la pantalla esté mirando ahora.
+      const fuera = loQueSeQuedaFuera(DOCUMENTO.GUARDADO, ramaFoto)
+      decir(
+        `Guardado «${r.registro.nombre}» en este navegador.` +
+          (persistencia?.persistido === false ? COLETILLA_SIN_PERSISTENCIA : '') +
+          (fuera === null ? '' : ` ${fuera}`),
+      )
+      // Y al panel, que es donde queda constancia de lo que le pasa al DATO: el renglón
+      // del diálogo se lo lleva el siguiente `fijar`, y esto hay que poder releerlo con
+      // el diálogo ya cerrado. El panel agrupa los repetidos con su contador, así que
+      // guardar diez veces con un edificio cargado deja una tarjeta, no diez.
+      if (fuera !== null) avisar(fuera)
+    } finally {
+      guardando = false
     }
-    if (!r.ok) {
-      // El almacén ya ha avisado por el panel con su motivo técnico; aquí se escribe
-      // en el renglón, que es donde está mirando quien acaba de pulsar.
-      decir(r.mensaje ?? 'No se ha podido guardar el expediente.')
-      return
-    }
-    identidades[ramaActual()] = {
-      id: r.registro.id,
-      nombre: r.registro.nombre,
-      creado: r.registro.creado,
-      modificado: r.registro.actualizado,
-    }
-    // Archivar y renombrar salen los dos por aquí —renombrar es guardar el MISMO
-    // registro con otro nombre—, y ninguno de los dos toca un store: sin este aviso
-    // la barra sigue diciendo «Sin guardar» con el acuse al lado. Ver el canal.
-    notificarIdentidad()
-    await refrescar({ nombre: r.registro.nombre })
-    if (destruido) return
-    // Rework de UI · T7: el acuse dice también lo que NO ha entrado. Va en la MISMA
-    // llamada a `decir` porque el renglón es uno solo y la segunda borraría la primera.
-    const fuera = loQueSeQuedaFuera(DOCUMENTO.GUARDADO)
-    decir(
-      `Guardado «${r.registro.nombre}» en este navegador.` +
-        (persistencia?.persistido === false ? COLETILLA_SIN_PERSISTENCIA : '') +
-        (fuera === null ? '' : ` ${fuera}`),
-    )
-    // Y al panel, que es donde queda constancia de lo que le pasa al DATO: el renglón
-    // del diálogo se lo lleva el siguiente `fijar`, y esto hay que poder releerlo con
-    // el diálogo ya cerrado. El panel agrupa los repetidos con su contador, así que
-    // guardar diez veces con un edificio cargado deja una tarjeta, no diez.
-    if (fuera !== null) avisar(fuera)
   }
 
   /** «Recuperar» de una fila. */
@@ -2129,6 +2223,11 @@ export function cablearExpediente({
    */
   async function abrirProyecto(fichero) {
     if (destruido) return
+    // La puerta se reclama al ACEPTAR, no al terminar de leer. Ver
+    // {@link mensajeFicheroSuperado}.
+    const nombreEste = typeof fichero?.name === 'string' ? fichero.name : 'el fichero'
+    const turno = (secuenciaFichero += 1)
+    ficheroVigente = nombreEste
     let texto
     try {
       texto = await fichero.text()
@@ -2142,6 +2241,11 @@ export function cablearExpediente({
       return
     }
     if (destruido) return
+    if (turno !== secuenciaFichero) {
+      // Llegó otro mientras este se leía: manda el otro, y se DICE (regla de oro 1).
+      avisar(mensajeFicheroSuperado(nombreEste, ficheroVigente ?? 'el siguiente'), NIVEL.AVISO)
+      return
+    }
 
     const r = deProyecto(texto)
     // Los avisos van SIEMPRE, salga bien o mal la lectura: una clave desconocida o una
@@ -2402,14 +2506,17 @@ export function cablearExpediente({
     // una oferta de borrador sin resolver dejaría las cuatro salidas apagadas
     // teniendo geometría delante.
     refrescarSalidas()
-    if (!autoguardadoArmado(RAMA.PARCELA)) return
-    auto.cambiado(parcela)
-
-    // Si el diálogo está abierto, lo que enseña («Guardar» encendido o apagado)
-    // acaba de cambiar.
+    // ⛔ E4 (auditoría del 2026-08-16): el refresco del diálogo, ANTES de la guarda
+    // del autoguardado y por el mismo argumento que las salidas de arriba. Estaba
+    // detrás del `return`, y con la oferta de borrador pendiente una parcela llegada
+    // por vía asíncrona con el diálogo abierto dejaba el gate «Guardar» apagado con
+    // un motivo ya falso hasta reabrir. Que el borrador no pueda escribirse todavía
+    // no cambia lo que el diálogo tiene que enseñar.
     if (dialogo.abierto()) {
       refrescar().catch((causa) => reventar('refrescar', causa))
     }
+    if (!autoguardadoArmado(RAMA.PARCELA)) return
+    auto.cambiado(parcela)
   }
 
   /**
@@ -2427,6 +2534,13 @@ export function cablearExpediente({
     // autoguardado. Aquí además importa más, porque `exportar-proyecto` es la ÚNICA
     // salida que un edificio habilita y es la única forma de sacarlo de la aplicación.
     refrescarSalidas()
+    // ⛔ E4 (auditoría del 2026-08-16): mismo orden que en el gemelo de PARCELA, y
+    // por lo mismo. Las dos salidas tempranas de abajo —la espera de la oferta y el
+    // edificio sin identidad— son razones para NO escribir el borrador, no para
+    // dejar de poner al día lo que el diálogo enseña.
+    if (dialogo.abierto()) {
+      refrescar().catch((causa) => reventar('refrescar', causa))
+    }
     if (!autoguardadoArmado(RAMA.EDIFICIO)) return
     // ⚠️ **Un edificio sin identidad no se autoguarda**, y se calla a propósito: es el
     // estado de un `Edificio` construido a mano fuera de las vías de entrada (los
@@ -2435,10 +2549,6 @@ export function cablearExpediente({
     // y el segundo pisaría al primero creyendo que es una edición suya.
     if (edificio !== null && (edificio.idLocal ?? null) === null) return
     autoEdificio.cambiado(edificio)
-
-    if (dialogo.abierto()) {
-      refrescar().catch((causa) => reventar('refrescar', causa))
-    }
   }
 
   /**

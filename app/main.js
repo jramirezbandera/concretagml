@@ -4891,17 +4891,26 @@ const navegacion = crearNavegacion({
  * ⚠️ **Se llama de más a propósito.** Derivar cuesta cuatro lecturas de POJO y una
  * llamada a un getter; equivocarse por defecto cuesta un rail que enseña un paso
  * apagado cuando ya se puede entrar, que es la clase de mentira que este rework
- * viene a quitar. `actualizarHechos` es idempotente y solo notifica si el paso
- * activo deja de sostenerse, así que llamarlo de sobra no repinta de sobra.
+ * viene a quitar.
+ *
+ * ⛔ **Y ahora llamarlo de sobra de verdad no repinta de sobra** (auditoría
+ * 2026-08-16, hallazgo B4). Esta misma línea afirmaba que `actualizarHechos` «solo
+ * notifica si el paso activo deja de sostenerse», y era falso: publicaba SIEMPRE, y
+ * `crearEstadoVista.set` notifica sin comparar. Medido: estas dos llamadas
+ * producían **2 notificaciones completas aunque no cambiara ni un hecho** —y esta
+ * función cuelga de los dos stores, o sea de cada vértice arrastrado— más el
+ * `barra.repintar()` de abajo: 3 pintadas enteras del rail, con sus tres pasadas de
+ * `contraste.aplicar`, `pantalla.aplicar` y `escribirRuta`. Arreglado en
+ * `app/navegacion.js#actualizarHechos`, que compara los hechos antes de publicar.
  *
  * @returns {void}
  */
 function refrescarHechos() {
   navegacion.actualizarHechos(hechosDeParcela(estado.get()), RAMA.PARCELA)
   navegacion.actualizarHechos(hechosDeEdificio(estadoEdificio.get()), RAMA.EDIFICIO)
-  // Los hechos pueden cambiar SIN que cambie `{rama, paso, modo}` —cargar una
-  // parcela no te mueve de paso, pero abre tres—, y en ese caso el store de la
-  // navegación no notifica. Por eso el repintado va a mano aquí.
+  // El repintado va a mano y SE QUEDA: es la red barata de la doctrina de arriba
+  // —repintar la barra son doce nodos— y lo único que garantiza que la zona del
+  // rail no se quede rancia si algún día un hecho deja de derivarse de un store.
   barra.repintar()
 }
 
@@ -5594,6 +5603,15 @@ function refrescarLeyenda() {
 
 navegacion.subscribe(refrescarLeyenda)
 estado.subscribe(refrescarLeyenda)
+// ⛔ **Y LA DERIVACIÓN, que faltaba** (auditoría 2026-08-16, hallazgo B1).
+// Los tres párrafos de arriba nombraban a la derivación como una de las tres
+// fuentes de esta leyenda y solo se enchufaban dos, así que el caso más visible de
+// los tres era justo el que no llegaba: pulsar «Derivar sobrante» pintaba las
+// manchas cian y ámbar y la tarjeta NO las anunciaba hasta la siguiente navegación
+// o edición. Derivar no toca ningún store ni mueve el rail —por eso ninguno de los
+// otros dos cables se entera—, y por eso `cablearDerivacion` publica su propio
+// canal, sin carga, igual que el de identidad del expediente.
+derivacionCableada.alCambiarSobrante(refrescarLeyenda)
 // Y una vez AHORA, para que la leyenda nazca coherente con la pantalla en la que
 // se aterriza (un hash `#/parcela/diagnostico` pegado en un correo entra
 // directamente en Diagnóstico y nadie habría navegado todavía).

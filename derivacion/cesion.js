@@ -432,8 +432,16 @@ export function derivarCesion(entrada) {
         // 4 decimales y no 2: una astilla de 0,005 m² con dos decimales se
         // imprimiría como «0 m²», que es exactamente el número plausible y falso
         // que esta aplicación persigue. La cifra sin tocar va en `datos`.
+        //
+        // ⛔ Y «grosor medio», NO «ancho» (2026-08-16): la cifra es `2·área/perímetro`
+        // y `geo/grosor.js` advierte en su cabecera que NO es el ancho mínimo — en
+        // una franja rectangular da la MITAD del ancho real (una de 2,00 m saldría
+        // anunciada como 1,667 m), y en una aguja también la mitad. Llamarla
+        // «ancho» afirmaba una medida física que no se había medido. El arreglo es
+        // de palabra: ni la métrica ni el umbral cambian. Vale para los TRES
+        // mensajes de este fichero y para el análogo de `derivacion/vecino.js`.
         `La pieza nº ${p.orden} mide ${numero(p.area, 4)} m² y es una franja de ` +
-          `${numero(p.grosor * 1000, 1)} mm de ancho, por debajo de los ` +
+          `${numero(p.grosor * 1000, 1)} mm de grosor medio, por debajo de los ` +
           `${numero(umbralGrosorM * 1000, 1)} mm a partir de los cuales una franja se ` +
           'considera superficie y no ruido de redondeo del lindero. Se lista igual, con sus ' +
           'cifras: incluirla o no es tuyo.',
@@ -454,8 +462,9 @@ export function derivarCesion(entrada) {
     detecciones.push(
       crearDeteccionDerivacion(
         TIPO_DERIVACION.PIEZA_NO_EMITIBLE,
+        // «grosor medio» y no «ancho»: ver la nota de PIEZA_ESTRECHA (2026-08-16).
         `La pieza nº ${p.orden} (${numero(p.area, 4)} m², ${numero(p.grosor * 1000, 1)} mm de ` +
-          'ancho) NO puede ser una parcela: escrita con los 2 decimales del fichero deja de ' +
+          'grosor medio) NO puede ser una parcela: escrita con los 2 decimales del fichero deja de ' +
           'encerrar superficie —sus dos bordes caen sobre las mismas coordenadas— y sin recinto ' +
           'no hay punto de referencia que declarar. Es la astilla que queda al enganchar tu ' +
           'medición al lindero oficial, no terreno. Se queda FUERA del expediente; si de verdad ' +
@@ -527,9 +536,10 @@ export function derivarCesion(entrada) {
   detecciones.push(
     crearDeteccionDerivacion(
       TIPO_DERIVACION.CRECE_FUERA,
+      // «grosor medio» y no «ancho»: ver la nota de PIEZA_ESTRECHA (2026-08-16).
       `La parcela editada NO cabe dentro de la oficial: se sale por ${fuera.length} ` +
         `${fuera.length === 1 ? 'sitio' : 'sitios'}, ${numero(areaFuera, 4)} m² en total y hasta ` +
-        `${numero(grosorMaximo, 3)} m de ancho. Eso no es una cesión: es superficie que hay que quitarle ` +
+        `${numero(grosorMaximo, 3)} m de grosor medio. Eso no es una cesión: es superficie que hay que quitarle ` +
         'a alguien, y quien la pierde tiene que ir en el expediente o el IVG saldrá negativo. ' +
         'El sobrante que se lista aquí sería un expediente INCOMPLETO.',
       SEVERIDAD.ERROR,

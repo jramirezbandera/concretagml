@@ -1512,7 +1512,17 @@ export function crearVisor(contenedor, opciones = {}) {
       // cablearla desde `app/main.js`. Ver la propiedad `barraEdicion` del
       // typedef {@link Visor}.
       if (opcionesEdicion.barra) {
-        barraEdicion = crearBarraEdicion({ mapa, posicion: opcionesEdicion.posicionBarra })
+        // `alAvisar` NO es opcional aquí, aunque el parámetro lo sea: era la única
+        // pieza del ensamblaje que se montaba sin el canal (auditoría V7), y su
+        // único aviso —la caída a `bottomleft` cuando el mapa no expone
+        // `_controlCorners`, `barra-edicion.js`— se iba al `console.warn` del suelo
+        // mínimo en vez de a la UI. O sea: la barra aparecía en otra esquina,
+        // encima del control de escala, y nadie se lo contaba al usuario.
+        barraEdicion = crearBarraEdicion({
+          mapa,
+          posicion: opcionesEdicion.posicionBarra,
+          alAvisar: avisar,
+        })
         deshacer.push(() => barraEdicion.destruir())
       }
     }

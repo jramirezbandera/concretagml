@@ -756,11 +756,6 @@ export function crearLeyenda({
   // Patrón obligatorio del visor: se resuelve (y se valida) aunque no se use.
   resolverAvisar(alAvisar)
 
-  const control = new ControlLeyenda({ position: posicion })
-  mapa.addControl(control)
-
-  let destruido = false
-
   /**
    * Valida y normaliza una lista de grupos.
    *
@@ -791,7 +786,22 @@ export function crearLeyenda({
     return [...new Set(lista)]
   }
 
-  control._grupos = validar(grupos)
+  // ⛔ **TODO se valida ANTES de montar nada** (auditoría V5, 2026-08-16). Los
+  // grupos se validaban DESPUÉS del `mapa.addControl`, al revés que el mapa, la
+  // esquina y `abierta`: con un grupo inválido la excepción salía **con la pastilla
+  // «Leyenda» ya colgada del mapa y sin asa para quitarla**, porque una función que
+  // lanza no devuelve el `destruir()`. Un contrato roto lo arregla el programador
+  // leyendo el mensaje; un control huérfano sobre la esquina no lo puede arreglar
+  // nadie. Es la misma disciplina de los dos cajones: validar entero, montar
+  // después.
+  const gruposIniciales = validar(grupos)
+
+  const control = new ControlLeyenda({ position: posicion })
+  mapa.addControl(control)
+
+  let destruido = false
+
+  control._grupos = gruposIniciales
   control._repintar()
   control._fijarAbierta(abierta)
 

@@ -102,8 +102,9 @@ const ORIGEN_POR_FORMATO = Object.freeze({
 
 /** No se han podido leer los bytes. Es del entorno, no del fichero. */
 export const MENSAJE_FICHERO_NO_LEIDO =
-  'No se ha podido leer ese fichero. Si lo has arrastrado desde una unidad de red o desde el ' +
-  'correo, prueba a guardarlo primero en el disco.'
+  'No se ha podido leer el contenido del fichero. Suele pasar cuando se ha movido, renombrado o ' +
+  'desconectado la unidad desde que se eligió, o cuando se arrastra desde el correo o una unidad ' +
+  'de red: guárdalo primero en el disco y vuelve a abrirlo. No se ha cambiado nada.'
 
 /** El usuario ha cerrado la revisión sin aceptar. No ha ido nada mal. */
 export const MENSAJE_CANCELADO =
@@ -133,6 +134,33 @@ export const MENSAJE_SIN_REFERENCIA =
  * que da `importar()`, que es el que sabe por qué.
  */
 export const ENCABEZADO_NO_CONSTRUIDA = 'No ha entrado ninguna parcela de ese fichero.'
+
+/**
+ * ⛔ **Un fichero SUPERADO por otro que se soltó después** (auditoría 2026-08-16,
+ * hallazgo B2).
+ *
+ * Se dice, y no es opcional: un fichero que el usuario suelta y que no entra sin
+ * que nadie lo cuente es exactamente la regla de oro 1 rota. Y aquí el usuario **no
+ * puede deducirlo**: los dos gestos son suyos, pero él no sabe que la lectura del
+ * primero seguía en vuelo cuando soltó el segundo — lo que ve es que uno de los dos
+ * ficheros «no ha hecho nada».
+ *
+ * Misma redacción y mismo criterio que la de `app/cableado-edificio.js`: es el
+ * mismo hecho en la otra rama, como ya pasa con {@link MENSAJE_FICHERO_NO_LEIDO}.
+ *
+ * ⚠️ **No afirma que el otro haya entrado**, solo que llegó después: el segundo
+ * fichero puede haber fallado por su cuenta (y entonces lo dice su propio mensaje),
+ * y esta frase seguiría siendo verdad. Decir aquí «es ése el que ha entrado» sería
+ * afirmar algo que este punto del recorrido no sabe.
+ *
+ * @param {string} nombre   El que se descarta.
+ * @param {string} vigente  El que llegó después.
+ * @returns {string}
+ */
+export const mensajeFicheroSuperado = (nombre, vigente) =>
+  `No se ha cargado «${nombre}»: mientras se leía soltaste «${vigente}». Entre dos ficheros manda ` +
+  `el ÚLTIMO que sueltas, no el que termine de leerse antes. Si el que querías era «${nombre}», ` +
+  `suéltalo otra vez.`
 
 // ── F19 · La vista previa del pegado ─────────────────────────────────────────
 
@@ -621,6 +649,28 @@ export function cablearMedicion({
   }
 
   let destruido = false
+
+  // ── ⛔ EL TOKEN DE LA PUERTA: ENTRE DOS FICHEROS MANDA EL ÚLTIMO SOLTADO ────
+  //
+  // **Auditoría 2026-08-16, hallazgo B2.** {@link alFichero} lee los bytes con un
+  // `await` y nada ordenaba las dos lecturas: soltar dos ficheros casi a la vez
+  // —o uno mientras el anterior todavía se leía— dejaba ganar al que RESUELVE
+  // último, que con un fichero grande y otro pequeño es el que se soltó PRIMERO. El
+  // usuario veía entrar lo que acababa de soltar y, un instante después, otra cosa.
+  //
+  // Es exactamente la defensa 2 del Catastro (`app/cableado-catastro.js`: «una
+  // respuesta lenta de un encuadre viejo NUNCA puede pisar una imagen más nueva»)
+  // aplicada a la otra puerta por la que entra geometría. Aquí es igual de caro:
+  // esto escribe la geometría que se firma y `alCargarParcela` reinicia el
+  // historial, así que lo pisado tampoco vuelve con Ctrl+Z.
+  //
+  // ⚠️ Y **con aviso**, al revés que la consulta superada del Catastro: allí el
+  // usuario sabe que ha sustituido su propia consulta; aquí no sabe que el primer
+  // fichero seguía leyéndose. Ver {@link mensajeFicheroSuperado}.
+  let secuenciaFichero = 0
+  /** El nombre del último fichero aceptado, para poder decir quién ganó. */
+  let ficheroVigente = null
+
   const revision = dialogo ?? crearDialogoImportacion({ documento, alAvisar: panel.avisar })
 
   const avisar = (mensaje, nivel = NIVEL.AVISO, extra = {}) => {
@@ -955,6 +1005,11 @@ export function cablearMedicion({
     if (destruido) return
     const nombre = esTexto(fichero?.name) ? fichero.name : 'fichero sin nombre'
 
+    // El token se coge al ACEPTAR el fichero, no al terminar de leerlo: es el orden
+    // en que el usuario los soltó, que es el único que él conoce. Ver el token.
+    const token = ++secuenciaFichero
+    ficheroVigente = nombre
+
     /** @type {ArrayBuffer} */
     let crudo
     try {
@@ -965,6 +1020,12 @@ export function cablearMedicion({
       return
     }
     if (destruido) return
+    if (token !== secuenciaFichero) {
+      // Superado mientras se leía. No se decodifica siquiera —el trabajo ya no le
+      // sirve a nadie— y se cuenta con los dos nombres.
+      avisar(mensajeFicheroSuperado(nombre, ficheroVigente ?? 'otro fichero'))
+      return
+    }
 
     let texto
     try {
@@ -978,7 +1039,7 @@ export function cablearMedicion({
       return
     }
 
-    await alTexto(texto, nombre, true)
+    await alTexto(texto, nombre, true, token)
   }
 
   /**
@@ -993,14 +1054,25 @@ export function cablearMedicion({
    *   renglón de procedencia: llamar «fichero» a lo que el usuario acaba de pegar
    *   es una afirmación falsa, y justo en la línea que existe para decir de dónde
    *   salió el dato. Lo destapó la primera corrida del guion 18.
+   * @param {number|null} [token=null]  El de la puerta, cuando esto viene de un
+   *   fichero: {@link alFichero} ya lo cogió al aceptarlo y aquí solo se comprueba.
+   *   `null` es «esta entrada es nueva» —el pegado— y entonces coge el suyo, que es
+   *   lo correcto: pegar unas coordenadas también es soltar algo, y si hay un
+   *   fichero todavía leyéndose, manda lo último que el usuario ha hecho.
    * @returns {Promise<void>}
    */
-  async function alTexto(texto, nombre = 'coordenadas pegadas', deFichero = false) {
+  async function alTexto(texto, nombre = 'coordenadas pegadas', deFichero = false, token = null) {
     if (destruido) return
     if (!esTexto(texto)) {
       // Contrato del programador, no dato del usuario: un pegado vacío lo para el
       // diálogo mucho antes de llegar aquí.
       throw new TypeError(`cablearMedicion.alTexto: 'texto' debe ser un string no vacío.`)
+    }
+
+    let vigilancia = token
+    if (vigilancia === null) {
+      vigilancia = ++secuenciaFichero
+      ficheroVigente = nombre
     }
 
     try {
@@ -1030,6 +1102,15 @@ export function cablearMedicion({
         for (const d of decisiones) resueltas.add(d.tipo)
         opts = { ...opts, ...elegido }
         resultado = importar(texto, opts)
+      }
+
+      // ⛔ **Y aquí otra vez el token**, porque las rondas de decisión son el otro
+      // `await` de este recorrido: soltar un fichero mientras la pantalla de
+      // revisión del anterior está abierta dejaría entrar los DOS, y el viejo el
+      // último. Se comprueba después de la última espera y antes de tocar nada.
+      if (vigilancia !== secuenciaFichero) {
+        avisar(mensajeFicheroSuperado(nombre, ficheroVigente ?? 'otro fichero'))
+        return
       }
 
       // ── 2 bis · ⭐ F22 · ¿Es que el dibujo trae VARIAS fincas? ────────────

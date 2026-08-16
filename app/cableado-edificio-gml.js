@@ -230,6 +230,23 @@ export function cablearGeneracionGmlEdificio({
     )
   }
 
+  // ── ⛔ LA BANDERA QUE FALTABA (auditoría 2026-08-16, hallazgo B3) ───────────
+  //
+  // Éste era el ÚNICO cableado de `app/` sin `destruido`, y no era inocuo: soltar
+  // los cables impide que lleguen EVENTOS, no que alguien LLAME. Y hay quien llama:
+  // `app/main.js` invoca `refrescar()` en cada conmutación de rama, y el botón y el
+  // renglón son **los mismos nodos** que gobierna la rama de parcela (el pie no se
+  // intercambia, lo dice `app/rama.js`). Un cable ya destruido podía por tanto
+  // escribirle encima el motivo de un edificio que ya no se ve, y publicar por
+  // {@link alValidacion} la validación de un documento retirado — que es lo que
+  // mueve el resalte de las huellas en el mapa.
+  //
+  // El patrón es el de los demás (`cableado-informe-edificio.js`,
+  // `cableado-contraste-edificio.js`, `cableado-diagnostico.js`): guarda al
+  // principio de cada método público y `destruido = true` al frente de `destruir()`,
+  // que además queda IDEMPOTENTE.
+  let destruido = false
+
   /** Escribe el renglón. Vacío + sin modificador es «todo en orden». */
   function decir(texto, esError) {
     nodoRenglon.textContent = texto
@@ -301,7 +318,7 @@ export function cablearGeneracionGmlEdificio({
    * cableado existe para no producir.
    */
   function refrescar() {
-    if (!mando()) return
+    if (destruido || !mando()) return
     let examen
     try {
       examen = examinar(estadoEdificio?.get() ?? null)
@@ -332,6 +349,7 @@ export function cablearGeneracionGmlEdificio({
 
   /** El recorrido completo, con la red que impide el botón mudo. */
   function generar() {
+    if (destruido) return null
     let fase = FASE.GENERACION
     try {
       return recorrido(() => {
@@ -490,7 +508,10 @@ export function cablearGeneracionGmlEdificio({
       return () => oyentesValidacion.delete(fn)
     },
 
+    /** Suelta los dos cables y deja el módulo INERTE. IDEMPOTENTE. */
     destruir() {
+      if (destruido) return
+      destruido = true
       nodoBoton.removeEventListener('click', generar)
       desuscribir()
       oyentesValidacion.clear()

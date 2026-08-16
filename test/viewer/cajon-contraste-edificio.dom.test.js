@@ -561,6 +561,97 @@ describe('F14 · cajón sobre el mapa vs. pantalla en el panel', () => {
 })
 
 // ═════════════════════════════════════════════════════════════════════════════
+// ⛔ EL BLOQUE ANCLADO Y LA REJILLA: las dos correcciones MEDIDAS del hermano
+// que este cajón heredaba a medias (auditoría 2026-08-16)
+// ═════════════════════════════════════════════════════════════════════════════
+// Los dos cajones son la misma pieza en las dos ramas y comparten receta de
+// anclado y de rejilla. El hermano midió y corrigió los dos defectos el
+// 2026-08-15; este cajón importaba los MISMOS estilos y conservaba los valores
+// viejos. Estas pruebas son el candado para que no vuelvan a divergir.
+describe('F14 · el bloque anclado y la rejilla heredan la corrección del hermano', () => {
+  it('⛔ el ancla del bloque pegado abajo llega al SUELO: compensa el relleno inferior', () => {
+    // ⛔ **`bottom` tiene que compensar el `padding-bottom`, no ser `0`.** Medido
+    // en Chrome el 2026-08-15 sobre el cajón hermano: con `bottom: 0` el borde
+    // inferior del sticky se ancla a la caja de RELLENO del contenedor que
+    // scrollea, no a su borde, y por esa rendija de 10 px seguía pasando texto
+    // POR DEBAJO del botón primario, como si fuera su pie. Aquí se exige lo que
+    // de verdad importa —que el ancla compense el relleno de abajo—, igual que
+    // lo afirma `test/viewer/cajon-diagnostico.dom.test.js`.
+    const { q } = montar()
+    const raiz = q(`.${CLASE_CONTENEDOR}`)
+    let ancla = null
+    for (let el = q(SELECTOR.ESTADO); el !== null && el !== raiz; el = el.parentElement) {
+      if (el.style.position === 'sticky') ancla = el
+    }
+    expect(ancla, 'no hay bloque anclado del que colgar lo accionable').not.toBe(null)
+
+    const rellenoAbajo = Number.parseFloat(raiz.style.paddingBottom) || 0
+    expect(rellenoAbajo, 'el cajón ha perdido su relleno inferior').toBeGreaterThan(0)
+    expect(Number.parseFloat(ancla.style.bottom)).toBe(-rellenoAbajo)
+
+    // Lo que HABLA y lo que se PULSA van dentro del bloque, con fondo opaco.
+    for (const sel of [SELECTOR.PREPARAR, SELECTOR.CONSULTAR, SELECTOR.ESTADO, SELECTOR.ESTADO_INFORME]) {
+      expect(ancla.contains(q(sel)), `se queda fuera del bloque anclado: ${sel}`).toBe(true)
+    }
+    expect(ancla.style.background).not.toBe('')
+    expect(ancla.style.background).not.toBe('transparent')
+  })
+
+  it('⛔ las tres rejillas de datos son LA MISMA que la del hermano, no la maquetación vieja', () => {
+    // El 2026-08-15 el hermano midió que `auto 1fr` + `gap: 2px 10px` era «el
+    // peor defecto del panel»: la ETIQUETA se quedaba con el ancho que pidiera y
+    // la cifra se partía en cuatro líneas («146,87 m² · 90,31 % de la mayor» en
+    // ~150 px). La corrección es `minmax(0,1fr) auto` —la que se parte es la
+    // PROSA—, cifra a la derecha, `baseline` y 6 px de aire. Este cajón compone
+    // cifras aún MÁS largas con etiquetas de 27 caracteres, así que se compara
+    // contra el DOM del hermano montado: si un día divergen, esto se pone rojo.
+    const { mapa, cajon } = montar()
+    const raiz = cajon.control.getContainer()
+    const otro = crearCajonDiagnostico({ mapa })
+    try {
+      const patron = otro.control.getContainer().querySelector('dl')
+      expect(patron.style.gridTemplateColumns, 'el hermano ha cambiado su rejilla').toBe(
+        'minmax(0,1fr) auto',
+      )
+      const rejillas = [...raiz.querySelectorAll('dl')]
+      expect(rejillas).toHaveLength(3)
+      for (const dl of rejillas) {
+        for (const prop of ['display', 'gridTemplateColumns', 'columnGap', 'rowGap', 'alignItems']) {
+          expect(dl.style[prop], `dl.${prop} diverge del cajón hermano`).toBe(patron.style[prop])
+        }
+      }
+    } finally {
+      otro.destruir()
+    }
+  })
+
+  it('las cifras van a la DERECHA, y un motivo/resumen se viste de PROSA (y a la vuelta, de cifra)', () => {
+    // La otra mitad de la receta del hermano: la cifra a la derecha es lo que
+    // hace comparables números de anchos distintos leídos en columna, y prosa de
+    // 15 px justificada a la derecha «es exactamente lo que no se lee».
+    const { cajon, q } = montar()
+    cajon.pintar(COMPLETO())
+    for (const sel of [SELECTOR.MEDIDA, SELECTOR.OFICIAL, SELECTOR.SOLAPE, SELECTOR.EN_PARCELA]) {
+      expect(q(sel).style.textAlign, sel).toBe('right')
+      expect(q(sel).style.fontSize, sel).toBe(ESCALA.DATO)
+    }
+
+    cajon.pintar(HONESTO())
+    // La medida sigue siendo cifra (es nuestra); el resto lleva motivo o resumen.
+    expect(q(SELECTOR.MEDIDA).style.textAlign).toBe('right')
+    for (const sel of [SELECTOR.OFICIAL, SELECTOR.SOLAPE, SELECTOR.EN_PARCELA]) {
+      expect(q(sel).style.textAlign, sel).toBe('left')
+      expect(q(sel).style.fontSize, sel).toBe(ESCALA.CUERPO)
+    }
+
+    // El camino de vuelta es el que se olvida (lección del hermano).
+    cajon.pintar(COMPLETO())
+    expect(q(SELECTOR.SOLAPE).style.textAlign).toBe('right')
+    expect(q(SELECTOR.SOLAPE).style.fontSize).toBe(ESCALA.DATO)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
 // ⭐ LA ESCALA COMPARTIDA CON EL CAJÓN HERMANO (2026-08-10)
 // ═════════════════════════════════════════════════════════════════════════════
 // Los dos cajones son la misma pieza en las dos ramas, y hasta hoy escribían sus

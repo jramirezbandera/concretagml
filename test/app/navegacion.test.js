@@ -634,6 +634,47 @@ describe('T1 · los hechos van POR RAMA', () => {
     expect(nav.get().paso).toBe(PASO.EDICION)
     expect(nav.hechosDe(RAMA.EDIFICIO).geometria).toBe(true)
   })
+
+  it('⛔ actualizar los hechos SIN cambiar ninguno NO notifica (auditoría B4)', () => {
+    // ⭐ **El invariante en el que se apoya `app/barra.js` (decisión A1) y que
+    // `app/main.js#refrescarHechos` afirma por escrito: «solo notifica si el paso
+    // activo deja de sostenerse».** Era falso: `actualizarHechos` llamaba SIEMPRE a
+    // `asentar` → `publicar` → `store.set(objeto nuevo)`, y `crearEstadoVista.set`
+    // notifica sin comparar. Medido: `refrescarHechos()` producía 2 notificaciones
+    // completas aunque no cambiara ni un hecho —una por rama— más el
+    // `barra.repintar()` explícito, o sea **3 pintadas enteras del rail por cada
+    // vértice arrastrado**, con sus 3 pasadas de contraste, pantalla y ruta.
+    const nav = crearNavegacion({ hechos: { geometria: true, oficial: true }, avisar: () => {} })
+    nav.navegarAPaso(PASO.DIAGNOSTICO)
+    const visto = vi.fn()
+    nav.subscribe(visto)
+
+    // Los mismos hechos, de las tres formas en que llegan: el registro entero (lo
+    // que hace `refrescarHechos`), una sola clave, y ninguna.
+    expect(nav.actualizarHechos({ geometria: true, oficial: true }).ok).toBe(true)
+    nav.actualizarHechos({ oficial: true })
+    nav.actualizarHechos({})
+    // Y los de la rama INACTIVA, que tampoco cambian.
+    nav.actualizarHechos({ geometria: false }, RAMA.EDIFICIO)
+    expect(visto, 'nada ha cambiado: nadie tiene que repintar').not.toHaveBeenCalled()
+
+    // ⚠️ La otra mitad, sin la cual la guarda podría no publicar NUNCA y este test
+    // seguiría verde: lo que SÍ cambia sigue notificando, y sigue tirando del paso.
+    expect(nav.actualizarHechos({ oficial: false }).ok).toBe(false)
+    expect(visto).toHaveBeenCalledTimes(1)
+    expect(nav.get().paso).toBe(PASO.EDICION)
+    expect(nav.get().hechos).toEqual({ geometria: true, oficial: false })
+  })
+
+  it('y el hecho de la rama inactiva que SÍ cambia se guarda igual', () => {
+    // Anti-vacuidad de la guarda por el otro lado: no publicar no puede significar
+    // no guardar. Es lo que sostiene el conmutador de rama.
+    const nav = crearNavegacion({ hechos: { PARCELA: { geometria: true } } })
+    nav.actualizarHechos({ geometria: true, oficial: true }, RAMA.EDIFICIO)
+    expect(nav.hechosDe(RAMA.EDIFICIO)).toEqual({ geometria: true, oficial: true })
+    expect(nav.cambiarRama(RAMA.EDIFICIO).ok).toBe(true)
+    expect(nav.get().hechos).toEqual({ geometria: true, oficial: true })
+  })
 })
 
 /* ⛔ **AQUÍ VIVÍA `describe('T1 · la puerta (D4…)')`, CON SUS CINCO PRUEBAS, Y SE

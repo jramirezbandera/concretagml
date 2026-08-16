@@ -576,6 +576,39 @@ describe('las cinco vías de entrada', () => {
     expect(procedencia()).toContain('Del Catastro')
   })
 
+  it('⛔ dos ficheros soltados casi a la vez: gana el ÚLTIMO SOLTADO, no el que lee antes', async () => {
+    // ⭐ **Auditoría 2026-08-16, hallazgo B2.** `alFichero` lee los bytes con un
+    // `await` y no había nada que ordenara las dos lecturas: si el primer fichero es
+    // grande y el segundo pequeño, el pequeño se aplica y **el grande lo pisa
+    // después**. El usuario ve entrar lo que soltó y, un segundo más tarde, otra cosa
+    // — la que ya había descartado.
+    const { cableado, estado, avisos } = montar()
+
+    const lento = ficheroDeTexto(textoDe(RUTA_TXT), 'lento.txt')
+    let entregarBytes = null
+    lento.arrayBuffer = () =>
+      new Promise((cumplir) => {
+        entregarBytes = () => cumplir(new Uint8Array(bytesDe(RUTA_TXT)).buffer)
+      })
+
+    const enVuelo = cableado.alFichero(lento) // se queda leyendo
+    await soltar(cableado, ficheroDe(RUTA_LIST, 'rapido.txt')) // éste entra entero
+    expect(estado.get().idLocal, 'el segundo soltado entra sin esperar al primero').toBe(
+      'rapido.txt',
+    )
+
+    entregarBytes()
+    await enVuelo
+    await cederTurno()
+
+    expect(estado.get().idLocal, 'el fichero superado NO puede pisar al que entró después').toBe(
+      'rapido.txt',
+    )
+    // Y no entra en silencio: un fichero soltado que no se carga se dice, con su
+    // nombre (regla de oro 1).
+    expect(avisos.map((a) => a.mensaje).join(' ')).toContain('lento.txt')
+  })
+
   it('el fichero ilegible se dice y no cambia nada', async () => {
     const { cableado, estado, avisos } = montar()
     const roto = ficheroDeTexto('lo que sea', 'x.dxf')

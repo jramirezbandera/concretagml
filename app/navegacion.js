@@ -1054,14 +1054,43 @@ export function crearNavegacion({
      * Actualiza los hechos de una rama (la activa por omisión) y reevalúa. Es lo
      * que llama el aplicador cuando el store del documento cambia.
      *
+     * ⛔ **Si NINGÚN hecho cambia, no se publica** (auditoría 2026-08-16, hallazgo
+     * B4). Es el invariante que `app/barra.js` (decisión A1) y
+     * `app/main.js#refrescarHechos` afirman por escrito —«solo notifica si el paso
+     * activo deja de sostenerse»— y que este método llevaba rompiendo: llamaba
+     * SIEMPRE a `asentar` → `publicar` → `store.set(objeto nuevo)`, y
+     * `crearEstadoVista.set` notifica sin comparar. Medido: `refrescarHechos()`
+     * producía **2 notificaciones completas** —una por rama— aunque no cambiara ni
+     * un hecho, más el `barra.repintar()` explícito de aquella función: **3
+     * pintadas enteras del rail por cada vértice arrastrado**, con sus tres pasadas
+     * de `contraste.aplicar`, `pantalla.aplicar` y `escribirRuta`.
+     *
+     * ⚠️ **La comparación es superficial y basta**: {@link fundirHechos} devuelve
+     * un registro plano con exactamente {@link CLAVES_HECHOS} booleanas, así que no
+     * hay nada anidado que comparar. Y se compara lo FUNDIDO contra lo que había,
+     * no `parciales` contra nada: `{}` y `{oficial: true}` sobre un `oficial` que
+     * ya era `true` son los dos «no ha cambiado nada».
+     *
+     * ⚠️ Y **no publicar no es no guardar**: el registro fundido se escribe igual
+     * (aunque sea idéntico), que es lo que sostiene el conmutador de rama. Lo único
+     * que se ahorra es despertar a quien pinta.
+     *
      * @param {object} parciales  Solo las claves que cambian.
      * @param {string} [rama]     A qué rama pertenecen; la activa por omisión.
      * @returns {Desenlace}
      */
     actualizarHechos(parciales, rama = store.get().rama) {
       exigirRama(rama, 'actualizarHechos')
-      porRama[rama] = fundirHechos(parciales, porRama[rama], 'actualizarHechos')
+      const antes = porRama[rama]
+      const fundido = fundirHechos(parciales, antes, 'actualizarHechos')
+      porRama[rama] = fundido
       const actual = store.get()
+      if (CLAVES_HECHOS.every((clave) => fundido[clave] === antes[clave])) {
+        // Nada que reevaluar: con los mismos hechos, la misma rama y el mismo paso,
+        // el veredicto es por fuerza el que ya está publicado. Se devuelve el
+        // desenlace de «no ha pasado nada», que es el mismo que devolvía `asentar`.
+        return { ok: true, paso: actual.paso, causa: null, motivo: null }
+      }
       return asentar({ rama: actual.rama, paso: actual.paso })
     },
 

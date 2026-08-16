@@ -317,7 +317,9 @@ describe('recortarVecinos · ⛔ a un vecino se le recorta por GROSOR, no por á
     // AVISO: no es un fallo del expediente, es una parcela que no entra.
     const d = r.detecciones.find((x) => x.tipo === TIPO_DERIVACION.VECINO_SOLO_REDONDEO)
     expect(d.severidad).toBe('AVISO')
-    expect(d.mensaje).toMatch(/1,5 mm de ancho/)
+    // «grosor medio» y no «ancho»: ver la nota de `test/derivacion/cesion.test.js`
+    // (auditoría 2026-08-16, la cifra es `2A/P` y no el ancho de la franja).
+    expect(d.mensaje).toMatch(/1,5 mm de grosor medio/)
   })
 
   it('⭐ y 5 cm SÍ lo recortan: el arreglo no ha apagado el caso que la fase existe para hacer', () => {

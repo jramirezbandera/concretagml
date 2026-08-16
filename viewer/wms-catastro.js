@@ -197,12 +197,22 @@ export const FORMATO_DEFECTO = 'image/png'
  * Por qué {@link getMapUrl} LANZA al superarlo (regla de oro 1): sin esta guarda,
  * `getMapUrl` construía sin objeción un `WIDTH=6000` y el llamante recibía una
  * imagen de otro tamaño **sin enterarse** — un boquete en la regla 1 (error
- * silencioso) y, peor, una imagen con otra escala de la que el llamante cree. En
- * el visor no se dispara nunca (el tamaño es el del lienzo), pero **F09 pide 2126
- * px de ancho para un plano de 180 mm a 300 ppp y podría pedir más** en formatos
- * grandes. Como el tamaño lo ELIGE el programador (no el usuario), la política
- * del proyecto es `throw`: F09 debe trocear el plano en varias peticiones o
- * reducir el tamaño DELIBERADAMENTE, no descubrir el recorte por accidente.
+ * silencioso) y, peor, una imagen con otra escala de la que el llamante cree.
+ * **F09 pide 2126 px de ancho para un plano de 180 mm a 300 ppp y podría pedir
+ * más** en formatos grandes. Como ahí el tamaño lo ELIGE el programador (no el
+ * usuario), la política del proyecto es `throw`: F09 debe trocear el plano en
+ * varias peticiones o reducir el tamaño DELIBERADAMENTE, no descubrir el recorte
+ * por accidente.
+ *
+ * ⛔ **Y en el visor SÍ se dispara** — aquí decía «no se dispara nunca (el tamaño
+ * es el del lienzo)», y era falso: el lienzo lo elige el MONITOR del usuario, no
+ * el programador. Un 8K son 7680 px de ancho, y un mapa embebido a lo ancho de un
+ * escritorio grande pasa de 4000 sin esfuerzo. Con aquel supuesto, `_solicitar`
+ * pasaba el tamaño del lienzo sin guarda y cada `moveend` lanzaba dentro del
+ * `fire()` de Leaflet: la capa se quedaba muda para siempre y el canal de avisos
+ * no se enteraba. La capa ya no le pide al servicio lo que no puede dar: recorta
+ * al techo conservando la proporción y lo DICE una vez. Ver {@link
+ * tamanoAlTecho} y {@link MENSAJES.LIENZO_SOBRE_EL_TECHO}.
  */
 export const MAX_PIXELES_WMS = 4000
 
@@ -273,6 +283,22 @@ export const MENSAJES = Object.freeze({
   OBSOLETA:
     'No se ha podido actualizar la cartografía catastral del Catastro; se sigue mostrando ' +
     'la del encuadre anterior (obsoleta).',
+  /**
+   * El mapa es más grande de lo que el servicio sabe servir. **No es un fallo y
+   * no se pierde nada geométrico**: la imagen se estira sobre el mismo encuadre,
+   * así que sigue encajando con la geometría; lo único que baja es la nitidez. Se
+   * dice igual (regla de oro 1) porque «hoy la cartografía se ve peor que ayer en
+   * otro monitor» es exactamente el tipo de cosa que, sin explicación, se lee como
+   * que la aplicación se ha estropeado.
+   *
+   * Las cifras concretas (lienzo, tamaño pedido, techo) van en el DETALLE, no en
+   * el texto: el mensaje es constante para que la UI y los tests lo comparen por
+   * identidad, como los otros dos.
+   */
+  LIENZO_SOBRE_EL_TECHO:
+    'El mapa es más grande de lo que el servicio de cartografía del Catastro sabe servir ' +
+    `(${MAX_PIXELES_WMS} px por lado), así que se pide a menor resolución y se ve menos ` +
+    'nítida. Encaja igual con la geometría: no afecta a las medidas ni al GML.',
 })
 
 // Decimales con los que se serializan las coordenadas del BBOX. 3 decimales =
@@ -502,6 +528,48 @@ function validarFormato(formato) {
   }
 }
 
+/**
+ * ⛔ **El tamaño que de verdad se le puede pedir al servicio** (auditoría V3,
+ * 2026-08-16). Devuelve el mismo tamaño si cabe, y si no, el mayor que cabe **con
+ * la MISMA proporción**.
+ *
+ * ── Por qué recortar y no rendirse ──────────────────────────────────────────
+ * La capa coloca la imagen con `setBounds(bounds)`: se ESTIRA sobre el encuadre,
+ * pase lo que pase con su número de píxeles. Así que pedir 4000 px para un lienzo
+ * de 5000 no miente en nada geométrico —la cartografía cae exactamente donde
+ * tiene que caer, que es lo que importa cuando se está calcando encima—; lo único
+ * que baja es la nitidez. Quedarse sin cartografía sería mucho peor, y es lo que
+ * hacía de hecho el defecto que esto cierra.
+ *
+ * ── Por qué la proporción se conserva ───────────────────────────────────────
+ * Recortar SOLO el eje que se pasa (5000×3000 → 4000×3000) sí sería deshonesto:
+ * al estirar esa imagen sobre un encuadre de otra proporción, la cartografía
+ * saldría DEFORMADA, y una imagen deformada sobre la que se calca es un error que
+ * se paga en metros. Se escala por el mismo factor en los dos ejes. (Es además lo
+ * que hace el propio servicio cuando se le pasa uno: medido el 2026-07-26,
+ * `4001×100` devolvió `4000×2000` — recorta un eje y reescala el otro por su
+ * cuenta, sin decirlo.)
+ *
+ * `Math.floor` y no `round`: redondear hacia arriba podría devolver 4001 y volver
+ * a lanzar, que es justo lo que no puede pasar. El `Math.max(1, …)` cubre el caso
+ * degenerado de un lienzo larguísimo y de 1 px de alto.
+ *
+ * @param {number} ancho  Ancho del lienzo en píxeles enteros (> 0).
+ * @param {number} alto   Alto del lienzo en píxeles enteros (> 0).
+ * @returns {{ancho:number, alto:number, recortado:boolean}}
+ */
+function tamanoAlTecho(ancho, alto) {
+  if (ancho <= MAX_PIXELES_WMS && alto <= MAX_PIXELES_WMS) {
+    return { ancho, alto, recortado: false }
+  }
+  const factor = Math.min(MAX_PIXELES_WMS / ancho, MAX_PIXELES_WMS / alto)
+  return {
+    ancho: Math.max(1, Math.floor(ancho * factor)),
+    alto: Math.max(1, Math.floor(alto * factor)),
+    recortado: true,
+  }
+}
+
 // ── La capa: un único L.ImageOverlay gestionado por encuadre ──────────────────
 
 /**
@@ -628,6 +696,7 @@ const CapaWMSCatastro = L.ImageOverlay.extend({
     this._precarga = null // <img> desprendido en vuelo (si hay)
     this._obsoleta = false
     this._atenuada = false // la imagen visible se muestra como PROVISIONAL
+    this._avisadoDelTecho = false // ya se dijo que el lienzo no cabe (una vez, no por encuadre)
     this._temporizadorFundido = null
     this._cuenta = { peticiones: 0, aplicadas: 0, cargadas: 0, descartadas: 0, fallidas: 0 }
 
@@ -817,7 +886,12 @@ const CapaWMSCatastro = L.ImageOverlay.extend({
    * panel oculto) o si el encuadre degenera: no hay nada que pedir, y no es un
    * error que contar al usuario.
    *
-   * @returns {{bounds: import('leaflet').LatLngBounds, bbox: BBoxProyectado, tamano: TamanoImagen}|null}
+   * El `tamano` que devuelve es el **pedible**, no el del lienzo: por encima del
+   * techo del servicio va recortado ({@link tamanoAlTecho}). Los dos viajan, y el
+   * del lienzo con ellos, porque quien avisa necesita las tres cifras.
+   *
+   * @returns {{bounds: import('leaflet').LatLngBounds, bbox: BBoxProyectado,
+   *   tamano: TamanoImagen, lienzo: TamanoImagen, recortado: boolean}|null}
    */
   _encuadre() {
     const mapa = this._map
@@ -827,6 +901,7 @@ const CapaWMSCatastro = L.ImageOverlay.extend({
     const ancho = Math.round(tam.x)
     const alto = Math.round(tam.y)
     if (!(ancho > 0) || !(alto > 0)) return null
+    const pedible = tamanoAlTecho(ancho, alto)
 
     const bounds = mapa.getBounds()
     // Proyección de las DOS esquinas del encuadre a metros Web Mercator. En 3857
@@ -841,12 +916,33 @@ const CapaWMSCatastro = L.ImageOverlay.extend({
     }
     if (!(bbox.maxX > bbox.minX) || !(bbox.maxY > bbox.minY)) return null
 
-    return { bounds, bbox, tamano: { ancho, alto } }
+    return {
+      bounds,
+      bbox,
+      tamano: { ancho: pedible.ancho, alto: pedible.alto },
+      lienzo: { ancho, alto },
+      recortado: pedible.recortado,
+    }
   },
 
   /**
-   * UNA petición por encuadre: calcula la URL, deduplica y precarga. Nunca
-   * lanza (corre dentro de handlers de eventos de Leaflet).
+   * UNA petición por encuadre: calcula la URL, deduplica y precarga.
+   *
+   * ⛔ **Nunca lanza, y eso es una obligación, no una descripción**: esto corre
+   * dentro del `fire()` de Leaflet (`moveend`, `resize`, `onAdd`), donde una
+   * excepción se lleva por delante a los demás oyentes, deja la capa muda para
+   * siempre y no pasa por `alAvisar` — el error silencioso más caro del módulo.
+   * Estuvo rota hasta la auditoría V3 (2026-08-16): le pasaba a `getMapUrl` el
+   * tamaño del lienzo sin guarda y un monitor de más de 4000 px la reventaba en
+   * cada encuadre.
+   *
+   * La promesa se sostiene sobre lo que `getMapUrl` puede rechazar, y está TODO
+   * cubierto aguas arriba: el `crs`, las `capas` y el `formato` se validan en el
+   * `initialize` (una capa mal construida no llega a existir); el BBOX degenerado
+   * o no finito lo descarta `_encuadre` devolviendo `null`; un lienzo de 0 px,
+   * también; y el techo de {@link MAX_PIXELES_WMS} lo respeta {@link
+   * tamanoAlTecho}. Quien añada una opción nueva a `getMapUrl` tiene que volver a
+   * mirar esta lista.
    *
    * @returns {boolean} `true` si se EMITIÓ una petición nueva. Lo consume la red
    *   de seguridad del fundido en `_alCambiarEncuadre`: un encuadre que no pide
@@ -856,6 +952,22 @@ const CapaWMSCatastro = L.ImageOverlay.extend({
     if (!this._map) return false
     const encuadre = this._encuadre()
     if (!encuadre) return false
+
+    // El lienzo no cabe en el servicio: se pide recortado (misma proporción, mismo
+    // encuadre) y se DICE. Una sola vez por episodio y no en cada `moveend`: un
+    // mapa grande dispara decenas de encuadres y repetirlo enterraría los avisos
+    // que sí piden algo del usuario. La bandera se rearma cuando el lienzo vuelve
+    // a caber, para que un segundo episodio —redimensionar la ventana— se cuente.
+    if (!encuadre.recortado) this._avisadoDelTecho = false
+    else if (!this._avisadoDelTecho) {
+      this._avisadoDelTecho = true
+      this._avisar(MENSAJES.LIENZO_SOBRE_EL_TECHO, {
+        nivel: NIVEL.AVISO,
+        lienzo: encuadre.lienzo,
+        pedido: encuadre.tamano,
+        techo: MAX_PIXELES_WMS,
+      })
+    }
 
     const url = getMapUrl(encuadre.bbox, encuadre.tamano, {
       crs: this._crs,

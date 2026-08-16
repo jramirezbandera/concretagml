@@ -28,11 +28,26 @@
 // paso está apagado?», la respuesta está en la tabla de guardas de `navegacion.js`.
 //
 // ── ⛔ UN SOLO `repintar()`, Y ES LA DECISIÓN A1 DE LA REVISIÓN ────────────
-// `navegacion.js` **no notifica cuando cambian los HECHOS** —cargar una parcela no
-// te mueve de paso, pero abre dos—, así que `app/main.js#refrescarHechos` tiene que
-// repintar a mano. Partir esto en dos módulos (peldaños por un lado, renglón por
-// otro) serían **dos llamadas que recordar**, y olvidar una deja un motivo rancio en
-// pantalla sin lanzar nada: el fallo silencioso perfecto. Un módulo, un `repintar()`.
+// `app/main.js#refrescarHechos` repinta a mano después de poner al día los hechos,
+// y esta barra le ofrece **una sola llamada** para hacerlo. Partir esto en dos
+// módulos (peldaños por un lado, renglón por otro) serían **dos llamadas que
+// recordar**, y olvidar una deja un motivo rancio en pantalla sin lanzar nada: el
+// fallo silencioso perfecto. Un módulo, un `repintar()`.
+//
+// ⛔ **La decisión A1 decía «`navegacion.js` no notifica cuando cambian los
+// HECHOS», y esa premisa era falsa por los dos lados** (auditoría 2026-08-16,
+// hallazgo B4). Lo que pasaba era lo contrario y peor: `actualizarHechos` publicaba
+// SIEMPRE —cambiaran los hechos o no—, así que `refrescarHechos()` disparaba 2
+// notificaciones completas (una por rama) más su `repintar()` explícito: **3
+// pintadas enteras del rail por cada vértice arrastrado**, con sus tres pasadas de
+// `contraste.aplicar`, `pantalla.aplicar` y `escribirRuta`. Desde el arreglo,
+// `navegacion.js` notifica **exactamente cuando cambia un hecho** y no cuando no,
+// que es lo que la decisión daba por hecho sin decirlo bien.
+//
+// La decisión A1 no se toca por eso: el `repintar()` de `refrescarHechos` sigue
+// siendo la red barata de la doctrina «llamar de más es más seguro que olvidar»
+// —repintar cuesta doce nodos—, y lo que se ha quitado es el trabajo que no
+// arreglaba nada.
 //
 // ── EL MARCADO SE PARTE EN DOS, Y NO ES CAPRICHO ───────────────────────────
 // `index.html` pone la CÁSCARA (el `<nav>`, la marca, el rótulo del grupo, el `<ol>`

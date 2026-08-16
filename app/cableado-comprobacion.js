@@ -344,7 +344,35 @@ export const MOTIVO_CANCELADO =
  */
 export const MENSAJE_FICHERO_NO_LEIDO =
   'No se ha podido leer el contenido del fichero. Suele pasar cuando se ha movido, renombrado o ' +
-  'desconectado la unidad desde que se eligió: vuelve a abrirlo. No se ha cambiado nada.'
+  'desconectado la unidad desde que se eligió, o cuando se arrastra desde el correo o una unidad ' +
+  'de red: guárdalo primero en el disco y vuelve a abrirlo. No se ha cambiado nada.'
+
+/**
+ * Lo que se le dice al usuario cuando suelta un fichero mientras el anterior
+ * todavía se estaba leyendo (auditoría 2026-08-16, cuarta puerta de la misma
+ * familia).
+ *
+ * ⛔ Entre dos ficheros manda el ÚLTIMO que se suelta, y hasta este arreglo mandaba
+ * el que TERMINABA DE LEERSE antes: `await fichero.arrayBuffer()` no garantiza
+ * orden, así que soltar un `.gml` grande y encima uno pequeño dejaba entrar el
+ * pequeño y, segundos después, el grande lo pisaba. Aquí eso escribe el store de
+ * parcela, o sea el documento que se firma.
+ *
+ * ⚠️ **No se afirma que el otro haya entrado**, solo que llegó después: el segundo
+ * puede haber fallado por su cuenta y prometer que está cargado sería mentir.
+ *
+ * Texto duplicado a propósito en las cuatro puertas —igual que
+ * {@link MENSAJE_FICHERO_NO_LEIDO}, que ya vive en tres—, con un test-guarda que
+ * las ata para que no diverjan en silencio (`test/contrato.test.js`).
+ *
+ * @param {string} nombre  El que NO se ha cargado.
+ * @param {string} vigente  El que sí manda.
+ * @returns {string}
+ */
+export const mensajeFicheroSuperado = (nombre, vigente) =>
+  `No se ha cargado «${nombre}»: mientras se leía soltaste «${vigente}». Entre dos ficheros manda ` +
+  `el ÚLTIMO que sueltas, no el que termine de leerse antes. Si el que querías era «${nombre}», ` +
+  `suéltalo otra vez.`
 
 /**
  * Lo que se le dice al usuario cuando la comprobación revienta por un defecto de
@@ -864,6 +892,13 @@ export function cablearComprobacion({
 
   let destruido = false
 
+  // ── La puerta de fichero, que es de UNO a la vez (auditoría 2026-08-16) ─────
+  // Contador propio y separado del de red: éste cuenta FICHEROS SOLTADOS, no
+  // consultas. Ver {@link mensajeFicheroSuperado}.
+  let secuenciaFichero = 0
+  /** El nombre del último fichero aceptado, para poder decir quién ganó. */
+  let ficheroVigente = null
+
   /**
    * El fichero que se está comprobando, con TODO lo que hace falta para volver a
    * comprobarlo con otro índice sin releer nada del disco. `null` = no hay ninguno.
@@ -949,6 +984,12 @@ export function cablearComprobacion({
 
     const nombre = typeof fichero?.name === 'string' ? fichero.name : 'fichero sin nombre'
 
+    // ⛔ La puerta se RECLAMA al aceptar el fichero, no al terminar de leerlo
+    // (auditoría 2026-08-16). Ver {@link mensajeFicheroSuperado}: sin esto, entre
+    // dos ficheros mandaba el que terminara de leerse antes.
+    const turno = (secuenciaFichero += 1)
+    ficheroVigente = nombre
+
     /** @type {ArrayBuffer} */
     let crudo
     try {
@@ -959,6 +1000,13 @@ export function cablearComprobacion({
       return
     }
     if (destruido) return
+    if (turno !== secuenciaFichero) {
+      // Llegó otro mientras este se leía: manda el otro, y se DICE (regla de oro 1).
+      panel.avisar(mensajeFicheroSuperado(nombre, ficheroVigente ?? 'el siguiente'), {
+        nivel: NIVEL.AVISO,
+      })
+      return
+    }
 
     try {
       // ⚠️ `new Uint8Array(...)` y no el búfer a pelo, y no es cosmética: la vista

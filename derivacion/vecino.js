@@ -540,9 +540,14 @@ export function recortarVecinos(entrada) {
           `${soloRedondeo.length === 1 ? 'entra' : 'entran'} en el expediente: ` +
           soloRedondeo
             .map(
+              // ⛔ «grosor medio» y no «ancho» (2026-08-16): la cifra es
+              // `2·área/perímetro` (`geo/grosor.js`), que su propia cabecera
+              // advierte que NO es el ancho — en una franja rectangular da la
+              // MITAD del ancho real. Decir «ancho» afirmaba una medida física
+              // que no se había medido. Cambia la palabra, no la métrica.
               (v) =>
                 `${v.refcat ?? 'parcela sin referencia'} (${numero(v.area, 4)} m², ` +
-                `${numero(v.grosor * 1000, 1)} mm de ancho)`,
+                `${numero(v.grosor * 1000, 1)} mm de grosor medio)`,
             )
             .join('; ') +
           '. Modificar la finca de otro titular por el ruido del redondeo es lo que devuelve un ' +
@@ -590,7 +595,16 @@ export function recortarVecinos(entrada) {
   }
 
   // ── 3 · El exceso que no cae sobre nadie: se DECLARA, no se bloquea ───────
-  if (sobreNadie > umbralGrosorM) {
+  // ⛔ El umbral es de ÁREA porque `sobreNadie` es un área: aquí también se
+  // comparaba contra `umbralGrosorM`, que son metros — la TERCERA comparación de
+  // la familia, corregida el 2026-08-16 (las otras dos, arriba: el filtro de los
+  // vecinos y la atribución). Con el umbral por defecto (7,1 mm) se callaban
+  // excesos sobre vial de hasta 71 cm² —muy por encima de lo que el fichero puede
+  // representar—, y pasar otro `umbralGrosorM` movía el corte del aviso sin
+  // sentido dimensional. Lo que se filtra es el ruido de coma flotante de la
+  // atribución, y su suelo lo fija el fichero: nada por debajo de medio
+  // centímetro cuadrado se puede ni escribir.
+  if (sobreNadie > AREA_MINIMA_FICHERO_M2) {
     detecciones.push(
       crearDeteccionDerivacion(
         TIPO_DERIVACION.FUERA_SOBRE_NADIE,

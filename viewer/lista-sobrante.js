@@ -929,6 +929,28 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
         emitir(oyentesSenal, 'señalar', pieza.orden)
       })
     }
+    // ⛔ **Y APAGARLO AL SALIR** (auditoría V4, 2026-08-16). El resaltado por
+    // teclado tenía ida y no vuelta: encendía la fila y su mancha en el mapa, y
+    // nada las apagaba. Quien tabulaba fuera del bloque se dejaba una fila y una
+    // mancha encendidas indefinidamente, señalando un trozo de terreno que ya no
+    // estaba tocando — con el ratón sí se apagaba (`mouseleave`), y esa asimetría
+    // era el síntoma.
+    //
+    // ⚠️ **`focusout` y no `blur`, y se pregunta por `relatedTarget`.** `blur` no
+    // burbujea (no alcanzaría al `<select>` de destino) y, sobre todo, apagar en
+    // CADA salida haría parpadear la mancha entre cada dos tabulaciones: de la
+    // casilla a su campo, y de una fila a la siguiente, se sale de un control para
+    // entrar en otro de la MISMA lista. La pregunta correcta no es «¿se ha salido
+    // de este control?» sino «¿se ha salido de la lista?»: si el foco entra en
+    // otra fila, quien manda es el `focus` que viene detrás, que ya resalta la
+    // suya. `relatedTarget` en `null` —el foco se va a la ventana o al cromo del
+    // navegador— cuenta como salir, que es lo que de verdad es.
+    fila.addEventListener('focusout', (evento) => {
+      const destinoFoco = evento.relatedTarget
+      if (destinoFoco !== null && destinoFoco !== undefined && lista.contains(destinoFoco)) return
+      resaltar(null)
+      emitir(oyentesSenal, 'señalar', null)
+    })
 
     filasPorOrden.set(pieza.orden, { fila, casilla, campo })
     return fila

@@ -197,6 +197,29 @@ describe('viewer/leyenda.js · contratos del programador', () => {
     expect(() => leyenda.grupos(['tampoco'])).toThrow(RangeError)
   })
 
+  it('⛔ y al lanzar NO deja media leyenda montada sobre el mapa (auditoría V5)', () => {
+    // `grupos` se validaba DESPUÉS de `mapa.addControl(control)`, al revés que los
+    // otros tres argumentos. Con un grupo inválido la excepción salía con la
+    // pastilla «Leyenda» ya colgada del mapa y sin asa para quitarla: `crearLeyenda`
+    // no devuelve nada cuando lanza, así que nadie tenía el `destruir()`. Un control
+    // huérfano sobre la esquina, imposible de retirar, es el peor de los dos males
+    // posibles — el contrato roto lo arregla el programador leyendo el mensaje; el
+    // control zombi no lo puede arreglar nadie.
+    const { mapa, contenedor, destruir } = montarMapa({})
+    limpiezas.push(destruir)
+
+    expect(() => crearLeyenda({ mapa, grupos: ['inventado'] })).toThrow(RangeError)
+
+    expect(
+      contenedor.querySelector(`.${CLASE.CONTENEDOR}`),
+      'ha quedado una leyenda montada que nadie puede destruir',
+    ).toBeNull()
+    // Y el que sí se monta después sigue siendo UNO solo (la trampa M8: dos nodos
+    // con la misma clase y `querySelector` se queda con el primero).
+    crearLeyenda({ mapa })
+    expect(contenedor.querySelectorAll(`.${CLASE.CONTENEDOR}`)).toHaveLength(1)
+  })
+
   it('la esquina por defecto es `bottomleft`, la única libre del visor', () => {
     const { contenedor } = conLeyenda()
     const esquina = contenedor.querySelector('.leaflet-bottom.leaflet-left')

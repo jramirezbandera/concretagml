@@ -1683,6 +1683,15 @@ describe('guarda transversal · los canales que `app/main.js` tiene que enchufar
         'siempre (auditoría 2026-08-15).',
     },
     {
+      llamada: 'alCambiarSobrante',
+      quien: 'app/cableado-derivacion.js',
+      porque:
+        'derivar no toca ningún store ni la navegación, así que sin este canal la leyenda del ' +
+        'visor no anuncia las manchas cian y ámbar que «Derivar sobrante» acaba de pintar —ni ' +
+        'deja de anunciarlas cuando la foto caduca— hasta la siguiente navegación o edición ' +
+        '(auditoría 2026-08-16, hallazgo B1).',
+    },
+    {
       llamada: 'olvidar',
       quien: 'app/colindantes.js',
       porque:
@@ -1704,5 +1713,86 @@ describe('guarda transversal · los canales que `app/main.js` tiene que enchufar
   it('la guarda NO es vacua: un canal inventado no aparece', () => {
     // Sin esta mitad, la prueba de arriba pasaría con cualquier cadena.
     expect(FUENTE_MAIN.includes('alCanalQueNadieHaEscrito')).toBe(false)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Guarda transversal · LAS PUERTAS DE FICHERO DICEN LO MISMO
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Hay CUATRO puertas por las que entra un fichero —medición, edificio,
+// comprobación y expediente— y las cuatro tuvieron el mismo defecto: entre dos
+// ficheros soltados mandaba el que TERMINABA de leerse antes, no el ÚLTIMO que se
+// soltaba (auditoría 2026-08-16). Las cuatro llevan ahora el mismo token de
+// secuencia y el mismo texto.
+//
+// El texto se duplica A PROPÓSITO, que es la disciplina que este proyecto ya
+// aplica a `MENSAJE_FICHERO_NO_LEIDO` (tres copias): cada cableado se explica
+// solo y no se crea un módulo de textos compartidos por cuatro frases. Pero
+// duplicar sin atar es cómo dos mensajes acaban diciendo cosas distintas del
+// mismo hecho, así que se atan aquí.
+
+/** Dos saltos de línea seguidos: el final del literal que se extrae abajo. */
+const SALTO_DOBLE = String.fromCharCode(10, 10)
+
+describe('guarda transversal · las cuatro puertas de fichero dicen lo mismo', () => {
+  /**
+   * El texto de una constante, leído del FUENTE y normalizado.
+   *
+   * Se lee el fichero en vez de importarlo porque los cuatro cableados arrastran
+   * Leaflet y este proyecto de Vitest es `node`, sin `window`. Es además la misma
+   * fórmula que el resto de guardas de este fichero.
+   *
+   * @param {string} ruta  Relativa a la raíz.
+   * @param {string} nombre  La constante a extraer.
+   * @returns {string}  El literal, con los blancos colapsados.
+   */
+  const literalDe = (ruta, nombre) => {
+    // ⚠️ Se normalizan los finales de línea ANTES de buscar: el repositorio es de
+    // Windows y basta con que un fichero venga en CRLF para que «dos saltos
+    // seguidos» no case nunca — y entonces esto capturaría hasta el final del
+    // fichero y compararía módulos enteros. Costó un rato descubrirlo.
+    const fuente = readFileSync(fileURLToPath(new URL(`../${ruta}`, import.meta.url)), 'utf8')
+      .split('\r\n')
+      .join(String.fromCharCode(10))
+    const desde = fuente.indexOf(`export const ${nombre}`)
+    expect(desde, `${ruta} no exporta ${nombre}`).toBeGreaterThan(-1)
+    // Hasta el primer renglón en blanco: el literal va concatenado con `+` en
+    // varias líneas y nunca lleva una línea vacía dentro.
+    const hasta = fuente.indexOf(SALTO_DOBLE, desde)
+    return fuente
+      .slice(desde, hasta === -1 ? undefined : hasta)
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  it('`mensajeFicheroSuperado` es idéntico en las cuatro', () => {
+    const rutas = [
+      'app/cableado-medicion.js',
+      'app/cableado-edificio.js',
+      'app/cableado-comprobacion.js',
+      'app/cableado-expediente.js',
+    ]
+    const textos = rutas.map((r) => literalDe(r, 'mensajeFicheroSuperado'))
+    for (const [i, texto] of textos.entries()) {
+      expect(texto, `${rutas[i]} ha divergido de ${rutas[0]}`).toBe(textos[0])
+    }
+    // Anti-vacuidad: que digan lo que tienen que decir, no cuatro cadenas iguales
+    // y vacías.
+    expect(textos[0]).toContain('Entre dos ficheros manda')
+    expect(textos[0]).toContain('ÚLTIMO')
+  })
+
+  it('`MENSAJE_FICHERO_NO_LEIDO` es idéntico en las tres que lo tienen', () => {
+    const rutas = [
+      'app/cableado-medicion.js',
+      'app/cableado-edificio.js',
+      'app/cableado-comprobacion.js',
+    ]
+    const textos = rutas.map((r) => literalDe(r, 'MENSAJE_FICHERO_NO_LEIDO'))
+    for (const [i, texto] of textos.entries()) {
+      expect(texto, `${rutas[i]} ha divergido de ${rutas[0]}`).toBe(textos[0])
+    }
+    expect(textos[0]).toContain('No se ha podido leer el contenido del fichero')
   })
 })

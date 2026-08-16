@@ -1350,11 +1350,25 @@ export function sincronizar({
    * mapa se quedaría resaltando el de antes mientras se teclea en otro — que es
    * justo la mentira que esta feature viene a quitar.
    *
+   * ⛔ **Una fila DESPRENDIDA no señala nada** (auditoría V6, 2026-08-16). El otro
+   * oyente del mismo `click` es la × de borrar, y borrar cambia la forma: para
+   * cuando este handler corre, la tabla ya se ha RECONSTRUIDO y `evento.target`
+   * cuelga de un `<tr>` que ya no está en el documento, con su `data-indice`
+   * viejo. Ese índice sigue existiendo en el modelo —lo ha heredado el vértice
+   * siguiente al correrse—, así que `fijarSeleccion` lo daba por bueno y dejaba
+   * seleccionado un vértice que el usuario no había tocado. Se pregunta por el
+   * NODO y no por el índice, que es la diferencia entre «esta fila existe» y «este
+   * número existe».
+   *
    * @param {Event} evento
    */
   function alSeñalarFila(evento) {
     if (!vivo) return
-    const ref = refDeFila(evento.target)
+    const nodo = evento.target
+    if (!nodo || typeof nodo.closest !== 'function') return
+    const fila = nodo.closest('tr[data-indice]')
+    if (fila === null || !tablaEl.contains(fila)) return
+    const ref = refDeFila(fila)
     if (ref === null) return
     fijarSeleccion(ref)
   }
@@ -1771,16 +1785,44 @@ export function sincronizar({
       )
       return
     }
+
+    // ⛔ **Y LA SELECCIÓN SE DEJA LIMPIA** (auditoría V6, 2026-08-16). No basta con
+    // que `alSeñalarFila` ignore la fila desprendida: si el vértice borrado ERA el
+    // seleccionado, `sincronizarSeleccion` daba la selección por buena al cerrar el
+    // render —solo comprueba que el par `(recinto, indice)` exista— y existe: es el
+    // vértice SIGUIENTE, que ha heredado el índice al correrse. O sea que borrar
+    // dejaba señalado, con `aria-current` y marcador grande, un trozo de lindero
+    // que el usuario no había tocado.
+    //
+    // Se suelta en vez de elegir un vecino, y es deliberado: cualquier vecino sería
+    // una intención inventada (¿el anterior? ¿el que hereda el índice?), y quien
+    // acaba de quitar un punto no ha pedido que se le señale otro. Soltar es lo
+    // único que no dice nada falso. (Al borrar la ÚLTIMA fila ya salía limpia
+    // porque no había quien heredara el índice; ahora los dos casos son el mismo.)
+    //
+    // Solo si el borrado ha OCURRIDO: `viewer/edicion.js#eliminar` sabe negarse
+    // cuando el anillo se quedaría con menos de tres vértices, y en ese caso no ha
+    // cambiado nada que justifique tocar la selección.
+    const antes = (anillosDe(estado.get())[recinto] ?? []).length
     alBorrar({ recinto, indice })
+    const despues = (anillosDe(estado.get())[recinto] ?? []).length
+    if (despues !== antes) fijarSeleccion(null)
   }
 
   // ── Arranque ─────────────────────────────────────────────────────────────
 
   tablaEl.addEventListener('change', alCambiarCelda)
   // El clic de la × va ANTES que `alSeñalarFila` en el orden de registro, y por
-  // tanto corre antes: así el borrado no deja de paso seleccionada la fila que
-  // acaba de desaparecer. Los dos escuchan `click` en el mismo nodo, que es
-  // legítimo — hacen cosas distintas y ninguno consume el evento.
+  // tanto corre antes. Los dos escuchan `click` en el mismo nodo, que es legítimo
+  // — hacen cosas distintas y ninguno consume el evento.
+  //
+  // ⚠️ **Aquí decía que ese orden bastaba para que el borrado no dejara de paso
+  // seleccionada la fila que acaba de desaparecer, y era falso** (auditoría V6):
+  // correr primero no impide nada, porque el que corre DESPUÉS lee el `dataset` de
+  // la fila ya desprendida y vuelve a seleccionar el índice, que para entonces es
+  // de OTRO vértice. Lo que de verdad lo impide son las dos guardas que hay en los
+  // handlers: `alSeñalarFila` ignora las filas que ya no están en la tabla, y
+  // `alPulsarBorrar` suelta la selección cuando el borrado ha ocurrido.
   if (puedeBorrar) tablaEl.addEventListener('click', alPulsarBorrar)
   // Los dos de la selección por tabla, delegados en el mismo nodo y por el mismo
   // motivo que el de `change`. `focusin` y no `focus`: `focus` NO burbujea, así

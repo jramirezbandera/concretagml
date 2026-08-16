@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url'
 
 import {
   MOTIVO_CENTROIDE_DEGENERADO,
+  MOTIVO_HUELLA_OFICIAL_NO_MEDIBLE,
   MOTIVO_NO_CONSULTADO,
   MOTIVO_NO_SE_HA_PODIDO,
   MOTIVO_SIN_CONSTRUCCIONES,
@@ -544,7 +545,13 @@ describe('diagnostico/edificio · casos límite', () => {
     // Tres puntos alineados: no encierran área, así que no hay cara medible.
     const centro = c.omisiones.find((o) => o.que === OMISION_EDIFICIO.CENTROIDES)
     expect(centro).toBeDefined()
-    expect([MOTIVO_CENTROIDE_DEGENERADO, MOTIVO_NO_CONSULTADO]).toContain(centro.motivo)
+    // ⭐ Y desde la auditoría del 2026-08-16 la distinción que este `it` promete
+    // es de verdad: antes, una huella CONSULTADA pero sin cara medible caía en
+    // `MOTIVO_NO_CONSULTADO` —«Todavía no se ha consultado al Catastro…»—, que era
+    // FALSO y mandaba al técnico a repetir una consulta ya hecha. Ahora tiene
+    // motivo propio, así que se afirma ese y no «uno de estos dos».
+    expect(centro.motivo).toBe(MOTIVO_HUELLA_OFICIAL_NO_MEDIBLE)
+    expect(centro.motivo).not.toBe(MOTIVO_NO_CONSULTADO)
   })
 
   it('los saltados se deduplican: N×M cruces no son N×M copias del mismo aviso', () => {

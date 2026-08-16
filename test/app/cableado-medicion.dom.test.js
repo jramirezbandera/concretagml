@@ -393,6 +393,34 @@ describe('cableado-medicion · alFichero', () => {
     expect(store.set).not.toHaveBeenCalled()
   })
 
+  it('⛔ dos ficheros soltados casi a la vez: gana el ÚLTIMO SOLTADO, no el que lee antes', async () => {
+    // ⭐ **Auditoría 2026-08-16, hallazgo B2.** `alFichero` lee los bytes con un
+    // `await` y no había nada que ordenara las dos lecturas: si el primero es grande
+    // y el segundo pequeño, el pequeño se aplica y **el grande lo pisa después**. Y
+    // aquí es caro de verdad: lo que entra por esta puerta es la geometría que se
+    // firma, y `alCargarParcela` reinicia el historial, así que lo pisado tampoco
+    // vuelve con Ctrl+Z.
+    const lento = ficheroDeTexto(CUADRADO, 'lento.txt')
+    let entregarBytes = null
+    lento.arrayBuffer = () =>
+      new Promise((cumplir) => {
+        entregarBytes = () => cumplir(new TextEncoder().encode(CUADRADO).buffer)
+      })
+
+    const medicion = cablear({ dialogo: dialogoQueResponde() })
+    const enVuelo = medicion.alFichero(lento) // se queda leyendo
+    await medicion.alFichero(ficheroDeTexto(CUADRADO, 'rapido.txt')) // éste entra entero
+    expect(store.get().idLocal).toBe('rapido.txt')
+
+    entregarBytes()
+    await enVuelo
+
+    expect(store.set, 'el fichero superado no vuelve a escribir el store').toHaveBeenCalledTimes(1)
+    expect(store.get().idLocal, 'y lo que queda es lo ÚLTIMO soltado').toBe('rapido.txt')
+    // Y no se descarta en silencio: se dice, con su nombre (regla de oro 1).
+    expect(dijo('lento.txt')).toBe(true)
+  })
+
   it('unos bytes ilegibles se cuentan como lo que son: del entorno, no del fichero', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const roto = ficheroDeTexto(CUADRADO, 'p.txt')

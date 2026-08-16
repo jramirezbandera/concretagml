@@ -380,7 +380,8 @@ const esPanel = (v) => !!v && typeof v.avisar === 'function'
  *   es lo único que permite afirmar algo exacto sobre el nombre en una prueba.
  * @param {typeof descargarGml} [opciones.descargar]  La entrega del fichero.
  * @returns {{derivar: () => (object|null), entregar: () => (object|null),
- *   ultimaCesion: () => (object|null), destruir: () => void}}
+ *   ultimaCesion: () => (object|null), alCambiarSobrante: (fn: () => void) => (() => void),
+ *   destruir: () => void}}
  * @throws {TypeError}  Contrato del programador.
  * @throws {Error}  Si la cáscara no trae los tres nodos del contrato.
  */
@@ -479,6 +480,45 @@ export function cablearDerivacion({
    */
   let reparto = {}
 
+  // ── ⭐ EL CANAL DEL SOBRANTE (auditoría 2026-08-16, hallazgo B1) ───────────
+  //
+  // ⛔ **El defecto que arregla, verificado por traza.** Pulsar «Derivar sobrante»
+  // pintaba las manchas cian y ámbar en el mapa SIN tocar el store y SIN publicar
+  // nada, así que la LEYENDA de `app/main.js` —que solo cuelga de `navegacion` y de
+  // `estado`— no las anunciaba hasta la siguiente navegación o edición. Es el
+  // reverso exacto de la doctrina escrita junto a `refrescarLeyenda`: la leyenda
+  // dice lo que hay dibujado, y aquí había dos grafismos dibujados que no decía
+  // nadie. Y no es solo el estreno: `invalidar()` los borra igual de callado, así
+  // que la tarjeta también podía quedarse anunciando un sobrante ya desaparecido.
+  //
+  // ⚠️ **El aviso NO lleva carga**, y es el mismo patrón —y por la misma razón— que
+  // `alCambiarIdentidad` de `app/cableado-expediente.js`: quien escuche vuelve a
+  // leer {@link ultimaCesion}, que sigue siendo la única definición de «hay foto».
+  // Mandar la foto por el canal crearía una segunda copia, y una copia que viaja es
+  // una copia que se queda atrás — justo el defecto que esto viene a arreglar.
+  //
+  // ⚠️ Y se dispara **después** de haber guardado (o borrado) la foto, nunca antes:
+  // un canal que dice «ha cambiado» y enseña lo de antes es peor que no avisar.
+
+  /** @type {Set<Function>} */
+  const oyentesSobrante = new Set()
+
+  /**
+   * Reparte el aviso **atrapando lo que revienten**: un oyente roto no puede dejar
+   * sin enterarse a los demás, y una excepción que subiera desde aquí saldría en
+   * mitad de `derivar()` —dentro del `click` del CTA, donde no la ve nadie— y
+   * dejaría la foto pintada a medias.
+   */
+  function notificarSobrante() {
+    for (const fn of [...oyentesSobrante]) {
+      try {
+        fn()
+      } catch (causa) {
+        console.error('[derivacion] un oyente del canal del sobrante ha fallado:', causa)
+      }
+    }
+  }
+
   /** Escribe el renglón del CTA del pie. */
   function decir(texto, esError = false) {
     elRenglon.textContent = texto
@@ -503,6 +543,11 @@ export function cablearDerivacion({
    * dice **en el bloque**, no en el canal global.
    */
   function invalidar(motivo) {
+    // Si no había foto no ha cambiado nada que ver: `derivar()` llama aquí con
+    // `null` en sus dos salidas malas, y avisar entonces convertiría el canal en
+    // ruido — el mismo criterio con el que el expediente solo notifica si de verdad
+    // ha soltado una identidad.
+    const habia = cesion !== null
     cesion = null
     claveDerivada = null
     reparto = {}
@@ -522,6 +567,9 @@ export function cablearDerivacion({
       // desaparecido, que es la definición de fallo silencioso.
       mostrarBloque(true)
     }
+    // Al final del todo: las dos capas ya están limpias, así que quien escuche ve
+    // el mapa que hay, no el que había.
+    if (habia) notificarSobrante()
   }
 
   /**
@@ -703,6 +751,10 @@ export function cablearDerivacion({
       bloqueHabla ? '' : 'No hay sobrante: la geometría medida cubre el contorno oficial entero.',
     )
     refrescarEntrega()
+    // Y AHORA se avisa, con la foto ya guardada y las dos capas ya pintadas: la
+    // leyenda que escucha lee `ultimaCesion()` y ve exactamente lo que hay en el
+    // mapa. Ver el canal del sobrante.
+    notificarSobrante()
     return derivada
   }
 
@@ -921,6 +973,35 @@ export function cablearDerivacion({
     derivar,
     entregar,
     ultimaCesion: () => cesion,
+
+    /**
+     * ⭐ **El canal del sobrante.** Avisa —sin carga— cuando cambia si hay foto
+     * derivada y cuál es: al FOTOGRAFIAR (se han pintado las manchas cian y ámbar)
+     * y al INVALIDAR (se han borrado). Quien escuche vuelve a leer
+     * {@link ultimaCesion}, que es la única definición.
+     *
+     * Existe porque derivar **no toca ningún store ni la navegación** y aun así
+     * mueve lo que hay dibujado en el mapa: sin este aviso la leyenda de
+     * `app/main.js` no anunciaba el sobrante hasta la siguiente navegación o
+     * edición. El razonamiento entero está donde se implementa
+     * ({@link notificarSobrante}).
+     *
+     * ⚠️ No notifica al suscribirse —mismo contrato que `crearEstadoVista` y que
+     * `alCambiarIdentidad`—: quien pinta al montar ya lee `ultimaCesion()`.
+     *
+     * @param {() => void} fn
+     * @returns {() => void}  La baja. IDEMPOTENTE.
+     * @throws {TypeError}  Si `fn` no es una función.
+     */
+    alCambiarSobrante(fn) {
+      if (typeof fn !== 'function') {
+        throw new TypeError(
+          `alCambiarSobrante: 'fn' debe ser una función; recibido ${describir(fn)}.`,
+        )
+      }
+      oyentesSobrante.add(fn)
+      return () => oyentesSobrante.delete(fn)
+    },
 
     destruir() {
       if (!vivo) return

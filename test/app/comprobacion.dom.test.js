@@ -72,6 +72,7 @@ import {
   SELECTOR_CAMPO_REFCAT as CAMPO_REEXPORTADO,
   SELECTOR_PROCEDENCIA,
   cablearComprobacion,
+  mensajeFicheroSuperado,
   motivoSinReferencia,
   motivoSrsAjeno,
 } from '../../app/cableado-comprobacion.js'
@@ -1344,5 +1345,73 @@ describe('F08 · T5.1 (ampliado en F10) · entradas ajenas por extensión', () =
     cableado.destruir()
     cableado.elegirFichero()
     expect(clic).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Auditoría 2026-08-16 · La puerta de fichero es de UNO a la vez
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// `await fichero.arrayBuffer()` no garantiza orden, así que entre dos ficheros
+// soltados mandaba el que TERMINABA de leerse antes y no el ÚLTIMO que se
+// soltaba. Aquí eso escribe el store de parcela, o sea el documento que se firma.
+//
+// Es la CUARTA puerta de la misma familia: medición y edificio se cerraron con
+// este mismo patrón, y un guarda de `test/contrato.test.js` ata las cuatro para
+// que su mensaje no diverja.
+
+describe('cableado-comprobacion · dos ficheros encabalgados: manda el ÚLTIMO', () => {
+  /**
+   * Un `File` cuyo `arrayBuffer()` no resuelve hasta que el test lo permite. Sin
+   * esto los dos ficheros no llegan a solaparse: `arrayBuffer()` de un `File`
+   * pequeño resuelve en la misma vuelta y la carrera no existe.
+   */
+  function ficheroLento(texto, nombre) {
+    const fichero = ficheroDeTexto(texto, nombre)
+    let soltarLectura
+    const espera = new Promise((cumplir) => {
+      soltarLectura = cumplir
+    })
+    const bytes = new TextEncoder().encode(texto)
+    fichero.arrayBuffer = async () => {
+      await espera
+      return bytes.buffer
+    }
+    return { fichero, contestar: () => soltarLectura() }
+  }
+
+  it('⭐ el que se soltó primero NO pisa al segundo cuando contesta tarde', async () => {
+    const { estado, panel } = montar()
+    const lento = ficheroLento(TEXTO_WFS, 'primero.gml')
+
+    soltar(lento.fichero) // queda leyéndose
+    await cederTurno()
+    await soltarYEsperar(ficheroDeTexto(TEXTO_WFS, 'segundo.gml'))
+
+    const trasElSegundo = estado.get()
+    expect(trasElSegundo, 'el segundo tenía que entrar').not.toBeNull()
+
+    // Y ahora contesta el PRIMERO, tarde.
+    lento.contestar()
+    await cederTurno()
+
+    expect(estado.get(), 'el primero no puede pisar al segundo').toBe(trasElSegundo)
+    // Y no se calla: el usuario soltó un fichero que no ha entrado (regla de oro 1).
+    expect(mensajes(panel)).toContain(mensajeFicheroSuperado('primero.gml', 'segundo.gml'))
+  })
+
+  it('un solo fichero, aunque tarde, entra con normalidad', async () => {
+    // Anti-vacuidad: una guarda que dijera «superado» a todo pasaría la de arriba
+    // y rompería la puerta entera.
+    const { estado, panel } = montar()
+    const lento = ficheroLento(TEXTO_WFS, 'unico.gml')
+
+    soltar(lento.fichero)
+    await cederTurno()
+    lento.contestar()
+    await cederTurno()
+
+    expect(estado.get(), 'el único fichero tiene que entrar').not.toBeNull()
+    expect(mensajes(panel).some((m) => m.includes('No se ha cargado'))).toBe(false)
   })
 })

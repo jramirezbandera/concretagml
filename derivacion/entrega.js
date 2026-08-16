@@ -567,6 +567,14 @@ export function prepararEntrega(entrada) {
     return cerrar({ ...salida, cierre, resumenGml, deteccionesGml: detGml })
   }
 
+  // ⛔ Y cómo se llama la DIANA (2026-08-16). `cierre.suma.areaOficial` suma el
+  // contorno oficial de la finca MÁS los de las colindantes recortadas
+  // (`oficialesExtra`, unas líneas más arriba), así que con un vecino en el
+  // expediente decir «del contorno oficial» afirmaba algo falso: el usuario leería
+  // que su finca mide lo que en realidad miden ella y sus vecinas juntas.
+  // `comprobacion/conjunto.js` resolvió esto mismo renombrando la diana, y este
+  // mensaje hereda su fórmula: con varios contornos se dice cuántos suma.
+  const nOficiales = 1 + nombrables.length
   detecciones.push(
     crearDeteccionDerivacion(
       TIPO_DERIVACION.ENTREGA_LISTA,
@@ -575,8 +583,10 @@ export function prepararEntrega(entrada) {
         'geométrica' +
         (cierre === null
           ? '.'
-          : ` y entre todas cubren los ${numero(cierre.suma.areaOficial)} m² del contorno ` +
-            'oficial.'),
+          : ` y entre todas cubren los ${numero(cierre.suma.areaOficial)} m² ` +
+            (nOficiales === 1
+              ? 'del contorno oficial.'
+              : `de los ${nOficiales} contornos oficiales que este expediente modifica.`)),
       SEVERIDAD.INFO,
       { nMiembros: miembros.length, tipoOperacion: operacion.tipo },
     ),

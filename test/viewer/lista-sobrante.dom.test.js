@@ -386,6 +386,51 @@ describe('crearListaSobrante · resaltado', () => {
     lista.pintar(cesion([pieza(1)]))
     expect(() => lista.resaltar(99)).not.toThrow()
   })
+
+  // ── ⛔ SALIR DE LA LISTA CON EL TABULADOR TAMBIÉN APAGA (auditoría V4) ──────
+  // El resaltado por teclado tenía ida y no vuelta: `focus` encendía la fila y su
+  // mancha en el mapa, y no había nada que las apagara. Quien tabulaba fuera del
+  // bloque —al botón «Derivar sobrante», o al siguiente paso— se dejaba una fila
+  // y una mancha encendidas indefinidamente, señalando algo que ya no está
+  // tocando. Con el ratón sí se apagaba (`mouseleave`), y esa asimetría era el
+  // síntoma.
+  it('⛔ tabular FUERA de la lista apaga la fila y su mancha', () => {
+    const vistos = []
+    lista.alSenalar((o) => vistos.push(o))
+    lista.pintar(cesion([pieza(1), pieza(2)]))
+    const fuera = document.createElement('button')
+    document.body.append(fuera)
+
+    casillas()[0].focus()
+    expect(vistos).toEqual([1])
+    expect(filas()[0].dataset.resaltada).toBe('si')
+
+    fuera.focus()
+
+    expect(vistos, 'salir de la lista no ha apagado la mancha').toEqual([1, null])
+    expect(filas().map((f) => f.dataset.resaltada)).toEqual(['no', 'no'])
+  })
+
+  it('tabular ENTRE controles de la lista NO parpadea (ni dentro de la fila ni entre filas)', () => {
+    // El defecto que se paga por arreglar mal el de arriba: apagar en cada
+    // `focusout` mandaría un `null` entre cada dos controles, y la mancha del mapa
+    // se encendería y apagaría a cada tabulación.
+    const vistos = []
+    lista.alSenalar((o) => vistos.push(o))
+    lista.pintar(cesion([pieza(1), pieza(2)]))
+
+    casillas()[0].focus()
+    campos()[0].focus() // mismo renglón: no es salir
+    casillas()[1].focus() // otra fila: la que entra manda, sin `null` de por medio
+
+    // Lo que NO puede aparecer es un `null` intercalado: ése es el parpadeo. Que
+    // el 1 se repita al pasar de la casilla a su campo es inocuo —señalar la misma
+    // pieza dos veces pinta la misma mancha— y no se dedupica a propósito: costaría
+    // un estado más para no arreglar nada que se vea.
+    expect(vistos).not.toContain(null)
+    expect(vistos).toEqual([1, 1, 2])
+    expect(filas().map((f) => f.dataset.resaltada)).toEqual(['no', 'si'])
+  })
 })
 
 // ── 8 · Desmontaje ──────────────────────────────────────────────────────────

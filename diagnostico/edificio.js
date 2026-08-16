@@ -186,6 +186,22 @@ export const MOTIVO_SIN_HUELLA_PROPIA =
   'La construcción no tiene ninguna huella con volumen sobre rasante, así que no hay superficie ' +
   'que contrastar. Revisa las plantas de las partes.'
 
+/**
+ * ⛔ Se consultó, hay respuesta, y NINGUNA cara de la huella registrada encierra
+ * superficie medible: `huellaOficial` llegó como `[]`, o con caras degeneradas que
+ * el filtro `piezaMedible` vacía.
+ *
+ * Existe porque la guarda de coherencia solo rechaza `CONSULTADO` con
+ * `huellaOficial === null`, y hasta el 2026-08-16 este estado caía en
+ * {@link MOTIVO_NO_CONSULTADO}: «Todavía no se ha consultado al Catastro…» con la
+ * consulta HECHA — un motivo falso. El cableado normaliza `[]` → `null`, pero NO
+ * filtra caras degeneradas, así que el estado es alcanzable.
+ */
+export const MOTIVO_HUELLA_OFICIAL_NO_MEDIBLE =
+  'Se ha consultado al Catastro y la huella registrada no encierra superficie medible, así que ' +
+  'no hay con qué contrastar. No es que falte la consulta: es que lo publicado no forma un ' +
+  'recinto que se pueda medir.'
+
 /** El motivo que le toca a cada estado del registro. */
 const MOTIVO_REGISTRO = Object.freeze({
   [REGISTRO.NO_CONSULTADO]: MOTIVO_NO_CONSULTADO,
@@ -491,12 +507,19 @@ export function contrastarEdificio(entrada) {
   // Cuando faltan las dos manda la PROPIA: es la única sobre la que el técnico
   // puede hacer algo, y decirle que el Catastro no contesta cuando además no ha
   // declarado ni una planta sería mandarle a arreglar lo que no le desbloquea nada.
+  // ⛔ Y la tercera causa, cazada el 2026-08-16: `CONSULTADO` sin cara medible NO
+  // es «no se ha consultado». La guarda de arriba solo rechaza `null`; `[]` y las
+  // caras degeneradas llegan aquí con la consulta HECHA, y el antiguo
+  // `MOTIVO_REGISTRO[registro] ?? MOTIVO_NO_CONSULTADO` los convertía en el motivo
+  // falso (para CONSULTADO la tabla da `null` y el `??` caía en no-consultado).
   const motivoSinContraste =
     piezas.length === 0
       ? MOTIVO_SIN_HUELLA_PROPIA
       : hayOficial
         ? null
-        : (MOTIVO_REGISTRO[registro] ?? MOTIVO_NO_CONSULTADO)
+        : registro === REGISTRO.CONSULTADO
+          ? MOTIVO_HUELLA_OFICIAL_NO_MEDIBLE
+          : MOTIVO_REGISTRO[registro]
 
   // ── Solape y diferencia simétrica ─────────────────────────────────────────
   let seccionSolape = null
@@ -588,23 +611,48 @@ export function contrastarEdificio(entrada) {
     // Pieza a pieza, y las invasiones de una misma vecina se acumulan: dos cuerpos
     // del edificio que pisan la misma colindante son UNA invasión de esa vecina
     // con la superficie sumada, no dos entradas que el lector tiene que sumar.
+    //
+    // ⛔ LA CLAVE DE ACUMULACIÓN ES EL ÍNDICE DE LA VECINA, NO SU `refcat`
+    // (auditoría 2026-08-16). `refcat` es `string|null` por contrato —
+    // `app/cableado-contraste-edificio.js#aVecinas` produce `null` a propósito
+    // cuando la parcela del WFS no trae la referencia—, y con `refcat` de clave
+    // dos vecinas DISTINTAS sin referencia colisionaban en `null`: sus invasiones
+    // se fundían en UNA con el área sumada, y el contraste afirmaba un colindante
+    // invadido cuando eran dos. Como `diagnostico/topologia.js#invasiones` solo
+    // identifica cada entrada por su `refcat`, a cada vecina bien formada se le
+    // estampa una clave sintética —su índice— ANTES de llamar y se le devuelve su
+    // referencia real (o su `null`) al salir. La vista ya escribe ese `null` como
+    // «parcela sin referencia», una línea por vecina, que es lo verdadero.
+    const marcadas = vecinas.map((v, i) =>
+      v !== null &&
+      typeof v === 'object' &&
+      !Array.isArray(v) &&
+      (v.refcat === null || typeof v.refcat === 'string')
+        ? { refcat: String(i), recintos: v.recintos }
+        : // Mal formada: pasa TAL CUAL para que `invasiones` LANCE con su índice y
+          // su mensaje de contrato, exactamente igual que antes de la clave.
+          v,
+    )
+    const refcatReal = (clave) => vecinas[Number(clave)].refcat ?? null
     const porVecina = new Map()
     const descartadasPorVecina = new Map()
     for (const pieza of piezas) {
-      const inv = invasiones(pieza, vecinas)
+      const inv = invasiones(pieza, marcadas)
       saltados.push(...inv.saltados)
       for (const h of inv.invasiones) {
         const previa = porVecina.get(h.refcat)
-        if (previa === undefined) porVecina.set(h.refcat, { ...h, piezas: [...h.piezas] })
-        else {
+        if (previa === undefined) {
+          porVecina.set(h.refcat, { ...h, refcat: refcatReal(h.refcat), piezas: [...h.piezas] })
+        } else {
           previa.area += h.area
           previa.piezas.push(...h.piezas)
         }
       }
       for (const d of inv.descartadas) {
         const previa = descartadasPorVecina.get(d.refcat)
-        if (previa === undefined) descartadasPorVecina.set(d.refcat, { ...d })
-        else {
+        if (previa === undefined) {
+          descartadasPorVecina.set(d.refcat, { ...d, refcat: refcatReal(d.refcat) })
+        } else {
           previa.area += d.area
           previa.nPiezas += d.nPiezas
           // El grosor que se conserva es el MAYOR de las astillas: es el que

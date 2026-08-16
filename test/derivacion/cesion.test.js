@@ -162,7 +162,13 @@ describe('derivarCesion · los ocho caminos', () => {
     // ⛔ AVISO y no ERROR: una astilla no impide entregar, sólo pide mirarla.
     expect(c.puedeEntregarse).toBe(true)
     // Las cifras van en el mensaje Y sin tocar en `datos` (regla de oro 11).
-    expect(c.detecciones[0].mensaje).toMatch(/0,5 mm de ancho/)
+    // ⛔ «grosor medio» y NO «ancho» desde la auditoría del 2026-08-16: la cifra
+    // es `2A/P`, que `geo/grosor.js` advierte en su cabecera que NO es el ancho.
+    // Una franja rectangular de 2,00 m de ancho real se anunciaba como «1,667 m
+    // de ancho», y en una aguja triangular la cifra es la mitad del ancho real.
+    // La métrica no cambió —es la buena para lo que decide—; cambió la palabra,
+    // que afirmaba una medida física que no era.
+    expect(c.detecciones[0].mensaje).toMatch(/0,5 mm de grosor medio/)
     expect(c.detecciones[0].datos.grosor).toBe(c.piezas[0].grosor)
     expect(c.detecciones[0].datos.umbralGrosorM).toBe(OPERATIVOS.grosorInvasionMinimoM)
     // ⛔ Y el área NO se imprime como «0 m²», que es lo que daría con 2 decimales.

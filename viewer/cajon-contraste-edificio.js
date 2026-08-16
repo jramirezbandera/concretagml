@@ -299,6 +299,95 @@ function estilar(el, estilos) {
   return el
 }
 
+/**
+ * ⭐ **LA REJILLA DE DATOS, HEREDADA DEL CAJÓN HERMANO** (2026-08-16).
+ *
+ * No es un valor copiado: es una corrección MEDIDA que este cajón se había perdido.
+ * El 2026-08-15 `viewer/cajon-diagnostico.js#REJILLA` cambió `auto 1fr` + `gap: 2px
+ * 10px` por esto, y lo llamó «el peor defecto del panel» con la medición delante: la
+ * columna de la ETIQUETA se quedaba con todo el ancho que pidiera y la del DATO con
+ * lo que sobrara, así que en el panel de 344 px quedaban ~150 px para cifras que
+ * miden hasta 30 y las filas se leían PARTIDAS en cuatro líneas.
+ *
+ * Aquí es peor que allí, y por eso esto no es aseo: las etiquetas de este cajón
+ * llegan a 27 caracteres («Desplazamiento de centroides») y las cifras son las más
+ * largas de la aplicación, porque van compuestas — «146,87 m² · 90,31 % de la
+ * mayor», «322,13 m² · 25 piezas». Con `auto 1fr` la etiqueta más larga fijaba la
+ * columna y todas las cifras se partían.
+ *
+ * Lo que hace, punto por punto (el porqué largo, en el hermano):
+ *   · **La etiqueta ya no manda en el ancho**: `minmax(0,1fr) auto` deja que se
+ *     parta la PROSA y la cifra se queda entera. La cifra es el dato; la etiqueta,
+ *     su nombre.
+ *   · **La cifra a la derecha** (la pone {@link vestirCifra}), que es lo que hace
+ *     comparables números de anchos distintos leídos en columna.
+ *   · **`baseline`** y no `center`: conviven etiquetas de 13 px con cifras de 15.
+ *   · **6 px de aire entre filas** en vez de 2: tres filas sin aire se leen como un
+ *     párrafo, no como una ficha.
+ *
+ * ⚠️ **Está COPIADO y no importado a propósito, y hay un guardián.** El hermano no
+ * lo exporta —es su detalle de maquetación—, y `viewer/` no comparte hoja. Lo que
+ * impide que los dos cajones vuelvan a divergir es un test que monta LOS DOS y
+ * compara sus `<dl>` propiedad a propiedad
+ * (`test/viewer/cajon-contraste-edificio.dom.test.js`, «son LA MISMA que la del
+ * hermano»): si un día uno cambia, el otro se pone rojo.
+ */
+const REJILLA = Object.freeze({
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0,1fr) auto',
+  columnGap: '12px',
+  rowGap: '6px',
+  alignItems: 'baseline',
+})
+
+/**
+ * La etiqueta de una fila. `margin: 0` explícito porque en una rejilla el aire lo
+ * reparte ella, no los márgenes del navegador.
+ *
+ * @param {Document} doc
+ * @param {string} texto
+ * @returns {HTMLElement}
+ */
+const etiquetaDato = (doc, texto) => estilar(crear(doc, 'dt', null, texto), { margin: '0' })
+
+/**
+ * Viste una celda como CIFRA: tamaño de dato y a la derecha.
+ *
+ * `margin: 0` no es adorno: un `<dd>` trae `margin-inline-start: 40px` del navegador
+ * y en una rejilla eso empuja la celda entera 40 px hacia dentro, comiéndose justo
+ * el ancho que esta reestructuración le devuelve a la cifra.
+ *
+ * @param {HTMLElement} dd
+ * @param {string} texto
+ */
+function vestirCifra(dd, texto) {
+  estilar(dd, { margin: '0', fontSize: ESCALA.DATO, textAlign: 'right' })
+  dd.textContent = texto
+}
+
+/**
+ * Viste una celda como PROSA: el motivo por el que esa fila no tiene cifra, o el
+ * resumen del estado del registro.
+ *
+ * **Se viste distinto que una cifra, y es deliberado** —misma lección que
+ * `cajon-diagnostico.js#ponerMotivo`, medida allí—: un motivo es prosa ya redactada
+ * («No hay geometría oficial contra la que medir…»), a veces de dos líneas, y
+ * heredaba el tamaño de dato y la alineación a la derecha. Prosa de 15 px
+ * justificada a la derecha en una columna estrecha es exactamente lo que no se lee.
+ *
+ * ⚠️ Las dos funciones escriben **las mismas propiedades**, nunca un subconjunto: el
+ * camino que se olvida es el de VUELTA (una celda que fue motivo y ahora trae
+ * cifra), y dejarse una propiedad sin reponer deja cifras alineadas a la izquierda
+ * en cuanto se repinta.
+ *
+ * @param {HTMLElement} dd
+ * @param {string} texto
+ */
+function vestirMotivo(dd, texto) {
+  estilar(dd, { margin: '0', fontSize: ESCALA.CUERPO, textAlign: 'left' })
+  dd.textContent = texto
+}
+
 const esMapa = (m) =>
   !!m &&
   typeof m.addControl === 'function' &&
@@ -423,13 +512,7 @@ const CajonContrasteEdificio = L.Control.extend({
 
     // ── La huella: lo medido contra lo publicado ───────────────────────────
     const huella = crear(doc, 'dl', CLASE.SECCION)
-    estilar(huella, {
-      display: 'grid',
-      gridTemplateColumns: 'auto 1fr',
-      gap: '2px 10px',
-      margin: '10px 0 0',
-      fontSize: ESCALA.CUERPO,
-    })
+    estilar(huella, { ...REJILLA, margin: '10px 0 0', fontSize: ESCALA.CUERPO })
     this._medida = crear(doc, 'dd', CLASE.CIFRA)
     this._medida.dataset.contraste = 'huella-medida'
     this._oficial = crear(doc, 'dd', CLASE.CIFRA)
@@ -437,23 +520,17 @@ const CajonContrasteEdificio = L.Control.extend({
     this._difHuella = crear(doc, 'dd', CLASE.CIFRA)
     this._difHuella.dataset.contraste = 'huella-diferencia'
     huella.append(
-      crear(doc, 'dt', null, 'Huella medida'),
+      etiquetaDato(doc, 'Huella medida'),
       this._medida,
-      crear(doc, 'dt', null, 'Huella del Catastro'),
+      etiquetaDato(doc, 'Huella del Catastro'),
       this._oficial,
-      crear(doc, 'dt', null, 'Diferencia'),
+      etiquetaDato(doc, 'Diferencia'),
       this._difHuella,
     )
 
     // ── El encaje de las dos huellas ───────────────────────────────────────
     const encaje = crear(doc, 'dl', CLASE.SECCION)
-    estilar(encaje, {
-      display: 'grid',
-      gridTemplateColumns: 'auto 1fr',
-      gap: '2px 10px',
-      margin: '10px 0 0',
-      fontSize: ESCALA.CUERPO,
-    })
+    estilar(encaje, { ...REJILLA, margin: '10px 0 0', fontSize: ESCALA.CUERPO })
     this._solape = crear(doc, 'dd', CLASE.CIFRA)
     this._solape.dataset.contraste = 'solape'
     this._diferencia = crear(doc, 'dd', CLASE.CIFRA)
@@ -461,31 +538,25 @@ const CajonContrasteEdificio = L.Control.extend({
     this._centroides = crear(doc, 'dd', CLASE.CIFRA)
     this._centroides.dataset.contraste = 'centroides'
     encaje.append(
-      crear(doc, 'dt', null, 'Solape'),
+      etiquetaDato(doc, 'Solape'),
       this._solape,
-      crear(doc, 'dt', null, 'Diferencia simétrica'),
+      etiquetaDato(doc, 'Diferencia simétrica'),
       this._diferencia,
-      crear(doc, 'dt', null, 'Desplazamiento de centroides'),
+      etiquetaDato(doc, 'Desplazamiento de centroides'),
       this._centroides,
     )
 
     // ── Dentro de la parcela: la pregunta propia de esta rama ──────────────
     const enParcela = crear(doc, 'dl', CLASE.SECCION)
-    estilar(enParcela, {
-      display: 'grid',
-      gridTemplateColumns: 'auto 1fr',
-      gap: '2px 10px',
-      margin: '10px 0 0',
-      fontSize: ESCALA.CUERPO,
-    })
+    estilar(enParcela, { ...REJILLA, margin: '10px 0 0', fontSize: ESCALA.CUERPO })
     this._enParcela = crear(doc, 'dd', CLASE.CIFRA)
     this._enParcela.dataset.contraste = 'en-parcela'
     this._fuera = crear(doc, 'dd', CLASE.CIFRA)
     this._fuera.dataset.contraste = 'fuera'
     enParcela.append(
-      crear(doc, 'dt', null, 'Dentro de la parcela'),
+      etiquetaDato(doc, 'Dentro de la parcela'),
       this._enParcela,
-      crear(doc, 'dt', null, 'Fuera de la parcela'),
+      etiquetaDato(doc, 'Fuera de la parcela'),
       this._fuera,
     )
 
@@ -586,7 +657,24 @@ const CajonContrasteEdificio = L.Control.extend({
     anclado.dataset.contraste = 'anclado'
     estilar(anclado, {
       position: 'sticky',
-      bottom: '0',
+      // ⛔ **`-10px` Y NO `0`, y el número es el `padding-bottom` del cajón.** Es la
+      // corrección que el hermano midió en Chrome el 2026-08-15 y que este bloque se
+      // había quedado sin heredar: con `bottom: 0` el borde inferior del sticky se
+      // ancla a la **caja de RELLENO** del contenedor que scrollea, no a su borde, y
+      // se queda 10 px por encima del suelo. Por esa rendija sigue pasando texto:
+      // allí se midió la última línea del margen de identidad IMPRESA DEBAJO del
+      // botón primario, como si fuera su pie. Aquí lo que asomaría por debajo es la
+      // sección de invasión —la única que puede llevar ámbar—, que es justo lo que
+      // no puede leerse a medias.
+      //
+      // El `marginBottom: -10px` de abajo NO lo tapa: ése quita el hueco al final
+      // del scroll, no mueve el ancla.
+      //
+      // Los 10 px son el `padding-bottom` de los DOS juegos de estilos importados
+      // ({@link ESTILO_SOBRE_EL_MAPA} y {@link ESTILO_EN_EL_PANEL}, que lo llevan
+      // igual a propósito); quien cambie uno tiene que cambiar esto. El test no
+      // afirma el literal sino que compense ese relleno, que es lo que importa.
+      bottom: '-10px',
       zIndex: '1',
       marginTop: '12px',
       marginLeft: '-12px',
@@ -605,12 +693,17 @@ const CajonContrasteEdificio = L.Control.extend({
     // Las ocho cifras a DATO contra etiquetas en CUERPO: el salto que hace que la
     // vista caiga en el número y no en su nombre. Antes ninguna declaraba tamaño y
     // heredaban 12 px de Leaflet sobre el mapa y otro distinto dentro del panel.
+    //
+    // Nacen vestidas de CIFRA —a la derecha y sin el margen del `<dd>`— porque el
+    // cajón puede abrirse antes del primer `pintar`; a partir de ahí cada repintado
+    // decide, celda a celda, si es cifra o prosa ({@link vestirCifra} /
+    // {@link vestirMotivo}).
     for (const dd of [
       this._medida, this._oficial, this._difHuella,
       this._solape, this._diferencia, this._centroides,
       this._enParcela, this._fuera,
     ]) {
-      estilar(dd, { fontSize: ESCALA.DATO })
+      vestirCifra(dd, '')
     }
 
     // Tres rótulos, con el vocabulario que este cajón ya usaba en sus etiquetas.
@@ -839,46 +932,60 @@ export function crearCajonContrasteEdificio({ mapa, posicion = 'bottomleft', alA
     control._registro.style.display = motivo ? '' : 'none'
   }
 
-  /** Las dos huellas y su diferencia. La medida SIEMPRE es una cifra: es nuestra. */
+  /**
+   * Las dos huellas y su diferencia. La medida SIEMPRE es una cifra: es nuestra.
+   *
+   * Las otras dos llevan cifra o RESUMEN del estado del registro, y cada cosa se
+   * viste de lo que es: ver {@link vestirCifra} y {@link vestirMotivo}.
+   */
   function pintarHuella(c) {
     const clave = c.registro?.clave ?? REGISTRO.NO_CONSULTADO
     const resumen = RESUMEN_REGISTRO[clave] ?? NO_CONSTA
     const piezas = c.huella.nPiezasMedida
-    control._medida.textContent =
-      `${m2(c.huella.medida)} · ${cuenta(piezas)} ` +
-      `${plural(piezas, 'pieza', 'piezas')}`
-    control._oficial.textContent =
-      c.huella.oficial === null
-        ? resumen
-        : `${m2(c.huella.oficial)} · ${cuenta(c.huella.nCarasOficial)} ` +
-          `${plural(c.huella.nCarasOficial, 'cara', 'caras')}`
-    control._difHuella.textContent =
-      c.huella.diferencia === null ? resumen : conSigno(c.huella.diferencia, m2)
+    vestirCifra(
+      control._medida,
+      `${m2(c.huella.medida)} · ${cuenta(piezas)} ${plural(piezas, 'pieza', 'piezas')}`,
+    )
+    if (c.huella.oficial === null) vestirMotivo(control._oficial, resumen)
+    else {
+      vestirCifra(
+        control._oficial,
+        `${m2(c.huella.oficial)} · ${cuenta(c.huella.nCarasOficial)} ` +
+          `${plural(c.huella.nCarasOficial, 'cara', 'caras')}`,
+      )
+    }
+    if (c.huella.diferencia === null) vestirMotivo(control._difHuella, resumen)
+    else vestirCifra(control._difHuella, conSigno(c.huella.diferencia, m2))
   }
 
   /** El encaje de las dos huellas. Cada `null` dice su motivo, no un guion. */
   function pintarEncaje(c) {
-    control._solape.textContent =
-      c.solape === null
-        ? textoOmitido(c, 'solape')
-        : `${m2(c.solape.area)} · ${porcentaje(c.solape.relativo)} de la mayor`
-    control._diferencia.textContent =
-      c.diferencia === null ? textoOmitido(c, 'diferencia') : m2(c.diferencia.area)
-    control._centroides.textContent =
-      c.centroides === null ? textoOmitido(c, 'centroides') : metros(c.centroides.distancia)
+    if (c.solape === null) vestirMotivo(control._solape, textoOmitido(c, 'solape'))
+    else {
+      vestirCifra(
+        control._solape,
+        `${m2(c.solape.area)} · ${porcentaje(c.solape.relativo)} de la mayor`,
+      )
+    }
+    if (c.diferencia === null) vestirMotivo(control._diferencia, textoOmitido(c, 'diferencia'))
+    else vestirCifra(control._diferencia, m2(c.diferencia.area))
+    if (c.centroides === null) vestirMotivo(control._centroides, textoOmitido(c, 'centroides'))
+    else vestirCifra(control._centroides, metros(c.centroides.distancia))
   }
 
   /** Cuánto de la construcción cae dentro de la parcela declarada, y cuánto fuera. */
   function pintarEnParcela(c) {
     if (c.enParcela === null) {
       const motivo = textoOmitido(c, 'enParcela')
-      control._enParcela.textContent = motivo
-      control._fuera.textContent = motivo
+      vestirMotivo(control._enParcela, motivo)
+      vestirMotivo(control._fuera, motivo)
       return
     }
-    control._enParcela.textContent =
-      `${m2(c.enParcela.superficieDentro)} · ${porcentaje(c.enParcela.relativo)}`
-    control._fuera.textContent = m2(c.enParcela.superficieFuera)
+    vestirCifra(
+      control._enParcela,
+      `${m2(c.enParcela.superficieDentro)} · ${porcentaje(c.enParcela.relativo)}`,
+    )
+    vestirCifra(control._fuera, m2(c.enParcela.superficieFuera))
   }
 
   /**
@@ -1008,7 +1115,9 @@ export function crearCajonContrasteEdificio({ mapa, posicion = 'bottomleft', alA
           control._enParcela,
           control._fuera,
         ]) {
-          el.textContent = NO_CONSTA
+          // «No consta» es prosa, no una cifra: se viste como tal, que además es lo
+          // que deja la celda lista para el camino de vuelta.
+          vestirMotivo(el, NO_CONSTA)
         }
         control._invasion.replaceChildren()
         // Sin construcción no hay informe que componer, y el botón lo dice.
