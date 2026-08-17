@@ -668,7 +668,7 @@ describe('rebanada 2 · el pie enseña lo de cada pantalla', () => {
     // «Generar GML» se queda aquí por decisión del autor (el camino corto de una
     // Subsanación no pasa por el diagnóstico).
     //
-    // ⭐ Y DESDE F17 SON TRES, no dos. «Derivar sobrante» entra en el pie y no
+    // ⭐ Y DESDE F17 SON TRES, no dos. «Rehacer el parcelario» entra en el pie y no
     // dentro de su propio bloque porque ese bloque aparece SOLO cuando hay
     // sobrante (decisión de diseño D2): un botón dentro de él sería un botón que
     // solo existe después de haberlo pulsado. ⚠️ El tercero tiene un precio en
@@ -711,7 +711,7 @@ describe('rebanada 2 · el pie enseña lo de cada pantalla', () => {
       'traer-fondo-catastral',
       'traer-colindantes',
       'diagnosticar',
-      'derivar-sobrante',
+      'rehacer-parcelario',
     ])
   })
 

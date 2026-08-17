@@ -1687,7 +1687,7 @@ describe('guarda transversal · los canales que `app/main.js` tiene que enchufar
       quien: 'app/cableado-derivacion.js',
       porque:
         'derivar no toca ningún store ni la navegación, así que sin este canal la leyenda del ' +
-        'visor no anuncia las manchas cian y ámbar que «Derivar sobrante» acaba de pintar —ni ' +
+        'visor no anuncia las manchas cian y ámbar que «Rehacer el parcelario» acaba de pintar —ni ' +
         'deja de anunciarlas cuando la foto caduca— hasta la siguiente navegación o edición ' +
         '(auditoría 2026-08-16, hallazgo B1).',
     },

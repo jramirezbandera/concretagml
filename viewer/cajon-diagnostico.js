@@ -274,12 +274,26 @@ export const ESTILO_EN_EL_PANEL = Object.freeze({
  * entrada, y va en CUERPO con peso 600.
  *
  * ⚠️ `DATO_XL` es SOLO para la superficie medida, y solo cuando hay una cifra:
- * «No consta» a 30 px grita una ausencia. Lo conmuta `pintar` (ver
+ * «No consta» a 22 px grita una ausencia. Lo conmuta `pintar` (ver
  * `destacarMedida`), no se pega aquí de una vez.
+ *
+ * ── ⭐ `DATO_XL` BAJÓ DE 30 A 22 px EL 2026-08-17 ───────────────────────────
+ * Encargo del autor sobre esta pantalla: «la superficie de medición está muy
+ * grande». Y estaba, por una razón que no se ve en la constante: **las cifras de
+ * este cajón van en MONO** (`.gml-cajon-cifra` de `estilos/app.css`), y la mono
+ * mide ~0,6 em por glifo contra ~0,5 de la sans. MEDIDO en Chrome sobre el
+ * diagnóstico real de la captura del autor: «103,64 m²» ocupaba **176 px de los
+ * 344 útiles del panel**, o sea que el dato titular se comía la mitad del ancho
+ * de la columna y dejaba a su etiqueta —«Medición», 13 px— flotando al otro
+ * extremo de un renglón vacío. A 22 px son 129 px: sigue siendo, con diferencia,
+ * lo primero que se lee, y ya no es un contador de gasolinera.
+ *
+ * El salto que la jerarquía necesita es el que hay CONTRA `DATO` (15 px), y 22/15
+ * lo da de sobra. 30/15 no era jerarquía: era otro tamaño de letra.
  */
 export const ESCALA = Object.freeze({
   /** El dato titular: la superficie medida, y nada más. */
-  DATO_XL: '30px',
+  DATO_XL: '22px',
   /** Toda cifra de la ficha (superficies, solape, centroides, desviación). */
   DATO: '15px',
   /** Prosa y etiquetas de dato. Sube desde el 11-12 px heredado. */
@@ -323,6 +337,26 @@ export const CLASE = Object.freeze({
    * línea entera y el matiz baja al tamaño de APUNTE, que es lo que es.
    */
   APUNTE: 'gml-cajon-apunte',
+  /**
+   * ⭐ **UNA CELDA QUE, EN VEZ DE CIFRA, LLEVA EL MOTIVO DE SU AUSENCIA**
+   * (2026-08-17). La lleva y la quita {@link ponerMotivo} / {@link ponerCifra},
+   * turnándose con {@link CLASE.CIFRA} en el MISMO `<dd>`.
+   *
+   * Existe por una razón de una línea: **`.gml-cajon-cifra` pone la MONO**, y un
+   * motivo no es una cifra, es un párrafo («No hay geometría oficial con la que
+   * contrastar: la parcela no se trajo del Catastro»). Prosa en mono, con su
+   * interletraje de máquina de escribir, tres veces seguidas y a lo ancho del
+   * panel. Es el mismo defecto que la primera columna de la tabla de cruces tenía
+   * hasta hoy, y se arregla igual: la hoja mete esta clase en la regla que ya
+   * viste a los `<dt>` —sans y gris secundario, que es exactamente lo que un
+   * motivo quiere—, así que **cuesta un selector y ninguna regla nueva**.
+   *
+   * ⚠️ La familia NO se puede resolver desde el módulo: es lo único que este
+   * fichero no declara (ver la cabecera), porque `system-ui` en línea ganaría a la
+   * hoja y dejaría el cajón con dos tipografías. De ahí que sea una clase y no un
+   * estilo más.
+   */
+  MOTIVO: 'gml-cajon-motivo',
   TABLA: 'gml-cajon-tabla',
   // No hay `OMISION`. La había, y no la llevaba ningún nodo: los motivos de
   // omisión se escriben DENTRO de la cifra que falta (`textoOmitido`), que es lo
@@ -548,13 +582,31 @@ function estilar(el, estilos) {
  * sobre blanco da 4,55:1 —pasa AA por los pelos y sin margen—, y este rótulo es
  * justo el texto más pequeño del cajón. `#475569` da ~7,5:1.
  *
+ * ── ⭐ EL RÓTULO TRAE SU FILETE DESDE EL 2026-08-17 ─────────────────────────
+ * Es la mitad del encargo «está poco estructurado». El cajón tenía DOS recetas
+ * distintas para separar secciones y las repartía al azar: las dos de abajo
+ * —invasión y margen— llevaban filete y respiro, y las dos de arriba —Superficie y
+ * Encaje— solo un rótulo en versalitas a 4 px de la cifra anterior. Resultado
+ * medido en la captura del autor: la tabla de cruces y el rótulo «ENCAJE» se leían
+ * como un mismo bloque, mientras la invasión sí se despegaba.
+ *
+ * La junta es ahora {@link JUNTA} y la llevan los cuatro grupos. El hermano de
+ * edificio —tres rótulos— la hereda sin tocar nada, que es exactamente por lo que
+ * esta función se exporta.
+ *
+ * El `margin-bottom` de 6 px es lo único que no sale de la constante: es el aire
+ * entre el rótulo y la primera fila de SU grupo, y tiene que ser MENOR que el de
+ * la junta —si no, el rótulo se lee tan pegado a lo de arriba como a lo de abajo y
+ * deja de decir a qué grupo pertenece—.
+ *
  * @param {Document} doc
  * @param {string} texto
  * @returns {HTMLElement}
  */
 export function rotuloDeGrupo(doc, texto) {
   return estilar(crear(doc, 'h3', CLASE.ROTULO, texto), {
-    margin: '12px 0 4px',
+    ...JUNTA,
+    marginBottom: '6px',
     fontSize: ESCALA.ROTULO,
     fontWeight: '500',
     letterSpacing: '0.09em',
@@ -593,16 +645,95 @@ export function rotuloDeGrupo(doc, texto) {
  *     anchos distintos leídos en columna — junto con las `tabular-nums` que ya
  *     ponía `estilos/app.css`.
  *   · **`alignItems: 'baseline'`**, y no `center`: en la fila de la superficie
- *     medida conviven una etiqueta de 13 px y una cifra de 30, y centrarlas
+ *     medida conviven una etiqueta de 13 px y una cifra de 22, y centrarlas
  *     verticalmente dejaría la etiqueta flotando a media altura del número.
- *   · **6 px de aire entre filas** en vez de 2.
+ *   · **8 px de aire entre filas** en vez de 2 (eran 6 hasta el 2026-08-17). Con
+ *     los dos campos que se rellenan —la registral y la clase— midiendo ahora
+ *     28 px de alto, 6 px dejaban las filas tocándose: un campo pegado a una
+ *     cifra se lee como si la cifra fuera editable.
  */
 const REJILLA = Object.freeze({
   display: 'grid',
   gridTemplateColumns: 'minmax(0,1fr) auto',
   columnGap: '12px',
-  rowGap: '6px',
+  rowGap: '8px',
   alignItems: 'baseline',
+})
+
+/**
+ * ⭐ **EL PESO DE UNA CIFRA** (2026-08-17). Todas las del cajón lo llevan, y por
+ * eso vive en una constante y no repetido en cinco sitios.
+ *
+ * `500` y **nunca `600`**, y el número no es de gusto: las cifras van en Geist
+ * Mono (`.gml-cajon-cifra` de `estilos/app.css`) y de esa familia el proyecto
+ * carga DOS pesos —400 y 500, ver `estilos/tokens/fonts.css`—. Un `600` no
+ * existe como fichero, así que el navegador lo SINTETIZA engordando el trazo del
+ * 500, y una mono sintetizada a 22 px se ve sucia justo en el dato titular.
+ *
+ * Lo que compra el 500 frente al 400: el dato se separa de su etiqueta por peso y
+ * no solo por tamaño, que es lo que permitió bajar `DATO_XL` de 30 a 22 sin que
+ * la cifra dejara de mandar en la fila.
+ *
+ * ⚠️ Y **se devuelve a 400 cuando la celda lleva un MOTIVO** en vez de una cifra
+ * (ver {@link ponerMotivo}): prosa en peso de dato es prosa que grita.
+ */
+const PESO_CIFRA = '500'
+
+/**
+ * ⭐ **LOS DOS CAMPOS QUE SE RELLENAN, VESTIDOS DE UNA VEZ** (2026-08-17).
+ *
+ * La superficie registral y la clase de suelo son lo ÚNICO de este cajón que no
+ * se mide: lo pone una persona. Hasta hoy cada uno se vestía en su sitio del
+ * `onAdd`, con los mismos tres valores copiados —y con el relleno `3px 6px`, que
+ * dejaba dos cajas de 22 px de alto en una ficha cuyas cifras miden 22 de letra.
+ * Un campo más bajo que su propio dato no se lee como un campo.
+ *
+ * 5 px arriba y abajo lo dejan en 28 px de alto, que es el mínimo con el que una
+ * caja de texto se ve pulsable, y los 8 px de los lados le dan a la cifra el
+ * mismo aire que tiene contra el borde del panel.
+ *
+ * ⚠️ **Aquí NO hay `color` ni `background`, y es deliberado**: los pone
+ * `estilos/app.css` con los tokens del sistema, y un valor en línea los mataría
+ * (el inline gana). Lo que sí se declara es lo que hace falta para que el campo
+ * sea usable SIN la hoja —borde, radio y relleno—, que es el reparto de todo este
+ * fichero; sin hoja, el `<input>` cae en los colores del navegador, que son
+ * blanco y negro y por tanto legibles.
+ */
+const ESTILO_CAMPO = Object.freeze({
+  padding: '5px 8px',
+  border: '1px solid #CBD5E1',
+  borderRadius: '6px',
+})
+
+/**
+ * ⭐ **LA JUNTA ENTRE SECCIONES, UNA SOLA VEZ** (2026-08-17).
+ *
+ * El cajón tiene CUATRO grupos —Superficie, Encaje, la invasión y el margen— y
+ * hasta hoy los separaba de dos maneras distintas: los dos primeros con un rótulo
+ * en versalitas a 4 px de la cifra anterior, los dos últimos con un filete de
+ * 1 px y 10 + 10 px de respiro escritos a mano en cada sitio. Un panel con dos
+ * gramáticas de separación no tiene ninguna, y era la mitad del «está poco
+ * estructurado» del autor.
+ *
+ * Ahora la junta es ESTA y la llevan los cuatro: el filete lo dibuja el rótulo
+ * cuando el grupo tiene rótulo ({@link rotuloDeGrupo}) y el propio bloque cuando
+ * no lo tiene (la invasión y el margen, y el porqué de que no lo tengan está en
+ * {@link CLASE.ROTULO}).
+ *
+ * ⚠️ **8 px y no 10, y el número está medido.** El cajón scrollea dentro de una
+ * altura que no elige, así que cada junta se paga cuatro veces: a 10 px el
+ * contenido del diagnóstico real del autor medía 830 px contra los 747 útiles del
+ * panel a 1400×900, o sea que el segundo párrafo del margen —la clase que la
+ * aplicación PROPONE— caía entero por debajo del bloque anclado. A 8 px la junta
+ * se sigue leyendo como junta y devuelve 24 px de los que se fueron.
+ *
+ * ⚠️ Va EN LÍNEA, como todo lo de este fichero, porque el cajón tiene que separar
+ * sus secciones también montado sobre un mapa pelado sin hoja de estilos.
+ */
+const JUNTA = Object.freeze({
+  marginTop: '8px',
+  paddingTop: '8px',
+  borderTop: '1px solid #E2E8F0',
 })
 
 /**
@@ -632,7 +763,7 @@ const etiquetaDato = (doc, texto) => estilar(crear(doc, 'dt', null, texto), { ma
 function celdaDato(doc, diag) {
   const dd = crear(doc, 'dd', CLASE.CIFRA)
   dd.dataset.diag = diag
-  estilar(dd, { margin: '0', fontSize: ESCALA.DATO, textAlign: 'right' })
+  estilar(dd, { margin: '0', fontSize: ESCALA.DATO, fontWeight: PESO_CIFRA, textAlign: 'right' })
   const cifra = crear(doc, 'span')
   const matiz = crear(doc, 'span', CLASE.APUNTE)
   estilar(matiz, {
@@ -657,7 +788,21 @@ function celdaDato(doc, diag) {
  * @param {string} [matiz='']
  */
 function ponerCifra(celda, cifra, matiz = '') {
-  estilar(celda.dd, { fontSize: ESCALA.DATO, textAlign: 'right' })
+  estilar(celda.dd, {
+    fontSize: ESCALA.DATO,
+    fontWeight: PESO_CIFRA,
+    textAlign: 'right',
+    // `gridColumn` se REPONE aquí aunque una cifra no lo necesite: es la propiedad
+    // que {@link ponerMotivo} cambia, y el camino que se olvida es el de VUELTA.
+    // Sin esto, una fila que fue motivo y recupera su cifra se quedaría ocupando
+    // las dos columnas para siempre — la cifra centrada a la derecha de un renglón
+    // entero, con su etiqueta sola en la línea de arriba.
+    gridColumn: 'auto',
+  })
+  // Y la clase vuelve a ser la de cifra: es lo que le devuelve la MONO (ver
+  // {@link CLASE.MOTIVO}). Las dos funciones escriben las mismas propiedades y
+  // ponen la misma clase, siempre, porque el camino que se olvida es el de vuelta.
+  celda.dd.className = CLASE.CIFRA
   celda.cifra.textContent = cifra
   celda.matiz.textContent = matiz
   celda.matiz.style.display = matiz === '' ? 'none' : 'block'
@@ -672,11 +817,37 @@ function ponerCifra(celda, cifra, matiz = '') {
  * lee: baja a CUERPO, se alinea a la izquierda y toma el gris del cromo, que es lo
  * que dice «esto es una explicación, no un número».
  *
+ * Y **vuelve al peso 400** ({@link PESO_CIFRA} es 500): el peso es la otra mitad
+ * de lo que dice «esto es un número». Un motivo de dos líneas en peso de dato
+ * pesa más que las cifras que sí hay.
+ *
+ * ── ⛔ EL MOTIVO OCUPA LAS DOS COLUMNAS, Y ESTO ARREGLA UN SOLAPE REAL ──────
+ * (2026-08-17.) La celda vivía en la columna `auto` de {@link REJILLA}, que se
+ * dimensiona a `max-content`. Con una cifra eso es exactamente lo que se quiere
+ * —«1.538,99 m²» nunca se parte—, pero un motivo es un párrafo: su `max-content`
+ * son 400 px de una línea, la columna se los pedía TODOS y la de la etiqueta
+ * —`minmax(0,1fr)`, o sea encogible hasta cero— se quedaba sin ancho. VISTO en
+ * Chrome sobre una parcela sin geometría oficial: **«Solape» y «No hay geometría
+ * oficial con la que contrastar…» se imprimían UNO ENCIMA DEL OTRO**, y las tres
+ * métricas omitidas quedaban ilegibles a la vez. El defecto entró con la rejilla
+ * el 2026-08-15 y no lo vio nadie porque en jsdom no hay maquetación: no hay
+ * columnas que repartir, así que las pruebas de dos pisos pasaban en verde.
+ *
+ * `gridColumn: '1 / -1'` baja el motivo a su propia línea, debajo de la etiqueta y
+ * con el ancho entero del panel. Que es además como se lee un párrafo: la razón
+ * por la que este dato no está no es un valor de una tabla, es una frase.
+ *
  * @param {{dd: HTMLElement, cifra: HTMLElement, matiz: HTMLElement}} celda
  * @param {string} texto
  */
 function ponerMotivo(celda, texto) {
-  estilar(celda.dd, { fontSize: ESCALA.CUERPO, textAlign: 'left' })
+  estilar(celda.dd, {
+    fontSize: ESCALA.CUERPO,
+    fontWeight: '400',
+    textAlign: 'left',
+    gridColumn: '1 / -1',
+  })
+  celda.dd.className = CLASE.MOTIVO
   celda.cifra.textContent = texto
   celda.matiz.textContent = ''
   celda.matiz.style.display = 'none'
@@ -870,15 +1041,33 @@ const CajonDiagnostico = L.Control.extend({
     // ser EXACTAMENTE la cifra, porque es lo que se compara con la ficha del pie.
     // Un segundo `<span>` dentro, aunque estuviera vacío, no cambiaría el texto
     // pero sí invitaría a meterle algo.
-    estilar(medida, { margin: '0', fontSize: ESCALA.DATO, textAlign: 'right' })
-    estilar(catastral, { margin: '0', fontSize: ESCALA.DATO, textAlign: 'right' })
+    estilar(medida, {
+      margin: '0',
+      fontSize: ESCALA.DATO,
+      fontWeight: PESO_CIFRA,
+      textAlign: 'right',
+      // La mono no aprieta sus glifos y a 22 px eso se ve: −0,01 em recoge la
+      // cifra titular lo justo para que se lea como un número y no como una
+      // matrícula. Va aquí y no en `ESCALA` porque es del DATO_XL y de nadie más.
+      letterSpacing: '-0.01em',
+    })
+    estilar(catastral, {
+      margin: '0',
+      fontSize: ESCALA.DATO,
+      fontWeight: PESO_CIFRA,
+      textAlign: 'right',
+    })
     this._medida = medida
     this._catastral = catastral
 
+    // `margin: 0`: el aire de encima lo pone el rótulo de grupo, que desde el
+    // 2026-08-17 cierra con 8 px. Los 8 px que ponía esto se sumaban a aquéllos y
+    // dejaban 16 px entre el rótulo y su primera fila — el doble del aire que hay
+    // entre las filas, o sea el rótulo despegado de lo que rotula.
     const lista = crear(doc, 'dl')
     estilar(lista, {
       ...REJILLA,
-      margin: '8px 0 0',
+      margin: '0',
       fontSize: ESCALA.CUERPO,
     })
     lista.append(
@@ -891,8 +1080,35 @@ const CajonDiagnostico = L.Control.extend({
     // El campo de la superficie REGISTRAL: es un dato de una escritura, no algo que
     // se mida, así que lo teclea el usuario y nace vacío. `type="number"` con
     // `step` de céntimo: es una superficie en m².
-    const etiquetaRegistral = crear(doc, 'label', null, 'Superficie registral (m²)')
+    //
+    // ── ⭐ LA ETIQUETA SE PARTE EN DOS PISOS Y EL HUECO SE QUEDA VACÍO ────────
+    // (2026-08-17, encargo del autor: «el cuadro para meter la superficie
+    // registral está feo».) Estaba, y por dos defectos que se sumaban:
+    //
+    //   1. **La pista vivía DENTRO de la caja.** El `placeholder` decía «de la
+    //      escritura», que es PROSA, y `estilos/app.css` pone los `input` de este
+    //      cajón en mono con cifras tabulares —porque lo que se teclea es un
+    //      número—. Prosa en mono dentro de una caja de 9 em: MEDIDO en Chrome,
+    //      se recortaba en «de la escri». Un campo cuya única ayuda aparece
+    //      truncada enseña a desconfiar del formulario.
+    //   2. **Era la fila más baja de la ficha.** 3 px de relleno vertical contra
+    //      los 22 px de la cifra de arriba: la caja parecía medio campo.
+    //
+    // La pista sube a la etiqueta como SEGUNDO PISO —el mismo recurso, y la misma
+    // clase, que el matiz de las cifras de encaje ({@link CLASE.APUNTE})—, así que
+    // se lee entera, en la familia de la prosa, y sigue asociada al campo por el
+    // `for`/`id` de siempre. La caja se queda vacía a propósito: un campo vacío
+    // con su etiqueta al lado dice «esto lo rellenas tú» sin gastar una línea en
+    // decirlo.
+    const etiquetaRegistral = crear(doc, 'label', null, 'Superficie registral')
     etiquetaRegistral.htmlFor = idRegistral
+    const pistaRegistral = crear(doc, 'span', CLASE.APUNTE, 'de la escritura, en m²')
+    estilar(pistaRegistral, {
+      display: 'block',
+      fontSize: ESCALA.APUNTE,
+      color: '#64748B',
+    })
+    etiquetaRegistral.append(pistaRegistral)
     const registral = crear(doc, 'input')
     registral.id = idRegistral
     registral.type = 'number'
@@ -900,12 +1116,18 @@ const CajonDiagnostico = L.Control.extend({
     registral.min = '0'
     registral.inputMode = 'decimal'
     registral.dataset.campo = 'superficie-registral'
-    registral.placeholder = 'de la escritura'
+    // El juego común de los dos campos, más lo que es de ÉSTE: la superficie
+    // tecleada se alinea con las dos que hay encima —mismo tamaño de dato, mismo
+    // peso, misma alineación a la derecha—, así que la coma cae en la misma
+    // columna que las otras dos. Es el único número del cajón que escribe una
+    // persona, y hasta hoy era también el único que no se podía comparar de un
+    // vistazo con los que la aplicación mide.
     estilar(registral, {
-      width: '9em',
-      padding: '3px 6px',
-      border: '1px solid #CBD5E1',
-      borderRadius: '6px',
+      ...ESTILO_CAMPO,
+      width: '7.5em',
+      fontSize: ESCALA.DATO,
+      fontWeight: PESO_CIFRA,
+      textAlign: 'right',
     })
     this._registral = registral
 
@@ -916,16 +1138,19 @@ const CajonDiagnostico = L.Control.extend({
     // que sí alineaban, y ese renglón torcido era lo primero que se veía del
     // bloque.
     const filaRegistral = crear(doc, 'div')
-    estilar(filaRegistral, { ...REJILLA, marginTop: '6px' })
+    estilar(filaRegistral, { ...REJILLA, marginTop: '8px' })
     estilar(etiquetaRegistral, { margin: '0' })
     filaRegistral.append(etiquetaRegistral, registral)
 
     // La tabla de diferencias cruzadas. Caja VACÍA: la rellena `pintar`.
+    // Los 12 px de arriba la despegan del campo de la registral: la tabla es lo
+    // que sale de comparar las TRES superficies de encima, y con 8 px se leía como
+    // una cuarta fila más de la ficha.
     const cruces = crear(doc, 'table', CLASE.TABLA)
     cruces.dataset.diag = 'cruces'
     estilar(cruces, {
       borderCollapse: 'collapse',
-      marginTop: '8px',
+      marginTop: '12px',
       width: '100%',
       fontSize: ESCALA.APUNTE,
     })
@@ -937,7 +1162,8 @@ const CajonDiagnostico = L.Control.extend({
     const metricas = crear(doc, 'dl', CLASE.SECCION)
     estilar(metricas, {
       ...REJILLA,
-      margin: '8px 0 0',
+      // Igual que la ficha de arriba: el aire de encima es del rótulo. Ver `lista`.
+      margin: '0',
       fontSize: ESCALA.CUERPO,
     })
     // Las tres son celdas de DOS PISOS ({@link celdaDato}): dos de ellas traen un
@@ -976,10 +1202,11 @@ const CajonDiagnostico = L.Control.extend({
     // esa misma regla: el ámbar es de los nodos que REPORTAN una invasión, y
     // pintar de alarma el «no se ha consultado» sería el juicio que la regla de
     // oro 9 prohíbe.
+    // La MISMA junta que los grupos con rótulo desde el 2026-08-17 ({@link JUNTA}):
+    // eran los mismos dos valores escritos a mano, y ahora hay un solo sitio donde
+    // cambiarlos para los cuatro.
     estilar(invasion, {
-      marginTop: '10px',
-      paddingTop: '10px',
-      borderTop: '1px solid #E2E8F0',
+      ...JUNTA,
       fontSize: ESCALA.CUERPO,
     })
     this._invasion = invasion
@@ -990,11 +1217,15 @@ const CajonDiagnostico = L.Control.extend({
     const selectorClase = crear(doc, 'select')
     selectorClase.id = idClase
     selectorClase.dataset.campo = 'clase-parcela'
-    estilar(selectorClase, {
-      padding: '3px 6px',
-      border: '1px solid #CBD5E1',
-      borderRadius: '6px',
-    })
+    // El MISMO juego que la registral ({@link ESTILO_CAMPO}): los dos campos de
+    // este cajón se rellenan igual, así que tienen que verse igual. Antes cada uno
+    // repetía los tres valores por su cuenta, que es como acaban divergiendo.
+    //
+    // El tamaño lo declara el módulo, como el de todo lo demás: son los mismos
+    // 12 px que ponía `estilos/app.css` hasta el 2026-08-17, escritos donde vive la
+    // escala. No sube a `DATO` como el `<input>` porque aquí lo que se lee es una
+    // PALABRA («Urbana»), no una cifra que tenga que alinear con nada.
+    estilar(selectorClase, { ...ESTILO_CAMPO, fontSize: ESCALA.APUNTE })
     for (const [valor, texto] of [
       ['', '(elegir)'],
       ['URBANA', 'Urbana'],
@@ -1046,11 +1277,7 @@ const CajonDiagnostico = L.Control.extend({
     // párrafo seguido de una columna indiferenciada. Aquí va EN LÍNEA y no en la
     // hoja porque el cajón tiene que separar sus secciones también cuando se monta
     // sobre un mapa pelado, que es la doctrina de todo este fichero.
-    estilar(bloqueMargen, {
-      marginTop: '10px',
-      paddingTop: '10px',
-      borderTop: '1px solid #E2E8F0',
-    })
+    estilar(bloqueMargen, { ...JUNTA })
     // La fila de la clase se maqueta con la MISMA rejilla que las cifras: es un
     // campo que se rellena, como la registral, y los dos tienen que caer en la
     // misma columna. Con el `flex` de antes, el `<select>` quedaba pegado a su
@@ -1546,23 +1773,54 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       `${m2Entero(d.superficie.catastral)} del parcelario vigente.`
   }
 
-  /** La tabla de los tres pares cruzados. */
+  /**
+   * La tabla de los tres pares cruzados.
+   *
+   * ── ⭐ LA TABLA SE ALINEA CON LA FICHA (2026-08-17) ─────────────────────────
+   * Las seis celdas llevaban `padding: '2px 4px'`, o sea 4 px de relleno también
+   * en el borde de fuera. Efecto medido en el panel: **la columna de rótulos
+   * empezaba 4 px a la derecha de las etiquetas del `<dl>` de encima y las cifras
+   * acababan 4 px antes que las de arriba.** Dos sangrías de 4 px que nadie eligió
+   * y que rompen justo lo que hace legible una columna de números: que el ojo
+   * pueda bajar por un solo canto.
+   *
+   * Ahora el relleno de fuera es CERO y el aire va donde hace falta —10 px entre
+   * columnas, 4 px entre filas—, así que la tabla comparte los dos cantos con la
+   * ficha de arriba y con todo lo demás del cajón.
+   */
   function pintarCruces(d) {
     const doc = control._doc
     const tabla = control._cruces
     tabla.replaceChildren()
+
+    // Los dos moldes de celda: el de la columna de rótulos (pegada al canto
+    // izquierdo) y el de las dos de cifras (pegadas al derecho, con su aire entre
+    // medias). Se escriben una vez y los usan cabecera y cuerpo, que es lo que
+    // impide que la cabecera acabe con una sangría distinta a su columna.
+    // 3 px arriba y abajo, no 4: son cuatro filas, así que cada píxel de relleno
+    // vertical se paga ocho veces en un cajón que ya scrollea (ver {@link JUNTA}).
+    // Con 3 el filete de `tbody tr + tr` sigue teniendo aire a los dos lados.
+    const CELDA_ROTULO = { textAlign: 'left', padding: '3px 0' }
+    const CELDA_CIFRA = { textAlign: 'right', padding: '3px 0 3px 10px' }
 
     const thead = crear(doc, 'thead')
     const filaCabecera = crear(doc, 'tr')
     for (const texto of ['', 'Diferencia', 'Relativa']) {
       const th = crear(doc, 'th', null, texto)
       estilar(th, {
-        textAlign: 'right',
-        padding: '2px 4px',
-        fontWeight: '600',
+        ...(texto === '' ? CELDA_ROTULO : CELDA_CIFRA),
+        // `500` y no `600`: los encabezados van en la sans (`.gml-cajon-tabla th`
+        // de `estilos/app.css`) y su peso medio es el del sistema. A 12 px, un 600
+        // sobre gris pesaba más que las cifras que encabeza.
+        fontWeight: '500',
         color: '#64748B',
+        // El filete bajo la cabecera es lo que hace que esto se lea como una TABLA
+        // y no como tres renglones con dos palabras encima. Es el mismo 1 px y el
+        // mismo gris que separa sus filas (`tbody tr + tr` en `estilos/app.css`) y
+        // que separa las secciones del cajón ({@link JUNTA}): en todo este panel
+        // hay un solo grosor de línea y un solo gris de línea.
+        borderBottom: '1px solid #E2E8F0',
       })
-      if (texto === '') th.style.textAlign = 'left'
       filaCabecera.append(th)
     }
     thead.append(filaCabecera)
@@ -1576,9 +1834,11 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
         null,
         `${ROTULO_BANDA[cruce.a]} − ${ROTULO_BANDA[cruce.b]}`,
       )
-      estilar(rotulo, {
-        padding: '2px 4px',
-      })
+      // El rótulo de la fila es PROSA («Medición − Catastro»), y por eso toma aquí
+      // el gris secundario: es el nombre del dato, no el dato. La familia la
+      // reparte `estilos/app.css`, que desde hoy pone la mono solo en las celdas
+      // de cifra y no en toda la fila.
+      estilar(rotulo, { ...CELDA_ROTULO, color: '#475569' })
       const absoluto = crear(doc, 'td', null, conSigno(cruce.absoluto, m2))
       const relativo = crear(doc, 'td', null, conSigno(cruce.relativo, porcentaje))
       for (const td of [absoluto, relativo]) {
@@ -1586,8 +1846,7 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
         // cuando es pequeño y en rojo cuando es grande estaría dictaminando si la
         // discrepancia es tolerable, que es la decisión que no nos toca.
         estilar(td, {
-          textAlign: 'right',
-          padding: '2px 4px',
+          ...CELDA_CIFRA,
           fontVariantNumeric: 'tabular-nums',
         })
         tr.append(td)
@@ -1674,7 +1933,7 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       )
       estilar(caja.firstChild, {
         margin: '0',
-        fontSize: '12px',
+        fontSize: ESCALA.APUNTE,
         color: '#64748B',
       })
       return
@@ -1684,31 +1943,62 @@ export function crearCajonDiagnostico({ mapa, posicion = 'bottomleft', alAvisar 
       const p = crear(doc, 'p', null, 'Invasión a colindantes: ninguna.')
       estilar(p, {
         margin: '0',
-        fontSize: '12px',
+        fontSize: ESCALA.APUNTE,
         color: '#64748B',
       })
       caja.append(p)
     } else {
       const titulo = crear(doc, 'p', null, 'Invasión a colindantes')
       estilar(titulo, {
-        margin: '0 0 4px',
+        margin: '0 0 6px',
         fontWeight: '600',
         color: '#92400E',
       })
       caja.append(titulo)
 
+      // ── ⭐ CADA INVASIÓN ES UNA FILA DE FICHA, NO UNA VIÑETA (2026-08-17) ──
+      // Era una `<ul>` con sangría de 18 px y renglones del tipo
+      // «• 7150904UF7675S: 5,31 m²». Tres cosas iban mal, y las tres eran de
+      // estructura: la sangría rompía el canto izquierdo de la columna (la única
+      // sección del cajón que lo hacía), el `:` metía prosa en una línea que ya
+      // era mono, y **el área —que es el dato— quedaba flotando a mitad de
+      // renglón**, sin alinearse con ninguna de las otras siete cifras del panel.
+      //
+      // Ahora cada `<li>` reparte referencia a la izquierda y superficie a la
+      // derecha, como las filas de las dos rejillas. Se leen dos columnas: a quién
+      // se pisa, y cuánto. Sin viñeta —`listStyle:'none'`— porque el ámbar y el
+      // filete ya anuncian la sección, y una viñeta más sangraría todo otros
+      // 18 px.
+      //
+      // ⚠️ El `<ul>`/`<li>` se conserva y no pasa a `<div>`: son varias
+      // invasiones o una, y un lector de pantalla tiene que poder contarlas.
       const ul = crear(doc, 'ul')
       estilar(ul, {
         margin: '0',
-        paddingLeft: '18px',
+        padding: '0',
+        listStyle: 'none',
       })
       for (const h of invasiones) {
-        const li = crear(
+        const li = crear(doc, 'li')
+        estilar(li, {
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+          gap: '10px',
+          padding: '1px 0',
+        })
+        const quien = crear(
           doc,
-          'li',
+          'span',
           null,
-          `${h.refcat === null ? 'Parcela sin referencia' : h.refcat}: ${m2(h.area)}`,
+          h.refcat === null ? 'Parcela sin referencia' : h.refcat,
         )
+        // `minWidth:0` para que una referencia larga se recorte por el ancho de la
+        // columna en vez de empujar la superficie fuera del panel.
+        estilar(quien, { minWidth: '0', overflowWrap: 'anywhere' })
+        const cuanto = crear(doc, 'span', null, m2(h.area))
+        estilar(cuanto, { flex: 'none', fontWeight: PESO_CIFRA })
+        li.append(quien, cuanto)
         // El ámbar, aquí y en ningún otro sitio del cajón.
         li.style.color = '#92400E'
         ul.append(li)

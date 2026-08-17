@@ -99,8 +99,8 @@ function montarCascara() {
     <div class="gml-app">
       <section data-anfitrion="sobrante" hidden></section>
       <div class="gml-acciones">
-        <button type="button" data-accion="derivar-sobrante" disabled>Derivar sobrante</button>
-        <p data-estado="derivar-sobrante" role="status"></p>
+        <button type="button" data-accion="rehacer-parcelario" disabled>Rehacer el parcelario</button>
+        <p data-estado="rehacer-parcelario" role="status"></p>
       </div>
     </div>`
 }
@@ -191,7 +191,7 @@ describe('cablearDerivacion', () => {
 
     it('si la cáscara no trae un nodo del contrato, LANZA nombrándolo', () => {
       document.body.innerHTML = '<div class="gml-app"></div>'
-      expect(() => cablear()).toThrow(/data-accion="derivar-sobrante"/)
+      expect(() => cablear()).toThrow(/data-accion="rehacer-parcelario"/)
     })
 
     it('cuelga el bloque de la sección anfitriona, que venía VACÍA', () => {
@@ -538,7 +538,7 @@ describe('cablearDerivacion', () => {
 
   describe('alCambiarSobrante · el canal que la leyenda escucha', () => {
     it('⛔ avisa al FOTOGRAFIAR y al INVALIDAR, sin carga, y la baja funciona', () => {
-      // El defecto verificado por traza: «Derivar sobrante» pintaba las manchas
+      // El defecto verificado por traza: «Rehacer el parcelario» pintaba las manchas
       // cian y ámbar SIN tocar el store y sin publicar nada, así que la leyenda
       // no las anunciaba hasta la siguiente navegación o edición — el reverso
       // exacto de la doctrina escrita junto a `refrescarLeyenda` en app/main.js.

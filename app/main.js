@@ -3023,7 +3023,7 @@ export function cablearEdicion({
     // —el que LEE `cablearDerivacion` para repartir el exceso entre los
     // vecinos— no lo soltaba nadie: su `olvidar()` no tenía un solo llamante en
     // toda la aplicación. Consecuencia medida: traídas las vecinas de A y cargada
-    // B, «Derivar sobrante» repartía el exceso de B contra las fincas de A y,
+    // B, «Rehacer el parcelario» repartía el exceso de B contra las fincas de A y,
     // como el registro seguía diciendo «ya se ha consultado», NO se emitía el
     // aviso de vecinas sin consultar: el exceso —que no toca nada de A— se
     // declaraba entero sobre VIAL, y eso abría la puerta de «Descargar
@@ -5682,7 +5682,7 @@ estado.subscribe(refrescarLeyenda)
 // ⛔ **Y LA DERIVACIÓN, que faltaba** (auditoría 2026-08-16, hallazgo B1).
 // Los tres párrafos de arriba nombraban a la derivación como una de las tres
 // fuentes de esta leyenda y solo se enchufaban dos, así que el caso más visible de
-// los tres era justo el que no llegaba: pulsar «Derivar sobrante» pintaba las
+// los tres era justo el que no llegaba: pulsar «Rehacer el parcelario» pintaba las
 // manchas cian y ámbar y la tarjeta NO las anunciaba hasta la siguiente navegación
 // o edición. Derivar no toca ningún store ni mueve el rail —por eso ninguno de los
 // otros dos cables se entera—, y por eso `cablearDerivacion` publica su propio

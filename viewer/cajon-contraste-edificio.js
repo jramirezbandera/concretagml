@@ -322,8 +322,13 @@ function estilar(el, estilos) {
  *   · **La cifra a la derecha** (la pone {@link vestirCifra}), que es lo que hace
  *     comparables números de anchos distintos leídos en columna.
  *   · **`baseline`** y no `center`: conviven etiquetas de 13 px con cifras de 15.
- *   · **6 px de aire entre filas** en vez de 2: tres filas sin aire se leen como un
- *     párrafo, no como una ficha.
+ *   · **8 px de aire entre filas** en vez de 2: tres filas sin aire se leen como un
+ *     párrafo, no como una ficha. **Eran 6 hasta el 2026-08-17**, y los sube el
+ *     hermano: allí la ficha convive con dos campos que se rellenan (28 px de alto)
+ *     y a 6 px las filas se tocaban. Aquí no hay campos, pero el guardián de abajo
+ *     compara los dos `<dl>` propiedad a propiedad y tiene razón en hacerlo: dos
+ *     paneles que se turnan la misma esquina con dos ritmos distintos se leen como
+ *     dos aplicaciones.
  *
  * ⚠️ **Está COPIADO y no importado a propósito, y hay un guardián.** El hermano no
  * lo exporta —es su detalle de maquetación—, y `viewer/` no comparte hoja. Lo que
@@ -336,9 +341,20 @@ const REJILLA = Object.freeze({
   display: 'grid',
   gridTemplateColumns: 'minmax(0,1fr) auto',
   columnGap: '12px',
-  rowGap: '6px',
+  rowGap: '8px',
   alignItems: 'baseline',
 })
+
+/**
+ * El peso de una cifra, copiado del hermano por lo mismo que {@link REJILLA} —y con
+ * el mismo guardián detrás—: `viewer/cajon-diagnostico.js#PESO_CIFRA`.
+ *
+ * `500` y **nunca `600`**: de Geist Mono el proyecto carga 400 y 500 (ver
+ * `estilos/tokens/fonts.css`), así que un 600 lo sintetiza el navegador engordando
+ * el trazo y se ve sucio. Lo que compra el 500 es que el dato se separe de su
+ * etiqueta por PESO y no solo por tamaño.
+ */
+const PESO_CIFRA = '500'
 
 /**
  * La etiqueta de una fila. `margin: 0` explícito porque en una rejilla el aire lo
@@ -361,7 +377,17 @@ const etiquetaDato = (doc, texto) => estilar(crear(doc, 'dt', null, texto), { ma
  * @param {string} texto
  */
 function vestirCifra(dd, texto) {
-  estilar(dd, { margin: '0', fontSize: ESCALA.DATO, textAlign: 'right' })
+  estilar(dd, {
+    margin: '0',
+    fontSize: ESCALA.DATO,
+    fontWeight: PESO_CIFRA,
+    textAlign: 'right',
+    // Se REPONE aunque una cifra no lo necesite: es lo que {@link vestirMotivo}
+    // cambia, y el camino que se olvida es el de vuelta. Ver allí el solape real
+    // que esto arregla.
+    gridColumn: 'auto',
+  })
+  dd.className = CLASE.CIFRA
   dd.textContent = texto
 }
 
@@ -384,7 +410,28 @@ function vestirCifra(dd, texto) {
  * @param {string} texto
  */
 function vestirMotivo(dd, texto) {
-  estilar(dd, { margin: '0', fontSize: ESCALA.CUERPO, textAlign: 'left' })
+  // Tres propiedades entran en las «mismas propiedades» del aviso de arriba el
+  // 2026-08-17, y las tres vienen del hermano:
+  //   · `fontWeight: '400'` — sin reponerlo, un motivo de dos líneas se pintaría en
+  //     peso de dato ({@link PESO_CIFRA}) y pesaría más que las cifras que sí hay.
+  //   · `gridColumn: '1 / -1'` — ⛔ **arregla un SOLAPE real.** La celda vive en la
+  //     columna `auto` de {@link REJILLA}, que se dimensiona a `max-content`: con
+  //     una cifra es justo lo que se quiere, pero un párrafo pide 400 px de una
+  //     línea, se los queda todos y la columna de la etiqueta —`minmax(0,1fr)`,
+  //     encogible hasta cero— se queda sin ancho, así que **la etiqueta y el motivo
+  //     se imprimen uno encima del otro**. Medido en Chrome en el hermano; aquí las
+  //     etiquetas son aún más largas (27 caracteres). En jsdom no se ve: no hay
+  //     maquetación que repartir.
+  //   · Y la CLASE pasa a {@link CLASE.MOTIVO}, que es lo que le quita la mono a un
+  //     texto que es prosa (el porqué, en el cajón hermano).
+  estilar(dd, {
+    margin: '0',
+    fontSize: ESCALA.CUERPO,
+    fontWeight: '400',
+    textAlign: 'left',
+    gridColumn: '1 / -1',
+  })
+  dd.className = CLASE.MOTIVO
   dd.textContent = texto
 }
 
@@ -1021,18 +1068,36 @@ export function crearCajonContrasteEdificio({ mapa, posicion = 'bottomleft', alA
       caja.append(p)
     } else {
       const titulo = crear(doc, 'p', null, 'Invasión a parcelas vecinas')
-      estilar(titulo, { margin: '0 0 4px', fontWeight: '600', color: '#92400E' })
+      estilar(titulo, { margin: '0 0 6px', fontWeight: '600', color: '#92400E' })
       caja.append(titulo)
 
+      // Cada invasión, una FILA DE FICHA y no una viñeta — la misma corrección, y
+      // por los mismos tres motivos, que el hermano el 2026-08-17: la sangría de
+      // 18 px rompía el único canto izquierdo del cajón, el `:` metía prosa en una
+      // línea de mono, y el área quedaba flotando a mitad de renglón sin alinearse
+      // con ninguna otra cifra del panel. Ahora: a quién se pisa a la izquierda,
+      // cuánto a la derecha.
       const ul = crear(doc, 'ul')
-      estilar(ul, { margin: '0', paddingLeft: '18px' })
+      estilar(ul, { margin: '0', padding: '0', listStyle: 'none' })
       for (const h of invasiones) {
-        const li = crear(
+        const li = crear(doc, 'li')
+        estilar(li, {
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
+          gap: '10px',
+          padding: '1px 0',
+        })
+        const quien = crear(
           doc,
-          'li',
+          'span',
           null,
-          `${h.refcat === null ? 'Parcela sin referencia' : h.refcat}: ${m2(h.area)}`,
+          h.refcat === null ? 'Parcela sin referencia' : h.refcat,
         )
+        estilar(quien, { minWidth: '0', overflowWrap: 'anywhere' })
+        const cuanto = crear(doc, 'span', null, m2(h.area))
+        estilar(cuanto, { flex: 'none', fontWeight: PESO_CIFRA })
+        li.append(quien, cuanto)
         // El ámbar, aquí y en ningún otro sitio del cajón.
         li.style.color = '#92400E'
         ul.append(li)

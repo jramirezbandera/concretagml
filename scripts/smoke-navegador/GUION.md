@@ -8,7 +8,7 @@
 >   panel (`data-pantalla="validacion edicion informe"`), la misma compuerta
 >   (`ramas: RAMAS, requiere: ['geometria']`), y como única diferencia el arrastre
 >   apagado y un pie con tres CTA. Edición se queda los CTA («Generar GML»,
->   «Diagnosticar encaje», «Derivar sobrante» y «Descargar expediente») y la ficha
+>   «Diagnosticar encaje», «Rehacer el parcelario» y «Descargar expediente») y la ficha
 >   entera.
 > - **Informe deja de ser un peldaño y sigue siendo una pantalla completa.** Se
 >   abre desde «Preparar informe (PDF)», dentro del cajón de diagnóstico, que es
@@ -5432,7 +5432,7 @@ no como problema.
 |---|---|---|
 | 1 | **El que rompía, de punta a punta.** Pulsar «Traer el parcelario de fondo» y comparar la tabla vértice a vértice | En jsdom la geometría se compara en memoria; aquí se cuenta lo que el usuario ve. Y la **deducción encadenada** (`.dxf` sin refcat → OVC → WFS) toca dos servicios reales |
 | 2 | **El aviso ya no manda a la trampa** | Se lee el texto **renderizado**, no la constante: lo que importa es lo que el usuario tiene delante |
-| 3 | **Se enciende lo ya construido** | «Diagnosticar encaje» y «Derivar sobrante» son F07 y F17, cerradas hace semanas e **inalcanzables** desde el flujo «medición primero» |
+| 3 | **Se enciende lo ya construido** | «Diagnosticar encaje» y «Rehacer el parcelario» son F07 y F17, cerradas hace semanas e **inalcanzables** desde el flujo «medición primero» |
 
 ### Cifras de referencia (2026-08-08, Chrome, `npm run dev`, 1280×720)
 

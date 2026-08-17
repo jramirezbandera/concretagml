@@ -328,7 +328,7 @@ frío y hasta **2.903 ms** el OVC en una sola llamada.
       los dos. (Eran TRES hasta el 2026-08-16, con «Deducir del mapa» al final;
       ese botón se retiró.)
 - [ ] Y en **Edición**: el pie tabula «Traer el parcelario de fondo» → «Traer
-      colindantes» → «Diagnosticar encaje» → «Derivar sobrante», en ese orden y
+      colindantes» → «Diagnosticar encaje» → «Rehacer el parcelario», en ese orden y
       con el anillo visible en los cuatro. El segundo llegó el 2026-08-16 desde
       Entrada, y es el que puede haber quedado fuera del orden natural.
 
@@ -1909,7 +1909,7 @@ dos BLOQUEANTES**, y ninguna máquina de este proyecto puede firmar ninguno.
 
 **Cómo prepararlo, y cuesta CERO peticiones al Catastro.** Con la app viva, ve a
 **Validación**, mueve dos o tres vértices hacia dentro (tecleando en la tabla o
-arrastrándolos) y pulsa **«Derivar sobrante»** en el pie del panel.
+arrastrándolos) y pulsa **«Rehacer el parcelario»** en el pie del panel.
 
 ### 13.1 · ⛔ ¿Se entiende que las piezas se PROPONEN? ⟨BLOQUEANTE⟩
 

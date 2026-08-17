@@ -39,7 +39,7 @@
 // distintos y por eso son dos sitios distintos.
 //
 // ── DÓNDE VIVE CADA BOTÓN, Y POR QUÉ ────────────────────────────────────────
-//   · **«Derivar sobrante»** está en el PIE del panel (`index.html`), junto a
+//   · **«Rehacer el parcelario»** está en el PIE del panel (`index.html`), junto a
 //     «Generar GML» y «Diagnosticar encaje». Tiene que existir ANTES de que haya
 //     bloque: el bloque aparece solo cuando hay sobrante, así que un botón dentro
 //     de él sería un botón que solo existe después de haberlo pulsado.
@@ -69,16 +69,16 @@ import { INSTRUCCION_PARCELARIO } from './navegacion.js'
 // ── Selectores de la cáscara (contrato con `index.html`) ─────────────────────
 
 /** El CTA del pie. */
-export const SELECTOR_BOTON = '[data-accion="derivar-sobrante"]'
+export const SELECTOR_BOTON = '[data-accion="rehacer-parcelario"]'
 /** Su renglón `role="status"`. */
-export const SELECTOR_ESTADO = '[data-estado="derivar-sobrante"]'
+export const SELECTOR_ESTADO = '[data-estado="rehacer-parcelario"]'
 /** La sección del panel que aloja el bloque. */
 export const SELECTOR_ANFITRION = '[data-anfitrion="sobrante"]'
 
 // ── Motivos, escritos una vez y en un solo sitio ─────────────────────────────
 
 /**
- * Por qué «Derivar sobrante» está apagado. Se escribe en el renglón **en el mismo
+ * Por qué «Rehacer el parcelario» está apagado. Se escribe en el renglón **en el mismo
  * instante** en que se apaga: un botón gris y mudo es un error silencioso.
  *
  * ⛔ **La instrucción decía «Trae la parcela del Catastro (o un GML con su
@@ -286,7 +286,7 @@ function oficialDe(parcela) {
 }
 
 /**
- * ¿Tiene sentido ofrecer «Derivar sobrante»? Hay contorno oficial Y hay geometría
+ * ¿Tiene sentido ofrecer «Rehacer el parcelario»? Hay contorno oficial Y hay geometría
  * del usuario. Ni una comprobación más: ver la cabecera.
  *
  * No se exporta: es una regla INTERNA de esta pantalla, y sacarla invitaría a que
@@ -482,7 +482,7 @@ export function cablearDerivacion({
 
   // ── ⭐ EL CANAL DEL SOBRANTE (auditoría 2026-08-16, hallazgo B1) ───────────
   //
-  // ⛔ **El defecto que arregla, verificado por traza.** Pulsar «Derivar sobrante»
+  // ⛔ **El defecto que arregla, verificado por traza.** Pulsar «Rehacer el parcelario»
   // pintaba las manchas cian y ámbar en el mapa SIN tocar el store y SIN publicar
   // nada, así que la LEYENDA de `app/main.js` —que solo cuelga de `navegacion` y de
   // `estado`— no las anunciaba hasta la siguiente navegación o edición. Es el

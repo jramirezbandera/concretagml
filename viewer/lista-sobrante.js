@@ -107,6 +107,18 @@ import { NIVEL, PREFIJO_FUERA, resolverAvisar, textoNumeroPieza } from './_comun
  */
 export const SELECTOR = Object.freeze({
   BLOQUE: '[data-sobrante="bloque"]',
+  // ── El cromo del panel (2026-08-17) ────────────────────────────────────────
+  // ⚠️ `MINIMIZAR` y `CERRAR` sí llevan `data-accion` —y no `data-sobrante`—
+  // porque son ÚNICOS en el documento, que es justo lo que K.1 exige. La
+  // convención es la del cajón de F07: `cerrar-diagnostico` allí,
+  // `cerrar-parcelario` aquí.
+  CABECERA: '[data-sobrante="cabecera"]',
+  TITULO: '[data-sobrante="titulo"]',
+  ASIDERO: '[data-sobrante="asidero"]',
+  RECUENTO: '[data-sobrante="recuento"]',
+  CUERPO: '[data-sobrante="cuerpo"]',
+  MINIMIZAR: '[data-accion="minimizar-parcelario"]',
+  CERRAR: '[data-accion="cerrar-parcelario"]',
   CONTADOR: '[data-sobrante="contador"]',
   LISTA: '[data-sobrante="lista"]',
   FILA: '[data-sobrante="fila"]',
@@ -191,7 +203,7 @@ export const SIN_PIEZAS =
  * oro 1): desde fuera no se distingue de uno roto.
  */
 export const MOTIVO_SIN_DERIVAR =
-  'Todavía no se ha derivado ningún sobrante. Pulsa «Derivar sobrante» en el pie del panel.'
+  'Todavía no se ha derivado ningún sobrante. Pulsa «Rehacer el parcelario» en el pie del panel.'
 
 /**
  * Y por qué se apaga cuando el usuario desmarca las N piezas. **No se descarta la
@@ -226,6 +238,36 @@ export const ROTULO_NO_EMITIBLE = 'no se puede emitir'
 
 /** El rótulo de la sección de lo que se sale del contorno oficial. */
 export const ROTULO_FUERA = 'Fuera del contorno oficial'
+
+/**
+ * El título del panel, y **el mismo texto que el botón que lo abre**.
+ *
+ * ⛔ **Que coincidan palabra por palabra no es cosmética.** Es la única pista de
+ * que este panel es la consecuencia de aquel botón: se pulsa «Rehacer el
+ * parcelario» en el pie y aparece una ventana que se llama igual. Con dos nombres
+ * distintos —«Rehacer el parcelario» abajo, «Sobrante» arriba— el usuario tiene
+ * que deducir la relación, y el sitio donde aparece no ayuda, porque no es donde
+ * pulsó. Si alguien renombra el botón, esta constante va en el mismo gesto.
+ */
+export const TITULO = 'Rehacer el parcelario'
+
+/**
+ * Lo que dice la barra cuando el panel está PLEGADO: `· 3 piezas`.
+ *
+ * Plegado, la barra es lo ÚNICO que queda, así que tiene que seguir diciendo que
+ * hay algo dentro. Una barra que solo pusiera «Rehacer el parcelario» se leería
+ * como un botón apagado, y el usuario que la plegó para ver el mapa no tendría
+ * cómo saber si sus tres piezas siguen ahí o se perdieron al plegar.
+ *
+ * ⚠️ Se escribe también DESPLEGADO —no se borra al restaurar—, porque el recuento
+ * de arriba y el contador «se emitirán N de M» de dentro cuentan cosas distintas:
+ * éste dice cuántas piezas hay, aquél cuántas van al fichero. Verlos a la vez es
+ * lo que enseña que excluir una casilla no borra la pieza.
+ */
+export function textoRecuento(total) {
+  if (!Number.isFinite(total) || total <= 0) return ''
+  return `· ${total} ${total === 1 ? 'pieza' : 'piezas'}`
+}
 
 /**
  * Lo que se lee bajo ese rótulo, y es la frase que esta fase existe para poder
@@ -375,6 +417,102 @@ const ESTILO_MEDIDAS = Object.freeze({
 
 const ESTILO_NOTA = Object.freeze({ margin: '0', fontSize: '11px' })
 
+// ── El cromo del panel (2026-08-17) ──────────────────────────────────────────
+
+/**
+ * La barra de título: asidero, nombre, recuento y los dos controles.
+ *
+ * ⚠️ **`flex: 'none'` es lo que la salva de encoger.** El bloque es un flex en
+ * columna con un `maxHeight` por debajo, así que sin declararlo la barra sería
+ * candidata a repartirse el recorte con la lista — y una barra de título de 14 px
+ * de alto no es una barra de título, es un renglón inservible con dos botones que
+ * ya no se pueden pulsar. Encoger es de la lista, que para eso scrollea.
+ *
+ * `userSelect: 'none'` porque arrastrar por un texto seleccionable selecciona el
+ * texto en vez de mover el panel: el cursor se convierte en una I, aparece el
+ * resalte azul y el panel se queda quieto. Es el defecto clásico de todo lo que
+ * se arrastra por su título.
+ */
+const ESTILO_CABECERA = Object.freeze({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  flex: 'none',
+  margin: '0',
+  padding: '2px 0',
+  userSelect: 'none',
+})
+
+/**
+ * El asidero `⠿`. **Existe para que el arrastre se vea antes de intentarlo**: un
+ * panel que se puede mover y no lo anuncia es un panel que nadie mueve.
+ *
+ * ⚠️ `aria-hidden` porque es DECORACIÓN: quien lo oye leído como «puntos braille
+ * dos-cuatro-cinco» no recibe ninguna información. Lo que sí anuncia el arrastre
+ * a un lector de pantalla son las teclas de flecha sobre la barra, y eso se dice
+ * con texto de verdad. El braille es para el ojo.
+ */
+const ESTILO_ASIDERO = Object.freeze({
+  flex: 'none',
+  fontSize: '12px',
+  lineHeight: '1',
+  color: '#94A3B8',
+})
+
+const ESTILO_TITULO = Object.freeze({
+  flex: 'none',
+  margin: '0',
+  fontSize: '12px',
+  fontWeight: '600',
+  color: '#0F172A',
+})
+
+/**
+ * El recuento de la barra. `flex: '1 1 auto'` con `minWidth: '0'`: es lo ÚNICO
+ * que puede encogerse aquí, así que cuando el panel se estrecha se recorta este
+ * texto y no los botones. Un `[×]` recortado es un panel que no se cierra.
+ */
+const ESTILO_RECUENTO = Object.freeze({
+  flex: '1 1 auto',
+  minWidth: '0',
+  overflow: 'hidden',
+  whiteSpace: 'nowrap',
+  textOverflow: 'ellipsis',
+  fontSize: '11px',
+  color: '#64748B',
+})
+
+/**
+ * Los dos botones del cromo, con la misma receta que el `✕` del cajón de F07
+ * (`viewer/cajon-diagnostico.js`) para que no estrenen un aspecto propio.
+ *
+ * ⚠️ **`cursor: 'pointer'` y no `'move'`**, aunque estén dentro de la barra que
+ * se arrastra: sobre ellos el gesto que vale es el clic. Y por eso mismo el
+ * arrastre los excluye explícitamente (`L.DomEvent.disableClickPropagation` no
+ * basta: no detiene el `click`, y está documentado en el cajón de al lado).
+ */
+const ESTILO_BOTON_CROMO = Object.freeze({
+  flex: 'none',
+  border: '0',
+  background: 'transparent',
+  cursor: 'pointer',
+  fontSize: '13px',
+  lineHeight: '1',
+  padding: '2px 4px',
+  color: '#64748B',
+})
+
+/**
+ * El cuerpo: todo menos la barra. Es lo que se pliega, y es lo único que hereda
+ * el `minHeight: '0'` que le deja encoger dentro del flex de la columna.
+ */
+const ESTILO_CUERPO = Object.freeze({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '4px',
+  minHeight: '0',
+})
+
 // ── Helpers de módulo ────────────────────────────────────────────────────────
 
 /** Describe un valor para un mensaje de contrato roto. */
@@ -421,6 +559,13 @@ function estilar(el, estilos) {
  *   Enciende o apaga el botón, **con el motivo escrito**.
  * @property {(texto: string, opciones?: {error?: boolean}) => void} estado  El
  *   renglón del botón: el acuse de la descarga, o el fallo.
+ * @property {() => void} plegar  Deja solo la barra de título con su recuento.
+ *   **No pierde nada**: ni nombres, ni casillas, ni destinos.
+ * @property {() => void} desplegar
+ * @property {() => void} cerrar  Esconde el panel entero, barra incluida.
+ * @property {() => void} abrir
+ * @property {() => boolean} estaPlegado
+ * @property {() => boolean} estaAbierto
  * @property {(fn: (seleccionadas: number[]) => void) => (() => void)} alCambiarSeleccion
  * @property {(fn: (orden: number, nombre: string) => void) => (() => void)} alNombrar
  * @property {(fn: (orden: number|null) => void) => (() => void)} alSenalar
@@ -439,7 +584,7 @@ function estilar(el, estilos) {
  * ```
  *
  * ⚠️ **No trae `alDerivar`, y el contrato del plan sí lo declaraba.** El CTA
- * «Derivar sobrante» bajó al PIE del panel (decisión de diseño D2: un bloque vacío
+ * «Rehacer el parcelario» bajó al PIE del panel (decisión de diseño D2: un bloque vacío
  * permanente cobraría 96,63 px en el 100 % de las sesiones para una función que se
  * usa en una fracción), así que ese botón lo pone `index.html` y lo cablea
  * `app/cableado-derivacion.js` directamente. Lo que sí vive aquí es
@@ -502,6 +647,67 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
   const bloque = doc.createElement('div')
   bloque.dataset.sobrante = 'bloque'
   estilar(bloque, ESTILO_BLOQUE)
+
+  // ── La barra de título, y por qué el panel entero cuelga de ella ───────────
+  //
+  // Es lo primero que se fabrica porque es lo que SOBREVIVE a todo lo demás:
+  // plegado, el cuerpo desaparece y la barra se queda; arrastrando, la barra es
+  // el asidero; y el acotado al viewport se calcula sobre SU rectángulo, no
+  // sobre el del panel (ver `viewer/acotar-viewport.js` y el porqué largo).
+  const cabecera = doc.createElement('header')
+  cabecera.dataset.sobrante = 'cabecera'
+  estilar(cabecera, ESTILO_CABECERA)
+
+  const asidero = doc.createElement('span')
+  asidero.dataset.sobrante = 'asidero'
+  asidero.textContent = '⠿'
+  asidero.setAttribute('aria-hidden', 'true')
+  estilar(asidero, ESTILO_ASIDERO)
+
+  // ⛔ **SIN la clase `gml-rotulo`, y no es un olvido.** El bloque ya tiene un
+  // `.gml-rotulo` dentro («Sobrante»), y esta barra se pinta ANTES en el DOM: con
+  // la clase puesta, `querySelector('.gml-rotulo')` —que es como lo resuelven los
+  // tests y como podría resolverlo cualquiera— pasaría a devolver el TÍTULO DE LA
+  // VENTANA en vez del rótulo de la sección, y el de dentro se quedaría mudo. Es
+  // literalmente la trampa que `index.html` lleva documentando desde F06, sólo
+  // que por clase en vez de por `data-*`. Y además sería mentira semántica: un
+  // título de ventana no es un rótulo de grupo, y el vocabulario visual de
+  // `.gml-rotulo` (versalita, interletraje) es el de los segundos.
+  const titulo = doc.createElement('h2')
+  titulo.dataset.sobrante = 'titulo'
+  titulo.textContent = TITULO
+  estilar(titulo, ESTILO_TITULO)
+
+  const recuento = doc.createElement('span')
+  recuento.dataset.sobrante = 'recuento'
+  // `role="status"` como los demás renglones vivos: al derivar otra vez, el
+  // lector de pantalla anuncia cuántas piezas hay SIN robar el foco.
+  recuento.setAttribute('role', 'status')
+  estilar(recuento, ESTILO_RECUENTO)
+
+  const botonMinimizar = doc.createElement('button')
+  botonMinimizar.type = 'button'
+  botonMinimizar.dataset.accion = 'minimizar-parcelario'
+  estilar(botonMinimizar, ESTILO_BOTON_CROMO)
+
+  const botonCerrar = doc.createElement('button')
+  botonCerrar.type = 'button'
+  botonCerrar.dataset.accion = 'cerrar-parcelario'
+  botonCerrar.textContent = '✕'
+  botonCerrar.setAttribute('aria-label', `Cerrar «${TITULO}»`)
+  estilar(botonCerrar, ESTILO_BOTON_CROMO)
+
+  cabecera.append(asidero, titulo, recuento, botonMinimizar, botonCerrar)
+
+  // ── El cuerpo: todo lo demás, en un nodo propio para poder plegarlo ────────
+  // ⚠️ **Un contenedor y no `hidden` en cada hijo**: plegar tiene que ser UN
+  // gesto reversible sin memoria. Escondiendo los hijos de uno en uno habría que
+  // acordarse de cuáles estaban ya escondidos por su cuenta —la sección de
+  // «fuera del contorno» nace `hidden`, y el bloque vacío también— y restaurar
+  // los repondría todos, enseñando cosas que no tocaba enseñar.
+  const cuerpo = doc.createElement('div')
+  cuerpo.dataset.sobrante = 'cuerpo'
+  estilar(cuerpo, ESTILO_CUERPO)
 
   const filaRotulo = doc.createElement('div')
   filaRotulo.className = 'gml-rotulo-fila'
@@ -578,7 +784,8 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
   // El exceso va DESPUÉS de la lista del sobrante y ANTES del botón: se lee de
   // arriba abajo como «esto sueltas · esto invades · esto puedes hacer», y así el
   // motivo por el que el botón está apagado queda justo encima del botón.
-  bloque.append(filaRotulo, nota, lista, vacio, fuera, boton, renglon)
+  cuerpo.append(filaRotulo, nota, lista, vacio, fuera, boton, renglon)
+  bloque.append(cabecera, cuerpo)
 
   // ── Pintado ───────────────────────────────────────────────────────────────
 
@@ -981,6 +1188,7 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
       vacio.hidden = true
       lista.hidden = true
       contador.textContent = ''
+      recuento.textContent = textoRecuento(0)
       boton.disabled = true
       renglon.textContent = MOTIVO_SIN_DERIVAR
       pintarFuera(null)
@@ -1012,6 +1220,19 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
     vacio.hidden = hayPiezas
     vacio.textContent = hayPiezas ? '' : SIN_PIEZAS
     repintarContador()
+    // El recuento de la BARRA cuenta piezas; el contador de dentro cuenta las que
+    // van al fichero. Son dos cifras distintas a propósito (ver {@link textoRecuento}).
+    recuento.textContent = textoRecuento(piezasPintadas.length)
+
+    // ⛔ **Una foto nueva DESPLIEGA y ABRE el panel**, y es lo que cierra el
+    // círculo con el botón del pie: se pulsa «Rehacer el parcelario» y sale el
+    // panel llamado igual. Sin esto, quien lo hubiera cerrado o plegado antes
+    // volvería a pulsar el botón, la derivación correría entera y **no pasaría
+    // nada visible** — el error silencioso en versión interfaz.
+    if (hayPiezas) {
+      fijarAbierto(true)
+      fijarPlegado(false)
+    }
 
     // La otra mitad de la foto. Sale de `cesion.puerta`, que esta vista ya recibía
     // dentro del mismo POJO y hasta hoy ignoraba: el cableado escondía el bloque
@@ -1094,6 +1315,53 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
 
   boton.addEventListener('click', () => emitir(oyentesEntrega, 'entregar'))
 
+  // ── Plegar y cerrar ───────────────────────────────────────────────────────
+  //
+  // Dos estados INDEPENDIENTES, y tienen que serlo: plegado es «lo tengo, no lo
+  // miro ahora» y cerrado es «quítamelo». Fundirlos en uno obligaría a que
+  // restaurar decidiera cuál de los dos deshacía, y esa decisión no la puede
+  // tomar el panel — sólo la sabe quien lo plegó.
+  //
+  // ⚠️ **Ninguno de los dos pierde nada.** Ni los nombres escritos, ni las
+  // casillas, ni los destinos, ni el resaltado: se esconde el nodo, y nada más.
+  // La única cosa que borra esta lista es {@link invalidar}, porque allí lo que
+  // ha caducado es el DATO. Confundirlos sería tirar el trabajo del usuario por
+  // haber pulsado `[–]`.
+
+  /** @type {boolean} */
+  let plegado = false
+  /** @type {boolean} */
+  let abierto = true
+
+  /**
+   * Pliega o despliega. El botón cambia de flecha Y de etiqueta: `▲`/`▼` solo se
+   * distinguen mirando, y `aria-expanded` es lo que lo dice de verdad.
+   */
+  function fijarPlegado(valor) {
+    plegado = valor === true
+    cuerpo.hidden = plegado
+    botonMinimizar.textContent = plegado ? '▲' : '–'
+    botonMinimizar.setAttribute('aria-expanded', plegado ? 'false' : 'true')
+    botonMinimizar.setAttribute(
+      'aria-label',
+      plegado ? `Desplegar «${TITULO}»` : `Plegar «${TITULO}»`,
+    )
+  }
+
+  /** Enseña o esconde el panel ENTERO, barra incluida. */
+  function fijarAbierto(valor) {
+    abierto = valor === true
+    bloque.hidden = !abierto
+  }
+
+  botonMinimizar.addEventListener('click', () => fijarPlegado(!plegado))
+  botonCerrar.addEventListener('click', () => fijarAbierto(false))
+
+  // El estado inicial del cromo, escrito por la misma función que lo cambia
+  // después: así el botón no puede nacer con una flecha y un `aria-expanded` que
+  // no concuerden, que es la clase de divergencia que sólo se ve con un lector.
+  fijarPlegado(false)
+
   // Estado de arranque: el bloque nace vacío y el botón apagado CON su motivo.
   pintar(null)
 
@@ -1148,6 +1416,18 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
       renglon.textContent = typeof texto === 'string' ? texto : ''
       renglon.classList.toggle('gml-accion-estado--error', error === true)
     },
+
+    // ── El cromo, en la API porque el cableado tiene que poder tocarlo ───────
+    // ⚠️ Se exponen los DOS estados por separado y con lectores propios, y no un
+    // solo `visible`: el cableado necesita distinguirlos para escribir el
+    // renglón vivo del pie («3 piezas, panel plegado» no se dice igual que
+    // «3 piezas, panel cerrado»), y un booleano fundido no deja.
+    plegar: () => fijarPlegado(true),
+    desplegar: () => fijarPlegado(false),
+    cerrar: () => fijarAbierto(false),
+    abrir: () => fijarAbierto(true),
+    estaPlegado: () => plegado,
+    estaAbierto: () => abierto,
 
     alCambiarSeleccion: (fn) => suscribir(oyentesSeleccion, 'alCambiarSeleccion', fn),
     alNombrar: (fn) => suscribir(oyentesNombre, 'alNombrar', fn),

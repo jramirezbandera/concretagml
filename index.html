@@ -157,7 +157,7 @@
 
          ⛔ **ARRIBA LO QUE SALE DE LA APP, ABAJO LO QUE TRANSFORMA EL
          EXPEDIENTE.** Es la regla que decide qué sube y qué no, y por eso
-         «Diagnosticar encaje» y «Derivar sobrante» se quedan en el pie del
+         «Diagnosticar encaje» y «Rehacer el parcelario» se quedan en el pie del
          panel: producen geometría dentro del expediente, no un fichero.
 
          ⚠️ **NINGÚN `data-accion` DE AQUÍ SE REPITE, Y ES LO MÁS FRÁGIL DEL
@@ -1376,7 +1376,7 @@
           </button>
           <p class="gml-accion-estado" data-estado="diagnosticar" role="status"></p>
 
-          <!-- ── F17 · «Derivar sobrante» ──────────────────────────────────
+          <!-- ── F17 · «Rehacer el parcelario» ─────────────────────────────
                EL TERCER CTA DE VALIDACIÓN, y el que cierra el hueco que dejaba
                a la aplicación sin poder entregar **más de 1 de cada 5**
                expedientes reales: mover un lindero hacia dentro obliga a aportar
@@ -1404,19 +1404,35 @@
                quien escribe el motivo mientras no lo habilita, es
                `app/cableado-derivacion.js`.
 
-               ⚠️ `data-estado="derivar-sobrante"`, con la misma cadena que su
+               ⚠️ `data-estado="rehacer-parcelario"`, con la misma cadena que su
                `data-accion` (convención del pie: `generar-gml`/`generar-gml`).
                El renglón del BLOQUE se llama `entregar-expediente` y es otra
-               cosa: aquél cuenta la descarga, éste la derivación. -->
+               cosa: aquél cuenta la descarga, éste la derivación.
+
+               ⭐ **SE LLAMABA «DERIVAR SOBRANTE» HASTA EL 2026-08-17.** El
+               nombre viejo contaba la OPERACIÓN interna —restar dos polígonos y
+               quedarse con lo que sobra— y no lo que el usuario obtiene. Y sobre
+               todo se quedaba corto: al pulsarlo no sale «el sobrante», sale el
+               parcelario entero rehecho —la medición propia, la finca que se
+               segrega y los colindantes recortados—, que son las piezas que
+               luego se descargan una a una. El nombre nuevo nombra las TRES
+               salidas; el viejo nombraba una. ⚠️ Renombrado ATÓMICO y sin
+               cambio de comportamiento: rótulo, `data-accion` y `data-estado`
+               en el mismo gesto (16 apariciones del token en 7 ficheros), para
+               que un guion de humo en rojo no pueda confundirse con el panel
+               que viene después. -->
+          <!-- ⚠️ El rótulo es un VERBO EN INFINITIVO como sus dos hermanos
+               («Generar GML», «Diagnosticar encaje»): el pie promete acciones,
+               no nombra pantallas. -->
           <button
             type="button"
             class="gml-boton gml-boton--secundario"
-            data-accion="derivar-sobrante"
+            data-accion="rehacer-parcelario"
             disabled
           >
-            Derivar sobrante
+            Rehacer el parcelario
           </button>
-          <p class="gml-accion-estado" data-estado="derivar-sobrante" role="status"></p>
+          <p class="gml-accion-estado" data-estado="rehacer-parcelario" role="status"></p>
         </div>
       </footer>
 

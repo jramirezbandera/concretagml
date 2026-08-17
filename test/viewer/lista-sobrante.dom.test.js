@@ -33,6 +33,8 @@ import {
   SIN_PIEZAS,
   textoContador,
   textoMedidas,
+  textoRecuento,
+  TITULO,
 } from '../../viewer/lista-sobrante.js'
 
 const UMBRAL = 0.00707
@@ -101,7 +103,7 @@ describe('crearListaSobrante · al nacer', () => {
     // uno roto.
     expect(boton().disabled).toBe(true)
     expect(renglon().textContent).toBe(MOTIVO_SIN_DERIVAR)
-    expect(renglon().textContent).toMatch(/Derivar sobrante/)
+    expect(renglon().textContent).toMatch(/Rehacer el parcelario/)
   })
 
   it('el bloque trae su rótulo, su lista y su contador, y no cuelga de nada', () => {
@@ -390,7 +392,7 @@ describe('crearListaSobrante · resaltado', () => {
   // ── ⛔ SALIR DE LA LISTA CON EL TABULADOR TAMBIÉN APAGA (auditoría V4) ──────
   // El resaltado por teclado tenía ida y no vuelta: `focus` encendía la fila y su
   // mancha en el mapa, y no había nada que las apagara. Quien tabulaba fuera del
-  // bloque —al botón «Derivar sobrante», o al siguiente paso— se dejaba una fila
+  // bloque —al botón «Rehacer el parcelario», o al siguiente paso— se dejaba una fila
   // y una mancha encendidas indefinidamente, señalando algo que ya no está
   // tocando. Con el ratón sí se apagaba (`mouseleave`), y esa asimetría era el
   // síntoma.
@@ -611,5 +613,154 @@ describe('crearListaSobrante · una pieza que no se puede emitir', () => {
     expect(casillas()[1].checked).toBe(true)
     expect(lista.seleccionadas()).toEqual([2])
     expect(qq(SELECTOR.NO_EMITIBLE)).toHaveLength(1)
+  })
+})
+
+// ── 9 · El cromo del panel: plegar y cerrar (2026-08-17) ────────────────────
+//
+// Desde que este bloque dejó de ser un trozo fijo de la columna y pasó a ser un
+// panel con barra de título, tiene dos estados que el usuario controla. Lo que se
+// afirma aquí es lo que hace que sean seguros:
+//
+//   1. **Plegar y cerrar NO PIERDEN NADA.** Ni un nombre escrito, ni una casilla
+//      desmarcada, ni un destino elegido. Lo único que borra esta lista es
+//      `invalidar()`, y allí lo que ha caducado es el DATO, no la vista. Si
+//      plegar tirara el trabajo, el `[–]` sería una trampa con forma de comodidad.
+//   2. **Volver a derivar SIEMPRE devuelve el panel**, esté plegado o cerrado. Sin
+//      eso, pulsar «Rehacer el parcelario» correría la derivación entera y no
+//      pasaría nada visible: el error silencioso en versión interfaz.
+
+describe('crearListaSobrante · plegar y cerrar', () => {
+  const treinta = () => cesion([pieza(1, { area: 30 }), pieza(2, { area: 12 })])
+
+  it('la barra se llama IGUAL que el botón que abre el panel', () => {
+    // Es la única pista de que el panel es consecuencia de aquel botón, porque no
+    // aparece donde se pulsó. Dos nombres distintos obligarían a deducirlo.
+    expect(q(SELECTOR.TITULO).textContent).toBe(TITULO)
+    expect(MOTIVO_SIN_DERIVAR).toContain(TITULO)
+  })
+
+  it('plegado deja la BARRA con su recuento y esconde el cuerpo', () => {
+    lista.pintar(treinta())
+    lista.plegar()
+
+    expect(lista.estaPlegado()).toBe(true)
+    expect(q(SELECTOR.CUERPO).hidden, 'el cuerpo se pliega').toBe(true)
+    expect(q(SELECTOR.CABECERA).hidden, '⛔ la barra NO: es la única salida').toBe(false)
+    expect(lista.nodo.hidden, 'plegar no es cerrar').toBe(false)
+    // Plegado, la barra es lo único que queda: tiene que seguir diciendo que hay
+    // algo dentro, o se lee como un botón apagado.
+    expect(q(SELECTOR.RECUENTO).textContent).toBe(textoRecuento(2))
+  })
+
+  it('⛔ restaurar devuelve la lista con NOMBRES y CASILLAS intactos', () => {
+    lista.pintar(treinta())
+    campos()[0].value = 'La Solana'
+    tocar(campos()[0], 'input')
+    casillas()[1].checked = false
+    tocar(casillas()[1], 'change')
+
+    const antes = { nombres: lista.nombres(), marcadas: lista.seleccionadas() }
+
+    lista.plegar()
+    lista.desplegar()
+
+    expect(lista.estaPlegado()).toBe(false)
+    expect(q(SELECTOR.CUERPO).hidden).toBe(false)
+    expect(lista.nombres(), 'el nombre escrito sobrevive al plegado').toEqual(antes.nombres)
+    expect(lista.seleccionadas(), 'y la casilla desmarcada también').toEqual(antes.marcadas)
+    expect(campos()[0].value).toBe('La Solana')
+  })
+
+  it('cerrar esconde el panel ENTERO, barra incluida, y tampoco pierde nada', () => {
+    lista.pintar(treinta())
+    campos()[0].value = 'La Solana'
+    tocar(campos()[0], 'input')
+
+    lista.cerrar()
+
+    expect(lista.estaAbierto()).toBe(false)
+    expect(lista.nodo.hidden).toBe(true)
+    expect(lista.nombres(), '⛔ cerrar es esconder, no vaciar').toEqual({ 1: 'La Solana' })
+
+    lista.abrir()
+    expect(lista.nodo.hidden).toBe(false)
+    expect(campos()[0].value).toBe('La Solana')
+  })
+
+  it('los dos estados son INDEPENDIENTES: plegar no cierra ni cerrar pliega', () => {
+    // Fundirlos en un solo booleano obligaría a que restaurar decidiera cuál de
+    // los dos deshace, y esa decisión sólo la sabe quien lo escondió.
+    lista.pintar(treinta())
+    lista.plegar()
+    lista.cerrar()
+    expect([lista.estaPlegado(), lista.estaAbierto()]).toEqual([true, false])
+
+    lista.abrir()
+    expect(lista.estaPlegado(), 'sigue plegado tras reabrir').toBe(true)
+    expect(q(SELECTOR.CUERPO).hidden).toBe(true)
+  })
+
+  it('⛔ una foto NUEVA despliega y abre: derivar otra vez siempre se ve', () => {
+    lista.pintar(treinta())
+    lista.plegar()
+    lista.cerrar()
+
+    lista.pintar(treinta())
+
+    expect(lista.estaAbierto(), 'vuelve a verse').toBe(true)
+    expect(lista.estaPlegado(), 'y desplegado').toBe(false)
+    expect(lista.nodo.hidden).toBe(false)
+    expect(q(SELECTOR.CUERPO).hidden).toBe(false)
+  })
+
+  it('…pero una foto VACÍA no fuerza el panel a nadie', () => {
+    // `pintar(null)` es lo que corre al arrancar y al invalidar. Abrir el panel
+    // ahí sería enseñar una caja vacía a quien acaba de cerrarla.
+    lista.pintar(treinta())
+    lista.cerrar()
+    lista.pintar(null)
+    expect(lista.estaAbierto()).toBe(false)
+  })
+
+  it('los dos botones del cromo responden al clic, que es como se usan', () => {
+    lista.pintar(treinta())
+
+    q(SELECTOR.MINIMIZAR).click()
+    expect(lista.estaPlegado()).toBe(true)
+    q(SELECTOR.MINIMIZAR).click()
+    expect(lista.estaPlegado()).toBe(false)
+
+    q(SELECTOR.CERRAR).click()
+    expect(lista.estaAbierto()).toBe(false)
+  })
+
+  it('el botón de plegar DICE su estado, y no solo con una flecha', () => {
+    // `▲` y `–` sólo se distinguen mirando. Quien llega con un lector de pantalla
+    // necesita `aria-expanded`, y que concuerde con lo que se ve.
+    const min = () => q(SELECTOR.MINIMIZAR)
+    expect(min().getAttribute('aria-expanded')).toBe('true')
+    expect(min().getAttribute('aria-label')).toMatch(/Plegar/)
+
+    lista.plegar()
+    expect(min().getAttribute('aria-expanded')).toBe('false')
+    expect(min().getAttribute('aria-label')).toMatch(/Desplegar/)
+  })
+
+  it('el recuento cuenta PIEZAS, y el contador de dentro cuenta las que se emiten', () => {
+    // Son dos cifras distintas a propósito: verlas a la vez es lo que enseña que
+    // desmarcar una casilla no borra la pieza.
+    lista.pintar(treinta())
+    casillas()[1].checked = false
+    tocar(casillas()[1], 'change')
+
+    expect(q(SELECTOR.RECUENTO).textContent, 'la barra: cuántas hay').toBe(textoRecuento(2))
+    expect(q(SELECTOR.CONTADOR).textContent, 'dentro: cuántas van').toBe(textoContador(1, 2))
+  })
+
+  it('el recuento concuerda en singular y desaparece sin piezas', () => {
+    expect(textoRecuento(1)).toBe('· 1 pieza')
+    expect(textoRecuento(2)).toBe('· 2 piezas')
+    expect(textoRecuento(0), 'sin piezas no se escribe «· 0 piezas»').toBe('')
   })
 })

@@ -246,8 +246,18 @@ eso la escala son valores exactos y no una progresión:
 
 `viewer/cajon-diagnostico.js#ESCALA`, en línea y por el motivo de §2:
 
-`DATO_XL` 30px (la superficie medida, y nada más) · `DATO` 15px (toda cifra) ·
+`DATO_XL` 22px (la superficie medida, y nada más) · `DATO` 15px (toda cifra) ·
 `CUERPO` 13px (prosa) · `APUNTE` 12px (procedencia, notas) · `ROTULO` 10px (grupo).
+
+⭐ **`DATO_XL` eran 30px hasta el 2026-08-17** («la superficie de medición está muy
+grande», encargo del autor). El número no se lee solo en la escala: **las cifras del
+cajón van en MONO**, que mide ~0,6 em por glifo, así que «103,64 m²» ocupaba 176 px
+de los 344 útiles del panel — la mitad del ancho de la columna para un solo dato,
+con su etiqueta al otro extremo de un renglón vacío. A 22 px son 129, sigue siendo lo
+primero que se lee, y el salto contra `DATO` (15) es lo que hace la jerarquía. Va
+acompañado de un peso: **toda cifra pesa 500** desde esa misma fecha
+(`PESO_CIFRA`) — y nunca 600, porque de Geist Mono solo se cargan 400 y 500 y el
+navegador sintetizaría el resto.
 
 Existe porque **antes de rediseñarla se midió que 92 de las 105 declaraciones de
 tamaño de la aplicación valían 10, 11 o 12 px**: el dato y su nombre se leían igual de
@@ -260,7 +270,14 @@ el DOM y exige que **todo** `fontSize` en línea salga de `ESCALA`. Cazó un `11
 suelto nada más escribirse.
 
 ⚠️ Y una regla de contenido: `DATO_XL` se aplica **solo cuando hay cifra**. «No
-consta» a 30 px grita una ausencia.
+consta» a 22 px grita una ausencia.
+
+⚠️ **La escala no es todo el cajón: hay una JUNTA y hay dos moldes más.** Desde el
+2026-08-17 las cuatro secciones del diagnóstico se separan con la MISMA junta
+(`JUNTA`: filete de 1 px de `--color-border-sub` y 8 px a cada lado), los dos campos
+que se rellenan se visten de una vez (`ESTILO_CAMPO`) y las cifras comparten peso
+(`PESO_CIFRA`). Antes había dos gramáticas de separación repartidas al azar —rótulo a
+secas arriba, filete abajo— y cada campo se vestía por su cuenta.
 
 ---
 

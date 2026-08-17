@@ -36,7 +36,7 @@
 //      desde Entrada» mandaba a la pantalla donde el único botón que había era
 //      el que borra la medición. Se lee el texto RENDERIZADO, no la constante.
 //   3. **Que se enciende lo que ya estaba construido.** Con el fondo puesto,
-//      «Diagnosticar encaje» y «Derivar sobrante» dejan de estar grises. Son dos
+//      «Diagnosticar encaje» y «Rehacer el parcelario» dejan de estar grises. Son dos
 //      features cerradas (F07 y F17) que desde el flujo «medición primero» eran
 //      INALCANZABLES, y no por falta de código: por falta de contorno oficial.
 //
@@ -147,8 +147,8 @@ const SEL = {
   ESTADO_FONDO: '[data-estado="traer-fondo-catastral"]',
   DIAGNOSTICAR: '[data-accion="diagnosticar"]',
   ESTADO_DIAGNOSTICAR: '[data-estado="diagnosticar"]',
-  DERIVAR: '[data-accion="derivar-sobrante"]',
-  ESTADO_DERIVAR: '[data-estado="derivar-sobrante"]',
+  DERIVAR: '[data-accion="rehacer-parcelario"]',
+  ESTADO_DERIVAR: '[data-estado="rehacer-parcelario"]',
   CARGAR_CATASTRO: '[data-accion="cargar-catastro"]',
   CAMPO_REFCAT: '[data-campo="refcat"]',
   PROCEDENCIA: '[data-procedencia="parcela"]',
@@ -504,7 +504,7 @@ const mudez = (() => {
   const pares = [
     ['traer-fondo-catastral', SEL.FONDO, SEL.ESTADO_FONDO],
     ['diagnosticar', SEL.DIAGNOSTICAR, SEL.ESTADO_DIAGNOSTICAR],
-    ['derivar-sobrante', SEL.DERIVAR, SEL.ESTADO_DERIVAR],
+    ['rehacer-parcelario', SEL.DERIVAR, SEL.ESTADO_DERIVAR],
   ]
   const mudos = []
   const ocultos = []

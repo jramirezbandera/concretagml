@@ -210,8 +210,8 @@ const SEL = {
   NOMBRE: '[data-sobrante="nombre"]',
   CONTADOR: '[data-sobrante="contador"]',
   NOTA: '[data-sobrante="nota"]',
-  DERIVAR: '[data-accion="derivar-sobrante"]',
-  ESTADO_DERIVAR: '[data-estado="derivar-sobrante"]',
+  DERIVAR: '[data-accion="rehacer-parcelario"]',
+  ESTADO_DERIVAR: '[data-estado="rehacer-parcelario"]',
   ENTREGAR: '[data-accion="entregar-expediente"]',
   ESTADO_ENTREGA: '[data-estado="entregar-expediente"]',
   NUMERO_MAPA: '.gml-pieza-numero',
@@ -357,7 +357,7 @@ if ($(SEL.DERIVAR) === null) {
     guion: '16-derivar-cesion',
     ok: false,
     problemas: [
-      'No existe «Derivar sobrante» en el pie del panel. Sin él, F17 no tiene entrada en la ' +
+      'No existe «Rehacer el parcelario» en el pie del panel. Sin él, F17 no tiene entrada en la ' +
         'aplicación y no hay nada que medir.',
     ],
   }
@@ -392,7 +392,7 @@ if (linea.bloqueVisible) {
 // traída), así que el CTA nace encendido y mudo.
 if (!linea.ctaHabilitado) {
   problemas.push(
-    `«Derivar sobrante» nace apagado con motivo ${JSON.stringify(linea.renglonCta)}, y la ` +
+    `«Rehacer el parcelario» nace apagado con motivo ${JSON.stringify(linea.renglonCta)}, y la ` +
       'parcela de demostración SÍ trae contorno oficial: o el cableado no está montado o el ' +
       'predicado se rompió.',
   )
@@ -435,7 +435,7 @@ if (msDerivar === null) {
     ok: false,
     problemas: [
       ...problemas,
-      'Tras encoger el lindero y pulsar «Derivar sobrante», el bloque no aparece. Renglón: ' +
+      'Tras encoger el lindero y pulsar «Rehacer el parcelario», el bloque no aparece. Renglón: ' +
         `${JSON.stringify(texto(SEL.ESTADO_DERIVAR))}.`,
     ],
     linea,
@@ -553,7 +553,7 @@ if (precio.pie && !precio.pie.dentroDelPanel) {
 }
 if (precio.pie && !precio.pie.ultimoBoton.seVe) {
   problemas.push(
-    `⛔ «Derivar sobrante» —el tercer botón del pie— NO SE VE: ` +
+    `⛔ «Rehacer el parcelario» —el tercer botón del pie— NO SE VE: ` +
       `${JSON.stringify(precio.pie.ultimoBoton)}.`,
   )
 }

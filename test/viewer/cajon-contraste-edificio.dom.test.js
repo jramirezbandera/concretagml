@@ -649,6 +649,31 @@ describe('F14 · el bloque anclado y la rejilla heredan la corrección del herma
     expect(q(SELECTOR.SOLAPE).style.textAlign).toBe('right')
     expect(q(SELECTOR.SOLAPE).style.fontSize).toBe(ESCALA.DATO)
   })
+
+  it('⛔ un motivo BAJA a su propia línea y suelta la mono (2026-08-17)', () => {
+    // Las otras dos mitades de la misma receta, y la primera arregla un SOLAPE
+    // real medido en el hermano: la celda con motivo vivía en la columna `auto`,
+    // que se dimensiona a `max-content`; un párrafo pide 400 px, se los queda
+    // todos, y la columna de la etiqueta —encogible hasta cero— se quedaba sin
+    // ancho, así que **etiqueta y motivo se imprimían uno encima del otro**. Aquí
+    // es peor que allí: estas etiquetas llegan a 27 caracteres. En jsdom no se ve
+    // (no hay maquetación), así que se afirma la estructura que lo impide.
+    const { cajon, q } = montar()
+    cajon.pintar(HONESTO())
+    for (const sel of [SELECTOR.OFICIAL, SELECTOR.SOLAPE, SELECTOR.EN_PARCELA]) {
+      expect(q(sel).style.gridColumn, sel).toBe('1 / -1')
+      // Y la clase cambia: la mono es de las cifras, y esto es prosa.
+      expect(q(sel).className, sel).toBe(CLASE_PARCELA.MOTIVO)
+    }
+
+    // El camino de vuelta, otra vez: sin reponer las dos, una cifra se quedaría
+    // ocupando el renglón entero y en la familia equivocada.
+    cajon.pintar(COMPLETO())
+    for (const sel of [SELECTOR.OFICIAL, SELECTOR.SOLAPE, SELECTOR.EN_PARCELA]) {
+      expect(q(sel).style.gridColumn, sel).toBe('auto')
+      expect(q(sel).className, sel).toBe(CLASE_PARCELA.CIFRA)
+    }
+  })
 })
 
 // ═════════════════════════════════════════════════════════════════════════════

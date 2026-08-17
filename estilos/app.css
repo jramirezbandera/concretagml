@@ -2907,7 +2907,7 @@ body {
  * modificador lo escriben SEIS módulos (`app/main.js`, `app/rama.js` y los cuatro
  * `app/cableado-*.js`) sobre renglones que ya viven **pegados a la acción que
  * bloquea** — el de «Traer del Catastro» está bajo sus botones, el de
- * «Diagnosticar encaje» bajo el suyo, el de «Derivar sobrante» bajo el suyo. O
+ * «Diagnosticar encaje» bajo el suyo, el de «Rehacer el parcelario» bajo el suyo. O
  * sea que la mitad «colócalo junto a la acción» **ya estaba resuelta en cinco de
  * los seis sitios** y lo que faltaba era que se vieran como un aviso.
  *
@@ -4190,8 +4190,24 @@ body {
 
    UN solo selector, y alcanza a las dos: la rejilla de las bandas es un `<dl>`
    DENTRO de un `.gml-cajon-seccion`, y la de las métricas es ella misma un
-   `dl.gml-cajon-seccion`. El descendiente cubre los dos casos. */
-.gml-app .gml-cajon-seccion dt {
+   `dl.gml-cajon-seccion`. El descendiente cubre los dos casos.
+
+   ⭐ Y desde el 2026-08-17 alcanza también a la PRIMERA celda de cada fila de la
+   tabla de cruces, que es un `<dt>` disfrazado: dice «Medición − Catastro», o sea
+   el nombre del dato y no el dato. Entra en esta regla en vez de estrenar una
+   propia porque quiere exactamente estas dos declaraciones —la sans y el gris
+   secundario—, y una segunda regla con el mismo cuerpo son 23 B de hoja
+   construida a cambio de nada. Las dos columnas de CIFRAS quedan fuera: se las
+   queda la regla de la mono, más abajo, con `td + td`.
+
+   ⭐ Y a `.gml-cajon-motivo`, por lo mismo y el mismo día: es el `<dd>` cuando, en
+   vez de una cifra, lleva el MOTIVO de que esa cifra no exista («No hay geometría
+   oficial con la que contrastar…»). Un párrafo, no un dato — así que la sans y el
+   gris secundario son literalmente lo que quiere, y entra aquí en vez de estrenar
+   regla. El `<dd>` se turna las dos clases en `ponerMotivo`/`ponerCifra`. */
+.gml-app .gml-cajon-seccion dt,
+.gml-app .gml-cajon-tabla td,
+.gml-app .gml-cajon-motivo {
   font-family: var(--font-sans);
   color: var(--color-text-secondary);
 }
@@ -4212,20 +4228,36 @@ body {
  * COLUMNA y se comparan entre sí; con cifras proporcionales, «1.538,99» y
  * «1.601,00» no alinean la coma y la comparación hay que hacerla leyendo en vez
  * de mirando. `.gml-mono` no se puede reutilizar tal cual porque estos nodos los
- * fabrica el módulo, que no conoce las clases de esta hoja. */
+ * fabrica el módulo, que no conoce las clases de esta hoja.
+ *
+ * ── ⭐ `td + td` Y NO `td`, DESDE EL 2026-08-17 ──────────────────────────────
+ * La regla decía `.gml-cajon-tabla td` y alcanzaba a las TRES celdas de cada
+ * fila, o sea también a la primera, que **no es una cifra: es el nombre del par**
+ * («Medición − Catastro»). Prosa en mono, con su interletraje de máquina de
+ * escribir, dentro de una columna estrecha. Se veía en la captura del autor y era
+ * media razón de que la tabla no pareciera de la misma aplicación que el resto
+ * del panel.
+ *
+ * El selector de hermano adyacente resuelve las dos columnas de cifras SIN
+ * pedirle una clase al módulo —que fabrica esos `<td>` sin ninguna— y sin
+ * enumerar posiciones con `:nth-child`, que se rompería el día que la tabla gane
+ * una cuarta columna. Lo que no lleva mono cae en la sans de `.gml-cajon-*`. */
 .gml-app .gml-cajon-cifra,
-.gml-app .gml-cajon-tabla td {
+.gml-app .gml-cajon-tabla td + td {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum' 1;
   color: var(--color-text-primary);
 }
 
-/* La tabla de los tres cruces. El módulo fija `border-collapse`, ancho y tamaño;
-   aquí, la separación entre filas y la familia de los encabezados. */
+/* La tabla de los tres cruces. El módulo fija `border-collapse`, ancho, tamaño,
+   relleno y PESO (500, ver `pintarCruces`); aquí, la separación entre filas y la
+   familia de los encabezados.
+   ⛔ Aquí había un `font-weight: var(--fw-medium)` y era CÓDIGO MUERTO: el módulo
+   escribe el peso EN LÍNEA y el inline gana a la hoja. Es la misma lección que
+   dejó escrita la regla de los botones, más abajo. */
 .gml-app .gml-cajon-tabla th {
   font-family: var(--font-sans);
-  font-weight: var(--fw-medium);
 }
 
 .gml-app .gml-cajon-tabla tbody tr + tr td,
@@ -4271,10 +4303,17 @@ body {
   color: var(--color-text-secondary);
 }
 
+/* ⛔ AQUÍ HABÍA UN `font-size: var(--text-12)` Y SE FUE EL 2026-08-17. Los dos
+   campos declaran ahora su tamaño EN LÍNEA —`ESCALA.DATO` (15 px) el `<input>`,
+   para que la superficie tecleada se alinee con las dos que hay encima;
+   `ESCALA.APUNTE` (12 px, el mismo valor que había aquí) el `<select>`—, y el
+   inline gana a la hoja: dejar la declaración habría sido escribir algo que no se
+   aplica. El reparto queda como en el resto del cajón y como en sus botones: el
+   módulo pone el TAMAÑO (lo necesita para ser legible sin esta hoja) y la hoja
+   pone la FAMILIA, que es lo único que el módulo no puede saber. */
 .gml-app .gml-cajon-diagnostico input,
 .gml-app .gml-cajon-diagnostico select {
   font-family: var(--font-sans);
-  font-size: var(--text-12);
   color: var(--color-text-primary);
   background: var(--color-bg-primary);
 }

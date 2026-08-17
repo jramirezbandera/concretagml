@@ -267,8 +267,36 @@ export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'dia
  * ── LA FORMA VUELVE A SER LA DE SIEMPRE ────────────────────────────────────
  * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja y vuelve a
  * tener que decidirse a mano. Que es lo que tenía que haber pasado hace dos hitos.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **SUBIDO 5 B EL 2026-08-17 (EL REDISEÑO DEL DIAGNÓSTICO)**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 60.293 a **60.298 B nuestros** (75.388 → 75.393 con vendor). **+5 B**, que es
+ * la subida más pequeña de las cuatro veces que esta línea se ha movido.
+ *
+ * ── QUÉ SE COMPRA CON ELLOS, Y POR QUÉ NO SON CERO ──────────────────────────
+ * El hito es un rediseño VISUAL del cajón del diagnóstico, o sea justo el tipo de
+ * trabajo que suele llegar pidiendo bytes, y **casi todo cuesta cero** porque ese
+ * módulo se viste EN LÍNEA (no importa ninguna hoja: tiene que leerse en jsdom y
+ * sobre un mapa pelado). La hoja solo entra donde el módulo tiene prohibido
+ * entrar: **la FAMILIA tipográfica**. Y ahí había dos textos que eran PROSA
+ * pintados en mono —la primera celda de la tabla de cruces («Medición − Catastro»)
+ * y el `<dd>` cuando lleva el motivo de una cifra que no existe («No hay geometría
+ * oficial con la que contrastar…»)—, los dos con el interletraje de una máquina de
+ * escribir dentro de una columna estrecha.
+ *
+ * Los 5 B netos son eso: **dos selectores metidos en la regla que YA vestía a los
+ * `<dt>`** —sans y gris secundario, que es exactamente lo que un nombre de fila y
+ * un párrafo de disculpa quieren—, menos las tres declaraciones que se devuelven
+ * en el mismo gesto (el `font-size` de los dos campos, que baja al módulo donde
+ * vive la escala, y un `font-weight` que era código muerto). El detalle byte a
+ * byte, en el asiento.
+ *
+ * ── LA FORMA SIGUE SIENDO LA MISMA ─────────────────────────────────────────
+ * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja y vuelve a
+ * tener que decidirse a mano.
  */
-export const TECHO = Object.freeze({ total: 75388, nuestro: 60293 })
+export const TECHO = Object.freeze({ total: 75393, nuestro: 60298 })
 
 /**
  * EL REGISTRO. Un asiento por hito, con la hoja construida medida de verdad.
@@ -1127,6 +1155,34 @@ export const ASIENTOS = Object.freeze(
         'por debajo. Pasa a ser la medición de hoy —60.293 B, **60 B más baja que la que había**— ' +
         'y la holgura vuelve a 0, que es la forma que el criterio 10 siempre tuvo. El ' +
         'razonamiento largo, en la cabecera de `TECHO`.' },
+    { hito: 'El diagnóstico de encaje, rediseñado',
+      commit: '(sin commitear)',
+      total: 75393, nuestro: 60298, rebanada: null,
+      nota:
+        '**+5 B, y era un rediseño VISUAL entero, o sea de los que suelen llegar pidiendo cientos.** ' +
+        'Encargo del autor sobre la pantalla de Diagnóstico: «la superficie de medición está muy ' +
+        'grande, el cuadro para meter la superficie registral está feo, todo está poco ' +
+        'estructurado». ── ⭐ **CASI TODO CUESTA CERO, Y NO ES SUERTE**: ' +
+        '`viewer/cajon-diagnostico.js` se viste EN LÍNEA porque no importa ninguna hoja (tiene ' +
+        'que leerse en jsdom y sobre un mapa pelado), así que bajar el dato titular de 30 a 22 px, ' +
+        'unificar la junta entre secciones (`JUNTA` allí: un filete y 8 px para los CUATRO grupos, ' +
+        'en vez de dos recetas repartidas al azar), dar peso 500 a las cifras, vestir los dos ' +
+        'campos de una vez, alinear la tabla de cruces con los dos cantos de la ficha, convertir ' +
+        'cada invasión en fila de dos columnas y bajar los motivos de omisión a su propia línea ' +
+        '—esto último arregla un SOLAPE real: etiqueta y motivo se imprimían uno encima del otro— ' +
+        '**no toca este fichero**. ── QUÉ SÍ LO TOCÓ ── Solo lo que el módulo tiene prohibido ' +
+        'declarar: **la FAMILIA**. Dos textos que son PROSA se pintaban en mono (la primera celda ' +
+        'de la tabla de cruces y el `<dd>` cuando lleva el motivo de una cifra que no existe), y ' +
+        'los dos se arreglan metiendo su selector en la regla que YA vestía a los `<dt>` —sans y ' +
+        'gris secundario, que es literalmente lo que quieren— en vez de estrenar reglas con el ' +
+        'mismo cuerpo: **+55 B en vez de +110**. ── QUÉ SE DEVUELVE EN EL MISMO GESTO ── El ' +
+        '`font-size` de los dos campos baja al MÓDULO, que es donde vive la escala del cajón (los ' +
+        'mismos 12 px para el `<select>`, y 15 para el `<input>`, que es lo que alinea la ' +
+        'superficie tecleada con las dos de encima), y con él se va la declaración de la hoja ' +
+        '(−20 B); y se retira un `font-weight: var(--fw-medium)` en `.gml-cajon-tabla th` que era ' +
+        'CÓDIGO MUERTO desde que se escribió, porque el módulo pone el peso en línea y el inline ' +
+        'gana (−30 B). Neto: **+5 B**. ── ⚠️ El techo sube esos 5 B (cabecera de `TECHO`) y la ' +
+        'holgura vuelve a 0. ── ⚠️ NO CIERRA REBANADA: es el rediseño de una pantalla ya cerrada.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

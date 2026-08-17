@@ -210,7 +210,7 @@ const SUELO_HOLGURA = 24
  * se ha optimizado nada, ha cambiado QUÉ PANTALLA es ésta. El rail bajó de cinco
  * peldaños a tres y «Validación» se fusionó con «Edición», así que esta caja
  * comparte ahora columna con lo que antes vivía en la otra: el pie de acciones
- * (113,17 px con «Generar GML», «Diagnosticar encaje» y «Derivar sobrante») y
+ * (113,17 px con «Generar GML», «Diagnosticar encaje» y «Rehacer el parcelario») y
  * tres pares más de ficha («Superficie catastral», «Δ catastral» y
  * «Colindantes», que venían del peldaño «Informe»).
  *

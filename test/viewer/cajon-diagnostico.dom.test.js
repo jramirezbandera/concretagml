@@ -765,9 +765,20 @@ describe('viewer/cajon-diagnostico.js · `pintar(null)` y desmontaje', () => {
     // llevaba ningún nodo: un gancho de CSS que no engancha nada, y que invita a
     // escribir la regla y a creer que se aplica. Esta comprobación es lo que lo
     // encontró, y lo que impide que vuelva a pasar.
+    //
+    // ⚠️ **Se comprueba contra DOS pintados y no contra uno** (2026-08-17). `MOTIVO`
+    // y `CIFRA` se TURNAN en el mismo `<dd>` —una celda lleva o la cifra o la razón
+    // de que no la haya—, así que ningún estado del cajón enseña las dos a la vez y
+    // exigirlas en un solo pintado dejaría a una de las dos sin guardián. Con el
+    // diagnóstico COMPLETO se ven las cifras; con uno sin geometría oficial, los
+    // motivos.
+    const conOmisiones = conCajon()
+    conOmisiones.cajon.pintar(SIN_OFICIAL())
     for (const nombre of Object.values(CLASE)) {
       if (nombre === CLASE.CONTENEDOR) continue
-      expect(raiz.querySelector(`.${nombre}`), `nadie lleva la clase .${nombre}`).not.toBeNull()
+      const enAlguno =
+        raiz.querySelector(`.${nombre}`) ?? conOmisiones.raiz.querySelector(`.${nombre}`)
+      expect(enAlguno, `nadie lleva la clase .${nombre}`).not.toBeNull()
     }
   })
 
@@ -1812,5 +1823,137 @@ describe('viewer/cajon-diagnostico.js · la ficha se lee (2026-08-15)', () => {
     const apuntes = [...raiz.querySelectorAll(`.${CLASE.APUNTE}`)]
     // Los dos matices de encaje y el párrafo de la clase propuesta.
     expect(apuntes.length).toBeGreaterThanOrEqual(3)
+  })
+})
+
+/* -------------------------------------------------------------------------- *
+ * EL REDISEÑO DEL 2026-08-17                                                  *
+ *                                                                            *
+ * Encargo del autor, tres frases: «la superficie de medición está muy grande», *
+ * «el cuadro para meter la superficie registral está feo», «en general todo    *
+ * está poco estructurado y feo». Lo que se corrigió, y lo que este bloque      *
+ * impide que vuelva:                                                          *
+ *                                                                            *
+ *   1. ⛔ **UN SOLAPE REAL, y es el defecto gordo que apareció por el camino**: *
+ *      una celda con MOTIVO en vez de cifra vivía en la columna `auto` de la    *
+ *      rejilla, que se dimensiona a `max-content`. Un párrafo pide 400 px, se   *
+ *      los queda todos, y la columna de la etiqueta —encogible hasta cero— se   *
+ *      quedaba sin ancho: **«Solape» y «No hay geometría oficial…» se           *
+ *      imprimían UNO ENCIMA DEL OTRO**, las tres métricas a la vez. Venía de la *
+ *      rejilla del 2026-08-15 y no lo vio nadie porque en jsdom no hay          *
+ *      maquetación. Lo vio un navegador; aquí se afirma la ESTRUCTURA que lo    *
+ *      arregla, que es lo que puede revertirse sin que nada se queje.           *
+ *   2. **La misma junta para los cuatro grupos.** Había dos recetas repartidas  *
+ *      al azar: filete y respiro abajo, un rótulo a 4 px de la cifra arriba.    *
+ *   3. **Prosa en mono.** El nombre del par en la tabla de cruces y el motivo   *
+ *      de una omisión se pintaban con el interletraje de una máquina de         *
+ *      escribir, porque las dos cosas colgaban de reglas de CIFRA.              *
+ *   4. **El dato titular a 30 px** ocupaba 176 de los 344 px del panel (mono),  *
+ *      y **el campo de la registral** llevaba la pista dentro, en mono y        *
+ *      recortada («de la escri»).                                              *
+ * -------------------------------------------------------------------------- */
+
+describe('viewer/cajon-diagnostico.js · el rediseño del 2026-08-17', () => {
+  const CELDAS = [SELECTOR.SOLAPE, SELECTOR.CENTROIDES, SELECTOR.DESVIACION]
+
+  it('⛔ un MOTIVO baja a su propia línea: la etiqueta y la razón ya no se pisan', () => {
+    const { cajon, raiz } = conCajon()
+    cajon.pintar(SIN_OFICIAL())
+    for (const sel of CELDAS) {
+      expect(nodo(raiz, sel).style.gridColumn, sel).toBe('1 / -1')
+    }
+  })
+
+  it('…y el camino de VUELTA repone la columna: una cifra no ocupa el renglón entero', () => {
+    // El olvido clásico de este par de funciones: sin reponer `grid-column`, una
+    // parcela que recupera su contorno oficial se queda con la cifra sola en una
+    // línea y su etiqueta en la de arriba, para siempre.
+    const { cajon, raiz } = conCajon()
+    cajon.pintar(SIN_OFICIAL())
+    cajon.pintar(COMPLETO())
+    for (const sel of CELDAS) {
+      expect(nodo(raiz, sel).style.gridColumn, sel).toBe('auto')
+    }
+  })
+
+  it('un motivo se DESVISTE de cifra: cambia de clase para soltar la mono', () => {
+    // La familia es lo único que este módulo no declara (la pone `estilos/app.css`),
+    // así que la única forma de que un párrafo no salga en mono es cambiarle la
+    // clase. Y tiene que volver: `CIFRA` es lo que le devuelve la mono a un número.
+    const { cajon, raiz } = conCajon()
+    cajon.pintar(SIN_OFICIAL())
+    for (const sel of CELDAS) {
+      expect(nodo(raiz, sel).className, sel).toBe(CLASE.MOTIVO)
+    }
+    cajon.pintar(COMPLETO())
+    for (const sel of CELDAS) {
+      expect(nodo(raiz, sel).className, sel).toBe(CLASE.CIFRA)
+    }
+  })
+
+  it('los CUATRO grupos se separan con la MISMA junta, no con dos recetas', () => {
+    const { raiz } = conCajon()
+    const rotulos = [...raiz.querySelectorAll(`.${CLASE.ROTULO}`)]
+    const juntas = [
+      ...rotulos,
+      nodo(raiz, SELECTOR.INVASION),
+      nodo(raiz, SELECTOR.MARGEN).parentElement,
+    ]
+    expect(juntas).toHaveLength(4)
+    const patron = juntas[0]
+    for (const nodoJunta of juntas) {
+      for (const prop of ['borderTopWidth', 'borderTopStyle', 'borderTopColor', 'paddingTop', 'marginTop']) {
+        expect(nodoJunta.style[prop], `la junta diverge en ${prop}`).toBe(patron.style[prop])
+      }
+    }
+    // Y es una junta de verdad, no cuatro ceros iguales.
+    expect(patron.style.borderTopWidth).not.toBe('')
+    expect(Number.parseFloat(patron.style.paddingTop)).toBeGreaterThan(0)
+  })
+
+  it('la tabla de cruces comparte los DOS cantos con la ficha de arriba', () => {
+    // 4 px de relleno en los bordes de fuera dejaban la columna de rótulos 4 px a
+    // la derecha de las etiquetas del `<dl>` y las cifras 4 px antes que las de
+    // arriba. Dos sangrías que nadie eligió, en lo único que hace legible una
+    // columna de números: que se pueda bajar por un solo canto.
+    const { cajon, raiz } = conCajon()
+    cajon.pintar(COMPLETO())
+    const tabla = nodo(raiz, SELECTOR.CRUCES)
+    for (const fila of tabla.querySelectorAll('tr')) {
+      const celdas = [...fila.children]
+      expect(celdas[0].style.paddingLeft, 'el canto izquierdo').toBe('0px')
+      expect(celdas.at(-1).style.paddingRight, 'el canto derecho').toBe('0px')
+    }
+  })
+
+  it('la superficie registral se teclea donde se leen las otras dos, y sin pista dentro', () => {
+    // La pista («de la escritura») vivía en el `placeholder`, o sea PROSA dentro de
+    // un campo que `estilos/app.css` pinta en mono: se recortaba en «de la escri».
+    // Ahora es el segundo piso de la etiqueta, y la caja se queda para el número.
+    const { raiz } = conCajon()
+    const campo = nodo(raiz, SELECTOR.REGISTRAL)
+    expect(campo.placeholder).toBe('')
+    expect(campo.style.fontSize, 'se lee como las dos superficies de encima').toBe(ESCALA.DATO)
+    expect(campo.style.textAlign, 'y la coma cae en la misma columna').toBe('right')
+    const etiqueta = raiz.querySelector(`label[for="${campo.id}"]`)
+    expect(etiqueta.textContent).toContain('Superficie registral')
+    expect(etiqueta.textContent).toContain('de la escritura')
+    expect(etiqueta.querySelector(`.${CLASE.APUNTE}`), 'la pista es un apunte').not.toBeNull()
+  })
+
+  it('cada invasión reparte referencia y superficie en DOS columnas', () => {
+    // Era «• 7150904UF7675S: 5,31 m²»: la sangría de la viñeta rompía el canto
+    // izquierdo del cajón y el área quedaba flotando a mitad de renglón, sin
+    // alinearse con ninguna de las otras cifras del panel.
+    const { cajon, raiz } = conCajon()
+    cajon.pintar(COMPLETO())
+    const li = nodo(raiz, SELECTOR.INVASION).querySelector('li')
+    expect(li.children).toHaveLength(2)
+    expect(li.style.display).toBe('flex')
+    expect(li.style.justifyContent).toBe('space-between')
+    expect(li.parentElement.style.listStyle).toBe('none')
+    // Y sigue diciendo las dos cosas: a quién se pisa y cuánto.
+    expect(li.textContent).toContain('9398515VK3799G')
+    expect(li.textContent).toContain(m2(2.641388))
   })
 })
