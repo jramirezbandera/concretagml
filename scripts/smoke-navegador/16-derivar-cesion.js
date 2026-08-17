@@ -7,18 +7,36 @@
 //                                   → descargar el expediente
 //
 // Y sobre todo **EL PRECIO EN PÍXELES**, que es lo único de F17 que ninguna de
-// las 6.278 pruebas puede ver. F17 rompe A PROPÓSITO la racha de «coste 0 px en
-// el panel» que el proyecto llevaba cinco fases defendiendo: la lista del
-// sobrante vive en la columna izquierda, en Validación, y le quita altura a la
-// tabla de vértices. La revisión de diseño lo midió sobre una maqueta (96,63 px
-// vacía + 31,00 por fila); **aquí se mide sobre el producto**.
+// las 7.989 pruebas puede ver.
 //
-// ⛔ Y el modo de fallo es el peor de todos: **el panel NO DESBORDA cuando esto
-// crece — la tabla de vértices ENCOGE EN SILENCIO**. Está medido: desborde 0 en
-// los seis casos de la revisión. O sea que pasarse de sitio **no tiene síntoma
-// visible**, y este guion es el único guardián posible. En jsdom no hay
-// maquetación: `getBoundingClientRect()` devuelve ceros y un panel que no cabe
-// sale VERDE en la suite entera.
+// ── ⭐ Y DESDE EL 2026-08-17 ESTE GUION MIDE LO CONTRARIO DE LO QUE NACIÓ MIDIENDO
+// Nació para vigilar un precio: F17 rompió a propósito la racha de «coste 0 px en
+// el panel» que el proyecto llevaba cinco fases defendiendo, porque la lista del
+// sobrante vivía en la columna izquierda y le quitaba altura a la tabla de
+// vértices (96,63 px vacía + 31,00 por fila, medido sobre el producto).
+//
+// **Ese precio se ha devuelto entero.** El sobrante se fue a una ventana
+// flotante sobre el mapa —arrastrable, plegable y cerrable— y la sección
+// `[data-anfitrion="sobrante"]` se retiró de `index.html`. Así que la
+// comprobación se invierte: derivar ya no puede quitarle **ni un píxel** a la
+// tabla, y eso se exige con tolerancia de redondeo (1 px), no de diseño.
+//
+// ⛔ Y el modo de fallo sigue siendo el peor de todos: **el panel NO DESBORDA
+// cuando algo crece — la tabla de vértices ENCOGE EN SILENCIO**. Está medido:
+// desborde 0 en los seis casos de la revisión. O sea que volver a colgar algo de
+// la columna **no tendría síntoma visible**, y este guion es el único guardián
+// posible. En jsdom no hay maquetación: `getBoundingClientRect()` devuelve ceros
+// y un panel que no cabe sale VERDE en la suite entera.
+//
+// Lo nuevo que vigila, y que tampoco puede ver la suite:
+//   · que el bloque cuelgue de `.leaflet-bottom.leaflet-left` (si vuelve a la
+//     columna, el precio vuelve con él);
+//   · que **la barra de título esté dentro del viewport** — con ella se van el
+//     asidero, el `[–]` y el `[×]`, y el panel deja de poder cerrarse. La
+//     aritmética del acotado está probada con números en
+//     `test/viewer/acotar-viewport.test.js` (proyecto `node`); lo que sólo se ve
+//     aquí es que de verdad se aplique;
+//   · que la zona «Para comprobar» ofrezca GML **y** TXT por cada geometría.
 //
 // ── ⚠️ ESTE GUION CAMBIA UN CRITERIO DEL PLAN, Y ESTÁ ESCRITO POR QUÉ ───────
 // El plan de F17 le mandaba comprobar que **«el nombre escrito llega al `localId`
@@ -107,15 +125,14 @@ const PIE_CON_DOS_BOTONES_PX = 209.47
 /** Cuántas filas se ven sin scroll, según `viewer/lista-sobrante.js`. */
 const FILAS_VISIBLES = 4
 
-/**
- * El alto por fila que declara `viewer/lista-sobrante.js#ALTO_FILA_PX`. ⛔ **Eran
- * 31 —el número de la MAQUETA de la revisión de diseño— hasta que la primera
- * corrida de este guion midió 26 sobre el componente de verdad**, y el tope
- * enseñaba 4,77 filas en vez de 4: no un defecto, pero 20 px de panel cobrados de
- * más en la pantalla donde F17 está gastando a propósito. Corregido el
- * 2026-08-05, y esto es exactamente para lo que existe este gate.
- */
-const ALTO_FILA_MAQUETA_PX = 26
+// ⛔ **AQUÍ VIVÍA `ALTO_FILA_MAQUETA_PX = 26`, Y SE RETIRÓ EL 2026-08-17.** Era
+// una COPIA de `viewer/lista-sobrante.js#ALTO_FILA_PX`, y esa copia hizo
+// exactamente lo que hacen las copias: el 2026-08-05 este guion midió 26 sobre el
+// componente (la maqueta decía 31) y se corrigieron los dos; el 2026-08-17 midió
+// 38 y se corrigió sólo uno, así que el aviso pasó a decir «se ven 4 filas y no
+// 4». Ahora el guion no sabe cuánto debe medir una fila: mide la que hay, lee el
+// tope que la lista se ha puesto y comprueba lo único que importa —que enseñe las
+// filas que promete—. Un número menos que mantener en dos sitios.
 
 /** Cuánto se le mueve el lindero. 3 m: se ve, y da piezas de decenas de m². */
 const MENGUA_M = 3
@@ -202,7 +219,9 @@ const SEL = {
   PIE: '.gml-panel-pie',
   ACCIONES: '.gml-acciones',
   VERTICES: '#tabla-vertices',
-  ANFITRION: '[data-anfitrion="sobrante"]',
+  CABECERA: '[data-sobrante="cabecera"]',
+  SUELTO: '[data-sobrante="suelto-descarga"]',
+  ESQUINA: '.leaflet-bottom.leaflet-left',
   BLOQUE: '[data-sobrante="bloque"]',
   LISTA: '[data-sobrante="lista"]',
   FILA: '[data-sobrante="fila"]',
@@ -504,7 +523,12 @@ const precio = {
   costeDelBloquePx: redondear((cajaVerticesAntesDeDerivar ?? 0) - (cajaVerticesConBloque ?? 0)),
   contraReferenciaHistoricaPx: redondear((cajaVerticesConBloque ?? 0) - REFERENCIA_VERTICES_PX),
   bloque: caja($(SEL.BLOQUE)),
-  seccionAnfitriona: caja($(SEL.ANFITRION)),
+  // ⭐ DESDE EL 2026-08-17 el bloque NO está en la columna: flota sobre el mapa
+  // como control de Leaflet en `bottomleft`. Lo que antes se medía aquí era la
+  // sección anfitriona `[data-anfitrion="sobrante"]`, que se retiró con él.
+  enLaEsquinaDelMapa: $(SEL.BLOQUE)?.closest(SEL.ESQUINA) !== null,
+  barraDeTitulo: caja($(SEL.CABECERA)),
+  nSueltos: $$(SEL.SUELTO).length,
   altoDeUnaFilaPx: filaEl === null ? null : redondear(filaEl.getBoundingClientRect().height),
   // ⚠️ El TOPE se lee del estilo calculado y NO del alto pintado: con dos filas
   // puestas, `getBoundingClientRect()` devuelve lo que ocupan las dos, no el
@@ -534,6 +558,58 @@ if (precio.cajaVerticesConBloque !== null && precio.cajaVerticesConBloque < SUEL
       'entera: la tabla encoge en silencio.',
   )
 }
+
+// ── ⭐ Y DESDE EL 2026-08-17 SE EXIGE LO CONTRARIO: QUE NO CUESTE NADA ───────
+//
+// El bloque se fue de la columna a una ventana flotante, así que el precio que
+// este guion existía para vigilar **se ha devuelto entero**. La comprobación se
+// invierte: derivar ya no puede quitarle un solo píxel a la tabla de vértices.
+//
+// ⛔ Se exige `≈ 0` y no `< SUELO`, y la diferencia importa: un umbral generoso
+// dejaría pasar una recaída silenciosa —alguien vuelve a colgar algo de la
+// columna y la tabla encoge otra vez sin desbordar—, que es exactamente el modo
+// de fallo que costó dos semanas descubrir la primera vez. La tolerancia es de
+// un píxel de redondeo, no de diseño.
+const TOLERANCIA_COSTE_PX = 1
+if (precio.costeDelBloquePx > TOLERANCIA_COSTE_PX) {
+  problemas.push(
+    `⛔ Derivar le ha quitado ${precio.costeDelBloquePx} px a la tabla de vértices, y desde el ` +
+      '2026-08-17 no puede quitarle ninguno: el sobrante flota sobre el mapa y ya no ocupa la ' +
+      'columna. Alguien ha vuelto a colgar algo del panel — y como el panel no desborda, la ' +
+      'tabla encogería en silencio otra vez.',
+  )
+}
+if (!precio.enLaEsquinaDelMapa) {
+  problemas.push(
+    '⛔ El bloque del sobrante NO cuelga de `.leaflet-bottom.leaflet-left`: ha dejado de ser un ' +
+      'control de Leaflet. Si ha vuelto a la columna, el precio en píxeles vuelve con él.',
+  )
+}
+// La barra de título es lo ÚNICO que no puede salirse: con ella se van el
+// asidero, el `[–]` y el `[×]`, y entonces el panel no se puede cerrar nunca más.
+// La aritmética está probada en `test/viewer/acotar-viewport.test.js` (proyecto
+// `node`); lo que sólo se puede ver aquí es que de verdad se aplique.
+const barra = precio.barraDeTitulo
+if (barra && (barra.top < 0 || barra.bottom > window.innerHeight || barra.right < 0 ||
+    barra.left > window.innerWidth)) {
+  problemas.push(
+    `⛔ La barra de título del panel está FUERA del viewport (${JSON.stringify(barra)}). Con ella ` +
+      'se van el asidero, el «–» y el «✕»: el panel deja de poder cerrarse y la única salida es ' +
+      'recargar, que se lleva por delante los nombres escritos.',
+  )
+}
+// Y las descargas sueltas: dos formatos por geometría del expediente.
+if (precio.nSueltos === 0) {
+  problemas.push(
+    'La zona «Para comprobar» no ofrece ninguna descarga suelta. Debería listar cada geometría ' +
+      'del expediente —la medición propia incluida— con su GML y su TXT.',
+  )
+} else if (precio.nSueltos % 2 !== 0) {
+  problemas.push(
+    `Hay ${precio.nSueltos} botones de descarga suelta, y tienen que ser PARES: cada geometría ` +
+      'se ofrece en GML y en TXT.',
+  )
+}
 if (precio.desborde && precio.desborde.vertical > DESBORDE_TOLERADO_PX) {
   problemas.push(`El panel DESBORDA ${precio.desborde.vertical} px por abajo con el bloque puesto.`)
 }
@@ -560,17 +636,29 @@ if (precio.pie && !precio.pie.ultimoBoton.seVe) {
 // El tope de las 4 filas: se comprueba la ARITMÉTICA sobre la fila real, no el
 // número de la maqueta. Si una fila mide más de lo previsto, el tope enseña menos
 // de cuatro y el contador es lo único que lo dice.
-if (precio.altoDeUnaFilaPx !== null) {
+// ⭐ **SE COMPARA CONTRA LO QUE LA LISTA PROMETE, NO CONTRA UN NÚMERO DE ESTE
+// GUION** (corregido el 2026-08-17). Antes se contrastaba la fila medida contra
+// `ALTO_FILA_MAQUETA_PX`, una copia del número que vive en
+// `viewer/lista-sobrante.js#ALTO_FILA_PX`. En cuanto aquél se corrigió a 38 —lo
+// pidió este mismo aviso—, las dos copias divergieron y el mensaje se volvió
+// absurdo: «se ven 4 filas y no 4». Dos sitios con el mismo número es un sitio
+// donde arreglarlo y otro donde olvidarse.
+//
+// Lo que de verdad importa no es cuánto mide una fila: es si la lista **enseña
+// las filas que promete**. Y eso se deriva de lo medido y del tope real, sin
+// que este guion tenga que saber ninguna constante de la aplicación.
+if (precio.altoDeUnaFilaPx !== null && precio.altoDeUnaFilaPx > 0) {
   const filasQueCaben = precio.topeDeLaListaPx / precio.altoDeUnaFilaPx
   precio.filasQueCabenDeVerdad = redondear(filasQueCaben)
-  if (Math.abs(precio.altoDeUnaFilaPx - ALTO_FILA_MAQUETA_PX) > 2) {
+  // El número que la aplicación cree que mide una fila, deducido de SU tope.
+  precio.altoDeFilaSegunLaApp = redondear(precio.topeDeLaListaPx / FILAS_VISIBLES)
+  if (Math.abs(filasQueCaben - FILAS_VISIBLES) > 0.25) {
     advertencias.push(
-      `Una fila mide ${precio.altoDeUnaFilaPx} px y la maqueta de la revisión de diseño midió ` +
-        `${ALTO_FILA_MAQUETA_PX}. El tope de la lista está calculado con el número de la ` +
-        `maqueta (${FILAS_VISIBLES} × ${ALTO_FILA_MAQUETA_PX} = ${precio.topeDeLaListaPx} px), ` +
-        `así que se ven ${redondear(filasQueCaben)} filas y no ${FILAS_VISIBLES}. No es un ` +
-        'defecto —el contador dice cuántas hay y ninguna desaparece—, pero el número hay que ' +
-        'rehacerlo con éste.',
+      `La lista promete ${FILAS_VISIBLES} filas y enseña ${redondear(filasQueCaben)}: una fila ` +
+        `mide ${precio.altoDeUnaFilaPx} px y el tope (${precio.topeDeLaListaPx} px) está ` +
+        `calculado con ${precio.altoDeFilaSegunLaApp}. No es un defecto —el contador dice ` +
+        'cuántas hay y ninguna desaparece—, pero `ALTO_FILA_PX` de ' +
+        '`viewer/lista-sobrante.js` hay que rehacerlo con el número medido.',
     )
   }
 }
@@ -815,25 +903,56 @@ const alCrecer = {
   renglon: texto(SEL.ESTADO_DERIVAR),
   renglonEsError: $(SEL.ESTADO_DERIVAR)?.classList.contains('gml-accion-estado--error') ?? false,
   filas: filas().length,
+  entregarApagado: $(SEL.ENTREGAR) === null || $(SEL.ENTREGAR).disabled,
+  renglonEntrega: texto(SEL.ESTADO_ENTREGA),
 }
 
-if (alCrecer.bloqueVisible || alCrecer.filas > 0) {
+// ── ⭐ LO QUE SE EXIGE AQUÍ CAMBIÓ CON F23, Y ESTA COMPROBACIÓN NO SE ENTERÓ ──
+//
+// Hasta F23 este bloque exigía que con la parcela creciendo **no se viera nada**:
+// la puerta llamaba a `invalidar(null)`, la lista desaparecía y con ella el
+// sobrante ya medido. F23 (`f1a8436`) lo cambió a propósito y lo dejó escrito en
+// `app/cableado-derivacion.js#motivoEntregaFuera`: «Ahora el sobrante se ve, el
+// exceso se ve, y lo único que sigue cerrado es la descarga — que es lo que de
+// verdad había que cerrar».
+//
+// La aserción vieja (`8d8d057`, F17 fase 5) siguió exigiendo lo de antes durante
+// una semana, así que este guion salía ROJO acusando al producto de un cambio
+// deliberado. Un guion que grita en falso enseña a ignorarlo, que es peor que no
+// tenerlo. Ahora se exige lo que F23 decidió: **se ve, y la descarga está
+// cerrada con su motivo.**
+if (!alCrecer.bloqueVisible) {
   problemas.push(
-    '⛔ Con la parcela CRECIENDO se ha derivado sobrante igual. El sobrante de una parcela que ' +
-      'se sale del contorno oficial no es una cesión: es terreno de alguien, y repartirlo es un ' +
-      'acto jurídico que esta versión no cubre.',
+    '⛔ Con la parcela creciendo el bloque NO se ve, y desde F23 tiene que verse: el sobrante ' +
+      'está medido y el exceso también, y esconderlos tiraba a la basura lo uno y lo otro sin ' +
+      'decirlo. Lo que tiene que estar cerrado es la DESCARGA, no la vista.',
   )
 }
-if (alCrecer.renglon === '') {
+if (!alCrecer.entregarApagado) {
   problemas.push(
-    '⛔ La puerta ha dicho que no y el renglón está VACÍO: un botón que no hace nada y no dice ' +
-      'por qué es indistinguible de uno roto (regla de oro 1).',
+    '⛔ Con la parcela creciendo «Descargar expediente» está ENCENDIDO. El sobrante de una ' +
+      'parcela que se sale del contorno oficial no es una cesión: es terreno de alguien, y ' +
+      'repartirlo es un acto jurídico que esta versión no cubre.',
   )
-} else if (!/SE SALE|se sale/.test(alCrecer.renglon) || !/m²/.test(alCrecer.renglon)) {
+}
+if (alCrecer.renglon === '' && alCrecer.renglonEntrega === '') {
   problemas.push(
-    `La puerta explica sin CIFRAS: «${alCrecer.renglon}». El plan exige que explique con ellas, ` +
-      'porque «no se puede» sin número no se puede corregir.',
+    '⛔ La puerta ha dicho que no y NINGÚN renglón lo explica: un botón que no hace nada y no ' +
+      'dice por qué es indistinguible de uno roto (regla de oro 1).',
   )
+} else {
+  // ⚠️ **Sin distinguir mayúsculas, y ése era el segundo falso rojo.** El motivo
+  // empieza la frase —«Se sale del contorno oficial: 15,17 m²…»—, así que ni
+  // `/SE SALE/` ni `/se sale/` casaban, y el guion denunciaba «explica sin
+  // CIFRAS» sobre un texto que las traía. Se comprueban los DOS renglones porque
+  // desde F23 el motivo puede estar en el del CTA o en el de la entrega.
+  const dicho = `${alCrecer.renglon} ${alCrecer.renglonEntrega}`
+  if (!/se sale/i.test(dicho) || !/m²/.test(dicho)) {
+    problemas.push(
+      `La puerta explica sin CIFRAS: «${dicho.trim()}». El plan exige que explique con ellas, ` +
+        'porque «no se puede» sin número no se puede corregir.',
+    )
+  }
 }
 
 // ── Veredicto ───────────────────────────────────────────────────────────────

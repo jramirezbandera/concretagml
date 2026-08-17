@@ -31,11 +31,16 @@ import {
   crearListaSobrante,
   DESTINO_ALTA,
   FILAS_VISIBLES,
+  FORMATO,
+  NOTA_SUELTOS,
+  PAPEL,
   MOTIVO_FOTO_CADUCA,
   MOTIVO_NINGUNA_INCLUIDA,
   MOTIVO_SIN_DERIVAR,
   ROTULO_ESTRECHA,
   ROTULO_NO_EMITIBLE,
+  SALTO_TECLADO,
+  SALTO_TECLADO_RAPIDO,
   SELECTOR,
   SIN_PIEZAS,
   textoContador,
@@ -648,6 +653,31 @@ describe('crearListaSobrante · plegar y cerrar', () => {
     expect(MOTIVO_SIN_DERIVAR).toContain(TITULO)
   })
 
+  it('⛔ esconder de verdad ESCONDE: `hidden` solo no basta con `display` en línea', () => {
+    // EL DEFECTO QUE ESTA PRUEBA CIERRA, cazado por el guion de humo 16 en Chrome
+    // el 2026-08-17. `hidden` esconde por la hoja del navegador
+    // (`[hidden]{display:none}`), y estos dos nodos llevan `display:flex` EN
+    // LÍNEA: un estilo en línea gana a cualquier selector, así que plegar y
+    // cerrar ponían el atributo y **no escondían nada**. En pantalla el panel
+    // seguía puesto; el guion lo denunció como «se ve antes de derivar nada» y
+    // tenía razón — lo roto era el cierre.
+    //
+    // ⚠️ Y las pruebas de aquí abajo NO lo veían, porque comprueban `.hidden`
+    // como propiedad y en jsdom nadie maqueta. Por eso ésta mira `display`, que
+    // es lo único que de verdad decide si se ve.
+    lista.pintar(treinta())
+
+    lista.plegar()
+    expect(q(SELECTOR.CUERPO).style.display, 'el cuerpo plegado').toBe('none')
+    lista.desplegar()
+    expect(q(SELECTOR.CUERPO).style.display, 'y desplegado vuelve a repartir').toBe('flex')
+
+    lista.cerrar()
+    expect(lista.nodo.style.display, 'el panel cerrado').toBe('none')
+    lista.abrir()
+    expect(lista.nodo.style.display).toBe('flex')
+  })
+
   it('plegado deja la BARRA con su recuento y esconde el cuerpo', () => {
     lista.pintar(treinta())
     lista.plegar()
@@ -868,5 +898,177 @@ describe('crearListaSobrante · como control del mapa', () => {
     // tiene por qué arrastrar un control a ninguna esquina.
     expect(lista.nodo.style.boxShadow).toBe('')
     expect(lista.nodo.closest('.leaflet-bottom')).toBeNull()
+  })
+})
+
+// ── 11 · Los ficheros sueltos, «para comprobar» (2026-08-17) ────────────────
+//
+// ⛔ **LA PROMESA QUE DEFIENDE ESTE BLOQUE NO ES QUE LA DESCARGA FUNCIONE: ES QUE
+// SE DIGA LO QUE NO ES.** La FORMA del fichero es el acto jurídico. Un `.gml` con
+// un solo `featureMember` es un documento impecable y válido contra el XSD, y aun
+// así no es un expediente: la segregación sólo existe cuando las parcelas viajan
+// en el MISMO documento (override O18, IVG positivo el 2026-08-03). Bajar las
+// piezas una a una y subirlas por separado no es «lo mismo repartido» — es otra
+// cosa, y la Sede la devuelve.
+//
+// Sin la nota de esta zona, dos botones junto a cada fila leerían exactamente
+// como «aquí tienes tu expediente en trozos», y quien lo creyera perdería semanas
+// esperando un IVG que ya salió negativo.
+
+describe('crearListaSobrante · los ficheros sueltos', () => {
+  const SUELTOS = [
+    { clave: '9398516VK3799G', etiqueta: '9398516VK3799G', papel: PAPEL.MEDICION, superficieM2: 1336.02 },
+    { clave: '9398516VK3799G.1', etiqueta: 'La Solana', papel: PAPEL.ALTA, superficieM2: 199.84 },
+    { clave: '7150904UF7675S', etiqueta: '7150904UF7675S', papel: PAPEL.VECINO, superficieM2: 5.3 },
+  ]
+
+  it('la zona nace ESCONDIDA y `[]` la esconde otra vez', () => {
+    // Antes de componer el expediente no se sabe qué geometrías lo forman, y
+    // enseñar aquí lo que el usuario ha marcado sería enseñar una lista que puede
+    // no coincidir con lo que acabaría dentro del fichero.
+    expect(q(SELECTOR.SUELTOS).hidden).toBe(true)
+    lista.piezasSueltas(SUELTOS)
+    expect(q(SELECTOR.SUELTOS).hidden).toBe(false)
+    lista.piezasSueltas([])
+    expect(q(SELECTOR.SUELTOS).hidden).toBe(true)
+    expect(qq(SELECTOR.SUELTO_FILA)).toHaveLength(0)
+  })
+
+  it('⛔ la zona DICE que un fichero suelto no forma expediente', () => {
+    // La afirmación central. Si esta nota desaparece, la función entera pasa a
+    // ser una invitación a presentar mal.
+    lista.piezasSueltas(SUELTOS)
+    expect(q(SELECTOR.SUELTOS_NOTA).textContent).toBe(NOTA_SUELTOS)
+    expect(NOTA_SUELTOS).toMatch(/NO forma expediente/)
+    expect(NOTA_SUELTOS).toMatch(/mismo documento/)
+  })
+
+  it('⭐ LA MEDICIÓN PROPIA está en la lista, y no es un descuido', () => {
+    // Es la pieza que el usuario no espera encontrar aquí —«eso ya lo tengo»— y
+    // justo por eso hace falta: sin ella la lista enseñaría las fincas nuevas y
+    // los vecinos y daría a entender que el expediente son sólo ésas.
+    lista.piezasSueltas(SUELTOS)
+    const etiquetas = qq(SELECTOR.SUELTO_ETIQUETA).map((e) => e.textContent)
+    expect(etiquetas[0]).toMatch(/^Tu medición ·/)
+    expect(etiquetas[1]).toMatch(/^Finca nueva · La Solana$/)
+    expect(etiquetas[2]).toMatch(/^Colindante recortado ·/)
+  })
+
+  it('cada geometría trae su superficie y sus DOS formatos', () => {
+    lista.piezasSueltas(SUELTOS)
+    expect(qq(SELECTOR.SUELTO_FILA)).toHaveLength(3)
+    expect(qq(SELECTOR.SUELTO_MEDIDA)[1].textContent).toMatch(/199,84 m²/)
+    const botones = qq(SELECTOR.SUELTO_DESCARGA)
+    expect(botones).toHaveLength(6)
+    expect(botones.map((b) => b.dataset.formato)).toEqual([
+      FORMATO.GML, FORMATO.TXT, FORMATO.GML, FORMATO.TXT, FORMATO.GML, FORMATO.TXT,
+    ])
+  })
+
+  it('pulsar un formato emite la CLAVE de la pieza y el formato', () => {
+    const pedidos = []
+    lista.alDescargarSuelto((clave, formato) => pedidos.push([clave, formato]))
+    lista.piezasSueltas(SUELTOS)
+
+    const botones = qq(SELECTOR.SUELTO_DESCARGA)
+    botones[2].click() // la segunda fila, GML
+    botones[5].click() // la tercera fila, TXT
+
+    expect(pedidos).toEqual([
+      ['9398516VK3799G.1', FORMATO.GML],
+      ['7150904UF7675S', FORMATO.TXT],
+    ])
+  })
+
+  it('el `aria-label` distingue las seis descargas, y repite el descargo', () => {
+    // «gml» a secas repetido seis veces en la misma lista no distingue nada para
+    // quien la recorre con un lector de pantalla.
+    lista.piezasSueltas(SUELTOS)
+    const etiquetas = qq(SELECTOR.SUELTO_DESCARGA).map((b) => b.getAttribute('aria-label'))
+    expect(new Set(etiquetas).size, 'las seis son distintas').toBe(6)
+    for (const e of etiquetas) expect(e).toMatch(/no forma expediente/)
+  })
+
+  it('⛔ una foto NUEVA o vaciada se lleva los sueltos por delante', () => {
+    // Dejarlos puestos sería ofrecer la descarga de unas geometrías que ya no se
+    // corresponden con la parcela en pantalla. Es la decisión 3C, y aquí con peor
+    // final: lo que se llevaría el usuario es un FICHERO.
+    lista.piezasSueltas(SUELTOS)
+    expect(q(SELECTOR.SUELTOS).hidden).toBe(false)
+    lista.pintar(null)
+    expect(q(SELECTOR.SUELTOS).hidden).toBe(true)
+
+    lista.piezasSueltas(SUELTOS)
+    lista.invalidar()
+    expect(q(SELECTOR.SUELTOS).hidden, 'invalidar pasa por `pintar(null)`').toBe(true)
+  })
+})
+
+// ── 12 · El teclado (2026-08-17) ────────────────────────────────────────────
+//
+// ⛔ **Un panel que tapa algo y sólo se aparta con ratón es una función que se le
+// quita a quien no usa ratón.** `L.Draggable` es de `mousedown`/`touchstart` y no
+// trae camino de teclado, así que lo pone este módulo.
+
+describe('crearListaSobrante · el teclado', () => {
+  let entorno = null
+  let conMapa = null
+
+  beforeEach(() => {
+    entorno = montarMapa({ zoom: 16 })
+    conMapa = crearListaSobrante({ mapa: entorno.mapa, documento: document })
+  })
+  afterEach(() => {
+    conMapa.destruir()
+    entorno.destruir()
+  })
+
+  const barra = () => conMapa.nodo.querySelector(SELECTOR.CABECERA)
+  const pos = () => {
+    const p = conMapa.nodo._leaflet_pos
+    return p ? [p.x, p.y] : [0, 0]
+  }
+  const teclear = (key, extra = {}) =>
+    barra().dispatchEvent(new window.KeyboardEvent('keydown', { key, bubbles: true, ...extra }))
+
+  it('la barra recibe el foco y DICE para qué sirve', () => {
+    // Un `tabindex` suelto es una parada del tabulador que no anuncia su función.
+    expect(barra().tabIndex).toBe(0)
+    expect(barra().getAttribute('aria-label')).toMatch(/flechas/i)
+  })
+
+  it('las flechas mueven 8 px, y con Mayús 32', () => {
+    // Píxel a píxel serían cien pulsaciones para cruzar la pantalla: entonces el
+    // teclado no es una alternativa, es un trámite.
+    teclear('ArrowRight')
+    expect(pos()).toEqual([SALTO_TECLADO, 0])
+    teclear('ArrowDown')
+    expect(pos()).toEqual([SALTO_TECLADO, SALTO_TECLADO])
+    teclear('ArrowLeft', { shiftKey: true })
+    expect(pos()).toEqual([SALTO_TECLADO - SALTO_TECLADO_RAPIDO, SALTO_TECLADO])
+  })
+
+  it('⛔ NO se roba la flecha si lleva Ctrl, Cmd o Alt', () => {
+    // Son atajos del navegador y del lector de pantalla. Comérselos aquí rompería
+    // la navegación de quien más depende de ella.
+    teclear('ArrowRight', { ctrlKey: true })
+    teclear('ArrowRight', { metaKey: true })
+    teclear('ArrowRight', { altKey: true })
+    expect(pos()).toEqual([0, 0])
+  })
+
+  it('`Escape` con el foco DENTRO cierra el panel', () => {
+    conMapa.pintar(null)
+    teclear('Escape')
+    expect(conMapa.estaAbierto()).toBe(false)
+  })
+
+  it('⛔ `Escape` FUERA del panel no lo cierra, y esa condición es media decisión', () => {
+    // Este panel no es modal: no atrapa el foco y se usa mirando el mapa y la
+    // tabla a la vez. Un `Escape` global se comería la tecla que cancela el
+    // diálogo del informe y la que cierra los cajones de F07/F08 — «dos cierres
+    // por una tecla», que es el defecto que el cajón de diagnóstico ya documenta.
+    document.body.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(conMapa.estaAbierto()).toBe(true)
   })
 })

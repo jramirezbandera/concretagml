@@ -140,6 +140,14 @@ export const SELECTOR = Object.freeze({
   MINIMIZAR: '[data-accion="minimizar-parcelario"]',
   CERRAR: '[data-accion="cerrar-parcelario"]',
   CONTADOR: '[data-sobrante="contador"]',
+  // ── Los ficheros sueltos, «para comprobar» (2026-08-17) ───────────────────
+  SUELTOS: '[data-sobrante="sueltos"]',
+  SUELTOS_NOTA: '[data-sobrante="sueltos-nota"]',
+  SUELTOS_LISTA: '[data-sobrante="sueltos-lista"]',
+  SUELTO_FILA: '[data-sobrante="suelto-fila"]',
+  SUELTO_ETIQUETA: '[data-sobrante="suelto-etiqueta"]',
+  SUELTO_MEDIDA: '[data-sobrante="suelto-medida"]',
+  SUELTO_DESCARGA: '[data-sobrante="suelto-descarga"]',
   LISTA: '[data-sobrante="lista"]',
   FILA: '[data-sobrante="fila"]',
   INCLUIR: '[data-sobrante="incluir"]',
@@ -202,8 +210,21 @@ export const FILAS_VISIBLES = 4
  * ⚠️ Quien toque el relleno, el tamaño de letra o el borde de `.gml-entrada`
  * mueve este número, y el guion 16 lo dirá con una advertencia. **El que manda es
  * el que mide el navegador**, no el de esta constante.
+ *
+ * ── ⭐ 26 → 38 px EL 2026-08-17, Y LO PIDIÓ EL GUION ────────────────────────
+ * El guion 16 llevaba avisando: «una fila mide 38 px y la maqueta midió 26, así
+ * que se ven **2,74 filas y no 4**». Con el tope calculado sobre 26 la lista
+ * prometía cuatro filas y enseñaba menos de tres — ninguna pieza desaparecía (el
+ * contador sigue diciendo cuántas hay) pero la promesa de {@link FILAS_VISIBLES}
+ * era falsa. Se toma el número del navegador, que es el que manda.
+ *
+ * ⚠️ **Y ahora se puede, que antes no.** Subirlo 12 px por fila habría costado
+ * 48 px de columna cuando el bloque vivía en el panel, y esos 48 salían de la
+ * tabla de vértices. Desde que flota sobre el mapa el tope sale de su propio
+ * `maxHeight: 60vh` y no se lo quita a nadie: por eso este número se corrige
+ * hoy y no el día que el guion empezó a avisar.
  */
-export const ALTO_FILA_PX = 26
+export const ALTO_FILA_PX = 38
 
 // ── Textos ───────────────────────────────────────────────────────────────────
 
@@ -270,6 +291,81 @@ export const ROTULO_FUERA = 'Fuera del contorno oficial'
  * pulsó. Si alguien renombra el botón, esta constante va en el mismo gesto.
  */
 export const TITULO = 'Rehacer el parcelario'
+
+/**
+ * Los dos formatos en los que se puede bajar una geometría suelta.
+ *
+ * ⚠️ **Son los dos que ya sabe escribir la aplicación**, no una elección nueva:
+ * el `.gml` lo escribe `gml/serialize-cp.js` y el `.txt` de coordenadas
+ * `export/coordenadas.js`. Aquí sólo se nombran para que la vista no reparta
+ * cadenas sueltas por el DOM.
+ */
+export const FORMATO = Object.freeze({ GML: 'gml', TXT: 'txt' })
+
+/**
+ * Cuánto se mueve el panel por pulsación de flecha, y cuánto con `Shift`.
+ *
+ * ⛔ **8 px y no 1.** Píxel a píxel son cien pulsaciones para cruzar la pantalla,
+ * y entonces el teclado no es una alternativa: es un trámite. La rejilla gruesa
+ * es lo que hace que apartar el panel sin ratón cueste lo mismo que con él.
+ */
+export const SALTO_TECLADO = 8
+/** Con `Shift`, cuatro veces más: cruzar la pantalla en una docena de teclas. */
+export const SALTO_TECLADO_RAPIDO = 32
+
+/** Las cuatro flechas, como vector `[x, y]`. */
+const PASOS_TECLADO = Object.freeze({
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+  ArrowUp: [0, -1],
+  ArrowDown: [0, 1],
+})
+
+/** El rótulo de la zona de ficheros sueltos. */
+export const ROTULO_SUELTOS = 'Para comprobar'
+
+/**
+ * ⛔ **LA FRASE POR LA QUE EXISTE ESTA ZONA, Y NO ES UN DESCARGO DE RESPONSABILIDAD.**
+ *
+ * La FORMA del fichero **es** el acto jurídico. Un `.gml` con un solo
+ * `featureMember` es un documento impecable y válido contra el XSD, y aun así no
+ * es un expediente: la segregación que este panel propone sólo existe cuando las
+ * parcelas viajan **en el mismo documento** (override O18, medido el 2026-08-03
+ * con IVG positivo, CSV `XMWPXCN9J8DB9J89`). Bajar las piezas una a una y
+ * subirlas por separado no es «lo mismo repartido»: es otra cosa, y la Sede la
+ * devuelve.
+ *
+ * Por eso los sueltos se ofrecen —hacen falta para pasar UNA geometría por un
+ * validador, o para llevarla a otro programa— pero se ofrecen **dichos**. Sin
+ * esta frase, dos botones `[GML]` junto a cada fila leerían exactamente como
+ * «aquí tienes tu expediente en trozos».
+ */
+export const NOTA_SUELTOS =
+  'Un fichero suelto NO forma expediente: sirve para pasar una geometría por un validador o ' +
+  'llevarla a otro programa, no para presentar. Lo que se presenta es el GML del conjunto, con ' +
+  'todas las parcelas dentro del mismo documento.'
+
+/**
+ * Cómo se llama cada geometría en la lista de sueltos, según su papel.
+ *
+ * ⚠️ **La medición propia entra en la lista, y es deliberado.** Es la pieza que
+ * el usuario no espera encontrar aquí —«eso ya lo tengo»— y justo por eso hace
+ * falta: sin ella, la lista enseñaría las fincas nuevas y los vecinos recortados
+ * y daría a entender que el expediente son sólo ésas. El expediente es la suma, y
+ * la suma empieza por lo que él ha medido.
+ */
+export const PAPEL = Object.freeze({
+  MEDICION: 'MEDICION',
+  ALTA: 'ALTA',
+  VECINO: 'VECINO',
+})
+
+/** El prefijo que precede a la etiqueta de cada suelto. */
+export const ROTULO_PAPEL = Object.freeze({
+  [PAPEL.MEDICION]: 'Tu medición',
+  [PAPEL.ALTA]: 'Finca nueva',
+  [PAPEL.VECINO]: 'Colindante recortado',
+})
 
 /**
  * Lo que dice la barra cuando el panel está PLEGADO: `· 3 piezas`.
@@ -649,6 +745,10 @@ function estilar(el, estilos) {
  * @property {(fn: (orden: number, nombre: string) => void) => (() => void)} alNombrar
  * @property {(fn: (orden: number|null) => void) => (() => void)} alSenalar
  * @property {(fn: () => void) => (() => void)} alEntregar
+ * @property {(piezas: Array<{clave: string, etiqueta: string, papel: string,
+ *   superficieM2: number}>) => void} piezasSueltas  Pinta las geometrías que se
+ *   pueden bajar por separado. `[]` esconde la zona entera.
+ * @property {(fn: (clave: string, formato: string) => void) => (() => void)} alDescargarSuelto
  * @property {() => void} destruir
  */
 
@@ -702,6 +802,8 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   const oyentesSenal = new Set()
   /** @type {Set<Function>} */
   const oyentesEntrega = new Set()
+  /** @type {Set<Function>} */
+  const oyentesSuelto = new Set()
 
   /**
    * Notifica a un juego de oyentes aislando los fallos: uno que reviente no puede
@@ -843,6 +945,34 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
 
   fuera.append(fueraFilaRotulo, fueraLista, fueraNota)
 
+  // ── La zona de ficheros sueltos, que nace escondida ───────────────────────
+  // ⚠️ **Cuesta CERO mientras no haya expediente que descomponer.** Aparece sólo
+  // cuando el cableado tiene una entrega compuesta, que es el único momento en
+  // que se sabe de verdad qué geometrías la forman — y no antes: enseñar aquí lo
+  // que el usuario ha marcado sería enseñar una lista que puede no coincidir con
+  // lo que acabaría dentro del fichero.
+  const sueltos = doc.createElement('div')
+  sueltos.dataset.sobrante = 'sueltos'
+  sueltos.hidden = true
+
+  const sueltosFilaRotulo = doc.createElement('div')
+  sueltosFilaRotulo.className = 'gml-rotulo-fila'
+  const sueltosRotulo = doc.createElement('h2')
+  sueltosRotulo.className = 'gml-rotulo'
+  sueltosRotulo.textContent = ROTULO_SUELTOS
+  sueltosFilaRotulo.append(sueltosRotulo)
+
+  const sueltosNota = doc.createElement('p')
+  sueltosNota.dataset.sobrante = 'sueltos-nota'
+  sueltosNota.textContent = NOTA_SUELTOS
+  estilar(sueltosNota, ESTILO_NOTA)
+
+  const sueltosLista = doc.createElement('ul')
+  sueltosLista.dataset.sobrante = 'sueltos-lista'
+  estilar(sueltosLista, ESTILO_LISTA)
+
+  sueltos.append(sueltosFilaRotulo, sueltosNota, sueltosLista)
+
   const boton = doc.createElement('button')
   boton.type = 'button'
   boton.className = 'gml-boton gml-boton--primario'
@@ -863,7 +993,12 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   // El exceso va DESPUÉS de la lista del sobrante y ANTES del botón: se lee de
   // arriba abajo como «esto sueltas · esto invades · esto puedes hacer», y así el
   // motivo por el que el botón está apagado queda justo encima del botón.
-  cuerpo.append(filaRotulo, nota, lista, vacio, fuera, boton, renglon)
+  // ⚠️ **Los sueltos van DESPUÉS del botón del conjunto, y no antes.** El orden
+  // de lectura es el orden de la decisión: primero lo que se presenta, y sólo
+  // debajo lo que sirve para comprobar. Ponerlos encima haría que lo primero que
+  // se ve al bajar la vista fueran seis botones de descarga, y el único que forma
+  // expediente quedaría el último de todos.
+  cuerpo.append(filaRotulo, nota, lista, vacio, fuera, boton, renglon, sueltos)
   bloque.append(cabecera, cuerpo)
 
   // ── Pintado ───────────────────────────────────────────────────────────────
@@ -1271,6 +1406,12 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
       boton.disabled = true
       renglon.textContent = MOTIVO_SIN_DERIVAR
       pintarFuera(null)
+      // ⛔ Y los sueltos se van con la foto. Dejarlos puestos sería ofrecer la
+      // descarga de unas geometrías que ya no se corresponden con la parcela que
+      // hay en pantalla — el mismo defecto que la decisión 3C cierra para los
+      // nombres, y con peor final: aquí lo que se llevaría el usuario es un
+      // fichero.
+      piezasSueltas([])
       return
     }
 
@@ -1394,6 +1535,87 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
 
   boton.addEventListener('click', () => emitir(oyentesEntrega, 'entregar'))
 
+  // ── Los ficheros sueltos ──────────────────────────────────────────────────
+
+  /**
+   * Pinta la lista de geometrías descargables por separado. `[]` la esconde.
+   *
+   * ⚠️ **La `clave` la pone el llamante y esta vista no la interpreta**: la
+   * devuelve tal cual por {@link alDescargarSuelto}. Es el `localId` del miembro,
+   * que el expediente ya garantiza único —si dos miembros lo repitieran, los
+   * cuatro `gml:id` chocarían y el documento entero sería inválido, así que
+   * `serializarExpedienteCp` lo comprueba y lanza—. O sea que la unicidad de esta
+   * clave no es una suposición de la interfaz: está defendida más abajo.
+   *
+   * @param {Array<{clave: string, etiqueta: string, papel: string,
+   *   superficieM2: number}>} piezas
+   */
+  function piezasSueltas(piezas) {
+    if (!vivo) return
+    const hay = Array.isArray(piezas) && piezas.length > 0
+    sueltos.hidden = !hay
+    sueltosLista.replaceChildren()
+    if (!hay) return
+
+    for (const p of piezas) {
+      const fila = doc.createElement('li')
+      fila.dataset.sobrante = 'suelto-fila'
+      fila.dataset.clave = p.clave
+      estilar(fila, ESTILO_FILA)
+
+      const etiqueta = doc.createElement('span')
+      etiqueta.dataset.sobrante = 'suelto-etiqueta'
+      // El PAPEL delante y la identidad detrás: «Finca nueva · 9398516VK3799G.1».
+      // Al revés se leería como una lista de referencias, y lo que hace falta
+      // saber primero es qué es cada cosa.
+      etiqueta.textContent = `${ROTULO_PAPEL[p.papel] ?? p.papel} · ${p.etiqueta}`
+      etiqueta.title = p.etiqueta
+      estilar(etiqueta, { flex: '1 1 auto', minWidth: '0', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' })
+
+      const medida = doc.createElement('span')
+      medida.dataset.sobrante = 'suelto-medida'
+      medida.className = 'gml-mono'
+      medida.textContent = `${FORMATO_AREA.format(p.superficieM2)} m²`
+      estilar(medida, ESTILO_MEDIDAS)
+
+      fila.append(etiqueta, medida)
+
+      for (const formato of [FORMATO.GML, FORMATO.TXT]) {
+        const b = doc.createElement('button')
+        b.type = 'button'
+        b.dataset.sobrante = 'suelto-descarga'
+        b.dataset.clave = p.clave
+        b.dataset.formato = formato
+        b.textContent = formato
+        // El `aria-label` dice las TRES cosas —qué se baja, de qué pieza y en qué
+        // formato—, porque «gml» a secas repetido seis veces en la misma lista no
+        // distingue nada para quien la recorre con un lector de pantalla.
+        b.setAttribute(
+          'aria-label',
+          `Descargar «${p.etiqueta}» suelta en ${formato.toUpperCase()} (no forma expediente)`,
+        )
+        estilar(b, {
+          flex: 'none',
+          border: '1px solid #CBD5E1',
+          borderRadius: '4px',
+          background: '#fff',
+          cursor: 'pointer',
+          fontSize: '10px',
+          lineHeight: '1',
+          padding: '3px 5px',
+          color: '#475569',
+          textTransform: 'uppercase',
+        })
+        b.addEventListener('click', () =>
+          emitir(oyentesSuelto, 'descargar suelto', p.clave, formato),
+        )
+        fila.append(b)
+      }
+
+      sueltosLista.append(fila)
+    }
+  }
+
   // ── Plegar y cerrar ───────────────────────────────────────────────────────
   //
   // Dos estados INDEPENDIENTES, y tienen que serlo: plegado es «lo tengo, no lo
@@ -1419,6 +1641,15 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   function fijarPlegado(valor) {
     plegado = valor === true
     cuerpo.hidden = plegado
+    // ⛔ **Y ADEMÁS `display`, porque `hidden` SOLO NO ESCONDE NADA AQUÍ.** El
+    // atributo `hidden` funciona por la hoja del navegador (`[hidden]{display:none}`)
+    // y este nodo lleva `display:flex` **EN LÍNEA** (ver {@link ESTILO_CUERPO}):
+    // un estilo en línea gana a cualquier selector, así que el cuerpo se quedaba
+    // puesto con `hidden` a `true`. Lo cazó el guion de humo 16 en Chrome; en
+    // jsdom no se ve, porque allí `hidden` se lee como propiedad y nadie maqueta.
+    // ⚠️ Se ponen LOS DOS: `hidden` es lo que leen los lectores de pantalla y lo
+    // que consultan los tests, y `display` es lo que de verdad lo esconde.
+    cuerpo.style.display = plegado ? 'none' : 'flex'
     botonMinimizar.textContent = plegado ? '▲' : '–'
     botonMinimizar.setAttribute('aria-expanded', plegado ? 'false' : 'true')
     botonMinimizar.setAttribute(
@@ -1427,10 +1658,18 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
     )
   }
 
-  /** Enseña o esconde el panel ENTERO, barra incluida. */
+  /**
+   * Enseña o esconde el panel ENTERO, barra incluida.
+   *
+   * ⛔ Mismo motivo que en {@link fijarPlegado} para tocar `display` además de
+   * `hidden`, y aquí era peor: con el panel «cerrado» pero visible, el guion 16
+   * lo veía puesto ANTES de derivar nada y lo denunciaba como la decisión D2
+   * rota. Tenía razón — lo que estaba roto era el cierre.
+   */
   function fijarAbierto(valor) {
     abierto = valor === true
     bloque.hidden = !abierto
+    bloque.style.display = abierto ? 'flex' : 'none'
   }
 
   botonMinimizar.addEventListener('click', () => fijarPlegado(!plegado))
@@ -1520,6 +1759,56 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
     // Y al cambiar el tamaño de la ventana, porque encoger el viewport deja
     // fuera un panel que no se ha movido: el que se mueve es el borde.
     vista?.addEventListener('resize', acotar)
+
+    // ── El arrastre CON EL TECLADO ──────────────────────────────────────────
+    //
+    // ⛔ **Sin esto el panel sólo se puede mover con un ratón**, y un panel que
+    // tapa algo y no se puede apartar sin ratón es una función que se le quita a
+    // quien no lo usa. `L.Draggable` es de `mousedown`/`touchstart` y no tiene
+    // camino de teclado, así que se añade aquí.
+    //
+    // ⚠️ **8 px por pulsación y 32 con `Shift`**, y no 1: mover un panel píxel a
+    // píxel son cien pulsaciones para cruzar la pantalla. La rejilla gruesa es lo
+    // que hace que el teclado sea una alternativa de verdad y no un trámite de
+    // conformidad.
+    //
+    // La barra lleva `tabindex="0"` para poder recibir el foco, y su
+    // `aria-label` dice lo que se puede hacer desde ella: sin eso, un `tabindex`
+    // suelto es una parada del tabulador que no anuncia para qué sirve.
+    cabecera.tabIndex = 0
+    cabecera.setAttribute('role', 'group')
+    cabecera.setAttribute(
+      'aria-label',
+      `${TITULO} — flechas para mover el panel, Mayús+flechas para moverlo más rápido`,
+    )
+    cabecera.addEventListener('keydown', (evento) => {
+      const paso = PASOS_TECLADO[evento.key]
+      if (paso === undefined) return
+      // ⚠️ No se roba la tecla si hay modificador de sistema: `Ctrl`/`Cmd`+flecha
+      // son atajos del navegador y del lector de pantalla.
+      if (evento.ctrlKey || evento.metaKey || evento.altKey) return
+      evento.preventDefault()
+      const salto = evento.shiftKey ? SALTO_TECLADO_RAPIDO : SALTO_TECLADO
+      const actual = L.DomUtil.getPosition(bloque) ?? new L.Point(0, 0)
+      L.DomUtil.setPosition(bloque, actual.add(new L.Point(paso[0] * salto, paso[1] * salto)))
+      acotar()
+    })
+
+    // ── `Escape` cierra, pero SÓLO con el foco dentro ───────────────────────
+    //
+    // ⛔ **Y esa condición es la mitad de la decisión.** Este panel NO es modal
+    // —no atrapa el foco, no tiene `aria-modal`, y se usa mirando el mapa y la
+    // tabla de vértices a la vez—, así que un `Escape` global se comería la tecla
+    // que cancela el diálogo del informe, el que sale del campo de nombre y el
+    // que cierra los cajones de F07/F08. Ya pasó en este proyecto: el cajón de
+    // diagnóstico documenta «dos cierres por una tecla» en su guarda de `Escape`.
+    //
+    // Con el foco dentro, en cambio, `Escape` es lo que cualquiera espera.
+    cabecera.addEventListener('keydown', (evento) => {
+      if (evento.key !== 'Escape') return
+      evento.stopPropagation()
+      fijarAbierto(false)
+    })
   }
 
   // El estado inicial del cromo, escrito por la misma función que lo cambia
@@ -1594,10 +1883,13 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
     estaPlegado: () => plegado,
     estaAbierto: () => abierto,
 
+    piezasSueltas,
+
     alCambiarSeleccion: (fn) => suscribir(oyentesSeleccion, 'alCambiarSeleccion', fn),
     alNombrar: (fn) => suscribir(oyentesNombre, 'alNombrar', fn),
     alSenalar: (fn) => suscribir(oyentesSenal, 'alSenalar', fn),
     alEntregar: (fn) => suscribir(oyentesEntrega, 'alEntregar', fn),
+    alDescargarSuelto: (fn) => suscribir(oyentesSuelto, 'alDescargarSuelto', fn),
 
     /** Deshace todo. Idempotente. */
     destruir() {
@@ -1610,6 +1902,7 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
       oyentesNombre.clear()
       oyentesSenal.clear()
       oyentesEntrega.clear()
+      oyentesSuelto.clear()
       // El orden importa: primero se suelta el arrastre y el oyente de la
       // ventana —que sobreviven al nodo y seguirían midiendo un panel que ya no
       // está—, y sólo después se quita el control. `control.remove()` hace

@@ -31,6 +31,7 @@ import {
   SELECTOR_BOTON,
   SELECTOR_ESTADO,
 } from '../../app/cableado-derivacion.js'
+import { nombreFicheroGml } from '../../gml/descargar.js'
 import { crearParcela, crearRecinto, ORIGEN_PARCELA } from '../../model/parcela.js'
 import { crearEstadoVista, latLngAUTM } from '../../viewer/_comun.js'
 import {
@@ -751,5 +752,145 @@ describe('cablearDerivacion · ⭐ retranqueo de milímetros + invasión de metr
     expect(botonEntregar().disabled).toBe(true)
     expect(renglonEntrega().textContent).toMatch(/Trae las parcelas colindantes/)
     expect(renglonEntrega().textContent).not.toBe(MOTIVO_NO_CIERRA)
+  })
+})
+
+// ── ⭐ LOS FICHEROS SUELTOS, «PARA COMPROBAR» (2026-08-17) ───────────────────
+//
+// ⛔ **LA FORMA DEL FICHERO ES EL ACTO JURÍDICO.** Un `.gml` con un solo
+// `featureMember` es un documento impecable y válido contra el XSD, y aun así no
+// es un expediente: la segregación sólo existe cuando las parcelas viajan en el
+// MISMO documento (override O18, IVG positivo el 2026-08-03, CSV
+// `XMWPXCN9J8DB9J89`). Así que estas descargas se ofrecen —hacen falta para pasar
+// UNA geometría por un validador— pero se ofrecen DICHAS, y esto lo comprueba.
+//
+// Lo que se defiende aquí, por orden:
+//   1. Que la lista salga de `prepararEntrega` y NO de la foto, o sea que enseñe
+//      **exactamente** las geometrías que el fichero del conjunto lleva dentro.
+//   2. Que el fichero baje llamándose `parcela_…` y no `expediente_…`: el propio
+//      artefacto desmiente lo que un usuario despistado creería haber bajado.
+//   3. Que el acuse repita que no forma expediente, en el instante en que el
+//      usuario cree tener algo presentable en la carpeta de descargas.
+
+describe('cablearDerivacion · los ficheros sueltos', () => {
+  let textos = []
+
+  beforeEach(() => {
+    const centro = latLngAUTM(entorno.mapa.getCenter(), HUSO)
+    X0 = centro[0] - 20
+    Y0 = centro[1] - 20
+    textos = []
+    estado = crearEstadoVista(null)
+    lista = crearListaSobrante({ mapa: entorno.mapa, documento: document })
+    capa = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO })
+    capaFuera = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.FUERA })
+  })
+
+  const descargarTxt = (texto, opciones) => {
+    textos.push({ texto, ...opciones })
+    return { descargado: true, nombre: opciones.nombreFichero, motivo: null }
+  }
+
+  const sueltos = () => [...document.querySelectorAll(SELECTOR.SUELTO_DESCARGA)]
+  const conUnSobrante = () => {
+    cablear({ descargarTxt })
+    estado.set(parcela({ mengua: 10 }))
+    boton().click()
+  }
+
+  it('⭐ la lista sale del EXPEDIENTE: la medición propia y la finca nueva', () => {
+    // No sale de la foto, aunque la foto bastaría para pintar filas más baratas:
+    // tiene que ser la misma función que compone el fichero del conjunto, o la
+    // zona «para comprobar» acabaría enseñando geometrías que el expediente no
+    // lleva —o al revés— y sería lo contrario de lo que sirve para comprobar.
+    conUnSobrante()
+    const etiquetas = [...document.querySelectorAll(SELECTOR.SUELTO_ETIQUETA)].map(
+      (e) => e.textContent,
+    )
+    expect(etiquetas).toHaveLength(2)
+    expect(etiquetas[0]).toMatch(/^Tu medición · 7136910UF1473N$/)
+    expect(etiquetas[1]).toMatch(/^Finca nueva · 7136910UF1473N\.1$/)
+  })
+
+  it('⛔ el GML suelto baja como «parcela_…», NUNCA como «expediente_…»', () => {
+    // `nombreFicheroGml` decide el prefijo a partir del HECHO —cuántas parcelas
+    // van dentro— y no de lo que le pidan, precisamente para que nadie pueda
+    // llamar «expediente» a un fichero con una sola.
+    conUnSobrante()
+    sueltos()[0].click() // la medición propia, en GML
+
+    expect(descargas).toHaveLength(1)
+    // ⚠️ Se afirma sobre lo que el cableado PIDE, no sobre el nombre que devuelve
+    // el doble de descarga: aquél se lo inventa el arnés. Lo que este módulo
+    // controla es el HECHO —`miembros: 1`— y la identidad con la que lo pide.
+    expect(descargas[0].miembros, 'un miembro: el hecho, no el prefijo').toBe(1)
+    expect(descargas[0].refcat).toBe('7136910UF1473N')
+    // Y que ese hecho produzca «parcela_» y no «expediente_» es de
+    // `nombreFicheroGml`, que es quien decide el prefijo para que nadie pueda
+    // llamar «expediente» a un fichero con una sola parcela dentro.
+    expect(nombreFicheroGml({ refcat: descargas[0].refcat, fecha: FECHA, miembros: 1 })).toMatch(
+      /^parcela_/,
+    )
+  })
+
+  it('el GML suelto lleva UN featureMember y es el de esa pieza', () => {
+    conUnSobrante()
+    sueltos()[2].click() // la finca nueva, en GML
+
+    const xml = descargas[0].xml
+    expect(xml.match(/<gml:featureMember>/g) ?? [], 'uno y sólo uno').toHaveLength(1)
+    // El `localId` de la cesión es el de O19: la referencia del padre con el
+    // ordinal detrás. Meter ahí el nombre del usuario cambiaría el único
+    // identificador de finca que la Sede ha aceptado.
+    expect(xml).toMatch(/7136910UF1473N\.1/)
+  })
+
+  it('el TXT suelto baja como «coordenadas_…» con las coordenadas de esa pieza', () => {
+    conUnSobrante()
+    sueltos()[3].click() // la finca nueva, en TXT
+
+    expect(textos).toHaveLength(1)
+    expect(textos[0].nombreFichero).toMatch(/^coordenadas_.*\.txt$/)
+    expect(textos[0].texto).toMatch(/7136910UF1473N\.1/)
+    expect(descargas, 'un TXT no baja además un GML').toHaveLength(0)
+  })
+
+  it('⛔ el acuse REPITE que no forma expediente', () => {
+    // Se lee justo después del clic, que es el único instante en el que el
+    // usuario cree tener algo presentable en la carpeta de descargas. No es
+    // redundante con la nota de la zona: aquélla se lee antes de decidir.
+    conUnSobrante()
+    sueltos()[0].click()
+    expect(renglonEntrega().textContent).toMatch(/NO forma expediente/)
+  })
+
+  it('⛔ editar la parcela se lleva los sueltos, y el conjunto sigue siendo el conjunto', () => {
+    // La foto caduca (3C). Ofrecer la descarga de unas geometrías que ya no se
+    // corresponden con la parcela en pantalla sería peor que perder los nombres:
+    // lo que se llevaría el usuario es un fichero.
+    conUnSobrante()
+    expect(sueltos().length).toBeGreaterThan(0)
+    estado.set(parcela({ mengua: 12 }))
+    expect(sueltos()).toHaveLength(0)
+    expect(document.querySelector(SELECTOR.SUELTOS).hidden).toBe(true)
+  })
+
+  it('⭐ la lista es el EXPEDIENTE y no la FOTO: desmarcar la única pieza la vacía', () => {
+    // La prueba que distingue las dos fuentes posibles. Al desmarcar la única
+    // pieza, la FOTO sigue teniendo su fila —no se ha borrado nada, y el usuario
+    // puede volver a marcarla—, pero ya no hay expediente que componer: sin
+    // altas, sin reparto y sin vecinos, lo que queda es el GML de una parcela
+    // sola, que ya sabe hacer «Generar GML». Una lista sacada de la foto habría
+    // seguido ofreciendo descargas de un expediente que no existe.
+    conUnSobrante()
+    expect(sueltos(), '2 geometrías × 2 formatos').toHaveLength(4)
+
+    const casilla = document.querySelector(SELECTOR.INCLUIR)
+    casilla.checked = false
+    casilla.dispatchEvent(new window.Event('change', { bubbles: true }))
+
+    expect(filas(), 'la FOTO no pierde la pieza: se puede volver a marcar').toHaveLength(1)
+    expect(sueltos(), 'pero ya no hay expediente que descomponer').toHaveLength(0)
+    expect(renglonEntrega().textContent).toBe(MOTIVO_NINGUNA_INCLUIDA)
   })
 })

@@ -58,12 +58,18 @@ import { TIPO_DERIVACION } from '../derivacion/_comun.js'
 import { derivarCesion } from '../derivacion/cesion.js'
 import { prepararEntrega } from '../derivacion/entrega.js'
 import { recortarVecinos } from '../derivacion/vecino.js'
-import { descargarGml } from '../gml/descargar.js'
+import { serializarCoordenadasTxt } from '../export/coordenadas.js'
+import { superficie } from '../geo/area.js'
+import { descargarGml, descargarTexto, TIPO_MIME_TEXTO } from '../gml/descargar.js'
+import { serializarParcelaCp } from '../gml/serialize-cp.js'
 import { NIVEL } from '../viewer/_comun.js'
 import {
+  FORMATO,
   MOTIVO_NINGUNA_INCLUIDA,
   MOTIVO_SIN_DERIVAR,
+  PAPEL,
 } from '../viewer/lista-sobrante.js'
+import { nombreFicheroExport } from './cableado-expediente.js'
 import { INSTRUCCION_PARCELARIO } from './navegacion.js'
 
 // ── Selectores de la cáscara (contrato con `index.html`) ─────────────────────
@@ -380,7 +386,11 @@ const esPanel = (v) => !!v && typeof v.avisar === 'function'
  *   `beginLifespanVersion` y para el nombre del fichero. Parámetro y no llamada
  *   directa por lo mismo que en `cablearDiagnostico` y `cablearGeneracionGml`:
  *   es lo único que permite afirmar algo exacto sobre el nombre en una prueba.
- * @param {typeof descargarGml} [opciones.descargar]  La entrega del fichero.
+ * @param {typeof descargarGml} [opciones.descargar]  La entrega del fichero del
+ *   CONJUNTO.
+ * @param {typeof descargarTexto} [opciones.descargarTxt]  La de un listado de
+ *   coordenadas suelto. Se inyecta por lo mismo que {@link opciones.descargar}: sin
+ *   ella, el camino del `.txt` solo se podria probar sustituyendo el modulo entero.
  * @returns {{derivar: () => (object|null), entregar: () => (object|null),
  *   ultimaCesion: () => (object|null), alCambiarSobrante: (fn: () => void) => (() => void),
  *   destruir: () => void}}
@@ -400,6 +410,7 @@ export function cablearDerivacion({
   renglon,
   ahora = () => new Date(),
   descargar = descargarGml,
+  descargarTxt = descargarTexto,
 } = {}) {
   if (!esStore(estado)) {
     throw new TypeError(
@@ -849,6 +860,7 @@ export function cablearDerivacion({
   function refrescarEntrega() {
     if (cesion === null) {
       lista.entrega({ habilitado: false, motivo: MOTIVO_SIN_DERIVAR })
+      lista.piezasSueltas([])
       return
     }
     // ⛔ La puerta solo sigue cerrada si el exceso NO está explicado. Con las
@@ -861,6 +873,7 @@ export function cablearDerivacion({
         habilitado: false,
         motivo: motivoEntregaFuera(cesion.puerta, formatearNumero),
       })
+      lista.piezasSueltas([])
       return
     }
     // ⛔ Cero piezas propias NO es cero expediente desde que existe el reparto: si
@@ -885,9 +898,183 @@ export function cablearDerivacion({
       cesion.piezas.length > 0
     ) {
       lista.entrega({ habilitado: false, motivo: MOTIVO_NINGUNA_INCLUIDA })
+      lista.piezasSueltas([])
       return
     }
     lista.entrega({ habilitado: true, motivo: '' })
+    refrescarSueltos()
+  }
+
+  // ── Los ficheros sueltos, «para comprobar» (2026-08-17) ───────────────────
+  //
+  // ⛔ **LA FORMA DEL FICHERO ES EL ACTO JURÍDICO, y por eso esto se ofrece
+  // DICHO.** Un `.gml` con un solo `featureMember` es un documento impecable y
+  // válido contra el XSD, y aun así no es un expediente: la segregación sólo
+  // existe cuando las parcelas viajan en el MISMO documento (override O18, IVG
+  // positivo el 2026-08-03, CSV `XMWPXCN9J8DB9J89`). Bajar las piezas una a una y
+  // subirlas por separado no es «lo mismo repartido»: es otra cosa, y la Sede la
+  // devuelve. La frase que lo dice vive en la vista (`NOTA_SUELTOS`), donde el
+  // usuario la lee; aquí vive la razón por la que existe.
+  //
+  // ⚠️ **La lista sale de `prepararEntrega` y NO de la foto**, aunque la foto
+  // bastaría para pintar las mismas filas más barato. Tiene que ser la misma
+  // función que compone el fichero del conjunto, o la zona «para comprobar»
+  // acabaría enseñando geometrías que el expediente no lleva —o al revés— y sería
+  // exactamente lo contrario de lo que sirve para comprobar.
+
+  /** La última entrega compuesta, para no rehacerla al pulsar una descarga. */
+  let ultimaEntrega = null
+
+  /** Qué papel juega un miembro del expediente en la lista de sueltos. */
+  function papelDe(miembro) {
+    if (miembro.esVecino === true) return PAPEL.VECINO
+    if (miembro.esCesion === true) return PAPEL.ALTA
+    return PAPEL.MEDICION
+  }
+
+  /**
+   * Recompone el expediente y le pasa a la vista qué geometrías lo forman.
+   *
+   * ⚠️ **Sin ruido si falla.** Un fallo aquí no puede publicar detecciones ni
+   * escribir en el renglón: esto corre al marcar una casilla, y quien la marcó
+   * está mirando el contador, no esperando un diagnóstico. Si el expediente no se
+   * puede componer, el botón del conjunto ya lo dirá con su motivo cuando se
+   * pulse; lo único que hace esta función es esconder la zona.
+   */
+  function refrescarSueltos() {
+    ultimaEntrega = null
+    const parcela = estado.get()
+    if (parcela === null || cesion === null) {
+      lista.piezasSueltas([])
+      return
+    }
+    try {
+      ultimaEntrega = prepararEntrega({
+        parcela,
+        srs,
+        cesion,
+        recorte: cesion.recorte ?? null,
+        incluidas: lista.seleccionadas(),
+        nombres: lista.nombres(),
+      })
+    } catch {
+      lista.piezasSueltas([])
+      return
+    }
+    lista.piezasSueltas(
+      ultimaEntrega.miembros.map((m) => ({
+        // El `localId`, que el expediente ya garantiza ÚNICO: si dos miembros lo
+        // repitieran, los cuatro `gml:id` chocarían y el documento entero sería
+        // inválido, así que `serializarExpedienteCp` lo comprueba y lanza. La
+        // unicidad de esta clave no es una suposición de la interfaz.
+        clave: m.identidad.refcat,
+        etiqueta: m.etiqueta,
+        papel: papelDe(m),
+        superficieM2: superficie(m.recintos),
+      })),
+    )
+  }
+
+  /**
+   * Baja UNA geometría suelta, en `.gml` o en `.txt`.
+   *
+   * ⛔ **El nombre del fichero dice «parcela» y no «expediente», y no es cosmética.**
+   * `nombreFicheroGml` decide el prefijo a partir del HECHO —cuántas parcelas van
+   * dentro— y no de lo que le pidan, precisamente para que nadie pueda llamar
+   * «expediente» a un fichero con una sola. Aquí va 1, así que baja como
+   * `parcela_…`: el propio artefacto desmiente lo que un usuario despistado
+   * podría creer que acaba de descargar.
+   */
+  function descargarSuelto(clave, formato) {
+    if (!vivo) return null
+    const miembro = ultimaEntrega?.miembros.find((m) => m.identidad.refcat === clave) ?? null
+    if (miembro === null) {
+      // La foto ha cambiado entre el pintado y el clic. No se inventa nada: se
+      // dice, y se repinta para que la lista deje de ofrecer lo que ya no hay.
+      lista.estado(
+        'Esa geometría ya no está en el expediente: la parcela ha cambiado desde que se ' +
+          'compuso la lista. Vuelve a pulsar «Rehacer el parcelario».',
+        { error: true },
+      )
+      refrescarSueltos()
+      return null
+    }
+
+    const fecha = ahora()
+    try {
+      if (formato === FORMATO.TXT) {
+        const { texto, detecciones } = serializarCoordenadasTxt({
+          recintos: miembro.recintos,
+          // ⚠️ La referencia que se estampa es el `localId` de ESTA pieza, no la
+          // de la finca madre: el listado es de lo que hay dentro del fichero.
+          refcat: miembro.identidad.refcat,
+          srs,
+          fecha,
+          nombre: miembro.nombre,
+        })
+        publicar(detecciones)
+        const resultado = descargarTxt(texto, {
+          nombreFichero: nombreFicheroExport({
+            prefijo: 'coordenadas',
+            extension: '.txt',
+            refcat: miembro.identidad.refcat,
+            fecha,
+          }),
+          mime: TIPO_MIME_TEXTO,
+          documento,
+        })
+        decirSuelto(resultado, miembro)
+        return resultado
+      }
+
+      const { xml, detecciones } = serializarParcelaCp({
+        ...miembro.identidad,
+        recintos: miembro.recintos,
+        srs,
+      })
+      publicar(detecciones)
+      if (xml === null) {
+        lista.estado(
+          `No se ha podido escribir «${miembro.etiqueta}» suelta. Mira el panel de avisos.`,
+          { error: true },
+        )
+        return null
+      }
+      // `miembros: 1` es el HECHO: este fichero lleva una parcela dentro.
+      const resultado = descargar(xml, {
+        refcat: miembro.identidad.refcat,
+        fecha,
+        miembros: 1,
+        documento,
+      })
+      decirSuelto(resultado, miembro)
+      return resultado
+    } catch (causa) {
+      panel.avisar(
+        `No se ha podido escribir «${miembro.etiqueta}» suelta: ${causa?.message ?? causa}`,
+        { nivel: NIVEL.ERROR },
+      )
+      lista.estado(`La descarga de «${miembro.etiqueta}» ha fallado. Mira el panel de avisos.`, {
+        error: true,
+      })
+      return null
+    }
+  }
+
+  /**
+   * El acuse de una descarga suelta. **Repite que no forma expediente**, y no es
+   * redundante con la nota de la zona: el acuse se lee JUSTO después del clic,
+   * que es el único instante en el que el usuario cree tener algo presentable en
+   * la carpeta de descargas.
+   */
+  function decirSuelto(resultado, miembro) {
+    lista.estado(
+      resultado.descargado
+        ? `Descargado «${resultado.nombre}» con ${miembro.etiqueta} y nada más. ` +
+            'Es una geometría suelta: NO forma expediente.'
+        : resultado.mensaje,
+      { error: !resultado.descargado },
+    )
   }
 
   /**
@@ -976,6 +1163,7 @@ export function cablearDerivacion({
   elBoton.addEventListener('click', derivar)
   const bajaEntrega = lista.alEntregar(entregar)
   const bajaSeleccion = lista.alCambiarSeleccion(repartir)
+  const bajaSuelto = lista.alDescargarSuelto(descargarSuelto)
 
   // El resaltado RECÍPROCO, que es media razón de ser de esta pantalla. Ni la
   // lista conoce el mapa ni el mapa la lista: los une este módulo, y en los dos
@@ -1031,6 +1219,7 @@ export function cablearDerivacion({
       vivo = false
       elBoton.removeEventListener('click', derivar)
       bajaEntrega()
+      bajaSuelto()
       bajaSeleccion()
       bajaSenalLista()
       bajaSenalCapa()
