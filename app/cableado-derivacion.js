@@ -72,8 +72,11 @@ import { INSTRUCCION_PARCELARIO } from './navegacion.js'
 export const SELECTOR_BOTON = '[data-accion="rehacer-parcelario"]'
 /** Su renglón `role="status"`. */
 export const SELECTOR_ESTADO = '[data-estado="rehacer-parcelario"]'
-/** La sección del panel que aloja el bloque. */
-export const SELECTOR_ANFITRION = '[data-anfitrion="sobrante"]'
+// ⛔ Aquí vivía `SELECTOR_ANFITRION = '[data-anfitrion="sobrante"]'`, y se retiró
+// el 2026-08-17 con la sección que nombraba: el sobrante ya no ocupa un hueco de
+// la columna, flota sobre el mapa como control de Leaflet. Un selector exportado
+// que no casa con nada es peor que no tenerlo, porque `querySelector` devuelve
+// `null` sin quejarse y quien lo use se queda mudo.
 
 // ── Motivos, escritos una vez y en un solo sitio ─────────────────────────────
 
@@ -373,7 +376,6 @@ const esPanel = (v) => !!v && typeof v.avisar === 'function'
  * @param {Document} [opciones.documento=globalThis.document]
  * @param {HTMLElement} [opciones.boton]  El CTA del pie. Por defecto, el de la cáscara.
  * @param {HTMLElement} [opciones.renglon]  Su `role="status"`.
- * @param {HTMLElement} [opciones.anfitrion]  La sección que aloja el bloque.
  * @param {() => Date} [opciones.ahora]  De dónde sale «ahora» para el
  *   `beginLifespanVersion` y para el nombre del fichero. Parámetro y no llamada
  *   directa por lo mismo que en `cablearDiagnostico` y `cablearGeneracionGml`:
@@ -396,7 +398,6 @@ export function cablearDerivacion({
   documento = globalThis.document,
   boton,
   renglon,
-  anfitrion,
   ahora = () => new Date(),
   descargar = descargarGml,
 } = {}) {
@@ -457,12 +458,21 @@ export function cablearDerivacion({
 
   const elBoton = boton ?? nodo(SELECTOR_BOTON, documento)
   const elRenglon = renglon ?? nodo(SELECTOR_ESTADO, documento)
-  const laSeccion = anfitrion ?? nodo(SELECTOR_ANFITRION, documento)
 
-  // El bloque se cuelga AQUÍ y no en `app/main.js`: quien conoce a la vez la
-  // sección anfitriona y la lista es este módulo. La sección viene VACÍA de
-  // `index.html` a propósito (ver su comentario), así que esto no pisa nada.
-  laSeccion.append(lista.nodo)
+  // ── ⭐ AQUÍ SE COLGABA EL BLOQUE DE LA COLUMNA, HASTA EL 2026-08-17 ────────
+  //
+  // Eran dos líneas: resolver `[data-anfitrion="sobrante"]` y hacerle `append`
+  // del nodo. Ya no, porque **el sobrante dejó de ser un trozo de la columna y
+  // pasó a ser una ventana flotante**: se monta como control de Leaflet en
+  // `bottomleft`, y de colgarlo se encarga el propio `crearListaSobrante` con el
+  // mapa que le pasa `viewer/index.js`. La sección de `index.html` se retiró en
+  // el mismo gesto, y con ella los ~220 px que le quitaba a la tabla de
+  // vértices.
+  //
+  // ⚠️ Lo que NO cambia es de quién es la lista: sigue siendo del visor, y este
+  // módulo sigue siendo el único que sabe qué pintar en ella. Lo que se ha ido
+  // es la responsabilidad de decidir DÓNDE se ve, que nunca fue de aquí — era un
+  // resto de cuando el sitio era un hueco del panel y no una esquina del mapa.
 
   // ── Estado interno ────────────────────────────────────────────────────────
   let vivo = true
@@ -533,9 +543,22 @@ export function cablearDerivacion({
     }
   }
 
-  /** Enseña o esconde el bloque. El `hidden` lo apaga `.gml-app [hidden]`. */
+  /**
+   * Enseña o esconde el panel.
+   *
+   * ⭐ **Antes esto ponía `hidden` a la SECCIÓN de la columna; ahora se lo pide a
+   * la propia lista** (2026-08-17), porque el panel ya no vive en una sección: es
+   * una ventana flotante sobre el mapa y sólo ella sabe dónde está colgada. El
+   * gesto es el mismo y el efecto también —se ve o no se ve—, y a cambio este
+   * módulo deja de tener que conocer un nodo de `index.html`.
+   *
+   * ⚠️ Esconderlo NO borra nada: los nombres escritos y las casillas siguen
+   * dentro (ver {@link ListaSobrante.cerrar}). Lo que vacía es {@link invalidar},
+   * y lo hace porque allí ha caducado el DATO, no la vista.
+   */
   function mostrarBloque(visible) {
-    laSeccion.hidden = !visible
+    if (visible) lista.abrir()
+    else lista.cerrar()
   }
 
   /**

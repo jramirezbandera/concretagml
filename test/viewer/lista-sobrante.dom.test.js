@@ -14,7 +14,14 @@
  *   3. **La foto caduca entera** (decisión 3C) y se dice EN EL BLOQUE, que es   *
  *      donde estaba lo que ha desaparecido.                                     *
  *                                                                              *
- * Proyecto Vitest `dom` (jsdom). El módulo no importa Leaflet: es un nodo.      *
+ * ⭐ **DESDE EL 2026-08-17 EL MÓDULO SÍ IMPORTA LEAFLET**: el bloque dejó de     *
+ * ser un trozo de la columna y es una VENTANA que flota sobre el mapa, con      *
+ * barra de título, arrastrable, plegable y cerrable. Los bloques 9 y 10 del     *
+ * final defienden lo que eso añade —que plegar y cerrar NO pierdan nada, y que  *
+ * el panel no pelee con el mapa que tiene debajo—, y con ello la columna        *
+ * recupera los ~220 px que el punto de arriba declaraba estar gastando.          *
+ *                                                                              *
+ * Proyecto Vitest `dom` (jsdom, con Leaflet real donde hace falta un mapa).      *
  * -------------------------------------------------------------------------- */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -36,6 +43,7 @@ import {
   textoRecuento,
   TITULO,
 } from '../../viewer/lista-sobrante.js'
+import { montarMapa } from './_ayuda-jsdom.js'
 
 const UMBRAL = 0.00707
 
@@ -762,5 +770,103 @@ describe('crearListaSobrante · plegar y cerrar', () => {
     expect(textoRecuento(1)).toBe('· 1 pieza')
     expect(textoRecuento(2)).toBe('· 2 piezas')
     expect(textoRecuento(0), 'sin piezas no se escribe «· 0 piezas»').toBe('')
+  })
+})
+
+// ── 10 · El panel sobre el mapa (2026-08-17) ────────────────────────────────
+//
+// Con `mapa`, esta vista deja de ser un nodo que alguien cuelga y pasa a ser un
+// CONTROL de Leaflet en la esquina `bottomleft`. Lo que se afirma aquí es lo que
+// separa un panel usable de uno que pelea con el mapa que tiene debajo.
+//
+// ⚠️ **Lo que este bloque NO puede probar es el ACOTADO**, y no por pereza: en
+// jsdom `getBoundingClientRect()` devuelve ceros, así que la corrección siempre
+// sale 0 y un `expect` sobre ella compararía nada contra nada. La aritmética se
+// prueba con números en `test/viewer/acotar-viewport.test.js` (proyecto `node`) y
+// su aplicación real la mide el guion de humo 16, en Chromium.
+
+describe('crearListaSobrante · como control del mapa', () => {
+  let entorno = null
+  let conMapa = null
+
+  beforeEach(() => {
+    entorno = montarMapa({ zoom: 16 })
+    conMapa = crearListaSobrante({ mapa: entorno.mapa, documento: document })
+  })
+
+  afterEach(() => {
+    conMapa.destruir()
+    entorno.destruir()
+    entorno = null
+    conMapa = null
+  })
+
+  it('se cuelga SOLO, en la esquina `bottomleft`, sin que nadie le haga append', () => {
+    // La esquina no es libre: la comparten tres cajones. No hay turno que
+    // negociar porque los tres los decide el PASO (`app/contraste.js#cajonDe`,
+    // que sólo devuelve cajón en ENTRADA y DIAGNOSTICO) y éste es de EDICIÓN.
+    expect(entorno.contenedor.contains(conMapa.nodo)).toBe(true)
+    expect(conMapa.nodo.closest('.leaflet-bottom.leaflet-left')).not.toBeNull()
+  })
+
+  it('⛔ el gesto del panel NO LLEGA al mapa: ni el arrastre, ni la rueda', () => {
+    // Los dos `OBLIGATORIOS` de Leaflet. Sin ellos el panel es inservible: cada
+    // intento de moverlo desplaza la ortofoto por debajo, y cada scroll dentro de
+    // la lista cambia la escala del mapa.
+    //
+    // ⛔ **Se mide la PROPAGACIÓN y no el centro del mapa**, y la primera versión
+    // de esta prueba hacía lo segundo: comprobaba que `getCenter()` no cambiara
+    // tras un `mousedown`+`mousemove`+`mouseup`. Salía verde **con las dos
+    // llamadas borradas**, porque en jsdom el arrastre de Leaflet no llega a
+    // mover nada de todas formas — o sea que medía el arnés, no el código. Es
+    // literalmente el defecto que este fichero denuncia en su cabecera, cometido
+    // dentro de él. Comprobado a la inversa: borrando las dos llamadas, esta
+    // versión sale ROJA.
+    const llegan = []
+    const espia = (e) => llegan.push(e.type)
+    for (const tipo of ['mousedown', 'wheel']) {
+      entorno.contenedor.addEventListener(tipo, espia)
+    }
+
+    conMapa.nodo.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true }))
+    conMapa.nodo.dispatchEvent(new window.WheelEvent('wheel', { bubbles: true, deltaY: -240 }))
+
+    for (const tipo of ['mousedown', 'wheel']) {
+      entorno.contenedor.removeEventListener(tipo, espia)
+    }
+    expect(llegan, 'ningún gesto del panel debe alcanzar el contenedor del mapa').toEqual([])
+  })
+
+  it('se viste de VENTANA: fondo, sombra y un tope de alto', () => {
+    // Sin tope, una foto con muchas piezas y la sección de «fuera del contorno»
+    // estiraría el panel hasta sacar su barra de título por arriba de la
+    // ventana — que es justo lo que el acotado existe para impedir, sólo que por
+    // el otro borde y sin que nadie arrastre nada.
+    expect(conMapa.nodo.style.background).not.toBe('')
+    expect(conMapa.nodo.style.boxShadow).not.toBe('')
+    expect(conMapa.nodo.style.maxHeight).toBe('60vh')
+    expect(conMapa.nodo.style.overflow).toBe('hidden')
+  })
+
+  it('el asidero se ve Y el cursor lo confirma: van juntos', () => {
+    // Uno se ve de lejos y el otro se descubre al pasar por encima. Con sólo el
+    // braille, el panel parece movible y no lo demuestra hasta que lo intentas.
+    expect(conMapa.nodo.querySelector(SELECTOR.ASIDERO).textContent).toBe('⠿')
+    expect(conMapa.nodo.querySelector(SELECTOR.CABECERA).style.cursor).toBe('move')
+  })
+
+  it('destruir lo saca del mapa y no deja el nodo suelto en el documento', () => {
+    const nodo = conMapa.nodo
+    conMapa.destruir()
+    expect(nodo.parentNode).toBeNull()
+    // Y es idempotente: el `afterEach` vuelve a llamarlo.
+    expect(() => conMapa.destruir()).not.toThrow()
+  })
+
+  it('sin mapa sigue siendo el nodo suelto de siempre, sin cromo de ventana', () => {
+    // `crearVisor` puede montarse sin la rama del sobrante, y quien lo haga no
+    // tiene por qué arrastrar un control a ninguna esquina.
+    expect(lista.nodo.style.boxShadow).toBe('')
+    expect(lista.nodo.closest('.leaflet-bottom')).toBeNull()
   })
 })

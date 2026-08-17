@@ -1001,40 +1001,36 @@
         <div id="tabla-vertices" class="gml-tabla-caja"></div>
       </section>
 
-      <!-- ══ EL SOBRANTE, EN LA COLUMNA (F17) ═════════════════════════════════
-           CAJA VACÍA, como la del diagnóstico de arriba y por el mismo motivo:
-           lo que se ve dentro lo fabrica `viewer/lista-sobrante.js` y lo cuelga
-           aquí `app/main.js` (paso 16). Aquí no hay ni un nodo hijo escrito a
-           mano, así que no hay un segundo juego de `[data-sobrante]` ni de
-           `[data-accion="entregar-expediente"]` compitiendo por el
-           `querySelector` — la trampa que este fichero documenta desde F06.
+      <!-- ══ AQUÍ ESTUVO EL SOBRANTE (F17) HASTA EL 2026-08-17 ════════════════
+           Si buscas la lista de piezas, sus casillas, los campos de nombre, los
+           desplegables de destino o «Descargar expediente»: ya no están en el
+           panel. Se fueron ENTEROS a una VENTANA FLOTANTE sobre el mapa —con
+           barra de título, arrastrable, plegable y cerrable— que fabrica
+           `viewer/lista-sobrante.js` y monta `viewer/index.js` como control de
+           Leaflet en la esquina `bottomleft`.
 
-           NACE `hidden`, Y ESO ES PRODUCTO, NO ARRANQUE (decisión de diseño D2):
-           el bloque aparece SOLO cuando hay sobrante que enseñar. Medido: vacío
-           cuesta 96,63 px, y cobrarlos en el 100 % de las sesiones para una
-           función que se usa en una fracción se comería justo el margen que hace
-           que la tabla de vértices siga por encima de sus 267,44 px. Quien lo
-           enseña y lo esconde es `app/cableado-derivacion.js`; el `hidden` lo
-           apaga `.gml-app [hidden]`, y el eje PASO lo deja además fuera de las
-           otras cuatro pantallas.
+           POR QUÉ SE FUERON, y es la misma historia que la barra de edición de
+           más abajo contó en su día: el bloque se comía ~220 px de un panel que
+           reparte una altura FIJA, y la tabla de vértices —que no tiene tope
+           propio— los pagaba ENCOGIENDO EN SILENCIO, sin desbordar y sin un solo
+           síntoma en pantalla. Se declaró al abrirlo («aquí se rompe a propósito
+           la racha de 0 px del panel») y se ha devuelto entero.
 
-           ⚠️ POR QUÉ NO LLEVA CLASE MODIFICADORA: `.gml-bloque` ya da lo que
-           necesita (columna flex, `min-height:0`, relleno de 16/24/0) y el bloque
-           NO se estira — el estirador de Validación sigue siendo
-           `.gml-bloque--vertices`, y dos estiradores a la vez descosen el
-           reparto. El cromo de dentro se lo pone el módulo EN LÍNEA, como el
-           cajón del diagnóstico: `viewer/*` no importa ninguna hoja. Resultado
-           medido: **cero bytes de CSS**.
+           ⛔ **LO QUE NO ERA VERDAD, Y COSTÓ DOS SEMANAS**: la fase 4 bajó este
+           bloque a la columna razonando que «las piezas se leen MIRANDO EL MAPA,
+           así que flotando taparían justo lo que señalan». Lo que tapa es un
+           panel FIJO. Uno que se arrastra, se pliega a su barra de título o se
+           cierra no tapa nada que el usuario no consienta — y aquel argumento
+           pedía CONTROL sobre el estorbo, no ausencia de estorbo.
 
-           ⚠️ Y VA DEBAJO DE LOS VÉRTICES, NO ENCIMA: lo que se revisa aquí es
-           consecuencia de la geometría de la tabla, y el ojo baja. Encima
-           empujaría la tabla hacia el pie en cuanto la lista creciera. -->
-      <section
-        class="gml-bloque"
-        data-pantalla="edicion"
-        data-anfitrion="sobrante"
-        hidden
-      ></section>
+           ⚠️ La esquina `bottomleft` la comparten tres cajones, y no hay turno
+           que negociar: quién se abre lo decide el PASO
+           (`app/contraste.js#cajonDe`), que sólo devuelve cajón en ENTRADA y en
+           DIAGNOSTICO, y este panel es de EDICIÓN. Quien algún día enseñe el
+           sobrante en Diagnóstico tiene que volver a leer esto.
+
+           Sigue sin costar un byte de CSS: el cromo se lo pone el módulo EN
+           LÍNEA, como el cajón del diagnóstico. -->
 
       <!-- ── AQUÍ ESTUVO EL BLOQUE «EDICIÓN» (F06) HASTA EL 2026-07-29 ────────
            Si buscas «Deshacer», «Ajustar al parcelario», la tolerancia, el

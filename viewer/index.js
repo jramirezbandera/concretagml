@@ -1678,7 +1678,13 @@ export function crearVisor(contenedor, opciones = {}) {
       const capaFuera = crearCapaPiezas({ mapa, zona, alAvisar: avisar, variante: VARIANTE.FUERA })
       deshacer.push(() => capaFuera.destruir())
 
+      // ⭐ **CON EL MAPA DESDE EL 2026-08-17.** Con él, la lista se monta como
+      // control de Leaflet en `bottomleft` y se arrastra; sin él seguiría siendo
+      // el nodo suelto que era, y alguien tendría que colgarlo. Ya no lo cuelga
+      // nadie: `app/cableado-derivacion.js` dejó de hacerlo y la sección
+      // `[data-anfitrion="sobrante"]` de `index.html` se retiró.
       const listaSobrante = crearListaSobrante({
+        mapa,
         documento: contenedor.ownerDocument ?? undefined,
         alAvisar: avisar,
       })

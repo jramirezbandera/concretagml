@@ -6,47 +6,58 @@
 // expediente y un campo para ponerle nombre. Más el contador «se emitirán N de M»
 // y el botón que descarga el expediente entero.
 //
-// ⛔ **NO ES UN CONTROL DE LEAFLET.** Es un nodo suelto que `app/main.js` cuelga
-// de la sección `[data-anfitrion="sobrante"]` del panel, así que no tiene
-// `abrir`/`cerrar`/`abierto`: quién lo enseña y quién lo esconde es el eje PASO
-// —`data-pantalla="validacion"` en `index.html`, resuelto por CSS— y el cableado,
-// que le pone `hidden` a la sección mientras no hay sobrante que enseñar.
+// ── ⭐ ES UN CONTROL DE LEAFLET, Y DESDE EL 2026-08-17 ──────────────────────
+// Vive FLOTANDO en la esquina `bottomleft` del mapa, con barra de título propia:
+// se arrastra, se pliega y se cierra. Hasta hoy era un nodo suelto colgado de la
+// sección `[data-anfitrion="sobrante"]` de la columna izquierda, y ese cambio de
+// naturaleza —de trozo de panel a ventana— es lo que pidió el autor al ver la
+// pantalla: «no me gusta dónde está el menú de después de derivar sobrante».
 //
-// **Y ESO ES UNA CORRECCIÓN DEL DISEÑO DE F17, NO SU PLAN ORIGINAL.** El diseño
-// aprobado el 2026-08-02 ponía este bloque FLOTANDO en la esquina `bottomleft` del
-// mapa, «mutuamente excluyente con los cajones de F07/F08». Esa esquina está libre
-// porque se vació a propósito el 2026-08-05, cuando el diagnóstico se mudó a la
-// columna, y el argumento que lo movió vale aquí palabra por palabra: **las piezas
-// se leen MIRANDO EL MAPA** —se sombrean sobre él, con su número encima, y
-// señalar una fila resalta su mancha—, así que flotando taparían justo lo que
-// señalan. Además el sobrante es parte de **la entrega** (qué más va en el
-// fichero), y la entrega vive en Validación desde el rework.
+// **Y con esto el diseño vuelve A DONDE ESTABA EL 2026-08-02.** Aquel plan ya lo
+// ponía flotando aquí; la fase 4 lo bajó a la columna con un argumento que sonaba
+// bien —«las piezas se leen MIRANDO EL MAPA, así que flotando taparían justo lo
+// que señalan»— y que resultó ser sólo media verdad. Lo que tapa es un panel
+// FIJO. Uno que se arrastra a un hueco, se pliega a una barra de 22 px y se
+// cierra del todo no tapa nada más de lo que el usuario consienta, y a cambio
+// devuelve la columna entera. Aquel argumento pedía CONTROL sobre el estorbo, y
+// se leyó como si pidiera no flotar.
 //
-// ── ⚠️ AQUÍ SE ROMPE A PROPÓSITO LA RACHA DE «0 px DEL PANEL» ───────────────
-// Cinco fases seguidas resolvieron su interfaz sin gastar un píxel de la columna:
-// F06 se llevó la edición a una barra flotante, F07 y F08 sus cifras a cajones
-// sobre el mapa, F09 y F10 a sendos `<dialog>`. F17 no puede: la revisión pieza a
-// pieza **es** una lista, y una lista con el mapa al lado es exactamente lo que
-// hace falta para poder revisarla.
+// ── LA ESQUINA ESTÁ LIBRE, Y ESO SE COMPROBÓ ANTES DE OCUPARLA ──────────────
+// `bottomleft` la comparten tres cajones (comprobación, contraste-edificio,
+// parcelas) que son mutuamente excluyentes. Pero **ninguno de los tres puede
+// estar abierto cuando este panel existe**: quién se abre lo decide el PASO en
+// `app/contraste.js#cajonDe`, que sólo devuelve cajón en `ENTRADA` y en
+// `DIAGNOSTICO`, y este panel es de `EDICION`. Así que no hay turno que negociar
+// ni coordinación que escribir — la exclusión ya la garantiza el eje de pantalla.
+// ⚠️ Quien algún día enseñe el sobrante en Diagnóstico tiene que volver aquí.
 //
-// Así que se gasta, y se declara. El presupuesto medido en la revisión de diseño
-// (1440×900 y 1280×720, sobre la aplicación real):
+// ── ⭐ LA RACHA DE «0 px DEL PANEL» SE RECUPERA ─────────────────────────────
+// Cinco fases seguidas resolvieron su interfaz sin gastar un píxel de la columna
+// —F06 la edición a una barra flotante, F07 y F08 sus cifras a cajones sobre el
+// mapa, F09 y F10 a sendos `<dialog>`—, y **F17 la rompió a propósito**: la
+// revisión pieza a pieza es una lista, y una lista con el mapa al lado es lo que
+// hace falta para revisarla. Costó lo que se declaró en su día:
 //
 //     bloque VACÍO ............ 96,63 px
 //     cada fila ............... 31,00 px
 //     invariante a defender ... 267,44 px de tabla de vértices (desde F07)
 //
-// De ahí sale {@link FILAS_VISIBLES}: con 4 filas el bloque mide ~220 px y la
-// tabla se queda en ≈287 px, por encima del invariante; con 5 lo rompe. ⛔ **Y el
-// número de filas NO lo decide el caso de uso, lo decide la geometría**: un
-// vértice mal puesto produce ocho piezas sin que nadie lo pretenda. Por eso el
-// tope es de ALTURA con scroll dentro, y no un recorte de la lista — ninguna pieza
-// desaparece, y el contador dice cuántas hay aunque solo se vean cuatro.
+// Hoy se devuelve entero. La sección de la columna se queda vacía y la tabla de
+// vértices recupera sus ~220 px, que es la mitad de lo que este cambio persigue.
 //
-// ⛔ **Y el panel NO desborda cuando esto crece: la tabla de vértices ENCOGE EN
-// SILENCIO.** Está medido: desborde 0 en los seis casos. O sea que aquí no hay
-// síntoma visible que avise de haberse pasado, que es el error silencioso en
-// versión maquetación. El guardián es el guion de humo 16, que mide la tabla.
+// ⛔ **Y el desborde seguía sin dar síntoma: la tabla de vértices ENCOGÍA EN
+// SILENCIO** (medido: desborde 0 en los seis casos). O sea que el precio se
+// pagaba sin que nada avisara, que es el error silencioso en versión maquetación.
+// El guardián sigue siendo el guion de humo 16, y ahora mide lo contrario: que la
+// tabla ha RECUPERADO la altura.
+//
+// {@link FILAS_VISIBLES} sobrevive al cambio y ya no defiende la columna, sino la
+// legibilidad del propio panel: con más de cuatro filas a la vista la ventana
+// empieza a tapar el mapa que las filas señalan. ⛔ El número de filas **NO lo
+// decide el caso de uso, lo decide la geometría** —un vértice mal puesto produce
+// ocho piezas sin que nadie lo pretenda—, así que el tope es de ALTURA con scroll
+// dentro y no un recorte: ninguna pieza desaparece, y el contador dice cuántas
+// hay aunque sólo se vean cuatro.
 //
 // ── ESTE MÓDULO ES UNA VISTA, Y NADA MÁS ────────────────────────────────────
 // Fabrica nodos, los rellena y avisa de lo que el usuario toca. **No conoce el
@@ -79,9 +90,18 @@
 // que este fichero declare ni un color ni un espaciado propios. Cero vocabulario
 // visual nuevo.
 //
-// SOLO-NAVEGADOR de hecho aunque no importe Leaflet: toca el DOM. Su test lleva el
-// sufijo `.dom` y no entra en el barrel raíz `index.js`.
+// SOLO-NAVEGADOR: importa Leaflet y toca el DOM. Su test lleva el sufijo `.dom` y
+// monta un mapa de verdad con `montarMapa` de `test/viewer/_ayuda-jsdom.js`.
+//
+// ⚠️ **La aritmética del acotado NO está aquí**, y es a propósito: vive en
+// `viewer/acotar-viewport.js`, sin DOM y sin Leaflet, para poder probarse con
+// números en el proyecto `node`. En jsdom `getBoundingClientRect()` devuelve
+// ceros, así que una prueba del acotado escrita aquí mediría **nada** y saldría
+// verde. El porqué largo, en la cabecera de aquel fichero.
 
+import L from 'leaflet'
+
+import { acotarAlViewport } from './acotar-viewport.js'
 import { NIVEL, PREFIJO_FUERA, resolverAvisar, textoNumeroPieza } from './_comun.js'
 
 // ── Contrato de nodos: los `data-*` que este módulo produce ──────────────────
@@ -371,6 +391,65 @@ const ESTILO_BLOQUE = Object.freeze({
   minHeight: '0',
 })
 
+/**
+ * ⭐ **EL CROMO DE VENTANA** (2026-08-17), la misma receta que el cajón de F07
+ * usa sobre el mapa, para que el proyecto no estrene un segundo aspecto de
+ * «cosa que flota sobre la ortofoto».
+ *
+ * Las tres decisiones que no se leen solas:
+ *
+ *   · **`maxWidth: 'min(420px,42vw)'`**, calcado de `cajon-diagnostico.js`. Las
+ *     filas llevan un campo de nombre que quiere ancho, pero un panel que se
+ *     come la mitad de la pantalla deja de ser una ventana y vuelve a ser una
+ *     columna — que es justo de lo que se está saliendo.
+ *   · **`maxHeight: '60vh'` con `overflow: 'hidden'`**: el tope de la LISTA ya
+ *     lo pone {@link FILAS_VISIBLES}, pero el panel entero puede crecer por
+ *     abajo (la sección de «fuera del contorno», la nota de piezas saltadas), y
+ *     sin tope una foto rara lo estiraría hasta salirse por arriba de la
+ *     ventana, llevándose la barra de título con él. ⛔ Que es exactamente lo
+ *     que `viewer/acotar-viewport.js` existe para impedir, sólo que por el otro
+ *     borde y sin que nadie arrastre nada.
+ *   · **`zIndex: '1000'`**: el de los controles de Leaflet. Sin declararlo, el
+ *     panel queda por debajo de las manchas del sobrante que él mismo enumera.
+ */
+const ESTILO_SOBRE_EL_MAPA = Object.freeze({
+  background: '#fff',
+  padding: '8px 10px',
+  borderRadius: '6px',
+  boxShadow: '0 2px 10px rgba(15,23,42,.25)',
+  width: 'min(420px,42vw)',
+  maxHeight: '60vh',
+  overflow: 'hidden',
+  zIndex: '1000',
+})
+
+/**
+ * El envoltorio mínimo que convierte el bloque en un control de Leaflet.
+ *
+ * ⛔ **Es un envoltorio y no una reescritura, y la diferencia importa.** La
+ * tentación era volver a escribir las 1.200 líneas de esta vista como
+ * `L.Control.extend({ onAdd() {…} })`, que es la forma del cajón de F07. Pero
+ * aquel cajón se construye DENTRO de `onAdd` porque nació así; éste ya tiene su
+ * nodo montado, con sus oyentes puestos y su foto pintada, mucho antes de que
+ * nadie hable de mapas. Lo único que Leaflet tiene que aportar es **dónde se
+ * cuelga** —la esquina, y que `remove()` funcione—, y eso son cinco líneas.
+ *
+ * `onAdd` devuelve el nodo que ya existe en vez de fabricar otro: un segundo
+ * contenedor sería un segundo `[data-accion="entregar-expediente"]` en el
+ * documento, y `querySelector` se queda con el PRIMERO. Es la trampa que
+ * `index.html` lleva documentando desde F06.
+ */
+const ControlSobrante = L.Control.extend({
+  options: { position: 'bottomleft' },
+  initialize(bloque, opciones) {
+    L.Util.setOptions(this, opciones)
+    this._bloque = bloque
+  },
+  onAdd() {
+    return this._bloque
+  },
+})
+
 const ESTILO_LISTA = Object.freeze({
   margin: '0',
   padding: '0',
@@ -599,7 +678,7 @@ function estilar(el, estilos) {
  * @returns {ListaSobrante}
  * @throws {TypeError} Contrato del programador.
  */
-export function crearListaSobrante({ documento, alAvisar } = {}) {
+export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   const doc = documento === undefined || documento === null ? globalThis.document : documento
   if (!doc || typeof doc.createElement !== 'function') {
     throw new TypeError(
@@ -1357,6 +1436,92 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
   botonMinimizar.addEventListener('click', () => fijarPlegado(!plegado))
   botonCerrar.addEventListener('click', () => fijarAbierto(false))
 
+  // ── El panel sobre el mapa: control, arrastre y acotado ───────────────────
+  //
+  // Todo esto es CONDICIONAL a que haya mapa, y no por comodidad de los tests:
+  // `crearVisor` puede montarse sin la rama del sobrante, y un `montarSobrante`
+  // en `false` no tiene por qué arrastrar un control a ningún sitio. Sin mapa
+  // este módulo sigue siendo lo que era —un nodo que alguien cuelga— y el
+  // llamante se apaña con `.nodo`.
+
+  /** @type {ReturnType<typeof L.Control>|null} */
+  let control = null
+  /** @type {L.Draggable|null} */
+  let arrastre = null
+  /** La ventana donde vive el panel, para el `resize`. `null` sin mapa. */
+  const vista = mapa ? (doc.defaultView ?? globalThis.window ?? null) : null
+
+  /**
+   * Devuelve el panel al viewport si su BARRA DE TÍTULO se ha salido.
+   *
+   * ⛔ **Se mide la barra y no el panel**, y la diferencia es la que separa
+   * «incómodo» de «irrecuperable»: un cuerpo que se sale por abajo se arrastra
+   * hacia arriba, pero una barra fuera del viewport se lleva con ella el
+   * asidero, el `[–]` y el `[×]` — y entonces la única salida es recargar, que
+   * es tirar los nombres que el usuario acababa de escribir.
+   *
+   * La cuenta no está aquí: es {@link acotarAlViewport}, pura y probada con
+   * números en el proyecto `node` (ver la cabecera de este fichero).
+   *
+   * ⚠️ **En jsdom no hace nada, y eso es correcto**: `getBoundingClientRect()`
+   * devuelve ceros, el rectángulo cabe de sobra y la corrección sale 0. Lo que
+   * este código hace de verdad sólo lo puede comprobar el guion de humo 16, en
+   * Chromium y con un `resize` de verdad.
+   */
+  function acotar() {
+    if (!vista || bloque.parentNode === null) return
+    const r = cabecera.getBoundingClientRect()
+    const destino = acotarAlViewport(
+      { x: r.left, y: r.top, ancho: r.width, alto: r.height },
+      { ancho: vista.innerWidth, alto: vista.innerHeight },
+    )
+    // Leaflet posiciona por `transform`, así que lo que se corrige es el
+    // DESPLAZAMIENTO acumulado y no una coordenada absoluta: sumarle el delta
+    // entre donde está la barra y donde debería estar respeta la esquina de la
+    // que cuelga el control.
+    const actual = L.DomUtil.getPosition(bloque) ?? new L.Point(0, 0)
+    const corregido = actual.add(new L.Point(destino.x - r.left, destino.y - r.top))
+    if (!corregido.equals(actual)) L.DomUtil.setPosition(bloque, corregido)
+  }
+
+  if (mapa) {
+    // El cromo de ventana se pone AQUÍ y no al fabricar el nodo: sin mapa este
+    // bloque no flota sobre nada, y pintarle sombra y fondo blanco dentro de una
+    // columna sería dibujar una tarjeta dentro de una tarjeta.
+    estilar(bloque, ESTILO_SOBRE_EL_MAPA)
+    // El cursor es la mitad de la promesa del asidero `⠿`: uno se ve de lejos y
+    // el otro se descubre al pasar por encima. Van juntos o no van.
+    cabecera.style.cursor = 'move'
+
+    control = new ControlSobrante(bloque)
+    control.addTo(mapa)
+
+    // ── ⛔ LOS DOS OBLIGATORIOS ────────────────────────────────────────────
+    // Sin ellos, arrastrar el panel ARRASTRA EL MAPA por debajo y hacer scroll
+    // dentro de la lista HACE ZOOM. Están marcados como obligatorios, con el
+    // mismo comentario, en `viewer/cajon-diagnostico.js:152`.
+    //
+    // ⚠️ Y `disableClickPropagation` **NO detiene el `click`**: detiene
+    // `mousedown`/`touchstart`/`dblclick`, que es lo que le hace falta a
+    // Leaflet, pero un `click` sigue burbujeando hasta el `document`. Lo dice
+    // aquel módulo en su línea 148, y aquí importa porque los dos botones del
+    // cromo son `click`: si algún día se añade un guardián de «clic fuera»,
+    // tendrá que excluir este nodo a mano.
+    L.DomEvent.disableClickPropagation(bloque)
+    L.DomEvent.disableScrollPropagation(bloque)
+
+    // ── El arrastre ────────────────────────────────────────────────────────
+    // Por la BARRA y no por el panel entero: arrastrando desde el cuerpo sería
+    // imposible marcar una casilla o seleccionar el texto de un nombre, porque
+    // cada `mousedown` empezaría a mover la ventana.
+    arrastre = new L.Draggable(bloque, cabecera)
+    arrastre.enable()
+    arrastre.on('dragend', acotar)
+    // Y al cambiar el tamaño de la ventana, porque encoger el viewport deja
+    // fuera un panel que no se ha movido: el que se mueve es el borde.
+    vista?.addEventListener('resize', acotar)
+  }
+
   // El estado inicial del cromo, escrito por la misma función que lo cambia
   // después: así el botón no puede nacer con una flecha y un `aria-expanded` que
   // no concuerden, que es la clase de divergencia que sólo se ve con un lector.
@@ -1445,6 +1610,13 @@ export function crearListaSobrante({ documento, alAvisar } = {}) {
       oyentesNombre.clear()
       oyentesSenal.clear()
       oyentesEntrega.clear()
+      // El orden importa: primero se suelta el arrastre y el oyente de la
+      // ventana —que sobreviven al nodo y seguirían midiendo un panel que ya no
+      // está—, y sólo después se quita el control. `control.remove()` hace
+      // `DomUtil.remove(this._container)`, así que se lleva el nodo con él.
+      arrastre?.disable()
+      vista?.removeEventListener('resize', acotar)
+      control?.remove()
       if (bloque.parentNode !== null) bloque.remove()
     },
   }

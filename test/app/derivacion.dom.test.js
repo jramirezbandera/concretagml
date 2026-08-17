@@ -28,7 +28,6 @@ import {
   MOTIVO_NO_CIERRA,
   MOTIVO_SIN_GEOMETRIA,
   MOTIVO_SIN_OFICIAL,
-  SELECTOR_ANFITRION,
   SELECTOR_BOTON,
   SELECTOR_ESTADO,
 } from '../../app/cableado-derivacion.js'
@@ -97,7 +96,6 @@ let cableado = null
 function montarCascara() {
   document.body.innerHTML = `
     <div class="gml-app">
-      <section data-anfitrion="sobrante" hidden></section>
       <div class="gml-acciones">
         <button type="button" data-accion="rehacer-parcelario" disabled>Rehacer el parcelario</button>
         <p data-estado="rehacer-parcelario" role="status"></p>
@@ -150,7 +148,9 @@ afterEach(() => {
 
 const boton = () => document.querySelector(SELECTOR_BOTON)
 const renglon = () => document.querySelector(SELECTOR_ESTADO)
-const seccion = () => document.querySelector(SELECTOR_ANFITRION)
+// El panel ya no cuelga de una sección de la cáscara: es un control de Leaflet
+// en la esquina del mapa, así que «se ve o no» se pregunta a SU nodo.
+const panelSobrante = () => lista.nodo
 const filas = () => [...document.querySelectorAll(SELECTOR.FILA)]
 const botonEntregar = () => document.querySelector(SELECTOR.ENTREGAR)
 const renglonEntrega = () => document.querySelector(SELECTOR.ESTADO_ENTREGA)
@@ -164,7 +164,7 @@ describe('cablearDerivacion', () => {
     X0 = centro[0] - 20
     Y0 = centro[1] - 20
     estado = crearEstadoVista(null)
-    lista = crearListaSobrante({ documento: document })
+    lista = crearListaSobrante({ mapa: entorno.mapa, documento: document })
     capa = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO })
     capaFuera = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.FUERA })
   })
@@ -194,15 +194,21 @@ describe('cablearDerivacion', () => {
       expect(() => cablear()).toThrow(/data-accion="rehacer-parcelario"/)
     })
 
-    it('cuelga el bloque de la sección anfitriona, que venía VACÍA', () => {
-      expect(seccion().children).toHaveLength(0)
+    it('⭐ el panel es un CONTROL del mapa, y ya no un hueco de la columna', () => {
+      // Hasta el 2026-08-17 este cableado resolvía `[data-anfitrion="sobrante"]`
+      // y le hacía `append` del nodo. Ya no: el panel se cuelga solo, en la
+      // esquina `bottomleft`, y este módulo dejó de conocer un nodo de la
+      // cáscara. Lo que se comprueba es que **está en el documento sin que nadie
+      // de `app/` lo haya colgado** — es decir, antes incluso de cablear.
+      expect(entorno.contenedor.contains(panelSobrante())).toBe(true)
+      expect(panelSobrante().closest('.leaflet-bottom.leaflet-left')).not.toBeNull()
       cablear()
-      expect(seccion().querySelector(SELECTOR.BLOQUE)).not.toBeNull()
+      expect(panelSobrante().matches(SELECTOR.BLOQUE)).toBe(true)
     })
 
-    it('el bloque nace ESCONDIDO: aparece solo cuando hay sobrante (D2)', () => {
+    it('el panel nace ESCONDIDO: aparece solo cuando hay sobrante (D2)', () => {
       cablear()
-      expect(seccion().hidden).toBe(true)
+      expect(panelSobrante().hidden).toBe(true)
     })
   })
 
@@ -250,7 +256,7 @@ describe('cablearDerivacion', () => {
       expect(filas()).toHaveLength(1)
       expect(manchas()).toHaveLength(1)
       expect(numeros()).toHaveLength(1)
-      expect(seccion().hidden).toBe(false)
+      expect(panelSobrante().hidden).toBe(false)
       // ⛔ Y el renglón del PIE se calla, a propósito: lo que diría —cuántas y
       // cuánto miden— lo dice el bloque con su contador y una fila por pieza, y lo
       // dice mejor. Medido por el guion 16: repetirlo cuesta 22,84 px de tabla de
@@ -299,7 +305,7 @@ describe('cablearDerivacion', () => {
       boton().click()
 
       // El bloque se ve, y dentro está la sección del exceso con su trozo.
-      expect(seccion().hidden).toBe(false)
+      expect(panelSobrante().hidden).toBe(false)
       const fuera = document.querySelector(SELECTOR.FUERA)
       expect(fuera.hidden).toBe(false)
       expect(document.querySelectorAll(SELECTOR.FUERA_FILA)).toHaveLength(1)
@@ -347,7 +353,7 @@ describe('cablearDerivacion', () => {
       // ⭐ Las DOS mitades a la vista, que es la frase entera de esta fase.
       expect(filas(), 'el sobrante del oeste tiene que listarse').toHaveLength(1)
       expect(document.querySelectorAll(SELECTOR.FUERA_FILA)).toHaveLength(1)
-      expect(seccion().hidden).toBe(false)
+      expect(panelSobrante().hidden).toBe(false)
 
       // Cada trozo en su capa y con su color: 400 m² a cada lado.
       expect(entorno.contenedor.querySelectorAll(`.${CLASE_PIEZA_FUERA}`)).toHaveLength(1)
@@ -425,7 +431,7 @@ describe('cablearDerivacion', () => {
       estado.set(parcela())
       boton().click()
       estado.set(parcela({ mengua: 12 }))
-      expect(seccion().hidden).toBe(false)
+      expect(panelSobrante().hidden).toBe(false)
       expect(nota().textContent).toMatch(/Los nombres escritos se han perdido/)
     })
 
@@ -683,7 +689,7 @@ describe('cablearDerivacion · ⭐ retranqueo de milímetros + invasión de metr
     X0 = centro[0] - 20
     Y0 = centro[1] - 20
     estado = crearEstadoVista(null)
-    lista = crearListaSobrante({ documento: document })
+    lista = crearListaSobrante({ mapa: entorno.mapa, documento: document })
     capa = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO })
     capaFuera = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.FUERA })
   })
