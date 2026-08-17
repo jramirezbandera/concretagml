@@ -269,7 +269,7 @@ consta» a 30 px grita una ausencia.
 **Base 8 px.** `--space-1` 4 · `--space-2` 8 · `--space-3` 12 · `--space-4` 16
 (relleno del panel) · `--space-6` 24.
 
-8 px es el `gap` de `.gml-campo-fila`, `.gml-boton-par` y `.gml-bloque`, y es también
+8 px es el `gap` de `.gml-campo-fila` y `.gml-bloque`, y es también
 la separación de columna que se eligió para las vías de Entrada: **la columna respira
 igual que la fila**.
 

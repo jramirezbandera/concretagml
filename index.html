@@ -436,6 +436,13 @@
            `.gml-bloque--catastro` (justo debajo) y `.gml-bloque--vertices` (más
            abajo); `.gml-bloque--avisos` y el pie son comunes y no se ocultan.
 
+           ⭐ **Y `.gml-bloque--vias` TAMPOCO SE OCULTA (2026-08-16)**, aunque esté
+           en medio de las dos que sí: las dos vías de fichero de la pantalla de
+           Entrada son las mismas en las dos ramas —el destino lo elige
+           `app/main.js` por la rama activa, no el marcado— y por eso NO llevan
+           marca. Es exactamente el caso que `aplicarSecciones` contempla: sin
+           `data-rama-panel`, ni se oculta ni se enseña; se deja en paz.
+
            QUIÉN LAS GOBIERNA: `app/rama.js`, dueño único de la rama activa. Pone
            `data-rama` en el `<body>` (único gancho de CSS de la rama) y MARCA él
            mismo estas dos con `data-rama-panel="PARCELA"` (su lista, por selector
@@ -568,6 +575,14 @@
              opciones NOMBRADAS Y SEPARADAS, no como botones sueltos compitiendo
              en una fila del rótulo».
 
+             ⭐ **DESDE EL 2026-08-16 LAS TRES NO ESTÁN EN LA MISMA `<section>`**, y
+             siguen siendo tres: aquí queda la PRINCIPAL —la referencia catastral,
+             que es lo único de esta pantalla que pertenece a la rama— y las otras
+             dos viven en `.gml-bloque--vias`, justo debajo, que **no se oculta al
+             conmutar**. El porqué entero está en el comentario de aquella sección;
+             el resumen es que las dos vías de fichero valen igual en las dos ramas
+             y esconderlas con este bloque dejaba la rama EDIFICIO con una sola vía.
+
              ⚠️ ASÍ ESTABA ANTES, Y POR ESO SE CAMBIA. Los tres caminos por los
              que entra un expediente vivían en tres sitios distintos y ninguno
              decía que fuera un camino:
@@ -657,41 +672,53 @@
             </div>
           </div>
 
-          <!-- LAS DOS CONSULTAS DERIVADAS, EN PAREJA. Las dos parten de algo que
-               ya tiene que estar cargado, y por eso las dos NACEN `disabled`:
-               «Deducir del mapa» va de la geometría a la referencia, y «Traer
-               colindantes» va de la referencia a las parcelas vecinas (que F06
-               necesita como dianas de enganche). Quien las enciende —y quien
-               escribe el motivo cuando NO las enciende— es el cableado.
+          <!-- ══ AQUÍ ESTABA LA PAREJA DE CONSULTAS DERIVADAS, Y SE FUE
+               EL 2026-08-16 ═══════════════════════════════════════════════════
+               Si buscas `[data-accion="deducir-refcat"]` o
+               `[data-accion="traer-colindantes"]`: uno ya no existe y el otro se
+               ha mudado. Las dos NACÍAN `disabled` aquí y las encendía
+               `app/cableado-catastro.js` mirando el store. Los dos motivos son
+               distintos y ninguno es de sitio:
 
-               Van en UNA fila y no una debajo de la otra por una razón que ya no
-               es de altura pero sigue siendo buena: son la misma clase de cosa
-               —consultas al Catastro sobre algo que ya está cargado— y ninguna de
-               las dos es una VÍA de entrada, así que ni compiten con las tres de
-               arriba ni se anuncian como ellas.
+                 · ⛔ **«Deducir del mapa» SE RETIRA ENTERO.** Su trabajo lo hacen
+                   ya, y mejor, los dos caminos que crecieron a su lado:
+                     — el CLIC EN EL MAPA (`cableado-catastro.js#alPulsarMapa`),
+                       que es lo que anuncia el apunte de arriba y que **no exige
+                       geometría cargada** —el punto lo trae el propio clic—,
+                       mientras que el botón sí la exigía (sacaba el punto de un
+                       `puntoInterior` de la parcela);
+                     — y la DEDUCCIÓN AUTOMÁTICA al importar
+                       (`app/main.js#deducirRefcatTrasImportar`), que gasta la
+                       misma petición que el usuario iba a gastar y ya no le deja
+                       el trabajo pendiente.
+                   Con los dos puestos, el botón solo se encendía en el caso que
+                   ya estaba resuelto antes de que nadie pudiera pulsarlo: había
+                   geometría y no había referencia. Un botón que no puede ofrecer
+                   nada que no haya pasado ya no es una vía: es un adorno que
+                   ocupa la mitad de una fila.
+                   ⚠️ **La FUNCIÓN sigue viva**: `catastro.deducir()` no se ha
+                   tocado, y sus dos llamantes de producción son los de arriba
+                   más «Traer el parcelario de fondo» de `cableado-diagnostico.js`.
+                   Lo que se ha ido es el control, no la capacidad.
 
-               ⚠️ `traer-colindantes` vive AQUÍ y no en la barra de edición del
-               mapa aunque sean las colindantes lo que F06 usa para enganchar:
-               esto es una CONSULTA al Catastro, no una edición, y la barra no
-               habla con la red. -->
-          <div class="gml-boton-par">
-            <button
-              type="button"
-              class="gml-boton gml-boton--secundario"
-              data-accion="deducir-refcat"
-              disabled
-            >
-              Deducir del mapa
-            </button>
-            <button
-              type="button"
-              class="gml-boton gml-boton--secundario"
-              data-accion="traer-colindantes"
-              disabled
-            >
-              Traer colindantes
-            </button>
-          </div>
+                 · **«Traer colindantes» SE MUDA AL PIE DE EDICIÓN.** Aquí decía
+                   —desde F06— que vivía en Entrada porque «esto es una CONSULTA
+                   al Catastro, no una edición». Eso era cierto y seguía siendo
+                   irrelevante: las vecinas se piden **para** editar (son las
+                   dianas de enganche del snap) y **para** diagnosticar (la
+                   invasión a colindantes), y las dos cosas pasan en Edición, con
+                   el botón dos pantallas atrás. Además el botón no se podía ni
+                   encender aquí en el caso que lo necesita —una parcela sin
+                   referencia recién importada—, y su motivo de estar apagado se
+                   leía en una pantalla que el usuario ya había dejado.
+                   Está ahora en el `.gml-acciones` del pie, junto a «Traer el
+                   parcelario de fondo», con renglón `role="status"` PROPIO
+                   (`data-estado="traer-colindantes"`) — que es lo que hace que su
+                   desenlace se lea donde se pulsa y no en este bloque.
+                   ⚠️ El precio se declara: el pie de Edición crece, y la caja de
+                   vértices encoge en lo que ocupen botón y renglón. Es el reparto
+                   de altura que `.gml-bloque--vertices` documenta en
+                   `estilos/app.css`. -->
 
           <!-- El desenlace de la acción. `role="status"` para que el lector de
                pantalla lo anuncie SIN robar el foco, igual que el renglón de
@@ -705,14 +732,87 @@
                caché se presente como recién traído de la Sede. -->
           <p class="gml-procedencia" data-procedencia="parcela"></p>
         </div>
+      </section>
 
+      <!-- ══ LAS DOS VÍAS DE FICHERO, EN SECCIÓN PROPIA Y COMÚN A LAS DOS RAMAS
+           (2026-08-16) ═══════════════════════════════════════════════════════
+           Si buscas «Medición propia» o «Abrir un GML» dentro de
+           `.gml-bloque--catastro`: **ya no están ahí**, y el motivo es un defecto
+           MEDIDO, no una preferencia de maquetación.
+
+           ⛔ LO QUE PASABA HASTA HOY. Las tres vías vivían dentro de
+           `.gml-bloque--catastro`, y esa sección está en
+           `app/rama.js#SECCIONES_PARCELA`: con la rama EDIFICIO puesta se oculta
+           ENTERA. Resultado: en la rama de edificio la pantalla de Entrada ofrecía
+           **una sola vía** —la referencia catastral—, y las otras dos quedaban
+           `hidden` aunque su destino existiera, funcionara y estuviera probado.
+           `app/main.js` enruta el `.dxf`/`.txt` y el pegado POR RAMA desde F11 y
+           F19 (`:3856` y `:5759`), y el GML de edificio por CONTENIDO (`:3885`),
+           así que lo único que faltaba era **poder pulsar**. El usuario de la rama
+           EDIFICIO solo tenía el arrastre sobre la ventana, que es exactamente lo
+           que el comentario de más arriba llama «un camino que solo conoce quien
+           escribió el código». Y el propio texto de producción ya prometía lo
+           contrario: `MOTIVO_SIN_EDIFICIO` de `app/cableado-edificio-gml.js` dice
+           «trae un edificio por cualquiera de las vías de Entrada —un GML, un DXF,
+           el propio Catastro—», y `SIN_PARTES` de `app/panel-edificio.js` enumera
+           cinco maneras.
+
+           ⭐ LO QUE SE HACE, Y POR QUÉ ASÍ. Solo la vía PRINCIPAL —el campo de
+           referencia catastral— es de la rama: cada rama tiene el suyo
+           (`refcat` aquí arriba, `refcat-edificio` en el panel que fabrica
+           `app/panel-edificio.js`). Las otras dos NO tienen nada de rama: el mismo
+           fichero, el mismo selector, el mismo botón. Así que se sacan a una
+           sección propia **sin `data-rama-panel`**, y `app/rama.js#aplicarSecciones`
+           las deja en paz — solo toca las que llevan la marca. Cero duplicación de
+           marcado, cero `data-accion` nuevos, cero cableado nuevo.
+
+           ⚠️ POR QUÉ NO SE DUPLICARON EN EL PANEL DE EDIFICIO, que era la otra
+           salida: dos juegos de `[data-accion="abrir-medicion"]` /
+           `"abrir-pegado"` / `"abrir-gml"` es la trampa que este fichero lleva
+           documentando desde F06 —`querySelector` se queda con el PRIMERO del
+           documento, también si está oculto—, y `app/zona-fichero.js` recibe UN
+           solo `boton`. Serían tres controles mudos y un módulo adivinando cuál de
+           los dos es el suyo.
+
+           ⚠️ EL ORDEN EN EL DOM IMPORTA Y ESTÁ ELEGIDO. Esta sección va DESPUÉS de
+           `.gml-bloque--catastro`, que es el ancla que `app/cableado-edificio.js`
+           usa para meter «Origen del edificio» (`ANCLA_ORIGEN`, con `.after()`).
+           Así el reparto queda igual en las dos ramas:
+             · PARCELA  → [Referencia catastral] · O bien · [fichero] · [GML]
+             · EDIFICIO → [Origen del edificio]  · O bien · [fichero] · [GML]
+           El «O bien» de arriba es el primer hijo de esta sección a propósito: sea
+           cual sea la vía principal que quede encima, la costura es la misma.
+
+           ⚠️ `data-pantalla="entrada"` y no otra cosa: estas dos vías son de
+           Entrada en las dos ramas (`PANTALLA.ORIGEN` del panel de edificio vale
+           `'entrada'`). El eje PASO y el eje RAMA no se pelean — está razonado en
+           `app/pantalla.js`. -->
+      <section class="gml-bloque gml-bloque--vias" data-pantalla="entrada">
         <p class="gml-obien"><span>O bien</span></p>
 
         <div class="gml-via">
           <h2 class="gml-rotulo">Medición propia</h2>
+          <!-- ⚠️ LA SEGUNDA FRASE CAMBIA CON LA RAMA, Y NO ES ADORNO (2026-08-16).
+               El MISMO `.dxf` es dos documentos distintos según dónde esté el
+               conmutador —`app/main.js:3856` lo dice con esas palabras—: en Parcela
+               es el recinto medido, y en Edificio cada polilínea del dibujo se
+               ofrece como una parte de la construcción. Anunciar solo uno de los
+               dos sería una afirmación falsa sobre lo que va a pasar al pulsar, que
+               es justo lo que esta aplicación se prohíbe.
+
+               Se resuelve con CSS y no con JS a propósito: el gancho
+               `.gml-app[data-rama]` ya existe —lo escribe `app/rama.js#aplicar`, y
+               es el único gancho de CSS de la rama—, así que esto no añade ni un
+               dueño más ni un nodo que repintar. Las reglas están en la sección K.3
+               de `estilos/app.css`, y el defecto (sin `data-rama` todavía puesto) es
+               la frase de PARCELA, que es la rama inicial. -->
           <p class="gml-via-apunte">
             Tu levantamiento en <span class="gml-mono">.dxf</span> o un volcado de coordenadas en
             <span class="gml-mono">.txt</span>. También puedes soltarlo sobre la ventana.
+            <span class="gml-solo-parcela">Entra como el recinto medido de la parcela.</span>
+            <span class="gml-solo-edificio"
+              >Cada polilínea del dibujo entra como una parte del edificio.</span
+            >
           </p>
           <button
             type="button"
@@ -748,9 +848,29 @@
                existe — y a quien viniera a retocar su propio fichero le habría
                dicho que ahí no podía. -->
           <h2 class="gml-rotulo">Abrir un GML</h2>
+          <!-- ⚠️ Y AQUÍ TAMBIÉN CAMBIA LA SEGUNDA FRASE, por el mismo motivo y con
+               el mismo mecanismo. Un `.gml` se encamina por CONTENIDO y no por
+               extensión (`app/cableado-comprobacion.js:1024`, dialecto BU), así que
+               desde cualquiera de las dos ramas se puede soltar el fichero de la
+               otra. Lo que pasa entonces NO es simétrico y por eso se dicen las dos
+               mitades por separado:
+                 · un GML de construcción CONMUTA la rama (`app/main.js:3885`);
+                 · uno de parcela NO conmuta, y no es un olvido: la parcela que hay
+                   en pantalla es el contexto del edificio
+                   (`app/cableado-edificio.js#parcelaContexto`, desviación 9), así
+                   que traerla estando en Edificio es un gesto útil y deliberado.
+                   Que el panel no cambie es entonces lo correcto — y por eso se
+                   avisa por el canal de avisos en vez de moverle la pantalla a
+                   nadie (`MENSAJE_GML_ES_DE_PARCELA` en `app/main.js`). -->
           <p class="gml-via-apunte">
             Un GML ya hecho —el tuyo o el de otro—. Se carga con su geometría y su
             referencia, y se puede editar y volver a generar.
+            <span class="gml-solo-parcela"
+              >Si es de construcción, la aplicación se pasa sola a Edificio.</span
+            >
+            <span class="gml-solo-edificio"
+              >Si es de parcela, entra en la rama Parcela y le sirve de contexto al edificio.</span
+            >
           </p>
           <button
             type="button"
@@ -1145,8 +1265,10 @@
                momentos distintos del recorrido —se diagnostica para decidir si
                hay algo que corregir, y se genera al final— y ponerlas a la par
                diría que da igual cuál se pulsa. La variante `--secundario` es la
-               misma que «Deducir del mapa» de F05, por el mismo motivo: es una
-               salida lateral del camino principal, no el camino.
+               misma que la de sus tres vecinos de este bloque, por el mismo
+               motivo: son salidas laterales del camino principal, no el camino.
+               (Aquí ponía «la misma que "Deducir del mapa" de F05», y ese botón
+               ya no existe — ver la lápida del bloque de Entrada.)
 
                NACE DESHABILITADO igual que el primario, y por una razón todavía
                más simple: sin parcela del Catastro no hay CONTRA QUÉ contrastar,
@@ -1199,6 +1321,48 @@
           <p
             class="gml-accion-estado"
             data-estado="traer-fondo-catastral"
+            role="status"
+          ></p>
+
+          <!-- ── F06 · «Traer colindantes», MUDADO DESDE ENTRADA EL 2026-08-16 ─
+               El porqué largo está donde estaba (la lápida del bloque «Parcela
+               del Catastro», arriba en este mismo fichero). El resumen: las
+               vecinas se piden PARA editar —son las dianas de enganche del
+               snap— y PARA diagnosticar —la invasión a colindantes—, y las dos
+               cosas pasan aquí.
+
+               VA ENTRE «Traer el parcelario de fondo» y «Diagnosticar encaje», y
+               ése es el orden real del trabajo: primero el contorno oficial
+               contra el que se mide, luego las vecinas contra las que se mide, y
+               entonces el diagnóstico, que necesita los dos. Leído de arriba
+               abajo el pie sigue contando el recorrido.
+
+               NACE DESHABILITADO como sus hermanos. Quien lo enciende —y quien
+               escribe el motivo mientras no lo enciende— es
+               `app/cableado-catastro.js` (no `cableado-diagnostico.js`: el
+               `data-accion` sigue siendo contrato de F05, que es quien habla con
+               el servicio de vecinas). Se enciende con lo mismo de siempre: que
+               haya una parcela CON REFERENCIA CATASTRAL en el modelo.
+
+               ⚠️ RENGLÓN PROPIO, y ésta es la mitad que la mudanza obligaba a
+               cambiar. Hasta hoy compartía el `[data-estado="cargar-catastro"]`
+               del bloque de Entrada, y con el botón aquí eso habría escrito el
+               desenlace de cada consulta —y el motivo de estar apagado— en una
+               pantalla que el usuario no está mirando: la peor versión del botón
+               mudo, porque además el texto existía. Mismo criterio, y mismo
+               párrafo, que el renglón de «Traer el parcelario de fondo» de
+               aquí arriba. -->
+          <button
+            type="button"
+            class="gml-boton gml-boton--secundario"
+            data-accion="traer-colindantes"
+            disabled
+          >
+            Traer colindantes
+          </button>
+          <p
+            class="gml-accion-estado"
+            data-estado="traer-colindantes"
             role="status"
           ></p>
 

@@ -240,8 +240,35 @@ export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'dia
  *
  * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
  * «No más de», holgura 0, y la siguiente subida vuelve a salir roja.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **BAJADO A MANO EL 2026-08-17 (LAS VÍAS DE ENTRADA), Y ES LA PRIMERA BAJADA**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 60.353 a **60.293 B nuestros** (75.448 → 75.388 con vendor). **−60 B.**
+ *
+ * ⛔ **ANTES QUE NADA: ESTE ASIENTO REPARA UNA INCOHERENCIA QUE LLEVABA DOS HITOS
+ * ABIERTA, Y NO LA CAUSA.** El asiento de «Deducir del mapa» devolvió 279 B y
+ * **nadie revisó el techo**, así que el registro se quedó con el techo en la
+ * medición de la leyenda y el último asiento 279 B por debajo. La consecuencia no
+ * era cosmética: el `it` «el techo ES un asiento medido de verdad» —que existe
+ * justamente para que el techo no sea un número aparte— llevaba desde entonces en
+ * ROJO. La suite decía la verdad y nadie la escuchó, que es el fallo que este
+ * registro entero existe para no cometer.
+ *
+ * ── POR QUÉ SE BAJA Y NO SE SUBE, QUE ES LO INTERESANTE ─────────────────────
+ * Los dos usos anteriores de esta línea fueron SUBIDAS, y las dos hubo que
+ * justificarlas. Ésta va al revés y no necesita justificación de gasto: el techo
+ * pasa a ser **la medición de hoy**, que es 60 B MÁS BAJA que la que había. La
+ * regla del criterio 10 —«acabar por debajo de donde se empezó»— se cumple con más
+ * margen que ayer, no con menos. Lo único que se pierde es la holgura de 60 B que
+ * el registro llevaba arrastrando por accidente, y perderla es exactamente lo que
+ * se quiere: una holgura que nadie decidió es un permiso abierto por si acaso.
+ *
+ * ── LA FORMA VUELVE A SER LA DE SIEMPRE ────────────────────────────────────
+ * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja y vuelve a
+ * tener que decidirse a mano. Que es lo que tenía que haber pasado hace dos hitos.
  */
-export const TECHO = Object.freeze({ total: 75448, nuestro: 60353 })
+export const TECHO = Object.freeze({ total: 75388, nuestro: 60293 })
 
 /**
  * EL REGISTRO. Un asiento por hito, con la hoja construida medida de verdad.
@@ -1035,6 +1062,71 @@ export const ASIENTOS = Object.freeze(
         'queda. ── ⚠️ NO CIERRA REBANADA (`rebanada: null`): la leyenda es cromo del mapa, no una ' +
         'pantalla del rail. Las cinco siguen cerradas, así que el techo se sigue exigiendo, y ' +
         'vuelve a quedar con holgura 0.' },
+    { hito: 'Se retira «Deducir del mapa» y «Traer colindantes» se muda al pie de Edición',
+      commit: '(sin commitear)',
+      total: 75169, nuestro: 60074, rebanada: null,
+      nota:
+        '**−279 B, y es un asiento que DEVUELVE.** Se va `.gml-boton-par` entera (la clase y su ' +
+        'descendiente `.gml-boton-par .gml-boton`, once declaraciones entre las dos), que era la ' +
+        'fila de dos botones a partes iguales del bloque de Entrada. ── POR QUÉ SE VA ── Tenía ' +
+        '**un solo uso en todo el proyecto**: la pareja «Deducir del mapa» / «Traer ' +
+        'colindantes». Ese día el primero se retira —su trabajo lo hacen ya el clic en el mapa y ' +
+        'la deducción automática al importar, y el clic además cubre el caso que el botón no ' +
+        'podía, la app recién abierta y sin geometría— y el segundo se muda al `.gml-acciones` ' +
+        'del pie de Edición, donde los CTA se apilan en columna como sus tres hermanos. Sin ' +
+        'pareja no hay fila, y CSS que apunta a marcado que no existe no avisa de nada: se borra ' +
+        'por la misma regla que borró las cinco reglas del bloque «Edición» en 2026-07-29. ── ' +
+        '⛔ **Y EL BOTÓN MUDADO NO CUESTA UN BYTE** ── ni él ni su renglón `role="status"` nuevo: ' +
+        '`.gml-boton`, `.gml-boton--secundario` y `.gml-accion-estado` ya vestían a los tres CTA ' +
+        'que había en ese pie, y el cuarto entra en las listas de selectores que ya existían. Es ' +
+        'el mismo reparto que F21, F14 y F15 dejaron escrito. ── ⚠️ El precio de la mudanza NO es ' +
+        'de hoja, es de ALTURA: el pie de Edición gana un botón y un renglón, y la caja de ' +
+        'vértices encoge en lo que ocupen. Eso no lo puede medir este script —mide bytes— y lo ' +
+        'mide el guion de humo 16. ── ⚠️ NO CIERRA REBANADA (`rebanada: null`): es una mudanza de ' +
+        'controles, no una pantalla del rail. Las cinco siguen cerradas, así que el techo se ' +
+        'sigue exigiendo. ── ⚠️ **Y EL TECHO NO SE TOCA**, que es lo que hace que este asiento ' +
+        'DEVUELVA en vez de gastar: sigue siendo el de la leyenda y la hoja queda 279 B por ' +
+        'debajo. Bajarlo a esta medición sería quedarse la devolución en el mismo gesto que la ' +
+        'produce, y subir o bajar el techo es la decisión del autor que este registro existe ' +
+        'para hacerle explícita.' },
+    { hito: 'Las vías de fichero de Entrada dejan de ser de la rama Parcela',
+      commit: '(sin commitear)',
+      total: 75388, nuestro: 60293, rebanada: null,
+      nota:
+        '**+219 B, y compra la mitad que faltaba de la pantalla de Entrada.** Hasta hoy las tres ' +
+        'vías vivían dentro de `.gml-bloque--catastro`, que `app/rama.js` oculta ENTERA al ' +
+        'conmutar: con la rama EDIFICIO puesta, «Medición propia» y «Abrir un GML» estaban ' +
+        '`hidden` y esa rama ofrecía **una sola vía**, la referencia catastral. El destino ya ' +
+        'existía y estaba probado desde F11 y F19 —`app/main.js` enruta el `.dxf`/`.txt` y el ' +
+        'pegado por la rama activa, y el GML por CONTENIDO—: lo que faltaba era poder pulsar. ── ' +
+        'QUÉ SE PAGA, LAS DOS PARTIDAS ── **1) `.gml-bloque--vias`, neta ~164 B**: la sección ' +
+        'nueva donde se mudan las dos vías de fichero, SIN `data-rama-panel`, o sea la única del ' +
+        'panel que no es de nadie y se ve en las dos ramas. Son cinco declaraciones **menos las ' +
+        'tres que devuelve `.gml-bloque--catastro`**: el papel de scroller de la pantalla se MUDA ' +
+        'con las vías, no se duplica, así que `flex`/`min-height`/`overflow-y` se van de allí. Y ' +
+        'eso NO es contabilidad: con las dos secciones encogibles a la vez el recorte se reparte ' +
+        'entre ambas y a 1280×720 caía justo sobre el `<input>` de la referencia catastral, ' +
+        'partido por la mitad y con su botón detrás de un scroll de 15 px. Visto en el navegador, ' +
+        'no deducido. ── **2) Las tres reglas de `.gml-solo-parcela` / `.gml-solo-edificio` ' +
+        '(~55 B)**: el mismo ' +
+        '`.dxf` es el recinto de la parcela o las partes del edificio según dónde esté el ' +
+        'conmutador, y un apunte que solo cuente uno de los dos casos afirma en falso lo que va a ' +
+        'pasar al pulsar. Se resuelve con el gancho `data-rama` que ya existe, que es lo que hace ' +
+        'que cueste 55 B y no un módulo. ── ⭐ **Y LO DEMÁS CUESTA CERO** ── ni el marcado mudado ' +
+        '(las clases `.gml-via*` y `.gml-obien` ya existían y no cambian), ni los tres botones ' +
+        '(siguen siendo los MISMOS nodos: cero `data-accion` nuevos, cero cableado nuevo — ' +
+        'duplicarlos en el panel de edificio habría sido la trampa del `querySelector` que ' +
+        '`index.html` documenta desde F06), ni el `padding-top` de la sección, que son 8 px ' +
+        'elegidos para que la costura vuelva a medir los mismos 12 px que medía dentro de la ' +
+        'sección de antes: **coste de ALTURA de la partición, 0 px**. ── ⚠️ NO CIERRA REBANADA ' +
+        '(`rebanada: null`): es la reparación de una asimetría entre ramas, no una pantalla del ' +
+        'rail. ── ⭐ **Y ESTE ASIENTO BAJA EL TECHO, QUE ES LA PRIMERA VEZ QUE SE MUEVE HACIA ' +
+        'ABAJO.** No porque lo pida este trabajo, sino porque el asiento anterior devolvió 279 B ' +
+        'sin revisarlo y desde entonces el `it` «el techo ES un asiento medido de verdad» estaba ' +
+        'en ROJO: el techo se había quedado en la medición de la leyenda con el registro 279 B ' +
+        'por debajo. Pasa a ser la medición de hoy —60.293 B, **60 B más baja que la que había**— ' +
+        'y la holgura vuelve a 0, que es la forma que el criterio 10 siempre tuvo. El ' +
+        'razonamiento largo, en la cabecera de `TECHO`.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

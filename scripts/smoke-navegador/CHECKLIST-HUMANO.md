@@ -305,7 +305,9 @@ frío y hasta **2.903 ms** el OVC en una sola llamada.
 - [ ] ¿Merece la pena que el renglón `role="status"` diga algo al empezar? Ojo:
       lo **anuncia el lector de pantalla**, así que un «consultando…» se oiría en
       cada pulsación. Es una decisión, no un olvido.
-- [ ] Lo mismo con «Deducir del mapa», que es el servicio lento de los dos.
+- [ ] Lo mismo con la **deducción por clic en el mapa**, que es el servicio lento
+      de los dos. ⛔ Aquí ponía «Deducir del mapa»: ese botón se retiró el
+      2026-08-16 y el gesto que queda es pinchar la parcela sobre la cartografía.
 
 ### 6.4 · El campo de la referencia, con un teclado y un portapapeles de verdad
 
@@ -322,8 +324,13 @@ frío y hasta **2.903 ms** el OVC en una sola llamada.
 - [ ] **Enter** dentro del campo. Hoy no dispara nada —el manejador está en el
       botón—, y teclear una referencia y pulsar Enter es el gesto natural.
       ¿Falta?
-- [ ] Tabulación: campo → «Traer del Catastro» → «Deducir del mapa», con el
-      anillo de foco visible en los tres.
+- [ ] Tabulación: campo → «Traer del Catastro», con el anillo de foco visible en
+      los dos. (Eran TRES hasta el 2026-08-16, con «Deducir del mapa» al final;
+      ese botón se retiró.)
+- [ ] Y en **Edición**: el pie tabula «Traer el parcelario de fondo» → «Traer
+      colindantes» → «Diagnosticar encaje» → «Derivar sobrante», en ese orden y
+      con el anillo visible en los cuatro. El segundo llegó el 2026-08-16 desde
+      Entrada, y es el que puede haber quedado fuera del orden natural.
 
 ### 6.5 · La deducción, en los casos que no se pueden pedir a voluntad
 
@@ -740,7 +747,11 @@ haciendo la consulta.
 > mantenimiento: fue recorriendo esto cuando se vio que las vecinas no se
 > dibujaban en ninguna parte** — ver el encabezado del punto 9.
 
-- [ ] Pulsa **«Traer colindantes»** (una petición). El guion ya afirma que
+- [ ] Pulsa **«Traer colindantes»** (una petición). ⚠️ **Está en el pie de
+      EDICIÓN desde el 2026-08-16**, debajo de «Traer el parcelario de fondo»; hasta
+      esa fecha vivía en el bloque de Entrada, y quien conozca la app de antes lo
+      buscará allí. Esa búsqueda **es parte de lo que hay que mirar aquí**: ¿se
+      encuentra sin pensárselo? El guion ya afirma que
       aparecen los contornos y que cuadran con la ficha; lo que se mira aquí es
       **si eso basta como acuse de recibo**: al encuadre de arranque las vecinas
       son grandes y el lado que comparten con la propia queda **debajo** del
@@ -1666,8 +1677,10 @@ imagen no lo puede hacer ninguna máquina de este proyecto.**
       debajo. ¿Tapa de más? ¿De menos? Es la comprobación que justifica pintarlas.
 - [ ] Pasa el puntero por encima de una huella: ¿sale el rótulo con el nombre de la
       parte? ¿Sigue al puntero (es `sticky`) o se planta en un sitio raro?
-- [ ] ⭐ **Con la huella delante, pincha en el mapa para «Deducir del mapa»** (rama
-      Parcela). Las huellas van en el pane **422, por encima de la parcela**, y su
+- [ ] ⭐ **Con la huella delante, pincha en el mapa para DEDUCIR la referencia**
+      (rama Parcela; desde el 2026-08-16 es el único gesto que la deduce, así que
+      esta casilla pesa más que antes). Las huellas van en el pane **422, por
+      encima de la parcela**, y su
       `interactive: true` podría robarle el clic. El guion mide que el ratón burbujea;
       **que el gesto de verdad funcione se ve aquí**.
 

@@ -574,8 +574,8 @@ import { crearDialogoDiccionario } from './dialogo-diccionario.js'
 import {
   SELECTOR_BOTON_CARGAR,
   SELECTOR_BOTON_COLINDANTES,
-  SELECTOR_BOTON_DEDUCIR,
   SELECTOR_ESTADO_CATASTRO,
+  SELECTOR_ESTADO_COLINDANTES,
   cablearCatastro,
 } from './cableado-catastro.js'
 import { cablearComprobacion } from './cableado-comprobacion.js'
@@ -664,7 +664,7 @@ const DEMO = Object.freeze({ REAL: 'real', HUECO: 'hueco' })
  * dónde mirar». Ese alguien es este fichero, y ésta es la decisión.
  *
  * **España entera** (decisión del autor, 2026-08-07). No privilegia ninguna
- * provincia, deja situarse antes de buscar, y mantiene útil «Deducir del mapa»
+ * provincia, deja situarse antes de buscar, y mantiene útil la DEDUCCIÓN POR CLIC
  * —que necesita cartografía debajo para poder pinchar—. Es además lo que hace la
  * propia Sede del Catastro al abrir sin referencia.
  *
@@ -1025,6 +1025,29 @@ const MENSAJE_SIN_MEDICION_CABLEADA =
 const MENSAJE_GML_ES_DE_EDIFICIO =
   'Ese GML describe una construcción, no una parcela: se ha cambiado a la rama Edificio para ' +
   'poder enseñártelo. El contraste contra el parcelario es de la rama Parcela y no se aplica aquí.'
+
+/**
+ * ⭐ **El espejo del anterior, y no es simétrico a propósito (2026-08-16).**
+ *
+ * Un `.gml` de PARCELA abierto con la rama EDIFICIO puesta entra en el store de
+ * parcela y **la rama no se toca**. Antes esto no hacía falta decirlo porque casi
+ * no pasaba: en esa rama la vía «Abrir un GML» estaba `hidden` y solo se llegaba
+ * arrastrando. Desde que las dos vías de fichero se ven en las dos ramas
+ * (`.gml-bloque--vias` de `index.html`), es un clic normal — y sin este renglón el
+ * usuario pulsa, el fichero entra, y el panel que está mirando **no cambia nada**.
+ * Eso se lee como que no ha funcionado.
+ *
+ * ⛔ **Y NO se conmuta a PARCELA, que era la otra salida.** La parcela que hay en
+ * pantalla es el CONTEXTO del edificio —`app/cableado-edificio.js#parcelaContexto`,
+ * desviación 9 del plan de F11, que se lo pasa a las cinco fábricas de entrada—,
+ * así que traerla estando en Edificio es un gesto útil y probablemente deliberado.
+ * Conmutar le desharía el trabajo a quien acertó. Se cuenta lo que ha pasado y se
+ * deja la pantalla donde el usuario la dejó.
+ */
+const MENSAJE_GML_ES_DE_PARCELA =
+  'Ese GML describe una parcela, no una construcción: ha entrado en la rama Parcela y sigues en ' +
+  'la de Edificio, que es donde estabas. No se ha perdido nada — esa parcela le sirve de ' +
+  'contexto al edificio. Cambia con el conmutador de arriba si quieres verla.'
 
 // ── Constantes del cableado de F04 ───────────────────────────────────────────
 
@@ -3405,9 +3428,36 @@ try {
     // la ficha la prefiere—, pero la conjetura se quedaba colgada y reaparecía
     // sobre el siguiente documento que entrara sin referencia. Ver
     // {@link entraDocumentoNuevo}.
+    // ⭐ **Y ATERRIZA EN EDICIÓN DESDE EL 2026-08-16.** Hasta hoy «Traer del
+    // Catastro» dejaba al usuario **en Entrada**, mirando las tres vías con la
+    // parcela ya cargada por debajo: exactamente el defecto que T9 del rework
+    // corrigió para «Contrastar» y F18 para la medición propia, y el único de los
+    // tres caminos de entrada que seguía sin arreglar. Cargar geometría y no moverse
+    // hace que la vía parezca no haber hecho nada.
+    //
+    // ⛔ **A EDICIÓN, Y NO A `aterrizarTrasContrastar`**, que es lo que usan los
+    // otros dos. Aquel intenta Diagnóstico primero, y aquí el diagnóstico valdría
+    // CERO POR CONSTRUCCIÓN: lo que se acaba de traer es a la vez `recintos` y
+    // `geometriaOficial` (ver {@link componerParcelaConOficial} con `sustituir`), o
+    // sea la parcela contrastada consigo misma. Es el mismo argumento con el que F22
+    // dejó fuera de Diagnóstico el DXF de «Consulta Masiva» —«que nadie lea ese cero
+    // como una verificación»—, y aquí se cumple SIEMPRE, no en un caso raro.
+    // Edición es además donde el usuario va a hacer lo que vino a hacer: mover el
+    // recinto oficial sobre la cartografía.
+    //
+    // ⚠️ Los HECHOS primero, como en `aterrizarTrasContrastar` y por lo mismo: el
+    // guardián del peldaño decidiría con los hechos de antes del `set` y mandaría al
+    // usuario de vuelta a Entrada por «no hay geometría».
+    //
+    // ⛔ Va en `alCargarParcela` y **no en `alCambiarOficial`**, que es el gancho de
+    // al lado y se dispara por las DOS puertas: por la puerta 2 —«Traer el parcelario
+    // de fondo», que se pulsa DESDE Edición— navegar sería moverle el suelo a quien
+    // ya está donde tiene que estar.
     alCargarParcela: (parcela) => {
       edicionCableada.alCambiarDocumento(parcela)
       entraDocumentoNuevo()
+      refrescarHechos()
+      navegacion.navegarAPaso(PASO.EDICION)
     },
     alCambiarOficial: (parcela) => {
       edicionCableada.alCambiarOficial(parcela)
@@ -3481,7 +3531,7 @@ try {
   }
 
   // Se comprueba la FORMA en vez de llamar a ciegas, y no es adorno defensivo:
-  // sin el puente, «Traer del Catastro» y «Deducir del mapa» siguen siendo
+  // sin el puente, «Traer del Catastro» y la deducción por clic siguen siendo
   // perfectamente útiles, así que un cableado que no publique colindantes no
   // puede llevarse por delante el bloque entero (que es lo que haría el `catch`
   // de abajo). Lo que no se hace es callarlo: va a la consola nombrando el
@@ -3522,20 +3572,25 @@ try {
   // encuentra, y lanzar DENTRO del catch de arranque volvería a tumbar la app
   // por el mismo sitio que se acaba de proteger. Aquí un nodo que falta es,
   // además, la causa más probable de haber llegado hasta este catch.
-  // Los TRES botones del bloque, no dos: «Traer colindantes» (F06) también lo
-  // cablea `cableado-catastro.js`, así que si su cableado revienta se queda
+  // Los DOS botones que cablea `cableado-catastro.js`, y el segundo **está en otra
+  // pantalla**: «Traer colindantes» (F06) se mudó al pie de Edición el 2026-08-16 y
+  // lo sigue cableando este módulo, así que si su cableado revienta se quedaría
   // encendido y mudo — el botón que promete algo que nadie puede cumplir, que es
-  // exactamente lo que este bucle existe para impedir (regla de oro 1).
-  for (const selector of [
-    SELECTOR_BOTON_CARGAR,
-    SELECTOR_BOTON_DEDUCIR,
-    SELECTOR_BOTON_COLINDANTES,
-  ]) {
+  // exactamente lo que este bucle existe para impedir (regla de oro 1). Que no se
+  // vea desde aquí no lo salva: el usuario llega a Edición en dos clics.
+  //
+  // ⛔ Eran TRES hasta esa fecha; el que falta es «Deducir del mapa», retirado.
+  for (const selector of [SELECTOR_BOTON_CARGAR, SELECTOR_BOTON_COLINDANTES]) {
     const boton = document.querySelector(selector)
     if (boton !== null) boton.disabled = true
   }
-  const renglonCatastro = document.querySelector(SELECTOR_ESTADO_CATASTRO)
-  if (renglonCatastro !== null) renglonCatastro.textContent = MENSAJE_SIN_CATASTRO
+  // Y los DOS renglones, por lo mismo: el motivo de un botón apagado se lee donde
+  // está el botón. Sin esta segunda línea, «Traer colindantes» quedaba gris en
+  // Edición con el porqué escrito dos pantallas atrás.
+  for (const selector of [SELECTOR_ESTADO_CATASTRO, SELECTOR_ESTADO_COLINDANTES]) {
+    const renglonCatastro = document.querySelector(selector)
+    if (renglonCatastro !== null) renglonCatastro.textContent = MENSAJE_SIN_CATASTRO
+  }
 }
 
 // ── 8 · Diagnóstico de encaje (F07 · T5.1) ───────────────────────────────────
@@ -3780,6 +3835,13 @@ comprobacionCableada = cablearComprobacion({
     // una deducción vieja sobra: la ficha ya prefiere la del modelo, y dejarla
     // colgada reaparecería en cuanto se cargara algo sin referencia.
     entraDocumentoNuevo()
+    // ⭐ 2026-08-16 · El fichero era de parcela y el usuario está en la otra rama:
+    // se DICE. El porqué entero —y por qué NO se conmuta— en
+    // {@link MENSAJE_GML_ES_DE_PARCELA}. Va antes de aterrizar para que el aviso
+    // esté puesto cuando la pantalla cambie de paso, no después.
+    if (ramaEnPantalla === RAMA.EDIFICIO) {
+      panel.avisar(MENSAJE_GML_ES_DE_PARCELA, { nivel: NIVEL.AVISO })
+    }
     aterrizarTrasContrastar()
   },
   // ── F10 · el `.json` entra por ESTA zona y no por una segunda ─────────────
@@ -5111,11 +5173,17 @@ function aterrizarTrasContrastar() {
 /**
  * ⭐ **La deducción automática de la importación.** Un `.dxf`/`.txt` entra SIN
  * referencia catastral —el fichero de un topógrafo trae coordenadas, no
- * referencias— y hasta hoy la app se limitaba a decirlo y a mandar al usuario a
- * «Deducir del mapa». El problema es DÓNDE lo dejaba: ese botón vive en **Entrada**
- * y la importación aterriza en **Edición** ({@link aterrizarTrasContrastar}), así
- * que el usuario caía en una pantalla desde la que la referencia no se podía sacar,
- * mirando un «Sin referencia» sin remedio a la vista.
+ * referencias— y hasta hoy la app se limitaba a decirlo y a mandar al usuario al
+ * botón «Deducir del mapa». El problema es DÓNDE lo dejaba: aquel botón vivía en
+ * **Entrada** y la importación aterriza en **Edición**
+ * ({@link aterrizarTrasContrastar}), así que el usuario caía en una pantalla desde
+ * la que la referencia no se podía sacar, mirando un «Sin referencia» sin remedio a
+ * la vista.
+ *
+ * ⭐ **Y EL 2026-08-16 ESE BOTÓN SE RETIRÓ, CON ESTO COMO MEDIA RAZÓN.** Entre esta
+ * deducción automática y el clic en el mapa —que no exige geometría cargada, al
+ * revés que el botón— no le quedaba ningún caso propio que atender. Este paso, que
+ * nació para tapar el hueco que dejaba, es hoy el camino principal.
  *
  * ── LO QUE ESTO NO CAMBIA, Y ES LO IMPORTANTE ──
  * **No escribe en el modelo.** `catastro.deducir()` rellena el CAMPO de Entrada y
@@ -5190,6 +5258,14 @@ function deducirRefcatTrasImportar(parcela) {
 // —hay UNA sola zona en toda la aplicación, porque dos harían `preventDefault`
 // las dos sobre el mismo `drop`— y el destino se resuelve por la extensión, que
 // es como funciona desde F10.
+//
+// ⭐ **2026-08-16 · Y ESTE BOTÓN SIRVE A LAS DOS RAMAS**, sin una línea de más
+// aquí: lo único que había que arreglar es que se VIERA. Vivía dentro de
+// `.gml-bloque--catastro`, que `app/rama.js` oculta al conmutar, así que el mismo
+// párrafo de arriba —«un camino que solo conoce quien escribió el código»— volvía
+// a ser cierto, palabra por palabra, para el usuario de la rama EDIFICIO. Ahora
+// las dos vías de fichero viven en `.gml-bloque--vias`, que no lleva marca de
+// rama; el destino lo sigue eligiendo `ramaEnPantalla` en el paso 9.
 const botonMedicion = document.querySelector('[data-accion="abrir-medicion"]')
 if (botonMedicion !== null) {
   if (comprobacionCableada !== null && typeof comprobacionCableada.elegirFichero === 'function') {

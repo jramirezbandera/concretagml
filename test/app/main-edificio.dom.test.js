@@ -1243,3 +1243,93 @@ describe('app/main · F19 · el pegado de coordenadas', () => {
     expect(arranque.peticiones.length - antes).toBe(0)
   })
 })
+
+/* -------------------------------------------------------------------------- *
+ * 2026-08-16 · LAS VÍAS DE FICHERO SE VEN EN LAS DOS RAMAS                    *
+ *                                                                            *
+ * ⛔ **EL DEFECTO QUE ESTAS PRUEBAS CIERRAN, Y POR QUÉ NINGUNA LO VEÍA.**     *
+ * El destino de un `.dxf`, de un pegado y de un GML lleva desde F11/F19       *
+ * eligiéndose por la rama activa, y hay pruebas de sobra de que ELIGE BIEN —  *
+ * la de aquí arriba, sin ir más lejos, pulsa «Pegar coordenadas…» con la rama *
+ * EDIFICIO puesta y comprueba que entran partes. Lo que ninguna miraba es si  *
+ * el usuario de esa rama podía **ver el botón**: los tres vivían dentro de    *
+ * `.gml-bloque--catastro`, que `app/rama.js` oculta entera al conmutar, así   *
+ * que en la rama EDIFICIO la pantalla de Entrada ofrecía UNA sola vía y las   *
+ * otras dos solo se alcanzaban arrastrando el fichero sobre la ventana.       *
+ *                                                                            *
+ * Un `.click()` de jsdom dispara igual sobre un nodo `hidden`, que es         *
+ * exactamente por lo que una suite entera en verde convivía con esto. De ahí  *
+ * que lo que se afirme aquí sea la VISIBILIDAD y no el efecto.                *
+ * -------------------------------------------------------------------------- */
+
+/** ¿Lo puede ver el usuario? `hidden` en el nodo o en cualquier antepasado. */
+function seVe(nodo) {
+  for (let n = nodo; n !== null && n !== document.body; n = n.parentElement) {
+    if (n.hidden === true) return false
+  }
+  return true
+}
+
+const ACCIONES_DE_VIA = ['abrir-medicion', 'abrir-pegado', 'abrir-gml']
+
+describe('app/main · las vías de fichero de Entrada no son de ninguna rama', () => {
+  it('⭐ con la rama EDIFICIO puesta, las tres se pueden PULSAR', () => {
+    irA(RAMA.EDIFICIO)
+    for (const accion of ACCIONES_DE_VIA) {
+      const boton = q(`[data-accion="${accion}"]`)
+      expect(boton, `«${accion}» no existe`).not.toBeNull()
+      expect(seVe(boton), `«${accion}» está oculto en la rama EDIFICIO`).toBe(true)
+      expect(boton.disabled, `«${accion}» está apagado en la rama EDIFICIO`).toBe(false)
+    }
+  })
+
+  it('y con la rama PARCELA también, que es lo que ya valía', () => {
+    irA(RAMA.PARCELA)
+    for (const accion of ACCIONES_DE_VIA) {
+      expect(seVe(q(`[data-accion="${accion}"]`)), `«${accion}» se ha perdido`).toBe(true)
+    }
+  })
+
+  it('⛔ su sección NO lleva marca de rama: es lo que la deja fuera del intercambio', () => {
+    // `app/rama.js#aplicarSecciones` solo toca las que llevan `data-rama-panel`.
+    // Ponerle la marca a ésta sería reabrir el defecto entero.
+    const vias = q('.gml-bloque--vias')
+    expect(vias, 'la sección de las vías de fichero ha desaparecido').not.toBeNull()
+    expect(vias.hasAttribute(ATRIBUTO_PANEL)).toBe(false)
+    for (const accion of ACCIONES_DE_VIA) {
+      expect(q(`[data-accion="${accion}"]`).closest('.gml-bloque--vias')).toBe(vias)
+    }
+  })
+
+  it('⛔ y siguen siendo TRES nodos y no seis: duplicarlos dejaría mudos a la mitad', () => {
+    // La trampa que `index.html` documenta desde F06: `querySelector` se queda con
+    // el primero del documento, también si está oculto. Un segundo juego de botones
+    // en el panel de edificio no lo cablearía nadie.
+    for (const accion of ACCIONES_DE_VIA) {
+      expect(document.querySelectorAll(`[data-accion="${accion}"]`)).toHaveLength(1)
+    }
+  })
+
+  it('la vía PRINCIPAL sí es de la rama, y cada rama enseña la suya', () => {
+    // Lo único de esta pantalla que pertenece a una rama es el campo por el que
+    // entra el dato: `refcat` aquí y `refcat-edificio` en el panel de edificio.
+    irA(RAMA.EDIFICIO)
+    expect(seVe(q('[data-campo="refcat"]'))).toBe(false)
+    expect(seVe(q('[data-campo="refcat-edificio"]'))).toBe(true)
+
+    irA(RAMA.PARCELA)
+    expect(seVe(q('[data-campo="refcat"]'))).toBe(true)
+    expect(seVe(q('[data-campo="refcat-edificio"]'))).toBe(false)
+  })
+
+  it('⭐ el orden del panel es el mismo en las dos ramas: vía principal y luego las de fichero', () => {
+    // `app/cableado-edificio.js#ANCLA_ORIGEN` mete «Origen del edificio» DETRÁS de
+    // `.gml-bloque--catastro` con `.after()`, así que la sección de las vías tiene
+    // que ir después de las dos. Si alguien mueve el marcado, en la rama EDIFICIO
+    // el «O bien» quedaría antes de la vía a la que separa.
+    const orden = [...document.querySelectorAll('.gml-bloque')]
+    const indice = (selector) => orden.indexOf(q(selector))
+    expect(indice('.gml-bloque--catastro')).toBeLessThan(indice('.gml-bloque--edificio'))
+    expect(indice('.gml-bloque--edificio')).toBeLessThan(indice('.gml-bloque--vias'))
+  })
+})

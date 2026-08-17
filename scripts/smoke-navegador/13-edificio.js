@@ -1647,7 +1647,7 @@ if (capaHuellas.paths > 0 && capaHuellas.dentroDelLienzo === false) {
 // rótulo LLEGA— es abrirlo. Y de paso mide lo que la cabecera de `viewer/partes.js`
 // declara como riesgo MAYOR que en `colindantes.js`: estas huellas van en 422, o
 // sea POR ENCIMA de la parcela, y su `interactive: true` podría robarle el clic al
-// mapa (que es «Deducir del mapa» de F05). `L.Path` trae `bubblingMouseEvents: true`.
+// mapa (que es la deducción por clic de F05). `L.Path` trae `bubblingMouseEvents: true`.
 const emergente = await (async () => {
   const uno = huellas()[0] ?? null
   if (uno === null) return { medido: false }
@@ -1660,7 +1660,7 @@ const emergente = await (async () => {
     clase: nodo === null ? null : nodo.getAttribute('class'),
     texto: nodo === null ? null : nodo.textContent.trim(),
     ariaDescribedbyAlAbrir: uno.hasAttribute('aria-describedby'),
-    // El clic NO se lo puede quedar la huella: eso es «Deducir del mapa».
+    // El clic NO se lo puede quedar la huella: eso es la deducción de F05.
     burbujeaElRaton: (() => {
       let llego = false
       const anota = () => {
@@ -1689,7 +1689,7 @@ if (emergente.medido && emergente.burbujeaElRaton === false) {
   problemas.push(
     'La huella NO deja pasar los sucesos de ratón al mapa. Es el riesgo que `viewer/partes.js` declara ' +
       'MAYOR que en `colindantes.js` —aquéllas van en 405, debajo de todo, y éstas en 422, por encima ' +
-      'de la parcela—: si esa prueba cae, «Deducir del mapa» (F05) deja de poder pinchar sobre el ' +
+      'de la parcela—: si esa prueba cae, la deducción por clic (F05) deja de poder pinchar sobre el ' +
       'edificio. La salida escrita es dejar la capa sin emergente y con `interactive: false`.',
   )
 }

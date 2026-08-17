@@ -25,8 +25,9 @@
 // La referencia catastral de cada vecina se enseña al pasar por encima
 // (`bindTooltip`), y un `tooltip` de Leaflet necesita que la capa reciba eventos
 // de puntero. Una capa interactiva puede ROBARLE EL CLIC AL MAPA — y ese clic es
-// «Deducir del mapa» de F05, que saca la referencia catastral de dónde se pulsa.
-// Perder esa función por un adorno habría sido un mal negocio.
+// la DEDUCCIÓN de F05, que saca la referencia catastral de dónde se pulsa. Desde
+// que se retiró el botón «Deducir del mapa» (2026-08-16) es además el ÚNICO gesto
+// que la ofrece, así que perderla por un adorno sería peor negocio que entonces.
 //
 // No pasa, y no se da por hecho: `L.Path` trae `bubblingMouseEvents: true` por
 // defecto, así que Leaflet dispara el evento en la capa Y DESPUÉS en el mapa

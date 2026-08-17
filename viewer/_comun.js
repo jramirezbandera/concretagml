@@ -228,8 +228,11 @@ export const PANE = Object.freeze({
  *     entrega el puntero a lo de arriba y la vecina solo recoge lo que cae fuera
  *     de la parcela propia. Y lo que recoge lo BURBUJEA al mapa
  *     (`bubblingMouseEvents:true`, el defecto de `L.Path`), que es lo que
- *     mantiene vivo el clic de «Deducir del mapa» de F05: medido en
- *     `test/viewer/colindantes.dom.test.js`, no supuesto.
+ *     mantiene vivo el CLIC DE DEDUCCIÓN de F05 —pinchar la parcela sobre la
+ *     cartografía para que la aplicación saque su referencia catastral—: medido
+ *     en `test/viewer/colindantes.dom.test.js`, no supuesto. (Este clic tuvo un
+ *     botón hermano, «Deducir del mapa», retirado el 2026-08-16; el gesto que
+ *     esto protege es el que quedó, y ahora es el único.)
  *
  * `partes` (F11, T1.5 — las HUELLAS de las partes de construcción, que pinta
  * `viewer/partes.js`) se intercala en **422**, en el único hueco que quedaba entre

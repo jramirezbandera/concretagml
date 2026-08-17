@@ -1570,23 +1570,61 @@ body {
  */
 .gml-bloque--catastro {
   gap: var(--space-2);
-  /* Desde T6 esta sección ES la pantalla de Entrada, y sus tres vías pueden
-     pasarse de alto en una ventana corta. Scrollea ELLA, no el panel: el panel es
-     `overflow: hidden` y lo que se le salga por abajo no se alcanza de ninguna
-     manera. `min-height: 0` es lo que permite que un hijo flex encoja por debajo
-     de su contenido — sin él, `overflow-y` no llega a morder nunca.
+  /* ⛔ **AQUÍ VIVÍAN `flex: 0 1 auto`, `min-height: 0` Y `overflow-y: auto`, Y SE
+     FUERON EL 2026-08-16 A `.gml-bloque--vias`** — que es donde se fueron las dos
+     vías que las hacían falta. Esta sección se queda con UNA vía, la referencia
+     catastral, así que ya no es «la pantalla de Entrada»: es la vía principal y
+     mide lo que mide. Vuelve al `flex: none` que hereda de `.gml-bloque`.
 
-     ⛔ `flex: 0 1 auto` Y NO `1 1 auto`, Y ESTÁ MEDIDO. La primera versión de T6
-     puso aquí un `flex: 1 1 auto` y creó un SEGUNDO ESTIRADOR en el panel, junto
-     al de avisos. `app/rama.js` ya lo tenía escrito —«dos estiradores a la vez
-     descosen el reparto de altura»— y pasó exactamente eso, con un síntoma que
-     parece imposible: **a 1440×900 la sección salía MÁS CORTA que a 1280×720**
-     (482,17 px contra 526,97), porque el hueco sobrante se repartía entre los dos
-     y la lista de avisos vacía se llevaba ~300 px. Resultado: la tercera vía no
-     cabía en la ventana GRANDE y sí en la pequeña. Lo cazó el guion 14 en la
-     primera pasada; a ojo no se ve, porque quien mira una pantalla cómoda no
-     sospecha de ella. Con `0 1 auto` esta sección pide su contenido, encoge solo
-     si hace falta, y el estirador vuelve a ser uno. */
+     ⛔ **Y HAY QUE DEJARLA ASÍ: DEVOLVERLE EL `0 1 auto` ROMPE LA PANTALLA, Y
+     ESTÁ VISTO.** Con las dos secciones encogibles a la vez, el navegador reparte
+     el recorte entre las dos en proporción a lo que piden, y a 1280×720 el recorte
+     que le tocaba a ésta caía **justo sobre el `<input>` de la referencia**: el
+     campo aparecía partido por la mitad, con su botón «Traer del Catastro» debajo
+     del corte y detrás de un scroll propio de 15 px. O sea el control principal de
+     la aplicación, inutilizable, en la primera pantalla. Con `none` aquí y `0 1
+     auto` allí el orden es el que tiene que ser: primero se recortan las vías de
+     fichero —que son cajas repetidas y se entiende que sigan más abajo— y el campo
+     por el que entra el dato no se toca nunca.
+
+     LO QUE SIGUE VALIENDO DE LA NOTA DE T6, porque la trampa no ha desaparecido,
+     solo se ha mudado: el panel reparte altura entre bloques y **dos estiradores a
+     la vez lo descosen**. La primera versión de T6 puso aquí `flex: 1 1 auto` y a
+     1440×900 la sección salía MÁS CORTA que a 1280×720 (482,17 px contra 526,97),
+     porque el sobrante se repartía con la lista de avisos. Quien encoja en esta
+     pantalla tiene que ser UNO, y desde hoy es `.gml-bloque--vias`. */
+}
+
+/* ── LA SECCIÓN DE LAS DOS VÍAS DE FICHERO (2026-08-16) ──────────────────────
+ *
+ * Gemela de `.gml-bloque--catastro` en todo lo que MIDE, y por una razón dura:
+ * hasta hoy las tres vías estaban dentro de aquella sección y esta es la MISMA
+ * columna partida en dos. Si las dos mitades no se visten igual, la pantalla de
+ * Entrada cambia de alto por haberla separado — y ésa es exactamente la clase de
+ * regresión que el guion 14 caza y que el presupuesto de CSS existe para no
+ * pagar. Por qué se partió: el comentario de `index.html`, sección
+ * `.gml-bloque--vias` (en corto: la de arriba se oculta al conmutar de rama y
+ * estas dos vías valen en las dos).
+ *
+ * ⛔ `flex: 0 1 auto` Y NO `1 1 auto`, IGUAL QUE SU GEMELA Y POR LO MISMO: un
+ * segundo estirador descose el reparto de altura del panel. La nota entera, con
+ * las cifras de aquel defecto (482,17 px a 1440×900 contra 526,97 a 1280×720),
+ * está arriba en `.gml-bloque--catastro`. Ahora hay DOS secciones con
+ * `0 1 auto`: las dos piden su contenido y encogen solo si hace falta, y quien
+ * más encoge es la que más pide —ésta—, que es lo que se quiere: el campo por el
+ * que entra el dato no se va detrás de un scroll.
+ *
+ * ⚠️ EL RELLENO SUPERIOR SON 8 px Y NO `--space-4`, Y LA CIFRA ESTÁ CUADRADA.
+ * `.gml-bloque` da `padding: var(--space-4) var(--space-6) 0` a todas, y aquí
+ * esos 16 px serían alto NUEVO salido de partir una sección — o sea el coste que
+ * esta separación no puede tener. Dentro de la sección de antes, la costura entre
+ * la vía principal y el primer «O bien» eran 12 px: 8 del `gap` del bloque + 4
+ * del `margin` del separador (está anotado en `.gml-obien`). Con
+ * `padding-top: var(--space-2)` son otra vez 8 + 4 = **12 px**, los mismos.
+ * Coste neto de la partición: 0 px. */
+.gml-bloque--vias {
+  gap: var(--space-2);
+  padding-top: var(--space-2);
   flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
@@ -1664,8 +1702,10 @@ body {
    una sola línea y la vía se leía como una caja partida por la mitad, no como
    dos acciones.
 
-   8 px y no otra cifra: es el `gap` de `.gml-campo-fila`, el de `.gml-boton-par`
-   y el de `.gml-bloque`. La columna respira igual que la fila.
+   8 px y no otra cifra: es el `gap` de `.gml-campo-fila` y el de `.gml-bloque`.
+   La columna respira igual que la fila. (Aquí se nombraba además
+   `.gml-boton-par`, que se fue con la pareja «Deducir del mapa» / «Traer
+   colindantes» el 2026-08-16; las dos cifras que quedan siguen siendo 8 px.)
 
    ⚠️ Y es un `+` y no un `gap` en `.gml-via`, a propósito. Poner
    `display: flex` en la vía metería el hueco TAMBIÉN entre el rótulo, el apunte
@@ -2490,18 +2530,21 @@ body {
  * no existe no avisa de nada: solo se queda ahí hasta que alguien lo copia
  * creyendo que está en uso.
  *
- * Sobreviven DOS, y las dos porque las usa otro sitio:
- *   · `.gml-boton-par` ..... empareja «Deducir del mapa» con «Traer colindantes»
- *     en el bloque «Origen de la parcela» (F05).
+ * Sobrevive UNA, y porque la usa otro sitio:
  *   · `.gml-tecla` ......... la píldora de una tecla. Hoy la usa la BARRA, en los
  *     botones de historial y en la tabla de gestos del panel de ayuda
  *     (`viewer/barra-edicion.js#CLASE_BARRA.TECLA`, que la nombra a propósito
  *     para no inventar una equivalente). Es su único consumidor: si algún día
  *     desaparece de ahí, esta regla se va con ella.
  *
- * Que `.gml-boton-par` esté declarada DESPUÉS de su uso en el DOM no importa:
- * `.gml-boton-par .gml-boton` es (0,2,0) y `.gml-boton` (0,1,0), así que gana por
- * ESPECIFICIDAD y no por orden — el mismo criterio que usa todo este fichero.
+ * ⛔ **SOBREVIVÍAN DOS HASTA EL 2026-08-16.** La segunda era `.gml-boton-par`, que
+ * emparejaba «Deducir del mapa» con «Traer colindantes» en el bloque «Parcela del
+ * Catastro». Ese día el primero se retiró y el segundo se mudó al pie de Edición,
+ * donde los CTA se apilan en columna como sus tres hermanos — así que la pareja
+ * dejó de existir y con ella su único uso. Se BORRA por la misma regla que borró a
+ * las cinco de arriba, y que este párrafo lleva escrita desde entonces: CSS que
+ * apunta a marcado que no existe no avisa de nada. El porqué del cambio está en
+ * `index.html`, en la lápida del bloque de Entrada.
  *
  * ⚠️ AQUÍ TAMPOCO SE USA EL AMARILLO DE LA GEOMETRÍA. Vale palabra por palabra lo
  * anotado en `.gml-bloque--catastro`: `--gml-color-usuario` (#FFD600) da ~1,4:1
@@ -2519,47 +2562,25 @@ body {
  * @see viewer/acotaciones.js     CLASE_ACOTACION (`gml-acotacion`).
  */
 
-/* ── Dos botones hermanos en una fila ────────────────────────────────────────
- * Reparto a partes IGUALES (`flex:1 1 0`, no `1 1 auto`): con `auto` la base
- * sería el ancho del texto y «Deshacer» saldría más estrecho que «Rehacer Ctrl+Y»
- * por dos caracteres de diferencia. Dos botones simétricos se leen como un par;
- * dos botones casi iguales, como un descuadre.
+/* ── AQUÍ ESTUVO `.gml-boton-par`, Y SE FUE EL 2026-08-16 ────────────────────
+ * Dos botones hermanos en una fila, a partes iguales (`flex:1 1 0`), con 8 px de
+ * `gap` y 8 px de `margin-top` para no quedar apoyados sobre «Traer del
+ * Catastro». Su único uso en todo el proyecto era la pareja «Deducir del mapa» /
+ * «Traer colindantes» del bloque de Entrada: retirado el primero y mudado el
+ * segundo al pie de Edición, no quedó ni un nodo que la llevara.
  *
- * `inline-flex` en el botón —y no el `block` implícito— es lo que permite meter
- * el `<kbd>` del atajo al lado del rótulo con un hueco propio, centrado en la
- * misma línea base óptica. */
-.gml-boton-par {
-  display: flex;
-  gap: var(--space-2);
-  /* ⛔ Y SEPARADA DE LO QUE VENGA ENCIMA (2026-08-08). El mismo defecto que
-     `.gml-via-boton + .gml-via-boton` arriba, y por la misma causa: la pareja
-     cuelga de `.gml-via`, que es un bloque normal, y va justo debajo de
-     `.gml-campo-fila`. Medido a 1440×900: «Traer del Catastro» terminaba en
-     284,53 px y «Deducir del mapa» empezaba en 284,53 px — cero. El botón
-     primario, que es oscuro y macizo, quedaba apoyado sobre el borde del
-     secundario y los dos se leían como un solo control roto.
-     Los 8 px son los mismos que separan a los dos botones ENTRE SÍ: así la
-     pareja se lee como una fila propia y no como el pie del campo de arriba.
-     `margin-top` en la clase y no en un `+`: `.gml-boton-par` tiene un único
-     uso en todo el proyecto (`index.html`, el bloque de la referencia
-     catastral), así que no hay ningún sitio donde este margen sobre. */
-  margin-top: var(--space-2);
-}
-
-.gml-boton-par .gml-boton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  /* 1 1 0 y no `auto`: ver arriba. `min-width:0` deja que encojan por debajo de
-     su texto antes que desbordar el panel. */
-  flex: 1 1 0;
-  min-width: 0;
-  width: auto;
-  padding-left: var(--space-2);
-  padding-right: var(--space-2);
-  white-space: nowrap;
-}
+ * ⚠️ Si algún día vuelve a hacer falta emparejar dos botones en una fila, lo que
+ * hay que recuperar es esto, y con sus dos porqués medidos:
+ *   · `flex: 1 1 0` y NO `1 1 auto` — con `auto` la base es el ancho del texto y
+ *     dos rótulos de largo distinto salen asimétricos: se leen como un descuadre,
+ *     no como un par.
+ *   · el `margin-top` en la clase y no en un `+` — la pareja colgaba de
+ *     `.gml-via`, que es un bloque normal, y medido a 1440×900 los dos bordes de
+ *     1 px se fundían en una sola línea (el mismo defecto que
+ *     `.gml-via-boton + .gml-via-boton` documenta arriba).
+ * El `inline-flex` del botón hijo, en cambio, NO hay que recuperarlo aquí: era
+ * para meter un `<kbd>` al lado del rótulo, y de eso se ocupa hoy la barra
+ * flotante con sus propias clases. */
 
 /* ── La tecla de un atajo o de un modificador (`<kbd>`) ──────────────────────
  * UN SOLO aspecto en toda la app, y esa es la decisión: la misma píldora sirve
@@ -5364,6 +5385,43 @@ body {
   background: var(--color-tint-accent);
   border-color: var(--color-accent);
   color: var(--color-text-primary);
+}
+
+/* ── K.1 bis · TEXTO QUE SOLO VALE EN UNA RAMA (2026-08-16) ──────────────────
+ *
+ * Dos clases, tres reglas, y el ÚNICO sitio de la hoja donde `data-rama` decide
+ * algo que no sea el aspecto del conmutador. Existen porque desde el 2026-08-16
+ * las dos vías de fichero de Entrada (`.gml-bloque--vias`) se ven en las DOS
+ * ramas, y lo que hace un fichero en cada una **no es lo mismo**: el mismo `.dxf`
+ * es el recinto de la parcela o las partes del edificio, según dónde esté el
+ * conmutador. Un apunte que solo cuente uno de los dos casos es una afirmación
+ * falsa sobre lo que va a pasar al pulsar.
+ *
+ * ⚠️ POR QUÉ CSS Y NO JAVASCRIPT. El gancho ya existe y tiene UN dueño
+ * (`app/rama.js#aplicar` escribe `data-rama` en `.gml-app`); repintar el texto
+ * desde el cableado sería un segundo dueño del mismo párrafo, y ninguno de los
+ * dos módulos de rama toca el marcado de `index.html` a propósito.
+ *
+ * ⚠️ POR QUÉ `display:none` Y NO `visibility`/`opacity`: `display:none` saca el
+ * nodo del árbol de accesibilidad. Con las otras dos, el lector de pantalla leería
+ * las dos frases —incluida la que no vale— y sin ocupar hueco visible, que es la
+ * peor de las combinaciones.
+ *
+ * ⚠️ EL DEFECTO ES LA FRASE DE PARCELA, Y ES DELIBERADO. Entre que el documento
+ * se pinta y que `app/rama.js` cablea, `.gml-app` todavía NO tiene `data-rama`;
+ * sin la primera regla se verían las dos frases a la vez en ese hueco. Se oculta
+ * por defecto la de edificio porque PARCELA es la rama inicial, así que en ese
+ * instante lo que se lee ya es lo correcto y no hay parpadeo de ninguna clase. */
+.gml-solo-edificio {
+  display: none;
+}
+
+.gml-app[data-rama='EDIFICIO'] .gml-solo-edificio {
+  display: inline;
+}
+
+.gml-app[data-rama='EDIFICIO'] .gml-solo-parcela {
+  display: none;
 }
 
 /* ── K.2 · «ORIGEN DEL EDIFICIO»: EL BLOQUE QUE SUSTITUYE AL DE PARCELA ──────

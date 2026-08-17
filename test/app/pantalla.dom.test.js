@@ -689,11 +689,27 @@ describe('rebanada 2 · el pie enseña lo de cada pantalla', () => {
     // segunda puerta del Catastro — una plaza que conviene no gastarse sin pensar.
     //
     // La regla que decide qué sube y qué se queda, en una frase: **arriba lo que
-    // sale de la app hacia fuera, abajo lo que transforma el expediente.** Las tres
-    // que quedan producen geometría o parcelario DENTRO del expediente; el GML es
-    // un fichero que se entrega.
+    // sale de la app hacia fuera, abajo lo que transforma el expediente.** Las que
+    // quedan producen geometría o parcelario DENTRO del expediente; el GML es un
+    // fichero que se entrega.
+    //
+    // ⭐ **Y EL 2026-08-16 VUELVEN A SER CUATRO: entra «Traer colindantes»**, que
+    // hasta ese día vivía en el bloque de Entrada. El motivo largo está en
+    // `index.html`; el corto es que las vecinas se piden PARA editar (dianas de
+    // enganche del snap) y PARA diagnosticar (invasión a colindantes), y las dos
+    // cosas pasan aquí. Cumple además la regla de arriba: no sale nada de la app.
+    //
+    // ⚠️ **VA ENTRE el fondo y el diagnóstico, y el ORDEN se afirma**: primero el
+    // contorno oficial contra el que se mide, luego las vecinas contra las que se
+    // mide, y entonces el diagnóstico, que necesita los dos. Una reordenación
+    // accidental rompe esto sin que nada más se ponga rojo.
+    //
+    // ⚠️ Y GASTA LA CUARTA PLAZA de un pie cuyo techo el proyecto midió en TRES el
+    // 2026-08-08. El precio en píxeles —el pie medía 209,47 px con dos— no lo puede
+    // ver este test: lo mide el guion de humo 16.
     expect([...acciones.querySelectorAll('[data-accion]')].map((b) => b.dataset.accion)).toEqual([
       'traer-fondo-catastral',
+      'traer-colindantes',
       'diagnosticar',
       'derivar-sobrante',
     ])

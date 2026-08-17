@@ -56,8 +56,9 @@
 // ── EL EMERGENTE OBLIGA A `interactive: true` ───────────────────────────────
 // Mismo riesgo, mismo desenlace y misma medición que en `colindantes.js`: el
 // título con el nombre de la parte necesita que la capa reciba eventos de puntero,
-// y una capa interactiva podría robarle el clic al mapa —que es «Deducir del mapa»
-// de F05—. No pasa, porque `L.Path` trae `bubblingMouseEvents: true`. Aquí el
+// y una capa interactiva podría robarle el clic al mapa —que es la DEDUCCIÓN de
+// F05, y desde el 2026-08-16 el único gesto que la ofrece—. No pasa, porque
+// `L.Path` trae `bubblingMouseEvents: true`. Aquí el
 // riesgo es MAYOR que allí y por eso también se mide: `colindantes` se defiende
 // además con el apilado (va en 405, debajo de todo), mientras que estas huellas
 // van en 422 y **sí quedan por encima del polígono de la parcela**. Si esa prueba

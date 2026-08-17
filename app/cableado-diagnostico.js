@@ -442,7 +442,8 @@ function oficialDe(parcelaActual) {
  * No se exporta: es una regla INTERNA de esta pantalla, y sacarla invitaría a que
  * otro módulo decidiera con ella. Se comprueba desde fuera por su efecto (el
  * `disabled` del botón), que es lo que el usuario ve. Mismo criterio que
- * `puedeDeducirDe` y `puedePedirColindantesDe` de F05.
+ * `puedePedirColindantesDe` de F05. (Aquí se nombraba también `puedeDeducirDe`, que
+ * se fue con el botón «Deducir del mapa» el 2026-08-16.)
  *
  * @param {object|null} parcelaActual
  * @returns {boolean}

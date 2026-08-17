@@ -679,10 +679,11 @@ Este smoke **no es de una sola vez**:
       el pane **405**, que está **por debajo** de `parcelaOficial` (410), el color y
       el grosor del contorno, el emergente y —lo que de verdad importa— que la capa
       interactiva **no le roba el clic al mapa**.
-    - **`app/cableado-catastro.js#puedeDeducirDe` y `puedePedirColindantesDe`.** De
-      ahí sale la coherencia campo ↔ botones que mide `campoRefcat`: si cambia
-      cuándo se enciende «Deducir del mapa» o «Traer colindantes», el guion se pone
-      rojo con razón.
+    - **`app/cableado-catastro.js#puedePedirColindantesDe`.** De ahí sale la
+      coherencia campo ↔ botón que mide `campoRefcat`: si cambia cuándo se enciende
+      «Traer colindantes», el guion se pone rojo con razón. ⛔ Eran DOS predicados
+      hasta el 2026-08-16; el otro, `puedeDeducirDe`, se fue con el botón «Deducir
+      del mapa».
     - **el fixture `test/fixtures/gml/UTM_1.gml`**, que el guion trae por `fetch` y
       del que deriva sus expectativas (3.450 B, 11 vértices, **sin** referencia
       catastral, otra parcela a ~414 km). Es el único fichero de la carpeta con una
@@ -1125,8 +1126,11 @@ tiene fuente oficial** y no se cita).
    La conexión se cierra siempre (`cache.conexionCerrada`).
 3. **El recorrido completo**: teclear → «Traer del Catastro» → parcela dibujada,
    ficha rellena, eyebrow en «Parcela del Catastro» → segunda pulsación servida
-   desde la copia local **sin una sola petición** → y, en la otra pasada,
-   «Deducir del mapa» → el campo con la referencia deducida.
+   desde la copia local **sin una sola petición**. ⛔ Tenía una segunda mitad —«y,
+   en la otra pasada, "Deducir del mapa" → el campo con la referencia deducida»— y
+   se fue con el botón el 2026-08-16: el gesto que queda (pinchar el mapa) no se
+   puede dirigir desde `page.evaluate`, y su tramo se retiró del guion. Lo mide
+   `test/app/catastro.dom.test.js`.
 
 ### Cómo se lanza
 
@@ -1772,9 +1776,9 @@ son de F08.
    **canónica**; con `UTM_1.gml`, que no la trae, el campo se **vacía** — decisión
    contraria a la de la vía del Catastro y razonada: allí el campo es lo que el
    usuario **tecleó** y no se le quita; aquí manda el fichero. Y en los dos casos
-   se comprueba que **ningún botón derivado se queda encendido contradiciéndolo**,
-   porque «Deducir del mapa» y «Traer colindantes» se encienden mirando el
-   **MODELO** y no el campo.
+   se comprueba que **el botón derivado no se queda contradiciéndolo**, porque
+   «Traer colindantes» se enciende mirando el **MODELO** y no el campo. (Eran DOS
+   botones hasta el 2026-08-16; el otro era «Deducir del mapa», retirado.)
 
 Y de propina: un **GML ajeno con una tanda larga de notas** (el riesgo que el
 plan de F08 mandó expresamente aquí: *«hay que mirarlo con un fichero malo de
@@ -1927,10 +1931,11 @@ Y desde el **2026-08-02**, las tres medidas de la firma humana:
   estuviera, medir que la referencia «llega» no afirmaría nada),
   `campoRefcat.conReferencia.canonica: true` con valor `"9398516VK3799G"`, y
   `campoRefcat.sinReferencia.vacio: true` con `UTM_1.gml`.
-- `campoRefcat.*.coherente: true` en las DOS: con referencia, «Deducir del mapa»
-  **apagado** y «Traer colindantes» **encendido**; sin referencia, al revés. Los
-  botones miran el MODELO, así que una referencia huérfana en el campo los deja
-  contradiciéndolo — que es exactamente el defecto que se arregló.
+- `campoRefcat.*.coherente: true` en las DOS: con referencia, «Traer colindantes»
+  **encendido**; sin referencia, **apagado**. El botón mira el MODELO, así que una
+  referencia huérfana en el campo lo deja contradiciéndolo — que es exactamente el
+  defecto que se arregló. (Medía además «Deducir del mapa», retirado el
+  2026-08-16.)
 - `colindantes.contornos > 0` y **cuadrando con la ficha**,
   `colindantes.enSuPane === colindantes.contornos`,
   `colindantes.porDebajoDeLaParcela: true` (405 < 410),
@@ -2196,8 +2201,12 @@ valor de tener la tabla.
 
 | Medida nueva | Valor |
 |---|---|
-| **Campo con el fichero del WFS** | `"9398516VK3799G"` — forma canónica, la misma que la ficha. «Deducir del mapa» **apagado**, «Traer colindantes» **encendido** |
-| **Campo con `UTM_1.gml`** (3.450 B, sin referencia) | `""` — **vaciado**. «Deducir del mapa» **encendido**, «Traer colindantes» **apagado**. Ficha: «Sin referencia» |
+| **Campo con el fichero del WFS** | `"9398516VK3799G"` — forma canónica, la misma que la ficha. «Traer colindantes» **encendido** |
+| **Campo con `UTM_1.gml`** (3.450 B, sin referencia) | `""` — **vaciado**. «Traer colindantes» **apagado**. Ficha: «Sin referencia» |
+
+> ⛔ **Las dos filas medían además «Deducir del mapa»** (apagado con referencia,
+> encendido sin ella). Ese botón se retiró el 2026-08-16 y su columna se fue con
+> él; lo que queda es la mitad que sigue existiendo.
 | **Colindantes dibujadas** | **4** contornos, y la ficha dice **4**. Las 4 en el pane `colindantes` |
 | Pane de las colindantes · pane de la parcela oficial | **405** · **410** ⇒ por debajo, como manda el lindero compartido |
 | Estilo del contorno | `stroke #CBD5E1`, `stroke-width 1.5`, `fill-opacity 0`, `leaflet-interactive` |

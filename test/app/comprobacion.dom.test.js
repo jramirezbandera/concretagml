@@ -60,7 +60,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { crearDialogoAvisos } from '../../app/dialogo-avisos.js'
 import {
   SELECTOR_BOTON_COLINDANTES,
-  SELECTOR_BOTON_DEDUCIR,
   SELECTOR_CAMPO_REFCAT,
   cablearCatastro,
 } from '../../app/cableado-catastro.js'
@@ -250,9 +249,9 @@ afterEach(() => {
  * @param {boolean} [opciones.conDiagnostico=false]  Monta también el cajón de F07,
  *   para las pruebas de exclusión mutua.
  * @param {boolean} [opciones.conCatastro=false]  Monta también `cablearCatastro`,
- *   que es quien enciende «Deducir del mapa» y «Traer colindantes» **mirando el
- *   store**. Sin él esos dos botones se quedan en el `disabled` con el que nacen en
- *   `index.html` y la contradicción del defecto no se puede medir.
+ *   que es quien enciende «Traer colindantes» **mirando el store**. Sin él ese botón
+ *   se queda en el `disabled` con el que nace en `index.html` y la contradicción del
+ *   defecto no se puede medir.
  */
 function montar({
   responder = undefined,
@@ -313,7 +312,6 @@ function montar({
     raizCajon: cajon.control.getContainer(),
     procedencia: document.querySelector(SELECTOR_PROCEDENCIA),
     campo: document.querySelector(SELECTOR_CAMPO_REFCAT),
-    botonDeducir: document.querySelector(SELECTOR_BOTON_DEDUCIR),
     botonColindantes: document.querySelector(SELECTOR_BOTON_COLINDANTES),
   }
 }
@@ -1102,10 +1100,11 @@ describe('cableado-comprobacion · entradas que no son un GML de parcela', () =>
  *
  * EL DEFECTO que esta sección ata, medido a mano sobre la app publicada: al cargar
  * un GML la referencia entraba en el MODELO pero no llegaba al campo del panel. Y
- * como «Deducir del mapa» y «Traer colindantes» se encienden mirando el STORE
- * (`cableado-catastro.js#refrescar`, suscriptor de `estado.subscribe`), quedaban
- * ENCENDIDOS con el campo vacío: la pantalla se contradecía a sí misma, con el botón
+ * como «Traer colindantes» se enciende mirando el STORE
+ * (`cableado-catastro.js#refrescar`, suscriptor de `estado.subscribe`), quedaba
+ * ENCENDIDO con el campo vacío: la pantalla se contradecía a sí misma, con el botón
  * diciendo «hay referencia» y el campo diciendo que no.
+ * (Eran DOS botones hasta el 2026-08-16; el otro era «Deducir del mapa», retirado.)
  *
  * ── LA DECISIÓN, Y POR QUÉ NO ES LA MISMA QUE LA DE LA VÍA DEL CATASTRO ──
  * Sin referencia utilizable el campo **se VACÍA**; no se deja como estaba. En
@@ -1116,8 +1115,8 @@ describe('cableado-comprobacion · entradas que no son un GML de parcela', () =>
  * respetar —manda el fichero—, y lo único que podría quedar ahí es la referencia de
  * una carga ANTERIOR. Eso sería peor que el hueco: el campo hablaría de una parcela
  * que ya no está en pantalla, y además reproduciría la contradicción del defecto del
- * revés (una referencia perfectamente escrita al lado de «Deducir del mapa»
- * encendido, que es el botón que promete que no hace falta escribirla).
+ * revés (una referencia perfectamente escrita al lado de un botón que afirma que la
+ * parcela cargada no tiene ninguna).
  * ------------------------------------------------------------------------- */
 
 describe('cableado-comprobacion · el campo de la referencia catastral', () => {
@@ -1197,32 +1196,33 @@ describe('cableado-comprobacion · el campo de la referencia catastral', () => {
     expect(transporte.peticiones).toHaveLength(1)
   })
 
-  it('EL DEFECTO: con referencia, el campo y los botones derivados dicen lo MISMO', async () => {
-    const { estado, campo, botonDeducir, botonColindantes, raizCajon } = montar({
+  // ⚠️ **AQUÍ SE MEDÍAN DOS BOTONES Y AHORA SE MIDE UNO** (2026-08-16): «Deducir
+  // del mapa» se retiró, así que la contradicción que esta sección ata —campo vacío
+  // al lado de un botón que dice «hay referencia»— solo puede darse ya por «Traer
+  // colindantes», que se sigue encendiendo mirando el STORE. Lo que no cambia es que
+  // hacen falta LAS DOS MITADES: con referencia y sin ella.
+  it('EL DEFECTO: con referencia, el campo y el botón derivado dicen lo MISMO', async () => {
+    const { estado, campo, botonColindantes, raizCajon } = montar({
       conCatastro: true,
     })
 
-    // De partida no hay parcela: nada que deducir y nadie a quien pedir vecinas.
+    // De partida no hay parcela: nadie a quien pedirle vecinas.
     expect(campo.value).toBe('')
-    expect(botonDeducir.disabled).toBe(true)
     expect(botonColindantes.disabled).toBe(true)
 
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
 
     expect(estado.get().refcat).toBe(REFCAT)
-    // Las tres superficies afirman lo mismo: hay referencia.
+    // Las dos superficies afirman lo mismo: hay referencia.
     expect(campo.value).toBe(REFCAT)
     expect(botonColindantes.disabled).toBe(false)
-    // Y «Deducir del mapa» apagado, que es la otra cara de la misma afirmación: con
-    // referencia no hay nada que deducir.
-    expect(botonDeducir.disabled).toBe(true)
   })
 
   it('EL DEFECTO, del otro lado: sin referencia, campo vacío Y botón apagado', async () => {
     // La comprobación que hace que la de arriba no sea media prueba: un cableado que
     // escribiera el campo SIEMPRE (con la cadena cruda, o con la anterior) pasaría
     // aquella y fallaría ésta.
-    const { estado, campo, botonDeducir, botonColindantes, raizCajon } = montar({
+    const { estado, campo, botonColindantes, raizCajon } = montar({
       conCatastro: true,
     })
     await soltarYEsperar(ficheroDeBytes(leerBytes(...GML('UTM_1.gml')), 'UTM_1.gml'))
@@ -1230,9 +1230,6 @@ describe('cableado-comprobacion · el campo de la referencia catastral', () => {
     expect(estado.get().refcat).toBeNull()
     expect(campo.value).toBe('')
     expect(botonColindantes.disabled).toBe(true)
-    // Y «Deducir del mapa» ENCENDIDO: hay geometría y no hay referencia, que es
-    // exactamente lo que el campo vacío está diciendo. No hay contradicción.
-    expect(botonDeducir.disabled).toBe(false)
   })
 })
 

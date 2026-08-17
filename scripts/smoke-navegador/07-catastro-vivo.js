@@ -23,9 +23,10 @@
 //      («segunda llamada sale de caché (sin red)») medido donde de verdad vale.
 //   3. **EL RECORRIDO COMPLETO EN EL NAVEGADOR**: teclear la referencia → pulsar
 //      «Traer del Catastro» → ver la parcela dibujada, la ficha rellena y el
-//      rótulo de procedencia → volver a pulsar y que salga de la copia local →
-//      y, con `?demo=hueco`, «Deducir del mapa» → el campo relleno con la
-//      referencia que el Catastro dice que hay bajo la geometría.
+//      rótulo de procedencia → volver a pulsar y que salga de la copia local.
+//      ⛔ Tenía una segunda mitad —«y, con `?demo=hueco`, "Deducir del mapa" →
+//      el campo relleno con la referencia que el Catastro dice que hay bajo la
+//      geometría»— y se fue con el botón el 2026-08-16.
 //
 // ── ⚠️ EL RÉGIMEN DE USO MANDA SOBRE TODO LO DEMÁS ─────────────────────────
 // Este guion llama al servicio real. La política del Catastro contempla la
@@ -158,7 +159,7 @@
 // ── HOOKS SEMÁNTICOS QUE USA (y por qué son estables) ──────────────────────
 //   · Los SEIS selectores del bloque de F05 son los que `app/cableado-catastro.js`
 //     EXPORTA (`SELECTOR_CAMPO_REFCAT`, `SELECTOR_BOTON_CARGAR`,
-//     `SELECTOR_BOTON_DEDUCIR`, `SELECTOR_ESTADO_CATASTRO`,
+//     `SELECTOR_ESTADO_CATASTRO`,
 //     `SELECTOR_PROCEDENCIA`, `SELECTOR_CANDIDATOS`) y contrato con `index.html`,
 //     que lo dice en su propia cabecera. Aquí van copiados porque
 //     `page.evaluate` no resuelve módulos; si divergen, este guion debe FALLAR.
@@ -208,8 +209,9 @@ const SELECTOR_CAMPO = '[data-campo="refcat"]'
 /** Copia de `SELECTOR_BOTON_CARGAR`. */
 const SELECTOR_BOTON_CARGAR = '[data-accion="cargar-catastro"]'
 
-/** Copia de `SELECTOR_BOTON_DEDUCIR`. */
-const SELECTOR_BOTON_DEDUCIR = '[data-accion="deducir-refcat"]'
+// ⛔ AQUÍ ESTABA LA COPIA DE `SELECTOR_BOTON_DEDUCIR`
+// (`[data-accion="deducir-refcat"]`). El botón «Deducir del mapa» se retiró el
+// 2026-08-16 y el nodo ya no existe en `index.html`. Ver el tramo del recorrido 2.
 
 /** Copia de `SELECTOR_ESTADO_CATASTRO`. */
 const SELECTOR_RENGLON = '[data-estado="cargar-catastro"]'
@@ -332,7 +334,6 @@ async function esperarHasta(condicion, topeMs, pasoMs = 60) {
 
 const campo = document.querySelector(SELECTOR_CAMPO)
 const botonCargar = document.querySelector(SELECTOR_BOTON_CARGAR)
-const botonDeducir = document.querySelector(SELECTOR_BOTON_DEDUCIR)
 const renglon = document.querySelector(SELECTOR_RENGLON)
 const procedencia = document.querySelector(SELECTOR_PROCEDENCIA)
 const candidatos = document.querySelector(SELECTOR_CANDIDATOS)
@@ -340,7 +341,6 @@ const candidatos = document.querySelector(SELECTOR_CANDIDATOS)
 const faltan = [
   [SELECTOR_CAMPO, campo],
   [SELECTOR_BOTON_CARGAR, botonCargar],
-  [SELECTOR_BOTON_DEDUCIR, botonDeducir],
   [SELECTOR_RENGLON, renglon],
   [SELECTOR_PROCEDENCIA, procedencia],
   [SELECTOR_CANDIDATOS, candidatos],
@@ -353,8 +353,8 @@ if (faltan.length > 0) {
     tarea: 'T5C',
     ok: false,
     problemas: [
-      `La cáscara no tiene ${faltan.map(([s]) => s).join(', ')}. Los seis nodos del bloque ` +
-        '«Origen de la parcela» son contrato de app/cableado-catastro.js con index.html: sin ' +
+      `La cáscara no tiene ${faltan.map(([s]) => s).join(', ')}. Los cinco nodos del bloque ` +
+        '«Parcela del Catastro» son contrato de app/cableado-catastro.js con index.html: sin ' +
         'ellos el módulo ni siquiera habría cableado, y no hay nada que medir.',
     ],
     ms: Math.round(performance.now() - t0),
@@ -662,7 +662,6 @@ function fotoDeLaPantalla() {
       declaraDomicilio: !b.textContent.includes('no ha dado el domicilio'),
     })),
     botonCargarDeshabilitado: botonCargar.disabled,
-    botonDeducirDeshabilitado: botonDeducir.disabled,
   }
 }
 
@@ -677,8 +676,9 @@ const pantallaAlEmpezar = fotoDeLaPantalla()
 
 /**
  * El RECORRIDO se elige por el ESTADO, no por `?demo=`: si la parcela de
- * arranque trae referencia no hay nada que deducir, y esa es exactamente la
- * condición con la que `puedeDeducirDe` habilita «Deducir del mapa».
+ * arranque trae referencia se anda el de CARGA, y si no lo trae no hay nada que
+ * andar desde el 2026-08-16 — ver el tramo del recorrido 2, que quedó sin gesto
+ * que pulsar cuando se retiró «Deducir del mapa».
  */
 const recorrido = hayReferencia ? 'carga' : 'deduccion'
 
@@ -859,14 +859,6 @@ try {
     if (pantalla1.filasDeLaTabla === 0) {
       problemas.push('La tabla se ha quedado sin vértices: la parcela traída no se ha dibujado.')
     }
-    if (!pantalla1.botonDeducirDeshabilitado) {
-      problemas.push(
-        'Con una parcela que YA tiene referencia catastral, «Deducir del mapa» ha quedado ' +
-          'habilitado: ofrecerlo invita a sobrescribir con una conjetura un dato que el usuario ' +
-          'ha afirmado (`puedeDeducirDe`).',
-      )
-    }
-
     // ── La caché: que el dato esté guardado DE VERDAD ──────────────────────
     if (!base.apiDisponible) {
       advertencias.push(
@@ -968,269 +960,63 @@ try {
       corsMedidoAqui: consulta1.peticiones.length > 0 && registroTrasLa1 !== undefined,
     }
   } else {
-    // ── Recorrido 2 · «Deducir del mapa» ─────────────────────────────────────
-
-    const clavesRevgeoAntes = new Set((cacheAntes[ALMACENES.REVGEO] || []).map((r) => r.clave))
-
-    if (pantallaAlEmpezar.botonDeducirDeshabilitado) {
-      problemas.push(
-        'Hay geometría en la tabla y la parcela NO tiene referencia catastral, así que «Deducir ' +
-          'del mapa» tenía que estar HABILITADO al cargar la página, y está gris. Quien abre la ' +
-          'app con `?demo=hueco` ve apagado justo el botón que le hace falta ' +
-          '(`cableado-catastro.js`, la línea de `refrescar(estado.get())` tras suscribirse).',
-      )
-    }
-
-    const deduccion1 = await pulsarYEsperar(botonDeducir, TOPE_RED_MS)
-    const pantalla1 = fotoDeLaPantalla()
-    const avisosTrasLa1 = pesoAvisos()
-    const cacheTrasLa1 = await fotoDeLaCache(base.bd, Date.now())
-    const nuevosRevgeo = (cacheTrasLa1[ALMACENES.REVGEO] || []).filter(
-      (r) => !clavesRevgeoAntes.has(r.clave),
-    )
-
-    if (!deduccion1.bloqueoDuranteLaConsulta) {
-      problemas.push(
-        'Al pulsar «Deducir del mapa» los botones NO se han quedado deshabilitados mientras la ' +
-          'consulta estaba en vuelo.',
-      )
-    }
-    if (!deduccion1.termino) {
-      problemas.push(
-        `La deducción no había terminado a los ${TOPE_RED_MS} ms. El OVC es el servicio lento de ` +
-          'los dos (2,9 s medidos en una sola llamada), pero esto es mucho más que eso.',
-      )
-    }
-    for (const peticion of deduccion1.peticiones) {
-      if (peticion.servicio !== 'OVC') {
-        problemas.push(
-          `«Deducir del mapa» ha llamado al ${peticion.servicio} y solo debe llamar al OVC de ` +
-            `geocodificación inversa: ${peticion.url.slice(0, 140)}.`,
-        )
-      }
-      if (peticion.responseStatus !== null && !(peticion.responseStatus >= 200 && peticion.responseStatus < 300)) {
-        problemas.push(`El OVC ha respondido con HTTP ${peticion.responseStatus}.`)
-      }
-    }
-    if (deduccion1.peticiones.length > 1) {
-      problemas.push(
-        `La deducción ha costado ${deduccion1.peticiones.length} peticiones al OVC y debía costar ` +
-          'una sola: cada reintento cuenta en el contador de quien nos vigila.',
-      )
-    }
-
-    // ── El PUNTO consultado, contra la geometría de la tabla ───────────────
-    const urlConsultada = deduccion1.peticiones.length > 0 ? deduccion1.peticiones[0].url : null
-    const parametros = urlConsultada === null ? null : new URL(urlConsultada).searchParams
-    const srsConsultado = parametros === null ? null : parametros.get('SRS')
-
-    const exterior = geometriaDeArranque.length > 0 ? geometriaDeArranque[0].vertices : []
-    const huecos = geometriaDeArranque.slice(1).map((r) => r.vertices)
-
-    /** ¿Cae el punto dentro del recinto exterior y fuera de todos los huecos? */
-    const caeDentro = (punto) =>
-      punto === null || exterior.length < 3
-        ? null
-        : dentroDelAnillo(punto, exterior) && !huecos.some((hueco) => dentroDelAnillo(punto, hueco))
-
-    /**
-     * La clave `revgeo:<srs>:<x>:<y>` de vuelta a su punto. Se parte por el
-     * FINAL: el SRS lleva dos puntos dentro (`EPSG:25830`), así que un `split`
-     * ingenuo por posición devolvería cualquier cosa.
-     */
-    function puntoDeLaClave(clave) {
-      const trozos = String(clave).split(':')
-      if (trozos.length < 2) return null
-      const punto = [Number(trozos[trozos.length - 2]), Number(trozos[trozos.length - 1])]
-      return punto.every(Number.isFinite) ? punto : null
-    }
-
-    // ── Qué punto se consultó, y de dónde se sabe ──────────────────────────
+    // ── ⛔ AQUÍ ESTUVO EL RECORRIDO 2 · «Deducir del mapa» ───────────────────
     //
-    // Con petición, del `CoorX`/`CoorY` de la URL: es el punto EXACTO que la app
-    // pidió, y comprobar que cae dentro de la parcela es una comprobación de
-    // verdad. Sin petición (la caché del punto ya estaba caliente) no hay URL, y
-    // lo único disponible es la CLAVE del registro cacheado — que se localiza
-    // precisamente por caer dentro de la parcela. Ahí la comprobación sería
-    // circular, así que **no se hace y se dice**, como `06` hace con
-    // `utf8.comprobacionVacua`.
-    const conPeticion = parametros !== null
-    const puntoConsultado = conPeticion
-      ? [Number(parametros.get('CoorX')), Number(parametros.get('CoorY'))]
-      : null
-
-    if (conPeticion) {
-      if (srsConsultado !== srs) {
-        problemas.push(
-          `Se ha consultado al OVC en ${JSON.stringify(srsConsultado)} y el expediente trabaja en ` +
-            `${srs}: los metros de un huso interpretados en otro colocan el punto a kilómetros.`,
-        )
-      }
-      if (caeDentro(puntoConsultado) === false) {
-        problemas.push(
-          `El punto consultado [${puntoConsultado}] NO cae dentro del recinto exterior (o cae en ` +
-            'un hueco). El centroide aritmético de una parcela en L se sale del polígono y el ' +
-            'Catastro contestaría tan tranquilo con la referencia de la VECINA: por eso ' +
-            '`cableado-catastro.js` usa `puntoInterior` y no el centroide.',
-        )
-      }
-    }
-
-    // ── La rama de la UI, contra lo que el servicio contestó de verdad ─────
-    // El registro se busca por la clave EXACTA cuando hubo petición; si no la
-    // hubo, entre los del almacén se elige el que cae dentro de esta parcela.
-    const registrosRevgeo = cacheTrasLa1[ALMACENES.REVGEO] || []
-    const claveExacta =
-      puntoConsultado === null
-        ? null
-        : `${PREFIJO.REVGEO}${srs}:${Math.round(puntoConsultado[0])}:${Math.round(puntoConsultado[1])}`
-    const registroRevgeo =
-      nuevosRevgeo.length > 0
-        ? nuevosRevgeo[0]
-        : claveExacta !== null
-          ? registrosRevgeo.find((r) => r.clave === claveExacta)
-          : registrosRevgeo.find((r) => caeDentro(puntoDeLaClave(r.clave)) === true)
-    const respuesta = registroRevgeo === undefined || registroRevgeo === null ? null : registroRevgeo.pojo
-
-    const puntoDelRegistro =
-      registroRevgeo === undefined || registroRevgeo === null
-        ? null
-        : puntoDeLaClave(registroRevgeo.clave)
-    const puntoDentro = conPeticion ? caeDentro(puntoConsultado) : null
-
-    if (!conPeticion && respuesta !== null) {
-      advertencias.push(
-        'La geocodificación inversa de este punto ya estaba en la caché, así que no ha salido ' +
-          'ninguna petición y no hay URL de la que leer el punto consultado. La comprobación de ' +
-          '«el punto cae dentro de la parcela» es por tanto VACUA en esta pasada: el registro se ' +
-          'ha localizado precisamente por caer dentro. Para medirla de verdad hace falta una ' +
-          'pasada en frío (GUION.md §13).',
-      )
-    }
-
-    // Tres desenlaces posibles, y la comprobación es la COHERENCIA entre lo que
-    // el servicio dijo y lo que la pantalla hizo — no un resultado concreto:
-    // «aquí no hay parcela» es una respuesta válida del Catastro (override C6).
-    let rama = 'DESCONOCIDA'
-    if (respuesta !== null && respuesta.unico === true) rama = 'UNICO'
-    else if (respuesta !== null && respuesta.unico === false) rama = 'VARIOS'
-    else if (pantalla1.renglonEnError && avisosTrasLa1.peso > avisosAntes.peso) rama = 'SIN_DATO'
-
-    if (rama === 'UNICO') {
-      const esperada = respuesta.candidatos !== null ? respuesta.candidatos[0].refcat : null
-      if (pantalla1.campo !== esperada) {
-        problemas.push(
-          `El OVC ha devuelto UN solo candidato (${esperada}) y el campo ha quedado en ` +
-            `${JSON.stringify(pantalla1.campo)}. Con un candidato único la spec (§7.3) pide ` +
-            'rellenar el campo.',
-        )
-      }
-      if (pantalla1.procedencia !== ROTULO_DEDUCIDA) {
-        problemas.push(
-          `El rótulo de procedencia dice ${JSON.stringify(pantalla1.procedencia)} y debía decir ` +
-            `«${ROTULO_DEDUCIDA}»: sus dos mitades son lo que distingue una referencia deducida ` +
-            'de una afirmada por el usuario.',
-        )
-      }
-      if (!pantalla1.candidatosOcultos) {
-        problemas.push('Con un solo candidato la lista debe quedar oculta, y está visible.')
-      }
-      if (pantalla1.renglonEnError) {
-        problemas.push(
-          `El renglón ha quedado en ERROR tras una deducción que ha salido bien: ` +
-            `${JSON.stringify(pantalla1.renglon)}.`,
-        )
-      }
-      if (pantalla1.fichaRefcat !== SIN_REFCAT) {
-        problemas.push(
-          `La deducción ha escrito la referencia en el MODELO (la ficha dice ` +
-            `${JSON.stringify(pantalla1.fichaRefcat)}). No debe: hasta que el usuario pulse ` +
-            '«Traer del Catastro», `parcela.refcat` tiene que significar «esto lo afirma el ' +
-            'usuario», nunca «esto lo adivinó un servicio».',
-        )
-      }
-    } else if (rama === 'VARIOS') {
-      if (pantalla1.campo !== pantallaAlEmpezar.campo) {
-        problemas.push(
-          `El OVC ha devuelto ${respuesta.cuantos} candidatos y el campo se ha rellenado igual ` +
-            `(${JSON.stringify(pantalla1.campo)}). Elegir uno a ciegas mete en el expediente la ` +
-            'parcela del vecino, que en un lindero es el error que esta herramienta existe para ' +
-            'no cometer (spec §7.3).',
-        )
-      }
-      if (pantalla1.candidatosOcultos || pantalla1.candidatos.length !== respuesta.cuantos) {
-        problemas.push(
-          `Con ${respuesta.cuantos} candidatos, la lista debía estar visible con ese mismo ` +
-            `número de botones y tiene ${pantalla1.candidatos.length} (oculta: ` +
-            `${pantalla1.candidatosOcultos}).`,
-        )
-      }
-      if (pantalla1.candidatos.some((c) => !RE_REFCAT.test(c.refcat || ''))) {
-        problemas.push('Algún botón de la lista de candidatos no lleva una referencia catastral válida.')
-      }
-    } else if (rama === 'SIN_DATO') {
-      advertencias.push(
-        'El Catastro no ha devuelto ninguna referencia para el punto interior de esta parcela ' +
-          'sintética, así que el recorrido de la deducción NO se ha podido ejercitar hasta el ' +
-          'final. La app se ha comportado bien con esa respuesta —renglón de fallo y mensaje ' +
-          'íntegro en el panel—, y «no encontrar nada» es un estado válido del servicio ' +
-          '(override C6), no un fallo. Renglón: ' +
-          `${JSON.stringify(pantalla1.renglon)}.`,
-      )
-    } else {
-      problemas.push(
-        'No se ha podido determinar qué contestó el OVC ni qué rama tomó la pantalla: no hay ' +
-          `registro en el almacén «${ALMACENES.REVGEO}» y el renglón no está en error. Renglón: ` +
-          `${JSON.stringify(pantalla1.renglon)}; campo: ${JSON.stringify(pantalla1.campo)}.`,
-      )
-    }
-
-    // ── Segunda deducción: la que NO debe tocar la red ─────────────────────
-    const deduccion2 = await pulsarYEsperar(botonDeducir, TOPE_CACHE_MS)
-    const pantalla2 = fotoDeLaPantalla()
-
-    if (rama !== 'SIN_DATO' && deduccion2.peticiones.length !== 0) {
-      problemas.push(
-        `La SEGUNDA deducción sobre el mismo punto ha emitido ${deduccion2.peticiones.length} ` +
-          'petición(es) al OVC, y debía emitir CERO: la geocodificación inversa se cachea con la ' +
-          'clave `revgeo:<srs>:<round(x)>:<round(y)>` justamente para que dos clics sobre el ' +
-          'mismo sitio sean una sola pregunta.',
-      )
-    }
+    // **Y SE RETIRÓ EL 2026-08-16, CON SU BOTÓN.** Este tramo pulsaba
+    // `[data-accion="deducir-refcat"]` con `?demo=hueco` y medía, sobre la red
+    // real, el camino entero: punto interior de la geometría → OVC → campo
+    // relleno (o lista de candidatos con su domicilio) → segunda pulsación
+    // servida desde IndexedDB sin tocar la red. Medía además, con un lanzamiento
+    // de rayo escrito aquí —segunda implementación, independiente de
+    // `gml/anillos.js#puntoInterior`—, que el punto consultado cayera DENTRO del
+    // recinto exterior y fuera de los huecos: la trampa del centroide de una
+    // parcela en L, que se sale del polígono y hace que el Catastro conteste tan
+    // tranquilo con la referencia de la vecina.
+    //
+    // ── POR QUÉ NO SE REESCRIBE CONTRA EL CLIC EN EL MAPA ──
+    // El gesto que sobrevive es el clic sobre la cartografía, y **no sirve para
+    // medir lo mismo**: el punto ya no lo calcula la aplicación a partir de la
+    // geometría, lo trae el dedo del usuario. Comprobar que «cae dentro» sería
+    // comprobar dónde pinchó este guion, que es circular; y para pinchar sobre
+    // la parcela desde `page.evaluate` haría falta la proyección del `L.Map`,
+    // que no está expuesta. Un tramo que consulta al servicio real y no puede
+    // afirmar nada que no sepamos ya no se queda: gasta una petición del cupo
+    // (override O8) a cambio de un dato que no decide nada.
+    //
+    // ── DÓNDE SE MIDE HOY LO QUE ESTE TRAMO MEDÍA ──
+    //   · el camino OVC entero (clic → `deducirEn` → campo relleno o lista de
+    //     candidatos, y la caché del punto) → `test/app/catastro.dom.test.js`,
+    //     sección «deducir con un clic en el mapa», con el cliente REAL sobre el
+    //     fixture `ovc-rccoor-ok.json`;
+    //   · que el punto sea interior y no el centroide → el mismo fichero,
+    //     mutación M6 anotada en su cabecera;
+    //   · la deducción automática al importar un dibujo sin referencia, que es
+    //     hoy el llamante más frecuente de `deducir()` → `main-refcat-deducida`.
+    // Lo que ya no se mide en NAVEGADOR y contra el servicio VIVO es la latencia
+    // del OVC y su CORS por esta vía. La carga por referencia (recorrido 1) sí
+    // sigue midiéndolos, y es el mismo host.
+    advertencias.push(
+      'El recorrido de DEDUCCIÓN no se ha medido: el botón «Deducir del mapa» se retiró el ' +
+        '2026-08-16 y el gesto que queda —pinchar la cartografía— no se puede dirigir desde este ' +
+        'guion sin la proyección del mapa. La parcela de arranque no trae referencia catastral, ' +
+        'así que tampoco había recorrido de CARGA que andar: esta pasada no ha ejercitado el ' +
+        'servicio. Para medir F05 en vivo, abre la app SIN `?demo=hueco`.',
+    )
 
     veredicto = {
       recorrido: 'deduccion',
-      queEjercita:
-        '«Deducir del mapa» → punto interior de la geometría → OVC → campo relleno (o lista de ' +
-        'candidatos con su domicilio) → segunda pulsación servida desde IndexedDB sin tocar la red',
-      rama,
-      respuestaDelServicio: respuesta,
-      consultas: [
-        { orden: 1, esperadas: '0 ó 1 (según la caché del punto)', ...deduccion1 },
-        { orden: 2, esperadas: 0, ...deduccion2 },
+      queEjercita: null,
+      noMedible:
+        'el botón «Deducir del mapa» ya no existe (retirado el 2026-08-16) y el clic en el mapa ' +
+        'no se puede dirigir desde `page.evaluate`',
+      dondeSeMideAhora: [
+        'test/app/catastro.dom.test.js · «deducir con un clic en el mapa»',
+        'test/app/main-refcat-deducida.dom.test.js · la deducción automática al importar',
       ],
-      punto: {
-        fuente: conPeticion ? 'CoorX/CoorY de la URL pedida' : 'clave de caché (no hubo petición)',
-        consultado: conPeticion ? puntoConsultado : puntoDelRegistro,
-        srsConsultado,
-        dentroDeLaParcela: puntoDentro,
-        // Sin petición, el registro se localiza POR caer dentro: comprobarlo
-        // después sería circular. Se dice, no se finge (precedente: `06`).
-        comprobacionVacua: !conPeticion,
-        comoSeComprueba:
-          'lanzamiento de rayo escrito en este guion sobre los anillos LEÍDOS DE LA TABLA: ' +
-          'segunda implementación, independiente de gml/anillos.js#puntoInterior',
-        geometria: resumirGeometria(geometriaDeArranque),
-      },
-      clavesRevgeoNuevas: nuevosRevgeo.map((r) => r.clave),
-      pantallaTrasLa1: pantalla1,
-      pantallaTrasLa2: pantalla2,
-      avisos: {
-        pesoAlEmpezar: avisosAntes.peso,
-        pesoTrasLa1: avisosTrasLa1.peso,
-        textos: avisosTrasLa1.textos,
-      },
-      corsMedidoAqui: deduccion1.peticiones.length > 0 && respuesta !== null,
+      geometriaDeArranque: resumirGeometria(geometriaDeArranque),
+      pantallaAlEmpezar,
+      avisos: { pesoAlEmpezar: avisosAntes.peso, textos: avisosAntes.textos },
+      corsMedidoAqui: false,
     }
   }
 } catch (error) {

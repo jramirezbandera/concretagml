@@ -951,10 +951,16 @@ const cajaAntesDeContrastar = altoCajaVertices()
 const procedenciaEl = $('[data-procedencia="parcela"]')
 const procedenciaAltoAntes = procedenciaEl === null ? 0 : Math.round(procedenciaEl.getBoundingClientRect().height)
 
-// El campo de la referencia y sus dos botones DERIVADOS (§17). Nacen así: el
-// campo VACÍO —`index.html` no le pone `value`— y los dos botones apagados.
+// El campo de la referencia y su botón DERIVADO (§17). Nacen así: el campo VACÍO
+// —`index.html` no le pone `value`— y el botón apagado.
+// ⛔ **ERAN DOS BOTONES HASTA EL 2026-08-16**: el otro era «Deducir del mapa»
+// (`[data-accion="deducir-refcat"]`), retirado. Su mitad de esta sección se va con
+// él; lo que sigue midiéndose —y es lo que la sección persigue— es que el botón
+// derivado y el campo digan LO MISMO, porque uno mira el modelo y el otro no.
+// ⚠️ «Traer colindantes» vive ahora en el pie de EDICIÓN, no en este bloque. Se
+// sigue localizando por `data-accion`, que no ha cambiado, y sigue estando montado
+// aunque su pantalla no se vea (contrato K.1).
 const campoRefcatEl = $('[data-campo="refcat"]')
-const botonDeducirEl = $('[data-accion="deducir-refcat"]')
 const botonColindantesEl = $('[data-accion="traer-colindantes"]')
 const campoAntesDeContrastar = campoRefcatEl === null ? null : campoRefcatEl.value
 // La vista ANTES, para el §17: esta parcela es LA MISMA que la de arranque
@@ -1050,8 +1056,8 @@ if (contraste.superficieCatastral === null) {
 /** Las dos mitades del campo: con referencia utilizable y sin ella. */
 const campoRefcat = {
   queEs:
-    'El campo `[data-campo="refcat"]` y sus dos botones DERIVADOS, que se encienden mirando el ' +
-    'MODELO y no el campo: por eso una referencia huérfana en el campo los deja contradiciéndolo.',
+    'El campo `[data-campo="refcat"]` y su botón DERIVADO, que se enciende mirando el ' +
+    'MODELO y no el campo: por eso una referencia huérfana en el campo lo deja contradiciéndolo.',
   arranqueVacio: campoAntesDeContrastar === '',
   conReferencia: null,
   sinReferencia: null,
@@ -1061,15 +1067,12 @@ campoRefcat.conReferencia = {
   valor: campoRefcatEl === null ? null : campoRefcatEl.value,
   canonica: campoRefcatEl !== null && campoRefcatEl.value === '9398516VK3799G',
   fichaRefcat: texto('[data-ficha="refcat"]'),
-  // Coherencia campo ↔ modelo: con referencia en el modelo, «Deducir del mapa» se
-  // APAGA (no hay nada que deducir) y «Traer colindantes» se ENCIENDE.
-  deducirHabilitado: botonDeducirEl === null ? null : !botonDeducirEl.disabled,
+  // Coherencia campo ↔ modelo: con referencia en el modelo, «Traer colindantes»
+  // se ENCIENDE, porque ya hay a quién pedirle vecinas.
   colindantesHabilitado: botonColindantesEl === null ? null : !botonColindantesEl.disabled,
 }
 campoRefcat.conReferencia.coherente =
-  campoRefcat.conReferencia.canonica &&
-  campoRefcat.conReferencia.deducirHabilitado === false &&
-  campoRefcat.conReferencia.colindantesHabilitado === true
+  campoRefcat.conReferencia.canonica && campoRefcat.conReferencia.colindantesHabilitado === true
 if (!campoRefcat.conReferencia.canonica) {
   problemas.push(
     `El campo «Referencia catastral» no trae la referencia del fichero en forma canónica: ` +
@@ -1079,10 +1082,9 @@ if (!campoRefcat.conReferencia.canonica) {
 }
 if (!campoRefcat.conReferencia.coherente) {
   problemas.push(
-    `Los botones derivados no cuadran con la referencia cargada (deducir habilitado: ` +
-      `${campoRefcat.conReferencia.deducirHabilitado}, colindantes habilitado: ` +
-      `${campoRefcat.conReferencia.colindantesHabilitado}). Con referencia en el MODELO, «Deducir ` +
-      'del mapa» no tiene nada que deducir y «Traer colindantes» sí tiene a quién preguntar.',
+    `El botón derivado no cuadra con la referencia cargada (colindantes habilitado: ` +
+      `${campoRefcat.conReferencia.colindantesHabilitado}). Con referencia en el MODELO, «Traer ` +
+      'colindantes» sí tiene a quién preguntar.',
   )
 }
 
@@ -1332,7 +1334,8 @@ if (contornos.length > 0) {
 
 // ── EL RIESGO QUE SE MIDIÓ Y QUEDÓ DESPEJADO ────────────────────────────────
 // El emergente obliga a `interactive: true`, y una capa interactiva puede ROBARLE
-// EL CLIC AL MAPA — que es «Deducir del mapa» de F05 y la selección de lindero de
+// EL CLIC AL MAPA — que es la DEDUCCIÓN por clic de F05 (desde el 2026-08-16, el
+// único gesto que la ofrece) y la selección de lindero de
 // F06. Aquí se comprueba con la app viva y con el motor de layout eligiendo el
 // destinatario: se pincha en un punto donde `elementFromPoint` devuelve el
 // `<path>` de una VECINA, y se mira si el mapa reaccionó **con la coordenada del
@@ -1433,7 +1436,7 @@ if (puntoCerca === null || puntoLejos === null) {
       'Un clic sobre el contorno de una parcela vecina NO llega al mapa con la coordenada del ' +
         `puntero (selecciona cerca: ${seleccionaAlPincharCerca}, deselecciona lejos: ` +
         `${deseleccionaAlPincharLejos}). La capa de colindantes es interactiva porque su emergente ` +
-        'lo exige, y si le roba el clic al mapa se lleva por delante «Deducir del mapa» de F05 y la ' +
+        'lo exige, y si le roba el clic al mapa se lleva por delante la deducción por clic de F05 y la ' +
         'selección de lindero de F06. La salida está decidida: la capa se queda sin emergente y con ' +
         '`interactive:false`.',
     )
@@ -1851,21 +1854,18 @@ if (traidoOtra.file === null) {
     // es lo que el usuario TECLEÓ y no se le quita; aquí manda el fichero, que
     // afirma que esta parcela no tiene referencia. Dejar la anterior sería peor que
     // el hueco: el campo hablaría de una parcela que ya no está en pantalla, y
-    // «Deducir del mapa» —que mira el MODELO— se encendería al lado de una
-    // referencia perfectamente escrita, que es lo único que ese botón promete que
-    // no hace falta.
+    // «Traer colindantes» —que mira el MODELO— se quedaría apagado al lado de una
+    // referencia perfectamente escrita, que es la contradicción que esta sección
+    // persigue. (Aquí se nombraba «Deducir del mapa», retirado el 2026-08-16.)
     campoRefcat.sinReferencia = {
       fichero: 'UTM_1.gml',
       valor: campoRefcatEl === null ? null : campoRefcatEl.value,
       vacio: campoRefcatEl !== null && campoRefcatEl.value === '',
       fichaRefcat: texto('[data-ficha="refcat"]'),
-      deducirHabilitado: botonDeducirEl === null ? null : !botonDeducirEl.disabled,
       colindantesHabilitado: botonColindantesEl === null ? null : !botonColindantesEl.disabled,
     }
     campoRefcat.sinReferencia.coherente =
-      campoRefcat.sinReferencia.vacio &&
-      campoRefcat.sinReferencia.deducirHabilitado === true &&
-      campoRefcat.sinReferencia.colindantesHabilitado === false
+      campoRefcat.sinReferencia.vacio && campoRefcat.sinReferencia.colindantesHabilitado === false
     if (!campoRefcat.sinReferencia.vacio) {
       problemas.push(
         `El campo «Referencia catastral» se ha quedado con ` +
@@ -1875,11 +1875,9 @@ if (traidoOtra.file === null) {
     }
     if (!campoRefcat.sinReferencia.coherente) {
       problemas.push(
-        `Con el campo vacío, los botones derivados no cuadran (deducir habilitado: ` +
-          `${campoRefcat.sinReferencia.deducirHabilitado}, colindantes habilitado: ` +
+        `Con el campo vacío, el botón derivado no cuadra (colindantes habilitado: ` +
           `${campoRefcat.sinReferencia.colindantesHabilitado}). Sin referencia en el modelo, ` +
-          '«Deducir del mapa» sí tiene algo que hacer y «Traer colindantes» no tiene a quién ' +
-          'preguntar.',
+          '«Traer colindantes» no tiene a quién preguntar.',
       )
     }
   }

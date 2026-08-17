@@ -564,11 +564,19 @@ export const APUNTE_MODELO = Object.freeze({
  * que ve el usuario de esta rama**: el store nace vacío a propósito. Enumera las
  * cinco vías de entrada en el mismo renglón, para que no se lea como «esto no ha
  * cargado».
+ *
+ * ⭐ **2026-08-16 · DECÍA «SOLTAR» TRES VECES, Y ERA LA VERDAD DE ENTONCES**: en
+ * esta rama las vías de fichero de la pantalla de Entrada estaban `hidden` —vivían
+ * dentro de `.gml-bloque--catastro`, que `app/rama.js` oculta al conmutar—, así que
+ * el arrastre sobre la ventana era el único gesto que quedaba. Este renglón lo
+ * describía con honradez y describía un agujero. Ahora las dos vías de fichero
+ * están en `.gml-bloque--vias`, que no es de nadie y se ve en las dos ramas, así
+ * que el verbo pasa a ser «elegir o soltar» — que es lo que se puede hacer.
  */
 export const SIN_PARTES =
-  'Todavía no hay ninguna parte. Hay cinco maneras de traer las huellas: soltar un DXF (cada ' +
-  'polilínea del dibujo se ofrece como una parte), pegar un listado LIST, cargar un fichero de ' +
-  'coordenadas .txt, soltar un GML de edificio ya existente, o escribir aquí arriba la ' +
+  'Todavía no hay ninguna parte. Hay cinco maneras de traer las huellas: elegir o soltar un DXF ' +
+  '(cada polilínea del dibujo se ofrece como una parte), pegar un listado LIST, cargar un ' +
+  'fichero de coordenadas .txt, abrir un GML de edificio ya existente, o escribir aquí arriba la ' +
   'referencia catastral y pulsar «Traer del Catastro».'
 
 /** Lo que dice el renglón de procedencia mientras no se ha traído nada. */

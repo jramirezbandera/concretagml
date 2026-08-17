@@ -124,10 +124,21 @@ export const MENSAJE_FALLO_INESPERADO =
  * querer solo mirar la geometría, o traer la referencia después— pero se dice, con
  * las dos vías que ya existen al lado. Decir «no» sin decir «por dónde» es la mitad
  * de un mensaje.
+ *
+ * ⛔ **DECÍA «o usa "Deducir del mapa"» HASTA EL 2026-08-16, Y ESE BOTÓN YA NO
+ * EXISTE.** Un mensaje que manda a un control retirado es peor que no decir la
+ * segunda vía: el usuario la busca, no la encuentra y deja de fiarse del resto del
+ * texto. La vía sigue existiendo y es la misma consulta —la deducción por
+ * geocodificación inversa—, sólo que el gesto es pinchar la parcela sobre la
+ * cartografía (`cableado-catastro.js#alPulsarMapa`).
+ *
+ * ⚠️ Y no se nombra ningún botón a propósito: éste es exactamente el mensaje que se
+ * quedó viejo por nombrar uno.
  */
 export const MENSAJE_SIN_REFERENCIA =
   'Esa geometría ha entrado sin referencia catastral, así que todavía no se puede generar un GML ' +
-  'para la Sede. Escríbela en el campo de arriba, o usa «Deducir del mapa».'
+  'para la Sede. Escríbela en el campo de arriba, o pincha tu parcela sobre el mapa para que la ' +
+  'aplicación la deduzca.'
 
 /**
  * El fichero se ha leído pero no ha salido una parcela. Se antepone al motivo REAL

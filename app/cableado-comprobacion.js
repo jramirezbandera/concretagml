@@ -1324,11 +1324,12 @@ export function cablearComprobacion({
       //
       // Dejar ahí la referencia ANTERIOR sería peor que el hueco: el campo estaría
       // hablando de una parcela que ya no está en pantalla. Y sería exactamente la
-      // contradicción que este bloque existe para cerrar, del revés — los botones
-      // derivados («Deducir del mapa», «Traer colindantes») se encienden mirando el
-      // MODELO y no el campo, así que una referencia huérfana dejaría «Deducir del
-      // mapa» encendido al lado de una referencia perfectamente escrita, que es lo
-      // único que ese botón promete que NO hace falta.
+      // contradicción que este bloque existe para cerrar, del revés — el botón
+      // derivado («Traer colindantes») se enciende mirando el MODELO y no el campo,
+      // así que una referencia huérfana lo dejaría APAGADO al lado de una referencia
+      // perfectamente escrita, con la pantalla diciendo dos cosas a la vez.
+      // (Eran DOS botones hasta el 2026-08-16; el otro, «Deducir del mapa», se
+      // retiró, y su mitad del argumento se fue con él.)
       //
       // Y esto es PINTAR, no consultar: escribir el campo no dispara ninguna
       // petición. La consulta ya se hizo arriba —o se decidió no hacerla— y quedó

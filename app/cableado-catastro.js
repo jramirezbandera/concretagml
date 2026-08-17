@@ -151,10 +151,13 @@
 // Hay TRES sitios donde escribir y cada uno dice una cosa distinta. Mezclarlos es
 // lo que produce paneles que repiten y renglones que no caben:
 //
-//   · **Renglón `role="status"`** (`data-estado="cargar-catastro"`) → el DESENLACE
-//     de la acción que el usuario acaba de pedir. Siempre, salga bien o mal. Es una
-//     línea de 11 px: lleva el RESUMEN ({@link RESUMEN_POR_MOTIVO}), nunca el
-//     mensaje largo del servicio.
+//   · **Renglón `role="status"`** → el DESENLACE de la acción que el usuario acaba
+//     de pedir. Siempre, salga bien o mal. Es una línea de 11 px: lleva el RESUMEN
+//     ({@link RESUMEN_POR_MOTIVO}), nunca el mensaje largo del servicio.
+//     ⭐ **Son DOS desde el 2026-08-16, uno por pantalla**: `cargar-catastro` en el
+//     bloque de Entrada (carga y deducción) y `traer-colindantes` en el pie de
+//     Edición (vecinas), porque ese botón se mudó allí. La regla es la misma —el
+//     desenlace se lee donde se pulsó— y quien escribe sigue siendo este módulo.
 //   · **Panel de avisos** → lo que le pasa al DATO, entero y sin recortar: «el
 //     servicio ha devuelto 5 parcelas y ninguna es la pedida», «esta parcela sale
 //     de la copia local, guardada hace 6 días». Es el único sitio donde caben los
@@ -209,6 +212,10 @@ import {
 } from '../services/catastro.js'
 import { NIVEL, latLngAUTM } from '../viewer/_comun.js'
 import { PROCEDENCIA, mensajeOrigenDesconocido } from './contraste.js'
+// ⚠️ De `navegacion.js` solo la INSTRUCCIÓN, y sin ciclo: aquel módulo no importa
+// ningún `app/cableado-*.js` justamente para que los cuatro que dicen «cómo se trae
+// el parcelario» lo digan con la misma frase. Ver su JSDoc.
+import { INSTRUCCION_PARCELARIO } from './navegacion.js'
 
 // ── Los selectores del contrato con `index.html` ─────────────────────────────
 //
@@ -224,24 +231,55 @@ export const SELECTOR_CAMPO_REFCAT = '[data-campo="refcat"]'
 export const SELECTOR_BOTON_CARGAR = '[data-accion="cargar-catastro"]'
 
 /**
- * «Deducir del mapa». **Nace `disabled` en `index.html`** y lo habilita el ESTADO,
- * nunca la mera importación de este módulo: ver {@link puedeDeducirDe}.
+ * ⛔ **AQUÍ ESTUVO `SELECTOR_BOTON_DEDUCIR` (`[data-accion="deducir-refcat"]`), Y SE
+ * RETIRÓ EL 2026-08-16.** Con él se fueron el nodo de `index.html`, su oyente y el
+ * predicado `puedeDeducirDe` que lo encendía (geometría en el store Y sin `refcat`).
+ *
+ * **La deducción NO se ha ido**: siguen vivos {@link deducirEn} y `deducir()`, y sus
+ * tres llamantes —el CLIC EN EL MAPA de este mismo módulo, la deducción automática
+ * de `app/main.js#deducirRefcatTrasImportar` y «Traer el parcelario de fondo» de
+ * `app/cableado-diagnostico.js`— cubren entre los tres todo lo que el botón ofrecía,
+ * y el clic además el caso que el botón NO podía atender: la aplicación recién
+ * abierta y vacía, sin geometría desde la que sacar un punto interior.
+ *
+ * El porqué largo está en `index.html`, en la lápida del bloque de Entrada.
  */
-export const SELECTOR_BOTON_DEDUCIR = '[data-accion="deducir-refcat"]'
 
 /**
  * «Traer colindantes». **Nace `disabled` en `index.html`** y lo habilita el
  * ESTADO: ver {@link puedePedirColindantesDe}.
  *
- * No tiene renglón propio y usa el del bloque ({@link SELECTOR_ESTADO_CATASTRO}),
- * que es lo correcto: es una consulta al Catastro más, y darle un `role="status"`
- * aparte haría que dos renglones vecinos se contradijeran sobre cuál fue la última
- * acción.
+ * ⭐ **VIVE EN EL PIE DE EDICIÓN DESDE EL 2026-08-16**, no en el bloque de Entrada.
+ * Aquí ponía —desde F06— que era «una CONSULTA al Catastro, no una edición», y eso
+ * era cierto y era irrelevante: las vecinas se piden PARA editar (dianas de
+ * enganche del snap) y PARA diagnosticar (invasión a colindantes), y las dos cosas
+ * pasan en Edición. El `data-accion` no ha cambiado, así que este selector sigue
+ * siendo el mismo literal; lo que ha cambiado es dónde lo encuentra
+ * `querySelector`.
  */
 export const SELECTOR_BOTON_COLINDANTES = '[data-accion="traer-colindantes"]'
 
 /** Renglón `role="status"` del bloque: el desenlace de la última acción. */
 export const SELECTOR_ESTADO_CATASTRO = '[data-estado="cargar-catastro"]'
+
+/**
+ * ⭐ El renglón `role="status"` **PROPIO de «Traer colindantes»** (2026-08-16), con
+ * la misma cadena que su `data-accion` — la convención de esta app y del pie de
+ * Edición donde ahora vive (`traer-fondo-catastral`/`traer-fondo-catastral`,
+ * `diagnosticar`/`diagnosticar`).
+ *
+ * **Hasta la mudanza compartía {@link SELECTOR_ESTADO_CATASTRO}**, y aquí estaba
+ * escrito por qué eso era lo correcto: «es una consulta al Catastro más, y darle un
+ * `role="status"` aparte haría que dos renglones vecinos se contradijeran sobre cuál
+ * fue la última acción». El argumento se cae con la mudanza —ya no son vecinos— y lo
+ * que queda es el defecto: el desenlace de una consulta pedida desde Edición se
+ * escribiría en un bloque de Entrada que el usuario no está mirando. Un botón que no
+ * dice qué ha pasado es un botón mudo, y aquí lo sería teniendo el texto escrito.
+ *
+ * ⚠️ Lo que NO cambia es el reparto de superficies: el mensaje ÍNTEGRO del servicio
+ * sigue yendo al PANEL, y a este renglón solo el resumen. Ver la cabecera.
+ */
+export const SELECTOR_ESTADO_COLINDANTES = '[data-estado="traer-colindantes"]'
 
 /** De dónde salió el dato que hay en pantalla, y su antigüedad. */
 export const SELECTOR_PROCEDENCIA = '[data-procedencia="parcela"]'
@@ -326,8 +364,8 @@ export const MENSAJE_SUSCRIPTOR_ROTO =
  * Se exporta para que su test lo afirme sin copiar el literal.
  */
 export const MOTIVO_COLINDANTES_APAGADO =
-  '«Traer colindantes» está apagado: las vecinas lo son de una parcela concreta, y todavía no ' +
-  'hay ninguna cargada con referencia catastral. Trae una parcela del Catastro y se enciende.'
+  '«Traer colindantes» está apagado: las vecinas lo son de una parcela concreta, y la que hay ' +
+  `cargada no tiene referencia catastral. ${INSTRUCCION_PARCELARIO}`
 
 /**
  * Lo que se dice cuando alguien llama a `cargar({refcat})` con una referencia que no
@@ -602,40 +640,50 @@ const vertices = (recintos) =>
   (Array.isArray(recintos) ? recintos : []).reduce((n, r) => n + r.vertices.length, 0)
 
 /**
- * ¿Tiene sentido ofrecer «Deducir del mapa»? **Hay geometría en el store Y `refcat`
- * es `null`.** Las dos mitades importan:
- *   · sin geometría no hay punto desde el que preguntar;
- *   · con referencia ya no hay nada que deducir, y ofrecerlo invitaría a
- *     sobrescribir un dato que el usuario ha afirmado con una conjetura.
+ * Escribe un renglón `role="status"`. Vacío + sin modificador es el estado «no ha
+ * pasado nada todavía»: el CSS lo colapsa (`:empty`) y el bloque no da un salto.
  *
- * Es alcanzable hoy con `?demo=hueco` (parcela sintética, sin referencia).
+ * **Son DOS los renglones desde el 2026-08-16** —el del bloque de Entrada y el de
+ * «Traer colindantes», que se mudó al pie de Edición—, y por eso el gesto se escribe
+ * una vez aquí en vez de dos veces dentro del cableado: que el modificador de fallo
+ * se ponga en uno y se olvide en el otro es el defecto que esta función impide.
  *
- * No se exporta: es una regla INTERNA de esta pantalla, y sacarla invitaría a que
- * otro módulo decidiera con ella cuándo se puede deducir — que es justo lo que este
- * cableado existe para no repartir. Se comprueba desde fuera por su efecto (el
- * `disabled` del botón), que es lo que el usuario ve.
- *
- * @param {object|null} parcelaActual
- * @returns {boolean}
+ * @param {HTMLElement} donde
+ * @param {string} texto
+ * @param {boolean} fallo  `true` si la acción NO ha traído lo que se le pidió.
+ * @returns {void}
  */
-function puedeDeducirDe(parcelaActual) {
-  return recintosDe(parcelaActual).length > 0 && referenciaDe(parcelaActual) === null
+function escribirRenglon(donde, texto, fallo) {
+  donde.textContent = texto
+  donde.classList.toggle(CLASE_ESTADO_ERROR, fallo)
 }
 
 /**
- * ¿Tiene sentido deducir la referencia con un CLIC EN EL MAPA? **Sólo que el modelo
- * no tenga ya una referencia.** Sin geometría, y ésa es toda la diferencia con
- * {@link puedeDeducirDe}.
+ * ⛔ **AQUÍ ESTUVO `puedeDeducirDe`, Y SE FUE CON SU BOTÓN EL 2026-08-16.** Decía
+ * «hay geometría en el store Y `refcat` es `null`», y las dos mitades eran del
+ * BOTÓN: sin geometría no había punto interior desde el que preguntar, y con
+ * referencia no había nada que deducir. Retirado «Deducir del mapa», no le quedaba
+ * ni un llamante.
  *
- * ── POR QUÉ SON DOS PREGUNTAS Y NO UNA (2026-08-11) ──
- * Hasta hoy el clic reusaba `puedeDeducirDe`, y con ella heredaba **una condición
- * que no es suya**: la de que haya geometría cargada. Esa condición existe por el
- * BOTÓN, que saca el punto de un `puntoInterior` de la parcela — sin parcela no hay
- * punto y el botón no puede prometer nada. **El clic trae su propio punto**: es
- * exactamente el sitio donde el usuario ha pinchado. Exigirle geometría era pedirle
- * un dato que no necesita, y el precio lo pagaba el caso más frecuente de todos —
- * la aplicación recién abierta, vacía, con el mapa delante y catorce caracteres que
- * teclear a mano.
+ * ⚠️ **No se ha unificado con {@link puedeDeducirClicando}**, que es lo que parece
+ * que sobra al leerlas juntas: la que queda es MÁS PERMISIVA a propósito (no exige
+ * geometría), así que quedarse con la otra habría apagado el clic en el caso más
+ * frecuente de todos — la aplicación recién abierta y vacía.
+ */
+
+/**
+ * ¿Tiene sentido deducir la referencia con un CLIC EN EL MAPA? **Sólo que el modelo
+ * no tenga ya una referencia.** Sin exigir geometría: el punto lo trae el clic.
+ *
+ * ── POR QUÉ ESTA CONDICIÓN Y NO OTRA (2026-08-11) ──
+ * Hasta esa fecha el clic reusaba el predicado del BOTÓN, y con él heredaba **una
+ * condición que no era suya**: la de que hubiera geometría cargada. Esa condición
+ * existía porque el botón sacaba el punto de un `puntoInterior` de la parcela — sin
+ * parcela no hay punto y el botón no podía prometer nada. **El clic trae su propio
+ * punto**: es exactamente el sitio donde el usuario ha pinchado. Exigirle geometría
+ * era pedirle un dato que no necesita, y el precio lo pagaba el caso más frecuente
+ * de todos — la aplicación recién abierta, vacía, con el mapa delante y catorce
+ * caracteres que teclear a mano.
  *
  * Lo que SÍ se conserva es la otra mitad, y por su motivo original: con una
  * referencia ya en el modelo, un clic en el mapa **no la pisa**. Ahí el mapa es la
@@ -643,8 +691,10 @@ function puedeDeducirDe(parcelaActual) {
  * arrastre; sustituir en silencio una referencia buena por la de donde cayó el dedo
  * sería el error silencioso de siempre.
  *
- * No se exporta, por lo mismo que {@link puedeDeducirDe}: es una regla INTERNA de
- * esta pantalla. Se comprueba desde fuera por su efecto (que el clic consulte o no).
+ * No se exporta: es una regla INTERNA de esta pantalla, y sacarla invitaría a que
+ * otro módulo decidiera con ella cuándo se puede deducir — que es justo lo que este
+ * cableado existe para no repartir. Se comprueba desde fuera por su efecto (que el
+ * clic consulte o no).
  *
  * @param {object|null} parcelaActual
  * @returns {boolean}
@@ -669,7 +719,7 @@ function puedeDeducirClicando(parcelaActual) {
  * disponible por eso mismo. Apagar el botón por algo que el usuario no puede ver ni
  * corregir sería la peor versión del botón mudo.
  *
- * No se exporta, por el mismo motivo que {@link puedeDeducirDe}: es una regla
+ * No se exporta, por el mismo motivo que {@link puedeDeducirClicando}: es una regla
  * INTERNA de esta pantalla. Se comprueba desde fuera por su efecto (el `disabled`).
  *
  * @param {object|null} parcelaActual
@@ -949,10 +999,17 @@ function esEmisor(m) {
  */
 
 /**
- * Cablea el bloque «Origen de la parcela»: el campo de la referencia, «Traer del
- * Catastro», «Deducir del mapa», «Traer colindantes», la lista de candidatos y el
- * renglón de procedencia. Es el último metro de F05 y lo único de toda la feature
- * que el usuario llega a ver.
+ * Cablea el bloque «Parcela del Catastro» de Entrada —el campo de la referencia,
+ * «Traer del Catastro», la lista de candidatos y el renglón de procedencia— **y el
+ * botón «Traer colindantes» del pie de Edición**, con su renglón. Es el último metro
+ * de F05 y lo único de toda la feature que el usuario llega a ver.
+ *
+ * ⚠️ **DOS PANTALLAS, UN CABLEADO, Y ES DELIBERADO** (2026-08-16). Repartir las
+ * vecinas a `cableado-diagnostico.js` porque su botón vive ahora en su pie sería
+ * partir en dos el esqueleto de defensas de la cabecera —token de secuencia,
+ * abortador, cotejo de identidad— y dejar que dos módulos consulten el mismo
+ * servicio con dos criterios de vigencia. Quien habla con el Catastro sigue siendo
+ * uno; lo que cambió es dónde está el botón.
  *
  * ── LAS TRES ACCIONES ──
  *   · **`cargar({refcat, sustituir})`** — `cliente.parcelaPorRefcat` y, si trae dato,
@@ -964,9 +1021,13 @@ function esEmisor(m) {
  *     `cliente.refcatPorCoordenada` → rellena el CAMPO (nunca el modelo). Con
  *     varios candidatos no rellena nada: los lista con su domicilio y deja elegir.
  *     **No dispara ningún gancho**: no mete geometría en ninguna parte.
+ *     ⚠️ **Ya no tiene botón** desde el 2026-08-16 (ver el selector retirado), pero
+ *     sigue siendo API: la llaman `app/main.js` al importar un dibujo sin referencia
+ *     y `app/cableado-diagnostico.js` antes de traer el parcelario de fondo. El clic
+ *     en el mapa entra por {@link deducirEn}, que es el tramo de abajo.
  *   · **`colindantes()`** — `cliente.parcelaYColindantes` de la parcela cargada.
- *     Desde F06 tiene su BOTÓN («Traer colindantes»), y sigue sin escribir en el
- *     modelo: `model/parcela.js` no tiene dónde guardar unas vecinas, y meterlas
+ *     Desde F06 tiene su BOTÓN («Traer colindantes», en el pie de Edición desde el
+ *     2026-08-16), y sigue sin escribir en el modelo: `model/parcela.js` no tiene dónde guardar unas vecinas, y meterlas
  *     donde no van sería peor que devolverlas. Se devuelve el
  *     {@link ResultadoCatastro} **y se publica** a los suscriptores de
  *     `alColindantes`, para que F06 (snap) y F07 (diagnóstico, invasión) hagan con
@@ -1025,9 +1086,12 @@ function esEmisor(m) {
  *   casos. Con la puerta 1 se llama DESPUÉS de `alCargarParcela`.
  * @param {HTMLElement} [opciones.campo]  Por defecto {@link SELECTOR_CAMPO_REFCAT}.
  * @param {HTMLElement} [opciones.botonCargar]  Ídem {@link SELECTOR_BOTON_CARGAR}.
- * @param {HTMLElement} [opciones.botonDeducir]  Ídem {@link SELECTOR_BOTON_DEDUCIR}.
  * @param {HTMLElement} [opciones.botonColindantes]  Ídem
- *   {@link SELECTOR_BOTON_COLINDANTES}.
+ *   {@link SELECTOR_BOTON_COLINDANTES}. **Vive en el pie de EDICIÓN**, no en este
+ *   bloque; ver el selector.
+ * @param {HTMLElement} [opciones.renglonColindantes]  Ídem
+ *   {@link SELECTOR_ESTADO_COLINDANTES}. El desenlace de las consultas de vecinas y
+ *   el motivo de su botón apagado, **donde se pulsa el botón**.
  * @param {HTMLElement} [opciones.renglon]  Ídem {@link SELECTOR_ESTADO_CATASTRO}.
  * @param {HTMLElement} [opciones.procedencia]  Ídem {@link SELECTOR_PROCEDENCIA}.
  * @param {HTMLElement} [opciones.candidatos]  Ídem {@link SELECTOR_CANDIDATOS}.
@@ -1055,9 +1119,9 @@ export function cablearCatastro({
   alCambiarOficial = null,
   campo = nodo(SELECTOR_CAMPO_REFCAT),
   botonCargar = nodo(SELECTOR_BOTON_CARGAR),
-  botonDeducir = nodo(SELECTOR_BOTON_DEDUCIR),
   botonColindantes = nodo(SELECTOR_BOTON_COLINDANTES),
   renglon = nodo(SELECTOR_ESTADO_CATASTRO),
+  renglonColindantes = nodo(SELECTOR_ESTADO_COLINDANTES),
   procedencia = nodo(SELECTOR_PROCEDENCIA),
   candidatos = nodo(SELECTOR_CANDIDATOS),
   ahora = () => new Date(),
@@ -1151,15 +1215,27 @@ export function cablearCatastro({
   // ── Escritura en la cáscara ────────────────────────────────────────────────
 
   /**
-   * Escribe el renglón `role="status"`. Vacío + sin modificador es el estado «no ha
-   * pasado nada todavía»: el CSS lo colapsa (`:empty`) y el bloque no da un salto.
+   * Escribe el renglón `role="status"` **del bloque de Entrada**: el desenlace de
+   * «Traer del Catastro» y de la deducción.
    *
    * @param {string} texto
    * @param {boolean} fallo  `true` si la acción NO ha traído lo que se le pidió.
    */
   function decir(texto, fallo) {
-    renglon.textContent = texto
-    renglon.classList.toggle(CLASE_ESTADO_ERROR, fallo)
+    escribirRenglon(renglon, texto, fallo)
+  }
+
+  /**
+   * Lo mismo, en el renglón de «Traer colindantes» (pie de Edición). Es una función
+   * aparte y no un `decir(texto, fallo, nodo)` con parámetro: las dos se pasan como
+   * VALOR a {@link contarFallo} y a {@link reventar}, y una firma de tres argumentos
+   * obligaría a envolverlas ahí en cada llamada.
+   *
+   * @param {string} texto
+   * @param {boolean} fallo
+   */
+  function decirColindantes(texto, fallo) {
+    escribirRenglon(renglonColindantes, texto, fallo)
   }
 
   /** Vacía y esconde la lista de candidatos. Una lista visible y vacía AFIRMARÍA
@@ -1170,67 +1246,58 @@ export function cablearCatastro({
   }
 
   /**
-   * Estado de los TRES botones. Es a la vez el suscriptor del store y lo que se
+   * Estado de los DOS botones. Es a la vez el suscriptor del store y lo que se
    * llama al acabar cada consulta, así que la regla vive en UN solo sitio:
    *
-   *   · mientras hay algo EN VUELO, los tres apagados (cortesía, no garantía; y
-   *     además es lo que impide que una doble pulsación dispare dos peticiones);
+   *   · mientras hay algo EN VUELO, los dos apagados (cortesía, no garantía; y
+   *     además es lo que impide que una doble pulsación dispare dos peticiones).
+   *     **Los dos aunque vivan en pantallas distintas**: el que está en vuelo es un
+   *     único abortador compartido, y encender uno mientras el otro espera dejaría
+   *     que dos consultas se pisaran la respuesta;
    *   · «Traer del Catastro», siempre disponible en reposo: el campo vacío o mal
    *     escrito lo resuelve el cliente con `ENTRADA_INVALIDA` y sin tocar la red,
    *     y un botón apagado sin motivo al lado es lo que no se admite;
-   *   · «Deducir del mapa», sólo si {@link puedeDeducirDe};
    *   · «Traer colindantes», sólo si {@link puedePedirColindantesDe}, y cuando
    *     queda apagado **se escribe el motivo**: ver {@link MOTIVO_COLINDANTES_APAGADO}.
    *
-   * ── POR QUÉ EL MOTIVO SÓLO SE ESCRIBE CON EL RENGLÓN VACÍO ──
-   * El renglón es del DESENLACE de la última acción (reparto de superficies de la
-   * cabecera), y `refrescar` corre en cada `set` del store —o sea, en cada vértice
-   * que F06 mueva— y al final de cada consulta. Escribir ahí sin condición borraría
-   * «Cargada la parcela X: 12 vértices» un instante después de haberlo puesto. El
-   * renglón VACÍO es el único estado que no es de nadie («no ha pasado nada
-   * todavía»), y es justo el que se ve al abrir la app con el botón ya gris: ese
-   * hueco es el que se llena. En cuanto una acción habla, el motivo del botón
-   * apagado ES lo que esa acción acaba de contar.
+   * ⛔ **ERAN TRES HASTA EL 2026-08-16**: el que falta es «Deducir del mapa», que se
+   * retiró con su predicado. Ver el selector.
+   *
+   * ── EL MOTIVO YA NO ESPERA A QUE EL RENGLÓN ESTÉ VACÍO (2026-08-16) ──
+   * Aquí había una condición `renglon.textContent === ''` y **era necesaria mientras
+   * el renglón fuera compartido**: `refrescar` corre en cada `set` del store —o sea,
+   * en cada vértice que F06 mueva— y escribir sin condición borraba «Cargada la
+   * parcela X: 12 vértices» un instante después de haberlo puesto.
+   *
+   * Con la mudanza el botón tiene renglón PROPIO, así que ya no hay nada de otra
+   * acción que pisar: lo único que este renglón puede estar diciendo es el desenlace
+   * de la última consulta de vecinas, y si el botón está apagado ese desenlace ya no
+   * describe la pantalla. Se escribe siempre, que además arregla el caso que la
+   * condición dejaba mudo: pedir vecinas, cargar después un DXF sin referencia y
+   * quedarse con «El Catastro ha devuelto 5 colindantes» al lado de un botón gris.
+   *
+   * ⚠️ Con el store VACÍO sigue sin escribirse, y por su motivo original: ahí el
+   * peldaño del rail ya dice «Trae antes una parcela», y esto lo repetiría en tres
+   * frases para un botón secundario. La otra mitad de aquel argumento —los 59 px
+   * medidos que costaba en Entrada— se ha ido con la mudanza: en el pie de Edición
+   * el hueco es el mismo que ya reservan sus tres hermanos.
+   *
+   * `ocupado` fuera de la condición: mientras hay algo en vuelo el motivo de estar
+   * apagado es la consulta en curso, no la falta de referencia, y contarlo sería
+   * mentir.
    *
    * @param {object|null} parcelaActual
    */
   function refrescar(parcelaActual) {
     const ocupado = enVuelo !== null
     botonCargar.disabled = ocupado
-    botonDeducir.disabled = ocupado || !puedeDeducirDe(parcelaActual)
     const sinReferencia = !puedePedirColindantesDe(parcelaActual)
     botonColindantes.disabled = ocupado || sinReferencia
 
-    // ⭐ **Y NO SE ESCRIBE CON EL STORE VACÍO** (2026-08-07). Desde que la
-    // aplicación arranca sin nada precargado, éste es el estado en el que se
-    // ABRE, y ahí el motivo dejó de ganarse su sitio por dos razones, las dos
-    // medidas el mismo día a 1280×720 —el suelo declarado del proyecto—:
-    //
-    //   · **DUPLICA AL RAIL.** Con el store vacío, el peldaño «Validación» ya
-    //     dice «Trae antes una parcela: por referencia catastral o desde tu
-    //     medición». Este párrafo repite eso mismo en tres frases y para un
-    //     botón secundario. Es exactamente la palanca 3 de F11·M29: no es un
-    //     recorte de honradez, es quitar la segunda copia.
-    //   · **COSTABA 59,00 px MEDIDOS Y SE COMÍA UNA RUTA CRÍTICA.** Con él
-    //     puesto, «¿Ya tenías un expediente? Abrirlo» —la ruta 4 del plan de
-    //     pruebas— quedaba **45 px por debajo del borde**, y `.gml-panel` es
-    //     `overflow:hidden` con `scrollHeight === clientHeight`: no recortada
-    //     tras un scroll, sino **inalcanzable y en silencio**. Sin él, el pie
-    //     entra con 14 px de holgura.
-    //
-    // ⚠️ **Con parcela y sin referencia SÍ se escribe, y ahí es donde importa**:
-    // una parcela que ha entrado por `.dxf`, por pegado o por un GML ajeno no
-    // tiene refcat, y entonces el botón apagado SÍ sorprende — el usuario ve una
-    // parcela en pantalla y un botón de colindantes que no responde. Ése es el
-    // caso para el que se escribió el mensaje.
-    //
-    // `ocupado` fuera de la condición: mientras hay algo en vuelo el motivo de
-    // estar apagado es la consulta en curso, no la falta de referencia, y
-    // contarlo sería mentir.
     const hayParcela = parcelaActual !== null && parcelaActual !== undefined
-    if (!ocupado && hayParcela && sinReferencia && renglon.textContent === '') {
+    if (!ocupado && hayParcela && sinReferencia) {
       // `false`: no es un fallo. Nadie ha pedido nada todavía; se explica un botón.
-      decir(MOTIVO_COLINDANTES_APAGADO, false)
+      decirColindantes(MOTIVO_COLINDANTES_APAGADO, false)
     }
   }
 
@@ -1326,11 +1393,18 @@ export function cablearCatastro({
    * del cliente al panel (con su nivel, que sale de `NIVEL_POR_MOTIVO` y nunca de
    * una clasificación inventada aquí) y el RESUMEN al renglón.
    *
+   * ⚠️ **Qué renglón, se pasa** (2026-08-16). Desde que «Traer colindantes» tiene el
+   * suyo en el pie de Edición, «el renglón» dejó de ser uno solo. El defecto por
+   * defecto sigue siendo el de Entrada, así que los llamantes de siempre no cambian.
+   *
    * @param {ResultadoCatastro} resultado
+   * @param {(texto: string, fallo: boolean) => void} [decirEn=decir]  Dónde se
+   *   escribe el resumen. El panel es el mismo para todos: lo que le pasa al dato no
+   *   depende de qué botón lo pidió.
    */
-  function contarFallo(resultado) {
+  function contarFallo(resultado, decirEn = decir) {
     panel.avisar(resultado.mensaje, { nivel: NIVEL_POR_MOTIVO[resultado.motivo] ?? NIVEL.AVISO })
-    decir(`${RESUMEN_POR_MOTIVO[resultado.motivo] ?? RESUMEN_DESCONOCIDO} ${COLA_DETALLE}`, true)
+    decirEn(`${RESUMEN_POR_MOTIVO[resultado.motivo] ?? RESUMEN_DESCONOCIDO} ${COLA_DETALLE}`, true)
   }
 
   /**
@@ -1344,9 +1418,11 @@ export function cablearCatastro({
    * el rechazo: los dos destinatarios atendidos.
    *
    * @param {*} causa
+   * @param {(texto: string, fallo: boolean) => void} [decirEn=decir]  Dónde se
+   *   escribe. Mismo motivo que en {@link contarFallo}: hay dos renglones.
    */
-  function reventar(causa) {
-    decir(MENSAJE_FALLO_INESPERADO, true)
+  function reventar(causa, decirEn = decir) {
+    decirEn(MENSAJE_FALLO_INESPERADO, true)
     panel.avisar(MENSAJE_FALLO_INESPERADO, { nivel: NIVEL.ERROR, causa })
     console.error('[catastro] la consulta al Catastro ha fallado de forma inesperada:', causa)
   }
@@ -1842,11 +1918,11 @@ export function cablearCatastro({
       if (!resultado.ok) {
         // Un resultado sin dato NO se publica: quien se suscribe espera vecinas
         // utilizables (dianas del snap), no un objeto que tenga que reclasificar.
-        contarFallo(resultado)
+        contarFallo(resultado, decirColindantes)
         return resultado
       }
       const cuantos = resultado.datos.colindantes.length
-      decir(
+      decirColindantes(
         cuantos === 0
           ? `El Catastro ha contestado con la parcela ${pedida} y NINGUNA colindante. No es un ` +
               `fallo: es el dato — hay parcelas aisladas, rodeadas de viales o de suelo sin ` +
@@ -1860,7 +1936,7 @@ export function cablearCatastro({
       publicarColindantes(resultado)
       return resultado
     } catch (causa) {
-      reventar(causa)
+      reventar(causa, decirColindantes)
       throw causa
     }
   }
@@ -1868,20 +1944,16 @@ export function cablearCatastro({
   // ── Oyentes ────────────────────────────────────────────────────────────────
 
   /**
-   * Los cuatro manejadores de `click` sueltan la promesa a propósito. Lo que puede
-   * fallar dentro ya se ha contado por TRES canales (renglón, panel y
-   * `console.error`) antes de rechazar, así que dejar además una promesa sin
-   * manejar sólo añadiría un mensaje del motor encima de los tres que sí explican
-   * qué ha pasado. Quien llama a la API (`cargar()`, F07) sí recibe el rechazo.
+   * Los manejadores de `click` sueltan la promesa a propósito. Lo que puede fallar
+   * dentro ya se ha contado por TRES canales (renglón, panel y `console.error`)
+   * antes de rechazar, así que dejar además una promesa sin manejar sólo añadiría
+   * un mensaje del motor encima de los tres que sí explican qué ha pasado. Quien
+   * llama a la API (`cargar()`, F07) sí recibe el rechazo.
    */
   const yaContado = () => {}
 
   const alPulsarCargar = () => {
     cargar().catch(yaContado)
-  }
-
-  const alPulsarDeducir = () => {
-    deducir().catch(yaContado)
   }
 
   /**
@@ -1958,17 +2030,16 @@ export function cablearCatastro({
 
   campo.addEventListener('input', alEscribirRefcat)
   botonCargar.addEventListener('click', alPulsarCargar)
-  botonDeducir.addEventListener('click', alPulsarDeducir)
   botonColindantes.addEventListener('click', alPulsarColindantes)
   candidatos.addEventListener('click', alElegirCandidato)
   if (mapa !== null) mapa.on('click', alPulsarMapa)
 
   const desuscribir = estado.subscribe(refrescar)
   // `subscribe` NO notifica al suscribirse (ver `crearEstadoVista`): el primer
-  // estado de los botones se calcula a mano. Sin esta línea, «Deducir del mapa» se
-  // quedaría en el `disabled` con el que nace en `index.html` hasta el primer
-  // cambio del store — y quien abre la app con `?demo=hueco` vería gris justo el
-  // botón que le hace falta.
+  // estado de los botones se calcula a mano. Sin esta línea, «Traer colindantes» se
+  // quedaría en el `disabled` con el que nace en `index.html` hasta el primer cambio
+  // del store — y quien abre un expediente guardado, o llega por una URL con
+  // parcela, vería gris el botón que le hace falta y sin motivo escrito al lado.
   refrescar(estado.get())
 
   return {
@@ -2008,9 +2079,12 @@ export function cablearCatastro({
     },
 
     /**
-     * Deja el cableado inerte: retira los cinco oyentes, la suscripción al store y
+     * Deja el cableado inerte: retira los cuatro oyentes, la suscripción al store y
      * **los suscriptores de `alColindantes`**, y **aborta lo que esté en vuelo**.
      * IDEMPOTENTE.
+     *
+     * ⛔ Eran CINCO hasta el 2026-08-16: el que falta es el clic de «Deducir del
+     * mapa», que se retiró con el botón.
      *
      * El orden importa: primero se invalida la secuencia y luego se aborta, para
      * que la respuesta que llegue después de esto no encuentre ningún camino por el
@@ -2026,7 +2100,6 @@ export function cablearCatastro({
       }
       campo.removeEventListener('input', alEscribirRefcat)
       botonCargar.removeEventListener('click', alPulsarCargar)
-      botonDeducir.removeEventListener('click', alPulsarDeducir)
       botonColindantes.removeEventListener('click', alPulsarColindantes)
       candidatos.removeEventListener('click', alElegirCandidato)
       if (mapa !== null) mapa.off('click', alPulsarMapa)

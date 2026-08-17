@@ -126,10 +126,10 @@ import {
   SELECTOR_BOTON_CARGAR,
   avisoReferenciaDeducida,
   SELECTOR_BOTON_COLINDANTES,
-  SELECTOR_BOTON_DEDUCIR,
   SELECTOR_CAMPO_REFCAT,
   SELECTOR_CANDIDATOS,
   SELECTOR_ESTADO_CATASTRO,
+  SELECTOR_ESTADO_COLINDANTES,
   SELECTOR_PROCEDENCIA,
   cablearCatastro,
   camposInvariantes,
@@ -472,9 +472,11 @@ function cablear(opciones = {}) {
     cableado,
     campo: document.querySelector(SELECTOR_CAMPO_REFCAT),
     botonCargar: document.querySelector(SELECTOR_BOTON_CARGAR),
-    botonDeducir: document.querySelector(SELECTOR_BOTON_DEDUCIR),
     botonColindantes: document.querySelector(SELECTOR_BOTON_COLINDANTES),
     renglon: document.querySelector(SELECTOR_ESTADO_CATASTRO),
+    // ⭐ El renglón PROPIO de «Traer colindantes» (2026-08-16). Vive en el pie de
+    // Edición, con el botón; hasta la mudanza los dos escribían en `renglon`.
+    renglonColindantes: document.querySelector(SELECTOR_ESTADO_COLINDANTES),
     procedencia: document.querySelector(SELECTOR_PROCEDENCIA),
     lista: document.querySelector(SELECTOR_CANDIDATOS),
   }
@@ -548,8 +550,11 @@ describe('cableado-catastro · el marcado de index.html es CONTRATO', () => {
   it.each([
     ['el campo de la referencia', SELECTOR_CAMPO_REFCAT],
     ['el botón de cargar', SELECTOR_BOTON_CARGAR],
-    ['el botón de deducir', SELECTOR_BOTON_DEDUCIR],
     ['el renglón de estado', SELECTOR_ESTADO_CATASTRO],
+    // ⭐ El nodo que estrena la mudanza del 2026-08-16. Falta él y el cableado
+    // lanza igual que por los otros seis: un botón en el pie de Edición cuyo
+    // desenlace no tiene dónde escribirse es peor que un botón que no existe.
+    ['el renglón de colindantes', SELECTOR_ESTADO_COLINDANTES],
     ['el renglón de procedencia', SELECTOR_PROCEDENCIA],
     ['la lista de candidatos', SELECTOR_CANDIDATOS],
   ])('falta %s ⇒ lanza NOMBRANDO el selector', (_caso, selector) => {
@@ -557,25 +562,36 @@ describe('cableado-catastro · el marcado de index.html es CONTRATO', () => {
     expect(() => cablear()).toThrow(selector)
   })
 
-  it('la guarda NO es vacua: index.html trae los seis nodos, y en su estado inicial', () => {
+  it('la guarda NO es vacua: index.html trae los siete nodos, y en su estado inicial', () => {
     for (const selector of [
       SELECTOR_CAMPO_REFCAT,
       SELECTOR_BOTON_CARGAR,
-      SELECTOR_BOTON_DEDUCIR,
+      SELECTOR_BOTON_COLINDANTES,
       SELECTOR_ESTADO_CATASTRO,
+      SELECTOR_ESTADO_COLINDANTES,
       SELECTOR_PROCEDENCIA,
       SELECTOR_CANDIDATOS,
     ]) {
       expect(document.querySelector(selector), selector).not.toBeNull()
     }
-    // «Deducir del mapa» nace apagado en el HTML: deducir sólo tiene sentido con
-    // geometría y sin referencia, y ofrecerlo antes prometería lo que no se puede.
-    expect(document.querySelector(SELECTOR_BOTON_DEDUCIR).disabled).toBe(true)
+    // «Traer colindantes» nace apagado en el HTML: las vecinas lo son de una parcela
+    // con referencia catastral, y ofrecerlo antes prometería lo que no se puede.
+    expect(document.querySelector(SELECTOR_BOTON_COLINDANTES).disabled).toBe(true)
     // La lista nace oculta: una lista visible y vacía AFIRMARÍA que no se encontró
     // nada, que es otra cosa muy distinta de que aún no se haya deducido.
     expect(document.querySelector(SELECTOR_CANDIDATOS).hidden).toBe(true)
-    // Y el renglón se anuncia sin robar el foco.
+    // Y los dos renglones se anuncian sin robar el foco.
     expect(document.querySelector(SELECTOR_ESTADO_CATASTRO).getAttribute('role')).toBe('status')
+    expect(document.querySelector(SELECTOR_ESTADO_COLINDANTES).getAttribute('role')).toBe('status')
+  })
+
+  // ⛔ **AQUÍ HABÍA UN SÉPTIMO CASO: `[data-accion="deducir-refcat"]`.** El botón
+  // «Deducir del mapa» se retiró el 2026-08-16 y con él su nodo, su oyente y el
+  // predicado que lo encendía. Lo que NO se ha ido es la deducción: sus pruebas
+  // están en «deducir()» y «deducir con un clic en el mapa», más abajo.
+  it('«deducir-refcat» ya NO es contrato: index.html no lo trae y cablear no lo pide', () => {
+    expect(document.querySelector('[data-accion="deducir-refcat"]')).toBeNull()
+    expect(() => cablear()).not.toThrow()
   })
 
   it('sin nodos explícitos los localiza solo (es como lo llamará `app/main.js`)', () => {
@@ -984,22 +1000,29 @@ describe('cableado-catastro · dos consultas encabalgadas', () => {
     })
   })
 
+  // ⚠️ Los dos botones viven en PANTALLAS DISTINTAS desde el 2026-08-16 («Traer
+  // colindantes» se mudó al pie de Edición), y da igual: lo que los apaga es un
+  // único `enVuelo` compartido. Encender uno mientras el otro espera dejaría que
+  // dos consultas se pisaran la respuesta, que es el defecto que esto mide.
   it('mientras hay algo en vuelo los dos botones están apagados, y luego vuelven', async () => {
     const transporte = crearTransporteDoble({ manual: true })
-    const montado = cablear({ transporte, parcelaInicial: parcelaSinReferencia() })
-    expect(montado.botonDeducir.disabled).toBe(false)
+    // CON referencia: es la única forma de que «Traer colindantes» empiece
+    // encendido, y sin eso la prueba sería vacua (mediría un botón ya apagado).
+    const montado = cablear({ transporte, parcelaInicial: parcelaConReferencia() })
+    expect(montado.botonColindantes.disabled).toBe(false)
 
     montado.campo.value = REFCAT
     const enCurso = montado.cableado.cargar()
     // Síncrono, en el mismo tick del clic: no hay una ventana en la que el botón
     // siga pulsable «mientras arranca la consulta».
     expect(montado.botonCargar.disabled).toBe(true)
-    expect(montado.botonDeducir.disabled).toBe(true)
+    expect(montado.botonColindantes.disabled).toBe(true)
 
     await hastaPeticion(transporte, 1)
     transporte.peticiones[0].responder()
     await enCurso
     expect(montado.botonCargar.disabled).toBe(false)
+    expect(montado.botonColindantes.disabled).toBe(false)
   })
 })
 
@@ -1098,27 +1121,30 @@ describe('cableado-catastro · destruir()', () => {
 
   it('retira los oyentes de los dos botones y del mapa', async () => {
     const mapa = crearMapaDoble()
-    const montado = cablear({ mapa, parcelaInicial: parcelaSinReferencia() })
+    const montado = cablear({ mapa, parcelaInicial: parcelaConReferencia() })
     expect(mapa.oyentes.get('click').size).toBe(1)
+    // Encendido ANTES de destruir: si no, el clic de abajo no consultaría nada por
+    // estar el botón gris y la prueba sería vacua.
+    expect(montado.botonColindantes.disabled).toBe(false)
 
     montado.cableado.destruir()
 
     expect(mapa.oyentes.get('click').size).toBe(0)
     montado.botonCargar.click()
-    montado.botonDeducir.click()
+    montado.botonColindantes.click()
     await Promise.resolve()
     expect(montado.transporte.emitidas).toBe(0)
   })
 
   it('deja de seguir al store, y es IDEMPOTENTE', () => {
-    const montado = cablear({ parcelaInicial: parcelaSinReferencia() })
-    expect(montado.botonDeducir.disabled).toBe(false)
+    const montado = cablear({ parcelaInicial: parcelaConReferencia() })
+    expect(montado.botonColindantes.disabled).toBe(false)
 
     montado.cableado.destruir()
-    montado.estado.set(parcelaConReferencia())
-    // Si siguiera suscrito, el botón se habría apagado al entrar una parcela con
+    montado.estado.set(parcelaSinReferencia())
+    // Si siguiera suscrito, el botón se habría apagado al entrar una parcela sin
     // referencia. Ya no es asunto de este cableado.
-    expect(montado.botonDeducir.disabled).toBe(false)
+    expect(montado.botonColindantes.disabled).toBe(false)
 
     expect(() => montado.cableado.destruir()).not.toThrow()
   })
@@ -1133,32 +1159,20 @@ describe('cableado-catastro · destruir()', () => {
   })
 })
 
-// ── 8 · El botón «Deducir del mapa» lo enciende el ESTADO ────────────────────
-
+// ── 8 · `deducir()` sigue siendo API, aunque ya no tenga botón ───────────────
+//
+// ⛔ **ESTA SECCIÓN MEDÍA EL `disabled` DE «Deducir del mapa», Y ESE BOTÓN SE
+// RETIRÓ EL 2026-08-16.** Con él se fue el predicado `puedeDeducirDe` (geometría en
+// el store Y sin referencia) y, con el predicado, los cuatro `it` que lo recorrían:
+// no queda superficie que medir, y unos `it` reescritos contra `deducir()` dirían lo
+// mismo que la sección 9 (el clic en el mapa) y la 10 (`deducir()` con geometría).
+//
+// Lo que se conserva —y por eso la sección no desaparece— es el único `it` que no
+// hablaba del botón sino de la FUNCIÓN: llamarla sin geometría no consulta a ciegas.
+// Sus tres llamantes de producción (el clic, la importación de `main.js` y «Traer el
+// parcelario de fondo») pueden llegar aquí, y ninguno pasa por un `disabled`.
 describe('cableado-catastro · cuándo se puede deducir', () => {
-  it('⚠️ apagado con una parcela que YA tiene referencia', () => {
-    const montado = cablear({ parcelaInicial: parcelaConReferencia() })
-    expect(montado.botonDeducir.disabled).toBe(true)
-  })
-
-  it('⚠️ encendido con una parcela que NO tiene referencia', () => {
-    const montado = cablear({ parcelaInicial: parcelaSinReferencia() })
-    expect(montado.botonDeducir.disabled).toBe(false)
-  })
-
-  it('apagado sin nada en el store: no hay desde dónde deducir', () => {
-    const montado = cablear({ parcelaInicial: null })
-    expect(montado.botonDeducir.disabled).toBe(true)
-  })
-
-  it('se re-evalúa con el store, no sólo al cablear', () => {
-    const montado = cablear({ parcelaInicial: parcelaSinReferencia() })
-    expect(montado.botonDeducir.disabled).toBe(false)
-    montado.estado.set(parcelaConReferencia())
-    expect(montado.botonDeducir.disabled).toBe(true)
-  })
-
-  it('sin geometría, pulsarlo lo explica en vez de consultar a ciegas', async () => {
+  it('sin geometría, llamar a deducir() lo explica en vez de consultar a ciegas', async () => {
     const montado = cablear({ parcelaInicial: null })
     const resultado = await montado.cableado.deducir()
     expect(resultado).toBeNull()
@@ -1455,9 +1469,12 @@ describe('cableado-catastro · deducir con un clic en el mapa', () => {
 
   // ── ⭐ EL CASO DE LA APLICACIÓN VACÍA (2026-08-11) ──────────────────────────
   // Es el estado en el que la app SE ABRE desde 2026-08-07, y era justo donde el
-  // clic no hacía nada: heredaba de `puedeDeducirDe` la exigencia de que hubiera
-  // geometría cargada, que es condición del BOTÓN (saca el punto de un
-  // `puntoInterior`) y no del clic, que trae su propio punto.
+  // clic no hacía nada: heredaba del predicado del BOTÓN (`puedeDeducirDe`, hoy
+  // retirado) la exigencia de que hubiera geometría cargada, que era condición suya
+  // —sacaba el punto de un `puntoInterior`— y no del clic, que trae su propio punto.
+  // ⚠️ Desde que el botón no existe (2026-08-16), **este `it` cubre el único gesto
+  // que deduce**: si alguien vuelve a exigirle geometría al clic, la función se
+  // queda sin ningún camino de usuario y sólo esta prueba lo dice.
 
   it('⭐ con el store VACÍO también deduce: el punto lo trae el clic, no la geometría', async () => {
     const mapa = crearMapaDoble()
@@ -1488,14 +1505,16 @@ describe('cableado-catastro · deducir con un clic en el mapa', () => {
     expect(montado.procedencia.textContent).toBe(ROTULO_DEDUCIDA)
   })
 
-  it('el botón «Deducir del mapa» NO se enciende por esto: sin geometría no puede', () => {
-    const mapa = crearMapaDoble()
-    const montado = cablear({ mapa, parcelaInicial: null })
-    // Las dos preguntas son distintas y siguen siéndolo. El botón deduce del
-    // `puntoInterior` de la parcela; sin parcela no tiene punto que ofrecer, y
-    // encenderlo prometería lo que no puede dar.
-    expect(montado.botonDeducir.disabled).toBe(true)
-  })
+  // ⛔ **AQUÍ SE MEDÍA QUE EL BOTÓN «Deducir del mapa» NO SE ENCENDÍA POR ESTO**:
+  // las dos preguntas eran distintas —el botón sacaba el punto de un `puntoInterior`
+  // y sin parcela no tenía punto que ofrecer— y esta prueba lo fijaba. Retirado el
+  // botón (2026-08-16) no queda `disabled` que afirmar, pero la mitad que importa
+  // sobrevive y es la de arriba: **el clic SÍ deduce con el store vacío**, que era
+  // justo lo que el botón no podía hacer y el motivo de que fueran dos predicados.
+  // Si algún día alguien vuelve a exigirle geometría al clic, esa prueba se pone
+  // roja — que es donde tiene que enterarse.
+
+
 
   it('un segundo clic en otro sitio vuelve a deducir: el campo sigue siendo del usuario', async () => {
     const mapa = crearMapaDoble()
@@ -1552,11 +1571,15 @@ describe('cableado-catastro · colindantes()', () => {
     expect(montado.sets).toHaveLength(0)
   })
 
-  it('lo cuenta en el renglón, que es el desenlace de lo que se pidió', async () => {
+  it('lo cuenta en SU renglón, que es el desenlace de lo que se pidió', async () => {
     const montado = cablear({ parcelaInicial: parcelaConReferencia() })
     const resultado = await montado.cableado.colindantes()
-    expect(montado.renglon.textContent).toContain(String(resultado.datos.colindantes.length))
-    expect(renglonEnFallo(montado.renglon)).toBe(false)
+    expect(montado.renglonColindantes.textContent).toContain(
+      String(resultado.datos.colindantes.length),
+    )
+    expect(renglonEnFallo(montado.renglonColindantes)).toBe(false)
+    // ⚠️ Y NO en el de Entrada (2026-08-16): el desenlace se lee donde se pulsó.
+    expect(montado.renglon.textContent).toBe('')
   })
 
   it('sin parcela cargada usa lo que haya en el campo', async () => {
@@ -1600,12 +1623,25 @@ describe('cableado-catastro · «Traer colindantes» es contrato de index.html',
     expect(boton.disabled).toBe(true)
   })
 
-  it('comparte el renglón del bloque: no se le ha inventado un `role="status"` propio', () => {
-    // Es una consulta al Catastro más. Dos renglones vecinos acabarían
-    // contradiciéndose sobre cuál fue la última acción.
-    expect(document.querySelectorAll('[role="status"][data-estado="cargar-catastro"]')).toHaveLength(
-      1,
-    )
+  // ⭐ **ESTE CASO AFIRMABA LO CONTRARIO HASTA EL 2026-08-16.** Decía «comparte el
+  // renglón del bloque: no se le ha inventado un `role="status"` propio», y el
+  // motivo era bueno mientras el botón viviera en Entrada: dos renglones VECINOS
+  // acabarían contradiciéndose sobre cuál fue la última acción. Con el botón mudado
+  // al pie de Edición ya no son vecinos, y compartir renglón pasó a significar
+  // escribir el desenlace en una pantalla que el usuario no está mirando.
+  it('tiene renglón PROPIO, y es un `role="status"` distinto del del bloque', () => {
+    const suyo = document.querySelectorAll(`[role="status"]${SELECTOR_ESTADO_COLINDANTES}`)
+    expect(suyo).toHaveLength(1)
+    // Y el del bloque de Entrada sigue existiendo, uno y solo uno: no se ha
+    // sustituido un renglón por otro, se ha añadido el que faltaba.
+    expect(
+      document.querySelectorAll(`[role="status"]${SELECTOR_ESTADO_CATASTRO}`),
+    ).toHaveLength(1)
+    // ⚠️ Y el renglón nuevo está DONDE ESTÁ EL BOTÓN, que es toda la mudanza: sin
+    // esto se podría haber declarado en Entrada y la prueba de arriba pasaría igual.
+    const boton = document.querySelector(SELECTOR_BOTON_COLINDANTES)
+    expect(suyo[0].closest('[data-pantalla]')).toBe(boton.closest('[data-pantalla]'))
+    expect(boton.closest('[data-pantalla]').dataset.pantalla).toContain('edicion')
   })
 
   it('un `alCargarParcela` que no es función se rechaza al cablear, no en la primera carga', () => {
@@ -1641,21 +1677,26 @@ describe('cableado-catastro · «Traer colindantes» lo enciende el ESTADO', () 
     //
     // Lo que NO cambia y lo vigila el caso siguiente: **con parcela y sin
     // referencia el mensaje sigue saliendo**, que es donde de verdad importa.
+    //
+    // ⚠️ Desde la mudanza del 2026-08-16 se mira el renglón PROPIO del botón. La
+    // segunda mitad del argumento de arriba —los 59 px de Entrada— caducó con ella;
+    // la primera —que ahí el rail ya lo dice— es la que sostiene este caso.
     const montado = cablear({ parcelaInicial: null })
     expect(montado.botonColindantes.disabled).toBe(true)
-    expect(montado.renglon.textContent).toBe('')
-    expect(renglonEnFallo(montado.renglon)).toBe(false)
+    expect(montado.renglonColindantes.textContent).toBe('')
+    expect(renglonEnFallo(montado.renglonColindantes)).toBe(false)
     // Y callarse en el renglón no es mandarlo por otro canal: no hay aviso.
     expect(montado.panel.resumen()).toEqual({ [NIVEL.ERROR]: 0, [NIVEL.AVISO]: 0 })
   })
 
   it('⚠️ apagado con geometría SIN referencia (el caso del DXF), y también lo dice', () => {
-    // Es el estado en el que sí se puede deducir: los dos botones del par dicen
-    // cosas distintas a la vez, y cada uno la suya.
+    // El caso para el que se escribió el mensaje: el usuario ve su parcela en
+    // pantalla y un botón de colindantes que no responde, en la MISMA pantalla.
     const montado = cablear({ parcelaInicial: parcelaSinReferencia() })
     expect(montado.botonColindantes.disabled).toBe(true)
-    expect(montado.botonDeducir.disabled).toBe(false)
-    expect(montado.renglon.textContent).toBe(MOTIVO_COLINDANTES_APAGADO)
+    expect(montado.renglonColindantes.textContent).toBe(MOTIVO_COLINDANTES_APAGADO)
+    // Y el renglón de Entrada NO se entera: cada acción cuenta lo suyo donde está.
+    expect(montado.renglon.textContent).toBe('')
   })
 
   it('se re-evalúa con el store, no sólo al cablear', () => {
@@ -1667,24 +1708,48 @@ describe('cableado-catastro · «Traer colindantes» lo enciende el ESTADO', () 
     expect(montado.botonColindantes.disabled).toBe(true)
   })
 
-  it('⚠️ el motivo NO pisa el desenlace de una acción anterior', async () => {
-    // El renglón es del DESENLACE de lo último que el usuario pidió. Si `refrescar`
-    // escribiera sin condición, cada `set` del store —cada vértice que F06 mueva—
-    // borraría lo que la última consulta acaba de contar.
+  // ⭐ **ESTE CASO AFIRMABA LO CONTRARIO HASTA EL 2026-08-16**, y decía «el motivo
+  // NO pisa el desenlace de una acción anterior». Era lo correcto mientras el
+  // renglón fuera COMPARTIDO: escribir sin condición borraba «Cargada la parcela X:
+  // 12 vértices» en cada `set` del store, o sea en cada vértice que F06 mueve.
+  //
+  // Con renglón propio no queda nada de otra acción que pisar —lo único que puede
+  // estar ahí es el desenlace de la última consulta de VECINAS— y la condición pasó
+  // de proteger a mentir: dejaba «El Catastro ha devuelto 4 colindantes» al lado de
+  // un botón gris que ya no puede pedir ninguna. Ese es el caso que esto mide.
+  it('⭐ el motivo SÍ sustituye al desenlace viejo cuando deja de ser cierto', async () => {
     const montado = cablear({ parcelaInicial: parcelaConReferencia() })
     // Con el botón encendido no hay nada que explicar: el renglón sigue libre.
-    expect(montado.renglon.textContent).toBe('')
+    expect(montado.renglonColindantes.textContent).toBe('')
 
     await montado.cableado.colindantes()
-    const desenlace = montado.renglon.textContent
+    const desenlace = montado.renglonColindantes.textContent
     expect(desenlace).not.toBe(MOTIVO_COLINDANTES_APAGADO)
+    expect(desenlace.length).toBeGreaterThan(0)
 
     // Ahora la parcela se queda sin referencia (el usuario abre un DXF encima): el
     // botón se apaga…
     montado.estado.set(parcelaSinReferencia())
     expect(montado.botonColindantes.disabled).toBe(true)
-    // …y el renglón sigue contando lo que pasó, que es lo que el usuario pidió.
-    expect(montado.renglon.textContent).toBe(desenlace)
+    // …y el renglón deja de contar unas vecinas que ya no son de nadie.
+    expect(montado.renglonColindantes.textContent).toBe(MOTIVO_COLINDANTES_APAGADO)
+
+    // ⚠️ Y el renglón de ENTRADA, que es el que aquella condición protegía, sigue
+    // intacto: lo que se ha ganado no se ha pagado con lo que se quería conservar.
+    expect(montado.renglon.textContent).toBe('')
+  })
+
+  it('⚠️ pero el desenlace SÍ sobrevive a los `set` que no apagan el botón', async () => {
+    // Un arrastre de F06 hace un `set` por vértice movido, y la parcela sigue
+    // teniendo referencia: ahí no hay motivo que escribir y lo que el usuario pidió
+    // se queda en pantalla. Sin esto, «se escribe siempre» sería un borrado por tick.
+    const montado = cablear({ parcelaInicial: parcelaConReferencia() })
+    await montado.cableado.colindantes()
+    const desenlace = montado.renglonColindantes.textContent
+
+    montado.estado.set(parcelaConReferencia())
+    expect(montado.botonColindantes.disabled).toBe(false)
+    expect(montado.renglonColindantes.textContent).toBe(desenlace)
   })
 
   it('mientras hay algo EN VUELO está apagado, y luego vuelve', async () => {
@@ -1824,9 +1889,10 @@ describe('cableado-catastro · alColindantes()', () => {
     expect(resultado.ok).toBe(false)
     expect(resultado.motivo).toBe(MOTIVO_CATASTRO.NO_ENCONTRADO)
     expect(vistos).toHaveLength(0)
-    // Pero no se calla: se cuenta por los dos canales de siempre.
+    // Pero no se calla: se cuenta por los dos canales de siempre —el panel, que es
+    // el mismo para todos, y SU renglón, que desde el 2026-08-16 es el suyo.
     expect(textosDelPanel()).toContain(resultado.mensaje)
-    expect(renglonEnFallo(montado.renglon)).toBe(true)
+    expect(renglonEnFallo(montado.renglonColindantes)).toBe(true)
   })
 
   it('⚠️ un suscriptor que revienta no tumba el cableado ni tapa a los demás', async () => {
@@ -1909,11 +1975,11 @@ describe('cableado-catastro · una parcela aislada', () => {
     expect(resultado.datos.colindantes).toHaveLength(0)
 
     // Ni renglón rojo, ni tarjeta de aviso: no ha fallado nada.
-    expect(renglonEnFallo(montado.renglon)).toBe(false)
+    expect(renglonEnFallo(montado.renglonColindantes)).toBe(false)
     expect(montado.panel.resumen()).toEqual({ [NIVEL.ERROR]: 0, [NIVEL.AVISO]: 0 })
     // Y el renglón lo dice con sus palabras, no con las de «4 colindantes».
-    expect(montado.renglon.textContent).toMatch(/ninguna colindante/i)
-    expect(montado.renglon.textContent).toMatch(/no es un fallo/i)
+    expect(montado.renglonColindantes.textContent).toMatch(/ninguna colindante/i)
+    expect(montado.renglonColindantes.textContent).toMatch(/no es un fallo/i)
   })
 
   it('⚠️ se distingue por el NÚMERO, nunca por el texto del servicio', async () => {
@@ -1938,7 +2004,7 @@ describe('cableado-catastro · una parcela aislada', () => {
     const inexistente = await sinNada.cableado.colindantes()
     expect(inexistente.ok).toBe(false)
     expect(inexistente.motivo).toBe(MOTIVO_CATASTRO.NO_ENCONTRADO)
-    expect(renglonEnFallo(sinNada.renglon)).toBe(true)
+    expect(renglonEnFallo(sinNada.renglonColindantes)).toBe(true)
   })
 
   it('se publica igual: no tener dianas de snap es una respuesta', async () => {

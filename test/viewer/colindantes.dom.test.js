@@ -7,7 +7,7 @@
  *   1. **EL CLIC DEL MAPA SOBREVIVE A LA CAPA INTERACTIVA.** Es el riesgo de   *
  *      la tarea, y la razón por la que este fichero existe: el emergente con la *
  *      referencia catastral obliga a `interactive:true`, y una capa interactiva  *
- *      puede robarle el clic al mapa — que es «Deducir del mapa» de F05. Se     *
+ *      puede robarle el clic al mapa — que es la deducción por clic de F05. Se  *
  *      MIDE (oyente en `mapa.on('click')`, clic real sobre el `<path>` de una   *
  *      vecina, y el oyente disparándose con su `latlng`), no se supone.        *
  *   2. **Una forma por vecina**, con su referencia en el emergente.            *
@@ -126,7 +126,7 @@ describe('viewer/colindantes · el CLIC del mapa sobrevive a la capa interactiva
   it('un clic sobre una vecina LLEGA a mapa.on(«click»), con su latlng', () => {
     // ⚠️ ESTE es el test que decide el diseño de la capa. `bindTooltip` exige
     // `interactive:true`, y una capa interactiva podría tragarse el clic del que
-    // depende «Deducir del mapa» de F05 (saca la referencia catastral de dónde se
+    // depende la deducción por clic de F05 (saca la referencia catastral de dónde se
     // pulsa). Si este test cae, la capa se queda SIN emergente y con
     // `interactive:false`: el clic de F05 manda sobre el adorno.
     const { mapa, capa } = conMapa()

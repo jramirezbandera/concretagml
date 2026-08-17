@@ -483,8 +483,17 @@ if (panel.holguraHastaElBordePx !== null && panel.holguraHastaElBordePx < -DESBO
 // Solo mide si la aplicación está EN Entrada. En cualquier otra pantalla no hay
 // vías, y contar cero sería un falso verde.
 
+// ⭐ **2026-08-16 · LA PANTALLA DE ENTRADA SON DOS `<section>`, NO UNA.** La vía
+// principal se queda en `.gml-bloque--catastro` —que es de la rama PARCELA y
+// desaparece al conmutar— y las dos de fichero se mudaron a `.gml-bloque--vias`,
+// que no es de ninguna rama y se ve en las dos. Por eso el límite de recorte ya no
+// puede leerse de UNA sección: cada vía se mide contra la caja visible de LA SUYA,
+// que es lo que scrollea de verdad. Medir las tres contra la primera daría 1 de 3
+// y un problema inventado.
 const pasoActivo = app.getAttribute('data-paso')
-const seccionEntrada = $('.gml-bloque--catastro')
+const seccionesEntrada = $$('.gml-bloque--catastro, .gml-bloque--vias, .gml-bloque--edificio')
+  .filter((s) => s !== null && !s.hidden)
+const seccionEntrada = seccionesEntrada[0] ?? null
 const vias = $$('.gml-via')
 
 const entrada = {
@@ -494,7 +503,12 @@ const entrada = {
   rotulos: vias.map((v) => v.querySelector('h2')?.textContent.trim() ?? '(sin rótulo)'),
   separadores: $$('.gml-obien').length,
   seccion: caja(seccionEntrada),
-  seccionDesbordaPx: desborde(seccionEntrada),
+  // La suma de las dos secciones: lo que queda detrás del scroll en la pantalla
+  // ENTERA, que es lo que el criterio 7 mide. Ver la nota de arriba.
+  seccionDesbordaPx: redondear(
+    seccionesEntrada.reduce((n, s) => n + (desborde(s) ?? 0), 0),
+    2,
+  ),
   /** Cuántas vías caben ENTERAS dentro de la caja visible de su sección. */
   viasCompletas: null,
   /** La cuarta vía (abrir un expediente): informativa, va en voz baja a propósito. */
@@ -503,8 +517,15 @@ const entrada = {
 }
 
 if (entrada.seMide && seccionEntrada !== null && vias.length > 0) {
+  /** El fondo visible de la sección que contiene a esa vía, que es lo que recorta. */
+  const limiteDe = (via) => {
+    const suya = seccionesEntrada.find((s) => s.contains(via)) ?? seccionEntrada
+    return suya.getBoundingClientRect().bottom + 0.5
+  }
   const limite = seccionEntrada.getBoundingClientRect().bottom + 0.5
-  entrada.viasCompletas = vias.filter((v) => v.getBoundingClientRect().bottom <= limite).length
+  entrada.viasCompletas = vias.filter(
+    (v) => v.getBoundingClientRect().bottom <= limiteDe(v),
+  ).length
   const pieCuarta = $('.gml-entrada-pie')
   entrada.cuartaViaVisible =
     pieCuarta === null ? null : pieCuarta.getBoundingClientRect().bottom <= limite
