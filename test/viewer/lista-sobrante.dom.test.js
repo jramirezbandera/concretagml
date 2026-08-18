@@ -33,6 +33,7 @@ import {
   FILAS_VISIBLES,
   FORMATO,
   NOTA_SUELTOS,
+  NOTA_SUELTOS_PORQUE,
   PAPEL,
   MOTIVO_FOTO_CADUCA,
   MOTIVO_NINGUNA_INCLUIDA,
@@ -43,9 +44,11 @@ import {
   SALTO_TECLADO_RAPIDO,
   SELECTOR,
   SIN_PIEZAS,
+  SIN_PIEZAS_PORQUE,
   textoContador,
   textoMedidas,
   textoRecuento,
+  textoResumen,
   TITULO,
 } from '../../viewer/lista-sobrante.js'
 import { montarMapa } from './_ayuda-jsdom.js'
@@ -120,7 +123,10 @@ describe('crearListaSobrante · al nacer', () => {
   })
 
   it('el bloque trae su rótulo, su lista y su contador, y no cuelga de nada', () => {
-    expect(q('.gml-rotulo').textContent).toBe('Sobrante')
+    // ⛔ El rótulo «Sobrante» se retiró el 2026-08-18: quedaba pegado debajo de
+    // «Para presentar», dos rótulos apilados sin nada en medio. Su recuento subió
+    // a la derecha del que se queda.
+    expect(q(SELECTOR.CONTADOR).closest('.gml-rotulo-fila')).not.toBeNull()
     expect(q(SELECTOR.LISTA)).not.toBeNull()
     expect(q(SELECTOR.CONTADOR)).not.toBeNull()
     expect(filas()).toHaveLength(0)
@@ -174,8 +180,10 @@ describe('crearListaSobrante · pintar', () => {
 
   it('la nota cuenta cuántas son estrechas, con el umbral que se ha usado', () => {
     lista.pintar(cesion([pieza(1, { estrecha: true }), pieza(2, { estrecha: true }), pieza(3)]))
+    // La línea CORTA lleva el recuento; el umbral vive detrás del «¿por qué?».
     expect(q(SELECTOR.NOTA).textContent).toMatch(/2 de 3 por debajo del umbral/)
-    expect(q(SELECTOR.NOTA).textContent).toMatch(/0,0071 m/)
+    expect(q(SELECTOR.NOTA).textContent).not.toMatch(/0,0071 m/)
+    expect(q(SELECTOR.porqueDe('nota')).textContent).toMatch(/0,0071 m/)
   })
 
   it('⭐ los `saltados` se pintan AQUÍ y dicen que la lista puede estar corta', () => {
@@ -186,7 +194,7 @@ describe('crearListaSobrante · pintar', () => {
       cesion([pieza(1)], { saltados: [{ sitio: 'recintos[0]', motivo: 'anillo degenerado' }] }),
     )
     expect(q(SELECTOR.NOTA).textContent).toMatch(/1 recinto\(s\) NO se han podido medir/)
-    expect(q(SELECTOR.NOTA).textContent).toMatch(/anillo degenerado/)
+    expect(q(SELECTOR.porqueDe('nota')).textContent).toMatch(/anillo degenerado/)
   })
 
   it('sin piezas, se DICE que no hay sobrante y no se deja una caja vacía', () => {
@@ -605,17 +613,17 @@ describe('crearListaSobrante · una pieza que no se puede emitir', () => {
     // finca: al escribirLAS … DEJAN de encerrar superficie»: lo cazó mirar la
     // pantalla en Chrome, no esta suite. Es la misma exigencia que «Las 1 parcelas»
     // en `comprobacion/conjunto.js`.
-    expect(q(SELECTOR.NOTA).textContent).toMatch(
+    expect(q(SELECTOR.porqueDe('nota')).textContent).toMatch(
       /1 no se puede emitir como finca: al escribirla con los 2 decimales del fichero deja de encerrar superficie\. Se queda fuera del expediente\./,
     )
-    expect(q(SELECTOR.NOTA).textContent).not.toMatch(/escribirlas|dejan|quedan/)
+    expect(q(SELECTOR.porqueDe('nota')).textContent).not.toMatch(/escribirlas|dejan|quedan/)
   })
 
   it('…y en plural también concuerda', () => {
     lista.pintar(
       cesion([astilla, pieza(2, { area: 0.02, grosor: 0.001, estrecha: true, emitible: false })]),
     )
-    expect(q(SELECTOR.NOTA).textContent).toMatch(
+    expect(q(SELECTOR.porqueDe('nota')).textContent).toMatch(
       /2 no se pueden emitir como finca: al escribirlas con los 2 decimales del fichero dejan de encerrar superficie\. Se quedan fuera del expediente\./,
     )
   })
@@ -940,7 +948,10 @@ describe('crearListaSobrante · los ficheros sueltos', () => {
     lista.piezasSueltas(SUELTOS)
     expect(q(SELECTOR.SUELTOS_NOTA).textContent).toBe(NOTA_SUELTOS)
     expect(NOTA_SUELTOS).toMatch(/NO forma expediente/)
-    expect(NOTA_SUELTOS).toMatch(/mismo documento/)
+    // El «mismo documento» —el porqué— vive detrás del «¿por qué?». La línea
+    // corta se queda con lo innegociable: que NO forma expediente.
+    expect(NOTA_SUELTOS_PORQUE).toMatch(/mismo documento/)
+    expect(q(SELECTOR.porqueDe('sueltos-nota')).textContent).toBe(NOTA_SUELTOS_PORQUE)
   })
 
   it('⭐ LA MEDICIÓN PROPIA está en la lista, y no es un descuido', () => {
@@ -1070,5 +1081,81 @@ describe('crearListaSobrante · el teclado', () => {
     // por una tecla», que es el defecto que el cajón de diagnóstico ya documenta.
     document.body.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     expect(conMapa.estaAbierto()).toBe(true)
+  })
+})
+
+// ── 13 · El rediseño: una línea, y el porqué detrás (2026-08-18) ────────────
+//
+// Encargo del autor: «está mal jerarquizado y tiene demasiado texto y cosas sin
+// estructurar». ⛔ **Pero ninguno de esos párrafos sobraba**: cada uno dice algo
+// que si no se dice acaba en un expediente mal presentado. El problema no era el
+// contenido, era que se leían TODOS a la vez y siempre.
+//
+// Lo que se defiende aquí es que el recorte NO perdió nada: cada línea corta
+// tiene su explicación entera detrás de un «¿por qué?», y lo innegociable se
+// queda SIEMPRE en la línea corta.
+
+describe('crearListaSobrante · una línea y el porqué detrás', () => {
+  const dos = () => cesion([pieza(1, { area: 30 }), pieza(2, { area: 12 })])
+
+  it('el resumen es lo PRIMERO, y cuenta PARCELAS del fichero, no piezas', () => {
+    // La jerarquía que faltaba: lo primero que hay que saber no es cuántos trozos
+    // ha calculado la resta booleana, es cuántas fincas salen del fichero.
+    // ⚠️ Sin punto de millar en «1763,80», y no es un descuido del formateador:
+    // `Intl` en es-ES aplica la regla `min2` —los números de CUATRO dígitos no se
+    // agrupan—, que es la tipografía española correcta y la que ya usa la ficha
+    // del panel («Superficie 1535,64 m²»). Escribir aquí «1.763,80» habría sido
+    // pedirle a esta cifra que se desviara del resto de la aplicación.
+    lista.resumir({ parcelas: 2, superficieM2: 1763.8 })
+    expect(q(SELECTOR.RESUMEN).textContent).toBe('2 parcelas · 1763,80 m²')
+    expect(textoResumen(1, 50)).toMatch(/^1 parcela · /)
+    lista.resumir()
+    expect(q(SELECTOR.RESUMEN).textContent).toBe('')
+  })
+
+  it('el «¿por qué?» nace CERRADO y despliega en el sitio', () => {
+    lista.pintar(cesion([]))
+    const boton = q(SELECTOR.botonPorqueDe('vacio'))
+    const largo = q(SELECTOR.porqueDe('vacio'))
+
+    expect(boton.getAttribute('aria-expanded')).toBe('false')
+    expect(largo.style.display, '⛔ y con `display`, no solo `hidden`').toBe('none')
+
+    boton.click()
+    expect(boton.getAttribute('aria-expanded')).toBe('true')
+    expect(largo.style.display).toBe('block')
+    expect(largo.textContent).toBe(SIN_PIEZAS_PORQUE)
+
+    boton.click()
+    expect(largo.style.display, 'y se vuelve a cerrar').toBe('none')
+  })
+
+  it('el botón APUNTA a su párrafo, para que un lector sepa qué abre', () => {
+    lista.pintar(cesion([]))
+    const boton = q(SELECTOR.botonPorqueDe('vacio'))
+    expect(boton.getAttribute('aria-controls')).toBe(q(SELECTOR.porqueDe('vacio')).id)
+  })
+
+  it('⛔ una línea SIN porqué no ofrece abrirlo', () => {
+    // `invalidar()` escribe un mensaje que ya está completo. Un «¿por qué?» que
+    // abre un hueco vacío enseña a no volver a pulsarlo.
+    lista.invalidar('La parcela ha cambiado.')
+    expect(q(SELECTOR.NOTA).textContent).toBe('La parcela ha cambiado.')
+    expect(q(SELECTOR.botonPorqueDe('nota')).style.display).toBe('none')
+  })
+
+  it('⛔ lo INNEGOCIABLE se queda en la línea corta, no detrás del «¿por qué?»', () => {
+    // Si de este descargo sólo se lee una línea, tiene que ser la que impide el
+    // error —«NO forma expediente»— y no la que explica para qué sirven los
+    // sueltos. Un usuario que no pulsa nada tiene que quedarse con lo que le
+    // ahorra presentar mal.
+    expect(NOTA_SUELTOS).toMatch(/NO forma expediente/)
+    expect(NOTA_SUELTOS.length, 'y cabe en una línea').toBeLessThan(60)
+  })
+
+  it('la nota corta cuenta, y la larga explica: ninguna de las dos se pierde', () => {
+    lista.pintar(cesion([pieza(1, { estrecha: true }), pieza(2)]))
+    expect(q(SELECTOR.NOTA).textContent).toBe('1 de 2 por debajo del umbral.')
+    expect(q(SELECTOR.porqueDe('nota')).textContent).toMatch(/umbral de grosor \(0,0071 m\)/)
   })
 })

@@ -165,6 +165,11 @@ function montarCromoDelMapa() {
     zona: husoPorSrs(SRS_DEMO),
     variante: VARIANTE.FUERA,
   })
+  const capaVecinos = crearCapaPiezas({
+    mapa,
+    zona: husoPorSrs(SRS_DEMO),
+    variante: VARIANTE.VECINO,
+  })
   // ⚠️ F11: el `L.Map` DE VERDAD se guarda y va al doble. Hasta aquí el
   // `visor.mapa` era `{on, off}` —lo justo que consume `cablearCatastro` por duck
   // typing—, y desde F11 hay un segundo consumidor, `viewer/partes.js`, que
@@ -172,7 +177,7 @@ function montarCromoDelMapa() {
   mapaVivo = mapa
   diagnosticoVivo = { cajon, contraste }
   comprobacionViva = cajonComprobacion
-  sobranteVivo = { lista: listaSobrante, capa: capaPiezas, capaFuera }
+  sobranteVivo = { lista: listaSobrante, capa: capaPiezas, capaFuera, capaVecinos }
   desmontarCromoVivo = () => {
     capaPiezas.destruir()
     listaSobrante.destruir()

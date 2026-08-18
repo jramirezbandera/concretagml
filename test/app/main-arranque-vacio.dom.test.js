@@ -89,6 +89,11 @@ function montarCromoDelMapa() {
       zona: husoPorSrs(SRS_DEMO),
       variante: VARIANTE.FUERA,
     }),
+    capaVecinos: crearCapaPiezas({
+      mapa,
+      zona: husoPorSrs(SRS_DEMO),
+      variante: VARIANTE.VECINO,
+    }),
   }
 }
 

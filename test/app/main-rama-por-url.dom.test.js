@@ -72,6 +72,7 @@ function montarCromoDelMapa() {
     lista: crearListaSobrante({ documento: document }),
     capa: crearCapaPiezas({ mapa, zona: husoPorSrs(SRS_DEMO) }),
     capaFuera: crearCapaPiezas({ mapa, zona: husoPorSrs(SRS_DEMO), variante: VARIANTE.FUERA }),
+    capaVecinos: crearCapaPiezas({ mapa, zona: husoPorSrs(SRS_DEMO), variante: VARIANTE.VECINO }),
   }
 }
 

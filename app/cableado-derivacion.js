@@ -104,6 +104,36 @@ export const MOTIVO_SIN_GEOMETRIA =
   'Todavía no hay geometría medida que comparar con el contorno oficial.'
 
 /**
+ * ⭐ **LA SEÑAL DE QUE FALTAN LOS COLINDANTES** (2026-08-18), escrita ANTES de
+ * pulsar y no después.
+ *
+ * ── EL DEFECTO QUE CIERRA, EN PALABRAS DEL AUTOR ────────────────────────────
+ * «Puede pasar que no lo hayas traído, le des, y no sepas que no te lo está
+ * rehaciendo porque no tiene la información.» Exacto: sin colindantes, un exceso
+ * de la medición no se puede atribuir a nadie, así que la derivación sale
+ * incompleta y lo único que lo decía era el motivo del botón de descarga —o sea,
+ * DESPUÉS de haber pulsado, y sólo si te fijabas en un renglón que está dentro
+ * del panel flotante.
+ *
+ * ── ⛔ POR QUÉ NO SE APAGA EL BOTÓN, QUE ERA LA OTRA OPCIÓN ─────────────────
+ * Porque **sin colindantes la derivación puede ser perfectamente correcta**: si
+ * la parcela sólo mengua, no hay exceso, no hay nada que atribuir y no hace falta
+ * ningún vecino. Apagar el CTA obligaría a pedir por red unas parcelas que no
+ * pintan nada en el caso más común, y castigaría el camino bueno para proteger el
+ * malo. Y no se puede saber cuál de los dos es antes de correr la resta booleana,
+ * que es justo lo que el botón dispara.
+ *
+ * Así que se avisa y se deja pasar: quien sepa que su parcela sólo encoge pulsa
+ * sin más, y quien no lo sepa lee esto antes de pulsar.
+ *
+ * ⚠️ Es un AVISO y no un error: va sin la clase de error, porque nada está mal
+ * todavía.
+ */
+export const AVISO_SIN_COLINDANTES =
+  'Aún no se han traído las parcelas colindantes. Si tu medición se sale por algún lado, no se ' +
+  'podrá saber de quién es esa superficie y el expediente quedará bloqueado.'
+
+/**
  * ⛔ La respuesta de la PUERTA cuando la parcela ha CRECIDO en vez de menguar.
  *
  * Es el caso que el plan llamó por su nombre: el sobrante saldría VACÍO mientras
@@ -306,6 +336,42 @@ function puedeDerivar(parcela) {
   return oficialDe(parcela) !== null && recintosDe(parcela).length > 0
 }
 
+/**
+ * Adapta los colindantes recortados a lo que la capa de manchas sabe pintar.
+ *
+ * ⛔ **Es un trozo por PIEZA y no un trozo por VECINO**, y tiene que serlo: una
+ * medición puede partir la finca del vecino en dos fincas disjuntas
+ * (`VecinoRecortado.seParte`), y cada una entra en el `.gml` como un
+ * `featureMember` propio. Pintar solo la mayor dejaría la otra dentro del fichero
+ * y fuera del mapa, que es el defecto que esta capa viene a cerrar, repetido en
+ * pequeño.
+ *
+ * La numeración corre SEGUIDA por todos los trozos de todos los vecinos —V1, V2,
+ * V3…— y en el mismo orden en el que `derivacion/entrega.js` los mete en el
+ * documento, para que el `V2` del mapa sea el segundo colindante de la lista.
+ *
+ * @param {import('../derivacion/vecino.js').Recorte|null} recorte
+ * @returns {Array<{orden: number, recintos: object[], centroide: [number,number]|null}>}
+ */
+function piezasDeVecinos(recorte) {
+  if (recorte === null || recorte === undefined || !Array.isArray(recorte.vecinos)) return []
+  const piezas = []
+  for (const vecino of recorte.vecinos) {
+    for (const trozo of vecino.trozos ?? []) {
+      piezas.push({
+        orden: piezas.length + 1,
+        recintos: trozo.recintos,
+        centroide: trozo.centroide ?? null,
+        // Viaja para que quien inspeccione la capa sepa de quién es la finca. La
+        // capa no lo pinta —el rótulo es `V1`, que es lo que cabe sobre una
+        // parcela— pero el dato no se pierde por el camino.
+        refcat: vecino.refcat ?? null,
+      })
+    }
+  }
+  return piezas
+}
+
 /** Qué parcela es ésta, para distinguir «otra» de «la misma editada». */
 function claveDeParcela(parcela) {
   if (parcela === null || parcela === undefined) return null
@@ -402,6 +468,7 @@ export function cablearDerivacion({
   lista,
   capa,
   capaFuera,
+  capaVecinos,
   panel,
   srs,
   colindantes = null,
@@ -438,6 +505,32 @@ export function cablearDerivacion({
         `Si vale undefined, el visor es de antes de que la puerta dejara de esconder el ` +
         `sobrante: sin ella, lo que se sale del contorno oficial no se pintaría en ninguna ` +
         `parte y el usuario vería un botón apagado sin ver por qué.`,
+    )
+  }
+  // ⛔ El registro es OPCIONAL —se puede cablear sin él y entonces «no se sabe si
+  // hay colindantes», que es un estado legítimo—, pero si viene tiene que traer
+  // sus DOS métodos. Sin `subscribe`, el aviso de «faltan colindantes» se
+  // quedaría escrito para siempre después de traerlas: no rompería nada, y por
+  // eso hay que cazarlo aquí. Un renglón que miente no da síntoma.
+  if (
+    colindantes !== null &&
+    colindantes !== undefined &&
+    (typeof colindantes.get !== 'function' || typeof colindantes.subscribe !== 'function')
+  ) {
+    throw new TypeError(
+      `cablearDerivacion: 'colindantes' debe ser el registro de app/colindantes.js ` +
+        `({get, subscribe}), o null para cablear sin él; recibido ${describir(colindantes)}. ` +
+        `Sin 'subscribe', el aviso de que faltan las colindantes se quedaría escrito después ` +
+        `de traerlas.`,
+    )
+  }
+  if (!esCapa(capaVecinos)) {
+    throw new TypeError(
+      `cablearDerivacion: 'capaVecinos' debe ser la TERCERA capa de viewer/piezas.js ` +
+        `(visor.sobrante.capaVecinos, la de variante 'VECINO'); recibido ` +
+        `${describir(capaVecinos)}. Si vale undefined, el visor es de antes del 2026-08-18: ` +
+        `sin ella, la aplicación propone MODIFICAR LA FINCA DE OTRO TITULAR —la mete en el ` +
+        `.gml y la lista con su superficie— y no la enseña en el mapa en ningún momento.`,
     )
   }
   if (!esPanel(panel)) {
@@ -540,6 +633,23 @@ export function cablearDerivacion({
     }
   }
 
+  /** ¿Se han consultado las colindantes? `null` es «no se sabe», no «no hay». */
+  function faltanColindantes() {
+    return colindantes === null || colindantes.get() === null
+  }
+
+  /**
+   * Lo que dice el renglón del CTA **antes de derivar**, con el botón encendido.
+   *
+   * O el aviso de que faltan colindantes, o nada. Que sea «nada» y no una frase
+   * de cortesía es deliberado: `.gml-accion-estado:empty` colapsa el renglón a
+   * 0 px, y un renglón lleno cuesta 22,84 px medidos de la tabla de vértices
+   * (guion 16). Se paga cuando hay algo que decir, y sólo entonces.
+   */
+  function decirEstadoDePartida() {
+    decir(faltanColindantes() ? AVISO_SIN_COLINDANTES : '')
+  }
+
   /** Escribe el renglón del CTA del pie. */
   function decir(texto, esError = false) {
     elRenglon.textContent = texto
@@ -591,6 +701,7 @@ export function cablearDerivacion({
     // que ya no exista, en el color que este proyecto reserva para el único hecho
     // al que le pone carga.
     capaFuera.limpiar()
+    capaVecinos.limpiar()
     if (motivo === null) {
       lista.pintar(null)
       mostrarBloque(false)
@@ -619,7 +730,7 @@ export function cablearDerivacion({
     if (elBoton.disabled) {
       decir(hayOficial ? MOTIVO_SIN_GEOMETRIA : MOTIVO_SIN_OFICIAL)
     } else if (cesion === null) {
-      decir('')
+      decirEstadoDePartida()
     }
 
     // ── 3C · la foto caduca con CUALQUIER cambio ────────────────────────────
@@ -631,7 +742,7 @@ export function cablearDerivacion({
         : 'Ha entrado otra parcela, así que el sobrante de la anterior ya no le corresponde. ' +
             'Los nombres escritos se han perdido: vuelve a derivar.',
     )
-    decir('')
+    decirEstadoDePartida()
   }
 
   /**
@@ -763,6 +874,7 @@ export function cablearDerivacion({
     lista.pintar(derivada)
     capa.pintar(derivada.piezas)
     capaFuera.pintar(derivada.puerta.piezas)
+    capaVecinos.pintar(piezasDeVecinos(derivada.recorte))
     mostrarBloque(true)
 
     // ⛔ **CON ALGO QUE ENSEÑAR, EL RENGLÓN DEL PIE SE CALLA**, y no es un descuido
@@ -861,6 +973,7 @@ export function cablearDerivacion({
     if (cesion === null) {
       lista.entrega({ habilitado: false, motivo: MOTIVO_SIN_DERIVAR })
       lista.piezasSueltas([])
+      lista.resumir()
       return
     }
     // ⛔ La puerta solo sigue cerrada si el exceso NO está explicado. Con las
@@ -874,6 +987,7 @@ export function cablearDerivacion({
         motivo: motivoEntregaFuera(cesion.puerta, formatearNumero),
       })
       lista.piezasSueltas([])
+      lista.resumir()
       return
     }
     // ⛔ Cero piezas propias NO es cero expediente desde que existe el reparto: si
@@ -899,6 +1013,7 @@ export function cablearDerivacion({
     ) {
       lista.entrega({ habilitado: false, motivo: MOTIVO_NINGUNA_INCLUIDA })
       lista.piezasSueltas([])
+      lista.resumir()
       return
     }
     lista.entrega({ habilitado: true, motivo: '' })
@@ -946,6 +1061,7 @@ export function cablearDerivacion({
     const parcela = estado.get()
     if (parcela === null || cesion === null) {
       lista.piezasSueltas([])
+      lista.resumir()
       return
     }
     try {
@@ -959,8 +1075,17 @@ export function cablearDerivacion({
       })
     } catch {
       lista.piezasSueltas([])
+      lista.resumir()
       return
     }
+    // El renglón de cabecera: cuántas fincas salen del fichero y cuánto suman.
+    // Sale del expediente compuesto y no de la foto, que es lo que lo hace la
+    // cifra correcta —incluye los colindantes recortados, que no son piezas de
+    // sobrante— y lo que obliga a escribirlo desde aquí.
+    lista.resumir({
+      parcelas: ultimaEntrega.miembros.length,
+      superficieM2: ultimaEntrega.miembros.reduce((s, m) => s + superficie(m.recintos), 0),
+    })
     lista.piezasSueltas(
       ultimaEntrega.miembros.map((m) => ({
         // El `localId`, que el expediente ya garantiza ÚNICO: si dos miembros lo
@@ -1165,6 +1290,23 @@ export function cablearDerivacion({
   const bajaSeleccion = lista.alCambiarSeleccion(repartir)
   const bajaSuelto = lista.alDescargarSuelto(descargarSuelto)
 
+  // ⭐ **El aviso de «faltan colindantes» tiene que APAGARSE SOLO** cuando el
+  // usuario los trae, y traerlos no toca el store — así que `refrescar` no se
+  // entera y el renglón se quedaría mintiendo hasta la siguiente edición.
+  //
+  // ⛔ **Y aquí NO se llama a `refrescar`**, que era lo cómodo: aquél invalida la
+  // foto, así que traer las colindantes con un sobrante ya derivado le habría
+  // borrado al usuario los nombres que acababa de escribir. Lo único que cambia
+  // al llegar las vecinas es lo que dice ese renglón, así que es lo único que se
+  // toca — y sólo mientras no haya foto que proteger.
+  const bajaColindantes =
+    colindantes === null
+      ? null
+      : colindantes.subscribe(() => {
+          if (!vivo || cesion !== null || elBoton.disabled) return
+          decirEstadoDePartida()
+        })
+
   // El resaltado RECÍPROCO, que es media razón de ser de esta pantalla. Ni la
   // lista conoce el mapa ni el mapa la lista: los une este módulo, y en los dos
   // sentidos. La reentrada no es un problema porque los dos `resaltar` son
@@ -1220,6 +1362,7 @@ export function cablearDerivacion({
       elBoton.removeEventListener('click', derivar)
       bajaEntrega()
       bajaSuelto()
+      bajaColindantes?.()
       bajaSeleccion()
       bajaSenalLista()
       bajaSenalCapa()

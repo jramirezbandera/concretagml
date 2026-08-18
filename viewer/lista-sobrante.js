@@ -141,6 +141,10 @@ export const SELECTOR = Object.freeze({
   CERRAR: '[data-accion="cerrar-parcelario"]',
   CONTADOR: '[data-sobrante="contador"]',
   // ── Los ficheros sueltos, «para comprobar» (2026-08-17) ───────────────────
+  RESUMEN: '[data-sobrante="resumen"]',
+  /** El «¿por qué?» y su párrafo, por la marca de SU línea: `nota-boton`, `nota-porque`… */
+  porqueDe: (marca) => `[data-sobrante="${marca}-porque"]`,
+  botonPorqueDe: (marca) => `[data-sobrante="${marca}-boton"]`,
   SUELTOS: '[data-sobrante="sueltos"]',
   SUELTOS_NOTA: '[data-sobrante="sueltos-nota"]',
   SUELTOS_LISTA: '[data-sobrante="sueltos-lista"]',
@@ -234,9 +238,13 @@ export const ALTO_FILA_PX = 38
  * (la parcela no menguó, o menguó por debajo del redondeo), y una caja vacía se
  * lee como «esto no ha cargado».
  */
-export const SIN_PIEZAS =
+export const SIN_PIEZAS = 'Sin sobrante que segregar.'
+
+/** Y el porqué, detrás del «¿por qué?». */
+export const SIN_PIEZAS_PORQUE =
   'La derivación no ha encontrado sobrante: la geometría medida cubre el contorno oficial ' +
-  'entero. No hay ninguna finca que segregar.'
+  'entero, así que no hay ninguna finca que segregar. Es un resultado legítimo y frecuente ' +
+  '—la parcela no menguó, o menguó por debajo del redondeo—, no un fallo del cálculo.'
 
 /**
  * Por qué el botón nace apagado. Se escribe en el renglón **en el mismo instante**
@@ -321,8 +329,50 @@ const PASOS_TECLADO = Object.freeze({
   ArrowDown: [0, 1],
 })
 
+// ── ⭐ EL REDISEÑO DEL 2026-08-18: UNA LÍNEA, Y EL PORQUÉ DETRÁS ────────────
+//
+// Encargo del autor sobre este panel: «está mal jerarquizado y tiene demasiado
+// texto y cosas sin estructurar». Y estaba: tres párrafos de cuatro a seis
+// líneas —el sobrante vacío, lo que cae fuera y el descargo de los sueltos—
+// escritos con el mismo tamaño y el mismo peso que las cifras, con el botón que
+// de verdad importa enterrado en medio de ellos.
+//
+// ⛔ **Pero ninguno de esos párrafos sobra**, y por eso no se borran: cada uno
+// dice algo que si no se dice acaba en un expediente mal presentado. El problema
+// no era su contenido, era que se leían TODOS a la vez y siempre, incluida la
+// vigésima sesión de alguien que ya se los sabe.
+//
+// La forma: **una línea accionable, y el porqué detrás de un «¿por qué?»** que
+// se abre en el sitio. Quien lo necesita lo abre una vez; quien no, ve un panel
+// de cifras. No se pierde nada y no estorba nada — que es exactamente lo que la
+// regla de oro 1 pide sin decir que haya que gritarlo cada vez.
+
+/** El rótulo del renglón que resume qué se propone. */
+export const ROTULO_RESUMEN = 'Propuesta'
+
+/** El rótulo de la zona que SÍ forma expediente. */
+export const ROTULO_PRESENTAR = 'Para presentar'
+
 /** El rótulo de la zona de ficheros sueltos. */
 export const ROTULO_SUELTOS = 'Para comprobar'
+
+/** Lo que se lee en el botón que despliega una explicación. */
+export const TEXTO_PORQUE = '¿por qué?'
+
+/**
+ * El renglón de resumen: `2 parcelas · 1.763,80 m²`.
+ *
+ * ⛔ **Cuenta PARCELAS del expediente, no piezas de sobrante**, y ésa es la
+ * jerarquía que faltaba: lo primero que hay que saber al abrir este panel no es
+ * cuántos trozos ha calculado la resta booleana, es **cuántas fincas van a salir
+ * del fichero y cuánto suman**. Lo demás es el detalle de cómo se llega ahí.
+ */
+export function textoResumen(nParcelas, superficieM2) {
+  if (!Number.isFinite(nParcelas) || nParcelas <= 0) return ''
+  const cuantas = `${nParcelas} ${nParcelas === 1 ? 'parcela' : 'parcelas'}`
+  if (!Number.isFinite(superficieM2)) return cuantas
+  return `${cuantas} · ${FORMATO_AREA.format(superficieM2)} m²`
+}
 
 /**
  * ⛔ **LA FRASE POR LA QUE EXISTE ESTA ZONA, Y NO ES UN DESCARGO DE RESPONSABILIDAD.**
@@ -340,10 +390,20 @@ export const ROTULO_SUELTOS = 'Para comprobar'
  * esta frase, dos botones `[GML]` junto a cada fila leerían exactamente como
  * «aquí tienes tu expediente en trozos».
  */
-export const NOTA_SUELTOS =
-  'Un fichero suelto NO forma expediente: sirve para pasar una geometría por un validador o ' +
-  'llevarla a otro programa, no para presentar. Lo que se presenta es el GML del conjunto, con ' +
-  'todas las parcelas dentro del mismo documento.'
+export const NOTA_SUELTOS = 'Un fichero suelto NO forma expediente.'
+
+/**
+ * Y el porqué, detrás del «¿por qué?».
+ *
+ * ⚠️ **La línea corta se queda con lo innegociable** —«NO forma expediente»— y
+ * NO con la parte amable. Si de este descargo sólo se lee una línea, tiene que
+ * ser la que impide el error, no la que explica para qué sirven los sueltos.
+ */
+export const NOTA_SUELTOS_PORQUE =
+  'Sirve para pasar una geometría por un validador o llevarla a otro programa, no para ' +
+  'presentar. Lo que se presenta es el GML del conjunto, con todas las parcelas dentro del ' +
+  'mismo documento: la segregación sólo existe cuando viajan juntas, y subirlas por separado ' +
+  'no es lo mismo repartido — la Sede lo devuelve.'
 
 /**
  * Cómo se llama cada geometría en la lista de sueltos, según su papel.
@@ -403,7 +463,10 @@ export function textoRecuento(total) {
  * No lleva cifras dentro: las cifras van en las filas, junto al trozo que
  * describen, que es donde se pueden auditar.
  */
-export const NOTA_FUERA =
+export const NOTA_FUERA = 'Tu medición se sale de la parcela oficial.'
+
+/** Y el porqué, detrás del «¿por qué?». */
+export const NOTA_FUERA_PORQUE =
   'Estos trozos de la geometría medida caen fuera de la parcela oficial. Los que caen sobre un ' +
   'colindante se le recortan a él, y su parcela entra en el expediente; los que no caen sobre ' +
   'ninguna (un vial, o un hueco del parcelario) se declaran tal cual.'
@@ -688,6 +751,57 @@ const ESTILO_CUERPO = Object.freeze({
   minHeight: '0',
 })
 
+/**
+ * El renglón de resumen: rótulo a la izquierda y cifra a la derecha, como las
+ * filas de ficha del resto de la aplicación.
+ */
+const ESTILO_RESUMEN = Object.freeze({
+  display: 'flex',
+  alignItems: 'baseline',
+  justifyContent: 'space-between',
+  gap: '8px',
+  margin: '0',
+  flex: 'none',
+})
+
+const ESTILO_RESUMEN_CIFRA = Object.freeze({
+  flex: 'none',
+  fontSize: '15px',
+  fontWeight: '500',
+  fontVariantNumeric: 'tabular-nums',
+  color: '#0F172A',
+})
+
+/**
+ * El botón «¿por qué?». Es un botón y no un `<a>` ni un `<summary>`: acciona algo
+ * dentro de la página y no navega a ningún sitio.
+ *
+ * ⚠️ **No se usa `<details>/<summary>`, que era lo obvio.** Su triángulo lo pinta
+ * el navegador con la tipografía del sistema y no hay forma de vestirlo igual en
+ * Chrome y Firefox sin CSS — y este módulo no importa ninguna hoja. Dos botones
+ * con el mismo aspecto en los dos navegadores valen más aquí que el elemento
+ * semánticamente perfecto que se ve distinto en cada uno.
+ */
+const ESTILO_PORQUE = Object.freeze({
+  flex: 'none',
+  border: '0',
+  background: 'transparent',
+  cursor: 'pointer',
+  padding: '0',
+  fontSize: '11px',
+  lineHeight: '1.3',
+  color: '#0369A1',
+  textDecoration: 'underline',
+})
+
+/** El párrafo largo, cuando se despliega. */
+const ESTILO_PORQUE_TEXTO = Object.freeze({
+  margin: '2px 0 0',
+  fontSize: '11px',
+  lineHeight: '1.45',
+  color: '#475569',
+})
+
 // ── Helpers de módulo ────────────────────────────────────────────────────────
 
 /** Describe un valor para un mensaje de contrato roto. */
@@ -708,6 +822,87 @@ function describir(valor) {
 function estilar(el, estilos) {
   for (const [propiedad, valor] of Object.entries(estilos)) el.style[propiedad] = valor
   return el
+}
+
+/**
+ * Un apunte de UNA línea con su explicación larga detrás de un «¿por qué?».
+ *
+ * Es la pieza que sostiene el rediseño del 2026-08-18: el panel enseña la línea
+ * accionable y guarda el porqué para quien lo pida. Ver el bloque de constantes
+ * de arriba para el razonamiento completo.
+ *
+ * ⚠️ **Se esconde con `hidden` Y con `display`**, como todo lo que se pliega en
+ * este módulo: el contenedor lleva `display` en línea, y un estilo en línea gana
+ * a la regla `[hidden]{display:none}` de la hoja del navegador. Ya costó un
+ * defecto en producción el 2026-08-17.
+ *
+ * ⚠️ **La LÍNEA CORTA conserva el `data-sobrante` de siempre** (`nota`, `vacio`,
+ * …) y no lo estrena la caja. Es el contrato con los tests y con el guion de humo
+ * 16: `[data-sobrante="nota"]` tiene que seguir devolviendo el texto que se lee,
+ * no un envoltorio. Mover la marca al contenedor habría dejado a los dos
+ * comparando contra el `textContent` de la caja entera —línea más porqué—, que
+ * casa por accidente y deja de casar en cuanto alguien despliega.
+ *
+ * @param {Document} doc
+ * @param {string} marca  El `data-sobrante` de la línea corta.
+ * @returns {{nodo: HTMLElement, fijar: (corto: string, largo: string) => void}}
+ */
+function crearApunte(doc, marca) {
+  const caja = doc.createElement('div')
+  caja.dataset.sobrante = `apunte-${marca}`
+  estilar(caja, { margin: '0', flex: 'none' })
+
+  const linea = doc.createElement('p')
+  linea.dataset.sobrante = marca
+  estilar(linea, { margin: '0', fontSize: '11px', display: 'inline' })
+
+  const boton = doc.createElement('button')
+  boton.type = 'button'
+  boton.dataset.sobrante = `${marca}-boton`
+  boton.textContent = TEXTO_PORQUE
+  estilar(boton, ESTILO_PORQUE)
+
+  const largo = doc.createElement('p')
+  largo.dataset.sobrante = `${marca}-porque`
+  largo.id = `gml-porque-${marca}`
+  largo.hidden = true
+  largo.style.display = 'none'
+  estilar(largo, ESTILO_PORQUE_TEXTO)
+
+  boton.setAttribute('aria-controls', largo.id)
+  boton.setAttribute('aria-expanded', 'false')
+
+  const cabeza = doc.createElement('div')
+  estilar(cabeza, { display: 'flex', alignItems: 'baseline', gap: '6px' })
+  estilar(linea, { margin: '0', fontSize: '11px', flex: '1 1 auto', minWidth: '0' })
+  cabeza.append(linea, boton)
+  caja.append(cabeza, largo)
+
+  boton.addEventListener('click', () => {
+    const abierto = boton.getAttribute('aria-expanded') === 'true'
+    boton.setAttribute('aria-expanded', abierto ? 'false' : 'true')
+    largo.hidden = abierto
+    largo.style.display = abierto ? 'none' : 'block'
+  })
+
+  return {
+    nodo: caja,
+    /**
+     * Escribe las dos mitades. Con `corto` vacío la caja entera se esconde; sin
+     * `largo`, el «¿por qué?» desaparece —una línea que no tiene nada detrás no
+     * puede ofrecer abrirlo—.
+     */
+    fijar(corto, largo_ = '') {
+      const hay = typeof corto === 'string' && corto.trim() !== ''
+      caja.hidden = !hay
+      caja.style.display = hay ? 'block' : 'none'
+      linea.textContent = hay ? corto : ''
+      const hayPorque = typeof largo_ === 'string' && largo_.trim() !== ''
+      largo.textContent = hayPorque ? largo_ : ''
+      boton.hidden = !hayPorque
+      boton.style.display = hayPorque ? 'inline' : 'none'
+    },
+  }
 }
 
 // ── API ──────────────────────────────────────────────────────────────────────
@@ -890,30 +1085,51 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   cuerpo.dataset.sobrante = 'cuerpo'
   estilar(cuerpo, ESTILO_CUERPO)
 
-  const filaRotulo = doc.createElement('div')
-  filaRotulo.className = 'gml-rotulo-fila'
-  const rotulo = doc.createElement('h2')
-  rotulo.className = 'gml-rotulo'
-  rotulo.textContent = 'Sobrante'
+  // ⛔ **AQUÍ VIVÍA EL RÓTULO «SOBRANTE», Y SE RETIRÓ EL 2026-08-18.** Quedaba
+  // justo debajo de «Para presentar», así que el panel abría con DOS rótulos
+  // apilados que no separaban nada: entre uno y otro no había ni una línea de
+  // contenido. Era la jerarquía mal puesta de la que se quejó el autor, en
+  // pequeño. El recuento —lo único que aquella fila aportaba— sube a la derecha
+  // del rótulo que se queda, que es donde se lee sin gastar un renglón propio.
   const contador = doc.createElement('span')
   contador.dataset.sobrante = 'contador'
   // `role="status"` como el resto de renglones vivos de la aplicación: el lector
   // de pantalla anuncia el recuento al marcar y desmarcar **sin robar el foco**,
   // que es exactamente lo que hace falta cuando el foco está en la casilla.
   contador.setAttribute('role', 'status')
-  filaRotulo.append(rotulo, contador)
 
-  const nota = doc.createElement('p')
-  nota.dataset.sobrante = 'nota'
-  estilar(nota, ESTILO_NOTA)
+  // ── El resumen: lo PRIMERO que se lee, y lo que faltaba ───────────────────
+  // Cuántas fincas salen del fichero y cuánto suman. Antes lo primero que se leía
+  // era un párrafo de cuatro líneas sobre el redondeo.
+  const resumen = doc.createElement('div')
+  resumen.className = 'gml-rotulo-fila'
+  estilar(resumen, ESTILO_RESUMEN)
+  const resumenRotulo = doc.createElement('h2')
+  resumenRotulo.className = 'gml-rotulo'
+  resumenRotulo.textContent = ROTULO_RESUMEN
+  const resumenCifra = doc.createElement('span')
+  resumenCifra.dataset.sobrante = 'resumen'
+  resumenCifra.className = 'gml-mono'
+  resumenCifra.setAttribute('role', 'status')
+  estilar(resumenCifra, ESTILO_RESUMEN_CIFRA)
+  resumen.append(resumenRotulo, resumenCifra)
+
+  // ── El rótulo de la zona que SÍ forma expediente ──────────────────────────
+  const filaPresentar = doc.createElement('div')
+  filaPresentar.className = 'gml-rotulo-fila'
+  const rotuloPresentar = doc.createElement('h2')
+  rotuloPresentar.className = 'gml-rotulo'
+  rotuloPresentar.textContent = ROTULO_PRESENTAR
+  filaPresentar.className = 'gml-rotulo-fila'
+  filaPresentar.append(rotuloPresentar, contador)
+
+  const apunteNota = crearApunte(doc, 'nota')
 
   const lista = doc.createElement('ul')
   lista.dataset.sobrante = 'lista'
   estilar(lista, ESTILO_LISTA)
 
-  const vacio = doc.createElement('p')
-  vacio.dataset.sobrante = 'vacio'
-  estilar(vacio, ESTILO_NOTA)
+  const apunteVacio = crearApunte(doc, 'vacio')
 
   // ── La sección de lo que se SALE, que nace escondida ──────────────────────
   // ⚠️ **Cuesta CERO píxeles en el caso normal**, y no es un detalle menor en esta
@@ -939,11 +1155,10 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   fueraLista.dataset.sobrante = 'fuera-lista'
   estilar(fueraLista, ESTILO_LISTA)
 
-  const fueraNota = doc.createElement('p')
-  estilar(fueraNota, ESTILO_NOTA)
-  fueraNota.textContent = NOTA_FUERA
+  const apunteFuera = crearApunte(doc, 'fuera-nota')
+  apunteFuera.fijar(NOTA_FUERA, NOTA_FUERA_PORQUE)
 
-  fuera.append(fueraFilaRotulo, fueraLista, fueraNota)
+  fuera.append(fueraFilaRotulo, apunteFuera.nodo, fueraLista)
 
   // ── La zona de ficheros sueltos, que nace escondida ───────────────────────
   // ⚠️ **Cuesta CERO mientras no haya expediente que descomponer.** Aparece sólo
@@ -962,16 +1177,14 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   sueltosRotulo.textContent = ROTULO_SUELTOS
   sueltosFilaRotulo.append(sueltosRotulo)
 
-  const sueltosNota = doc.createElement('p')
-  sueltosNota.dataset.sobrante = 'sueltos-nota'
-  sueltosNota.textContent = NOTA_SUELTOS
-  estilar(sueltosNota, ESTILO_NOTA)
+  const apunteSueltos = crearApunte(doc, 'sueltos-nota')
+  apunteSueltos.fijar(NOTA_SUELTOS, NOTA_SUELTOS_PORQUE)
 
   const sueltosLista = doc.createElement('ul')
   sueltosLista.dataset.sobrante = 'sueltos-lista'
   estilar(sueltosLista, ESTILO_LISTA)
 
-  sueltos.append(sueltosFilaRotulo, sueltosNota, sueltosLista)
+  sueltos.append(sueltosFilaRotulo, apunteSueltos.nodo, sueltosLista)
 
   const boton = doc.createElement('button')
   boton.type = 'button'
@@ -998,7 +1211,17 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   // debajo lo que sirve para comprobar. Ponerlos encima haría que lo primero que
   // se ve al bajar la vista fueran seis botones de descarga, y el único que forma
   // expediente quedaría el último de todos.
-  cuerpo.append(filaRotulo, nota, lista, vacio, fuera, boton, renglon, sueltos)
+  cuerpo.append(
+    resumen,
+    filaPresentar,
+    apunteNota.nodo,
+    lista,
+    apunteVacio.nodo,
+    fuera,
+    boton,
+    renglon,
+    sueltos,
+  )
   bloque.append(cabecera, cuerpo)
 
   // ── Pintado ───────────────────────────────────────────────────────────────
@@ -1392,14 +1615,12 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
     lista.replaceChildren()
     filasPorOrden.clear()
     piezasPintadas = []
-    nota.textContent = ''
-    nota.hidden = true
+    apunteNota.fijar('')
     renglon.textContent = ''
     renglon.classList.remove('gml-accion-estado--error')
 
     if (cesion === null || cesion === undefined) {
-      vacio.textContent = ''
-      vacio.hidden = true
+      apunteVacio.fijar('')
       lista.hidden = true
       contador.textContent = ''
       recuento.textContent = textoRecuento(0)
@@ -1412,6 +1633,7 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
       // nombres, y con peor final: aquí lo que se llevaría el usuario es un
       // fichero.
       piezasSueltas([])
+      resumenCifra.textContent = ''
       return
     }
 
@@ -1437,8 +1659,7 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
 
     const hayPiezas = piezasPintadas.length > 0
     lista.hidden = !hayPiezas
-    vacio.hidden = hayPiezas
-    vacio.textContent = hayPiezas ? '' : SIN_PIEZAS
+    apunteVacio.fijar(hayPiezas ? '' : SIN_PIEZAS, SIN_PIEZAS_PORQUE)
     repintarContador()
     // El recuento de la BARRA cuenta piezas; el contador de dentro cuenta las que
     // van al fichero. Son dos cifras distintas a propósito (ver {@link textoRecuento}).
@@ -1465,8 +1686,15 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
     // Los `saltados` de la resta son el caso que el plan dejó abierto: si acabaran
     // en el canal global se leerían entre avisos de otra cosa, y son justamente el
     // motivo por el que la lista puede estar más corta de lo que debería.
+    // ⭐ DOS listas en paralelo desde el rediseño del 2026-08-18: la CORTA es la
+    // que se lee siempre —un recuento, sin el porqué— y la LARGA la que aparece
+    // al pulsar «¿por qué?». Se construyen a la vez y no se derivan una de otra:
+    // recortar la larga por su primer signo de puntuación daría frases mutiladas
+    // en cuanto alguien reescriba una.
+    const cortos = []
     const trozos = []
     if (cesion.nEstrechas > 0) {
+      cortos.push(`${cesion.nEstrechas} de ${piezasPintadas.length} por debajo del umbral.`)
       trozos.push(
         `${cesion.nEstrechas} de ${piezasPintadas.length} por debajo del umbral de grosor ` +
           `(${FORMATO_GROSOR.format(cesion.umbralGrosorM)} m).`,
@@ -1481,6 +1709,9 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
     // como un renglón de máquina, igual que «Las 1 parcelas» en `conjunto.js`.
     if (cesion.nNoEmitibles > 0) {
       const una = cesion.nNoEmitibles === 1
+      cortos.push(
+        `${cesion.nNoEmitibles} ${una ? "no se puede" : "no se pueden"} emitir como finca.`,
+      )
       trozos.push(
         `${cesion.nNoEmitibles} ${una ? 'no se puede' : 'no se pueden'} emitir como finca: al ` +
           `${una ? 'escribirla' : 'escribirlas'} con los 2 decimales del fichero ` +
@@ -1489,13 +1720,13 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
       )
     }
     if (Array.isArray(cesion.saltados) && cesion.saltados.length > 0) {
+      cortos.push(`${cesion.saltados.length} recinto(s) NO se han podido medir.`)
       trozos.push(
         `${cesion.saltados.length} recinto(s) NO se han podido medir, así que puede faltar ` +
           `sobrante en esta lista: ${cesion.saltados.map((s) => s.motivo).join('; ')}.`,
       )
     }
-    nota.textContent = trozos.join(' ')
-    nota.hidden = trozos.length === 0
+    apunteNota.fijar(cortos.join(' '), trozos.join(' '))
   }
 
   /**
@@ -1509,8 +1740,7 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
     if (!vivo) return
     const texto = typeof motivo === 'string' && motivo.trim() !== '' ? motivo : MOTIVO_FOTO_CADUCA
     pintar(null)
-    nota.textContent = texto
-    nota.hidden = false
+    apunteNota.fijar(texto)
   }
 
   /**
@@ -1882,6 +2112,18 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
     abrir: () => fijarAbierto(true),
     estaPlegado: () => plegado,
     estaAbierto: () => abierto,
+
+    /**
+     * El renglón de cabecera: cuántas fincas salen del fichero y cuánto suman.
+     *
+     * Lo escribe el cableado y no esta vista porque sale del EXPEDIENTE compuesto
+     * —no de la foto—, y componerlo es de `derivacion/entrega.js`. Sin argumentos
+     * lo borra.
+     */
+    resumir({ parcelas, superficieM2 } = {}) {
+      if (!vivo) return
+      resumenCifra.textContent = textoResumen(parcelas, superficieM2)
+    },
 
     piezasSueltas,
 

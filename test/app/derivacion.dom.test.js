@@ -26,6 +26,7 @@ import {
   cablearDerivacion,
   motivoEntregaBloqueada,
   MOTIVO_NO_CIERRA,
+  AVISO_SIN_COLINDANTES,
   MOTIVO_SIN_GEOMETRIA,
   MOTIVO_SIN_OFICIAL,
   SELECTOR_BOTON,
@@ -44,6 +45,8 @@ import {
   CLASE_NUMERO,
   CLASE_PIEZA,
   CLASE_PIEZA_FUERA,
+  CLASE_PIEZA_VECINO,
+  PREFIJO_VECINO,
   VARIANTE,
   crearCapaPiezas,
 } from '../../viewer/piezas.js'
@@ -89,6 +92,7 @@ let estado = null
 let lista = null
 let capa = null
 let capaFuera = null
+let capaVecinos = null
 let avisos = []
 let descargas = []
 let cableado = null
@@ -116,6 +120,7 @@ function cablear(extra = {}) {
     lista,
     capa,
     capaFuera,
+    capaVecinos,
     panel: { avisar: (mensaje, detalle) => avisos.push({ mensaje, nivel: detalle?.nivel }) },
     srs: SRS,
     documento: document,
@@ -143,9 +148,13 @@ afterEach(() => {
   lista?.destruir()
   capa?.destruir()
   capaFuera?.destruir()
+  capaVecinos?.destruir()
   entorno.destruir()
   document.body.innerHTML = ''
 })
+
+/** Un registro de colindantes ya consultado, con la forma real ({get, subscribe}). */
+const registroConVecinas = () => ({ get: () => [], subscribe: () => () => {} })
 
 const boton = () => document.querySelector(SELECTOR_BOTON)
 const renglon = () => document.querySelector(SELECTOR_ESTADO)
@@ -168,6 +177,7 @@ describe('cablearDerivacion', () => {
     lista = crearListaSobrante({ mapa: entorno.mapa, documento: document })
     capa = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO })
     capaFuera = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.FUERA })
+    capaVecinos = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.VECINO })
   })
 
   // ── 1 · Contratos ─────────────────────────────────────────────────────────
@@ -179,6 +189,7 @@ describe('cablearDerivacion', () => {
         lista,
         capa,
         capaFuera,
+        capaVecinos,
         panel: { avisar() {} },
         srs: SRS,
         documento: document,
@@ -229,11 +240,63 @@ describe('cablearDerivacion', () => {
       expect(renglon().textContent).toBe(MOTIVO_SIN_GEOMETRIA)
     })
 
-    it('con las dos mitades, se enciende y el renglón se calla', () => {
-      cablear()
+    it('con las dos mitades se enciende, y CON las colindantes el renglón se calla', () => {
+      // El renglón vacío no es cortesía: `.gml-accion-estado:empty` lo colapsa a
+      // 0 px, y lleno cuesta 22,84 px medidos de la tabla de vértices. Se paga
+      // cuando hay algo que decir.
+      cablear({ colindantes: registroConVecinas() })
       estado.set(parcela())
       expect(boton().disabled).toBe(false)
       expect(renglon().textContent).toBe('')
+    })
+
+    it('⭐ SIN las colindantes se enciende igual, pero AVISA antes de pulsar', () => {
+      // El defecto que esto cierra, en palabras del autor: «puede pasar que no lo
+      // hayas traído, le des, y no sepas que no te lo está rehaciendo porque no
+      // tiene la información».
+      //
+      // ⛔ Y el botón NO se apaga, que era la otra opción: sin colindantes la
+      // derivación puede ser perfectamente correcta —si la parcela sólo mengua no
+      // hay exceso que atribuir—, y no se sabe cuál de los dos casos es hasta
+      // correr la resta booleana, que es lo que el botón dispara. Apagarlo
+      // castigaría el camino bueno para proteger el malo.
+      cablear()
+      estado.set(parcela())
+      expect(boton().disabled, 'se puede derivar igual').toBe(false)
+      expect(renglon().textContent).toBe(AVISO_SIN_COLINDANTES)
+      expect(
+        renglon().classList.contains('gml-accion-estado--error'),
+        'es un AVISO: todavía no hay nada mal',
+      ).toBe(false)
+    })
+
+    it('…y el aviso se APAGA SOLO cuando llegan las colindantes', () => {
+      // Traerlas no toca el store, así que `refrescar` no se entera: sin la
+      // suscripción al registro el renglón se quedaría mintiendo hasta la
+      // siguiente edición.
+      // ⚠️ La bandera es SUYA y no «¿me he suscrito ya?»: `subscribe` corre al
+      // cablear, así que derivarlo de él haría que el registro naciera diciendo
+      // «ya las tengo» y la prueba se cumpliría sola.
+      let traidas = false
+      let avisar = () => {}
+      const registro = {
+        get: () => (traidas ? [] : null),
+        subscribe: (fn) => {
+          avisar = fn
+          return () => {}
+        },
+      }
+      cablear({ colindantes: registro })
+      estado.set(parcela())
+      expect(renglon().textContent).toBe(AVISO_SIN_COLINDANTES)
+
+      traidas = true
+      avisar() // llegan las vecinas
+      expect(renglon().textContent).toBe('')
+    })
+
+    it('⛔ un registro sin `subscribe` LANZA en vez de mentir en silencio', () => {
+      expect(() => cablear({ colindantes: { get: () => null } })).toThrow(/subscribe/)
     })
 
     it('⛔ el predicado NO mira la superficie: una parcela que CRECIÓ lo enciende igual', () => {
@@ -693,6 +756,7 @@ describe('cablearDerivacion · ⭐ retranqueo de milímetros + invasión de metr
     lista = crearListaSobrante({ mapa: entorno.mapa, documento: document })
     capa = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO })
     capaFuera = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.FUERA })
+    capaVecinos = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.VECINO })
   })
 
   /** Enganchada al oeste por 0,5 mm y metida 5 m en el vecino por el este. */
@@ -706,8 +770,53 @@ describe('cablearDerivacion · ⭐ retranqueo de milímetros + invasión de metr
     })
 
   /** El registro de `app/colindantes.js`, reducido a lo que este cable le pide. */
+  // ⚠️ Trae `subscribe` además de `get` porque el registro de verdad
+  // (`app/colindantes.js`) lo tiene y el cableado se apoya en él: al llegar las
+  // vecinas se apaga solo el aviso de «faltan colindantes». Un doble sin
+  // `subscribe` no probaría un cableado más simple — probaría otro cableado.
   const registro = () => ({
     get: () => [{ refcat: 'V-1', recintos: [crearRecinto(anilloRect(X0 + 40, Y0, X0 + 80, Y0 + 40))] }],
+    subscribe: () => () => {},
+  })
+
+  it('⛔ EL VECINO RECORTADO SE PINTA EN EL MAPA, que es el defecto de 2026-08-18', () => {
+    // ── EL DEFECTO, TAL CUAL ESTABA ──────────────────────────────────────────
+    // `recorte.vecinos[].trozos[].recintos` —cómo queda la finca del colindante
+    // después del corte— se calculaba, viajaba en la foto, entraba en el `.gml`
+    // como un `featureMember` más y se listaba en el panel con su superficie… y
+    // el ÚNICO uso de `recorte.vecinos` en todo `app/` y `viewer/` era contar
+    // cuántos había para encender un botón. O sea: **la aplicación proponía
+    // modificar la finca de otro titular y no la enseñaba en ninguna parte.**
+    //
+    // Lo cazó el autor mirando la pantalla, no la suite: en el mapa salía la
+    // mancha ámbar de la invasión y nada más, así que no había forma de ver por
+    // dónde queda el lindero nuevo del vecino — que es justo lo que hay que
+    // juzgar antes de firmar.
+    cablear({ colindantes: registro() })
+    estado.set(medida())
+    boton().click()
+
+    const delVecino = entorno.contenedor.querySelectorAll(`.${CLASE_PIEZA_VECINO}`)
+    expect(delVecino.length, 'la finca recortada del colindante tiene que estar dibujada')
+      .toBeGreaterThan(0)
+    // Y con rótulo propio: `V1`, para poder emparejarla con su fila del panel.
+    const rotulos = [...entorno.contenedor.querySelectorAll(`.${CLASE_NUMERO}`)].map(
+      (n) => n.textContent,
+    )
+    expect(rotulos).toContain(`${PREFIJO_VECINO}1`)
+  })
+
+  it('⛔ y se BORRA con la foto: editar la parcela no deja la finca ajena pintada', () => {
+    // Dejar el contorno del vecino sobre el mapa después de mover un vértice
+    // sería enseñar un recorte que ya no se corresponde con nada — y encima
+    // sobre la finca de otro.
+    cablear({ colindantes: registro() })
+    estado.set(medida())
+    boton().click()
+    expect(entorno.contenedor.querySelectorAll(`.${CLASE_PIEZA_VECINO}`).length).toBeGreaterThan(0)
+
+    estado.set(parcela({ mengua: 12 }))
+    expect(entorno.contenedor.querySelectorAll(`.${CLASE_PIEZA_VECINO}`)).toHaveLength(0)
   })
 
   it('⛔ la única pieza del sobrante NO se ofrece como finca, y se dice por qué', () => {
@@ -784,6 +893,7 @@ describe('cablearDerivacion · los ficheros sueltos', () => {
     lista = crearListaSobrante({ mapa: entorno.mapa, documento: document })
     capa = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO })
     capaFuera = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.FUERA })
+    capaVecinos = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.VECINO })
   })
 
   const descargarTxt = (texto, opciones) => {

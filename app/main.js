@@ -5622,6 +5622,10 @@ const derivacionCableada = cablearDerivacion({
   lista: visor.sobrante.lista,
   capa: visor.sobrante.capa,
   capaFuera: visor.sobrante.capaFuera,
+  // La TERCERA capa (2026-08-18): cómo queda la parcela del colindante tras el
+  // recorte. Sin ella la aplicación proponía modificar la finca de otro titular
+  // —la metía en el `.gml` y la listaba con su superficie— sin enseñarla nunca.
+  capaVecinos: visor.sobrante.capaVecinos,
   colindantes: registroColindantes,
   panel,
   srs: SRS_DEMO,

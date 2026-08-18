@@ -145,6 +145,19 @@ export const DENSIDAD_BASE_PX = 13
 export const PREFIJO_FUERA = 'F'
 
 /**
+ * Y lo que precede al número de una parcela COLINDANTE ya recortada (2026-08-18).
+ *
+ * Vive aquí por lo mismo que {@link PREFIJO_FUERA} y con el mismo guardián
+ * detrás: lo escriben el rótulo del mapa (`viewer/piezas.js`) y la fila del panel
+ * (`viewer/lista-sobrante.js`), y el mapa diciendo `V1` mientras el panel dice
+ * `C1` sobre la misma finca ajena es exactamente el fallo que nadie ve.
+ *
+ * ⚠️ **`V` de vecino, y no `C` de colindante**, porque `C` ya se lee como
+ * «catastro» en media aplicación.
+ */
+export const PREFIJO_VECINO = 'V'
+
+/**
  * El número con el que se rotula una pieza, en el mapa Y en la lista.
  *
  * Existe para que los dos escriban **la misma cadena**: es la única forma de que un

@@ -1037,13 +1037,17 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  *   sin ver el mapa no es elegir, es adivinar.
  * @property {{lista: ReturnType<typeof crearListaSobrante>,
  *   capa: ReturnType<typeof crearCapaPiezas>,
- *   capaFuera: ReturnType<typeof crearCapaPiezas>}|null} sobrante  Las TRES piezas
+ *   capaFuera: ReturnType<typeof crearCapaPiezas>,
+ *   capaVecinos: ReturnType<typeof crearCapaPiezas>}|null} sobrante  Las CUATRO piezas
  *   de F17, o **`null`** si el visor se montó sin ellas. Van JUNTAS en un objeto,
  *   como `diagnostico` y por lo mismo: se usan siempre a la vez —la lista enseña
  *   las cifras y las capas las manchas de la misma foto— y así `if (visor.sobrante)`
  *   es una sola pregunta.
  *   · `capa` pinta lo que la parcela SUELTA (cian, `P_of − P_new`).
  *   · `capaFuera` pinta lo que se SALE del contorno oficial (ámbar, `P_new − P_of`).
+ *   · `capaVecinos` pinta cómo queda la parcela del COLINDANTE tras el recorte
+ *     (violeta, relleno tenue). Sin ella, la aplicación proponía modificar la
+ *     finca de otro titular sin enseñarla nunca.
  *     Existe desde que la puerta dejó de esconder el sobrante cuando las dos cosas
  *     pasan a la vez, que es el caso normal de un lindero rectificado.
  *   ⚠️ **`lista.nodo` NO está en el documento**: `crearVisor` la fabrica y la
@@ -1661,7 +1665,7 @@ export function crearVisor(contenedor, opciones = {}) {
     // diferencia: aquél nace en una esquina del mapa y SE MUDA; éste nunca ha
     // estado en el mapa, así que hasta que alguien lo cuelgue no está en el
     // documento — y por eso `crearVisor` lo devuelve en vez de darlo por puesto.
-    /** @type {{lista: object, capa: object, capaFuera: object}|null} */
+    /** @type {{lista: object, capa: object, capaFuera: object, capaVecinos: object}|null} */
     let sobrante = null
     if (montarSobrante) {
       const capaPiezas = crearCapaPiezas({ mapa, zona, alAvisar: avisar })
@@ -1678,6 +1682,18 @@ export function crearVisor(contenedor, opciones = {}) {
       const capaFuera = crearCapaPiezas({ mapa, zona, alAvisar: avisar, variante: VARIANTE.FUERA })
       deshacer.push(() => capaFuera.destruir())
 
+      // ⛔ **LA TERCERA CAPA, Y ES UN DEFECTO CORREGIDO** (2026-08-18): cómo queda
+      // la parcela del COLINDANTE después del recorte. Se calculaba, viajaba en la
+      // foto y entraba en el `.gml` como una parcela más del expediente… y no se
+      // dibujaba en ningún sitio. La aplicación proponía modificar la finca de otro
+      // titular sin enseñarla nunca.
+      //
+      // Es una capa aparte y no un modo de las otras dos por lo mismo que aquéllas
+      // son dos: **se pintan a la vez** —lo ámbar es lo que invades, lo violeta es
+      // cómo le queda a él— y cada una tiene su foto y su resaltado.
+      const capaVecinos = crearCapaPiezas({ mapa, zona, alAvisar: avisar, variante: VARIANTE.VECINO })
+      deshacer.push(() => capaVecinos.destruir())
+
       // ⭐ **CON EL MAPA DESDE EL 2026-08-17.** Con él, la lista se monta como
       // control de Leaflet en `bottomleft` y se arrastra; sin él seguiría siendo
       // el nodo suelto que era, y alguien tendría que colgarlo. Ya no lo cuelga
@@ -1690,7 +1706,7 @@ export function crearVisor(contenedor, opciones = {}) {
       })
       deshacer.push(() => listaSobrante.destruir())
 
-      sobrante = { lista: listaSobrante, capa: capaPiezas, capaFuera }
+      sobrante = { lista: listaSobrante, capa: capaPiezas, capaFuera, capaVecinos }
     }
 
     // 6 · El encuadre, lo ÚLTIMO del MONTAJE (ver cabecera: así la capa WMS del

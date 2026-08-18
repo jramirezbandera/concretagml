@@ -65,6 +65,7 @@ import {
   NIVEL,
   PANE,
   PREFIJO_FUERA,
+  PREFIJO_VECINO,
   resolverAvisar,
   textoNumeroPieza,
   vertUTMaLatLng,
@@ -74,7 +75,7 @@ import {
 // panel, y la lista no puede importar de aquí (Leaflet). Vive en `_comun.js`, que
 // es el único sitio que las dos alcanzan. Se reexporta para no romper a quien ya lo
 // importaba de este módulo — que es donde nació.
-export { PREFIJO_FUERA, textoNumeroPieza }
+export { PREFIJO_FUERA, PREFIJO_VECINO, textoNumeroPieza }
 
 // ── Constantes ───────────────────────────────────────────────────────────────
 
@@ -143,27 +144,72 @@ export const CLASE_PIEZA_FUERA = 'gml-pieza--fuera'
 const COLOR_FUERA = '#D97706'
 
 /**
- * Las dos variantes de la capa: qué pinta y con qué aspecto.
+ * Clase CSS de la parcela de un COLINDANTE ya recortada (2026-08-18). Igual que
+ * {@link CLASE_PIEZA_FUERA}, se pone ADEMÁS de {@link CLASE_PIEZA}.
+ */
+export const CLASE_PIEZA_VECINO = 'gml-pieza--vecino'
+
+/**
+ * Color de la parcela de un colindante DESPUÉS del recorte.
  *
- * Van como UN valor y no como tres opciones sueltas (color, clase, prefijo) para
- * que no se puedan combinar en algo que no signifique nada — una mancha ámbar con
- * número sin prefijo sería un desborde disfrazado de sobrante.
+ * ── ⛔ POR QUÉ ESTO TENÍA QUE EXISTIR, Y ES UN DEFECTO CORREGIDO ────────────
+ * Hasta el 2026-08-18 el contorno nuevo del vecino **no se dibujaba en ningún
+ * sitio**. Se calculaba (`derivacion/vecino.js`), viajaba en la foto, entraba en
+ * el `.gml` como una parcela más del expediente y se listaba en el panel con su
+ * superficie… y el único uso de `recorte.vecinos` en todo `app/` y `viewer/` era
+ * contar cuántos había para encender un botón. O sea: **la aplicación proponía
+ * modificar la finca de otro titular y no la enseñaba**. Es la regla de oro 1 en
+ * su versión más cara, porque lo que no se veía era una parcela ajena dentro de
+ * un documento que se firma.
+ *
+ * ── EL COLOR, POR DESCARTE Y CON LA MISMA REJILLA QUE EL CIAN ───────────────
+ * Con las mismas restricciones que se escribieron al elegir {@link COLOR_PIEZA}:
+ *
+ *   · **No el ámbar `#D97706`**, que es la invasión — y el vecino recortado es la
+ *     CONSECUENCIA de esa invasión, no la invasión. Verlos del mismo color
+ *     borraría justo la distinción que esta capa viene a enseñar: lo ámbar es lo
+ *     que te llevas, lo violeta es cómo queda su finca después.
+ *   · **No el cian `#22D3EE`** del sobrante: aquello lo sueltas tú, esto se lo
+ *     quitas a otro.
+ *   · **No el amarillo `#FFD600`** del usuario ni el gris `#64748B` de F07.
+ *   · **No el violeta oscuro `#7C3AED`**, y esto es una lección pagada: la fase 5
+ *     de F03 lo descartó porque **los tonos oscuros desaparecen en las sombras de
+ *     la ortofoto**, y una finca colindante cae con la misma frecuencia en un
+ *     borde arbolado.
+ *
+ * ⚠️ **Y NO se reutiliza el `#A78BFA` de la huella de parte**, aunque no puedan
+ * coexistir —aquélla es de la rama EDIFICIO y ésta de PARCELA—. Un color con dos
+ * significados obliga a la leyenda a saber en qué rama está para no mentir, y la
+ * leyenda de este proyecto se deriva de lo que hay pintado, no de la rama. Se
+ * coge el morado claro de al lado, que sobre ortofoto se distingue del lila de la
+ * huella y aguanta las sombras.
+ */
+const COLOR_VECINO = '#C084FC'
+
+/**
+ * ⚠️ **El relleno del vecino es MUCHO más tenue que el de las manchas, y el
+ * motivo es geométrico, no estético.** Una pieza de sobrante es una astilla o una
+ * franja; un colindante recortado es **una parcela entera**, a menudo mayor que
+ * la del usuario. Con el 0,35 de {@link OPACIDAD_RELLENO} la mitad del mapa
+ * quedaría teñida y taparía justo lo que hay que juzgar: por dónde pasa el
+ * lindero nuevo. Se pinta el CONTORNO con fuerza y el relleno como un velo.
+ */
+const OPACIDAD_RELLENO_VECINO = 0.12
+
+/**
+ * Las tres variantes de la capa: qué pinta y con qué aspecto.
+ *
+ * Van como UN valor y no como cuatro opciones sueltas (color, clase, prefijo,
+ * opacidad) para que no se puedan combinar en algo que no signifique nada — una
+ * mancha ámbar con número sin prefijo sería un desborde disfrazado de sobrante.
  */
 export const VARIANTE = Object.freeze({
   /** Lo que la parcela SUELTA: `P_of − P_new`. Es el defecto. */
   SOBRANTE: 'SOBRANTE',
   /** Lo que la parcela INVADE: `P_new − P_of`. */
   FUERA: 'FUERA',
-})
-
-/** El aspecto de cada variante, en un solo sitio. */
-const ASPECTO = Object.freeze({
-  [VARIANTE.SOBRANTE]: { color: COLOR_PIEZA, clase: CLASE_PIEZA, prefijo: '' },
-  [VARIANTE.FUERA]: {
-    color: COLOR_FUERA,
-    clase: `${CLASE_PIEZA} ${CLASE_PIEZA_FUERA}`,
-    prefijo: PREFIJO_FUERA,
-  },
+  /** Cómo queda la parcela de un COLINDANTE después del recorte. */
+  VECINO: 'VECINO',
 })
 
 /** Grosor del contorno, en píxeles. */
@@ -188,6 +234,28 @@ const OPACIDAD_RELLENO = 0.35
 
 /** Y la del relleno resaltado. Sube lo justo para que la mancha «salte». */
 const OPACIDAD_RELLENO_RESALTADO = 0.6
+
+/** El aspecto de cada variante, en un solo sitio. */
+const ASPECTO = Object.freeze({
+  [VARIANTE.SOBRANTE]: {
+    color: COLOR_PIEZA,
+    clase: CLASE_PIEZA,
+    prefijo: '',
+    relleno: OPACIDAD_RELLENO,
+  },
+  [VARIANTE.FUERA]: {
+    color: COLOR_FUERA,
+    clase: `${CLASE_PIEZA} ${CLASE_PIEZA_FUERA}`,
+    prefijo: PREFIJO_FUERA,
+    relleno: OPACIDAD_RELLENO,
+  },
+  [VARIANTE.VECINO]: {
+    color: COLOR_VECINO,
+    clase: `${CLASE_PIEZA} ${CLASE_PIEZA_VECINO}`,
+    prefijo: PREFIJO_VECINO,
+    relleno: OPACIDAD_RELLENO_VECINO,
+  },
+})
 
 /**
  * Estilo EN LÍNEA del rótulo del número. Va en línea y no en la hoja por lo mismo
@@ -390,7 +458,7 @@ export function crearCapaPiezas({ mapa, zona, alAvisar, variante = VARIANTE.SOBR
     const activa = entrada.orden === resaltada
     entrada.poligono.setStyle({
       weight: activa ? GROSOR_TRAZO_RESALTADO : GROSOR_TRAZO,
-      fillOpacity: activa ? OPACIDAD_RELLENO_RESALTADO : OPACIDAD_RELLENO,
+      fillOpacity: activa ? OPACIDAD_RELLENO_RESALTADO : aspecto.relleno,
     })
     // El rótulo se marca con un `data-*` en vez de con un color distinto: es un
     // gancho de inspección para los tests y para `estilos/app.css`, y no gasta
@@ -475,7 +543,7 @@ export function crearCapaPiezas({ mapa, zona, alAvisar, variante = VARIANTE.SOBR
         opacity: 1,
         fill: true,
         fillColor: aspecto.color,
-        fillOpacity: OPACIDAD_RELLENO,
+        fillOpacity: aspecto.relleno,
       })
       poligono.addTo(mapa)
 
