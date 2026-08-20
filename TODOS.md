@@ -83,6 +83,39 @@ si luego se gasta en palabras, que es la aproximación B del diseño, la que no 
 cinco del núcleo. Es la inversión de lo que hace el código hoy: **lo que se ve poco no se
 aprende nunca**, y hoy las raras son justo las que desaparecen.
 
+⛔ **MEDIDO EL 2026-08-20, Y EL ARREGLO PENSADO NO CABE.** A 1280×720 el mapa mide 888 px y
+el guion avisa a partir de 444 (la mitad). Con los nueve controles la barra mide **343 px
+(38,6 %)**; rotulando «Dibujar» y «Quitar puntos» se va a **472 px (53,1 %)**, o sea que
+cruza el umbral. Coste por rótulo: `Quitar puntos` 83 px, `Desplazar` 65, `Deshacer` 59,
+`Rehacer` 53, `Insertar` 50, `Dibujar` 46, `Borrar` 41, `Ayuda` 41. Rotular **uno solo** sí
+entra («Quitar puntos» → 426 px, 48,0 %).
+
+✅ **VÍA ELEGIDA POR EL AUTOR: arreglar los ICONOS, que cuesta 0 px de barra.** Entregado el
+2026-08-20 — ver abajo. La vía de los rótulos queda medida y descartada por ahora, no
+olvidada.
+
+**Lo entregado (2026-08-20), y lo que NO se tocó.** Se renderizaron los nueve a 58 px y a
+los 18 px reales del botón, y se juzgaron ahí y no leyendo sus `path`:
+  · **«Desplazar lindero» → cambiado.** Era el glifo de ACOTAR de cualquier CAD (dos líneas
+    y una flecha de doble punta = «la distancia entre estas dos»). En una aplicación que
+    mide parcelas, eso es la confusión más cara posible. Ahora: sólida arriba, discontinua
+    abajo, flecha de UNA punta — la convención de *offset*.
+  · **«Dibujar recinto» → cambiado.** Un pentágono cerrado dice «una forma», y en esta app
+    un polígono **es la parcela**. Ahora va ABIERTO por el último lado: un contorno sin
+    cerrar solo puede significar que se está trazando.
+  · **«Insertar vértice» → NO se toca, y no por falta de alternativa.** Se probaron cuatro y
+    ninguna mejora el SIGNIFICADO. Y hay razón para dejarlo: su vecina es la papelera, así
+    que `+` junto a papelera se lee como **el par añadir/quitar** — que es exactamente lo
+    que son (`viewer/edicion.js` los hace excluyentes). El icono no falla; funciona como
+    mitad de una pareja.
+  · **«Quitar puntos» → NO se toca**: se diseñó con medición el 2026-08-19 (seis puntos y no
+    cuatro, medidos en navegador). Cambiarlo sin evidencia sería tirar ese trabajo.
+  · Deshacer, Rehacer, Ajuste, Borrar y Ayuda son convención universal y se quedan.
+
+⚠️ **Lo que esto NO cierra.** Un icono mejor sigue siendo un icono: la identidad se lee
+antes, pero no se lee sin mirar. Si el dolor persiste, la siguiente parada es rotular
+«Quitar puntos» sola, que es la única que entra sin cruzar el umbral.
+
 ⛔ **Y NO es un restyle. Dos trampas, las dos localizadas:**
 1. `.gml-barra-rotulo` está oculto **con estilos EN LÍNEA** (`viewer/barra-edicion.js:836-848`),
    y un estilo en línea gana a cualquier selector: desde `app.css` no se «arregla». Hay que

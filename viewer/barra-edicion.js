@@ -751,10 +751,29 @@ const ICONOS = Object.freeze({
    */
   IMAN: Object.freeze(['M5 4h4v8a3 3 0 0 0 6 0V4h4v8a7 7 0 0 1-14 0Z', 'M5 10h4', 'M15 10h4']),
   /**
-   * Dos linderos paralelos y una flecha de doble punta entre ellos: desplazar un
-   * lado en paralelo a sí mismo, que es literalmente lo que hace la herramienta.
+   * El lindero SÓLIDO arriba, su destino DISCONTINUO abajo, y una flecha de UNA
+   * punta entre los dos (2026-08-20).
+   *
+   * ⛔ **ANTES ERAN DOS LÍNEAS SÓLIDAS CON UNA FLECHA DE DOBLE PUNTA EN MEDIO, y
+   * ése es exactamente el glifo de ACOTAR de cualquier CAD**: dos líneas de
+   * referencia y una cota con puntas a los dos lados. Dice «la distancia ENTRE
+   * estas dos», no «mueve ÉSTA». En una aplicación cuyo oficio entero es medir
+   * parcelas, tener una herramienta que parece la de acotar es la peor confusión
+   * posible — y estaba en el botón que más veces se abre sin usarse.
+   *
+   * Las tres piezas dicen las tres mitades del contrato, y ninguna sobra:
+   *   · **la sólida** es el lindero que hay;
+   *   · **la discontinua** es donde va a quedar (la línea de trazos es lo que
+   *     todo editor usa para «resultado previsto», y esta herramienta previsualiza);
+   *   · **la flecha de una punta** es la DIRECCIÓN. Con dos puntas no habría
+   *     dirección, habría distancia, que es de lo que se venía.
+   *
+   * ⚠️ La discontinua son TRES trazos y no un `stroke-dasharray`: {@link crearIcono}
+   * pone los atributos de trazo en el `<svg>`, así que un guion por `path` obligaría
+   * a cambiar la fábrica para un solo icono. Tres segmentos cuestan lo mismo y no
+   * tocan a nadie más.
    */
-  OFFSET: Object.freeze(['M3 5h18', 'M3 19h18', 'M12 8v8', 'M9.5 10.5 12 8l2.5 2.5', 'M9.5 13.5 12 16l2.5-2.5']),
+  OFFSET: Object.freeze(['M3 6h18', 'M4 18h3', 'M10.5 18h3', 'M17 18h3', 'M12 9v5', 'M10 12 12 14l2-2']),
   /**
    * Un lindero abajo y un signo «+» grande encima: insertar un vértice en un lado
    * que ya existe (2026-08-18).
@@ -778,12 +797,25 @@ const ICONOS = Object.freeze({
     'M14 11v6',
   ]),
   /**
-   * Un recinto cerrado de cinco lados. NO un lápiz: un lápiz querría decir
-   * «dibujar» y también «editar», que es justo lo que hacen las otras cinco
-   * herramientas de esta barra (el mismo argumento que ya estaba escrito cuando
-   * este botón llevaba palabras).
+   * Un recinto de cinco lados **ABIERTO por el último** (2026-08-20): falta el
+   * lado que volvería al primer vértice, que es justo el que cierra el usuario.
+   *
+   * ⛔ **ANTES ESTABA CERRADO, y un polígono cerrado a secas dice «una forma», no
+   * «dibuja una».** Y en ESTA aplicación dice algo peor: un polígono **es la
+   * parcela** —es lo que pintan `viewer/dibujo.js`, la leyenda y el diagnóstico—,
+   * así que el botón podía leerse como «enséñame el recinto» en vez de como la
+   * herramienta que lo traza. El hueco es toda la diferencia: un contorno sin
+   * cerrar solo puede significar que se está trazando.
+   *
+   * ⚠️ Y sigue sin ser un LÁPIZ, por el argumento de siempre: un lápiz querría
+   * decir «dibujar» y también «editar», que es lo que hacen las otras cinco
+   * herramientas de esta barra.
+   *
+   * ⚠️ El hueco va abajo a la izquierda y no arriba: probado en el navegador a los
+   * 18 px reales del botón, con el hueco arriba el pentágono se lee como una forma
+   * MORDIDA —un desperfecto— y no como un trazado a medias.
    */
-  DIBUJAR: Object.freeze(['M12 3l8 6-3 10H7L4 9Z']),
+  DIBUJAR: Object.freeze(['M4 9 L12 3 L20 9 L17 19 L7 19']),
   /**
    * Un campo de seis puntos sueltos y una raya que lo tacha: quitar el levantamiento.
    *
