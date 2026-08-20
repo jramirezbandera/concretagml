@@ -1159,3 +1159,217 @@ describe('crearListaSobrante · una línea y el porqué detrás', () => {
     expect(q(SELECTOR.porqueDe('nota')).textContent).toMatch(/umbral de grosor \(0,0071 m\)/)
   })
 })
+
+// ── 14 · «CUÁL DE TODAS ES ÉSTA» (2026-08-20) ───────────────────────────────
+//
+// ⛔ **LA PROMESA QUE DEFIENDE ESTE BLOQUE: que se pueda emparejar una fila del
+// expediente con una geometría del mapa.** La zona «Para comprobar» lista las
+// parcelas que van dentro del fichero por su referencia catastral, y el caso
+// normal es que compartan once caracteres de doce (`29053A00109007` y
+// `29053A00109007.1`). Sin esta señal, el usuario tiene delante todo lo que va a
+// firmar y no tiene forma de saber cuál es cuál — y lo que se firma es un
+// documento que modifica la finca de otros titulares.
+//
+// Los tres estados que la sostienen y por qué son tres, en la cabecera de la zona
+// (`viewer/lista-sobrante.js`). Aquí se defiende lo que se ve.
+
+describe('crearListaSobrante · la señal de «cuál es cuál»', () => {
+  const SUELTOS = [
+    { clave: 'K1', etiqueta: '29053A01000001', papel: PAPEL.MEDICION, superficieM2: 108023.17 },
+    { clave: 'K2', etiqueta: '29053A00109007', papel: PAPEL.VECINO, superficieM2: 8049.47 },
+    { clave: 'K3', etiqueta: '29053A00109007.1', papel: PAPEL.VECINO, superficieM2: 3050.37 },
+  ]
+
+  const etiquetas = () => qq(SELECTOR.SUELTO_ETIQUETA)
+  const sueltoFilas = () => qq(SELECTOR.SUELTO_FILA)
+  const entrar = (i) => sueltoFilas()[i].dispatchEvent(new window.MouseEvent('mouseenter'))
+  const salir = (i) => sueltoFilas()[i].dispatchEvent(new window.MouseEvent('mouseleave'))
+
+  it('⭐ la zona DICE que las filas se señalan: si no, la función no existe', () => {
+    // Una fila que sólo reacciona al ratón es invisible hasta que alguien pone el
+    // ratón encima por casualidad, y quien no lo haga seguirá sin saber cuál es
+    // cuál — que es exactamente el defecto que esto cierra.
+    lista.piezasSueltas(SUELTOS)
+    expect(q(SELECTOR.SUELTOS_AYUDA).textContent).toMatch(/mapa/)
+  })
+
+  it('la etiqueta es un BOTÓN, y dice el gesto y no sólo el nombre', () => {
+    // Un `<span>` con un `click` encima no recibe el foco, no se activa con Intro
+    // ni con Espacio y no tiene `aria-pressed`. Y «29053A00109007» a secas es lo
+    // que ya se lee en la fila: lo que hay que anunciar es que es accionable.
+    lista.piezasSueltas(SUELTOS)
+    const boton = etiquetas()[1]
+    expect(boton.tagName).toBe('BUTTON')
+    expect(boton.getAttribute('aria-pressed')).toBe('false')
+    expect(boton.getAttribute('aria-label')).toMatch(/29053A00109007/)
+    expect(boton.getAttribute('aria-label')).toMatch(/mapa/)
+  })
+
+  it('pasar el ratón por una fila emite SU clave, y salir emite null', () => {
+    const senaladas = []
+    lista.alSenalarSuelto((clave) => senaladas.push(clave))
+    lista.piezasSueltas(SUELTOS)
+    senaladas.length = 0
+
+    entrar(2)
+    expect(senaladas).toEqual(['K3'])
+    expect(sueltoFilas()[2].dataset.resaltada).toBe('si')
+    salir(2)
+    expect(senaladas).toEqual(['K3', null])
+    expect(sueltoFilas()[2].dataset.resaltada).toBe('no')
+  })
+
+  it('recorrer la lista NO repite la misma clave dos veces seguidas', () => {
+    // El canal corre con cada movimiento del ratón y quien escucha repinta un
+    // polígono: emitir de más es repintar de más en la mano del usuario.
+    const senaladas = []
+    lista.piezasSueltas(SUELTOS)
+    lista.alSenalarSuelto((clave) => senaladas.push(clave))
+    entrar(0)
+    entrar(0)
+    expect(senaladas).toEqual(['K1'])
+  })
+
+  it('⭐ pulsar una fila la FIJA, y emite por el canal del encuadre', () => {
+    const fijadas = []
+    lista.alFijarSuelto((clave) => fijadas.push(clave))
+    lista.piezasSueltas(SUELTOS)
+
+    etiquetas()[1].click()
+    expect(fijadas).toEqual(['K2'])
+    expect(lista.sueltoFijado()).toBe('K2')
+    expect(sueltoFilas()[1].dataset.fijada).toBe('si')
+    expect(etiquetas()[1].getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('volver a pulsar la fijada la SUELTA, y lo dice con un null', () => {
+    const fijadas = []
+    lista.alFijarSuelto((clave) => fijadas.push(clave))
+    lista.piezasSueltas(SUELTOS)
+
+    etiquetas()[1].click()
+    etiquetas()[1].click()
+    expect(fijadas).toEqual(['K2', null])
+    expect(lista.sueltoFijado()).toBeNull()
+    expect(sueltoFilas()[1].dataset.fijada).toBe('no')
+  })
+
+  it('⛔ señalar otra fila NO pierde la fijada: al salir se vuelve a ver', () => {
+    // Sin el tercer estado —efectiva = señalada ?? fijada—, pasear el ratón por la
+    // lista borraría la elección que el usuario acaba de hacer con un clic.
+    lista.piezasSueltas(SUELTOS)
+    etiquetas()[0].click()
+    expect(lista.sueltoSenalado()).toBe('K1')
+
+    entrar(2)
+    expect(lista.sueltoSenalado()).toBe('K3')
+    expect(lista.sueltoFijado(), 'la fijada sigue siendo la suya').toBe('K1')
+    salir(2)
+    expect(lista.sueltoSenalado(), 'y vuelve a verse').toBe('K1')
+  })
+
+  it('⛔ pulsar una fila NO emite por el canal de señalar más de lo necesario', () => {
+    // Fijar cambia lo efectivo sólo si no estaba ya señalada por el ratón: el
+    // usuario que pulsa tiene el ratón encima, así que no hay nada que repintar.
+    const senaladas = []
+    lista.piezasSueltas(SUELTOS)
+    lista.alSenalarSuelto((clave) => senaladas.push(clave))
+    entrar(1)
+    etiquetas()[1].click()
+    expect(senaladas).toEqual(['K2'])
+  })
+
+  it('el foco en CUALQUIERA de los tres botones de la fila señala su geometría', () => {
+    // Quien tabula hasta «GML» tiene el mismo derecho a saber de qué geometría es
+    // ese fichero que quien pasa el ratón — y ahí es cuando más falta le hace.
+    lista.piezasSueltas(SUELTOS)
+    const descargas = qq(SELECTOR.SUELTO_DESCARGA)
+    descargas[2].dispatchEvent(new window.FocusEvent('focus'))
+    expect(lista.sueltoSenalado()).toBe('K2')
+  })
+
+  it('⛔ tabular DENTRO de la lista no apaga la señal; salir de ella sí', () => {
+    // Apagar en cada `focusout` haría parpadear el marco entre cada dos
+    // tabulaciones: de la etiqueta a su botón GML se sale de un control para
+    // entrar en otro de la MISMA lista.
+    lista.piezasSueltas(SUELTOS)
+    const fila = sueltoFilas()[0]
+    etiquetas()[0].dispatchEvent(new window.FocusEvent('focus'))
+    expect(lista.sueltoSenalado()).toBe('K1')
+
+    const hermano = qq(SELECTOR.SUELTO_DESCARGA)[0]
+    fila.dispatchEvent(new window.FocusEvent('focusout', { relatedTarget: hermano }))
+    expect(lista.sueltoSenalado(), 'sigue dentro de la lista').toBe('K1')
+
+    fila.dispatchEvent(new window.FocusEvent('focusout', { relatedTarget: null }))
+    expect(lista.sueltoSenalado(), 'y ahora se ha ido').toBeNull()
+  })
+
+  it('⭐ la FIJADA sobrevive a un repintado, la señalada no', () => {
+    // Esta lista se repinta entera cada vez que se marca o desmarca una casilla
+    // del sobrante. Una fijada que no sobreviviera se perdería al primer clic en
+    // cualquier otro sitio, que es tirar la elección del usuario sin nombrarla.
+    lista.piezasSueltas(SUELTOS)
+    etiquetas()[1].click()
+    entrar(0)
+    expect(lista.sueltoSenalado()).toBe('K1')
+
+    lista.piezasSueltas(SUELTOS)
+    expect(lista.sueltoFijado(), 'la fijada sigue').toBe('K2')
+    expect(lista.sueltoSenalado(), 'y lo señalado con el ratón, no').toBe('K2')
+    expect(sueltoFilas()[1].dataset.fijada).toBe('si')
+  })
+
+  it('⛔ una fijada que YA NO ESTÁ en el expediente se suelta, y se dice', () => {
+    // Con el reparto, una parcela entra y sale del fichero según lo que el usuario
+    // marque. Conservar la clave dejaría el marco señalando algo que el documento
+    // no lleva.
+    const senaladas = []
+    lista.piezasSueltas(SUELTOS)
+    etiquetas()[2].click()
+    lista.alSenalarSuelto((clave) => senaladas.push(clave))
+
+    lista.piezasSueltas(SUELTOS.slice(0, 2))
+    expect(lista.sueltoFijado()).toBeNull()
+    expect(senaladas).toEqual([null])
+  })
+
+  it('⛔ vaciar la zona apaga la señal: el marco no puede sobrevivir a la foto', () => {
+    const senaladas = []
+    lista.piezasSueltas(SUELTOS)
+    etiquetas()[0].click()
+    lista.alSenalarSuelto((clave) => senaladas.push(clave))
+
+    lista.piezasSueltas([])
+    expect(senaladas).toEqual([null])
+    expect(lista.sueltoFijado()).toBeNull()
+
+    lista.piezasSueltas(SUELTOS)
+    etiquetas()[0].click()
+    senaladas.length = 0
+    lista.pintar(null)
+    expect(senaladas, 'y una foto nueva pasa por el mismo sitio').toEqual([null])
+  })
+
+  it('un oyente que revienta no tumba a los demás ni deja la lista a medias', () => {
+    lista.alSenalarSuelto(() => {
+      throw new Error('boom')
+    })
+    const vistas = []
+    lista.alSenalarSuelto((clave) => vistas.push(clave))
+    lista.piezasSueltas(SUELTOS)
+    expect(() => entrar(0)).not.toThrow()
+    expect(vistas).toContain('K1')
+    expect(avisos.some((a) => /alSenalarSuelto|señalar geometría/.test(a.mensaje))).toBe(true)
+  })
+
+  it('suscribirse con algo que no es función LANZA, y la baja es idempotente', () => {
+    expect(() => lista.alSenalarSuelto(null)).toThrow(TypeError)
+    expect(() => lista.alFijarSuelto('no')).toThrow(TypeError)
+    const baja = lista.alSenalarSuelto(() => {})
+    expect(() => {
+      baja()
+      baja()
+    }).not.toThrow()
+  })
+})

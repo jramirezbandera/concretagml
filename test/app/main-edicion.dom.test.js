@@ -114,6 +114,7 @@ import { crearCajonDiagnostico } from '../../viewer/cajon-diagnostico.js'
 import { crearContraste } from '../../viewer/contraste.js'
 import { crearListaSobrante } from '../../viewer/lista-sobrante.js'
 import { VARIANTE, crearCapaPiezas } from '../../viewer/piezas.js'
+import { crearSenalMiembro } from '../../viewer/senal-miembro.js'
 import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
 
 // ── EL CROMO DEL MAPA: el segundo efecto de `crearVisor` sobre el documento ──
@@ -197,8 +198,16 @@ function montarCromoDelMapa() {
   barraViva = barra
   diagnosticoVivo = { cajon, contraste }
   comprobacionViva = cajonComprobacion
-  sobranteVivo = { lista: listaSobrante, capa: capaPiezas, capaFuera, capaVecinos }
+  const senalMiembro = crearSenalMiembro({ mapa, zona: husoPorSrs(SRS_DEMO) })
+  sobranteVivo = {
+    lista: listaSobrante,
+    capa: capaPiezas,
+    capaFuera,
+    capaVecinos,
+    senal: senalMiembro,
+  }
   desmontarCromoVivo = () => {
+    senalMiembro.destruir()
     capaPiezas.destruir()
     listaSobrante.destruir()
     cajonComprobacion.destruir()

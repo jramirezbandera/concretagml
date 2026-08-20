@@ -269,6 +269,48 @@ export const ENTRADAS = Object.freeze([
     texto: 'Trozo que se sale del contorno oficial.',
     fuente: 'viewer/piezas.js',
   }),
+  // ⛔ **ESTE RENGLÓN FALTABA, Y LA TARJETA MENTÍA POR OMISIÓN** (2026-08-20).
+  // `viewer/piezas.js` pinta el violeta del colindante recortado desde el
+  // 2026-08-18 —el día que se cerró el defecto de proponer modificar la finca de
+  // otro titular sin enseñarla— y la leyenda se quedó sin nombrarlo. O sea que en
+  // el mapa aparecía una parcela entera de un color que la tarjeta no declaraba,
+  // justo en el grupo donde sí declaraba los otros dos. Y es el color que más
+  // falta hace explicar: el ámbar es lo que TE LLEVAS y el violeta es **cómo le
+  // queda la finca a él**, que es una distinción de la que responde quien firma.
+  Object.freeze({
+    id: 'vecino',
+    grupo: GRUPO.SOBRANTE,
+    muestra: MUESTRA.AREA,
+    color: '#C084FC',
+    // ⚠️ 0,12 y no 0,35 como sus dos vecinas de grupo, porque la capa lo pinta
+    // así y por un motivo geométrico: una pieza de sobrante es una astilla, pero un
+    // colindante recortado es una parcela ENTERA, a menudo mayor que la del
+    // usuario. La muestra enseña el velo real, no un relleno de familia.
+    relleno: 0.12,
+    texto: 'Parcela de un colindante, como queda tras el recorte.',
+    fuente: 'viewer/piezas.js',
+  }),
+  // ⭐ (2026-08-20) El marco de «cuál es cuál». Va en este grupo porque sale de
+  // la misma pantalla —la lista del sobrante— y porque **es el único grafismo del
+  // mapa que no significa nada del terreno**: es un puntero. Sin este renglón, un
+  // usuario que fije una fila y luego mire el mapa se encuentra un marco blanco
+  // parpadeando sobre una parcela y la leyenda no lo nombra, que es justo lo que
+  // esta tarjeta existe para impedir.
+  Object.freeze({
+    id: 'senal-miembro',
+    grupo: GRUPO.SOBRANTE,
+    muestra: MUESTRA.LINEA,
+    color: '#FFFFFF',
+    // La SOMBRA con la que se dibuja de verdad. No es adorno de la muestra: sin
+    // ella un trazo blanco sobre el fondo claro de la tarjeta sería invisible
+    // —igual que lo sería sobre una era en la ortofoto—, y esa sombra es
+    // exactamente lo que la capa pinta debajo para que no lo sea.
+    sombra: 'rgba(15,23,42,.55)',
+    trazo: '8 6',
+    grosor: 3,
+    texto: 'Geometría del expediente señalada desde la lista.',
+    fuente: 'viewer/senal-miembro.js',
+  }),
   // ── Construcción ──────────────────────────────────────────────────────────
   Object.freeze({
     id: 'huella',
@@ -536,6 +578,11 @@ function muestraDe(doc, entrada) {
     height: `${grosor}px`,
     background: fondo,
   })
+  // La SOMBRA de la capa, si la tiene. Se dibuja como anillo alrededor del trazo
+  // —que es lo que hace en el mapa una polilínea más gruesa por debajo— y no como
+  // un segundo hijo: con `repeating-linear-gradient` el hueco del trazo es
+  // transparente, así que el anillo asoma por los huecos igual que asoma allí.
+  if (entrada.sombra) linea.style.boxShadow = `0 0 0 2px ${entrada.sombra}`
   caja.append(linea)
   return caja
 }

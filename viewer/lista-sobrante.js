@@ -148,6 +148,7 @@ export const SELECTOR = Object.freeze({
   SUELTOS: '[data-sobrante="sueltos"]',
   SUELTOS_NOTA: '[data-sobrante="sueltos-nota"]',
   SUELTOS_LISTA: '[data-sobrante="sueltos-lista"]',
+  SUELTOS_AYUDA: '[data-sobrante="sueltos-ayuda"]',
   SUELTO_FILA: '[data-sobrante="suelto-fila"]',
   SUELTO_ETIQUETA: '[data-sobrante="suelto-etiqueta"]',
   SUELTO_MEDIDA: '[data-sobrante="suelto-medida"]',
@@ -355,6 +356,23 @@ export const ROTULO_PRESENTAR = 'Para presentar'
 
 /** El rótulo de la zona de ficheros sueltos. */
 export const ROTULO_SUELTOS = 'Para comprobar'
+
+/**
+ * ⭐ **LA FRASE QUE HACE DESCUBRIBLE LA SEÑAL** (2026-08-20), y sin ella la
+ * función no existe.
+ *
+ * Las filas de esta zona señalan su geometría en el mapa al pasar el ratón y se
+ * FIJAN al pulsarlas. Nada de eso se ve: una fila que reacciona al ratón es
+ * invisible hasta que alguien pone el ratón encima por casualidad, y quien no lo
+ * haga seguirá sin saber cuál es cuál — que es exactamente el defecto que esto
+ * viene a cerrar. Así que se dice, y se dice en el rótulo, que es lo que se lee
+ * antes de mirar las filas.
+ *
+ * ⚠️ Va en la MISMA fila que el rótulo y no en un renglón propio: el panel flota
+ * sobre el mapa y cada línea que se le añade es mapa que se tapa. La fila del
+ * rótulo ya existe y está medio vacía.
+ */
+export const AYUDA_SUELTOS = 'señala una fila para verla en el mapa'
 
 /** Lo que se lee en el botón que despliega una explicación. */
 export const TEXTO_PORQUE = '¿por qué?'
@@ -944,6 +962,15 @@ function crearApunte(doc, marca) {
  *   superficieM2: number}>) => void} piezasSueltas  Pinta las geometrías que se
  *   pueden bajar por separado. `[]` esconde la zona entera.
  * @property {(fn: (clave: string, formato: string) => void) => (() => void)} alDescargarSuelto
+ * @property {() => (string|null)} sueltoSenalado  Qué geometría del expediente
+ *   está señalada ahora mismo, o `null`.
+ * @property {() => (string|null)} sueltoFijado  Y cuál está FIJADA por un clic.
+ * @property {(fn: (clave: string|null) => void) => (() => void)} alSenalarSuelto
+ *   «Enseña esta geometría en el mapa». La otra mitad la pone
+ *   `viewer/senal-miembro.js`, y quien las une es el cableado.
+ * @property {(fn: (clave: string|null) => void) => (() => void)} alFijarSuelto
+ *   «Llévame a esta geometría»: el usuario ha PULSADO una fila. Canal aparte
+ *   del anterior porque aquél pinta y éste MUEVE EL MAPA.
  * @property {() => void} destruir
  */
 
@@ -999,6 +1026,10 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   const oyentesEntrega = new Set()
   /** @type {Set<Function>} */
   const oyentesSuelto = new Set()
+  /** @type {Set<Function>} */
+  const oyentesSenalSuelto = new Set()
+  /** @type {Set<Function>} */
+  const oyentesFijarSuelto = new Set()
 
   /**
    * Notifica a un juego de oyentes aislando los fallos: uno que reviente no puede
@@ -1175,7 +1206,20 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   const sueltosRotulo = doc.createElement('h2')
   sueltosRotulo.className = 'gml-rotulo'
   sueltosRotulo.textContent = ROTULO_SUELTOS
-  sueltosFilaRotulo.append(sueltosRotulo)
+  // La frase que hace descubrible la señal. Ver {@link AYUDA_SUELTOS}: una fila
+  // que solo reacciona al ratón es una función que no existe hasta que alguien
+  // la encuentra por casualidad.
+  const sueltosAyuda = doc.createElement('span')
+  sueltosAyuda.dataset.sobrante = 'sueltos-ayuda'
+  sueltosAyuda.textContent = AYUDA_SUELTOS
+  estilar(sueltosAyuda, {
+    marginLeft: 'auto',
+    flex: 'none',
+    fontSize: '10px',
+    fontStyle: 'italic',
+    opacity: '.75',
+  })
+  sueltosFilaRotulo.append(sueltosRotulo, sueltosAyuda)
 
   const apunteSueltos = crearApunte(doc, 'sueltos-nota')
   apunteSueltos.fijar(NOTA_SUELTOS, NOTA_SUELTOS_PORQUE)
@@ -1766,16 +1810,117 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   boton.addEventListener('click', () => emitir(oyentesEntrega, 'entregar'))
 
   // ── Los ficheros sueltos ──────────────────────────────────────────────────
+  //
+  // ── ⭐ Y LA SEÑAL DE «CUÁL ES CUÁL» (2026-08-20) ──────────────────────────
+  // Esta zona lista las parcelas que forman el expediente por su REFERENCIA
+  // CATASTRAL, y el caso normal es que compartan los once primeros caracteres de
+  // doce: `29053A00109007` y `29053A00109007.1` no se distinguen de un vistazo, y
+  // ninguna de las dos dice dónde cae. Enseñar todo lo que se va a firmar sin
+  // poder emparejarlo con lo que hay dibujado es enseñarlo a medias.
+  //
+  // Se resuelve con TRES estados y no con uno, y los tres hacen falta:
+  //   · **Señalada** (ratón encima, o foco en uno de sus botones): efímera. Marca
+  //     la geometría en el mapa y se apaga al salir. Es «¿cuál es ésta?».
+  //   · **Fijada** (pulsada): permanente hasta que se vuelva a pulsar. Sobrevive
+  //     a soltar el ratón, y además ENCUADRA. Es «llévame a ésta y déjamela».
+  //   · **Efectiva** = señalada ?? fijada. Es lo que se manda al mapa: pasar el
+  //     ratón por otra fila enseña esa otra sin perder la que estaba fijada, y al
+  //     salir de la lista se vuelve a ver la fijada. Sin esta tercera, señalar
+  //     con el ratón borraría la elección hecha con el clic.
+  //
+  // ⛔ **La FIJADA sobrevive a un repintado, la SEÑALADA no**, y la asimetría es
+  // deliberada. Esta lista se repinta entera cada vez que el usuario marca o
+  // desmarca una casilla del sobrante (`refrescarSueltos` la recompone desde el
+  // expediente), así que una fijada que no sobreviviera se perdería al primer
+  // clic en cualquier otro sitio — la elección del usuario tirada por un gesto
+  // que no la nombra. La señalada, en cambio, es el ratón: los nodos que lo
+  // recibían ya no existen, y darla por buena sería afirmar que el puntero está
+  // sobre una fila que se acaba de destruir.
+
+  /** `clave` → `{fila, boton}` de la lista de sueltos pintada ahora mismo. */
+  const filasPorClave = new Map()
+  /** La clave FIJADA por un clic, o `null`. Sobrevive a un repintado. */
+  let sueltoFijado = null
+  /** La clave que el ratón o el foco está señalando, o `null`. Efímera. */
+  let sueltoSenalado = null
+  /** La última clave EFECTIVA emitida, para no repetir el aviso. */
+  let sueltoEmitido = null
+
+  /** Lo que hay que enseñar en el mapa: lo señalado manda sobre lo fijado. */
+  function sueltoEfectivo() {
+    return sueltoSenalado ?? sueltoFijado
+  }
+
+  /**
+   * Viste las filas según los tres estados y avisa al mapa SI ha cambiado lo
+   * efectivo. Un solo sitio para las dos cosas: separarlas dejaría abierta la
+   * puerta a que la fila se encendiera y el mapa no, que es la clase de
+   * divergencia que sólo se ve mirando las dos a la vez.
+   */
+  function vestirSueltos() {
+    const efectiva = sueltoEfectivo()
+    for (const [clave, entrada] of filasPorClave) {
+      const senalada = clave === efectiva
+      const fijada = clave === sueltoFijado
+      // `data-*` y no clases: gancho de inspección para los tests y para
+      // `estilos/app.css`, la misma convención que `resaltar` usa más arriba.
+      entrada.fila.dataset.resaltada = senalada ? 'si' : 'no'
+      entrada.fila.dataset.fijada = fijada ? 'si' : 'no'
+      // ⛔ **Un gris y no un color.** Lo que marca esta fila es un PUNTERO, no una
+      // clase de geometría: el cian, el ámbar y el violeta ya significan cosas
+      // (`viewer/piezas.js`), y teñir la fila con uno de ellos afirmaría algo
+      // sobre el terreno que la fila describe. El marco del mapa sigue la misma
+      // regla y por el mismo motivo (`viewer/senal-miembro.js`).
+      entrada.fila.style.background = fijada
+        ? 'rgba(15,23,42,.14)'
+        : senalada
+          ? 'rgba(15,23,42,.07)'
+          : ''
+      entrada.boton.setAttribute('aria-pressed', fijada ? 'true' : 'false')
+      entrada.boton.style.textDecoration = senalada ? 'underline' : 'none'
+    }
+    if (efectiva === sueltoEmitido) return
+    sueltoEmitido = efectiva ?? null
+    emitir(oyentesSenalSuelto, 'señalar geometría', sueltoEmitido)
+  }
+
+  /**
+   * Fija (o suelta) una fila; volver a pulsar la fijada la suelta.
+   *
+   * Emite SIEMPRE que el estado cambie, incluso al soltar: quien escucha usa este
+   * canal para ENCUADRAR el mapa, y un `null` es «ya no me lleves a ninguna
+   * parte».
+   */
+  function fijarSuelto(clave) {
+    const siguiente = clave === sueltoFijado ? null : clave
+    if (siguiente === sueltoFijado) return
+    sueltoFijado = siguiente
+    vestirSueltos()
+    emitir(oyentesFijarSuelto, 'fijar geometría', sueltoFijado)
+  }
+
+  /**
+   * Lo que dice el botón de una fila para un lector de pantalla, y su título.
+   *
+   * ⛔ Dice el GESTO y no solo el nombre. «29053A00109007» a secas es lo que ya
+   * se lee en la fila; lo que hace falta anunciar es que ese texto es accionable
+   * y qué pasa al pulsarlo, porque un botón vestido de texto no lo enseña.
+   */
+  function textoSenalarSuelto(pieza) {
+    const rotulo = ROTULO_PAPEL[pieza.papel] ?? pieza.papel
+    return `Señalar «${pieza.etiqueta}» (${rotulo}) en el mapa y encuadrarla`
+  }
 
   /**
    * Pinta la lista de geometrías descargables por separado. `[]` la esconde.
    *
    * ⚠️ **La `clave` la pone el llamante y esta vista no la interpreta**: la
-   * devuelve tal cual por {@link alDescargarSuelto}. Es el `localId` del miembro,
-   * que el expediente ya garantiza único —si dos miembros lo repitieran, los
-   * cuatro `gml:id` chocarían y el documento entero sería inválido, así que
-   * `serializarExpedienteCp` lo comprueba y lanza—. O sea que la unicidad de esta
-   * clave no es una suposición de la interfaz: está defendida más abajo.
+   * devuelve tal cual por {@link alDescargarSuelto}, {@link alSenalarSuelto} y
+   * {@link alFijarSuelto}. Es el `localId` del miembro, que el expediente ya
+   * garantiza único —si dos miembros lo repitieran, los cuatro `gml:id` chocarían
+   * y el documento entero sería inválido, así que `serializarExpedienteCp` lo
+   * comprueba y lanza—. O sea que la unicidad de esta clave no es una suposición
+   * de la interfaz: está defendida más abajo.
    *
    * @param {Array<{clave: string, etiqueta: string, papel: string,
    *   superficieM2: number}>} piezas
@@ -1785,22 +1930,75 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
     const hay = Array.isArray(piezas) && piezas.length > 0
     sueltos.hidden = !hay
     sueltosLista.replaceChildren()
-    if (!hay) return
+    filasPorClave.clear()
+    // El ratón señalaba un nodo que ya no existe (ver la cabecera de esta zona).
+    sueltoSenalado = null
+    if (!hay) {
+      // Sin lista no hay nada que fijar, y hay que DECÍRSELO al mapa: si no, el
+      // marco se quedaría puesto sobre una geometría de una foto ya caducada.
+      sueltoFijado = null
+      vestirSueltos()
+      return
+    }
+
+    // La fijada sólo sobrevive si su geometría sigue en el expediente. Con el
+    // reparto, una parcela puede entrar y salir del fichero según lo que el
+    // usuario marque, y conservar una clave que ya no está dejaría el marco
+    // señalando algo que el documento no lleva.
+    if (sueltoFijado !== null && !piezas.some((p) => p.clave === sueltoFijado)) {
+      sueltoFijado = null
+    }
 
     for (const p of piezas) {
       const fila = doc.createElement('li')
       fila.dataset.sobrante = 'suelto-fila'
       fila.dataset.clave = p.clave
       estilar(fila, ESTILO_FILA)
+      // El fondo cambia al señalar, así que una transición corta evita el
+      // parpadeo al recorrer la lista deprisa. Nada más: ni movimiento ni tamaño.
+      estilar(fila, { borderRadius: '4px', transition: 'background-color .12s' })
 
-      const etiqueta = doc.createElement('span')
+      // ⭐ **La etiqueta es un BOTÓN desde el 2026-08-20**, y no un `<span>`.
+      // Es lo que convierte «no sé cuál es cuál» en un gesto: se pulsa para fijar
+      // la geometría en el mapa y llevar el encuadre hasta ella. Y siendo un
+      // botón, el camino de TECLADO sale gratis y correcto —recibe el foco, se
+      // activa con Intro y con Espacio, y `aria-pressed` dice si está fijada—,
+      // que es lo que un `<span>` con un `click` encima no da.
+      //
+      // ⚠️ Es una tercera parada de tabulador por fila, y se acepta: las otras dos
+      // bajan un fichero, y ésta es la única que responde a la pregunta que el
+      // usuario tiene delante.
+      const etiqueta = doc.createElement('button')
+      etiqueta.type = 'button'
       etiqueta.dataset.sobrante = 'suelto-etiqueta'
+      etiqueta.dataset.clave = p.clave
+      etiqueta.setAttribute('aria-pressed', 'false')
       // El PAPEL delante y la identidad detrás: «Finca nueva · 9398516VK3799G.1».
       // Al revés se leería como una lista de referencias, y lo que hace falta
       // saber primero es qué es cada cosa.
       etiqueta.textContent = `${ROTULO_PAPEL[p.papel] ?? p.papel} · ${p.etiqueta}`
-      etiqueta.title = p.etiqueta
-      estilar(etiqueta, { flex: '1 1 auto', minWidth: '0', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' })
+      etiqueta.setAttribute('aria-label', textoSenalarSuelto(p))
+      etiqueta.title = textoSenalarSuelto(p)
+      estilar(etiqueta, {
+        flex: '1 1 auto',
+        minWidth: '0',
+        overflow: 'hidden',
+        whiteSpace: 'nowrap',
+        textOverflow: 'ellipsis',
+        // Se viste de TEXTO y no de botón: seis botones con marco en un panel de
+        // 344 px útiles serían una rejilla de cajas sin ninguna jerarquía. Lo que
+        // dice que es accionable es el subrayado al señalar, el cursor y el
+        // `aria-pressed` — no un borde.
+        appearance: 'none',
+        border: '0',
+        background: 'none',
+        padding: '0',
+        margin: '0',
+        font: 'inherit',
+        color: 'inherit',
+        textAlign: 'left',
+        cursor: 'pointer',
+      })
 
       const medida = doc.createElement('span')
       medida.dataset.sobrante = 'suelto-medida'
@@ -1842,8 +2040,51 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
         fila.append(b)
       }
 
+      // ── Los cables de la señal ──────────────────────────────────────────
+      // `mouseenter`/`mouseleave` y no `mouseover`/`mouseout` por lo mismo que en
+      // las filas del sobrante: estos últimos vuelven a dispararse al pasar de un
+      // hijo a otro dentro de la misma fila —de la etiqueta a los botones— y el
+      // marco del mapa parpadearía.
+      fila.addEventListener('mouseenter', () => {
+        sueltoSenalado = p.clave
+        vestirSueltos()
+      })
+      fila.addEventListener('mouseleave', () => {
+        if (sueltoSenalado !== p.clave) return
+        sueltoSenalado = null
+        vestirSueltos()
+      })
+      // Y por teclado. Señalan los TRES botones de la fila y no sólo el de la
+      // etiqueta: quien tabula hasta «GML» tiene el mismo derecho a saber de qué
+      // geometría es ese fichero que quien pasa el ratón por encima — y es justo
+      // ahí, con el dedo sobre la descarga, cuando más falta le hace.
+      for (const control of fila.querySelectorAll('button')) {
+        control.addEventListener('focus', () => {
+          sueltoSenalado = p.clave
+          vestirSueltos()
+        })
+      }
+      // ⚠️ `focusout` con `relatedTarget`, y la pregunta es «¿se ha salido de la
+      // LISTA?» y no «¿de este control?». Tabular de la etiqueta a su botón GML,
+      // o de una fila a la siguiente, es salir de un control para entrar en otro
+      // de la misma lista: apagar en cada salida haría parpadear el marco entre
+      // cada dos tabulaciones. Con el foco en otra fila manda el `focus` que
+      // viene detrás, que ya señala la suya. Es el mismo razonamiento —y el mismo
+      // defecto evitado— que el `focusout` de las filas del sobrante.
+      fila.addEventListener('focusout', (evento) => {
+        const destino = evento.relatedTarget
+        if (destino !== null && destino !== undefined && sueltosLista.contains(destino)) return
+        if (sueltoSenalado !== p.clave) return
+        sueltoSenalado = null
+        vestirSueltos()
+      })
+      etiqueta.addEventListener('click', () => fijarSuelto(p.clave))
+
+      filasPorClave.set(p.clave, { fila, boton: etiqueta })
       sueltosLista.append(fila)
     }
+
+    vestirSueltos()
   }
 
   // ── Plegar y cerrar ───────────────────────────────────────────────────────
@@ -2127,11 +2368,47 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
 
     piezasSueltas,
 
+    /**
+     * Qué geometría del expediente está señalada AHORA, o `null`. Para inspección
+     * y para los tests: la vista no la interpreta, sólo la devuelve tal cual.
+     */
+    sueltoSenalado: () => sueltoEmitido,
+
+    /** Y cuál está FIJADA por un clic, o `null`. */
+    sueltoFijado: () => sueltoFijado,
+
     alCambiarSeleccion: (fn) => suscribir(oyentesSeleccion, 'alCambiarSeleccion', fn),
     alNombrar: (fn) => suscribir(oyentesNombre, 'alNombrar', fn),
     alSenalar: (fn) => suscribir(oyentesSenal, 'alSenalar', fn),
     alEntregar: (fn) => suscribir(oyentesEntrega, 'alEntregar', fn),
     alDescargarSuelto: (fn) => suscribir(oyentesSuelto, 'alDescargarSuelto', fn),
+
+    /**
+     * ⭐ Suscribe «enseña ESTA geometría del expediente» (o ninguna, con `null`).
+     *
+     * Llega la clave EFECTIVA —lo señalado con el ratón o el foco manda sobre lo
+     * fijado con un clic— y sólo cuando cambia: recorrer la lista no emite el
+     * mismo valor dos veces seguidas. Quien escucha pinta el marco en el mapa
+     * (`app/cableado-derivacion.js` → `viewer/senal-miembro.js`).
+     *
+     * @param {(clave: string|null) => void} fn
+     * @returns {() => void}  La baja.
+     */
+    alSenalarSuelto: (fn) => suscribir(oyentesSenalSuelto, 'alSenalarSuelto', fn),
+
+    /**
+     * ⭐ Y «LLÉVAME a esta geometría»: el usuario ha PULSADO una fila, o ha
+     * vuelto a pulsar la que estaba fijada y ha llegado `null`.
+     *
+     * Es un canal aparte de {@link alSenalarSuelto} porque son dos cosas
+     * distintas: aquél PINTA —y corre con cada movimiento del ratón—, y éste
+     * MUEVE EL MAPA. Fundirlos haría que pasar el ratón por la lista persiguiera
+     * el encuadre por toda la provincia.
+     *
+     * @param {(clave: string|null) => void} fn
+     * @returns {() => void}  La baja.
+     */
+    alFijarSuelto: (fn) => suscribir(oyentesFijarSuelto, 'alFijarSuelto', fn),
 
     /** Deshace todo. Idempotente. */
     destruir() {
@@ -2145,6 +2422,9 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
       oyentesSenal.clear()
       oyentesEntrega.clear()
       oyentesSuelto.clear()
+      oyentesSenalSuelto.clear()
+      oyentesFijarSuelto.clear()
+      filasPorClave.clear()
       // El orden importa: primero se suelta el arrastre y el oyente de la
       // ventana —que sobreviven al nodo y seguirían midiendo un panel que ya no
       // está—, y sólo después se quita el control. `control.remove()` hace

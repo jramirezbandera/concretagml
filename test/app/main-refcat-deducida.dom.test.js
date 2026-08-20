@@ -72,6 +72,7 @@ import { crearCapaCandidatas } from '../../viewer/candidatas.js'
 import { crearContraste } from '../../viewer/contraste.js'
 import { crearListaSobrante } from '../../viewer/lista-sobrante.js'
 import { VARIANTE, crearCapaPiezas } from '../../viewer/piezas.js'
+import { crearSenalMiembro } from '../../viewer/senal-miembro.js'
 import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
 
 const RAIZ = join(import.meta.dirname, '..', '..')
@@ -162,6 +163,7 @@ function montarCromoDelMapa() {
       capa: crearCapaPiezas({ mapa, zona }),
       capaFuera: crearCapaPiezas({ mapa, zona, variante: VARIANTE.FUERA }),
       capaVecinos: crearCapaPiezas({ mapa, zona, variante: VARIANTE.VECINO }),
+      senal: crearSenalMiembro({ mapa, zona: zona }),
     },
   }
 }

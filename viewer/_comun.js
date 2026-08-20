@@ -224,6 +224,7 @@ export const PANE = Object.freeze({
   PIEZAS: 'piezas',
   PARTES: 'partes',
   ACOTACIONES: 'acotaciones',
+  SENAL_MIEMBRO: 'senalMiembro',
   DIAGNOSTICO: 'diagnostico',
   PUNTOS_LEVANTAMIENTO: 'puntosLevantamiento',
   VERTICES: 'vertices',
@@ -351,6 +352,26 @@ export const PANE = Object.freeze({
  *     propia línea al cruzar una zona densa de puntos. (Van además
  *     `interactive:false`, así que tampoco interceptan el puntero.)
  *
+ * `senalMiembro` (2026-08-20) se intercala en **426**, justo encima de
+ * `acotaciones`. Es la SEÑAL de «esta geometría es la de esa fila»: el marco que
+ * `viewer/senal-miembro.js` dibuja alrededor de un miembro del expediente cuando
+ * el usuario recorre la lista «Para comprobar». No es una geometría más, es un
+ * PUNTERO, y de ahí salen sus dos límites:
+ *   · por ENCIMA de todo lo que puede señalar —`parcelaEditada` (420), `piezas`
+ *     (421), `partes` (422)— y de `acotaciones` (425). Un puntero por debajo del
+ *     relleno de aquello a lo que apunta no apunta a nada, y partido por las
+ *     cotas se leería como cuatro trazos sueltos en vez de como un marco.
+ *   · por DEBAJO de `vertices` (430), por lo mismo que las cotas y el
+ *     diagnóstico: el vértice es lo que se agarra, y señalar una parcela no
+ *     puede tapar la esquina que se está moviendo. Va además `interactive:false`
+ *     —al marco se llega desde la fila de la lista, nunca desde el mapa—, así
+ *     que el zIndex es la segunda línea de defensa y no la única.
+ *
+ * ⚠️ Su posición frente a `diagnostico` (428) **no es una decisión que nadie
+ * tenga que defender**: la lista que enciende esta señal es el panel flotante del
+ * sobrante, que vive en el PASO de Edición, y las capas de F07 sólo se pintan en
+ * el de Diagnóstico. No coexisten.
+ *
  * `viewer/mapa.js#crearMapa` ITERA esta lista para crear los panes, así que
  * añadir una entrada aquí es todo lo que hace falta: ni ese módulo ni el arnés
  * de test (`test/viewer/_ayuda-jsdom.js#crearPanes`) llevan nombres a mano.
@@ -364,6 +385,7 @@ export const PANES = Object.freeze([
   { nombre: PANE.PIEZAS, zIndex: 421 },
   { nombre: PANE.PARTES, zIndex: 422 },
   { nombre: PANE.ACOTACIONES, zIndex: 425 },
+  { nombre: PANE.SENAL_MIEMBRO, zIndex: 426 },
   { nombre: PANE.DIAGNOSTICO, zIndex: 428 },
   { nombre: PANE.PUNTOS_LEVANTAMIENTO, zIndex: 429 },
   { nombre: PANE.VERTICES, zIndex: 430 },

@@ -240,6 +240,7 @@ import { crearListaSobrante } from './lista-sobrante.js'
 import { crearLeyenda } from './leyenda.js'
 import { crearMapa } from './mapa.js'
 import { VARIANTE, crearCapaPiezas } from './piezas.js'
+import { crearSenalMiembro } from './senal-miembro.js'
 import { montarCapas } from './capas.js'
 import { sincronizar } from './sincronizacion.js'
 
@@ -1071,7 +1072,8 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  * @property {{lista: ReturnType<typeof crearListaSobrante>,
  *   capa: ReturnType<typeof crearCapaPiezas>,
  *   capaFuera: ReturnType<typeof crearCapaPiezas>,
- *   capaVecinos: ReturnType<typeof crearCapaPiezas>}|null} sobrante  Las CUATRO piezas
+ *   capaVecinos: ReturnType<typeof crearCapaPiezas>,
+ *   senal: ReturnType<typeof crearSenalMiembro>}|null} sobrante  Las CINCO piezas
  *   de F17, o **`null`** si el visor se montó sin ellas. Van JUNTAS en un objeto,
  *   como `diagnostico` y por lo mismo: se usan siempre a la vez —la lista enseña
  *   las cifras y las capas las manchas de la misma foto— y así `if (visor.sobrante)`
@@ -1083,6 +1085,10 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  *     finca de otro titular sin enseñarla nunca.
  *     Existe desde que la puerta dejó de esconder el sobrante cuando las dos cosas
  *     pasan a la vez, que es el caso normal de un lindero rectificado.
+ *   · `senal` marca UNA geometría del expediente —la de la fila que el usuario
+ *     está señalando en «Para comprobar»— con un marco de selección, y sabe
+ *     encuadrarla. No es una capa de datos: es un puntero, y por eso no lleva
+ *     color propio (`viewer/senal-miembro.js`).
  *   ⚠️ **`lista.nodo` NO está en el documento**: `crearVisor` la fabrica y la
  *   devuelve, y quien la cuelga de la sección anfitriona del panel es `app/main.js`.
  * @property {ReturnType<typeof crearLeyenda>|null} leyenda  La LEYENDA de los
@@ -1712,7 +1718,8 @@ export function crearVisor(contenedor, opciones = {}) {
     // diferencia: aquél nace en una esquina del mapa y SE MUDA; éste nunca ha
     // estado en el mapa, así que hasta que alguien lo cuelgue no está en el
     // documento — y por eso `crearVisor` lo devuelve en vez de darlo por puesto.
-    /** @type {{lista: object, capa: object, capaFuera: object, capaVecinos: object}|null} */
+    /** @type {{lista: object, capa: object, capaFuera: object, capaVecinos: object,
+     *   senal: object}|null} */
     let sobrante = null
     if (montarSobrante) {
       const capaPiezas = crearCapaPiezas({ mapa, zona, alAvisar: avisar })
@@ -1753,7 +1760,33 @@ export function crearVisor(contenedor, opciones = {}) {
       })
       deshacer.push(() => listaSobrante.destruir())
 
-      sobrante = { lista: listaSobrante, capa: capaPiezas, capaFuera, capaVecinos }
+      // ⭐ **LA CUARTA PIEZA (2026-08-20): la SEÑAL de «cuál es cuál».**
+      //
+      // No es una capa de datos como las tres de arriba —no tiene foto propia ni
+      // se pinta sola—: es el PUNTERO que marca en el mapa la geometría de la
+      // fila que el usuario está señalando en la zona «Para comprobar», y sabe
+      // encuadrarla. Existe porque aquella zona lista las parcelas del expediente
+      // por su referencia catastral y el caso normal es que compartan once
+      // caracteres de doce: el usuario tenía delante todo lo que iba a firmar y
+      // no podía emparejar una fila con ninguna de las manchas del mapa.
+      //
+      // ⛔ **Y no es una VARIANTE más de `crearCapaPiezas`**, que era lo cómodo.
+      // Aquella capa pinta MUCHAS manchas permanentes, numeradas y con un color
+      // que significa algo; ésta pinta UNA, mientras se apunta, y sin color
+      // propio a propósito (el porqué, en la cabecera de su módulo). Meterlas en
+      // la misma fábrica habría obligado a que «pintar el sobrante» y «señalar
+      // una parcela» compartieran el estado de resaltado, que son dos cosas que
+      // el usuario hace a la vez.
+      const senalMiembro = crearSenalMiembro({ mapa, zona, alAvisar: avisar })
+      deshacer.push(() => senalMiembro.destruir())
+
+      sobrante = {
+        lista: listaSobrante,
+        capa: capaPiezas,
+        capaFuera,
+        capaVecinos,
+        senal: senalMiembro,
+      }
     }
 
     // 6 · El encuadre, lo ÚLTIMO del MONTAJE (ver cabecera: así la capa WMS del

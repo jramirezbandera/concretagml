@@ -123,6 +123,41 @@ describe('viewer/leyenda.js · ⭐ la paleta no puede divergir de la que se dibu
     })
   }
 
+  // ── ⛔ Y LA GUARDA AL REVÉS (2026-08-20), QUE ES LA QUE FALTABA ──────────
+  //
+  // Todo lo de arriba comprueba una sola dirección: que el color que la leyenda
+  // ANUNCIA siga pintándose. **No caza la omisión**, que es el fallo que este
+  // proyecto acaba de tener: `viewer/piezas.js` estrenó el violeta del colindante
+  // recortado el 2026-08-18 y la leyenda se quedó sin nombrarlo hasta el
+  // 2026-08-20. Dos días con una parcela ENTERA pintada de un color que la
+  // tarjeta no declaraba —y en el mismo grupo donde sí declaraba los otros dos—.
+  //
+  // ⚠️ **Se vigila `viewer/piezas.js` y no `viewer/` entero, y es a propósito.**
+  // Ahí cada `COLOR_*` es, por construcción, el relleno de una mancha que el
+  // usuario ve como una finca: son los tres grafismos de la capa y no hay más.
+  // Otros módulos declaran además sombras, orlas y trazos de apoyo —el
+  // `COLOR_SOMBRA` de `senal-miembro.js`, sin ir más lejos— que no son grafismos
+  // por sí mismos y que exigir en la leyenda la llenaría de renglones que no
+  // significan nada. Una guarda que obliga a inventar entradas deja de ser una
+  // guarda.
+  it('⛔ TODO color que `viewer/piezas.js` declara está en la leyenda', () => {
+    const fuente = fuenteDe('viewer/piezas.js')
+    const declarados = [...fuente.matchAll(/const\s+COLOR_\w+\s*=\s*'(#[0-9A-Fa-f]{6})'/g)].map(
+      (m) => m[1].toLowerCase(),
+    )
+    expect(declarados.length, 'la capa declara sus colores como constantes').toBeGreaterThan(0)
+
+    const anunciados = new Set(ENTRADAS.map((e) => e.color.toLowerCase()))
+    for (const color of declarados) {
+      expect(
+        anunciados.has(color),
+        `viewer/piezas.js pinta ${color} y la leyenda no lo nombra. Un color en el mapa que la ` +
+          `tarjeta no declara es una leyenda que MIENTE POR OMISIÓN: el usuario ve una mancha ` +
+          `y no tiene dónde mirar qué significa. Añade su renglón al catálogo.`,
+      ).toBe(true)
+    }
+  })
+
   it('cada entrada declara un fichero de `viewer/` que existe', () => {
     for (const entrada of ENTRADAS) {
       expect(entrada.fuente, `«${entrada.id}»`).toMatch(/^viewer\/_?[a-z-]+\.js$/)

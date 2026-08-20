@@ -43,6 +43,7 @@ import { crearCajonDiagnostico } from '../../viewer/cajon-diagnostico.js'
 import { crearContraste } from '../../viewer/contraste.js'
 import { crearListaSobrante } from '../../viewer/lista-sobrante.js'
 import { VARIANTE, crearCapaPiezas } from '../../viewer/piezas.js'
+import { crearSenalMiembro } from '../../viewer/senal-miembro.js'
 import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
 
 const RAIZ = join(import.meta.dirname, '..', '..')
@@ -73,6 +74,7 @@ function montarCromoDelMapa() {
     capa: crearCapaPiezas({ mapa, zona: husoPorSrs(SRS_DEMO) }),
     capaFuera: crearCapaPiezas({ mapa, zona: husoPorSrs(SRS_DEMO), variante: VARIANTE.FUERA }),
     capaVecinos: crearCapaPiezas({ mapa, zona: husoPorSrs(SRS_DEMO), variante: VARIANTE.VECINO }),
+    senal: crearSenalMiembro({ mapa, zona: husoPorSrs(SRS_DEMO) }),
   }
 }
 

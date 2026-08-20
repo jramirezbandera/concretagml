@@ -50,6 +50,7 @@ import {
   VARIANTE,
   crearCapaPiezas,
 } from '../../viewer/piezas.js'
+import { CLASE_SENAL, crearSenalMiembro } from '../../viewer/senal-miembro.js'
 import { crearPanes, montarMapa } from '../viewer/_ayuda-jsdom.js'
 
 const SRS = 'EPSG:25830'
@@ -93,6 +94,7 @@ let lista = null
 let capa = null
 let capaFuera = null
 let capaVecinos = null
+let senal = null
 let avisos = []
 let descargas = []
 let cableado = null
@@ -121,6 +123,7 @@ function cablear(extra = {}) {
     capa,
     capaFuera,
     capaVecinos,
+    senal,
     panel: { avisar: (mensaje, detalle) => avisos.push({ mensaje, nivel: detalle?.nivel }) },
     srs: SRS,
     documento: document,
@@ -149,6 +152,7 @@ afterEach(() => {
   capa?.destruir()
   capaFuera?.destruir()
   capaVecinos?.destruir()
+  senal?.destruir()
   entorno.destruir()
   document.body.innerHTML = ''
 })
@@ -178,6 +182,7 @@ describe('cablearDerivacion', () => {
     capa = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO })
     capaFuera = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.FUERA })
     capaVecinos = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.VECINO })
+    senal = crearSenalMiembro({ mapa: entorno.mapa, zona: HUSO })
   })
 
   // ── 1 · Contratos ─────────────────────────────────────────────────────────
@@ -190,6 +195,7 @@ describe('cablearDerivacion', () => {
         capa,
         capaFuera,
         capaVecinos,
+        senal,
         panel: { avisar() {} },
         srs: SRS,
         documento: document,
@@ -197,6 +203,18 @@ describe('cablearDerivacion', () => {
       expect(() => cablearDerivacion({ ...base, estado: null })).toThrow(/'estado'/)
       expect(() => cablearDerivacion({ ...base, lista: {} })).toThrow(/sobrante: true/)
       expect(() => cablearDerivacion({ ...base, capa: {} })).toThrow(/viewer\/piezas\.js/)
+      // ⭐ La SEÑAL de «cuál es cuál» (2026-08-20). Sin ella la zona «Para
+      // comprobar» vuelve a ser una lista de referencias que comparten once
+      // caracteres de doce, así que se exige como las capas y no como una opción.
+      expect(() => cablearDerivacion({ ...base, senal: {} })).toThrow(
+        /viewer\/senal-miembro\.js/,
+      )
+      // Y con `senalar` pero sin `encuadrar` TAMBIÉN lanza: pulsar una fila
+      // marcaría la geometría y no llevaría el mapa hasta ella, que es la mitad
+      // de la función perdida en silencio.
+      expect(() =>
+        cablearDerivacion({ ...base, senal: { senalar() {}, limpiar() {} } }),
+      ).toThrow(/viewer\/senal-miembro\.js/)
       expect(() => cablearDerivacion({ ...base, panel: null })).toThrow(/app\/avisos\.js/)
       expect(() => cablearDerivacion({ ...base, srs: '' })).toThrow(/EPSG:25830/)
     })
@@ -757,6 +775,7 @@ describe('cablearDerivacion · ⭐ retranqueo de milímetros + invasión de metr
     capa = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO })
     capaFuera = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.FUERA })
     capaVecinos = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.VECINO })
+    senal = crearSenalMiembro({ mapa: entorno.mapa, zona: HUSO })
   })
 
   /** Enganchada al oeste por 0,5 mm y metida 5 m en el vecino por el este. */
@@ -894,6 +913,7 @@ describe('cablearDerivacion · los ficheros sueltos', () => {
     capa = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO })
     capaFuera = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.FUERA })
     capaVecinos = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.VECINO })
+    senal = crearSenalMiembro({ mapa: entorno.mapa, zona: HUSO })
   })
 
   const descargarTxt = (texto, opciones) => {
@@ -1002,5 +1022,124 @@ describe('cablearDerivacion · los ficheros sueltos', () => {
     expect(filas(), 'la FOTO no pierde la pieza: se puede volver a marcar').toHaveLength(1)
     expect(sueltos(), 'pero ya no hay expediente que descomponer').toHaveLength(0)
     expect(renglonEntrega().textContent).toBe(MOTIVO_NINGUNA_INCLUIDA)
+  })
+})
+
+// ── 12 · «CUÁL DE TODAS ES ÉSTA» (2026-08-20) ───────────────────────────────
+//
+// ⛔ **LO QUE ESTE BLOQUE DEFIENDE: que la señal salga de la MISMA fuente que las
+// filas.** Si el marco del mapa se pintara desde la foto (`cesion`) y las filas
+// desde el expediente compuesto, señalar una fila podría marcar una geometría
+// distinta de la que el fichero lleva —los colindantes recortados no son piezas
+// del sobrante, y una pieza excluida sí es una fila que desaparece—, y entonces
+// la señal mentiría justo en la pantalla que existe para comprobar.
+//
+// Y lo segundo: que el marco NO SOBREVIVA a lo que señalaba. Un rótulo con una
+// referencia catastral encima de un trozo de terreno que ya no es esa parcela es
+// la regla de oro 1 al revés.
+
+describe('cablearDerivacion · la señal de «cuál es cuál»', () => {
+  beforeEach(() => {
+    const centro = latLngAUTM(entorno.mapa.getCenter(), HUSO)
+    X0 = centro[0] - 20
+    Y0 = centro[1] - 20
+    estado = crearEstadoVista(null)
+    lista = crearListaSobrante({ mapa: entorno.mapa, documento: document })
+    capa = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO })
+    capaFuera = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.FUERA })
+    capaVecinos = crearCapaPiezas({ mapa: entorno.mapa, zona: HUSO, variante: VARIANTE.VECINO })
+    senal = crearSenalMiembro({ mapa: entorno.mapa, zona: HUSO })
+  })
+
+  const etiquetas = () => [...document.querySelectorAll(SELECTOR.SUELTO_ETIQUETA)]
+  const filasSueltas = () => [...document.querySelectorAll(SELECTOR.SUELTO_FILA)]
+  const marcos = () => entorno.contenedor.querySelectorAll(`.${CLASE_SENAL}`)
+  const conUnSobrante = () => {
+    cablear()
+    estado.set(parcela({ mengua: 10 }))
+    boton().click()
+  }
+
+  it('⭐ señalar una fila marca EN EL MAPA su geometría, con su etiqueta', () => {
+    conUnSobrante()
+    expect(senal.senalada(), 'nace sin nada señalado').toBeNull()
+
+    filasSueltas()[1].dispatchEvent(new window.MouseEvent('mouseenter'))
+    // La finca nueva: la etiqueta del marco es la MISMA que se lee en la fila,
+    // que es lo que empareja una cosa con la otra.
+    expect(senal.senalada()).toBe('7136910UF1473N.1')
+    expect(marcos()).toHaveLength(1)
+
+    filasSueltas()[1].dispatchEvent(new window.MouseEvent('mouseleave'))
+    expect(senal.senalada()).toBeNull()
+    expect(marcos()).toHaveLength(0)
+  })
+
+  it('⭐ el marco es la geometría del EXPEDIENTE, no la de la foto', () => {
+    // La medición propia y la finca nueva son geometrías DISTINTAS, y sólo la
+    // segunda es una pieza del sobrante. Señalar la primera tiene que marcar la
+    // parcela entera; si la señal saliera de `cesion.piezas`, no habría nada que
+    // marcar y la fila más importante de la lista sería la única muda.
+    conUnSobrante()
+    filasSueltas()[0].dispatchEvent(new window.MouseEvent('mouseenter'))
+    expect(senal.senalada()).toBe('7136910UF1473N')
+    expect(marcos()).toHaveLength(1)
+  })
+
+  it('⭐ pulsar una fila la fija Y ENCUADRA el mapa en ella', () => {
+    // Es lo que resuelve el caso que estrenó esta función: un colindante
+    // veintitrés veces mayor que la parcela propia, con el grueso de su
+    // superficie fuera de lo que se ve.
+    conUnSobrante()
+    const encuadrar = vi.spyOn(entorno.mapa, 'fitBounds')
+    etiquetas()[1].click()
+
+    expect(senal.senalada()).toBe('7136910UF1473N.1')
+    expect(encuadrar, 'el mapa se ha movido a esa geometría').toHaveBeenCalledTimes(1)
+    encuadrar.mockRestore()
+  })
+
+  it('⛔ pasar el ratón por la lista NO persigue el encuadre', () => {
+    // El canal de señalar corre con cada movimiento; el de fijar, con un clic.
+    // Fundirlos haría que pasear el ratón por cuatro filas moviera el mapa cuatro
+    // veces, que es lo que nadie quiere que haga un mapa mientras lo mira.
+    conUnSobrante()
+    const encuadrar = vi.spyOn(entorno.mapa, 'fitBounds')
+    for (const fila of filasSueltas()) fila.dispatchEvent(new window.MouseEvent('mouseenter'))
+    expect(encuadrar).not.toHaveBeenCalled()
+    encuadrar.mockRestore()
+  })
+
+  it('⛔ soltar la fila apaga el marco y NO devuelve el mapa a donde estaba', () => {
+    // Guardar «dónde estaba» y restaurarlo convierte un encuadre en un estado que
+    // hay que caducar: entre el clic que trajo al usuario aquí y el que la suelta
+    // puede haber movido el mapa o cambiado de parcela. Encuadrar es un gesto.
+    conUnSobrante()
+    etiquetas()[0].click()
+    const encuadrar = vi.spyOn(entorno.mapa, 'fitBounds')
+    etiquetas()[0].click()
+
+    expect(senal.senalada()).toBeNull()
+    expect(marcos()).toHaveLength(0)
+    expect(encuadrar, 'soltar no mueve el mapa').not.toHaveBeenCalled()
+    encuadrar.mockRestore()
+  })
+
+  it('⛔ editar la parcela apaga el marco: no puede sobrevivir a lo que señalaba', () => {
+    conUnSobrante()
+    etiquetas()[0].click()
+    expect(senal.senalada()).not.toBeNull()
+
+    estado.set(parcela({ mengua: 12 }))
+    expect(senal.senalada(), 'la foto ha caducado y el marco con ella').toBeNull()
+    expect(marcos()).toHaveLength(0)
+  })
+
+  it('desmontar el cableado deja el mapa limpio, aunque la señal la destruya el visor', () => {
+    conUnSobrante()
+    etiquetas()[0].click()
+    cableado.destruir()
+    cableado = null
+    expect(marcos()).toHaveLength(0)
   })
 })

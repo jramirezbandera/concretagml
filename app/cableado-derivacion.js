@@ -407,6 +407,19 @@ const esLista = (v) =>
   typeof v.resaltar === 'function' &&
   !!v.nodo
 
+/**
+ * La SEÑAL de «cuál es cuál» (`viewer/senal-miembro.js`). Se comprueban los DOS
+ * métodos que este módulo usa y no solo `senalar`: sin `encuadrar`, pulsar una
+ * fila marcaría la geometría y no llevaría el mapa hasta ella — o sea, la mitad
+ * de la función, en silencio, y justo la mitad que resuelve el caso del
+ * colindante de dos millones de metros que cae fuera de la pantalla.
+ */
+const esSenal = (v) =>
+  !!v &&
+  typeof v.senalar === 'function' &&
+  typeof v.encuadrar === 'function' &&
+  typeof v.limpiar === 'function'
+
 const esCapa = (v) =>
   !!v &&
   typeof v.pintar === 'function' &&
@@ -439,6 +452,8 @@ const esPanel = (v) => !!v && typeof v.avisar === 'function'
  *   visor. Se LEE y se ESCUCHA; **nunca se escribe**: derivar no edita la parcela.
  * @param {object} opciones.lista  `visor.sobrante.lista`.
  * @param {object} opciones.capa  `visor.sobrante.capa`.
+ * @param {object} opciones.senal  `visor.sobrante.senal`: el marco que dice QUÉ
+ *   geometría del expediente es la de cada fila de «Para comprobar».
  * @param {import('./avisos.js').PanelAvisos} opciones.panel  Panel de avisos: ahí
  *   van las DETECCIONES de la derivación y del expediente, que es lo que le pasa
  *   al DATO. Los motivos de los botones van en sus renglones, que es lo que le
@@ -469,6 +484,7 @@ export function cablearDerivacion({
   capa,
   capaFuera,
   capaVecinos,
+  senal,
   panel,
   srs,
   colindantes = null,
@@ -531,6 +547,15 @@ export function cablearDerivacion({
         `${describir(capaVecinos)}. Si vale undefined, el visor es de antes del 2026-08-18: ` +
         `sin ella, la aplicación propone MODIFICAR LA FINCA DE OTRO TITULAR —la mete en el ` +
         `.gml y la lista con su superficie— y no la enseña en el mapa en ningún momento.`,
+    )
+  }
+  if (!esSenal(senal)) {
+    throw new TypeError(
+      `cablearDerivacion: 'senal' debe ser la de viewer/senal-miembro.js ` +
+        `(visor.sobrante.senal); recibido ${describir(senal)}. Si vale undefined, el visor ` +
+        `es de antes del 2026-08-20: sin ella, la zona «Para comprobar» vuelve a ser una ` +
+        `lista de referencias catastrales que comparten once caracteres de doce, y el ` +
+        `usuario no puede emparejar ninguna fila con ninguna mancha del mapa.`,
     )
   }
   if (!esPanel(panel)) {
@@ -702,6 +727,16 @@ export function cablearDerivacion({
     // al que le pone carga.
     capaFuera.limpiar()
     capaVecinos.limpiar()
+    // Y el marco de «cuál es cuál», por lo mismo: señalaba una geometría del
+    // expediente que se acaba de componer con una parcela que ya no está en
+    // pantalla. Dejarlo puesto sería apuntar con un rótulo y una referencia
+    // catastral a un trozo de terreno que ya no significa eso.
+    //
+    // ⚠️ Va aquí ADEMÁS de en `piezasSueltas([])` —que también lo apaga por su
+    // canal— porque `invalidar` puede llegar por caminos que no repintan la lista
+    // (la foto caduca antes de que llegara a haber sueltos), y una señal que
+    // depende de que otro la apague es una señal que un día se queda encendida.
+    senal.senalar(null)
     if (motivo === null) {
       lista.pintar(null)
       mostrarBloque(false)
@@ -1040,6 +1075,33 @@ export function cablearDerivacion({
   /** La última entrega compuesta, para no rehacerla al pulsar una descarga. */
   let ultimaEntrega = null
 
+  /**
+   * ⭐ **QUÉ GEOMETRÍA ES CADA FILA** (2026-08-20): `clave` → el miembro del
+   * expediente que esa fila describe.
+   *
+   * ⛔ **Sale del MISMO `ultimaEntrega` que las filas, y eso es la mitad de que
+   * sirva.** Si el marco del mapa se pintara desde la foto (`cesion`) y las filas
+   * desde el expediente compuesto, señalar una fila podría marcar una geometría
+   * distinta de la que ese fichero lleva —los colindantes recortados no son
+   * piezas del sobrante, y una pieza excluida sí es una fila que desaparece—, y
+   * entonces la señal mentiría justo en la pantalla que existe para comprobar.
+   * Una sola fuente, o ninguna.
+   *
+   * ⚠️ Se guarda el MIEMBRO entero y no solo sus recintos, para que la señal
+   * pueda rotular con la misma `etiqueta` que se lee en la fila. Y se guarda por
+   * REFERENCIA: `viewer/senal-miembro.js` compara el objeto para no repintar el
+   * mismo polígono en cada `mouseenter`.
+   *
+   * @type {Map<string, {recintos: object[], etiqueta: string}>}
+   */
+  let miembrosPorClave = new Map()
+
+  /** El miembro de una clave, o `null` si la lista ya no se corresponde. */
+  function miembroDe(clave) {
+    if (typeof clave !== 'string') return null
+    return miembrosPorClave.get(clave) ?? null
+  }
+
   /** Qué papel juega un miembro del expediente en la lista de sueltos. */
   function papelDe(miembro) {
     if (miembro.esVecino === true) return PAPEL.VECINO
@@ -1058,6 +1120,10 @@ export function cablearDerivacion({
    */
   function refrescarSueltos() {
     ultimaEntrega = null
+    // El índice se vacía ANTES de recomponer, no después de fallar: si
+    // `prepararEntrega` lanza, las filas se van y lo que este mapa guardara sería
+    // una respuesta a «qué geometría es esa fila» sobre filas que ya no existen.
+    miembrosPorClave = new Map()
     const parcela = estado.get()
     if (parcela === null || cesion === null) {
       lista.piezasSueltas([])
@@ -1086,6 +1152,9 @@ export function cablearDerivacion({
       parcelas: ultimaEntrega.miembros.length,
       superficieM2: ultimaEntrega.miembros.reduce((s, m) => s + superficie(m.recintos), 0),
     })
+    for (const m of ultimaEntrega.miembros) {
+      miembrosPorClave.set(m.identidad.refcat, { recintos: m.recintos, etiqueta: m.etiqueta })
+    }
     lista.piezasSueltas(
       ultimaEntrega.miembros.map((m) => ({
         // El `localId`, que el expediente ya garantiza ÚNICO: si dos miembros lo
@@ -1314,6 +1383,36 @@ export function cablearDerivacion({
   const bajaSenalLista = lista.alSenalar((orden) => capa.resaltar(orden))
   const bajaSenalCapa = capa.alSenalar((orden) => lista.resaltar(orden))
 
+  // ── ⭐ «CUÁL DE TODAS ES ÉSTA» (2026-08-20) ──────────────────────────────
+  //
+  // Los dos cables que unen la zona «Para comprobar» con el mapa. Ni la lista
+  // conoce el mapa ni el mapa la lista —la misma división que sostiene el
+  // resaltado recíproco de las piezas—, y aquí además ninguna de las dos conoce
+  // el EXPEDIENTE: la lista maneja claves opacas y la señal, geometrías. Quien
+  // sabe que una clave es un miembro con recintos es este módulo, que es el que
+  // lo compuso.
+  //
+  // ⛔ **Y son DOS y no uno.** `alSenalarSuelto` corre con cada movimiento del
+  // ratón por la lista y sólo PINTA; `alFijarSuelto` corre con un clic y MUEVE EL
+  // MAPA. Fundirlos haría que pasear el ratón por cuatro filas persiguiera el
+  // encuadre por toda la provincia, que es exactamente lo que nadie quiere que
+  // haga un mapa mientras se está mirando.
+  const bajaSenalSuelto = lista.alSenalarSuelto((clave) => {
+    // `null` —o una clave que ya no está— apaga el marco, no lo deja puesto: una
+    // señal que sobrevive a lo que señalaba es un rótulo mintiendo sobre el
+    // terreno.
+    senal.senalar(miembroDe(clave))
+  })
+  const bajaFijarSuelto = lista.alFijarSuelto((clave) => {
+    // Sólo se encuadra al FIJAR una fila. Al soltarla (`clave === null`) el marco
+    // se apaga por el canal de arriba y el mapa **se queda donde está**: devolver
+    // la vista anterior exigiría guardarla y caducarla, y entre el clic que trajo
+    // al usuario aquí y el que la suelta puede haber movido el mapa, editado un
+    // vértice o cambiado de parcela. Encuadrar es un gesto, no un modo.
+    if (miembroDe(clave) === null) return
+    senal.encuadrar()
+  })
+
   const bajaStore = estado.subscribe(refrescar)
   // `subscribe` NO notifica al suscribirse, así que el primer estado del botón se
   // calcula a mano. Sin esta línea el CTA se quedaría en el `disabled` con el que
@@ -1366,6 +1465,13 @@ export function cablearDerivacion({
       bajaSeleccion()
       bajaSenalLista()
       bajaSenalCapa()
+      bajaSenalSuelto()
+      bajaFijarSuelto()
+      // El marco NO se destruye aquí —la señal es del visor, que la deshace con
+      // el resto de sus capas—, pero sí se apaga: este módulo es el único que la
+      // enciende, y dejarla puesta al desmontar el cableado sería un marco sin
+      // nadie que pueda quitarlo.
+      senal.limpiar()
       bajaStore()
     },
   }

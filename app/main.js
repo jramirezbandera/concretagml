@@ -6338,6 +6338,12 @@ const derivacionCableada = cablearDerivacion({
   // recorte. Sin ella la aplicación proponía modificar la finca de otro titular
   // —la metía en el `.gml` y la listaba con su superficie— sin enseñarla nunca.
   capaVecinos: visor.sobrante.capaVecinos,
+  // ⭐ La SEÑAL de «cuál es cuál» (2026-08-20): el marco que marca en el mapa la
+  // geometría de la fila que se está señalando en «Para comprobar». Sin ella esa
+  // zona lista las parcelas del expediente por su referencia catastral —once
+  // caracteres iguales de doce, en el caso normal— y no hay forma de emparejar
+  // una fila con ninguna de las manchas del mapa.
+  senal: visor.sobrante.senal,
   colindantes: registroColindantes,
   panel,
   srs: SRS_DEMO,
