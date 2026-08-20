@@ -76,6 +76,10 @@ export const TIPO_DETECCION = Object.freeze({
   CIERRE: 'CIERRE', // el anillo no cierra (geo/cierre.js)
   HUSO_DETECTADO: 'HUSO_DETECTADO', // resultado de detectarHuso: punto de caída (INFO) o fuera de España (AVISO)
   HUSO_AMBIGUO: 'HUSO_AMBIGUO', // detectarHuso devolvió varios husos viables (A1)
+  // F18 · el levantamiento de PUNTOS sueltos: se ha propuesto —o aplicado— el
+  // anillo que los une. Lleva en `datos` de dónde sale el orden (numeración del
+  // fichero o volcado), que es lo que el usuario necesita para poder revisarlo.
+  PUNTOS_UNIDOS: 'PUNTOS_UNIDOS',
 })
 
 /**

@@ -139,7 +139,15 @@
 //   · Los `<kbd>` VISIBLES de deshacer y rehacer se van con las palabras. El atajo
 //     no se pierde: se dice en la pista y sigue en `aria-keyshortcuts`.
 //
-// ── EL MODO BORRAR ES LA ÚNICA HERRAMIENTA CON ESTADO ───────────────────────
+// ── LAS HERRAMIENTAS CON ESTADO: TRES, Y VAN JUNTAS ─────────────────────────
+// ⛔ **AQUÍ PONÍA «EL MODO BORRAR ES LA ÚNICA HERRAMIENTA CON ESTADO» y llevaba
+// mintiendo desde el 2026-08-18**, que es cuando entró «Insertar vértices» con su
+// propio `aria-pressed`. Hoy son TRES —insertar, borrar y dibujar—, son
+// EXCLUYENTES entre sí (lo decide `viewer/edicion.js`) y desde T4 viven dentro de
+// un `role="group"` que lo enseña sin una palabra: ver {@link CLASE_BARRA.MANDO}.
+// Lo que sigue vale para las tres; se redacta sobre «Borrar» porque fue la primera
+// y porque es la que además destruye.
+//
 // «Borrar vértices» (`[data-accion="borrar"]`) no ejecuta: ARMA. Queda pulsada y
 // cada clic del mapa borra un vértice hasta que se apaga. Eso obliga a tres cosas
 // que las demás herramientas no necesitan, y las tres están aquí y no en el CSS:
@@ -160,9 +168,16 @@
 // de zoom: dos cajas de cromo pegadas, la de la app colgando de la del mapa como
 // si fuera parte de él. El autor lo rechazó también, y las cuatro esquinas de
 // Leaflet no tienen dónde ir: `topleft` es el zoom, `topright` el control de
-// capas, `bottomright` el de opacidad **y** la atribución, y `bottomleft` el
-// control de escala más los cajones de F07 y F08. Cualquier esquina repite el
-// apilamiento en otro sitio.
+// capas **y, desde el 2026-08-19, el de opacidad apilado debajo**, `bottomright`
+// la atribución, y `bottomleft` el control de escala más los cajones de F07 y
+// F08. Cualquier esquina repite el apilamiento en otro sitio.
+//
+// ⭐ **La mudanza del control de opacidad a `topright` del 2026-08-19 es POR ESTA
+// BARRA**, y el porqué medido está en `viewer/capas.js#ControlOpacidad`: con las
+// nueve herramientas visibles esta barra pasa de 285 a 326 px + los ~30 de
+// «Quitar puntos», y contra los 27,6 px de holgura que había eso era un solape de
+// ~8 px que YA existía en la pantalla del levantamiento. Ahora `bottomright` solo
+// tiene la atribución, que cruza 196,1 px en horizontal y **0 en vertical**.
 //
 // El sitio libre es el CENTRO del borde inferior, que además es donde la ponen
 // los editores. Leaflet no lo ofrece: `map._controlCorners` trae exactamente
@@ -195,8 +210,7 @@
 import L from 'leaflet'
 
 import { OPERATIVOS } from '../config/operativos.js'
-import { DENSIDAD_BASE_PX, NIVEL, resolverAvisar } from './_comun.js'
-import { UMBRAL_PUNTERIA_PX } from './edicion.js'
+import { DENSIDAD_BASE_PX, NIVEL, UMBRAL_PUNTERIA_PX, resolverAvisar } from './_comun.js'
 
 // ── Clases CSS estables ──────────────────────────────────────────────────────
 
@@ -224,6 +238,23 @@ export const CLASE_BARRA = Object.freeze({
    * geometría al primer clic no puede verse igual que el que la dibuja.
    */
   HERRAMIENTA_DESTRUCTIVA: 'gml-barra-herramienta--destructiva',
+  /**
+   * El MANDO de los modos (2026-08-20, tarea T4): el `role="group"` que encierra
+   * las tres herramientas que ARMAN un modo —insertar, borrar y dibujar— y las
+   * presenta como un solo control segmentado.
+   *
+   * ⛔ **`role="group"` y NO `radiogroup`**, y la diferencia no es de gusto:
+   *   · el estado normal de esta barra es **ningún modo armado**, y un radiogroup
+   *     no sabe expresar «ninguno elegido» sin inventarse una opción vacía;
+   *   · un `radiogroup` de verdad se recorre con las FLECHAS, y las flechas de
+   *     esta barra ya son suyas desde el 2026-08-10: recorren las nueve
+   *     herramientas de la fila entera ({@link BarraEdicion#_alTeclaEnBarra}).
+   *     Meter aquí un widget que se queda las mismas teclas para otra cosa
+   *     rompería la única forma de teclado que la barra anuncia.
+   * Lo que sí se conserva es lo que ya decía el DOM: tres `aria-pressed`, uno por
+   * segmento, que es exactamente «tres conmutadores excluyentes» y se anuncia así.
+   */
+  MANDO: 'gml-barra-mando',
   /**
    * La PISTA: el globo con el nombre de la herramienta señalada. Sustituye al
    * `title` nativo por la razón que abre la cabecera (aparece a 120 ms, no a 600).
@@ -274,6 +305,17 @@ export const CLASE_BARRA = Object.freeze({
    * ocupa alto) y el modificador `--error` que `app/main.js` conmuta.
    */
   ESTADO: 'gml-barra-estado',
+  /**
+   * El RENGLÓN DE SITUACIÓN (2026-08-19, tarea T2). **No confundir con
+   * {@link CLASE_BARRA.ESTADO}**, que es el `role="status"`: son dos canales con
+   * dos oficios y dos visibilidades, y ésa es toda la razón de que sean dos nodos.
+   *
+   * | | qué cuenta | ¿se ve? | ¿lo anuncia el lector? |
+   * |---|---|---|---|
+   * | `ESTADO` (`role="status"`) | el DESENLACE de una acción | no, salvo error | sí |
+   * | `SITUACION` (esta) | en qué ESTADO estás | **sí** | no (`aria-hidden`) |
+   */
+  SITUACION: 'gml-barra-situacion',
 })
 
 /**
@@ -405,11 +447,88 @@ const PISTA_BORRAR = Object.freeze({
   encendido: 'Salir del modo borrar (Escape)',
 })
 
+/**
+ * Los dos nombres de «Insertar vértices» (2026-08-18), por el mismo criterio que
+ * {@link PISTA_BORRAR} y con la misma trampa que evitar: el icono promete una
+ * acción y lo que hace es ARMAR un modo, así que el texto del estado apagado tiene
+ * que contar el gesto entero («…y pincha»).
+ *
+ * ⚠️ El texto encendido nombra `Escape` **y no dice nada del doble clic**, aunque
+ * el doble clic siga insertando: la pista de un botón cuenta lo que ese botón hace,
+ * y el gesto alternativo vive en la tabla de la ayuda, que es donde se busca.
+ */
+const PISTA_INSERTAR = Object.freeze({
+  apagado: 'Insertar vértices: enciende el modo y pincha en el lindero',
+  encendido: 'Salir del modo insertar (Escape)',
+})
+
 /** Los dos nombres de «Dibujar recinto», por el mismo criterio (F12). */
 const PISTA_DIBUJAR = Object.freeze({
   parado: 'Dibujar el recinto de la parte activa, vértice a vértice',
   dibujando: 'Cancelar el dibujo en curso (Escape)',
 })
+
+/**
+ * ── EL TEXTO DEL RENGLÓN DE SITUACIÓN (T2, 2026-08-19) ──────────────────────
+ *
+ * ⛔ **Estas frases NO son las de `app/main.js`, y no se pueden reutilizar.** Allí
+ * hay seis constantes —`MENSAJE_CON_LADO`, `MENSAJE_BORRAR_ARMADO`,
+ * `MENSAJE_BORRAR_APAGADO`…— que están redactadas como **TRANSICIONES**, porque
+ * ése es su oficio: se dicen una vez, al lector de pantalla, en el instante en que
+ * algo cambia. «Modo borrar **apagado**: el clic vuelve a seleccionar linderos» es
+ * una frase perfecta para oírla al desarmar y **absurda dejada en pantalla**: al
+ * cabo de un minuto sigue anunciando algo que pasó hace un minuto.
+ *
+ * Esto es lo contrario: un renglón que **se queda**, así que sus frases están en
+ * PRESENTE y describen el estado, no el cambio. El estado «no hay modo» no tiene
+ * frase: se queda vacío, que es lo que dice que no pasa nada.
+ *
+ * ⚠️ **El orden de los trozos es FIJO —selección primero, modo después— y no es
+ * indiferente.** Un renglón que reordena sus partes según lo que haya activo
+ * obliga a releerlo entero cada vez; con las posiciones quietas, el ojo va al
+ * trozo que le interesa. Es el mismo criterio que ordena la tabla de {@link GESTOS}
+ * como la barra.
+ */
+const SITUACION = Object.freeze({
+  LADO: 'Lindero seleccionado',
+  INSERTAR: 'Modo insertar: pincha en un lindero',
+  BORRAR: 'Modo borrar: pincha los vértices que sobren',
+  DIBUJAR: 'Dibujando un recinto: pincha cada esquina',
+  /** Lo que une los dos trozos cuando hay selección Y modo a la vez. */
+  UNION: ' · ',
+})
+
+/**
+ * El nombre de «Quitar los puntos», que lleva la CUENTA dentro (2026-08-19).
+ *
+ * ⭐ **No es un adorno: es la única cifra que el usuario tiene.** Un levantamiento
+ * real trae 55, 88 o 178 puntos, y sobre el mapa —a 3 px de radio y superpuestos—
+ * no hay forma de contarlos. Si el botón dijera «Quitar los puntos» a secas, lo
+ * que se va no tendría tamaño hasta después de pulsarlo.
+ *
+ * ⚠️ Y dice **«se puede deshacer»** ANTES del clic, no después. Es la única
+ * herramienta de esta barra que se lleva por delante algo que vino de un fichero
+ * que el usuario puede no tener a mano; la red existe (`Ctrl+Z`, porque la
+ * operación pasa por el historial como cualquier otra edición) y una red que no se
+ * anuncia no evita la duda, que es lo que frena la mano.
+ *
+ * Es {@link BarraEdicion#puntosVisible} quien lo escribe, en la misma llamada que
+ * decide si el botón se ve: una sola fuente para la cuenta y para la presencia.
+ *
+ * @param {number} cuantos
+ * @returns {string}
+ */
+function pistaQuitarPuntos(cuantos) {
+  // El `0` es el nombre de NACIMIENTO, y no dice «los 0 puntos»: el botón nace
+  // escondido y sin cuenta que dar, y un rótulo con un cero es lo que leería el
+  // guardián de accesibilidad —que mira el marcado, no lo que se ve— y lo que oiría
+  // quien recorra la barra con el lector antes de que llegue ningún fichero.
+  const sujeto =
+    cuantos === 0 ? 'los puntos sueltos'
+    : cuantos === 1 ? 'el punto suelto'
+    : `los ${cuantos} puntos sueltos`
+  return `Quitar ${sujeto} del levantamiento (se puede deshacer)`
+}
 
 /**
  * Los gestos de edición, tal y como los fija la tabla «El mapa de gestos» de
@@ -425,7 +544,7 @@ const PISTA_DIBUJAR = Object.freeze({
  * renglón no lo arregla — ese renglón se va en cuanto el dibujo acaba, y la ayuda
  * es justo el sitio al que se vuelve cuando uno ya no se acuerda.
  *
- * Los cuatro llevan `donde: 'dibujando un recinto'`, que es lo que los distingue
+ * Los CINCO llevan `donde: 'dibujando un recinto'`, que es lo que los distingue
  * de los de arriba: **el mismo clic hace dos cosas distintas** según si hay un
  * trazo abierto o no, y la tabla tiene que poder decirlo sin ambigüedad.
  *
@@ -439,9 +558,10 @@ const PISTA_DIBUJAR = Object.freeze({
  * inventarse un mini-lenguaje: una cadena es texto, un `{kbd}` es una tecla.
  *
  * El umbral de puntería NO se escribe: se interpola de
- * `viewer/edicion.js#UMBRAL_PUNTERIA_PX`. Es lo único que este módulo importa de
- * la interacción, y es una CONSTANTE — no una llamada. Copiar el número dejaría
- * que la ayuda mintiera el día que alguien lo ajustara, que es el modo de fallo
+ * `viewer/_comun.js#UMBRAL_PUNTERIA_PX` — vivía en `viewer/edicion.js` hasta el
+ * 2026-08-19, cuando el cierre por clic de `viewer/dibujo.js` lo estrenó como
+ * tercer llamante. Es una CONSTANTE, no una llamada. Copiar el número dejaría que
+ * la ayuda mintiera el día que alguien lo ajustara, que es el modo de fallo
  * habitual de toda ayuda escrita a mano.
  *
  * @type {ReadonlyArray<{gesto: ReadonlyArray<string|{kbd: string}>, donde: string, hace: string}>}
@@ -459,7 +579,8 @@ export const GESTOS = Object.freeze([
     donde: 'mapa',
     hace:
       'Inserta un vértice en el lindero más cercano, proyectado sobre el lado y no en el punto ' +
-      'crudo del clic. Único gesto del mapa que cambia la geometría.',
+      'crudo del clic. Es la vía rápida, y sigue funcionando: la herramienta «Insertar vértices» ' +
+      'de esta barra hace exactamente lo mismo con un clic, y las dos escriben por el mismo sitio.',
   }),
   Object.freeze({
     gesto: Object.freeze(['Clic derecho']),
@@ -494,6 +615,33 @@ export const GESTOS = Object.freeze([
     hace: 'Desplaza el lado seleccionado la distancia en metros que se teclee.',
   }),
 
+  // ── Los tres del modo insertar, que solo valen con la herramienta armada ────
+  // Van ANTES de los del modo borrar y en el mismo orden que los botones de la
+  // barra: la ayuda se lee mirando la barra, y dos ordenaciones distintas para las
+  // mismas seis filas obligan a buscar dos veces.
+  Object.freeze({
+    gesto: Object.freeze(['Insertar vértices']),
+    donde: 'esta barra',
+    hace:
+      'ARMA el modo insertar y se queda pulsada: no inserta nada por sí misma. Armarla apaga el ' +
+      'modo borrar si estaba puesto, porque los dos se llevan el clic y no puede haber dos.',
+  }),
+  Object.freeze({
+    gesto: Object.freeze(['Clic']),
+    donde: 'en modo insertar',
+    hace:
+      `Inserta un vértice en el lindero que esté a ${UMBRAL_PUNTERIA_PX} px o menos del punto ` +
+      `pinchado, uno por clic y sin salir del modo. Mientras el modo dura, el clic no selecciona ` +
+      `linderos.`,
+  }),
+  Object.freeze({
+    gesto: Object.freeze([{ kbd: 'Escape' }]),
+    donde: 'en modo insertar',
+    hace:
+      'Sale del modo. También se sale al cambiar de pantalla, igual que en el modo borrar: un ' +
+      'modo que escribe en la geometría no sobrevive a irse y volver.',
+  }),
+
   // ── Los tres del modo borrar, que solo valen con la herramienta armada ──────
   Object.freeze({
     gesto: Object.freeze(['Borrar vértices']),
@@ -525,20 +673,30 @@ export const GESTOS = Object.freeze([
       'navegador sobre lo que se está escribiendo, y las celdas de coordenada son campos.',
   }),
 
-  // ── F12 · los cuatro del dibujo, que solo valen con un trazo abierto ───────
+  // ── F12 · los CINCO del dibujo, que solo valen con un trazo abierto ───────
   Object.freeze({
     gesto: Object.freeze(['Clic']),
     donde: 'dibujando un recinto',
     hace:
-      'Añade una esquina, enganchada al parcelario igual que un arrastre. Mientras hay un trazo ' +
-      'abierto el clic NO selecciona linderos: dibuja.',
+      'Añade una esquina, enganchada al parcelario, a los puntos de tu levantamiento y a las ' +
+      'esquinas que ya has puesto. Mientras hay un trazo abierto el clic NO selecciona linderos: ' +
+      'dibuja.',
+  }),
+  // ⭐ (2026-08-19) El quinto. Entra el mismo día que el gesto, y por lo mismo que
+  // los otros cuatro: un gesto que la ayuda no cuenta no lo descubre nadie.
+  Object.freeze({
+    gesto: Object.freeze(['Clic en la PRIMERA esquina']),
+    donde: 'dibujando un recinto',
+    hace:
+      `Cierra el recinto. La primera esquina se agranda en cuanto hay tres puestas, y se rellena ` +
+      `al acercarle el puntero: ese clic cierra. Vale con acertarle a ${UMBRAL_PUNTERIA_PX} px.`,
   }),
   Object.freeze({
     gesto: Object.freeze(['Doble clic o ', { kbd: 'Enter' }]),
     donde: 'dibujando un recinto',
     hace:
-      'Cierra el recinto y se lo asigna a la parte elegida. Con menos de tres esquinas no cierra ' +
-      'y lo dice: dos puntos no encierran superficie.',
+      'Cierran también, desde donde estés. Con menos de tres esquinas no cierra y lo dice: dos ' +
+      'puntos no encierran superficie.',
   }),
   Object.freeze({
     gesto: Object.freeze([{ kbd: 'Retroceso' }, ' / ', { kbd: 'Supr' }]),
@@ -597,6 +755,20 @@ const ICONOS = Object.freeze({
    * lado en paralelo a sí mismo, que es literalmente lo que hace la herramienta.
    */
   OFFSET: Object.freeze(['M3 5h18', 'M3 19h18', 'M12 8v8', 'M9.5 10.5 12 8l2.5 2.5', 'M9.5 13.5 12 16l2.5-2.5']),
+  /**
+   * Un lindero abajo y un signo «+» grande encima: insertar un vértice en un lado
+   * que ya existe (2026-08-18).
+   *
+   * NO un punto suelto, y no es un matiz: la herramienta no crea puntos en el
+   * vacío —`insertarEn` proyecta el clic sobre el lado más cercano y rechaza el que
+   * cae a más de {@link UMBRAL_PUNTERIA_PX} px—, así que un icono de punto suelto
+   * prometería dibujar donde uno quisiera. El lindero dentro del icono es la mitad
+   * del mensaje: se añade **a esto**.
+   *
+   * El «+» va SEPARADO de la línea y no cruzándola: cruzándola se lee como cortar,
+   * que es lo contrario de lo que hace, y el vecino de al lado ya es la papelera.
+   */
+  INSERTAR: Object.freeze(['M3 20h18', 'M12 3v8', 'M8 7h8']),
   /** Papelera: borrar vértices. */
   BORRAR: Object.freeze([
     'M4 7h16',
@@ -612,6 +784,36 @@ const ICONOS = Object.freeze({
    * este botón llevaba palabras).
    */
   DIBUJAR: Object.freeze(['M12 3l8 6-3 10H7L4 9Z']),
+  /**
+   * Un campo de seis puntos sueltos y una raya que lo tacha: quitar el levantamiento.
+   *
+   * NO una papelera, y la vecina de dos botones más allá es exactamente por qué:
+   * la papelera de esta barra ARMA un modo y borra vértices DE LA GEOMETRIA de uno
+   * en uno. Ésta se pulsa una vez y se lleva una nube entera que no es geometría.
+   * Dos cosas distintas con el mismo dibujo se confunden justo el día que hay
+   * prisa.
+   *
+   * Los puntos son `h.01` con el remate redondo —el mismo truco que el punto de la
+   * interrogación de {@link ICONOS.AYUDA}—, así que miden **2 px de los 24 del
+   * `viewBox`**: a los 18 px reales del botón eso es un punto y medio. Por eso son
+   * SEIS y no cuatro, medido en el navegador el 2026-08-19: con cuatro el icono se
+   * leía como una raya diagonal con dos motas al lado, y la mota es justo lo que
+   * tiene que leerse como «los puntos».
+   *
+   * Tres a cada lado de la diagonal, y **ninguno encima**: la raya mide 2 px de
+   * grueso y se traga cualquier punto a menos de ~3 px de ella, así que un punto
+   * mal colocado no se ve mal — desaparece, y el icono queda descompensado sin que
+   * nadie sepa por qué. Los seis están a 4,9 px o más de la línea `x + y = 24`.
+   */
+  QUITAR_PUNTOS: Object.freeze([
+    'M6 6h.01',
+    'M11 6h.01',
+    'M6 11h.01',
+    'M18 13h.01',
+    'M13 18h.01',
+    'M18 18h.01',
+    'M4 20L20 4',
+  ]),
   /** Interrogación: la ayuda. */
   AYUDA: Object.freeze(['M9.2 9a2.8 2.8 0 1 1 3.3 2.75c-.9.2-1.5.9-1.5 1.8v.45', 'M12 17.5h.01']),
   /** Punta de flecha hacia abajo: «esto abre algo». */
@@ -1058,17 +1260,82 @@ const BarraEdicion = L.Control.extend({
     })
     this._dispOffset.dataset.desplegable = 'offset'
 
+    // ── EL MANDO DE LOS MODOS (T4, 2026-08-20) ───────────────────────────────
+    // Las tres herramientas que ARMAN un modo —insertar, borrar y dibujar— dejan
+    // de ser tres botones sueltos en la fila y pasan a un solo control segmentado.
+    //
+    // ⭐ **QUÉ ARREGLA, que es lo único que justifica un nodo más.** Las tres son
+    // EXCLUYENTES: armar una desarma las otras dos, y eso lo decide
+    // `viewer/edicion.js`, no el usuario. Hasta hoy esa exclusión solo existía en
+    // el comportamiento —pulsas una y otra se apaga sin que nada lo hubiera
+    // anunciado— y en la fila se veían igual que la papelera, que la ayuda o que
+    // el desplazamiento, que NO son modos y NO se excluyen con nada. Un marco
+    // compartido y un filete entre medias dicen «de estos tres, como mucho uno», y
+    // lo dicen antes de pulsar. Es la misma información que el `aria-pressed` ya
+    // daba por el canal del lector de pantalla, puesta por fin en el visual.
+    //
+    // ⚠️ **El redondeo de los extremos NO se hace aquí ni con `overflow:hidden`.**
+    // Recortar el contenido recortaría también el anillo de foco global
+    // (`.gml-app :focus-visible`, con `outline-offset: 2px`), que es la trampa que
+    // `.gml-barra-partido` ya se encontró y dejó escrita en `estilos/app.css`. Los
+    // extremos los redondea la hoja, y el extremo DERECHO lo elige con `:has()`
+    // porque el último segmento —«Dibujar recinto»— es justo el que se esconde:
+    // un `:last-child` a secas le daría el borde final a un botón invisible.
+    const mando = crear(doc, 'div', CLASE_BARRA.MANDO, fila)
+    mando.setAttribute('role', 'group')
+    // El `aria-label` es la ÚNICA forma de nombrar este grupo: no hay texto
+    // visible que pudiera hacer de `aria-labelledby`, porque los tres segmentos
+    // son iconos y sus nombres están en sus propios `<span>` ocultos. Sin nombre,
+    // un lector de pantalla anuncia «grupo» y no dice de qué, que es peor que no
+    // agrupar: añade un nivel al recorrido sin añadir información.
+    mando.setAttribute('aria-label', 'Modos de edición de la geometría')
+
+    // ── Insertar vértices (2026-08-18) ───────────────────────────────────────
+    // La mitad que faltaba. Hasta hoy la barra tenía un modo para BORRAR un vértice
+    // y ninguno para AÑADIRLO: el gesto que lo añade —doble clic sobre el lindero—
+    // estaba solo en la tabla de {@link GESTOS}, detrás del botón «?», descrito allí
+    // como «único gesto del mapa que cambia la geometría». O sea que la capacidad
+    // más importante del editor era la única sin representar en una barra donde
+    // todo lo demás sí lo está.
+    //
+    // ⚠️ **ES EL PRIMER SEGMENTO DEL MANDO**, y va antes que la papelera porque el
+    // orden —crear antes que destruir— es el de la frase que el usuario ya tiene en
+    // la cabeza. Hasta T4 lo que decía que insertar y borrar eran pareja era la
+    // AUSENCIA de separador entre las dos; ahora lo dice el marco que las encierra,
+    // que además alcanza al dibujo. La razón de fondo no cambia: son el mismo
+    // trabajo en sus tres formas, comparten el modo-armado como manera de
+    // funcionar y son excluyentes entre sí en `viewer/edicion.js`.
+    //
+    // ⚠️ NO lleva `HERRAMIENTA_DESTRUCTIVA`: no destruye. Es el único rasgo visual
+    // que lo separa de su gemela, y es exactamente el que tiene que separarlos.
+    //
+    // `aria-pressed` desde el arranque y en `'false'`, por el mismo motivo escrito
+    // en la papelera aquí abajo.
+    this._botonInsertar = crearBoton(doc, {
+      padre: mando,
+      icono: ICONOS.INSERTAR,
+      nombre: PISTA_INSERTAR.apagado,
+    })
+    this._botonInsertar.dataset.accion = 'insertar-vertice'
+    this._botonInsertar.setAttribute('aria-pressed', 'false')
+
     // ── Borrar vértices (2026-08-10) ─────────────────────────────────────────
-    // El modo destructivo. Va JUNTO a «Desplazar lindero» y no al lado de la
-    // ayuda porque las dos son lo mismo —herramientas que cambian la geometría del
-    // recinto— y el separador de después las agrupa como tales.
+    // El modo destructivo, y el segmento CENTRAL del mando.
+    //
+    // ⛔ **CONSERVA `HERRAMIENTA_DESTRUCTIVA` dentro del mando** (decisión de T4).
+    // La tentación era quitárselo: si el relleno macizo es lo que dice qué segmento
+    // está armado, dos rellenos distintos podrían leerse como dos estados distintos.
+    // Pero es al revés — armar «Borrar» y armar «Insertar» NO son el mismo suceso:
+    // uno añade geometría al primer clic y el otro la destruye. El color es lo
+    // único que se lee sin mirar qué icono es, y dentro de un mando donde los tres
+    // se parecen más que nunca hace MÁS falta, no menos.
     //
     // ⚠️ `aria-pressed` desde el arranque, y en `'false'`, no ausente: un
     // conmutador que solo estrena el atributo al pulsarse por primera vez se
     // anuncia como un botón normal hasta entonces, y quien va por lector de
     // pantalla no puede saber que va a ARMAR algo en vez de ejecutarlo.
     this._botonBorrar = crearBoton(doc, {
-      padre: fila,
+      padre: mando,
       icono: ICONOS.BORRAR,
       nombre: PISTA_BORRAR.apagado,
       clase: `${CLASE_BARRA.HERRAMIENTA} ${CLASE_BARRA.HERRAMIENTA_DESTRUCTIVA}`,
@@ -1076,26 +1343,102 @@ const BarraEdicion = L.Control.extend({
     this._botonBorrar.dataset.accion = 'borrar'
     this._botonBorrar.setAttribute('aria-pressed', 'false')
 
-    crearSeparador(doc, fila)
-
-    // ── Dibujar recinto (F12) ────────────────────────────────────────────────
+    // ── Dibujar recinto (F12; también en PARCELA desde F18) ──────────────────
     // La herramienta con la que se declara un porche o una piscina que no estaban
-    // en ningún fichero, que es el caso COMÚN de la rama EDIFICIO.
+    // en ningún fichero —el caso COMÚN de la rama EDIFICIO— y, desde F18, con la
+    // que se traza el contorno de una parcela sobre los puntos de un levantamiento
+    // importado.
     //
-    // ⚠️ **Nace OCULTO**, no apagado: en la rama PARCELA no existe una «parte» que
-    // dibujar, y un botón permanentemente gris con un motivo que habla de otra
-    // rama sería peor que no tenerlo. Lo enseña `dibujoVisible(true)`, que llama
-    // el cableado del edificio. Es la única herramienta de esta barra que se
-    // esconde, y por eso se dice aquí en vez de dejarlo al `display` de la hoja.
+    // ⚠️ **Nace OCULTO**, no apagado, y sigue siendo la única herramienta de esta
+    // barra que se esconde: hay pantallas y ramas donde no hay nada que dibujar
+    // —la rama EDIFICIO sin parte elegida, cualquier paso que no sea Edición— y un
+    // botón permanentemente gris con un motivo que habla de otro sitio sería peor
+    // que su ausencia. Lo enseña `dibujoVisible(true)`.
+    //
+    // ⛔ **Y desde F18 lo llaman DOS cableados, uno por rama** —`cablearEdificio`
+    // y `cablearEdicion`—, así que este módulo no puede suponer de quién es la
+    // orden: pinta lo que le digan y no sabe qué rama manda. Quién decide, y en qué
+    // orden se le pregunta a cada uno, está escrito en `app/main.js#aplicarEdicion`,
+    // que es el único sitio que conoce a la vez el paso y la rama.
     this._botonDibujar = crearBoton(doc, {
-      padre: fila,
+      padre: mando,
       icono: ICONOS.DIBUJAR,
       nombre: PISTA_DIBUJAR.parado,
     })
     this._botonDibujar.dataset.accion = 'dibujar-recinto'
     this._botonDibujar.hidden = true
-    this._separadorDibujar = crearSeparador(doc, fila)
-    this._separadorDibujar.hidden = true
+    // ⛔ **ESTE `aria-pressed` FALTABA DESDE F12, y lo ha destapado T4.** Sus dos
+    // hermanos de mando lo estrenan en el montaje y con el motivo escrito —«un
+    // conmutador que solo estrena el atributo al pulsarse por primera vez se
+    // anuncia como un botón normal hasta entonces»—, y éste solo lo recibía dentro
+    // de {@link BarraEdicion#dibujoEnCurso}, o sea la primera vez que alguien
+    // dibujaba. Hasta hoy era una incoherencia que no se veía porque los tres
+    // botones estaban sueltos en la fila; desde que son los tres segmentos de un
+    // control cuyo significado entero es «esto conmuta», uno de ellos anunciándose
+    // como botón corriente es el grupo diciendo una cosa y su contenido otra.
+    this._botonDibujar.setAttribute('aria-pressed', 'false')
+
+    // ⬆️ Aquí se cierra el mando. El separador que hasta T4 iba entre «Borrar» y
+    // «Dibujar» no se ha borrado: se ha MUDADO aquí abajo. Separaba dos grupos de
+    // herramientas y sigue haciéndolo; lo que ha cambiado es cuáles son los grupos,
+    // porque el dibujo se ha pasado al de los modos.
+    crearSeparador(doc, fila)
+
+    // ── Quitar los puntos del levantamiento (F24, 2026-08-19) ───────────────
+    // Un DXF de levantamiento entra con 55, 88 o 178 puntos sueltos, y en cuanto
+    // el contorno está dibujado encima **dejan de servir para nada y no se van
+    // solos**: viven en el modelo, así que se guardan con el expediente, viajan en
+    // el fichero de proyecto y vuelven a pintarse cada vez que se recupera. Hasta
+    // hoy la única forma de perderlos era no importarlos.
+    //
+    // ⛔ **HASTA T4 IBA PEGADO A «Dibujar recinto», SIN SEPARADOR ENTRE MEDIAS.**
+    // Esa adyacencia era de F24 y decía algo cierto —se dibuja SOBRE los puntos y
+    // se quitan CUANDO ya se ha dibujado, o sea el mismo trabajo en sus dos
+    // tiempos—, pero se ha perdido a propósito, y conviene saber qué se cambió por
+    // qué: el dibujo se ha ido al MANDO, y este botón **no puede entrar ahí**. El
+    // mando significa exactamente una cosa —«de estos tres, como mucho uno está
+    // armado»— y quitar los puntos NO ARMA NADA: se pulsa y sucede. Un cuarto
+    // segmento que se ejecuta al primer clic dentro de un control cuyo mensaje
+    // entero es «esto conmuta» sería la peor mentira que esta barra podría contar,
+    // y además la que más caro se paga: es la única herramienta que borra de golpe
+    // algo que vino de fuera.
+    //
+    // Así que queda FUERA, al otro lado del filete, que es lo que era antes de
+    // llegar el dibujo: una acción suelta entre las herramientas y la ayuda.
+    //
+    // ⚠️ **Nace OCULTO**: sin puntos no hay nada que quitar, y un botón gris
+    // permanente con un motivo que habla de un fichero que nadie ha soltado sería
+    // peor que su ausencia. Lo enseña {@link BarraEdicion#puntosVisible}, y desde
+    // T4 el separador de después es SUYO y de nadie más
+    // ({@link BarraEdicion#_refrescarSeparadorPuntos}).
+    //
+    // ⚠️ Lleva `HERRAMIENTA_DESTRUCTIVA` —el rojo de la papelera— y lo lleva con
+    // razón: es la única herramienta de esta barra que borra de una vez algo que
+    // vino de fuera. Que se pueda deshacer no lo hace inocuo; lo hace reversible,
+    // y eso se dice en el nombre (ver {@link pistaQuitarPuntos}).
+    this._botonQuitarPuntos = crearBoton(doc, {
+      padre: fila,
+      icono: ICONOS.QUITAR_PUNTOS,
+      nombre: pistaQuitarPuntos(0),
+      clase: `${CLASE_BARRA.HERRAMIENTA} ${CLASE_BARRA.HERRAMIENTA_DESTRUCTIVA}`,
+    })
+    this._botonQuitarPuntos.dataset.accion = 'quitar-puntos'
+    this._botonQuitarPuntos.hidden = true
+
+    // La bandera del escondite. Nace en `false` porque el botón nace oculto: un
+    // `undefined` aquí dejaría el separador visible en la primera pasada, que es
+    // un filete suelto entre la papelera y la ayuda.
+    //
+    // ⛔ **ERAN DOS HASTA T4** —`_verDibujo` y ésta—, porque el dibujo y los puntos
+    // compartían este filete y había que mirar a los dos lados. Desde que el dibujo
+    // se ha ido al mando, el único vecino escondible que le queda a este separador
+    // es «Quitar puntos», así que la condición vuelve a ser de uno. `_verDibujo`
+    // se ha BORRADO en vez de dejarse puesto: un estado que ya no decide nada es
+    // un estado que el día de mañana alguien consulta creyendo que sí.
+    this._verQuitarPuntos = false
+
+    this._separadorPuntos = crearSeparador(doc, fila)
+    this._separadorPuntos.hidden = true
 
     // ── Ayuda ────────────────────────────────────────────────────────────────
     // «Ayuda sobre los gestos de edición», entero: una interrogación sola no dice
@@ -1213,8 +1556,10 @@ const BarraEdicion = L.Control.extend({
       casilla,
       this._dispSnap,
       this._dispOffset,
+      this._botonInsertar,
       this._botonBorrar,
       this._botonDibujar,
+      this._botonQuitarPuntos,
       this._botonAyuda,
     ]
 
@@ -1254,6 +1599,71 @@ const BarraEdicion = L.Control.extend({
     pista.style.color = '#fff'
     pista.style.padding = '3px 7px'
     pista.style.borderRadius = '6px'
+
+    // ── El renglón de SITUACIÓN (T2, 2026-08-19) ─────────────────────────────
+    //
+    // ⭐ **POR QUÉ ES UN NODO NUEVO Y NO EL `role="status"` QUE YA HABÍA.** El
+    // renglón de estado de esta barra **no se ve**: `app/main.js` le aplica
+    // `RENGLON_OCULTO` —`position:absolute; width:1px; clipPath:inset(50%)`, el
+    // patrón *visually-hidden* de manual— a todo lo que no sea un error, por
+    // decisión del autor del 2026-08-18. Su motivo sigue siendo bueno: por allí
+    // pasan quince DESENLACES de acciones que el usuario acaba de hacer con las
+    // manos sobre el mapa, y contarlos otra vez a 400 px de donde está mirando es
+    // decir dos veces lo mismo.
+    //
+    // Pero la SITUACIÓN no es un desenlace. «Estás en modo borrar» no se ve en
+    // ninguna otra parte, no lo acabas de hacer, y sigue siendo verdad dentro de un
+    // minuto. Meterla en aquel nodo obligaba a inventar reglas de quién pisa a
+    // quién y cuándo vuelve el otro — y había un caso sin salida: `Ctrl+Z` deja un
+    // desenlace, el usuario no vuelve a tocar el mapa, y la situación no reaparece
+    // nunca. **Dos nodos hacen que esa clase entera de fallo no exista**, y dejan
+    // los dieciséis mensajes y sus pruebas intactos.
+    //
+    // ⚠️ **`aria-hidden="true"`, y es obligatorio.** Los mismos hechos ya se
+    // anuncian por el `role="status"` (`MENSAJE_CON_LADO`, `MENSAJE_BORRAR_ARMADO`
+    // y compañía, desde `app/main.js`). Sin esta línea, quien va por lector de
+    // pantalla oiría la selección DOS VECES por cada clic. Esto es un espejo para
+    // los ojos, no un segundo canal.
+    //
+    // ⚠️ **COMPARTE SLOT CON LA PISTA, Y POR ESO SON EXCLUYENTES.** Las dos se
+    // dibujan en `bottom: calc(100% + 6px)`. Podría haber ido debajo de la fila o
+    // dentro de ella, y las dos opciones eran peores: la barra está anclada por su
+    // borde inferior, así que **cualquier cosa que ocupe alto EMPUJA LA FILA hacia
+    // arriba** — o sea que los botones se moverían bajo el cursor cada vez que
+    // eliges un lindero. Es el mismo motivo por el que la pista es `absolute` y no
+    // un renglón más, escrito veinte líneas más arriba. Con el slot compartido la
+    // fila **no se mueve nunca**, y no se pierde nada: mientras señalas una
+    // herramienta te interesa qué hace ESA, no dónde estabas.
+    const situacion = crear(doc, 'p', CLASE_BARRA.SITUACION, fila)
+    situacion.setAttribute('aria-hidden', 'true')
+    situacion.hidden = true
+    this._situacion = situacion
+    // Vacío = no hay nada que contar. Nace así y vuelve aquí en cuanto se desarma
+    // todo: es lo que protege el invariante de que **el arranque no planta un
+    // cartel sobre el mapa** (`test/app/main-edicion.dom.test.js`, «el arranque no
+    // planta un cartel»), que sigue valiendo palabra por palabra para este nodo.
+    this._sitLado = false
+    // En línea por lo mismo que la pista y que el fondo del contenedor: esto tiene
+    // que ser legible sobre una ortofoto aunque `estilos/app.css` no llegue. Lo que
+    // NO va aquí es refinamiento tipográfico: eso sería de la hoja, y la hoja está
+    // clavada en su techo de presupuesto.
+    situacion.style.position = 'absolute'
+    situacion.style.zIndex = '1'
+    situacion.style.bottom = 'calc(100% + 6px)'
+    situacion.style.left = '0'
+    situacion.style.margin = '0'
+    situacion.style.maxWidth = '100%'
+    situacion.style.whiteSpace = 'nowrap'
+    situacion.style.overflow = 'hidden'
+    situacion.style.textOverflow = 'ellipsis'
+    situacion.style.pointerEvents = 'none'
+    // Claro y no oscuro como la pista, a propósito: la pista es un globo que
+    // interrumpe, esto es un rótulo que acompaña. Mismo fondo que el contenedor de
+    // la barra para que se lea como parte de ella.
+    situacion.style.background = 'rgba(255,255,255,0.94)'
+    situacion.style.color = '#0f172a'
+    situacion.style.padding = '3px 7px'
+    situacion.style.borderRadius = '6px'
 
     // ── Oyentes ──────────────────────────────────────────────────────────────
     // Sin esto, pulsar un botón de la barra SELECCIONARÍA UN LINDERO por debajo
@@ -1316,13 +1726,44 @@ const BarraEdicion = L.Control.extend({
    * Enseña o esconde «Dibujar recinto» **y su separador**.
    *
    * ⚠️ Se ESCONDE, no se apaga, y es la única herramienta de esta barra que lo
-   * hace: en la rama PARCELA no hay ninguna «parte» que dibujar, así que un botón
-   * gris permanente con un motivo que habla de otra rama diría menos que su
-   * ausencia. Las que sí se apagan con motivo —«Deshacer», «Desplazar lindero»—
-   * describen algo que *aquí* se puede hacer y ahora mismo no.
+   * hace: hay sitios donde no hay NADA que dibujar —la rama EDIFICIO sin parte
+   * elegida, cualquier paso que no sea Edición—, y ahí un botón gris permanente
+   * con un motivo que habla de otro sitio diría menos que su ausencia. Las que sí
+   * se apagan con motivo —«Deshacer», «Desplazar lindero»— describen algo que
+   * *aquí* se puede hacer y ahora mismo no.
    *
-   * El separador va con él por la misma razón por la que existe: separa dos grupos
-   * de herramientas, y un separador que no separa nada es una raya suelta.
+   * ── ⭐ LO QUE ESTE MÉTODO CUESTA EN PÍXELES (F18 · paso 12) ────────────────
+   * **Medido en Chromium el 2026-08-19**, no calculado: la barra flota SOBRE el
+   * mapa, así que lo que ocupa se lo quita a la ortofoto que el usuario está
+   * calcando, y hasta F18 estos píxeles solo se pagaban en la rama EDIFICIO.
+   * Ahora se pagan también en la de PARCELA, que es la pantalla donde más se
+   * trabaja — por eso se remide en vez de suponer que «un botón más da igual».
+   *
+   *   · **La fila pasa de 275 a 316 px, y la barra de 285 a 326.** El delta son
+   *     **41 px** exactos, en TODOS los viewports probados (1440×900, 1366×768,
+   *     1280×800, 1152×864 y 1024×768): 28 del botón, 2 del `gap` que lo precede,
+   *     1 del filete, 8 de sus dos márgenes (`--space-1`) y 2 más de `gap`. La
+   *     cuenta del CSS y la medida coinciden al píxel porque la barra es de
+   *     ICONOS: ningún ancho depende de la fuente ni del texto.
+   *   · **La barra NO se estrecha con la ventana** —es contenido, no rejilla—, así
+   *     que lo que cambia con el viewport es cuánto mapa tapa: **31,1 % del ancho
+   *     del mapa a 1440×900** (722 px libres) y **51,6 % a 1024×768** (306 px).
+   *   · **El punto en que dejaría de caber son ~718 px de ventana**, con el panel
+   *     lateral llevándose sus ~392: por debajo, el mapa mide menos que la barra.
+   *     Queda muy lejos del objetivo de este producto —un perito con un plano—,
+   *     así que no se estrecha nada por ahora; queda escrito para que quien mueva
+   *     el panel sepa cuánto margen está gastando.
+   *
+   * ⚠️ La medida de layout REAL —no esta nota— la vuelve a tomar y a VIGILAR
+   * `scripts/smoke-navegador/08-edicion.js` §10, porque jsdom no hace layout y
+   * ningún test de la suite puede ver un píxel.
+   *
+   * ⚠️ **ESTE MÉTODO YA NO GOBIERNA NINGÚN SEPARADOR** (T4, 2026-08-20). Desde que
+   * el dibujo es el tercer segmento del mando, esconderlo no deja ningún filete
+   * suelto: el mando nunca se queda vacío —insertar y borrar no se esconden jamás—
+   * y el separador que va después sigue separando lo mismo. Lo único que hace
+   * ahora este método es enseñar y esconder el botón. El filete que hay más allá
+   * es de «Quitar puntos» y lo decide {@link BarraEdicion#_refrescarSeparadorPuntos}.
    *
    * @param {boolean} visible
    * @returns {boolean}  Lo que ha quedado.
@@ -1336,8 +1777,100 @@ const BarraEdicion = L.Control.extend({
       )
     }
     if (this._botonDibujar) this._botonDibujar.hidden = !visible
-    if (this._separadorDibujar) this._separadorDibujar.hidden = !visible
+    // ⛔ **ESCONDERLO LO DESARMA, Y ES UN ARREGLO DE T10 (2026-08-20).**
+    //
+    // Sin esta línea la barra se quedaba afirmando un modo que el usuario **no
+    // puede abandonar**: el botón es el único sitio donde se cancela un dibujo con
+    // el ratón, así que un `aria-pressed="true"` sobre un botón invisible no es un
+    // estado, es una trampa. Y salía a la luz al VOLVER: `dibujoVisible(true)`
+    // devolvía el botón **relleno de azul** y el renglón de situación diciendo
+    // «Dibujando un recinto: pincha cada esquina» sin que nadie estuviera dibujando.
+    //
+    // El camino es real y está en el repositorio: `app/cableado-edificio.js:2529`
+    // esconde el botón al desmontar la parte activa **sin pasar por
+    // `dibujoEnCurso(false)`** —y hace bien, porque a esas alturas ya ha destruido
+    // el motor del dibujo—. Hasta hoy lo que salvaba a la barra era que sus DOS
+    // cableados llaman siempre a los dos métodos seguidos y en ese orden. O sea que
+    // la coherencia de este módulo dependía de la disciplina de quien lo llama, que
+    // es exactamente la clase de acuerdo que se rompe en la tercera llamada.
+    //
+    // Se delega en {@link BarraEdicion#dibujoEnCurso} en vez de escribir el atributo
+    // aquí: desarmar es también devolverle el NOMBRE al botón, y ese texto tiene un
+    // solo dueño.
+    if (!visible) this.dibujoEnCurso(false)
     return visible
+  },
+
+  /**
+   * Enseña «Quitar los puntos» con su CUENTA, o lo esconde (F24, 2026-08-19).
+   *
+   * ⭐ **Un solo argumento para las dos cosas**, y es la decisión de este método:
+   * `0` esconde, `n > 0` enseña Y renombra. Una API con `visible` y `cuantos` por
+   * separado tendría un estado imposible —visible con cero— y ese estado es
+   * exactamente el defecto que se quiere evitar: un botón ofreciendo quitar una
+   * nube que ya no está.
+   *
+   * ⚠️ **No pregunta nada al modelo.** Quién cuenta los puntos es
+   * `app/main.js#repintarPuntosLevantamiento`, que es el ÚNICO suscriptor del store
+   * que sabe de ellos y el que ya empuja las otras dos salidas (la capa que los
+   * pinta y las dianas que los enganchan). Tres salidas, un solo sitio que las
+   * escribe: separarlas es la forma de que un día haya un botón para quitar unos
+   * puntos que ya nadie ve.
+   *
+   * ⚠️ Y refresca la PISTA si el globo está abierto justo sobre este botón, igual
+   * que {@link borrarMotivo}: sin esto, quitar puntos con el ratón encima dejaría
+   * el globo diciendo una cuenta vieja.
+   *
+   * @param {number} [cuantos]  Sin argumento, LEE si está visible.
+   * @returns {boolean}  Si ha quedado visible.
+   */
+  puntosVisible(cuantos) {
+    if (cuantos === undefined) {
+      return this._botonQuitarPuntos ? !this._botonQuitarPuntos.hidden : false
+    }
+    if (typeof cuantos !== 'number' || !Number.isInteger(cuantos) || cuantos < 0) {
+      throw new TypeError(
+        `puntosVisible: 'cuantos' debe ser un entero >= 0 (o nada, para leer); ` +
+          `recibido ${JSON.stringify(cuantos)}.`,
+      )
+    }
+    const visible = cuantos > 0
+    if (this._botonQuitarPuntos) {
+      this._botonQuitarPuntos.hidden = !visible
+      if (visible) this._renombrar(this._botonQuitarPuntos, pistaQuitarPuntos(cuantos))
+      if (this._pista && !this._pista.hidden && this._pistaDe === this._botonQuitarPuntos) {
+        this._pista.textContent = this._botonQuitarPuntos.dataset.pista
+      }
+    }
+    this._verQuitarPuntos = visible
+    this._refrescarSeparadorPuntos()
+    return visible
+  },
+
+  /**
+   * El filete que hay entre «Quitar puntos» y la ayuda se va con él.
+   *
+   * ⛔ **ESTE SEPARADOR HA CAMBIADO DE DUEÑO DOS VECES, y las dos por el mismo
+   * motivo: un filete que no separa nada es una raya suelta.**
+   *   · Hasta F24 era propiedad de {@link BarraEdicion#dibujoVisible} y se escondía
+   *     con el dibujo. Al llegar un segundo vecino escondible eso dejó de valer: en
+   *     la rama EDIFICIO sin parte elegida el dibujo se esconde, y si la parcela
+   *     traía puntos el botón de quitarlos se quedaba solo detrás de un filete
+   *     invisible, pegado a la ayuda.
+   *   · Desde T4 (2026-08-20) el dibujo se ha ido al MANDO, que está al otro lado y
+   *     no se esconde nunca. O sea que a este filete le queda **un solo vecino
+   *     escondible**, y la condición vuelve a tener un término.
+   *
+   * ⚠️ Sigue siendo una función y no un `hidden` suelto dentro de
+   * {@link BarraEdicion#puntosVisible} justamente por esa historia: es el sitio
+   * donde está escrito a qué mira, y la próxima herramienta escondible que aparezca
+   * por aquí tiene que pasar por él.
+   *
+   * @returns {void}
+   */
+  _refrescarSeparadorPuntos() {
+    if (!this._separadorPuntos) return
+    this._separadorPuntos.hidden = !this._verQuitarPuntos
   },
 
   /**
@@ -1354,6 +1887,33 @@ const BarraEdicion = L.Control.extend({
     if (!this._botonDibujar) return
     this._renombrar(this._botonDibujar, dibujando ? PISTA_DIBUJAR.dibujando : PISTA_DIBUJAR.parado)
     this._botonDibujar.setAttribute('aria-pressed', dibujando ? 'true' : 'false')
+    this._pintarSituacion()
+  },
+
+  /**
+   * Pone «Insertar vértices» en armado o lo devuelve a su estado normal
+   * (2026-08-18).
+   *
+   * ⚠️ **Esto NO enciende el modo: lo REFLEJA**, igual que {@link borrarActivo}.
+   * Quien manda es `viewer/edicion.js#modoInsertar` y quien empuja es el cableado,
+   * suscrito a `alCambiarModoInsertar`.
+   *
+   * ⭐ Y aquí la suscripción hace un trabajo que en la papelera no hacía: los dos
+   * modos son EXCLUYENTES, así que armar el de borrar apaga éste **sin que este
+   * botón haya recibido ningún clic**. Un botón que sondeara el booleano al pulsarse
+   * se quedaría pulsado y mintiendo; empujado por la suscripción, se apaga solo.
+   *
+   * @param {boolean} activo
+   * @returns {void}
+   */
+  insertarActivo(activo) {
+    if (!this._botonInsertar) return
+    this._renombrar(this._botonInsertar, activo ? PISTA_INSERTAR.encendido : PISTA_INSERTAR.apagado)
+    this._botonInsertar.setAttribute('aria-pressed', activo ? 'true' : 'false')
+    if (this._pista && !this._pista.hidden && this._pistaDe === this._botonInsertar) {
+      this._pista.textContent = this._botonInsertar.dataset.pista
+    }
+    this._pintarSituacion()
   },
 
   /**
@@ -1378,6 +1938,71 @@ const BarraEdicion = L.Control.extend({
     if (this._pista && !this._pista.hidden && this._pistaDe === this._botonBorrar) {
       this._pista.textContent = this._botonBorrar.dataset.pista
     }
+    this._pintarSituacion()
+  },
+
+  /**
+   * ⭐ **Refleja si hay un lindero elegido en el mapa (T2, 2026-08-19).**
+   *
+   * Mismo contrato que {@link borrarActivo} y {@link insertarActivo}, y por el
+   * mismo motivo: **esto NO selecciona nada, lo REFLEJA**. Quien manda es
+   * `viewer/edicion.js`, y quien empuja es `app/main.js#cablearEdicion`, suscrito a
+   * `alCambiarSeleccion`. Llamar a esto sin que la selección haya cambiado deja el
+   * renglón mintiendo.
+   *
+   * ⚠️ **Es el ÚNICO empujón que T2 necesitó**, y merece decirse por qué: los otros
+   * tres trozos de la situación —insertar, borrar y dibujar— **la barra ya los
+   * sabía**, porque el cableado se los venía reflejando desde F12 y desde el
+   * 2026-08-10 para pintar los botones. La selección era el único hecho del que
+   * esta vista no tenía copia. De ahí que «Dibujar recinto» entre en el renglón sin
+   * cableado nuevo: `dibujoEnCurso` ya lo llaman **las dos ramas**
+   * (`app/main.js` y `app/cableado-edificio.js`), cada una con su dueño.
+   *
+   * @param {boolean} hay  `true` si hay un lindero seleccionado.
+   * @returns {void}
+   */
+  ladoSeleccionado(hay) {
+    this._sitLado = hay === true
+    this._pintarSituacion()
+  },
+
+  /**
+   * Recompone el renglón de situación con lo que la barra sabe AHORA, y lo esconde
+   * si no hay nada que contar.
+   *
+   * ── De dónde sale cada trozo, y por qué de ahí ──────────────────────────────
+   * El modo NO se guarda en un campo propio: se lee del `aria-pressed` de los tres
+   * botones, que es donde ya vive. Guardarlo aparte sería **dos verdades del mismo
+   * booleano**, que es exactamente lo que el JSDoc de {@link borrarActivo} prohíbe
+   * unas líneas más arriba — y la que se quedaría vieja sería siempre ésta, porque
+   * los modos se apagan por caminos que esta vista no ve (`Escape`, salir de
+   * Edición, armar el otro modo). Leyendo del DOM no puede divergir: el mismo
+   * `setAttribute` que pinta el botón alimenta el renglón.
+   *
+   * ⚠️ **Se esconde con un desplegable abierto**, por lo mismo que la pista: los
+   * tres paneles se abren justo donde esto se dibuja, y quien tiene un panel
+   * abierto está leyendo, no explorando.
+   */
+  _pintarSituacion() {
+    if (!this._situacion) return
+    // La pista manda mientras está a la vista: comparten slot y es transitoria.
+    const pistaALaVista = this._pista !== null && this._pista !== undefined && !this._pista.hidden
+    if (pistaALaVista || this._abierto !== null) {
+      this._situacion.hidden = true
+      return
+    }
+    const armado = (boton) => boton && !boton.hidden && boton.getAttribute('aria-pressed') === 'true'
+    const trozos = []
+    if (this._sitLado) trozos.push(SITUACION.LADO)
+    // Excluyentes entre sí en `viewer/edicion.js`, así que como mucho entra uno —
+    // pero se comprueban los tres por orden en vez de suponerlo: si algún día
+    // dejaran de serlo, esto diría la verdad en vez de esconder la mitad.
+    if (armado(this._botonInsertar)) trozos.push(SITUACION.INSERTAR)
+    else if (armado(this._botonBorrar)) trozos.push(SITUACION.BORRAR)
+    else if (armado(this._botonDibujar)) trozos.push(SITUACION.DIBUJAR)
+
+    this._situacion.textContent = trozos.join(SITUACION.UNION)
+    this._situacion.hidden = trozos.length === 0
   },
 
   /**
@@ -1388,6 +2013,48 @@ const BarraEdicion = L.Control.extend({
    * @param {HTMLElement} boton
    * @param {string} nombre
    */
+  /**
+   * ⛔ **Apaga «Borrar vértices» CON SU MOTIVO, o lo devuelve a la vida
+   * (2026-08-19).**
+   *
+   * Nace de un defecto reportado con captura: un recinto de tres vértices, la
+   * papelera armada y «no me deja borrar por más que pincho». La aplicación tenía
+   * razón —quitar un vértice de tres deja un segmento, y `edit/vertices.js` lo
+   * rechaza siempre— y lo estaba diciendo, pero **después del gesto** y en una
+   * tarjeta del panel plegado, agrupada como «×6». O sea: el mando prometía algo
+   * que no podía cumplir NI UNA VEZ, y solo lo confesaba a quien insistiera.
+   *
+   * Es la regla de oro 1 aplicada tal cual: un botón apagado lleva su motivo al
+   * lado. Aquí «al lado» es **la pista propia de la barra** —el globo que ya
+   * sustituyó al `title` nativo el 2026-08-10—, que es donde el usuario mira
+   * cuando un icono no responde. No hay renglón que gastar ni desplegable que
+   * abrir, y el motivo viaja además al nombre accesible: quien va por lector de
+   * pantalla oye «Borrar vértices · No hay ningún vértice que se pueda borrar…»
+   * en vez de un botón deshabilitado y mudo.
+   *
+   * ⚠️ **No toca `aria-pressed`, ni el modo, ni `disabled`.** Escribe TEXTO y
+   * nada más, y eso es una decisión que costó una mutación superviviente: el
+   * apagado lo escribía a la vez el cableado, así que quitarle allí la línea
+   * dejaba la suite verde —la otra escritura tapaba el agujero—. Dos dueños del
+   * mismo booleano es justo lo que el JSDoc de {@link borrarActivo} prohíbe unas
+   * líneas más arriba. Manda `app/main.js#cablearEdicion`, que es quien conoce la
+   * geometría; esto pone las palabras.
+   *
+   * @param {string} motivo  Vacío = se puede borrar, el botón vuelve a su nombre.
+   * @returns {void}
+   */
+  borrarMotivo(motivo) {
+    if (!this._botonBorrar) return
+    const apagado = typeof motivo === 'string' && motivo !== ''
+    this._renombrar(
+      this._botonBorrar,
+      apagado ? `${PISTA_BORRAR.apagado} · ${motivo}` : PISTA_BORRAR.apagado,
+    )
+    if (this._pista && !this._pista.hidden && this._pistaDe === this._botonBorrar) {
+      this._pista.textContent = this._botonBorrar.dataset.pista
+    }
+  },
+
   _renombrar(boton, nombre) {
     const rotulo = boton.querySelector(`.${CLASE_BARRA.ROTULO}`)
     if (rotulo) rotulo.textContent = nombre
@@ -1457,6 +2124,8 @@ const BarraEdicion = L.Control.extend({
       this._pistaDe = boton
       this._pista.hidden = false
       this._colocarPista(boton)
+      // Comparten slot: mientras el globo está a la vista, la situación se aparta.
+      this._pintarSituacion()
     }
     // Sin espera en dos casos: con el teclado (ver {@link RETARDO_PISTA_MS}) y
     // cuando ya hay una pista a la vista. Lo segundo es la «ventana caliente» de
@@ -1508,6 +2177,8 @@ const BarraEdicion = L.Control.extend({
     if (!this._pista) return
     this._pista.hidden = true
     this._pistaDe = null
+    // El slot queda libre: si hay algo que contar, la situación vuelve.
+    this._pintarSituacion()
   },
 
   _alSenalar(evento) {
@@ -1603,6 +2274,9 @@ const BarraEdicion = L.Control.extend({
     panel.hidden = true
     disparador.setAttribute('aria-expanded', 'false')
     this._abierto = null
+    // El panel deja libre el slot: la situación puede volver. VA DESPUÉS de poner
+    // `_abierto` a null, porque {@link _pintarSituacion} lo consulta.
+    this._pintarSituacion()
     if (devolverFoco) disparador.focus()
   },
 
@@ -1623,6 +2297,11 @@ const BarraEdicion = L.Control.extend({
     panel.hidden = false
     disparador.setAttribute('aria-expanded', 'true')
     this._abierto = nombre
+    // ⚠️ AQUÍ Y NO ANTES. `_ocultarPista()` de arriba ya repinta la situación, pero
+    // lo hace con `_abierto` todavía en `null` —se pone tres líneas más abajo—, así
+    // que la dejaría VISIBLE justo debajo del panel que se acaba de abrir. Este
+    // segundo repintado es el que la aparta.
+    this._pintarSituacion()
     if (foco) foco.focus()
   },
 
@@ -1839,6 +2518,17 @@ export function crearBarraEdicion({ mapa, posicion = CENTRO_ABAJO, alAvisar } = 
     dibujoEnCurso: (dibujando) => control.dibujoEnCurso(dibujando),
 
     /**
+     * F24. Enseña «Quitar los puntos» CON SU CUENTA, o lo esconde con un `0`.
+     *
+     * Un solo argumento para las dos cosas, a propósito: ver
+     * {@link BarraEdicion#puntosVisible} para el porqué.
+     *
+     * @param {number} [cuantos]
+     * @returns {boolean}
+     */
+    puntosVisible: (cuantos) => control.puntosVisible(cuantos),
+
+    /**
      * REFLEJA el modo borrar en su botón (`aria-pressed` + el nombre y la pista).
      * No enciende nada: el dueño del modo es `viewer/edicion.js#modoBorrar` y quien
      * empuja es el cableado, suscrito a `alCambiarModoBorrar`. Ver la sección del
@@ -1848,6 +2538,37 @@ export function crearBarraEdicion({ mapa, posicion = CENTRO_ABAJO, alAvisar } = 
      * @returns {void}
      */
     borrarActivo: (activo) => control.borrarActivo(activo),
+
+    /**
+     * Apaga «Borrar vértices» con el motivo escrito, o lo devuelve a la vida con
+     * la cadena vacía. Ver {@link ControlBarraEdicion.borrarMotivo}.
+     */
+    borrarMotivo: (motivo) => control.borrarMotivo(motivo),
+
+    /**
+     * REFLEJA el modo insertar en su botón (2026-08-18). Gemela de
+     * {@link borrarActivo} y con el mismo contrato: no enciende nada, el dueño del
+     * modo es `viewer/edicion.js#modoInsertar` y quien empuja es el cableado.
+     *
+     * @param {boolean} activo
+     * @returns {void}
+     */
+    insertarActivo: (activo) => control.insertarActivo(activo),
+
+    /**
+     * ⭐ **Refleja si hay un lindero elegido (T2, 2026-08-19).** Alimenta el
+     * renglón de SITUACIÓN —el visible—, no el `role="status"`, que sigue siendo
+     * de los desenlaces y sigue oculto salvo error. Mismo contrato que
+     * {@link borrarActivo}: no selecciona, refleja.
+     *
+     * Es el único empujón nuevo de T2: los otros tres trozos del renglón
+     * —insertar, borrar y dibujar— la barra ya los recibía por
+     * {@link insertarActivo}, {@link borrarActivo} y {@link dibujoEnCurso}.
+     *
+     * @param {boolean} hay
+     * @returns {void}
+     */
+    ladoSeleccionado: (hay) => control.ladoSeleccionado(hay),
 
     /**
      * Quita el control del mapa —lo que dispara `onRemove` y con él la retirada de

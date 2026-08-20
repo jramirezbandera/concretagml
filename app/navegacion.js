@@ -236,11 +236,11 @@ export const CAUSA = Object.freeze({ RAMA: 'RAMA', DATO: 'DATO' })
 // ── Los hechos: lo único que entra de fuera ─────────────────────────────────
 
 /**
- * Las dos cosas que este módulo necesita saber del expediente, y **las únicas**.
+ * Las tres cosas que este módulo necesita saber del expediente, y **las únicas**.
  * Son booleanos ya resueltos por quien sí conoce el modelo; aquí no se abre ni un
  * POJO. Quién los calcula, para que no haya que adivinarlo:
  *
- * · `geometria`   — ¿hay algo con lo que trabajar en la rama activa?
+ * · `geometria`   — ¿hay un RECINTO con el que trabajar en la rama activa?
  *                   En PARCELA es `hayGeometria(parcela)`
  *                   (`app/cableado-expediente.js:477`: un exterior con al menos
  *                   un vértice). En EDIFICIO es `hayEdificio(edificio)` (ídem,
@@ -249,6 +249,21 @@ export const CAUSA = Object.freeze({ RAMA: 'RAMA', DATO: 'DATO' })
  * · `oficial`     — ¿hay contorno del Catastro contra el que contrastar?
  *                   Es la primera mitad de `puedeDiagnosticar`
  *                   (`app/cableado-diagnostico.js:346`).
+ * · `puntos`      — ⭐ (2026-08-19) ¿hay puntos sueltos de un levantamiento
+ *                   importado? En PARCELA es `hayPuntos(parcela)`
+ *                   (`app/cableado-expediente.js`, al lado de `hayGeometria`); en
+ *                   EDIFICIO es `false` y no hay planes: esa rama dibuja sobre la
+ *                   parte activa y no importa nubes de puntos.
+ *
+ * ── ⛔ POR QUÉ UN HECHO NUEVO Y NO ENSANCHAR `geometria` ────────────────────
+ * La tentación era hacer que `geometria` significara «hay algo con lo que
+ * trabajar» y contar los puntos dentro. **Habría abierto Diagnóstico sobre cero
+ * recintos**, porque su regla lo exige (`REGLA[PASO.DIAGNOSTICO]`), y esa pantalla
+ * contrastaría una geometría que no existe contra el parcelario. Un hecho que dos
+ * peldaños leen con el mismo nombre tiene que querer decir lo mismo en los dos.
+ *
+ * Y no repite el error del hecho `diagnostico` que se retiró abajo: **éste tiene
+ * un lector real** —la compuerta de Edición— desde la línea en que se escribe.
  *
  * ── ⛔ ERAN TRES, Y EL TERCERO SE VA CON EL PELDAÑO QUE LO LEÍA (2026-08-08) ──
  * Había un `diagnostico` — «¿se ha llegado a hacer un diagnóstico de encaje?»— y
@@ -267,7 +282,7 @@ export const CAUSA = Object.freeze({ RAMA: 'RAMA', DATO: 'DATO' })
  * @readonly
  * @type {readonly string[]}
  */
-export const CLAVES_HECHOS = Object.freeze(['geometria', 'oficial'])
+export const CLAVES_HECHOS = Object.freeze(['geometria', 'oficial', 'puntos'])
 
 /**
  * Cómo arranca una rama: sin nada. Se congela y se COPIA en cada uso; devolver
@@ -275,7 +290,7 @@ export const CLAVES_HECHOS = Object.freeze(['geometria', 'oficial'])
  *
  * @readonly
  */
-export const HECHOS_VACIOS = Object.freeze({ geometria: false, oficial: false })
+export const HECHOS_VACIOS = Object.freeze({ geometria: false, oficial: false, puntos: false })
 
 // ── Los motivos, que son el producto de este módulo tanto como el estado ────
 //
@@ -531,6 +546,14 @@ export const TOPE_RECONCILIACION = 8
  *                     diagnóstico eso significa «trae antes una parcela» antes
  *                     que «falta el parcelario», que es el orden en que el
  *                     usuario puede resolverlos.
+ *                     ⭐ **Un elemento que sea ARRAY es una alternativa**: basta
+ *                     con que se cumpla uno de los que nombra. Entró el
+ *                     2026-08-19 con el hecho `puntos`, porque Edición se abre
+ *                     con un recinto **o** con una nube de puntos importada, y
+ *                     esas dos cosas no se pueden fundir en un booleano sin que
+ *                     Diagnóstico herede el ensanche (ver {@link CLAVES_HECHOS}).
+ *                     El motivo que se redacta es el del **primero nombrado**: es
+ *                     el principal, y el orden de la lista ya era significativo.
  *
  * ⚠️ **Edición NO exige que la validación haya pasado**, y es deliberado: F02
  * puede devolver `puedeGenerar: false` con errores, y la forma de arreglarlos es
@@ -570,9 +593,19 @@ const REGLA = Object.freeze({
   // ⛔ **Y el 2026-08-07 pierde su `enComprobacion: false`**, que era el único
   // `false` de toda la tabla: era lo que apagaba Edición mientras hubiera un GML
   // ajeno delante. El porqué de la retirada está en la cabecera.
+  //
+  // ⭐ **Y el 2026-08-19 su `requiere` estrena la forma de ALTERNATIVA.** Un
+  // levantamiento de campo son puntos sueltos y cero polilíneas: se importan sin
+  // unir, no hay recinto todavía, y la pantalla que sirve para hacerlo —la que
+  // tiene «Dibujar recinto» y el enganche a esos puntos— es justo ésta. Con
+  // `['geometria']` a secas, la única herramienta que resuelve ese fichero quedaba
+  // detrás de una puerta que solo abría el resultado de haberla usado.
+  //
+  // ⚠️ En la rama EDIFICIO la alternativa no cambia nada: allí `puntos` es
+  // siempre `false`, así que la compuerta sigue siendo `geometria` a secas.
   [PASO.EDICION]: {
     ramas: RAMAS,
-    requiere: Object.freeze(['geometria']),
+    requiere: Object.freeze([Object.freeze(['geometria', 'puntos'])]),
   },
   // ⭐ **F14 · DIAGNÓSTICO E INFORME PASAN A EXISTIR TAMBIÉN EN LA RAMA EDIFICIO**,
   // y con ellos `requiere` deja de ser una lista para poder ser un MAPA POR RAMA.
@@ -662,8 +695,17 @@ export function evaluarPaso(paso, { rama, hechos }) {
     return { disponible: false, causa: CAUSA.RAMA, motivo, breve: motivo }
   }
   // 2 · DATO — lo único que se resuelve solo según se avanza.
-  for (const hecho of hechosQueExige(regla, rama)) {
-    if (hechos[hecho] !== true) {
+  for (const exigencia of hechosQueExige(regla, rama)) {
+    // Un array es una ALTERNATIVA («cualquiera de éstos»); un string, el hecho a
+    // secas. Se normaliza a lista para tener UN solo camino y no dos ramas que
+    // puedan divergir en qué motivo redactan.
+    const alternativas = Array.isArray(exigencia) ? exigencia : [exigencia]
+    if (!alternativas.some((h) => hechos[h] === true)) {
+      // El PRIMERO nombrado es el principal, y es el que da las palabras: decirle
+      // al usuario «falta la parcela» describe la vía normal, mientras que nombrar
+      // la alternativa («o importa unos puntos sueltos») convertiría el caso raro
+      // en la instrucción principal.
+      const hecho = alternativas[0]
       // El de la rama manda cuando lo hay: ver {@link MOTIVO_DATO_EDIFICIO}.
       const enEdificio = rama === RAMA.EDIFICIO
       const propio = enEdificio ? MOTIVO_DATO_EDIFICIO[hecho] : undefined

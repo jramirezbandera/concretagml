@@ -43,12 +43,19 @@
 //   · **`Alt`** ..................... mientras está pulsada, el snap NO engancha.
 //   · **MODO BORRAR** (`modoBorrar(true)`) ... mientras está encendido, el CLIC
 //     del mapa **borra** el vértice que tenga a menos de {@link UMBRAL_PUNTERIA_PX}
-//     px en vez de seleccionar el lindero, y el doble clic **no inserta**. Es el
-//     único modo de este módulo y el único sitio donde un clic sencillo escribe en
-//     el modelo, o sea la única excepción a la garantía de dos puntos más arriba —
-//     por eso hay que ARMARLO a propósito, se ve en el cursor, y se apaga con
-//     `Escape`, al salir de Edición y al destruir. Todo el razonamiento está junto
-//     a la variable `borrando` de {@link crearEdicion}.
+//     px en vez de seleccionar el lindero, y el doble clic **no inserta**. Hay que
+//     ARMARLO a propósito, se ve en el cursor, y se apaga con `Escape`, al salir de
+//     Edición y al destruir. Todo el razonamiento está junto a la variable
+//     `borrando` de {@link crearEdicion}.
+//   · **MODO INSERTAR** (`modoInsertar(true)`) ... mientras está encendido, el CLIC
+//     del mapa **inserta** un vértice en el lindero más cercano, por el mismo
+//     `insertarEn` que el doble clic —que sigue funcionando—, y el doble clic deja
+//     de insertar para no escribir tres veces con un gesto. Mismas tres formas de
+//     apagarlo, y **EXCLUYENTE con el modo borrar**: los dos secuestran el clic
+//     sencillo, así que armar uno apaga el otro. Razonamiento junto a `insertando`.
+//
+//   ⚠️ Esos dos modos son los ÚNICOS sitios donde un clic sencillo escribe en el
+//   modelo, o sea la única excepción a la garantía de dos puntos más arriba.
 //
 // ── POR QUÉ `Alt` Y NO `Ctrl` NI `Shift` ────────────────────────────────────
 // `Ctrl` colisiona con el zoom por rueda y con el pan de Leaflet; `Shift`, con su
@@ -67,14 +74,14 @@
 // verdad del sistema corrige al seguimiento, nunca al revés.
 //
 // ── LA CACHÉ DE DIANAS, Y SU POLÍTICA DE INVALIDACIÓN ───────────────────────
-// `dianasDe` recorre el parcelario oficial, las colindantes y la geometría
-// editable, y copia cada par `[x,y]`: sobre un catálogo lleno cuesta del orden de
+// `dianasDe` recorre los puntos importados, el parcelario oficial, las colindantes
+// y la geometría editable, y copia cada par `[x,y]`: sobre un catálogo lleno cuesta del orden de
 // milisegundos. `ajustar` cuesta una fracción de eso y se llama en CADA fotograma
 // del arrastre. Reconstruir el catálogo por fotograma se come el cuadro; por eso
 // se construye UNA VEZ POR GESTO y se cachea.
 //
 // El catálogo se invalida —y esto es donde se esconden los bugs de esta clase, así
-// que va escrito— cuando cambia CUALQUIERA de sus tres entradas:
+// que va escrito— cuando cambia CUALQUIERA de sus cuatro entradas:
 //   1. **El estado**. Se compara la IDENTIDAD del POJO (`estado.get() !== cache.parcela`)
 //      en cada consulta, y además se invalida desde el suscriptor del store. Hacen
 //      falta las dos: el suscriptor NO se dispara en un `set` reentrante (la guarda
@@ -86,7 +93,24 @@
 //   2. **Las colindantes**, por {@link crearEdicion}#fijarColindantes: guarda una
 //      COPIA superficial, así que cada llamada cambia la identidad del array y la
 //      caché cae sola.
-//   3. **El vértice excluido** (`excluir`), o sea la `RefVertice` del gesto. Cambia
+//   3. **Los puntos importados** (2026-08-18), por {@link crearEdicion}#fijarPuntos,
+//      con el mismo mecanismo que las colindantes: copia superficial, identidad
+//      nueva, caché caída.
+//      ⛔ **Y por eso la CLAVE de la caché los compara, además de la invalidación
+//      explícita.** Una fuente nueva de `dianasDe` que no entra en la clave no
+//      rompe nada ruidosamente —el snap sigue enganchando, no lanza, no pinta
+//      nada raro—: engancha al catálogo VIEJO, el de antes de importar, y nadie
+//      se queja. Es el fallo silencioso de manual, y la defensa estructural es que
+//      la clave tenga TANTOS CAMPOS COMO FUENTES tiene `dianasDe`. Quien añada la
+//      quinta fuente, que añada la quinta clave.
+//      ⚠️ **Las dos guardas son REDUNDANTES entre sí, y está medido**: quitando
+//      solo la clave, o solo el `cacheDianas = null` de `fijarPuntos`, la suite
+//      sigue verde; quitando las dos caen tres pruebas. Ninguna prueba puede
+//      distinguirlas desde fuera porque `puntos` no tiene otra vía de cambio, así
+//      que no se escribió una que finja hacerlo. Lo que protege el comportamiento
+//      es el test de «importar OTROS puntos cambia lo que engancha»; la clave está
+//      por lo que venga después. Exactamente la misma situación que `vecinas`.
+//   4. **El vértice excluido** (`excluir`), o sea la `RefVertice` del gesto. Cambia
 //      al empezar a arrastrar otro vértice, que es exactamente «otro gesto».
 // Lo que NO invalida: cambiar τ (`tolerancia(m)`) o encender/apagar el snap. El
 // catálogo no depende de la tolerancia —τ solo se usa al comparar distancias—, y
@@ -148,35 +172,10 @@ import {
   resolverAvisar,
   soltarZoomDobleClicApagado,
   vertUTMaLatLng,
+  UMBRAL_PUNTERIA_PX,
 } from './_comun.js'
 
 // ── Constantes ───────────────────────────────────────────────────────────────
-
-/**
- * Radio de PUNTERÍA, **en píxeles de pantalla**, para el clic que selecciona un
- * lindero y para el doble clic que inserta un vértice: si el lindero más cercano
- * queda a más de esto del punto pinchado, no se selecciona ni se inserta nada.
- *
- * ── Por qué en píxeles y no en metros ──
- * Esto no es una tolerancia de TERRENO (esa es τ, `OPERATIVOS.snapMetros`, y va en
- * metros porque mide la precisión del parcelario). Es una tolerancia de PUNTERÍA:
- * mide cuánto se desvía la mano de quien apunta con un ratón, y eso se mide en
- * pantalla. Un umbral en metros acertaría en un zoom y mentiría en todos los
- * demás: 20 cm son varios píxeles a escala de parcela y una centésima de píxel en
- * la vista general, así que a poco que el usuario se alejara no habría forma
- * humana de insertar un vértice, sin que nada explicara por qué. Es la misma razón
- * por la que `OPERATIVOS.acotacionMinimaPx` va en píxeles, y está escrita en
- * `config/operativos.js`.
- *
- * ── Por qué 12 ──
- * Es algo mayor que el lado del cuadradito de vértice de
- * `viewer/sincronizacion.js` (10 px), de modo que cualquier clic que TOQUE
- * visualmente la línea cuenta, y del mismo orden que la tolerancia de clic que
- * Leaflet usa por defecto en su renderizador de canvas (10 px). No vive en
- * `config/operativos.json` porque no es una tolerancia de ingeniería del dato: es
- * el tamaño de la diana de un gesto, y solo lo usa este módulo.
- */
-export const UMBRAL_PUNTERIA_PX = 12
 
 /**
  * Clases CSS de las dos capas que este módulo pinta. **Estables**: `estilos/app.css`
@@ -204,6 +203,20 @@ export const CLASE_EDICION = Object.freeze({
    * es del mapa entero, no de quince iconos.
    */
   MODO_BORRAR: 'gml-modo-borrar',
+  /**
+   * Ídem para el MODO INSERTAR (2026-08-18). Gemela de {@link MODO_BORRAR} y por
+   * el mismo motivo, con una precisión que decide su existencia:
+   *
+   * ⚠️ **Cuelga de ella un cursor DISTINTO —`copy`, no `crosshair`—, y eso no es
+   * cosmética.** Los dos modos son excluyentes y los dos secuestran el clic, así
+   * que con el mismo cursor serían indistinguibles con la mano puesta sobre el
+   * mapa. El único otro aviso es el botón pulsado de la barra, y de ése ya dice
+   * `estilos/app.css` —donde vive la regla del cursor de borrar— que «vive abajo
+   * del todo, a 400 px de donde está el ratón; el cursor viaja con la mano». Dos
+   * modos armados que se ven igual es exactamente la trampa silenciosa que esa
+   * regla existe para cerrar, con el agravante de que uno de los dos destruye.
+   */
+  MODO_INSERTAR: 'gml-modo-insertar',
 })
 
 /**
@@ -536,7 +549,7 @@ function exigirTolerancia(valor, fn) {
  * @param {number} [args.tolerancia=OPERATIVOS.snapMetros]  τ del snap, en METROS.
  * @param {import('./_comun.js').Avisar} [args.alAvisar]  Canal de aviso.
  * @returns {{
- *   ajustar: (utm: [number,number], refVertice: RefVertice, eventoOriginal?: object|null) => (Enganche|null),
+ *   ajustar: (utm: [number,number], refVertice: RefVertice|null, eventoOriginal?: object|null, opciones?: {dianasExtra?: Array<[number,number]>}) => (Enganche|null),
  *   alCrearMarcador: (marcador: object, refVertice: RefVertice) => void,
  *   snapActivo: (valor?: boolean) => boolean,
  *   tolerancia: (metros?: number) => number,
@@ -546,9 +559,12 @@ function exigirTolerancia(valor, fn) {
  *   insertarEn: (latlng: object|[number,number]) => {aplicado: boolean, ref: RefVertice|null},
  *   eliminar: (refVertice: RefVertice) => {aplicado: boolean, motivo: string|null},
  *   fijarColindantes: (recintos: Array<object>) => void,
+ *   fijarPuntos: (puntos: Array<[number,number]>) => void,
  *   alCambiarSeleccion: (fn: (ref: RefVertice|null) => void) => (() => void),
  *   modoBorrar: (valor?: boolean) => boolean,
  *   alCambiarModoBorrar: (fn: (activo: boolean) => void) => (() => void),
+ *   modoInsertar: (valor?: boolean) => boolean,
+ *   alCambiarModoInsertar: (fn: (activo: boolean) => void) => (() => void),
  *   destruir: () => void,
  * }}
  * @throws {TypeError|RangeError}
@@ -639,6 +655,17 @@ export function crearEdicion({
    */
   let vecinasParaDianas = []
 
+  /**
+   * Puntos sueltos del levantamiento importado (F11), en UTM y como PARES. COPIA
+   * superficial de lo que dan, por el mismo motivo que `colindantes`.
+   *
+   * Aquí NO entra el vocabulario del DXF —`{capa, x, y, z}`—, igual que no entra en
+   * `edit/snap.js`: este módulo trabaja en pares UTM y no conoce ni capas ni cotas.
+   * La conversión es de quien cablea, y {@link crearEdicion}#fijarPuntos la exige
+   * en voz alta en vez de tragarse los objetos y quedarse sin dianas en silencio.
+   */
+  let puntos = []
+
   /** Caché del catálogo de dianas. Ver la política de invalidación en la cabecera. */
   let cacheDianas = null
 
@@ -671,6 +698,42 @@ export function crearEdicion({
    */
   let borrando = false
   const oyentesModoBorrar = new Set()
+
+  /**
+   * ── EL MODO INSERTAR (2026-08-18) ─────────────────────────────────────────
+   * Si está encendido, el clic del mapa **inserta un vértice en el lindero más
+   * cercano** en vez de seleccionarlo: exactamente lo que ya hacía el doble clic,
+   * con un gesto en vez de dos y con un mando que se ve.
+   *
+   * **Por qué existe, si el doble clic ya insertaba.** Porque no se descubría. El
+   * gesto está documentado en la tabla `GESTOS` de `viewer/barra-edicion.js` como
+   * «único gesto del mapa que cambia la geometría», y esa tabla vive detrás del
+   * botón «?» — o sea que la capacidad más importante del editor era la única sin
+   * representación en una barra donde todo lo demás sí la tiene. Y había una
+   * asimetría que lo delataba: existía un modo para BORRAR vértice y no existía su
+   * espejo para añadirlo.
+   *
+   * ⛔ **El doble clic NO se retira, y es una decisión.** El botón lo hace
+   * descubrible; no lo sustituye. Quien ya lo tiene en los dedos no puede
+   * encontrarse con que su gesto dejó de funcionar, y quien no lo conocía ya no lo
+   * necesita. Las dos vías escriben por el MISMO {@link insertarEn}, así que no hay
+   * dos definiciones de «insertar» que puedan divergir.
+   *
+   * **Es EXCLUYENTE con el modo borrar**, y por la razón más simple que hay: los
+   * dos secuestran el clic sencillo, así que con los dos armados el clic no tendría
+   * un significado. Encender uno apaga el otro, en {@link fijarModoBorrar} y en
+   * {@link fijarModoInsertar}, y los dos anuncian — el botón de la barra que se
+   * apaga solo se entera por su suscripción, no por el clic que no recibió.
+   *
+   * **Se apaga en los mismos tres sitios que borrar** (`Escape`, `activa(false)`,
+   * `destruir()`). Aquí el motivo no es que sea destructivo —no lo es— sino que un
+   * modo que sobrevive a un cambio de pantalla convierte el siguiente clic
+   * distraído en una escritura en el modelo, y eso vale igual para crear que para
+   * borrar: un vértice de más en un lindero es un defecto que F02 señala y que el
+   * usuario no ha pedido.
+   */
+  let insertando = false
+  const oyentesModoInsertar = new Set()
 
   let indicador = null
   /** Tipo del indicador VIVO, para no recrearlo en cada fotograma. */
@@ -775,6 +838,13 @@ export function crearEdicion({
     if (borrando && evento && evento.type === 'keydown' && evento.key === 'Escape') {
       fijarModoBorrar(false)
     }
+    // Ídem para insertar (2026-08-18). Se comprueba aparte y no con un `||` porque
+    // son excluyentes: como mucho uno de los dos está armado, así que la segunda
+    // condición cuesta una comparación de booleano y se lee como lo que es —dos
+    // modos que se cancelan con la misma tecla—, no como una rama compartida.
+    if (insertando && evento && evento.type === 'keydown' && evento.key === 'Escape') {
+      fijarModoInsertar(false)
+    }
   }
 
   /**
@@ -807,15 +877,17 @@ export function crearEdicion({
       cacheDianas !== null &&
       cacheDianas.parcela === parcela &&
       cacheDianas.vecinas === vecinasParaDianas &&
+      cacheDianas.puntos === puntos &&
       cacheDianas.recinto === recintoRef &&
       cacheDianas.indice === indiceRef
     ) {
       return cacheDianas.dianas
     }
-    const dianas = dianasDe({ parcela, colindantes: vecinasParaDianas, excluir: ref })
+    const dianas = dianasDe({ parcela, colindantes: vecinasParaDianas, puntos, excluir: ref })
     cacheDianas = {
       parcela,
       vecinas: vecinasParaDianas,
+      puntos,
       recinto: recintoRef,
       indice: indiceRef,
       dianas,
@@ -934,6 +1006,10 @@ export function crearEdicion({
     for (const fn of oyentesModoBorrar) fn(borrando)
   }
 
+  function anunciarModoInsertar() {
+    for (const fn of oyentesModoInsertar) fn(insertando)
+  }
+
   /**
    * Enciende o apaga el modo borrar, repinta el cursor y anuncia SOLO si ha
    * cambiado de verdad (mismo criterio que {@link fijarSeleccion}: un anuncio por
@@ -955,8 +1031,40 @@ export function crearEdicion({
     // Al ENCENDER se suelta el lindero: el clic ya no lo va a poder cambiar y el
     // resalte estaría prometiendo algo que no se cumple (ver `borrando`).
     if (borrando) fijarSeleccion(null)
+    // …y se apaga el modo INSERTAR (2026-08-18): los dos secuestran el clic
+    // sencillo, así que armados a la vez el clic no tendría UN significado. Va
+    // ANTES del anuncio propio para que el orden que ven los oyentes sea el mismo
+    // que el de los hechos: primero se apaga el que estaba, después se enciende el
+    // que llega. Y no hay recursión: `fijarModoInsertar` solo apaga borrar cuando
+    // ENCIENDE, y aquí llega con `false`.
+    if (borrando) fijarModoInsertar(false)
     anunciarModoBorrar()
     return borrando
+  }
+
+  /**
+   * Enciende o apaga el modo insertar. Gemela exacta de {@link fijarModoBorrar},
+   * con las mismas tres reglas: anuncia solo si cambia de verdad, escribe su clase
+   * en el CONTENEDOR del mapa (el cursor pertenece a la superficie sobre la que se
+   * pincha, no a un icono), y apaga a su hermano al encenderse.
+   *
+   * Suelta el lindero seleccionado por el mismo motivo que borrar: el clic deja de
+   * poder cambiarlo, y un resalte pintado sobre un lado que el siguiente clic ya no
+   * va a seleccionar es un mando que miente sobre lo que va a pasar.
+   *
+   * @param {boolean} valor
+   * @returns {boolean}  Lo que ha quedado.
+   */
+  function fijarModoInsertar(valor) {
+    if (valor === insertando) return insertando
+    insertando = valor
+    if (contenedor && contenedor.classList) {
+      contenedor.classList.toggle(CLASE_EDICION.MODO_INSERTAR, insertando)
+    }
+    if (insertando) fijarSeleccion(null)
+    if (insertando) fijarModoBorrar(false)
+    anunciarModoInsertar()
+    return insertando
   }
 
   /** Fija la selección, repinta y anuncia SOLO si ha cambiado de verdad. */
@@ -1339,12 +1447,30 @@ export function crearEdicion({
    *   el contrato del programador que `exigirFormaRef` defiende, y no se afloja.
    * @param {object|null} [eventoOriginal]  El evento del gesto, si lo hay. Solo se
    *   le mira `altKey` (directo o en `originalEvent`).
+   * @param {{dianasExtra?: Array<[number,number]>}} [opciones]  ⭐ **(2026-08-19)**
+   *   Pares UTM que se añaden al catálogo **como VÉRTICES**, solo para esta llamada.
+   *
+   *   Existe por un caso concreto: `viewer/dibujo.js` engancha los vértices de un
+   *   recinto que **todavía no está en el modelo**, así que el catálogo no los
+   *   conoce y no había forma de poner un vértice exactamente encima de otro ya
+   *   puesto — que es lo que hace falta para volver sobre el trazo o rematar
+   *   contra una esquina que uno mismo acaba de clavar.
+   *
+   *   ⚠️ **Se pasan por aquí y no se engancha aparte, y esa es toda la decisión.**
+   *   Un segundo `ajustar` dentro de `viewer/dibujo.js` tendría su propia
+   *   tolerancia y su propia idea de la tecla `Alt`, y los dos criterios de
+   *   proximidad discreparían el día que el usuario cambiara τ. Aquí τ sigue
+   *   siendo **una**.
+   *
+   *   ⚠️ Y **NO invalidan la caché de dianas**: se añaden sobre una copia del
+   *   catálogo vigente. Cambian en cada clic, así que meterlas en la clave dejaría
+   *   la caché inútil justo en el gesto que más la usa.
    * @returns {Enganche|null}  `null` significa **«no tengo opinión: usa tu punto tal
    *   cual»**, y ocurre con el snap apagado (tecla o `snapActivo(false)`), sin estado,
    *   con una referencia que ya no señala ningún vértice, o tras `destruir()`. Con
    *   objeto, `punto` es SIEMPRE utilizable (copia del de entrada si no enganchó).
    */
-  function ajustar(utm, refVertice, eventoOriginal = null) {
+  function ajustar(utm, refVertice, eventoOriginal = null, { dianasExtra = [] } = {}) {
     if (!vivo) return null
     // `null` = «no muevo ningún vértice»; cualquier otra cosa tiene que tener la
     // forma de una RefVertice. Ver el porqué en la firma.
@@ -1371,7 +1497,18 @@ export function crearEdicion({
       return null
     }
 
-    const enganche = engancharPunto(utm, dianasVigentes(parcela, ref), { tolerancia: tau })
+    // El catálogo cacheado, más lo que pida el llamante SOLO para esta llamada. La
+    // copia es superficial y se hace únicamente cuando hay extras: en el arrastre
+    // —que llama aquí en cada fotograma— no se paga nada.
+    let dianas = dianasVigentes(parcela, ref)
+    if (Array.isArray(dianasExtra) && dianasExtra.length > 0) {
+      // Delante de los demás vértices, por lo mismo que `dianasDe` pone primeros
+      // los puntos importados: en un empate a distancia manda lo que el usuario
+      // acaba de poner. Los pares mal formados los descarta `edit/snap.js#ajustar`,
+      // igual que descarta un vértice degenerado del modelo.
+      dianas = { vertices: [...dianasExtra, ...dianas.vertices], segmentos: dianas.segmentos }
+    }
+    const enganche = engancharPunto(utm, dianas, { tolerancia: tau })
     if (enganche.enganchado) mostrarIndicador(enganche.punto, enganche.tipo)
     else ocultarIndicador()
 
@@ -1507,6 +1644,21 @@ export function crearEdicion({
       return
     }
 
+    // ── …y el modo insertar se lleva el resto ─────────────────────────────────
+    // Mismo trato y por la misma razón (2026-08-18). Se delega ENTERO en
+    // `insertarEn`, que es quien ya sabe proyectar el clic sobre el lado, rechazar
+    // el punto que cae en un extremo y contar con cifras por qué cuando no se
+    // aplica: duplicar aquí cualquiera de esas tres cosas daría dos definiciones de
+    // «insertar», y la que se queda vieja es siempre la nueva.
+    //
+    // El modo NO se apaga al insertar, igual que borrar: colocar cuatro vértices
+    // seguidos sobre un lindero largo es su caso de uso, y apagarse solo obligaría
+    // a volver a la barra —400 px abajo— entre punto y punto.
+    if (insertando) {
+      insertarEn(evento.latlng)
+      return
+    }
+
     const mejor = ladoMasCercano(parcela, latLngAUTM(evento.latlng, zona))
     if (mejor === null) {
       fijarSeleccion(null)
@@ -1531,6 +1683,18 @@ export function crearEdicion({
     // `preventDefault` igual (el zoom por doble clic sigue apagado y devolverlo
     // aquí sería un salto de escala en mitad de una limpieza de vértices).
     if (borrando) return
+    // ⚠️ Y en modo INSERTAR tampoco, por la misma aritmética (2026-08-18): un doble
+    // clic contiene dos clics y en ese modo **cada clic ya inserta**, así que sin
+    // esta guarda el gesto escribiría TRES vértices casi en el mismo sitio —dos del
+    // modo y uno de aquí—, que es exactamente el «vértice duplicado» que
+    // `insertarEn` rechaza a mano unas líneas más arriba.
+    //
+    // Los dos del modo SÍ entran, y se acepta con los ojos abiertos: es la misma
+    // cuenta que borrar (allí un doble clic borra dos vértices) y arreglarlo pediría
+    // un temporizador que distinguiera clic de doble clic, o sea meter el reloj en
+    // un módulo que hoy no lo tiene. Quien arma un modo de clic y hace doble clic
+    // obtiene dos veces lo que pidió, que es raro pero no es una sorpresa.
+    if (insertando) return
     insertarEn(evento.latlng)
   }
 
@@ -1577,6 +1741,26 @@ export function crearEdicion({
     alCrearMarcador,
 
     /**
+     * Apaga el indicador de enganche, si lo hay. Idempotente.
+     *
+     * ⭐ **Existe por el DIBUJO (2026-08-19).** `ajustar` enciende y apaga el
+     * indicador solo mientras alguien le pregunta, y eso basta para un arrastre:
+     * el `dragend` viene precedido de un fotograma que ya decidió. `viewer/dibujo.js`
+     * no tiene ese fotograma final —se para con `Escape`, con `Enter`, con un doble
+     * clic o porque cambia la pantalla—, así que sin esta puerta el cuadradito del
+     * OSNAP se quedaba pintado sobre un mapa en el que ya no se dibuja: una marca
+     * que promete un enganche que ya no va a ocurrir.
+     *
+     * No apaga el snap ni suelta ninguna selección: es **solo** el adorno.
+     *
+     * @returns {void}
+     */
+    soltarEnganche() {
+      if (!vivo) return
+      ocultarIndicador()
+    },
+
+    /**
      * Getter/setter de los CUATRO gestos de edición del mapa (rebanada 3).
      *
      * Sin argumento lee; con un booleano escribe y devuelve el valor ya escrito,
@@ -1610,9 +1794,11 @@ export function crearEdicion({
       edicionActiva = valor
       for (const marcador of marcadoresDeVertice()) aplicarArrastre(marcador)
       if (!edicionActiva) {
-        // El modo borrar PRIMERO: es el único estado de este módulo que sobrevivir
-        // a un cambio de pantalla convertiría en un accidente (ver `borrando`).
+        // Los dos MODOS primero: son los estados de este módulo que sobrevivir a un
+        // cambio de pantalla convertiría en un accidente (ver `borrando` e
+        // `insertando`). El de borrar, además, es destructivo.
         fijarModoBorrar(false)
+        fijarModoInsertar(false)
         fijarSeleccion(null)
         ocultarIndicador()
       }
@@ -1710,6 +1896,53 @@ export function crearEdicion({
     },
 
     /**
+     * Fija los PUNTOS SUELTOS del levantamiento importado (F11) contra los que
+     * también se engancha. Array VACÍO = se olvidan los que hubiera, que es el
+     * estado de partida y también lo que toca al cerrar un expediente.
+     *
+     * Aportan dianas de VÉRTICE y ninguna de segmento —un punto suelto no tiene
+     * lado—, y `edit/snap.js#dianasDe` los pone los PRIMEROS del catálogo: en un
+     * empate a distancia manda lo medido sobre lo oficial.
+     *
+     * ⚠️ Recibe PARES `[x, y]` en UTM, no los objetos del parser. Lo que devuelve
+     * `parsers/dxf.js` en `puntos` es `{capa, x, y, z}`, así que quien cablee
+     * convierte: `resultado.puntos.map((p) => [p.x, p.y])`. Pasar los objetos sin
+     * convertir NO se acepta en silencio —`dianasDe` los descartaría uno a uno y el
+     * snap se quedaría sin una sola diana nueva, sin lanzar y sin avisar—: se lanza
+     * diciendo qué hacer, que es la misma política que {@link fijarColindantes}.
+     *
+     * Un par mal formado suelto (un `NaN`, un array de uno) NO lanza: lo descarta
+     * `dianasDe`, igual que descarta un vértice degenerado de la parcela. La guarda
+     * de aquí es para el error de FORMA, que se lleva el array entero; el dato malo
+     * aislado sigue la regla de la casa.
+     *
+     * @param {Array<[number,number]>} nuevos  Pares UTM, o `[]`.
+     * @returns {void}
+     * @throws {TypeError} Si no es un array, o si trae los objetos del parser.
+     */
+    fijarPuntos(nuevos) {
+      if (!vivo) return
+      if (!Array.isArray(nuevos)) {
+        throw new TypeError(
+          `fijarPuntos: se espera un array de pares UTM [x, y], o [] si no hay ninguno; ` +
+            `recibido ${describir(nuevos)}.`,
+        )
+      }
+      for (const p of nuevos) {
+        if (p && typeof p === 'object' && !Array.isArray(p) && 'x' in p && 'y' in p) {
+          throw new TypeError(
+            `fijarPuntos: se esperan PARES [x, y] y han llegado los objetos del parser (los ` +
+              `elementos traen 'x' e 'y'). Conviértelos: puntos.map((p) => [p.x, p.y]).`,
+          )
+        }
+      }
+      // Copia superficial: identidad nueva en cada llamada —que es lo que tira la
+      // caché por la clave— y no queda atada a un array que el llamante siga mutando.
+      puntos = [...nuevos]
+      cacheDianas = null
+    },
+
+    /**
      * Se suscribe a los cambios de selección. Devuelve la función de BAJA.
      * El suscriptor recibe una COPIA de la `RefVertice`, o `null`.
      *
@@ -1772,6 +2005,51 @@ export function crearEdicion({
     },
 
     /**
+     * Getter/setter del MODO INSERTAR (2026-08-18). Gemelo de {@link modoBorrar} y
+     * con su mismo contrato: sin argumento lee, con un booleano escribe y devuelve
+     * lo que ha quedado, y tras `destruir()` no se enciende.
+     *
+     * Encendido, el clic del mapa **inserta** un vértice en el lindero más cercano
+     * —por el mismo {@link insertarEn} que usa el doble clic, que sigue vivo— en vez
+     * de seleccionar el lindero, y el doble clic deja de insertar. Es EXCLUYENTE con
+     * {@link modoBorrar}: encender éste apaga aquél, y al revés. Todo el porqué está
+     * junto a la variable `insertando`.
+     *
+     * @param {boolean} [valor]
+     * @returns {boolean}
+     */
+    modoInsertar(valor) {
+      if (valor === undefined) return insertando
+      if (typeof valor !== 'boolean') {
+        throw new TypeError(
+          `modoInsertar: 'valor' debe ser un booleano (o nada, para leer); recibido ${describir(valor)}.`,
+        )
+      }
+      if (!vivo) return insertando
+      return fijarModoInsertar(valor)
+    },
+
+    /**
+     * Se suscribe a los cambios del modo insertar. Devuelve la función de BAJA.
+     * Gemela de {@link alCambiarModoBorrar}, y aquí la suscripción no es una
+     * comodidad: el modo se apaga TAMBIÉN por caminos que el botón no ve —`Escape`,
+     * salir de la pantalla, y sobre todo **armar el modo borrar**, que lo cancela—.
+     * Un botón que sondeara el booleano se quedaría pulsado y mintiendo.
+     *
+     * @param {(activo: boolean) => void} fn
+     * @returns {() => void}
+     */
+    alCambiarModoInsertar(fn) {
+      if (typeof fn !== 'function') {
+        throw new TypeError(
+          `alCambiarModoInsertar: 'fn' debe ser una función; recibido ${describir(fn)}.`,
+        )
+      }
+      oyentesModoInsertar.add(fn)
+      return () => oyentesModoInsertar.delete(fn)
+    },
+
+    /**
      * Deja el módulo inerte y el mapa como estaba: capas fuera, oyentes del mapa, del
      * documento y de la ventana retirados, baja del store y `doubleClickZoom`
      * restaurado. IDEMPOTENTE.
@@ -1792,6 +2070,12 @@ export function crearEdicion({
       // criterio que la selección, aquí abajo: no se notifica a quien se desmonta).
       oyentesModoBorrar.clear()
       fijarModoBorrar(false)
+      // Ídem para insertar, y en el mismo sitio: antes de bajar `vivo`, para que
+      // `fijarModoInsertar` pueda quitar su clase del contenedor. Un mapa que se
+      // queda con el cursor de insertar puesto y sin nadie que atienda el clic es
+      // un modo fantasma, que es peor que uno encendido.
+      oyentesModoInsertar.clear()
+      fijarModoInsertar(false)
       vivo = false
       bajaDelStore()
       mapa.off('click', alClicMapa)
@@ -1812,6 +2096,7 @@ export function crearEdicion({
       cacheDianas = null
       colindantes = []
       vecinasParaDianas = []
+      puntos = []
       altPulsado = false
     },
   }

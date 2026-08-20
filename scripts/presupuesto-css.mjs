@@ -295,8 +295,211 @@ export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'dia
  * ── LA FORMA SIGUE SIENDO LA MISMA ─────────────────────────────────────────
  * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja y vuelve a
  * tener que decidirse a mano.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **SUBIDO 69 B EL 2026-08-18 (EL ANILLO DE FOCO DE LAS COLINDANTES)**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 60.298 a **60.367 B nuestros** (75.393 → 75.462 con vendor). Los compra UNA
+ * regla de una declaración: `.gml-app .leaflet-interactive:focus:not(:focus-visible)
+ * { outline: none }`.
+ *
+ * ── POR QUÉ NO PUEDE COSTAR CERO ────────────────────────────────────────────
+ * Porque el defecto que arregla NO es de este proyecto y no se puede apagar desde
+ * donde se pinta. Pulsar una colindante dejaba un rectángulo negro pegado a ella:
+ * el anillo de foco por defecto de Chromium sobre el `<path>`, que el navegador
+ * dibuja alrededor de la CAJA ENVOLVENTE de una forma SVG. `viewer/colindantes.js`
+ * no puede devolverlo en línea —un `outline` en línea no distingue `:focus` de
+ * `:focus-visible`, que es justo la mitad que hay que conservar— y Leaflet no lo
+ * tapa solo: su `preventOutline` sube hasta el primer elemento con `tabindex`, o
+ * sea hasta el contenedor del mapa, y deja el `path` con su anillo.
+ *
+ * ── QUÉ SE COMPRA DE MÁS POR EL MISMO PRECIO ────────────────────────────────
+ * El selector es `.leaflet-interactive` y no `.gml-colindante`: las candidatas,
+ * las piezas y las partes tienen el MISMO defecto por la misma causa, y una regla
+ * por capa costaría cuatro veces esto sin arreglar nada más.
+ *
+ * ── LA FORMA SIGUE SIENDO LA MISMA ─────────────────────────────────────────
+ * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **SUBIDO 1.707 B EL 2026-08-18 (LA TARJETA DE BIENVENIDA)**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 60.367 a **62.074 B nuestros** (75.462 → 77.169 con vendor). Es la subida más
+ * grande desde el rework, y va con su justificación porque el criterio 10 exige
+ * exactamente eso: que subir sea una línea que alguien escribe a mano.
+ *
+ * ── QUÉ COMPRA ─────────────────────────────────────────────────────────────
+ * Superficie NUEVA, no un parche: la tarjeta que sale sola en la primera visita
+ * sobre el mapa de España (`app/tarjeta-bienvenida.js`) y que cuenta qué es esto,
+ * cómo empezar, y que **pinchar el mapa rellena la referencia catastral**. Ese
+ * último camino existe desde F05 y no tiene ningún control que lo anuncie; el
+ * propio `index.html:609` lo lleva denunciado por escrito desde el 2026-08-11.
+ *
+ * ── POR QUÉ NO PUEDE COSTAR CERO ───────────────────────────────────────────
+ * Porque no hay ninguna clase que reutilizar: los seis `dialogo-*` de la casa son
+ * `<dialog>` con `::backdrop`, y ésta **no puede serlo** — un backdrop se tragaría
+ * el clic del mapa que la tarjeta existe para enseñar. Lo único reutilizado de
+ * verdad es el título (su selector se añade a la regla compartida de los títulos de
+ * diálogo, +30 B en vez de +120) y el `menuitem` que la reabre, que sale a 0 B
+ * colgándose de `gml-barra-menu-opcion`.
+ *
+ * ── LO QUE SE DEVOLVIÓ ANTES DE SUBIR ──────────────────────────────────────
+ * 1.792 → 1.970 → **1.707 B** en tres medidas. El detalle, en el asiento; la
+ * lección, en la cabecera de la sección de la hoja, y merece repetirse aquí porque
+ * es contraintuitiva: **agrupar declaraciones en listas de selectores SUBE la
+ * cuenta** cuando los nombres de clase son largos, porque cada selector repite el
+ * prefijo entero. Lo barato es agrupar por ELEMENTO.
+ *
+ * ── LA FORMA SIGUE SIENDO LA MISMA ─────────────────────────────────────────
+ * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **BAJADO 7 B EL 2026-08-18 (EL PLIEGUE DE LA TERCERA VÍA, POR FIN)**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 62.074 a **62.067 B nuestros** (77.169 → 77.162 con vendor). ⭐ **La hoja BAJA
+ * 7 bytes**, y con esa bajada se cierra el apunte que llevaba abierto desde el
+ * rework: la tercera vía de Entrada ya se ve ENTERA a 1280×720. `viasCompletas === 3`
+ * y `seccionDesbordaPx === 0`, medidos con el guion 14 en el navegador. Es la
+ * primera vez que este registro anota un hito que **arregla una pantalla y devuelve
+ * bytes a la vez**, y por eso la cuenta va desglosada abajo en vez de resumida.
+ *
+ * ── POR QUÉ SALE GRATIS ────────────────────────────────────────────────────
+ * Porque de los 117 px que faltaban, **116 salieron de cambios de VALOR** —relleno
+ * de la cabecera 16→12, relleno de cada vía 12→8, hueco entre vías 8→4, márgenes
+ * del apunte— y de recortar tres apuntes de cuatro líneas a tres, que es
+ * `index.html` y no cuesta hoja. Se suma **una regla nueva de 37 B**,
+ * `.gml-via .gml-rotulo { margin-bottom: var(--space-1) }`, que compra los últimos
+ * 7 px sin tocar los rótulos de los otros seis bloques; y se RESTAN **44 B de código
+ * muerto** cazado en la misma pasada: un `.gml-bienvenida .gml-boton { align-self:
+ * start }` que se había escrito una hora antes para que el botón no se estirase, y
+ * que no hacía nada porque `.gml-boton` lleva `width: 100%` y gana. Se descubrió
+ * MIRANDO la captura, no leyendo la hoja. Neto: **−7 B**.
+ *
+ * ── ⭐ Y EL TROZO GRANDE NO FUE CSS ────────────────────────────────────────
+ * **72 de los 117 px eran un defecto**, no aire: el panel enseñaba, con la
+ * aplicación recién abierta y VACÍA, una caja roja de 47,69 px diciendo «1 error
+ * bloquea la generación del GML: la parcela no tiene ningún recinto». Los dos
+ * apuntes abiertos de `TODOS.md` —el del pliegue y el del chip que dice «0
+ * errores»— eran el mismo problema. Se arregla en `app/main.js`
+ * ({@link MENSAJE_SIN_PARCELA_TODAVIA}) y cuesta 0 B de hoja. La lección: **antes
+ * de apretar la maqueta, mira si lo que sobra es un bug**.
+ *
+ * ── LA FORMA SIGUE SIENDO LA MISMA ─────────────────────────────────────────
+ * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **SUBIDO A MANO EL 2026-08-19 (EL MOTIVO DEL BOTÓN APAGADO SE VUELVE PISTA)**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 62.067 a **62.586 B nuestros** (77.162 → 77.681 con vendor). **+519 B**, y los
+ * ponen tres reglas: la envoltura `.gml-accion`, el globo que sale al pasar el
+ * ratón y el `:hover` que lo enciende.
+ *
+ * ── POR QUÉ VALE LA PENA, QUE ES LO QUE ESTA LÍNEA OBLIGA A ESCRIBIR ────────
+ * Porque lo que compra no es cromo: es **la tabla de vértices a 1280×720**. Los
+ * cuatro CTA del pie de Edición nacen apagados y los cuatro escriben al lado por
+ * qué —regla de oro 1—, y con los cuatro apagados a la vez, que es como arranca la
+ * aplicación, esos párrafos medían **307,28 px** y dejaban la caja de vértices en
+ * **8,36 px: cero filas visibles**. Medido en el navegador, no estimado. Con la
+ * pista: 120 px de acciones y **195,64 px de tabla, 5 filas**. Son 519 B por 187,28
+ * px en el suelo declarado del proyecto.
+ *
+ * ── LO QUE SE DESCARTÓ ANTES DE PEDIR LA SUBIDA ────────────────────────────
+ * **Acortar los cuatro textos**, que costaba 0 B. Se descartó porque esos párrafos
+ * son la mitad útil de un botón apagado: recortarlos habría comprado los píxeles
+ * con lo único que hace que el estado apagado se entienda. No se ha tocado una
+ * palabra. También se devolvieron 20 B por el camino quitando `.gml-boton` de los
+ * dos selectores, que dentro de `.gml-accion` no distingue nada.
+ *
+ * ── LA FORMA NO CAMBIA ──────────────────────────────────────────────────────
+ * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **SUBIDO A MANO EL 2026-08-20 (EL REWORK DE LA BARRA DE EDICIÓN)**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 62.586 a **63.701 B nuestros** (77.681 → 78.796 con vendor). **+1.115 B**, y
+ * los ponen dos tareas de un mismo encargo: T4 (el mando de los tres modos, ~1.080)
+ * y T6 (el chip del ajuste, ~35).
+ *
+ * ── POR QUÉ VALE LA PENA, QUE ES LO QUE ESTA LÍNEA OBLIGA A ESCRIBIR ────────
+ * Porque es **el único asiento de este registro que sube bytes y BAJA píxeles a la
+ * vez**: la barra pasa de 326 a **313 px** medidos en Chrome a 1280×720. Lo normal
+ * en este proyecto ha sido pagar sitio en pantalla por cada mejora de lectura —el
+ * asiento de F18 lo dice con todas las letras—, y aquí no: agrupar los tres modos
+ * hace innecesario un separador que llevaba filete a los dos lados del dibujo.
+ *
+ * Y lo que compra en lectura es lo que el autor pidió. Los tres modos ya eran
+ * excluyentes en `viewer/edicion.js` y esa exclusión no existía en la forma; el
+ * ajuste al parcelario y un modo armado se pintaban con **el mismo `rgb(3,105,161)`**
+ * siendo dos contratos que no se parecen en nada. Los dos hechos eran invisibles
+ * hasta pulsar, y ahora se leen antes.
+ *
+ * ── LO QUE SE DESCARTÓ ANTES DE PEDIR LA SUBIDA ────────────────────────────
+ * **Resolver el mando con `overflow:hidden`**, que era una declaración en vez de
+ * las tres reglas de redondeo. Se descartó porque recorta el anillo de foco global
+ * (`.gml-app :focus-visible`, `outline-offset: 2px`): habría comprado los bytes con
+ * el teclado, que es exactamente la trampa que `.gml-barra-partido` ya tenía
+ * escrita unas reglas más abajo. También se descartó **vestir el mando desde
+ * `viewer/barra-edicion.js` en línea**, que habría costado 0 B de hoja: el estilo
+ * en línea de ese módulo está reservado a lo que tiene que sobrevivir a que la hoja
+ * no cargue —lo que hace legible la barra sobre una ortofoto—, y un redondeo no
+ * entra en esa lista. Falsear el presupuesto mudando bytes a JavaScript es la única
+ * forma de que este guardián deje de significar algo.
+ *
+ * ── LA FORMA NO CAMBIA ──────────────────────────────────────────────────────
+ * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **SUBIDO A MANO EL 2026-08-20 (LA ZONA DE EXPEDIENTE DE LA BARRA)**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 63.701 a **65.041 B nuestros** (78.796 → 80.136 con vendor). **+1.340 B**, y
+ * los pone entero el rediseño del botón de expediente y de su desplegable, encargo
+ * del autor sobre lo que había: «el menú de expediente y el botón son horribles».
+ *
+ * ── POR QUÉ VALE LA PENA, QUE ES LO QUE ESTA LÍNEA OBLIGA A ESCRIBIR ────────
+ * Porque de los tres defectos que corrige, **dos no eran de gusto y estaban
+ * medidos**, y el tercero era una regla de este mismo sistema de diseño incumplida:
+ *
+ *   1. **El botón no parecía un botón.** `border: transparent` + `background:
+ *      transparent`: dos renglones de texto que solo estrenaban caja en `:hover`.
+ *      La única puerta a «Expedientes guardados», al diccionario de rechazos, a la
+ *      ayuda y a «Vaciarlo» se anunciaba DESPUÉS de que la descubrieras.
+ *   2. **El panel se leía como dos listas.** El apunte iba pegado al borde derecho
+ *      (`margin-left: auto`), así que con frases —no con valores— el panel se
+ *      estiraba hasta su tope de 340 px y dejaba un río de hasta 90 px en medio.
+ *      Con la frase debajo del rótulo baja a 240, o sea al ancho de su disparador.
+ *   3. **La prosa iba en Geist Mono.** DESIGN.md §5 la reserva para valor numérico,
+ *      unidad y referencia catastral, y éste era el único sitio de la aplicación
+ *      donde escribía una oración («traducir el mensaje de la Sede»).
+ *
+ * Y compra dos cosas que no estaban: el punto de estado —tres colores sobre el
+ * `data-expediente-estado` que pone `app/barra.js`, REFUERZO de lo que las palabras
+ * ya dicen (§3.3)— y un filete que separa «Vaciarlo», la única acción irreversible
+ * del menú, del resto de la lista; hasta hoy compartía borde con «Cómo funciona» y
+ * se encendía del mismo gris al pasarle el puntero por encima.
+ *
+ * ── EL PRECIO EN PÍXELES ES NEGATIVO, Y ES LA SEGUNDA VEZ QUE PASA ─────────
+ * El botón **baja de 44,34 a 39,8 px** de alto (medido en Chrome a 1440×900) pese a
+ * estrenar chapa, punto y flecha: se lo devuelve el `line-height: 1.25` que antes no
+ * tenía. En una barra de 48 px eso es holgura recuperada, no aire decorativo. El
+ * panel crece 59 px de alto (143,6 → 202,6) y **no le cuesta nada a la aplicación**:
+ * crece hacia abajo, sobre el mapa, y solo mientras está abierto.
+ *
+ * ── LO QUE SE DESCARTÓ ANTES DE PEDIR LA SUBIDA ────────────────────────────
+ * **Dar los dos renglones a los DOS menús** en vez de acotar la variante con
+ * `[data-menu='expediente']`, que habría ahorrado el selector: el de salidas tiene
+ * apuntes que SÍ son valores (`.dxf`, `.txt`, `.xlsx`) y la columna alineada a la
+ * derecha es ahí la forma correcta — se comprobó en pantalla. También **subir el
+ * apunte del botón a `--text-11`**, que es lo que §5.1 pide para los apuntes: la
+ * frase más larga que escribe ese nodo ya ocupa 194 px de los 240 del tope a 10 px,
+ * así que a 11 lo que se gana en tamaño se pierde en unos puntos suspensivos. Y
+ * **poner el punto de estado con un glifo en `::before`**: Chrome mete el contenido
+ * generado en el nombre accesible del botón, así que el rótulo habría pasado a ser
+ * «● Sin guardar…». Es `content: ''` y color de fondo por eso, no por gusto.
+ *
+ * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
+ * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
  */
-export const TECHO = Object.freeze({ total: 75393, nuestro: 60298 })
+export const TECHO = Object.freeze({ total: 80136, nuestro: 65041 })
 
 /**
  * EL REGISTRO. Un asiento por hito, con la hoja construida medida de verdad.
@@ -1183,6 +1386,208 @@ export const ASIENTOS = Object.freeze(
         'CÓDIGO MUERTO desde que se escribió, porque el módulo pone el peso en línea y el inline ' +
         'gana (−30 B). Neto: **+5 B**. ── ⚠️ El techo sube esos 5 B (cabecera de `TECHO`) y la ' +
         'holgura vuelve a 0. ── ⚠️ NO CIERRA REBANADA: es el rediseño de una pantalla ya cerrada.' },
+    { hito: 'El cuadrado negro de las colindantes',
+      commit: '(sin commitear)',
+      total: 75462, nuestro: 60367, rebanada: null,
+      nota:
+        '**+69 B, una sola regla de una sola declaración**, y es el precio de tapar un defecto ' +
+        'del NAVEGADOR, no de añadir producto. Encargo del autor: «hay un cuadrado negro que se ' +
+        'pone cuando selecciono una parcela catastral colindante». Medido en la aplicación real: ' +
+        'al pulsar una colindante, `document.activeElement` pasa a ser su `<path>` y Chromium le ' +
+        'pinta su anillo de foco por defecto (`outline: rgb(16,16,16) auto 5px`) alrededor de la ' +
+        '**caja envolvente** de la forma — de ahí que un triángulo produzca un cuadrado. ── ⛔ **Y ' +
+        'NO SE PUEDE DEVOLVER EN LÍNEA**, que es lo que haría que costara cero: `viewer/*` viste ' +
+        'sus capas con opciones de Leaflet y estilos en línea, y un `outline` en línea no sabe ' +
+        'distinguir `:focus` de `:focus-visible` — apagaría también el anillo de teclado, que es ' +
+        'exactamente lo que hay que conservar. Leaflet tampoco lo tapa solo: su `preventOutline` ' +
+        'sube mientras `tabIndex === -1` y acaba apagándoselo al CONTENEDOR del mapa, no al ' +
+        '`path`; su defensa está escrita para los marcadores. ── QUÉ SE COMPRA DE MÁS POR EL ' +
+        'MISMO PRECIO ── El selector es `.leaflet-interactive`, no `.gml-colindante`: las ' +
+        'candidatas, las piezas y las partes son interactivas por la misma razón y traen el ' +
+        'mismo defecto, así que una regla las cubre a las cuatro. ── ⚠️ El techo sube esos 69 B ' +
+        '(cabecera de `TECHO`) y la holgura vuelve a 0. NO CIERRA REBANADA.' },
+    { hito: 'La tarjeta de bienvenida',
+      commit: '(sin commitear)',
+      total: 77169, nuestro: 62074, rebanada: null,
+      nota:
+        '**+1.707 B**, y es superficie NUEVA: la tarjeta de la primera visita que sale sobre el ' +
+        'mapa de España al abrir la aplicación vacía (`app/tarjeta-bienvenida.js`). Caja, bloque ' +
+        'destacado del gesto con su estado apagado, lista de vías, aspa y su hover. ── QUÉ ' +
+        'COMPRA ── Que el camino más rápido para empezar deje de ser un secreto: pinchar el mapa ' +
+        'rellena la referencia catastral desde F05 y **no tiene ningún control que lo anuncie** ' +
+        '(el propio `index.html:609` lo lleva escrito desde el 2026-08-11: «un camino que solo ' +
+        'conoce quien escribió el código no es un camino: es un secreto»). Hasta hoy vivía en la ' +
+        'segunda frase del apunte de una vía. ── QUÉ SE HA DEVUELTO ANTES DE SUBIR EL TECHO ── ' +
+        'Se midió tres veces: 1.792 B la primera versión; **1.970 B** al «optimizarla» agrupando ' +
+        'reseteos y grises en listas de selectores (178 B PEOR, porque cada selector de una lista ' +
+        'repite el prefijo entero y aquí los prefijos son largos); y 1.707 B en la definitiva, ' +
+        'quitando el prefijo `.gml-app` de los once selectores (−88 B, y además CORRIGE la ' +
+        'especificidad: la tarjeta tiene que PERDER contra `.gml-app [hidden]`, y con (0,2,0) el ' +
+        'empate lo resolvía el orden en el fichero), colapsando los párrafos en un `.gml-bienvenida ' +
+        'p` y retirando un `@media (max-width:900px)` de 109 B que no hacía nada que el ' +
+        '`max-width` no hiciera ya. ── ⚠️ El techo sube 1.707 B (cabecera de `TECHO`) y la holgura ' +
+        'vuelve a 0. NO CIERRA REBANADA: Entrada ya estaba cerrada.' },
+    { hito: 'El pliegue de la tercera vía',
+      commit: '(sin commitear)',
+      total: 77162, nuestro: 62067, rebanada: null,
+      nota:
+        '**−7 B (sí, NEGATIVO), y cierran el apunte más viejo de `TODOS.md`**: la tercera vía de ' +
+        'Entrada ya se ' +
+        've ENTERA a 1280×720. Medido con el guion 14 en navegador: `viasCompletas` 2 → **3** y ' +
+        '`seccionDesbordaPx` 117 → **0**. ── ⛔ **Y EL PUNTO DE PARTIDA ERA FALSO** ── `DESIGN.md` ' +
+        '§11 declaraba 16 px de déficit; lo medido eran **117**. La cifra vieja se tomó con la ' +
+        'barra a 72 px de alto y con otra maqueta, y llevaba dos hitos sin remedir. ── DE DÓNDE ' +
+        'SALEN LOS 117 ── **72 px eran un DEFECTO, no aire**: el panel enseñaba una caja roja de ' +
+        '47,69 px con la aplicación vacía («1 error bloquea la generación del GML: la parcela no ' +
+        'tiene ningún recinto»), que es el mismo apunte del chip que dice «0 errores». Se arregla ' +
+        'en `app/main.js` y cuesta **0 B**. Los otros 45 salen de cambios de VALOR (cabecera ' +
+        '16→12, vía 12→8, hueco 8→4, márgenes del apunte) y de recortar tres apuntes de cuatro ' +
+        'líneas a tres en `index.html`, que tampoco es hoja. ── QUÉ SON ENTONCES LOS 37 B ── UNA ' +
+        'regla nueva de 37 B: `.gml-via .gml-rotulo { margin-bottom: var(--space-1) }`, los últimos 7 ' +
+        'px; y se restan 44 B de CÓDIGO MUERTO cazado en la misma pasada (un `align-self: start` en ' +
+        'el botón de la tarjeta que no hacía nada, porque `.gml-boton` lleva `width: 100%` y gana). ' +
+        'Se vio MIRANDO la captura, no leyendo la hoja. ' +
+        'Se acota a la vía en vez de bajar `.gml-rotulo` global (0 B) porque ese rótulo viste seis ' +
+        'bloques más y moverlos todos para ganar 7 px en una pantalla sería cambiar seis maquetas ' +
+        'medidas para arreglar una. ── ⭐ LA LECCIÓN ── **Antes de apretar la maqueta, mira si lo ' +
+        'que sobra es un bug.** ── ⚠️ El techo BAJA 7 B y la holgura vuelve a 0. NO CIERRA ' +
+        'REBANADA, pero sí el criterio 7 del rework, que llevaba abierto desde entonces.' },
+    { hito: 'El modo insertar, y una corrección de atribución',
+      commit: '(sin commitear)',
+      total: 77162, nuestro: 62067, rebanada: null,
+      nota:
+        '**+0 B sobre el asiento anterior, y eso es justo lo que hay que explicar: NO es que este ' +
+        'hito no gastara.** Gastó **138 B** —el cursor del modo insertar, `.gml-modo-insertar` con ' +
+        'sus dos reglas, que el minificador funde en una porque comparten `cursor:copy`— y esos ' +
+        '138 B **ya estaban dentro del total que anotó un asiento anterior**. ── CÓMO SE MIDIÓ ── ' +
+        'Con el método de la cabecera, construyendo con y sin: **77.162 B con las reglas, 77.024 ' +
+        'sin ellas**, mismo día y mismo árbol. ── DE QUIÉN SON LOS 138 ── Del asiento «La tarjeta ' +
+        'de bienvenida», que declara +1.707 B. Su delta real es **1.569**. Se puede afirmar porque ' +
+        'el asiento anterior a ése —«El cuadrado negro de las colindantes», 75.462 B— se leyó en ' +
+        'verde ANTES de que estas reglas existieran, así que la hoja limpia era 75.462 y los 138 ' +
+        'entraron entre uno y otro. ── POR QUÉ PASÓ, QUE ES LO QUE IMPORTA ── **Dos sesiones ' +
+        'escribiendo CSS en el mismo árbol el mismo día.** Una midió la hoja construida DESPUÉS de ' +
+        'que la otra hubiera guardado, y se llevó sus bytes en su propio delta. El guardián no lo ' +
+        've: solo compara la hoja con el último total, y el total estaba bien — lo que estaba mal ' +
+        'era de quién eran los bytes, que es exactamente lo que este registro existe para saber. ' +
+        '⚠️ **Ni el total ni `TECHO` se tocan: los dos ya eran correctos.** Lo único que cambia es ' +
+        'la atribución, y por eso este asiento no mueve la cifra. ── LA LECCIÓN ── Un asiento mide ' +
+        'un DELTA, y un delta solo es tuyo si nadie más ha tocado la hoja entre las dos ' +
+        'construcciones. Cuando haya otra sesión viva, medir con y sin lo propio —no restar el ' +
+        'total anterior— es la única forma que no miente.' },
+    { hito: 'El motivo del botón apagado se vuelve pista',
+      commit: '(sin commitear)',
+      total: 77681, nuestro: 62586, rebanada: null,
+      nota:
+        '**+519 B, y compran los 187,28 px que el pie de Edición le estaba robando a la tabla de ' +
+        'vértices.** Encargo del autor, con captura: «hay tanto texto debajo de los botones que se ' +
+        'queda sin espacio el cuadro de los vértices; todo ese texto podría pasar a una ' +
+        'información si haces hover sobre el botón desactivado». ── LO QUE SE MIDIÓ, QUE ES LO QUE ' +
+        'JUSTIFICA EL GASTO ── En el navegador, a **1280×720** (el suelo declarado) y con los ' +
+        'cuatro CTA apagados —que es como ARRANCA la aplicación—: `.gml-acciones` medía **307,28 ' +
+        'px** y `.gml-tabla-caja` **8,36 px, o sea CERO filas de vértices visibles**. Después: ' +
+        '**120 px** de acciones y **195,64 px** de tabla, **5 filas**. A 1920×1080 el mismo cambio ' +
+        'va de 13 a 15 filas; el que importa es el suelo. ── QUÉ ENTRA EN BYTES ── tres reglas: ' +
+        '`.gml-accion` (la envoltura, cuatro declaraciones), el globo (posición, caja, sombra, ' +
+        '`opacity: 0`) y el `:hover` que lo enciende. Ni una línea de JS: el interruptor es ' +
+        '`:disabled + .gml-accion-estado`, y como el par botón + renglón ya eran hermanos ' +
+        'contiguos en `index.html`, los seis módulos que escriben estos renglones siguen ' +
+        'escribiendo igual que ayer. ── ⛔ LO QUE **NO** SE HIZO, Y ERA LO BARATO ── acortar los ' +
+        'cuatro textos: 0 B y habría comprado los píxeles con la mitad útil de un botón apagado ' +
+        '(regla de oro 1). No se ha tocado una palabra; lo que cambia es dónde se enseñan. ── ' +
+        '⚠️ LA ENVOLTURA NO ES DECORADO ── un `<button disabled>` no recibe eventos de ratón, así ' +
+        'que `:hover` sobre él no casa: el puntero encima de un control apagado hace blanco en su ' +
+        'PADRE. Sin el `<div>` la pista no abriría nunca, justo en el único estado en el que ' +
+        'existe. ── ⚠️ Y SE ESCONDE CON `opacity` ── no con `display` ni `visibility`, que sacan ' +
+        'el nodo del árbol de accesibilidad: estos renglones son `role="status"` y quien usa ' +
+        'lector de pantalla tiene que seguir oyendo el motivo. Mismo criterio que `RENGLON_OCULTO` ' +
+        'en `app/main.js`. ── ⚠️ El techo SUBE 519 B (cabecera de `TECHO`) y la holgura vuelve a ' +
+        '0. NO CIERRA REBANADA: es el rediseño de un pie ya cerrado.' },
+    { hito: 'El rework de la barra de edición: el mando de los modos y el chip del ajuste',
+      commit: '(sin commitear)',
+      total: 78796, nuestro: 63701, rebanada: null,
+      nota:
+        '**+1.115 B por las tareas T4 y T6 del rediseño de `viewer/barra-edicion.js`, y es el ' +
+        'primer asiento del proyecto que ADEMÁS DEVUELVE PÍXELES: la barra baja de 326 a 313 px.** ' +
+        'Un solo asiento para las dos porque son un solo hito —la barra se había hecho en cinco ' +
+        'fases y el encargo del autor fue «no tiene mucha coherencia ni está clara»—, y partirlo ' +
+        'en dos habría dado dos filas que nadie puede leer por separado. ── (1) T4 · EL MANDO, ' +
+        '~1.080 B ── siete reglas bajo `.gml-barra-mando`: el marco del `role="group"`, el ' +
+        'redondeo de los extremos, el filete divisorio en `box-shadow` y su supresión contra un ' +
+        'segmento armado. **Qué compran:** insertar, borrar y dibujar YA eran excluyentes en ' +
+        '`viewer/edicion.js` —armar uno apaga los otros— y esa exclusión existía solo en el ' +
+        'comportamiento y en un `aria-pressed` que no se ve. Ahora se lee ANTES de pulsar, que es ' +
+        'el único momento en que sirve. **Y el ancho baja 13 px** (fila 316 → 303, medido en ' +
+        'Chrome a 1280×720): no es que se estreche nada, es UN SEPARADOR que deja de hacer falta ' +
+        'cuando el dibujo entra al mando. ── (2) T6 · EL CHIP DEL AJUSTE, ~35 B ── casi todo es ' +
+        'canje de tokens; lo único que suma es un filo de 2 px. **Qué arregla:** el ajuste puesto ' +
+        'y un modo armado daban los dos `rgb(3, 105, 161)` —medido, uno al lado del otro— siendo ' +
+        'DOS CONTRATOS distintos (un ajuste que lleva puesto desde el expediente anterior contra ' +
+        'un estado que dura un minuto y cambia lo que hace el clic siguiente). El chip baja a ' +
+        'acento suave mezclado + icono sky-700 + filo, tres señales y ninguna un bloque de color; ' +
+        'el bloque macizo se queda para el modo armado, que es el que lo necesita. ── ⭐ POR QUÉ ' +
+        'CEDE EL CHIP Y NO EL MODO, QUE ES LA DECISIÓN ── por FRECUENCIA: el ajuste nace puesto ' +
+        '(`defaultChecked`) y lo está casi el 100 % del tiempo, así que un bloque azul permanente ' +
+        'competía por la atención con el estado que sí cambia. ── ⛔ LO QUE **NO** SE HIZO, Y ERA ' +
+        'LO BARATO ── resolver el mando con `overflow:hidden` (una declaración en vez de tres ' +
+        'reglas de redondeo): recorta el anillo de foco global —`.gml-app :focus-visible` con ' +
+        '`outline-offset: 2px`— y habría comprado los bytes con el teclado, trampa que ' +
+        '`.gml-barra-partido` ya tenía escrita. El extremo derecho se elige con `:has(+ [hidden])` ' +
+        'porque el último segmento es justo el que se esconde. ── ⚠️ Y DE PROPINA, 0 B ── medir ' +
+        'T4 en navegador destapó que el `:hover` (0,4,0) GANABA al estado armado (0,3,0) desde el ' +
+        '2026-08-10: un modo recién pulsado se veía gris con el puntero encima. Se cierra con un ' +
+        '`:not([aria-pressed="true"])`, que es lo que la regla del color destructivo ya hacía. ' +
+        '── ⚠️ El techo SUBE 1.115 B (cabecera de `TECHO`) y la holgura vuelve a 0. NO CIERRA ' +
+        'REBANADA: las cinco estaban cerradas y esto es el rediseño de una barra ya entregada.' },
+    { hito: 'La zona de expediente de la barra: el botón y su desplegable',
+      commit: '(sin commitear)',
+      total: 80136, nuestro: 65041, rebanada: null,
+      nota:
+        '**+1.340 B, y el encargo del autor fue de una línea: «el menú de expediente y el botón ' +
+        'son horribles».** Al medirlo en Chrome con el menú abierto, tres de los cuatro defectos ' +
+        'no eran de gusto. ── (1) EL BOTÓN NO PARECÍA UN BOTÓN, ~330 B ── era `border: ' +
+        'transparent` sobre `background: transparent`, o sea dos renglones de texto sueltos que ' +
+        'solo estrenaban caja al pasarles el puntero: la única puerta a los expedientes ' +
+        'guardados, al diccionario de rechazos, a la ayuda y a «Vaciarlo» se anunciaba DESPUÉS ' +
+        'de haberla descubierto. Se paga la chapa en reposo (la pareja más floja del sistema: ' +
+        '`--color-bg-surface` con filete `--color-border-sub`), la rejilla de dos columnas que ' +
+        'hace sitio a la flecha y el giro de esa flecha con `[aria-expanded="true"]`, que es ' +
+        'un atributo que el botón ya llevaba. ⭐ **Y el botón BAJA de 44,34 a 39,8 px** pese a ' +
+        'estrenar chapa, punto y flecha: se lo devuelve el `line-height: 1.25` que no tenía —el ' +
+        'mismo valor que su vecina `.gml-rail-marca`, que tiene el mismo problema de dos ' +
+        'renglones—. En una barra de 48 px eso es holgura recuperada. ── (2) EL PANEL SE LEÍA ' +
+        'COMO DOS LISTAS, ~250 B ── la regla base pega el apunte al borde DERECHO ' +
+        '(`margin-left: auto`) y lo escribe en monoespaciada. Para el menú de salidas es la ' +
+        'gramática correcta —`.dxf`, `.txt`, `.xlsx` son valores y se comparan alineados—, pero ' +
+        'los apuntes de éste son FRASES: el panel se estiraba a sus 340 px de tope y entre las ' +
+        'dos mitades quedaba un río de hasta 90 px. Con la frase debajo del rótulo el panel baja ' +
+        'a **240 px**, o sea al `max-width` del botón que lo abre, y de paso la prosa sale de ' +
+        'Geist Mono, que DESIGN.md §5 reserva para valor numérico, unidad y referencia catastral ' +
+        '— era el único sitio de la aplicación donde la monoespaciada escribía una oración. La ' +
+        'variante va acotada por `[data-menu="expediente"]`, un atributo que YA estaba en el ' +
+        'marcado, así que no cuesta ni un byte de HTML. ── (3) LO IRREVERSIBLE NO SE ' +
+        'DISTINGUÍA, ~260 B ── «Vaciarlo» era rojo desde F15, y ahí acababa: compartía borde con ' +
+        '«Cómo funciona», se encendía del MISMO gris al pasarle el puntero por encima —en el ' +
+        'último instante útil para avisar— y su confirmación («vuelve a pulsar para ' +
+        'confirmarlo») era un gris de 10 px suelto, con menos peso en pantalla que el apunte de ' +
+        'la opción de ayuda. Entran un filete de separación, el `:hover` en `--color-tint-fail` ' +
+        'y el tinte del renglón de confirmación. **Ni un color nuevo**: es el mismo par que ya ' +
+        'llevan `.gml-chip--error` y el bloque de error del panel. ⚠️ El filete va en el ' +
+        'envoltorio `[data-pie]` y no en un `role="separator"` propio porque ese envoltorio es ' +
+        'el nodo que `app/empezar-de-nuevo.js` esconde cuando no hay nada que vaciar: un ' +
+        'separador con nodo propio se quedaría colgando bajo la última opción. ── (4) LO ÚNICO ' +
+        'QUE ES PRODUCTO NUEVO, ~230 B ── el punto de estado delante del nombre, en los tres ' +
+        'colores de `[data-expediente-estado]` (neutro · ámbar · verde). Es la misma bolita de ' +
+        '7 px que ya usan `.gml-capa::before` y el chip de avisos, y es **refuerzo** (§3.3): las ' +
+        'palabras siguen diciendo el estado entero al lado. El atributo lo pone `app/barra.js` ' +
+        'en las TRES salidas de `pintarExpediente()` y en ninguna otra, para que el punto y la ' +
+        'frase no puedan separarse; lo custodian tres `it` nuevos en ' +
+        '`test/app/barra.dom.test.js`, con mutación ejecutada. ── EL PRECIO EN PÍXELES ── el ' +
+        'panel crece 59 px de alto (143,6 → 202,6) y a la aplicación no le cuesta nada: crece ' +
+        'hacia abajo sobre el mapa y solo mientras está abierto. La barra sigue midiendo 49 px y ' +
+        'a 1280×720 no desborda. ── ⚠️ El techo SUBE 1.340 B (cabecera de `TECHO`, con lo que se ' +
+        'descartó antes de pedirlo) y la holgura vuelve a 0. NO CIERRA REBANADA: las cinco ' +
+        'estaban cerradas y esto es el rediseño de una zona ya entregada.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

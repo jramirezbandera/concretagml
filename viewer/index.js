@@ -233,6 +233,7 @@ import { crearCajonParcelas } from './cajon-parcelas.js'
 import { crearCapaCandidatas } from './candidatas.js'
 import { crearCajonDiagnostico } from './cajon-diagnostico.js'
 import { crearCapaColindantes } from './colindantes.js'
+import { crearCapaPuntosLevantamiento } from './puntos-levantamiento.js'
 import { crearContraste } from './contraste.js'
 import { crearEdicion } from './edicion.js'
 import { crearListaSobrante } from './lista-sobrante.js'
@@ -890,19 +891,51 @@ export function encuadrarSobreRecintos({
  * caso degenerado, la proyección vértice a vértice, el aviso de los vértices no
  * numéricos— es la misma función y no una copia.
  *
+ * ── ⭐ Y DESDE EL 2026-08-19 MIRA TAMBIÉN A LOS PUNTOS SUELTOS ─────────────
+ * Un levantamiento de campo importado SIN UNIR entra con `recintos: []` y su nube
+ * de puntos. Sin esta segunda mirada, `encuadrarGeometria` devolvía `false`, la
+ * cascada caía a `vistaInicial` y el usuario aterrizaba en Edición **mirando la
+ * vista general de España** con sus 88 esquinas a diez husos de distancia: la
+ * herramienta puesta, los puntos cargados y nada en pantalla. Es un defecto de los
+ * caros —parece que el fichero no ha entrado— y sale gratis de arreglar, porque
+ * son pares UTM igual que los vértices de un recinto.
+ *
+ * ⚠️ **Los recintos MANDAN cuando los hay.** En cuanto el técnico cierra su
+ * primer contorno, lo que encuadra es el contorno: los puntos son la referencia
+ * sobre la que se dibujó, y pueden extenderse más allá de lo que acabó siendo la
+ * finca (un levantamiento suele medir más de lo que se declara).
+ *
  * @param {object} args
  * @param {import('leaflet').Map} args.mapa
  * @param {import('./_comun.js').EstadoVista} args.estado
  * @param {number} args.zona
  * @param {import('./_comun.js').Avisar} args.avisar
- * @returns {boolean}  `true` si ha encuadrado; `false` si no había geometría (y
- *   entonces NO ha tocado la vista).
+ * @returns {boolean}  `true` si ha encuadrado; `false` si no había ni geometría ni
+ *   puntos (y entonces NO ha tocado la vista).
  */
 function encuadrarGeometria({ mapa, estado, zona, avisar }) {
   const parcela = estado.get()
+  if (
+    encuadrarSobreRecintos({
+      mapa,
+      recintos: parcela && parcela.recintos,
+      zona,
+      alAvisar: avisar,
+    })
+  ) {
+    return true
+  }
+
+  // Los puntos se envuelven en un recinto SINTÉTICO —no se guarda en ninguna
+  // parte— para reutilizar entera la función de arriba en vez de escribir un
+  // segundo encuadre que tendría su propio margen y su propio caso degenerado.
+  const puntos = parcela && Array.isArray(parcela.puntosLevantamiento)
+    ? parcela.puntosLevantamiento
+    : []
+  if (puntos.length === 0) return false
   return encuadrarSobreRecintos({
     mapa,
-    recintos: parcela && parcela.recintos,
+    recintos: [{ vertices: puntos }],
     zona,
     alAvisar: avisar,
   })
@@ -1165,8 +1198,9 @@ function comprobarTopeDeZoom(mapa, maxNativeZoom) {
  *   cartografía catastral superpuesta encendida.
  * @param {number} [opciones.opacidad=0.6]  Opacidad inicial de la superpuesta.
  * @param {string} [opciones.posicion='topright']  Esquina del control de capas.
- * @param {string} [opciones.posicionOpacidad='bottomright']  Esquina del control
- *   de opacidad.
+ * @param {string} [opciones.posicionOpacidad='topright']  Esquina del control de
+ *   opacidad. Desde el 2026-08-19 se apila BAJO el de capas, y `bottomright` queda
+ *   libre para la barra de edición (ver `viewer/capas.js#ControlOpacidad`).
  * @param {number} [opciones.maxZoom=24]  Tope de zoom del mapa. DEBE superar el
  *   `maxNativeZoom` de las capas montadas o se lanza `RangeError` (ver cabecera).
  * @param {boolean|{tolerancia?: number, minimoPx?: number, snapActivo?: boolean}}
@@ -1445,6 +1479,19 @@ export function crearVisor(contenedor, opciones = {}) {
       colindantes = crearCapaColindantes({ mapa, zona, alAvisar: avisar })
       deshacer.push(() => colindantes.destruir())
     }
+
+    // 2 quater · LOS PUNTOS SUELTOS DEL LEVANTAMIENTO (2026-08-19). Se monta
+    // SIEMPRE y nace vacía, como la de vecinas: no pone una capa en el mapa hasta
+    // que alguien le pase puntos, y son un dato del expediente —viajan en
+    // `parcela.puntosLevantamiento`— y no una opción del visor, así que no hay
+    // nada que preguntarle al llamante. La alternativa era un tercer booleano de
+    // montaje para una capa inerte.
+    //
+    // ⚠️ **Y su gemela es `edicion.fijarPuntos`, que come del MISMO array.** Ésta
+    // los enseña y aquélla los engancha; si un día una de las dos se alimentara de
+    // otro sitio, el usuario apuntaría a un punto y engancharía a otro.
+    const puntosLevantamiento = crearCapaPuntosLevantamiento({ mapa, zona, alAvisar: avisar })
+    deshacer.push(() => puntosLevantamiento.destruir())
 
     // 2 ter · LA LEYENDA. Va aquí, pegada a las capas y antes de que se dibuje
     // nada, por lo mismo que el control de capas: es cromo del mapa y no depende
@@ -1819,6 +1866,7 @@ export function crearVisor(contenedor, opciones = {}) {
       comprobacion,
       parcelas,
       colindantes,
+      puntosLevantamiento,
       sobrante,
       leyenda,
 

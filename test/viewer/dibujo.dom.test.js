@@ -12,9 +12,15 @@
  * -------------------------------------------------------------------------- */
 
 import L from 'leaflet'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { MENSAJE_CANCELADO, MENSAJE_EMPEZAR, crearDibujo } from '../../viewer/dibujo.js'
+import {
+  CLASE_PUNTO_CIERRE,
+  CLASE_PUNTO_TRAZO,
+  MENSAJE_CANCELADO,
+  MENSAJE_EMPEZAR,
+  crearDibujo,
+} from '../../viewer/dibujo.js'
 import { NIVEL, latLngAUTM, vertUTMaLatLng } from '../../viewer/_comun.js'
 import { crearPanes, montarMapa } from './_ayuda-jsdom.js'
 
@@ -31,15 +37,21 @@ const V = Object.freeze({
 
 const aLatLng = (utm) => vertUTMaLatLng(utm, HUSO)
 
-function montar({ ajustar = null, alCerrar = vi.fn(), alAvisar = vi.fn() } = {}) {
+function montar({
+  ajustar = null,
+  alSoltarEnganche = null,
+  alCerrar = vi.fn(),
+  alAvisar = vi.fn(),
+} = {}) {
   const { mapa, destruir: destruirMapa } = montarMapa({ zoom: ZOOM })
   crearPanes(mapa)
-  const dibujo = crearDibujo({ mapa, zona: HUSO, ajustar, alCerrar, alAvisar })
+  const dibujo = crearDibujo({ mapa, zona: HUSO, ajustar, alSoltarEnganche, alCerrar, alAvisar })
   return {
     mapa,
     dibujo,
     alCerrar,
     alAvisar,
+    alSoltarEnganche,
     /** Simula un clic del usuario en un punto UTM. */
     clic(utm) {
       mapa.fire('click', { latlng: L.latLng(aLatLng(utm)) })
@@ -49,6 +61,28 @@ function montar({ ajustar = null, alCerrar = vi.fn(), alAvisar = vi.fn() } = {})
     },
     tecla(key) {
       document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }))
+    },
+    /** Mueve el puntero por el mapa (el gesto que ARMA el cierre). */
+    mover(utm) {
+      mapa.fire('mousemove', { latlng: L.latLng(aLatLng(utm)) })
+    },
+    /** Los `L.CircleMarker` del trazo que hay ahora mismo en el mapa. */
+    marcadores() {
+      const puestos = []
+      mapa.eachLayer((capa) => {
+        if (capa instanceof L.CircleMarker) puestos.push(capa)
+      })
+      return puestos
+    },
+    /**
+     * Un punto UTM desplazado `px` píxeles hacia el este EN PANTALLA. Es la única
+     * forma honesta de probar un umbral de puntería: convertir metros a píxeles a
+     * mano repetiría aquí el cálculo que se está probando.
+     */
+    aPixelesDe(utm, px) {
+      const p = mapa.latLngToContainerPoint(L.latLng(aLatLng(utm)))
+      const ll = mapa.containerPointToLatLng(L.point(p.x + px, p.y))
+      return latLngAUTM(ll, HUSO)
     },
     limpiar() {
       dibujo.destruir()
@@ -70,6 +104,9 @@ describe('crearDibujo · contratos', () => {
     expect(() => crearDibujo({ mapa, zona: HUSO, alCerrar: () => {}, ajustar: 'no' })).toThrow(
       TypeError,
     )
+    expect(() =>
+      crearDibujo({ mapa, zona: HUSO, alCerrar: () => {}, alSoltarEnganche: 'no' }),
+    ).toThrow(TypeError)
     destruir()
   })
 
@@ -429,5 +466,426 @@ describe('crearDibujo · no toca el modelo', () => {
     expect(x).toBeCloseTo(esperado[0], 6)
     expect(y).toBeCloseTo(esperado[1], 6)
     ctx.limpiar()
+  })
+})
+
+// ── `alCambiar`: el canal que faltaba (2026-08-18) ───────────────────────────
+//
+// De las CINCO formas de terminar un dibujo, solo una avisaba a quien lo mandó
+// empezar: cerrar bien, por `alCerrar`. `Escape`, `Enter` con menos de tres
+// vértices, el doble clic corto y `destruir()` paraban el trazo en silencio, y el
+// botón de la barra se quedaba diciendo «Cancelar dibujo» sobre un dibujo que ya
+// no existía. En la rama PARCELA eso es peor que cosmético: allí el cableado apaga
+// la edición mientras se dibuja, y sin aviso se quedaría apagada para siempre.
+
+describe('crearDibujo · alCambiar', () => {
+  it('emite al empezar y al parar, y solo cuando cambia de verdad', () => {
+    const ctx = montar()
+    const visto = []
+    ctx.dibujo.alCambiar((d) => visto.push(d))
+
+    ctx.dibujo.empezar()
+    expect(visto).toEqual([true])
+    // Empezar dos veces es la misma intención dicha dos veces, no un cambio.
+    ctx.dibujo.empezar()
+    expect(visto).toEqual([true])
+
+    ctx.dibujo.cancelar()
+    expect(visto).toEqual([true, false])
+    // Y cancelar sin dibujar tampoco emite: `parar` sale antes.
+    ctx.dibujo.cancelar()
+    expect(visto).toEqual([true, false])
+    ctx.limpiar()
+  })
+
+  it('⛔ las cuatro salidas SILENCIOSAS ahora avisan', () => {
+    for (const terminar of [
+      (ctx) => ctx.tecla('Escape'),
+      (ctx) => ctx.tecla('Enter'), // con 3 vértices: cierra
+      (ctx) => ctx.dobleClic([440020, 4480000]),
+      (ctx) => ctx.dibujo.destruir(),
+    ]) {
+      const ctx = montar()
+      const visto = []
+      ctx.dibujo.alCambiar((d) => visto.push(d))
+      ctx.dibujo.empezar()
+      ctx.clic([440000, 4480000])
+      ctx.clic([440010, 4480000])
+      ctx.clic([440020, 4480000])
+      terminar(ctx)
+      expect(visto.at(-1), 'esta salida no ha avisado').toBe(false)
+      expect(ctx.dibujo.dibujando()).toBe(false)
+      ctx.limpiar()
+    }
+  })
+
+  it('devuelve la BAJA, y admite más de un oyente', () => {
+    // `Set` y no callback único: la barra quiere saberlo y el cableado también, y
+    // el segundo en llegar no puede desalojar al primero.
+    const ctx = montar()
+    const a = []
+    const b = []
+    const baja = ctx.dibujo.alCambiar((d) => a.push(d))
+    ctx.dibujo.alCambiar((d) => b.push(d))
+
+    ctx.dibujo.empezar()
+    expect(a).toEqual([true])
+    expect(b).toEqual([true])
+
+    baja()
+    ctx.dibujo.cancelar()
+    expect(a).toEqual([true])
+    expect(b).toEqual([true, false])
+    ctx.limpiar()
+  })
+
+  it('un oyente que LANZA no se lleva por delante ni a los demás ni al gesto', () => {
+    // Esto corre en mitad de un `keydown`. Un oyente roto no puede dejar el trazo
+    // a medias ni impedir que el siguiente se entere.
+    const ctx = montar()
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const visto = []
+    ctx.dibujo.alCambiar(() => {
+      throw new Error('prueba')
+    })
+    ctx.dibujo.alCambiar((d) => visto.push(d))
+
+    expect(() => ctx.dibujo.empezar()).not.toThrow()
+    expect(visto).toEqual([true])
+    expect(error).toHaveBeenCalled()
+    error.mockRestore()
+    ctx.limpiar()
+  })
+
+  it('exige una función', () => {
+    const ctx = montar()
+    expect(() => ctx.dibujo.alCambiar(null)).toThrow(TypeError)
+    expect(() => ctx.dibujo.alCambiar('fn')).toThrow(TypeError)
+    ctx.limpiar()
+  })
+})
+
+// ── ⭐ Cerrar pinchando la primera esquina (2026-08-19) ──────────────────────
+//
+// ⛔ **EL DEFECTO QUE ESTO CIERRA.** Hasta hoy el recinto solo se cerraba con doble
+// clic o `Enter`, y pinchar el primer vértice **no cerraba**: añadía un vértice
+// duplicado encima, porque `edit/dibujo.js#anadirPunto` compara el punto nuevo
+// contra el ANTERIOR y no contra el primero. El usuario, viendo que no cerraba,
+// seguía pinchando y acumulaba vértices en el mismo sitio.
+describe('viewer/dibujo · el clic sobre la primera esquina CIERRA', () => {
+  const abiertos = []
+  afterEach(() => {
+    while (abiertos.length > 0) abiertos.pop()()
+  })
+  const abrir = (opciones) => {
+    const ctx = montar(opciones)
+    abiertos.push(ctx.limpiar)
+    return ctx
+  }
+
+  it('⭐ tres esquinas y un clic en la primera: recinto cerrado, sin doble clic', () => {
+    const ctx = abrir()
+    ctx.dibujo.empezar()
+    ctx.clic(V.A)
+    ctx.clic(V.B)
+    ctx.clic(V.C)
+    ctx.clic(V.A)
+
+    expect(ctx.alCerrar).toHaveBeenCalledTimes(1)
+    const recinto = ctx.alCerrar.mock.calls[0][0]
+    // TRES vértices, no cuatro: el clic que cierra NO es un vértice más.
+    expect(recinto.vertices).toHaveLength(3)
+    expect(ctx.dibujo.dibujando()).toBe(false)
+  })
+
+  it('acertar dentro del radio de puntería basta: no hay que dar en el píxel exacto', () => {
+    // Es la razón de ser del cambio. Con la tolerancia del ENGANCHE (0,2 m) el
+    // primer vértice pide dos píxeles de puntería a escala de finca.
+    const ctx = abrir()
+    ctx.dibujo.empezar()
+    ctx.clic(V.A)
+    ctx.clic(V.B)
+    ctx.clic(V.C)
+    ctx.clic(ctx.aPixelesDe(V.A, 8)) // dentro de los 12 px
+
+    expect(ctx.alCerrar).toHaveBeenCalledTimes(1)
+  })
+
+  it('⛔ y FUERA del radio pone un vértice, no cierra: la diana tiene borde', () => {
+    const ctx = abrir()
+    ctx.dibujo.empezar()
+    ctx.clic(V.A)
+    ctx.clic(V.B)
+    ctx.clic(V.C)
+    ctx.clic(ctx.aPixelesDe(V.A, 40))
+
+    expect(ctx.alCerrar).not.toHaveBeenCalled()
+    expect(ctx.dibujo.nVertices()).toBe(4)
+    expect(ctx.dibujo.dibujando()).toBe(true)
+  })
+
+  it('⚠️ con DOS esquinas puestas, pinchar la primera pone su vértice y NO se queja', () => {
+    // `sePuedeCerrar` manda. Soltar aquí «hacen falta al menos tres» sería regañar
+    // al usuario por un clic que la aplicación no le ha ofrecido como cierre: el
+    // primer vértice ni siquiera se ha agrandado todavía.
+    const ctx = abrir()
+    ctx.dibujo.empezar()
+    ctx.clic(V.A)
+    ctx.clic(V.B)
+    ctx.clic(V.A)
+
+    expect(ctx.alCerrar).not.toHaveBeenCalled()
+    expect(ctx.dibujo.nVertices()).toBe(3)
+    expect(mensajes(ctx.alAvisar).join(' ')).not.toMatch(/al menos tres/i)
+  })
+
+  it('⭐ la primera esquina se AGRANDA solo cuando ya se puede cerrar', () => {
+    // Un grafismo que anuncie una diana que no lo es es un mando que miente, la
+    // misma regla que gobierna los botones de esta aplicación.
+    const ctx = abrir()
+    ctx.dibujo.empezar()
+    ctx.clic(V.A)
+    ctx.clic(V.B)
+    expect(ctx.marcadores().every((m) => m.options.className === CLASE_PUNTO_TRAZO)).toBe(true)
+
+    ctx.clic(V.C)
+    const conTres = ctx.marcadores()
+    expect(conTres[0].options.className).toBe(CLASE_PUNTO_CIERRE)
+    expect(conTres[0].options.radius).toBeGreaterThan(conTres[1].options.radius)
+  })
+
+  it('y se RELLENA al acercarle el puntero: es el aviso de que ese clic cierra', () => {
+    const ctx = abrir()
+    ctx.dibujo.empezar()
+    ctx.clic(V.A)
+    ctx.clic(V.B)
+    ctx.clic(V.C)
+
+    const cierre = ctx.marcadores()[0]
+    expect(cierre.options.fillOpacity).toBe(0)
+    ctx.mover(V.A)
+    expect(cierre.options.fillOpacity).toBe(1)
+    // Y se suelta al alejarse: no es un estado del que no se pueda salir.
+    ctx.mover(V.C)
+    expect(cierre.options.fillOpacity).toBe(0)
+  })
+
+  it('⛔ el DOBLE CLIC sigue cerrando y sigue sin descontar un vértice bueno', () => {
+    // El guardián de la lección de F12: pinchar A, B, C y hacer doble clic en D
+    // tiene que dar un CUADRILÁTERO. Que ahora exista el cierre por clic no puede
+    // haber cambiado eso.
+    const ctx = abrir()
+    ctx.dibujo.empezar()
+    ctx.clic(V.A)
+    ctx.clic(V.B)
+    ctx.clic(V.C)
+    ctx.clic(V.D) // primer clic del doble
+    ctx.clic(V.D) // segundo clic del doble -> PUNTO_REPETIDO, se ignora
+    ctx.dobleClic(V.D)
+
+    expect(ctx.alCerrar).toHaveBeenCalledTimes(1)
+    expect(ctx.alCerrar.mock.calls[0][0].vertices).toHaveLength(4)
+  })
+
+  it('⛔ y hacer DOBLE clic sobre la primera esquina cierra UNA vez, no dos', () => {
+    // Leaflet dispara los dos `click` del doble antes que el `dblclick`. El primero
+    // ya cierra y deja `dibujando` en false, así que el segundo sale por la guarda
+    // de `alClic`. Sin ella, `alCerrar` se llamaría sobre un trazo ya entregado.
+    const ctx = abrir()
+    ctx.dibujo.empezar()
+    ctx.clic(V.A)
+    ctx.clic(V.B)
+    ctx.clic(V.C)
+    ctx.clic(V.A) // primer clic del doble: CIERRA
+    ctx.clic(V.A) // segundo: el dibujo ya no está en marcha
+
+    expect(ctx.alCerrar).toHaveBeenCalledTimes(1)
+    expect(ctx.alCerrar.mock.calls[0][0].vertices).toHaveLength(3)
+  })
+
+  it('el mensaje de arranque nombra el gesto nuevo el PRIMERO', () => {
+    const ctx = abrir()
+    ctx.dibujo.empezar()
+    expect(MENSAJE_EMPEZAR).toMatch(/vuelve a pinchar la primera/i)
+    expect(mensajes(ctx.alAvisar)).toContain(MENSAJE_EMPEZAR)
+  })
+})
+
+// ── ⭐ Los vértices ya puestos son dianas de enganche (2026-08-19) ───────────
+
+describe('viewer/dibujo · el trazo se engancha a sí mismo', () => {
+  const abiertos = []
+  afterEach(() => {
+    while (abiertos.length > 0) abiertos.pop()()
+  })
+
+  it('⭐ `ajustar` recibe los vértices ya puestos como `dianasExtra`', () => {
+    // El catálogo del enganche se construye sobre el MODELO, y el recinto que se
+    // está dibujando todavía no está en él: sin esto no hay forma de clavar un
+    // vértice justo encima de otro que uno mismo acaba de poner.
+    const ajustar = vi.fn((utm) => ({ punto: utm, enganchado: false, tipo: null }))
+    const ctx = montar({ ajustar })
+    abiertos.push(ctx.limpiar)
+
+    ctx.dibujo.empezar()
+    ctx.clic(V.A)
+    ctx.clic(V.B)
+
+    const ultima = ajustar.mock.calls.at(-1)
+    expect(ultima[1]).toBeNull() // no se está moviendo ningún vértice existente
+    // ⚠️ `toBeCloseTo` y no `toEqual`: el punto ha ido y vuelto de lat/lon, así que
+    // arrastra el error de coma flotante de la proyección. Lo que se comprueba es
+    // que llega el vértice A, no que la reproyección sea exacta al bit.
+    expect(ultima[3].dianasExtra).toHaveLength(1)
+    expect(ultima[3].dianasExtra[0][0]).toBeCloseTo(V.A[0], 6)
+    expect(ultima[3].dianasExtra[0][1]).toBeCloseTo(V.A[1], 6)
+  })
+
+  it('el primer clic no lleva ninguna: todavía no hay nada puesto', () => {
+    const ajustar = vi.fn((utm) => ({ punto: utm, enganchado: false, tipo: null }))
+    const ctx = montar({ ajustar })
+    abiertos.push(ctx.limpiar)
+
+    ctx.dibujo.empezar()
+    ctx.clic(V.A)
+    expect(ajustar.mock.calls[0][3].dianasExtra).toEqual([])
+  })
+})
+
+// ── ⭐ La previsualización del enganche al pasar el puntero (2026-08-19) ─────
+
+describe('viewer/dibujo · el enganche se ve ANTES de pinchar', () => {
+  const abiertos = []
+  afterEach(() => {
+    while (abiertos.length > 0) abiertos.pop()()
+  })
+
+  /**
+   * Un `ajustar` que dice «he enganchado» sin mover el punto. Anunciar la captura
+   * es lo que enciende el indicador en `viewer/edicion.js`; devolver el punto tal
+   * cual es lo que deja que estas pruebas pongan vértices distintos y lleguen a
+   * poder cerrar, que es donde vive la mitad interesante del comportamiento.
+   */
+  const engancharA = () => vi.fn((utm) => ({ punto: [...utm], enganchado: true, tipo: 'VERTICE' }))
+
+  it('⭐ mover el puntero PREGUNTA al enganche, que es quien pinta el indicador', () => {
+    // El defecto que esto cierra: hasta hoy `ajustar` solo se llamaba en el CLIC,
+    // así que pasar por encima de un punto del levantamiento importado no enseñaba
+    // nada y el enganche se descubría cuando el vértice ya estaba puesto.
+    const ajustar = engancharA()
+    const ctx = montar({ ajustar })
+    abiertos.push(ctx.limpiar)
+
+    ctx.dibujo.empezar()
+    expect(ajustar).not.toHaveBeenCalled()
+
+    ctx.mover(V.B)
+    expect(ajustar).toHaveBeenCalledTimes(1)
+    // La MISMA pregunta que hará el clic: sin vértice que excluir y con los ya
+    // puestos como dianas. Si divergieran, el indicador prometería un enganche
+    // distinto del que el clic va a hacer.
+    expect(ajustar.mock.calls[0][1]).toBeNull()
+    expect(ajustar.mock.calls[0][3].dianasExtra).toEqual([])
+  })
+
+  it('el puntero NO pone vértices: solo pregunta', () => {
+    const ajustar = engancharA()
+    const ctx = montar({ ajustar })
+    abiertos.push(ctx.limpiar)
+
+    ctx.dibujo.empezar()
+    ctx.mover(V.A)
+    ctx.mover(V.B)
+    ctx.mover(V.C)
+    expect(ctx.dibujo.nVertices()).toBe(0)
+  })
+
+  it('sin dibujar, mover el puntero no pregunta nada', () => {
+    const ajustar = engancharA()
+    const ctx = montar({ ajustar })
+    abiertos.push(ctx.limpiar)
+
+    ctx.mover(V.A)
+    expect(ajustar).not.toHaveBeenCalled()
+  })
+
+  it('⚠️ sobre la primera esquina ARMADA no previsualiza: ahí el clic CIERRA', () => {
+    // Dos marcas encima del mismo punto contando dos cosas distintas —«engancharás
+    // aquí» y «cerrarás aquí»— es peor que una sola. Manda el aro relleno.
+    const ajustar = engancharA()
+    const alSoltarEnganche = vi.fn()
+    const ctx = montar({ ajustar, alSoltarEnganche })
+    abiertos.push(ctx.limpiar)
+
+    ctx.dibujo.empezar()
+    ctx.clic(V.A)
+    ctx.clic(V.B)
+    ctx.clic(V.C)
+    const llamadasTrasLosClics = ajustar.mock.calls.length
+
+    ctx.mover(V.A)
+    expect(ajustar.mock.calls.length).toBe(llamadasTrasLosClics) // no ha preguntado
+    expect(alSoltarEnganche).toHaveBeenCalled() // y ha apagado el indicador
+    expect(ctx.marcadores()[0].options.fillOpacity).toBe(1) // el aro sí se rellena
+  })
+
+  it('⛔ al PARAR se apaga el indicador: no es pintura de este módulo', () => {
+    // `limpiarPintura` no lo alcanza —lo pone `viewer/edicion.js`— y ninguna de las
+    // cinco formas de terminar un dibujo pasa por un último `mousemove` que lo
+    // apagara. Sin esto se queda pintado sobre un mapa en el que ya no se dibuja.
+    const alSoltarEnganche = vi.fn()
+    const ctx = montar({ ajustar: engancharA(), alSoltarEnganche })
+    abiertos.push(ctx.limpiar)
+
+    ctx.dibujo.empezar()
+    ctx.mover(V.B)
+    alSoltarEnganche.mockClear()
+
+    ctx.tecla('Escape')
+    expect(alSoltarEnganche).toHaveBeenCalledTimes(1)
+  })
+
+  it('y también al cerrar bien y al destruir', () => {
+    const alSoltarEnganche = vi.fn()
+    const ctx = montar({ ajustar: engancharA(), alSoltarEnganche })
+    abiertos.push(ctx.limpiar)
+
+    ctx.dibujo.empezar()
+    ctx.clic(V.A)
+    ctx.clic(V.B)
+    ctx.clic(V.C)
+    alSoltarEnganche.mockClear()
+    ctx.dibujo.cerrar()
+    expect(alSoltarEnganche).toHaveBeenCalledTimes(1)
+
+    ctx.dibujo.empezar()
+    alSoltarEnganche.mockClear()
+    ctx.dibujo.destruir()
+    expect(alSoltarEnganche).toHaveBeenCalledTimes(1)
+  })
+
+  it('un `alSoltarEnganche` que LANZA no se lleva por delante el gesto', () => {
+    const alSoltarEnganche = vi.fn(() => {
+      throw new Error('boom')
+    })
+    const ctx = montar({ ajustar: engancharA(), alSoltarEnganche })
+    abiertos.push(ctx.limpiar)
+    const consola = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    ctx.dibujo.empezar()
+    expect(() => ctx.tecla('Escape')).not.toThrow()
+    expect(ctx.dibujo.dibujando()).toBe(false)
+    expect(consola).toHaveBeenCalled()
+    consola.mockRestore()
+  })
+
+  it('sin `alSoltarEnganche` no pasa nada: el gancho es opcional', () => {
+    const ctx = montar({ ajustar: engancharA() })
+    abiertos.push(ctx.limpiar)
+
+    ctx.dibujo.empezar()
+    ctx.mover(V.B)
+    expect(() => ctx.tecla('Escape')).not.toThrow()
+    expect(ctx.dibujo.dibujando()).toBe(false)
   })
 })

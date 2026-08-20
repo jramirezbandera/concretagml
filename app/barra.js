@@ -197,6 +197,43 @@ export const ATRIBUTO_CONSERVA = 'data-menu-conserva'
 export const ATRIBUTO_BARRA = 'data-barra'
 
 /**
+ * `data-expediente-estado` en el DISPARADOR de la zona, y de él cuelga el punto de
+ * color que lleva el nombre delante.
+ *
+ * ── POR QUÉ EXISTE (2026-08-20) ─────────────────────────────────────────────
+ * La zona ya decía los tres estados **con palabras** —«Sin expediente», «Sin
+ * guardar», el nombre archivado—, y las palabras están a 13 px en una barra que
+ * cruza la ventana entera: hay que pararse a leerlas. El punto los dice de un
+ * vistazo, en el sitio donde la mirada ya está.
+ *
+ * ⚠️ **El color es REFUERZO y nunca el único canal** (DESIGN.md §3.3, regla de oro
+ * nº 9): quien no distinga el ámbar del verde sigue teniendo la frase entera al
+ * lado, que es la que manda. Por eso este atributo no cambia ni una palabra de lo
+ * que se escribe: se pone en la MISMA función y con las mismas tres salidas.
+ *
+ * ⛔ Y es un `data-*` y no una clase, por lo de siempre en esta casa: el aspecto
+ * sale de un `data-*` (DESIGN.md §8.3), así que la hoja lee `[data-expediente-estado='…']`
+ * y este módulo no tiene que saber cómo se llama ningún color.
+ */
+export const ATRIBUTO_EXPEDIENTE_ESTADO = 'data-expediente-estado'
+
+/**
+ * Los tres valores de {@link ATRIBUTO_EXPEDIENTE_ESTADO}, que son las tres salidas
+ * de `pintarExpediente()` y ni una más. Se exportan para que la prueba los afirme
+ * sin copiar el literal, igual que {@link EXPEDIENTE_VACIO}.
+ *
+ * @readonly
+ */
+export const ESTADO_EXPEDIENTE = Object.freeze({
+  /** No hay nada que archivar: la aplicación se acaba de abrir. */
+  VACIO: 'vacio',
+  /** Hay trabajo en pantalla y todavía no tiene nombre. */
+  SIN_ARCHIVAR: 'sin-archivar',
+  /** Está guardado con nombre en este navegador. */
+  ARCHIVADO: 'archivado',
+})
+
+/**
  * Lo que se lee en la zona de expediente cuando no hay ninguno archivado, que es
  * el caso normal al abrir la aplicación. Se exporta para que el test lo afirme
  * sin copiar el literal, igual que los motivos de `app/navegacion.js`.
@@ -599,6 +636,11 @@ export function cablearBarra({
 
   const nodoNombre = documento.querySelector(`[${ATRIBUTO_BARRA}="expediente-nombre"]`)
   const nodoApunte = documento.querySelector(`[${ATRIBUTO_BARRA}="expediente-apunte"]`)
+  // El disparador de la zona, que es donde va {@link ATRIBUTO_EXPEDIENTE_ESTADO}.
+  // ⚠️ Puede ser `null` sin que pase nada: el punto es refuerzo de lo que las dos
+  // líneas de arriba ya dicen con palabras, así que una cáscara sin él pinta igual
+  // de bien. Por eso NO entra en la guarda de `pintarExpediente()`.
+  const nodoDisparador = documento.querySelector(`[${ATRIBUTO_DISPARADOR}="expediente"]`)
 
   /**
    * Lleva el estado del expediente a la barra. Se llama desde `pintar()`, o sea
@@ -634,12 +676,14 @@ export function cablearBarra({
     if (foto === null || typeof foto !== 'object') {
       nodoNombre.textContent = EXPEDIENTE_VACIO.nombre
       nodoApunte.textContent = EXPEDIENTE_VACIO.apunte
+      marcarEstado(ESTADO_EXPEDIENTE.VACIO)
       return
     }
     const nombre = typeof foto.nombreAbierto === 'string' ? foto.nombreAbierto.trim() : ''
     if (nombre !== '') {
       nodoNombre.textContent = nombre
       nodoApunte.textContent = foto.puedeGuardar === true ? 'Guardado en este navegador' : ''
+      marcarEstado(ESTADO_EXPEDIENTE.ARCHIVADO)
       return
     }
     // Sin nombre hay dos casos y **no dicen lo mismo**: o no hay nada (la app
@@ -649,6 +693,21 @@ export function cablearBarra({
     const cual = hayTrabajo ? EXPEDIENTE_SIN_NOMBRE : EXPEDIENTE_VACIO
     nodoNombre.textContent = cual.nombre
     nodoApunte.textContent = cual.apunte
+    marcarEstado(hayTrabajo ? ESTADO_EXPEDIENTE.SIN_ARCHIVAR : ESTADO_EXPEDIENTE.VACIO)
+  }
+
+  /**
+   * Pone {@link ATRIBUTO_EXPEDIENTE_ESTADO} en el disparador, de donde cuelga el
+   * punto de color. Se llama desde las TRES salidas de `pintarExpediente()` y
+   * desde ningún otro sitio: el atributo tiene que valer siempre lo mismo que las
+   * palabras que se acaban de escribir, y la única forma de garantizarlo es que
+   * los dos se pongan en el mismo acto.
+   *
+   * @param {string} cual Uno de {@link ESTADO_EXPEDIENTE}.
+   */
+  function marcarEstado(cual) {
+    if (nodoDisparador === null) return
+    nodoDisparador.setAttribute(ATRIBUTO_EXPEDIENTE_ESTADO, cual)
   }
 
   // El canal del expediente. Repinta SOLO su zona: el resto de la barra depende de

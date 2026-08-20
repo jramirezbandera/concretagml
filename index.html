@@ -207,10 +207,46 @@
           <span class="gml-barra-expediente-apunte" data-barra="expediente-apunte">
             Nada que guardar todavía
           </span>
+          <!-- ⭐ LA FLECHA, PUESTA EL 2026-08-20. Hasta hoy este botón no se
+               parecía a un botón: dos renglones de texto sin borde ni marca de
+               nada, que solo estrenaban caja al pasarles el puntero por encima
+               — o sea que el único momento en que la zona decía «esto abre algo»
+               era DESPUÉS de haberlo descubierto. `aria-haspopup="menu"` ya lo
+               contaba, pero solo a quien usa lector de pantalla.
+
+               Es el MISMO `▾` que la entrega lleva al otro extremo de la barra
+               (`.gml-barra-entregar-flecha`), y va como `<span>` de verdad y no
+               como un `::after` de la hoja por dos motivos: Chrome mete el
+               contenido generado en el nombre accesible del botón —el rótulo
+               pasaría a ser «Sin guardar … ▾»—, y `aria-hidden` no se le puede
+               poner a un pseudoelemento. La hoja lo gira 180° con
+               `[aria-expanded='true']`, que es un atributo que este botón ya
+               tenía que llevar. -->
+          <span class="gml-barra-expediente-flecha" aria-hidden="true">▾</span>
         </button>
         <div class="gml-barra-menu" id="gml-menu-expediente" role="menu" data-menu="expediente" hidden>
+          <!-- ⭐ **DECÍA «Expedientes guardados» HASTA EL 2026-08-20, Y ERA MEDIA
+               VERDAD.** El `<dialog>` que abre (`app/dialogo-expediente.js`) se
+               titula «Expediente» y tiene DOS grupos: arriba «Guardar el trabajo en
+               este navegador» —con el campo del nombre y el botón «Guardar», que es
+               además donde `abrir()` deja el foco— y debajo la lista de lo ya
+               guardado. El rótulo solo nombraba el segundo.
+
+               ⛔ Y el que se quedaba sin puerta era el primero, que es justo el que
+               la barra te manda usar: el botón de al lado dice «Sin guardar · Se
+               autoguarda; **archívalo** para conservarlo», y en el menú no había
+               ninguna palabra que se pareciera a archivar. Quien no hubiera abierto
+               nunca ese diálogo no tenía por dónde deducir que «Expedientes
+               guardados» es también donde se guarda éste.
+
+               ⚠️ Un rótulo y NO dos opciones. Añadir un «Guardar como…» aparte
+               habría puesto dos `menuitem` que abren exactamente la misma pantalla
+               —el diálogo no tiene modos— y en esta casa dos puertas al mismo sitio
+               acaban divergiendo. El `data-accion` no se toca: es
+               `SELECTOR_BOTON_EXPEDIENTE` de `app/cableado-expediente.js` y G16 exige
+               que case un solo nodo. -->
           <button type="button" role="menuitem" class="gml-barra-menu-opcion" data-accion="abrir-expediente">
-            Expedientes guardados<span class="gml-barra-menu-apunte">en este navegador</span>
+            Guardar o abrir un expediente<span class="gml-barra-menu-apunte">en este navegador</span>
           </button>
           <!-- F15 · EL DICCIONARIO DE ERRORES. Abre el `<dialog>` que fabrica
                `app/dialogo-diccionario.js`, donde se pega el mensaje del IVG o del
@@ -224,6 +260,30 @@
                coste en píxeles de la barra es CERO — el menú crece hacia abajo. -->
           <button type="button" role="menuitem" class="gml-barra-menu-opcion" data-accion="consultar-rechazo">
             Me han rechazado el fichero<span class="gml-barra-menu-apunte">traducir el mensaje de la Sede</span>
+          </button>
+          <!-- LA TARJETA DE BIENVENIDA, OTRA VEZ. Reabre la `<section>` que fabrica
+               `app/tarjeta-bienvenida.js` — la que sale sola en la primera visita,
+               sobre el mapa de España, y cuenta qué es esto y que pinchar el mapa
+               rellena la referencia.
+
+               ⛔ **ESTE RENGLÓN NO ES OPCIONAL Y EL MÓDULO LANZA SIN ÉL.** Una
+               ayuda que solo se ve una vez en la vida es exactamente lo que
+               DESIGN.md §8 prohíbe («jamás retirado de la pantalla»), y encima
+               repetiría el defecto que la tarjeta viene a arreglar: un camino que
+               solo conoce quien lo vio una vez es un secreto. Por eso
+               `crearTarjetaBienvenida` no se monta «si encuentra el botón», sino
+               que **revienta al arrancar** si no está — mismo criterio que
+               `crearDialogoDiccionario` con el de arriba.
+
+               ⚠️ Va en el menú de Expediente, al lado del diccionario, y no en el
+               de salidas: los dos son AYUDA DE CONSULTA y el de la derecha exporta
+               ficheros. El coste en píxeles de la barra es CERO — el menú crece
+               hacia abajo — y en bytes de hoja también, porque reutiliza
+               `gml-barra-menu-opcion` sin añadir ni una regla. Con el presupuesto a
+               0 B de holgura (DESIGN.md §10) ésa era la única ruta que salía en
+               verde por defecto. -->
+          <button type="button" role="menuitem" class="gml-barra-menu-opcion" data-accion="como-funciona" aria-haspopup="dialog">
+            Cómo funciona<span class="gml-barra-menu-apunte">la ayuda de la primera visita</span>
           </button>
           <!-- ⚠️ «Vaciarlo» conserva su doble pulsación —vaciar es irreversible en
                pantalla— y desde la mudanza la confirmación se pide EN EL PROPIO
@@ -626,10 +686,17 @@
                más. La referencia no entra en el expediente hasta que se pulsa
                «Traer del Catastro», que es lo que hace que `parcela.refcat`
                signifique siempre «esto lo afirma quien firma». -->
+          <!-- ⚠️ ACORTADO EL 2026-08-18, Y CON UNA REGLA: SE QUITAN PALABRAS, NO
+               HECHOS. De cuatro líneas a tres. «del Catastro» se va porque lo dicen
+               el `<h2>` y el botón de debajo; «la cartografía» pasa a «la ortofoto»,
+               que es lo que de verdad hay debajo. **La segunda frase entera se
+               queda**, incluido «la revisas antes de traerla»: es EL camino que no
+               tiene ningún control que lo anuncie, y es justo lo que el comentario
+               de arriba lleva denunciando desde el 2026-08-11. Acortarla habría sido
+               pagar los píxeles con el único sitio donde ese camino está escrito. -->
           <p class="gml-via-apunte">
-            Trae el recinto oficial del Catastro y edítalo sobre la cartografía. También puedes
-            pinchar la parcela en el mapa: la referencia se rellena sola y la revisas antes de
-            traerla.
+            Trae el recinto oficial y edítalo sobre la ortofoto. O pincha la parcela en el mapa:
+            la referencia se rellena sola y la revisas antes de traerla.
           </p>
 
           <div class="gml-campo">
@@ -806,9 +873,14 @@
                dueño más ni un nodo que repintar. Las reglas están en la sección K.3
                de `estilos/app.css`, y el defecto (sin `data-rama` todavía puesto) es
                la frase de PARCELA, que es la rama inicial. -->
+          <!-- ⚠️ ACORTADO EL 2026-08-18 (ver la vía de arriba): «un volcado de
+               coordenadas en .txt» → «coordenadas en .txt», y las dos frases se
+               cosen con un punto y coma. **Las dos mitades de rama siguen enteras**:
+               son la afirmación de qué va a pasar al soltar el fichero, y decir solo
+               una sería falso en la otra rama. -->
           <p class="gml-via-apunte">
-            Tu levantamiento en <span class="gml-mono">.dxf</span> o un volcado de coordenadas en
-            <span class="gml-mono">.txt</span>. También puedes soltarlo sobre la ventana.
+            Tu levantamiento en <span class="gml-mono">.dxf</span> o coordenadas en
+            <span class="gml-mono">.txt</span>; también vale soltarlo sobre la ventana.
             <span class="gml-solo-parcela">Entra como el recinto medido de la parcela.</span>
             <span class="gml-solo-edificio"
               >Cada polilínea del dibujo entra como una parte del edificio.</span
@@ -862,9 +934,20 @@
                    Que el panel no cambie es entonces lo correcto — y por eso se
                    avisa por el canal de avisos en vez de moverle la pantalla a
                    nadie (`MENSAJE_GML_ES_DE_PARCELA` en `app/main.js`). -->
+          <!-- ⚠️ ACORTADO EL 2026-08-18 (ver las dos vías de arriba): el inciso con
+               rayas pasa a aposición y las dos frases se cosen con dos puntos. De
+               cuatro líneas a tres. **Las dos mitades de rama siguen enteras**: lo
+               que pasa al abrir un GML NO es simétrico entre ramas (el comentario de
+               arriba lo razona), así que ninguna de las dos se puede resumir. -->
+          <!-- ⚠️ «también vale soltarlo» AÑADIDO EL 2026-08-18. La vía de medición lo
+               decía desde F18 y ésta no, así que las dos juntas afirmaban que el
+               arrastre era cosa del `.dxf`. No lo es: la zona de `crearZonaFichero`
+               es la VENTANA ENTERA y encamina `.gml`/`.xml` por su entrada
+               principal (`app/main.js`, `alFichero`), que es la MISMA que usa este
+               botón. Cuatro palabras, y la asimetría se acaba. -->
           <p class="gml-via-apunte">
-            Un GML ya hecho —el tuyo o el de otro—. Se carga con su geometría y su
-            referencia, y se puede editar y volver a generar.
+            Un GML ya hecho, tuyo o de otro: se carga con su geometría y su referencia,
+            listo para editar y volver a generar; también vale soltarlo sobre la ventana.
             <span class="gml-solo-parcela"
               >Si es de construcción, la aplicación se pasa sola a Edificio.</span
             >
@@ -1256,6 +1339,43 @@
 
         <div class="gml-acciones" data-pantalla="edicion">
 
+          <!-- ── ⭐ `.gml-accion`: LA ENVOLTURA QUE CONVIERTE EL MOTIVO EN PISTA
+               (2026-08-19) ────────────────────────────────────────────────────
+               Los CUATRO CTA de este pie nacen apagados, y los cuatro escriben al
+               lado POR QUÉ (regla de oro 1: un botón gris y mudo es un error
+               silencioso). El texto es largo a propósito —dice qué falta Y cómo
+               conseguirlo—, y con los cuatro apagados a la vez, que es como
+               arranca la aplicación, sumaban ~350 px de la columna: medido en el
+               navegador, la tabla de vértices se quedaba en UNA fila visible.
+
+               ⚠️ **No se ha acortado ni un texto, y esa era la tentación.** Lo
+               que cambia es DÓNDE se enseña: mientras el botón está apagado su
+               renglón deja el flujo y se pinta como un globo sobre la columna al
+               pasar el ratón por la envoltura (`.gml-accion:hover`, en
+               `estilos/app.css`). Cuesta 0 px de alto y no pierde una palabra.
+
+               ⛔ **La envoltura existe porque un `<button disabled>` NO recibe
+               eventos de ratón**, así que `:hover` sobre él no casa en Chrome: el
+               puntero encima de un control apagado hace blanco en su PADRE. Sin
+               este `<div>` la pista no se abriría nunca — justamente en el único
+               estado en el que hace falta.
+
+               ⚠️ Y el renglón **sigue siendo un `role="status"` con su texto
+               dentro**: la pista se esconde con `opacity`, que no saca el nodo del
+               árbol de accesibilidad. Quien usa lector de pantalla oye el motivo
+               entero en cuanto se escribe, como hasta hoy. Es el mismo criterio
+               —y el mismo porqué— del renglón de la barra de edición en
+               `app/main.js` (`RENGLON_OCULTO`), que `display:none` habría
+               dejado mudo.
+
+               ⚠️ Con el botón ENCENDIDO no hay pista: el renglón vuelve a ser un
+               renglón en el flujo, porque entonces cuenta el DESENLACE de lo que
+               el usuario acaba de pulsar y eso no se puede esconder detrás de un
+               gesto. Lo mismo con los errores (`--error`), apagado o no. El
+               interruptor está en el CSS y es `:disabled + .gml-accion-estado`,
+               sin una línea de JS: los cuatro cableados siguen escribiendo el
+               texto igual que siempre. -->
+
           <!-- ── F07 · «Diagnosticar» ──────────────────────────────────────
                SECUNDARIO y DEBAJO del primario, no al lado: son dos acciones de
                momentos distintos del recorrido —se diagnostica para decidir si
@@ -1306,19 +1426,21 @@
                «Diagnosticar encaje»: los dos escriben motivo cuando nacen
                apagados, y con un solo `role="status"` el último en refrescarse
                borraría al otro en cada cambio del store. -->
-          <button
-            type="button"
-            class="gml-boton gml-boton--secundario"
-            data-accion="traer-fondo-catastral"
-            disabled
-          >
-            Traer el parcelario de fondo
-          </button>
-          <p
-            class="gml-accion-estado"
-            data-estado="traer-fondo-catastral"
-            role="status"
-          ></p>
+          <div class="gml-accion">
+            <button
+              type="button"
+              class="gml-boton gml-boton--secundario"
+              data-accion="traer-fondo-catastral"
+              disabled
+            >
+              Traer el parcelario de fondo
+            </button>
+            <p
+              class="gml-accion-estado"
+              data-estado="traer-fondo-catastral"
+              role="status"
+            ></p>
+          </div>
 
           <!-- ── F06 · «Traer colindantes», MUDADO DESDE ENTRADA EL 2026-08-16 ─
                El porqué largo está donde estaba (la lápida del bloque «Parcela
@@ -1348,29 +1470,33 @@
                mudo, porque además el texto existía. Mismo criterio, y mismo
                párrafo, que el renglón de «Traer el parcelario de fondo» de
                aquí arriba. -->
-          <button
-            type="button"
-            class="gml-boton gml-boton--secundario"
-            data-accion="traer-colindantes"
-            disabled
-          >
-            Traer colindantes
-          </button>
-          <p
-            class="gml-accion-estado"
-            data-estado="traer-colindantes"
-            role="status"
-          ></p>
+          <div class="gml-accion">
+            <button
+              type="button"
+              class="gml-boton gml-boton--secundario"
+              data-accion="traer-colindantes"
+              disabled
+            >
+              Traer colindantes
+            </button>
+            <p
+              class="gml-accion-estado"
+              data-estado="traer-colindantes"
+              role="status"
+            ></p>
+          </div>
 
-          <button
-            type="button"
-            class="gml-boton gml-boton--secundario"
-            data-accion="diagnosticar"
-            disabled
-          >
-            Diagnosticar encaje
-          </button>
-          <p class="gml-accion-estado" data-estado="diagnosticar" role="status"></p>
+          <div class="gml-accion">
+            <button
+              type="button"
+              class="gml-boton gml-boton--secundario"
+              data-accion="diagnosticar"
+              disabled
+            >
+              Diagnosticar encaje
+            </button>
+            <p class="gml-accion-estado" data-estado="diagnosticar" role="status"></p>
+          </div>
 
           <!-- ── F17 · «Rehacer el parcelario» ─────────────────────────────
                EL TERCER CTA DE VALIDACIÓN, y el que cierra el hueco que dejaba
@@ -1420,15 +1546,17 @@
           <!-- ⚠️ El rótulo es un VERBO EN INFINITIVO como sus dos hermanos
                («Generar GML», «Diagnosticar encaje»): el pie promete acciones,
                no nombra pantallas. -->
-          <button
-            type="button"
-            class="gml-boton gml-boton--secundario"
-            data-accion="rehacer-parcelario"
-            disabled
-          >
-            Rehacer el parcelario
-          </button>
-          <p class="gml-accion-estado" data-estado="rehacer-parcelario" role="status"></p>
+          <div class="gml-accion">
+            <button
+              type="button"
+              class="gml-boton gml-boton--secundario"
+              data-accion="rehacer-parcelario"
+              disabled
+            >
+              Rehacer el parcelario
+            </button>
+            <p class="gml-accion-estado" data-estado="rehacer-parcelario" role="status"></p>
+          </div>
         </div>
       </footer>
 

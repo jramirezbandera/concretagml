@@ -90,6 +90,7 @@
 // dejó a `MENSAJE_DIBUJO_EN_PARCELA` describiendo un mundo que ya no existía.
 import { TIPO_DETECCION } from '../parsers/_comun.js'
 import { BLOQUEOS } from '../parsers/importar.js'
+import { ORDEN } from '../parsers/levantamiento.js'
 import { NIVEL, resolverAvisar } from '../viewer/_comun.js'
 
 // ── El vocabulario de decisiones ─────────────────────────────────────────────
@@ -104,6 +105,8 @@ import { NIVEL, resolverAvisar } from '../viewer/_comun.js'
  */
 export const TIPO_DECISION = Object.freeze({
   CAPA: 'CAPA',
+  /** F18 · unir los puntos sueltos de un levantamiento para formar el contorno. */
+  PUNTOS: 'PUNTOS',
   GRADOS: 'GRADOS',
   SWAP_XY: 'SWAP_XY',
   CIERRE: 'CIERRE',
@@ -254,6 +257,24 @@ const APUNTE_CAPAS =
 
 const MOTIVO_SIN_CAPA = 'Elige una capa para continuar.'
 
+/** F18 · Gemelo del de arriba, para el levantamiento de puntos sueltos. */
+const MOTIVO_SIN_PUNTOS = 'Di qué hacer con los puntos para continuar.'
+
+/**
+ * F18 · El valor de la opción «no unirlos, pero tráelos».
+ *
+ * ⚠️ **Es un centinela y no la cadena vacía, y eso lo decide un requisito del
+ * gate.** El `value` de las demás opciones de este grupo ES el nombre de la capa,
+ * así que la tercera necesita uno que ninguna capa pueda tener. Con `''` —lo que
+ * había— «no ha elegido nada» y «ha elegido no unirlos» se leían igual en
+ * {@link leerOpciones}, y eso era inocuo mientras esa respuesta no producía nada.
+ * Desde que produce, distinguirlas es obligatorio: el botón sigue apagado hasta
+ * que alguien elige, y lo que se elige tiene que llegar entero.
+ */
+const VALOR_SOLO_PUNTOS = '@solo-puntos'
+
+const ROTULO_PUNTOS = 'Puntos sueltos, sin contorno'
+
 const ROTULO_GRADOS = 'Coordenadas en grados'
 const ROTULO_SWAP = 'X e Y invertidas'
 const ROTULO_CIERRE = 'El contorno no cierra del todo'
@@ -401,6 +422,31 @@ export function decisionesDe(resultado) {
         },
       ],
       bloqueos: bloqueos.filter((b) => !REPARTO.includes(b.codigo)),
+      informativas: informativasDe(detecciones),
+    }
+  }
+
+  // ── 1ter · ⭐ F18 · EL LEVANTAMIENTO QUE SOLO TRAE PUNTOS ─────────────────
+  //
+  // Va con los excluyentes —si está, es lo ÚNICO que se pregunta— y por el mismo
+  // motivo que el reparto de capas y los grados: **todavía no hay geometría**. El
+  // cierre, el huso y la superficie se miden sobre un contorno que aún no existe,
+  // así que preguntar por ellos ahora sería pedirle al usuario que decida sobre
+  // nada. Aceptada la unión, el cableado vuelve a llamar a `importar()` y las
+  // decisiones de verdad aparecen sobre el anillo ya formado.
+  //
+  // ⛔ **Y el bloqueo `SIN_GEOMETRIA` NO se enseña aquí.** Tiene corrección, y
+  // está justo encima. Decir a la vez «este fichero no trae ninguna polilínea,
+  // vuelve a exportarlo desde el CAD» y «pulsa aquí para unir sus 88 puntos» es la
+  // contradicción que esta casa ya pagó dos veces (M28 de F11, y los grados).
+  const propuesta = resultado?.propuestaPuntos ?? null
+  const yaUnidos = porTipo(detecciones, TIPO_DETECCION.PUNTOS_UNIDOS).some(
+    (d) => d?.datos?.aplicado === true,
+  )
+  if (propuesta !== null && propuesta.anillo !== null && !yaUnidos) {
+    return {
+      decisiones: [{ tipo: TIPO_DECISION.PUNTOS, propuesta }],
+      bloqueos: bloqueos.filter((b) => b.codigo !== BLOQUEOS.SIN_GEOMETRIA),
       informativas: informativasDe(detecciones),
     }
   }
@@ -692,6 +738,74 @@ export function crearDialogoImportacion({ documento = document, alAvisar } = {})
     return caja
   }
 
+  /**
+   * ⭐ **F18 · La pantalla del levantamiento.** Un solo grupo resuelve las DOS
+   * preguntas que hay —si se unen y con qué capa—, porque en realidad son la
+   * misma: «¿cuál de estas nubes de puntos es tu linde, o ninguna?». Partirlas en
+   * dos grupos obligaría a contestar «sí» y luego «¿cuál?», que es un paso de más
+   * para una respuesta que el usuario ya tiene entera en la cabeza.
+   *
+   * ⛔ **Ninguna opción nace marcada, y es deliberado.** Las otras decisiones de
+   * esta pantalla tienen un defecto seguro —«no toques mi dato»—; aquí ese defecto
+   * no existe: las tres respuestas hacen algo distinto con la geometría que se va a
+   * firmar, y ninguna es la respuesta prudente. Se hace como con el reparto por
+   * capas: el botón se queda apagado **con su motivo escrito al lado** hasta que
+   * alguien elige. Ver {@link repintarGate}.
+   *
+   * ⭐ **Y la tercera opción dejó de ser un callejón el 2026-08-19.** Decía «No
+   * unirlos (no entrará ninguna parcela)» y era verdad: la nube se tiraba entera y
+   * el usuario acababa donde empezó, con una frase que no le daba salida. Ahora los
+   * puntos ENTRAN sin contorno —quedan de enganche para dibujarlo a mano— así que
+   * la etiqueta dice qué entra y qué se hará con ello. Ofrecer una salida que no lo
+   * es es peor que no ofrecer ninguna: lo midió F22 y aquí se cierra.
+   *
+   * ⚠️ **Y el orden se dice en la etiqueta de cada opción**, no en el apunte de
+   * arriba: es lo que distingue reproducir el recorrido del topógrafo de conjeturar
+   * por el orden del volcado, y va pegado a la opción que lo aplica.
+   */
+  function pintarPuntos(decision) {
+    const p = decision.propuesta
+    const porNumeros = p.orden === ORDEN.NUMERACION
+    const caja = grupo(
+      ROTULO_PUNTOS,
+      `Este fichero no dibuja ningún contorno: trae puntos sueltos, que es como vuelca un ` +
+        `levantamiento de campo. ` +
+        (porNumeros
+          ? 'Vienen numerados, así que se pueden unir en el orden en que se midieron.'
+          : 'No traen números de punto, así que solo se pueden unir en el orden del volcado: ' +
+            'revisa el trazado antes de darlo por bueno.'),
+    )
+    const lista = crear('div', CLASE.LISTA)
+    for (const { capa, puntos } of p.capasCandidatas) {
+      // El recuento del anillo solo se conoce de la capa YA medida; para las demás
+      // se dice cuántos puntos tiene, que es lo que se sabe sin volver a parsear.
+      const cuantos = capa === p.capa ? p.anillo.length : puntos
+      lista.append(
+        opcionRadio(
+          'puntos',
+          capa,
+          `Unir los ${cuantos} puntos de «${capa}»` +
+            (capa === p.capa && porNumeros ? ' por su numeración' : ''),
+          false,
+        ),
+      )
+    }
+    // La capa la elige el módulo, no el usuario: para hacer de dianas las dos capas
+    // del fichero son la MISMA nube (el CAD escribe cada punto en la 2D y en la
+    // 3D), así que preguntarlo otra vez sería duplicar la lista para una respuesta
+    // que no cambia nada. Lo que sí se dice es CUÁL entra y CUÁNTOS son.
+    lista.append(
+      opcionRadio(
+        'puntos',
+        VALOR_SOLO_PUNTOS,
+        `No unirlos: traer los ${p.anillo.length} puntos de «${p.capa}» y dibujar yo el recinto`,
+        false,
+      ),
+    )
+    caja.append(lista)
+    return caja
+  }
+
   function pintarSwap(decision) {
     const caja = grupo(
       ROTULO_SWAP,
@@ -778,10 +892,17 @@ export function crearDialogoImportacion({ documento = document, alAvisar } = {})
   function repintarGate() {
     const pideCapa = decisionesEnPantalla.some((d) => d.tipo === TIPO_DECISION.CAPA)
     const elegida = pideCapa ? dialogo.querySelector('input[data-campo="capa"]:checked') : null
-    const falta = pideCapa && elegida === null
+    const faltaCapa = pideCapa && elegida === null
+    // F18 · lo mismo para el levantamiento, y por lo mismo: ninguna de sus
+    // opciones es un defecto seguro, así que no hay ninguna marcada y hasta que el
+    // usuario elija no hay nada que importar. Ver {@link pintarPuntos}.
+    const pidePuntos = decisionesEnPantalla.some((d) => d.tipo === TIPO_DECISION.PUNTOS)
+    const faltaPuntos =
+      pidePuntos && dialogo.querySelector('input[data-campo="puntos"]:checked') === null
+    const falta = faltaCapa || faltaPuntos
     botonImportar.disabled = falta
     // Regla de oro 1: un botón apagado sin motivo escrito es un botón roto.
-    estado.textContent = falta ? MOTIVO_SIN_CAPA : ''
+    estado.textContent = faltaCapa ? MOTIVO_SIN_CAPA : faltaPuntos ? MOTIVO_SIN_PUNTOS : ''
   }
 
   // ── Lectura de lo elegido ─────────────────────────────────────────────────
@@ -801,6 +922,21 @@ export function crearDialogoImportacion({ documento = document, alAvisar } = {})
       if (d.tipo === TIPO_DECISION.CAPA) {
         const capa = leer('capa')
         if (capa) opts.capa = capa.value
+      }
+      if (d.tipo === TIPO_DECISION.PUNTOS) {
+        // El valor ES el nombre de la capa, salvo el centinela de «no unirlos». Se
+        // escriben SIEMPRE las dos claves porque `importar()` necesita las dos: sin
+        // `capaPuntos` volvería a elegir capa por su cuenta y podría no ser la que
+        // el usuario acaba de señalar — y eso vale igual para unir que para traer,
+        // porque el recuento que la pantalla ha ofrecido es el de ESA capa.
+        const elegido = leer('puntos')?.value
+        if (elegido === VALOR_SOLO_PUNTOS) {
+          opts.soloPuntos = true
+          opts.capaPuntos = d.propuesta.capa
+        } else if (typeof elegido === 'string' && elegido !== '') {
+          opts.unirPuntos = true
+          opts.capaPuntos = elegido
+        }
       }
       if (d.tipo === TIPO_DECISION.GRADOS) {
         if (leer('grados')?.value === 'si') opts.proyectarGrados = true
@@ -934,6 +1070,7 @@ export function crearDialogoImportacion({ documento = document, alAvisar } = {})
 
       for (const d of decisiones) {
         if (d.tipo === TIPO_DECISION.CAPA) grupos.append(pintarCapas(d))
+        if (d.tipo === TIPO_DECISION.PUNTOS) grupos.append(pintarPuntos(d))
         if (d.tipo === TIPO_DECISION.GRADOS) grupos.append(pintarGrados(d))
         if (d.tipo === TIPO_DECISION.SWAP_XY) grupos.append(pintarSwap(d))
         if (d.tipo === TIPO_DECISION.CIERRE) grupos.append(pintarCierre(d))

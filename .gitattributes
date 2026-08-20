@@ -109,6 +109,34 @@
 #      se pone roja sin que nadie haya tocado nada: el mismo defecto que (1).
 #      Lo comprueba una prueba de ese fichero, que lee este `.gitattributes`.
 
+#   0. ⭐ **Y LA REGLA GENERAL, PUESTA EL 2026-08-20, QUE NO ESTABA.** Todo lo de
+#      arriba son excepciones nombradas una a una, y estaban bien; lo que faltaba
+#      era el caso normal. El índice ya guardaba LF en TODO menos en un fichero
+#      (`estilos/tokens/spacing.css`, comprobado recorriendo los objetos del
+#      índice), o sea que la regla existía DE HECHO y no la sostenía nadie.
+#
+#      Lo que la puso a prueba: una edición hecha con una herramienta de Windows
+#      reescribió `scripts/presupuesto-css.mjs` entero en CRLF sin decirlo. `git
+#      diff` cantó 1.430 líneas donde había 50 —o sea que el diff dejó de servir
+#      para revisar—, y ⛔ **el transformador de vitest se atragantó**: `SyntaxError:
+#      Invalid or unexpected token` en un fichero que `node --check` daba por bueno.
+#      Un fallo que solo se ve en una de las dos herramientas es de los que cuestan
+#      media tarde.
+#
+#      ⚠️ **VA LA PRIMERA DE LA LISTA, Y EL ORDEN ES LO QUE LA HACE INOCUA**: en
+#      `.gitattributes` gana la ÚLTIMA línea que casa, así que las once reglas de
+#      abajo siguen mandando sobre las suyas —el `.dxf` en CRLF incluido—. Y
+#      `text=auto` es AUTO: git no toca lo que detecta binario, así que no hace
+#      falta declarar los `.png` ni los `.pdf` para protegerlos.
+#
+#      ⚠️ Consecuencia declarada: `estilos/tokens/spacing.css` era el único CRLF
+#      del índice y se normaliza a LF con este mismo cambio. Sale un diff de
+#      fichero entero que no toca ni una declaración de CSS; se hace ahora y a
+#      propósito, porque dejar viva la única excepción es tener un guardián que no
+#      guarda.
+
+* text=auto eol=lf
+
 test/gml/__snapshots__/*.gml    text eol=lf
 test/fixtures/gml/*.gml         text eol=lf
 test/fixtures/gml/derivados/*.gml  text eol=lf

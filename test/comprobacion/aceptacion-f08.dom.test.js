@@ -1140,7 +1140,8 @@ describe('F08 · AC4 · un GML de edificio se encamina al contraste de construcc
 //
 // No es un criterio de la spec: es el riesgo de esta fase. Las CUATRO esquinas del
 // mapa ya estaban ocupadas cuando llegó F08 —`topleft` la barra de edición,
-// `topright` el control de capas, `bottomright` la opacidad y la atribución—, así
+// `topright` el control de capas (y la opacidad desde el 2026-08-19),
+// `bottomright` la atribución—, así
 // que el cajón de comprobación comparte `bottomleft` con el de diagnóstico y son
 // **mutuamente excluyentes por diseño**. Aquí se afirma sobre el recorrido de
 // verdad; los tres caminos uno a uno están en `test/app/comprobacion.dom.test.js`.

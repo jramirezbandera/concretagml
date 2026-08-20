@@ -1572,6 +1572,54 @@ const altoFila = filaCualquiera === null ? null : filaCualquiera.getBoundingClie
 const altoCabecera = cabeceraTabla === null ? 0 : cabeceraTabla.getBoundingClientRect().height
 const rectBarra = barraEdicion === null ? null : barraEdicion.getBoundingClientRect()
 
+// ── ⭐ F18 · paso 12 · EL PRESUPUESTO DE ANCHO DE LA BARRA ───────────────────
+//
+// Hasta F18 aquí solo se anotaban el ancho y el alto. Se remide —y ahora se
+// VIGILA— porque el paso 10 de esta fase le dio a la barra una herramienta más en
+// la rama PARCELA: «Dibujar recinto» dejó de ser cosa de la rama EDIFICIO, y ésta
+// es la pantalla donde el perito pasa el rato.
+//
+// **Medido en Chromium el 2026-08-19**: enseñar el botón ensancha la fila
+// exactamente 41 px (275 → 316; la barra, 285 → 326) y el número NO cambia con el
+// viewport, porque la barra es de ICONOS y ninguno de sus anchos depende del
+// texto. Lo que sí cambia es cuánto mapa tapa: 31,1 % a 1440×900 y 51,6 % a
+// 1024×768, porque la barra no se estrecha con la ventana y el mapa sí.
+//
+// ⭐ **REMEDIDO EL 2026-08-20, TRAS T4 (el mando de los tres modos): 326 → 313 px**
+// (la fila, 316 → 303), en Chrome a 1280×720 con «Dibujar recinto» a la vista. Los
+// **13 px** no son de estrechar nada: son UN SEPARADOR que ha dejado de hacer
+// falta. Hasta T4 el dibujo formaba grupo propio y llevaba filete a los dos lados;
+// desde que es el tercer segmento del mando, el filete de su izquierda se lo come
+// el marco compartido y el de su derecha pasa a ser de «Quitar puntos» —que en
+// esta pantalla está escondido—, así que se va con él. Es la primera vez en este
+// proyecto que la barra AGRUPA y ADELGAZA a la vez; lo normal era pagar píxeles
+// por cada mejora de lectura.
+//
+// ⚠️ Y por eso mismo esta nota lleva fecha: es la lección que el repo ya se
+// escribió el 2026-08-18 —«una cifra de maquetación sin fecha de remedición es una
+// cifra que caduca sin avisar»—. Las de arriba son de F18 y siguen valiendo para
+// lo que explican (cuánto costó el botón), no como el ancho de hoy.
+//
+// ⚠️ **Se vigila la PROPORCIÓN y no un ancho tope**, y es deliberado: un umbral en
+// píxeles envejece con el primer cambio del panel lateral, y lo que le importa al
+// usuario no es que la barra mida 326 px sino cuánta ortofoto le queda para
+// calcar. Los dos umbrales son de layout, no de gusto:
+//   · **desbordar el mapa** → problema. La barra va centrada abajo: si es más
+//     ancha que el mapa, sus extremos se salen y hay herramientas inalcanzables.
+//   · **pasar de la mitad** → advertencia. No rompe nada, pero es la señal de que
+//     la siguiente herramienta que entre hay que pensarla, no añadirla.
+function presupuestoDeLaBarra(rect) {
+  const caja = document.querySelector('#mapa')
+  if (caja === null) return { mapaPx: null, ocupaDelMapaPct: null, libreEnElMapaPx: null }
+  const rectMapa = caja.getBoundingClientRect()
+  const proporcion = rectMapa.width > 0 ? rect.width / rectMapa.width : null
+  return {
+    mapaPx: Math.round(rectMapa.width),
+    libreEnElMapaPx: Math.round(rectMapa.width - rect.width),
+    ocupaDelMapaPct: proporcion === null ? null : redondear(proporcion * 100, 1),
+  }
+}
+
 const panel = {
   queEs: 'MEDIDA de layout real, sin juicio: el umbral de «demasiado corta» es humano.',
   viewport: { ancho: window.innerWidth, alto: window.innerHeight },
@@ -1594,7 +1642,15 @@ const panel = {
   barra:
     rectBarra === null
       ? null
-      : { anchoPx: Math.round(rectBarra.width), altoPx: Math.round(rectBarra.height) },
+      : {
+          anchoPx: Math.round(rectBarra.width),
+          altoPx: Math.round(rectBarra.height),
+          // ⭐ F18 · paso 12. Lo que la barra le tapa al mapa, en tanto por ciento
+          // de su ancho. El número absoluto no dice nada solo —la barra no se
+          // estrecha con la ventana y el mapa sí—, así que lo que hay que mirar es
+          // la PROPORCIÓN: a 1440×900 medía 31,1 % y a 1024×768, 51,6 %.
+          ...presupuestoDeLaBarra(rectBarra),
+        },
   tarjetasDeAvisos: pesoAvisos().tarjetas,
 }
 
@@ -1608,6 +1664,55 @@ if (barraEdicion === null) {
       'alguien los ha devuelto al marcado del panel: es el duplicado que G16 prohíbe, y la barra ' +
       'quedaría muerta en cuanto vuelva (querySelector se queda con el primero).',
   )
+}
+
+// ── F18 · paso 12 · los dos umbrales del ancho ──────────────────────────────
+// Ver por qué se mide la PROPORCIÓN y no un ancho tope en presupuestoDeLaBarra().
+if (panel.barra !== null && panel.barra.ocupaDelMapaPct !== null) {
+  if (panel.barra.libreEnElMapaPx < 0) {
+    problemas.push(
+      `La barra de edición (${panel.barra.anchoPx} px) es MÁS ANCHA que el mapa ` +
+        `(${panel.barra.mapaPx} px): va centrada abajo, así que sus extremos se salen y hay ` +
+        'herramientas que no se pueden pulsar. Hay que estrechar la barra o darle más sitio al mapa.',
+    )
+  } else if (panel.barra.ocupaDelMapaPct > 50) {
+    advertencias.push(
+      `La barra de edición tapa el ${panel.barra.ocupaDelMapaPct} % del ancho del mapa ` +
+        `(${panel.barra.anchoPx} de ${panel.barra.mapaPx} px, ${panel.barra.libreEnElMapaPx} libres). ` +
+        'Medido el 2026-08-19: 31,1 % a 1440×900 y 51,6 % a 1024×768, con «Dibujar recinto» ' +
+        'puesto — los 41 px que le añadió el paso 10 de F18. No rompe nada, pero la siguiente ' +
+        'herramienta que entre hay que pensarla en vez de añadirla.',
+    )
+  }
+}
+
+// ── F18 · paso 10 · «Dibujar recinto» TAMBIÉN en la rama PARCELA ────────────
+// Hasta F18 este botón solo se enseñaba en la rama EDIFICIO, así que aquí no se
+// miraba. Ahora es la herramienta con la que se traza el contorno sobre los puntos
+// de un levantamiento importado, y **que esté escondido en esta pantalla es
+// exactamente el defecto que el paso 10 vino a cerrar** — uno que no rompe nada:
+// simplemente no hay forma de dibujar, y el usuario no tiene por qué saber que la
+// hubo. La suite no lo puede ver: jsdom no tiene layout.
+{
+  const botonDibujar = document.querySelector('[data-accion="dibujar-recinto"]')
+  const app = document.querySelector('.gml-app')
+  const enEdicion = app !== null && app.getAttribute('data-paso') === 'edicion'
+  const enParcela = app !== null && app.getAttribute('data-rama') !== 'EDIFICIO'
+  panel.dibujarRecinto = {
+    existe: botonDibujar !== null,
+    visible: botonDibujar === null ? null : !botonDibujar.hidden,
+    anchoPx: botonDibujar === null ? null : Math.round(botonDibujar.getBoundingClientRect().width),
+    enPantallaDeEdicion: enEdicion,
+    enRamaParcela: enParcela,
+  }
+  if (enEdicion && enParcela && botonDibujar !== null && botonDibujar.hidden) {
+    problemas.push(
+      '«Dibujar recinto» está ESCONDIDO en la pantalla de Edición de la rama PARCELA. Desde F18 ' +
+        'es la herramienta con la que se traza el contorno sobre los puntos de un levantamiento ' +
+        'importado, y escondida no hay ninguna otra forma de hacerlo. Lo enseña ' +
+        'cablearEdicion#mandoDeDibujo(true), que empuja app/main.js#aplicarEdicion.',
+    )
+  }
 }
 
 const abortadoPorTiempo = agotado()

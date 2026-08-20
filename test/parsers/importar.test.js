@@ -33,6 +33,18 @@ const LIST_REAL = leer('../fixtures/parsers/LIST.txt')
 const PARCELA_REAL = leer('../fixtures/parsers/PARCELA.txt')
 const DXF_REAL = leer('../fixtures/parsers/UTM.dxf')
 const DXF_EDIFICIO = leer('../fixtures/parsers/edificio_consulta_masiva_3515508VF0831N.dxf')
+/** F18 · el levantamiento: 3 puntos por capa (2D y 3D) y sus rótulos numerados. */
+const DXF_PUNTOS = leer('../fixtures/parsers/puntos_levantamiento.dxf')
+
+/**
+ * F18 · el MISMO levantamiento sin la capa de números. Se fabrica quitándole los
+ * tres `TEXT` de `VER_NOPTO`, en vez de escribir un segundo fixture: así la única
+ * diferencia entre los dos casos es exactamente la que se quiere medir.
+ */
+const DXF_PUNTOS_SIN_NUMEROS = DXF_PUNTOS.replace(
+  /0\r?\nTEXT\r?\n8\r?\nVER_NOPTO(?:\r?\n[^\n]*){6}/g,
+  '',
+)
 
 /** Helpers de filtrado de detecciones. */
 const porTipo = (dets, tipo) => dets.filter((d) => d.tipo === tipo)
@@ -1218,5 +1230,196 @@ describe('parsers/importar â€” CIERRE declarado por el fichero (DXF, cÃ³d
     expect(buena[0].datos.cerradoEnElFichero).toBe(true) // el flag de la SEGUNDA
     const otra = porTipo(importar(texto, { capa: 'OTRA' }).detecciones, TIPO_DETECCION.CIERRE)
     expect(otra[0].datos.cerradoEnElFichero).toBe(false)
+  })
+})
+
+// ── F18 · el levantamiento que solo trae PUNTOS ──────────────────────────────
+//
+// El fichero real de un topógrafo no trae polilíneas. Hasta esta fase, este
+// orquestador lo leía entero y devolvía `SIN_GEOMETRIA`: la aplicación se
+// comportaba como si estuviera vacío, teniendo dentro las esquinas de la parcela.
+
+describe('importar · los puntos sueltos de un levantamiento', () => {
+  it('⭐ sin pedirlo NO se une nada, pero se PROPONE: la oferta viaja en el resultado', () => {
+    // Que no se aplique solo es la regla de oro 1 (nunca corregir en silencio); que
+    // se proponga es lo que permite ofrecerlo — sin la propuesta en el resultado, la
+    // pantalla no tendría nada que enseñar y el usuario solo leería que su fichero
+    // no trae geometría.
+    const r = importar(DXF_PUNTOS)
+    expect(r.resumen.construida).toBe(false)
+    expect(r.resumen.bloqueos).toContain(BLOQUEOS.SIN_GEOMETRIA)
+    expect(r.propuestaPuntos).not.toBeNull()
+    expect(r.propuestaPuntos.anillo).toHaveLength(3)
+    expect(r.propuestaPuntos.orden).toBe('NUMERACION')
+  })
+
+  it('⭐ con «unirPuntos» el fichero que salía vacío construye su parcela', () => {
+    const r = importar(DXF_PUNTOS, { unirPuntos: true, capaPuntos: 'VER_P2D' })
+    expect(r.resumen.bloqueos).toEqual([])
+    expect(r.resumen.construida).toBe(true)
+    expect(r.parcela.recintos).toHaveLength(1)
+    expect(r.parcela.recintos[0].vertices).toHaveLength(3)
+    expect(r.parcela.recintos[0].tipo).toBe(TIPO_RECINTO.EXTERIOR)
+    expect(superficie(r.parcela.recintos)).toBeGreaterThan(0)
+    expect(r.parcela.origen).toBe(ORIGEN_PARCELA.DXF)
+  })
+
+  it('⛔ el anillo que sale de los puntos recorre TODO lo que recorre uno del fichero', () => {
+    // El sitio del bloque en `importar()` no es indiferente: entra antes del
+    // reparto por capas, así que el huso se deduce, la superficie se cuenta y la
+    // topología se mide igual que con una polilínea. Un anillo con menos garantías
+    // que el de al lado sería geometría entrando por la puerta de atrás.
+    const r = importar(DXF_PUNTOS, { unirPuntos: true, capaPuntos: 'VER_P2D' })
+    expect(r.resumen.huso).not.toBeNull()
+    expect(r.resumen.huso.zona).toBe(30)
+    expect(r.resumen.nAnillos).toBe(1)
+    expect(r.resumen.nVertices).toEqual([3])
+    expect(r.resumen.capas).toEqual(['VER_P2D'])
+  })
+
+  it('en el caso normal no abre el cierre ambiguo: la vuelta es una arista real', () => {
+    // Primer y último punto a metros de distancia: eso es el linde de cierre, no
+    // una errata. Se cuenta en INFO y no se pregunta nada.
+    const r = importar(DXF_PUNTOS, { unirPuntos: true, capaPuntos: 'VER_P2D' })
+    const cierres = porTipo(r.detecciones, TIPO_DETECCION.CIERRE).filter(
+      (d) => d.severidad !== SEVERIDAD.INFO,
+    )
+    expect(cierres).toEqual([])
+  })
+
+  it('⛔ pero el punto de cierre REMEDIDO sí se pregunta: en campo no se repite, se remide', () => {
+    // ⭐ **Este `it` nació de una mutación que sobrevivió.** El anillo se inyectaba
+    // DECLARADO CERRADO, con el argumento de que `propuestaDePuntos` ya quita el
+    // vértice de cierre repetido. Cierto — pero solo quita el EXACTO, y el
+    // topógrafo que cierra la vuelta no repite el punto 1: vuelve a medirlo y le
+    // sale a un par de centímetros. Declararlo cerrado convertía esos 2 cm en «una
+    // arista dibujada» y la aplicación se tragaba un lado de 2 cm en silencio.
+    //
+    // Se fabrica el caso moviendo el último punto del fixture encima del primero,
+    // a 3 cm: es la vuelta cerrada de cualquier levantamiento real.
+    // ⚠️ El fixture va con CRLF, así que la sustitución tolera el \r: escribirla
+    // con \n a secas no sustituía nada y el `it` medía el fichero SIN tocar —o sea,
+    // pasaba por el motivo equivocado—. Se afirma que ha cambiado, y por eso.
+    const casiCerrado = DXF_PUNTOS.replace(
+      /(POINT\r?\n8\r?\nVER_P2D\r?\n10\r?\n)400030(\r?\n20\r?\n)4070005/,
+      '$1400010.02$24070010.02',
+    )
+    expect(casiCerrado).not.toBe(DXF_PUNTOS)
+    const r = importar(casiCerrado, { unirPuntos: true, capaPuntos: 'VER_P2D' })
+    const cierres = porTipo(r.detecciones, TIPO_DETECCION.CIERRE)
+    expect(cierres.length).toBeGreaterThan(0)
+    // La pregunta que ya existía desde F01 llega hasta aquí en vez de quedarse
+    // tapada: hay una decisión de cierre que ofrecer.
+    expect(cierres.some((d) => d.severidad !== SEVERIDAD.INFO)).toBe(true)
+  })
+
+  it('⛔ un DXF CON polilíneas no propone nada: ahí los puntos son cotas de replanteo', () => {
+    // Unirlos sería inventarse un contorno encima del que el fichero dibuja.
+    expect(importar(DXF_REAL).propuestaPuntos).toBeNull()
+    expect(importar(LIST_REAL).propuestaPuntos).toBeNull()
+  })
+
+  it('⭐ la SEVERIDAD la decide de dónde sale el orden, no el hecho de unir', () => {
+    // Unir por la numeración del topógrafo es exacto → INFO, al diario.
+    // Unir por el orden del volcado es una conjetura sobre una finca que se va a
+    // firmar → AVISO, al panel. Con INFO, la única frase que permite revisar el
+    // trazado no llegaba a quien tiene que revisarlo (medido de punta a punta en
+    // test/app/cableado-medicion.dom.test.js).
+    const conNumeros = porTipo(
+      importar(DXF_PUNTOS, { unirPuntos: true, capaPuntos: 'VER_P2D' }).detecciones,
+      TIPO_DETECCION.PUNTOS_UNIDOS,
+    )
+    expect(conNumeros).toHaveLength(1)
+    expect(conNumeros[0].severidad).toBe(SEVERIDAD.INFO)
+    expect(conNumeros[0].datos.aplicado).toBe(true)
+    expect(conNumeros[0].mensaje).toMatch(/numeración/i)
+
+    const sinNumeros = porTipo(
+      importar(DXF_PUNTOS_SIN_NUMEROS, { unirPuntos: true, capaPuntos: 'VER_P2D' }).detecciones,
+      TIPO_DETECCION.PUNTOS_UNIDOS,
+    )
+    expect(sinNumeros).toHaveLength(1)
+    expect(sinNumeros[0].datos.orden).toBe('FICHERO')
+    expect(sinNumeros[0].severidad).toBe(SEVERIDAD.AVISO)
+    expect(sinNumeros[0].mensaje).toMatch(/REVISA/)
+  })
+
+  it('mientras es una OFERTA no avisa: todavía no ha pasado nada que revisar', () => {
+    const ofrecido = porTipo(
+      importar(DXF_PUNTOS_SIN_NUMEROS).detecciones,
+      TIPO_DETECCION.PUNTOS_UNIDOS,
+    )
+    expect(ofrecido[0].datos.aplicado).toBe(false)
+    expect(ofrecido[0].severidad).toBe(SEVERIDAD.INFO)
+  })
+
+  // ── ⭐ «No unirlos» deja de ser un callejón (2026-08-19) ───────────────────
+  //
+  // Hasta hoy la tercera respuesta de esa pantalla no producía NADA: los puntos no
+  // salían de `importar()`, el bloqueo seguía puesto y el usuario leía «no ha
+  // entrado ninguna parcela». Ofrecer una salida que no lo es es peor que no
+  // ofrecer ninguna — lo midió F22 y aquí se cierra.
+  describe('soloPuntos · los puntos entran sin formar contorno', () => {
+    it('⭐ entran como dianas, con parcela de CERO recintos y sin bloqueo', () => {
+      const r = importar(DXF_PUNTOS, { soloPuntos: true, capaPuntos: 'VER_P2D' })
+
+      expect(r.resumen.bloqueos).toEqual([])
+      expect(r.resumen.construida).toBe(true)
+      expect(r.resumen.nAnillos).toBe(0)
+      expect(r.parcela.recintos).toEqual([])
+      expect(r.parcela.puntosLevantamiento).toHaveLength(3)
+      expect(r.parcela.origen).toBe(ORIGEN_PARCELA.DXF)
+      // Y salen también sueltos, para quien cablea sin abrir el modelo.
+      expect(r.puntos).toEqual(r.parcela.puntosLevantamiento)
+    })
+
+    it('⛔ SIN_GEOMETRIA se retira porque el usuario YA ha contestado a eso', () => {
+      // Sin la opción, el mismo fichero bloquea. La diferencia es una decisión
+      // tomada, no un dato distinto.
+      expect(importar(DXF_PUNTOS).resumen.bloqueos).toContain('SIN_GEOMETRIA')
+      expect(importar(DXF_PUNTOS, { soloPuntos: true }).resumen.bloqueos).toEqual([])
+    })
+
+    it('⚠️ son de UNA sola capa: el CAD escribe cada punto dos veces', () => {
+      // Traer «todos» daría cada diana duplicada y un recuento que miente. La
+      // cifra que entra es exactamente la que la pantalla ofreció.
+      const r2d = importar(DXF_PUNTOS, { soloPuntos: true, capaPuntos: 'VER_P2D' })
+      const libre = importar(DXF_PUNTOS, { soloPuntos: true })
+      expect(r2d.puntos).toHaveLength(r2d.propuestaPuntos.anillo.length)
+      expect(libre.puntos).toHaveLength(libre.propuestaPuntos.anillo.length)
+    })
+
+    it('sin la opción NO entra ninguno: se ofrece, no se aplica', () => {
+      const r = importar(DXF_PUNTOS)
+      expect(r.puntos).toEqual([])
+      expect(r.parcela).toBeNull()
+    })
+
+    it('⛔ lo cuenta en AVISO, no en INFO: es la única frase que dice qué hacer', () => {
+      // `app/cableado-medicion.js#avisosDe` filtra todo lo que no sea AVISO o
+      // ERROR, así que en INFO esta frase no llegaba a la pantalla.
+      const d = porTipo(
+        importar(DXF_PUNTOS, { soloPuntos: true, capaPuntos: 'VER_P2D' }).detecciones,
+        TIPO_DETECCION.PUNTOS_UNIDOS,
+      )
+      expect(d).toHaveLength(1)
+      expect(d[0].severidad).toBe(SEVERIDAD.AVISO)
+      expect(d[0].datos.aplicado).toBe(false)
+      expect(d[0].datos.traidos).toBe(3)
+      expect(d[0].mensaje).toMatch(/Dibujar recinto/)
+      // ⛔ Y NO dice que se hayan unido por su numeración: no se ha unido nada.
+      expect(d[0].mensaje).not.toMatch(/numeración/i)
+    })
+
+    it('un fichero de polilíneas no se ve afectado por la opción', () => {
+      // Los puntos de un plano normal son cotas de replanteo, no el linde: la
+      // propuesta ni siquiera se calcula cuando hay anillos.
+      const r = importar(DXF_REAL, { soloPuntos: true })
+      expect(r.propuestaPuntos).toBeNull()
+      expect(r.puntos).toEqual([])
+      expect(r.anillos.length).toBeGreaterThan(0)
+      // Y el bloqueo de «sin geometría» no aparece por ningún lado: hay geometría.
+      expect(r.resumen.bloqueos).not.toContain('SIN_GEOMETRIA')
+    })
   })
 })

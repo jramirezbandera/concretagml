@@ -173,6 +173,49 @@ export function textoNumeroPieza(orden, prefijo = '') {
   return `${prefijo}${orden}`
 }
 
+/**
+ * Radio de PUNTERÍA, **en píxeles de pantalla**: la diana de un gesto del ratón.
+ * Lo usan el clic que selecciona un lindero y el doble clic que inserta un vértice
+ * (`viewer/edicion.js`), y el clic que CIERRA el recinto sobre su primer vértice
+ * (`viewer/dibujo.js`). Si lo apuntado queda a más de esto del punto pinchado, no
+ * pasa nada.
+ *
+ * ── Por qué en píxeles y no en metros ──
+ * Esto no es una tolerancia de TERRENO (esa es τ, `OPERATIVOS.snapMetros`, y va en
+ * metros porque mide la precisión del parcelario). Es una tolerancia de PUNTERÍA:
+ * mide cuánto se desvía la mano de quien apunta con un ratón, y eso se mide en
+ * pantalla. Un umbral en metros acertaría en un zoom y mentiría en todos los
+ * demás: 20 cm son varios píxeles a escala de parcela y una centésima de píxel en
+ * la vista general, así que a poco que el usuario se alejara no habría forma
+ * humana de insertar un vértice, sin que nada explicara por qué. Es la misma razón
+ * por la que `OPERATIVOS.acotacionMinimaPx` va en píxeles, y está escrita en
+ * `config/operativos.js`.
+ *
+ * ⭐ **Y el 2026-08-19 esa distinción dejó de ser teórica.** Cerrar un recinto
+ * exigía doble clic porque un clic sobre el primer vértice no cerraba nada, y
+ * acertarle con τ = 0,2 m era imposible salvo a zoom máximo: a escala de finca son
+ * dos píxeles. La respuesta no era subir τ —eso mueve el ENGANCHE, que es
+ * precisión del dato— sino usar la tolerancia que ya existía para lo que un gesto
+ * necesita. Son dos umbrales distintos porque miden dos cosas distintas.
+ *
+ * ── Por qué 12 ──
+ * Es algo mayor que el lado del cuadradito de vértice de
+ * `viewer/sincronizacion.js` (10 px), de modo que cualquier clic que TOQUE
+ * visualmente la línea cuenta, y del mismo orden que la tolerancia de clic que
+ * Leaflet usa por defecto en su renderizador de canvas (10 px). No vive en
+ * `config/operativos.json` porque no es una tolerancia de ingeniería del dato: es
+ * el tamaño de la diana de un gesto.
+ *
+ * ⚠️ **Vive aquí y no en `viewer/edicion.js`, donde nació, desde el 2026-08-19.**
+ * Su JSDoc decía «y solo lo usa este módulo», y dejó de ser verdad al estrenar el
+ * cierre por clic. `viewer/dibujo.js` **no conoce a la edición ni al revés** (lo
+ * declara su cabecera), así que importarlo de allí habría creado justo la
+ * dependencia que ese módulo evita; y copiar el 12 son dos diales que divergen el
+ * día que alguien mueva uno. **Sin alias en el sitio viejo**: quien lo importara
+ * de `viewer/edicion.js` tiene que romperse ahora, no dentro de un año.
+ */
+export const UMBRAL_PUNTERIA_PX = 12
+
 /** Nombres canónicos de los panes del visor. */
 export const PANE = Object.freeze({
   COLINDANTES: 'colindantes',
@@ -182,6 +225,7 @@ export const PANE = Object.freeze({
   PARTES: 'partes',
   ACOTACIONES: 'acotaciones',
   DIAGNOSTICO: 'diagnostico',
+  PUNTOS_LEVANTAMIENTO: 'puntosLevantamiento',
   VERTICES: 'vertices',
 })
 
@@ -295,6 +339,18 @@ export const PANE = Object.freeze({
  * 421 para que las tres capas de GEOMETRÍA queden contiguas por debajo de las tres
  * de ANOTACIÓN, que es el criterio con el que está ordenada toda esta lista.
  *
+ * `puntosLevantamiento` (2026-08-19) se intercala en **429**, y es el pane más
+ * apretado de la lista: va justo por debajo de `vertices` y por encima de todo lo
+ * demás, y las dos mitades importan.
+ *   · Por ENCIMA de la geometría y de las anotaciones porque son las DIANAS sobre
+ *     las que se está dibujando: una nube de puntos tapada por el relleno de la
+ *     parcela no sirve para apuntar, que es su única función.
+ *   · Por DEBAJO de `vertices` (430) porque ahí vive el trazo en curso de
+ *     `viewer/dibujo.js`. Lo que se está dibujando AHORA tiene que quedar sobre
+ *     las referencias contra las que se dibuja, o el usuario dejaría de ver su
+ *     propia línea al cruzar una zona densa de puntos. (Van además
+ *     `interactive:false`, así que tampoco interceptan el puntero.)
+ *
  * `viewer/mapa.js#crearMapa` ITERA esta lista para crear los panes, así que
  * añadir una entrada aquí es todo lo que hace falta: ni ese módulo ni el arnés
  * de test (`test/viewer/_ayuda-jsdom.js#crearPanes`) llevan nombres a mano.
@@ -309,6 +365,7 @@ export const PANES = Object.freeze([
   { nombre: PANE.PARTES, zIndex: 422 },
   { nombre: PANE.ACOTACIONES, zIndex: 425 },
   { nombre: PANE.DIAGNOSTICO, zIndex: 428 },
+  { nombre: PANE.PUNTOS_LEVANTAMIENTO, zIndex: 429 },
   { nombre: PANE.VERTICES, zIndex: 430 },
 ])
 

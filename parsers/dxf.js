@@ -91,7 +91,10 @@ const ORIGEN = 'DXF'
 //   Una Deteccion AVISO por ocurrencia, con la guía del feature (LIMPIA/PURGE).
 // ANOTACION (INFO, resumida): rótulos y cotas; hay muchas → NUNCA una por cada
 //   una (regla del feature): se resumen en UNA sola Deteccion.
-// El resto (LINE, POINT, IMAGE…): no forman anillo por sí solas → se resumen en
+// PUNTO (2026-08-18): `POINT` suelto → se DEVUELVE en `puntos[]`. No forma anillo,
+//   pero en un levantamiento es EL dato (hay ficheros con 88 puntos y cero
+//   polilíneas). Ver {@link puntoDe}. Ya NO cae en el resumen de abajo.
+// El resto (LINE, IMAGE…): no forman anillo por sí solas → se resumen en
 //   UNA Deteccion INFO "otras entidades ignoradas".
 
 const ENT_NO_SOPORTADA = new Set([
@@ -228,6 +231,51 @@ function rotuloDe(tipo, grupos) {
 }
 
 /**
+ * Un `POINT` suelto → `{capa, x, y, z}`, o `null` si no trae posición utilizable.
+ *
+ * ── POR QUÉ EXISTE (2026-08-18) ─────────────────────────────────────────────
+ * Hasta hoy los `POINT` caían en el cajón `otras` y salían por el resumen «Se
+ * ignoraron N entidad(es) que no forman anillo». Eso era CIERTO —un punto no
+ * forma anillo— y a la vez inútil: en un levantamiento de topografía los puntos
+ * **son el dato**. Medido sobre los cinco ficheros de `icuc-pruebas/ejemplos dxf/`
+ * (levantamientos reales del autor, 2023 y 2025): traen entre 26 y 88 puntos,
+ * **ni una polilínea**, y el parser devolvía `anillos: []`. O sea que la
+ * aplicación leía el fichero entero, contaba sus puntos, tiraba las coordenadas y
+ * enseñaba una parcela vacía.
+ *
+ * Es el mismo movimiento que F22 hizo con las anotaciones —de «se ignoraron» a
+ * `rotulos[]`— y por el mismo argumento, que está escrito unas líneas más abajo
+ * en la detección de anotaciones: *«dejarlo como estaba sería la clase de frase
+ * que enseña a desconfiar de lo que la aplicación dice de sí misma»*.
+ *
+ * ── LO QUE NO HACE, Y ES DELIBERADO ────────────────────────────────────────
+ * **No deduplica ni elige capa.** Los cinco ficheros medidos escriben CADA punto
+ * dos veces, en `VER_P2D` y en `VER_P3D`, con la misma X/Y. Quedarse con una de
+ * las dos es una decisión del llamante —igual que con los anillos, donde este
+ * módulo devuelve `capas[]` y quien reparte es el diálogo de capas—, no del
+ * parser. Aquí se devuelve lo que hay, con su capa, y se dice cuántos por capa.
+ *
+ * `z` (código 30) se conserva porque en un punto de levantamiento **sí es dato**
+ * —la cota—, al revés que en un vértice de polilínea, donde se descarta y se
+ * cuenta en `zCount`. Nadie la usa todavía; tirarla aquí obligaría a reparsear.
+ *
+ * @param {Array<[string, string]>} grupos  Pares (código, valor) de la entidad.
+ * @returns {{capa: string, x: number, y: number, z: number|null}|null}
+ */
+function puntoDe(grupos) {
+  let x = NaN
+  let y = NaN
+  let z = NaN
+  for (const [code, val] of grupos) {
+    if (code === '10') x = parseFloat(val)
+    else if (code === '20') y = parseFloat(val)
+    else if (code === '30') z = parseFloat(val)
+  }
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+  return { capa: capaDe(grupos), x, y, z: Number.isFinite(z) ? z : null }
+}
+
+/**
  * Lee la CAPA (código de grupo 8) de los pares de una entidad.
  *
  * Devuelve el PRIMER código 8 recortado —una entidad DXF lleva uno solo— o `''`
@@ -252,6 +300,7 @@ function capaDe(grupos) {
  *   (se pasa tal cual a geo/arco.js#discretizarBulge).
  * @returns {{ anillos: number[][][], capas: string[], cerrados: boolean[],
  *   rotulos: Array<{tipo: string, capa: string, texto: string, x: number, y: number}>,
+ *   puntos: Array<{capa: string, x: number, y: number, z: number|null}>,
  *   detecciones: import('./_comun.js').Deteccion[], origen: 'DXF' }}
  *   `capas[i]` es la capa de `anillos[i]` (LITERAL, `''` si no había código 8);
  *   los dos arrays tienen SIEMPRE la misma longitud.
@@ -262,6 +311,12 @@ function capaDe(grupos) {
  *   `rotulos` (F22) son las anotaciones con texto y posición, en el orden del
  *   fichero. ⚠️ **NO va 1:1 con `anillos`** —hay planos con 153 rótulos y 8
  *   recintos, y otros sin ninguno—: emparejarlos es de `parsers/topologia.js`.
+ *   `puntos` (2026-08-18) son los `POINT` sueltos, en el orden del fichero, SIN
+ *   deduplicar y SIN elegir capa (ver {@link puntoDe}), y sin los que caen en
+ *   (0, 0). En un levantamiento son EL dato: hay ficheros con 88 puntos y cero
+ *   anillos. ⚠️ Tampoco va 1:1 con nada, pero **en los cinco levantamientos
+ *   medidos SÍ casa 1:1 y por orden con los rótulos de cada capa de etiquetas**
+ *   (número de punto, cota y código), una vez fuera el punto del origen.
  * @throws {TypeError}  Si `texto` no es un string (regla de oro 1: no se adivina).
  */
 export function parseDXF(texto, opts = {}) {
@@ -281,6 +336,27 @@ export function parseDXF(texto, opts = {}) {
   const capas = [] // capas[i] ↔ anillos[i]; se empujan SIEMPRE a la vez.
   const cerrados = [] // cerrados[i] ↔ anillos[i]; flag 70 bit 0. Ver la cabecera.
   const rotulos = [] // F22 · anotaciones con texto y sitio; NO va 1:1 con anillos.
+  const puntos = [] // 2026-08-18 · POINT sueltos; ver puntoDe. NO va 1:1 con nada.
+  /**
+   * Puntos EXACTAMENTE en (0, 0), descartados y contados aparte.
+   *
+   * ⚠️ **MEDIDO, y el resultado corrige la sospecha que motivó esta guarda.** Los
+   * cinco levantamientos de `icuc-pruebas/ejemplos dxf/` traen un `POINT` en (0,0)
+   * —dos, uno por capa— pero **viven en la sección BLOCKS**, y este parser no
+   * desciende a BLOCKS (ver la cabecera). O sea que **no llegan hasta aquí y esta
+   * guarda no se dispara con ellos**. Decirlo importa: el contador saldrá 0 en
+   * esos ficheros, y quien lo vea a 0 no debe concluir que está roto.
+   *
+   * Se deja puesta igualmente, y no es defensa por si acaso: un punto en (0,0)
+   * **en ENTITIES** sería basura inequívoca —en EPSG:25830 el origen cae en el
+   * Atlántico, a cientos de kilómetros de cualquier parcela española— y colarlo
+   * saldría caro, no feo. Medido sobre el fichero entero, con él dentro la
+   * extensión pasa de 48×150 m (una parcela) a **4.090 km**: cualquier encuadre
+   * sobre esos puntos dejaría la parcela en un píxel. Cuesta cuatro líneas y se
+   * DICE cuántos, porque un descarte silencioso es lo que este parser no hace en
+   * ningún otro sitio.
+   */
+  let puntosEnOrigen = 0
   const detecciones = []
   let zCount = 0 // vértices con código 30 (Z) descartada.
   let elevacionesLW = 0 // H7 · LWPOLYLINE con elevación (código 38) NO nula, descartada.
@@ -487,6 +563,19 @@ export function parseDXF(texto, opts = {}) {
       case 'SEQEND':
         if (polyAbierto) cerrarPoly()
         return
+      // 2026-08-18 · El `POINT` deja el cajón `otras` y pasa a ser DATO. Va como
+      // `case` propio y no dentro del `default` porque ya no es «lo que no
+      // reconocemos»: es una entidad soportada, como las tres de aquí arriba.
+      case 'POINT': {
+        const punto = puntoDe(grupos)
+        if (punto === null) return
+        if (punto.x === 0 && punto.y === 0) {
+          puntosEnOrigen += 1
+          return
+        }
+        puntos.push(punto)
+        return
+      }
       default:
         if (ENT_NO_SOPORTADA.has(tipo)) {
           // Aviso por ocurrencia (regla 1 + AC4): nunca un fallo de programa.
@@ -639,6 +728,51 @@ export function parseDXF(texto, opts = {}) {
       ),
     )
   }
+  // 2026-08-18 · Los PUNTOS, que hasta hoy salían por el resumen de aquí abajo con
+  // la frase «se ignoraron». Ya no se ignoran, así que la frase no puede seguir.
+  //
+  // ⚠️ Se emite también con `puntos.length === 0` si se descartó algún (0,0): el
+  // fichero que trae UN punto y es el de origen queda si no completamente mudo, y
+  // ése es justo el caso en el que el usuario se pregunta por qué no sale nada.
+  if (puntos.length > 0 || puntosEnOrigen > 0) {
+    const porCapa = new Map()
+    for (const p of puntos) porCapa.set(p.capa, (porCapa.get(p.capa) || 0) + 1)
+    const capasDePuntos = [...porCapa.keys()]
+    const conCota = puntos.reduce((n, p) => n + (p.z !== null ? 1 : 0), 0)
+    const descarte =
+      puntosEnOrigen > 0
+        ? ` Se ha descartado ${puntosEnOrigen === 1 ? 'otro' : `otros ${puntosEnOrigen}`} en ` +
+          `la coordenada (0, 0): el origen no es un sitio, y colarlo estiraría el encuadre ` +
+          `miles de kilómetros.`
+        : ''
+    const reparto =
+      capasDePuntos.length > 1
+        ? ` Vienen repartidos en ${capasDePuntos.length} capas ` +
+          `(${capasDePuntos.map((c) => `${c || 'sin capa'}: ${porCapa.get(c)}`).join(', ')}), y ` +
+          `hay software de topografía que escribe CADA punto en dos de ellas: elige una sola o ` +
+          `los tendrás por duplicado.`
+        : capasDePuntos.length === 1
+          ? ` Todos en la capa «${capasDePuntos[0] || 'sin capa'}».`
+          : ''
+    detecciones.push(
+      crearDeteccion(
+        TIPO_DETECCION.ENTIDAD_NO_SOPORTADA,
+        puntos.length === 0
+          ? `Este DXF no trae ningún punto utilizable.${descarte}`
+          : `${puntos.length} punto(s) sueltos. No forman anillo por sí solos, pero en un ` +
+            `levantamiento son EL dato: se leen con sus coordenadas y sirven de enganche para ` +
+            `dibujar la geometría ${sujeto.escueto}.${reparto}${descarte}` +
+            (conCota > 0 ? ` ${conCota} traen cota (Z).` : ''),
+        SEVERIDAD.INFO,
+        {
+          total: puntos.length,
+          porCapa: Object.fromEntries(porCapa),
+          enOrigenDescartados: puntosEnOrigen,
+          conCota,
+        },
+      ),
+    )
+  }
   if (otras.size > 0) {
     const tipos = Object.fromEntries(otras)
     const total = [...otras.values()].reduce((a, b) => a + b, 0)
@@ -653,7 +787,7 @@ export function parseDXF(texto, opts = {}) {
     )
   }
 
-  return { anillos, capas, cerrados, rotulos, detecciones, origen: ORIGEN }
+  return { anillos, capas, cerrados, rotulos, puntos, detecciones, origen: ORIGEN }
 }
 
 export default parseDXF

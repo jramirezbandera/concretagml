@@ -233,7 +233,14 @@ vi.mock('../../viewer/index.js', async (importarOriginal) => ({
         // `cablearEdicion` le pide es leerlo, escribirlo y suscribirse.
         modoBorrar: () => false,
         alCambiarModoBorrar: () => () => {},
+        // El modo insertar (2026-08-18): gemelo del de arriba, y por lo mismo.
+        modoInsertar: () => false,
+        alCambiarModoInsertar: () => () => {},
         fijarColindantes() {},
+        // Los puntos sueltos del levantamiento (2026-08-19). El doble solo tiene
+        // que EXISTIR: quien comprueba que se le pasan los buenos es
+        // `main-edicion.dom.test.js`.
+        fijarPuntos() {},
         desplazarSeleccion: () => ({ aplicado: false, modo: null, detecciones: [] }),
         // ⛔ F12 · T4.2. **Sin `activa` este doble dejaba MUERTO el bloque de
         // `app/main.js` que reparte quién edita**, porque aquel empieza por
@@ -261,6 +268,7 @@ vi.mock('../../viewer/index.js', async (importarOriginal) => ({
         dibujoEnCurso: (v) => arranque.dibujoEnCurso.push(v),
       },
       colindantes: { pintar() {}, limpiar() {}, destruir() {} },
+        puntosLevantamiento: { pintar() {}, limpiar() {}, destruir() {} },
       diagnostico: diagnosticoVivo,
       comprobacion: comprobacionViva,
       sobrante: sobranteVivo,
@@ -538,6 +546,28 @@ describe('app/main · F12 · las dos ediciones no pueden estar encendidas a la v
     irA(RAMA.PARCELA)
     irAPaso(PASO.EDICION)
     expect(ultimoParcela()).toBe(true)
+  })
+
+  it('⛔ F18 · y la palabra «Dibujar recinto» acaba VISIBLE: gana el que recibe el mando', () => {
+    // ⛔ **EL ORDEN DE LAS DOS LLAMADAS ES LA PRUEBA, y sin este `it` no lo vigila
+    // nadie** (mutación medida el 2026-08-18: sustituir el reparto de
+    // `aplicarEdicion` por un orden fijo dejaba 255 pruebas en verde).
+    //
+    // Desde F18 el botón tiene DOS dueños, uno por rama, y los dos escriben
+    // siempre —el que no manda, `false`—. Eso hace que **gane el último que
+    // escribe**, así que hay que llamar primero al que PIERDE el mando. Con orden
+    // fijo parcela→edificio, esta conmutación acaba con el edificio escribiendo
+    // `false` justo después de que la parcela lo enseñara: la herramienta sería
+    // invisible EN LA ÚNICA RAMA QUE ACABA DE GANARLA, y en silencio.
+    //
+    // Se mide sobre el último `dibujoVisible(x)` porque es la señal observable, la
+    // misma con la que F12 vigila el mando de la otra rama.
+    irA(RAMA.EDIFICIO)
+    irA(RAMA.PARCELA)
+    irAPaso(PASO.EDICION)
+
+    expect(ultimoParcela()).toBe(true)
+    expect(arranque.dibujoVisible.at(-1)).toBe(true)
   })
 
   it('⭐ conmutar a EDIFICIO APAGA la edición de parcela', () => {

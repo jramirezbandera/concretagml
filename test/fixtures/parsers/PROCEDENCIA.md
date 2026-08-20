@@ -371,3 +371,36 @@ el caso real.
 | Versión DXF | AC1015 |
 | Finales de línea | **LF** — es el único de la carpeta, y es coherente con haberlo escrito aquí |
 | Anillos | 1, en la capa `0` · sin sección `TABLES` |
+
+## `puntos_levantamiento.dxf` — SINTÉTICO, y lo dice (2026-08-18)
+
+El segundo fichero fabricado de esta carpeta, y como `poly_clasica.dxf` se declara aquí para
+que nadie lo cite como verdad externa.
+
+⛔ **Existe SÍNTETICO por una razón que no es comodidad: los ficheros reales que definen este
+caso están en `icuc-pruebas/`, que va en `.gitignore`.** Son cinco levantamientos de trabajos
+del autor (2023-2025) con coordenadas de fincas de clientes, y meterlos aquí sería versionar
+datos de encargos reales. Así que **la anatomía se midió sobre ellos y se reprodujo aquí**.
+
+Lo que reproduce, medido en los cinco (`casillas`, `culebral 2`, `dehesa`, `el puerto`,
+`martin`):
+
+| rasgo real | cómo está aquí |
+|---|---|
+| **Ni una polilínea**: solo puntos y rótulos | `anillos: []` |
+| Cada punto escrito **dos veces**, en `VER_P2D` y `VER_P3D` | 3 puntos × 2 capas = 6 |
+| La Z (la cota) solo en la capa 3D | `conCota: 3` |
+| Tres capas de etiquetas 1:1 con los puntos, por orden | `VER_NOPTO`, `VER_COTAS`, `VER_CODIGOS`, 3 cada una |
+| Un `POINT` en **(0,0) dentro de `BLOCKS`** | lo lleva, y el parser NO desciende: no cuenta |
+
+⭐ **Y añade UN caso que los reales NO tienen: un `POINT` en (0,0) dentro de `ENTITIES`.** En
+los cinco ficheros medidos ese punto vive solo en `BLOCKS`, así que la guarda de
+`parsers/dxf.js` que lo descarta **nunca se dispararía** y quedaría sin prueba. Aquí se
+dispara (`enOrigenDescartados: 1`), que es la única forma de que esa rama esté defendida.
+
+| | |
+|---|---|
+| Origen | **fabricado por el proyecto** (2026-08-18), a imagen de cinco ficheros reales |
+| Finales de línea | CRLF, como los reales |
+| Codificación | latin1 |
+| Anillos | **0** — es el caso entero: un DXF sin ninguna geometría cerrada |

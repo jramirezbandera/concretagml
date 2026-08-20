@@ -477,10 +477,48 @@ function validarOpacidadInicial(valor) {
  * única forma de que un control de opacidad no mienta sobre algo que no se ve.
  * Se deshabilita en vez de desaparecer para que la posición del cromo no baile
  * al conmutar la capa.
+ *
+ * ── SE MUDA A `topright` EL 2026-08-19, Y NO ES UNA PREFERENCIA ─────────────
+ * ⛔ **Estaba en `bottomright` y ahí chocaba con la barra de edición del mapa.**
+ * `TODOS.md` daba ese solape por cerrado el 2026-08-18 con «0 px²», pero esa
+ * medida se tomó con **«Quitar puntos» escondido**, o sea sin la pantalla en la
+ * que más botones se ven a la vez: la del levantamiento importado.
+ *
+ * **MEDIDO EN CHROMIUM A 1280×720, `?demo=real`, el 2026-08-19** (intersección de
+ * rectángulos de verdad, no solo el eje X), con las DIEZ herramientas visibles:
+ *
+ * | | cruce X | cruce Y | área |
+ * |---|---|---|---|
+ * | Opacidad en `bottomright` (como estaba) | 7,9 px | 38 px | **299,3 px²** |
+ * | Opacidad en `topright` (hoy) | 7,9 px | **0 px** | **0 px²** |
+ *
+ * La barra mide **326 px** con nueve herramientas y **356** con las diez; su borde
+ * derecho llega a 1014 y el control de opacidad empieza en 1006,1. O sea que **el
+ * cruce horizontal sigue existiendo** —la barra es ancha y va centrada— y lo que
+ * lo vuelve inofensivo es que el vecino ya no comparte banda vertical.
+ *
+ * ⭐ **El defecto EXISTÍA y nadie lo sabía**, porque la cifra que lo declaraba
+ * cerrado había caducado sin avisar. Es la misma lección que ese apunte se
+ * escribió a sí mismo —«una cifra de maquetación sin fecha de remedición es una
+ * cifra que caduca sin avisar»— aplicada a él. Al remedir, comprobar SIEMPRE con
+ * qué botones visibles se toma el número.
+ *
+ * ⚠️ **`topright` no es «una esquina libre cualquiera»: es la del control de
+ * capas, y ahí SE APILA debajo**, que es lo que se quiere. Leaflet apila por
+ * orden de alta dentro de una esquina, y en {@link montarCapas} el control de
+ * capas se da de alta ANTES que éste — así que el orden visual sale solo y no
+ * hay que reordenar nada. El de capas nace `collapsed: false` (cinco bases y una
+ * superpuesta), así que la columna crece, pero hacia abajo desde el borde
+ * superior, que es espacio que en esta aplicación no compite con nada.
+ *
+ * ⭐ **Lo que esto libera, que es el motivo de la mudanza:** `bottomright` se
+ * queda **solo con la atribución de Leaflet**, y la atribución cruza a la barra
+ * 196,1 px en horizontal pero **0 en vertical** (medido el 2026-08-18). O sea que
+ * el borde inferior derecho deja de ser un vecino con el que chocar.
  */
 const ControlOpacidad = L.Control.extend({
   options: {
-    position: 'bottomright',
+    position: 'topright',
     etiqueta: 'Opacidad de la cartografía catastral',
   },
 
@@ -695,8 +733,10 @@ function esMapa(mapa) {
  *   Es opacidad INICIAL, o sea contrato del programador: se VALIDA y no se acota
  *   (ver {@link acotarOpacidad}). Para acotar hay `fijarOpacidad`, que es el gesto.
  * @param {string} [opciones.posicion='topright']  Esquina del control de capas.
- * @param {string} [opciones.posicionOpacidad='bottomright']  Esquina del control
- *   de opacidad.
+ * @param {string} [opciones.posicionOpacidad='topright']  Esquina del control de
+ *   opacidad. ⚠️ **Es la MISMA que la de capas a propósito desde el 2026-08-19**:
+ *   se apila debajo, y `bottomright` se libera para que la barra de edición deje
+ *   de chocar con él. El porqué medido está en {@link ControlOpacidad}.
  * @returns {CapasMontadas}
  * @throws {TypeError}   Si `mapa` no es un mapa de Leaflet, o si `opacidad` no es
  *   un número finito.
@@ -714,7 +754,7 @@ export function montarCapas(opciones = {}) {
     superpuestaInicial = false,
     opacidad = OPACIDAD_SUPERPUESTA,
     posicion = 'topright',
-    posicionOpacidad = 'bottomright',
+    posicionOpacidad = 'topright',
   } = opciones
 
   if (!esMapa(mapa)) {

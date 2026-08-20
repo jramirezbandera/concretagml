@@ -40,6 +40,13 @@ const fixture = (n) => readFileSync(join(RAIZ, 'test', 'fixtures', 'parsers', n)
 
 const UTM_DXF = fixture('UTM.dxf')
 
+/**
+ * F18 · el DXF que SOLO trae puntos, que es lo que vuelca un levantamiento de
+ * campo. Hasta hoy este fichero moría en «no ha entrado ninguna parcela» con las
+ * esquinas dentro.
+ */
+const PUNTOS_DXF = fixture('puntos_levantamiento.dxf')
+
 // ⭐ **El cuadrado «limpio» se mudó a MÁLAGA el 2026-08-09**, y no es cosmética:
 // estaba en (440123, 4470987) —Madrid— y desde que `geo/huso.js` afina la ventana
 // por huso, un punto de Madrid SIGUE siendo ambiguo (leído como huso 31 aterriza
@@ -293,6 +300,70 @@ describe('cableado-medicion · alFichero', () => {
     // ⛔ El guardián de la regresión de F11: superficie POSITIVA, no −390,45 m².
     expect(superficie(parcela.recintos)).toBeGreaterThan(0)
     expect(superficie(parcela.recintos)).toBeCloseTo(61.045, 3)
+  })
+
+  it('⭐ F18 · un DXF de SOLO PUNTOS abre la revisión y, unidos, entra la parcela', async () => {
+    // ⛔ **El recorrido entero de la fase, de punta a punta.** Antes de F18 este
+    // mismo fichero recorría todo el camino para acabar en «No ha entrado ninguna
+    // parcela de ese fichero» — con las esquinas de la parcela dentro, leídas,
+    // contadas y tiradas. Ahora la pregunta que se hace es la que se puede
+    // contestar: cuál de las nubes de puntos es el linde.
+    const dialogo = dialogoQueResponde({ unirPuntos: true, capaPuntos: 'VER_P2D' })
+    const medicion = cablear({ dialogo })
+    await medicion.alFichero(ficheroDeTexto(PUNTOS_DXF, 'levantamiento.dxf'))
+
+    // UNA sola apertura: unidos los puntos, el contorno ya no tiene nada ambiguo.
+    expect(dialogo.aperturas).toHaveLength(1)
+
+    const parcela = store.get()
+    expect(parcela).not.toBeNull()
+    expect(parcela.origen).toBe(ORIGEN_PARCELA.DXF)
+    expect(parcela.recintos[0].vertices).toHaveLength(3)
+    expect(superficie(parcela.recintos)).toBeGreaterThan(0)
+    // ⚠️ Y NO se llena el panel de avisos: unir por la numeración del topógrafo
+    // es exacto, así que la nota es INFO y se queda en el diario. Lo que sí avisa
+    // —porque ahí sí hay algo que revisar— es unir por el orden del volcado; su
+    // severidad se mide en `test/parsers/importar.test.js`.
+    expect(dijo('No ha entrado ninguna parcela')).toBe(false)
+  })
+
+  it('⛔ F18 · y si dice que NO los una, no se inventa ningún contorno', async () => {
+    // La otra mitad, que no cambia: no unir NO puede producir una parcela con
+    // linde. Lo que sí cambia desde el 2026-08-19 es que los puntos entran igual.
+    const dialogo = dialogoQueResponde({ soloPuntos: true, capaPuntos: 'VER_P2D' })
+    const medicion = cablear({ dialogo })
+    await medicion.alFichero(ficheroDeTexto(PUNTOS_DXF, 'levantamiento.dxf'))
+
+    expect(store.get().recintos).toEqual([])
+  })
+
+  it('⭐ F18 · «no unirlos» DEJÓ DE SER UN CALLEJÓN: los puntos entran como dianas', async () => {
+    // ⛔ Hasta el 2026-08-19 esta respuesta no producía nada: la nube se tiraba
+    // entera —no salía siquiera de `parsers/importar.js`— y el usuario leía «no ha
+    // entrado ninguna parcela» y se quedaba donde estaba. Ofrecer una salida que
+    // no lo es es peor que no ofrecer ninguna (lo midió F22 con
+    // `ConsultaMasiva_ (90).dxf`).
+    const dialogo = dialogoQueResponde({ soloPuntos: true, capaPuntos: 'VER_P2D' })
+    const medicion = cablear({ dialogo })
+    await medicion.alFichero(ficheroDeTexto(PUNTOS_DXF, 'levantamiento.dxf'))
+
+    const parcela = store.get()
+    expect(parcela).not.toBeNull()
+    expect(parcela.origen).toBe(ORIGEN_PARCELA.DXF)
+    expect(parcela.puntosLevantamiento).toHaveLength(3)
+    // Y NO se le dice al usuario que no ha entrado nada, porque ha entrado.
+    expect(dijo('No ha entrado ninguna parcela')).toBe(false)
+  })
+
+  it('⭐ F18 · y se le dice qué ha entrado y qué hacer, en el PANEL y no en el diario', async () => {
+    // `avisosDe` filtra todo lo que no sea AVISO o ERROR, así que en INFO la única
+    // frase que da la salida se quedaba fuera de la pantalla. Es el mismo defecto
+    // que ya se corrigió con el orden degradado.
+    const dialogo = dialogoQueResponde({ soloPuntos: true, capaPuntos: 'VER_P2D' })
+    const medicion = cablear({ dialogo })
+    await medicion.alFichero(ficheroDeTexto(PUNTOS_DXF, 'levantamiento.dxf'))
+
+    expect(dijo('Dibujar recinto')).toBe(true)
   })
 
   it('⭐ importar sobre una parcela traída NO borra la geometría oficial', async () => {

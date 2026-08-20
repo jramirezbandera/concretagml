@@ -455,6 +455,151 @@ if (eyebrow === '') {
   )
 }
 
+// ── 6 · ⭐ LA TARJETA DE BIENVENIDA (2026-08-18) ───────────────────────────
+//
+// Hasta hoy el `noCubierto` de este guion decía: *«SI LA PANTALLA ES ACOGEDORA.
+// Que un colegiado que abre esto por primera vez sepa por dónde empezar no tiene
+// número»*. Sigue sin tenerlo del todo, pero la parte que SÍ se puede medir ya
+// existe y se mide aquí, porque este es el único guion que se lanza sin `?demo=`
+// — o sea el único que ve lo que ve un usuario nuevo.
+//
+// ⛔ **LO QUE DE VERDAD VIGILA ESTA SECCIÓN NO ES QUE LA TARJETA ESTÉ.** Es que
+// **no tape lo que vino a explicar**. Una bienvenida que se pone encima de las tres
+// vías del panel, o encima de la barra, convierte la ayuda en un obstáculo — y eso
+// no se ve leyendo el CSS, se ve midiendo dos rectángulos.
+
+/**
+ * La tarjeta solo sale la PRIMERA vez (llave `gml.bienvenida.vista` en
+ * `localStorage`), así que la segunda pasada de este guion no la vería y saldría
+ * verde por ausencia. Se detecta y se dice: es el mismo criterio que
+ * `entrada.seMide` en el guion 14 — un guardián que no ha medido tiene que decir
+ * que no ha medido, nunca callarse y parecer verde.
+ */
+const llaveBienvenida = (() => {
+  try {
+    return localStorage.getItem('gml.bienvenida.vista')
+  } catch {
+    return null
+  }
+})()
+
+const tarjetaEl = $('.gml-bienvenida')
+const cajaTarjeta = tarjetaEl && !tarjetaEl.hidden ? tarjetaEl.getBoundingClientRect() : null
+const cajaPanel = $('.gml-panel')?.getBoundingClientRect() ?? null
+const cajaBarra = $('.gml-rail')?.getBoundingClientRect() ?? null
+
+/** ¿Se pisan dos rectángulos? Un solo píxel de solape ya es tapar. */
+const seSolapan = (a, b) =>
+  a !== null &&
+  b !== null &&
+  a.left < b.right &&
+  a.right > b.left &&
+  a.top < b.bottom &&
+  a.bottom > b.top
+
+const bienvenida = {
+  llave: llaveBienvenida,
+  seMide: llaveBienvenida === null,
+  enElDom: tarjetaEl !== null,
+  visible: cajaTarjeta !== null,
+  caja: cajaTarjeta
+    ? {
+        ancho: redondear(cajaTarjeta.width),
+        alto: redondear(cajaTarjeta.height),
+        x: redondear(cajaTarjeta.left),
+        y: redondear(cajaTarjeta.top),
+      }
+    : null,
+  tapaElPanel: seSolapan(cajaTarjeta, cajaPanel),
+  tapaLaBarra: seSolapan(cajaTarjeta, cajaBarra),
+  /** Cuánto se sale del contenedor del mapa por abajo. Negativo o 0 = cabe. */
+  desbordaElMapaPx:
+    cajaTarjeta && cajaMapa ? redondear(cajaTarjeta.bottom - cajaMapa.bottom) : null,
+  /** Los dos controles de cierre, y su objetivo de pulsación. */
+  aspaPx: (() => {
+    const c = $('[data-accion="cerrar-bienvenida"]')?.getBoundingClientRect()
+    return c ? redondear(Math.min(c.width, c.height)) : null
+  })(),
+  tieneEmpezar: $('[data-accion="empezar-bienvenida"]') !== null,
+  /** Que el reabridor exista es la mitad de DESIGN.md §8: se ve una vez y se puede volver. */
+  tieneReabridor: $('[data-accion="como-funciona"]') !== null,
+  /** Que el gesto que enseña esté en el texto, y en DOS TIEMPOS. */
+  diceElGesto: /busca tu parcela en el mapa y p[ií]nchala/i.test(tarjetaEl?.textContent ?? ''),
+  /** ⛔ Y que NO prometa lo que el clic no hace. */
+  prometeTraerLaParcela: /trae la parcela|carga la parcela/i.test(tarjetaEl?.textContent ?? ''),
+}
+
+if (!bienvenida.seMide) {
+  advertencias.push(
+    `La tarjeta de bienvenida NO se ha medido: la llave 'gml.bienvenida.vista' ya está puesta en ` +
+      `este navegador, así que la aplicación hace bien en no enseñarla. Para medirla, ` +
+      `\`localStorage.removeItem('gml.bienvenida.vista')\` y recarga.`,
+  )
+} else if (!bienvenida.visible) {
+  problemas.push(
+    'Primera visita (sin llave), arranque vacío y mapa mirando a España: la tarjeta de ' +
+      'bienvenida TENDRÍA que estar en pantalla y no está. Sin ella, el camino de pinchar el ' +
+      'mapa para rellenar la referencia vuelve a no tener ningún control que lo anuncie.',
+  )
+} else {
+  // ⭐ Las dos que justifican la sección entera.
+  if (bienvenida.tapaElPanel) {
+    problemas.push(
+      'La tarjeta de bienvenida SE SOLAPA con el panel de Entrada. Está nombrando las tres vías ' +
+        'y a la vez tapándolas: la ayuda se ha convertido en el obstáculo. Es una tarjeta que ' +
+        'vive en la celda `mapa` de la rejilla, así que si pisa el panel es que su ancho o su ' +
+        'margen se han ido.',
+    )
+  }
+  if (bienvenida.tapaLaBarra) {
+    problemas.push(
+      'La tarjeta de bienvenida SE SOLAPA con la barra de arriba. Su plano es `--gml-z-panel` ' +
+        '(1010) precisamente para quedar por debajo de la barra (1020); si la tapa, alguien ha ' +
+        'tocado el z-index o la celda de la rejilla.',
+    )
+  }
+  if (bienvenida.desbordaElMapaPx !== null && bienvenida.desbordaElMapaPx > 0) {
+    problemas.push(
+      `La tarjeta de bienvenida se sale ${bienvenida.desbordaElMapaPx} px por debajo del mapa a ` +
+        `${window.innerWidth}×${window.innerHeight}. El tope de alto (60vh) y el scroll interno ` +
+        `existen justo para que esto no pase.`,
+    )
+  }
+  if (bienvenida.aspaPx !== null && bienvenida.aspaPx < 32) {
+    problemas.push(
+      `El aspa de la tarjeta mide ${bienvenida.aspaPx} px y el objetivo de pulsación de esta casa ` +
+        `es 32 (\`--gml-alto-control\`).`,
+    )
+  }
+  if (!bienvenida.tieneEmpezar) {
+    problemas.push('La tarjeta de bienvenida no tiene el botón «Empezar»: solo se puede cerrar por el aspa.')
+  }
+  if (!bienvenida.diceElGesto) {
+    problemas.push(
+      'La tarjeta de bienvenida NO cuenta el gesto del mapa en dos tiempos («busca tu parcela y ' +
+        'pínchala»). Es la frase por la que existe: a zoom 6 —España entera, ~1,5 km por píxel— ' +
+        'no hay ninguna parcela que señalar todavía, y «pincha cualquier parcela» sería una ' +
+        'instrucción que no se puede ejecutar con sentido.',
+    )
+  }
+  if (bienvenida.prometeTraerLaParcela) {
+    problemas.push(
+      'La tarjeta de bienvenida dice que el clic TRAE la parcela, y no la trae: rellena el campo ' +
+        'y nada más. La referencia no entra en el expediente hasta que se pulsa «Traer del ' +
+        'Catastro», que es lo que hace que `parcela.refcat` signifique siempre «esto lo afirma ' +
+        'quien firma».',
+    )
+  }
+}
+
+if (!bienvenida.tieneReabridor) {
+  problemas.push(
+    'No está el `menuitem` «Cómo funciona» que reabre la bienvenida. Sin él la ayuda se ve una ' +
+      'vez en la vida y queda retirada de la pantalla para siempre, que es lo que DESIGN.md §8 ' +
+      'prohíbe — y repite el defecto que la tarjeta viene a arreglar.',
+  )
+}
+
 return {
   guion: '22-arranque-vacio',
   ok: problemas.length === 0,
@@ -463,7 +608,8 @@ return {
   advertencias,
   noCubierto: [
     'QUE LAS TRES VÍAS FUNCIONEN. Aquí se mide que la puerta existe y se puede pulsar, no lo que hay detrás: eso son los guiones 07 (Catastro en vivo), 17 (medición propia) y 18 (pegado).',
-    'SI LA PANTALLA ES ACOGEDORA. Que un colegiado que abre esto por primera vez sepa por dónde empezar no tiene número, y sigue siendo del checklist humano.',
+    'SI LA PANTALLA ES ACOGEDORA. Desde el 2026-08-18 la parte medible sí está (apartado 6: que la tarjeta de bienvenida esté, quepa y NO tape ni el panel ni la barra). Lo que sigue sin tener número es si un colegiado que abre esto por primera vez ENTIENDE por dónde empezar: eso es del checklist humano.',
+    '⚠️ QUE EL PRIMER CLIC EN EL MAPA CIERRE LA TARJETA. Y OJO CON EL MOTIVO, que cambió el 2026-08-18: hasta ese día era «no se puede disparar sin gastar una consulta de verdad al Catastro», y eso YA NO ES CIERTO — con la puerta de escala de `app/cableado-catastro.js` un clic a escala de país no consulta nada. El motivo de hoy es otro y es más fuerte: este guion promete en su cabecera que NO TOCA NADA y que se puede lanzar dos veces seguidas sin recargar, y un clic cerraría la tarjeta y escribiría su llave. Sigue siendo del checklist humano, y de `test/app/tarjeta-bienvenida.dom.test.js` por el lado del contrato.',
     'QUE LA CARTOGRAFÍA SEA LA CORRECTA. Se cuentan teselas PINTADAS, no se mira qué hay en ellas: un PNOA de otra zona daría la misma cifra. El encuadre fino es del guion 02.',
   ],
   contexto,
@@ -472,4 +618,5 @@ return {
   mudez,
   red,
   procedencia,
+  bienvenida,
 }

@@ -763,6 +763,34 @@ export function hayGeometria(parcela) {
   )
 }
 
+/**
+ * ⭐ **(2026-08-19) ¿Hay puntos sueltos de un levantamiento importado?**
+ *
+ * El tercer hecho de `app/navegacion.js#CLAVES_HECHOS`, y vive aquí por lo mismo
+ * que sus dos hermanos: es un predicado ESTRUCTURAL sobre el POJO del modelo, no
+ * una regla de ninguna pantalla, y la alternativa era escribirlo otra vez en
+ * `app/main.js`.
+ *
+ * ⛔ **NO es lo mismo que {@link hayGeometria}, y por eso son dos funciones.** Un
+ * fichero de campo trae 88 `POINT` y cero polilíneas: importado sin unir, esa
+ * parcela tiene puntos y **`recintos: []`**. Hay con qué trabajar —se dibuja el
+ * linde encima, enganchando a ellos— pero **no hay geometría que firmar**, así que
+ * lo que se abre con esto es Edición y no Diagnóstico. Fundir los dos predicados
+ * en uno haría que el Diagnóstico contrastara un contorno inexistente contra el
+ * parcelario y llamara diagnóstico al resultado.
+ *
+ * @param {object|null} parcela
+ * @returns {boolean}
+ */
+export function hayPuntos(parcela) {
+  return (
+    !!parcela &&
+    typeof parcela === 'object' &&
+    Array.isArray(parcela.puntosLevantamiento) &&
+    parcela.puntosLevantamiento.length > 0
+  )
+}
+
 // ── Nodos de la cáscara ──────────────────────────────────────────────────────
 
 /**

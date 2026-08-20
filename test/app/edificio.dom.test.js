@@ -1892,6 +1892,26 @@ describe('F12 · T4.2 · quién edita, y la palabra de la barra', () => {
     expect(ctx.estado.get().partes[1].recinto.vertices).toHaveLength(4)
   })
 
+  it('⛔ cancelar con Escape DESPEGA el botón: la barra no se queda mintiendo', () => {
+    // Hasta el 2026-08-18 este cableado solo se enteraba de UNA de las cinco formas
+    // de terminar un dibujo —cerrar bien, por `alCerrar`—. `Escape` paraba el trazo
+    // dentro de `viewer/dibujo.js` sin avisar a nadie, así que la barra se quedaba
+    // en «Cancelar dibujo» y con `aria-pressed="true"` sobre un dibujo que ya no
+    // existía: un mando que miente sobre lo que va a pasar al pulsarlo. Lo cierra el
+    // canal `alCambiar`, que nació para la rama PARCELA y aquí cuesta dos líneas.
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+    document.querySelector('[data-parte-indice="0"] [data-accion="seleccionar-parte"]').click()
+    ctx.cableado.edicion(true)
+    ctx.cableado.alternarDibujo()
+    ctx.mapa.fire('click', { latlng: { lat: 40.45, lng: -3.7 } })
+    expect(ctx.barra.enCurso.at(-1)).toBe(true)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+
+    expect(ctx.barra.enCurso.at(-1)).toBe(false)
+  })
+
   it('`destruir()` apaga el motor de la parte activa y esconde la palabra', () => {
     const ctx = montar()
     ctx.estado.set(edificioDosPartes())

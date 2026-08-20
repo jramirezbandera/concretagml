@@ -5,6 +5,104 @@ contexto y qué la bloquea, para que retomarla no cueste rediseñarla.
 
 ---
 
+## ✅ CERRADA · El presupuesto de CSS estuvo en rojo entre T4 y T7 (2026-08-20)
+
+**Abierta y cerrada el mismo día**, y se conserva por la lección, no por el trabajo.
+
+El rediseño de la barra movió `estilos/app.css` **+1.115 B** en T4 y T6, y el plan ponía
+**un solo asiento al final** (T7) para que cubriera las dos: un asiento por hito, y el
+hito era la barra entera. Cerrada con el asiento «El rework de la barra de edición» y el
+techo subido a mano a 63.701 B nuestros. Holgura de nuevo 0, que es la forma declarada.
+
+⭐ **LA LECCIÓN, que es lo único que hace falta recordar de aquí:** durante esas tres
+tareas `npm test` estuvo en verde con **8.241 pruebas** y `npm run presupuesto` en rojo.
+Es el único guardián del repositorio que puede quedarse rojo **sin poner ni una prueba en
+rojo** — la suite mide la LÓGICA del script sobre datos sintéticos, no la hoja construida,
+y no puede: haría falta un `npm run build` dentro de la suite. Quien deje trabajo de CSS
+a medias tiene que anotarlo aquí, porque el CI de pruebas no lo va a recordar por él.
+
+---
+
+## Deshacer y rehacer no son herramientas de geometría, y siguen en la barra del mapa
+
+**Anotada el 2026-08-19 tras `/plan-eng-review`.** Es la rebanada 2 del diseño
+`javie-main-design-20260819-144225.md`, aplazada **en la propia revisión** por coste de
+ficheros, no por dudas de diseño.
+
+**Qué.** Mudar `[data-accion="deshacer"]` y `[data-accion="rehacer"]` de
+`viewer/barra-edicion.js` a una zona nueva del `<nav class="gml-rail">` de `index.html`.
+
+**Por qué.** Son acciones **de documento**, no de geometría, y comparten fila con cinco
+herramientas que sí lo son. En **cuatro pantallas están apagadas** (medido, cabecera del
+módulo) ocupando el sitio de más valor de la barra, y su marcha libera **~60 px** del eje
+escaso.
+
+⭐ **Lo que esta revisión desbloqueó, y es lo que hace la nota barata de retomar.**
+`app/main.js#nodo()` es `document.querySelector` (`main.js:1537`) y los ocho nodos del
+contrato llegan como **parámetros inyectables** con ese `nodo()` solo de valor por defecto.
+O sea que **`cablearEdicion` no se toca**: el contrato ata NOMBRE y TIPO DE ELEMENTO, **no
+ubicación ni módulo productor**. La cabecera de `barra-edicion.js` lo describe como si
+atara también el módulo, y no es así.
+
+Y hay un efecto secundario bueno: en el topbar los botones nacerían en **marcado estático**,
+o sea que existirían **antes** de que `cablearEdicion` corra en `main.js:3821` — que es
+estrictamente más seguro que hoy, donde los fabrica un control de Leaflet.
+
+**Lo que cuesta, contado.** `index.html` (zona nueva), `estilos/app.css` (el `gml-rail` es
+`grid-template-columns: auto auto minmax(0,1fr) auto auto` — **cinco columnas exactas**, hay
+que abrir una sexta), un asiento en `scripts/presupuesto-css.mjs`, y los guiones de navegador
+**08** y **14**.
+
+**Lo que NO cuesta, verificado.** El topbar es `grid-template-rows: var(--gml-barra-alto)`,
+**altura fija de 48 px**, y su contenido más alto es la marca, no un botón. **No empeora**
+la entrada abierta de la tercera vía de Entrada. Esto se comprobó, no se supuso.
+
+**Bloqueado por.** Nada. La rebanada 0 (mover el control de opacidad a `topright`) la vuelve
+**menos urgente**, no innecesaria.
+
+---
+
+## De los tres dolores de la barra, «no reconozco el icono» se queda entero
+
+**Anotada el 2026-08-19 tras `/plan-eng-review`, y señalada primero por la voz externa.**
+
+**Qué.** El autor marcó tres dolores de la barra: no saber qué pasará al pulsar (**B**), no
+reconocer el icono (**A**), y no saber en qué estado está (**D**). Las rebanadas acordadas
+atacan **B** (el segmentado enseña el contrato) y **D** (el nodo de situación visible).
+**A no lo toca ninguna.**
+
+✅ **B y D entregados el 2026-08-20** (tareas T2, T4 y T6 del plan). **A sigue entero**, y
+esta entrada sigue abierta por eso.
+
+**Por qué no lo toca.** El globo de la pista enseña la frase entera —a 120 ms de ratón y
+**0 ms de teclado**— pero **hay que posar**. Y la forma del segmentado enseña el CONTRATO
+(«esto es un modo»), no la IDENTIDAD («cuál de los tres»). Liberar ancho solo ayuda a **A**
+si luego se gasta en palabras, que es la aproximación B del diseño, la que no se eligió.
+
+**Cuál sería el arreglo, ya pensado.** Rotular **las contextuales** y dejar en icono las
+cinco del núcleo. Es la inversión de lo que hace el código hoy: **lo que se ve poco no se
+aprende nunca**, y hoy las raras son justo las que desaparecen.
+
+⛔ **Y NO es un restyle. Dos trampas, las dos localizadas:**
+1. `.gml-barra-rotulo` está oculto **con estilos EN LÍNEA** (`viewer/barra-edicion.js:836-848`),
+   y un estilo en línea gana a cualquier selector: desde `app.css` no se «arregla». Hay que
+   tocar el DOM o crear otro texto.
+2. `scripts/smoke-navegador/08-edicion.js:1744-1756` **falla a propósito** si algún rótulo se
+   vuelve visible. Es un guardián deliberado, así que hay que renegociarlo, no saltárselo.
+
+**Bloqueado por.** ✅ **DESBLOQUEADO EL 2026-08-20.** Era la rebanada 0 —«sin liberar ancho
+esto no cabe»— y el ancho ya está liberado por dos vías, las dos medidas en Chrome a
+1280×720:
+
+  · **T1** mudó el control de opacidad a `topright`: el solape con la barra pasa a **0 px²**
+    (y de paso se descubrió que el solape **ya existía**, no era un riesgo futuro).
+  · **T4** bajó la barra de **326 a 313 px** sin quitar nada: agrupar los tres modos hizo
+    innecesario un separador que llevaba filete a los dos lados del dibujo.
+
+⚠️ **Las dos trampas de arriba siguen intactas** —el ocultado en línea y el guardián del
+guion 08—: lo que se ha ido es el motivo de ancho, no el trabajo. Y la cifra de 313 px lleva
+fecha a propósito: en este fichero ya caducó una sin avisar.
+
 ## ~~F17 fase 2 · El colindante recortado~~ ✅ ENTREGADO — se conserva como lección
 
 **Estado:** ⛔ **CERRADO COMO TODO el 2026-08-11.** Se entregó el 2026-08-10 y se publicó
@@ -145,6 +243,37 @@ rebanada 2 sobre qué sube a la barra. Volver a lanzar el guion 14 a 1280×720 d
 
 ---
 
+## La pista del botón apagado no se puede abrir con el teclado
+
+**Estado.** Abierto y **declarado el mismo día en que se introdujo** (2026-08-19), que es la
+única forma honrada de meter una regresión conocida.
+
+**Qué pasa.** Los cuatro CTA del pie de Edición —«Traer el parcelario de fondo», «Traer
+colindantes», «Diagnosticar encaje», «Rehacer el parcelario»— escriben al lado por qué están
+apagados (regla de oro 1). Desde hoy ese texto ya no ocupa alto: sale como un globo al pasar
+el ratón por encima (`.gml-accion:hover`, en `estilos/app.css`). El motivo del cambio está
+medido: con los cuatro apagados —el arranque de la aplicación— esos párrafos valían **307,28
+px** y dejaban la tabla de vértices en **8,36 px, cero filas visibles**, a 1280×720.
+
+**Qué se pierde.** Un `<button disabled>` **no es enfocable**, así que quien ve la pantalla y
+no usa ratón no tiene ningún gesto con el que abrir la pista. No es un fallo silencioso —el
+renglón sigue siendo un `role="status"` con su texto dentro, escondido con `opacity` y no con
+`display`, así que el lector de pantalla lo anuncia igual que ayer—, pero sí es un hueco real
+para el teclado sin lector.
+
+**Qué lo arreglaría, y por qué no se ha hecho hoy.** Cambiar `disabled` por
+`aria-disabled="true"` en los cuatro: el botón seguiría enfocable —y la pista abriría con
+`:focus-within`, una línea de CSS— a cambio de volverse **pulsable**, o sea de tener que
+explicarse al pulsarlo en vez de solo al señalarlo. Eso es una decisión de producto y toca
+los cuatro cableados (`cableado-diagnostico.js`, `cableado-catastro.js`,
+`cableado-derivacion.js`) y las pruebas que afirman `.disabled`. No cabía dentro de un encargo
+que era de altura de columna.
+
+**Por dónde empezar.** `estilos/app.css`, el bloque «EL MOTIVO DEL BOTÓN APAGADO SE VUELVE
+PISTA», y el comentario gemelo en `index.html` sobre `.gml-accion`.
+
+---
+
 ## El chip dice «0 errores» mientras el panel dice «14 errores»
 
 **Estado.** Abierto. **Medido** el 2026-08-11 en Chrome, en las DOS ramas. Lo destapó
@@ -188,31 +317,73 @@ en `app/cableado-edificio-gml.js#motivoDeBloqueo`.
 
 ---
 
-## La barra de edición del mapa se solapa con el control de opacidad
+## ✅ CERRADA (de verdad) · La barra de edición del mapa se solapa con el control de opacidad
 
-**Estado.** Abierto. **Preexistente**, no de la rebanada 1 — y la rebanada 1 lo **mejora**.
+⛔ **ESTA ENTRADA SE CERRÓ MAL EL 2026-08-18, Y SE VUELVE A CERRAR EL 2026-08-19, ESTA VEZ
+ARREGLÁNDOLA.** El cierre del 18 decía «el solape es 0 px², llevaba abierta describiendo un
+defecto que ya no existía». **Era falso**, y el motivo es exactamente el que esta misma
+entrada predicaba: la remedición se tomó **con «Quitar puntos» escondido**, o sea sin la
+pantalla donde más botones se ven a la vez — la del levantamiento importado.
 
-**Qué.** En Edición, `.gml-barra-edicion` (esquina `bottomcenter`, 547,8 px de ancho) y el
-control de opacidad de `viewer/capas.js` (esquina `bottomright`, 255,9 px) se pisan.
+**Lo medido el 2026-08-19** en Chromium, `?demo=real`, 1280×720, con las **diez**
+herramientas visibles e intersección de rectángulos de verdad:
 
-**Cuánto, medido a 1280×720:**
+| | cruce X | cruce Y | área |
+|---|---|---|---|
+| Opacidad en `bottomright` (como estaba) | 7,9 px | 38 px | **299,3 px²** |
+| Opacidad en `topright` (tras el arreglo) | 7,9 px | **0 px** | **0 px²** |
 
-| | mapa | solape |
-|---|---|---|
-| Antes de la rebanada 1 | 678 px de ancho | **200,8 px** |
-| Después | 888 px | **95,8 px** |
+**El arreglo.** `viewer/capas.js#ControlOpacidad` se muda a `topright`, apilado bajo el
+control de capas (Leaflet apila por orden de alta y el de capas se da de alta antes, así que
+el orden sale solo). `bottomright` se queda solo con la atribución, que cruza la barra en
+horizontal pero **0 en vertical**. Entra con la tarea **T1** de la revisión de ingeniería del
+2026-08-19.
 
-La barra se centra sobre el mapa; cuanto más estrecho es el mapa, más se mete en la esquina
-derecha. Ensanchar el mapa 210 px se llevó por delante 105 px de solape sin proponérselo.
+⭐ **La lección, que es la de esta entrada aplicada a sí misma.** El apunte del 18 escribió
+«una cifra de maquetación sin fecha de remedición es una cifra que caduca sin avisar» — y
+acto seguido tomó una cifra nueva **sin anotar en qué configuración**. Remedir no basta:
+hay que decir **con qué visible** se remidió. Un número de maquetación sin su configuración
+es media medida.
 
-**Por qué no se arregla aquí.** Es de `viewer/barra-edicion.js` y del reparto de esquinas de
-Leaflet, no de la cáscara. Arreglarlo dentro de la rebanada 1 sería ensanchar el alcance de
-una rebanada que se cerró estrecha a propósito.
+---
 
-**Por dónde empezar.** Las dos esquinas: o el control de opacidad se va a `topright` bajo el
-selector de capas, o la barra de edición deja de centrarse sobre el mapa entero y se centra
-sobre el hueco que le queda libre. Lo primero es una línea; lo segundo es correcto pero pide
-saber el ancho del vecino.
+## Registro histórico del cierre equivocado (2026-08-18)
+
+Se conserva entero porque el fallo de método es el aprendizaje.
+
+**Lo que decía, y de cuándo era.** Que `.gml-barra-edicion` (esquina `bottomcenter`) medía
+**547,8 px** y se comía **95,8 px** del control de opacidad a 1280×720. Esa cifra se tomó
+cuando la barra llevaba **palabras**. El rediseño a solo iconos la dejó en menos de la mitad
+y **nadie volvió aquí a remedirla**.
+
+**Lo medido hoy**, en Chrome real, `?demo=real`, 1280×720, mapa de 888 px:
+
+| | ancho de la barra | solape con el control de opacidad | holgura |
+|---|---|---|---|
+| Cifra vieja de este apunte | 547,8 px | **95,8 px** | — |
+| Medido antes del botón nuevo | **255 px** | **0 px²** | 42,6 px |
+| Medido con «Insertar vértices» | **285 px** | **0 px²** | **27,6 px** |
+
+Intersección de rectángulos de verdad, no solo el eje X: con el control de opacidad la
+intersección vertical es de 38 px pero la horizontal es **0**; con la atribución pasa lo
+contrario (196,1 px de cruce horizontal y **0** vertical). Área 0 en los dos casos.
+
+**Lo que sí cuesta el botón nuevo, medido escondiéndolo y volviéndolo a enseñar:** la barra
+pasa de 255 a **285 px**, o sea **30 px** (28 de botón + 2 de `gap`, sin separador propio
+porque se pega a la papelera). Como la barra va **centrada**, el borde derecho solo avanza
+**15 px**: la holgura baja de 42,6 a 27,6.
+
+**Lo que queda, y es otra cosa.** La holgura son 27,6 px a 1280×720. **Caben dos botones más
+de esta barra, y el tercero vuelve a abrir esto.** Cuando eso pase —y la rebanada 2 del
+diseño del 2026-08-18 trae «Dibujar recinto» a la rama PARCELA, que es exactamente un botón
+más— la salida ya está escrita: o el control de opacidad se va a `topright` bajo el selector
+de capas (una línea), o la barra deja de centrarse sobre el mapa entero y se centra sobre el
+hueco libre (correcto, pero pide saber el ancho del vecino).
+
+⭐ **La lección, que es la misma que dejó el asiento «El pliegue de la tercera vía»:** una
+cifra de maquetación sin fecha de remedición es una cifra que caduca sin avisar. Ésta llevaba
+un rediseño entero mintiendo, y el coste no fue el defecto —no lo había— sino que estuvo a
+punto de bloquear un botón que sí cabía.
 
 ---
 

@@ -875,7 +875,44 @@ export function cablearDiagnostico({
       if (renglonFondo.textContent !== '') decirFondo('', false)
       return
     }
+    // ⛔ **EL MOTIVO QUE DEJA DE SER VERDAD SE RETIRA (2026-08-19), y lo destapó
+    // el navegador.** La regla de arriba —escribir solo con el renglón vacío—
+    // protege el desenlace de la última acción de ser borrado por el siguiente
+    // `set` del store, y eso sigue en pie. Lo que le faltaba es la vuelta: cuando
+    // la condición que se contó DESAPARECE, nadie retiraba la frase, así que el
+    // botón se encendía con «está apagado porque…» escrito justo debajo.
+    //
+    // Era inalcanzable hasta hoy: con `MOTIVO_FONDO_SIN_GEOMETRIA` puesto no había
+    // forma de fabricar geometría sin cargar otro documento, y eso reinicia la
+    // pantalla. El levantamiento de puntos sueltos abre justo ese camino —se entra
+    // en Edición sin contorno y se dibuja allí mismo— y con él aparecen las dos
+    // mitades contradictorias a la vez, que es el defecto que esta casa ya ha
+    // pagado tres veces (M25, M31 y el chip de «0 errores»).
+    //
+    // ⚠️ Solo se retira **lo que ha escrito esta misma función**. Un desenlace
+    // —«el Catastro no contesta», «hay varias parcelas ahí»— no es un motivo de
+    // apagado y no se toca: por eso se compara contra el catálogo de motivos y no
+    // se vacía a ciegas.
+    if (motivo === null && esMotivoDeApagado(renglonFondo.textContent)) {
+      decirFondo('', false)
+      return
+    }
     if (motivo !== null && renglonFondo.textContent === '') decirFondo(motivo, false)
+  }
+
+  /**
+   * ¿Este texto es uno de los motivos de APAGADO que escribe
+   * {@link refrescarBotonFondo}, y no el desenlace de una acción del usuario?
+   *
+   * Se compara contra el catálogo y no contra «cualquier cosa», porque son los
+   * únicos que esta función tiene derecho a retirar: los demás los ha puesto un
+   * intento real de traer el fondo y siguen siendo verdad.
+   *
+   * @param {string} texto
+   * @returns {boolean}
+   */
+  function esMotivoDeApagado(texto) {
+    return texto === MOTIVO_FONDO_SIN_GEOMETRIA || texto === MOTIVO_FONDO_SIN_CATASTRO
   }
 
   /**

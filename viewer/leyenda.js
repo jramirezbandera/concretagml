@@ -167,6 +167,20 @@ export const ENTRADAS = Object.freeze([
     texto: 'Vértice: se arrastra para mover el lindero.',
     fuente: 'viewer/_comun.js',
   }),
+  // ⭐ (2026-08-19) El punto suelto del levantamiento. Va JUNTO al vértice y no en
+  // otro grupo porque las dos cosas son del técnico y las dos son amarillas: lo
+  // único que las separa es que una se arrastra y la otra no, y esa es
+  // exactamente la frase que hay que poder leer aquí. Sin este renglón, la
+  // leyenda enseñaría dos grafismos del mismo color explicando solo uno.
+  Object.freeze({
+    id: 'punto-levantamiento',
+    grupo: GRUPO.LEVANTAMIENTO,
+    muestra: MUESTRA.PUNTO,
+    color: '#FFD600',
+    texto: 'Punto suelto de tu levantamiento: hace de enganche al dibujar, no se mueve.',
+    // Lo dibuja `viewer/puntos-levantamiento.js`; el color lo declara `_comun.js`.
+    fuente: 'viewer/_comun.js',
+  }),
   Object.freeze({
     id: 'cota',
     grupo: GRUPO.LEVANTAMIENTO,
@@ -319,42 +333,58 @@ const MUESTRA_ANCHO_PX = 26
 const MUESTRA_ALTO_PX = 14
 
 /**
- * ⭐ **EL FONDO DE DOS TONOS DE LAS MUESTRAS, Y POR QUÉ NO SON BLANCAS.**
+ * ⭐ **EL FONDO DE LAS MUESTRAS: UN TONO, EL CLARO.**
  *
- * ⛔ **Defecto REAL, medido en el navegador el 2026-08-15 sobre la primera
- * versión de este control**: sobre el blanco de la tarjeta, la muestra de «parcelas
- * colindantes» —`#CBD5E1`, slate-300— **no se veía**. Da 1,3:1 de contraste, o sea
- * un renglón con su texto y un hueco donde tendría que estar el grafismo. Una
- * leyenda con una muestra invisible es exactamente el fallo silencioso que este
- * control existe para cerrar: el usuario lee «parcelas colindantes» y sigue sin
- * saber cómo son.
+ * ── ⛔ AQUÍ HUBO UNA BANDA DE DOS TONOS, Y SE RETIRA EL 2026-08-19 ─────────
+ * Encargo del autor, mirando la leyenda: *«los iconos están como en claro y
+ * oscuro, como si estuvieran pensando en los dos modos, pero solo hay modo
+ * claro»*. Se le ofreció ensanchar la costura para que se leyera como sombra en
+ * vez de como dos temas, y su respuesta fue clara: *«no es para tanto, con quitar
+ * la mitad oscura está bien sin hacer nada más»*. **Decisión suya, tomada con el
+ * coste delante**, que es como se toman aquí.
  *
- * ── POR QUÉ NO SIRVE UN FONDO PLANO, Y ESTÁ CALCULADO ───────────────────────
- * Los colores del visor están elegidos para leerse sobre una ORTOFOTO, que va de
- * asfalto casi blanco a arbolado en sombra en el mismo encuadre, así que la paleta
- * tiene claros y oscuros a propósito. Ningún gris plano les sirve a todos:
+ * ── LO QUE SE PIERDE, DICHO CON EL NÚMERO ────────────────────────────────
+ * ⚠️ **La muestra de «parcelas colindantes» (`#CBD5E1`) pasa a 1,4:1 y deja de
+ * verse.** Medido en navegador el 2026-08-15 sobre la primera versión de este
+ * control, que es lo que había justificado la banda: el usuario lee «parcelas
+ * colindantes» y a su izquierda no hay dibujo, solo un rectángulo claro.
+ *
+ * ⛔ **No se compensa por lo bajo, y eso es lo importante.** La tentación es
+ * oscurecer ESA muestra para que se vea. Sería mentir: la leyenda existe para
+ * decir de qué color es una cosa en el mapa, y una leyenda que retoca el color
+ * para que luzca deja de ser una leyenda. Antes invisible que falsa.
+ *
+ * ── LA TABLA QUE JUSTIFICABA LA BANDA, QUE NO SE BORRA ───────────────────
+ * Se conserva porque el problema que medía **sigue existiendo**, solo que ahora
+ * se acepta a sabiendas. Quien vuelva a esto no tiene que volver a medirlo:
  *
  *     fondo        #CBD5E1 (colindante)   #6B7280 (parcelario vigente)
  *     ─────────    ────────────────────   ───────────────────────────
  *     blanco       1,3:1  ⛔               4,8:1  ✅
+ *     #F1F5F9      1,4:1  ⛔               4,5:1  ✅   ← el de hoy
  *     #94A3B8      1,6:1  ⛔               1,9:1  ⛔
  *     #64748B      2,6:1  ✅               1,1:1  ⛔
  *
- * O sea: cualquier plano deja fuera a uno de los dos. Lo que funciona es **tener
- * las dos mitades**, que es lo que hace un pie de foto de cartografía de toda la
- * vida — la muestra se pinta sobre un trozo de terreno, no sobre papel.
+ * O sea: **ningún tono plano sirve a los dos**, y por eso el arreglo de verdad,
+ * el día que se quiera, no es cambiar este color — es tener dos zonas, o darle a
+ * esa entrada un fondo propio. Las dos cuestan más de lo que este encargo pedía.
  *
- * Así que cada muestra va sobre una banda diagonal clara→oscura, y todo grafismo
- * la cruza entera: el que se pierda en una mitad se lee en la otra. Y de paso dice
- * la verdad sobre los rellenos, que en el mapa son TRANSLÚCIDOS: sobre esta banda
- * se ve que dejan pasar lo de debajo, igual que dejan ver la ortofoto.
+ * ── POR QUÉ SIGUE SIENDO UN `linear-gradient` DE UN SOLO COLOR ───────────
+ * Porque {@link muestraDe} lo COMPONE con el relleno translúcido de las áreas
+ * (`linear-gradient(0deg, relleno, relleno), FONDO_MUESTRA`), y ahí solo caben
+ * valores de `background-image`. Un color plano obligaría a repartir ese trozo
+ * entre `backgroundColor` y `backgroundImage` en dos sitios distintos. Se queda
+ * como imagen de un tono: una línea rara aquí contra dos ramas allí.
+ *
+ * ⚠️ El tono es `--color-bg-elevated` (#F1F5F9) y no blanco: la muestra sigue
+ * teniendo caja propia sobre la tarjeta, que es blanca. Y sigue enseñando que los
+ * rellenos de las áreas son TRANSLÚCIDOS, que es la otra cosa que hacía la banda.
  *
  * ⚠️ No lo lleva {@link MUESTRA.ROTULO}: la cota trae su propia pastilla oscura
  * —es la que le pone `viewer/acotaciones.js` para poder leerse sobre cualquier
  * fondo— y ponerle otra debajo sería dibujar dos cosas donde en el mapa hay una.
  */
-const FONDO_MUESTRA =
-  'linear-gradient(135deg,#F1F5F9 0%,#F1F5F9 46%,#64748B 54%,#64748B 100%)'
+const FONDO_MUESTRA = 'linear-gradient(#F1F5F9,#F1F5F9)'
 
 const crear = (doc, etiqueta, clase, texto) => {
   const el = doc.createElement(etiqueta)
@@ -424,9 +454,10 @@ function muestraDe(doc, entrada) {
     borderRadius: '2px',
     overflow: 'hidden',
   })
-  // La banda de dos tonos, debajo de TODO menos de la cota. Ver {@link FONDO_MUESTRA}
-  // para el defecto medido que cierra y para la tabla de contrastes que descarta
-  // cualquier fondo plano.
+  // El fondo de la muestra, debajo de TODO menos de la cota. ⚠️ Fue una BANDA DE
+  // DOS TONOS hasta el 2026-08-19 y hoy es un tono plano: ver {@link FONDO_MUESTRA}
+  // para la decisión, para lo que se pierde con ella y para la tabla de contrastes
+  // —que se conserva porque el problema que medía sigue ahí, aceptado a sabiendas.
   if (entrada.muestra !== MUESTRA.ROTULO) caja.style.backgroundImage = FONDO_MUESTRA
 
   if (entrada.muestra === MUESTRA.AREA) {
@@ -709,8 +740,9 @@ const ControlLeyenda = L.Control.extend({
  * @param {import('leaflet').Map} opciones.mapa  El mapa del visor.
  * @param {string} [opciones.posicion='bottomleft']  Esquina de Leaflet. El defecto
  *   no es arbitrario: `topleft` la ocupa el control de zoom, `topright` el de
- *   capas, `bottomright` el de opacidad **y** la atribución, y el borde inferior
- *   centrado la barra de edición de F06. `bottomleft` es la única esquina libre —
+ *   capas **y el de opacidad desde el 2026-08-19**, `bottomright` la atribución, y
+ *   el borde inferior centrado la barra de edición de F06. `bottomleft` es la
+ *   única esquina libre —
  *   la comparte con el cajón de diagnóstico cuando el visor se monta a pelo, y por
  *   eso esto nace PLEGADO y ocupa una pastilla.
  * @param {string[]} [opciones.grupos]  Qué grupos enseñar. Ver {@link GRUPO} y

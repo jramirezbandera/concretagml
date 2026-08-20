@@ -90,9 +90,11 @@ describe('edit/snap.js — vocabulario público', () => {
   })
 })
 
-// ── dianasDe · las tres fuentes ──────────────────────────────────────────────
+// ── dianasDe · las fuentes del catálogo ──────────────────────────────────────
+// Eran tres hasta el 2026-08-18; desde entonces son CUATRO (los `puntos`
+// importados van delante, y tienen su propio bloque al final de este fichero).
 
-describe('edit/snap.js — dianasDe: compone las tres fuentes en su orden', () => {
+describe('edit/snap.js — dianasDe: compone las tres fuentes de geometría en su orden', () => {
   it('geometriaOficial + colindantes + recintos, en ese orden', () => {
     const dianas = dianasDe({ parcela: parcelaTresFuentes(), colindantes: colindantesUna() })
 
@@ -899,5 +901,103 @@ describe('edit/snap.js — rendimiento con el catálogo en su techo', () => {
     // portátil no es un banco de pruebas), que sigue descartando un O(n²) —que
     // costaría ×100— sin convertir el test en un dado.
     expect(grande).toBeLessThan(Math.max(chico, 1) * 40)
+  })
+})
+
+// ── dianasDe · la CUARTA fuente: los puntos importados (2026-08-18) ──────────
+//
+// El caso que la abre: un DXF de levantamiento con 88 puntos y CERO polilíneas
+// (medido sobre cinco ficheros reales; ver `parsers/dxf.js#puntoDe`). Esos puntos
+// son el dato contra el que el técnico quiere dibujar, así que tienen que ser
+// dianas — y el hallazgo que hace esto barato es que el catálogo ya estaba
+// DESACOPLADO del origen: `ajustar` no pregunta de dónde vino cada diana.
+
+describe('edit/snap.js — dianasDe: los puntos importados', () => {
+  const PUNTOS = [
+    [441000, 4481000],
+    [441010, 4481000],
+    [441010, 4481010],
+  ]
+
+  it('aportan vértices y NINGÚN segmento: un punto suelto no tiene lado', () => {
+    // ⛔ Lo que este `it` impide es la «mejora» evidente: unir los puntos entre sí
+    // por su orden en el array. Eso sería decidir por el usuario en qué orden se
+    // unen sus puntos, que es justo la decisión que la herramienta de dibujo
+    // existe para dejarle a él.
+    const dianas = dianasDe({ puntos: PUNTOS })
+    expect(dianas.vertices).toEqual(PUNTOS)
+    expect(dianas.segmentos).toEqual([])
+  })
+
+  it('⭐ van los PRIMEROS del catálogo, delante del parcelario oficial', () => {
+    // Solo cambia algo en un empate exacto —a distinta distancia manda la
+    // distancia— y en ese empate gana el punto MEDIDO. El parcelario oficial es la
+    // versión del Catastro, que es lo que una subsanación existe para corregir.
+    const dianas = dianasDe({
+      parcela: parcelaTresFuentes(),
+      colindantes: colindantesUna(),
+      puntos: PUNTOS,
+    })
+    expect(dianas.vertices).toEqual([...PUNTOS, ...OFICIAL, ...COLINDANTE, ...EDITABLE])
+    // Y no han tocado los lados de nadie: siguen siendo los 12 de las tres fuentes.
+    expect(dianas.segmentos).toHaveLength(12)
+  })
+
+  it('son VACÍOS por defecto: sin importar nada, el catálogo es el de siempre', () => {
+    const conYSin = dianasDe({ parcela: parcelaTresFuentes() })
+    expect(conYSin.vertices).toEqual([...OFICIAL, ...EDITABLE])
+  })
+
+  it('el catálogo lleva COPIAS: escribir en él no toca el array del importador', () => {
+    // Regla 2, la misma que ya cumplen las otras tres fuentes.
+    const origen = structuredClone(PUNTOS)
+    const dianas = dianasDe({ puntos: origen })
+    expect(compartidas(dianas, origen)).toEqual([])
+    dianas.vertices[0][0] = -1
+    expect(origen[0][0]).toBe(PUNTOS[0][0])
+  })
+
+  it('un elemento degenerado NO lanza: se cae del catálogo y ya está', () => {
+    // Regla 1, rama del dato degenerado. Un DXF puede traer cualquier cosa, y eso
+    // no puede impedir engancharse a los puntos que sí son válidos.
+    const dianas = dianasDe({
+      puntos: [PUNTOS[0], null, [NaN, 4481000], ['440000', '4480000'], [441020], PUNTOS[1]],
+    })
+    expect(dianas.vertices).toEqual([PUNTOS[0], PUNTOS[1]])
+  })
+
+  it('pero que `puntos` NO sea un array SÍ lanza: eso es contrato del programador', () => {
+    expect(() => dianasDe({ puntos: 'no soy un array' })).toThrow(TypeError)
+    expect(() => dianasDe({ puntos: { 0: [1, 2] } })).toThrow(TypeError)
+    // Y el mensaje nombra el argumento y lo recibido, como el resto del módulo.
+    expect(() => dianasDe({ puntos: 42 })).toThrow(/'puntos'/)
+  })
+
+  it('ajustar engancha a un punto importado como a cualquier otra diana', () => {
+    // La prueba de que el desacoplamiento es real: `ajustar` no ha cambiado ni una
+    // línea y engancha a una diana que en su día no existía.
+    const dianas = dianasDe({ puntos: PUNTOS })
+    const tau = OPERATIVOS.snapMetros
+    const r = ajustar([441000 + tau * 0.5, 4481000], dianas)
+    expect(r.enganchado).toBe(true)
+    expect(r.tipo).toBe(TIPO_ENGANCHE.VERTICE)
+    expect(r.punto).toEqual(PUNTOS[0])
+    // VERTICE, así que sin `t`: no hay lado sobre el que parametrizar.
+    expect(r.t).toBeNull()
+  })
+
+  it('⭐ en un EMPATE exacto, el punto medido gana al vértice oficial', () => {
+    // El único caso en el que el orden se nota, y la razón de que los puntos vayan
+    // delante. Se coloca un punto importado EXACTAMENTE sobre un vértice oficial:
+    // las dos dianas están a la misma distancia y el desempate es el del catálogo.
+    const encimaDelOficial = [OFICIAL[0][0], OFICIAL[0][1]]
+    const dianas = dianasDe({ parcela: parcelaTresFuentes(), puntos: [encimaDelOficial] })
+    expect(dianas.vertices[0]).toEqual(encimaDelOficial)
+    expect(dianas.vertices[1]).toEqual(OFICIAL[0])
+    const r = ajustar([OFICIAL[0][0] + OPERATIVOS.snapMetros * 0.5, OFICIAL[0][1]], dianas)
+    expect(r.enganchado).toBe(true)
+    // Coinciden en coordenada, así que lo que se afirma es la IDENTIDAD del array
+    // elegido: el primero del catálogo, o sea el punto importado.
+    expect(r.punto).toEqual(dianas.vertices[0])
   })
 })

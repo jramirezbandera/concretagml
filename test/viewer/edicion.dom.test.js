@@ -31,7 +31,8 @@ import { MODO_OFFSET, TIPO_OFFSET } from '../../edit/offset.js'
 import { dianasDe } from '../../edit/snap.js'
 import { MENSAJE_POR_MOTIVO, MOTIVO_VERTICE } from '../../edit/vertices.js'
 import { TIPO_RECINTO, crearParcela, crearRecinto } from '../../model/parcela.js'
-import { CLASE_EDICION, UMBRAL_PUNTERIA_PX, crearEdicion } from '../../viewer/edicion.js'
+import { UMBRAL_PUNTERIA_PX } from '../../viewer/_comun.js'
+import { CLASE_EDICION, crearEdicion } from '../../viewer/edicion.js'
 import { COLOR_USUARIO, NIVEL, PANE, crearEstadoVista, vertUTMaLatLng } from '../../viewer/_comun.js'
 import { crearPanes, montarMapa, parcelaConHueco } from './_ayuda-jsdom.js'
 
@@ -464,6 +465,23 @@ describe('viewer/edicion · caché de dianas (una construcción por gesto)', () 
     ctx.limpiar()
   })
 
+  it('`fijarPuntos` invalida el catálogo (la CUARTA fuente, la cuarta clave)', () => {
+    const ctx = montar()
+    dianasDe.mockClear()
+    ctx.edicion.ajustar([439240, 4479655], { recinto: 0, indice: 0 })
+    ctx.edicion.fijarPuntos([])
+    ctx.edicion.ajustar([439240, 4479655], { recinto: 0, indice: 0 })
+    expect(dianasDe).toHaveBeenCalledTimes(2)
+    // Y el catálogo se pide CON los puntos: si la llamada no los llevara, importar
+    // un levantamiento no cambiaría ni una diana y nadie se enteraría.
+    ctx.edicion.fijarPuntos([[439237, 4479655]])
+    ctx.edicion.ajustar([439240, 4479655], { recinto: 0, indice: 0 })
+    expect(dianasDe).toHaveBeenLastCalledWith(
+      expect.objectContaining({ puntos: [[439237, 4479655]] }),
+    )
+    ctx.limpiar()
+  })
+
   it('cambiar τ o apagar el snap NO invalida el catálogo (no depende de la tolerancia)', () => {
     const ctx = montar()
     dianasDe.mockClear()
@@ -506,6 +524,163 @@ describe('viewer/edicion · colindantes como dianas', () => {
     const ctx = montar()
     expect(() => ctx.edicion.fijarColindantes([{ recintos: [] }])).toThrow(TypeError)
     expect(() => ctx.edicion.fijarColindantes([{ recintos: [] }])).toThrow(/flatMap/)
+    ctx.limpiar()
+  })
+})
+
+// ── Puntos importados como dianas (F11 · 2026-08-18) ─────────────────────────
+//
+// La cuarta fuente del catálogo. Lo que se blinda aquí no es que `dianasDe` sepa
+// leerlos —eso lo mide `test/edit/snap.test.js`— sino que el VISOR se los pase y
+// que la caché los tenga en su clave. Ese es el fallo que esta tanda existe para
+// evitar, y es SILENCIOSO: sin la clave, el snap sigue funcionando, no lanza y no
+// pinta nada raro; simplemente engancha al catálogo de antes de importar.
+
+describe('viewer/edicion · puntos importados como dianas', () => {
+  it('un punto importado aporta diana de VÉRTICE donde antes no había nada', () => {
+    const ctx = montar()
+    // 3 m al oeste del vértice 0: fuera de τ de todo lo que hay.
+    expect(ctx.edicion.ajustar([439237, 4479655], { recinto: 0, indice: 0 }).enganchado).toBe(false)
+
+    ctx.edicion.fijarPuntos([[439237, 4479655]])
+    const r = ctx.edicion.ajustar([439237.1, 4479655], { recinto: 0, indice: 0 })
+    expect(r.enganchado).toBe(true)
+    expect(r.tipo).toBe('VERTICE')
+    expect(r.punto).toEqual([439237, 4479655])
+    ctx.limpiar()
+  })
+
+  it('dos puntos NO hacen un lindero: aportan vértices y ningún segmento', () => {
+    const ctx = montar()
+    ctx.edicion.fijarPuntos([
+      [439237, 4479650],
+      [439237, 4479660],
+    ])
+    // Los dos extremos enganchan…
+    expect(ctx.edicion.ajustar([439237.05, 4479650], { recinto: 0, indice: 0 }).tipo).toBe('VERTICE')
+    // …y el punto medio, que caería sobre el lado si existiera, NO.
+    expect(ctx.edicion.ajustar([439237, 4479655], { recinto: 0, indice: 0 }).enganchado).toBe(false)
+    ctx.limpiar()
+  })
+
+  it('⛔ importar OTROS puntos cambia lo que engancha: el catálogo viejo no sobrevive', () => {
+    // EL TEST DE LA TRAMPA. Si los puntos no entraran en la clave de la caché —o si
+    // `fijarPuntos` olvidara invalidarla— este gesto (misma parcela, misma
+    // referencia, misma τ) seguiría enganchando al punto que ya no está importado.
+    const ctx = montar()
+    const ref = { recinto: 0, indice: 0 }
+
+    ctx.edicion.fijarPuntos([[439237, 4479655]])
+    expect(ctx.edicion.ajustar([439237.05, 4479655], ref).punto).toEqual([439237, 4479655])
+
+    ctx.edicion.fijarPuntos([[439236, 4479655]])
+    // El viejo ya no engancha…
+    expect(ctx.edicion.ajustar([439237.05, 4479655], ref).enganchado).toBe(false)
+    // …y el nuevo sí.
+    expect(ctx.edicion.ajustar([439236.05, 4479655], ref).punto).toEqual([439236, 4479655])
+
+    // Y el array vacío los olvida todos (cerrar el expediente, cargar otro).
+    ctx.edicion.fijarPuntos([])
+    expect(ctx.edicion.ajustar([439236.05, 4479655], ref).enganchado).toBe(false)
+    ctx.limpiar()
+  })
+
+  // ── ⭐ `dianasExtra` (2026-08-19) ─────────────────────────────────────────
+  //
+  // El catálogo se construye sobre el MODELO, y `viewer/dibujo.js` engancha los
+  // vértices de un recinto que todavía no está en él. Sin esto no había forma de
+  // clavar un vértice justo encima de otro que uno mismo acababa de poner.
+  it('⭐ `dianasExtra` engancha a un par que NO está en el catálogo', () => {
+    const ctx = montar()
+    const ref = { recinto: 0, indice: 0 }
+    const suelto = [439237, 4479655] // 3 m al oeste: fuera de τ de todo lo que hay
+
+    expect(ctx.edicion.ajustar([439237.05, 4479655], ref).enganchado).toBe(false)
+    const r = ctx.edicion.ajustar([439237.05, 4479655], ref, null, { dianasExtra: [suelto] })
+    expect(r.enganchado).toBe(true)
+    expect(r.tipo).toBe('VERTICE')
+    expect(r.punto).toEqual(suelto)
+    ctx.limpiar()
+  })
+
+  it('⛔ y son SOLO para esa llamada: no se quedan pegadas al catálogo', () => {
+    // Es lo que las distingue de `fijarPuntos`. Un extra que sobreviviera a su
+    // llamada convertiría un vértice de un trazo cancelado en una diana eterna.
+    const ctx = montar()
+    const ref = { recinto: 0, indice: 0 }
+    ctx.edicion.ajustar([439237.05, 4479655], ref, null, { dianasExtra: [[439237, 4479655]] })
+    expect(ctx.edicion.ajustar([439237.05, 4479655], ref).enganchado).toBe(false)
+    ctx.limpiar()
+  })
+
+  it('⚠️ NO invalidan la caché: cambian en cada clic y la dejarían inútil', () => {
+    // El espía sobre `dianasDe` cuenta CONSTRUCCIONES del catálogo. Con la caché
+    // caliente, pasar extras distintos en cada llamada no puede añadir ninguna.
+    const ctx = montar()
+    const ref = { recinto: 0, indice: 0 }
+    ctx.edicion.ajustar([439250, 4479655], ref) // calienta la caché
+    const antes = dianasDe.mock.calls.length
+
+    ctx.edicion.ajustar([439237.05, 4479655], ref, null, { dianasExtra: [[439237, 4479655]] })
+    ctx.edicion.ajustar([439236.05, 4479655], ref, null, { dianasExtra: [[439236, 4479655]] })
+
+    expect(dianasDe.mock.calls.length).toBe(antes)
+    ctx.limpiar()
+  })
+
+  it('un extra mal formado se descarta sin lanzar, como cualquier diana degenerada', () => {
+    // La guarda dura es la de `fijarPuntos`, que GUARDA. Esto es de paso: la regla
+    // de la casa para el dato malo aislado es descartarlo, no tumbar el gesto.
+    const ctx = montar()
+    const ref = { recinto: 0, indice: 0 }
+    expect(() =>
+      ctx.edicion.ajustar([439237.05, 4479655], ref, null, {
+        dianasExtra: [[Number.NaN, 4479655], [439237]],
+      }),
+    ).not.toThrow()
+    ctx.limpiar()
+  })
+
+  it('sin `dianasExtra` todo sigue exactamente igual: el cuarto argumento es opcional', () => {
+    const ctx = montar()
+    const ref = { recinto: 0, indice: 0 }
+    expect(ctx.edicion.ajustar([439237.05, 4479655], ref, null, {}).enganchado).toBe(false)
+    expect(ctx.edicion.ajustar([439237.05, 4479655], ref).enganchado).toBe(false)
+    ctx.limpiar()
+  })
+
+  it('no queda atado al array del llamante: mutarlo después no cambia las dianas', () => {
+    const ctx = montar()
+    const mios = [[439237, 4479655]]
+    ctx.edicion.fijarPuntos(mios)
+    mios.push([439236, 4479655])
+    expect(ctx.edicion.ajustar([439236.05, 4479655], { recinto: 0, indice: 0 }).enganchado).toBe(
+      false,
+    )
+    ctx.limpiar()
+  })
+
+  it('pasar los OBJETOS del parser lanza diciendo cómo convertirlos (no se traga en silencio)', () => {
+    // `dianasDe` descartaría uno a uno los objetos `{capa, x, y, z}` y devolvería el
+    // catálogo de siempre: cero dianas nuevas, cero avisos. Por eso se lanza aquí.
+    const ctx = montar()
+    const delParser = [{ capa: 'PUNTOS', x: 439237, y: 4479655, z: 12.3 }]
+    expect(() => ctx.edicion.fijarPuntos(delParser)).toThrow(TypeError)
+    expect(() => ctx.edicion.fijarPuntos(delParser)).toThrow(/p.x/)
+    ctx.limpiar()
+  })
+
+  it('exige un array, y un par degenerado suelto se descarta sin lanzar', () => {
+    const ctx = montar()
+    expect(() => ctx.edicion.fijarPuntos('puntos')).toThrow(TypeError)
+    expect(() => ctx.edicion.fijarPuntos(null)).toThrow(TypeError)
+    // El dato malo AISLADO sigue la regla de la casa: se descarta, no se lanza.
+    expect(() =>
+      ctx.edicion.fijarPuntos([[Number.NaN, 4479655], [439237], [439237, 4479655]]),
+    ).not.toThrow()
+    expect(ctx.edicion.ajustar([439237.05, 4479655], { recinto: 0, indice: 0 }).punto).toEqual([
+      439237, 4479655,
+    ])
     ctx.limpiar()
   })
 })
@@ -578,6 +753,28 @@ describe('viewer/edicion · indicador de enganche', () => {
     ctx.edicion.ajustar([439259.9, 4479655], { recinto: 0, indice: 0 })
     expect(indicadorDe(ctx.mapa)).not.toBeNull()
     ctx.edicion.snapActivo(false)
+    expect(indicadorDe(ctx.mapa)).toBeNull()
+    ctx.limpiar()
+  })
+
+  it('⭐ `soltarEnganche` lo apaga a mano, y es idempotente', () => {
+    // Existe por el DIBUJO: `ajustar` enciende y apaga mientras alguien pregunta,
+    // y un dibujo se termina de cinco maneras —`Escape`, `Enter`, doble clic,
+    // botón, `destruir()`— sin un último fotograma que lo apagara. Sin esta puerta
+    // el cuadradito se quedaba pintado sobre un mapa en el que ya no se dibuja.
+    const ctx = montar()
+    ctx.edicion.ajustar([439259.9, 4479655], { recinto: 0, indice: 0 })
+    expect(indicadorDe(ctx.mapa)).not.toBeNull()
+
+    ctx.edicion.soltarEnganche()
+    expect(indicadorDe(ctx.mapa)).toBeNull()
+    // Dos veces seguidas, y después de destruir: el desmontaje del visor va en
+    // orden inverso y nadie puede depender de llamarlo una sola vez.
+    expect(() => ctx.edicion.soltarEnganche()).not.toThrow()
+    ctx.edicion.destruir()
+    expect(() => ctx.edicion.soltarEnganche()).not.toThrow()
+
+    // Y NO apaga el snap: es solo el adorno.
     expect(indicadorDe(ctx.mapa)).toBeNull()
     ctx.limpiar()
   })

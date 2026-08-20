@@ -118,9 +118,76 @@ describe('crearParcela', () => {
       geometriaOficial: null,
       superficieRegistral: null,
       superficieCatastral: null,
+      puntosLevantamiento: [],
       origen: 'WFS',
     })
     expect(Object.getPrototypeOf(p)).toBe(Object.prototype)
+  })
+
+  // ── puntosLevantamiento (2026-08-19) ──────────────────────────────────────
+  //
+  // Los `POINT` sueltos de un DXF de campo. Se prueban aparte de `recintos` porque
+  // NO son geometría de la parcela: no se miden, no se serializan y una parcela
+  // puede tenerlos con cero recintos.
+  describe('puntosLevantamiento', () => {
+    const nube = () => [
+      [439237, 4479655],
+      [439257, 4479655],
+      [439257, 4479675],
+    ]
+
+    it('copia los pares y NO comparte referencias con la entrada', () => {
+      const entrada = nube()
+      const p = crearParcela({ idLocal: 'P1', origen: 'DXF', puntosLevantamiento: entrada })
+
+      expect(p.puntosLevantamiento).toEqual(nube())
+      expect(p.puntosLevantamiento).not.toBe(entrada)
+      expect(p.puntosLevantamiento[0]).not.toBe(entrada[0])
+
+      // Mutar la entrada DESPUÉS no puede tocar lo guardado.
+      entrada[0][0] = 0
+      entrada.push([1, 1])
+      expect(p.puntosLevantamiento).toEqual(nube())
+    })
+
+    it('se guarda CONGELADO, igual que geometriaOficial', () => {
+      const p = crearParcela({ idLocal: 'P1', origen: 'DXF', puntosLevantamiento: nube() })
+      // Módulo ESM ⇒ modo estricto ⇒ mutar algo congelado LANZA, no falla en silencio.
+      expect(() => p.puntosLevantamiento.push([0, 0])).toThrow(TypeError)
+      expect(() => {
+        p.puntosLevantamiento[0][0] = 0
+      }).toThrow(TypeError)
+    })
+
+    it('CERO recintos con puntos es un estado válido: el levantamiento sin unir', () => {
+      const p = crearParcela({ idLocal: 'lev.dxf', origen: 'DXF', puntosLevantamiento: nube() })
+      expect(p.recintos).toEqual([])
+      expect(p.puntosLevantamiento).toHaveLength(3)
+    })
+
+    it('un par mal formado LANZA nombrando su índice (el dato se GUARDA)', () => {
+      // Al revés que `edit/snap.js#dianasDe`, que los descarta: allí el catálogo se
+      // rehace en cada gesto; aquí el par malo sobrevive en un expediente guardado.
+      const conNaN = [[439237, 4479655], [Number.NaN, 4479655]]
+      expect(() => crearParcela({ idLocal: 'P1', origen: 'DXF', puntosLevantamiento: conNaN })).toThrow(
+        TypeError,
+      )
+      expect(() => crearParcela({ idLocal: 'P1', origen: 'DXF', puntosLevantamiento: conNaN })).toThrow(
+        /punto de levantamiento 1/,
+      )
+      expect(() =>
+        crearParcela({ idLocal: 'P1', origen: 'DXF', puntosLevantamiento: [[439237]] }),
+      ).toThrow(TypeError)
+    })
+
+    it('la FORMA equivocada lanza, y null/undefined valen por «ninguno»', () => {
+      expect(() =>
+        crearParcela({ idLocal: 'P1', origen: 'DXF', puntosLevantamiento: 'muchos' }),
+      ).toThrow(TypeError)
+      expect(
+        crearParcela({ idLocal: 'P1', origen: 'DXF', puntosLevantamiento: null }).puntosLevantamiento,
+      ).toEqual([])
+    })
   })
 
   it('conserva los campos suministrados', () => {

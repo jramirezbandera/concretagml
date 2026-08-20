@@ -17,6 +17,11 @@
 //   - `geometriaOficial` (la del WFS) se guarda como copia INDEPENDIENTE e
 //     intacta y se congela para que NUNCA se mute (regla 2): es el término de
 //     comparación del diagnóstico.
+//   - `puntosLevantamiento` (los POINT sueltos de un DXF de campo) recibe el
+//     MISMO trato —copia independiente y congelada— y por el mismo motivo: nada
+//     los edita. No son geometría de la parcela: no se miden, no se serializan y
+//     no se diagnostican. Sirven de enganche para dibujar encima, y una parcela
+//     puede tenerlos con CERO recintos.
 
 // ── Constantes de dominio ────────────────────────────────────────────────────
 
@@ -177,6 +182,25 @@ export function crearRecinto(vertices, tipo = TIPO_RECINTO.EXTERIOR) {
  *        Se valida como `superficieRegistral` —número finito o null—, sin
  *        forzar el entero: aquí se guarda lo que el servicio declaró tal cual
  *        (regla de oro 11: el modelo no redondea; el redondeo es de salida).
+ * @param {Array<[number,number]>} [args.puntosLevantamiento=[]] - Los PUNTOS
+ *        SUELTOS del levantamiento importado, en UTM y como pares.
+ *          · Es el fichero real de un topógrafo: cinco levantamientos del autor
+ *            medidos el 2026-08-18 dan entre 26 y 88 `POINT` y **cero** anillos.
+ *            El técnico une esos puntos dibujando encima, así que son **dato del
+ *            expediente** y no un residuo del parseo: si no se guardaran aquí,
+ *            recargar la página o recuperar el expediente obligaría a reimportar
+ *            el DXF para poder seguir dibujando.
+ *          · **No son geometría de la parcela.** No entran en el GML, no se
+ *            miden y no participan en el diagnóstico: sirven de ENGANCHE
+ *            (`edit/snap.js#dianasDe` los pone los primeros del catálogo) y de
+ *            referencia visual. Por eso viven en su propio campo y no en
+ *            `recintos`, donde cualquier consumidor los tomaría por un contorno.
+ *          · Una parcela puede tener puntos y **cero recintos**: es justo el
+ *            estado en el que se aterriza tras importar un levantamiento sin
+ *            unir, y lo que abre el peldaño Edición (`app/navegacion.js`, hecho
+ *            `puntos`).
+ *          · Se guardan **CONGELADOS**, el mismo trato que `geometriaOficial`:
+ *            son el registro de lo que traía el fichero y nada los edita.
  * @param {string} args.origen - Uno de ORIGEN_PARCELA (obligatorio).
  * @returns {object} Parcela
  */
@@ -187,6 +211,7 @@ export function crearParcela({
   geometriaOficial = null,
   superficieRegistral = null,
   superficieCatastral = null,
+  puntosLevantamiento = [],
   origen,
 } = {}) {
   if (typeof idLocal !== 'string' || idLocal.length === 0) {
@@ -235,6 +260,37 @@ export function crearParcela({
     deepFreeze(geoOficial)
   }
 
+  // puntosLevantamiento: copia INDEPENDIENTE y CONGELADA, mismo trato que
+  // `geometriaOficial` y por el mismo motivo (nada los edita; son el registro de
+  // lo que traía el fichero).
+  //
+  // La FORMA se exige entera —un array— porque equivocarse ahí se lleva la nube
+  // completa; y un par suelto mal formado **también lanza**, al revés que en
+  // `edit/snap.js#dianasDe`. No es una incoherencia: allí el catálogo se
+  // reconstruye en cada gesto y descartar un par malo cuesta una diana, mientras
+  // que aquí el dato se GUARDA y reaparece en un expediente recuperado meses
+  // después. La regla del modelo es la de `crearRecinto`: el par malo se nombra
+  // por su índice y se lanza.
+  let puntosCopia = []
+  if (puntosLevantamiento !== null && puntosLevantamiento !== undefined) {
+    if (!Array.isArray(puntosLevantamiento)) {
+      throw new TypeError(
+        `crearParcela: 'puntosLevantamiento' debe ser un array de pares UTM [x,y]; ` +
+          `recibido ${typeof puntosLevantamiento}.`,
+      )
+    }
+    puntosCopia = puntosLevantamiento.map((p, i) => {
+      if (!Array.isArray(p) || p.length < 2 || !esNumeroFinito(p[0]) || !esNumeroFinito(p[1])) {
+        throw new TypeError(
+          `crearParcela: el punto de levantamiento ${i} no es un par UTM [x,y] de números ` +
+            `finitos: ${JSON.stringify(p)}.`,
+        )
+      }
+      return [p[0], p[1]]
+    })
+    deepFreeze(puntosCopia)
+  }
+
   return {
     idLocal,
     refcat,
@@ -242,6 +298,7 @@ export function crearParcela({
     geometriaOficial: geoOficial,
     superficieRegistral,
     superficieCatastral,
+    puntosLevantamiento: puntosCopia,
     origen,
   }
 }

@@ -273,6 +273,40 @@ export const MS_FUNDIDO = 180
 const FRACCION_PROVISIONAL = 0.35
 
 /**
+ * ⭐ **CUÁNTO SUELO PUEDE CUBRIR UN PÍXEL ANTES DE QUE PEDIR LA IMAGEN NO SIRVA
+ * PARA NADA: 10 metros.** Por encima de esto, `_encuadre` devuelve `null` y **no
+ * se emite ningún `GetMap`**.
+ *
+ * ── DE DÓNDE SALE EL 10, QUE ES LO ÚNICO QUE HAY QUE DEFENDER ──────────────
+ * De lo que se está dibujando. Lo que esta capa pinta son PARCELAS, y la parcela
+ * urbana pequeña de este país ronda los 100 m², o sea unos **10 m de lado**. Con un
+ * píxel de más de 10 m, la parcela más pequeña que el servicio puede dibujar **no
+ * ocupa ni un píxel entero**: la imagen que vuelve no es peor, es que no puede
+ * contener la información que se le está pidiendo. No es un umbral de gusto ni de
+ * rendimiento — es el punto por debajo del cual la pregunta no tiene respuesta
+ * posible.
+ *
+ * ⚠️ **Es DELIBERADAMENTE flojo, y conviene saberlo.** A 10 m/px las parcelas
+ * siguen sin verse de forma útil; para eso hacen falta 1 o 2 m/px. El suelo no está
+ * puesto donde la capa empieza a SERVIR, sino donde deja de poder servir **en
+ * absoluto**, porque lo que se está retirando es una petición inútil y no una
+ * decisión de producto sobre a qué escala se enseña la cartografía. Apretar esta
+ * cifra hacia 2 haría desaparecer la capa a escala de ciudad, y eso ya sí es una
+ * decisión de producto con su propio dueño y su propia conversación.
+ *
+ * ── LO QUE ESTO NO ES ─────────────────────────────────────────────────────
+ * NO es el umbral del clic que deduce la referencia catastral. Aquel vive en
+ * `app/cableado-catastro.js` y es MUCHO más estricto (2 m/px), porque contesta a
+ * otra pregunta: allí no se trata de si el servicio puede dibujar la parcela, sino
+ * de si una persona puede APUNTARLE con el ratón. Dos preguntas distintas, dos
+ * números distintos, y ninguno de los dos se copia del otro.
+ *
+ * ⛔ **Y no se declara aquí ningún número de zoom.** Ver la nota de `_encuadre`:
+ * un zoom es una escala distinta en cada latitud, y este módulo se mide en metros.
+ */
+const METROS_POR_PIXEL_MAXIMO = 10
+
+/**
  * Mensajes de usuario del módulo (español, mostrables tal cual). Exportados para
  * que la UI de avisos de Fase 3/4 y los tests los referencien en vez de
  * parafrasearlos. Distinguen las dos situaciones del punto 6 de la cabecera.
@@ -904,6 +938,31 @@ const CapaWMSCatastro = L.ImageOverlay.extend({
     const pedible = tamanoAlTecho(ancho, alto)
 
     const bounds = mapa.getBounds()
+
+    // ── ⭐ EL SUELO DE ESCALA (2026-08-18) ────────────────────────────────────
+    //
+    // ⛔ **EL DEFECTO, MEDIDO POR EL GUION 22 EL 2026-08-18:** con la aplicación
+    // recién abierta —que desde el 2026-08-07 arranca mirando a España entera— esta
+    // capa pedía un `GetMap` con un BBOX de **2.172 × 1.641 km**. En cada apertura,
+    // a un servicio de una administración pública, para una imagen en la que no se
+    // distingue ni una parcela. No rompía nada, y por eso llevaba un año sin que
+    // nadie lo mirara: los fallos que no rompen nada son los que más duran.
+    //
+    // ── EL CRITERIO, Y POR QUÉ NO ES UN ZOOM ────────────────────────────────
+    // Un número de zoom mentiría: los metros que cubre un píxel dependen de la
+    // LATITUD (en Web Mercator, del `cos` de la latitud), así que el mismo zoom es
+    // una escala distinta en Canarias y en Gerona. Se pregunta lo que de verdad
+    // importa —**cuánto suelo cubre un píxel**— y se le pregunta a Leaflet, que lo
+    // sabe exacto.
+    //
+    // ⚠️ **La distancia se saca de `mapa.distance` y NO del BBOX de 3857**, aunque
+    // el BBOX ya esté aquí abajo y fuera gratis. En Web Mercator el metro está
+    // inflado por 1/cos(latitud) —a 40° un 30 % de más—, así que dividir el BBOX
+    // entre los píxeles daría una escala optimista y el suelo se aplicaría torcido,
+    // y más torcido cuanto más al norte. `distance` devuelve metros de los de
+    // andar.
+    const anchoRealM = mapa.distance(bounds.getSouthWest(), bounds.getSouthEast())
+    if (anchoRealM / ancho > METROS_POR_PIXEL_MAXIMO) return null
     // Proyección de las DOS esquinas del encuadre a metros Web Mercator. En 3857
     // el orden es X,Y y NO se invierte nada (dossier §2.5).
     const so = L.CRS.EPSG3857.project(bounds.getSouthWest())

@@ -118,18 +118,50 @@ describe('parseDXF · UTM.dxf real (solo ENTITIES, nunca BLOCKS)', () => {
     expect(r.detecciones.filter((d) => d.tipo === TIPO_DETECCION.ARCO_DISCRETIZADO)).toHaveLength(0)
   })
 
-  it('resume anotaciones (TEXT/MTEXT) y otras entidades (LINE/POINT/IMAGE) en INFO, sin spam', () => {
+  it('resume anotaciones (TEXT/MTEXT) y otras entidades (LINE/IMAGE) en INFO, sin spam', () => {
     const infos = r.detecciones.filter(
       (d) => d.tipo === TIPO_DETECCION.ENTIDAD_NO_SOPORTADA && d.severidad === SEVERIDAD.INFO,
     )
     // Una detección para anotaciones y otra para el resto: NUNCA una por entidad.
-    const anot = infos.find((d) => d.datos.tipos.TEXT)
+    // ⚠️ `d.datos.tipos &&` no sobra desde el 2026-08-18: la detección de los
+    // PUNTOS es de este mismo tipo y severidad y sus `datos` NO llevan `tipos`
+    // (llevan `porCapa`), así que sin la guarda estos `find` revientan al pasar
+    // por ella. Se blinda aquí en vez de estrechar el filtro de arriba porque lo
+    // que este `it` afirma es «una detección por FAMILIA, nunca una por entidad»,
+    // y para eso tiene que seguir mirando a todas las INFO de esa familia.
+    const anot = infos.find((d) => d.datos.tipos && d.datos.tipos.TEXT)
     expect(anot.datos.tipos).toEqual({ TEXT: 121, MTEXT: 15 })
     expect(anot.datos.total).toBe(136)
-    const otras = infos.find((d) => d.datos.tipos.LINE)
+    const otras = infos.find((d) => d.datos.tipos && d.datos.tipos.LINE)
     expect(otras.datos.tipos.LINE).toBe(70)
-    expect(otras.datos.tipos.POINT).toBe(155)
     expect(otras.datos.tipos.IMAGE).toBe(1)
+  })
+
+  it('⛔ el POINT YA NO va al cajón de «entidades ignoradas»: es dato (2026-08-18)', () => {
+    // Este `it` es la mitad negativa del cambio, y existe porque el `expect` que
+    // había aquí —`otras.datos.tipos.POINT === 155`— era la prueba de que 155
+    // puntos se tiraban a la basura, y pasaba en VERDE. Si alguien devuelve el
+    // POINT al cajón `otras`, esto se pone rojo.
+    const infos = r.detecciones.filter(
+      (d) => d.tipo === TIPO_DETECCION.ENTIDAD_NO_SOPORTADA && d.severidad === SEVERIDAD.INFO,
+    )
+    const otras = infos.find((d) => d.datos.tipos && d.datos.tipos.LINE)
+    expect(otras.datos.tipos.POINT).toBeUndefined()
+    // Y los 155 siguen contados, pero del lado de los que SÍ se usan.
+    expect(r.puntos).toHaveLength(155)
+    const dePuntos = infos.find((d) => d.datos.porCapa)
+    expect(dePuntos.datos.total).toBe(155)
+    expect(dePuntos.mensaje).toContain('punto(s) sueltos')
+  })
+
+  it('cada punto trae capa y coordenadas finitas, y la Z solo si venía', () => {
+    for (const p of r.puntos) {
+      expect(typeof p.capa, 'la capa es string aunque falte el código 8').toBe('string')
+      expect(Number.isFinite(p.x) && Number.isFinite(p.y)).toBe(true)
+      expect(p.z === null || Number.isFinite(p.z)).toBe(true)
+      // Un punto en el origen no puede salir por aquí: es basura y se descarta.
+      expect(p.x === 0 && p.y === 0).toBe(false)
+    }
   })
 })
 
@@ -871,5 +903,80 @@ describe('parseDXF · H8 — ARC/CIRCLE pueden SER la parcela (aviso con guía)'
         (d) => d.datos && d.datos.tipos && (d.datos.tipos.ARC || d.datos.tipos.CIRCLE),
       ),
     ).toEqual([])
+  })
+})
+
+// ── 9 · El DXF que SOLO trae puntos (2026-08-18) ─────────────────────────────
+//
+// El caso que motivó devolver `puntos[]`. La anatomía está medida sobre cinco
+// levantamientos reales del autor que NO pueden vivir aquí (`icuc-pruebas/` va en
+// `.gitignore`: son coordenadas de encargos de clientes), así que se reprodujo en
+// un fixture sintético — con su porqué escrito en `fixtures/parsers/PROCEDENCIA.md`.
+//
+// Lo que estas pruebas defienden, en una frase: **un fichero con 88 puntos y cero
+// polilíneas dejaba de existir para esta aplicación**, y lo hacía en verde.
+
+describe('parseDXF · el levantamiento que solo trae PUNTOS', () => {
+  const r = parseDXF(readFileSync(fixture('puntos_levantamiento.dxf'), 'latin1'))
+
+  it('⭐ sin una sola polilínea, el fichero YA NO sale vacío', () => {
+    // El corazón del cambio. Antes: `anillos: []` y una línea INFO diciendo «se
+    // ignoraron N entidad(es)». O sea, la aplicación leía el fichero entero,
+    // contaba sus puntos, tiraba las coordenadas y enseñaba una parcela vacía.
+    expect(r.anillos).toEqual([])
+    expect(r.puntos.length).toBeGreaterThan(0)
+  })
+
+  it('devuelve los puntos SIN deduplicar y SIN elegir capa, que es del llamante', () => {
+    // El software real escribe cada punto dos veces, en la capa 2D y en la 3D.
+    // Quedarse con una es una decisión del diálogo de capas, no del parser —el
+    // mismo trato que ya tienen los anillos con `capas[]`.
+    expect(r.puntos).toHaveLength(6)
+    const porCapa = {}
+    for (const p of r.puntos) porCapa[p.capa] = (porCapa[p.capa] || 0) + 1
+    expect(porCapa).toEqual({ VER_P2D: 3, VER_P3D: 3 })
+  })
+
+  it('la Z se conserva solo donde venía: en un punto de levantamiento es la COTA', () => {
+    // Al revés que en un vértice de polilínea, donde se descarta y se cuenta en
+    // `zCount`. Aquí es dato.
+    const conCota = r.puntos.filter((p) => p.z !== null)
+    expect(conCota).toHaveLength(3)
+    for (const p of conCota) expect(Number.isFinite(p.z)).toBe(true)
+    for (const p of r.puntos.filter((x) => x.capa === 'VER_P2D')) expect(p.z).toBeNull()
+  })
+
+  it('⛔ el punto en (0,0) de ENTITIES se descarta Y SE DICE cuántos', () => {
+    // No es un punto: en EPSG:25830 el origen cae en el Atlántico. Colarlo estira
+    // el encuadre miles de kilómetros y deja la parcela en un píxel. Lo que este
+    // `it` defiende no es el descarte —eso es obvio— sino que **no sea silencioso**.
+    for (const p of r.puntos) expect(p.x === 0 && p.y === 0).toBe(false)
+    const d = r.detecciones.find((x) => x.datos && x.datos.porCapa)
+    expect(d.datos.enOrigenDescartados).toBe(1)
+    expect(d.mensaje).toContain('(0, 0)')
+  })
+
+  it('⛔ el POINT de BLOCKS NO cuenta: este parser no desciende a BLOCKS', () => {
+    // Los cinco ficheros reales traen su (0,0) AHÍ, no en ENTITIES. O sea que en
+    // ellos la guarda de arriba no se dispara nunca, y el contador sale 0. Quien
+    // lo vea a 0 no debe concluir que está roto: está contando otra cosa.
+    // El fixture lleva un POINT dentro de BLOCKS a propósito; si alguien hiciera
+    // descender el parser, `puntos` pasaría de 6 a 7 y esto se pondría rojo.
+    expect(r.puntos).toHaveLength(6)
+  })
+
+  it('los rótulos siguen leyéndose, y son los que dan número, cota y código', () => {
+    // F22 ya los devolvía; lo que se mide aquí es que las TRES capas de etiquetas
+    // del software de topografía llegan enteras, porque son lo que convierte una
+    // nube de puntos en puntos IDENTIFICADOS.
+    const porCapa = {}
+    for (const t of r.rotulos) porCapa[t.capa] = (porCapa[t.capa] || 0) + 1
+    expect(porCapa).toEqual({ VER_NOPTO: 3, VER_COTAS: 3, VER_CODIGOS: 3 })
+    // Y casan 1:1 y por orden con los puntos de UNA capa, que es el hallazgo que
+    // permite emparejarlos sin geometría difusa.
+    const dosD = r.puntos.filter((p) => p.capa === 'VER_P2D')
+    const numeros = r.rotulos.filter((t) => t.capa === 'VER_NOPTO')
+    expect(dosD).toHaveLength(numeros.length)
+    expect(numeros.map((t) => t.texto)).toEqual(['1', '2', '3'])
   })
 })

@@ -358,6 +358,66 @@ describe('crearCapaWMSCatastro · una imagen por encuadre, JAMÁS un mosaico', (
   })
 })
 
+// ── ⭐ EL SUELO DE ESCALA (2026-08-18) ──────────────────────────────────────
+//
+// Lo destapó el guion de humo 22 midiendo el arranque de PRODUCCIÓN: con la
+// aplicación recién abierta —que desde el 2026-08-07 mira a España entera— esta
+// capa pedía un `GetMap` con un BBOX de **2.172 × 1.641 km**. En cada apertura, a
+// un servicio de una administración pública, para una imagen en la que no cabe ni
+// una parcela.
+//
+// No rompía nada. Por eso llevaba un año ahí: los fallos que no rompen nada son
+// los que más duran, y hace falta que alguien vaya a CONTAR para verlos.
+
+describe('crearCapaWMSCatastro · el suelo de escala: no se pide lo que no se puede dibujar', () => {
+  let arnes
+  let espia
+
+  afterEach(() => {
+    espia.restaurar()
+    arnes.destruir()
+  })
+
+  it('⛔ a escala de país NO pide nada: la parcela más pequeña no ocupa ni un píxel', () => {
+    // Zoom 6 es literalmente la vista de arranque de la aplicación
+    // (`app/main.js#VISTA_SIN_PARCELA`). Ahí un píxel son ~1,5 km, y el umbral son 10 m.
+    arnes = montarMapa({ ancho: 800, alto: 600, zoom: 6 })
+    espia = espiarPeticiones()
+
+    const capa = crearCapaWMSCatastro().addTo(arnes.mapa)
+
+    expect(espia.total).toBe(0)
+    expect(capa.estado().peticiones).toBe(0)
+  })
+
+  it('a escala de parcela pide como siempre', () => {
+    // Zoom 18: ~0,45 m/px a esta latitud, muy por debajo de los 10 del umbral.
+    arnes = montarMapa({ ancho: 800, alto: 600, zoom: 18 })
+    espia = espiarPeticiones()
+
+    crearCapaWMSCatastro().addTo(arnes.mapa)
+
+    expect(espia.total).toBe(1)
+  })
+
+  it('⭐ acercarse desde el país destapa la petición, sin haber gastado ninguna por el camino', () => {
+    // El recorrido real del usuario que abre la aplicación y busca su parcela. Lo
+    // que se afirma es que el suelo no es una puerta que se cierra: es una que se
+    // abre sola en cuanto la pregunta tiene respuesta posible.
+    arnes = montarMapa({ ancho: 800, alto: 600, zoom: 6 })
+    espia = espiarPeticiones()
+
+    crearCapaWMSCatastro().addTo(arnes.mapa)
+    expect(espia.total).toBe(0)
+
+    arnes.mapa.setView(arnes.mapa.getCenter(), 10, { animate: false })
+    expect(espia.total).toBe(0)
+
+    arnes.mapa.setView(arnes.mapa.getCenter(), 18, { animate: false })
+    expect(espia.total).toBe(1)
+  })
+})
+
 describe('crearCapaWMSCatastro · intercambio de imagen y carreras', () => {
   let arnes
   let espia

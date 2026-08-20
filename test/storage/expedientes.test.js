@@ -256,6 +256,41 @@ describe('storage/expedientes · la geometría oficial vuelve CONGELADA (regla d
     bd.close()
   })
 
+  it('⭐ los PUNTOS del levantamiento sobreviven a la vuelta, y vuelven congelados', async () => {
+    // ⛔ La lección de F21 en su forma más cara: un campo que la ida y vuelta no
+    // arrastra desaparece en silencio y reaparece vacío meses después. Aquí duele
+    // el doble, porque los puntos son las dianas sobre las que se dibuja y el DXF
+    // de campo puede no estar ya en el disco: sin esto, recuperar un expediente a
+    // medio dibujar obligaría a reimportar el fichero.
+    const nube = anillo(40)
+    const { bd } = await baseNueva()
+    const exp = crearExpedientes({ bd, ahora: relojQueAvanza() })
+    const original = crearExpediente({
+      srs: 'EPSG:25830',
+      parcela: crearParcela({
+        idLocal: 'levantamiento.dxf',
+        // CERO recintos: el estado real de un levantamiento importado sin unir, y
+        // el que más fácil sería perder por el camino.
+        recintos: [],
+        puntosLevantamiento: nube,
+        origen: 'DXF',
+      }),
+    })
+
+    const { registro } = await exp.guardar(original)
+    const { expediente } = await exp.recuperar(registro.id)
+
+    expect(expediente.parcela.puntosLevantamiento).toEqual(nube)
+    expect(expediente.parcela.recintos).toEqual([])
+    // Y vuelven congelados, como `geometriaOficial`: nada los edita.
+    expect(Object.isFrozen(expediente.parcela.puntosLevantamiento)).toBe(true)
+    expect(() => {
+      expediente.parcela.puntosLevantamiento[0][0] = 0
+    }).toThrow(TypeError)
+
+    bd.close()
+  })
+
   it('los recintos EDITABLES siguen siendo editables: no se congela de más', async () => {
     // El reverso: congelar la parcela entera «por si acaso» rompería la edición de
     // F06 en cuanto alguien recuperase un expediente.

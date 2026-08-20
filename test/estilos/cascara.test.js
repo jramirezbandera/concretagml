@@ -284,3 +284,80 @@ describe('T5 · las dos reglas duras de la hoja', () => {
     for (const ruta of importados) expect(ruta).not.toMatch(/leaflet/i)
   })
 })
+
+// ═════════════════════════════════════════════════════════════════════════════
+// T6 · LOS DOS «ENCENDIDOS» DE LA BARRA DE EDICIÓN NO SE PINTAN IGUAL
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// ⛔ **EL DEFECTO QUE ESTE BLOQUE CIERRA ESTUVO VIVO Y MEDIDO.** El 2026-08-20, en
+// Chrome, con el ajuste puesto y «Insertar vértices» armado, los dos daban
+// `rgb(3, 105, 161)`: mismo fondo, mismo color de icono, píxel por píxel. Y no son
+// la misma cosa —
+//
+//   · **el ajuste al parcelario** es un AJUSTE PERSISTENTE: nace puesto, sigue
+//     puesto expediente tras expediente y no cambia lo que hace el clic siguiente,
+//     cambia dónde CAE;
+//   · **insertar / borrar / dibujar** son MODOS ARMADOS: duran lo que duran, son
+//     excluyentes y sí cambian lo que hace el clic siguiente.
+//
+// Pintar los dos contratos con el mismo bloque azul no era coherencia: era una
+// homonimia, y se veía uno al lado del otro. Ninguna prueba de `test/viewer/`
+// podía cazarlo —jsdom no aplica esta hoja— y ninguna captura en reposo tampoco,
+// porque hace falta tener un modo armado a la vez. Por eso el guardián vive aquí,
+// sobre el TEXTO de la hoja, que es lo único que hay antes del navegador.
+describe('T6 · el ajuste encendido y un modo armado son dos cosas distintas', () => {
+  /**
+   * El cuerpo de una regla, buscándola por su selector EXACTO en la hoja viva.
+   * Lanza si no la encuentra: un guardián que no localiza a su sujeto pasa en
+   * verde sin vigilar nada, que es exactamente lo que no queremos.
+   */
+  const cuerpo = (selector) => {
+    const i = VIVO.indexOf(selector)
+    if (i === -1) throw new Error(`test/estilos/cascara.test.js: la hoja ya no tiene «${selector}»`)
+    const abre = VIVO.indexOf('{', i)
+    const cierra = VIVO.indexOf('}', abre)
+    return VIVO.slice(abre + 1, cierra)
+  }
+
+  const CHIP = ".gml-app .gml-barra-conmutador:checked + .gml-barra-conmutador-rotulo"
+  const ARMADO = ".gml-app .gml-barra-herramienta[aria-pressed='true']"
+
+  it('⭐ el MODO ARMADO se queda el bloque macizo', () => {
+    // Es el estado transitorio y el que cambia lo que hace el clic siguiente, así
+    // que es el que tiene derecho al registro fuerte. Y el token es del sistema
+    // (`--color-btn-primary-bg`, ≈5,7:1 con su `fg`), no un color inventado aquí.
+    expect(cuerpo(ARMADO)).toMatch(/background:\s*var\(--color-btn-primary-bg\)/)
+  })
+
+  it('⛔ y el AJUSTE ENCENDIDO ya no puede usar ese mismo fondo', () => {
+    // Ésta es la regresión exacta: hasta T6 esta regla decía
+    // `background: var(--color-btn-primary-bg)`, igual que la de arriba.
+    expect(cuerpo(CHIP)).not.toMatch(/var\(--color-btn-primary-bg\)/)
+    // Lo que usa es el acento MEZCLADO, que es la receta que ya tienen
+    // `.gml-via-marca` y `::selection`: en este sistema no hay token de «acento
+    // suave» y no se inventa un hexadecimal.
+    expect(cuerpo(CHIP)).toMatch(/background:\s*color-mix\(in srgb, var\(--color-accent\)/)
+  })
+
+  it('⭐ el encendido del ajuste se dice con TRES señales, y ninguna es un bloque', () => {
+    // El tinte solo da 1,23:1 contra el blanco de la barra —medido—, o sea que
+    // como única señal sería un matiz, y éste es el estado más consultado de la
+    // barra. Las tres juntas se leen de un vistazo: fondo, tinta del icono y filo.
+    // Es la misma receta del peldaño activo del topbar, que ya dice en esta app
+    // que un filo de acento significa «éste está puesto».
+    const regla = cuerpo(CHIP)
+    expect(regla, 'falta el tinte').toMatch(/background:\s*color-mix/)
+    expect(regla, 'falta la tinta del icono').toMatch(/color:\s*var\(--color-accent-hover\)/)
+    expect(regla, 'falta el filo de 2 px').toMatch(/box-shadow:\s*inset 0 -2px 0 var\(--color-accent\)/)
+  })
+
+  it('⛔ el ajuste sigue siendo un `<input type="checkbox">` de verdad', () => {
+    // Constraint del diseño: T6 es RE-VESTIR, no re-tipar. `app/main.js` lee
+    // `.checked` y escucha `change`, y toda esta apariencia cuelga de `:checked`,
+    // que solo existe si el nodo sigue siendo una casilla. Si alguien la
+    // convirtiera en un `<button aria-pressed>`, estas reglas dejarían de casar
+    // **en silencio** y el chip se quedaría apagado para siempre.
+    expect(VIVO).toContain('.gml-barra-conmutador:checked')
+    expect(cuerpo('.gml-app .gml-barra-conmutador')).toMatch(/appearance:\s*none/)
+  })
+})

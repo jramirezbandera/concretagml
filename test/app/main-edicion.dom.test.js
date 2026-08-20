@@ -92,12 +92,23 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { crearDialogoAvisos } from '../../app/dialogo-avisos.js'
 import { SRS_DEMO, parcelaDemo } from '../../app/demo-datos.js'
 import { OPERATIVOS } from '../../config/operativos.js'
-import { commit, crearHistorial, puedeDeshacer, puedeRehacer } from '../../edit/historial.js'
+import {
+  commit,
+  crearHistorial,
+  puedeDeshacer,
+  puedeRehacer,
+  // ⚠️ La API de la pila se llama `undo`/`redo`; los `deshacer`/`rehacer` de este
+  // fichero son los BOTONES que devuelve `cablear(...)`. Se importan con alias para
+  // que los dos nombres no se crucen: dos cosas distintas con el mismo nombre en el
+  // mismo fichero es como se cuela un test que pasa midiendo otra.
+  undo as deshacerPila,
+  redo as rehacerPila,
+} from '../../edit/historial.js'
 import { metricas } from '../../edit/metricas.js'
 import { husoPorSrs } from '../../geo/huso.js'
 import { crearParcela, crearRecinto, ORIGEN_PARCELA, TIPO_RECINTO } from '../../model/parcela.js'
 import { NIVEL, crearEstadoVista } from '../../viewer/_comun.js'
-import { crearBarraEdicion } from '../../viewer/barra-edicion.js'
+import { CLASE_BARRA, crearBarraEdicion } from '../../viewer/barra-edicion.js'
 import { crearCajonComprobacion } from '../../viewer/cajon-comprobacion.js'
 import { crearCajonDiagnostico } from '../../viewer/cajon-diagnostico.js'
 import { crearContraste } from '../../viewer/contraste.js'
@@ -115,6 +126,14 @@ let mapaVivo = null
 
 /** El cajón y la capa de F07 vivos, para que el doble los entregue. */
 let diagnosticoVivo = null
+
+/**
+ * La barra de edición VIVA. Se montaba desde F06 —`cablearEdicion` lanza sin sus
+ * siete nodos— pero no se guardaba, porque hasta F18 ninguna prueba de este fichero
+ * le pedía nada. «Dibujar recinto» sí: es la única herramienta que se ESCONDE, y
+ * comprobarlo sobre un doble sería comprobar el doble.
+ */
+let barraViva = null
 
 /** El cajón de F08 vivo, ídem. Va SUELTO, como en el visor real. */
 let comprobacionViva = null
@@ -175,6 +194,7 @@ function montarCromoDelMapa() {
   // typing—, y desde F11 hay un segundo consumidor, `viewer/partes.js`, que
   // necesita `addLayer`/`removeLayer`/`getPane` para pintar las huellas.
   mapaVivo = mapa
+  barraViva = barra
   diagnosticoVivo = { cajon, contraste }
   comprobacionViva = cajonComprobacion
   sobranteVivo = { lista: listaSobrante, capa: capaPiezas, capaFuera, capaVecinos }
@@ -187,6 +207,7 @@ function montarCromoDelMapa() {
     barra.destruir()
     destruirMapa()
     mapaVivo = null
+    barraViva = null
     diagnosticoVivo = null
     comprobacionViva = null
     sobranteVivo = null
@@ -229,6 +250,10 @@ const arranque = vi.hoisted(() => ({
     pintadas: [],
     /** Cuántas veces se ha llamado a `visor.colindantes.limpiar`. */
     limpiezas: 0,
+    /** Cada `visor.puntosLevantamiento.pintar`, con su argumento tal cual. */
+    puntosPintados: [],
+    /** Cada `visor.edicion.fijarPuntos`, ídem. Tienen que ir SIEMPRE en pareja. */
+    puntosFijados: [],
   },
 }))
 
@@ -269,6 +294,12 @@ vi.mock('../../viewer/index.js', async (importarOriginal) => ({
         alCambiarSeleccion: () => () => {},
         modoBorrar: () => false,
         alCambiarModoBorrar: () => () => {},
+        // El modo insertar (2026-08-18): gemelo del de arriba, y por lo mismo.
+        modoInsertar: () => false,
+        alCambiarModoInsertar: () => () => {},
+        fijarPuntos(puntos) {
+          arranque.registro.puntosFijados.push(puntos)
+        },
         fijarColindantes(recintos) {
           arranque.registro.colindantes.push(recintos)
         },
@@ -292,6 +323,22 @@ vi.mock('../../viewer/index.js', async (importarOriginal) => ({
         },
         destruir() {},
       },
+      // ⭐ (2026-08-19) La capa de puntos sueltos. Se dobla por el mismo criterio
+      // que `colindantes`: aquí se prueba CON QUÉ la llama `app/main.js`; lo que
+      // la capa hace con eso vive en `test/viewer/puntos-levantamiento.dom.test.js`.
+      puntosLevantamiento: {
+        pintar(puntos) {
+          arranque.registro.puntosPintados.push(puntos)
+        },
+        limpiar() {},
+        destruir() {},
+      },
+      // ⭐ (2026-08-19) La barra del mapa, LA DE VERDAD —la acaba de montar
+      // `montarCromoDelMapa`—, y no un doble: `app/main.js` le empuja la cuenta de
+      // puntos con `puntosVisible(n)` y lo que se quiere vigilar es que ese número
+      // llegue A LA BARRA QUE EL USUARIO VE, no a un objeto escrito aquí que diría
+      // que sí a cualquier cosa. Es el mismo criterio que el cajón de F07.
+      barraEdicion: barraViva,
       // Las dos piezas de F07, LAS DE VERDAD (las ha montado `montarCromoDelMapa`
       // sobre un `L.Map` real). No se doblan por lo mismo que la barra: el cableado
       // del diagnóstico comprueba los diez métodos del cajón por duck typing, así
@@ -438,6 +485,9 @@ const {
   SELECTOR_BOTON_BORRAR,
   SELECTOR_ESTADO_EDICION,
   SELECTOR_BOTON_GML,
+  MENSAJE_SIN_PUNTOS_QUE_QUITAR,
+  mensajePuntosQuitados,
+  quitarPuntosLevantamiento,
 } = await import('../../app/main.js')
 
 /**
@@ -457,6 +507,18 @@ const DEL_ARRANQUE = Object.freeze({
   // F07 · el CTA del pie y su renglón. Se capturan aquí por lo mismo que el resto.
   botonDiagnosticar: document.querySelector('[data-accion="diagnosticar"]'),
   estadoDiagnosticar: document.querySelector('[data-estado="diagnosticar"]'),
+  // ⭐ F24 · «Quitar los puntos». Se captura AQUÍ y no dentro del test por el
+  // motivo de siempre, pero agravado: este botón no está en `index.html`, lo
+  // fabrica `viewer/barra-edicion.js` cuando `crearVisor` monta la barra —o sea
+  // durante el `import` de arriba—, y es a ESE nodo al que el ensamblaje le colgó
+  // su oyente. Cada `montar()` posterior rehace la barra entera, así que un
+  // `querySelector` desde un `it()` devolvería un botón NUEVO y mudo, y el test
+  // pasaría en verde midiendo un clic que no llega a ninguna parte.
+  botonQuitarPuntos: document.querySelector('[data-accion="quitar-puntos"]'),
+  // Y el panel de avisos SOBRE EL QUE ESCRIBE el ensamblaje. `crearDialogoAvisos`
+  // se quedó con los nodos de la cáscara de entonces; el `#avisos` que devuelve un
+  // `querySelector` desde un `it()` es el de la cáscara remontada, y está mudo.
+  avisos: document.querySelector('#avisos'),
 })
 
 /** El store REAL del ensamblaje (el mismo objeto que comparten las tres vistas). */
@@ -559,9 +621,28 @@ function crearEdicionFalsa({ desplazamiento = { aplicado: true, modo: 'MITER', d
   // sobre nada.
   let borrando = false
   const oyentesBorrar = new Set()
+  // El modo insertar (2026-08-18), con su propio juego de oyentes y por lo mismo.
+  // ⚠️ Y aquí el doble tiene que imitar UNA cosa más que en borrar: los dos modos
+  // son EXCLUYENTES en `viewer/edicion.js`, así que encender uno apaga el otro **y
+  // lo anuncia**. Un doble que no lo hiciera dejaría pasar en verde el defecto que
+  // más probable es: los dos botones pulsados a la vez.
+  let insertando = false
+  const oyentesInsertar = new Set()
+  // F18 · el interruptor de los cuatro gestos del mapa. Nace ENCENDIDO, como el
+  //  de `viewer/edicion.js`: el dibujo lo apaga mientras dura y lo repone al salir.
+  let editando = true
 
   return {
-    llamadas: { snapActivo: [], tolerancia: [], colindantes: [], desplazar: [], modoBorrar: [] },
+    llamadas: {
+      snapActivo: [],
+      tolerancia: [],
+      colindantes: [],
+      desplazar: [],
+      modoBorrar: [],
+      modoInsertar: [],
+      /** F18 · cada `activa(x)` que el dibujo le manda. */
+      activa: [],
+    },
     /** Simula un clic del mapa que selecciona (o suelta) un lindero. */
     seleccionar(ref) {
       seleccion = ref
@@ -573,6 +654,11 @@ function crearEdicionFalsa({ desplazamiento = { aplicado: true, modo: 'MITER', d
         // Como el real: solo se anuncia si CAMBIA de verdad.
         if (valor !== borrando) {
           borrando = valor
+          // Como el real: al ENCENDER, apaga a su hermano y lo anuncia.
+          if (borrando && insertando) {
+            insertando = false
+            for (const fn of oyentesInsertar) fn(false)
+          }
           for (const fn of oyentesBorrar) fn(borrando)
         }
       }
@@ -587,6 +673,30 @@ function crearEdicionFalsa({ desplazamiento = { aplicado: true, modo: 'MITER', d
       if (!borrando) return
       borrando = false
       for (const fn of oyentesBorrar) fn(false)
+    },
+    modoInsertar(valor) {
+      if (valor !== undefined) {
+        this.llamadas.modoInsertar.push(valor)
+        if (valor !== insertando) {
+          insertando = valor
+          if (insertando && borrando) {
+            borrando = false
+            for (const fn of oyentesBorrar) fn(false)
+          }
+          for (const fn of oyentesInsertar) fn(insertando)
+        }
+      }
+      return insertando
+    },
+    alCambiarModoInsertar(fn) {
+      oyentesInsertar.add(fn)
+      return () => oyentesInsertar.delete(fn)
+    },
+    /** Gemela de {@link apagarModoBorrarDesdeElVisor}: `Escape`, salir de Edición. */
+    apagarModoInsertarDesdeElVisor() {
+      if (!insertando) return
+      insertando = false
+      for (const fn of oyentesInsertar) fn(false)
     },
     snapActivo(valor) {
       if (valor !== undefined) {
@@ -607,6 +717,26 @@ function crearEdicionFalsa({ desplazamiento = { aplicado: true, modo: 'MITER', d
       oyentes.add(fn)
       return () => oyentes.delete(fn)
     },
+    /**
+     * F18 · el interruptor de los CUATRO gestos del mapa. El dibujo lo apaga
+     * mientras dura y lo repone al terminar, y aquí se apunta cada llamada porque
+     * «se apagó y se volvió a encender» es exactamente lo que hay que medir.
+     */
+    activa(valor) {
+      if (valor !== undefined) {
+        this.llamadas.activa.push(valor)
+        editando = valor
+      }
+      return editando
+    },
+    /**
+     * F18 · el gancho de enganche. Devuelve el punto TAL CUAL —«no tengo opinión»,
+     * que es una respuesta legítima de `viewer/edicion.js#ajustar`—: lo que aquí se
+     * prueba es el recorrido del recinto hasta el store, no el snap, que tiene su
+     * propia suite en `test/edit/snap.test.js`.
+     */
+    ajustar: (utm) => ({ punto: utm, enganchado: false, tipo: null }),
+    fijarPuntos() {},
     fijarColindantes(recintos) {
       this.llamadas.colindantes.push(recintos)
     },
@@ -702,6 +832,16 @@ function teclear(tecla, { ctrl = true, shift = false, meta = false, destino = nu
 /** Textos de las tarjetas del panel de avisos. */
 const textosDelPanel = () =>
   [...document.querySelectorAll('#avisos .gml-aviso-texto')].map((t) => t.textContent)
+
+/**
+ * Ídem, pero del panel QUE EL ENSAMBLAJE ESCRIBE (ver `DEL_ARRANQUE.avisos`).
+ *
+ * ⛔ Sin esto, un test sobre lo que `app/main.js` avisa lee el `#avisos` de la
+ * cáscara remontada —siempre vacío— y `.at(-1)` devuelve `undefined`. Un
+ * `toContain` sobre esa lista pasaría en verde sin haber leído nada.
+ */
+const textosDelPanelDelArranque = () =>
+  [...(DEL_ARRANQUE.avisos?.querySelectorAll('.gml-aviso-texto') ?? [])].map((t) => t.textContent)
 
 /** ¿Está el renglón en estado de error (el modificador rojo del CSS)? */
 const renglonEnError = (renglon) => renglon.classList.contains('gml-accion-estado--error')
@@ -1669,12 +1809,39 @@ describe('app/main · las colindantes llegan APLANADAS a las dianas del enganche
   })
 
   it('cero colindantes SÍ es una respuesta: se cuenta el 0', () => {
-    const { cableado, colindantesContadas, edicion, renglon } = cablear(parcelaCuadrada())
+    const { cableado, colindantesContadas, edicion } = cablear(parcelaCuadrada())
     cableado.alColindantes({ ok: true, datos: { colindantes: [] } })
 
     expect(colindantesContadas).toEqual([0])
     expect(edicion.llamadas.colindantes.at(-1)).toEqual([])
-    expect(renglon.textContent.length).toBeGreaterThan(0)
+  })
+
+  it('⛔ y NO escribe en el renglón de la barra: ese texto ya lo da el panel', () => {
+    // Este `it` afirmaba lo CONTRARIO hasta el 2026-08-18 —que el renglón se
+    // llenaba— y se ha dado la vuelta a propósito, así que conviene decir por qué
+    // para que nadie lo «arregle» de vuelta.
+    //
+    // El desenlace de la consulta de vecinas ya lo escribe
+    // `app/cableado-catastro.js#colindantes` en `[data-estado="traer-colindantes"]`,
+    // que es el renglón `role="status"` PROPIO de «Traer colindantes» desde el
+    // 2026-08-16. Escribirlo TAMBIÉN aquí contaba el mismo hecho dos veces, en dos
+    // sitios de la pantalla, y encima ponía el texto encima del mapa —lejos del
+    // botón que se acababa de pulsar—. De los dieciséis mensajes de este cableado
+    // era el único que tenía casa en otro sitio, y el único que no describía una
+    // acción del usuario SOBRE EL MAPA.
+    //
+    // Se afirma con las dos cardinalidades porque la redacción retirada tenía una
+    // rama para cada una: si vuelve, vuelve por una de las dos.
+    const conCero = cablear(parcelaCuadrada())
+    conCero.cableado.alColindantes({ ok: true, datos: { colindantes: [] } })
+    expect(conCero.renglon.textContent).toBe('')
+
+    const conVecinas = cablear(parcelaCuadrada())
+    conVecinas.cableado.alColindantes({
+      ok: true,
+      datos: { colindantes: [parcelaCuadrada(), parcelaCuadrada()] },
+    })
+    expect(conVecinas.renglon.textContent).toBe('')
   })
 
   it('una consulta que FALLA no borra las dianas ni inventa un recuento', () => {
@@ -2054,4 +2221,671 @@ describe('app/main · F07 · el diagnóstico, montado y cableado en el arranque'
   // Ese invariante es de la ACEPTACIÓN de F07 y se afirma en
   // `test/diagnostico/aceptacion-f07.dom.test.js`, que monta la app entera sin
   // doblar el visor — que es la única forma de tener las dos vistas vivas a la vez.
+})
+
+// ── F18 · «Dibujar recinto» en la rama PARCELA ──────────────────────────────
+//
+// Desde F12 se dibuja un recinto vértice a vértice, pero solo en la rama EDIFICIO.
+// Aquí se blinda la otra mitad, que es la que da sentido a importar un
+// levantamiento de PUNTOS SUELTOS: las dianas ya estaban (paso 9) y faltaba la
+// herramienta con la que unirlas.
+//
+// Se dibuja sobre el `L.Map` REAL del arnés y con la BARRA REAL, no con dobles: lo
+// que se prueba es que el clic acaba en el store y que el botón dice la verdad, y
+// las dos cosas pasan por piezas que ya existen.
+
+describe('app/main · «Dibujar recinto» en la rama PARCELA (F18)', () => {
+  /** Los tres clics y el doble que cierra. Es el gesto del usuario, sin atajos. */
+  function dibujarTriangulo(mapa) {
+    for (const [lat, lng] of [
+      [40.45, -3.7],
+      [40.4501, -3.7],
+      [40.4501, -3.6999],
+    ]) {
+      mapa.fire('click', { latlng: { lat, lng } })
+    }
+    mapa.fire('dblclick', { latlng: { lat: 40.4501, lng: -3.6999 } })
+  }
+
+  /** El cableado con las dos piezas del dibujo puestas y la barra REAL. */
+  function cablearConDibujo(parcelaInicial = parcelaCuadrada()) {
+    return cablear(parcelaInicial, { mapa: mapaVivo, srs: SRS_DEMO, barra: barraViva })
+  }
+
+  const botonDibujar = () => document.querySelector('[data-accion="dibujar-recinto"]')
+
+  it('sin el mando, la palabra no aparece y el botón no dibuja nada', () => {
+    // El mando lo empuja `aplicarEdicion`, que es de `app/main.js`. Un cableado
+    // recién montado NO lo tiene: la pantalla nace en Entrada, no en Edición.
+    const m = cablearConDibujo()
+    expect(botonDibujar().hidden).toBe(true)
+    expect(m.cableado.alternarDibujo()).toBe(false)
+    expect(m.cableado.dibujando()).toBe(false)
+    // Y la edición sigue encendida: nadie la ha apagado para dibujar.
+    expect(m.edicion.activa()).toBe(true)
+  })
+
+  it('con el mando, la palabra aparece y el trazo cerrado SUSTITUYE al exterior', () => {
+    const m = cablearConDibujo()
+    m.cableado.mandoDeDibujo(true)
+    expect(botonDibujar().hidden).toBe(false)
+
+    const verticesAntes = m.estado.get().recintos[0].vertices.length
+    m.cableado.alternarDibujo()
+    expect(m.cableado.dibujando()).toBe(true)
+
+    dibujarTriangulo(mapaVivo)
+
+    const recintos = m.estado.get().recintos
+    expect(recintos).toHaveLength(1)
+    expect(recintos[0].vertices.length).toBeGreaterThanOrEqual(3)
+    expect(recintos[0].vertices.length).not.toBe(verticesAntes)
+    expect(m.cableado.dibujando()).toBe(false)
+  })
+
+  it('⛔ mientras se dibuja, la edición está APAGADA — y vuelve al cerrar', () => {
+    // Los dos módulos escuchan `click` en el MISMO mapa. Sin apagar la edición, el
+    // clic que pone una esquina seleccionaría además un lindero de la parcela vieja
+    // —y con «Borrar vértices» armado le borraría uno—.
+    const m = cablearConDibujo()
+    m.cableado.mandoDeDibujo(true)
+
+    m.cableado.alternarDibujo()
+    expect(m.edicion.activa()).toBe(false)
+    expect(m.edicion.llamadas.activa.at(-1)).toBe(false)
+
+    dibujarTriangulo(mapaVivo)
+    expect(m.edicion.activa()).toBe(true)
+  })
+
+  it('⛔ «Escape» cancela, repone la edición y despega el botón', () => {
+    // EL CASO QUE NO TENÍA CANAL. De las cinco formas de terminar un dibujo, solo
+    // cerrar bien avisaba; `Escape` paraba el trazo dentro de `viewer/dibujo.js` sin
+    // decírselo a nadie. Aquí eso dejaría la edición apagada PARA SIEMPRE.
+    const m = cablearConDibujo()
+    m.cableado.mandoDeDibujo(true)
+    m.cableado.alternarDibujo()
+    mapaVivo.fire('click', { latlng: { lat: 40.45, lng: -3.7 } })
+    expect(m.edicion.activa()).toBe(false)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+
+    expect(m.cableado.dibujando()).toBe(false)
+    expect(m.edicion.activa()).toBe(true)
+    expect(botonDibujar().getAttribute('aria-pressed')).toBe('false')
+    // Y el store no se ha tocado: cancelar no es cerrar.
+    expect(m.estado.get().recintos).toHaveLength(1)
+    expect(m.estado.get().recintos[0].vertices.length).toBe(parcelaCuadrada().recintos[0].vertices.length)
+  })
+
+  it('perder el mando cancela el trazo a medias y esconde la palabra', () => {
+    // Un dibujo a medias que sobreviviera a un cambio de pantalla volvería a la vida
+    // sobre otra geometría. Es lo que el modo borrar ya tiene prohibido por escrito.
+    const m = cablearConDibujo()
+    m.cableado.mandoDeDibujo(true)
+    m.cableado.alternarDibujo()
+    mapaVivo.fire('click', { latlng: { lat: 40.45, lng: -3.7 } })
+
+    m.cableado.mandoDeDibujo(false)
+
+    expect(m.cableado.dibujando()).toBe(false)
+    expect(botonDibujar().hidden).toBe(true)
+    expect(m.edicion.activa()).toBe(true)
+  })
+
+  it('⭐ el recinto dibujado se DESHACE como cualquier otra edición', async () => {
+    // La red que hace admisible reemplazar el exterior: el dibujo commitea, así que
+    // `Ctrl+Z` devuelve la parcela entera. Sin el commit, cuatro clics serían
+    // irreversibles.
+    const m = cablearConDibujo()
+    const antes = m.estado.get().recintos[0].vertices.length
+    m.cableado.mandoDeDibujo(true)
+    m.cableado.alternarDibujo()
+    dibujarTriangulo(mapaVivo)
+    await cederMicrotarea()
+
+    expect(m.cableado.deshacer()).toBe(true)
+    expect(m.estado.get().recintos[0].vertices.length).toBe(antes)
+  })
+
+  it('⛔ los huecos se pierden con el exterior, y se DICE con su número', () => {
+    // `recintos[0]` es el EXTERIOR y los demás son HUECOS (modelo §4.3), así que
+    // sustituir el primero se los lleva. Callarlo sería perder trabajo en silencio.
+    const conHueco = crearParcela({
+      idLocal: 'prueba-dibujo',
+      origen: ORIGEN_PARCELA.LIST,
+      recintos: [
+        crearRecinto(parcelaCuadrada().recintos[0].vertices, TIPO_RECINTO.EXTERIOR),
+        crearRecinto(
+          [
+            [440010, 4480010],
+            [440020, 4480010],
+            [440020, 4480020],
+          ],
+          TIPO_RECINTO.HUECO,
+        ),
+      ],
+    })
+    const m = cablearConDibujo(conHueco)
+    m.cableado.mandoDeDibujo(true)
+    m.cableado.alternarDibujo()
+    dibujarTriangulo(mapaVivo)
+
+    expect(m.estado.get().recintos).toHaveLength(1)
+    const dicho = textosDelPanel().join(" ")
+    expect(dicho).toMatch(/hueco/i)
+    expect(dicho).toMatch(/Ctrl\+Z|Deshacer/i)
+  })
+
+  it('sin parcela abierta, el recinto NO se tira en silencio', () => {
+    const m = cablearConDibujo(null)
+    m.cableado.mandoDeDibujo(true)
+    m.cableado.alternarDibujo()
+    dibujarTriangulo(mapaVivo)
+
+    expect(m.estado.get()).toBeNull()
+    expect(textosDelPanel().join(" ")).toMatch(/no hay ninguna parcela abierta/i)
+  })
+})
+
+// ── ⛔ El defecto del 2026-08-19: «no me deja borrar por más que pincho» ──────
+//
+// Reportado con captura: un recinto de TRES vértices, la papelera ROJA —armada,
+// prometiendo— y ni un borrado. La aplicación tenía razón y lo estaba diciendo:
+// quitar un vértice de tres deja un segmento, así que edit/vertices.js lo rechaza
+// SIEMPRE. Pero lo decía DESPUÉS del gesto, en una tarjeta del panel plegado y
+// agrupada como «×6» — que es como seis intentos se leen como «1 error» en la
+// cabecera.
+//
+// El defecto no era el rechazo: era dejar ARMAR un modo que no podía actuar ni una
+// sola vez. Y tenía un hermano peor, introducido por F18 · paso 10: con un dibujo
+// en curso la edición está apagada, así que el modo se armaba igual y los clics no
+// borraban NI AVISABAN — silencio absoluto.
+
+describe('app/main · «Borrar vértices» no se arma si no puede borrar nada', () => {
+  /** Un triángulo: el mínimo. Ningún vértice suyo se puede quitar. */
+  const triangulo = () =>
+    crearParcela({
+      idLocal: 'prueba-triangulo',
+      origen: ORIGEN_PARCELA.LIST,
+      recintos: [
+        crearRecinto(
+          [
+            [439300, 4479650],
+            [439310, 4479650],
+            [439310, 4479660],
+          ],
+          TIPO_RECINTO.EXTERIOR,
+        ),
+      ],
+    })
+
+  it('⛔ con un recinto en el mínimo, el botón nace APAGADO y con su motivo', async () => {
+    const m = cablear(triangulo(), { barra: barraViva })
+    await cederMicrotarea()
+
+    expect(m.borrar.disabled).toBe(true)
+    // El motivo va en la PISTA, que es donde el usuario mira cuando un icono no
+    // responde, y de paso en el nombre accesible.
+    expect(m.borrar.dataset.pista).toMatch(/mínimo de 3|no se pueda borrar/i)
+  })
+
+  it('con un cuadrado sí se puede: el botón está vivo y sin motivo pegado', async () => {
+    const m = cablear(parcelaCuadrada(), { barra: barraViva })
+    await cederMicrotarea()
+
+    expect(m.borrar.disabled).toBe(false)
+    expect(m.borrar.dataset.pista).not.toMatch(/mínimo de 3/i)
+  })
+
+  it('⭐ y se DESARMA solo cuando la geometría baja al mínimo borrando', async () => {
+    // El camino normal para llegar aquí: se borran vértices hasta dejar tres.
+    // Dejar la papelera roja sobre un modo que ya no puede actuar es la misma
+    // mentira, alcanzada por el otro lado.
+    const m = cablear(parcelaCuadrada(), { barra: barraViva })
+    await cederMicrotarea()
+    m.borrar.click()
+    expect(m.edicion.modoBorrar()).toBe(true)
+
+    await editar(m.estado, m.historial, triangulo())
+
+    expect(m.edicion.modoBorrar()).toBe(false)
+    expect(m.borrar.disabled).toBe(true)
+  })
+
+  it('un hueco con vértices de sobra basta: se pregunta por ANILLO, no por la parcela', async () => {
+    // Con un exterior de 3 y un hueco de 4, del hueco SÍ se puede quitar. Preguntar
+    // «¿tiene la parcela más de 3 vértices?» daría true también con dos recintos de
+    // tres, donde no se puede tocar ninguno.
+    const conHueco = crearParcela({
+      idLocal: 'prueba-mixta',
+      origen: ORIGEN_PARCELA.LIST,
+      recintos: [
+        crearRecinto(triangulo().recintos[0].vertices, TIPO_RECINTO.EXTERIOR),
+        crearRecinto(
+          [
+            [439302, 4479652],
+            [439304, 4479652],
+            [439304, 4479654],
+            [439302, 4479654],
+          ],
+          TIPO_RECINTO.HUECO,
+        ),
+      ],
+    })
+    const m = cablear(conHueco, { barra: barraViva })
+    await cederMicrotarea()
+    expect(m.borrar.disabled).toBe(false)
+  })
+
+  it('⛔ …y DOS recintos de tres no suman: no se puede tocar ninguno', async () => {
+    // El caso que distingue «por anillo» de «en total», y lo pidió una mutación que
+    // sobrevivía: sumando vértices salen 6 —más de 3— y el botón se encendería
+    // sobre una geometría en la que ningún borrado es posible. Es el mismo defecto
+    // reportado, alcanzado por una geometría distinta.
+    const dosTriangulos = crearParcela({
+      idLocal: 'prueba-dos-triangulos',
+      origen: ORIGEN_PARCELA.LIST,
+      recintos: [
+        crearRecinto(triangulo().recintos[0].vertices, TIPO_RECINTO.EXTERIOR),
+        crearRecinto(
+          [
+            [439302, 4479652],
+            [439304, 4479652],
+            [439304, 4479654],
+          ],
+          TIPO_RECINTO.HUECO,
+        ),
+      ],
+    })
+    const m = cablear(dosTriangulos, { barra: barraViva })
+    await cederMicrotarea()
+    expect(m.borrar.disabled).toBe(true)
+  })
+})
+
+describe('app/main · dibujar, borrar e insertar son EXCLUYENTES (2026-08-19)', () => {
+  const conDibujo = () =>
+    cablear(parcelaCuadrada(), { mapa: mapaVivo, srs: SRS_DEMO, barra: barraViva })
+
+  it('⛔ armar «Borrar» con un trazo a medias lo CANCELA: nada de clics mudos', async () => {
+    // Desde F18 · paso 10 el dibujo apaga la edición mientras dura. Sin esto, el
+    // modo se armaba igual y `alClicMapa` salía antes de mirarlo: papelera roja y
+    // clics que no borran NI AVISAN.
+    const m = conDibujo()
+    await cederMicrotarea()
+    m.cableado.mandoDeDibujo(true)
+    m.cableado.alternarDibujo()
+    expect(m.cableado.dibujando()).toBe(true)
+    expect(m.edicion.activa()).toBe(false)
+
+    m.borrar.click()
+
+    expect(m.cableado.dibujando()).toBe(false)
+    // Y la edición vuelve, que es lo que hace que el modo recién armado sirva.
+    expect(m.edicion.activa()).toBe(true)
+    expect(m.edicion.modoBorrar()).toBe(true)
+  })
+
+  it('y al revés: empezar a dibujar DESARMA los dos modos', async () => {
+    const m = conDibujo()
+    await cederMicrotarea()
+    m.borrar.click()
+    expect(m.edicion.modoBorrar()).toBe(true)
+
+    m.cableado.mandoDeDibujo(true)
+    m.cableado.alternarDibujo()
+
+    expect(m.edicion.modoBorrar()).toBe(false)
+    expect(m.edicion.modoInsertar()).toBe(false)
+    expect(m.cableado.dibujando()).toBe(true)
+  })
+})
+
+// ── ⭐ Los puntos sueltos del levantamiento (2026-08-19) ─────────────────────
+//
+// ⛔ **`viewer/edicion.js#fijarPuntos` llevaba desde el paso 9 de F18 escrito,
+// documentado y con catorce pruebas, y su único llamante en todo el repo era su
+// propia prueba.** El enganche a lo medido existía en el catálogo de
+// `edit/snap.js` y no había forma de llegar a él desde la aplicación. Este bloque
+// es el guardián de que ese cable no se vuelva a soltar, y de que no se suelte a
+// medias: enseñar los puntos sin engancharlos, o al revés, es peor que ninguna de
+// las dos cosas — el usuario apuntaría a un sitio y el vértice caería en otro.
+describe('app/main · los puntos del levantamiento se PINTAN y ENGANCHAN, siempre a la vez', () => {
+  const NUBE = [
+    [439237, 4479655],
+    [439257, 4479655],
+    [439257, 4479675],
+  ]
+
+  const conPuntos = (puntos) =>
+    crearParcela({
+      idLocal: 'levantamiento.dxf',
+      // Cero recintos: es el estado real de un fichero de campo importado SIN unir.
+      recintos: [],
+      puntosLevantamiento: puntos,
+      origen: ORIGEN_PARCELA.DXF,
+    })
+
+  beforeEach(() => {
+    arranque.registro.puntosPintados.length = 0
+    arranque.registro.puntosFijados.length = 0
+  })
+
+  it('⭐ una parcela con puntos y CERO recintos llega a las dos piezas', () => {
+    estadoDelArranque.set(conPuntos(NUBE))
+    expect(arranque.registro.puntosPintados.at(-1)).toEqual(NUBE)
+    expect(arranque.registro.puntosFijados.at(-1)).toEqual(NUBE)
+  })
+
+  it('⛔ y llegan EXACTAMENTE los mismos: dibujo y enganche no pueden divergir', () => {
+    estadoDelArranque.set(conPuntos(NUBE))
+    expect(arranque.registro.puntosPintados.at(-1)).toEqual(arranque.registro.puntosFijados.at(-1))
+    expect(arranque.registro.puntosPintados).toHaveLength(arranque.registro.puntosFijados.length)
+  })
+
+  it('va por el STORE, así que sirve para TODAS las puertas y no solo para importar', () => {
+    // Recuperar un expediente guardado, abrir un proyecto y `Ctrl+Z` escriben en
+    // el mismo sitio. Colgarlo del gancho de la medición habría dejado esas tres
+    // sin puntos, y la diferencia no se ve hasta que alguien intenta apuntar.
+    estadoDelArranque.set(conPuntos(NUBE))
+    estadoDelArranque.set(conPuntos([[439300, 4479700]]))
+    expect(arranque.registro.puntosFijados.at(-1)).toEqual([[439300, 4479700]])
+  })
+
+  it('una parcela SIN puntos los suelta: los del expediente anterior no se quedan', () => {
+    estadoDelArranque.set(conPuntos(NUBE))
+    estadoDelArranque.set(parcelaCuadrada())
+    expect(arranque.registro.puntosPintados.at(-1)).toEqual([])
+    expect(arranque.registro.puntosFijados.at(-1)).toEqual([])
+  })
+
+  it('y `null` en el store tampoco revienta ni deja dianas colgadas', () => {
+    estadoDelArranque.set(conPuntos(NUBE))
+    expect(() => estadoDelArranque.set(null)).not.toThrow()
+    expect(arranque.registro.puntosFijados.at(-1)).toEqual([])
+  })
+})
+
+// ── ⭐ F24 · Quitar la nube: el único mando que se la lleva ───────────────────
+//
+// ⛔ **EL HUECO QUE ESTO CIERRA.** Los puntos viven en el modelo, así que se
+// guardan con el expediente, viajan en el fichero de proyecto y se vuelven a
+// pintar cada vez que se recupera. En cuanto el contorno está dibujado encima
+// dejan de servir para nada, y hasta hoy la única forma de perderlos era no
+// haberlos importado: con 88 puntos sobre una parcela ya cerrada, el mapa se
+// quedaba tapado para siempre.
+//
+// Lo que se mide aquí es el MODELO y la RED. Que el botón exista, se esconda sin
+// puntos y lleve la cuenta en el nombre lo mide `test/viewer/barra-edicion.dom.test.js`;
+// que el clic del usuario llegue de verdad hasta aquí lo mide el navegador
+// (`scripts/smoke-navegador/28-puntos-sueltos.js`), que es la única herramienta que
+// ve el botón que se pulsa.
+describe('app/main · «Quitar los puntos» vacía la nube y deja una red para volver', () => {
+  const NUBE = [
+    [439237, 4479655],
+    [439257, 4479655],
+    [439257, 4479675],
+  ]
+
+  const conPuntos = (puntos) =>
+    crearParcela({
+      idLocal: 'levantamiento.dxf',
+      refcat: '1234567VK4713D',
+      recintos: [],
+      puntosLevantamiento: puntos,
+      origen: ORIGEN_PARCELA.DXF,
+    })
+
+  const original = estadoDelArranque.get()
+  const indiceOriginal = historialDelArranque.indice
+  afterEach(() => {
+    estadoDelArranque.set(original)
+    historialDelArranque.indice = indiceOriginal
+  })
+
+  it('⭐ el botón que el ensamblaje cableó lleva la CUENTA, y se va con la nube', () => {
+    // El nodo es el de `crearVisor`, no uno recién montado: ver `DEL_ARRANQUE`.
+    const boton = DEL_ARRANQUE.botonQuitarPuntos
+    expect(boton, 'la barra no fabricó el botón').not.toBeNull()
+
+    estadoDelArranque.set(conPuntos(NUBE))
+    expect(boton.hidden).toBe(false)
+    expect(boton.dataset.pista).toContain('3 puntos sueltos')
+
+    // Y sin puntos se esconde SOLO, por el store: es la misma suscripción que
+    // pinta la capa y fija las dianas, no un tercer sitio que se pueda quedar viejo.
+    estadoDelArranque.set(parcelaCuadrada())
+    expect(boton.hidden).toBe(true)
+  })
+
+  it('⭐ vacía `puntosLevantamiento` y NO toca nada más del expediente', () => {
+    estadoDelArranque.set(conPuntos(NUBE))
+    const antes = estadoDelArranque.get()
+
+    quitarPuntosLevantamiento()
+
+    const despues = estadoDelArranque.get()
+    expect(despues.puntosLevantamiento).toEqual([])
+    // La lección de F21 por el otro lado: allí se perdía un campo que un
+    // compositor no arrastraba; aquí no se compone nada, se clona el expediente
+    // entero, y por eso lo demás tiene que seguir clavado.
+    expect(despues.idLocal).toBe(antes.idLocal)
+    expect(despues.refcat).toBe(antes.refcat)
+    expect(despues.recintos).toEqual(antes.recintos)
+    expect(despues.origen).toBe(antes.origen)
+    // Objeto NUEVO, no el mismo mutado: el store publica por identidad.
+    expect(despues).not.toBe(antes)
+  })
+
+  it('⛔ lo DICE, con la cuenta y nombrando el atajo que lo devuelve', () => {
+    // Lo que se acaba de borrar vino de un fichero que el usuario puede no tener a
+    // mano. Decir solo «quitados» sería contar la pérdida sin contar la salida.
+    estadoDelArranque.set(conPuntos(NUBE))
+    quitarPuntosLevantamiento()
+    // Se busca en TODA la lista y no en `.at(-1)`: el panel conserva lo dicho
+    // antes (el aviso de IndexedDB del arranque, por ejemplo) y agrupa las
+    // repeticiones, así que el orden de las tarjetas no es asunto de este test.
+    const dichos = textosDelPanelDelArranque()
+    expect(dichos).toContain(mensajePuntosQuitados(3))
+    expect(mensajePuntosQuitados(3)).toContain('3 puntos sueltos')
+    expect(mensajePuntosQuitados(3)).toContain('Ctrl+Z')
+  })
+
+  it('⭐ LA RED: commitea, así que la pila devuelve la nube entera', () => {
+    // Ésta es la prueba que hace admisible que un botón se lleve 88 puntos de un
+    // clic. Sin el `commit` —o con él ANTES del `set`— el mando sería irreversible
+    // y la promesa que el propio botón hace en su nombre, mentira.
+    estadoDelArranque.set(conPuntos(NUBE))
+    commit(historialDelArranque, estadoDelArranque.get())
+
+    quitarPuntosLevantamiento()
+    expect(puedeDeshacer(historialDelArranque)).toBe(true)
+
+    const previa = deshacerPila(historialDelArranque)
+    expect(previa.puntosLevantamiento).toEqual(NUBE)
+
+    // Y rehacer los vuelve a quitar: la operación es una más de la pila, no un
+    // caso aparte.
+    const siguiente = rehacerPila(historialDelArranque)
+    expect(siguiente.puntosLevantamiento).toEqual([])
+  })
+
+  it('sin puntos que quitar NO revienta, no escribe y lo dice', () => {
+    // No debería llegar —el botón está escondido—, pero un clic que no hace nada y
+    // no lo cuenta es la regla de oro 1 rota por omisión.
+    estadoDelArranque.set(parcelaCuadrada())
+    const antes = estadoDelArranque.get()
+    const commitsAntes = historialDelArranque.pila.length
+
+    expect(() => quitarPuntosLevantamiento()).not.toThrow()
+
+    expect(estadoDelArranque.get()).toBe(antes)
+    expect(historialDelArranque.pila.length).toBe(commitsAntes)
+    expect(textosDelPanelDelArranque()).toContain(MENSAJE_SIN_PUNTOS_QUE_QUITAR)
+  })
+
+  it('con el store en `null` tampoco revienta', () => {
+    estadoDelArranque.set(null)
+    expect(() => quitarPuntosLevantamiento()).not.toThrow()
+    expect(textosDelPanelDelArranque()).toContain(MENSAJE_SIN_PUNTOS_QUE_QUITAR)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// T2 · EL CABLEADO EMPUJA LA SELECCIÓN AL RENGLÓN DE SITUACIÓN (2026-08-19)
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Los DOS canales, y por qué hay dos. `cablearEdicion` escribe en:
+//
+//   · el `role="status"` (`anunciar`, que se llamaba `decir` hasta T3) — lo de siempre, **oculto salvo error**, con las
+//     frases en pasado para el lector de pantalla. Aquí NO se ha tocado nada, y
+//     estas pruebas lo afirman explícitamente para que se note si algún día pasa.
+//   · `barra.ladoSeleccionado(...)` — el renglón VISIBLE de la barra, en presente.
+//     Es el único empujón nuevo de T2: insertar, borrar y dibujar ya se reflejaban.
+
+describe('app/main · T2 · la selección alimenta el renglón de situación', () => {
+  const situacion = () => document.querySelector(`.${CLASE_BARRA.SITUACION}`)
+
+  it('seleccionar un lindero lo ENSEÑA, y soltarlo lo esconde', () => {
+    const m = cablear(parcelaCuadrada(), { barra: barraViva })
+    expect(situacion().hidden, 'el arranque no planta un cartel sobre el mapa').toBe(true)
+
+    m.edicion.seleccionar({ anillo: 0, indice: 0 })
+    expect(situacion().hidden).toBe(false)
+    expect(situacion().textContent).toBe('Lindero seleccionado')
+
+    m.edicion.seleccionar(null)
+    expect(situacion().hidden).toBe(true)
+  })
+
+  it('⛔ y el `role="status"` sigue EXACTAMENTE como estaba: oculto y en pasado', () => {
+    const m = cablear(parcelaCuadrada(), { barra: barraViva })
+    m.edicion.seleccionar({ anillo: 0, indice: 0 })
+
+    // El texto de siempre, con su redacción de siempre (transición, no estado).
+    expect(m.renglon.textContent).toMatch(/ya puedes desplazarlo/i)
+    // Y sigue recortado a 1 px: lo escribe `RENGLON_OCULTO` para todo lo que no
+    // sea un error. Si esto se rompe, ha vuelto el cartel del 2026-08-18.
+    expect(m.renglon.style.position).toBe('absolute')
+    expect(m.renglon.style.width).toBe('1px')
+  })
+
+  it('⚠️ los dos nodos dicen cosas DISTINTAS a la vez, y eso es el diseño', () => {
+    const m = cablear(parcelaCuadrada(), { barra: barraViva })
+    m.edicion.seleccionar({ anillo: 0, indice: 0 })
+
+    // El de los desenlaces habla en PASADO de la transición; el visible habla en
+    // PRESENTE del estado. Que digan lo mismo sería la señal de que sobra uno.
+    expect(m.renglon.textContent).toMatch(/ya puedes desplazarlo/i)
+    expect(situacion().textContent).toBe('Lindero seleccionado')
+    expect(situacion().textContent).not.toBe(m.renglon.textContent)
+  })
+
+  it('sin barra el cableado NO revienta (hay montajes sin visor)', () => {
+    // `barra` es opcional y por eso el empujón va con doble `?.`. Un montaje sin
+    // visor tiene que seguir escribiendo el `role="status"` y nada más.
+    const m = cablear(parcelaCuadrada())
+    expect(() => m.edicion.seleccionar({ anillo: 0, indice: 0 })).not.toThrow()
+    expect(m.renglon.textContent).toMatch(/ya puedes desplazarlo/i)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// T10 · EL DOBLE ANUNCIO, SOBRE EL CABLEADO DE VERDAD (2026-08-20)
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// `test/viewer/barra-edicion.dom.test.js` ya vigila que el renglón visible no sea
+// anunciable, pero lo hace sobre la barra SOLA. El fallo que el diseño marcó como
+// crítico solo puede darse aquí: hacen falta los DOS canales escribiendo a la vez
+// sobre el mismo hecho, y el único que los tiene a los dos es `cablearEdicion`.
+//
+// ⚠️ **Es el más silencioso de todos los huecos de aquella tabla**: si al renglón
+// de situación le faltara el `aria-hidden`, en pantalla no se notaría nada en
+// absoluto y quien va por lector de pantalla oiría cada selección DOS VECES.
+describe('app/main · T10 · con los dos canales vivos, ningún hecho se oye dos veces', () => {
+  /**
+   * Lo que un lector de pantalla LEERÍA de un subárbol. Se salta lo que lleva
+   * `aria-hidden="true"` y lo que está `hidden`; **no** se salta lo recortado a
+   * 1×1 px, que es justo lo que sigue anunciándose (ver `RENGLON_OCULTO`).
+   */
+  const textoAnunciable = (raiz, excepto = null) => {
+    const trozos = []
+    const bajar = (n) => {
+      if (n.nodeType === 3) return void trozos.push(n.textContent)
+      if (n.nodeType !== 1) return
+      if (n === excepto) return
+      if (n.hidden || n.getAttribute('aria-hidden') === 'true') return
+      for (const hijo of n.childNodes) bajar(hijo)
+    }
+    bajar(raiz)
+    return trozos.join(' ').replace(/\s+/g, ' ').trim()
+  }
+
+  const situacion = () => document.querySelector(`.${CLASE_BARRA.SITUACION}`)
+
+  /**
+   * Lo que se anuncia de la barra **descontando el `role="status"`**, que es el
+   * único que TIENE que anunciar estos hechos.
+   *
+   * ⚠️ **Y descontarlo no es hacerle un favor a la prueba: sin eso la prueba no
+   * puede afirmar nada.** Los dos canales dicen cosas distintas —«Lindero
+   * seleccionado» en presente contra «Lindero seleccionado: ya puedes
+   * desplazarlo.» en pasado— pero el corto es PREFIJO del largo, así que buscar el
+   * texto visible por toda la barra siempre lo encuentra… en el nodo correcto.
+   * La primera versión de este `it` se puso roja justo por ahí. Lo que hay que
+   * afirmar es «además del `role="status"`, nadie más lo dice».
+   */
+  const restoDeLaBarra = () =>
+    textoAnunciable(
+      situacion().closest(`.${CLASE_BARRA.CONTENEDOR}`),
+      document.querySelector(`.${CLASE_BARRA.ESTADO}`),
+    )
+
+  it('⭐ el hecho se VE una vez y se OYE una vez, y no son el mismo nodo', () => {
+    const m = cablear(parcelaCuadrada(), { barra: barraViva })
+    m.edicion.seleccionar({ anillo: 0, indice: 0 })
+
+    // Se ve: el renglón de la barra, en presente.
+    expect(situacion().hidden).toBe(false)
+    expect(situacion().textContent).toBe('Lindero seleccionado')
+
+    // Se oye: el `role="status"`, en pasado y recortado a 1 px.
+    expect(m.renglon.textContent).toMatch(/ya puedes desplazarlo/i)
+    expect(textoAnunciable(m.renglon)).toBe(m.renglon.textContent)
+
+    // Y lo que se ve NO se oye: quitando el `role="status"`, en la barra no queda
+    // ni una palabra del renglón visible.
+    expect(restoDeLaBarra()).not.toContain('Lindero seleccionado')
+  })
+
+  it('⛔ y con un modo armado ADEMÁS de la selección, sigue sin duplicarse', () => {
+    // El caso peor: los dos canales escribiendo a la vez sobre dos hechos, con el
+    // renglón visible uniéndolos con « · ». Si el `aria-hidden` cayera, aquí se
+    // oirían cuatro cosas donde hay dos.
+    const m = cablear(parcelaCuadrada(), { barra: barraViva })
+    m.edicion.seleccionar({ anillo: 0, indice: 0 })
+    m.borrar.click()
+
+    expect(situacion().textContent).toContain('Lindero seleccionado')
+    expect(situacion().textContent).toContain('Modo borrar')
+
+    const anunciable = restoDeLaBarra()
+    for (const frase of situacion().textContent.split(' · ')) {
+      expect(anunciable, `«${frase}» se oiría además de verse`).not.toContain(frase)
+    }
+  })
+
+  it('⛔ la cautela: la barra NO se ha quedado muda para conseguirlo', () => {
+    // Sin esta prueba, un `aria-hidden` puesto de más —en la fila, en el
+    // contenedor— dejaría a las dos de arriba en verde por la vía equivocada: sin
+    // nada que anunciar tampoco hay nada duplicado. Y sería un defecto mucho peor
+    // que el que vienen a evitar.
+    const m = cablear(parcelaCuadrada(), { barra: barraViva })
+    m.edicion.seleccionar({ anillo: 0, indice: 0 })
+
+    const anunciable = restoDeLaBarra()
+    expect(anunciable).toContain('Deshacer')
+    expect(anunciable).toContain('Ayuda sobre los gestos de edición')
+  })
 })

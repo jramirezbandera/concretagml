@@ -481,6 +481,80 @@ const MENSAJE_SUPERADA =
   'Esta consulta al Catastro quedó superada por otra más nueva, así que su respuesta se ha ' +
   'descartado sin usarla.'
 
+/**
+ * ⭐ **CUÁNTO SUELO PUEDE CUBRIR UN PÍXEL PARA QUE UN CLIC SIGA SIENDO UNA
+ * PARCELA: 2 metros.** Por encima de esto, el clic en el mapa no consulta.
+ *
+ * ── DE DÓNDE SALE EL 2 ────────────────────────────────────────────────────
+ * De la puntería de una persona, que es la pregunta que este umbral contesta. Una
+ * parcela urbana pequeña mide unos **20 m de frente**, y nadie apunta con el ratón
+ * a un objetivo de menos de **~10 px** (es, de hecho, el mismo orden que el
+ * `minimoPx` con el que la edición decide si has pinchado un vértice). 20 ÷ 10 =
+ * **2 m por píxel**. Por encima de ahí el clic no señala una parcela: señala un
+ * barrio, y el Catastro contesta —bien— sobre una finca que el usuario no ha visto.
+ *
+ * ⛔ **NO es el mismo número que el de `viewer/wms-catastro.js`, y no debe
+ * unificarse.** Allí son 10 m/px y contestan a otra pregunta: si el servicio puede
+ * DIBUJAR una parcela. Aquí se pregunta si una persona puede APUNTARLE. Son cinco
+ * veces más estricto porque apuntar es más difícil que dibujar. Juntarlos en una
+ * constante compartida obligaría a que una de las dos preguntas se contestara con
+ * el número de la otra — y la que perdería sería siempre ésta, que es la que el
+ * usuario nota.
+ *
+ * ⚠️ **Se mide en metros y no en zoom.** Un número de zoom es una escala distinta
+ * en cada latitud (en Web Mercator, por el `cos` de la latitud), así que el mismo
+ * umbral sería más estricto en Gerona que en Canarias. Ver {@link metrosPorPixel}.
+ */
+const METROS_POR_PIXEL_MAXIMO = 2
+
+/**
+ * Lo que se dice cuando el clic cae con el mapa demasiado lejos.
+ *
+ * ⛔ **Dice qué hacer, no solo qué ha pasado.** «Acerca el mapa» es la mitad
+ * accionable; sin ella esto sería un «no se puede» que deja al usuario donde
+ * estaba. Y NO se marca como error (ver el llamante): no ha fallado nada.
+ */
+const MENSAJE_DEMASIADO_LEJOS =
+  'Acerca el mapa hasta ver la parcela y vuelve a pincharla: desde tan lejos un clic no señala ' +
+  'una parcela concreta, así que no se consulta al Catastro.'
+
+/**
+ * Cuánto suelo cubre UN píxel del mapa ahora mismo, en metros.
+ *
+ * ⛔ **Se le pregunta a Leaflet en vez de calcularlo desde el zoom**, y no es
+ * comodidad: `mapa.distance` devuelve metros de los de andar (elipsoidales),
+ * mientras que cualquier cuenta hecha sobre el zoom o sobre coordenadas Web
+ * Mercator los devuelve inflados por 1/cos(latitud) — a 40° un 30 % de más. Con la
+ * cuenta inflada, el umbral se aplicaría torcido y cada vez más torcido cuanto más
+ * al norte, o sea que el clic funcionaría a distintas escalas según la provincia.
+ *
+ * ⛔ **DEVUELVE 0 —o sea «cerquísima», o sea NO BLOQUEA— CUANDO EL MAPA NO SABE
+ * CONTESTAR, y esa elección es la mitad de esta función.** El instinto dice
+ * `Infinity` («sin escala conocida, no consultes»), y estaría MAL: el contrato de
+ * `opciones.mapa` de este módulo pide un emisor por DUCK TYPING y solo exige `on` y
+ * `off` (ver {@link esEmisor}). Un emisor legítimo que no sepa de `getBounds` es
+ * exactamente lo que este módulo ha aceptado siempre, y con `Infinity` la deducción
+ * por clic dejaría de funcionar para él **en silencio y para siempre** — se habría
+ * cambiado un contrato publicado por la puerta de atrás, para tapar una petición
+ * inútil.
+ *
+ * El suelo de escala es una mejora sobre lo que ya funcionaba, no una condición
+ * nueva para funcionar: cuando se puede medir, se aplica; cuando no, la deducción
+ * se comporta exactamente como antes del 2026-08-18. En producción el mapa es
+ * siempre un `L.Map` de verdad y contesta, que es donde el defecto vivía.
+ *
+ * @param {{getBounds?: Function, getSize?: Function, distance?: Function}} mapa
+ * @returns {number}  Metros por píxel, o **0** si el mapa no sabe decirlo.
+ */
+function metrosPorPixel(mapa) {
+  if (typeof mapa?.getBounds !== 'function' || typeof mapa?.distance !== 'function') return 0
+  const bounds = mapa.getBounds()
+  const ancho = mapa.getSize?.()?.x
+  if (!bounds || !(ancho > 0)) return 0
+  const metros = mapa.distance(bounds.getSouthWest(), bounds.getSouthEast())
+  return Number.isFinite(metros) && metros > 0 ? metros / ancho : 0
+}
+
 /** No hay geometría en el store: no hay desde dónde deducir. */
 const MENSAJE_SIN_GEOMETRIA =
   'No hay ninguna geometría cargada, así que no hay ningún punto desde el que preguntarle al ' +
@@ -738,7 +812,7 @@ function puedePedirColindantesDe(parcelaActual) {
  * Los dos compositores del proyecto —{@link componerParcelaConOficial} aquí y
  * `componerParcelaMedida` en `app/cableado-medicion.js`— son duales: cada uno pisa lo
  * que el otro conserva (uno trae `recintos`, el otro `geometriaOficial`). Pero estos
- * dos campos no los toca ninguno, y por eso son el único trozo compartido:
+ * tres campos no los toca ninguno, y por eso son el único trozo compartido:
  *
  *   · **`idLocal`** — la identidad del documento abierto. Cambiarlo aquí crearía un
  *     expediente distinto por traer un fondo, y el almacén de F10 lo guardaría como
@@ -747,6 +821,15 @@ function puedePedirColindantesDe(parcelaActual) {
  *     Catastro ni el fichero del usuario: **la teclea una persona**, y es el dato más
  *     caro de recuperar de los tres. Es exactamente el que se perdía en silencio
  *     cuando este cableado construía la parcela desde cero.
+ *   · **`puntosLevantamiento`** (2026-08-19) — los `POINT` sueltos del DXF de campo.
+ *     ⭐ **Entran aquí, y no en un compositor, porque son el caso de libro de este
+ *     helper**: no son geometría de la parcela ni cartografía del Catastro, así que
+ *     no caen en ninguno de los dos ejes que los compositores se reparten. Traer el
+ *     parcelario de fondo o rehacer la medición **no puede** llevárselos: son las
+ *     dianas sobre las que el técnico está dibujando, y su fichero puede no estar ya
+ *     en el disco. Es la trampa de F21 —`edificio/mutaciones.js#reconstruir` no
+ *     arrastraba la precisión declarada y cualquier mutación la borraba en
+ *     silencio— resuelta antes de que muerda, y en un solo sitio en vez de en dos.
  *
  * ⚠️ **`refcat`, `superficieCatastral`, `geometriaOficial`, `recintos` y `origen` NO
  * están aquí a propósito.** Cada compositor decide qué hace con ellos, y meterlos en
@@ -755,12 +838,14 @@ function puedePedirColindantesDe(parcelaActual) {
  *
  * @param {object} actual  El POJO del store. Se asume no nulo (lo garantiza el
  *   llamante, que sólo llega aquí con algo que conservar).
- * @returns {{idLocal: string, superficieRegistral: number|null}}
+ * @returns {{idLocal: string, superficieRegistral: number|null,
+ *   puntosLevantamiento: Array<[number,number]>}}
  */
 export function camposInvariantes(actual) {
   return {
     idLocal: actual.idLocal,
     superficieRegistral: actual.superficieRegistral ?? null,
+    puntosLevantamiento: actual.puntosLevantamiento ?? [],
   }
 }
 
@@ -2003,10 +2088,48 @@ export function cablearCatastro({
    *     botones: sin ella, un clic accidental durante una carga la abortaría. Y de
    *     paso es lo que hace que el doble clic de zoom —que en Leaflet emite DOS
    *     `click` antes del `dblclick`— cueste una sola consulta y no dos.
+   *   · **⭐ Si el mapa está demasiado lejos** ({@link METROS_POR_PIXEL_MAXIMO}).
+   *     Es la tercera desde el 2026-08-18, y a diferencia de las otras dos **SÍ se
+   *     dice en voz alta**: las otras dos ocurren cuando el usuario no estaba
+   *     pidiendo esto, y ésta ocurre justo cuando sí.
    */
   const alPulsarMapa = (evento) => {
     if (destruido || enVuelo !== null) return
     if (!puedeDeducirClicando(estado.get())) return
+
+    // ── ⭐ LA PUERTA DE ESCALA (2026-08-18) ─────────────────────────────────
+    //
+    // ⛔ **EL DEFECTO:** `deducirEn` llevaba la coordenada del clic al Catastro sin
+    // mirar a qué distancia estaba el mapa. Y la vista de arranque de esta
+    // aplicación es **España entera** (`app/main.js#VISTA_SIN_PARCELA`, zoom 6),
+    // donde un píxel son ~1,5 km. Un clic ahí devolvía la referencia de una parcela
+    // real… que el usuario no había visto, no había elegido y no podía reconocer.
+    // El servicio contestaba bien; la pregunta era la que no tenía sentido.
+    //
+    // Lo destapó la revisión de diseño de la tarjeta de bienvenida: la tarjeta iba
+    // a enseñar «pincha el mapa» **en el instante exacto en que el gesto no podía
+    // funcionar**. Se tapó primero con las palabras («busca tu parcela y
+    // pínchala») y esto es la otra mitad, la que faltaba.
+    //
+    // ── EL CRITERIO: ¿PUEDE UNA PERSONA APUNTAR? ───────────────────────────
+    // No es «¿puede el Catastro dibujarlo?» —ésa es otra pregunta y vive en
+    // `viewer/wms-catastro.js` con otro número— sino si el usuario puede señalar
+    // LA parcela que quiere. Una parcela urbana pequeña mide ~20 m de frente, y
+    // nadie apunta con el ratón a algo de menos de ~10 px. 20 m ÷ 10 px = **2 m por
+    // píxel**. Por encima de eso el clic no designa una parcela: designa un barrio.
+    if (metrosPorPixel(mapa) > METROS_POR_PIXEL_MAXIMO) {
+      // ⛔ **SE DICE, y esto es la regla de oro 1 sobre un gesto en vez de sobre un
+      // botón.** Un clic que no hace nada y no explica nada es exactamente el
+      // control apagado y mudo que esta aplicación se prohíbe — y aquí es peor que
+      // en un botón, porque un gesto sin control no se puede «ver apagado»: la
+      // única forma de que el usuario sepa que existe y por qué no ha funcionado es
+      // que se lo digan al intentarlo.
+      //
+      // `false` y no `true`: no es un error de nadie. Es una instrucción.
+      decir(MENSAJE_DEMASIADO_LEJOS, false)
+      return
+    }
+
     const [x, y] = latLngAUTM(evento.latlng, huso)
     deducirEn(x, y).catch(yaContado)
   }

@@ -197,6 +197,35 @@ describe('export/proyecto · exportar e importar devuelve el mismo expediente', 
     expect(recintos[0].vertices[0][0]).toBeGreaterThan(0)
   })
 
+  it('⭐ los PUNTOS del levantamiento cruzan el fichero, y vuelven congelados', () => {
+    // El fichero de proyecto es lo que hace que «sin backend» no signifique «sin
+    // salida» (SPEC §1): es la copia de seguridad y la forma de mandarle un
+    // expediente a un compañero. Un expediente a medio dibujar que llegue sin sus
+    // dianas obliga al que lo abre a pedir el DXF por separado.
+    const nube = [
+      [440123.45, 4470987.65],
+      [440163.45, 4470987.65],
+      [440163.45, 4471027.65],
+    ]
+    const conPuntos = crearExpediente({
+      srs: SRS,
+      metadatos: { ...METADATOS },
+      parcela: {
+        idLocal: 'levantamiento.dxf',
+        origen: 'DXF',
+        // CERO recintos: el levantamiento importado sin unir, que es el estado más
+        // fácil de perder por el camino porque no hay geometría que lo delate.
+        recintos: [],
+        puntosLevantamiento: nube,
+      },
+    })
+
+    const { expediente } = deProyecto(porElFichero(aProyecto(conPuntos, { fecha: FECHA })))
+    expect(expediente.parcela.puntosLevantamiento).toEqual(nube)
+    expect(expediente.parcela.recintos).toEqual([])
+    expect(Object.isFrozen(expediente.parcela.puntosLevantamiento)).toBe(true)
+  })
+
   it('la geometría oficial NO se contagia de la edición: son copias independientes', () => {
     const { expediente } = deProyecto(porElFichero(aProyecto(expedienteReal(), { fecha: FECHA })))
     const antes = expediente.parcela.geometriaOficial[0].vertices[0][0]

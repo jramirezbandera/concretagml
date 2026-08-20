@@ -206,7 +206,14 @@ vi.mock('../../viewer/index.js', async (importarOriginal) => ({
         // `cablearEdicion` le pide es leerlo, escribirlo y suscribirse.
         modoBorrar: () => false,
         alCambiarModoBorrar: () => () => {},
+        // El modo insertar (2026-08-18): gemelo del de arriba, y por lo mismo.
+        modoInsertar: () => false,
+        alCambiarModoInsertar: () => () => {},
         fijarColindantes() {},
+        // Los puntos sueltos del levantamiento (2026-08-19). El doble solo tiene
+        // que EXISTIR: quien comprueba que se le pasan los buenos es
+        // `main-edicion.dom.test.js`.
+        fijarPuntos() {},
         desplazarSeleccion: () => ({ aplicado: false, modo: null, detecciones: [] }),
       },
       // La capa de vecinas: doblada y muda. Aquí no se prueba nada suyo (eso está
@@ -214,6 +221,7 @@ vi.mock('../../viewer/index.js', async (importarOriginal) => ({
       // `app/main.js` monta el visor con `colindantes: true` y el suscriptor que
       // las dibuja llama a `visor.colindantes.pintar(...)` sin comprobar nada.
       colindantes: { pintar() {}, limpiar() {}, destruir() {} },
+        puntosLevantamiento: { pintar() {}, limpiar() {}, destruir() {} },
       diagnostico: cromo.diagnostico,
       comprobacion: cromo.comprobacion,
       sobrante: cromo.sobrante,
@@ -286,6 +294,8 @@ const {
   SELECTOR_ESTADO_GML,
   MENSAJE_FALLO_INESPERADO,
   MENSAJE_FALLO_ENTREGA,
+  MENSAJE_SIN_CONTORNO_TODAVIA,
+  MENSAJE_SIN_PARCELA_TODAVIA,
 } = await import(
   '../../app/main.js'
 )
@@ -858,13 +868,70 @@ describe('app/main · parcela con un error BLOQUEANTE inyectado', () => {
     for (const mensaje of distintos) expect(tarjetaDe(mensaje).dataset.nivel).toBe(NIVEL.ERROR)
   })
 
-  it('sin parcela en el store: bloquea diciéndolo, y no revienta', () => {
-    // `null` es el valor inicial documentado del store. `validarParcela` LANZA si
-    // no le dan un array, así que el cableado tiene que traducirlo a «no hay
-    // contorno exterior», que es un estado del expediente y no una excepción.
+  it('⭐ sin parcela en el store: bloquea diciéndolo, pero NO como un error', () => {
+    // ── ⛔ ESTA PRUEBA CAMBIÓ DE AFIRMACIÓN EL 2026-08-18, Y EL PORQUÉ IMPORTA ──
+    // Hasta hoy exigía que el renglón dijera «contorno exterior», o sea el hallazgo
+    // que `validarParcela([])` devuelve. Y era verdad… y a la vez decía algo falso:
+    // sobre un store VACÍO no hay ninguna parcela a la que le falte el contorno. Lo
+    // que hay es un expediente que todavía no ha empezado.
+    //
+    // Es la MISMA lección que `EYEBROW_VACIO` (`app/main.js`), que existe porque
+    // decir «Parcela de demostración» sobre un store vacío «sería inventarse un
+    // dato». Aquí se estaba inventando un defecto.
+    //
+    // Y no era cosmético: en pantalla eso era una caja ROJA de 47,69 px en el
+    // arranque de producción —está en la captura del autor del 2026-08-11 y en el
+    // apunte de `TODOS.md` sobre el chip que dice «0 errores»—, y esos píxeles
+    // salían del sitio de la tercera vía de Entrada.
+    //
+    // Lo que NO cambia, y por eso sigue afirmándose: el botón se queda apagado y el
+    // renglón sigue diciendo POR QUÉ. La regla de oro 1 no admite un control
+    // apagado y mudo, y ese contrato es el que esta prueba defiende de verdad.
     const { boton, renglon } = cablear(null)
     expect(boton.disabled).toBe(true)
-    expect(renglon.textContent).toContain('contorno exterior')
+    expect(renglon.textContent).toBe(MENSAJE_SIN_PARCELA_TODAVIA)
+    expect(renglon.textContent).not.toBe('')
+    expect(renglonEnError(renglon)).toBe(false)
+  })
+
+  it('⭐ y con un LEVANTAMIENTO sin unir dice otra cosa: hay parcela, falta el contorno', () => {
+    // ⛔ **EL TERCER ESTADO DEL MISMO RENGLÓN (2026-08-19), y lo destapó el
+    // navegador.** Con puntos importados sin unir hay parcela —con su origen, su
+    // nube y su idLocal— y CERO recintos, así que la frase de arriba se enseñaba
+    // tal cual y decía dos cosas falsas a la vez: que no hay nada (con 55 puntos
+    // pintados en el mapa) y que la salida está «arriba», en una pantalla en la
+    // que el usuario ya no está.
+    //
+    // Es la misma trampa que su gemelo vino a cerrar el 2026-08-18, un estado más
+    // allá: no hay parcela ≠ la parcela está mal, y tampoco ≠ la parcela todavía
+    // no tiene contorno.
+    const conPuntos = crearParcela({
+      idLocal: 'levantamiento.dxf',
+      recintos: [],
+      puntosLevantamiento: [
+        [439237, 4479655],
+        [439257, 4479655],
+        [439257, 4479675],
+      ],
+      origen: ORIGEN_PARCELA.DXF,
+    })
+    const { boton, renglon } = cablear(conPuntos)
+
+    expect(boton.disabled).toBe(true)
+    expect(renglon.textContent).toBe(MENSAJE_SIN_CONTORNO_TODAVIA)
+    // ⛔ Y NO la del store vacío: es lo único que esta prueba defiende de verdad.
+    expect(renglon.textContent).not.toBe(MENSAJE_SIN_PARCELA_TODAVIA)
+    // Sin caja roja, por lo mismo que su gemelo: no es un defecto, es el paso
+    // siguiente. Y nombra la herramienta, que es lo único accionable que hay.
+    expect(renglonEnError(renglon)).toBe(false)
+    expect(renglon.textContent).toMatch(/Dibujar recinto/)
+  })
+
+  it('⛔ y NO revienta: un store en `null` es un estado legítimo, no una excepción', () => {
+    // La otra mitad de la prueba de siempre. `validarParcela` LANZA si no le dan un
+    // array, así que el cableado tiene que absorber el `null` del store —que es su
+    // valor inicial documentado— sin dejar caer la aplicación.
+    expect(() => cablear(null)).not.toThrow()
   })
 })
 

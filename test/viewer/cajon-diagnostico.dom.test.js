@@ -148,8 +148,9 @@ describe('viewer/cajon-diagnostico.js · contratos del programador', () => {
   })
 
   it('la esquina por defecto es `bottomleft`, la única libre del visor', () => {
-    // `topleft` la ocupa la barra de edición de F06, `topright` el control de capas y
-    // `bottomright` el de opacidad Y la atribución de Leaflet. No es un gusto.
+    // `topleft` la ocupa la barra de edición de F06, `topright` el control de capas
+    // Y el de opacidad (mudado ahí el 2026-08-19), y `bottomright` la atribución de
+    // Leaflet. No es un gusto.
     const { cajon } = conCajon()
     expect(cajon.control.getPosition()).toBe('bottomleft')
   })

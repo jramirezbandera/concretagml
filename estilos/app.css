@@ -694,18 +694,49 @@ body {
 }
 
 /* ── Zona 2 · el expediente ─────────────────────────────────────────────── */
-
+/*
+ * ⭐ **REDISEÑADO EL 2026-08-20**, encargo del autor sobre lo que había («el menú
+ * de expediente y el botón son horribles»). Los tres defectos que se corrigen aquí
+ * se midieron en Chrome a 1440×900 con el menú abierto:
+ *
+ * 1. **NO PARECÍA UN CONTROL.** El botón era `border: transparent` + `background:
+ *    transparent`, o sea dos renglones de texto sueltos, y solo estrenaba caja en
+ *    `:hover`. Un control que se anuncia DESPUÉS de que lo descubras no se anuncia.
+ *    Ahora tiene chapa en reposo —`--color-bg-surface` con filete `--color-border-sub`,
+ *    la pareja más floja del sistema— y la flecha que `index.html` le ha puesto.
+ * 2. **AL ABRIRSE PARECÍA UN GLOBO, NO EL ORIGEN DEL MENÚ.** Medido: botón 210 px de
+ *    ancho, panel 340, los dos con caja propia y 4 px de aire entre medias. Se leían
+ *    como dos cosas flotando. El panel baja a ~220 px (ver más abajo), o sea al ancho
+ *    del botón, y el filete del botón abierto pasa a `--color-border-main`, el mismo
+ *    del panel: una pieza con dos mitades.
+ * 3. **NO DECÍA DE UN VISTAZO EN QUÉ ESTADO ESTÁS.** Lo decía con palabras a 13 px en
+ *    una barra de 1440. El punto de color delante del nombre lo dice antes de leer.
+ *
+ * ⚠️ **El punto es REFUERZO** (DESIGN.md §3.3): el estado sigue estando escrito con
+ * todas sus letras al lado, y quien no distinga el ámbar del verde no pierde nada.
+ * El color lo elige `[data-expediente-estado]`, que pone `app/barra.js` en las tres
+ * salidas de `pintarExpediente()` — el aspecto sale de un `data-*` (§8.3) y no de
+ * una clase.
+ *
+ * ⛔ **`line-height: 1.25` NO es cosmética, es lo que hace que quepa.** Sin ella el
+ * botón medía **44,34 px** de los 48 de la barra (medido), y el rediseño le añade
+ * una flecha. Con 1.25 —el mismo valor que `.gml-rail-marca`, que es su vecino y
+ * tiene el mismo problema de dos renglones— baja a ~40 y deja el aire de antes.
+ */
 .gml-barra-expediente {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
+  /* Rejilla y no columna flex: la flecha tiene que ocupar las DOS filas por su
+     derecha, y eso en una columna flex pide un envoltorio de más. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1px var(--space-2);
   max-width: 240px;
   padding: var(--space-1) var(--space-2);
-  border: 1px solid transparent;
+  border: 1px solid var(--color-border-sub);
   border-radius: var(--radius);
-  background: transparent;
+  background: var(--color-bg-surface);
   font: inherit;
+  line-height: 1.25;
   text-align: left;
   color: inherit;
   cursor: pointer;
@@ -728,15 +759,67 @@ body {
   text-overflow: ellipsis;
 }
 
+/* El punto de estado. Mismas medidas que el de `.gml-capa::before` y el del chip de
+   avisos —7 px y `border-radius: 50%`—, porque es el mismo grafismo y en esta
+   aplicación ya existía. Va DENTRO del `<span>` del nombre y no como hermano para
+   que lo arrastre el `text-overflow` del rótulo largo: un punto que se quedara
+   flotando junto a unos puntos suspensivos sería peor que no tenerlo.
+
+   ⚠️ `content: ''` y no un glifo: Chrome mete el contenido generado en el nombre
+   accesible del botón, y el estado ya lo dicen las palabras que van detrás. */
+.gml-barra-expediente-nombre::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--color-state-neutral);
+}
+
+[data-expediente-estado='sin-archivar'] .gml-barra-expediente-nombre::before {
+  background: var(--color-state-warn);
+}
+
+[data-expediente-estado='archivado'] .gml-barra-expediente-nombre::before {
+  background: var(--color-state-ok);
+}
+
 /* El apunte va en monoespaciada cuando es una referencia catastral, y el que la
-   escribe es `app/barra.js`: aquí solo se declara el tamaño y el gris. */
+   escribe es `app/barra.js`: aquí solo se declara el tamaño y el gris.
+
+   ⚠️ **Sigue a `--text-10` y NO sube a `--text-11`**, que es lo que DESIGN.md §5.1
+   reserva para los apuntes, y el motivo es de ancho y está medido: la frase más
+   larga que escribe este nodo —«Se autoguarda; archívalo para conservarlo», 40
+   caracteres— ya ocupa 194 px de los 240 del tope a 10 px. A 11 se pasa, y lo que
+   se ve entonces no es un apunte más legible: es «…para conserv…». El gris sí sube
+   de `--color-text-disabled` a `--color-text-secondary`, que es contraste gratis. */
 .gml-barra-expediente-apunte {
   max-width: 100%;
   font-size: var(--text-10);
-  color: var(--color-text-disabled);
+  color: var(--color-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* La flecha ocupa las dos filas por la derecha, así que se coloca a mano: la
+   colocación automática de la rejilla la mandaría a la segunda columna de la
+   primera fila y el apunte se le pondría debajo. */
+.gml-barra-expediente-flecha {
+  grid-area: 1 / 2 / 3 / 3;
+  font-size: var(--text-10);
+  /* El glifo ▾ no está centrado en su caja: cuelga hacia abajo, y girado 180° se
+     va hacia arriba. Con `line-height: 1` la caja se ciñe al glifo y el
+     `align-items: center` de la rejilla vuelve a centrarlo de verdad. */
+  line-height: 1;
+  color: var(--color-text-disabled);
+  transition: var(--transition);
+}
+
+.gml-barra-expediente[aria-expanded='true'] .gml-barra-expediente-flecha {
+  transform: rotate(180deg);
+  color: var(--color-text-secondary);
 }
 
 /* ── Los menús desplegables de la barra ─────────────────────────────────── */
@@ -769,6 +852,65 @@ body {
   box-shadow: var(--gml-sombra-flotante);
 }
 
+/* ── ⭐ EL MENÚ DE EXPEDIENTE PASA A DOS RENGLONES (2026-08-20) ──────────────
+ *
+ * La regla base de abajo pone el rótulo a la izquierda y el apunte pegado al borde
+ * DERECHO (`margin-left: auto`), en monoespaciada. Es la gramática de una COLUMNA
+ * DE VALORES, y para el menú de salidas es la correcta: «Exportar para CAD … .dxf»
+ * son tres extensiones alineadas que se comparan de un vistazo.
+ *
+ * ⛔ **En el de expediente los apuntes no son valores, son FRASES** —«en este
+ * navegador», «traducir el mensaje de la Sede», «la ayuda de la primera visita»—, y
+ * aplicarles esa gramática costaba las dos cosas a la vez, medidas el 2026-08-20:
+ *   · el panel se estiraba a **340 px** (el tope) para caber rótulo + río + frase, y
+ *     entre las dos mitades quedaba un vacío de hasta 90 px que las leía como dos
+ *     listas distintas; y
+ *   · la prosa salía en Geist Mono, que DESIGN.md §5 reserva para **valor numérico,
+ *     unidad y referencia catastral**. Era el único sitio de la aplicación donde la
+ *     monoespaciada escribía una oración.
+ *
+ * Con la frase debajo del rótulo el panel baja a ~220 px —el `min-width`, o sea el
+ * ancho del botón que lo abre— y desaparece el río. Cuesta alto, y el alto es lo
+ * que un desplegable tiene de sobra: crece hacia abajo sobre el mapa.
+ *
+ * ⚠️ Va acotado por `[data-menu='expediente']` y no por una clase modificadora
+ * nueva porque ese atributo YA está en el marcado (es el que casa con
+ * `data-menu-disparador`), así que la variante no cuesta ni un byte de HTML. */
+/* 240 px es el `max-width` del botón que lo abre, así que el panel nunca sale más
+   ESTRECHO que su disparador — que es lo que se veía con el `min-width: 220` de la
+   regla base (botón 226,5 · panel 220, medido) y se lee como un desalineado, no
+   como una decisión. Más ancho sí puede salir, y eso está bien: un desplegable que
+   se ensancha hacia abajo es lo normal; uno que se estrecha, no. */
+[data-menu='expediente'] {
+  min-width: 240px;
+}
+
+[data-menu='expediente'] .gml-barra-menu-opcion {
+  display: block;
+  line-height: 1.3;
+}
+
+[data-menu='expediente'] .gml-barra-menu-apunte {
+  display: block;
+  margin-left: 0;
+  font-family: inherit;
+  font-size: var(--text-11);
+  /* Deshace el 500 del rótulo, que aquí se hereda por ser hijo y no hermano. */
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+/* El filete que separa lo irreversible del resto. Va en el envoltorio `[data-pie]`
+   —que es el nodo que `app/empezar-de-nuevo.js` enseña y esconde— y no en un
+   `role="separator"` propio, y ése es justo el motivo: cuando no hay nada que
+   vaciar el envoltorio está `hidden`, así que el filete se va con él. Un separador
+   con su propio nodo se quedaría colgando bajo la última opción. */
+.gml-barra-menu [data-pie='empezar-de-nuevo'] {
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--color-border-sub);
+}
+
 /* El de la entrega se alinea por la DERECHA: nace pegado al borde de la ventana
    y abriéndolo hacia la izquierda no se sale. */
 .gml-barra-menu--derecha {
@@ -792,6 +934,11 @@ body {
   background: transparent;
   font: inherit;
   font-size: var(--text-12);
+  /* 500 y no 400: es lo que separa el RÓTULO de su apunte sin gastar un tamaño
+     más. Con los dos a 400 —que es como estaba— la única diferencia entre «Cómo
+     funciona» y «la ayuda de la primera visita» era un punto de tamaño y un gris,
+     y en dos renglones apilados eso no hace jerarquía, hace un párrafo. */
+  font-weight: 500;
   text-align: left;
   color: var(--color-text-primary);
   cursor: pointer;
@@ -823,6 +970,16 @@ body {
   color: var(--color-state-fail);
 }
 
+/* ⭐ Y el resalte al pasar por encima también es rojo desde el 2026-08-20. Con el
+   `--color-bg-elevated` de la regla de arriba, la única opción irreversible del
+   menú se encendía del mismo gris que «Cómo funciona» **en el instante exacto en
+   que el puntero está sobre ella**, que es el último momento útil para avisar. Es
+   el mismo par color+tinte que ya llevan `.gml-chip--error` y el bloque de error
+   del panel: no entra ni un color nuevo. */
+.gml-barra-menu-opcion--riesgo:hover:not(:disabled) {
+  background: var(--color-tint-fail);
+}
+
 .gml-barra-menu-apunte {
   margin-left: auto;
   white-space: nowrap;
@@ -835,10 +992,19 @@ body {
    renglón del panel que ya no se está mirando. Vacío no ocupa alto. */
 .gml-barra-menu-estado {
   margin: var(--space-1) 0 0;
-  padding: 0 var(--space-3);
+  /* ⭐ Relleno arriba y abajo, y tinte, desde el 2026-08-20. Este renglón dice
+     «vuelve a pulsar para confirmarlo» y era un gris de 10 px suelto bajo la
+     opción, o sea con menos peso en pantalla que el apunte de «Cómo funciona» —
+     siendo lo único que separa al usuario de vaciar el expediente. Se viste con el
+     mismo par que la opción que lo dispara: `--color-tint-fail` de fondo y el texto
+     en `--color-text-primary`, que sobre ese tinte es el contraste bueno (el rojo
+     sobre rojo diluido a 10 px no llega). */
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--color-tint-fail);
   font-size: var(--text-10);
   line-height: 1.35;
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
 }
 
 .gml-barra-menu-estado:empty {
@@ -1195,7 +1361,13 @@ body {
 
 .gml-panel-cabecera {
   flex: none;
-  padding: var(--space-4) var(--space-6);
+  /* ⚠️ EL RELLENO VERTICAL SON 12 px Y NO 16 DESDE EL 2026-08-18, Y ES CARGA
+     ESTRUCTURAL. Esos 4 px de arriba y 4 de abajo son parte de los 117 px que le
+     faltaban a la TERCERA VÍA de Entrada para verse entera a 1280×720 (el apunte
+     de `TODOS.md` y el criterio 7 del rework). No es aire recuperado por gusto:
+     está MEDIDO con el guion 14, y si vuelve a 16 la tercera vía vuelve a caer bajo
+     el pliegue. El horizontal se queda en `--space-6`: ahí no sobraba. */
+  padding: var(--space-3) var(--space-6);
   border-bottom: 1px solid var(--color-border-sub);
 }
 
@@ -1623,7 +1795,11 @@ body {
  * `padding-top: var(--space-2)` son otra vez 8 + 4 = **12 px**, los mismos.
  * Coste neto de la partición: 0 px. */
 .gml-bloque--vias {
-  gap: var(--space-2);
+  /* 4 px y no 8 desde el 2026-08-18: parte de los 117 px de la tercera vía (ver
+     `.gml-panel-cabecera`). Su gemela `.gml-bloque--catastro` NO cambia: tiene una
+     sola vía, o sea ningún hueco entre hermanas que apretar. La simetría que aquel
+     comentario exige es la de lo que MIDE, y aquí no hay nada que descuadrar. */
+  gap: var(--space-1);
   padding-top: var(--space-2);
   flex: 0 1 auto;
   min-height: 0;
@@ -1646,7 +1822,11 @@ body {
   /* ⭐ 13/14 px hasta la revisión de diseño del 2026-08-10. Eran dos cifras de
      nadie: la rejilla del sistema es de base 8 y tiene 12 y 16, así que la caja
      pasa a `--space-3` / `--space-4`. De paso devuelve 2 px de alto por vía. */
-  padding: var(--space-3) var(--space-4);
+  /* ⚠️ EL VERTICAL BAJÓ A `--space-2` EL 2026-08-18 (8 px): son 24 px de los 117
+     de la tercera vía, y los más baratos de los cuatro recortes porque la caja no
+     los estaba usando para nada. El horizontal se queda en `--space-4`: por los
+     lados es donde vive el texto y ahí sí hace falta que respire. */
+  padding: var(--space-2) var(--space-4);
   border: 1px solid var(--color-border-main);
   border-radius: var(--radius-md);
   background: var(--color-bg-primary);
@@ -1681,10 +1861,24 @@ body {
 }
 
 .gml-via-apunte {
-  margin: var(--space-1) 0 var(--space-2);
+  /* Pegado a su rótulo (0 arriba) y a 4 px de su botón: otros 16 px de los 117. Y
+     no solo ahorra — el apunte PERTENECE al rótulo que tiene encima, así que
+     juntarlos agrupa mejor de lo que estaban. */
+  margin: 0 0 var(--space-1);
   font-size: var(--text-12);
   line-height: 1.45;
   color: var(--color-text-disabled);
+}
+
+/* ⚠️ LOS ÚLTIMOS 7 px DE LOS 117, y la única regla NUEVA de todo el recorte.
+   `.gml-rotulo` da 8 px de margen inferior a TODOS los rótulos de la aplicación y
+   aquí hacen falta 4. Se acota a la vía en vez de bajar el valor global: el rótulo
+   genérico viste media docena de bloques más —vértices, partes, contraste— y
+   apretarlos todos para ganar 7 px en una pantalla sería mover seis maquetas
+   medidas para arreglar una. Este es el reparto que el guion 14 mide, y cuesta
+   45 B que están en el asiento del presupuesto. */
+.gml-via .gml-rotulo {
+  margin-bottom: var(--space-1);
 }
 
 /* Un botón de vía ocupa el ancho de su caja: es LA acción de esa vía, y dejarlo
@@ -2860,6 +3054,101 @@ body {
   display: none;
 }
 
+/* ── ⭐ EL MOTIVO DEL BOTÓN APAGADO SE VUELVE PISTA (2026-08-19) ─────────────
+ *
+ * Encargo del autor, textual: «hay tanto texto debajo de los botones que se queda
+ * sin espacio el cuadro de los vértices; todo ese texto podría pasar a una
+ * información si haces hover sobre el botón desactivado, algo que no ocupe tanto
+ * espacio».
+ *
+ * El diagnóstico es exacto y se puede medir. Los CUATRO CTA del pie de Edición
+ * nacen apagados y los cuatro escriben al lado POR QUÉ —la regla de oro 1: un
+ * botón gris y mudo es un error silencioso—, con textos que dicen qué falta Y cómo
+ * conseguirlo. Con los cuatro apagados a la vez, que es como ARRANCA la aplicación,
+ * eso son cuatro párrafos de tres a seis líneas a 11/1,35 en una columna de 392 px:
+ * del orden de 350 px. Y `.gml-bloque--vertices` es el único bloque que se estira,
+ * o sea que ese alto sale **entero** de la tabla de vértices, que se quedaba en UNA
+ * fila visible.
+ *
+ * ── LO QUE **NO** SE HACE: ACORTAR LOS TEXTOS ──────────────────────────────
+ * Era la salida obvia y es la mala. Esos párrafos son la mitad útil de un botón
+ * apagado; recortarlos habría comprado píxeles con lo único que hace que el estado
+ * apagado se entienda. Lo que cambia es DÓNDE se enseñan, no cuánto dicen: ni una
+ * palabra se ha tocado en los cuatro cableados.
+ *
+ * ── EL INTERRUPTOR ES `:disabled`, Y ES CSS PURO ───────────────────────────
+ * Mientras el botón está APAGADO su renglón es un motivo: sale del flujo y se pinta
+ * como un globo sobre la columna al pasar el ratón. Cuando el botón se ENCIENDE, el
+ * mismo nodo pasa a contar el DESENLACE de lo que el usuario acaba de pulsar, y eso
+ * vuelve a ser un renglón en el flujo: un resultado no se puede esconder detrás de
+ * un gesto que hay que descubrir. Los `--error` se quedan siempre en el flujo,
+ * encendido o apagado, por lo mismo. Como el par botón + renglón son hermanos
+ * contiguos en `index.html`, el selector `:disabled + …` lo expresa entero sin una
+ * línea de JS: los seis módulos que escriben estos renglones siguen escribiendo
+ * igual que ayer.
+ *
+ * ⛔ **LA ENVOLTURA `.gml-accion` NO ES DECORADO: SIN ELLA LA PISTA NO ABRE.**
+ * Un `<button disabled>` no recibe eventos de ratón, así que `:hover` sobre él no
+ * casa nunca en Chrome — el puntero encima de un control apagado hace blanco en su
+ * PADRE. Colgar el `:hover` del botón habría dejado la pista muerta justo en el
+ * único estado en el que existe. El `<div>` es además el bloque contenedor del
+ * globo (`position: relative`), que es lo que lo ancla a SU botón y no al panel.
+ *
+ * ⚠️ **SE ESCONDE CON `opacity`, Y NO CON `display` NI `visibility`.** Las dos
+ * sacan el nodo del árbol de accesibilidad, y estos renglones son `role="status"`:
+ * con cualquiera de ellas, quien usa lector de pantalla dejaría de oír por qué el
+ * botón está apagado — exactamente los usuarios que no pueden pasar el ratón por
+ * encima para averiguarlo. Mismo criterio, y mismo porqué, que `RENGLON_OCULTO` en
+ * `app/main.js`. El texto sigue dentro del nodo y se anuncia igual que ayer.
+ *
+ * ⚠️ `:empty` sigue mandando por encima de todo esto (0,2,0 con `display`): un
+ * motivo vacío no pinta globo, no reserva nada y no cuesta un píxel.
+ *
+ * ⚠️ El límite conocido, dicho en vez de disimulado: **con el teclado no hay forma
+ * de abrir la pista**, porque un botón apagado no es enfocable. No es una regresión
+ * silenciosa —el lector de pantalla lo anuncia por el `role="status"`—, pero sí un
+ * hueco para quien ve la pantalla y no usa ratón. Cerrarlo de verdad es cambiar
+ * `disabled` por `aria-disabled` en los cuatro CTA, que es una decisión de producto
+ * (el botón pasaría a ser pulsable y a tener que explicarse al pulsarlo) y no un
+ * cambio de hoja. Queda anotado en TODOS.md. */
+.gml-accion {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* El globo. `left/right: 0` le dan el ancho de SU botón —así no se sale de la
+   columna por ningún lado sin necesidad de un `max-width`— y `bottom: 100%` lo
+   sube justo encima, que es donde hay sitio: el pie está pegado al borde inferior
+   del panel. `z-index: 2` gana a la cabecera pegajosa de la tabla de vértices
+   (`thead th`, que es `z-index: 1` en el mismo contexto de apilamiento) para el
+   caso de una tabla corta. `pointer-events: none` es lo que evita que el globo
+   tape los botones que cubre: el ratón los sigue alcanzando a través de él. */
+.gml-accion > :disabled + .gml-accion-estado:not(.gml-accion-estado--error) {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + var(--space-1));
+  left: 0;
+  z-index: 2;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-sub);
+  border-radius: var(--radius);
+  background: var(--color-bg-elevated);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+/* 120 ms de fundido y NI UN MILISEGUNDO DE ESPERA, que es la objeción que este
+   proyecto ya le hizo al `title` nativo el 2026-08-10: aparecer al segundo es
+   aparecer después de que el usuario haya dudado. El fundido solo quita el
+   parpadeo al cruzar el pie de lado a lado. */
+.gml-accion:hover > :disabled + .gml-accion-estado {
+  opacity: 1;
+}
+
 /* El acuse de «Generar GML», que es el ÚNICO que no vive dentro del `<footer>`:
    su botón está en la barra y se ve en los tres pasos, así que él también tiene
    que verse en los tres, y el `<footer>` entero es `data-pantalla="edicion"`.
@@ -3246,6 +3535,170 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* ═══ La tarjeta de bienvenida (primera visita) ══════════════════════════════
+ *
+ * La fabrica `app/tarjeta-bienvenida.js`. Va AQUÍ, con el cromo del mapa, porque
+ * es donde vive: comparte la celda `mapa` de la rejilla con `<main id="mapa">`
+ * **sin estar dentro de él** (el porqué entero, en la cabecera de aquel módulo —
+ * resumen: `.gml-mapa` y `.leaflet-container` son el mismo nodo, y un botón dentro
+ * habría disparado el clic del mapa, o sea una consulta al Catastro por pulsar
+ * «Empezar»).
+ *
+ * ⛔ **NO es un `<dialog>` y no tiene `::backdrop`.** Es una `<section>` normal, y
+ * eso es la decisión del cambio, no un detalle: la tarjeta existe para enseñar
+ * «pincha el mapa» y un backdrop se habría tragado ese clic. El mapa de detrás se
+ * arrastra, hace zoom y responde — que es lo que hace falta, porque a zoom 6
+ * (España entera) lo primero no es pinchar, es acercarse.
+ *
+ * ── ⚠️ SIN `.gml-app` DELANTE, Y LAS DOS RAZONES IMPORTAN ──────────────────
+ * Casi toda esta hoja lleva `.gml-app` delante para ganarle la cascada a Leaflet.
+ * Esta sección NO, y no es un descuido:
+ *
+ *   1. **Correcto**: esta tarjeta no está dentro de `.leaflet-container`, así que
+ *      no hay nada de Leaflet a lo que ganarle. Y sobre todo tiene que **PERDER**
+ *      contra `.gml-app [hidden]` (0,2,0), que es lo que la esconde. Con
+ *      `.gml-app .gml-bienvenida` (0,2,0) el empate lo resolvería el orden de
+ *      aparición en el fichero — o sea por casualidad. Con (0,1,0) gana el
+ *      `[hidden]` siempre y por especificidad. Misma trampa que midió el guion 19
+ *      en `.gml-barra-herramienta`, resuelta al revés.
+ *   2. **Barato**: son 8 caracteres × 11 selectores.
+ *
+ * ── ⭐ Y LA LECCIÓN DE MÉTODO, QUE VALE MÁS QUE LA SECCIÓN ──────────────────
+ * La primera versión de esto se escribió «una regla por pieza» y midió **1.792 B**.
+ * Se «optimizó» agrupando los reseteos de margen y los grises en LISTAS DE
+ * SELECTORES —que es lo que uno hace por instinto— y midió **1.970 B**: 178 B PEOR.
+ * El motivo, obvio en cuanto se mide y nada obvio antes: cada selector de una lista
+ * repite el prefijo entero, y aquí los prefijos son largos. **Con nombres largos,
+ * agrupar declaraciones sale caro y agrupar POR ELEMENTO sale barato.** Los
+ * comentarios, en cambio, son gratis: el minificador se los come y el presupuesto
+ * mide la hoja CONSTRUIDA. Se aprietan los selectores, nunca la prosa.
+ */
+.gml-bienvenida {
+  grid-area: mapa;
+  /* Pegada al borde IZQUIERDO del mapa y centrada en vertical: es la única zona
+     libre del contenedor. Arriba a la izquierda está la barra de edición, abajo a
+     la izquierda el cajón del diagnóstico, arriba a la derecha el control de capas
+     y abajo a la derecha la opacidad y la atribución. */
+  justify-self: start;
+  align-self: center;
+  margin-inline-start: var(--space-6);
+  position: relative;
+  z-index: var(--gml-z-panel);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+
+  /* 440 px MEDIDOS contra el suelo declarado: a 1280×720 el mapa mide 888 px de
+     ancho, así que quedan 448 px de cartografía a la vista y el usuario puede
+     buscar su parcela sin cerrar nada. Y queda por debajo de los 68ch que usan de
+     tope los diálogos de la casa, así que la línea sigue siendo legible.
+     El tope de alto (60vh = 432 px a 720) existe para el viewport corto, no para
+     el normal: el contenido medido cae en ~330. */
+  width: 440px;
+  max-width: calc(100% - 2 * var(--space-4));
+  max-height: 60vh;
+  overflow-y: auto;
+
+  padding: var(--space-4);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-sub);
+  border-radius: var(--radius-md);
+  box-shadow: var(--gml-sombra-dialogo);
+}
+
+/* Lo único propio del título es dejarle sitio al aspa: el tamaño, el peso y el
+   interlineado los hereda de la regla compartida de los títulos de diálogo, a la
+   que este selector está añadido más abajo en el fichero. */
+.gml-bienvenida-titulo {
+  padding-inline-end: var(--gml-alto-control);
+}
+
+/* TODOS los párrafos de la tarjeta de una vez: el reseteo de margen y el gris
+   secundario. Un selector de elemento corto sale MÁS BARATO que repartir
+   `margin:0` por las tres reglas de clase que lo necesitaban (ver la lección de
+   método de la cabecera). El titular del gesto se sale de aquí, abajo. */
+.gml-bienvenida p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+/* ── El bloque del gesto ─────────────────────────────────────────────────────
+ * ⛔ **SIN filo de acento a la izquierda.** `border-left: 3px solid <acento>` es
+ * el patrón que delata una interfaz generada, y la revisión de diseño lo marcó por
+ * su nombre. Se destaca con superficie, que es como destaca todo en esta
+ * aplicación. */
+.gml-bienvenida-gesto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius);
+}
+
+.gml-bienvenida-gesto-titular {
+  color: var(--color-text-primary);
+  font-weight: var(--fw-semibold);
+}
+
+/* APAGADO CON EL MOTIVO ESCRITO, nunca retirado (DESIGN.md §8). Se da cuando la
+   tarjeta se reabre con una referencia ya en el modelo: ahí
+   `cableado-catastro.js#puedeDeducirClicando` apaga el clic a propósito, y enseñar
+   el gesto sin decirlo sería la regla de oro 1 rota por el texto que existe para
+   explicarla. El color NO es el único canal: el cuerpo cambia de frase. */
+.gml-bienvenida-gesto[data-estado=pausa] .gml-bienvenida-gesto-titular {
+  color: var(--color-text-disabled);
+}
+
+.gml-bienvenida-vias {
+  margin: 0;
+  padding-inline-start: var(--space-4);
+  color: var(--color-text-secondary);
+}
+
+.gml-bienvenida-via-nombre {
+  color: var(--color-text-primary);
+}
+
+/* ⛔ AQUÍ HUBO UN `.gml-bienvenida .gml-boton { align-self: start }` Y ERA CÓDIGO
+   MUERTO. Se escribió para que el botón no se estirara a los 440 px de la columna
+   flex… y `.gml-boton` lleva `width: 100%` desde siempre, que gana igual. Medido en
+   el navegador: `align-self` valía `start` y el ancho seguía siendo 406 px, o sea
+   la caja de contenido entera. Se anota en vez de borrarse porque la regla se veía
+   razonable y estuvo ahí una hora sin hacer nada: el ancho de un botón de esta casa
+   no se decide desde el contenedor. Y el botón a todo el ancho es lo correcto — es
+   lo que hacen los de las tres vías, a tres centímetros de aquí. */
+
+/* El aspa. Objetivo de pulsación `--gml-alto-control` (32 px), que es la medida de
+   control de esta casa y está en la rejilla de 8. */
+.gml-bienvenida-cerrar {
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline-end: var(--space-2);
+  width: var(--gml-alto-control);
+  height: var(--gml-alto-control);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-15);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.gml-bienvenida-cerrar:hover {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+}
+
+/* ⛔ AQUÍ HUBO UN `@media (max-width: 900px)` Y SE HA RETIRADO, MEDIDO: costaba
+   109 B y no hacía nada que no hiciera ya el `max-width` de arriba. Con el mapa a
+   400 px la tarjeta ya mide 368 y arranca 24 px dentro: cabe. Se anota en vez de
+   borrarse porque la media query «por si acaso» es el reflejo caro de esta hoja, y
+   el criterio para justificar una es que el `max-width` NO baste. */
+
 /* ── El vértice arrastrable (`L.divIcon`, clase `gml-vertice`) ───────────────
  * El cuadradito violeta lo pinta un <span> con estilos EN LÍNEA dentro del
  * icono (`sincronizacion.js` no puede importar CSS): su color, tamaño y sombra
@@ -3343,6 +3796,70 @@ body {
 .gml-app .gml-modo-borrar .leaflet-marker-icon,
 .gml-app .gml-modo-borrar .leaflet-interactive {
   cursor: crosshair;
+}
+
+/* ── …y su GEMELA, que llegó con el modo insertar (2026-08-18) ────────────────
+ * Todo lo del bloque de arriba vale igual: la clase la pone y la quita
+ * `viewer/edicion.js` en el CONTENEDOR del mapa, el selector no lleva `.gml-mapa`
+ * delante por la misma trampa, y la segunda regla no es redundante porque
+ * `.leaflet-grab` y `.leaflet-marker-draggable` fijan los suyos.
+ *
+ * ⚠️ **Lo único que cambia es el cursor, y es TODO el motivo de que estas dos
+ * reglas existan en vez de reutilizar la clase de arriba.** Los dos modos son
+ * excluyentes y los dos secuestran el clic sencillo, así que con el mismo cursor
+ * serían indistinguibles justo donde está mirando el usuario. El otro aviso es el
+ * botón pulsado de la barra, y de ése ya dice el bloque de arriba que «vive abajo
+ * del todo, a 400 px de donde está el ratón; el cursor viaja con la mano». Dos
+ * modos armados que se ven igual —y uno de ellos destruye— es exactamente la
+ * trampa silenciosa que aquel bloque existe para cerrar.
+ *
+ * `copy` y no `cell` ni un `crosshair` de otro color: `copy` es el único cursor
+ * del juego estándar que dibuja un **signo +**, o sea el mismo símbolo que el
+ * icono del botón, y «añadir» es literalmente lo que hace el clic. `cell` es la
+ * cruz de hoja de cálculo y se confunde con `crosshair` a tamaño de cursor, que
+ * es precisamente lo que hay que evitar. */
+.gml-app .gml-modo-insertar {
+  cursor: copy;
+}
+
+.gml-app .gml-modo-insertar .leaflet-marker-icon,
+.gml-app .gml-modo-insertar .leaflet-interactive {
+  cursor: copy;
+}
+
+/* ── …y OTRA, que llegó con el cuadrado negro de las colindantes (2026-08-18) ─
+ *
+ * Pulsar una parcela colindante dejaba un RECTÁNGULO NEGRO alrededor de ella que
+ * no se iba. No lo pinta ninguna capa de este proyecto: es el **anillo de foco
+ * por defecto de Chromium** (`outline: rgb(16,16,16) auto 5px`, medido en la
+ * aplicación real sobre `path.gml-colindante`), y sale con forma de caja porque
+ * el navegador dibuja el anillo de un elemento SVG alrededor de su **caja
+ * envolvente**, no de su contorno. De ahí que un triángulo produzca un cuadrado.
+ *
+ * Por qué le llega el foco a un `<path>`: en Chromium un `click` sobre una forma
+ * SVG la deja como `document.activeElement` (medido: `activeElement` = el propio
+ * `path`). Y por qué Leaflet no lo tapa él solo, que es lo que se esperaría:
+ * `Map#_handleDOMEvent` llama a `preventOutline(el)` en cada `mousedown`, pero esa
+ * función SUBE mientras `tabIndex === -1` (`leaflet-src.js` 1.9.4, ~línea 2622) y
+ * un `<path>` sin `tabindex` vale exactamente −1 → acaba apagándole el anillo al
+ * CONTENEDOR del mapa, que es el primero con `tabindex="0"`, y no al `path`. Su
+ * defensa está pensada para los marcadores, no para las formas.
+ *
+ * ⚠️ Se apaga SOLO en `:focus:not(:focus-visible)`, o sea en el foco que viene del
+ * ratón — que es el único que hay aquí: ninguna de estas formas lleva `tabindex`,
+ * así que **no se puede llegar a ellas con el tabulador** y no hay navegación de
+ * teclado que romper. Si algún día se les da `tabindex`, `:focus-visible` sí
+ * casará y el anillo de acento de `.gml-app :focus-visible` volverá a pintarse
+ * solo, sin tocar esta regla. Apagar el `outline` a secas sería la versión de esto
+ * que se lleva por delante la accesibilidad futura sin avisar.
+ *
+ * Vale para TODA forma interactiva del visor y no solo para las colindantes
+ * (`gml-colindante`, `gml-candidata`, las piezas y las partes comparten el
+ * defecto), por eso el selector es el `.leaflet-interactive` de Leaflet. Los
+ * marcadores no lo necesitan: son `<div>` con `tabindex="0"` y a ellos SÍ les
+ * llega el `preventOutline` de Leaflet. */
+.gml-app .leaflet-interactive:focus:not(:focus-visible) {
+  outline: none;
 }
 
 /* ── La LEYENDA de los grafismos del mapa (`viewer/leyenda.js`, 2026-08-15) ──
@@ -3571,9 +4088,25 @@ body {
 
 /* La fila `role="toolbar"`. `nowrap` es carga útil: si las herramientas se
    partieran en dos líneas, la barra ganaría alto sobre la ortofoto justo cuando
-   menos sitio hay. Son siete iconos —ocho en la rama EDIFICIO, con «Dibujar
-   recinto»— de 28 px, o sea ~200 px con separadores: cabían de sobra ya cuando
-   eran palabras y medían ~530.
+   menos sitio hay. Son nueve controles de 28 px —ocho en la rama PARCELA sin
+   fichero— y cabían de sobra ya cuando eran palabras y medían ~530.
+
+   ⭐ **ANCHO VIGENTE: 313 px de barra, 303 de fila**, medidos en Chrome a
+   1280×720 el **2026-08-20** con «Dibujar recinto» a la vista. La cifra lleva
+   fecha porque en este proyecto ya caducó una sin avisar: los 326 px que este
+   bloque citaba venían de antes de T4.
+
+   ⚠️ **Los tres MODOS no gastan separadores entre sí**: insertar, borrar y dibujar
+   viven dentro de `.gml-barra-mando`, pegados y sin `gap`, porque son excluyentes
+   en `viewer/edicion.js` y el marco compartido es lo que lo dice. Agruparlos hizo
+   además innecesario un filete —el dibujo tenía uno a cada lado cuando era grupo
+   propio—, así que la barra ADELGAZÓ 13 px al ganar legibilidad, que en este
+   proyecto es la excepción y no la regla.
+
+   ⚠️ El solape con el control de opacidad que `TODOS.md` tenía abierto se cerró el
+   2026-08-19 mudando ese control a `topright` (0 px² de intersección medidos). El
+   eje sigue siendo escaso: la barra flota sobre la ortofoto que el usuario está
+   calcando, y cada píxel de aquí es mapa que no se ve.
 
    ⚠️ `position: relative` NO se declara aquí: lo pone en línea
    `viewer/barra-edicion.js`, porque de él depende que la PISTA quede colocada y
@@ -3653,7 +4186,18 @@ body {
   display: none;
 }
 
-.gml-app .gml-barra-herramienta:hover:not(:disabled) {
+/* ⛔ **EL `:not([aria-pressed='true'])` NO ES ADORNO: SIN ÉL EL `:hover` BORRABA EL
+   ESTADO ARMADO, y estaba así desde el 2026-08-10.** Medido en Chrome el
+   2026-08-20 sobre «Borrar vértices» recién pulsado: `aria-pressed="true"` y fondo
+   `rgb(241,245,249)`, o sea el gris de señalar, no el rojo de armado. La causa es
+   de especificidad pura — esta regla vale (0,4,0) y las dos del estado armado
+   (0,3,0) y (0,3,0)+atributo — así que el gris ganaba **justo en el instante en
+   que el usuario acaba de pulsar y todavía tiene el puntero encima**, que es
+   exactamente cuando hace falta ver que el modo se armó.
+   La regla del color destructivo de más abajo ya se excluía del estado armado; le
+   faltaba a ésta, que es la que pinta el fondo. Un modo armado no necesita además
+   respuesta al `:hover`: ya es el estado más fuerte de la barra. */
+.gml-app .gml-barra-herramienta:hover:not(:disabled):not([aria-pressed='true']) {
   background: var(--color-bg-elevated);
   border-color: var(--color-border-sub);
   color: var(--color-text-primary);
@@ -3675,15 +4219,23 @@ body {
 }
 
 /* ── El conmutador ARMADO ────────────────────────────────────────────────────
- * Vale para «Borrar vértices» y para «Dibujar recinto»: los dos son modos, los dos
- * llevan `aria-pressed`, y el estado sale del DOM sin que nadie observe nada — el
- * mismo recurso que el `[aria-expanded="true"]` de arriba.
+ * Vale para los tres segmentos del mando —insertar, borrar y dibujar—: los tres
+ * son modos, los tres llevan `aria-pressed`, y el estado sale del DOM sin que
+ * nadie observe nada, el mismo recurso que el `[aria-expanded="true"]` de arriba.
  *
  * Un modo armado NO se puede señalar con un fondo gris claro como el de `:hover`:
  * mientras dura, el clic siguiente hace algo distinto de lo que hacía hace un
- * segundo, y eso pide un bloque macizo, no un matiz. Se usan los mismos tokens que
- * el conmutador del ajuste (≈5,7:1), que es el otro estado permanente de la barra:
- * dos maneras de pintar «esto está encendido» acabarían divergiendo. */
+ * segundo, y eso pide un bloque macizo, no un matiz.
+ *
+ * ⛔ **AQUÍ DECÍA «se usan los mismos tokens que el conmutador del ajuste, porque
+ * dos maneras de pintar “esto está encendido” acabarían divergiendo», Y ESTABA
+ * MAL** (corregido en T6, 2026-08-20). El razonamiento suena a unificación y era
+ * lo contrario: el ajuste y un modo armado **no están encendidos en el mismo
+ * sentido**. Uno es un ajuste que lleva puesto desde el expediente anterior; el
+ * otro es un estado que dura un minuto y cambia lo que hace el clic siguiente.
+ * Pintarlos igual no era coherencia, era una homonimia — y se veía: los dos daban
+ * `rgb(3, 105, 161)` a la vez, uno al lado del otro. El bloque macizo se queda
+ * AQUÍ, que es donde hace falta, y el ajuste baja a acento suave (ver su regla). */
 .gml-app .gml-barra-herramienta[aria-pressed='true'] {
   background: var(--color-btn-primary-bg);
   border-color: var(--color-btn-primary-bg);
@@ -3705,6 +4257,85 @@ body {
    para ganar al `:hover` genérico de más arriba (0,3,0). */
 .gml-app .gml-barra-herramienta--destructiva:hover:not(:disabled):not([aria-pressed='true']) {
   color: var(--color-state-fail);
+}
+
+/* ── El MANDO de los tres modos (T4, 2026-08-20) ─────────────────────────────
+ * `role="group"` con las tres herramientas que ARMAN un modo —insertar, borrar y
+ * dibujar—, pintadas como un solo control segmentado.
+ *
+ * ⭐ **QUÉ PAGA ESTE ASIENTO.** Las tres son excluyentes: armar una desarma las
+ * otras dos, y lo decide `viewer/edicion.js`. Hasta hoy eso solo se sabía DESPUÉS
+ * de pulsar —o leyendo el `aria-pressed`, que no se ve—, y en la fila se
+ * presentaban igual que la papelera o la ayuda, que no se excluyen con nada. Un
+ * marco compartido y un filete entre medias lo dicen ANTES de pulsar, que es el
+ * único momento en que sirve de algo.
+ *
+ * ⛔ **NADA de `overflow:hidden` aquí, y no es una omisión: es LA decisión de este
+ * bloque.** Recortaría el anillo de foco global —`.gml-app :focus-visible` con
+ * `outline-offset: 2px`— del segmento enfocado, o sea que dejaría el mando bonito
+ * y la barra sin teclado visible. Es exactamente la trampa que `.gml-barra-partido`
+ * ya se encontró unas reglas más abajo, y se resuelve igual: **el redondeo va en
+ * los extremos, no en el contenedor.**
+ *
+ * El alto lo fija el mando (28 px, borde incluido por `box-sizing:border-box`) y
+ * los segmentos lo estiran: sin esto el mando mediría 30 y la fila entera crecería
+ * 2 px sobre la ortofoto, que es justo lo que T1 acababa de recuperar. */
+.gml-app .gml-barra-mando {
+  display: inline-flex;
+  align-items: stretch;
+  height: 28px;
+  border: 1px solid var(--color-border-main);
+  border-radius: var(--radius);
+}
+
+/* Dentro del mando el segmento pierde su redondeo propio: el que se ve es el de
+   los extremos, dos reglas más abajo. */
+.gml-app .gml-barra-mando > .gml-barra-herramienta {
+  height: auto;
+  border-radius: 0;
+}
+
+.gml-app .gml-barra-mando > .gml-barra-herramienta:first-child {
+  border-top-left-radius: var(--radius);
+  border-bottom-left-radius: var(--radius);
+}
+
+/* ⛔ **EL EXTREMO DERECHO NO ES `:last-child` A SECAS, Y ÉSA ES LA TRAMPA.** El
+   último segmento es «Dibujar recinto», que **nace `hidden`** y se esconde en la
+   rama PARCELA: un `:last-child` solo le daría el borde final a un botón
+   invisible, y el mando se vería con la esquina derecha en pico. El `:has()`
+   pregunta al DOM la única cosa que hace falta saber —«¿te sigue uno escondido?»—
+   y así no hay ningún estado en JavaScript que pudiera desincronizarse. Es el
+   mismo recurso que ya usa `.leaflet-control-layers label:has(…:checked)`. */
+.gml-app .gml-barra-mando > .gml-barra-herramienta:last-child,
+.gml-app .gml-barra-mando > .gml-barra-herramienta:has(+ [hidden]) {
+  border-top-right-radius: var(--radius);
+  border-bottom-right-radius: var(--radius);
+}
+
+/* El filete que divide los segmentos. Va en `box-shadow` y NO en `border-left`
+   porque el borde del botón ya tiene dueño: el `:hover` genérico lo pinta entero
+   para señalar la herramienta, y las dos declaraciones se pisarían. Con la sombra
+   interior el filete sobrevive a cualquier estado sin una sola regla que lo
+   restaure. Y un segmento escondido no pinta nada, así que el filete que sobra al
+   esconderse el dibujo se va con él sin que nadie lo gobierne. */
+.gml-app .gml-barra-mando > .gml-barra-herramienta + .gml-barra-herramienta {
+  box-shadow: inset 1px 0 0 var(--color-border-sub);
+}
+
+/* …salvo contra un segmento ARMADO, a cada lado: el relleno macizo ya es el
+   límite, y un filete encima se leería como una raya sobre el color. */
+.gml-app .gml-barra-mando > .gml-barra-herramienta[aria-pressed='true'],
+.gml-app .gml-barra-mando > .gml-barra-herramienta[aria-pressed='true'] + .gml-barra-herramienta {
+  box-shadow: none;
+}
+
+/* Señalar un segmento no dibuja su marco: dentro del mando eso sería una caja
+   dentro de otra a 1 px de distancia. Queda el relleno, que es lo que dice «estás
+   encima», y el filete divisorio no se mueve. (0,5,0) para ganar al `:hover`
+   genérico (0,4,0). */
+.gml-app .gml-barra-mando > .gml-barra-herramienta:hover:not(:disabled):not([aria-pressed='true']) {
+  border-color: transparent;
 }
 
 /* ── La PISTA (el globo que sustituye al `title` nativo) ─────────────────────
@@ -3830,17 +4461,53 @@ body {
   background: var(--color-bg-elevated);
 }
 
-/* (0,4,0): gana a la regla de `:hover` de arriba (0,3,0) por especificidad, así
-   que señalar el conmutador ENCENDIDO nunca lo hace parecer apagado. */
+/* ── ⭐ T6 · EL CHIP ENCENDIDO BAJA DE REGISTRO (2026-08-20) ──────────────────
+ *
+ * ⛔ **HASTA HOY ESTA REGLA PINTABA `--color-btn-primary-bg`, O SEA EXACTAMENTE
+ * LOS MISMOS PÍXELES QUE UN MODO ARMADO.** Medido en Chrome el 2026-08-20 con el
+ * ajuste puesto y «Insertar vértices» armado: los dos daban `rgb(3, 105, 161)`
+ * sobre blanco, mismo fondo y mismo color de icono. Y no son la misma cosa ni de
+ * lejos — son **dos contratos distintos**, que es la tesis entera del rework:
+ *
+ *   · **Ajuste al parcelario** = AJUSTE PERSISTENTE. Nace puesto
+ *     (`defaultChecked`), se queda puesto expediente tras expediente y no cambia
+ *     lo que hace el clic siguiente: cambia dónde CAE.
+ *   · **Insertar / Borrar / Dibujar** = MODO ARMADO. Dura lo que dura, es
+ *     excluyente y **sí** cambia lo que hace el clic siguiente.
+ *
+ * ⭐ **Y el argumento que decide cuál de los dos cede el bloque macizo no es de
+ * gusto: es de frecuencia.** El ajuste está encendido casi el 100 % del tiempo, y
+ * un bloque azul permanente compite por la atención con el estado que sí cambia y
+ * que sí hay que ver. El registro fuerte se le devuelve al que lo necesita.
+ *
+ * El acento suave se MEZCLA, no se inventa: es la misma receta de `.gml-via-marca`
+ * y de `::selection` —no hay token de «acento suave» en el sistema—, y el icono va
+ * en `--color-accent-hover` (sky-700) y no en `--color-accent` (sky-600) porque
+ * sobre un fondo tan claro el sky-600 se queda corto de contraste.
+ *
+ * (0,4,0): gana a la regla de `:hover` de arriba (0,3,0) por especificidad, así
+ * que señalar el conmutador ENCENDIDO nunca lo hace parecer apagado. */
 .gml-app .gml-barra-conmutador:checked + .gml-barra-conmutador-rotulo {
-  background: var(--color-btn-primary-bg);
-  border-right-color: var(--color-btn-primary-bg);
-  color: var(--color-btn-primary-fg);
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  border-right-color: var(--color-accent);
+  color: var(--color-accent-hover);
+  /* ⭐ **EL FILO DE 2 px ES LO QUE IMPIDE QUE ESTO SEA UN MATIZ, y está medido.**
+     El acento suave sobre el blanco de la barra da **1,23:1** —o sea que como
+     única señal de estado sería casi nada— y el icono en sky-700 sobre el chip da
+     4,82:1 frente a los 7,58:1 del apagado. Con las tres señales juntas —tinte,
+     tinta del icono y filo— el encendido se lee de un vistazo SIN que ninguna de
+     ellas sea un bloque de color, que es justo lo que hay que reservar para el
+     modo armado.
+     Y no es una invención de esta regla: es la MISMA receta con la que el peldaño
+     activo del topbar dice dónde estás (`.gml-rail-paso[data-rail-estado=activo]`
+     — «tres señales y ninguna es un bloque de color: el punto relleno, el rótulo a
+     600 y el filo de 2 px»). En esta app un filo de acento ya significa «éste está
+     puesto». */
+  box-shadow: inset 0 -2px 0 var(--color-accent);
 }
 
 .gml-app .gml-barra-conmutador:checked + .gml-barra-conmutador-rotulo:hover {
-  background: var(--color-btn-primary-bg-hover);
-  border-right-color: var(--color-btn-primary-bg-hover);
+  background: color-mix(in srgb, var(--color-accent) 26%, transparent);
 }
 
 /* `block` mata el hueco de línea base que deja un `<svg>` en línea y que, en un
@@ -6004,7 +6671,12 @@ button.gml-parte-nombre {
 .gml-dialogo-pegado-titulo,
 .gml-dialogo-avisos-titulo,
 .gml-dialogo-diccionario-titulo,
-.gml-dialogo-importacion-titulo {
+.gml-dialogo-importacion-titulo,
+/* La tarjeta de bienvenida NO es un `<dialog>` (ver su sección) pero su título es
+   el mismo tipo de título, así que entra aquí en vez de declarar el suyo: con el
+   presupuesto de la hoja a 0 B de holgura, un selector añadido a una regla que ya
+   existe cuesta 30 B y una regla nueva costaría 120. */
+.gml-bienvenida-titulo {
   margin: 0;
   font-size: var(--gml-titulo-tam);
   font-weight: var(--fw-semibold);

@@ -48,6 +48,8 @@ const leerFixture = (n) => readFileSync(join(RAIZ, 'test', 'fixtures', 'parsers'
 
 const UTM_DXF = leerFixture('UTM.dxf')
 const PARCELA_TXT = leerFixture('PARCELA.txt')
+/** F18 · el DXF que solo trae PUNTOS: 3 en dos capas, con su numeración al lado. */
+const PUNTOS_DXF = leerFixture('puntos_levantamiento.dxf')
 
 /**
  * Un anillo cuadrado en UTM 30N realista, ABIERTO. Está en Madrid, y **sigue
@@ -554,5 +556,156 @@ describe('dialogo-importacion · la elección produce la parcela correcta', () =
     expect(/no se puede elegir|no puedes elegir|todav[íi]a no/i.test(mensaje)).toBe(false)
     // Y lo exigido es que diga dónde se elige, que es lo que la fase 3 construyó.
     expect(/caj[óo]n/i.test(mensaje)).toBe(true)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// F18 · El levantamiento que solo trae PUNTOS
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// El caso que hasta hoy moría con «este fichero no trae ninguna polilínea»
+// teniendo dentro las 88 esquinas de la parcela. Lo que se blinda aquí es que la
+// pantalla lo OFRECE —porque una corrección que existe y no se puede aceptar es
+// exactamente el defecto que este diálogo vino a cerrar— y que el trazado propuesto
+// dice de dónde saca su orden.
+
+describe('dialogo-importacion · F18 · los puntos sueltos', () => {
+  const abrirPuntos = (opts) => {
+    dialogo = crearDialogoImportacion({ documento: document })
+    const resultado = importar(PUNTOS_DXF, opts)
+    const promesa = dialogo.abrir({ nombre: 'levantamiento.dxf', resultado })
+    return { promesa, nodo: dialogo.nodo, resultado }
+  }
+
+  it('⭐ un DXF de solo puntos ABRE la pantalla, y pregunta ESO y nada más', () => {
+    const r = importar(PUNTOS_DXF)
+    expect(r.resumen.construida).toBe(false)
+    expect(r.resumen.bloqueos).toContain(BLOQUEOS.SIN_GEOMETRIA)
+
+    const { decisiones, bloqueos } = decisionesDe(r)
+    expect(decisiones.map((d) => d.tipo)).toEqual([TIPO_DECISION.PUNTOS])
+    // ⛔ Y el bloqueo NO se enseña: tiene corrección, y está justo encima. Decir a
+    // la vez «vuelve a exportarlo desde el CAD» y «pulsa aquí para unir sus puntos»
+    // es la contradicción que esta casa ya pagó dos veces.
+    expect(bloqueos.map((b) => b.codigo)).not.toContain(BLOQUEOS.SIN_GEOMETRIA)
+    expect(hayQueDecidir(r)).toBe(true)
+  })
+
+  it('ofrece UNA opción por capa de puntos, con su recuento, y la de no unir', () => {
+    const { nodo } = abrirPuntos()
+    const valores = [...nodo.querySelectorAll('input[data-campo="puntos"]')].map((i) => i.value)
+    // Las dos capas del fichero real (2D y 3D) más el centinela de «no unirlos».
+    // ⚠️ **El centinela NO es la cadena vacía**, y no es cosmética: el `value` de
+    // las demás opciones ES el nombre de la capa, así que con `''` no se podía
+    // distinguir «no ha elegido nada» de «ha elegido no unirlos». Era inocuo
+    // mientras esa respuesta no producía nada; desde que produce, no lo es.
+    expect(valores).toEqual(expect.arrayContaining(['VER_P2D', 'VER_P3D', '@solo-puntos']))
+    expect(valores).not.toContain('')
+    expect(nodo.textContent).toContain('«VER_P2D»')
+  })
+
+  it('⭐ la tercera opción DEJÓ DE SER UN CALLEJÓN: dice qué entra y qué se hará', () => {
+    // Decía «No unirlos (no entrará ninguna parcela)» y era verdad: la nube se
+    // tiraba entera y el usuario acababa donde empezó. Ofrecer una salida que no
+    // lo es es peor que no ofrecer ninguna (lo midió F22).
+    const { nodo } = abrirPuntos()
+    expect(nodo.textContent).not.toMatch(/no entrará ninguna parcela/i)
+    expect(nodo.textContent).toMatch(/No unirlos: traer los 3 puntos de «VER_P2D»/)
+    expect(nodo.textContent).toMatch(/dibujar yo el recinto/i)
+  })
+
+  it('⭐ dice que el orden sale de la NUMERACIÓN, que es lo que permite revisarlo', () => {
+    const { nodo } = abrirPuntos()
+    expect(nodo.textContent).toMatch(/numerad/i)
+    expect(nodo.textContent).toMatch(/por su numeración/i)
+  })
+
+  it('⛔ «Importar» nace APAGADO: ninguna opción es un defecto seguro', () => {
+    // Las otras decisiones de esta pantalla tienen una: «no toques mi dato». Aquí
+    // las tres respuestas hacen algo distinto con la geometría que se va a firmar,
+    // y ninguna es la prudente: se pide que elija, con el motivo escrito al lado.
+    const { nodo } = abrirPuntos()
+    const boton = nodo.querySelector('[data-accion="importar-medicion"]')
+    expect(boton.disabled).toBe(true)
+    expect(nodo.querySelector('[data-estado="dialogo-importacion"]').textContent).toMatch(
+      /puntos/i,
+    )
+    expect([...nodo.querySelectorAll('input[data-campo="puntos"]')].some((i) => i.checked)).toBe(
+      false,
+    )
+  })
+
+  it('elegir una capa enciende el botón y resuelve con las DOS claves de importar()', async () => {
+    const { promesa, nodo } = abrirPuntos()
+    const dosD = [...nodo.querySelectorAll('input[data-campo="puntos"]')].find(
+      (i) => i.value === 'VER_P2D',
+    )
+    dosD.checked = true
+    dosD.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(nodo.querySelector('[data-accion="importar-medicion"]').disabled).toBe(false)
+    nodo.querySelector('[data-accion="importar-medicion"]').click()
+
+    // `capaPuntos` va SIEMPRE con `unirPuntos`: sin ella `importar()` volvería a
+    // elegir capa por su cuenta y podría no ser la que el usuario acaba de señalar.
+    await expect(promesa).resolves.toEqual({ unirPuntos: true, capaPuntos: 'VER_P2D' })
+  })
+
+  it('⭐ y con esa elección el fichero que salía VACÍO construye la parcela', async () => {
+    const { promesa, nodo } = abrirPuntos()
+    const dosD = [...nodo.querySelectorAll('input[data-campo="puntos"]')].find(
+      (i) => i.value === 'VER_P2D',
+    )
+    dosD.checked = true
+    dosD.dispatchEvent(new Event('change', { bubbles: true }))
+    nodo.querySelector('[data-accion="importar-medicion"]').click()
+
+    const definitivo = importar(PUNTOS_DXF, await promesa)
+    expect(definitivo.resumen.bloqueos).toEqual([])
+    expect(definitivo.resumen.construida).toBe(true)
+    expect(definitivo.parcela.recintos[0].vertices).toHaveLength(3)
+    expect(superficie(definitivo.parcela.recintos)).toBeGreaterThan(0)
+  })
+
+  it('⭐ «No unirlos» resuelve con `soloPuntos` y la capa que la etiqueta prometió', async () => {
+    const { promesa, nodo } = abrirPuntos()
+    const no = [...nodo.querySelectorAll('input[data-campo="puntos"]')].find(
+      (i) => i.value === '@solo-puntos',
+    )
+    no.checked = true
+    no.dispatchEvent(new Event('change', { bubbles: true }))
+    nodo.querySelector('[data-accion="importar-medicion"]').click()
+    // `capaPuntos` va también aquí: el recuento que la pantalla ha ofrecido es el
+    // de ESA capa, y sin decirla `importar()` volvería a elegir por su cuenta.
+    await expect(promesa).resolves.toEqual({ soloPuntos: true, capaPuntos: 'VER_P2D' })
+  })
+
+  it('⭐ y con esa elección los puntos ENTRAN, sin contorno y sin bloqueo', async () => {
+    const { promesa, nodo } = abrirPuntos()
+    const no = [...nodo.querySelectorAll('input[data-campo="puntos"]')].find(
+      (i) => i.value === '@solo-puntos',
+    )
+    no.checked = true
+    no.dispatchEvent(new Event('change', { bubbles: true }))
+    nodo.querySelector('[data-accion="importar-medicion"]').click()
+
+    const definitivo = importar(PUNTOS_DXF, await promesa)
+    expect(definitivo.resumen.bloqueos).toEqual([])
+    expect(definitivo.parcela.recintos).toEqual([])
+    expect(definitivo.parcela.puntosLevantamiento).toHaveLength(3)
+  })
+
+  it('⛔ una vez unidos, NO vuelve a preguntar: la segunda ronda ya trae contorno', () => {
+    // Sin esto el cableado daría vueltas: cada pasada volvería a ofrecer lo que
+    // acaba de aplicarse. Lo distingue `datos.aplicado` de la detección, igual que
+    // en X/Y invertidas y en los grados.
+    const ya = importar(PUNTOS_DXF, { unirPuntos: true, capaPuntos: 'VER_P2D' })
+    const { decisiones } = decisionesDe(ya)
+    expect(decisiones.map((d) => d.tipo)).not.toContain(TIPO_DECISION.PUNTOS)
+  })
+
+  it('⚠️ un DXF con polilíneas NO pregunta por sus puntos: ahí son cotas de replanteo', () => {
+    // Unirlos sería inventarse un contorno encima del que el fichero dibuja.
+    const { decisiones } = decisionesDe(importar(UTM_DXF))
+    expect(decisiones.map((d) => d.tipo)).not.toContain(TIPO_DECISION.PUNTOS)
   })
 })

@@ -374,6 +374,68 @@ de la barra se pintan desde `data-rail-estado` y hay un guardián que lo exige.
 ahorra un atributo `class` por `<tr>`. La prohibición es **de la barra**, no de la
 hoja — afirmarla sobre la hoja entera puso rojo un uso legítimo.
 
+### 8.4 · Icono o palabra: la decisión más cara, tomada tres veces
+
+> **Un icono solo vale si tiene respuesta a 120 ms. Con respuesta a 600 ms, no vale.**
+
+Esta aplicación ha ido y vuelto **dos veces** sobre lo mismo, y las tres versiones están
+fechadas en la cabecera de `viewer/barra-edicion.js` — que es donde vive la historia
+completa, con sus facturas medidas. Lo que se recoge aquí es solo la regla, porque la
+decisión no es de un módulo: es del producto.
+
+| | forma | qué la tumbó |
+|---|---|---|
+| hasta **2026-08-05** | iconos + `title` nativo | el `title` llega **al segundo**, o sea después de haber dudado |
+| **2026-08-05 → 08-10** | cada herramienta con su nombre escrito | la fila medía ~530 px y dejaba ~70 px de blanco muerto junto al panel de ayuda |
+| desde **2026-08-10** | iconos + **pista propia a 120 ms** | — |
+
+⭐ **Por qué la tercera no es la primera otra vez.** La objeción del autor nunca fue «no me
+gustan los iconos»: era que un imán en herradura o dos linderos con una flecha **hay que
+aprendérselos**, y el `title` no los enseña. La versión de hoy ataca esa objeción de frente
+—pista propia, 120 ms con el ratón y **0 ms con el teclado**— en vez de repetir la forma
+esperando otro resultado. Ése es el criterio que hay que aplicar la próxima vez que alguien
+proponga volver a las palabras: **no se discute icono contra palabra, se discute cuánto
+tarda en explicarse.**
+
+⚠️ **Y lo que esto NO resuelve, dicho sin maquillar:** la pista hay que **posarla**. El
+autor sigue marcando «no reconozco el icono» como dolor vivo (`TODOS.md`), y la forma de un
+control dice su CONTRATO —«esto es un modo»—, nunca su IDENTIDAD —«cuál de los tres»—. La
+salida ya pensada es rotular **las contextuales** y dejar en icono las del núcleo: lo que se
+ve poco no se aprende nunca, y hoy las raras son justo las que desaparecen.
+
+### 8.5 · Los cuatro contratos de un control, y por qué no pueden pintarse igual
+
+> **Dos controles que se pintan igual prometen lo mismo. Si no hacen lo mismo, es una
+> mentira, y da igual que cada uno por separado esté bien resuelto.**
+
+Escrito el 2026-08-20, después de que la barra de edición pasara meses con **dos contratos
+distintos pintados con el mismo `rgb(3, 105, 161)`** (medido, uno al lado del otro):
+
+| contrato | qué promete | cómo se pinta | ejemplos |
+|---|---|---|---|
+| **Acción** | se pulsa y sucede | botón normal; sin estado persistente | Deshacer, Quitar puntos |
+| **Ajuste persistente** | está puesto o quitado, y sigue puesto mañana | **acento suave**: tinte + tinta de acento + filo de 2 px | Ajuste al parcelario |
+| **Modo armado** | mientras dure, **el clic siguiente hace otra cosa** | **bloque macizo**, y rojo si destruye | Insertar, Borrar, Dibujar |
+| **Panel** | abre algo que hay que leer | `aria-expanded` + hundido | Ayuda, los dos desplegables |
+
+⭐ **Quién se queda el bloque macizo se decide por FRECUENCIA, no por importancia.** El
+ajuste al parcelario nace puesto y lo está casi el 100 % del tiempo: un bloque de color
+permanente compite por la atención con el estado que **sí** cambia. El registro fuerte es
+para lo transitorio.
+
+⚠️ **Y los modos excluyentes se agrupan.** Cuando varios controles se apagan entre sí —lo
+decide `viewer/edicion.js`, no el usuario—, esa exclusión tiene que verse **antes de
+pulsar**: un `role="group"` con marco compartido y filete entre segmentos. Nunca un
+`radiogroup`, porque el estado normal es **ninguno armado** y un radiogroup no sabe
+expresarlo sin inventarse una opción vacía.
+
+⛔ **El error que hay que reconocer, porque tenía un comentario que lo defendía.** La hoja
+justificaba los dos azules idénticos así: «se usan los mismos tokens porque dos maneras de
+pintar *esto está encendido* acabarían divergiendo». Suena a coherencia y era lo contrario
+— un ajuste que lleva puesto desde el expediente anterior y un modo que dura un minuto **no
+están encendidos en el mismo sentido**. Unificar la pintura de dos cosas que no son la misma
+no es un sistema de diseño: es una homonimia.
+
 ---
 
 ## 9 · Las reglas duras de la hoja
@@ -462,4 +524,6 @@ Se anota aquí para que no parezca resuelto:
 | Los guardianes de la hoja | `test/estilos/cascara.test.js` |
 | El presupuesto y su registro | `scripts/presupuesto-css.mjs` · `npm run build && npm run presupuesto` |
 | Apagado con motivo | `app/navegacion.js#evaluarPaso` · `app/salidas.js#evaluarSalida` |
+| Icono o palabra: la historia entera con sus facturas | cabecera de `viewer/barra-edicion.js` (§8.4 solo trae la regla) |
+| Los cuatro contratos, pintados | `estilos/app.css`, bloque `.gml-barra-*` · guardián en `test/estilos/cascara.test.js` |
 | Lo que solo se ve en un navegador | `scripts/smoke-navegador/GUION.md` |

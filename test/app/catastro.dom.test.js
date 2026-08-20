@@ -514,6 +514,26 @@ function crearMapaDoble() {
 }
 
 /**
+ * El mismo emisor, pero que además sabe decir a QUÉ ESCALA está — o sea el trozo
+ * de `L.Map` que mira la puerta de escala del clic (2026-08-18).
+ *
+ * `metrosPorPixel` de `app/cableado-catastro.js` no lee el zoom: le pide a Leaflet
+ * la distancia REAL entre las dos esquinas de abajo y la divide entre los píxeles
+ * de ancho. Aquí se falsifica esa cuenta directamente, que es lo que deja escribir
+ * la escala que se quiera sin montar un mapa.
+ *
+ * @param {number} metrosPorPixel  Lo que tiene que salir de la cuenta.
+ */
+function crearMapaConEscala(metrosPorPixel) {
+  const ANCHO_PX = 800
+  const mapa = crearMapaDoble()
+  mapa.getSize = () => ({ x: ANCHO_PX, y: 600 })
+  mapa.getBounds = () => ({ getSouthWest: () => 'SO', getSouthEast: () => 'SE' })
+  mapa.distance = (a, b) => (a === 'SO' && b === 'SE' ? metrosPorPixel * ANCHO_PX : NaN)
+  return mapa
+}
+
+/**
  * Cede el turno unas cuantas veces al bucle de microtareas.
  *
  * Hace falta porque entre `cargar()` y el `pedirTexto` del transporte hay VARIOS
@@ -1465,6 +1485,61 @@ describe('cableado-catastro · deducir con un clic en el mapa', () => {
     await Promise.resolve()
 
     expect(montado.transporte.emitidas).toBe(0)
+  })
+
+  // ── ⭐ LA PUERTA DE ESCALA (2026-08-18) ────────────────────────────────────
+  //
+  // El defecto: la vista de arranque de esta aplicación es España entera (zoom 6,
+  // ~1,5 km por píxel) y el clic consultaba igual. El Catastro contestaba bien —
+  // con la referencia de una finca que el usuario no había visto ni elegido—, así
+  // que no había ningún error que mirar. Lo destapó la revisión de diseño de la
+  // tarjeta de bienvenida: la tarjeta iba a enseñar «pincha el mapa» justo en el
+  // instante en que el gesto no podía funcionar.
+
+  it('⛔ demasiado lejos: NO consulta, y lo DICE', async () => {
+    // 1.500 m/px es la escala real del arranque (España entera). El umbral son 2.
+    const mapa = crearMapaConEscala(1500)
+    const montado = cablear({ mapa, parcelaInicial: parcelaSinReferencia() })
+
+    mapa.emitir('click', { latlng: latlngDentro })
+    await cederTurno()
+
+    expect(montado.transporte.emitidas).toBe(0)
+    // ⭐ Y ESTA MITAD IMPORTA IGUAL. Un gesto que no hace nada y no explica nada es
+    // el control apagado y mudo que esta aplicación se prohíbe — y en un gesto es
+    // peor que en un botón, porque no hay nada que se pueda «ver apagado».
+    expect(montado.renglon.textContent).toMatch(/acerca el mapa/i)
+    // No es un error de nadie: es una instrucción.
+    expect(renglonEnFallo(montado.renglon)).toBe(false)
+  })
+
+  it('lo justo de cerca: consulta como siempre', async () => {
+    // 1,9 m/px, por debajo de los 2 del umbral.
+    const mapa = crearMapaConEscala(1.9)
+    const montado = cablear({ mapa, parcelaInicial: parcelaSinReferencia() })
+
+    mapa.emitir('click', { latlng: latlngDentro })
+    await cederTurno()
+
+    expect(montado.transporte.emitidas).toBe(1)
+  })
+
+  it('⛔ un emisor que NO sabe de escala sigue deduciendo: el contrato es `on`/`off`', async () => {
+    // La prueba que defiende la decisión de `metrosPorPixel`: devuelve 0 —«no
+    // bloquees»— cuando el mapa no sabe contestar, en vez de `Infinity`. El
+    // contrato publicado de `opciones.mapa` es duck typing y solo exige `on` y
+    // `off`; con `Infinity`, este suelo de escala habría apagado la deducción por
+    // clic para todo emisor legítimo que no fuera un `L.Map`, en silencio y por la
+    // puerta de atrás. Es la primera prueba de arriba, repetida aquí a propósito
+    // para que se lea junto a su motivo.
+    const mapa = crearMapaDoble()
+    expect(mapa.getBounds).toBeUndefined()
+    const montado = cablear({ mapa, parcelaInicial: parcelaSinReferencia() })
+
+    mapa.emitir('click', { latlng: latlngDentro })
+    await cederTurno()
+
+    expect(montado.transporte.emitidas).toBe(1)
   })
 
   // ── ⭐ EL CASO DE LA APLICACIÓN VACÍA (2026-08-11) ──────────────────────────
@@ -2582,12 +2657,44 @@ describe('cableado-catastro · componerParcelaConOficial (la función pura)', ()
     expect(parcela.refcat).toBe(REFCAT)
   })
 
-  it('`camposInvariantes` son los dos que ningún compositor toca', () => {
+  it('`camposInvariantes` son los TRES que ningún compositor toca', () => {
     // El contrato de 4A: si esto crece, es que alguien ha unificado los compositores
     // duales, y entonces uno de los dos ejes se está pisando.
+    //
+    // ⭐ Creció UNA vez, el 2026-08-19, y con motivo: `puntosLevantamiento` no es
+    // geometría de la parcela ni cartografía del Catastro, así que no cae en
+    // ninguno de los dos ejes que los compositores se reparten. Son las dianas
+    // sobre las que el técnico está dibujando, y traer el parcelario de fondo no
+    // puede llevárselas.
     expect(camposInvariantes(parcelaMedida(2, { superficieRegistral: 7 }))).toEqual({
       idLocal: 'mi-levantamiento',
       superficieRegistral: 7,
+      puntosLevantamiento: [],
     })
+  })
+
+  it('⭐ traer el parcelario de fondo NO se lleva los puntos del levantamiento', () => {
+    // La trampa de F21 (`reconstruir` no arrastraba la precisión declarada y
+    // cualquier mutación la borraba en silencio), cazada antes de que muerda.
+    const nube = [
+      [439237, 4479655],
+      [439257, 4479675],
+    ]
+    const actual = { ...parcelaMedida(2), puntosLevantamiento: nube }
+    const traida = { recintos: parcelaMedida(2).recintos, areaValue: 100, localId: 'X' }
+
+    // Puerta 2 (conserva la medición) y puerta 1 (la sustituye): la primera tiene
+    // que conservarlos, y la segunda es un documento nuevo y empieza sin ellos.
+    const conservada = componerParcelaConOficial(actual, traida, {
+      refcat: '9398516VK3799G',
+      sustituir: false,
+    })
+    expect(conservada.puntosLevantamiento).toEqual(nube)
+
+    const sustituida = componerParcelaConOficial(actual, traida, {
+      refcat: '9398516VK3799G',
+      sustituir: true,
+    })
+    expect(sustituida.puntosLevantamiento).toEqual([])
   })
 })

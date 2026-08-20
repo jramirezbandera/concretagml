@@ -224,7 +224,7 @@ import OPERATIVOS_RAW from './operativos.json' with { type: 'json' }
  *   a «la diferencia entre estos dos puntos» sería un dedo señalando al
  *   aire. 12 px reutiliza el mismo orden de magnitud que ya usa este visor
  *   para «distancia mínima distinguible con el puntero»
- *   (`viewer/edicion.js#UMBRAL_PUNTERIA_PX`, también 12 px): es el suelo de
+ *   (`viewer/_comun.js#UMBRAL_PUNTERIA_PX`, también 12 px): es el suelo de
  *   resolución PERCEPTIVA de este mapa, no el suelo de caber-un-texto.
  *
  * ── F09 · informe (descripción literaria del lindero) ───────────────────────

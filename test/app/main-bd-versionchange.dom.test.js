@@ -109,7 +109,14 @@ vi.mock('../../viewer/index.js', async (importarOriginal) => {
           alCambiarSeleccion: () => () => {},
           modoBorrar: () => false,
           alCambiarModoBorrar: () => () => {},
+          // El modo insertar (2026-08-18): gemelo del de arriba, y por lo mismo.
+          modoInsertar: () => false,
+          alCambiarModoInsertar: () => () => {},
           fijarColindantes() {},
+          // Los puntos sueltos del levantamiento (2026-08-19). El doble solo tiene
+          // que EXISTIR: quien comprueba que se le pasan los buenos es
+          // `main-edicion.dom.test.js`.
+          fijarPuntos() {},
           desplazarSeleccion: () => ({ aplicado: false, modo: null, detecciones: [] }),
           activa: (v) => v,
         },
@@ -119,6 +126,7 @@ vi.mock('../../viewer/index.js', async (importarOriginal) => {
           dibujoEnCurso() {},
         },
         colindantes: { pintar() {}, limpiar() {}, destruir() {} },
+        puntosLevantamiento: { pintar() {}, limpiar() {}, destruir() {} },
         diagnostico: diagnosticoVivo,
         comprobacion: comprobacionViva,
         sobrante: sobranteVivo,

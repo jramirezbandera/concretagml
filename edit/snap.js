@@ -9,7 +9,7 @@
 //
 // Dos funciones y una separación deliberada entre ellas:
 //
-//   dianasDe({parcela, colindantes, excluir}) -> {vertices, segmentos}
+//   dianasDe({parcela, colindantes, puntos, excluir}) -> {vertices, segmentos}
 //   ajustar(punto, dianas, {tolerancia})      -> {punto, enganchado, tipo, distancia, t}
 //
 // El catálogo se construye UNA vez (en `dragstart`) y se consulta en CADA
@@ -202,9 +202,12 @@ function acumularRecintos(recintos, salida, recintoExcluido, indiceExcluido) {
 /**
  * Construye el catálogo de dianas contra las que engancha {@link ajustar}.
  *
- * **Tres fuentes, y este es su orden** (que además es el de prioridad en los
+ * **CUATRO fuentes, y este es su orden** (que además es el de prioridad en los
  * empates, ver {@link ajustar}):
  *
+ *   0. **`puntos`** — puntos sueltos IMPORTADOS, típicamente los `POINT` de un DXF
+ *      de levantamiento (`parsers/dxf.js#puntos`). Por defecto VACÍO. Añadidos el
+ *      2026-08-18; ver abajo por qué van los PRIMEROS y por qué no aportan lados.
  *   1. **`parcela.geometriaOficial`** — el parcelario oficial del Catastro. Es la
  *      diana principal: el caso de uso entero de F06 es «ajustar unos vértices
  *      sobre la parcela oficial» (spec F06, «Objetivo»).
@@ -215,6 +218,30 @@ function acumularRecintos(recintos, salida, recintoExcluido, indiceExcluido) {
  *      cuesta una petición al WFS y no se hace a espaldas de nadie.
  *   3. **`parcela.recintos`** — la propia geometría EDITABLE, menos el vértice
  *      que se está moviendo (ver `excluir`).
+ *
+ * ── `puntos`: POR QUÉ VAN LOS PRIMEROS, Y POR QUÉ NO APORTAN LADOS ──────────
+ * **No aportan segmentos, y no es una omisión: un punto suelto no tiene lado.**
+ * Inventarle uno —uniéndolo al siguiente del array, por ejemplo— sería decidir por
+ * el usuario en qué orden se unen sus puntos, que es justamente la decisión que la
+ * herramienta de dibujo existe para dejarle a él. Aquí solo entran como vértices.
+ *
+ * **Van delante del parcelario oficial, y ese orden es una postura.** Solo cambia
+ * algo en un EMPATE exacto —a distinta distancia manda la distancia, siempre— y en
+ * ese empate gana el punto medido. El motivo: estos puntos son el levantamiento
+ * del propio técnico, o sea el dato que dice dónde está la realidad; el parcelario
+ * oficial es la versión del Catastro, que es exactamente lo que una subsanación
+ * existe para corregir. Empatar y quedarse con la cifra que se quiere enmendar
+ * sería el orden al revés.
+ *
+ * Un elemento que no sea un par `[x, y]` finito **no lanza**: no entra en el
+ * catálogo y ya está (regla 1, rama del dato degenerado — un DXF puede traer
+ * cualquier cosa y eso no puede impedir arrastrar el vértice de al lado). Lo que sí
+ * lanza es que `puntos` no sea un array, que es contrato del programador.
+ *
+ * ⚠️ **Y llegan como pares `[x, y]`, no como los objetos del parser.**
+ * `parsers/dxf.js#puntos` devuelve `{capa, x, y, z}`; convertirlos es del llamante.
+ * Este módulo trabaja en pares UTM y no conoce ni capas ni cotas (regla 4), y
+ * meterle aquí el vocabulario del DXF ataría el snap a un formato de fichero.
  *
  * ── `excluir`: EL VÉRTICE **Y SUS DOS LADOS** ────────────────────────────────
  * Esto es lo delicado del módulo y lo primero que rompería un «simplificador»
@@ -251,17 +278,20 @@ function acumularRecintos(recintos, salida, recintoExcluido, indiceExcluido) {
  *   (`model/parcela.js#crearParcela`). `null`, sin `recintos` o sin
  *   `geometriaOficial` no es un error: aporta menos dianas, o ninguna.
  * @param {Array<{recintos?: Recinto[]}>} [args.colindantes=[]]  Parcelas vecinas.
+ * @param {Array<[number,number]>} [args.puntos=[]]  Puntos sueltos importados, en
+ *   UTM y como PARES. Aportan dianas de vértice y ninguna de segmento.
  * @param {RefVertice|null} [args.excluir=null]  Vértice que se está arrastrando.
  * @returns {Dianas}  Catálogo aplanado; `{vertices: [], segmentos: []}` si no hay
  *   geometría de la que sacar dianas.
- * @throws {TypeError}  Si `parcela` no es un objeto o `null`, si `colindantes` no
- *   es un array, o si `excluir` no tiene la forma `{recinto, indice}` de enteros ≥ 0.
+ * @throws {TypeError}  Si `parcela` no es un objeto o `null`, si `colindantes` o
+ *   `puntos` no son arrays, o si `excluir` no tiene la forma `{recinto, indice}`
+ *   de enteros ≥ 0.
  * @throws {RangeError} Si `excluir` apunta a un recinto o a un índice que no
  *   existe en `parcela.recintos`. No se absorbe: un `excluir` que no señala nada
  *   deja el vértice arrastrado enganchado a sí mismo, que es exactamente el bug
  *   que esta opción existe para evitar — y lo haría en silencio.
  */
-export function dianasDe({ parcela = null, colindantes = [], excluir = null } = {}) {
+export function dianasDe({ parcela = null, colindantes = [], puntos = [], excluir = null } = {}) {
   const FN = 'dianasDe'
 
   if (parcela !== null && parcela !== undefined) {
@@ -275,6 +305,12 @@ export function dianasDe({ parcela = null, colindantes = [], excluir = null } = 
     throw new TypeError(
       `${FN}: 'colindantes' debe ser un array de parcelas (las de ` +
         `services/catastro.js#parcelaYColindantes); recibido ${describir(colindantes)}.`,
+    )
+  }
+  if (!Array.isArray(puntos)) {
+    throw new TypeError(
+      `${FN}: 'puntos' debe ser un array de pares UTM [x, y] (los de ` +
+        `parsers/dxf.js#puntos, ya convertidos a pares); recibido ${describir(puntos)}.`,
     )
   }
 
@@ -319,6 +355,14 @@ export function dianasDe({ parcela = null, colindantes = [], excluir = null } = 
 
   const salida = { vertices: [], segmentos: [] }
 
+  // 0 · Puntos importados (2026-08-18). PRIMEROS a propósito —el empate lo gana lo
+  // medido, no lo oficial— y solo como VÉRTICES: un punto suelto no tiene lado.
+  // Se COPIA el par, como todo lo que sale de aquí (regla 2): quien reciba el
+  // catálogo no puede escribir por accidente en el array del importador.
+  for (const p of puntos) {
+    if (esPar(p)) salida.vertices.push([p[0], p[1]])
+  }
+
   // 1 · Parcelario oficial. Sin exclusión: es OTRA geometría (ver JSDoc).
   if (parcela) acumularRecintos(parcela.geometriaOficial, salida, -1, -1)
 
@@ -354,7 +398,9 @@ export function dianasDe({ parcela = null, colindantes = [], excluir = null } = 
  *
  * **2 · Dentro de cada clase, gana el más cercano; en un empate, el primero del
  * recorrido.** El orden del recorrido es el del catálogo, que
- * {@link dianasDe} construye siempre igual: oficial → colindantes → editable. Se
+ * {@link dianasDe} construye siempre igual: **puntos importados** → oficial →
+ * colindantes → editable (los puntos entraron el 2026-08-18, y van delante por el
+ * motivo que está escrito en `dianasDe`: en un empate manda lo medido). Se
  * compara con `<` estricto, de modo que un empate NUNCA reemplaza al ya elegido:
  * la misma entrada da siempre la misma salida, que es lo mínimo exigible a algo
  * que corre en cada fotograma. No se deduplican dianas idénticas (la parcela

@@ -415,15 +415,35 @@ function nodo(selector) {
  * demo es una parcela real, ya viene con `origen: WFS`, y editar un vértice
  * construye un objeto nuevo—. Se reutiliza ese, no un segundo criterio.
  *
+ * ── ⭐ LOS PUNTOS SUELTOS (2026-08-19) ─────────────────────────────────────
+ * `puntosLevantamiento` viaja aparte de `recintos` porque **no es geometría de la
+ * parcela**: son los `POINT` del DXF de campo, que sirven de enganche para dibujar
+ * encima (`edit/snap.js#dianasDe` los pone los primeros del catálogo). Una parcela
+ * puede tenerlos con **cero recintos** — es el estado en que se aterriza tras
+ * importar un levantamiento sin unir.
+ *
+ * ⚠️ **`null` NO significa «bórralos»: significa «este fichero no traía».** Un DXF
+ * de polilíneas no habla de puntos, y hacer que su llegada se llevara por delante la
+ * nube sobre la que el técnico está dibujando sería trabajo perdido en silencio, con
+ * el fichero puede que ya fuera del disco. Conservarlos es lo que hace
+ * `camposInvariantes` por la rama de abajo, y ahí está razonado. Lo que SÍ sustituye
+ * es un fichero que traiga puntos propios: ése habla del mismo asunto.
+ *
  * @param {object|null} actual  Lo que hay en el store, o `null`.
  * @param {Array<object>} recintos  Los recintos recién importados.
  * @param {object} args
  * @param {string} args.origen  Uno de `ORIGEN_PARCELA`.
  * @param {string|null} args.idLocalDemo  El `idLocal` del dataset de demostración.
  * @param {string} args.nombreFichero  Último recurso para el `idLocal`.
+ * @param {Array<[number,number]>|null} [args.puntosLevantamiento=null]  Los puntos
+ *   sueltos que traía ESTE fichero, o `null` si no traía ninguno.
  * @returns {object} Parcela
  */
-export function componerParcelaMedida(actual, recintos, { origen, idLocalDemo, nombreFichero }) {
+export function componerParcelaMedida(
+  actual,
+  recintos,
+  { origen, idLocalDemo, nombreFichero, puntosLevantamiento = null },
+) {
   const sigueEnDemo =
     !actual || (esTexto(idLocalDemo) && actual.idLocal === idLocalDemo)
 
@@ -435,6 +455,9 @@ export function componerParcelaMedida(actual, recintos, { origen, idLocalDemo, n
       refcat: null,
       recintos,
       geometriaOficial: null,
+      // La demostración se sustituye entera, así que aquí no hay nada que conservar:
+      // lo que no traiga el fichero se queda vacío.
+      puntosLevantamiento: puntosLevantamiento ?? [],
       origen,
     })
   }
@@ -451,6 +474,9 @@ export function componerParcelaMedida(actual, recintos, { origen, idLocalDemo, n
     // ⛔ INTACTA. Es toda la decisión de la fase en una línea.
     geometriaOficial: actual.geometriaOficial ?? null,
     superficieCatastral: actual.superficieCatastral ?? null,
+    // El fichero que trae puntos manda; el que no trae, deja los de
+    // `camposInvariantes` donde estaban. Ver el apartado de arriba.
+    ...(puntosLevantamiento === null ? {} : { puntosLevantamiento }),
     origen,
   })
 }
@@ -558,6 +584,13 @@ export function componerParcelaElegida(anillo, candidata, { origen, nombreFicher
   const recintos = [crearRecinto(anillo, TIPO_RECINTO.EXTERIOR)]
   const nombre = esTexto(candidata?.nombre) ? candidata.nombre : null
 
+  // ⚠️ **Sin `puntosLevantamiento`, y es una decisión.** Esta función no recibe
+  // `actual`: elegir una finca de un parcelario compone un documento NUEVO, así
+  // que empieza sin nube igual que la rama de demostración de
+  // {@link componerParcelaMedida}. Y el fichero que llega aquí tampoco los trae:
+  // un DXF de «Consulta Masiva» es todo polilíneas, así que `propuestaPuntos` es
+  // `null` y no hay puntos que arrastrar. Se dice porque el día que un parcelario
+  // venga con puntos, esta línea es donde hay que decidirlo.
   return crearParcela({
     // La referencia sirve de `idLocal` cuando la hay: es lo que identifica la finca
     // en todas las demás pantallas. Sin ella, el nombre del fichero, que es el
@@ -724,6 +757,10 @@ export function cablearMedicion({
       origen,
       idLocalDemo,
       nombreFichero: nombre,
+      // ⚠️ `null` y NO `[]` cuando el fichero no trae puntos: son dos cosas
+      // distintas —«no traía» y «traía cero»— y solo la primera conserva la nube
+      // sobre la que el técnico pueda estar dibujando. Razonado en el compositor.
+      puntosLevantamiento: resultado.puntos.length > 0 ? resultado.puntos : null,
     })
 
     estado.set(parcela)

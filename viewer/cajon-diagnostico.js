@@ -1695,8 +1695,9 @@ const CajonDiagnostico = L.Control.extend({
  *   NO es arbitrario: `topleft` la ocupa el control de zoom —y hasta el 2026-08-05
  *   también la barra de edición de F06, que hoy vive centrada en el borde inferior,
  *   en una quinta esquina que `viewer/barra-edicion.js` le añade a Leaflet—,
- *   `topright` el control de capas y `bottomright` el de opacidad **y** la
- *   atribución. `bottomleft` es la única esquina libre del visor.
+ *   `topright` el control de capas **y, desde el 2026-08-19, el de opacidad
+ *   apilado debajo** (se mudó para dejar de chocar con la barra de edición), y
+ *   `bottomright` la atribución. `bottomleft` es la única esquina libre del visor.
  * @param {((mensaje: string, detalle?: object) => void)|null} [opciones.alAvisar]
  *   Canal de aviso (regla de oro 1). Se resuelve y valida aunque no se use, que es
  *   el patrón obligatorio del visor.

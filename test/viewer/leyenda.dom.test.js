@@ -389,11 +389,26 @@ describe('viewer/leyenda.js · las muestras', () => {
     expect(muestra.style.backgroundImage).toContain(String(invasion.relleno))
   })
 
-  it('⛔ ninguna muestra se queda sobre BLANCO: hay colores que ahí no se ven', () => {
-    // Medido en navegador el 2026-08-15: `#CBD5E1` (parcelas colindantes) da 1,3:1
-    // sobre blanco, o sea un renglón con su texto y un hueco donde iba el grafismo.
-    // La banda de dos tonos es lo que lo arregla, y ninguna otra cosa lo haría —
-    // cualquier fondo PLANO deja fuera al claro o al oscuro. Ver `FONDO_MUESTRA`.
+  it('toda muestra tiene fondo propio: ninguna se queda sobre el blanco de la tarjeta', () => {
+    // ── ⛔ ESTA PRUEBA CAMBIÓ DE AFIRMACIÓN EL 2026-08-19 ──────────────────────
+    // Se llamaba «ninguna muestra se queda sobre BLANCO: hay colores que ahí no se
+    // ven» y defendía la BANDA DE DOS TONOS, que existía porque `#CBD5E1` (parcelas
+    // colindantes) da 1,3:1 sobre blanco — medido en navegador el 2026-08-15.
+    //
+    // La banda se retiró por decisión del autor, tomada con ese número delante:
+    // los dos grises de interfaz pegados por un filo duro se leían como un tema
+    // claro y uno oscuro en una aplicación que solo tiene modo claro.
+    //
+    // ⚠️ **Lo que la prueba NO puede seguir afirmando** es que todas las muestras se
+    // vean: la de colindantes no se ve, y eso está aceptado a sabiendas y escrito
+    // en `FONDO_MUESTRA`. Fingir aquí que sigue cubierto sería dejar un guardián
+    // verde sobre una promesa retirada — el mismo defecto que costó una semana de
+    // rojos falsos en el guion de humo 14.
+    //
+    // Lo que SÍ sigue siendo cierto, y es lo que se mide: cada muestra tiene fondo
+    // propio (`--color-bg-elevated`) y por tanto caja visible sobre la tarjeta, que
+    // es blanca. Sin eso, las muestras de área perderían además la prueba de que sus
+    // rellenos son translúcidos.
     const { raiz } = conLeyenda({ grupos: Object.values(GRUPO) })
     for (const entrada of ENTRADAS) {
       if (entrada.muestra === MUESTRA.ROTULO) continue // trae su propia pastilla oscura

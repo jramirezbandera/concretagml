@@ -34,9 +34,12 @@ import {
 } from '../../app/navegacion.js'
 import {
   ATRIBUTO_BARRA,
+  ATRIBUTO_DISPARADOR,
   ATRIBUTO_ESTADO,
+  ATRIBUTO_EXPEDIENTE_ESTADO,
   ATRIBUTO_IR_A_PASO,
   CLASE,
+  ESTADO_EXPEDIENTE,
   ESTADO,
   EXPEDIENTE_SIN_NOMBRE,
   EXPEDIENTE_VACIO,
@@ -446,6 +449,52 @@ describe('topbar · rebanada 2 · la zona de expediente', () => {
     p.poner(SIN_ARCHIVAR)
     expect(nombre()).toBe(EXPEDIENTE_SIN_NOMBRE.nombre)
     expect(nombre()).not.toBe('Linde norte')
+  })
+
+  /* ──────────────────────────────────────────────────────────────────────── *
+   * EL PUNTO DE ESTADO (2026-08-20)                                          *
+   *                                                                          *
+   * El rediseño de la zona le pone al nombre un punto de color delante, y el  *
+   * color lo elige `[data-expediente-estado]`. El riesgo que estos tres `it`  *
+   * cierran es el de siempre con dos canales para un mismo hecho: que el      *
+   * atributo y las palabras se separen y el punto acabe diciendo verde sobre  *
+   * un expediente sin archivar — que es la mentira cara de las dos, porque    *
+   * afirma que el trabajo está guardado. Por eso cada aserción mira el        *
+   * atributo Y la frase en el mismo `expect`.                                 *
+   * ──────────────────────────────────────────────────────────────────────── */
+
+  const marcaDeEstado = () =>
+    document
+      .querySelector(`[${ATRIBUTO_DISPARADOR}="expediente"]`)
+      .getAttribute(ATRIBUTO_EXPEDIENTE_ESTADO)
+
+  it('el punto dice VACÍO cuando la frase dice que no hay nada', () => {
+    cablear({ hechos: TODO })
+    expect(nombre()).toBe(EXPEDIENTE_VACIO.nombre)
+    expect(marcaDeEstado()).toBe(ESTADO_EXPEDIENTE.VACIO)
+  })
+
+  it('el punto dice SIN ARCHIVAR cuando la frase dice que hay trabajo suelto', () => {
+    const p = productor(SIN_ARCHIVAR)
+    cablear({ hechos: TODO, expediente: p.estado, suscribirExpediente: p.suscribir })
+    expect(nombre()).toBe(EXPEDIENTE_SIN_NOMBRE.nombre)
+    expect(marcaDeEstado()).toBe(ESTADO_EXPEDIENTE.SIN_ARCHIVAR)
+  })
+
+  it('⭐ y el punto viaja CON el nombre: archivar lo pone verde, borrar lo devuelve', () => {
+    const p = productor(SIN_ARCHIVAR)
+    cablear({ hechos: TODO, expediente: p.estado, suscribirExpediente: p.suscribir })
+    expect(marcaDeEstado()).toBe(ESTADO_EXPEDIENTE.SIN_ARCHIVAR)
+
+    p.poner(ARCHIVADO)
+    expect(nombre()).toBe('Linde norte')
+    expect(marcaDeEstado()).toBe(ESTADO_EXPEDIENTE.ARCHIVADO)
+
+    // ⛔ La vuelta es la mitad que importa: si el atributo se quedara en
+    // «archivado» tras borrar, el punto seguiría verde junto a «Sin guardar».
+    p.poner(SIN_ARCHIVAR)
+    expect(nombre()).toBe(EXPEDIENTE_SIN_NOMBRE.nombre)
+    expect(marcaDeEstado()).toBe(ESTADO_EXPEDIENTE.SIN_ARCHIVAR)
   })
 
   it('⛔ MITAD ANTI-VACUIDAD: sin el aviso del canal, la barra se queda rancia', () => {

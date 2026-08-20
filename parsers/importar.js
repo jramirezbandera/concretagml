@@ -112,6 +112,7 @@ import { parseLIST } from './list.js'
 import { parseTXT } from './txt.js'
 import { parseDXF } from './dxf.js'
 import { analizarReparto, rotularRecintos } from './topologia.js'
+import { ORDEN, propuestaDePuntos } from './levantamiento.js'
 import { crearDeteccion, declinar, SUJETOS, TIPO_DETECCION, SEVERIDAD } from './_comun.js'
 import {
   detectarHuso,
@@ -907,12 +908,110 @@ function contarDetecciones(detecciones) {
  *   nombre LITERAL. Es la oferta que resuelve `ANILLOS_EN_VARIAS_CAPAS`. Si la capa no existe
  *   en el fichero NO se lanza: se avisa nombrándola, no entra ningún anillo y el bloqueo pasa a
  *   ser `SIN_GEOMETRIA` — elegir mal una capa es una decisión sobre el dato, no un fallo del programa.
+ * @param {boolean} [opts.unirPuntos=false]  **F18.** Formar el contorno UNIENDO los
+ *   puntos sueltos del fichero, en el orden que diga `propuestaPuntos`. Sin esto la
+ *   propuesta se calcula y se ofrece, pero no se aplica: es el mismo baile de dos
+ *   pasadas que la capa, el huso y los grados. Solo tiene efecto si el fichero no
+ *   trae ninguna polilínea y hay al menos tres puntos distintos.
+ * @param {boolean} [opts.soloPuntos=false]  **F18 (2026-08-19).** La otra respuesta
+ *   a la misma pregunta: **no** unirlos, pero **sí** traerlos. Los puntos entran en
+ *   `puntos` y en `parcela.puntosLevantamiento` como dianas de enganche, la parcela
+ *   se construye con `recintos: []` y `SIN_GEOMETRIA` deja de bloquear. Excluyente
+ *   de hecho con `unirPuntos` —son dos opciones del mismo grupo de radio—; si
+ *   llegaran las dos, `unirPuntos` forma el anillo y esto no añade nada, porque
+ *   entonces los puntos YA son la geometría.
+ * @param {string} [opts.capaPuntos]  **F18.** Forzar de qué capa salen los puntos,
+ *   en vez de dejar que `parsers/levantamiento.js` elija la que más tiene. Elegir
+ *   una es obligatorio: el software de topografía escribe cada punto DOS veces, en
+ *   la capa 2D y en la 3D.
  * @returns {{ parcela: object|null, anillos: number[][][], capas: string[],
+ *   puntos: Array<[number,number]>,
  *   detecciones: import('./_comun.js').Deteccion[], resumen: ResumenImportacion }}
  *   `capas[i]` es la capa de `anillos[i]` (F11); ver `ResumenImportacion.capas`.
+ *   `puntos` son los sueltos que han ENTRADO con `soloPuntos` (pares UTM, de una
+ *   sola capa y sin repetidos); `[]` en todos los demás casos.
  * @throws {TypeError}   Si `texto` no es un string (error de programación).
  * @throws {RangeError}  Si `opts.formato`, `opts.huso` u `opts.capa` son inválidos (error de programación).
  */
+/**
+ * ⭐ **F18 · Lo que se le cuenta al usuario sobre los puntos sueltos.**
+ *
+ * Dice TRES cosas y las dice siempre en el mismo orden, porque son las tres que
+ * hacen falta para poder revisar el trazado antes de firmarlo:
+ *   1. **cuántos** puntos se han unido y de qué capa salen;
+ *   2. **de dónde sale el orden** — y aquí está el meollo: unir por la numeración
+ *      del topógrafo es reproducir el recorrido que caminó, y unir por el orden
+ *      del volcado es una conjetura razonable. Las dos sirven; presentarlas igual
+ *      sería mentir por omisión, así que la segunda **pide revisión en voz alta**;
+ *   3. **qué se ha descartado**, si algo (puntos repetidos o el cierre escrito).
+ *
+ * ⚠️ El sujeto viene declinado (F14): el MISMO importador lee el volcado de una
+ * parcela y el de una construcción, y contar esto sobre el objeto equivocado manda
+ * al técnico a buscar el problema donde no está.
+ *
+ * ⭐ **Y desde el 2026-08-19 hay un TERCER estado que contar, no dos.** La
+ * propuesta se ofrece, se acepta… o se declina quedándose los puntos (`traidos`).
+ * Ese tercer caso no habla de ningún contorno —no lo hay— así que no dice de dónde
+ * saldría el orden ni pide revisar un trazado que nadie ha trazado: dice qué ha
+ * entrado y con qué sirve. Redactarlo con las mismas tres partes que los otros dos
+ * habría producido la frase «se han unido por su numeración» sobre algo que no se
+ * ha unido, que es la contradicción de M28 de F11 en una línea.
+ *
+ * @param {import('./levantamiento.js').Propuesta} propuesta
+ * @param {boolean} aplicado  Si el anillo ha ENTRADO, o solo se ofrece.
+ * @param {object} sujeto  El de `parsers/_comun.js#declinar`.
+ * @param {boolean} [traidos=false]  Si los puntos han entrado SIN unirse.
+ * @returns {string}
+ */
+function mensajePuntos(propuesta, aplicado, sujeto, traidos = false) {
+  const { anillo, orden, capa, capaNumeros, descartados, numeros } = propuesta
+  const enCapa = capa ? ` de la capa «${capa}»` : ''
+
+  if (anillo === null) {
+    return (
+      `El fichero trae puntos sueltos${enCapa} pero no llegan a formar un recinto: hacen falta al ` +
+      `menos tres distintos. Se cargan como referencia para dibujar encima.`
+    )
+  }
+
+  const cuantos = `${anillo.length} punto${anillo.length === 1 ? '' : 's'}${enCapa}`
+
+  if (traidos) {
+    return (
+      `Han entrado ${cuantos} de tu levantamiento, sin unir. Todavía no hay contorno ` +
+      `${sujeto.genitivo}: dibújalo encima con «Dibujar recinto» — los puntos hacen de enganche, ` +
+      `así que los vértices caen exactos sobre lo medido.`
+    )
+  }
+
+  let porDonde = 'por el orden en que están en el fichero'
+  let revisar =
+    ' Este fichero no trae los números de punto, así que el orden es el del volcado: REVISA el ' +
+    'trazado antes de darlo por bueno.'
+  if (orden === ORDEN.NUMERACION) {
+    const rango =
+      Array.isArray(numeros) && numeros.length > 0
+        ? `, del ${numeros[0]} al ${numeros[numeros.length - 1]}`
+        : ''
+    porDonde = capaNumeros
+      ? `por su numeración (capa «${capaNumeros}»${rango})`
+      : `por su numeración${rango}`
+    revisar = ''
+  }
+
+  const perdidos =
+    descartados > 0
+      ? descartados === 1
+        ? ' Se ha descartado 1 punto repetido.'
+        : ` Se han descartado ${descartados} puntos repetidos.`
+      : ''
+
+  return aplicado
+    ? `El contorno ${sujeto.genitivo} se ha formado uniendo ${cuantos} ${porDonde}.${perdidos}${revisar}`
+    : `Este fichero no trae ninguna polilínea, pero sí ${cuantos}: se pueden unir ${porDonde} para ` +
+        `formar el contorno.${perdidos}${revisar}`
+}
+
 export function importar(texto, opts = {}) {
   if (typeof texto !== 'string') {
     throw new TypeError(`importar: se esperaba el volcado como string; recibido ${typeof texto}.`)
@@ -966,6 +1065,138 @@ export function importar(texto, opts = {}) {
 
   // 2) Arrastramos las detecciones del parser al informe final.
   const detecciones = [...res.detecciones]
+
+  // ── ⭐ F18 · 1bis) EL LEVANTAMIENTO QUE SOLO TRAE PUNTOS ──────────────────
+  //
+  // ⛔ **El caso que salía VACÍO, y en verde.** Cinco levantamientos reales del
+  // autor traen entre 26 y 88 `POINT` y CERO polilíneas: este orquestador los
+  // leía enteros y devolvía `SIN_GEOMETRIA`, o sea que la aplicación se
+  // comportaba como si el fichero no tuviera nada. Lo tenía todo — sin unir.
+  //
+  // Va AQUÍ, entre el despacho y el reparto por capas, y el sitio no es
+  // indiferente: el anillo que sale de los puntos tiene que recorrer TODO lo que
+  // recorre un anillo del fichero —el reparto, los grados, el cierre, el huso, la
+  // superficie, la topología— o sería geometría con menos garantías que la de al
+  // lado, entrando por la puerta de atrás.
+  //
+  // ── SE PROPONE SIEMPRE, SE APLICA SOLO SI LO PIDEN ────────────────────────
+  // La propuesta se calcula aunque nadie la haya pedido, porque es lo que permite
+  // OFRECERLA: `app/dialogo-importacion.js` la convierte en una decisión y el
+  // cableado vuelve a llamar aquí con `unirPuntos`, que es el mismo baile de dos
+  // pasadas que ya hacen la capa, el huso y los grados. Sin la propuesta en el
+  // primer resultado no habría nada que enseñar y el usuario solo leería que su
+  // fichero no trae geometría — que es exactamente la mentira que esto cierra.
+  //
+  // ⚠️ **Y solo cuando NO hay anillos.** Un DXF con polilíneas Y puntos de
+  // referencia es un plano normal, y ahí los puntos son cotas de replanteo, no el
+  // linde: unirlos sería inventarse un contorno encima del que el fichero dibuja.
+  const puntosCrudos = Array.isArray(res.puntos) ? res.puntos : []
+  const propuesta =
+    puntosCrudos.length > 0 && res.anillos.length === 0
+      ? propuestaDePuntos({
+          puntos: puntosCrudos,
+          rotulos: Array.isArray(res.rotulos) ? res.rotulos : [],
+          capa: typeof opts.capaPuntos === 'string' ? opts.capaPuntos : null,
+        })
+      : null
+  const unePuntos = opts.unirPuntos === true && propuesta !== null && propuesta.anillo !== null
+  // ── ⭐ LA OTRA MITAD DE LA MISMA PREGUNTA (2026-08-19) ────────────────────
+  //
+  // «No unirlos» era un callejón: se preguntaba, se contestaba, y la nube de
+  // puntos se tiraba entera —no salía de este fichero— así que el usuario leía
+  // «no ha entrado ninguna parcela» y se quedaba igual que antes de importar.
+  // **Ofrecer una salida que no lo es es peor que no ofrecer ninguna** (la lección
+  // que F22 midió con `ConsultaMasiva_ (90).dxf`).
+  //
+  // Con `soloPuntos` los puntos ENTRAN sin formar contorno: quedan como dianas de
+  // enganche (`edit/snap.js#dianasDe` los pone los primeros del catálogo) para que
+  // el técnico dibuje el linde encima con la herramienta de F18. Es la vía manual
+  // de lo que `unirPuntos` hace de un tirón, y por eso son opciones del MISMO
+  // grupo de radio y no dos preguntas.
+  //
+  // ⚠️ **Se entrega `propuesta.anillo`, no `puntosCrudos`, y no es pereza.** Ese
+  // array ya es (a) de UNA sola capa —el CAD escribe cada punto dos veces, en la
+  // 2D y en la 3D, y traer las dos daría cada diana duplicada y un recuento que
+  // miente— y (b) sin repetidos consecutivos ni el cierre escrito. El ORDEN que
+  // trae sobra aquí, pero no estorba: un catálogo de dianas no tiene orden. Y
+  // hace que la cifra que la pantalla ofreció («traer los 55 puntos de VER_P2D»)
+  // sea **exactamente** la que entra.
+  const soloPuntos = opts.soloPuntos === true && propuesta !== null && propuesta.anillo !== null
+  const puntosSueltos = soloPuntos ? propuesta.anillo.map((p) => [p[0], p[1]]) : []
+  if (unePuntos) {
+    // Se inyecta como un anillo más, con su capa y **SIN declararlo cerrado**.
+    //
+    // ⛔ **Lo segundo estuvo en `true` y lo corrigió una mutación que sobrevivió.**
+    // El razonamiento era: `propuestaDePuntos` ya quita el vértice de cierre
+    // repetido, así que no hay misclosure y preguntar por el cierre sería preguntar
+    // por algo que no existe. La primera mitad es cierta; la conclusión, no.
+    //
+    // El módulo solo quita el cierre **EXACTO**, y en campo el punto de cierre no
+    // se repite: se REMIDE. El topógrafo vuelve al punto 1 y le sale a 2 cm — el
+    // caso normal de una vuelta cerrada—, así que el anillo llega con un vértice
+    // espurio a 2 cm del primero. Con `true` eso se declara «arista dibujada» y la
+    // aplicación se traga un lado de 2 cm sin decir nada; con `false` cae en la
+    // banda ambigua y **se pregunta**, que es exactamente para lo que existe esa
+    // pregunta y ya estaba escrita desde F01.
+    //
+    // ⚠️ Y en el caso normal no cambia nada: con el primer y el último punto a
+    // metros de distancia, el cierre se lee como arista real y se cuenta en INFO,
+    // sin abrir ninguna pantalla. Se comprueba en `test/parsers/importar.test.js`.
+    res.anillos = [propuesta.anillo.map((p) => [p[0], p[1]])]
+    res.capas = [propuesta.capa ?? '']
+    res.cerrados = [false]
+  }
+  if (propuesta !== null) {
+    // La detección se emite SIEMPRE que hay puntos que unir —aplicada o no— y su
+    // `datos.aplicado` distingue las dos, igual que hacen SWAP_XY y GRADOS. Es lo
+    // que permite a la pantalla ofrecerla la primera vez y contarla la segunda.
+    // ⭐ **LA SEVERIDAD LA DECIDE DE DÓNDE SALE EL ORDEN, y esto lo destapó una
+    // prueba de punta a punta.** La regla de clasificación de la casa
+    // (`viewer/_comun.js#Avisar`) dice: operación aplicada tal cual → INFO;
+    // aplicada pero DEGRADADA → AVISO. Unir por la numeración del topógrafo es
+    // reproducir el recorrido que caminó, y eso no es degradado: es exacto. Unir
+    // por el orden del volcado es una CONJETURA razonable sobre el contorno de una
+    // finca que se va a firmar.
+    //
+    // ⛔ Y la diferencia no es de matiz: los consumidores publican en el panel
+    // AVISO y ERROR, y dejan las INFO en el renglón —son el diario del parser—.
+    // Con INFO, «he unido tus 88 puntos en el orden en que estaban, revísalo» se
+    // quedaba fuera de la pantalla. O sea que la única frase que permite revisar el
+    // trazado no llegaba a quien tiene que revisarlo.
+    //
+    // Solo cuando se APLICA: mientras es una oferta no ha pasado nada que revisar,
+    // y la pantalla que la ofrece ya lo dice en sus propias palabras.
+    const degradado = unePuntos && propuesta.orden === ORDEN.FICHERO
+    detecciones.push(
+      crearDeteccion(
+        TIPO_DETECCION.PUNTOS_UNIDOS,
+        mensajePuntos(propuesta, unePuntos, declinar(opts.sujeto), soloPuntos),
+        // ⭐ Traer los puntos sin unir se cuenta en AVISO y no en INFO, y no es
+        // por gravedad: es por DESTINO. Los consumidores publican AVISO y ERROR en
+        // el panel y dejan las INFO en el renglón del parser
+        // (`app/cableado-medicion.js#avisosDe` filtra todo lo que no sea AVISO o
+        // ERROR). Esta frase es la ÚNICA que le dice al técnico qué ha entrado y
+        // qué hacer a continuación, así que en INFO se quedaba fuera de la
+        // pantalla — el mismo defecto que ya se corrigió con el orden degradado,
+        // dos párrafos más arriba.
+        degradado || soloPuntos ? SEVERIDAD.AVISO : SEVERIDAD.INFO,
+        {
+          aplicado: unePuntos,
+          // Cuántos han entrado como dianas sin formar contorno. Es 0 cuando se
+          // unen (entonces son un anillo, y eso lo cuenta `nPuntos`) y 0 mientras
+          // la propuesta es solo una oferta.
+          traidos: puntosSueltos.length,
+          orden: propuesta.orden,
+          capa: propuesta.capa,
+          capaNumeros: propuesta.capaNumeros,
+          capasCandidatas: propuesta.capasCandidatas,
+          nPuntos: propuesta.anillo === null ? 0 : propuesta.anillo.length,
+          descartados: propuesta.descartados,
+          motivo: propuesta.motivo,
+        },
+      ),
+    )
+  }
 
   // 2bis) Reparto por capas (F11). Solo el DXF trae capas; LIST y TXT no tienen
   //   el concepto, así que se rellena con '' para que `capas` sea SIEMPRE un
@@ -1077,6 +1308,12 @@ export function importar(texto, opts = {}) {
     recintos = anillos.map((r, i) =>
       crearRecinto(r, i === 0 ? TIPO_RECINTO.EXTERIOR : TIPO_RECINTO.HUECO),
     )
+  } else if (soloPuntos) {
+    // ⭐ CERO recintos, y es un valor y no un hueco: el levantamiento traído sin
+    // unir tiene puntos y ningún contorno, y eso hay que poder decirlo. `null`
+    // significa aquí «no hay modelo que construir» —lo mira el paso 7— y con
+    // `soloPuntos` sí lo hay: una parcela con su nube y sin linde todavía.
+    recintos = []
   }
 
   // 6) Cotejo de superficie (valor añadido, solo LIST con Área reportada).
@@ -1224,7 +1461,14 @@ export function importar(texto, opts = {}) {
   )
   if (hayLineasPerdidas) bloqueos.push('LINEAS_NO_IMPORTADAS')
   if (anillos.length === 0) {
-    if (!hayLineasPerdidas) bloqueos.push('SIN_GEOMETRIA')
+    // ⭐ Con `soloPuntos` el usuario YA ha contestado a esto: sabe que su fichero no
+    // dibuja ningún contorno y ha pedido quedarse los puntos para dibujarlo él. El
+    // bloqueo se retira por el mismo motivo por el que `unirPuntos` lo hace
+    // desaparecer construyendo el anillo, y por el que la pantalla no lo enseña al
+    // preguntar (`app/dialogo-importacion.js`, bloque 1ter): decir a la vez «vuelve
+    // a exportarlo desde el CAD» y «aquí tienes tus 55 puntos» es la contradicción
+    // que esta casa ya pagó dos veces (M28 de F11, y los grados).
+    if (!hayLineasPerdidas && !soloPuntos) bloqueos.push('SIN_GEOMETRIA')
   } else {
     if (gradosCualquiera) bloqueos.push('COORDENADAS_EN_GRADOS')
     if (huso === null) bloqueos.push('HUSO_NO_RESUELTO')
@@ -1241,9 +1485,21 @@ export function importar(texto, opts = {}) {
     }
     if (sonDisjuntos) bloqueos.push('VARIOS_RECINTOS_DISJUNTOS')
   }
+  // ⚠️ **`recintos` puede ser `[]` y la parcela sigue siendo legítima**: es la que
+  // sale de un levantamiento traído sin unir, que tiene puntos y ningún contorno.
+  // `model/parcela.js` lo admite desde su primera línea (`recintos = []` es su
+  // valor por defecto) y quien decide si eso basta para abrir una pantalla es
+  // `app/navegacion.js`, con el hecho `puntos`. Aquí no se juzga: se construye lo
+  // que el fichero dio.
   const parcela =
     bloqueos.length === 0 && recintos
-      ? crearParcela({ idLocal, refcat, recintos, origen: res.origen })
+      ? crearParcela({
+          idLocal,
+          refcat,
+          recintos,
+          puntosLevantamiento: puntosSueltos,
+          origen: res.origen,
+        })
       : null
 
   // 8) Resumen para la UI (F03).
@@ -1262,7 +1518,19 @@ export function importar(texto, opts = {}) {
     detecciones: contarDetecciones(detecciones),
   }
 
-  return { parcela, anillos, capas, detecciones, resumen }
+  // ⚠️ **`propuestaPuntos` va aquí y NO en `resumen`, y lo decidió un guardián.**
+  // `test/edificio/entrada.test.js` exige que el resumen de `edificio/entrada.js`
+  // sea el ESPEJO exacto de éste, clave por clave: es lo que impide que las dos
+  // ramas acaben contando lo mismo con vocabularios distintos. Meterlo en el
+  // resumen obligaba a una de dos cosas, y las dos malas: romper ese espejo, o
+  // darle a la rama EDIFICIO un campo que hoy no usa nadie — que es exactamente
+  // el patrón «canal escrito y sin enchufar» que este proyecto ya se ha reprochado
+  // cuatro veces. Como dato del FICHERO que es, viaja al lado de `anillos`.
+  //
+  // La DETECCIÓN sí llega a las dos ramas, y es correcto: dice algo verdadero
+  // sobre el fichero —«no trae polilíneas pero sí N puntos»— y es INFO, así que no
+  // bloquea nada en la rama que todavía no sabe unirlos.
+  return { parcela, anillos, capas, puntos: puntosSueltos, detecciones, resumen, propuestaPuntos: propuesta }
 }
 
 export default importar

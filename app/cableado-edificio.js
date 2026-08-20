@@ -1250,9 +1250,23 @@ export function cablearEdificio({
       // El MISMO enganche que la edición: el dibujo no reimplementa el snap, que
       // es lo que `edit/dibujo.js` dejó escrito al nacer.
       ajustar: edicionActiva.ajustar,
+      // Su contrapartida: el indicador OSNAP se enciende también al PASAR el
+      // puntero, y ninguna de las cinco formas de terminar un dibujo pasa por un
+      // último `mousemove` que lo apagara. Sin esto se queda pintado.
+      alSoltarEnganche: () => edicionActiva?.soltarEnganche(),
       alCerrar: (recinto) => cerrarDibujo(recinto),
       alAvisar: (m, o) => panel.avisar(m, o),
     })
+    // ⛔ **EL BOTÓN SE QUEDABA PEGADO, Y ESTO LO ARREGLA (2026-08-18).** De las
+    // cinco formas de terminar un dibujo, este cableado solo se enteraba de UNA
+    // —cerrar bien, por `alCerrar`—. `Escape`, `Enter` con menos de tres vértices y
+    // el doble clic paraban el trazo dentro de `viewer/dibujo.js` sin avisar a
+    // nadie, así que la barra se quedaba diciendo «Cancelar dibujo» y con
+    // `aria-pressed="true"` sobre un dibujo que ya no existía: un mando que miente
+    // sobre lo que va a pasar al pulsarlo. El canal `alCambiar` nació en F18 —lo
+    // necesitaba la rama PARCELA, donde además hay una edición apagada que reponer—
+    // y aquí cuesta dos líneas.
+    dibujoActivo.alCambiar(() => refrescarBarra())
   }
 
   // ── Los fallos, cada uno contado donde ocurre ──────────────────────────────

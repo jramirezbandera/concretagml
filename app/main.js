@@ -526,6 +526,7 @@ import {
 } from '../edit/historial.js'
 import { metricas } from '../edit/metricas.js'
 import { area } from '../geo/area.js'
+import { husoPorSrs } from '../geo/huso.js'
 import { PERFIL, SEVERIDAD } from '../gml/_comun.js'
 import { descargarGml } from '../gml/descargar.js'
 import { NAMESPACE_INSPIRE_CATASTRO, NAMESPACE_INSPIRE_DEFECTO } from '../gml/ids.js'
@@ -554,6 +555,8 @@ import { crearEstadoVista, NIVEL } from '../viewer/_comun.js'
 // sentido con la rama EDIFICIO puesta, y meterlo en el visor obligaría a que el
 // visor supiera qué es una rama —que es exactamente lo que no sabe—.
 import { crearCajonContrasteEdificio } from '../viewer/cajon-contraste-edificio.js'
+import { MINIMO_VERTICES } from '../edit/vertices.js'
+import { crearDibujo } from '../viewer/dibujo.js'
 import { crearVisor } from '../viewer/index.js'
 // La leyenda SÍ sale por `viewer/index.js` (el visor la monta), pero sus GRUPOS
 // son un enumerado y hay que nombrarlos para encender y apagar renglones. Se
@@ -604,6 +607,7 @@ import {
   cablearExpediente,
   hayEdificio,
   hayGeometria,
+  hayPuntos,
 } from './cableado-expediente.js'
 import { cablearInforme } from './cableado-informe.js'
 import { cablearInformeEdificio } from './cableado-informe-edificio.js'
@@ -617,6 +621,7 @@ import {
 } from './demo-datos.js'
 import { cablearContraste } from './contraste.js'
 import { cablearEmpezarDeNuevo } from './empezar-de-nuevo.js'
+import { crearTarjetaBienvenida } from './tarjeta-bienvenida.js'
 import { PASO, crearNavegacion } from './navegacion.js'
 import { crearPanelEdificio } from './panel-edificio.js'
 import { cablearPantalla } from './pantalla.js'
@@ -1116,6 +1121,62 @@ export const MENSAJE_FALLO_INESPERADO =
   'fichero. El detalle técnico está en la consola del navegador.'
 
 /**
+ * ⭐ **LO QUE DICE EL RENGLÓN CUANDO NO HAY NINGUNA PARCELA** (2026-08-18).
+ *
+ * ── EL DEFECTO QUE RETIRA, MEDIDO EN NAVEGADOR ──────────────────────────────
+ * Hasta hoy, la aplicación recién abierta y **vacía** enseñaba en el panel una
+ * caja ROJA de 47,69 px que decía: *«1 error bloquea la generación del GML: La
+ * parcela no tiene ningún recinto: falta el contorno exterior.»* Está en la
+ * captura que el autor mandó el 2026-08-11 y en el apunte de `TODOS.md` sobre el
+ * chip que dice «0 errores» mientras el panel dice otra cosa.
+ *
+ * ⛔ **Y es la misma lección que esta aplicación ya aprendió con el eyebrow.**
+ * `EYEBROW_VACIO` existe porque decir «Parcela de demostración» sobre un store
+ * vacío «sería inventarse un dato». Esto era la misma frase con otra ropa: sobre
+ * un store vacío **no hay ninguna parcela a la que le falte el contorno**. La
+ * frase era literalmente cierta —`validarParcela([])` devuelve ese hallazgo, y
+ * hace bien— y a la vez decía algo falso: que hay un expediente con un defecto.
+ * Lo que hay es un expediente que todavía no ha empezado.
+ *
+ * ── LO QUE **NO** SE HACE, Y ES LA MITAD QUE IMPORTA ────────────────────────
+ * NO se calla. El botón «Generar GML» sigue apagado y el renglón sigue diciendo
+ * por qué, porque la regla de oro 1 no admite un control apagado y mudo. Lo que
+ * cambia es que deja de ser un ERROR (`esError: false`, o sea sin la caja roja) y
+ * pasa a decir lo único accionable que hay: elige una vía.
+ *
+ * ── ⚠️ EL EFECTO DE MAQUETA, QUE ES POR LO QUE ESTO SE ENCONTRÓ ─────────────
+ * La caja roja se llevaba **72 px** de la columna del panel —más que su propio
+ * alto, porque con ella se van sus márgenes—, y esos 72 px salían del sitio de la
+ * tercera vía de Entrada, que lleva desde el rework cayendo bajo el pliegue a
+ * 1280×720. Los dos apuntes abiertos de `TODOS.md` eran el mismo problema.
+ */
+export const MENSAJE_SIN_PARCELA_TODAVIA =
+  'Todavía no hay parcela. Empieza por una de las vías de arriba.'
+
+/**
+ * ⭐ **EL TERCER ESTADO DEL MISMO RENGLÓN (2026-08-19), y lo destapó el
+ * navegador.** Con un levantamiento de puntos importado SIN unir hay parcela
+ * —con su origen, su nube y su idLocal— y **cero recintos**, así que el renglón
+ * de arriba se enseñaba tal cual y decía dos cosas falsas a la vez: que no hay
+ * nada («todavía no hay parcela», con 55 puntos pintados en el mapa) y que la
+ * salida está «arriba», en una pantalla en la que el usuario ya no está.
+ *
+ * Es EXACTAMENTE la trampa que su gemelo vino a cerrar el 2026-08-18 —una frase
+ * literalmente derivable de `recintos.length === 0` que describe un expediente
+ * distinto del que hay en pantalla— repetida un estado más allá. El criterio no
+ * cambia: **no hay parcela ≠ la parcela está mal**, y ahora tampoco **no hay
+ * parcela ≠ la parcela todavía no tiene contorno**.
+ *
+ * Va sin caja roja, por lo mismo: no es un defecto del expediente, es el paso
+ * siguiente. Y dice **la herramienta por su nombre**, que es lo único accionable
+ * que hay aquí — la palabra «Dibujar recinto» está en la barra del mapa, a la
+ * vista, mientras se lee esto.
+ */
+export const MENSAJE_SIN_CONTORNO_TODAVIA =
+  'Tu levantamiento ha entrado, pero todavía no tiene contorno: dibújalo sobre los puntos con ' +
+  '«Dibujar recinto», en la barra del mapa.'
+
+/**
  * Gemelo del anterior para el momento de la ENTREGA. Se distingue a propósito:
  * aquí el GML SÍ se ha generado bien y lo que ha fallado es la descarga, así que
  * la acción que le toca al usuario es otra (reintentar, mirar los permisos del
@@ -1223,6 +1284,15 @@ export const SELECTOR_BOTON_OFFSET = '[data-accion="offset"]'
  * a explicar un motivo que no existe.
  */
 export const SELECTOR_BOTON_BORRAR = '[data-accion="borrar"]'
+
+/**
+ * El conmutador del MODO INSERTAR (2026-08-18), el noveno nodo del contrato que
+ * `viewer/barra-edicion.js` fabrica para este módulo. Es el espejo exacto de
+ * {@link SELECTOR_BOTON_BORRAR}: hasta hoy la barra tenía un modo para quitar un
+ * vértice y ninguno para ponerlo, y el gesto que lo ponía —doble clic sobre el
+ * lindero— solo se contaba en la tabla de la ayuda, detrás del botón «?».
+ */
+export const SELECTOR_BOTON_INSERTAR = '[data-accion="insertar-vertice"]'
 /** Renglón `role="status"` del bloque, gemelo del de «Generar GML». */
 export const SELECTOR_ESTADO_EDICION = '[data-estado="edicion"]'
 
@@ -1349,6 +1419,49 @@ const MENSAJE_PARCELA_NUEVA =
   'Parcela nueva: el historial de edición empieza de cero. «Deshacer» revierte tus ediciones de ' +
   'la geometría, nunca la parcela que has traído.'
 
+/**
+ * Se ha cerrado un recinto dibujado y no hay expediente donde meterlo. No debería
+ * ocurrir —a la pantalla de Edición no se llega sin parcela—, y por eso el texto
+ * no intenta enseñar nada: dice qué ha pasado con el trabajo, que es lo único que
+ * el usuario necesita en ese instante.
+ */
+const MENSAJE_DIBUJO_SIN_PARCELA =
+  'El recinto dibujado no se ha podido guardar: no hay ninguna parcela abierta. Empieza un ' +
+  'expediente y vuelve a dibujarlo.'
+
+/**
+ * Dibujar REEMPLAZA el exterior, y `recintos[0]` se lleva los huecos con él (la
+ * invariante del modelo, §4.3: solo el primero es EXTERIOR). Cuando había alguno,
+ * se dice **con su número**: es la cifra que se comprueba de un vistazo, y callarla
+ * sería perder trabajo en silencio.
+ *
+ * Es AVISO y no ERROR por la regla de clasificación de `viewer/_comun.js`: la
+ * operación que el usuario pidió SÍ se ha aplicado — con una pérdida que se cuenta.
+ * Y `Ctrl+Z` la revierte entera, porque el dibujo commitea como cualquier edición.
+ */
+const mensajeHuecosPerdidos = (n) =>
+  `El recinto dibujado sustituye al exterior de la parcela, así que ${
+    n === 1 ? 'se ha quitado el hueco que tenía' : `se han quitado sus ${n} huecos`
+  }. «Deshacer» (Ctrl+Z) lo devuelve todo.`
+
+/**
+ * ⛔ **«Borrar vértices» armado sobre una geometría que ya está en el mínimo.**
+ *
+ * Reportado con captura el 2026-08-19: un recinto de TRES vértices, la papelera
+ * roja —o sea armada, prometiendo— y «no me deja borrar por más que pincho». La
+ * aplicación tenía razón y lo estaba diciendo: quitar un vértice de tres deja un
+ * segmento, no un recinto, así que `edit/vertices.js` lo rechaza SIEMPRE. Pero lo
+ * decía **después** del gesto, en una tarjeta del panel plegado, y agrupada como
+ * «×6» — que es como seis intentos se leen como «1 error» en la cabecera.
+ *
+ * El defecto no era el rechazo: era **dejar armar un modo que no puede hacer nada
+ * ni una sola vez**. Regla de oro 1: un mando que no puede actuar va apagado y con
+ * el motivo escrito, no encendido esperando a que el usuario lo descubra pinchando.
+ */
+const MOTIVO_SIN_NADA_QUE_BORRAR =
+  'No hay ningún vértice que se pueda borrar: todos los recintos están en el mínimo de 3. Con dos ' +
+  'o menos deja de ser un recinto. Añade vértices, o quita el recinto entero.'
+
 /** Estado del offset cuando no hay ningún lindero elegido. */
 const MENSAJE_SIN_LADO = 'Sin lindero seleccionado: pincha uno en el mapa para poder desplazarlo.'
 /** …y cuando sí lo hay. */
@@ -1378,6 +1491,23 @@ const MENSAJE_BORRAR_ARMADO =
   'Modo borrar: cada clic sobre un vértice lo elimina. Escape para salir.'
 /** …y al desarmarlo, por cualquiera de sus tres caminos. */
 const MENSAJE_BORRAR_APAGADO = 'Modo borrar apagado: el clic vuelve a seleccionar linderos.'
+
+/**
+ * Los gemelos del modo INSERTAR (2026-08-18), y aquí el `role="status"` gana un
+ * cuarto camino que el de borrar no tenía: los dos modos son EXCLUYENTES, así que
+ * armar uno **apaga el otro sin que su botón haya recibido ningún clic**. Ése es el
+ * caso en el que un mensaje hablado vale de verdad — el usuario pulsó «Borrar» y lo
+ * que se apagó fue otra cosa, en otro punto de la barra.
+ *
+ * ⚠️ Desde hoy este renglón solo se VE cuando es un error (ver `anunciar`), así que
+ * estos dos textos son de lector de pantalla en la práctica. Se redactan igual de
+ * cuidados: quien no ve el mapa no tiene otra vía de saber qué hace el próximo clic.
+ */
+const MENSAJE_INSERTAR_ARMADO =
+  'Modo insertar: cada clic sobre un lindero le añade un vértice. Escape para salir.'
+/** …y al desarmarlo, por cualquiera de sus cuatro caminos. */
+const MENSAJE_INSERTAR_APAGADO =
+  'Modo insertar apagado: el clic vuelve a seleccionar linderos.'
 
 /**
  * El offset no se ha aplicado. NO se repite aquí el motivo: `viewer/edicion.js`
@@ -1785,6 +1915,28 @@ function dibujoEsLaOficial(parcelaActual) {
     }
   }
   return true
+}
+
+/**
+ * ⭐ **(2026-08-19) ¿Lo que ha entrado es un levantamiento SIN UNIR?** O sea: hay
+ * nube de puntos y todavía **ningún** contorno.
+ *
+ * Es el tercer destino del aterrizaje tras importar, y existe porque las otras dos
+ * preguntas del sitio —{@link dibujoEsLaOficial} y `aterrizarTrasContrastar`— dan
+ * la geometría por hecha. Con `recintos: []` la primera contesta `false` (no hay
+ * dibujo que comparar) y la segunda abriría el Diagnóstico de un contorno que no
+ * existe. El destino correcto es Edición: es donde están «Dibujar recinto» y el
+ * enganche a esos puntos, o sea la pantalla que convierte ese fichero en parcela.
+ *
+ * ⚠️ **Se pregunta por `hayGeometria` y no por `recintos.length`**, para que la
+ * definición de «hay contorno» siga saliendo de un solo sitio
+ * (`app/cableado-expediente.js`) y no de una segunda regla escrita aquí.
+ *
+ * @param {object|null} parcelaActual
+ * @returns {boolean}
+ */
+function soloPuntosSinRecinto(parcelaActual) {
+  return hayPuntos(parcelaActual) && !hayGeometria(parcelaActual)
 }
 
 /**
@@ -2415,6 +2567,136 @@ const visor = crearVisor(nodo('#mapa'), {
   alPrevisualizar: previsualizarMedidas,
 })
 
+// ── 5 bis · LOS PUNTOS SUELTOS DEL LEVANTAMIENTO (2026-08-19) ────────────────
+//
+// Un fichero de campo trae 88 `POINT` y cero polilíneas. Desde hoy se pueden
+// importar SIN unir y quedan de dianas para dibujar el linde encima.
+//
+// ⛔ **`viewer/edicion.js#fijarPuntos` llevaba desde el paso 9 de F18 escrito,
+// documentado y probado, y su ÚNICO llamante era su propia prueba.** El
+// enganche a lo medido existía en el catálogo de `edit/snap.js` y no había forma
+// de llegar a él desde la aplicación: es el patrón «canal escrito y sin
+// enchufar» que este proyecto ya se ha reprochado cuatro veces. Esto es el cable.
+//
+// ── POR QUÉ POR EL STORE Y NO EN EL GANCHO DE IMPORTACIÓN ──────────────────
+// Los puntos viven en el modelo (`parcela.puntosLevantamiento`), así que llegan
+// por MÁS puertas que la importación: recuperar un expediente guardado, abrir un
+// fichero de proyecto, deshacer con `Ctrl+Z`. Colgarlo del gancho de la medición
+// habría dejado las tres últimas sin puntos —sin verlos y sin engancharlos— y la
+// diferencia no se ve hasta que alguien intenta apuntar. Por el store se cubren
+// todas de una vez, que es lo mismo que ya hacen la ficha del pie y los hechos.
+//
+// ⚠️ **Las DOS llamadas van juntas y siempre**: `pintar` los enseña y
+// `fijarPuntos` los engancha. Separarlas es la forma de que un día se vea un
+// punto donde no se puede enganchar, o al revés.
+function repintarPuntosLevantamiento() {
+  const parcela = estado.get()
+  const puntos = Array.isArray(parcela?.puntosLevantamiento) ? parcela.puntosLevantamiento : []
+  visor.puntosLevantamiento?.pintar(puntos)
+  // `fijarPuntos` copia y tira su caché de dianas; pasarle el array del modelo
+  // —congelado— es seguro y es lo que garantiza que dibujo y enganche coincidan.
+  visor.edicion?.fijarPuntos(puntos)
+  // ⭐ **Y LA TERCERA SALIDA, desde F24**: el botón que los quita, con su cuenta.
+  // Va aquí y no en `cablearEdicion` —que es quien gobierna las otras seis
+  // herramientas de esa barra— por una razón que las otras seis no tienen: los
+  // puntos no dependen de la rama ni del paso, solo del store, y éste es el único
+  // suscriptor que ya los conoce. Meterlo allí habría hecho falta un segundo
+  // suscriptor al mismo store para la misma cifra, y dos cuentas del mismo dato
+  // divergen (la que se queda vieja es siempre la de la UI).
+  visor.barraEdicion?.puntosVisible?.(puntos.length)
+}
+
+/** Lo que se dice si alguien logra pulsar «Quitar los puntos» sin puntos. */
+export const MENSAJE_SIN_PUNTOS_QUE_QUITAR =
+  'No hay ningún punto de levantamiento que quitar: este expediente no trae ninguno.'
+
+/**
+ * Lo que se dice tras quitar la nube de puntos.
+ *
+ * ⚠️ **Nombra el atajo, y esa es la mitad del mensaje.** Lo que se acaba de borrar
+ * vino de un fichero que el usuario puede no tener a mano —el `.dxf` que le pasó el
+ * topógrafo—, así que decir solo «quitados» sería contar la pérdida sin contar la
+ * salida. El botón ya lo prometía antes del clic (ver `pistaQuitarPuntos`); esto lo
+ * confirma después, que es cuando hace falta de verdad.
+ *
+ * @param {number} cuantos
+ * @returns {string}
+ */
+export function mensajePuntosQuitados(cuantos) {
+  const sujeto = cuantos === 1 ? 'el punto suelto' : `los ${cuantos} puntos sueltos`
+  return `Quitado${cuantos === 1 ? '' : 's'} ${sujeto} del levantamiento. «Deshacer» (Ctrl+Z) los devuelve.`
+}
+
+/**
+ * Quita del expediente la nube de puntos del levantamiento (F24, 2026-08-19).
+ *
+ * ⛔ **EL HUECO QUE ESTO CIERRA.** Desde que un `.dxf` de puntos puede entrar sin
+ * unirlos, los puntos VIVEN EN EL MODELO: se guardan con el expediente, viajan en
+ * el fichero de proyecto y se vuelven a pintar cada vez que se recupera. En cuanto
+ * el contorno está dibujado encima dejan de servir para nada, y **no había forma de
+ * quitarlos**: la única era no haberlos importado. Con 88 puntos sobre una parcela
+ * ya cerrada eso es el mapa tapado para siempre.
+ *
+ * ⭐ **BORRA DE VERDAD, no esconde**, y es la decisión. Un conmutador de visibilidad
+ * habría dejado dos verdades —lo que hay en el modelo y lo que se ve— y habría
+ * obligado a apagar el enganche por su cuenta, porque un punto invisible al que se
+ * engancha el ratón es peor que un punto de más. Además esa segunda verdad no
+ * sobrevive a guardar y recuperar, así que la nube volvería a aparecer sola.
+ *
+ * ⭐ **Y ES REVERSIBLE PORQUE PASA POR EL MISMO CAMINO QUE TODO LO DEMÁS**: clon,
+ * `set`, y un `commit` DESPUÉS. `Ctrl+Z` lo deshace como cualquier edición, que es
+ * exactamente la red que hace admisible que un botón se lleve 88 puntos de un clic.
+ * (El mismo razonamiento —y el mismo orden de las tres líneas— que `cerrarDibujo`.)
+ *
+ * ⚠️ **No toca ningún otro campo**, y la copia es un `structuredClone` del
+ * expediente entero: es la lección de F21 por el otro lado —lo que allí se perdía
+ * era un campo que un compositor no arrastraba, y aquí se arrastra todo porque no
+ * se compone nada.
+ *
+ * ⚠️ **Se EXPORTA para poder probarla sin el botón**, y no es una comodidad: el
+ * botón lo fabrica `viewer/barra-edicion.js` en el momento del montaje, así que un
+ * test que rehaga la barra —cosa que el arnés de `main-edicion.dom.test.js` hace en
+ * cada `montar()`— se queda con un nodo que este oyente nunca vio. Lo que la
+ * aplicación garantiza es esta función; que el botón la alcance de verdad lo mide
+ * el navegador (`scripts/smoke-navegador/28-puntos-sueltos.js`), que es la única
+ * herramienta que ve el botón que el usuario pulsa.
+ *
+ * @returns {void}
+ */
+export function quitarPuntosLevantamiento() {
+  const actual = estado.get()
+  const puntos = Array.isArray(actual?.puntosLevantamiento) ? actual.puntosLevantamiento : []
+  if (puntos.length === 0) {
+    // No debería llegar —el botón está escondido sin puntos—, pero un clic que no
+    // hace nada y no lo dice es la regla de oro 1 rota por omisión.
+    panel.avisar(MENSAJE_SIN_PUNTOS_QUE_QUITAR, { nivel: NIVEL.AVISO })
+    return
+  }
+  const cuantos = puntos.length
+  const siguiente = structuredClone(actual)
+  siguiente.puntosLevantamiento = []
+  estado.set(siguiente)
+  commit(historial, siguiente)
+  panel.avisar(mensajePuntosQuitados(cuantos), { nivel: NIVEL.AVISO })
+}
+
+// El botón lo fabrica `viewer/barra-edicion.js` y vive en la barra del mapa, así
+// que se busca como «Dibujar recinto» —con `querySelector` y su guarda— y no por
+// el contrato de `nodo()`, que LANZA: un montaje sin visor (los dobles de test de
+// otros pasos) no tiene barra, y ahí no hay nada que cablear.
+{
+  const botonQuitarPuntos = document.querySelector('[data-accion="quitar-puntos"]')
+  if (botonQuitarPuntos !== null) {
+    botonQuitarPuntos.addEventListener('click', quitarPuntosLevantamiento)
+  }
+}
+
+estado.subscribe(repintarPuntosLevantamiento)
+// `subscribe` NO notifica al suscribirse (ver `crearEstadoVista`), y el arranque
+// puede traer ya una parcela con puntos —un expediente recuperado—: la primera
+// pasada se hace a mano, igual que con la ficha del pie.
+repintarPuntosLevantamiento()
+
 // ── 6 · Edición: historial, atajos y controles (F06 · T5.1) ──────────────────
 
 /**
@@ -2625,6 +2907,11 @@ function numeroTecleado(texto) {
  * @param {HTMLInputElement} [opciones.campoOffset]
  * @param {HTMLElement} [opciones.botonOffset]
  * @param {HTMLElement} [opciones.botonBorrar]
+ * @param {HTMLElement} [opciones.botonInsertar]  El conmutador del modo insertar
+ *   (2026-08-18), {@link SELECTOR_BOTON_INSERTAR}. Es el NOVENO nodo del contrato,
+ *   y como los ocho anteriores: si falta, `nodo` LANZA. No se ha hecho opcional a
+ *   propósito — un noveno que se pudiera omitir dejaría dos formas de montar la
+ *   barra, y la que se queda vieja es siempre la nueva.
  * @param {HTMLElement} [opciones.renglon]
  * @param {import('../viewer/barra-edicion.js').BarraMontada|null} [opciones.barra=null]
  *   `visor.barraEdicion`. **Opcional a propósito**: lo único que se le pide es
@@ -2644,6 +2931,9 @@ function numeroTecleado(texto) {
  *   alCambiarDocumento: (parcelaNueva: object) => void,
  *   alCambiarOficial: (parcela: object) => void,
  *   alColindantes: (resultado: object) => void,
+ *   mandoDeDibujo: (activo: boolean) => boolean,
+ *   alternarDibujo: () => boolean,
+ *   dibujando: () => boolean,
  *   destruir: () => void,
  * }}
  * @throws {TypeError}  Contrato del programador (ver arriba).
@@ -2653,6 +2943,13 @@ export function cablearEdicion({
   historial,
   edicion,
   panel,
+  // ── F18 · «Dibujar recinto» en la rama PARCELA (2026-08-18) ───────────────
+  // Los DOS o ninguno: sin mapa no hay dónde pinchar y sin `srs` no se sabe a qué
+  // huso convertir los clics. Faltando cualquiera, el resto del cableado funciona
+  // igual y lo único que no habrá es la herramienta — que es el caso real de un
+  // montaje sin visor (los dobles de test de otros pasos).
+  mapa = null,
+  srs = null,
   alContarColindantes = () => {},
   alSoltarColindantes = () => {},
   aplicarDeEdificio = () => false,
@@ -2664,6 +2961,7 @@ export function cablearEdicion({
   campoOffset = nodo(SELECTOR_CAMPO_OFFSET),
   botonOffset = nodo(SELECTOR_BOTON_OFFSET),
   botonBorrar = nodo(SELECTOR_BOTON_BORRAR),
+  botonInsertar = nodo(SELECTOR_BOTON_INSERTAR),
   renglon = nodo(SELECTOR_ESTADO_EDICION),
   barra = null,
   documento = document,
@@ -2688,27 +2986,231 @@ export function cablearEdicion({
     )
   }
 
+  // ── F18 · EL DIBUJO DE LA PARCELA ─────────────────────────────────────────
+  //
+  // ⭐ **Lo que esto cierra.** Desde F12 se puede dibujar un recinto vértice a
+  // vértice… pero solo en la rama EDIFICIO. En la de PARCELA, la única forma de
+  // que entrara geometría era traerla (Catastro, GML, DXF, pegado): con un
+  // levantamiento de PUNTOS SUELTOS —el fichero real del autor, 88 puntos y cero
+  // polilíneas— la aplicación tenía las dianas puestas (paso 9) y ninguna
+  // herramienta con la que unirlas. Es `viewer/dibujo.js` estrenando su segundo
+  // llamante, y por eso ese módulo no se reescribe para esto.
+  //
+  // ── POR QUÉ AQUÍ Y NO EN UN MÓDULO NUEVO ──────────────────────────────────
+  // Este cableado ya gobierna las otras cinco herramientas de la MISMA barra
+  // —snap, tolerancia, offset, borrar, insertar— y ya tiene las cuatro piezas que
+  // el dibujo necesita: el store, el historial, el panel y la edición. Un módulo
+  // aparte tendría que recibirlas todas y, sobre todo, **habría un segundo dueño
+  // de `barra.dibujoVisible` dentro de la misma rama**. Ya hay dos (uno por rama);
+  // tres es donde estas cosas empiezan a parpadear.
+  //
+  // ── LA EDICIÓN SE APAGA MIENTRAS SE DIBUJA, Y NO ES OPCIONAL ──────────────
+  // `viewer/dibujo.js` escucha `click` en el mapa; `viewer/edicion.js` TAMBIÉN
+  // —selecciona lindero, y con un modo armado borra o inserta un vértice—. Sin
+  // apagar la edición, el mismo clic que pone una esquina del recinto nuevo
+  // seleccionaría un lindero de la parcela vieja, y con «Borrar vértices» armado
+  // le borraría uno. `viewer/dibujo.js` lo dejó escrito al nacer («quien apaga eso
+  // es `app/`») y hasta hoy no lo hacía nadie: en la rama EDIFICIO las dos conviven
+  // porque allí el clic de la edición cae sobre OTRA geometría.
+  //
+  // ⚠️ Y `ajustar` sigue vivo con la edición apagada —`activa(false)` apaga los
+  // GESTOS, no el enganche—, que es justo lo que hace falta: se dibuja enganchando
+  // a los puntos importados.
+  const husoDibujo = srs === null ? null : husoPorSrs(srs)
+
+  /** @type {object|null} El dibujo vértice a vértice, o `null` si no hay mapa. */
+  let dibujoActivo = null
+  /** Si es ESTA rama la que puede dibujar ahora mismo. Lo empuja `app/main.js`. */
+  let mandoDibujo = false
+  /** Lo que valía `edicion.activa()` justo antes de empezar a dibujar. */
+  let edicionAntesDelDibujo = true
+
+  /**
+   * Deja la barra diciendo la verdad sobre el dibujo.
+   *
+   * ⚠️ **Escribe SIEMPRE, tenga el mando o no**, igual que hace la rama EDIFICIO:
+   * el que no lo tiene escribe `false`. Quien decide el ORDEN de las dos llamadas
+   * es el único sitio que conoce los dos ejes (ver `aplicarEdicion`). Callarse
+   * aquí dejaría el botón como lo hubiera dejado la otra rama.
+   */
+  function refrescarBarraDibujo() {
+    if (barra === null) return
+    barra.dibujoVisible?.(mandoDibujo && dibujoActivo !== null)
+    barra.dibujoEnCurso?.(dibujoActivo?.dibujando() === true)
+  }
+
+  /**
+   * El usuario ha cerrado un recinto dibujado sobre la parcela.
+   *
+   * ⛔ **REEMPLAZA el exterior, y con él los huecos.** Es la decisión del autor
+   * (2026-08-18) y es la misma semántica que la rama EDIFICIO, donde el recinto
+   * dibujado sustituye al de la parte activa. Lo que aquí se añade es **decirlo**:
+   * un hueco que desaparece sin una palabra es trabajo perdido en silencio, y el
+   * usuario no tiene por qué saber que `recintos[0]` arrastra a los demás.
+   *
+   * Pasa por el MISMO camino que las tres operaciones de `viewer/edicion.js`
+   * —clon, `set`, un `commit` DESPUÉS— así que `Ctrl+Z` lo deshace como cualquier
+   * otra edición. Ésa es la red que hace admisible reemplazar.
+   *
+   * @param {{vertices: Array<[number,number]>, tipo?: string}} recinto
+   */
+  function cerrarDibujo(recinto) {
+    const actual = estado.get()
+    if (actual === null || actual === undefined) {
+      // No hay expediente donde escribir. No debería llegar —la barra vive en la
+      // pantalla de Edición, a la que no se llega sin parcela—, pero tirar treinta
+      // clics en silencio sería exactamente lo que este proyecto no hace.
+      panel.avisar(MENSAJE_DIBUJO_SIN_PARCELA, { nivel: NIVEL.ERROR })
+      refrescarBarraDibujo()
+      return
+    }
+    const previos = Array.isArray(actual.recintos) ? actual.recintos : []
+    const huecos = Math.max(0, previos.length - 1)
+    const siguiente = structuredClone(actual)
+    siguiente.recintos = [recinto]
+    estado.set(siguiente)
+    // UN commit por operación acabada y DESPUÉS del `set`, como `aplicarRecintos`.
+    commit(historial, siguiente)
+    if (huecos > 0) panel.avisar(mensajeHuecosPerdidos(huecos), { nivel: NIVEL.AVISO })
+    refrescarBarraDibujo()
+  }
+
+  if (mapa !== null && husoDibujo !== null) {
+    dibujoActivo = crearDibujo({
+      mapa,
+      zona: husoDibujo,
+      // El MISMO enganche que el arrastre: el dibujo no reimplementa el snap. Y es
+      // lo que hace que dibujar sobre un levantamiento importado sea exacto y no
+      // aproximado — sus puntos son dianas desde el paso 9.
+      ajustar: edicion.ajustar,
+      // Su contrapartida: el indicador OSNAP se enciende también al PASAR el
+      // puntero, y ninguna de las cinco formas de terminar un dibujo pasa por un
+      // último `mousemove` que lo apagara. Sin esto se queda pintado.
+      alSoltarEnganche: () => edicion.soltarEnganche(),
+      alCerrar: cerrarDibujo,
+      alAvisar: (m, o) => panel.avisar(m, o),
+    })
+    // ⛔ El canal que `viewer/dibujo.js` estrenó para esto. De las cinco formas de
+    // terminar un dibujo solo UNA avisaba (cerrar bien); `Escape`, `Enter` corto,
+    // el doble clic y `destruir()` paraban en silencio. Sin esta suscripción, un
+    // `Escape` dejaría la edición apagada PARA SIEMPRE y el botón diciendo
+    // «Cancelar dibujo» sobre un dibujo que ya no existe.
+    dibujoActivo.alCambiar((dibujando) => {
+      if (!dibujando) edicion.activa(edicionAntesDelDibujo)
+      refrescarBarraDibujo()
+    })
+  }
+
+  /**
+   * Las nueve declaraciones del «oculto a la vista, presente para el lector de
+   * pantalla» (2026-08-18). Es la receta estándar, y **no es `display:none` ni
+   * `visibility:hidden`**: las dos sacan el nodo del árbol de accesibilidad, así que
+   * con cualquiera de ellas el `role="status"` dejaría de anunciar y este renglón se
+   * quedaría sin su única razón de seguir existiendo.
+   *
+   * Se escriben EN LÍNEA y no en `estilos/app.css` a propósito: esa hoja está en su
+   * techo de presupuesto con **0 B de holgura** (`scripts/presupuesto-css.mjs`), y
+   * meter aquí nueve declaraciones obligaría a un asiento para algo que no lo
+   * necesita — este estado lo escribe JS en cada llamada, no hay ningún selector que
+   * lo pueda expresar sin observar la clase desde la hoja.
+   */
+  const RENGLON_OCULTO = Object.freeze({
+    position: 'absolute',
+    width: '1px',
+    height: '1px',
+    margin: '-1px',
+    padding: '0',
+    border: '0',
+    overflow: 'hidden',
+    clipPath: 'inset(50%)',
+    whiteSpace: 'nowrap',
+  })
+
   /**
    * Escribe el renglón `role="status"`. Vacío + sin modificador es el estado «no
    * hay nada que contar»: el CSS lo colapsa (`.gml-accion-estado:empty`) y el
-   * bloque no da un salto de layout. Gemelo del `decir` de
-   * {@link cablearGeneracionGml}.
+   * bloque no da un salto de layout.
+   *
+   * 🏷️ **SE LLAMABA `decir` HASTA EL 2026-08-20**, y se renombró porque en este
+   * mismo fichero hay otro `decir` —el de {@link cablearGeneracionGml}— con una
+   * FIRMA DISTINTA: aquél lleva un tercer parámetro `esExito` y su segundo
+   * argumento es obligatorio. Dos funciones locales homónimas con contratos que
+   * no encajan es una trampa para quien busque por nombre, y desde F24 el
+   * renglón de la barra tiene además un hermano visible
+   * (`CLASE_BARRA.SITUACION`) del que hay que distinguirlo al leer. El nombre
+   * dice ahora lo único que hace esta: **anunciar por lector de pantalla**. El
+   * de `cablearGeneracionGml` conserva `decir` —escribe el pie del expediente,
+   * que sí se ve— y no se tocó.
+   *
+   * ⭐ **DESDE EL 2026-08-18 ESTE RENGLÓN SOLO SE VE CUANDO ES UN ERROR**, y ese es
+   * el cambio que pidió el autor al ver un texto flotando encima de la barra del
+   * mapa. El porqué, que no es de gusto:
+   *
+   *   · Por aquí pasan quince desenlaces de acciones que el usuario **acaba de hacer
+   *     con las manos sobre el mapa** —insertar, borrar, deshacer, desplazar, cambiar
+   *     la tolerancia—. Todas se ven en el propio mapa o en el propio control en el
+   *     mismo instante, así que el texto las contaba por segunda vez, encima del
+   *     mapa y a 400 px de donde estaba mirando el usuario.
+   *   · Un ERROR no se ve en ninguna otra parte: es la operación que **no** se
+   *     aplicó, o sea que no hay nada nuevo en el mapa que mirar. Esos siguen a la
+   *     vista, en rojo, con su `--error`.
+   *
+   * ⛔ **Y sigue anunciándose entero por lector de pantalla, los quince incluidos.**
+   * Ése es el motivo de que se oculte con {@link RENGLON_OCULTO} y no con
+   * `display:none`: quien no ve el mapa no tiene ninguna otra vía de enterarse de
+   * que el vértice se insertó. Vaciar el renglón habría sido dejar mudas quince
+   * acciones para exactamente los usuarios que más lo necesitan.
    *
    * @param {string} texto
    * @param {boolean} [esError=false]
    */
-  function decir(texto, esError = false) {
+  function anunciar(texto, esError = false) {
     renglon.textContent = texto
     renglon.classList.toggle(CLASE_ESTADO_ERROR, esError)
+    for (const [propiedad, valor] of Object.entries(RENGLON_OCULTO)) {
+      // Cadena vacía = «quita la declaración en línea» y devuelve el nodo a lo que
+      // diga la hoja, que es lo que tiene que pasar con un error: se ve como se ha
+      // visto siempre. Asignar el valor solo cuando toca dejaría el rastro puesto.
+      renglon.style[propiedad] = esError ? '' : valor
+    }
   }
 
   /**
    * El estado de los dos botones del historial, DERIVADO de la pila. Nunca se
    * les toca el `textContent` (llevan su `<kbd>` dentro).
    */
+  /**
+   * ¿Queda algún vértice que se pueda borrar?
+   *
+   * Se pregunta por ANILLO y no por la parcela entera, que es como lo decide
+   * `edit/vertices.js`: con un exterior de 3 y un hueco de 5, del hueco sí se puede
+   * quitar. Preguntar «¿tiene la parcela más de 3 vértices?» daría `true` en ese
+   * caso Y en el de dos recintos de tres, donde no se puede tocar ninguno.
+   *
+   * @param {object|null} parcela
+   * @returns {boolean}
+   */
+  function hayAlgoQueBorrar(parcela) {
+    const recintos = Array.isArray(parcela?.recintos) ? parcela.recintos : []
+    return recintos.some((r) => Array.isArray(r?.vertices) && r.vertices.length > MINIMO_VERTICES)
+  }
+
   function refrescar() {
     botonDeshacer.disabled = !puedeDeshacer(historial)
     botonRehacer.disabled = !puedeRehacer(historial)
+
+    // ── ⛔ «Borrar vértices» no se deja armar si no puede borrar NADA ─────────
+    // Ver {@link MOTIVO_SIN_NADA_QUE_BORRAR}: el defecto que esto cierra es un
+    // mando encendido que no podía actuar ni una vez, y que solo lo confesaba
+    // después del gesto y en un panel plegado.
+    const sePuedeBorrar = hayAlgoQueBorrar(estado.get())
+    botonBorrar.disabled = !sePuedeBorrar
+    // Y si estaba armado cuando la geometría bajó al mínimo —borrando vértices
+    // hasta dejarla en tres, que es el camino normal para llegar aquí—, se
+    // DESARMA: dejarlo rojo sobre un modo que ya no puede actuar es la misma
+    // mentira, solo que alcanzada por el otro lado.
+    if (!sePuedeBorrar && edicion.modoBorrar()) edicion.modoBorrar(false)
+    if (barra !== null) barra.borrarMotivo?.(sePuedeBorrar ? '' : MOTIVO_SIN_NADA_QUE_BORRAR)
   }
 
   /**
@@ -2758,7 +3260,7 @@ export function cablearEdicion({
     // pasado nada.
     if (instantanea === null) {
       refrescar()
-      decir(vacio)
+      anunciar(vacio)
       return false
     }
 
@@ -2767,17 +3269,17 @@ export function cablearEdicion({
         // Se devuelve el índice a donde estaba: la operación NO se ha deshecho.
         desnavegar(historial)
         refrescar()
-        decir(MENSAJE_OTRA_PARTE, true)
+        anunciar(MENSAJE_OTRA_PARTE, true)
         return false
       }
       refrescar()
-      decir(`${exito} ${COLA_ERA_DEL_EDIFICIO}`)
+      anunciar(`${exito} ${COLA_ERA_DEL_EDIFICIO}`)
       return true
     }
 
     estado.set(instantanea)
     refrescar()
-    decir(exito)
+    anunciar(exito)
     return true
   }
 
@@ -2817,7 +3319,7 @@ export function cablearEdicion({
     // atajo roto, y los dos casos son justo aquellos en los que el usuario no
     // tiene delante el botón gris que se lo contaría.
     if (hayDialogoModalAbierto(documento)) {
-      decir(MENSAJE_ATAJO_CON_DIALOGO, true)
+      anunciar(MENSAJE_ATAJO_CON_DIALOGO, true)
       // Y al panel además, porque el renglón está detrás del velo. Ver el bloque
       // de {@link MENSAJE_ATAJO_CON_DIALOGO}.
       panel.avisar(MENSAJE_ATAJO_CON_DIALOGO, { nivel: NIVEL.AVISO })
@@ -2826,7 +3328,7 @@ export function cablearEdicion({
     if (arrastrandoVertice) {
       // Sin panel: aquí no hay velo, el renglón se lee y el estado dura lo que
       // dura el gesto. Ver {@link MENSAJE_ATAJO_ARRASTRANDO}.
-      decir(MENSAJE_ATAJO_ARRASTRANDO, true)
+      anunciar(MENSAJE_ATAJO_ARRASTRANDO, true)
       return
     }
 
@@ -2853,7 +3355,7 @@ export function cablearEdicion({
   const alCambiarSnap = () => {
     const activo = casillaSnap.checked === true
     edicion.snapActivo(activo)
-    decir(
+    anunciar(
       activo
         ? `Ajuste al parcelario activado (${FORMATO_DECLARADO.format(toleranciaEnCm())} cm).`
         : 'Ajuste al parcelario desactivado: el arrastre no engancha a nada.',
@@ -2884,7 +3386,7 @@ export function cablearEdicion({
         `${FORMATO_DECLARADO.format(toleranciaEnCm())} cm.`
       if (alArrancar) console.warn(`[edicion] ${mensaje}`)
       else panel.avisar(mensaje, { nivel: NIVEL.AVISO })
-      decir(mensaje, true)
+      anunciar(mensaje, true)
       revertirTolerancia()
       return false
     }
@@ -2894,7 +3396,7 @@ export function cablearEdicion({
 
   const alCambiarTolerancia = () => {
     if (aplicarTolerancia()) {
-      decir(`Tolerancia de ajuste: ${FORMATO_DECLARADO.format(toleranciaEnCm())} cm.`)
+      anunciar(`Tolerancia de ajuste: ${FORMATO_DECLARADO.format(toleranciaEnCm())} cm.`)
     }
   }
 
@@ -2911,8 +3413,41 @@ export function cablearEdicion({
    * además sería contarlo dos veces por el camino del botón y una sola por los
    * otros tres.
    */
+  /**
+   * ⛔ **Y antes de nada, cancela el dibujo en curso** (2026-08-19).
+   *
+   * Desde F18 · paso 10 el dibujo APAGA la edición mientras dura —si no, el mismo
+   * clic pondría una esquina y además borraría un vértice—. La consecuencia que se
+   * escapó: con un trazo a medias, este botón seguía armando el modo borrar, así
+   * que el usuario se quedaba con la papelera ROJA y unos clics que no borraban
+   * nada **y que tampoco avisaban de nada**, porque `alClicMapa` sale antes de
+   * mirar el modo cuando la edición está apagada. Silencio absoluto, que es peor
+   * que el rechazo con motivo.
+   *
+   * Los tres —dibujar, borrar e insertar— secuestran el clic sencillo, así que son
+   * excluyentes por la misma razón por la que ya lo eran borrar e insertar entre
+   * sí: armados a la vez, el clic no tendría UN significado.
+   */
   const alPulsarBorrar = () => {
+    dibujoActivo?.cancelar()
     edicion.modoBorrar(!edicion.modoBorrar())
+  }
+
+  /**
+   * Pulsar «Insertar vértices» CONMUTA su modo. Gemelo exacto de
+   * {@link alPulsarBorrar} y con las mismas dos reglas: se lee el estado vigente del
+   * visor —no una copia local— y no se escribe aquí ni el renglón ni el
+   * `aria-pressed`, que son de la suscripción.
+   *
+   * ⭐ Y aquí la segunda regla deja de ser higiene y pasa a ser necesaria: como los
+   * dos modos son excluyentes, esta pulsación puede apagar el modo BORRAR. Pintar
+   * desde aquí dejaría al botón de la papelera pulsado y mintiendo, porque este
+   * `click` no es suyo. Empujando desde `alCambiarModoBorrar`, se apaga solo.
+   */
+  const alPulsarInsertar = () => {
+    // Gemelo del de borrar, y por lo mismo: ver {@link alPulsarBorrar}.
+    dibujoActivo?.cancelar()
+    edicion.modoInsertar(!edicion.modoInsertar())
   }
 
   // ── El offset ─────────────────────────────────────────────────────────────
@@ -2924,7 +3459,7 @@ export function cablearEdicion({
         `Distancia de desplazamiento: «${campoOffset.value}» no es un número de metros. No se ha ` +
         `movido ningún lindero.`
       panel.avisar(mensaje, { nivel: NIVEL.AVISO })
-      decir(mensaje, true)
+      anunciar(mensaje, true)
       // Aquí NO se revierte el campo, a diferencia de la tolerancia, y la razón
       // es que no hay ningún «valor vigente» al que volver: la distancia de un
       // offset no vive en el modelo, es lo que el usuario está escribiendo ahora.
@@ -2938,7 +3473,7 @@ export function cablearEdicion({
     // Las `detecciones` NO se publican otra vez: ya las ha soltado en el panel
     // `viewer/edicion.js`, verbatim y con el nivel que les toca. Ver
     // {@link MENSAJE_OFFSET_SIN_APLICAR}.
-    decir(
+    anunciar(
       aplicado
         ? `Lindero desplazado ${FORMATO_SUPERFICIE.format(metros)} m.`
         : MENSAJE_OFFSET_SIN_APLICAR,
@@ -2981,7 +3516,7 @@ export function cablearEdicion({
   function alCambiarDocumento(parcelaNueva) {
     reiniciar(historial, parcelaNueva)
     refrescar()
-    decir(MENSAJE_PARCELA_NUEVA)
+    anunciar(MENSAJE_PARCELA_NUEVA)
   }
 
   /**
@@ -3076,17 +3611,22 @@ export function cablearEdicion({
     edicion.fijarColindantes(recintos)
     alContarColindantes(vecinas.length)
 
-    const cuantas =
-      vecinas.length === 0
-        ? 'El Catastro no ha devuelto ninguna parcela colindante'
-        : vecinas.length === 1
-          ? '1 parcela colindante'
-          : `${FORMATO_ENTERO.format(vecinas.length)} parcelas colindantes`
-    decir(
-      vecinas.length === 0
-        ? `${cuantas}: el ajuste sigue enganchando solo a la parcela propia.`
-        : `${cuantas}: el ajuste engancha también a sus linderos.`,
-    )
+    // ⛔ **AQUÍ HABÍA UN `anunciar()`, Y SE RETIRÓ EL 2026-08-18. No volver a ponerlo
+    // sin leer esto.** Escribía en el renglón de la barra del mapa «2 parcelas
+    // colindantes: el ajuste engancha también a sus linderos», y era **el mismo
+    // hecho contado dos veces**: el desenlace de esta consulta ya lo escribe
+    // `app/cableado-catastro.js#colindantes` en `[data-estado="traer-colindantes"]`,
+    // que es el renglón `role="status"` PROPIO de «Traer colindantes» y que nació el
+    // 2026-08-16 exactamente para esto (su constante lo dice con estrella).
+    //
+    // O sea que de los dieciséis mensajes que pasaban por `anunciar` en este cableado,
+    // éste era el único que ya tenía casa en otro sitio — y encima el único que no
+    // contaba una acción del usuario sobre el mapa, sino el resultado de una
+    // consulta de red lanzada desde un botón del panel. Se queda donde se pulsa.
+    //
+    // Lo que NO se ha perdido: `fijarColindantes` de aquí arriba sigue dando las
+    // dianas al snap, y `alContarColindantes` sigue dejando la cuenta en el modelo.
+    // Lo único que se fue es la segunda copia del texto.
   }
 
   // ── Arranque ──────────────────────────────────────────────────────────────
@@ -3114,14 +3654,31 @@ export function cablearEdicion({
   campoTolerancia.addEventListener('change', alCambiarTolerancia)
   botonOffset.addEventListener('click', alPulsarOffset)
   botonBorrar.addEventListener('click', alPulsarBorrar)
+  botonInsertar.addEventListener('click', alPulsarInsertar)
 
   // El botón del offset sigue a la SELECCIÓN, que vive en `viewer/edicion.js` y
   // cambia con los clics del mapa: sin lado elegido no hay nada que desplazar.
   const bajaSeleccion = edicion.alCambiarSeleccion((ref) => {
     botonOffset.disabled = ref === null
-    decir(ref === null ? MENSAJE_SIN_LADO : MENSAJE_CON_LADO)
+    anunciar(ref === null ? MENSAJE_SIN_LADO : MENSAJE_CON_LADO)
+    // ⭐ **El renglón de SITUACIÓN de la barra (T2, 2026-08-19).** Es OTRO canal
+    // que el `anunciar` de arriba, y la diferencia es toda la tarea:
+    //
+    //   · `anunciar` escribe el `role="status"`, que **no se ve** —`RENGLON_OCULTO` lo
+    //     recorta a 1 px salvo que sea un error— y cuenta el CAMBIO, en pasado, al
+    //     lector de pantalla. Sigue igual que antes: no se le ha tocado una coma.
+    //   · esto escribe un renglón **visible** sobre la barra, en presente, que dice
+    //     en qué estado estás y se queda mientras dure. Va `aria-hidden` justo
+    //     porque el de arriba ya lo anuncia: sin eso, se oiría dos veces.
+    //
+    // La barra es OPCIONAL —hay montajes sin visor— y por eso el doble `?.`, igual
+    // que `barra?.borrarActivo?.()`. Sin barra no se pierde nada de lo de arriba.
+    barra?.ladoSeleccionado?.(ref !== null)
   })
   botonOffset.disabled = edicion.ladoSeleccionado() === null
+  // El estado inicial, por el mismo camino que el botón de al lado: sin esto la
+  // barra nacería diciendo «sin lindero» aunque se monte sobre una selección viva.
+  barra?.ladoSeleccionado?.(edicion.ladoSeleccionado() !== null)
 
   // ── El modo borrar: UN solo sentido de propagación ─────────────────────────
   // El botón PIDE (`alPulsarBorrar` → `edicion.modoBorrar(...)`) y la suscripción
@@ -3138,7 +3695,21 @@ export function cablearEdicion({
     // por parámetro —y no se busca por selector— porque `borrarActivo` es un método
     // del control de Leaflet, no un nodo.
     barra?.borrarActivo?.(activo)
-    decir(activo ? MENSAJE_BORRAR_ARMADO : MENSAJE_BORRAR_APAGADO)
+    anunciar(activo ? MENSAJE_BORRAR_ARMADO : MENSAJE_BORRAR_APAGADO)
+  })
+
+  // ── El modo insertar: lo mismo, y con un camino más ────────────────────────
+  // Idéntico al de arriba, y el argumento del sentido único se refuerza: a los tres
+  // caminos que este cableado no ve (`Escape`, salir de Edición, `destruir`) se suma
+  // un CUARTO que además es de la propia barra — **armar el modo borrar apaga éste**,
+  // y al revés, porque los dos se llevan el clic sencillo y no puede haber dos. O
+  // sea que pulsar un botón cambia el `aria-pressed` del OTRO. Pintar al pulsar
+  // dejaría siempre a uno de los dos mintiendo; con las dos suscripciones puestas,
+  // los dos botones se enteran de todo pase lo que pase.
+  const bajaModoInsertar = edicion.alCambiarModoInsertar((activo) => {
+    botonInsertar.setAttribute('aria-pressed', activo ? 'true' : 'false')
+    barra?.insertarActivo?.(activo)
+    anunciar(activo ? MENSAJE_INSERTAR_ARMADO : MENSAJE_INSERTAR_APAGADO)
   })
 
   // ⚠️ EL ARRANQUE DEL ENGANCHE LO MANDA EL HTML, y esto es lo que ata las dos
@@ -3191,6 +3762,55 @@ export function cablearEdicion({
     alColindantes,
 
     /**
+     * Dice si es ESTA rama la que puede dibujar ahora mismo. Gemelo de
+     * `cablearEdificio#edicion(bool)`, y lo empuja el mismo sitio: `aplicarEdicion`,
+     * el único que conoce a la vez el paso y la rama.
+     *
+     * Perder el mando **cancela el trazo en curso**. Un dibujo a medias que
+     * sobreviviera a un cambio de pantalla volvería a la vida sobre otra geometría,
+     * que es el accidente que el modo borrar ya tiene prohibido por escrito.
+     *
+     * @param {boolean} activo
+     * @returns {boolean}  Lo que ha quedado.
+     */
+    mandoDeDibujo(activo) {
+      mandoDibujo = activo === true
+      if (!mandoDibujo) dibujoActivo?.cancelar()
+      refrescarBarraDibujo()
+      return mandoDibujo
+    },
+
+    /**
+     * Empieza a dibujar el recinto de la parcela, o cancela el que iba. Es lo que
+     * hace el botón «Dibujar recinto» cuando el mando es de esta rama.
+     *
+     * @returns {boolean}  Si ha quedado dibujando.
+     */
+    alternarDibujo() {
+      if (dibujoActivo === null || !mandoDibujo) return false
+      if (dibujoActivo.dibujando()) {
+        dibujoActivo.cancelar()
+      } else {
+        // ⛔ La otra mitad de la exclusión (ver `alPulsarBorrar`): empezar a dibujar
+        // DESARMA los dos modos. Sin esto, el modo borrar sobreviviría al dibujo y
+        // volvería a estar vivo —con su botón rojo— en cuanto el trazo terminara,
+        // sobre una geometría que el propio dibujo acaba de reemplazar.
+        edicion.modoBorrar(false)
+        edicion.modoInsertar(false)
+        // Y el orden importa: se apaga la edición ANTES de enganchar los oyentes
+        // del dibujo, o el primer clic llegaría a las dos.
+        edicionAntesDelDibujo = edicion.activa() !== false
+        edicion.activa(false)
+        dibujoActivo.empezar()
+      }
+      refrescarBarraDibujo()
+      return dibujoActivo.dibujando()
+    },
+
+    /** ¿Se está dibujando sobre la parcela? Para el guion de humo y para el test. */
+    dibujando: () => dibujoActivo?.dibujando() === true,
+
+    /**
      * Retira los NUEVE oyentes —los siete de siempre más los dos del `mouseup`/
      * `pointerup` que cierran un arrastre huérfano (ver {@link arrastrandoVertice})—,
      * las dos bajas del visor (selección y modo borrar) y la del store. IDEMPOTENTE.
@@ -3206,9 +3826,16 @@ export function cablearEdicion({
       campoTolerancia.removeEventListener('change', alCambiarTolerancia)
       botonOffset.removeEventListener('click', alPulsarOffset)
       botonBorrar.removeEventListener('click', alPulsarBorrar)
+      botonInsertar.removeEventListener('click', alPulsarInsertar)
       bajaSeleccion()
       bajaModoBorrar()
+      bajaModoInsertar()
       bajaDelStore()
+      // `destruir` del dibujo PARA el trazo, y al parar emite su último `false`:
+      // la barra se limpia sola y la edición se repone. Por eso no hace falta
+      // esconder el botón a mano aquí.
+      dibujoActivo?.destruir()
+      dibujoActivo = null
     },
   }
 }
@@ -3222,6 +3849,14 @@ const edicionCableada = cablearEdicion({
   historial,
   edicion: visor.edicion,
   panel,
+  // ── F18 · las dos piezas de «Dibujar recinto» en esta rama ────────────────
+  // El MISMO `L.Map` que usa la rama EDIFICIO para lo suyo: las dos comparten la
+  // cartografía y nunca dibujan a la vez (lo garantiza `aplicarEdicion`).
+  mapa: visor.mapa,
+  // El mismo SRS del expediente que reciben el visor y las dos ramas. De él sale
+  // el huso al que se convierten los clics, por `geo/huso.js#husoPorSrs` — que es
+  // el único sitio del proyecto que sabe qué husos están implementados.
+  srs: SRS_DEMO,
   // Para que «Borrar vértices» diga «Salir del modo borrar» mientras está armado.
   // Puede ser `null` (visor montado con `edicion:{barra:false}`) y el cableado lo
   // admite: ver el JSDoc de `opciones.barra`.
@@ -4246,6 +4881,25 @@ export function cablearGeneracionGml({
       decir('', false)
       return
     }
+    // ⭐ NO HAY PARCELA ≠ LA PARCELA ESTÁ MAL (2026-08-18). El botón se apaga
+    // igual y el renglón sigue diciendo por qué —regla de oro 1—, pero sin la
+    // caja roja y sin hablar de un contorno que le falta a algo que no existe.
+    // El porqué entero, en {@link MENSAJE_SIN_PARCELA_TODAVIA}.
+    // La MISMA expresión que usa `validar` justo arriba, a propósito: si las dos
+    // divergen, una diría «no hay parcela» y la otra validaría algo.
+    if (((parcelaActual && parcelaActual.recintos) || []).length === 0) {
+      boton.disabled = true
+      // ⭐ Y SON DOS SITUACIONES, no una (2026-08-19). Sin recintos puede no haber
+      // NADA, o haber un levantamiento de puntos esperando a que se dibuje su
+      // linde. La segunda tiene parcela, tiene 55 puntos en el mapa y tiene una
+      // acción concreta que hacer, así que decirle «todavía no hay parcela» sería
+      // el mismo defecto que el mensaje de al lado vino a corregir.
+      decir(
+        hayPuntos(parcelaActual) ? MENSAJE_SIN_CONTORNO_TODAVIA : MENSAJE_SIN_PARCELA_TODAVIA,
+        false,
+      )
+      return
+    }
     bloquear(errores)
   }
 
@@ -4841,10 +5495,10 @@ expedienteCableado = cablearExpediente({
 /**
  * Los hechos de la rama PARCELA, para las guardas del rail.
  *
- * ⚠️ **Las dos primeras preguntas NO se responden aquí**: `hayGeometria` viene de
- * `app/cableado-expediente.js`, que es quien ya decidía qué cuenta como geometría
- * a la hora de guardar. Escribir aquí una segunda versión de esa regla la haría
- * divergir el día que una de las dos cambiara, y el síntoma sería un rail que
+ * ⚠️ **`geometria` y `puntos` NO se responden aquí**: `hayGeometria` y `hayPuntos`
+ * vienen de `app/cableado-expediente.js`, que es quien ya decidía qué cuenta como
+ * geometría a la hora de guardar. Escribir aquí una segunda versión de esa regla la
+ * haría divergir el día que una de las dos cambiara, y el síntoma sería un rail que
  * ofrece un paso que el pie no deja completar.
  *
  * `oficial` sí se lee del modelo directamente, y es deliberado: la pregunta
@@ -4869,6 +5523,9 @@ function hechosDeParcela(parcela) {
   return {
     geometria: hayGeometria(parcela),
     oficial: Array.isArray(parcela?.geometriaOficial) && parcela.geometriaOficial.length > 0,
+    // ⭐ El tercero (2026-08-19). Abre Edición cuando no hay recinto todavía: es el
+    // levantamiento de puntos sueltos, que se importa sin unir y se dibuja encima.
+    puntos: hayPuntos(parcela),
   }
 }
 
@@ -4905,6 +5562,11 @@ function hechosDeEdificio(edificio) {
   return {
     geometria: hayEdificio(edificio),
     oficial: hayHuellaOficial(edificio),
+    // ⛔ `false` SIEMPRE, y escrito y no omitido: `fundirHechos` obliga a que las
+    // dos ramas hablen el mismo vocabulario, y callarlo dejaría la clave a merced
+    // del valor por defecto. Esta rama dibuja sobre la parte activa y no importa
+    // nubes de puntos; el día que lo haga, esta línea es donde se entera.
+    puntos: false,
   }
 }
 
@@ -5224,6 +5886,14 @@ function aterrizarTrasContrastar() {
  */
 function deducirRefcatTrasImportar(parcela) {
   if (parcela && parcela.refcat) return
+  // ⭐ **SIN CONTORNO NO SE PREGUNTA (2026-08-19), y lo destapó el navegador.**
+  // La deducción busca un punto interior de la geometría y le pregunta al Catastro
+  // qué parcela hay ahí; con un levantamiento de puntos importado sin unir no hay
+  // polígono, así que `deducir()` contestaba con un AVISO —«no hay ninguna
+  // geometría cargada»— **sobre una importación que había ido bien**, y era el
+  // primero que el usuario leía. No es un fallo: es un paso que todavía no aplica,
+  // y un aviso que cuenta un paso inaplicable enseña a no leer los avisos.
+  if (!hayGeometria(parcela)) return
   if (catastroCableado === null || typeof catastroCableado.deducir !== 'function') return
 
   // El sello de ESTE documento. Se lee ahora y no dentro del `then`: leerlo allí
@@ -5473,8 +6143,35 @@ if (visor.edicion !== null && typeof visor.edicion.activa === 'function') {
   const aplicarEdicion = () => {
     const editando = navegacion.get().paso === PASO.EDICION
     const enEdificio = ramaCableada !== null && ramaCableada.get() === RAMA.EDIFICIO
-    visor.edicion.activa(editando && !enEdificio)
-    edificioCableado?.edicion(editando && enEdificio)
+    const mandaParcela = editando && !enEdificio
+    const mandaEdificio = editando && enEdificio
+
+    // ── ⭐ F18 · Y DESDE QUE LAS DOS RAMAS DIBUJAN, EL ORDEN IMPORTA ─────────
+    // «Dibujar recinto» es UN botón con DOS dueños, uno por rama, y los dos
+    // escriben siempre —el que no manda, `false`—. Eso es deliberado (callarse
+    // dejaría el botón como lo hubiera dejado el otro), pero convierte el ORDEN de
+    // estas dos llamadas en la decisión: **gana el último que escribe**, así que
+    // hay que llamar primero al que PIERDE el mando. Es el mismo problema que
+    // «Generar GML» resolvió con `mando()`, y se resuelve en el mismo sitio: aquí,
+    // que es el único que conoce a la vez el paso y la rama.
+    //
+    // Sin esto y con orden fijo, una de las dos conmutaciones deja el botón
+    // mintiendo: yendo a Parcela lo escondería el edificio justo después de que la
+    // parcela lo enseñara, y la herramienta sería invisible en la única rama que
+    // acaba de ganarla.
+    if (mandaParcela) {
+      edificioCableado?.edicion(false)
+      edicionCableada.mandoDeDibujo(true)
+    } else {
+      edicionCableada.mandoDeDibujo(false)
+      edificioCableado?.edicion(mandaEdificio)
+    }
+
+    // ⚠️ Y ESTO, EL ÚLTIMO. `mandoDeDibujo(false)` cancela el trazo en curso, y al
+    // cancelarlo el cableado REPONE la edición que había apagado para dibujar. Si
+    // `activa(...)` se escribiera antes, esa reposición sería la última palabra y
+    // dejaría la edición de la parcela encendida en una pantalla que no es Edición.
+    visor.edicion.activa(mandaParcela)
   }
   aplicarEdicion()
   navegacion.subscribe(aplicarEdicion)
@@ -5530,13 +6227,28 @@ gmlDeEdificio.alValidacion((validacion) => {
 //
 // Se cablea aquí y no en `viewer/barra-edicion.js` por lo mismo que «Deshacer» y
 // «Offset»: la barra FABRICA el botón y no sabe qué hace, y quien lo sabe es el
-// cableado de la rama. El botón nace ESCONDIDO —no apagado— y lo enseña
-// `cablearEdificio` cuando hay una parte elegida y esta rama tiene el mando.
+// cableado de la rama. El botón nace ESCONDIDO —no apagado— y lo enseña quien
+// tenga el mando: `cablearEdificio` cuando hay una parte elegida, y desde F18
+// también `cablearEdicion` en la rama PARCELA.
+//
+// ── ⭐ F18 · UN BOTÓN, DOS HERRAMIENTAS, Y EL REPARTO ESCRITO AQUÍ ──────────
+// El mismo botón dibuja el recinto de la parte activa en EDIFICIO y el exterior de
+// la parcela en PARCELA. No son la misma operación —escriben en stores distintos y
+// significan cosas distintas— pero son la misma PALABRA para el usuario, y por eso
+// comparten mando en vez de tener uno cada uno: dos botones «Dibujar recinto» en la
+// misma barra, uno de ellos siempre escondido, sería la barra explicando la
+// arquitectura interna.
+//
+// El reparto se decide en el instante del clic y no en el montaje, por lo mismo que
+// el destino de un `.dxf` soltado: la rama la elige el usuario después. Y se lee
+// `mandoDeParcela()`, que ya existe desde el paso 10 y es la MISMA condición que
+// gobierna «Generar GML» — una sola definición de «quién manda ahora».
 {
   const botonDibujar = document.querySelector('[data-accion="dibujar-recinto"]')
-  if (botonDibujar !== null && edificioCableado !== null) {
+  if (botonDibujar !== null) {
     botonDibujar.addEventListener('click', () => {
-      edificioCableado.alternarDibujo()
+      if (mandoDeParcela()) edicionCableada.alternarDibujo()
+      else edificioCableado?.alternarDibujo()
     })
   }
 }
@@ -5747,6 +6459,15 @@ const medicion = cablearMedicion({
   // El criterio es {@link dibujoEsLaOficial}, el mismo que M25 midió para la
   // cabecera: **que lo dibujado SEA la oficial**, no que exista una. El destino es
   // Edición, que es donde están la tabla de vértices y los CTA.
+  //
+  // ⭐ **Y HAY UN TERCER DESTINO desde el 2026-08-19: el levantamiento SIN UNIR.**
+  // Ese fichero entra con `recintos: []` y su nube de puntos, así que las dos ramas
+  // de arriba fallarían las dos: `dibujoEsLaOficial` es falso —no hay dibujo— y
+  // `aterrizarTrasContrastar` intentaría Diagnóstico sobre un contorno que no
+  // existe. El sitio al que hay que ir es Edición, que es donde están «Dibujar
+  // recinto» y el enganche a esos puntos: la pantalla que convierte ese fichero en
+  // una parcela. Se comprueba ANTES que las otras dos por eso mismo — es el único
+  // caso en que todavía no hay geometría, y las demás preguntas la dan por hecha.
   alCargarParcela: (parcela) => {
     edicionCableada.alCargarParcela(parcela)
     // Entra geometría nueva: la deducción de la ANTERIOR deja de valer. Se borra
@@ -5754,7 +6475,7 @@ const medicion = cablearMedicion({
     // de la parcela que se acaba de ir. Y sube el sello, que es lo que deja
     // superada la consulta que aquella importación pudiera tener en el aire.
     entraDocumentoNuevo()
-    if (dibujoEsLaOficial(parcela)) {
+    if (soloPuntosSinRecinto(parcela) || dibujoEsLaOficial(parcela)) {
       refrescarHechos()
       navegacion.navegarAPaso(PASO.EDICION)
     } else {
@@ -5896,3 +6617,102 @@ cablearEmpezarDeNuevo({
 requestAnimationFrame(() => {
   if (visor?.mapa) visor.mapa.invalidateSize()
 })
+
+// ── 18 · LA PRIMERA VISITA ───────────────────────────────────────────────────
+//
+// La tarjeta que cuenta qué es esto, cómo empezar, y —lo que de verdad justifica
+// el paso— que **pinchar el mapa rellena la referencia catastral**. Ese camino
+// existe desde F05 y no tiene ningún control que lo anuncie: hasta hoy vivía en la
+// segunda frase del apunte de una vía (`index.html:630`), que es mejor que nada y
+// menos que suficiente.
+//
+// Va LA ÚLTIMA del fichero a propósito. La condición de apertura mira los DOS
+// stores, y para que esa mirada valga algo tiene que ocurrir cuando ya ha pasado
+// todo lo que puede meter una parcela: el `?demo=`, el aterrizaje por `location.hash`
+// (paso 17) y cualquier expediente que se restaure. Montarla antes daría la
+// fotografía de un arranque que todavía no ha terminado de arrancar.
+//
+// El módulo NO escucha ni al mapa ni al store: los dos cierres automáticos se
+// cablean aquí abajo. Ver la cabecera de `app/tarjeta-bienvenida.js`.
+const bienvenida = crearTarjetaBienvenida({ documento: document })
+
+/**
+ * ⭐ **LA CONDICIÓN, Y SUS DOS MITADES.**
+ *
+ *   · **La llave.** Primera visita de este navegador.
+ *   · **Los dos stores vacíos.** Ésta es la mitad que se olvida, y es la que
+ *     impide que la tarjeta MIENTA. Su texto habla del mapa de España, así que
+ *     solo puede salir cuando el mapa mira a España — o sea cuando `encuadrar`
+ *     cae en `vistaInicial` por no haber geometría. Con un expediente restaurado,
+ *     con `?demo=` o con una URL que trae parcela, el mapa ya voló a ella y una
+ *     bienvenida encima sería una tarjeta describiendo una pantalla que no está.
+ *
+ * ⛔ Y cuando no se abre **la llave NO se escribe**: quien llegó por una URL con
+ * parcela no ha visto nada, así que sigue teniendo pendiente su primera visita.
+ */
+if (!bienvenida.yaVista() && estado.get() === null && estadoEdificio.get() === null) {
+  // Sin parcela no hay referencia, así que el gesto está siempre vivo en este
+  // camino. Se pasa explícito igual —y no por defecto— porque el día que esta
+  // condición cambie, el que la cambie tiene que ver esta línea.
+  const abrirBienvenida = () => bienvenida.abrir({ rama: ramaEnPantalla, puedeDeducir: true })
+
+  // ── ⚠️ NO SE ABRE EN EL PRIMER FOTOGRAMA, Y ES UNA DECISIÓN MEDIDA ────────
+  // `.gml-mapa` enseña de telón la retícula de puntos mientras cargan las teselas
+  // (ver la sección «Mapa» de `estilos/app.css`). Una tarjeta blanca flotando
+  // sobre esa retícula gris no se lee como una bienvenida: se lee como que la
+  // cartografía no ha cargado. Se espera al primer `load` de la capa base —la de
+  // verdad, la que `viewer/capas.js` tiene montada— y, si no llega, a 600 ms.
+  //
+  // Es una CARRERA y no una espera: el `load` puede no llegar nunca (sin red, o
+  // con el WMS caído), y en ese caso la tarjeta tiene que salir igual. Un camino
+  // que solo funciona con red sería peor que el problema que resuelve.
+  let yaAbierta = false
+  const abrirUnaVez = () => {
+    if (yaAbierta) return
+    yaAbierta = true
+    abrirBienvenida()
+  }
+  const base = visor?.capas?.bases?.get?.(visor.capas.baseActiva?.())
+  if (base && typeof base.once === 'function') base.once('load', abrirUnaVez)
+  setTimeout(abrirUnaVez, 600)
+
+  // ── Cierre 1 · el primer clic en el mapa ─────────────────────────────────
+  // El gesto que la retira es EL MISMO que enseña. Se lee, se prueba, y la ayuda
+  // se aparta sola justo cuando deja de hacer falta. Se marca la llave: quien ha
+  // ejecutado el gesto ya no necesita que se lo cuenten.
+  //
+  // ⚠️ `once` y no `on`: este oyente no tiene por qué sobrevivir a su único uso, y
+  // dejarlo puesto obligaría a retirarlo en algún sitio que hoy no existe.
+  if (visor?.mapa && typeof visor.mapa.once === 'function') {
+    visor.mapa.once('click', () => bienvenida.cerrar({ marcar: true }))
+  }
+
+  // ── Cierre 2 · entra una parcela por cualquier vía ───────────────────────
+  // ⛔ **ESTA MITAD NO ESTABA EN EL PLAN Y SIN ELLA HAY UN DEFECTO REAL.** Quien
+  // ignora la tarjeta, teclea una referencia y pulsa «Traer del Catastro» carga su
+  // parcela — y el mapa vuela a ella — con la bienvenida todavía encima. La
+  // tarjeta describe el arranque vacío: en cuanto el arranque deja de estar vacío,
+  // la tarjeta sobra. Es la misma regla de la condición de apertura, aplicada
+  // también DESPUÉS de abrir.
+  //
+  // Se marca la llave porque llegar aquí es haber empezado de verdad, y eso es
+  // exactamente lo que la tarjeta venía a conseguir. De paso cierra el flanco de
+  // «Empezar de nuevo», que recarga la página: sin marcar, quien carga una parcela
+  // y vacía volvería a ver la bienvenida como si fuera nuevo.
+  //
+  // Las dos suscripciones **se dan de baja en cuanto disparan**, y no es limpieza
+  // decorativa: sin la baja quedarían dos cierres vivos para siempre, y quien
+  // reabra la tarjeta desde «Cómo funciona» con una parcela en pantalla la vería
+  // cerrarse sola en la siguiente edición —cada operación de `edit/` publica un
+  // POJO nuevo—. O sea: una opción de menú que no hace nada, sin decir por qué.
+  //
+  // `crearEstadoVista#subscribe` NO notifica al suscribirse (está escrito en su
+  // contrato), así que esto no puede autodispararse con el estado que ya hay.
+  const bajas = []
+  const cerrarPorDato = (dato) => {
+    if (dato === null) return
+    bienvenida.cerrar({ marcar: true })
+    while (bajas.length) bajas.pop()()
+  }
+  bajas.push(estado.subscribe(cerrarPorDato), estadoEdificio.subscribe(cerrarPorDato))
+}

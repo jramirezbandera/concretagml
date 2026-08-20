@@ -1101,6 +1101,41 @@ describe('cableado-diagnostico · la puerta 2 · el botón', () => {
     expect(renglonFondo.textContent).toBe(MOTIVO_FONDO_SIN_GEOMETRIA)
   })
 
+  it('⛔ y el motivo SE RETIRA cuando deja de ser verdad, no se queda escrito', () => {
+    // ⛔ **EL DEFECTO QUE ESTO CIERRA (2026-08-19), y lo destapó el navegador.**
+    // La regla de esta capa —escribir el motivo solo con el renglón vacío— protege
+    // el desenlace de la última acción de ser borrado por el siguiente `set` del
+    // store. Le faltaba la vuelta: cuando la condición desaparecía, nadie retiraba
+    // la frase, así que el botón se ENCENDÍA con «está apagado porque…» escrito
+    // justo debajo — las dos mitades contradictorias a la vez, que es el defecto
+    // que esta casa ya ha pagado tres veces.
+    //
+    // Era inalcanzable hasta que el levantamiento de puntos sueltos abrió el
+    // camino: se entra en Edición sin contorno y se DIBUJA allí mismo.
+    const { botonFondo, renglonFondo, estado } = montar({
+      parcelaInicial: null,
+      catastro: crearCatastroConFondo(),
+    })
+    expect(renglonFondo.textContent).toBe(MOTIVO_FONDO_SIN_GEOMETRIA)
+
+    estado.set(parcelaSinOficial())
+    expect(botonFondo.disabled).toBe(false)
+    expect(renglonFondo.textContent).toBe('')
+  })
+
+  it('⚠️ pero un DESENLACE no se retira: no es un motivo de apagado', () => {
+    // La otra mitad, sin la cual el arreglo de arriba sería un `textContent = ''`
+    // a ciegas: «el Catastro no contesta» lo ha puesto un intento REAL del usuario
+    // y sigue siendo verdad cuando el store se mueve.
+    const { renglonFondo, estado } = montar({
+      parcelaInicial: parcelaSinOficial(),
+      catastro: crearCatastroConFondo(),
+    })
+    renglonFondo.textContent = MENSAJE_FONDO_ROTO
+    estado.set(parcelaSinOficial())
+    expect(renglonFondo.textContent).toBe(MENSAJE_FONDO_ROTO)
+  })
+
   it('se ENCIENDE con geometría propia, aunque no haya parcelario todavía', () => {
     // Es el estado que motiva la feature: un .dxf recién importado.
     const { botonFondo } = montar({

@@ -55,14 +55,16 @@ import { RAMA as RAMA_DESDE_RAMA, RAMAS as RAMAS_DESDE_RAMA } from '../../app/ra
 
 const RAIZ = join(import.meta.dirname, '..', '..')
 
-/** Todas las combinaciones de los tres hechos: 2³ = 8. Escrito así y no a mano
- *  para que añadir un hecho a {@link CLAVES_HECHOS} amplíe la rejilla solo. */
+/** Todas las combinaciones de los hechos: 2^n. Escrito así y no a mano para que
+ *  añadir un hecho a {@link CLAVES_HECHOS} amplíe la rejilla solo — y el
+ *  2026-08-19 lo hizo: con `puntos` volvieron a ser tres, o sea 8. */
 const COMBINACIONES_DE_HECHOS = Array.from({ length: 2 ** CLAVES_HECHOS.length }, (_, mascara) =>
   Object.fromEntries(CLAVES_HECHOS.map((clave, i) => [clave, Boolean(mascara & (1 << i))])),
 )
 
-/** Las 16 situaciones posibles. Eran 32 hasta el 2026-08-07, cuando el eje MODO
- *  se retiró: ver la cabecera de `app/navegacion.js`. */
+/** Las situaciones posibles: combinaciones × ramas. Fueron 32 hasta el
+ *  2026-08-07 (el eje MODO se retiró), 8 desde el 2026-08-08 (se fue el hecho
+ *  `diagnostico`) y son **16** desde el 2026-08-19, con el hecho `puntos`. */
 const SITUACIONES = RAMAS.flatMap((rama) =>
   COMBINACIONES_DE_HECHOS.map((hechos) => ({ rama, hechos })),
 )
@@ -154,7 +156,7 @@ describe('T1 · el módulo no toca el DOM', () => {
 })
 
 describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
-  it('Entrada está disponible SIEMPRE, en las 32 situaciones', () => {
+  it('Entrada está disponible SIEMPRE, en todas las situaciones', () => {
     for (const situacion of SITUACIONES) {
       expect(evaluarPaso(PASO.ENTRADA, situacion)).toEqual({
         disponible: true,
@@ -169,7 +171,7 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
     }
   })
 
-  it('⭐ CERO PASOS APAGADOS EN SILENCIO: los 160 veredictos traen causa y motivo', () => {
+  it('⭐ CERO PASOS APAGADOS EN SILENCIO: todos los veredictos traen causa y motivo', () => {
     let bloqueos = 0
     for (const situacion of SITUACIONES) {
       for (const paso of PASOS) {
@@ -431,6 +433,72 @@ describe('T1 · las guardas — `evaluarPaso` es la única que decide', () => {
   })
 })
 
+// ── ⭐ El hecho `puntos` y la alternativa (2026-08-19) ───────────────────────
+//
+// Un levantamiento de campo son puntos sueltos y cero polilíneas. Importado sin
+// unir no hay recinto todavía, y la pantalla que sirve para dibujarlo —la que
+// tiene «Dibujar recinto» y engancha a esos puntos— es Edición. Con
+// `requiere: ['geometria']` a secas, la única herramienta que resolvía ese fichero
+// estaba detrás de una puerta que solo abría el resultado de haberla usado.
+describe('T1 · Edición se abre con un recinto O con puntos sueltos', () => {
+  const conPuntos = { rama: RAMA.PARCELA, hechos: { geometria: false, oficial: false, puntos: true } }
+  const conNada = { rama: RAMA.PARCELA, hechos: { geometria: false, oficial: false, puntos: false } }
+
+  it('⭐ solo con puntos, Edición está disponible', () => {
+    expect(evaluarPaso(PASO.EDICION, conPuntos).disponible).toBe(true)
+  })
+
+  it('sin recinto y sin puntos sigue cerrada, con su motivo de siempre', () => {
+    const v = evaluarPaso(PASO.EDICION, conNada)
+    expect(v.disponible).toBe(false)
+    expect(v.causa).toBe(CAUSA.DATO)
+    // ⚠️ El motivo es el del PRIMER hecho nombrado. Nombrar la alternativa
+    // convertiría el caso raro en la instrucción principal.
+    expect(v.motivo).toBe(MOTIVO_DATO.geometria)
+    expect(v.breve).toBe(MOTIVO_BREVE.geometria)
+  })
+
+  it('⛔ y Diagnóstico NO se abre con puntos: no hay contorno que contrastar', () => {
+    // Es toda la razón de que esto sea un hecho nuevo y no un `geometria`
+    // ensanchado. Con el ensanche, esta pantalla contrastaría una geometría
+    // inexistente contra el parcelario y llamaría diagnóstico al resultado.
+    const conPuntosYOficial = {
+      rama: RAMA.PARCELA,
+      hechos: { geometria: false, oficial: true, puntos: true },
+    }
+    const v = evaluarPaso(PASO.DIAGNOSTICO, conPuntosYOficial)
+    expect(v.disponible).toBe(false)
+    expect(v.causa).toBe(CAUSA.DATO)
+    expect(v.motivo).toBe(MOTIVO_DATO.geometria)
+  })
+
+  it('en la rama EDIFICIO la alternativa no cambia nada: allí `puntos` es false', () => {
+    expect(
+      evaluarPaso(PASO.EDICION, {
+        rama: RAMA.EDIFICIO,
+        hechos: { geometria: true, oficial: false, puntos: false },
+      }).disponible,
+    ).toBe(true)
+    const sin = evaluarPaso(PASO.EDICION, {
+      rama: RAMA.EDIFICIO,
+      hechos: { geometria: false, oficial: false, puntos: false },
+    })
+    expect(sin.disponible).toBe(false)
+    expect(sin.motivo).toBe(MOTIVO_DATO_EDIFICIO.geometria)
+  })
+
+  it('el hecho viaja por el store y tira del paso al perderse, como los otros dos', () => {
+    const nav = crearNavegacion({ paso: PASO.ENTRADA, hechos: { puntos: true } })
+    expect(nav.navegarAPaso(PASO.EDICION).ok).toBe(true)
+    // Se dibuja el recinto ⇒ ahora hay geometría de verdad y los puntos siguen.
+    expect(nav.actualizarHechos({ geometria: true, puntos: true }).ok).toBe(true)
+    expect(nav.get().paso).toBe(PASO.EDICION)
+    // Y perder LAS DOS cosas devuelve a Entrada, contándolo.
+    expect(nav.actualizarHechos({ geometria: false, puntos: false }).ok).toBe(false)
+    expect(nav.get().paso).toBe(PASO.ENTRADA)
+  })
+})
+
 describe('T1 · el store', () => {
   it('`subscribe` NO notifica al suscribirse, y la baja funciona', () => {
     const nav = navegacionCompleta()
@@ -605,7 +673,7 @@ describe('T1 · los hechos van POR RAMA', () => {
 
   it('un hecho AUSENTE es `false` y no lanza: lo que no afirmas, no lo tienes', () => {
     const nav = crearNavegacion({ hechos: { geometria: true } })
-    expect(nav.get().hechos).toEqual({ geometria: true, oficial: false })
+    expect(nav.get().hechos).toEqual({ geometria: true, oficial: false, puntos: false })
   })
 
   it('perder el dato tira del paso hacia atrás, y lo CUENTA', () => {
@@ -663,7 +731,7 @@ describe('T1 · los hechos van POR RAMA', () => {
     expect(nav.actualizarHechos({ oficial: false }).ok).toBe(false)
     expect(visto).toHaveBeenCalledTimes(1)
     expect(nav.get().paso).toBe(PASO.EDICION)
-    expect(nav.get().hechos).toEqual({ geometria: true, oficial: false })
+    expect(nav.get().hechos).toEqual({ geometria: true, oficial: false, puntos: false })
   })
 
   it('y el hecho de la rama inactiva que SÍ cambia se guarda igual', () => {
@@ -671,9 +739,9 @@ describe('T1 · los hechos van POR RAMA', () => {
     // no guardar. Es lo que sostiene el conmutador de rama.
     const nav = crearNavegacion({ hechos: { PARCELA: { geometria: true } } })
     nav.actualizarHechos({ geometria: true, oficial: true }, RAMA.EDIFICIO)
-    expect(nav.hechosDe(RAMA.EDIFICIO)).toEqual({ geometria: true, oficial: true })
+    expect(nav.hechosDe(RAMA.EDIFICIO)).toEqual({ geometria: true, oficial: true, puntos: false })
     expect(nav.cambiarRama(RAMA.EDIFICIO).ok).toBe(true)
-    expect(nav.get().hechos).toEqual({ geometria: true, oficial: true })
+    expect(nav.get().hechos).toEqual({ geometria: true, oficial: true, puntos: false })
   })
 })
 

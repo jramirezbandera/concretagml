@@ -401,13 +401,64 @@ if (disparador !== null) {
   disparador.click()
 }
 
-// Los motivos breves de los peldaños siguen midiéndose: el tope está en
-// `app/navegacion.js#TOPE_MOTIVO_BREVE` y la frase se acorta allí, no aquí.
-for (const nodo of $$('.gml-rail-motivo')) {
-  if (nodo.getBoundingClientRect().height > 0 && nodo.scrollWidth - nodo.clientWidth > 1) {
+// ── Los motivos breves de los peldaños ──────────────────────────────────────
+//
+// ⛔ **AQUÍ HABÍA UN GUARDIÁN QUE LLEVABA UNA SEMANA DANDO ROJO EN FALSO, Y SE
+// CAMBIA DE PREGUNTA (2026-08-18).** Medía `scrollWidth - clientWidth > 1` sobre
+// `.gml-rail-motivo` y denunciaba que «el motivo breve no cabe y se recorta,
+// acorta la frase en `TOPE_MOTIVO_BREVE`». Medido en navegador el 2026-08-18:
+// `clientWidth: 1`, `scrollWidth: 91`, **y lo mismo a 1280, a 1440 y a 1920**. O
+// sea que no era un problema de ancho ni de longitud de la frase —«Falta la
+// parcela» son 16 caracteres y el tope son 22—: el nodo mide 1 px SIEMPRE.
+//
+// Y mide 1 px **a propósito**, desde el 2026-08-11: el motivo breve salió DE LA
+// VISTA y no del DOM (encargo del autor: «no me gusta el texto debajo de Edición y
+// Diagnóstico... queda desproporcionado»), y `.gml-rail-motivo` es hoy el patrón
+// clásico de «visible solo para lectores de pantalla» —`width:1px`,
+// `clip-path: inset(50%)`—. La forma LARGA vive en el `title` del peldaño.
+//
+// ⭐ **LA LECCIÓN, que es por lo que esto se cuenta entero:** cuando aquel día se
+// escondió el motivo, nadie vino a este guion. El guardián siguió verde-rojo
+// midiendo el recorte de un texto que ya nadie podía ver, y su mensaje mandaba al
+// siguiente a acortar una frase que no era el problema — un guardián que denuncia
+// la causa equivocada cuesta más que no tener guardián, porque el que lo lee se
+// fía. Un guardián sobrevive a la decisión que lo justificaba y hay que ir a
+// buscarlo.
+//
+// LO QUE SE MIDE AHORA es lo único que sigue importando de ese texto: que **el
+// motivo siga existiendo para quien no ve la pantalla**, y que la forma larga
+// siga en el `title`. Los dos canales, porque el peldaño apagado tiene que decir
+// por qué por los dos.
+for (const boton of $$('.gml-rail-boton')) {
+  if (!boton.disabled) continue
+  const motivo = boton.querySelector('.gml-rail-motivo')
+  const breve = motivo?.textContent.trim() ?? ''
+  const largo = boton.getAttribute('title')?.trim() ?? ''
+
+  if (breve === '') {
     problemas.push(
-      `El motivo breve «${nodo.textContent}» no cabe en su peldaño y se recorta. El tope está en ` +
-        '`app/navegacion.js#TOPE_MOTIVO_BREVE`: la frase se acorta allí, no aquí.',
+      `El peldaño «${boton.querySelector('.gml-rail-rotulo')?.textContent.trim()}» está APAGADO y ` +
+        `no tiene motivo breve en \`.gml-rail-motivo\`. Ese texto es invisible a propósito, pero ` +
+        `es lo ÚNICO que un lector de pantalla lee al llegar al peldaño: sin él, el control está ` +
+        `apagado y MUDO para quien no ve la pantalla, que es la regla de oro 1 rota justo donde ` +
+        `no se nota mirando.`,
+    )
+  } else if (breve.length > 22) {
+    // El tope sigue vivo aunque el texto no se vea: `app/navegacion.js#TOPE_MOTIVO_BREVE`
+    // lo declara y hay quien lo lee en voz alta. Una frase que se desmadre ahí es
+    // una frase que alguien escuchará entera.
+    problemas.push(
+      `El motivo breve «${breve}» son ${breve.length} caracteres y el tope declarado en ` +
+        '`app/navegacion.js#TOPE_MOTIVO_BREVE` son 22.',
+    )
+  }
+
+  if (largo === '') {
+    problemas.push(
+      `El peldaño «${boton.querySelector('.gml-rail-rotulo')?.textContent.trim()}» está APAGADO y ` +
+        `no tiene \`title\`. La forma LARGA del motivo vive ahí desde que el sub-renglón se ` +
+        `retiró (2026-08-11): sin ella, quien ve la pantalla no tiene NINGÚN sitio donde leer por ` +
+        `qué no puede pasar.`,
     )
   }
 }
