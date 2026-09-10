@@ -207,6 +207,7 @@ import {
   PERFIL,
   PERFILES,
   SEVERIDAD,
+  crearDeteccionGml,
   perfilPorId,
   srsNamePorForma,
 } from './_comun.js'
@@ -1095,7 +1096,32 @@ export function serializarExpedienteCp(opciones = {}) {
     }
   })
 
-  const detecciones = miembros.flatMap((m) => m.detecciones)
+  // ── ⛔ CADA DETECCIÓN DICE DE QUÉ PARCELA HABLA ───────────────────────────
+  //
+  // Aplanar sin más era lo que había hasta el 2026-09-10, y con un solo miembro no
+  // se notaba. En un expediente de tres, «Los vértices nº 4 y nº 5 del contorno
+  // exterior estaban a 3,0 mm…» es una frase que no se puede usar: hay tres
+  // contornos exteriores y la frase no dice cuál. Es el mismo defecto que
+  // `derivacion/entrega.js` ya había tenido que arreglar en sus propios mensajes —
+  // un aviso sobre una parcela sin nombrar manda al técnico a buscar en la suya un
+  // problema que puede estar en la del vecino.
+  //
+  // ⚠️ Se atribuye en el MENSAJE y no sólo en `datos`, porque el panel de avisos
+  // pinta `d.mensaje` y nada más. Un `datos.parcela` que no se ve no resuelve la
+  // ambigüedad de quien lee.
+  //
+  // ⛔ `serializarParcelaCp` NO hace esto y no debe: allí hay UNA parcela, el
+  // llamante sabe cuál, y prefijar cada renglón con la referencia que el usuario ya
+  // tiene delante sería ruido. La diferencia entre las dos funciones es justo que
+  // aquí conviven varias.
+  const detecciones = miembros.flatMap((m) =>
+    m.detecciones.map((d) =>
+      crearDeteccionGml(d.tipo, `«${m.resumen.localId}» · ${d.mensaje}`, d.severidad, {
+        ...(d.datos ?? {}),
+        parcela: m.resumen.localId,
+      }),
+    ),
+  )
   const bloqueos = [...new Set(miembros.flatMap((m) => m.resumen.bloqueos))]
 
   const resumen = {

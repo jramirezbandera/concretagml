@@ -568,13 +568,19 @@ export function prepararEntrega(entrada) {
   // ⚠️ Las detecciones del serializador son de OTRO léxico (`gml/_comun.js`) y no
   // se mezclan con las de aquí: tienen sus propios tipos y la interfaz las pinta
   // igual pero las cuenta aparte. Lo que sí sube es el BLOQUEO, traducido.
+  //
+  // ⛔ **Salen por `deteccionesGml` para que alguien las PUBLIQUE**, no para que
+  // viajen y se queden en un campo. Hasta el 2026-09-10 nadie lo hacía en este
+  // camino y el mensaje de abajo remitía a un detalle invisible; ahora las publica
+  // `app/cableado-derivacion.js` justo después de las de aquí. Si un cableado nuevo
+  // llama a `prepararEntrega`, esto es parte de su contrato (regla de oro 1).
   if (xml === null) {
     detecciones.push(
       crearDeteccionDerivacion(
         TIPO_DERIVACION.PIEZA_INVALIDA,
         'El escritor de GML no ha podido emitir el fichero: ' +
           resumenGml.bloqueos.join(', ') +
-          '. El detalle está en las detecciones del serializador.',
+          '. El detalle, parcela por parcela, está en los avisos que siguen a éste.',
         SEVERIDAD.ERROR,
         { bloqueos: resumenGml.bloqueos },
       ),

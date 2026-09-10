@@ -1324,6 +1324,26 @@ export function cablearDerivacion({
 
     publicar(entrega.detecciones)
 
+    // ── ⛔ Y LO QUE DECIDIÓ EL ESCRITOR, TAMBIÉN ──────────────────────────────
+    //
+    // Regla de oro 1, y hasta el 2026-09-10 este cableado era el ÚNICO camino de
+    // la aplicación que no la cumplía. `app/main.js` lo tiene escrito al lado de
+    // su propia llamada —«TODO lo que decidió el serializador, al panel»— y
+    // `app/cableado-expediente.js` hace lo mismo con los escritores de `export/`.
+    // Aquí las detecciones se recogían en `entrega.deteccionesGml`, viajaban hasta
+    // la interfaz… y se quedaban ahí. Un anillo invertido, un punto de referencia
+    // recalculado o dos vértices fundidos por el redondeo son cosas que le pasan al
+    // DATO que el usuario va a firmar, y no se veían por ninguna parte.
+    //
+    // ⚠️ Y se publican TAMBIÉN cuando el fichero no sale, que es cuando más falta
+    // hacen: el bloqueo que sí se veía dice «el detalle está en el panel», y hasta
+    // hoy ese detalle no llegaba a él.
+    //
+    // ⚠️ Van DESPUÉS de las de la derivación a propósito: el panel apila por orden
+    // de llegada y lo que el usuario necesita leer primero es qué pasa con su
+    // expediente, no cómo se ha orientado un anillo.
+    publicar(entrega.deteccionesGml)
+
     // ⛔ NO BASTA `xml !== null`. El fichero de una sola parcela sería un GML
     // impecable y válido contra el XSD; lo que estaría mal es el EXPEDIENTE, y eso
     // no lo ve ningún validador de esquema. `puedeEntregarse` es lo que hay que

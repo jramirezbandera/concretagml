@@ -569,6 +569,43 @@ describe('cablearDerivacion', () => {
       expect(renglonEntrega().classList.contains('gml-accion-estado--error')).toBe(false)
     })
 
+    // ── ⛔ Regla de oro 1: lo que decidió el ESCRITOR también se ve ──────────
+    //
+    // Hasta el 2026-09-10 este era el único camino de la aplicación que recogía
+    // las detecciones del serializador (`entrega.deteccionesGml`) y no las
+    // publicaba: viajaban hasta la interfaz y morían ahí. `app/main.js` lleva
+    // desde F04 publicando las suyas y `app/cableado-expediente.js` las de
+    // `export/`; este cableado no.
+
+    /** Lo que sólo puede haber dicho `gml/`: su léxico no lo usa `derivacion/`. */
+    const delEscritor = () =>
+      avisos.filter((a) => /HORARIO|al redondear|punto de referencia/i.test(a.mensaje))
+
+    it('publica en el panel lo que decidió el escritor de GML', () => {
+      derivado()
+      botonEntregar().click()
+      expect(
+        delEscritor().length,
+        'el serializador SIEMPRE decide algo aquí: los anillos del arnés son antihorarios y ' +
+          'los invierte (override O1). Si esto sale vacío, es que no se publica nada.',
+      ).toBeGreaterThan(0)
+    })
+
+    it('⛔ y cada uno dice DE QUÉ PARCELA habla', () => {
+      // El expediente lleva dos miembros, así que «el contorno exterior» a secas
+      // es una frase inservible: hay dos. La atribución la pone
+      // `gml/serialize-cp.js#serializarExpedienteCp` al aplanar.
+      derivado()
+      botonEntregar().click()
+      const suyos = delEscritor()
+      for (const a of suyos) {
+        expect(a.mensaje, `sin parcela al frente: «${a.mensaje}»`).toMatch(/^«[^»]+» · /)
+      }
+      const parcelas = new Set(suyos.map((a) => /^«([^»]+)»/.exec(a.mensaje)[1]))
+      expect(parcelas.size, 'los DOS miembros tienen que estar nombrados').toBe(2)
+      expect([...parcelas].some((p) => p.includes('7136910UF1473N'))).toBe(true)
+    })
+
     it('excluir una pieza cambia lo que se compone', () => {
       derivado()
       const casilla = document.querySelector(SELECTOR.INCLUIR)

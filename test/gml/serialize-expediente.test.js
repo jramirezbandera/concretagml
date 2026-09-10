@@ -326,3 +326,56 @@ describe('serializarExpedienteCp · si un miembro está bloqueado, no sale nada'
     expect(resumen.porMiembro[1].emitido).toBe(false)
   })
 })
+
+// ── ⛔ Cada detección dice de qué parcela habla ──────────────────────────────
+//
+// Aplanar `miembros.flatMap(m => m.detecciones)` sin más era lo que había hasta el
+// 2026-09-10, y con un solo miembro no se notaba. En un expediente de tres, «Los
+// vértices nº 4 y nº 5 del contorno exterior…» es una frase inservible: hay tres
+// contornos exteriores y no dice cuál. Es el mismo defecto que `derivacion/` ya
+// había tenido que arreglar en sus propios mensajes — un aviso sobre una parcela
+// sin nombrar manda al técnico a buscar en la suya un problema del vecino.
+
+describe('serializarExpedienteCp · las detecciones nombran su parcela', () => {
+  it('el recorrido NO es vacuo: los miembros del fixture SÍ producen detecciones', () => {
+    // Sin esto, dejar de emitir detecciones convertiría lo de abajo en bucles
+    // vacíos pasando en verde.
+    const { detecciones } = serializarExpedienteCp({ parcelas: [MATRIZ, CESION] })
+    expect(detecciones.length).toBeGreaterThan(0)
+  })
+
+  it('cada mensaje empieza por «localId» ·', () => {
+    const { detecciones } = serializarExpedienteCp({ parcelas: [MATRIZ, CESION] })
+    for (const d of detecciones) {
+      expect(d.mensaje, `sin parcela al frente: «${d.mensaje}»`).toMatch(/^«[^»]+» · /)
+    }
+  })
+
+  it('y los DOS miembros salen nombrados, cada uno con SU localId', () => {
+    const { detecciones } = serializarExpedienteCp({ parcelas: [MATRIZ, CESION] })
+    const nombradas = new Set(detecciones.map((d) => /^«([^»]+)»/.exec(d.mensaje)[1]))
+    expect(nombradas).toEqual(new Set(['7136910UF1473N', '7136910UF1473N.1']))
+  })
+
+  it('la atribución va TAMBIÉN en `datos.parcela`, para quien no lea el texto', () => {
+    const { detecciones } = serializarExpedienteCp({ parcelas: [MATRIZ, CESION] })
+    for (const d of detecciones) {
+      expect(d.datos.parcela).toBe(/^«([^»]+)»/.exec(d.mensaje)[1])
+    }
+  })
+
+  it('el tipo y la severidad NO cambian: sólo se le pone nombre delante', () => {
+    const { detecciones: sueltas } = serializarParcelaCp(MATRIZ)
+    const { detecciones } = serializarExpedienteCp({ parcelas: [MATRIZ] })
+    expect(detecciones.map((d) => d.tipo)).toEqual(sueltas.map((d) => d.tipo))
+    expect(detecciones.map((d) => d.severidad)).toEqual(sueltas.map((d) => d.severidad))
+  })
+
+  it('⛔ `serializarParcelaCp` NO prefija nada: allí hay UNA parcela y el llamante sabe cuál', () => {
+    const { detecciones } = serializarParcelaCp(MATRIZ)
+    expect(detecciones.length).toBeGreaterThan(0)
+    for (const d of detecciones) {
+      expect(d.mensaje, `prefijo indebido: «${d.mensaje}»`).not.toMatch(/^«[^»]+» · /)
+    }
+  })
+})
