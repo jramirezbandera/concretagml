@@ -73,8 +73,20 @@
 // con un segmento de longitud cero. NINGÚN test de F02 puede detectarlo, porque
 // el redondeo ocurre después de que F02 haya terminado. De ahí
 // `COLAPSO_POR_REDONDEO`, que es la única regla geométrica que vive aquí y no
-// allí. Se DETECTA, no se corrige: quitar el vértice cambiaría la geometría en
-// silencio (regla de oro 1) y la corrección es decisión del usuario.
+// allí.
+//
+// ⚠️ **Qué se hace con él, revisado el 2026-09-09.** Hasta esa fecha era «se
+// DETECTA, no se corrige», y la mitad seguía siendo cierta y la otra mitad era un
+// fichero malo: el vértice fundido se quedaba en el `posList`, así que el GML
+// salía —sin bloqueos— con dos posiciones consecutivas iguales, o sea un
+// `gml:LinearRing` mal formado. La detección lo anunciaba palabra por palabra («el
+// GML llevaría un segmento de longitud cero») y nadie lo impedía. Ahora el paso 1c
+// retira la repetición, y eso NO contradice la regla de oro 1 porque los dos
+// puntos son ya el mismo número: no se cambia ninguna geometría, se deja de
+// escribir dos veces la misma. **La geometría del usuario sigue sin tocarse por
+// debajo del redondeo**; para las piezas que calcula la propia aplicación —los
+// colindantes recortados de F23— existen `depurarAnillo` y `depurarRecintos`, con
+// su propia justificación escrita al lado.
 //
 // RESIDUAL CONOCIDO, escrito para que no sorprenda: un colapso puede además
 // crear una AUTOINTERSECCIÓN que solo `kinks` vería. Ese chequeo —revalidar la
@@ -141,6 +153,43 @@ export const DECIMALES_COORD = 2
  * @readonly
  */
 export const LIMITE_MAGNITUD_COORD = 1e15
+
+/**
+ * Separación por debajo de la cual dos vértices **son el mismo punto para el
+ * fichero**, en metros. Con {@link DECIMALES_COORD} = 2 son **7,0711 mm**.
+ *
+ * Sale del formato y no de una cifra escrita a mano: la retícula de publicación
+ * tiene paso `10⁻ᴰ` y el redondeo mueve cada coordenada como mucho `½·10⁻ᴰ` por
+ * eje, o sea `½·10⁻ᴰ·√2` en el plano.
+ *
+ * ⚠️ **Precisión de la afirmación, porque la versión corta miente.** Dos vértices
+ * más juntos que esto no acaban forzosamente en el mismo punto del fichero: caen
+ * en la misma celda de la retícula —y entonces sí son literalmente el mismo punto—
+ * o en dos contiguas, y entonces el `posList` lleva un escalón de un centímetro
+ * que nadie ha medido. En los dos casos lo que se escribe lo dicta la retícula y
+ * no el levantamiento, y por eso es el suelo por debajo del cual una pieza
+ * CALCULADA no tiene detalle que conservar. Para una pieza DIBUJADA por el usuario
+ * esta constante no se usa: ver {@link depurarAnillo}.
+ *
+ * ⚠️ **Coincide en valor con `comprobacion/conjunto.js#DESPLAZAMIENTO_MAXIMO_COORD_M`
+ * y con `OPERATIVOS.grosorInvasionMinimoM`, y no es la misma decisión que ninguno
+ * de los dos.** Aquel mide cuánto puede MOVERSE un vértice al redondear (para
+ * presupuestar el residuo del cierre) y el otro, cuánto ruido mete el redondeo
+ * del WFS en un solape ajeno. Éste dice cuándo dos vértices NUESTROS dejan de
+ * poder escribirse por separado. Los tres derivan del mismo `10⁻ᴰ` y por eso hoy
+ * dan el mismo número; el día que uno cambie no debe arrastrar a los otros —
+ * mismo criterio con el que `config/operativos.js` separó `grosorInvasionMinimoM`
+ * de `duplicadoMetros`.
+ *
+ * ⛔ **Y NO es `OPERATIVOS.duplicadoMetros` (1 mm).** Aquella cifra afirma algo
+ * sobre el MODELO de esta aplicación —«más juntos que esto son el mismo punto»— y
+ * la comprueba `validation/reglas-geometria.js` sobre coordenadas sin redondear.
+ * Ésta afirma algo sobre el FICHERO. Confundirlas es el error que
+ * `config/operativos.js` ya documenta haber cometido una vez.
+ *
+ * @readonly
+ */
+export const SEPARACION_INDISTINGUIBLE_M = 0.5 * 10 ** -DECIMALES_COORD * Math.SQRT2
 
 /**
  * Override O1 — orientación que el Catastro exige a cada tipo de anillo, en la
@@ -353,11 +402,14 @@ export function invertirAnillo(anillo) {
  * lo que llega cerrado.
  *
  * Deliberadamente TONTA: repite el primer vértice y punto. No comprueba si el
- * anillo «ya venía cerrado» ni deduplica nada. Si el redondeo hubiera fundido el
- * último vértice con el primero, el anillo cerrado tendría un segmento de
- * longitud cero — y ese hecho YA lo ha reportado {@link prepararRecintos} como
- * `COLAPSO_POR_REDONDEO` sobre el par (n−1, 0). Corregirlo aquí, callado y a
- * espaldas de la detección, sería exactamente lo que prohíbe la regla de oro 1.
+ * anillo «ya venía cerrado» ni deduplica nada, y sigue sin hacerlo: quien retira
+ * la repetición es {@link prepararRecintos} en su paso 1c, **después** de haberla
+ * reportado como `COLAPSO_POR_REDONDEO`. Ése es el sitio, porque allí el hecho se
+ * dice; hacerlo aquí sería corregir a espaldas de la detección, que es lo que
+ * prohíbe la regla de oro 1.
+ *
+ * ⚠️ Así que esta función recibe siempre un anillo ya depurado, y su contrato —
+ * «repito el primero al final» — no tiene que defenderse de nada.
  *
  * @param {Array<[number, number]>} anillo  Anillo ABIERTO, no vacío.
  * @returns {Array<[number, number]>}  Anillo cerrado de `n + 1` posiciones.
@@ -376,6 +428,102 @@ export function cerrarAnillo(anillo) {
     )
   }
   return [...anillo, anillo[0]]
+}
+
+// ── Depuración de la geometría que CALCULA la aplicación ──────────────────────
+//
+// ⛔ **Esto NO se aplica a la geometría que dibuja el usuario, y la distinción es
+// la razón de ser de estas dos funciones.** La cabecera de este módulo fija que un
+// colapso por redondeo «se DETECTA, no se corrige: quitar el vértice cambiaría la
+// geometría en silencio (regla de oro 1) y la corrección es decisión del usuario».
+// Eso sigue siendo verdad palabra por palabra **para el dato del usuario**: sus
+// vértices son su levantamiento y no se le tocan a sus espaldas.
+//
+// Pero desde F23 el expediente lleva parcelas que el usuario NO ha dibujado: los
+// colindantes recortados y las piezas del sobrante los produce el motor booleano
+// (`derivacion/topologia.js`). Ahí no hay decisión del usuario que preservar, y un
+// par de vértices por debajo de {@link SEPARACION_INDISTINGUIBLE_M} no es un hecho
+// del terreno: es dónde `polyclip-ts` cortó. Concretamente —MEDIDO el 2026-09-09
+// sobre el expediente 18111A00400806— basta con que un vértice arrastrado caiga a
+// 0,3 mm de un vértice del vecino para que el recorte salga con ese par y
+// `validarParcela` lo rechace con «Vértices consecutivos duplicados (< 1 mm)»,
+// bloqueando el expediente ENTERO con un mensaje que además le pide al usuario que
+// corrija una parcela que no es suya. La ventana es de menos de 1 mm:
+//
+//     corte a −1,0 mm del vértice del vecino → 6 vértices, válido
+//     corte a −0,8 … −0,1 mm                 → 6 vértices, ERROR bloqueante
+//     corte a  0,0 mm                        → 4 vértices, válido
+//
+// Quitar el ruido en el momento de traducir el resultado del motor al modelo hace
+// que esa ventana no exista. No se pierde nada declarable: lo que se borra no cabe
+// en el fichero.
+
+/** Distancia euclídea entre dos pares. Local: este módulo no importa de `geo/`. */
+const separacion = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1])
+
+/**
+ * Quita de un anillo los vértices que el fichero no puede separar del anterior.
+ *
+ * Recorre el ciclo quedándose con el primero de cada grupo y comparando siempre
+ * contra el **último conservado**, no contra el vecino inmediato: así una tira de
+ * vértices a 5 mm no se derrumba en cadena, y ningún punto del anillo se queda a
+ * más de `separacionMinima` de donde había un vértice.
+ *
+ * ⭐ **El PIVOTE no se mueve nunca.** Si el último vértice es indistinguible del
+ * primero se retira el ÚLTIMO, igual que {@link invertirAnillo} conserva
+ * `anillo[0]`, y por lo mismo: el `posList` sigue empezando donde empezaba y el
+ * área sale bit-idéntica (`geo/area.js` traslada al primer vértice).
+ *
+ * ⛔ **No puede CREAR una degeneración.** Si depurar dejara menos de 3 vértices, el
+ * anillo entero medía menos que la retícula del fichero — y eso es un hecho que
+ * tiene que decir quien lo mida (`validation/`, los filtros de área y grosor de
+ * `derivacion/`), no un paso de limpieza que lo haga desaparecer en silencio. En
+ * ese caso se devuelve el anillo **tal cual entró**.
+ *
+ * @param {Array<[number, number]>} anillo  Anillo ABIERTO en UTM, sin redondear.
+ * @param {number} [separacionMinima=SEPARACION_INDISTINGUIBLE_M]  En metros.
+ * @returns {Array<[number, number]>}  Anillo nuevo. La entrada no se toca.
+ * @throws {TypeError}  Si `anillo` no es un array (contrato del programador).
+ */
+export function depurarAnillo(anillo, separacionMinima = SEPARACION_INDISTINGUIBLE_M) {
+  if (!Array.isArray(anillo)) {
+    throw new TypeError(
+      `depurarAnillo: se esperaba un array de pares [x,y]; recibido ${typeof anillo}.`,
+    )
+  }
+  if (anillo.length < 4) return [...anillo]
+
+  const salida = []
+  for (const v of anillo) {
+    const ultimo = salida[salida.length - 1]
+    if (ultimo !== undefined && separacion(ultimo, v) < separacionMinima) continue
+    salida.push(v)
+  }
+  while (salida.length > 1 && separacion(salida[salida.length - 1], salida[0]) < separacionMinima) {
+    salida.pop()
+  }
+
+  return salida.length < 3 ? [...anillo] : salida
+}
+
+/**
+ * {@link depurarAnillo} sobre un conjunto de recintos, cada anillo por su cuenta.
+ *
+ * Los huecos se depuran igual que el exterior: un hueco es un anillo del mismo
+ * fichero y le afecta la misma retícula.
+ *
+ * @param {Array<{vertices: Array<[number, number]>, tipo: string}>} recintos
+ * @param {number} [separacionMinima=SEPARACION_INDISTINGUIBLE_M]
+ * @returns {Array<{vertices: Array<[number, number]>, tipo: string}>}  Copia nueva.
+ * @throws {TypeError}  Si `recintos` no es un array.
+ */
+export function depurarRecintos(recintos, separacionMinima = SEPARACION_INDISTINGUIBLE_M) {
+  if (!Array.isArray(recintos)) {
+    throw new TypeError(
+      `depurarRecintos: se esperaba un array de recintos; recibido ${typeof recintos}.`,
+    )
+  }
+  return recintos.map((r) => ({ ...r, vertices: depurarAnillo(r.vertices, separacionMinima) }))
 }
 
 // ── Helpers internos ──────────────────────────────────────────────────────────
@@ -469,6 +617,46 @@ function contarVerticesDistintos(anillo) {
 }
 
 /**
+ * Quita del anillo YA REDONDEADO las repeticiones consecutivas, incluida la del
+ * cierre (último ≡ primero).
+ *
+ * ⛔ **Esto NO es «corregir la geometría a espaldas del usuario»**, que es lo que
+ * prohíbe la cabecera de este módulo, y la diferencia es exacta: los dos puntos que
+ * se funden ya son **el mismo número** —`mismoPunto` es igualdad estricta sobre
+ * coordenadas redondeadas—, así que escribirlos las dos veces no añade ni un dato,
+ * añade un segmento de longitud cero. Un `gml:LinearRing` con un punto consecutivo
+ * repetido es un anillo mal formado, y el `posList` salía así:
+ *
+ *     … 500050.00 4100000.00  500050.00 4100000.00  500000.00 4100000.00
+ *
+ * MEDIDO el 2026-09-09 con una parcela dibujada a mano con dos vértices a 4 mm:
+ * pasaba F02 (legales, están por encima de `duplicadoMetros`), se fundían al
+ * redondear, y el fichero se emitía —`emitido: true`, sin bloqueos— con el punto
+ * repetido dentro. La detección {@link deteccionesColapso} lo anunciaba («el GML
+ * llevaría un segmento de longitud cero») y era literalmente cierto.
+ *
+ * ⚠️ El HECHO se sigue diciendo con la misma detección y con la misma severidad:
+ * lo que cambia es que ahora la frase describe lo que se ha hecho con él en vez de
+ * anunciar un fichero malo. Corregir CALLANDO sería la regla de oro 1; corregir
+ * DICIÉNDOLO es lo que se espera de un serializador.
+ *
+ * @param {Array<[number, number]>} anillo  Anillo ABIERTO ya redondeado.
+ * @returns {Array<[number, number]>}  Copia sin repeticiones consecutivas.
+ */
+function colapsarRepetidos(anillo) {
+  const salida = []
+  for (const v of anillo) {
+    const ultimo = salida[salida.length - 1]
+    if (ultimo !== undefined && mismoPunto(ultimo, v)) continue
+    salida.push(v)
+  }
+  // El cierre lo pone `cerrarAnillo` repitiendo el primero: si el último ya ES el
+  // primero, sobra. Se retira el ÚLTIMO para no mover el pivote (ver `invertirAnillo`).
+  while (salida.length > 1 && mismoPunto(salida[salida.length - 1], salida[0])) salida.pop()
+  return salida
+}
+
+/**
  * Paso 1b — detecciones `COLAPSO_POR_REDONDEO` de un anillo.
  *
  * Solo se reportan los pares que ESTABAN SEPARADOS y han quedado IGUALES: un
@@ -518,9 +706,10 @@ function deteccionesColapso(original, redondeado, indice) {
       TIPO_GML.COLAPSO_POR_REDONDEO,
       `Los vértices nº ${i} y nº ${j} ${delRecinto(indice)} estaban a ` +
         `${(separacion * 1000).toFixed(1)} mm y se funden en el mismo punto al redondear ` +
-        `a ${DECIMALES_COORD} decimales: el GML llevaría un segmento de longitud cero. ` +
+        `a ${DECIMALES_COORD} decimales, así que el fichero lleva uno de los dos y no los ` +
+        `dos: un gml:LinearRing no puede tener dos posiciones consecutivas iguales. ` +
         (severidad === SEVERIDAD.ERROR
-          ? 'Además el anillo se queda por debajo de los 4 puntos que exige un gml:LinearRing.'
+          ? 'Y aun así el anillo se queda por debajo de los 4 puntos que exige un gml:LinearRing.'
           : 'La validación previa no puede verlo, porque trabaja sobre las coordenadas sin redondear.'),
       severidad,
       {
@@ -579,18 +768,30 @@ export function prepararRecintos(recintos) {
     const redondeado = redondearAnillo(original)
 
     // ── 1b · COLAPSO POR REDONDEO ────────────────────────────────────────────
+    // Se DICE antes de tocar nada, y sobre los índices del MODELO: la detección
+    // señala qué par de vértices del usuario se ha fundido, que es lo que él
+    // puede reconocer y corregir. Después del paso 1c esos índices ya no
+    // corresponden a las posiciones del anillo emitido, y no deben: nadie edita
+    // el `posList`.
     detecciones.push(...deteccionesColapso(original, redondeado, i))
 
+    // ── 1c · QUITAR LAS REPETICIONES ─────────────────────────────────────────
+    // Un `gml:LinearRing` no puede llevar dos posiciones consecutivas iguales.
+    // Ver {@link colapsarRepetidos}: no se pierde ningún dato, porque los dos
+    // puntos ya son el mismo número.
+    const sinRepetidos = colapsarRepetidos(redondeado)
+
     // ── 2 · ORIENTAR ─────────────────────────────────────────────────────────
-    // El signo se mide sobre el anillo YA REDONDEADO: se normaliza el sentido de
-    // lo que se va a escribir, no el de un polígono que no llega al fichero.
+    // El signo se mide sobre el anillo YA REDONDEADO Y YA DEPURADO: se normaliza
+    // el sentido de lo que se va a escribir, no el de un polígono que no llega al
+    // fichero.
     // Anillo degenerado (área firmada 0): `geo/area.js` devuelve +1 por convenio
     // documentado, así que un exterior degenerado se «invertirá» sin efecto
     // real. Es inocuo, y su problema de fondo —la degeneración— lo señala F02.
-    const signo = orientacion(redondeado)
+    const signo = orientacion(sinRepetidos)
     const deseada = ORIENTACION_ESPERADA[tipo]
     const invertir = signo !== deseada
-    const anillo = invertir ? invertirAnillo(redondeado) : redondeado
+    const anillo = invertir ? invertirAnillo(sinRepetidos) : sinRepetidos
 
     if (invertir) {
       detecciones.push(

@@ -4,6 +4,11 @@
 // Contrato:
 //   · `restar(recintosA, recintosB) → {piezas, saltados, detecciones}`
 //
+// ⚠️ **Las piezas salen DEPURADAS** desde el 2026-09-09: sin vértices que el
+// fichero no pueda separar. No es una decisión sobre las piezas —eso sigue siendo
+// de `cesion.js`— sino parte de traducirlas al modelo. El porqué, con la medición
+// que lo obligó, está en {@link piezasDelMotor}.
+//
 // Es el ÚNICO módulo de la capa `derivacion/` que importa Turf, igual que
 // `diagnostico/topologia.js` lo es de la suya y `validation/reglas-topologia.js`
 // de la de validación, y por el mismo motivo (regla de oro 6: de Turf, SOLO lo
@@ -67,8 +72,53 @@ import difference from '@turf/difference'
 import { featureCollection, polygon } from '@turf/helpers'
 import union from '@turf/union'
 
+import { depurarRecintos } from '../gml/anillos.js'
 import { coordsRegion, recintosDeGeometriaTurf } from '../geo/poligono.js'
 import { MOTIVO_RESTA, SEVERIDAD, TIPO_DERIVACION, crearDeteccionDerivacion } from './_comun.js'
+
+/**
+ * Traduce el resultado del motor al modelo **sin traerse su ruido**.
+ *
+ * ── POR QUÉ ESTO ESTÁ AQUÍ Y NO EN QUIEN LLAMA ─────────────────────────────
+ * Éste es el único sitio de la capa por el que entra geometría que no ha dibujado
+ * nadie. Todo lo que sale de `polyclip-ts` —las piezas del sobrante de F17 y los
+ * colindantes recortados de F23— pasa por estas dos funciones, así que limpiarlo
+ * en la traducción lo limpia una vez y para siempre; repartir la limpieza entre
+ * `cesion.js` y `vecino.js` sería dos sitios que hay que acordarse de tocar, y el
+ * tercero que aparezca no se tocaría.
+ *
+ * ── QUÉ SE LIMPIA, Y POR QUÉ NO ES «DECIDIR SOBRE LAS PIEZAS» ──────────────
+ * La cabecera promete que aquí no se ordena, ni se nombra, ni se descarta nada
+ * por estrecho: todo eso sigue siendo de `cesion.js`. Esto no es una decisión
+ * sobre las piezas, es parte de traducirlas: donde la geometría medida cruza un
+ * lindero a menos de un centímetro de un vértice que ya existía, el motor devuelve
+ * los dos puntos, y ese par **no es un hecho del terreno, es dónde cortó el
+ * barrido**. No cabe en el `posList` —`gml/anillos.js#SEPARACION_INDISTINGUIBLE_M`
+ * lo deriva del formato— y por debajo de 1 mm además hacía que
+ * `validation/reglas-geometria.js` rechazara la pieza como «vértices consecutivos
+ * duplicados», bloqueando el expediente ENTERO con un mensaje que le pedía al
+ * usuario que corrigiera la parcela de un vecino. MEDIDO el 2026-09-09 sobre el
+ * expediente 18111A00400806: la ventana de fallo era de 0,1 a 0,8 mm.
+ *
+ * ⚠️ **Las áreas que esta capa reporta salen de la geometría ya depurada**, y así
+ * tiene que ser: es la regla de oro 11 —el número que se enseña es el de las
+ * coordenadas que se escriben— aplicada a las piezas calculadas.
+ *
+ * ⛔ **Cuánto cambia el área, dicho sin adornos.** Quitar un vértice desplaza el
+ * lindero como mucho `SEPARACION_INDISTINGUIBLE_M`, así que el área se mueve hasta
+ * `½·7,07 mm·(longitud de los dos lados que tocaban ese vértice)`: sobre un lado de
+ * 50 m son 0,18 m², no unos centímetros cuadrados. **No es despreciable, es
+ * PRESUPUESTADO**: `comprobacion/conjunto.js#DESPLAZAMIENTO_MAXIMO_COORD_M` es esa
+ * misma cifra y la tolerancia del cierre ya es `esa cifra × perímetro`, justamente
+ * porque el redondeo del fichero mueve los linderos en ese orden. Depurar gasta de
+ * ese presupuesto en vez de añadirle nada nuevo.
+ *
+ * @param {object|null} geometria  Lo que devolvió Turf.
+ * @returns {Array<Recinto[]>}
+ */
+function piezasDelMotor(geometria) {
+  return recintosDeGeometriaTurf(geometria).map((pieza) => depurarRecintos(pieza))
+}
 
 /** @typedef {import('../geo/poligono.js').RecintoSaltado} RecintoSaltado */
 /** @typedef {{vertices: Array<[number,number]>, tipo: string}} Recinto */
@@ -181,7 +231,7 @@ export function restar(recintosA, recintosB) {
 
   // `null` (A está enteramente dentro de B) y `Feature` los digiere igual
   // `recintosDeGeometriaTurf`, que además ya parte el `MultiPolygon` en piezas.
-  const piezas = recintosDeGeometriaTurf(resultado)
+  const piezas = piezasDelMotor(resultado)
 
   if (piezas.length === 0) {
     detecciones.push(
@@ -253,7 +303,7 @@ export function unir(recintosA, recintosB) {
       ),
     )
     return {
-      piezas: recintosDeGeometriaTurf(polA === null ? polB : polA),
+      piezas: piezasDelMotor(polA === null ? polB : polA),
       saltados,
       detecciones,
     }
@@ -281,5 +331,5 @@ export function unir(recintosA, recintosB) {
     return { piezas: [], saltados, detecciones }
   }
 
-  return { piezas: recintosDeGeometriaTurf(resultado), saltados, detecciones }
+  return { piezas: piezasDelMotor(resultado), saltados, detecciones }
 }

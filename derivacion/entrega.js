@@ -479,12 +479,27 @@ export function prepararEntrega(entrada) {
         TIPO_DERIVACION.PIEZA_INVALIDA,
         `«${m.etiqueta}» no pasa la validación geométrica: ` +
           `${m.validacion.errores.map((e) => e.mensaje).join(' ')} ` +
-          (m.esCesion
-            ? 'Es una pieza que ha calculado la aplicación, así que esto es un problema de la ' +
-              'geometría de partida: revisa el lindero que has movido.'
-            : 'Corrige la parcela antes de entregar.'),
+          // ⛔ **Un miembro VECINO necesita su propia frase.** Hasta el 2026-09-09
+          // caía en el `else` y leía «Corrige la parcela antes de entregar», que es
+          // un consejo imposible: esa parcela no es del usuario, no la puede editar
+          // en el mapa, y los vértices que fallan no los ha puesto él sino el motor
+          // booleano al recortarla. Lo único que él puede mover es SU lindero, y eso
+          // es lo que hay que decirle.
+          (m.esVecino === true
+            ? 'Es un colindante que ha recortado la aplicación, así que no es una parcela que ' +
+              'tú puedas editar: revisa el lindero TUYO que la corta, que es lo único de ella ' +
+              'que está en tu mano.'
+            : m.esCesion
+              ? 'Es una pieza que ha calculado la aplicación, así que esto es un problema de la ' +
+                'geometría de partida: revisa el lindero que has movido.'
+              : 'Corrige la parcela antes de entregar.'),
         SEVERIDAD.ERROR,
-        { orden: m.orden, esCesion: m.esCesion, errores: m.validacion.errores },
+        {
+          orden: m.orden,
+          esCesion: m.esCesion,
+          esVecino: m.esVecino === true,
+          errores: m.validacion.errores,
+        },
       ),
     )
   }
