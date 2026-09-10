@@ -34,7 +34,7 @@ import { recortarVecinos } from '../../derivacion/vecino.js'
 import { prepararEntrega } from '../../derivacion/entrega.js'
 import { restar } from '../../derivacion/topologia.js'
 import { TIPO_DERIVACION } from '../../derivacion/_comun.js'
-import { SEPARACION_INDISTINGUIBLE_M } from '../../gml/anillos.js'
+import { OPERATIVOS } from '../../config/operativos.js'
 import { validarParcela } from '../../validation/parcela.js'
 import { TIPO_RECINTO } from '../../model/parcela.js'
 
@@ -136,7 +136,7 @@ describe('derivacion · el colindante recortado a menos de un milímetro de su v
 })
 
 describe('derivacion/topologia · lo que sale del motor viene ya depurado', () => {
-  it('ninguna pieza trae dos vértices más juntos que la retícula del fichero', () => {
+  it('ninguna pieza trae dos vértices que el modelo cuente como el mismo punto', () => {
     let pares = 0
     for (const d of DESPLAZAMIENTOS) {
       const { piezas } = restar(VECINA, medicionHasta(120 + d))
@@ -151,7 +151,7 @@ describe('derivacion/topologia · lo que sale del motor viene ya depurado', () =
             expect(
               Math.hypot(b[0] - a[0], b[1] - a[1]),
               `d = ${d} m, par ${i}`,
-            ).toBeGreaterThanOrEqual(SEPARACION_INDISTINGUIBLE_M)
+            ).toBeGreaterThanOrEqual(OPERATIVOS.duplicadoMetros)
           }
         }
       }

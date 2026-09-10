@@ -203,6 +203,129 @@ export const nVerticesDe = (recinto) =>
     ? recinto.vertices.length
     : 0
 
+// ── Depurar lo que devuelve el motor booleano ────────────────────────────────
+//
+// La otra mitad del puente. `recintosDeGeometriaTurf` traduce la FORMA de lo que
+// Turf devuelve —`MultiPolygon` a piezas, anillos cerrados a abiertos—; esto quita
+// el RUIDO que trae dentro.
+//
+// ── DE DÓNDE SALE ESE RUIDO (F23, medido el 2026-09-09) ────────────────────
+// Cuando la geometría medida cruza el lindero de un colindante a una décima de
+// milímetro de un vértice suyo, `polyclip-ts` devuelve LOS DOS puntos. Los dos
+// existen y el motor hace bien: uno es el vértice del vecino y el otro es dónde
+// cortó. Pero para el MODELO de esta aplicación son el mismo punto —eso es
+// exactamente lo que afirma `OPERATIVOS.duplicadoMetros`—, así que
+// `validation/reglas-geometria.js` los rechazaba como duplicados y tumbaba el
+// expediente entero: una parcela CALCULADA caída por una regla escrita para la
+// geometría que DIBUJA el usuario, con un mensaje que le pedía que corrigiera la
+// finca de otro titular. La ventana era de menos de 1 mm y por eso no se alcanza
+// razonando, se alcanza arrastrando un vértice.
+//
+// ── ⛔ POR QUÉ ESTO NO SE LE HACE A LA GEOMETRÍA DEL USUARIO ───────────────
+// Porque ahí sí hay un levantamiento que preservar y la corrección es suya (la
+// cabecera de `gml/anillos.js` lo tiene escrito para el colapso por redondeo).
+// Aquí no hay dibujo de nadie: hay dónde cortó un barrido. Normalizar eso a la
+// noción de identidad de puntos que el modelo ya tiene no es cambiarle el dato a
+// nadie, es terminar de traducirlo.
+//
+// ── ⛔ Y POR QUÉ EL UMBRAL ENTRA POR PARÁMETRO ─────────────────────────────
+// Regla de oro 9 y la costumbre de esta capa: `geo/` es aritmética pura y HOJA del
+// grafo, no lee `config/`. `geo/grosor.js` y `geo/segmento.js` ya reciben así sus
+// tolerancias. Quien pone la cifra es `derivacion/topologia.js`, que es la capa que
+// sabe qué significa —y hoy pone `OPERATIVOS.duplicadoMetros`, ni más ni menos: se
+// borra lo que el modelo ya llama «el mismo punto» y NADA por encima de eso.
+//
+// ⚠️ **Se probó con 7,07 mm** —la retícula del fichero, `½·10⁻²·√2`— y se bajó el
+// 2026-09-10 tras medirlo. Aquel suelo también desbloqueaba, pero borraba puntos
+// que el modelo considera DISTINTOS (hasta 0,18 m² de la finca de un vecino sobre
+// un lado de 50 m) con la excusa de que «no caben en el fichero», y eso sólo es
+// cierto la mitad de las veces: dos puntos a 5 mm caen en la misma celda de la
+// retícula o en dos contiguas, y en el segundo caso el fichero los escribe
+// perfectamente. Lo que queda entre 1 mm y la retícula lo resuelve el paso 1c de
+// `gml/anillos.js#prepararRecintos`, al escribir y con su detección.
+
+/**
+ * Distancia euclídea entre dos pares. Local: `geo/metrica.js` la tiene, pero este
+ * módulo es HOJA del grafo y no importa nada (ver cabecera).
+ */
+const separacion = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1])
+
+/**
+ * Quita de un anillo los vértices que están más juntos que `separacionMinima`.
+ *
+ * Recorre el ciclo quedándose con el primero de cada grupo y comparando siempre
+ * contra el **último conservado**, no contra el vecino inmediato: así una tira de
+ * puntos casi juntos no se derrumba en cadena, y ningún punto del anillo acaba a
+ * más de `separacionMinima` de donde había un vértice.
+ *
+ * ⭐ **El PIVOTE no se mueve nunca.** Si el último vértice no se separa del
+ * primero se retira el ÚLTIMO, igual que `gml/anillos.js#invertirAnillo` conserva
+ * `anillo[0]`, y por lo mismo: la parcela sigue empezando donde empezaba y su
+ * área sale bit-idéntica (`geo/area.js` traslada al primer vértice).
+ *
+ * ⛔ **No puede CREAR una degeneración.** Si depurar dejara menos de 3 vértices, el
+ * anillo entero era más fino que el umbral — y eso es un hecho que tiene que decir
+ * quien lo mida (`validation/`, los filtros de área y grosor de `derivacion/`), no
+ * un paso de limpieza que lo haga desaparecer en silencio. En ese caso se devuelve
+ * el anillo **tal cual entró**.
+ *
+ * @param {Array<[number, number]>} anillo  Anillo ABIERTO en UTM.
+ * @param {number} separacionMinima  En metros. **Obligatorio**: ver la cabecera de
+ *   la sección — esta capa no elige tolerancias.
+ * @returns {Array<[number, number]>}  Anillo nuevo. La entrada no se toca.
+ * @throws {TypeError}   Si `anillo` no es un array (contrato del programador).
+ * @throws {RangeError}  Si `separacionMinima` no es un número finito ≥ 0.
+ */
+export function depurarAnillo(anillo, separacionMinima) {
+  if (!Array.isArray(anillo)) {
+    throw new TypeError(
+      `depurarAnillo: se esperaba un array de pares [x,y]; recibido ${typeof anillo}.`,
+    )
+  }
+  if (!Number.isFinite(separacionMinima) || separacionMinima < 0) {
+    throw new RangeError(
+      `depurarAnillo: 'separacionMinima' debe ser un número finito ≥ 0 (metros); recibido ` +
+        `${String(separacionMinima)}. No tiene valor por defecto a propósito: 'geo/' no lee ` +
+        `'config/', y un umbral implícito aquí sería una tolerancia elegida por la capa que ` +
+        `no puede elegirla (regla de oro 9).`,
+    )
+  }
+  if (anillo.length < 4) return [...anillo]
+
+  const salida = []
+  for (const v of anillo) {
+    const ultimo = salida[salida.length - 1]
+    if (ultimo !== undefined && separacion(ultimo, v) < separacionMinima) continue
+    salida.push(v)
+  }
+  while (salida.length > 1 && separacion(salida[salida.length - 1], salida[0]) < separacionMinima) {
+    salida.pop()
+  }
+
+  return salida.length < 3 ? [...anillo] : salida
+}
+
+/**
+ * {@link depurarAnillo} sobre un conjunto de recintos, cada anillo por su cuenta.
+ *
+ * Los huecos se depuran igual que el exterior: un hueco es un anillo del mismo
+ * modelo y le afecta la misma noción de punto.
+ *
+ * @param {Array<{vertices: Array<[number, number]>, tipo: string}>} recintos
+ * @param {number} separacionMinima  En metros. Obligatorio, como arriba.
+ * @returns {Array<{vertices: Array<[number, number]>, tipo: string}>}  Copia nueva.
+ * @throws {TypeError}   Si `recintos` no es un array.
+ * @throws {RangeError}  Lo que lance {@link depurarAnillo}.
+ */
+export function depurarRecintos(recintos, separacionMinima) {
+  if (!Array.isArray(recintos)) {
+    throw new TypeError(
+      `depurarRecintos: se esperaba un array de recintos; recibido ${typeof recintos}.`,
+    )
+  }
+  return recintos.map((r) => ({ ...r, vertices: depurarAnillo(r.vertices, separacionMinima) }))
+}
+
 /**
  * Por qué un recinto se quedó fuera al construir una REGIÓN. Los tres valores
  * posibles de `saltados[i].motivo`, escritos aquí y no repartidos por el código:

@@ -84,9 +84,9 @@
 // retira la repetición, y eso NO contradice la regla de oro 1 porque los dos
 // puntos son ya el mismo número: no se cambia ninguna geometría, se deja de
 // escribir dos veces la misma. **La geometría del usuario sigue sin tocarse por
-// debajo del redondeo**; para las piezas que calcula la propia aplicación —los
-// colindantes recortados de F23— existen `depurarAnillo` y `depurarRecintos`, con
-// su propia justificación escrita al lado.
+// debajo del redondeo**; las piezas que calcula la propia aplicación —los
+// colindantes recortados de F23— llegan aquí ya depuradas por
+// `geo/poligono.js#depurarRecintos`, que es otra capa y otro criterio.
 //
 // RESIDUAL CONOCIDO, escrito para que no sorprenda: un colapso puede además
 // crear una AUTOINTERSECCIÓN que solo `kinks` vería. Ese chequeo —revalidar la
@@ -153,43 +153,6 @@ export const DECIMALES_COORD = 2
  * @readonly
  */
 export const LIMITE_MAGNITUD_COORD = 1e15
-
-/**
- * Separación por debajo de la cual dos vértices **son el mismo punto para el
- * fichero**, en metros. Con {@link DECIMALES_COORD} = 2 son **7,0711 mm**.
- *
- * Sale del formato y no de una cifra escrita a mano: la retícula de publicación
- * tiene paso `10⁻ᴰ` y el redondeo mueve cada coordenada como mucho `½·10⁻ᴰ` por
- * eje, o sea `½·10⁻ᴰ·√2` en el plano.
- *
- * ⚠️ **Precisión de la afirmación, porque la versión corta miente.** Dos vértices
- * más juntos que esto no acaban forzosamente en el mismo punto del fichero: caen
- * en la misma celda de la retícula —y entonces sí son literalmente el mismo punto—
- * o en dos contiguas, y entonces el `posList` lleva un escalón de un centímetro
- * que nadie ha medido. En los dos casos lo que se escribe lo dicta la retícula y
- * no el levantamiento, y por eso es el suelo por debajo del cual una pieza
- * CALCULADA no tiene detalle que conservar. Para una pieza DIBUJADA por el usuario
- * esta constante no se usa: ver {@link depurarAnillo}.
- *
- * ⚠️ **Coincide en valor con `comprobacion/conjunto.js#DESPLAZAMIENTO_MAXIMO_COORD_M`
- * y con `OPERATIVOS.grosorInvasionMinimoM`, y no es la misma decisión que ninguno
- * de los dos.** Aquel mide cuánto puede MOVERSE un vértice al redondear (para
- * presupuestar el residuo del cierre) y el otro, cuánto ruido mete el redondeo
- * del WFS en un solape ajeno. Éste dice cuándo dos vértices NUESTROS dejan de
- * poder escribirse por separado. Los tres derivan del mismo `10⁻ᴰ` y por eso hoy
- * dan el mismo número; el día que uno cambie no debe arrastrar a los otros —
- * mismo criterio con el que `config/operativos.js` separó `grosorInvasionMinimoM`
- * de `duplicadoMetros`.
- *
- * ⛔ **Y NO es `OPERATIVOS.duplicadoMetros` (1 mm).** Aquella cifra afirma algo
- * sobre el MODELO de esta aplicación —«más juntos que esto son el mismo punto»— y
- * la comprueba `validation/reglas-geometria.js` sobre coordenadas sin redondear.
- * Ésta afirma algo sobre el FICHERO. Confundirlas es el error que
- * `config/operativos.js` ya documenta haber cometido una vez.
- *
- * @readonly
- */
-export const SEPARACION_INDISTINGUIBLE_M = 0.5 * 10 ** -DECIMALES_COORD * Math.SQRT2
 
 /**
  * Override O1 — orientación que el Catastro exige a cada tipo de anillo, en la
@@ -428,102 +391,6 @@ export function cerrarAnillo(anillo) {
     )
   }
   return [...anillo, anillo[0]]
-}
-
-// ── Depuración de la geometría que CALCULA la aplicación ──────────────────────
-//
-// ⛔ **Esto NO se aplica a la geometría que dibuja el usuario, y la distinción es
-// la razón de ser de estas dos funciones.** La cabecera de este módulo fija que un
-// colapso por redondeo «se DETECTA, no se corrige: quitar el vértice cambiaría la
-// geometría en silencio (regla de oro 1) y la corrección es decisión del usuario».
-// Eso sigue siendo verdad palabra por palabra **para el dato del usuario**: sus
-// vértices son su levantamiento y no se le tocan a sus espaldas.
-//
-// Pero desde F23 el expediente lleva parcelas que el usuario NO ha dibujado: los
-// colindantes recortados y las piezas del sobrante los produce el motor booleano
-// (`derivacion/topologia.js`). Ahí no hay decisión del usuario que preservar, y un
-// par de vértices por debajo de {@link SEPARACION_INDISTINGUIBLE_M} no es un hecho
-// del terreno: es dónde `polyclip-ts` cortó. Concretamente —MEDIDO el 2026-09-09
-// sobre el expediente 18111A00400806— basta con que un vértice arrastrado caiga a
-// 0,3 mm de un vértice del vecino para que el recorte salga con ese par y
-// `validarParcela` lo rechace con «Vértices consecutivos duplicados (< 1 mm)»,
-// bloqueando el expediente ENTERO con un mensaje que además le pide al usuario que
-// corrija una parcela que no es suya. La ventana es de menos de 1 mm:
-//
-//     corte a −1,0 mm del vértice del vecino → 6 vértices, válido
-//     corte a −0,8 … −0,1 mm                 → 6 vértices, ERROR bloqueante
-//     corte a  0,0 mm                        → 4 vértices, válido
-//
-// Quitar el ruido en el momento de traducir el resultado del motor al modelo hace
-// que esa ventana no exista. No se pierde nada declarable: lo que se borra no cabe
-// en el fichero.
-
-/** Distancia euclídea entre dos pares. Local: este módulo no importa de `geo/`. */
-const separacion = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1])
-
-/**
- * Quita de un anillo los vértices que el fichero no puede separar del anterior.
- *
- * Recorre el ciclo quedándose con el primero de cada grupo y comparando siempre
- * contra el **último conservado**, no contra el vecino inmediato: así una tira de
- * vértices a 5 mm no se derrumba en cadena, y ningún punto del anillo se queda a
- * más de `separacionMinima` de donde había un vértice.
- *
- * ⭐ **El PIVOTE no se mueve nunca.** Si el último vértice es indistinguible del
- * primero se retira el ÚLTIMO, igual que {@link invertirAnillo} conserva
- * `anillo[0]`, y por lo mismo: el `posList` sigue empezando donde empezaba y el
- * área sale bit-idéntica (`geo/area.js` traslada al primer vértice).
- *
- * ⛔ **No puede CREAR una degeneración.** Si depurar dejara menos de 3 vértices, el
- * anillo entero medía menos que la retícula del fichero — y eso es un hecho que
- * tiene que decir quien lo mida (`validation/`, los filtros de área y grosor de
- * `derivacion/`), no un paso de limpieza que lo haga desaparecer en silencio. En
- * ese caso se devuelve el anillo **tal cual entró**.
- *
- * @param {Array<[number, number]>} anillo  Anillo ABIERTO en UTM, sin redondear.
- * @param {number} [separacionMinima=SEPARACION_INDISTINGUIBLE_M]  En metros.
- * @returns {Array<[number, number]>}  Anillo nuevo. La entrada no se toca.
- * @throws {TypeError}  Si `anillo` no es un array (contrato del programador).
- */
-export function depurarAnillo(anillo, separacionMinima = SEPARACION_INDISTINGUIBLE_M) {
-  if (!Array.isArray(anillo)) {
-    throw new TypeError(
-      `depurarAnillo: se esperaba un array de pares [x,y]; recibido ${typeof anillo}.`,
-    )
-  }
-  if (anillo.length < 4) return [...anillo]
-
-  const salida = []
-  for (const v of anillo) {
-    const ultimo = salida[salida.length - 1]
-    if (ultimo !== undefined && separacion(ultimo, v) < separacionMinima) continue
-    salida.push(v)
-  }
-  while (salida.length > 1 && separacion(salida[salida.length - 1], salida[0]) < separacionMinima) {
-    salida.pop()
-  }
-
-  return salida.length < 3 ? [...anillo] : salida
-}
-
-/**
- * {@link depurarAnillo} sobre un conjunto de recintos, cada anillo por su cuenta.
- *
- * Los huecos se depuran igual que el exterior: un hueco es un anillo del mismo
- * fichero y le afecta la misma retícula.
- *
- * @param {Array<{vertices: Array<[number, number]>, tipo: string}>} recintos
- * @param {number} [separacionMinima=SEPARACION_INDISTINGUIBLE_M]
- * @returns {Array<{vertices: Array<[number, number]>, tipo: string}>}  Copia nueva.
- * @throws {TypeError}  Si `recintos` no es un array.
- */
-export function depurarRecintos(recintos, separacionMinima = SEPARACION_INDISTINGUIBLE_M) {
-  if (!Array.isArray(recintos)) {
-    throw new TypeError(
-      `depurarRecintos: se esperaba un array de recintos; recibido ${typeof recintos}.`,
-    )
-  }
-  return recintos.map((r) => ({ ...r, vertices: depurarAnillo(r.vertices, separacionMinima) }))
 }
 
 // ── Helpers internos ──────────────────────────────────────────────────────────

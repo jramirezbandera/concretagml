@@ -1,43 +1,30 @@
 /* -------------------------------------------------------------------------- *
- * test/gml/depuracion.test.js — El vértice que no cabe en el fichero.          *
+ * test/gml/depuracion.test.js — El vértice que el redondeo funde y el fichero  *
+ * escribía dos veces.                                                          *
  *                                                                              *
- * Cubre las dos mitades de un mismo arreglo (2026-09-09), que son opuestas y    *
- * conviene leerlas juntas para que nadie las funda:                             *
+ * Hasta el 2026-09-09 `gml/anillos.js` DETECTABA el colapso por redondeo y no   *
+ * hacía nada con él, así que el vértice fundido se quedaba en el `posList` y el *
+ * GML salía —sin bloqueos— con dos posiciones consecutivas iguales, o sea un    *
+ * `gml:LinearRing` mal formado. La detección lo anunciaba palabra por palabra   *
+ * («el GML llevaría un segmento de longitud cero») y nadie lo impedía.          *
  *                                                                              *
- *   1. **La geometría del USUARIO no se toca por debajo del redondeo.** Lo      *
- *      único que se retira es la REPETICIÓN que crea el propio `toFixed(2)`:    *
- *      dos posiciones consecutivas iguales no son un dato, son un               *
- *      `gml:LinearRing` mal formado. Antes se emitían, y el `posList` salía con *
- *      un segmento de longitud cero mientras la detección lo anunciaba sin que  *
- *      nadie lo impidiera.                                                      *
- *   2. **La geometría que CALCULA la aplicación sí se depura**, con             *
- *      `depurarAnillo` y el suelo `SEPARACION_INDISTINGUIBLE_M`, porque ahí no  *
- *      hay levantamiento de nadie que preservar — sólo dónde cortó el motor     *
- *      booleano. El caso que lo hizo necesario vive en                          *
- *      `test/derivacion/recorte-submilimetrico.test.js`.                        *
- *                                                                              *
- * ⚠️ La prueba que separa las dos es «un par a 5 mm que redondea a DOS          *
- * centímetros distintos»: `depurarAnillo` lo colapsa y `prepararRecintos` NO.   *
- * Si algún día alguien mete la depuración dentro del serializador, esa prueba   *
- * es la que lo caza.                                                            *
+ * ⛔ **Esto NO es depurar la geometría del usuario**, y la diferencia es exacta: *
+ * los dos puntos que se retiran ya son el MISMO NÚMERO tras `toFixed(2)`, así   *
+ * que escribirlos las dos veces no añade un dato, añade un segmento de longitud *
+ * cero. La depuración de verdad —la de las piezas que CALCULA la aplicación—    *
+ * vive en `geo/poligono.js` y se prueba en `test/geo/depuracion.test.js`, que   *
+ * además clava que el serializador no la aplica.                                *
  *                                                                              *
  * Proyecto Vitest `node`: aritmética pura, sin DOM.                             *
  * -------------------------------------------------------------------------- */
 
 import { describe, it, expect } from 'vitest'
 
-import {
-  DECIMALES_COORD,
-  SEPARACION_INDISTINGUIBLE_M,
-  depurarAnillo,
-  depurarRecintos,
-  prepararRecintos,
-} from '../../gml/anillos.js'
+import { prepararRecintos } from '../../gml/anillos.js'
 import { TIPO_GML, SEVERIDAD } from '../../gml/_comun.js'
 import { serializarParcelaCp } from '../../gml/serialize-cp.js'
 import { superficie } from '../../geo/area.js'
 import { TIPO_RECINTO } from '../../model/parcela.js'
-import { OPERATIVOS } from '../../config/operativos.js'
 
 // ── Utillaje ────────────────────────────────────────────────────────────────
 
@@ -56,15 +43,6 @@ function repeticionesInternas(posiciones) {
   return repes
 }
 
-/**
- * Los desplazamientos X respecto al origen local, redondeados al 0,1 mm.
- *
- * ⚠️ Se redondea a propósito: `439050.01 − 439000` no da `50.01` en float64, y
- * comparar el crudo convertiría una prueba sobre la DEPURACIÓN en una prueba
- * sobre el último bit de la resta.
- */
-const desplazamientosX = (vertices) => vertices.map(([x]) => Number((x - X0).toFixed(4)))
-
 /** El `posList` del GML como lista de pares numéricos. */
 function posListDe(xml) {
   const bruto = /<gml:posList[^>]*>([^<]*)</.exec(xml)
@@ -73,98 +51,6 @@ function posListDe(xml) {
   for (let i = 0; i < numeros.length; i += 2) pares.push([numeros[i], numeros[i + 1]])
   return pares
 }
-
-// ── La constante ────────────────────────────────────────────────────────────
-
-describe('gml/anillos · SEPARACION_INDISTINGUIBLE_M', () => {
-  it('se DERIVA de DECIMALES_COORD, no es una cifra escrita a mano', () => {
-    expect(SEPARACION_INDISTINGUIBLE_M).toBe(0.5 * 10 ** -DECIMALES_COORD * Math.SQRT2)
-    // Con D = 2 son 7,0711 mm. Si esto cambiara, es que cambió el formato.
-    expect(DECIMALES_COORD).toBe(2)
-    expect(SEPARACION_INDISTINGUIBLE_M).toBeCloseTo(0.0070711, 7)
-  })
-
-  it('NO es `duplicadoMetros`: son afirmaciones distintas y hoy dan cifras distintas', () => {
-    // `duplicadoMetros` (1 mm) habla del MODELO; ésta, del FICHERO. Que coincidan
-    // en valor sería la coincidencia sin sentido físico que `config/operativos.js`
-    // documenta haber sufrido una vez.
-    expect(SEPARACION_INDISTINGUIBLE_M).not.toBe(OPERATIVOS.duplicadoMetros)
-    expect(SEPARACION_INDISTINGUIBLE_M).toBeGreaterThan(OPERATIVOS.duplicadoMetros)
-  })
-})
-
-// ── depurarAnillo ───────────────────────────────────────────────────────────
-
-describe('gml/anillos · depurarAnillo', () => {
-  const LIMPIO = [p(0, 0), p(50, 0), p(50, 40), p(0, 40)]
-
-  it('un anillo sin ruido sale igual', () => {
-    expect(depurarAnillo(LIMPIO)).toEqual(LIMPIO)
-  })
-
-  it('quita el vértice que no se puede separar del anterior', () => {
-    const conRuido = [p(0, 0), p(50, 0), p(50.003, 0.002), p(50, 40), p(0, 40)]
-    const salida = depurarAnillo(conRuido)
-    expect(salida).toHaveLength(4)
-    expect(salida).toEqual([p(0, 0), p(50, 0), p(50, 40), p(0, 40)])
-  })
-
-  it('quita el ÚLTIMO cuando es el que no se separa del primero: el pivote no se mueve', () => {
-    // Es el caso que produce el recorte de un colindante: el motor cierra la
-    // pieza a 0,3 mm del vértice con el que empezó.
-    const conRuido = [p(0, 0), p(50, 0), p(50, 40), p(0, 40), p(0, 0.0003)]
-    const salida = depurarAnillo(conRuido)
-    expect(salida[0], 'el primer vértice tiene que seguir siendo el mismo').toEqual(p(0, 0))
-    expect(salida).toEqual(LIMPIO)
-  })
-
-  it('NO se derrumba en cadena: compara contra el último conservado, no contra el vecino', () => {
-    // Cinco vértices a 5 mm cada uno recorren 2 cm en total. Si se comparase
-    // contra el vecino inmediato, se irían los cuatro y el lindero se movería
-    // 2 cm; comparando contra el conservado, sobreviven los que hacen falta.
-    const tira = [p(0, 0), p(50, 0), p(50.005, 0), p(50.01, 0), p(50.015, 0), p(50.02, 0), p(50, 40)]
-    const salida = depurarAnillo(tira)
-    const xs = desplazamientosX(salida)
-    expect(xs).toContain(50)
-    expect(xs).toContain(50.01)
-    expect(xs).toContain(50.02)
-    for (let i = 0; i + 1 < salida.length; i++) {
-      const d = Math.hypot(salida[i + 1][0] - salida[i][0], salida[i + 1][1] - salida[i][1])
-      expect(d, `par ${i} demasiado junto`).toBeGreaterThanOrEqual(SEPARACION_INDISTINGUIBLE_M)
-    }
-  })
-
-  it('NO puede crear una degeneración: si dejara menos de 3 vértices, devuelve la entrada', () => {
-    // Una astilla entera más fina que la retícula. Quien tiene que decir que no
-    // es una parcela es quien la mida, no este paso.
-    const astilla = [p(0, 0), p(0.002, 0), p(0.002, 0.002), p(0, 0.002)]
-    expect(depurarAnillo(astilla)).toEqual(astilla)
-  })
-
-  it('no toca la entrada (regla de oro 2)', () => {
-    const entrada = [p(0, 0), p(50, 0), p(50.003, 0.002), p(50, 40), p(0, 40)]
-    const copia = entrada.map((v) => [...v])
-    depurarAnillo(entrada)
-    expect(entrada).toEqual(copia)
-  })
-
-  it('lanza con lo que no es un array (contrato del programador)', () => {
-    expect(() => depurarAnillo(null)).toThrow(TypeError)
-  })
-
-  it('depurarRecintos hace lo mismo con cada anillo, huecos incluidos', () => {
-    const recintos = [
-      { vertices: [p(0, 0), p(50, 0), p(50.003, 0.002), p(50, 40), p(0, 40)], tipo: TIPO_RECINTO.EXTERIOR },
-      { vertices: [p(10, 10), p(20, 10), p(20.002, 10.001), p(20, 20), p(10, 20)], tipo: TIPO_RECINTO.HUECO },
-    ]
-    const salida = depurarRecintos(recintos)
-    expect(salida[0].vertices).toHaveLength(4)
-    expect(salida[1].vertices).toHaveLength(4)
-    expect(salida[0].tipo).toBe(TIPO_RECINTO.EXTERIOR)
-    expect(salida[1].tipo).toBe(TIPO_RECINTO.HUECO)
-    expect(recintos[0].vertices, 'la entrada no se toca').toHaveLength(5)
-  })
-})
 
 // ── prepararRecintos: la repetición que crea el redondeo ────────────────────
 
@@ -212,20 +98,5 @@ describe('gml/anillos · prepararRecintos no deja posiciones repetidas', () => {
     const { recintos, detecciones } = prepararRecintos(limpio)
     expect(recintos[0].vertices).toHaveLength(4)
     expect(detecciones.filter((d) => d.tipo === TIPO_GML.COLAPSO_POR_REDONDEO)).toEqual([])
-  })
-
-  it('⛔ NO depura la geometría del usuario: un par a 5 mm que cae en DOS centímetros se conserva', () => {
-    // 5 mm está por debajo de SEPARACION_INDISTINGUIBLE_M, así que `depurarAnillo`
-    // lo colapsaría. `prepararRecintos` NO: es dato del usuario y los dos puntos
-    // se escriben distintos (…50.00 y …50.01). Esta prueba es la que separa las
-    // dos mitades del arreglo.
-    const anillo = [p(0, 0), p(50.004, 0), p(50.009, 0), p(50, 40), p(0, 40)]
-    expect(depurarAnillo(anillo)).toHaveLength(4)
-
-    const { recintos } = prepararRecintos(ext(anillo))
-    expect(recintos[0].vertices).toHaveLength(5)
-    const xs = desplazamientosX(recintos[0].vertices)
-    expect(xs).toContain(50)
-    expect(xs).toContain(50.01)
   })
 })

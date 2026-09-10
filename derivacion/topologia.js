@@ -4,10 +4,11 @@
 // Contrato:
 //   · `restar(recintosA, recintosB) → {piezas, saltados, detecciones}`
 //
-// ⚠️ **Las piezas salen DEPURADAS** desde el 2026-09-09: sin vértices que el
-// fichero no pueda separar. No es una decisión sobre las piezas —eso sigue siendo
-// de `cesion.js`— sino parte de traducirlas al modelo. El porqué, con la medición
-// que lo obligó, está en {@link piezasDelMotor}.
+// ⚠️ **Las piezas salen DEPURADAS** desde el 2026-09-09: sin pares de vértices que
+// el modelo ya considera el mismo punto (`OPERATIVOS.duplicadoMetros`). No es una
+// decisión sobre las piezas —eso sigue siendo de `cesion.js`— sino parte de
+// traducirlas al modelo. El porqué, con la medición que lo obligó, está en
+// {@link piezasDelMotor} y en `geo/poligono.js`.
 //
 // Es el ÚNICO módulo de la capa `derivacion/` que importa Turf, igual que
 // `diagnostico/topologia.js` lo es de la suya y `validation/reglas-topologia.js`
@@ -72,8 +73,8 @@ import difference from '@turf/difference'
 import { featureCollection, polygon } from '@turf/helpers'
 import union from '@turf/union'
 
-import { depurarRecintos } from '../gml/anillos.js'
-import { coordsRegion, recintosDeGeometriaTurf } from '../geo/poligono.js'
+import { OPERATIVOS } from '../config/operativos.js'
+import { coordsRegion, depurarRecintos, recintosDeGeometriaTurf } from '../geo/poligono.js'
 import { MOTIVO_RESTA, SEVERIDAD, TIPO_DERIVACION, crearDeteccionDerivacion } from './_comun.js'
 
 /**
@@ -82,42 +83,47 @@ import { MOTIVO_RESTA, SEVERIDAD, TIPO_DERIVACION, crearDeteccionDerivacion } fr
  * ── POR QUÉ ESTO ESTÁ AQUÍ Y NO EN QUIEN LLAMA ─────────────────────────────
  * Éste es el único sitio de la capa por el que entra geometría que no ha dibujado
  * nadie. Todo lo que sale de `polyclip-ts` —las piezas del sobrante de F17 y los
- * colindantes recortados de F23— pasa por estas dos funciones, así que limpiarlo
- * en la traducción lo limpia una vez y para siempre; repartir la limpieza entre
+ * colindantes recortados de F23— pasa por `restar` y `unir`, así que limpiarlo en
+ * la traducción lo limpia una vez y para siempre; repartir la limpieza entre
  * `cesion.js` y `vecino.js` sería dos sitios que hay que acordarse de tocar, y el
- * tercero que aparezca no se tocaría.
+ * tercero que apareciera no se tocaría.
  *
  * ── QUÉ SE LIMPIA, Y POR QUÉ NO ES «DECIDIR SOBRE LAS PIEZAS» ──────────────
- * La cabecera promete que aquí no se ordena, ni se nombra, ni se descarta nada
- * por estrecho: todo eso sigue siendo de `cesion.js`. Esto no es una decisión
- * sobre las piezas, es parte de traducirlas: donde la geometría medida cruza un
- * lindero a menos de un centímetro de un vértice que ya existía, el motor devuelve
- * los dos puntos, y ese par **no es un hecho del terreno, es dónde cortó el
- * barrido**. No cabe en el `posList` —`gml/anillos.js#SEPARACION_INDISTINGUIBLE_M`
- * lo deriva del formato— y por debajo de 1 mm además hacía que
- * `validation/reglas-geometria.js` rechazara la pieza como «vértices consecutivos
- * duplicados», bloqueando el expediente ENTERO con un mensaje que le pedía al
- * usuario que corrigiera la parcela de un vecino. MEDIDO el 2026-09-09 sobre el
- * expediente 18111A00400806: la ventana de fallo era de 0,1 a 0,8 mm.
+ * La cabecera promete que aquí no se ordena, ni se nombra, ni se descarta nada por
+ * estrecho: todo eso sigue siendo de `cesion.js`. Esto no es una decisión sobre las
+ * piezas, es parte de traducirlas: donde la geometría medida cruza un lindero a una
+ * décima de milímetro de un vértice que ya existía, el motor devuelve los dos
+ * puntos, y para el modelo de esta aplicación son **el mismo punto**. El porqué
+ * largo, con la medición que lo obligó, está en `geo/poligono.js`.
+ *
+ * ── ⛔ LA CIFRA ES `duplicadoMetros`, Y ESTA VEZ SÍ ES LA SUYA ─────────────
+ * `config/operativos.js` documenta haber tomado prestado ese milímetro una vez para
+ * significar otra cosa —el ruido del redondeo del WFS— y haberse equivocado; de ahí
+ * nació `grosorInvasionMinimoM`. Aquí NO pasa eso: `duplicadoMetros` afirma «dos
+ * puntos más juntos que esto son el mismo punto **en el modelo**», y lo que hace
+ * esta función es meter en el modelo lo que devolvió un motor externo. Es
+ * literalmente la misma afirmación, en la dirección de entrada.
+ *
+ * ⚠️ **Y es EXACTAMENTE lo que hace falta, medido.** Lo que bloqueaba era
+ * `validation/reglas-geometria.js` con ese mismo umbral, así que borrar por debajo
+ * de él cierra la ventana entera y ni un micrón más. Se probó con la retícula del
+ * fichero (7,07 mm) y se bajó el 2026-09-10: aquello borraba además puntos que el
+ * modelo considera distintos —hasta 0,18 m² de la finca de un vecino sobre un lado
+ * de 50 m— sin decirlo en ninguna parte.
  *
  * ⚠️ **Las áreas que esta capa reporta salen de la geometría ya depurada**, y así
  * tiene que ser: es la regla de oro 11 —el número que se enseña es el de las
- * coordenadas que se escriben— aplicada a las piezas calculadas.
- *
- * ⛔ **Cuánto cambia el área, dicho sin adornos.** Quitar un vértice desplaza el
- * lindero como mucho `SEPARACION_INDISTINGUIBLE_M`, así que el área se mueve hasta
- * `½·7,07 mm·(longitud de los dos lados que tocaban ese vértice)`: sobre un lado de
- * 50 m son 0,18 m², no unos centímetros cuadrados. **No es despreciable, es
- * PRESUPUESTADO**: `comprobacion/conjunto.js#DESPLAZAMIENTO_MAXIMO_COORD_M` es esa
- * misma cifra y la tolerancia del cierre ya es `esa cifra × perímetro`, justamente
- * porque el redondeo del fichero mueve los linderos en ese orden. Depurar gasta de
- * ese presupuesto en vez de añadirle nada nuevo.
+ * coordenadas que se escriben— aplicada a las piezas calculadas. Con este umbral el
+ * lindero se mueve como mucho 1 mm, muy por debajo de lo que
+ * `comprobacion/conjunto.js` ya presupuesta para el cierre.
  *
  * @param {object|null} geometria  Lo que devolvió Turf.
  * @returns {Array<Recinto[]>}
  */
 function piezasDelMotor(geometria) {
-  return recintosDeGeometriaTurf(geometria).map((pieza) => depurarRecintos(pieza))
+  return recintosDeGeometriaTurf(geometria).map((pieza) =>
+    depurarRecintos(pieza, OPERATIVOS.duplicadoMetros),
+  )
 }
 
 /** @typedef {import('../geo/poligono.js').RecintoSaltado} RecintoSaltado */
