@@ -126,6 +126,21 @@ const NOMBRES = Object.freeze({
   NO: 'Noroeste',
 })
 
+/**
+ * Los CUATRO puntos cardinales, en el mismo sentido horario desde el Norte que
+ * {@link CUADRANTES}. Son un subconjunto suyo a propósito —los mismos códigos,
+ * los mismos nombres en {@link NOMBRES}— para que nadie tenga que traducir entre
+ * dos vocabularios.
+ * @type {readonly Cuadrante[]}
+ */
+const CARDINALES = Object.freeze(['N', 'E', 'S', 'O'])
+
+/** Amplitud de cada uno de los cuatro sectores cardinales, en grados. */
+const SECTOR_CARDINAL_GRADOS = 90
+
+/** Medio sector cardinal: del rumbo que nombra a cada uno de sus bordes. */
+const SEMISECTOR_CARDINAL_GRADOS = SECTOR_CARDINAL_GRADOS / 2 // 45
+
 /** True si `P` es un punto plano válido: `[x, y]` con ambos finitos. */
 function esPuntoFinito(P) {
   return Array.isArray(P) && P.length === 2 && Number.isFinite(P[0]) && Number.isFinite(P[1])
@@ -257,6 +272,69 @@ export function cuadrante(azimutGrados) {
     return CUADRANTES[0]
   }
   return CUADRANTES[Math.floor((azimutGrados + SEMISECTOR_GRADOS) / SECTOR_GRADOS)]
+}
+
+/**
+ * Punto cardinal de un azimut: CUATRO sectores de 90°, cada uno **centrado en el
+ * rumbo que nombra**. El sector 'N' es [315°, 360) ∪ [0°, 45°), el 'E' es
+ * [45°, 135°), y así.
+ *
+ * Es la misma construcción que {@link cuadrante} con otro paso, y **el criterio
+ * en los bordes es el mismo**: el intervalo es semiabierto [centro − 45°,
+ * centro + 45°), así que 45° exactos son 'E' (no 'N') y 315° exactos son 'N' (no
+ * 'O'). Los cuatro sectores PARTEN la circunferencia: ningún azimut cae en dos,
+ * ninguno se queda fuera.
+ *
+ * ── POR QUÉ EXISTEN LAS DOS Y NO UNA CON PARÁMETRO ──────────────────────────
+ * Porque no son la misma pregunta con distinta resolución: son dos convenciones
+ * de redacción distintas. Un lindero se describe en una escritura con los cuatro
+ * puntos cardinales —«linda al Norte con…»— y el detalle de ocho es lo que pide
+ * una memoria técnica. Quien llama elige cuál usa **y se ve en la llamada**; un
+ * `cuadrante(az, {sectores: 4})` escondería esa elección en un argumento que se
+ * lee mal en el sitio de uso y que invita a pasarle un 16 que nadie ha definido.
+ *
+ * ⚠️ **Un tramo a 45° cae en 'E', no en 'NE'.** Con cuatro sectores, el rumbo que
+ * nombra el cardinal puede separarse hasta 45° del rumbo real del lindero; con
+ * ocho, hasta 22,5°. No es una pérdida de precisión del DATO —el azimut exacto
+ * viaja aparte y no lo toca nadie—, sino de la palabra con que se redacta.
+ *
+ * @param {number} azimutGrados  Azimut en grados, en [0, 360) — el que devuelve
+ *   {@link azimut}.
+ * @returns {Cuadrante}  Siempre uno de {@link CARDINALES}: 'N', 'E', 'S' u 'O'.
+ * @throws {TypeError} Si no es un número finito. En particular con `null`, que es
+ *   lo que devuelve {@link azimut} para dos puntos coincidentes: tratarlo como 0
+ *   lo convertiría en «Norte» en silencio.
+ * @throws {RangeError} Si está fuera de [0, 360).
+ */
+export function puntoCardinal(azimutGrados) {
+  if (!Number.isFinite(azimutGrados)) {
+    throw new TypeError(
+      `puntoCardinal: se esperaba un azimut en grados (número finito); ` +
+        `recibido ${JSON.stringify(azimutGrados)}. ` +
+        `Si viene de azimut(), recuerda que devuelve null cuando los dos puntos coinciden: ` +
+        `eso es «no hay rumbo» y hay que tratarlo antes, porque 0 es el Norte, un rumbo legítimo.`,
+    )
+  }
+  if (azimutGrados < 0 || azimutGrados >= 360) {
+    throw new RangeError(
+      `puntoCardinal: el azimut debe estar en [0, 360); recibido ${azimutGrados}. ` +
+        `Fuera de rango casi siempre significa que alguien sumó 180° para el rumbo inverso ` +
+        `y no volvió a normalizar: ((g % 360) + 360) % 360.`,
+    )
+  }
+
+  // Mismo esquema que `cuadrante`: 'N' envuelve el 0 y se resuelve aparte; con él
+  // fuera, los otros tres son un tramo continuo y el índice sale de una división
+  // entera sobre el azimut desplazado medio sector.
+  if (
+    azimutGrados >= 360 - SEMISECTOR_CARDINAL_GRADOS ||
+    azimutGrados < SEMISECTOR_CARDINAL_GRADOS
+  ) {
+    return CARDINALES[0]
+  }
+  return CARDINALES[
+    Math.floor((azimutGrados + SEMISECTOR_CARDINAL_GRADOS) / SECTOR_CARDINAL_GRADOS)
+  ]
 }
 
 /**

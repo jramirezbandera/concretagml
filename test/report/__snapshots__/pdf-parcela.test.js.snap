@@ -2266,7 +2266,7 @@ startxref
 
 exports[`report/pdf-parcela · snapshot > y las medidas del informe COMPLETO sobre la parcela real 1`] = `
 {
-  "bytes": 35896,
-  "paginas": 5,
+  "bytes": 34629,
+  "paginas": 4,
 }
 `;

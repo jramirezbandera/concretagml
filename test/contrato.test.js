@@ -442,7 +442,7 @@ describe('contrato F09 · la capa del informe sale por el barrel; el plano y el 
     // verdad aquí —este bloque no habla por la red— y no es lo mismo que `[]`.
     const literal = barrel.report.describirLindero({ recintos: parcela.recintos })
     expect(literal.tramos.length).toBeGreaterThan(0)
-    expect(literal.texto).toContain('Linda al ')
+    expect(literal.texto).toContain('Linda: al ')
     expect(literal.vecinasConsultadas).toBe(false)
 
     // Contrato D. Sin descriptivos, que tampoco se pueden consultar sin red.

@@ -162,7 +162,7 @@ import { orientacion } from '../geo/area.js'
 import { bbox } from '../geo/bbox.js'
 import { distancia, longitudesDeLados } from '../geo/metrica.js'
 import { anilloCerrado } from '../geo/poligono.js'
-import { azimut, cuadrante, nombreCardinal } from '../geo/rumbo.js'
+import { azimut, nombreCardinal, puntoCardinal } from '../geo/rumbo.js'
 
 // ── Vocabulario ─────────────────────────────────────────────────────────────
 
@@ -413,6 +413,94 @@ function separacionAngular(a, b) {
 
 // ── La redacción ────────────────────────────────────────────────────────────
 
+// ── Cómo se NOMBRA una parcela colindante ───────────────────────────────────
+//
+// ⭐ **La corrección del 2026-09-11, y el hecho que la hace posible.** La cabecera
+// de este módulo decía —y la decisión D2 de `spec/feature-09-informe-parcela.md`
+// con ella— que «la parcela 68 del polígono 27» no se puede escribir para un
+// colindante porque polígono y parcela salen de `Consulta_DNPRC` y pedirlo para
+// cada vecina serían cinco peticiones por informe contra el override O8.
+//
+// Para el PARAJE o el MUNICIPIO eso sigue siendo verdad. Para el polígono y la
+// parcela **no**: van dentro de la propia referencia catastral rústica, que ya
+// viene con la geometría del WFS. Contrastado contra la respuesta real del
+// servicio que el repo guarda como fixture:
+//
+//     refcat 13005A10900005  →  derivado:  polígono 109, parcela 5
+//     ovc-dnprc-rustica-13005A10900005.json →  cpo = '109',  cpa = '5'
+//
+// Cero peticiones. Lo que la decisión D2 protege es el presupuesto de red, y esto
+// no gasta ni una.
+//
+// ── ⛔ SOLO LA RÚSTICA SE DESCOMPONE, Y NO ES UNA LIMITACIÓN TEMPORAL ───────
+// La referencia rústica tiene una forma que la identifica sola —5 dígitos de
+// provincia y municipio, una letra de sector, 3 de polígono y 5 de parcela— y de
+// ahí salen los dos números. La urbana NO lleva dentro ni calle ni número: su
+// dirección solo existe en `Consulta_DNPRC`, y por eso viaja por `domicilio`
+// cuando alguien la ha pedido y vale `null` cuando no.
+//
+// ⚠️ Y la clase **no se deduce de la forma de la referencia**. Que una referencia
+// no encaje en el patrón rústico no la convierte en urbana: puede ser una
+// referencia mal transcrita, de otro país o de una versión del formato que este
+// código no conoce. Aquí solo se afirma lo que se puede leer; quien dice la clase
+// es `services/_catastro-dnp.js`, que la lee del subárbol del servicio.
+
+/**
+ * Polígono y parcela de una referencia catastral RÚSTICA, o `null`.
+ *
+ * ⚠️ **Sin ceros a la izquierda**, que es como los escribe el Catastro en su
+ * propio `ldt` («Polígono 109 Parcela 5») y como los devuelve `Consulta_DNPRC` en
+ * `cpo`/`cpa`. Escribir «la parcela 00005 del polígono 109» sería copiar el
+ * relleno del formato, no el número de la parcela.
+ *
+ * @param {string} refcat  Referencia catastral, de 14 posiciones (parcela) o de
+ *   20 (bien inmueble): las 14 primeras son las mismas y bastan.
+ * @returns {{poligono: string, parcela: string}|null}  `null` si no tiene la forma
+ *   de una referencia rústica — y eso incluye «es urbana» y «no se ha entendido»,
+ *   que aquí no se distinguen porque este módulo no puede distinguirlas.
+ */
+function poligonoParcelaDe(refcat) {
+  const casa = /^(\d{5})([A-Z])(\d{3})(\d{5})/.exec(refcat)
+  if (casa === null) return null
+  const sinCeros = (s) => String(Number(s))
+  return { poligono: sinCeros(casa[3]), parcela: sinCeros(casa[4]) }
+}
+
+/**
+ * Cómo se nombra una parcela colindante de la que SÍ consta referencia catastral.
+ *
+ * Tres formas, por orden de lo que se sabe de ella:
+ *
+ *   · rústica          → «la parcela 68 del polígono 27, con referencia catastral X»
+ *   · urbana con señas → «el nº 72 de Calle San Restituto, con referencia catastral X»
+ *   · lo demás         → «la parcela catastral X»
+ *
+ * ⛔ **El `cp:label` ya no se escribe.** Decía «rotulada «68» en el parcelario
+ * catastral», una fórmula prudente que existía porque no se podía afirmar que ese
+ * rótulo FUERA el número de parcela. En rústica ahora no hace falta: el número
+ * sale de la referencia y se puede afirmar. Y donde no sale —urbana—, el `label`
+ * no es el número de la calle sino el orden dentro de la manzana (medido: la
+ * parcela `9398516VK3799G` tiene `cp:label` 16 y está en el nº 72 de su calle),
+ * así que escribirlo al lado de una dirección invitaría a leerlo como parte de
+ * ella. Sigue viajando en `tramos[].label` para quien lo quiera.
+ *
+ * @param {{refcat: string, domicilio: string|null}} tramo
+ * @returns {string}
+ */
+function nombrarParcela(tramo) {
+  const rustica = poligonoParcelaDe(tramo.refcat)
+  if (rustica !== null) {
+    return (
+      `la parcela ${rustica.parcela} del polígono ${rustica.poligono}, ` +
+      `con referencia catastral ${tramo.refcat}`
+    )
+  }
+  if (tramo.domicilio !== null) {
+    return `${tramo.domicilio}, con referencia catastral ${tramo.refcat}`
+  }
+  return `la parcela catastral ${tramo.refcat}`
+}
+
 /**
  * Con quién linda un tramo, en palabras. Los cinco casos se escriben DISTINTO a
  * propósito; los tres últimos son el mismo `refcat: null` del contrato y no
@@ -424,9 +512,7 @@ function separacionAngular(a, b) {
  */
 function conQuienLinda(tramo, consultadas) {
   if (tramo.refcat !== null) {
-    const rotulo =
-      tramo.label === null ? '' : `, rotulada «${tramo.label}» en el parcelario catastral`
-    return `con la parcela de referencia catastral ${tramo.refcat}${rotulo}`
+    return `con ${nombrarParcela(tramo)}`
   }
   if (tramo.label !== null) {
     return (
@@ -454,39 +540,111 @@ function conQuienLinda(tramo, consultadas) {
     : 'con parcela sin identificar (no se han consultado las parcelas colindantes)'
 }
 
-/** La medida de un tramo: recta si es un solo lado, quebrada si se agruparon varios. */
-const medidaDelTramo = (tramo) =>
-  tramo.nLados === 1
-    ? `en línea recta de ${metros(tramo.longitud)}`
-    : `en línea quebrada de ${plural(tramo.nLados, 'lado', 'lados')} que suman ${metros(tramo.longitud)}`
+/**
+ * ⛔ **HACIA DÓNDE CAE EL VECINO**, dado el rumbo del tramo. La corrección del
+ * 2026-09-11, y la avería más cara que ha tenido este módulo.
+ *
+ * ── EL DEFECTO ─────────────────────────────────────────────────────────────
+ * Hasta hoy el cardinal salía del azimut del PROPIO LADO —«la ORIENTACIÓN de cada
+ * lado respecto al Norte», dice la cabecera de `geo/rumbo.js`— y eso **no es lo
+ * que significa «linda al Norte»**. En una escritura el cardinal dice DÓNDE ESTÁ
+ * el vecino, no hacia dónde corre la línea que os separa; y una línea que corre
+ * al Este separa de alguien que está al Norte o al Sur, nunca al Este.
+ *
+ * MEDIDO con un cuadrado de 40 m y una vecina pegada a cada lado:
+ *
+ *     dónde está de verdad        qué decía el informe
+ *     VECINA-NORTE           →    «al Este»
+ *     VECINA-ESTE            →    «al Sur»
+ *     VECINA-SUR             →    «al Oeste»
+ *     VECINA-OESTE           →    «al Norte»
+ *
+ * Los cuatro girados 90°, sistemáticamente. El documento se leía perfectamente
+ * bien y era falso de cabo a rabo — **exactamente lo que el test «EL MISMO TEXTO
+ * con el anillo horario y con el anillo antihorario» existía para impedir**. Aquel
+ * guardián cerró el error de 180° (recorrer el anillo al revés) y dejó abierto el
+ * de 90°, porque comparaba el módulo consigo mismo en vez de con la posición real
+ * de una vecina conocida. Un oráculo que solo se compara consigo mismo confirma
+ * cualquier convención, incluida la equivocada.
+ *
+ * ── LA CORRECCIÓN ──────────────────────────────────────────────────────────
+ * El vecino está en la dirección de la NORMAL EXTERIOR del tramo. El recorrido lo
+ * normaliza este módulo a HORARIO (`ordenDeRecorrido`, y hay test que lo fija), y
+ * en un anillo horario la normal exterior va **90° a la izquierda del avance**:
+ * avanzando al Este (90°) se sale por el Norte (0°). De ahí el −90°, que no es un
+ * ajuste empírico sino la normal que este mismo módulo ya construye para lanzar la
+ * sonda de atribución (`nx = signo·uy`, `ny = −signo·ux`) — la misma dirección, un
+ * apaño menos.
+ *
+ * ⚠️ **`tramos[].azimut` NO cambia**: sigue siendo el rumbo del tramo, que es lo
+ * que mide un topógrafo y lo que pinta la tabla. Lo que cambia es el CARDINAL, que
+ * es una palabra sobre otra cosa. Las dos cifras conviven y ahora dicen cada una
+ * lo suyo.
+ *
+ * @param {number} azimutTramo  Rumbo del tramo en grados [0, 360).
+ * @returns {number}  Rumbo de la normal exterior, en [0, 360).
+ */
+const hacia = (azimutTramo) => (azimutTramo - 90 + 360) % 360
 
 /**
- * Una frase de lindero por cada RACHA de tramos consecutivos con el mismo
- * cardinal, que es lo que pide la spec («agrupando por cuadrantes N/E/S/O») y lo
- * que hace legible el resultado: «Linda al Norte, en línea recta de 12,45 m, con
- * A; y en línea recta de 3,20 m, con B.»
+ * El orden en que se recitan los cardinales, que **no es el del recorrido**: es
+ * el de una escritura. Se escribe aquí, una vez, porque un orden implícito en un
+ * `sort` es un orden que nadie puede leer.
+ */
+const ORDEN_CARDINAL = Object.freeze(['Norte', 'Sur', 'Este', 'Oeste'])
+
+/**
+ * UNA frase con el lindero entero, agrupado por punto cardinal.
+ *
+ *     Linda: al NORTE, con la parcela 68 del polígono 27, con referencia
+ *     catastral 29094A02700068, y con la parcela 736 del polígono 27, con
+ *     referencia catastral 29094A02700736; al SUR, con …
+ *
+ * ── QUÉ CAMBIÓ EL 2026-09-11, Y QUÉ SE PERDIÓ ──────────────────────────────
+ * Antes salía una frase por RACHA de tramos consecutivos del mismo cardinal, con
+ * la medida de cada tramo delante («Linda al Norte, en línea recta de 12,45 m,
+ * con A»). La forma nueva la pidió el autor con un ejemplo redactado a mano, y
+ * hace tres cosas distintas:
+ *
+ *   1. **Agrupa por cardinal en todo el perímetro**, no por racha. Un cardinal
+ *      sale UNA vez aunque el recorrido pase por él dos veces.
+ *   2. **Recita en el orden N-S-E-O** ({@link ORDEN_CARDINAL}), no en el del
+ *      recorrido. Es como se leen los linderos en una escritura.
+ *   3. ⚠️ **No escribe las distancias.** Es una pérdida REAL y conviene que esté
+ *      dicha donde se comete: la longitud de cada tramo era lo que permitía
+ *      replantearlo sobre el terreno, y `spec/feature-09` la pedía («con
+ *      distancia»). No desaparece del informe —sigue en `tramos[].longitud`, que
+ *      es lo que pintan la tabla del PDF y la lista del diálogo—, pero sale del
+ *      párrafo que el técnico copia y pega.
+ *
+ * ⚠️ **Un mismo colindante no se repite dentro de su cardinal.** Si dos tramos
+ * distintos del Norte lindan con la misma parcela —porque el lindero va y vuelve,
+ * o porque entre ellos se cruzó otro cardinal— se nombra una sola vez. Repetirla
+ * no añadiría nada sin las distancias, que son lo que distinguía un tramo de otro.
  *
  * @param {Array<object>} tramos
  * @param {boolean} consultadas
- * @returns {string[]}  Una frase por racha, en el orden del recorrido.
+ * @returns {string[]}  Un único párrafo, o ninguno si no hay tramos.
  */
 function frasesDeLindero(tramos, consultadas) {
-  const frases = []
-  let i = 0
-  while (i < tramos.length) {
-    let j = i + 1
-    while (j < tramos.length && tramos[j].cardinal === tramos[i].cardinal) j++
-    const partes = tramos
-      .slice(i, j)
-      .map((t) => `${medidaDelTramo(t)}, ${conQuienLinda(t, consultadas)}`)
-    const cuerpo =
-      partes.length === 1
-        ? partes[0]
-        : `${partes.slice(0, -1).join('; ')}; y ${partes[partes.length - 1]}`
-    frases.push(`Linda al ${tramos[i].cardinal}, ${cuerpo}.`)
-    i = j
+  if (tramos.length === 0) return []
+
+  /** @type {Map<string, string[]>} cardinal → las formas de nombrar, sin repetir. */
+  const porCardinal = new Map()
+  for (const t of tramos) {
+    if (!porCardinal.has(t.cardinal)) porCardinal.set(t.cardinal, [])
+    const dichas = porCardinal.get(t.cardinal)
+    const frase = conQuienLinda(t, consultadas)
+    if (!dichas.includes(frase)) dichas.push(frase)
   }
-  return frases
+
+  // Los cardinales presentes, en el orden de la escritura. Un cardinal que no
+  // aparezca en el recorrido no se nombra: «al Oeste, con nada» sería falso.
+  const partes = ORDEN_CARDINAL.filter((c) => porCardinal.has(c)).map(
+    (c) => `al ${c.toUpperCase()}, ${porCardinal.get(c).join(', y ')}`,
+  )
+
+  return [`Linda: ${partes.join('; ')}.`]
 }
 
 /** Rótulo con el que abre la nota técnica dentro del documento completo. */
@@ -684,6 +842,14 @@ function salida(datos) {
  * @typedef {Object} VecinaLiteral
  * @property {string|null} [refcat]  Referencia catastral, o `null` si no consta.
  * @property {string|null} [label]   `cp:label` del parcelario, o `null`.
+ * @property {string|null} [domicilio]  Cómo se nombra la finca por sus señas
+ *   —«el nº 72 de Calle San Restituto»—, ya REDACTADO por quien lo consiguió, o
+ *   `null` si no consta. Es lo único de esta lista que NO viene con la geometría
+ *   del WFS: hay que pedirlo a `Consulta_DNPRC`, una petición por colindante, y
+ *   por eso entra por el contrato en vez de buscarlo este módulo (que es puro y no
+ *   toca la red). Con `null` la parcela se nombra por su referencia y nada más.
+ *   ⚠️ En RÚSTICA no se usa aunque venga: allí manda el polígono y la parcela, que
+ *   salen de la propia referencia y no cuestan ninguna petición.
  * @property {Array<{vertices: Array<[number,number]>, tipo?: string}>} recintos
  *   Su geometría; `[]` es legítimo (el Catastro devolvió la vecina sin geometría).
  */
@@ -978,6 +1144,7 @@ export function describirLindero(entrada) {
       longitud,
       refcat: textoONulo(vecina?.refcat),
       label: textoONulo(vecina?.label),
+      domicilio: textoONulo(vecina?.domicilio),
     })
   }
 
@@ -1011,6 +1178,7 @@ export function describirLindero(entrada) {
       longitud: lado.longitud,
       refcat: lado.refcat,
       label: lado.label,
+      domicilio: lado.domicilio,
       indiceInicio: lado.iDesde,
       indiceFin: lado.iHasta,
       nLados: 1,
@@ -1051,11 +1219,12 @@ export function describirLindero(entrada) {
     const az = cuerda === null ? t.azimutPrimero : cuerda
     const sinColindante = t.refcat === null && t.label === null
     return {
-      cardinal: nombreCardinal(cuadrante(az)),
+      cardinal: nombreCardinal(puntoCardinal(hacia(az))),
       azimut: az,
       longitud: t.longitud,
       refcat: t.refcat,
       label: t.label,
+      domicilio: t.domicilio,
       indiceInicio: t.indiceInicio,
       indiceFin: t.indiceFin,
       nLados: t.nLados,

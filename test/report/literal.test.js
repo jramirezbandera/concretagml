@@ -41,7 +41,7 @@ import { diagnosticar } from '../../diagnostico/parcela.js'
 import { areaFirmada, orientacion } from '../../geo/area.js'
 import { bbox } from '../../geo/bbox.js'
 import { distancia, longitudesDeLados, perimetroAnillo } from '../../geo/metrica.js'
-import { azimut, cuadrante, nombreCardinal } from '../../geo/rumbo.js'
+import { azimut, cuadrante, nombreCardinal, puntoCardinal } from '../../geo/rumbo.js'
 import { parsearGml } from '../../gml/parse.js'
 import { informeContrasteTexto } from '../../report/contraste-texto.js'
 import {
@@ -149,10 +149,16 @@ describe('report/literal · los tramos de la parcela real y sus cuatro colindant
         longitud: Number(t.longitud.toFixed(2)),
       })),
     ).toEqual([
-      { cardinal: 'Este', refcat: '9398517VK3799G', label: '17', nLados: 1, longitud: 26.5 },
-      { cardinal: 'Sudeste', refcat: '9398518VK3799G', label: '18', nLados: 2, longitud: 39.4 },
-      { cardinal: 'Sudoeste', refcat: '9398515VK3799G', label: '15', nLados: 3, longitud: 50 },
-      { cardinal: 'Noroeste', refcat: null, label: null, nLados: 9, longitud: 47.21 },
+      // ⚠️ Los cardinales son los de la NORMAL EXTERIOR de cada tramo —dónde cae
+      // el vecino—, no los del rumbo del tramo. Hasta el 2026-09-11 eran
+      // 'Este'/'Sudeste'/'Sudoeste'/'Noroeste', que es lo mismo girado 90°: ver
+      // `report/literal.js#hacia`. Contrastado contra la dirección del CENTROIDE
+      // de cada colindante real: 9398517 a 328,1°, 9398518 a 21,0° y 9398515 a
+      // 122,3° desde el centroide de la parcela.
+      { cardinal: 'Norte', refcat: '9398517VK3799G', label: '17', nLados: 1, longitud: 26.5 },
+      { cardinal: 'Norte', refcat: '9398518VK3799G', label: '18', nLados: 2, longitud: 39.4 },
+      { cardinal: 'Sur', refcat: '9398515VK3799G', label: '15', nLados: 3, longitud: 50 },
+      { cardinal: 'Oeste', refcat: null, label: null, nLados: 9, longitud: 47.21 },
     ])
   })
 
@@ -212,13 +218,19 @@ describe('report/literal · los tramos de la parcela real y sus cuatro colindant
     }
   })
 
-  it('el rumbo de un tramo agrupado es el de su CUERDA, y su cardinal lo sigue', () => {
+  it('el rumbo de un tramo agrupado es el de su CUERDA, y su cardinal es el de la NORMAL', () => {
     // Contraste independiente: se recalcula con `geo/rumbo.js` desde los vértices
     // del fixture, sin pasar por el módulo.
+    //
+    // ⚠️ Las dos cifras dicen cosas distintas y por eso se comprueban distinto:
+    // `azimut` es por dónde CORRE el tramo y `cardinal` es dónde CAE el vecino,
+    // que en un anillo recorrido en horario está 90° a la izquierda. Comprobar el
+    // cardinal contra el azimut del propio tramo es el error que este fichero tuvo
+    // hasta el 2026-09-11.
     for (const t of r.tramos) {
       const esperado = azimut(ANILLO[t.indiceInicio], ANILLO[t.indiceFin])
       expect(t.azimut).toBeCloseTo(esperado, 9)
-      expect(t.cardinal).toBe(nombreCardinal(cuadrante(esperado)))
+      expect(t.cardinal).toBe(nombreCardinal(puntoCardinal((esperado - 90 + 360) % 360)))
     }
   })
 
@@ -346,9 +358,14 @@ describe('report/literal · el lindero abre el documento y el método va al pie'
   it('el texto EMPIEZA en «Linda al …», que es lo que se copia a una escritura', () => {
     // Un preámbulo metodológico delante se cuela en el portapapeles de quien solo
     // quería los linderos, y obliga a saltárselo en cada lectura.
-    expect(r.texto.startsWith('Linda al Este, en línea recta de 26,50 m,')).toBe(true)
-    expect(r.lindero).toHaveLength(4)
-    for (const p of r.lindero) expect(p.startsWith('Linda al ')).toBe(true)
+    // ⚠️ Desde el 2026-09-11 el lindero es UN párrafo con todos los cardinales
+    // dentro, no uno por tramo: ver `report/literal.js#frasesDeLindero`.
+    expect(r.texto.startsWith('Linda: al NORTE, con la parcela catastral 9398517VK3799G')).toBe(
+      true,
+    )
+    expect(r.lindero).toHaveLength(1)
+    expect(r.lindero[0].startsWith('Linda: al ')).toBe(true)
+    expect(r.lindero[0].endsWith('.')).toBe(true)
   })
 
   it('`texto` es EXACTAMENTE `lindero` + `notaTecnica`, sin nada por el camino', () => {
@@ -487,7 +504,11 @@ describe('report/literal · un lado sin rumbo se salta y se dice, no se inventa'
     const limpio = caso()
     const sinIndices = ({ indiceInicio, indiceFin, ...resto }) => resto
     expect(duplicado.tramos.map(sinIndices)).toEqual(limpio.tramos.map(sinIndices))
-    expect(duplicado.tramos.some((t) => t.cardinal === 'Norte')).toBe(false)
+    // ⚠️ El centinela ya no puede ser «no hay ningún tramo al Norte»: con los
+    // cardinales corregidos, DOS frentes de esta parcela caen legítimamente al
+    // Norte. Lo que hay que afirmar es que no ha aparecido un tramo de MÁS, que es
+    // lo que haría un lado sin rumbo tratado como azimut 0.
+    expect(duplicado.tramos).toHaveLength(limpio.tramos.length)
   })
 
   it('la suma de longitudes sigue siendo el perímetro (el lado saltado mide 0)', () => {
@@ -535,10 +556,12 @@ describe('report/literal · vía pública: solo en urbana, y marcada como no ver
     // (`MEJORES_PRACTICAS_GML.md` §5.2, punto 3), así que este frente de 9 lados y
     // 47,21 m —casi un tercio del perímetro— no puede encontrar colindante por
     // muchas vecinas que se traigan. Es el texto que aprobó el colegiado.
-    expect(urbana.lindero[3]).toBe(
-      'Linda al Noroeste, en línea quebrada de 9 lados que suman 47,21 m, presumiblemente ' +
-        'con vía pública (ninguna parcela catastral colindante alcanza este lindero; dato NO ' +
-        'verificado, confirme antes de firmar).',
+    // Las TRES advertencias siguen en la misma frase que el lector copia, que es
+    // lo que la cabecera del módulo exige; lo que ha cambiado es que esa frase va
+    // dentro del párrafo único, detrás de su cardinal.
+    expect(urbana.lindero[0]).toContain(
+      'al OESTE, presumiblemente con vía pública (ninguna parcela catastral colindante ' +
+        'alcanza este lindero; dato NO verificado, confirme antes de firmar)',
     )
   })
 
@@ -560,7 +583,7 @@ describe('report/literal · vía pública: solo en urbana, y marcada como no ver
     // camino, un cauce, un monte público o una finca no catastrada: proponer «vía
     // pública» ahí sería temerario.
     expect(sinClase.lindero).toEqual(rustica.lindero)
-    expect(sinClase.lindero[3]).toContain('con parcela sin identificar')
+    expect(sinClase.lindero[0]).toContain('con parcela sin identificar')
     expect(sinClase.tramos.every((t) => t.presuncionNoVerificada === null)).toBe(true)
     expect(rustica.tramos.every((t) => t.presuncionNoVerificada === null)).toBe(true)
   })
@@ -604,7 +627,7 @@ describe('report/literal · vía pública: solo en urbana, y marcada como no ver
     const nota = urbana.notaTecnica.join('\n\n')
     expect(nota).toContain('1 tramo se describe como vía pública POR PRESUNCIÓN y no por medición')
     expect(nota).toContain('no ha consultado el callejero')
-    for (const marca of MARCAS_PRESUNCION) expect(urbana.lindero[3]).toContain(marca)
+    for (const marca of MARCAS_PRESUNCION) expect(urbana.lindero[0]).toContain(marca)
   })
 
   it('`clase` fuera del vocabulario LANZA en vez de degradar a «no consta»', () => {
@@ -810,11 +833,27 @@ describe('report/literal · el texto no finge saber más de lo que sabe', () => 
     expect(texto).not.toMatch(/\bmunicipio\b/i)
   })
 
-  it('nombra a los colindantes por su referencia catastral y su `cp:label`, atribuido', () => {
-    // El rótulo va entrecomillado y con la fuente delante: es lo que el parcelario
-    // pone, no un número de parcela que nosotros afirmemos.
-    expect(texto).toContain(
-      'con la parcela de referencia catastral 9398517VK3799G, rotulada «17» en el parcelario catastral',
+  it('nombra a los colindantes URBANOS por su referencia catastral, y nada más', () => {
+    // ⛔ El `cp:label` ya NO se escribe, y no es un olvido. Decía «rotulada «17» en
+    // el parcelario catastral», una fórmula prudente que existía porque no se podía
+    // afirmar que ese rótulo fuera el número de parcela. En urbana NO lo es —esta
+    // misma parcela tiene `cp:label` 16 y está en el nº 72 de su calle—, así que
+    // ponerlo junto a una dirección invitaría a leerlo como parte de ella. Sigue
+    // viajando en `tramos[].label` para quien lo quiera.
+    expect(texto).toContain('con la parcela catastral 9398517VK3799G')
+    expect(texto).not.toContain('rotulada')
+  })
+
+  it('y a los RÚSTICOS por su parcela y su polígono, que van dentro de la referencia', () => {
+    // La corrección del 2026-09-11: polígono y parcela NO hacen falta pedirlos al
+    // `Consulta_DNPRC` —la decisión D2 de la spec daba eso por supuesto—, están en
+    // la propia referencia rústica. Cero peticiones.
+    const rustico = describirLindero({
+      recintos: recintos(),
+      vecinas: vecinas().map((v) => ({ ...v, refcat: '29094A02700068' })),
+    })
+    expect(rustico.texto).toContain(
+      'con la parcela 68 del polígono 27, con referencia catastral 29094A02700068',
     )
   })
 
@@ -825,13 +864,18 @@ describe('report/literal · el texto no finge saber más de lo que sabe', () => 
     expect(texto).toContain('no de Norte geográfico')
   })
 
-  it('«en línea recta» solo cuando el tramo es UN lado; si no, «en línea quebrada»', () => {
-    // Llamar «línea recta de 47,21 m» a una quebrada de nueve lados sería una medida
-    // que no se puede replantear sobre el terreno.
-    expect(texto).toContain('en línea recta de 26,50 m')
-    expect(texto).toContain('en línea quebrada de 9 lados que suman 47,21 m')
-    const rectas = texto.match(/en línea recta/g) ?? []
-    expect(rectas).toHaveLength(caso().tramos.filter((t) => t.nLados === 1).length)
+  it('⚠️ el párrafo de lindero YA NO lleva las distancias, y eso es una pérdida', () => {
+    // Hasta el 2026-09-11 cada tramo se escribía «en línea recta de 26,50 m» o «en
+    // línea quebrada de 9 lados que suman 47,21 m», y `spec/feature-09` lo pedía
+    // («con distancia»). El autor eligió el formato corto el 2026-09-11. Se
+    // comprueba que la cifra NO se ha perdido del informe —sigue en `tramos[]`, que
+    // es lo que pintan la tabla del PDF y la lista del diálogo—, solo del párrafo
+    // que se copia y pega.
+    expect(texto).not.toContain('en línea recta')
+    expect(texto).not.toContain('en línea quebrada')
+    const r = caso()
+    expect(r.tramos.map((t) => Number(t.longitud.toFixed(2)))).toEqual([26.5, 39.4, 50, 47.21])
+    expect(r.tramos.map((t) => t.nLados)).toEqual([1, 2, 3, 9])
   })
 
   it('describe SOLO el lindero exterior, y dice que hay huecos cuando los hay', () => {
@@ -933,9 +977,19 @@ describe('report/literal · las tolerancias operativas de F09', () => {
       perimetroAnillo(ANILLO),
       9,
     )
-    // Dos tramos consecutivos con el MISMO cardinal se escriben en una sola frase,
-    // encadenados con «; y», que es como se redacta un lindero.
-    expect(estrecho.texto).toMatch(/Linda al Noroeste, [^\n]*; y en línea quebrada/)
+    // ⚠️ Y el TEXTO no cambia aunque los tramos se partan: los trozos nuevos son
+    // del mismo frente sin colindante, así que dicen todos la misma frase y se
+    // nombran una vez (ver `frasesDeLindero`). Partir tramos es una decisión de
+    // MEDIDA; el párrafo habla de con quién se linda, no de en cuántos trozos.
+    expect(estrecho.lindero).toEqual(caso().lindero)
+  })
+
+  it('dos colindantes DISTINTOS del mismo cardinal se encadenan con «, y con»', () => {
+    // Es la forma que pidió el autor: un solo «al NORTE» y detrás las dos fincas.
+    expect(caso().lindero[0]).toContain(
+      'al NORTE, con la parcela catastral 9398517VK3799G, y con la parcela catastral ' +
+        '9398518VK3799G;',
+    )
   })
 
   it('la agrupación NO deriva en cadena: un polígono de 36 lados no es un solo tramo', () => {
@@ -1007,9 +1061,9 @@ describe('report/literal · colindantes que no vienen como el manual', () => {
       v.refcat === '9398515VK3799G' ? { ...v, refcat: null } : v,
     )
     const r = describirLindero({ recintos: recintos(), vecinas: anonima })
-    const so = r.tramos.find((t) => t.cardinal === 'Sudoeste')
+    const so = r.tramos.find((t) => t.label === '15')
     expect(so.refcat).toBe(null)
-    expect(so.label).toBe('15')
+    expect(so.cardinal).toBe('Sur')
     expect(r.texto).toContain(
       'con la parcela rotulada «15» en el parcelario catastral, de la que no consta referencia catastral',
     )
@@ -1021,7 +1075,7 @@ describe('report/literal · colindantes que no vienen como el manual', () => {
     // criterio reproducible en vez de dejarlo al orden de iteración.
     const gemela = { ...clon(VECINAS.find((v) => v.refcat === '9398515VK3799G')), refcat: 'GEMELA' }
     const r = describirLindero({ recintos: recintos(), vecinas: [gemela, ...vecinas()] })
-    expect(r.tramos.find((t) => t.cardinal === 'Sudoeste').refcat).toBe('GEMELA')
+    expect(r.tramos.find((t) => t.cardinal === 'Sur').refcat).toBe('GEMELA')
   })
 
   it('una vecina que no es un objeto LANZA nombrando su posición', () => {
@@ -1072,6 +1126,7 @@ describe('report/literal · contrato del llamante', () => {
     expect(Object.keys(r.tramos[0]).sort()).toEqual([
       'azimut',
       'cardinal',
+      'domicilio',
       'indiceFin',
       'indiceInicio',
       'label',

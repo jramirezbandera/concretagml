@@ -596,7 +596,7 @@ describe('report/pdf-parcela · las secciones del §Contenido de la spec', () =>
 
   it('5 · el lindero sale en cuerpo NORMAL y la nota técnica en cuerpo MENOR', () => {
     const renglones = leido.paginas.flatMap((p) => p.renglones)
-    const delLindero = renglones.find((r) => r.texto.startsWith('Linda al Este,'))
+    const delLindero = renglones.find((r) => r.texto.startsWith('Linda: al NORTE,'))
     const deLaNota = renglones.find((r) => r.texto.startsWith('Nota técnica.'))
     expect(delLindero, 'no está el primer párrafo del lindero').toBeDefined()
     expect(deLaNota, 'no está la nota técnica').toBeDefined()
@@ -957,7 +957,7 @@ describe('report/pdf-parcela · la presunción de vía pública', () => {
     const dentro = leido.corrido
     expect(dentro).toContain('se describen por PRESUNCIÓN y no por medición')
     expect(dentro).toContain('Dato NO verificado: confirme antes de firmar')
-    expect(dentro).toContain('Tramo 4 (Noroeste, 47,21 m)')
+    expect(dentro).toContain('Tramo 4 (Oeste, 47,21 m)')
   })
 
   it('un tramo con un código de presunción DESCONOCIDO no pasa por medido', () => {

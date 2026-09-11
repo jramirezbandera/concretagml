@@ -907,10 +907,12 @@ describe('F09 · AC4 · la descripción literaria de una geometría fixture reco
         longitud: Number(t.longitud.toFixed(2)),
       })),
     ).toEqual([
-      { cardinal: 'Este', refcat: '9398517VK3799G', nLados: 1, longitud: 26.5 },
-      { cardinal: 'Sudeste', refcat: '9398518VK3799G', nLados: 2, longitud: 39.4 },
-      { cardinal: 'Sudoeste', refcat: '9398515VK3799G', nLados: 3, longitud: 50 },
-      { cardinal: 'Noroeste', refcat: null, nLados: 9, longitud: 47.21 },
+      // ⚠️ El cardinal es el de la NORMAL EXTERIOR —dónde cae el vecino—, no el
+      // del rumbo del tramo: `report/literal.js#hacia`, corregido el 2026-09-11.
+      { cardinal: 'Norte', refcat: '9398517VK3799G', nLados: 1, longitud: 26.5 },
+      { cardinal: 'Norte', refcat: '9398518VK3799G', nLados: 2, longitud: 39.4 },
+      { cardinal: 'Sur', refcat: '9398515VK3799G', nLados: 3, longitud: 50 },
+      { cardinal: 'Oeste', refcat: null, nLados: 9, longitud: 47.21 },
     ])
 
     // La agrupación no pierde ni un lado ni un metro: los `nLados` suman los 15 y
@@ -933,9 +935,14 @@ describe('F09 · AC4 · la descripción literaria de una geometría fixture reco
 
   it('la descripción sale REDACTADA, no como una lista de datos: es lo que se copia a una escritura', () => {
     const r = literalReal()
+    // Un solo párrafo con todos los cardinales dentro, en el orden de una
+    // escritura (N-S-E-O) y encadenando con «, y con» los del mismo frente.
+    expect(r.lindero).toHaveLength(1)
     expect(r.lindero[0]).toBe(
-      'Linda al Este, en línea recta de 26,50 m, con la parcela de referencia catastral ' +
-        '9398517VK3799G, rotulada «17» en el parcelario catastral.',
+      'Linda: al NORTE, con la parcela catastral 9398517VK3799G, y con la parcela catastral ' +
+        '9398518VK3799G; al SUR, con la parcela catastral 9398515VK3799G; al OESTE, ' +
+        'presumiblemente con vía pública (ninguna parcela catastral colindante alcanza este ' +
+        'lindero; dato NO verificado, confirme antes de firmar).',
     )
     // Y el frente sin colindante catastral se PROPONE como vía pública, con la marca
     // de «no verificado» viajando en el tramo y no solo dentro de la frase — que es
@@ -1050,7 +1057,7 @@ describe('F09 · AC4 · «…es editable»: el borrador se corrige antes de expo
       'rotulada «17» en el parcelario catastral',
     )
     // Anti-vacuidad: sin corregir, el borrador SÍ sale.
-    expect(leerPdf(informe().bytes).corrido).toContain('rotulada «17» en el parcelario catastral')
+    expect(leerPdf(informe().bytes).corrido).toContain('la parcela catastral 9398517VK3799G')
   })
 })
 

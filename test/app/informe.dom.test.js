@@ -719,7 +719,7 @@ describe('cablearInforme · el recorrido completo', () => {
 
     // … y con el lindero YA redactado (no un cuadro en blanco).
     const cuadro = enDialogo(m, SELECTOR_DIALOGO.LITERAL)
-    expect(cuadro.value).toMatch(/Linda al /)
+    expect(cuadro.value).toMatch(/Linda: al /)
     // Las colindantes publicadas se han USADO: el literal nombra las que de verdad
     // alcanzan un lindero. No se exige que salgan las cuatro —una parcela vecina
     // en el WFS puede no tocar el contorno— sino que la suscripción haya servido
