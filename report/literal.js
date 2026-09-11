@@ -484,7 +484,7 @@ function poligonoParcelaDe(refcat) {
  * así que escribirlo al lado de una dirección invitaría a leerlo como parte de
  * ella. Sigue viajando en `tramos[].label` para quien lo quiera.
  *
- * @param {{refcat: string, domicilio: string|null}} tramo
+ * @param {{refcat: string, via: string|null, numeroVia: string|null}} tramo
  * @returns {string}
  */
 function nombrarParcela(tramo) {
@@ -495,8 +495,13 @@ function nombrarParcela(tramo) {
       `con referencia catastral ${tramo.refcat}`
     )
   }
-  if (tramo.domicilio !== null) {
-    return `${tramo.domicilio}, con referencia catastral ${tramo.refcat}`
+  if (tramo.via !== null) {
+    // «el nº 72 de Calle San Restituto», que es como se nombra una finca urbana en
+    // una escritura. Sin número —un diseminado, una finca sin portal— se queda en
+    // «Calle San Restituto»: inventarle un número sería peor que no darlo.
+    const señas =
+      tramo.numeroVia === null ? tramo.via : `el nº ${tramo.numeroVia} de ${tramo.via}`
+    return `${señas}, con referencia catastral ${tramo.refcat}`
   }
   return `la parcela catastral ${tramo.refcat}`
 }
@@ -842,14 +847,17 @@ function salida(datos) {
  * @typedef {Object} VecinaLiteral
  * @property {string|null} [refcat]  Referencia catastral, o `null` si no consta.
  * @property {string|null} [label]   `cp:label` del parcelario, o `null`.
- * @property {string|null} [domicilio]  Cómo se nombra la finca por sus señas
- *   —«el nº 72 de Calle San Restituto»—, ya REDACTADO por quien lo consiguió, o
+ * @property {string|null} [via]  Nombre de la vía con su tipo delante —«Calle San
+ *   Restituto»—, tal como lo compone `services/_catastro-dnp.js#nombreDeVia`, o
  *   `null` si no consta. Es lo único de esta lista que NO viene con la geometría
  *   del WFS: hay que pedirlo a `Consulta_DNPRC`, una petición por colindante, y
  *   por eso entra por el contrato en vez de buscarlo este módulo (que es puro y no
  *   toca la red). Con `null` la parcela se nombra por su referencia y nada más.
- *   ⚠️ En RÚSTICA no se usa aunque venga: allí manda el polígono y la parcela, que
- *   salen de la propia referencia y no cuestan ninguna petición.
+ *   ⚠️ En RÚSTICA no se usa aunque venga —y viene, porque el subárbol rústico del
+ *   servicio también trae `lourb`—: allí manda el polígono y la parcela, que salen
+ *   de la propia referencia y no cuestan ninguna petición.
+ * @property {string|null} [numeroVia]  Número de portal («72»), o `null`. Se
+ *   escribe solo si hay `via`: un número sin calle no nombra nada.
  * @property {Array<{vertices: Array<[number,number]>, tipo?: string}>} recintos
  *   Su geometría; `[]` es legítimo (el Catastro devolvió la vecina sin geometría).
  */
@@ -1144,7 +1152,8 @@ export function describirLindero(entrada) {
       longitud,
       refcat: textoONulo(vecina?.refcat),
       label: textoONulo(vecina?.label),
-      domicilio: textoONulo(vecina?.domicilio),
+      via: textoONulo(vecina?.via),
+      numeroVia: textoONulo(vecina?.numeroVia),
     })
   }
 
@@ -1178,7 +1187,8 @@ export function describirLindero(entrada) {
       longitud: lado.longitud,
       refcat: lado.refcat,
       label: lado.label,
-      domicilio: lado.domicilio,
+      via: lado.via,
+      numeroVia: lado.numeroVia,
       indiceInicio: lado.iDesde,
       indiceFin: lado.iHasta,
       nLados: 1,
@@ -1224,7 +1234,8 @@ export function describirLindero(entrada) {
       longitud: t.longitud,
       refcat: t.refcat,
       label: t.label,
-      domicilio: t.domicilio,
+      via: t.via,
+      numeroVia: t.numeroVia,
       indiceInicio: t.indiceInicio,
       indiceFin: t.indiceFin,
       nLados: t.nLados,

@@ -701,14 +701,24 @@ describe('report/firma · lo que identifica a la finca depende de su clase', () 
     expect(l.parcela).toBeUndefined()
   })
 
-  it('el ENCABEZADO conserva las once claves aunque se impriman menos líneas', () => {
+  it('el ENCABEZADO conserva TODAS las claves aunque se impriman menos líneas', () => {
     // El contrato D no cambia de forma según la finca: lo que cambia es lo que se
     // imprime. Quien quiera el dato crudo lo tiene, se pinte o no.
     const e = encabezadoReal()
     expect(Object.keys(e)).toEqual([...CAMPOS_ENCABEZADO])
     expect(e.paraje).toBeNull()
     expect(lineasEncabezado(e).length).toBeLessThan(CAMPOS_ENCABEZADO.length)
-    expect(lineasEncabezado(encabezadoRustico()).length).toBe(CAMPOS_ENCABEZADO.length)
+    // ⚠️ La rústica tampoco imprime las once: desde el 2026-09-12 hay DOS campos
+    // solo-urbanos (`via`, `numeroVia`) que se omiten en una rústica que no los
+    // traiga, con la misma regla con la que la urbana omite `paraje`/`poligono`/
+    // `parcela`. Lo que se afirma es la simetría, no un número.
+    const rustico = lineasEncabezado(encabezadoRustico()).map((l) => l.campo)
+    expect(rustico).toContain('poligono')
+    expect(rustico).toContain('parcela')
+    expect(rustico).not.toContain('numeroVia')
+    const urbano = lineasEncabezado(e).map((l) => l.campo)
+    expect(urbano).toContain('via')
+    expect(urbano).not.toContain('poligono')
   })
 
   it('una clase que NO es del contrato E lanza, nombrando las dos que sí', () => {

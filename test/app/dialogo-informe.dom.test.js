@@ -46,6 +46,7 @@ import {
 } from '../../app/dialogo-informe.js'
 import {
   CAMPOS_FIRMA,
+  CAMPOS_SOLO_URBANA,
   componerEncabezado,
   NO_CONSTA,
   NO_CONSULTADO,
@@ -391,7 +392,13 @@ describe('app/dialogo-informe · el encabezado', () => {
 
   it('los seis editables son `<input>` y los cinco de la aplicación son texto fijo', () => {
     const { raiz } = conInforme()
-    for (const campo of CAMPOS_EDITABLES) {
+    // ⚠️ El fixture de este bloque es RÚSTICO, así que `via` y `numeroVia` no se
+    // pintan: son los campos solo-urbanos, simétricos de `paraje`/`poligono`/
+    // `parcela`, y se omiten igual cuando no aplican y no traen dato. Que se pinten
+    // cuando SÍ aplican lo comprueba el bloque de la finca urbana.
+    const editablesDeUnaRustica = CAMPOS_EDITABLES.filter((c) => !CAMPOS_SOLO_URBANA.includes(c))
+    expect(editablesDeUnaRustica.length).toBeGreaterThan(0)
+    for (const campo of editablesDeUnaRustica) {
       expect(nodo(raiz, selectorEncabezado(campo)).tagName, campo).toBe('INPUT')
     }
     for (const campo of ['clase', 'refcat', 'srs', 'fecha', 'idDocumento']) {

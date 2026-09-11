@@ -22,7 +22,7 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 595.276 841.89] /Resources 3 0 R /Contents 7 0 R >>
 endobj
 7 0 obj
-<< /Length 8775 >>
+<< /Length 8662 >>
 stream
 q
 0 g
@@ -155,7 +155,7 @@ q
 BT
 /F1 8.504 Tf
 1 0 0 1 42.52 627.069 Tm
-(Referencia catastral) Tj
+(V«ed»a) Tj
 ET
 Q
 q
@@ -163,7 +163,7 @@ q
 BT
 /F1 8.504 Tf
 1 0 0 1 198.425 627.069 Tm
-(9398516VK3799G) Tj
+(Calle San Restituto) Tj
 ET
 Q
 q
@@ -171,7 +171,7 @@ q
 BT
 /F1 8.504 Tf
 1 0 0 1 42.52 614.993 Tm
-(Sistema de referencia) Tj
+(N«fa»mero) Tj
 ET
 Q
 q
@@ -179,7 +179,7 @@ q
 BT
 /F1 8.504 Tf
 1 0 0 1 198.425 614.993 Tm
-(EPSG:25830) Tj
+(72) Tj
 ET
 Q
 q
@@ -187,7 +187,7 @@ q
 BT
 /F1 8.504 Tf
 1 0 0 1 42.52 602.918 Tm
-(Fecha del informe) Tj
+(Referencia catastral) Tj
 ET
 Q
 q
@@ -195,7 +195,7 @@ q
 BT
 /F1 8.504 Tf
 1 0 0 1 198.425 602.918 Tm
-(02/08/2026 17:04 \\(UTC\\)) Tj
+(9398516VK3799G) Tj
 ET
 Q
 q
@@ -203,7 +203,7 @@ q
 BT
 /F1 8.504 Tf
 1 0 0 1 42.52 590.842 Tm
-(Identificador del documento) Tj
+(Sistema de referencia) Tj
 ET
 Q
 q
@@ -211,7 +211,7 @@ q
 BT
 /F1 8.504 Tf
 1 0 0 1 198.425 590.842 Tm
-(CG-9398516VK3799G-20260802-170453Z) Tj
+(EPSG:25830) Tj
 ET
 Q
 q
@@ -219,7 +219,7 @@ q
 BT
 /F1 8.504 Tf
 1 0 0 1 42.52 578.767 Tm
-(Procedencia de la geometr«ed»a) Tj
+(Fecha del informe) Tj
 ET
 Q
 q
@@ -227,6 +227,38 @@ q
 BT
 /F1 8.504 Tf
 1 0 0 1 198.425 578.767 Tm
+(02/08/2026 17:04 \\(UTC\\)) Tj
+ET
+Q
+q
+0.4 g
+BT
+/F1 8.504 Tf
+1 0 0 1 42.52 566.691 Tm
+(Identificador del documento) Tj
+ET
+Q
+q
+0 g
+BT
+/F1 8.504 Tf
+1 0 0 1 198.425 566.691 Tm
+(CG-9398516VK3799G-20260802-170453Z) Tj
+ET
+Q
+q
+0.4 g
+BT
+/F1 8.504 Tf
+1 0 0 1 42.52 554.615 Tm
+(Procedencia de la geometr«ed»a) Tj
+ET
+Q
+q
+0 g
+BT
+/F1 8.504 Tf
+1 0 0 1 198.425 554.615 Tm
 (Fichero GML aportado por el usuario) Tj
 ET
 Q
@@ -234,22 +266,22 @@ q
 0 g
 BT
 /F2 10.205 Tf
-1 0 0 1 42.52 548.323 Tm
+1 0 0 1 42.52 524.171 Tm
 (2.  PLANO DE SITUACI«d3»N) Tj
 ET
 Q
 q
 0.3 G
 1.134 w
-42.52 541.996 m
-552.756 541.996 l
+42.52 517.844 m
+552.756 517.844 l
 S
 Q
 q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 42.52 524.137 Tm
+1 0 0 1 42.52 499.986 Tm
 (No se ha podido componer el plano de situaci«f3»n, as«ed» que este informe sale SIN plano. No es un informe equivalente al que lo lleva: la) Tj
 ET
 Q
@@ -257,7 +289,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 42.52 512.062 Tm
+1 0 0 1 42.52 487.911 Tm
 (relaci«f3»n de v«e9»rtices y las cifras del contraste siguen siendo las mismas, pero aqu«ed» falta la comprobaci«f3»n visual del encaje.) Tj
 ET
 Q
@@ -265,22 +297,22 @@ q
 0 g
 BT
 /F2 10.205 Tf
-1 0 0 1 42.52 481.618 Tm
+1 0 0 1 42.52 457.466 Tm
 (3.  RELACI«d3»N DE V«c9»RTICES) Tj
 ET
 Q
 q
 0.3 G
 1.134 w
-42.52 475.291 m
-552.756 475.291 l
+42.52 451.14 m
+552.756 451.14 l
 S
 Q
 q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 42.52 457.432 Tm
+1 0 0 1 42.52 433.281 Tm
 (Superficie medida) Tj
 ET
 Q
@@ -288,7 +320,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 457.432 Tm
+1 0 0 1 198.425 433.281 Tm
 (1.538,99 m«b2») Tj
 ET
 Q
@@ -296,40 +328,8 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 42.52 445.357 Tm
-(Per«ed»metro exterior) Tj
-ET
-Q
-q
-0 g
-BT
-/F1 8.504 Tf
-1 0 0 1 198.425 445.357 Tm
-(163,79 m) Tj
-ET
-Q
-q
-0.4 g
-BT
-/F1 8.504 Tf
-1 0 0 1 42.52 433.281 Tm
-(Per«ed»metro de huecos) Tj
-ET
-Q
-q
-0 g
-BT
-/F1 8.504 Tf
-1 0 0 1 198.425 433.281 Tm
-(0,00 m) Tj
-ET
-Q
-q
-0.4 g
-BT
-/F1 8.504 Tf
 1 0 0 1 42.52 421.206 Tm
-(Per«ed»metro total) Tj
+(Per«ed»metro exterior) Tj
 ET
 Q
 q
@@ -341,10 +341,42 @@ BT
 ET
 Q
 q
+0.4 g
+BT
+/F1 8.504 Tf
+1 0 0 1 42.52 409.13 Tm
+(Per«ed»metro de huecos) Tj
+ET
+Q
+q
+0 g
+BT
+/F1 8.504 Tf
+1 0 0 1 198.425 409.13 Tm
+(0,00 m) Tj
+ET
+Q
+q
+0.4 g
+BT
+/F1 8.504 Tf
+1 0 0 1 42.52 397.054 Tm
+(Per«ed»metro total) Tj
+ET
+Q
+q
+0 g
+BT
+/F1 8.504 Tf
+1 0 0 1 198.425 397.054 Tm
+(163,79 m) Tj
+ET
+Q
+q
 0.3 g
 BT
 /F1 6.803 Tf
-1 0 0 1 42.52 404.821 Tm
+1 0 0 1 42.52 380.67 Tm
 (Coordenadas en EPSG:25830, en metros, con dos decimales. Los anillos van ABIERTOS: el «fa»ltimo v«e9»rtice no repite el primero, que es como los guarda el modelo y) Tj
 ET
 Q
@@ -352,7 +384,7 @@ q
 0.3 g
 BT
 /F1 6.803 Tf
-1 0 0 1 42.52 395.161 Tm
+1 0 0 1 42.52 371.01 Tm
 (como se numeran aqu«ed». Los v«e9»rtices se numeran desde 1 DENTRO DE CADA RECINTO, igual que en el plano. Total: 15 v«e9»rtices en 1 recinto.) Tj
 ET
 Q
@@ -360,7 +392,7 @@ q
 0 g
 BT
 /F2 8.504 Tf
-1 0 0 1 42.52 368.549 Tm
+1 0 0 1 42.52 344.398 Tm
 (Exterior «97» 15 v«e9»rtices) Tj
 ET
 Q
@@ -368,7 +400,7 @@ q
 0 g
 BT
 /F2 7.37 Tf
-1 0 0 1 77.028 353.129 Tm
+1 0 0 1 77.028 328.978 Tm
 (N«ba») Tj
 ET
 Q
@@ -376,7 +408,7 @@ q
 0 g
 BT
 /F2 7.37 Tf
-1 0 0 1 162.992 353.129 Tm
+1 0 0 1 162.992 328.978 Tm
 (X \\(m\\)) Tj
 ET
 Q
@@ -384,22 +416,22 @@ q
 0 g
 BT
 /F2 7.37 Tf
-1 0 0 1 270.709 353.129 Tm
+1 0 0 1 270.709 328.978 Tm
 (Y \\(m\\)) Tj
 ET
 Q
 q
 0.55 G
 0.709 w
-53.858 350.129 m
-297.638 350.129 l
+53.858 325.978 m
+297.638 325.978 l
 S
 Q
 q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 80.942 340.963 Tm
+1 0 0 1 80.942 316.811 Tm
 (1) Tj
 ET
 Q
@@ -407,7 +439,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 146.586 340.963 Tm
+1 0 0 1 146.586 316.811 Tm
 (439283,63) Tj
 ET
 Q
@@ -415,7 +447,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 250.205 340.963 Tm
+1 0 0 1 250.205 316.811 Tm
 (4479671,27) Tj
 ET
 Q
@@ -423,7 +455,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 80.942 330.497 Tm
+1 0 0 1 80.942 306.346 Tm
 (2) Tj
 ET
 Q
@@ -431,7 +463,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 146.586 330.497 Tm
+1 0 0 1 146.586 306.346 Tm
 (439268,76) Tj
 ET
 Q
@@ -439,7 +471,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 250.205 330.497 Tm
+1 0 0 1 250.205 306.346 Tm
 (4479658,01) Tj
 ET
 Q
@@ -447,7 +479,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 80.942 320.031 Tm
+1 0 0 1 80.942 295.88 Tm
 (3) Tj
 ET
 Q
@@ -455,7 +487,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 146.586 320.031 Tm
+1 0 0 1 146.586 295.88 Tm
 (439257,63) Tj
 ET
 Q
@@ -463,7 +495,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 250.205 320.031 Tm
+1 0 0 1 250.205 295.88 Tm
 (4479647,80) Tj
 ET
 Q
@@ -471,7 +503,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 80.942 309.566 Tm
+1 0 0 1 80.942 285.415 Tm
 (4) Tj
 ET
 Q
@@ -479,7 +511,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 146.586 309.566 Tm
+1 0 0 1 146.586 285.415 Tm
 (439246,37) Tj
 ET
 Q
@@ -487,7 +519,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 250.205 309.566 Tm
+1 0 0 1 250.205 285.415 Tm
 (4479637,48) Tj
 ET
 Q
@@ -495,7 +527,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 80.942 299.1 Tm
+1 0 0 1 80.942 274.949 Tm
 (5) Tj
 ET
 Q
@@ -503,7 +535,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 146.586 299.1 Tm
+1 0 0 1 146.586 274.949 Tm
 (439244,43) Tj
 ET
 Q
@@ -511,7 +543,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 250.205 299.1 Tm
+1 0 0 1 250.205 274.949 Tm
 (4479640,02) Tj
 ET
 Q
@@ -519,7 +551,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 80.942 288.635 Tm
+1 0 0 1 80.942 264.484 Tm
 (6) Tj
 ET
 Q
@@ -527,7 +559,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 146.586 288.635 Tm
+1 0 0 1 146.586 264.484 Tm
 (439239,96) Tj
 ET
 Q
@@ -535,7 +567,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 250.205 288.635 Tm
+1 0 0 1 250.205 264.484 Tm
 (4479646,73) Tj
 ET
 Q
@@ -543,7 +575,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 80.942 278.169 Tm
+1 0 0 1 80.942 254.018 Tm
 (7) Tj
 ET
 Q
@@ -551,7 +583,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 146.586 278.169 Tm
+1 0 0 1 146.586 254.018 Tm
 (439229,31) Tj
 ET
 Q
@@ -559,7 +591,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 250.205 278.169 Tm
+1 0 0 1 250.205 254.018 Tm
 (4479665,26) Tj
 ET
 Q
@@ -567,7 +599,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 80.942 267.704 Tm
+1 0 0 1 80.942 243.553 Tm
 (8) Tj
 ET
 Q
@@ -575,7 +607,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 146.586 267.704 Tm
+1 0 0 1 146.586 243.553 Tm
 (439228,84) Tj
 ET
 Q
@@ -583,7 +615,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 250.205 267.704 Tm
+1 0 0 1 250.205 243.553 Tm
 (4479666,09) Tj
 ET
 Q
@@ -591,7 +623,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 80.942 257.238 Tm
+1 0 0 1 80.942 233.087 Tm
 (9) Tj
 ET
 Q
@@ -599,7 +631,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 146.586 257.238 Tm
+1 0 0 1 146.586 233.087 Tm
 (439227,62) Tj
 ET
 Q
@@ -607,7 +639,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 250.205 257.238 Tm
+1 0 0 1 250.205 233.087 Tm
 (4479668,26) Tj
 ET
 Q
@@ -615,7 +647,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 76.844 246.773 Tm
+1 0 0 1 76.844 222.622 Tm
 (10) Tj
 ET
 Q
@@ -623,7 +655,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 146.586 246.773 Tm
+1 0 0 1 146.586 222.622 Tm
 (439225,21) Tj
 ET
 Q
@@ -631,7 +663,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 250.205 246.773 Tm
+1 0 0 1 250.205 222.622 Tm
 (4479672,54) Tj
 ET
 Q
@@ -639,7 +671,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 76.844 236.307 Tm
+1 0 0 1 76.844 212.156 Tm
 (11) Tj
 ET
 Q
@@ -647,7 +679,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 146.586 236.307 Tm
+1 0 0 1 146.586 212.156 Tm
 (439222,89) Tj
 ET
 Q
@@ -655,7 +687,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 250.205 236.307 Tm
+1 0 0 1 250.205 212.156 Tm
 (4479677,12) Tj
 ET
 Q
@@ -663,7 +695,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 76.844 225.842 Tm
+1 0 0 1 76.844 201.691 Tm
 (12) Tj
 ET
 Q
@@ -671,7 +703,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 146.586 225.842 Tm
+1 0 0 1 146.586 201.691 Tm
 (439222,53) Tj
 ET
 Q
@@ -679,7 +711,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 250.205 225.842 Tm
+1 0 0 1 250.205 201.691 Tm
 (4479678,00) Tj
 ET
 Q
@@ -687,7 +719,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 76.844 215.376 Tm
+1 0 0 1 76.844 191.225 Tm
 (13) Tj
 ET
 Q
@@ -695,7 +727,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 146.586 215.376 Tm
+1 0 0 1 146.586 191.225 Tm
 (439222,47) Tj
 ET
 Q
@@ -703,7 +735,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 250.205 215.376 Tm
+1 0 0 1 250.205 191.225 Tm
 (4479678,13) Tj
 ET
 Q
@@ -711,7 +743,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 76.844 204.911 Tm
+1 0 0 1 76.844 180.76 Tm
 (14) Tj
 ET
 Q
@@ -719,7 +751,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 146.586 204.911 Tm
+1 0 0 1 146.586 180.76 Tm
 (439247,30) Tj
 ET
 Q
@@ -727,7 +759,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 250.205 204.911 Tm
+1 0 0 1 250.205 180.76 Tm
 (4479687,38) Tj
 ET
 Q
@@ -735,7 +767,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 76.844 194.445 Tm
+1 0 0 1 76.844 170.294 Tm
 (15) Tj
 ET
 Q
@@ -743,7 +775,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 146.586 194.445 Tm
+1 0 0 1 146.586 170.294 Tm
 (439276,64) Tj
 ET
 Q
@@ -751,37 +783,37 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 250.205 194.445 Tm
+1 0 0 1 250.205 170.294 Tm
 (4479673,63) Tj
 ET
 Q
 q
 0.55 G
 0.709 w
-53.858 188.742 m
-297.638 188.742 l
+53.858 164.591 m
+297.638 164.591 l
 S
 Q
 q
 0 g
 BT
 /F2 10.205 Tf
-1 0 0 1 42.52 160.169 Tm
+1 0 0 1 42.52 136.018 Tm
 (4.  DIAGN«d3»STICO DE ENCAJE Y COMPARACI«d3»N A TRES BANDAS) Tj
 ET
 Q
 q
 0.3 G
 1.134 w
-42.52 153.842 m
-552.756 153.842 l
+42.52 129.691 m
+552.756 129.691 l
 S
 Q
 q
 0 g
 BT
 /F2 8.504 Tf
-1 0 0 1 42.52 126.062 Tm
+1 0 0 1 42.52 101.911 Tm
 (4.1  Superficies) Tj
 ET
 Q
@@ -789,7 +821,7 @@ q
 0 g
 BT
 /F2 7.37 Tf
-1 0 0 1 53.858 110.642 Tm
+1 0 0 1 53.858 86.491 Tm
 (Concepto) Tj
 ET
 Q
@@ -797,22 +829,22 @@ q
 0 g
 BT
 /F2 7.37 Tf
-1 0 0 1 463.263 110.642 Tm
+1 0 0 1 463.263 86.491 Tm
 (Superficie) Tj
 ET
 Q
 q
 0.55 G
 0.709 w
-53.858 107.642 m
-507.402 107.642 l
+53.858 83.491 m
+507.402 83.491 l
 S
 Q
 q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 98.476 Tm
+1 0 0 1 53.858 74.324 Tm
 (Medida sobre la geometr«ed»a de la parcela) Tj
 ET
 Q
@@ -820,7 +852,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 459.571 98.476 Tm
+1 0 0 1 459.571 74.324 Tm
 (1.538,99 m«b2») Tj
 ET
 Q
@@ -828,7 +860,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 88.01 Tm
+1 0 0 1 53.858 63.859 Tm
 (Declarada por el Catastro \\(cp:areaValue\\)) Tj
 ET
 Q
@@ -836,48 +868,9 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 469.815 88.01 Tm
+1 0 0 1 469.815 63.859 Tm
 (1.536 m«b2») Tj
 ET
-Q
-q
-0 g
-BT
-/F1 7.37 Tf
-1 0 0 1 53.858 77.545 Tm
-(Medida sobre el contorno oficial del Catastro) Tj
-ET
-Q
-q
-0 g
-BT
-/F1 7.37 Tf
-1 0 0 1 459.571 77.545 Tm
-(1.535,87 m«b2») Tj
-ET
-Q
-q
-0 g
-BT
-/F1 7.37 Tf
-1 0 0 1 53.858 67.079 Tm
-(Registral, de la escritura) Tj
-ET
-Q
-q
-0 g
-BT
-/F1 7.37 Tf
-1 0 0 1 465.718 67.079 Tm
-(No consta) Tj
-ET
-Q
-q
-0.55 G
-0.709 w
-53.858 61.376 m
-507.402 61.376 l
-S
 Q
 q
 0.55 G
@@ -909,13 +902,75 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 595.276 841.89] /Resources 3 0 R /Contents 9 0 R >>
 endobj
 9 0 obj
-<< /Length 10162 >>
+<< /Length 10065 >>
 stream
+q
+0 g
+BT
+/F2 7.37 Tf
+1 0 0 1 53.858 793.474 Tm
+(Concepto) Tj
+ET
+Q
+q
+0 g
+BT
+/F2 7.37 Tf
+1 0 0 1 463.263 793.474 Tm
+(Superficie) Tj
+ET
+Q
+q
+0.55 G
+0.709 w
+53.858 790.474 m
+507.402 790.474 l
+S
+Q
+q
+0 g
+BT
+/F1 7.37 Tf
+1 0 0 1 53.858 781.308 Tm
+(Medida sobre el contorno oficial del Catastro) Tj
+ET
+Q
+q
+0 g
+BT
+/F1 7.37 Tf
+1 0 0 1 459.571 781.308 Tm
+(1.535,87 m«b2») Tj
+ET
+Q
+q
+0 g
+BT
+/F1 7.37 Tf
+1 0 0 1 53.858 770.842 Tm
+(Registral, de la escritura) Tj
+ET
+Q
+q
+0 g
+BT
+/F1 7.37 Tf
+1 0 0 1 465.718 770.842 Tm
+(No consta) Tj
+ET
+Q
+q
+0.55 G
+0.709 w
+53.858 765.139 m
+507.402 765.139 l
+S
+Q
 q
 0.3 g
 BT
 /F1 6.803 Tf
-1 0 0 1 53.858 793.928 Tm
+1 0 0 1 53.858 756.295 Tm
 (Las dos cifras del Catastro no son la misma y no deben confundirse: la DECLARADA es el cp:areaValue que publica el parcelario, y la MEDIDA SOBRE EL) Tj
 ET
 Q
@@ -923,7 +978,7 @@ q
 0.3 g
 BT
 /F1 6.803 Tf
-1 0 0 1 53.858 784.267 Tm
+1 0 0 1 53.858 746.634 Tm
 (CONTORNO OFICIAL es lo que esta aplicaci«f3»n mide sobre las coordenadas que emite ese mismo parcelario. Que difieran es el dato, no un fallo.) Tj
 ET
 Q
@@ -931,7 +986,7 @@ q
 0 g
 BT
 /F2 8.504 Tf
-1 0 0 1 42.52 763.325 Tm
+1 0 0 1 42.52 725.692 Tm
 (4.2  Per«ed»metros) Tj
 ET
 Q
@@ -939,7 +994,7 @@ q
 0 g
 BT
 /F2 7.37 Tf
-1 0 0 1 53.858 747.904 Tm
+1 0 0 1 53.858 710.271 Tm
 () Tj
 ET
 Q
@@ -947,7 +1002,7 @@ q
 0 g
 BT
 /F2 7.37 Tf
-1 0 0 1 283.959 747.904 Tm
+1 0 0 1 283.959 710.271 Tm
 (Exterior) Tj
 ET
 Q
@@ -955,7 +1010,7 @@ q
 0 g
 BT
 /F2 7.37 Tf
-1 0 0 1 381.568 747.904 Tm
+1 0 0 1 381.568 710.271 Tm
 (Huecos) Tj
 ET
 Q
@@ -963,22 +1018,22 @@ q
 0 g
 BT
 /F2 7.37 Tf
-1 0 0 1 486.96 747.904 Tm
+1 0 0 1 486.96 710.271 Tm
 (Total) Tj
 ET
 Q
 q
 0.55 G
 0.709 w
-53.858 744.905 m
-513.071 744.905 l
+53.858 707.272 m
+513.071 707.272 l
 S
 Q
 q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 735.738 Tm
+1 0 0 1 53.858 698.105 Tm
 (Medici«f3»n) Tj
 ET
 Q
@@ -986,7 +1041,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 281.085 735.738 Tm
+1 0 0 1 281.085 698.105 Tm
 (163,79 m) Tj
 ET
 Q
@@ -994,7 +1049,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 385.659 735.738 Tm
+1 0 0 1 385.659 698.105 Tm
 (0,00 m) Tj
 ET
 Q
@@ -1002,7 +1057,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 473.841 735.738 Tm
+1 0 0 1 473.841 698.105 Tm
 (163,79 m) Tj
 ET
 Q
@@ -1010,7 +1065,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 725.272 Tm
+1 0 0 1 53.858 687.64 Tm
 (Contorno oficial) Tj
 ET
 Q
@@ -1018,7 +1073,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 281.085 725.272 Tm
+1 0 0 1 281.085 687.64 Tm
 (163,12 m) Tj
 ET
 Q
@@ -1026,7 +1081,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 385.659 725.272 Tm
+1 0 0 1 385.659 687.64 Tm
 (0,00 m) Tj
 ET
 Q
@@ -1034,22 +1089,22 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 473.841 725.272 Tm
+1 0 0 1 473.841 687.64 Tm
 (163,12 m) Tj
 ET
 Q
 q
 0.55 G
 0.709 w
-53.858 719.569 m
-513.071 719.569 l
+53.858 681.936 m
+513.071 681.936 l
 S
 Q
 q
 0 g
 BT
 /F2 8.504 Tf
-1 0 0 1 42.52 699.443 Tm
+1 0 0 1 42.52 661.81 Tm
 (4.3  Comparaci«f3»n a tres bandas) Tj
 ET
 Q
@@ -1057,7 +1112,7 @@ q
 0.3 g
 BT
 /F1 6.803 Tf
-1 0 0 1 53.858 684.476 Tm
+1 0 0 1 53.858 646.843 Tm
 (Los tres pares salen siempre y en orden fijo, aunque falte con qu«e9» calcularlos: una fila ausente se leer«ed»a como «ab»esto no hac«ed»a falta mirarlo«bb» y una fila con «ab»No) Tj
 ET
 Q
@@ -1065,7 +1120,7 @@ q
 0.3 g
 BT
 /F1 6.803 Tf
-1 0 0 1 53.858 674.816 Tm
+1 0 0 1 53.858 637.183 Tm
 (consta«bb» dice lo que de verdad pasa. El signo es informaci«f3»n: «ab»Medici«f3»n - Catastro«bb» negativo significa que se ha medido menos de lo que declara el Catastro.) Tj
 ET
 Q
@@ -1073,7 +1128,7 @@ q
 0 g
 BT
 /F2 7.37 Tf
-1 0 0 1 53.858 660.45 Tm
+1 0 0 1 53.858 622.817 Tm
 (Par) Tj
 ET
 Q
@@ -1081,7 +1136,7 @@ q
 0 g
 BT
 /F2 7.37 Tf
-1 0 0 1 361.216 660.45 Tm
+1 0 0 1 361.216 622.817 Tm
 (Diferencia) Tj
 ET
 Q
@@ -1089,22 +1144,22 @@ q
 0 g
 BT
 /F2 7.37 Tf
-1 0 0 1 476.303 660.45 Tm
+1 0 0 1 476.303 622.817 Tm
 (Relativa) Tj
 ET
 Q
 q
 0.55 G
 0.709 w
-53.858 657.45 m
-513.071 657.45 l
+53.858 619.817 m
+513.071 619.817 l
 S
 Q
 q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 648.283 Tm
+1 0 0 1 53.858 610.651 Tm
 (Medici«f3»n - Catastro) Tj
 ET
 Q
@@ -1112,7 +1167,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 367.562 648.283 Tm
+1 0 0 1 367.562 610.651 Tm
 (+2,99 m«b2») Tj
 ET
 Q
@@ -1120,7 +1175,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 477.32 648.283 Tm
+1 0 0 1 477.32 610.651 Tm
 (+0,19 %) Tj
 ET
 Q
@@ -1128,7 +1183,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 637.818 Tm
+1 0 0 1 53.858 600.185 Tm
 (Medici«f3»n - Registro) Tj
 ET
 Q
@@ -1136,7 +1191,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 363.67 637.818 Tm
+1 0 0 1 363.67 600.185 Tm
 (No consta) Tj
 ET
 Q
@@ -1144,7 +1199,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 471.387 637.818 Tm
+1 0 0 1 471.387 600.185 Tm
 (No consta) Tj
 ET
 Q
@@ -1152,7 +1207,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 627.352 Tm
+1 0 0 1 53.858 589.72 Tm
 (Catastro - Registro) Tj
 ET
 Q
@@ -1160,7 +1215,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 363.67 627.352 Tm
+1 0 0 1 363.67 589.72 Tm
 (No consta) Tj
 ET
 Q
@@ -1168,22 +1223,22 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 471.387 627.352 Tm
+1 0 0 1 471.387 589.72 Tm
 (No consta) Tj
 ET
 Q
 q
 0.55 G
 0.709 w
-53.858 621.649 m
-513.071 621.649 l
+53.858 584.016 m
+513.071 584.016 l
 S
 Q
 q
 0 g
 BT
 /F2 8.504 Tf
-1 0 0 1 42.52 601.523 Tm
+1 0 0 1 42.52 563.89 Tm
 (4.4  Solape con el contorno oficial) Tj
 ET
 Q
@@ -1191,7 +1246,7 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 585.196 Tm
+1 0 0 1 53.858 547.563 Tm
 (Superficie com«fa»n) Tj
 ET
 Q
@@ -1199,7 +1254,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 585.196 Tm
+1 0 0 1 198.425 547.563 Tm
 (1.535,87 m«b2») Tj
 ET
 Q
@@ -1207,7 +1262,7 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 573.12 Tm
+1 0 0 1 53.858 535.487 Tm
 (Sobre la mayor de las dos) Tj
 ET
 Q
@@ -1215,7 +1270,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 573.12 Tm
+1 0 0 1 198.425 535.487 Tm
 (99,80 %) Tj
 ET
 Q
@@ -1223,7 +1278,7 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 561.044 Tm
+1 0 0 1 53.858 523.412 Tm
 (Piezas disjuntas) Tj
 ET
 Q
@@ -1231,7 +1286,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 561.044 Tm
+1 0 0 1 198.425 523.412 Tm
 (1) Tj
 ET
 Q
@@ -1239,7 +1294,7 @@ q
 0 g
 BT
 /F2 8.504 Tf
-1 0 0 1 42.52 539.048 Tm
+1 0 0 1 42.52 501.415 Tm
 (4.5  Diferencia con el contorno oficial) Tj
 ET
 Q
@@ -1247,7 +1302,7 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 522.72 Tm
+1 0 0 1 53.858 485.087 Tm
 (Superficie no com«fa»n) Tj
 ET
 Q
@@ -1255,7 +1310,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 522.72 Tm
+1 0 0 1 198.425 485.087 Tm
 (3,12 m«b2») Tj
 ET
 Q
@@ -1263,7 +1318,7 @@ q
 0.3 g
 BT
 /F1 6.803 Tf
-1 0 0 1 53.858 512.005 Tm
+1 0 0 1 53.858 474.372 Tm
 (Diferencia sim«e9»trica: la superficie que est«e1» en uno de los dos contornos y no en el otro, sumando los dos sentidos.) Tj
 ET
 Q
@@ -1271,7 +1326,7 @@ q
 0 g
 BT
 /F2 8.504 Tf
-1 0 0 1 42.52 491.063 Tm
+1 0 0 1 42.52 453.43 Tm
 (4.6  Desplazamiento de centroides) Tj
 ET
 Q
@@ -1279,7 +1334,7 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 474.735 Tm
+1 0 0 1 53.858 437.102 Tm
 (Centroide de la medici«f3»n) Tj
 ET
 Q
@@ -1287,7 +1342,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 474.735 Tm
+1 0 0 1 198.425 437.102 Tm
 (439250,41 ; 4479666,06) Tj
 ET
 Q
@@ -1295,7 +1350,7 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 462.66 Tm
+1 0 0 1 53.858 425.027 Tm
 (Centroide del oficial) Tj
 ET
 Q
@@ -1303,7 +1358,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 462.66 Tm
+1 0 0 1 198.425 425.027 Tm
 (439250,35 ; 4479666,05) Tj
 ET
 Q
@@ -1311,7 +1366,7 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 450.584 Tm
+1 0 0 1 53.858 412.951 Tm
 (Distancia entre ambos) Tj
 ET
 Q
@@ -1319,7 +1374,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 450.584 Tm
+1 0 0 1 198.425 412.951 Tm
 (0,06 m) Tj
 ET
 Q
@@ -1327,7 +1382,7 @@ q
 0 g
 BT
 /F2 8.504 Tf
-1 0 0 1 42.52 428.587 Tm
+1 0 0 1 42.52 390.954 Tm
 (4.7  Desviaci«f3»n de lindero, lado a lado) Tj
 ET
 Q
@@ -1335,7 +1390,7 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 412.26 Tm
+1 0 0 1 53.858 374.627 Tm
 (Desviaci«f3»n m«e1»xima) Tj
 ET
 Q
@@ -1343,7 +1398,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 412.26 Tm
+1 0 0 1 198.425 374.627 Tm
 (0,40 m) Tj
 ET
 Q
@@ -1351,7 +1406,7 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 400.184 Tm
+1 0 0 1 53.858 362.551 Tm
 (Lado que la produce) Tj
 ET
 Q
@@ -1359,7 +1414,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 400.184 Tm
+1 0 0 1 198.425 362.551 Tm
 (lado 1 del exterior) Tj
 ET
 Q
@@ -1367,7 +1422,7 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 388.108 Tm
+1 0 0 1 53.858 350.476 Tm
 (Punto de la medici«f3»n) Tj
 ET
 Q
@@ -1375,7 +1430,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 388.108 Tm
+1 0 0 1 198.425 350.476 Tm
 (439283,63 ; 4479671,27) Tj
 ET
 Q
@@ -1383,7 +1438,7 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 376.033 Tm
+1 0 0 1 53.858 338.4 Tm
 (Su hom«f3»logo del oficial) Tj
 ET
 Q
@@ -1391,7 +1446,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 376.033 Tm
+1 0 0 1 198.425 338.4 Tm
 (439283,23 ; 4479671,27) Tj
 ET
 Q
@@ -1399,7 +1454,7 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 363.957 Tm
+1 0 0 1 53.858 326.324 Tm
 (Muestras tomadas) Tj
 ET
 Q
@@ -1407,7 +1462,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 363.957 Tm
+1 0 0 1 198.425 326.324 Tm
 (570) Tj
 ET
 Q
@@ -1415,7 +1470,7 @@ q
 0.3 g
 BT
 /F1 6.803 Tf
-1 0 0 1 53.858 353.242 Tm
+1 0 0 1 53.858 315.609 Tm
 (Es el m«e1»ximo, lado a lado, de la distancia m«ed»nima de cada muestra al contorno oficial completo. Se muestrea cada 0,30 m sobre el terreno y los dos extremos de) Tj
 ET
 Q
@@ -1423,7 +1478,7 @@ q
 0.3 g
 BT
 /F1 6.803 Tf
-1 0 0 1 53.858 343.582 Tm
+1 0 0 1 53.858 305.949 Tm
 (cada lado entran siempre, as«ed» que la cifra puede quedarse hasta 0,15 m por debajo del m«e1»ximo continuo. La medida es dirigida \\(de la medici«f3»n al oficial\\) y por tanto) Tj
 ET
 Q
@@ -1431,7 +1486,7 @@ q
 0.3 g
 BT
 /F1 6.803 Tf
-1 0 0 1 53.858 333.921 Tm
+1 0 0 1 53.858 296.289 Tm
 (asim«e9»trica.) Tj
 ET
 Q
@@ -1439,7 +1494,7 @@ q
 0 g
 BT
 /F2 7.37 Tf
-1 0 0 1 53.858 318.138 Tm
+1 0 0 1 53.858 280.505 Tm
 (Lado) Tj
 ET
 Q
@@ -1447,7 +1502,7 @@ q
 0 g
 BT
 /F2 7.37 Tf
-1 0 0 1 318.251 318.138 Tm
+1 0 0 1 318.251 280.505 Tm
 (Desviaci«f3»n) Tj
 ET
 Q
@@ -1455,22 +1510,22 @@ q
 0 g
 BT
 /F2 7.37 Tf
-1 0 0 1 442.205 318.138 Tm
+1 0 0 1 442.205 280.505 Tm
 () Tj
 ET
 Q
 q
 0.55 G
 0.709 w
-53.858 315.138 m
-450.709 315.138 l
+53.858 277.506 m
+450.709 277.506 l
 S
 Q
 q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 305.972 Tm
+1 0 0 1 53.858 268.339 Tm
 (Exterior, lado 1) Tj
 ET
 Q
@@ -1478,7 +1533,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 334.635 305.972 Tm
+1 0 0 1 334.635 268.339 Tm
 (0,40 m) Tj
 ET
 Q
@@ -1486,7 +1541,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 416.409 305.972 Tm
+1 0 0 1 416.409 268.339 Tm
 (m«e1»xima) Tj
 ET
 Q
@@ -1494,7 +1549,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 295.506 Tm
+1 0 0 1 53.858 257.873 Tm
 (Exterior, lado 2) Tj
 ET
 Q
@@ -1502,7 +1557,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 334.635 295.506 Tm
+1 0 0 1 334.635 257.873 Tm
 (0,00 m) Tj
 ET
 Q
@@ -1510,7 +1565,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 442.205 295.506 Tm
+1 0 0 1 442.205 257.873 Tm
 () Tj
 ET
 Q
@@ -1518,7 +1573,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 285.041 Tm
+1 0 0 1 53.858 247.408 Tm
 (Exterior, lado 3) Tj
 ET
 Q
@@ -1526,7 +1581,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 334.635 285.041 Tm
+1 0 0 1 334.635 247.408 Tm
 (0,00 m) Tj
 ET
 Q
@@ -1534,7 +1589,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 442.205 285.041 Tm
+1 0 0 1 442.205 247.408 Tm
 () Tj
 ET
 Q
@@ -1542,7 +1597,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 274.575 Tm
+1 0 0 1 53.858 236.942 Tm
 (Exterior, lado 4) Tj
 ET
 Q
@@ -1550,7 +1605,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 334.635 274.575 Tm
+1 0 0 1 334.635 236.942 Tm
 (0,00 m) Tj
 ET
 Q
@@ -1558,7 +1613,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 442.205 274.575 Tm
+1 0 0 1 442.205 236.942 Tm
 () Tj
 ET
 Q
@@ -1566,7 +1621,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 264.11 Tm
+1 0 0 1 53.858 226.477 Tm
 (Exterior, lado 5) Tj
 ET
 Q
@@ -1574,7 +1629,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 334.635 264.11 Tm
+1 0 0 1 334.635 226.477 Tm
 (0,00 m) Tj
 ET
 Q
@@ -1582,7 +1637,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 442.205 264.11 Tm
+1 0 0 1 442.205 226.477 Tm
 () Tj
 ET
 Q
@@ -1590,7 +1645,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 253.644 Tm
+1 0 0 1 53.858 216.011 Tm
 (Exterior, lado 6) Tj
 ET
 Q
@@ -1598,7 +1653,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 334.635 253.644 Tm
+1 0 0 1 334.635 216.011 Tm
 (0,00 m) Tj
 ET
 Q
@@ -1606,7 +1661,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 442.205 253.644 Tm
+1 0 0 1 442.205 216.011 Tm
 () Tj
 ET
 Q
@@ -1614,7 +1669,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 243.179 Tm
+1 0 0 1 53.858 205.546 Tm
 (Exterior, lado 7) Tj
 ET
 Q
@@ -1622,7 +1677,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 334.635 243.179 Tm
+1 0 0 1 334.635 205.546 Tm
 (0,00 m) Tj
 ET
 Q
@@ -1630,7 +1685,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 442.205 243.179 Tm
+1 0 0 1 442.205 205.546 Tm
 () Tj
 ET
 Q
@@ -1638,7 +1693,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 232.713 Tm
+1 0 0 1 53.858 195.08 Tm
 (Exterior, lado 8) Tj
 ET
 Q
@@ -1646,7 +1701,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 334.635 232.713 Tm
+1 0 0 1 334.635 195.08 Tm
 (0,00 m) Tj
 ET
 Q
@@ -1654,7 +1709,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 442.205 232.713 Tm
+1 0 0 1 442.205 195.08 Tm
 () Tj
 ET
 Q
@@ -1662,7 +1717,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 222.248 Tm
+1 0 0 1 53.858 184.615 Tm
 (Exterior, lado 9) Tj
 ET
 Q
@@ -1670,7 +1725,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 334.635 222.248 Tm
+1 0 0 1 334.635 184.615 Tm
 (0,00 m) Tj
 ET
 Q
@@ -1678,7 +1733,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 442.205 222.248 Tm
+1 0 0 1 442.205 184.615 Tm
 () Tj
 ET
 Q
@@ -1686,7 +1741,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 211.782 Tm
+1 0 0 1 53.858 174.149 Tm
 (Exterior, lado 10) Tj
 ET
 Q
@@ -1694,7 +1749,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 334.635 211.782 Tm
+1 0 0 1 334.635 174.149 Tm
 (0,00 m) Tj
 ET
 Q
@@ -1702,7 +1757,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 442.205 211.782 Tm
+1 0 0 1 442.205 174.149 Tm
 () Tj
 ET
 Q
@@ -1710,7 +1765,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 201.317 Tm
+1 0 0 1 53.858 163.684 Tm
 (Exterior, lado 11) Tj
 ET
 Q
@@ -1718,7 +1773,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 334.635 201.317 Tm
+1 0 0 1 334.635 163.684 Tm
 (0,00 m) Tj
 ET
 Q
@@ -1726,7 +1781,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 442.205 201.317 Tm
+1 0 0 1 442.205 163.684 Tm
 () Tj
 ET
 Q
@@ -1734,7 +1789,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 190.851 Tm
+1 0 0 1 53.858 153.218 Tm
 (Exterior, lado 12) Tj
 ET
 Q
@@ -1742,7 +1797,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 334.635 190.851 Tm
+1 0 0 1 334.635 153.218 Tm
 (0,00 m) Tj
 ET
 Q
@@ -1750,7 +1805,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 442.205 190.851 Tm
+1 0 0 1 442.205 153.218 Tm
 () Tj
 ET
 Q
@@ -1758,7 +1813,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 180.386 Tm
+1 0 0 1 53.858 142.753 Tm
 (Exterior, lado 13) Tj
 ET
 Q
@@ -1766,7 +1821,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 334.635 180.386 Tm
+1 0 0 1 334.635 142.753 Tm
 (0,00 m) Tj
 ET
 Q
@@ -1774,7 +1829,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 442.205 180.386 Tm
+1 0 0 1 442.205 142.753 Tm
 () Tj
 ET
 Q
@@ -1782,7 +1837,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 169.92 Tm
+1 0 0 1 53.858 132.287 Tm
 (Exterior, lado 14) Tj
 ET
 Q
@@ -1790,7 +1845,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 334.635 169.92 Tm
+1 0 0 1 334.635 132.287 Tm
 (0,00 m) Tj
 ET
 Q
@@ -1798,7 +1853,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 442.205 169.92 Tm
+1 0 0 1 442.205 132.287 Tm
 () Tj
 ET
 Q
@@ -1806,7 +1861,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 53.858 159.454 Tm
+1 0 0 1 53.858 121.822 Tm
 (Exterior, lado 15) Tj
 ET
 Q
@@ -1814,7 +1869,7 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 334.635 159.454 Tm
+1 0 0 1 334.635 121.822 Tm
 (0,40 m) Tj
 ET
 Q
@@ -1822,22 +1877,22 @@ q
 0 g
 BT
 /F1 7.37 Tf
-1 0 0 1 442.205 159.454 Tm
+1 0 0 1 442.205 121.822 Tm
 () Tj
 ET
 Q
 q
 0.55 G
 0.709 w
-53.858 153.751 m
-450.709 153.751 l
+53.858 116.118 m
+450.709 116.118 l
 S
 Q
 q
 0 g
 BT
 /F2 8.504 Tf
-1 0 0 1 42.52 133.625 Tm
+1 0 0 1 42.52 95.992 Tm
 (4.8  Invasi«f3»n a colindantes) Tj
 ET
 Q
@@ -1845,87 +1900,9 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 117.298 Tm
+1 0 0 1 53.858 79.665 Tm
 (Se ha consultado. La parcela comparte superficie con:) Tj
 ET
-Q
-q
-0 g
-BT
-/F2 7.37 Tf
-1 0 0 1 53.858 101.877 Tm
-(Referencia catastral) Tj
-ET
-Q
-q
-0 g
-BT
-/F2 7.37 Tf
-1 0 0 1 364.797 101.877 Tm
-(Superficie compartida) Tj
-ET
-Q
-q
-0.55 G
-0.709 w
-53.858 98.878 m
-450.709 98.878 l
-S
-Q
-q
-0 g
-BT
-/F1 7.37 Tf
-1 0 0 1 53.858 89.711 Tm
-(9398501VK3799G) Tj
-ET
-Q
-q
-0 g
-BT
-/F1 7.37 Tf
-1 0 0 1 417.22 89.711 Tm
-(0,23 m«b2») Tj
-ET
-Q
-q
-0 g
-BT
-/F1 7.37 Tf
-1 0 0 1 53.858 79.245 Tm
-(9398518VK3799G) Tj
-ET
-Q
-q
-0 g
-BT
-/F1 7.37 Tf
-1 0 0 1 417.22 79.245 Tm
-(0,25 m«b2») Tj
-ET
-Q
-q
-0 g
-BT
-/F1 7.37 Tf
-1 0 0 1 53.858 68.78 Tm
-(9398515VK3799G) Tj
-ET
-Q
-q
-0 g
-BT
-/F1 7.37 Tf
-1 0 0 1 417.22 68.78 Tm
-(2,64 m«b2») Tj
-ET
-Q
-q
-0.55 G
-0.709 w
-53.858 63.077 m
-450.709 63.077 l
-S
 Q
 q
 0.55 G
@@ -1957,13 +1934,91 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 595.276 841.89] /Resources 3 0 R /Contents 11 0 R >>
 endobj
 11 0 obj
-<< /Length 3751 >>
+<< /Length 4430 >>
 stream
 q
 0 g
 BT
+/F2 7.37 Tf
+1 0 0 1 53.858 793.474 Tm
+(Referencia catastral) Tj
+ET
+Q
+q
+0 g
+BT
+/F2 7.37 Tf
+1 0 0 1 364.797 793.474 Tm
+(Superficie compartida) Tj
+ET
+Q
+q
+0.55 G
+0.709 w
+53.858 790.474 m
+450.709 790.474 l
+S
+Q
+q
+0 g
+BT
+/F1 7.37 Tf
+1 0 0 1 53.858 781.308 Tm
+(9398501VK3799G) Tj
+ET
+Q
+q
+0 g
+BT
+/F1 7.37 Tf
+1 0 0 1 417.22 781.308 Tm
+(0,23 m«b2») Tj
+ET
+Q
+q
+0 g
+BT
+/F1 7.37 Tf
+1 0 0 1 53.858 770.842 Tm
+(9398518VK3799G) Tj
+ET
+Q
+q
+0 g
+BT
+/F1 7.37 Tf
+1 0 0 1 417.22 770.842 Tm
+(0,25 m«b2») Tj
+ET
+Q
+q
+0 g
+BT
+/F1 7.37 Tf
+1 0 0 1 53.858 760.377 Tm
+(9398515VK3799G) Tj
+ET
+Q
+q
+0 g
+BT
+/F1 7.37 Tf
+1 0 0 1 417.22 760.377 Tm
+(2,64 m«b2») Tj
+ET
+Q
+q
+0.55 G
+0.709 w
+53.858 754.673 m
+450.709 754.673 l
+S
+Q
+q
+0 g
+BT
 /F2 8.504 Tf
-1 0 0 1 42.52 792.567 Tm
+1 0 0 1 42.52 734.547 Tm
 (4.9  Margen oficial de identidad) Tj
 ET
 Q
@@ -1971,7 +2026,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 776.239 Tm
+1 0 0 1 53.858 718.22 Tm
 (Margen de identidad del Catastro en clase URBANA: «b1»0,50 m de per«ed»metro y 5,00 % de superficie.) Tj
 ET
 Q
@@ -1979,7 +2034,7 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 759.912 Tm
+1 0 0 1 53.858 701.892 Tm
 (Clase de suelo) Tj
 ET
 Q
@@ -1987,7 +2042,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 759.912 Tm
+1 0 0 1 198.425 701.892 Tm
 (URBANA \\(propuesta por la aplicaci«f3»n, no elegida por una persona\\)) Tj
 ET
 Q
@@ -1995,7 +2050,7 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 747.836 Tm
+1 0 0 1 53.858 689.817 Tm
 (Criterio de la propuesta) Tj
 ET
 Q
@@ -2003,7 +2058,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 747.836 Tm
+1 0 0 1 198.425 689.817 Tm
 (La referencia 9398516VK3799G no lleva c«f3»digo de pol«ed»gono y parcela, sino hoja de plano) Tj
 ET
 Q
@@ -2011,7 +2066,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 735.761 Tm
+1 0 0 1 198.425 677.741 Tm
 (\\(dos letras y cuatro d«ed»gitos\\), propia del parcelario URBANO.) Tj
 ET
 Q
@@ -2019,7 +2074,7 @@ q
 0.3 g
 BT
 /F1 6.803 Tf
-1 0 0 1 53.858 725.046 Tm
+1 0 0 1 53.858 667.026 Tm
 (Fuente: BOE-A-2020-12111. Es un criterio de IDENTIDAD «97»si se est«e1» hablando de la misma finca«97» y no una calificaci«f3»n del levantamiento. Este informe lo) Tj
 ET
 Q
@@ -2027,7 +2082,7 @@ q
 0.3 g
 BT
 /F1 6.803 Tf
-1 0 0 1 53.858 715.385 Tm
+1 0 0 1 53.858 657.366 Tm
 (ENUNCIA y no lo enfrenta a las cifras de arriba: esa lectura es del colegiado que firma. Una discrepancia grande significa a menudo que la geometr«ed»a catastral est«e1») Tj
 ET
 Q
@@ -2035,7 +2090,7 @@ q
 0.3 g
 BT
 /F1 6.803 Tf
-1 0 0 1 53.858 705.725 Tm
+1 0 0 1 53.858 647.705 Tm
 (mal, y «e9»se suele ser el motivo por el que se abre el expediente.) Tj
 ET
 Q
@@ -2043,7 +2098,7 @@ q
 0 g
 BT
 /F2 8.504 Tf
-1 0 0 1 42.52 684.782 Tm
+1 0 0 1 42.52 626.763 Tm
 (4.10  Lo que no se ha podido medir) Tj
 ET
 Q
@@ -2051,7 +2106,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 668.455 Tm
+1 0 0 1 53.858 610.435 Tm
 (Se ha podido medir todo lo que este informe recoge.) Tj
 ET
 Q
@@ -2059,7 +2114,7 @@ q
 0 g
 BT
 /F2 8.504 Tf
-1 0 0 1 42.52 646.458 Tm
+1 0 0 1 42.52 588.438 Tm
 (4.11  Recintos que no se han podido medir) Tj
 ET
 Q
@@ -2067,7 +2122,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 53.858 630.13 Tm
+1 0 0 1 53.858 572.111 Tm
 (Se han medido todos los recintos.) Tj
 ET
 Q
@@ -2075,22 +2130,22 @@ q
 0 g
 BT
 /F2 10.205 Tf
-1 0 0 1 42.52 599.686 Tm
+1 0 0 1 42.52 541.667 Tm
 (5.  DESCRIPCI«d3»N LITERARIA DEL LINDERO) Tj
 ET
 Q
 q
 0.3 G
 1.134 w
-42.52 593.359 m
-552.756 593.359 l
+42.52 535.34 m
+552.756 535.34 l
 S
 Q
 q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 42.52 575.501 Tm
+1 0 0 1 42.52 517.482 Tm
 (No se ha compuesto la descripci«f3»n literaria del lindero, as«ed» que este informe no la lleva. No significa que la parcela no tenga lindero) Tj
 ET
 Q
@@ -2098,7 +2153,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 42.52 563.426 Tm
+1 0 0 1 42.52 505.406 Tm
 (descriptible: significa que no se ha pedido o no se ha podido redactar.) Tj
 ET
 Q
@@ -2106,22 +2161,22 @@ q
 0 g
 BT
 /F2 10.205 Tf
-1 0 0 1 42.52 532.981 Tm
+1 0 0 1 42.52 474.962 Tm
 (6.  FIRMA) Tj
 ET
 Q
 q
 0.3 G
 1.134 w
-42.52 526.654 m
-552.756 526.654 l
+42.52 468.635 m
+552.756 468.635 l
 S
 Q
 q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 42.52 508.796 Tm
+1 0 0 1 42.52 450.777 Tm
 (Nombre y apellidos) Tj
 ET
 Q
@@ -2129,7 +2184,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 508.796 Tm
+1 0 0 1 198.425 450.777 Tm
 (No consta) Tj
 ET
 Q
@@ -2137,7 +2192,7 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 42.52 496.721 Tm
+1 0 0 1 42.52 438.701 Tm
 (N«fa»mero de colegiado) Tj
 ET
 Q
@@ -2145,7 +2200,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 496.721 Tm
+1 0 0 1 198.425 438.701 Tm
 (No consta) Tj
 ET
 Q
@@ -2153,7 +2208,7 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 42.52 484.645 Tm
+1 0 0 1 42.52 426.626 Tm
 (Colegio profesional) Tj
 ET
 Q
@@ -2161,7 +2216,7 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 484.645 Tm
+1 0 0 1 198.425 426.626 Tm
 (No consta) Tj
 ET
 Q
@@ -2169,7 +2224,7 @@ q
 0.4 g
 BT
 /F1 8.504 Tf
-1 0 0 1 42.52 472.569 Tm
+1 0 0 1 42.52 414.55 Tm
 (Contacto) Tj
 ET
 Q
@@ -2177,22 +2232,22 @@ q
 0 g
 BT
 /F1 8.504 Tf
-1 0 0 1 198.425 472.569 Tm
+1 0 0 1 198.425 414.55 Tm
 (No consta) Tj
 ET
 Q
 q
 0 G
 0.85 w
-42.52 404.935 m
-269.291 404.935 l
+42.52 346.915 m
+269.291 346.915 l
 S
 Q
 q
 0.4 g
 BT
 /F1 6.803 Tf
-1 0 0 1 42.52 395.24 Tm
+1 0 0 1 42.52 337.221 Tm
 (Firma) Tj
 ET
 Q
@@ -2200,7 +2255,7 @@ q
 0.3 g
 BT
 /F1 6.803 Tf
-1 0 0 1 42.52 379.911 Tm
+1 0 0 1 42.52 321.891 Tm
 (Este documento no lleva firma electr«f3»nica ni c«f3»digo seguro de verificaci«f3»n: la firma es la que estampe quien suscribe, con los medios que su colegio y el destinatario) Tj
 ET
 Q
@@ -2208,7 +2263,7 @@ q
 0.3 g
 BT
 /F1 6.803 Tf
-1 0 0 1 42.52 370.25 Tm
+1 0 0 1 42.52 312.231 Tm
 (admitan. El identificador que consta en el encabezado lo emite esta aplicaci«f3»n y sirve para rastrear el documento, no para verificarlo ante ning«fa»n organismo.) Tj
 ET
 Q
@@ -2251,22 +2306,22 @@ xref
 0000000314 00000 n«0d»
 0000000416 00000 n«0d»
 0000000527 00000 n«0d»
-0000009354 00000 n«0d»
-0000009465 00000 n«0d»
-0000019680 00000 n«0d»
-0000019793 00000 n«0d»
-0000023597 00000 n«0d»
+0000009241 00000 n«0d»
+0000009352 00000 n«0d»
+0000019470 00000 n«0d»
+0000019583 00000 n«0d»
+0000024066 00000 n«0d»
 trailer
 << /Size 13 /Root 1 0 R /Info 12 0 R >>
 startxref
-23880
+24349
 %%EOF
 "
 `;
 
 exports[`report/pdf-parcela · snapshot > y las medidas del informe COMPLETO sobre la parcela real 1`] = `
 {
-  "bytes": 34629,
+  "bytes": 34944,
   "paginas": 4,
 }
 `;

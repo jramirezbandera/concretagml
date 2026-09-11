@@ -442,6 +442,11 @@ describe('leerDnprc · la parcela rústica (rama `bico`): aquí sí viven paraje
       paraje: lorus.npa,
       poligono: lorus.cpp.cpo,
       parcela: lorus.cpp.cpa,
+      // ⚠️ La rústica TAMBIÉN trae vía: su subárbol `lors` contiene un `lourb`
+      // (ver el test de abajo). Se lee y se dice; lo que no se hace es deducir de
+      // ahí que la parcela sea urbana.
+      via: 'ER Extrarradio',
+      numeroVia: null,
       domicilio: inmuebleRustica.ldt,
       clase: CLASE_PARCELA.RUSTICA,
     })

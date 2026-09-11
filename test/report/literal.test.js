@@ -1126,14 +1126,15 @@ describe('report/literal · contrato del llamante', () => {
     expect(Object.keys(r.tramos[0]).sort()).toEqual([
       'azimut',
       'cardinal',
-      'domicilio',
       'indiceFin',
       'indiceInicio',
       'label',
       'longitud',
       'nLados',
+      'numeroVia',
       'presuncionNoVerificada',
       'refcat',
+      'via',
     ])
   })
 })

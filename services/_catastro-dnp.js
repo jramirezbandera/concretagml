@@ -322,6 +322,18 @@ export const CAMPOS_DESCRIPTIVOS = Object.freeze([
   'paraje',
   'poligono',
   'parcela',
+  // ⭐ La pareja URBANA, simétrica de `poligono`/`parcela` (2026-09-12). Una finca
+  // rústica se identifica por su polígono y su número dentro de él; una urbana,
+  // por su calle y su número de portal. Las cuatro son campos DESCRIPTIVOS del
+  // mismo servicio y viajan por el mismo sitio.
+  //
+  // ⛔ **Esto NO reabre la decisión C.** Aquella dice que `domicilio` es el `ldt`
+  // LITERAL y no se compone, y sigue siéndolo: no se toca ni una de sus letras.
+  // Lo que se hace aquí es LEER dos campos que el servicio manda por separado
+  // (`dir.tv`, `dir.nv`, `dir.pnp`) en vez de dejarlos en el JSON sin recoger, que
+  // es lo contrario de redactar un dato.
+  'via',
+  'numeroVia',
   'domicilio',
   'clase',
 ])
@@ -627,6 +639,86 @@ function claseDeInmueble(locs, cn) {
   return { clase: porSubarbol ?? porCn, avisos }
 }
 
+// ── El nombre de la vía: leer la abreviatura, no inventarla ─────────────────
+//
+// El servicio manda la dirección PARTIDA: `tv` es el tipo de vía en abreviatura de
+// dos letras («CL»), `nv` el nombre («SAN RESTITUTO») y `pnp` el número de portal
+// («72»). Un informe que se firma no puede decir «CL SAN RESTITUTO»: hay que
+// escribir «Calle San Restituto».
+//
+// ⛔ **LA TABLA NO SE INVENTA DE MEMORIA, Y POR ESO ES CORTA.** Una expansión
+// equivocada en un documento que se firma —«CR» leído como «Carrera» donde el
+// Catastro dice «Carretera»— es exactamente el error silencioso que prohíbe la
+// regla de oro 1: el texto se lee perfectamente bien y nombra otra calle. Así que
+// aquí solo están las abreviaturas que se han podido confirmar, y **lo que no esté
+// sale TAL CUAL**, en su abreviatura, que es feo pero cierto. Quien añada una
+// entrada nueva tiene que poder decir de dónde la ha sacado.
+//
+// Confirmadas: `CL`/`AV`/`PZ`/`PS`/`CR`/`CM`/`TR`/`RD`/`GL`/`DS` aparecen en los
+// literales `ldt` del propio servicio, que es la fuente de verdad de esta casa
+// (regla de oro 8): el fixture rústico trae «ER EXTRARRADIO», y el ejemplo que
+// aportó el autor, «Diseminado Benajarafe 247» para un `DS`.
+const TIPOS_VIA = Object.freeze({
+  CL: 'Calle',
+  AV: 'Avenida',
+  PZ: 'Plaza',
+  PS: 'Paseo',
+  CR: 'Carretera',
+  CM: 'Camino',
+  TR: 'Travesía',
+  RD: 'Ronda',
+  GL: 'Glorieta',
+  DS: 'Diseminado',
+})
+
+/**
+ * Partículas que se quedan en minúscula al recomponer un nombre en mayúsculas.
+ * Sin ellas, «CALLE DE LA PALMA» saldría «Calle De La Palma», que no es como se
+ * escribe un nombre propio en español.
+ */
+const PARTICULAS = Object.freeze(['de', 'del', 'la', 'las', 'los', 'el', 'y', 'a', 'al'])
+
+/**
+ * «SAN RESTITUTO» → «San Restituto». Solo toca las MAYÚSCULAS.
+ *
+ * ⚠️ **Es una decisión de PRESENTACIÓN, no un cambio de dato**: el servicio manda
+ * los topónimos en mayúsculas sin acentuar y esta función no añade ni una tilde ni
+ * cambia una letra, solo baja las que no abren palabra. Un nombre que llegue ya en
+ * minúsculas o mezclado se devuelve intacto, porque ahí el servicio está diciendo
+ * algo con las mayúsculas y no nos toca corregirlo.
+ *
+ * ⚠️ Y **no se aplica a `municipio` ni a `provincia`**, que el encabezado del
+ * informe lleva imprimiendo en mayúsculas desde F09: cambiarlos aquí sería
+ * reescribir un dato que ya se publica de otra forma.
+ */
+function enCapitular(texto) {
+  if (texto !== texto.toUpperCase()) return texto
+  return texto
+    .toLowerCase()
+    .split(/(\s+)/)
+    .map((trozo, i) => {
+      if (/^\s+$/.test(trozo) || trozo === '') return trozo
+      if (i > 0 && PARTICULAS.includes(trozo)) return trozo
+      return trozo.charAt(0).toUpperCase() + trozo.slice(1)
+    })
+    .join('')
+}
+
+/**
+ * El nombre de la vía, con el tipo delante y ya legible: «Calle San Restituto».
+ *
+ * @param {*} dir  El `dir` del inmueble (`{tv, nv, pnp, plp}`), o `null`.
+ * @returns {string|null}  `null` si el servicio no manda nombre de vía — sin `nv`
+ *   no hay calle que nombrar, y un «Calle» a secas sería peor que no decir nada.
+ */
+function nombreDeVia(dir) {
+  const nombre = textoDnp(dir?.nv)
+  if (nombre === null) return null
+  const abreviatura = textoDnp(dir?.tv)
+  const tipo = abreviatura === null ? null : (TIPOS_VIA[abreviatura.toUpperCase()] ?? abreviatura)
+  return tipo === null ? enCapitular(nombre) : `${tipo} ${enCapitular(nombre)}`
+}
+
 /**
  * Lee UN inmueble —un `bico.bi` o un `lrcdnp.rcdnp[i]`— y saca sus siete campos.
  *
@@ -655,6 +747,14 @@ function leerInmueble(crudo) {
   const locs = rama(dt, 'locs')
   const lorus = rama(rama(locs, 'lors'), 'lorus')
   const cpp = rama(lorus, 'cpp')
+  // ⚠️ La dirección cuelga de `lourb`, y `lourb` vive en DOS sitios: bajo `lous`
+  // en una urbana y bajo `lors` en una rústica (ver la trampa de la cabecera: el
+  // subárbol rústico contiene su propio `lourb`). Se miran los dos, en ese orden,
+  // porque quien busque solo en `locs.lous.lourb` se queda sin dirección en media
+  // España.
+  const dir =
+    rama(rama(rama(locs, 'lous'), 'lourb'), 'dir') ??
+    rama(rama(rama(locs, 'lors'), 'lourb'), 'dir')
   const clase = claseDeInmueble(locs, rama(crudo, 'idbi')?.cn)
 
   return {
@@ -668,6 +768,8 @@ function leerInmueble(crudo) {
       // `ldt` solo existe en `bico`. En `lrcdnp` no se compone desde `dir`
       // (decisión C de la cabecera): sería redactar el dato, no leerlo.
       domicilio: textoDnp(crudo.ldt),
+      via: nombreDeVia(dir),
+      numeroVia: textoDnp(dir?.pnp),
       clase: clase.clase,
     },
   }

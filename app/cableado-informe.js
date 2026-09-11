@@ -227,6 +227,26 @@ export const ACUSE_DESCRIPTIVOS =
   'lo que se imprime.'
 
 /**
+ * La forma de una referencia catastral RÚSTICA: 5 dígitos de provincia y
+ * municipio, una letra de sector, 3 de polígono y 5 de parcela.
+ *
+ * ⚠️ **Es la misma que `report/literal.js#poligonoParcelaDe`, y está duplicada a
+ * propósito.** Allí es una función interna de un módulo PURO que no se exporta —
+ * sacarla obligaría a que este cableado importase de `report/` una utilidad de
+ * cadenas, que no es lo que esa capa publica—. Aquí solo se necesita el SÍ/NO. El
+ * test de este fichero compara las dos formas sobre las mismas referencias para
+ * que no puedan divergir: si una cambia y la otra no, se preguntaría al Catastro
+ * por parcelas que no lo necesitan, o se dejaría de preguntar por las que sí.
+ */
+export const RE_REFCAT_RUSTICA = /^\d{5}[A-Z]\d{8}/
+
+/** Cuántas colindantes se han quedado sin señas habiéndolas pedido. */
+const motivoSinSenas = (cuantas) =>
+  `${cuantas === 1 ? 'Una parcela colindante se ha quedado' : `${cuantas} parcelas colindantes se han quedado`} ` +
+  'sin calle y sin número: el Catastro no los ha devuelto. En el lindero se nombran por su ' +
+  'referencia catastral, que es lo que consta.'
+
+/**
  * Clave de motivo con la que se envuelve un fallo INESPERADO del cliente del
  * Catastro para que siga cabiendo en el sobre del contrato E. Los del catálogo
  * salen por `ok:false` con su propio motivo; esto es para lo que revienta.
@@ -677,6 +697,20 @@ export function cablearInforme({
   let descriptivos = { clave: null, valor: null }
 
   /**
+   * Las SEÑAS de cada colindante —«Calle San Restituto», «72»— indexadas por su
+   * referencia catastral. Se llena en {@link pedirSenasDeVecinas} y se vacía con la
+   * parcela, igual que `descriptivos` y por lo mismo: son de esta finca.
+   *
+   * Una entrada con `via: null` significa «se preguntó y no consta», y también se
+   * guarda: sin ella, cada preparación del informe volvería a preguntar por una
+   * parcela cuya respuesta ya conocemos, que es la ráfaga que castiga el override
+   * O8.
+   *
+   * @type {Map<string, {via: string|null, numeroVia: string|null}>}
+   */
+  const senasDeVecinas = new Map()
+
+  /**
    * El documento que se está preparando, congelado en el instante de pulsar
    * «Preparar informe». **Congelado a propósito**: la fecha, el `idDocumento`, el
    * encabezado, el lindero y el diagnóstico tienen que ser todos del MISMO
@@ -764,6 +798,73 @@ export function cablearInforme({
     // parcela nueva —o recargar— limpia la caché.
     descriptivos = { clave: refcat, valor: sobre }
     return sobre
+  }
+
+  /**
+   * Las señas de los colindantes URBANOS, para que el lindero pueda decir «con el
+   * nº 72 de Calle San Restituto» en vez de «con la parcela catastral …».
+   *
+   * ── ⛔ ESTO GASTA RED, Y POR ESO SE PIDE LO MÍNIMO ─────────────────────────
+   * La decisión D2 de `spec/feature-09-informe-parcela.md` reservaba el
+   * `Consulta_DNPRC` a la parcela PROPIA: pedirlo también para las cuatro vecinas
+   * serían cinco peticiones por informe, contra el override O8 (denegación ~10 días
+   * por abuso). Esa decisión se revisa aquí, el 2026-09-12, y se revisa ACOTADA:
+   *
+   *   1. **Solo las que lo necesitan.** Una colindante RÚSTICA se nombra por su
+   *      polígono y su parcela, que van dentro de su propia referencia y no cuestan
+   *      nada (`report/literal.js#poligonoParcelaDe`). Por ésas no se pregunta.
+   *   2. **Una sola vez por referencia**, con {@link senasDeVecinas} delante y la
+   *      caché de `services/catastro.js` detrás — que además sobrevive a la recarga.
+   *   3. **En serie, no en paralelo.** Cuatro peticiones a la vez son una ráfaga, y
+   *      lo que castiga la política de uso es exactamente eso. Se tarda más y se
+   *      nota en el renglón del cajón, que ya está diciendo que se consulta.
+   *   4. **Un fallo no para el informe.** La vecina que no conteste se queda sin
+   *      señas y se nombra por su referencia, que es lo que se hacía antes de este
+   *      cambio. Lo que NO se hace es callarlo.
+   *
+   * @returns {Promise<number>}  Cuántas colindantes se han quedado sin señas
+   *   habiéndolas pedido. 0 si no había nada que pedir.
+   */
+  async function pedirSenasDeVecinas() {
+    if (cliente === null || vecinas === null) return 0
+
+    // `poligonoParcelaDe` vive en `report/literal.js` y no se exporta: la pregunta
+    // «¿esta referencia es rústica?» se responde aquí con el mismo patrón, y hay un
+    // test que ata las dos formas para que no puedan divergir.
+    const pendientes = vecinas
+      .map((v) => v.refcat)
+      .filter((r) => typeof r === 'string' && r !== '' && !RE_REFCAT_RUSTICA.test(r))
+      .filter((r) => !senasDeVecinas.has(r))
+    const unicas = [...new Set(pendientes)]
+
+    let sinSenas = 0
+    for (const refcat of unicas) {
+      let sobre
+      try {
+        sobre = await cliente.descriptivosPorRefcat(refcat)
+      } catch (causa) {
+        console.error('cablearInforme: fallo al consultar las señas de un colindante', causa)
+        sobre = null
+      }
+      if (destruido) return sinSenas
+      const datos = sobre?.ok === true ? sobre.datos : null
+      const via = typeof datos?.via === 'string' && datos.via !== '' ? datos.via : null
+      if (via === null) sinSenas += 1
+      senasDeVecinas.set(refcat, {
+        via,
+        numeroVia:
+          typeof datos?.numeroVia === 'string' && datos.numeroVia !== '' ? datos.numeroVia : null,
+      })
+    }
+
+    // Se pegan a la lista que consume el literal. Copia nueva: `vecinas` viaja a
+    // `describirLindero`, que no muta nada, pero mutar en sitio una lista que otro
+    // cableado también mira es la clase de acoplamiento que este módulo evita.
+    vecinas = vecinas.map((v) => {
+      const senas = typeof v.refcat === 'string' ? senasDeVecinas.get(v.refcat) : undefined
+      return senas === undefined ? v : { ...v, ...senas }
+    })
+    return sinSenas
   }
 
   // ── El pie de firma recordado ──────────────────────────────────────────────
@@ -896,6 +997,12 @@ export function cablearInforme({
         // que no trae ningún `metadatos.idDocumento` que reutilizar.
         idDocumento: componerIdDocumento(refcat, fecha),
       })
+      // Las señas de los colindantes, ANTES de redactar: el lindero las escribe si
+      // están y se nombra por la referencia si no.
+      const sinSenas = await pedirSenasDeVecinas()
+      if (destruido) return
+      if (sinSenas > 0) decirEnCajon(motivoSinSenas(sinSenas))
+
       const literal = redactarLindero(recintos, encabezado.clase)
 
       const { firma, recordado } = await recuperarFirma()
@@ -1319,6 +1426,7 @@ export function cablearInforme({
       clave = nueva
       vecinas = null
       descriptivos = { clave: null, valor: null }
+      senasDeVecinas.clear()
     }
     if (preparado === null) return
     preparado = null

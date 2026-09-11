@@ -286,6 +286,13 @@ export const CAMPOS_DEL_SERVICIO = Object.freeze([
   'paraje',
   'poligono',
   'parcela',
+  // La pareja URBANA, simétrica de `poligono`/`parcela`: una finca rústica se
+  // identifica por su polígono y su número dentro de él, y una urbana por su calle
+  // y su portal. Van detrás por el mismo motivo por el que van las rústicas: el
+  // bloque de identificación viene después de la `clase`, que es la que dice cuál
+  // de los dos aplica.
+  'via',
+  'numeroVia',
 ])
 
 /**
@@ -298,6 +305,22 @@ export const CAMPOS_DEL_SERVICIO = Object.freeze([
  * @type {readonly string[]}
  */
 export const CAMPOS_SOLO_RUSTICA = Object.freeze(['paraje', 'poligono', 'parcela'])
+
+/**
+ * Y las dos que **solo tienen sentido en una finca URBANA**, por la misma razón y
+ * con la misma regla: en una rústica no faltan, es que no existen. Simétrica de
+ * {@link CAMPOS_SOLO_RUSTICA} y omitida igual — solo cuando además no hay dato,
+ * que es la invariante que impide perder nada.
+ *
+ * ⚠️ El caso que obliga a la condición «y además no hay dato»: el `lourb` del
+ * servicio existe TAMBIÉN en el subárbol rústico, así que una rústica puede traer
+ * vía perfectamente («ER Extrarradio» en el fixture del repo). Si la trae, se
+ * imprime.
+ *
+ * @readonly
+ * @type {readonly string[]}
+ */
+export const CAMPOS_SOLO_URBANA = Object.freeze(['via', 'numeroVia'])
 
 /**
  * Los once campos del encabezado, en orden de impresión. **Que estén todos en el
@@ -327,8 +350,14 @@ export const CAMPOS_ENCABEZADO = Object.freeze([
  * @readonly
  * @type {readonly string[]}
  */
+// ⚠️ `via` y `numeroVia` entran en la lista de los NO exigidos el 2026-09-12 por
+// la misma razón que `clase` y `domicilio` en su día: llegaron después, y un
+// encabezado compuesto antes —o a mano por quien solo tenga los otros— tiene que
+// seguir valiendo. La ampliación es aditiva o no es.
+const AÑADIDOS_DESPUES = Object.freeze(['clase', 'domicilio', 'via', 'numeroVia'])
+
 const CAMPOS_ENCABEZADO_EXIGIDOS = Object.freeze(
-  CAMPOS_ENCABEZADO.filter((campo) => campo !== 'clase' && campo !== 'domicilio'),
+  CAMPOS_ENCABEZADO.filter((campo) => !AÑADIDOS_DESPUES.includes(campo)),
 )
 
 /**
@@ -371,6 +400,8 @@ export const ROTULO_ENCABEZADO = Object.freeze({
   paraje: 'Paraje',
   poligono: 'Polígono',
   parcela: 'Parcela (nº en el polígono)',
+  via: 'Vía',
+  numeroVia: 'Número',
   refcat: 'Referencia catastral',
   srs: 'Sistema de referencia',
   fecha: 'Fecha del informe',
@@ -977,8 +1008,13 @@ function claseDe(encabezado) {
  * @returns {boolean}
  */
 function noAplica(campo, clase, encabezado) {
-  if (clase !== CLASE_URBANA) return false
-  if (!CAMPOS_SOLO_RUSTICA.includes(campo)) return false
+  const sobran =
+    clase === CLASE_URBANA
+      ? CAMPOS_SOLO_RUSTICA
+      : clase === CLASE_RUSTICA
+        ? CAMPOS_SOLO_URBANA
+        : null
+  if (sobran === null || !sobran.includes(campo)) return false
   const bruto = encabezado[campo]
   return typeof bruto !== 'string' || limpiar(bruto) === null
 }

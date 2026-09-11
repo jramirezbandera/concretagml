@@ -72,12 +72,14 @@ import {
   MOTIVO_PREPARACION_SUPERADA,
   MOTIVO_SIN_CLIENTE,
   MOTIVO_SIN_REFCAT,
+  RE_REFCAT_RUSTICA,
   cablearInforme,
 } from '../../app/cableado-informe.js'
 import { SELECTOR as SELECTOR_DIALOGO, selectorEncabezado } from '../../app/dialogo-informe.js'
 import { diagnosticar } from '../../diagnostico/parcela.js'
 import { TIPO_MIME_PDF, descargarBinario } from '../../gml/descargar.js'
 import { parsearGml } from '../../gml/parse.js'
+import { describirLindero } from '../../report/literal.js'
 import { ORIGEN_PARCELA, crearParcela } from '../../model/parcela.js'
 import {
   NO_CONSTA,
@@ -706,8 +708,15 @@ describe('cablearInforme · el recorrido completo', () => {
     m.catastro.publicar(COLINDANTES)
     await prepararInforme(m)
 
-    // ── 1 · Se ha consultado el DNPRC, UNA vez y con la referencia de la parcela.
-    expect(m.cliente.pedidas).toEqual([REFCAT])
+    // ── 1 · Se ha consultado el DNPRC con la referencia de la parcela y, desde el
+    // 2026-09-12, con la de cada colindante URBANO: es lo que permite escribir «con
+    // el nº 72 de Calle San Restituto» en vez de «con la parcela catastral …».
+    // ⚠️ La propia va PRIMERA y cada referencia sale UNA vez.
+    expect(m.cliente.pedidas[0]).toBe(REFCAT)
+    expect(new Set(m.cliente.pedidas).size).toBe(m.cliente.pedidas.length)
+    expect([...m.cliente.pedidas].sort()).toEqual(
+      [REFCAT, ...COLINDANTES.map((c) => c.refcat)].sort(),
+    )
 
     // ── 2 · El diálogo está abierto con el encabezado compuesto…
     expect(m.dialogo.abierto()).toBe(true)
@@ -787,14 +796,21 @@ describe('cablearInforme · el recorrido completo', () => {
 
   it('una segunda pulsación NO gasta una segunda petición al Catastro', async () => {
     const m = montar()
+    m.catastro.publicar(COLINDANTES)
     await prepararInforme(m)
+
+    // La caché por expediente es lo que impide que preparar el informe cinco veces
+    // sean cinco ráfagas de peticiones (override O8). El presupuesto ya no es «+1»
+    // desde que se piden las señas de los colindantes, pero sigue siendo **una por
+    // referencia y por expediente**, que es justo lo que aquí se afirma.
+    const trasLaPrimera = [...m.cliente.pedidas]
+    expect(trasLaPrimera.length).toBeGreaterThan(1)
+
     m.dialogo.cerrar()
     await m.informe.preparar()
     await cederTurno()
 
-    // El presupuesto de red de F09 es +1 petición, y la caché por expediente es lo
-    // que lo cumple aunque el usuario prepare el informe cinco veces.
-    expect(m.cliente.pedidas).toEqual([REFCAT])
+    expect(m.cliente.pedidas).toEqual(trasLaPrimera)
     expect(m.dialogo.abierto()).toBe(true)
   })
 
@@ -1323,5 +1339,53 @@ describe('cablearInforme · destruir', () => {
     })
     cableado.destruir()
     expect(destruido).toBe(false)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ⛔ El guarda que ata las DOS formas de preguntar «¿es rústica esta referencia?»
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// `app/cableado-informe.js#RE_REFCAT_RUSTICA` decide a QUIÉN se le piden las señas
+// al Catastro, y `report/literal.js#poligonoParcelaDe` decide a quién se le
+// escriben el polígono y la parcela. Son la misma pregunta en dos capas —una no
+// puede importar de la otra: aquélla es una función interna de un módulo puro— y si
+// divergen pasa una de dos cosas, las dos malas: se gastan peticiones por parcelas
+// que no las necesitan, o se deja de pedir para parcelas que sí.
+//
+// No se comprueba que los dos patrones sean iguales como TEXTO —eso no probaría
+// nada— sino que dan la MISMA respuesta sobre referencias reales de los dos tipos.
+
+describe('cablearInforme · «¿es rústica?» se responde igual en las dos capas', () => {
+  const RUSTICAS = ['13005A10900005', '29050A01000144', '18111A00400806', '29094A02700068']
+  const URBANAS = ['9398516VK3799G', '7136910UF1473N', '9398515VK3799G']
+
+  /** ¿`report/literal.js` la nombra por polígono y parcela? Se pregunta al TEXTO. */
+  const literalLaTratraComoRustica = (refcat) => {
+    const cuadrado = [
+      { tipo: 'EXTERIOR', vertices: [[0, 0], [40, 0], [40, 40], [0, 40]].map(([x, y]) => [439000 + x, 4479000 + y]) },
+    ]
+    const vecina = {
+      refcat,
+      label: null,
+      recintos: [
+        { tipo: 'EXTERIOR', vertices: [[0, 40], [40, 40], [40, 80], [0, 80]].map(([x, y]) => [439000 + x, 4479000 + y]) },
+      ],
+    }
+    return /del polígono /.test(describirLindero({ recintos: cuadrado, vecinas: [vecina] }).texto)
+  }
+
+  it('el recorrido NO es vacuo: hay referencias de los dos tipos', () => {
+    expect(RUSTICAS.length).toBeGreaterThan(0)
+    expect(URBANAS.length).toBeGreaterThan(0)
+  })
+
+  it.each([...RUSTICAS, ...URBANAS])('%s recibe la misma respuesta de las dos', (refcat) => {
+    expect(RE_REFCAT_RUSTICA.test(refcat)).toBe(literalLaTratraComoRustica(refcat))
+  })
+
+  it('y las rústicas son rústicas y las urbanas no, que es lo que se está atando', () => {
+    for (const r of RUSTICAS) expect(RE_REFCAT_RUSTICA.test(r), r).toBe(true)
+    for (const u of URBANAS) expect(RE_REFCAT_RUSTICA.test(u), u).toBe(false)
   })
 })
