@@ -132,8 +132,36 @@ sino el orden dentro de la manzana —medido: la parcela `9398516VK3799G` tiene
 invitaría a leerlo como parte de ella. Sigue viajando en `tramos[].label`.
 
 ⛔ **El titular NO se puede poner.** «de D. Salvador Pérez López» no lo publica el
-Catastro por ningún servicio: es dato protegido. Solo puede escribirlo a mano quien
-firma, en el cuadro de edición del informe.
+Catastro por ningún servicio abierto: es dato protegido, y los dos que esta aplicación
+consulta —WFS del parcelario y `Consulta_DNPRC`— devuelven geometría y datos
+descriptivos, nunca personas. **La nota técnica del literal lo dice** (2026-09-12), para
+que quien lea el informe sepa que la ausencia es estructural y no un fallo de la
+consulta, y que el borrador es editable si él sí conoce el dato.
+
+**La tabla de tipos de vía sale del Anexo II, transcrita y fechada.** El servicio manda
+la dirección partida (`tv`/`nv`/`pnp`) y **el Catastro tampoco expande la abreviatura**:
+su propio `ldt` escribe «CL SAN RESTITUTO 72(C) MADRID (MADRID)». Así que la expansión
+es nuestra y necesita fuente:
+
+```
+https://www.catastro.hacienda.gob.es/ws/Webservices_Libres.pdf
+versión 2.6, 01-12-2025, página 22 — Anexo II «Tipos de vía», 93 códigos
+```
+
+Es el mismo Anexo II al que remite la ficha del campo. Tres cosas quedan declaradas
+donde se implementan (`services/_catastro-dnp.js`) y atadas con tests:
+
+- ⛔ **Dieciséis códigos son ambiguos en la propia fuente** («CR CARRETERA, CARRERA»,
+  «CM CAMINO, CARMEN»…): el código no determina la palabra y el servicio no manda nada
+  que lo desempate. Se escribe la **primera** denominación, que es la que la tabla
+  oficial pone delante. En una vía que de verdad sea una «Carrera», el informe dirá
+  «Carretera» — y el lindero es editable antes de exportarlo.
+- **Los acentos son nuestros**: el Anexo II viene en mayúsculas y casi sin acentuar
+  («TRAVESIA»), y escribirlo así en una escritura serían faltas de ortografía. Se
+  acentúa la palabra del diccionario; no se cambia por otra.
+- **Un código que no esté en la tabla sale TAL CUAL**, en su abreviatura. Feo, pero
+  cierto — y el día que el Catastro publique una versión nueva del PDF se vuelve a
+  transcribir de ahí, no se parchea una sigla suelta.
 
 ### ⚠️ El cardinal llevaba 90° de giro (corregido el 2026-09-11)
 

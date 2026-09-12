@@ -822,13 +822,18 @@ describe('report/literal · guardián de la regla de oro 9', () => {
 describe('report/literal · el texto no finge saber más de lo que sabe', () => {
   const texto = caso().texto
 
-  it('NO escribe «la parcela 98 del polígono 8»: ese dato no se tiene de un colindante', () => {
-    // El ejemplo de la spec lo dice así, y no se puede: polígono y parcela salen de
-    // `Consulta_DNPRC`, que se consulta POR referencia catastral — hacerlo para los
-    // cuatro vecinos serían cinco peticiones por informe contra el régimen de uso
-    // del servicio (override O8: denegación ~10 días por abuso).
-    expect(texto).not.toMatch(/pol[íi]gono/i)
-    expect(texto).not.toMatch(/\bla parcela \d+\b/i)
+  it('a una colindante URBANA no se le inventa un polígono ni una parcela', () => {
+    // Esto cambió el 2026-09-12 y la mitad sigue en pie. Lo que SÍ se puede escribir
+    // es «la parcela 68 del polígono 27» de una RÚSTICA, porque los dos números van
+    // dentro de su referencia. De una urbana no: su referencia no los lleva, y
+    // pedirlos no serviría —no los tiene—. La afirmación se hace sobre el PÁRRAFO
+    // del lindero y no sobre el texto entero: la nota técnica sí nombra esos campos,
+    // para explicar con qué se nombra a un colindante y con qué no.
+    const lindero = caso().lindero.join(' ')
+    expect(lindero).not.toMatch(/pol[íi]gono/i)
+    expect(lindero).not.toMatch(/\bla parcela \d+\b/i)
+    // El paraje y el municipio de un colindante no se escriben NUNCA, ni en la nota:
+    // ésos sí saldrían de una consulta que no se hace.
     expect(texto).not.toMatch(/\bparaje\b/i)
     expect(texto).not.toMatch(/\bmunicipio\b/i)
   })

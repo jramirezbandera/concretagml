@@ -745,6 +745,30 @@ function redactar({
       )
     }
 
+    // ── ⛔ EL TITULAR, QUE NO SALE Y HAY QUE DECIR POR QUÉ ────────────────────
+    //
+    // Una descripción de linderos escrita a mano suele nombrar al dueño: «…y con la
+    // parcela catastral 001401100UF96E, de D. Salvador Pérez López». Ésta no lo hace
+    // NUNCA, y quien la lea tiene derecho a saber que la ausencia es estructural y no
+    // un fallo de la consulta: **el Catastro no publica la titularidad por ninguno de
+    // sus servicios abiertos** — es dato protegido, y los servicios que este programa
+    // usa (WFS del parcelario y `Consulta_DNPRC`) devuelven geometría y datos
+    // descriptivos, nunca personas.
+    //
+    // ⚠️ Va SIEMPRE, se hayan consultado colindantes o no: es una propiedad de este
+    // documento, no del resultado de una consulta. Y dice la salida —el texto es
+    // editable antes de exportar— para que quien lo sepa pueda escribirlo él, que es
+    // el único que puede responder de ese dato ante quien firma.
+    if (tramos.length > 0) {
+      nota.push(
+        'Esta descripción nombra a los colindantes por su referencia catastral y, cuando ' +
+          'consta, por su polígono y parcela o por su calle y número; nunca por su titular. ' +
+          'El Catastro no publica la titularidad en los servicios abiertos que esta ' +
+          'aplicación consulta, así que aquí no falta: no se puede saber. Si quien firma ' +
+          'la conoce, el borrador es editable antes de exportarlo.',
+      )
+    }
+
     // La presunción, explicada donde se explica todo lo demás. Va ADEMÁS de los
     // tres avisos que lleva la propia frase del lindero, no en su lugar: quien
     // solo copie los linderos se lleva la advertencia igualmente.

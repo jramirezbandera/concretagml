@@ -58,6 +58,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   CAMPOS_DESCRIPTIVOS,
+  TIPOS_VIA,
   CATASTRO_OVC_DNPRC_JSON,
   CLASE_PARCELA,
   CLASE_POR_CN,
@@ -445,7 +446,10 @@ describe('leerDnprc · la parcela rústica (rama `bico`): aquí sí viven paraje
       // ⚠️ La rústica TAMBIÉN trae vía: su subárbol `lors` contiene un `lourb`
       // (ver el test de abajo). Se lee y se dice; lo que no se hace es deducir de
       // ahí que la parcela sea urbana.
-      via: 'ER Extrarradio',
+      // `tv: 'ER'` y `nv: 'EXTRARRADIO'`: el servicio manda el tipo de via repetido
+      // como nombre —su forma de decir «esta finca no esta en ninguna calle»— y su
+      // propio `ldt` arrastra la redundancia. Se escribe UNA vez.
+      via: 'Extrarradio',
       numeroVia: null,
       domicilio: inmuebleRustica.ldt,
       clase: CLASE_PARCELA.RUSTICA,
@@ -942,5 +946,58 @@ describe('descriptivosPorRefcat · guardián: NO_ENCONTRADO no es alcanzable', (
     expect(MOTIVOS_VISTOS.size).toBeGreaterThan(2)
     expect(MOTIVOS_VISTOS.has(MOTIVO_CATASTRO.RESPUESTA_ILEGIBLE)).toBe(true)
     expect(MOTIVOS_VISTOS.has(MOTIVO_CATASTRO.ENTRADA_INVALIDA)).toBe(true)
+  })
+})
+
+// =============================================================================
+// La tabla de TIPOS DE VIA: transcrita del Anexo II, no inventada
+// =============================================================================
+//
+// Fuente: https://www.catastro.hacienda.gob.es/ws/Webservices_Libres.pdf
+// version 2.6, 01-12-2025, pagina 22 — el mismo Anexo II al que remite la ficha
+// del campo (`<tv>CODIFICACION DEL TIPO DE VIA (ANEXO II)</tv>`).
+
+describe('TIPOS_VIA · la tabla oficial del Anexo II', () => {
+  it('trae los 93 codigos del Anexo II, ni uno mas ni uno menos', () => {
+    // El guarda contra la poda accidental: si alguien borra media tabla de un
+    // copy-paste, las siglas que falten saldrian en abreviatura y nadie lo veria
+    // hasta leer un informe firmado.
+    expect(Object.keys(TIPOS_VIA)).toHaveLength(93)
+  })
+
+  it('todos son dos letras mayusculas y ningun valor esta vacio', () => {
+    for (const [codigo, nombre] of Object.entries(TIPOS_VIA)) {
+      expect(codigo, codigo).toMatch(/^[A-Z]{2}$/)
+      expect(typeof nombre, codigo).toBe('string')
+      expect(nombre.trim(), codigo).not.toBe('')
+      // Acentuado y capitalizado: el Anexo II viene en mayusculas y sin acentos, y
+      // escribirlo asi en una escritura serian faltas de ortografia.
+      expect(nombre, codigo).not.toBe(nombre.toUpperCase())
+    }
+  })
+
+  it.each([
+    ['CL', 'Calle'],
+    ['AV', 'Avenida'],
+    ['PZ', 'Plaza'],
+    ['DS', 'Diseminados'],
+    ['ER', 'Extrarradio'],
+    ['TR', 'Travesía'],
+    ['UR', 'Urbanización'],
+    ['GV', 'Gran Vía'],
+  ])('%s → %s', (codigo, nombre) => {
+    expect(TIPOS_VIA[codigo]).toBe(nombre)
+  })
+
+  it('los codigos AMBIGUOS toman la PRIMERA denominacion de la tabla oficial', () => {
+    // El Anexo II da DOS para varios codigos («CR CARRETERA, CARRERA»): el codigo no
+    // determina la palabra y el servicio no manda nada que lo desempate. Se escribe
+    // la primera, que es la eleccion declarada en `services/_catastro-dnp.js`; en una
+    // via que de verdad sea una «Carrera» este informe escribira «Carretera», y el
+    // lindero es editable antes de exportarlo.
+    expect(TIPOS_VIA.CR).toBe('Carretera') // o Carrera
+    expect(TIPOS_VIA.CM).toBe('Camino') // o Carmen
+    expect(TIPOS_VIA.CJ).toBe('Calleja') // o Callejón
+    expect(TIPOS_VIA.PQ).toBe('Parroquia') // o Parque
   })
 })

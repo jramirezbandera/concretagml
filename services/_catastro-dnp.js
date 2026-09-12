@@ -639,36 +639,142 @@ function claseDeInmueble(locs, cn) {
   return { clase: porSubarbol ?? porCn, avisos }
 }
 
-// ── El nombre de la vía: leer la abreviatura, no inventarla ─────────────────
+// ── El nombre de la vía: la tabla OFICIAL, transcrita y fechada ─────────────
 //
 // El servicio manda la dirección PARTIDA: `tv` es el tipo de vía en abreviatura de
 // dos letras («CL»), `nv` el nombre («SAN RESTITUTO») y `pnp` el número de portal
 // («72»). Un informe que se firma no puede decir «CL SAN RESTITUTO»: hay que
 // escribir «Calle San Restituto».
 //
-// ⛔ **LA TABLA NO SE INVENTA DE MEMORIA, Y POR ESO ES CORTA.** Una expansión
-// equivocada en un documento que se firma —«CR» leído como «Carrera» donde el
-// Catastro dice «Carretera»— es exactamente el error silencioso que prohíbe la
-// regla de oro 1: el texto se lee perfectamente bien y nombra otra calle. Así que
-// aquí solo están las abreviaturas que se han podido confirmar, y **lo que no esté
-// sale TAL CUAL**, en su abreviatura, que es feo pero cierto. Quien añada una
-// entrada nueva tiene que poder decir de dónde la ha sacado.
+// ⚠️ **Y el Catastro tampoco lo expande.** Su propio literal descriptivo —el `ldt`
+// que este módulo copia en `domicilio`— escribe «CL SAN RESTITUTO 72(C) MADRID
+// (MADRID)» y «ER EXTRARRADIO  Polígono 109 Parcela 5». Así que la expansión es
+// NUESTRA y no se puede cosechar de ninguna respuesta: hace falta la tabla.
 //
-// Confirmadas: `CL`/`AV`/`PZ`/`PS`/`CR`/`CM`/`TR`/`RD`/`GL`/`DS` aparecen en los
-// literales `ldt` del propio servicio, que es la fuente de verdad de esta casa
-// (regla de oro 8): el fixture rústico trae «ER EXTRARRADIO», y el ejemplo que
-// aportó el autor, «Diseminado Benajarafe 247» para un `DS`.
-const TIPOS_VIA = Object.freeze({
-  CL: 'Calle',
+// ── DE DÓNDE SALE (regla de oro 8) ──────────────────────────────────────────
+// Transcrita del **Anexo II «Tipos de vía»** de la documentación oficial de los
+// servicios web libres de la Dirección General del Catastro:
+//
+//     https://www.catastro.hacienda.gob.es/ws/Webservices_Libres.pdf
+//     versión 2.6, 01-12-2025, página 22 — 93 códigos
+//
+// Es el mismo Anexo II al que remite la propia ficha del campo: «<tv>CÓDIFICACIÓN
+// DEL TIPO DE VÍA (ANEXO II)</tv>». No se ha inventado ni una entrada, y el día
+// que el Catastro publique una versión nueva del PDF se vuelve a transcribir de
+// ahí — no se parchea a mano una sigla suelta que alguien haya visto por ahí.
+//
+// ── ⛔ DIECISÉIS CÓDIGOS SON AMBIGUOS EN LA PROPIA FUENTE ───────────────────
+// El Anexo II da DOS denominaciones para varios códigos: «CR CARRETERA, CARRERA»,
+// «CM CAMINO, CARMEN», «CJ CALLEJA, CALLEJON», «PQ PARROQUIA, PARQUE»… El código
+// **no determina la palabra**, y el servicio no manda nada más que lo desempate.
+//
+// Se escribe **la PRIMERA de las dos**, que es lo que hace la tabla oficial al
+// ponerla delante, y aquí queda dicho que es una elección y no un dato: en una vía
+// que de verdad sea una «Carrera», este informe escribirá «Carretera». La
+// alternativa —dejar esos dieciséis en abreviatura— castigaría a `CR`, que es de
+// los más frecuentes, para cubrir un caso raro. Quien firme puede corregirlo en el
+// cuadro de edición, que para eso el lindero es editable. La segunda denominación
+// va en el comentario de cada línea para que se vea cuál es sin abrir el PDF.
+//
+// ⚠️ **Los acentos son NUESTROS.** El Anexo II está en mayúsculas y casi sin
+// acentuar («TRAVESIA», «URBANIZACION»); escribirlo así en una escritura sería
+// faltas de ortografía. Es la misma decisión de PRESENTACIÓN que {@link enCapitular}
+// y con el mismo límite: se acentúa la palabra del diccionario, no se cambia por
+// otra.
+export const TIPOS_VIA = Object.freeze({
+  AC: 'Acceso',
+  AG: 'Agregado',
+  AL: 'Aldea', // o Alameda
+  AN: 'Andador',
+  AR: 'Área', // o Arrabal
+  AU: 'Autopista',
   AV: 'Avenida',
-  PZ: 'Plaza',
-  PS: 'Paseo',
-  CR: 'Carretera',
-  CM: 'Camino',
-  TR: 'Travesía',
-  RD: 'Ronda',
+  AY: 'Arroyo',
+  BJ: 'Bajada',
+  BL: 'Bloque',
+  BO: 'Barrio',
+  BQ: 'Barranquil',
+  BR: 'Barranco',
+  CA: 'Cañada',
+  CG: 'Colegio', // o Cigarral
+  CH: 'Chalet',
+  CI: 'Cinturón',
+  CJ: 'Calleja', // o Callejón
+  CL: 'Calle',
+  CM: 'Camino', // o Carmen
+  CN: 'Colonia',
+  CO: 'Concejo', // o Colegio
+  CP: 'Campa', // o Campo
+  CR: 'Carretera', // o Carrera
+  CS: 'Caserío',
+  CT: 'Cuesta', // o Costanilla
+  CU: 'Conjunto',
+  CY: 'Caleya',
+  CZ: 'Callizo',
+  DE: 'Detrás',
+  DP: 'Diputación',
+  DS: 'Diseminados',
+  ED: 'Edificios',
+  EM: 'Extramuros',
+  EN: 'Entrada', // o Ensanche
+  EP: 'Espalda',
+  ER: 'Extrarradio',
+  ES: 'Escalinata',
+  EX: 'Explanada',
+  FC: 'Ferrocarril',
+  FN: 'Finca',
   GL: 'Glorieta',
-  DS: 'Diseminado',
+  GR: 'Grupo',
+  GV: 'Gran Vía',
+  HT: 'Huerta', // o Huerto
+  JR: 'Jardines',
+  LA: 'Lago',
+  LD: 'Lado', // o Ladera
+  LG: 'Lugar',
+  MA: 'Malecón',
+  MC: 'Mercado',
+  ML: 'Muelle',
+  MN: 'Municipio',
+  MS: 'Masías',
+  MT: 'Monte',
+  MZ: 'Manzana',
+  PB: 'Poblado',
+  PC: 'Placeta',
+  PD: 'Partida',
+  PI: 'Particular',
+  PJ: 'Pasaje', // o Pasadizo
+  PL: 'Polígono',
+  PM: 'Páramo',
+  PQ: 'Parroquia', // o Parque
+  PR: 'Prolongación', // o Continuación
+  PS: 'Paseo',
+  PT: 'Puente',
+  PU: 'Pasadizo',
+  PZ: 'Plaza',
+  QT: 'Quinta',
+  RA: 'Raconada',
+  RB: 'Rambla',
+  RC: 'Rincón', // o Rincona
+  RD: 'Ronda',
+  RM: 'Ramal',
+  RP: 'Rampa',
+  RR: 'Riera',
+  RU: 'Rúa',
+  SA: 'Salida',
+  SC: 'Sector',
+  SD: 'Senda',
+  SL: 'Solar',
+  SN: 'Salón',
+  SU: 'Subida',
+  TN: 'Terrenos',
+  TO: 'Torrente',
+  TR: 'Travesía',
+  UR: 'Urbanización',
+  VA: 'Valle',
+  VD: 'Viaducto',
+  VI: 'Vía',
+  VL: 'Vial',
+  VR: 'Vereda',
 })
 
 /**
@@ -716,7 +822,19 @@ function nombreDeVia(dir) {
   if (nombre === null) return null
   const abreviatura = textoDnp(dir?.tv)
   const tipo = abreviatura === null ? null : (TIPOS_VIA[abreviatura.toUpperCase()] ?? abreviatura)
-  return tipo === null ? enCapitular(nombre) : `${tipo} ${enCapitular(nombre)}`
+  const denominacion = enCapitular(nombre)
+  if (tipo === null) return denominacion
+
+  // ⚠️ **«Extrarradio Extrarradio».** MEDIDO sobre el fixture rústico del repo: el
+  // servicio manda `tv: 'ER'` y `nv: 'EXTRARRADIO'`, o sea el tipo de vía repetido
+  // como nombre — es su forma de decir «esta finca no está en ninguna calle». Su
+  // propio `ldt` arrastra la redundancia («ER EXTRARRADIO  Polígono 109 Parcela
+  // 5»); un informe que se firma, no. Se escribe una vez.
+  //
+  // ⛔ Se compara la palabra EXPANDIDA con el nombre, no la abreviatura: «CL» nunca
+  // sería igual a «SAN RESTITUTO», así que comparar antes de expandir no cazaría
+  // nada. Y no se toca el dato: los dos campos siguen llegando como llegaron.
+  return tipo.toLowerCase() === denominacion.toLowerCase() ? tipo : `${tipo} ${denominacion}`
 }
 
 /**
