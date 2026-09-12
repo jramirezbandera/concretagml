@@ -74,9 +74,87 @@ divergir y dejar el pie diciendo una cosa y el cuerpo otra.
 | # | Decisión | Por qué, y qué costó |
 |---|---|---|
 | **D1** | **Escritor de PDF PROPIO** (`report/pdf.js`), no jsPDF | Mismo precedente que `geo/utm.js` frente a proj4 (regla de oro 7), tomado otra vez y por el mismo motivo. **Medido: `report/pdf.js` aporta 13,49 kB al paquete**; jsPDF **no es dependencia de este repo** y su coste no se ha medido aquí — la cabecera del módulo cita ~350 kB, que es la cifra del plan, no una medición propia. Lo que sí es consecuencia comprobada: al ser puro entra en el proyecto Vitest `node` y **su salida se fija con un snapshot de BYTES**, cosa que con jsPDF no se podría. El módulo declara además su techo: «el día que alguien se vea añadiendo fuentes incrustadas, compresión o formularios, lo correcto es PARAR y volver a discutir jsPDF» |
-| **D2** | **`Consulta_DNPRC` solo para la parcela PROPIA** | Los datos descriptivos del encabezado (municipio, paraje, polígono/parcela) no están en el WFS. Pedirlos también para los cuatro colindantes serían **cinco peticiones por informe**, y el override **O8** (denegación ~10 días por abuso) no lo justifica. Los colindantes se nombran por **referencia catastral y `cp:label`**, que ya vienen con la geometría. **Presupuesto de red de F09: +1 petición**, y pasa por la caché antes de tocar la red |
+| **D2** | **`Consulta_DNPRC` solo para la parcela PROPIA** — ⚠️ **REVISADA el 2026-09-12, ver abajo** | Los datos descriptivos del encabezado (municipio, paraje, polígono/parcela) no están en el WFS. Pedirlos también para los cuatro colindantes serían **cinco peticiones por informe**, y el override **O8** (denegación ~10 días por abuso) no lo justifica. Los colindantes se nombran por **referencia catastral y `cp:label`**, que ya vienen con la geometría. **Presupuesto de red de F09: +1 petición**, y pasa por la caché antes de tocar la red |
 | **D3** | **Diálogo `<dialog>`**, rompiendo a propósito la norma «nada de modales» de F08 | El caso es otro: los cajones de F07 y F08 **anotan el mapa** y viven sobre él porque hablan de él; esto **prepara un documento**, y el mapa no aporta nada mientras se teclea un número de colegiado. Las cuatro esquinas de Leaflet están ocupadas desde F08 y los dos cajones ya suman 946 px sobre 900 de lienzo. Se paga lo que cuesta un modal: foco al abrir, `Escape` que cierra, foco devuelto, y **cerrar no borra nada** |
 | **D4** | **El informe de TEXTO de F08 convive con el PDF** | Se compone **sin red** —no pide una sola tesela— y baja igual el día que el plano no se pueda armar. Los dos botones viven en la misma fila del pie del cajón de diagnóstico, el PDF primero: el orden es lo único que dice cuál de los dos es el entregable. **Degradar no es quitar** |
+
+### ⚠️ D2, revisada el 2026-09-12: cómo se nombra un colindante
+
+D2 daba por supuesto un hecho que **no es cierto de todos sus campos**, y eso hizo que
+el literal renunciara a algo que no costaba nada. Se corrige aquí en vez de reescribir
+la fila: la decisión original y su motivo siguen valiendo, y lo que cambia es el
+alcance.
+
+**Lo que D2 daba por supuesto y no era verdad.** Que polígono y parcela hay que
+pedirlos al `Consulta_DNPRC`. Para el **paraje** y el **municipio** es cierto. Para el
+**polígono y la parcela de una finca rústica, no**: van dentro de su propia referencia
+catastral, que ya viene con la geometría del WFS. Contrastado contra la respuesta real
+del servicio que el repo guarda como fixture:
+
+```
+refcat 13005A10900005  →  derivado:  polígono 109, parcela 5
+ovc-dnprc-rustica-13005A10900005.json  →  cpo = '109',  cpa = '5'
+```
+
+Cero peticiones. Lo que D2 protege es el presupuesto de red, y esto no gasta nada.
+
+**Lo que sí cuesta, y se paga con candados.** La dirección de una finca **urbana** no
+está en su referencia: solo la tiene el `Consulta_DNPRC`, una petición por colindante.
+Se piden, y el presupuesto de F09 deja de ser «+1». Las cuatro condiciones que lo
+acotan están implementadas en `app/cableado-informe.js#pedirSenasDeVecinas`:
+
+1. **Solo las que lo necesitan.** Por una colindante rústica no se pregunta: su
+   polígono y su parcela salen de la referencia. Un test ata las dos formas de
+   responder «¿es rústica?» —el patrón del cableado y `report/literal.js#poligonoParcelaDe`—
+   sobre referencias reales de los dos tipos: si divergen, se gastan peticiones de más
+   o se dejan de hacer las que hacen falta.
+2. **Una vez por referencia**, con caché en el cableado delante y la de
+   `services/catastro.js` detrás, que además sobrevive a la recarga.
+3. **En serie, no en paralelo.** Cuatro peticiones a la vez son una ráfaga, y lo que
+   castiga la política de uso (override **O8**) es exactamente eso.
+4. **Un fallo no para el informe.** La vecina que no conteste se nombra por su
+   referencia catastral, como antes, y **se dice cuántas se han quedado así**.
+
+**Cómo queda nombrado un colindante**, por orden de lo que se sabe de él:
+
+| Caso | Cómo se escribe | Qué cuesta |
+|---|---|---|
+| Rústica | «la parcela 68 del polígono 27, con referencia catastral 29094A02700068» | Nada: sale de la referencia |
+| Urbana con señas | «el nº 72 de Calle San Restituto, con referencia catastral 9398516VK3799G» | 1 petición, cacheada |
+| Lo demás | «la parcela catastral 9398516VK3799G» | Nada |
+
+⛔ **El `cp:label` deja de escribirse.** Decía «rotulada «17» en el parcelario
+catastral», una fórmula prudente que existía porque no se podía afirmar que ese rótulo
+fuera el número de parcela. En rústica ya no hace falta: el número sale de la
+referencia y se puede afirmar. Y en urbana el `label` **no** es el número de la calle
+sino el orden dentro de la manzana —medido: la parcela `9398516VK3799G` tiene
+`cp:label` 16 y está en el nº 72 de su calle—, así que ponerlo junto a una dirección
+invitaría a leerlo como parte de ella. Sigue viajando en `tramos[].label`.
+
+⛔ **El titular NO se puede poner.** «de D. Salvador Pérez López» no lo publica el
+Catastro por ningún servicio: es dato protegido. Solo puede escribirlo a mano quien
+firma, en el cuadro de edición del informe.
+
+### ⚠️ El cardinal llevaba 90° de giro (corregido el 2026-09-11)
+
+El cardinal salía del azimut del **propio lado**, y eso no es lo que significa «linda
+al Norte»: en una escritura el cardinal dice **dónde está el vecino**, y una línea que
+corre al Este separa de alguien que está al Norte o al Sur, nunca al Este. Medido con
+un cuadrado de 40 m y una vecina pegada a cada lado, los cuatro salían girados 90°
+(`VECINA-NORTE` → «al Este»). Contrastado además sobre la parcela real del repo con la
+dirección del centroide de cada colindante.
+
+La corrección es la **normal exterior** del tramo: el recorrido ya se normaliza a
+horario, y en un anillo horario la normal va 90° a la izquierda del avance —la misma
+dirección que el módulo ya construye para lanzar la sonda de atribución—.
+`tramos[].azimut` no cambia: sigue siendo el rumbo del tramo.
+
+⚠️ **Por qué no lo cazó el guardián que existía para esto.** El test «EL MISMO TEXTO
+con el anillo horario y con el anillo antihorario» estaba escrito contra este mismo
+riesgo y cerró el error de 180°, pero comparaba **el módulo consigo mismo** en vez de
+con la posición real de una vecina conocida. Un oráculo que solo se compara consigo
+mismo confirma cualquier convención, incluida la equivocada.
+
 
 ## Las tres decisiones del colegiado sobre el lindero
 
@@ -97,7 +175,7 @@ delante, no con el módulo:
    el primer `replace` de quien maquete, y este documento existe para que el texto se
    pueda reescribir.
 2. **El preámbulo metodológico baja AL PIE**, como nota técnica. La descripción
-   empieza en «Linda al Este…», que es como se lee un lindero en una escritura y como
+   empieza en «Linda: al NORTE…», que es como se lee un lindero en una escritura y como
    se copia y pega en una instancia. Lo metodológico —sentido del recorrido, vértice
    de arranque, norte de cuadrícula, reparto en tramos, qué significa que un tramo no
    lleve referencia catastral— **no se pierde ni una palabra**: se agrupa al final para
@@ -162,7 +240,7 @@ oro 8).
 | **M7** | (no previsto) | **La raíz es `consulta_dnprcResult`, TODO EN MINÚSCULAS**, mientras el hermano usa `Consulta_RCCOORResult`. Misma casa, misma máquina, misma tanda de medición, **y no siguen la misma convención**. Cualquier código que derive la clave del nombre de la operación funciona con uno y falla con el otro. Es la **segunda** de las cuatro razones por las que `services/_catastro-dnp.js` es un fichero aparte y no un capítulo de `_catastro-ovc.js`: leídas juntas, las dos claves sugieren una regla que es falsa |
 | **M8** | (no previsto) | **Hay DOS ramas y no tienen la misma forma**: `bico.bi` (un inmueble, objeto) y `lrcdnp.rcdnp[]` (varios, array). No son la misma estructura con distinta cardinalidad: traen campos distintos. **Y la parcela de referencia de este proyecto cae en la rama LISTA, con 18 inmuebles** — o sea que `bico`, que parece el caso normal, **no lo es** en la parcela que recorre toda la suite. Quien lea `…Result.bico.bi.dt.nm` para sacar el municipio obtiene `undefined` justo ahí. En `lrcdnp` **no existen `ldt` ni `cn`**: ni domicilio ya montado ni forma directa de saber si la finca es urbana o rústica, y la referencia catastral cuelga un nivel más arriba (`rcdnp.rc` frente a `bico.bi.idbi.rc`). De ahí las dos decisiones de lectura: **cada campo se lee de los 18 y solo vale si los 18 coinciden** (si no, `null` **y la discrepancia se declara**), y **`clase` se deduce del subárbol presente**, no de `cn` |
 | **M9** | (no previsto) | Tres trampas más del mismo cuerpo, las tres medidas: **el subárbol rústico es `locs.lors` y contiene `lorus` Y `lourb`** —quien busque la dirección en `locs.lous.lourb`, la ruta que funciona en urbana, no la encuentra en rústica **aunque `lourb` exista**—; **los códigos vienen SIN ceros a la izquierda** (`loine.cm:"5"` para el INE 005, `cpp.cpa:"5"` mientras la referencia lleva `00005`) y hay **DOS códigos de municipio distintos**, INE (`loine.cm`) y DGC (`cmc`) — para Madrid, `"79"` y `"900"`; y **`debi.cpt` trae COMA decimal dentro de la cadena** (`"8,200000"`, o sea `NaN` con `Number()`), al revés que el hermano, que daba punto. El módulo **no expone ningún código y no lee ni un número**: los siete campos del contrato son cadenas o `null`, así que la coma decimal no le puede morder. Queda escrito para quien venga a añadir superficies |
-| **M10** | El literal: *«Linda al norte, en línea recta de 12,45 m, con **la parcela 98 del polígono 8**…»* | **El literal NO dice «la parcela 98 del polígono 8» para los colindantes, y no es un recorte: es la decisión D2.** Polígono y parcela son datos **descriptivos**, y traerlos para cada vecina serían cuatro peticiones más al `Consulta_DNPRC` por informe, contra el override O8. Las colindantes se nombran por lo que **ya viene con su geometría** del WFS: la **referencia catastral** y el `cp:label`. La forma completa se reserva para la parcela propia, que es la única por la que se pregunta. Lo que sí se cumple entero es el patrón: **recorrido horario desde el vértice más al NO**, agrupando tramos consecutivos con el mismo colindante y rumbo similar, por cuadrantes, con distancia — y **«en línea recta» solo cuando lo es**: un tramo agrupado se escribe «en línea quebrada de N lados que suman X m», y su longitud es la SUMA de los lados (no la cuerda), para que la suma de los tramos sea el perímetro |
+| **M10** | El literal: *«Linda al norte, en línea recta de 12,45 m, con **la parcela 98 del polígono 8**…»* | ⚠️ **Resuelto a medias el 2026-09-12, y la otra mitad se retiró a propósito.** «La parcela 98 del polígono 8» **sí se escribe** para una colindante rústica: los dos números van dentro de su referencia catastral y no cuestan ninguna petición (ver la revisión de D2). En urbana se escribe la calle y el número, que sí cuesta una petición por vecina, con los cuatro candados de allí. Lo que **ya no** se escribe es la **distancia**: el autor eligió el 2026-09-12 el formato corto de una escritura —un solo párrafo, cardinales en orden N-S-E-O, colindantes del mismo frente encadenados con «, y con»— y las cifras salieron del párrafo. **No salen del informe**: `tramos[].longitud` y `nLados` siguen alimentando la tabla del PDF y la lista del diálogo. Del patrón original sigue en pie todo lo demás: recorrido horario desde el vértice más al NO y agrupación de tramos consecutivos con el mismo colindante y rumbo similar |
 
 ### Y tres más, que no salieron de ningún test: los destapó **RENDERIZAR el PDF y mirarlo**
 
@@ -370,7 +448,7 @@ La spec original nombraba **tres**. Son estos, contados con `git status` y
 | Fichero | Qué es |
 |---|---|
 | `geo/bbox.js` | caja envolvente en UTM, margen y **ajuste al ratio del papel**. Puro y **hoja** del grafo. Existe porque tres cosas leen la misma caja —el `BBOX=`, el mapeo UTM→px y la escala rotulada— y con un metro de discrepancia el vector sale desplazado sobre una cartografía impecable |
-| `geo/rumbo.js` | azimut, cuadrante y **el nombre con el que se escribe en un lindero**. Puro y hoja, sin un solo `import`. **No existía nada parecido** en el proyecto |
+| `geo/rumbo.js` | azimut, cuadrante de ocho sectores, **punto cardinal de cuatro** (`puntoCardinal`, 2026-09-11) y el nombre con el que se escribe en un lindero. Puro y hoja, sin un solo `import`. **No existía nada parecido** en el proyecto. ⚠️ Los ocho y los cuatro son **dos convenciones de redacción distintas**, no una con parámetro: la escritura usa cuatro, la memoria técnica ocho, y quien llama elige cuál — y se ve en la llamada |
 | `report/encuadre.js` | **contrato A**: de unos recintos y un tamaño de papel, a la caja de mundo, la escala, el mapeo y las peticiones de cartografía. Puro. El troceado **es obligatorio, no una optimización** (M3) |
 | `report/canvas.js` | **contrato B**: la Receta A. El único módulo de `report/` que toca el DOM y el único que habla por la red — por eso **no sale del barrel** |
 | `report/literal.js` | **contrato C**: la descripción literaria del lindero. Uno de los cuatro diferenciadores, y el único sitio del proyecto donde la app **propone** |
@@ -563,7 +641,9 @@ el caveat **corregido en M3**), §5.6 (descripción literaria, memoria de encaje
 (nomenclatura, firma neutral), §5.2 (neutralidad jurídica del pie).
 `SPEC.md` §2 reglas de oro **1**, **6**, **7**, **9** y **11**; §3 overrides **O7**
 (CORS del WMS, verificado y ahora consumido), **O8** (régimen de uso: el presupuesto de
-red de esta fase es +1 petición), **O9** (jsPDF: **ya no aplica**).
+red de esta fase era +1 petición; desde la revisión de D2 del 2026-09-12 son +1 por la
+parcela propia **y una más por cada colindante URBANO**, todas cacheadas y en serie),
+**O9** (jsPDF: **ya no aplica**).
 `spec/feature-08-comprobar-gml.md` §Desviaciones (el informe de texto, que convive) y
 **M17/M18** (la familia del clic, primera aparición).
 `scripts/smoke-navegador/GUION.md` §17 y `CHECKLIST-HUMANO.md` §10.
