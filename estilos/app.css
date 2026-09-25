@@ -5520,12 +5520,20 @@ body {
    no como un `<input readonly>`: un campo de formulario que no se puede escribir
    invita a intentarlo y no dice por qué no. El `padding` vertical es el mismo que
    el de `.gml-entrada`, para que la fila de un dato fijo y la de uno editable no
-   bailen dentro de la misma rejilla. */
+   bailen dentro de la misma rejilla.
+
+   ⚠️ EN GRIS, PORQUE EL APUNTE DEL GRUPO LO PROMETE (revisión de diseño,
+   2026-09-25). El diálogo dice «los datos en gris los pone la aplicación y no se
+   editan», y se pintaban en `--color-text-primary`: el mismo negro que lo que se
+   teclea en los campos de al lado, así que la frase señalaba algo que no se veía.
+   `--color-text-secondary` (7,58:1 sobre blanco) y no `-disabled`: no están
+   apagados, están puestos. Y ya no son cuatro: con los datos descriptivos del
+   Catastro entra también «Clase de finca». */
 .gml-dialogo-informe-fijo {
   margin: 0;
   padding: var(--space-2) 0;
   font-size: var(--text-13);
-  color: var(--color-text-primary);
+  color: var(--color-text-secondary);
   overflow-wrap: anywhere;
 }
 

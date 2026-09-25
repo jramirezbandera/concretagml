@@ -726,7 +726,7 @@ export function crearDialogoInforme({ documento, alAvisar } = {}) {
     crear(
       'p',
       CLASE.APUNTE,
-      'Lo que se escriba aquí es lo que se imprime. Los cuatro datos en gris los pone la ' +
+      'Lo que se escriba aquí es lo que se imprime. Los datos en gris los pone la ' +
         'aplicación y no se editan: cambiarlos a mano haría que el texto hablara de una parcela ' +
         'y el plano de otra.',
     ),
