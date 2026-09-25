@@ -15,11 +15,15 @@ escrita o pide una que es del producto. Por impacto:
 1. ✅ **HECHO el 2026-09-25.** ~~La columna Y de la tabla de vértices no alinea los
    decimales.~~ `formatearCoordenada` muestra ahora **entre 2 y 3 decimales**
    (`4479647.80`, `4479678.00`); el porqué está en `DECIMALES_MINIMOS`.
-2. **Tinta de color sobre su propio tinte, por debajo de AA.** El chip «1 aviso» da
-   **4,39:1** (12 px/600, medido), el de errores ~4,13:1 y `.gml-filtro-avisos--puesto`
-   ~3,70:1. Faltan tokens de tinta oscura para usar sobre un tinte; el visor ya usa uno por
-   su cuenta (`#92400E` en `viewer/cajon-diagnostico.js`). *Bloquea:* un token nuevo es
-   decisión del producto (DESIGN.md §1).
+2. ✅ **HECHO el 2026-09-25.** ~~Tinta de color sobre su propio tinte, por debajo de
+   AA.~~ Decisión del autor: **texto negro, ni un color nuevo** (DESIGN.md §3.3). Chips,
+   etiquetas ERROR/AVISO, `:hover` de «Vaciarlo» y nº del vértice seleccionado a
+   `--color-text-primary` (~15:1); filtro de avisos a sky-700 (5,37:1).
+   ⏳ **Queda el primo de este problema, y es más grande:** el gris de «apagado»
+   (`--color-text-disabled`, #64748B) se usa como texto normal en 28 de sus 34 usos, y
+   sobre `--color-bg-elevated` da 4,34:1 (apuntes de los menús al señalar, el apunte
+   del recuadro «PROPONE» del informe sobre su tinte cálido, 4,3:1). Es sistémico:
+   cambiarlo es decidir para qué sirve ese token.
 3. **Un secundario en reposo se parece a un botón apagado.** Mismo fondo y mismo filo; solo
    cambia el color del texto (`#0F172A` contra `#64748B`). Desde `FINDING-001` hay tres
    secundarios en Entrada, así que se nota más. *Bloquea:* es la receta de §8 y del

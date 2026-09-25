@@ -551,8 +551,25 @@ export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'dia
  *
  * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
  * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **Y UNA TERCERA VEZ EL 2026-09-25 (NINGÚN TEXTO DE COLOR SOBRE SU TINTE)**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 65.761 a **65.925 B nuestros** (80.856 → 81.020 con vendor). **+164 B.** Seis
+ * pares de texto sobre su propio tinte estaban por debajo de AA (4,13–4,39:1; el
+ * filtro azul, 3,7). El autor eligió el criterio de agosto frente a añadir tintas
+ * oscuras a la paleta: la palabra en negro y el color en el tinte, el filo y el
+ * punto (DESIGN.md §3.3).
+ *
+ * ── LO QUE SE DESCARTÓ ─────────────────────────────────────────────────────
+ * **Dos tokens de tinta** (`--color-state-fail-ink`, `-warn-ink`), que costaban
+ * menos bytes porque no hacían falta los `::before` del punto. Los descartó el
+ * autor: la paleta no crece, y el texto negro ya era la respuesta escrita.
+ *
+ * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
+ * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
  */
-export const TECHO = Object.freeze({ total: 80856, nuestro: 65761 })
+export const TECHO = Object.freeze({ total: 81020, nuestro: 65925 })
 
 /**
  * EL REGISTRO. Un asiento por hito, con la hoja construida medida de verdad.
@@ -1672,6 +1689,20 @@ export const ASIENTOS = Object.freeze(
         'consulta de ancho de la hoja, `@media (width<=1200px)`, que aprieta aire y nunca ' +
         'texto; es lo que deja la cabecera sin solapes hasta ~870 px. ── ⚠️ El techo SUBE ' +
         '693 B (cabecera de `TECHO`) y la holgura vuelve a 0. NO CIERRA REBANADA.' },
+    { hito: 'Ningún texto de color sobre su propio tinte',
+      commit: '(sin commitear)',
+      total: 81020, nuestro: 65925, rebanada: null,
+      nota:
+        '**+164 B, y ni un color nuevo: decisión del autor.** Rojo, ámbar o el ámbar del ' +
+        'usuario sobre su propio tinte daban entre 4,13 y 4,39:1. La palabra pasa a ' +
+        '`--color-text-primary` y el color se queda en el tinte, el filo y el punto, que ' +
+        'es el criterio que el renglón de error dejó escrito en agosto. Entran los dos ' +
+        '`::before` que mantienen el punto de los chips en su color (ya no es ' +
+        '`currentColor`), el `color` del `:hover` de «Vaciarlo» y el de la fila del vértice ' +
+        'seleccionado. Las dos etiquetas ERROR/AVISO se funden en una sola regla, que ' +
+        'devuelve parte de lo gastado. El filtro de avisos pasa de sky-600 a sky-700, que ' +
+        'ya existía. ── ⚠️ El techo SUBE 164 B (cabecera de `TECHO`) y la holgura vuelve a ' +
+        '0. NO CIERRA REBANADA.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

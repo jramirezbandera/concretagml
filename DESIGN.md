@@ -172,6 +172,14 @@ implica, en concreto:
 - **El color nunca es el único canal.** Los dos indicadores de geometría cargada
   cambian el TEXTO además del color («Sin levantamiento»), y por eso no hace falta
   una utilidad de texto solo para lectores.
+- ⛔ **Texto de color sobre su propio tinte, no.** Rojo sobre `--color-tint-fail`,
+  ámbar sobre `--color-tint-warn` o el ámbar del usuario sobre su 12 % se quedan entre
+  4,1 y 4,4:1, o sea por debajo de AA. Ahí la palabra va en `--color-text-primary` y
+  el color se queda en el tinte, el filo, la barra o el punto. Se decidió primero en
+  el renglón de error (agosto) y se extendió el 2026-09-25 a los chips, las etiquetas
+  de la lista de avisos, el `:hover` de «Vaciarlo» y la fila del vértice seleccionado.
+  **No se añaden tintas oscuras a la paleta.** El azul es la excepción que no lo es:
+  sobre su tinte va en `--color-accent-hover`, que ya existía.
 
 ### 3.4 · El verde llegó tarde, y merece quedar escrito
 

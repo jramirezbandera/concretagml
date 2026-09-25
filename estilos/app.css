@@ -991,8 +991,14 @@ body {
    que el puntero está sobre ella**, que es el último momento útil para avisar. Es
    el mismo par color+tinte que ya llevan `.gml-chip--error` y el bloque de error
    del panel: no entra ni un color nuevo. */
+/* ⚠️ Y AL SEÑALAR, LA PALABRA PASA A NEGRO (revisión de diseño, 2026-09-25). El
+   rojo sobre su propio tinte daba 4,13:1 a 13 px —medido—, o sea que «Vaciarlo»
+   dejaba de pasar AA justo en el instante en que el puntero está encima. En
+   reposo sigue en rojo sobre blanco (4,83:1); al señalar el aviso lo lleva el
+   fondo, igual que en el renglón de confirmación que se abre debajo. */
 .gml-barra-menu-opcion--riesgo:hover:not(:disabled) {
   background: var(--color-tint-fail);
+  color: var(--color-text-primary);
 }
 
 .gml-barra-menu-apunte {
@@ -1574,16 +1580,31 @@ body {
   background: currentColor;
 }
 
+/* ⭐ LA PALABRA VA EN NEGRO Y EL COLOR SE QUEDA EN EL PUNTO, EL FILO Y EL TINTE
+   (revisión de diseño, 2026-09-25). Era rojo sobre rojo diluido y ámbar sobre
+   ámbar diluido: «1 aviso» medía **4,39:1** a 12 px (y el rojo ~4,13), por debajo
+   de AA. Es el mismo criterio que `.gml-accion-estado--error` dejó escrito en
+   agosto —o se oscurece el rojo, metiendo un color más, o el color se va a donde
+   se ve mejor— y la misma respuesta: ni un color nuevo. El punto deja de ser
+   `currentColor` en estas dos variantes para no volverse negro con la palabra. */
 .gml-chip--error {
-  color: var(--color-state-fail);
+  color: var(--color-text-primary);
   background: var(--color-tint-fail);
   border-color: color-mix(in srgb, var(--color-state-fail) 30%, transparent);
 }
 
+.gml-chip--error::before {
+  background: var(--color-state-fail);
+}
+
 .gml-chip--aviso {
-  color: var(--color-state-warn);
+  color: var(--color-text-primary);
   background: var(--color-tint-warn);
   border-color: color-mix(in srgb, var(--color-state-warn) 32%, transparent);
+}
+
+.gml-chip--aviso::before {
+  background: var(--color-state-warn);
 }
 
 /* Que se note que ABRE algo. El chip no tiene sitio para un rótulo tipo «ver
@@ -2437,12 +2458,14 @@ body {
   color: var(--color-text-secondary);
 }
 
-.gml-aviso[data-nivel='ERROR'] .gml-aviso-etiqueta {
-  color: var(--color-state-fail);
-}
-
+/* La etiqueta de una tarjeta con nivel sube de gris a NEGRO, y no a su color
+   (revisión de diseño, 2026-09-25): a 10 px, rojo sobre `--color-tint-fail` y
+   ámbar sobre `--color-tint-warn` no llegaban a AA. El nivel ya lo dicen tres
+   canales —el tinte, el filo y la barra de 3 px—, y la palabra «ERROR» o «AVISO»
+   escrita es el cuarto. Mismo criterio que los chips de la cabecera. */
+.gml-aviso[data-nivel='ERROR'] .gml-aviso-etiqueta,
 .gml-aviso[data-nivel='AVISO'] .gml-aviso-etiqueta {
-  color: var(--color-state-warn);
+  color: var(--color-text-primary);
 }
 
 /* «×3». Ausente cuando el hallazgo ocurre una sola vez (lo decide app/avisos.js). */
@@ -2631,8 +2654,14 @@ body {
   background: color-mix(in srgb, var(--gml-color-usuario-sobre-claro) 12%, transparent);
 }
 
+/* En la fila seleccionada el nº pasa a NEGRO (revisión de diseño, 2026-09-25):
+   el ámbar sobre su propio tinte al 12 % daba 4,20:1, y el «≈5,0:1» de DESIGN.md
+   §3.2 solo vale sobre blanco. La fila ya dice «geometría del usuario» con el
+   tinte y la barra de 3 px; el número no tiene que repetirlo en un color que
+   ahí no se lee. */
 .gml-tabla-vertices .gml-fila-vertice[aria-current='true'] .gml-celda-indice {
   box-shadow: inset 3px 0 0 var(--gml-color-usuario-sobre-claro);
+  color: var(--color-text-primary);
 }
 
 /* El nº de vértice, en el ámbar reservado a la GEOMETRÍA DEL USUARIO sobre
@@ -7014,8 +7043,12 @@ button.gml-parte-nombre {
   color: var(--color-text-primary);
 }
 
+/* El texto en `--color-accent-hover` (sky-700) y no en el acento (sky-600): sobre
+   su propio tinte el sky-600 daba ~3,7:1 (revisión de diseño, 2026-09-25). No es
+   un color nuevo: es el mismo par que ya usan `.gml-via-marca` y el chip del
+   ajuste por el mismo motivo. */
 .gml-app .gml-filtro-avisos--puesto {
-  color: var(--color-accent);
+  color: var(--color-accent-hover);
   background: var(--color-tint-accent);
   border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
 }
