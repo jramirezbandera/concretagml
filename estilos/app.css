@@ -2468,7 +2468,11 @@ body {
      mide parcelas catastrales, una unidad mal escrita no es cosmética. Si algún
      día hace falta el aspecto de versalitas, tendrá que ser sin tocar la unidad
      (p. ej. `font-variant-caps`), nunca con `text-transform`. */
-  color: var(--color-text-disabled);
+  /* `--color-text-secondary` y no `-disabled` (revisión de diseño, 2026-09-25):
+     el gris de deshabilitado sobre este `--color-bg-elevated` da 4,34:1 a 10 px, o
+     sea por debajo de AA, y además dice «esto no responde» de unas columnas que
+     no están apagadas. El secundario da 6,92:1 sobre el mismo fondo. */
+  color: var(--color-text-secondary);
   text-align: right;
   white-space: nowrap;
 }
