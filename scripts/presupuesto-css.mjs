@@ -523,8 +523,36 @@ export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'dia
  *
  * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
  * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **SUBIDO A MANO OTRA VEZ EL 2026-09-25 (LO QUE LA REVISIÓN DEJÓ PARA DECIDIR)**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 65.068 a **65.761 B nuestros** (80.163 → 80.856 con vendor). **+693 B**, en
+ * tres puntos que el autor pidió hacer de la lista de la revisión:
+ *
+ *   1. **+161 B · la flecha de las salidas.** Con el primario apagado era lo más
+ *      pesado de la barra. Pasa a contorno, no a gris: la asimetría escrita en la
+ *      propia regla («pintarla de gris dejándola pulsable mentiría») se respeta.
+ *   2. **+278 B · el informe a página completa.** Medía 1.408 px de ancho: un
+ *      `<select>` de una palabra a 1.408 px y el lindero a ~210 caracteres por
+ *      renglón. Columna de 960 px, que crece 101 px hacia abajo; con 760, el ancho
+ *      de la tarjeta, eran 252 px.
+ *   3. **+254 B · la barra estrecha.** Desde ~1.120 px los pasos se montaban
+ *      encima de «Parcela / Edificio». Media pantalla de 1920 es 960, y ahí está el
+ *      CAD.
+ *
+ * ── LO QUE SE DESCARTÓ ANTES DE PEDIR LA SUBIDA ────────────────────────────
+ * **Cortar texto en la barra** —el subtítulo de la marca, la palabra de los
+ * chips— en vez de apretar aire: el subtítulo mide lo mismo que «Concreta GML»,
+ * así que no ganaba nada, y un chip que dice solo «● 0» no dice de qué. **Una
+ * cifra suelta de 728 px para el lindero**: habría ahorrado la variable, pero
+ * dejaba dos anchos que tienen que ser el mismo sin nadie que los atara (§2 de
+ * DESIGN.md).
+ *
+ * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
+ * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
  */
-export const TECHO = Object.freeze({ total: 80163, nuestro: 65068 })
+export const TECHO = Object.freeze({ total: 80856, nuestro: 65761 })
 
 /**
  * EL REGISTRO. Un asiento por hito, con la hoja construida medida de verdad.
@@ -1628,6 +1656,22 @@ export const ASIENTOS = Object.freeze(
         '`-secondary` (FINDING-004), porque el apunte del grupo los llama «los datos en gris» y ' +
         'salían en el negro de lo que se teclea. ── ⚠️ El techo SUBE 27 B (cabecera de `TECHO`) ' +
         'y la holgura vuelve a 0. NO CIERRA REBANADA.' },
+    { hito: 'Lo que la revisión de diseño dejó para decidir: la flecha, el informe y la barra estrecha',
+      commit: 'fe30293',
+      total: 80856, nuestro: 65761, rebanada: null,
+      nota:
+        '**+693 B en tres commits, medidos uno a uno reconstruyendo la hoja en cada uno.** ' +
+        '(1) +161 B (`5fd204b`): con «Generar GML» apagado, la flecha de las salidas pasa a ' +
+        'CONTORNO —fondo blanco, filo y gliffo sky-700— en vez de bloque azul macizo, más su ' +
+        '`:hover` en `--color-tint-accent`. (2) +278 B (`e9b9e1f`): el informe a página ' +
+        'completa pasa a columna de 960 px centrada, el grupo del lindero se queda al ancho ' +
+        'de la tarjeta (`--gml-informe-ancho`, nueva, que ata los dos sitios) y la rejilla ' +
+        'pasa de `auto-fit` a `auto-fill` (+1 B, y es la que baja el `<select>` de 1.408 a ' +
+        '228 px). (3) +254 B (`fe30293`): la barra de arriba reparte distinto ' +
+        '(`max-content minmax(0, auto) minmax(min-content, 1fr) …`) y estrena la primera ' +
+        'consulta de ancho de la hoja, `@media (width<=1200px)`, que aprieta aire y nunca ' +
+        'texto; es lo que deja la cabecera sin solapes hasta ~870 px. ── ⚠️ El techo SUBE ' +
+        '693 B (cabecera de `TECHO`) y la holgura vuelve a 0. NO CIERRA REBANADA.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 
