@@ -35,6 +35,26 @@
 // error nuevo se note sin abrir nada). Se puede seguir montando contra un `<div>`
 // suelto, y así lo hace `test/app/avisos.dom.test.js`.
 //
+// ── ⭐ LO QUE BLOQUEA AHORA NO ES UN AVISO MÁS (2026-09-25) ──────────────────
+// Hasta hoy este panel solo sabía de EVENTOS: algo pasa, entra una tarjeta, y se
+// queda hasta que alguien vacía la lista. Y la pregunta «¿se puede generar el
+// GML?» no es un evento, es un ESTADO: cambia en cada edición y deja de ser
+// verdad en cuanto se corrige. Meterla por `avisar` obligaba a elegir entre dos
+// mentiras, y la aplicación había elegido las dos a la vez (TODOS.md, «El chip
+// dice 0 errores mientras el panel dice 14 errores»):
+//   · la validación solo se publicaba AL PULSAR «Generar GML», así que el chip
+//     decía «0 errores» junto a un renglón rojo que decía «14 errores bloquean»;
+//   · y lo que sí se publicaba se quedaba en la lista después de corregirlo.
+//
+// Por eso hay un segundo canal, {@link PanelAvisos#fijar}: cada fuente (el
+// «Generar GML» de cada rama) SUSTITUYE su lista entera en cada validación. No
+// acumula `×N` por tecleo, no sobrevive a la corrección, y «Vaciar la lista» no
+// lo toca —se va solo cuando deja de ser cierto—. Se pinta ARRIBA y sin el tope
+// de tarjetas, porque su tamaño lo acota el modelo, no la red, y lo que impide
+// generar tiene que poder leerse entero. Y se cuenta POR HALLAZGO, no por texto
+// distinto, que es como cuenta el renglón: «Vértices consecutivos duplicados»
+// puede salir tres veces, en tres sitios, y son tres errores.
+//
 // ── LO QUE ESTE MÓDULO NO HACE ───────────────────────────────────────────────
 //   · No pinta `causa` (regla 2 de la tarea): puede ser un `Event` del DOM o un
 //     `Error`, y volcarlo a la UI es ruido para un usuario que no es programador.
@@ -59,6 +79,16 @@ const TOPE_TARJETAS = 12
  * `NIVEL`, nunca literales `'ERROR'`/`'AVISO'` sueltos. */
 const ETIQUETA_NIVEL = {
   [NIVEL.ERROR]: 'Bloqueante',
+  [NIVEL.AVISO]: 'Aviso',
+}
+
+/**
+ * Etiqueta de las tarjetas FIJADAS (ver {@link PanelAvisos#fijar}). Dice qué
+ * bloquean, no solo que bloquean: es lo que explica por qué estas tarjetas no se
+ * van al vaciar la lista y las de debajo sí.
+ */
+const ETIQUETA_VIGENTE = {
+  [NIVEL.ERROR]: 'Impide generar el GML',
   [NIVEL.AVISO]: 'Aviso',
 }
 
@@ -141,10 +171,10 @@ function normalizarNivel(detalle) {
 
 /**
  * @typedef {Object} ResumenAvisos
- * @property {number} ERROR  Nº de mensajes DISTINTOS de nivel `NIVEL.ERROR`
- *   agrupados (no la suma de sus repeticiones).
- * @property {number} AVISO  Nº de mensajes DISTINTOS de nivel `NIVEL.AVISO`
- *   agrupados (no la suma de sus repeticiones).
+ * @property {number} ERROR  Nº de mensajes DISTINTOS de nivel `NIVEL.ERROR` del
+ *   registro (no la suma de sus repeticiones), MÁS cada hallazgo fijado de ese
+ *   nivel (ver {@link PanelAvisos#fijar}).
+ * @property {number} AVISO  Ídem para `NIVEL.AVISO`.
  */
 
 /**
@@ -152,10 +182,15 @@ function normalizarNivel(detalle) {
  * @property {import('../viewer/_comun.js').Avisar} avisar  El canal que se
  *   pasa tal cual como `alAvisar` a `crearVisor` y al resto de módulos del
  *   visor que puedan fallar por red o por entrada del usuario.
- * @property {() => void} limpiar  Vacía todos los avisos acumulados y vuelve
- *   al estado vacío («Sin avisos.»).
- * @property {() => ResumenAvisos} resumen  Recuento de mensajes DISTINTOS por
- *   nivel, el mismo dato que pintan los chips.
+ * @property {() => void} limpiar  Vacía el REGISTRO (lo que entró por
+ *   `avisar`). Lo fijado no se toca: se va solo cuando su fuente deja de fijarlo.
+ * @property {(fuente: string, hallazgos: ?Array<{mensaje: string, nivel: string}>) => void} fijar
+ *   Sustituye ENTERA la lista de lo que bloquea ahora según `fuente`. Una lista
+ *   vacía (o `null`) la retira. Ver la cabecera del módulo.
+ * @property {() => ResumenAvisos} resumen  El mismo recuento que pintan los
+ *   chips.
+ * @property {() => number} vaciables  Cuántas tarjetas se llevaría `limpiar`.
+ *   Es lo que decide si «Vaciar la lista» se puede pulsar.
  * @property {(nivel: 'ERROR'|'AVISO'|null) => void} filtro  Deja en la lista
  *   solo las tarjetas de ese nivel. `null` (o cualquier valor que no esté en
  *   `NIVEL`) las enseña todas. Lo maneja `app/dialogo-avisos.js` desde sus tres
@@ -182,11 +217,12 @@ function normalizarNivel(detalle) {
  *   `34vh` son cosa del CSS, independientes del tope de 12 tarjetas de aquí).
  * @param {HTMLElement} opciones.chipError  Chip-resumen de nivel `NIVEL.ERROR`.
  * @param {HTMLElement} opciones.chipAviso  Chip-resumen de nivel `NIVEL.AVISO`.
- * @param {(resumen: ResumenAvisos) => void} [opciones.alCambiar]  Se llama
- *   DESPUÉS de cada repintado, con el mismo recuento que pintan los chips. Lo
- *   usa `app/dialogo-avisos.js` para poner al día los rótulos de sus tres
- *   pestañas sin tener que recontar por su cuenta. Si lanza, el fallo NO tumba
- *   el canal de avisos: se traga y se anota en consola.
+ * @param {(resumen: ResumenAvisos, extra: {vaciables: number}) => void} [opciones.alCambiar]
+ *   Se llama DESPUÉS de cada repintado, con el mismo recuento que pintan los
+ *   chips y, de segundo argumento, lo mismo que devolvería `vaciables()`. Lo usa
+ *   `app/dialogo-avisos.js` para poner al día los rótulos de sus tres pestañas y
+ *   el botón «Vaciar» sin tener que recontar por su cuenta. Si lanza, el fallo NO
+ *   tumba el canal de avisos: se traga y se anota en consola.
  * @returns {PanelAvisos}
  * @throws {TypeError}  Si `contenedor`, `chipError` o `chipAviso` no son
  *   elementos del DOM.
@@ -220,6 +256,15 @@ export function crearPanelAvisos({ contenedor, chipError, chipAviso, alCambiar }
   // vuelve a ocurrir — sigue siendo la actividad más reciente del panel.
   let secuencia = 0
 
+  /**
+   * Lo que bloquea AHORA, por fuente (ver {@link fijar}). Cada entrada es la
+   * lista de esa fuente ya agrupada por `${nivel}|${mensaje}`, en el orden en que
+   * llegaron los hallazgos, y `veces` cuenta HALLAZGOS con el mismo texto — no
+   * repeticiones de un suceso, como en `grupos`.
+   * @type {Map<string, Array<{nivel:'ERROR'|'AVISO', mensaje:string, veces:number, clave:string}>>}
+   */
+  let vigentes = new Map()
+
   let destruido = false
 
   /** Nivel al que está reducida la lista, o `null` para «todos». Ver
@@ -238,15 +283,59 @@ export function crearPanelAvisos({ contenedor, chipError, chipAviso, alCambiar }
   // «nada de globales implícitos» que `documento` en el resto de la casa.
   const ventana = doc?.defaultView ?? globalThis
 
+  /**
+   * Lo fijado por todas las fuentes, en una sola lista. Si dos fuentes fijaran
+   * el mismo texto al mismo nivel se funden en una tarjeta con la suma de
+   * `veces` — hoy no pasa (las dos ramas se excluyen por `mando()`), pero dos
+   * tarjetas idénticas se leerían como un defecto del panel.
+   *
+   * @returns {Array<{nivel:'ERROR'|'AVISO', mensaje:string, veces:number, clave:string}>}
+   */
+  function listaVigente() {
+    const porClave = new Map()
+    for (const lista of vigentes.values()) {
+      for (const grupo of lista) {
+        const previo = porClave.get(grupo.clave)
+        if (previo) previo.veces += grupo.veces
+        else porClave.set(grupo.clave, { ...grupo })
+      }
+    }
+    return Array.from(porClave.values())
+  }
+
+  /**
+   * Los grupos del REGISTRO que no repiten algo fijado. Un mensaje que está
+   * fijado y además entró por `avisar` (un «Generar GML» pulsado antes de este
+   * cambio, o una fuente que publica por los dos canales) sale UNA vez, arriba y
+   * con su etiqueta de fijado: contarlo dos veces sería el chip mintiendo al
+   * revés.
+   *
+   * @param {Set<string>} clavesVigentes
+   */
+  function registroVisible(clavesVigentes) {
+    return Array.from(grupos.entries())
+      .filter(([clave]) => !clavesVigentes.has(clave))
+      .map(([, grupo]) => grupo)
+  }
+
   /** @returns {ResumenAvisos} */
   function resumen() {
-    let cuentaError = 0
-    let cuentaAviso = 0
-    for (const grupo of grupos.values()) {
-      if (grupo.nivel === NIVEL.ERROR) cuentaError += 1
-      else cuentaAviso += 1
+    const cuenta = { [NIVEL.ERROR]: 0, [NIVEL.AVISO]: 0 }
+    const fijado = listaVigente()
+    // Lo fijado cuenta POR HALLAZGO: es la misma cifra que da el renglón de
+    // «Generar GML» («3 errores bloquean…»), y el chip no puede decir otra.
+    for (const grupo of fijado) cuenta[grupo.nivel] += grupo.veces
+    // El registro cuenta mensajes DISTINTOS, como siempre: ahí `veces` son
+    // repeticiones del mismo suceso (doscientas teselas que no cargan).
+    for (const grupo of registroVisible(new Set(fijado.map((g) => g.clave)))) {
+      cuenta[grupo.nivel] += 1
     }
-    return { [NIVEL.ERROR]: cuentaError, [NIVEL.AVISO]: cuentaAviso }
+    return cuenta
+  }
+
+  /** Cuántas tarjetas se llevaría {@link limpiar}. */
+  function vaciables() {
+    return registroVisible(new Set(listaVigente().map((g) => g.clave))).length
   }
 
   /**
@@ -308,18 +397,30 @@ export function crearPanelAvisos({ contenedor, chipError, chipAviso, alCambiar }
     )
   }
 
-  /** Construye una tarjeta `.gml-aviso` (contrato de DOM de la tarea). */
-  function construirTarjeta(grupo) {
+  /**
+   * Construye una tarjeta `.gml-aviso` (contrato de DOM de la tarea).
+   *
+   * Las fijadas llevan `data-vigente` y su propia etiqueta, y NADA de CSS nuevo:
+   * `data-nivel` sigue siendo el de siempre, así que se pintan igual que un
+   * bloqueante y los guiones que cuentan `[data-nivel="ERROR"]` las siguen
+   * viendo. El atributo es para quien necesite distinguirlas (un guion que mida
+   * lo que deja una operación, que no debe contar lo que ya estaba fijado).
+   *
+   * @param {{nivel:'ERROR'|'AVISO', mensaje:string, veces:number}} grupo
+   * @param {boolean} [vigente=false]
+   */
+  function construirTarjeta(grupo, vigente = false) {
     const articulo = doc.createElement('article')
     articulo.className = 'gml-aviso'
     articulo.dataset.nivel = grupo.nivel
+    if (vigente) articulo.dataset.vigente = 'true'
 
     const cabecera = doc.createElement('div')
     cabecera.className = 'gml-aviso-cabecera'
 
     const etiqueta = doc.createElement('span')
     etiqueta.className = 'gml-aviso-etiqueta'
-    etiqueta.textContent = ETIQUETA_NIVEL[grupo.nivel]
+    etiqueta.textContent = (vigente ? ETIQUETA_VIGENTE : ETIQUETA_NIVEL)[grupo.nivel]
     cabecera.appendChild(etiqueta)
 
     // `.gml-aviso-veces` AUSENTE cuando `veces === 1` (contrato de DOM de la
@@ -357,13 +458,23 @@ export function crearPanelAvisos({ contenedor, chipError, chipAviso, alCambiar }
   function render() {
     contenedor.replaceChildren()
 
+    const pasaFiltro = (grupo) => filtroPuesto === null || grupo.nivel === filtroPuesto
+
+    // Lo FIJADO va primero, entero y en el orden de la validación: es lo que
+    // impide generar ahora, y el tope de abajo es para el registro, no para esto.
+    // Recortarlo sería volver a dejar motivos sin leer en ninguna parte.
+    const fijado = listaVigente()
+    const fijadoVisible = fijado.filter(pasaFiltro)
+
     // Más recientes arriba (regla de diseño 6): orden descendente por la última
     // vez que CADA grupo tuvo actividad (alta o repetición).
-    const ordenados = Array.from(grupos.values())
-      .filter((grupo) => filtroPuesto === null || grupo.nivel === filtroPuesto)
+    const ordenados = registroVisible(new Set(fijado.map((g) => g.clave)))
+      .filter(pasaFiltro)
       .sort((a, b) => b.orden - a.orden)
 
-    if (ordenados.length === 0) {
+    for (const grupo of fijadoVisible) contenedor.appendChild(construirTarjeta(grupo, true))
+
+    if (ordenados.length === 0 && fijadoVisible.length === 0) {
       const vacio = doc.createElement('p')
       vacio.className = 'gml-avisos-vacio'
       // «Sin avisos.» es el texto de SIEMPRE y no se toca: es el gancho del
@@ -372,7 +483,7 @@ export function crearPanelAvisos({ contenedor, chipError, chipAviso, alCambiar }
       // que no hay avisos —que puede ser falso: puede haber cinco—.
       vacio.textContent = filtroPuesto === NIVEL.ERROR ? 'Sin errores.' : 'Sin avisos.'
       contenedor.appendChild(vacio)
-    } else {
+    } else if (ordenados.length > 0) {
       const visibles = ordenados.slice(0, TOPE_TARJETAS)
       const resto = ordenados.length - visibles.length
 
@@ -398,7 +509,7 @@ export function crearPanelAvisos({ contenedor, chipError, chipAviso, alCambiar }
 
     if (typeof alCambiar === 'function') {
       try {
-        alCambiar(conteo)
+        alCambiar(conteo, { vaciables: vaciables() })
       } catch (causa) {
         // Este módulo ES el canal de avisos: si se cayera por un fallo de su
         // propio oyente, el siguiente error de la aplicación no lo vería nadie.
@@ -435,11 +546,62 @@ export function crearPanelAvisos({ contenedor, chipError, chipAviso, alCambiar }
     render()
   }
 
-  /** Vacía todos los avisos acumulados y vuelve al estado vacío. */
+  /**
+   * Vacía el REGISTRO. Lo fijado se queda: no es algo que haya pasado y ya se
+   * haya leído, es algo que sigue siendo verdad, y borrarlo dejaría el chip a
+   * cero junto a un renglón que sigue diciendo que no se puede generar.
+   */
   function limpiar() {
     if (destruido) return
     grupos = new Map()
     secuencia = 0
+    render()
+  }
+
+  /**
+   * Sustituye ENTERA la lista de lo que bloquea ahora según `fuente`. Ver la
+   * cabecera del módulo.
+   *
+   * No repinta si la lista no ha cambiado: quien llama lo hace en cada `set` del
+   * store, y sin esta guarda cada vértice movido rehacía la lista del diálogo
+   * para dejarla igual.
+   *
+   * @param {string} fuente  Quién fija. Cada fuente solo pisa lo suyo.
+   * @param {?Array<{mensaje: string, nivel?: string}>} hallazgos  Los hallazgos
+   *   de hoy, con la forma de `validation/_comun.js#crearHallazgo`. `null` o `[]`
+   *   retiran lo que esa fuente tuviera fijado.
+   * @throws {TypeError}  Si `fuente` no es una cadena no vacía, o `hallazgos` no
+   *   es una lista ni `null`: eso es contrato roto por el programador, no un dato
+   *   raro que absorber.
+   */
+  function fijar(fuente, hallazgos) {
+    if (typeof fuente !== 'string' || fuente === '') {
+      throw new TypeError(
+        `fijar: 'fuente' debe ser una cadena no vacía; recibido ${JSON.stringify(fuente)}.`,
+      )
+    }
+    if (hallazgos !== null && hallazgos !== undefined && !Array.isArray(hallazgos)) {
+      throw new TypeError(`fijar: 'hallazgos' debe ser una lista; recibido ${typeof hallazgos}.`)
+    }
+    if (destruido) return
+
+    /** @type {Map<string, {nivel:'ERROR'|'AVISO', mensaje:string, veces:number, clave:string}>} */
+    const porClave = new Map()
+    for (const hallazgo of hallazgos ?? []) {
+      const mensaje = normalizarMensaje(hallazgo?.mensaje)
+      const nivel = normalizarNivel(hallazgo)
+      const clave = `${nivel}|${mensaje}`
+      const previo = porClave.get(clave)
+      if (previo) previo.veces += 1
+      else porClave.set(clave, { nivel, mensaje, veces: 1, clave })
+    }
+    const nueva = Array.from(porClave.values())
+
+    const firma = (lista) => (lista ?? []).map((g) => `${g.clave}×${g.veces}`).join('\n')
+    if (firma(nueva) === firma(vigentes.get(fuente))) return
+
+    if (nueva.length === 0) vigentes.delete(fuente)
+    else vigentes.set(fuente, nueva)
     render()
   }
 
@@ -464,6 +626,7 @@ export function crearPanelAvisos({ contenedor, chipError, chipAviso, alCambiar }
     if (destruido) return
     destruido = true
     grupos = new Map()
+    vigentes = new Map()
     contenedor.replaceChildren()
     // Un destello a medias dejaría la clase puesta para siempre en un chip que
     // ya no gobierna nadie.
@@ -476,5 +639,14 @@ export function crearPanelAvisos({ contenedor, chipError, chipAviso, alCambiar }
 
   render() // Estado inicial: «Sin avisos.» y los dos chips a cero.
 
-  return { avisar, limpiar, resumen, filtro, filtroActual: () => filtroPuesto, destruir }
+  return {
+    avisar,
+    limpiar,
+    fijar,
+    resumen,
+    vaciables,
+    filtro,
+    filtroActual: () => filtroPuesto,
+    destruir,
+  }
 }

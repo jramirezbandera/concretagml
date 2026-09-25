@@ -24,6 +24,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import {
+  FUENTE_BLOQUEOS_EDIFICIO,
   MENSAJE_FALLO_INESPERADO,
   MOTIVO_SIN_EDIFICIO,
   MOTIVO_SIN_HUELLA,
@@ -93,14 +94,22 @@ function crearStore(inicial = null) {
 }
 
 let avisos
+let fijados
 let descargas
+
+/** Lo que esta rama tiene fijado ahora en el panel (`app/avisos.js#fijar`). */
+const fijadoAhora = () => fijados.get(FUENTE_BLOQUEOS_EDIFICIO) ?? []
 
 /** Cablea sobre la cáscara real. `mando` por defecto: esta rama manda. */
 function cablear(opciones = {}) {
   const estadoEdificio = opciones.estadoEdificio ?? crearStore(null)
   const cable = cablearGeneracionGmlEdificio({
     estadoEdificio,
-    panel: { avisar: (mensaje, o) => avisos.push({ mensaje, ...o }) },
+    panel: {
+      avisar: (mensaje, o) => avisos.push({ mensaje, ...o }),
+      // Como el panel de verdad: SUSTITUYE lo de esa fuente, no acumula.
+      fijar: (fuente, lista) => fijados.set(fuente, [...(lista ?? [])]),
+    },
     srs: SRS,
     ahora: () => new Date(Date.UTC(2026, 7, 6, 18, 30, 0)),
     descargar: (texto, o) => {
@@ -121,6 +130,7 @@ beforeEach(() => {
   document.documentElement.innerHTML = HTML
   document.body.className = 'gml-app'
   avisos = []
+  fijados = new Map()
   descargas = []
 })
 
@@ -320,14 +330,54 @@ describe('cablearGeneracionGmlEdificio · el panel de avisos', () => {
     expect(descargas).toHaveLength(0)
     expect(renglon().textContent).toMatch(/^2 errores bloquean/)
 
-    // Y por la vía PROGRAMÁTICA —que es API pública de este módulo— los errores
-    // sí salen enteros y uno a uno, que es donde caben. Sigue sin descargarse nada.
+    // ⛔ HASTA EL 2026-09-25 los errores solo llegaban al panel por la vía
+    // PROGRAMÁTICA, y esta prueba lo afirmaba como si fuera el contrato. Era el
+    // defecto: el usuario no tiene esa vía, así que el chip decía «0 errores» junto
+    // al renglón rojo. Ahora están FIJADOS desde el `set`, sin pulsar nada.
+    const bloqueantes = fijadoAhora()
+    expect(bloqueantes).toHaveLength(2)
+    expect(bloqueantes.every((h) => h.nivel === NIVEL.ERROR)).toBe(true)
+    expect(bloqueantes.every((h) => /plantas sobre rasante/.test(h.mensaje))).toBe(true)
+
+    // Y la vía programática ya no los duplica en el registro: siguen fijados, que
+    // es donde se van solos al corregirlos. Sigue sin descargarse nada.
     avisos.length = 0
     expect(cable.generar()).toBeNull()
-    const bloqueantes = avisos.filter((a) => a.nivel === NIVEL.ERROR)
-    expect(bloqueantes).toHaveLength(2)
-    expect(bloqueantes.every((a) => /plantas sobre rasante/.test(a.mensaje))).toBe(true)
+    expect(avisos.filter((a) => a.nivel === NIVEL.ERROR)).toHaveLength(0)
+    expect(fijadoAhora()).toHaveLength(2)
     expect(descargas).toHaveLength(0)
+  })
+
+  it('⭐ lo fijado se va SOLO al corregirlo: fijar es sustituir, no acumular', () => {
+    const { estadoEdificio } = cablear()
+    estadoEdificio.set(
+      crearEdificio({ idLocal: 'x', partes: [parte('C', rect(0, 0, 10, 10), { plantasSobreRasante: null })] }),
+    )
+    expect(fijadoAhora()).toHaveLength(1)
+
+    estadoEdificio.set(edificioBueno())
+    expect(fijadoAhora(), 'un error corregido no puede seguir contando en el chip').toEqual([])
+  })
+
+  it('⭐ el motivo ROJO que no es de la validación también se fija: «sin huella»', () => {
+    // La regla es que el chip cuente lo que el renglón pinta en rojo. «Sin huella»
+    // no sale de `validarEdificio` —la validación lo da por bueno— y aun así apaga
+    // el botón en rojo: si no se fijara, volvería el «0 errores» junto a la caja roja.
+    const { estadoEdificio } = cablear()
+    estadoEdificio.set(
+      crearEdificio({
+        idLocal: 'sotano.dxf',
+        partes: [parte('Sótano', rect(0, 0, 10, 10), { plantasSobreRasante: 0, plantasBajoRasante: 1 })],
+      }),
+    )
+    expect(renglon().classList.contains('gml-accion-estado--error')).toBe(true)
+    expect(fijadoAhora()).toEqual([{ nivel: NIVEL.ERROR, mensaje: MOTIVO_SIN_HUELLA }])
+  })
+
+  it('sin construcción no se fija nada: no hay nada mal, hay un expediente sin empezar', () => {
+    cablear()
+    expect(renglon().textContent).toBe(MOTIVO_SIN_EDIFICIO)
+    expect(fijadoAhora()).toEqual([])
   })
 
   it('lo que decide el serializador también se cuenta (regla de oro 1)', () => {
@@ -351,6 +401,33 @@ describe('cablearGeneracionGmlEdificio · sin mando no toca nada', () => {
 
     expect(boton().disabled).toBe(false)
     expect(renglon().textContent).toBe('GML de la parcela preparado.')
+  })
+
+  it('⭐ al perder el mando RETIRA lo fijado: el chip cuenta lo del renglón, que es de la otra rama', () => {
+    let manda = true
+    const { cable, estadoEdificio } = cablear({ mando: () => manda })
+    estadoEdificio.set(
+      crearEdificio({ idLocal: 'x', partes: [parte('C', rect(0, 0, 10, 10), { plantasSobreRasante: null })] }),
+    )
+    expect(fijadoAhora()).toHaveLength(1)
+
+    manda = false
+    cable.refrescar()
+    expect(fijadoAhora()).toEqual([])
+
+    manda = true
+    cable.refrescar()
+    expect(fijadoAhora(), 'y al recuperarlo vuelve a fijar lo suyo').toHaveLength(1)
+  })
+
+  it('`destruir()` retira lo fijado: nadie lo evalúa ya', () => {
+    const { cable, estadoEdificio } = cablear()
+    estadoEdificio.set(
+      crearEdificio({ idLocal: 'x', partes: [parte('C', rect(0, 0, 10, 10), { plantasSobreRasante: null })] }),
+    )
+    expect(fijadoAhora()).toHaveLength(1)
+    cable.destruir()
+    expect(fijadoAhora()).toEqual([])
   })
 
   it('y un clic que llegue igualmente NO descarga el GML de la construcción', () => {

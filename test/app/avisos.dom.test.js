@@ -532,3 +532,146 @@ describe('app/avisos · el destello del chip', () => {
     }
   })
 })
+
+// ── ⭐ Lo que bloquea AHORA: `fijar` (2026-09-25) ─────────────────────────────
+//
+// TODOS.md, «El chip dice 0 errores mientras el panel dice 14 errores». La
+// validación es un ESTADO y el registro es de EVENTOS: se publicaba solo al
+// pulsar «Generar GML», así que el chip decía cero junto a un renglón rojo, y lo
+// publicado se quedaba en la lista después de corregirlo. `fijar` es el segundo
+// canal, y estas pruebas fijan su contrato por fuera, contra el DOM y el chip.
+
+describe('app/avisos · fijar: lo que impide generar, como ESTADO', () => {
+  const error = (mensaje) => ({ nivel: NIVEL.ERROR, mensaje })
+
+  it('lo fijado se pinta y CUENTA en el chip sin que nadie pulse nada', () => {
+    panel.fijar('gml-parcela', [error('Autointersección.'), error('Superficie nula.')])
+    expect(textos(cascara.contenedor)).toEqual(['Autointersección.', 'Superficie nula.'])
+    expect(cascara.chipError.textContent).toBe('2 errores')
+    expect(panel.resumen()).toEqual({ [NIVEL.ERROR]: 2, [NIVEL.AVISO]: 0 })
+  })
+
+  it('SUSTITUYE, no acumula: fijar dos veces lo mismo no da ×2, y lo corregido se va', () => {
+    panel.fijar('gml-parcela', [error('A.'), error('B.')])
+    panel.fijar('gml-parcela', [error('A.'), error('B.')])
+    expect(tarjetas(cascara.contenedor)).toHaveLength(2)
+    expect(tarjetas(cascara.contenedor).map(veces)).toEqual([null, null])
+
+    panel.fijar('gml-parcela', [error('B.')])
+    expect(textos(cascara.contenedor)).toEqual(['B.'])
+
+    panel.fijar('gml-parcela', [])
+    expect(tarjetas(cascara.contenedor)).toHaveLength(0)
+    expect(cascara.chipError.textContent).toBe('0 errores')
+  })
+
+  it('cuenta POR HALLAZGO, como el renglón: el mismo texto en tres sitios son tres errores', () => {
+    // «Vértices consecutivos duplicados» sale una vez por pareja de vértices. El
+    // renglón dice «3 errores bloquean…» y el chip no puede decir «1 error».
+    const dup = error('Vértices consecutivos duplicados (distancia < 1 mm).')
+    panel.fijar('gml-parcela', [dup, dup, dup])
+    expect(tarjetas(cascara.contenedor)).toHaveLength(1)
+    expect(veces(tarjetas(cascara.contenedor)[0])).toBe('×3')
+    expect(cascara.chipError.textContent).toBe('3 errores')
+  })
+
+  it('va ARRIBA, con su propia etiqueta y `data-vigente`, y conserva `data-nivel`', () => {
+    panel.avisar('Tesela del IGN.', { nivel: NIVEL.AVISO })
+    panel.fijar('gml-parcela', [error('Autointersección.')])
+    const [primera, segunda] = tarjetas(cascara.contenedor)
+    expect(primera.dataset.vigente).toBe('true')
+    expect(primera.dataset.nivel).toBe(NIVEL.ERROR)
+    expect(primera.querySelector('.gml-aviso-etiqueta').textContent).toBe('Impide generar el GML')
+    expect(segunda.dataset.vigente).toBeUndefined()
+  })
+
+  it('NO se recorta por el tope: lo que impide generar se lee entero', () => {
+    const muchos = Array.from({ length: TOPE_TARJETAS + 5 }, (_, i) => error(`Error ${i}.`))
+    panel.fijar('gml-edificio', muchos)
+    expect(tarjetas(cascara.contenedor)).toHaveLength(TOPE_TARJETAS + 5)
+    expect(cascara.contenedor.querySelector('.gml-avisos-resto')).toBeNull()
+  })
+
+  it('`limpiar()` vacía el registro y DEJA lo fijado: sigue siendo verdad', () => {
+    panel.avisar('Tesela del IGN.', { nivel: NIVEL.AVISO })
+    panel.fijar('gml-parcela', [error('Autointersección.')])
+    expect(panel.vaciables()).toBe(1)
+
+    panel.limpiar()
+    expect(textos(cascara.contenedor)).toEqual(['Autointersección.'])
+    expect(cascara.chipError.textContent).toBe('1 error')
+    expect(panel.vaciables()).toBe(0)
+  })
+
+  it('un texto fijado que además está en el registro sale UNA vez y cuenta UNA', () => {
+    panel.avisar('Autointersección.', { nivel: NIVEL.ERROR })
+    panel.fijar('gml-parcela', [error('Autointersección.')])
+    expect(tarjetas(cascara.contenedor)).toHaveLength(1)
+    expect(tarjetas(cascara.contenedor)[0].dataset.vigente).toBe('true')
+    expect(cascara.chipError.textContent).toBe('1 error')
+    // Y no se ofrece vaciar algo que no se ve.
+    expect(panel.vaciables()).toBe(0)
+  })
+
+  it('cada fuente pisa solo lo suyo', () => {
+    panel.fijar('gml-parcela', [error('De parcela.')])
+    panel.fijar('gml-edificio', [error('De edificio.')])
+    panel.fijar('gml-parcela', [])
+    expect(textos(cascara.contenedor)).toEqual(['De edificio.'])
+  })
+
+  it('el filtro también rige sobre lo fijado', () => {
+    panel.fijar('gml-parcela', [error('Autointersección.')])
+    panel.avisar('Tesela del IGN.', { nivel: NIVEL.AVISO })
+    panel.filtro(NIVEL.AVISO)
+    expect(textos(cascara.contenedor)).toEqual(['Tesela del IGN.'])
+    panel.filtro(NIVEL.ERROR)
+    expect(textos(cascara.contenedor)).toEqual(['Autointersección.'])
+  })
+
+  it('no repinta si no cambia nada (se llama en cada `set` del store)', () => {
+    const alCambiar = vi.fn()
+    panel.destruir()
+    cascara = montarCascara()
+    panel = crearPanelAvisos({ ...cascara, alCambiar })
+    alCambiar.mockClear()
+
+    panel.fijar('gml-parcela', [error('A.')])
+    panel.fijar('gml-parcela', [error('A.')])
+    panel.fijar('gml-parcela', [error('A.')])
+    expect(alCambiar).toHaveBeenCalledTimes(1)
+    expect(alCambiar).toHaveBeenLastCalledWith(
+      { [NIVEL.ERROR]: 1, [NIVEL.AVISO]: 0 },
+      { vaciables: 0 },
+    )
+  })
+
+  it('el chip destella cuando lo fijado SUBE, no cuando se repite', () => {
+    vi.useFakeTimers()
+    try {
+      panel.fijar('gml-parcela', [error('A.')])
+      expect(cascara.chipError.classList.contains('gml-chip--destello')).toBe(true)
+      vi.runAllTimers()
+      panel.fijar('gml-parcela', [error('A.')])
+      expect(cascara.chipError.classList.contains('gml-chip--destello')).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('contrato roto por el programador ⇒ TypeError; `null` retira', () => {
+    expect(() => panel.fijar('', [])).toThrow(TypeError)
+    expect(() => panel.fijar(undefined, [])).toThrow(TypeError)
+    expect(() => panel.fijar('gml-parcela', 'no es lista')).toThrow(TypeError)
+
+    panel.fijar('gml-parcela', [error('A.')])
+    panel.fijar('gml-parcela', null)
+    expect(tarjetas(cascara.contenedor)).toHaveLength(0)
+  })
+
+  it('tras destruir(), `fijar` es un no-op', () => {
+    panel.destruir()
+    panel.fijar('gml-parcela', [error('A.')])
+    expect(tarjetas(cascara.contenedor)).toHaveLength(0)
+  })
+})

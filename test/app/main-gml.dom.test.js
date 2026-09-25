@@ -865,9 +865,40 @@ describe('app/main · parcela con un error BLOQUEANTE inyectado', () => {
     boton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
 
     for (const mensaje of distintos) expect(textosDelPanel()).toContain(mensaje)
-    expect(panel.resumen()[NIVEL.ERROR]).toBe(distintos.length)
+    // Por HALLAZGO, como el renglón (2026-09-25): ver la prueba de abajo.
+    expect(panel.resumen()[NIVEL.ERROR]).toBe(errores.length)
     // Bloqueantes, no avisos de cortesía.
     for (const mensaje of distintos) expect(tarjetaDe(mensaje).dataset.nivel).toBe(NIVEL.ERROR)
+  })
+
+  it('⭐ el chip cuenta LO MISMO que el renglón, y SIN pulsar nada', () => {
+    // ⛔ TODOS.md, «El chip dice 0 errores mientras el panel dice 14 errores»: los
+    // errores solo entraban en el panel al pulsar «Generar GML», y con el botón
+    // apagado el usuario no pulsa. Esta prueba NO hace clic a propósito: es
+    // exactamente su situación.
+    const parcela = parcelaCruzada()
+    const { errores } = validarParcela(parcela.recintos, { srs: SRS_DEMO })
+    const { estado, panel, renglon } = cablear(parcela)
+
+    expect(renglon.textContent).toContain(`${errores.length} error`)
+    expect(panel.resumen()[NIVEL.ERROR], 'el chip dice la cifra del renglón').toBe(errores.length)
+    for (const e of errores) expect(tarjetaDe(e.mensaje)?.dataset.vigente).toBe('true')
+
+    // Y corregido se va SOLO: el registro no lo retiene, el chip vuelve a cero.
+    estado.set(parcelaDemo())
+    expect(renglonEnError(renglon)).toBe(false)
+    expect(panel.resumen()[NIVEL.ERROR]).toBe(0)
+    for (const e of errores) expect(tarjetaDe(e.mensaje)).toBeNull()
+  })
+
+  it('⭐ sin el mando (rama Edificio) no deja nada fijado: el renglón es de la otra rama', () => {
+    let manda = true
+    const { cableado, panel } = cablear(parcelaCruzada(), { mando: () => manda })
+    expect(panel.resumen()[NIVEL.ERROR]).toBeGreaterThan(0)
+
+    manda = false
+    cableado.refrescar()
+    expect(panel.resumen()[NIVEL.ERROR]).toBe(0)
   })
 
   it('⭐ sin parcela en el store: bloquea diciéndolo, pero NO como un error', () => {

@@ -119,7 +119,35 @@ function motivoDeBloqueo(errores) {
     errores.length === 1
       ? '1 error bloquea la generación del GML'
       : `${errores.length} errores bloquean la generación del GML`
-  return `${recuento}: ${visibles.join(' ')}` + (resto > 0 ? ` (…y ${resto} motivo(s) más.)` : '')
+  return (
+    `${recuento}: ${visibles.join(' ')}` +
+    (resto > 0 ? ` (…y ${resto} motivo(s) más, todos en la lista de avisos.)` : '')
+  )
+}
+
+/**
+ * La fuente con la que esta rama fija en el panel lo que impide generar
+ * (`app/avisos.js#fijar`). La de parcela es otra (`app/main.js`), y cada una solo
+ * pisa lo suyo.
+ */
+export const FUENTE_BLOQUEOS_EDIFICIO = 'gml-edificio'
+
+/**
+ * Lo que impide generar, como hallazgos, a partir del `examen` de este módulo.
+ *
+ * Son los errores de la validación cuando los hay, y si no, el motivo que pinta
+ * el renglón EN ROJO (hoy solo «sin huella») como un hallazgo más: la regla es que
+ * el chip cuente lo mismo que el renglón, y un renglón rojo junto a «0 errores» es
+ * exactamente el defecto que esto cierra. «No hay edificio» no cuenta, por lo
+ * mismo que no va en rojo: no hay nada mal, hay un expediente sin empezar.
+ *
+ * @param {{hay: boolean, motivo: ?string, validacion?: object}} examen
+ * @returns {Array<{nivel: string, mensaje: string}>}
+ */
+function bloqueosDe(examen) {
+  if (examen.motivo === null || !examen.hay) return []
+  const errores = examen.validacion?.errores ?? []
+  return errores.length > 0 ? errores : [{ nivel: NIVEL.ERROR, mensaje: examen.motivo }]
 }
 
 /**
@@ -318,7 +346,14 @@ export function cablearGeneracionGmlEdificio({
    * cableado existe para no producir.
    */
   function refrescar() {
-    if (destruido || !mando()) return
+    if (destruido) return
+    // Sin el mando no se toca el botón ni el renglón, pero SÍ se retira lo fijado:
+    // el chip tiene que contar lo que dice el renglón, y el renglón es de la otra
+    // rama (2026-09-25).
+    if (!mando()) {
+      panel.fijar(FUENTE_BLOQUEOS_EDIFICIO, [])
+      return
+    }
     let examen
     try {
       examen = examinar(estadoEdificio?.get() ?? null)
@@ -334,10 +369,14 @@ export function cablearGeneracionGmlEdificio({
       decir(MENSAJE_FALLO_INESPERADO, true)
       console.error('[gml-bu] no se ha podido evaluar si la construcción puede generarse:', causa)
       // Y el resalte del mapa se RETIRA: unas huellas señaladas por una validación
-      // que acaba de reventar señalarían lo que ya no se sabe.
+      // que acaba de reventar señalarían lo que ya no se sabe. Lo fijado, igual.
       publicarValidacion(null)
+      panel.fijar(FUENTE_BLOQUEOS_EDIFICIO, [])
       return
     }
+    // Lo que impide generar, al panel, en CADA evaluación —también cuando es
+    // nada—: fijar es sustituir, y así un error corregido se va de la lista solo.
+    panel.fijar(FUENTE_BLOQUEOS_EDIFICIO, bloqueosDe(examen))
     if (examen.motivo === null) {
       nodoBoton.disabled = false
       decir('', false)
@@ -374,9 +413,11 @@ export function cablearGeneracionGmlEdificio({
     // ── 1 · Validación ──────────────────────────────────────────────────────
     const examen = examinar(edificio)
     if (examen.motivo !== null) {
-      // Al panel, uno por uno: es donde caben enteros. `h.nivel` ya es el del
-      // hallazgo, para que las dos capas no puedan divergir.
-      for (const h of examen.validacion?.errores ?? []) panel.avisar(h.mensaje, { nivel: h.nivel })
+      // Al panel, enteros —es donde caben—, pero FIJADOS y no por `avisar`
+      // (2026-09-25): publicarlos en el registro los dejaría ahí después de
+      // corregirlos. `h.nivel` ya es el del hallazgo, para que las dos capas no
+      // puedan divergir.
+      panel.fijar(FUENTE_BLOQUEOS_EDIFICIO, bloqueosDe(examen))
       nodoBoton.disabled = true
       decir(examen.motivo, examen.hay)
       return null
@@ -515,6 +556,8 @@ export function cablearGeneracionGmlEdificio({
       nodoBoton.removeEventListener('click', generar)
       desuscribir()
       oyentesValidacion.clear()
+      // Un cableado que se va no puede dejar fijado lo que ya nadie evalúa.
+      panel.fijar(FUENTE_BLOQUEOS_EDIFICIO, [])
     },
   }
 }

@@ -299,6 +299,29 @@ describe('app/dialogo-avisos · cerrar y vaciar', () => {
     expect(vaciar.disabled, 'un botón que ya no hace nada tiene que decirlo').toBe(true)
   })
 
+  it('⭐ «Vaciar» deja lo que impide generar, y con solo eso a la vista se apaga', () => {
+    // Lo fijado (`app/avisos.js#fijar`) no se vacía: se va al corregirlo. Con
+    // tarjetas en la lista pero nada que vaciar, un «Vaciar» encendido no haría
+    // nada — el botón mudo que este proyecto persigue desde F08.
+    const vaciar = document.querySelector('[data-accion="vaciar-avisos"]')
+    avisos.fijar('gml-parcela', [{ nivel: NIVEL.ERROR, mensaje: 'Autointersección.' }])
+    expect(vaciar.disabled).toBe(false)
+
+    clic(vaciar)
+    expect(textos()).toEqual(['Autointersección.'])
+    expect(cascara.chipError.textContent).toBe('1 error')
+    expect(vaciar.disabled).toBe(true)
+
+    // Y el apunte explica por qué esa tarjeta se queda.
+    expect(document.querySelector('.gml-dialogo-avisos-apunte').textContent).toMatch(
+      /no al vaciar la lista/,
+    )
+
+    avisos.fijar('gml-parcela', [])
+    expect(tarjetas()).toHaveLength(0)
+    expect(vaciar.disabled).toBe(true)
+  })
+
   it('cerrar es IDEMPOTENTE: el `close` del navegador vuelve a entrar por aquí', () => {
     avisos.cerrar()
     expect(() => avisos.cerrar()).not.toThrow()

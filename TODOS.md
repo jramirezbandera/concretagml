@@ -368,7 +368,37 @@ PISTA», y el comentario gemelo en `index.html` sobre `.gml-accion`.
 
 ---
 
-## El chip dice «0 errores» mientras el panel dice «14 errores»
+## ✅ CERRADA · El chip dice «0 errores» mientras el panel dice «14 errores»
+
+**Anotada el 2026-08-11 · cerrada el 2026-09-25**, por la salida 1 de las dos de abajo, con
+el riesgo que la nota le ponía (la frecuencia) desactivado por diseño en vez de medido.
+
+**Qué se hizo.** El panel tiene un segundo canal, `app/avisos.js#fijar(fuente, hallazgos)`:
+lo que impide generar el GML es un ESTADO y no un evento, así que cada «Generar GML» (uno por
+rama) **sustituye** su lista entera en cada validación, también cuando es vacía. Por eso no
+hay catorce tarjetas por tecleo: fijar lo mismo dos veces no da `×2` ni repinta, y lo
+corregido se va solo. Se pinta arriba, entero (el tope de 12 es del registro), con la
+etiqueta «Impide generar el GML» y `data-vigente`; «Vaciar la lista» no lo toca y se apaga si
+es lo único que hay. El chip lo cuenta **por hallazgo**, que es como cuenta el renglón —
+«Vértices consecutivos duplicados» puede salir tres veces y son tres errores—, y la rama sin
+el mando fija una lista vacía, porque el renglón es de la otra. El «(…y 12 motivo(s) más)»
+del renglón dice ahora dónde están: «todos en la lista de avisos». En EDIFICIO se fija
+también «sin huella», que apaga el botón en rojo sin venir de la validación. Guardianes:
+`test/app/avisos.dom.test.js` (describe «fijar»), `main-gml`, `edificio-gml` y
+`dialogo-avisos`.
+
+⭐ **Lo que se aprendió, que no estaba en la nota.** `edificio-gml.dom.test.js` tenía una
+prueba que afirmaba el defecto como contrato: «por la vía PROGRAMÁTICA los errores sí salen
+enteros y uno a uno». Era verdad, y era la única vía por la que llegaban: la del usuario —el
+clic— la cierra el propio `disabled`, como la misma prueba dejaba medido dos líneas antes.
+
+⚠️ **Lo que queda por mirar en navegador.** Los guiones 06 y 08 pesan `#avisos .gml-aviso`
+para medir lo que deja una operación. Una edición que rompe la validación ahora añade
+tarjetas fijadas sin pulsar nada; si algún veredicto cambia por eso, lo fijado lleva
+`data-vigente="true"` para excluirlo. No se han relanzado.
+
+<details>
+<summary>La nota original, como se anotó el 2026-08-11</summary>
 
 **Estado.** Abierto. **Medido** el 2026-08-11 en Chrome, en las DOS ramas. Lo destapó
 rehabilitar el guion 13; no es de F11 ni de F21.
@@ -408,6 +438,8 @@ Eso arregla el recorte y **no arregla la contradicción**.
 **Por dónde empezar.** `app/main.js#recorrido` (publica los errores **solo** al pulsar, con
 su comentario ya escrito), `app/avisos.js` (el chip y su recuento) y el gemelo de edificio
 en `app/cableado-edificio-gml.js#motivoDeBloqueo`.
+
+</details>
 
 ---
 

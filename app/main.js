@@ -4661,6 +4661,12 @@ function identidadInspireDe(parcelaActual) {
  * botón gris y mudo— es un error silencioso de manual: el usuario ve apagado lo
  * único que la pantalla le ofrece hacer y no tiene forma de saber por qué.
  *
+ * ⭐ **Y dice dónde está el resto** (2026-09-25). Hasta hoy el «(…y 12 motivo(s)
+ * más.)» remataba una lista que no se podía leer en ninguna parte: los errores
+ * solo entraban en el panel al pulsar «Generar GML», y con el botón apagado no se
+ * pulsa. Ahora están todos fijados en la lista de avisos desde que existen (ver
+ * {@link FUENTE_BLOQUEOS_PARCELA}), y el renglón lo dice.
+ *
  * @param {import('../validation/_comun.js').Hallazgo[]} errores  Lista NO vacía.
  * @returns {string}
  */
@@ -4673,9 +4679,17 @@ function motivoDeBloqueo(errores) {
       ? '1 error bloquea la generación del GML'
       : `${errores.length} errores bloquean la generación del GML`
   return (
-    `${recuento}: ${visibles.join(' ')}` + (resto > 0 ? ` (…y ${resto} motivo(s) más.)` : '')
+    `${recuento}: ${visibles.join(' ')}` +
+    (resto > 0 ? ` (…y ${resto} motivo(s) más, todos en la lista de avisos.)` : '')
   )
 }
+
+/**
+ * La fuente con la que «Generar GML» de PARCELA fija en el panel lo que impide
+ * generar (`app/avisos.js#fijar`). Una por rama: cada una solo pisa lo suyo, y la
+ * que no tiene el mando fija una lista vacía.
+ */
+const FUENTE_BLOQUEOS_PARCELA = 'gml-parcela'
 
 /**
  * Texto del renglón cuando es el SERIALIZADOR el que no emite fichero. Es un
@@ -4834,10 +4848,22 @@ export function cablearGeneracionGml({
     return validarParcela(recintos, { srs })
   }
 
-  /** Deja el botón apagado y el renglón diciendo por qué. */
+  /**
+   * Lo que impide generar, al panel. Se llama en CADA evaluación y con lo que
+   * haya —también con una lista vacía—, porque fijar es sustituir: si solo se
+   * llamara al bloquear, un error corregido se quedaría en la lista y en el chip.
+   *
+   * @param {import('../validation/_comun.js').Hallazgo[]} errores
+   */
+  function fijarBloqueos(errores) {
+    panel.fijar(FUENTE_BLOQUEOS_PARCELA, errores)
+  }
+
+  /** Deja el botón apagado, el renglón diciendo por qué y el panel con todos. */
   function bloquear(errores) {
     boton.disabled = true
     decir(motivoDeBloqueo(errores), true)
+    fijarBloqueos(errores)
   }
 
   /**
@@ -4851,7 +4877,13 @@ export function cablearGeneracionGml({
     // ⭐ F13 · si esta rama no tiene el mando, no se toca el botón NI el renglón:
     // el otro dueño está diciendo algo suyo ahí y pisárselo dejaría al usuario
     // leyendo el motivo de una parcela mientras trabaja con un edificio.
-    if (!mando()) return
+    //
+    // Lo que SÍ se hace es retirar lo fijado (2026-09-25): el chip tiene que
+    // contar lo mismo que dice el renglón, y el renglón es de la otra rama.
+    if (!mando()) {
+      fijarBloqueos([])
+      return
+    }
     let errores
     let puedeGenerar
     try {
@@ -4874,6 +4906,9 @@ export function cablearGeneracionGml({
       // como ERROR. Lo que no hace es llevarse por delante la aplicación.
       boton.disabled = true
       decir(MENSAJE_FALLO_INESPERADO, true)
+      // Lo fijado de antes ya no se sabe si es verdad: se retira, y el fallo
+      // entra en el registro como siempre (sigue contando en el chip).
+      fijarBloqueos([])
       panel.avisar(MENSAJE_FALLO_INESPERADO, { nivel: NIVEL.ERROR, causa })
       console.error('[gml] no se ha podido evaluar si la parcela puede generarse:', causa)
       return
@@ -4881,6 +4916,7 @@ export function cablearGeneracionGml({
     if (puedeGenerar) {
       boton.disabled = false
       decir('', false)
+      fijarBloqueos([])
       return
     }
     // ⭐ NO HAY PARCELA ≠ LA PARCELA ESTÁ MAL (2026-08-18). El botón se apaga
@@ -4900,6 +4936,9 @@ export function cablearGeneracionGml({
         hayPuntos(parcelaActual) ? MENSAJE_SIN_CONTORNO_TODAVIA : MENSAJE_SIN_PARCELA_TODAVIA,
         false,
       )
+      // Ni un error fijado, por lo mismo que el renglón no va en rojo: aquí no
+      // hay nada mal, hay un expediente que no ha empezado.
+      fijarBloqueos([])
       return
     }
     bloquear(errores)
@@ -4977,11 +5016,11 @@ export function cablearGeneracionGml({
     // ── 1 · Validación ──────────────────────────────────────────────────────
     const { errores, puedeGenerar } = validar(parcelaActual)
     if (!puedeGenerar) {
-      // Al panel, uno por uno y con su mensaje: es donde el usuario puede leerlos
-      // enteros (el renglón sólo cabe resumir). `e.nivel` ya es `NIVEL.ERROR` —se
-      // pasa el del hallazgo en vez de escribirlo, para que las dos capas no
-      // puedan divergir.
-      for (const e of errores) panel.avisar(e.mensaje, { nivel: e.nivel })
+      // Al panel van todos, enteros —el renglón sólo cabe resumir—, pero FIJADOS
+      // y no por `avisar` (2026-09-25): ya lo estaban desde que se produjeron, y
+      // publicarlos otra vez en el registro los dejaría ahí después de corregirlos.
+      // `bloquear` los fija con el `nivel` de cada hallazgo, para que las dos capas
+      // no puedan divergir.
       bloquear(errores)
       return null
     }
@@ -5090,6 +5129,8 @@ export function cablearGeneracionGml({
     destruir() {
       boton.removeEventListener('click', generar)
       desuscribir()
+      // Un cableado que se va no puede dejar fijado lo que ya nadie evalúa.
+      fijarBloqueos([])
     },
   }
 }

@@ -66,7 +66,8 @@ const TITULO = 'Avisos y errores'
  */
 const APUNTE =
   'Todo lo que la aplicación ha tenido que decir en esta sesión. Los contadores de la cabecera ' +
-  'abren esta lista.'
+  'abren esta lista. Lo que impide generar el GML va arriba y se queda mientras siga siendo ' +
+  'cierto: se va al corregirlo, no al vaciar la lista.'
 
 const BOTON_VACIAR = 'Vaciar la lista'
 const BOTON_CERRAR = 'Cerrar'
@@ -128,6 +129,8 @@ function esElementoDOM(el) {
  *   — es lo que la aplicación entera inyecta como `alAvisar`, así que este
  *   objeto sirve tal cual donde antes iba el panel.
  * @property {() => void} limpiar
+ * @property {(fuente: string, hallazgos: ?object[]) => void} fijar  Reexportado
+ *   del panel: lo que bloquea ahora, por fuente. Ver `app/avisos.js`.
  * @property {() => import('./avisos.js').ResumenAvisos} resumen
  * @property {(nivel?: 'ERROR'|'AVISO'|null) => void} abrir  Enseña el diálogo
  *   con el filtro puesto en ese nivel (o sin filtro).
@@ -263,7 +266,7 @@ export function crearDialogoAvisos({ documento = document, chipError, chipAviso 
     contenedor: lista,
     chipError: chips[NIVEL.ERROR],
     chipAviso: chips[NIVEL.AVISO],
-    alCambiar: (conteo) => pintarFiltros(conteo),
+    alCambiar: (conteo, { vaciables }) => pintarFiltros(conteo, vaciables),
   })
 
   /**
@@ -275,9 +278,16 @@ export function crearDialogoAvisos({ documento = document, chipError, chipAviso 
    * «Sin avisos.» que hay justo encima): un botón que no hace nada y no dice por
    * qué es la trampa que este proyecto persigue desde F08.
    *
+   * ⚠️ **Y se apaga por lo que VACIARÍA, no por lo que se ve** (2026-09-25).
+   * Desde que la lista enseña además lo que impide generar el GML —que no se
+   * vacía, ver `app/avisos.js`—, «hay tarjetas» y «hay algo que vaciar» dejaron
+   * de ser lo mismo: con solo lo fijado a la vista, el botón encendido no haría
+   * nada. El apunte de arriba dice por qué esas tarjetas se quedan.
+   *
    * @param {import('./avisos.js').ResumenAvisos} conteo
+   * @param {number} vaciables  Lo que devolvería `panel.vaciables()`.
    */
-  function pintarFiltros(conteo) {
+  function pintarFiltros(conteo, vaciables) {
     const cuentas = {
       [FILTRO_TODO]: conteo[NIVEL.ERROR] + conteo[NIVEL.AVISO],
       [NIVEL.ERROR]: conteo[NIVEL.ERROR],
@@ -288,7 +298,7 @@ export function crearDialogoAvisos({ documento = document, chipError, chipAviso 
       boton.setAttribute('aria-pressed', String(clave === clavePuesta))
       boton.classList.toggle('gml-filtro-avisos--puesto', clave === clavePuesta)
     }
-    botonVaciar.disabled = cuentas[FILTRO_TODO] === 0
+    botonVaciar.disabled = vaciables === 0
   }
 
   /**
@@ -307,7 +317,7 @@ export function crearDialogoAvisos({ documento = document, chipError, chipAviso 
     const nivel = clave === NIVEL.ERROR || clave === NIVEL.AVISO ? clave : null
     clavePuesta = nivel ?? FILTRO_TODO
     panel.filtro(nivel)
-    pintarFiltros(panel.resumen())
+    pintarFiltros(panel.resumen(), panel.vaciables())
   }
 
   // ── Apertura y cierre ─────────────────────────────────────────────────────
@@ -435,7 +445,7 @@ export function crearDialogoAvisos({ documento = document, chipError, chipAviso 
   dialogo.addEventListener('cancel', alCancelar)
   dialogo.addEventListener('keydown', alTecla)
 
-  pintarFiltros(panel.resumen())
+  pintarFiltros(panel.resumen(), panel.vaciables())
 
   return {
     nodo: dialogo,
@@ -443,6 +453,7 @@ export function crearDialogoAvisos({ documento = document, chipError, chipAviso 
     panel,
     avisar: panel.avisar,
     limpiar: panel.limpiar,
+    fijar: panel.fijar,
     resumen: panel.resumen,
     abrir,
     cerrar,
