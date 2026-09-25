@@ -42,9 +42,12 @@ escrita o pide una que es del producto. Por impacto:
    monta encima de los pasos~~ (medido: desde ~1.120). La rejilla deja ceder al
    expediente y, por debajo de 1.200 px, la barra compacta aprieta aire. Nada se pisa
    hasta ~870 px, y a 960 «Sin guardar» se lee entero (DESIGN.md §6).
-8. **En el arranque en vacío, la bienvenida tapa el mapa y pide «busca tu parcela en el mapa
-   y pínchala»** desde la vista de España entera (escala de 100 km), sin buscador de
-   dirección ni de municipio. *Es una feature*, no un retoque.
+8. ✅ **HECHO el 2026-09-25.** ~~Sin buscador de dirección ni de municipio.~~ Buscador del
+   mapa sobre **CartoCiudad** (decisión del autor): `services/cartociudad.js` +
+   `viewer/buscador.js`. Un portal deduce la referencia con el Catastro, igual que el clic.
+   ⏳ **Queda, si se quiere:** una marca en el mapa en el punto buscado. No se puso
+   porque todo grafismo del mapa tiene que estar en la leyenda, y ésta sería una entrada
+   más para algo que dura un momento.
 9. **`--transition` vale `all 150ms`**, y el bloque de `prefers-reduced-motion` enumera
    selectores a mano y se deja fuera 9 de los 15 usos (entre ellos la flecha que gira). Con
    un `--transition: none` en `:root` dentro de la consulta quedarían cubiertos todos.

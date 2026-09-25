@@ -2165,9 +2165,36 @@ export function cablearCatastro({
   // parcela, vería gris el botón que le hace falta y sin motivo escrito al lado.
   refrescar(estado.get())
 
+  /**
+   * ⭐ Deduce la referencia en el punto de un lugar BUSCADO (el buscador del mapa,
+   * `viewer/buscador.js`, revisión de diseño del 2026-09-25). Es el clic en el mapa
+   * sin el dedo: la misma consulta al Catastro, y por eso la referencia que entra en
+   * el campo sale de la misma fuente, con la misma marca de «deducida de la
+   * ubicación» y la misma lista cuando en el punto hay varias parcelas.
+   *
+   * **Las mismas puertas que {@link alPulsarMapa} menos una**, y a sabiendas:
+   *   · con referencia en el modelo NO consulta (`puedeDeducirClicando`): buscar
+   *     otra calle mueve el mapa, y pisar en silencio la referencia traída sería el
+   *     error mudo de siempre;
+   *   · con algo en vuelo NO consulta: no aborta una carga por buscar;
+   *   · ⚠️ la de ESCALA no se mira. Aquella existe porque un clic a zoom 6 designa
+   *     un barrio y no una parcela; aquí el punto no sale de un píxel, sale de un
+   *     portal, y quien llama ya ha llevado el mapa a escala de parcela.
+   *
+   * @param {{lat: number, lng: number}} latlng
+   * @returns {Promise<ResultadoCatastro>|null}  `null` si una puerta está cerrada.
+   */
+  function deducirEnPunto(latlng) {
+    if (destruido || enVuelo !== null) return null
+    if (!puedeDeducirClicando(estado.get())) return null
+    const [x, y] = latLngAUTM(latlng, huso)
+    return deducirEn(x, y)
+  }
+
   return {
     cargar,
     deducir,
+    deducirEnPunto,
     colindantes,
 
     /**

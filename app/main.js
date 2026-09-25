@@ -542,6 +542,7 @@ import { ORIGEN_PARCELA } from '../model/parcela.js'
 import { crearTransporte } from '../services/_red.js'
 import { crearClienteCatastro } from '../services/catastro.js'
 import { crearClienteEdificio } from '../services/catastro-edificio.js'
+import { CARTOCIUDAD, crearClienteCartoCiudad } from '../services/cartociudad.js'
 import { abrirBd } from '../storage/bd.js'
 import { crearCacheCatastro } from '../storage/cache-catastro.js'
 import { crearCuota } from '../storage/cuota.js'
@@ -549,6 +550,7 @@ import { crearExpedientes } from '../storage/expedientes.js'
 import { crearPieDeFirmaGuardado } from '../storage/pie-firma.js'
 import { validarParcela } from '../validation/parcela.js'
 import { crearEstadoVista, NIVEL } from '../viewer/_comun.js'
+import { crearBuscador } from '../viewer/buscador.js'
 // F14 · No sale por `viewer/index.js`, y es a propósito: `crearVisor` monta el
 // cajón de diagnóstico porque **las dos ramas comparten mapa** y aquél existe
 // desde F07 con su opción `diagnostico`. Éste se monta aparte porque solo tiene
@@ -6721,4 +6723,53 @@ if (!bienvenida.yaVista() && estado.get() === null && estadoEdificio.get() === n
     while (bajas.length) bajas.pop()()
   }
   bajas.push(estado.subscribe(cerrarPorDato), estadoEdificio.subscribe(cerrarPorDato))
+}
+
+// ══ EL BUSCADOR DEL MAPA (revisión de diseño, 2026-09-25) ══════════════════════
+//
+// La bienvenida pide «busca tu parcela en el mapa y pínchala» desde España entera.
+// Esto es lo que hace posible la primera mitad sin catorce saltos de rueda: una
+// dirección, un municipio o una referencia, y el mapa va allí
+// (`viewer/buscador.js` + `services/cartociudad.js`).
+//
+// Va AQUÍ, al final, porque su `alElegir` toca tres cosas que se montan antes:
+// la bienvenida (se cierra), la rama en pantalla y el cableado del Catastro.
+//
+// ── ⭐ TRANSPORTE PROPIO, Y SIN EL PANEL ────────────────────────────────────
+// No se reutiliza el del Catastro, por dos motivos distintos:
+//   · su cola de 2 (`MAX_CONCURRENCIA`) es una medida ANTI-BLOQUEO del Catastro, y
+//     una búsqueda no tiene por qué esperar detrás de una carga del parcelario, ni
+//     ocupar una plaza que el Catastro necesita;
+//   · su canal de aviso es el panel, y cada fallo de red al teclear acabaría como
+//     una entrada en «Avisos y errores». El fallo se DICE igual (regla de oro 1):
+//     en el renglón del propio buscador, que es donde se mira, y en la consola.
+//
+// ── QUÉ PASA AL ELEGIR ──────────────────────────────────────────────────────
+// El buscador ya ha movido el mapa. Aquí: se cierra la bienvenida (si estaba
+// abierta; `cerrar` no hace nada si no) y, si es un PORTAL en la rama Parcela, se
+// pregunta al Catastro por ese punto, con las mismas puertas que el clic en el
+// mapa (`cableado-catastro.js#deducirEnPunto`). La referencia de CartoCiudad no se
+// usa: la del campo sale siempre del Catastro. Y el campo se RELLENA, nada más:
+// traerla sigue siendo «Traer del Catastro».
+/** @type {ReturnType<typeof crearBuscador>|null} */
+let buscadorMapa = null
+try {
+  const cartociudad = crearClienteCartoCiudad({ transporte: crearTransporte() })
+  buscadorMapa = crearBuscador({
+    mapa: visor.mapa,
+    buscar: cartociudad.buscar,
+    situar: cartociudad.situar,
+    atribucion: CARTOCIUDAD.ATRIBUCION,
+    minCaracteres: CARTOCIUDAD.MIN_CARACTERES,
+    alElegir: ({ centro, esPunto }) => {
+      bienvenida.cerrar({ marcar: true })
+      if (!esPunto || ramaEnPantalla !== RAMA.PARCELA || catastroCableado === null) return
+      // Los fallos ya los cuenta el cableado por sus tres canales; aquí no hay
+      // nada más que decir, solo que la promesa no quede sin manejar.
+      catastroCableado.deducirEnPunto(centro)?.catch(() => {})
+    },
+  })
+} catch (causa) {
+  // Sin buscador la aplicación sigue entera: se acerca a mano, como antes.
+  console.error('[buscador] no se ha podido montar el buscador del mapa:', causa)
 }

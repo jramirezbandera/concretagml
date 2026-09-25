@@ -25,6 +25,7 @@ import {
   ROTULO_TIPO,
   cajaDeWkt,
   crearClienteCartoCiudad,
+  sinRepeticion,
 } from '../../services/cartociudad.js'
 import { crearDobleDormir, crearDobleFetch, errorDeRed } from './_doble-fetch.js'
 
@@ -194,6 +195,27 @@ describe('situar', () => {
   it('un lugar que no salió de buscar() es un contrato roto', async () => {
     const { cliente } = montar({ estado: 200, texto: '{}' })
     await expect(cliente.situar({ id: 3 })).rejects.toThrow(TypeError)
+  })
+})
+
+describe('sinRepeticion', () => {
+  it('quita la mitad repetida con la que el servicio escribe las poblaciones (medido)', () => {
+    expect(sinRepeticion('Alhaurín de la Torre, Alhaurín de la Torre')).toBe('Alhaurín de la Torre')
+    expect(sinRepeticion('Alhaurín Golf, Alhaurín Golf (Alhaurín el Grande)')).toBe(
+      'Alhaurín Golf (Alhaurín el Grande)',
+    )
+  })
+
+  it('una dirección con su municipio NO se toca', () => {
+    expect(sinRepeticion('CALLE MAYOR 12, Alcalá de Henares')).toBe('CALLE MAYOR 12, Alcalá de Henares')
+    expect(sinRepeticion('28039')).toBe('28039')
+  })
+
+  it('y se aplica a lo que sale de buscar()', async () => {
+    const { cliente } = montar({ estado: 200, texto: fixture('candidatos-zonas.json') })
+    const r = await cliente.buscar('alhaurin')
+    expect(r.datos.map((l) => l.rotulo)).toContain('Alhaurín de la Torre')
+    expect(r.datos.map((l) => l.rotulo)).not.toContain('Alhaurín de la Torre, Alhaurín de la Torre')
   })
 })
 

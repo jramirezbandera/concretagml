@@ -566,10 +566,20 @@ export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'dia
  * menos bytes porque no hacían falta los `::before` del punto. Los descartó el
  * autor: la paleta no crece, y el texto negro ya era la respuesta escrita.
  *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **Y UNA CUARTA EL 2026-09-25 (EL BUSCADOR DEL MAPA)**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 65.925 a **65.977 B nuestros** (81.020 → 81.072 con vendor). **+52 B**: la
+ * familia tipográfica del buscador, en la regla que ya la ponía a la leyenda. El
+ * resto del control es estilo en línea (zona 3), como el de todo el cromo del
+ * visor, y no pasa por aquí. Se descartó darle una regla propia con su caja y sus
+ * colores: habría costado ~400 B para decir lo que el módulo ya dice, y el control
+ * dejaría de leerse sobre la ortofoto el día que la hoja no cargue.
+ *
  * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
  * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
  */
-export const TECHO = Object.freeze({ total: 81020, nuestro: 65925 })
+export const TECHO = Object.freeze({ total: 81072, nuestro: 65977 })
 
 /**
  * EL REGISTRO. Un asiento por hito, con la hoja construida medida de verdad.
@@ -1703,6 +1713,17 @@ export const ASIENTOS = Object.freeze(
         'devuelve parte de lo gastado. El filtro de avisos pasa de sky-600 a sky-700, que ' +
         'ya existía. ── ⚠️ El techo SUBE 164 B (cabecera de `TECHO`) y la holgura vuelve a ' +
         '0. NO CIERRA REBANADA.' },
+    { hito: 'El buscador del mapa',
+      commit: '(sin commitear)',
+      total: 81072, nuestro: 65977, rebanada: null,
+      nota:
+        '**+52 B, y es todo lo que el buscador le cuesta a la hoja: dos selectores.** ' +
+        '`viewer/buscador.js` es zona 3 y trae en línea sus tamaños, colores y cajas; la ' +
+        'hoja solo pone la FAMILIA, y lo hace en la regla en lista que ya vestía la leyenda ' +
+        '(`.gml-buscador` y `.gml-buscador-campo`: un `<input>` no hereda la familia de su ' +
+        '`<form>`). Es la forma barata que DESIGN.md §10 pide: reutilizar lo que ya existe. ' +
+        '── ⚠️ El techo SUBE 52 B (cabecera de `TECHO`) y la holgura vuelve a 0. NO CIERRA ' +
+        'REBANADA.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

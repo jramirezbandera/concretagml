@@ -97,10 +97,16 @@ const APUNTE =
  * Catastro», que es lo que hace que `parcela.refcat` signifique siempre «esto lo
  * afirma quien firma». El apunte de `index.html:630` ya lo dice así y aquí no puede
  * decir otra cosa.
+ *
+ * ⭐ **Y EL PRIMER TIEMPO YA TIENE HERRAMIENTA (2026-09-25).** «Busca» era acercarse
+ * a mano desde España entera; ahora hay un buscador arriba a la izquierda del mapa
+ * (`viewer/buscador.js`), y la frase lo nombra. Con un portal, además, el campo se
+ * rellena sin pinchar: es la misma consulta al Catastro que hace el clic.
  */
 const GESTO_TITULAR = 'Busca tu parcela en el mapa y pínchala.'
 const GESTO_CUERPO =
-  'Su referencia catastral se rellena sola en el campo de la izquierda, y la revisas ' +
+  'Para llegar, escribe la dirección o el municipio en el buscador del mapa. Su ' +
+  'referencia catastral se rellena sola en el campo de la izquierda, y la revisas ' +
   'antes de traerla.'
 
 /**

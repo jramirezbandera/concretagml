@@ -3993,10 +3993,17 @@ body {
    los botones de los tres cajones: aquí lo que se reparte es UNA propiedad, y
    escribirla cuatro veces costaría el triple de bytes de la hoja construida —que
    está presupuestada al byte (`scripts/presupuesto-css.mjs`)— sin decir nada más. */
+/* ⭐ Y EL BUSCADOR DEL MAPA ENTRA EN LA MISMA LISTA (2026-09-25): es cromo del
+   visor con el mismo reparto —`viewer/buscador.js` fija tamaños y colores en
+   línea, la familia la pone esto— y el mismo motivo para nombrar el campo aparte:
+   es un `<input>`, y un control de formulario no hereda la familia de su `<form>`.
+   Las opciones y los renglones sí heredan, y nada los apunta. */
 .gml-app .gml-leyenda,
 .gml-app .gml-leyenda-pastilla,
 .gml-app .gml-leyenda-grupo,
-.gml-app .gml-leyenda-entrada {
+.gml-app .gml-leyenda-entrada,
+.gml-app .gml-buscador,
+.gml-app .gml-buscador-campo {
   font-family: var(--font-sans);
 }
 

@@ -372,6 +372,17 @@ siendo el que congelan los fixtures. **No está en CI a propósito**: dispararí
 desde las IP compartidas de GitHub, que es justo el patrón centralizado que la
 política del Catastro penaliza.
 
+### Cómo se busca un sitio en el mapa (2026-09-25)
+
+Arriba a la izquierda del mapa hay un **buscador**: una dirección, un municipio, un
+código postal o una referencia catastral, y el mapa va allí. Lo contesta
+**CartoCiudad** (IGN, sin clave, CORS abierto; `services/cartociudad.js`), por un
+transporte propio que no hace cola con el del Catastro. Un **portal** lleva el mapa a
+escala de parcela y, en la rama Parcela, **la referencia la pone el Catastro**, con la
+misma consulta que el clic en el mapa. CartoCiudad también trae una referencia, y se
+ignora a propósito: el campo tiene una sola fuente. El campo se rellena, y traer la
+parcela sigue siendo «Traer del Catastro».
+
 ### Cómo se edita una parcela (F06)
 
 Las herramientas están en una **barra flotante sobre el mapa**, arriba a la

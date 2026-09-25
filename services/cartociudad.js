@@ -174,6 +174,23 @@ export function cajaDeWkt(wkt) {
 }
 
 /**
+ * Quita la repetición con la que CartoCiudad escribe las poblaciones (medido):
+ * «Alhaurín de la Torre, Alhaurín de la Torre» y «Alhaurín Golf, Alhaurín Golf
+ * (Alhaurín el Grande)». Si la segunda mitad EMPIEZA por la primera, la primera
+ * sobra. «CALLE MAYOR 12, Alcalá de Henares» no se toca.
+ *
+ * @param {string} texto
+ * @returns {string}
+ */
+export function sinRepeticion(texto) {
+  const coma = texto.indexOf(', ')
+  if (coma <= 0) return texto
+  const primera = texto.slice(0, coma)
+  const resto = texto.slice(coma + 2)
+  return resto.startsWith(primera) ? resto : texto
+}
+
+/**
  * Traduce un candidato crudo. Devuelve `null` si no trae lo mínimo para usarlo
  * (un `id` y un `type`), y quien llama lo descarta: un candidato que no se puede
  * situar no se ofrece.
@@ -187,10 +204,11 @@ function lugarDe(crudo) {
   const tipo = typeof crudo.type === 'string' ? crudo.type : ''
   if (id === '' || tipo === '') return null
   const esPunto = TIPOS_PUNTO.includes(tipo)
-  const rotulo =
+  const rotulo = sinRepeticion(
     (typeof crudo.address === 'string' && crudo.address.trim()) ||
-    (typeof crudo.postalCode === 'string' && crudo.postalCode.trim()) ||
-    id
+      (typeof crudo.postalCode === 'string' && crudo.postalCode.trim()) ||
+      id,
+  )
   // Dónde: el municipio si lo hay y no está ya en la primera línea, y si no la
   // provincia. «Calle Mayor 12 · Portal · Alcalá de Henares» es lo que distingue
   // entre las seis «Calle Mayor 12» que devuelve el servicio (medido).

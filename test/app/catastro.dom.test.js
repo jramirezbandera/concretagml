@@ -2698,3 +2698,56 @@ describe('cableado-catastro · componerParcelaConOficial (la función pura)', ()
     expect(sustituida.puntosLevantamiento).toEqual([])
   })
 })
+
+// ── ⭐ EL BUSCADOR DEL MAPA: DEDUCIR EN EL PUNTO DE UN LUGAR (2026-09-25) ───────
+//
+// `deducirEnPunto` es el clic en el mapa sin el dedo: el buscador lleva el mapa a
+// un portal y la aplicación pregunta al Catastro por ese punto. Tiene que dar lo
+// MISMO que el clic —misma consulta, misma marca, mismo modelo intacto— y cerrar
+// las mismas puertas salvo la de escala, que aquí no significa nada.
+describe('cableado-catastro · deducir en el punto de un lugar buscado', () => {
+  const portal = { lat: 40.4653857, lng: -3.716672 }
+
+  it('consulta al Catastro en UTM y rellena el CAMPO con la marca de deducida', async () => {
+    const montado = cablear({ parcelaInicial: null })
+    await montado.cableado.deducirEnPunto(portal)
+
+    expect(montado.transporte.peticiones[0].url).toContain('Consulta_RCCOOR')
+    const [x, y] = puntoConsultado(montado.transporte)
+    expect(x).toBeGreaterThan(100_000)
+    expect(y).toBeGreaterThan(1_000_000)
+    const uno = JSON.parse(TEXTO_RCCOOR_OK)[CLAVE_RCCOOR].coordenadas.coord[0]
+    expect(montado.campo.value).toBe(`${uno.pc.pc1}${uno.pc.pc2}`)
+    expect(montado.procedencia.textContent).toBe(ROTULO_DEDUCIDA)
+    // Y NO abre expediente: eso sigue siendo «Traer del Catastro».
+    expect(montado.sets).toHaveLength(0)
+  })
+
+  it('⚠️ la puerta de escala NO aplica: el punto sale de un portal, no de un píxel', async () => {
+    const montado = cablear({ mapa: crearMapaConEscala(1500), parcelaInicial: null })
+    await montado.cableado.deducirEnPunto(portal)
+    expect(montado.transporte.emitidas).toBe(1)
+  })
+
+  it('con referencia en el modelo NO consulta: buscar otra calle no pisa la traída', () => {
+    const montado = cablear({ parcelaInicial: parcelaConReferencia() })
+    expect(montado.cableado.deducirEnPunto(portal)).toBeNull()
+    expect(montado.transporte.emitidas).toBe(0)
+  })
+
+  it('con algo en vuelo NO consulta: buscar no aborta una carga', async () => {
+    const transporte = crearTransporteDoble({ manual: true })
+    const montado = cablear({ transporte, parcelaInicial: null })
+    montado.cableado.deducirEnPunto(portal)
+    await cederTurno()
+    expect(montado.cableado.deducirEnPunto(portal)).toBeNull()
+    expect(transporte.emitidas).toBe(1)
+    transporte.peticiones[0].responder()
+  })
+
+  it('después de destruir no hace nada', () => {
+    const montado = cablear({ parcelaInicial: null })
+    montado.cableado.destruir()
+    expect(montado.cableado.deducirEnPunto(portal)).toBeNull()
+  })
+})
