@@ -251,13 +251,21 @@ eso la escala son valores exactos y no una progresión:
 
 | token | valor | papel |
 |---|---|---|
-| `--text-10` | 10px | cabeceras de sección en VERSALES (`--tracking-caps: 0.07em`), rótulos de grupo |
-| `--text-11` | 11px | apuntes, valores de fila, versión |
+| `--text-10` | 10px | rótulos de grupo de los diálogos y del control de opacidad, en VERSALES (`--tracking-caps: 0.07em`) |
+| `--text-11` | 11px | **cabeceras de sección** en VERSALES a **0,1 em** (`.gml-rotulo`, y los de «Capa base» y «Superpuesta»), apuntes, valores de fila, versión |
 | `--text-12` | 12px | valores de campo (mono), nombres de fila, opciones de menú |
 | `--text-13` | 13px | rótulos de campo, peldaños del recorrido |
 | `--text-14` | 14px | título de módulo |
 | `--text-15` | 15px | marca de la barra |
 | `--gml-titulo-tam` | 19px | el `<h1>` del panel. **Propio: el sistema no llegaba** |
+
+⚠️ **Corregido el 2026-09-25: esta tabla decía que las cabeceras de sección iban a
+10 px con `--tracking-caps`.** Fue verdad hasta la revisión del 2026-08-10, cuando el
+autor dijo que a 10 px no se entendían: subieron a 11 y a **0,1 em**, que en la hoja se
+llama «la interletra de la casa». Queda una costura a la vista, y se dice en vez de
+taparla: esos 0,1 em son un **literal**, mientras que el token `--tracking-caps` (0,07 em)
+solo lo usan los tres rótulos de 10 px. Cuadrarlo (subir el token a 0,1 em o dejar dos
+interletras con nombre) es una decisión de aspecto, no de este documento.
 
 ### 5.2 · La segunda escala, la del cajón (zona 3)
 
@@ -307,9 +315,19 @@ secas arriba, filete abajo— y cada campo se vestía por su cuenta.
 la separación de columna que se eligió para las vías de Entrada: **la columna respira
 igual que la fila**.
 
-**Radios: tope duro en 6 px.** `--radius` 4 (campos, chips, botones) · `--radius-md`
-6 (diálogos, cajones, marcos) · `--gml-radio` 6 (el propio del cromo del mapa). Nada
-más redondeado que 6 px aparece en la aplicación.
+**Radios: UNO, de 6 px (`--gml-radio`).** Desde la revisión del 2026-08-10 (encargo
+del autor: «radio de esquina, un solo valor»), `estilos/app.css` redeclara `--radius`,
+`--radius-md` y `--radius-sm` apuntándolos a `--gml-radio`, y así los ~40 sitios que
+ya decían `var(--radius)` pasaron a 6 px sin tocarlos. ⚠️ `tokens/spacing.css` sigue
+declarando `--radius: 4px`, y **ese 4 no se ve en ningún sitio**. Hasta el 2026-09-25
+este párrafo lo daba por bueno («`--radius` 4, campos, chips, botones»).
+
+⚠️ **Lo que no es 6, dicho con nombre.** La zona 3 (§2) escribe sus radios en literal y
+no todos son el de la casa: el cuadradito del vértice (2 px), la cota del mapa y su
+muestra en la leyenda (3 px), las filas de la lista de sobrante (4 px) y las píldoras
+de los números de pieza y del miembro señalado (999px). Además de los círculos (los
+puntos de estado, 50 %). No es la regla, es lo que hay; cuadrarlo sería una revisión
+de aspecto de la zona 3.
 
 **Dimensiones propias** (`--gml-*` en `app.css`, porque son de esta cáscara y no del
 sistema): `--gml-panel-ancho` 392px · `--gml-barra-alto` 48px ·

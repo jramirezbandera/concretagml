@@ -51,10 +51,10 @@ escrita o pide una que es del producto. Por impacto:
 9. ✅ **HECHO el 2026-09-25.** ~~`--transition` vale `all 150ms`~~: ahora nombra sus seis
    propiedades (sin foco ni maqueta), y el movimiento reducido apaga los dos tokens en
    `:root`, así que ya no depende de una lista a mano.
-10. **DESIGN.md ha derivado del código en dos cifras** (según su §0, entonces el documento
-    está roto): §6 dice `--radius` 4 px, pero `estilos/app.css` redirige los tres radios a
-    `--gml-radio` (6 px); §5.1 dice versales de 10 px/0,07 em, y `.gml-rotulo` es de
-    11 px/0,1 em.
+10. ✅ **HECHO el 2026-09-25.** ~~DESIGN.md ha derivado del código en dos cifras.~~ §5.1 y
+    §6 dicen ya lo que hay, incluidas las dos costuras que siguen abiertas, sin decidir:
+    la interletra de 0,1 em es un literal que no usa `--tracking-caps` (0,07 em), y la zona
+    3 tiene radios de 2, 3, 4 y 999 px.
 11. ✅ **HECHO el 2026-09-25.** ~~Las cotas del mapa van en `ui-sans-serif`.~~ Cotas y
     números de pieza en Geist Mono a 500 (no se sintetiza nada), el nombre del miembro en
     Geist Sans a 600, y la muestra de la leyenda con ellas. Por el token con alternativa:
