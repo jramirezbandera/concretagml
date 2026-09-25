@@ -187,7 +187,10 @@ const ControlBuscador = L.Control.extend({
       margin: '0',
       padding: '6px 8px',
       border: `1px solid ${COLOR.FILO}`,
-      borderRadius: '4px',
+      // 6 px, el ÚNICO radio de la interfaz (`--gml-radio`, DESIGN.md §6). En literal
+      // por lo mismo que `viewer/capas.js`: sin la hoja, una variable sin alternativa
+      // dejaría la esquina a 0.
+      borderRadius: '6px',
       background: '#ffffff',
       color: COLOR.TEXTO,
       fontSize: '13px',
@@ -369,7 +372,7 @@ export function crearBuscador({
         flexDirection: 'column',
         gap: '1px',
         padding: '6px 8px',
-        borderRadius: '4px',
+        borderRadius: '6px',
         cursor: 'pointer',
       })
       const rotulo = crear(doc, 'span', null, lugar.rotulo)
