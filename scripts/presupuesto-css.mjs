@@ -498,8 +498,33 @@ export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'dia
  *
  * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
  * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **SUBIDO A MANO EL 2026-09-25 (REVISIÓN DE DISEÑO)**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 65.041 a **65.068 B nuestros** (80.136 → 80.163 con vendor). **+27 B**, y
+ * ninguno compra aspecto nuevo: son tres defectos medidos en Chrome a 1440×900.
+ *
+ *   1. **+24 B · el pie del informe dejaba asomar el texto que se firma.** El
+ *      bloque anclado llevaba `bottom: 0`, y un sticky se ancla a la caja de
+ *      RELLENO del `<dialog>` que scrollea: 16 px por encima del suelo, y por esa
+ *      rendija se leía el cuadro del lindero pasando por DEBAJO de «Componer PDF».
+ *   2. **+1 B · la cabecera de la tabla de vértices no llegaba a AA** (4,34:1 a
+ *      10 px, en el gris que la aplicación reserva para lo apagado). 6,92:1.
+ *   3. **+2 B · «los datos en gris» se pintaban en negro.** El apunte del
+ *      encabezado del informe lo promete y la hoja no lo cumplía.
+ *
+ * ── LO QUE SE DESCARTÓ ANTES DE PEDIR LA SUBIDA ────────────────────────────
+ * **`bottom: -16px` en literal**, que ahorraba 20 B: ataría el ancla a una cifra
+ * que no dice de dónde sale, y el relleno del diálogo es `--space-4`; quien lo
+ * cambie tiene que ver que el ancla lo sigue. Es el mismo criterio que el cajón
+ * del visor deja escrito junto a su «-10px», que allí es literal solo porque el
+ * visor no puede leer tokens.
+ *
+ * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
+ * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
  */
-export const TECHO = Object.freeze({ total: 80136, nuestro: 65041 })
+export const TECHO = Object.freeze({ total: 80163, nuestro: 65068 })
 
 /**
  * EL REGISTRO. Un asiento por hito, con la hoja construida medida de verdad.
@@ -1588,6 +1613,21 @@ export const ASIENTOS = Object.freeze(
         'a 1280×720 no desborda. ── ⚠️ El techo SUBE 1.340 B (cabecera de `TECHO`, con lo que se ' +
         'descartó antes de pedirlo) y la holgura vuelve a 0. NO CIERRA REBANADA: las cinco ' +
         'estaban cerradas y esto es el rediseño de una zona ya entregada.' },
+    { hito: 'Revisión de diseño del 2026-09-25: un pie que dejaba asomar el lindero y dos grises',
+      commit: 'a1ab955',
+      total: 80163, nuestro: 65068, rebanada: null,
+      nota:
+        '**+27 B, y los tres son arreglos de algo medido, ninguno aspecto nuevo.** (1) +24 B: ' +
+        'el pie anclado del informe pasa de `bottom: 0` a `bottom: calc(-1 * var(--space-4))` ' +
+        '(FINDING-002). Un sticky se ancla a la caja de RELLENO del `<dialog>` que scrollea, así ' +
+        'que se quedaba 16 px por encima del suelo y por la rendija se leía el cuadro del ' +
+        'lindero; es la corrección que los dos cajones del visor ya llevaban («-10px Y NO 0»). ' +
+        '(2) +1 B: la cabecera de la tabla de vértices pasa de `--color-text-disabled` a ' +
+        '`-secondary` (FINDING-003): 4,34:1 a 10 px sobre `--color-bg-elevated`, por debajo de ' +
+        'AA, y ahora 6,92:1. (3) +2 B: los datos fijos del informe pasan de `-primary` a ' +
+        '`-secondary` (FINDING-004), porque el apunte del grupo los llama «los datos en gris» y ' +
+        'salían en el negro de lo que se teclea. ── ⚠️ El techo SUBE 27 B (cabecera de `TECHO`) ' +
+        'y la holgura vuelve a 0. NO CIERRA REBANADA.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 
