@@ -157,6 +157,32 @@ const PANES_REQUERIDOS = Object.freeze([
  */
 const DECIMALES_VISIBLES = 3
 
+/**
+ * Decimales que una coordenada muestra SIEMPRE, aunque sean ceros (centímetro).
+ *
+ * ── Por qué hay mínimo desde el 2026-09-25 (revisión de diseño) ─────────────
+ * Hasta ese día la celda decía «sin ceros de relleno», y la columna Y de la
+ * parcela real salía así: `4479671.27`, `4479647.8`, `4479678`. La columna va
+ * alineada a la DERECHA, así que el punto decimal bailaba de fila en fila, y en
+ * una tabla que se coteja cifra a cifra contra un listado de coordenadas eso es
+ * justo lo que no puede pasar. Con dos decimales fijos el punto cae en la misma
+ * vertical en todas las filas.
+ *
+ * ⚠️ **Mínimo 2 y no 3.** Con tres, TODAS las filas llevarían un cero de milímetro
+ * que nadie ha medido (la salida GML va al centímetro, override O6), y el cero de
+ * relleno leería como precisión. El milímetro solo aparece cuando está en el
+ * modelo, o sea cuando alguien lo ha tecleado; esa fila se sale un carácter de la
+ * vertical, y es a propósito: es la fila que tiene algo distinto que decir.
+ *
+ * El relleno NO rompe el ciclo mostrar→leer: `parsearCoordenada('4479647.80')`
+ * devuelve el mismo número que `'4479647.8'`, así que tabular por la tabla sigue
+ * sin commitear nada (ver `alCambiarCelda`).
+ */
+const DECIMALES_MINIMOS = 2
+
+/** Los ceros finales que sobran por encima de {@link DECIMALES_MINIMOS}. */
+const CEROS_QUE_SOBRAN = new RegExp(`0{1,${DECIMALES_VISIBLES - DECIMALES_MINIMOS}}$`)
+
 /** Lado del cuadradito de vértice, en px CSS. */
 const LADO_VERTICE_PX = 10
 
@@ -359,15 +385,16 @@ function crearIconoVertice({ lado, borde, anillo, clase }) {
 }
 
 /**
- * Texto con el que una coordenada se muestra en la celda: hasta
- * {@link DECIMALES_VISIBLES} decimales, sin ceros de relleno.
+ * Texto con el que una coordenada se muestra en la celda: entre
+ * {@link DECIMALES_MINIMOS} y {@link DECIMALES_VISIBLES} decimales
+ * (`4479647.80`, `4479678.00`, `439247.305`).
  *
  * @param {number} valor
  * @returns {string}
  */
 function formatearCoordenada(valor) {
   if (!Number.isFinite(valor)) return ''
-  return String(Number(valor.toFixed(DECIMALES_VISIBLES)))
+  return valor.toFixed(DECIMALES_VISIBLES).replace(CEROS_QUE_SOBRAN, '')
 }
 
 /**

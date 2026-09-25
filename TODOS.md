@@ -12,12 +12,9 @@ contexto y qué la bloquea, para que retomarla no cueste rediseñarla.
 asiento de +27 B). Lo que sigue **no** se tocó porque cada punto choca con una decisión
 escrita o pide una que es del producto. Por impacto:
 
-1. **La columna Y de la tabla de vértices no alinea los decimales.** `4479647.8`,
-   `4479678` y `439247.3` junto a `4479671.27`: la columna va a la derecha, así que el punto
-   decimal baila. Viene de `viewer/sincronizacion.js#formatearCoordenada`, que dice «sin
-   ceros de relleno» a propósito. Propuesta: **mínimo 2 decimales, máximo 3**
-   (`4479647.80`), y el milímetro tecleado se sigue viendo; el ciclo mostrar→leer no pierde
-   nada. *Bloquea:* revertir una decisión escrita.
+1. ✅ **HECHO el 2026-09-25.** ~~La columna Y de la tabla de vértices no alinea los
+   decimales.~~ `formatearCoordenada` muestra ahora **entre 2 y 3 decimales**
+   (`4479647.80`, `4479678.00`); el porqué está en `DECIMALES_MINIMOS`.
 2. **Tinta de color sobre su propio tinte, por debajo de AA.** El chip «1 aviso» da
    **4,39:1** (12 px/600, medido), el de errores ~4,13:1 y `.gml-filtro-avisos--puesto`
    ~3,70:1. Faltan tokens de tinta oscura para usar sobre un tinte; el visor ya usa uno por

@@ -20,6 +20,7 @@ import L from 'leaflet'
 
 import { NIVEL, PANE, COLOR_USUARIO, crearEstadoVista, vertUTMaLatLng } from '../../viewer/_comun.js'
 import { crearHistorial } from '../../edit/historial.js'
+import { crearParcela, crearRecinto, TIPO_RECINTO } from '../../model/parcela.js'
 import { sincronizar } from '../../viewer/sincronizacion.js'
 // `crearPanes` viene del ARNÉS (no reimplementado aquí): así el bucle "crear los
 // panes de PANES con su zIndex" existe en un solo sitio del lado de test y un
@@ -268,6 +269,46 @@ describe('viewer/sincronizacion · multi-recinto con huecos (C6/T6)', () => {
         expect(Number(iy.value)).toBeCloseTo(y, 3)
       })
     })
+
+    ctx.limpiar()
+  })
+
+  it('⭐ la columna alinea el punto: mínimo 2 decimales, máximo 3 (revisión de diseño)', () => {
+    // Los cuatro casos de la parcela real que movían el punto decimal de fila en
+    // fila (`4479647.8`, `4479678`, `439247.3`) y el que tiene que seguir
+    // saliéndose: el milímetro tecleado.
+    const exterior = crearRecinto(
+      [
+        [439257.63, 4479647.8],
+        [439222.53, 4479678],
+        [439247.3, 4479687.38],
+        [439276.645, 4479673.63],
+      ],
+      TIPO_RECINTO.EXTERIOR,
+    )
+    const parcela = {
+      ...crearParcela({ idLocal: 'decimales', origen: 'LIST', recintos: [exterior] }),
+      huso: 30,
+    }
+    const ctx = montar({ parcela })
+    const textos = [0, 1, 2, 3].map((i) => {
+      const { x, y } = inputsDe(filaDe(ctx.tablaEl, 0, i))
+      return [x.value, y.value]
+    })
+    expect(textos).toEqual([
+      ['439257.63', '4479647.80'],
+      ['439222.53', '4479678.00'],
+      ['439247.30', '4479687.38'],
+      ['439276.645', '4479673.63'],
+    ])
+
+    // El relleno no es una edición: devolver a la celda su propio texto no toca
+    // el modelo (tabular por la tabla no puede ensuciar el historial).
+    const espiaSet = vi.spyOn(ctx.store, 'set')
+    const { y } = inputsDe(filaDe(ctx.tablaEl, 0, 0))
+    cambiarCelda(y, y.value)
+    expect(espiaSet).not.toHaveBeenCalled()
+    expect(ctx.alAvisar).not.toHaveBeenCalled()
 
     ctx.limpiar()
   })
