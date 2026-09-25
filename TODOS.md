@@ -5,6 +5,63 @@ contexto y qué la bloquea, para que retomarla no cueste rediseñarla.
 
 ---
 
+## Revisión de diseño del 2026-09-25: lo que quedó para decidir
+
+**Anotada tras `/design-review`** (Chrome a 1440×900, 1280×720 y hasta 375 px, sobre
+`?demo=real`). Se arreglaron cinco defectos medidos (commits `FINDING-001` a `-005`, más su
+asiento de +27 B). Lo que sigue **no** se tocó porque cada punto choca con una decisión
+escrita o pide una que es del producto. Por impacto:
+
+1. **La columna Y de la tabla de vértices no alinea los decimales.** `4479647.8`,
+   `4479678` y `439247.3` junto a `4479671.27`: la columna va a la derecha, así que el punto
+   decimal baila. Viene de `viewer/sincronizacion.js#formatearCoordenada`, que dice «sin
+   ceros de relleno» a propósito. Propuesta: **mínimo 2 decimales, máximo 3**
+   (`4479647.80`), y el milímetro tecleado se sigue viendo; el ciclo mostrar→leer no pierde
+   nada. *Bloquea:* revertir una decisión escrita.
+2. **Tinta de color sobre su propio tinte, por debajo de AA.** El chip «1 aviso» da
+   **4,39:1** (12 px/600, medido), el de errores ~4,13:1 y `.gml-filtro-avisos--puesto`
+   ~3,70:1. Faltan tokens de tinta oscura para usar sobre un tinte; el visor ya usa uno por
+   su cuenta (`#92400E` en `viewer/cajon-diagnostico.js`). *Bloquea:* un token nuevo es
+   decisión del producto (DESIGN.md §1).
+3. **Un secundario en reposo se parece a un botón apagado.** Mismo fondo y mismo filo; solo
+   cambia el color del texto (`#0F172A` contra `#64748B`). Desde `FINDING-001` hay tres
+   secundarios en Entrada, así que se nota más. *Bloquea:* es la receta de §8 y del
+   2026-08-10.
+4. **La flecha ▾ de «Generar GML» sigue en azul macizo con el principal apagado.** Lo más
+   llamativo de la barra abre las salidas secundarias. Propuesta:
+   `.gml-barra-entregar:disabled + .gml-barra-entregar-flecha` con el aspecto de secundario.
+   *Cuesta:* bytes de hoja.
+5. **Los dos menús de la cabecera declaran `role="menu"` y las flechas no mueven el foco**
+   (medido: solo Tab). O foco móvil con flechas, Inicio y Fin, o patrón *disclosure*, que es
+   lo que la APG recomienda para esto. *Cuesta:* JS de `app/barra.js` y sus pruebas.
+6. **El informe a página completa estira los campos a 1.408 px.** «Tipo de operación» es
+   un `<select>` de una palabra que mide 1.408 px, y el cuadro del lindero da unos 190
+   caracteres por línea: justo el texto que hay que releer antes de firmar. Propuesta: tope
+   de ancho en `[data-presentacion='pantalla'] .gml-dialogo-informe-cuerpo`. *Bloquea:* el
+   formulario crece hacia abajo, y el pliegue de este diálogo está medido.
+7. **Por debajo de ~1.000 px de ancho, «Parcela / Edificio» se monta encima de los pasos.**
+   Queda por debajo del suelo declarado de 1280×720, pero **960 px es media pantalla de
+   1920, junto al CAD**. *Decidir:* si el suelo incluye ese caso.
+8. **En el arranque en vacío, la bienvenida tapa el mapa y pide «busca tu parcela en el mapa
+   y pínchala»** desde la vista de España entera (escala de 100 km), sin buscador de
+   dirección ni de municipio. *Es una feature*, no un retoque.
+9. **`--transition` vale `all 150ms`**, y el bloque de `prefers-reduced-motion` enumera
+   selectores a mano y se deja fuera 9 de los 15 usos (entre ellos la flecha que gira). Con
+   un `--transition: none` en `:root` dentro de la consulta quedarían cubiertos todos.
+10. **DESIGN.md ha derivado del código en dos cifras** (según su §0, entonces el documento
+    está roto): §6 dice `--radius` 4 px, pero `estilos/app.css` redirige los tres radios a
+    `--gml-radio` (6 px); §5.1 dice versales de 10 px/0,07 em, y `.gml-rotulo` es de
+    11 px/0,1 em.
+11. **Las cotas del mapa van en `ui-sans-serif` 600/700 y no en Geist Mono** (§5: «para todo
+    valor numérico»). De Geist Mono solo se cargan 400 y 500, así que el cambio sintetizaría
+    la negrita. *Decidir* si §5 alcanza a la zona 3.
+
+Pulido, sin prisa: costuras claras entre teselas de la ortofoto al sobreampliar (Leaflet
+1.9.4, `plus-lighter` a escala 1,79); y 5 errores 400 de `https://www.ign.es/wmts/pnoa-ma`
+en consola en cada carga, que no son de diseño pero ensucian cualquier medición.
+
+---
+
 ## ✅ CERRADA · El presupuesto de CSS estuvo en rojo entre T4 y T7 (2026-08-20)
 
 **Abierta y cerrada el mismo día**, y se conserva por la lección, no por el trabajo.
