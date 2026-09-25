@@ -126,11 +126,21 @@ const FORMATO_LONGITUD = new Intl.NumberFormat('es-ES', {
  *    punto medio del lado: un hijo `inline-block` arranca ahí y el translate del
  *    50% lo centra, sin necesidad de `position:absolute` ni de que la hoja de
  *    Leaflet esté cargada.
+ * 4. **⭐ Geist Mono a 500, y por el TOKEN (revisión de diseño, 2026-09-25).** Era
+ *    `600 … ui-sans-serif`: una cifra con unidad fuera de la monoespaciada que
+ *    DESIGN.md §5 reserva para «todo valor numérico, unidad y referencia
+ *    catastral». 500 y no 600 porque de Geist Mono solo se cargan 400 y 500, y el
+ *    navegador sintetizaría el resto (es el `PESO_CIFRA` del cajón de diagnóstico).
+ *    La familia sale de `var(--font-mono, ui-monospace, monospace)`, y la
+ *    alternativa NO es decorativa: los cajones escriben sus colores en literal
+ *    porque «una variable sin declarar deja la propiedad en su valor inicial», y
+ *    con alternativa eso no pasa. Sin la hoja, la cota sale en la monoespaciada del
+ *    sistema; con ella, en la de la casa, y sin copiar aquí su nombre.
  */
 const ESTILO_ROTULO =
   'display:inline-block;transform:translate(-50%,-50%);' +
   'white-space:nowrap;pointer-events:none;' +
-  'font:600 11px/1.35 ui-sans-serif,system-ui,sans-serif;font-variant-numeric:tabular-nums;' +
+  'font:500 11px/1.35 var(--font-mono,ui-monospace,monospace);font-variant-numeric:tabular-nums;' +
   `color:${COLOR_USUARIO};background:rgba(17,24,39,.82);` +
   'padding:1px 5px;border-radius:3px;'
 

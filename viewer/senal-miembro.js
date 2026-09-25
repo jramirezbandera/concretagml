@@ -159,11 +159,17 @@ const ZOOM_MAXIMO_ENCUADRE = 20
  * `viewer/acotaciones.js` y `viewer/piezas.js`: este módulo no importa CSS, y un
  * rótulo que solo se ve con `estilos/app.css` cargada dejaría el mapa mudo sin
  * ella. `pointer-events:none` para que no le robe el puntero a nada de debajo.
+ *
+ * ⚠️ En SANS y no en mono, al revés que la cota y el número de pieza: esto es un
+ * NOMBRE —la etiqueta de la fila de la lista—, no una cifra. Geist Sans a 600 por
+ * el token con alternativa (revisión de diseño, 2026-09-25; el porqué de la
+ * alternativa está en la decisión 4 de `viewer/acotaciones.js#ESTILO_ROTULO`). 600
+ * y no el 700 de antes porque de Geist Sans se cargan 400, 500 y 600.
  */
 const ESTILO_ROTULO =
   'display:inline-block;transform:translate(-50%,-50%);' +
   'white-space:nowrap;pointer-events:none;' +
-  'font:700 12px/1.35 ui-sans-serif,system-ui,sans-serif;font-variant-numeric:tabular-nums;' +
+  'font:600 12px/1.35 var(--font-sans,ui-sans-serif,system-ui,sans-serif);font-variant-numeric:tabular-nums;' +
   `color:${COLOR_MARCO};background:rgba(15,23,42,.86);` +
   `padding:2px 8px;border-radius:999px;border:1px solid rgba(255,255,255,.55);`
 

@@ -233,6 +233,15 @@ pide nadie. El bloque retirado sigue en el historial de git.
 `tabular-nums`. Las cinco fuentes son locales (`estilos/fuentes/`, SIL OFL 1.1), con
 `font-display: swap`. No hay `system-ui` como primaria.
 
+⭐ **El «todo» alcanza al mapa desde el 2026-09-25.** Las cotas de lado y los números
+de pieza estaban en `ui-sans-serif` a 600/700. Ahora van en Geist Mono a 500, y el
+nombre del miembro señalado en Geist Sans a 600, porque es un nombre y no una cifra.
+Son zona 3 (§2), así que toman la familia con **`var(--font-mono, ui-monospace,
+monospace)`**. La regla de la zona 3 contra los tokens era por «una variable sin
+declarar deja la propiedad en su valor inicial», y con alternativa eso no pasa: sin
+hoja sale la monoespaciada del sistema. Vale para la familia; los colores siguen en
+literal, porque su alternativa sería el mismo literal repetido.
+
 `--font-features: "ss01", "cv11"` en todo el producto.
 
 ### 5.1 · La escala, que es literal en píxeles

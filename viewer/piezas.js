@@ -267,11 +267,15 @@ const ASPECTO = Object.freeze({
  * mismo —un rótulo sobre una ortofoto de contraste impredecible— y ya está
  * resuelto. `pointer-events:none` para que el número no le robe el puntero a la
  * mancha que rotula: quien recoge el ratón es el polígono.
+ *
+ * Geist Mono a 500 por el token, como la cota (ver la decisión 4 de
+ * `viewer/acotaciones.js#ESTILO_ROTULO`, revisión de diseño del 2026-09-25): el
+ * número de pieza es una cifra, y era 700 en la letra del sistema.
  */
 const estiloNumero = (color) =>
   'display:inline-block;transform:translate(-50%,-50%);' +
   'white-space:nowrap;pointer-events:none;' +
-  'font:700 12px/1.35 ui-sans-serif,system-ui,sans-serif;font-variant-numeric:tabular-nums;' +
+  'font:500 12px/1.35 var(--font-mono,ui-monospace,monospace);font-variant-numeric:tabular-nums;' +
   `color:${color};background:rgba(17,24,39,.82);` +
   'padding:1px 6px;border-radius:999px;'
 

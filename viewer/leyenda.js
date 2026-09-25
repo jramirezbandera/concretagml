@@ -540,10 +540,16 @@ function muestraDe(doc, entrada) {
   if (entrada.muestra === MUESTRA.ROTULO) {
     // La cota tal cual se ve: amarillo sobre pastilla oscura translúcida, que es lo
     // que `viewer/acotaciones.js` monta para poder leerse sobre cualquier fondo.
+    // Y en la MISMA letra desde el 2026-09-25: la cota pasó a Geist Mono a 500 (ver
+    // la decisión 4 de `viewer/acotaciones.js#ESTILO_ROTULO`), y una muestra en otra
+    // letra que la del mapa sería una leyenda que miente. Aquí sí va la familia en
+    // línea: no pisa ninguna regla de la hoja, que viste los renglones y no la caja.
     estilar(caja, {
       background: 'rgba(17,24,39,.82)',
       borderRadius: '3px',
       color: entrada.color,
+      fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+      fontWeight: '500',
       fontSize: '9px',
       lineHeight: `${MUESTRA_ALTO_PX}px`,
       textAlign: 'center',

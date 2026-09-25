@@ -55,9 +55,10 @@ escrita o pide una que es del producto. Por impacto:
     está roto): §6 dice `--radius` 4 px, pero `estilos/app.css` redirige los tres radios a
     `--gml-radio` (6 px); §5.1 dice versales de 10 px/0,07 em, y `.gml-rotulo` es de
     11 px/0,1 em.
-11. **Las cotas del mapa van en `ui-sans-serif` 600/700 y no en Geist Mono** (§5: «para todo
-    valor numérico»). De Geist Mono solo se cargan 400 y 500, así que el cambio sintetizaría
-    la negrita. *Decidir* si §5 alcanza a la zona 3.
+11. ✅ **HECHO el 2026-09-25.** ~~Las cotas del mapa van en `ui-sans-serif`.~~ Cotas y
+    números de pieza en Geist Mono a 500 (no se sintetiza nada), el nombre del miembro en
+    Geist Sans a 600, y la muestra de la leyenda con ellas. Por el token con alternativa:
+    DESIGN.md §5.
 
 Pulido, sin prisa: costuras claras entre teselas de la ortofoto al sobreampliar (Leaflet
 1.9.4, `plus-lighter` a escala 1,79); y 5 errores 400 de `https://www.ign.es/wmts/pnoa-ma`
