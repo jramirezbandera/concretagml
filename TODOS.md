@@ -34,9 +34,10 @@ escrita o pide una que es del producto. Por impacto:
    1.408 px.~~ Columna de 960 px centrada (+101 px de alto, medido; con 760 eran +252),
    rejillas en `auto-fill` (el `<select>` suelto mide 228 px) y el grupo del lindero al
    ancho de la tarjeta, `--gml-informe-ancho` (~107 caracteres por renglón).
-7. **Por debajo de ~1.000 px de ancho, «Parcela / Edificio» se monta encima de los pasos.**
-   Queda por debajo del suelo declarado de 1280×720, pero **960 px es media pantalla de
-   1920, junto al CAD**. *Decidir:* si el suelo incluye ese caso.
+7. ✅ **HECHO el 2026-09-25.** ~~Por debajo de ~1.000 px de ancho, «Parcela / Edificio» se
+   monta encima de los pasos~~ (medido: desde ~1.120). La rejilla deja ceder al
+   expediente y, por debajo de 1.200 px, la barra compacta aprieta aire. Nada se pisa
+   hasta ~870 px, y a 960 «Sin guardar» se lee entero (DESIGN.md §6).
 8. **En el arranque en vacío, la bienvenida tapa el mapa y pide «busca tu parcela en el mapa
    y pínchala»** desde la vista de España entera (escala de 100 km), sin buscador de
    dirección ni de municipio. *Es una feature*, no un retoque.

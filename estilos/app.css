@@ -675,7 +675,17 @@ body {
   z-index: var(--gml-z-barra);
   box-shadow: var(--gml-sombra-barra);
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  /* ⭐ QUIÉN CEDE CUANDO NO CABE (revisión de diseño, 2026-09-25). Era
+     `auto auto minmax(0, 1fr) auto auto`, y con eso las cuatro zonas `auto` se
+     quedaban su ancho entero ANTES que el recorrido, que partía de 0: por debajo
+     de ~1.120 px los pasos (317 px de mínimo) desbordaban centrados y se montaban
+     encima de «Parcela / Edificio». Ahora el recorrido parte de su `min-content`
+     y lo que cede es el EXPEDIENTE (`minmax(0, auto)`), que es la única zona hecha
+     para cortarse: su botón tiene tope y sus dos renglones terminan en «…».
+     `max-content` en la marca, los chips y la entrega porque son las que NO saben
+     cortarse: la zona de chips es flexible y, apretada, partía «0 avisos» a una
+     segunda línea (medido). */
+  grid-template-columns: max-content minmax(0, auto) minmax(min-content, 1fr) max-content max-content;
   grid-template-rows: var(--gml-barra-alto);
   align-items: center;
   /* ⭐ 12 px hasta la revisión de diseño del 2026-08-10 («amontona logo, estado,
@@ -1352,6 +1362,43 @@ body {
 .gml-rail-paso[data-rail-estado='activo'] .gml-rail-rotulo {
   font-weight: 600;
   color: var(--color-text-primary);
+}
+
+/* ══ LA BARRA COMPACTA, POR DEBAJO DE 1.200 px (revisión de diseño, 2026-09-25) ═
+ *
+ * La primera consulta de ANCHO de esta hoja, y cumple el criterio que dejó
+ * escrito la que se retiró de la bienvenida: se justifica cuando el reparto NO
+ * basta. Aquí está medido que no basta. Marca, pasos, chips y entrega piden
+ * 840 px de mínimo, más 96 de huecos y 32 de relleno, y a 960 px —media pantalla
+ * de 1920, al lado del CAD— al expediente le quedaban 0.
+ *
+ * Así que por debajo de 1.200 se aprieta AIRE, nunca texto: los huecos entre
+ * zonas bajan de 24 a 8 px (los pasos ya traen relleno propio, así que la
+ * separación visual entre grupos sigue siendo de 12), el relleno de los pasos de
+ * 12 a 4, sus uniones de 16 a 8 y el de «Generar GML» de 16 a 12. Son 136 px, y
+ * con ellos «Sin guardar» se lee entero a 960 px.
+ *
+ * ⚠️ 1.200 y no 1.120, y no a ojo: es donde el expediente mide lo mismo con la
+ * barra normal que con la compacta (226 px), así que cruzar el corte no lo hace
+ * saltar de ancho. Y el suelo declarado (1280×720) no se entera: queda por encima.
+ * Por debajo de ~870 px ya no hay aire que quitar y lo que asoma es un corte por
+ * la derecha, no un solape. */
+@media (max-width: 1200px) {
+  .gml-rail {
+    gap: 0 var(--space-2);
+  }
+
+  .gml-rail-boton {
+    padding: 0 var(--space-1);
+  }
+
+  .gml-rail-paso + .gml-rail-paso::before {
+    width: var(--space-2);
+  }
+
+  .gml-app .gml-barra-entregar {
+    padding-inline: var(--space-3);
+  }
 }
 
 /* ⭐ EL PANEL FLOTA SOBRE EL MAPA (revisión de diseño, 2026-08-10). Las tres

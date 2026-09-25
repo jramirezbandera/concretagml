@@ -313,6 +313,12 @@ objetivo es orden, no vacío»**.
 `--gml-candidatos-alto-max` 20vh. Existen porque **el suelo declarado del proyecto es
 1280×720** y una lista sin tope se come la columna del panel entera.
 
+⚠️ **La barra de arriba aguanta hasta 960 px de ancho desde el 2026-09-25**, que es
+media pantalla de 1920 junto al CAD. Por debajo de 1.200 px entra la única consulta
+de ancho de la hoja, y aprieta **aire, nunca texto** (huecos 24 → 8, pasos 12 → 4);
+lo que cede es el expediente, que corta con «…». El suelo declarado no cambia: esto
+es degradar bien, no un segundo diseño.
+
 ---
 
 ## 7 · Elevación
