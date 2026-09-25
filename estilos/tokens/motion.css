@@ -18,8 +18,20 @@
    la transición de la casa para hover, foco y cambios de color de estado. Nunca
    se anima un reflujo de maqueta ni un cambio de pantalla. */
 
+/* ⭐ `--transition` NOMBRA LO QUE ANIMA DESDE EL 2026-09-25 (revisión de diseño).
+   Era `all 150ms`, y `all` contradecía la frase de arriba: animaba también lo que
+   esta casa dice no animar. Medido en Chrome: el anillo de FOCO entraba fundiéndose
+   (se leyó el `outline-color` a medio camino al tabular por la barra), y el radio
+   de `.gml-barra-herramienta` transicionaba al esconder un hermano, que es lo que
+   hizo creer rota una regla que funcionaba (ver el aprendizaje del 2026-08-20). Se
+   quedan las seis propiedades que de verdad cambian al señalar o al cambiar de
+   estado —color, fondo, filo, sombra, opacidad y el giro de la flecha del
+   expediente— y ninguna de maqueta. El foco, sin transición: aparece al instante. */
 :root {
-  --transition: all 150ms ease-in-out;
+  --transition:
+    color 150ms ease-in-out, background-color 150ms ease-in-out,
+    border-color 150ms ease-in-out, box-shadow 150ms ease-in-out,
+    opacity 150ms ease-in-out, transform 150ms ease-in-out;
   --transition-border: border-color 150ms ease-in-out;
   --duration: 150ms;
 }

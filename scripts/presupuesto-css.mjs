@@ -576,10 +576,19 @@ export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'dia
  * colores: habría costado ~400 B para decir lo que el módulo ya dice, y el control
  * dejaría de leerse sobre la ortofoto el día que la hoja no cargue.
  *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **Y UNA QUINTA EL 2026-09-25 (`--transition` DEJA DE SER `all`)**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 65.977 a **66.177 B nuestros** (81.072 → 81.272 con vendor). **+200 B.** El
+ * token nombra ahora sus seis propiedades en vez de `all`, y el movimiento reducido
+ * apaga los dos tokens en `:root`. Se descartó escribir la lista con
+ * `var(--duration)` en cada tramo, que la ataba a la duración de la casa pero
+ * costaba ~70 B más para una cifra que no ha cambiado desde la copia del 2026-07-26.
+ *
  * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
  * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
  */
-export const TECHO = Object.freeze({ total: 81072, nuestro: 65977 })
+export const TECHO = Object.freeze({ total: 81272, nuestro: 66177 })
 
 /**
  * EL REGISTRO. Un asiento por hito, con la hoja construida medida de verdad.
@@ -1724,6 +1733,17 @@ export const ASIENTOS = Object.freeze(
         '`<form>`). Es la forma barata que DESIGN.md §10 pide: reutilizar lo que ya existe. ' +
         '── ⚠️ El techo SUBE 52 B (cabecera de `TECHO`) y la holgura vuelve a 0. NO CIERRA ' +
         'REBANADA.' },
+    { hito: '`--transition` deja de ser `all`',
+      commit: '(sin commitear)',
+      total: 81272, nuestro: 66177, rebanada: null,
+      nota:
+        '**+200 B.** El token de la casa pasa de `all 150ms ease-in-out` a las seis ' +
+        'propiedades que de verdad cambian (color, fondo, filo, sombra, opacidad y giro): ' +
+        '+138 B, en UNA declaración que heredan los quince llamantes. Con `all` el anillo de ' +
+        'foco entraba fundiéndose y los radios transicionaban (medido). Y el bloque de ' +
+        'movimiento reducido apaga los dos tokens en `:root`: +~50 B que cubren los nueve ' +
+        'llamantes que su lista a mano se dejaba fuera, incluida la flecha que gira. ── ⚠️ El ' +
+        'techo SUBE 200 B (cabecera de `TECHO`) y la holgura vuelve a 0. NO CIERRA REBANADA.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

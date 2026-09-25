@@ -48,9 +48,9 @@ escrita o pide una que es del producto. Por impacto:
    ⏳ **Queda, si se quiere:** una marca en el mapa en el punto buscado. No se puso
    porque todo grafismo del mapa tiene que estar en la leyenda, y ésta sería una entrada
    más para algo que dura un momento.
-9. **`--transition` vale `all 150ms`**, y el bloque de `prefers-reduced-motion` enumera
-   selectores a mano y se deja fuera 9 de los 15 usos (entre ellos la flecha que gira). Con
-   un `--transition: none` en `:root` dentro de la consulta quedarían cubiertos todos.
+9. ✅ **HECHO el 2026-09-25.** ~~`--transition` vale `all 150ms`~~: ahora nombra sus seis
+   propiedades (sin foco ni maqueta), y el movimiento reducido apaga los dos tokens en
+   `:root`, así que ya no depende de una lista a mano.
 10. **DESIGN.md ha derivado del código en dos cifras** (según su §0, entonces el documento
     está roto): §6 dice `--radius` 4 px, pero `estilos/app.css` redirige los tres radios a
     `--gml-radio` (6 px); §5.1 dice versales de 10 px/0,07 em, y `.gml-rotulo` es de

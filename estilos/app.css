@@ -7448,6 +7448,17 @@ button.gml-parte-nombre {
  * propia mecánica, y apagarlas desde aquí sería meterse donde no toca.
  */
 @media (prefers-reduced-motion: reduce) {
+  /* ⭐ LOS DOS TOKENS, APAGADOS DE UNA VEZ (revisión de diseño, 2026-09-25). La
+     lista de abajo enumeraba selectores a mano y se dejaba fuera 9 de los 15 que
+     usan `var(--transition)` —entre ellos `.gml-boton` y la flecha que GIRA al
+     abrir el expediente, que es el único movimiento de verdad de la barra—. Con
+     los tokens a `none` en `:root`, todo lo que los usa se apaga, incluido lo que
+     se escriba mañana. La lista se queda para los que llevan su transición a mano. */
+  :root {
+    --transition: none;
+    --transition-border: none;
+  }
+
   .gml-aviso,
   .gml-input-coordenada,
   .gml-entrada,
