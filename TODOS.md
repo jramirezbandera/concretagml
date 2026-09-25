@@ -30,11 +30,10 @@ escrita o pide una que es del producto. Por impacto:
 5. **Los dos menús de la cabecera declaran `role="menu"` y las flechas no mueven el foco**
    (medido: solo Tab). O foco móvil con flechas, Inicio y Fin, o patrón *disclosure*, que es
    lo que la APG recomienda para esto. *Cuesta:* JS de `app/barra.js` y sus pruebas.
-6. **El informe a página completa estira los campos a 1.408 px.** «Tipo de operación» es
-   un `<select>` de una palabra que mide 1.408 px, y el cuadro del lindero da unos 190
-   caracteres por línea: justo el texto que hay que releer antes de firmar. Propuesta: tope
-   de ancho en `[data-presentacion='pantalla'] .gml-dialogo-informe-cuerpo`. *Bloquea:* el
-   formulario crece hacia abajo, y el pliegue de este diálogo está medido.
+6. ✅ **HECHO el 2026-09-25.** ~~El informe a página completa estira los campos a
+   1.408 px.~~ Columna de 960 px centrada (+101 px de alto, medido; con 760 eran +252),
+   rejillas en `auto-fill` (el `<select>` suelto mide 228 px) y el grupo del lindero al
+   ancho de la tarjeta, `--gml-informe-ancho` (~107 caracteres por renglón).
 7. **Por debajo de ~1.000 px de ancho, «Parcela / Edificio» se monta encima de los pasos.**
    Queda por debajo del suelo declarado de 1280×720, pero **960 px es media pantalla de
    1920, junto al CAD**. *Decidir:* si el suelo incluye ese caso.

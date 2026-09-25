@@ -415,6 +415,11 @@
      el sistema no tiene un token para ese tamaño. */
   --gml-titulo-tam: 19px;
 
+  /* El ancho de la tarjeta del informe, y a la vez el del grupo del lindero cuando
+     el informe va a página completa: el cuadro se escribió para leerse a este
+     ancho, y una sola cifra ata los dos sitios (revisión de diseño, 2026-09-25). */
+  --gml-informe-ancho: 760px;
+
   /* ── El color de la geometría del usuario, en sus DOS fondos ───────────────
    *
    * `viewer/_comun.js#COLOR_USUARIO` es amarillo `#FFD600` desde la revisión
@@ -5356,7 +5361,7 @@ body {
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 1200;
-  width: min(760px, calc(100vw - 2 * var(--space-4)));
+  width: min(var(--gml-informe-ancho), calc(100vw - 2 * var(--space-4)));
   max-height: min(88vh, 900px);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -5448,6 +5453,34 @@ body {
   gap: var(--space-4);
 }
 
+/* ⭐ A PÁGINA COMPLETA, EL INFORME ES UNA COLUMNA Y NO LA VENTANA ENTERA
+ * (revisión de diseño, 2026-09-25). Sin tope, a 1440×900 el cuerpo medía 1.408 px:
+ * la rejilla del encabezado salía a seis campos por fila y el cuadro del lindero
+ * a unos 210 caracteres por renglón, que es el texto que hay que releer antes de
+ * firmar.
+ *
+ * 960 px y no el ancho de la tarjeta, y la cifra está MEDIDA: con 760 el
+ * formulario crecía 252 px hacia abajo (1.343 → 1.595) y con 960 crece 101
+ * (→ 1.444), que es lo que cuesta pasar el encabezado de seis a cuatro columnas.
+ * Este diálogo tiene el pliegue medido dos veces (ver la regla de arriba), así que
+ * el ancho se eligió por lo que empuja hacia abajo, no a ojo. Lo que de verdad se
+ * lee a renglón corrido —el grupo del lindero— se estrecha aparte, abajo.
+ *
+ * Centrado: a página completa es una hoja, y el pie anclado la sigue porque es
+ * hijo de este mismo cuerpo. */
+.gml-app .gml-dialogo-informe[data-presentacion='pantalla'] .gml-dialogo-informe-cuerpo {
+  max-width: 960px;
+  margin-inline: auto;
+}
+
+/* El grupo del lindero, al ancho de contenido de la tarjeta: ~107 caracteres por
+   renglón en vez de ~142, y «Regenerar el borrador» sigue pegado al borde derecho
+   de SU cuadro, no al de la columna. En la tarjeta no cambia nada: ése ya es su
+   ancho. */
+.gml-dialogo-informe-grupo[data-informe='lindero'] {
+  max-width: calc(var(--gml-informe-ancho) - 2 * var(--space-4));
+}
+
 .gml-dialogo-informe-titulo {
   margin: 0;
   font-size: var(--gml-titulo-tam);
@@ -5496,10 +5529,16 @@ body {
 
 /* Dos columnas donde quepan y una donde no, sin consulta de medios: el diálogo
    puede quedarse en 320 px de ancho en un portátil pequeño y los rótulos
-   («Parcela (nº en el polígono)») no admiten columnas estrechas. */
+   («Parcela (nº en el polígono)») no admiten columnas estrechas.
+
+   `auto-fill` y no `auto-fit` (revisión de diseño, 2026-09-25): `auto-fit` pliega
+   las columnas vacías y reparte su ancho entre las que tienen campo, así que una
+   rejilla de UN solo campo —«Tipo de operación»— lo estiraba a la fila entera, y a
+   página completa eso era un `<select>` de una palabra midiendo 1.408 px. Con
+   `auto-fill` el campo suelto ocupa una columna, como sus vecinos de arriba. */
 .gml-dialogo-informe-rejilla {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: var(--space-3) var(--space-4);
 }
 
