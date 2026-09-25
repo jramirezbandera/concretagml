@@ -31,9 +31,9 @@ escrita o pide una que es del producto. Por impacto:
 4. ✅ **HECHO el 2026-09-25.** ~~La flecha ▾ de «Generar GML» sigue en azul macizo con el
    principal apagado.~~ Pasa a CONTORNO (blanco, filo y gliffo sky-700), no a gris: la
    asimetría escrita en `app.css` («apagarla o pintarla de gris mentiría») se respeta.
-5. **Los dos menús de la cabecera declaran `role="menu"` y las flechas no mueven el foco**
-   (medido: solo Tab). O foco móvil con flechas, Inicio y Fin, o patrón *disclosure*, que es
-   lo que la APG recomienda para esto. *Cuesta:* JS de `app/barra.js` y sus pruebas.
+5. ✅ **HECHO el 2026-09-25.** ~~Los dos menús declaran `role="menu"` y las flechas no
+   mueven el foco.~~ Patrón «menu button» de la APG en `app/barra.js`: ↓/↑ con vuelta,
+   Inicio/Fin, ↓/↑ abren desde el disparador, Tab cierra, y se saltan las opciones ocultas.
 6. ✅ **HECHO el 2026-09-25.** ~~El informe a página completa estira los campos a
    1.408 px.~~ Columna de 960 px centrada (+101 px de alto, medido; con 760 eran +252),
    rejillas en `auto-fill` (el `<select>` suelto mide 228 px) y el grupo del lindero al

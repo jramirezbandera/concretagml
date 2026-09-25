@@ -568,3 +568,89 @@ describe('T5 · destruir', () => {
  * SEGUNDO sitio para frases que ya tenían el suyo, y con un GML descargado se  *
  * veía la misma frase dos veces en pantalla a la vez.                          *
  * ══════════════════════════════════════════════════════════════════════════ */
+
+// ── ⭐ EL TECLADO DE LOS MENÚS (revisión de diseño, 2026-09-25) ────────────────
+//
+// Los dos menús declaran `role="menu"`, y ese rol le promete al lector de pantalla
+// un teclado de flechas (patrón «menu button» de la WAI-ARIA APG). Medido en
+// Chrome antes de esto: solo respondía el Tabulador.
+describe('los menús de la barra se recorren con el teclado', () => {
+  const disparadorDe = (nombre) => document.querySelector(`[${ATRIBUTO_DISPARADOR}="${nombre}"]`)
+  const panelDe = (nombre) => document.querySelector(`[data-menu="${nombre}"]`)
+  const accionEnFoco = () => document.activeElement?.dataset?.accion ?? null
+  const tecla = (key, destino = document.activeElement) =>
+    destino.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }))
+
+  it('abierto, ↓ y ↑ recorren las opciones y dan la vuelta', () => {
+    cablear()
+    disparadorDe('salidas').click()
+    expect(accionEnFoco()).toBe('exportar-dxf')
+    tecla('ArrowDown')
+    expect(accionEnFoco()).toBe('exportar-coordenadas')
+    tecla('ArrowDown')
+    tecla('ArrowDown')
+    expect(accionEnFoco()).toBe('exportar-dxf')
+    tecla('ArrowUp')
+    expect(accionEnFoco()).toBe('exportar-excel')
+  })
+
+  it('Inicio y Fin van a la primera y a la última', () => {
+    cablear()
+    disparadorDe('salidas').click()
+    tecla('End')
+    expect(accionEnFoco()).toBe('exportar-excel')
+    tecla('Home')
+    expect(accionEnFoco()).toBe('exportar-dxf')
+  })
+
+  it('desde el disparador CERRADO, ↓ abre en la primera y ↑ en la última', () => {
+    cablear()
+    disparadorDe('salidas').focus()
+    tecla('ArrowDown')
+    expect(panelDe('salidas').hidden).toBe(false)
+    expect(disparadorDe('salidas').getAttribute('aria-expanded')).toBe('true')
+    expect(accionEnFoco()).toBe('exportar-dxf')
+
+    tecla('Escape')
+    expect(disparadorDe('salidas').getAttribute('aria-expanded')).toBe('false')
+    tecla('ArrowUp')
+    expect(accionEnFoco()).toBe('exportar-excel')
+  })
+
+  it('se saltan las opciones ocultas: «Vaciarlo» no está cuando no hay nada que vaciar', () => {
+    cablear()
+    disparadorDe('expediente').click()
+    expect(accionEnFoco()).toBe('abrir-expediente')
+    tecla('End')
+    // El envoltorio `data-pie` de «Vaciarlo» nace oculto en la cáscara.
+    expect(accionEnFoco()).toBe('como-funciona')
+  })
+
+  it('Tab CIERRA el menú y deja seguir', () => {
+    cablear()
+    disparadorDe('salidas').click()
+    tecla('Tab')
+    expect(panelDe('salidas').hidden).toBe(true)
+    expect(disparadorDe('salidas').getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('Escape sigue cerrando y devuelve el foco al disparador', () => {
+    cablear()
+    disparadorDe('expediente').click()
+    tecla('ArrowDown')
+    tecla('Escape')
+    expect(panelDe('expediente').hidden).toBe(true)
+    expect(document.activeElement).toBe(disparadorDe('expediente'))
+  })
+
+  it('las flechas fuera de un menú no hacen nada (el mapa y las tablas son suyas)', () => {
+    cablear()
+    const fuera = document.querySelector('#campo-refcat')
+    fuera.focus()
+    const evento = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
+    fuera.dispatchEvent(evento)
+    expect(evento.defaultPrevented).toBe(false)
+    expect(panelDe('salidas').hidden).toBe(true)
+    expect(panelDe('expediente').hidden).toBe(true)
+  })
+})

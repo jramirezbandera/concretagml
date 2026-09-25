@@ -576,8 +576,22 @@ export function cablearBarra({
     panelMenu.hidden = false
     disparador.setAttribute('aria-expanded', 'true')
     menuAbierto = disparador
-    const primera = panelMenu.querySelector('[role="menuitem"]:not([disabled])')
-    if (primera !== null && typeof primera.focus === 'function') primera.focus()
+    opcionesDe(panelMenu)[0]?.focus?.()
+  }
+
+  /**
+   * Las opciones que se pueden ENFOCAR del menú, en orden. Se saltan las apagadas
+   * —un `<button disabled>` no admite foco— y las que cuelgan de un nodo oculto,
+   * que es como `app/empezar-de-nuevo.js` retira «Vaciarlo» cuando no hay nada que
+   * vaciar. Un `querySelector` a secas cogía la primera aunque estuviera oculta.
+   *
+   * @param {Element} panelMenu
+   * @returns {HTMLElement[]}
+   */
+  function opcionesDe(panelMenu) {
+    return [...panelMenu.querySelectorAll('[role="menuitem"]')].filter(
+      (opcion) => !opcion.disabled && opcion.closest('[hidden]') === null,
+    )
   }
 
   for (const disparador of documento.querySelectorAll(`[${ATRIBUTO_DISPARADOR}]`)) {
@@ -624,12 +638,65 @@ export function cablearBarra({
     cerrarMenus()
   })
 
-  // `Escape` cierra Y devuelve el foco: quien lo pulsa está en el menú, y dejarle
-  // el foco en el `<body>` le obliga a tabular desde el principio de la página.
+  // ── ⭐ EL TECLADO DE LOS MENÚS (revisión de diseño, 2026-09-25) ────────────
+  //
+  // Los dos menús declaran `role="menu"` desde el 2026-08-11, y un lector de
+  // pantalla, al oírlo, pasa a usar las FLECHAS: es lo que ese rol promete (patrón
+  // «menu button» de la WAI-ARIA APG). Aquí solo respondía el Tabulador —medido en
+  // Chrome—, así que el rol anunciaba un teclado que no existía. Ahora:
+  //   · con el menú abierto, ↓ y ↑ recorren las opciones y dan la vuelta, e Inicio y
+  //     Fin van a la primera y a la última;
+  //   · desde el disparador CERRADO, ↓ abre en la primera y ↑ en la última;
+  //   · Tab CIERRA y deja seguir: el foco sale al siguiente control de la barra en
+  //     vez de quedarse paseando por un menú que ya no se mira;
+  //   · `Escape` cierra Y devuelve el foco, como siempre: quien lo pulsa está en el
+  //     menú, y dejarle el foco en el `<body>` le obligaría a tabular desde el
+  //     principio de la página.
+  // ⚠️ Las opciones siguen siendo tabulables (no hay `tabindex="-1"` itinerante): el
+  // Tab cierra antes de moverse, así que en la práctica no se pasea por ellas, y así
+  // no hace falta tocar el marcado de `index.html` ni el de los módulos que las pintan.
   escuchar(documento, 'keydown', (evento) => {
-    if (evento.key !== 'Escape' || menuAbierto === null) return
-    evento.stopPropagation()
-    cerrarMenus({ devolverFoco: true })
+    const activo = documento.activeElement
+
+    if (menuAbierto === null) {
+      const disparador = activo?.closest?.(`[${ATRIBUTO_DISPARADOR}]`) ?? null
+      if (disparador === null || (evento.key !== 'ArrowDown' && evento.key !== 'ArrowUp')) return
+      evento.preventDefault()
+      abrirMenu(disparador)
+      if (evento.key === 'ArrowUp' && menuAbierto !== null) {
+        opcionesDe(menuDe(menuAbierto.getAttribute(ATRIBUTO_DISPARADOR))).at(-1)?.focus?.()
+      }
+      return
+    }
+
+    if (evento.key === 'Escape') {
+      evento.stopPropagation()
+      cerrarMenus({ devolverFoco: true })
+      return
+    }
+
+    const panelMenu = menuDe(menuAbierto.getAttribute(ATRIBUTO_DISPARADOR))
+    if (panelMenu === null) return
+    const dentro = panelMenu.contains(activo) || menuAbierto.contains(activo)
+    if (!dentro) return
+
+    if (evento.key === 'Tab') {
+      if (panelMenu.contains(activo)) cerrarMenus()
+      return
+    }
+
+    const opciones = opcionesDe(panelMenu)
+    const n = opciones.length
+    if (n === 0) return
+    const i = opciones.indexOf(activo)
+    let destino
+    if (evento.key === 'ArrowDown') destino = i < 0 ? 0 : (i + 1) % n
+    else if (evento.key === 'ArrowUp') destino = i < 0 ? n - 1 : (i - 1 + n) % n
+    else if (evento.key === 'Home') destino = 0
+    else if (evento.key === 'End') destino = n - 1
+    else return
+    evento.preventDefault()
+    opciones[destino].focus()
   })
 
   // ── La zona de expediente ─────────────────────────────────────────────────
