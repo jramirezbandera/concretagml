@@ -886,9 +886,16 @@
               >Cada polilínea del dibujo entra como una parte del edificio.</span
             >
           </p>
+          <!-- ⚠️ SECUNDARIO Y NO PRIMARIO DESDE EL 2026-09-25 (revisión de diseño), y
+               también el de «Abrir un GML…». Las tres vías llevaban botón primario, y
+               la que su marca llama «Vía principal» tenía el más pequeño de los tres:
+               las dos alternativas, a lo ancho de su caja y en azul macizo, pesaban más
+               que la vía que el propio rótulo recomienda. Con UN solo primario en la
+               pantalla —«Traer del Catastro»— el peso dice lo mismo que la marca. El
+               ancho entero se queda: sigue siendo LA acción de su vía. -->
           <button
             type="button"
-            class="gml-boton gml-boton--primario gml-via-boton"
+            class="gml-boton gml-boton--secundario gml-via-boton"
             data-accion="abrir-medicion"
           >
             Elegir un fichero de medición…
@@ -957,7 +964,7 @@
           </p>
           <button
             type="button"
-            class="gml-boton gml-boton--primario gml-via-boton"
+            class="gml-boton gml-boton--secundario gml-via-boton"
             data-accion="abrir-gml"
           >
             Abrir un GML…
