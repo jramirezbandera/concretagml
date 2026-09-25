@@ -319,7 +319,12 @@ const ESTILO_ROTULO_SECCION = {
   color: '#0F172A',
 }
 const ESTILO_LISTA = { margin: '0', paddingLeft: '18px', fontSize: '12px' }
-const ESTILO_APUNTE = { margin: '4px 0 0', fontSize: '11px', color: '#94A3B8' }
+// `#64748B` y no `#94A3B8` (revisión de diseño, 2026-09-25): el mismo arreglo que
+// los dos cajones hermanos llevan desde el 2026-08-10 y que éste se quedó sin
+// heredar. `#94A3B8` daba 2,56:1 sobre el blanco del cajón, y el único apunte que
+// pinta es la frase que impide leer «Detecciones de nivel ERROR» como un veredicto:
+// la que menos podía leerse a medias. `#64748B` da 4,76:1.
+const ESTILO_APUNTE = { margin: '4px 0 0', fontSize: '11px', color: '#64748B' }
 
 /**
  * El botón primario, encendido y apagado.
