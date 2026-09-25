@@ -24,10 +24,9 @@ escrita o pide una que es del producto. Por impacto:
    cambia el color del texto (`#0F172A` contra `#64748B`). Desde `FINDING-001` hay tres
    secundarios en Entrada, así que se nota más. *Bloquea:* es la receta de §8 y del
    2026-08-10.
-4. **La flecha ▾ de «Generar GML» sigue en azul macizo con el principal apagado.** Lo más
-   llamativo de la barra abre las salidas secundarias. Propuesta:
-   `.gml-barra-entregar:disabled + .gml-barra-entregar-flecha` con el aspecto de secundario.
-   *Cuesta:* bytes de hoja.
+4. ✅ **HECHO el 2026-09-25.** ~~La flecha ▾ de «Generar GML» sigue en azul macizo con el
+   principal apagado.~~ Pasa a CONTORNO (blanco, filo y gliffo sky-700), no a gris: la
+   asimetría escrita en `app.css` («apagarla o pintarla de gris mentiría») se respeta.
 5. **Los dos menús de la cabecera declaran `role="menu"` y las flechas no mueven el foco**
    (medido: solo Tab). O foco móvil con flechas, Inicio y Fin, o patrón *disclosure*, que es
    lo que la APG recomienda para esto. *Cuesta:* JS de `app/barra.js` y sus pruebas.

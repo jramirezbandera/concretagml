@@ -1060,10 +1060,25 @@ body {
   line-height: 1;
 }
 
-/* El apagado del primario se lleva el filete a un gris del sistema: sobre la
-   superficie apagada, el blanco translúcido desaparece. */
+/* ⭐ CON EL PRIMARIO APAGADO, LA FLECHA PASA A CONTORNO (revisión de diseño,
+   2026-09-25). La asimetría de arriba se mantiene —la flecha sigue encendida,
+   porque sirve—, pero en bloque macizo era lo MÁS pesado de toda la barra justo
+   cuando no se puede generar: el ojo iba a las salidas secundarias antes que al
+   motivo del apagado. Contorno y no gris: fondo blanco, filo y gliffo en
+   `--color-accent-hover` (sky-700, 5,9:1 sobre blanco). Se ve pulsable, no dice
+   «apagado», y cede el peso. Encendido el primario, vuelve a ser la mitad azul
+   de un solo control.
+
+   El filo de la costura lo pone el `border` entero: sobre el gris del apagado, el
+   blanco translúcido de la regla de arriba desaparecía. */
 .gml-app .gml-barra-partido-entrega .gml-barra-entregar:disabled + .gml-barra-entregar-flecha {
-  border-left-color: color-mix(in srgb, var(--color-btn-primary-fg) 45%, transparent);
+  background: var(--color-bg-primary);
+  color: var(--color-accent-hover);
+  border: 1px solid var(--color-accent-hover);
+}
+
+.gml-app .gml-barra-partido-entrega .gml-barra-entregar:disabled + .gml-barra-entregar-flecha:hover {
+  background: var(--color-tint-accent);
 }
 
 .gml-rail-marca {
