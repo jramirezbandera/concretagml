@@ -5638,7 +5638,15 @@ body {
    el pie del cajón de diagnóstico. */
 .gml-dialogo-informe-anclado {
   position: sticky;
-  bottom: 0;
+  /* ⛔ EL RELLENO DEL DIÁLOGO EN NEGATIVO, Y NO `0` (revisión de diseño,
+     2026-09-25). Es la corrección que los dos cajones del visor ya llevan
+     (`viewer/cajon-contraste-edificio.js`, «-10px Y NO 0»): con `bottom: 0` el
+     sticky se ancla a la caja de RELLENO del `<dialog>` que scrollea, no a su
+     borde, y se quedaba 16 px por encima del suelo. Por esa rendija se leía el
+     cuadro del lindero —el texto que se firma— pasando por DEBAJO de «Componer
+     PDF». El `margin` de abajo no lo tapa: quita el hueco al final del scroll, no
+     mueve el ancla. */
+  bottom: calc(-1 * var(--space-4));
   z-index: 1;
   margin: var(--space-4) calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
   padding: var(--space-3) var(--space-4) var(--space-4);
