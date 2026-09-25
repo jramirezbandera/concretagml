@@ -548,6 +548,24 @@ Cinco cosas que conviene saber, porque son decisiones:
 - **Borrar es en dos tiempos.** El primer clic avisa, el segundo borra. No hay
   papelera: lo que se borra, se va.
 
+**Desde el 2026-09-25 hay dos formas de que el trabajo no dependa del humor del
+navegador**, y las dos están en el mismo diálogo «Expediente»:
+
+- **Instalar como aplicación.** La app tiene manifiesto y service worker
+  (`pwa/`), así que Chrome y Edge la ofrecen instalar; el botón aparece junto al
+  aviso de durabilidad **solo cuando el navegador hace la oferta**. Instalada, se
+  abre en su propia ventana y abre sin conexión con lo último que cargó. Al
+  instalar se le vuelve a preguntar al navegador si conserva los datos, y se dice
+  lo que conteste. El service worker **no toca** el Catastro, el IGN ni OSM: solo
+  los ficheros de la propia aplicación, con la portada siempre por red primero.
+- **Guardar en un fichero del disco** (Chrome y Edge; File System Access). Se
+  elige una vez el `.json` —en la carpeta del encargo, junto al DXF y el PDF— y
+  cada cambio se escribe ahí solo, con la misma cadencia que el autoguardado. Si
+  entra otro expediente, el vínculo se suelta y se dice, para no pisar el fichero
+  con otro trabajo. La sesión siguiente ofrece «Seguir con ese fichero», que pide
+  el permiso de escritura —el navegador lo exige tras cerrar la pestaña— y lo
+  abre. En Firefox y Safari no existe la API y el bloque no aparece.
+
 ## ✅ Verificado en la Sede Electrónica
 
 El 2026-07-27 se subió un GML generado por esta app a la Sede Electrónica del

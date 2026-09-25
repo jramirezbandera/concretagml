@@ -159,6 +159,30 @@ jobs:
           fi
           echo "OK: el bundle apunta dentro de /concretagml/"
 
+      # ── La aplicación instalable (2026-09-25) ─────────────────────────────
+      # Sin `sw.js` o con su lista vacía, la aplicación se sigue publicando y sigue
+      # funcionando —y deja de poder instalarse y de abrir sin conexión SIN QUE NADA
+      # FALLE—. Es el error silencioso de manual, así que se para aquí. La lista
+      # vacía es lo que emite la plantilla sin componer (`pwa/sw.js`).
+      - name: Comprobar el service worker y el manifiesto
+        run: |
+          set -euo pipefail
+          for f in dist/sw.js dist/manifest.webmanifest dist/iconos/icono-192.png dist/iconos/icono-512.png; do
+            if [ ! -s "$f" ]; then
+              echo "::error::Falta $f: la aplicación dejaría de poder instalarse."
+              exit 1
+            fi
+          done
+          if ! grep -q 'const PRECACHE = \["\./"' dist/sw.js; then
+            echo "::error::dist/sw.js no trae la lista de precache compuesta (¿se ha perdido el plugin gml-service-worker de vite.config.js?)."
+            exit 1
+          fi
+          if ! grep -q 'rel="manifest" href="/concretagml/manifest.webmanifest"' dist/index.html; then
+            echo "::error::dist/index.html no enlaza el manifiesto bajo /concretagml/."
+            exit 1
+          fi
+          echo "OK: sw.js compuesto y manifiesto enlazado"
+
       # ── El presupuesto de la hoja de estilo (rework T10) ──────────────────
       # Va aquí y no en `pruebas` porque se mide sobre el ARTEFACTO: la cifra
       # presupuestada es la hoja construida con los comentarios ya comidos, no

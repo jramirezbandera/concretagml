@@ -76,6 +76,12 @@
          desaparecería — el mismo problema de contraste que resuelve
          `--gml-color-usuario-sobre-claro` en la tabla. -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230F172A'/><path d='M7.5 22.5 11.5 8.5 24.5 11.5 21 24.5Z' fill='none' stroke='%23FFD600' stroke-width='2.3' stroke-linejoin='round'/></svg>" />
+    <!-- La aplicación INSTALABLE (2026-09-25). El manifiesto vive en `public/` y los
+         iconos los dibuja `scripts/iconos-pwa.py` con el mismo recinto de arriba: si
+         cambia el favicon, se rehacen allí. El service worker no se enlaza aquí: lo
+         registra `app/main.js`, y solo en el build (ver `pwa/registro.js`). -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0F172A" />
     <link rel="stylesheet" href="/estilos/app.css" />
   </head>
 

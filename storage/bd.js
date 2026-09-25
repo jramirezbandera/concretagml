@@ -235,6 +235,14 @@ export const ALMACENES = Object.freeze({
    * su único dueño.
    */
   EXPEDIENTES: 'expedientes',
+  /**
+   * 2026-09-25 · El último fichero del disco en el que se autoguardaba un expediente
+   * (File System Access). **Un solo registro, siempre el mismo**, como el pie de
+   * firma: no es un historial de ficheros abiertos. Guarda el `FileSystemFileHandle`
+   * —que IndexedDB sabe clonar— para poder ofrecer «seguir con ese fichero» en la
+   * sesión siguiente. Su único dueño es `storage/fichero-disco.js`.
+   */
+  VINCULOS: 'vinculos',
 })
 
 /**
@@ -340,6 +348,12 @@ export const ESQUEMA_ALMACENES = Object.freeze({
       refcat: Object.freeze({ keyPath: 'refcat', unique: false }),
     }),
   }),
+  /**
+   * 2026-09-25 · `keyPath: 'id'` con UNA clave fija, por el mismo motivo que el pie
+   * de firma: `put` pisa, así que no puede acumularse un historial de los ficheros
+   * que alguien ha tenido abiertos.
+   */
+  [ALMACENES.VINCULOS]: Object.freeze({ keyPath: 'id', indices: Object.freeze({}) }),
 })
 
 // ── Escalera de migraciones ──────────────────────────────────────────────────
@@ -421,6 +435,19 @@ export const MIGRACIONES = Object.freeze([
       const almacen = bd.createObjectStore('expedientes', { keyPath: 'id' })
       almacen.createIndex('actualizado', 'actualizado', { unique: false })
       almacen.createIndex('refcat', 'refcat', { unique: false })
+    },
+  }),
+  Object.freeze({
+    version: 4,
+    // 2026-09-25 · el último fichero del disco donde se autoguardaba un expediente.
+    //
+    // Un almacén NUEVO y vacío: ningún registro que copiar ni transformar, así que es
+    // el peldaño más barato posible. Lo que sí trae consigo es lo que trae cualquier
+    // subida de versión —una pestaña abierta con la base en la 3 recibe
+    // `versionchange`—, y eso ya lo gobiernan `alVersionChange` y el motivo
+    // `BLOQUEADA` de arriba.
+    aplicar(bd) {
+      bd.createObjectStore('vinculos', { keyPath: 'id' })
     },
   }),
 ])

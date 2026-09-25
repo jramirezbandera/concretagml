@@ -178,6 +178,7 @@ import {
 } from '../gml/descargar.js'
 import { MS_AUTOGUARDADO, crearAutoguardado } from '../storage/autoguardado.js'
 import { AVISO_SIN_PERSISTENCIA } from '../storage/cuota.js'
+import { MOTIVO_DISCO, mensajeDisco } from '../storage/fichero-disco.js'
 import { NIVEL } from '../viewer/_comun.js'
 import { describirEdad } from './cableado-catastro.js'
 import {
@@ -640,6 +641,82 @@ export const MENSAJE_CUOTA_TRAS_PURGAR =
   'el trabajo a un fichero de proyecto —eso no depende del espacio del navegador— y borra ' +
   'expedientes que ya no necesites.'
 
+// ── ⭐ La aplicación instalable (2026-09-25) ─────────────────────────────────
+// Lo que se dice tras pulsar «Instalar como aplicación». Tras instalar se le VUELVE a
+// preguntar al navegador si conserva los datos, y se dice lo que conteste: prometer
+// que instalar lo resuelve sería decir algo que no hemos medido en cada navegador.
+
+/** Instalada, y el navegador ya se compromete a conservar lo guardado. */
+export const MENSAJE_INSTALADA_CON_PERSISTENCIA =
+  'Aplicación instalada. El navegador se compromete ahora a no borrar por su cuenta lo que se ' +
+  'guarde aquí.'
+
+/** Instalada, pero el navegador sigue sin comprometerse. */
+export const MENSAJE_INSTALADA_SIN_PERSISTENCIA =
+  'Aplicación instalada. El navegador sigue sin comprometerse a conservar lo guardado aquí: para ' +
+  'llevarte un trabajo con seguridad, guárdalo también en un fichero de proyecto.'
+
+/**
+ * Por qué no se ha instalado, por motivo de `pwa/instalacion.js#MOTIVO_INSTALACION`.
+ * Decir que no NO es un error, y por eso no va en rojo.
+ */
+export const MENSAJE_SIN_INSTALAR = Object.freeze({
+  NO_DISPONIBLE:
+    'El navegador no está ofreciendo instalar la aplicación ahora mismo. Si lo admite, también ' +
+    'se puede instalar desde su menú.',
+  RECHAZADA: 'No se ha instalado. Se puede instalar más adelante, desde aquí o desde el menú del navegador.',
+  ERROR:
+    'El navegador no ha podido enseñar la instalación. Se puede probar desde su menú; el detalle ' +
+    'técnico está en la consola.',
+})
+
+// ── ⭐ El expediente autoguardado en un fichero del disco (2026-09-25) ────────
+// Ver `storage/fichero-disco.js` para el porqué. Los textos dicen siempre en qué
+// fichero y qué pasa con lo que ya estaba escrito en él.
+
+/** Acabado de vincular: el primer volcado ya está hecho. */
+export const mensajeVinculado = (nombre) =>
+  `Guardado en «${nombre}». Desde ahora cada cambio se escribe ahí solo.`
+
+/** Al retomar el fichero de la sesión anterior. */
+export const mensajeReanudado = (nombre) =>
+  `Abierto «${nombre}». Cada cambio se sigue guardando en él.`
+
+/** «Dejar de guardar en él». */
+export const mensajeDesvinculado = (nombre) =>
+  `Se ha dejado de guardar en «${nombre}». El fichero se queda como estaba tras el último cambio.`
+
+/**
+ * Ha entrado OTRO documento en la rama vinculada. Se suelta el vínculo en vez de
+ * seguir escribiendo: el fichero es de un expediente, y escribir encima el siguiente
+ * que se abra sería perder el anterior sin que nadie lo pidiera.
+ */
+export const mensajeVinculoSoltado = (nombre) =>
+  `Lo que hay en pantalla ya no es el expediente que se guardaba en «${nombre}», así que se ha ` +
+  'dejado de escribir en él. El fichero conserva el trabajo anterior.'
+
+/**
+ * La escritura falla de forma que no se va a arreglar sola (sin permiso, fichero
+ * movido o borrado): se suelta el vínculo y se dice qué hacer.
+ */
+export const mensajeVinculoRoto = (texto) =>
+  `${texto} Se ha dejado de guardar en él; lo que hay en pantalla sigue a salvo en este ` +
+  'navegador. Elige otro fichero en «Expediente», o descarga el proyecto.'
+
+/**
+ * La escritura falla de una forma que puede ser pasajera (otro programa tiene el
+ * fichero abierto, la sincronización de la nube lo está subiendo): se sigue intentando
+ * en el próximo cambio, y se dice UNA vez por racha.
+ */
+export const mensajeVinculoAtascado = (texto) =>
+  `${texto} Se volverá a intentar con el próximo cambio; mientras tanto, lo que hay en ` +
+  'pantalla sigue guardándose en este navegador.'
+
+/** El navegador no ha devuelto el permiso para escribir en el fichero de la sesión anterior. */
+export const MENSAJE_REANUDAR_SIN_PERMISO =
+  'El navegador no ha dado permiso para escribir en ese fichero, así que no se puede seguir ' +
+  'guardando en él. Puedes elegir otro, o abrirlo con «Abrir un proyecto…».'
+
 /** Coletilla del acuse de guardado cuando el navegador no garantiza la conservación. */
 export const COLETILLA_SIN_PERSISTENCIA =
   ' El navegador no garantiza conservarlo: si se queda sin espacio puede borrarlo por su cuenta.'
@@ -863,6 +940,12 @@ function nodoDe(doc, selector) {
  * @param {(() => void)|null} [opciones.elegirFichero=null]  Abre el selector de
  *   ficheros de la ÚNICA zona de la aplicación (`cablearComprobacion#elegirFichero`).
  *   `null` ⇒ «Abrir un proyecto…» lo dice en vez de no hacer nada.
+ * @param {object|null} [opciones.instalacion=null]  El de `pwa/instalacion.js`, ya
+ *   construido. `null` ⇒ «Instalar como aplicación» no aparece nunca, que es lo que
+ *   pasa en un navegador que no ofrece instalar y en todas las pruebas anteriores.
+ * @param {object|null} [opciones.ficheroDisco=null]  El de `storage/fichero-disco.js`,
+ *   ya construido. `null` —o uno con `disponible: false`— ⇒ el bloque «Guardar en un
+ *   fichero del disco» no aparece.
  * @param {HTMLElement} [opciones.boton]  Por defecto {@link SELECTOR_BOTON_EXPEDIENTE}.
  * @param {Document} [opciones.documento=globalThis.document]
  * @param {typeof URL} [opciones.url=globalThis.URL]  Objeto con
@@ -899,6 +982,8 @@ export function cablearExpediente({
   estadoEdificio = null,
   alCargarParcela = null,
   elegirFichero = null,
+  instalacion = null,
+  ficheroDisco = null,
   documento = globalThis.document,
   url = globalThis.URL,
   boton,
@@ -961,6 +1046,28 @@ export function cablearExpediente({
     throw new TypeError(
       `cablearExpediente: 'elegirFichero' debe ser una función o null; recibido ` +
         `${typeof elegirFichero}.`,
+    )
+  }
+  if (
+    instalacion !== null &&
+    (typeof instalacion?.instalar !== 'function' ||
+      typeof instalacion?.estado !== 'function' ||
+      typeof instalacion?.alCambiar !== 'function')
+  ) {
+    throw new TypeError(
+      `cablearExpediente: 'instalacion' debe ser el de pwa/instalacion.js (instalar, estado y ` +
+        `alCambiar) o null; recibido ${typeof instalacion}.`,
+    )
+  }
+  if (
+    ficheroDisco !== null &&
+    ['elegirDestino', 'escribir', 'pedirPermiso', 'leer', 'recordar', 'ultimo', 'olvidar'].some(
+      (m) => typeof ficheroDisco?.[m] !== 'function',
+    )
+  ) {
+    throw new TypeError(
+      `cablearExpediente: 'ficheroDisco' debe ser el de storage/fichero-disco.js o null; ` +
+        `recibido ${typeof ficheroDisco}.`,
     )
   }
   if (typeof ahora !== 'function') {
@@ -1483,6 +1590,204 @@ export function cablearExpediente({
     }),
   )
 
+  // ── ⭐ El fichero del disco (2026-09-25) ───────────────────────────────────
+  //
+  // Un TERCER debounce, y no un destino más de los otros dos, por lo mismo que los
+  // otros dos son dos: cada uno coalesce lo suyo. Escribe en el fichero elegido el
+  // mismo `.json` que baja «Guardar proyecto», con la misma cadencia.
+  //
+  // El vínculo es de UN documento: la rama y la identidad local (`idLocal`) que
+  // había en pantalla al elegir el fichero. Si entra otro documento en esa rama, se
+  // suelta y se dice ({@link mensajeVinculoSoltado}) — seguir escribiendo pisaría el
+  // expediente anterior con el siguiente. Y no espera a la oferta del borrador, a
+  // diferencia de los otros dos: el vínculo lo ha pedido el usuario, y lo que se
+  // escribe es lo que tiene delante.
+
+  /** @type {{asa: *, nombre: string, rama: string, idLocal: string|null}|null} */
+  let vinculo = null
+  /** El fichero de la sesión anterior, que se ofrece retomar. @type {{asa: *, nombre: string}|null} */
+  let recordado = null
+  /** El aviso de un fallo pasajero se dice UNA vez por racha, como el del autoguardado. */
+  let dichoElFalloFichero = false
+
+  /** El Expediente de una rama, desde el dato de su store. `null` si no hay qué guardar. */
+  function armarDeRama(r, dato) {
+    if (r === RAMA.EDIFICIO) {
+      if (!hayEdificio(dato)) return null
+      return crearExpediente({
+        tipo: TIPO_EXPEDIENTE.EDIFICIO,
+        srs,
+        edificio: conParcelaDeContexto(dato),
+        metadatos: metadatosDe(RAMA.EDIFICIO),
+      })
+    }
+    if (!hayGeometria(dato)) return null
+    return crearExpediente({ srs, parcela: dato, metadatos: metadatosDe(RAMA.PARCELA) })
+  }
+
+  /** El texto del fichero: el mismo que baja «Guardar proyecto (.json)». */
+  const textoDeProyecto = (exp, r) =>
+    JSON.stringify(aProyecto(exp, { fecha: ahora(), nombre: identidades[r].nombre }), null, 2)
+
+  const autoFichero = crearAutoguardado({
+    guardar: async (dato) => {
+      if (vinculo === null || ficheroDisco === null) return { ok: true }
+      const exp = armarDeRama(vinculo.rama, dato)
+      // Sin geometría no se escribe: un fichero de proyecto vacío encima del bueno
+      // sería perder el trabajo por haber borrado un vértice de más.
+      if (exp === null) return { ok: true }
+      return ficheroDisco.escribir(vinculo.asa, textoDeProyecto(exp, vinculo.rama))
+    },
+    ms,
+    ...(programar === undefined ? {} : { programar }),
+    ...(cancelar === undefined ? {} : { cancelar }),
+    ahora: () => ahora().getTime(),
+    alFallo: ({ resultado, causa }) => {
+      if (vinculo === null) return
+      const motivo = resultado?.motivo ?? MOTIVO_DISCO.ERROR
+      const texto = mensajeDisco(motivo, vinculo.nombre)
+      // Sin permiso, o sin fichero, no se arregla solo: se suelta y se dice qué hacer.
+      if (motivo === MOTIVO_DISCO.SIN_PERMISO || motivo === MOTIVO_DISCO.NO_ENCONTRADO) {
+        vinculo = null
+        autoFichero.olvidar()
+        pintarDisco()
+        avisar(mensajeVinculoRoto(texto), NIVEL.ERROR, causa ?? resultado?.causa ?? null)
+        return
+      }
+      // Bloqueado, o cualquier otra cosa: puede ser pasajero, y se reintenta.
+      if (dichoElFalloFichero) return
+      dichoElFalloFichero = true
+      avisar(mensajeVinculoAtascado(texto), NIVEL.AVISO, causa ?? resultado?.causa ?? null)
+    },
+    alGuardado: () => {
+      dichoElFalloFichero = false
+    },
+  })
+
+  /** Pinta el bloque del disco del diálogo con el estado de ahora. */
+  function pintarDisco() {
+    dialogo.fijarDisco({
+      disponible: ficheroDisco?.disponible === true,
+      vinculado: vinculo?.nombre ?? null,
+      recordado: recordado?.nombre ?? null,
+    })
+  }
+
+  /**
+   * Un cambio en el store de la rama `r`. Si esa rama está vinculada y sigue siendo el
+   * MISMO documento, se programa la escritura; si es otro, se suelta el vínculo.
+   *
+   * @param {string} r
+   * @param {*} dato
+   */
+  function alimentarVinculo(r, dato) {
+    if (vinculo === null || vinculo.rama !== r) return
+    if (idLocalAbierto[r] !== vinculo.idLocal) {
+      const nombre = vinculo.nombre
+      vinculo = null
+      autoFichero.olvidar()
+      pintarDisco()
+      avisar(mensajeVinculoSoltado(nombre))
+      return
+    }
+    autoFichero.cambiado(dato)
+  }
+
+  /** «Guardar en un fichero del disco…» */
+  async function vincularFichero() {
+    if (ficheroDisco === null || ficheroDisco.disponible !== true) {
+      decir(mensajeDisco(MOTIVO_DISCO.SIN_API, ''))
+      return
+    }
+    if (bloqueada(SALIDA.PROYECTO)) return
+    const r = ramaActual()
+    const exp = expedienteActual()
+    if (exp === null) return
+    const eleccion = await ficheroDisco.elegirDestino(
+      nombreFicheroExport({
+        prefijo: FICHERO.PROYECTO.prefijo,
+        extension: FICHERO.PROYECTO.extension,
+        refcat: refcatActual(),
+        fecha: ahora(),
+      }),
+    )
+    if (destruido) return
+    // Cerrar el selector es una decisión del usuario, no un fallo: no se dice nada.
+    if (eleccion.motivo === MOTIVO_DISCO.CANCELADO) return
+    if (!eleccion.ok) {
+      decir(mensajeDisco(eleccion.motivo, eleccion.nombre ?? 'el fichero'), { error: true })
+      return
+    }
+    // El primer volcado, YA: sin él, el fichero elegido estaría vacío hasta el próximo
+    // cambio, y cerrar la pestaña antes lo dejaría así.
+    const escrito = await ficheroDisco.escribir(eleccion.asa, textoDeProyecto(exp, r))
+    if (destruido) return
+    if (!escrito.ok) {
+      decir(mensajeDisco(escrito.motivo, eleccion.nombre), { error: true })
+      return
+    }
+    // Lo pendiente del vínculo anterior —si lo había— se escribe antes de cambiar de
+    // fichero; si no, se escribiría dos segundos después en el nuevo.
+    await autoFichero.ahoraMismo()
+    vinculo = { asa: eleccion.asa, nombre: eleccion.nombre, rama: r, idLocal: idLocalAbierto[r] }
+    recordado = { asa: eleccion.asa, nombre: eleccion.nombre }
+    dichoElFalloFichero = false
+    pintarDisco()
+    decir(mensajeVinculado(eleccion.nombre), { exito: true })
+    // Recordarlo para la próxima sesión. Si no se puede, lo avisa el propio módulo, y
+    // el vínculo de ESTA sesión sigue igual.
+    await ficheroDisco.recordar(eleccion.asa)
+  }
+
+  /** «Dejar de guardar en él». Escribe lo pendiente antes de soltar. */
+  async function desvincularFichero() {
+    if (vinculo === null) return
+    await autoFichero.ahoraMismo()
+    if (destruido || vinculo === null) return
+    const nombre = vinculo.nombre
+    vinculo = null
+    recordado = null
+    pintarDisco()
+    decir(mensajeDesvinculado(nombre))
+    await ficheroDisco?.olvidar()
+  }
+
+  /**
+   * «Seguir con ese fichero»: pide el permiso de escritura —el navegador lo exige tras
+   * cerrar la pestaña, y solo lo concede desde un clic—, lo ABRE como proyecto y lo
+   * deja vinculado. Se abre en vez de suponer que la pantalla ya lo tiene: el fichero
+   * es la copia buena, y la pantalla arranca vacía.
+   */
+  async function reanudarFichero() {
+    if (recordado === null || ficheroDisco === null) return
+    const { asa, nombre } = recordado
+    const permiso = await ficheroDisco.pedirPermiso(asa)
+    if (destruido) return
+    if (permiso !== 'granted') {
+      decir(MENSAJE_REANUDAR_SIN_PERMISO)
+      return
+    }
+    const leido = await ficheroDisco.leer(asa)
+    if (destruido) return
+    if (!leido.ok) {
+      decir(mensajeDisco(leido.motivo, nombre), { error: true })
+      // Un fichero que ya no existe no se vuelve a ofrecer.
+      if (leido.motivo === MOTIVO_DISCO.NO_ENCONTRADO) {
+        recordado = null
+        pintarDisco()
+        await ficheroDisco.olvidar()
+      }
+      return
+    }
+    const abierto = await abrirProyecto(leido.fichero)
+    if (destruido || abierto !== true) return
+    const r = ramaActual()
+    vinculo = { asa, nombre, rama: r, idLocal: idLocalAbierto[r] }
+    dichoElFalloFichero = false
+    pintarDisco()
+    decir(mensajeReanudado(nombre), { exito: true })
+  }
+
   // ── El diálogo ────────────────────────────────────────────────────────────
 
   const dialogo = crearDialogoExpediente({ documento: doc, alAvisar: panel.avisar })
@@ -1574,6 +1879,17 @@ export function cablearExpediente({
       }
     }
     ofrecido = encontrados.length === 0 ? null : encontrados
+
+    // ⭐ 2026-09-25 · el fichero del disco de la sesión anterior, para OFRECERLO en el
+    // diálogo. No se abre solo por lo mismo que el borrador no se recupera solo: la
+    // pantalla arranca como siempre, y además el navegador exige un clic para devolver
+    // el permiso de escritura.
+    if (ficheroDisco?.disponible === true) {
+      const u = await ficheroDisco.ultimo()
+      if (destruido) return
+      recordado = u.recordado ? { asa: u.asa, nombre: u.nombre ?? 'el fichero' } : null
+      pintarDisco()
+    }
 
     // La oferta del borrador SÍ sale por el panel: es de una sola vez por sesión, es
     // directamente accionable y desaparece en cuanto el usuario la resuelve.
@@ -2247,7 +2563,9 @@ export function cablearExpediente({
    * `deProyecto` devuelve su motivo y sus avisos, y aquí se cuentan.
    *
    * @param {File} fichero
-   * @returns {Promise<void>}
+   * @returns {Promise<boolean|undefined>}  `true` si ha entrado un documento. Lo mira
+   *   {@link reanudarFichero} (2026-09-25) para no vincular un fichero que no se ha
+   *   podido abrir; los demás llamantes lo ignoran, y cuando no abre ya ha dicho por qué.
    */
   async function abrirProyecto(fichero) {
     if (destruido) return
@@ -2296,8 +2614,7 @@ export function cablearExpediente({
     // «no lleva ninguna parcela» de abajo y el trabajo no aparecía por ninguna parte.
     // Ahora va al store que le corresponde y la pantalla se conmuta para enseñarlo.
     if (r.expediente.tipo === TIPO_EXPEDIENTE.EDIFICIO) {
-      abrirProyectoDeEdificio(r, fichero)
-      return
+      return abrirProyectoDeEdificio(r, fichero)
     }
     const parcela = r.expediente.parcela ?? null
     if (!hayGeometria(parcela)) {
@@ -2320,6 +2637,7 @@ export function cablearExpediente({
     )
     decir(`Abierto el proyecto «${r.nombre ?? fichero.name}».`)
     dialogo.cerrar()
+    return true
   }
 
   /**
@@ -2377,6 +2695,7 @@ export function cablearExpediente({
     )
     decir(`Abierto el proyecto «${r.nombre ?? fichero.name}» en la rama Edificio.`)
     dialogo.cerrar()
+    return true
   }
 
   /** «Abrir un proyecto…»: abre el selector de la ÚNICA zona de fichero de la app. */
@@ -2387,6 +2706,34 @@ export function cablearExpediente({
       return
     }
     elegirFichero()
+  }
+
+  /**
+   * ⭐ «Instalar como aplicación» (2026-09-25). Enseña el diálogo del navegador y, si se
+   * instala, le vuelve a preguntar si conserva los datos: instalar es precisamente lo
+   * que Chrome pide para decir que sí (`storage/cuota.js`), y la respuesta cambia lo que
+   * dice el acuse de cada guardado ({@link COLETILLA_SIN_PERSISTENCIA}). Se dice lo que
+   * conteste, no lo que se espera que conteste.
+   */
+  async function instalarAplicacion() {
+    if (instalacion === null) {
+      decir(MENSAJE_SIN_INSTALAR.NO_DISPONIBLE)
+      return
+    }
+    const resultado = await instalacion.instalar()
+    if (destruido) return
+    if (!resultado.ok) {
+      decir(MENSAJE_SIN_INSTALAR[resultado.motivo] ?? MENSAJE_SIN_INSTALAR.ERROR)
+      return
+    }
+    persistencia = await cuota.pedirPersistencia()
+    if (destruido) return
+    decir(
+      persistencia?.persistido === true
+        ? MENSAJE_INSTALADA_CON_PERSISTENCIA
+        : MENSAJE_INSTALADA_SIN_PERSISTENCIA,
+      { exito: true },
+    )
   }
 
   // ── Oyentes ───────────────────────────────────────────────────────────────
@@ -2437,7 +2784,15 @@ export function cablearExpediente({
           return exportarProyecto(nombre)
         case ACCION.ABRIR_PROYECTO:
           return pedirProyecto()
-        /* c8 ignore next 2 -- el diálogo solo emite las diez de arriba */
+        case ACCION.INSTALAR:
+          return instalarAplicacion()
+        case ACCION.VINCULAR:
+          return vincularFichero()
+        case ACCION.DESVINCULAR:
+          return desvincularFichero()
+        case ACCION.REANUDAR:
+          return reanudarFichero()
+        /* c8 ignore next 2 -- el diálogo solo emite las de arriba */
         default:
           return undefined
       }
@@ -2543,6 +2898,9 @@ export function cablearExpediente({
     if (dialogo.abierto()) {
       refrescar().catch((causa) => reventar('refrescar', causa))
     }
+    // ⭐ 2026-09-25 · el fichero del disco, ANTES de la guarda del borrador: el vínculo
+    // lo pidió el usuario y no espera a ninguna oferta. Ver {@link alimentarVinculo}.
+    alimentarVinculo(RAMA.PARCELA, parcela)
     if (!autoguardadoArmado(RAMA.PARCELA)) return
     auto.cambiado(parcela)
   }
@@ -2569,6 +2927,7 @@ export function cablearExpediente({
     if (dialogo.abierto()) {
       refrescar().catch((causa) => reventar('refrescar', causa))
     }
+    alimentarVinculo(RAMA.EDIFICIO, edificio)
     if (!autoguardadoArmado(RAMA.EDIFICIO)) return
     // ⚠️ **Un edificio sin identidad no se autoguarda**, y se calla a propósito: es el
     // estado de un `Edificio` construido a mano fuera de las vías de entrada (los
@@ -2666,6 +3025,12 @@ export function cablearExpediente({
     escribirYa().catch((causa) => {
       console.warn('[expediente] no se ha podido volcar el borrador al ocultar la pestaña:', causa)
     })
+    // ⭐ 2026-09-25 · y el fichero del disco, suelto por lo mismo: una escritura al
+    // disco que falle no puede llevarse por delante la del navegador. Sus fallos los
+    // cuenta su propio `alFallo`.
+    autoFichero.ahoraMismo().catch((causa) => {
+      console.warn('[expediente] no se ha podido volcar el fichero del disco al ocultar la pestaña:', causa)
+    })
   }
 
   /** Escribe YA lo pendiente de las dos ramas. `Promise.all` para poder esperarlas. */
@@ -2717,6 +3082,16 @@ export function cablearExpediente({
   refrescarSalidas()
 
   const bajaAccion = dialogo.alAccion(alAccion)
+  // ⭐ 2026-09-25 · «Instalar como aplicación» sigue a la oferta del navegador: existe
+  // mientras haya una sin usar, y el primer pintado no espera a que cambie nada.
+  const bajaInstalacion =
+    instalacion === null
+      ? () => {}
+      : instalacion.alCambiar((e) => dialogo.ofrecerInstalacion(e.disponible))
+  dialogo.ofrecerInstalacion(instalacion?.estado().disponible === true)
+  // Y el bloque del disco: visible desde el montaje si el navegador lo admite; el
+  // fichero de la sesión anterior se suma cuando `arrancar` lo haya leído.
+  pintarDisco()
   const desuscribirStore = estado.subscribe(alCambiarElStore)
   // Sin conmutador cableado no hay a qué suscribirse, y la baja es un no-op: así
   // `destruir()` no tiene que preguntar. Lo mismo con el segundo store, que en las
@@ -2820,6 +3195,12 @@ export function cablearExpediente({
       autoguardado: auto.estado(),
       /** F12 · T4.3 · el segundo debounce, el de la rama EDIFICIO. */
       autoguardadoEdificio: autoEdificio.estado(),
+      /** 2026-09-25 · el nombre del fichero del disco vinculado, o `null`. */
+      vinculo: vinculo?.nombre ?? null,
+      /** 2026-09-25 · el de la sesión anterior que se ofrece retomar, o `null`. */
+      recordado: recordado?.nombre ?? null,
+      /** 2026-09-25 · el tercer debounce, el del fichero del disco. */
+      autoguardadoFichero: autoFichero.estado(),
     }),
 
     /**
@@ -2834,6 +3215,7 @@ export function cablearExpediente({
       for (const { diana, tipo, fn } of oyentes) diana.removeEventListener(tipo, fn)
       oyentes.length = 0
       bajaAccion()
+      bajaInstalacion()
       desuscribirStore()
       bajaRama()
       bajaEdificio()
@@ -2844,6 +3226,7 @@ export function cablearExpediente({
       oyentesIdentidad.clear()
       auto.destruir()
       autoEdificio.destruir()
+      autoFichero.destruir()
       dialogo.destruir()
     },
   }

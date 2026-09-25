@@ -162,7 +162,38 @@ export const ACCION = Object.freeze({
   EXPORTAR_EXCEL: 'exportar-excel',
   EXPORTAR_PROYECTO: 'exportar-proyecto',
   ABRIR_PROYECTO: 'abrir-proyecto',
+  // 2026-09-25 · la aplicación instalable. Ver `pwa/instalacion.js`.
+  INSTALAR: 'instalar-aplicacion',
+  // 2026-09-25 · el expediente autoguardado en un fichero del disco. Ver
+  // `storage/fichero-disco.js`.
+  VINCULAR: 'vincular-fichero',
+  DESVINCULAR: 'desvincular-fichero',
+  REANUDAR: 'reanudar-fichero',
 })
+
+/** El apunte del bloque del disco cuando no hay ningún fichero vinculado. */
+export const APUNTE_DISCO =
+  'Elige un fichero en la carpeta del encargo y cada cambio se guardará ahí solo, sin volver a ' +
+  'pedirlo. Queda junto al DXF y al PDF, y tu copia de seguridad lo cubre como a ellos.'
+
+/** El apunte cuando hay un fichero vinculado. */
+export const apunteVinculado = (nombre) =>
+  `Cada cambio se guarda solo en «${nombre}». Si abres otro expediente, se deja de escribir en él.`
+
+/** El apunte cuando la sesión anterior guardaba en un fichero. */
+export const apunteRecordado = (nombre) =>
+  `La última vez se guardaba en «${nombre}». Puedes seguir con ese fichero —se abre y se sigue ` +
+  'guardando en él— o elegir otro.'
+
+/**
+ * El apunte que acompaña a «Instalar como aplicación». Dice lo que cambia y lo que no se
+ * promete: tras instalar se le vuelve a preguntar al navegador si conserva los datos, y
+ * lo que conteste se dice en el renglón —igual que al guardar—.
+ */
+export const APUNTE_INSTALAR =
+  'Instalada, la aplicación se abre en su propia ventana, y es lo que el navegador pide para ' +
+  'comprometerse a no borrar lo que se guarda aquí. Al instalarla se le vuelve a preguntar, y ' +
+  'abajo se dice qué contesta.'
 
 /**
  * Los `data-*` que este módulo produce. **Son el CONTRATO con el cableado de T5.1**,
@@ -530,6 +561,24 @@ export function crearDialogoExpediente({ documento, alAvisar } = {}) {
   const durabilidad = crear('p', CLASE.APUNTE, AVISO_DURABILIDAD)
   durabilidad.dataset.expediente = 'durabilidad'
   noSeGuarda.append(durabilidad)
+
+  // ⭐ 2026-09-25 · «Instalar como aplicación», DEBAJO de la durabilidad y no en otro
+  // sitio: es la respuesta al párrafo de encima. Nace ESCONDIDO —no apagado— porque
+  // solo existe cuando el navegador ofrece instalar (`pwa/instalacion.js`); en Firefox,
+  // o ya instalada, no hay nada que ofrecer, y un botón apagado ahí pediría un motivo
+  // que el usuario no puede resolver. Existe siempre en el DOM por lo mismo que el
+  // bloque del borrador: el cableado lo localiza al montar.
+  const bloqueInstalar = crear('div', CLASE.PIE)
+  bloqueInstalar.dataset.expediente = 'instalar'
+  bloqueInstalar.hidden = true
+  const instalar = crear('button', 'gml-boton gml-boton--secundario', 'Instalar como aplicación')
+  instalar.type = 'button'
+  instalar.dataset.accion = ACCION.INSTALAR
+  instalar.setAttribute('aria-describedby', id('instalar'))
+  const apunteInstalar = crear('p', CLASE.APUNTE, APUNTE_INSTALAR)
+  apunteInstalar.id = id('instalar')
+  bloqueInstalar.append(apunteInstalar, instalar)
+  noSeGuarda.append(bloqueInstalar)
   grupoGuardar.append(noSeGuarda)
 
   // ── Grupo 2 · lo guardado ─────────────────────────────────────────────────
@@ -610,6 +659,32 @@ export function crearDialogoExpediente({ documento, alAvisar } = {}) {
     pieFicheros.append(boton)
   }
   grupoFicheros.append(pieFicheros)
+
+  // ⭐ 2026-09-25 · EL FICHERO DEL DISCO. Va en este grupo porque es lo mismo que
+  // «Guardar proyecto (.json)» sin tener que repetirlo: el mismo fichero, escrito solo
+  // en cada cambio. Nace ESCONDIDO entero, igual que «Instalar»: en Firefox y Safari no
+  // existe la API, y un botón apagado pediría un motivo que el usuario no puede
+  // resolver. Los tres botones existen siempre y `fijarDisco` decide cuáles se ven.
+  const bloqueDisco = crear('div')
+  bloqueDisco.dataset.expediente = 'disco'
+  bloqueDisco.hidden = true
+  const apunteDisco = crear('p', CLASE.APUNTE, APUNTE_DISCO)
+  apunteDisco.dataset.expediente = 'disco-estado'
+  const pieDisco = crear('div', CLASE.PIE)
+  const botonDisco = (accion, rotulo) => {
+    const boton = crear('button', 'gml-boton gml-boton--secundario', rotulo)
+    boton.type = 'button'
+    boton.dataset.accion = accion
+    pieDisco.append(boton)
+    return boton
+  }
+  const reanudar = botonDisco(ACCION.REANUDAR, 'Seguir con ese fichero')
+  const vincular = botonDisco(ACCION.VINCULAR, 'Guardar en un fichero del disco…')
+  const desvincular = botonDisco(ACCION.DESVINCULAR, 'Dejar de guardar en él')
+  reanudar.hidden = true
+  desvincular.hidden = true
+  bloqueDisco.append(apunteDisco, pieDisco)
+  grupoFicheros.append(bloqueDisco)
 
   // ── Pie ───────────────────────────────────────────────────────────────────
   const pie = crear('div', CLASE.PIE)
@@ -1045,6 +1120,40 @@ export function crearDialogoExpediente({ documento, alAvisar } = {}) {
      */
     estado(texto) {
       if (!destruido) estadoNodo.textContent = typeof texto === 'string' ? texto : ''
+    },
+
+    /**
+     * Enseña u oculta «Instalar como aplicación». Lo gobierna el cableado con lo que
+     * diga `pwa/instalacion.js#estado().disponible`: el botón solo existe mientras el
+     * navegador tenga una oferta sin usar.
+     *
+     * @param {boolean} disponible
+     */
+    ofrecerInstalacion(disponible) {
+      if (!destruido) bloqueInstalar.hidden = disponible !== true
+    },
+
+    /**
+     * Pinta el bloque del fichero del disco. Lo gobierna el cableado.
+     *
+     * @param {{disponible: boolean, vinculado: string|null, recordado: string|null}} datos
+     *   `vinculado`: el nombre del fichero en el que se está guardando ahora.
+     *   `recordado`: el de la sesión anterior, que se ofrece retomar. Con los dos, manda
+     *   `vinculado`: lo que se hace ahora pesa más que lo que se hizo.
+     */
+    fijarDisco({ disponible = false, vinculado = null, recordado = null } = {}) {
+      if (destruido) return
+      bloqueDisco.hidden = disponible !== true
+      if (vinculado !== null) {
+        apunteDisco.textContent = apunteVinculado(vinculado)
+      } else if (recordado !== null) {
+        apunteDisco.textContent = apunteRecordado(recordado)
+      } else {
+        apunteDisco.textContent = APUNTE_DISCO
+      }
+      vincular.hidden = vinculado !== null
+      desvincular.hidden = vinculado === null
+      reanudar.hidden = vinculado !== null || recordado === null
     },
 
     /**

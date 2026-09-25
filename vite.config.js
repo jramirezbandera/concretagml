@@ -1,5 +1,9 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
+
+import { componerServiceWorker, listaPrecache, versionDe } from './pwa/precache.js'
 
 // Concreta GML — F03 · tooling de la app (frontend puro).
 //
@@ -64,6 +68,66 @@ function gmlSinProj4() {
 }
 
 /**
+ * Los ficheros de `public/`, con su ruta relativa y su contenido. Vite los copia tal
+ * cual a `dist/` y NO pasan por el bundle, así que el plugin de abajo no los ve en
+ * `generateBundle` y tiene que leerlos él.
+ *
+ * @param {string} dir
+ * @param {string} [prefijo='']
+ * @returns {Array<[string, Buffer]>}
+ */
+function ficherosPublicos(dir, prefijo = '') {
+  let entradas
+  try {
+    entradas = readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return []
+  }
+  return entradas.flatMap((e) => {
+    const rel = prefijo === '' ? e.name : `${prefijo}/${e.name}`
+    if (e.isDirectory()) return ficherosPublicos(join(dir, e.name), rel)
+    return e.isFile() ? [[rel, readFileSync(join(dir, e.name))]] : []
+  })
+}
+
+/**
+ * **El service worker se compone en el build, y no es un fichero de `public/`**
+ * (2026-09-25). La plantilla es `pwa/sw.js`; este plugin le escribe la lista de lo que
+ * hay que precachear —que solo existe cuando el paquete ya tiene sus nombres con
+ * hash— y una versión derivada del contenido, y la emite como `dist/sw.js`. El porqué
+ * de la versión está en la cabecera de `pwa/precache.js`.
+ *
+ * `enforce: 'post'` para llegar DESPUÉS de que Vite emita `index.html`, que es la
+ * portada y la primera entrada de la lista. `apply: 'build'`: en `npm run dev` no hay
+ * service worker —ni se registra, ver `app/main.js`—, porque interceptaría la recarga
+ * en caliente.
+ *
+ * @returns {import('vite').Plugin}
+ */
+function gmlServiceWorker() {
+  return {
+    name: 'gml-service-worker',
+    apply: 'build',
+    enforce: 'post',
+    generateBundle(_opciones, bundle) {
+      const ficheros = [
+        ...Object.values(bundle).map((f) => [f.fileName, f.type === 'chunk' ? f.code : f.source]),
+        ...ficherosPublicos(join(root, 'public')),
+      ]
+      const plantilla = readFileSync(join(root, 'pwa', 'sw.js'), 'utf8')
+      this.emitFile({
+        type: 'asset',
+        fileName: 'sw.js',
+        source: componerServiceWorker(plantilla, {
+          precache: listaPrecache(ficheros.map(([ruta]) => ruta)),
+          version: versionDe(ficheros),
+        }),
+      })
+    },
+  }
+}
+
+/**
  * Prefijo de TODAS las URL que el bundle genera. Vale el nombre del repositorio
  * porque GitHub Pages de proyecto publica en `https://<usuario>.github.io/<repo>/`,
  * no en la raíz del dominio.
@@ -96,5 +160,5 @@ const BASE_PAGES = '/concretagml/'
 export default defineConfig({
   root,
   base: BASE_PAGES,
-  plugins: [gmlSinProj4()],
+  plugins: [gmlSinProj4(), gmlServiceWorker()],
 })

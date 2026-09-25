@@ -5,6 +5,36 @@ contexto y qué la bloquea, para que retomarla no cueste rediseñarla.
 
 ---
 
+## La aplicación instalable y el fichero del disco: lo que falta medir en Chrome
+
+**Anotada el 2026-09-25**, el mismo día en que entraron `pwa/` y
+`storage/fichero-disco.js`. Las dos cosas están probadas por fuera —el service worker
+se ejecuta de verdad en un `vm` (`test/pwa/precache.test.js`) y el vínculo con el
+`crearFicheroDisco` real sobre dobles del navegador—, pero **ninguna de las APIs que
+usan existe en jsdom**, así que lo que sigue solo lo puede firmar un navegador:
+
+1. **Que Chrome ofrezca instalar** en `https://…/concretagml/` (icono en la barra de
+   direcciones y el botón del diálogo). Si no lo ofrece, mirar primero las DevTools,
+   pestaña Application › Manifest: dice qué requisito falla.
+2. **Que `persist()` diga que sí tras instalar.** Es la premisa de toda la mitad
+   PWA y está escrita en `storage/cuota.js` como lo que Chrome hace, no como algo
+   medido aquí. El acuse lo dice sea cual sea la respuesta; lo que falta es saberla.
+3. **Que abra sin conexión**: instalar, cargar, cortar la red, recargar.
+4. **Que un despliegue nuevo llegue**: con la versión vieja instalada, publicar y
+   recargar CON red — la portada va por red primero, así que tiene que verse la
+   nueva sin cerrar nada.
+5. **El fichero del disco en una carpeta de OneDrive**, que es el caso real: que el
+   `.crswap` temporal no se quede al lado y que un «bloqueado» mientras sincroniza se
+   reintente en el siguiente cambio en vez de soltar el vínculo.
+6. **«Seguir con ese fichero» tras cerrar el navegador entero**: que pida el permiso
+   con un solo clic y que el fichero reabierto siga recibiendo los cambios.
+
+**Por dónde empezar.** `npm run build && npx vite preview` sirve el artefacto con el
+service worker —en `npm run dev` no se registra a propósito—, en
+`http://localhost:4173/concretagml/`. `localhost` cuenta como contexto seguro.
+
+---
+
 ## Revisión de diseño del 2026-09-25: lo que quedó para decidir
 
 **Anotada tras `/design-review`** (Chrome a 1440×900, 1280×720 y hasta 375 px, sobre

@@ -539,6 +539,8 @@ import { serializarParcelaCp } from '../gml/serialize-cp.js'
 // viejo cuando el modelo estrene un origen. Escribirlo a mano aquí es exactamente
 // lo que produjo el defecto que el guion 17 destapó.
 import { ORIGEN_PARCELA } from '../model/parcela.js'
+import { crearInstalacion } from '../pwa/instalacion.js'
+import { registrarServiceWorker } from '../pwa/registro.js'
 import { crearTransporte } from '../services/_red.js'
 import { crearClienteCatastro } from '../services/catastro.js'
 import { crearClienteEdificio } from '../services/catastro-edificio.js'
@@ -547,6 +549,7 @@ import { abrirBd } from '../storage/bd.js'
 import { crearCacheCatastro } from '../storage/cache-catastro.js'
 import { crearCuota } from '../storage/cuota.js'
 import { crearExpedientes } from '../storage/expedientes.js'
+import { crearFicheroDisco } from '../storage/fichero-disco.js'
 import { crearPieDeFirmaGuardado } from '../storage/pie-firma.js'
 import { validarParcela } from '../validation/parcela.js'
 import { crearEstadoVista, NIVEL } from '../viewer/_comun.js'
@@ -5455,6 +5458,16 @@ contrasteEdificioCableado.alContraste(() => refrescarHechos())
 // **`index.html` aporta un botón y nada más**: el `<dialog>` lo fabrica
 // `app/dialogo-expediente.js`, igual que hicieron `app/zona-fichero.js`, los dos
 // cajones y el diálogo de F09.
+
+/**
+ * ⭐ La oferta de instalar la aplicación (2026-09-25). Se crea AQUÍ, en el montaje y
+ * antes de registrar el service worker (paso 12b), para no perder el
+ * `beforeinstallprompt`: el navegador lo emite una vez cuando la página cumple los
+ * requisitos, y quien no esté escuchando entonces no lo vuelve a oír hasta la próxima
+ * carga. Ver `pwa/instalacion.js`.
+ */
+const instalacion = crearInstalacion({ ventana: window })
+
 expedienteCableado = cablearExpediente({
   // El MISMO store que las otras seis vistas.
   estado,
@@ -5517,7 +5530,36 @@ expedienteCableado = cablearExpediente({
     comprobacionCableada !== null && typeof comprobacionCableada.elegirFichero === 'function'
       ? () => comprobacionCableada.elegirFichero()
       : null,
+  // ⭐ 2026-09-25 · la oferta de instalar, para el botón que vive junto a la
+  // durabilidad. Ver {@link instalacion} justo abajo.
+  instalacion,
+  // ⭐ 2026-09-25 · el expediente autoguardado en un fichero del disco (Chrome y Edge;
+  // en los demás `disponible` es `false` y no se enseña nada). Recuerda el último
+  // fichero en la MISMA base que todo lo demás —`abrirBd` memoiza su conexión—.
+  ficheroDisco: crearFicheroDisco({
+    ventana: window,
+    bd: abrirBd({ alAvisar: panel.avisar }),
+    alAvisar: panel.avisar,
+  }),
 })
+
+// ── 12b · La aplicación instalable (2026-09-25) ──────────────────────────────
+//
+// `AVISO_SIN_PERSISTENCIA` lleva desde F10 aconsejando «instálala como aplicación», y
+// hasta hoy no se podía: no había manifiesto ni service worker. Lo segundo se registra
+// aquí, SOLO en el build: en `npm run dev` interceptaría la recarga en caliente, y bajo
+// Vitest `import.meta.env.PROD` es `false`. Tras el evento `load` y no antes, para que
+// el precache —que vuelve a pedir el paquete entero— no compita con el primer pintado.
+// Un fallo no se cuenta en el panel: ver la cabecera de `pwa/registro.js`.
+if (import.meta.env.PROD) {
+  window.addEventListener(
+    'load',
+    () => {
+      registrarServiceWorker({ url: `${import.meta.env.BASE_URL}sw.js` })
+    },
+    { once: true },
+  )
+}
 
 
 // ── 14 · EL RAIL DE NAVEGACIÓN (rework de UI · T5) ───────────────────────────

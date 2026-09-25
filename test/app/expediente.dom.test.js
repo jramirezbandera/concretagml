@@ -64,7 +64,17 @@ import { IDBFactory } from 'fake-indexeddb'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { crearDialogoAvisos } from '../../app/dialogo-avisos.js'
+import { crearInstalacion } from '../../pwa/instalacion.js'
+import { crearFicheroDisco } from '../../storage/fichero-disco.js'
 import {
+  MENSAJE_REANUDAR_SIN_PERMISO,
+  mensajeDesvinculado,
+  mensajeReanudado,
+  mensajeVinculado,
+  mensajeVinculoSoltado,
+  MENSAJE_INSTALADA_CON_PERSISTENCIA,
+  MENSAJE_INSTALADA_SIN_PERSISTENCIA,
+  MENSAJE_SIN_INSTALAR,
   COLETILLA_SIN_PERSISTENCIA,
   DOCUMENTO,
   EXTENSIONES_PROYECTO,
@@ -305,6 +315,13 @@ async function montar({
   // Entra por parámetro desde T7: un `url` sin `createObjectURL` es la forma limpia de
   // provocar que `descargarTexto` NO entregue, sin doblar el módulo entero.
   url = espiaUrl(),
+  // 2026-09-25 · la aplicación instalable: la oferta, y una cuota cuya respuesta pueda
+  // cambiar a mitad de prueba (la de abajo contesta siempre lo mismo).
+  instalacion = null,
+  cuota: cuotaPropia = null,
+  ficheroDisco = null,
+  // El acuse de la barra: es donde se lee lo que pasa con el diálogo ya cerrado.
+  acuse = null,
 } = {}) {
   const apertura = bd ?? (await baseNueva())
   let reloj = Date.UTC(2026, 7, 3, 10, 0, 0)
@@ -315,7 +332,7 @@ async function montar({
     almacen ??
     crearExpedientes({ bd: apertura, ahora: () => reloj, alAvisar: panel.avisar })
   const persistencias = []
-  const cuota = {
+  const cuota = cuotaPropia ?? {
     async pedirPersistencia() {
       persistencias.push(true)
       return { ok: true, persistido, yaEstaba: persistido, motivo: null, mensaje: null, causa: null }
@@ -357,6 +374,9 @@ async function montar({
     programar: timers.programar,
     cancelar: timers.cancelar,
     url,
+    instalacion,
+    ficheroDisco,
+    acuse,
   })
 
   await reposar()
@@ -2779,6 +2799,376 @@ describe('cableado-expediente · dos proyectos encabalgados: manda el ÚLTIMO', 
     await enVuelo
 
     expect(m.avisos().join('\n')).not.toContain('No se ha cargado')
+    m.desmontar()
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ⭐ 2026-09-25 · «Instalar como aplicación»
+//
+// `AVISO_SIN_PERSISTENCIA` aconseja instalar desde F10 y hasta hoy no había forma. El
+// botón vive junto a la durabilidad, existe solo mientras el navegador ofrece
+// instalar, y tras instalar se le VUELVE a preguntar por la persistencia: lo que
+// conteste es lo que se dice. Se prueba con la `crearInstalacion` real sobre un
+// `EventTarget`, y un `beforeinstallprompt` de mentira.
+describe('2026-09-25 · la aplicación instalable, desde el diálogo del expediente', () => {
+  const selectorInstalar = '[data-accion="instalar-aplicacion"]'
+  const bloqueInstalar = () => document.querySelector('[data-expediente="instalar"]')
+
+  function oferta(outcome = 'accepted') {
+    const e = new Event('beforeinstallprompt', { cancelable: true })
+    e.prompt = vi.fn(async () => {})
+    e.userChoice = Promise.resolve({ outcome })
+    return e
+  }
+
+  /** Una cuota que dice que NO hasta que se instala, y que SÍ después. */
+  function cuotaQueCambia() {
+    let persistido = false
+    return {
+      conceder: () => (persistido = true),
+      preguntas: 0,
+      async pedirPersistencia() {
+        this.preguntas += 1
+        return { ok: true, persistido, yaEstaba: false, motivo: null, mensaje: null, causa: null }
+      },
+    }
+  }
+
+  it('sin oferta del navegador, el botón NO aparece (ni apagado: escondido)', async () => {
+    const m = await montar({ instalacion: crearInstalacion({ ventana: new EventTarget() }) })
+    await abrir(m)
+    expect(bloqueInstalar().hidden).toBe(true)
+    m.desmontar()
+  })
+
+  it('sin `instalacion` (el montaje de siempre), tampoco', async () => {
+    const m = await montar()
+    await abrir(m)
+    expect(bloqueInstalar().hidden).toBe(true)
+    m.desmontar()
+  })
+
+  it('con oferta aparece; pulsado, instala, vuelve a preguntar y dice lo que contesta', async () => {
+    const ventana = new EventTarget()
+    const cuota = cuotaQueCambia()
+    const m = await montar({ instalacion: crearInstalacion({ ventana }), cuota })
+    const e = oferta('accepted')
+    ventana.dispatchEvent(e)
+    await abrir(m)
+    expect(bloqueInstalar().hidden).toBe(false)
+
+    const preguntasAntes = cuota.preguntas
+    cuota.conceder()
+    pulsar(selectorInstalar)
+    await reposar()
+
+    expect(e.prompt).toHaveBeenCalledTimes(1)
+    expect(cuota.preguntas, 'tras instalar se vuelve a preguntar').toBe(preguntasAntes + 1)
+    expect(m.renglon()).toBe(MENSAJE_INSTALADA_CON_PERSISTENCIA)
+    expect(m.cableado.estado().persistido).toBe(true)
+    // La oferta se gastó: el botón se va.
+    expect(bloqueInstalar().hidden).toBe(true)
+    m.desmontar()
+  })
+
+  it('instalada pero el navegador sigue diciendo que no: se dice, no se promete', async () => {
+    const ventana = new EventTarget()
+    const m = await montar({ instalacion: crearInstalacion({ ventana }), cuota: cuotaQueCambia() })
+    ventana.dispatchEvent(oferta('accepted'))
+    await abrir(m)
+    pulsar(selectorInstalar)
+    await reposar()
+    expect(m.renglon()).toBe(MENSAJE_INSTALADA_SIN_PERSISTENCIA)
+    m.desmontar()
+  })
+
+  it('si el usuario dice que no, se dice sin tono de error y no se vuelve a preguntar', async () => {
+    const ventana = new EventTarget()
+    const cuota = cuotaQueCambia()
+    const m = await montar({ instalacion: crearInstalacion({ ventana }), cuota })
+    ventana.dispatchEvent(oferta('dismissed'))
+    await abrir(m)
+    const preguntasAntes = cuota.preguntas
+    pulsar(selectorInstalar)
+    await reposar()
+    expect(m.renglon()).toBe(MENSAJE_SIN_INSTALAR.RECHAZADA)
+    expect(cuota.preguntas).toBe(preguntasAntes)
+    m.desmontar()
+  })
+
+  it('los textos nuevos pasan la higiene de la casa: sin Markdown crudo ni mérito', () => {
+    for (const texto of [
+      MENSAJE_INSTALADA_CON_PERSISTENCIA,
+      MENSAJE_INSTALADA_SIN_PERSISTENCIA,
+      ...Object.values(MENSAJE_SIN_INSTALAR),
+    ]) {
+      expect(texto).not.toMatch(/[`*_]/)
+      expect(texto).not.toMatch(/\b(válid|correct|perfect|éxito)/i)
+    }
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ⭐ 2026-09-25 · el expediente autoguardado en un fichero del disco
+//
+// Con el `crearFicheroDisco` REAL: lo doble es lo que el navegador pone —la ventana
+// con `showSaveFilePicker`, el `FileSystemFileHandle` y la base—. Un handle de mentira
+// con métodos no se puede clonar a IndexedDB (el de verdad sí), así que la base es un
+// `Map` con la forma de `idb`; el peldaño 4 de la escalera lo prueba `test/storage/`.
+describe('2026-09-25 · el expediente autoguardado en un fichero del disco', () => {
+  const NOMBRE = 'proyecto_encargo.json'
+  const apunteDisco = () => document.querySelector('[data-expediente="disco-estado"]').textContent
+  const bloqueDisco = () => document.querySelector('[data-expediente="disco"]')
+  const boton = (accion) => document.querySelector(`[data-accion="${accion}"]`)
+
+  const errorDe = (nombre) => Object.assign(new Error(nombre), { name: nombre })
+
+  function asaFalsa(nombre = NOMBRE) {
+    const asa = {
+      name: nombre,
+      escrito: [],
+      fallo: null,
+      permiso: 'granted',
+      async createWritable() {
+        if (asa.fallo) throw errorDe(asa.fallo)
+        let buffer = ''
+        return {
+          async write(t) {
+            buffer += t
+          },
+          async close() {
+            asa.escrito.push(buffer)
+          },
+          async abort() {},
+        }
+      },
+      async queryPermission() {
+        return asa.permiso
+      },
+      async requestPermission() {
+        return asa.permiso
+      },
+      async getFile() {
+        return { name: nombre, text: async () => asa.escrito.at(-1) ?? '' }
+      },
+    }
+    return asa
+  }
+
+  function baseFalsa() {
+    const datos = new Map()
+    return {
+      async get(a, k) {
+        return datos.get(`${a}/${k}`)
+      },
+      async put(a, r) {
+        datos.set(`${a}/${r.id}`, r)
+      },
+      async delete(a, k) {
+        datos.delete(`${a}/${k}`)
+      },
+    }
+  }
+
+  function disco({ asa = asaFalsa(), bd = baseFalsa() } = {}) {
+    const showSaveFilePicker = vi.fn(async () => asa)
+    return {
+      asa,
+      bd,
+      showSaveFilePicker,
+      ficheroDisco: crearFicheroDisco({ ventana: { showSaveFilePicker }, bd }),
+    }
+  }
+
+  /** Una edición del MISMO documento: objeto nuevo, misma identidad local. */
+  const editar = (m) => m.estado.set({ ...m.estado.get() })
+
+  async function vincular(m) {
+    await abrir(m)
+    pulsar('[data-accion="vincular-fichero"]')
+    await reposar()
+  }
+
+  it('sin API (Firefox, Safari) o sin `ficheroDisco`, el bloque no aparece', async () => {
+    const m = await montar({ ficheroDisco: crearFicheroDisco({ ventana: {} }) })
+    await abrir(m)
+    expect(bloqueDisco().hidden).toBe(true)
+    m.desmontar()
+    const m2 = await montar()
+    await abrir(m2)
+    expect(bloqueDisco().hidden).toBe(true)
+    m2.desmontar()
+  })
+
+  it('con API aparece, y de entrada solo ofrece «Guardar en un fichero del disco…»', async () => {
+    const m = await montar({ ficheroDisco: disco().ficheroDisco })
+    await abrir(m)
+    expect(bloqueDisco().hidden).toBe(false)
+    expect(boton('vincular-fichero').hidden).toBe(false)
+    expect(boton('desvincular-fichero').hidden).toBe(true)
+    expect(boton('reanudar-fichero').hidden).toBe(true)
+    m.desmontar()
+  })
+
+  it('vincular vuelca YA el proyecto, lo recuerda, y cada cambio se escribe solo', async () => {
+    const d = disco()
+    const m = await montar({ ficheroDisco: d.ficheroDisco })
+    await vincular(m)
+
+    expect(d.showSaveFilePicker.mock.calls[0][0].suggestedName).toMatch(/^proyecto_.*\.json$/)
+    expect(d.asa.escrito, 'el primer volcado es inmediato').toHaveLength(1)
+    const leido = deProyecto(d.asa.escrito[0])
+    expect(leido.ok, 'lo escrito es un fichero de proyecto que la app sabe reabrir').toBe(true)
+    expect(leido.expediente.parcela.recintos.length).toBeGreaterThan(0)
+
+    expect(m.renglon()).toBe(mensajeVinculado(NOMBRE))
+    expect(m.cableado.estado().vinculo).toBe(NOMBRE)
+    expect(apunteDisco()).toContain(`«${NOMBRE}»`)
+    expect(boton('desvincular-fichero').hidden).toBe(false)
+    expect(boton('vincular-fichero').hidden).toBe(true)
+    expect((await d.ficheroDisco.ultimo()).nombre, 'recordado para la próxima sesión').toBe(NOMBRE)
+
+    editar(m)
+    m.timers.disparar()
+    await reposar()
+    expect(d.asa.escrito).toHaveLength(2)
+    m.desmontar()
+  })
+
+  it('cerrar el selector no vincula ni dice nada', async () => {
+    const d = disco()
+    d.showSaveFilePicker.mockImplementation(async () => {
+      throw errorDe('AbortError')
+    })
+    const m = await montar({ ficheroDisco: d.ficheroDisco })
+    await abrir(m)
+    const antes = m.renglon()
+    pulsar('[data-accion="vincular-fichero"]')
+    await reposar()
+    expect(m.renglon()).toBe(antes)
+    expect(m.cableado.estado().vinculo).toBeNull()
+    m.desmontar()
+  })
+
+  it('⛔ si entra OTRO documento se suelta y se dice: el fichero no se pisa con él', async () => {
+    const d = disco()
+    const m = await montar({ ficheroDisco: d.ficheroDisco })
+    await vincular(m)
+
+    m.estado.set(parcelaDemoConHueco()) // otra identidad local
+    m.timers.disparar()
+    await reposar()
+    expect(d.asa.escrito, 'el fichero conserva el expediente anterior').toHaveLength(1)
+    expect(m.cableado.estado().vinculo).toBeNull()
+    expect(m.avisos()).toContain(mensajeVinculoSoltado(NOMBRE))
+    m.desmontar()
+  })
+
+  it('sin permiso (retirado) se suelta, y se dice como error con qué hacer', async () => {
+    const d = disco()
+    const m = await montar({ ficheroDisco: d.ficheroDisco })
+    await vincular(m)
+    d.asa.fallo = 'NotAllowedError'
+    editar(m)
+    m.timers.disparar()
+    await reposar()
+    expect(m.cableado.estado().vinculo).toBeNull()
+    expect(m.avisos().some((t) => t.includes('permiso') && t.includes('Elige otro fichero'))).toBe(true)
+    m.desmontar()
+  })
+
+  it('bloqueado por otro programa: se dice UNA vez y se sigue intentando', async () => {
+    const d = disco()
+    const m = await montar({ ficheroDisco: d.ficheroDisco })
+    await vincular(m)
+    d.asa.fallo = 'NoModificationAllowedError'
+    for (let i = 0; i < 2; i += 1) {
+      editar(m)
+      m.timers.disparar()
+      await reposar()
+    }
+    expect(m.cableado.estado().vinculo).toBe(NOMBRE)
+    expect(m.avisos().filter((t) => t.includes('otro programa'))).toHaveLength(1)
+
+    d.asa.fallo = null
+    editar(m)
+    m.timers.disparar()
+    await reposar()
+    expect(d.asa.escrito).toHaveLength(2)
+    m.desmontar()
+  })
+
+  it('«Dejar de guardar en él» escribe lo pendiente, lo olvida y ya no escribe más', async () => {
+    const d = disco()
+    const m = await montar({ ficheroDisco: d.ficheroDisco })
+    await vincular(m)
+    editar(m) // pendiente, sin disparar
+    // Se deja reposar el repintado que esa edición le pide al diálogo abierto: si no,
+    // llega DESPUÉS del acuse y lo vacía, que es el contrato de `fijar`.
+    await reposar()
+    pulsar('[data-accion="desvincular-fichero"]')
+    await reposar()
+    expect(d.asa.escrito, 'lo pendiente no se pierde al soltar').toHaveLength(2)
+    expect(m.renglon()).toBe(mensajeDesvinculado(NOMBRE))
+    expect((await d.ficheroDisco.ultimo()).recordado).toBe(false)
+
+    editar(m)
+    m.timers.disparar()
+    await reposar()
+    expect(d.asa.escrito).toHaveLength(2)
+    m.desmontar()
+  })
+
+  it('la sesión siguiente OFRECE retomarlo; pulsado, pide permiso, lo abre y sigue escribiendo', async () => {
+    const bd = baseFalsa()
+    const d1 = disco({ bd })
+    const m1 = await montar({ ficheroDisco: d1.ficheroDisco })
+    await vincular(m1)
+    m1.desmontar()
+
+    // Sesión nueva: la pantalla arranca vacía, y el permiso hay que volver a pedirlo.
+    document.body.innerHTML = CUERPO_INDEX
+    d1.asa.permiso = 'prompt'
+    d1.asa.requestPermission = vi.fn(async () => 'granted')
+    const acuses = []
+    const m2 = await montar({
+      parcela: null,
+      ficheroDisco: crearFicheroDisco({ ventana: { showSaveFilePicker: vi.fn() }, bd }),
+      acuse: (texto) => acuses.push(texto),
+    })
+    await abrir(m2)
+    expect(apunteDisco()).toContain(`La última vez se guardaba en «${NOMBRE}»`)
+    expect(boton('reanudar-fichero').hidden).toBe(false)
+
+    pulsar('[data-accion="reanudar-fichero"]')
+    await reposar()
+    expect(d1.asa.requestPermission).toHaveBeenCalledWith({ mode: 'readwrite' })
+    expect(m2.estado.get()?.recintos?.length, 'el fichero se ha abierto').toBeGreaterThan(0)
+    expect(m2.cableado.estado().vinculo).toBe(NOMBRE)
+    // Abrir el proyecto cierra el diálogo: la confirmación se lee en la barra.
+    expect(acuses).toContain(mensajeReanudado(NOMBRE))
+
+    editar(m2)
+    m2.timers.disparar()
+    await reposar()
+    expect(d1.asa.escrito).toHaveLength(2)
+    m2.desmontar()
+  })
+
+  it('si al retomar el navegador no da permiso, se dice y no se abre nada', async () => {
+    const bd = baseFalsa()
+    const asa = asaFalsa()
+    asa.escrito.push('{}')
+    asa.permiso = 'denied'
+    await crearFicheroDisco({ ventana: {}, bd }).recordar(asa)
+    const m = await montar({ parcela: null, ficheroDisco: disco({ asa, bd }).ficheroDisco })
+    await abrir(m)
+    pulsar('[data-accion="reanudar-fichero"]')
+    await reposar()
+    expect(m.renglon()).toBe(MENSAJE_REANUDAR_SIN_PERMISO)
+    expect(m.estado.get()).toBeNull()
+    expect(m.cableado.estado().vinculo).toBeNull()
     m.desmontar()
   })
 })
