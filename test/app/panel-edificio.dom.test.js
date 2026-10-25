@@ -39,6 +39,7 @@ import {
   CLASE,
   CLASE_REUTILIZADA,
   DIALOGO,
+  FALTAN_PLANTAS,
   INTRO_ATRIBUTOS,
   INTRO_CAPAS,
   MENSAJE_OYENTE_ROTO,
@@ -716,6 +717,25 @@ describe('app/panel-edificio · la lista de partes', () => {
     expect(cuenta()).toBe('1 parte')
     panel.fijar({ edificio: EDIFICIO_SIMPLE })
     expect(cuenta()).toBe('3 partes')
+  })
+
+  it('⭐ la fila dice «faltan plantas» donde el validador lo diría, y solo ahí', () => {
+    // 2026-10-25 · Con trece partes, saber cuál faltaba obligaba a abrirlas una a
+    // una. La regla es la de `validation/edificio.js`: PRINCIPAL, con contorno y
+    // sin plantas sobre rasante. La que no tiene contorno ya lo dice su dato.
+    const faltas = () =>
+      [...panel.seccionPartes.querySelectorAll(`.${CLASE.PARTE}`)].map(
+        (li) => li.querySelector(`.${CLASE.PARTE_FALTA}`)?.textContent ?? null,
+      )
+    panel.fijar({ edificio: EDIFICIO_SIMPLE })
+    expect(faltas()).toEqual([FALTAN_PLANTAS, FALTAN_PLANTAS, null])
+    panel.fijar({ edificio: EDIFICIO_F12 })
+    const conPlantas = EDIFICIO_F12.partes.map((p) =>
+      p.tipo === TIPO_PARTE.PRINCIPAL && p.recinto !== null && p.plantasSobreRasante === null
+        ? FALTAN_PLANTAS
+        : null,
+    )
+    expect(faltas()).toEqual(conPlantas)
   })
 
   it('⛔ el `<ul>` del contrato es SIEMPRE el mismo nodo: nunca se sustituye', () => {

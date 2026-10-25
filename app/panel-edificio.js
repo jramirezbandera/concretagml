@@ -254,6 +254,8 @@ export const CLASE = Object.freeze({
   PARTE_ACTIVA: 'gml-parte--activa',
   PARTE_NOMBRE: 'gml-parte-nombre',
   PARTE_DATO: 'gml-parte-dato',
+  /** ⭐ 2026-10-25 · «faltan plantas» en la fila de una parte. */
+  PARTE_FALTA: 'gml-parte-falta',
   PARTES_VACIO: 'gml-partes-vacio',
 
   ACTIVA_ROTULO: 'gml-parte-activa-rotulo',
@@ -549,14 +551,16 @@ const LOS_SIETE = ATRIBUTOS_COMPLETO.map((c) => ROTULO_ATRIBUTO[c]).join(', ')
  * @readonly
  */
 export const APUNTE_MODELO = Object.freeze({
+  // ⭐ 2026-10-25 · Recortados a la mitad: eran seis renglones de letra pequeña ANTES
+  // de traer nada, lo primero que se leía de esta rama («es difícil de entender los
+  // pasos», dijo el autor). Lo que se pierde al elegir SIMPLIFICADO sigue dicho, y
+  // COMPLETO sigue nombrando los siete: son las dos cosas que vigila la suite.
   [MODELO_EDIFICIO.SIMPLIFICADO]:
-    'Geometría de las partes, referencia catastral y estado. Es el modelo que admite el ICUC ' +
-    'y es el caso más frecuente. Al elegirlo se borran los siete atributos del edificio, si los ' +
-    'hubiera: volver a «Completo» los repone vacíos, no con los valores de antes.',
+    'Huellas de las partes, referencia y estado: lo que admite el ICUC y lo más habitual. Si ' +
+    'vienes de «Completo», se borran los siete atributos del edificio.',
   [MODELO_EDIFICIO.COMPLETO]:
-    `Añade siete atributos del edificio en su conjunto (${LOS_SIETE}), que se rellenan en una ` +
-    'ventana aparte, con el botón «Atributos» de aquí arriba. Las plantas no van ahí: van por ' +
-    'parte, y esta versión todavía no las pide.',
+    `Suma siete atributos del edificio (${LOS_SIETE}), que se rellenan con el botón ` +
+    '«Atributos». Las plantas van por parte.',
 })
 
 /**
@@ -573,6 +577,26 @@ export const APUNTE_MODELO = Object.freeze({
  * están en `.gml-bloque--vias`, que no es de nadie y se ve en las dos ramas, así
  * que el verbo pasa a ser «elegir o soltar» — que es lo que se puede hacer.
  */
+/**
+ * ⭐ 2026-10-25 · Lo que se lee en la FILA de una parte principal sin plantas.
+ *
+ * Encargo del autor: el edificio «es difícil de entender los pasos y cómo hay que
+ * hacerlo». Medido: con trece partes, lo único que decía cuáles faltaban por
+ * completar era el renglón de «Generar GML» —una frase larga, lejos de la lista— y
+ * para saber cuál era había que abrirlas una a una. La regla es la de
+ * `validation/edificio.js` (PRINCIPAL con `plantasSobreRasante === null`), y la
+ * lista solo la ENSEÑA: no decide nada que el validador no decida ya.
+ *
+ * Es un HECHO sobre el dato que falta, no un juicio: el punto ámbar es del estado
+ * de la aplicación («esto te impedirá generar»), y la palabra va en negro
+ * (DESIGN.md §3.3).
+ */
+export const FALTAN_PLANTAS = 'faltan plantas'
+
+/** ¿A esta fila le faltan las plantas que pide el validador? @param {FilaParte} parte */
+export const faltanPlantas = (parte) =>
+  parte.tipo === TIPO_PARTE.PRINCIPAL && parte.sobre === null && parte.tieneRecinto === true
+
 export const SIN_PARTES =
   'Todavía no hay ninguna parte. Hay cinco maneras de traer las huellas: elegir o soltar un DXF ' +
   '(cada polilínea del dibujo se ofrece como una parte), pegar un listado LIST, cargar un ' +
@@ -1669,6 +1693,7 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
       // pulsado, es CUÁL de los elementos de una lista es el actual.
       if (activa === i) elegir.setAttribute('aria-current', 'true')
       li.append(elegir)
+      if (faltanPlantas(parte)) li.append(crear('span', CLASE.PARTE_FALTA, FALTAN_PLANTAS))
       li.append(crear('span', CLASE.PARTE_DATO, parte.dato))
     }
 

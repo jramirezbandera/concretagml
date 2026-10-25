@@ -441,6 +441,14 @@
              que arranca VACÍA, «Parcela cargada» es falso al abrir y sigue siendo
              falso hasta que el usuario traiga algo — y es la primera línea que se
              lee de la pantalla. Ahora dice lo que hay. -->
+        <!-- ⭐ QUÉ GML GENERAS (2026-10-25). El conmutador Parcela / Edificio lo
+             fabrica `app/rama.js` y `app/main.js` lo monta en este hueco. Antes
+             vivía en `.gml-chips` de la barra, al lado de «0 errores», y se leía
+             como un filtro; es la primera decisión del trabajo y va la primera. -->
+        <div class="gml-rama-fila">
+          <span class="gml-rama-fila-rotulo">Qué GML generas</span>
+          <div class="gml-rama-hueco" data-rama-hueco></div>
+        </div>
         <p class="gml-eyebrow" data-eyebrow>Sin parcela</p>
 
         <!-- ── QUÉ GEOMETRÍAS HAY CARGADAS (2026-08-08) ────────────────────
@@ -1499,18 +1507,6 @@
             ></p>
           </div>
 
-          <div class="gml-accion">
-            <button
-              type="button"
-              class="gml-boton gml-boton--secundario"
-              data-accion="diagnosticar"
-              disabled
-            >
-              Diagnosticar encaje
-            </button>
-            <p class="gml-accion-estado" data-estado="diagnosticar" role="status"></p>
-          </div>
-
           <!-- ── F17 · «Rehacer el parcelario» ─────────────────────────────
                EL TERCER CTA DE VALIDACIÓN, y el que cierra el hueco que dejaba
                a la aplicación sin poder entregar **más de 1 de cada 5**
@@ -1559,7 +1555,12 @@
           <!-- ⚠️ El rótulo es un VERBO EN INFINITIVO como sus dos hermanos
                («Generar GML», «Diagnosticar encaje»): el pie promete acciones,
                no nombra pantallas. -->
-          <div class="gml-accion">
+          <!-- ⭐ 2026-10-25 · SOLO EN PARCELA. Rehace el parcelario de la PARCELA, y en la
+               rama Edificio la parcela es contexto: el botón se leía como una tarea
+               más del edificio («la parte de edificio también es un caos», dijo el
+               autor). `.gml-solo-parcela` ya existía y lo apaga por CSS desde
+               `data-rama`; el nodo sigue en el DOM con su cableado intacto. -->
+          <div class="gml-accion gml-solo-parcela">
             <button
               type="button"
               class="gml-boton gml-boton--secundario"
@@ -1569,6 +1570,29 @@
               Rehacer el parcelario
             </button>
             <p class="gml-accion-estado" data-estado="rehacer-parcelario" role="status"></p>
+          </div>
+
+          <!-- ⭐ «DIAGNOSTICAR ENCAJE» ES EL BOTÓN «SIGUIENTE» DE EDICIÓN (2026-10-25).
+               Encargo del autor: el usuario no sabía qué pulsar ni en qué paso.
+               Este botón ya llevaba al Diagnóstico y abría el cajón, así que en vez
+               de poner al lado un segundo botón que hiciera lo mismo, éste se vuelve
+               PRIMARIO, pasa al FINAL del pie —donde termina la lectura— y dice que
+               es el paso siguiente. En Entrada, la guía es `app/siguiente-paso.js`,
+               que en Edición se calla para no repetir éste.
+               El rótulo va por rama con `.gml-solo-parcela`/`.gml-solo-edificio`:
+               el botón es el mismo nodo en las dos (lo gobierna `app/rama.js`).
+               `data-accion` y `data-estado` no cambian: son contrato de F07. -->
+          <div class="gml-accion">
+            <button
+              type="button"
+              class="gml-boton gml-boton--primario"
+              data-accion="diagnosticar"
+              disabled
+            >
+              <span class="gml-solo-parcela">Siguiente: diagnosticar el encaje →</span>
+              <span class="gml-solo-edificio">Siguiente: contrastar con el Catastro →</span>
+            </button>
+            <p class="gml-accion-estado" data-estado="diagnosticar" role="status"></p>
           </div>
         </div>
       </footer>

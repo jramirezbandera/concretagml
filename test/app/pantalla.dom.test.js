@@ -707,11 +707,18 @@ describe('rebanada 2 · el pie enseña lo de cada pantalla', () => {
     // ⚠️ Y GASTA LA CUARTA PLAZA de un pie cuyo techo el proyecto midió en TRES el
     // 2026-08-08. El precio en píxeles —el pie medía 209,47 px con dos— no lo puede
     // ver este test: lo mide el guion de humo 16.
+    //
+    // ⭐ **Y EL 2026-10-25 «DIAGNOSTICAR» PASA AL FINAL**, primario y rotulado
+    // «Siguiente: …». Es el botón guía de Edición (encargo del autor: «el usuario
+    // no sabe qué tiene que pulsar ni en qué paso»), y la salida del paso va donde
+    // termina la lectura. La secuencia de requisitos se sigue leyendo de arriba
+    // abajo —fondo, vecinas—; «Rehacer el parcelario» es la salida lateral que
+    // queda entre las dos.
     expect([...acciones.querySelectorAll('[data-accion]')].map((b) => b.dataset.accion)).toEqual([
       'traer-fondo-catastral',
       'traer-colindantes',
-      'diagnosticar',
       'rehacer-parcelario',
+      'diagnosticar',
     ])
   })
 

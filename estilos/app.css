@@ -3154,6 +3154,26 @@ body {
   display: none;
 }
 
+/* ── ⭐ EL BOTÓN «SIGUIENTE» AL PIE DEL PANEL (2026-10-25) ───────────────────
+ *
+ * Lo fabrica `app/siguiente-paso.js` delante del acuse de «Generar GML». Es la
+ * guía del recorrido: tras cargar algo, el panel no decía que lo siguiente era
+ * Edición. Mismo marco que `.gml-accion-estado--panel` (filete arriba, relleno
+ * de la columna) para que se lea como parte del pie y no como otra sección.
+ *
+ * `margin-top: auto` lo empuja al suelo en Entrada, que no tiene estirador. En
+ * Edición y Diagnóstico el estirador ya se come el sitio libre y el auto vale 0,
+ * así que no compite con el `margin-top: auto` de `.gml-panel-pie`. */
+.gml-siguiente {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: auto;
+  padding: var(--space-3) var(--space-6);
+  border-top: 1px solid var(--color-border-sub);
+}
+
 /* ── ⭐ EL MOTIVO DEL BOTÓN APAGADO SE VUELVE PISTA (2026-08-19) ─────────────
  *
  * Encargo del autor, textual: «hay tanto texto debajo de los botones que se queda
@@ -6275,6 +6295,64 @@ body {
  * sin la primera regla se verían las dos frases a la vez en ese hueco. Se oculta
  * por defecto la de edificio porque PARCELA es la rama inicial, así que en ese
  * instante lo que se lee ya es lo correcto y no hay parpadeo de ninguna clase. */
+/* ── ⭐ EL CONMUTADOR SE MUDA A LA CABECERA DEL PANEL (2026-10-25) ───────────
+ *
+ * Encargo del autor: «lo de elegir entre edificio o parcela está arriba en la
+ * barra y escondido, y quizás no se ve». Medido: dos `.gml-boton--menudo` de 11 px
+ * al lado de «0 errores» y «0 avisos», con el mismo filo que ellos. Se leían como
+ * un filtro, y es la primera decisión del trabajo: qué GML vas a generar.
+ *
+ * Ahora es una fila propia en la cabecera del panel, con su rótulo y un control
+ * SEGMENTADO a lo ancho: un marco con los dos botones dentro y sin filo propio,
+ * para que se lea como UNA elección de dos posiciones. El activo lo sigue pintando
+ * la regla de `body[data-rama]` de arriba, que gana por (0,3,0); aquí solo se da
+ * medida y reposo, sin tocar el estado.
+ *
+ * Coste: ~36 px de alto en la cabecera, a la vista y aceptado por el autor.
+ * Las mediciones de holgura de K.1 eran las de `.gml-chips` y ya no gobiernan:
+ * aquí los rótulos tienen el ancho de media columna. */
+.gml-rama-fila {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+}
+
+.gml-rama-fila-rotulo {
+  flex: none;
+  font-size: var(--text-11);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.gml-rama-hueco {
+  display: flex;
+  flex: 1;
+}
+
+.gml-rama-hueco .gml-conmutador-rama {
+  flex: 1;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border-main);
+  border-radius: var(--gml-radio);
+  background: var(--color-bg-elevated);
+}
+
+.gml-rama-hueco .gml-boton--menudo {
+  flex: 1;
+  /* 24 y no 32 (`--gml-alto-control`): con el marco y su relleno el conmutador
+     mide 30, que es WCAG 2.5.8 holgado; los 8 px que no se gastan aquí son de la
+     tabla de vértices a 1280×720. */
+  min-height: 24px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-13);
+}
+
 .gml-solo-edificio {
   display: none;
 }
@@ -6510,6 +6588,27 @@ body {
   font-feature-settings: 'tnum' 1;
   font-size: var(--text-11);
   color: var(--color-text-secondary);
+}
+
+/* ⭐ «faltan plantas» en la fila (2026-10-25). Ver `FALTAN_PLANTAS` en
+   `app/panel-edificio.js`: el validador ya lo sabía, y la lista no lo decía. La
+   palabra en negro y el ámbar en el punto, nunca texto de color sobre blanco
+   pequeño (DESIGN.md §3.3); es estado de la aplicación, no juicio sobre el dato. */
+.gml-parte-falta {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  /* El negro lo hereda de `.gml-parte`, que ya es `--color-text-primary`. */
+  font-size: var(--text-11);
+}
+
+.gml-parte-falta::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-state-warn);
 }
 
 /* El estado vacío de la lista. El store de edificio NACE VACÍO a propósito —no

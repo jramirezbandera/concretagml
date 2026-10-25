@@ -585,10 +585,21 @@ export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'dia
  * `var(--duration)` en cada tramo, que la ataba a la duración de la casa pero
  * costaba ~70 B más para una cifra que no ha cambiado desde la copia del 2026-07-26.
  *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **Y UNA SEXTA EL 2026-10-25 (EL RECORRIDO SE EXPLICA SOLO)**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 66.177 a **67.185 B nuestros** (81.272 → 82.280 con vendor). **+1.008 B**, la
+ * subida más grande desde la barra de agosto, y por un encargo de producto, no de
+ * pulido: el autor midió que el usuario no encontraba la elección Parcela/Edificio
+ * ni sabía qué pulsar después de cargar. Lo que se descartó: dar al conmutador
+ * TARJETAS grandes en Entrada además de la fila (el autor eligió solo la fila), y
+ * un segundo botón «Siguiente» en Edición al lado de «Diagnosticar encaje» (+57 px
+ * de panel que la tabla de vértices no tiene a 1280×720; se reutilizó el botón).
+ *
  * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
  * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
  */
-export const TECHO = Object.freeze({ total: 81272, nuestro: 66177 })
+export const TECHO = Object.freeze({ total: 82280, nuestro: 67185 })
 
 /**
  * EL REGISTRO. Un asiento por hito, con la hoja construida medida de verdad.
@@ -1744,6 +1755,22 @@ export const ASIENTOS = Object.freeze(
         'movimiento reducido apaga los dos tokens en `:root`: +~50 B que cubren los nueve ' +
         'llamantes que su lista a mano se dejaba fuera, incluida la flecha que gira. ── ⚠️ El ' +
         'techo SUBE 200 B (cabecera de `TECHO`) y la holgura vuelve a 0. NO CIERRA REBANADA.' },
+    { hito: 'El recorrido se explica solo: rama en el panel y botón «Siguiente»',
+      commit: '(sin commitear)',
+      total: 82280, nuestro: 67185, rebanada: null,
+      nota:
+        '**+1.008 B.** Encargo del autor del 2026-10-25: «el usuario puede no saber las ' +
+        'funciones que tiene». Cuatro piezas: el conmutador Parcela/Edificio se muda de ' +
+        '`.gml-chips` a una fila propia de la cabecera del panel, con rótulo y control ' +
+        'segmentado (`.gml-rama-fila`, `-rotulo`, `.gml-rama-hueco` y sus dos descendientes: ' +
+        '~560 B); el bloque «Siguiente» al pie del panel (`.gml-siguiente`, ~170 B); y la marca ' +
+        '«faltan plantas» de la lista de partes con su punto ámbar (`.gml-parte-falta`, ~250 B). ' +
+        '«Diagnosticar encaje» como botón guía de Edición sale a 0 B: reutiliza ' +
+        '`.gml-boton--primario` y `.gml-solo-parcela`/`-edificio`, igual que esconder «Rehacer el ' +
+        'parcelario» en la rama Edificio. ── QUÉ SE HA DEVUELTO ANTES DE SUBIR ── el fondo de ' +
+        '`.gml-siguiente` (el panel ya es blanco) y el color de `.gml-parte-falta` (lo hereda ' +
+        'de `.gml-parte`): −67 B. ── ⚠️ El techo SUBE 1.008 B (cabecera de `TECHO`) y la ' +
+        'holgura vuelve a 0. NO CIERRA REBANADA.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

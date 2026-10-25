@@ -636,6 +636,41 @@ describe('cableado-catastro · el marcado de index.html es CONTRATO', () => {
 // ── 2 · Traer del Catastro: el camino feliz ──────────────────────────────────
 
 describe('cableado-catastro · cargar la parcela real del fixture', () => {
+  // ⭐ 2026-10-25 · «Traer del Catastro» trae también las colindantes. Lo vigila el
+  // BOTÓN y no la API: `cargar()` lo llaman también el parcelario de fondo y el aviso
+  // accionable, que no son abrir una parcela y no tienen por qué pedir vecinas.
+  const vecindadesPedidas = (transporte) =>
+    transporte.peticiones.filter((p) => p.url.includes('GetNeighbourParcel')).length
+
+  it('⭐ el BOTÓN pide las colindantes en cuanto entra la parcela, y una sola vez', async () => {
+    const montado = cablear()
+    montado.campo.value = REFCAT
+    montado.botonCargar.click()
+    await cederTurno(200)
+
+    expect(montado.sets.length).toBeGreaterThan(0)
+    expect(vecindadesPedidas(montado.transporte)).toBe(1)
+    expect(montado.renglonColindantes.textContent).toContain('colindante')
+  })
+
+  it('⭐ la API `cargar()` NO pide colindantes: solo el botón abre una parcela', async () => {
+    const montado = cablear()
+    montado.campo.value = REFCAT
+    await montado.cableado.cargar()
+    await cederTurno(50)
+
+    expect(vecindadesPedidas(montado.transporte)).toBe(0)
+  })
+
+  it('⭐ si la parcela no entra, no se piden colindantes', async () => {
+    const montado = cablear()
+    montado.campo.value = '0000000XX0000X'
+    montado.botonCargar.click()
+    await cederTurno(200)
+
+    expect(vecindadesPedidas(montado.transporte)).toBe(0)
+  })
+
   it('hace UN SOLO `estado.set`, y con lo que exige el modelo de F05', async () => {
     const montado = cablear()
     montado.campo.value = REFCAT

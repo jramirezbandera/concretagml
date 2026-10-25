@@ -2037,8 +2037,24 @@ export function cablearCatastro({
    */
   const yaContado = () => {}
 
+  /**
+   * ⭐ 2026-10-25 · «Traer del Catastro» trae también las COLINDANTES, en cuanto
+   * la parcela ha entrado. Encargo del autor: «Traer colindantes» era un botón más
+   * en el pie de Edición, sin orden ni paso, y si no se pulsaba el expediente
+   * quedaba bloqueado («no se podrá saber de quién es esa superficie»). Una tarea
+   * obligatoria disfrazada de opcional.
+   *
+   * Una apertura, una petición de vecinas (override O8): es la MISMA que el
+   * usuario habría lanzado a mano, y la que el Diagnóstico lanzaría al abrirse.
+   * Solo desde este botón: las otras llamadas a `cargar()` (el parcelario de
+   * fondo, el aviso accionable) no son abrir una parcela. Si la parcela no entra
+   * —fallo, superada—, no se pide nada. El botón «Traer colindantes» sigue en
+   * el pie para quien abrió por medición o GML, o quiera volver a consultarlas.
+   */
   const alPulsarCargar = () => {
-    cargar().catch(yaContado)
+    cargar()
+      .then((resultado) => (resultado?.ok === true && !destruido ? colindantes() : null))
+      .catch(yaContado)
   }
 
   /**

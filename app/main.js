@@ -631,7 +631,8 @@ import { PASO, crearNavegacion } from './navegacion.js'
 import { crearPanelEdificio } from './panel-edificio.js'
 import { cablearPantalla } from './pantalla.js'
 import { cablearBarra } from './barra.js'
-import { RAMA, cablearRama } from './rama.js'
+import { RAMA, SELECTOR as SELECTOR_RAMA, cablearRama } from './rama.js'
+import { cablearSiguientePaso } from './siguiente-paso.js'
 
 // ── Constantes de presentación ───────────────────────────────────────────────
 
@@ -5283,6 +5284,10 @@ const informeCableado = cablearInforme({
 ramaCableada = cablearRama({
   documento: document,
   panel,
+  // ⭐ En la CABECERA DEL PANEL desde el 2026-10-25, y ya no en `.gml-chips` de la
+  // barra: allí parecía un filtro más al lado de «0 errores», y es la primera
+  // decisión del trabajo —qué GML vas a generar—. Ver `.gml-rama-fila` en la hoja.
+  contenedor: document.querySelector(SELECTOR_RAMA.HUECO_PANEL),
   // ⛔ Se le pasa el VISOR entero y él pregunta por `visor.barraEdicion`, jamás por
   // `visor.edicion`: son dos preguntas distintas y la segunda no implica la primera
   // (con `edicion: {barra: false}` la edición se monta y la barra no). Está medido.
@@ -5794,6 +5799,15 @@ const barra = cablearBarra({
 // —dos ejes escribiendo `hidden` serían dos dueños de la misma propiedad— está
 // en la cabecera de `app/pantalla.js`.
 cablearPantalla({ documento: document, navegacion })
+
+// El botón «Siguiente» al pie del panel (2026-10-25). Lee el mismo veredicto que el
+// rail (`navegacion.puedeIrA`) y no necesita `refrescarHechos`: lo que puede
+// encenderlo es un cambio de hechos, y ése ya publica. Ver `app/siguiente-paso.js`.
+cablearSiguientePaso({
+  documento: document,
+  panel: document.querySelector('.gml-panel'),
+  navegacion,
+})
 
 // ── 15 · LA PANTALLA DE CONTRASTE (rework de UI · T9) ────────────────────────
 //

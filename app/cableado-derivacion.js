@@ -130,8 +130,13 @@ export const MOTIVO_SIN_GEOMETRIA =
  * todavía.
  */
 export const AVISO_SIN_COLINDANTES =
-  'Aún no se han traído las parcelas colindantes. Si tu medición se sale por algún lado, no se ' +
-  'podrá saber de quién es esa superficie y el expediente quedará bloqueado.'
+  'Faltan las colindantes: si tu medición sale fuera, no se sabrá de quién es esa superficie.'
+// ⭐ 2026-10-25 · Decía «Aún no se han traído las parcelas colindantes. Si tu medición
+// se sale por algún lado, no se podrá saber de quién es esa superficie y el expediente
+// quedará bloqueado.» Tres renglones en el pie de Edición, que a 1280×720 son los que
+// le faltan a la tabla de vértices. Lo de «sin consultar» ya lo dice la ficha justo
+// encima, y desde hoy «Traer del Catastro» trae las colindantes solo: este aviso
+// queda para quien abrió por medición o GML.
 
 /**
  * ⛔ La respuesta de la PUERTA cuando la parcela ha CRECIDO en vez de menguar.

@@ -25,6 +25,10 @@
 //
 // ── QUÉ HACE, EN UNA LÍNEA CADA COSA ────────────────────────────────────────
 //   1. Fabrica el CONMUTADOR («Parcela» / «Edificio») dentro de `.gml-chips`.
+//      ⭐ **Desde el 2026-10-25 `app/main.js` lo monta en la cabecera del PANEL**
+//      (`SELECTOR.HUECO_PANEL`). En la barra parecía un filtro más al lado de
+//      «0 errores», y es la primera decisión del trabajo. Las mediciones de
+//      holgura de más abajo son las de `.gml-chips` y ya no gobiernan nada.
 //   2. Pone `data-rama` en el `<body>` —el ÚNICO gancho de CSS de la rama—.
 //   3. Intercambia las `<section>` marcadas con `data-rama-panel`, por
 //      VISIBILIDAD y jamás por sustitución del DOM (ver la regla dura de abajo).
@@ -225,8 +229,12 @@ export const ATRIBUTO_IR_A_RAMA = 'data-ir-a-rama'
 export const SELECTOR = Object.freeze({
   /** El `<body>`, que **es** `.gml-app`: ahí va `data-rama`. */
   APP: '.gml-app',
-  /** La fila de chips de la cabecera, donde se inserta el conmutador. */
+  /** La fila de chips de la cabecera. Es el sitio POR OMISIÓN del conmutador, y
+   *  el que siguen usando las pruebas de este módulo. */
   CHIPS: '.gml-chips',
+  /** ⭐ 2026-10-25 · El hueco de la cabecera DEL PANEL, donde lo monta
+   *  `app/main.js`. Ver `.gml-rama-fila` en `estilos/app.css`. */
+  HUECO_PANEL: '[data-rama-hueco]',
   /** El envoltorio del conmutador, ya fabricado. */
   CONMUTADOR: '[data-conmutador="rama"]',
   /** Cualquiera de los dos botones del conmutador. */

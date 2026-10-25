@@ -415,8 +415,10 @@ describe('app/main · F11 · el paso 13 monta la segunda rama', () => {
     const conmutador = q(SELECTOR_RAMA.CONMUTADOR)
 
     expect(conmutador).not.toBeNull()
-    // Dentro de `.gml-chips`, que es el sitio medido a coste 0 px.
-    expect(conmutador.closest(SELECTOR_RAMA.CHIPS)).not.toBeNull()
+    // ⭐ En la cabecera DEL PANEL desde el 2026-10-25 (ya no en `.gml-chips` de la
+    // barra, donde se leía como un filtro): es la primera decisión del trabajo.
+    expect(conmutador.closest(SELECTOR_RAMA.HUECO_PANEL)).not.toBeNull()
+    expect(conmutador.closest('.gml-panel-cabecera')).not.toBeNull()
     expect(cuerpo.getAttribute(ATRIBUTO_RAMA)).toBe(RAMA.PARCELA)
     expect(botonRama(RAMA.PARCELA).getAttribute('aria-pressed')).toBe('true')
     expect(botonRama(RAMA.EDIFICIO).getAttribute('aria-pressed')).toBe('false')
