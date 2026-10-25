@@ -1555,13 +1555,29 @@ describe('viewer/cajon-diagnostico.js · `anfitrion` (2026-08-05)', () => {
 // heredando 12 px de Leaflet sobre el mapa y otro distinto dentro del panel—.
 // Estos `it` vigilan las tres decisiones que lo arreglaron.
 describe('viewer/cajon-diagnostico · la escala y los rótulos de grupo', () => {
-  it('salen los DOS rótulos de grupo, en orden y como <h3>', () => {
+  it('salen los TRES rótulos de grupo, en orden y como <h3>', () => {
+    // ⭐ Eran dos hasta el 2026-10-25. El tercero junta los dos campos que rellena el
+    // usuario —registral y clase de suelo—, que antes iban sueltos entre las cifras.
     const { raiz } = conCajon()
     const rotulos = [...raiz.querySelectorAll(`.${CLASE.ROTULO}`)]
-    expect(rotulos.map((r) => r.textContent)).toEqual(['Superficie', 'Encaje'])
+    expect(rotulos.map((r) => r.textContent)).toEqual([
+      'Superficie',
+      'Encaje',
+      'Datos para el informe',
+    ])
     // `<h3>` y no `<p>`: cuelgan del `<h2>` de la cabecera, así que un lector de
     // pantalla puede saltar de grupo en grupo. En versalitas se verían igual.
-    expect(rotulos.map((r) => r.tagName)).toEqual(['H3', 'H3'])
+    expect(rotulos.map((r) => r.tagName)).toEqual(['H3', 'H3', 'H3'])
+  })
+
+  it('⭐ los dos campos que rellena el usuario van juntos en «Datos para el informe»', () => {
+    const { raiz } = conCajon()
+    const datos = raiz.querySelector('[data-diag="datos-informe"]')
+    expect(datos).not.toBeNull()
+    expect(datos.contains(nodo(raiz, SELECTOR.REGISTRAL))).toBe(true)
+    expect(datos.querySelector('[data-campo="clase-parcela"]')).not.toBeNull()
+    // Y la nota del margen de identidad va con la clase de suelo, de la que depende.
+    expect(datos.contains(nodo(raiz, SELECTOR.MARGEN))).toBe(true)
   })
 
   it('la invasión NO lleva rótulo de grupo, y es a propósito', () => {
@@ -1895,11 +1911,10 @@ describe('viewer/cajon-diagnostico.js · el rediseño del 2026-08-17', () => {
   it('los CUATRO grupos se separan con la MISMA junta, no con dos recetas', () => {
     const { raiz } = conCajon()
     const rotulos = [...raiz.querySelectorAll(`.${CLASE.ROTULO}`)]
-    const juntas = [
-      ...rotulos,
-      nodo(raiz, SELECTOR.INVASION),
-      nodo(raiz, SELECTOR.MARGEN).parentElement,
-    ]
+    // ⭐ 2026-10-25 · El margen ya no lleva junta propia: vive dentro de «Datos para
+    // el informe», cuyo rótulo la trae. Siguen siendo cuatro: tres rótulos y la
+    // invasión.
+    const juntas = [...rotulos, nodo(raiz, SELECTOR.INVASION)]
     expect(juntas).toHaveLength(4)
     const patron = juntas[0]
     for (const nodoJunta of juntas) {

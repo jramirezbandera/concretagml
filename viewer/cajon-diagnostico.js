@@ -1156,7 +1156,9 @@ const CajonDiagnostico = L.Control.extend({
     })
     this._cruces = cruces
 
-    bandas.append(lista, filaRegistral, cruces)
+    // ⭐ 2026-10-25 · La fila del registral YA NO va aquí: se ha ido a «Datos para el
+    // informe», con la clase de suelo. Ver {@link datosInforme}.
+    bandas.append(lista, cruces)
 
     // ── Las métricas de encaje ─────────────────────────────────────────────
     const metricas = crear(doc, 'dl', CLASE.SECCION)
@@ -1287,6 +1289,34 @@ const CajonDiagnostico = L.Control.extend({
     estilar(etiquetaClase, { margin: '0' })
     filaClase.append(etiquetaClase, selectorClase)
     bloqueMargen.append(filaClase, margen)
+
+    // ⭐ «DATOS PARA EL INFORME» (2026-10-25). Encargo del autor: «el menú de
+    // diagnóstico es un caos visual». Medido: los dos únicos campos que el usuario
+    // RELLENA —la superficie registral y la clase de suelo— estaban sueltos entre
+    // las cifras medidas, uno en mitad de «Superficie» y otro debajo de la invasión,
+    // y nada decía que eran suyos ni para qué servían. Ahora van juntos, con su
+    // rótulo de grupo y una línea que lo dice, pegados al «Preparar informe (PDF)»
+    // que es quien los consume. La tabla de cruces sigue arriba y se rellena sola
+    // en cuanto se teclea el registral: la causa queda debajo del efecto, pero a la
+    // vista en la misma columna, y a cambio las cifras se leen sin interrupciones.
+    // Sin JUNTA propia: la trae su rótulo de grupo, como «Superficie» y «Encaje».
+    const datosInforme = crear(doc, 'div')
+    datosInforme.dataset.diag = 'datos-informe'
+    const apunteDatos = crear(
+      doc,
+      'p',
+      CLASE.APUNTE,
+      'Lo que la aplicación no puede medir: lo pones tú y sale en el informe.',
+    )
+    estilar(apunteDatos, { margin: '0 0 4px', fontSize: ESCALA.APUNTE, color: '#64748B' })
+    estilar(filaRegistral, { marginTop: '0' })
+    estilar(bloqueMargen, { borderTop: 'none', paddingTop: '0', marginTop: '8px' })
+    datosInforme.append(
+      rotuloDeGrupo(doc, 'Datos para el informe'),
+      apunteDatos,
+      filaRegistral,
+      bloqueMargen,
+    )
 
     // ── El renglón de estado ───────────────────────────────────────────────
     // `role="status"` para que el lector de pantalla lo anuncie SIN robar el foco,
@@ -1461,7 +1491,7 @@ const CajonDiagnostico = L.Control.extend({
       rotuloDeGrupo(doc, 'Encaje'),
       metricas,
       invasion,
-      bloqueMargen,
+      datosInforme,
       anclado,
     )
 
