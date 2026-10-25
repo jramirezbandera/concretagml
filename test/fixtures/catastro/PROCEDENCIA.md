@@ -188,6 +188,41 @@ Cada miembro trae la parcela completa (geometría, `areaValue`, `referencePoint`
 forma URI OGC, la de la **descarga**, coherente con el override O2 de `spec/SPEC.md`. Se pidió
 `EPSG::25830` y contesta con la URI: los dos extremos del canal usan formas distintas.
 
+## `wfs-neighbour-41024A10900009.xml` — LA VECINDAD REPITE MIEMBROS Y ANILLOS
+
+| | |
+|---|---|
+| Origen | WFS INSPIRE, *stored query* `GetNeighbourParcel` |
+| URL | `https://ovc.catastro.meh.es/INSPIRE/wfsCP.aspx?service=wfs&version=2&request=getfeature&STOREDQUERIE_ID=GetNeighbourParcel&refcat=41024A10900009&srsname=EPSG::25830` |
+| Descargado | 2026-10-25 (`timeStamp` de la respuesta: `2026-10-25T22:31:16`) |
+| HTTP | 200 OK |
+| SHA-256 descargado | `264b820f00efabd14d7fe841da69ec881645a9d77d55fb4fc3f2d61f1e6932c9` (44.681 B, CRLF) |
+| Aquí | 44.301 B, LF |
+
+**Qué congela: la respuesta trae COPIAS, de dos clases, y las dos idénticas byte a byte.**
+
+**7 `<member>` para 5 colindantes** (más la propia, O15 clásico):
+
+| # | `nationalCadastralReference` | `gml:surfaceMember` | |
+|---|---|---|---|
+| 1 | `41024A10900089` | 1 | vecina |
+| 2 | **`41024A10900009`** | 1 | **la parcela consultada** |
+| 3 | `41024A10900089` | **2** | **la vecina 1 OTRA VEZ**, mismo `gml:id` |
+| 4 | `41024A10900039` | **3** | vecina |
+| 5 | `41024A10909008` | **4** | vecina |
+| 6 | `41024A10909009` | **3** | vecina |
+| 7 | `41024A10909001` | **2** | vecina |
+
+Y donde hay más de un `surfaceMember` (`Surface_….1`, `….2`, …) **todas llevan la misma
+`posList`**. `GetParcel` sobre esas mismas referencias devuelve UN anillo cada una: no es su
+geometría, es la consulta de vecindad. La creciente 1-2-3-4 huele a un *join* que multiplica
+filas, pero eso es conjetura; lo medido es la repetición.
+
+La repetición de anillos no llega a la aplicación: `gml/parse.js` lee solo el primer
+`surfaceMember` de cada parcela. **La del miembro sí llegaba**: `41024A10900089` salía dos
+veces en el panel del parcelario y en el expediente. La limpia
+`services/catastro.js#limpiarVecindad`, que funde **solo lo idéntico**.
+
 ## `wfs-bbox-count10.xml` — EL FIXTURE QUE DEMUESTRA LA MENTIRA
 
 | | |

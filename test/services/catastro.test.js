@@ -88,6 +88,7 @@ import {
   ORIGEN,
   SRS_DEFAULT,
   crearClienteCatastro,
+  limpiarVecindad,
   normalizarRefcat,
 } from '../../services/catastro.js'
 import {
@@ -114,6 +115,7 @@ const EXC_RC_INEXISTENTE = leer(DIR_CATASTRO, 'wfs-exceptionreport-rc-inexistent
 const EXC_BBOX_VACIO = leer(DIR_CATASTRO, 'wfs-bbox-vacio-mar.xml')
 const BBOX_COUNT10 = leer(DIR_CATASTRO, 'wfs-bbox-count10.xml')
 const VECINDAD = leer(DIR_CATASTRO, 'wfs-neighbour-9398516VK3799G.xml')
+const VECINDAD_REPETIDA = leer(DIR_CATASTRO, 'wfs-neighbour-41024A10900009.xml')
 const CATALOGO_XML = leer(DIR_CATASTRO, 'wfs-describestoredqueries.xml')
 const OVC_OK = leer(DIR_CATASTRO, 'ovc-rccoor-ok.json')
 const OVC_COD16 = leer(DIR_CATASTRO, 'ovc-rccoor-cod16.json')
@@ -794,6 +796,56 @@ describe('services/catastro · parcelaYColindantes (criterio 4)', () => {
     // Y NINGÚN miembro se pierde: los que llegaron son todos colindantes.
     expect(r.datos.colindantes.length).toBe(miembrosDe(VECINDAD))
     expect(r.datos.colindantes.map((p) => p.refcat)).toContain(RC_BUENA)
+  })
+})
+
+// ⭐ 2026-10-25 · LA VECINDAD TRAE COPIAS. Medido sobre `41024A10900009`: 7 miembros
+// para 5 colindantes, con `41024A10900089` dos veces. La ficha está en
+// `PROCEDENCIA.md`.
+describe('services/catastro · parcelaYColindantes limpia las copias del servicio', () => {
+  const RC_REPETIDA = parametros(urlMedida('wfs-neighbour-41024A10900009.xml')).refcat
+
+  it('el fixture SÍ trae las copias (anti-vacuidad)', () => {
+    const refcats = refcatsDe(VECINDAD_REPETIDA)
+    expect(refcats.filter((r) => r === '41024A10900089')).toHaveLength(2)
+    const crudas = leerColeccion(VECINDAD_REPETIDA).parcelas
+    expect(crudas.filter((p) => p.refcat === '41024A10900089')).toHaveLength(2)
+  })
+
+  it('cada colindante sale UNA vez, con UN anillo, y la propia no se cuela', async () => {
+    const { cliente } = montar({ plan: { estado: 200, texto: VECINDAD_REPETIDA } })
+    const r = await cliente.parcelaYColindantes(RC_REPETIDA)
+
+    expect(r.ok).toBe(true)
+    expect(r.datos.propia.refcat).toBe(RC_REPETIDA)
+    const refcats = r.datos.colindantes.map((p) => p.refcat)
+    expect(refcats).toEqual([
+      '41024A10900089',
+      '41024A10900039',
+      '41024A10909008',
+      '41024A10909009',
+      '41024A10909001',
+    ])
+    for (const p of r.datos.colindantes) {
+      expect(p.recintos, p.refcat).toHaveLength(1)
+      expect(p.orientacion, p.refcat).toHaveLength(1)
+    }
+  })
+
+  it('⛔ solo funde lo IDÉNTICO: dos trozos distintos de la misma parcela se quedan', () => {
+    const a = { vertices: [[0, 0], [1, 0], [1, 1]], tipo: 'EXTERIOR' }
+    const b = { vertices: [[5, 5], [6, 5], [6, 6]], tipo: 'EXTERIOR' }
+    const limpias = limpiarVecindad([
+      { refcat: '41024A10900089', recintos: [a], orientacion: [-1] },
+      { refcat: '41024a10900089 ', recintos: [a, b], orientacion: [-1, 1] },
+      { refcat: null, recintos: [a], orientacion: [-1] },
+      { refcat: null, recintos: [a], orientacion: [-1] },
+    ])
+    expect(limpias).toHaveLength(3)
+    expect(limpias[0].recintos).toEqual([a, b])
+    expect(limpias[0].orientacion).toEqual([-1, 1])
+    // Sin referencia no hay identidad: dos geometrías iguales no son «la misma».
+    expect(limpias.filter((p) => p.refcat === null)).toHaveLength(2)
   })
 })
 

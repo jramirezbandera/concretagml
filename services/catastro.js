@@ -638,6 +638,52 @@ export function normalizarRefcat(crudo) {
   return null
 }
 
+/**
+ * ⛔ Quita las COPIAS que `GetNeighbourParcel` mete en su respuesta (medido el
+ * 2026-10-25 sobre `41024A10900009`), y solo las copias.
+ *
+ * `41024A10900089` llegaba **dos veces**, con el mismo `gml:id` y el mismo anillo.
+ * Sin limpiar, salía dos veces en el panel del parcelario —y en el expediente, con
+ * el mismo `localId`— y el diagnóstico la recorría dos veces como dos vecinas.
+ *
+ * (La misma respuesta repite además el anillo N veces DENTRO de cada miembro
+ * —tres `gml:surfaceMember` idénticos en `41024A10900039`—, pero eso no llega aquí:
+ * `gml/parse.js` lee solo el primero y lo anota como detección.)
+ *
+ * ⚠️ **Solo se funde lo IDÉNTICO.** Dos miembros con la misma referencia se juntan
+ * en uno, pero sus recintos se suman salvo los que repitan vértice a vértice: si
+ * algún día el servicio manda dos trozos DISTINTOS de una misma parcela, los dos se
+ * quedan. Y una vecina sin referencia no se funde con nada: sin identidad, dos
+ * geometrías no son «la misma».
+ *
+ * @param {ParcelaGml[]} parcelas
+ * @returns {ParcelaGml[]}  Nuevas; las de entrada no se tocan.
+ */
+export function limpiarVecindad(parcelas) {
+  const firma = (r) => JSON.stringify([r.tipo, r.vertices])
+  /** @type {Map<string, {parcela: ParcelaGml, vistos: Set<string>}>} */
+  const porRefcat = new Map()
+  const salida = []
+  for (const p of parcelas) {
+    const refcat = normalizarRefcat(p.refcat)
+    let destino = refcat === null ? undefined : porRefcat.get(refcat)
+    if (destino === undefined) {
+      destino = { parcela: { ...p, recintos: [], orientacion: [] }, vistos: new Set() }
+      salida.push(destino.parcela)
+      if (refcat !== null) porRefcat.set(refcat, destino)
+    }
+    const recintos = Array.isArray(p.recintos) ? p.recintos : []
+    recintos.forEach((r, i) => {
+      const f = firma(r)
+      if (destino.vistos.has(f)) return
+      destino.vistos.add(f)
+      destino.parcela.recintos.push(r)
+      if (Array.isArray(p.orientacion)) destino.parcela.orientacion.push(p.orientacion[i])
+    })
+  }
+  return salida
+}
+
 // ── Mensajes ──────────────────────────────────────────────────────────────────
 
 /**
@@ -1104,7 +1150,8 @@ export function crearClienteCatastro(opciones = {}) {
    * @returns {{propia: ParcelaGml|null, colindantes: ParcelaGml[]}}
    */
   function separarVecindad(parcelas, refcat) {
-    return separarPropia(parcelas, refcat) ?? { propia: null, colindantes: parcelas }
+    const limpias = limpiarVecindad(parcelas)
+    return separarPropia(limpias, refcat) ?? { propia: null, colindantes: limpias }
   }
 
   /** Mensaje del caso «vino una colección y la parcela pedida no está en ella». */
