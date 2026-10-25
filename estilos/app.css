@@ -6152,6 +6152,12 @@ body {
 
 /* ── K.1 · EL CONMUTADOR DE RAMA, DENTRO DE `.gml-chips` ─────────────────────
  *
+ * ⭐ **HISTÓRICO DESDE EL 2026-10-25**: el conmutador ya no vive en `.gml-chips`
+ * sino en `.gml-rama-fila` de la cabecera del panel (ver «El conmutador se muda a
+ * la cabecera del panel», más abajo). Las reglas de este bloque siguen valiendo
+ * —son las del componente, esté donde esté—, pero las cifras de holgura de aquí
+ * son las de su sitio viejo y ya no gobiernan nada.
+ *
  * Dos `.gml-boton--menudo` («Parcela» / «Edificio») metidos en la fila de chips
  * de la cabecera. Sexta fase seguida a COSTE 0 px, y esta vez el 0 está medido
  * antes de escribir nada (2026-08-03, Chrome, 1440×900):

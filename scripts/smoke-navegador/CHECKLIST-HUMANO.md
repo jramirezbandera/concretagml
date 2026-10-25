@@ -328,9 +328,11 @@ frío y hasta **2.903 ms** el OVC en una sola llamada.
       los dos. (Eran TRES hasta el 2026-08-16, con «Deducir del mapa» al final;
       ese botón se retiró.)
 - [ ] Y en **Edición**: el pie tabula «Traer el parcelario de fondo» → «Traer
-      colindantes» → «Diagnosticar encaje» → «Rehacer el parcelario», en ese orden y
-      con el anillo visible en los cuatro. El segundo llegó el 2026-08-16 desde
-      Entrada, y es el que puede haber quedado fuera del orden natural.
+      colindantes» → «Rehacer el parcelario» → «Siguiente: diagnosticar el encaje»,
+      en ese orden y con el anillo visible en los cuatro. ⭐ **Desde el 2026-10-25 el
+      de diagnosticar es el ÚLTIMO, y azul**: es el botón guía del paso (§23). El
+      segundo llegó el 2026-08-16 desde Entrada, y es el que puede haber quedado
+      fuera del orden natural.
 
 ### 6.5 · La deducción, en los casos que no se pueden pedir a voluntad
 
@@ -747,6 +749,9 @@ haciendo la consulta.
 > mantenimiento: fue recorriendo esto cuando se vio que las vecinas no se
 > dibujaban en ninguna parte** — ver el encabezado del punto 9.
 
+- [ ] ⭐ **Desde el 2026-10-25, «Traer del Catastro» las trae SOLAS** al entrar la
+      parcela: si has llegado por ahí, los contornos ya están y este botón solo
+      vuelve a consultar. Para recorrer lo de abajo, entra por medición o por GML.
 - [ ] Pulsa **«Traer colindantes»** (una petición). ⚠️ **Está en el pie de
       EDICIÓN desde el 2026-08-16**, debajo de «Traer el parcelario de fondo»; hasta
       esa fecha vivía en el bloque de Entrada, y quien conozca la app de antes lo
@@ -1689,6 +1694,12 @@ imagen no lo puede hacer ninguna máquina de este proyecto.**
 **Por qué está aquí.** El guion pulsa con `el.click()`, que no es un gesto de ratón
 (§0). Y el conmutador tiene **45,12 px de holgura medidos** antes de que la fila de
 chips se parta en dos líneas y se coma ~20–29 px de la tabla de vértices.
+
+> ⭐ **2026-10-25 · el conmutador ya no está en la fila de chips**: es la primera fila
+> de la cabecera del panel, «Qué GML generas», con un control segmentado a lo ancho
+> (botones de 24 px de alto y ~101 de ancho). Lo de la holgura y el estrechar la
+> ventana de abajo ya no aplica; lo que se mira ahora está en §23.1. Las otras
+> preguntas (teclado, lector, el activo de un vistazo) siguen valiendo.
 
 - [ ] Pulsa «Parcela» y «Edificio» con el ratón varias veces. ¿Se nota cuál está
       activo? El estado activo se pinta desde `data-rama` (no desde `aria-pressed`),
@@ -2936,3 +2947,63 @@ ruido del redondeo—; ahora se quedan fuera y sale un aviso con sus cifras.
 **Lo que hay que ver:** que en el IVG no aparezcan esos colindantes como
 «afectadas». Si aparecieran, la superficie AFECTADAS no cuadraría con la que la
 aplicación anuncia.
+
+---
+
+## §23 · La guía del recorrido (2026-10-25) — lo que hay que mirar con alguien delante
+
+**Qué cambió** (DESIGN.md §8.6, README «Cómo se recorre la aplicación»): Parcela/
+Edificio pasa a la cabecera del panel; un botón «Siguiente» al pie lleva de paso en
+paso; «Traer del Catastro» trae también las colindantes; en Diagnóstico, lo que se
+rellena va junto en «Datos para el informe»; en Edificio, la lista marca «faltan
+plantas» y «Rehacer el parcelario» no aparece.
+
+**Por qué es humano.** El encargo era de COMPRENSIÓN («el usuario puede no saber las
+funciones que tiene»). Los guiones afirman que los botones existen, llevan a donde
+dicen y no recortan nada; si alguien que no conoce la app sabe qué hacer, no lo
+puede decir ninguno. Lo ideal es mirarlo con **alguien que no la haya usado**, sin
+explicarle nada.
+
+### 23.1 · Lo primero que se ve
+
+- [ ] Con la app vacía: ¿encuentra **dónde se elige Parcela o Edificio** sin que se
+      lo digas? ¿Entiende que es «qué fichero vas a generar» y no un filtro?
+- [ ] ¿Se lee el activo de un vistazo? El segmentado activo lleva el tinte y el filo
+      de acento; el otro, gris sobre gris.
+
+### 23.2 · El «Siguiente»
+
+- [ ] Tras traer una parcela (o cargar un GML de edificio), ¿va al botón del pie sin
+      dudar, o busca en la barra de arriba?
+- [ ] ⚠️ **Dos azules a la vista**: «Generar GML» arriba y «Siguiente» abajo. ¿Duda
+      entre ellos? ¿Pulsa «Generar GML» antes de tiempo? (`TODOS.md`, «La guía del
+      recorrido», punto 1.)
+- [ ] Con la app vacía el botón sale gris y dice «Falta la parcela» debajo, y el
+      motivo largo al dejar el ratón encima (`title` nativo, al segundo: no es la
+      pista propia de 120 ms de la barra de edición). ¿Se entiende por qué no se
+      puede pulsar?
+- [ ] En Diagnóstico no hay botón: hay una frase que manda a «Generar GML». ¿Se lee
+      como el final del recorrido, o como un aviso más?
+
+### 23.3 · Las colindantes
+
+- [ ] Pulsa «Traer del Catastro» y mira el mapa: ¿se nota que han llegado las
+      vecinas sin pedirlas? El renglón del pie de Edición dice cuántas.
+
+### 23.4 · El diagnóstico
+
+- [ ] ¿Distingue de un vistazo lo que mide la aplicación (Superficie, Encaje,
+      invasión) de lo que tiene que poner él («Datos para el informe»)?
+- [ ] La tabla de diferencias (Medición – Registro…) está arriba y el campo del
+      registral abajo. Al teclearlo, ¿ve que la tabla de arriba cambia, o no se entera?
+
+### 23.5 · El edificio
+
+- [ ] Carga un DXF sin plantas (`test/fixtures/parsers/edificio_consulta_masiva_*.dxf`).
+      ¿Ve en la lista qué partes «faltan plantas» y entiende qué tiene que hacer?
+- [ ] En Edición, «Parte activa» nace vacía (a propósito: auditoría H3). ¿Sabe que
+      tiene que pinchar una parte **de la lista**? Pinchar la huella en el mapa no
+      la elige (ese clic deduce la referencia).
+- [ ] A 1280×720, en Parcela › Edición, ¿bastan **tres filas** de la tabla de
+      vértices para trabajar, o se echa de menos la cuarta? (Coste medido de la fila
+      del conmutador: DESIGN.md §6.)

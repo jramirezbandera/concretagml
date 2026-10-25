@@ -5,6 +5,51 @@ contexto y qué la bloquea, para que retomarla no cueste rediseñarla.
 
 ---
 
+## La guía del recorrido (2026-10-25): lo que quedó abierto
+
+**Anotada el 2026-10-25**, tras `1a91248` y `1161865`. Encargo del autor: el usuario
+no encontraba Parcela/Edificio, no sabía qué pulsar después de cargar, «Traer
+colindantes» no tenía paso y el diagnóstico y el edificio eran «un caos». Lo hecho
+está en DESIGN.md §8.6 y en el README («Cómo se recorre la aplicación»). Lo que
+sigue no se tocó, por orden de impacto:
+
+1. **Dos primarios a la vista.** «Generar GML» (barra) y «Siguiente» (pie) son los
+   dos azules en Entrada y Edición. Uno es el destino y otro el camino, y así se
+   dejó, pero nadie ha mirado si un usuario nuevo duda entre ellos. *Bloquea:*
+   mirarlo con alguien delante; es la pregunta 13.1 de `CHECKLIST-HUMANO.md`.
+2. **La tabla de vértices enseña 3 filas a 1280×720** (eran 4; a 1440×900, 11 en
+   vez de 12).
+   Medido con las dos versiones servidas a la vez: cabecera +34,00 px, pie
+   −14,84. Lo que queda para recuperarla es quitar algo de la cabecera (el rótulo
+   de procedencia y los dos indicadores repiten en parte lo que ya dice el
+   conmutador) o de la ficha del pie. *Bloquea:* es decisión de contenido.
+3. **Las colindantes solo vienen solas con «Traer del Catastro».** Quien entra por
+   medición propia o por GML sigue teniendo que pulsar «Traer colindantes», aunque
+   la referencia se deduzca sola tras importar. Pedirlas también ahí es una
+   petición más por apertura en una vía que hoy no la hace. *Bloquea:* la política
+   de peticiones del override O8, que es del autor.
+4. **En Edificio, «Parte activa» nace vacía** y hay que adivinar que se pincha una
+   parte de la lista. No se elige la primera sola porque lo prohíbe la auditoría
+   del 2026-08-16 (H3: el siguiente arrastre entraría en una huella que el usuario
+   no ha tocado). Y pinchar una huella en el mapa **no** la elige, a propósito: ese
+   clic sube al mapa y es el que deduce la referencia catastral (cabecera de
+   `viewer/partes.js`). Lo que queda es mejorar el aviso de la sección vacía, o
+   decidir si el clic en una huella vale más como «elegir parte» que como
+   «deducir referencia» dentro de la rama Edificio.
+5. ⚠️ **El guion de humo 13 sale con UN problema, y no es de este cambio.** Al
+   soltar un `.dxf` en la rama Parcela, el campo de referencia pasa de
+   «9398516VK3799G» a «8703361TF9980S». Reproducido también sobre `a09e470`, antes de
+   esta tanda, así que es anterior. Puede ser una premisa muerta del guion (la
+   deducción de referencia tras importar escribe en el campo a propósito) o un
+   defecto real. *Sin investigar.*
+6. **Los guiones 09, 10, 11, 16, 20, 23 y 25 no se han vuelto a lanzar.** Pulsan
+   «Diagnosticar encaje», «Rehacer el parcelario» y «Traer colindantes» por su
+   `data-accion`, que no ha cambiado. Pero el orden del pie sí cambió, «Rehacer»
+   está oculto en Edificio y «Traer del Catastro» hace ahora una petición más. El
+   25 cuenta peticiones al Catastro: es el primero que hay que mirar.
+
+---
+
 ## La aplicación instalable y el fichero del disco: lo que falta medir en Chrome
 
 **Anotada el 2026-09-25**, el mismo día en que entraron `pwa/` y

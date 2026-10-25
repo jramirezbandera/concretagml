@@ -83,7 +83,7 @@ para que el resultado no dependa de interpretar prosa. Diecinueve son de aceptac
 | `10-comprobar-gml.js` | F08 · 1 a 4 · **+ los tres arreglos del check visual** | **soltar un fichero de verdad** de punta a punta (bytes reales, velo con `opacity` calculada, `File.arrayBuffer()`), el cajón que no tapa ninguno de los cinco controles del mapa, los dos cajones que no coinciden, el informe que baja con BYTES, el invariante de los ~267 px, la tipografía real de los botones de los dos cajones y —desde el 2026-08-02— **el REENCUADRE** (viaja con otra parcela, no se mueve al editar), **las COLINDANTES dibujadas** y **el CAMPO de la referencia** | ✅ `ok:true` desde el **2026-08-07**, tras la revisión que el §16 dejó pendiente el 2026-08-04. Conducía el flujo anterior al rework Y el peaje de F08; los dos se han retirado. Ver §16 |
 | `11-informe-pdf.js` | F09 · **1** a 5 | ⭐ **el CRITERIO 1, que solo se puede medir aquí**: `toDataURL` sobre un lienzo con una tesela REAL del WMS, **con control negativo** (sin `crossOrigin` tiene que lanzar); el PDF que baja con BYTES de verdad (`%PDF`, páginas declaradas, el plano `/DCTDecode` dentro); que componer **no cierre nada por debajo** (tercera aparición del mismo defecto); el `<dialog>` con la presentación que le toca y el encaje en la ventana, el invariante de la caja de vértices y la tipografía de los cuatro botones nuevos. ⛔ **Su veredicto sobre el `<dialog>` está INVERTIDO desde el 2026-08-08 y ésa es la corrección**: exigía modal DE VERDAD (capa superior, fondo inerte) porque en F09 lo era; la rebanada 5 lo convirtió en PANTALLA con `show()` el 2026-08-05 y nadie volvió aquí, así que llevaba tres meses acusando a la aplicación de hacer lo que se le pidió. Hoy exige lo contrario —**que NO sea modal y que el rail siga alcanzable**— y de paso se corrigió su sonda, que probaba el fondo contra un control OCULTO y por eso daba «inerte» pasara lo que pasara | `ok:true` — ver §17 |
 | `12-expedientes.js` | F10 · 1 a 6 · **+ F20** | ⭐ **que los bytes están en una base de VERDAD** (la suite entera de F10 corre sobre `fake-indexeddb`, que no es una base de datos): supervivencia a la recarga contrastada contra `performance.timeOrigin`, segunda conexión a IndexedDB, `persist()`/`estimate()` reales, **las CUATRO exportaciones** con sus BYTES, el `<dialog>` como modal y el invariante de los 267 px. **Desde F20 (2026-08-06)** mide además el `.xlsx` sobre sus bytes —firma `PK`, EOCD, las seis partes de OOXML, sin comprimir y ⭐ **que la coordenada sea una celda NUMÉRICA y no una cadena con la coma dentro**, que es el criterio que justifica la fase entera— y **que los CINCO botones del pie de exportaciones quepan**, que es la medida que la suite no puede dar porque jsdom no maqueta | `ok:true` — ver §18 |
-| `13-edificio.js` | F11 · 1 a 4 | ⭐ **el guardián de ANCHO del conmutador, que solo existe aquí** (sustituye al `flex-wrap: nowrap` que el plan pedía por error); **M10 ida y vuelta en un navegador real** —mismo nodo, mismo valor, oyentes vivos—; el invariante de los 267 px y las tres cifras de M8; que las huellas del DXF **se ven y ENCIMA de la parcela** (orden real de los panes, no solo que existan los `<path>`); soltar un `.dxf` de verdad en las DOS ramas, con su diálogo de reparto por capas; la ficha del pie que cambia de cara; y ⭐ **el reparto de altura del panel, en vacío y con datos, con el recorte a CERO EXACTO y el déficit en píxeles cuando no llega** | ⭐ **`ok:true` otra vez el 2026-08-11, y esta vez costó rehabilitarlo**: llevaba desde agosto acusando en falso porque **CINCO de sus premisas murieron y nadie volvió a él** —los avisos se mudaron a un `<dialog>` (2026-08-07), los chips y el conmutador subieron a la barra (2026-08-10), y F18 le dio a la rama PARCELA la entrada por `.dxf` que este guion exigía que NO existiera—. Ocho problemas: **siete eran suyos y uno era real** (el panel recortaba 13 px a 1280×720 y lo que se caía era el renglón que dice por qué no puedes generar el GML). Ver §19 |
+| `13-edificio.js` | F11 · 1 a 4 | ⭐ **2026-10-25: el conmutador se muda a la cabecera del panel y la guarda pasa a `filaRama`** (§19, «La corrida del 2026-10-25»). Antes: **el guardián de ANCHO del conmutador, que solo existe aquí** (sustituye al `flex-wrap: nowrap` que el plan pedía por error); **M10 ida y vuelta en un navegador real** —mismo nodo, mismo valor, oyentes vivos—; el invariante de los 267 px y las tres cifras de M8; que las huellas del DXF **se ven y ENCIMA de la parcela** (orden real de los panes, no solo que existan los `<path>`); soltar un `.dxf` de verdad en las DOS ramas, con su diálogo de reparto por capas; la ficha del pie que cambia de cara; y ⭐ **el reparto de altura del panel, en vacío y con datos, con el recorte a CERO EXACTO y el déficit en píxeles cuando no llega** | ⭐ **`ok:true` otra vez el 2026-08-11, y esta vez costó rehabilitarlo**: llevaba desde agosto acusando en falso porque **CINCO de sus premisas murieron y nadie volvió a él** —los avisos se mudaron a un `<dialog>` (2026-08-07), los chips y el conmutador subieron a la barra (2026-08-10), y F18 le dio a la rama PARCELA la entrada por `.dxf` que este guion exigía que NO existiera—. Ocho problemas: **siete eran suyos y uno era real** (el panel recortaba 13 px a 1280×720 y lo que se caía era el renglón que dice por qué no puedes generar el GML). Ver §19 |
 | `14-shell.js` | Rework · 1 a 4 | la cáscara de tres columnas y su coste en píxeles, en **las DOS pasadas de D5** (1280×720 y 1440×900): ancho del rail, desborde del panel, el invariante de `#tabla-vertices`, cuántas tarjetas de aviso caben enteras y cuánto queda escondido tras el pliegue; **se detecta solo** en cuál de los dos mundos está (`LINEA_BASE` sin rail / `SHELL` con él); y desde la rebanada 4, **si el diagnóstico sigue en pantalla después de tocar el mapa** | `ok:true` en las dos — ver §20 |
 | `15-contraste.js` | Rework · T9, **reescrito 2026-08-07** | ⭐ **la RUTA CRÍTICA 2 entera**, que hoy es *soltar un GML → está cargado, dibujado y EDITABLE*, en un solo gesto: el cajón que NO sale, «Edición» abierta, la procedencia que dice de dónde salió sin atribuírselo al Catastro, la barra de edición que de verdad se ve (las tres patas de `elementFromPoint`), y **el caso que el guion viejo no montaba: un GML SIN referencia catastral**, que es donde el recorrido se moría | ⛔ **encontró un defecto real el 2026-08-04 (la puerta invisible) y NO pudo ver el de fondo: su pantalla era inalcanzable sin parcelario.** Hoy `ok:true` — ver §22 |
 | `16-derivar-cesion.js` | F17 · 1 a 4 · **+ el criterio 6** | ⭐ **EL PRECIO EN PÍXELES, que es lo único de F17 que la suite no puede ver**: F17 rompe a propósito la racha de «0 px en el panel» de cinco fases, y ⛔ **cuando se pasa, el panel NO desborda — la tabla de vértices encoge en silencio**. Mide el recorrido entero sin tocar la red (mover el lindero hacia dentro → derivar → revisar y nombrar → descargar), la PUERTA explicando con cifras al crecer, la correspondencia fila↔mancha en los dos sentidos, los BYTES del expediente (N `featureMember`, los `localId` de O19 y **que el nombre escrito NO viaja al fichero**), y la invalidación de la foto al editar | ✅ **`ok:true` en las DOS** desde el 2026-08-05, tras encontrar **un defecto real a 1280×720** y corregirlo — ver §25 |
@@ -3020,10 +3020,21 @@ Medido el **2026-08-04**: a 1440×768 el tope vale **199,68 px** (contra 234,00 
 
 ### Qué cuenta como «pasa»
 
+> ⭐ **2026-10-25 · el conmutador ya no está en `.gml-chips`.** Desde `1161865`
+> vive en la cabecera del panel (`.gml-rama-fila`, «Qué GML generas»). Las cifras
+> de abajo que hablan de él en la fila de chips (`conmutadorAncho.*`) siguen
+> saliendo, pero miden la fila de chips de la barra, no al conmutador. Lo que lo
+> vigila ahora es `filaRama`, y la referencia de la caja de vértices es **304 px**.
+> Ver «La corrida del 2026-10-25» al final de esta sección.
+
 - `ok: true`, `problemas: []`. **Hoy NO pasa**: ver abajo.
-- `arranque.altoCajaVerticesPx: 267` **con `tarjetasDeAvisos: 0`**.
-- `conmutadorAncho.saltoDeLinea: false` y `holguraPx > 24`.
-- `invariante.cabeceraClavada: true` (117,13 en las dos ramas).
+- `arranque.altoCajaVerticesPx: 304` **con `tarjetasDeAvisos: 0`** (era 267, luego 416;
+  las dos caducadas, ver la corrida del 2026-10-25).
+- ⭐ `filaRama.dentroDeLaCabecera: true`, `saltoDeLinea: false`, `desbordePx: 0`,
+  `altoDelBotonPx ≥ 24`.
+- `conmutadorAncho.saltoDeLinea: false` (hoy mide solo los chips de la barra).
+- `invariante.cabeceraClavada: true` (128,92 en las dos ramas desde el 2026-10-25;
+  era 117,13).
 - `idaYVuelta.mismoNodo: true`, `valorAhora` intacto, `sondaSigueDisparando: true`.
 - `capaHuellas.zPartes: 422`, entre 420 y 430, y los `<path>` colgando del pane.
 - `reparto.partesTrasAplicar: 7` y `huellasTrasAplicar: 7`.
@@ -3364,6 +3375,41 @@ tres cifras la podía dar la suite.
 | `#avisos` (vacío / cargado) | 0 / 0 | 10,89 / 6,69 | **24,09 / 24,84** |
 | `.gml-partes` (vacío / cargado) | 2,00 / 2,00 | 58,70 / 2,00 | **90,03 / 7,06** |
 | Déficit del mínimo decente | — (no cabía) | 32,70 px | **18,33 px** |
+
+### La corrida del 2026-10-25: el conmutador se muda al panel
+
+**Qué cambió.** El conmutador Parcela/Edificio pasó de `.gml-chips` (barra) a
+`.gml-rama-fila` (cabecera del panel). El guion se actualizó en el mismo día:
+
+- **`CAJA_VERTICES_REFERENCIA` 416 → 304.** Medido con las DOS versiones servidas a
+  la vez (Chrome 1440×900, `?demo=real#/parcela/edicion`, IndexedDB borrada):
+  **323,11 px antes** (`a09e470`) y **303,95 después** (`1161865`). Los 416 ya estaban
+  caducados antes de este cambio: el guion acusaba en falso desde hacía tiempo.
+- **Bloque 2 bis, `filaRama`.** La guarda nueva: que el conmutador esté en la
+  cabecera, que la fila no se parta y que no desborde. «Partida» se mide como «la
+  fila es más alta que su hijo más alto» y no comparando `top`s: la fila es
+  `align-items:center`, y el rótulo (13 px) y el conmutador (30 px) arrancan a
+  alturas distintas estando en la misma línea. La primera versión comparaba `top`s
+  y dio un falso positivo.
+- Sobre `a09e470` el guion nuevo da los dos problemas esperables (caja 323 ≠ 304,
+  conmutador fuera del panel): las guardas distinguen el antes del después.
+
+**Resultado sobre `1161865`, con la base borrada:** `filaRama` = `{altoPx: 30,
+saltoDeLinea: false, desbordePx: 0, altoDelBotonPx: 24, anchoDelBotonPx: 101,17}`,
+caja **304** con 0 avisos, `(no console errors)`. `ok: false` por **un** problema,
+que **no es de este cambio**: al soltar un `.dxf` en Parcela el campo de referencia
+pasa de «9398516VK3799G» a «8703361TF9980S». Reproducido igual sobre `a09e470`.
+Anotado en `TODOS.md` («La guía del recorrido», punto 5).
+
+⚠️ **Lánzalo con la base BORRADA de verdad.** Si antes has cargado un edificio a
+mano, el autoguardado lo restaura y el guion ve 13 huellas al arrancar, la lista de
+partes llena y el estirador cambiado: seis problemas falsos. Borra **todas** las
+bases, no solo `concreta-gml`:
+
+```bash
+$B js "await Promise.all((await indexedDB.databases()).map(d=>new Promise(r=>{const p=indexedDB.deleteDatabase(d.name);p.onsuccess=r;p.onerror=r;p.onblocked=r}))); localStorage.clear(); return 'ok'"
+$B goto about:blank && $B goto http://localhost:PUERTO/concretagml/?demo=real#/parcela/edicion
+```
 
 ### Lo que este guion deja al checklist humano (§12)
 

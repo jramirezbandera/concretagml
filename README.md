@@ -119,7 +119,8 @@ desde F03 no.
   humana** del mismo checklist (su sección 8 trae el punto bloqueante: que ninguna
   cifra ni color se lea como un veredicto).
   👉 **La pregunta por la que se hace todo lo anterior**: *¿mi medición cuadra con
-  Catastro?* Un botón «Diagnosticar encaje» abre un cajón sobre el mapa con el
+  Catastro?* Un botón «Diagnosticar encaje» (desde el 2026-10-25, «Siguiente:
+  diagnosticar el encaje →» al pie de Edición) abre un cajón sobre el mapa con el
   contraste completo — superficies a tres bandas (medida / catastral / registral,
   con las tres diferencias cruzadas), solape, desplazamiento de centroides,
   desviación por lindero con el peor resaltado y acotado sobre el dibujo, invasión
@@ -371,6 +372,34 @@ se puede añadir sin medirlo antes.
 siendo el que congelan los fixtures. **No está en CI a propósito**: dispararía
 desde las IP compartidas de GitHub, que es justo el patrón centralizado que la
 política del Catastro penaliza.
+
+### Cómo se recorre la aplicación (2026-10-25)
+
+Lo primero del panel es **«Qué GML generas»**: Parcela o Edificio. Hasta el
+2026-10-25 esa elección vivía en la barra de arriba, al lado de los contadores de
+errores y avisos, y se leía como un filtro más; es la primera decisión del trabajo
+y ahora va la primera.
+
+Después, tres pasos —**Entrada → Edición → Diagnóstico**— que se ven en la barra y
+que se recorren con el botón del pie del panel:
+
+- **En Entrada** se trae la geometría (referencia catastral, medición propia o un
+  GML) y el pie dice **«Siguiente: editar el recinto →»** (o «revisar las partes» en
+  Edificio). Mientras no haya nada que editar sale en gris y dice qué falta.
+- **«Traer del Catastro» trae también las colindantes**, sin otro clic. Hacen falta
+  para saber de quién es lo que tu medición saque fuera; si entras por medición o
+  por GML, «Traer colindantes» sigue en el pie de Edición.
+- **En Edición** el último botón del pie es **«Siguiente: diagnosticar el encaje →»**
+  («contrastar con el Catastro» en Edificio). Encima quedan las acciones que
+  transforman el expediente: el parcelario de fondo, las colindantes y, solo en
+  Parcela, «Rehacer el parcelario».
+- **En Diagnóstico** las cifras van primero (superficie, encaje, invasión) y lo que
+  rellenas tú —superficie registral y clase de suelo— va junto en **«Datos para el
+  informe»**, encima de «Preparar informe (PDF)». El pie recuerda que el recorrido
+  acaba en **«Generar GML»**, arriba a la derecha.
+- **En Edificio**, la lista de partes marca **«faltan plantas»** en cada parte
+  principal que todavía no las tiene: es lo que impediría generar el GML, y antes
+  solo lo decía el renglón de «Generar GML».
 
 ### Cómo se busca un sitio en el mapa (2026-09-25)
 

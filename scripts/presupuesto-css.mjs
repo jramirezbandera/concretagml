@@ -1756,7 +1756,7 @@ export const ASIENTOS = Object.freeze(
         'llamantes que su lista a mano se dejaba fuera, incluida la flecha que gira. ── ⚠️ El ' +
         'techo SUBE 200 B (cabecera de `TECHO`) y la holgura vuelve a 0. NO CIERRA REBANADA.' },
     { hito: 'El recorrido se explica solo: rama en el panel y botón «Siguiente»',
-      commit: '(sin commitear)',
+      commit: '1161865',
       total: 82280, nuestro: 67185, rebanada: null,
       nota:
         '**+1.008 B.** Encargo del autor del 2026-10-25: «el usuario puede no saber las ' +

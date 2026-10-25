@@ -169,6 +169,10 @@ implica, en concreto:
   te deja seguir, que es lo que el rojo lleva haciendo desde F04.
 - ✅ **Única excepción sobre un dato: la invasión a colindante.** Es un hecho
   topológico binario, y admite ámbar.
+- ✅ **«faltan plantas» en la lista de partes (2026-10-25) NO es la segunda.** No
+  califica una cifra: dice que falta un dato que el validador exige para generar,
+  o sea estado de la aplicación. Por eso el ámbar va en el **punto** y la palabra
+  en negro, como en los chips.
 - **El color nunca es el único canal.** Los dos indicadores de geometría cargada
   cambian el TEXTO además del color («Sin levantamiento»), y por eso no hace falta
   una utilidad de texto solo para lectores.
@@ -343,6 +347,15 @@ aquella revisión salió a −0,56 px, o sea neutro. El encargo del autor lo pro
 expresamente: **«no añadas aire decorativo que reduzca lo que cabe en pantalla; el
 objetivo es orden, no vacío»**.
 
+⭐ **La cabecera del panel crece 34 px el 2026-10-25, a sabiendas.** La fila «Qué
+GML generas» (el conmutador Parcela/Edificio, que sale de la barra; §8.6) lleva la
+cabecera de 94,92 a 128,92 px. El pie de Edición devuelve 14,84 (el aviso de
+colindantes pasa de tres renglones a dos), y el neto se paga en la tabla de
+vértices: **12 → 11 filas enteras a 1440×900 y 4 → 3 a 1280×720**, medido con las
+dos versiones servidas a la vez. En Edificio el pie baja de 297 a 205 px y la lista
+de partes gana 16 px a 720. Los botones del segmentado miden 24 px y no 32: es lo
+único que se apretó para pagar la fila.
+
 ⚠️ **Los cuatro topes de alto van en `vh`**: `--gml-avisos-alto-max` 56vh,
 `--gml-partes-alto-max` 26vh, `--gml-cajon-lista-alto-max` 22vh,
 `--gml-candidatos-alto-max` 20vh. Existen porque **el suelo declarado del proyecto es
@@ -477,6 +490,52 @@ pintar *esto está encendido* acabarían divergiendo». Suena a coherencia y era
 están encendidos en el mismo sentido**. Unificar la pintura de dos cosas que no son la misma
 no es un sistema de diseño: es una homonimia.
 
+### 8.6 · La guía del recorrido: un solo «Siguiente» por paso
+
+> **El rail es navegación; la guía está al pie del panel, donde termina la
+> lectura.** Quien no sabe a dónde ir no mira la barra: lee la columna de arriba
+> abajo, y al final tiene que encontrar qué hacer después.
+
+Decidido el 2026-10-25, por encargo del autor: «el usuario puede no saber las
+funciones que tiene». Medido en Chrome: tras cargar un GML de trece partes la
+pantalla se quedaba en Entrada, y nada en la columna decía que lo siguiente era
+Edición.
+
+| paso | la guía | quién la pinta |
+|---|---|---|
+| Entrada | «Siguiente: editar el recinto →» / «revisar las partes →» | `app/siguiente-paso.js` |
+| Edición | «Siguiente: diagnosticar el encaje →» / «contrastar con el Catastro →» | el CTA `[data-accion="diagnosticar"]` del pie, ahora primario y el último |
+| Diagnóstico | una frase que señala «Generar GML» | `app/siguiente-paso.js` |
+
+Las reglas que la sostienen:
+
+- **No decide nada.** Lee `navegacion.puedeIrA`, el mismo veredicto que pinta el
+  rail, así que el botón y el peldaño no pueden discrepar. Apagado, dice el BREVE
+  a la vista y el LARGO en el `title` (§8.2).
+- **Uno por paso, nunca dos.** En Edición ya había un botón que llevaba al
+  Diagnóstico; ponerle al lado un «Siguiente» que hiciera lo mismo costaba 57 px
+  que la tabla de vértices no tiene a 1280×720. Se reutilizó el que había y el
+  módulo se calla en ese paso (`PASOS_CON_GUIA_PROPIA`).
+- **La elección Parcela/Edificio no es un filtro.** Vivía en `.gml-chips`, con el
+  mismo filo que «0 errores», y se leía como uno más. Es la primera decisión del
+  trabajo, así que va la primera de la columna: fila propia en la cabecera del
+  panel, rótulo «Qué GML generas» y control segmentado. El activo sigue pintándose
+  desde `body[data-rama]` (§8.3).
+- **Lo que no es de la rama no se enseña en la rama.** «Rehacer el parcelario»
+  rehace la PARCELA; en Edificio la parcela es contexto, y el botón se leía como
+  tarea del edificio. Se oculta con `.gml-solo-parcela`. No contradice §8.1: allí
+  se habla de controles que existen en la pantalla y aún no se pueden usar, no de
+  los que no pertenecen a ella, igual que las secciones de la otra rama.
+- **Lo que el usuario rellena va junto, y junto a quien lo consume.** En el cajón
+  del diagnóstico, superficie registral y clase de suelo forman «Datos para el
+  informe», encima de «Preparar informe (PDF)». Mezclados con las cifras medidas
+  no se distinguía qué era de la aplicación y qué del usuario.
+
+⚠️ **Lo que esto NO resuelve:** con «Generar GML» en la barra y «Siguiente» al pie
+hay **dos botones primarios a la vista** en Entrada y Edición. Es deliberado
+—uno es el destino, otro el camino—, pero no se ha medido si confunde. Ver
+`TODOS.md`.
+
 ---
 
 ## 9 · Las reglas duras de la hoja
@@ -543,6 +602,9 @@ exactamente eso— pero desde hoy es la única que sale en verde por defecto.
 
 Se anota aquí para que no parezca resuelto:
 
+- **La tabla de vértices enseña 3 filas a 1280×720 desde el 2026-10-25** (eran 4):
+  el precio de la fila «Qué GML generas» (§6, §8.6). Recuperarla pide decidir qué
+  sale de la cabecera o de la ficha del pie, y eso es una decisión de contenido.
 - **La tercera vía de Entrada cae 16 px bajo el pliegue a 1280×720.** Medido, y el
   arreglo que queda es recortar aire de la cabecera del panel. Es una decisión que hay
   que tomar **mirando, no calculando**. Ver `TODOS.md`.
@@ -565,6 +627,8 @@ Se anota aquí para que no parezca resuelto:
 | Los guardianes de la hoja | `test/estilos/cascara.test.js` |
 | El presupuesto y su registro | `scripts/presupuesto-css.mjs` · `npm run build && npm run presupuesto` |
 | Apagado con motivo | `app/navegacion.js#evaluarPaso` · `app/salidas.js#evaluarSalida` |
+| La guía del recorrido («Siguiente») | `app/siguiente-paso.js` · el CTA `diagnosticar` de `index.html` · §8.6 |
+| Dónde se monta Parcela/Edificio | `app/rama.js#SELECTOR.HUECO_PANEL` · `.gml-rama-fila` de `estilos/app.css` |
 | Icono o palabra: la historia entera con sus facturas | cabecera de `viewer/barra-edicion.js` (§8.4 solo trae la regla) |
 | Los cuatro contratos, pintados | `estilos/app.css`, bloque `.gml-barra-*` · guardián en `test/estilos/cascara.test.js` |
 | Lo que solo se ve en un navegador | `scripts/smoke-navegador/GUION.md` |

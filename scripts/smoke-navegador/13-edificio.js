@@ -228,7 +228,17 @@ const SUELO_HOLGURA = 24
 // se convirtió en la barra de arriba (2026-08-10) y el renglón de motivo se retiró—,
 // así que **no se atribuyen los +11 px a ninguna**: atribuir sin haber construido
 // las variantes sería inventar. Lo que sí se afirma es lo que se midió hoy.
-const CAJA_VERTICES_REFERENCIA = 416
+//
+// ⭐ **RE-MEDIDA EL 2026-10-25: 304 px.** Y esta vez con las DOS variantes
+// construidas, sirviendo el árbol anterior en otro puerto (Chrome 1440×900,
+// `?demo=real#/parcela/edicion`, avisos vacíos):
+//   · ANTES de mover el conmutador al panel (`a09e470`): **323,11 px** — o sea que
+//     los 416 ya llevaban un tiempo caducados y este guion acusaba en falso.
+//   · DESPUÉS (`1161865`): **303,95 px**. La cabecera crece +34,00 px (94,92 →
+//     128,92: la fila «Qué GML generas») y el pie devuelve 14,84 (377,03 → 362,19:
+//     el aviso de colindantes, de tres renglones a dos). Neto −19,16 px: 12 → 11
+//     filas enteras a 900 de alto y 4 → 3 a 720. Coste aceptado por el autor.
+const CAJA_VERTICES_REFERENCIA = 304
 
 /** El violeta claro de la huella (`viewer/partes.js#COLOR_HUELLA`), en `rgb()`. */
 const COLOR_HUELLA_RGB = 'rgb(167, 139, 250)'
@@ -506,9 +516,9 @@ if (
 ) {
   problemas.push(
     `La caja de vértices arranca en ${arranque.altoCajaVerticesPx} px con la lista de avisos vacía, y ` +
-      `la referencia medida son ${CAJA_VERTICES_REFERENCIA} px (los mismos que dejaron F07, F08, F09 y ` +
-      'F10). F11 tenía que ser la SEXTA fase seguida a coste 0 px: algo del tamaño de un bloque ha ' +
-      'entrado en el panel, o el conmutador ha partido la fila de chips (mira `conmutadorAncho`).',
+      `la referencia medida son ${CAJA_VERTICES_REFERENCIA} px (re-medida el 2026-10-25 con ` +
+      'el conmutador ya en el panel). Algo del tamaño de un bloque ha ' +
+      'entrado en el panel, o se ha partido la fila «Qué GML generas» (mira `filaRama`).',
   )
 }
 if (arranque.huellasEnElMapa > 0) {
@@ -652,6 +662,56 @@ if (conmutadorAncho.altoDelBotonPx !== null && conmutadorAncho.altoDelBotonPx < 
       '24. El estirón lo daba `align-items: stretch` contra el alto del chip, y era gratis: si la ' +
       'fila se ha quedado sin chips, el conmutador vuelve a sus ~15 px.',
   )
+}
+
+// ── 2 bis · ⭐ LA FILA DE LA RAMA, EN LA CABECERA DEL PANEL (2026-10-25) ─────
+//
+// Desde `1161865` el conmutador NO vive en `.gml-chips`: `app/main.js` lo monta en
+// `[data-rama-hueco]`, dentro de `.gml-rama-fila` («Qué GML generas»). El bloque 2
+// de arriba sigue midiendo la fila de chips de la barra —que existe y no debe
+// partirse—, pero sus cifras «con/sin conmutador» describen un sitio donde el
+// conmutador ya no está. Lo que vigila AHORA lo que importa es esto: la fila nueva
+// es una caja de ancho FIJO (la columna del panel, `overflow:hidden`), así que
+// partirse cuesta alto de la tabla de vértices y desbordar es recortar en silencio.
+
+const filaRama = (() => {
+  const fila = conmutador.closest('.gml-rama-fila')
+  if (fila === null) return { medido: false }
+  // «Partida» = la fila mide más que su hijo más alto. No vale comparar los `top`
+  // como en `.gml-chips`: aquí la fila es `align-items:center` y el rótulo (13 px)
+  // y el conmutador (30 px) arrancan a alturas distintas estando en la misma línea.
+  const altos = [...fila.children].map((h) => h.getBoundingClientRect().height)
+  const altoPx = fila.getBoundingClientRect().height
+  return {
+    medido: true,
+    altoPx: redondear(altoPx),
+    saltoDeLinea: altoPx > Math.max(0, ...altos) + 1,
+    desbordePx: fila.scrollWidth - fila.clientWidth,
+    anchoDelBotonPx: redondear(botonParcela.getBoundingClientRect().width),
+    altoDelBotonPx: redondear(botonParcela.getBoundingClientRect().height),
+    dentroDeLaCabecera: fila.closest('.gml-panel-cabecera') !== null,
+  }
+})()
+
+if (!filaRama.medido || !filaRama.dentroDeLaCabecera) {
+  problemas.push(
+    'El conmutador Parcela/Edificio no está en `.gml-rama-fila` de la cabecera del panel. Desde el ' +
+      '2026-10-25 va ahí («Qué GML generas»): en la barra se leía como un filtro más. Mira el ' +
+      '`contenedor` que `app/main.js` le pasa a `cablearRama`.',
+  )
+} else {
+  if (filaRama.saltoDeLinea) {
+    problemas.push(
+      `La fila «Qué GML generas» se ha partido en dos líneas (alto ${filaRama.altoPx} px). Cada ` +
+        'línea de más sale de la tabla de vértices, que a 1280×720 ya solo enseña tres filas.',
+    )
+  }
+  if (filaRama.desbordePx > 0) {
+    problemas.push(
+      `La fila «Qué GML generas» desborda ${filaRama.desbordePx} px y el panel es ` +
+        '`overflow:hidden`: se está recortando EN SILENCIO un rótulo o un botón.',
+    )
+  }
 }
 
 // ── 3 · ⭐ M10 EN UN NAVEGADOR DE VERDAD: ida y vuelta ──────────────────────
@@ -2513,6 +2573,7 @@ return {
   noCubierto,
   arranque,
   conmutadorAncho,
+  filaRama,
   enEdificio,
   fichaEnEdificio,
   aspecto,
