@@ -239,7 +239,7 @@ export const ALTO_FILA_PX = 38
  * (la parcela no menguó, o menguó por debajo del redondeo), y una caja vacía se
  * lee como «esto no ha cargado».
  */
-export const SIN_PIEZAS = 'Sin sobrante que segregar.'
+export const SIN_PIEZAS = 'Ninguno.'
 
 /** Y el porqué, detrás del «¿por qué?». */
 export const SIN_PIEZAS_PORQUE =
@@ -351,8 +351,16 @@ const PASOS_TECLADO = Object.freeze({
 /** El rótulo del renglón que resume qué se propone. */
 export const ROTULO_RESUMEN = 'Propuesta'
 
-/** El rótulo de la zona que SÍ forma expediente. */
-export const ROTULO_PRESENTAR = 'Para presentar'
+/**
+ * El rótulo de la sección de piezas del sobrante.
+ *
+ * ⚠️ Fue «Para presentar» hasta el 2026-10-25, y mentía por omisión: lo que se
+ * presenta es el expediente ENTERO —medición, altas y colindantes recortados—, y
+ * debajo de ese rótulo solo vivían las altas. Con sobrante vacío el panel decía
+ * «Para presentar · No hay piezas que emitir» encima de un expediente de tres
+ * parcelas. Ahora nombra lo que hay debajo.
+ */
+export const ROTULO_PRESENTAR = 'Sobrante a segregar'
 
 /** El rótulo de la zona de ficheros sueltos. */
 export const ROTULO_SUELTOS = 'Para comprobar'
@@ -540,7 +548,9 @@ export function textoMedidas(pieza) {
  * @returns {string}
  */
 export function textoContador(incluidas, total) {
-  if (total === 0) return 'No hay piezas que emitir.'
+  // ⚠️ Sin piezas, NADA: el «Ninguno.» del apunte vacío ya lo dice en la misma
+  // fila, y los dos juntos eran dos renglones repitiendo el mismo cero.
+  if (total === 0) return ''
   const cuantas = total === 1 ? '1 pieza' : `${total} piezas`
   return `Se emitirán ${incluidas} de ${cuantas}, más la parcela.`
 }
@@ -591,7 +601,10 @@ const ESTILO_BLOQUE = Object.freeze({
  */
 const ESTILO_SOBRE_EL_MAPA = Object.freeze({
   background: '#fff',
-  padding: '8px 10px',
+  // Sin relleno propio: la barra y el cuerpo llevan el suyo, para que la barra
+  // pueda pintar su fondo de lado a lado como una barra de ventana de verdad.
+  padding: '0',
+  gap: '0',
   borderRadius: '6px',
   boxShadow: '0 2px 10px rgba(15,23,42,.25)',
   width: 'min(420px,42vw)',
@@ -641,8 +654,13 @@ const ESTILO_LISTA = Object.freeze({
 
 const ESTILO_FILA = Object.freeze({
   display: 'flex',
+  // ⛔ `wrap` ES CARGA ÚTIL. El desplegable de destino y el «sobre quién cae» se
+  // declaran `flex: 1 1 100%` para ir en un segundo renglón, y sin `wrap` ese
+  // 100 % no salta de línea: se ESTRUJA al lado de las medidas, en una columna de
+  // dos palabras de ancho. Así se veía el 2026-10-25.
+  flexWrap: 'wrap',
   alignItems: 'center',
-  gap: '6px',
+  gap: '2px 6px',
   padding: '3px 0',
   fontSize: '12px',
 })
@@ -808,8 +826,37 @@ const ESTILO_PORQUE = Object.freeze({
   padding: '0',
   fontSize: '11px',
   lineHeight: '1.3',
-  color: '#0369A1',
-  textDecoration: 'underline',
+  // Gris y punteado, no azul y subrayado: con tres en el panel, tres enlaces
+  // azules eran lo más llamativo de la ventana y competían con el botón.
+  color: '#64748B',
+  textDecoration: 'underline dotted',
+  textUnderlineOffset: '2px',
+})
+
+/**
+ * Las secciones del cuerpo van separadas por un filete y aire, no solo por el
+ * rótulo: con 4 px entre todo, «Fuera del contorno» se leía como una fila más de
+ * la lista de arriba.
+ */
+const ESTILO_SECCION = Object.freeze({
+  borderTop: '1px solid #E2E8F0',
+  paddingTop: '10px',
+})
+
+/** El rótulo de sección dentro del panel: sin el margen inferior de 8 px de la clase. */
+const ESTILO_ROTULO_FILA = Object.freeze({ margin: '0 0 4px' })
+
+/**
+ * La cabeza del cuerpo: QUÉ sale del fichero y el botón que lo baja, juntos y
+ * arriba. Un fondo tenue la separa del detalle sin estrenar color.
+ */
+const ESTILO_PROPUESTA = Object.freeze({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '8px',
+  padding: '8px 10px',
+  borderRadius: '6px',
+  background: '#F1F5F9',
 })
 
 /** El párrafo largo, cuando se despliega. */
@@ -872,7 +919,12 @@ function crearApunte(doc, marca) {
 
   const linea = doc.createElement('p')
   linea.dataset.sobrante = marca
-  estilar(linea, { margin: '0', fontSize: '11px', display: 'inline' })
+  estilar(linea, {
+    margin: '0',
+    fontSize: '11px',
+    display: 'inline',
+    color: '#475569',
+  })
 
   const boton = doc.createElement('button')
   boton.type = 'button'
@@ -892,7 +944,12 @@ function crearApunte(doc, marca) {
 
   const cabeza = doc.createElement('div')
   estilar(cabeza, { display: 'flex', alignItems: 'baseline', gap: '6px' })
-  estilar(linea, { margin: '0', fontSize: '11px', flex: '1 1 auto', minWidth: '0' })
+  estilar(linea, {
+    margin: '0',
+    fontSize: '11px',
+    flex: '1 1 auto',
+    minWidth: '0',
+  })
   cabeza.append(linea, boton)
   caja.append(cabeza, largo)
 
@@ -1145,14 +1202,13 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   estilar(resumenCifra, ESTILO_RESUMEN_CIFRA)
   resumen.append(resumenRotulo, resumenCifra)
 
-  // ── El rótulo de la zona que SÍ forma expediente ──────────────────────────
+  // ── La sección de las piezas del sobrante ─────────────────────────────────
   const filaPresentar = doc.createElement('div')
   filaPresentar.className = 'gml-rotulo-fila'
+  estilar(filaPresentar, ESTILO_ROTULO_FILA)
   const rotuloPresentar = doc.createElement('h2')
   rotuloPresentar.className = 'gml-rotulo'
   rotuloPresentar.textContent = ROTULO_PRESENTAR
-  filaPresentar.className = 'gml-rotulo-fila'
-  filaPresentar.append(rotuloPresentar, contador)
 
   const apunteNota = crearApunte(doc, 'nota')
 
@@ -1160,7 +1216,18 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   lista.dataset.sobrante = 'lista'
   estilar(lista, ESTILO_LISTA)
 
+  // ⭐ El «Ninguno.» va EN LA FILA DEL RÓTULO, donde iría el contador (que sin
+  // piezas está vacío): «SOBRANTE A SEGREGAR · Ninguno. ¿por qué?» es UN renglón.
+  // Antes eran tres —rótulo, «No hay piezas que emitir.», «Sin sobrante que
+  // segregar.»— diciendo el mismo cero.
   const apunteVacio = crearApunte(doc, 'vacio')
+  apunteVacio.nodo.style.marginLeft = 'auto'
+  filaPresentar.append(rotuloPresentar, contador, apunteVacio.nodo)
+
+  const seccionSobrante = doc.createElement('div')
+  seccionSobrante.dataset.sobrante = 'seccion-sobrante'
+  estilar(seccionSobrante, ESTILO_SECCION)
+  seccionSobrante.append(filaPresentar, apunteNota.nodo, lista)
 
   // ── La sección de lo que se SALE, que nace escondida ──────────────────────
   // ⚠️ **Cuesta CERO píxeles en el caso normal**, y no es un detalle menor en esta
@@ -1171,9 +1238,11 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   const fuera = doc.createElement('div')
   fuera.dataset.sobrante = 'fuera'
   fuera.hidden = true
+  estilar(fuera, ESTILO_SECCION)
 
   const fueraFilaRotulo = doc.createElement('div')
   fueraFilaRotulo.className = 'gml-rotulo-fila'
+  estilar(fueraFilaRotulo, ESTILO_ROTULO_FILA)
   const fueraRotulo = doc.createElement('h2')
   fueraRotulo.className = 'gml-rotulo'
   fueraRotulo.textContent = ROTULO_FUERA
@@ -1200,9 +1269,11 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   const sueltos = doc.createElement('div')
   sueltos.dataset.sobrante = 'sueltos'
   sueltos.hidden = true
+  estilar(sueltos, ESTILO_SECCION)
 
   const sueltosFilaRotulo = doc.createElement('div')
   sueltosFilaRotulo.className = 'gml-rotulo-fila'
+  estilar(sueltosFilaRotulo, ESTILO_ROTULO_FILA)
   const sueltosRotulo = doc.createElement('h2')
   sueltosRotulo.className = 'gml-rotulo'
   sueltosRotulo.textContent = ROTULO_SUELTOS
@@ -1247,25 +1318,26 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   renglon.id = 'gml-estado-entregar-expediente'
   boton.setAttribute('aria-describedby', renglon.id)
 
-  // El exceso va DESPUÉS de la lista del sobrante y ANTES del botón: se lee de
-  // arriba abajo como «esto sueltas · esto invades · esto puedes hacer», y así el
-  // motivo por el que el botón está apagado queda justo encima del botón.
-  // ⚠️ **Los sueltos van DESPUÉS del botón del conjunto, y no antes.** El orden
-  // de lectura es el orden de la decisión: primero lo que se presenta, y sólo
-  // debajo lo que sirve para comprobar. Ponerlos encima haría que lo primero que
-  // se ve al bajar la vista fueran seis botones de descarga, y el único que forma
-  // expediente quedaría el último de todos.
-  cuerpo.append(
-    resumen,
-    filaPresentar,
-    apunteNota.nodo,
-    lista,
-    apunteVacio.nodo,
-    fuera,
-    boton,
-    renglon,
-    sueltos,
-  )
+  // ── ⭐ EL ORDEN, REHECHO EL 2026-10-25 ─────────────────────────────────────
+  // Arriba, en una sola caja: QUÉ sale del fichero, el botón que lo baja y su
+  // renglón. Debajo, el detalle de cómo se llega ahí —sobrante, lo que se sale—
+  // y al final lo que sólo sirve para comprobar.
+  //
+  // Antes el botón vivía EN MEDIO, entre «Fuera del contorno» y los sueltos, y el
+  // panel se leía como cinco renglones grises del mismo peso con un botón azul
+  // perdido entre ellos. El argumento de entonces —«el motivo del botón apagado
+  // queda justo encima»— sigue cubierto: el motivo es el renglón de DEBAJO del
+  // botón, que viaja con él.
+  //
+  // ⚠️ **Los sueltos siguen DESPUÉS del botón del conjunto**, y por lo mismo de
+  // siempre: si lo primero que se viera fueran seis botones de descarga, el único
+  // que forma expediente quedaría el último de todos.
+  const propuesta = doc.createElement('div')
+  propuesta.dataset.sobrante = 'propuesta'
+  estilar(propuesta, ESTILO_PROPUESTA)
+  propuesta.append(resumen, boton, renglon)
+
+  cuerpo.append(propuesta, seccionSobrante, fuera, sueltos)
   bloque.append(cabecera, cuerpo)
 
   // ── Pintado ───────────────────────────────────────────────────────────────
@@ -1358,6 +1430,15 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
     // El MISMO rótulo que la mancha ámbar del mapa: `F1`, `F2`… Ver `_comun.js`.
     numero.textContent = textoNumeroPieza(pieza.orden, PREFIJO_FUERA)
     estilar(numero, ESTILO_NUMERO)
+    // Vestido como la etiqueta ámbar de la mancha del mapa, para que el ojo los
+    // empareje sin leer: es la misma pieza en los dos sitios.
+    estilar(numero, {
+      padding: '1px 5px',
+      borderRadius: '4px',
+      background: 'rgba(245,158,11,.22)',
+      color: '#92400E',
+      fontSize: '11px',
+    })
 
     const medidas = doc.createElement('span')
     medidas.className = 'gml-mono'
@@ -1380,26 +1461,56 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
     // ~344 px; y **solo aparece si se ha consultado**, porque no haberlo preguntado
     // y no caer sobre nadie son cosas opuestas.
     if (atribucion !== null && atribucion !== undefined) {
-      const dueños = doc.createElement('span')
+      // ⭐ UN RENGLÓN POR DUEÑO (2026-10-25), con la referencia a la izquierda y
+      // los m² alineados a la derecha bajo las medidas de la fila. Antes iba todo
+      // en una frase «sobre A (x m²) · ninguna parcela (y m²)» que, estrujada,
+      // partía las cifras entre renglones y no se podía sumar con la vista.
+      const dueños = doc.createElement('div')
       dueños.dataset.sobrante = 'fuera-sobre'
-      estilar(dueños, { flex: '1 1 100%', fontSize: '11px', paddingLeft: '2px' })
-      const trozos = atribucion.porVecino.map(
-        (v) => `${v.refcat ?? 'parcela sin referencia'} (${FORMATO_AREA.format(v.area)} m²)`,
-      )
-      if (atribucion.sobreNadie > 0.005) {
-        // ⚠️ **No se llama «vial» aquí.** Que no solape ninguna colindante es lo
-        // MEDIDO; que sea un vial, dominio público o un hueco del parcelario es una
-        // interpretación, y este proyecto no dictamina (regla de oro 9). El aviso
-        // de `derivacion/vecino.js` sí enumera las tres posibilidades, con su
-        // superficie, que es donde cabe explicarlo.
-        // ⚠️ Con la MISMA forma que las demás entradas —«quién (cuánto)»— porque
-        // todas se concatenan detrás de un solo «sobre». La primera versión decía
-        // «56,37 m² sobre ninguna parcela» y salía «sobre 56,37 m² sobre ninguna
-        // parcela»: lo cazó el guion 25 en su primera corrida, no la suite.
-        trozos.push(`ninguna parcela (${FORMATO_AREA.format(atribucion.sobreNadie)} m²)`)
-      }
-      dueños.textContent = trozos.length === 0 ? '' : `sobre ${trozos.join(' · ')}`
-      if (dueños.textContent !== '') fila.append(dueños)
+      estilar(dueños, {
+        flex: '1 1 100%',
+        display: 'grid',
+        gridTemplateColumns: 'auto 1fr auto',
+        columnGap: '6px',
+        fontSize: '11px',
+        color: '#475569',
+        paddingLeft: '2px',
+      })
+      const renglones = atribucion.porVecino.map((v) => [
+        v.refcat ?? 'parcela sin referencia',
+        v.area,
+      ])
+      // ⚠️ **No se llama «vial» aquí.** Que no solape ninguna colindante es lo
+      // MEDIDO; que sea un vial, dominio público o un hueco del parcelario es una
+      // interpretación, y este proyecto no dictamina (regla de oro 9). El aviso
+      // de `derivacion/vecino.js` sí enumera las tres posibilidades.
+      if (atribucion.sobreNadie > 0.005) renglones.push(['ninguna parcela', atribucion.sobreNadie])
+      renglones.forEach(([quien, area], i) => {
+        const prefijo = doc.createElement('span')
+        prefijo.textContent = i === 0 ? 'sobre' : ''
+        estilar(prefijo, { color: '#94A3B8' })
+        const nombre = doc.createElement('span')
+        nombre.className = 'gml-mono'
+        nombre.textContent = quien
+        estilar(nombre, {
+          minWidth: '0',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        })
+        const cifra = doc.createElement('span')
+        cifra.className = 'gml-mono'
+        cifra.textContent = `${FORMATO_AREA.format(area)} m²`
+        estilar(cifra, {
+          textAlign: 'right',
+          fontVariantNumeric: 'tabular-nums',
+        })
+        dueños.append(prefijo, nombre, cifra)
+      })
+      // El texto corrido, para quien lo oye: tres celdas sueltas no son una frase.
+      const trozos = renglones.map(([quien, area]) => `${quien} (${FORMATO_AREA.format(area)} m²)`)
+      dueños.setAttribute('role', 'note')
+      dueños.setAttribute('aria-label', trozos.length === 0 ? '' : `sobre ${trozos.join(' · ')}`)
+      if (trozos.length > 0) fila.append(dueños)
     }
 
     return fila
@@ -1459,7 +1570,12 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
     // pulsable de la casilla (que mide 14 px y es el objetivo más pequeño de la
     // pantalla) y el lector de pantalla lee los dos como un solo control.
     const etiqueta = doc.createElement('label')
-    estilar(etiqueta, { display: 'flex', alignItems: 'center', gap: '4px', flex: 'none' })
+    estilar(etiqueta, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px',
+      flex: 'none',
+    })
 
     const casilla = doc.createElement('input')
     casilla.type = 'checkbox'
@@ -1513,7 +1629,11 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
       destino.dataset.sobrante = 'destino'
       destino.dataset.orden = String(pieza.orden)
       destino.setAttribute('aria-label', `Destino de la pieza ${pieza.orden}`)
-      estilar(destino, { flex: '1 1 100%', fontSize: '11px', marginTop: '2px' })
+      estilar(destino, {
+        flex: '1 1 100%',
+        fontSize: '11px',
+        marginTop: '2px',
+      })
 
       const alta = doc.createElement('option')
       alta.value = DESTINO_ALTA
@@ -1587,7 +1707,11 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
         'Su grosor está por debajo del umbral con el que este proyecto distingue una astilla ' +
         'de redondeo de una finca. Se lista con sus cifras y NO se descarta: decidirlo es de ' +
         'quien firma.'
-      estilar(estrecha, { flex: 'none', fontSize: '11px', fontStyle: 'italic' })
+      estilar(estrecha, {
+        flex: 'none',
+        fontSize: '11px',
+        fontStyle: 'italic',
+      })
       fila.append(estrecha)
     }
 
@@ -1956,7 +2080,10 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
       estilar(fila, ESTILO_FILA)
       // El fondo cambia al señalar, así que una transición corta evita el
       // parpadeo al recorrer la lista deprisa. Nada más: ni movimiento ni tamaño.
-      estilar(fila, { borderRadius: '4px', transition: 'background-color .12s' })
+      estilar(fila, {
+        borderRadius: '4px',
+        transition: 'background-color .12s',
+      })
 
       // ⭐ **La etiqueta es un BOTÓN desde el 2026-08-20**, y no un `<span>`.
       // Es lo que convierte «no sé cuál es cuál» en un gesto: se pulsa para fijar
@@ -2199,6 +2326,24 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
     // bloque no flota sobre nada, y pintarle sombra y fondo blanco dentro de una
     // columna sería dibujar una tarjeta dentro de una tarjeta.
     estilar(bloque, ESTILO_SOBRE_EL_MAPA)
+    // La barra se pinta como barra: fondo propio de lado a lado y un filete que
+    // la separa del contenido. Sin eso, el título «Rehacer el parcelario» se leía
+    // como un renglón más del cuerpo.
+    estilar(cabecera, {
+      padding: '7px 8px 7px 10px',
+      background: '#F8FAFC',
+      borderBottom: '1px solid #E2E8F0',
+    })
+    // ⛔ **El cuerpo SCROLLEA, no se recorta.** El panel es `overflow:hidden` con
+    // tope de 60vh, y con fuera del contorno + seis sueltos el cuerpo pasaba de
+    // ese tope: lo último —los sueltos— desaparecía por abajo sin ninguna señal.
+    estilar(cuerpo, {
+      flex: '1 1 auto',
+      padding: '10px 12px 12px',
+      gap: '10px',
+      overflowY: 'auto',
+      overscrollBehavior: 'contain',
+    })
     // El cursor es la mitad de la promesa del asidero `⠿`: uno se ve de lejos y
     // el otro se descubre al pasar por encima. Van juntos o no van.
     cabecera.style.cursor = 'move'
