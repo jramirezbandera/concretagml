@@ -2989,6 +2989,8 @@ explicarle nada.
 
 - [ ] Pulsa «Traer del Catastro» y mira el mapa: ¿se nota que han llegado las
       vecinas sin pedirlas? El renglón del pie de Edición dice cuántas.
+- [ ] Abre un GML de parcela con referencia: también tienen que llegar solas. Y una
+      medición sin referencia (solo deducida): **no** tienen que pedirse.
 
 ### 23.4 · El diagnóstico
 
@@ -3002,8 +3004,9 @@ explicarle nada.
 - [ ] Carga un DXF sin plantas (`test/fixtures/parsers/edificio_consulta_masiva_*.dxf`).
       ¿Ve en la lista qué partes «faltan plantas» y entiende qué tiene que hacer?
 - [ ] En Edición, «Parte activa» nace vacía (a propósito: auditoría H3). ¿Sabe que
-      tiene que pinchar una parte **de la lista**? Pinchar la huella en el mapa no
-      la elige (ese clic deduce la referencia).
-- [ ] A 1280×720, en Parcela › Edición, ¿bastan **tres filas** de la tabla de
-      vértices para trabajar, o se echa de menos la cuarta? (Coste medido de la fila
-      del conmutador: DESIGN.md §6.)
+      tiene que elegir una parte? Desde el 2026-10-25 vale pinchar su fila **o su
+      huella en el mapa**. Si la elige en el mapa, ¿encuentra la fila? (La lista no
+      se desplaza hasta ella: `TODOS.md`.)
+- [ ] En Edición y Diagnóstico el panel ya no lleva título grande (solo lo oye el
+      lector). ¿Se echa de menos, o el peldaño de la barra basta para saber dónde
+      está?

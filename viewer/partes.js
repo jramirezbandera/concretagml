@@ -349,7 +349,17 @@ export function rotuloPlantas(parte) {
  * @returns {CapaPartes}
  * @throws {TypeError|RangeError} Contrato del programador.
  */
-export function crearCapaPartes({ mapa, zona, alAvisar } = {}) {
+export function crearCapaPartes({ mapa, zona, alAvisar, alPulsarParte = null } = {}) {
+  // ⭐ 2026-10-25 · `alPulsarParte(indice)`: pinchar una huella puede ELEGIR su parte.
+  // Si devuelve `true` el clic se CONSUME y no sube al mapa —donde deduciría la
+  // referencia catastral (ver la cabecera)—; con cualquier otra cosa sube como
+  // siempre. Quien decide cuándo vale cada cosa es el llamante, no la capa.
+  if (alPulsarParte !== null && typeof alPulsarParte !== 'function') {
+    throw new TypeError(
+      `crearCapaPartes: 'alPulsarParte' debe ser una función o null; recibido ` +
+        `${describir(alPulsarParte)}.`,
+    )
+  }
   // ── Contratos del programador: throw, nunca corrección callada ─────────────
   // Se comprueban las funciones que este módulo usa DE VERDAD (mismo criterio que
   // `viewer/colindantes.js` y `viewer/contraste.js`): un guardián que solo mira
@@ -563,6 +573,14 @@ export function crearCapaPartes({ mapa, zona, alAvisar } = {}) {
         sticky: true,
         direction: 'top',
       })
+
+      if (alPulsarParte !== null) {
+        poligono.on('click', (evento) => {
+          // `stopPropagation` sobre el evento de Leaflet marca `originalEvent._stopped`,
+          // que es lo que mira el mapa antes de disparar su propio `click`.
+          if (alPulsarParte(indice) === true) L.DomEvent.stopPropagation(evento)
+        })
+      }
 
       poligono.addTo(mapa)
       capas.push(poligono)

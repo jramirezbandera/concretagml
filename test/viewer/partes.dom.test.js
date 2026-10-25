@@ -91,10 +91,10 @@ afterEach(() => {
 })
 
 /** Monta mapa + panes + capa, y lo apunta todo para la limpieza. */
-function conMapa({ alAvisar } = {}) {
+function conMapa({ alAvisar, alPulsarParte } = {}) {
   const { mapa, contenedor, destruir } = montarMapa({ centro: [36.7, -4.5], zoom: 19 })
   crearPanes(mapa)
-  const capa = crearCapaPartes({ mapa, zona: ZONA, alAvisar })
+  const capa = crearCapaPartes({ mapa, zona: ZONA, alAvisar, alPulsarParte })
   montados.push(() => {
     capa.destruir()
     destruir()
@@ -251,6 +251,32 @@ describe('viewer/partes · el CLIC del mapa sobrevive a la capa interactiva', ()
     const esperado = mapa.containerPointToLatLng(L.point(400, 300))
     expect(evento.latlng.lat).toBeCloseTo(esperado.lat, 9)
     expect(evento.latlng.lng).toBeCloseTo(esperado.lng, 9)
+  })
+
+  it('⭐ 2026-10-25 · con `alPulsarParte` → true, el clic elige la parte y NO llega al mapa', () => {
+    const alPulsarParte = vi.fn(() => true)
+    const { mapa, capa } = conMapa({ alPulsarParte })
+    const alClicar = vi.fn()
+    mapa.on('click', alClicar)
+
+    capa.pintar([VIVIENDA, PORCHE])
+    clicarSobre(huellasDe(mapa)[1].getElement())
+
+    expect(alPulsarParte).toHaveBeenCalledWith(1)
+    expect(alClicar, 'el clic consumido no puede deducir referencia').not.toHaveBeenCalled()
+  })
+
+  it('⭐ 2026-10-25 · con `alPulsarParte` → false, el clic sube al mapa como siempre', () => {
+    const alPulsarParte = vi.fn(() => false)
+    const { mapa, capa } = conMapa({ alPulsarParte })
+    const alClicar = vi.fn()
+    mapa.on('click', alClicar)
+
+    capa.pintar([VIVIENDA])
+    clicarSobre(huellasDe(mapa)[0].getElement())
+
+    expect(alPulsarParte).toHaveBeenCalledWith(0)
+    expect(alClicar).toHaveBeenCalledTimes(1)
   })
 
   it('la huella declara `bubblingMouseEvents` (el defecto de L.Path del que depende)', () => {

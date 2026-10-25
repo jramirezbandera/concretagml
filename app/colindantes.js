@@ -105,6 +105,38 @@ export function traducirColindantes(parcelas) {
  *   destruir: () => void}}
  * @throws {TypeError} Si `catastro` no es `null` y no publica `alColindantes`.
  */
+/** Una referencia en su forma comparable, o `null` si no hay. @param {unknown} r */
+const comparable = (r) => (typeof r === 'string' && r.trim() !== '' ? r.trim().toUpperCase() : null)
+
+/**
+ * ⭐ 2026-10-25 · ¿Hay que pedir las colindantes de la parcela que acaba de entrar
+ * por un GML o por la medición? Devuelve la referencia a pedir, o `null`.
+ *
+ * Tres condiciones, y las tres tienen motivo:
+ *   · **La parcela trae `refcat`.** Es la AFIRMADA, la del fichero. Una deducida por
+ *     ubicación vive aparte (`refcatDeducida`) y nadie la ha revisado: pedir sus
+ *     vecinas podría traer las de otra finca.
+ *   · **Sigue siendo la del store** cuando se va a pedir. Si ha entrado otro
+ *     documento entre medias, no se pide para uno que ya no está.
+ *   · **Sus vecinas no están ya.** Una medición nueva sobre la MISMA finca no cambia
+ *     sus colindantes, y pedirlas otra vez sería una petición de más (override O8).
+ *
+ * Pura, sin red ni DOM: quien pide es `app/main.js#traerColindantesSiHayReferencia`.
+ *
+ * @param {object} args
+ * @param {object|null|undefined} args.parcela  La que acaba de entrar.
+ * @param {object|null|undefined} args.actual   La que hay en el store al ir a pedir.
+ * @param {string|null} args.conColindantes     Referencia de las últimas vecinas.
+ * @returns {string|null}
+ */
+export function refcatParaPedirColindantes({ parcela, actual, conColindantes }) {
+  const refcat = comparable(parcela?.refcat)
+  if (refcat === null) return null
+  if (comparable(actual?.refcat) !== refcat) return null
+  if (comparable(conColindantes) === refcat) return null
+  return refcat
+}
+
 export function crearRegistroColindantes({ catastro = null } = {}) {
   if (catastro !== null && typeof catastro.alColindantes !== 'function') {
     throw new TypeError(

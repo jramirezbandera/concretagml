@@ -3028,13 +3028,16 @@ Medido el **2026-08-04**: a 1440×768 el tope vale **199,68 px** (contra 234,00 
 > Ver «La corrida del 2026-10-25» al final de esta sección.
 
 - `ok: true`, `problemas: []`. **Hoy NO pasa**: ver abajo.
-- `arranque.altoCajaVerticesPx: 304` **con `tarjetasDeAvisos: 0`** (era 267, luego 416;
-  las dos caducadas, ver la corrida del 2026-10-25).
+- `arranque.altoCajaVerticesPx: 343` **con `tarjetasDeAvisos: 0`** (era 267, luego 416,
+  luego 304; ver la corrida del 2026-10-25).
 - ⭐ `filaRama.dentroDeLaCabecera: true`, `saltoDeLinea: false`, `desbordePx: 0`,
   `altoDelBotonPx ≥ 24`.
 - `conmutadorAncho.saltoDeLinea: false` (hoy mide solo los chips de la barra).
-- `invariante.cabeceraClavada: true` (128,92 en las dos ramas desde el 2026-10-25;
-  era 117,13).
+- `invariante.cabeceraClavada: true`, **o `null` si las dos medidas son de pasos
+  distintos** (`pasosDeLasDosCabeceras`). Desde el 2026-10-25 el `<h1>` solo se ve en
+  Entrada, así que la cabecera depende del paso: 90,13 px en Edición y Diagnóstico,
+  128,92 en Entrada. Con la rama EDIFICIO vacía la pantalla cae a Entrada, y comparar
+  ahí acusaría al título.
 - `idaYVuelta.mismoNodo: true`, `valorAhora` intacto, `sondaSigueDisparando: true`.
 - `capaHuellas.zPartes: 422`, entre 420 y 430, y los `<path>` colgando del pane.
 - `reparto.partesTrasAplicar: 7` y `huellasTrasAplicar: 7`.
@@ -3400,6 +3403,11 @@ caja **304** con 0 avisos, `(no console errors)`. `ok: false` por **un** problem
 que **no es de este cambio**: al soltar un `.dxf` en Parcela el campo de referencia
 pasa de «9398516VK3799G» a «8703361TF9980S». Reproducido igual sobre `a09e470`.
 Anotado en `TODOS.md` («La guía del recorrido», punto 5).
+
+**Y el mismo día, otra vez**: al ocultar el `<h1>` en Edición y Diagnóstico la
+cabecera bajó a 90,13 px y la caja a **343** (referencia actualizada), y
+`cabeceraClavada` pasó a compararse solo dentro del mismo paso. Resultado: el mismo
+único problema anterior, nada más.
 
 ⚠️ **Lánzalo con la base BORRADA de verdad.** Si antes has cargado un edificio a
 mano, el autoguardado lo restaura y el guion ve 13 huellas al arrancar, la lista de

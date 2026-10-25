@@ -17,18 +17,30 @@ sigue no se tocó, por orden de impacto:
    dos azules en Entrada y Edición. Uno es el destino y otro el camino, y así se
    dejó, pero nadie ha mirado si un usuario nuevo duda entre ellos. *Bloquea:*
    mirarlo con alguien delante; es la pregunta 13.1 de `CHECKLIST-HUMANO.md`.
-2. **La tabla de vértices enseña 3 filas a 1280×720** (eran 4; a 1440×900, 11 en
-   vez de 12).
+2. ✅ **HECHO el mismo día.** ~~La tabla de vértices enseña 3 filas a 1280×720.~~ El
+   `<h1>` del panel se oculta a la vista en Edición y Diagnóstico (repetía el peldaño
+   de la barra): 4 filas enteras y media a 1280×720, 13 a 1440×900. +84 B.
+   Lo que sigue es la historia del punto:
+   (eran 4; a 1440×900, 11 en vez de 12).
    Medido con las dos versiones servidas a la vez: cabecera +34,00 px, pie
    −14,84. Lo que queda para recuperarla es quitar algo de la cabecera (el rótulo
    de procedencia y los dos indicadores repiten en parte lo que ya dice el
    conmutador) o de la ficha del pie. *Bloquea:* es decisión de contenido.
-3. **Las colindantes solo vienen solas con «Traer del Catastro».** Quien entra por
+3. ✅ **HECHO el mismo día**, por decisión del autor: también por GML y por medición
+   cuando la parcela trae su referencia afirmada y sus vecinas no están ya
+   (`app/colindantes.js#refcatParaPedirColindantes`). Con una referencia solo
+   deducida sigue sin pedirse. Lo que sigue es la historia del punto:
+   **Las colindantes solo vienen solas con «Traer del Catastro».** Quien entra por
    medición propia o por GML sigue teniendo que pulsar «Traer colindantes», aunque
    la referencia se deduzca sola tras importar. Pedirlas también ahí es una
    petición más por apertura en una vía que hoy no la hace. *Bloquea:* la política
    de peticiones del override O8, que es del autor.
-4. **En Edificio, «Parte activa» nace vacía** y hay que adivinar que se pincha una
+4. ✅ **HECHO a medias el mismo día**: en Edificio › Edición, pinchar una huella
+   elige su parte (decisión del autor). «Parte activa» sigue naciendo vacía por H3.
+   ⏳ **Queda**: la lista de partes no se desplaza hasta la fila elegida desde el
+   mapa; con trece partes, la elegida puede quedar fuera de la vista de la lista.
+   Lo que sigue es la historia del punto:
+   **En Edificio, «Parte activa» nace vacía** y hay que adivinar que se pincha una
    parte de la lista. No se elige la primera sola porque lo prohíbe la auditoría
    del 2026-08-16 (H3: el siguiente arrastre entraría en una huella que el usuario
    no ha tocado). Y pinchar una huella en el mapa **no** la elige, a propósito: ese

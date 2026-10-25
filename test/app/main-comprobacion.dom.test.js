@@ -603,6 +603,19 @@ describe('app/main · F08 · las dos features, enlazadas', () => {
     expect(texto).toContain('de-otro-despacho.gml')
   })
 
+  it('⭐ 2026-10-25 · soltar un GML de la MISMA finca no vuelve a pedir sus colindantes', async () => {
+    // `traerColindantesSiHayReferencia` (app/main.js). Esta app arranca con la parcela
+    // de demostración, que es esta misma finca, y sus vecinas ya han llegado en las
+    // pruebas de arriba: un fichero nuevo de la misma referencia no las cambia. La
+    // decisión entera, con sus tres condiciones, se prueba en `colindantes.test.js`.
+    await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
+    await cederTurno()
+    arranque.peticiones.length = 0
+    await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'otra-vez.gml'))
+    await cederTurno()
+    expect(arranque.peticiones.filter((u) => u.includes('Neighbour'))).toHaveLength(0)
+  })
+
   it('«Descartar» suelta el fichero y el envoltorio vuelve a `null`', async () => {
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
     expect(arranque.diagnostico.comprobacion()).not.toBeNull()

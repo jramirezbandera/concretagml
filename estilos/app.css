@@ -1521,6 +1521,14 @@ body {
   line-height: 1.2;
 }
 
+/* ⭐ EN EDICIÓN Y DIAGNÓSTICO EL TÍTULO SOLO LO OYE EL LECTOR (2026-10-25).
+ * «Edición del recinto» y «Diagnóstico de encaje» repetían el peldaño marcado en
+ * la barra, y costaban la fila de vértices que se llevó «Qué GML generas»
+ * (DESIGN.md §6). En Entrada se queda: «Empieza tu expediente» sí orienta a quien
+ * llega. Oculto a la vista y no `display:none`: sigue siendo el `<h1>` de la página.
+ * La regla es la de `.gml-rotulo-oculto`, que lleva estos dos selectores en su
+ * lista: escribirla aparte costaba 191 B para repetir siete declaraciones. */
+
 /* ⛔ EL `wrap` DE AQUÍ ES CARGA ÚTIL Y NO SE CAMBIA A `nowrap`. Desde F11 esta
    fila no lleva solo chips: lleva también el conmutador de rama, y el plan de F11
    pedía `nowrap` para que no saltara de línea. Se midió y estaba MAL: con `nowrap`
@@ -2796,7 +2804,9 @@ body {
  * es duplicación: aquella la escribe EN LÍNEA `viewer/barra-edicion.js` porque la
  * barra flota sobre la ortofoto y tiene que ser correcta aunque esta hoja no
  * cargue. Esta tabla ya depende de la hoja para todo lo demás. */
-.gml-rotulo-oculto {
+.gml-rotulo-oculto,
+.gml-app[data-paso='edicion'] .gml-titulo,
+.gml-app[data-paso='diagnostico'] .gml-titulo {
   position: absolute;
   width: 1px;
   height: 1px;

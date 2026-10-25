@@ -596,10 +596,15 @@ export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'dia
  * un segundo botón «Siguiente» en Edición al lado de «Diagnosticar encaje» (+57 px
  * de panel que la tabla de vértices no tiene a 1280×720; se reutilizó el botón).
  *
+ * ⭐ **Y +84 B EL MISMO DÍA** (de 67.185 a **67.269 B nuestros**; 82.280 → 82.364 con
+ * vendor): el `<h1>` del panel se oculta a la vista en Edición y Diagnóstico, y con
+ * eso la tabla de vértices recupera la fila y gana otra. Se fundió en la regla de
+ * `.gml-rotulo-oculto` en vez de repetirla, que es lo que la dejó en 84 y no en 191.
+ *
  * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
  * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
  */
-export const TECHO = Object.freeze({ total: 82280, nuestro: 67185 })
+export const TECHO = Object.freeze({ total: 82364, nuestro: 67269 })
 
 /**
  * EL REGISTRO. Un asiento por hito, con la hoja construida medida de verdad.
@@ -1771,6 +1776,17 @@ export const ASIENTOS = Object.freeze(
         '`.gml-siguiente` (el panel ya es blanco) y el color de `.gml-parte-falta` (lo hereda ' +
         'de `.gml-parte`): −67 B. ── ⚠️ El techo SUBE 1.008 B (cabecera de `TECHO`) y la ' +
         'holgura vuelve a 0. NO CIERRA REBANADA.' },
+    { hito: 'El título del panel solo lo oye el lector en Edición y Diagnóstico',
+      commit: '(sin commitear)',
+      total: 82364, nuestro: 67269, rebanada: null,
+      nota:
+        '**+84 B.** «Edición del recinto» y «Diagnóstico de encaje» repetían el peldaño ' +
+        'marcado en la barra y costaban la fila de vértices que se llevó «Qué GML generas»: ' +
+        'ocultos a la vista (no `display:none`, siguen siendo el `<h1>`), la tabla pasa de 3 a ' +
+        '5 filas a 1280×720. ── QUÉ SE HA DEVUELTO ANTES DE SUBIR ── la regla se escribió ' +
+        'aparte (+191 B) y se fundió en la lista de selectores de `.gml-rotulo-oculto`, que ' +
+        'ya declaraba las siete propiedades: −107 B. ── ⚠️ El techo SUBE 84 B (cabecera de ' +
+        '`TECHO`) y la holgura vuelve a 0. NO CIERRA REBANADA.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

@@ -238,7 +238,11 @@ const SUELO_HOLGURA = 24
 //     128,92: la fila «Qué GML generas») y el pie devuelve 14,84 (377,03 → 362,19:
 //     el aviso de colindantes, de tres renglones a dos). Neto −19,16 px: 12 → 11
 //     filas enteras a 900 de alto y 4 → 3 a 720. Coste aceptado por el autor.
-const CAJA_VERTICES_REFERENCIA = 304
+//
+// ⭐ **Y 343 EL MISMO DÍA**, tras ocultar a la vista el `<h1>` en Edición y
+// Diagnóstico: cabecera 128,92 → 90,13 px, caja 304 → 343. A 1280×720 son 4
+// filas enteras y la quinta asomando (eran 3).
+const CAJA_VERTICES_REFERENCIA = 343
 
 /** El violeta claro de la huella (`viewer/partes.js#COLOR_HUELLA`), en `rgb()`. */
 const COLOR_HUELLA_RGB = 'rgb(167, 139, 250)'
@@ -459,6 +463,9 @@ const arranque = {
   tarjetasDeAvisos: tarjetasDeAvisos(),
   altoCajaVerticesPx: altoCajaVertices(),
   altoCabeceraPx: alto(cabecera),
+  // ⭐ 2026-10-25 · El paso en pantalla: desde hoy el `<h1>` solo se ve en Entrada, así
+  // que la cabecera depende del paso y solo se compara dentro del mismo.
+  pasoEnPantalla: document.body.getAttribute('data-paso'),
   altoFichaPx: alto(ficha),
   // La rama PARCELA se ve y la de EDIFICIO no. Se pregunta por `hidden` —el
   // mecanismo— y por `display` —el efecto—: una regla de CSS con `display` y
@@ -775,6 +782,9 @@ const enEdificio = {
   // publica para que nadie lea el 0 como una pérdida.
   altoCajaVerticesPx: altoCajaVertices(),
   altoCabeceraPx: alto(cabecera),
+  // ⭐ 2026-10-25 · El paso en pantalla: desde hoy el `<h1>` solo se ve en Entrada, así
+  // que la cabecera depende del paso y solo se compara dentro del mismo.
+  pasoEnPantalla: document.body.getAttribute('data-paso'),
   altoBloqueOrigenPx: alto(bloqueEdificio),
   altoBloquePartesPx: alto(bloquePartes),
   altoListaPartesPx: alto('.gml-partes'),
@@ -2434,10 +2444,16 @@ const invariante = {
   bloqueOrigenEnEdificioPx: enEdificio.altoBloqueOrigenPx,
   cabeceraEnParcelaPx: arranque.altoCabeceraPx,
   cabeceraEnEdificioPx: enEdificio.altoCabeceraPx,
+  // ⭐ 2026-10-25 · `null` (no comparable) si las dos medidas son de pasos distintos:
+  // el título se ve en Entrada y no en Edición ni Diagnóstico, y con la rama
+  // EDIFICIO vacía la pantalla cae a Entrada. Comparar ahí acusaría al título.
   cabeceraClavada:
-    arranque.altoCabeceraPx === null || enEdificio.altoCabeceraPx === null
+    arranque.altoCabeceraPx === null ||
+    enEdificio.altoCabeceraPx === null ||
+    arranque.pasoEnPantalla !== enEdificio.pasoEnPantalla
       ? null
       : Math.abs(arranque.altoCabeceraPx - enEdificio.altoCabeceraPx) < 1,
+  pasosDeLasDosCabeceras: [arranque.pasoEnPantalla, enEdificio.pasoEnPantalla],
 }
 
 if (invariante.clavado === false && invariante.avisosQueEsteGuionHaProvocado === 0) {

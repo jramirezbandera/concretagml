@@ -972,6 +972,10 @@ export function cablearEdificio({
   trasOrigen,
   trasPartes,
   crearCapa = crearCapaPartes,
+  // ⭐ 2026-10-25 · ¿Elige parte un clic en su huella AHORA? Lo decide quien conoce
+  // la rama y el paso (`app/main.js`: Edificio › Edición). Por omisión, nunca: el
+  // clic sigue subiendo al mapa como antes.
+  puedeElegirEnMapa = () => false,
   encuadrar = encuadrarSobreRecintos,
   ahora = () => new Date(),
 } = {}) {
@@ -1159,7 +1163,21 @@ export function cablearEdificio({
   const capa =
     mapa === null
       ? null
-      : crearCapa({ mapa, zona: huso, alAvisar: (m, o) => panel.avisar(m, o) })
+      : crearCapa({
+          mapa,
+          zona: huso,
+          alAvisar: (m, o) => panel.avisar(m, o),
+          // ⭐ 2026-10-25 · Pinchar una huella elige su parte, como pinchar su fila.
+          // NO choca con la auditoría H3 (nada se elige sin un gesto): esto ES el
+          // gesto. Se repinta a mano por lo mismo que en SELECCIONAR_PARTE: elegir
+          // no muta el `Edificio` y el store no notifica.
+          alPulsarParte: (indice) => {
+            if (puedeElegirEnMapa() !== true) return false
+            seleccionarParte(indice)
+            repintar(estado.get())
+            return true
+          },
+        })
 
   // ══ F12 · T4.2 · EL MOTOR DE EDICIÓN DE LA PARTE ACTIVA ═══════════════════
   //

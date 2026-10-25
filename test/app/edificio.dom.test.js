@@ -263,6 +263,7 @@ function montar({
   conRama = false,
   parcela = null,
   encuadrar,
+  puedeElegirEnMapa,
 } = {}) {
   document.body.className = INDEX.clase
   document.body.innerHTML = INDEX.cuerpo
@@ -327,6 +328,7 @@ function montar({
     documento: document,
     crearCapa,
     ...(encuadrar === undefined ? {} : { encuadrar }),
+    ...(puedeElegirEnMapa === undefined ? {} : { puedeElegirEnMapa }),
   })
 
   const contexto = {
@@ -1506,6 +1508,31 @@ describe('F12 · T4.2 · añadir, elegir y eliminar partes', () => {
     expect(ctx.cableado.parteActiva()).toBe(1)
     expect(ctx.panelEdificio.parteActiva()).toBe(1)
     expect(ultimoPintado(ctx).activa).toBe(1)
+  })
+
+  it('⭐ 2026-10-25 · pinchar una huella elige su parte cuando el paso lo permite', () => {
+    // Es el mismo gesto que pinchar la fila, por otro sitio: no contradice H3.
+    let permitido = true
+    const ctx = montar({ puedeElegirEnMapa: () => permitido })
+    ctx.estado.set(edificioDosPartes())
+    const alPulsarParte = ctx.capa.creada[0].alPulsarParte
+
+    expect(alPulsarParte(1), 'consume el clic: no tiene que subir al mapa').toBe(true)
+    expect(ctx.cableado.parteActiva()).toBe(1)
+    expect(ctx.panelEdificio.parteActiva()).toBe(1)
+    expect(ultimoPintado(ctx).activa).toBe(1)
+
+    // Fuera de Edificio › Edición el clic es de la deducción: ni elige ni se consume.
+    permitido = false
+    expect(alPulsarParte(0)).toBe(false)
+    expect(ctx.cableado.parteActiva()).toBe(1)
+  })
+
+  it('⭐ 2026-10-25 · sin `puedeElegirEnMapa`, pinchar una huella no elige nada', () => {
+    const ctx = montar()
+    ctx.estado.set(edificioDosPartes())
+    expect(ctx.capa.creada[0].alPulsarParte(0)).toBe(false)
+    expect(ctx.cableado.parteActiva()).toBeNull()
   })
 
   it('⛔ eliminar la parte activa deja de haber activa, y NO lanza', () => {

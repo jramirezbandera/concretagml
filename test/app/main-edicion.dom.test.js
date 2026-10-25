@@ -1921,7 +1921,12 @@ describe('app/main · los dos ganchos que el arranque le entrega al Catastro', (
     // primero»), y este número es lo que lo afirma desde el arranque real. Eran dos
     // hasta que las vecinas se pintaron, tres hasta F09 y cuatro hasta F23; si
     // alguna vez BAJA, alguien ha desenchufado a uno.
-    expect(arranque.oyentesColindantes.size, 'el puente del arranque').toBe(5)
+    //
+    // ⭐ **Y SEIS desde el 2026-10-25**: `app/main.js` apunta de qué finca son las
+    // últimas vecinas (`refcatConColindantes`), para no volver a pedirlas cuando una
+    // medición o un GML entra sobre la misma referencia. Tampoco consulta nada: lee
+    // lo que llega por este canal.
+    expect(arranque.oyentesColindantes.size, 'el puente del arranque').toBe(6)
   })
 
   it('traer una parcela REINICIA la pila del arranque (deshacer no la devuelve)', () => {

@@ -5,7 +5,11 @@
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { crearRegistroColindantes, traducirColindantes } from '../../app/colindantes.js'
+import {
+  crearRegistroColindantes,
+  refcatParaPedirColindantes,
+  traducirColindantes,
+} from '../../app/colindantes.js'
 
 /** Un doble del cableado de F05: solo lo que el registro usa. */
 function catastroDoble() {
@@ -155,5 +159,43 @@ describe('crearRegistroColindantes · la suscripción', () => {
   it('`subscribe` con algo que no es función LANZA', () => {
     const r = crearRegistroColindantes()
     expect(() => r.subscribe('no')).toThrow(TypeError)
+  })
+})
+
+describe('refcatParaPedirColindantes · 2026-10-25', () => {
+  const R = '9398516VK3799G'
+  const con = (refcat) => ({ refcat })
+
+  it('pide la referencia AFIRMADA de la parcela que entra, normalizada', () => {
+    expect(
+      refcatParaPedirColindantes({ parcela: con(' 9398516vk3799g '), actual: con(R), conColindantes: null }),
+    ).toBe(R)
+  })
+
+  it('sin referencia afirmada no pide nada (una deducida vive aparte)', () => {
+    for (const refcat of [null, undefined, '', '   ']) {
+      expect(
+        refcatParaPedirColindantes({ parcela: con(refcat), actual: con(refcat), conColindantes: null }),
+      ).toBeNull()
+    }
+    expect(refcatParaPedirColindantes({ parcela: null, actual: null, conColindantes: null })).toBeNull()
+  })
+
+  it('si el store ya tiene OTRO documento, no pide para uno que ya no está', () => {
+    expect(
+      refcatParaPedirColindantes({ parcela: con(R), actual: con('8703361TF9980S'), conColindantes: null }),
+    ).toBeNull()
+    expect(refcatParaPedirColindantes({ parcela: con(R), actual: null, conColindantes: null })).toBeNull()
+  })
+
+  it('si las vecinas de ESA finca ya están, no las pide otra vez', () => {
+    expect(refcatParaPedirColindantes({ parcela: con(R), actual: con(R), conColindantes: R })).toBeNull()
+    expect(
+      refcatParaPedirColindantes({ parcela: con(R), actual: con(R), conColindantes: R.toLowerCase() }),
+    ).toBeNull()
+    // Las de OTRA finca no cuentan.
+    expect(
+      refcatParaPedirColindantes({ parcela: con(R), actual: con(R), conColindantes: '8703361TF9980S' }),
+    ).toBe(R)
   })
 })

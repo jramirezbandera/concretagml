@@ -386,9 +386,10 @@ que se recorren con el botón del pie del panel:
 - **En Entrada** se trae la geometría (referencia catastral, medición propia o un
   GML) y el pie dice **«Siguiente: editar el recinto →»** (o «revisar las partes» en
   Edificio). Mientras no haya nada que editar sale en gris y dice qué falta.
-- **«Traer del Catastro» trae también las colindantes**, sin otro clic. Hacen falta
-  para saber de quién es lo que tu medición saque fuera; si entras por medición o
-  por GML, «Traer colindantes» sigue en el pie de Edición.
+- **«Traer del Catastro» trae también las colindantes**, sin otro clic, y lo mismo
+  un GML o una medición que traigan su referencia catastral. Hacen falta para saber
+  de quién es lo que tu medición saque fuera. Si la referencia solo se ha deducido
+  por ubicación, no se piden: «Traer colindantes» sigue en el pie de Edición.
 - **En Edición** el último botón del pie es **«Siguiente: diagnosticar el encaje →»**
   («contrastar con el Catastro» en Edificio). Encima quedan las acciones que
   transforman el expediente: el parcelario de fondo, las colindantes y, solo en
@@ -399,7 +400,8 @@ que se recorren con el botón del pie del panel:
   acaba en **«Generar GML»**, arriba a la derecha.
 - **En Edificio**, la lista de partes marca **«faltan plantas»** en cada parte
   principal que todavía no las tiene: es lo que impediría generar el GML, y antes
-  solo lo decía el renglón de «Generar GML».
+  solo lo decía el renglón de «Generar GML». En Edición, **pinchar una huella en el
+  mapa elige su parte**, igual que pinchar su fila.
 
 ### Cómo se busca un sitio en el mapa (2026-09-25)
 

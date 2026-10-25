@@ -593,7 +593,7 @@ import { cablearComprobacion } from './cableado-comprobacion.js'
 // reloj hay es esta costura.
 import { cablearContrasteEdificio } from './cableado-contraste-edificio.js'
 import { cablearDerivacion } from './cableado-derivacion.js'
-import { crearRegistroColindantes } from './colindantes.js'
+import { crearRegistroColindantes, refcatParaPedirColindantes } from './colindantes.js'
 import { cablearDiagnostico } from './cableado-diagnostico.js'
 // ⚠️ **El alias dice `DIBUJO` y no `EDIFICIO` desde F18, y es una corrección de
 // vocabulario, no un capricho.** Esa lista (`.dxf`, `.txt`) la sigue publicando el
@@ -3899,6 +3899,46 @@ const edicionCableada = cablearEdicion({
  */
 let catastroCableado = null
 
+/** La referencia de las últimas vecinas pedidas o recibidas. Ver
+ *  {@link traerColindantesSiHayReferencia}. @type {string|null} */
+let refcatConColindantes = null
+
+/**
+ * ⭐ 2026-10-25 · Las COLINDANTES, también cuando la parcela entra por un GML o por
+ * la medición propia — pero solo si trae su referencia AFIRMADA.
+ *
+ * «Traer del Catastro» ya las pide solo (`app/cableado-catastro.js#alPulsarCargar`).
+ * Por las otras dos puertas había que acordarse de «Traer colindantes», y sin ellas
+ * no se sabe de quién es lo que la medición saque fuera. El Diagnóstico las pide
+ * igual al abrirse: esto no añade peticiones a quien llega allí, las ADELANTA a
+ * Edición, que es donde sirven (enganche y sobrante).
+ *
+ * ⛔ **Solo con `parcela.refcat`**, la que trae el fichero. Una referencia DEDUCIDA
+ * por ubicación vive aparte (`refcatDeducida`) y nadie la ha revisado: pedir sus
+ * vecinas podría traer las de otra finca. Y se mira en una microtarea, contra el
+ * store: si para entonces ha entrado otro documento, no se pide nada.
+ *
+ * @param {object|null|undefined} parcela
+ * @returns {void}
+ */
+function traerColindantesSiHayReferencia(parcela) {
+  queueMicrotask(() => {
+    if (catastroCableado === null || typeof catastroCableado.colindantes !== 'function') return
+    // Las tres condiciones —afirmada, todavía en el store, y sin vecinas ya— y su
+    // porqué viven en la función pura, que es la que tiene pruebas.
+    const refcat = refcatParaPedirColindantes({
+      parcela,
+      actual: estado.get(),
+      conColindantes: refcatConColindantes,
+    })
+    if (refcat === null) return
+    refcatConColindantes = refcat
+    // Lo que falle ya lo cuenta el cableado por sus tres canales (renglón, panel y
+    // consola); aquí no queda nada que añadir.
+    catastroCableado.colindantes().catch(() => {})
+  })
+}
+
 /**
  * El CLIENTE del Catastro, o `null` si no se ha llegado a construir. Vive fuera
  * del `try` por la misma razón que {@link catastroCableado} —el `const` de dentro
@@ -4483,6 +4523,9 @@ comprobacionCableada = cablearComprobacion({
     if (ramaEnPantalla === RAMA.EDIFICIO) {
       panel.avisar(MENSAJE_GML_ES_DE_PARCELA, { nivel: NIVEL.AVISO })
     }
+    // ⭐ 2026-10-25 · Si el GML trae su referencia, sus colindantes. Ver
+    // {@link traerColindantesSiHayReferencia}.
+    traerColindantesSiHayReferencia(parcela)
     aterrizarTrasContrastar()
   },
   // ── F10 · el `.json` entra por ESTA zona y no por una segunda ─────────────
@@ -5312,6 +5355,11 @@ edificioCableado = cablearEdificio({
   // como el de parcela es el POJO Parcela.
   estado: estadoEdificio,
   panel,
+  // ⭐ 2026-10-25 · Pinchar una huella elige su parte, pero SOLO en Edificio ›
+  // Edición. En Entrada y en Parcela ese clic sigue deduciendo la referencia.
+  // `navegacion` es del paso 14: la flecha se llama con un clic, ya todo evaluado.
+  puedeElegirEnMapa: () =>
+    ramaEnPantalla === RAMA.EDIFICIO && navegacion.get().paso === PASO.EDICION,
   panelEdificio,
   // El mismo SRS del expediente que reciben el visor, los dos clientes, F08 y F09.
   srs: SRS_DEMO,
@@ -6428,6 +6476,20 @@ window.addEventListener('hashchange', () => {
 // consultado» y NO «no hay ninguna»: la derivación lo dice en vez de inventarlo.
 const registroColindantes = crearRegistroColindantes({ catastro: catastroCableado })
 
+// ⭐ 2026-10-25 · De qué referencia son las últimas vecinas que han llegado, las haya
+// pedido quien sea (el botón, «Traer del Catastro», el Diagnóstico o
+// {@link traerColindantesSiHayReferencia}). Es lo que impide pedirlas dos veces
+// cuando una medición entra sobre la misma finca: las vecinas no dependen de la
+// geometría medida, solo de la referencia.
+if (catastroCableado !== null && typeof catastroCableado.alColindantes === 'function') {
+  catastroCableado.alColindantes((resultado) => {
+    const propia = resultado?.datos?.propia?.refcat
+    if (typeof propia === 'string' && propia.trim() !== '') {
+      refcatConColindantes = propia
+    }
+  })
+}
+
 const derivacionCableada = cablearDerivacion({
   estado,
   lista: visor.sobrante.lista,
@@ -6580,6 +6642,9 @@ const medicion = cablearMedicion({
     // de la parcela que se acaba de ir. Y sube el sello, que es lo que deja
     // superada la consulta que aquella importación pudiera tener en el aire.
     entraDocumentoNuevo()
+    // ⭐ 2026-10-25 · Si el dibujo trae su referencia (fincas de Consulta Masiva),
+    // sus colindantes. Ver {@link traerColindantesSiHayReferencia}.
+    traerColindantesSiHayReferencia(parcela)
     if (soloPuntosSinRecinto(parcela) || dibujoEsLaOficial(parcela)) {
       refrescarHechos()
       navegacion.navegarAPaso(PASO.EDICION)

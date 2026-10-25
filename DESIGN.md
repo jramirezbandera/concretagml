@@ -356,6 +356,13 @@ dos versiones servidas a la vez. En Edificio el pie baja de 297 a 205 px y la li
 de partes gana 16 px a 720. Los botones del segmentado miden 24 px y no 32: es lo
 único que se apretó para pagar la fila.
 
+⭐ **Y la fila se recuperó el mismo día, con una más.** En Edición y Diagnóstico el
+`<h1>` del panel («Edición del recinto», «Diagnóstico de encaje») repetía el peldaño
+marcado en la barra: se oculta a la vista —no `display:none`: sigue siendo el `<h1>`
+para el lector— y la cabecera baja a 90,13 px. La caja de vértices queda en 343 px a
+1440×900 (13 filas) y **4 filas enteras más media a 1280×720**. En Entrada el título
+se queda: «Empieza tu expediente» sí orienta a quien llega.
+
 ⚠️ **Los cuatro topes de alto van en `vh`**: `--gml-avisos-alto-max` 56vh,
 `--gml-partes-alto-max` 26vh, `--gml-cajon-lista-alto-max` 22vh,
 `--gml-candidatos-alto-max` 20vh. Existen porque **el suelo declarado del proyecto es
@@ -531,6 +538,14 @@ Las reglas que la sostienen:
   informe», encima de «Preparar informe (PDF)». Mezclados con las cifras medidas
   no se distinguía qué era de la aplicación y qué del usuario.
 
+- **Las colindantes llegan solas también por GML y por medición**, si la parcela
+  trae su referencia AFIRMADA (la del fichero; nunca una deducida sin revisar) y sus
+  vecinas no están ya. La decisión es pura y tiene pruebas:
+  `app/colindantes.js#refcatParaPedirColindantes`.
+- **En Edificio › Edición, pinchar una huella elige su parte**, como pinchar su fila.
+  En los demás pasos y en Parcela ese clic sigue siendo el de deducir la referencia.
+  No contradice la auditoría H3 («nada se elige sin un gesto»): es el gesto.
+
 ⚠️ **Lo que esto NO resuelve:** con «Generar GML» en la barra y «Siguiente» al pie
 hay **dos botones primarios a la vista** en Entrada y Edición. Es deliberado
 —uno es el destino, otro el camino—, pero no se ha medido si confunde. Ver
@@ -602,9 +617,6 @@ exactamente eso— pero desde hoy es la única que sale en verde por defecto.
 
 Se anota aquí para que no parezca resuelto:
 
-- **La tabla de vértices enseña 3 filas a 1280×720 desde el 2026-10-25** (eran 4):
-  el precio de la fila «Qué GML generas» (§6, §8.6). Recuperarla pide decidir qué
-  sale de la cabecera o de la ficha del pie, y eso es una decisión de contenido.
 - **La tercera vía de Entrada cae 16 px bajo el pliegue a 1280×720.** Medido, y el
   arreglo que queda es recortar aire de la cabecera del panel. Es una decisión que hay
   que tomar **mirando, no calculando**. Ver `TODOS.md`.
