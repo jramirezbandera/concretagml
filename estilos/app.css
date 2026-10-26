@@ -1407,6 +1407,56 @@ body {
   }
 }
 
+/* ⭐ POR DEBAJO DE 760 px LA BARRA SE PARTE EN RENGLONES (encargo del autor,
+ * 2026-10-26, con captura del móvil: «se ven superpuestas como lo del proyecto»).
+ * Medido a 390 px: la zona del expediente cedía hasta 0 px y su botón, que no
+ * sabe bajar de 34 (relleno + flecha), se montaba encima de «Entrada»; la barra
+ * medía 692 y lo de la derecha salía cortado. El corte cae donde la zona baja de
+ * esos 34: las otras cuatro suman ~708 px de mínimo.
+ *
+ * ⛔ PARTIR Y NO `overflow-x: auto`. Desplazar la barra dentro de sí misma era lo
+ * barato, pero un `overflow` que no sea `visible` recorta en los DOS ejes, y los
+ * dos menús cuelgan HACIA ABAJO de su zona: se quedarían dentro de los 48 px.
+ * Por eso la fila de la rejilla pasa a `auto` y la barra crece lo que pida.
+ *
+ * ⚠️ El panel tampoco cabía: 392 px fijos en una ventana de 390. Cede él y el mapa
+ * se queda a 0 — es la decisión del autor: quitar solapes, no rehacer el móvil.
+ * Y el bloque de vías deja de scrollear por su cuenta: en el alto de un teléfono
+ * cortaba la tarjeta de Medición por arriba justo debajo de la de Referencia, y
+ * aquello se leía como una tarjeta montada en otra. Scrollea el panel entero; las
+ * demás secciones siguen siendo `min-height: 0` y no cambian. */
+@media (max-width: 760px) {
+  /* El ancho del panel se redefine en vez de reescribir la plantilla de columnas:
+     dice lo mismo con la mitad de bytes, y nadie más lee la variable. */
+  .gml-app {
+    --gml-panel-ancho: min(392px, 100vw);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .gml-rail {
+    display: flex;
+    flex-wrap: wrap;
+    padding-block: var(--space-1);
+  }
+
+  /* Su `height: 100%` era el de la barra, que ahora es `auto`: el porcentaje se
+     volvía circular y empujaba el tercer renglón fuera (medido). Se queda con el
+     alto de la barra de escritorio, el que necesita la raya del peldaño activo. */
+  .gml-rail-pasos {
+    height: var(--gml-barra-alto);
+  }
+
+  /* `.gml-app` delante porque las dos reglas base se declaran MÁS ABAJO en la
+     hoja y, a igual especificidad, ganaban ellas (medido: no aplicaba). */
+  .gml-app .gml-panel {
+    overflow-y: auto;
+  }
+
+  .gml-app .gml-bloque--vias {
+    flex: none;
+  }
+}
+
 /* ⭐ EL PANEL FLOTA SOBRE EL MAPA (revisión de diseño, 2026-08-10). Las tres
    líneas nuevas —`position`, `z-index`, `box-shadow`— son la mitad del encargo
    del autor. Y `position: relative` no es decoración: sin él `z-index` no aplica

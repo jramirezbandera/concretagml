@@ -601,10 +601,20 @@ export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'dia
  * eso la tabla de vértices recupera la fila y gana otra. Se fundió en la regla de
  * `.gml-rotulo-oculto` en vez de repetirla, que es lo que la dejó en 84 y no en 191.
  *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **Y UNA SÉPTIMA EL 2026-10-26 (EN EL MÓVIL NADA SE PISA)**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 67.269 a **67.560 B nuestros** (82.364 → 82.655 con vendor). **+291 B**: un
+ * `@media (max-width: 760px)` que parte la barra en renglones y deja hacer scroll al
+ * panel entero. El autor eligió «quitar solapes» frente a rehacer el móvil (apilar
+ * panel y mapa) o solo avisar. Se descartó `overflow-x: auto` en la barra, que salía
+ * más barato pero recortaba los dos menús; y reescribir la plantilla de columnas,
+ * que costaba ~35 B más que redefinir `--gml-panel-ancho`.
+ *
  * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
  * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
  */
-export const TECHO = Object.freeze({ total: 82364, nuestro: 67269 })
+export const TECHO = Object.freeze({ total: 82655, nuestro: 67560 })
 
 /**
  * EL REGISTRO. Un asiento por hito, con la hoja construida medida de verdad.
@@ -1787,6 +1797,17 @@ export const ASIENTOS = Object.freeze(
         'aparte (+191 B) y se fundió en la lista de selectores de `.gml-rotulo-oculto`, que ' +
         'ya declaraba las siete propiedades: −107 B. ── ⚠️ El techo SUBE 84 B (cabecera de ' +
         '`TECHO`) y la holgura vuelve a 0. NO CIERRA REBANADA.' },
+    { hito: 'En el móvil la barra se parte en renglones y nada se pisa',
+      commit: '(sin commitear)',
+      total: 82655, nuestro: 67560, rebanada: null,
+      nota:
+        '**+291 B.** Captura del autor en un móvil: el botón del expediente se montaba ' +
+        'encima de «Entrada» y la tarjeta de Medición parecía metida bajo la de Referencia. ' +
+        'Un `@media (max-width: 760px)`: la barra pasa a `flex-wrap` con su fila a `auto`, ' +
+        'los pasos conservan los 48 px, el panel cede a `min(392px, 100vw)` y hace scroll ' +
+        'entero en vez del bloque de vías. ── QUÉ SE HA DEVUELTO ANTES DE SUBIR ── redefinir ' +
+        '`--gml-panel-ancho` en vez de reescribir `grid-template-columns`: −35 B. ── ⚠️ El ' +
+        'techo SUBE 291 B (cabecera de `TECHO`) y la holgura vuelve a 0. NO CIERRA REBANADA.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 
