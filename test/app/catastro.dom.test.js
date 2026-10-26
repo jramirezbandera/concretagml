@@ -1666,6 +1666,57 @@ describe('cableado-catastro · deducir con un clic en el mapa', () => {
 
 // ── 12 · Colindantes ─────────────────────────────────────────────────────────
 
+describe('⭐ cableado-catastro · alRellenarRefcat (2026-10-25)', () => {
+  const latlngDentro = { lat: 40.4, lng: -3.7 }
+  const refcatDe = (texto) => {
+    const { pc } = JSON.parse(texto)[CLAVE_RCCOOR].coordenadas.coord[0]
+    return `${pc.pc1}${pc.pc2}`
+  }
+
+  it('el clic en el mapa que rellena el campo avisa con la referencia que ha entrado', async () => {
+    const alRellenarRefcat = vi.fn()
+    const mapa = crearMapaDoble()
+    const montado = cablear({ mapa, parcelaInicial: parcelaSinReferencia(), alRellenarRefcat })
+
+    mapa.emitir('click', { latlng: latlngDentro })
+    await cederTurno()
+
+    expect(montado.campo.value).toBe(refcatDe(TEXTO_RCCOOR_OK))
+    expect(alRellenarRefcat).toHaveBeenCalledTimes(1)
+    expect(alRellenarRefcat).toHaveBeenCalledWith(refcatDe(TEXTO_RCCOOR_OK))
+  })
+
+  it('con VARIOS candidatos no avisa al deducir, y sí al elegir uno de la lista', async () => {
+    const alRellenarRefcat = vi.fn()
+    const montado = cablear({
+      parcelaInicial: parcelaSinReferencia(),
+      transporte: crearTransporteDoble({ rccoor: TEXTO_RCCOOR_VARIOS }),
+      alRellenarRefcat,
+    })
+    const resultado = await montado.cableado.deducir()
+    expect(alRellenarRefcat).not.toHaveBeenCalled()
+
+    montado.lista.querySelectorAll('button')[1].click()
+    expect(alRellenarRefcat).toHaveBeenCalledWith(resultado.datos.candidatos[1].refcat)
+  })
+
+  it('un gancho que revienta no impide que el campo se rellene', async () => {
+    const montado = cablear({
+      parcelaInicial: parcelaSinReferencia(),
+      alRellenarRefcat: () => {
+        throw new Error('prueba: el gancho revienta')
+      },
+    })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await montado.cableado.deducir()
+    expect(montado.campo.value).toBe(refcatDe(TEXTO_RCCOOR_OK))
+  })
+
+  it('`alRellenarRefcat` que no es función se rechaza AL CABLEAR', () => {
+    expect(() => cablear({ alRellenarRefcat: 'sí, gracias' })).toThrow(TypeError)
+  })
+})
+
 describe('cableado-catastro · colindantes()', () => {
   it('devuelve los colindantes SEPARADOS de la propia, y no toca el store', async () => {
     const montado = cablear({ parcelaInicial: parcelaConReferencia() })

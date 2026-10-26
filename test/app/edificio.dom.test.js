@@ -86,10 +86,12 @@ import {
   MENSAJE_SIN_AUTOGUARDADO_BREVE,
   MENSAJE_SIN_CLIENTE,
   MENSAJE_SIN_REFERENCIA,
+  ORIGEN_REFCAT,
   SUJETO_ENCUADRE,
   cablearEdificio,
   entradaPorCapas,
   mensajeCapasCanceladas,
+  mensajeRefcatPropuesta,
   mensajeVariosCandidatos,
 } from '../../app/cableado-edificio.js'
 import { SELECTOR as SELECTOR_PANEL, crearPanelEdificio } from '../../app/panel-edificio.js'
@@ -949,6 +951,138 @@ describe('⛔ el servicio de edificios y sus cuatro trampas medidas', () => {
     await cableado.cargar()
     expect(avisos.some((a) => a.mensaje.includes('copia local'))).toBe(true)
     expect(procedencia()).toContain('copia local')
+  })
+})
+
+// ══ 5bis · ⭐ 2026-10-25 · EL CAMPO SE RELLENA SOLO, SI ESTÁ VACÍO ═════════════
+
+/** Un cliente de parcela que contesta siempre lo mismo al `RCCOOR`. */
+function clienteParcelaQueDice(candidatos) {
+  return {
+    refcatPorCoordenada: vi.fn(async () => ({
+      ok: true,
+      datos: { candidatos, unico: candidatos.length === 1 },
+      motivo: null,
+      mensaje: null,
+      procedencia: { origen: ORIGEN.RED, edadMs: null, intentos: 1, ms: 3, url: 'u' },
+    })),
+  }
+}
+
+const campoRefcat = () => document.querySelector(SELECTOR_PANEL.REFCAT)
+
+describe('⭐ proponerRefcat · la referencia que llega sin que nadie la teclee', () => {
+  it('con el campo vacío entra, y el renglón dice de dónde sale y qué hacer', () => {
+    const { cableado } = montar()
+    expect(cableado.proponerRefcat('9398516VK3799G', ORIGEN_REFCAT.PARCELA)).toBe(true)
+    expect(campoRefcat().value).toBe('9398516VK3799G')
+    expect(renglon()).toBe(mensajeRefcatPropuesta('9398516VK3799G', ORIGEN_REFCAT.PARCELA, false))
+  })
+
+  it('⛔ lo que ha escrito una persona NO se pisa', () => {
+    const { cableado } = montar()
+    campoRefcat().value = '1111111AA1111A'
+    expect(cableado.proponerRefcat('9398516VK3799G', ORIGEN_REFCAT.UBICACION)).toBe(false)
+    expect(campoRefcat().value).toBe('1111111AA1111A')
+  })
+
+  it('una propuesta nueva sustituye a la anterior mientras siga intacta', () => {
+    // Se cargó la parcela A y luego la B: el campo no puede quedarse con la que se fue.
+    const { cableado } = montar()
+    cableado.proponerRefcat('1111111AA1111A', ORIGEN_REFCAT.PARCELA)
+    expect(cableado.proponerRefcat('9398516VK3799G', ORIGEN_REFCAT.PARCELA)).toBe(true)
+    expect(campoRefcat().value).toBe('9398516VK3799G')
+  })
+
+  it('pero si el usuario la ha tocado, ya es suya y no se sustituye', () => {
+    const { cableado } = montar()
+    cableado.proponerRefcat('1111111AA1111A', ORIGEN_REFCAT.PARCELA)
+    campoRefcat().value = '2222222BB2222B'
+    expect(cableado.proponerRefcat('9398516VK3799G', ORIGEN_REFCAT.PARCELA)).toBe(false)
+    expect(campoRefcat().value).toBe('2222222BB2222B')
+  })
+
+  it('una medición cargada DESPUÉS la lleva en el documento, y deja de ser propuesta', async () => {
+    const { cableado, estado } = montar()
+    cableado.proponerRefcat('1111111AA1111A', ORIGEN_REFCAT.PARCELA)
+    await soltar(cableado, ficheroDe(RUTA_LIST, 'LIST.txt'))
+    expect(estado.get().refcat).toBe('1111111AA1111A')
+    // Ya la lleva un documento: otra parcela que entre no se la cambia por detrás.
+    expect(cableado.proponerRefcat('9398516VK3799G', ORIGEN_REFCAT.PARCELA)).toBe(false)
+    expect(campoRefcat().value).toBe('1111111AA1111A')
+  })
+
+  it('con un edificio ya cargado el renglón dice que es la que llevará el GML', async () => {
+    const { cableado } = montar()
+    await soltar(cableado, ficheroDe(RUTA_LIST, 'LIST.txt'))
+    cableado.proponerRefcat('9398516VK3799G', ORIGEN_REFCAT.UBICACION)
+    expect(renglon()).toBe(mensajeRefcatPropuesta('9398516VK3799G', ORIGEN_REFCAT.UBICACION, true))
+    expect(renglon()).toMatch(/llevará el GML/)
+  })
+
+  it('nada que proponer no cambia nada', () => {
+    const { cableado } = montar()
+    expect(cableado.proponerRefcat(null, ORIGEN_REFCAT.PARCELA)).toBe(false)
+    expect(cableado.proponerRefcat('  ', ORIGEN_REFCAT.PARCELA)).toBe(false)
+    expect(campoRefcat().value).toBe('')
+  })
+})
+
+describe('⭐ tras cargar una medición sin referencia, se deduce de la huella', () => {
+  it('UNA consulta, y el campo se rellena con la referencia del punto interior', async () => {
+    const clienteParcela = clienteParcelaQueDice([{ refcat: '9398516VK3799G', domicilio: 'C/ X' }])
+    const { cableado, estado } = montar({ clienteParcela })
+    await soltar(cableado, ficheroDe(RUTA_LIST, 'LIST.txt'))
+
+    expect(clienteParcela.refcatPorCoordenada).toHaveBeenCalledTimes(1)
+    expect(campoRefcat().value).toBe('9398516VK3799G')
+    expect(renglon()).toBe(mensajeRefcatPropuesta('9398516VK3799G', ORIGEN_REFCAT.HUELLA, true))
+    // En el CAMPO, no en el documento.
+    expect(estado.get().refcat).toBeNull()
+  })
+
+  it('con una referencia ya escrita no se pregunta nada', async () => {
+    const clienteParcela = clienteParcelaQueDice([{ refcat: '9398516VK3799G', domicilio: 'C/ X' }])
+    const { cableado } = montar({ clienteParcela })
+    campoRefcat().value = '1111111AA1111A'
+    await soltar(cableado, ficheroDe(RUTA_LIST, 'LIST.txt'))
+    expect(clienteParcela.refcatPorCoordenada).not.toHaveBeenCalled()
+  })
+
+  it('con VARIOS candidatos no rellena ninguno, y lo dice', async () => {
+    const lista = [
+      { refcat: '9398516VK3799G', domicilio: 'A' },
+      { refcat: '9398516VK3799H', domicilio: 'B' },
+    ]
+    const { cableado, avisos } = montar({ clienteParcela: clienteParcelaQueDice(lista) })
+    await soltar(cableado, ficheroDe(RUTA_LIST, 'LIST.txt'))
+    expect(campoRefcat().value).toBe('')
+    expect(avisos.map((a) => a.mensaje)).toContain(mensajeVariosCandidatos(lista))
+  })
+
+  it('⛔ la respuesta que llega con OTRO documento en pantalla no escribe', async () => {
+    let soltarRespuesta
+    const clienteParcela = {
+      refcatPorCoordenada: vi.fn(
+        () =>
+          new Promise((resolver) => {
+            soltarRespuesta = resolver
+          }),
+      ),
+    }
+    const { cableado, estado } = montar({ clienteParcela })
+    await soltar(cableado, ficheroDe(RUTA_LIST, 'LIST.txt'))
+    // Mientras se pregunta, entra otro documento (aquí, uno que ya trae referencia).
+    estado.set(crearEdificio({ idLocal: 'otro', refcat: '1111111AA1111A', partes: estado.get().partes }))
+    soltarRespuesta({
+      ok: true,
+      datos: { candidatos: [{ refcat: '9398516VK3799G', domicilio: 'C/ X' }], unico: true },
+      motivo: null,
+      mensaje: null,
+      procedencia: { origen: ORIGEN.RED, edadMs: null, intentos: 1, ms: 3, url: 'u' },
+    })
+    await cederTurno()
+    expect(campoRefcat().value).not.toBe('9398516VK3799G')
   })
 })
 

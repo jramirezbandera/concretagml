@@ -1169,6 +1169,12 @@ function esEmisor(m) {
  *   fondo (las dianas del snap de la parcela anterior, el contador de vecinas, el
  *   diagnóstico ya calculado, la capa que lo pinta) hay que invalidarlo en los dos
  *   casos. Con la puerta 1 se llama DESPUÉS de `alCargarParcela`.
+ * @param {((refcat: string) => void)|null} [opciones.alRellenarRefcat=null]  ⭐
+ *   2026-10-25 · Se llama cada vez que la UBICACIÓN rellena el campo —el clic en el
+ *   mapa, el buscador, la deducción tras importar o un candidato elegido de la
+ *   lista—, con la referencia que ha entrado. Es por donde se entera la rama de
+ *   Edificio, que tiene su propio campo. **OPCIONAL**, y no se llama cuando la
+ *   consulta no rellena nada (varios candidatos, fallo, respuesta superada).
  * @param {HTMLElement} [opciones.campo]  Por defecto {@link SELECTOR_CAMPO_REFCAT}.
  * @param {HTMLElement} [opciones.botonCargar]  Ídem {@link SELECTOR_BOTON_CARGAR}.
  * @param {HTMLElement} [opciones.botonColindantes]  Ídem
@@ -1191,7 +1197,7 @@ function esEmisor(m) {
  *            destruir: () => void}}
  * @throws {Error|TypeError|RangeError}  Si falta un nodo del contrato (vía
  *   {@link nodo}, nombrando el selector), si el `cliente` no lo es, si el `mapa` no
- *   emite, si `alCargarParcela` o `alCambiarOficial` no son función, o si el `srs` no es un huso
+ *   emite, si `alCargarParcela`, `alCambiarOficial` o `alRellenarRefcat` no son función, o si el `srs` no es un huso
  *   soportado.
  */
 export function cablearCatastro({
@@ -1202,6 +1208,7 @@ export function cablearCatastro({
   mapa = null,
   alCargarParcela = null,
   alCambiarOficial = null,
+  alRellenarRefcat = null,
   campo = nodo(SELECTOR_CAMPO_REFCAT),
   botonCargar = nodo(SELECTOR_BOTON_CARGAR),
   botonColindantes = nodo(SELECTOR_BOTON_COLINDANTES),
@@ -1238,6 +1245,13 @@ export function cablearCatastro({
       `cablearCatastro: 'alCambiarOficial' debe ser una función (se le pasa el POJO de la parcela ` +
         `cuyo parcelario oficial acaba de cambiar) o null si no hace falta; recibido ` +
         `${typeof alCambiarOficial}. Mismo momento y mismo motivo que 'alCargarParcela'.`,
+    )
+  }
+  if (alRellenarRefcat !== null && typeof alRellenarRefcat !== 'function') {
+    throw new TypeError(
+      `cablearCatastro: 'alRellenarRefcat' debe ser una función (se le pasa la referencia que ` +
+        `acaba de entrar en el campo) o null si no hace falta; recibido ` +
+        `${typeof alRellenarRefcat}. Mismo momento y mismo motivo que 'alCargarParcela'.`,
     )
   }
   // Delegado: `husoPorSrs` es el único sitio del proyecto que sabe qué husos están
@@ -1843,6 +1857,7 @@ export function cablearCatastro({
     // el domicilio, es una persona—, así que ésa no arrastra el aviso del panel
     // ni sobrevive a la carga como conjetura. La que nadie miró, sí.
     refcatDeducida = sinConfirmar ? refcat : null
+    llamarGancho(alRellenarRefcat, 'el aviso de referencia rellenada (alRellenarRefcat)', refcat)
   }
 
   /**

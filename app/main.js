@@ -602,7 +602,11 @@ import { cablearDiagnostico } from './cableado-diagnostico.js'
 // dos extensiones entran ahora en las dos ramas y quien elige es la rama en
 // pantalla. Llamarla `EXTENSIONES_EDIFICIO` aquí haría leer el `entradasExtra` del
 // paso 9 como si el fichero fuera del edificio antes de saberlo.
-import { EXTENSIONES as EXTENSIONES_DIBUJO, cablearEdificio } from './cableado-edificio.js'
+import {
+  EXTENSIONES as EXTENSIONES_DIBUJO,
+  ORIGEN_REFCAT,
+  cablearEdificio,
+} from './cableado-edificio.js'
 // F13 · el segundo dueño de «Generar GML»: la rama EDIFICIO ya sabe escribir su
 // fichero (el del ICUC), así que el botón deja de estar apagado por ser edificio.
 import { cablearGeneracionGmlEdificio, partesSenaladas } from './cableado-edificio-gml.js'
@@ -4137,9 +4141,14 @@ try {
     alCargarParcela: (parcela) => {
       edicionCableada.alCambiarDocumento(parcela)
       entraDocumentoNuevo()
+      proponerRefcatAEdificio(parcela?.refcat, ORIGEN_REFCAT.PARCELA)
       refrescarHechos()
       navegacion.navegarAPaso(PASO.EDICION)
     },
+    // ⭐ 2026-10-25 · Lo que la UBICACIÓN pone en el campo de parcela —el clic en el
+    // mapa, el buscador, la deducción tras importar— va también al de Edificio si
+    // está vacío. Ver {@link proponerRefcatAEdificio}.
+    alRellenarRefcat: (refcat) => proponerRefcatAEdificio(refcat, ORIGEN_REFCAT.UBICACION),
     alCambiarOficial: (parcela) => {
       edicionCableada.alCambiarOficial(parcela)
       // ── Y AQUÍ SE INVALIDA LO QUE LA EDICIÓN NO TIENE EN LA MANO ────────
@@ -4337,6 +4346,31 @@ let expedienteCableado = null
 let edificioCableado = null
 
 /**
+ * ⭐ 2026-10-25 · La referencia que acaba de llegar a la rama de PARCELA, propuesta
+ * también para el campo de Edificio. Se llama desde las puertas por las que entra
+ * una referencia en la otra rama: el clic en el mapa y las deducciones del
+ * Catastro (`alRellenarRefcat`, paso 7), y las parcelas que se cargan con la suya
+ * (Catastro, GML y medición).
+ *
+ * Quien decide si entra es `cablearEdificio#proponerRefcat`, y la regla es suya:
+ * **solo si el campo está vacío** o sigue teniendo la propuesta anterior. Aquí no
+ * se mira la rama en pantalla: la referencia tiene que estar ya en el campo cuando
+ * el usuario pase a Edificio, no cuando vuelva a pinchar.
+ *
+ * ⚠️ Se llama desde ganchos que se cablean ANTES de que exista
+ * {@link edificioCableado} (paso 7), pero siempre por un gesto del usuario, o sea
+ * con el módulo ya evaluado entero.
+ *
+ * @param {string|null|undefined} refcat
+ * @param {string} origen  Uno de `ORIGEN_REFCAT`.
+ * @returns {void}
+ */
+function proponerRefcatAEdificio(refcat, origen) {
+  if (edificioCableado === null || typeof edificioCableado.proponerRefcat !== 'function') return
+  edificioCableado.proponerRefcat(refcat, origen)
+}
+
+/**
  * F14 · El contraste de la construcción, o `null` mientras el paso 13b no haya
  * corrido. **Referencia adelantada, y esta sí es necesaria y no un accidente de
  * orden**: `hechosDeEdificio` lo lee para saber si se ha llegado a contrastar, y
@@ -4516,6 +4550,9 @@ comprobacionCableada = cablearComprobacion({
     // una deducción vieja sobra: la ficha ya prefiere la del modelo, y dejarla
     // colgada reaparecería en cuanto se cargara algo sin referencia.
     entraDocumentoNuevo()
+    // ⭐ 2026-10-25 · Y su referencia, al campo de Edificio si está vacío: la de un
+    // GML de parcela es la de la parcela donde va el edificio.
+    proponerRefcatAEdificio(parcela?.refcat, ORIGEN_REFCAT.PARCELA)
     // ⭐ 2026-08-16 · El fichero era de parcela y el usuario está en la otra rama:
     // se DICE. El porqué entero —y por qué NO se conmuta— en
     // {@link MENSAJE_GML_ES_DE_PARCELA}. Va antes de aterrizar para que el aviso
@@ -6345,6 +6382,9 @@ const gmlDeEdificio = cablearGeneracionGmlEdificio({
   panel,
   srs: SRS_DEMO,
   mando: mandoDeEdificio,
+  // ⭐ 2026-10-25 · La referencia del GML es la del CAMPO cuando dice algo: lo que
+  // se ve es lo que sale, aunque la referencia haya llegado después del dibujo.
+  refcatDelCampo: () => panelEdificio.valores().refcat,
 })
 
 ramaCableada?.subscribe(() => {
@@ -6642,6 +6682,10 @@ const medicion = cablearMedicion({
     // de la parcela que se acaba de ir. Y sube el sello, que es lo que deja
     // superada la consulta que aquella importación pudiera tener en el aire.
     entraDocumentoNuevo()
+    // ⭐ 2026-10-25 · Si el dibujo ya trae su referencia (Consulta Masiva, fincas de
+    // F22), al campo de Edificio. Si no la trae, llega después por la deducción, a
+    // través de `alRellenarRefcat`.
+    proponerRefcatAEdificio(parcela?.refcat, ORIGEN_REFCAT.PARCELA)
     // ⭐ 2026-10-25 · Si el dibujo trae su referencia (fincas de Consulta Masiva),
     // sus colindantes. Ver {@link traerColindantesSiHayReferencia}.
     traerColindantesSiHayReferencia(parcela)

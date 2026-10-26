@@ -851,8 +851,12 @@ describe('app/main · F11 · el dibujo entra por la zona que ya existía', () =>
     expect(edificio.partes[0].origen).toBe('DXF')
     // Y se VEN: el criterio 2 se verifica con los ojos, no solo en un test.
     expect(huellasEnElMapa()).toBe(1)
-    // Sin tocar la red: leer un dibujo no consulta nada.
-    expect(arranque.peticiones).toHaveLength(0)
+    // ⭐ 2026-10-25 · Decía «sin tocar la red: leer un dibujo no consulta nada».
+    // Leerlo sigue sin consultar; lo que hay ahora es UNA consulta después, la que
+    // deduce la referencia de la huella para el campo vacío (la misma que hace la
+    // rama de parcela tras importar). Una, y solo esa.
+    expect(arranque.peticiones).toHaveLength(1)
+    expect(arranque.peticiones[0]).toContain('Consulta_RCCOOR')
   })
 
   it('⭐ la parcela que hay en pantalla viaja como `parcelaContexto`, no como rama', async () => {
@@ -968,6 +972,20 @@ describe('app/main · F11 · un GML de edificio CONMUTA la rama y se carga', () 
     expect(comprobacionViva.abierto()).toBe(false)
     expect(storeEdificio().get()).toBeNull()
     expect(storeParcela().get()).not.toBeNull()
+  })
+
+  it('⭐ 2026-10-25 · con EDIFICIO puesta, un GML de parcela deja su referencia en el campo de Edificio', async () => {
+    // El caso que lo pidió: el técnico está en Edificio, suelta el GML de la
+    // parcela y el campo de su rama se quedaba vacío, con la referencia solo en la
+    // otra rama.
+    irA(RAMA.EDIFICIO)
+    const campoEdificio = q(SELECTOR_PANEL_EDIFICIO.REFCAT)
+    campoEdificio.value = ''
+
+    await soltarYEsperar(ficheroDeBytes(GML_CP, 'parcela.gml'))
+
+    expect(cuerpo.getAttribute(ATRIBUTO_RAMA)).toBe(RAMA.EDIFICIO)
+    expect(campoEdificio.value).toBe('9398516VK3799G')
   })
 })
 

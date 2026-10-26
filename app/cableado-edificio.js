@@ -213,6 +213,10 @@ import { metricas } from '../edit/metricas.js'
 // SIEMPRE «esto lo afirma el usuario al cargar», nunca «esto estaba a medio
 // teclear». Aplicarla a un edificio ya cargado es una acción que el panel de F11
 // no ofrece; queda para F12, que es quien la necesita.
+// ⭐ 2026-10-25 · Y sigue sin importarse, pero **el GML ya no depende de ello**: lo
+// que haya en el campo al generar es la referencia del fichero
+// (`app/cableado-edificio-gml.js#refcatDelCampo`). El documento no se toca; lo que
+// cambia es que lo que se ve en el campo es lo que sale.
 import { husoPorSrs } from '../geo/huso.js'
 import { decodificarGml } from '../gml/decodificar.js'
 import { MODELO_EDIFICIO, crearEdificio } from '../model/edificio.js'
@@ -513,6 +517,44 @@ export const MENSAJE_SIN_PUNTO_INTERIOR =
 export const mensajeVariosCandidatos = (lista) =>
   `En el punto de la huella hay ${lista.length} parcelas (${lista.map((c) => c.refcat).join(', ')}) ` +
   'y no se rellena ninguna a ciegas. Escribe en el campo la que sea la tuya y vuelve a pulsar.'
+
+/**
+ * ⭐ 2026-10-25 · De dónde le llega al campo de Edificio una referencia que nadie
+ * ha tecleado. Solo cambia CÓMO SE DICE: las tres entran por
+ * `proponerRefcat` y con la misma regla (nunca encima de lo que haya escrito una
+ * persona).
+ */
+export const ORIGEN_REFCAT = Object.freeze({
+  /** La parcela que acaba de entrar en la otra rama trae la suya (GML, Catastro, DXF). */
+  PARCELA: 'PARCELA',
+  /** El Catastro la ha deducido de un punto: el clic en el mapa o el dibujo de parcela. */
+  UBICACION: 'UBICACION',
+  /** El Catastro la ha deducido del punto interior de la huella recién cargada. */
+  HUELLA: 'HUELLA',
+})
+
+const DE_DONDE_REFCAT = {
+  [ORIGEN_REFCAT.PARCELA]: 'es la de la parcela cargada',
+  [ORIGEN_REFCAT.UBICACION]: 'deducida de la ubicación, sin confirmar',
+  [ORIGEN_REFCAT.HUELLA]: 'deducida de la huella que acabas de cargar, sin confirmar',
+}
+
+/**
+ * Lo que dice el renglón cuando el campo se rellena solo. Dice de dónde ha salido
+ * y QUÉ VA A HACER: desde el 2026-10-25 la referencia del campo es la que lleva el
+ * GML (`app/cableado-edificio-gml.js`), así que con un edificio ya cargado eso es
+ * lo que hay que saber, y sin él lo es cómo seguir.
+ *
+ * @param {string} refcat
+ * @param {string} origen  Uno de {@link ORIGEN_REFCAT}.
+ * @param {boolean} hayEdificio
+ * @returns {string}
+ */
+export const mensajeRefcatPropuesta = (refcat, origen, hayEdificio) =>
+  `Referencia catastral ${refcat}: ${DE_DONDE_REFCAT[origen] ?? 'puesta por la aplicación'}. ` +
+  (hayEdificio
+    ? 'Es la que llevará el GML que generes; si no es la tuya, corrígela en el campo.'
+    : 'Pulsa «Traer del Catastro» para traer su edificio, o carga tu medición y la llevará.')
 
 /**
  * El usuario ha cerrado la elección de capas sin cargar nada. **No se calla**: ha
@@ -952,6 +994,7 @@ const esPanelEdificio = (p) =>
  *   la hora sale POR PANTALLA en el renglón de procedencia.
  * @returns {{alFichero: (f: File) => Promise<void>,
  *            cargar: () => Promise<ResultadoEdificioCatastro|null>,
+ *            proponerRefcat: (refcat: string|null, origen: string) => boolean,
  *            secciones: () => HTMLElement[],
  *            destruir: () => void}}
  * @throws {Error|TypeError|RangeError}
@@ -1058,6 +1101,15 @@ export function cablearEdificio({
 
   /** Lo que hay que escribir en el campo de la RC en el PRÓXIMO repintado. */
   let refcatPendiente = null
+
+  /**
+   * La última referencia que puso en el campo {@link proponerRefcat}, mientras
+   * siga siendo solo una propuesta. Es lo que permite que una propuesta nueva
+   * sustituya a la anterior —se cargó la parcela A y después la B— sin pisar nunca
+   * lo que haya tecleado una persona. Se olvida en {@link aplicar}: en cuanto un
+   * edificio entra con ella, ya la lleva el documento.
+   */
+  let refcatPropuesta = null
 
   /** De dónde salió lo que hay en pantalla. Se compone con el renglón permanente. */
   let procedenciaDato = ''
@@ -1698,6 +1750,7 @@ export function cablearEdificio({
 
     procedenciaDato = procedencia
     refcatPendiente = conNombre.refcat ?? ''
+    refcatPropuesta = null
     estado.set(conNombre)
     encuadrarSobre(conNombre)
 
@@ -1818,7 +1871,7 @@ export function cablearEdificio({
       if (pareceXml(texto)) {
         const entrada = normalizar(entradaDesdeGmlBu(texto, comunes()))
         entrada.detecciones = [...deteccionesTexto, ...entrada.detecciones]
-        aplicar(
+        const entro = aplicar(
           entrada,
           `«${nombre}»`,
           deFichero
@@ -1826,6 +1879,7 @@ export function cablearEdificio({
             : 'Del GML de edificio pegado en esta pantalla.',
           idLocalDe(nombre),
         )
+        if (entro) deducirTrasCargar()
         return
       }
 
@@ -1847,7 +1901,9 @@ export function cablearEdificio({
 
       const entrada = normalizar(previa)
       entrada.detecciones = [...deteccionesTexto, ...entrada.detecciones]
-      aplicar(entrada, `«${nombre}»`, `${deDonde}, medido por el técnico.`, idLocalDe(nombre))
+      if (aplicar(entrada, `«${nombre}»`, `${deDonde}, medido por el técnico.`, idLocalDe(nombre))) {
+        deducirTrasCargar()
+      }
     } catch (causa) {
       pendiente = null
       reventar(`la lectura de «${nombre}» ha fallado`, causa)
@@ -1869,12 +1925,13 @@ export function cablearEdificio({
       entrada.detecciones = [...detecciones, ...entrada.detecciones]
       panelEdificio.cerrarCapas()
       pendiente = null
-      aplicar(
+      const entro = aplicar(
         entrada,
         `«${nombre}»`,
         `Del fichero «${nombre}», medido por el técnico · capas ${elegidas.map((c) => `«${c}»`).join(', ')}.`,
         idLocalDe(nombre),
       )
+      if (entro) deducirTrasCargar()
     } catch (causa) {
       pendiente = null
       panelEdificio.cerrarCapas()
@@ -1977,6 +2034,86 @@ export function cablearEdificio({
     refcatPendiente = candidatos[0].refcat
     repintar(estado.get())
     return candidatos[0].refcat
+  }
+
+  /**
+   * ⭐ 2026-10-25 · Pone una referencia en el campo **solo si nadie ha escrito
+   * ninguna**. Es la puerta por la que entran las que no ha tecleado el usuario:
+   * la de la parcela que acaba de cargarse en la otra rama, la que el Catastro
+   * deduce del clic en el mapa, y la de la huella recién cargada.
+   *
+   * Lo que haya escrito una persona **no se pisa nunca**. Lo único que se
+   * sustituye es la propuesta anterior mientras siga intacta en el campo
+   * ({@link refcatPropuesta}): si se carga la parcela A y después la B, el campo
+   * tiene que decir B y no quedarse con la del documento que ya se fue.
+   *
+   * No escribe en el modelo, igual que todo lo que llega a este campo: desde esta
+   * misma fecha lo que manda en el GML es el CAMPO (`refcatDelCampo` de
+   * `app/cableado-edificio-gml.js`), así que no hace falta tocar el documento
+   * para que la referencia llegue al fichero.
+   *
+   * @param {string|null|undefined} refcat
+   * @param {string} origen  Uno de {@link ORIGEN_REFCAT}. Solo cambia la frase.
+   * @returns {boolean}  `true` si el campo ha cambiado.
+   */
+  function proponerRefcat(refcat, origen) {
+    if (destruido) return false
+    const propuesta = textoNoVacio(refcat)
+    if (propuesta === null) return false
+    const escrita = textoNoVacio(panelEdificio.valores().refcat)
+    if (escrita !== null && escrita !== refcatPropuesta) return false
+    if (escrita === propuesta) return false
+    refcatPropuesta = propuesta
+    refcatPendiente = propuesta
+    repintar(estado.get())
+    panelEdificio.estado(mensajeRefcatPropuesta(propuesta, origen, tieneGeometria(estado.get())))
+    return true
+  }
+
+  /**
+   * ⭐ 2026-10-25 · Tras cargar una medición SIN referencia, se deduce de la huella
+   * y se propone para el campo. Es lo que la rama de parcela hace desde F18 tras
+   * importar (`app/main.js#deducirRefcatTrasImportar`), y la misma consulta que
+   * «Traer del Catastro» hacía ya con el campo vacío ({@link referenciaAConsultar}),
+   * solo que ahora no espera a que se pulse.
+   *
+   * Una sola consulta por fichero, y ninguna si no hace falta: con referencia en
+   * el documento o en el campo no se pregunta nada. La respuesta que llega cuando
+   * ya hay OTRO documento en pantalla se descarta sin decir nada: es cierta, pero
+   * no de lo que se está viendo.
+   *
+   * La promesa se suelta: no lanza, y lo que falla se cuenta por el panel, sin
+   * tocar el renglón, que sigue diciendo lo que se ha cargado.
+   *
+   * @returns {Promise<void>}
+   */
+  async function deducirTrasCargar() {
+    if (destruido) return
+    if (clienteParcela === null || typeof clienteParcela.refcatPorCoordenada !== 'function') return
+    const edificio = estado.get()
+    if (!tieneGeometria(edificio) || textoNoVacio(edificio.refcat) !== null) return
+    if (textoNoVacio(panelEdificio.valores().refcat) !== null) return
+    const clave = claveDeEdificio(edificio)
+    try {
+      const punto = puntoDeReferencia(edificio)
+      if (punto === null) return
+      const { resultado, vigente } = await operar((senal) =>
+        clienteParcela.refcatPorCoordenada(punto[0], punto[1], { srs, senal }),
+      )
+      if (!vigente || destruido || claveDeEdificio(estado.get()) !== clave) return
+      if (!resultado.ok) {
+        panel.avisar(resultado.mensaje, { nivel: NIVEL_POR_MOTIVO[resultado.motivo] ?? NIVEL.AVISO })
+        return
+      }
+      const { candidatos, unico } = resultado.datos
+      if (!unico) {
+        panel.avisar(mensajeVariosCandidatos(candidatos), { nivel: NIVEL.AVISO })
+        return
+      }
+      proponerRefcat(candidatos[0].refcat, ORIGEN_REFCAT.HUELLA)
+    } catch (causa) {
+      console.error('[edificio] la deducción de la referencia tras cargar ha fallado:', causa)
+    }
   }
 
   /**
@@ -2328,6 +2465,7 @@ export function cablearEdificio({
     alTexto,
     inspeccionarTexto,
     cargar,
+    proponerRefcat,
 
     /** Las `<section>` que este módulo ha sellado. Para el test y para T4.1. */
     secciones: () => [...secciones],

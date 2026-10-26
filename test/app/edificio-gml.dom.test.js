@@ -32,6 +32,7 @@ import {
   SELECTOR_ESTADO,
   cablearGeneracionGmlEdificio,
   identidadDe,
+  motivoRefcatIlegible,
   otrasDe,
   partesSenaladas,
   plantasDelEdificio,
@@ -293,6 +294,58 @@ describe('cablearGeneracionGmlEdificio · la entrega', () => {
 })
 
 // ── 3 · Lo que se le cuenta al usuario antes de subirlo ──────────────────────
+
+describe('cablearGeneracionGmlEdificio · ⭐ 2026-10-25 · la referencia del CAMPO manda', () => {
+  it('un DXF cargado SIN referencia sale con la que se escribió después en el campo', () => {
+    // El caso que lo pidió: el dibujo entra primero, la referencia llega luego
+    // (deducida o tecleada) y el GML bajaba como «sin-referencia» con ella a la vista.
+    let campo = ''
+    const { estadoEdificio } = cablear({ refcatDelCampo: () => campo })
+    estadoEdificio.set(edificioBueno())
+    campo = '9398516VK3799G'
+    boton().click()
+
+    expect(descargas[0].nombreFichero).toBe('edificio_9398516VK3799G_2026-08-06T18-30-00.gml')
+    expect(descargas[0].texto).toContain('<base:localId>9398516VK3799G</base:localId>')
+    // El documento no se toca: lo que manda es el campo, no una escritura en el store.
+    expect(estadoEdificio.get().refcat).toBeNull()
+  })
+
+  it('el campo gana a la referencia del documento, y se escribe en su forma canónica', () => {
+    const { estadoEdificio } = cablear({ refcatDelCampo: () => ' 9398516 vk3799g ' })
+    estadoEdificio.set(edificioBueno({ refcat: '1111111AA1111A' }))
+    boton().click()
+    expect(descargas[0].nombreFichero).toBe('edificio_9398516VK3799G_2026-08-06T18-30-00.gml')
+  })
+
+  it('con el campo vacío sale la del documento, como siempre', () => {
+    const { estadoEdificio } = cablear({ refcatDelCampo: () => '   ' })
+    estadoEdificio.set(edificioBueno({ refcat: '9398516VK3799G' }))
+    boton().click()
+    expect(descargas[0].nombreFichero).toBe('edificio_9398516VK3799G_2026-08-06T18-30-00.gml')
+  })
+
+  it('⛔ una referencia ilegible en el campo NO genera, y dice por qué', () => {
+    const { estadoEdificio } = cablear({ refcatDelCampo: () => '9398516' })
+    estadoEdificio.set(edificioBueno())
+    boton().click()
+
+    expect(descargas).toHaveLength(0)
+    expect(renglon().textContent).toBe(motivoRefcatIlegible('9398516'))
+    expect(avisos.map((a) => a.mensaje)).toContain(motivoRefcatIlegible('9398516'))
+  })
+
+  it('si el campo dice lo mismo que el documento no se valida: un GML abierto vuelve a salir igual', () => {
+    // La referencia de un GML de edificio llega al campo tal cual al cargarlo, y
+    // reabrir un fichero ajeno no puede bloquearse por la forma de su referencia.
+    const rara = 'REF-LOCAL-1'
+    const { estadoEdificio } = cablear({ refcatDelCampo: () => rara })
+    estadoEdificio.set(edificioBueno({ refcat: rara }))
+    boton().click()
+    expect(descargas).toHaveLength(1)
+    expect(descargas[0].texto).toContain(`<base:localId>${rara}</base:localId>`)
+  })
+})
 
 describe('cablearGeneracionGmlEdificio · el panel de avisos', () => {
   it('⭐ «no se ha comprobado si cae dentro de la parcela» sale ANTES de descargar', () => {

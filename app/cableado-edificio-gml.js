@@ -44,6 +44,7 @@ import { TIPO_MIME_GML, descargarTexto, nombreFicheroGmlEdificio } from '../gml/
 import { envolventeDe } from '../edificio/envolvente.js'
 import { validarEdificio } from '../validation/edificio.js'
 import { TIPO_PARTE } from '../model/edificio.js'
+import { normalizarRefcat } from '../services/catastro.js'
 
 // ── Contrato con `index.html` ────────────────────────────────────────────────
 // Los MISMOS nodos que la rama de parcela, a propósito: el pie no se intercambia
@@ -82,6 +83,19 @@ export const MOTIVO_SIN_HUELLA =
   'Ninguna parte de la construcción tiene plantas sobre rasante, así que no hay huella que ' +
   'aportar: el ICUC pide la del edificio, y un volumen enterrado no la tiene. Revisa las plantas ' +
   'de las partes.'
+
+/**
+ * ⭐ 2026-10-25 · La referencia del campo no tiene forma de referencia catastral.
+ * **No se genera**: ponerla tal cual metería en el `gml:id` y en el nombre del
+ * fichero algo que la Sede no va a reconocer, y caer en silencio a la del documento
+ * sería generar con una referencia distinta de la que el usuario tiene delante.
+ *
+ * @param {string} escrita
+ * @returns {string}
+ */
+export const motivoRefcatIlegible = (escrita) =>
+  `No se ha generado el GML: «${escrita}», en el campo de la referencia catastral, no tiene ` +
+  'forma de referencia (14 caracteres, o los 20 del recibo del IBI). Corrígela o vacía el campo.'
 
 /** Lo que se dice cuando revienta algo antes de tener el fichero. */
 export const MENSAJE_FALLO_INESPERADO =
@@ -214,6 +228,9 @@ export function identidadDe(edificio) {
   return null
 }
 
+/** El texto del campo sin blancos alrededor, o `null` si no dice nada. */
+const textoDelCampo = (v) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null)
+
 /** La referencia catastral de verdad, o `null`. Es lo que va en el NOMBRE. */
 const referenciaDe = (edificio) =>
   typeof edificio?.refcat === 'string' && edificio.refcat.trim() !== '' ? edificio.refcat : null
@@ -233,6 +250,9 @@ const referenciaDe = (edificio) =>
  * @param {() => Date} [opciones.ahora]
  * @param {typeof descargarTexto} [opciones.descargar]
  * @param {() => boolean} [opciones.mando]  Si esta rama gobierna hoy el botón.
+ * @param {() => (string|null)} [opciones.refcatDelCampo]  Lo que hay escrito en el
+ *   campo de la referencia de Edificio. ⭐ 2026-10-25 · **Si no está vacío, manda**
+ *   sobre la del documento: es lo que el usuario tiene delante al pulsar.
  * @param {Document} [opciones.documento]
  * @returns {{generar: () => (object|null), refrescar: () => void, destruir: () => void}}
  * @throws {TypeError} Si falta el botón o el renglón en la cáscara.
@@ -246,6 +266,7 @@ export function cablearGeneracionGmlEdificio({
   ahora = () => new Date(),
   descargar = descargarTexto,
   mando = () => true,
+  refcatDelCampo = () => null,
   documento = globalThis.document,
 } = {}) {
   const nodoBoton = boton ?? documento.querySelector(SELECTOR_BOTON)
@@ -429,8 +450,29 @@ export function cablearGeneracionGmlEdificio({
     // tiene que leer ANTES, no cuando el fichero ya está en su carpeta.
     for (const h of examen.validacion.avisos) panel.avisar(h.mensaje, { nivel: h.nivel })
 
+    // ── ⭐ 2026-10-25 · La referencia del CAMPO manda ──────────────────────────
+    // Hasta hoy el GML salía con `edificio.refcat`, que solo se escribe al CARGAR:
+    // un DXF cargado antes de tener la referencia —escrita a mano o deducida—
+    // bajaba como `edificio_sin-referencia_…` con la referencia a la vista en el
+    // campo. Ahora sale con lo que dice el campo. El documento no se toca.
+    //
+    // ⚠️ Si el campo dice lo mismo que el documento no se normaliza ni se valida:
+    // un GML de edificio abierto tal cual tiene que volver a salir igual.
+    const escrita = textoDelCampo(refcatDelCampo())
+    let conReferencia = edificio
+    if (escrita !== null && escrita !== edificio.refcat) {
+      const normalizada = normalizarRefcat(escrita)
+      if (normalizada === null) {
+        const motivo = motivoRefcatIlegible(escrita)
+        decir(motivo, true)
+        panel.avisar(motivo, { nivel: NIVEL.ERROR })
+        return null
+      }
+      conReferencia = { ...edificio, refcat: normalizada }
+    }
+
     // ── 3 · Serialización ───────────────────────────────────────────────────
-    const identidad = identidadDe(edificio)
+    const identidad = identidadDe(conReferencia)
     if (identidad === null) {
       // No debería llegar aquí —`examinar` exige partes y el modelo exige nombre
       // en cuanto hay documento—, pero si llegara, `serializarEdificioBu` lanzaría
@@ -489,7 +531,7 @@ export function cablearGeneracionGmlEdificio({
       // La REFERENCIA, no la identidad: un edificio sin referencia catastral se
       // llama `edificio_sin-referencia_…`, que es verdad, y no `edificio_<el
       // nombre del fichero que soltó el usuario>`.
-      nombreFichero: nombreFicheroGmlEdificio({ refcat: referenciaDe(edificio), fecha }),
+      nombreFichero: nombreFicheroGmlEdificio({ refcat: referenciaDe(conReferencia), fecha }),
       mime: TIPO_MIME_GML,
     })
     decir(
