@@ -539,7 +539,7 @@ const arranque = {
   tarjetasDeAvisos: tarjetasDeAvisos(),
   cajonComprobacionCerrado: !visible(cajonComp),
   cajonDiagnosticoCerrado: !visible(cajonDiag),
-  ctaDiagnosticoHabilitado: !ctaDiag.disabled,
+  ctaDiagnosticoHabilitado: ctaDiag.getAttribute('aria-disabled') !== 'true',
   boton: {
     etiqueta: botonAbrir.tagName.toLowerCase(),
     texto: botonAbrir.textContent.trim(),
@@ -1004,7 +1004,7 @@ const contraste = {
   superficieFicha: leerNumero(texto('[data-ficha="superficie"]')),
   superficieCatastral: leerNumero(texto('[data-ficha="superficie-catastral"]')),
   refcatFicha: texto('[data-ficha="refcat"]'),
-  ctaDiagnosticoHabilitado: !ctaDiag.disabled,
+  ctaDiagnosticoHabilitado: ctaDiag.getAttribute('aria-disabled') !== 'true',
   renglonCta: texto('[data-estado="diagnosticar"]'),
   tarjetasDeAvisos: tarjetasDeAvisos(),
 }
@@ -1069,7 +1069,7 @@ campoRefcat.conReferencia = {
   fichaRefcat: texto('[data-ficha="refcat"]'),
   // Coherencia campo ↔ modelo: con referencia en el modelo, «Traer colindantes»
   // se ENCIENDE, porque ya hay a quién pedirle vecinas.
-  colindantesHabilitado: botonColindantesEl === null ? null : !botonColindantesEl.disabled,
+  colindantesHabilitado: botonColindantesEl === null ? null : botonColindantesEl.getAttribute('aria-disabled') !== 'true',
 }
 campoRefcat.conReferencia.coherente =
   campoRefcat.conReferencia.canonica && campoRefcat.conReferencia.colindantesHabilitado === true
@@ -1639,7 +1639,7 @@ if (traidoHuso.file === null) {
 // apilado, y quien decide si molesta es el checklist §9.
 
 const terceraVia = { medida: false, sePudoProvocar: false }
-if (visible(cajonComp) && !ctaDiag.disabled) {
+if (visible(cajonComp) && ctaDiag.getAttribute('aria-disabled') !== 'true') {
   ctaDiag.click()
   await esperar(() => visible(cajonDiag), 5000, 'el cajón de diagnóstico de la tercera vía')
   const rc = rect(cajonComp)
@@ -1862,7 +1862,7 @@ if (traidoOtra.file === null) {
       valor: campoRefcatEl === null ? null : campoRefcatEl.value,
       vacio: campoRefcatEl !== null && campoRefcatEl.value === '',
       fichaRefcat: texto('[data-ficha="refcat"]'),
-      colindantesHabilitado: botonColindantesEl === null ? null : !botonColindantesEl.disabled,
+      colindantesHabilitado: botonColindantesEl === null ? null : botonColindantesEl.getAttribute('aria-disabled') !== 'true',
     }
     campoRefcat.sinReferencia.coherente =
       campoRefcat.sinReferencia.vacio && campoRefcat.sinReferencia.colindantesHabilitado === false

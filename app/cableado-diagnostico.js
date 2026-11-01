@@ -119,6 +119,7 @@ import { informeContrasteTexto } from '../report/contraste-texto.js'
 // escribe ese renglón cuando el botón está apagado es el propio cajón, en el mismo
 // instante en que lo apaga. Ver la guarda de `descargarInforme`.
 import { NIVEL } from '../viewer/_comun.js'
+import { apagar, estaApagado } from './apagado.js'
 import { traducirColindantes } from './colindantes.js'
 import { INSTRUCCION_PARCELARIO } from './navegacion.js'
 
@@ -801,7 +802,7 @@ export function cablearDiagnostico({
    */
   function refrescarBoton(parcelaActual) {
     const sinOficial = !puedeDiagnosticar(parcelaActual)
-    boton.disabled = sinOficial
+    apagar(boton, sinOficial)
     if (sinOficial && renglon.textContent === '') decir(MOTIVO_SIN_OFICIAL, false)
   }
 
@@ -868,7 +869,7 @@ export function cablearDiagnostico({
 
     botonFondo.hidden = yaHayParcelario
     renglonFondo.hidden = yaHayParcelario
-    botonFondo.disabled = yaHayParcelario || motivo !== null || trayendoFondo
+    apagar(botonFondo, yaHayParcelario || motivo !== null || trayendoFondo)
 
     if (yaHayParcelario) {
       // Un motivo escrito debajo de un botón invisible es ruido, y encima ocupa.
@@ -1341,6 +1342,9 @@ export function cablearDiagnostico({
    * promesa.
    */
   const alPulsar = (evento) => {
+    // Apagado con `aria-disabled` (`app/apagado.js`): el clic llega igual, y aquí
+    // no hace nada más que lo que ya hizo el foco, enseñar el motivo.
+    if (estaApagado(boton)) return
     abrir(evento).catch(() => {})
   }
 
@@ -1392,6 +1396,7 @@ export function cablearDiagnostico({
 
   /** Suelta la promesa igual que {@link alPulsar}, y por lo mismo. */
   const alPulsarFondo = () => {
+    if (estaApagado(botonFondo)) return
     traerFondo().catch(() => {})
   }
 

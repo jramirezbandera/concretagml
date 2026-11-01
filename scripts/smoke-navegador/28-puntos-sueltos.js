@@ -421,7 +421,7 @@ if (cerrado.puntosSiguenAhi !== entrada.puntosPintados) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 const coherencia = {
-  fondoApagado: $(SEL.BOTON_FONDO)?.disabled ?? null,
+  fondoApagado: $(SEL.BOTON_FONDO) === null ? null : $(SEL.BOTON_FONDO).getAttribute('aria-disabled') === 'true',
   renglonFondo: ($(SEL.ESTADO_FONDO)?.textContent ?? '').trim(),
   renglonGml: ($(SEL.ESTADO_GML)?.textContent ?? '').trim(),
 }

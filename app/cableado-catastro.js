@@ -211,6 +211,7 @@ import {
   normalizarRefcat,
 } from '../services/catastro.js'
 import { NIVEL, latLngAUTM } from '../viewer/_comun.js'
+import { apagar, estaApagado } from './apagado.js'
 import { PROCEDENCIA, mensajeOrigenDesconocido } from './contraste.js'
 // ⚠️ De `navegacion.js` solo la INSTRUCCIÓN, y sin ciclo: aquel módulo no importa
 // ningún `app/cableado-*.js` justamente para que los cuatro que dicen «cómo se trae
@@ -1391,7 +1392,7 @@ export function cablearCatastro({
     const ocupado = enVuelo !== null
     botonCargar.disabled = ocupado
     const sinReferencia = !puedePedirColindantesDe(parcelaActual)
-    botonColindantes.disabled = ocupado || sinReferencia
+    apagar(botonColindantes, ocupado || sinReferencia)
 
     const hayParcela = parcelaActual !== null && parcelaActual !== undefined
     if (!ocupado && hayParcela && sinReferencia) {
@@ -2080,6 +2081,8 @@ export function cablearCatastro({
    * la de siempre —abortador + token—, no el atributo.
    */
   const alPulsarColindantes = () => {
+    // Apagado con `aria-disabled` (`app/apagado.js`), así que el clic llega igual.
+    if (estaApagado(botonColindantes)) return
     colindantes().catch(yaContado)
   }
 

@@ -81,6 +81,7 @@ import { join } from 'node:path'
 
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest'
 
+import { estaApagado } from '../../app/apagado.js'
 import {
   SELECTOR_BOTON_CARGAR,
   SELECTOR_ESTADO_CATASTRO,
@@ -871,7 +872,7 @@ describe('app/main · F08 · la app arranca IGUAL sin cliente del Catastro', () 
   it('el CTA de F07 queda apagado CON su motivo escrito, no gris y mudo', () => {
     // La otra mitad de la degradación honrada: sin contorno oficial no hay encaje
     // que diagnosticar, y el usuario tiene derecho a saber por qué.
-    expect(document.querySelector(SELECTOR_BOTON_DIAGNOSTICAR).disabled).toBe(true)
+    expect(estaApagado(document.querySelector(SELECTOR_BOTON_DIAGNOSTICAR))).toBe(true)
     expect(document.querySelector(SELECTOR_ESTADO_DIAGNOSTICO).textContent.trim()).not.toBe('')
   })
 

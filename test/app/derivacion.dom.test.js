@@ -22,6 +22,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
+import { estaApagado } from '../../app/apagado.js'
 import {
   cablearDerivacion,
   motivoEntregaBloqueada,
@@ -104,7 +105,7 @@ function montarCascara() {
   document.body.innerHTML = `
     <div class="gml-app">
       <div class="gml-acciones">
-        <button type="button" data-accion="rehacer-parcelario" disabled>Rehacer el parcelario</button>
+        <button type="button" data-accion="rehacer-parcelario" aria-disabled="true">Rehacer el parcelario</button>
         <p data-estado="rehacer-parcelario" role="status"></p>
       </div>
     </div>`
@@ -247,14 +248,14 @@ describe('cablearDerivacion', () => {
   describe('el CTA del pie', () => {
     it('con el store vacío nace APAGADO y el renglón dice que falta el contorno', () => {
       cablear()
-      expect(boton().disabled).toBe(true)
+      expect(estaApagado(boton())).toBe(true)
       expect(renglon().textContent).toBe(MOTIVO_SIN_OFICIAL)
     })
 
     it('con contorno oficial pero sin geometría medida, lo dice DISTINTO', () => {
       cablear()
       estado.set({ geometriaOficial: oficial(), recintos: [] })
-      expect(boton().disabled).toBe(true)
+      expect(estaApagado(boton())).toBe(true)
       expect(renglon().textContent).toBe(MOTIVO_SIN_GEOMETRIA)
     })
 
@@ -264,7 +265,7 @@ describe('cablearDerivacion', () => {
       // cuando hay algo que decir.
       cablear({ colindantes: registroConVecinas() })
       estado.set(parcela())
-      expect(boton().disabled).toBe(false)
+      expect(estaApagado(boton())).toBe(false)
       expect(renglon().textContent).toBe('')
     })
 
@@ -280,7 +281,7 @@ describe('cablearDerivacion', () => {
       // castigaría el camino bueno para proteger el malo.
       cablear()
       estado.set(parcela())
-      expect(boton().disabled, 'se puede derivar igual').toBe(false)
+      expect(estaApagado(boton()), 'se puede derivar igual').toBe(false)
       expect(renglon().textContent).toBe(AVISO_SIN_COLINDANTES)
       expect(
         renglon().classList.contains('gml-accion-estado--error'),
@@ -323,7 +324,7 @@ describe('cablearDerivacion', () => {
       // dice que no es la PUERTA, al pulsar.
       cablear()
       estado.set(parcela({ mengua: -10 }))
-      expect(boton().disabled).toBe(false)
+      expect(estaApagado(boton())).toBe(false)
     })
   })
 

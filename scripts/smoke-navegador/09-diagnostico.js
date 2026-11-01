@@ -245,7 +245,7 @@ if (boton === null || renglonCta === null || cajonEl === null) {
 const arranque = {
   filas: filasDeTabla(),
   superficieFicha: superficieFichaArranque,
-  ctaHabilitado: !boton.disabled,
+  ctaHabilitado: boton.getAttribute('aria-disabled') !== 'true',
   renglonCta: renglonCta.textContent,
   cajonCerrado: getComputedStyle(cajonEl).display === 'none',
   pxPorMetro: redondear(escala(), 4),

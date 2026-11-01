@@ -620,10 +620,20 @@ export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'dia
  * para su «Cerrar» (+52 B): el pie del diccionario lo empuja ahora por posición, y
  * ese selector es más corto que el que nombraba uno.
  *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **Y BAJA EL MISMO DÍA (LOS CTA APAGADOS SE ABREN CON EL TECLADO)**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 67.611 a **67.475 B nuestros** (82.706 → 82.570 con vendor). **−136 B**, y
+ * no por podar: los cuatro CTA del pie pasan de `disabled` a `aria-disabled` para
+ * que su pista se abra con el teclado (+167 B en selectores), y lo pagan los tres
+ * `:disabled` calcados de `.gml-boton` (primario, secundario y menudo), que eran
+ * tres bloques con las mismas cuatro declaraciones y ahora son uno. El techo BAJA
+ * con la medición, como sube: holgura 0.
+ *
  * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
  * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
  */
-export const TECHO = Object.freeze({ total: 82706, nuestro: 67611 })
+export const TECHO = Object.freeze({ total: 82570, nuestro: 67475 })
 
 /**
  * EL REGISTRO. Un asiento por hito, con la hoja construida medida de verdad.
@@ -1828,6 +1838,17 @@ export const ASIENTOS = Object.freeze(
         'pie lo empuja ahora con `> :last-child`, que vale para los dos y es más corto que el ' +
         'selector de antes. ── ⚠️ El techo SUBE 51 B (cabecera de `TECHO`) y la holgura vuelve ' +
         'a 0. NO CIERRA REBANADA.' },
+    { hito: 'Los CTA apagados del pie se abren con el teclado',
+      commit: '(sin commitear)',
+      total: 82570, nuestro: 67475, rebanada: null,
+      nota:
+        '**−136 B.** «Traer el parcelario de fondo», «Traer colindantes», «Rehacer el ' +
+        'parcelario» y «Diagnosticar» se apagan con `aria-disabled` (`app/apagado.js`): siguen ' +
+        'en el tabulador y su pista abre con `:focus-within`. Los selectores nuevos cuestan ' +
+        '+167 B. ── QUÉ SE HA DEVUELTO ── los `:disabled` de `--primario`, `--secundario` y ' +
+        '`--menudo` eran tres bloques calcados y pasan a ser uno con `.gml-boton[aria-disabled]`: ' +
+        '−303 B. ── El techo BAJA 136 B (cabecera de `TECHO`) y la holgura sigue en 0. NO ' +
+        'CIERRA REBANADA.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

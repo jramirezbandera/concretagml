@@ -69,6 +69,7 @@ import {
   MOTIVO_SIN_DERIVAR,
   PAPEL,
 } from '../viewer/lista-sobrante.js'
+import { apagar, estaApagado } from './apagado.js'
 import { nombreFicheroExport } from './cableado-expediente.js'
 import { INSTRUCCION_PARCELARIO } from './navegacion.js'
 
@@ -766,8 +767,8 @@ export function cablearDerivacion({
 
     const hayOficial = oficialDe(parcela) !== null
     const hayGeometria = recintosDe(parcela).length > 0
-    elBoton.disabled = !(hayOficial && hayGeometria)
-    if (elBoton.disabled) {
+    apagar(elBoton, !(hayOficial && hayGeometria))
+    if (estaApagado(elBoton)) {
       decir(hayOficial ? MOTIVO_SIN_GEOMETRIA : MOTIVO_SIN_OFICIAL)
     } else if (cesion === null) {
       decirEstadoDePartida()
@@ -1379,7 +1380,13 @@ export function cablearDerivacion({
 
   // ── Los cables ────────────────────────────────────────────────────────────
 
-  elBoton.addEventListener('click', derivar)
+  // Apagado con `aria-disabled` (`app/apagado.js`): el clic llega igual, y pulsar
+  // apagado no debe pintar el motivo de ROJO, que es lo que `derivar()` hace —con
+  // razón— cuando se le llama desde un test o desde otro cable.
+  const alPulsar = () => {
+    if (!estaApagado(elBoton)) derivar()
+  }
+  elBoton.addEventListener('click', alPulsar)
   const bajaEntrega = lista.alEntregar(entregar)
   const bajaSeleccion = lista.alCambiarSeleccion(repartir)
   const bajaSuelto = lista.alDescargarSuelto(descargarSuelto)
@@ -1397,7 +1404,7 @@ export function cablearDerivacion({
     colindantes === null
       ? null
       : colindantes.subscribe(() => {
-          if (!vivo || cesion !== null || elBoton.disabled) return
+          if (!vivo || cesion !== null || estaApagado(elBoton)) return
           decirEstadoDePartida()
         })
 
@@ -1483,7 +1490,7 @@ export function cablearDerivacion({
     destruir() {
       if (!vivo) return
       vivo = false
-      elBoton.removeEventListener('click', derivar)
+      elBoton.removeEventListener('click', alPulsar)
       bajaEntrega()
       bajaSuelto()
       bajaColindantes?.()

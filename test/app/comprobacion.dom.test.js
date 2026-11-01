@@ -57,6 +57,7 @@ import { join } from 'node:path'
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
+import { estaApagado } from '../../app/apagado.js'
 import { crearDialogoAvisos } from '../../app/dialogo-avisos.js'
 import {
   SELECTOR_BOTON_COLINDANTES,
@@ -1208,14 +1209,14 @@ describe('cableado-comprobacion · el campo de la referencia catastral', () => {
 
     // De partida no hay parcela: nadie a quien pedirle vecinas.
     expect(campo.value).toBe('')
-    expect(botonColindantes.disabled).toBe(true)
+    expect(estaApagado(botonColindantes)).toBe(true)
 
     await soltarYEsperar(ficheroDeTexto(TEXTO_FICHERO_MOVIDO, 'de-otro-despacho.gml'))
 
     expect(estado.get().refcat).toBe(REFCAT)
     // Las dos superficies afirman lo mismo: hay referencia.
     expect(campo.value).toBe(REFCAT)
-    expect(botonColindantes.disabled).toBe(false)
+    expect(estaApagado(botonColindantes)).toBe(false)
   })
 
   it('EL DEFECTO, del otro lado: sin referencia, campo vacío Y botón apagado', async () => {
@@ -1229,7 +1230,7 @@ describe('cableado-comprobacion · el campo de la referencia catastral', () => {
 
     expect(estado.get().refcat).toBeNull()
     expect(campo.value).toBe('')
-    expect(botonColindantes.disabled).toBe(true)
+    expect(estaApagado(botonColindantes)).toBe(true)
   })
 })
 

@@ -582,6 +582,7 @@ import { crearDialogoDiccionario } from './dialogo-diccionario.js'
 // F16 · Créditos y licencias. Tampoco mira el estado: lee el inventario que
 // escribe el build.
 import { crearDialogoCreditos } from './dialogo-creditos.js'
+import { apagar, estaApagado } from './apagado.js'
 import {
   SELECTOR_BOTON_CARGAR,
   SELECTOR_BOTON_COLINDANTES,
@@ -4283,10 +4284,12 @@ try {
   // vea desde aquí no lo salva: el usuario llega a Edición en dos clics.
   //
   // ⛔ Eran TRES hasta esa fecha; el que falta es «Deducir del mapa», retirado.
-  for (const selector of [SELECTOR_BOTON_CARGAR, SELECTOR_BOTON_COLINDANTES]) {
-    const boton = document.querySelector(selector)
-    if (boton !== null) boton.disabled = true
-  }
+  const botonCargarCaido = document.querySelector(SELECTOR_BOTON_CARGAR)
+  if (botonCargarCaido !== null) botonCargarCaido.disabled = true
+  // «Traer colindantes» se apaga con `aria-disabled`, como lo apaga su cableado:
+  // así el tabulador llega y su pista dice por qué (`app/apagado.js`).
+  const botonColindantesCaido = document.querySelector(SELECTOR_BOTON_COLINDANTES)
+  if (botonColindantesCaido !== null) apagar(botonColindantesCaido, true)
   // Y los DOS renglones, por lo mismo: el motivo de un botón apagado se lee donde
   // está el botón. Sin esta segunda línea, «Traer colindantes» quedaba gris en
   // Edición con el porqué escrito dos pantallas atrás.
@@ -6299,6 +6302,8 @@ if (ctaDiagnosticar !== null) {
   // `abrirDiagnostico` del paso 15 se encuentra el trabajo hecho: por eso no vuelve
   // a pedir las vecinas. Si algún día se invierten, se pedirían dos veces.
   ctaDiagnosticar.addEventListener('click', () => {
+    // Apagado con `aria-disabled` (`app/apagado.js`): el clic llega, y no navega.
+    if (estaApagado(ctaDiagnosticar)) return
     navegacion.navegarAPaso(PASO.DIAGNOSTICO)
   })
 }

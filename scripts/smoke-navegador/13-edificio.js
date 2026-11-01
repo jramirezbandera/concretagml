@@ -486,7 +486,7 @@ const arranque = {
     display: getComputedStyle(s).display,
   })),
   ctaGenerarApagado: ctaGenerar === null ? null : ctaGenerar.disabled,
-  ctaDiagnosticarApagado: ctaDiagnosticar === null ? null : ctaDiagnosticar.disabled,
+  ctaDiagnosticarApagado: ctaDiagnosticar === null ? null : ctaDiagnosticar.getAttribute('aria-disabled') === 'true',
   renglonGenerar: renglonGenerar === null ? null : renglonGenerar.textContent.trim(),
   renglonDiagnosticar: renglonDiagnosticar === null ? null : renglonDiagnosticar.textContent.trim(),
   barraEdicionVisible: (() => {
@@ -812,7 +812,7 @@ const enEdificio = {
   // esté apagado, que su renglón lleve texto propio y que ese texto explique de
   // verdad por qué.
   ctaGenerarApagado: ctaGenerar === null ? null : ctaGenerar.disabled,
-  ctaDiagnosticarApagado: ctaDiagnosticar === null ? null : ctaDiagnosticar.disabled,
+  ctaDiagnosticarApagado: ctaDiagnosticar === null ? null : ctaDiagnosticar.getAttribute('aria-disabled') === 'true',
   motivoGenerar: renglonGenerar === null ? null : renglonGenerar.textContent.trim(),
   motivoDiagnosticar: renglonDiagnosticar === null ? null : renglonDiagnosticar.textContent.trim(),
   // ⭐ La cadena de accesibilidad del segundo CTA, entera y por sus tres eslabones:
@@ -1508,7 +1508,7 @@ if (clasica.file === null) {
 const antesDeLaVuelta = {
   filas: filasDeTabla(),
   ctaGenerarApagado: ctaGenerar === null ? null : ctaGenerar.disabled,
-  ctaDiagnosticarApagado: ctaDiagnosticar === null ? null : ctaDiagnosticar.disabled,
+  ctaDiagnosticarApagado: ctaDiagnosticar === null ? null : ctaDiagnosticar.getAttribute('aria-disabled') === 'true',
   renglonGenerar: renglonGenerar === null ? null : renglonGenerar.textContent.trim(),
 }
 
@@ -2269,7 +2269,7 @@ const idaYVuelta = {
     refcatParcelaDespues.closest('[data-rama-panel]')?.getAttribute('data-rama-panel') === 'PARCELA',
   // 5 · Los dos CTA del pie, restaurados EXACTAMENTE como estaban.
   ctaGenerarApagado: ctaGenerar === null ? null : ctaGenerar.disabled,
-  ctaDiagnosticarApagado: ctaDiagnosticar === null ? null : ctaDiagnosticar.disabled,
+  ctaDiagnosticarApagado: ctaDiagnosticar === null ? null : ctaDiagnosticar.getAttribute('aria-disabled') === 'true',
   renglonGenerar: renglonGenerar === null ? null : renglonGenerar.textContent.trim(),
   renglonDiagnosticar: renglonDiagnosticar === null ? null : renglonDiagnosticar.textContent.trim(),
   ctaGenerarRestaurado:
@@ -2277,7 +2277,7 @@ const idaYVuelta = {
   ctaDiagnosticarRestaurado:
     ctaDiagnosticar === null
       ? null
-      : ctaDiagnosticar.disabled === antesDeLaVuelta.ctaDiagnosticarApagado,
+      : (ctaDiagnosticar.getAttribute('aria-disabled') === 'true') === antesDeLaVuelta.ctaDiagnosticarApagado,
   renglonGenerarRestaurado:
     renglonGenerar === null ? null : renglonGenerar.textContent.trim() === antesDeLaVuelta.renglonGenerar,
   // ⭐ Y las DOS marcas que `cablearRama` pone SOLO mientras la rama EDIFICIO está

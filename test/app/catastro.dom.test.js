@@ -115,6 +115,7 @@ import { join } from 'node:path'
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
+import { estaApagado } from '../../app/apagado.js'
 import {
   MENSAJE_FALLO_INESPERADO,
   MENSAJE_FONDO_SIN_SOLAPE,
@@ -596,7 +597,7 @@ describe('cableado-catastro · el marcado de index.html es CONTRATO', () => {
     }
     // «Traer colindantes» nace apagado en el HTML: las vecinas lo son de una parcela
     // con referencia catastral, y ofrecerlo antes prometería lo que no se puede.
-    expect(document.querySelector(SELECTOR_BOTON_COLINDANTES).disabled).toBe(true)
+    expect(estaApagado(document.querySelector(SELECTOR_BOTON_COLINDANTES))).toBe(true)
     // La lista nace oculta: una lista visible y vacía AFIRMARÍA que no se encontró
     // nada, que es otra cosa muy distinta de que aún no se haya deducido.
     expect(document.querySelector(SELECTOR_CANDIDATOS).hidden).toBe(true)
@@ -1064,20 +1065,20 @@ describe('cableado-catastro · dos consultas encabalgadas', () => {
     // CON referencia: es la única forma de que «Traer colindantes» empiece
     // encendido, y sin eso la prueba sería vacua (mediría un botón ya apagado).
     const montado = cablear({ transporte, parcelaInicial: parcelaConReferencia() })
-    expect(montado.botonColindantes.disabled).toBe(false)
+    expect(estaApagado(montado.botonColindantes)).toBe(false)
 
     montado.campo.value = REFCAT
     const enCurso = montado.cableado.cargar()
     // Síncrono, en el mismo tick del clic: no hay una ventana en la que el botón
     // siga pulsable «mientras arranca la consulta».
     expect(montado.botonCargar.disabled).toBe(true)
-    expect(montado.botonColindantes.disabled).toBe(true)
+    expect(estaApagado(montado.botonColindantes)).toBe(true)
 
     await hastaPeticion(transporte, 1)
     transporte.peticiones[0].responder()
     await enCurso
     expect(montado.botonCargar.disabled).toBe(false)
-    expect(montado.botonColindantes.disabled).toBe(false)
+    expect(estaApagado(montado.botonColindantes)).toBe(false)
   })
 })
 
@@ -1180,7 +1181,7 @@ describe('cableado-catastro · destruir()', () => {
     expect(mapa.oyentes.get('click').size).toBe(1)
     // Encendido ANTES de destruir: si no, el clic de abajo no consultaría nada por
     // estar el botón gris y la prueba sería vacua.
-    expect(montado.botonColindantes.disabled).toBe(false)
+    expect(estaApagado(montado.botonColindantes)).toBe(false)
 
     montado.cableado.destruir()
 
@@ -1193,13 +1194,13 @@ describe('cableado-catastro · destruir()', () => {
 
   it('deja de seguir al store, y es IDEMPOTENTE', () => {
     const montado = cablear({ parcelaInicial: parcelaConReferencia() })
-    expect(montado.botonColindantes.disabled).toBe(false)
+    expect(estaApagado(montado.botonColindantes)).toBe(false)
 
     montado.cableado.destruir()
     montado.estado.set(parcelaSinReferencia())
     // Si siguiera suscrito, el botón se habría apagado al entrar una parcela sin
     // referencia. Ya no es asunto de este cableado.
-    expect(montado.botonColindantes.disabled).toBe(false)
+    expect(estaApagado(montado.botonColindantes)).toBe(false)
 
     expect(() => montado.cableado.destruir()).not.toThrow()
   })
@@ -1781,7 +1782,7 @@ describe('cableado-catastro · «Traer colindantes» es contrato de index.html',
     expect(boton).not.toBeNull()
     // Pedir las vecinas de nada no tiene sentido: hace falta una parcela con
     // referencia catastral en el modelo, y al abrir la app no la hay.
-    expect(boton.disabled).toBe(true)
+    expect(estaApagado(boton)).toBe(true)
   })
 
   // ⭐ **ESTE CASO AFIRMABA LO CONTRARIO HASTA EL 2026-08-16.** Decía «comparte el
@@ -1815,7 +1816,7 @@ describe('cableado-catastro · «Traer colindantes» es contrato de index.html',
 describe('cableado-catastro · «Traer colindantes» lo enciende el ESTADO', () => {
   it('⚠️ encendido con una parcela que YA tiene referencia catastral', () => {
     const montado = cablear({ parcelaInicial: parcelaConReferencia() })
-    expect(montado.botonColindantes.disabled).toBe(false)
+    expect(estaApagado(montado.botonColindantes)).toBe(false)
   })
 
   it('⭐ apagado sin nada en el store, y el renglón se CALLA (2026-08-07)', () => {
@@ -1843,7 +1844,7 @@ describe('cableado-catastro · «Traer colindantes» lo enciende el ESTADO', () 
     // segunda mitad del argumento de arriba —los 59 px de Entrada— caducó con ella;
     // la primera —que ahí el rail ya lo dice— es la que sostiene este caso.
     const montado = cablear({ parcelaInicial: null })
-    expect(montado.botonColindantes.disabled).toBe(true)
+    expect(estaApagado(montado.botonColindantes)).toBe(true)
     expect(montado.renglonColindantes.textContent).toBe('')
     expect(renglonEnFallo(montado.renglonColindantes)).toBe(false)
     // Y callarse en el renglón no es mandarlo por otro canal: no hay aviso.
@@ -1854,7 +1855,7 @@ describe('cableado-catastro · «Traer colindantes» lo enciende el ESTADO', () 
     // El caso para el que se escribió el mensaje: el usuario ve su parcela en
     // pantalla y un botón de colindantes que no responde, en la MISMA pantalla.
     const montado = cablear({ parcelaInicial: parcelaSinReferencia() })
-    expect(montado.botonColindantes.disabled).toBe(true)
+    expect(estaApagado(montado.botonColindantes)).toBe(true)
     expect(montado.renglonColindantes.textContent).toBe(MOTIVO_COLINDANTES_APAGADO)
     // Y el renglón de Entrada NO se entera: cada acción cuenta lo suyo donde está.
     expect(montado.renglon.textContent).toBe('')
@@ -1862,11 +1863,11 @@ describe('cableado-catastro · «Traer colindantes» lo enciende el ESTADO', () 
 
   it('se re-evalúa con el store, no sólo al cablear', () => {
     const montado = cablear({ parcelaInicial: parcelaSinReferencia() })
-    expect(montado.botonColindantes.disabled).toBe(true)
+    expect(estaApagado(montado.botonColindantes)).toBe(true)
     montado.estado.set(parcelaConReferencia())
-    expect(montado.botonColindantes.disabled).toBe(false)
+    expect(estaApagado(montado.botonColindantes)).toBe(false)
     montado.estado.set(parcelaSinReferencia())
-    expect(montado.botonColindantes.disabled).toBe(true)
+    expect(estaApagado(montado.botonColindantes)).toBe(true)
   })
 
   // ⭐ **ESTE CASO AFIRMABA LO CONTRARIO HASTA EL 2026-08-16**, y decía «el motivo
@@ -1891,7 +1892,7 @@ describe('cableado-catastro · «Traer colindantes» lo enciende el ESTADO', () 
     // Ahora la parcela se queda sin referencia (el usuario abre un DXF encima): el
     // botón se apaga…
     montado.estado.set(parcelaSinReferencia())
-    expect(montado.botonColindantes.disabled).toBe(true)
+    expect(estaApagado(montado.botonColindantes)).toBe(true)
     // …y el renglón deja de contar unas vecinas que ya no son de nadie.
     expect(montado.renglonColindantes.textContent).toBe(MOTIVO_COLINDANTES_APAGADO)
 
@@ -1909,24 +1910,24 @@ describe('cableado-catastro · «Traer colindantes» lo enciende el ESTADO', () 
     const desenlace = montado.renglonColindantes.textContent
 
     montado.estado.set(parcelaConReferencia())
-    expect(montado.botonColindantes.disabled).toBe(false)
+    expect(estaApagado(montado.botonColindantes)).toBe(false)
     expect(montado.renglonColindantes.textContent).toBe(desenlace)
   })
 
   it('mientras hay algo EN VUELO está apagado, y luego vuelve', async () => {
     const transporte = crearTransporteDoble({ manual: true })
     const montado = cablear({ transporte, parcelaInicial: parcelaConReferencia() })
-    expect(montado.botonColindantes.disabled).toBe(false)
+    expect(estaApagado(montado.botonColindantes)).toBe(false)
 
     montado.campo.value = REFCAT
     const enCurso = montado.cableado.cargar()
     // Síncrono, en el mismo tick: no hay ventana en la que siga pulsable.
-    expect(montado.botonColindantes.disabled).toBe(true)
+    expect(estaApagado(montado.botonColindantes)).toBe(true)
 
     await hastaPeticion(transporte, 1)
     transporte.peticiones[0].responder()
     await enCurso
-    expect(montado.botonColindantes.disabled).toBe(false)
+    expect(estaApagado(montado.botonColindantes)).toBe(false)
   })
 })
 
@@ -1960,7 +1961,7 @@ describe('cableado-catastro · el régimen de uso del servicio', () => {
     montado.botonColindantes.click()
     // El `disabled` se pone en el mismo tick del clic, así que el segundo `click()`
     // ni siquiera despacha el evento.
-    expect(montado.botonColindantes.disabled).toBe(true)
+    expect(estaApagado(montado.botonColindantes)).toBe(true)
     montado.botonColindantes.click()
     montado.botonColindantes.click()
 
@@ -1971,7 +1972,7 @@ describe('cableado-catastro · el régimen de uso del servicio', () => {
     transporte.peticiones[0].responder()
     await cederTurno()
     expect(transporte.emitidas).toBe(1)
-    expect(montado.botonColindantes.disabled).toBe(false)
+    expect(estaApagado(montado.botonColindantes)).toBe(false)
   })
 
   it('⚠️ la SEGUNDA pulsación sobre la misma parcela NO vuelve a la red', async () => {

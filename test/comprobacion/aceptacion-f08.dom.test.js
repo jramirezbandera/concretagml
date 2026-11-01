@@ -105,6 +105,7 @@ import { join } from 'node:path'
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
+import { estaApagado } from '../../app/apagado.js'
 import { crearDialogoAvisos } from '../../app/dialogo-avisos.js'
 import {
   SELECTOR_PROCEDENCIA,
@@ -582,7 +583,7 @@ describe('F08 · AC1 · un .gml de parcela válido se parsea y llega al diagnós
     const banco = montar()
     // El CTA nace apagado, y dice por qué (regla de oro 1: un botón gris y mudo no
     // se distingue de uno roto).
-    expect(banco.ctaDiagnosticar.disabled).toBe(true)
+    expect(estaApagado(banco.ctaDiagnosticar)).toBe(true)
 
     await soltarFixture(WFS)
     banco.botonContrastar.click()
@@ -596,7 +597,7 @@ describe('F08 · AC1 · un .gml de parcela válido se parsea y llega al diagnós
     expect(parcela.origen).toBe(ORIGEN_PARCELA.GML_EXISTENTE)
     expect(parcela.geometriaOficial).not.toBeNull()
     // Cero código nuevo en F07: el CTA se habilita ⟺ hay contorno oficial.
-    expect(banco.ctaDiagnosticar.disabled).toBe(false)
+    expect(estaApagado(banco.ctaDiagnosticar)).toBe(false)
   })
 
   it('…y pulsarlo pinta el diagnóstico de encaje con las cifras de ESTA parcela', async () => {
@@ -702,7 +703,7 @@ describe('F08 · AC1 · un .gml de parcela válido se parsea y llega al diagnós
     expect(banco.estado.get().geometriaOficial).toBeNull()
     expect(banco.procedencia.textContent).toContain('VACÍA')
     // Y el CTA de F07 se queda apagado CON SU MOTIVO escrito, no gris y mudo.
-    expect(banco.ctaDiagnosticar.disabled).toBe(true)
+    expect(estaApagado(banco.ctaDiagnosticar)).toBe(true)
     expect(banco.renglonDiagnosticar.textContent.length).toBeGreaterThan(20)
   })
 })
@@ -1033,7 +1034,7 @@ describe('F08 · AC3 · la acción principal del diagnóstico por esta vía sigu
     await cederTurno()
 
     expect(banco.estado.get().geometriaOficial).toBeNull()
-    expect(banco.ctaDiagnosticar.disabled).toBe(true)
+    expect(estaApagado(banco.ctaDiagnosticar)).toBe(true)
     banco.ctaDiagnosticar.click()
     await cederTurno()
 
@@ -1083,7 +1084,7 @@ describe('F08 · AC4 · un GML de edificio se encamina al contraste de construcc
     expect(banco.estado.get()).toBeNull()
     expect(banco.transporte.peticiones).toEqual([])
     // Y el CTA de F07 sigue apagado: no hay ningún lindero que diagnosticar.
-    expect(banco.ctaDiagnosticar.disabled).toBe(true)
+    expect(estaApagado(banco.ctaDiagnosticar)).toBe(true)
     expect(banco.cajonDiagnostico.abierto()).toBe(false)
   })
 

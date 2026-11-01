@@ -316,7 +316,7 @@ const botonFondo = $(SEL.FONDO)
 const puerta = {
   existe: botonFondo !== null,
   visible: visible(botonFondo),
-  habilitado: botonFondo !== null && !botonFondo.disabled,
+  habilitado: botonFondo !== null && botonFondo.getAttribute('aria-disabled') !== 'true',
   rotulo: (botonFondo?.textContent ?? '').trim(),
   motivo: texto(SEL.ESTADO_FONDO),
   // Contrato K.1: su `data-accion` no puede repetir el de Entrada.
@@ -454,11 +454,11 @@ if (fondo.capaOficial === 'true' && fondo.procedenciaDiceDelCatastroASecas) {
 const encendido = {
   diagnosticar: (() => {
     const b = $(SEL.DIAGNOSTICAR)
-    return { existe: b !== null, habilitado: b !== null && !b.disabled, motivo: texto(SEL.ESTADO_DIAGNOSTICAR) }
+    return { existe: b !== null, habilitado: b !== null && b.getAttribute('aria-disabled') !== 'true', motivo: texto(SEL.ESTADO_DIAGNOSTICAR) }
   })(),
   derivar: (() => {
     const b = $(SEL.DERIVAR)
-    return { existe: b !== null, habilitado: b !== null && !b.disabled, motivo: texto(SEL.ESTADO_DERIVAR) }
+    return { existe: b !== null, habilitado: b !== null && b.getAttribute('aria-disabled') !== 'true', motivo: texto(SEL.ESTADO_DERIVAR) }
   })(),
 }
 
@@ -470,7 +470,7 @@ const encendido = {
 // volvería a rojo y desde aquí no se entendería por qué.
 encendido.fondoEscondido = (() => {
   const b = $(SEL.FONDO)
-  return { existe: b !== null, oculto: b !== null && !visible(b), disabled: b?.disabled ?? null }
+  return { existe: b !== null, oculto: b !== null && !visible(b), disabled: b === null ? null : b.getAttribute('aria-disabled') === 'true' }
 })()
 
 if (fondo.capaOficial === 'true' && !encendido.fondoEscondido.oculto) {
@@ -510,7 +510,7 @@ const mudez = (() => {
   const ocultos = []
   for (const [nombre, selBoton, selEstado] of pares) {
     const b = $(selBoton)
-    if (b === null || !b.disabled) continue
+    if (b === null || b.getAttribute('aria-disabled') !== 'true') continue
     // ⛔ **UN BOTÓN OCULTO NO PUEDE SER «GRIS Y MUDO»**, y esta distinción la
     // encontró el propio guion: tras esconder «Traer el parcelario de fondo» con
     // el parcelario ya puesto, esta sección lo acusó de mudo. La regla de oro 1

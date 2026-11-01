@@ -403,7 +403,7 @@ const arranque = {
   filas: filasDeTabla(),
   superficieFicha: superficieArranque,
   refcatFicha: texto('[data-ficha="refcat"]'),
-  ctaDiagnosticoHabilitado: !ctaDiag.disabled,
+  ctaDiagnosticoHabilitado: ctaDiag.getAttribute('aria-disabled') !== 'true',
   cajonDiagnosticoCerrado: !visible(cajonDiag),
   // Los dos botones del pie del cajón nacen APAGADOS y con el motivo escrito en el
   // mismo paso (regla de oro 1): sin diagnóstico enseñándose no hay informe que

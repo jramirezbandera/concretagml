@@ -3052,15 +3052,8 @@ body {
   color: var(--color-btn-primary-fg);
 }
 
-.gml-boton--primario:hover:not(:disabled) {
+.gml-boton--primario:hover:not(:disabled, [aria-disabled='true']) {
   background: var(--color-btn-primary-bg-hover);
-}
-
-.gml-boton--primario:disabled {
-  background: var(--color-bg-elevated);
-  color: var(--color-text-disabled);
-  border-color: var(--color-border-sub);
-  cursor: not-allowed;
 }
 
 /* ── La variante SECUNDARIA: «Deducir del mapa» (F05) ────────────────────────
@@ -3091,23 +3084,20 @@ body {
  * nacen apagados en esta app tienen que apagarse igual, o el usuario acaba
  * aprendiendo dos idiomas para el mismo estado. Y sigue valiendo lo que dice el
  * bloque de arriba: apagado no basta: quien lo deja apagado escribe el motivo al
- * lado, en un `role="status"`. */
+ * lado, en un `role="status"`.
+ *
+ * ⭐ Los CTA del pie se apagan con `aria-disabled` y no con `disabled` (2026-11-01,
+ * `app/apagado.js`): el `:hover` de las dos variantes los salta, y el aspecto de
+ * apagado es la regla única que hay tras `--menudo`. */
 .gml-boton--secundario {
   background: var(--color-bg-elevated);
   color: var(--color-text-primary);
   border-color: var(--color-border-sub);
 }
 
-.gml-boton--secundario:hover:not(:disabled) {
+.gml-boton--secundario:hover:not(:disabled, [aria-disabled='true']) {
   background: var(--color-bg-primary);
   border-color: var(--color-border-main);
-}
-
-.gml-boton--secundario:disabled {
-  background: var(--color-bg-elevated);
-  color: var(--color-text-disabled);
-  border-color: var(--color-border-sub);
-  cursor: not-allowed;
 }
 
 /* ── La variante MENUDA: «Abrir un GML…» en la fila del rótulo (F08) ─────────
@@ -3192,7 +3182,17 @@ body {
 /* CALCADO al de las otras dos variantes, y a propósito: los botones que se apagan
    en esta app tienen que apagarse igual, o el usuario acaba aprendiendo tres
    idiomas para el mismo estado. Y sigue valiendo lo de arriba: apagado no basta,
-   quien lo apaga escribe el motivo al lado. */
+   quien lo apaga escribe el motivo al lado.
+
+   ⭐ Y desde el 2026-11-01 es UNA regla para las tres: eran tres bloques con las
+   mismas cuatro declaraciones, y «calcado» escrito tres veces es tres sitios donde
+   dejar de estarlo. Su especificidad (0,2,0) gana a las bases (0,1,0) aunque vaya
+   después de ellas, y el `:hover:not(…)` (0,3,0) excluye lo apagado él solo. Los
+   CTA del pie se apagan con `aria-disabled` (`app/apagado.js`), y por eso entra
+   también ese atributo. */
+.gml-boton--primario:disabled,
+.gml-boton--secundario:disabled,
+.gml-boton[aria-disabled='true'],
 .gml-boton--menudo:disabled {
   background: var(--color-bg-elevated);
   color: var(--color-text-disabled);
@@ -3256,14 +3256,15 @@ body {
  * apagado se entienda. Lo que cambia es DÓNDE se enseñan, no cuánto dicen: ni una
  * palabra se ha tocado en los cuatro cableados.
  *
- * ── EL INTERRUPTOR ES `:disabled`, Y ES CSS PURO ───────────────────────────
+ * ── EL INTERRUPTOR ES `[aria-disabled='true']`, Y ES CSS PURO ─────────────
+ * (Era `:disabled` hasta el 2026-11-01; ver el final de este bloque.)
  * Mientras el botón está APAGADO su renglón es un motivo: sale del flujo y se pinta
  * como un globo sobre la columna al pasar el ratón. Cuando el botón se ENCIENDE, el
  * mismo nodo pasa a contar el DESENLACE de lo que el usuario acaba de pulsar, y eso
  * vuelve a ser un renglón en el flujo: un resultado no se puede esconder detrás de
  * un gesto que hay que descubrir. Los `--error` se quedan siempre en el flujo,
  * encendido o apagado, por lo mismo. Como el par botón + renglón son hermanos
- * contiguos en `index.html`, el selector `:disabled + …` lo expresa entero sin una
+ * contiguos en `index.html`, el selector `[aria-disabled] + …` lo expresa sin una
  * línea de JS: los seis módulos que escriben estos renglones siguen escribiendo
  * igual que ayer.
  *
@@ -3284,13 +3285,12 @@ body {
  * ⚠️ `:empty` sigue mandando por encima de todo esto (0,2,0 con `display`): un
  * motivo vacío no pinta globo, no reserva nada y no cuesta un píxel.
  *
- * ⚠️ El límite conocido, dicho en vez de disimulado: **con el teclado no hay forma
- * de abrir la pista**, porque un botón apagado no es enfocable. No es una regresión
- * silenciosa —el lector de pantalla lo anuncia por el `role="status"`—, pero sí un
- * hueco para quien ve la pantalla y no usa ratón. Cerrarlo de verdad es cambiar
- * `disabled` por `aria-disabled` en los cuatro CTA, que es una decisión de producto
- * (el botón pasaría a ser pulsable y a tener que explicarse al pulsarlo) y no un
- * cambio de hoja. Queda anotado en TODOS.md. */
+ * ⭐ **CON EL TECLADO TAMBIÉN ABRE (2026-11-01).** Hasta esa fecha los cuatro CTA
+ * llevaban `disabled`, un botón así no es enfocable, y quien ve la pantalla sin usar
+ * ratón no tenía gesto con el que abrir la pista. Ahora se apagan con
+ * `aria-disabled` (`app/apagado.js`): siguen en el orden de tabulación y el globo
+ * abre también con `:focus-within`. Pulsarlo apagado no hace nada —cada manejador lo
+ * pregunta—, así que su única respuesta es la misma que al enfocarlo: el motivo. */
 .gml-accion {
   position: relative;
   display: flex;
@@ -3305,7 +3305,7 @@ body {
    (`thead th`, que es `z-index: 1` en el mismo contexto de apilamiento) para el
    caso de una tabla corta. `pointer-events: none` es lo que evita que el globo
    tape los botones que cubre: el ratón los sigue alcanzando a través de él. */
-.gml-accion > :disabled + .gml-accion-estado:not(.gml-accion-estado--error) {
+.gml-accion > [aria-disabled='true'] + .gml-accion-estado:not(.gml-accion-estado--error) {
   position: absolute;
   right: 0;
   bottom: calc(100% + var(--space-1));
@@ -3325,7 +3325,7 @@ body {
    proyecto ya le hizo al `title` nativo el 2026-08-10: aparecer al segundo es
    aparecer después de que el usuario haya dudado. El fundido solo quita el
    parpadeo al cruzar el pie de lado a lado. */
-.gml-accion:hover > :disabled + .gml-accion-estado {
+.gml-accion:is(:hover, :focus-within) > [aria-disabled='true'] + .gml-accion-estado {
   opacity: 1;
 }
 

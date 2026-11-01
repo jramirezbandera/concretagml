@@ -40,6 +40,7 @@ import { join } from 'node:path'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import L from 'leaflet'
 
+import { estaApagado } from '../../app/apagado.js'
 import { crearDialogoAvisos } from '../../app/dialogo-avisos.js'
 import {
   COLA_SIN_VECINAS,
@@ -530,7 +531,7 @@ describe('cableado-diagnostico · el marcado de index.html es CONTRATO', () => {
     const renglon = document.querySelector(SELECTOR_ESTADO_DIAGNOSTICO)
     expect(boton).not.toBeNull()
     expect(renglon).not.toBeNull()
-    expect(boton.disabled).toBe(true)
+    expect(estaApagado(boton)).toBe(true)
     expect(renglon.getAttribute('role')).toBe('status')
   })
 
@@ -551,7 +552,7 @@ describe('cableado-diagnostico · el marcado de index.html es CONTRATO', () => {
 describe('cableado-diagnostico · el CTA y su motivo', () => {
   it('sin parcela nace apagado Y con el motivo escrito: nunca gris y mudo', () => {
     const { boton, renglon } = montar()
-    expect(boton.disabled).toBe(true)
+    expect(estaApagado(boton)).toBe(true)
     expect(renglon.textContent).toBe(MOTIVO_SIN_OFICIAL)
   })
 
@@ -560,7 +561,7 @@ describe('cableado-diagnostico · el CTA y su motivo', () => {
     // geometría, y aun así no vale — es un DXF, no trae contra qué contrastar.
     const { boton, renglon, estado } = montar()
     estado.set(parcelaSinOficial())
-    expect(boton.disabled).toBe(true)
+    expect(estaApagado(boton)).toBe(true)
     expect(renglon.textContent).toContain('contorno OFICIAL')
   })
 
@@ -570,7 +571,7 @@ describe('cableado-diagnostico · el CTA y su motivo', () => {
 
     estado.set(parcelaDelCatastro())
 
-    expect(boton.disabled).toBe(false)
+    expect(estaApagado(boton)).toBe(false)
     // Y el motivo se va, porque quien lo borra es la rama de «ha entrado una parcela
     // distinta»: un motivo que ya no se cumple es peor que un renglón vacío. Que se
     // borre por esa vía y no por una línea suelta en `refrescarBoton` es lo que
@@ -582,7 +583,7 @@ describe('cableado-diagnostico · el CTA y su motivo', () => {
     // `subscribe` no notifica al suscribirse: sin el `refrescarBoton` a mano del
     // final del cableado, el CTA se quedaría gris hasta el primer cambio del store.
     const { boton } = montar({ parcelaInicial: parcelaDelCatastro() })
-    expect(boton.disabled).toBe(false)
+    expect(estaApagado(boton)).toBe(false)
   })
 })
 
@@ -639,7 +640,7 @@ describe('cableado-diagnostico · abrir pinta las DOS vistas', () => {
     // El `disabled` es cortesía; la garantía es la comprobación de dentro. Se
     // llama al manejador saltándose el atributo, que es lo que haría un atajo de
     // teclado o el inspector.
-    boton.disabled = false
+    boton.removeAttribute('aria-disabled')
     boton.click()
 
     expect(cajon.abierto()).toBe(false)
@@ -1056,7 +1057,7 @@ describe('cableado-diagnostico · `olvidarPorFondoNuevo`', () => {
     estado.set(parcelaSinOficial())
     cableado.olvidarPorFondoNuevo()
 
-    expect(boton.disabled).toBe(true)
+    expect(estaApagado(boton)).toBe(true)
     expect(renglon.textContent).toBe(MOTIVO_SIN_OFICIAL)
   })
 })
@@ -1076,7 +1077,7 @@ describe('cableado-diagnostico · la puerta 2 · el botón', () => {
       parcelaInicial: parcelaConRefcatSinOficial(),
       catastro: crearCatastroDoble(),
     })
-    expect(botonFondo.disabled).toBe(true)
+    expect(estaApagado(botonFondo)).toBe(true)
     expect(renglonFondo.textContent).toBe(MOTIVO_FONDO_SIN_CATASTRO)
   })
 
@@ -1097,7 +1098,7 @@ describe('cableado-diagnostico · la puerta 2 · el botón', () => {
       parcelaInicial: null,
       catastro: crearCatastroConFondo(),
     })
-    expect(botonFondo.disabled).toBe(true)
+    expect(estaApagado(botonFondo)).toBe(true)
     expect(renglonFondo.textContent).toBe(MOTIVO_FONDO_SIN_GEOMETRIA)
   })
 
@@ -1119,7 +1120,7 @@ describe('cableado-diagnostico · la puerta 2 · el botón', () => {
     expect(renglonFondo.textContent).toBe(MOTIVO_FONDO_SIN_GEOMETRIA)
 
     estado.set(parcelaSinOficial())
-    expect(botonFondo.disabled).toBe(false)
+    expect(estaApagado(botonFondo)).toBe(false)
     expect(renglonFondo.textContent).toBe('')
   })
 
@@ -1142,7 +1143,7 @@ describe('cableado-diagnostico · la puerta 2 · el botón', () => {
       parcelaInicial: parcelaSinOficial(),
       catastro: crearCatastroConFondo(),
     })
-    expect(botonFondo.disabled).toBe(false)
+    expect(estaApagado(botonFondo)).toBe(false)
   })
 
   it('⭐ y CON parcelario ya traído se ESCONDE: el pie no tiene sitio para los cuatro', () => {
@@ -1157,7 +1158,7 @@ describe('cableado-diagnostico · la puerta 2 · el botón', () => {
     expect(botonFondo.hidden).toBe(true)
     // ⚠️ DOS afirmaciones y no una: oculto pero habilitado lo sigue alcanzando el
     // tabulador. Es la regla que `navegacion.dom.test.js` defiende para los pasos.
-    expect(botonFondo.disabled).toBe(true)
+    expect(estaApagado(botonFondo)).toBe(true)
     // Y su renglón se va con él: un motivo bajo un botón invisible es ruido que ocupa.
     expect(renglonFondo.hidden).toBe(true)
     expect(renglonFondo.textContent).toBe('')
@@ -1183,7 +1184,7 @@ describe('cableado-diagnostico · la puerta 2 · el botón', () => {
     estado.set(parcelaSinOficial())
 
     expect(botonFondo.hidden).toBe(false)
-    expect(botonFondo.disabled).toBe(false)
+    expect(estaApagado(botonFondo)).toBe(false)
   })
 })
 
@@ -1359,12 +1360,12 @@ describe('cableado-diagnostico · la puerta 2 · defensas', () => {
     const { botonFondo } = montar({ parcelaInicial: parcelaConRefcatSinOficial(), catastro })
 
     botonFondo.click()
-    expect(botonFondo.disabled).toBe(true) // síncrono, antes del primer await
+    expect(estaApagado(botonFondo)).toBe(true) // síncrono, antes del primer await
     botonFondo.click() // la doble pulsación no llega a disparar nada
     await cederTurno()
 
     expect(catastro.cargas).toHaveLength(1)
-    expect(botonFondo.disabled).toBe(false) // y vuelve
+    expect(estaApagado(botonFondo)).toBe(false) // y vuelve
   })
 
   it('un fallo INESPERADO no deja el «pidiendo…» eterno ni el botón apagado', async () => {
@@ -1376,7 +1377,7 @@ describe('cableado-diagnostico · la puerta 2 · defensas', () => {
     await cederTurno()
 
     expect(renglonFondo.textContent).toBe(MENSAJE_FONDO_ROTO)
-    expect(botonFondo.disabled).toBe(false)
+    expect(estaApagado(botonFondo)).toBe(false)
     expect(consola).toHaveBeenCalled()
     consola.mockRestore()
   })
@@ -1413,7 +1414,7 @@ describe('cableado-diagnostico · el olvido por fondo nuevo (cont.)', () => {
     estado.set(parcelaSinOficial())
     cableado.olvidarPorFondoNuevo()
 
-    expect(boton.disabled).toBe(true)
+    expect(estaApagado(boton)).toBe(true)
     expect(renglon.textContent).toBe(MOTIVO_SIN_OFICIAL)
   })
 })

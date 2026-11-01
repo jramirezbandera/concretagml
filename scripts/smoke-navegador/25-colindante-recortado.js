@@ -373,7 +373,7 @@ if (!botonColindantes) {
     'No hay botón «Traer colindantes» en esta pantalla: el resto del guion (reparto y apertura ' +
       'de la entrega) NO se ha podido medir.',
   )
-} else if (botonColindantes.disabled) {
+} else if (botonColindantes.getAttribute('aria-disabled') === 'true') {
   advertencias.push('«Traer colindantes» está apagado: no se ha podido completar el recorrido.')
 } else {
   botonColindantes.click()

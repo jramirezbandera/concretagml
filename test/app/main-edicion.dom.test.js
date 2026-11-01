@@ -89,6 +89,7 @@ import { join } from 'node:path'
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
+import { estaApagado } from '../../app/apagado.js'
 import { crearDialogoAvisos } from '../../app/dialogo-avisos.js'
 import { SRS_DEMO, parcelaDemo } from '../../app/demo-datos.js'
 import { OPERATIVOS } from '../../config/operativos.js'
@@ -2217,7 +2218,7 @@ describe('app/main · F07 · el diagnóstico, montado y cableado en el arranque'
     // levantado ya: `subscribe` no notifica al suscribirse, así que esto solo pasa
     // si el cableado calcula el primer estado a mano.
     expect(parcelaDemo().geometriaOficial).not.toBeNull()
-    expect(DEL_ARRANQUE.botonDiagnosticar.disabled).toBe(false)
+    expect(estaApagado(DEL_ARRANQUE.botonDiagnosticar)).toBe(false)
   })
 
   it('el renglón del CTA se anuncia sin robar el foco', () => {

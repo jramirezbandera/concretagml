@@ -367,7 +367,7 @@ const linea = {
   pie: pieCabe(),
   desborde: desbordeDelPanel(),
   bloqueVisible: bloqueVisible(),
-  ctaHabilitado: $(SEL.DERIVAR) !== null && !$(SEL.DERIVAR).disabled,
+  ctaHabilitado: $(SEL.DERIVAR) !== null && $(SEL.DERIVAR).getAttribute('aria-disabled') !== 'true',
   renglonCta: texto(SEL.ESTADO_DERIVAR),
 }
 

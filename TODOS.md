@@ -424,7 +424,18 @@ rebanada 2 sobre qué sube a la barra. Volver a lanzar el guion 14 a 1280×720 d
 
 ---
 
-## La pista del botón apagado no se puede abrir con el teclado
+## ✅ CERRADA · La pista del botón apagado no se puede abrir con el teclado
+
+**Anotada el 2026-08-19 · cerrada el 2026-11-01** por la salida que la propia nota dejaba
+escrita: los cuatro CTA se apagan con `aria-disabled` (`app/apagado.js`), siguen en el
+orden de tabulación y el globo abre también con `:focus-within`. La decisión de producto
+que la nota reservaba —«el botón pasaría a ser pulsable»— se tomó así: pulsarlo apagado
+**no hace nada**, cada manejador lo pregunta con `estaApagado`, y lo único que responde es
+el motivo que ya enseñó el foco. «Diagnosticar» navegaba también desde `app/main.js`, y ese
+oyente lo pregunta igual. Guardián del contrato de `index.html`: `test/app/apagado.dom.test.js`.
+⚠️ Queda por mirar en navegador que el globo abra al tabular (jsdom no pinta).
+
+La nota original, tal como estaba:
 
 **Estado.** Abierto y **declarado el mismo día en que se introdujo** (2026-08-19), que es la
 única forma honrada de meter una regresión conocida.

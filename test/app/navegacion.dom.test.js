@@ -45,6 +45,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 
+import { estaApagado } from '../../app/apagado.js'
 import { MOTIVO_SIN_OFICIAL as MOTIVO_DERIVACION } from '../../app/cableado-derivacion.js'
 import { MOTIVO_SIN_OFICIAL as MOTIVO_DIAGNOSTICO } from '../../app/cableado-diagnostico.js'
 import { textoProcedenciaMedicion } from '../../app/cableado-medicion.js'
@@ -260,9 +261,12 @@ describe('T2 · apagado son DOS afirmaciones: oculto Y deshabilitado', () => {
       // Criterio 2 del plan, literal: NO desaparece del documento…
       expect(cta.isConnected).toBe(true)
       expect(document.body.contains(cta)).toBe(true)
-      // …y a la vez no se puede pulsar ni alcanzar con el tabulador.
-      expect(cta.disabled).toBe(true)
     }
+    // …y a la vez no se puede pulsar. «Diagnosticar» se apaga con `aria-disabled`
+    // desde el 2026-11-01 (`app/apagado.js`): el tabulador SÍ llega, a propósito,
+    // para que su pista se abra con el teclado.
+    expect(generar.disabled).toBe(true)
+    expect(estaApagado(diagnosticar)).toBe(true)
   })
 
   it('la barra de edición se OCULTA, no se quita del documento', () => {
