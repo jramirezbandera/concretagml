@@ -2482,6 +2482,9 @@ export function cablearEdificio({
     /** Las `<section>` que este módulo ha sellado. Para el test y para T4.1. */
     secciones: () => [...secciones],
 
+    /** ¿Se está dibujando un recinto de esta rama? Para que el clic no sea otra cosa. */
+    dibujando: () => dibujoActivo?.dibujando() === true,
+
     /**
      * Aplica a la parte activa una instantánea del historial que sea SUYA.
      *

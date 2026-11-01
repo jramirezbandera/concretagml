@@ -4288,6 +4288,11 @@ try {
     // typing (`on`/`off`) y solo actúa cuando tiene sentido deducir, así que un
     // clic normal del mapa no consulta nada.
     mapa: visor.mapa,
+    // ⭐ F25 · fase 5 · Y mientras se dibuja un recinto, en cualquiera de las dos
+    // ramas, el clic es una esquina y no una pregunta (guion 29: tres consultas al
+    // Catastro por dibujar una parcela nueva al lado de otra sin referencia). Se
+    // llama con un clic, ya todo montado: `edificioCableado` existe para entonces.
+    mapaOcupado: () => edicionCableada.dibujando() || edificioCableado?.dibujando?.() === true,
     // ── LOS DOS GANCHOS, UNO POR PUERTA (2026-08-08) ──────────────────────
     // Éste es el ÚNICO llamante que recibe los dos por separado, y es el motivo
     // por el que hubo que partirlos: es el único que tiene dos puertas.

@@ -1513,6 +1513,29 @@ describe('cableado-catastro · deducir con un clic en el mapa', () => {
     expect(y).toBeGreaterThan(1_000_000)
   })
 
+  // ⭐ F25 · fase 5 · lo midió el guion 29: dibujar una parcela nueva al lado de otra
+  // sin referencia mandaba una consulta por esquina. El clic de dibujo no pregunta.
+  it('se ignora mientras el mapa está ocupado (se dibuja un recinto), y vuelve al soltarlo', async () => {
+    const mapa = crearMapaDoble()
+    let dibujando = true
+    const montado = cablear({ mapa, parcelaInicial: parcelaSinReferencia(), mapaOcupado: () => dibujando })
+
+    mapa.emitir('click', { latlng: latlngDentro })
+    mapa.emitir('click', { latlng: latlngDentro })
+    await cederTurno()
+    expect(montado.transporte.emitidas).toBe(0)
+
+    // Contraprueba: la misma puerta, sin dibujo, consulta como siempre.
+    dibujando = false
+    mapa.emitir('click', { latlng: latlngDentro })
+    await cederTurno()
+    expect(montado.transporte.emitidas).toBe(1)
+  })
+
+  it('`mapaOcupado` que no es función se rechaza al cablear', () => {
+    expect(() => cablear({ mapa: crearMapaDoble(), mapaOcupado: true })).toThrow(/mapaOcupado/)
+  })
+
   it('se ignora cuando la parcela YA tiene referencia: no es tráfico que nadie pidió', async () => {
     const mapa = crearMapaDoble()
     const montado = cablear({ mapa, parcelaInicial: parcelaConReferencia() })

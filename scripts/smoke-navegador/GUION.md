@@ -99,6 +99,7 @@ para que el resultado no dependa de interpretar prosa. Diecinueve son de aceptac
 | `26-diccionario-errores.js` | F15 | *(de otra sesión, en curso el 2026-08-11)* | — |
 | `27-piscina-precision.js` | F21 · fase 3 · T3.1 | **LO QUE F21 DEJÓ SIN MEDIR EN NAVEGADOR**, que es lo que su ficha declaraba como motivo de no cerrarse: que el botón «Trabajo» **quepa en la fila del rótulo** sin partirla (el hueco de coste 0 px de F08), que el `<dialog>` de las especificaciones **se lea entero a 1280×720** con su campo y sus dos botones dentro, que el campo **rechace fuera del rango del ICUC con un gesto real** (teclear + pulsar, no asignar `.value`), que la precisión declarada **sobreviva a una mutación**, y que una parte de tipo «Otra» **no enseñe contadores de plantas**. ⛔ **Se llama 27 y no 22**: la ficha de F21 reservó el 22 y se lo quedó `22-arranque-vacio.js` tres días después; el 26 se lo llevó el diccionario de errores mientras éste se escribía. ⚠️ **La vía del SERVICIO —la piscina real por `wfsBU.aspx`— sigue sin medida**: su único fixture es una respuesta WFS que la app no acepta soltar, y medirla exige red | ✅ `ok:true` en Chrome a 1280×720. **Su primera corrida destapó un defecto REAL**: declarar la precisión sin edificio cargado la tiraba en silencio —`aplicarMutacion` se iba con un `return` mudo— y el diálogo se cerraba como si hubiera guardado |
 | `28-puntos-sueltos.js` | (2026-08-19) | ⭐ **EL FICHERO REAL DE UN TOPÓGRAFO, andado entero**: soltar un DXF de **55 puntos y CERO polilíneas** → elegir «no unirlos, tráelos» → aterrizar en Edición con la nube pintada → dibujar el contorno encima → **cerrarlo pinchando su primera esquina** → y **quitar la nube de un clic, con `Ctrl+Z` para traerla de vuelta** (§5, 2026-08-19). Mide lo que la suite no puede: que los puntos **SE PINTEN** (`fijarPuntos` llevaba desde el paso 9 de F18 escrito, probado y con un solo llamante: su propia prueba), que el mapa **ENCUADRE sobre ellos** —con `recintos: []` la cascada caía a `vistaInicial` y en jsdom eso sale verde, el mismo defecto que el guion 24 midió con las ocho fincas a 0×0—, que el **cierre por clic funcione con puntería real** (12 px de PANTALLA, que solo existen con layout) y que **ningún renglón diga lo contrario de su botón**, y que el clic sobre «Quitar los puntos» **llegue de verdad hasta el store** — la suite prueba la función y prueba el botón, cada uno por su lado, y lo que ningún test de jsdom ve es el cable entre los dos (el botón que se cablea al arrancar muere en el primer remontaje del arnés). Régimen de red: **ninguna** de datos, y se exige cero — sin contorno no hay punto interior que preguntar | ⛔ **su primera corrida destapó TRES defectos que las 8.185 pruebas aprobaban**, los tres de la familia M25/M31: «todavía no hay parcela» con 55 puntos en el mapa, «Traer el parcelario de fondo está apagado» **con el botón encendido** (el motivo se escribía una vez y no se retiraba nunca), y un **AVISO sobre una importación que había ido bien**. Corregidos con guardián; hoy **`ok:true`** en Chrome a 1280×720. ⚠️ La §5 nació en rojo por una `` dentro de una plantilla —que es el carácter de RETROCESO, no la frontera de palabra— y daba problema con el nombre correcto delante: `String.raw` |
+| `29-parcelas-del-expediente.js` | F25 · 1, 3, 5 y 6 | ⭐ **UNA SEGREGACIÓN HECHA A MANO, con la parcela real partida en TRES**: dibujar dos piezas enganchando a los vértices de la matriz, borrarle a la matriz lo que ha soltado, deshacer en una parcela y comprobar que **no toca a otra** (Ctrl+Z de verdad, por el oyente de `document`), y bajar **un** `.gml` con las tres — más la contraprueba: sin una pieza no cubre lo oficial y **no se escribe**. Mide lo que la suite no puede: el enganche con puntería real, que el control cueste **0 px de panel** (la matriz con sus 15 filas, antes y después de tener tres) y **0 reglas de CSS**, que no pise ningún control del mapa con la descarga abierta, y que el **borrador de IndexedDB de verdad** lleve las tres. Régimen de red: **ninguna**, y se exige cero contando por `performance` | ⛔ **su primera corrida destapó UN DEFECTO REAL**: dibujar una parcela al lado de otra sin referencia mandaba una `Consulta_RCCOOR` por esquina (tres en siete clics) y el panel acababa diciendo «no hay referencia en ese punto». Corregido con guardián; hoy **`ok:true` en las dos ventanas** — ver §36 |
 
 `05` es de otra clase que los cuatro primeros: no cuelga de ningún criterio del
 spec. Es el REPRODUCTOR con el que se diagnosticó el defecto que reportó la
@@ -5821,3 +5822,123 @@ detecta y **lo dice** en vez de acusar.
   firma ningún test.
 - **Si el ámbar se distingue del cian sobre una ortofoto real.** Aquí se comprueba el
   hex; que se lean como dos cosas distintas sobre un borde arbolado, no.
+
+## 36. `29-parcelas-del-expediente.js` — una segregación hecha a mano (F25 · fase 5)
+
+**UNA PARCELA PARTIDA EN TRES, andada entera** sobre la parcela real (`?demo=real`,
+9398516VK3799G, 15 vértices), con cortes que van de vértice a vértice:
+
+| Pieza | Vértices de la matriz | Cómo entra |
+|---|---|---|
+| B | v1…v6 | «Añadir parcela ▾» › «Dibujar una parcela nueva», enganchando a cada vértice |
+| C | v1, v6…v11 | Igual, con B ya en edición: engancha a la matriz, que es otra parcela |
+| Matriz | v1, v11…v15 | De vuelta a ella con el selector, borrando v2…v10 con la × de cada fila |
+
+El corte es **exacto por construcción**: cada esquina de las piezas es un vértice de la
+matriz, enganchado. Son las tres parcelas «editadas a mano» que pide el criterio 7.
+
+### Cómo se lanza
+
+```
+$B viewport 1280x720
+$B goto http://localhost:PUERTO/concretagml/package.json
+$B eval <el borrado del borrador, abajo>
+$B goto "http://localhost:PUERTO/concretagml/?demo=real#/parcela/edicion"
+$B wait ".gml-rail-pasos"
+$B eval scripts/smoke-navegador/29-parcelas-del-expediente.js
+$B console --errors
+```
+
+y otra vez con `1440x900`. Necesita `npm run dev` y el base `/concretagml/`.
+
+⛔ **El borrador hay que borrarlo ANTES, y desde una página que no arranque la app.**
+Al recargar, la aplicación **recupera sola** el borrador del autoguardado aunque la URL
+diga `?demo=real`, así que la segunda corrida empezaba con el expediente de tres de la
+primera. Borrarlo desde la propia app no sirve: la página viva lo vuelve a escribir al
+salir. Se borra desde cualquier URL del mismo origen que no sea la aplicación (por
+ejemplo `package.json`):
+
+```js
+return await new Promise((ok) => { const p = indexedDB.open('concreta-gml'); p.onsuccess = () => { const bd = p.result; const tx = bd.transaction('expedientes', 'readwrite'); tx.objectStore('expedientes').delete('EXP-borrador-en-curso'); tx.oncomplete = () => { bd.close(); ok('borrado') } } })
+```
+
+El guion **lo detecta y lo dice** si se olvida (más de una parcela al empezar), en vez de
+medir sobre un estado calentado: la lección del §35.
+
+### Lo que mide, y por qué ninguna cosa la puede dar la suite
+
+| # | Qué | Por qué aquí |
+|---|---|---|
+| 1 | **El enganche con puntería real** | Los clics van al centro en píxeles de los marcadores. Si no enganchan, las piezas no cierran y la contraprueba no mide nada |
+| 2 | **El deshacer de cada parcela, con la tecla** (criterio 1) | Ctrl+Z en B —que no tiene nada que deshacer— no puede llegar a la matriz; de vuelta en la matriz, Ctrl+Z devuelve su último borrado y Ctrl+Y lo rehace. La suite prueba el cambio de parcela y el historial por separado; el cable entre los dos solo existe aquí |
+| 3 | **0 px de panel y 0 B de CSS** (criterio 6) | La tabla de vértices se mide con **la misma matriz y las mismas 15 filas**, con una parcela y con tres. Y se cuentan las reglas de las hojas cargadas que nombren el control o la capa |
+| 4 | **Que el control no pise nada** | Con «Descargar ▾» abierto, contra todos los controles del mapa, y dentro del mapa |
+| 5 | **El borrador de IndexedDB lleva las tres** (criterio 3) | Sobre la base de verdad; la de la suite es `fake-indexeddb` |
+| 6 | **Los bytes del `.gml`** (criterio 5) | 3 `featureMember`, `localId` únicos, la matriz `ES.SDGC.CP`, «Segregación» propuesta; **sin C no se escribe** y el renglón dice por qué; y el «GML» de una fila |
+
+El **XSD estricto** se pasa fuera: el guion devuelve el XML en `ficheros.expediente`, y
+`node scripts/validar-xsd.mjs --estricto <fichero>` lo valida.
+
+### Cifras de referencia (2026-11-01, Chromium headless, `npm run dev`)
+
+| Medida | 1280×720 | 1440×900 |
+|---|---|---|
+| Veredicto | **`ok: true`** · 0 problemas | **`ok: true`** · 0 problemas |
+| Niveles alejados para dejar libres los vértices | 1 | 1 |
+| Superficies (matriz + B + C) | 384,74 + 279,57 + 871,56 = **1.535,87 m²**, la oficial exacta | ídem |
+| Tabla de vértices, 15 filas, con 1 y con 3 parcelas | 413,81 / **413,81 px** | 413,81 / **413,81 px** |
+| Desborde del panel | 0 / 0 | 0 / 0 |
+| Control con la descarga abierta | 343,58 × 164,94 px en (402, 180), no pisa nada | ídem |
+| Reglas de CSS del control | **0** | **0** |
+| Consultas a servicios de datos | **0** | **0** |
+| `.gml` de las tres | 4.940 B, 3 miembros, XSD estricto **OK** | — |
+| Sin C | «No se descarga: … 1535,87 m² oficiales; las parcelas suman 664,31 m²» | ídem |
+
+### ⛔ El defecto que destapó, y era REAL
+
+**Dibujar una parcela al lado de otra sin referencia consultaba al Catastro con cada
+esquina.** `app/cableado-catastro.js#alPulsarMapa` pregunta «¿qué parcela hay aquí?»
+con cada clic en el mapa mientras la parcela en edición no tenga referencia, que es la
+vía de entrada de quien no tiene los catorce caracteres. Con B en edición (una pieza
+dibujada, sin referencia), los siete clics del dibujo de C mandaron **tres**
+`Consulta_RCCOOR` (las demás las paró la guarda de «una en vuelo») y la última
+respuesta acabó en el panel: «El Catastro no tiene ninguna referencia catastral en ese
+punto». Un aviso sobre una pregunta que nadie hizo.
+
+Antes de F25 ya era alcanzable —dibujar el recinto de un DXF sin referencia—, pero ahí
+el caso era raro; F25 lo convierte en el normal: **toda pieza dibujada es una parcela
+sin referencia**. Corregido con `mapaOcupado`: mientras se dibuja un recinto, en
+cualquiera de las dos ramas, el clic es una esquina. Con prueba en
+`test/app/catastro.dom.test.js` que **se pone roja sin el arreglo** (medido).
+
+### ⛔ Y tres defectos del propio guion, que son de método
+
+1. **Contaba la red envolviendo `window.fetch`, y era ciego.** El transporte de los
+   servicios guarda su `fetch` al montarse (`services/_red.js`), así que un envoltorio
+   puesto después no ve nada: la primera corrida dijo «0 peticiones» con una respuesta
+   del Catastro pintada en el panel. Ahora cuenta por `performance` (con el búfer
+   ampliado: las teselas lo llenan) y filtra los servicios de DATOS (`OVCServWeb`,
+   `INSPIRE/wfs`), no las teselas del WMS, que también son de `ovc.catastro`.
+   ⚠️ **`28-puntos-sueltos.js` cuenta igual** (`window.fetch`), así que su «cero
+   consultas» no está demostrado. No se ha tocado aquí.
+2. **Medía el coste del panel al final, con la matriz en 6 filas**, y acusaba a la fase
+   de encoger la tabla 217 px que eran nueve filas menos.
+3. **Exigía que bajo cada vértice estuviera SU marcador**, y v8 tapa media v7 a
+   cualquier zoom; alejaba tres niveles buscándolo y acababa con los vértices
+   amontonados. Lo que importa es que haya mapa y no un control: el punto del clic lo
+   calcula el mapa por las coordenadas.
+
+Y uno de quien lo escribió, antes de escribirlo: la primera partición probada (v1…v4)
+era una **astilla** —esos cuatro vértices están casi en línea— y la app la marcó como
+autointersección, que es lo correcto.
+
+### Lo que NO cubre
+
+- ⛔ **Si la Sede lo acepta** (criterio 7). Las piezas dibujadas salen como **altas sin
+  referencia** (`ES.LOCAL.CP`, `localId` `parcela-nueva-N`, `nationalCadastralReference`
+  vacía): `derivacion/identidad.js#identidadDeMiembro` solo da la forma de O19 (`…G.1`)
+  a las piezas del sobrante. Esa forma, en una segregación, **no se ha presentado
+  nunca**. El guion lo deja como advertencia. Va a `CHECKLIST-HUMANO.md` §24.
+- **Si un técnico sabe qué parcela está editando sin que se lo expliquen.** Juicio, y
+  bloqueante: §24.2.
+- **El arrastre como gesto de ratón** (§0): los clics son `MouseEvent` sintéticos.

@@ -3010,3 +3010,73 @@ explicarle nada.
 - [ ] En Edición y Diagnóstico el panel ya no lleva título grande (solo lo oye el
       lector). ¿Se echa de menos, o el peldaño de la barra basta para saber dónde
       está?
+
+---
+
+## §24 · F25 · Las parcelas del expediente — lo que cierra la fase es tuyo
+
+El guion `29-parcelas-del-expediente.js` sale `ok:true` en las dos ventanas
+(1280×720 y 1440×900) partiendo la parcela real en tres a mano, y la suite está en
+verde. **Eso no cierra la fase**: el criterio 7 es verdad externa y el punto 24.2 es
+juicio. Ver `GUION.md` §36.
+
+### 24.1 · ⛔ EL IVG CON TRES O MÁS PARCELAS EDITADAS A MANO (criterio 7)
+
+Nunca se ha subido a la Sede un `.gml` de tres o más miembros (F17 se cerró sin anotar
+cuántos ni el CSV, `SPEC.md` §7.1), ni uno cuyas altas estén **dibujadas a mano**.
+
+**Cómo se prepara**, sobre un expediente tuyo real:
+
+1. Trae la parcela del Catastro y ve a Edición.
+2. «Añadir parcela ▾» › «Dibujar una parcela nueva»: dibuja cada finca resultante
+   pinchando sobre los vértices de la matriz (enganchan). Cierra pinchando la primera
+   esquina.
+3. Vuelve a la matriz con «Parcela en edición» y bórrale los vértices que ha soltado.
+4. «Descargar ▾» con todas marcadas › «Descargar las N marcadas en un .gml». El
+   renglón tiene que proponer **Segregación**. Si dice «No se descarga», es que el
+   conjunto no cubre el contorno oficial: el renglón dice cuánto falta.
+
+**Lo que hay que mirar en el IVG, por orden de gravedad:**
+
+1. ⛔ **La identidad de las parcelas dibujadas.** Salen como altas sin referencia:
+   `ES.LOCAL.CP`, `localId` = `parcela-nueva-1`, `parcela-nueva-2`…,
+   `nationalCadastralReference` **vacía**. La única forma de alta aceptada con IVG
+   positivo (O19, CSV `XMWPXCN9J8DB9J89`) es la de la matriz con sufijo —`localId` =
+   referencia = `…473N.1`—, y hoy solo la llevan las piezas del sobrante. **La forma de
+   las dibujadas no se ha presentado nunca.** Si el IVG la rechaza, la corrección es
+   darles la de O19 (`…G.2`, `…G.3`) cuando la principal tiene referencia; si la
+   acepta, se anota y no se toca nada. Es tu decisión con el informe delante.
+2. **Que cargue las N parcelas y las cuente.** Anota cuántas y el CSV en `SPEC.md`
+   §7.1, que es la deuda que esta fase heredó de F17.
+3. **«Tipo de operación».** Prueba con Segregación, que es lo que propone la forma.
+4. **`AFECTADAS`.** Tiene que ser la superficie oficial de la matriz (en el caso del
+   guion, 1.535,87 m²): las piezas suman exactamente eso.
+
+### 24.2 · ⛔ BLOQUEANTE · ¿Sabe qué parcela está editando, sin que se lo expliquen?
+
+Es el peor fallo que puede tener esta fase: mover un vértice de la parcela equivocada
+sin darse cuenta. El selector va **sobre el mapa** y no en la cabecera del panel (la
+fase 2 lo movió para no gastar un renglón del panel), así que esto es lo que hay que
+comprobar con alguien que no conozca la app:
+
+- [ ] Con tres parcelas, pídele que mueva un vértice de **la segunda**. ¿Encuentra
+      «Parcela en edición», o busca en el panel?
+- [ ] Después pregúntale cuál está editando. ¿Lo sabe por el selector, por la
+      cabecera del panel («Parcela nueva · dibujada aquí»), o por las líneas
+      discontinuas de las otras? ¿Se distinguen las discontinuas de la parcela en
+      edición sobre la ortofoto?
+- [ ] Pulsa Ctrl+Z justo después de cambiar de parcela. ¿Espera que deshaga lo último
+      que hizo en la OTRA? (No lo hace: cada parcela tiene su deshacer. Que el
+      usuario lo entienda sin leerlo es lo que hay que ver.)
+
+### 24.3 · Lo que el guion no puede juzgar
+
+- [ ] **El reencuadre al elegir otra en el selector.** El mapa salta a la parcela
+      elegida (decidido en la fase 2: «llévame a ella»). Ajustando un lindero
+      compartido muy de cerca, ¿estorba?
+- [ ] **«Quitar esta parcela» con dos pulsaciones**, y no se deshace con Ctrl+Z. ¿Se
+      entiende el «¿Quitarla? Pulsa otra vez»?
+- [ ] **«Añadir parcela ▾» ya con una sola parcela.** ¿Se descubre sin buscarlo, o
+      estorba en el mapa a quien solo trabaja con una?
+- [ ] **El panel de descarga sobre el mapa** (343 × 165 px con tres parcelas, esquina
+      de arriba a la izquierda). ¿Tapa algo que necesitas ver mientras eliges?

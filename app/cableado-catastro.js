@@ -1160,6 +1160,10 @@ function esEmisor(m) {
  *   ({@link puedeDeducirClicando}), y eso incluye la aplicación recién abierta y
  *   vacía: el punto lo trae el clic, así que no hace falta geometría cargada —
  *   ésa es condición del BOTÓN, que saca el punto de la parcela.
+ * @param {() => boolean} [opciones.mapaOcupado]  ⭐ F25 · fase 5 · ¿El clic del mapa
+ *   es de OTRA herramienta? Mientras devuelva `true` el clic no pregunta nada: está
+ *   poniendo la esquina de un recinto, no señalando una parcela. Ver
+ *   {@link alPulsarMapa}. Por defecto, nunca.
  * @param {((parcela: object) => void)|null} [opciones.alCargarParcela=null]  **El
  *   gancho del DOCUMENTO NUEVO.** Se llama DESPUÉS del `estado.set` de una parcela
  *   traída del Catastro **que ha sustituido a la anterior**, con el POJO que ha
@@ -1211,6 +1215,7 @@ export function cablearCatastro({
   cliente,
   srs,
   mapa = null,
+  mapaOcupado = () => false,
   alCargarParcela = null,
   alCambiarOficial = null,
   alRellenarRefcat = null,
@@ -1235,6 +1240,12 @@ export function cablearCatastro({
     throw new TypeError(
       `cablearCatastro: 'mapa' debe ser un emisor con 'on' y 'off' (el L.Map del visor), o null ` +
         `si no se quiere deducir con un clic; recibido ${typeof mapa}.`,
+    )
+  }
+  if (typeof mapaOcupado !== 'function') {
+    throw new TypeError(
+      `cablearCatastro: 'mapaOcupado' debe ser una función que diga si el clic del mapa es de ` +
+        `otra herramienta; recibido ${typeof mapaOcupado}.`,
     )
   }
   if (alCargarParcela !== null && typeof alCargarParcela !== 'function') {
@@ -2130,9 +2141,19 @@ export function cablearCatastro({
    *     Es la tercera desde el 2026-08-18, y a diferencia de las otras dos **SÍ se
    *     dice en voz alta**: las otras dos ocurren cuando el usuario no estaba
    *     pidiendo esto, y ésta ocurre justo cuando sí.
+   *   · **⭐ Si el clic es de otra herramienta** (`mapaOcupado`, F25 · fase 5).
+   *     Medido con el guion 29: con una parcela dibujada en edición —que no tiene
+   *     referencia—, dibujar la SIGUIENTE mandaba una `Consulta_RCCOOR` por cada
+   *     esquina que no encontraba otra en vuelo (tres en siete clics) y la última
+   *     respuesta acababa en el panel como «no hay referencia en ese punto». Cada
+   *     esquina es un recinto, no una pregunta. Va callada, como las dos primeras:
+   *     el usuario no estaba pidiendo esto. Funciona por ORDEN: este oyente se
+   *     registra al arrancar y el del dibujo al empezar a dibujar, así que aquí el
+   *     dibujo sigue en curso también en el clic que lo cierra.
    */
   const alPulsarMapa = (evento) => {
     if (destruido || enVuelo !== null) return
+    if (mapaOcupado()) return
     if (!puedeDeducirClicando(estado.get())) return
 
     // ── ⭐ LA PUERTA DE ESCALA (2026-08-18) ─────────────────────────────────

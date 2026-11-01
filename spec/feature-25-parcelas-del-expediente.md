@@ -27,8 +27,10 @@ restaurar), `export/proyecto.js` (versión 2), `storage/expedientes.js` (`NO_SE_
 parcelas, se cambia entre ellas, se añaden (dibujadas, colindantes, piezas del sobrante,
 vecinos recortados, las demás de un GML) y se quitan, y se descarga el GML de una o un
 `.gml` con las marcadas, con validación, solapes, cierre y tipo de operación propuesto.
-Queda la fase 5: el guion de humo, el checklist humano y la verdad externa (IVG positivo
-con tres o más parcelas editadas a mano).
+Fase 5 **hecha salvo la verdad externa**: el guion 29 sale `ok:true` a 1280×720 y
+1440×900 (y destapó un defecto real, corregido) y el checklist humano tiene su §24.
+**Queda el IVG positivo con tres o más parcelas editadas a mano** (criterio 7), con una
+pregunta abierta sobre la identidad de las piezas dibujadas (5.3).
 
 > ⏳ **Esta ficha se abre ANTES del código**, y es a propósito: F23 y F24 llegaron tarde
 > a `spec/` y las dos lo anotaron como hallazgo. Lo que aquí se dice del futuro está en
@@ -570,6 +572,40 @@ intercepta `URL.createObjectURL`—, consola limpia):
 **Fase 5 · los gates.** Guion `29-parcelas-del-expediente.js` a 1280×720 y 1440×900,
 `CHECKLIST-HUMANO.md` con su punto bloqueante (que un técnico sepa **qué parcela está
 editando** sin que se lo expliquen) y la verdad externa del criterio 7.
+
+**Lo hecho el 2026-11-01** (suite **8.751 pruebas / 209 ficheros, 0 rojas**; ni una
+dependencia; la hoja de estilo **no cambia**, 82.616 B, la del último asiento):
+
+- **5.1 · el guion 29, `ok:true` en las DOS ventanas.** Parte la parcela real en tres a
+  mano —dos piezas dibujadas enganchando a los vértices de la matriz, y la matriz
+  recortada borrando filas— y mide: el deshacer de cada una con la tecla de verdad
+  (criterio 1), el borrador de IndexedDB con las tres (criterio 3), **un** `.gml` de 3
+  miembros con «Segregación» propuesta y su contraprueba —sin una pieza no cubre lo
+  oficial y **no se escribe**— (criterio 5), y **0 px de panel** (la tabla de la matriz
+  con sus 15 filas mide 413,81 px con una parcela y con tres) y **0 reglas de CSS**
+  (criterio 6). Las tres superficies suman la oficial exacta (1.535,87 m²) y el fichero
+  pasa el **XSD estricto**. `GUION.md` §36.
+  - ⛔⛔ **DEFECTO REAL destapado en su primera corrida, y ninguna prueba lo habría
+    visto**: dibujar una parcela al lado de otra SIN referencia —o sea, cualquier pieza
+    dibujada— mandaba una `Consulta_RCCOOR` al Catastro por cada esquina que no
+    encontraba otra en vuelo (tres en siete clics), y la última respuesta acababa en el
+    panel como «no hay referencia en ese punto». El clic del mapa que deduce la
+    referencia (`app/cableado-catastro.js#alPulsarMapa`) no sabía que se estaba
+    dibujando. Corregido con `mapaOcupado`, que `app/main.js` responde con el dibujo de
+    las DOS ramas (`app/cableado-edificio.js` gana `dibujando()`); prueba en
+    `test/app/catastro.dom.test.js` que **se pone roja sin el arreglo** (medido).
+  - ⛔ **Y el guion contaba la red a ciegas**: envolvía `window.fetch`, y el transporte
+    guarda el suyo al montarse. Ahora cuenta por `performance`. ⚠️ `28-puntos-sueltos.js`
+    cuenta igual que lo hacía éste y **no se ha tocado**: su «cero consultas» no está
+    demostrado.
+- **5.2 · `CHECKLIST-HUMANO.md` §24**, con el punto bloqueante (24.2) y la receta del
+  IVG (24.1).
+- ⏳ **5.3 · el criterio 7 queda ABIERTO, y es lo que impide cerrar la fase.** ⚠️ Con un
+  hallazgo que lo agrava: las piezas DIBUJADAS salen como altas sin referencia
+  (`ES.LOCAL.CP`, `localId` `parcela-nueva-N`, `nationalCadastralReference` vacía),
+  porque `derivacion/identidad.js#identidadDeMiembro` solo da la forma de O19 (`…G.1`)
+  a las piezas del sobrante. **Esa forma, en una segregación, no se ha presentado
+  nunca.** No se cambia sin medir (regla de oro 9): lo decide el IVG (§24.1).
 
 ## Riesgos
 
