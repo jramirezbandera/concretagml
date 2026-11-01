@@ -66,7 +66,16 @@
   /* ── Texto ── */
   --color-text-primary: #0f172a;   /* cifras, títulos, texto de peso */
   --color-text-secondary: #475569; /* rótulos de campo, cabeceras de sección */
-  --color-text-disabled: #64748b;  /* apagado, apuntes, versión */
+  /* ⭐ #5a6a7e y no el slate-500 (#64748b) del DS, desde el 2026-11-01. Este gris
+     NO es solo el de lo apagado: es el tercer nivel de texto (apuntes de ayuda, el
+     renglón encima del título, las cabeceras de la ayuda, los apuntes de los
+     menús…), y el #64748b daba 4,34:1 sobre `--color-bg-elevated`, por debajo de
+     AA. Éste da 5,53 / 5,29 / 5,05:1 sobre las tres superficies y sigue claramente
+     más claro que `--color-text-secondary` (1,37:1 entre los dos), así que los
+     tres niveles de la columna no se funden. Es un valor de ESTE producto: el
+     slate no tiene paso entre el 500 y el 600 (#475569), y el 600 habría igualado
+     la ayuda con las etiquetas de sección. */
+  --color-text-disabled: #5a6a7e;  /* apagado, apuntes, versión */
 
   /* ── Interacción y acento ── */
   --color-accent: #0284c7;         /* sky-600 — anillo de foco, enlaces */

@@ -118,7 +118,7 @@ tener presentes al proponer cualquier cosa:
 |---|---|
 | Superficies | `--color-bg-primary` #ffffff · `--color-bg-surface` #f8fafc · `--color-bg-elevated` #f1f5f9 |
 | Filos | `--color-border-main` #cbd5e1 · `--color-border-sub` #e2e8f0 |
-| Texto | `--color-text-primary` #0f172a · `--color-text-secondary` #475569 · `--color-text-disabled` #64748b |
+| Texto | `--color-text-primary` #0f172a · `--color-text-secondary` #475569 · `--color-text-disabled` #5a6a7e (AA sobre las tres superficies; ver `colors.css`) |
 | Acento | `--color-accent` #0284c7 · `--color-accent-hover` #0369a1 |
 | Botón primario | `--color-btn-primary-bg` #0369a1 · `-hover` #075985 · `-fg` #ffffff |
 | Estados | `--color-state-ok` #15803d · `-warn` #b45309 · `-fail` #dc2626 · `-neutral` #64748b |

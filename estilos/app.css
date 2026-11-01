@@ -616,9 +616,9 @@ body {
  *
  * ── ⛔ EL GRIS DEL PASO BLOQUEADO SALE DEL TOKEN, NUNCA DEL OJO ────────────
  * La maqueta pintó los pasos bloqueados en `#94a3b8` sobre `#f8fafc`: **2,45:1,
- * por debajo del 4,5:1 de AA**. `--color-text-disabled` (#64748b) da **4,55:1** y
- * pasa; el token ya existía en `tokens/colors.css`, comentado «inactive modules,
- * group labels, version». Un motivo que no se lee es un paso apagado en silencio,
+ * por debajo del 4,5:1 de AA**. `--color-text-disabled` (#64748b entonces, 4,55:1;
+ * #5a6a7e desde el 2026-11-01, 5,29:1) pasa; el token ya existía en
+ * `tokens/colors.css`, comentado «inactive modules, group labels, version». Un motivo que no se lee es un paso apagado en silencio,
  * que es exactamente lo que esta barra existe para evitar.
  *
  * ── MOVIMIENTO: 150 ms EN HOVER Y FOCO, CERO EN EL CAMBIO DE PASO ──────────

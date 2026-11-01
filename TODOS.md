@@ -106,6 +106,12 @@ escrita o pide una que es del producto. Por impacto:
    AA.~~ Decisión del autor: **texto negro, ni un color nuevo** (DESIGN.md §3.3). Chips,
    etiquetas ERROR/AVISO, `:hover` de «Vaciarlo» y nº del vértice seleccionado a
    `--color-text-primary` (~15:1); filtro de avisos a sky-700 (5,37:1).
+   ✅ **CERRADO el 2026-11-01** (lo que sigue es la historia): el token pasa de #64748B a
+   **#5A6A7E**, que da 5,53 / 5,29 / 5,05:1 sobre las tres superficies y sigue más claro que
+   `--color-text-secondary`, así que la ayuda no se iguala con las etiquetas (porqué entero
+   en `estilos/tokens/colors.css`). Cuesta 0 B. ⚠️ Los literales `#64748B` de
+   `viewer/cajon-comprobacion.js` no lo siguen (el visor no lee la hoja) y dan 4,76:1 sobre
+   blanco, que ya pasa.
    ⏳ **Queda el primo de este problema, y es más grande:** el gris de «apagado»
    (`--color-text-disabled`, #64748B) se usa como texto normal en 28 de sus 34 usos, y
    sobre `--color-bg-elevated` da 4,34:1 (apuntes de los menús al señalar, el apunte
