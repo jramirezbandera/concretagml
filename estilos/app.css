@@ -7011,6 +7011,13 @@ button.gml-parte-nombre {
 .gml-dialogo-diccionario-intro,
 .gml-dialogo-importacion-intro,
 .gml-diccionario-cuenta,
+.gml-diccionario-vermas,
+.gml-diccionario-vacio {
+  margin: 0;
+  max-width: 68ch;
+  font-size: var(--text-12);
+  color: var(--color-text-secondary);
+}
 
 /* ── El reparto por capas ──────────────────────────────────────────────────── */
 
@@ -7592,14 +7599,6 @@ button.gml-parte-nombre {
 /* Las tres entradas que enmiendan un catálogo ajeno. Color de aviso y no rojo:
    no hay nada roto, hay algo que mucha gente cree y no es cierto. Su regla vive
    fundida con las de F18 y F19: es la misma pieza. */
-
-.gml-diccionario-vermas,
-.gml-diccionario-vacio {
-  margin: 0;
-  max-width: 68ch;
-  font-size: var(--text-12);
-  color: var(--color-text-secondary);
-}
 
 /* «Cerrar» a la derecha del todo, como en el pie del diálogo de avisos. */
 .gml-dialogo-diccionario-pie [data-accion='cerrar-diccionario'] {

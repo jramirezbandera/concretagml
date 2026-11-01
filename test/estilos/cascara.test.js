@@ -258,7 +258,7 @@ describe('T5 · el contrato de clases con `app/barra.js`', () => {
   })
 })
 
-describe('T5 · las dos reglas duras de la hoja', () => {
+describe('T5 · las reglas duras de la hoja', () => {
   it('⛔ cero declaraciones con la palabra clave de prioridad de CSS', () => {
     // «Cuando hace falta ganar una cascada se sube la especificidad, nunca se
     // fuerza el peso» — cabecera de `estilos/app.css`. Llevaba doce fases
@@ -282,6 +282,22 @@ describe('T5 · las dos reglas duras de la hoja', () => {
     // la entrada de la aplicación, y cambiarlo alteraría el orden de la cascada
     // que razona el comentario de `index.html`.
     for (const ruta of importados) expect(ruta).not.toMatch(/leaflet/i)
+  })
+
+  it('⛔ ninguna lista de selectores acaba en coma y renglón en blanco', () => {
+    // ⛔ **ESTUVO VIVO DEL 2026-08-11 AL 2026-11-01.** F15 añadió tres selectores a
+    // la regla de las entradillas de los diálogos y se perdió su cuerpo: la lista
+    // quedó en `.gml-diccionario-cuenta,` + renglón en blanco + comentario, y el
+    // navegador la fundió con la SIGUIENTE regla de la hoja, la de la lista de
+    // capas. Cinco entradillas salieron con marco y fondo de superficie durante
+    // casi tres meses, y el presupuesto no se movió ni un byte al arreglarlo.
+    //
+    // ⚠️ Sobre el texto CRUDO y no sobre `VIVO`: una lista partida por un
+    // comentario es legítima aquí (la del título de los diálogos lleva uno dentro
+    // para la tarjeta de bienvenida), y quitarle el comentario la dejaría con un
+    // renglón en blanco que este patrón tomaría por el defecto.
+    const sueltas = [...FUENTE.replace(/\r\n/g, '\n').matchAll(/([^\n]*),\n[ \t]*\n/g)]
+    expect(sueltas.map((m) => m[1].trim())).toEqual([])
   })
 })
 
