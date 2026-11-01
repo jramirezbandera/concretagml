@@ -554,6 +554,7 @@ import { crearPieDeFirmaGuardado } from '../storage/pie-firma.js'
 import { validarParcela } from '../validation/parcela.js'
 import { crearEstadoVista, NIVEL } from '../viewer/_comun.js'
 import { crearBuscador } from '../viewer/buscador.js'
+import { crearParcelasExpediente } from '../viewer/parcelas-expediente.js'
 // F14 · No sale por `viewer/index.js`, y es a propósito: `crearVisor` monta el
 // cajón de diagnóstico porque **las dos ramas comparten mapa** y aquél existe
 // desde F07 con su opción `diagnostico`. Éste se monta aparte porque solo tiene
@@ -598,6 +599,8 @@ import { cablearComprobacion } from './cableado-comprobacion.js'
 import { cablearContrasteEdificio } from './cableado-contraste-edificio.js'
 import { cablearDerivacion } from './cableado-derivacion.js'
 import { crearRegistroColindantes, refcatParaPedirColindantes } from './colindantes.js'
+import { cambiarDeParcela } from './cambio-de-parcela.js'
+import { MOTIVO_CAMBIO, crearConjunto } from './conjunto.js'
 import { cablearDiagnostico } from './cableado-diagnostico.js'
 // ⚠️ **El alias dice `DIBUJO` y no `EDIFICIO` desde F18, y es una corrección de
 // vocabulario, no un capricho.** Esa lista (`.dxf`, `.txt`) la sigue publicando el
@@ -1657,6 +1660,72 @@ const historial = crearHistorial()
 // irreversible**, con el botón «Deshacer» apagado y sin nada que lo explicara.
 // Con la semilla, el estado de partida es un destino legítimo al que volver.
 commit(historial, estado.get())
+
+// ── 2 bis · F25 · LAS PARCELAS DEL EXPEDIENTE ───────────────────────────────
+//
+// El store sigue llevando UNA parcela —la que está en edición— y sus suscriptores no
+// se enteran de que hay más (decisión D0 de la ficha). Las demás viven en el
+// conjunto, y este suscriptor lo mantiene al día:
+//
+//   · la parcela en edición, editada ............ se actualiza su copia;
+//   · un `idLocal` que el expediente no tiene .... es un DOCUMENTO NUEVO: el conjunto
+//     se abre con esa sola parcela, que es lo que hacía la aplicación antes de F25
+//     al traer otra parcela (fichero, Catastro, pegado, medición);
+//   · el store vacío ............................. el expediente se vacía.
+//
+// Así cualquier puerta de entrada —las que hay y la que se añada mañana— abre su
+// expediente sin acordarse de nada, que es el mismo argumento con el que
+// `viewer/index.js` suelta las colindantes desde el store y no desde cada cableado.
+// Las dos puertas que abren un expediente de VARIAS (recuperar uno guardado, abrir un
+// proyecto) llaman a `conjunto.abrir` ANTES del `set`, y este suscriptor ya las
+// encuentra dentro.
+//
+// ⚠️ Va el PRIMERO de todos los suscriptores del store, y conviene que siga así,
+// aunque hoy ningún suscriptor lee el conjunto durante la notificación: quien
+// compone el expediente lo hace después (al guardar, o con el debounce) y con la
+// parcela del store en la mano.
+const conjunto = crearConjunto()
+
+/**
+ * `true` mientras el `set` del store sea un CAMBIO DE PARCELA dentro del expediente.
+ * Es lo único que los suscriptores no pueden deducir solos (H1 de la ficha de F25):
+ * por el `idLocal`, cambiar de parcela y abrir otro documento son lo mismo. Lo
+ * levanta y lo baja {@link activarParcela}, alrededor del `set` y de nada más.
+ */
+let cambiandoDeParcela = false
+
+/** Lo que se dice si alguien mete en el store otra parcela del expediente sin activarla. */
+const MENSAJE_PARCELA_SIN_ACTIVAR =
+  'Ha entrado en pantalla otra parcela del expediente sin pasar por «Parcela en edición». Se ' +
+  'sigue editando ésa y las demás no se han perdido, pero su deshacer empieza de cero.'
+
+function seguirAlStore(parcela) {
+  if (parcela === null || parcela === undefined) {
+    if (conjunto.parcelas().length > 0) conjunto.abrir()
+    return
+  }
+  if (conjunto.actualizarActiva(parcela)) return
+  if (conjunto.parcelas().some((p) => p.idLocal === parcela.idLocal)) {
+    // No debería pasar —solo `activarParcela` mete otra del expediente— y si pasa no
+    // se abre un expediente nuevo: eso tiraría las demás sin decirlo.
+    conjunto.activar(parcela.idLocal, null)
+    conjunto.actualizarActiva(parcela)
+    console.error('[conjunto] ' + MENSAJE_PARCELA_SIN_ACTIVAR)
+    return
+  }
+  try {
+    conjunto.abrir({ parcelas: [parcela] })
+  } catch (causa) {
+    // Una parcela que el modelo no admite no puede tumbar a los suscriptores que van
+    // detrás (`crearEstadoVista` no los aísla). Se queda vacío y se cuenta: el
+    // expediente se guarda entonces como la parcela del store sola, como antes de F25.
+    conjunto.abrir()
+    console.error('[conjunto] la parcela del store no es una Parcela válida del modelo:', causa)
+  }
+}
+estado.subscribe(seguirAlStore)
+// `subscribe` no notifica al suscribirse: la parcela de arranque, a mano.
+seguirAlStore(estado.get())
 
 // ── 3 · Panel de avisos ──────────────────────────────────────────────────────
 
@@ -2976,6 +3045,11 @@ export function cablearEdicion({
   srs = null,
   alContarColindantes = () => {},
   alSoltarColindantes = () => {},
+  // ⭐ F25 · los recintos de las OTRAS parcelas del expediente, como dianas del
+  // enganche: en una segregación, el lindero de la pieza se ajusta contra el de la
+  // matriz. Se pregunta en cada `fijarDianas` y no se guarda: cambian al cambiar de
+  // parcela, y una copia aquí se quedaría vieja.
+  dianasDeOtras = () => [],
   aplicarDeEdificio = () => false,
   esDeEdificio = () => false,
   botonDeshacer = nodo(SELECTOR_BOTON_DESHACER),
@@ -3574,7 +3648,8 @@ export function cablearEdicion({
       ...instantanea,
       geometriaOficial: parcela.geometriaOficial,
     }))
-    edicion.fijarColindantes([])
+    vecinasDianas = []
+    fijarDianas()
     alContarColindantes(null)
     // ⛔ Y EL REGISTRO, que es la TERCERA pieza y se quedó fuera hasta que la
     // auditoría del 2026-08-16 lo midió. Las dianas del enganche y el recuento de
@@ -3610,6 +3685,19 @@ export function cablearEdicion({
   }
 
   /**
+   * Los recintos de las colindantes del Catastro que hay ahora como dianas. Se guardan
+   * aquí porque `fijarColindantes` SUSTITUYE: sin la copia, refrescar las dianas de
+   * las otras parcelas (F25) borraría las de las vecinas, y al revés.
+   * @type {Array<object>}
+   */
+  let vecinasDianas = []
+
+  /** Vecinas del Catastro + otras parcelas del expediente, de una vez. */
+  function fijarDianas() {
+    edicion.fijarColindantes([...vecinasDianas, ...dianasDeOtras()])
+  }
+
+  /**
    * Han llegado las parcelas VECINAS («Traer colindantes»).
    *
    * ⚠️ `fijarColindantes` recibe RECINTOS y F05 devuelve PARCELAS: hay que
@@ -3631,8 +3719,8 @@ export function cablearEdicion({
     if (!resultado || resultado.ok !== true || !resultado.datos) return
 
     const vecinas = Array.isArray(resultado.datos.colindantes) ? resultado.datos.colindantes : []
-    const recintos = vecinas.flatMap((v) => (v && Array.isArray(v.recintos) ? v.recintos : []))
-    edicion.fijarColindantes(recintos)
+    vecinasDianas = vecinas.flatMap((v) => (v && Array.isArray(v.recintos) ? v.recintos : []))
+    fijarDianas()
     alContarColindantes(vecinas.length)
 
     // ⛔ **AQUÍ HABÍA UN `anunciar()`, Y SE RETIRÓ EL 2026-08-18. No volver a ponerlo
@@ -3784,6 +3872,8 @@ export function cablearEdicion({
     alCambiarDocumento,
     alCambiarOficial,
     alColindantes,
+    /** F25 · vuelve a pedir las dianas de las otras parcelas (han cambiado). */
+    refrescarDianas: fijarDianas,
 
     /**
      * Dice si es ESTA rama la que puede dibujar ahora mismo. Gemelo de
@@ -3891,6 +3981,11 @@ const edicionCableada = cablearEdicion({
   // El registro se monta en el paso 12, así que se lee PEREZOSAMENTE igual que
   // los dos de abajo. Ver el porqué en `alCambiarOficial`.
   alSoltarColindantes: () => registroColindantes?.olvidar(),
+  dianasDeOtras: () =>
+    conjunto
+      .parcelas()
+      .filter((p) => p.idLocal !== conjunto.activa())
+      .flatMap((p) => (Array.isArray(p.recintos) ? p.recintos : [])),
   // ── A cada instantánea, su store (auditoría 2026-08-16) ───────────────────
   // Los dos se leen PEREZOSAMENTE: `edificioCableado` se monta en el paso 13 y
   // esto es el 6, así que aquí todavía vale `null` — y tiene que seguir
@@ -5625,6 +5720,10 @@ expedienteCableado = cablearExpediente({
   // cambió antes de salir de la rama—, así que no vale pasárselo después.
   rama: ramaCableada,
   estadoEdificio,
+  // F25 · las parcelas del expediente: guardar lleva todas, y cambiar de parcela no
+  // es abrir otro documento. Ver el paso 2 bis.
+  conjunto,
+  esCambioDeParcela: () => cambiandoDeParcela,
   // El MISMO gancho que reciben el Catastro (paso 7) y la comprobación (paso 9).
   //
   // ⛔ **Y ENVUELTO COMO ELLOS DESDE LA AUDITORÍA DEL 2026-08-16.** Ésta era la otra
@@ -7004,3 +7103,103 @@ try {
   // Sin buscador la aplicación sigue entera: se acerca a mano, como antes.
   console.error('[buscador] no se ha podido montar el buscador del mapa:', causa)
 }
+
+// ── 20 · F25 · CAMBIAR DE PARCELA DENTRO DEL EXPEDIENTE ─────────────────────
+//
+// Lo que hace el selector «Parcela en edición» —y cualquier otro llamante que venga—,
+// en un solo sitio. Tres piezas, y el orden importa:
+//
+//   1. La HISTORIA: se aparta la de la que sale y se restaura la de la que entra
+//      (`edit/historial.js#apartar`/`restaurar`). Si es la primera vez que se edita,
+//      se siembra con `reiniciar`, que es lo que hace cualquier documento nuevo.
+//   2. El `set`, con {@link cambiandoDeParcela} levantado: es lo que le dice a
+//      `cableado-expediente.js` que el expediente guardado sigue siendo el mismo (H2).
+//   3. Lo que era de la parcela anterior y no del expediente: las colindantes del
+//      Catastro en sus tres sitios (`alCambiarOficial`) y la referencia deducida
+//      (`entraDocumentoNuevo`). Las vecinas son las de UNA parcela: diagnosticar la
+//      nueva contra las de la anterior diría «no invade» sin haber mirado.
+//
+// Lo que NO se hace es `alCambiarDocumento`: reiniciaría la historia que el paso 1
+// acaba de restaurar y anunciaría «parcela nueva» de algo que ya estaba.
+
+/**
+ * Cuando la historia de deshacer lleva instantáneas del EDIFICIO no se puede repartir
+ * por parcelas: la pila es UNA para las dos ramas (paso 13, «Ctrl+Z es UNA tecla»), y
+ * apartarla con la parcela haría que, al volver, un Ctrl+Z devolviera un edificio de
+ * otro momento al otro store sin que se viera. En ese caso se empieza de cero y se dice.
+ */
+export const MENSAJE_DESHACER_COMPARTIDO =
+  'Al cambiar de parcela el deshacer empieza de cero: llevaba también cambios del edificio, y ' +
+  'repartirlos entre las parcelas podría devolver un edificio de otro momento.'
+
+/** Lo que se dice si el cambio de parcela revienta por dentro. */
+const MENSAJE_CAMBIO_ROTO =
+  'No se ha podido cambiar de parcela por un fallo interno; sigues en la que estabas. El ' +
+  'detalle técnico está en la consola del navegador.'
+
+/**
+ * Pone otra parcela del expediente en edición.
+ *
+ * Se EXPORTA para poder probarla sin el selector, igual que
+ * {@link quitarPuntosLevantamiento}: el control lo fabrica el visor.
+ *
+ * @param {string} idLocal
+ * @returns {boolean}  `true` si ha cambiado; `false` si ya era ésa.
+ * @throws {Error}  Si el expediente no tiene ninguna parcela con ese `idLocal`.
+ */
+export function activarParcela(idLocal) {
+  // Los pasos 1 y 2 de la cabecera de este paso, en `app/cambio-de-parcela.js`.
+  const { cambiado, deshacerReiniciado } = cambiarDeParcela({
+    conjunto,
+    historial,
+    estado,
+    idLocal,
+    esDeEdificio: (i) => edificioCableado?.esInstantaneaDeEdificio(i) === true,
+    marcar: (levantada) => {
+      cambiandoDeParcela = levantada
+    },
+  })
+  if (!cambiado) return false
+  // El paso 3: lo que era de la parcela anterior.
+  entraDocumentoNuevo()
+  edicionCableada.alCambiarOficial(estado.get())
+  if (deshacerReiniciado) panel.avisar(MENSAJE_DESHACER_COMPARTIDO, { nivel: NIVEL.AVISO })
+  return true
+}
+
+/** @type {ReturnType<typeof crearParcelasExpediente>|null} */
+let parcelasExpediente = null
+try {
+  parcelasExpediente = crearParcelasExpediente({
+    mapa: visor.mapa,
+    zona: husoPorSrs(SRS_DEMO),
+    alAvisar: panel.avisar,
+  })
+  parcelasExpediente.alElegir((idLocal) => {
+    try {
+      activarParcela(idLocal)
+    } catch (causa) {
+      panel.avisar(MENSAJE_CAMBIO_ROTO, { nivel: NIVEL.ERROR, causa })
+      console.error('[conjunto] el cambio de parcela ha fallado:', causa)
+    }
+  })
+} catch (causa) {
+  // Sin capa ni selector la aplicación sigue entera: el expediente se guarda con todas
+  // sus parcelas igual, y la que se edita es la que entró.
+  console.error('[conjunto] no se ha podido montar la capa de las parcelas del expediente:', causa)
+}
+
+/**
+ * Lo que cambia con el conjunto: la capa y el selector, y las dianas de las otras.
+ * Con `EDITADA` solo cambia la que está en edición, que la capa no dibuja y las dianas
+ * no incluyen: no hay nada que rehacer, y llega con cada vértice arrastrado.
+ */
+conjunto.subscribe(({ motivo }) => {
+  if (motivo === MOTIVO_CAMBIO.EDITADA) return
+  parcelasExpediente?.pintar({ parcelas: conjunto.parcelas(), activa: conjunto.activa() })
+  edicionCableada.refrescarDianas()
+})
+parcelasExpediente?.pintar({ parcelas: conjunto.parcelas(), activa: conjunto.activa() })
+// La rama Edificio no edita parcelas: allí la capa y el selector sobran.
+ramaCableada?.subscribe((rama) => parcelasExpediente?.visible(rama !== RAMA.EDIFICIO))
+parcelasExpediente?.visible(ramaCableada?.get?.() !== RAMA.EDIFICIO)

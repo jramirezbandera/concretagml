@@ -23,9 +23,11 @@ restaurar), `export/proyecto.js` (versión 2), `storage/expedientes.js` (`NO_SE_
 `viewer/index.js`, `app/rama.js` (el selector de la cabecera), `app/main.js`.
 **Se actualiza al cerrar cada fase.**
 
-**Estado:** ⏳ **ABIERTA el 2026-11-01.** Fases 0 (la auditoría) y 1 (el modelo, sin
-interfaz) **hechas**. Todavía no se puede cambiar de parcela: un expediente de varias se
-**rechaza al abrirlo**, a propósito (ver fase 1).
+**Estado:** ⏳ **ABIERTA el 2026-11-01.** Fases 0 (la auditoría), 1 (el modelo) y 2 (cambiar
+de parcela) **hechas**. Un expediente de varias se abre entero, se cambia de parcela con el
+selector «Parcela en edición» y se guarda con todas. Lo que todavía **no** se puede es
+CREAR la segunda parcela dentro de la aplicación (fase 3) ni exportar una selección
+(fase 4).
 
 > ⏳ **Esta ficha se abre ANTES del código**, y es a propósito: F23 y F24 llegaron tarde
 > a `spec/` y las dos lo anotaron como hallazgo. Lo que aquí se dice del futuro está en
@@ -164,6 +166,19 @@ el historial, anuncian «parcela nueva» y **sueltan las colindantes** en sus tr
   diagnóstico y el informe **adoptan** un resultado del Catastro solo si su parcela
   `propia` coincide con la del store: con una colindante en edición, las vecinas de la
   parcela principal **se rechazarían por ajenas**.
+
+  ⛔ **CORREGIDA el mismo día, al escribir la fase 2: el hecho es cierto y la conclusión
+  era FALSA.** Que esos cuatro sitios suelten las vecinas al cambiar de parcela **es lo
+  correcto**, no un defecto. Las vecinas que trae el Catastro son las de UNA parcela
+  (`GetNeighbourParcel` por referencia): diagnosticar la pieza contra las vecinas de la
+  matriz declararía «no invade» **sin haber mirado** las suyas, y F23 repartiría su exceso
+  contra fincas que no lindan con ella —que es palabra por palabra el defecto que
+  `app/main.js#alCambiarOficial` documenta (2026-08-16) y lo que la cabecera de
+  `app/colindantes.js` llama inaceptable—. Lo que sí es del expediente son **las demás
+  parcelas del expediente**, y ésas se dibujan siempre con su propia capa. Y el filtro de
+  adopción por `propia` también acierta: rechaza vecinas pedidas para otra parcela.
+  **Consecuencia**: el criterio 2 se reescribe, y la «unión del contexto» de la 3.5 tendrá
+  que guardar las vecinas **por parcela**, no mezclarlas.
 - **H4 · Las tres copias de `claveDeExpediente` ya no son iguales.** La de
   `cableado-catastro.js:692` **no** pasa la referencia a mayúsculas y las de diagnóstico e
   informe sí. **Hoy no es un defecto vivo**: cada módulo compara solo consigo mismo. Pero
@@ -273,7 +288,10 @@ pasarse no tiene síntoma: la tabla de vértices encoge sin avisar.
 
 1. Cambiar de miembro y volver **conserva el deshacer** de cada uno, y Ctrl+Z nunca toca un
    miembro que no está en edición.
-2. Cambiar de miembro **no suelta** las colindantes en ninguno de sus cuatro sitios (H3).
+2. ~~Cambiar de miembro **no suelta** las colindantes en ninguno de sus cuatro sitios
+   (H3).~~ **Reescrito en la fase 2 (ver H3 corregida)**: cambiar de parcela **suelta** las
+   colindantes del Catastro, que son de la parcela que se deja, y **las demás parcelas del
+   expediente siguen dibujadas y como dianas de enganche**.
 3. «Guardar», el autoguardado y el fichero de proyecto llevan **el conjunto entero**, y
    cambiar de miembro **no** crea un registro nuevo (H2).
 4. Un proyecto de la versión 1 abre como un expediente de un miembro, sin aviso de error.
@@ -345,19 +363,71 @@ medido**):
   y las dianas pintan la UNIÓN de los puntos de todos los miembros**, y una parcela nueva
   dibujada al lado los ve aunque no sean suyos.
 
-**Fase 2 · cambiar de miembro.**
-- 2.1 La identidad del expediente en `conjunto.js` y el aviso «mismo expediente» a los
-  módulos de H1/H3. Las tres copias de `claveDeExpediente` dejan de decidir sobre las
-  vecinas (H4).
-- 2.2 `alActivarMiembro` (H5, H6).
-- 2.3 `cableado-expediente.js` anclado al conjunto (H2), y fuera la guarda temporal
-  `mensajeVariasParcelas` de la fase 1.
-- 2.5 La capa de puntos de levantamiento y sus dianas, con la unión de los miembros
-  (H9, decidido en la 1.5).
-- 2.4 `viewer/miembros.js`, el selector de la cabecera y el cajón, de momento para mirar
-  y activar.
+**Fase 2 · cambiar de parcela — hecha el 2026-11-01** (suite **8.709 pruebas / 208
+ficheros, 0 rojas**; ni una dependencia, ni un byte de CSS; probado en Chromium a
+1280×720 con un proyecto de dos parcelas metido por la zona de fichero, consola limpia):
+
+~~2.1 La identidad del expediente en `conjunto.js` y el aviso «mismo expediente» a los
+módulos de H1/H3. Las tres copias de `claveDeExpediente` dejan de decidir sobre las
+vecinas (H4).~~ ⛔ **Se hizo MENOS de lo planeado, y lo planeado estaba mal.** Ver H3
+corregida, abajo: la mayoría de los módulos de H1 tienen que seguir tomando el cambio de
+parcela **por lo que es para ellos**, una parcela distinta. El único que no puede es el
+expediente guardado, y a ése se le dice desde fuera:
+
+- **La marca `cambiandoDeParcela`** (`app/main.js`, paso 2 bis), levantada solo alrededor
+  del `set` del cambio. Es el patrón «se dice desde fuera» que `viewer/index.js` ya usa
+  para el fondo nuevo, y **sustituye al reordenamiento de suscriptores** que se pensó
+  primero: con la marca, el orden en que se notifican deja de decidir nada.
+- **El conjunto sigue al store** (paso 2 bis): un `idLocal` que el expediente no tiene es
+  un documento nuevo y abre un expediente de una. Así las seis puertas de entrada de hoy
+  —y la que se añada— abren su expediente sin acordarse. Las dos que abren uno de varias
+  (recuperar y proyecto) llaman a `conjunto.abrir` ANTES del `set`.
+- **2.2 · `app/cambio-de-parcela.js`** (nuevo, fuera del plan): el corazón de
+  `activarParcela`, sacado de `main.js` para poder probar el ORDEN sin montar la
+  aplicación —apartar, activar, restaurar, y el `set` con la marca—. Su prueba mira lo
+  que ve cada suscriptor EN el instante de la notificación.
+  - ⛔ **Hallazgo al escribirlo: la pila de deshacer es UNA para las dos ramas**
+    (`main.js`, paso 13: «Ctrl+Z es UNA tecla»). Repartirla por parcelas con instantáneas
+    del edificio dentro haría que, al volver, un Ctrl+Z devolviera **un edificio de otro
+    momento al otro store** sin que se viera. Si la pila lleva alguna, el cambio empieza
+    de cero y lo dice (`MENSAJE_DESHACER_COMPARTIDO`).
+- **2.3 · H2 resuelto**: `cableado-expediente.js` recibe `conjunto` y `esCambioDeParcela`.
+  Guardar, el borrador y el fichero del disco llevan **todas** las parcelas (con la del
+  store en su sitio, la más reciente); la identidad del registro y el vínculo con el
+  fichero del disco **sobreviven** al cambio; el nombre de los ficheros sale de la
+  **principal**. La guarda de la fase 1 solo actúa sin conjunto. Prueba central: guardar,
+  cambiar, editar y guardar → **UN registro con las dos**; y su contraprueba, el mismo
+  recorrido sin la marca → dos registros.
+- **2.4 · `viewer/parcelas-expediente.js`** (se iba a llamar `viewer/miembros.js`, pero
+  `viewer/senal-miembro.js` ya usa «miembro» para las parcelas de un GML comprobado):
+  la capa de las que no están en edición y el selector «Parcela en edición».
+  - ⛔ **El selector va SOBRE EL MAPA, no en la cabecera del panel** (desviación de
+    §La interfaz): allí gastaría un renglón en un panel que F17 dejó a 1,57 px de su
+    suelo a 1280×720, con síntoma mudo, y ese margen no se ha remedido desde el rework.
+    Sobre el mapa: 0 px de panel, 0 B de CSS. **Solo aparece con dos o más** y se oculta
+    en la rama Edificio. Medido en Chromium: se apila bajo el zoom (402,180 · 306×34 px)
+    y no pisa nada.
+  - ⛔ **Las otras parcelas NO se eligen con un clic en el mapa**: ese clic es, a menudo,
+    el de dibujar la pieza nueva o el de insertar un vértice en el lindero compartido.
+    Llevan su emergente y el clic sigue llegando al mapa (`bubblingMouseEvents`,
+    medido como en `viewer/colindantes.js`).
+  - Color: `COLOR_USUARIO` discontinuo. Ningún color nuevo.
+  - **Elegir otra REENCUADRA el mapa sobre ella** (lo hace el visor, como con cualquier
+    parcela distinta). Se dejó así a propósito: desde un selector, «llévame a ella» es lo
+    útil. ⚠️ Puede molestar a quien esté ajustando un lindero compartido muy de cerca:
+    es pregunta para el checklist humano, no para el código.
+- **2.5 → fase 3** (la unión de los puntos de levantamiento): en esta fase no hay forma
+  de crear la segunda parcela que los necesitaría. **El cajón con casillas → fase 4**: su
+  razón de ser es la exportación por selección.
+- ⚠️ **Visto en el navegador y apuntado para la fase 3**: el rótulo de procedencia de la
+  cabecera (`rotuloDelDato`) dice «Parcela del Catastro» de cualquier parcela con
+  `origen: WFS` que entre después del arranque, y una pieza clonada de la matriz lo
+  hereda. Con piezas de verdad (dibujadas o derivadas) el origen será otro, pero el
+  rótulo tiene que contemplar el cambio de parcela.
 
 **Fase 3 · las entradas.**
+- 3.0 La unión de los puntos de levantamiento en la capa y en las dianas (H9, desde la
+  2.5), y el rótulo de procedencia al cambiar de parcela.
 - 3.1 «Añadir para editar» una colindante, y con ella el texto de `NO_SE_GUARDA`
   (desviado aquí desde la 1.2).
 - 3.2 Materializar las piezas de F17 y los vecinos de F23 como miembros.

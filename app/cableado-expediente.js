@@ -481,15 +481,17 @@ export const mensajeVariasParcelas = (n) =>
  * preguntan esto mismo, y con la misma respuesta.
  *
  * @param {object} expediente  Normalizado por `crearExpediente`.
+ * @param {boolean} [conConjunto=false]  Si hay `app/conjunto.js` cableado (F25 · fase
+ *   2): entonces uno de varias SÍ se abre, entero.
  * @returns {{parcela: object|null, motivo: string|null}}  `motivo` es el texto para
  *   el usuario cuando `parcela` es `null`.
  */
-function parcelaAbrible(expediente) {
+function parcelaAbrible(expediente, conConjunto = false) {
   // El `?.` que había en dos de las tres puertas, conservado: un resultado `ok` sin
   // expediente no debería llegar, y si llega se dice lo mismo que antes.
   if (!expediente) return { parcela: null, motivo: MENSAJE_GUARDADO_SIN_PARCELA }
   const n = expediente.parcelas.length
-  if (n > 1) return { parcela: null, motivo: mensajeVariasParcelas(n) }
+  if (n > 1 && !conConjunto) return { parcela: null, motivo: mensajeVariasParcelas(n) }
   const parcela = parcelaActiva(expediente)
   return hayGeometria(parcela)
     ? { parcela, motivo: null }
@@ -982,6 +984,16 @@ function nodoDe(doc, selector) {
  * @param {object|null} [opciones.ficheroDisco=null]  El de `storage/fichero-disco.js`,
  *   ya construido. `null` —o uno con `disponible: false`— ⇒ el bloque «Guardar en un
  *   fichero del disco» no aparece.
+ * @param {object|null} [opciones.conjunto=null]  **F25.** Las parcelas del expediente
+ *   (`app/conjunto.js`), ya cableadas al store por `app/main.js`. Con él, guardar lleva
+ *   TODAS las parcelas y abrir un expediente de varias las mete todas. `null` ⇒ el
+ *   expediente es la parcela del store, como hasta F25, y uno de varias se rechaza al
+ *   abrirlo ({@link mensajeVariasParcelas}).
+ * @param {() => boolean} [opciones.esCambioDeParcela]  **F25.** `true` mientras el `set`
+ *   del store sea un cambio de parcela DENTRO del expediente. Es lo único que este
+ *   cableado no puede deducir solo: por el `idLocal`, un cambio de parcela y un
+ *   documento nuevo son idénticos, y tomar el primero por el segundo partiría el
+ *   expediente guardado (H2 de la ficha de F25). Lo dice quien hace el `set`.
  * @param {HTMLElement} [opciones.boton]  Por defecto {@link SELECTOR_BOTON_EXPEDIENTE}.
  * @param {Document} [opciones.documento=globalThis.document]
  * @param {typeof URL} [opciones.url=globalThis.URL]  Objeto con
@@ -1020,6 +1032,8 @@ export function cablearExpediente({
   elegirFichero = null,
   instalacion = null,
   ficheroDisco = null,
+  conjunto = null,
+  esCambioDeParcela = () => false,
   documento = globalThis.document,
   url = globalThis.URL,
   boton,
@@ -1064,6 +1078,17 @@ export function cablearExpediente({
       `cablearExpediente: 'rama' debe ser el conmutador de app/rama.js#cablearRama ` +
         `({get, set, subscribe}) o null si esta pantalla solo tiene la rama de parcela; recibido ` +
         `${typeof rama}.`,
+    )
+  }
+  if (conjunto !== null && (typeof conjunto.parcelas !== 'function' || typeof conjunto.abrir !== 'function')) {
+    throw new TypeError(
+      `cablearExpediente: 'conjunto' debe ser el de app/conjunto.js#crearConjunto o null; ` +
+        `recibido ${typeof conjunto}.`,
+    )
+  }
+  if (typeof esCambioDeParcela !== 'function') {
+    throw new TypeError(
+      `cablearExpediente: 'esCambioDeParcela' debe ser una función; recibido ${typeof esCambioDeParcela}.`,
     )
   }
   if (estadoEdificio !== null && !esStore(estadoEdificio)) {
@@ -1430,7 +1455,27 @@ export function cablearExpediente({
     }
     const parcela = estado.get()
     if (!hayGeometria(parcela)) return null
-    return crearExpediente({ srs, parcela, metadatos })
+    return crearExpediente({ srs, ...ramaParcelas(parcela), metadatos })
+  }
+
+  /**
+   * La rama de parcelas del expediente, a partir de la parcela del store (F25).
+   *
+   * Con el conjunto cableado son TODAS las parcelas, en su orden, con la del store en
+   * su sitio —la del store y no la copia del conjunto, porque es la más reciente y
+   * porque así esto no depende del orden en que se notifiquen los suscriptores—. Sin
+   * conjunto, o si el conjunto no tiene esa parcela en edición, es la del store sola:
+   * exactamente lo de antes de F25.
+   *
+   * @param {object} parcela
+   * @returns {{parcela: object}|{parcelas: object[], activa: string}}
+   */
+  function ramaParcelas(parcela) {
+    if (conjunto === null || conjunto.activa() !== parcela?.idLocal) return { parcela }
+    return {
+      parcelas: conjunto.parcelas().map((p) => (p.idLocal === parcela.idLocal ? parcela : p)),
+      activa: parcela.idLocal,
+    }
   }
 
   /**
@@ -1490,9 +1535,17 @@ export function cablearExpediente({
    * La referencia catastral de lo que hay en pantalla, o `null`. **De la rama activa**:
    * de ella sale el nombre de los ficheros que bajan, y estampar la RC de la parcela en
    * un fichero de edificio sería etiquetar mal un documento.
+   *
+   * ⭐ F25 · con varias parcelas, la de la PRINCIPAL y no la de la que esté en edición,
+   * por lo mismo que el registro guardado se rotula con ella
+   * (`model/parcela.js#parcelaPrincipal`): el fichero es del expediente entero, y en
+   * una segregación la pieza en pantalla no suele tener referencia propia.
    */
-  const refcatActual = () =>
-    (enEdificio() ? edificioActual()?.refcat : estado.get()?.refcat) ?? null
+  const refcatActual = () => {
+    if (enEdificio()) return edificioActual()?.refcat ?? null
+    const principal = conjunto?.parcelas()[0] ?? estado.get()
+    return principal?.refcat ?? null
+  }
 
   // ── Carga de una parcela en el store ──────────────────────────────────────
 
@@ -1508,13 +1561,27 @@ export function cablearExpediente({
    * después tampoco valdría: nuestro propio suscriptor —y los otros diez— se
    * despertarían con la rama equivocada.
    *
-   * @param {object} parcela
+   * ⭐ **F25 · el conjunto se abre ANTES del `set`**, con todas las parcelas del
+   * expediente, por lo mismo que la identidad: cuando el store notifique, quien siga al
+   * store tiene que encontrar ya la parcela entre las del expediente, y no tomarla por
+   * un documento suelto que abre otro expediente de una.
+   *
+   * @param {object} parcela  La que entra en el store: la que estaba en edición.
    * @param {{id: string|null, nombre: string|null, creado: string, modificado: string}} nuevaIdentidad
+   * @param {object|null} [expediente=null]  El expediente entero, si viene de uno
+   *   guardado o de un fichero. Sin él (o sin conjunto), se abre un expediente de una.
    */
-  function cargar(parcela, nuevaIdentidad) {
+  function cargar(parcela, nuevaIdentidad, expediente = null) {
     identidades[RAMA.PARCELA] = nuevaIdentidad
     idLocalAbierto[RAMA.PARCELA] = parcela?.idLocal ?? null
     irARama(RAMA.PARCELA)
+    if (conjunto !== null) {
+      conjunto.abrir(
+        expediente === null
+          ? { parcelas: [parcela] }
+          : { parcelas: expediente.parcelas, activa: expediente.activa },
+      )
+    }
     estado.set(parcela)
     if (alCargarParcela !== null) alCargarParcela(parcela)
   }
@@ -1604,7 +1671,7 @@ export function cablearExpediente({
   })
 
   const auto = autoDeRama((parcela) =>
-    crearExpediente({ srs, parcela, metadatos: metadatosDe(RAMA.PARCELA) }),
+    crearExpediente({ srs, ...ramaParcelas(parcela), metadatos: metadatosDe(RAMA.PARCELA) }),
   )
 
   /**
@@ -1658,7 +1725,7 @@ export function cablearExpediente({
       })
     }
     if (!hayGeometria(dato)) return null
-    return crearExpediente({ srs, parcela: dato, metadatos: metadatosDe(RAMA.PARCELA) })
+    return crearExpediente({ srs, ...ramaParcelas(dato), metadatos: metadatosDe(RAMA.PARCELA) })
   }
 
   /** El texto del fichero: el mismo que baja «Guardar proyecto (.json)». */
@@ -2097,17 +2164,21 @@ export function cablearExpediente({
       decir(motivoOtroHuso(r.registro.srs))
       return
     }
-    const { parcela, motivo } = parcelaAbrible(r.expediente)
+    const { parcela, motivo } = parcelaAbrible(r.expediente, conjunto !== null)
     if (parcela === null) {
       decir(motivo)
       return
     }
-    cargar(parcela, {
-      id: r.registro.id,
-      nombre: r.registro.nombre,
-      creado: r.expediente.metadatos?.creado ?? r.registro.creado,
-      modificado: r.registro.actualizado,
-    })
+    cargar(
+      parcela,
+      {
+        id: r.registro.id,
+        nombre: r.registro.nombre,
+        creado: r.expediente.metadatos?.creado ?? r.registro.creado,
+        modificado: r.registro.actualizado,
+      },
+      r.expediente,
+    )
     decir(`Abierto «${r.registro.nombre}».`)
     // Se CIERRA: recuperar un expediente es pedir que se abra en el visor, y dejar el
     // diálogo tapando el mapa obligaría a un segundo gesto para ver lo que se acaba de
@@ -2228,7 +2299,7 @@ export function cablearExpediente({
           continue
         }
       } else {
-        const { motivo } = parcelaAbrible(r.expediente)
+        const { motivo } = parcelaAbrible(r.expediente, conjunto !== null)
         if (motivo !== null) {
           estorbos.push(motivo)
           continue
@@ -2269,7 +2340,7 @@ export function cablearExpediente({
         modificado: r.registro.actualizado,
       }
       if (tipo === TIPO_EXPEDIENTE.EDIFICIO) cargarEdificio(r.expediente.edificio, nueva)
-      else cargar(parcelaActiva(r.expediente), nueva)
+      else cargar(parcelaActiva(r.expediente), nueva, r.expediente)
     }
 
     const que = enumerarBorradores(abribles.map(({ tipo, r }) => ({ tipo, refcat: r.registro.refcat })))
@@ -2654,7 +2725,7 @@ export function cablearExpediente({
     if (r.expediente.tipo === TIPO_EXPEDIENTE.EDIFICIO) {
       return abrirProyectoDeEdificio(r, fichero)
     }
-    const { parcela, motivo } = parcelaAbrible(r.expediente)
+    const { parcela, motivo } = parcelaAbrible(r.expediente, conjunto !== null)
     if (parcela === null) {
       avisar(motivo)
       decir(motivo)
@@ -2663,12 +2734,16 @@ export function cablearExpediente({
     // Entra SIN identificador: el fichero viene de otro equipo o de otra sesión y no se
     // corresponde con ningún registro de ESTE navegador. El primer «Guardar» creará el
     // suyo. El nombre sí viaja, porque es del trabajo y no del almacén.
-    cargar(parcela, {
-      id: null,
-      nombre: r.nombre,
-      creado: r.expediente.metadatos?.creado ?? instanteISO(),
-      modificado: instanteISO(),
-    })
+    cargar(
+      parcela,
+      {
+        id: null,
+        nombre: r.nombre,
+        creado: r.expediente.metadatos?.creado ?? instanteISO(),
+        modificado: instanteISO(),
+      },
+      r.expediente,
+    )
     avisar(
       `Abierto el proyecto «${r.nombre ?? fichero.name}». Todavía no está guardado en este ` +
         'navegador: usa «Guardar» en «Expediente» si quieres conservarlo aquí.',
@@ -2878,6 +2953,18 @@ export function cablearExpediente({
    */
   function refrescarIdentidad(r, documento) {
     const idLocal = documento?.idLocal ?? null
+    // ⭐ F25 · otra parcela del MISMO expediente: el `idLocal` cambia y el documento no.
+    // Se sigue la parcela —y el vínculo con el fichero del disco, que se ata a ella—
+    // y la identidad se queda. Tomarlo por otro documento haría que el siguiente
+    // «Guardar» creara un registro nuevo con una sola parcela (H2).
+    if (r === RAMA.PARCELA && idLocal !== idLocalAbierto[r] && esCambioDeParcela()) {
+      if (vinculo !== null && vinculo.rama === r && vinculo.idLocal === idLocalAbierto[r]) {
+        vinculo = { ...vinculo, idLocal }
+      }
+      idLocalAbierto[r] = idLocal
+      identidades[r] = { ...identidades[r], modificado: instanteISO() }
+      return
+    }
     if (idLocal !== idLocalAbierto[r]) {
       idLocalAbierto[r] = idLocal
       identidades[r] = identidadNueva()

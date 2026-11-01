@@ -116,6 +116,7 @@ import { TIPO_EXPEDIENTE, crearExpediente, parcelaActiva } from '../../model/par
 import { ALMACENES } from '../../storage/bd.js'
 import { crearExpedientes } from '../../storage/expedientes.js'
 import { crearEstadoVista } from '../../viewer/_comun.js'
+import { crearConjunto } from '../../app/conjunto.js'
 
 // ── La cáscara REAL, leída de `index.html` ───────────────────────────────────
 
@@ -323,12 +324,25 @@ async function montar({
   ficheroDisco = null,
   // El acuse de la barra: es donde se lee lo que pasa con el diálogo ya cerrado.
   acuse = null,
+  // F25 · fase 2: las parcelas del expediente, y la marca de «esto es un cambio de
+  // parcela» que en producción levanta `app/main.js#activarParcela`.
+  conjunto = null,
+  cambio = { valor: false },
 } = {}) {
   const apertura = bd ?? (await baseNueva())
   let reloj = Date.UTC(2026, 7, 3, 10, 0, 0)
 
   const panel = crearDialogoAvisos({ documento: document })
   const estado = crearEstadoVista(parcela)
+  // El seguidor del store de `app/main.js` (paso 2 bis), el PRIMERO, como allí.
+  if (conjunto !== null) {
+    const seguir = (p) => {
+      if (p === null) return conjunto.abrir()
+      if (!conjunto.actualizarActiva(p)) conjunto.abrir({ parcelas: [p] })
+    }
+    estado.subscribe(seguir)
+    seguir(estado.get())
+  }
   const expedientes =
     almacen ??
     crearExpedientes({ bd: apertura, ahora: () => reloj, alAvisar: panel.avisar })
@@ -378,6 +392,8 @@ async function montar({
     instalacion,
     ficheroDisco,
     acuse,
+    conjunto,
+    esCambioDeParcela: () => cambio.valor,
   })
 
   await reposar()
@@ -3218,5 +3234,142 @@ describe('2026-09-25 · el expediente autoguardado en un fichero del disco', () 
     expect(m.estado.get()).toBeNull()
     expect(m.cableado.estado().vinculo).toBeNull()
     m.desmontar()
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
+// F25 · fase 2 · el expediente guardado con VARIAS parcelas
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe('F25 · fase 2 · el expediente guardado lleva TODAS las parcelas', () => {
+  const PIEZA = () => ({ ...parcelaDemo(), idLocal: 'PIEZA-1', refcat: null })
+  const deDos = (activa = parcelaDemo().idLocal) =>
+    crearExpediente({ srs: SRS, parcelas: [parcelaDemo(), PIEZA()], activa })
+
+  /** Lo que hace `app/main.js#activarParcela` con el store y la marca. */
+  function cambiarA(m, conjunto, cambio, idLocal) {
+    const { parcela } = conjunto.activar(idLocal, null)
+    cambio.valor = true
+    try {
+      m.estado.set(parcela)
+    } finally {
+      cambio.valor = false
+    }
+  }
+
+  /** Mueve el primer vértice de la parcela del store: una edición de verdad. */
+  function editar(m) {
+    const p = structuredClone(m.estado.get())
+    p.recintos[0].vertices[0][0] += 0.5
+    m.estado.set(p)
+  }
+
+  async function montarConDos({ conMarca = true } = {}) {
+    const conjunto = crearConjunto()
+    const cambio = { valor: false }
+    const m = await montar({ conjunto, cambio })
+    await m.expedientes.guardar(deDos(), { nombre: 'Segregación' })
+    await abrir(m)
+    const registro = (await m.expedientes.listar()).registros[0]
+    pulsar(`${selectorFila(registro.id)} [data-accion="recuperar-expediente"]`)
+    await reposar()
+    return { m, conjunto, cambio: conMarca ? cambio : { valor: false }, registro }
+  }
+
+  it('con el conjunto, un expediente de DOS se abre entero: las dos en el conjunto y la activa en el store', async () => {
+    const { m, conjunto } = await montarConDos()
+    expect(conjunto.parcelas().map((p) => p.idLocal)).toEqual([parcelaDemo().idLocal, 'PIEZA-1'])
+    expect(m.estado.get().idLocal).toBe(parcelaDemo().idLocal)
+    expect(m.renglon()).not.toBe(mensajeVariasParcelas(2))
+    m.cableado.destruir()
+  })
+
+  it('⭐ H2 · guardar, CAMBIAR de parcela, editarla y guardar otra vez → UN registro con las dos', async () => {
+    const { m, conjunto, cambio } = await montarConDos()
+    await abrir(m)
+    pulsar(SELECTOR.GUARDAR)
+    await reposar()
+
+    cambiarA(m, conjunto, cambio, 'PIEZA-1')
+    editar(m)
+    await reposar()
+    await abrir(m)
+    pulsar(SELECTOR.GUARDAR)
+    await reposar()
+
+    const { registros } = await m.expedientes.listar()
+    expect(registros).toHaveLength(1)
+    const r = await m.expedientes.recuperar(registros[0].id)
+    expect(r.expediente.parcelas.map((p) => p.idLocal)).toEqual([parcelaDemo().idLocal, 'PIEZA-1'])
+    expect(r.expediente.activa).toBe('PIEZA-1')
+    // La edición de la pieza está guardada, y la principal no se ha tocado.
+    expect(r.expediente.parcelas[1].recintos[0].vertices[0][0]).toBe(PIEZA().recintos[0].vertices[0][0] + 0.5)
+    expect(r.expediente.parcelas[0].recintos[0].vertices[0][0]).toBe(parcelaDemo().recintos[0].vertices[0][0])
+    // Y se rotula con la PRINCIPAL aunque se esté editando la pieza.
+    expect(registros[0].refcat).toBe(REFCAT_DEMO)
+    m.cableado.destruir()
+  })
+
+  it('contraprueba: el MISMO recorrido sin la marca de cambio de parcela partiría el expediente', async () => {
+    // Es lo que demuestra que la marca es lo que sostiene H2, y no otra cosa: por el
+    // `idLocal`, cambiar de parcela y traer otro documento son idénticos.
+    const { m, conjunto } = await montarConDos({ conMarca: false })
+    await abrir(m)
+    pulsar(SELECTOR.GUARDAR)
+    await reposar()
+    cambiarA(m, conjunto, { valor: false }, 'PIEZA-1')
+    await reposar()
+    await abrir(m)
+    pulsar(SELECTOR.GUARDAR)
+    await reposar()
+    expect((await m.expedientes.listar()).registros).toHaveLength(2)
+    m.cableado.destruir()
+  })
+
+  it('el autoguardado escribe el borrador con las dos parcelas', async () => {
+    const { m, conjunto, cambio } = await montarConDos()
+    cambiarA(m, conjunto, cambio, 'PIEZA-1')
+    editar(m)
+    await reposar()
+    await m.cableado.guardarBorradorYa()
+    const borrador = await m.expedientes.leerBorrador()
+    expect(borrador.ok).toBe(true)
+    expect(borrador.expediente.parcelas.map((p) => p.idLocal)).toEqual([parcelaDemo().idLocal, 'PIEZA-1'])
+    expect(borrador.expediente.activa).toBe('PIEZA-1')
+    m.cableado.destruir()
+  })
+
+  it('un fichero de proyecto de dos se abre entero y SIN el rechazo de la fase 1', async () => {
+    const conjunto = crearConjunto()
+    const m = await montar({ conjunto })
+    const sobre = {
+      formato: 'concreta-gml/proyecto',
+      version: 2,
+      generado: '2026-11-01T10:00:00.000Z',
+      nombre: 'Segregación',
+      expediente: deDos('PIEZA-1'),
+    }
+    await m.cableado.abrirProyecto(ficheroDeTexto('dos.json', JSON.stringify(sobre)))
+    await reposar()
+    expect(m.avisos().join('\n')).not.toContain(mensajeVariasParcelas(2))
+    expect(m.estado.get().idLocal).toBe('PIEZA-1')
+    expect(conjunto.parcelas()).toHaveLength(2)
+    expect(conjunto.activa()).toBe('PIEZA-1')
+    m.cableado.destruir()
+  })
+
+  it('traer OTRO documento sigue soltando la identidad, también con el conjunto', async () => {
+    const { m } = await montarConDos()
+    await abrir(m)
+    pulsar(SELECTOR.GUARDAR)
+    await reposar()
+    m.estado.set(parcelaDemoConHueco())
+    await reposar()
+    await abrir(m)
+    pulsar(SELECTOR.GUARDAR)
+    await reposar()
+    const { registros } = await m.expedientes.listar()
+    expect(registros).toHaveLength(2)
+    m.cableado.destruir()
   })
 })
