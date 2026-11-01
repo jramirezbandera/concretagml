@@ -47,6 +47,7 @@
 import L from 'leaflet'
 
 import { HUSOS_VALIDOS } from '../geo/huso.js'
+import { ORIGEN_PARCELA } from '../model/parcela.js'
 import { COLOR_USUARIO, NIVEL, PANE, resolverAvisar, vertUTMaLatLng } from './_comun.js'
 
 /** Clase del `<path>` de cada parcela que no está en edición. */
@@ -100,13 +101,20 @@ const COLOR = Object.freeze({ TEXTO: '#0F172A', SECUNDARIO: '#475569', FILO: '#C
  * de tenerla—. El número va SIEMPRE: dos piezas sin referencia tienen que poder
  * distinguirse, y la referencia sola no lo permite.
  *
- * @param {{refcat?: string|null}} parcela
+ * ⭐ F25 · fase 3b: una pieza del sobrante (`DERIVACION`) tampoco tiene referencia
+ * propia, pero sí el identificador con el que irá al fichero —la del padre con su
+ * ordinal, `…473N.1`, la forma aceptada con IVG positivo (O19)—, y es como la nombra
+ * la lista del sobrante. Se enseña ése: «sin referencia» la confundiría con una
+ * dibujada.
+ *
+ * @param {{refcat?: string|null, idLocal?: string, origen?: string}} parcela
  * @param {number} orden  Empezando en 1.
  * @returns {string}
  */
 export function rotularParcela(parcela, orden) {
   const refcat = typeof parcela?.refcat === 'string' && parcela.refcat.trim() !== '' ? parcela.refcat.trim() : null
-  return `${orden} · ${refcat ?? TEXTO.SIN_REFERENCIA}`
+  const deSobrante = parcela?.origen === ORIGEN_PARCELA.DERIVACION ? parcela.idLocal : null
+  return `${orden} · ${refcat ?? deSobrante ?? TEXTO.SIN_REFERENCIA}`
 }
 
 /** Estilos en línea propiedad a propiedad (ver `viewer/buscador.js#estilar`). */

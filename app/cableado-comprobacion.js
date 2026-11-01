@@ -284,12 +284,20 @@ export const ESPERANDO_PARCELARIO = 'Trayendo el parcelario del Catastro…'
  * frase que diga por qué se ha parado el recorrido. El cajón lo explica también,
  * pero el cajón está sobre el mapa y el usuario puede estar mirando el panel.
  *
+ * ⚠️ F25 · fase 3b: con la casilla «Abrir también las otras…» ofrecida, «un expediente
+ * lleva una» y «las demás se quedan en el fichero» ya no son ciertas, y se dice lo que
+ * hay. Sin ella, lo de antes, que sigue siéndolo para ese montaje.
+ *
  * @param {number} cuantas
+ * @param {boolean} [conLasDemas=false]  Si se ofrece meterlas todas en el expediente.
  * @returns {string}
  */
-export const mensajeElegirParcela = (cuantas) =>
-  `Ese GML trae ${cuantas} parcelas dentro y un expediente lleva una. Elige cuál cargas en el ` +
-  'cuadro que ha salido sobre el mapa; las demás se quedan en el fichero.'
+export const mensajeElegirParcela = (cuantas, conLasDemas = false) =>
+  conLasDemas
+    ? `Ese GML trae ${cuantas} parcelas dentro. Elige en el cuadro que ha salido sobre el mapa ` +
+      'cuál se pone en edición; con su casilla, las demás entran también en el expediente.'
+    : `Ese GML trae ${cuantas} parcelas dentro y un expediente lleva una. Elige cuál cargas en el ` +
+      'cuadro que ha salido sobre el mapa; las demás se quedan en el fichero.'
 
 /**
  * Lo que se le dice cuando el fichero se ha leído y **la aplicación no puede
@@ -303,6 +311,34 @@ export const mensajeElegirParcela = (cuantas) =>
  */
 export const mensajeNoSePuedeCargar = (nombre, motivo) =>
   `No se ha podido cargar «${nombre}»: ${motivo}`
+
+/**
+ * F25 · fase 3b · lo que se dice tras meter en el expediente las demás parcelas de un
+ * fichero multiparcela. Cuenta lo que ha entrado, lo que ya estaba y lo que el fichero
+ * no deja leer, y recuerda lo que les falta: el parcelario del Catastro, que no se ha
+ * pedido para ellas (una apertura, una petición).
+ *
+ * @param {{añadidas?: string[], yaEstaban?: string[], ilegibles?: number[]}} r
+ * @returns {string}
+ */
+export function mensajeDemasDelFichero({ añadidas = [], yaEstaban = [], ilegibles = [] }) {
+  const partes = []
+  if (añadidas.length > 0) {
+    partes.push(
+      `${añadidas.length === 1 ? 'Ha entrado 1 parcela más' : `Han entrado ${añadidas.length} parcelas más`} ` +
+        `del fichero en el expediente (${añadidas.join(', ')}). Entran sin el parcelario del ` +
+        'Catastro: tráelo de cada una al ponerla en edición.',
+    )
+  }
+  if (yaEstaban.length > 0) partes.push(`Ya estaban en el expediente: ${yaEstaban.join(', ')}.`)
+  if (ilegibles.length > 0) {
+    partes.push(
+      `El fichero no deja leer ${ilegibles.length === 1 ? 'la parcela nº' : 'las parcelas nº'} ` +
+        `${ilegibles.join(', ')}: no han entrado.`,
+    )
+  }
+  return partes.length === 0 ? 'No había más parcelas que añadir.' : partes.join(' ')
+}
 
 /**
  * Cola común de todos los motivos por los que la parcela entra SIN parcelario. Se
@@ -780,6 +816,11 @@ export function cablearComprobacion({
   cajonDiagnostico = null,
   alCargarParcela = null,
   alPedirEleccion = null,
+  // ⭐ F25 · fase 3b · quien mete en el expediente las DEMÁS parcelas de un fichero
+  // multiparcela, si el usuario marca «Abrir también las otras…». Recibe las parcelas
+  // (POJOs para `crearParcela`) y devuelve `{añadidas, yaEstaban}`. `null` ⇒ la
+  // casilla no se ofrece, y el cajón dice lo de antes.
+  alAñadirResto = null,
   entradasExtra = [],
   alGmlDeEdificio = null,
   ventana = globalThis,
@@ -824,6 +865,11 @@ export function cablearComprobacion({
       `cablearComprobacion: 'alCargarParcela' debe ser una función (se le pasa el POJO de la ` +
         `parcela que acaba de entrar en el store) o null si no hace falta; recibido ` +
         `${typeof alCargarParcela}.`,
+    )
+  }
+  if (alAñadirResto !== null && typeof alAñadirResto !== 'function') {
+    throw new TypeError(
+      `cablearComprobacion: 'alAñadirResto' debe ser una función o null; recibido ${typeof alAñadirResto}.`,
     )
   }
   if (alPedirEleccion !== null && typeof alPedirEleccion !== 'function') {
@@ -1036,7 +1082,9 @@ export function cablearComprobacion({
         // clic-fuera no se entera y se quedarían los dos apilados.
         if (cajonDiagnostico !== null) cajonDiagnostico.cerrar()
         cajon.abrir()
-        panel.avisar(mensajeElegirParcela(primera.miembros.length), { nivel: NIVEL.AVISO })
+        panel.avisar(mensajeElegirParcela(primera.miembros.length, alAñadirResto !== null), {
+          nivel: NIVEL.AVISO,
+        })
         // Envuelto, igual que {@link notificarCarga}: un oyente roto no puede
         // deshacer un cajón que ya está en pantalla con la pregunta hecha.
         if (alPedirEleccion !== null) {
@@ -1153,6 +1201,61 @@ export function cablearComprobacion({
     } catch (causa) {
       reventar(`la comprobación de la parcela nº ${indice + 1} ha fallado`, causa)
     }
+  }
+
+  /**
+   * ⭐ F25 · fase 3b · las DEMÁS parcelas del fichero entran en el expediente, detrás
+   * de la elegida. Cada una se comprueba ENTERA con su índice —las cuatro
+   * comprobaciones de F08 son de la parcela, no del fichero— y **sin tocar
+   * `comprobacion`**, que es lo que el informe de F09 imprime de la elegida.
+   *
+   * No se contrastan con el Catastro: entran sin geometría oficial. Una petición por
+   * parcela al abrir un fichero rompería la regla vigente («una apertura, una
+   * petición», override O8), y cada una puede traer su parcelario de fondo después,
+   * cuando se ponga en edición. Las que el fichero no deja leer se cuentan.
+   *
+   * @param {object} c  La comprobación de la elegida (de ella salen fichero y miembros).
+   * @param {string} idLocalElegida
+   */
+  function añadirLasDemas(c, idLocalElegida) {
+    const usados = new Set([idLocalElegida])
+    const parcelas = []
+    const ilegibles = []
+    c.miembros.forEach((miembro, i) => {
+      if (i === c.elegido) return
+      const ci = comprobarGml({
+        texto: fuente.texto,
+        nombreFichero: fuente.nombre,
+        bytes: fuente.bytes,
+        deteccionesPrevias: fuente.detecciones,
+        encodingUsado: fuente.encodingUsado,
+        indiceElegido: i,
+      })
+      if (!ci.puedeContinuar || ci.geometria === null) {
+        ilegibles.push(i + 1)
+        return
+      }
+      const refcat = normalizarRefcat(miembro.refcat)
+      // Dos miembros sin `localId` ni referencia darían el mismo identificador (el
+      // nombre del fichero): se numeran, porque el expediente no admite repetidos.
+      let idLocal = idLocalDe(miembro, refcat, c.fichero.nombre)
+      if (usados.has(idLocal)) idLocal = `${idLocal}#${i + 1}`
+      usados.add(idLocal)
+      parcelas.push({
+        idLocal,
+        refcat,
+        recintos: ci.geometria.recintos,
+        origen: ORIGEN_PARCELA.GML_EXISTENTE,
+      })
+    })
+    let resultado = { añadidas: [], yaEstaban: [] }
+    try {
+      resultado = alAñadirResto(parcelas)
+    } catch (causa) {
+      reventar('meter en el expediente las demás parcelas del fichero', causa)
+      return
+    }
+    panel.avisar(mensajeDemasDelFichero({ ...resultado, ilegibles }), { nivel: NIVEL.AVISO })
   }
 
   // ── 2 · Del cajón al store, pasando por el Catastro ────────────────────────
@@ -1301,9 +1404,14 @@ export function cablearComprobacion({
         origen: ORIGEN_PARCELA.GML_EXISTENTE,
       })
 
+      // F25 · la casilla se lee ANTES del `set`: el `set` cierra el cajón.
+      const conLasDemas = alAñadirResto !== null && cajon.abrirTodas?.() === true
+
       // EL ÚNICO `set` del recorrido. Su suscriptor cierra este cajón (ver la
       // cabecera), así que a partir de esta línea el cajón ya no se ve.
       estado.set(parcela)
+
+      if (conLasDemas) añadirLasDemas(c, parcela.idLocal)
 
       // ── EL CAMPO DICE LO MISMO QUE EL MODELO. SIEMPRE, Y TAMBIÉN CUANDO ES «NADA»
       //
@@ -1466,6 +1574,8 @@ export function cablearComprobacion({
   const bajaElegir = cajon.alElegir(elegir)
   const bajaContrastar = cajon.alContrastar(alContrastar)
   const bajaDescartar = cajon.alDescartar(descartar)
+  // F25 · la casilla «Abrir también las otras…» solo existe si hay quien las añada.
+  cajon.ofrecerTodas?.(alAñadirResto !== null)
   const desuscribirStore = estado.subscribe(alCambiarElStore)
 
   return {

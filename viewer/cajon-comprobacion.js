@@ -188,6 +188,8 @@ export const CLASE = Object.freeze({
 export const SELECTOR = Object.freeze({
   CONTRASTAR: '[data-accion="contrastar-parcelario"]',
   DESCARTAR: '[data-accion="descartar-comprobacion"]',
+  /** F25 · fase 3b · la casilla «abrir también las demás». */
+  ABRIR_TODAS: '[data-comp="abrir-todas"]',
   ESTADO: '[data-estado="cajon-comprobacion"]',
   TITULAR: '[data-comp="titular"]',
   FICHERO: '[data-comp="fichero"]',
@@ -581,6 +583,24 @@ const CajonComprobacion = L.Control.extend({
 
     pie.append(contrastar, descartar)
 
+    // ── ⭐ F25 · fase 3b · las DEMÁS parcelas del fichero, también ────────────
+    // Una casilla y no un segundo botón: la acción sigue siendo UNA —cargar la
+    // elegida, que es la que se pone en edición y la única que se contrasta con el
+    // Catastro (una petición, override O8)—, y la casilla dice qué más entra con
+    // ella. Nace oculta: solo aparece con varias parcelas y si quien cablea sabe
+    // meterlas en el expediente (`ofrecerTodas`).
+    const abrirTodas = crear(doc, 'label')
+    abrirTodas.dataset.comp = 'abrir-todas'
+    abrirTodas.hidden = true
+    estilar(abrirTodas, { display: 'none', alignItems: 'center', gap: '6px', margin: '8px 0 0', fontSize: '12px' })
+    const casillaTodas = crear(doc, 'input')
+    casillaTodas.type = 'checkbox'
+    const textoTodas = crear(doc, 'span')
+    abrirTodas.append(casillaTodas, textoTodas)
+    this._abrirTodas = abrirTodas
+    this._casillaTodas = casillaTodas
+    this._textoTodas = textoTodas
+
     // ── El renglón de estado ────────────────────────────────────────────────
     // `role="status"` para que el lector de pantalla lo anuncie SIN robar el foco,
     // igual que el de «Generar GML», el de la barra de edición y el del cajón de
@@ -603,6 +623,7 @@ const CajonComprobacion = L.Control.extend({
       bloqueHallazgos,
       notas,
       bloqueos,
+      abrirTodas,
       pie,
       estado,
     )
@@ -737,6 +758,10 @@ export function crearCajonComprobacion({ mapa, posicion = 'bottomleft', alAvisar
   mapa.addControl(control)
 
   let destruido = false
+  /** F25 · si se ofrece la casilla «Abrir también las otras…» (`ofrecerTodas`). */
+  let ofreceTodas = false
+  /** De qué fichero es lo marcado en esa casilla: con otro fichero se desmarca. */
+  let ficheroDeLaCasilla = null
 
   /** El miembro que se está comprobando, o `null` si el fichero no trae ninguno. */
   const elegidoDe = (c) =>
@@ -754,6 +779,16 @@ export function crearCajonComprobacion({ mapa, posicion = 'bottomleft', alAvisar
    * sugiere que se podría desmarcar. Con una sola se enuncia y ya está.
    */
   function pintarMiembros(c) {
+    // La casilla de «las demás», con la cuenta de ESTE fichero. Se desmarca con cada
+    // fichero nuevo: lo que se marcó para uno no se arrastra al siguiente.
+    const varias = ofreceTodas && c.miembros.length > 1
+    control._abrirTodas.hidden = !varias
+    control._abrirTodas.style.display = varias ? 'flex' : 'none'
+    if (!varias || c.fichero?.nombre !== ficheroDeLaCasilla) control._casillaTodas.checked = false
+    ficheroDeLaCasilla = c.fichero?.nombre ?? null
+    control._textoTodas.textContent = varias
+      ? `Abrir también las otras ${c.miembros.length - 1} parcelas del fichero en el expediente`
+      : ''
     const doc = control._doc
     const caja = control._miembros
     // Se conserva la `<legend>`: es parte de la estructura, no del contenido.
@@ -778,13 +813,20 @@ export function crearCajonComprobacion({ mapa, posicion = 'bottomleft', alAvisar
       return
     }
 
+    // ⚠️ F25 · fase 3b: «un expediente lleva una sola parcela» dejó de ser cierto. Con
+    // la casilla ofrecida, se dice lo que hay; sin ella, lo de antes, que sigue siendo
+    // verdad para ese montaje.
     const intro = crear(
       doc,
       'p',
       null,
-      `El fichero trae ${c.miembros.length} parcelas y se comprueba UNA. Las demás se quedan ` +
-        'en el fichero: un expediente lleva una sola parcela, y unirlas no es algo que esta ' +
-        'aplicación haga.',
+      ofreceTodas
+        ? `El fichero trae ${c.miembros.length} parcelas y se comprueba UNA: la que elijas se ` +
+            'pone en edición y se contrasta con el Catastro. Con la casilla de abajo, las demás ' +
+            'entran también en el expediente.'
+        : `El fichero trae ${c.miembros.length} parcelas y se comprueba UNA. Las demás se quedan ` +
+            'en el fichero: un expediente lleva una sola parcela, y unirlas no es algo que esta ' +
+            'aplicación haga.',
     )
     estilar(intro, { margin: '0 0 4px', fontSize: '12px', color: '#64748B' })
     caja.append(intro)
@@ -1138,6 +1180,18 @@ export function crearCajonComprobacion({ mapa, posicion = 'bottomleft', alAvisar
       control._oyentes.descartar.add(fn)
       return () => control._oyentes.descartar.delete(fn)
     },
+
+    /**
+     * ⭐ F25 · fase 3b · ofrece (o deja de ofrecer) la casilla «Abrir también las
+     * otras parcelas del fichero». La llama quien sabe meterlas en el expediente.
+     * @param {boolean} si
+     */
+    ofrecerTodas(si) {
+      ofreceTodas = si === true
+    },
+
+    /** ¿Está marcada «Abrir también las otras…»? `false` si no se ofrece. */
+    abrirTodas: () => ofreceTodas && !control._abrirTodas.hidden && control._casillaTodas.checked === true,
 
     /**
      * Quita el control del mapa —lo que dispara `onRemove` y con él la retirada de

@@ -261,6 +261,7 @@ function montar({
   conCatastro = false,
   entradasExtra = [],
   alGmlDeEdificio = null,
+  alAñadirResto = null,
 } = {}) {
   const { mapa, destruir: destruirMapa } = montarMapa({ zoom: 19 })
 
@@ -289,6 +290,7 @@ function montar({
     cajonDiagnostico,
     entradasExtra,
     alGmlDeEdificio,
+    alAñadirResto,
     ventana: window,
   })
 
@@ -845,6 +847,54 @@ describe('cableado-comprobacion · un fichero con tres parcelas', () => {
     expect(estado.get().recintos).toHaveLength(1)
     expect(estado.get().recintos[0].vertices).toHaveLength(8)
     expect(estado.get().idLocal).toBe('1A')
+  })
+})
+
+describe('cableado-comprobacion · F25 · «Abrir también las otras parcelas del fichero»', () => {
+  const casilla = (raiz) => raiz.querySelector('[data-comp="abrir-todas"]')
+
+  it('sin quien las añada, la casilla no existe para el usuario y el cajón dice lo de antes', async () => {
+    const { raizCajon } = montar()
+    await soltarYEsperar(ficheroDeBytes(leerBytes(...DERIVADO('cp_multiparcela_entrega.gml')), 'tres.gml'))
+    expect(casilla(raizCajon).hidden).toBe(true)
+    expect(raizCajon.textContent).toMatch(/un expediente lleva una sola parcela/)
+  })
+
+  it('marcada: entra la elegida en edición y las OTRAS DOS detrás, sin oficial, y se dice', async () => {
+    const recibidas = []
+    const { estado, raizCajon, panel } = montar({
+      alAñadirResto: (parcelas) => {
+        recibidas.push(...parcelas)
+        return { añadidas: parcelas.map((p) => p.idLocal), yaEstaban: [] }
+      },
+    })
+    await soltarYEsperar(ficheroDeBytes(leerBytes(...DERIVADO('cp_multiparcela_entrega.gml')), 'tres.gml'))
+    expect(casilla(raizCajon).hidden).toBe(false)
+    expect(casilla(raizCajon).textContent).toMatch(/otras 2 parcelas/)
+    expect(raizCajon.textContent).not.toMatch(/un expediente lleva una sola parcela/)
+    raizCajon.querySelectorAll('[data-comp="miembro"], input[type="radio"]')[1]?.click()
+    await cederTurno(2)
+    casilla(raizCajon).querySelector('input').click()
+    await contrastar(raizCajon)
+
+    expect(estado.get().idLocal).toBe('2B')
+    expect(estado.set).toHaveBeenCalledTimes(1)
+    expect(recibidas.map((p) => p.idLocal)).toEqual(['1A', '3C'])
+    for (const p of recibidas) {
+      expect(p.origen).toBe('GML_EXISTENTE')
+      expect(p.geometriaOficial).toBeUndefined()
+      expect(p.recintos[0].vertices.length).toBeGreaterThan(2)
+    }
+    const avisos = panel.avisar.mock.calls.map((c) => c[0]).join(' | ')
+    expect(avisos).toMatch(/Han entrado 2 parcelas más del fichero en el expediente \(1A, 3C\)/)
+  })
+
+  it('sin marcar, no entra nada más que la elegida', async () => {
+    const recibidas = []
+    const { raizCajon } = montar({ alAñadirResto: (p) => (recibidas.push(...p), { añadidas: [], yaEstaban: [] }) })
+    await soltarYEsperar(ficheroDeBytes(leerBytes(...DERIVADO('cp_multiparcela_entrega.gml')), 'tres.gml'))
+    await contrastar(raizCajon)
+    expect(recibidas).toEqual([])
   })
 })
 

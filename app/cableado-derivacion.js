@@ -62,6 +62,7 @@ import { serializarCoordenadasTxt } from '../export/coordenadas.js'
 import { superficie } from '../geo/area.js'
 import { descargarGml, descargarTexto, TIPO_MIME_TEXTO } from '../gml/descargar.js'
 import { serializarParcelaCp } from '../gml/serialize-cp.js'
+import { ORIGEN_PARCELA } from '../model/parcela.js'
 import { NIVEL } from '../viewer/_comun.js'
 import {
   FORMATO,
@@ -228,6 +229,40 @@ export const MOTIVO_NO_CIERRA =
   'El expediente NO cierra sobre el contorno oficial, así que no se descarga: un fichero que ' +
   'no cubre la finca de partida sale con IVG negativo aunque cada parcela suya sea impecable. ' +
   'Mira el panel de avisos.'
+
+/**
+ * F25 · fase 3b · lo que dice el renglón tras «Añadir al expediente». Cuenta las tres
+ * cosas que pueden pasar, y la tercera es la que no se puede callar: los colindantes
+ * recortados NO han entrado (ver `añadirAlExpediente`).
+ *
+ * @param {{añadidas: string[], yaEstaban: string[], vecinos: number}} r
+ * @returns {string}
+ */
+export function mensajeAñadidasAlExpediente({ añadidas = [], yaEstaban = [], vecinos = 0 }) {
+  const partes = []
+  if (añadidas.length > 0) {
+    partes.push(
+      añadidas.length === 1
+        ? `Añadida al expediente la pieza ${añadidas[0]}: ya se puede editar desde «Parcela en edición».`
+        : `Añadidas al expediente ${añadidas.length} piezas (${añadidas.join(', ')}): ya se pueden ` +
+            'editar desde «Parcela en edición».',
+    )
+  }
+  if (yaEstaban.length > 0) {
+    partes.push(
+      `${yaEstaban.join(', ')} ya estaba${yaEstaban.length === 1 ? '' : 'n'} en el expediente y no se ` +
+        'ha sustituido: puede haberse editado a mano.',
+    )
+  }
+  if (añadidas.length === 0 && yaEstaban.length === 0) partes.push('No había ninguna pieza que añadir.')
+  if (vecinos > 0) {
+    partes.push(
+      `Los ${vecinos === 1 ? 'colindante recortado no se añade' : `${vecinos} trozos de colindantes recortados no se añaden`}: ` +
+        'siguen saliendo solo en «Descargar expediente».',
+    )
+  }
+  return partes.join(' ')
+}
 
 /**
  * Qué decir cuando el expediente se ha compuesto y no puede salir.
@@ -500,7 +535,17 @@ export function cablearDerivacion({
   ahora = () => new Date(),
   descargar = descargarGml,
   descargarTxt = descargarTexto,
+  // ⭐ F25 · fase 3b · quien mete las piezas del sobrante en el expediente como
+  // parcelas. Recibe las parcelas a añadir (POJOs para `crearParcela`) y devuelve
+  // `{añadidas, yaEstaban}` con los `idLocal`. `null` ⇒ el botón no aparece.
+  alAñadirAlExpediente = null,
 } = {}) {
+  if (alAñadirAlExpediente !== null && typeof alAñadirAlExpediente !== 'function') {
+    throw new TypeError(
+      `cablearDerivacion: 'alAñadirAlExpediente' debe ser una función o null; recibido ` +
+        `${describir(alAñadirAlExpediente)}.`,
+    )
+  }
   if (!esStore(estado)) {
     throw new TypeError(
       `cablearDerivacion: 'estado' debe ser el store de crearEstadoVista ({get, subscribe}); ` +
@@ -1378,6 +1423,65 @@ export function cablearDerivacion({
     return resultado
   }
 
+  /**
+   * ⭐ F25 · fase 3b · las PIEZAS del sobrante entran en el expediente como parcelas:
+   * editables, guardadas con él, y con el identificador con el que irían al fichero
+   * (`…473N.1`, O19) como `idLocal`. Pasa por EXACTAMENTE la misma composición que
+   * «Descargar expediente» —la puerta del exceso, la validación de cada pieza y el
+   * cierre del conjunto—, así que lo que no se puede entregar tampoco se añade.
+   *
+   * ⛔ **Solo las piezas propias.** Los colindantes que F23 recorta NO entran todavía:
+   * si un vecino pasara a ser parcela del expediente, «Rehacer el parcelario» lo
+   * volvería a recortar; y sacarlo del recorte haría que su exceso se declarara sobre
+   * vial, que es el error caro que F23 existe para no cometer. Eso se decide con el
+   * cierre del conjunto de la fase 4. Se dice cuántos se quedan fuera.
+   *
+   * Una pieza cuyo `idLocal` ya está en el expediente NO se sustituye: puede haberse
+   * editado a mano después de añadirla, y pisarla con lo recién calculado sería perder
+   * ese trabajo sin decirlo. Se cuenta.
+   *
+   * @returns {{añadidas: string[], yaEstaban: string[]}|null}  `null` si no se pudo.
+   */
+  function añadirAlExpediente() {
+    if (!vivo || cesion === null || alAñadirAlExpediente === null) return null
+    if (cesion.puerta.contenida === false && !excesoExplicado()) {
+      lista.estado(motivoEntregaFuera(cesion.puerta, formatearNumero), { error: true })
+      return null
+    }
+    let entrega
+    try {
+      entrega = prepararEntrega({
+        parcela: estado.get(),
+        srs,
+        cesion,
+        recorte: cesion.recorte ?? null,
+        incluidas: lista.seleccionadas(),
+        nombres: lista.nombres(),
+      })
+    } catch (causa) {
+      panel.avisar(`No se han podido preparar las piezas: ${causa?.message ?? causa}`, { nivel: NIVEL.ERROR })
+      lista.estado('No se han podido preparar las piezas. Mira el panel de avisos.', { error: true })
+      return null
+    }
+    publicar(entrega.detecciones)
+    if (!entrega.puedeEntregarse) {
+      lista.estado(motivoEntregaBloqueada(entrega), { error: true })
+      return null
+    }
+    const piezas = entrega.miembros.filter((m) => m.esCesion)
+    const vecinos = entrega.miembros.filter((m) => m.esVecino === true).length
+    const resultado = alAñadirAlExpediente(
+      piezas.map((m) => ({
+        idLocal: m.identidad.refcat,
+        refcat: null,
+        recintos: m.recintos,
+        origen: ORIGEN_PARCELA.DERIVACION,
+      })),
+    )
+    lista.estado(mensajeAñadidasAlExpediente({ ...resultado, vecinos }))
+    return resultado
+  }
+
   // ── Los cables ────────────────────────────────────────────────────────────
 
   // Apagado con `aria-disabled` (`app/apagado.js`): el clic llega igual, y pulsar
@@ -1388,6 +1492,12 @@ export function cablearDerivacion({
   }
   elBoton.addEventListener('click', alPulsar)
   const bajaEntrega = lista.alEntregar(entregar)
+  const bajaAñadir =
+    alAñadirAlExpediente !== null && typeof lista.alAñadirAlExpediente === 'function'
+      ? lista.alAñadirAlExpediente(() => {
+          añadirAlExpediente()
+        })
+      : () => {}
   const bajaSeleccion = lista.alCambiarSeleccion(repartir)
   const bajaSuelto = lista.alDescargarSuelto(descargarSuelto)
 
@@ -1456,6 +1566,7 @@ export function cablearDerivacion({
   return {
     derivar,
     entregar,
+    añadirAlExpediente,
     ultimaCesion: () => cesion,
 
     /**
@@ -1492,6 +1603,7 @@ export function cablearDerivacion({
       vivo = false
       elBoton.removeEventListener('click', alPulsar)
       bajaEntrega()
+      bajaAñadir()
       bajaSuelto()
       bajaColindantes?.()
       bajaSeleccion()

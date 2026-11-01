@@ -517,10 +517,19 @@ export function textoProcedenciaFincaElegida({ nombreFichero, capa = null, refca
   )
 }
 
-/** Lo que se dice en el panel al abrir el cajón de elección. */
+/**
+ * Lo que se dice en el panel al abrir el cajón de elección.
+ *
+ * ⚠️ F25 · fase 3: decía «y un expediente lleva una sola», y desde que un expediente
+ * lleva varias eso es falso. Lo que sigue siendo verdad es que se elige UNA para
+ * empezar —la que se pone en edición— y que las demás quedan como colindantes (F22,
+ * decisión 1), desde donde «Añadir parcela» mete en el expediente las que tienen
+ * referencia catastral.
+ */
 export const mensajeElegirFinca = (cuantas) =>
-  `El dibujo trae ${cuantas} fincas separadas y un expediente lleva una sola. ` +
-  `Elige la tuya en el cajón del mapa: al marcarla se resalta sobre la cartografía.`
+  `El dibujo trae ${cuantas} fincas separadas. Elige la tuya en el cajón del mapa: al ` +
+  `marcarla se resalta sobre la cartografía. Las demás quedan como colindantes, y desde ` +
+  `«Añadir parcela» puedes meter en el expediente las que traigan referencia catastral.`
 
 /** Y lo que se dice al descartar el dibujo entero. */
 export const MENSAJE_FINCAS_DESCARTADAS =

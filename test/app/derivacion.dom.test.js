@@ -25,6 +25,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { estaApagado } from '../../app/apagado.js'
 import {
   cablearDerivacion,
+  mensajeAñadidasAlExpediente,
   motivoEntregaBloqueada,
   MOTIVO_NO_CIERRA,
   AVISO_SIN_COLINDANTES,
@@ -637,6 +638,60 @@ describe('cablearDerivacion', () => {
       expect(cableado.entregar()).toBeNull()
       expect(descargas).toHaveLength(0)
       expect(renglonEntrega().textContent).toBe(MOTIVO_SIN_DERIVAR)
+    })
+
+    // ── F25 · fase 3b · «Añadir al expediente» ──────────────────────────────
+    const botonAñadir = () => document.querySelector('[data-accion="añadir-al-expediente"]')
+
+    it('F25 · sin quien añada, «Añadir al expediente» no aparece', () => {
+      derivado()
+      expect(botonAñadir().hidden).toBe(true)
+    })
+
+    it('F25 · las piezas entran como parcelas DERIVACION con el idLocal del fichero (O19), y se dice', () => {
+      const recibidas = []
+      cablear({
+        alAñadirAlExpediente: (parcelas) => {
+          recibidas.push(...parcelas)
+          return { añadidas: parcelas.map((p) => p.idLocal), yaEstaban: [] }
+        },
+      })
+      estado.set(parcela())
+      boton().click()
+      expect(botonAñadir().hidden).toBe(false)
+      expect(botonAñadir().disabled).toBe(botonEntregar().disabled)
+      botonAñadir().click()
+      expect(recibidas).toHaveLength(1)
+      expect(recibidas[0]).toMatchObject({ idLocal: '7136910UF1473N.1', refcat: null, origen: 'DERIVACION' })
+      expect(recibidas[0].recintos.length).toBeGreaterThan(0)
+      // Y NADA se descarga: añadir no es entregar.
+      expect(descargas).toHaveLength(0)
+      expect(renglonEntrega().textContent).toMatch(/Añadida al expediente la pieza 7136910UF1473N\.1/)
+    })
+
+    it('F25 · lo que no se puede ENTREGAR tampoco se AÑADE (misma puerta)', () => {
+      const recibidas = []
+      cablear({
+        alAñadirAlExpediente: (parcelas) => {
+          recibidas.push(...parcelas)
+          return { añadidas: [], yaEstaban: [] }
+        },
+      })
+      estado.set(parcela())
+      boton().click()
+      const casilla = document.querySelector(SELECTOR.INCLUIR)
+      casilla.checked = false
+      casilla.dispatchEvent(new window.Event('change', { bubbles: true }))
+      expect(cableado.añadirAlExpediente()).toBeNull()
+      expect(recibidas).toEqual([])
+      expect(renglonEntrega().textContent).toBe(MOTIVO_NO_CIERRA)
+    })
+
+    it('F25 · mensajeAñadidasAlExpediente cuenta las que ya estaban y los colindantes que se quedan fuera', () => {
+      expect(mensajeAñadidasAlExpediente({ añadidas: [], yaEstaban: ['X.1'], vecinos: 2 })).toMatch(
+        /X\.1 ya estaba en el expediente y no se ha sustituido.*2 trozos de colindantes recortados no se añaden/,
+      )
+      expect(mensajeAñadidasAlExpediente({})).toBe('No había ninguna pieza que añadir.')
     })
   })
 

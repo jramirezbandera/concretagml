@@ -479,17 +479,49 @@ real al Catastro, consola limpia):
   edición (el conjunto no deja quitar la activa) y lo dice. Un armado que sobrevive a un
   cambio de parcela se desarma: no se quita la que no es.
 
-**Pendiente, tanda 3b:**
-- 3.0 bis · La unión de los puntos de levantamiento en la capa y en las dianas (H9).
-- 3.2 Materializar las piezas de F17 y los vecinos de F23 como miembros.
-- 3.4 Un GML con varios miembros (hoy el cajón de F08 obliga a elegir uno) y un DXF de F22
-  pueden entrar enteros.
-- 3.5 El contexto acumula (H7).
+**Tanda 3b — hecha el 2026-11-01** (suite **8.727 pruebas / 208 ficheros, 0 rojas**; ni
+una dependencia, ni un byte de CSS; recorrida en Chromium a 1280×720 con la parcela real
+y con el fichero de tres parcelas de las pruebas, consola limpia):
+
+- **3.0 bis · los puntos de levantamiento de TODAS las parcelas** se pintan y se
+  enganchan (H9, decidido en la 1.5), sin repetir. «Quitar los puntos» sigue contando y
+  quitando solo los de la parcela en edición, que es lo único que borra.
+- **3.2 · «Añadir al expediente»** en la ventana del sobrante, junto a «Descargar
+  expediente» y gobernado por la MISMA puerta (lo que no se puede entregar tampoco se
+  añade). Las piezas entran como parcelas `DERIVACION` con el identificador del fichero
+  como `idLocal` (`…9398516VK3799G.1`, O19) y sin ponerse en edición; el selector las
+  rotula con ese identificador. Una que ya está no se pisa: puede haberse editado.
+  **Medido**: el lindero de 9398516VK3799G metido hacia dentro dejó una pieza de
+  86,58 m² que entró como parcela 2, con su rótulo «Parcela nueva · sobrante del lindero».
+  - ⛔ **Los colindantes que recorta F23 NO entran, y se desvía del plan a propósito.**
+    Un vecino hecho parcela volvería a recortarse al rehacer el parcelario; y sacarlo del
+    recorte (D3) haría que su exceso se declarara SOBRE VIAL —el error caro que F23
+    existe para no cometer—. Las dos cosas se resuelven con el cierre del CONJUNTO, que
+    es de la fase 4: allí van juntas la 3.2 de vecinos y la 4.3. El renglón dice cuántos
+    trozos se quedan fuera.
+- **3.4 · «Abrir también las otras parcelas del fichero»**: una casilla en el cajón de
+  F08 (solo con varias, y solo si hay quien las añada). La elegida entra como siempre —en
+  edición y contrastada con el Catastro—; las demás entran detrás **sin parcelario
+  oficial**, porque una petición por parcela al abrir un fichero rompería «una apertura,
+  una petición» (O8). Cada una se comprueba entera con su índice y **sin tocar la
+  comprobación de la elegida**, que es la que imprime el informe de F09. **Medido** con
+  el fichero de tres parcelas: entraron las tres, la elegida en edición.
+  - El DXF de F22 no gana casilla: sus otras fincas ya entran como colindantes (decisión
+    1 de F22), y desde ahí «Añadir parcela» mete las que tienen referencia.
+  - ⛔ **Cuatro textos decían «un expediente lleva una sola parcela»** y dejaron de ser
+    verdad: el aviso de F08 al soltar un multiparcela, la intro del cajón de F08, el
+    aviso de F22 y la explicación del cajón de fincas. Los de F08 cambian según se
+    ofrezca la casilla; los de F22 dicen ya que las demás se pueden añadir.
+- **3.5 · «el contexto acumula» → APLAZADO, con el motivo que dejó H3 corregida**: las
+  vecinas son de UNA parcela y no se pueden mezclar; lo que tendría sentido es guardarlas
+  POR parcela para no volver a pedirlas al cambiar. Es comodidad (ahorra una petición),
+  no corrección, y no bloquea nada.
 
 **Fase 4 · las salidas.**
 - 4.1 Descargar una fila.
 - 4.2 La selección → un `.gml`, con validación, cierre y tipo de operación.
-- 4.3 D3 en `derivacion/vecino.js`: los miembros quedan fuera del recorte automático.
+- 4.3 D3 en `derivacion/vecino.js`: los miembros quedan fuera del recorte automático —y,
+  desde la 3b, **junto con ella**, añadir al expediente los colindantes que recorta F23—.
 - 4.4 Los textos de H8 y de la foto de la derivación (suscriptor 6).
 
 **Fase 5 · los gates.** Guion `29-parcelas-del-expediente.js` a 1280×720 y 1440×900,

@@ -110,14 +110,20 @@ export const TITULAR = 'El dibujo trae varias fincas'
 
 /**
  * La explicación, que es la que evita que esto se lea como un error del usuario.
- * ⚠️ Dice **por qué** hay que elegir (un expediente lleva una parcela) y **qué
- * pasa con las demás** (se quedan como parcelario de contexto), porque «elige
- * una» a secas invita a pensar que se pierde el resto.
+ * ⚠️ Dice **por qué** hay que elegir y **qué pasa con las demás** (se quedan como
+ * parcelario de contexto), porque «elige una» a secas invita a pensar que se pierde
+ * el resto.
+ *
+ * ⛔ F25 · fase 3: el porqué decía «un expediente lleva una sola», y dejó de ser
+ * verdad cuando el expediente pasó a llevar varias. Lo que sigue siéndolo es que se
+ * elige UNA para empezar, y que las demás —las que traen referencia— se pueden meter
+ * después desde «Añadir parcela».
  */
 export const EXPLICACION =
-  'No es una parcela con patios: son fincas distintas, ninguna dentro de otra. Un expediente ' +
-  'lleva una sola. Marca la tuya —se resalta en el mapa al marcarla— y las demás se quedan ' +
-  'dibujadas alrededor como parcelario de contexto.'
+  'No es una parcela con patios: son fincas distintas, ninguna dentro de otra. Marca la tuya ' +
+  '—se resalta en el mapa al marcarla— y las demás se quedan dibujadas alrededor como ' +
+  'parcelario de contexto; desde «Añadir parcela» puedes meter cualquiera con referencia en el ' +
+  'expediente.'
 
 const nf = new Intl.NumberFormat('es-ES', {
   minimumFractionDigits: 2,

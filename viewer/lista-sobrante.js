@@ -1081,6 +1081,8 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   const oyentesSenal = new Set()
   /** @type {Set<Function>} */
   const oyentesEntrega = new Set()
+  /** F25 · los de «Añadir al expediente». */
+  const oyentesAñadir = new Set()
   /** @type {Set<Function>} */
   const oyentesSuelto = new Set()
   /** @type {Set<Function>} */
@@ -1308,6 +1310,20 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   boton.textContent = 'Descargar expediente'
   boton.disabled = true
 
+  // ⭐ F25 · fase 3b · «Añadir al expediente»: las piezas pasan a ser PARCELAS del
+  // expediente, editables y guardadas con él. Va junto a «Descargar expediente» y se
+  // enciende y se apaga CON él —lo que no se puede entregar tampoco se añade—. Nace
+  // oculto y solo aparece si alguien se suscribe (`alAñadirAlExpediente`): una lista
+  // montada sin expediente de varias parcelas detrás no ofrece una acción que no hace
+  // nada.
+  const botonAñadir = doc.createElement('button')
+  botonAñadir.type = 'button'
+  botonAñadir.className = 'gml-boton'
+  botonAñadir.dataset.accion = 'añadir-al-expediente'
+  botonAñadir.textContent = 'Añadir al expediente'
+  botonAñadir.disabled = true
+  botonAñadir.hidden = true
+
   const renglon = doc.createElement('p')
   renglon.className = 'gml-accion-estado'
   renglon.dataset.estado = 'entregar-expediente'
@@ -1317,6 +1333,7 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   // botones del pie del cajón de diagnóstico.
   renglon.id = 'gml-estado-entregar-expediente'
   boton.setAttribute('aria-describedby', renglon.id)
+  botonAñadir.setAttribute('aria-describedby', renglon.id)
 
   // ── ⭐ EL ORDEN, REHECHO EL 2026-10-25 ─────────────────────────────────────
   // Arriba, en una sola caja: QUÉ sale del fichero, el botón que lo baja y su
@@ -1335,7 +1352,7 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   const propuesta = doc.createElement('div')
   propuesta.dataset.sobrante = 'propuesta'
   estilar(propuesta, ESTILO_PROPUESTA)
-  propuesta.append(resumen, boton, renglon)
+  propuesta.append(resumen, boton, botonAñadir, renglon)
 
   cuerpo.append(propuesta, seccionSobrante, fuera, sueltos)
   bloque.append(cabecera, cuerpo)
@@ -1793,6 +1810,7 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
       contador.textContent = ''
       recuento.textContent = textoRecuento(0)
       boton.disabled = true
+      botonAñadir.disabled = true
       renglon.textContent = MOTIVO_SIN_DERIVAR
       pintarFuera(null)
       // ⛔ Y los sueltos se van con la foto. Dejarlos puestos sería ofrecer la
@@ -1932,6 +1950,7 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
   }
 
   boton.addEventListener('click', () => emitir(oyentesEntrega, 'entregar'))
+  botonAñadir.addEventListener('click', () => emitir(oyentesAñadir, 'añadir al expediente'))
 
   // ── Los ficheros sueltos ──────────────────────────────────────────────────
   //
@@ -2464,6 +2483,7 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
         )
       }
       boton.disabled = !habilitado
+      botonAñadir.disabled = !habilitado
       // ⛔ Apagar SIN motivo es lo que la regla de oro 1 prohíbe, así que se exige
       // aquí y no se confía en que el llamante se acuerde.
       if (!habilitado) {
@@ -2526,6 +2546,18 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
     alNombrar: (fn) => suscribir(oyentesNombre, 'alNombrar', fn),
     alSenalar: (fn) => suscribir(oyentesSenal, 'alSenalar', fn),
     alEntregar: (fn) => suscribir(oyentesEntrega, 'alEntregar', fn),
+    /**
+     * F25 · fase 3b · «Añadir al expediente». Suscribirse lo hace APARECER; sin nadie
+     * escuchando, el botón no existe para el usuario.
+     */
+    alAñadirAlExpediente: (fn) => {
+      const baja = suscribir(oyentesAñadir, 'alAñadirAlExpediente', fn)
+      botonAñadir.hidden = false
+      return () => {
+        baja()
+        botonAñadir.hidden = oyentesAñadir.size === 0
+      }
+    },
     alDescargarSuelto: (fn) => suscribir(oyentesSuelto, 'alDescargarSuelto', fn),
 
     /**
@@ -2566,6 +2598,7 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
       oyentesNombre.clear()
       oyentesSenal.clear()
       oyentesEntrega.clear()
+      oyentesAñadir.clear()
       oyentesSuelto.clear()
       oyentesSenalSuelto.clear()
       oyentesFijarSuelto.clear()

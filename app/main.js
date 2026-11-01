@@ -2696,10 +2696,28 @@ const visor = crearVisor(nodo('#mapa'), {
 function repintarPuntosLevantamiento() {
   const parcela = estado.get()
   const puntos = Array.isArray(parcela?.puntosLevantamiento) ? parcela.puntosLevantamiento : []
-  visor.puntosLevantamiento?.pintar(puntos)
+  // ⭐ F25 · fase 3b (H9): se PINTAN y se ENGANCHAN los puntos de TODAS las parcelas
+  // del expediente, no solo los de la que está en edición. Los puntos de un
+  // levantamiento son del terreno: entran con la parcela del fichero, y la pieza nueva
+  // que se dibuja al lado los necesita como dianas aunque no sean suyos. Sin repetir:
+  // dos parcelas del mismo levantamiento pueden traer los mismos.
+  // ⚠️ El botón de quitar sigue contando y quitando SOLO los de la parcela en edición
+  // (más abajo): es lo único que borra.
+  const todos = [...puntos]
+  const vistos = new Set(puntos.map((p) => `${p[0]},${p[1]}`))
+  for (const otra of conjunto.parcelas()) {
+    if (otra.idLocal === parcela?.idLocal || !Array.isArray(otra.puntosLevantamiento)) continue
+    for (const p of otra.puntosLevantamiento) {
+      const clave = `${p[0]},${p[1]}`
+      if (vistos.has(clave)) continue
+      vistos.add(clave)
+      todos.push(p)
+    }
+  }
+  visor.puntosLevantamiento?.pintar(todos)
   // `fijarPuntos` copia y tira su caché de dianas; pasarle el array del modelo
   // —congelado— es seguro y es lo que garantiza que dibujo y enganche coincidan.
-  visor.edicion?.fijarPuntos(puntos)
+  visor.edicion?.fijarPuntos(todos)
   // ⭐ **Y LA TERCERA SALIDA, desde F24**: el botón que los quita, con su cuenta.
   // Va aquí y no en `cablearEdicion` —que es quien gobierna las otras seis
   // herramientas de esa barra— por una razón que las otras seis no tienen: los
@@ -4664,6 +4682,9 @@ comprobacionCableada = cablearComprobacion({
   // El MISMO store que el mapa, la tabla, la ficha y el diagnóstico. Es el quinto
   // suscriptor, y escribe en él UNA sola vez por recorrido.
   estado,
+  // ⭐ F25 · fase 3b · «Abrir también las otras parcelas del fichero»: entran detrás
+  // de la elegida, sin ponerse en edición. Ver el paso 20 bis.
+  alAñadirResto: añadirAlConjunto,
   // La pieza SUELTA del visor (no `visor.comprobacion.cajon`): F07 son dos piezas
   // inseparables —el cajón dice las cifras y la capa las señala— y F08 es una.
   cajon: visor.comprobacion,
@@ -6734,6 +6755,10 @@ const derivacionCableada = cablearDerivacion({
   colindantes: registroColindantes,
   panel,
   srs: SRS_DEMO,
+  // ⭐ F25 · fase 3b · «Añadir al expediente»: las piezas entran en el conjunto SIN
+  // ponerse en edición —quien revisa el sobrante sigue con su parcela, y las piezas
+  // aparecen discontinuas y en «Parcela en edición»—. La que ya está no se pisa.
+  alAñadirAlExpediente: añadirAlConjunto,
 })
 
 // ── 16 bis · LA LEYENDA DICE LO QUE HAY DIBUJADO, Y NADA MÁS ─────────────────
@@ -7294,6 +7319,34 @@ function opcionesAñadir() {
   return opciones
 }
 
+/**
+ * Mete VARIAS parcelas en el expediente, detrás de las que hay y SIN ponerlas en
+ * edición: es lo que hacen «Añadir al expediente» (las piezas del sobrante, F17) y
+ * «Abrir también las otras parcelas del fichero» (F08). Una cuyo `idLocal` ya está NO
+ * se sustituye —puede haberse editado a mano— y se devuelve para que se diga.
+ *
+ * Se declara como función porque los cableados de los pasos 9 y 16 la reciben antes
+ * de este paso; se llama con un clic, ya todo montado.
+ *
+ * @param {object[]} parcelas  POJOs para `crearParcela`.
+ * @returns {{añadidas: string[], yaEstaban: string[]}}
+ */
+function añadirAlConjunto(parcelas) {
+  const yaEstan = new Set(conjunto.parcelas().map((p) => p.idLocal))
+  const añadidas = []
+  const yaEstaban = []
+  for (const p of parcelas) {
+    if (yaEstan.has(p.idLocal)) {
+      yaEstaban.push(p.idLocal)
+      continue
+    }
+    conjunto.añadir(p)
+    yaEstan.add(p.idLocal)
+    añadidas.push(p.idLocal)
+  }
+  return { añadidas, yaEstaban }
+}
+
 /** Un `idLocal` libre para una parcela dibujada: `parcela-nueva-1`, `-2`… */
 function idLocalNuevo() {
   const usados = new Set(conjunto.parcelas().map((p) => p.idLocal))
@@ -7430,6 +7483,8 @@ conjunto.subscribe(({ motivo }) => {
   if (motivo === MOTIVO_CAMBIO.EDITADA) return
   parcelasExpediente?.pintar({ parcelas: conjunto.parcelas(), activa: conjunto.activa() })
   edicionCableada.refrescarDianas()
+  // H9: los puntos de las otras parcelas, que han podido entrar o salir.
+  repintarPuntosLevantamiento()
 })
 parcelasExpediente?.pintar({ parcelas: conjunto.parcelas(), activa: conjunto.activa() })
 // La rama Edificio no edita parcelas: allí la capa y el selector sobran.
