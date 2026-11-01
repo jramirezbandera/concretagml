@@ -6932,6 +6932,7 @@ button.gml-parte-nombre {
 .gml-app .gml-dialogo-pegado,
 .gml-app .gml-dialogo-avisos,
 .gml-app .gml-dialogo-diccionario,
+.gml-app .gml-dialogo-creditos,
 .gml-app dialog[data-bloque='atributos-edificio'] {
   position: fixed;
   top: 50%;
@@ -6965,6 +6966,7 @@ button.gml-parte-nombre {
 .gml-app .gml-dialogo-pegado::backdrop,
 .gml-app .gml-dialogo-avisos::backdrop,
 .gml-app .gml-dialogo-diccionario::backdrop,
+.gml-app .gml-dialogo-creditos::backdrop,
 .gml-app dialog[data-bloque='atributos-edificio']::backdrop {
   background: color-mix(in srgb, var(--color-text-primary) 45%, transparent);
 }
@@ -7600,8 +7602,11 @@ button.gml-parte-nombre {
    no hay nada roto, hay algo que mucha gente cree y no es cierto. Su regla vive
    fundida con las de F18 y F19: es la misma pieza. */
 
-/* «Cerrar» a la derecha del todo, como en el pie del diálogo de avisos. */
-.gml-dialogo-diccionario-pie [data-accion='cerrar-diccionario'] {
+/* «Cerrar» a la derecha del todo, como en el pie del diálogo de avisos. Por
+   POSICIÓN y no por su `data-accion` desde F16, que reutiliza este pie con un solo
+   botón: en los dos diálogos «Cerrar» es el último, y así una regla vale para ambos
+   y sale más corta que la de antes, que nombraba uno. */
+.gml-dialogo-diccionario-pie > :last-child {
   margin-left: auto;
 }
 

@@ -622,8 +622,9 @@ describe('los menús de la barra se recorren con el teclado', () => {
     disparadorDe('expediente').click()
     expect(accionEnFoco()).toBe('abrir-expediente')
     tecla('End')
-    // El envoltorio `data-pie` de «Vaciarlo» nace oculto en la cáscara.
-    expect(accionEnFoco()).toBe('como-funciona')
+    // El envoltorio `data-pie` de «Vaciarlo» nace oculto en la cáscara, así que la
+    // última visible es la de antes: «Créditos y licencias» desde F16.
+    expect(accionEnFoco()).toBe('creditos')
   })
 
   it('Tab CIERRA el menú y deja seguir', () => {

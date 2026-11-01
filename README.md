@@ -18,7 +18,11 @@ cada push a `main`, y solo si la suite completa pasa (ver «Despliegue»).
   rectángulos y un JPEG pegado sin recodificar, que es lo que el informe necesita.
 - Plano compuesto **a mano en canvas** — sin html2canvas, que sobre el div de
   Leaflet produce el polígono flotando en un rectángulo gris.
-- [Vite](https://vitejs.dev/) como servidor de desarrollo y empaquetador.
+- [Vite](https://vitejs.dev/) como servidor de desarrollo y empaquetador. El build
+  inventaría además lo que va empaquetado de terceros y emite sus licencias
+  (`licencias.json` y `licencias-terceros.txt`), que se leen en la aplicación en
+  Expediente › «Créditos y licencias». Si entra un paquete con una licencia que no
+  está en la lista cerrada de `licencias/terceros.js`, el build no sale.
 - [Vitest](https://vitest.dev/) (proyectos `node` y `dom`) para los tests.
 
 ## Scripts

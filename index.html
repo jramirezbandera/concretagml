@@ -291,6 +291,17 @@
           <button type="button" role="menuitem" class="gml-barra-menu-opcion" data-accion="como-funciona" aria-haspopup="dialog">
             Cómo funciona<span class="gml-barra-menu-apunte">la ayuda de la primera visita</span>
           </button>
+          <!-- F16 · CRÉDITOS Y LICENCIAS. Abre el `<dialog>` que fabrica
+               `app/dialogo-creditos.js`: las atribuciones de los datos y el software
+               y las tipografías que van empaquetados, con su licencia. Es la única
+               puerta a una página que las licencias obligan a tener, así que el
+               módulo revienta al arrancar si este nodo no está, igual que los dos
+               de arriba. Al lado de «Cómo funciona» porque también es consulta, y
+               la opción cuesta 0 px de barra y 0 B de hoja por las mismas razones
+               (lo que cuesta el diálogo está en su cabecera). -->
+          <button type="button" role="menuitem" class="gml-barra-menu-opcion" data-accion="creditos" aria-haspopup="dialog">
+            Créditos y licencias<span class="gml-barra-menu-apunte">datos y software de terceros</span>
+          </button>
           <!-- ⚠️ «Vaciarlo» conserva su doble pulsación —vaciar es irreversible en
                pantalla— y desde la mudanza la confirmación se pide EN EL PROPIO
                MENÚ (decisión Q3 de la revisión): pedirla en un renglón del panel

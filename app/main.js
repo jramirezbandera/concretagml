@@ -579,6 +579,9 @@ import { crearDialogoAvisos } from './dialogo-avisos.js'
 // F15 · El diccionario de errores de la Sede. NO se le pasa `alAvisar` ni nada
 // del estado: es una pantalla de consulta que no mira el fichero de nadie.
 import { crearDialogoDiccionario } from './dialogo-diccionario.js'
+// F16 · Créditos y licencias. Tampoco mira el estado: lee el inventario que
+// escribe el build.
+import { crearDialogoCreditos } from './dialogo-creditos.js'
 import {
   SELECTOR_BOTON_CARGAR,
   SELECTOR_BOTON_COLINDANTES,
@@ -1674,6 +1677,16 @@ const panel = crearDialogoAvisos({ documento: document })
 // repositorio, sus 43 pruebas dan verde y **el usuario no tiene ninguna forma de
 // llegar a él**. Es el modo de fallo que este proyecto ha pagado tres veces.
 crearDialogoDiccionario({ documento: document })
+
+// F16 · «Créditos y licencias», por lo mismo y en el mismo sitio. `construido` es
+// `import.meta.env.PROD`: el inventario lo escribe el build, y en `npm run dev` el
+// diálogo lo dice en vez de pedir un fichero que no existe. En Vitest también es
+// `false`, así que ninguna prueba de la aplicación montada hace una petición.
+crearDialogoCreditos({
+  documento: document,
+  base: import.meta.env.BASE_URL,
+  construido: import.meta.env.PROD,
+})
 
 // El dataset sintético lo dice también EN LA LISTA de avisos, no solo en el
 // eyebrow: el eyebrow se lee una vez al abrir y la lista queda.

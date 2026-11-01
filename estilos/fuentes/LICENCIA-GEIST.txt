@@ -44,13 +44,13 @@ documentos, siempre que (a) no se venda por sí sola de forma aislada, y
 (b) los ficheros modificados no reutilicen el/los nombre(s) reservados de
 la fuente sin renombrarla.
 
-Pendiente para F16 (página de créditos)
------------------------------------------
-Anotar en la futura página de créditos de F16:
-  - Geist Sans / Geist Mono — Vercel, Inc. — SIL Open Font License 1.1
-    (ver este fichero).
-  - Leaflet — BSD-2-Clause, NO MIT (override O9 del dossier del proyecto).
-    Turf, jsPDF, html2canvas y proj4js sí son MIT.
+En la página de créditos de F16 (2026-11-01)
+---------------------------------------------
+El build lee ESTE fichero (`licencias/terceros.js#FUENTES`): toma el texto
+desde su primera línea que empieza por la palabra en inglés del aviso de
+derechos, la de abajo, y lo publica en Expediente › «Créditos y licencias» y
+en `licencias-terceros.txt`. Por eso ningún renglón de estas notas puede
+empezar por esa palabra: el texto saldría cortado por donde no es.
 
 ============================================================
 Texto legal completo — SIL Open Font License, Version 1.1

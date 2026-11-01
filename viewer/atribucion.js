@@ -30,10 +30,10 @@
 //   · Este módulo NO importa Leaflet ni toca el DOM (a propósito: su test corre
 //     en el proyecto Vitest `node`, lo que demuestra que es Leaflet-free).
 //
-// Nota para F16 (página de créditos) — Override O9 del dossier: Leaflet se
-// distribuye bajo licencia BSD-2-Clause, NO MIT (Turf, jsPDF, html2canvas y
-// proj4js sí son MIT). No es un texto de atribución de datos cartográficos, por
-// eso NO vive en `ATRIBUCION`; queda anotado aquí para que F16 lo recoja.
+// F16 (2026-11-01) · El diálogo «Créditos y licencias» (`app/dialogo-creditos.js`)
+// importa `ATRIBUCION` y enseña los cuatro textos juntos, tal cual. Las licencias del
+// SOFTWARE —Leaflet BSD-2-Clause, override O9— no viven aquí: las inventaría el build
+// desde lo empaquetado (`licencias/terceros.js`).
 
 /**
  * Textos literales de atribución cartográfica, verificados contra

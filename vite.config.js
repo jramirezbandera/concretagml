@@ -3,6 +3,16 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 
+import {
+  FUENTES,
+  RUTA_AVISO,
+  RUTA_INVENTARIO,
+  componerAviso,
+  esFuente,
+  ficheroLicencia,
+  inventariar,
+  paqueteDeModulo,
+} from './licencias/terceros.js'
 import { componerServiceWorker, listaPrecache, versionDe } from './pwa/precache.js'
 
 // Concreta GML — F03 · tooling de la app (frontend puro).
@@ -91,6 +101,73 @@ function ficherosPublicos(dir, prefijo = '') {
 }
 
 /**
+ * **F16 · El inventario de lo que va empaquetado de otros, con su licencia**
+ * (2026-11-01). Pregunta al paquete ya construido qué módulos lleva, los agrupa por
+ * paquete de npm, lee de cada uno su `package.json` y su fichero de licencia, y emite
+ * `licencias.json` (lo lee el diálogo «Créditos y licencias») y
+ * `licencias-terceros.txt` (los textos completos). Qué se dice de cada uno, y por
+ * qué el build se para si una licencia no se puede afirmar, está en
+ * `licencias/terceros.js`.
+ *
+ * Orden normal y no `post`: tiene que emitir ANTES de que `gmlServiceWorker` haga
+ * su lista, para que los dos ficheros entren en el precache y el diálogo funcione
+ * sin conexión.
+ *
+ * @returns {import('vite').Plugin}
+ */
+function gmlLicencias() {
+  return {
+    name: 'gml-licencias',
+    apply: 'build',
+    generateBundle(_opciones, bundle) {
+      // Por CARPETA y no por nombre: medido, van dos `@turf/helpers` (7.3.5 arriba y
+      // 7.4.0 anidado bajo `@turf/difference` y `@turf/union`), y por nombre se
+      // perdía uno.
+      const dirs = new Map()
+      const fuentes = new Set()
+      for (const fichero of Object.values(bundle)) {
+        if (fichero.type === 'chunk') {
+          for (const id of Object.keys(fichero.modules)) {
+            const paquete = paqueteDeModulo(id)
+            if (paquete !== null) dirs.set(paquete.dir, paquete.nombre)
+          }
+          continue
+        }
+        if (!esFuente(fichero.fileName)) continue
+        const origenes = (fichero.originalFileNames ?? []).map((r) => r.replace(/\\/g, '/'))
+        const fuente = FUENTES.find((f) => origenes.some((r) => f.patron.test(r)))
+        if (fuente === undefined) {
+          throw new Error(
+            `gml-licencias: el artefacto lleva la tipografía ${fichero.fileName} ` +
+              `(${origenes.join(', ') || 'sin origen'}) y no está en FUENTES de ` +
+              `licencias/terceros.js. Una fuente de otro también pide su licencia.`,
+          )
+        }
+        fuentes.add(fuente)
+      }
+      const inventario = inventariar({
+        paquetes: [...dirs].map(([dir, nombre]) => {
+          const datos = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
+          const licencia = ficheroLicencia(readdirSync(dir))
+          return {
+            nombre,
+            version: datos.version,
+            licencia: datos.license ?? datos.licenses,
+            texto: licencia === null ? null : readFileSync(join(dir, licencia), 'utf8'),
+          }
+        }),
+        fuentes: [...fuentes].map((fuente) => ({
+          fuente,
+          texto: readFileSync(join(root, fuente.licencia), 'utf8'),
+        })),
+      })
+      this.emitFile({ type: 'asset', fileName: RUTA_INVENTARIO, source: JSON.stringify(inventario) })
+      this.emitFile({ type: 'asset', fileName: RUTA_AVISO, source: componerAviso(inventario) })
+    },
+  }
+}
+
+/**
  * **El service worker se compone en el build, y no es un fichero de `public/`**
  * (2026-09-25). La plantilla es `pwa/sw.js`; este plugin le escribe la lista de lo que
  * hay que precachear —que solo existe cuando el paquete ya tiene sus nombres con
@@ -160,5 +237,5 @@ const BASE_PAGES = '/concretagml/'
 export default defineConfig({
   root,
   base: BASE_PAGES,
-  plugins: [gmlSinProj4(), gmlServiceWorker()],
+  plugins: [gmlSinProj4(), gmlLicencias(), gmlServiceWorker()],
 })

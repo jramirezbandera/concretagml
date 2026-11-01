@@ -611,10 +611,19 @@ export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'dia
  * más barato pero recortaba los dos menús; y reescribir la plantilla de columnas,
  * que costaba ~35 B más que redefinir `--gml-panel-ancho`.
  *
+ * ═════════════════════════════════════════════════════════════════════════════
+ * ⭐ **Y UNA OCTAVA EL 2026-11-01 (F16 · CRÉDITOS Y LICENCIAS)**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * De 67.560 a **67.611 B nuestros** (82.655 → 82.706 con vendor). **+51 B**: la
+ * clase del diálogo en la caja y en el velo, y nada más; el interior reutiliza el
+ * del diccionario y los grupos del de importación. Se descartó una regla propia
+ * para su «Cerrar» (+52 B): el pie del diccionario lo empuja ahora por posición, y
+ * ese selector es más corto que el que nombraba uno.
+ *
  * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
  * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
  */
-export const TECHO = Object.freeze({ total: 82655, nuestro: 67560 })
+export const TECHO = Object.freeze({ total: 82706, nuestro: 67611 })
 
 /**
  * EL REGISTRO. Un asiento por hito, con la hoja construida medida de verdad.
@@ -1808,6 +1817,17 @@ export const ASIENTOS = Object.freeze(
         'entero en vez del bloque de vías. ── QUÉ SE HA DEVUELTO ANTES DE SUBIR ── redefinir ' +
         '`--gml-panel-ancho` en vez de reescribir `grid-template-columns`: −35 B. ── ⚠️ El ' +
         'techo SUBE 291 B (cabecera de `TECHO`) y la holgura vuelve a 0. NO CIERRA REBANADA.' },
+    { hito: 'F16 · Créditos y licencias',
+      commit: '(sin commitear)',
+      total: 82706, nuestro: 67611, rebanada: null,
+      nota:
+        '**+51 B.** El diálogo «Créditos y licencias» solo paga su clase en las dos reglas del ' +
+        'contenedor (la caja y el velo); cuerpo, título, entradilla, fichas plegables y pie son ' +
+        'los del diccionario, y los grupos con rótulo los del diálogo de importación. ── QUÉ SE ' +
+        'HA DEVUELTO ANTES DE SUBIR ── su «Cerrar» iba a entrar por `data-accion` (+52 B); el ' +
+        'pie lo empuja ahora con `> :last-child`, que vale para los dos y es más corto que el ' +
+        'selector de antes. ── ⚠️ El techo SUBE 51 B (cabecera de `TECHO`) y la holgura vuelve ' +
+        'a 0. NO CIERRA REBANADA.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 
