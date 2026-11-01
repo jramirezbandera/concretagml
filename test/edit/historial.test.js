@@ -8,6 +8,8 @@ import {
   redo,
   puedeDeshacer,
   puedeRehacer,
+  apartar,
+  restaurar,
 } from '../../edit/historial.js'
 
 // Estado de referencia con la forma real del modelo (POJO plano): recintos con
@@ -515,5 +517,103 @@ describe('edit/historial.js — reencuadrar (cambia el fondo, no el documento)',
     commit(h, estadoRecintos('HUECO', [7, 7])) // sin geometriaOficial
     expect(h.pila[h.indice].geometriaOficial).toBe(undefined)
     expect(undo(h).geometriaOficial).toEqual(oficialPrueba()) // el pasado sí lo tiene
+  })
+})
+
+// ── F25 · tarea 1.3 · cada parcela del expediente con SU deshacer ─────────────
+describe('edit/historial.js — apartar y restaurar (F25)', () => {
+  /** Un historial con tres pasos y el presente en el del medio (hay undo y redo). */
+  const conTresPasos = () => {
+    const h = crearHistorial()
+    commit(h, estadoRecintos('EXTERIOR', [1, 1]))
+    commit(h, estadoRecintos('EXTERIOR', [2, 2]))
+    commit(h, estadoRecintos('EXTERIOR', [3, 3]))
+    undo(h)
+    return h
+  }
+
+  it('ida y vuelta: otra parcela en medio, y al volver se deshace y se rehace como antes', () => {
+    const h = conTresPasos()
+    const deA = apartar(h)
+    // Entra la parcela B con su propia historia, y se edita.
+    reiniciar(h, estadoRecintos('EXTERIOR', [50, 50]))
+    commit(h, estadoRecintos('EXTERIOR', [51, 51]))
+    const deB = apartar(h)
+    // Vuelve A.
+    restaurar(h, deA)
+    expect(h.indice).toBe(1)
+    expect(h.pila[h.indice].recintos[0].vertices[0]).toEqual([2, 2])
+    expect(redo(h).recintos[0].vertices[0]).toEqual([3, 3])
+    expect(undo(h).recintos[0].vertices[0]).toEqual([2, 2])
+    expect(undo(h).recintos[0].vertices[0]).toEqual([1, 1])
+    // ⛔ Y Ctrl+Z NUNCA llega a la otra parcela: la historia de A no sabe nada de B.
+    expect(puedeDeshacer(h)).toBe(false)
+    // B también vuelve entera.
+    restaurar(h, deB)
+    expect(undo(h).recintos[0].vertices[0]).toEqual([50, 50])
+  })
+
+  it('apartar NO toca el historial y devuelve una COPIA (clona a la salida)', () => {
+    const h = conTresPasos()
+    const antes = structuredClone({ pila: h.pila, indice: h.indice })
+    const apartado = apartar(h)
+    expect({ pila: h.pila, indice: h.indice }).toEqual(antes)
+    expect(apartado.pila).not.toBe(h.pila)
+    apartado.pila[0].recintos[0].vertices[0][0] = 999
+    expect(h.pila[0].recintos[0].vertices[0][0]).toBe(1)
+  })
+
+  it('restaurar clona a la ENTRADA: el apartado puede seguir vivo sin tocar la historia', () => {
+    const h = conTresPasos()
+    const apartado = apartar(h)
+    reiniciar(h, estadoRecintos())
+    restaurar(h, apartado)
+    apartado.pila[1].recintos[0].vertices[0][0] = 999
+    expect(h.pila[1].recintos[0].vertices[0][0]).toBe(2)
+  })
+
+  it('restaurar es EN SITIO: quien tenía `historial.pila` sigue viendo la pila viva', () => {
+    const h = conTresPasos()
+    const apartado = apartar(h)
+    const referencia = h.pila
+    reiniciar(h, estadoRecintos())
+    restaurar(h, apartado)
+    expect(h.pila).toBe(referencia)
+    expect(referencia).toHaveLength(3)
+  })
+
+  it('la oficial COMPARTIDA tras un reencuadre sigue siendo UNA en la copia, no N', () => {
+    const h = conTresPasos()
+    const oficial = [{ vertices: [[0, 0], [1, 0], [1, 1]], tipo: 'EXTERIOR' }]
+    reencuadrar(h, (e) => ({ ...e, geometriaOficial: oficial }))
+    const apartado = apartar(h)
+    expect(apartado.pila[0].geometriaOficial).toBe(apartado.pila[2].geometriaOficial)
+    expect(apartado.pila[0].geometriaOficial).not.toBe(oficial)
+  })
+
+  it('respeta el límite de ESTE historial: se pierden los más antiguos y el presente se desplaza', () => {
+    const grande = crearHistorial({ limite: 10 })
+    for (let i = 0; i < 6; i++) commit(grande, estadoRecintos('EXTERIOR', [i, i]))
+    const apartado = apartar(grande) // 6 pasos, presente en el 5
+    const pequeño = crearHistorial({ limite: 4 })
+    restaurar(pequeño, apartado)
+    expect(pequeño.pila).toHaveLength(4)
+    expect(pequeño.indice).toBe(3)
+    expect(pequeño.pila[0].recintos[0].vertices[0]).toEqual([2, 2])
+    expect(pequeño.pila[3].recintos[0].vertices[0]).toEqual([5, 5])
+  })
+
+  it.each([
+    ['null', null],
+    ['sin pila', { indice: 0 }],
+    ['pila vacía', { pila: [], indice: 0 }],
+    ['índice fuera', { pila: [estadoRecintos()], indice: 1 }],
+    ['índice negativo', { pila: [estadoRecintos()], indice: -1 }],
+    ['índice no entero', { pila: [estadoRecintos(), estadoRecintos()], indice: 0.5 }],
+  ])('con un apartado mal formado (%s) LANZA y deja el historial como estaba', (_que, roto) => {
+    const h = conTresPasos()
+    const antes = structuredClone({ pila: h.pila, indice: h.indice })
+    expect(() => restaurar(h, roto)).toThrow(TypeError)
+    expect({ pila: h.pila, indice: h.indice }).toEqual(antes)
   })
 })

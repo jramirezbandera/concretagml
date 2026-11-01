@@ -86,7 +86,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { serializarCoordenadasTxt } from '../../export/coordenadas.js'
 import { CAPAS, serializarParcelaDxf } from '../../export/dxf.js'
 import { FORMATO_PROYECTO, VERSION_PROYECTO, aProyecto, deProyecto } from '../../export/proyecto.js'
-import { crearExpediente, crearParcela } from '../../model/parcela.js'
+import { crearExpediente, crearParcela, parcelaActiva } from '../../model/parcela.js'
 import { parseDXF } from '../../parsers/dxf.js'
 import {
   ALMACENES,
@@ -206,11 +206,11 @@ describe('AC1 · «Guardar → listar → recuperar → duplicar un expediente c
     const recuperado = await almacen.recuperar(listado.registros[0].id)
     expect(recuperado.ok).toBe(true)
     expect(recuperado.expediente.srs).toBe(original.srs)
-    expect(recuperado.expediente.parcela.refcat).toBe(original.parcela.refcat)
-    expect(recuperado.expediente.parcela.recintos[0].vertices).toEqual(
-      original.parcela.recintos[0].vertices,
+    expect(parcelaActiva(recuperado.expediente).refcat).toBe(parcelaActiva(original).refcat)
+    expect(parcelaActiva(recuperado.expediente).recintos[0].vertices).toEqual(
+      parcelaActiva(original).recintos[0].vertices,
     )
-    expect(recuperado.expediente.parcela.superficieCatastral).toBe(1600)
+    expect(parcelaActiva(recuperado.expediente).superficieCatastral).toBe(1600)
 
     const duplicado = await almacen.duplicar(listado.registros[0].id)
     expect(duplicado.ok).toBe(true)
@@ -231,11 +231,11 @@ describe('AC1 · «Guardar → listar → recuperar → duplicar un expediente c
     // obliga a rehidratar. Si esto dejara de ser cierto, el `it` de arriba dejaría
     // de significar nada y hay que enterarse.
     const crudo = await apertura.bd.get(ALMACENES.EXPEDIENTES, registro.id)
-    expect(Object.isFrozen(crudo.expediente.parcela.geometriaOficial)).toBe(false)
+    expect(Object.isFrozen(parcelaActiva(crudo.expediente).geometriaOficial)).toBe(false)
 
     const { expediente } = await almacen.recuperar(registro.id)
-    expect(Object.isFrozen(expediente.parcela.geometriaOficial)).toBe(true)
-    expect(Object.isFrozen(expediente.parcela.geometriaOficial[0])).toBe(true)
+    expect(Object.isFrozen(parcelaActiva(expediente).geometriaOficial)).toBe(true)
+    expect(Object.isFrozen(parcelaActiva(expediente).geometriaOficial[0])).toBe(true)
   })
 
   it('la lista viene del MÁS RECIENTE al más antiguo (el índice da el orden contrario)', async () => {
@@ -295,7 +295,7 @@ describe('AC1 · «Guardar → listar → recuperar → duplicar un expediente c
     // Y lo escrito es el ÚLTIMO cambio, no el primero.
     const leido = await almacen.leerBorrador()
     expect(leido.ok).toBe(true)
-    expect(leido.expediente.parcela.recintos[0].vertices[0][0]).toBe(anillo(40, 14)[0][0])
+    expect(parcelaActiva(leido.expediente).recintos[0].vertices[0][0]).toBe(anillo(40, 14)[0][0])
   })
 
   it('la espera del debounce cae dentro del rango 1–3 s que pide la ficha', async () => {
@@ -633,17 +633,17 @@ describe('AC6 · «El fichero de proyecto `.json`» (alcance NUEVO)', () => {
     expect(leido.ok).toBe(true)
     expect(leido.nombre).toBe('Para el compañero')
     expect(leido.expediente.srs).toBe(original.srs)
-    expect(leido.expediente.parcela.refcat).toBe(original.parcela.refcat)
-    expect(leido.expediente.parcela.recintos[0].vertices).toEqual(
-      original.parcela.recintos[0].vertices,
+    expect(parcelaActiva(leido.expediente).refcat).toBe(parcelaActiva(original).refcat)
+    expect(parcelaActiva(leido.expediente).recintos[0].vertices).toEqual(
+      parcelaActiva(original).recintos[0].vertices,
     )
-    expect(leido.expediente.parcela.superficieCatastral).toBe(1600)
+    expect(parcelaActiva(leido.expediente).superficieCatastral).toBe(1600)
   })
 
   it('lo leído vuelve CONGELADO, igual que lo recuperado del almacén', () => {
     const proyecto = aProyecto(expedientePrueba(), { fecha: FECHA })
     const leido = deProyecto(JSON.stringify(proyecto))
-    expect(Object.isFrozen(leido.expediente.parcela.geometriaOficial)).toBe(true)
+    expect(Object.isFrozen(parcelaActiva(leido.expediente).geometriaOficial)).toBe(true)
   })
 
   it('el sobre se declara: formato y versión van dentro del fichero', () => {
@@ -703,8 +703,8 @@ describe('AC6 · «El fichero de proyecto `.json`» (alcance NUEVO)', () => {
 
     expect(puesto.ok).toBe(true)
     const final = await almacenB.recuperar(puesto.registro.id)
-    expect(final.expediente.parcela.recintos[0].vertices).toEqual(
-      expediente.parcela.recintos[0].vertices,
+    expect(parcelaActiva(final.expediente).recintos[0].vertices).toEqual(
+      parcelaActiva(expediente).recintos[0].vertices,
     )
     // Anti-vacuidad: son DOS bases distintas, no la misma dos veces.
     expect((await almacenA.listar()).registros).toHaveLength(1)

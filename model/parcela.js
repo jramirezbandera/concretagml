@@ -304,9 +304,99 @@ export function crearParcela({
 }
 
 /**
+ * Las parcelas de un expediente a partir de las dos formas de entrada, ya copiadas
+ * por `crearParcela` y con sus dos invariantes comprobados (F25 · fase 1).
+ *
+ * ── LAS DOS FORMAS, Y POR QUÉ LA CORTA SIGUE EXISTIENDO ──
+ * `{parcelas, activa}` es la forma del expediente desde F25: N parcelas y la que
+ * está en edición. `{parcela}` es la de antes, y se sigue admitiendo **solo de
+ * entrada** porque es exactamente lo que escriben los ficheros de proyecto de la
+ * versión 1, los registros que ya hay en IndexedDB y los compositores de `app/`
+ * que arman un expediente de una sola parcela. La SALIDA tiene una forma y no dos: un
+ * expediente con `parcela` y `parcelas` a la vez serían dos representaciones del
+ * mismo dato, y la que se desincroniza es la que nadie mira.
+ *
+ * Pasar las dos a la vez LANZA: no hay forma honrada de decidir cuál manda.
+ *
+ * @param {object|null} parcela
+ * @param {Array<object>|undefined} parcelas
+ * @param {string|null|undefined} activa
+ * @returns {{parcelas: object[], activa: string|null}}
+ */
+function parcelasDeExpediente(parcela, parcelas, activa) {
+  if (parcelas !== undefined && parcela !== null) {
+    throw new Error(
+      `crearExpediente: se han pasado 'parcela' y 'parcelas' a la vez. 'parcela' es la forma ` +
+        `corta de un expediente de UNA parcela; con varias, todas van en 'parcelas' y la que ` +
+        `está en edición se nombra en 'activa'.`,
+    )
+  }
+  if (parcelas === undefined) {
+    if (activa !== undefined && activa !== null) {
+      throw new Error(
+        `crearExpediente: 'activa' solo tiene sentido con 'parcelas'; con la forma corta, la ` +
+          `parcela en edición es la única que hay. Recibido activa=${JSON.stringify(activa)}.`,
+      )
+    }
+    if (parcela === null) return { parcelas: [], activa: null }
+    const copia = crearParcela(parcela)
+    return { parcelas: [copia], activa: copia.idLocal }
+  }
+  if (!Array.isArray(parcelas)) {
+    throw new TypeError(`crearExpediente: 'parcelas' debe ser un array; recibido ${typeof parcelas}.`)
+  }
+
+  const copias = parcelas.map((p) => crearParcela(p))
+  // `idLocal` ÚNICO entre parcelas. No es higiene: el `gml:id` del sobre de N
+  // miembros es `xs:ID` en TODO el documento (override O18), y la identidad del
+  // miembro en edición —la que distingue «he editado ésta» de «he cambiado a otra»—
+  // sale de aquí. Dos iguales harían que activar una abriera la otra.
+  const vistos = new Set()
+  for (const p of copias) {
+    if (vistos.has(p.idLocal)) {
+      throw new Error(
+        `crearExpediente: dos parcelas del expediente comparten el idLocal ` +
+          `${JSON.stringify(p.idLocal)}. Cada parcela necesita el suyo: es lo que la identifica ` +
+          `dentro del expediente y en el gml:id del fichero.`,
+      )
+    }
+    vistos.add(p.idLocal)
+  }
+
+  if (copias.length === 0) {
+    if (activa !== undefined && activa !== null) {
+      throw new Error(
+        `crearExpediente: 'activa' es ${JSON.stringify(activa)} y el expediente no tiene ninguna ` +
+          `parcela.`,
+      )
+    }
+    return { parcelas: [], activa: null }
+  }
+  // Con una sola, la que está en edición no admite duda y se rellena. Con varias,
+  // rellenarla sería ELEGIR por el usuario cuál estaba editando (regla 1).
+  if ((activa === undefined || activa === null) && copias.length === 1) {
+    return { parcelas: copias, activa: copias[0].idLocal }
+  }
+  if (typeof activa !== 'string' || !vistos.has(activa)) {
+    throw new Error(
+      `crearExpediente: 'activa' debe ser el idLocal de una de sus ${copias.length} parcelas ` +
+        `(${copias.map((p) => JSON.stringify(p.idLocal)).join(', ')}); recibido ` +
+        `${JSON.stringify(activa)}.`,
+    )
+  }
+  return { parcelas: copias, activa }
+}
+
+/**
  * Crea un Expediente (POJO plano) — la raíz del modelo. Porta UNA rama según
- * `tipo`: `parcela` (PARCELA) o `edificio` (EDIFICIO); mezclar ramas LANZA
+ * `tipo`: `parcelas` (PARCELA) o `edificio` (EDIFICIO); mezclar ramas LANZA
  * (regla 1; auditoría A5: antes el tipo EDIFICIO era un cascarón sin rama).
+ *
+ * ⭐ **Desde F25 la rama PARCELA lleva N parcelas** (`parcelas`) y nombra la que
+ * está en edición (`activa`, su `idLocal`). Hasta entonces era UNA (`parcela`).
+ * Para leer la que se está editando, {@link parcelaActiva}; la que da nombre al
+ * expediente, {@link parcelaPrincipal}. Ver {@link parcelasDeExpediente} para las
+ * dos formas de entrada.
  *
  * @param {object} [args]
  * @param {'PARCELA'|'EDIFICIO'} [args.tipo='PARCELA']
@@ -316,12 +406,16 @@ export function crearParcela({
  * @param {object} [args.metadatos] - `{ creado, modificado, autor, idDocumento }`;
  *        cada campo ausente se completa (autor/idDocumento desde sus params;
  *        creado/modificado con la marca de tiempo actual).
- * @param {object|null} [args.parcela=null] - Solo tipo PARCELA. Se copia vía
- *        crearParcela (validación + copia independiente).
+ * @param {object|null} [args.parcela=null] - Forma CORTA, solo de entrada: un
+ *        expediente de una parcela. Excluyente con `parcelas`.
+ * @param {Array<object>} [args.parcelas] - Solo tipo PARCELA. Cada una se copia vía
+ *        crearParcela; sus `idLocal` no pueden repetirse.
+ * @param {string|null} [args.activa] - El `idLocal` de la parcela en edición.
+ *        Obligatorio con dos o más; con una se rellena solo.
  * @param {object|null} [args.edificio=null] - Solo tipo EDIFICIO. Construido con
  *        `model/edificio.js#crearEdificio` (dueño de su validación; las ramas del
  *        modelo no se importan entre sí): aquí solo copia estructural profunda.
- * @returns {object} Expediente
+ * @returns {object} Expediente `{tipo, srs, metadatos, parcelas, activa, edificio}`
  */
 export function crearExpediente({
   tipo = TIPO_EXPEDIENTE.PARCELA,
@@ -330,6 +424,8 @@ export function crearExpediente({
   idDocumento = '',
   metadatos = null,
   parcela = null,
+  parcelas = undefined,
+  activa = undefined,
   edificio = null,
 } = {}) {
   const tiposValidos = Object.values(TIPO_EXPEDIENTE)
@@ -347,8 +443,9 @@ export function crearExpediente({
   if (tipo === TIPO_EXPEDIENTE.PARCELA && edificio !== null) {
     throw new Error(`crearExpediente: un expediente de tipo PARCELA no puede llevar rama 'edificio'.`)
   }
-  if (tipo === TIPO_EXPEDIENTE.EDIFICIO && parcela !== null) {
-    throw new Error(`crearExpediente: un expediente de tipo EDIFICIO no puede llevar rama 'parcela'.`)
+  const rama = parcelasDeExpediente(parcela, parcelas, activa)
+  if (tipo === TIPO_EXPEDIENTE.EDIFICIO && rama.parcelas.length > 0) {
+    throw new Error(`crearExpediente: un expediente de tipo EDIFICIO no puede llevar rama 'parcelas'.`)
   }
   if (edificio !== null) {
     // Chequeo estructural ligero; la validación de dominio vive en crearEdificio.
@@ -382,7 +479,84 @@ export function crearExpediente({
     tipo,
     srs,
     metadatos: metadatosOut,
-    parcela: parcela === null ? null : crearParcela(parcela),
+    parcelas: rama.parcelas,
+    activa: rama.activa,
     edificio: edificioCopia,
   }
+}
+
+/**
+ * Comprueba que llega un Expediente ya normalizado, o lanza diciendo qué ha llegado.
+ * El mensaje nombra la forma vieja porque es el error más probable: un objeto
+ * `{parcela}` de antes de F25 que no ha pasado por `crearExpediente`.
+ */
+function exigirExpediente(expediente, fn) {
+  if (expediente === null || typeof expediente !== 'object' || !Array.isArray(expediente.parcelas)) {
+    throw new TypeError(
+      `${fn}: se esperaba un Expediente de crearExpediente (con 'parcelas'); recibido ` +
+        `${expediente === null ? 'null' : typeof expediente}` +
+        (expediente && typeof expediente === 'object' && 'parcela' in expediente
+          ? ` con la forma anterior a F25 ('parcela'). Pásalo antes por normalizarExpediente.`
+          : '.'),
+    )
+  }
+}
+
+/**
+ * La parcela que está EN EDICIÓN —la que va al store—, o `null` si el expediente no
+ * tiene ninguna (uno vacío, o uno de EDIFICIO). Devuelve el objeto del expediente,
+ * no una copia: quien lo vaya a mutar lo copia, como con cualquier otra rama.
+ *
+ * @param {object} expediente  Un Expediente de {@link crearExpediente}.
+ * @returns {object|null}
+ * @throws {TypeError}  Si no es un Expediente normalizado.
+ */
+export function parcelaActiva(expediente) {
+  exigirExpediente(expediente, 'parcelaActiva')
+  return expediente.parcelas.find((p) => p.idLocal === expediente.activa) ?? null
+}
+
+/**
+ * La parcela que DA NOMBRE al expediente: la primera. Es la que rotula el registro
+ * guardado y la que indexa su referencia catastral, y no tiene por qué ser la que se
+ * está editando: en una segregación se edita una pieza nueva y el expediente sigue
+ * siendo el de la matriz. Que sea la primera no es una convención arbitraria: es la
+ * que entró al abrir el expediente, y las demás se AÑADEN detrás.
+ *
+ * @param {object} expediente  Un Expediente de {@link crearExpediente}.
+ * @returns {object|null}
+ * @throws {TypeError}  Si no es un Expediente normalizado.
+ */
+export function parcelaPrincipal(expediente) {
+  exigirExpediente(expediente, 'parcelaPrincipal')
+  return expediente.parcelas[0] ?? null
+}
+
+/**
+ * Vuelve a pasar por {@link crearExpediente} un expediente que llega de FUERA —un
+ * registro de IndexedDB, un fichero de proyecto, el borrador—, en cualquiera de sus
+ * dos formas: la de F25 (`parcelas` + `activa`) o la anterior (`parcela`).
+ *
+ * Existe porque esta misma llamada, campo a campo, estaba escrita **cinco veces**
+ * (`storage/expedientes.js` ×3, `export/proyecto.js` ×2), y F25 tenía que tocar las
+ * cinco igual. Cinco copias que hay que cambiar a la vez son cinco ocasiones de que
+ * una se quede atrás —la auditoría de F25 midió justo eso en las tres copias de
+ * `claveDeExpediente` (H4)—, y la que se queda atrás aquí PIERDE parcelas al guardar.
+ *
+ * No es tolerante: lo que `crearExpediente` rechaza, lanza. Quien lee un fichero ajeno
+ * captura y lo cuenta (`export/proyecto.js#deProyecto`).
+ *
+ * @param {object|null|undefined} valor
+ * @returns {object} Expediente
+ */
+export function normalizarExpediente(valor) {
+  return crearExpediente({
+    tipo: valor?.tipo,
+    srs: valor?.srs,
+    metadatos: valor?.metadatos ?? undefined,
+    parcela: valor?.parcela ?? null,
+    parcelas: valor?.parcelas,
+    activa: valor?.activa,
+    edificio: valor?.edificio ?? null,
+  })
 }

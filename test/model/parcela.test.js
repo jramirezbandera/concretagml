@@ -10,6 +10,9 @@ import {
   ORIGEN_PARCELA,
   SRS_VALIDOS,
   TIPO_EXPEDIENTE,
+  normalizarExpediente,
+  parcelaActiva,
+  parcelaPrincipal,
 } from '../../model/parcela.js'
 
 // F00 · tarea 2.4 — modelo de datos de la rama PARCELA como POJO plano.
@@ -319,7 +322,7 @@ describe('crearParcela · superficieCatastral (el cp:areaValue DECLARADO)', () =
     // Y lo heredado sigue ahí: `superficieRegistral` no se ha sustituido.
     expect(clavesSin.filter((k) => k !== CLAVE_NUEVA)).toContain('superficieRegistral')
     // El expediente reconstruye la parcela con la misma factory: mismo shape.
-    expect(Object.keys(crearExpediente({ parcela: sin }).parcela).sort()).toEqual(clavesSin)
+    expect(Object.keys(parcelaActiva(crearExpediente({ parcela: sin }))).sort()).toEqual(clavesSin)
   })
 
   it('por defecto es null, y el null SOBREVIVE a structuredClone (undo/redo real)', () => {
@@ -336,8 +339,8 @@ describe('crearParcela · superficieCatastral (el cp:areaValue DECLARADO)', () =
       parcela: crearParcela({ ...base, superficieCatastral: ring.areaValue }),
     })
     const clonE = structuredClone(e)
-    expect(clonE.parcela.superficieCatastral).toBe(ring.areaValue)
-    expect(structuredClone(crearExpediente({ parcela: p })).parcela.superficieCatastral).toBe(null)
+    expect(parcelaActiva(clonE).superficieCatastral).toBe(ring.areaValue)
+    expect(parcelaActiva(structuredClone(crearExpediente({ parcela: p }))).superficieCatastral).toBe(null)
   })
 
   it('conserva un valor válido tal cual (sin redondear: regla de oro 11)', () => {
@@ -400,7 +403,7 @@ describe('crearExpediente', () => {
     const e = crearExpediente()
     expect(e.tipo).toBe('PARCELA')
     expect(e.srs).toBe('EPSG:25830')
-    expect(e.parcela).toBe(null)
+    expect(parcelaActiva(e)).toBe(null)
     expect(Object.keys(e.metadatos).sort()).toEqual(
       ['autor', 'creado', 'idDocumento', 'modificado'].sort(),
     )
@@ -443,12 +446,12 @@ describe('crearExpediente', () => {
       recintos: [{ vertices: [[0, 0], [10, 0], [10, 10]], tipo: 'EXTERIOR' }],
     })
     const e = crearExpediente({ parcela })
-    expect(e.parcela.idLocal).toBe('P1')
-    expect(e.parcela).not.toBe(parcela)
-    expect(e.parcela.recintos).not.toBe(parcela.recintos)
+    expect(parcelaActiva(e).idLocal).toBe('P1')
+    expect(parcelaActiva(e)).not.toBe(parcela)
+    expect(parcelaActiva(e).recintos).not.toBe(parcela.recintos)
     // mutar la fuente no toca la copia del expediente
     parcela.recintos[0].vertices[0][0] = 777
-    expect(e.parcela.recintos[0].vertices[0][0]).toBe(0)
+    expect(parcelaActiva(e).recintos[0].vertices[0][0]).toBe(0)
   })
 
   // ── Rama EDIFICIO del expediente (auditoría A5) ────────────────────────────
@@ -476,7 +479,7 @@ describe('crearExpediente', () => {
     const e = crearExpediente({ tipo: 'EDIFICIO', edificio })
     expect(e.edificio).not.toBe(edificio)
     expect(e.edificio.partes[0].nombre).toBe('cuerpo principal')
-    expect(e.parcela).toBe(null)
+    expect(parcelaActiva(e)).toBe(null)
     // mutar la fuente no toca la copia del expediente
     edificio.partes[0].plantasSobreRasante = 99
     expect(e.edificio.partes[0].plantasSobreRasante).toBe(2)
@@ -505,6 +508,120 @@ describe('crearExpediente', () => {
   })
 })
 
+describe('crearExpediente · F25 · varias parcelas', () => {
+  const p = (idLocal, extra = {}) =>
+    crearParcela({
+      idLocal,
+      origen: 'WFS',
+      recintos: [{ vertices: [[0, 0], [10, 0], [10, 10]], tipo: 'EXTERIOR' }],
+      ...extra,
+    })
+
+  it('la SALIDA tiene una sola forma: `parcelas` + `activa`, y nunca `parcela`', () => {
+    for (const e of [crearExpediente(), crearExpediente({ parcela: p('A') }), crearExpediente({ parcelas: [p('A')] })]) {
+      expect(Object.keys(e)).toEqual(['tipo', 'srs', 'metadatos', 'parcelas', 'activa', 'edificio'])
+      expect('parcela' in e).toBe(false)
+    }
+  })
+
+  it('la forma corta `parcela` da un expediente de UNA, con ella en edición', () => {
+    const e = crearExpediente({ parcela: p('A') })
+    expect(e.parcelas.map((x) => x.idLocal)).toEqual(['A'])
+    expect(e.activa).toBe('A')
+  })
+
+  it('vacío: `parcelas: []` y `activa: null`, por cualquiera de las dos formas', () => {
+    expect(crearExpediente()).toMatchObject({ parcelas: [], activa: null })
+    expect(crearExpediente({ parcelas: [] })).toMatchObject({ parcelas: [], activa: null })
+  })
+
+  it('con varias, conserva el ORDEN y la que estaba en edición', () => {
+    const e = crearExpediente({ parcelas: [p('A'), p('B'), p('C')], activa: 'B' })
+    expect(e.parcelas.map((x) => x.idLocal)).toEqual(['A', 'B', 'C'])
+    expect(e.activa).toBe('B')
+  })
+
+  it('cada parcela se copia por crearParcela: independiente y con la oficial congelada', () => {
+    const fuente = p('A', { geometriaOficial: [{ vertices: [[0, 0], [1, 0], [1, 1]], tipo: 'EXTERIOR' }] })
+    const e = crearExpediente({ parcelas: [fuente, p('B')], activa: 'A' })
+    expect(e.parcelas[0]).not.toBe(fuente)
+    fuente.recintos[0].vertices[0][0] = 777
+    expect(e.parcelas[0].recintos[0].vertices[0][0]).toBe(0)
+    expect(Object.isFrozen(e.parcelas[0].geometriaOficial)).toBe(true)
+  })
+
+  it('con UNA sola, `activa` se rellena; con DOS o más no se elige por el usuario', () => {
+    expect(crearExpediente({ parcelas: [p('A')] }).activa).toBe('A')
+    expect(() => crearExpediente({ parcelas: [p('A'), p('B')] })).toThrow(/'activa' debe ser el idLocal/)
+  })
+
+  it.each([
+    ['las dos formas a la vez', { parcela: p('A'), parcelas: [p('B')] }, /'parcela' y 'parcelas' a la vez/],
+    ['`activa` con la forma corta', { parcela: p('A'), activa: 'A' }, /solo tiene sentido con 'parcelas'/],
+    ['`activa` sin parcelas', { parcelas: [], activa: 'A' }, /no tiene ninguna parcela/],
+    ['`activa` que no es de ninguna', { parcelas: [p('A'), p('B')], activa: 'Z' }, /'activa' debe ser/],
+    ['dos con el mismo idLocal', { parcelas: [p('A'), p('A')], activa: 'A' }, /comparten el idLocal "A"/],
+    ['`parcelas` que no es lista', { parcelas: 'A' }, /'parcelas' debe ser un array/],
+    ['EDIFICIO con parcelas', { tipo: 'EDIFICIO', parcelas: [p('A')] }, /EDIFICIO no puede llevar rama 'parcelas'/],
+  ])('LANZA con %s', (_que, args, mensaje) => {
+    expect(() => crearExpediente(args)).toThrow(mensaje)
+  })
+
+  it('structuredClone del expediente de varias conserva todo (es la foto del borrador)', () => {
+    const e = crearExpediente({ parcelas: [p('A'), p('B')], activa: 'B' })
+    const clon = structuredClone(e)
+    expect(clon).toEqual(e)
+    expect(clon.parcelas[1]).not.toBe(e.parcelas[1])
+  })
+})
+
+describe('parcelaActiva · parcelaPrincipal · normalizarExpediente (F25)', () => {
+  const p = (idLocal, refcat = null) => crearParcela({ idLocal, refcat, origen: 'WFS' })
+
+  it('parcelaActiva es la de `activa`; parcelaPrincipal, la PRIMERA aunque no esté en edición', () => {
+    const e = crearExpediente({ parcelas: [p('MATRIZ', '7136910UF1473N'), p('PIEZA')], activa: 'PIEZA' })
+    expect(parcelaActiva(e).idLocal).toBe('PIEZA')
+    expect(parcelaPrincipal(e).idLocal).toBe('MATRIZ')
+    // El objeto del expediente, no una copia.
+    expect(parcelaActiva(e)).toBe(e.parcelas[1])
+  })
+
+  it('las dos devuelven null en un expediente sin parcelas (vacío o de EDIFICIO)', () => {
+    expect(parcelaActiva(crearExpediente())).toBe(null)
+    expect(parcelaPrincipal(crearExpediente())).toBe(null)
+  })
+
+  it('LANZAN con un objeto que no es un Expediente normalizado, y nombran la forma vieja', () => {
+    expect(() => parcelaActiva(null)).toThrow(TypeError)
+    expect(() => parcelaActiva({ parcela: p('A') })).toThrow(/forma anterior a F25.*normalizarExpediente/)
+    expect(() => parcelaPrincipal({})).toThrow(TypeError)
+  })
+
+  it('normalizarExpediente lee las DOS formas y devuelve la nueva', () => {
+    const vieja = { tipo: 'PARCELA', srs: 'EPSG:25830', parcela: p('A') }
+    const nueva = crearExpediente({ parcelas: [p('A'), p('B')], activa: 'B' })
+    expect(normalizarExpediente(vieja)).toMatchObject({ activa: 'A' })
+    expect(normalizarExpediente(vieja).parcelas).toHaveLength(1)
+    const releida = normalizarExpediente(JSON.parse(JSON.stringify(nueva)))
+    expect(releida.parcelas.map((x) => x.idLocal)).toEqual(['A', 'B'])
+    expect(releida.activa).toBe('B')
+  })
+
+  it('normalizarExpediente NO es tolerante: lo que el modelo rechaza, lanza', () => {
+    expect(() => normalizarExpediente({ parcelas: [p('A'), p('A')], activa: 'A' })).toThrow(/comparten/)
+    expect(() => normalizarExpediente({ srs: 'EPSG:4326' })).toThrow(RangeError)
+  })
+
+  it('⛔ guardián: nadie fuera del modelo vuelve a escribir la normalización campo a campo', () => {
+    // Estaba copiada CINCO veces y F25 tenía que cambiar las cinco a la vez. Si
+    // vuelve a aparecer, una copia se quedará atrás y perderá parcelas al guardar.
+    for (const ruta of ['storage/expedientes.js', 'export/proyecto.js']) {
+      const fuente = readFileSync(fileURLToPath(new URL(`../../${ruta}`, import.meta.url)), 'utf8')
+      expect(fuente, ruta).not.toMatch(/parcela: \w+\??\.parcela \?\? null/)
+    }
+  })
+})
+
 describe('structuredClone (undo/redo)', () => {
   it('clona en profundidad un expediente completo sin perder datos ni compartir referencias', () => {
     const e = crearExpediente({
@@ -525,11 +642,11 @@ describe('structuredClone (undo/redo)', () => {
     // Las referencias internas NO se comparten.
     expect(clon).not.toBe(e)
     expect(clon.metadatos).not.toBe(e.metadatos)
-    expect(clon.parcela).not.toBe(e.parcela)
-    expect(clon.parcela.recintos).not.toBe(e.parcela.recintos)
-    expect(clon.parcela.recintos[0]).not.toBe(e.parcela.recintos[0])
-    expect(clon.parcela.recintos[0].vertices).not.toBe(e.parcela.recintos[0].vertices)
-    expect(clon.parcela.geometriaOficial).not.toBe(e.parcela.geometriaOficial)
+    expect(parcelaActiva(clon)).not.toBe(parcelaActiva(e))
+    expect(parcelaActiva(clon).recintos).not.toBe(parcelaActiva(e).recintos)
+    expect(parcelaActiva(clon).recintos[0]).not.toBe(parcelaActiva(e).recintos[0])
+    expect(parcelaActiva(clon).recintos[0].vertices).not.toBe(parcelaActiva(e).recintos[0].vertices)
+    expect(parcelaActiva(clon).geometriaOficial).not.toBe(parcelaActiva(e).geometriaOficial)
   })
 
   it('el clon es mutable aunque geometriaOficial del original esté congelada', () => {
@@ -541,9 +658,9 @@ describe('structuredClone (undo/redo)', () => {
       }),
     })
     const clon = structuredClone(e)
-    expect(Object.isFrozen(clon.parcela.geometriaOficial)).toBe(false)
+    expect(Object.isFrozen(parcelaActiva(clon).geometriaOficial)).toBe(false)
     expect(() => {
-      clon.parcela.geometriaOficial[0].vertices[0][0] = 1
+      parcelaActiva(clon).geometriaOficial[0].vertices[0][0] = 1
     }).not.toThrow()
   })
 })

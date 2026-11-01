@@ -7,6 +7,7 @@ import {
   crearExpediente,
   crearParcela,
   crearRecinto,
+  parcelaActiva,
 } from '../model/parcela.js'
 import { crearEdificio, crearParteConstruccion } from '../model/edificio.js'
 // `diagnosticar` NO sale por el barrel (es de F07 y nadie lo ha pedido ahí): se
@@ -74,7 +75,7 @@ describe('contrato F00 · el modelo y la geometría pura viven en UTM (criterio 
     })
     expect(clavesGeograficas(expediente)).toEqual([])
     // y sus vértices son pares UTM
-    expect(expediente.parcela.recintos[0].vertices.every(esParUTM)).toBe(true)
+    expect(parcelaActiva(expediente).recintos[0].vertices.every(esParUTM)).toBe(true)
   })
 
   it('un Edificio con partes no contiene claves lat/lon', () => {
@@ -650,7 +651,7 @@ describe('contrato F10 · `export/` sale por el barrel; el almacén y el diálog
     expect(vuelta.ok).toBe(true)
     expect(vuelta.expediente).toEqual(expediente)
     // Y la geometría oficial vuelve CONGELADA, que es lo que JSON no conserva.
-    expect(Object.isFrozen(vuelta.expediente.parcela.geometriaOficial)).toBe(true)
+    expect(Object.isFrozen(parcelaActiva(vuelta.expediente).geometriaOficial)).toBe(true)
   })
 
   it('⚠️ el almacén de expedientes y el diálogo NO salen — y esto es lo único que lo impide', () => {

@@ -21,8 +21,12 @@
 //       "version": 1,
 //       "generado": "2026-08-03T09:45:12.000Z",
 //       "nombre": "Linde norte",
-//       "expediente": { "tipo": …, "srs": …, "metadatos": …, "parcela": …, "edificio": … }
+//       "expediente": { "tipo": …, "srs": …, "metadatos": …, "parcelas": […], "activa": …, "edificio": … }
 //     }
+//
+// ⭐ **Versión 2 desde F25**: el expediente lleva N parcelas (`parcelas`) y nombra la
+// que está en edición (`activa`). La versión 1 llevaba UNA (`parcela`) y **se sigue
+// leyendo**: `model/parcela.js#normalizarExpediente` la convierte en una lista de una.
 //
 // El `expediente` es LITERALMENTE lo que devuelve `model/parcela.js#crearExpediente`,
 // sin una clave de más ni de menos. Es POJO plano desde F00 —regla de oro 4, escrita
@@ -88,7 +92,7 @@
 // en todo `report/`. Un fichero exportado es un snapshot: su prueba tiene que valer
 // igual dentro de un año.
 
-import { SRS_VALIDOS, TIPO_EXPEDIENTE, crearExpediente } from '../model/parcela.js'
+import { SRS_VALIDOS, TIPO_EXPEDIENTE, crearExpediente, normalizarExpediente } from '../model/parcela.js'
 import { SEVERIDAD, TIPO_EXPORT, crearDeteccionExport, resumirDetecciones } from './_comun.js'
 
 // ── Identidad del formato ────────────────────────────────────────────────────
@@ -112,9 +116,14 @@ export const FORMATO_PROYECTO = 'concreta-gml/proyecto'
  * viejos puedan ignorar no obliga a subirla —para eso está {@link TIPO_EXPORT}`.CLAVE_DESCONOCIDA`—;
  * cambiar el significado de una que ya existe, sí.
  *
+ * **1 → 2 en F25**, y es el segundo caso: `parcela` pasa a `parcelas` + `activa`. Una
+ * aplicación de antes de F25 que abra un fichero de la versión 2 avisa de
+ * `VERSION_POSTERIOR`, no encuentra `parcela` y dice que el expediente no trae ninguna:
+ * falla diciéndolo, que es lo que el aviso de versión existe para garantizar.
+ *
  * @readonly
  */
-export const VERSION_PROYECTO = 1
+export const VERSION_PROYECTO = 2
 
 /**
  * Las claves que este código conoce del SOBRE. Cualquier otra se declara como
@@ -139,6 +148,20 @@ export const CLAVES_SOBRE = Object.freeze(['formato', 'version', 'generado', 'no
  * @type {readonly string[]}
  */
 export const CLAVES_EXPEDIENTE = Object.freeze(Object.keys(crearExpediente()))
+
+/**
+ * Claves del expediente que este código ya no ESCRIBE pero sigue ENTENDIENDO. Hoy es
+ * una: `parcela`, la forma de la versión 1 (F25 la sustituyó por `parcelas` +
+ * `activa`). Sin esta lista, abrir un proyecto de la versión 1 avisaría de un «dato que
+ * esta versión no sabe interpretar» que en realidad se lee entero.
+ *
+ * ⚠️ Esta lista CRECE, no se limpia, por lo mismo que la de rutas retiradas de
+ * `app/navegacion.js`: borrar una entrada es dejar de entender ficheros que existen.
+ *
+ * @readonly
+ * @type {readonly string[]}
+ */
+export const CLAVES_EXPEDIENTE_HEREDADAS = Object.freeze(['parcela'])
 
 // ── Degradación ──────────────────────────────────────────────────────────────
 
@@ -277,13 +300,7 @@ export function aProyecto(expediente, opciones = {}) {
     throw new TypeError(`aProyecto: 'nombre' debe ser un texto o null; recibido ${describir(nombre)}.`)
   }
 
-  const normal = crearExpediente({
-    tipo: expediente?.tipo,
-    srs: expediente?.srs,
-    metadatos: expediente?.metadatos ?? undefined,
-    parcela: expediente?.parcela ?? null,
-    edificio: expediente?.edificio ?? null,
-  })
+  const normal = normalizarExpediente(expediente)
 
   return {
     formato: FORMATO_PROYECTO,
@@ -425,7 +442,9 @@ export function deProyecto(entrada) {
     )
   }
 
-  avisos.push(...clavesDesconocidas(guardado, CLAVES_EXPEDIENTE, 'el expediente'))
+  avisos.push(
+    ...clavesDesconocidas(guardado, [...CLAVES_EXPEDIENTE, ...CLAVES_EXPEDIENTE_HEREDADAS], 'el expediente'),
+  )
 
   // El SRS se comprueba aquí, antes de `crearExpediente`, para poder decir CUÁL es el
   // que no vale y cuáles sí. `crearExpediente` también lo rechaza, pero con el
@@ -442,13 +461,7 @@ export function deProyecto(entrada) {
 
   let expediente
   try {
-    expediente = crearExpediente({
-      tipo: guardado.tipo,
-      srs: guardado.srs,
-      metadatos: guardado.metadatos ?? undefined,
-      parcela: guardado.parcela ?? null,
-      edificio: guardado.edificio ?? null,
-    })
+    expediente = normalizarExpediente(guardado)
   } catch (error) {
     return rechazo(
       MOTIVO_PROYECTO.EXPEDIENTE_ILEGIBLE,

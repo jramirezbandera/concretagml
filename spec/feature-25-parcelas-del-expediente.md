@@ -23,8 +23,9 @@ restaurar), `export/proyecto.js` (versión 2), `storage/expedientes.js` (`NO_SE_
 `viewer/index.js`, `app/rama.js` (el selector de la cabecera), `app/main.js`.
 **Se actualiza al cerrar cada fase.**
 
-**Estado:** ⏳ **ABIERTA el 2026-11-01.** Fase 0 (la auditoría) **hecha**; ni una línea
-de código todavía.
+**Estado:** ⏳ **ABIERTA el 2026-11-01.** Fases 0 (la auditoría) y 1 (el modelo, sin
+interfaz) **hechas**. Todavía no se puede cambiar de parcela: un expediente de varias se
+**rechaza al abrirlo**, a propósito (ver fase 1).
 
 > ⏳ **Esta ficha se abre ANTES del código**, y es a propósito: F23 y F24 llegaron tarde
 > a `spec/` y las dos lo anotaron como hallazgo. Lo que aquí se dice del futuro está en
@@ -195,8 +196,10 @@ el historial, anuncian «parcela nueva» y **sueltan las colindantes** en sus tr
 
 `crearExpediente` cambia `parcela` por **`parcelas: Parcela[]` + `activa: idLocal`**, con
 un `parcelaActiva(expediente)` para las lecturas que hoy hacen `expediente.parcela`.
-⚠️ **16 ficheros de producción** nombran `.parcela`, pero no todos se refieren al
-expediente (algunos son resultados del Catastro): la cifra real se cuenta en la tarea 1.1. Invariantes nuevos, y los dos lanzan:
+~~⚠️ **16 ficheros de producción** nombran `.parcela`, pero no todos se refieren al
+expediente: la cifra real se cuenta en la tarea 1.1.~~ **Contada en la 1.1: 3 ficheros y
+10 sitios** (`app/cableado-expediente.js`, `storage/expedientes.js`, `export/proyecto.js`);
+los otros trece eran resultados del Catastro, de un parser o un namespace. Invariantes nuevos, y los dos lanzan:
 
 - `idLocal` es **único** entre miembros. El `gml:id` es `xs:ID` en todo el documento
   (O18), y la identidad del miembro sale de ahí.
@@ -284,25 +287,79 @@ pasarse no tiene síntoma: la tabla de vértices encoge sin avisar.
 **Fase 0 · abrir la fase y auditar — hecha el 2026-11-01.** Esta ficha, la fila P13f de
 `SPEC.md` y la auditoría de los 18 suscriptores (H1–H9).
 
-**Fase 1 · el modelo, sin interfaz.**
-- 1.1 `crearExpediente` con `parcelas` + `activa` y sus dos invariantes; `parcelaActiva`.
-- 1.2 Proyecto v2 leyendo la v1; `NO_SE_GUARDA`.
-- 1.3 `edit/historial.js`: apartar y restaurar **en sitio**, con prueba de que una
-  referencia a `historial.pila` tomada antes sigue viva después.
-- 1.4 `app/conjunto.js` con su suite.
-- 1.5 Decidir H9 (los puntos de levantamiento) con el modelo de F24 delante.
+**Fase 1 · el modelo, sin interfaz — hecha el 2026-11-01** (suite **8.685 pruebas / 206
+ficheros, 0 rojas**, medida sobre un árbol que también lleva cambios sin commitear de otra
+sesión; ni una dependencia, ni un byte de CSS; `npm run build` en verde, paquete
+**1.307,30 kB** con esos cambios ajenos dentro, así que el delta de esta fase **no está
+medido**):
+
+- **1.1** `crearExpediente` devuelve `{tipo, srs, metadatos, parcelas, activa, edificio}`,
+  con sus dos invariantes (`idLocal` único, `activa` de una de ellas) y **una sola forma de
+  salida**. La forma corta `{parcela}` se admite **solo de entrada**, porque es la de los
+  ficheros v1, los registros de IndexedDB y los compositores de `app/`, que **no se han
+  tocado**. Con dos o más parcelas `activa` es obligatoria: rellenarla sería elegir por el
+  usuario. Nuevos `parcelaActiva`, `parcelaPrincipal` (la primera: la que rotula e indexa
+  el registro guardado, aunque se esté editando otra) y `normalizarExpediente`.
+  - ⭐ **`normalizarExpediente` sustituye CINCO copias** de la misma llamada campo a campo
+    (`storage/expedientes.js` ×3, `export/proyecto.js` ×2). F25 tenía que cambiar las
+    cinco a la vez, y la que se quedara atrás **perdería parcelas al guardar**. Tiene
+    guardián de que no vuelven.
+  - Las **54 lecturas** de `expediente.parcela` de la suite (6 ficheros) pasan a
+    `parcelaActiva(…)`. Fueron exactamente las 42 rojas del primer pase, y ninguna más.
+- **1.2** El proyecto pasa a la **versión 2** y la 1 se sigue abriendo **sin avisar de
+  nada**: `parcela` entra en `CLAVES_EXPEDIENTE_HEREDADAS`, una lista que crece y no se
+  limpia (como las rutas retiradas de `app/navegacion.js`). Ida y vuelta medida con tres
+  parcelas: orden, activa y oficial congelada.
+  - ⛔ **`NO_SE_GUARDA` NO se ha tocado, y se desvía del plan a propósito.** La frase nueva
+    —«las colindantes que se añaden al expediente sí se guardan»— describiría algo que hoy
+    no se puede hacer, y esa lista existe para decir lo que hace ESTE código. Pasa a la
+    tarea **3.1**, que es la que crea «Añadir para editar».
+  - ⛔ **Y una guarda temporal que el plan no tenía**: `app/cableado-expediente.js`
+    **rechaza** un expediente de varias parcelas en sus tres puertas (recuperar, borrador
+    y fichero de proyecto) con `mensajeVariasParcelas(n)`. Abrir solo la que estaba en
+    edición era lo cómodo, y el siguiente «Guardar» o el autoguardado habrían escrito el
+    expediente con UNA y **perdido las demás sin decirlo**. La aplicación está publicada
+    desde `main`, así que esto no es teórico en cuanto exista un fichero v2 con dos. Sus
+    dos pruebas **se ponen rojas con la guarda quitada** (medido). Desaparece en la fase 2.
+- **1.3** `edit/historial.js#apartar` y `#restaurar`: clonan **en las dos fronteras**, como
+  el resto del módulo; `restaurar` es **en sitio** y **atómico**, y respeta el `limite`
+  del historial que recibe. La `geometriaOficial` que un reencuadre comparte entre N
+  snapshots **sigue siendo una** en la copia (medido: `structuredClone` de la pila entera,
+  no snapshot a snapshot).
+- **1.4** `app/conjunto.js` con su suite (`test/app/conjunto.test.js`), que incluye **el
+  recorrido de la fase 2 con el historial de verdad**: editar A, pasar a B, editar B,
+  volver a A, y Ctrl+Z **nunca llega a B**. Decisiones de contrato:
+  - **No toca el store ni el historial, y no se suscribe a nada.** Quien cambia de parcela
+    aparta, activa, restaura y hace el `set`. Así se prueba en Node, y no ata el orden de
+    los suscriptores del store, que ya decide cosas (el reencuadre de `viewer/index.js`).
+  - `actualizarActiva` **devuelve `false` y no lanza** si lo que llega no es la activa:
+    se llamará desde un suscriptor del store, y `crearEstadoVista` **no aísla** a sus
+    suscriptores, así que un `throw` dejaría sin notificar a los que vienen detrás.
+  - **La que está en edición no se puede quitar**: hay que activar otra antes.
+  - ⚠️ **Sin llamante en producción hasta la fase 2**, como `derivacion/` en las fases 1–3
+    de F17: hoy no entra en el paquete.
+- **1.5 · H9, decidido: los puntos de levantamiento SIGUEN en la parcela.** F24 los metió
+  ahí porque el modelo solo tenía un documento, no por una razón contra el expediente.
+  Moverlos rompería los caminos que F24 cerró (`camposInvariantes`, el hecho `puntos`,
+  `componerParcelaMedida`) a cambio de nada que la fase 2 no resuelva más barato: **la capa
+  y las dianas pintan la UNIÓN de los puntos de todos los miembros**, y una parcela nueva
+  dibujada al lado los ve aunque no sean suyos.
 
 **Fase 2 · cambiar de miembro.**
 - 2.1 La identidad del expediente en `conjunto.js` y el aviso «mismo expediente» a los
   módulos de H1/H3. Las tres copias de `claveDeExpediente` dejan de decidir sobre las
   vecinas (H4).
 - 2.2 `alActivarMiembro` (H5, H6).
-- 2.3 `cableado-expediente.js` anclado al conjunto (H2).
+- 2.3 `cableado-expediente.js` anclado al conjunto (H2), y fuera la guarda temporal
+  `mensajeVariasParcelas` de la fase 1.
+- 2.5 La capa de puntos de levantamiento y sus dianas, con la unión de los miembros
+  (H9, decidido en la 1.5).
 - 2.4 `viewer/miembros.js`, el selector de la cabecera y el cajón, de momento para mirar
   y activar.
 
 **Fase 3 · las entradas.**
-- 3.1 «Añadir para editar» una colindante.
+- 3.1 «Añadir para editar» una colindante, y con ella el texto de `NO_SE_GUARDA`
+  (desviado aquí desde la 1.2).
 - 3.2 Materializar las piezas de F17 y los vecinos de F23 como miembros.
 - 3.3 «Nueva parcela» (dibujarla, con `edit/dibujo.js` de F12).
 - 3.4 Un GML con varios miembros (hoy el cajón de F08 obliga a elegir uno) y un DXF de F22

@@ -27,6 +27,8 @@
 //   redo(historial, estadoActual?)            -> estado | null
 //   puedeDeshacer(historial)                  -> boolean
 //   puedeRehacer(historial)                   -> boolean
+//   apartar(historial)                        -> apartado
+//   restaurar(historial, apartado)            -> void
 //
 // Modelo interno: una sola `pila` de snapshots (clones) + un `indice` que apunta
 // al PRESENTE dentro de la pila. `undo` mueve el índice atrás y devuelve el clon
@@ -221,4 +223,77 @@ export function redo(historial, estadoActual) {
   if (!puedeRehacer(historial)) return null
   historial.indice++
   return structuredClone(historial.pila[historial.indice])
+}
+
+/**
+ * La historia de un documento, puesta aparte para devolverla luego con
+ * {@link restaurar}. Es lo que hace falta para que cada parcela del expediente tenga
+ * SU deshacer (F25): al cambiar de parcela se aparta la historia de la que sale y se
+ * restaura la de la que entra, y el `historial` sigue siendo **el mismo objeto** — los
+ * 53 usos de `app/main.js` no se enteran.
+ *
+ * @typedef {Object} Apartado
+ * @property {Array<any>} pila  Clones de los snapshots.
+ * @property {number} indice  Dónde estaba el presente.
+ */
+
+/**
+ * Aparta la historia vigente y devuelve una COPIA. El historial no se toca.
+ *
+ * Clona a la SALIDA, como `undo` y `redo`, y es la misma disciplina que hace segura la
+ * referencia compartida de {@link reencuadrar}: lo que sale de este módulo es siempre
+ * una copia fresca. `structuredClone` de la pila ENTERA, y no snapshot a snapshot,
+ * para que la `geometriaOficial` que los N snapshots comparten tras un reencuadre siga
+ * siendo UNA en la copia y no N.
+ *
+ * @param {Historial} historial
+ * @returns {Apartado}
+ */
+export function apartar(historial) {
+  return { pila: structuredClone(historial.pila), indice: historial.indice }
+}
+
+/**
+ * Devuelve al historial una historia apartada con {@link apartar}: el presente y lo
+ * que se podía deshacer y rehacer quedan como estaban al apartarla.
+ *
+ * Notas de contrato:
+ *   · **Clona a la ENTRADA**, como `commit` y `reiniciar`: el apartado puede seguir
+ *     vivo en quien lo guardaba sin que nada de lo que haga con él toque la historia.
+ *   · **En sitio**, por lo mismo que `reiniciar`: quien tenga `historial.pila` no se
+ *     queda con la vieja.
+ *   · **Atómico.** Un apartado con mala forma LANZA antes de tocar nada. Restaurar a
+ *     medias dejaría un deshacer que salta a otra parcela, y eso no se ve hasta que el
+ *     usuario pulsa Ctrl+Z.
+ *   · Respeta el `limite` de ESTE historial: si el apartado trae más snapshots, se
+ *     descartan los más antiguos, igual que haría `commit`.
+ *
+ * @param {Historial} historial
+ * @param {Apartado} apartado
+ * @returns {void}
+ * @throws {TypeError}  Si `apartado` no tiene la forma de lo que devuelve `apartar`.
+ */
+export function restaurar(historial, apartado) {
+  const pila = apartado?.pila
+  const indice = apartado?.indice
+  if (!Array.isArray(pila) || pila.length === 0) {
+    throw new TypeError(
+      `restaurar: el apartado debe traer una 'pila' con al menos el presente; recibido ` +
+        `${Array.isArray(pila) ? 'una pila vacía' : typeof pila}.`,
+    )
+  }
+  if (!Number.isInteger(indice) || indice < 0 || indice >= pila.length) {
+    throw new TypeError(
+      `restaurar: 'indice' debe señalar un snapshot de la pila (0…${pila.length - 1}); ` +
+        `recibido ${JSON.stringify(indice)}.`,
+    )
+  }
+  const copia = structuredClone(pila)
+  // Recorte por el límite: se pierden los más ANTIGUOS, y el presente se desplaza con
+  // ellos. Si el presente era uno de los recortados, se queda en el más antiguo que
+  // sobrevive —es lo más cerca de él que queda—.
+  const sobran = Math.max(0, copia.length - historial.limite)
+  historial.pila.length = 0
+  historial.pila.push(...copia.slice(sobran))
+  historial.indice = Math.max(0, indice - sobran)
 }

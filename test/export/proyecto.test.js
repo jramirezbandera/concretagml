@@ -31,6 +31,7 @@ import { describe, expect, it } from 'vitest'
 import { SEVERIDAD, TIPO_EXPORT } from '../../export/_comun.js'
 import {
   CLAVES_EXPEDIENTE,
+  CLAVES_EXPEDIENTE_HEREDADAS,
   CLAVES_SOBRE,
   FORMATO_PROYECTO,
   MOTIVO_PROYECTO,
@@ -39,7 +40,7 @@ import {
   deProyecto,
 } from '../../export/proyecto.js'
 import { parsearGml } from '../../gml/parse.js'
-import { SRS_VALIDOS, crearExpediente } from '../../model/parcela.js'
+import { SRS_VALIDOS, crearExpediente, parcelaActiva } from '../../model/parcela.js'
 
 const RAIZ = join(import.meta.dirname, '..', '..')
 
@@ -139,7 +140,7 @@ describe('export/proyecto · aProyecto', () => {
     expect(texto).toContain(FORMATO_PROYECTO)
     expect(texto).toContain(REF)
     const vuelta = JSON.parse(texto)
-    expect(vuelta.expediente.parcela.recintos[0].vertices.length).toBe(
+    expect(parcelaActiva(vuelta.expediente).recintos[0].vertices.length).toBe(
       DEL_WFS.recintos[0].vertices.length,
     )
   })
@@ -167,7 +168,7 @@ describe('export/proyecto · exportar e importar devuelve el mismo expediente', 
     const texto = JSON.stringify(aProyecto(expedienteReal(), { fecha: FECHA }), null, 2)
     const r = deProyecto(texto)
     expect(r.ok).toBe(true)
-    expect(r.expediente.parcela.refcat).toBe(REF)
+    expect(parcelaActiva(r.expediente).refcat).toBe(REF)
   })
 
   it('⭐ la geometría oficial vuelve CONGELADA, aunque JSON no conserve el freeze', () => {
@@ -176,10 +177,10 @@ describe('export/proyecto · exportar e importar devuelve el mismo expediente', 
     // `deProyecto` lo arregla. Sin la primera mitad, la segunda podría estar pasando
     // por casualidad.
     const proyecto = porElFichero(aProyecto(expedienteReal(), { fecha: FECHA }))
-    expect(Object.isFrozen(proyecto.expediente.parcela.geometriaOficial)).toBe(false)
+    expect(Object.isFrozen(parcelaActiva(proyecto.expediente).geometriaOficial)).toBe(false)
 
     const { expediente } = deProyecto(proyecto)
-    const oficial = expediente.parcela.geometriaOficial
+    const oficial = parcelaActiva(expediente).geometriaOficial
     expect(Object.isFrozen(oficial)).toBe(true)
     expect(Object.isFrozen(oficial[0])).toBe(true)
     expect(Object.isFrozen(oficial[0].vertices)).toBe(true)
@@ -191,7 +192,7 @@ describe('export/proyecto · exportar e importar devuelve el mismo expediente', 
 
   it('los recintos EDITABLES siguen siéndolo: congelar de más rompería F06', () => {
     const { expediente } = deProyecto(porElFichero(aProyecto(expedienteReal(), { fecha: FECHA })))
-    const recintos = expediente.parcela.recintos
+    const recintos = parcelaActiva(expediente).recintos
     expect(Object.isFrozen(recintos)).toBe(false)
     recintos[0].vertices[0][0] += 1 // no lanza: la edición sigue viva
     expect(recintos[0].vertices[0][0]).toBeGreaterThan(0)
@@ -221,16 +222,16 @@ describe('export/proyecto · exportar e importar devuelve el mismo expediente', 
     })
 
     const { expediente } = deProyecto(porElFichero(aProyecto(conPuntos, { fecha: FECHA })))
-    expect(expediente.parcela.puntosLevantamiento).toEqual(nube)
-    expect(expediente.parcela.recintos).toEqual([])
-    expect(Object.isFrozen(expediente.parcela.puntosLevantamiento)).toBe(true)
+    expect(parcelaActiva(expediente).puntosLevantamiento).toEqual(nube)
+    expect(parcelaActiva(expediente).recintos).toEqual([])
+    expect(Object.isFrozen(parcelaActiva(expediente).puntosLevantamiento)).toBe(true)
   })
 
   it('la geometría oficial NO se contagia de la edición: son copias independientes', () => {
     const { expediente } = deProyecto(porElFichero(aProyecto(expedienteReal(), { fecha: FECHA })))
-    const antes = expediente.parcela.geometriaOficial[0].vertices[0][0]
-    expediente.parcela.recintos[0].vertices[0][0] += 5
-    expect(expediente.parcela.geometriaOficial[0].vertices[0][0]).toBe(antes)
+    const antes = parcelaActiva(expediente).geometriaOficial[0].vertices[0][0]
+    parcelaActiva(expediente).recintos[0].vertices[0][0] += 5
+    expect(parcelaActiva(expediente).geometriaOficial[0].vertices[0][0]).toBe(antes)
   })
 })
 
@@ -469,6 +470,72 @@ describe('export/proyecto · lo que se tolera, se dice', () => {
 })
 
 // ═════════════════════════════════════════════════════════════════════════════
+// F25 · la versión 2: N parcelas, y la 1 se sigue abriendo
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe('export/proyecto · F25 · versión 2', () => {
+  /** Lo que escribía la aplicación antes de F25: `parcela`, y `version: 1`. */
+  const ficheroV1 = () => {
+    const actual = aProyecto(expedienteReal(), { fecha: FECHA })
+    const { parcelas, activa, ...resto } = actual.expediente
+    return { ...actual, version: 1, expediente: { ...resto, parcela: parcelas[0] } }
+  }
+
+  it('escribe la versión 2, con `parcelas` y `activa` y SIN `parcela`', () => {
+    const p = aProyecto(expedienteReal(), { fecha: FECHA })
+    expect(VERSION_PROYECTO).toBe(2)
+    expect(p.version).toBe(2)
+    expect(p.expediente.parcelas).toHaveLength(1)
+    expect(p.expediente.activa).toBe('PARCELA-1')
+    expect('parcela' in p.expediente).toBe(false)
+  })
+
+  it('un fichero de la versión 1 se abre como un expediente de UNA parcela y sin avisar de nada', () => {
+    const r = deProyecto(JSON.stringify(ficheroV1()))
+    expect(r.ok).toBe(true)
+    expect(r.version).toBe(1)
+    expect(r.expediente.parcelas).toHaveLength(1)
+    expect(r.expediente.activa).toBe('PARCELA-1')
+    expect(parcelaActiva(r.expediente).refcat).toBe(REF)
+    // ⛔ El aviso que sin CLAVES_EXPEDIENTE_HEREDADAS saldría: «un dato que esta
+    // versión no sabe interpretar (parcela)», sobre algo que se ha leído entero.
+    expect(r.avisos.filter((a) => a.tipo === TIPO_EXPORT.CLAVE_DESCONOCIDA)).toEqual([])
+  })
+
+  it('ida y vuelta con TRES parcelas: el orden y la que estaba en edición se conservan', () => {
+    const base = parcelaActiva(expedienteReal())
+    const nueva = (idLocal) => ({ ...base, idLocal, refcat: null, geometriaOficial: null })
+    const expediente = crearExpediente({
+      srs: SRS,
+      parcelas: [base, nueva('NUEVA-1'), nueva('NUEVA-2')],
+      activa: 'NUEVA-1',
+    })
+    const r = deProyecto(JSON.stringify(aProyecto(expediente, { fecha: FECHA })))
+    expect(r.ok).toBe(true)
+    expect(r.expediente.parcelas.map((p) => p.idLocal)).toEqual(['PARCELA-1', 'NUEVA-1', 'NUEVA-2'])
+    expect(r.expediente.activa).toBe('NUEVA-1')
+    expect(r.avisos).toEqual([])
+    // La geometría oficial vuelve congelada en la que la tenía (regla de oro 2).
+    expect(Object.isFrozen(r.expediente.parcelas[0].geometriaOficial)).toBe(true)
+  })
+
+  it.each([
+    ['las dos formas a la vez', (e) => ({ ...e, parcela: e.parcelas[0] })],
+    ['dos parcelas con el mismo idLocal', (e) => ({ ...e, parcelas: [e.parcelas[0], e.parcelas[0]] })],
+    ['`activa` que no es de ninguna', (e) => ({ ...e, activa: 'NO-EXISTE' })],
+  ])('«%s» → `ok:false` EXPEDIENTE_ILEGIBLE, sin lanzar', (_que, estropear) => {
+    const p = aProyecto(expedienteReal(), { fecha: FECHA })
+    const roto = { ...p, expediente: estropear(p.expediente) }
+    let r
+    expect(() => {
+      r = deProyecto(JSON.stringify(roto))
+    }).not.toThrow()
+    expect(r.ok).toBe(false)
+    expect(r.motivo).toBe(MOTIVO_PROYECTO.EXPEDIENTE_ILEGIBLE)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════
 // 5 · Guardianes
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -477,9 +544,20 @@ describe('export/proyecto · guardianes', () => {
     // Si el modelo crece y esta lista no, el lector avisaría de una clave que sí
     // entiende. La derivación lo impide; esto solo comprueba que sigue derivada.
     expect(CLAVES_EXPEDIENTE).toEqual(Object.keys(crearExpediente()))
-    expect(CLAVES_EXPEDIENTE).toContain('parcela')
+    expect(CLAVES_EXPEDIENTE).toContain('parcelas')
+    expect(CLAVES_EXPEDIENTE).toContain('activa')
     expect(CLAVES_EXPEDIENTE).toContain('edificio')
     expect(Object.isFrozen(CLAVES_EXPEDIENTE)).toBe(true)
+  })
+
+  it('F25 · `parcela` ya no se escribe, pero sigue entre las claves que se ENTIENDEN', () => {
+    // La forma de la versión 1. Si saliera de las heredadas, abrir un proyecto viejo
+    // avisaría de un dato «que esta versión no sabe interpretar» que sí se lee entero.
+    expect(CLAVES_EXPEDIENTE).not.toContain('parcela')
+    expect(CLAVES_EXPEDIENTE_HEREDADAS).toContain('parcela')
+    expect(Object.isFrozen(CLAVES_EXPEDIENTE_HEREDADAS)).toBe(true)
+    // Ninguna heredada puede volver a escribirse: serían dos formas del mismo dato.
+    for (const k of CLAVES_EXPEDIENTE_HEREDADAS) expect(CLAVES_EXPEDIENTE).not.toContain(k)
   })
 
   it('el módulo no importa nada de `viewer/`, `services/`, `storage/` ni `app/`', () => {

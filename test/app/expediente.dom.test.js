@@ -96,6 +96,7 @@ import {
   mensajeFicheroSuperado,
   mensajeParcelaDeContexto,
   mensajeParcelaFuera,
+  mensajeVariasParcelas,
   nombreFicheroExport,
 } from '../../app/cableado-expediente.js'
 import { parcelaDemo, parcelaDemoConHueco, REFCAT_DEMO } from '../../app/demo-datos.js'
@@ -111,7 +112,7 @@ import { ACADVER } from '../../export/dxf.js'
 import { deProyecto } from '../../export/proyecto.js'
 import { TIPO_MIME_TEXTO, TIPO_MIME_XLSX, nombreFicheroGml } from '../../gml/descargar.js'
 import { crearEdificio } from '../../model/edificio.js'
-import { TIPO_EXPEDIENTE, crearExpediente } from '../../model/parcela.js'
+import { TIPO_EXPEDIENTE, crearExpediente, parcelaActiva } from '../../model/parcela.js'
 import { ALMACENES } from '../../storage/bd.js'
 import { crearExpedientes } from '../../storage/expedientes.js'
 import { crearEstadoVista } from '../../viewer/_comun.js'
@@ -497,16 +498,16 @@ describe('F10 · T5.1 · 1 · el Expediente por fin existe', () => {
     const exp = m.cableado.expedienteActual()
     expect(exp.tipo).toBe('PARCELA')
     expect(exp.srs).toBe(SRS)
-    expect(exp.parcela.refcat).toBe(REFCAT_DEMO)
-    expect(exp.parcela.recintos[0].vertices).toHaveLength(15)
+    expect(parcelaActiva(exp).refcat).toBe(REFCAT_DEMO)
+    expect(parcelaActiva(exp).recintos[0].vertices).toHaveLength(15)
     m.cableado.destruir()
   })
 
   it('⭐ la geometría oficial vuelve CONGELADA (regla de oro 2)', async () => {
     const m = await montar()
     const exp = m.cableado.expedienteActual()
-    expect(Object.isFrozen(exp.parcela.geometriaOficial)).toBe(true)
-    expect(Object.isFrozen(exp.parcela.geometriaOficial[0])).toBe(true)
+    expect(Object.isFrozen(parcelaActiva(exp).geometriaOficial)).toBe(true)
+    expect(Object.isFrozen(parcelaActiva(exp).geometriaOficial[0])).toBe(true)
     m.cableado.destruir()
   })
 
@@ -756,6 +757,53 @@ describe('F10 · T5.1 · 4 · recuperar, duplicar y borrar', () => {
     m.cableado.destruir()
   })
 
+  // ── F25 · fase 1: un expediente de VARIAS parcelas todavía no se abre ──────────
+  // El modelo ya las lleva y esta pantalla aún no sabe cambiar entre ellas. Abrir
+  // solo la que estaba en edición haría que el siguiente «Guardar» —o el
+  // autoguardado— escribiera el expediente con UNA y perdiera las demás sin decirlo.
+  const deDos = () =>
+    crearExpediente({
+      srs: SRS,
+      parcelas: [parcelaDemo(), { ...parcelaDemo(), idLocal: 'PIEZA-1', refcat: null }],
+      activa: 'PIEZA-1',
+    })
+
+  it('F25 · un fichero de proyecto con DOS parcelas se rechaza diciendo cuántas trae', async () => {
+    const m = await montar()
+    m.estado.set(parcelaDemoConHueco())
+    await reposar()
+    const sobre = {
+      formato: 'concreta-gml/proyecto',
+      version: 2,
+      generado: '2026-11-01T10:00:00.000Z',
+      nombre: 'Segregación',
+      expediente: deDos(),
+    }
+    await m.cableado.abrirProyecto(ficheroDeTexto('dos.json', JSON.stringify(sobre)))
+    await reposar()
+
+    expect(m.avisos().join('\n')).toContain(mensajeVariasParcelas(2))
+    expect(m.cargadas).toEqual([])
+    expect(m.estado.get().recintos).toHaveLength(2) // sigue la del hueco: nada se ha pisado
+    m.cableado.destruir()
+  })
+
+  it('F25 · y un expediente GUARDADO con dos tampoco se recupera, con el mismo texto', async () => {
+    const m = await montar()
+    await m.expedientes.guardar(deDos(), { nombre: 'Segregación' })
+    await abrir(m)
+    const registro = (await m.expedientes.listar()).registros[0]
+    pulsar(`${selectorFila(registro.id)} [data-accion="recuperar-expediente"]`)
+    await reposar()
+
+    expect(m.cargadas).toEqual([])
+    expect(m.renglon()).toBe(mensajeVariasParcelas(2))
+    // El registro sigue entero: rechazar no es borrar.
+    const r = await m.expedientes.recuperar(registro.id)
+    expect(r.expediente.parcelas.map((p) => p.idLocal)).toEqual([parcelaDemo().idLocal, 'PIEZA-1'])
+    m.cableado.destruir()
+  })
+
   it('«Duplicar» añade una copia con «(copia)» en el nombre', async () => {
     const m = await montar()
     const registro = await conUnoGuardado(m, 'Original')
@@ -996,7 +1044,7 @@ describe('F10 · T5.1 · 5 · ⭐ el autoguardado y su espera', () => {
 
     const b = await m.expedientes.leerBorrador()
     expect(b.ok).toBe(true)
-    expect(b.expediente.parcela.recintos).toHaveLength(2)
+    expect(parcelaActiva(b.expediente).recintos).toHaveLength(2)
     m.cableado.destruir()
   })
 
@@ -1022,7 +1070,7 @@ describe('F10 · T5.1 · 5 · ⭐ el autoguardado y su espera', () => {
 
     const b = await m.expedientes.leerBorrador()
     // Sigue siendo el de ayer: la parcela de un solo recinto, no la de dos.
-    expect(b.expediente.parcela.recintos).toHaveLength(1)
+    expect(parcelaActiva(b.expediente).recintos).toHaveLength(1)
     m.cableado.destruir()
   })
 
@@ -1053,7 +1101,7 @@ describe('F10 · T5.1 · 5 · ⭐ el autoguardado y su espera', () => {
 
     const b = await m.expedientes.leerBorrador()
     expect(b.ok).toBe(true)
-    expect(b.expediente.parcela.recintos).toHaveLength(2)
+    expect(parcelaActiva(b.expediente).recintos).toHaveLength(2)
     m.cableado.destruir()
   })
 
@@ -1246,7 +1294,7 @@ describe('F10 · T5.1 · 6 · las tres exportaciones', () => {
     expect(leido.ok).toBe(true)
     expect(leido.nombre).toBe('Para el compañero')
     expect(leido.expediente.srs).toBe(SRS)
-    expect(leido.expediente.parcela.recintos[0].vertices).toEqual(
+    expect(parcelaActiva(leido.expediente).recintos[0].vertices).toEqual(
       m.estado.get().recintos[0].vertices,
     )
     m.cableado.destruir()
@@ -1588,7 +1636,7 @@ describe('F11 · T3.3 · 12 · (a) `expedienteActual()` pregunta por la rama', (
 
     expect(exp.tipo).toBe('EDIFICIO')
     expect(exp.edificio.partes).toHaveLength(2)
-    expect(exp.parcela).toBeNull()
+    expect(parcelaActiva(exp)).toBeNull()
     // Anti-vacuidad: en el store de parcela HAY una parcela entera, y aun así no sale.
     expect(m.estado.get().refcat).toBe(REFCAT_DEMO)
     m.desmontar()
@@ -1600,7 +1648,7 @@ describe('F11 · T3.3 · 12 · (a) `expedienteActual()` pregunta por la rama', (
     const m = await montar({ conRama: true, edificio: edificioDemo() })
     const exp = m.cableado.expedienteActual()
     expect(exp.tipo).toBe('PARCELA')
-    expect(exp.parcela.refcat).toBe(REFCAT_DEMO)
+    expect(parcelaActiva(exp).refcat).toBe(REFCAT_DEMO)
     expect(exp.edificio).toBeNull()
     m.desmontar()
   })
@@ -1617,7 +1665,7 @@ describe('F11 · T3.3 · 12 · (a) `expedienteActual()` pregunta por la rama', (
     expect(() => m.cableado.expedienteActual()).not.toThrow()
     const exp = m.cableado.expedienteActual()
     // Una rama y solo una, en cada sentido.
-    expect([exp.parcela, exp.edificio].filter((r) => r !== null)).toHaveLength(1)
+    expect([parcelaActiva(exp), exp.edificio].filter((r) => r !== null)).toHaveLength(1)
     m.desmontar()
   })
 
@@ -1627,7 +1675,7 @@ describe('F11 · T3.3 · 12 · (a) `expedienteActual()` pregunta por la rama', (
 
     expect(exp.edificio.parcelaContexto).toEqual(parcelaDemo().recintos)
     // Y no se ha colado por la puerta de al lado.
-    expect(exp.parcela).toBeNull()
+    expect(parcelaActiva(exp)).toBeNull()
     // El store no se ha mutado (regla de oro 4): el POJO de allí sigue sin contexto.
     expect(m.estadoEdificio.get().parcelaContexto).toBeNull()
     m.desmontar()
@@ -1782,7 +1830,7 @@ describe('F11 · T3.3 · 13 · (b) F11 no guarda expedientes de edificio, y lo d
 
     const borrador = await m.expedientes.leerBorrador()
     expect(borrador.ok).toBe(true)
-    expect(borrador.expediente.parcela.recintos).toHaveLength(2) // la del hueco
+    expect(parcelaActiva(borrador.expediente).recintos).toHaveLength(2) // la del hueco
     m.desmontar()
   })
 
@@ -1800,7 +1848,7 @@ describe('F11 · T3.3 · 13 · (b) F11 no guarda expedientes de edificio, y lo d
     const deParcela = await m.expedientes.leerBorrador(TIPO_EXPEDIENTE.PARCELA)
     const deEdificio = await m.expedientes.leerBorrador(TIPO_EXPEDIENTE.EDIFICIO)
     expect(deParcela.ok).toBe(true)
-    expect(deParcela.expediente.parcela.recintos).toHaveLength(2)
+    expect(parcelaActiva(deParcela.expediente).recintos).toHaveLength(2)
     expect(deEdificio.ok).toBe(true)
     expect(deEdificio.expediente.edificio.idLocal).toBe('el-de-la-prueba')
     m.desmontar()
@@ -2437,7 +2485,7 @@ describe('Rework de UI · T7 · 16 · qué rama se guarda y cuál NO va en el fi
     const leido = deProyecto(texto)
     // Dentro del fichero SÍ está, como contexto y solo con los recintos.
     expect(leido.expediente.edificio.parcelaContexto).toEqual(parcelaDemo().recintos)
-    expect(leido.expediente.parcela).toBeNull()
+    expect(parcelaActiva(leido.expediente)).toBeNull()
 
     // Una parcela distinguible en el store, para poder ver si la trae o si la pisa.
     m.estado.set(parcelaDemoConHueco())
@@ -3020,7 +3068,7 @@ describe('2026-09-25 · el expediente autoguardado en un fichero del disco', () 
     expect(d.asa.escrito, 'el primer volcado es inmediato').toHaveLength(1)
     const leido = deProyecto(d.asa.escrito[0])
     expect(leido.ok, 'lo escrito es un fichero de proyecto que la app sabe reabrir').toBe(true)
-    expect(leido.expediente.parcela.recintos.length).toBeGreaterThan(0)
+    expect(parcelaActiva(leido.expediente).recintos.length).toBeGreaterThan(0)
 
     expect(m.renglon()).toBe(mensajeVinculado(NOMBRE))
     expect(m.cableado.estado().vinculo).toBe(NOMBRE)

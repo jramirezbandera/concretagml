@@ -92,7 +92,7 @@
 // lee al llamar, no al cargar—, así que el único que lo impide es el guardián de
 // `test/contrato.test.js`.
 
-import { TIPO_EXPEDIENTE, crearExpediente } from '../model/parcela.js'
+import { TIPO_EXPEDIENTE, normalizarExpediente, parcelaPrincipal } from '../model/parcela.js'
 import { NIVEL, resolverAvisar } from '../viewer/_comun.js'
 import { ALMACENES, ESQUEMA_ALMACENES } from './bd.js'
 // `esCuotaExcedida` es PURA: no toca `navigator.storage` ni nada del entorno, así
@@ -311,11 +311,15 @@ function nombrePorDefecto(refcat, tipo = TIPO_EXPEDIENTE.PARCELA) {
  * llenan: mirar solo `parcela` dejaba el de edificio a `null` y su rótulo por defecto
  * en «sin referencia» teniéndola.
  *
+ * ⭐ F25: con varias parcelas, la que rotula el registro es la PRINCIPAL y no la que
+ * esté en edición. Si fuera la activa, guardar con una pieza nueva en pantalla
+ * cambiaría el nombre y el índice del expediente entero.
+ *
  * @param {object} expediente  Ya normalizado por `crearExpediente`.
  * @returns {string|null}
  */
 function refcatDe(expediente) {
-  return expediente.parcela?.refcat ?? expediente.edificio?.refcat ?? null
+  return parcelaPrincipal(expediente)?.refcat ?? expediente.edificio?.refcat ?? null
 }
 
 // ── Typedefs ─────────────────────────────────────────────────────────────────
@@ -517,13 +521,7 @@ export function crearExpedientes(opciones = {}) {
     const guardado = registro?.expediente
     if (!guardado || typeof guardado !== 'object' || Array.isArray(guardado)) return null
     try {
-      return crearExpediente({
-        tipo: guardado.tipo,
-        srs: guardado.srs,
-        metadatos: guardado.metadatos ?? undefined,
-        parcela: guardado.parcela ?? null,
-        edificio: guardado.edificio ?? null,
-      })
+      return normalizarExpediente(guardado)
     } catch {
       return null
     }
@@ -578,13 +576,7 @@ export function crearExpedientes(opciones = {}) {
    * @throws {TypeError|RangeError}  Lo que lance `crearExpediente`.
    */
   async function guardar(expediente, { nombre, id } = {}) {
-    const normal = crearExpediente({
-      tipo: expediente?.tipo,
-      srs: expediente?.srs,
-      metadatos: expediente?.metadatos ?? undefined,
-      parcela: expediente?.parcela ?? null,
-      edificio: expediente?.edificio ?? null,
-    })
+    const normal = normalizarExpediente(expediente)
     if (id !== undefined && (typeof id !== 'string' || id.length === 0)) {
       throw new TypeError(`guardar: 'id' debe ser un texto no vacío; recibido ${JSON.stringify(id)}.`)
     }
@@ -861,13 +853,7 @@ export function crearExpedientes(opciones = {}) {
    * @throws {TypeError|RangeError}  Lo que lance `crearExpediente`.
    */
   async function guardarBorrador(expediente) {
-    const normal = crearExpediente({
-      tipo: expediente?.tipo,
-      srs: expediente?.srs,
-      metadatos: expediente?.metadatos ?? undefined,
-      parcela: expediente?.parcela ?? null,
-      edificio: expediente?.edificio ?? null,
-    })
+    const normal = normalizarExpediente(expediente)
     // Va DESPUÉS de normalizar y antes de tocar la base: `crearExpediente` ya ha
     // validado el tipo, así que llegar aquí con uno desconocido solo puede ser que
     // este mapa se haya quedado corto — y eso tiene que verse, no degradar.

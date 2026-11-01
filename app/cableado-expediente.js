@@ -158,7 +158,7 @@
 //
 // Su test es `test/app/expediente.dom.test.js`, con sufijo `.dom`: toca el DOM.
 
-import { TIPO_EXPEDIENTE, crearExpediente } from '../model/parcela.js'
+import { TIPO_EXPEDIENTE, crearExpediente, parcelaActiva } from '../model/parcela.js'
 import { conIdLocal } from '../edificio/mutaciones.js'
 import { SEVERIDAD } from '../export/_comun.js'
 import { serializarCoordenadasTxt } from '../export/coordenadas.js'
@@ -459,6 +459,42 @@ export const IDENTIDAD_DE_PROYECTO = 'edificio-de-proyecto'
 export const MENSAJE_GUARDADO_SIN_PARCELA =
   'Ese expediente guardado no lleva ninguna parcela, así que no hay geometría que abrir en el ' +
   'visor. No se ha borrado nada.'
+
+/**
+ * Cuando el expediente trae VARIAS parcelas (F25) y esta pantalla todavía solo sabe abrir
+ * una. ⛔ **No se abre la que está en edición y ya está**: el siguiente «Guardar» o el
+ * autoguardado escribirían el expediente con UNA parcela y las demás se perderían sin que
+ * nada lo dijera. Se rechaza entero y se dice cuántas trae. Desaparece en la fase 2 de
+ * F25, cuando cambiar de parcela exista.
+ *
+ * @param {number} n  Cuántas parcelas trae.
+ * @returns {string}
+ */
+export const mensajeVariasParcelas = (n) =>
+  `Ese expediente lleva ${n} parcelas y esta versión de la aplicación todavía solo sabe abrir ` +
+  'expedientes de una. No se ha abierto, para que guardarlo no pierda las demás. No se ha ' +
+  'borrado nada.'
+
+/**
+ * La parcela que se puede abrir de un expediente, o por qué no hay ninguna. Las tres
+ * puertas de entrada —recuperar un guardado, el borrador y el fichero de proyecto—
+ * preguntan esto mismo, y con la misma respuesta.
+ *
+ * @param {object} expediente  Normalizado por `crearExpediente`.
+ * @returns {{parcela: object|null, motivo: string|null}}  `motivo` es el texto para
+ *   el usuario cuando `parcela` es `null`.
+ */
+function parcelaAbrible(expediente) {
+  // El `?.` que había en dos de las tres puertas, conservado: un resultado `ok` sin
+  // expediente no debería llegar, y si llega se dice lo mismo que antes.
+  if (!expediente) return { parcela: null, motivo: MENSAJE_GUARDADO_SIN_PARCELA }
+  const n = expediente.parcelas.length
+  if (n > 1) return { parcela: null, motivo: mensajeVariasParcelas(n) }
+  const parcela = parcelaActiva(expediente)
+  return hayGeometria(parcela)
+    ? { parcela, motivo: null }
+    : { parcela: null, motivo: MENSAJE_GUARDADO_SIN_PARCELA }
+}
 
 // ── F11 · lo que la rama EDIFICIO cambia, dicho ──────────────────────────────
 
@@ -2061,9 +2097,9 @@ export function cablearExpediente({
       decir(motivoOtroHuso(r.registro.srs))
       return
     }
-    const parcela = r.expediente?.parcela ?? null
-    if (!hayGeometria(parcela)) {
-      decir(MENSAJE_GUARDADO_SIN_PARCELA)
+    const { parcela, motivo } = parcelaAbrible(r.expediente)
+    if (parcela === null) {
+      decir(motivo)
       return
     }
     cargar(parcela, {
@@ -2183,7 +2219,6 @@ export function cablearExpediente({
         estorbos.push(motivoOtroHuso(r.registro.srs))
         continue
       }
-      const parcela = r.expediente?.parcela ?? null
       const edificio = r.expediente?.edificio ?? null
       if (tipo === TIPO_EXPEDIENTE.EDIFICIO) {
         // Sin rama de edificio montada no hay dónde ponerlo, y decirlo es mejor que
@@ -2192,9 +2227,12 @@ export function cablearExpediente({
           estorbos.push(MENSAJE_GUARDADO_SIN_EDIFICIO)
           continue
         }
-      } else if (!hayGeometria(parcela)) {
-        estorbos.push(MENSAJE_GUARDADO_SIN_PARCELA)
-        continue
+      } else {
+        const { motivo } = parcelaAbrible(r.expediente)
+        if (motivo !== null) {
+          estorbos.push(motivo)
+          continue
+        }
       }
       abribles.push({ tipo, r })
     }
@@ -2231,7 +2269,7 @@ export function cablearExpediente({
         modificado: r.registro.actualizado,
       }
       if (tipo === TIPO_EXPEDIENTE.EDIFICIO) cargarEdificio(r.expediente.edificio, nueva)
-      else cargar(r.expediente.parcela, nueva)
+      else cargar(parcelaActiva(r.expediente), nueva)
     }
 
     const que = enumerarBorradores(abribles.map(({ tipo, r }) => ({ tipo, refcat: r.registro.refcat })))
@@ -2616,10 +2654,10 @@ export function cablearExpediente({
     if (r.expediente.tipo === TIPO_EXPEDIENTE.EDIFICIO) {
       return abrirProyectoDeEdificio(r, fichero)
     }
-    const parcela = r.expediente.parcela ?? null
-    if (!hayGeometria(parcela)) {
-      avisar(MENSAJE_GUARDADO_SIN_PARCELA)
-      decir(MENSAJE_GUARDADO_SIN_PARCELA)
+    const { parcela, motivo } = parcelaAbrible(r.expediente)
+    if (parcela === null) {
+      avisar(motivo)
+      decir(motivo)
       return
     }
     // Entra SIN identificador: el fichero viene de otro equipo o de otra sesión y no se

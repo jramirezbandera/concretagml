@@ -31,7 +31,7 @@ import { IDBFactory } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
 
 import { crearEdificio } from '../../model/edificio.js'
-import { TIPO_EXPEDIENTE, crearExpediente, crearParcela } from '../../model/parcela.js'
+import { TIPO_EXPEDIENTE, crearExpediente, crearParcela, parcelaActiva } from '../../model/parcela.js'
 import { ALMACENES, ESQUEMA_ALMACENES } from '../../storage/bd.js'
 import {
   AVISO_DURABILIDAD,
@@ -225,14 +225,14 @@ describe('storage/expedientes · la geometría oficial vuelve CONGELADA (regla d
     const exp = crearExpedientes({ bd, ahora: relojQueAvanza() })
     const original = expedienteDePrueba()
 
-    expect(Object.isFrozen(original.parcela.geometriaOficial)).toBe(true)
-    expect(Object.isFrozen(original.parcela.geometriaOficial[0])).toBe(true)
+    expect(Object.isFrozen(parcelaActiva(original).geometriaOficial)).toBe(true)
+    expect(Object.isFrozen(parcelaActiva(original).geometriaOficial[0])).toBe(true)
 
     const { registro } = await exp.guardar(original)
     const crudo = await bd.get(ALMACENES.EXPEDIENTES, registro.id)
 
-    expect(crudo.expediente.parcela.geometriaOficial).toEqual(original.parcela.geometriaOficial)
-    expect(Object.isFrozen(crudo.expediente.parcela.geometriaOficial)).toBe(false) // ⚠️ el peligro
+    expect(parcelaActiva(crudo.expediente).geometriaOficial).toEqual(parcelaActiva(original).geometriaOficial)
+    expect(Object.isFrozen(parcelaActiva(crudo.expediente).geometriaOficial)).toBe(false) // ⚠️ el peligro
     bd.close()
   })
 
@@ -242,7 +242,7 @@ describe('storage/expedientes · la geometría oficial vuelve CONGELADA (regla d
     const { registro } = await exp.guardar(expedienteDePrueba())
 
     const { expediente } = await exp.recuperar(registro.id)
-    const oficial = expediente.parcela.geometriaOficial
+    const oficial = parcelaActiva(expediente).geometriaOficial
 
     expect(Object.isFrozen(oficial)).toBe(true)
     expect(Object.isFrozen(oficial[0])).toBe(true)
@@ -280,12 +280,12 @@ describe('storage/expedientes · la geometría oficial vuelve CONGELADA (regla d
     const { registro } = await exp.guardar(original)
     const { expediente } = await exp.recuperar(registro.id)
 
-    expect(expediente.parcela.puntosLevantamiento).toEqual(nube)
-    expect(expediente.parcela.recintos).toEqual([])
+    expect(parcelaActiva(expediente).puntosLevantamiento).toEqual(nube)
+    expect(parcelaActiva(expediente).recintos).toEqual([])
     // Y vuelven congelados, como `geometriaOficial`: nada los edita.
-    expect(Object.isFrozen(expediente.parcela.puntosLevantamiento)).toBe(true)
+    expect(Object.isFrozen(parcelaActiva(expediente).puntosLevantamiento)).toBe(true)
     expect(() => {
-      expediente.parcela.puntosLevantamiento[0][0] = 0
+      parcelaActiva(expediente).puntosLevantamiento[0][0] = 0
     }).toThrow(TypeError)
 
     bd.close()
@@ -299,9 +299,9 @@ describe('storage/expedientes · la geometría oficial vuelve CONGELADA (regla d
     const { registro } = await exp.guardar(expedienteDePrueba())
 
     const { expediente } = await exp.recuperar(registro.id)
-    expect(Object.isFrozen(expediente.parcela.recintos)).toBe(false)
-    expediente.parcela.recintos[0].vertices[0][0] = 1
-    expect(expediente.parcela.recintos[0].vertices[0][0]).toBe(1)
+    expect(Object.isFrozen(parcelaActiva(expediente).recintos)).toBe(false)
+    parcelaActiva(expediente).recintos[0].vertices[0][0] = 1
+    expect(parcelaActiva(expediente).recintos[0].vertices[0][0]).toBe(1)
 
     bd.close()
   })
@@ -378,7 +378,7 @@ describe('storage/expedientes · el borrador es un registro con clave reservada'
 
     const { ok, expediente } = await exp.leerBorrador()
     expect(ok).toBe(true)
-    expect(expediente.parcela.recintos[0].vertices[0][0]).toBe(440123.45 + 4) // el último
+    expect(parcelaActiva(expediente).recintos[0].vertices[0][0]).toBe(440123.45 + 4) // el último
 
     bd.close()
   })
@@ -443,7 +443,7 @@ describe('storage/expedientes · el borrador es UNO POR RAMA (F12 · T4.3)', () 
     expect(await bd.count(ALMACENES.EXPEDIENTES)).toBe(2)
     const deParcela = await exp.leerBorrador(TIPO_EXPEDIENTE.PARCELA)
     const deEdificio = await exp.leerBorrador(TIPO_EXPEDIENTE.EDIFICIO)
-    expect(deParcela.expediente.parcela.recintos[0].vertices[0][0]).toBe(440123.45 + 7)
+    expect(parcelaActiva(deParcela.expediente).recintos[0].vertices[0][0]).toBe(440123.45 + 7)
     expect(deEdificio.expediente.edificio.idLocal).toBe('EDIF-1')
     // Y cada uno en SU clave, no en una cualquiera.
     expect(await bd.get(ALMACENES.EXPEDIENTES, ID_BORRADOR)).toBeDefined()
