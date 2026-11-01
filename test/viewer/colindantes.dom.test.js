@@ -477,3 +477,20 @@ describe('viewer/colindantes · limpiar y destruir', () => {
     expect(contornosDe(mapa)).toHaveLength(0)
   })
 })
+
+describe('viewer/colindantes · F25 · vecinas(): lo que se ve es lo que se puede añadir', () => {
+  it('devuelve las vecinas PINTADAS, sin la que no se pudo dibujar, y se vacía al limpiar', () => {
+    const { capa } = conMapa({ alAvisar: () => {} })
+    const sinContorno = { refcat: '9398599VK3799G', recintos: [] }
+    capa.pintar([VECINA_A, sinContorno, VECINA_B])
+    expect(capa.vecinas().map((v) => v.refcat)).toEqual([VECINA_A.refcat, VECINA_B.refcat])
+    // Lista nueva: empujar en ella no cambia la capa.
+    capa.vecinas().push(VECINA_CON_HUECO)
+    expect(capa.vecinas()).toHaveLength(2)
+    capa.limpiar()
+    expect(capa.vecinas()).toEqual([])
+    capa.pintar([VECINA_A])
+    capa.pintar(null)
+    expect(capa.vecinas()).toEqual([])
+  })
+})

@@ -75,13 +75,123 @@ const otrasDe = (mapa) => {
 const control = (contenedor) => contenedor.querySelector(SELECTOR.CONTROL)
 const lista = (contenedor) => contenedor.querySelector(SELECTOR.LISTA)
 
-describe('viewer/parcelas-expediente · con UNA sola parcela no hay nada', () => {
-  it('el selector nace oculto y sigue oculto con una parcela; la capa no pinta nada', () => {
+describe('viewer/parcelas-expediente · con UNA sola parcela, solo la puerta de «Añadir»', () => {
+  it('sin parcela en edición no hay control; con una, solo «Añadir parcela» y ninguna capa', () => {
     const { mapa, contenedor, capa } = conMapa()
     expect(control(contenedor).hidden).toBe(true)
     capa.pintar({ parcelas: [MATRIZ], activa: 'MATRIZ' })
-    expect(control(contenedor).hidden).toBe(true)
+    // ⚠️ En la fase 2 esto era «oculto». La fase 3 lo cambió a propósito: «Añadir
+    // parcela» es la única puerta al expediente de varias, y escondida no existe.
+    expect(control(contenedor).hidden).toBe(false)
+    expect(contenedor.querySelector(SELECTOR.AÑADIR).hidden).toBe(false)
+    expect(contenedor.querySelector(SELECTOR.FILA_LISTA).hidden).toBe(true)
+    expect(contenedor.querySelector(SELECTOR.QUITAR).hidden).toBe(true)
     expect(otrasDe(mapa)).toEqual([])
+  })
+})
+
+describe('viewer/parcelas-expediente · «Añadir parcela» y «Quitar esta parcela» (fase 3)', () => {
+  function conOpciones(opciones, extra = {}) {
+    const { mapa, destruir } = montarMapa({ centro: [36.7, -4.5], zoom: 19 })
+    crearPanes(mapa)
+    const opcionesAñadir = vi.fn(() => opciones)
+    const capa = crearParcelasExpediente({ mapa, zona: ZONA, opcionesAñadir, ...extra })
+    montados.push(() => {
+      capa.destruir()
+      destruir()
+    })
+    return { capa, contenedor: mapa.getContainer(), opcionesAñadir }
+  }
+  const pulsar = (contenedor, selector) => contenedor.querySelector(selector).click()
+
+  it('el menú se rellena AL ABRIRLO, y elegir una opción avisa con su clave y lo cierra', () => {
+    const { capa, contenedor, opcionesAñadir } = conOpciones([
+      { clave: 'dibujar', texto: 'Dibujar una parcela nueva' },
+      { clave: 'colindante:9398501VK3799G', texto: 'Colindante 9398501VK3799G' },
+    ])
+    capa.pintar({ parcelas: [MATRIZ], activa: 'MATRIZ' })
+    expect(opcionesAñadir).not.toHaveBeenCalled()
+    const alAñadir = vi.fn()
+    capa.alAñadir(alAñadir)
+    pulsar(contenedor, SELECTOR.AÑADIR)
+    expect(opcionesAñadir).toHaveBeenCalledTimes(1)
+    expect(contenedor.querySelector(SELECTOR.AÑADIR).getAttribute('aria-expanded')).toBe('true')
+    const botones = [...contenedor.querySelectorAll(SELECTOR.OPCION)]
+    expect(botones.map((b) => b.textContent)).toEqual(['Dibujar una parcela nueva', 'Colindante 9398501VK3799G'])
+    botones[1].click()
+    expect(alAñadir).toHaveBeenCalledWith('colindante:9398501VK3799G')
+    expect(contenedor.querySelector(SELECTOR.MENU).hidden).toBe(true)
+  })
+
+  it('⛔ elegir una opción NO llega al mapa como un clic suyo (era la primera esquina del dibujo)', () => {
+    // Medido en Chromium: con el menú vaciándose al elegir, el botón quedaba despegado
+    // del DOM y `Map#_isClickDisabled` no encontraba la marca de su control. El dibujo
+    // que la opción acababa de empezar recibía ESA pulsación como primer vértice.
+    const { mapa, destruir } = montarMapa({ centro: [36.7, -4.5], zoom: 19 })
+    crearPanes(mapa)
+    const capa = crearParcelasExpediente({
+      mapa,
+      zona: ZONA,
+      opcionesAñadir: () => [{ clave: 'dibujar', texto: 'Dibujar una parcela nueva' }],
+    })
+    montados.push(() => {
+      capa.destruir()
+      destruir()
+    })
+    capa.pintar({ parcelas: [MATRIZ], activa: 'MATRIZ' })
+    const clicsDelMapa = vi.fn()
+    mapa.on('click', clicsDelMapa)
+    const contenedor = mapa.getContainer()
+    contenedor.querySelector(SELECTOR.AÑADIR).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    const opcion = contenedor.querySelector(SELECTOR.OPCION)
+    opcion.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 50, clientY: 50 }))
+    expect(clicsDelMapa).not.toHaveBeenCalled()
+    // Y el botón sigue dentro del control: es lo que el mapa mira.
+    expect(opcion.isConnected).toBe(true)
+  })
+
+  it('sin opciones el menú lo dice, en vez de abrirse vacío', () => {
+    const { capa, contenedor } = conOpciones([])
+    capa.pintar({ parcelas: [MATRIZ], activa: 'MATRIZ' })
+    pulsar(contenedor, SELECTOR.AÑADIR)
+    expect(contenedor.querySelector(SELECTOR.MENU).textContent).toBe(TEXTO.SIN_OPCIONES)
+  })
+
+  it('«Quitar» pide DOS pulsaciones; la primera solo arma, y el armado caduca', () => {
+    let disparar = null
+    const programar = vi.fn((fn) => {
+      disparar = fn
+      return () => {
+        disparar = null
+      }
+    })
+    const { capa, contenedor } = conOpciones([], { programar })
+    capa.pintar({ parcelas: [MATRIZ, PIEZA_1], activa: 'PIEZA-1' })
+    const alQuitar = vi.fn()
+    capa.alQuitar(alQuitar)
+    const quitar = contenedor.querySelector(SELECTOR.QUITAR)
+    expect(quitar.hidden).toBe(false)
+    quitar.click()
+    expect(alQuitar).not.toHaveBeenCalled()
+    expect(quitar.textContent).toBe(TEXTO.QUITAR_ARMADO)
+    disparar() // caduca
+    expect(quitar.textContent).toBe(TEXTO.QUITAR)
+    quitar.click()
+    quitar.click()
+    expect(alQuitar).toHaveBeenCalledTimes(1)
+    expect(alQuitar).toHaveBeenCalledWith('PIEZA-1')
+  })
+
+  it('cambiar de parcela con «Quitar» armado lo DESARMA: no se quita la que no es', () => {
+    const { capa, contenedor } = conOpciones([], { programar: () => () => {} })
+    capa.pintar({ parcelas: [MATRIZ, PIEZA_1], activa: 'PIEZA-1' })
+    const alQuitar = vi.fn()
+    capa.alQuitar(alQuitar)
+    contenedor.querySelector(SELECTOR.QUITAR).click()
+    capa.pintar({ parcelas: [MATRIZ, PIEZA_1], activa: 'MATRIZ' })
+    contenedor.querySelector(SELECTOR.QUITAR).click()
+    expect(alQuitar).not.toHaveBeenCalled()
+    expect(contenedor.querySelector(SELECTOR.QUITAR).textContent).toBe(TEXTO.QUITAR_ARMADO)
   })
 })
 

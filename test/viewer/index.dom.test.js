@@ -1938,6 +1938,37 @@ describe('crearVisor · reencuadre automático: solo cuando entra una parcela DI
     expect(visor.mapa.distance(bounds.getNorthWest(), bounds.getNorthEast())).toBeLessThan(200)
   })
 
+  it('F25 · dentro de `sinReencuadrar` una parcela distinta NO mueve la vista, y después sí', () => {
+    // «Dibujar una parcela nueva»: la pieza se acaba de dibujar donde se mira, y
+    // encuadrarla llevaba el mapa a escala de 1 m (medido en Chromium).
+    const { visor, store } = abrirVisor({ parcela: parcelaComo({ refcat: REF_A }) })
+    const antes = vistaDe(visor.mapa)
+    const devuelto = visor.sinReencuadrar(() => {
+      store.set(parcelaComo({ refcat: REF_B, dx: 500, dy: 500 }))
+      return 'hecho'
+    })
+    expect(devuelto).toBe('hecho')
+    expect(vistaDe(visor.mapa)).toEqual(antes)
+    // Se ha anotado como encuadrada: editarla luego tampoco mueve nada.
+    store.set(parcelaComo({ refcat: REF_B, dx: 510, dy: 510 }))
+    expect(vistaDe(visor.mapa)).toEqual(antes)
+    // Y la suspensión se acaba con la función: la siguiente distinta sí reencuadra.
+    store.set(parcelaComo({ refcat: REF_A, dx: 2000, dy: 2000 }))
+    expect(vistaDe(visor.mapa)).not.toEqual(antes)
+  })
+
+  it('F25 · `sinReencuadrar` se levanta aunque la función reviente', () => {
+    const { visor, store } = abrirVisor({ parcela: parcelaComo({ refcat: REF_A }) })
+    const antes = vistaDe(visor.mapa)
+    expect(() =>
+      visor.sinReencuadrar(() => {
+        throw new Error('roto')
+      }),
+    ).toThrow('roto')
+    store.set(parcelaComo({ refcat: REF_B, dx: 500, dy: 500 }))
+    expect(vistaDe(visor.mapa)).not.toEqual(antes)
+  })
+
   it('sin refcat, manda el `idLocal`: otro idLocal mueve, el mismo no', () => {
     // Es el caso de un DXF, un TXT o un GML ajeno sin referencia: la parcela no
     // deja de tener identidad por no venir del Catastro.

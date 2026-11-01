@@ -34,13 +34,25 @@ export const TIPO_EXPEDIENTE = Object.freeze({ PARCELA: 'PARCELA', EDIFICIO: 'ED
 /** Tipo de recinto (anillo). `recintos[0]` es EXTERIOR; los huecos van después. */
 export const TIPO_RECINTO = Object.freeze({ EXTERIOR: 'EXTERIOR', HUECO: 'HUECO' })
 
-/** Procedencia de la geometría de la parcela. */
+/**
+ * Procedencia de la geometría de la parcela.
+ *
+ * ⭐ F25 · fase 3 estrena dos, porque desde entonces una parcela puede NACER dentro de
+ * la aplicación, como una más del expediente:
+ *   · `DIBUJO` — la ha dibujado el técnico, vértice a vértice («Dibujar una parcela
+ *     nueva»). Hasta F25 dibujar solo sustituía el recinto de una parcela que ya
+ *     tenía su origen.
+ *   · `DERIVACION` — es una pieza del sobrante de F17 que se ha añadido al expediente:
+ *     la ha calculado el programa restando, no la ha medido nadie.
+ */
 export const ORIGEN_PARCELA = Object.freeze({
   WFS: 'WFS',
   LIST: 'LIST',
   TXT: 'TXT',
   DXF: 'DXF',
   GML_EXISTENTE: 'GML_EXISTENTE',
+  DIBUJO: 'DIBUJO',
+  DERIVACION: 'DERIVACION',
 })
 
 // ── Helpers internos ─────────────────────────────────────────────────────────

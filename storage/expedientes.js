@@ -214,7 +214,11 @@ export const CAMPOS_REGISTRO = Object.freeze([
  */
 export const NO_SE_GUARDA = Object.freeze([
   'El historial de deshacer y rehacer: al recuperar se empieza una sesión de edición nueva.',
-  'Las parcelas colindantes: se vuelven a pedir al Catastro cuando hagan falta.',
+  // ⭐ F25 · fase 3: desde que una colindante se puede AÑADIR al expediente, «las
+  // colindantes no se guardan» dejó de ser cierto entero. Las que solo se ven en el
+  // mapa siguen sin guardarse; las añadidas son parcelas del expediente y viajan con él.
+  'Las parcelas colindantes que solo se ven en el mapa: se vuelven a pedir al Catastro cuando ' +
+    'hagan falta. Las que has añadido al expediente sí se guardan, como el resto de sus parcelas.',
   'El diagnóstico de encaje y el informe: se recalculan desde la geometría.',
   'El pie de firma, que se recuerda aparte y se borra aparte.',
 ])

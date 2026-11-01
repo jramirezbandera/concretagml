@@ -2297,6 +2297,50 @@ describe('app/main · «Dibujar recinto» en la rama PARCELA (F18)', () => {
     expect(m.edicion.activa()).toBe(true)
   })
 
+  // ── F25 · fase 3 · «Dibujar una parcela nueva» ──────────────────────────────
+  it('F25 · en modo «parcela nueva» el trazo NO toca la parcela en edición: va a alDibujarNueva', () => {
+    const nuevas = []
+    const m = cablear(parcelaCuadrada(), {
+      mapa: mapaVivo,
+      srs: SRS_DEMO,
+      barra: barraViva,
+      alDibujarNueva: (r) => nuevas.push(r),
+    })
+    m.cableado.mandoDeDibujo(true)
+    const antes = structuredClone(m.estado.get())
+    expect(m.cableado.dibujarParcelaNueva()).toBe(true)
+    dibujarTriangulo(mapaVivo)
+    expect(nuevas).toHaveLength(1)
+    expect(nuevas[0].vertices.length).toBeGreaterThanOrEqual(3)
+    expect(m.estado.get()).toEqual(antes)
+    expect(m.edicion.activa()).toBe(true)
+  })
+
+  it('F25 · cancelar el modo «parcela nueva» no lo deja colgado: el siguiente dibujo SUSTITUYE', () => {
+    const nuevas = []
+    const m = cablear(parcelaCuadrada(), {
+      mapa: mapaVivo,
+      srs: SRS_DEMO,
+      barra: barraViva,
+      alDibujarNueva: (r) => nuevas.push(r),
+    })
+    m.cableado.mandoDeDibujo(true)
+    m.cableado.dibujarParcelaNueva()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    m.cableado.alternarDibujo()
+    dibujarTriangulo(mapaVivo)
+    expect(nuevas).toEqual([])
+    expect(m.estado.get().recintos[0].vertices).toHaveLength(3)
+  })
+
+  it('F25 · sin mando, o sin quien reciba la parcela nueva, el modo no arranca', () => {
+    const m = cablearConDibujo()
+    expect(m.cableado.dibujarParcelaNueva()).toBe(false)
+    m.cableado.mandoDeDibujo(true)
+    expect(m.cableado.dibujarParcelaNueva()).toBe(false) // sin `alDibujarNueva`
+    expect(m.cableado.dibujando()).toBe(false)
+  })
+
   it('con el mando, la palabra aparece y el trazo cerrado SUSTITUYE al exterior', () => {
     const m = cablearConDibujo()
     m.cableado.mandoDeDibujo(true)

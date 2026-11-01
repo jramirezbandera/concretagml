@@ -425,13 +425,63 @@ expediente guardado, y a ése se le dice desde fuera:
   hereda. Con piezas de verdad (dibujadas o derivadas) el origen será otro, pero el
   rótulo tiene que contemplar el cambio de parcela.
 
-**Fase 3 · las entradas.**
-- 3.0 La unión de los puntos de levantamiento en la capa y en las dianas (H9, desde la
-  2.5), y el rótulo de procedencia al cambiar de parcela.
-- 3.1 «Añadir para editar» una colindante, y con ella el texto de `NO_SE_GUARDA`
-  (desviado aquí desde la 1.2).
+**Fase 3 · las entradas.** Partida en dos tandas con su commit cada una.
+
+**Tanda 3a — hecha el 2026-11-01** (suite **8.720 pruebas / 208 ficheros, 0 rojas**; ni
+una dependencia, ni un byte de CSS; recorrida en Chromium a 1280×720 con una petición
+real al Catastro, consola limpia):
+
+- **3.0 · dos orígenes nuevos en el modelo**, `DIBUJO` y `DERIVACION`, con su texto de
+  procedencia (`app/contraste.js#PROCEDENCIA`, cuyo guardián recorre el catálogo) y su
+  rótulo de cabecera: «Parcela nueva · dibujada aquí» y «Parcela nueva · sobrante del
+  lindero». Eso cierra lo visto en la fase 2: la cabecera ya no dice «del Catastro» de
+  una pieza. ~~La unión de los puntos de levantamiento~~ → **pasa a la tanda 3b**.
+- **3.1 · «Añadir parcela» → una colindante.** El control del mapa gana «Añadir parcela
+  ▾» —un menú de BOTONES, no opciones del `<select>`: con el teclado, las flechas en un
+  `<select>` cerrado disparan `change` en Chrome y cada flecha añadiría una parcela— y
+  «Quitar esta parcela». Se ofrece **lo que se ve**: `viewer/colindantes.js#vecinas()`
+  devuelve lo pintado, y solo las que tienen referencia catastral (una finca oficial sin
+  referencia no se puede identificar ante la Sede). Entra con su contorno como trabajo Y
+  como oficial, `origen: WFS`, y se pone en edición. **Medido con datos reales**: el
+  Catastro devolvió 4 colindantes de 9398516VK3799G, el menú las ofreció, y
+  9398501VK3799G entró con sus 31 vértices y su parcelario encendido.
+  - ⚠️ Su «Superficie catastral» sale «No consta»: `GetNeighbourParcel` no trae el
+    `areaValue` y la vecina traducida no lo guarda. **Deuda**, no defecto: lo que se
+    afirma es que no consta, y es verdad.
+  - `NO_SE_GUARDA` dice ya lo que hace el código: las colindantes que solo se ven no se
+    guardan; las añadidas sí.
+  - ⚠️ **El control aparece ya con UNA parcela** (solo «Añadir parcela»), y es un cambio
+    deliberado sobre la fase 2: sin una puerta visible, la función no existe para quien
+    no sabe que está.
+- **3.3 · «Dibujar una parcela nueva».** El dibujo de F18 en un modo `'nueva'`: el
+  recinto cerrado NO toca la parcela en edición; crea otra (`DIBUJO`, `parcela-nueva-N`)
+  y la pone en edición. Con el mismo enganche (a la parcela en edición, a las otras, a
+  las colindantes y a los puntos). Cancelar con Escape no deja el modo colgado: el dibujo
+  avisa «ya no dibujo» ANTES de entregar el recinto (medido en `viewer/dibujo.js`), así
+  que el destino se recoge en ese aviso y se consume al cerrar.
+  - ⛔⛔ **DEFECTO REAL destapado en el navegador, y ninguna prueba lo habría visto**: la
+    primera esquina de cada parcela dibujada caía ~100 m al noroeste, **encima del
+    menú**. Leaflet 1.9 **no detiene el `click`** de un control: el mapa sube por
+    `parentNode` buscando la marca de `disableClickPropagation` (`Map#_isClickDisabled`).
+    Al elegir la opción, su oyente vaciaba el menú (despegando el botón del DOM) y
+    empezaba el dibujo, todo dentro del mismo clic; cuando el evento llegaba al mapa, el
+    botón ya no tenía padre, la marca no aparecía, y el dibujo recién empezado recibía
+    esa pulsación como su primer vértice. Corregido cerrando el menú **sin vaciarlo**, y
+    con prueba que se pone roja con el defecto reintroducido (medido).
+  - ⛔ **Y el reencuadre, que la fase 2 dejó para el checklist, aquí se decidió con la
+    prueba delante**: poner en edición un triángulo de 11 m recién dibujado llevaba el
+    mapa a escala de 1 m. `viewer/index.js#sinReencuadrar(fn)` suspende el reencuadre
+    durante el cambio (las colindantes se sueltan igual). Restaurar la vista DESPUÉS se
+    probó primero y **no funciona**: `fitBounds` anima el zoom y termina más tarde que
+    cualquier `setView`. Para elegir otra parcela en el selector el reencuadre se queda.
+- **Quitar esta parcela** (no estaba en el plan y sin él un error al añadir no tenía
+  vuelta): dos pulsaciones, porque **no se deshace con Ctrl+Z**; primero pone otra en
+  edición (el conjunto no deja quitar la activa) y lo dice. Un armado que sobrevive a un
+  cambio de parcela se desarma: no se quita la que no es.
+
+**Pendiente, tanda 3b:**
+- 3.0 bis · La unión de los puntos de levantamiento en la capa y en las dianas (H9).
 - 3.2 Materializar las piezas de F17 y los vecinos de F23 como miembros.
-- 3.3 «Nueva parcela» (dibujarla, con `edit/dibujo.js` de F12).
 - 3.4 Un GML con varios miembros (hoy el cajón de F08 obliga a elegir uno) y un DXF de F22
   pueden entrar enteros.
 - 3.5 El contexto acumula (H7).

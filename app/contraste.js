@@ -149,6 +149,11 @@ export const PROCEDENCIA = Object.freeze({
   // Lo que sí se sigue diciendo, porque sí es verdad y sí importa, es que **no lo
   // emite el Catastro** (ver {@link COLA_GML_EXISTENTE} y el rótulo de la ficha).
   [ORIGEN_PARCELA.GML_EXISTENTE]: 'Recinto leído de un GML existente.',
+  // F25 · las dos procedencias de una parcela que nace dentro del expediente. Dicen
+  // QUIÉN hizo la geometría, que es lo que las distingue de una medición: una la
+  // trazó el técnico a mano, la otra la calculó el programa restando contornos.
+  [ORIGEN_PARCELA.DIBUJO]: 'Recinto dibujado a mano en esta aplicación.',
+  [ORIGEN_PARCELA.DERIVACION]: 'Recinto calculado como sobrante del lindero (F17).',
 })
 
 /**

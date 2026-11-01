@@ -1800,6 +1800,13 @@ export function crearVisor(contenedor, opciones = {}) {
     // de encuadrar: eso —y que `crearEstadoVista#subscribe` no notifica al
     // suscribirse— es lo que garantiza que el arranque encuadre UNA sola vez.
     let claveEncuadrada = claveDeParcela(estado.get())
+    /**
+     * F25 · `true` mientras dure {@link sinReencuadrar}: el cambio de identidad se
+     * anota y suelta las colindantes, pero la vista NO se mueve. Un caso que este
+     * módulo no puede distinguir —«esta parcela distinta se acaba de dibujar donde
+     * se está mirando»— se dice desde fuera, como el fondo nuevo.
+     */
+    let reencuadreSuspendido = false
     /** Un solo aviso de «parcela sin identidad» por visor, no uno por `set`. */
     let avisadoSinIdentidad = false
 
@@ -1831,6 +1838,11 @@ export function crearVisor(contenedor, opciones = {}) {
       }
 
       claveEncuadrada = clave
+
+      if (reencuadreSuspendido) {
+        if (colindantes !== null) colindantes.limpiar()
+        return
+      }
 
       // ── PARCELA NUEVA ⇒ LAS VECINAS DE LA ANTERIOR SE VAN ────────────────────
       // Unas colindantes dibujadas junto a una parcela que ya no está en pantalla
@@ -1914,6 +1926,27 @@ export function crearVisor(contenedor, opciones = {}) {
         const rama = encuadrar({ mapa, estado, zona, vistaInicial, avisar })
         claveEncuadrada = claveDeParcela(estado.get())
         return rama
+      },
+
+      /**
+       * ⭐ F25 · ejecuta `fn` sin el reencuadre automático: si dentro entra una
+       * parcela distinta, se anota como encuadrada y sus colindantes se sueltan
+       * igual, pero el mapa se queda donde estaba. Lo usa «Dibujar una parcela
+       * nueva»: la pieza se acaba de dibujar donde se estaba mirando, y encuadrarla
+       * llevaba el mapa a escala de 1 m (medido en Chromium). Deshacerlo DESPUÉS no
+       * vale: `fitBounds` anima el zoom y termina más tarde que cualquier `setView`.
+       *
+       * @template T
+       * @param {() => T} fn
+       * @returns {T}
+       */
+      sinReencuadrar(fn) {
+        reencuadreSuspendido = true
+        try {
+          return fn()
+        } finally {
+          reencuadreSuspendido = false
+        }
       },
 
       destruir() {

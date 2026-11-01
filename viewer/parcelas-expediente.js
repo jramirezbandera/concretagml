@@ -5,9 +5,14 @@
 //   · **La capa**: las parcelas que NO están en edición, dibujadas. Sin ella, cambiar
 //     de parcela haría desaparecer del mapa la que se deja, y en una segregación es
 //     justo el lindero contra el que se está ajustando la otra.
-//   · **El selector**: qué parcela está en edición, y para elegir otra. Es un control
-//     de Leaflet en la esquina de la barra de edición, y **solo aparece con dos o
-//     más**: un expediente de una parcela se ve exactamente como antes de F25.
+//   · **El selector**: qué parcela está en edición, para elegir otra, y desde la fase
+//     3 para AÑADIR una (dibujarla, o una colindante) y QUITAR la que se edita. Es un
+//     control de Leaflet en la esquina del buscador y el zoom. Con una sola parcela
+//     solo enseña «Añadir parcela», que es la puerta de entrada; la lista y «Quitar»
+//     aparecen con dos o más. ⚠️ En la fase 2 el control entero se escondía con una
+//     parcela («un expediente de una se ve exactamente como antes de F25»), y la fase
+//     3 lo cambió a propósito: sin esa puerta visible, la función no existe para
+//     quien no la conoce.
 //
 // Quien cambia de parcela es `app/main.js` (apartar el historial, activar, `set`).
 // Este módulo pinta y avisa de que se ha elegido otra, y nada más.
@@ -53,15 +58,31 @@ export const CLASE_EMERGENTE = 'gml-otra-parcela-emergente'
 /** Los ganchos del selector, para el cableado y las pruebas. */
 export const SELECTOR = Object.freeze({
   CONTROL: '[data-parcelas-expediente="control"]',
+  FILA_LISTA: '[data-parcelas-expediente="fila-lista"]',
   LISTA: '[data-parcelas-expediente="lista"]',
   CUENTA: '[data-parcelas-expediente="cuenta"]',
+  AÑADIR: '[data-parcelas-expediente="añadir"]',
+  MENU: '[data-parcelas-expediente="menu"]',
+  OPCION: '[data-parcelas-expediente="opcion"]',
+  QUITAR: '[data-parcelas-expediente="quitar"]',
 })
 
 /** Lo que dice el selector. */
 export const TEXTO = Object.freeze({
   ROTULO: 'Parcela en edición',
   SIN_REFERENCIA: 'sin referencia',
+  AÑADIR: 'Añadir parcela',
+  QUITAR: 'Quitar esta parcela',
+  QUITAR_ARMADO: '¿Quitarla? Pulsa otra vez',
+  SIN_OPCIONES: 'No hay nada que añadir ahora mismo.',
 })
+
+/**
+ * Cuánto dura armado «Quitar esta parcela». Quitar una parcela NO se deshace con
+ * Ctrl+Z —el deshacer es de cada parcela, y ésta deja de existir—, así que se pide
+ * una segunda pulsación, como «Borrar» en la lista de expedientes guardados.
+ */
+export const MS_QUITAR_ARMADO = 4000
 
 /** Trazo discontinuo: «es tuya y no es la que editas». Ver la cabecera. */
 const GROSOR = 2
@@ -134,10 +155,56 @@ const ControlSelector = L.Control.extend({
     cuenta.dataset.parcelasExpediente = 'cuenta'
     estilar(cuenta, { color: COLOR.SECUNDARIO, whiteSpace: 'nowrap' })
     etiqueta.append(rotulo, lista, cuenta)
-    contenedor.append(etiqueta)
+    etiqueta.dataset.parcelasExpediente = 'fila-lista'
+
+    // ── F25 · fase 3 · añadir y quitar ──
+    // Botones y no opciones del `<select>`: con el teclado, las flechas sobre un
+    // `<select>` cerrado disparan `change` en Chrome, y cada flecha AÑADIRÍA una
+    // parcela. Para cambiar de parcela eso cuesta un reencuadre; para añadir, no vale.
+    const acciones = doc.createElement('div')
+    estilar(acciones, { display: 'flex', gap: '6px', marginTop: '4px' })
+    const boton = (dato, texto) => {
+      const b = doc.createElement('button')
+      b.type = 'button'
+      b.dataset.parcelasExpediente = dato
+      b.textContent = texto
+      estilar(b, {
+        font: 'inherit',
+        padding: '2px 8px',
+        border: `1px solid ${COLOR.FILO}`,
+        borderRadius: '6px',
+        background: '#ffffff',
+        color: COLOR.TEXTO,
+        cursor: 'pointer',
+      })
+      return b
+    }
+    const añadir = boton('añadir', `${TEXTO.AÑADIR} ▾`)
+    const idMenu = `gml-parcelas-menu-${L.Util.stamp(this)}`
+    añadir.setAttribute('aria-expanded', 'false')
+    añadir.setAttribute('aria-controls', idMenu)
+    const quitar = boton('quitar', TEXTO.QUITAR)
+    acciones.append(añadir, quitar)
+    const menu = doc.createElement('div')
+    menu.id = idMenu
+    menu.dataset.parcelasExpediente = 'menu'
+    menu.hidden = true
+    estilar(menu, { flexDirection: 'column', gap: '2px', marginTop: '4px' })
+
+    contenedor.append(etiqueta, acciones, menu)
     L.DomEvent.disableClickPropagation(contenedor)
     L.DomEvent.disableScrollPropagation(contenedor)
-    Object.assign(this, { _doc: doc, _contenedor: contenedor, _lista: lista, _cuenta: cuenta })
+    Object.assign(this, {
+      _doc: doc,
+      _contenedor: contenedor,
+      _fila: etiqueta,
+      _lista: lista,
+      _cuenta: cuenta,
+      _añadir: añadir,
+      _quitar: quitar,
+      _menu: menu,
+      _boton: boton,
+    })
     return contenedor
   },
 })
@@ -156,11 +223,27 @@ const ControlSelector = L.Control.extend({
  * @param {import('leaflet').Map} args.mapa  Con el pane `PANE.COLINDANTES` montado.
  * @param {number} args.zona  Huso UTM.
  * @param {string} [args.posicion='topleft']
+ * @param {() => Array<{clave: string, texto: string}>} [args.opcionesAñadir]  Lo que
+ *   ofrece «Añadir parcela». Se pregunta AL ABRIR el menú, no al pintar: lo que hay
+ *   que ofrecer —las colindantes dibujadas— cambia por caminos que este módulo no ve.
+ * @param {(fn: () => void, ms: number) => () => void} [args.programar]  El
+ *   temporizador del armado de «Quitar». Devuelve con qué cancelarlo.
  * @param {import('./_comun.js').Avisar} [args.alAvisar]
- * @returns {{pintar: Function, alElegir: Function, visible: Function, control: object, destruir: Function}}
+ * @returns {{pintar: Function, alElegir: Function, alAñadir: Function, alQuitar: Function,
+ *   visible: Function, control: object, destruir: Function}}
  * @throws {TypeError|RangeError}  Contrato del programador.
  */
-export function crearParcelasExpediente({ mapa, zona, posicion = 'topleft', alAvisar } = {}) {
+export function crearParcelasExpediente({
+  mapa,
+  zona,
+  posicion = 'topleft',
+  opcionesAñadir = () => [],
+  programar = (fn, ms) => {
+    const id = setTimeout(fn, ms)
+    return () => clearTimeout(id)
+  },
+  alAvisar,
+} = {}) {
   if (
     !mapa ||
     typeof mapa.addLayer !== 'function' ||
@@ -188,6 +271,9 @@ export function crearParcelasExpediente({ mapa, zona, posicion = 'topleft', alAv
         `vez del vértice.`,
     )
   }
+  if (typeof opcionesAñadir !== 'function' || typeof programar !== 'function') {
+    throw new TypeError(`crearParcelasExpediente: 'opcionesAñadir' y 'programar' deben ser funciones.`)
+  }
   const avisar = resolverAvisar(alAvisar)
 
   let vivo = true
@@ -199,24 +285,108 @@ export function crearParcelasExpediente({ mapa, zona, posicion = 'topleft', alAv
   let ultimo = { parcelas: [], activa: null }
   /** @type {Set<(idLocal: string) => void>} */
   const oyentes = new Set()
+  /** @type {Set<(clave: string) => void>} */
+  const oyentesAñadir = new Set()
+  /** @type {Set<(idLocal: string) => void>} */
+  const oyentesQuitar = new Set()
+  /** Con qué se cancela el armado de «Quitar», o `null` si no está armado. */
+  let desarmar = null
 
   const control = new ControlSelector({ position: posicion })
   mapa.addControl(control)
 
-  const alCambiarLista = () => {
-    const idLocal = control._lista.value
-    for (const fn of oyentes) {
+  const repartir = (lista, valor, quien) => {
+    for (const fn of lista) {
       try {
-        fn(idLocal)
+        fn(valor)
       } catch (causa) {
-        console.error('viewer/parcelas-expediente.js: un oyente de alElegir ha fallado', causa)
+        console.error(`viewer/parcelas-expediente.js: un oyente de ${quien} ha fallado`, causa)
       }
     }
   }
+
+  const alCambiarLista = () => repartir(oyentes, control._lista.value, 'alElegir')
   control._lista.addEventListener('change', alCambiarLista)
 
+  /**
+   * Cierra el menú OCULTÁNDOLO, sin vaciarlo: los botones se rehacen al abrirlo.
+   *
+   * ⛔ **Vaciarlo aquí plantaba la primera esquina del dibujo encima del menú**
+   * (medido en Chromium al cerrar la fase 3). Leaflet 1.9 no detiene el `click` de un
+   * control: el mapa sube por `parentNode` desde el elemento pulsado buscando la marca
+   * de `disableClickPropagation` (`Map#_isClickDisabled`). La opción se pulsa, su
+   * oyente cierra el menú y EMPIEZA el dibujo, y si el cierre la despega del DOM el
+   * mapa ya no encuentra la marca: toma la pulsación por suya y el dibujo recién
+   * empezado la convierte en su primer vértice.
+   */
+  function cerrarMenu() {
+    control._menu.hidden = true
+    control._menu.style.display = 'none'
+    control._añadir.setAttribute('aria-expanded', 'false')
+  }
+
+  function abrirMenu() {
+    const opciones = opcionesAñadir()
+    control._menu.replaceChildren()
+    if (!Array.isArray(opciones) || opciones.length === 0) {
+      const nada = control._doc.createElement('p')
+      nada.textContent = TEXTO.SIN_OPCIONES
+      estilar(nada, { margin: '2px 0', color: COLOR.SECUNDARIO })
+      control._menu.append(nada)
+    } else {
+      for (const { clave, texto } of opciones) {
+        const b = control._boton('opcion', texto)
+        b.dataset.clave = clave
+        estilar(b, { textAlign: 'left' })
+        b.addEventListener('click', () => {
+          cerrarMenu()
+          repartir(oyentesAñadir, clave, 'alAñadir')
+        })
+        control._menu.append(b)
+      }
+    }
+    control._menu.hidden = false
+    control._menu.style.display = 'flex'
+    control._añadir.setAttribute('aria-expanded', 'true')
+  }
+
+  const alPulsarAñadir = () => (control._menu.hidden ? abrirMenu() : cerrarMenu())
+  control._añadir.addEventListener('click', alPulsarAñadir)
+
+  function soltarArmado() {
+    desarmar?.()
+    desarmar = null
+    control._quitar.textContent = TEXTO.QUITAR
+  }
+
+  const alPulsarQuitar = () => {
+    if (desarmar === null) {
+      control._quitar.textContent = TEXTO.QUITAR_ARMADO
+      desarmar = programar(() => {
+        desarmar = null
+        control._quitar.textContent = TEXTO.QUITAR
+      }, MS_QUITAR_ARMADO)
+      return
+    }
+    const idLocal = ultimo.activa
+    soltarArmado()
+    repartir(oyentesQuitar, idLocal, 'alQuitar')
+  }
+  control._quitar.addEventListener('click', alPulsarQuitar)
+
+  /**
+   * ⭐ F25 · fase 3: el control aparece en cuanto hay una parcela en edición, porque
+   * «Añadir parcela» es la puerta de entrada al expediente de varias. La lista y
+   * «Quitar» solo con dos o más: con una no hay nada entre lo que elegir ni nada que
+   * se pueda quitar sin dejar el expediente vacío.
+   */
   function aplicarVisibilidad() {
-    control._contenedor.hidden = !(mostrar && cuantas >= 2)
+    const hayActiva = ultimo.activa !== null
+    control._contenedor.hidden = !(mostrar && hayActiva)
+    control._fila.hidden = cuantas < 2
+    control._fila.style.display = cuantas < 2 ? 'none' : 'flex'
+    control._quitar.hidden = cuantas < 2
+    if (control._contenedor.hidden) cerrarMenu()
   }
 
   function limpiar() {
@@ -252,6 +422,12 @@ export function crearParcelasExpediente({ mapa, zona, posicion = 'topleft', alAv
       throw new TypeError(`pintar: 'parcelas' debe ser un array; recibido ${typeof parcelas}.`)
     }
     limpiar()
+    // Otra parcela en edición, u otro expediente: un «Quitar» armado se referiría a
+    // la de antes, y un menú abierto ofrecería lo de antes.
+    if (activa !== ultimo.activa) {
+      soltarArmado()
+      cerrarMenu()
+    }
     ultimo = { parcelas, activa }
     cuantas = parcelas.length
 
@@ -323,6 +499,34 @@ export function crearParcelasExpediente({ mapa, zona, posicion = 'topleft', alAv
       return () => oyentes.delete(fn)
     },
 
+    /**
+     * Se llama cuando el usuario elige algo del menú «Añadir parcela», con la `clave`
+     * de la opción tal como la dio `opcionesAñadir`.
+     * @param {(clave: string) => void} fn
+     * @returns {() => void}
+     */
+    alAñadir(fn) {
+      if (typeof fn !== 'function') {
+        throw new TypeError(`alAñadir: 'fn' debe ser una función; recibido ${typeof fn}.`)
+      }
+      oyentesAñadir.add(fn)
+      return () => oyentesAñadir.delete(fn)
+    },
+
+    /**
+     * Se llama con la SEGUNDA pulsación de «Quitar esta parcela», con el `idLocal` de
+     * la que está en edición.
+     * @param {(idLocal: string) => void} fn
+     * @returns {() => void}
+     */
+    alQuitar(fn) {
+      if (typeof fn !== 'function') {
+        throw new TypeError(`alQuitar: 'fn' debe ser una función; recibido ${typeof fn}.`)
+      }
+      oyentesQuitar.add(fn)
+      return () => oyentesQuitar.delete(fn)
+    },
+
     /** Enseña u oculta la capa y el selector (la rama Edificio no edita parcelas). */
     visible(si) {
       if (!vivo || mostrar === (si === true)) return
@@ -337,8 +541,13 @@ export function crearParcelasExpediente({ mapa, zona, posicion = 'topleft', alAv
       if (!vivo) return
       vivo = false
       limpiar()
+      soltarArmado()
       control._lista.removeEventListener('change', alCambiarLista)
+      control._añadir.removeEventListener('click', alPulsarAñadir)
+      control._quitar.removeEventListener('click', alPulsarQuitar)
       oyentes.clear()
+      oyentesAñadir.clear()
+      oyentesQuitar.clear()
       try {
         mapa.removeControl(control)
       } catch {

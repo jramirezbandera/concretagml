@@ -32,6 +32,9 @@ describe('constantes de dominio', () => {
       TXT: 'TXT',
       DXF: 'DXF',
       GML_EXISTENTE: 'GML_EXISTENTE',
+      // F25 · fase 3: las dos de una parcela que nace dentro del expediente.
+      DIBUJO: 'DIBUJO',
+      DERIVACION: 'DERIVACION',
     })
   })
 })

@@ -230,6 +230,8 @@ export function crearCapaColindantes({ mapa, zona, alAvisar } = {}) {
   let vivo = true
   /** Los polígonos puestos en el mapa por el último `pintar`. */
   let capas = []
+  /** Las vecinas que esos polígonos dibujan, para {@link vecinas}. */
+  let pintadas = []
 
   /**
    * Los anillos DIBUJABLES de una vecina, en `[lat,lon]`.
@@ -258,6 +260,7 @@ export function crearCapaColindantes({ mapa, zona, alAvisar } = {}) {
 
   /** Quita del mapa todo lo puesto por el último `pintar`. */
   function limpiar() {
+    pintadas = []
     for (const capa of capas) {
       try {
         mapa.removeLayer(capa)
@@ -336,6 +339,7 @@ export function crearCapaColindantes({ mapa, zona, alAvisar } = {}) {
 
       poligono.addTo(mapa)
       capas.push(poligono)
+      pintadas.push(vecina)
     }
 
     if (saltadas > 0) {
@@ -353,6 +357,17 @@ export function crearCapaColindantes({ mapa, zona, alAvisar } = {}) {
   return {
     pintar,
     limpiar,
+
+    /**
+     * ⭐ F25 · las vecinas que hay DIBUJADAS ahora mismo, en la forma en que llegaron
+     * (`[{refcat, recintos}]`). Es de donde sale «Añadir parcela al expediente»: se
+     * ofrece lo que el usuario ve, ni más ni menos —una que no se pudo dibujar no se
+     * ofrece, y en cuanto la capa se limpia (otra parcela) la lista se vacía con ella—.
+     * Lista nueva; los objetos son los que se pintaron.
+     *
+     * @returns {Vecina[]}
+     */
+    vecinas: () => pintadas.slice(),
 
     /** Deshace todo: quita los contornos del mapa. Idempotente. */
     destruir() {

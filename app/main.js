@@ -538,7 +538,7 @@ import { serializarParcelaCp } from '../gml/serialize-cp.js'
 // geometría, y derivarlo del catálogo es lo único que impide que el rótulo se quede
 // viejo cuando el modelo estrene un origen. Escribirlo a mano aquí es exactamente
 // lo que produjo el defecto que el guion 17 destapó.
-import { ORIGEN_PARCELA } from '../model/parcela.js'
+import { ORIGEN_PARCELA, crearParcela } from '../model/parcela.js'
 import { crearInstalacion } from '../pwa/instalacion.js'
 import { registrarServiceWorker } from '../pwa/registro.js'
 import { crearTransporte } from '../services/_red.js'
@@ -554,7 +554,7 @@ import { crearPieDeFirmaGuardado } from '../storage/pie-firma.js'
 import { validarParcela } from '../validation/parcela.js'
 import { crearEstadoVista, NIVEL } from '../viewer/_comun.js'
 import { crearBuscador } from '../viewer/buscador.js'
-import { crearParcelasExpediente } from '../viewer/parcelas-expediente.js'
+import { crearParcelasExpediente, rotularParcela } from '../viewer/parcelas-expediente.js'
 // F14 · No sale por `viewer/index.js`, y es a propósito: `crearVisor` monta el
 // cajón de diagnóstico porque **las dos ramas comparten mapa** y aquél existe
 // desde F07 con su opción `diagnostico`. Éste se monta aparte porque solo tiene
@@ -760,6 +760,15 @@ const EYEBROW_MEDICION = 'Tu medición · no del Catastro'
  * emite el Catastro**: eso es lo que se dice.
  */
 const EYEBROW_GML_IMPORTADO = 'GML importado · no del Catastro'
+
+/**
+ * F25 · las dos parcelas que nacen DENTRO del expediente. Sin ellas caían en el
+ * último recurso de {@link rotuloDelDato}, «Parcela del Catastro», que de una pieza
+ * dibujada o calculada aquí es exactamente la afirmación falsa que esta cabecera
+ * existe para no hacer (visto en Chromium al cerrar la fase 2 de F25).
+ */
+const EYEBROW_DIBUJADA = 'Parcela nueva · dibujada aquí'
+const EYEBROW_DERIVADA = 'Parcela nueva · sobrante del lindero'
 
 /**
  * ⛔ **EL SEXTO (F22), Y EXISTE PORQUE SIN ÉL ESTA FASE MENTÍA AL REVÉS.**
@@ -1972,6 +1981,8 @@ function rotuloDelDato(parcelaActual) {
     return esSintetica ? EYEBROW_SINTETICA : EYEBROW_DEMOSTRACION
   }
   if (parcelaActual.origen === ORIGEN_PARCELA.GML_EXISTENTE) return EYEBROW_GML_IMPORTADO
+  if (parcelaActual.origen === ORIGEN_PARCELA.DIBUJO) return EYEBROW_DIBUJADA
+  if (parcelaActual.origen === ORIGEN_PARCELA.DERIVACION) return EYEBROW_DERIVADA
   // ⛔ F22 · Un dibujo que ES la geometría oficial es cartografía del Catastro, no
   // una medición. Ver {@link EYEBROW_DIBUJO_CATASTRO} y {@link dibujoEsLaOficial},
   // donde está escrito el criterio que se probó primero y por qué era falso.
@@ -3050,6 +3061,10 @@ export function cablearEdicion({
   // matriz. Se pregunta en cada `fijarDianas` y no se guarda: cambian al cambiar de
   // parcela, y una copia aquí se quedaría vieja.
   dianasDeOtras = () => [],
+  // ⭐ F25 · fase 3 · adónde va un recinto dibujado en modo «parcela nueva»: a quien
+  // cablea, que crea la parcela en el expediente y la pone en edición. Sin él, ese
+  // modo no existe ({@link dibujarParcelaNueva} devuelve `false`).
+  alDibujarNueva = null,
   aplicarDeEdificio = () => false,
   esDeEdificio = () => false,
   botonDeshacer = nodo(SELECTOR_BOTON_DESHACER),
@@ -3122,6 +3137,18 @@ export function cablearEdicion({
   let mandoDibujo = false
   /** Lo que valía `edicion.activa()` justo antes de empezar a dibujar. */
   let edicionAntesDelDibujo = true
+  /**
+   * F25 · adónde va el recinto del dibujo EN CURSO: `'actual'` sustituye el exterior
+   * de la parcela en edición (F18), `'nueva'` crea otra parcela en el expediente.
+   *
+   * ⚠️ Y una SEGUNDA variable, {@link destinoAlParar}, por un orden medido en
+   * `viewer/dibujo.js#cerrarAhora`: al cerrar, el dibujo avisa «ya no dibujo»
+   * (`alCambiar(false)`) ANTES de entregar el recinto (`alCerrar`). El destino se
+   * recoge en el aviso —que llega también al cancelar, y así un modo «nueva» nunca se
+   * queda colgado para el siguiente dibujo— y se consume al cerrar.
+   */
+  let destinoDibujo = 'actual'
+  let destinoAlParar = 'actual'
 
   /**
    * Deja la barra diciendo la verdad sobre el dibujo.
@@ -3153,6 +3180,15 @@ export function cablearEdicion({
    * @param {{vertices: Array<[number,number]>, tipo?: string}} recinto
    */
   function cerrarDibujo(recinto) {
+    const destino = destinoAlParar
+    destinoAlParar = 'actual'
+    if (destino === 'nueva' && alDibujarNueva !== null) {
+      // No toca la parcela en edición: el recinto es OTRA parcela. Quien la crea la
+      // pone en edición, con su propia historia (F25, `activarParcela`).
+      alDibujarNueva(recinto)
+      refrescarBarraDibujo()
+      return
+    }
     const actual = estado.get()
     if (actual === null || actual === undefined) {
       // No hay expediente donde escribir. No debería llegar —la barra vive en la
@@ -3194,7 +3230,11 @@ export function cablearEdicion({
     // `Escape` dejaría la edición apagada PARA SIEMPRE y el botón diciendo
     // «Cancelar dibujo» sobre un dibujo que ya no existe.
     dibujoActivo.alCambiar((dibujando) => {
-      if (!dibujando) edicion.activa(edicionAntesDelDibujo)
+      if (!dibujando) {
+        edicion.activa(edicionAntesDelDibujo)
+        destinoAlParar = destinoDibujo
+        destinoDibujo = 'actual'
+      }
       refrescarBarraDibujo()
     })
   }
@@ -3923,6 +3963,26 @@ export function cablearEdicion({
 
     /** ¿Se está dibujando sobre la parcela? Para el guion de humo y para el test. */
     dibujando: () => dibujoActivo?.dibujando() === true,
+    /**
+     * ⭐ F25 · fase 3 · empieza a dibujar una PARCELA NUEVA del expediente: el mismo
+     * dibujo de F18, con el mismo enganche —a la parcela en edición, a las demás del
+     * expediente, a las colindantes y a los puntos—, pero el recinto cerrado no toca
+     * la parcela en edición: va a `alDibujarNueva`. Cancelar con `Escape` no crea nada.
+     *
+     * @returns {boolean}  Si ha quedado dibujando.
+     */
+    dibujarParcelaNueva() {
+      if (dibujoActivo === null || !mandoDibujo || alDibujarNueva === null) return false
+      if (dibujoActivo.dibujando()) dibujoActivo.cancelar()
+      edicion.modoBorrar(false)
+      edicion.modoInsertar(false)
+      edicionAntesDelDibujo = edicion.activa() !== false
+      edicion.activa(false)
+      destinoDibujo = 'nueva'
+      dibujoActivo.empezar()
+      refrescarBarraDibujo()
+      return dibujoActivo.dibujando()
+    },
 
     /**
      * Retira los NUEVE oyentes —los siete de siempre más los dos del `mouseup`/
@@ -3986,6 +4046,8 @@ const edicionCableada = cablearEdicion({
       .parcelas()
       .filter((p) => p.idLocal !== conjunto.activa())
       .flatMap((p) => (Array.isArray(p.recintos) ? p.recintos : [])),
+  // F25 · fase 3 · el recinto de «Dibujar una parcela nueva». Ver el paso 20.
+  alDibujarNueva: (recinto) => añadirParcelaDibujada(recinto),
   // ── A cada instantánea, su store (auditoría 2026-08-16) ───────────────────
   // Los dos se leen PEREZOSAMENTE: `edificioCableado` se monta en el paso 13 y
   // esto es el 6, así que aquí todavía vale `null` — y tiene que seguir
@@ -7134,8 +7196,8 @@ export const MENSAJE_DESHACER_COMPARTIDO =
 
 /** Lo que se dice si el cambio de parcela revienta por dentro. */
 const MENSAJE_CAMBIO_ROTO =
-  'No se ha podido cambiar de parcela por un fallo interno; sigues en la que estabas. El ' +
-  'detalle técnico está en la consola del navegador.'
+  'No se ha podido completar lo que has pedido sobre las parcelas del expediente por un fallo ' +
+  'interno. El detalle técnico está en la consola del navegador.'
 
 /**
  * Pone otra parcela del expediente en edición.
@@ -7167,22 +7229,192 @@ export function activarParcela(idLocal) {
   return true
 }
 
+// ── 20 bis · F25 · fase 3 · AÑADIR Y QUITAR PARCELAS ─────────────────────────
+//
+// Tres puertas, y las tres acaban igual: la parcela entra en el conjunto y se pone en
+// edición con `activarParcela`, que es quien sabe cambiar de parcela sin perder nada.
+//
+//   · **Dibujarla** — el dibujo de F18 en modo «nueva» (`dibujarParcelaNueva`).
+//   · **Una colindante** — de las que hay DIBUJADAS (`visor.colindantes.vecinas()`),
+//     y solo las que tienen referencia catastral: una finca oficial sin referencia no
+//     se puede identificar ante la Sede, así que editarla no lleva a ningún fichero.
+//     Entra con su contorno como geometría de trabajo Y como oficial: es del
+//     Catastro, y es contra lo que se medirá lo que se le haga.
+//   · **Quitar** — la que está en edición, con dos pulsaciones (el control lo exige).
+
+/** Las claves del menú «Añadir parcela». */
+const CLAVE_DIBUJAR = 'dibujar'
+const PREFIJO_COLINDANTE = 'colindante:'
+
+/** Lo que se dice si no se puede empezar a dibujar (sin mapa, o en otra rama). */
+export const MENSAJE_NO_SE_PUEDE_DIBUJAR =
+  'No se puede dibujar una parcela nueva desde aquí: hace falta estar en Edición, en la rama ' +
+  'Parcela, con el mapa cargado.'
+
+/** Lo que se dice al quitar una parcela, que NO se deshace con Ctrl+Z. */
+export const mensajeParcelaQuitada = (rotulo) =>
+  `Quitada la parcela ${rotulo} del expediente. No se recupera con «Deshacer»: si no lo has ` +
+  'guardado todavía, el expediente guardado la sigue teniendo.'
+
+/** Lo que se dice si una colindante no se puede convertir en una parcela del modelo. */
+export const mensajeColindanteNoAñadida = (refcat, causa) =>
+  `No se ha podido añadir la colindante ${refcat} al expediente: ${causa}`
+
+const comparable = (r) => (typeof r === 'string' && r.trim() !== '' ? r.trim().toUpperCase() : null)
+
+/** El rótulo de una parcela del expediente, el mismo que el selector. */
+function rotuloDeParcela(idLocal) {
+  const parcelas = conjunto.parcelas()
+  const i = parcelas.findIndex((p) => p.idLocal === idLocal)
+  return i === -1 ? idLocal : rotularParcela(parcelas[i], i + 1)
+}
+
+/** Las colindantes dibujadas que se pueden añadir: con referencia y que no estén ya. */
+function colindantesAñadibles() {
+  const yaEstan = new Set(
+    conjunto.parcelas().flatMap((p) => [comparable(p.refcat), comparable(p.idLocal)]).filter(Boolean),
+  )
+  const vistas = new Set()
+  const salida = []
+  for (const v of visor.colindantes?.vecinas?.() ?? []) {
+    const refcat = comparable(v?.refcat)
+    if (refcat === null || yaEstan.has(refcat) || vistas.has(refcat)) continue
+    vistas.add(refcat)
+    salida.push(v)
+  }
+  return salida
+}
+
+/** Lo que ofrece «Añadir parcela», preguntado al abrir el menú. */
+function opcionesAñadir() {
+  const opciones = [{ clave: CLAVE_DIBUJAR, texto: 'Dibujar una parcela nueva' }]
+  for (const v of colindantesAñadibles()) {
+    opciones.push({ clave: `${PREFIJO_COLINDANTE}${v.refcat.trim()}`, texto: `Colindante ${v.refcat.trim()}` })
+  }
+  return opciones
+}
+
+/** Un `idLocal` libre para una parcela dibujada: `parcela-nueva-1`, `-2`… */
+function idLocalNuevo() {
+  const usados = new Set(conjunto.parcelas().map((p) => p.idLocal))
+  let n = 1
+  while (usados.has(`parcela-nueva-${n}`)) n += 1
+  return `parcela-nueva-${n}`
+}
+
+/**
+ * El recinto cerrado en modo «parcela nueva» entra en el expediente y se pone en
+ * edición. Se declara como función —y no como `const`— porque `cablearEdicion` (paso
+ * 6) la recibe mucho antes de este paso: el gancho se llama con un clic, ya todo
+ * montado.
+ *
+ * @param {{vertices: Array<[number,number]>, tipo?: string}} recinto
+ */
+function añadirParcelaDibujada(recinto) {
+  const parcela = conjunto.añadir({
+    idLocal: idLocalNuevo(),
+    refcat: null,
+    recintos: [{ vertices: recinto.vertices, tipo: 'EXTERIOR' }],
+    origen: ORIGEN_PARCELA.DIBUJO,
+  })
+  // ⛔ La vista se CONSERVA. Al ponerla en edición, el visor reencuadraría sobre ella
+  // como sobre cualquier parcela distinta, y con una pieza recién dibujada eso es un
+  // estorbo medido en Chromium: un triángulo de 11 m llevaba el mapa a escala de 1 m
+  // y el usuario perdía el sitio donde acababa de dibujar. Se acaba de dibujar donde
+  // se estaba mirando: ahí se queda. (Restaurar la vista después no funcionó: el
+  // `fitBounds` del visor anima el zoom y termina más tarde. Ver `sinReencuadrar`.)
+  if (typeof visor.sinReencuadrar === 'function') visor.sinReencuadrar(() => activarParcela(parcela.idLocal))
+  else activarParcela(parcela.idLocal)
+}
+
+/**
+ * Una colindante dibujada entra en el expediente y se pone en edición.
+ *
+ * @param {string} refcat
+ * @returns {boolean}  Si ha entrado.
+ */
+export function añadirColindante(refcat) {
+  const vecina = colindantesAñadibles().find((v) => comparable(v.refcat) === comparable(refcat))
+  if (vecina === undefined) return false
+  // Los recintos tal como los sirvió el Catastro, con su tipo. Si una vecina llega con
+  // dos exteriores (dos trozos con la misma referencia), el modelo la rechaza, y se
+  // dice: añadir media finca sería peor que no añadirla.
+  const recintos = vecina.recintos.map((r, i) => ({
+    vertices: r.vertices,
+    tipo: r.tipo ?? (i === 0 ? 'EXTERIOR' : 'HUECO'),
+  }))
+  let parcela
+  try {
+    parcela = crearParcela({
+      idLocal: refcat.trim(),
+      refcat: refcat.trim(),
+      recintos,
+      geometriaOficial: recintos,
+      origen: ORIGEN_PARCELA.WFS,
+    })
+  } catch (causa) {
+    panel.avisar(mensajeColindanteNoAñadida(refcat, causa.message), { nivel: NIVEL.AVISO, causa })
+    return false
+  }
+  conjunto.añadir(parcela)
+  activarParcela(parcela.idLocal)
+  return true
+}
+
+/**
+ * Quita del expediente la parcela que está en edición: antes pone otra en edición —la
+ * principal, o la primera que no sea ésta—, porque el conjunto no deja quitar la
+ * activa (y con razón: el store se quedaría con una parcela que ya no es de nadie).
+ *
+ * @param {string} idLocal
+ * @returns {boolean}  Si se ha quitado.
+ */
+export function quitarParcela(idLocal) {
+  const otra = conjunto.parcelas().find((p) => p.idLocal !== idLocal)
+  if (otra === undefined) return false
+  const rotulo = rotuloDeParcela(idLocal)
+  if (conjunto.activa() === idLocal) activarParcela(otra.idLocal)
+  conjunto.quitar(idLocal)
+  panel.avisar(mensajeParcelaQuitada(rotulo), { nivel: NIVEL.AVISO })
+  return true
+}
+
+/** Lo que hace cada opción del menú «Añadir parcela». */
+function alAñadirParcela(clave) {
+  if (clave === CLAVE_DIBUJAR) {
+    // Se dibuja en Edición: si se pide desde otro peldaño, se va allí primero, que es
+    // donde el mando del dibujo es de esta rama.
+    if (navegacion.get().paso !== PASO.EDICION) navegacion.navegarAPaso(PASO.EDICION)
+    if (!edicionCableada.dibujarParcelaNueva()) {
+      panel.avisar(MENSAJE_NO_SE_PUEDE_DIBUJAR, { nivel: NIVEL.AVISO })
+    }
+    return
+  }
+  if (clave.startsWith(PREFIJO_COLINDANTE)) añadirColindante(clave.slice(PREFIJO_COLINDANTE.length))
+}
+
+/** Un fallo dentro de un clic del control no puede quedarse en la consola. */
+const conRed = (fn, quien) => (valor) => {
+  try {
+    fn(valor)
+  } catch (causa) {
+    panel.avisar(MENSAJE_CAMBIO_ROTO, { nivel: NIVEL.ERROR, causa })
+    console.error(`[conjunto] ${quien} ha fallado:`, causa)
+  }
+}
+
 /** @type {ReturnType<typeof crearParcelasExpediente>|null} */
 let parcelasExpediente = null
 try {
   parcelasExpediente = crearParcelasExpediente({
     mapa: visor.mapa,
     zona: husoPorSrs(SRS_DEMO),
+    opcionesAñadir,
     alAvisar: panel.avisar,
   })
-  parcelasExpediente.alElegir((idLocal) => {
-    try {
-      activarParcela(idLocal)
-    } catch (causa) {
-      panel.avisar(MENSAJE_CAMBIO_ROTO, { nivel: NIVEL.ERROR, causa })
-      console.error('[conjunto] el cambio de parcela ha fallado:', causa)
-    }
-  })
+  parcelasExpediente.alElegir(conRed(activarParcela, 'el cambio de parcela'))
+  parcelasExpediente.alAñadir(conRed(alAñadirParcela, 'añadir una parcela'))
+  parcelasExpediente.alQuitar(conRed(quitarParcela, 'quitar una parcela'))
 } catch (causa) {
   // Sin capa ni selector la aplicación sigue entera: el expediente se guarda con todas
   // sus parcelas igual, y la que se edita es la que entró.
