@@ -233,7 +233,7 @@ import { textoProcedencia } from './cableado-catastro.js'
 // sospecha por el signo de la diferencia. Dos redacciones del mismo aviso acabarían
 // divergiendo, y la de esta rama sería la peor porque se usa menos.
 import { avisoDeSuperficie } from './cableado-medicion.js'
-import { ACCION, DIALOGO, SIN_MEDIDA } from './panel-edificio.js'
+import { ACCION, DIALOGO, SIN_MEDIDA, selectorParte } from './panel-edificio.js'
 import { ATRIBUTO_PANEL, ATRIBUTO_RAMA, RAMA } from './rama.js'
 
 // ── El contrato con `index.html` ─────────────────────────────────────────────
@@ -1225,8 +1225,20 @@ export function cablearEdificio({
           // no muta el `Edificio` y el store no notifica.
           alPulsarParte: (indice) => {
             if (puedeElegirEnMapa() !== true) return false
-            seleccionarParte(indice)
+            const elegida = seleccionarParte(indice)
             repintar(estado.get())
+            // Con trece partes la fila elegida puede quedar fuera de la lista, que
+            // tiene su propio scroll: se acerca DESPUÉS de repintar, porque el
+            // repintado cambia los `<li>`. Mismo gesto que la tabla de vértices
+            // (`viewer/sincronizacion.js`): `nearest` es el mínimo movimiento, y se
+            // pregunta por `scrollIntoView` porque jsdom no lo implementa.
+            const fila =
+              elegida === null
+                ? null
+                : panelEdificio.seccionPartes.querySelector(selectorParte(elegida))
+            if (fila && typeof fila.scrollIntoView === 'function') {
+              fila.scrollIntoView({ block: 'nearest' })
+            }
             return true
           },
         })

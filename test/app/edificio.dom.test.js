@@ -1662,6 +1662,29 @@ describe('F12 · T4.2 · añadir, elegir y eliminar partes', () => {
     expect(ctx.cableado.parteActiva()).toBe(1)
   })
 
+  it('pinchar una huella acerca su fila en la lista, que tiene scroll propio', () => {
+    // Con trece partes la elegida puede quedar fuera de la vista de la lista. jsdom
+    // no implementa `scrollIntoView`: se pone en el prototipo y se mira sobre qué
+    // fila se llama — la del repintado, no una que el repintado ya ha tirado.
+    const llamadas = []
+    const original = HTMLElement.prototype.scrollIntoView
+    HTMLElement.prototype.scrollIntoView = function (opciones) {
+      llamadas.push({ fila: this, opciones })
+    }
+    try {
+      const ctx = montar({ puedeElegirEnMapa: () => true })
+      ctx.estado.set(edificioDosPartes())
+      ctx.capa.creada[0].alPulsarParte(1)
+      expect(llamadas).toHaveLength(1)
+      expect(llamadas[0].fila.dataset.parteIndice).toBe('1')
+      expect(llamadas[0].fila.isConnected).toBe(true)
+      expect(llamadas[0].opciones).toEqual({ block: 'nearest' })
+    } finally {
+      if (original === undefined) delete HTMLElement.prototype.scrollIntoView
+      else HTMLElement.prototype.scrollIntoView = original
+    }
+  })
+
   it('⭐ 2026-10-25 · sin `puedeElegirEnMapa`, pinchar una huella no elige nada', () => {
     const ctx = montar()
     ctx.estado.set(edificioDosPartes())
