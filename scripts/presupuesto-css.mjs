@@ -643,10 +643,17 @@ export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'dia
  * un selector más en la lista de `.gml-rotulo-oculto`. El resto lo pagaron los
  * textos de las vías, que no cuestan hoja.
  *
+ * ⭐ **Y −25 B AL HACER LO MISMO EN EDIFICIO** (de 67.546 a **67.521 B nuestros**;
+ * 82.641 → 82.616 con vendor). El renglón vacío de la rama Edificio también se
+ * oculta en Entrada, y en vez de un segundo selector con su rama, las dos ramas
+ * ponen la MISMA marca (`[data-vacio]`) en el nodo que comparten: quien escribe el
+ * texto escribe la marca, así que no hace falta la rama en el selector y el de
+ * Parcela se acorta. El techo BAJA con la medición: holgura 0.
+ *
  * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
  * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
  */
-export const TECHO = Object.freeze({ total: 82641, nuestro: 67546 })
+export const TECHO = Object.freeze({ total: 82616, nuestro: 67521 })
 
 /**
  * EL REGISTRO. Un asiento por hito, con la hoja construida medida de verdad.
@@ -1882,6 +1889,15 @@ export const ASIENTOS = Object.freeze(
         'ocultar a la vista, solo en Entrada de PARCELA, el renglón que repetía «Falta la ' +
         'parcela». Los apuntes acortados no cuestan hoja. ── ⚠️ El techo SUBE 59 B (cabecera ' +
         'de `TECHO`) y la holgura vuelve a 0. NO CIERRA REBANADA.' },
+    { hito: 'Entrada en la rama Edificio también se ve entera a 1280×720',
+      commit: '(sin commitear)',
+      total: 82616, nuestro: 67521, rebanada: null,
+      nota:
+        '**−25 B.** Faltaban 200,6 px (medido). La pregunta del modelo nace plegada (JS, 0 B), ' +
+        'un apunte pierde un renglón (marcado, 0 B) y el renglón vacío de «Generar GML» se ' +
+        'oculta a la vista en las DOS ramas con una sola marca, `[data-vacio]`, que pone quien ' +
+        'escribe el texto: el selector deja de llevar la rama y por eso la hoja BAJA. ── El ' +
+        'techo BAJA 25 B (cabecera de `TECHO`) y la holgura sigue en 0. NO CIERRA REBANADA.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
 

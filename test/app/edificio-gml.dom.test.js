@@ -143,6 +143,9 @@ describe('cablearGeneracionGmlEdificio · el botón nunca queda gris y mudo', ()
     expect(boton().disabled).toBe(true)
     expect(renglon().textContent).toBe(MOTIVO_SIN_EDIFICIO)
     expect(renglon().textContent).toMatch(/Entrada/)
+    // ⭐ 2026-11-01 · Y lleva la marca con la que la hoja lo oculta A LA VISTA en
+    // Entrada, donde repite el «Falta el edificio» del pie: el texto sigue dentro.
+    expect(renglon().hasAttribute('data-vacio')).toBe(true)
   })
 
   it('con una construcción válida: encendido y el renglón LIMPIO', () => {
@@ -150,6 +153,8 @@ describe('cablearGeneracionGmlEdificio · el botón nunca queda gris y mudo', ()
     estadoEdificio.set(edificioBueno())
     expect(boton().disabled).toBe(false)
     expect(renglon().textContent).toBe('')
+    // La marca se va con el motivo: un renglón que dice otra cosa no se oculta.
+    expect(renglon().hasAttribute('data-vacio')).toBe(false)
   })
 
   it('una parte principal sin plantas lo apaga, con el recuento delante', () => {

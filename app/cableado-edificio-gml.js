@@ -300,6 +300,11 @@ export function cablearGeneracionGmlEdificio({
   function decir(texto, esError) {
     nodoRenglon.textContent = texto
     nodoRenglon.classList.toggle(CLASE_ESTADO_ERROR, esError)
+    // ⭐ 2026-11-01 · En Entrada repite el «Falta el edificio» del pie «Siguiente»,
+    // y costaba 69,5 px del pliegue de la tercera vía. La hoja lo oculta A LA VISTA
+    // solo ahí (sigue siendo `role="status"`). Misma marca que pone `app/main.js`
+    // en este nodo compartido: quien escribe el texto, escribe la marca.
+    nodoRenglon.toggleAttribute('data-vacio', texto === MOTIVO_SIN_EDIFICIO)
   }
 
   // ── ⭐ F14 · La validación, PUBLICADA ──────────────────────────────────────

@@ -193,6 +193,13 @@
 // desaparecer esa frase bajo el propio cursor que la provocó. Cuando entra un
 // edificio la pregunta ya está contestada y el panel pasa de elegir a trabajar.
 //
+// ⭐ **Y DESDE EL 2026-11-01 TAMBIÉN NACE PLEGADO**, por decisión del autor. Abierto
+// sin edificio costaba 126,6 px de Entrada (medido a 1280×720), y con él «Abrir un
+// GML» caía 200 px bajo el pliegue. SIMPLIFICADO ya es el modelo por defecto —lo
+// que admite el ICUC y lo más habitual— y «Cambiar» lo abre con un clic, así que la
+// pregunta sigue estando a mano sin ocupar la pantalla de quien no la necesita. Lo
+// de arriba no cambia: elegir con el radio NO pliega.
+//
 // ── ⛔ LA TABLA DE COORDENADAS ES UNA CAJA VACÍA, Y NO ES NEGOCIABLE ────────
 // `viewer/sincronizacion.js` hace `tablaEl.replaceChildren()` en CADA repintado,
 // así que cualquier cosa que este módulo meta dentro de {@link tablaParteActiva}
@@ -1005,10 +1012,10 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
   /** Qué parte se está editando. `null` = ninguna. F12 · T4.1. */
   let activa = null
   /**
-   * ¿Está plegado el selector de modelo? Nace DESPLEGADO: mientras no ha entrado
-   * ningún edificio, elegir el modelo es lo primero que hay que poder hacer.
+   * ¿Está plegado el selector de modelo? Nace PLEGADO desde el 2026-11-01 (ver la
+   * cabecera): el defecto es SIMPLIFICADO y «Cambiar» lo abre.
    */
-  let plegado = false
+  let plegado = true
   /**
    * ¿Lo ha desplegado el usuario con «Cambiar»? Mientras siga habiendo edificio,
    * eso GANA sobre el pliegue automático: un repintado —y hay uno por cada
@@ -2444,8 +2451,7 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
   }
 
   // Estado inicial coherente: SIMPLIFICADO, sin partes, sin capas, sin parte
-  // activa y con el selector DESPLEGADO — mientras no ha entrado ningún
-  // edificio, elegir el modelo es lo primero que hay que poder hacer.
+  // activa y con el selector PLEGADO en su renglón con «Cambiar» (ver la cabecera).
   pintarModelo()
   pintarPartes()
   pintarParteActiva()
@@ -2590,9 +2596,9 @@ export function crearPanelEdificio({ documento, alAvisar } = {}) {
         datos = null
         renombrando = null
         activa = null
-        // Vuelve a nacer: sin edificio, la pregunta del modelo se reabre — y se
-        // olvida que alguien la hubiera reabierto a mano.
-        plegado = false
+        // Vuelve a nacer: plegada, como al arrancar — y se olvida que alguien la
+        // hubiera reabierto a mano.
+        plegado = true
         desplegadoAMano = false
         // ⚠️ Y la precisión también vuelve a `null`. Es un dato del documento que
         // se está declarando, no una preferencia del técnico: dejarla puesta la

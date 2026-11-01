@@ -374,13 +374,18 @@ llegaba. El autor eligió **compactar las vías**:
 - Los apuntes de Medición y de Abrir un GML, **un renglón menos cada uno**, con las dos
   mitades de rama intactas: −35 px.
 - En Entrada de PARCELA sin parcela, el renglón «Todavía no hay parcela…» se oculta **a la
-  vista** (`[data-sin-parcela]` en `.gml-rotulo-oculto`; sigue siendo `role="status"`):
+  vista** (`[data-vacio]` en `.gml-rotulo-oculto`; sigue siendo `role="status"`):
   repetía el «Falta la parcela» del pie «Siguiente». −40 px.
 
 Resultado medido a 1280×720 y a 1440×900: las tres vías enteras y la sección sin desborde.
-⚠️ **Queda fuera, dicho:** Entrada en la rama EDIFICIO tiene otra maqueta (la sección de
-origen del edificio, 280 px) y sigue haciendo scroll en su bloque de vías; ya lo hacía antes.
-El guion 14 no se ha relanzado entero.
+✅ **Y Entrada en la rama EDIFICIO, el mismo día** (faltaban 200,6 px, medido). Decisión del
+autor: la pregunta Simplificado/Completo **nace plegada** en «Modelo: Simplificado — solo las
+huellas · Cambiar» (−126,6 px; `app/panel-edificio.js`, y «Cambiar» sin edificio no se vuelve
+a cerrar al repintar); el renglón vacío de «Generar GML» se oculta a la vista también aquí
+(−69,5 px), con la MISMA marca `[data-vacio]` que pone cada rama al escribir su texto; y el
+apunte de Edificio de Medición dice «Cada polilínea es una parte del edificio.» (un renglón
+menos). Medido a 1280×720: las tres vías enteras en las dos ramas, con 5,8 px libres en el
+panel de Parcela y 12,9 en el de Edificio. El guion 14 no se ha relanzado entero.
 
 La nota original:
 

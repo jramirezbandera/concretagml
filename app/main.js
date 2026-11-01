@@ -4933,9 +4933,10 @@ export function cablearGeneracionGml({
     // ⭐ 2026-11-01 · En Entrada, «todavía no hay parcela» repite el «Falta la
     // parcela» que ya dice el pie «Siguiente», y costaba 40 px del pliegue de la
     // tercera vía. La hoja lo oculta A LA VISTA solo ahí (sigue siendo un
-    // `role="status"` y el lector lo lee), con la rama en el selector porque el
-    // nodo lo comparte la rama Edificio y escribe otras cosas.
-    renglon.toggleAttribute('data-sin-parcela', texto === MENSAJE_SIN_PARCELA_TODAVIA)
+    // `role="status"` y el lector lo lee). La marca es la MISMA que pone la rama
+    // Edificio en este nodo compartido (`app/cableado-edificio-gml.js`): quien
+    // escribe el texto pone o quita la marca a la vez, y nunca queda una vieja.
+    renglon.toggleAttribute('data-vacio', texto === MENSAJE_SIN_PARCELA_TODAVIA)
   }
 
   /**

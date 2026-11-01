@@ -925,6 +925,9 @@ describe('app/main · parcela con un error BLOQUEANTE inyectado', () => {
     expect(renglon.textContent).toBe(MENSAJE_SIN_PARCELA_TODAVIA)
     expect(renglon.textContent).not.toBe('')
     expect(renglonEnError(renglon)).toBe(false)
+    // ⭐ 2026-11-01 · Con la marca con la que la hoja lo oculta A LA VISTA en Entrada,
+    // donde repite el «Falta la parcela» del pie. El texto sigue dentro.
+    expect(renglon.hasAttribute('data-vacio')).toBe(true)
   })
 
   it('⭐ y con un LEVANTAMIENTO sin unir dice otra cosa: hay parcela, falta el contorno', () => {
@@ -954,6 +957,7 @@ describe('app/main · parcela con un error BLOQUEANTE inyectado', () => {
     expect(renglon.textContent).toBe(MENSAJE_SIN_CONTORNO_TODAVIA)
     // ⛔ Y NO la del store vacío: es lo único que esta prueba defiende de verdad.
     expect(renglon.textContent).not.toBe(MENSAJE_SIN_PARCELA_TODAVIA)
+    expect(renglon.hasAttribute('data-vacio')).toBe(false)
     // Sin caja roja, por lo mismo que su gemelo: no es un defecto, es el paso
     // siguiente. Y nombra la herramienta, que es lo único accionable que hay.
     expect(renglonEnError(renglon)).toBe(false)

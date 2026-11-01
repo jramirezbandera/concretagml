@@ -2863,7 +2863,7 @@ body {
  * barra flota sobre la ortofoto y tiene que ser correcta aunque esta hoja no
  * cargue. Esta tabla ya depende de la hoja para todo lo demás. */
 .gml-rotulo-oculto,
-.gml-app[data-paso='entrada'][data-rama='PARCELA'] [data-sin-parcela],
+.gml-app[data-paso='entrada'] [data-vacio],
 .gml-app[data-paso='edicion'] .gml-titulo,
 .gml-app[data-paso='diagnostico'] .gml-titulo {
   position: absolute;

@@ -1839,15 +1839,20 @@ describe('app/panel-edificio · F12: lo que se teclea en las plantas', () => {
 })
 
 describe('app/panel-edificio · F12: el selector de modelo se pliega', () => {
-  it('nace DESPLEGADO: elegir el modelo es lo primero que hay que poder hacer', () => {
-    expect(panel.modeloPlegado()).toBe(false)
-    expect(nodo(SELECTOR.MODELO).closest('[hidden]')).toBeNull()
-    expect(nodo(SELECTOR.DESPLEGAR_MODELO).closest('[hidden]')).not.toBeNull()
+  it('⭐ 2026-11-01 · nace PLEGADO en su renglón, con SIMPLIFICADO y «Cambiar» a mano', () => {
+    // Abierto costaba 126,6 px de Entrada y dejaba «Abrir un GML» 200 px bajo el
+    // pliegue a 1280×720. Decisión del autor: el defecto ya está elegido.
+    expect(panel.modeloPlegado()).toBe(true)
+    expect(nodo(SELECTOR.MODELO).closest('[hidden]')).not.toBeNull()
+    const renglon = nodo(SELECTOR.DESPLEGAR_MODELO).closest(`.${CLASE.MODELO_PLEGADO}`)
+    expect(renglon.hidden).toBe(false)
+    expect(renglon.textContent).toContain(ROTULO_MODELO[MODELO_EDIFICIO.SIMPLIFICADO])
   })
 
   it('⛔ pulsar un radio NO lo pliega: ahí es cuando hay que leer qué se pierde', () => {
     // Plegar en el `change` haría desaparecer bajo el propio cursor el apunte que
     // dice «se borran los siete atributos». Es la frase que justifica el gesto.
+    nodo(SELECTOR.DESPLEGAR_MODELO).click()
     const radio = todos(SELECTOR.MODELO).find((r) => r.value === MODELO_EDIFICIO.COMPLETO)
     radio.click()
     expect(panel.modeloPlegado()).toBe(false)
@@ -1885,11 +1890,20 @@ describe('app/panel-edificio · F12: el selector de modelo se pliega', () => {
     expect(panel.modeloPlegado()).toBe(false)
   })
 
-  it('`fijar(null)` vuelve a empezar: desplegado, y sin recordar el «Cambiar»', () => {
+  it('«Cambiar» SIN edificio también se queda abierto al repintar', () => {
+    // Desde que nace plegado, quien quiere COMPLETO antes de cargar nada pulsa
+    // «Cambiar» con el panel vacío, y cada notificación del store repinta con
+    // `{ edificio: null }`. Eso no puede volver a plegárselo.
+    nodo(SELECTOR.DESPLEGAR_MODELO).click()
+    panel.fijar({ edificio: null })
+    expect(panel.modeloPlegado()).toBe(false)
+  })
+
+  it('`fijar(null)` vuelve a empezar: plegado como al nacer, y sin recordar el «Cambiar»', () => {
     panel.fijar({ edificio: EDIFICIO_F12 })
     nodo(SELECTOR.DESPLEGAR_MODELO).click()
     panel.fijar(null)
-    expect(panel.modeloPlegado()).toBe(false)
+    expect(panel.modeloPlegado()).toBe(true)
     expect(panel.parteActiva()).toBeNull()
     panel.fijar({ edificio: EDIFICIO_F12 })
     expect(panel.modeloPlegado()).toBe(true)
