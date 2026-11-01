@@ -67,9 +67,11 @@ const FUENTE_MAIN = readFileSync(join(RAIZ, 'app', 'main.js'), 'utf8')
  * ser». Los nombres de las constantes son lo único escrito a mano (son el
  * contrato); los VALORES salen de la fuente.
  */
+// ⭐ Sin `SELECTOR_BOTON_DESHACER` ni `SELECTOR_BOTON_REHACER` desde el 2026-11-01:
+// se mudaron a la barra de arriba (`index.html`), y de este fichero sale también la
+// lista con la que G16 (`test/services/contrato-catastro.test.js`) decide qué nodo
+// tiene que estar en la cáscara y cuál no.
 const CONTRATO = Object.freeze([
-  { constante: 'SELECTOR_BOTON_DESHACER', etiqueta: 'BUTTON' },
-  { constante: 'SELECTOR_BOTON_REHACER', etiqueta: 'BUTTON' },
   { constante: 'SELECTOR_CAMPO_SNAP', etiqueta: 'INPUT', tipo: 'checkbox' },
   { constante: 'SELECTOR_CAMPO_TOLERANCIA', etiqueta: 'INPUT', tipo: 'number' },
   { constante: 'SELECTOR_CAMPO_OFFSET', etiqueta: 'INPUT', tipo: 'number' },
@@ -197,10 +199,8 @@ describe('barra de edición · los OCHO nodos del contrato de app/main.js', () =
     expect(nodo(SELECTOR.SELECTOR_CAMPO_OFFSET).getAttribute('step')).toBe('0.01')
   })
 
-  it('los tres botones que main.js gobierna nacen DESHABILITADOS', () => {
+  it('el botón de desplazar lindero, que main.js gobierna, nace DESHABILITADO', () => {
     montarBarra()
-    expect(nodo(SELECTOR.SELECTOR_BOTON_DESHACER).disabled).toBe(true)
-    expect(nodo(SELECTOR.SELECTOR_BOTON_REHACER).disabled).toBe(true)
     expect(nodo(SELECTOR.SELECTOR_BOTON_OFFSET).disabled).toBe(true)
   })
 
@@ -216,18 +216,17 @@ describe('barra de edición · los OCHO nodos del contrato de app/main.js', () =
     expect(renglon.classList.contains(CLASE_BARRA.ESTADO)).toBe(true)
   })
 
-  it('los botones del historial dicen su atajo en la PISTA y en aria-keyshortcuts', () => {
+  it('⭐ 2026-11-01 · deshacer y rehacer YA NO los fabrica la barra: viven arriba', () => {
     montarBarra()
-    const deshacer = nodo(SELECTOR.SELECTOR_BOTON_DESHACER)
-    const rehacer = nodo(SELECTOR.SELECTOR_BOTON_REHACER)
-    // ⚠️ El `<kbd>` visible se fue con las palabras el 2026-08-10 (la barra volvió
-    // a los iconos). El atajo NO se perdió: sale por las dos vías que cubren a los
-    // dos públicos —la pista para el ratón, `aria-keyshortcuts` para el lector de
-    // pantalla— y además sigue en la tabla del panel de ayuda.
-    expect(deshacer.dataset.pista).toBe('Deshacer · Ctrl+Z')
-    expect(rehacer.dataset.pista).toBe('Rehacer · Ctrl+Y')
-    expect(deshacer.getAttribute('aria-keyshortcuts')).toBe('Control+Z')
-    expect(rehacer.getAttribute('aria-keyshortcuts')).toBe('Control+Y')
+    // Si volvieran aquí habría DOS nodos con el mismo `data-accion` en la
+    // aplicación (el de `index.html` y éste), y `querySelector` se quedaría con el
+    // primero del documento: la trampa K.1. Que estén arriba, y bien, lo prueba
+    // `test/app/main-edicion.dom.test.js`.
+    expect(document.querySelector('[data-accion="deshacer"]')).toBeNull()
+    expect(document.querySelector('[data-accion="rehacer"]')).toBeNull()
+    // El atajo sigue en la tabla del panel de ayuda, que es donde se vuelve a
+    // mirar cuando uno no se acuerda.
+    expect(panel('ayuda').textContent).toContain('Ctrl+Z')
   })
 
   it('«Borrar vértices» nace armable y sin armar: `aria-pressed="false"`, sin `disabled`', () => {
@@ -386,7 +385,7 @@ describe('barra de edición · disableClickPropagation y disableScrollPropagatio
     const clicsDelMapa = []
     mapa.on('click', () => clicsDelMapa.push(1))
 
-    clic(nodo(SELECTOR.SELECTOR_BOTON_DESHACER))
+    clic(nodo(SELECTOR.SELECTOR_BOTON_BORRAR))
     clic(nodo('[data-accion="ayuda"]'))
 
     expect(clicsDelMapa.length).toBe(0)
@@ -397,7 +396,7 @@ describe('barra de edición · disableClickPropagation y disableScrollPropagatio
     const vistos = []
     contenedor.addEventListener('mousedown', () => vistos.push(1))
 
-    nodo(SELECTOR.SELECTOR_BOTON_DESHACER).dispatchEvent(
+    nodo(SELECTOR.SELECTOR_BOTON_BORRAR).dispatchEvent(
       new MouseEvent('mousedown', { bubbles: true, cancelable: true }),
     )
 
@@ -622,7 +621,9 @@ describe('barra de edición · accesibilidad', () => {
     // vértices», «Insertar vértices» y «Quitar los puntos» de F24, que nace
     // escondida por lo mismo que el dibujo. La casilla del ajuste se cuenta aparte,
     // abajo: su piel es el `<label for>`, no un botón con esta clase.
-    expect(herramientas.length).toBe(9)
+    // ⭐ Siete desde el 2026-11-01: «Deshacer» y «Rehacer» subieron a la barra de
+    // arriba (`index.html`).
+    expect(herramientas.length).toBe(7)
     for (const herramienta of herramientas) {
       const nombre = herramienta.textContent.trim()
       expect(nombre.length, `herramienta sin nombre: ${herramienta.outerHTML}`).toBeGreaterThan(0)
@@ -640,7 +641,8 @@ describe('barra de edición · accesibilidad', () => {
     const conNombre = [
       ...contenedor.querySelectorAll(`.${CLASE_BARRA.HERRAMIENTA}, .${CLASE_BARRA.CONMUTADOR_ROTULO}`),
     ]
-    expect(conNombre.length).toBe(10)
+    // Ocho desde el 2026-11-01 (deshacer y rehacer subieron a `index.html`).
+    expect(conNombre.length).toBe(8)
     for (const herramienta of conNombre) {
       const oculto = herramienta.querySelector(`.${CLASE_BARRA.ROTULO}`)
       expect(oculto, `sin nombre accesible: ${herramienta.outerHTML}`).not.toBeNull()
@@ -670,8 +672,9 @@ describe('barra de edición · accesibilidad', () => {
     const { contenedor } = montarBarra()
     const iconos = [...contenedor.querySelectorAll(`.${CLASE_BARRA.ICONO}`)]
     // Nueve dibujos de herramienta —incluido el imán del ajuste— más las dos
-    // puntas de flecha de lo que despliega.
-    expect(iconos.length).toBe(11)
+    // puntas de flecha de lo que despliega. Siete dibujos y no nueve desde el
+    // 2026-11-01: los de deshacer y rehacer se fueron con sus botones a `index.html`.
+    expect(iconos.length).toBe(9)
     for (const icono of iconos) {
       expect(icono.getAttribute('aria-hidden')).toBe('true')
       expect(icono.getAttribute('focusable')).toBe('false')
@@ -693,17 +696,19 @@ describe('barra de edición · accesibilidad', () => {
     tecla(casilla, 'ArrowRight')
     expect(document.activeElement).toBe(dispSnap)
 
-    // Hacia atrás desde la casilla: deshacer y rehacer están apagados, así que se
-    // saltan y se da la vuelta hasta la última herramienta.
+    // Hacia atrás desde la casilla, que es la primera desde que deshacer y rehacer
+    // subieron a la barra de arriba: se da la vuelta hasta la última herramienta.
     casilla.focus()
     tecla(casilla, 'ArrowLeft')
     expect(document.activeElement).toBe(ayuda)
 
-    // Y en cuanto main.js enciende «Deshacer», la flecha ya lo alcanza.
-    nodo(SELECTOR.SELECTOR_BOTON_DESHACER).disabled = false
+    // Y lo apagado se salta (lo oculto también: «Quitar puntos» y «Dibujar» nacen
+    // escondidos). Era deshacer apagado quien lo demostraba aquí; ahora se apaga a
+    // mano la última para verlo.
+    ayuda.disabled = true
     casilla.focus()
     tecla(casilla, 'ArrowLeft')
-    expect(document.activeElement).toBe(nodo(SELECTOR.SELECTOR_BOTON_DESHACER))
+    expect(document.activeElement).toBe(nodo(SELECTOR.SELECTOR_BOTON_BORRAR))
   })
 
   it('las flechas dentro de un campo del desplegable son del campo, no de la barra', () => {
@@ -726,7 +731,7 @@ describe('barra de edición · accesibilidad', () => {
 describe('barra de edición · destruir()', () => {
   it('quita la barra del documento y es IDEMPOTENTE', () => {
     const { barra } = montarBarra()
-    expect(document.querySelector(SELECTOR.SELECTOR_BOTON_DESHACER)).not.toBeNull()
+    expect(document.querySelector(SELECTOR.SELECTOR_BOTON_BORRAR)).not.toBeNull()
 
     barra.destruir()
     barra.destruir()
@@ -955,9 +960,9 @@ describe('barra de edición · las herramientas se dibujan y se nombran en la pi
     // con `hidden`: en la rama PARCELA no hay ninguna parte que dibujar. Se cuenta
     // aquí porque este guardián mira el MARCADO —que la herramienta esté nombrada—,
     // no lo que se ve; que nazca escondida lo defiende su propia prueba, más abajo.
+    // ⭐ Sin «Deshacer» ni «Rehacer» delante desde el 2026-11-01: viven en la barra
+    // de arriba (`index.html`), y la fila empieza por la primera de geometría.
     expect(nombres).toEqual([
-      'Deshacer',
-      'Rehacer',
       'Ajuste al parcelario',
       'Tolerancia del ajuste',
       'Desplazar lindero',
@@ -1014,7 +1019,12 @@ describe('barra de edición · las herramientas se dibujan y se nombran en la pi
     // «Quitar puntos» y el cuarto es de «Quitar puntos» en exclusiva
     // (`_refrescarSeparadorPuntos`). El último nace escondido con su botón; que no
     // quede ninguno suelto en ninguna combinación lo vigila la prueba de T8.
-    expect(separadores).toHaveLength(4)
+    //
+    // ⭐ Y son TRES desde el 2026-11-01: el del historial se fue con deshacer y
+    // rehacer a la barra de arriba, y la fila empieza directamente por el ajuste:
+    //
+    //     ajuste │ desplazar + [mando] │ quitar puntos │ ayuda
+    expect(separadores).toHaveLength(3)
     for (const separador of separadores) {
       expect(separador.getAttribute('role')).toBe('separator')
       expect(separador.getAttribute('aria-orientation')).toBe('vertical')
@@ -1122,16 +1132,16 @@ describe('barra de edición · la pista', () => {
     vi.useFakeTimers()
     try {
       montarBarra()
-      const deshacer = nodo(SELECTOR.SELECTOR_BOTON_DESHACER)
+      const ayuda = nodo('[data-accion="ayuda"]')
       const borrar = nodo(SELECTOR.SELECTOR_BOTON_BORRAR)
 
-      senalar(deshacer)
+      senalar(ayuda)
       vi.advanceTimersByTime(RETARDO_PISTA_MS)
-      expect(pista().textContent).toBe('Deshacer · Ctrl+Z')
+      expect(pista().textContent).toBe(ayuda.dataset.pista)
 
       // `relatedTarget` apunta a la herramienta siguiente: sin la guarda, el
       // `mouseout` apagaría el globo que el `mouseover` acaba de encender.
-      dejarDeSenalar(deshacer, borrar)
+      dejarDeSenalar(ayuda, borrar)
       senalar(borrar)
       expect(pista().hidden, 'la ventana caliente: ya no espera').toBe(false)
       expect(
@@ -1746,8 +1756,6 @@ describe('barra de edición · T4 · el mando de los tres modos', () => {
     // ⚠️ Los del CONTRATO se leen de `app/main.js`, no se copian: es la regla que
     // vigila `test/services/contrato-catastro.test.js` para este fichero entero.
     for (const selector of [
-      SELECTOR.SELECTOR_BOTON_DESHACER,
-      SELECTOR.SELECTOR_BOTON_REHACER,
       '[data-desplegable="snap"]',
       '[data-desplegable="offset"]',
       '[data-accion="ayuda"]',
@@ -1962,7 +1970,6 @@ describe('barra de edición · T10 · nada se anuncia dos veces', () => {
     const { contenedor } = montarBarra()
     const anunciable = textoAnunciable(contenedor)
     for (const nombre of [
-      'Deshacer',
       'Ajuste al parcelario',
       'Desplazar lindero',
       'Ayuda sobre los gestos de edición',

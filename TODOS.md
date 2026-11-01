@@ -177,7 +177,17 @@ a medias tiene que anotarlo aquí, porque el CI de pruebas no lo va a recordar p
 
 ---
 
-## Deshacer y rehacer no son herramientas de geometría, y siguen en la barra del mapa
+## ✅ CERRADA · Deshacer y rehacer no son herramientas de geometría, y siguen en la barra del mapa
+
+**Cerrada el 2026-11-01.** Viven en la barra de arriba, en una zona «historial» detrás del
+expediente (`index.html`), con marcado estático: existen antes de que corra
+`cablearEdicion`, que no se tocó. Se ven en los tres pasos. Pista con `title` (la barra de
+arriba no tiene globo propio) más `aria-keyshortcuts`. **+12 B** de hoja, la sexta columna.
+Medido en Chrome: nada se pisa de 1280 a 870 px (a 870 el expediente se corta en «…», como
+antes), y la barra del mapa empieza ahora por el ajuste. Guiones 08 y 14: el 08 conduce por
+selector y no cambia; ninguno de los dos se ha relanzado entero.
+
+La nota original:
 
 **Anotada el 2026-08-19 tras `/plan-eng-review`.** Es la rebanada 2 del diseño
 `javie-main-design-20260819-144225.md`, aplazada **en la propia revisión** por coste de

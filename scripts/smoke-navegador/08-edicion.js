@@ -167,6 +167,9 @@
 // desplegables para escribir en la tolerancia o en la distancia: los campos
 // existen siempre en el DOM y solo se ocultan con `hidden` (invariante declarado
 // en la cabecera de ese módulo, y con test).
+// ⭐ **Y desde el 2026-11-01 deshacer y rehacer SÍ están en `index.html`**, en la
+// barra de arriba (zona «historial»): son acciones del documento. Mismos
+// selectores, así que este guion no cambia por eso.
 
 /** Copias de `SELECTOR_BOTON_DESHACER` … `SELECTOR_ESTADO_EDICION`. */
 const SEL = Object.freeze({
@@ -1654,8 +1657,8 @@ const panel = {
   tarjetasDeAvisos: pesoAvisos().tarjetas,
 }
 
-// La barra es hoy la ÚNICA superficie desde la que se puede deshacer, conmutar el
-// enganche o desplazar un lindero. Que falte no lo detecta el bloque de arriba
+// La barra es hoy la ÚNICA superficie desde la que se puede conmutar el enganche o
+// desplazar un lindero (deshacer subió a la barra de arriba el 2026-11-01). Que falte no lo detecta el bloque de arriba
 // —los siete selectores existirían igual si alguien los devolviera al panel—, así
 // que se comprueba aparte.
 if (barraEdicion === null) {

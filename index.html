@@ -325,6 +325,32 @@
         </div>
       </div>
 
+      <!-- ── ZONA 2½ · DESHACER Y REHACER (2026-11-01) ─────────────────────
+           ⭐ MUDADOS DESDE LA BARRA DEL MAPA (`viewer/barra-edicion.js`), que es
+           la deuda «Deshacer y rehacer no son herramientas de geometría» de
+           TODOS.md. Son acciones del DOCUMENTO, y su pila es una sola para las
+           dos ramas: van junto al expediente, que es el documento, y se ven en
+           los tres pasos. Fuera de Edición se quedan apagados casi siempre, y
+           cuando no, `app/main.js` dice qué ha deshecho que no se estaba mirando.
+
+           ⚠️ Llevan MARCADO DENTRO —el `<svg>` y el `<span>` del nombre—, y quien
+           los cablea (`app/main.js#cablearEdicion`) toca su `disabled`, nunca su
+           `textContent`. Nacen apagados: con la pila vacía no hay nada que
+           deshacer. El cromo es el de las herramientas del mapa
+           (`.gml-barra-herramienta`, 0 B de hoja), y la pista es el `title`: la
+           barra de arriba no tiene globo propio, y el atajo lo dice también
+           `aria-keyshortcuts` y la tabla de la ayuda del mapa. -->
+      <div class="gml-barra-zona" data-zona="historial" role="group" aria-label="Historial de edición">
+        <button type="button" class="gml-barra-herramienta" data-accion="deshacer" aria-keyshortcuts="Control+Z" title="Deshacer · Ctrl+Z" disabled>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 14l-4-4 4-4"/><path d="M5 10h9a5 5 0 0 1 0 10h-4"/></svg>
+          <span class="gml-barra-rotulo">Deshacer</span>
+        </button>
+        <button type="button" class="gml-barra-herramienta" data-accion="rehacer" aria-keyshortcuts="Control+Y" title="Rehacer · Ctrl+Y" disabled>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 14l4-4-4-4"/><path d="M19 10h-9a5 5 0 0 0 0 10h4"/></svg>
+          <span class="gml-barra-rotulo">Rehacer</span>
+        </button>
+      </div>
+
       <!-- ── ZONA 3 · EL RECORRIDO ─────────────────────────────────────────
            Vacío A PROPÓSITO: lo rellena `app/barra.js`. Un `<ol>` con peldaños
            escritos aquí saldría en la pantalla del usuario durante el instante

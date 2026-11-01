@@ -2814,11 +2814,10 @@ describe('crearVisor · `barraEdicion` en el objeto devuelto (F11)', () => {
 
     expect(nodo.isConnected).toBe(true)
     expect(barraEnDom(contenedor)).toBe(nodo)
-    // Los siete nodos que `app/main.js#cablearEdicion` resolvió UNA sola vez en el
-    // montaje siguen siendo los mismos y siguen estando en el documento.
+    // Los nodos que `app/main.js#cablearEdicion` resolvió UNA sola vez en el
+    // montaje siguen siendo los mismos y siguen estando en el documento. (Deshacer
+    // y rehacer ya no son de la barra: están en `index.html` desde el 2026-11-01.)
     for (const selector of [
-      '[data-accion="deshacer"]',
-      '[data-accion="rehacer"]',
       '[data-accion="offset"]',
       '[data-campo="snap"]',
       '[data-campo="snap-tolerancia"]',

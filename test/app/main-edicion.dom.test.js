@@ -2170,6 +2170,23 @@ describe('app/main · el marcado de las herramientas de edición es CONTRATO', (
     expect(document.querySelector(SELECTOR_ESTADO_EDICION).getAttribute('role')).toBe('status')
   })
 
+  it('⭐ 2026-11-01 · deshacer y rehacer viven en la barra de ARRIBA, no en la del mapa', () => {
+    // Son acciones del documento: van junto al expediente y se ven en los tres
+    // pasos. Uno solo de cada en el documento (la trampa K.1), fuera de la barra
+    // flotante, y con su atajo dicho por las dos vías que no necesitan el globo.
+    for (const [selector, atajo, pista] of [
+      [SELECTOR_BOTON_DESHACER, 'Control+Z', 'Deshacer · Ctrl+Z'],
+      [SELECTOR_BOTON_REHACER, 'Control+Y', 'Rehacer · Ctrl+Y'],
+    ]) {
+      expect(document.querySelectorAll(selector), selector).toHaveLength(1)
+      const boton = document.querySelector(selector)
+      expect(boton.closest('.gml-rail [data-zona="historial"]'), selector).not.toBeNull()
+      expect(boton.closest(`.${CLASE_BARRA.CONTENEDOR}`), selector).toBeNull()
+      expect(boton.getAttribute('aria-keyshortcuts')).toBe(atajo)
+      expect(boton.getAttribute('title')).toBe(pista)
+    }
+  })
+
   it('un visor SIN edición no se cablea a medias: lanza diciendo por qué', () => {
     const estado = crearEstadoVista(parcelaCuadrada())
     const historial = crearHistorial()
@@ -2900,7 +2917,8 @@ describe('app/main · T10 · con los dos canales vivos, ningún hecho se oye dos
     m.edicion.seleccionar({ anillo: 0, indice: 0 })
 
     const anunciable = restoDeLaBarra()
-    expect(anunciable).toContain('Deshacer')
+    // «Deshacer» ya no vale de testigo: subió a la barra de arriba el 2026-11-01.
+    expect(anunciable).toContain('Ajuste al parcelario')
     expect(anunciable).toContain('Ayuda sobre los gestos de edición')
   })
 })

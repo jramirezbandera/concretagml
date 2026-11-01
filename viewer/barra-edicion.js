@@ -13,13 +13,20 @@
 // ── LA RESTRICCIÓN QUE GOBIERNA TODO ESTE MÓDULO ────────────────────────────
 // `app/main.js#cablearEdicion` localiza sus nodos POR SELECTOR, al llamarla:
 //
-//     [data-accion="deshacer"]        [data-campo="snap"]              (checkbox)
-//     [data-accion="rehacer"]         [data-campo="snap-tolerancia"]   (cm)
+//     [data-campo="snap"]              (checkbox)
+//     [data-campo="snap-tolerancia"]   (cm)
 //     [data-accion="offset"]          [data-campo="offset-distancia"]  (m)
 //     [data-accion="borrar"]          (conmutador del modo borrar, 2026-08-10)
 //     [data-estado="edicion"]         (role="status")
 //
-// **Este módulo produce EXACTAMENTE esos ocho nodos, con esos mismos `data-*` y
+// ⭐ **Eran ocho hasta el 2026-11-01**: `[data-accion="deshacer"]` y
+// `[data-accion="rehacer"]` se mudaron a la barra de arriba (`index.html`, zona
+// «historial»), porque son acciones del documento y no de geometría. El contrato
+// ataba NOMBRE y TIPO DE ELEMENTO, no módulo productor, así que `cablearEdicion`
+// no cambió: su `nodo()` los encuentra en el marcado estático, y ahora existen
+// ANTES de que corra.
+//
+// **Este módulo produce EXACTAMENTE esos seis nodos, con esos mismos `data-*` y
 // esos mismos tipos de elemento.** Esa es la razón de ser de media cabecera: si
 // se cumple, `app/main.js` NO hay que tocarlo —ni él, ni sus pruebas, ni el
 // guion de navegador `08-edicion.js`—, y el traslado del panel al mapa es un
@@ -740,10 +747,8 @@ const LADO_CARET_PX = 12
  * no como clipart.
  */
 const ICONOS = Object.freeze({
-  /** Flecha que vuelve sobre sus pasos hacia la izquierda. */
-  DESHACER: Object.freeze(['M9 14l-4-4 4-4', 'M5 10h9a5 5 0 0 1 0 10h-4']),
-  /** La misma, espejada: es la pareja obvia y se lee como tal. */
-  REHACER: Object.freeze(['M15 14l4-4-4-4', 'M19 10h-9a5 5 0 0 0 0 10h4']),
+  // DESHACER y REHACER se fueron con sus botones a `index.html` (2026-11-01): los
+  // mismos trazos están escritos allí, en el `<svg>` de la zona «historial».
   /**
    * Imán en herradura: el ajuste al parcelario. Es el símbolo universal del
    * «snap» en todo editor de dibujo, así que aquí sí hay convención que
@@ -1214,27 +1219,10 @@ const BarraEdicion = L.Control.extend({
     fila.setAttribute('role', 'toolbar')
     fila.setAttribute('aria-label', this.options.etiqueta)
 
-    // Deshacer y rehacer. ⚠️ Llevan MARCADO dentro (el `<svg>` del icono y el
-    // `<span>` del nombre accesible): quien los cablea enciende y apaga su
-    // `disabled`, y NUNCA les reescribe el `textContent` — se llevaría por delante
-    // las dos cosas. Lo decía `index.html` junto a ellos y sigue valiendo aquí.
-    this._botonDeshacer = this._crearBotonHistorial(doc, fila, {
-      accion: 'deshacer',
-      icono: ICONOS.DESHACER,
-      nombre: 'Deshacer',
-      tecla: 'Ctrl+Z',
-      // `aria-keyshortcuts` usa los nombres de tecla de UI Events, no el rótulo.
-      atajo: 'Control+Z',
-    })
-    this._botonRehacer = this._crearBotonHistorial(doc, fila, {
-      accion: 'rehacer',
-      icono: ICONOS.REHACER,
-      nombre: 'Rehacer',
-      tecla: 'Ctrl+Y',
-      atajo: 'Control+Y',
-    })
-
-    crearSeparador(doc, fila)
+    // ⭐ Aquí empezaba la fila con deshacer y rehacer, y un separador. Desde el
+    // 2026-11-01 viven en la barra de arriba (`index.html`, zona «historial»): son
+    // acciones del documento, y la fila empieza por la primera herramienta de
+    // geometría.
 
     // ── Botón partido del ajuste: la casilla conmuta, la flecha despliega ─────
     const partido = crear(doc, 'span', CLASE_BARRA.PARTIDO, fila)
@@ -1583,8 +1571,6 @@ const BarraEdicion = L.Control.extend({
      * casilla.
      */
     this._herramientas = [
-      this._botonDeshacer,
-      this._botonRehacer,
       casilla,
       this._dispSnap,
       this._dispOffset,
@@ -2094,26 +2080,6 @@ const BarraEdicion = L.Control.extend({
   },
 
   // ── Construcción de piezas ─────────────────────────────────────────────────
-
-  /**
-   * Un botón del historial: su icono, su nombre y su atajo.
-   *
-   * El atajo va en TRES sitios y ninguno sobra: en la PISTA (`Deshacer · Ctrl+Z`),
-   * que es como lo descubre quien usa el ratón; en `aria-keyshortcuts`, que es
-   * donde lo busca un lector de pantalla; y en la tabla del panel de ayuda, que es
-   * donde se vuelve cuando ya no se acuerda uno. Lo que ya NO hay es un `<kbd>`
-   * visible dentro del botón: con la barra en iconos no cabe, y las otras dos
-   * salidas cubren a los dos públicos que aquella tenía.
-   */
-  _crearBotonHistorial(doc, padre, { accion, icono, nombre, tecla, atajo }) {
-    const boton = crearBoton(doc, { padre, icono, nombre, pista: `${nombre} · ${tecla}` })
-    boton.dataset.accion = accion
-    boton.setAttribute('aria-keyshortcuts', atajo)
-    // Nacen apagados: con la pila vacía no hay nada que deshacer ni que rehacer.
-    // A partir de aquí manda `app/main.js#refrescar`.
-    boton.disabled = true
-    return boton
-  },
 
   // ── La pista ───────────────────────────────────────────────────────────────
 

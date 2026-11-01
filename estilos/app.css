@@ -684,8 +684,10 @@ body {
      para cortarse: su botón tiene tope y sus dos renglones terminan en «…».
      `max-content` en la marca, los chips y la entrega porque son las que NO saben
      cortarse: la zona de chips es flexible y, apretada, partía «0 avisos» a una
-     segunda línea (medido). */
-  grid-template-columns: max-content minmax(0, auto) minmax(min-content, 1fr) max-content max-content;
+     segunda línea (medido).
+     ⭐ SEIS desde el 2026-11-01: deshacer y rehacer suben del mapa y entran
+     detrás del expediente, en `max-content` porque dos iconos no saben cortarse. */
+  grid-template-columns: max-content minmax(0, auto) max-content minmax(min-content, 1fr) max-content max-content;
   grid-template-rows: var(--gml-barra-alto);
   align-items: center;
   /* ⭐ 12 px hasta la revisión de diseño del 2026-08-10 («amontona logo, estado,

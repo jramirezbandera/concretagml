@@ -630,10 +630,16 @@ export const REBANADAS = Object.freeze(['entrada', 'validacion', 'edicion', 'dia
  * tres bloques con las mismas cuatro declaraciones y ahora son uno. El techo BAJA
  * con la medición, como sube: holgura 0.
  *
+ * ⭐ **Y +12 B EL MISMO DÍA** (de 67.475 a **67.487 B nuestros**; 82.570 → 82.582
+ * con vendor): deshacer y rehacer suben de la barra del mapa a la de arriba, y lo
+ * único que paga la hoja es la sexta columna de `.gml-rail`. Los botones visten el
+ * cromo de `.gml-barra-herramienta` y el nombre oculto de `.gml-barra-rotulo`, que
+ * ya existían; la pista es el `title`, que no cuesta hoja.
+ *
  * ── LA FORMA SIGUE SIN CAMBIAR ─────────────────────────────────────────────
  * «No más de», **holgura 0**, y la siguiente subida vuelve a salir roja.
  */
-export const TECHO = Object.freeze({ total: 82570, nuestro: 67475 })
+export const TECHO = Object.freeze({ total: 82582, nuestro: 67487 })
 
 /**
  * EL REGISTRO. Un asiento por hito, con la hoja construida medida de verdad.
@@ -1848,6 +1854,16 @@ export const ASIENTOS = Object.freeze(
         '+167 B. ── QUÉ SE HA DEVUELTO ── los `:disabled` de `--primario`, `--secundario` y ' +
         '`--menudo` eran tres bloques calcados y pasan a ser uno con `.gml-boton[aria-disabled]`: ' +
         '−303 B. ── El techo BAJA 136 B (cabecera de `TECHO`) y la holgura sigue en 0. NO ' +
+        'CIERRA REBANADA.' },
+    { hito: 'Deshacer y rehacer suben a la barra de arriba',
+      commit: '(sin commitear)',
+      total: 82582, nuestro: 67487, rebanada: null,
+      nota:
+        '**+12 B.** Son acciones del documento y salen de la barra del mapa a una zona ' +
+        '«historial» de `.gml-rail`, detrás del expediente: la rejilla pasa de cinco a seis ' +
+        'columnas y eso es todo lo que paga la hoja. ── QUÉ NO SE HA ESCRITO ── ni cromo ni ' +
+        'globo: reutilizan `.gml-barra-herramienta` y `.gml-barra-rotulo`, y la pista es el ' +
+        '`title`. ── ⚠️ El techo SUBE 12 B (cabecera de `TECHO`) y la holgura vuelve a 0. NO ' +
         'CIERRA REBANADA.' },
   ].map((a) => Object.freeze({ ...a, vendor: a.total - a.nuestro })),
 )
