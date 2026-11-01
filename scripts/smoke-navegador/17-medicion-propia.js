@@ -234,7 +234,7 @@ if (!linea.hayMapa) problemas.push('No hay mapa: la aplicación no ha arrancado.
 if (linea.paso === 'entrada') {
   if (!linea.hayBotonMedicion) {
     problemas.push(
-      'El botón «Elegir un fichero de medición…» no se ve en Entrada. Sin él la vía solo la ' +
+      'El botón «Elegir fichero…» no se ve en Entrada. Sin él la vía solo la ' +
         'conoce quien escribió el código.',
     )
   }

@@ -2054,9 +2054,15 @@ body {
    y el campo —que ya se separan con sus propios márgenes, y que dentro de un
    flex NO se colapsan (misma trampa anotada en `.gml-entrada-pie`)—: medido,
    costaría 22 px de columna en vez de 16, y la pantalla de Entrada ya no cabe
-   entera a 1280×720. */
-.gml-via-boton + .gml-via-boton {
-  margin-top: var(--space-2);
+   entera a 1280×720.
+
+   ⭐ DESDE EL 2026-11-01 LOS DOS VAN LADO A LADO, en su propia fila: apilados
+   costaban 40 px de la columna y la tercera vía caía 109 px bajo el pliegue. El
+   `gap` vive en la fila y no en la vía, así que lo de arriba sigue valiendo; con
+   `width: 100%` los dos encogen por igual y salen a media caja cada uno. */
+.gml-via-botones {
+  display: flex;
+  gap: var(--space-2);
 }
 
 /* El separador entre vías. La línea a los lados es lo que dice «son alternativas»
@@ -2857,6 +2863,7 @@ body {
  * barra flota sobre la ortofoto y tiene que ser correcta aunque esta hoja no
  * cargue. Esta tabla ya depende de la hoja para todo lo demás. */
 .gml-rotulo-oculto,
+.gml-app[data-paso='entrada'][data-rama='PARCELA'] [data-sin-parcela],
 .gml-app[data-paso='edicion'] .gml-titulo,
 .gml-app[data-paso='diagnostico'] .gml-titulo {
   position: absolute;

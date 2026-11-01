@@ -219,7 +219,7 @@ const rama = document.body.dataset.rama ?? null
  */
 const PUERTAS = [
   { accion: 'cargar-catastro', nombre: 'Traer del Catastro' },
-  { accion: 'abrir-medicion', nombre: 'Elegir un fichero de medición…' },
+  { accion: 'abrir-medicion', nombre: 'Elegir fichero…' },
   { accion: 'abrir-pegado', nombre: 'Pegar coordenadas…' },
   { accion: 'abrir-gml', nombre: 'Abrir un GML…' },
   { accion: 'abrir-expediente', nombre: 'Abrirlo (expediente guardado)' },

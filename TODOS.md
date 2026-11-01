@@ -37,8 +37,9 @@ sigue no se tocó, por orden de impacto:
    de peticiones del override O8, que es del autor.
 4. ✅ **HECHO a medias el mismo día**: en Edificio › Edición, pinchar una huella
    elige su parte (decisión del autor). «Parte activa» sigue naciendo vacía por H3.
-   ⏳ **Queda**: la lista de partes no se desplaza hasta la fila elegida desde el
-   mapa; con trece partes, la elegida puede quedar fuera de la vista de la lista.
+   ✅ ~~**Queda**: la lista de partes no se desplaza hasta la fila elegida desde el
+   mapa~~ — **hecho el 2026-11-01**: tras repintar, la fila se acerca con
+   `scrollIntoView({block:'nearest'})`, el mismo gesto que la tabla de vértices.
    Lo que sigue es la historia del punto:
    **En Edificio, «Parte activa» nace vacía** y hay que adivinar que se pincha una
    parte de la lista. No se elige la primera sola porque lo prohíbe la auditoría
@@ -362,7 +363,26 @@ breve reutiliza `.gml-rotulo-oculto`, que ya existía y su propio bloque declara
 
 ---
 
-## La tercera vía de Entrada cae bajo el pliegue a 1280×720
+## ✅ CERRADA · La tercera vía de Entrada cae bajo el pliegue a 1280×720
+
+**Cerrada el 2026-11-01**, y no con los 16 px de abajo: **medido ese día en Chrome, faltaban
+108,83 px.** Desde agosto entraron el conmutador Parcela/Edificio en la cabecera, el pie
+«Siguiente» y el renglón de «Generar GML» bajo el panel, así que recortar aire ya no
+llegaba. El autor eligió **compactar las vías**:
+
+- «Elegir fichero…» y «Pegar coordenadas…» **lado a lado** (`.gml-via-botones`): −40 px.
+- Los apuntes de Medición y de Abrir un GML, **un renglón menos cada uno**, con las dos
+  mitades de rama intactas: −35 px.
+- En Entrada de PARCELA sin parcela, el renglón «Todavía no hay parcela…» se oculta **a la
+  vista** (`[data-sin-parcela]` en `.gml-rotulo-oculto`; sigue siendo `role="status"`):
+  repetía el «Falta la parcela» del pie «Siguiente». −40 px.
+
+Resultado medido a 1280×720 y a 1440×900: las tres vías enteras y la sección sin desborde.
+⚠️ **Queda fuera, dicho:** Entrada en la rama EDIFICIO tiene otra maqueta (la sección de
+origen del edificio, 280 px) y sigue haciendo scroll en su bloque de vías; ya lo hacía antes.
+El guion 14 no se ha relanzado entero.
+
+La nota original:
 
 **Estado.** Abierto. Defecto **introducido** por la rebanada 1 del topbar (2026-08-10) y
 **medido**, no estimado. El guion 14 lo reporta y por eso sale `ok:false`.
@@ -449,7 +469,8 @@ que la nota reservaba —«el botón pasaría a ser pulsable»— se tomó así:
 **no hace nada**, cada manejador lo pregunta con `estaApagado`, y lo único que responde es
 el motivo que ya enseñó el foco. «Diagnosticar» navegaba también desde `app/main.js`, y ese
 oyente lo pregunta igual. Guardián del contrato de `index.html`: `test/app/apagado.dom.test.js`.
-⚠️ Queda por mirar en navegador que el globo abra al tabular (jsdom no pinta).
+Mirado en Chrome a 1280×720: tabulando hasta «Siguiente» apagado el globo abre, e Intro
+no navega.
 
 La nota original, tal como estaba:
 

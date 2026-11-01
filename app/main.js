@@ -4930,6 +4930,12 @@ export function cablearGeneracionGml({
     renglon.textContent = texto
     renglon.classList.toggle(CLASE_ESTADO_ERROR, esError)
     renglon.classList.toggle(CLASE_ESTADO_EXITO, esExito)
+    // ⭐ 2026-11-01 · En Entrada, «todavía no hay parcela» repite el «Falta la
+    // parcela» que ya dice el pie «Siguiente», y costaba 40 px del pliegue de la
+    // tercera vía. La hoja lo oculta A LA VISTA solo ahí (sigue siendo un
+    // `role="status"` y el lector lo lee), con la rama en el selector porque el
+    // nodo lo comparte la rama Edificio y escribe otras cosas.
+    renglon.toggleAttribute('data-sin-parcela', texto === MENSAJE_SIN_PARCELA_TODAVIA)
   }
 
   /**
@@ -6767,7 +6773,7 @@ if (botonPegado !== null) {
       // Regla de oro 1: un botón que traga el clic es peor que uno apagado.
       panel.avisar(
         'La pantalla de pegar coordenadas no está disponible en esta sesión. Puedes seguir ' +
-          'usando «Elegir un fichero de medición…» o soltando el fichero sobre la ventana.',
+          'usando «Elegir fichero…» o soltando el fichero sobre la ventana.',
         { nivel: NIVEL.AVISO },
       )
       return

@@ -929,9 +929,11 @@
                cosen con un punto y coma. **Las dos mitades de rama siguen enteras**:
                son la afirmación de qué va a pasar al soltar el fichero, y decir solo
                una sería falso en la otra rama. -->
+          <!-- ⚠️ Y OTRA VEZ EL 2026-11-01, por el pliegue de la tercera vía (TODOS.md):
+               de tres renglones a dos, con las dos mitades de rama intactas. -->
           <p class="gml-via-apunte">
-            Tu levantamiento en <span class="gml-mono">.dxf</span> o coordenadas en
-            <span class="gml-mono">.txt</span>; también vale soltarlo sobre la ventana.
+            Tu <span class="gml-mono">.dxf</span> o coordenadas en
+            <span class="gml-mono">.txt</span>, o suéltalo en la ventana.
             <span class="gml-solo-parcela">Entra como el recinto medido de la parcela.</span>
             <span class="gml-solo-edificio"
               >Cada polilínea del dibujo entra como una parte del edificio.</span
@@ -944,26 +946,33 @@
                que la vía que el propio rótulo recomienda. Con UN solo primario en la
                pantalla —«Traer del Catastro»— el peso dice lo mismo que la marca. El
                ancho entero se queda: sigue siendo LA acción de su vía. -->
-          <button
-            type="button"
-            class="gml-boton gml-boton--secundario gml-via-boton"
-            data-accion="abrir-medicion"
-          >
-            Elegir un fichero de medición…
-          </button>
-          <!-- F19 · La otra mitad de esta vía, y la que `feature-01` llama
-               PRINCIPAL: el pegado de la LISTA de AutoCAD. Hasta F19 no había ni
-               un manejador de `paste` en producción, así que el técnico que copia
-               su polilínea en el CAD —el gesto más corto que tiene— no tenía
-               dónde soltarla. La pantalla la fabrica `app/dialogo-pegado.js`:
-               aquí solo está el botón que la abre. -->
-          <button
-            type="button"
-            class="gml-boton gml-boton--secundario gml-via-boton"
-            data-accion="abrir-pegado"
-          >
-            Pegar coordenadas…
-          </button>
+          <!-- ⭐ LOS DOS BOTONES VAN LADO A LADO DESDE EL 2026-11-01: apilados costaban
+               40 px de columna (32 + 8 de hueco), y son los 40 que más fácil se
+               devuelven del pliegue de la tercera vía. «Elegir fichero…» y no «Elegir
+               un fichero de medición…»: a media caja el largo no cabe, y el rótulo
+               «Medición propia» ya dice de qué fichero. -->
+          <div class="gml-via-botones">
+            <button
+              type="button"
+              class="gml-boton gml-boton--secundario gml-via-boton"
+              data-accion="abrir-medicion"
+            >
+              Elegir fichero…
+            </button>
+            <!-- F19 · La otra mitad de esta vía, y la que `feature-01` llama
+                 PRINCIPAL: el pegado de la LISTA de AutoCAD. Hasta F19 no había ni
+                 un manejador de `paste` en producción, así que el técnico que copia
+                 su polilínea en el CAD —el gesto más corto que tiene— no tenía
+                 dónde soltarla. La pantalla la fabrica `app/dialogo-pegado.js`:
+                 aquí solo está el botón que la abre. -->
+            <button
+              type="button"
+              class="gml-boton gml-boton--secundario gml-via-boton"
+              data-accion="abrir-pegado"
+            >
+              Pegar coordenadas…
+            </button>
+          </div>
         </div>
 
         <p class="gml-obien"><span>O bien</span></p>
@@ -1003,9 +1012,13 @@
                es la VENTANA ENTERA y encamina `.gml`/`.xml` por su entrada
                principal (`app/main.js`, `alFichero`), que es la MISMA que usa este
                botón. Cuatro palabras, y la asimetría se acaba. -->
+          <!-- ⚠️ ACORTADO OTRA VEZ EL 2026-11-01 (pliegue de la tercera vía): «Un GML
+               ya hecho» lo dice el rótulo, y «con su geometría y su referencia» lo
+               dice «listo para editar». De cuatro renglones a tres; las dos mitades
+               de rama, enteras. -->
           <p class="gml-via-apunte">
-            Un GML ya hecho, tuyo o de otro: se carga con su geometría y su referencia,
-            listo para editar y volver a generar; también vale soltarlo sobre la ventana.
+            Tuyo o de otro, listo para editar y volver a generar, o suéltalo en la
+            ventana.
             <span class="gml-solo-parcela"
               >Si es de construcción, la aplicación se pasa sola a Edificio.</span
             >
