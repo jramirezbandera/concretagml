@@ -434,8 +434,12 @@ export const MENSAJE_SOLAPE_NO_MEDIDO =
  * Dice además qué hacer, porque tiene arreglo de un clic: volver a pulsar.
  */
 export const MENSAJE_OTRO_DOCUMENTO =
+  // ⚠️ F25 · fase 4: «o has cambiado de parcela». Con varias parcelas en el expediente,
+  // pasar a otra mientras el servicio contesta también descarta la respuesta (H8 de la
+  // ficha), y la lista de antes no lo nombraba.
   'No se ha cargado nada del Catastro: mientras el servicio contestaba ha entrado otro documento ' +
-  'en el expediente (un fichero soltado, un pegado o un proyecto abierto), y la respuesta habría ' +
+  'en el expediente (un fichero soltado, un pegado, un proyecto abierto) o has cambiado de ' +
+  'parcela en el expediente, y la respuesta habría ' +
   'pisado justo lo que acabas de cargar. Lo que hay en pantalla es lo tuyo y está intacto. Si ' +
   'querías el parcelario, vuelve a pulsar «Traer del Catastro».'
 

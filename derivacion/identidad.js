@@ -193,3 +193,42 @@ export function identidadDeCesion({ refcatPadre = null, idLocalPadre = null, ord
     nationalCadastralReference: util(refcatPadre) ? localId : '',
   }
 }
+
+/**
+ * ⭐ F25 · fase 4 · la identidad de una PARCELA DEL EXPEDIENTE, sea cual sea su origen.
+ *
+ * Una sola pregunta para las dos salidas —«Generar GML» de la parcela en edición y la
+ * descarga de varias—, para que una misma parcela no pueda salir con dos identidades
+ * según el botón:
+ *
+ *   · **Con referencia catastral** → {@link identidadDeParcela}: la finca existe.
+ *   · **Una pieza del sobrante** (`origen: 'DERIVACION'`) cuyo `idLocal` es
+ *     `«referencia de la principal».«ordinal»` → la forma de {@link identidadDeCesion}
+ *     CON referencia del padre: `localId` = `nationalCadastralReference` =
+ *     `…473N.1` bajo `ES.LOCAL.CP`. Es la combinación presentada con IVG positivo
+ *     (O19). Sin esto, la pieza saldría con la referencia VACÍA, que es la forma que
+ *     nunca se ha presentado.
+ *   · **Cualquier otra** (dibujada, de un fichero sin referencia, o una pieza cuya
+ *     principal no tiene referencia) → un alta: `idLocal` bajo `ES.LOCAL.CP` y
+ *     referencia vacía. Es {@link identidadDeParcela} sin `refcat`.
+ *
+ * Se decide por la PRINCIPAL y no por el texto del `idLocal`: que una cadena «parezca»
+ * una referencia con sufijo no prueba de qué finca sale, y la principal sí lo dice.
+ *
+ * @param {{refcat?: string|null, idLocal: string, origen?: string}} parcela
+ * @param {{principal?: {refcat?: string|null}|null}} [contexto]
+ * @returns {IdentidadInspire}
+ */
+export function identidadDeMiembro(parcela, { principal = null } = {}) {
+  if (util(parcela?.refcat)) return identidadDeParcela({ refcat: parcela.refcat })
+  const padre = util(principal?.refcat) ? principal.refcat.trim() : null
+  const idLocal = util(parcela?.idLocal) ? parcela.idLocal.trim() : null
+  if (parcela?.origen === 'DERIVACION' && padre !== null && idLocal !== null) {
+    const prefijo = `${padre}${SEPARADOR_SEGREGADA}`
+    const ordinal = idLocal.startsWith(prefijo) ? Number(idLocal.slice(prefijo.length)) : NaN
+    if (Number.isInteger(ordinal) && ordinal >= 1) {
+      return identidadDeCesion({ refcatPadre: padre, orden: ordinal })
+    }
+  }
+  return identidadDeParcela({ idLocal })
+}

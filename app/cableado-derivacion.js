@@ -231,21 +231,24 @@ export const MOTIVO_NO_CIERRA =
   'Mira el panel de avisos.'
 
 /**
- * F25 · fase 3b · lo que dice el renglón tras «Añadir al expediente». Cuenta las tres
- * cosas que pueden pasar, y la tercera es la que no se puede callar: los colindantes
- * recortados NO han entrado (ver `añadirAlExpediente`).
+ * F25 · lo que dice el renglón tras «Añadir al expediente»: lo que ha entrado, lo que
+ * ya estaba —y no se pisa—, y lo que se queda fuera y por qué.
  *
- * @param {{añadidas: string[], yaEstaban: string[], vecinos: number}} r
+ * ⚠️ En la fase 3b decía además que los colindantes recortados NO entraban; desde la
+ * fase 4 entran (D3 ya impide que se recorten otra vez), y lo único que se queda fuera
+ * es un vecino PARTIDO en varios trozos (ver `añadirAlExpediente`).
+ *
+ * @param {{añadidas?: string[], yaEstaban?: string[], partidos?: string[]}} r
  * @returns {string}
  */
-export function mensajeAñadidasAlExpediente({ añadidas = [], yaEstaban = [], vecinos = 0 }) {
+export function mensajeAñadidasAlExpediente({ añadidas = [], yaEstaban = [], partidos = [] }) {
   const partes = []
   if (añadidas.length > 0) {
     partes.push(
       añadidas.length === 1
-        ? `Añadida al expediente la pieza ${añadidas[0]}: ya se puede editar desde «Parcela en edición».`
-        : `Añadidas al expediente ${añadidas.length} piezas (${añadidas.join(', ')}): ya se pueden ` +
-            'editar desde «Parcela en edición».',
+        ? `Añadida al expediente ${añadidas[0]}: ya se puede editar desde «Parcela en edición».`
+        : `Añadidas al expediente ${añadidas.length} parcelas (${añadidas.join(', ')}): ya se ` +
+            'pueden editar desde «Parcela en edición».',
     )
   }
   if (yaEstaban.length > 0) {
@@ -254,14 +257,29 @@ export function mensajeAñadidasAlExpediente({ añadidas = [], yaEstaban = [], v
         'ha sustituido: puede haberse editado a mano.',
     )
   }
-  if (añadidas.length === 0 && yaEstaban.length === 0) partes.push('No había ninguna pieza que añadir.')
-  if (vecinos > 0) {
+  if (añadidas.length === 0 && yaEstaban.length === 0) partes.push('No había nada que añadir.')
+  if (partidos.length > 0) {
     partes.push(
-      `Los ${vecinos === 1 ? 'colindante recortado no se añade' : `${vecinos} trozos de colindantes recortados no se añaden`}: ` +
-        'siguen saliendo solo en «Descargar expediente».',
+      `${partidos.join(', ')} ${partidos.length === 1 ? 'queda partida' : 'quedan partidas'} en ` +
+        'varios trozos y no se añade: sigue saliendo en «Descargar expediente».',
     )
   }
   return partes.join(' ')
+}
+
+/**
+ * F25 · D3 · por qué «Descargar expediente» no sale de aquí cuando la medición afecta a
+ * una colindante que ya es parcela del expediente, y dónde sale completo.
+ *
+ * @param {Array<{refcat: string}>} enExpediente
+ * @returns {string}
+ */
+export function motivoEnExpediente(enExpediente) {
+  const refs = enExpediente.map((v) => v.refcat).join(', ')
+  return (
+    `El expediente completo ya no sale de aquí: ${refs} ${enExpediente.length === 1 ? 'es parcela' : 'son parcelas'} ` +
+    'del expediente y no van en este fichero. Descárgalo desde «Parcela en edición» › «Descargar».'
+  )
 }
 
 /**
@@ -290,6 +308,11 @@ export function motivoEntregaBloqueada(entrega) {
 
   /** Una frase por bloqueo, en el orden en que conviene leerlas. */
   const FRASES = {
+    // F25 · D3: no es que falte nada por hacer aquí, es que el fichero completo
+    // sale desde otro sitio. Va la primera porque explica a las demás.
+    [TIPO_DERIVACION.VECINO_EN_EXPEDIENTE]:
+      'modifica una colindante que tienes como parcela del expediente; descárgalo desde ' +
+      '«Parcela en edición» › «Descargar», con todas las que intervienen',
     [TIPO_DERIVACION.CRECE_FUERA]:
       'la geometría medida se sale del contorno oficial y no se sabe de quién es esa superficie',
     [TIPO_DERIVACION.PIEZA_INVALIDA]:
@@ -539,7 +562,17 @@ export function cablearDerivacion({
   // parcelas. Recibe las parcelas a añadir (POJOs para `crearParcela`) y devuelve
   // `{añadidas, yaEstaban}` con los `idLocal`. `null` ⇒ el botón no aparece.
   alAñadirAlExpediente = null,
+  // ⭐ F25 · fase 4 · D3 · las referencias catastrales de las parcelas del expediente.
+  // Una colindante que ya es parcela del expediente no se recorta sola: manda lo que
+  // el técnico ha editado. Por defecto ninguna, que es el comportamiento de F23.
+  refcatsDelExpediente = () => [],
 } = {}) {
+  if (typeof refcatsDelExpediente !== 'function') {
+    throw new TypeError(
+      `cablearDerivacion: 'refcatsDelExpediente' debe ser una función; recibido ` +
+        `${describir(refcatsDelExpediente)}.`,
+    )
+  }
   if (alAñadirAlExpediente !== null && typeof alAñadirAlExpediente !== 'function') {
     throw new TypeError(
       `cablearDerivacion: 'alAñadirAlExpediente' debe ser una función o null; recibido ` +
@@ -825,8 +858,11 @@ export function cablearDerivacion({
     invalidar(
       clave === claveDerivada
         ? undefined // el texto por defecto: «la parcela ha cambiado»
-        : 'Ha entrado otra parcela, así que el sobrante de la anterior ya no le corresponde. ' +
-            'Los nombres escritos se han perdido: vuelve a derivar.',
+        : // ⚠️ F25 · fase 4: «o has cambiado de parcela». Decía solo «ha entrado otra»,
+          // que con varias parcelas en el expediente no es lo que ha pasado al elegir otra.
+          'La parcela en pantalla ya no es la que derivaste —ha entrado otra, o has cambiado ' +
+            'de parcela en el expediente—, así que su sobrante ya no le corresponde. Los ' +
+            'nombres escritos se han perdido: vuelve a derivar.',
     )
     decirEstadoDePartida()
   }
@@ -954,6 +990,8 @@ export function cablearDerivacion({
             // vial. Ver la cabecera de `app/colindantes.js`.
             vecinas: colindantes === null ? null : colindantes.get(),
             fuera: derivada.puerta.piezas,
+            // D3: la parcela en edición no cuenta —no es su propia colindante—.
+            gestionadas: gestionadas(parcela),
           })
     if (derivada.recorte !== null) publicar(derivada.recorte.detecciones)
 
@@ -1016,6 +1054,15 @@ export function cablearDerivacion({
    * se pintan en esta lista. Así que se recalcula el recorte en silencio y se
    * refresca lo único que sí cambia: si la entrega puede salir.
    */
+  /**
+   * D3 · las referencias de las parcelas del expediente que pueden ser colindantes de
+   * la que está en edición: todas menos ella misma.
+   */
+  function gestionadas(parcela) {
+    const propia = typeof parcela?.refcat === 'string' ? parcela.refcat.trim().toUpperCase() : null
+    return refcatsDelExpediente().filter((r) => typeof r === 'string' && r.trim().toUpperCase() !== propia)
+  }
+
   function repartir() {
     if (!vivo || cesion === null) return
     reparto = lista.asignaciones()
@@ -1027,6 +1074,7 @@ export function cablearDerivacion({
         fuera: cesion.puerta.piezas,
         sobrante: cesion.piezas,
         asignadas: reparto,
+        gestionadas: gestionadas(parcela),
       })
     } catch (causa) {
       panel.avisar(`No se ha podido repartir el sobrante: ${causa?.message ?? causa}`, {
@@ -1100,6 +1148,15 @@ export function cablearDerivacion({
       lista.entrega({ habilitado: false, motivo: MOTIVO_NINGUNA_INCLUIDA })
       lista.piezasSueltas([])
       lista.resumir()
+      return
+    }
+    // ⭐ F25 · D3: con una colindante del expediente afectada, este fichero no sale
+    // completo —ella no va dentro—. Se dice YA, en el botón, y no al pulsarlo; y
+    // «Añadir al expediente» sigue encendido, porque las piezas sí se pueden añadir.
+    const enExpediente = cesion.recorte?.enExpediente ?? []
+    if (enExpediente.length > 0) {
+      lista.entrega({ habilitado: false, motivo: motivoEnExpediente(enExpediente), añadir: true })
+      refrescarSueltos()
       return
     }
     lista.entrega({ habilitado: true, motivo: '' })
@@ -1464,21 +1521,49 @@ export function cablearDerivacion({
       return null
     }
     publicar(entrega.detecciones)
-    if (!entrega.puedeEntregarse) {
+    // D3: que una colindante ya esté en el expediente bloquea «Descargar expediente»
+    // —el fichero de aquí saldría sin ella— pero NO añadir: lo que se añade son las
+    // piezas, y el envío completo lo comprueba la descarga de las parcelas del expediente.
+    const soloD3 =
+      entrega.bloqueos.length > 0 && entrega.bloqueos.every((t) => t === TIPO_DERIVACION.VECINO_EN_EXPEDIENTE)
+    if (!entrega.puedeEntregarse && !soloD3) {
       lista.estado(motivoEntregaBloqueada(entrega), { error: true })
       return null
     }
     const piezas = entrega.miembros.filter((m) => m.esCesion)
-    const vecinos = entrega.miembros.filter((m) => m.esVecino === true).length
-    const resultado = alAñadirAlExpediente(
-      piezas.map((m) => ({
+    // ⭐ F25 · fase 4 · los colindantes RECORTADOS entran también, ya con D3 detrás: al
+    // volver a derivar no se recortan otra vez, y su exceso no pasa a ser vial. Entra
+    // el trozo que conserva la referencia, con su contorno oficial de antes; un vecino
+    // PARTIDO en varios trozos no se añade —sus altas llevarían la identidad del padre
+    // vecino, que es otra pregunta— y se cuenta.
+    const recortados = cesion.recorte?.vecinos ?? []
+    const vecinos = recortados.filter((v) => typeof v.refcat === 'string' && v.refcat.trim() !== '' && !v.seParte)
+    const partidos = recortados.filter((v) => v.seParte).map((v) => v.refcat ?? '(sin referencia)')
+    const resultado = alAñadirAlExpediente([
+      ...piezas.map((m) => ({
         idLocal: m.identidad.refcat,
         refcat: null,
         recintos: m.recintos,
         origen: ORIGEN_PARCELA.DERIVACION,
       })),
+      ...vecinos.map((v) => ({
+        idLocal: v.refcat.trim(),
+        refcat: v.refcat.trim(),
+        recintos: v.trozos[0].recintos,
+        geometriaOficial: v.recintosOficiales,
+        origen: ORIGEN_PARCELA.WFS,
+      })),
+    ])
+    // Con los vecinos dentro, el recorte de la foto ya no vale: se rehace ANTES de
+    // escribir el renglón —rehacerlo después lo pisaría— para que «Descargar
+    // expediente» diga lo que hay (D3) y no ofrezca otra vez un vecino recortado que
+    // ahora es una parcela que se edita a mano.
+    if (vecinos.length > 0) repartir()
+    const enExpediente = cesion?.recorte?.enExpediente ?? []
+    lista.estado(
+      mensajeAñadidasAlExpediente({ ...resultado, partidos }) +
+        (enExpediente.length > 0 ? ` ${motivoEnExpediente(enExpediente)}` : ''),
     )
-    lista.estado(mensajeAñadidasAlExpediente({ ...resultado, vecinos }))
     return resultado
   }
 

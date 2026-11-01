@@ -381,6 +381,26 @@ describe('prepararEntrega · ⛔ CRECE_FUERA deja de bloquear cuando el recorte 
     expect(e.xml).not.toBeNull()
   })
 
+  it('F25 · D3 · si el vecino YA es parcela del expediente, aquí NO sale y dice dónde sale', () => {
+    // El recorte no lo toca (manda lo editado a mano), así que este fichero saldría
+    // sin la finca que pierde suelo. No se emite incompleto: se remite al de las
+    // parcelas del expediente, que sí la lleva.
+    const recorte = recortarVecinos({
+      recintos: MEDIDA,
+      vecinas: [VECINA],
+      fuera: cesionDe().puerta.piezas,
+      gestionadas: ['V1'],
+    })
+    const e = prepararEntrega({ parcela, srs: ARGS.srs, cesion: cesionDe(), recorte })
+    expect(e.puedeEntregarse).toBe(false)
+    expect(e.bloqueos).toContain('VECINO_EN_EXPEDIENTE')
+    expect(e.xml).toBeNull()
+    const d = e.detecciones.find((x) => x.tipo === 'VECINO_EN_EXPEDIENTE')
+    expect(d.mensaje).toMatch(/V1.*«Descargar»/)
+    // Y NO se confunde con un exceso sobre vial.
+    expect(recorte.sobreNadie).toBeCloseTo(0, 6)
+  })
+
   it('⛔ la detección CRECE_FUERA SIGUE en la lista: deja de bloquear, no se borra', () => {
     // El usuario tiene derecho a leer que su medición se sale, aunque el expediente
     // ya explique a quién. Borrarla sería entregar en silencio.

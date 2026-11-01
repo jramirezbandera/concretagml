@@ -260,7 +260,26 @@ export function recortarVecinos(entrada) {
     sobrante = [],
     asignadas = {},
     umbralGrosorM = OPERATIVOS.grosorInvasionMinimoM,
+    // ⭐ F25 · fase 4 · D3: las referencias de las colindantes que YA SON parcelas del
+    // expediente. No se recortan —manda lo que el técnico ha editado a mano—, pero
+    // SIGUEN en `vecinas` para la atribución: su parte del exceso es suya, no de un
+    // vial. Ver `enExpediente`.
+    gestionadas = [],
   } = entrada
+  if (!Array.isArray(gestionadas)) {
+    throw new TypeError(
+      `recortarVecinos: 'gestionadas' debe ser un array de referencias catastrales; recibido ` +
+        `${describir(gestionadas)}.`,
+    )
+  }
+  const normal = (r) => (typeof r === 'string' && r.trim() !== '' ? r.trim().toUpperCase() : null)
+  const delExpediente = new Set(gestionadas.map(normal).filter(Boolean))
+  /**
+   * D3 · las colindantes del expediente a las que la medición entra, con cuánto. No
+   * se recortan: se dicen.
+   * @type {Array<{refcat: string, area: number}>}
+   */
+  const enExpediente = []
 
   exigirRecintos(recintos, 'recortarVecinos')
   if (vecinas !== null && !Array.isArray(vecinas)) {
@@ -304,6 +323,7 @@ export function recortarVecinos(entrada) {
     lindes: [],
     sobreNadie: 0,
     soloRedondeo,
+    enExpediente,
     consultado: vecinas !== null,
     saltados,
     detecciones,
@@ -380,6 +400,15 @@ export function recortarVecinos(entrada) {
 
     const areaOficial = superficie(suyos)
     const r = restar(suyos, recintos)
+    // D3: una colindante del expediente no se recorta sola. Se mide cuánto le entra la
+    // medición —para decirlo— y se sigue: su geometría es la que el técnico ha editado.
+    if (delExpediente.has(normal(vecina.refcat))) {
+      const entra = areaOficial - areaDe(r.piezas)
+      if (r.detecciones.every((d) => d.severidad !== SEVERIDAD.ERROR) && entra > AREA_MINIMA_FICHERO_M2) {
+        enExpediente.push({ refcat: vecina.refcat, area: entra })
+      }
+      continue
+    }
     saltados.push(...r.saltados)
 
     if (r.detecciones.some((d) => d.severidad === SEVERIDAD.ERROR)) {
@@ -519,6 +548,22 @@ export function recortarVecinos(entrada) {
         ),
       )
     }
+  }
+
+  if (enExpediente.length > 0) {
+    detecciones.push(
+      crearDeteccionDerivacion(
+        TIPO_DERIVACION.VECINO_EN_EXPEDIENTE,
+        `La geometría medida entra en ${enExpediente
+          .map((v) => `${v.refcat} (${numero(v.area)} m²)`)
+          .join(', ')}, que ${enExpediente.length === 1 ? 'es parcela' : 'son parcelas'} del ` +
+          'expediente editada a mano: no se recorta sola, manda lo que has editado. Ajusta su ' +
+          'lindero tú, y descarga el expediente desde «Parcela en edición», con todas las que ' +
+          'intervienen.',
+        SEVERIDAD.AVISO,
+        { vecinos: enExpediente },
+      ),
+    )
   }
 
   vecinos.sort((a, b) => b.pierde - a.pierde)

@@ -38,6 +38,8 @@ export { derivarCesion } from './cesion.js'
 // el acto jurídico y escribir un `.gml` con N miembros. ⚠️ NO descarga: quien tiene
 // `Blob` es `gml/descargar.js`, que se queda fuera del barrel raíz.
 export { prepararEntrega } from './entrega.js'
+// F25 · fase 4 · el fichero de las parcelas del expediente, armado a mano.
+export { prepararEntregaExpediente } from './entrega-expediente.js'
 
 // Qué acto jurídico dice ser esto. Sale aparte de `entrega.js` porque lo consumen
 // también el diálogo del informe y el propio informe, y ninguno de los dos debe
@@ -53,5 +55,6 @@ export {
   NAMESPACE_LOCAL,
   SEPARADOR_SEGREGADA,
   identidadDeCesion,
+  identidadDeMiembro,
   identidadDeParcela,
 } from './identidad.js'

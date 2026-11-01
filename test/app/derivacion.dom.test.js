@@ -524,7 +524,7 @@ describe('cablearDerivacion', () => {
       estado.set(parcela())
       boton().click()
       estado.set(parcela({ idLocal: 'P-2', refcat: '9999999XX9999X' }))
-      expect(nota().textContent).toMatch(/Ha entrado otra parcela/)
+      expect(nota().textContent).toMatch(/ya no es la que derivaste/)
     })
 
     it('los nombres escritos NO se reasignan: se pierden', () => {
@@ -666,7 +666,7 @@ describe('cablearDerivacion', () => {
       expect(recibidas[0].recintos.length).toBeGreaterThan(0)
       // Y NADA se descarga: añadir no es entregar.
       expect(descargas).toHaveLength(0)
-      expect(renglonEntrega().textContent).toMatch(/Añadida al expediente la pieza 7136910UF1473N\.1/)
+      expect(renglonEntrega().textContent).toMatch(/Añadida al expediente 7136910UF1473N\.1/)
     })
 
     it('F25 · lo que no se puede ENTREGAR tampoco se AÑADE (misma puerta)', () => {
@@ -687,11 +687,11 @@ describe('cablearDerivacion', () => {
       expect(renglonEntrega().textContent).toBe(MOTIVO_NO_CIERRA)
     })
 
-    it('F25 · mensajeAñadidasAlExpediente cuenta las que ya estaban y los colindantes que se quedan fuera', () => {
-      expect(mensajeAñadidasAlExpediente({ añadidas: [], yaEstaban: ['X.1'], vecinos: 2 })).toMatch(
-        /X\.1 ya estaba en el expediente y no se ha sustituido.*2 trozos de colindantes recortados no se añaden/,
+    it('F25 · mensajeAñadidasAlExpediente cuenta las que ya estaban y los vecinos PARTIDOS que se quedan fuera', () => {
+      expect(mensajeAñadidasAlExpediente({ añadidas: [], yaEstaban: ['X.1'], partidos: ['9398501VK3799G'] })).toMatch(
+        /X\.1 ya estaba en el expediente y no se ha sustituido.*9398501VK3799G queda partida en varios trozos y no se añade/,
       )
-      expect(mensajeAñadidasAlExpediente({})).toBe('No había ninguna pieza que añadir.')
+      expect(mensajeAñadidasAlExpediente({})).toBe('No había nada que añadir.')
     })
   })
 

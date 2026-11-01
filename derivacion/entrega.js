@@ -255,6 +255,27 @@ export function prepararEntrega(entrada) {
     )
   }
 
+  // ── ⛔ F25 · D3 · UNA COLINDANTE QUE YA ES PARCELA DEL EXPEDIENTE ──────────
+  // `recortarVecinos` no la recorta —manda lo editado a mano— y por eso este fichero
+  // NO puede salir completo: la parte de suelo que esa finca pierde no la lleva ningún
+  // miembro de aquí, y la diana del cierre seguiría pidiéndola. Lo honrado no es
+  // emitir un expediente al que le falta una finca, sino decir dónde está el completo:
+  // en «Parcelas del expediente», que sí la tiene.
+  const enExpediente = recorte === null ? [] : recorte.enExpediente ?? []
+  if (enExpediente.length > 0) {
+    detecciones.push(
+      crearDeteccionDerivacion(
+        TIPO_DERIVACION.VECINO_EN_EXPEDIENTE,
+        `Este expediente modifica ${enExpediente.map((v) => v.refcat).join(', ')}, que ` +
+          `${enExpediente.length === 1 ? 'tienes como parcela' : 'tienes como parcelas'} del ` +
+          'expediente editada a mano, así que aquí no sale completo. Descárgalo desde «Parcela ' +
+          'en edición» › «Descargar», con todas las que intervienen.',
+        SEVERIDAD.ERROR,
+        { vecinos: enExpediente },
+      ),
+    )
+  }
+
   // ── ⛔ LA PUERTA `CRECE_FUERA`, Y CUÁNDO DEJA DE SER UNA PUERTA ───────────
   //
   // `derivacion/cesion.js` marca `CRECE_FUERA` como ERROR, y hace bien: mirando SOLO

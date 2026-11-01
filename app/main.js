@@ -514,6 +514,9 @@
 import 'leaflet/dist/leaflet.css'
 
 import { OPERATIVOS } from '../config/operativos.js'
+import { prepararEntregaExpediente } from '../derivacion/entrega-expediente.js'
+import { identidadDeMiembro } from '../derivacion/identidad.js'
+import { ROTULO_OPERACION } from '../derivacion/operacion.js'
 import {
   commit,
   crearHistorial,
@@ -5090,6 +5093,10 @@ export function cablearGeneracionGml({
   // que lleguen sus avisos). Por defecto `true`, para que quien cablee esto solo
   // —los tests de F04— no tenga que saber nada de ramas.
   mando = () => true,
+  // ⭐ F25 · fase 4 · la parcela PRINCIPAL del expediente, para la identidad de una
+  // pieza del sobrante (`derivacion/identidad.js#identidadDeMiembro`). Por defecto
+  // ninguna: los montajes de F04 no tienen expediente de varias parcelas.
+  principal = () => null,
 } = {}) {
   /**
    * Escribe el renglón `role="status"`. Vacío + sin modificador es el estado
@@ -5314,17 +5321,29 @@ export function cablearGeneracionGml({
     // Un solo instante para el fichero y para su nombre (ver la cabecera del
     // módulo, decisión 1).
     const fecha = ahora()
+    // ⭐ F25 · fase 4: una pieza del sobrante lleva la identidad de O19 —referencia de
+    // la principal con su ordinal, no vacía—, la MISMA con la que sale en la descarga
+    // de varias. Para todo lo demás el camino es el de siempre, byte a byte.
+    const deMiembro =
+      parcelaActual.origen === ORIGEN_PARCELA.DERIVACION
+        ? identidadDeMiembro(parcelaActual, { principal: principal() })
+        : null
     const { xml, resumen, detecciones } = serializarParcelaCp({
       recintos: parcelaActual.recintos,
       srs,
-      refcat: identidadDe(parcelaActual),
+      refcat: deMiembro?.refcat ?? identidadDe(parcelaActual),
       // El PERFIL va EXPLÍCITO aunque hoy sea el defecto del serializador: es la
       // diferencia entre un fichero que la Sede admite y uno que rechaza, y no
       // puede quedar colgando de un valor por omisión de otro módulo.
       perfil: PERFIL.ENTREGA,
       // `namespaceInspire` y `nationalCadastralReference` son UNA sola decisión y
       // salen juntos de un solo sitio: ver {@link identidadInspireDe}.
-      ...identidadInspireDe(parcelaActual),
+      ...(deMiembro === null
+        ? identidadInspireDe(parcelaActual)
+        : {
+            namespaceInspire: deMiembro.namespaceInspire,
+            nationalCadastralReference: deMiembro.nationalCadastralReference,
+          }),
       // `beginLifespanVersion` NO se pasa a propósito: en el perfil de entrega su
       // ausencia emite `xsi:nil="true" nilReason="other:unpopulated"`, que es lo
       // que trae la plantilla oficial y lo único honesto en un alta — desde
@@ -5447,6 +5466,7 @@ const gmlDeParcela = cablearGeneracionGml({
   panel,
   srs: SRS_DEMO,
   mando: mandoDeParcela,
+  principal: () => conjunto.parcelas()[0] ?? null,
 })
 
 // ── 11 · Informe de contraste firmable en PDF (F09 · T5.1) ───────────────────
@@ -6759,6 +6779,13 @@ const derivacionCableada = cablearDerivacion({
   // ponerse en edición —quien revisa el sobrante sigue con su parcela, y las piezas
   // aparecen discontinuas y en «Parcela en edición»—. La que ya está no se pisa.
   alAñadirAlExpediente: añadirAlConjunto,
+  // ⭐ F25 · fase 4 · D3: una colindante que ya es parcela del expediente no se
+  // recorta sola. Las referencias, preguntadas en cada derivación.
+  refcatsDelExpediente: () =>
+    conjunto
+      .parcelas()
+      .map((p) => p.refcat)
+      .filter((r) => typeof r === 'string' && r.trim() !== ''),
 })
 
 // ── 16 bis · LA LEYENDA DICE LO QUE HAY DIBUJADO, Y NADA MÁS ─────────────────
@@ -7432,6 +7459,86 @@ export function quitarParcela(idLocal) {
   return true
 }
 
+// ── 20 ter · F25 · fase 4 · DESCARGAR LAS PARCELAS DEL EXPEDIENTE ─────────────
+//
+// «GML» de una fila y «Descargar las N marcadas». Las dos pasan por
+// `derivacion/entrega-expediente.js` —validación de cada una, solapes, cierre cuando
+// la forma es de Segregación—, y una sola parcela también: «una fila» no es un atajo
+// que se salte lo que se le exige al envío entero.
+
+/** Lo que el escritor y la composición deciden, al panel (regla de oro 1). */
+function publicarEntrega(entrega) {
+  for (const d of [...entrega.detecciones, ...entrega.deteccionesGml]) {
+    if (d.severidad === 'INFO') continue
+    panel.avisar(d.mensaje, { nivel: d.severidad === 'ERROR' ? NIVEL.ERROR : NIVEL.AVISO })
+  }
+}
+
+/**
+ * El motivo de que no salga, en una frase para el renglón del control: el primer
+ * bloqueo con su texto; el detalle completo está en el panel.
+ */
+function motivoNoSale(entrega) {
+  const primero = entrega.detecciones.find((d) => d.severidad === 'ERROR')
+  return `No se descarga: ${primero?.mensaje ?? 'hay algo que lo impide; mira el panel de avisos.'}`
+}
+
+/**
+ * Lo que se dice al bajar un fichero de varias. Nombra el tipo de operación que la
+ * FORMA del fichero propone, porque es el único dato del expediente que no viaja en
+ * ningún fichero (O20) y quien sube el `.gml` tiene que elegirlo en el IVG.
+ */
+export function mensajeDescargaExpediente(nombre, entrega) {
+  const tipo = entrega.operacion?.tipo ?? null
+  const operacion =
+    tipo === null
+      ? ' La forma del fichero no es ninguna de las dos que la Sede ha aceptado: el tipo de ' +
+        'operación del IVG lo eliges tú.'
+      : ` Tipo de operación que propone su forma para el IVG: ${ROTULO_OPERACION[tipo]} (lo decide ` +
+        'quien firma).'
+  return `Descargado «${nombre}» con ${entrega.nMiembros} parcelas.${operacion}`
+}
+
+/** Las parcelas del expediente con la que está en edición tal como está en el store. */
+function parcelasAlDia() {
+  const enEdicion = estado.get()
+  return conjunto.parcelas().map((p) => (p.idLocal === enEdicion?.idLocal ? enEdicion : p))
+}
+
+/**
+ * Descarga el fichero de unas parcelas del expediente.
+ *
+ * @param {string[]} idLocales  En el orden en que vayan; se reordenan al del expediente.
+ * @returns {object|null}  El resultado de la descarga, o `null` si no ha salido.
+ */
+export function descargarParcelas(idLocales) {
+  const quiero = new Set(idLocales)
+  const todas = parcelasAlDia()
+  const parcelas = todas.filter((p) => quiero.has(p.idLocal))
+  if (parcelas.length === 0) return null
+  const entrega = prepararEntregaExpediente({ parcelas, principal: todas[0] ?? null, srs: SRS_DEMO })
+  publicarEntrega(entrega)
+  if (!entrega.puedeEntregarse || entrega.xml === null) {
+    parcelasExpediente?.estado(motivoNoSale(entrega), { error: true })
+    return null
+  }
+  const resultado = descargarGml(entrega.xml, {
+    // Una sola: su propio identificador. Varias: el de la principal.
+    refcat: parcelas.length === 1 ? entrega.miembros[0].identidad.refcat : entrega.refcat,
+    fecha: new Date(),
+    miembros: entrega.nMiembros,
+  })
+  parcelasExpediente?.estado(
+    resultado.descargado
+      ? parcelas.length === 1
+        ? `Descargado «${resultado.nombre}».`
+        : mensajeDescargaExpediente(resultado.nombre, entrega)
+      : resultado.mensaje,
+    { error: !resultado.descargado },
+  )
+  return resultado
+}
+
 /** Lo que hace cada opción del menú «Añadir parcela». */
 function alAñadirParcela(clave) {
   if (clave === CLAVE_DIBUJAR) {
@@ -7468,6 +7575,8 @@ try {
   parcelasExpediente.alElegir(conRed(activarParcela, 'el cambio de parcela'))
   parcelasExpediente.alAñadir(conRed(alAñadirParcela, 'añadir una parcela'))
   parcelasExpediente.alQuitar(conRed(quitarParcela, 'quitar una parcela'))
+  parcelasExpediente.alDescargarUna(conRed((id) => descargarParcelas([id]), 'descargar una parcela'))
+  parcelasExpediente.alDescargarSeleccion(conRed(descargarParcelas, 'descargar las parcelas marcadas'))
 } catch (causa) {
   // Sin capa ni selector la aplicación sigue entera: el expediente se guarda con todas
   // sus parcelas igual, y la que se edita es la que entró.

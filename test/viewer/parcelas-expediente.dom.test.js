@@ -22,6 +22,7 @@ import {
   TEXTO,
   crearParcelasExpediente,
   rotularParcela,
+  textoDescargarSeleccion,
 } from '../../viewer/parcelas-expediente.js'
 import { crearPanes, montarMapa } from './_ayuda-jsdom.js'
 
@@ -302,5 +303,99 @@ describe('viewer/parcelas-expediente · contrato', () => {
     expect(() => crearParcelasExpediente({ mapa, zona: 28 })).toThrow(RangeError)
     expect(() => crearParcelasExpediente({ mapa, zona: ZONA, posicion: 'centro' })).toThrow(RangeError)
     expect(() => crearParcelasExpediente({ mapa: {}, zona: ZONA })).toThrow(TypeError)
+  })
+})
+
+describe('viewer/parcelas-expediente · F25 · fase 4 · «Descargar ▾»', () => {
+  function conDescarga() {
+    const { mapa, destruir } = montarMapa({ centro: [36.7, -4.5], zoom: 19 })
+    crearPanes(mapa)
+    const capa = crearParcelasExpediente({ mapa, zona: ZONA })
+    montados.push(() => {
+      capa.destruir()
+      destruir()
+    })
+    return { capa, raiz: mapa.getContainer() }
+  }
+
+  it('solo con dos o más; abre una lista con TODAS marcadas y su «GML» por fila', () => {
+    const { capa, raiz } = conDescarga()
+    capa.pintar({ parcelas: [MATRIZ], activa: 'MATRIZ' })
+    expect(raiz.querySelector(SELECTOR.DESCARGAR).hidden).toBe(true)
+    capa.pintar({ parcelas: [MATRIZ, PIEZA_1, PIEZA_2], activa: 'MATRIZ' })
+    const descargar = raiz.querySelector(SELECTOR.DESCARGAR)
+    expect(descargar.hidden).toBe(false)
+    descargar.click()
+    expect(descargar.getAttribute('aria-expanded')).toBe('true')
+    const casillas = [...raiz.querySelectorAll(SELECTOR.INCLUIR)]
+    expect(casillas.map((c) => c.dataset.idLocal)).toEqual(['MATRIZ', 'PIEZA-1', 'PIEZA-2'])
+    expect(casillas.every((c) => c.checked)).toBe(true)
+    expect(raiz.querySelectorAll(SELECTOR.GML_FILA)).toHaveLength(3)
+    expect(raiz.querySelector(SELECTOR.DESCARGAR_SELECCION).textContent).toBe(textoDescargarSeleccion(3))
+  })
+
+  it('el «GML» de una fila avisa con ESA parcela; el pie, con las marcadas en orden', () => {
+    const { capa, raiz } = conDescarga()
+    const una = vi.fn()
+    const varias = vi.fn()
+    capa.alDescargarUna(una)
+    capa.alDescargarSeleccion(varias)
+    capa.pintar({ parcelas: [MATRIZ, PIEZA_1, PIEZA_2], activa: 'MATRIZ' })
+    raiz.querySelector(SELECTOR.DESCARGAR).click()
+    raiz.querySelectorAll(SELECTOR.GML_FILA)[1].click()
+    expect(una).toHaveBeenCalledWith('PIEZA-1')
+    const casilla = raiz.querySelectorAll(SELECTOR.INCLUIR)[1]
+    casilla.checked = false
+    casilla.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(raiz.querySelector(SELECTOR.DESCARGAR_SELECCION).textContent).toBe(textoDescargarSeleccion(2))
+    raiz.querySelector(SELECTOR.DESCARGAR_SELECCION).click()
+    expect(varias).toHaveBeenCalledWith(['MATRIZ', 'PIEZA-2'])
+  })
+
+  it('sin ninguna marcada el pie se apaga; una parcela que ENTRA nace marcada', () => {
+    const { capa, raiz } = conDescarga()
+    capa.pintar({ parcelas: [MATRIZ, PIEZA_1], activa: 'MATRIZ' })
+    raiz.querySelector(SELECTOR.DESCARGAR).click()
+    for (const c of raiz.querySelectorAll(SELECTOR.INCLUIR)) {
+      c.checked = false
+      c.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+    expect(raiz.querySelector(SELECTOR.DESCARGAR_SELECCION).disabled).toBe(true)
+    capa.pintar({ parcelas: [MATRIZ, PIEZA_1, PIEZA_2], activa: 'MATRIZ' })
+    const marcadas = [...raiz.querySelectorAll(SELECTOR.INCLUIR)].filter((c) => c.checked).map((c) => c.dataset.idLocal)
+    expect(marcadas).toEqual(['PIEZA-2'])
+  })
+
+  it('el renglón cuenta el desenlace, en rojo si no ha salido', () => {
+    const { capa, raiz } = conDescarga()
+    capa.pintar({ parcelas: [MATRIZ, PIEZA_1], activa: 'MATRIZ' })
+    capa.estado('No se descarga: se pisan.', { error: true })
+    const renglon = raiz.querySelector(SELECTOR.ESTADO)
+    expect(renglon.textContent).toBe('No se descarga: se pisan.')
+    expect(renglon.getAttribute('role')).toBe('status')
+  })
+})
+
+describe('viewer/parcelas-expediente · F25 · lo que se abre va delante', () => {
+  it('con el menú o la descarga abiertos, su esquina sube sobre las demás; al cerrar, vuelve', () => {
+    const { mapa, destruir } = montarMapa({ centro: [36.7, -4.5], zoom: 19 })
+    crearPanes(mapa)
+    const capa = crearParcelasExpediente({ mapa, zona: ZONA })
+    montados.push(() => {
+      capa.destruir()
+      destruir()
+    })
+    capa.pintar({ parcelas: [MATRIZ, PIEZA_1], activa: 'MATRIZ' })
+    const raiz = mapa.getContainer()
+    const esquina = raiz.querySelector(SELECTOR.CONTROL).parentElement
+    expect(esquina.style.zIndex).toBe('')
+    raiz.querySelector(SELECTOR.DESCARGAR).click()
+    expect(esquina.style.zIndex).toBe('1001')
+    raiz.querySelector(SELECTOR.DESCARGAR).click()
+    expect(esquina.style.zIndex).toBe('')
+    raiz.querySelector(SELECTOR.AÑADIR).click()
+    expect(esquina.style.zIndex).toBe('1001')
+    capa.destruir()
+    expect(esquina.style.zIndex).toBe('')
   })
 })

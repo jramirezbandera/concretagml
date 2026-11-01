@@ -2474,7 +2474,7 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
     asignaciones,
     nombres,
 
-    entrega({ habilitado, motivo } = {}) {
+    entrega({ habilitado, motivo, añadir } = {}) {
       if (!vivo) return
       if (typeof habilitado !== 'boolean') {
         throw new TypeError(
@@ -2483,7 +2483,10 @@ export function crearListaSobrante({ mapa, documento, alAvisar } = {}) {
         )
       }
       boton.disabled = !habilitado
-      botonAñadir.disabled = !habilitado
+      // F25 · «Añadir al expediente» sigue a «Descargar expediente» SALVO que se diga
+      // otra cosa: con una colindante ya en el expediente (D3), el fichero de aquí no
+      // sale completo pero las piezas se pueden seguir añadiendo.
+      botonAñadir.disabled = !(typeof añadir === 'boolean' ? añadir : habilitado)
       // ⛔ Apagar SIN motivo es lo que la regla de oro 1 prohíbe, así que se exige
       // aquí y no se confía en que el llamante se acuerde.
       if (!habilitado) {

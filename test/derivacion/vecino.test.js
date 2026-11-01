@@ -354,3 +354,44 @@ describe('recortarVecinos · ⛔ a un vecino se le recorta por GROSOR, no por á
     expect(tipos(r)).not.toContain(TIPO_DERIVACION.VECINO_SOLO_REDONDEO)
   })
 })
+
+describe('recortarVecinos · F25 · D3 · una colindante que YA es parcela del expediente', () => {
+  const entrada = (gestionadas) => ({
+    recintos: rect(0, 0, 12, 10),
+    vecinas: [
+      { refcat: '9398501VK3799G', recintos: rect(10, 0, 20, 10) },
+      { refcat: 'B', recintos: rect(30, 0, 40, 10) },
+    ],
+    fuera: [trozo(1, 10, 0, 12, 10)],
+    gestionadas,
+  })
+
+  it('NO se recorta: manda lo editado a mano, y se dice cuánto le entra', () => {
+    const r = recortarVecinos(entrada(['9398501vk3799g'])) // la comparación no distingue mayúsculas
+    expect(r.vecinos).toEqual([])
+    expect(r.enExpediente).toHaveLength(1)
+    expect(r.enExpediente[0].refcat).toBe('9398501VK3799G')
+    expect(r.enExpediente[0].area).toBeCloseTo(20, 6)
+    const d = r.detecciones.find((x) => x.tipo === TIPO_DERIVACION.VECINO_EN_EXPEDIENTE)
+    expect(d.severidad).toBe('AVISO')
+    expect(d.mensaje).toContain('9398501VK3799G')
+  })
+
+  it('⛔ y su parte del exceso SIGUE siendo suya: no pasa a «sobre nadie» (vial)', () => {
+    // Es lo que hace D3 admisible. Sacarla de `vecinas` sin más declararía sus 20 m²
+    // sobre un vial, que es el error caro que F23 existe para no cometer.
+    const r = recortarVecinos(entrada(['9398501VK3799G']))
+    expect(r.sobreNadie).toBeCloseTo(0, 6)
+    expect(tipos(r)).not.toContain(TIPO_DERIVACION.FUERA_SOBRE_NADIE)
+  })
+
+  it('sin gestionadas, F23 tal cual: se recorta', () => {
+    const r = recortarVecinos(entrada([]))
+    expect(r.vecinos.map((v) => v.refcat)).toEqual(['9398501VK3799G'])
+    expect(r.enExpediente).toEqual([])
+  })
+
+  it('`gestionadas` que no es una lista LANZA', () => {
+    expect(() => recortarVecinos({ ...entrada([]), gestionadas: 'A' })).toThrow(TypeError)
+  })
+})

@@ -66,6 +66,12 @@ export const SELECTOR = Object.freeze({
   MENU: '[data-parcelas-expediente="menu"]',
   OPCION: '[data-parcelas-expediente="opcion"]',
   QUITAR: '[data-parcelas-expediente="quitar"]',
+  DESCARGAR: '[data-parcelas-expediente="descargar"]',
+  PANEL_DESCARGA: '[data-parcelas-expediente="panel-descarga"]',
+  INCLUIR: '[data-parcelas-expediente="incluir"]',
+  GML_FILA: '[data-parcelas-expediente="gml-fila"]',
+  DESCARGAR_SELECCION: '[data-parcelas-expediente="descargar-seleccion"]',
+  ESTADO: '[data-parcelas-expediente="estado"]',
 })
 
 /** Lo que dice el selector. */
@@ -76,7 +82,13 @@ export const TEXTO = Object.freeze({
   QUITAR: 'Quitar esta parcela',
   QUITAR_ARMADO: '¿Quitarla? Pulsa otra vez',
   SIN_OPCIONES: 'No hay nada que añadir ahora mismo.',
+  DESCARGAR: 'Descargar',
+  SELECCION_VACIA: 'Marca al menos una parcela para descargar.',
 })
+
+/** El botón del pie de la descarga, con cuántas van. */
+export const textoDescargarSeleccion = (n) =>
+  n === 1 ? 'Descargar la parcela marcada (.gml)' : `Descargar las ${n} marcadas en un .gml`
 
 /**
  * Cuánto dura armado «Quitar esta parcela». Quitar una parcela NO se deshace con
@@ -192,14 +204,37 @@ const ControlSelector = L.Control.extend({
     añadir.setAttribute('aria-expanded', 'false')
     añadir.setAttribute('aria-controls', idMenu)
     const quitar = boton('quitar', TEXTO.QUITAR)
-    acciones.append(añadir, quitar)
+    // ⭐ F25 · fase 4 · «Descargar ▾»: el GML de una parcela, o UN fichero con las
+    // marcadas. Un solo fichero y no N: el navegador bloquea la segunda descarga
+    // automática y eso no se puede detectar desde JavaScript (F17), y la Sede valida
+    // el envío como un todo (O18).
+    const descargar = boton('descargar', `${TEXTO.DESCARGAR} ▾`)
+    const idPanel = `gml-parcelas-descarga-${L.Util.stamp(this)}`
+    descargar.setAttribute('aria-expanded', 'false')
+    descargar.setAttribute('aria-controls', idPanel)
+    acciones.append(añadir, descargar, quitar)
+    const panelDescarga = doc.createElement('div')
+    panelDescarga.id = idPanel
+    panelDescarga.dataset.parcelasExpediente = 'panel-descarga'
+    panelDescarga.hidden = true
+    estilar(panelDescarga, { display: 'none', flexDirection: 'column', gap: '4px', marginTop: '4px' })
+    const filasDescarga = doc.createElement('div')
+    estilar(filasDescarga, { display: 'flex', flexDirection: 'column', gap: '2px' })
+    const descargarSeleccion = boton('descargar-seleccion', textoDescargarSeleccion(0))
+    panelDescarga.append(filasDescarga, descargarSeleccion)
+    // El desenlace, dicho donde se ha pedido: un fichero que no baja tiene que decir
+    // por qué al lado del botón, no solo en el panel de avisos.
+    const estadoDescarga = doc.createElement('p')
+    estadoDescarga.dataset.parcelasExpediente = 'estado'
+    estadoDescarga.setAttribute('role', 'status')
+    estilar(estadoDescarga, { margin: '4px 0 0', maxWidth: '300px', color: COLOR.SECUNDARIO })
     const menu = doc.createElement('div')
     menu.id = idMenu
     menu.dataset.parcelasExpediente = 'menu'
     menu.hidden = true
     estilar(menu, { flexDirection: 'column', gap: '2px', marginTop: '4px' })
 
-    contenedor.append(etiqueta, acciones, menu)
+    contenedor.append(etiqueta, acciones, menu, panelDescarga, estadoDescarga)
     L.DomEvent.disableClickPropagation(contenedor)
     L.DomEvent.disableScrollPropagation(contenedor)
     Object.assign(this, {
@@ -212,6 +247,11 @@ const ControlSelector = L.Control.extend({
       _quitar: quitar,
       _menu: menu,
       _boton: boton,
+      _descargar: descargar,
+      _panelDescarga: panelDescarga,
+      _filasDescarga: filasDescarga,
+      _descargarSeleccion: descargarSeleccion,
+      _estadoDescarga: estadoDescarga,
     })
     return contenedor
   },
@@ -297,6 +337,13 @@ export function crearParcelasExpediente({
   const oyentesAñadir = new Set()
   /** @type {Set<(idLocal: string) => void>} */
   const oyentesQuitar = new Set()
+  /** @type {Set<(idLocal: string) => void>} */
+  const oyentesDescargarUna = new Set()
+  /** @type {Set<(idLocales: string[]) => void>} */
+  const oyentesDescargarSeleccion = new Set()
+  /** Las que están DESMARCADAS para la descarga. Se guardan las de fuera y no las de
+   *  dentro para que una parcela que entra al expediente nazca marcada. */
+  const desmarcadas = new Set()
   /** Con qué se cancela el armado de «Quitar», o `null` si no está armado. */
   let desarmar = null
 
@@ -327,10 +374,26 @@ export function crearParcelasExpediente({
    * mapa ya no encuentra la marca: toma la pulsación por suya y el dibujo recién
    * empezado la convierte en su primer vértice.
    */
+  /**
+   * ⛔ Lo que se acaba de abrir va DELANTE (medido en Chromium al cerrar la fase 4).
+   * Leaflet apila sus cuatro esquinas con el mismo `z-index` (1000), así que gana la
+   * que va después en el DOM: la de abajo. Con la ventana del sobrante abierta, que
+   * crece desde abajo, el panel de descarga quedaba DEBAJO de ella con el botón y el
+   * renglón tapados. Mientras el menú o el panel estén abiertos, la esquina de este
+   * control sube un peldaño; al cerrarlos, vuelve a su sitio.
+   */
+  function alFrente() {
+    const esquina = control._contenedor.parentElement
+    if (!esquina) return
+    const abierto = !control._menu.hidden || !control._panelDescarga.hidden
+    esquina.style.zIndex = abierto ? '1001' : ''
+  }
+
   function cerrarMenu() {
     control._menu.hidden = true
     control._menu.style.display = 'none'
     control._añadir.setAttribute('aria-expanded', 'false')
+    alFrente()
   }
 
   function abrirMenu() {
@@ -356,6 +419,7 @@ export function crearParcelasExpediente({
     control._menu.hidden = false
     control._menu.style.display = 'flex'
     control._añadir.setAttribute('aria-expanded', 'true')
+    alFrente()
   }
 
   const alPulsarAñadir = () => (control._menu.hidden ? abrirMenu() : cerrarMenu())
@@ -382,6 +446,73 @@ export function crearParcelasExpediente({
   }
   control._quitar.addEventListener('click', alPulsarQuitar)
 
+  // ── La descarga ──
+  const marcadas = () => ultimo.parcelas.map((p) => p.idLocal).filter((id) => !desmarcadas.has(id))
+
+  function refrescarPie() {
+    const n = marcadas().length
+    control._descargarSeleccion.textContent = textoDescargarSeleccion(n)
+    control._descargarSeleccion.disabled = n === 0
+    control._descargarSeleccion.title = n === 0 ? TEXTO.SELECCION_VACIA : ''
+  }
+
+  /** Las filas de la descarga, una por parcela, en el orden del expediente. */
+  function pintarFilasDescarga() {
+    const doc = control._doc
+    control._filasDescarga.replaceChildren()
+    ultimo.parcelas.forEach((p, i) => {
+      const fila = doc.createElement('div')
+      estilar(fila, { display: 'flex', alignItems: 'center', gap: '6px' })
+      const etiqueta = doc.createElement('label')
+      estilar(etiqueta, { display: 'flex', alignItems: 'center', gap: '4px', flex: '1', margin: '0' })
+      const casilla = doc.createElement('input')
+      casilla.type = 'checkbox'
+      casilla.dataset.parcelasExpediente = 'incluir'
+      casilla.dataset.idLocal = p.idLocal
+      casilla.checked = !desmarcadas.has(p.idLocal)
+      casilla.addEventListener('change', () => {
+        if (casilla.checked) desmarcadas.delete(p.idLocal)
+        else desmarcadas.add(p.idLocal)
+        refrescarPie()
+      })
+      const nombre = doc.createElement('span')
+      nombre.textContent = rotularParcela(p, i + 1)
+      etiqueta.append(casilla, nombre)
+      const gml = control._boton('gml-fila', 'GML')
+      gml.dataset.idLocal = p.idLocal
+      gml.setAttribute('aria-label', `Descargar el GML de la parcela ${rotularParcela(p, i + 1)}`)
+      gml.addEventListener('click', () => repartir(oyentesDescargarUna, p.idLocal, 'alDescargarUna'))
+      fila.append(etiqueta, gml)
+      control._filasDescarga.append(fila)
+    })
+    refrescarPie()
+  }
+
+  function cerrarDescarga() {
+    control._panelDescarga.hidden = true
+    control._panelDescarga.style.display = 'none'
+    control._descargar.setAttribute('aria-expanded', 'false')
+    alFrente()
+  }
+
+  const alPulsarDescargar = () => {
+    if (!control._panelDescarga.hidden) return cerrarDescarga()
+    cerrarMenu()
+    pintarFilasDescarga()
+    control._panelDescarga.hidden = false
+    control._panelDescarga.style.display = 'flex'
+    control._descargar.setAttribute('aria-expanded', 'true')
+    alFrente()
+  }
+  control._descargar.addEventListener('click', alPulsarDescargar)
+
+  const alPulsarSeleccion = () => {
+    const ids = marcadas()
+    if (ids.length === 0) return
+    repartir(oyentesDescargarSeleccion, ids, 'alDescargarSeleccion')
+  }
+  control._descargarSeleccion.addEventListener('click', alPulsarSeleccion)
+
   /**
    * ⭐ F25 · fase 3: el control aparece en cuanto hay una parcela en edición, porque
    * «Añadir parcela» es la puerta de entrada al expediente de varias. La lista y
@@ -394,6 +525,8 @@ export function crearParcelasExpediente({
     control._fila.hidden = cuantas < 2
     control._fila.style.display = cuantas < 2 ? 'none' : 'flex'
     control._quitar.hidden = cuantas < 2
+    control._descargar.hidden = cuantas < 2
+    if (cuantas < 2 || control._contenedor.hidden) cerrarDescarga()
     if (control._contenedor.hidden) cerrarMenu()
   }
 
@@ -438,6 +571,8 @@ export function crearParcelasExpediente({
     }
     ultimo = { parcelas, activa }
     cuantas = parcelas.length
+    // Con el panel de descarga abierto, sus filas son las del expediente de AHORA.
+    if (!control._panelDescarga.hidden) pintarFilasDescarga()
 
     // ── La lista ──
     const lista = control._lista
@@ -527,6 +662,44 @@ export function crearParcelasExpediente({
      * @param {(idLocal: string) => void} fn
      * @returns {() => void}
      */
+    /**
+     * F25 · fase 4 · el «GML» de una fila: el fichero de ESA parcela.
+     * @param {(idLocal: string) => void} fn
+     * @returns {() => void}
+     */
+    alDescargarUna(fn) {
+      if (typeof fn !== 'function') {
+        throw new TypeError(`alDescargarUna: 'fn' debe ser una función; recibido ${typeof fn}.`)
+      }
+      oyentesDescargarUna.add(fn)
+      return () => oyentesDescargarUna.delete(fn)
+    },
+
+    /**
+     * F25 · fase 4 · «Descargar las N marcadas»: los `idLocal` en el orden del
+     * expediente. Nunca vacío: con ninguna marcada el botón está apagado.
+     * @param {(idLocales: string[]) => void} fn
+     * @returns {() => void}
+     */
+    alDescargarSeleccion(fn) {
+      if (typeof fn !== 'function') {
+        throw new TypeError(`alDescargarSeleccion: 'fn' debe ser una función; recibido ${typeof fn}.`)
+      }
+      oyentesDescargarSeleccion.add(fn)
+      return () => oyentesDescargarSeleccion.delete(fn)
+    },
+
+    /**
+     * El desenlace de una descarga, en el renglón del control.
+     * @param {string} texto
+     * @param {{error?: boolean}} [opciones]
+     */
+    estado(texto, { error = false } = {}) {
+      if (!vivo) return
+      control._estadoDescarga.textContent = texto
+      control._estadoDescarga.style.color = error ? '#B91C1C' : COLOR.SECUNDARIO
+    },
+
     alQuitar(fn) {
       if (typeof fn !== 'function') {
         throw new TypeError(`alQuitar: 'fn' debe ser una función; recibido ${typeof fn}.`)
@@ -552,7 +725,14 @@ export function crearParcelasExpediente({
       soltarArmado()
       control._lista.removeEventListener('change', alCambiarLista)
       control._añadir.removeEventListener('click', alPulsarAñadir)
+      // La esquina vuelve a su sitio: destruirse con un panel abierto no puede dejar
+      // los otros controles de esa esquina por encima de todo para siempre.
+      if (control._contenedor.parentElement) control._contenedor.parentElement.style.zIndex = ''
       control._quitar.removeEventListener('click', alPulsarQuitar)
+      control._descargar.removeEventListener('click', alPulsarDescargar)
+      control._descargarSeleccion.removeEventListener('click', alPulsarSeleccion)
+      oyentesDescargarUna.clear()
+      oyentesDescargarSeleccion.clear()
       oyentes.clear()
       oyentesAñadir.clear()
       oyentesQuitar.clear()

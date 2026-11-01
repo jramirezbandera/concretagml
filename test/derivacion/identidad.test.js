@@ -28,6 +28,7 @@ import {
   NAMESPACE_LOCAL,
   SEPARADOR_SEGREGADA,
   identidadDeCesion,
+  identidadDeMiembro,
   identidadDeParcela,
 } from '../../derivacion/identidad.js'
 import { serializarExpedienteCp } from '../../gml/serialize-cp.js'
@@ -189,5 +190,49 @@ describe('identidad · encaja en `serializarExpedienteCp` esparciéndola', () =>
     const ids = [...xml.matchAll(/gml:id="([^"]+)"/g)].map((m) => m[1])
     expect(ids.length).toBe(new Set(ids).size)
     expect(ids.length).toBe(2 * 3 + 1)
+  })
+})
+
+describe('identidadDeMiembro · F25 · una parcela del expediente, una sola identidad', () => {
+  const PRINCIPAL = { refcat: '7136910UF1473N' }
+
+  it('con referencia catastral, la finca existe: ES.SDGC.CP', () => {
+    expect(identidadDeMiembro({ refcat: '9398501VK3799G', idLocal: 'x' }, { principal: PRINCIPAL })).toEqual(
+      identidadDeParcela({ refcat: '9398501VK3799G' }),
+    )
+  })
+
+  it('⭐ una pieza del sobrante de la principal sale con la forma de O19 (referencia sufijada, no vacía)', () => {
+    const id = identidadDeMiembro(
+      { refcat: null, idLocal: '7136910UF1473N.2', origen: 'DERIVACION' },
+      { principal: PRINCIPAL },
+    )
+    expect(id).toEqual(identidadDeCesion({ refcatPadre: '7136910UF1473N', orden: 2 }))
+    expect(id.nationalCadastralReference).toBe('7136910UF1473N.2')
+    expect(id.namespaceInspire).toBe(NAMESPACE_LOCAL)
+  })
+
+  it('se decide por la PRINCIPAL, no por el aspecto del idLocal', () => {
+    // Un idLocal con pinta de referencia sufijada pero de OTRA finca es un alta.
+    const ajena = identidadDeMiembro(
+      { refcat: null, idLocal: '9398516VK3799G.1', origen: 'DERIVACION' },
+      { principal: PRINCIPAL },
+    )
+    expect(ajena.nationalCadastralReference).toBe('')
+    // Y sin principal con referencia, también.
+    const sinPadre = identidadDeMiembro({ refcat: null, idLocal: '7136910UF1473N.1', origen: 'DERIVACION' })
+    expect(sinPadre.nationalCadastralReference).toBe('')
+    // Y una dibujada, aunque se llame igual, es un alta.
+    const dibujada = identidadDeMiembro(
+      { refcat: null, idLocal: '7136910UF1473N.1', origen: 'DIBUJO' },
+      { principal: PRINCIPAL },
+    )
+    expect(dibujada).toEqual(identidadDeParcela({ idLocal: '7136910UF1473N.1' }))
+  })
+
+  it('un ordinal que no es un entero ≥ 1 no se toma por pieza', () => {
+    for (const idLocal of ['7136910UF1473N.0', '7136910UF1473N.x', '7136910UF1473N.']) {
+      expect(identidadDeMiembro({ idLocal, origen: 'DERIVACION' }, { principal: PRINCIPAL }).nationalCadastralReference).toBe('')
+    }
   })
 })

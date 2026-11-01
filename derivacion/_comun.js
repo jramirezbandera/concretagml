@@ -116,6 +116,21 @@ export const TIPO_DERIVACION = Object.freeze({
    * exactamente lo que no se le puede mandar a la Sede.
    */
   VECINO_SOLO_REDONDEO: 'VECINO_SOLO_REDONDEO',
+  // ── Los de las PARCELAS DEL EXPEDIENTE (F25), que F17 y F23 no podían prever ──
+  // Nacen cuando el expediente deja de ser «una parcela y lo que el programa deriva
+  // de ella» y pasa a ser un conjunto que el técnico arma a mano. Son preguntas que
+  // antes no existían: dos parcelas DEL USUARIO que se pisan, dos que se llamarían
+  // igual en el fichero, y un colindante que ya no es del Catastro sino del expediente.
+  /** Dos parcelas del envío se solapan: dos fincas no pueden ocupar el mismo suelo. */
+  PARCELAS_SE_PISAN: 'PARCELAS_SE_PISAN',
+  /** Dos parcelas del envío saldrían con el mismo `localId`: el fichero no se escribe. */
+  IDENTIDAD_REPETIDA: 'IDENTIDAD_REPETIDA',
+  /**
+   * El exceso cae sobre una colindante que YA ES parcela del expediente (D3): no se
+   * recorta sola —manda lo que se ha editado a mano— y su parte se le atribuye a ella,
+   * no a un vial. El expediente completo sale desde las parcelas del expediente.
+   */
+  VECINO_EN_EXPEDIENTE: 'VECINO_EN_EXPEDIENTE',
 })
 
 /**

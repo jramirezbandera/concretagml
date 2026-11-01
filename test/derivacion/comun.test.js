@@ -60,6 +60,8 @@ describe('derivacion/_comun · el léxico de la capa', () => {
       'CRECE_FUERA',
       'ENTREGA_LISTA',
       'FUERA_SOBRE_NADIE',
+      'IDENTIDAD_REPETIDA',
+      'PARCELAS_SE_PISAN',
       'PIEZA_ESTRECHA',
       'PIEZA_EXCLUIDA',
       'PIEZA_INVALIDA',
@@ -70,6 +72,7 @@ describe('derivacion/_comun · el léxico de la capa', () => {
       'SIN_GEOMETRIA_OFICIAL',
       'SIN_SOBRANTE',
       'VECINAS_SIN_CONSULTAR',
+      'VECINO_EN_EXPEDIENTE',
       'VECINO_PARTIDO',
       'VECINO_SOLO_REDONDEO',
     ])
@@ -127,8 +130,10 @@ describe('derivacion/index · el barrel expone el vocabulario y NADA de geometr�
       'crearDeteccionDerivacion',
       'derivarCesion',
       'identidadDeCesion',
+      'identidadDeMiembro',
       'identidadDeParcela',
       'prepararEntrega',
+      'prepararEntregaExpediente',
       'resumirDetecciones',
       'tipoDeOperacion',
     ])

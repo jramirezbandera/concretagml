@@ -23,11 +23,12 @@ restaurar), `export/proyecto.js` (versión 2), `storage/expedientes.js` (`NO_SE_
 `viewer/index.js`, `app/rama.js` (el selector de la cabecera), `app/main.js`.
 **Se actualiza al cerrar cada fase.**
 
-**Estado:** ⏳ **ABIERTA el 2026-11-01.** Fases 0 (la auditoría), 1 (el modelo) y 2 (cambiar
-de parcela) **hechas**. Un expediente de varias se abre entero, se cambia de parcela con el
-selector «Parcela en edición» y se guarda con todas. Lo que todavía **no** se puede es
-CREAR la segunda parcela dentro de la aplicación (fase 3) ni exportar una selección
-(fase 4).
+**Estado:** ⏳ **ABIERTA el 2026-11-01.** Fases 0 a 4 **hechas**: el expediente lleva N
+parcelas, se cambia entre ellas, se añaden (dibujadas, colindantes, piezas del sobrante,
+vecinos recortados, las demás de un GML) y se quitan, y se descarga el GML de una o un
+`.gml` con las marcadas, con validación, solapes, cierre y tipo de operación propuesto.
+Queda la fase 5: el guion de humo, el checklist humano y la verdad externa (IVG positivo
+con tres o más parcelas editadas a mano).
 
 > ⏳ **Esta ficha se abre ANTES del código**, y es a propósito: F23 y F24 llegaron tarde
 > a `spec/` y las dos lo anotaron como hallazgo. Lo que aquí se dice del futuro está en
@@ -517,12 +518,54 @@ y con el fichero de tres parcelas de las pruebas, consola limpia):
   POR parcela para no volver a pedirlas al cambiar. Es comodidad (ahorra una petición),
   no corrección, y no bloquea nada.
 
-**Fase 4 · las salidas.**
-- 4.1 Descargar una fila.
-- 4.2 La selección → un `.gml`, con validación, cierre y tipo de operación.
-- 4.3 D3 en `derivacion/vecino.js`: los miembros quedan fuera del recorte automático —y,
-  desde la 3b, **junto con ella**, añadir al expediente los colindantes que recorta F23—.
-- 4.4 Los textos de H8 y de la foto de la derivación (suscriptor 6).
+**Fase 4 · las salidas — hecha el 2026-11-01** (suite **8.749 pruebas / 209 ficheros, 0
+rojas**; ni una dependencia, ni un byte de CSS; recorrida en Chromium a 1280×720 con la
+parcela real y una petición real al Catastro, leyendo los ficheros que se bajan —se
+intercepta `URL.createObjectURL`—, consola limpia):
+
+- **Una sola identidad por parcela**: `derivacion/identidad.js#identidadDeMiembro`. Una pieza
+  del sobrante cuya `idLocal` es `«referencia de la principal».N` sale con la forma de O19
+  (`localId` = `nationalCadastralReference` = `…G.1`, `ES.LOCAL.CP`) **también desde «Generar
+  GML»**, que hasta aquí la habría escrito con la referencia VACÍA —la forma que nunca se ha
+  presentado—. Se decide por la PRINCIPAL y no por el aspecto del `idLocal`. Para todo lo
+  demás «Generar GML» no mueve un byte (la rama nueva solo actúa con `DERIVACION`).
+- **`derivacion/entrega-expediente.js`** (nuevo, puro, en el barrel): el fichero de las
+  parcelas elegidas. Bloquea SIEMPRE una que no valida, dos con el mismo `localId`
+  (`IDENTIDAD_REPETIDA`, nuevo) y dos que se pisan (`PARCELAS_SE_PISAN`, nuevo; también sin
+  ninguna oficial). Exige el CIERRE solo cuando la forma es de Segregación (hay altas), que
+  es lo que F17 exige y por lo mismo; una Subsanación de varias oficiales no lo exige, porque
+  que la medición no coincida con el contorno es el caso normal de esta herramienta.
+- **4.1 y 4.2 · «Descargar ▾»** en el control del mapa (con dos o más): una lista con todas
+  marcadas —una parcela que entra nace marcada—, un «GML» por fila y «Descargar las N
+  marcadas en un .gml». El renglón del control dice el desenlace y, con varias, **el tipo de
+  operación que propone la forma** (o que no propone ninguno), porque es el único dato del
+  expediente que no viaja en ningún fichero (O20). **Medido**: matriz + pieza → 2 miembros,
+  `ES.SDGC.CP` y `ES.LOCAL.CP`, referencias `…G` y `…G.1`, «Segregación»; la pieza sola →
+  1 miembro con la misma identidad.
+  - ⛔ **Visto en el navegador y corregido**: la ventana del sobrante, que crece desde la
+    esquina de abajo, TAPABA el panel de descarga —Leaflet apila sus esquinas con el mismo
+    `z-index` y gana la de abajo por orden del DOM—. Mientras el menú o el panel están
+    abiertos, la esquina del control sube un peldaño; al cerrarlos (o al destruir) vuelve.
+- **4.3 · D3, y con él los colindantes de F23 como parcelas.** `recortarVecinos` recibe
+  `gestionadas`: una colindante que ya es parcela del expediente NO se recorta (manda lo
+  editado) pero SIGUE contando para la atribución, así que su parte del exceso no pasa a ser
+  «sobre vial» (medido en prueba: `sobreNadie` 0). Sale en `enExpediente`, con su superficie
+  (`VECINO_EN_EXPEDIENTE`, nuevo). Y entonces:
+  - «Descargar expediente» de F17 se APAGA con el motivo ya en el botón —el fichero de ahí
+    saldría sin esa finca— y remite a «Parcela en edición» › «Descargar». «Añadir al
+    expediente» sigue encendido (`lista.entrega` acepta `añadir` aparte).
+  - **«Añadir al expediente» mete también los vecinos recortados** (el trozo que conserva la
+    referencia, con su oficial de antes); un vecino PARTIDO no se añade y se dice. Después
+    se rehace el recorte, que ya los encuentra gestionados.
+  - **Medido con datos reales**: sacar 3 m un vértice de 9398516VK3799G entró en TRES
+    colindantes (15,07 + 4,13 + 1,94 m²); «Añadir al expediente» las metió las tres, el
+    sobrante pasó a decir que el expediente completo ya no sale de ahí, y «Descargar las 4
+    marcadas» bajó el fichero con las cuatro. Su forma (4 oficiales) no es ninguna de las
+    dos medidas, y la app **no propone** tipo de operación y lo dice.
+- **4.4 · los textos**: el aviso del Catastro que descarta una respuesta (H8) y el de la foto
+  del sobrante nombran ya el cambio de parcela.
+- ⚠️ **No medido, y la fase 5 lo necesita**: que la Sede acepte un `.gml` de 3 o más
+  miembros, y de varias oficiales colindantes modificadas a la vez (lo de arriba).
 
 **Fase 5 · los gates.** Guion `29-parcelas-del-expediente.js` a 1280×720 y 1440×900,
 `CHECKLIST-HUMANO.md` con su punto bloqueante (que un técnico sepa **qué parcela está
